@@ -1,11 +1,10 @@
 import math
-
 import pygame
 
 
 class Settings:
     def __init__(self):
-        self.scale = 20
+        self.scale = 5
         self.asset_size = (self.scale * 12, self.scale * 14)
         self.display_size = (5 * self.asset_size[0], 5 * self.asset_size[1])
 
@@ -31,6 +30,7 @@ class HexTile:
 
 
 pygame.init()
+game_settings = Settings()
 
 white = (255, 255, 255)
 black = (0, 0, 0)
@@ -40,13 +40,13 @@ silver = (192, 192, 192)
 side_color = silver
 surface_color = white
 
-display_size = [20 * 5 * 12, 20 * 5 * 14]
+display_size = game_settings.display_size
 
 radius = 7
 # height = 2 * radius
 # width = math.sqrt(3) * radius
-width = 20 * 12
-height = 20 * 14
+width = game_settings.asset_size[0]
+height = game_settings.asset_size[1]
 sides_width = 1
 # x = 0 + width // 2
 # y = 0 + radius
@@ -62,15 +62,14 @@ def triangle_area(v1, v2, v3):
 
 def create_map():
     def create_hex_tile(position_row, position_col):
-        horizontal_shift = width / 2 * (position_row % 2)
-        left = int(position_col * width + horizontal_shift)
-        top = int(position_row * height * 3 / 4)
+        horizontal_shift = width / 2 * int(position_row % 2)
+        left = position_col * width + horizontal_shift
+        top = position_row * int(height * 3 / 4)
         return HexTile((left, top))
 
     def generate_columns(row):
         return [create_hex_tile(row, col)
-                for col in range(num_columns)
-                if row == col or row == 0 or col == 0]
+                for col in range(num_columns)]
 
     return [generate_columns(row)
             for row in range(num_rows)]
@@ -93,7 +92,6 @@ def hit_test(mouse_position, tile):
     return any(values)
 
 
-game_settings = Settings()
 game_map = create_map()
 assets_grass_path = './hexagon-pack/PNG/Tiles/Terrain/Grass/'
 Grass_tile_mid = pygame.image.load(assets_grass_path + 'grass_15.png')
