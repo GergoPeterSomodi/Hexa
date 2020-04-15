@@ -91,13 +91,56 @@ def hit_test(mouse_position, tile):
 
 game_map = create_map()
 assets_grass_path = './hexagon-pack/PNG/Tiles/Terrain/Grass/'
-Grass_tile_mid = pygame.image.load(assets_grass_path + 'grass_selection.png')
-Grass_tile = pygame.image.load(assets_grass_path + 'grass_05.png')
-Grass_tile_mid = pygame.transform.scale(Grass_tile_mid, game_settings.asset_size)
-Grass_tile = pygame.transform.scale(Grass_tile, game_settings.asset_size)
+#Grass_tile_mid = pygame.image.load(assets_grass_path + 'grass_selection.png')
+#Grass_tile = pygame.image.load(assets_grass_path + 'grass_05.png')
+#Grass_tile_mid = pygame.transform.scale(Grass_tile_mid, game_settings.asset_size)
+#Grass_tile = pygame.transform.scale(Grass_tile, game_settings.asset_size)
+
+green_land = [
+                pygame.image.load(assets_grass_path + 'grass_05.png'),
+
+    ]
+
+green_selected_land = [
+                pygame.image.load(assets_grass_path + 'grass_selection.png'),
+                pygame.image.load(assets_grass_path + 'grass_06.png'),
+                pygame.image.load(assets_grass_path + 'grass_07.png'),
+                pygame.image.load(assets_grass_path + 'grass_08.png'),
+                pygame.image.load(assets_grass_path + 'grass_09.png')
+    ]
+
+green_forest_land = [
+                pygame.image.load(assets_grass_path + 'grass_10.png'),
+                pygame.image.load(assets_grass_path + 'grass_11.png'),
+                pygame.image.load(assets_grass_path + 'grass_12.png'),
+                pygame.image.load(assets_grass_path + 'grass_13.png')
+    ]
+
+
+grass_tile = []
+for i in range(1):
+    grass_tile_render = pygame.transform.scale(green_land[i], game_settings.asset_size)
+    grass_tile.append(grass_tile_render)
+
+grass_tile_outside = []
+for i in range(4):
+    grass_tile_outside_render = pygame.transform.scale(green_selected_land[i], game_settings.asset_size)
+    grass_tile_outside.append(grass_tile_outside_render)
+
+grass_tile_forest = []
+for i in range(4):
+    grass_tile_forest_render = pygame.transform.scale(green_forest_land[i], game_settings.asset_size)
+    grass_tile_forest.append(grass_tile_forest_render)
+
 
 running = True
 while running:
+
+    gameBackground.fill(silver)
+    for z in game_map:
+        for index, i in enumerate(z):
+            gameBackground.blit(grass_tile[0], i.left_top)
+            # pygame.draw.polygon(gameBackground, white, i.corners)
 
     for event in pygame.event.get():
         cursor_x, cursor_y = pygame.mouse.get_pos()
@@ -107,24 +150,16 @@ while running:
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
             for z in game_map:
-                for i in z:
-                    i.color = white
+                for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
-                        i.color = green
+                        gameBackground.blit(grass_tile_outside[0], i.left_top)
 
         if event.type == pygame.MOUSEMOTION:
             mouse_pos = pygame.mouse.get_pos()
             for z in game_map:
-                for i in z:
-                    i.side_color = silver
+                for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
-                        i.side_color = red
-
-    gameBackground.fill(silver)
-    for z in game_map:
-        for index, i in enumerate(z):
-            gameBackground.blit(Grass_tile, i.left_top)
-            # pygame.draw.polygon(gameBackground, white, i.corners)
+                        gameBackground.blit(grass_tile_outside[0], i.left_top)
 
     pygame.display.flip()
 
