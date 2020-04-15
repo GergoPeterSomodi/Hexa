@@ -93,6 +93,10 @@ for i in range(4):
     grass_tile_forest.append(grass_tile_forest_render)
 
 
+def get_rectangle(x_pos, y_pos):
+    pygame.draw.rect(gameBackground, white, [x_pos, y_pos, 200, 300])
+
+
 def triangle_area(v1, v2, v3):
     return 1 / 2 * abs((v1[0] - v3[0]) * (v2[1] - v1[1]) - (v1[0] - v2[0]) * (v3[1] - v1[1]))
 
@@ -137,25 +141,17 @@ game_map = create_map()
 running = True
 while running:
 
-    gameBackground.fill(silver)
-    for z in game_map:
-        for index, i in enumerate(z):
-            gameBackground.blit(i.image, i.left_top)
-            # pygame.draw.polygon(gameBackground, white, i.corners)
 
     for event in pygame.event.get():
         cursor_x, cursor_y = pygame.mouse.get_pos()
         if event.type == pygame.QUIT:
             running = False
 
-        if event.type == pygame.MOUSEBUTTONUP:
-            mouse_pos = pygame.mouse.get_pos()
-            for z in game_map:
-                for index, i in enumerate(z):
-                    #i.image = grass_tile[0]
-                    if hit_test(mouse_pos, i):
-                        i.image = random.choice(grass_tile_forest)
-                        gameBackground.blit(i.image, i.left_top)
+        gameBackground.fill(silver)
+        for z in game_map:
+            for index, i in enumerate(z):
+                gameBackground.blit(i.image, i.left_top)
+                # pygame.draw.polygon(gameBackground, white, i.corners)
 
         if event.type == pygame.MOUSEMOTION:
             mouse_pos = pygame.mouse.get_pos()
@@ -163,6 +159,18 @@ while running:
                 for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
                         gameBackground.blit(grass_tile_outside[0], i.left_top)
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            mouse_pos = pygame.mouse.get_pos()
+            for z in game_map:
+                for index, i in enumerate(z):
+                    #i.image = grass_tile[0]
+                    if hit_test(mouse_pos, i):
+                        get_rectangle(mouse_pos[0], mouse_pos[1])
+                        #i.image = random.choice(grass_tile_forest)
+                        #gameBackground.blit(i.image, i.left_top)
+
+
 
     pygame.display.flip()
 
