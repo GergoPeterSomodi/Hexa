@@ -1,5 +1,6 @@
-import math
+aimport math
 import pygame
+import random
 
 
 class Settings:
@@ -10,12 +11,13 @@ class Settings:
 
 
 class HexTile:
-    def __init__(self, left_top):
+    def __init__(self, left_top, image):
         self.left_top = left_top
         self.center = (left_top[0] + width / 2, left_top[1] + height / 2)
         self.corners = HexTile.pointy_hex_corner(self.center)
         self.color = white
         self.side_color = black
+        self.image = image
 
     @staticmethod
     def pointy_hex_corner(center):
@@ -52,49 +54,7 @@ num_rows = int(display_size[1] / height / (3 / 4))
 
 gameBackground = pygame.display.set_mode(display_size)
 
-
-def triangle_area(v1, v2, v3):
-    return 1 / 2 * abs((v1[0] - v3[0]) * (v2[1] - v1[1]) - (v1[0] - v2[0]) * (v3[1] - v1[1]))
-
-
-def create_map():
-    def create_hex_tile(position_row, position_col):
-        horizontal_shift = (width + gap) / 2 * int(position_row % 2)
-        left = position_col * width + horizontal_shift + position_col * gap
-        top = position_row * int(height * 3 / 4) + position_row * gap
-        return HexTile((left, top))
-
-    def generate_columns(row):
-        return [create_hex_tile(row, col)
-                for col in range(num_columns)]
-
-    return [generate_columns(row)
-            for row in range(num_rows)]
-
-
-def hit_test(mouse_position, tile):
-    corners = tile.corners
-    center = tile.center
-    values = []
-    for corner_num in range(6):
-        pos = (corner_num + 1) % 6
-        area_total = triangle_area(center, corners[corner_num], corners[pos])
-        area1 = triangle_area(mouse_position, corners[corner_num], corners[pos])
-        area2 = triangle_area(mouse_position, center, corners[pos])
-        area3 = triangle_area(mouse_position, corners[corner_num], center)
-
-        is_inside = area_total >= area1 + area2 + area3 - 1
-        values.append(is_inside)
-
-    return any(values)
-
-
-game_map = create_map()
 assets_grass_path = './hexagon-pack/PNG/Tiles/Terrain/Grass/'
-#Grass_tile_mid = pygame.image.load(assets_grass_path + 'grass_selection.png')
-#Grass_tile = pygame.image.load(assets_grass_path + 'grass_05.png')
-#Grass_tile_mid = pygame.transform.scale(Grass_tile_mid, game_settings.asset_size)
-#Grass_tile = pygame.transform.scale(Grass_tile, game_settings.asset_size)
 
 green_land = [
                 pygame.image.load(assets_grass_path + 'grass_05.png'),
@@ -133,13 +93,54 @@ for i in range(4):
     grass_tile_forest.append(grass_tile_forest_render)
 
 
+def triangle_area(v1, v2, v3):
+    return 1 / 2 * abs((v1[0] - v3[0]) * (v2[1] - v1[1]) - (v1[0] - v2[0]) * (v3[1] - v1[1]))
+
+
+def create_map():
+    def create_hex_tile(position_row, position_col, image):
+        horizontal_shift = (width + gap) / 2 * int(position_row % 2)
+        left = position_col * width + horizontal_shift + position_col * gap
+        top = position_row * int(height * 3 / 4) + position_row * gap
+        image = grass_tile[0]
+        return HexTile((left, top), image)
+
+    def generate_columns(row):
+        return [create_hex_tile(row, col, grass_tile[0])
+                for col in range(num_columns)]
+
+    return [generate_columns(row)
+            for row in range(num_rows)]
+
+
+def hit_test(mouse_position, tile):
+    corners = tile.corners
+    center = tile.center
+    values = []
+    for corner_num in range(6):
+        pos = (corner_num + 1) % 6
+        area_total = triangle_area(center, corners[corner_num], corners[pos])
+        area1 = triangle_area(mouse_position, corners[corner_num], corners[pos])
+        area2 = triangle_area(mouse_position, center, corners[pos])
+        area3 = triangle_area(mouse_position, corners[corner_num], center)
+
+        is_inside = area_total >= area1 + area2 + area3 - 1
+        values.append(is_inside)
+
+    return any(values)
+
+
+game_map = create_map()
+
+
+
 running = True
 while running:
 
     gameBackground.fill(silver)
     for z in game_map:
         for index, i in enumerate(z):
-            gameBackground.blit(grass_tile[0], i.left_top)
+            gameBackground.blit(i.image, i.left_top)
             # pygame.draw.polygon(gameBackground, white, i.corners)
 
     for event in pygame.event.get():
@@ -151,8 +152,10 @@ while running:
             mouse_pos = pygame.mouse.get_pos()
             for z in game_map:
                 for index, i in enumerate(z):
+                    #i.image = grass_tile[0]
                     if hit_test(mouse_pos, i):
-                        gameBackground.blit(grass_tile_outside[0], i.left_top)
+                        i.image = random.choice(grass_tile_forest)
+                        gameBackground.blit(i.image, i.left_top)
 
         if event.type == pygame.MOUSEMOTION:
             mouse_pos = pygame.mouse.get_pos()
@@ -164,3 +167,4 @@ while running:
     pygame.display.flip()
 
 pygame.quit()
+
