@@ -12,7 +12,7 @@ class Settings:
 class HexTile:
     def __init__(self, left_top):
         self.left_top = left_top
-        self.center = (left_top[0] + height // 2, left_top[1] + width // 2)
+        self.center = (left_top[0] + width / 2, left_top[1] + height / 2)
         self.corners = HexTile.pointy_hex_corner(self.center)
         self.color = white
         self.side_color = black
@@ -25,7 +25,7 @@ class HexTile:
             angle_rad = math.pi / 180 * angle_deg
             pos_x = center[0] + radius * math.cos(angle_rad)
             pos_y = center[1] + radius * math.sin(angle_rad)
-            points.append([int(pos_x), int(pos_y)])
+            points.append((pos_x, pos_y))
         return points
 
 
@@ -42,7 +42,7 @@ surface_color = white
 
 display_size = game_settings.display_size
 
-radius = 7
+radius = game_settings.scale * 7
 width = game_settings.asset_size[0]
 height = game_settings.asset_size[1]
 sides_width = 1
@@ -91,7 +91,7 @@ def hit_test(mouse_position, tile):
 
 game_map = create_map()
 assets_grass_path = './hexagon-pack/PNG/Tiles/Terrain/Grass/'
-Grass_tile_mid = pygame.image.load(assets_grass_path + 'grass_15.png')
+Grass_tile_mid = pygame.image.load(assets_grass_path + 'grass_selection.png')
 Grass_tile = pygame.image.load(assets_grass_path + 'grass_05.png')
 Grass_tile_mid = pygame.transform.scale(Grass_tile_mid, game_settings.asset_size)
 Grass_tile = pygame.transform.scale(Grass_tile, game_settings.asset_size)
@@ -123,10 +123,8 @@ while running:
     gameBackground.fill(silver)
     for z in game_map:
         for index, i in enumerate(z):
-            texture = Grass_tile_mid
-            if index % 2 == 0:
-                texture = Grass_tile
-            gameBackground.blit(texture, i.left_top)
+            gameBackground.blit(Grass_tile, i.left_top)
+            # pygame.draw.polygon(gameBackground, white, i.corners)
 
     pygame.display.flip()
 
