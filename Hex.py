@@ -8,6 +8,8 @@ class Settings:
         self.scale = 5
         self.asset_size = (self.scale * 12, self.scale * 14)
         self.display_size = (650, 650)
+        self.game_size = (self.display_size[0] * 2 / 3, self.display_size[1])
+        self.workstation_size = (self.display_size[0] * 1 / 3, self.display_size[1] / 2)
 
 
 class HexTile:
@@ -43,14 +45,20 @@ side_color = silver
 surface_color = white
 
 display_size = game_settings.display_size
+game_size = game_settings.game_size
+workstation_size = game_settings.workstation_size
 
 radius = game_settings.scale * 7
 width = game_settings.asset_size[0]
 height = game_settings.asset_size[1]
 sides_width = 1
 gap = 2
-num_columns = int(display_size[0] / width)
-num_rows = int(display_size[1] / height / (3 / 4))
+num_columns = int(game_size[0] / width)
+num_rows = int(game_size[1] / height / (3 / 4))
+
+workstation_size_num_columns = int((workstation_size[0] / width) * (3 / 4))
+workstation_size_num_rows = int((workstation_size[1] / height / (3 / 4)))
+
 
 gameBackground = pygame.display.set_mode(display_size)
 
@@ -93,8 +101,8 @@ for i in range(4):
     grass_tile_forest.append(grass_tile_forest_render)
 
 
-def get_rectangle(x_pos, y_pos):
-    pygame.draw.rect(gameBackground, white, [x_pos, y_pos, 200, 300])
+def get_rectangle(x_pos, y_pos, w, h):
+    pygame.draw.rect(gameBackground, black, [x_pos, y_pos, w, h], 2)
 
 
 def triangle_area(v1, v2, v3):
@@ -117,6 +125,21 @@ def create_map():
             for row in range(num_rows)]
 
 
+def create_workstation():
+    def create_hex_tile(position_row, position_col, image):
+        horizontal_shift = (width + gap) / 2 * int(position_row % 2)
+        left = position_col * width + horizontal_shift + position_col * gap + game_size[0] + width
+        top = position_row * int(height * 3 / 4) + position_row * gap
+        return HexTile((left, top), image)
+
+    def generate_columns(row):
+        return [create_hex_tile(row, col, random.choice(grass_tile_forest))
+                for col in range(workstation_size_num_columns)]
+
+    return [generate_columns(row)
+            for row in range(workstation_size_num_rows)]
+
+
 def hit_test(mouse_position, tile):
     corners = tile.corners
     center = tile.center
@@ -135,12 +158,11 @@ def hit_test(mouse_position, tile):
 
 
 game_map = create_map()
-
+workstation = create_workstation()
 
 
 running = True
 while running:
-
 
     for event in pygame.event.get():
         cursor_x, cursor_y = pygame.mouse.get_pos()
@@ -148,10 +170,17 @@ while running:
             running = False
 
         gameBackground.fill(silver)
+        imagei = grass_tile[0]
+
         for z in game_map:
             for index, i in enumerate(z):
                 gameBackground.blit(i.image, i.left_top)
-                # pygame.draw.polygon(gameBackground, white, i.corners)
+
+        #get_rectangle(workstation_size[0] + width, workstation_size[1] + height * 3 / 4, workstation_size[0] - width, workstation_size[1] - height * 3 / 4)
+
+        for z in workstation:
+            for index, i in enumerate(z):
+                gameBackground.blit(i.image, i.left_top)
 
         if event.type == pygame.MOUSEMOTION:
             mouse_pos = pygame.mouse.get_pos()
@@ -160,15 +189,29 @@ while running:
                     if hit_test(mouse_pos, i):
                         gameBackground.blit(grass_tile_outside[0], i.left_top)
 
+        if event.type == pygame.MOUSEMOTION:
+            mouse_pos = pygame.mouse.get_pos()
+            for z in workstation:
+                for index, i in enumerate(z):
+                    if hit_test(mouse_pos, i):
+                        gameBackground.blit(grass_tile_outside[0], i.left_top)
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            mouse_pos = pygame.mouse.get_pos()
+            for z in workstation:
+                for index, i in enumerate(z):
+                    # i.image = grass_tile[0]
+                    if hit_test(mouse_pos, i):
+                        imagei = i.image
+                        gameBackground.blit(i.image, i.left_top)
+
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
             for z in game_map:
                 for index, i in enumerate(z):
-                    #i.image = grass_tile[0]
                     if hit_test(mouse_pos, i):
-                        get_rectangle(mouse_pos[0], mouse_pos[1])
-                        #i.image = random.choice(grass_tile_forest)
-                        #gameBackground.blit(i.image, i.left_top)
+                        i.image = imagei
+                        gameBackground.blit(i.image, i.left_top)
 
 
 
