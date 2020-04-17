@@ -159,7 +159,7 @@ def hit_test(mouse_position, tile):
 
 game_map = create_map()
 workstation = create_workstation()
-
+imagei = grass_tile[0]
 
 running = True
 while running:
@@ -170,7 +170,6 @@ while running:
             running = False
 
         gameBackground.fill(silver)
-        imagei = grass_tile[0]
 
         for z in game_map:
             for index, i in enumerate(z):
