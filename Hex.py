@@ -56,52 +56,47 @@ gap = 2
 num_columns = int(game_size[0] / width)
 num_rows = int(game_size[1] / height / (3 / 4))
 
-workstation_size_num_columns = int((workstation_size[0] / width) * (3 / 4))
-workstation_size_num_rows = int((workstation_size[1] / height / (3 / 4)))
-
-
 gameBackground = pygame.display.set_mode(display_size)
 
 assets_grass_path = './hexagon-pack/PNG/Tiles/Terrain/Grass/'
 assets_dirt_path = './hexagon-pack/PNG/Tiles/Terrain/Dirt/'
 
 green_land = [
-                pygame.image.load(assets_grass_path + 'grass_05.png'),
+    pygame.image.load(assets_grass_path + 'grass_05.png'),
 
-    ]
+]
 
 green_selected_land = [
-                pygame.image.load(assets_grass_path + 'grass_selection.png'),
-                pygame.image.load(assets_grass_path + 'grass_06.png'),
-                pygame.image.load(assets_grass_path + 'grass_07.png'),
-                pygame.image.load(assets_grass_path + 'grass_08.png'),
-                pygame.image.load(assets_grass_path + 'grass_09.png')
-    ]
+    pygame.image.load(assets_grass_path + 'grass_selection.png'),
+    pygame.image.load(assets_grass_path + 'grass_06.png'),
+    pygame.image.load(assets_grass_path + 'grass_07.png'),
+    pygame.image.load(assets_grass_path + 'grass_08.png'),
+    pygame.image.load(assets_grass_path + 'grass_09.png')
+]
 
 green_forest_land = [
-                pygame.image.load(assets_grass_path + 'grass_10.png'),
-                pygame.image.load(assets_grass_path + 'grass_11.png'),
-                pygame.image.load(assets_grass_path + 'grass_12.png'),
-                pygame.image.load(assets_grass_path + 'grass_13.png')
-    ]
-
+    pygame.image.load(assets_grass_path + 'grass_10.png'),
+    pygame.image.load(assets_grass_path + 'grass_11.png'),
+    pygame.image.load(assets_grass_path + 'grass_12.png'),
+    pygame.image.load(assets_grass_path + 'grass_13.png')
+]
 
 dirt_land = [
-                pygame.image.load(assets_dirt_path + 'dirt_01.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_02.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_03.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_04.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_05.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_06.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_07.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_08.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_08.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_10.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_11.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_12.png'),
-                pygame.image.load(assets_dirt_path + 'dirt_13.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_01.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_02.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_03.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_04.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_05.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_06.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_07.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_08.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_08.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_10.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_11.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_12.png'),
+    pygame.image.load(assets_dirt_path + 'dirt_13.png'),
 
-    ]
+]
 
 grass_tile = []
 for i in range(1):
@@ -153,21 +148,24 @@ def create_map():
             for row in range(num_rows)]
 
 
+def create_workstation(textures):
+    columns_size = 2
+    a = [textures[x:x + columns_size]
+         for x in range(0, len(textures), columns_size)]
+    # [[0, 1], [2]]
 
-
-def create_workstation(texture):
     def create_hex_tile(position_row, position_col, image):
         horizontal_shift = (width + gap) / 2 * int(position_row % 2)
         left = position_col * width + horizontal_shift + position_col * gap + game_size[0] + width
         top = position_row * int(height * 3 / 4) + position_row * gap
         return HexTile((left, top), image)
 
-    def generate_columns(row):
-        return [create_hex_tile(row, col, random.choice(texture))
-                for col in range(workstation_size_num_columns)]
+    def generate_columns(row_index, row_texture):
+        return [create_hex_tile(row_index, col_index, texture)
+                for col_index, texture in enumerate(row_texture)]
 
-    return [generate_columns(row)
-            for row in range(workstation_size_num_rows)]
+    return [generate_columns(row_index, row_texture)
+            for row_index, row_texture in enumerate(a)]
 
 
 def hit_test(mouse_position, tile):
@@ -186,8 +184,11 @@ def hit_test(mouse_position, tile):
 
     return any(values)
 
-workstation_texture = dirt_tiles
+
 game_map = create_map()
+workstation_grass = create_workstation(grass_tile_forest)
+workstation_dirt = create_workstation(dirt_tiles)
+workstation = workstation_grass
 
 imagei = grass_tile[0]
 color1 = black
@@ -202,34 +203,29 @@ while running:
             running = False
 
         gameBackground.fill(silver)
-        workstation = create_workstation(workstation_texture)
 
         for z in game_map:
             for index, i in enumerate(z):
                 gameBackground.blit(i.image, i.left_top)
-
 
         get_rectangle(black, 500, 500, 20, 20, 0)
         get_rectangle(color1, 500, 500, 20, 20, 2)
         get_rectangle(black, 530, 500, 20, 20, 0)
         get_rectangle(color2, 530, 500, 20, 20, 2)
 
-
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
             if hit_test_rectangle(mouse_pos, 500, 500, 20, 20):
                 color1 = red
                 color2 = black
-                workstation_texture = grass_tile_forest
-
+                workstation = workstation_grass
 
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
             if hit_test_rectangle(mouse_pos, 530, 500, 20, 20):
                 color1 = black
                 color2 = red
-                workstation_texture = dirt_tiles
-
+                workstation = workstation_dirt
 
         for z in workstation:
             for index, i in enumerate(z):
@@ -266,9 +262,6 @@ while running:
                         i.image = imagei
                         gameBackground.blit(i.image, i.left_top)
 
-
-
     pygame.display.flip()
 
 pygame.quit()
-
