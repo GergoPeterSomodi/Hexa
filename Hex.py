@@ -147,7 +147,6 @@ def create_map():
     return [generate_columns(row)
             for row in range(num_rows)]
 
-
 def create_workstation(textures):
     columns_size = 2
     a = [textures[x:x + columns_size]
@@ -185,14 +184,22 @@ def hit_test(mouse_position, tile):
     return any(values)
 
 
-game_map = create_map()
+game_map_1 = create_map()
+game_map_2 = create_map()
+game_map_3 = create_map()
+game_map = game_map_1
 workstation_grass = create_workstation(grass_tile_forest)
 workstation_dirt = create_workstation(dirt_tiles)
 workstation = workstation_grass
 
-imagei = grass_tile[0]
-color1 = black
+base_image = grass_tile[0]
+color1 = red
 color2 = black
+color3 = black
+color4 = black
+color5 = black
+num_layers = 1
+k = 30
 
 running = True
 while running:
@@ -205,6 +212,10 @@ while running:
         gameBackground.fill(silver)
 
         for z in game_map:
+            for index, i in enumerate(z):
+                gameBackground.blit(i.image, i.left_top)
+
+        for z in workstation:
             for index, i in enumerate(z):
                 gameBackground.blit(i.image, i.left_top)
 
@@ -227,9 +238,70 @@ while running:
                 color2 = red
                 workstation = workstation_dirt
 
-        for z in workstation:
-            for index, i in enumerate(z):
-                gameBackground.blit(i.image, i.left_top)
+        get_rectangle(black, 500, 530, 20, 20, 0)
+        get_rectangle(black, 530, 530, 20, 20, 0)
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            mouse_pos = pygame.mouse.get_pos()
+            if hit_test_rectangle(mouse_pos, 500, 560, 20, 20):
+                color3 = green
+                color4 = black
+                color5 = black
+                game_map = game_map_1
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            mouse_pos = pygame.mouse.get_pos()
+            if hit_test_rectangle(mouse_pos, 500, 590, 20, 20):
+                color3 = black
+                color4 = green
+                color5 = black
+                game_map = game_map_2
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            mouse_pos = pygame.mouse.get_pos()
+            if hit_test_rectangle(mouse_pos, 500, 620, 20, 20):
+                color3 = black
+                color4 = black
+                color5 = green
+                game_map = game_map_3
+
+        if num_layers == 1:
+            get_rectangle(black, 500, 530 + (k * 1), 20, 20, 0)
+            get_rectangle(color3, 500, 530 + (k * 1), 20, 20, 2)
+
+        elif num_layers == 2:
+            get_rectangle(black, 500, 530 + (k * 1), 20, 20, 0)
+            get_rectangle(color3, 500, 530 + (k * 1), 20, 20, 2)
+            get_rectangle(black, 500, 530 + (k * 2), 20, 20, 0)
+            get_rectangle(color4, 500, 530 + (k * 2), 20, 20, 2)
+
+        else:
+            get_rectangle(black, 500, 530 + (k * 1), 20, 20, 0)
+            get_rectangle(color3, 500, 530 + (k * 1), 20, 20, 2)
+            get_rectangle(black, 500, 530 + (k * 2), 20, 20, 0)
+            get_rectangle(color4, 500, 530 + (k * 2), 20, 20, 2)
+            get_rectangle(black, 500, 530 + (k * 3), 20, 20, 0)
+            get_rectangle(color5, 500, 530 + (k * 3), 20, 20, 2)
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            mouse_pos = pygame.mouse.get_pos()
+            if hit_test_rectangle(mouse_pos, 500, 530, 20, 20):
+                if num_layers > 1:
+                    num_layers -= 1
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            mouse_pos = pygame.mouse.get_pos()
+            if hit_test_rectangle(mouse_pos, 530, 530, 20, 20):
+                if num_layers < 3:
+                    num_layers += 1
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            mouse_pos = pygame.mouse.get_pos()
+            for z in workstation:
+                for index, i in enumerate(z):
+                    if hit_test(mouse_pos, i):
+                        base_image = i.image
+                        gameBackground.blit(grass_tile_outside[0], i.left_top)
 
         if event.type == pygame.MOUSEMOTION:
             mouse_pos = pygame.mouse.get_pos()
@@ -245,21 +317,13 @@ while running:
                     if hit_test(mouse_pos, i):
                         gameBackground.blit(grass_tile_outside[0], i.left_top)
 
-        if event.type == pygame.MOUSEBUTTONUP:
-            mouse_pos = pygame.mouse.get_pos()
-            for z in workstation:
-                for index, i in enumerate(z):
-                    # i.image = grass_tile[0]
-                    if hit_test(mouse_pos, i):
-                        imagei = i.image
-                        gameBackground.blit(i.image, i.left_top)
 
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
             for z in game_map:
                 for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
-                        i.image = imagei
+                        i.image = base_image
                         gameBackground.blit(i.image, i.left_top)
 
     pygame.display.flip()
