@@ -1,6 +1,6 @@
 import math
 import pygame
-import random
+import pygame_gui
 
 
 class Settings:
@@ -57,6 +57,7 @@ num_columns = int(game_size[0] / width)
 num_rows = int(game_size[1] / height / (3 / 4))
 
 gameBackground = pygame.display.set_mode(display_size)
+manager = pygame_gui.UIManager(display_size)
 
 assets_grass_path = './hexagon-pack/PNG/Tiles/Terrain/Grass/'
 assets_dirt_path = './hexagon-pack/PNG/Tiles/Terrain/Dirt/'
@@ -193,22 +194,43 @@ workstation_dirt = create_workstation(dirt_tiles)
 workstation = workstation_grass
 
 base_image = grass_tile[0]
-color1 = red
-color2 = black
-color3 = black
-color4 = black
-color5 = black
 num_layers = 1
-k = 30
+
+grass_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 400), (50, 30)),
+                                            text='Grass', manager=manager)
+
+dirt_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((550, 400), (50, 30)),
+                                            text='Dirt', manager=manager)
+
+add_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 510), (30, 30)),
+                                            text='+', manager=manager)
+
+subtract_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((550, 510), (30, 30)),
+                                            text='-', manager=manager)
+
+
+layer_1_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 550), (80, 30)),
+                                            text='Layer 1', manager=manager)
+
+layer_2_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 585), (80, 30)),
+                                            text='Layer 2', manager=manager)
+
+
+layer_3_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 620), (80, 30)),
+                                        text='Layer 3', manager=manager)
+
+
+clock = pygame.time.Clock()
 
 running = True
 while running:
-
+    time_delta = clock.tick(60) / 1000.0
     for event in pygame.event.get():
         cursor_x, cursor_y = pygame.mouse.get_pos()
         if event.type == pygame.QUIT:
             running = False
 
+        manager.process_events(event)
         gameBackground.fill(silver)
 
         for z in game_map:
@@ -219,81 +241,24 @@ while running:
             for index, i in enumerate(z):
                 gameBackground.blit(i.image, i.left_top)
 
-        get_rectangle(black, 500, 500, 20, 20, 0)
-        get_rectangle(color1, 500, 500, 20, 20, 2)
-        get_rectangle(black, 530, 500, 20, 20, 0)
-        get_rectangle(color2, 530, 500, 20, 20, 2)
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            mouse_pos = pygame.mouse.get_pos()
-            if hit_test_rectangle(mouse_pos, 500, 500, 20, 20):
-                color1 = red
-                color2 = black
-                workstation = workstation_grass
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            mouse_pos = pygame.mouse.get_pos()
-            if hit_test_rectangle(mouse_pos, 530, 500, 20, 20):
-                color1 = black
-                color2 = red
-                workstation = workstation_dirt
-
-        get_rectangle(black, 500, 530, 20, 20, 0)
-        get_rectangle(black, 530, 530, 20, 20, 0)
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            mouse_pos = pygame.mouse.get_pos()
-            if hit_test_rectangle(mouse_pos, 500, 560, 20, 20):
-                color3 = green
-                color4 = black
-                color5 = black
-                game_map = game_map_1
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            mouse_pos = pygame.mouse.get_pos()
-            if hit_test_rectangle(mouse_pos, 500, 590, 20, 20):
-                color3 = black
-                color4 = green
-                color5 = black
-                game_map = game_map_2
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            mouse_pos = pygame.mouse.get_pos()
-            if hit_test_rectangle(mouse_pos, 500, 620, 20, 20):
-                color3 = black
-                color4 = black
-                color5 = green
-                game_map = game_map_3
-
-        if num_layers == 1:
-            get_rectangle(black, 500, 530 + (k * 1), 20, 20, 0)
-            get_rectangle(color3, 500, 530 + (k * 1), 20, 20, 2)
-
-        elif num_layers == 2:
-            get_rectangle(black, 500, 530 + (k * 1), 20, 20, 0)
-            get_rectangle(color3, 500, 530 + (k * 1), 20, 20, 2)
-            get_rectangle(black, 500, 530 + (k * 2), 20, 20, 0)
-            get_rectangle(color4, 500, 530 + (k * 2), 20, 20, 2)
-
-        else:
-            get_rectangle(black, 500, 530 + (k * 1), 20, 20, 0)
-            get_rectangle(color3, 500, 530 + (k * 1), 20, 20, 2)
-            get_rectangle(black, 500, 530 + (k * 2), 20, 20, 0)
-            get_rectangle(color4, 500, 530 + (k * 2), 20, 20, 2)
-            get_rectangle(black, 500, 530 + (k * 3), 20, 20, 0)
-            get_rectangle(color5, 500, 530 + (k * 3), 20, 20, 2)
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            mouse_pos = pygame.mouse.get_pos()
-            if hit_test_rectangle(mouse_pos, 500, 530, 20, 20):
-                if num_layers > 1:
-                    num_layers -= 1
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            mouse_pos = pygame.mouse.get_pos()
-            if hit_test_rectangle(mouse_pos, 530, 530, 20, 20):
-                if num_layers < 3:
-                    num_layers += 1
+        if event.type == pygame.USEREVENT:
+            if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                if event.ui_element == grass_button:
+                    workstation = workstation_grass
+                elif event.ui_element == dirt_button:
+                    workstation = workstation_dirt
+                elif event.ui_element == layer_1_button:
+                    game_map = game_map_1
+                elif event.ui_element == layer_2_button:
+                    game_map = game_map_2
+                elif event.ui_element == layer_3_button:
+                    game_map = game_map_3
+                elif event.ui_element == subtract_button:
+                    if num_layers > 1:
+                        num_layers -= 1
+                elif event.ui_element == add_button:
+                    if num_layers < 3:
+                        num_layers += 1
 
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
@@ -317,7 +282,6 @@ while running:
                     if hit_test(mouse_pos, i):
                         gameBackground.blit(grass_tile_outside[0], i.left_top)
 
-
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
             for z in game_map:
@@ -326,6 +290,9 @@ while running:
                         i.image = base_image
                         gameBackground.blit(i.image, i.left_top)
 
+    manager.update(time_delta)
+    manager.draw_ui(gameBackground)
     pygame.display.flip()
+
 
 pygame.quit()
