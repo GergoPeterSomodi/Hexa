@@ -196,11 +196,9 @@ workstation = workstation_grass
 base_image = grass_tile[0]
 num_layers = 1
 
-grass_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 400), (50, 30)),
-                                            text='Grass', manager=manager)
+options = ["Grass", "Dirt"]
 
-dirt_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((550, 400), (50, 30)),
-                                            text='Dirt', manager=manager)
+
 
 add_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 510), (30, 30)),
                                             text='+', manager=manager)
@@ -217,7 +215,14 @@ layer_2_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 58
 
 
 layer_3_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 620), (80, 30)),
-                                        text='Layer 3', manager=manager)
+                                            text='Layer 3', manager=manager)
+
+dropdown = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((500, 400), (80, 30)),
+                                              manager=manager,
+                                              options_list=options,
+                                              starting_option='Grass',
+                                              object_id='1',
+                                              )
 
 
 clock = pygame.time.Clock()
@@ -242,12 +247,13 @@ while running:
                 gameBackground.blit(i.image, i.left_top)
 
         if event.type == pygame.USEREVENT:
-            if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
-                if event.ui_element == grass_button:
+            if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
+                if event.text == 'Grass':
                     workstation = workstation_grass
-                elif event.ui_element == dirt_button:
+                if event.text == 'Dirt':
                     workstation = workstation_dirt
-                elif event.ui_element == layer_1_button:
+            if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                if event.ui_element == layer_1_button:
                     game_map = game_map_1
                 elif event.ui_element == layer_2_button:
                     game_map = game_map_2
