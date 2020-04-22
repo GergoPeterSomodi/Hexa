@@ -64,7 +64,6 @@ assets_dirt_path = './hexagon-pack/PNG/Tiles/Terrain/Dirt/'
 
 green_land = [
     pygame.image.load(assets_grass_path + 'grass_05.png'),
-
 ]
 
 green_selected_land = [
@@ -148,16 +147,18 @@ def create_map():
     return [generate_columns(row)
             for row in range(num_rows)]
 
+
 def create_workstation(textures):
-    columns_size = 2
+    columns_size = 3
     a = [textures[x:x + columns_size]
          for x in range(0, len(textures), columns_size)]
+
     # [[0, 1], [2]]
 
     def create_hex_tile(position_row, position_col, image):
-        horizontal_shift = (width + gap) / 2 * int(position_row % 2)
-        left = position_col * width + horizontal_shift + position_col * gap + game_size[0] + width
-        top = position_row * int(height * 3 / 4) + position_row * gap
+        #horizontal_shift = (width + gap) / 2 * int(position_row % 2)
+        left = position_col * width + position_col * gap + game_size[0] + width / 2 + gap
+        top = position_row * height + position_row * gap + int(height * 3 / 4) + gap
         return HexTile((left, top), image)
 
     def generate_columns(row_index, row_texture):
@@ -197,33 +198,27 @@ base_image = grass_tile[0]
 num_layers = 1
 
 options = ["Grass", "Dirt"]
+game_map_opt = ["Map1", "Map2", "Map3"]
 
-
-
-add_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 510), (30, 30)),
-                                            text='+', manager=manager)
-
-subtract_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((550, 510), (30, 30)),
-                                            text='-', manager=manager)
-
-
-layer_1_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 550), (80, 30)),
-                                            text='Layer 1', manager=manager)
-
-layer_2_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 585), (80, 30)),
-                                            text='Layer 2', manager=manager)
-
-
-layer_3_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 620), (80, 30)),
-                                            text='Layer 3', manager=manager)
-
-dropdown = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((500, 400), (80, 30)),
+dropdown = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_size[0] + width / 2, 20), (80, 30)),
                                               manager=manager,
                                               options_list=options,
                                               starting_option='Grass',
                                               object_id='1',
                                               )
 
+dropdown2 = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_size[0] + width / 2 + 85, 20), (80, 30)),
+                                              manager=manager,
+                                              options_list=game_map_opt,
+                                              starting_option='Map1',
+                                              object_id='1',
+                                              )
+
+#add_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 510), (30, 30)),
+#                                         text='+', manager=manager)
+
+#subtract_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((550, 510), (30, 30)),
+#                                               text='-', manager=manager)
 
 clock = pygame.time.Clock()
 
@@ -250,21 +245,28 @@ while running:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
                 if event.text == 'Grass':
                     workstation = workstation_grass
-                if event.text == 'Dirt':
+                elif event.text == 'Dirt':
                     workstation = workstation_dirt
-            if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
-                if event.ui_element == layer_1_button:
+                elif event.text == 'Map1':
                     game_map = game_map_1
-                elif event.ui_element == layer_2_button:
+                elif event.text == 'Map2':
                     game_map = game_map_2
-                elif event.ui_element == layer_3_button:
+                elif event.text == 'Map3':
                     game_map = game_map_3
-                elif event.ui_element == subtract_button:
-                    if num_layers > 1:
-                        num_layers -= 1
-                elif event.ui_element == add_button:
-                    if num_layers < 3:
-                        num_layers += 1
+
+            #if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                #if event.ui_element == subtract_button:
+                #    if num_layers > 1:
+                #        num_layers -= 1
+                #elif event.ui_element == add_button:
+                #    if num_layers < 3:
+                #        num_layers += 1
+                #if event.ui_element == layer_1_button:
+                #    game_map = game_map_1
+                #elif event.ui_element == layer_2_button:
+                #    game_map = game_map_2
+                #elif event.ui_element == layer_3_button:
+                #    game_map = game_map_3
 
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
@@ -299,6 +301,5 @@ while running:
     manager.update(time_delta)
     manager.draw_ui(gameBackground)
     pygame.display.flip()
-
 
 pygame.quit()
