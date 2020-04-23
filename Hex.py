@@ -7,6 +7,7 @@ class Settings:
     def __init__(self):
         self.scale = 5
         self.asset_size = (self.scale * 12, self.scale * 14)
+        self.asset_size_medium = (self.scale * 10, self.scale * 12)
         self.display_size = (650, 650)
         self.game_size = (self.display_size[0] * 2 / 3, self.display_size[1])
         self.workstation_size = (self.display_size[0] * 1 / 3, self.display_size[1] / 2)
@@ -115,6 +116,9 @@ dirt_land = [
 objects = [
     pygame.image.load(assets_objects_path + 'castle_large.png'),
     pygame.image.load(assets_objects_path + 'castle_open.png'),
+]
+
+objects_medium = [
     pygame.image.load(assets_objects_path + 'castle_small.png'),
 ]
 
@@ -148,6 +152,11 @@ object_tiles = []
 for i in range(len(objects)):
     object_render = pygame.transform.scale(objects[i], game_settings.asset_size)
     object_tiles.append(object_render)
+
+for i in range(len(objects_medium)):
+    object_render = pygame.transform.scale(objects_medium[i], game_settings.asset_size_medium)
+    object_tiles.append(object_render)
+
 
 water_tiles = []
 for i in range(len(water)):
@@ -237,7 +246,7 @@ workstation = workstation_grass
 base_image = grass_tiles[19]
 
 options = ["Grass", "Dirt", "Objects", "Water"]
-game_map_opt = ["Map1", "Map2", "Map3"]
+game_map_opt = ["Layer1", "Layer2", "Layer3"]
 
 dropdown = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_size[0] + width / 2, 20), (80, 30)),
                                               manager=manager,
@@ -249,18 +258,12 @@ dropdown = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_si
 dropdown2 = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_size[0] + width / 2 + 85, 20), (80, 30)),
                                               manager=manager,
                                               options_list=game_map_opt,
-                                              starting_option='Map2',
+                                              starting_option='Layer1',
                                               object_id='1',
                                               )
-
-#add_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((500, 510), (30, 30)),
-#                                         text='+', manager=manager)
-
-#subtract_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((550, 510), (30, 30)),
-#                                               text='-', manager=manager)
-
 clock = pygame.time.Clock()
 
+small_objects = True
 running = True
 while running:
     time_delta = clock.tick(60) / 1000.0
@@ -296,11 +299,11 @@ while running:
                     workstation = workstation_objects
                 elif event.text == 'Water':
                     workstation = workstation_waters
-                elif event.text == 'Map1':
+                elif event.text == 'Layer1':
                     game_x = game_base
-                elif event.text == 'Map2':
+                elif event.text == 'Layer2':
                     game_x = game_map
-                elif event.text == 'Map3':
+                elif event.text == 'Layer3':
                     game_x = game_top
 
         if event.type == pygame.MOUSEBUTTONUP:
