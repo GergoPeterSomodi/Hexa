@@ -224,6 +224,9 @@ game_map_1 = create_map()
 game_map_2 = create_map()
 game_map_3 = create_map()
 game_map = game_map_1
+game_base = create_map()
+game_top = game_map_2
+game_x = game_map
 workstation_grass = create_workstation(grass_tiles)
 workstation_dirt = create_workstation(dirt_tiles)
 workstation_objects = create_workstation(object_tiles)
@@ -246,7 +249,7 @@ dropdown = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_si
 dropdown2 = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_size[0] + width / 2 + 85, 20), (80, 30)),
                                               manager=manager,
                                               options_list=game_map_opt,
-                                              starting_option='Map1',
+                                              starting_option='Map2',
                                               object_id='1',
                                               )
 
@@ -269,7 +272,15 @@ while running:
         manager.process_events(event)
         gameBackground.fill(silver)
 
+        for z in game_base:
+            for index, i in enumerate(z):
+                gameBackground.blit(i.image, i.left_top)
+
         for z in game_map:
+            for index, i in enumerate(z):
+                gameBackground.blit(i.image, i.left_top)
+
+        for z in game_top:
             for index, i in enumerate(z):
                 gameBackground.blit(i.image, i.left_top)
 
@@ -288,11 +299,11 @@ while running:
                 elif event.text == 'Water':
                     workstation = workstation_waters
                 elif event.text == 'Map1':
-                    game_map = game_map_1
+                    game_x = game_base
                 elif event.text == 'Map2':
-                    game_map = game_map_2
+                    game_x = game_map
                 elif event.text == 'Map3':
-                    game_map = game_map_3
+                    game_x = game_top
 
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
@@ -318,7 +329,7 @@ while running:
 
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
-            for z in game_map:
+            for z in game_x:
                 for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
                         i.image = base_image
