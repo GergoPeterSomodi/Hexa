@@ -83,6 +83,7 @@ green_land = [
     pygame.image.load(assets_grass_path + 'grass_17.png'),
     pygame.image.load(assets_grass_path + 'grass_18.png'),
     pygame.image.load(assets_grass_path + 'grass_19.png'),
+    pygame.image.load(assets_grass_path + 'none.png'),
 ]
 
 green_selected_land = [
@@ -153,6 +154,7 @@ for i in range(len(water)):
     object_render = pygame.transform.scale(water[i], game_settings.asset_size)
     water_tiles.append(object_render)
 
+
 def get_rectangle(color, x_pos, y_pos, w, h, s):
     pygame.draw.rect(gameBackground, color, [x_pos, y_pos, w, h], s)
 
@@ -171,11 +173,10 @@ def create_map():
         horizontal_shift = (width + gap) / 2 * int(position_row % 2)
         left = position_col * width + horizontal_shift + position_col * gap
         top = position_row * int(height * 3 / 4) + position_row * gap
-        image = grass_tiles[4]
         return HexTile((left, top), image)
 
     def generate_columns(row):
-        return [create_hex_tile(row, col, grass_tiles[5])
+        return [create_hex_tile(row, col, grass_tiles[19])
                 for col in range(num_columns)]
 
     return [generate_columns(row)
@@ -233,8 +234,7 @@ workstation_objects = create_workstation(object_tiles)
 workstation_waters = create_workstation(water_tiles)
 workstation = workstation_grass
 
-base_image = grass_tiles[4]
-num_layers = 1
+base_image = grass_tiles[19]
 
 options = ["Grass", "Dirt", "Objects", "Water"]
 game_map_opt = ["Map1", "Map2", "Map3"]
@@ -275,11 +275,9 @@ while running:
         for z in game_base:
             for index, i in enumerate(z):
                 gameBackground.blit(i.image, i.left_top)
-
         for z in game_map:
             for index, i in enumerate(z):
                 gameBackground.blit(i.image, i.left_top)
-
         for z in game_top:
             for index, i in enumerate(z):
                 gameBackground.blit(i.image, i.left_top)
