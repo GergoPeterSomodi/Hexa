@@ -267,6 +267,7 @@ small_objects = True
 running = True
 while running:
     time_delta = clock.tick(60) / 1000.0
+
     for event in pygame.event.get():
         cursor_x, cursor_y = pygame.mouse.get_pos()
         if event.type == pygame.QUIT:
