@@ -8,6 +8,7 @@ class Settings:
         self.scale = 5
         self.asset_size = (self.scale * 12, self.scale * 14)
         self.asset_size_medium = (self.scale * 10, self.scale * 12)
+        self.asset_size_small = (self.scale * 8, self.scale * 10)
         self.display_size = (650, 650)
         self.game_size = (self.display_size[0] * 2 / 3, self.display_size[1])
         self.workstation_size = (self.display_size[0] * 1 / 3, self.display_size[1] / 2)
@@ -229,6 +230,16 @@ def hit_test(mouse_position, tile):
 
     return any(values)
 
+map_data = []
+with open('/Users/gergopetersomodi/PycharmProjects/Hexa/map.tmx') as base_map:
+    for line in base_map:
+        map_data.append(line.strip())
+
+for rows, tiles in enumerate(map_data):
+    for columns, tile in enumerate(tiles):
+        if tile == '1':
+            print(rows, columns)
+
 
 game_map_1 = create_map()
 game_map_2 = create_map()
@@ -261,6 +272,7 @@ dropdown2 = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_s
                                               starting_option='Layer1',
                                               object_id='1',
                                               )
+
 clock = pygame.time.Clock()
 
 small_objects = True
