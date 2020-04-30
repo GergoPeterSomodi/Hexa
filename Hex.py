@@ -15,13 +15,13 @@ class Settings:
 
 
 class HexTile:
-    def __init__(self, left_top, image):
+    def __init__(self, left_top, image_path):
         self.left_top = left_top
         self.center = (left_top[0] + width / 2, left_top[1] + height / 2)
         self.corners = HexTile.pointy_hex_corner(self.center)
         self.color = white
         self.side_color = black
-        self.image = image
+        self.image_path = image_path
 
     @staticmethod
     def pointy_hex_corner(center):
@@ -33,6 +33,11 @@ class HexTile:
             pos_y = center[1] + radius * math.sin(angle_rad)
             points.append((pos_x, pos_y))
         return points
+
+
+def load_and_convert(path, size):
+    raw_image = pygame.image.load(path)
+    return pygame.transform.scale(raw_image, size)
 
 
 pygame.init()
@@ -65,104 +70,74 @@ assets_grass_path = './hexagon-pack/PNG/Tiles/Terrain/Grass/'
 assets_dirt_path = './hexagon-pack/PNG/Tiles/Terrain/Dirt/'
 assets_objects_path = './hexagon-pack/PNG/Objects/'
 
-green_land = [
-    pygame.image.load(assets_grass_path + 'grass_01.png'),
-    pygame.image.load(assets_grass_path + 'grass_02.png'),
-    pygame.image.load(assets_grass_path + 'grass_03.png'),
-    pygame.image.load(assets_grass_path + 'grass_04.png'),
-    pygame.image.load(assets_grass_path + 'grass_05.png'),
-    pygame.image.load(assets_grass_path + 'grass_06.png'),
-    pygame.image.load(assets_grass_path + 'grass_07.png'),
-    pygame.image.load(assets_grass_path + 'grass_08.png'),
-    pygame.image.load(assets_grass_path + 'grass_09.png'),
-    pygame.image.load(assets_grass_path + 'grass_10.png'),
-    pygame.image.load(assets_grass_path + 'grass_11.png'),
-    pygame.image.load(assets_grass_path + 'grass_12.png'),
-    pygame.image.load(assets_grass_path + 'grass_13.png'),
-    pygame.image.load(assets_grass_path + 'grass_14.png'),
-    pygame.image.load(assets_grass_path + 'grass_15.png'),
-    pygame.image.load(assets_grass_path + 'grass_16.png'),
-    pygame.image.load(assets_grass_path + 'grass_17.png'),
-    pygame.image.load(assets_grass_path + 'grass_18.png'),
-    pygame.image.load(assets_grass_path + 'grass_19.png'),
-    pygame.image.load(assets_grass_path + 'none.png'),
-]
+green_land = {
+    'grass_01.png' : load_and_convert(assets_grass_path + 'grass_01.png', game_settings.asset_size),
+    'grass_02.png' : load_and_convert(assets_grass_path + 'grass_02.png', game_settings.asset_size),
+    'grass_03.png' : load_and_convert(assets_grass_path + 'grass_03.png', game_settings.asset_size),
+    'grass_04.png' : load_and_convert(assets_grass_path + 'grass_04.png', game_settings.asset_size),
+    'grass_05.png' : load_and_convert(assets_grass_path + 'grass_05.png', game_settings.asset_size),
+    'grass_06.png' : load_and_convert(assets_grass_path + 'grass_06.png', game_settings.asset_size),
+    'grass_07.png' : load_and_convert(assets_grass_path + 'grass_07.png', game_settings.asset_size),
+    'grass_08.png' : load_and_convert(assets_grass_path + 'grass_08.png', game_settings.asset_size),
+    'grass_09.png' : load_and_convert(assets_grass_path + 'grass_09.png', game_settings.asset_size),
+    'grass_10.png' : load_and_convert(assets_grass_path + 'grass_10.png', game_settings.asset_size),
+    'grass_11.png' : load_and_convert(assets_grass_path + 'grass_11.png', game_settings.asset_size),
+    'grass_12.png' : load_and_convert(assets_grass_path + 'grass_12.png', game_settings.asset_size),
+    'grass_13.png' : load_and_convert(assets_grass_path + 'grass_13.png', game_settings.asset_size),
+    'grass_14.png' : load_and_convert(assets_grass_path + 'grass_14.png', game_settings.asset_size),
+    'grass_15.png' : load_and_convert(assets_grass_path + 'grass_15.png', game_settings.asset_size),
+    'grass_16.png' : load_and_convert(assets_grass_path + 'grass_16.png', game_settings.asset_size),
+    'grass_17.png' : load_and_convert(assets_grass_path + 'grass_17.png', game_settings.asset_size),
+    'grass_18.png' : load_and_convert(assets_grass_path + 'grass_18.png', game_settings.asset_size),
+    'grass_19.png' : load_and_convert(assets_grass_path + 'grass_19.png', game_settings.asset_size),
+    'none.png' : load_and_convert(assets_grass_path + 'none.png', game_settings.asset_size),
+}
 
-green_selected_land = [
-    pygame.image.load(assets_grass_path + 'grass_selection.png'),
-]
+green_selected_land = {
+    'grass_selection.png': load_and_convert(assets_grass_path + 'grass_selection.png', game_settings.asset_size),
+}
 
-dirt_land = [
-    pygame.image.load(assets_dirt_path + 'dirt_01.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_02.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_03.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_04.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_05.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_06.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_07.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_08.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_09.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_10.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_11.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_12.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_13.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_14.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_15.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_16.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_17.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_18.png'),
-    pygame.image.load(assets_dirt_path + 'dirt_19.png'),
-]
+dirt_land = {
+    'dirt_01.png': load_and_convert(assets_dirt_path + 'dirt_01.png', game_settings.asset_size),
+    'dirt_02.png': load_and_convert(assets_dirt_path + 'dirt_02.png', game_settings.asset_size),
+    'dirt_03.png': load_and_convert(assets_dirt_path + 'dirt_03.png', game_settings.asset_size),
+    'dirt_04.png': load_and_convert(assets_dirt_path + 'dirt_04.png', game_settings.asset_size),
+    'dirt_05.png': load_and_convert(assets_dirt_path + 'dirt_05.png', game_settings.asset_size),
+    'dirt_06.png': load_and_convert(assets_dirt_path + 'dirt_06.png', game_settings.asset_size),
+    'dirt_07.png': load_and_convert(assets_dirt_path + 'dirt_07.png', game_settings.asset_size),
+    'dirt_08.png': load_and_convert(assets_dirt_path + 'dirt_08.png', game_settings.asset_size),
+    'dirt_09.png': load_and_convert(assets_dirt_path + 'dirt_09.png', game_settings.asset_size),
+    'dirt_10.png': load_and_convert(assets_dirt_path + 'dirt_10.png', game_settings.asset_size),
+    'dirt_11.png': load_and_convert(assets_dirt_path + 'dirt_11.png', game_settings.asset_size),
+    'dirt_12.png': load_and_convert(assets_dirt_path + 'dirt_12.png', game_settings.asset_size),
+    'dirt_13.png': load_and_convert(assets_dirt_path + 'dirt_13.png', game_settings.asset_size),
+    'dirt_14.png': load_and_convert(assets_dirt_path + 'dirt_14.png', game_settings.asset_size),
+    'dirt_15.png': load_and_convert(assets_dirt_path + 'dirt_15.png', game_settings.asset_size),
+    'dirt_16.png': load_and_convert(assets_dirt_path + 'dirt_16.png', game_settings.asset_size),
+    'dirt_17.png': load_and_convert(assets_dirt_path + 'dirt_17.png', game_settings.asset_size),
+    'dirt_18.png': load_and_convert(assets_dirt_path + 'dirt_18.png', game_settings.asset_size),
+    'dirt_19.png': load_and_convert(assets_dirt_path + 'dirt_19.png', game_settings.asset_size),
+}
 
-objects = [
-    pygame.image.load(assets_objects_path + 'castle_large.png'),
-    pygame.image.load(assets_objects_path + 'castle_open.png'),
-]
+objects = {
+    'castle_large.png': load_and_convert(assets_objects_path + 'castle_large.png', game_settings.asset_size),
+    'castle_open.png': load_and_convert(assets_objects_path + 'castle_open.png', game_settings.asset_size),
+}
 
-objects_medium = [
-    pygame.image.load(assets_objects_path + 'castle_small.png'),
-]
+objects_medium = {
+    'castle_small.png': load_and_convert(assets_objects_path + 'castle_small.png', game_settings.asset_size),
+}
 
-water = [
-    pygame.image.load(assets_grass_path + 'river_01.png'),
-    pygame.image.load(assets_grass_path + 'river_02.png'),
-    pygame.image.load(assets_grass_path + 'river_03.png'),
-    pygame.image.load(assets_grass_path + 'river_04.png'),
-    pygame.image.load(assets_grass_path + 'river_05.png'),
-    pygame.image.load(assets_grass_path + 'river_06.png'),
-    pygame.image.load(assets_grass_path + 'water_full.png'),
-    pygame.image.load(assets_grass_path + 'lake.png'),
-]
-
-grass_tiles = []
-for i in range(len(green_land)):
-    grass_tile_render = pygame.transform.scale(green_land[i], game_settings.asset_size)
-    grass_tiles.append(grass_tile_render)
-
-grass_tile_outside = []
-for i in range(1):
-    grass_tile_outside_render = pygame.transform.scale(green_selected_land[i], game_settings.asset_size)
-    grass_tile_outside.append(grass_tile_outside_render)
-
-dirt_tiles = []
-for i in range(len(dirt_land)):
-    dirt_land_render = pygame.transform.scale(dirt_land[i], game_settings.asset_size)
-    dirt_tiles.append(dirt_land_render)
-
-object_tiles = []
-for i in range(len(objects)):
-    object_render = pygame.transform.scale(objects[i], game_settings.asset_size)
-    object_tiles.append(object_render)
-
-for i in range(len(objects_medium)):
-    object_render = pygame.transform.scale(objects_medium[i], game_settings.asset_size_medium)
-    object_tiles.append(object_render)
-
-
-water_tiles = []
-for i in range(len(water)):
-    object_render = pygame.transform.scale(water[i], game_settings.asset_size)
-    water_tiles.append(object_render)
+water = {
+    'river_01.png': load_and_convert(assets_grass_path + 'river_01.png', game_settings.asset_size),
+    'river_02.png': load_and_convert(assets_grass_path + 'river_02.png', game_settings.asset_size),
+    'river_03.png': load_and_convert(assets_grass_path + 'river_03.png', game_settings.asset_size),
+    'river_04.png': load_and_convert(assets_grass_path + 'river_04.png', game_settings.asset_size),
+    'river_05.png': load_and_convert(assets_grass_path + 'river_05.png', game_settings.asset_size),
+    'river_06.png': load_and_convert(assets_grass_path + 'river_06.png', game_settings.asset_size),
+    'water_full.png': load_and_convert(assets_grass_path + 'water_full.png', game_settings.asset_size),
+    'lake.png': load_and_convert(assets_grass_path + 'lake.png', game_settings.asset_size),
+}
 
 
 def get_rectangle(color, x_pos, y_pos, w, h, s):
@@ -186,7 +161,7 @@ def create_map():
         return HexTile((left, top), image)
 
     def generate_columns(row):
-        return [create_hex_tile(row, col, grass_tiles[19])
+        return [create_hex_tile(row, col, green_land['none.png'])
                 for col in range(num_columns)]
 
     return [generate_columns(row)
@@ -194,9 +169,10 @@ def create_map():
 
 
 def create_workstation(textures):
+    image = list(textures.values())
     columns_size = 3
-    a = [textures[x:x + columns_size]
-         for x in range(0, len(textures), columns_size)]
+    a = [image[x:x + columns_size]
+         for x in range(0, len(image), columns_size)]
 
     # [[0, 1], [2]]
 
@@ -230,16 +206,6 @@ def hit_test(mouse_position, tile):
 
     return any(values)
 
-map_data = []
-with open('/Users/gergopetersomodi/PycharmProjects/Hexa/map.tmx') as base_map:
-    for line in base_map:
-        map_data.append(line.strip())
-
-for rows, tiles in enumerate(map_data):
-    for columns, tile in enumerate(tiles):
-        if tile == '1':
-            print(rows, columns)
-
 
 game_map_1 = create_map()
 game_map_2 = create_map()
@@ -248,13 +214,13 @@ game_map = game_map_1
 game_base = create_map()
 game_top = game_map_2
 game_x = game_map
-workstation_grass = create_workstation(grass_tiles)
-workstation_dirt = create_workstation(dirt_tiles)
-workstation_objects = create_workstation(object_tiles)
-workstation_waters = create_workstation(water_tiles)
+workstation_grass = create_workstation(green_land)
+workstation_dirt = create_workstation(dirt_land)
+workstation_objects = create_workstation(objects)
+workstation_waters = create_workstation(water)
 workstation = workstation_grass
 
-base_image = grass_tiles[19]
+base_image = green_land['none.png']
 
 options = ["Grass", "Dirt", "Objects", "Water"]
 game_map_opt = ["Layer1", "Layer2", "Layer3"]
@@ -290,17 +256,17 @@ while running:
 
         for z in game_base:
             for index, i in enumerate(z):
-                gameBackground.blit(i.image, i.left_top)
+                gameBackground.blit(i.image_path, i.left_top)
         for z in game_map:
             for index, i in enumerate(z):
-                gameBackground.blit(i.image, i.left_top)
+                gameBackground.blit(i.image_path, i.left_top)
         for z in game_top:
             for index, i in enumerate(z):
-                gameBackground.blit(i.image, i.left_top)
+                gameBackground.blit(i.image_path, i.left_top)
 
         for z in workstation:
             for index, i in enumerate(z):
-                gameBackground.blit(i.image, i.left_top)
+                gameBackground.blit(i.image_path, i.left_top)
 
         if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
@@ -324,30 +290,30 @@ while running:
             for z in workstation:
                 for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
-                        base_image = i.image
-                        gameBackground.blit(grass_tile_outside[0], i.left_top)
+                        base_image = i.image_path
+                        gameBackground.blit(green_selected_land['grass_selection.png'], i.left_top)
 
         if event.type == pygame.MOUSEMOTION:
             mouse_pos = pygame.mouse.get_pos()
             for z in game_map:
                 for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
-                        gameBackground.blit(grass_tile_outside[0], i.left_top)
+                        gameBackground.blit(green_selected_land['grass_selection.png'], i.left_top)
 
         if event.type == pygame.MOUSEMOTION:
             mouse_pos = pygame.mouse.get_pos()
             for z in workstation:
                 for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
-                        gameBackground.blit(grass_tile_outside[0], i.left_top)
+                        gameBackground.blit(green_selected_land['grass_selection.png'], i.left_top)
 
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
             for z in game_x:
                 for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
-                        i.image = base_image
-                        gameBackground.blit(i.image, i.left_top)
+                        i.image_path = base_image
+                        gameBackground.blit(i.image_path, i.left_top)
 
     manager.update(time_delta)
     manager.draw_ui(gameBackground)
