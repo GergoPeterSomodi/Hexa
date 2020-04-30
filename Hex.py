@@ -125,7 +125,7 @@ objects = {
 }
 
 objects_medium = {
-    'castle_small.png': load_and_convert(assets_objects_path + 'castle_small.png', game_settings.asset_size),
+    'castle_small.png': load_and_convert(assets_objects_path + 'castle_small.png', game_settings.asset_size_medium),
 }
 
 water = {
@@ -139,6 +139,16 @@ water = {
     'lake.png': load_and_convert(assets_grass_path + 'lake.png', game_settings.asset_size),
 }
 
+assetStore = {}
+assetStore.update(green_land)
+assetStore.update(green_selected_land)
+assetStore.update(dirt_land)
+assetStore.update(objects)
+assetStore.update(objects_medium)
+assetStore.update(water)
+
+# + green_selected_land.items() + dirt_land.items() \
+# + objects.items() + objects_medium.items() + water.items()
 
 def get_rectangle(color, x_pos, y_pos, w, h, s):
     pygame.draw.rect(gameBackground, color, [x_pos, y_pos, w, h], s)
@@ -161,7 +171,7 @@ def create_map():
         return HexTile((left, top), image)
 
     def generate_columns(row):
-        return [create_hex_tile(row, col, green_land['none.png'])
+        return [create_hex_tile(row, col, 'none.png')
                 for col in range(num_columns)]
 
     return [generate_columns(row)
@@ -169,7 +179,7 @@ def create_map():
 
 
 def create_workstation(textures):
-    image = list(textures.values())
+    image = list(textures.keys())
     columns_size = 3
     a = [image[x:x + columns_size]
          for x in range(0, len(image), columns_size)]
@@ -220,7 +230,7 @@ workstation_objects = create_workstation(objects)
 workstation_waters = create_workstation(water)
 workstation = workstation_grass
 
-base_image = green_land['none.png']
+base_image = 'none.png'
 
 options = ["Grass", "Dirt", "Objects", "Water"]
 game_map_opt = ["Layer1", "Layer2", "Layer3"]
@@ -256,17 +266,21 @@ while running:
 
         for z in game_base:
             for index, i in enumerate(z):
-                gameBackground.blit(i.image_path, i.left_top)
+                image = assetStore[i.image_path]
+                gameBackground.blit(image, i.left_top)
         for z in game_map:
             for index, i in enumerate(z):
-                gameBackground.blit(i.image_path, i.left_top)
+                image = assetStore[i.image_path]
+                gameBackground.blit(image, i.left_top)
         for z in game_top:
             for index, i in enumerate(z):
-                gameBackground.blit(i.image_path, i.left_top)
+                image = assetStore[i.image_path]
+                gameBackground.blit(image, i.left_top)
 
         for z in workstation:
             for index, i in enumerate(z):
-                gameBackground.blit(i.image_path, i.left_top)
+                image = assetStore[i.image_path]
+                gameBackground.blit(image, i.left_top)
 
         if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
@@ -313,7 +327,8 @@ while running:
                 for index, i in enumerate(z):
                     if hit_test(mouse_pos, i):
                         i.image_path = base_image
-                        gameBackground.blit(i.image_path, i.left_top)
+                        image = assetStore[i.image_path]
+                        gameBackground.blit(image, i.left_top)
 
     manager.update(time_delta)
     manager.draw_ui(gameBackground)
