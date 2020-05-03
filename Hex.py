@@ -115,9 +115,9 @@ if __name__ == '__main__':
 
     def create_map():
         def create_hex_tile(position_row, position_col, image):
-            horizontal_shift = (width + gap) / 2 * int(position_row % 2)
-            left = position_col * width + horizontal_shift + position_col * gap
-            top = position_row * int(height * 3 / 4) + position_row * gap
+            horizontal_shift = (game_settings.width + gap) / 2 * int(position_row % 2)
+            left = position_col * game_settings.width + horizontal_shift + position_col * gap
+            top = position_row * int(game_settings.height * 3 / 4) + position_row * gap
             return HexTile((left, top), image)
 
         def generate_columns(row):
@@ -138,8 +138,8 @@ if __name__ == '__main__':
 
         def create_hex_tile(position_row, position_col, image):
             #horizontal_shift = (width + gap) / 2 * int(position_row % 2)
-            left = position_col * width + position_col * gap + game_size[0] + width / 2 + gap
-            top = position_row * height + position_row * gap + int(height * 3 / 4) + gap
+            left = position_col * game_settings.width + position_col * gap + game_size[0] + game_settings.width / 2 + gap
+            top = position_row * game_settings.height + position_row * gap + int(game_settings.height * 3 / 4) + gap
             return HexTile((left, top), image)
 
         def generate_columns(row_index, row_texture):
@@ -185,14 +185,14 @@ if __name__ == '__main__':
     options = ["Grass", "Dirt", "Objects", "Water"]
     game_map_opt = ["Layer1", "Layer2", "Layer3"]
 
-    dropdown = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_size[0] + width / 2, 20), (80, 30)),
+    dropdown = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_size[0] + game_settings.width / 2, 20), (80, 30)),
                                                   manager=manager,
                                                   options_list=options,
                                                   starting_option='Grass',
                                                   object_id='1',
                                                   )
 
-    dropdown2 = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_size[0] + width / 2 + 85, 20), (80, 30)),
+    dropdown2 = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((game_size[0] + game_settings.width / 2 + 85, 20), (80, 30)),
                                                   manager=manager,
                                                   options_list=game_map_opt,
                                                   starting_option='Layer1',
