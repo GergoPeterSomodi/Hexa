@@ -1,5 +1,6 @@
 from Setting import *
 
+import xml.etree.ElementTree as ET
 
 def create_dict():
     temp = {
@@ -66,19 +67,43 @@ def create_hex_tile(position_row, position_col, image):
     return HexTile((left, top), image)
 
 
+def read_xml(layer_id):
+    base_map = []
+    tree = ET.parse('map3.xml')
+    root = tree.getroot()
+
+    for layer in root.findall(".//layer"):
+        #print(layer.get('id'))
+        for data in layer:
+            if layer.get('id') == layer_id:
+                #print(data.text)
+                base_map = data.text
+    return base_map
+
+
 def load_game():
     temp = create_dict()
-    with open('./map.tmx') as base_map:
-        data_map = [line.strip().split(',') for line in base_map]
-        # print(data_map)
-        array = []
-        for index_x, x in enumerate(data_map):
-            row = []
-            for index_y, y in enumerate(x):
-                hex_tile = create_hex_tile(index_x, index_y, temp[y])
-                row.append(hex_tile)
-            array.append(row)
-        return array
+
+    #with open('./map.tmx') as base_map:
+    base_map = read_xml('1')
+    data_map = [line.strip().split(',') for line in base_map]
+    #print(data_map)
+    array = []
+    for index_x, x in enumerate(data_map):
+        row = []
+        for index_y, y in enumerate(x):
+            hex_tile = create_hex_tile(index_x, index_y, temp[y])
+            row.append(hex_tile)
+        array.append(row)
+    return array
+
+
+def load_game_xml():
+    pass
+
+
+def save_game():
+    pass
 
 
 if __name__ == '__main__':
