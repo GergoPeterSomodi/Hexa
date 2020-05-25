@@ -69,7 +69,7 @@ def create_hex_tile(position_row, position_col, image):
 
 def read_xml(layer_id):
     base_map = []
-    tree = ET.parse('map3.xml')
+    tree = ET.parse('map2.tmx')
     root = tree.getroot()
 
     for layer in root.findall(".//layer"):
@@ -85,9 +85,10 @@ def load_game():
     temp = create_dict()
 
     #with open('./map.tmx') as base_map:
-    base_map = read_xml('1')
-    data_map = [line.strip().split(',') for line in base_map]
-    #print(data_map)
+        #print(base_map.read())
+    base_map = read_xml('1').replace('\n', ',').split(',')
+    data_map = [line.strip().split(', ') for line in base_map]
+    print(data_map)
     array = []
     for index_x, x in enumerate(data_map):
         row = []
@@ -96,10 +97,6 @@ def load_game():
             row.append(hex_tile)
         array.append(row)
     return array
-
-
-def load_game_xml():
-    pass
 
 
 def save_game():
