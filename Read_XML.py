@@ -29,11 +29,13 @@ with open('./map.tmx') as base_map:
 
 #for data in root.iter('data'):
 #    print(data.text)
-
-#for data in root.findall("./layer/[@id='1']"):
-#    print(data.tag, data.attrib)
-#    print(data.get('name'))
-#    print(data.get('id'))
+    tree = ET.parse('map3.xml')
+    root = tree.getroot()
+for data in root.findall("./layer/[@id='1']"):
+    print(data.tag, data.attrib)
+    print(data.get('name'))
+    print(data.get('id'))
+    print(data.get('width'))
 
 #for data in root.findall("./layer/[@id='1'])"):
 #        print(data.text)

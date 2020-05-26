@@ -69,23 +69,37 @@ def create_hex_tile(position_row, position_col, image):
 
 def read_xml(layer_id):
     base_map = []
-    tree = ET.parse('map2.tmx')
+    tree = ET.parse('map3.xml')
     root = tree.getroot()
 
     for layer in root.findall(".//layer"):
         #print(layer.get('id'))
         for data in layer:
-            if layer.get('id') == layer_id:
-                #print(data.text)
+            if int(layer.get('id')) == layer_id:
+                #print(layer.get('width'))
+                map_width = layer.get('width')
                 base_map = data.text
     return base_map
+
+
+def get_map_width(layer_id):
+    map_width = []
+    tree = ET.parse('map3.xml')
+    root = tree.getroot()
+
+    for layer in root.findall(".//layer"):
+        #print(layer.get('id'))
+            if int(layer.get('id')) == layer_id:
+                map_width = layer.get('width')
+    return map_width
 
 
 def load_game():
     temp = create_dict()
 
-    base_map = read_xml('1').replace('\n', ',').split(',')
-    data_map = [base_map[x:x + 6] for x in range(0, len(base_map), 6)]
+    map_width = int(get_map_width(1))
+    base_map = read_xml(1).replace('\n', ',').split(',')
+    data_map = [base_map[x:x + map_width] for x in range(0, len(base_map), map_width)]
     array = []
     for index_x, x in enumerate(data_map):
         row = []
