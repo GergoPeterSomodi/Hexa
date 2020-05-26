@@ -13,7 +13,7 @@ def read_xml(layer_id):
                 base_map = data.text
     return base_map
 
-print(read_xml('1'))
+print(read_xml('2'))
 
 with open('./map.tmx') as base_map:
     print(base_map)

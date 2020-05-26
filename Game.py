@@ -84,11 +84,8 @@ def read_xml(layer_id):
 def load_game():
     temp = create_dict()
 
-    #with open('./map.tmx') as base_map:
-        #print(base_map.read())
     base_map = read_xml('1').replace('\n', ',').split(',')
-    data_map = [line.strip().split(', ') for line in base_map]
-    print(data_map)
+    data_map = [base_map[x:x + 6] for x in range(0, len(base_map), 6)]
     array = []
     for index_x, x in enumerate(data_map):
         row = []
