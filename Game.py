@@ -94,11 +94,11 @@ def get_map_width(layer_id):
     return map_width
 
 
-def load_game():
+def load_game(layer_id):
     temp = create_dict()
 
-    map_width = int(get_map_width(1))
-    base_map = read_xml(1).replace('\n', ',').split(',')
+    map_width = int(get_map_width(layer_id))
+    base_map = read_xml(layer_id).replace('\n', ',').split(',')
     data_map = [base_map[x:x + map_width] for x in range(0, len(base_map), map_width)]
     array = []
     for index_x, x in enumerate(data_map):

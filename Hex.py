@@ -167,12 +167,12 @@ if __name__ == '__main__':
         return any(values)
 
 
-    game_map_1 = load_game()
-    game_map_2 = load_game()
-    game_map_3 = load_game()
-    game_map = game_map_1
-    game_base = load_game()
-    game_top = game_map_2
+    game_map_1 = load_game(1)
+    game_map_2 = load_game(2)
+    game_map_3 = load_game(3)
+    game_map = game_map_2
+    game_base = game_map_1
+    game_top = game_map_3
     game_x = game_map
     workstation_grass = create_workstation(green_land)
     workstation_dirt = create_workstation(dirt_land)
