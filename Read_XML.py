@@ -1,45 +1,21 @@
 import xml.etree.ElementTree as ET
+from Game import *
 
-print((1))
-def read_xml(layer_id):
-    tree = ET.parse('map2.tmx')
-    root = tree.getroot()
+image = ['none.png', "grass_01.png", "grass_02.png", "grass_03.png"]
 
-    for layer in root.findall(".//layer"):
-        #print(layer.get('id'))
-        for data in layer:
-            if layer.get('id') == '1':
-                #print(data.text)
-                base_map = data.text
-    return base_map
 
-print(read_xml('2'))
+def get_hex_id(images):
 
-with open('./map.tmx') as base_map:
-    print(base_map)
+    temp = create_dict()
+    layer_map = []
 
-#print(root.tag)
-#print(root.attrib)
+    for image in images:
+        for key, value in temp.items():
+            if value == image:
+                layer_id = key
+                layer_map.append(layer_id)
+    return layer_map
 
-#for child in root:
-#    print(child.tag, child.attrib)
-
-#for data in root.iter('data'):
-#    print(data.attrib)
-
-#for data in root.iter('data'):
-#    print(data.text)
-    tree = ET.parse('map3.xml')
-    root = tree.getroot()
-for data in root.findall("./layer/[@id='1']"):
-    print(data.tag, data.attrib)
-    print(data.get('name'))
-    print(data.get('id'))
-    print(data.get('width'))
-
-#for data in root.findall("./layer/[@id='1'])"):
-#        print(data.text)
-
-#for data in root.findall('layer/data'):
-#        print(data.text)
+id = get_hex_id(image)
+print(id)
 

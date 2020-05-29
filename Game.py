@@ -24,7 +24,6 @@ def create_dict():
         '17': 'grass_17.png',
         '18': 'grass_18.png',
         '19': 'grass_19.png',
-        '20': 'none.png',
         '21': 'grass_selection.png',
         '22': 'dirt_01.png',
         '23': 'dirt_02.png',
