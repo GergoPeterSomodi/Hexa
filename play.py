@@ -1,7 +1,8 @@
-"""Hexa: a small turn-based medieval strategy game.
+"""Hexa: a small turn-based strategy game on a hex map.
 
-    python play.py            # random map
-    python play.py --seed 42  # the same map every time
+    python play.py                                   # start menu
+    python play.py --mode conquest --seed 42         # skip the menu, same map every time
+    python play.py --mode colony --start sea --goal survive
 """
 import argparse
 import os
@@ -9,6 +10,8 @@ import os
 import pygame
 
 from hexa import ai
+from hexa.colony.app import ColonyApp
+from hexa.menu import Menu
 from hexa.hexgrid import pixel_to_hex
 from hexa.render import END_TURN_RECT, MAP_ORIGIN, WINDOW_SIZE, Button, Renderer, button_rects
 from hexa.rules import IMPROVEMENT_FOR_TERRAIN, PLAYER, SETTLER, UNIT_TYPES, WORKER, cost_text
@@ -39,6 +42,7 @@ class App:
         self.renderer = Renderer(self.screen, TILES_DIR)
         self.clock = pygame.time.Clock()
         self.running = True
+        self.result = None       # "menu" or "quit" when the loop ends
         self.new_game(seed)
 
     def new_game(self, seed=None):
@@ -46,7 +50,7 @@ class App:
         self.ui = UIState()
         self.ai_turn = None
         self.ai_next = 0
-        pygame.display.set_caption(f"Hexa  -  map #{self.world.seed}")
+        pygame.display.set_caption(f"Hexa conquest  -  map #{self.world.seed}")
         self.refresh()
 
     # ----- selection -----------------------------------------------------------
@@ -184,13 +188,15 @@ class App:
 
     def handle(self, event):
         if event.type == pygame.QUIT:
-            self.running = False
+            self.running, self.result = False, "quit"
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 if self.ui.selected or self.ui.town:
                     self.select()
                 else:
-                    self.running = False
+                    self.running, self.result = False, "quit"
+            elif event.key == pygame.K_m:
+                self.running, self.result = False, "menu"
             elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
                 self.end_turn()
             elif event.key == pygame.K_TAB and self.players_turn():
@@ -232,13 +238,34 @@ class App:
             self.renderer.draw(self.world, self.ui)
             pygame.display.flip()
             self.clock.tick(60)
-        pygame.quit()
+        return self.result
 
 
 def main():
     parser = argparse.ArgumentParser(description="Play Hexa.")
+    parser.add_argument("--mode", choices=("conquest", "colony"), help="skip the menu and start this mode")
+    parser.add_argument("--start", choices=("sea", "land"), default="sea", help="colonisation: how to start")
+    parser.add_argument("--goal", choices=("survive", "independence", "endless"), default="survive",
+                        help="colonisation: how to win")
     parser.add_argument("--seed", type=int, help="map number, to replay the same map")
-    App(parser.parse_args().seed).run()
+    args = parser.parse_args()
+    settings = {"mode": args.mode or "colony", "start": args.start, "goal": args.goal}
+    skip_menu = args.mode is not None
+    pygame.init()
+    while True:
+        screen = pygame.display.set_mode(WINDOW_SIZE)
+        if not skip_menu:
+            settings = Menu(screen, settings).run()
+            if settings is None:
+                break
+        skip_menu = False
+        if settings["mode"] == "conquest":
+            result = App(args.seed).run()
+        else:
+            result = ColonyApp(screen, TILES_DIR, args.seed, settings["start"], settings["goal"]).run()
+        if result != "menu":
+            break
+    pygame.quit()
 
 
 if __name__ == "__main__":

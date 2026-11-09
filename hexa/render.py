@@ -203,7 +203,7 @@ class Renderer:
 
         hint = ui.hover_button.hint if ui.hover_button else self._hover_text(world, ui.hover)
         self._text(self.small, self._fit(self.small, hint, 515), (x, ROW + 91), MUTED)
-        self._text(self.small, "Tab: next unit   B: build/found   1-4: train   Space: end turn   R: new map",
+        self._text(self.small, "Tab: next unit   B: build/found   1-4: train   Space: end turn   R: new map   M: menu",
                    (x, ROW + 111), FAINT)
 
         active = world.current == PLAYER and not world.winner
