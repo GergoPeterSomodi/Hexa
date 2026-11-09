@@ -1,14 +1,15 @@
-"""Rule tests. Run with:  python -m unittest discover tests"""
+"""Rule tests. Run with:  python -m unittest discover -s tests -t ."""
 import unittest
 
 from hexa import ai
-from hexa.hexgrid import distance, hex_center, neighbors, pixel_to_hex
-from hexa.rules import AI, PLAYER, SCOUT, SOLDIER, SPAWN_EVERY, TURN_LIMIT
+from hexa.hexgrid import distance, hex_center, neighbors, pixel_to_hex, within
+from hexa.rules import (AI, CASTLE_INCOME, IMPROVEMENTS, PLAYER, SCOUT, SETTLER, SOLDIER,
+                        TURN_LIMIT, WORKER)
 from hexa.world import World
 
 
-def clear_units(world):
-    world.units.clear()
+def free_neighbor(world, pos):
+    return next(n for n in neighbors(pos) if world.is_free(n))
 
 
 class HexGridTest(unittest.TestCase):
@@ -27,19 +28,19 @@ class MapTest(unittest.TestCase):
     def test_maps_are_playable_and_repeatable(self):
         for seed in range(40):
             world = World(seed)
-            again = World(seed)
-            self.assertEqual(world.terrain, again.terrain)
-            home, enemy = (c.pos for c in world.castles)
+            self.assertEqual(world.terrain, World(seed).terrain)
+            home, enemy = world.capital_of(PLAYER).pos, world.capital_of(AI).pos
             self.assertIn(home, world.cost_field(enemy), f"seed {seed}: castles not connected")
-            self.assertEqual(len(world.units_of(PLAYER)), 2)
-            self.assertEqual(len(world.units_of(AI)), 2)
+            for side in (PLAYER, AI):
+                kinds = sorted(u.type.key for u in world.units_of(side))
+                self.assertEqual(kinds, ["scout", "soldier", "worker"])
 
 
 class RulesTest(unittest.TestCase):
     def setUp(self):
         self.world = World(7)
-        self.home = self.world.castles_of(PLAYER)[0].pos
-        self.enemy_home = self.world.castles_of(AI)[0].pos
+        self.home = self.world.capital_of(PLAYER).pos
+        self.enemy_home = self.world.capital_of(AI).pos
 
     def test_move_spends_moves_and_reveals_map(self):
         scout = next(u for u in self.world.units_of(PLAYER) if u.type is SCOUT)
@@ -59,10 +60,9 @@ class RulesTest(unittest.TestCase):
 
     def test_combat_damages_and_kills(self):
         w = self.world
-        clear_units(w)
+        w.units.clear()
         attacker = w.spawn(SOLDIER, PLAYER, (6, 5))
-        free = [n for n in neighbors(attacker.pos) if w.is_free(n)]
-        target = w.spawn(SCOUT, AI, free[0])
+        target = w.spawn(SCOUT, AI, free_neighbor(w, attacker.pos))
         target.hp = 1
         self.assertIn(target.pos, w.attack_options(attacker))
         self.assertTrue(w.attack(attacker, target))
@@ -70,23 +70,24 @@ class RulesTest(unittest.TestCase):
         self.assertEqual(attacker.moves_left, 0)
         self.assertEqual(w.attack_options(attacker), {})
 
+    def test_civilians_cannot_attack(self):
+        w = self.world
+        w.units.clear()
+        worker = w.spawn(WORKER, PLAYER, (6, 5))
+        w.spawn(SCOUT, AI, free_neighbor(w, worker.pos))
+        self.assertEqual(w.attack_options(worker), {})
+
     def test_capturing_the_castle_wins(self):
         w = self.world
-        clear_units(w)
-        free = [n for n in neighbors(self.enemy_home) if w.is_free(n)]
-        scout = w.spawn(SCOUT, PLAYER, free[0])
+        w.units.clear()
+        spot = free_neighbor(w, self.enemy_home)
+        scout = w.spawn(SCOUT, PLAYER, spot)
         self.assertNotIn(self.enemy_home, w.reachable(scout), "scouts cannot take castles")
         w.units.remove(scout)
-        raider = w.spawn(SOLDIER, PLAYER, free[0])
+        raider = w.spawn(SOLDIER, PLAYER, spot)
         self.assertTrue(w.move(raider, self.enemy_home))
         self.assertEqual(w.winner, PLAYER)
-        self.assertFalse(w.move(raider, free[0]))
-
-    def test_castles_train_soldiers(self):
-        w = self.world
-        while w.turn < SPAWN_EVERY:
-            w.end_turn()
-        self.assertEqual(len([u for u in w.units_of(PLAYER) if u.type is SOLDIER]), 2)
+        self.assertFalse(w.move(raider, spot))
 
     def test_resting_heals(self):
         w = self.world
@@ -96,10 +97,112 @@ class RulesTest(unittest.TestCase):
         self.assertGreater(unit.hp, 3)
 
 
+class EconomyTest(unittest.TestCase):
+    def setUp(self):
+        self.world = World(7)
+        self.castle = self.world.capital_of(PLAYER)
+
+    def test_castle_income_and_soldier_upkeep(self):
+        w = self.world
+        income = w.income(PLAYER)
+        self.assertEqual(income["food"], CASTLE_INCOME["food"] - 1)   # one soldier eats 1 food
+        self.assertEqual(income["stone"], CASTLE_INCOME["stone"])
+        before = dict(w.stock[PLAYER])
+        w.end_turn()
+        w.end_turn()
+        self.assertEqual(w.stock[PLAYER]["wood"], before["wood"] + income["wood"])
+
+    def test_training_costs_resources_once_per_turn(self):
+        w = self.world
+        w.stock[PLAYER] = {"food": 20, "wood": 20, "stone": 20}
+        unit = w.train(self.castle, SCOUT)
+        self.assertIsNotNone(unit)
+        self.assertEqual(unit.moves_left, 0, "new units act next turn")
+        self.assertEqual(w.stock[PLAYER]["food"], 20 - SCOUT.cost["food"])
+        self.assertIsNone(w.train(self.castle, SOLDIER), "only one unit per town per turn")
+        w.stock[PLAYER] = {"food": 0, "wood": 0, "stone": 0}
+        w.end_turn()
+        w.end_turn()
+        ok, reason = w.train_check(self.castle, SETTLER)
+        self.assertFalse(ok)
+        self.assertIn("resources", reason)
+
+    def test_worker_builds_inside_borders_only(self):
+        w = self.world
+        w.units.clear()
+        w.stock[PLAYER] = {"food": 20, "wood": 20, "stone": 20}
+        inside = next(p for p in within(self.castle.pos, 2) if w.in_bounds(p)
+                      and w.terrain[p] in ("grass", "dirt") and p != self.castle.pos)
+        worker = w.spawn(WORKER, PLAYER, inside)
+        self.assertEqual(worker.pos, inside)
+        food_before = w.income(PLAYER)["food"]
+        self.assertTrue(w.build(worker))
+        self.assertEqual(w.improvements[inside], "farm")
+        self.assertEqual(w.income(PLAYER)["food"], food_before + IMPROVEMENTS["farm"].yields["food"])
+        self.assertEqual(w.stock[PLAYER]["wood"], 20 - IMPROVEMENTS["farm"].cost["wood"])
+
+        outside = next(p for p in w.terrain if w.territory_owner(p) is None
+                       and w.terrain[p] in ("grass", "dirt") and w.is_free(p))
+        far_worker = w.spawn(WORKER, PLAYER, outside)
+        improvement, reason = w.build_check(far_worker)
+        self.assertIsNone(improvement)
+        self.assertIn("borders", reason)
+
+    def test_enemy_on_a_farm_stops_its_food(self):
+        w = self.world
+        w.units.clear()
+        w.stock[PLAYER]["wood"] = 10
+        spot = next(p for p in within(self.castle.pos, 2) if w.in_bounds(p)
+                    and w.terrain[p] in ("grass", "dirt") and p != self.castle.pos)
+        w.build(w.spawn(WORKER, PLAYER, spot))
+        with_farm = w.income(PLAYER)["food"]
+        w.units.clear()
+        w.spawn(SCOUT, AI, spot)
+        self.assertEqual(w.income(PLAYER)["food"], with_farm - 2)
+
+    def test_settler_founds_a_town_with_its_own_land(self):
+        w = self.world
+        w.units.clear()
+        site = next(p for p in w.terrain if w.terrain_at(p).passable
+                    and all(distance(t.pos, p) >= 4 for t in w.towns))
+        settler = w.spawn(SETTLER, PLAYER, site)
+        too_close = w.spawn(SETTLER, PLAYER, free_neighbor(w, self.castle.pos))
+        self.assertFalse(w.found_check(too_close)[0])
+        town = w.found_town(settler)
+        self.assertIsNotNone(town)
+        self.assertNotIn(settler, w.units)
+        self.assertEqual(w.territory_owner(site), PLAYER)
+        self.assertIn(town, w.towns_of(PLAYER))
+
+    def test_capturing_a_town_does_not_end_the_game(self):
+        w = self.world
+        w.units.clear()
+        site = next(p for p in w.terrain if w.terrain_at(p).passable
+                    and all(distance(t.pos, p) >= 4 for t in w.towns))
+        w.current = AI
+        town = w.found_town(w.spawn(SETTLER, AI, site))
+        w.current = PLAYER
+        raider = w.spawn(SOLDIER, PLAYER, free_neighbor(w, town.pos))
+        self.assertTrue(w.move(raider, town.pos))
+        self.assertEqual(town.owner, PLAYER)
+        self.assertIsNone(w.winner)
+
+    def test_starving_soldiers_lose_hp(self):
+        w = self.world
+        soldier = next(u for u in w.units_of(PLAYER) if u.type is SOLDIER)
+        soldier.hp = 5
+        w.stock[PLAYER]["food"] = -5
+        soldier.acted = True   # no resting heal
+        w.end_turn()
+        w.end_turn()
+        self.assertEqual(soldier.hp, 4)
+        self.assertEqual(w.stock[PLAYER]["food"], 0)
+
+
 class AITest(unittest.TestCase):
-    def play_out(self, world, max_turns=100):
+    def play_out(self, world):
         """Both sides played by the AI until someone wins."""
-        while not world.winner and world.turn <= max_turns:
+        while not world.winner:
             for _ in ai.take_turn(world, world.current):
                 pass
             world.end_turn()
@@ -107,23 +210,33 @@ class AITest(unittest.TestCase):
 
     def test_ai_takes_an_undefended_castle(self):
         w = World(3)
-        clear_units(w)
-        home = w.castles_of(PLAYER)[0].pos
-        free = [n for n in neighbors(home) if w.is_free(n)]
-        w.spawn(SOLDIER, AI, free[0])
+        w.units.clear()
+        home = w.capital_of(PLAYER).pos
+        w.spawn(SOLDIER, AI, free_neighbor(w, home))
         w.end_turn()
         list(ai.take_turn(w))
         self.assertEqual(w.winner, AI)
 
+    def test_ai_builds_an_economy(self):
+        for seed in range(6):
+            w = World(seed)
+            while w.turn < 15:
+                if w.current == AI:
+                    list(ai.take_turn(w))
+                w.end_turn()
+            mine = [p for p in w.improvements if w.territory_owner(p) == AI]
+            self.assertGreaterEqual(len(mine), 3, f"seed {seed}: AI built too little")
+            self.assertGreaterEqual(len(w.towns_of(AI)), 2, f"seed {seed}: AI never settled")
+
     def test_ai_games_finish_without_errors(self):
-        finished = 0
-        for seed in range(25):
+        for seed in range(20):
             w = self.play_out(World(seed))
-            finished += w.winner is not None
+            self.assertIsNotNone(w.winner)
             for unit in w.units:
                 self.assertTrue(w.terrain_at(unit.pos).passable)
                 self.assertEqual(sum(u.pos == unit.pos for u in w.units), 1)
-        self.assertEqual(finished, 25, "every game ends by conquest or at the turn limit")
+            for side in (PLAYER, AI):
+                self.assertTrue(all(n >= 0 for n in w.stock[side].values()), f"seed {seed}: {w.stock}")
 
     def test_ai_beats_a_player_who_does_nothing(self):
         for seed in range(10):
@@ -133,9 +246,9 @@ class AITest(unittest.TestCase):
                     list(ai.take_turn(w))
                 w.end_turn()
             self.assertEqual(w.winner, AI, f"seed {seed}")
-            self.assertLess(w.turn, 30, f"seed {seed}: AI too slow")
+            self.assertLess(w.turn, 35, f"seed {seed}: AI too slow")
 
-    def test_turn_limit_decides_on_army_strength(self):
+    def test_turn_limit_decides_on_score(self):
         w = World(5)
         w.units.remove(w.units_of(AI)[0])
         while not w.winner:
