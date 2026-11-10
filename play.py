@@ -265,7 +265,10 @@ def main():
             if settings is None:
                 break
         skip_menu_once, skip_menu = skip_menu, False
-        if settings["mode"] == "campaign":
+        load = settings.pop("load", None)
+        if settings["mode"] == "campaign" and load:
+            result = CampaignApp(TILES_DIR, load=load).run()
+        elif settings["mode"] == "campaign":
             result = CampaignApp(TILES_DIR, args.nation if skip_menu_once else None, settings.get("map", "europe"),
                                  args.seed if skip_menu_once else None).run()
         elif settings["mode"] == "conquest":

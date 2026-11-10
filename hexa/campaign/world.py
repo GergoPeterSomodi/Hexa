@@ -228,21 +228,25 @@ class War:
     start: int
 
 
+def map_source(map, seed):
+    """The geography a world is built from: the real 1480 map, or a random world for this seed."""
+    if map == "random":
+        from . import randomgeo
+        if seed not in _RANDOM_GEOS:
+            _RANDOM_GEOS[seed] = randomgeo.generate(seed)
+        return _RANDOM_GEOS[seed]
+    return geo
+
+
 # ----- the world ------------------------------------------------------------------------
 class CampaignWorld:
     mode = "campaign"
 
     def __init__(self, seed=1480, player=None, map="europe"):
-        if map == "random":
-            from . import randomgeo
-            source = _RANDOM_GEOS.get(seed) or _RANDOM_GEOS.setdefault(seed, randomgeo.generate(seed))
-        else:
-            source = geo
+        source = map_source(map, seed)
         key = (map, seed)
         if key in _SNAPSHOTS:
-            self.__dict__.update(pickle.loads(_SNAPSHOTS[key]))
-            self._ids = itertools.count(self.__dict__.pop("_next_id"))
-            self.geo = source
+            self._restore(pickle.loads(_SNAPSHOTS[key]))
             self.player = player
             self.update_visibility()
             return
@@ -271,12 +275,29 @@ class CampaignWorld:
             self._explore_home(country)
         self.economy()                   # first prices and incomes
         self.message(f"{date(1)}. The age of discovery begins.")
+        _SNAPSHOTS[key] = pickle.dumps(self.save_state(), protocol=pickle.HIGHEST_PROTOCOL)
+        self.player = player
+        self.update_visibility()
+
+    # ----- saving --------------------------------------------------------------------
+    def save_state(self):
+        """Everything needed to rebuild this world (picklable; the map source is rebuilt from map + seed)."""
         state = {k: v for k, v in self.__dict__.items() if k not in ("geo", "_ids")}
         state["_next_id"] = next(self._ids)
         self._ids = itertools.count(state["_next_id"])
-        _SNAPSHOTS[key] = pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL)
-        self.player = player
-        self.update_visibility()
+        return state
+
+    def _restore(self, state):
+        self.__dict__.update(state)
+        self._ids = itertools.count(self.__dict__.pop("_next_id"))
+        self.geo = map_source(self.map, self.seed)
+
+    @classmethod
+    def from_state(cls, state):
+        world = cls.__new__(cls)
+        world._restore(state)
+        world.update_visibility()
+        return world
 
     # ----- map ---------------------------------------------------------------------
     def _build_map(self):
@@ -759,6 +780,21 @@ class CampaignWorld:
     def units_at(self, pos):
         return [u for u in self.units if u.pos == pos and u.carrier is None]
 
+    def owners_at(self):
+        """{pos: set of owners} of every unit standing on the map (one pass, for path searches)."""
+        found = {}
+        for u in self.units:
+            if u.carrier is None:
+                found.setdefault(u.pos, set()).add(u.owner)
+        return found
+
+    def in_old_world(self, pos):
+        """Whether a hex belongs to the known Old World (not a colony region)."""
+        if self.map == "random":
+            return pos in self._known_world
+        lon, lat = geo.lonlat(pos)
+        return not (lon < -20 or (lat < 15 and lon < 20))
+
     def units_of(self, tag):
         return [u for u in self.units if u.owner == tag]
 
@@ -806,8 +842,7 @@ class CampaignWorld:
         return sum(p.pop for p in self.provinces_of(tag))
 
     def colonies_of(self, tag):
-        return [p for p in self.provinces_of(tag) if p.colony or p.trading_post or geo.lonlat(p.pos)[0] < -20
-                or (geo.lonlat(p.pos)[1] < 15 and geo.lonlat(p.pos)[0] < 20)]
+        return [p for p in self.provinces_of(tag) if p.colony or p.trading_post or not self.in_old_world(p.pos)]
 
     # ----- markets and trade routes -------------------------------------------------
     def _build_markets(self):
@@ -1411,10 +1446,11 @@ class CampaignWorld:
         bonus = GENERAL_STACK if any(u.kind is GENERAL for u in units) else 0
         return STACK_LIMIT[self.countries[tag].era] + bonus
 
-    def can_stand(self, group, pos):
+    def can_stand(self, group, pos, others=None):
         """Whether these units (all of one owner) may end their move together on pos."""
         owner = group[0].owner
-        others = [u for u in self.units_at(pos) if u not in group]
+        if others is None:
+            others = [u for u in self.units_at(pos) if u not in group]
         if any(u.owner != owner for u in others):
             return False
         if group[0].naval:
@@ -1743,6 +1779,7 @@ class CampaignWorld:
             return reach
         naval = lead.naval
         zoc = set() if naval else self.zoc(lead.owner)
+        occupied, mine = self.owners_at(), {lead.owner}
         costs = {lead.pos: 0}
         heap = [(0, lead.pos)]
         while heap:
@@ -1754,14 +1791,16 @@ class CampaignWorld:
             for n in neighbors(pos):
                 if n not in self.terrain or not all(self.may_enter(u, n) for u in group):
                     continue
-                if any(u.owner != lead.owner for u in self.units_at(n)):
+                if occupied.get(n, mine) != mine:
                     continue                # cannot walk into or through foreign units
                 step = 1 if naval else self.step_cost(pos, n)
                 new = cost + step
                 if new <= moves and new < costs.get(n, INF):
                     costs[n] = new
                     heapq.heappush(heap, (new, n))
-        reach = {p: c for p, c in costs.items() if p == lead.pos or self.can_stand(group, p)}
+        alone = self.can_stand(group, None, others=[])
+        reach = {p: c for p, c in costs.items()
+                 if p == lead.pos or (alone if p not in occupied else self.can_stand(group, p))}
         if not naval:
             for ship in self.units_of(lead.owner):
                 if ship.naval and len(self.cargo(ship)) + len(group) <= ship.kind.capacity:
@@ -1775,6 +1814,7 @@ class CampaignWorld:
         lead = group[0]
         naval = lead.naval
         zoc = set() if naval else self.zoc(lead.owner)
+        occupied, mine = self.owners_at(), {lead.owner}
         best = {lead.pos: (0, None)}
         heap = [(0, lead.pos)]
         while heap:
@@ -1786,7 +1826,7 @@ class CampaignWorld:
             for n in neighbors(pos):
                 if n not in self.terrain or not all(self.may_enter(u, n) for u in group):
                     continue
-                if any(u.owner != lead.owner for u in self.units_at(n)):
+                if occupied.get(n, mine) != mine:
                     continue
                 new = cost + (1 if naval else self.step_cost(pos, n))
                 if new <= budget and new < best.get(n, (INF,))[0]:
@@ -1800,7 +1840,10 @@ class CampaignWorld:
             return {}
         speed = min(u.kind.moves for u in group)
         budget = min(u.moves_left for u in group) + speed
-        return {p: c for p, (c, _) in self.plan(group, budget).items() if self.can_stand(group, p)}
+        occupied = self.owners_at()
+        alone = self.can_stand(group, None, others=[])
+        return {p: c for p, (c, _) in self.plan(group, budget).items()
+                if (alone if p not in occupied else self.can_stand(group, p))}
 
     def path_to(self, group, goal, seasons=4):
         """[(pos, move cost so far)] from the stack to goal, or [] if it is too far or blocked."""
@@ -1831,6 +1874,19 @@ class CampaignWorld:
         ship = None
         if not lead.naval:
             ship = next((u for u in self.units_at(dest) if u.naval and u.owner == lead.owner), None)
+        # Walk the route hex by hex, looking around on the way (so fog clears along it, not just at the end).
+        path = self.route(group, dest)
+        self.last_move = ([u.id for u in group], path)
+        for step in path[1:-1]:
+            for unit in group:
+                unit.pos = step
+                for passenger in self.cargo(unit):
+                    passenger.pos = step
+                self.see_from(unit, refresh=False)
+        for unit in group:
+            unit.pos = path[0]
+            for passenger in self.cargo(unit):
+                passenger.pos = path[0]
         for unit in group:
             if ship:
                 unit.carrier, unit.pos, unit.moves_left = ship, dest, 0
@@ -1849,6 +1905,24 @@ class CampaignWorld:
         for unit in group:
             self.see_from(unit)
         return True
+
+    def route(self, group, dest):
+        """The hexes the stack walks through to reach dest this season, start and end included."""
+        lead = group[0]
+        if lead.carrier or distance(lead.pos, dest) <= 1:
+            return [lead.pos, dest]
+        best = self.plan(group, min(u.moves_left for u in group))
+        if dest not in best:                     # boarding a ship: walk to the shore next to it
+            shore = [n for n in neighbors(dest) if n in best]
+            if not shore:
+                return [lead.pos, dest]
+            last = min(shore, key=lambda n: best[n][0])
+            return self.route(group, last) + [dest] if last != lead.pos else [lead.pos, dest]
+        path, pos = [], dest
+        while pos is not None:
+            path.append(pos)
+            pos = best[pos][1]
+        return path[::-1]
 
     def cost_field(self, goal, naval=False, tag=None, until=None):
         """Move costs to `goal` from everywhere (or until every hex in `until` is settled)."""
@@ -2304,13 +2378,13 @@ class CampaignWorld:
                 if p in self.terrain:
                     country.explored.add(p)
 
-    def see_from(self, unit, radius=None):
+    def see_from(self, unit, radius=None, refresh=True):
         country = self.countries[unit.owner]
         before = len(country.explored)
         for p in within(unit.pos, radius or unit.kind.sight):
             if p in self.terrain:
                 country.explored.add(p)
-        if unit.owner == self.player:
+        if unit.owner == self.player and refresh:
             if len(country.explored) != before:
                 self.changed()
             self.update_visibility()

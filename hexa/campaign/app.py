@@ -2,7 +2,9 @@
 import pygame
 
 
-from . import ai, geo
+from .. import settings as options
+from . import ai, geo, saves
+from .gamemenu import GameMenu
 from .data import (FOOD_PER_TROOP, MANPOWER, NEEDS, OUTPUT, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BRANCH_NAMES, ERAS, GENERAL, GENERAL_TRAITS, RESEARCH_FUND, SCOUT, UPGRADE_MAX, BUILDINGS, CARAVEL, CARRACK, CASTLES, COLONIST, COLONY_DONE, GOODS, PIONEER,
                    SETTLEMENT_SLOTS, SETTLEMENTS, TAX_LEVELS, TERRAIN, UNIT_KINDS, WORKS, WORKS_BONUS, WORKS_COST)
 from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
@@ -53,13 +55,16 @@ class UI:
         self.first_moves = 3
         self.order_route = None     # route whose merchant orders are open in the market panel
         self.hoverables = []        # (rect, card) areas that show a hover card
+        self.anim = None            # (unit ids, route, start ms) of a move being shown
         self.hover_key = None
         self.hover_since = 0
 
 
-class CampaignApp:
-    def __init__(self, tiles_dir=None, player=None, map="europe", seed=None):
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+class CampaignApp(GameMenu):
+    def __init__(self, tiles_dir=None, player=None, map="europe", seed=None, load=None):
+        self.settings = options.load()
+        self.apply_display()
+        self.tiles_dir = tiles_dir
         pygame.display.set_caption("Hexa: Age of Discovery")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("segoeui,arial", 14)
@@ -70,7 +75,8 @@ class CampaignApp:
         if map == "random" and seed is None:
             import random
             seed = random.randrange(1, 100000)
-        self.world = CampaignWorld(seed if seed is not None else 1480, player=player, map=map)
+        loaded = saves.load(load) if load else None
+        self.world = loaded or CampaignWorld(seed if seed is not None else 1480, player=player, map=map)
         pygame.display.set_caption(f"Hexa: Age of Discovery  -  {self.world.geo.name}")
         self.view = MapView(self.world, tiles_dir)
         self.ui = UI()
@@ -83,8 +89,27 @@ class CampaignApp:
         self._mini_key = None
         self.view.zoom = 1
         self.look_at(geo.hex_of(*self.world.geo.START))
-        if player:
+        if loaded:
+            self.load_world(loaded)
+            self.toast(f"Loaded {saves.slot_name(load)}: {loaded.date()}.")
+        elif player:
             self.choose(player)
+
+    def load_world(self, world):
+        """Switch to a loaded world: fresh map view and selection, camera on the player's capital."""
+        self.world = world
+        self.view = MapView(world, self.tiles_dir)
+        self.ui = UI()
+        self._mini_key = None
+        self.busy = False
+        pygame.display.set_caption(f"Hexa: Age of Discovery  -  {world.geo.name}")
+        if world.player:
+            self.view.zoom = 4
+            self.look_at(world.countries[world.player].capital)
+        else:
+            self.view.zoom = 1
+            self.look_at(geo.hex_of(*world.geo.START))
+        self.refresh()
 
     # ----- camera ----------------------------------------------------------------------
     def view_rect(self):
@@ -211,6 +236,7 @@ class CampaignApp:
         self._advance_orders()
         self.busy = False
         self.refresh()
+        self.autosave()
 
     def _advance_orders(self):
         """Units with a far-away destination keep moving toward it each season, stacks together."""
@@ -238,6 +264,18 @@ class CampaignApp:
     # ----- input -------------------------------------------------------------------------
     def handle(self, event):
         ui = self.ui
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+            self.toggle_fullscreen()
+            return
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_F5 and not self.busy:
+            self.save_to("quick")
+            return
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_F9 and not self.busy:
+            self.load_from("quick")
+            return
+        if self.menu:
+            self.menu_handle(event)
+            return
         if event.type == pygame.QUIT:
             self.running, self.result = False, "quit"
         elif event.type == pygame.KEYDOWN:
@@ -247,9 +285,9 @@ class CampaignApp:
                     ui.selected, ui.panel, ui.province = None, None, None
                     self.refresh()
                 else:
-                    self.running, self.result = False, "quit"
+                    self.open_menu()
             elif key == pygame.K_m:
-                self.running, self.result = False, "menu"
+                self.open_menu()
             elif key in (pygame.K_SPACE, pygame.K_RETURN) and self.player:
                 self.end_turn()
             elif key == pygame.K_TAB and self.player:
@@ -356,13 +394,15 @@ class CampaignApp:
         elif pos in ui.reach and pos != here:
             for unit in group:
                 unit.goal = None
-            world.move_group(group, pos)
+            if world.move_group(group, pos):
+                self.animate()
         elif pos != here:
             dest = world.step_toward_group(group, pos)
             if dest != here:
                 for unit in group:
                     unit.goal = pos
-                world.move_group(group, dest)
+                if world.move_group(group, dest):
+                    self.animate()
                 self.toast("On their way: they keep moving there in the coming seasons.")
             else:
                 self.toast("They cannot get there.")
@@ -370,13 +410,20 @@ class CampaignApp:
         ui.picked = {u.id for u in ui.group}
         self.refresh()
 
+    def animate(self):
+        """Slide the stack that just moved along its route on the map."""
+        ids, path = getattr(self.world, "last_move", ((), []))
+        self.ui.anim = (ids, path, pygame.time.get_ticks()) if len(path) > 1 else None
+
     def open_country(self, tag):
         self.ui.panel, self.ui.country = "country", tag
 
     def press(self, action):
         world, ui, tag = self.world, self.ui, self.player
         kind = action[0]
-        if kind == "mode":
+        if kind == "game_menu":
+            self.open_menu()
+        elif kind == "mode":
             self.view.mode = action[1]
         elif kind == "panel":
             if action[1] == "country":
@@ -454,12 +501,15 @@ class CampaignApp:
         self.refresh()
 
     def scroll(self):
+        if self.menu:
+            return
+        speed = options.SCROLL[self.settings["scroll"]]
         keys = pygame.key.get_pressed()
         dx = (keys[pygame.K_RIGHT] or keys[pygame.K_d]) - (keys[pygame.K_LEFT] or keys[pygame.K_a])
         dy = (keys[pygame.K_DOWN] or keys[pygame.K_s]) - (keys[pygame.K_UP] or keys[pygame.K_w])
         if dx or dy:
-            self.camera[0] += dx * SCROLL
-            self.camera[1] += dy * SCROLL
+            self.camera[0] += dx * speed
+            self.camera[1] += dy * speed
             self.clamp()
 
     # ----- drawing helpers --------------------------------------------------------------------
@@ -511,6 +561,8 @@ class CampaignApp:
         if self.world.over:
             self.banner(f"The year {self.world.year()} has come. Final ranking: "
                         f"{', '.join(c.name for c in self.world.ranking()[:3])} lead. Press L for the ledger.")
+        if self.menu:
+            self.draw_menu()
 
     def _update_path(self):
         ui, world = self.ui, self.world
@@ -576,8 +628,14 @@ class CampaignApp:
                 w = self.small.size(label)[0] + 16
                 self.button((x, 10, w, 26), label, True, ("panel", panel), small=True)
                 x += w + 4
-            self.button((WIDTH - 130, 7, 120, 32), "End season", not self.busy and not world.over, ("end",),
-                        "Let the season pass (Space)")
+            menu_x = x + 10
+            end_w = max(64, min(120, WIDTH - menu_x - 64 - 20))
+            self.button((WIDTH - end_w - 10, 7, end_w, 32), "End season" if end_w >= 110 else "End",
+                        not self.busy and not world.over, ("end",), "Let the season pass (Space)")
+        else:
+            menu_x = WIDTH - 80
+        self.button((menu_x, 10, 64, 26), "Menu", True, ("game_menu",), "Save, load, options and exit (Esc)",
+                    small=True)
 
     def draw_log(self):
         lines = self.world.log[-5:]

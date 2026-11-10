@@ -116,14 +116,19 @@ def _pioneers(world, tag):
         if unit:
             pioneers.append(unit)
     claimed = set()
+    occupied = world.owners_at()
     for unit in pioneers:
         if unit not in world.units or unit.moves_left <= 0 or unit.carrier:
             continue
         if world.improve_check(unit)[0] and country.treasury > 150:
             world.improve(unit)
             continue
+        mass = world.landmass.get(unit.pos)
         sites = [p for p in world.provinces_of(tag) if p.good in WORKS and p.works < 3 and p.controller == tag
-                 and p.pos not in claimed and (world.unit_at(p.pos) in (None, unit))]
+                 and p.pos not in claimed and world.landmass.get(p.pos) == mass
+                 and (p.pos not in occupied or p.pos == unit.pos)]
+        near = [p for p in sites if distance(p.pos, unit.pos) <= 10 * SCALE]
+        sites = near or sites
         if not sites:
             continue
         def value(p):
@@ -269,7 +274,7 @@ def _colonise(world, tag):
     if target is None and colonies < limit and ships:
         target = memory["target"] = _pick_site(world, tag, ships[0])
 
-    if not memory.get("west") and any(geo.lonlat(p)[0] < -30 for p in country.explored if p in world.provinces):
+    if not memory.get("west") and any(_new_world(world, p) for p in country.explored if p in world.provinces):
         memory["west"] = True
     explore = colonies >= 2 and not memory.get("west")
     for ship in ships:
@@ -356,7 +361,7 @@ def _pick_site(world, tag, ship):
         if not prov or prov.owner is not None or not prov.coastal or not prov.good:
             continue
         lon, lat = geo.lonlat(pos)
-        if lon > -12 and lat > 20:
+        if (world.in_old_world(pos) if world.map == "random" else lon > -12 and lat > 20):
             continue                              # the Old World is not for colonising
         if prov.terrain == "desert" or lon > 20:
             continue
@@ -365,13 +370,20 @@ def _pick_site(world, tag, ship):
         price = GOODS[prov.good].price
         value = price * 2 + (2 if prov.terrain in ("plains", "jungle") else 0) - distance(pos, capital) / (12 * SCALE)
         value -= prov.natives / 8 * SCALE * SCALE
-        if lon < -30:
+        if _new_world(world, pos):
             value += 3                            # the New World is the prize
         if any(p.owner == tag for p in (world.provinces.get(n) for n in neighbors(pos)) if p):
             value += 3
         if best is None or value > best[0]:
             best = (value, pos)
     return best[1] if best else None
+
+
+def _new_world(world, pos):
+    """Land across the ocean: the Americas, or a random world's unknown continents."""
+    if world.map == "random":
+        return not world.in_old_world(pos) and geo.lonlat(pos)[0] < world.geo.START[0] - 30
+    return geo.lonlat(pos)[0] < -30
 
 
 def _frontier(world, tag, ship):

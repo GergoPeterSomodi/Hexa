@@ -97,12 +97,24 @@ One turn is one season, from spring 1480 to 1650. Every land hex is a province.
 a red-outlined enemy). Right-click far away to send a unit there over several seasons. Mouse wheel or
 **+/-** zooms, right-drag or **WASD** scrolls, **1-4** switch map modes (political, terrain, goods, markets;
 press **3** again to switch the goods view between chips, deposits and prices), **Tab** cycles units,
-**C** opens your country, **L** the ledger, **Space** ends the season, **M** the menu.
+**C** opens your country, **L** the ledger, **Space** ends the season.
 Hover anything for a moment to get a card explaining it: troops, buttons, provinces, goods.
 
 **Moving:** a selected stack shows where it can go this season (green, bright edge), next season (blue),
 what it can attack (red; "fire" for cannons), and "stop" where an enemy castle will halt it. Hover a hex to
 see the path, the move cost of each step and how many seasons it takes.
+
+### Menu, saving and options
+- **Esc** (or **M**, or the **Menu** button) pauses the game and opens the menu: resume, save, load, options, back to the main menu, exit.
+- **Saving:** there are eight save slots plus a quicksave (**F5** saves, **F9** loads) and an autosave (every year by default). Each slot shows the country, the date and the map.
+  - Saves are kept in `~/.hexa/saves`.
+  - **Continue** on the start menu loads your latest save.
+- **Options:**
+  - fullscreen (also **F11**)
+  - window size: 1280x720, 1600x900 or 1920x1080; the map fills the extra space
+  - autosave: off, every year or every 5 years
+  - scroll speed
+- Options are kept in `~/.hexa/settings.json`.
 
 ### The map
 - **Two maps** (pick one in the menu, or with `--map europe|random`):

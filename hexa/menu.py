@@ -1,6 +1,7 @@
 """The start menu: pick the game mode and, for colonisation, how to start and how to win."""
 import pygame
 
+from .campaign import saves
 from .colony.rules import GOAL_NAMES, START_NAMES
 
 BG = (22, 28, 38)
@@ -32,6 +33,8 @@ class Menu:
         self.font = pygame.font.SysFont("segoeui,arial", 16)
         self.button_font = pygame.font.SysFont("segoeui,arial", 17, bold=True)
         self.hover = None
+        self.last_save = saves.latest()
+        self.last_meta = saves.meta(self.last_save) if self.last_save else None
 
     def _rows(self):
         rows = [("mode", "Game mode", {k: v[0] for k, v in MODES.items()})]
@@ -51,7 +54,13 @@ class Menu:
                 buttons.append((pygame.Rect(x, y, w, 42), key, value))
                 x += w + 12
             y += 100
-        return buttons, pygame.Rect(self.screen.get_width() // 2 - 110, y + 30, 220, 54)
+        start = pygame.Rect(self.screen.get_width() // 2 - 110, y + 30, 220, 54)
+        if self.last_meta:
+            start.x += 120
+        return buttons, start
+
+    def _continue_rect(self, start):
+        return pygame.Rect(start.x - 240, start.y, 220, 54) if self.last_meta else None
 
     def run(self):
         """Returns the chosen settings, or None if the window was closed."""
@@ -69,6 +78,9 @@ class Menu:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if start.collidepoint(event.pos):
                         return self.settings
+                    resume = self._continue_rect(start)
+                    if resume and resume.collidepoint(event.pos):
+                        return dict(self.settings, mode="campaign", load=self.last_save)
                     for rect, key, value in buttons:
                         if rect.collidepoint(event.pos):
                             self.settings[key] = value
@@ -108,5 +120,14 @@ class Menu:
         pygame.draw.rect(screen, (60, 150, 80) if hovered else (50, 125, 68), start, border_radius=10)
         label = self.button_font.render("Start game", True, TEXT)
         screen.blit(label, label.get_rect(center=start.center))
+        resume = self._continue_rect(start)
+        if resume:
+            hovered = self.hover and resume.collidepoint(self.hover)
+            pygame.draw.rect(screen, (70, 90, 150) if hovered else (55, 75, 128), resume, border_radius=10)
+            label = self.button_font.render("Continue", True, TEXT)
+            screen.blit(label, label.get_rect(center=(resume.centerx, resume.centery - 8)))
+            info = self.last_meta
+            sub = self.font.render(f"{info['country'] or 'Campaign'}, {info['date']}", True, (200, 210, 230))
+            screen.blit(sub, sub.get_rect(center=(resume.centerx, resume.centery + 13)))
         foot = self.font.render("Enter: start    Esc: quit", True, MUTED)
         screen.blit(foot, foot.get_rect(center=(cx, screen.get_height() - 30)))

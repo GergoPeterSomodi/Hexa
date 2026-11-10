@@ -71,6 +71,35 @@ class EuropeMapTest(unittest.TestCase):
         self.assertIn(b, w.reachable_group(stack))
 
 
+class WalkingTest(unittest.TestCase):
+    def test_moves_walk_the_route_and_clear_fog_on_the_way(self):
+        from hexa.hexgrid import distance
+        w = CampaignWorld(player="POR")
+        ship = next(u for u in w.units_of("POR") if u.naval)
+        reach = w.reachable_group([ship])
+        unknown = [p for p in reach if p not in w.countries["POR"].explored]
+        self.assertTrue(unknown, "the caravel can sail into the black fog")
+        dest = max(unknown, key=lambda p: (distance(p, ship.pos), p))
+        start = ship.pos
+        path = w.route([ship], dest)
+        self.assertEqual((path[0], path[-1]), (start, dest))
+        self.assertTrue(all(b in neighbors(a) for a, b in zip(path, path[1:])), "one hex at a time")
+        self.assertTrue(w.move_group([ship], dest))
+        self.assertEqual(ship.pos, dest)
+        explored = w.countries["POR"].explored
+        self.assertTrue(all(p in explored for p in path), "every hex of the route was seen")
+        self.assertEqual(w.last_move, ([ship.id], path))
+        # armies walk too
+        army = [u for u in w.units_of("POR") if u.kind.war]
+        stack = [u for u in army if u.pos == army[0].pos]
+        reach = w.reachable_group(stack)
+        far = max(reach, key=lambda p: (reach[p], p))
+        path = w.route(stack, far)
+        self.assertTrue(all(b in neighbors(a) for a, b in zip(path, path[1:])))
+        self.assertTrue(w.move_group(stack, far))
+        self.assertTrue(all(u.pos == far for u in stack))
+
+
 class RandomWorldTest(unittest.TestCase):
     def test_a_random_world_is_playable(self):
         w = CampaignWorld(11, map="random")

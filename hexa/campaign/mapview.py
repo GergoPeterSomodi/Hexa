@@ -306,8 +306,11 @@ class MapView:
         player = world.player
         group = getattr(ui, "group", [])
         done = set()
+        moving, slide = self._sliding(ui, at)
         for unit in world.units:
             if unit.carrier is not None or unit.pos in done:
+                continue
+            if unit.id in moving and slide:
                 continue
             if player and unit.owner != player and unit.pos not in world.visible:
                 continue
@@ -321,7 +324,32 @@ class MapView:
                 self._diorama(screen, stack, top, (x, y), any(u in group for u in stack))
             else:
                 self._token(screen, top, (x, y), any(u in group for u in stack), len(stack))
+        if slide:
+            stack = [u for u in world.units if u.id in moving and u.carrier is None]
+            if stack:
+                top = max(stack, key=lambda u: (u.kind.war, u.kind.naval, u.id))
+                if self.zoom >= TILE_FROM and self.tiles_dir:
+                    self._diorama(screen, stack, top, slide, True)
+                else:
+                    self._token(screen, top, slide, True, len(stack))
         screen.set_clip(None)
+
+    STEP_MS = 70                    # how long a moving stack takes per hex
+
+    def _sliding(self, ui, at):
+        """(ids of the units in the move being animated, their current screen position) or (set(), None)."""
+        anim = getattr(ui, "anim", None)
+        if not anim:
+            return set(), None
+        ids, path, start = anim
+        t = (pygame.time.get_ticks() - start) / self.STEP_MS
+        if t >= len(path) - 1:
+            ui.anim = None
+            return set(), None
+        i = int(t)
+        (x0, y0), (x1, y1) = at(path[i]), at(path[i + 1])
+        f = t - i
+        return set(ids), (x0 + (x1 - x0) * f, y0 + (y1 - y0) * f)
 
     # ----- tile art (zoomed in) ------------------------------------------------------------
     def sprite(self, path):
