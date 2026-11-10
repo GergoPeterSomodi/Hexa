@@ -1,7 +1,10 @@
 # Hexa
 
-A small turn-based strategy game on a hex map, made with pygame. It has two modes:
+A small turn-based strategy game on a hex map, made with pygame. It has three modes:
 
+- **Age of Discovery:** Europe, North Africa and the Mediterranean in 1480, with about 50 real
+  countries. Pick any of them, run an economy of goods, markets and trade routes, fight your
+  neighbours, and sail into the unknown to colonise the Americas, Africa and the Atlantic islands.
 - **Conquest:** a small medieval map against one rival kingdom. Grow towns and capture its castle.
 - **Colonisation:** a big unknown continent. Land your colonists, survive the winters, deal with
   native tribes, trade with your homeland and out-grow two rival companies.
@@ -85,6 +88,94 @@ what you have and your income per turn.
   guarding its castle, gathers 3 soldiers, then attacks together. It can see the whole map.
 
 All numbers are in `hexa/rules.py` if you want to rebalance the game.
+
+## Age of Discovery
+
+One turn is one season, from spring 1480 to 1650. Every land hex is a province.
+
+**Controls:** left-click selects a province or unit, **right-click** moves the selected unit (or attacks
+a red-outlined enemy). Right-click far away to send a unit there over several seasons. Mouse wheel or
+**+/-** zooms, right-drag or **WASD** scrolls, **1-4** switch map modes (political, terrain, goods, markets;
+press **3** again to switch the goods view between chips, deposits and prices), **Tab** cycles units,
+**C** opens your country, **L** the ledger, **Space** ends the season, **M** the menu.
+Hover anything for a moment to get a card explaining it: troops, buttons, provinces, goods.
+
+**Moving:** a selected stack shows where it can go this season (green, bright edge), next season (blue),
+what it can attack (red; "fire" for cannons), and "stop" where an enemy castle will halt it. Hover a hex to
+see the path, the move cost of each step and how many seasons it takes.
+
+### Fog
+- **Black fog:** places your country has never seen. In 1480 that is everything west of the Canaries:
+  the Azores, Cape Verde and the Americas (Portugal and Castile also know the African coast).
+- **Light fog:** places you know but cannot see right now. You see owners and terrain, not armies.
+  You see around your provinces and your units; ships see furthest.
+
+### Economy
+- **Goods:** grain, fish, salt, wine, wool, cotton, timber, iron, cloth, tools, weapons, sugar, tobacco,
+  furs, ivory, spices, silver and gold. Each province produces one (shown by the goods map mode).
+- **Pops:** peasants, burghers and nobles. Peasants work the land, burghers staff manufactories,
+  everyone eats and buys cloth, wine, salt and (the rich) sugar, spices, furs and more.
+- **Markets:** about 20 market towns (Lisbon, London, Antwerp, Venice, Constantinople...).
+  Each province sells in its nearest market. Prices rise when demand beats supply and fall when
+  goods pile up (between 0.3× and 3.5× the base price). Colonial markets (Havana, Bahia, Elmina...)
+  open once someone settles near them.
+- **Trade routes:** goods flow between neighbouring markets (and across the Atlantic) from cheap to dear
+  by themselves; market owners take tolls.
+- **Merchants** are yours to play: in a market panel press **+** on a route and give a merchant an order,
+  **export** or **import** a good you choose (12 units a season). The card shows the expected profit;
+  the profit or loss each season is yours. You get more merchants from marketplaces and market towns.
+- **The tile:** zoom in (mouse wheel) to see the map in tile art. Each province's tile can be improved:
+  - **Works** (built instantly by **pioneers** standing on the tile, press **B**): field → farm → windmill estate,
+    mine → deep mine → great mine, lumber camp, plantation, fishery and so on. +35% goods per level.
+  - **Settlement:** countryside → village → town → city. Needs enough people; gives more taxes and
+    building slots (1 / 3 / 5).
+  - **Castle:** tower → small castle → large castle. Defensive: +defense for your armies there and much longer sieges.
+- **One job per province each season:** train a unit, or start a settlement, castle or building (4 seasons to finish).
+- **Buildings** (use the settlement's slots): weavers (wool or cotton → cloth), toolmakers (iron → tools),
+  armouries (iron + tools → weapons), marketplaces, ports and shipyards. Manufactories buy their inputs on the
+  market and need burghers.
+- **Money each season:** taxes on goods produced and on people (low/normal/high tax), a share of
+  manufactory profits, and trade; minus upkeep for buildings, armies, ships and young colonies.
+- Food shortages make people shrink; full markets make them grow.
+
+### Colonies
+Raise **colonists** (1,000 settlers from a province) and a **caravel** or **carrack** at a port.
+Move the colonists onto the ship, sail into the black fog, and land on unclaimed coast:
+- **Found a colony:** settlers take the land and it grows; at 5,000 people it becomes a full province.
+  Natives nearby may raid young colonies.
+- **Open a trading post:** on a coast with natives, who keep living there and produce goods for you.
+
+### War
+**Troops** stack on a hex (6 in 1480, 7 and 8 in later eras; a general adds 2). Click a stack to select it all;
+untick units in the side panel to leave them behind. Right-click moves the ticked units or attacks.
+
+| | 1480 | from ~1520 | from ~1575 | Good at |
+|---|---|---|---|---|
+| Infantry | Pikemen | Arquebusiers | Musketeers | Defending, holding castles, stopping cavalry |
+| Cavalry | Knights | Lancers | Cuirassiers | Fast; hits hard in open land, weak in forests, hills and against castles |
+| Cannons | Bombards | Culverins | Field guns | Fire 2 hexes away without reply, smash castles and speed up sieges; weak up close |
+
+- **Battles:** the best 3 units of each side form the front line; every unit behind adds +5% (up to +25%),
+  and cannons behind the line fire first. Defenders strike back. Terrain and castles help defenders.
+- **Castles** have their own garrison (stronger with each level). They stop enemy armies walking past
+  (armies must halt next to them) and must be **besieged** for several seasons (cannons and siege-master
+  generals shorten it) or stormed. Taking a province without a castle needs one season.
+- **Getting better:** research (burghers, or pay to fund it) unlocks new eras; **refit** old troops in a town.
+  A **barracks** (infantry, cavalry) or **foundry** (cannons) lets you drill units for +attack / +defense.
+  Units that survive battles become **Veteran** (+10%) and **Elite** (+20%). **Generals** (raised in your
+  capital) give +2 stack room and +20% in their speciality: open field, forests and hills, storming castles,
+  defending, or cavalry.
+- **Feeding armies:** every troop takes 1,000 men from its province when raised and eats 0.5 grain a
+  season from the local market (paid in ducats, it raises food prices). Each province **feeds** a number of
+  troops (people and farms; half in foreign land): bigger stacks lose 1 HP a season. **Supply lines:** towns,
+  castles and ports are depots; a stack within 3 hexes of one through land you control is in supply. Enemy
+  armies cut the line; cut-off troops cannot heal and lose 1 HP a season. A **supply wagon** feeds its stack for
+  4 seasons away from depots (refills in supply), or the stack can **forage** foreign land (the province loses
+  people and half its goods).
+- Troops heal in their own land when fed (faster in towns). Declare war on a neighbour from their country panel;
+  make peace from yours: demand the land you occupy, offer white peace, or give up.
+
+All numbers are in `hexa/campaign/data.py`; the map, countries and markets in `hexa/campaign/geo.py`.
 
 ## Colonisation
 
@@ -179,6 +270,7 @@ All colonisation numbers are in `hexa/colony/rules.py`.
 |---|---|
 | `play.py` | Starts the game: menu, then the conquest window (mouse, keyboard, enemy turn timing) |
 | `hexa/menu.py` | The start menu |
+| `hexa/campaign/` | Age of Discovery: `geo.py` (real map, countries, markets), `data.py` (goods, buildings, balance), `world.py` (economy, trade, colonies, war), `ai.py`, `mapview.py`, `app.py` |
 | `hexa/colony/` | Colonisation mode: `rules.py`, `mapgen.py`, `world.py` (rules), `ai.py` (rivals, natives, royal army), `render.py`, `app.py` (window) |
 | `hexa/rules.py` | Unit, terrain and balance numbers |
 | `hexa/world.py` | Game state and rules: movement, combat, fog of war, turns, winning |

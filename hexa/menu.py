@@ -8,7 +8,9 @@ TEXT = (235, 238, 242)
 MUTED = (150, 160, 172)
 GOLD = (255, 214, 70)
 
-MODES = {"conquest": ("Conquest", "Small map, one rival kingdom. Capture its castle or have the best score after 40 turns."),
+MODES = {"campaign": ("Age of Discovery", "Europe and the Mediterranean in 1480. Pick any country, build an economy "
+                                         "of markets and trade, and colonise the unknown world."),
+         "conquest": ("Conquest", "Small map, one rival kingdom. Capture its castle or have the best score after 40 turns."),
          "colony": ("Colonisation", "Big unknown continent. Survive the winters, deal with native tribes, "
                                     "out-grow two rival companies and trade with your homeland.")}
 START_HELP = {"sea": "Start on a ship with 2 colonists, a soldier and a pioneer. You choose where to land.",

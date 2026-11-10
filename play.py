@@ -3,6 +3,7 @@
     python play.py                                   # start menu
     python play.py --mode conquest --seed 42         # skip the menu, same map every time
     python play.py --mode colony --start sea --goal survive
+    python play.py --mode campaign --nation POR             # Age of Discovery as Portugal
 """
 import argparse
 import os
@@ -10,6 +11,7 @@ import os
 import pygame
 
 from hexa import ai
+from hexa.campaign.app import CampaignApp
 from hexa.colony.app import ColonyApp
 from hexa.menu import Menu
 from hexa.hexgrid import pixel_to_hex
@@ -243,13 +245,14 @@ class App:
 
 def main():
     parser = argparse.ArgumentParser(description="Play Hexa.")
-    parser.add_argument("--mode", choices=("conquest", "colony"), help="skip the menu and start this mode")
+    parser.add_argument("--mode", choices=("campaign", "conquest", "colony"), help="skip the menu and start this mode")
+    parser.add_argument("--nation", help="campaign: play this country straight away (e.g. POR, ENG, VEN)")
     parser.add_argument("--start", choices=("sea", "land"), default="sea", help="colonisation: how to start")
     parser.add_argument("--goal", choices=("survive", "independence", "endless"), default="survive",
                         help="colonisation: how to win")
     parser.add_argument("--seed", type=int, help="map number, to replay the same map")
     args = parser.parse_args()
-    settings = {"mode": args.mode or "colony", "start": args.start, "goal": args.goal}
+    settings = {"mode": args.mode or "campaign", "start": args.start, "goal": args.goal}
     skip_menu = args.mode is not None
     pygame.init()
     while True:
@@ -258,8 +261,10 @@ def main():
             settings = Menu(screen, settings).run()
             if settings is None:
                 break
-        skip_menu = False
-        if settings["mode"] == "conquest":
+        skip_menu_once, skip_menu = skip_menu, False
+        if settings["mode"] == "campaign":
+            result = CampaignApp(TILES_DIR, args.nation if skip_menu_once else None).run()
+        elif settings["mode"] == "conquest":
             result = App(args.seed).run()
         else:
             result = ColonyApp(screen, TILES_DIR, args.seed, settings["start"], settings["goal"]).run()
