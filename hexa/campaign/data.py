@@ -2,7 +2,11 @@
 
 One turn is one season. Population is counted in thousands, money in ducats.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
+
+from .geo import SCALE          # the map is SCALE times finer than the original: distances grow, provinces shrink
+
+AREA = SCALE * SCALE            # provinces per original province
 
 START_YEAR = 1480
 END_YEAR = 1650
@@ -71,18 +75,28 @@ class Terrain:
     density: float        # people per hex (thousands) in 1480 Europe
 
 
+def _terrain(key, name, color, move, defense, density):
+    return Terrain(key, name, color, move, defense, density / AREA)
+
+
 TERRAIN = {t.key: t for t in (
-    Terrain("plains", "Farmland", (150, 180, 95), 1, 0.0, 55),
-    Terrain("steppe", "Steppe", (190, 190, 120), 1, 0.0, 18),
-    Terrain("forest", "Forest", (70, 125, 70), 2, 0.25, 22),
-    Terrain("hills", "Hills", (160, 150, 105), 2, 0.25, 35),
-    Terrain("mountains", "Mountains", (130, 120, 115), 3, 0.5, 12),
-    Terrain("desert", "Desert", (225, 205, 150), 2, 0.0, 2),
-    Terrain("jungle", "Jungle", (40, 110, 60), 3, 0.25, 15),
-    Terrain("tundra", "Tundra", (175, 185, 180), 2, 0.0, 2),
-    Terrain("lake", "Lake", (90, 150, 200), None, 0.0, 0),
-    Terrain("ocean", "Sea", (40, 85, 150), None, 0.0, 0),
+    _terrain("plains", "Farmland", (150, 180, 95), 1, 0.0, 55),
+    _terrain("steppe", "Steppe", (190, 190, 120), 1, 0.0, 18),
+    _terrain("forest", "Forest", (70, 125, 70), 2, 0.25, 22),
+    _terrain("hills", "Hills", (160, 150, 105), 2, 0.25, 35),
+    _terrain("mountains", "Mountains", (130, 120, 115), 3, 0.5, 12),
+    _terrain("desert", "Desert", (225, 205, 150), 2, 0.0, 2),
+    _terrain("jungle", "Jungle", (40, 110, 60), 3, 0.25, 15),
+    _terrain("tundra", "Tundra", (175, 185, 180), 2, 0.0, 2),
+    _terrain("marsh", "Marsh", (95, 140, 110), 3, 0.15, 14),
+    _terrain("taiga", "Taiga", (90, 120, 100), 2, 0.25, 6),
+    _terrain("savanna", "Savanna", (200, 180, 95), 1, 0.0, 14),
+    _terrain("beach", "Coast", (230, 215, 160), 1, 0.0, 30),
+    _terrain("snow", "Snowfield", (232, 238, 244), 3, 0.25, 1),
+    _terrain("lake", "Lake", (90, 150, 200), None, 0.0, 0),
+    _terrain("ocean", "Sea", (40, 85, 150), None, 0.0, 0),
 )}
+ROUGH = ("forest", "hills", "mountains", "jungle", "marsh", "taiga", "snow")
 # Kenney tiles used when zoomed in (paths under hexagon-pack/PNG/Tiles/).
 TERRAIN_SPRITES = {
     "plains": ("Terrain/Grass/grass_05.png", "Terrain/Grass/grass_19.png"),
@@ -93,8 +107,17 @@ TERRAIN_SPRITES = {
     "desert": ("Terrain/Sand/sand_07.png", "Terrain/Sand/sand_19.png"),
     "jungle": ("Terrain/Grass/grass_13.png", "Terrain/Grass/grass_12.png"),
     "tundra": ("Terrain/Stone/stone_05.png", "Terrain/Stone/stone_12.png"),
+    "marsh": ("art:marsh:0", "art:marsh:1"),
+    "taiga": ("art:taiga:0", "art:taiga:1"),
+    "snow": ("art:snow:0", "art:snow:1"),
+    "savanna": ("art:savanna:0", "art:savanna:1"),
+    "beach": ("art:beach:0", "art:beach:1"),
     "lake": ("Terrain/Grass/lake.png",),
 }
+# Farmland growing these goods gets its own look (until works are built on it).
+GOOD_SPRITES = {"wine": ("art:vineyard:0", "art:vineyard:1"), "wool": ("art:pasture:0", "art:pasture:1"),
+                "sugar": ("art:plantation:0", "art:plantation:1"), "tobacco": ("art:plantation:0", "art:plantation:1"),
+                "cotton": ("art:plantation:0", "art:plantation:1")}
 NATIVE_VILLAGE_SPRITE = "Western/western_indians.png"
 
 # ----- buildings --------------------------------------------------------------------
@@ -130,8 +153,8 @@ BUILD_TURNS = 4
 # ----- tile levels --------------------------------------------------------------------
 # Works: what pioneers build on a tile to raise its goods. (names per level, sprites per level)
 WORKS_BONUS = 0.35                 # extra output per level
-WORKS_COST = (100, 200, 350)       # ducats for level 1, 2, 3
-WORKS_UPKEEP = 0.2                 # per level per season
+WORKS_COST = tuple(round(c / AREA) for c in (100, 200, 350))   # ducats for level 1, 2, 3
+WORKS_UPKEEP = 0.2 / AREA          # per level per season
 _FIELDS = (("Field", "Farm", "Windmill estate"),
            ("Medieval/medieval_cabin.png", "Medieval/medieval_farm.png", "Medieval/medieval_windmill.png"))
 _MINES = (("Mine", "Deep mine", "Great mine"), ("Medieval/medieval_mine.png",) * 3)
@@ -152,7 +175,7 @@ WORKS = {"grain": _FIELDS, "wine": (("Vineyard", "Wine estate", "Great winery"),
 SETTLEMENTS = ("", "Village", "Town", "City")
 SETTLEMENT_SPRITES = ("", "Medieval/medieval_house.png", "Medieval/medieval_church.png", "Medieval/medieval_openCastle.png")
 SETTLEMENT_COST = (0, 120, 400, 900)
-SETTLEMENT_POP = (0, 15, 45, 90)        # thousand people needed to grow to this level
+SETTLEMENT_POP = (0, 6, 20, 45)         # thousand people needed to grow to this level
 SETTLEMENT_SLOTS = (0, 1, 3, 5)         # buildings (weaver, port, marketplace...) allowed
 SETTLEMENT_TAX = (0.0, 0.05, 0.15, 0.3)
 SETTLEMENT_UPKEEP = (0.0, 0.2, 0.5, 1.0)
@@ -191,9 +214,20 @@ class UnitKind:
     def war(self):
         return bool(self.branch)
 
+    def __reduce__(self):
+        # The game compares kinds by identity (unit.kind is GENERAL), so copies must stay the same object.
+        if UNIT_KINDS.get(self.key) is self:
+            return (unit_kind, (self.key,))
+        return (UnitKind, tuple(getattr(self, f.name) for f in fields(self)))
+
+
+def unit_kind(key):
+    return UNIT_KINDS[key]
+
 
 def _troop(key, name, branch, era, hp, attack, defense, moves, gold, goods, upkeep, **kw):
-    return UnitKind(key, name, moves, 2 if branch == "cavalry" else 1, gold=gold, goods=goods, upkeep=upkeep,
+    return UnitKind(key, name, moves * SCALE, (2 if branch == "cavalry" else 1) * SCALE, gold=gold, goods=goods,
+                    upkeep=upkeep,
                     branch=branch, era=era, hp=hp, attack=attack, defense=defense, **kw)
 
 
@@ -219,14 +253,14 @@ def troop(branch, era):
     return next(t for t in TROOPS if t.branch == branch and t.era == era)
 
 
-SCOUT = UnitKind("scout", "Scouts", 5, 3, gold=15, goods={"grain": 0.5}, upkeep=0.2, hp=6)
-GENERAL = UnitKind("general", "General", 4, 2, gold=120, upkeep=1.0, hp=1)
-WAGON = UnitKind("wagon", "Supply wagon", 3, 1, gold=20, goods={"grain": 3.0}, upkeep=0.2, hp=4)
-PIONEER = UnitKind("pioneer", "Pioneers", 3, 1, gold=30, goods={"tools": 1.5}, upkeep=0.2)
-COLONIST = UnitKind("colonist", "Colonists", 3, 1, gold=40, goods={"tools": 1.0, "grain": 3.0})
-CARAVEL = UnitKind("caravel", "Caravel", 10, 3, naval=True, capacity=4, gold=40,
+SCOUT = UnitKind("scout", "Scouts", 5 * SCALE, 3 * SCALE, gold=15, goods={"grain": 0.5}, upkeep=0.2, hp=6)
+GENERAL = UnitKind("general", "General", 4 * SCALE, 2 * SCALE, gold=120, upkeep=1.0, hp=1)
+WAGON = UnitKind("wagon", "Supply wagon", 3 * SCALE, SCALE, gold=20, goods={"grain": 3.0}, upkeep=0.2, hp=4)
+PIONEER = UnitKind("pioneer", "Pioneers", 3 * SCALE, SCALE, gold=30, goods={"tools": 1.5}, upkeep=0.2)
+COLONIST = UnitKind("colonist", "Colonists", 3 * SCALE, SCALE, gold=40, goods={"tools": 1.0, "grain": 3.0})
+CARAVEL = UnitKind("caravel", "Caravel", 10 * SCALE, 3 * SCALE, naval=True, capacity=4, gold=40,
                    goods={"timber": 8.0, "cloth": 2.0}, upkeep=0.4)
-CARRACK = UnitKind("carrack", "Carrack", 8, 2, naval=True, capacity=8, gold=70,
+CARRACK = UnitKind("carrack", "Carrack", 8 * SCALE, 2 * SCALE, naval=True, capacity=8, gold=70,
                    goods={"timber": 14.0, "cloth": 4.0, "iron": 2.0}, upkeep=0.8)
 UNIT_KINDS = {k.key: k for k in (SCOUT, GENERAL, WAGON, PIONEER, COLONIST, CARAVEL, CARRACK) + TROOPS}
 COLONIST_PEOPLE = 1.0       # thousand peasants who leave home with each colonist unit
@@ -239,7 +273,7 @@ CIVILIAN_LIMIT = 3                         # pioneers, colonists and scouts that
 FRONT = 3                                  # units fighting in the front line
 SUPPORT_BONUS, SUPPORT_MAX = 0.05, 0.25    # each unit behind the front line adds this much
 COUNTER = 0.6                              # defenders strike back this hard
-OPEN_GROUND = ("plains", "steppe", "desert", "tundra")
+OPEN_GROUND = ("plains", "steppe", "desert", "tundra", "savanna", "beach")
 # How hard each branch hits in each kind of fight (attack) and how well it holds (defense).
 FIGHT_ATTACK = {"infantry": {"open": 1.0, "rough": 1.0, "assault": 1.0},
                 "cavalry": {"open": 1.4, "rough": 0.7, "assault": 0.5},
@@ -265,11 +299,11 @@ RESEARCH_FUND = (60, 15)                   # ducats -> research points
 MANPOWER = 1.0             # thousand peasants each new troop takes from its province
 FOOD_PER_TROOP = 0.5       # grain each troop eats per season, bought on the local market
 SUPPLY_BASE = 2            # troops any province can feed...
-SUPPLY_PER_PEOPLE = 12     # ... plus one per this many thousand people...
+SUPPLY_PER_PEOPLE = 4      # ... plus one per this many thousand people...
 SUPPLY_PER_FARM = 1        # ... plus this per level of farm works
 FOREIGN_SUPPLY = 0.5       # in land that is not yours
 ATTRITION = 1              # HP each troop loses per season over the supply limit or cut off
-SUPPLY_RANGE = 3           # hexes from a depot (town, castle or port) through your land
+SUPPLY_RANGE = 3 * SCALE   # hexes from a depot (town, castle or port) through your land
 WAGON_SEASONS = 4          # seasons a full wagon keeps its stack fed
 FORAGE_LOSS = 0.04         # share of a province's people lost to foraging
 FARM_GOODS = ("grain", "wine", "wool", "cotton", "sugar", "tobacco")
@@ -281,7 +315,7 @@ PRODUCTION_TAX = 0.12            # share of the value of a province's goods the 
 PEASANT_TAX, BURGHER_TAX = 0.02, 0.15   # ducats per thousand per season
 BASE_GROWTH = 0.0025             # per season
 COLONY_GROWTH = 0.035
-COLONY_DONE = 5.0                # a colony with this many thousand people becomes a full province
+COLONY_DONE = 5.0 / SCALE                # a colony with this many thousand people becomes a full province
 COLONY_UPKEEP = 0.5
 TRADING_POST_SHARE = 0.4         # natives working for a trading post produce at this rate
 NATIVE_RAID_CHANCE = 0.04
@@ -289,7 +323,7 @@ ROUTE_BASE = 6.0                 # units of goods a trade route moves per season
 MERCHANT_CAPACITY = 12.0
 MARKETPLACE_CAPACITY = 4.0
 PORT_CAPACITY = 3.0
-MARKET_REACH = 14                # provinces further than this from any market sell at home, at a loss
+MARKET_REACH = 14 * SCALE                # provinces further than this from any market sell at home, at a loss
 REMOTE_PENALTY = 0.7
 SEA_STEP = 0.5
 SUBSISTENCE = 0.15               # food every 1,000 peasants grow for themselves each season
@@ -298,6 +332,6 @@ TOLL_SHARE = 0.1                 # share of a route's profit each market owner t
 MERCHANT_SHARE = 0.8             # (unused) kept for old saves
 SIEGE_BASE = 1
 WAR_LENGTH_AI = 16               # AI wars end after about this many turns
-SEA_ROUTE_RANGE = 18
-ATLANTIC_RANGE = 90
-TERRITORY_RADIUS = 4             # starting countries own land this close to one of their seeds
+SEA_ROUTE_RANGE = 18 * SCALE
+ATLANTIC_RANGE = 90 * SCALE
+TERRITORY_RADIUS = 4 * SCALE             # starting countries own land this close to one of their seeds

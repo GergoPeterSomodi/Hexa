@@ -8,11 +8,11 @@ from collections import deque
 
 from ..hexgrid import distance, neighbors
 from . import geo
+SCALE = geo.SCALE
 from .data import (BUILDINGS, CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GOODS,
                    MANUFACTORY_TAX, PIONEER, PRODUCTION_TAX, troop,
                    SETTLEMENT_TAX, WORKS, WORKS_BONUS, WORKS_COST)
 
-COLONIAL = {"POR": 0, "CAS": 0, "ENG": 30, "FRA": 30, "BUR": 40, "DAN": 80, "SWE": 100, "SCO": 100}
 # (tag: first turn it starts colonising; Portugal and Castile lead the way)
 MAX_WARS = 3
 
@@ -184,10 +184,10 @@ def _raise(world, tag, troops):
 
 def _gather(world, tag, stack):
     capital = world.countries[tag].capital
-    if distance(stack[0].pos, capital) <= 1:
+    if distance(stack[0].pos, capital) <= SCALE:
         return
     home = world.provinces.get(stack[0].pos)
-    if home and home.owner == tag and distance(stack[0].pos, capital) <= 4:
+    if home and home.owner == tag and distance(stack[0].pos, capital) <= 4 * SCALE:
         return
     world.move_group(stack, world.step_toward_group(stack, capital))
 
@@ -223,7 +223,7 @@ def _campaign(world, tag, stack, enemies):
     if not targets:
         return
     goal = min(targets, key=lambda p: distance(p.pos, stack[0].pos)).pos
-    if distance(goal, stack[0].pos) > 30:
+    if distance(goal, stack[0].pos) > 30 * SCALE:
         return
     world.move_group(stack, world.step_toward_group(stack, goal))
 
@@ -243,7 +243,7 @@ def _diplomacy(world, tag):
 
 # ----- exploration and colonies --------------------------------------------------------------
 def _colonial(world, tag):
-    if tag not in COLONIAL or world.turn < COLONIAL[tag]:
+    if tag not in world.colonial or world.turn < world.colonial[tag]:
         return False
     return world.countries[tag].balance > 8 and any(p.level("port") for p in world.provinces_of(tag))
 
@@ -269,13 +269,16 @@ def _colonise(world, tag):
     if target is None and colonies < limit and ships:
         target = memory["target"] = _pick_site(world, tag, ships[0])
 
+    if not memory.get("west") and any(geo.lonlat(p)[0] < -30 for p in country.explored if p in world.provinces):
+        memory["west"] = True
+    explore = colonies >= 2 and not memory.get("west")
     for ship in ships:
         if ship not in world.units:
             continue
         aboard = world.cargo(ship)
         if aboard and target:
             _sail_and_land(world, ship, aboard, target)
-        elif target and not colonists and country.treasury > 120:
+        elif target and not colonists and country.treasury > 120 and not explore:
             port = _port_next_to(world, tag, ship)
             if port:
                 unit = world.recruit(tag, port, COLONIST)
@@ -283,7 +286,7 @@ def _colonise(world, tag):
                     world.move(unit, ship.pos)
             else:
                 world.move(ship, world.step_toward(ship, _sea_by(world, home.pos)))
-        elif target is None or not colonists:
+        elif target is None or not colonists or (explore and not aboard):
             frontier = _frontier(world, tag, ship)
             if frontier:
                 world.move(ship, world.step_toward(ship, frontier))
@@ -322,7 +325,7 @@ def _sail_and_land(world, ship, aboard, target):
 def _port_next_to(world, tag, ship):
     for n in neighbors(ship.pos):
         prov = world.provinces.get(n)
-        if prov and prov.owner == tag and world.unit_at(n) is None and prov.peasants >= 3:
+        if prov and prov.owner == tag and prov.peasants >= 3:
             return prov
     return None
 
@@ -331,7 +334,7 @@ def _sea_by(world, pos):
     seas = [n for n in neighbors(pos) if world.is_sea(n)]
     if seas:
         return min(seas)
-    for r in range(2, 5):
+    for r in range(2, 5 * SCALE):
         found = [p for p in _ring(pos, r) if world.is_sea(p)]
         if found:
             return min(found)
@@ -360,8 +363,10 @@ def _pick_site(world, tag, ship):
         if not any(world.sea_body.get(n) == body for n in neighbors(pos)):
             continue
         price = GOODS[prov.good].price
-        value = price * 2 + (2 if prov.terrain in ("plains", "jungle") else 0) - distance(pos, capital) / 12
-        value -= prov.natives / 8
+        value = price * 2 + (2 if prov.terrain in ("plains", "jungle") else 0) - distance(pos, capital) / (12 * SCALE)
+        value -= prov.natives / 8 * SCALE * SCALE
+        if lon < -30:
+            value += 3                            # the New World is the prize
         if any(p.owner == tag for p in (world.provinces.get(n) for n in neighbors(pos)) if p):
             value += 3
         if best is None or value > best[0]:
@@ -376,7 +381,7 @@ def _frontier(world, tag, ship):
     seen = {ship.pos}
     queue = deque([ship.pos])
     found = []
-    while queue and len(seen) < 4000:
+    while queue and len(seen) < 4000 * SCALE * SCALE:
         pos = queue.popleft()
         if any(n in world.terrain and n not in explored for n in neighbors(pos)):
             found.append(pos)

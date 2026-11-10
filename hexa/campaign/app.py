@@ -5,7 +5,7 @@ import pygame
 from . import ai, geo
 from .data import (FOOD_PER_TROOP, MANPOWER, NEEDS, OUTPUT, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BRANCH_NAMES, ERAS, GENERAL, GENERAL_TRAITS, RESEARCH_FUND, SCOUT, UPGRADE_MAX, BUILDINGS, CARAVEL, CARRACK, CASTLES, COLONIST, COLONY_DONE, GOODS, PIONEER,
                    SETTLEMENT_SLOTS, SETTLEMENTS, TAX_LEVELS, TERRAIN, UNIT_KINDS, WORKS, WORKS_BONUS, WORKS_COST)
-from .mapview import GOODS_VIEWS, MODES, MapView
+from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
 from .world import CampaignWorld
 
 WIDTH, HEIGHT = 1280, 720
@@ -58,7 +58,7 @@ class UI:
 
 
 class CampaignApp:
-    def __init__(self, tiles_dir=None, player=None):
+    def __init__(self, tiles_dir=None, player=None, map="europe", seed=None):
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Hexa: Age of Discovery")
         self.clock = pygame.time.Clock()
@@ -67,7 +67,11 @@ class CampaignApp:
         self.bold = pygame.font.SysFont("segoeui,arial", 15, bold=True)
         self.title = pygame.font.SysFont("segoeui,arial", 20, bold=True)
         self.big = pygame.font.SysFont("georgia,timesnewroman,serif", 30, bold=True)
-        self.world = CampaignWorld(player=player)
+        if map == "random" and seed is None:
+            import random
+            seed = random.randrange(1, 100000)
+        self.world = CampaignWorld(seed if seed is not None else 1480, player=player, map=map)
+        pygame.display.set_caption(f"Hexa: Age of Discovery  -  {self.world.geo.name}")
         self.view = MapView(self.world, tiles_dir)
         self.ui = UI()
         self.camera = [0.0, 0.0]
@@ -78,7 +82,7 @@ class CampaignApp:
         self._mini = None
         self._mini_key = None
         self.view.zoom = 1
-        self.look_at(geo.hex_of(8, 46))
+        self.look_at(geo.hex_of(*self.world.geo.START))
         if player:
             self.choose(player)
 
@@ -99,7 +103,7 @@ class CampaignApp:
         self.camera[1] = max(-100, min(h - rect.h + 100, self.camera[1]))
 
     def zoom(self, step, at=None):
-        new = max(0, min(4, self.view.zoom + step))
+        new = max(0, min(len(ZOOMS) - 1, self.view.zoom + step))
         if new == self.view.zoom:
             return
         rect = self.view_rect()
@@ -130,7 +134,7 @@ class CampaignApp:
         world.changed()
         self.ui.panel, self.ui.country = "country", tag
         world.message(f"You lead {world.countries[tag].name}. Grow your economy, trade, and reach for the New World.")
-        self.view.zoom = 3
+        self.view.zoom = 4
         self.look_at(world.countries[tag].capital)
 
     def toast(self, text):
@@ -588,7 +592,7 @@ class CampaignApp:
             self.text(self.small, line, (box.x + 8, box.y + 3 + i * 18), TEXT if i == len(lines) - 1 else MUTED, width - 16)
 
     def minimap_rect(self):
-        w, h = self.world.cols * 2 + 1, self.world.rows * 2
+        w, h = self.world.cols + 1, self.world.rows
         right = WIDTH - (PANEL_W if self.ui.panel else 0) - 10
         return pygame.Rect(right - w, HEIGHT - h - 10, w, h)
 
@@ -597,7 +601,7 @@ class CampaignApp:
         key = (world.version, world.player)
         if key != self._mini_key:
             self._mini_key = key
-            surf = pygame.Surface((world.cols * 2 + 1, world.rows * 2))
+            surf = pygame.Surface((world.cols + 1, world.rows))
             surf.fill((14, 16, 22))
             known = world.countries[world.player].explored if world.player else world.terrain
             for pos, terrain in world.terrain.items():
@@ -610,7 +614,7 @@ class CampaignApp:
                     color = world.countries[prov.owner].color
                 else:
                     color = (190, 178, 145)
-                surf.fill(color, (pos[0] * 2 + (pos[1] & 1), pos[1] * 2, 2, 2))
+                surf.set_at((pos[0] + (pos[1] & 1), pos[1]), color)
             self._mini = surf
         rect = self.minimap_rect()
         pygame.draw.rect(self.screen, (10, 10, 12), rect.inflate(6, 6), border_radius=3)

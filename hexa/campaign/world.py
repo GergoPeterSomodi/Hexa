@@ -4,13 +4,14 @@ Every land hex is a province. Nothing in here uses pygame.
 """
 import heapq
 import itertools
+import pickle
 import random
 from collections import deque
 from dataclasses import dataclass, field
 
 from ..hexgrid import distance, neighbors, to_cube, within
-from . import geo
-from .data import (BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_ATTACK,
+from . import geo, wfc
+from .data import (AREA, BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_ATTACK,
                    GARRISON_DEFENSE, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS, GENERAL_STACK,
                    GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT, STACK_LIMIT,
                    SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_COST, UPGRADE_MAX, VETERAN_RANKS, UnitKind, troop,
@@ -27,6 +28,19 @@ from .data import (BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_
                    date, SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE, MERCHANT_SHARE)
 
 INF = float("inf")
+SCALE = geo.SCALE
+_RANDOM_GEOS = {}
+_SNAPSHOTS = {}           # (map, seed) -> pickled freshly built world: building the map takes seconds
+LAND_TILES = ("plains", "steppe", "forest", "hills", "mountains", "desert", "jungle", "tundra", "marsh", "taiga",
+              "savanna", "beach", "snow")
+# Terrain that may not touch (wave function collapse rules): mountains rise through hills, deserts
+# fade through steppe and savanna, snow sits next to tundra, taiga and mountains...
+FORBIDDEN = [("mountains", t) for t in ("plains", "marsh", "beach", "steppe")] + \
+    [("desert", t) for t in ("jungle", "marsh", "taiga", "snow", "forest", "tundra")] + \
+    [("snow", t) for t in ("plains", "jungle", "savanna", "beach", "desert", "steppe", "marsh")] + \
+    [("jungle", t) for t in ("taiga", "tundra", "steppe")] + \
+    [("taiga", t) for t in ("savanna", "beach")] + [("tundra", t) for t in ("jungle", "savanna")] + \
+    [("marsh", "savanna")]
 CLASSES = ("peasants", "burghers", "nobles")
 MANUFACTORIES = ("weaver", "toolmaker", "armoury")
 
@@ -124,7 +138,7 @@ class Route:
 
     @property
     def cost(self):
-        return 0.15 + 0.02 * self.distance * (1 if self.sea else 2)
+        return 0.15 + 0.02 / SCALE * self.distance * (1 if self.sea else 2)
 
     def other(self, market):
         return self.b if market is self.a else self.a
@@ -218,12 +232,27 @@ class War:
 class CampaignWorld:
     mode = "campaign"
 
-    def __init__(self, seed=1480, player=None):
+    def __init__(self, seed=1480, player=None, map="europe"):
+        if map == "random":
+            from . import randomgeo
+            source = _RANDOM_GEOS.get(seed) or _RANDOM_GEOS.setdefault(seed, randomgeo.generate(seed))
+        else:
+            source = geo
+        key = (map, seed)
+        if key in _SNAPSHOTS:
+            self.__dict__.update(pickle.loads(_SNAPSHOTS[key]))
+            self._ids = itertools.count(self.__dict__.pop("_next_id"))
+            self.geo = source
+            self.player = player
+            self.update_visibility()
+            return
+        self.geo = source
+        self.map = map
         self.seed = seed
         self.rng = random.Random(seed)
         self.cols, self.rows = geo.COLS, geo.ROWS
         self.turn = 1
-        self.player = player
+        self.player = None
         self.log = []
         self.units = []
         self.wars = []
@@ -241,40 +270,48 @@ class CampaignWorld:
         for country in self.countries.values():
             self._explore_home(country)
         self.economy()                   # first prices and incomes
-        self.update_visibility()
         self.message(f"{date(1)}. The age of discovery begins.")
+        state = {k: v for k, v in self.__dict__.items() if k not in ("geo", "_ids")}
+        state["_next_id"] = next(self._ids)
+        self._ids = itertools.count(state["_next_id"])
+        _SNAPSHOTS[key] = pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL)
+        self.player = player
+        self.update_visibility()
 
     # ----- map ---------------------------------------------------------------------
     def _build_map(self):
-        polys = [geo.EUROPE_ASIA, geo.SCANDINAVIA, geo.BRITAIN, geo.IRELAND, geo.AFRICA,
-                 geo.NORTH_AMERICA, geo.SOUTH_AMERICA] + geo.ISLANDS
-        boxes = [(geo.bbox(p), p) for p in polys]
-        seas = [(geo.bbox(p), p) for p in geo.SEAS]
-        lakes = [(geo.bbox(p), p) for p in geo.LAKES]
-
-        def hit(point, shapes):
-            return any(b[0] <= point[0] <= b[2] and b[1] <= point[1] <= b[3] and geo.inside(point, p)
-                       for b, p in shapes)
-
+        g = self.geo
+        land, lakes = g.land_cells(self.cols, self.rows)
         self.terrain = {}
-        land = set()
         for r in range(self.rows):
             for c in range(self.cols):
-                point = geo.lonlat((c, r))
-                if hit(point, boxes) and not hit(point, seas):
-                    land.add((c, r))
-                self.terrain[(c, r)] = "lake" if hit(point, lakes) else "ocean"
-        for lon, lat in geo.FORCE_LAND + [(x[1], x[2]) for x in geo.CITIES]:
+                self.terrain[(c, r)] = "lake" if (c, r) in lakes else "ocean"
+        for lon, lat in list(g.FORCE_LAND) + [(x[1], x[2]) for x in g.CITIES]:
             pos = geo.hex_of(lon, lat)
             if pos in self.terrain:
                 land.add(pos)
+                lakes.discard(pos)
+        land -= lakes
+        for lon, lat in getattr(g, "FORCE_SEA", ()):
+            land.discard(geo.hex_of(lon, lat))
+
+        # Rivers, traced onto the hexes they flow through.
+        self.rivers, self.river_at = {}, {}
+        for name, line in g.RIVERS:
+            path = [p for p in self._trace(line) if p in land]
+            if len(path) >= 3:
+                self.rivers[name] = path
+                for pos in path:
+                    self.river_at.setdefault(pos, name)
+
+        # Terrain by wave function collapse: each hex gets odds from its geography, and
+        # neighbouring hexes must fit together.
+        coastal = {p for p in land if any(n in self.terrain and n not in land for n in neighbors(p))}
+        prior = {p: self._prior(p, p in coastal, p in self.river_at) for p in land}
+        tiles = wfc.collapse(sorted(land), prior, FORBIDDEN, neighbors, random.Random(self.seed), affinity=1.6)
+        for pos, tile in tiles.items():
+            self.terrain[pos] = tile
         rng = random.Random(1480)
-        deserts = [(geo.bbox(p), p) for p in geo.DESERTS]
-        steppes = [(geo.bbox(p), p) for p in geo.STEPPES]
-        for pos in sorted(land):
-            if self.terrain[pos] == "lake":
-                continue
-            self.terrain[pos] = self._classify(geo.lonlat(pos), rng, deserts, steppes)
 
         self.sea_body = {}
         body = 0
@@ -291,7 +328,7 @@ class CampaignWorld:
                         self.sea_body[n] = body
                         queue.append(n)
         self.cities = {}
-        for name, lon, lat, size in geo.CITIES:
+        for name, lon, lat, size in g.CITIES:
             pos = geo.hex_of(lon, lat)
             if self.is_land(pos):
                 self.cities[pos] = (name, size)
@@ -302,35 +339,103 @@ class CampaignWorld:
         for prov in self.provinces.values():
             prov.good = self._good_for(prov, rng)
 
-    def _classify(self, point, rng, deserts, steppes):
+    def _trace(self, line):
+        """The hexes a (lon, lat) polyline passes through, in order, without loops."""
+        out = []
+        for (x0, y0), (x1, y1) in zip(line, line[1:]):
+            steps = max(1, int(max(abs(x1 - x0), abs(y1 - y0)) / geo.COL_DEG * 4))
+            for i in range(steps + 1):
+                t = i / steps
+                pos = geo.hex_of(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)
+                if pos not in self.terrain or (out and out[-1] == pos):
+                    continue
+                if pos in out:
+                    del out[out.index(pos) + 1:]
+                    continue
+                if out and distance(out[-1], pos) > 1:       # fill a skipped corner
+                    between = [n for n in neighbors(out[-1]) if distance(n, pos) == 1]
+                    if between:
+                        out.append(min(between))
+                out.append(pos)
+        return out
+
+    @staticmethod
+    def _near_line(point, lines, limit):
+        """Distance in degrees to the nearest line, or `limit` if none is closer."""
+        best = limit
         lon, lat = point
-        if any(geo.line_distance(point, line) < 0.8 for line in geo.MOUNTAINS):
-            return "mountains"
-        if any(geo.line_distance(point, line) < 1.6 for line in geo.MOUNTAINS) or \
-                any(geo.line_distance(point, line) < 1.0 for line in geo.HILLS):
-            return "hills" if rng.random() < 0.8 else "forest"
-        river = any(geo.line_distance(point, line) < 0.9 for line in geo.FERTILE_RIVERS)
-        if not river and any(b[0] <= lon <= b[2] and b[1] <= lat <= b[3] and geo.inside(point, p) for b, p in deserts):
-            return "desert"
+        for line in lines:
+            for (ax, ay), (bx, by) in zip(line, line[1:]):
+                if min(ax, bx) - limit > lon or max(ax, bx) + limit < lon or \
+                        min(ay, by) - limit > lat or max(ay, by) + limit < lat:
+                    continue
+                best = min(best, geo.seg_distance(point, (ax, ay), (bx, by)))
+        return best
+
+    def _prior(self, pos, coastal, river):
+        """Odds for each kind of terrain on a land hex, from what is known about the place."""
+        g = self.geo
+        point = geo.lonlat(pos)
+        lon, lat = point
+        mount = self._near_line(point, g.MOUNTAINS, 2.0)
+        if mount < 0.8:
+            return {"mountains": 1.0, "snow": 0.35 if lat > 45.5 or (lon < -30 and lat > 50) else 0.0,
+                    "hills": 0.15}
+        hills = mount < 1.6 or self._near_line(point, g.HILLS, 1.0) < 1.0
+        desert = g.desert_at(point)
+        marsh = g.marsh_at(point)
+        americas = lon < -30
         if river:
-            return "plains"
-        if lon < -30:                                   # the Americas
-            if lat >= 56:
-                return "tundra"
+            if desert:
+                return {"plains": 1.0, "marsh": 0.08 + marsh}
+            return {"plains": 1.0, "marsh": 0.15 + marsh, "forest": 0.15, "hills": 0.05}
+        if desert:
+            return {"desert": 1.0, "steppe": 0.06, "hills": 0.04 if hills else 0.0}
+        if hills:
+            w = {"hills": 0.7, "forest": 0.25, "mountains": 0.08 if mount < 1.2 else 0.0}
+            if lat > 57:
+                w["taiga"] = 0.3
+            if lat < 17:
+                w["jungle" if lat < 8 else "savanna"] = 0.2
+            return w
+        if americas:
+            if lat >= 59:
+                return {"tundra": 1.0, "snow": 0.35, "taiga": 0.1}
+            if lat >= 55:
+                return {"tundra": 0.6, "taiga": 0.6, "marsh": 0.05}
+            if lat >= 47:
+                return {"taiga": 0.5, "forest": 0.4, "plains": 0.12, "marsh": 0.06 + marsh}
             if lat < 21.5:
                 if lon < -95 and lat > 16.5:
-                    return "plains" if rng.random() < 0.7 else "hills"
-                return "jungle" if rng.random() < 0.6 else "plains"
-            return "forest" if rng.random() < (0.75 if lat > 40 else 0.55) else "plains"
+                    return {"plains": 0.6, "hills": 0.3, "savanna": 0.1}
+                w = {"jungle": 0.6, "plains": 0.15, "savanna": 0.3 if 2 < lat < 12 and lon > -72 else 0.1,
+                     "marsh": 0.04 + marsh}
+                if coastal:
+                    w["beach"] = 0.3
+                return w
+            w = {"forest": 0.75 if lat > 40 else 0.5, "plains": 0.3 if lat > 40 else 0.45, "marsh": 0.04 + marsh}
+            if coastal and lat < 36:
+                w["beach"] = 0.25
+            return w
         if lat < 17:                                    # Africa south of the Sahara
-            return "jungle" if lat < 8 and rng.random() < 0.7 else "plains"
-        if any(b[0] <= lon <= b[2] and b[1] <= lat <= b[3] and geo.inside(point, p) for b, p in steppes):
-            return "steppe"
-        forest = 0.75 if lat >= 58 else 0.45 if lat >= 53 else 0.22
-        roll = rng.random()
-        if roll < forest:
-            return "forest"
-        return "hills" if roll < forest + 0.1 else "plains"
+            if lat < 8:
+                w = {"jungle": 0.7, "plains": 0.12, "savanna": 0.18, "marsh": 0.04 + marsh}
+            else:
+                w = {"savanna": 0.65, "plains": 0.3, "steppe": 0.05}
+            if coastal:
+                w["beach"] = 0.2
+            return w
+        if g.steppe_at(point):
+            return {"steppe": 1.0, "plains": 0.12, "marsh": marsh}
+        if lat >= 58 or (lon > 24 and lat >= 55):
+            w = {"taiga": 0.5, "forest": 0.25, "plains": 0.2, "marsh": 0.06 + marsh}
+        elif lat >= 53:
+            w = {"forest": 0.45, "plains": 0.45, "hills": 0.08, "marsh": 0.05 + marsh}
+        else:
+            w = {"plains": 0.64, "forest": 0.22, "hills": 0.1, "marsh": 0.02 + marsh}
+        if coastal and lat < 41:
+            w["beach"] = 0.18
+        return w
 
     def _good_for(self, prov, rng):
         lon, lat = geo.lonlat(prov.pos)
@@ -339,6 +444,22 @@ class CampaignWorld:
         near = lambda x, y, r=2.5: abs(lon - x) < r and abs(lat - y) < r
         if t == "desert":
             return ("salt" if roll < 0.5 else "fish") if prov.coastal else None
+        if t == "marsh":
+            return "fish" if prov.coastal and roll < 0.5 else "wool" if roll < 0.75 else "grain"
+        if t == "taiga":
+            return "furs" if roll < 0.5 else "timber"
+        if t == "snow":
+            return "furs" if roll < 0.6 else None
+        if t == "savanna":
+            if americas:
+                return "cotton" if roll < 0.4 else "grain" if roll < 0.8 else "tobacco"
+            return "ivory" if roll < 0.35 else "grain" if roll < 0.75 else "cotton"
+        if t == "beach":
+            if prov.coastal and roll < 0.45:
+                return "fish"
+            if americas or africa:
+                return "sugar" if roll < 0.75 else "cotton"
+            return "salt" if roll < 0.6 else "wine" if lat < 44 else "grain"
         if t == "tundra":
             return "fish" if prov.coastal and roll < 0.4 else "furs"
         if t == "mountains" or (t == "hills" and roll < 0.3):
@@ -408,21 +529,22 @@ class CampaignWorld:
 
         self.countries = {}
         seeds = []
-        for tag, (name, color, points) in geo.COUNTRIES.items():
+        for tag, (name, color, points) in self.geo.COUNTRIES.items():
             capital = self._nearest_land(geo.hex_of(*points[0]))
             self.countries[tag] = Country(tag, name, color, capital)
             for lon, lat in points:
                 pos = self._nearest_land(geo.hex_of(lon, lat))
                 seeds.append((tag, pos, to_cube(pos), landmass[pos]))
+        reach = TERRITORY_RADIUS * (1.7 if self.map == "random" else 1)
         for prov in self.provinces.values():
             q, r, s = to_cube(prov.pos)
             best = None
             for tag, pos, (sq, sr, ss), mass in seeds:
                 d = max(abs(q - sq), abs(r - sr), abs(s - ss))
-                limit = TERRITORY_RADIUS if mass == landmass[prov.pos] else 1
+                limit = reach if mass == landmass[prov.pos] else 1
                 if d <= limit and (best is None or d < best[0]):
                     best = (d, tag)
-            if best and not (prov.terrain == "desert" and best[0] > 2):
+            if best and not (prov.terrain == "desert" and best[0] > 2 * SCALE):
                 prov.owner = prov.controller = best[1]
         for tag, country in self.countries.items():
             self.provinces[country.capital].owner = self.provinces[country.capital].controller = tag
@@ -436,10 +558,10 @@ class CampaignWorld:
                 prov.name = self.cities[prov.pos][0]
             else:
                 near = min(named, key=lambda kv: distance(kv[0], prov.pos))
-                if distance(near[0], prov.pos) <= 4:
+                if distance(near[0], prov.pos) <= 4 * SCALE:
                     prov.name = f"near {near[1][0]}"
             if prov.owner is None:
-                prov.tribe = min(geo.TRIBES, key=lambda t: (t[1] - lon) ** 2 + (t[2] - lat) ** 2)[0]
+                prov.tribe = min(self.geo.TRIBES, key=lambda t: (t[1] - lon) ** 2 + (t[2] - lat) ** 2)[0]
                 if not prov.name:
                     prov.name = f"{prov.tribe} lands"
             elif not prov.name:
@@ -455,8 +577,10 @@ class CampaignWorld:
                     factor = 0.4
                 elif lat < 37.5 and lon < 28:
                     factor = 0.7
-                if geo.line_distance((lon, lat), geo.FERTILE_RIVERS[0]) < 1:
+                if self.geo.FERTILE_RIVERS and geo.line_distance((lon, lat), self.geo.FERTILE_RIVERS[0]) < 1:
                     factor = 2.2
+                elif prov.pos in self.river_at:
+                    factor *= 1.3
                 prov.peasants = density * factor * 0.94
                 prov.burghers = density * factor * 0.03
                 prov.nobles = density * factor * 0.03
@@ -482,7 +606,7 @@ class CampaignWorld:
             capital = self.countries[prov.owner].capital == prov.pos
             if prov.city:
                 prov.settlement = 3 if self.cities[prov.pos][1] >= 40 else 2
-            elif prov.pop >= SETTLEMENT_POP[1] * 2:
+            elif prov.pop >= SETTLEMENT_POP[1] * 2.5:
                 prov.settlement = 1
             if capital:
                 prov.settlement = max(prov.settlement, 2)
@@ -498,7 +622,71 @@ class CampaignWorld:
             if prov.good and rng.random() < 0.2:
                 prov.works = 1
         for country in self.countries.values():
-            country.treasury = 150 + 4 * len(self.provinces_of(country.tag))
+            mine = self.provinces_of(country.tag)
+            coast = [p for p in mine if p.coastal]
+            if coast and not any(p.level("port") for p in mine):
+                max(coast, key=lambda p: (p.pop, p.pos)).buildings["port"] = 1
+            country.treasury = 150 + 4 / AREA * len(self.provinces_of(country.tag))
+        self.colonial = dict(getattr(self.geo, "COLONIAL", {}))
+        self._build_roads()
+
+    def _build_roads(self):
+        """Roads join each country's towns to the nearest town already on its network, and capitals to
+        neighbouring capitals. Armies march along them at one move per hex."""
+        self.roads, self.road_paths = set(), []
+
+        def connect(start, goals, limit, owner=None):
+            best = {start: (0, None)}
+            heap = [(0, start)]
+            while heap:
+                cost, pos = heapq.heappop(heap)
+                if cost > best[pos][0]:
+                    continue
+                if pos in goals and pos != start:
+                    path = []
+                    while pos is not None:
+                        path.append(pos)
+                        pos = best[pos][1]
+                    return path[::-1]
+                for n in neighbors(pos):
+                    prov = self.provinces.get(n)
+                    if prov is None or (owner and prov.owner != owner):
+                        continue
+                    step = 0.5 if n in self.roads else TERRAIN[prov.terrain].move
+                    if cost + step <= limit and cost + step < best.get(n, (INF,))[0]:
+                        best[n] = (cost + step, pos)
+                        heapq.heappush(heap, (cost + step, n))
+            return None
+
+        for tag, country in self.countries.items():
+            towns = [p.pos for p in self.provinces_of(tag) if p.settlement >= 2 or p.city]
+            network = {country.capital}
+            for pos in sorted(towns, key=lambda q: distance(q, country.capital)):
+                if pos in network:
+                    continue
+                path = connect(pos, network, 14 * SCALE, owner=tag)
+                if path:
+                    self.road_paths.append(path)
+                    self.roads.update(path)
+                network.add(pos)
+        capitals = [c.capital for c in self.countries.values()]
+        for i, a in enumerate(capitals):
+            for b in capitals[i + 1:]:
+                if self.landmass.get(a) == self.landmass.get(b) and distance(a, b) <= 9 * SCALE:
+                    path = connect(a, {b}, 16 * SCALE)
+                    if path:
+                        self.road_paths.append(path)
+                        self.roads.update(path)
+
+    def step_cost(self, frm, to):
+        """Move points to walk from one land hex into the next: roads and rivers make it cheaper."""
+        move = TERRAIN[self.terrain[to]].move
+        if to in self.roads and frm in self.roads:
+            return 1
+        river = self.river_at.get(to)
+        if river and self.river_at.get(frm) == river:
+            return max(1, move - 1)
+        return move
 
     def _starting_units(self):
         for prov in self.provinces.values():
@@ -513,7 +701,7 @@ class CampaignWorld:
                 spot = self._land_spot(tag, self.provinces[country.capital], kind)
                 if spot:
                     self._add_unit(kind, tag, spot, moves=kind.moves)
-            if tag in ("POR", "CAS", "ENG", "FRA", "BUR"):
+            if self.colonial.get(tag, 999) <= 40:
                 ports = [p for p in self.provinces_of(tag) if p.level("port")]
                 ports.sort(key=lambda p: (geo.lonlat(p.pos)[0], -p.pop))
                 for prov in ports:
@@ -585,13 +773,20 @@ class CampaignWorld:
 
     def neighbours_of(self, tag):
         """Countries that share a land border (or a narrow sea) with `tag`."""
+        owned = self.provinces_of(tag)
+        cache = getattr(self, "_neighbour_cache", None)
+        if cache is None or cache[0] is not self._owned:
+            cache = self._neighbour_cache = (self._owned, {})
+        if tag in cache[1]:
+            return set(cache[1][tag])
         found = set()
-        for prov in self.provinces_of(tag):
-            for pos in within(prov.pos, 2):
+        for prov in owned:
+            for pos in (within(prov.pos, 2 * SCALE) if prov.coastal else neighbors(prov.pos)):
                 other = self.provinces.get(pos)
                 if other and other.owner and other.owner != tag and \
-                        (distance(pos, prov.pos) == 1 or (prov.coastal and other.coastal)):
+                        (prov.coastal and other.coastal or distance(pos, prov.pos) == 1):
                     found.add(other.owner)
+        cache[1][tag] = frozenset(found)
         return found
 
     def power(self, unit):
@@ -617,7 +812,7 @@ class CampaignWorld:
     # ----- markets and trade routes -------------------------------------------------
     def _build_markets(self):
         self.markets = []
-        for name, lon, lat, colonial in geo.MARKETS:
+        for name, lon, lat, colonial in self.geo.MARKETS:
             market = Market(name, (lon, lat), colonial)
             for g, good in GOODS.items():
                 market.price[g] = good.price
@@ -665,7 +860,7 @@ class CampaignWorld:
                 if self.is_sea(n):
                     step = SEA_STEP if (self.is_sea(pos) or self.provinces.get(pos) and self.provinces[pos].coastal) else INF
                 elif self.is_land(n):
-                    step = TERRAIN[self.terrain[n]].move if not self.is_sea(pos) else 1
+                    step = self.step_cost(pos, n) if not self.is_sea(pos) else 1
                 else:
                     continue
                 new = cost + step
@@ -1561,7 +1756,7 @@ class CampaignWorld:
                     continue
                 if any(u.owner != lead.owner for u in self.units_at(n)):
                     continue                # cannot walk into or through foreign units
-                step = 1 if naval else TERRAIN[self.terrain[n]].move
+                step = 1 if naval else self.step_cost(pos, n)
                 new = cost + step
                 if new <= moves and new < costs.get(n, INF):
                     costs[n] = new
@@ -1593,7 +1788,7 @@ class CampaignWorld:
                     continue
                 if any(u.owner != lead.owner for u in self.units_at(n)):
                     continue
-                new = cost + (1 if naval else TERRAIN[self.terrain[n]].move)
+                new = cost + (1 if naval else self.step_cost(pos, n))
                 if new <= budget and new < best.get(n, (INF,))[0]:
                     best[n] = (new, pos)
                     heapq.heappush(heap, (new, n))
@@ -1655,19 +1850,26 @@ class CampaignWorld:
             self.see_from(unit)
         return True
 
-    def cost_field(self, goal, naval=False, tag=None):
+    def cost_field(self, goal, naval=False, tag=None, until=None):
+        """Move costs to `goal` from everywhere (or until every hex in `until` is settled)."""
         field = {goal: 0}
         heap = [(0, goal)]
+        left = set(until) if until else None
         while heap:
             cost, pos = heapq.heappop(heap)
             if cost > field.get(pos, INF):
                 continue
+            if left is not None:
+                left.discard(pos)
+                if not left:
+                    break
             for n in neighbors(pos):
                 if naval:
                     ok, step = self.is_sea(n), 1
                 else:
                     ok = self.is_land(n)
-                    step = TERRAIN[self.terrain[n]].move if ok else 0
+                    step = self.step_cost(n, pos) if ok and self.is_land(pos) else \
+                        TERRAIN[self.terrain[n]].move if ok else 0
                 if ok and cost + step < field.get(n, INF):
                     field[n] = cost + step
                     heapq.heappush(heap, (cost + step, n))
@@ -1678,8 +1880,8 @@ class CampaignWorld:
 
     def step_toward_group(self, group, goal, field=None):
         lead = group[0]
-        field = field if field is not None else self.cost_field(goal, lead.naval)
         reach = self.reachable_group(group)
+        field = field if field is not None else self.cost_field(goal, lead.naval, until=reach)
         options = [p for p in reach if p == lead.pos or not any(u.naval for u in self.units_at(p)) or lead.naval]
         return min(options, key=lambda p: (field.get(p, distance(p, goal) * 4 + 1000), reach[p]))
 
@@ -1699,7 +1901,7 @@ class CampaignWorld:
         if trading_post:
             if not prov.coastal:
                 return False, "Trading posts must be on the coast"
-            if prov.natives < 3:
+            if prov.natives < 1.0:
                 return False, "Trading posts need a native population to trade with"
         return True, ""
 
@@ -1725,7 +1927,7 @@ class CampaignWorld:
         country = self.countries[unit.owner]
         self.message(f"{country.name} founded a {what} at {prov.name}.",
                      None if unit.owner == self.player or geo.lonlat(prov.pos)[0] < -20 else unit.owner)
-        self.see_from(unit, radius=2)
+        self.see_from(unit, radius=2 * SCALE)
         return prov
 
     # ----- war -----------------------------------------------------------------------------
@@ -2083,16 +2285,22 @@ class CampaignWorld:
     # ----- knowledge and sight ---------------------------------------------------------
     def _explore_home(self, country):
         if not country.explored:
-            for pos in self.terrain:
-                lon, lat = geo.lonlat(pos)
-                if geo.KNOWN_WORLD(lon, lat):
-                    country.explored.add(pos)
-                limit = geo.COASTAL_KNOWLEDGE.get(country.tag)
-                if limit is not None and lat >= limit and lon > -19.5 and (
-                        self.is_sea(pos) or self.provinces.get(pos) and self.provinces[pos].coastal):
-                    country.explored.add(pos)
+            if getattr(self, "_known_world", None) is None:
+                self._known_world = {p for p in self.terrain if self.geo.KNOWN_WORLD(*geo.lonlat(p))}
+            country.explored |= self._known_world
+            limit = self.geo.COASTAL_KNOWLEDGE.get(country.tag)
+            if limit is not None:
+                for pos in self.terrain:
+                    lon, lat = geo.lonlat(pos)
+                    if lat >= limit and lon > -19.5 and (
+                            self.is_sea(pos) or self.provinces.get(pos) and self.provinces[pos].coastal):
+                        country.explored.add(pos)
+        done = self.__dict__.setdefault("_explored_from", {}).setdefault(country.tag, set())
         for prov in self.provinces_of(country.tag):
-            for p in within(prov.pos, 1):
+            if prov.pos in done:
+                continue
+            done.add(prov.pos)
+            for p in within(prov.pos, SCALE):
                 if p in self.terrain:
                     country.explored.add(p)
 

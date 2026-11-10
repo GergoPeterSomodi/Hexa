@@ -104,6 +104,28 @@ Hover anything for a moment to get a card explaining it: troops, buttons, provin
 what it can attack (red; "fire" for cannons), and "stop" where an enemy castle will halt it. Hover a hex to
 see the path, the move cost of each step and how many seasons it takes.
 
+### The map
+- **Two maps** (pick one in the menu, or with `--map europe|random`):
+  - **Europe 1480** is the real map, with about 14,000 provinces.
+  - **Random world** is a new world every game (`--seed` repeats one). It has invented countries in a known Old World with an inland sea, and an unknown New World across the ocean.
+- **Wave function collapse:** both maps grow their terrain this way.
+  - Every hex gets odds from its geography (latitude, mountain ranges, deserts, steppes, marsh regions, rivers).
+  - Neighbouring hexes must fit together: mountains rise through hills, deserts fade through steppe and savanna, and snow only touches cold land.
+  - Like clumps with like, so forests, marshes and hills form natural regions.
+  - The random world also lays out its continents by wave function collapse, on a coarse grid.
+- **Terrain:** farmland, steppe, forest, hills, mountains, desert, jungle, tundra, marsh, taiga, savanna, coast and snowfield.
+  - Each has its own move cost, defense and population.
+  - Vineyards, pastures and plantations show what farmland grows.
+- **Rivers** (Rhine, Danube, Loire, Nile, Mississippi...): river land holds more people, and marching along a river costs one move less.
+- **Roads** join each country's towns and its neighbours' capitals. Along a road, every hex costs one move.
+- **Looks:**
+  - Coasts have surf and shallow water.
+  - Rivers have banks, and bridges where roads cross.
+  - Borders are ribbons in the country's colours.
+  - Towns and cities grow extra houses, mines smoke, and ports get docks.
+  - Northern Europe frosts over in winter.
+- **Units:** close up, a stack shows up to three figures of what it holds, with a shield for its size. Zoomed out, it shows as a board-game token with era pips.
+
 ### Fog
 - **Black fog:** places your country has never seen. In 1480 that is everything west of the Canaries:
   the Azores, Cape Verde and the Americas (Portugal and Castile also know the African coast).
@@ -270,7 +292,7 @@ All colonisation numbers are in `hexa/colony/rules.py`.
 |---|---|
 | `play.py` | Starts the game: menu, then the conquest window (mouse, keyboard, enemy turn timing) |
 | `hexa/menu.py` | The start menu |
-| `hexa/campaign/` | Age of Discovery: `geo.py` (real map, countries, markets), `data.py` (goods, buildings, balance), `world.py` (economy, trade, colonies, war), `ai.py`, `mapview.py`, `app.py` |
+| `hexa/campaign/` | Age of Discovery: `geo.py` (real map, countries, markets, rivers), `randomgeo.py` (random worlds), `wfc.py` (wave function collapse), `art.py` (code-drawn tiles, figures, tokens), `data.py` (goods, buildings, balance), `world.py` (economy, trade, colonies, war), `ai.py`, `mapview.py`, `app.py` |
 | `hexa/colony/` | Colonisation mode: `rules.py`, `mapgen.py`, `world.py` (rules), `ai.py` (rivals, natives, royal army), `render.py`, `app.py` (window) |
 | `hexa/rules.py` | Unit, terrain and balance numbers |
 | `hexa/world.py` | Game state and rules: movement, combat, fog of war, turns, winning |

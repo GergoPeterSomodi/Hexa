@@ -13,6 +13,9 @@ MODES = {"campaign": ("Age of Discovery", "Europe and the Mediterranean in 1480.
          "conquest": ("Conquest", "Small map, one rival kingdom. Capture its castle or have the best score after 40 turns."),
          "colony": ("Colonisation", "Big unknown continent. Survive the winters, deal with native tribes, "
                                     "out-grow two rival companies and trade with your homeland.")}
+MAP_NAMES = {"europe": "Europe 1480", "random": "Random world"}
+MAP_HELP = {"europe": "The real map: Europe, North Africa and the Mediterranean, with the Americas to discover.",
+            "random": "A new world every game, grown by wave function collapse: invented countries and continents."}
 START_HELP = {"sea": "Start on a ship with 2 colonists, a soldier and a pioneer. You choose where to land.",
               "land": "Start with a small colony already on the coast, plus a soldier, pioneer and scout."}
 GOAL_HELP = {"survive": "After 10 years (40 seasons) the best colony wins: population, colonies, buildings, gold.",
@@ -34,6 +37,8 @@ class Menu:
         rows = [("mode", "Game mode", {k: v[0] for k, v in MODES.items()})]
         if self.settings["mode"] == "colony":
             rows += [("start", "Start", START_NAMES), ("goal", "Goal", GOAL_NAMES)]
+        if self.settings["mode"] == "campaign":
+            rows += [("map", "Map", MAP_NAMES)]
         return rows
 
     def _layout(self):
@@ -84,17 +89,18 @@ class Menu:
             y = 190 + i * 100
             screen.blit(self.head.render(heading, True, TEXT), (90, y + 10))
             help_text = {"mode": MODES[self.settings["mode"]][1], "start": START_HELP.get(self.settings["start"]),
-                         "goal": GOAL_HELP.get(self.settings["goal"])}[key]
+                         "goal": GOAL_HELP.get(self.settings["goal"]),
+                         "map": MAP_HELP.get(self.settings.get("map", "europe"))}[key]
             screen.blit(self.font.render(help_text, True, MUTED), (90, y + 54))
         for rect, key, value in buttons:
-            chosen = self.settings[key] == value
+            chosen = self.settings.get(key, "europe") == value
             hovered = self.hover and rect.collidepoint(self.hover)
             color = (60, 100, 160) if chosen else (58, 64, 76) if hovered else (42, 47, 58)
             pygame.draw.rect(screen, color, rect, border_radius=8)
             if chosen:
                 pygame.draw.rect(screen, GOLD, rect, 2, border_radius=8)
             label = {"mode": MODES.get(value, ("",))[0], "start": START_NAMES.get(value),
-                     "goal": GOAL_NAMES.get(value)}[key]
+                     "goal": GOAL_NAMES.get(value), "map": MAP_NAMES.get(value)}[key]
             text = self.button_font.render(label, True, TEXT)
             screen.blit(text, text.get_rect(center=rect.center))
 
