@@ -210,6 +210,7 @@ class UISuiteWithoutPygameTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, home, True)
         env = dict(os.environ, HEXA_HOME=home)
         env.pop(pg.REQUIRE_VAR, None)
+        env.pop(slow.FAST_VAR, None)            # @slow window tests would show as skipped, not as errors
         if require:
             env[pg.REQUIRE_VAR] = "1"
         done = subprocess.run([sys.executable, "-c", UI_SUITE_WITHOUT_PYGAME], cwd=ROOT, env=env,
@@ -231,7 +232,7 @@ class UISuiteWithoutPygameTest(unittest.TestCase):
         self.assertIn(pg.REQUIRE_VAR, done.stderr, "the error says why the tests did not skip")
 
     def test_importing_the_harness_and_ui_tests_does_not_import_pygame(self):
-        code = ("import sys, tests.support.harness, tests.ui.test_smoke; "
+        code = ("import sys, tests.support.harness, tests.ui.test_smoke, tests.ui.test_menu, tests.ui.test_launcher; "
                 "sys.exit(1 if 'pygame' in sys.modules else 0)")
         done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, timeout=60)
         self.assertEqual(done.returncode, 0, f"pygame was imported at module level\n{done.stderr}")
