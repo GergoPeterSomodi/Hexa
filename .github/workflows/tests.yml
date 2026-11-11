@@ -1,0 +1,42 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: unit (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the floor, 3.x is the newest release.
+        python-version: ["3.10", "3.13", "3.x"]
+    steps:
+      # runner.temp can't be used in a job-level env, so the folder is set by the first step.
+      - name: Isolate HEXA_HOME
+        run: echo "HEXA_HOME=$RUNNER_TEMP/hexa-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # No "pip install": this job proves the suite needs no pygame.
+      - name: Choose test flags
+        # --durations only exists on Python 3.12 and newer.
+        run: |
+          if python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)'; then
+            echo "TEST_FLAGS=--durations 15" >> "$GITHUB_ENV"
+          fi
+      - name: Run unit tests
+        run: |
+          # shellcheck disable=SC2086  # TEST_FLAGS is empty or "--durations 15": split into words on purpose
+          python -m unittest discover -s tests -t . -v $TEST_FLAGS

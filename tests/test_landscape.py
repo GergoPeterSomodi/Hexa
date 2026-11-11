@@ -6,7 +6,10 @@ import unittest
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
-import pygame  # noqa: E402
+try:
+    import pygame  # noqa: E402
+except ImportError:                     # the unit suite runs without pygame (the CI unit job): skip the module
+    raise unittest.SkipTest("pygame is not installed") from None
 
 from hexa.campaign import landscape as L  # noqa: E402
 from hexa.campaign.world import CampaignWorld  # noqa: E402

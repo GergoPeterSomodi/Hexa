@@ -1,5 +1,7 @@
 # Hexa
 
+[![tests](https://github.com/GergoPeterSomodi/Hexa/actions/workflows/tests.yml/badge.svg)](https://github.com/GergoPeterSomodi/Hexa/actions/workflows/tests.yml)
+
 A small turn-based strategy game on a hex map, made with pygame. It has three modes:
 
 - **Age of Discovery:** Europe, North Africa and the Mediterranean in 1480, with about 50 real
@@ -382,6 +384,15 @@ python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip   # one tes
 The game rules, AI and map generation don't use pygame; only the window, menu and drawing code do.
 To keep test runs or experiments away from your real saves and options, set `HEXA_HOME` to another folder
 (the default is `~/.hexa`).
+
+Python 3.10 or newer is needed (the suite passes on 3.10, the oldest version CI tests). Every push and pull
+request runs the whole suite on GitHub Actions (`.github/workflows/tests.yml`) on Python 3.10, 3.13 and the
+newest release, without installing pygame. To reproduce a CI run locally:
+
+```bash
+HEXA_HOME=$(mktemp -d) python -m unittest discover -s tests -t . -v
+HEXA_HOME=$(mktemp -d) python -m unittest discover -s tests -t . -v --durations 15   # Python 3.12+: slowest tests
+```
 
 ## Project layout
 
