@@ -1,5 +1,6 @@
 """Save, load and settings tests (they use a temporary HEXA_HOME). Run with:
 python -m unittest discover -s tests -t ."""
+import importlib.util
 import json
 import os
 import pickle
@@ -125,6 +126,7 @@ class OldAndBrokenSavesTest(TempHome):
         self.assertIsNone(saves.load("4"))
 
 
+@unittest.skipUnless(importlib.util.find_spec("pygame"), "needs pygame")
 class AppLoadingTest(TempHome):
     @classmethod
     def setUpClass(cls):
