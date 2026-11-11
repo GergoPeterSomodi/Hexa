@@ -401,6 +401,19 @@ HEXA_HOME=$(mktemp -d) python -m unittest discover -s tests -t . -v
 HEXA_HOME=$(mktemp -d) python -m unittest discover -s tests -t . -v --durations 15   # Python 3.12+: slowest tests
 ```
 
+To see which code the tests reach, install coverage.py (the only development dependency, never needed to play)
+and run the suite under it. The settings are in `.coveragerc` (branch coverage; `hexa/` and `play.py`, without the
+tests and the legacy editor). Branch coverage is about 5 times slower on Python 3.12 and older, so CI measures on 3.14:
+
+```bash
+pip install -r requirements-dev.txt
+HEXA_HOME=$(mktemp -d) coverage run -m unittest discover -s tests -t .
+coverage report            # table in the terminal; coverage html writes htmlcov/index.html
+```
+
+Every CI run also shows the coverage table on its summary page and attaches the HTML report as the `htmlcov`
+artifact. There is no minimum yet.
+
 ## Project layout
 
 | File | What it does |

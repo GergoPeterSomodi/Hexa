@@ -26,6 +26,9 @@ HEXA_FAST=1 python -m unittest discover -s tests -t .                     # skip
 python -m unittest tests.test_game                                        # one module
 python -m unittest tests.test_campaign.WarTest                            # one class
 python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip      # one test
+
+pip install -r requirements-dev.txt                                       # coverage.py (CI only; config in .coveragerc)
+coverage run -m unittest discover -s tests -t . && coverage report        # branch coverage; slow before Python 3.14
 ```
 
 Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fresh(player)` a mutable one,

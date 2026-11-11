@@ -1,0 +1,24 @@
+# Used by `coverage run` / `coverage report` (see "Development" in README.md and the coverage job in
+# .github/workflows/tests.yml).
+[run]
+branch = True
+# "source = hexa" plus "include = play.py" does not work: coverage ignores "include" when "source" is set,
+# so play.py would be missing. Measuring from the repo root and omitting what we don't want reports hexa/*
+# and play.py, and lists files no test imports (play.py today) at 0 % instead of leaving them out.
+source =
+    .
+omit =
+    tests/*
+    # Legacy pygame-gui map editor; it doesn't touch the hexa package.
+    Hex.py
+    Game.py
+    Setting.py
+    Create_xml.py
+    Read_XML.py
+    # Virtual environments inside the checkout.
+    .venv/*
+    venv/*
+    env/*
+
+[report]
+skip_empty = True
