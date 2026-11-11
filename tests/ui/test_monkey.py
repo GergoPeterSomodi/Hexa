@@ -126,8 +126,9 @@ class SessionTest(MonkeyCase):
         self.assertIn("in update", "\n".join(report), "with the traceback")
         self.assertEqual(report[-1], "Replay: python -m tools.monkey conquest 1 300 --burst 0.3")
 
-    def test_the_known_goods_map_crash_is_not_excused_anywhere_else(self):
-        """KNOWN_ISSUES withholds input; it never excuses an exception, even the one the goods map raises."""
+    def test_a_known_issue_never_excuses_an_exception(self):
+        """KNOWN_ISSUES withholds input; it never excuses an exception, even a KeyError like the one the close-up
+        goods map used to raise."""
         from hexa.campaign.app import CampaignApp
         drawn = []
 
@@ -175,37 +176,6 @@ class SessionTest(MonkeyCase):
 class KnownIssuesTest(MonkeyCase):
     """The input withheld for known open crashes (monkey.KNOWN_ISSUES): exactly what would crash, nothing more."""
 
-    def test_the_goods_map_is_withheld_only_where_it_would_crash(self):
-        import pygame
-        import play
-        from hexa.campaign.app import CampaignApp
-        from hexa.campaign.mapview import TILE_FROM
-        from tests.support.harness import click, key, wheel
-
-        app = CampaignApp(play.TILES_DIR, "POR")
-        app.draw()
-        view = app.view
-        withheld = lambda events: [monkey._goods_close_up(app, e) for e in events if e.type in (   # noqa: E731
-            pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.MOUSEWHEEL)]
-        goods = harness.button_rect(app, "Goods", ("mode", "goods")).center
-        terrain = harness.button_rect(app, "Terrain", ("mode", "terrain")).center
-        middle = app.view_rect().center
-        self.assertEqual((view.zoom, view.mode), (4, "political"))
-        self.assertEqual(withheld(key("3") + click(goods) + click(goods, 3)), [True, True, False])
-        self.assertEqual(withheld(key("2") + click(terrain) + key("+") + wheel(1, pos=middle)), [False] * 4)
-        view.zoom = TILE_FROM - 1
-        self.assertEqual(withheld(key("3") + click(goods)), [False, False], "zoomed out the goods map is fine")
-        view.mode = "goods"
-        self.assertEqual(withheld(key("+") + key("=") + key("[+]") + wheel(1, pos=middle)), [True] * 4)
-        self.assertEqual(withheld(key("-") + wheel(-1, pos=middle) + key("3")), [False] * 3)
-        app.ui.panel, app.ui.mouse = "country", app.panel_rect().center       # the window keeps the mouse there
-        self.assertEqual(withheld(wheel(1, pos=app.ui.mouse)), [False], "the wheel over a panel")
-        app.open_menu()
-        self.assertEqual(withheld(key("+")), [False], "the pause menu takes the keys")
-        app.close_menu()
-        view.zoom = TILE_FROM - 2
-        self.assertEqual(withheld(key("+")), [False], "one step in stays below the tile zoom levels")
-
     def test_a_click_on_a_greyed_out_troop_button_is_withheld_and_nothing_else(self):
         import pygame
         import play
@@ -214,33 +184,27 @@ class KnownIssuesTest(MonkeyCase):
 
         app = CampaignApp(play.TILES_DIR, "POR")
         world = app.world
-        world.countries["POR"].treasury = 0                  # every troop greyed out, and Fund research
-        app.press(("raise", world.provinces[world.countries["POR"].capital]))
+        world.countries["POR"].treasury = 0                  # every troop greyed out, and the capital's upgrades
+        capital = world.provinces[world.countries["POR"].capital]
+        withheld = lambda events: [monkey._card_toast(app, e) for e in events                     # noqa: E731
+                                   if e.type == pygame.MOUSEBUTTONDOWN]
+        app.press(("province", capital))
+        app.draw()
+        greyed = [b for b in app.ui.buttons if not b.enabled]
+        self.assertTrue(greyed and all(isinstance(b.hint, str) and b.hint for b in greyed), "lines of hint")
+        self.assertEqual(withheld(click(greyed[0].rect.center)), [False], "a greyed-out button with a line of hint")
+        app.press(("raise", capital))
         app.draw()
         troops = [b for b in app.ui.buttons if b.action[0] == "recruit"]
         self.assertTrue(troops)
         self.assertFalse(any(b.enabled for b in troops))
         self.assertIsInstance(troops[0].hint, tuple, "a hover card")
-        fund = next(b for b in app.ui.buttons if b.action == ("fund",))
-        self.assertEqual((fund.enabled, type(fund.hint)), (False, str))
         back = harness.button_rect(app, "Back to the province").center
-        withheld = lambda events: [monkey._card_toast(app, e) for e in events                     # noqa: E731
-                                   if e.type == pygame.MOUSEBUTTONDOWN]
         self.assertEqual(withheld(click(troops[0].rect.center) + click(troops[-1].rect.center)), [True, True])
-        self.assertEqual(withheld(click(fund.rect.center) + click(back) + click(troops[0].rect.center, 3)),
-                         [False] * 3, "a greyed-out button with a line of hint, an enabled one, a right click")
+        self.assertEqual(withheld(click(back) + click(troops[0].rect.center, 3)), [False] * 2,
+                         "an enabled button, a right click")
         app.open_menu()
         self.assertEqual(withheld(click(troops[0].rect.center)), [False], "the pause menu takes the clicks")
-
-    @unittest.expectedFailure
-    def test_seed_1_without_withholding_the_goods_map(self):
-        """New bug, no GitHub issue filed yet (KNOWN_ISSUES "goods-close-up", pinned on its own by test_campaign_app
-        MapModeTest.test_the_close_up_goods_map_shows_each_goods_view): with that input let through, campaign seed 1
-        turns the goods map on at a tile zoom level at frame 95 and crashes with KeyError: 'cattle' in
-        MapView._mode_layer. When the bug is fixed, remove this decorator and the KNOWN_ISSUES row.
-        Replay: python -m tools.monkey campaign 1 300 --burst 0.3 --hit goods-close-up"""
-        outcome = monkey.run_session("campaign", 1, 300, 0.3, hit=("goods-close-up",))
-        self.assert_fixed(outcome, KeyError, "_mode_layer")
 
 
 class NewBugsTest(MonkeyCase):

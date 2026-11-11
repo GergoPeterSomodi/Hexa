@@ -97,14 +97,6 @@ DRAG_BUTTONS = {3: 70, 2: 15, 1: 15}
 # predicate below (_WITHHOLD) that says, at the moment the window would handle an event, whether that event is it.
 # run_session(hit=...) and the tool's --hit let an issue's input through, to reproduce the crash.
 KNOWN_ISSUES = (
-    ("goods-close-up", "campaign",
-     "the goods map at the tile zoom levels (3 and up): key 3 and left clicks on the top bar's Goods button and "
-     "goods-view buttons (Chips, Deposits, Prices) while zoomed in that far, and zooming in to those levels "
-     "(+, =, keypad +, the wheel over the map) while the goods map is on",
-     "KeyError: 'stone' (or another of the 17 goods added since) in MapView._mode_layer: it looks the good of "
-     "every province on screen up in ABBR and DEPOSITS, which miss them",
-     "new bug, no GitHub issue filed yet; pinned by tests/ui/test_campaign_app.py "
-     "MapModeTest.test_the_close_up_goods_map_shows_each_goods_view"),
     ("card-toast", "campaign",
      "left clicks on a greyed-out button whose hover hint is a card rather than a line of text: the troops of "
      "the Raise panel",
@@ -610,30 +602,6 @@ class _Session:
                 out.problems.setdefault(name, (self.frame(), text))
 
 
-def _goods_close_up(app, event):
-    """Would the campaign window handle this event by showing the goods map at a tile zoom level (KNOWN_ISSUES
-    "goods-close-up")? Follows CampaignApp.handle(): F-keys first, then the pause menu takes everything."""
-    import pygame
-    from hexa.campaign.mapview import TILE_FROM
-    if app.menu:
-        return False
-    view, ui = app.view, app.ui
-    if view.mode == "goods":            # zooming in to a tile zoom level
-        if view.zoom + 1 < TILE_FROM:
-            return False
-        if event.type == pygame.KEYDOWN:
-            return event.key in (pygame.K_PLUS, pygame.K_EQUALS, pygame.K_KP_PLUS)
-        return (event.type == pygame.MOUSEWHEEL and event.y > 0
-                and not (ui.panel and app.panel_rect().collidepoint(ui.mouse)))
-    if view.zoom < TILE_FROM:           # turning the goods map on
-        return False
-    if event.type == pygame.KEYDOWN:
-        return event.key == pygame.K_3
-    button = _clicked_button(app, event)
-    return button is not None and button.enabled and (button.action == ("mode", "goods")
-                                                      or button.action[0] == "goods_view")
-
-
 def _clicked_button(app, event):
     """The campaign button a left click lands on, as left_click() finds it (None: the pause menu is open, no left
     click, or no button there)."""
@@ -649,7 +617,7 @@ def _card_toast(app, event):
     return button is not None and not button.enabled and bool(button.hint) and not isinstance(button.hint, str)
 
 
-_WITHHOLD = {"goods-close-up": _goods_close_up, "card-toast": _card_toast}
+_WITHHOLD = {"card-toast": _card_toast}
 
 
 def _describe(event):

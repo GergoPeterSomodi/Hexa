@@ -62,7 +62,8 @@ def main(argv=None):
                 outcome = monkey.run_session(mode, seed, args.frames or monkey.DEFAULT_FRAMES[mode], args.burst,
                                              hit=args.hit)
             except ImportError as error:              # no pygame
-                print(error, file=sys.stderr)
+                print(f"The monkey needs pygame: run it with a Python 3.12 or 3.13 venv (README, Window tests).\n"
+                      f"{error}", file=sys.stderr)
                 return 2
             ran += 1
             print(outcome.summary(), flush=True)
