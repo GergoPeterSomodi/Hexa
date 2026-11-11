@@ -170,6 +170,45 @@ class EventHelperTest(harness.UITestCase):
         self.assertEqual(hover((7, 8))[0].buttons, (0, 0, 0))
 
 
+class HeldKeysTest(harness.UITestCase):
+    def test_get_pressed_reports_the_held_keys_by_name_or_code(self):
+        import pygame
+        keys = self.hold_keys("left")
+        self.assertIs(pygame.key.get_pressed, keys)
+        state = pygame.key.get_pressed()
+        self.assertTrue(state[pygame.K_LEFT])
+        self.assertFalse(state[pygame.K_RIGHT])
+        self.assertIsNone(keys.press(pygame.K_d, "up"))
+        self.assertTrue(all(pygame.key.get_pressed()[k] for k in (pygame.K_LEFT, pygame.K_d, pygame.K_UP)))
+        self.assertFalse(state[pygame.K_d], "an earlier reading does not change")
+        keys.release("left")
+        self.assertFalse(pygame.key.get_pressed()[pygame.K_LEFT])
+        self.assertTrue(pygame.key.get_pressed()[pygame.K_UP])
+        keys.release()
+        self.assertFalse(any(pygame.key.get_pressed()[k] for k in (pygame.K_d, pygame.K_UP)))
+
+    def test_the_driver_presses_and_releases_on_its_frames_and_the_patch_ends_with_the_test(self):
+        import pygame
+        real = pygame.key.get_pressed
+        seen = []
+
+        class Holding(harness.UITestCase):
+            def test_it(self):
+                keys = self.hold_keys()
+                self.driver.at(2, lambda: keys.press("right"))
+                self.driver.at(4, lambda: keys.release("right"))
+                clock = pygame.time.Clock()
+                for _ in range(5):
+                    clock.tick()
+                    seen.append(pygame.key.get_pressed()[pygame.K_RIGHT])
+
+        result = unittest.TestResult()
+        unittest.defaultTestLoader.loadTestsFromTestCase(Holding).run(result)
+        self.assertTrue(result.wasSuccessful(), result.errors + result.failures)
+        self.assertEqual(seen, [False, True, True, False, False])
+        self.assertIs(pygame.key.get_pressed, real, "the cleanup put the real get_pressed back")
+
+
 class WhereTest(harness.UITestCase):
     """hex_pixel and the rect helpers agree with the windows' own hit tests."""
 
@@ -203,6 +242,24 @@ class WhereTest(harness.UITestCase):
         app.look_at(colony)
         self.assertEqual(app.hex_at(harness.hex_pixel(app, colony)), colony)
         self.assertEqual(harness.end_turn_rect(app), END_TURN_RECT)
+
+    def test_colonisation_minimap_cells(self):
+        import pygame
+        import play
+        from hexa.colony.app import ColonyApp
+        from hexa.colony.render import WINDOW_SIZE, minimap_rect
+        from hexa.colony.rules import PLAYER
+        app = ColonyApp(pygame.display.set_mode(WINDOW_SIZE), play.TILES_DIR, 5, "land", "survive")
+        world = app.world
+        rect = minimap_rect(world)
+        self.assertEqual(harness.minimap_pixel(app, (0, 0)), (rect.x + 2, rect.y + 2))
+        self.assertEqual(harness.minimap_pixel(app, (world.cols - 1, 1)), (rect.right - 2, rect.y + 6))
+        app.renderer.draw(world, app.ui, app.camera)
+        screen = pygame.display.get_surface()
+        units = [u for u in world.units_of(PLAYER) if u.carrier is None]
+        self.assertTrue(units)
+        for unit in units:              # the minimap draws the player's units as white cells
+            self.assertEqual(screen.get_at(harness.minimap_pixel(app, unit.pos))[:3], (255, 255, 255), unit)
 
     def test_campaign_with_its_camera_and_zoom(self):
         import play

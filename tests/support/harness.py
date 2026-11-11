@@ -29,10 +29,16 @@ keeps going anyway raises RunawayLoop instead of hanging.
 
 Event helpers return lists of pygame events: key, click, drag, wheel, hover. Rect helpers read the window's
 own state, so tests survive layout changes: button_rect, end_turn_rect, pause_button_rect, menu_option_rect,
-menu_start_rect, menu_continue_rect, and hex_pixel for the screen position of a map hex.
+menu_start_rect, menu_continue_rect, hex_pixel for the screen position of a map hex, and minimap_pixel for a
+hex's cell on the Colonisation minimap.
 
-Not handled here: posted key events don't change pygame.key.get_pressed(), so tests of held-key scrolling patch
-that function themselves (unittest.mock.patch).
+Held keys: posted key events don't change pygame.key.get_pressed(), which the held-key scrolling reads.
+self.hold_keys() (UITestCase) patches it for one test with a HeldKeys, whose press() and release() the script
+calls on the frames it wants:
+
+    keys = self.hold_keys()
+    self.driver.at(2, lambda: keys.press("right"))       # scroll() sees it from the next loop iteration ...
+    self.driver.at(12, lambda: keys.release("right"))    # ... for 10 iterations
 
 pygame is imported lazily, so importing this module (as the pygame-free unit suite does) never loads it.
 """
@@ -40,6 +46,7 @@ import os
 import re
 import sys
 import time
+from unittest import mock
 
 from tests.support.home import TempHome
 from tests.support.pg import REQUIRE_VAR, requires_pygame
@@ -320,6 +327,43 @@ def drag(start, end, button=3, steps=4):
     return events + [pygame.event.Event(pygame.MOUSEBUTTONUP, pos=end, button=button, touch=False)]
 
 
+def _code(k):
+    return _pygame().key.key_code(k) if isinstance(k, str) else k
+
+
+class _Pressed:
+    """What pygame.key.get_pressed() returns: indexed by key code (keys[pygame.K_RIGHT])."""
+
+    def __init__(self, codes):
+        self.codes = frozenset(codes)
+
+    def __getitem__(self, code):
+        return code in self.codes
+
+
+class HeldKeys:
+    """A stand-in for pygame.key.get_pressed(): the keys in down (key codes) read as held, all others as up.
+
+    Install one with UITestCase.hold_keys(). press() and release() take key codes or names ("right", "d") and
+    return None, so the driver can call them on a frame. release() with no keys releases them all. Holding a key
+    posts no KEYDOWN: add key(...) to the script too if the window should also see the press."""
+
+    def __init__(self):
+        self.down = set()
+
+    def press(self, *keys):
+        self.down.update(_code(k) for k in keys)
+
+    def release(self, *keys):
+        if keys:
+            self.down.difference_update(_code(k) for k in keys)
+        else:
+            self.down.clear()
+
+    def __call__(self):
+        return _Pressed(self.down)
+
+
 def wheel(dy, dx=0, pos=None):
     """A mouse wheel turn: dy > 0 away from you (zooms in on the campaign map). With pos, the mouse moves
     there first (the campaign zooms around the mouse)."""
@@ -413,6 +457,16 @@ def hex_pixel(app, pos):
     return _point(hex_center(pos, MAP_ORIGIN))
 
 
+def minimap_pixel(app, pos):
+    """Colonisation: the centre of hex pos's cell on the minimap (top right) as it is drawn, odd rows half a
+    cell to the right: the pixel a player clicks to look at that hex."""
+    from hexa.colony.render import MINI_CELL, minimap_rect
+    rect = minimap_rect(app.world)
+    col, row = pos
+    return (rect.x + col * MINI_CELL + (row & 1) * (MINI_CELL // 2) + MINI_CELL // 2,
+            rect.y + row * MINI_CELL + MINI_CELL // 2)
+
+
 # ----- tests -----------------------------------------------------------------------------------------------
 def artifacts_dir():
     """The folder for files that explain a failure ($HEXA_TEST_ARTIFACTS, default test-artifacts/); CI keeps it."""
@@ -446,6 +500,16 @@ class UITestCase(TempHome):
         self.driver = install()         # first: without pygame there is nothing to clean up
         self.driver.reset()
         super().setUp()
+
+    def hold_keys(self, *keys):
+        """Patch pygame.key.get_pressed() with a HeldKeys until the test ends, keys held from the start;
+        return it, to press() and release() keys on the frames the test wants."""
+        held = HeldKeys()
+        held.press(*keys)
+        patcher = mock.patch.object(sys.modules["pygame"].key, "get_pressed", held)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return held
 
     def run(self, result=None):
         before = _problems(result)
