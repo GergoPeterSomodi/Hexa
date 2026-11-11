@@ -36,6 +36,10 @@ RANDOM_KEPT = 2           # random worlds kept in those caches (the Europe snaps
 WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "visible": set, "over": False,
                   "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
                   "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None}
+# World attributes no save can do without (from_state refuses a state that lacks one). Every other attribute
+# has a default above, is rebuilt on load (geo, _ids) or is added when first needed (_explored_from).
+WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countries", "markets", "cities", "landmass",
+                  "sea_body", "rivers", "river_at", "roads", "road_paths", "colonial")
 LAND_TILES = ("plains", "steppe", "forest", "hills", "mountains", "desert", "jungle", "tundra", "marsh", "taiga",
               "savanna", "beach", "snow")
 # Terrain that may not touch (wave function collapse rules): mountains rise through hills, deserts
@@ -344,8 +348,16 @@ class CampaignWorld:
 
     @classmethod
     def from_state(cls, state):
+        """The world a save holds. Raises ValueError if the state is not a whole world (saves.load reports it)."""
+        if not isinstance(state, dict):
+            raise ValueError(f"a saved world is a dict, not {type(state).__name__}")
+        missing = [name for name in WORLD_REQUIRED if name not in state]
+        if missing:
+            raise ValueError(f"the saved world has no {', '.join(missing)}")
         world = cls.__new__(cls)
         world._restore(state)
+        if world.player is not None and world.player not in world.countries:
+            raise ValueError(f"the saved world has no country {world.player!r} to play")
         world.update_visibility()
         return world
 

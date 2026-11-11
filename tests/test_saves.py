@@ -1,6 +1,9 @@
 """Save, load and settings tests (they use a temporary HEXA_HOME). Run with:
 python -m unittest discover -s tests -t ."""
+import contextlib
+import io
 import json
+import operator
 import os
 import pickle
 import shutil
@@ -11,7 +14,7 @@ from unittest import mock
 from hexa import settings
 from hexa.campaign import ai, saves
 from hexa.campaign.data import GENERAL, troop
-from hexa.campaign.world import CampaignWorld
+from hexa.campaign.world import WORLD_DEFAULTS, WORLD_REQUIRED, CampaignWorld
 
 
 class TempHome(unittest.TestCase):
@@ -123,6 +126,52 @@ class OldAndBrokenSavesTest(TempHome):
         self._write("4", w.save_state(), version=saves.VERSION + 1)
         self.assertIsNone(saves.meta("4"))
         self.assertIsNone(saves.load("4"))
+
+    def _refused(self, slot, why):
+        """load() gives None for the slot and says why on stderr; returns what it said."""
+        said = io.StringIO()
+        with contextlib.redirect_stderr(said):
+            self.assertIsNone(saves.load(slot), why)
+        self.assertIn(f"Could not load save {slot!r}", said.getvalue())
+        return said.getvalue()
+
+    def test_a_state_that_is_not_a_whole_world_is_refused(self):
+        self._write("1", {})                                        # the example in issue #6
+        self._refused("1", "an empty state")
+        self._write("2", [1, 2, 3])
+        self._refused("2", "a state that is not a dict")
+        w = CampaignWorld(player="POR")
+        for slot, name in (("3", "countries"), ("4", "markets"), ("5", "turn"), ("6", "cols")):
+            state = w.save_state()
+            del state[name]
+            self._write(slot, state)
+            self.assertIn(name, self._refused(slot, f"a world without {name}"))
+
+    def test_a_player_country_that_is_not_in_the_world_is_refused(self):
+        w = CampaignWorld(player="POR")
+        w.player = "XXX"                    # load_world() would look up its capital and crash
+        saves.save(w, "1")
+        self.assertIn("'XXX'", self._refused("1", "a world without the player's country"))
+
+    def test_errors_while_unpickling_are_refused(self):
+        class Fails:                        # pickles as a call that raises when the save is read back
+            def __init__(self, func, *args):
+                self.call = (func, args)
+
+            def __reduce__(self):
+                return self.call
+        self._write("1", Fails(int, "1", 2, 3))
+        self.assertIn("TypeError", self._refused("1", "a TypeError while unpickling"))
+        self._write("2", Fails(operator.getitem, (), 0))
+        self.assertIn("IndexError", self._refused("2", "an IndexError while unpickling"))
+
+    def test_every_saved_attribute_is_required_or_has_a_default(self):
+        state = CampaignWorld(player="POR").save_state()
+        restored = {"map", "seed", "_next_id"}           # _restore() handles these itself
+        lazy = {"_explored_from"}                        # added when first needed
+        self.assertEqual(set(state) - set(WORLD_REQUIRED) - set(WORLD_DEFAULTS) - restored - lazy, set(),
+                         "a new world attribute must go into WORLD_REQUIRED or WORLD_DEFAULTS")
+        self.assertTrue(set(WORLD_REQUIRED) <= set(state), "WORLD_REQUIRED only names real attributes")
 
 
 class AppLoadingTest(TempHome):
