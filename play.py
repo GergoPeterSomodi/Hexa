@@ -4,6 +4,7 @@
     python play.py --mode conquest --seed 42         # skip the menu, same map every time
     python play.py --mode colony --start sea --goal survive
     python play.py --mode campaign --nation POR             # Age of Discovery as Portugal
+    python play.py --mode campaign --nation venice          # tag or name, any case
     python play.py --mode campaign --map random --seed 7    # Age of Discovery on a random world
 """
 import argparse
@@ -248,7 +249,8 @@ class App:
 def main():
     parser = argparse.ArgumentParser(description="Play Hexa.")
     parser.add_argument("--mode", choices=("campaign", "conquest", "colony"), help="skip the menu and start this mode")
-    parser.add_argument("--nation", help="campaign: play this country straight away (e.g. POR, ENG, VEN)")
+    parser.add_argument("--nation", help="campaign: play this country straight away, by tag or name in any case "
+                        "(e.g. POR, eng, Venice); random worlds have their own countries")
     parser.add_argument("--map", choices=("europe", "random"), default="europe",
                         help="campaign: the real 1480 map or a random world")
     parser.add_argument("--start", choices=("sea", "land"), default="sea", help="colonisation: how to start")
