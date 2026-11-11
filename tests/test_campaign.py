@@ -308,6 +308,34 @@ class WarTest(unittest.TestCase):
         self.assertLessEqual(len(hurt), 3)
         self.assertGreater(sum(u.hp < u.kind.hp or u not in w.units for u in defenders), 0)
 
+    def test_battle_report_counts_only_hp_lost_in_this_fight(self):
+        w = self.w
+        w.declare_war("POR", "CAS")
+        target, home = self.border()
+        attackers = place(w, troop("infantry", 1), "POR", home, 3)
+        defenders = place(w, troop("infantry", 1), "CAS", target.pos, 3)
+        for unit in attackers + defenders:
+            unit.hp = 4                       # already wounded: 6 HP missing each before the fight
+        w.rng.seed(1)
+        w.attack_group(attackers, target.pos)
+        lost_a = sum(4 - max(0, u.hp) for u in attackers)
+        lost_d = sum(4 - max(0, u.hp) for u in defenders)
+        self.assertGreater(lost_a + lost_d, 0, "the fight must have hurt someone")
+        report = w.log[-1]
+        self.assertRegex(report, rf"{w.countries['POR'].name} lost {lost_a} strength")
+        self.assertRegex(report, rf"{w.countries['CAS'].name} lost {lost_d}\b")
+
+    def test_battle_report_counts_garrison_damage_taken_not_missing(self):
+        w = self.w
+        w.declare_war("POR", "CAS")
+        target, home = self.border()
+        target.castle, target.garrison = 1, 3     # half of the 6 HP a level-1 castle garrison can have
+        w.changed(ownership=True)
+        attackers = place(w, troop("infantry", 1), "POR", home, 3)
+        w.rng.seed(1)
+        w.attack_group(attackers, target.pos)
+        self.assertRegex(w.log[-1], rf"{w.countries['CAS'].name} lost {3 - target.garrison}\b")
+
     def test_cannons_fire_from_two_hexes_without_reply(self):
         w = self.w
         w.declare_war("POR", "CAS")
