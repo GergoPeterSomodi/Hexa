@@ -508,8 +508,8 @@ class CampaignApp(GameMenu, TechScreen):
         elif kind == "goods_view":
             self.view.mode, self.view.goods_view = "goods", action[1]
         elif kind == "forage":
-            if not world.forage(self.active()):
-                self.toast(world.forage_check(self.active())[1])
+            if not world.forage(self.active(), tag):
+                self.toast(world.forage_check(self.active(), tag)[1])
         elif kind == "recall":
             world.recall_merchant(tag, action[1], action[2] if len(action) > 2 else None)
         elif kind == "market":
@@ -1046,9 +1046,10 @@ class CampaignApp(GameMenu, TechScreen):
                 (f"This land feeds {limit} troops (people and farms; half in foreign land).", TEXT),
                 ("Bigger stacks lose 1 HP a season. Wagons and foraging keep stacks fed.", MUTED)]))
             y += 20
-            if state == "cut off" or (state != "supplied" and world.provinces.get(unit.pos) and
-                                      world.provinces[unit.pos].owner != unit.owner):
-                ok, reason = world.forage_check(group)
+            if unit.owner == self.player and (state == "cut off" or
+                                              (state != "supplied" and world.provinces.get(unit.pos) and
+                                               world.provinces[unit.pos].owner != unit.owner)):
+                ok, reason = world.forage_check(group, self.player)
                 self.button((x, y, w, 24), "Forage the land", ok, ("forage",),
                             reason or "Feed the stack from this province: it loses people and half its goods", small=True)
                 y += 28
