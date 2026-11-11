@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from tests.support import pg, slow, worlds
+from tests.support import monkey, pg, slow, worlds
 from tests.support.home import TempHome
 from tests.support.worlds import fresh, play_seasons, pristine, random_world
 
@@ -202,6 +202,108 @@ class RequiresPygameTest(unittest.TestCase):
             self.assertEqual(len(self._run_sample(False, value).skipped), 1, repr(value))
 
 
+class MonkeyPlanTest(unittest.TestCase):
+    """tests/support/monkey.py without pygame: the plan of a session, the environment variables, the report."""
+
+    def test_a_seed_always_gives_the_same_plan(self):
+        for mode in monkey.MODES:
+            first = monkey.plan(mode, 5, 400, 0.5)
+            self.assertEqual(monkey.plan(mode, 5, 400, 0.5).digest(), first.digest(), mode)
+            self.assertNotEqual(monkey.plan(mode, 6, 400, 0.5).digest(), first.digest(), mode)
+            self.assertNotEqual(monkey.plan(mode, 5, 400, 0.3).digest(), first.digest(), mode)
+        self.assertNotEqual(monkey.plan("conquest", 5, 400).frames, monkey.plan("colony", 5, 400).frames)
+
+    def test_a_shorter_session_is_the_start_of_a_longer_one(self):
+        for mode in monkey.MODES:
+            self.assertEqual(monkey.plan(mode, 9, 100, 0.5).frames, monkey.plan(mode, 9, 3000, 0.5).frames[:99])
+        frames = [frame for frame, _ in monkey.plan("colony", 9, 100).frames]
+        self.assertEqual(frames, list(range(1, 100)), "an action list for every frame but the last (the QUIT's)")
+
+    def test_burst_is_the_share_of_frames_with_several_actions(self):
+        for ratio in (0.0, 0.3, 0.5, 1.0):
+            schedule = monkey.plan("conquest", 1, 4001, ratio).frames
+            bursts = [actions for _, actions in schedule if len(actions) > 1]
+            self.assertAlmostEqual(len(bursts) / len(schedule), ratio, delta=0.03, msg=ratio)
+            self.assertTrue(all(monkey.BURST_SIZE[0] <= len(a) <= monkey.BURST_SIZE[1] for a in bursts))
+            self.assertFalse(any(action == ("wait",) for actions in bursts for action in actions),
+                             "a burst frame never idles")
+
+    def test_keys_come_from_the_whitelist_and_every_action_is_known(self):
+        kinds = {"key", "end", "click", "aim", "drag", "wheel", "hover", "hold", "release", "wait"}
+        for mode in monkey.MODES:
+            schedule = monkey.plan(mode, 2, 3000, 0.5).frames
+            actions = [action for _, actions in schedule for action in actions]
+            self.assertLessEqual({"key", "end", "click", "aim", "drag", "hover"}, {a[0] for a in actions}, mode)
+            self.assertLessEqual({a[0] for a in actions}, kinds)
+            pressed = {a[1] for a in actions if a[0] == "key" or (a[0] == "end" and a[1] != "click")}
+            self.assertLessEqual(pressed, monkey.keys_of(mode), mode)
+            self.assertEqual(pressed, monkey.keys_of(mode), f"{mode}: 3000 frames press every key at least once")
+            self.assertLessEqual({a[1] for a in actions if a[0] == "aim"}, set(monkey.AIMS[mode]), mode)
+        self.assertFalse(any(a[0] in ("hold", "release") for _, f in monkey.plan("conquest", 2, 3000).frames
+                             for a in f), "Conquest has no scrolling")
+
+    def test_the_window_each_seed_opens(self):
+        from hexa.campaign import geo
+        from hexa.colony.rules import GOAL_NAMES, START_NAMES
+        self.assertEqual(monkey.setup_of("conquest", 7), {"map": 7})
+        colony = [monkey.setup_of("colony", seed) for seed in range(1, 40)]
+        self.assertEqual({s["map"] for s in colony}, set(range(1, 40)))
+        self.assertEqual({s["start"] for s in colony}, set(START_NAMES))
+        self.assertEqual({s["goal"] for s in colony}, set(GOAL_NAMES))
+        nations = {monkey.setup_of("campaign", seed)["nation"] for seed in range(1, 40)}
+        self.assertLessEqual(nations, set(geo.COUNTRIES))
+        self.assertGreater(len(nations), 10)
+        self.assertEqual(monkey.setup_of("campaign", 25), monkey.setup_of("campaign", 25))
+
+    def test_the_environment_sets_seeds_frames_and_burst(self):
+        self.assertEqual(monkey.seeds("colony", {}), monkey.DEFAULT_SEEDS["colony"])
+        self.assertEqual(monkey.seeds("colony", {monkey.SEEDS_VAR: "3"}), (1, 2, 3))
+        self.assertEqual(monkey.seeds("colony", {monkey.SEEDS_VAR: "5-7, 12"}), (5, 6, 7, 12))
+        self.assertEqual(monkey.parse_seeds("7", count=False), (7,), "the tool's seed is one seed")
+        self.assertEqual({mode: monkey.frames(mode, {}) for mode in monkey.MODES},
+                         {"conquest": 800, "colony": 800, "campaign": 300})
+        env = {monkey.FRAMES_VAR: "3000,campaign=600"}
+        self.assertEqual({mode: monkey.frames(mode, env) for mode in monkey.MODES},
+                         {"conquest": 3000, "colony": 3000, "campaign": 600})
+        self.assertEqual(monkey.frames("conquest", {monkey.FRAMES_VAR: "campaign=600"}), 800)
+        self.assertEqual((monkey.burst({}), monkey.burst({monkey.BURST_VAR: "0.5"})), (0.3, 0.5))
+        bad = [(monkey.seeds, ("colony", {monkey.SEEDS_VAR: "x"}), monkey.SEEDS_VAR),
+               (monkey.seeds, ("colony", {monkey.SEEDS_VAR: "0"}), monkey.SEEDS_VAR),
+               (monkey.seeds, ("colony", {monkey.SEEDS_VAR: "9-3"}), "empty range"),
+               (monkey.frames, ("colony", {monkey.FRAMES_VAR: "bogus=5"}), "not a mode"),
+               (monkey.frames, ("colony", {monkey.FRAMES_VAR: "1"}), "at least 2"),
+               (monkey.burst, ({monkey.BURST_VAR: "1.5"},), "between 0 and 1"),
+               (monkey.plan, ("chess", 1, 10), "unknown mode")]
+        for function, args, says in bad:
+            with self.subTest(args=args), self.assertRaisesRegex(ValueError, says):
+                function(*args)
+
+    def test_a_report_ends_with_the_command_that_replays_the_session(self):
+        outcome = monkey.Outcome("colony", 7, 800, 0.5, monkey.setup_of("colony", 7))
+        self.assertFalse(outcome.failed)
+        outcome.problems["unit-hp"] = (150, "unit-hp: crimson soldier #4 at (3, 4) has 0 HP (max 10)")
+        outcome.known["colony-capital"] = (50, "colony-capital: golden has 0 capitals among 1 colonies", "bug")
+        outcome.log = [(149, "key", "tab"), (150, "click", (10, 20), 1)]
+        self.assertTrue(outcome.failed)
+        report = outcome.report().splitlines()
+        self.assertTrue(report[0].startswith("Colonisation monkey, seed 7 (map 7, start "), report[0])
+        self.assertIn("    frame 150: unit-hp: crimson soldier #4 at (3, 4) has 0 HP (max 10)", report)
+        self.assertIn("    frame 50: colony-capital: golden has 0 capitals among 1 colonies  [bug]", report)
+        self.assertEqual(report[-1], "Replay: python -m tools.monkey colony 7 800 --burst 0.5")
+        self.assertEqual(monkey.repro("campaign", 25, 300, 0.5, ("card-toast",)),
+                         "python -m tools.monkey campaign 25 300 --burst 0.5 --hit card-toast")
+
+    def test_every_known_issue_is_documented(self):
+        ids = [issue[0] for issue in monkey.KNOWN_ISSUES]
+        self.assertEqual(len(ids), len(set(ids)))
+        for issue in monkey.KNOWN_ISSUES:
+            self.assertEqual(len(issue), 5)
+            self.assertIn(issue[1], monkey.MODES)
+            self.assertTrue(all(isinstance(text, str) and len(text) > 20 for text in issue[2:]), issue[0])
+            self.assertIn("pinned by", issue[4], f"{issue[0]}: which test pins the bug")
+        self.assertEqual(sorted(monkey._WITHHOLD), sorted(ids), "each issue has its predicate")
+
+
 class UISuiteWithoutPygameTest(unittest.TestCase):
     """End to end, in a subprocess where pygame can't be imported: the ui job's command skips or errors."""
 
@@ -232,7 +334,8 @@ class UISuiteWithoutPygameTest(unittest.TestCase):
         self.assertIn(pg.REQUIRE_VAR, done.stderr, "the error says why the tests did not skip")
 
     def test_importing_the_harness_and_ui_tests_does_not_import_pygame(self):
-        code = ("import sys, tests.support.harness, tests.ui.test_smoke, tests.ui.test_menu, tests.ui.test_launcher; "
+        code = ("import sys, tests.support.harness, tests.support.monkey, tests.ui.test_smoke, tests.ui.test_menu, "
+                "tests.ui.test_launcher, tests.ui.test_monkey, tools.monkey; "
                 "sys.exit(1 if 'pygame' in sys.modules else 0)")
         done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, timeout=60)
         self.assertEqual(done.returncode, 0, f"pygame was imported at module level\n{done.stderr}")

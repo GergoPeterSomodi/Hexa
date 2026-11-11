@@ -13,4 +13,5 @@ Nothing in this package may import pygame at module level; the unit suite has to
     digest_run   python3 -m tests.support.digest_run MODE SEED...: digests of fixed-seed games (determinism test)
     pg           HAVE_PYGAME, @requires_pygame (skip without pygame unless HEXA_REQUIRE_PYGAME=1)
     harness      UITestCase and the Driver: the real windows run headless on fake time with scripted input
+    monkey       seeded random-input sessions through a real window (tests/ui/test_monkey.py, tools/monkey.py)
 """

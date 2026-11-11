@@ -449,7 +449,7 @@ job runs them.
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install pygame==2.6.1 -r requirements-dev.txt
-HEXA_HOME=$(mktemp -d) .venv/bin/python -m unittest discover -s tests/ui -t . -v   # only the window tests (about 30 seconds)
+HEXA_HOME=$(mktemp -d) .venv/bin/python -m unittest discover -s tests/ui -t . -v   # only the window tests (about 1.5 minutes)
 HEXA_HOME=$(mktemp -d) .venv/bin/python -m unittest discover -s tests -t .         # everything, window tests included
 HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .                 # without pygame: errors, not skips
 ```
@@ -468,6 +468,32 @@ driver reset; `self.hold_keys()` holds keys down for the scrolling that reads `p
 screen from the window's own state. Test
 modules in `tests/ui/` import pygame and the window modules inside the tests, never at the top, so the
 pygame-free run can still import them.
+
+`tests/ui/test_monkey.py` is a seeded monkey: it feeds each window random input through its own `run()` loop,
+keys from a whitelist (never QUIT; Space and Return end the turn now and then), left, right and middle clicks
+anywhere or aimed at the window's own buttons, units, reachable hexes and minimap, drags, wheel turns, mouse moves
+and held scroll keys, one action a frame or, with the burst probability, 2 to 6 in the same frame. When Esc or M
+ends the loop it simply runs again until the frame budget is used. A session fails on any exception and on any
+broken world invariant that no known open bug explains (`KNOWN_OPEN` in `tests/support/invariants.py`). Each
+session has its own temporary `HEXA_HOME`. By default it plays seeds 1 and 2 of each mode, 800 frames (the
+campaign 300), burst 0.3, in about 30 seconds; three environment variables scale it:
+
+```bash
+HEXA_MONKEY_SEEDS=30 HEXA_MONKEY_BURST=0.5 .venv/bin/python -m unittest tests.ui.test_monkey.MonkeyTest   # seeds 1 to 30
+HEXA_MONKEY_SEEDS=5-9 HEXA_MONKEY_FRAMES=3000,campaign=600 .venv/bin/python -m unittest tests.ui.test_monkey.MonkeyTest
+.venv/bin/python -m tools.monkey colony 7 800 --burst 0.5          # replay one session (a failure prints this line)
+.venv/bin/python -m tools.monkey campaign 1-30 300 --burst 0.5     # bug hunting: a batch of seeds, a line each
+.venv/bin/python -m tools.monkey --issues                          # the input withheld for known open crashes
+```
+
+`HEXA_MONKEY_SEEDS` is a count (`30`: seeds 1 to 30), a range (`5-9`) or a list (`3,8,12`); `HEXA_MONKEY_FRAMES`
+sets every mode's budget (`3000`), one mode's (`campaign=600`) or both; `HEXA_MONKEY_BURST` is between 0 and 1. A
+failing session prints its report and the command that replays it, `python -m tools.monkey <mode> <seed> <frames>
+--burst <b>`, and saves both, with its last frame, to `test-artifacts/monkey-<mode>-<seed>.txt` and `.png`. Run
+`tools/monkey.py` from the repository root with the venv's Python; `--log N` prints a session's last N actions and
+`--digest` its digests (the same seed always plays the same session). Input that would hit a known open crash is
+withheld (`KNOWN_ISSUES` in `tests/support/monkey.py`), so long runs can find other bugs; expected-failure tests pin
+those crashes, and `--hit <issue>` lets that input through to reproduce one.
 
 CI's `ui` job runs these tests on Python 3.12 with pygame 2.6.1 and adds a second coverage table, of lines
 only: on 3.12 branch coverage is slow, and `HEXA_COVERAGE_BRANCH=0` switches it off in `.coveragerc`. Locally:
@@ -493,6 +519,7 @@ HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon HEXA_HOME=$(mktemp -d) .venv/bin/cov
 | `hexa/render.py` | Drawing the map, units and info bar |
 | `hexa/hexgrid.py` | Hex grid maths |
 | `tests/` | Rule tests (see Development); shared helpers in `tests/support/`; headless window tests in `tests/ui/` |
+| `tools/` | Developer tools: `monkey.py` replays or hunts with the window tests' seeded monkey (`python -m tools.monkey`) |
 | `Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py`, `Read_XML.py` | The original map editor and its XML map loading (`map*.xml`) |
 
 Tile art: [Kenney Hexagon Pack](https://kenney.nl/assets/hexagon-pack) (CC0), in `hexagon-pack/`.

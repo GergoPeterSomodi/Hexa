@@ -37,9 +37,11 @@ coverage run -m unittest discover -s tests -t . && coverage report        # bran
 
 # Window tests (tests/ui) need pygame, which has no wheels for 3.14+: use a 3.12/3.13 venv
 python3.12 -m venv .venv && .venv/bin/pip install pygame==2.6.1 -r requirements-dev.txt
-.venv/bin/python -m unittest discover -s tests/ui -t .                    # headless window tests only, about 30 s
+.venv/bin/python -m unittest discover -s tests/ui -t .                    # headless window tests only, about 90 s (monkey ~50 s)
 HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .        # error instead of skip without pygame (CI ui job)
 HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon .venv/bin/coverage run -m unittest discover -s tests/ui -t .   # line coverage, as the ui job
+HEXA_MONKEY_SEEDS=30 HEXA_MONKEY_FRAMES=3000 HEXA_MONKEY_BURST=0.5 .venv/bin/python -m unittest tests.ui.test_monkey.MonkeyTest   # longer monkey runs (default seeds 1-2, 800 frames / campaign 300, burst 0.3)
+.venv/bin/python -m tools.monkey colony 7 800 --burst 0.5                 # replay one monkey session; a failure prints this line ("1-30" seeds: a batch)
 ```
 
 Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fresh(player)` a mutable one,
@@ -47,7 +49,9 @@ Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fre
 `tearDownModule` pristine guard, so use `fresh()` for anything you change. `tests/support/invariants.py`
 (`check_conquest`, `check_colony`, `check_campaign`) states what must hold after any action; `agents.py` has the
 seeded random players and the `Judge` that enforces the `*_check` contract below; `digests.py` digests a whole
-world (`world_digest` compares across processes, `quick_digest` within one); `games.py` plays all-AI games.
+world (`world_digest` compares across processes, `quick_digest` within one); `games.py` plays all-AI games;
+`monkey.py` is the seeded random-input engine of `tests/ui/test_monkey.py` and `tools/monkey.py` (its `KNOWN_ISSUES`
+table withholds input that would hit a known open crash; keep it narrow and pin each crash as an expected failure).
 
 Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and nine game
 modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
