@@ -2546,7 +2546,7 @@ class CampaignWorld:
         for unit in list(self.units):
             if unit.carrier is None and not unit.naval and unit.owner in (a, b):
                 prov = self.provinces.get(unit.pos)
-                if prov and prov.owner not in (None, unit.owner):
+                if prov and prov.owner in (a, b) and prov.owner != unit.owner:
                     home = self.countries[unit.owner].capital
                     spot = self._free_spot_near(unit, home)
                     if spot:
