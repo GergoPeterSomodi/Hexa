@@ -46,21 +46,38 @@ GOODS = {g.key: g for g in (
     Good("spices", "Spices", 9.0, (220, 120, 40), "luxury"),
     Good("silver", "Silver", 7.0, (200, 205, 215), "money"),
     Good("gold", "Gold", 10.0, (250, 210, 60), "money"),
+    Good("horses", "Horses", 3.0, (150, 100, 60), "raw"),
+    Good("cattle", "Cattle", 1.5, (120, 80, 60), "raw"),
+    Good("stone", "Stone", 1.0, (185, 185, 180), "raw"),
+    Good("copper", "Copper", 2.5, (205, 125, 70), "raw"),
+    Good("hemp", "Hemp & flax", 1.2, (125, 165, 85), "raw"),
+    Good("olives", "Olive oil", 2.5, (165, 170, 90), "luxury"),
+    Good("silk", "Silk", 6.0, (240, 200, 225), "luxury"),
+    Good("dyes", "Dyes", 5.0, (95, 75, 205), "luxury"),
+    Good("cocoa", "Cocoa", 5.0, (115, 70, 40), "luxury"),
+    Good("coffee", "Coffee", 5.0, (90, 55, 35), "luxury"),
+    Good("rope", "Rope & sails", 3.5, (215, 195, 145), "made"),
+    Good("glass", "Glass", 5.0, (165, 220, 235), "made"),
+    Good("leather", "Leather", 3.5, (155, 105, 60), "made"),
+    Good("gunpowder", "Gunpowder", 5.0, (75, 75, 80), "made"),
 )}
 FOODS = ("grain", "fish")
 
 # What 1,000 people of each class want per season.
 NEEDS = {
-    "peasants": {"food": 0.25, "salt": 0.02, "cloth": 0.02, "wine": 0.01},
+    "peasants": {"food": 0.25, "salt": 0.02, "cloth": 0.02, "wine": 0.01, "olives": 0.005},
     "burghers": {"food": 0.25, "salt": 0.03, "cloth": 0.08, "wine": 0.05, "tools": 0.03, "sugar": 0.03,
-                 "tobacco": 0.02, "spices": 0.01},
+                 "tobacco": 0.02, "spices": 0.01, "olives": 0.02, "glass": 0.02, "leather": 0.02, "coffee": 0.01,
+                 "dyes": 0.005},
     "nobles": {"food": 0.25, "cloth": 0.15, "wine": 0.12, "sugar": 0.08, "spices": 0.06, "furs": 0.06,
-               "tobacco": 0.04, "ivory": 0.03, "weapons": 0.03},
+               "tobacco": 0.04, "ivory": 0.03, "weapons": 0.03, "silk": 0.05, "cocoa": 0.03, "glass": 0.03,
+               "dyes": 0.02, "horses": 0.02, "coffee": 0.02, "olives": 0.02},
 }
 # Raw output per 1,000 peasants per season.
 OUTPUT = {"grain": 0.42, "fish": 0.4, "salt": 0.2, "wine": 0.2, "wool": 0.25, "cotton": 0.25, "timber": 0.3,
           "iron": 0.2, "sugar": 0.22, "tobacco": 0.22, "furs": 0.12, "ivory": 0.08, "spices": 0.06,
-          "silver": 0.06, "gold": 0.04}
+          "silver": 0.06, "gold": 0.04, "horses": 0.12, "cattle": 0.25, "stone": 0.3, "copper": 0.15, "hemp": 0.25,
+          "olives": 0.2, "silk": 0.06, "dyes": 0.08, "cocoa": 0.1, "coffee": 0.1}
 PRICE_FLOOR, PRICE_CAP = 0.3, 3.5      # prices stay between these multiples of the base price
 ELASTICITY = 0.6
 
@@ -147,34 +164,63 @@ BUILDINGS = {b.key: b for b in (
     Building("shipyard", "Shipyard", 250, 1, 0.3, "Needed for carracks; ships cost less timber", needs_coast=True),
     Building("barracks", "Barracks", 220, 1, 0.4, "Drill infantry and cavalry here for +attack or +defense"),
     Building("foundry", "Foundry", 260, 1, 0.4, "Cast cannons here; improve cannons for +attack or +defense"),
+    Building("ropewalk", "Ropewalk", 260, 3, 0.3, "Twists hemp into rope and sails for ships", needs_burghers=2,
+             inputs={"hemp": 2.5}, outputs={"rope": 2.0}),
+    Building("glassworks", "Glassworks", 300, 3, 0.3, "Melts stone (sand) with timber into glass", needs_burghers=2,
+             inputs={"stone": 1.5, "timber": 1.0}, outputs={"glass": 1.2}),
+    Building("tannery", "Tannery", 240, 3, 0.3, "Tans cattle hides into leather", needs_burghers=2,
+             inputs={"cattle": 2.5}, outputs={"leather": 2.0}),
+    Building("powder_mill", "Powder mill", 320, 3, 0.3, "Grinds saltpetre and charcoal into gunpowder",
+             needs_burghers=2, inputs={"salt": 1.5, "timber": 1.0}, outputs={"gunpowder": 1.2}),
 )}
+MANUFACTORIES = ("weaver", "toolmaker", "armoury", "ropewalk", "glassworks", "tannery", "powder_mill")
 BUILD_TURNS = 4
 
-# ----- tile levels --------------------------------------------------------------------
-# Works: what pioneers build on a tile to raise its goods. (names per level, sprites per level)
-WORKS_BONUS = 0.35                 # extra output per level
-WORKS_COST = tuple(round(c / AREA) for c in (100, 200, 350))   # ducats for level 1, 2, 3
+# ----- province investment: five levels per goods tile ------------------------------------------
+# Bought in the province panel (no builder units): ducats plus goods bought on the local market.
+# Higher levels unlock with the eras. Each level adds output and changes how the tile looks.
+WORKS_LEVELS = 5
+WORKS_BONUS = 0.3                  # extra output per level
+WORKS_COST = tuple(round(c / AREA) for c in (100, 180, 300, 450, 650))   # ducats for levels 1..5
+WORKS_GOODS = ({"timber": 1.0}, {"timber": 1.5, "tools": 0.5}, {"tools": 1.0, "stone": 1.0},
+               {"tools": 1.5, "iron": 1.0, "stone": 1.5}, {"tools": 2.0, "iron": 1.5, "stone": 2.0})
+WORKS_GOODS = tuple({g: n / SCALE for g, n in level.items()} for level in WORKS_GOODS)
+WORKS_ERA = (1, 1, 2, 2, 3)        # era needed for levels 1..5
 WORKS_UPKEEP = 0.2 / AREA          # per level per season
-_FIELDS = (("Field", "Farm", "Windmill estate"),
-           ("Medieval/medieval_cabin.png", "Medieval/medieval_farm.png", "Medieval/medieval_windmill.png"))
-_MINES = (("Mine", "Deep mine", "Great mine"), ("Medieval/medieval_mine.png",) * 3)
-_LUMBER = (("Lumber camp", "Sawmill", "Timber yard"), ("Medieval/medieval_lumber.png",) * 3)
-_TRAPS = (("Trapping camp", "Trapping lodge", "Fur company"), ("Modern/modern_campsite.png",) * 3)
-_FISH = (("Fishing huts", "Fishing fleet", "Fish market"), ("Mill/mill_warehouse.png",) * 3)
-_POSTS = (("Trading hut", "Warehouse", "Factory house"), ("Mill/mill_storage.png", "Mill/mill_storage.png",
-                                                         "Mill/mill_stoneWarehouse.png"))
-WORKS = {"grain": _FIELDS, "wine": (("Vineyard", "Wine estate", "Great winery"), _FIELDS[1]),
-         "wool": (("Pasture", "Sheep farm", "Wool estate"), _FIELDS[1]),
-         "cotton": (("Cotton field", "Plantation", "Great plantation"), _FIELDS[1]),
-         "sugar": (("Cane field", "Plantation", "Sugar mill"), _FIELDS[1]),
-         "tobacco": (("Tobacco field", "Plantation", "Great plantation"), _FIELDS[1]),
-         "iron": _MINES, "silver": _MINES, "gold": _MINES, "salt": (("Salt pans", "Saltworks", "Salt mine"), _MINES[1]),
-         "timber": _LUMBER, "furs": _TRAPS, "fish": _FISH, "ivory": _POSTS, "spices": _POSTS}
+# The name of every level, per good (the tile art in goodsart.py draws the same places).
+WORKS = {
+    "grain": ('Wheat strips', 'Open fields', 'Grange barn', 'Windmill farm', 'Manor estate'),
+    "wine": ('Hillside vines', 'Terraced vineyard', 'Press house', 'Wine cellars', 'Chateau'),
+    "wool": ('Upland grazing', 'Walled pastures', "Shepherd's hut", 'Sheepfolds', 'Wool barn'),
+    "cotton": ('Cotton patch', 'Cotton fields', 'Drying sheds', 'Cotton farm', 'Gin house'),
+    "sugar": ('Cane patch', 'Cane fields', 'Boiling house', 'Sugar works', 'Sugar mill'),
+    "tobacco": ('Tobacco patch', 'Tobacco fields', 'Curing barn', 'Tobacco farm', 'Tobacco warehouse'),
+    "timber": ("Woodcutters' clearing", 'Logging camp', 'Sawpit', 'Sawmill', 'Timber yard'),
+    "iron": ('Iron diggings', 'Iron mine', 'Ore tramway', 'Bloomery', 'Ironworks'),
+    "silver": ('Silver vein', 'Silver mine', 'Deep workings', 'Stamp mill', 'Royal mint'),
+    "gold": ('Gold panning', 'Placer claim', 'Sluice works', 'Gold diggings', 'Fortified gold mine'),
+    "salt": ('Salt pans', 'Salt marsh works', 'Salt mounds', 'Saltern', 'Salt house'),
+    "fish": ('Fishing beach', 'Fishing jetty', 'Fishing village', 'Fishing pier', 'Fishing harbour'),
+    "furs": ('Trapline', "Trapper's lodge", 'Trapping camp', 'Fur post', 'Fur trading fort'),
+    "ivory": ('Elephant grounds', 'Hunting camp', 'Trading hut', 'Ivory market', 'Ivory fort'),
+    "spices": ('Spice garden', 'Spice grove', 'Drying yard', 'Spice plantation', 'Spice warehouse'),
+    "horses": ('Horse corral', 'Round paddock', 'Stables', 'Stud farm', 'Royal stud'),
+    "cattle": ('Grazing meadow', 'Cattle pasture', 'Cattle barn', 'Cattle ranch', 'Cattle estate'),
+    "stone": ('Stone cutting', 'Quarry', 'Crane quarry', 'Deep quarry', 'Marble works'),
+    "copper": ('Copper outcrop', 'Copper diggings', 'Copper mine', 'Roasting yard', 'Copper smelter'),
+    "hemp": ('Hemp & flax plot', 'Hemp fields', 'Retting ponds', 'Rope yard', 'Ropewalk'),
+    "olives": ('Olive trees', 'Olive terraces', 'Olive farm', 'Oil jars', 'Olive press'),
+    "silk": ('Mulberry hedges', 'Mulberry orchard', 'Silkworm sheds', 'Silk farm', 'Silk caravanserai'),
+    "dyes": ('Dye vats', 'Dye yard', 'Dye works', 'Cloth dyers', 'Dye house'),
+    "cocoa": ('Cocoa grove', 'Cocoa clearing', 'Drying mats', 'Cocoa plantation', 'Cocoa hacienda'),
+    "coffee": ('Coffee shrubs', 'Coffee terraces', 'Drying patios', 'Coffee estate', 'Coffee tower house'),
+}
 
 # Settlements: village -> town -> city. More slots for buildings, more taxes, more burghers.
 SETTLEMENTS = ("", "Village", "Town", "City")
 SETTLEMENT_SPRITES = ("", "Medieval/medieval_house.png", "Medieval/medieval_church.png", "Medieval/medieval_openCastle.png")
 SETTLEMENT_COST = (0, 120, 400, 900)
+SETTLEMENT_GOODS = ({}, {"timber": 2.0}, {"stone": 3.0, "timber": 2.0}, {"stone": 6.0, "glass": 1.0})
 SETTLEMENT_POP = (0, 6, 20, 45)         # thousand people needed to grow to this level
 SETTLEMENT_SLOTS = (0, 1, 3, 5)         # buildings (weaver, port, marketplace...) allowed
 SETTLEMENT_TAX = (0.0, 0.05, 0.15, 0.3)
@@ -185,6 +231,7 @@ CASTLES = ("", "Tower", "Small castle", "Large castle")
 CASTLE_SPRITES = ("", "Medieval/medieval_tower.png", "Medieval/medieval_smallCastle.png",
                   "Medieval/medieval_largeCastle.png")
 CASTLE_COST = (0, 150, 400, 800)
+CASTLE_GOODS = ({}, {"timber": 2.0, "stone": 1.0}, {"stone": 5.0}, {"stone": 10.0, "gunpowder": 2.0})
 CASTLE_UPKEEP = (0.0, 0.4, 1.0, 2.0)
 CASTLE_DEFENSE = 0.25                   # extra defense per level for the owner's armies
 CASTLE_SIEGE = 3                        # extra siege points needed per level (cannons add points)
@@ -233,17 +280,22 @@ def _troop(key, name, branch, era, hp, attack, defense, moves, gold, goods, upke
 
 TROOPS = (
     _troop("pikemen", "Pikemen", "infantry", 1, 10, 4, 5, 3, 25, {"weapons": 1.0, "grain": 1.0}, 0.5),
-    _troop("arquebusiers", "Arquebusiers", "infantry", 2, 10, 5, 6, 3, 30, {"weapons": 1.5, "grain": 1.0}, 0.6),
-    _troop("musketeers", "Musketeers", "infantry", 3, 11, 7, 7, 3, 36, {"weapons": 2.0, "grain": 1.0}, 0.7),
-    _troop("knights", "Knights", "cavalry", 1, 10, 6, 3, 5, 45, {"weapons": 1.0, "grain": 2.0}, 0.9),
-    _troop("lancers", "Lancers", "cavalry", 2, 10, 7, 3, 5, 50, {"weapons": 1.5, "grain": 2.0}, 0.9),
-    _troop("cuirassiers", "Cuirassiers", "cavalry", 3, 11, 8, 4, 5, 58, {"weapons": 2.0, "grain": 2.0}, 1.0),
-    _troop("bombards", "Bombards", "artillery", 1, 8, 6, 1, 2, 60, {"iron": 3.0, "tools": 1.0}, 1.0,
-           range=2, siege=1, needs="town"),
-    _troop("culverins", "Culverins", "artillery", 2, 8, 7, 1, 2, 66, {"iron": 3.0, "tools": 1.5}, 1.0,
-           range=2, siege=2, needs="town"),
-    _troop("field_guns", "Field guns", "artillery", 3, 9, 9, 2, 3, 72, {"iron": 3.5, "tools": 2.0}, 1.1,
-           range=2, siege=2, needs="town"),
+    _troop("arquebusiers", "Arquebusiers", "infantry", 2, 10, 5, 6, 3, 30,
+           {"weapons": 1.5, "grain": 1.0, "gunpowder": 0.5}, 0.6),
+    _troop("musketeers", "Musketeers", "infantry", 3, 11, 7, 7, 3, 36,
+           {"weapons": 2.0, "grain": 1.0, "gunpowder": 0.8}, 0.7),
+    _troop("knights", "Knights", "cavalry", 1, 10, 6, 3, 5, 45,
+           {"weapons": 1.0, "grain": 2.0, "horses": 1.0, "leather": 0.5}, 0.9),
+    _troop("lancers", "Lancers", "cavalry", 2, 10, 7, 3, 5, 50,
+           {"weapons": 1.5, "grain": 2.0, "horses": 1.0, "leather": 0.5}, 0.9),
+    _troop("cuirassiers", "Cuirassiers", "cavalry", 3, 11, 8, 4, 5, 58,
+           {"weapons": 2.0, "grain": 2.0, "horses": 1.0, "leather": 1.0}, 1.0),
+    _troop("bombards", "Bombards", "artillery", 1, 8, 6, 1, 2, 60,
+           {"iron": 2.0, "tools": 1.0, "copper": 1.5, "gunpowder": 1.0}, 1.0, range=2, siege=1, needs="town"),
+    _troop("culverins", "Culverins", "artillery", 2, 8, 7, 1, 2, 66,
+           {"iron": 2.0, "tools": 1.5, "copper": 2.0, "gunpowder": 1.0}, 1.0, range=2, siege=2, needs="town"),
+    _troop("field_guns", "Field guns", "artillery", 3, 9, 9, 2, 3, 72,
+           {"iron": 2.0, "tools": 2.0, "copper": 2.5, "gunpowder": 1.5}, 1.1, range=2, siege=2, needs="town"),
 )
 BRANCHES = ("infantry", "cavalry", "artillery")
 BRANCH_NAMES = {"infantry": "Infantry", "cavalry": "Cavalry", "artillery": "Cannons"}
@@ -255,13 +307,15 @@ def troop(branch, era):
 
 SCOUT = UnitKind("scout", "Scouts", 5 * SCALE, 3 * SCALE, gold=15, goods={"grain": 0.5}, upkeep=0.2, hp=6)
 GENERAL = UnitKind("general", "General", 4 * SCALE, 2 * SCALE, gold=120, upkeep=1.0, hp=1)
-WAGON = UnitKind("wagon", "Supply wagon", 3 * SCALE, SCALE, gold=20, goods={"grain": 3.0}, upkeep=0.2, hp=4)
+WAGON = UnitKind("wagon", "Supply wagon", 3 * SCALE, SCALE, gold=20, goods={"grain": 3.0, "horses": 0.5},
+                 upkeep=0.2, hp=4)
+# Pioneers are retired (provinces invest from the panel now); the kind stays so old saves load.
 PIONEER = UnitKind("pioneer", "Pioneers", 3 * SCALE, SCALE, gold=30, goods={"tools": 1.5}, upkeep=0.2)
 COLONIST = UnitKind("colonist", "Colonists", 3 * SCALE, SCALE, gold=40, goods={"tools": 1.0, "grain": 3.0})
 CARAVEL = UnitKind("caravel", "Caravel", 10 * SCALE, 3 * SCALE, naval=True, capacity=4, gold=40,
-                   goods={"timber": 8.0, "cloth": 2.0}, upkeep=0.4)
+                   goods={"timber": 8.0, "rope": 2.0}, upkeep=0.4)
 CARRACK = UnitKind("carrack", "Carrack", 8 * SCALE, 2 * SCALE, naval=True, capacity=8, gold=70,
-                   goods={"timber": 14.0, "cloth": 4.0, "iron": 2.0}, upkeep=0.8)
+                   goods={"timber": 14.0, "rope": 4.0, "iron": 2.0}, upkeep=0.8)
 UNIT_KINDS = {k.key: k for k in (SCOUT, GENERAL, WAGON, PIONEER, COLONIST, CARAVEL, CARRACK) + TROOPS}
 COLONIST_PEOPLE = 1.0       # thousand peasants who leave home with each colonist unit
 

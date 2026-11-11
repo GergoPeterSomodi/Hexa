@@ -5,8 +5,9 @@ import pygame
 from .. import settings as options
 from . import ai, geo, saves
 from .gamemenu import GameMenu
-from .data import (FOOD_PER_TROOP, MANPOWER, NEEDS, OUTPUT, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BRANCH_NAMES, ERAS, GENERAL, GENERAL_TRAITS, RESEARCH_FUND, SCOUT, UPGRADE_MAX, BUILDINGS, CARAVEL, CARRACK, CASTLES, COLONIST, COLONY_DONE, GOODS, PIONEER,
-                   SETTLEMENT_SLOTS, SETTLEMENTS, TAX_LEVELS, TERRAIN, UNIT_KINDS, WORKS, WORKS_BONUS, WORKS_COST)
+from .data import (FOOD_PER_TROOP, MANPOWER, NEEDS, OUTPUT, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BRANCH_NAMES, ERAS, GENERAL, GENERAL_TRAITS, RESEARCH_FUND, SCOUT, UPGRADE_MAX, BUILDINGS, CARAVEL, CARRACK, CASTLES, COLONIST, COLONY_DONE, GOODS,
+                   SETTLEMENT_SLOTS, SETTLEMENTS, TAX_LEVELS, TERRAIN, UNIT_KINDS, WORKS, WORKS_BONUS, WORKS_ERA,
+                   WORKS_LEVELS)
 from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
 from .world import CampaignWorld
 
@@ -76,6 +77,8 @@ class CampaignApp(GameMenu):
             import random
             seed = random.randrange(1, 100000)
         loaded = saves.load(load) if load else None
+        if load and loaded is None:          # never quietly start some other game instead
+            raise saves.LoadError(f"{saves.slot_name(load)} could not be loaded.")
         self.world = loaded or CampaignWorld(seed if seed is not None else 1480, player=player, map=map)
         pygame.display.set_caption(f"Hexa: Age of Discovery  -  {self.world.geo.name}")
         self.view = MapView(self.world, tiles_dir)
@@ -271,7 +274,7 @@ class CampaignApp(GameMenu):
             self.save_to("quick")
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F9 and not self.busy:
-            self.load_from("quick")
+            self.quickload()
             return
         if self.menu:
             self.menu_handle(event)
@@ -307,10 +310,8 @@ class CampaignApp(GameMenu):
             elif key == pygame.K_c and self.player:
                 self.open_country(self.player)
             elif key == pygame.K_b and ui.selected and ui.selected.owner == self.player:
-                worker = next((u for u in self.active() if u.kind in (PIONEER, COLONIST)), None)
-                if worker and worker.kind is PIONEER:
-                    self.press(("improve", worker))
-                elif worker:
+                worker = next((u for u in self.active() if u.kind is COLONIST), None)
+                if worker:
                     self.press(("found", worker, False))
         elif event.type == pygame.MOUSEWHEEL:
             if not self.panel_rect().collidepoint(ui.mouse) or not ui.panel:
@@ -444,9 +445,9 @@ class CampaignApp(GameMenu):
             unit = world.recruit(tag, action[1], action[2])
             if unit and not unit.kind.war and unit.kind is not GENERAL:
                 self.select_unit(unit, only=True)
-        elif kind == "improve":
-            if not world.improve(action[1]):
-                self.toast(world.improve_check(action[1])[1])
+        elif kind == "invest":
+            if not world.invest(tag, action[1]):
+                self.toast(world.invest_check(tag, action[1])[1])
         elif kind == "found":
             prov = world.found(action[1], trading_post=action[2])
             if prov:
@@ -927,13 +928,22 @@ class CampaignApp(GameMenu):
             y = self._heading("The tile", y)
             if prov.good in WORKS:
                 level = prov.works
-                name = world.works_name(prov) or "No works yet"
-                self.text(self.font, f"{name}" + (f"  (+{WORKS_BONUS * level * 100:.0f}%)" if level else ""),
+                name = world.works_name(prov) or "Untouched land"
+                pips = "".join("*" if i < level else "." for i in range(WORKS_LEVELS))
+                self.text(self.font, f"{name}" + (f"  +{WORKS_BONUS * level * 100:.0f}%" if level else ""),
                           (x, y + 3), TEXT if level else MUTED, 190)
-                nxt = WORKS[prov.good][0][level] if level < 3 else ""
-                note = f"Pioneers: {nxt.lower()} for {WORKS_COST[level]}" if nxt else "fully improved"
-                self.text(self.small, note, (x + 200, y + 5), MUTED if nxt else FAINT, w - 200)
-                y += 25
+                self.text(self.small, pips, (x + 192, y + 5), GOLD)
+                if level < WORKS_LEVELS:
+                    nxt = WORKS[prov.good][level]
+                    ok, reason = world.invest_check(tag, prov)
+                    goods = ", ".join(f"{n:g} {GOODS[g].name.lower()}" for g, n in world.invest_goods(prov).items())
+                    hint = reason or (f"Invest: {nxt} (+{WORKS_BONUS * 100:.0f}% {GOODS[prov.good].name.lower()}). "
+                                      f"Needs {goods}, bought on the local market. Era {WORKS_ERA[level]}+.")
+                    self.button((x + 230, y, w - 230, 23), f"Invest: {nxt}", ok, ("invest", prov), hint,
+                                f"{world.invest_cost(prov)}", small=True)
+                else:
+                    self.text(self.small, "fully developed", (x + 240, y + 5), FAINT)
+                y += 26
             for key, names in (("settlement", SETTLEMENTS), ("castle", CASTLES)):
                 level = prov.settlement if key == "settlement" else prov.castle
                 current = names[level] or ("Countryside" if key == "settlement" else "No castle")
@@ -943,8 +953,10 @@ class CampaignApp(GameMenu):
                     self.text(self.small, f"building, {queued[1]} season{'s' * (queued[1] != 1)} left", (x + 170, y + 5), GOLD)
                 elif level < 3:
                     ok, reason = world.build_check(tag, prov, key)
-                    hint = reason or ("More people, taxes and building slots" if key == "settlement"
-                                      else "Defends the land: +defense, longer sieges")
+                    goods = ", ".join(f"{n:g} {GOODS[g].name.lower()}" for g, n in world.build_goods(prov, key).items())
+                    hint = reason or (("More people, taxes and building slots" if key == "settlement"
+                                       else "Defends the land: +defense, longer sieges") +
+                                      (f". Needs {goods} from the market." if goods else ""))
                     self.button((x + 160, y, w - 160, 23), f"To {names[level + 1].lower()}", ok, ("build", prov, key),
                                 hint, f"{world.build_cost(prov, key)}", small=True)
                 y += 26
@@ -1067,18 +1079,11 @@ class CampaignApp(GameMenu):
                         self.button((bx + 56 + i * 36, y, 32, 22), "+A" if stat == "attack" else "+D", ok,
                                     ("upgrade", u, stat), reason or f"Drill +1 {stat} for {cost} ducats", small=True)
             y += 26
-        workers = [u for u in self.active() if u.kind in (PIONEER, COLONIST)]
+        workers = [u for u in self.active() if u.kind is COLONIST]
         if workers:
             worker = workers[0]
             y += 4
-            if worker.kind is PIONEER:
-                prov = world.provinces.get(worker.pos)
-                ok, reason = world.improve_check(worker)
-                label = "Improve this tile"
-                if prov and prov.good in WORKS and prov.works < 3:
-                    label = f"Build a {WORKS[prov.good][0][prov.works].lower()} (B)"
-                self.button((x, y, w, 26), label, ok, ("improve", worker), reason or "Pioneers improve the tile", small=True)
-            else:
+            if True:
                 ok, reason = world.found_check(worker)
                 bw = (w - 6) // 2
                 self.button((x, y, bw, 26), "Found colony (B)", ok, ("found", worker, False),

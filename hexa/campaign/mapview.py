@@ -5,9 +5,9 @@ import os
 import pygame
 
 from ..hexgrid import neighbors
-from . import art, geo
-from .data import (CASTLE_SPRITES, COLONIST, GENERAL, GOOD_SPRITES, GOODS, NATIVE_VILLAGE_SPRITE, PIONEER, SCOUT,
-                   SETTLEMENT_SPRITES, TERRAIN, TERRAIN_SPRITES, WORKS)
+from . import art, geo, goodsart, wfctiles
+from .data import (COLONIST, GENERAL, GOODS, NATIVE_VILLAGE_SPRITE, PIONEER, SCOUT,
+                   TERRAIN, TERRAIN_SPRITES, WORKS)
 
 SQRT3 = math.sqrt(3)
 ZOOMS = (3, 5, 8, 13, 21, 34)     # hex radius in pixels
@@ -83,6 +83,9 @@ class MapView:
             pts = art.smooth([self.unit_point(q) for q in path], 3, wobble=0.22, seed=i)
             xs, ys = [x for x, _ in pts], [y for _, y in pts]
             self._rivers.append((pts, (min(xs), min(ys), max(xs), max(ys))))
+        self._edges = self._edge_sockets(world)
+        self._overlay_base = {}       # TileDesc -> 120x140 overlay (generated a few per frame)
+        self._gen_budget = 0
         self._roads = []
         for path in getattr(world, "road_paths", []):
             pts = [self.unit_point(q) for q in path]
@@ -319,7 +322,11 @@ class MapView:
             if not view_rect.inflate(40, 40).collidepoint(x, y):
                 continue
             stack = world.units_at(unit.pos)
-            top = world.unit_at(unit.pos)
+            if slide:                            # units still sliding in are not here yet
+                stack = [u for u in stack if u.id not in moving]
+            if not stack:
+                continue
+            top = next((u for u in stack if u.kind.war), stack[0])
             if self.zoom >= TILE_FROM and self.tiles_dir:
                 self._diorama(screen, stack, top, (x, y), any(u in group for u in stack))
             else:
@@ -354,6 +361,11 @@ class MapView:
     # ----- tile art (zoomed in) ------------------------------------------------------------
     def sprite(self, path):
         key = (path, self.r)
+        if key not in self._sprites and isinstance(path, tuple):
+            _, good, level, variant = path
+            img = goodsart.good_tile(good, level, self.tiles_dir, variant)
+            self._sprites[key] = wfctiles.scale_tile(img, int(round(self.r * SQRT3)) + 1,
+                                                     int(round(self.r * SPRITE_H)) + 1)
         if key not in self._sprites:
             if path.startswith("art:"):
                 _, name, variant = path.split(":")
@@ -393,25 +405,96 @@ class MapView:
         return self._overlays[key]
 
     def tile_sprite(self, prov):
-        """The tile art for a province: castle > town or city > works > village > native camp > land."""
-        if prov.castle:
-            return CASTLE_SPRITES[prov.castle]
-        if prov.settlement >= 2:
-            return SETTLEMENT_SPRITES[prov.settlement]
-        if prov.works and prov.good in WORKS:
-            return WORKS[prov.good][1][prov.works - 1]
-        if prov.settlement == 1:
-            return SETTLEMENT_SPRITES[1]
+        """The base picture of a province: its developed goods tile, a native camp, or the bare land.
+        Towns, castles, coasts, rivers and roads are drawn on top as one edge-matched overlay."""
+        if prov.works and prov.good in WORKS and not (prov.settlement or prov.castle):
+            return ("good", prov.good, min(5, prov.works), self._variant(prov.pos))
         if prov.owner is None and prov.natives >= 2.5 and (prov.pos[0] * 7 + prov.pos[1] * 3) % 5 == 0:
             return NATIVE_VILLAGE_SPRITE
-        if prov.terrain == "plains" and prov.good in GOOD_SPRITES and prov.owner:
-            options = GOOD_SPRITES[prov.good]
-            return options[(prov.pos[0] * 5 + prov.pos[1] * 11) % len(options)]
         return self.land_sprite(prov)
+
+    @staticmethod
+    def _variant(pos):
+        return ((pos[0] * 73856093) ^ (pos[1] * 19349663)) % 3
 
     @staticmethod
     def building(prov):
         return bool(prov.castle or prov.settlement or (prov.works and prov.good in WORKS))
+
+    # ----- edge sockets: which of a hex's six edges a coast, river or road crosses ------------------
+    @staticmethod
+    def _edge_sockets(world):
+        """{pos: (sea edges, river edges, river mouth?, road edges)}; edge e is the e-th neighbors(pos)."""
+        rivers, roads = {}, {}
+
+        def link(table, a, b):
+            near_a, near_b = list(neighbors(a)), list(neighbors(b))
+            if b in near_a and a in near_b:
+                table.setdefault(a, set()).add(near_a.index(b))
+                table.setdefault(b, set()).add(near_b.index(a))
+
+        river_at = getattr(world, "river_at", {})
+        for name, path in getattr(world, "rivers", {}).items():
+            for a, b in zip(path, path[1:]):
+                link(rivers, a, b)
+            end = path[-1]                      # a tributary flows into the river next to it
+            for n in neighbors(end):
+                if river_at.get(n) not in (None, name) and n not in path:
+                    link(rivers, end, n)
+                    break
+        for path in getattr(world, "road_paths", []):
+            for a, b in zip(path, path[1:]):
+                link(roads, a, b)
+        out = {}
+        for pos in world.provinces:
+            near = list(neighbors(pos))
+            sea = frozenset(e for e, n in enumerate(near) if world.terrain.get(n) == "ocean")
+            river = frozenset(rivers.get(pos, ()))
+            mouth = bool(river) and bool(sea) and len(river) == 1
+            road = frozenset(roads.get(pos, ()))
+            if sea or river or road:
+                out[pos] = (sea, river, mouth, road)
+        return out
+
+    def overlay_desc(self, prov, bare=False):
+        """The wfctiles description of what lies on top of this province's base picture (or None)."""
+        sea, river, mouth, road = self._edges.get(prov.pos, (frozenset(), frozenset(), False, frozenset()))
+        town = castle = 0
+        if not bare:
+            if prov.settlement:
+                town = {1: 2, 2: 4 if prov.castle else 3, 3: 6 if prov.pop >= 60 else 5}[prov.settlement]
+                if prov.settlement == 1 and prov.castle:
+                    town, castle = 0, prov.castle
+            elif prov.castle:
+                castle = prov.castle
+        else:
+            road = frozenset()
+        if not (sea or river or road or town or castle):
+            return None
+        return wfctiles.TileDesc(sea=sea, river=river - sea, mouth=mouth, road=road - sea,
+                                 paved=(road - sea) if town >= 3 else frozenset(), town=town, castle=castle,
+                                 variant=self._variant(prov.pos))
+
+    def overlay_img(self, desc):
+        key = ("wfc", desc, self.r)
+        if key not in self._sprites:
+            base = self._overlay_base.get(desc)
+            if base is None:
+                if self._gen_budget <= 0:
+                    return None                 # drawn in a later frame: new overlays are made a few at a time
+                self._gen_budget -= 1
+                base = self._overlay_base[desc] = wfctiles.overlay(desc)
+            self._sprites[key] = wfctiles.scale_tile(base, int(round(self.r * SQRT3)) + 1,
+                                                     int(round(self.r * SPRITE_H)) + 1)
+        return self._sprites[key]
+
+    def sea_img(self, pos):
+        key = ("sea", self._variant(pos), self.r)
+        if key not in self._sprites:
+            base = wfctiles.sea_tile("sea", self._variant(pos))
+            self._sprites[key] = wfctiles.scale_tile(base, int(round(self.r * SQRT3)) + 1,
+                                                     int(round(self.r * SPRITE_H)) + 1)
+        return self._sprites[key]
 
     def decoration(self, kind, seed):
         key = ("deco", kind, seed % 4, self.r)
@@ -422,21 +505,11 @@ class MapView:
         return self._sprites[key]
 
     def decorations_for(self, prov):
-        """Extra life on a tile: trees, rocks, hamlets and fields on open land, smoke over mines,
-        a dock at ports, more houses around growing towns."""
+        """Extra life on undeveloped open land: a few trees, rocks, fields or a hamlet."""
         col, row = prov.pos
         h = (col * 73856093 ^ row * 19349663) & 0xFFFF
         out = []
-        if prov.settlement >= 2 and not prov.castle:
-            out.append("town" if prov.settlement == 2 else "city")
-        elif prov.castle and prov.settlement >= 3:
-            out.append("city")
-        if prov.level("port") and (prov.settlement or prov.castle):
-            out.append("port")
-        if prov.works and prov.good in MINES:
-            out.append("smoke")
-        if not self.building(prov) and prov.terrain in ("plains", "steppe", "savanna") and \
-                not (prov.owner and prov.good in GOOD_SPRITES and prov.terrain == "plains"):
+        if not self.building(prov) and prov.pos not in self._edges and prov.terrain in ("plains", "steppe", "savanna"):
             if h % 6 == 0:
                 out.append("trees")
             elif h % 9 == 1:
@@ -459,8 +532,8 @@ class MapView:
         col0 = max(0, int((camera[0] - self.MARGIN) / w) - 1)
         col1 = min(world.cols - 1, int((camera[0] + view_rect.w - self.MARGIN) / w) + 1)
         bare = self.mode == "terrain" or (self.mode == "goods" and self.goods_view == "deposits")
-        shown, hidden, dimmed, coast, redraw = [], [], [], [], []
-        roads, rivers = getattr(world, "roads", set()), getattr(world, "river_at", {})
+        shown, hidden, dimmed = [], [], []
+        self._gen_budget = 24
 
         def blit(img, cx, cy):
             screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
@@ -475,69 +548,18 @@ class MapView:
                     continue
                 prov = world.provinces.get(pos)
                 if prov is None:
-                    if world.is_sea(pos):
-                        img = self.overlay("shallow" if pos in self.shallow else "ocean")
-                    else:
-                        img = self.sprite(TERRAIN_SPRITES["lake"][0])
+                    img = self.sea_img(pos) if world.is_sea(pos) else self.sprite(TERRAIN_SPRITES["lake"][0])
+                    blit(img, cx, cy)
                 else:
-                    path = self.land_sprite(prov) if bare else self.tile_sprite(prov)
-                    img = self.sprite(path)
+                    blit(self.sprite(self.land_sprite(prov) if bare else self.tile_sprite(prov)), cx, cy)
+                    desc = self.overlay_desc(prov, bare)
+                    if desc is not None:
+                        img = self.overlay_img(desc)
+                        if img is not None:
+                            blit(img, cx, cy)
                     shown.append((prov, cx, cy))
-                    if prov.coastal:
-                        coast.append((prov, cx, cy))
-                    if not bare and (pos in roads or pos in rivers) and self.building(prov):
-                        redraw.append((img, cx, cy))
-                blit(img, cx, cy)
                 if world.player and pos not in visible:
                     dimmed.append((cx, cy))
-
-        # Surf where land meets the sea.
-        surf_w = max(2, r // 9)
-        for prov, cx, cy in coast:
-            pts = hex_points(cx, cy, r)
-            near = list(neighbors(prov.pos))
-            for edge in range(6):
-                if world.terrain.get(near[(6 - edge) % 6]) == "ocean":
-                    pygame.draw.line(screen, (240, 248, 252), pts[edge], pts[(edge + 1) % 6], surf_w)
-
-        # Rivers and roads, then the buildings they pass through on top again.
-        view = (camera[0] - self.MARGIN - 2 * r, camera[1] - self.MARGIN - 2 * r,
-                camera[0] + view_rect.w + 2 * r, camera[1] + view_rect.h + 2 * r)
-        m = self.MARGIN
-
-        def on_screen(box):
-            return box[2] * r >= view[0] and box[0] * r <= view[2] and box[3] * r >= view[1] and box[1] * r <= view[3]
-        for pts, box in self._rivers:
-            if on_screen(box):
-                line = [(ox + m + x * r, oy + m + y * r) for x, y in pts]
-                for color, k in ((BANK, 0.36), (RIVER_DARK, 0.25), (RIVER, 0.15)):
-                    width = max(2, int(r * k))
-                    pygame.draw.lines(screen, color, False, line, width)
-                    for x, y in line[::3]:
-                        pygame.draw.circle(screen, color, (x, y), width / 2)
-        dash = max(3, r * 0.28)
-        for pts, box in self._roads:
-            if not on_screen(box):
-                continue
-            line = [(ox + m + x * r, oy + m + y * r) for x, y in pts]
-            for (x0, y0), (x1, y1) in zip(line, line[1:]):
-                length = math.hypot(x1 - x0, y1 - y0)
-                n = max(1, int(length / dash))
-                for i in range(0, n, 2):
-                    a, b = i / n, min(1.0, (i + 1) / n)
-                    seg = ((x0 + (x1 - x0) * a, y0 + (y1 - y0) * a), (x0 + (x1 - x0) * b, y0 + (y1 - y0) * b))
-                    pygame.draw.line(screen, ROAD_EDGE, *seg, max(3, r // 6))
-                    pygame.draw.line(screen, ROAD, *seg, max(1, r // 6 - 2))
-        for prov, cx, cy in shown:
-            if prov.pos in roads and prov.pos in rivers and not self.building(prov):
-                bridge = pygame.Rect(0, 0, r * 0.62, r * 0.3)
-                bridge.center = (cx, cy)
-                pygame.draw.rect(screen, ROAD_EDGE, bridge.inflate(2, 2), border_radius=3)
-                pygame.draw.rect(screen, (175, 135, 85), bridge, border_radius=2)
-                for k in (-0.2, 0.0, 0.2):
-                    pygame.draw.line(screen, ROAD_EDGE, (cx + k * r, bridge.top), (cx + k * r, bridge.bottom), 1)
-        for img, cx, cy in redraw:
-            blit(img, cx, cy)
         if not bare:
             for prov, cx, cy in shown:
                 kinds, h = self.decorations_for(prov)

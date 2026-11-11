@@ -10,8 +10,8 @@ from ..hexgrid import distance, neighbors
 from . import geo
 SCALE = geo.SCALE
 from .data import (BUILDINGS, CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GOODS,
-                   MANUFACTORY_TAX, PIONEER, PRODUCTION_TAX, troop,
-                   SETTLEMENT_TAX, WORKS, WORKS_BONUS, WORKS_COST)
+                   MANUFACTORIES, MANUFACTORY_TAX, PRODUCTION_TAX, troop,
+                   SETTLEMENT_TAX, WORKS, WORKS_BONUS)
 
 # (tag: first turn it starts colonising; Portugal and Castile lead the way)
 MAX_WARS = 3
@@ -28,7 +28,7 @@ def run(world, tag):
     for _ in range(1 + int(country.treasury > 1500) + int(country.treasury > 4000)):
         _build(world, tag)
     _army(world, tag)
-    _pioneers(world, tag)
+    _invest(world, tag)
     if _colonial(world, tag):
         _colonise(world, tag)
     _diplomacy(world, tag)
@@ -71,7 +71,7 @@ def _gain(world, prov, key):
         if prov.pos == country.capital and prov.castle < 2:
             return 2.0
         return 0.6 if border and prov.settlement >= 2 and prov.castle < 1 else 0
-    if key in ("weaver", "toolmaker", "armoury"):
+    if key in MANUFACTORIES:
         b = BUILDINGS[key]
         made = sum(n * market.price[g] for g, n in b.outputs.items())
         cost = sum(n * market.price[g] for g, n in b.inputs.items())
@@ -90,7 +90,7 @@ def _build(world, tag):
     provinces = sorted(world.provinces_of(tag), key=lambda p: -p.pop)[:14]
     best = None
     for prov in provinces:
-        for key in ("settlement", "castle", "weaver", "toolmaker", "armoury", "marketplace"):
+        for key in ("settlement", "castle", "marketplace") + MANUFACTORIES:
             if not world.build_check(tag, prov, key)[0]:
                 continue
             value = _gain(world, prov, key) / world.build_cost(prov, key)
@@ -105,41 +105,26 @@ def _build(world, tag):
         world.build(tag, best[1], best[2])
 
 
-def _pioneers(world, tag):
-    """Keep a few pioneers busy improving the best tiles."""
+def _invest(world, tag):
+    """Develop the goods tiles that pay back fastest (ducats and goods spent from the province panel)."""
     country = world.countries[tag]
-    pioneers = [u for u in world.units_of(tag) if u.kind is PIONEER]
-    wanted = 1 + len(world.provinces_of(tag)) // 25
-    if len(pioneers) < wanted and country.treasury > 200 and country.balance > 3:
-        capital = world.provinces[country.capital]
-        unit = world.recruit(tag, capital, PIONEER)
-        if unit:
-            pioneers.append(unit)
-    claimed = set()
-    occupied = world.owners_at()
-    for unit in pioneers:
-        if unit not in world.units or unit.moves_left <= 0 or unit.carrier:
-            continue
-        if world.improve_check(unit)[0] and country.treasury > 150:
-            world.improve(unit)
-            continue
-        mass = world.landmass.get(unit.pos)
-        sites = [p for p in world.provinces_of(tag) if p.good in WORKS and p.works < 3 and p.controller == tag
-                 and p.pos not in claimed and world.landmass.get(p.pos) == mass
-                 and (p.pos not in occupied or p.pos == unit.pos)]
-        near = [p for p in sites if distance(p.pos, unit.pos) <= 10 * SCALE]
-        sites = near or sites
-        if not sites:
-            continue
-        def value(p):
-            price = p.market.price[p.good] if p.market else GOODS[p.good].price
-            return p.output * WORKS_BONUS * price / WORKS_COST[p.works] - distance(p.pos, unit.pos) * 0.002
-        goal = max(sites, key=value).pos
-        claimed.add(goal)
-        if goal != unit.pos:
-            world.move(unit, world.step_toward(unit, goal))
-        if unit.pos == goal and world.improve_check(unit)[0] and country.treasury > 150:
-            world.improve(unit)
+    reserve = 100 + 2 * max(5.0, country.balance)
+    if country.treasury < reserve:
+        return
+    sites = [p for p in world.provinces_of(tag) if p.good in WORKS and p.works < 5 and not p.busy]
+    if not sites:
+        return
+
+    def value(p):
+        price = p.market.price[p.good] if p.market else GOODS[p.good].price
+        return p.output * WORKS_BONUS * price / max(1, world.invest_cost(p))
+    sites.sort(key=value, reverse=True)
+    budget = 1 + len(sites) // 40 + int(country.treasury > 800)
+    for prov in sites[:budget * 3]:
+        if budget <= 0 or country.treasury - world.invest_cost(prov) < reserve * 0.6:
+            break
+        if world.invest_check(tag, prov)[0] and world.invest(tag, prov):
+            budget -= 1
 
 
 # ----- armies and war ---------------------------------------------------------------------

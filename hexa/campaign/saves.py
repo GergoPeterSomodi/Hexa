@@ -6,10 +6,13 @@ Files live in ~/.hexa/saves (or $HEXA_HOME/saves).
 import json
 import os
 import pickle
+import sys
 import time
 
 from .world import CampaignWorld
 
+# The save format. Bump it only for changes the migration in CampaignWorld._migrate cannot handle:
+# saves from older versions still load (missing fields get defaults), newer ones are refused.
 VERSION = 1
 SLOTS = tuple(str(i) for i in range(1, 9))
 SPECIAL = ("quick", "auto")
@@ -55,20 +58,35 @@ def meta(slot):
             info = json.loads(f.readline().decode("utf-8"))
     except (OSError, ValueError):
         return None
-    return info if info.get("version") == VERSION else None
+    return info if _readable(info) else None
+
+
+def _readable(info):
+    version = info.get("version") if isinstance(info, dict) else None
+    return isinstance(version, int) and 1 <= version <= VERSION
+
+
+class LoadError(Exception):
+    """A save that was asked for could not be loaded."""
 
 
 def load(slot):
-    """The saved world, or None if there is nothing (readable) in the slot."""
+    """The saved world, or None if there is nothing (readable) in the slot.
+
+    Any failure (a missing file, a broken pickle, a unit kind or class the game no longer has...)
+    means "can't load", never a crash."""
     try:
         with open(path(slot), "rb") as f:
             info = json.loads(f.readline().decode("utf-8"))
-            if info.get("version") != VERSION:
+            if not _readable(info):
                 return None
             state = pickle.loads(f.read())
-    except (OSError, ValueError, pickle.UnpicklingError, EOFError, AttributeError, ImportError):
+        return CampaignWorld.from_state(state)
+    except FileNotFoundError:
         return None
-    return CampaignWorld.from_state(state)
+    except Exception as error:      # noqa: BLE001 - an unreadable save must not take the game down
+        print(f"Could not load save {slot!r}: {type(error).__name__}: {error}", file=sys.stderr)
+        return None
 
 
 def listing():

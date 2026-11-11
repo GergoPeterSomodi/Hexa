@@ -72,7 +72,8 @@ class EconomyTest(unittest.TestCase):
     def test_merchants_follow_your_orders(self):
         w = fresh()
         mine = w.merchant_markets("POR")
-        options = [(o, r) for r in w.routes if r.a in mine or r.b in mine for o in w.merchant_options("POR", r)]
+        options = [(o, r) for r in w.routes if r.a in mine or r.b in mine for o in w.merchant_options("POR", r)
+                   if o[4] >= 3]
         (good, src, dst, margin, amount), route = max(options, key=lambda x: x[0][3])
         self.assertGreater(margin, 0)
         self.assertTrue(w.send_merchant("POR", route, good, src))
@@ -86,27 +87,51 @@ class EconomyTest(unittest.TestCase):
         self.assertFalse(w.send_merchant_check("POR", route)[0], "merchants run out")
         self.assertTrue(w.recall_merchant("POR", route, (good, src.name)))
 
-    def test_pioneers_improve_tiles(self):
+    def test_provinces_invest_in_five_levels_without_builders(self):
+        from hexa.campaign.data import UNIT_KINDS, WORKS_LEVELS
         w = fresh()
-        prov = next(p for p in w.provinces_of("POR") if p.good and not p.works and w.unit_at(p.pos) is None)
-        w.countries["POR"].treasury = 2000
-        pioneer = w.recruit("POR", w.provinces[w.countries["POR"].capital], PIONEER)
-        self.assertIsNotNone(pioneer)
-        pioneer.pos, pioneer.moves_left = prov.pos, 3
-        before = prov.output
-        self.assertTrue(w.improve(pioneer))
+        self.assertNotIn(PIONEER, w.raise_options("POR"), "no builder units any more")
+        prov = next(p for p in w.provinces_of("POR") if p.good in WORKS and not p.works)
+        country = w.countries["POR"]
+        country.treasury = 5000
+        before, pending = prov.output, dict(prov.market.pending)
+        cost = w.invest_cost(prov)
+        self.assertGreater(cost, w.invest_goods(prov) and 0)
+        self.assertTrue(w.invest("POR", prov))
         self.assertEqual(prov.works, 1)
-        self.assertFalse(w.improve_check(pioneer)[0], "the pioneers' season is spent")
+        self.assertAlmostEqual(country.treasury, 5000 - cost)
+        self.assertGreater(sum(prov.market.pending.values()), sum(pending.values()), "materials bought on the market")
+        self.assertFalse(w.invest_check("POR", prov)[0], "one job per province per season")
         w.economy()
         self.assertGreater(prov.output, before * 1.2)
-        pioneer.moves_left = 3
-        w.improve(pioneer)
-        pioneer.moves_left = 3
-        w.improve(pioneer)
-        self.assertEqual(prov.works, 3)
-        self.assertEqual(w.works_name(prov), WORKS[prov.good][0][2])
-        pioneer.moves_left = 3
-        self.assertFalse(w.improve_check(pioneer)[0], "three levels at most")
+        prov.busy = False
+        self.assertTrue(w.invest("POR", prov))
+        prov.busy = False
+        ok, reason = w.invest_check("POR", prov)
+        self.assertFalse(ok)
+        self.assertIn("needs the age of", reason.lower(), "level 3 needs the second era")
+        country.era = 3
+        for _ in range(3):
+            prov.busy = False
+            self.assertTrue(w.invest("POR", prov))
+        self.assertEqual(prov.works, WORKS_LEVELS)
+        self.assertEqual(w.works_name(prov), WORKS[prov.good][-1])
+        prov.busy = False
+        self.assertFalse(w.invest_check("POR", prov)[0], "five levels at most")
+        self.assertIn("pioneer", UNIT_KINDS, "the old kind stays so old saves still load")
+
+    def test_new_goods_are_made_and_used(self):
+        w = fresh()
+        made = {p.good for p in w.provinces.values() if p.owner}
+        for good in ("horses", "cattle", "stone", "copper", "hemp", "olives", "silk"):
+            self.assertIn(good, made, good)
+        builds = {k for p in w.provinces.values() for k in p.buildings}
+        self.assertTrue({"ropewalk", "glassworks", "tannery", "powder_mill"} <= builds)
+        self.assertIn("horses", troop("cavalry", 1).goods)
+        self.assertIn("gunpowder", troop("artillery", 1).goods)
+        self.assertIn("rope", CARAVEL.goods)
+        cap = w.provinces[w.countries["POR"].capital]
+        self.assertTrue(w.build_goods(cap, "castle") or cap.castle >= 3)
 
     def test_towns_grow_into_cities_and_give_slots(self):
         w = fresh()

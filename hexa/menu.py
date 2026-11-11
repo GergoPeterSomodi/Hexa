@@ -33,6 +33,7 @@ class Menu:
         self.font = pygame.font.SysFont("segoeui,arial", 16)
         self.button_font = pygame.font.SysFont("segoeui,arial", 17, bold=True)
         self.hover = None
+        self.error = self.settings.pop("error", None)     # e.g. a save that could not be loaded
         self.last_save = saves.latest()
         self.last_meta = saves.meta(self.last_save) if self.last_save else None
 
@@ -129,5 +130,8 @@ class Menu:
             info = self.last_meta
             sub = self.font.render(f"{info['country'] or 'Campaign'}, {info['date']}", True, (200, 210, 230))
             screen.blit(sub, sub.get_rect(center=(resume.centerx, resume.centery + 13)))
+        if self.error:
+            text = self.head.render(self.error, True, (240, 120, 105))
+            screen.blit(text, text.get_rect(center=(cx, start.bottom + 34)))
         foot = self.font.render("Enter: start    Esc: quit", True, MUTED)
         screen.blit(foot, foot.get_rect(center=(cx, screen.get_height() - 30)))

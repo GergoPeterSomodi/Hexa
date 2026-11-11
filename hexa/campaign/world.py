@@ -7,7 +7,7 @@ import itertools
 import pickle
 import random
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 
 from ..hexgrid import distance, neighbors, to_cube, within
 from . import geo, wfc
@@ -29,8 +29,13 @@ from .data import (AREA, BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, 
 
 INF = float("inf")
 SCALE = geo.SCALE
-_RANDOM_GEOS = {}
+_RANDOM_GEOS = {}         # seed -> random geography (only the last few kept)
 _SNAPSHOTS = {}           # (map, seed) -> pickled freshly built world: building the map takes seconds
+RANDOM_KEPT = 2           # random worlds kept in those caches (the Europe snapshot always stays)
+# World attributes a save from an older version may lack, with their defaults (callables build fresh ones).
+WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "visible": set, "over": False,
+                  "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
+                  "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None}
 LAND_TILES = ("plains", "steppe", "forest", "hills", "mountains", "desert", "jungle", "tundra", "marsh", "taiga",
               "savanna", "beach", "snow")
 # Terrain that may not touch (wave function collapse rules): mountains rise through hills, deserts
@@ -42,7 +47,7 @@ FORBIDDEN = [("mountains", t) for t in ("plains", "marsh", "beach", "steppe")] +
     [("taiga", t) for t in ("savanna", "beach")] + [("tundra", t) for t in ("jungle", "savanna")] + \
     [("marsh", "savanna")]
 CLASSES = ("peasants", "burghers", "nobles")
-MANUFACTORIES = ("weaver", "toolmaker", "armoury")
+from .data import CASTLE_GOODS, ERAS as _ERAS, MANUFACTORIES, SETTLEMENT_GOODS, WORKS_ERA, WORKS_GOODS, WORKS_LEVELS
 
 
 # ----- state objects --------------------------------------------------------------------
@@ -234,8 +239,34 @@ def map_source(map, seed):
         from . import randomgeo
         if seed not in _RANDOM_GEOS:
             _RANDOM_GEOS[seed] = randomgeo.generate(seed)
+        _RANDOM_GEOS[seed] = _RANDOM_GEOS.pop(seed)          # most recently used last
+        while len(_RANDOM_GEOS) > RANDOM_KEPT:
+            _RANDOM_GEOS.pop(next(iter(_RANDOM_GEOS)))
         return _RANDOM_GEOS[seed]
     return geo
+
+
+def _remember_snapshot(key, data):
+    """Keep the Europe snapshot plus the last RANDOM_KEPT random ones (each holds a whole world)."""
+    _SNAPSHOTS.pop(key, None)
+    _SNAPSHOTS[key] = data
+    randoms = [k for k in _SNAPSHOTS if k[0] == "random"]
+    for old in randoms[:-RANDOM_KEPT]:
+        del _SNAPSHOTS[old]
+
+
+def _fill_defaults(obj):
+    """Give a dataclass object loaded from an older save the fields it is missing."""
+    if not is_dataclass(obj):
+        return
+    have = vars(obj)
+    for f in fields(obj):
+        if f.name in have:
+            continue
+        if f.default is not MISSING:
+            setattr(obj, f.name, f.default)
+        elif f.default_factory is not MISSING:
+            setattr(obj, f.name, f.default_factory())
 
 
 # ----- the world ------------------------------------------------------------------------
@@ -246,6 +277,7 @@ class CampaignWorld:
         source = map_source(map, seed)
         key = (map, seed)
         if key in _SNAPSHOTS:
+            _remember_snapshot(key, _SNAPSHOTS[key])
             self._restore(pickle.loads(_SNAPSHOTS[key]))
             self.player = player
             self.update_visibility()
@@ -275,7 +307,7 @@ class CampaignWorld:
             self._explore_home(country)
         self.economy()                   # first prices and incomes
         self.message(f"{date(1)}. The age of discovery begins.")
-        _SNAPSHOTS[key] = pickle.dumps(self.save_state(), protocol=pickle.HIGHEST_PROTOCOL)
+        _remember_snapshot(key, pickle.dumps(self.save_state(), protocol=pickle.HIGHEST_PROTOCOL))
         self.player = player
         self.update_visibility()
 
@@ -289,8 +321,26 @@ class CampaignWorld:
 
     def _restore(self, state):
         self.__dict__.update(state)
-        self._ids = itertools.count(self.__dict__.pop("_next_id"))
+        self.map = self.__dict__.get("map", "europe")
+        self.seed = self.__dict__.get("seed", 1480)
+        next_id = self.__dict__.pop("_next_id", None)
+        if next_id is None:
+            next_id = max((u.id for u in self.__dict__.get("units", ())), default=0) + 1
+        self._ids = itertools.count(next_id)
         self.geo = map_source(self.map, self.seed)
+        self._migrate()
+
+    def _migrate(self):
+        """Fill in what a save from an older version lacks: world attributes and dataclass fields."""
+        for name, default in WORLD_DEFAULTS.items():
+            if name not in self.__dict__:
+                setattr(self, name, default() if callable(default) else default)
+        groups = (getattr(self, "provinces", {}).values(), getattr(self, "countries", {}).values(),
+                  self.units, getattr(self, "markets", ()), self.routes, self.wars)
+        for group in groups:
+            for obj in group:
+                _fill_defaults(obj)
+        self.units = [u for u in self.units if u.kind is not PIONEER]      # provinces invest from the panel now
 
     @classmethod
     def from_state(cls, state):
@@ -463,6 +513,9 @@ class CampaignWorld:
         t, roll = prov.terrain, rng.random()
         americas, africa = lon < -30, lat < 17 and lon > -20
         near = lambda x, y, r=2.5: abs(lon - x) < r and abs(lat - y) < r
+        special = self._special_good(prov, lon, lat, t, rng.random(), americas, near)
+        if special:
+            return special
         if t == "desert":
             return ("salt" if roll < 0.5 else "fish") if prov.coastal else None
         if t == "marsh":
@@ -529,6 +582,38 @@ class CampaignWorld:
             return "salt"
         wool = 0.35 if (lon < 2 and lat > 50) or (-7 < lon < -1 and 39 < lat < 43) else 0.15
         return "wool" if roll < wool else "grain"
+
+    @staticmethod
+    def _special_good(prov, lon, lat, t, r, americas, near):
+        """Horses, cattle, stone, copper, hemp, olives, silk, dyes, cocoa and coffee, where they belonged in 1480."""
+        if t in ("mountains", "hills") and (near(15.5, 60.5, 3) or near(19.0, 48.7, 2) or near(13.0, 50.5, 1.5)
+                                           or near(33.0, 35.0, 1.5) or (americas and lon < -95)) and r < 0.35:
+            return "copper"
+        if t in ("hills", "mountains") and not americas and lat > 35 and r < (0.3 if near(10.5, 44.0, 3) else 0.16):
+            return "stone"
+        if t == "steppe" and r < 0.35:
+            return "horses"
+        if t in ("plains", "savanna") and (near(19.5, 47.0, 3) or near(-5.5, 37.5, 2)) and r < 0.3:
+            return "horses"
+        if t in ("plains", "marsh", "steppe") and not americas and 44 < lat < 56 and r < 0.12:
+            return "cattle"
+        if t == "savanna" and not americas and r < 0.15:
+            return "cattle"
+        if t in ("plains", "marsh") and not americas and lat > 50 and -6 < lon < 45 and r < 0.18:
+            return "hemp"
+        if t in ("plains", "hills") and (near(29.0, 40.0, 2.5) or near(10.5, 45.2, 1.8) or near(-3.6, 37.2, 1.0)) \
+                and r < 0.35:
+            return "silk"
+        if t in ("plains", "hills", "beach") and not americas and 30 < lat < 43.8 and -10 < lon < 37 and r < 0.3:
+            return "olives"
+        if americas and t in ("jungle", "savanna", "plains") and lat < 22 and lon > -98:
+            if r < 0.16:
+                return "cocoa" if lon < -75 else "dyes"
+            if r < 0.24:
+                return "dyes"
+        if t in ("hills", "mountains", "plains", "savanna") and lon > 36 and 8 < lat < 18 and r < 0.4:
+            return "coffee"
+        return None
 
     # ----- countries and people ----------------------------------------------------
     def _build_countries(self):
@@ -638,10 +723,20 @@ class CampaignWorld:
                 prov.buildings["port"] = 1
             if prov.burghers >= 14:
                 prov.buildings["weaver"] = 1
+            if prov.city and prov.burghers >= 8:            # the old trades of the big towns
+                h = (prov.pos[0] * 31 + prov.pos[1] * 17) % 7
+                if prov.level("port") or (prov.coastal and h < 3):
+                    prov.buildings["ropewalk"] = 1
+                if capital or h == 1:
+                    prov.buildings["powder_mill"] = 1
+                if h in (2, 5):
+                    prov.buildings["tannery"] = 1
+                if h == 4 or prov.name in ("Venice", "Genoa", "Antwerp", "Nuremberg", "Constantinople"):
+                    prov.buildings["glassworks"] = 1
             if prov.burghers >= 30:
                 prov.buildings["marketplace"] = 1
-            if prov.good and rng.random() < 0.2:
-                prov.works = 1
+            if prov.good and prov.good in WORKS and rng.random() < 0.25:
+                prov.works = 2 if prov.pop > 20 and rng.random() < 0.4 else 1
         for country in self.countries.values():
             mine = self.provinces_of(country.tag)
             coast = [p for p in mine if p.coastal]
@@ -1100,12 +1195,7 @@ class CampaignWorld:
         for market in self.markets:
             self._split_food(market)
             self._set_prices(market)
-        for route in self.routes:
-            self._merchants_trade(route)
-        for route in self.routes:
-            self._trade(route)
-        for market in self.markets:
-            self._set_prices(market)
+        # Workshops make their goods first, so merchants and trade routes can carry them.
         profits = {}
         for prov in self.provinces.values():
             if not prov.owner or not prov.market or prov.controller != prov.owner:
@@ -1124,6 +1214,12 @@ class CampaignWorld:
                     made += n * share * market.price[g]
                 cost = sum(n * share * market.price[g] for g, n in inputs.items())
                 profits[prov.owner] = profits.get(prov.owner, 0) + max(0.0, made - cost) * MANUFACTORY_TAX
+        for market in self.markets:
+            self._set_prices(market)
+        for route in self.routes:
+            self._merchants_trade(route)
+        for route in self.routes:
+            self._trade(route)
         for market in self.markets:
             self._set_prices(market)
             for g in GOODS:
@@ -1327,18 +1423,39 @@ class CampaignWorld:
         level = prov.works if level is None else level
         if not prov.good or prov.good not in WORKS or level <= 0:
             return ""
-        return WORKS[prov.good][0][level - 1]
+        return WORKS[prov.good][level - 1]
 
     def slots_used(self, prov):
         built = sum(1 for v in prov.buildings.values() if v)
         return built + sum(1 for item in prov.queue if item[0] in BUILDINGS and not prov.level(item[0]))
 
+    def goods_price(self, prov, goods):
+        """What these goods cost on the province's market (ducats)."""
+        market = prov.market
+        return sum(n * (market.price[g] if market else GOODS[g].price * 1.5) for g, n in goods.items())
+
+    @staticmethod
+    def _buy(prov, goods):
+        """Book the goods as a purchase on the local market (it shows up in next season's demand)."""
+        if prov.market:
+            for g, n in goods.items():
+                prov.market.pending[g] = prov.market.pending.get(g, 0) + n
+
+    def build_goods(self, prov, key):
+        if key == "settlement":
+            return SETTLEMENT_GOODS[min(3, prov.settlement + 1)]
+        if key == "castle":
+            return CASTLE_GOODS[min(3, prov.castle + 1)]
+        return {}
+
     def build_cost(self, prov, key):
         if key == "settlement":
-            return SETTLEMENT_COST[min(3, prov.settlement + 1)]
-        if key == "castle":
-            return CASTLE_COST[min(3, prov.castle + 1)]
-        return BUILDINGS[key].cost * (prov.level(key) + 1)
+            base = SETTLEMENT_COST[min(3, prov.settlement + 1)]
+        elif key == "castle":
+            base = CASTLE_COST[min(3, prov.castle + 1)]
+        else:
+            return BUILDINGS[key].cost * (prov.level(key) + 1)
+        return round(base + self.goods_price(prov, self.build_goods(prov, key)))
 
     def _job_check(self, tag, prov):
         if prov.owner != tag:
@@ -1393,39 +1510,50 @@ class CampaignWorld:
         if not self.build_check(tag, prov, key)[0]:
             return False
         self.countries[tag].treasury -= self.build_cost(prov, key)
+        self._buy(prov, self.build_goods(prov, key))
         prov.queue.append([key, BUILD_TURNS])
         prov.busy = True
         self.message(f"{prov.name}: started a {self.building_name(prov, key).lower()} "
                      f"(ready in {BUILD_TURNS} seasons).", tag)
         return True
 
-    # ----- pioneers improve the tile they stand on ---------------------------------
-    def improve_check(self, unit):
-        if unit.kind is not PIONEER:
-            return False, "Only pioneers improve tiles"
-        if unit.carrier or unit.moves_left <= 0:
-            return False, "No moves left this season"
-        prov = self.provinces.get(unit.pos)
-        if not prov or prov.owner != unit.owner or prov.controller != unit.owner:
-            return False, "Pioneers work in your own provinces"
+    # ----- province investment: raise a goods tile one level, from the province panel ------------
+    def invest_goods(self, prov):
+        return dict(WORKS_GOODS[prov.works]) if prov.works < WORKS_LEVELS else {}
+
+    def invest_cost(self, prov):
+        """Ducats for the next level: a fee plus the goods it needs, at local prices."""
+        if prov.works >= WORKS_LEVELS:
+            return 0
+        return round(WORKS_COST[prov.works] + self.goods_price(prov, self.invest_goods(prov)))
+
+    def invest_check(self, tag, prov):
+        ok, reason = self._job_check(tag, prov)
+        if not ok:
+            return ok, reason
         if not prov.good or prov.good not in WORKS:
-            return False, "Nothing to improve here"
-        if prov.works >= 3:
-            return False, f"Already a {self.works_name(prov).lower()}"
-        cost = WORKS_COST[prov.works]
-        if self.countries[unit.owner].treasury < cost:
+            return False, "Nothing to develop here"
+        if prov.works >= WORKS_LEVELS:
+            return False, f"Fully developed ({self.works_name(prov)})"
+        era = WORKS_ERA[prov.works]
+        if self.countries[tag].era < era:
+            return False, f"The next level needs the {_ERAS[era][0]}"
+        if prov.colony and prov.works >= 2:
+            return False, "Young colonies can only reach level 2"
+        cost = self.invest_cost(prov)
+        if self.countries[tag].treasury < cost:
             return False, f"Costs {cost} ducats"
         return True, ""
 
-    def improve(self, unit):
-        if not self.improve_check(unit)[0]:
+    def invest(self, tag, prov):
+        if not self.invest_check(tag, prov)[0]:
             return False
-        prov = self.provinces[unit.pos]
-        self.countries[unit.owner].treasury -= WORKS_COST[prov.works]
+        self.countries[tag].treasury -= self.invest_cost(prov)
+        self._buy(prov, self.invest_goods(prov))
         prov.works += 1
-        unit.moves_left, unit.acted = 0, True
-        self.message(f"{prov.name}: pioneers built a {self.works_name(prov).lower()} "
-                     f"(+{WORKS_BONUS * prov.works * 100:.0f}% {GOODS[prov.good].name.lower()}).", unit.owner)
+        prov.busy = True
+        self.message(f"{prov.name}: now a {self.works_name(prov).lower()} "
+                     f"(+{WORKS_BONUS * prov.works * 100:.0f}% {GOODS[prov.good].name.lower()}).", tag)
         self.changed()
         return True
 
@@ -1440,7 +1568,7 @@ class CampaignWorld:
 
     def raise_options(self, tag):
         era = self.countries[tag].era
-        return [troop(b, era) for b in BRANCHES] + [GENERAL, WAGON, SCOUT, PIONEER, COLONIST, CARAVEL, CARRACK]
+        return [troop(b, era) for b in BRANCHES] + [GENERAL, WAGON, SCOUT, COLONIST, CARAVEL, CARRACK]
 
     def stack_limit(self, tag, units=()):
         bonus = GENERAL_STACK if any(u.kind is GENERAL for u in units) else 0
@@ -1765,7 +1893,8 @@ class CampaignWorld:
     def reachable(self, unit):
         return self.reachable_group([unit])
 
-    def reachable_group(self, group):
+    def reachable_group(self, group, best=None):
+        """{pos: move cost} the stack can reach this season. `best` is a plan() over its moves, if one is at hand."""
         lead = group[0]
         moves = min(u.moves_left for u in group)
         if any(u.carrier for u in group):
@@ -1778,26 +1907,10 @@ class CampaignWorld:
                     reach[n] = 1
             return reach
         naval = lead.naval
-        zoc = set() if naval else self.zoc(lead.owner)
-        occupied, mine = self.owners_at(), {lead.owner}
-        costs = {lead.pos: 0}
-        heap = [(0, lead.pos)]
-        while heap:
-            cost, pos = heapq.heappop(heap)
-            if cost > costs.get(pos, INF):
-                continue
-            if pos != lead.pos and pos in zoc:
-                continue                    # zone of control: stop here
-            for n in neighbors(pos):
-                if n not in self.terrain or not all(self.may_enter(u, n) for u in group):
-                    continue
-                if occupied.get(n, mine) != mine:
-                    continue                # cannot walk into or through foreign units
-                step = 1 if naval else self.step_cost(pos, n)
-                new = cost + step
-                if new <= moves and new < costs.get(n, INF):
-                    costs[n] = new
-                    heapq.heappush(heap, (new, n))
+        occupied = self.owners_at()
+        if best is None:
+            best = self.plan(group, moves)
+        costs = {p: c for p, (c, _) in best.items()}
         alone = self.can_stand(group, None, others=[])
         reach = {p: c for p, c in costs.items()
                  if p == lead.pos or (alone if p not in occupied else self.can_stand(group, p))}
@@ -1868,21 +1981,23 @@ class CampaignWorld:
         lead = group[0]
         if dest == lead.pos:
             return True
-        reach = self.reachable_group(group)
+        best = None if any(u.carrier for u in group) else self.plan(group, min(u.moves_left for u in group))
+        reach = self.reachable_group(group, best)
         if dest not in reach:
             return False
         ship = None
         if not lead.naval:
             ship = next((u for u in self.units_at(dest) if u.naval and u.owner == lead.owner), None)
         # Walk the route hex by hex, looking around on the way (so fog clears along it, not just at the end).
-        path = self.route(group, dest)
+        path = self.route(group, dest, best)
         self.last_move = ([u.id for u in group], path)
+        scout = max(group, key=lambda u: u.kind.sight)      # the stack sees as far as its best eyes
         for step in path[1:-1]:
             for unit in group:
                 unit.pos = step
                 for passenger in self.cargo(unit):
                     passenger.pos = step
-                self.see_from(unit, refresh=False)
+            self.see_from(scout, refresh=False)
         for unit in group:
             unit.pos = path[0]
             for passenger in self.cargo(unit):
@@ -1902,22 +2017,29 @@ class CampaignWorld:
         if not lead.naval and not ship and dest in self.zoc(lead.owner):
             for unit in group:
                 unit.moves_left = 0
+        country = self.countries[lead.owner]
+        before = len(country.explored)
         for unit in group:
-            self.see_from(unit)
+            self.see_from(unit, refresh=False)
+        if lead.owner == self.player:
+            if len(country.explored) != before:
+                self.changed()
+            self.update_visibility()
         return True
 
-    def route(self, group, dest):
+    def route(self, group, dest, best=None):
         """The hexes the stack walks through to reach dest this season, start and end included."""
         lead = group[0]
         if lead.carrier or distance(lead.pos, dest) <= 1:
             return [lead.pos, dest]
-        best = self.plan(group, min(u.moves_left for u in group))
+        if best is None:
+            best = self.plan(group, min(u.moves_left for u in group))
         if dest not in best:                     # boarding a ship: walk to the shore next to it
             shore = [n for n in neighbors(dest) if n in best]
             if not shore:
                 return [lead.pos, dest]
             last = min(shore, key=lambda n: best[n][0])
-            return self.route(group, last) + [dest] if last != lead.pos else [lead.pos, dest]
+            return self.route(group, last, best) + [dest] if last != lead.pos else [lead.pos, dest]
         path, pos = [], dest
         while pos is not None:
             path.append(pos)
@@ -1955,7 +2077,12 @@ class CampaignWorld:
     def step_toward_group(self, group, goal, field=None):
         lead = group[0]
         reach = self.reachable_group(group)
-        field = field if field is not None else self.cost_field(goal, lead.naval, until=reach)
+        if field is None:
+            # Only wait for hexes this field can settle: a land field never reaches the sea hex of a
+            # friendly ship in `reach`, and waiting for it would search the whole map.
+            settles = self.is_sea if lead.naval else self.is_land
+            until = [p for p in reach if settles(p)] or [goal]
+            field = self.cost_field(goal, lead.naval, until=until)
         options = [p for p in reach if p == lead.pos or not any(u.naval for u in self.units_at(p)) or lead.naval]
         return min(options, key=lambda p: (field.get(p, distance(p, goal) * 4 + 1000), reach[p]))
 

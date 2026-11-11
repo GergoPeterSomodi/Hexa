@@ -130,6 +130,9 @@ see the path, the move cost of each step and how many seasons it takes.
   - Vineyards, pastures and plantations show what farmland grows.
 - **Rivers** (Rhine, Danube, Loire, Nile, Mississippi...): river land holds more people, and marching along a river costs one move less.
 - **Roads** join each country's towns and its neighbours' capitals. Along a road, every hex costs one move.
+- **Edge-matched tiles:** coasts, rivers, roads, bridges, town walls, towns and castles come from a wave function collapse tileset (`wfctiles.py`).
+  - Every tile has a socket on each of its six edges, so coastlines, rivers and roads always join across hexes.
+  - Settlements grow from hamlet to great city, and coastal towns get harbours.
 - **Looks:**
   - Coasts have surf and shallow water.
   - Rivers have banks, and bridges where roads cross.
@@ -145,8 +148,20 @@ see the path, the move cost of each step and how many seasons it takes.
   You see around your provinces and your units; ships see furthest.
 
 ### Economy
-- **Goods:** grain, fish, salt, wine, wool, cotton, timber, iron, cloth, tools, weapons, sugar, tobacco,
-  furs, ivory, spices, silver and gold. Each province produces one (shown by the goods map mode).
+- **Goods (32):**
+  - **Raw:** grain, fish, salt, wine, wool, cotton, timber, iron, horses, cattle, stone, copper, hemp & flax.
+  - **Luxuries:** sugar, tobacco, furs, ivory, spices, olive oil, silk, dyes, cocoa and coffee.
+  - **Money:** silver and gold.
+  - **Made in towns:** cloth, tools, weapons, rope & sails, glass, leather and gunpowder.
+  - Each province produces one raw good, where it grew in 1480 (shown by the goods map mode). For example: horses on the steppe and in Hungary, copper in Sweden and Hungary, silk in Anatolia and Lombardy, olives around the Mediterranean, cocoa in Central America, coffee in Yemen and Ethiopia.
+- **What goods are needed for:**
+  - **Cavalry:** horses and leather.
+  - **Cannons:** copper and gunpowder.
+  - **Arquebusiers and musketeers:** gunpowder.
+  - **Ships:** rope & sails.
+  - **Towns, cities and castles:** stone, plus glass for a city and gunpowder for a large castle.
+  - **Province investment:** timber, tools, stone and iron.
+  - All of it is bought on the local market, so shortages raise prices.
 - **Pops:** peasants, burghers and nobles. Peasants work the land, burghers staff manufactories,
   everyone eats and buys cloth, wine, salt and (the rich) sugar, spices, furs and more.
 - **Markets:** about 20 market towns (Lisbon, London, Antwerp, Venice, Constantinople...).
@@ -159,14 +174,24 @@ see the path, the move cost of each step and how many seasons it takes.
   **export** or **import** a good you choose (12 units a season). The card shows the expected profit;
   the profit or loss each season is yours. You get more merchants from marketplaces and market towns.
 - **The tile:** zoom in (mouse wheel) to see the map in tile art. Each province's tile can be improved:
-  - **Works** (built instantly by **pioneers** standing on the tile, press **B**): field → farm → windmill estate,
-    mine → deep mine → great mine, lumber camp, plantation, fishery and so on. +35% goods per level.
+  - **Investment** (no builder units: press **Invest** in the province panel):
+    - Every goods tile has five levels, each with its own look. For example: wheat strips → open fields → grange barn → windmill farm → manor estate; iron diggings → … → ironworks; fishing beach → … → fishing harbour.
+    - Each level costs ducats plus timber, tools, stone or iron bought on the local market, and gives +30% goods.
+    - Levels 3–4 need the second era, and level 5 the third.
   - **Settlement:** countryside → village → town → city. Needs enough people; gives more taxes and
     building slots (1 / 3 / 5).
   - **Castle:** tower → small castle → large castle. Defensive: +defense for your armies there and much longer sieges.
 - **One job per province each season:** train a unit, or start a settlement, castle or building (4 seasons to finish).
-- **Buildings** (use the settlement's slots): weavers (wool or cotton → cloth), toolmakers (iron → tools),
-  armouries (iron + tools → weapons), marketplaces, ports and shipyards. Manufactories buy their inputs on the
+- **Buildings** (use the settlement's slots):
+  - Manufactories:
+    - weavers (wool or cotton → cloth)
+    - toolmakers (iron → tools)
+    - armouries (iron + tools → weapons)
+    - ropewalks (hemp → rope & sails)
+    - glassworks (stone + timber → glass)
+    - tanneries (cattle → leather)
+    - powder mills (salt(petre) + timber → gunpowder)
+  - Marketplaces, ports and shipyards. Manufactories buy their inputs on the
   market and need burghers.
 - **Money each season:** taxes on goods produced and on people (low/normal/high tax), a share of
   manufactory profits, and trade; minus upkeep for buildings, armies, ships and young colonies.

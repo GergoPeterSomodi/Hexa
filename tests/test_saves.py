@@ -1,9 +1,12 @@
 """Save, load and settings tests (they use a temporary HEXA_HOME). Run with:
 python -m unittest discover -s tests -t ."""
+import json
 import os
+import pickle
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 from hexa import settings
 from hexa.campaign import ai, saves
@@ -76,6 +79,82 @@ class SaveTest(TempHome):
             f.write(b"not a save")
         self.assertIsNone(saves.load("6"), "a broken file loads nothing")
         self.assertIsNone(saves.meta("6"))
+
+
+class OldAndBrokenSavesTest(TempHome):
+    def _write(self, slot, state, version=saves.VERSION):
+        os.makedirs(saves.folder(), exist_ok=True)
+        meta = {"version": version, "slot": slot, "saved": 1.0, "date": "Spring 1480", "turn": 1,
+                "map": "Europe 1480", "tag": "POR", "country": "Portugal", "treasury": 0}
+        with open(saves.path(slot), "wb") as f:
+            f.write(json.dumps(meta).encode("utf-8") + b"\n" + pickle.dumps(state))
+
+    def test_a_removed_unit_kind_means_cant_load_not_a_crash(self):
+        from hexa.campaign import data
+        w = CampaignWorld(player="POR")
+        saves.save(w, "2")
+        gone = next(u.kind.key for u in w.units if u.kind.war)
+        with mock.patch.dict(data.UNIT_KINDS):
+            del data.UNIT_KINDS[gone]
+            self.assertIsNone(saves.load("2"))
+        self.assertIsNotNone(saves.load("2"), "the same save loads once the kind is back")
+
+    def test_an_older_save_gets_defaults_for_newer_fields(self):
+        w = CampaignWorld(player="POR")
+        state = pickle.loads(pickle.dumps(w.save_state()))
+        for key in ("over", "wars", "_castle_list", "_known_world"):
+            state.pop(key, None)
+        prov = next(iter(state["provinces"].values()))
+        del prov.__dict__["queue"]
+        del state["countries"]["POR"].__dict__["memory"]
+        del state["units"][0].__dict__["supplies"]
+        self._write("3", state)
+        back = saves.load("3")
+        self.assertIsNotNone(back)
+        self.assertFalse(back.over)
+        self.assertEqual(back.wars, [])
+        self.assertEqual(back.provinces[prov.pos].queue, [])
+        self.assertEqual(back.countries["POR"].memory, {})
+        self.assertEqual(back.units[0].supplies, 0)
+        back.end_round()                         # and the game plays on
+
+    def test_saves_from_a_newer_version_are_refused(self):
+        w = CampaignWorld(player="POR")
+        self._write("4", w.save_state(), version=saves.VERSION + 1)
+        self.assertIsNone(saves.meta("4"))
+        self.assertIsNone(saves.load("4"))
+
+
+class AppLoadingTest(TempHome):
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        import pygame
+        pygame.init()
+
+    def test_a_failed_continue_does_not_start_another_game(self):
+        from hexa.campaign.app import CampaignApp
+        with self.assertRaises(saves.LoadError):
+            CampaignApp(load="5")
+
+    def test_f9_asks_first_then_loads_and_closes_the_menu(self):
+        from hexa.campaign.app import CampaignApp
+        app = CampaignApp(player="POR")
+        app.toast = lambda text: setattr(app, "last_toast", text)
+        app.quickload()
+        self.assertIn("No quicksave", app.last_toast)
+        saves.save(app.world, "quick")
+        turn = app.world.turn
+        app.world.end_round()
+        app.open_menu("load")
+        self.assertFalse(app.quickload(), "the first F9 only asks")
+        self.assertEqual(app.world.turn, turn + 1)
+        self.assertIn("F9 again", app.last_toast)
+        self.assertTrue(app.quickload())
+        self.assertEqual(app.world.turn, turn)
+        self.assertIsNone(app.menu)
+        app.world.end_round()
+        self.assertFalse(app.quickload(), "the confirmation does not last forever")
 
 
 class SettingsTest(TempHome):

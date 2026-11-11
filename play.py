@@ -12,6 +12,7 @@ import os
 import pygame
 
 from hexa import ai
+from hexa.campaign import saves
 from hexa.campaign.app import CampaignApp
 from hexa.colony.app import ColonyApp
 from hexa.menu import Menu
@@ -267,7 +268,11 @@ def main():
         skip_menu_once, skip_menu = skip_menu, False
         load = settings.pop("load", None)
         if settings["mode"] == "campaign" and load:
-            result = CampaignApp(TILES_DIR, load=load).run()
+            try:
+                result = CampaignApp(TILES_DIR, load=load).run()
+            except saves.LoadError as error:
+                settings["error"] = str(error)
+                result = "menu"
         elif settings["mode"] == "campaign":
             result = CampaignApp(TILES_DIR, args.nation if skip_menu_once else None, settings.get("map", "europe"),
                                  args.seed if skip_menu_once else None).run()

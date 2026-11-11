@@ -99,6 +99,41 @@ class WalkingTest(unittest.TestCase):
         self.assertTrue(w.move_group(stack, far))
         self.assertTrue(all(u.pos == far for u in stack))
 
+    def test_a_move_searches_its_path_once_and_looks_around_once_per_step(self):
+        from unittest import mock
+        w = CampaignWorld(player="POR")
+        army = [u for u in w.units_of("POR") if u.kind.war]
+        stack = [u for u in army if u.pos == army[0].pos]
+        reach = w.reachable_group(stack)
+        far = max(reach, key=lambda p: (reach[p], p))
+        with mock.patch.object(w, "plan", wraps=w.plan) as plan,                 mock.patch.object(w, "see_from", wraps=w.see_from) as see:
+            self.assertTrue(w.move_group(stack, far))
+        self.assertEqual(plan.call_count, 1, "reach and route share one search")
+        path = w.last_move[1]
+        self.assertEqual(see.call_count, len(path) - 2 + len(stack))
+        self.assertTrue(all(p in w.countries["POR"].explored for p in path))
+
+    def test_a_land_army_next_to_a_ship_does_not_search_the_whole_map(self):
+        from unittest import mock
+        w = CampaignWorld(player="POR")
+        ship = next(u for u in w.units_of("POR") if u.naval)
+        army = next(u for u in w.units_of("POR") if u.kind.war and not u.naval and not u.carrier
+                    and any(w.is_sea(n) for n in neighbors(u.pos)))
+        stack = [u for u in w.units_at(army.pos) if u.owner == "POR"]
+        for passenger in w.cargo(ship):
+            passenger.carrier = None
+            passenger.pos = army.pos
+        ship.pos = next(n for n in neighbors(army.pos) if w.is_sea(n))
+        reach = w.reachable_group(stack)
+        self.assertIn(ship.pos, reach, "the army could board the ship")
+        goal = w.countries["CAS"].capital
+        full = w.cost_field(goal)
+        with mock.patch.object(w, "cost_field", wraps=w.cost_field) as cost:
+            w.step_toward_group(stack, goal)
+        until = cost.call_args.kwargs["until"]
+        self.assertTrue(all(w.is_land(p) for p in until), "only hexes a land field can settle")
+        self.assertLess(len(w.cost_field(goal, until=until)), len(full), "the search stops early")
+
 
 class RandomWorldTest(unittest.TestCase):
     def test_a_random_world_is_playable(self):

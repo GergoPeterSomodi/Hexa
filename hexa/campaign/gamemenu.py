@@ -15,6 +15,7 @@ BUTTON = (44, 50, 62)
 HOVER = (62, 70, 86)
 DISABLED = (34, 38, 46)
 WARN = (170, 60, 50)
+QUICKLOAD_CONFIRM_MS = 4000
 OPTION_TEXT = {
     "fullscreen": ("Fullscreen", lambda v: "On" if v else "Off"),
     "window": ("Window size", str),
@@ -28,6 +29,7 @@ class GameMenu:
     menu_confirm = None       # the button waiting for a second click (overwrite, exit...)
     menu_buttons = ()
     _slots = None
+    _quickload_until = 0      # ticks until which a second F9 press loads the quicksave
 
     # ----- the screen -----------------------------------------------------------------
     def apply_display(self):
@@ -67,6 +69,22 @@ class GameMenu:
             return False
         self.load_world(world)
         self.toast(f"Loaded {saves.slot_name(slot)}: {world.date()}.")
+        return True
+
+    def quickload(self):
+        """F9: load the quicksave. Unsaved progress is lost, so the first press only asks."""
+        now = pygame.time.get_ticks()
+        if self.player and not self.world.over and now > self._quickload_until:
+            if not saves.meta("quick"):
+                self.toast("No quicksave to load.")
+                return False
+            self._quickload_until = now + QUICKLOAD_CONFIRM_MS
+            self.toast("Press F9 again to load the quicksave (unsaved progress is lost).")
+            return False
+        self._quickload_until = 0
+        if not self.load_from("quick"):
+            return False
+        self.close_menu()
         return True
 
     def autosave(self):
@@ -148,8 +166,7 @@ class GameMenu:
         pygame.draw.rect(self.screen, color, rect, border_radius=7)
         if waiting:
             pygame.draw.rect(self.screen, GOLD, rect, 2, border_radius=7)
-        font = self.bold if not detail else self.bold
-        img = font.render(label, True, TEXT if enabled else MUTED)
+        img = self.bold.render(label, True, TEXT if enabled else MUTED)
         if detail:
             self.screen.blit(img, (rect.x + 14, rect.y + 5))
             sub = self.small.render(detail, True, MUTED if not waiting else TEXT)
