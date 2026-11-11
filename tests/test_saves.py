@@ -1,9 +1,11 @@
 """Save, load and settings tests (they use a temporary HEXA_HOME). Run with:
 python -m unittest discover -s tests -t ."""
+import errno
 import json
 import os
 import pickle
 import shutil
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -197,6 +199,72 @@ class SettingsTest(TempHome):
         odd = settings.load()
         self.assertEqual(odd["scroll"], "normal", "unknown values fall back to the default")
         self.assertEqual(odd["autosave"], "off")
+
+
+def _gamemenu():
+    """hexa.campaign.gamemenu without needing pygame: these tests never draw or open a window."""
+    try:
+        import pygame  # noqa: F401
+    except ImportError:
+        with mock.patch.dict(sys.modules, {"pygame": mock.MagicMock()}):
+            from hexa.campaign import gamemenu
+            return gamemenu
+    from hexa.campaign import gamemenu
+    return gamemenu
+
+
+class UnsavedOptionsTest(TempHome):
+    """Options that can't be written to settings.json still apply to this game (issue #10)."""
+    def _unwritable(self):
+        blocker = os.path.join(self.home, "a-file")
+        with open(blocker, "w") as f:
+            f.write("not a folder")
+        os.environ["HEXA_HOME"] = blocker       # writing under it fails with an OSError, even as root
+
+    def test_an_unwritable_folder_is_reported_not_raised(self):
+        self._unwritable()
+        s = settings.load()
+        settings.cycle(s, "scroll")
+        self.assertFalse(settings.save(s))
+        self.assertEqual(s["scroll"], "fast", "the change stays in memory")
+
+    def test_a_failed_write_keeps_the_old_file(self):
+        s = settings.load()
+        settings.cycle(s, "autosave")
+        self.assertTrue(settings.save(s))
+        settings.cycle(s, "autosave")
+        with mock.patch("hexa.settings.json.dump", side_effect=OSError(errno.ENOSPC, "No space left on device")):
+            self.assertFalse(settings.save(s))
+        self.assertEqual(settings.load()["autosave"], "5 years", "the last good options survive a full disk")
+        self.assertEqual(os.listdir(self.home), ["settings.json"], "no temporary file is left behind")
+
+    def test_f11_and_the_options_page_still_change_the_option(self):
+        gamemenu = _gamemenu()
+
+        class Game(gamemenu.GameMenu):
+            def __init__(self):
+                self.settings, self.toasts, self.displays = settings.load(), [], 0
+
+            def apply_display(self):
+                self.displays += 1
+
+            def toast(self, text):
+                self.toasts.append(text)
+
+        game = Game()
+        game.toggle_fullscreen()
+        self.assertEqual(game.toasts, [], "no warning when the options were saved")
+        self.assertTrue(settings.load()["fullscreen"])
+        self._unwritable()
+        game.toggle_fullscreen()                                  # F11
+        self.assertFalse(game.settings["fullscreen"])
+        self.assertEqual(game.displays, 2, "the screen mode still changes")
+        game.menu_press(("option", "scroll"))                     # Menu -> Options
+        game.menu_press(("option", "window"))
+        self.assertEqual((game.settings["scroll"], game.settings["window"]), ("fast", "1600x900"))
+        self.assertEqual(game.displays, 3)
+        self.assertEqual(len(game.toasts), 3)
+        self.assertTrue(all("next time" in t for t in game.toasts), game.toasts)
 
 
 if __name__ == "__main__":
