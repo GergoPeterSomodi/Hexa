@@ -29,6 +29,9 @@ python play.py --mode colony --start land --goal independence
 `--seed` replays the same map. The map number is shown in the window title. **M** goes back to the menu.
 `python play.py --help` lists every option.
 
+`--nation` takes a country's tag or name in any case (`POR`, `por`, `Portugal`). Random worlds invent their own
+countries (pass `--seed` too); an unknown name opens the country chooser and the terminal lists that map's countries.
+
 ## Conquest
 
 - **Goal:** move a soldier onto the enemy (red) castle. If nobody wins by turn 40, the higher
