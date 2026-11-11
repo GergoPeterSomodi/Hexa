@@ -22,6 +22,8 @@ def load():
             stored = json.load(f)
     except (OSError, ValueError):
         return settings
+    if not isinstance(stored, dict):            # valid JSON, but not an object: same as a missing file
+        return settings
     for key, value in stored.items():
         if key in CHOICES and value in CHOICES[key]:
             settings[key] = value
