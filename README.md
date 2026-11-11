@@ -449,7 +449,7 @@ job runs them.
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install pygame==2.6.1 -r requirements-dev.txt
-HEXA_HOME=$(mktemp -d) .venv/bin/python -m unittest discover -s tests/ui -t . -v   # only the window tests (a few seconds)
+HEXA_HOME=$(mktemp -d) .venv/bin/python -m unittest discover -s tests/ui -t . -v   # only the window tests (about 30 seconds)
 HEXA_HOME=$(mktemp -d) .venv/bin/python -m unittest discover -s tests -t .         # everything, window tests included
 HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .                 # without pygame: errors, not skips
 ```
@@ -461,9 +461,11 @@ the failed run. `SDL_VIDEODRIVER` and `SDL_AUDIODRIVER` default to `dummy`; set 
 to open a real window instead, though the scripted run doesn't slow down for you to watch.
 
 The helpers are in `tests/support/harness.py`: `UITestCase` (pygame set up, a temporary `HEXA_HOME`, the
-driver reset), `driver.at(frame, events)` and `driver.run_for(frames, until=...)` to script a run, the events
-`key`, `click`, `drag`, `wheel` and `hover`, and `button_rect`, `end_turn_rect`, `pause_button_rect`,
-`menu_option_rect`, `menu_start_rect` and `hex_pixel` to find things on screen from the window's own state. Test
+driver reset; `self.hold_keys()` holds keys down for the scrolling that reads `pygame.key.get_pressed()`),
+`driver.at(frame, events)` and `driver.run_for(frames, until=...)` to script a run, the events `key`, `click`,
+`drag`, `wheel` and `hover`, and `button_rect`, `end_turn_rect`, `pause_button_rect`, `menu_option_rect`,
+`menu_start_rect`, `hex_pixel` and `minimap_pixel` (a hex's cell on the Colonisation minimap) to find things on
+screen from the window's own state. Test
 modules in `tests/ui/` import pygame and the window modules inside the tests, never at the top, so the
 pygame-free run can still import them.
 

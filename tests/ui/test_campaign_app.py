@@ -283,13 +283,13 @@ class MapModeTest(CampaignCase):
         self.assertEqual([k for _, _, k in seen], [(1, mode, stamp) for mode, _, _ in seen],
                          "zoomed out, the goods views share one cached picture: no redraw for a new view")
 
-    @unittest.expectedFailure
     def test_the_close_up_goods_map_shows_each_goods_view(self):
-        """New bug, no GitHub issue filed yet: the goods map crashes the game at the tile zoom levels (zoom 3 and
-        up; choosing a country starts at zoom 4) with a KeyError. MapView._mode_layer looks the good of every
-        province on screen up in ABBR (chips and prices) and DEPOSITS (deposits), and neither table has the 17
-        goods added since: stone, olives, horses, copper, cattle and so on. Next to Lisbon it is 'stone'."""
+        """Was a crash (found by these tests, never filed, fixed on master by v0.1.4): the goods map raised a
+        KeyError at the tile zoom levels (zoom 3 and up; choosing a country starts at zoom 4), because
+        MapView._mode_layer looked the good of every province on screen up in ABBR (chips and prices) and DEPOSITS
+        (deposits), and neither table had the 17 goods added since (stone, olives, horses, ...)."""
         import pygame
+        from hexa.campaign import mapview
         from hexa.campaign.app import PANEL_W, TOP, WIDTH
         app = self.start("POR")                              # zoom 4: the tile map, Lisbon in the middle
         view = app.view
@@ -301,14 +301,17 @@ class MapModeTest(CampaignCase):
             area = app.screen.subsurface(land)
             seen.append((view.mode, view.goods_view, hashlib.sha1(pygame.image.tobytes(area, "RGB")).hexdigest()))
 
-        # The tile art is made a few tiles a frame: give every view 8 frames before looking at it.
+        # The landscape art is made a few hexes a frame, as many as LAND_BUILD_MS of real time allows: lift that
+        # limit so that every frame draws the whole picture whatever the machine's speed, and give every view 8
+        # frames before looking at it.
         frame = 8
         for k in ("3", None, "3", "3", "3", "2", "3"):
             if k:
                 self.driver.at(frame, key(k))
             frame += 8
             self.driver.at(frame, snap)
-        self.play(frame + 2)
+        with mock.patch.object(mapview, "LAND_BUILD_MS", 1e9):
+            self.play(frame + 2)
 
         self.assertEqual([(mode, goods) for mode, goods, _ in seen],
                          [("goods", "chips"), ("goods", "chips"), ("goods", "deposits"), ("goods", "prices"),

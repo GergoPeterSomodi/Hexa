@@ -37,7 +37,7 @@ coverage run -m unittest discover -s tests -t . && coverage report        # bran
 
 # Window tests (tests/ui) need pygame, which has no wheels for 3.14+: use a 3.12/3.13 venv
 python3.12 -m venv .venv && .venv/bin/pip install pygame==2.6.1 -r requirements-dev.txt
-.venv/bin/python -m unittest discover -s tests/ui -t .                    # headless window tests only, a few seconds
+.venv/bin/python -m unittest discover -s tests/ui -t .                    # headless window tests only, about 30 s
 HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .        # error instead of skip without pygame (CI ui job)
 HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon .venv/bin/coverage run -m unittest discover -s tests/ui -t .   # line coverage, as the ui job
 ```
