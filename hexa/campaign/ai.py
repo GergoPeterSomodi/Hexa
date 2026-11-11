@@ -7,10 +7,10 @@ have explored.
 from collections import deque
 
 from ..hexgrid import distance, neighbors
-from . import geo
+from . import geo, tech
 SCALE = geo.SCALE
 from .data import (BUILDINGS, CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GOODS,
-                   MANUFACTORIES, MANUFACTORY_TAX, PRODUCTION_TAX, troop,
+                   MANUFACTORIES, MANUFACTORY_TAX, UNIT_KINDS, troop,
                    SETTLEMENT_TAX, WORKS, WORKS_BONUS)
 
 # (tag: first turn it starts colonising; Portugal and Castile lead the way)
@@ -24,6 +24,9 @@ def run(world, tag):
     memory = country.memory
     memory.setdefault("seed", sum(ord(ch) for ch in tag))
     country.tax = "high" if country.treasury < 0 else "low" if country.treasury > 600 else "normal"
+    _research(world, tag)
+    _fund(world, tag)
+    _pick_idea(world, tag)
     _merchants(world, tag)
     for _ in range(1 + int(country.treasury > 1500) + int(country.treasury > 4000)):
         _build(world, tag)
@@ -32,6 +35,103 @@ def run(world, tag):
     if _colonial(world, tag):
         _colonise(world, tag)
     _diplomacy(world, tag)
+
+
+# ----- technology and ideas ----------------------------------------------------------------
+def _upkeep(country):
+    """Ducats a season that upkeep and the army cost (positive)."""
+    return max(0.0, -country.income.get("upkeep", 0) - country.income.get("military", 0))
+
+
+def _threatened(world, tag):
+    """At war, or a neighbour has a stronger army."""
+    if world.enemies(tag):
+        return True
+    mine = world.army_strength(tag)
+    return any(world.army_strength(t) > mine for t in world.neighbours_of(tag))
+
+
+def _branch_weights(world, tag):
+    """Multiplier per tech branch from the country's situation and its personality (also used for ideas)."""
+    country = world.countries[tag]
+    weights = {b: 1.0 for b in tech.BRANCHES}
+    if _threatened(world, tag):
+        weights["military"] *= 2
+    if (any(p.coastal for p in world.provinces_of(tag)) and tag in world.colonial) or world.colonies_of(tag):
+        weights["navigation"] *= 1.5
+    if country.treasury < 4 * _upkeep(country):
+        weights["trade"] *= 1.5
+    weights[tech.BRANCHES[country.memory["seed"] % len(tech.BRANCHES)]] *= 1.25
+    return weights
+
+
+def _research(world, tag):
+    """When nothing is being researched, start the available tech with the best weight per cost."""
+    country = world.countries[tag]
+    if country.researching:
+        return
+    options = sorted(tech.available(country.techs, country.era))
+    if not options:
+        return
+    weights = _branch_weights(world, tag)
+    era_open = country.era + 1 in tech.ERA_YEARS
+    era_techs = sum(1 for k in country.techs if k in tech.TECHS and tech.TECHS[k].era == country.era)
+    gate_open = era_open and era_techs < tech.ERA_GATE_TECHS
+    best = None
+    for key in options:
+        t = tech.TECHS[key]
+        weight = weights[t.branch] * (1.5 if gate_open and t.era == country.era else 1.0)
+        score = weight / (max(1, world.tech_cost(tag, key)) / 100) * world.rng.uniform(0.9, 1.1)
+        if best is None or score > best[0]:
+            best = (score, key)
+    world.set_research(tag, best[1])
+
+
+def _fund(world, tag):
+    """Once a season, buy research points with ducats when the treasury is comfortable and at peace."""
+    country = world.countries[tag]
+    if country.memory.get("funded") == world.turn or world.enemies(tag):
+        return
+    if country.treasury <= 8 * _upkeep(country):
+        return
+    if world.fund_research(tag):
+        country.memory["funded"] = world.turn
+
+
+def _idea(key):
+    if key in tech.IDEAS:
+        return tech.IDEAS[key]
+    return next((i for lst in tech.NATIONAL_IDEAS.values() for i in lst if i.key == key), None)
+
+
+def _pick_idea(world, tag):
+    """Take the nation's own card unless a general card scores more than 1.5 times as much."""
+    country = world.countries[tag]
+    offered = [i for i in (_idea(k) for k in country.pending_ideas) if i is not None]
+    if not offered:
+        return
+    weights = _branch_weights(world, tag)
+    scored = [(weights[i.branch] * world.rng.uniform(0.9, 1.1), i) for i in offered]
+    own = [s for s in scored if s[1].nation == tag]
+    general = [s for s in scored if s[1].nation != tag]
+    best_own = max(own, key=lambda s: s[0]) if own else None
+    best_general = max(general, key=lambda s: s[0]) if general else None
+    if best_own is None or (best_general is not None and best_general[0] > 1.5 * best_own[0]):
+        pick = best_general
+    else:
+        pick = best_own
+    world.pick_idea(tag, pick[1].key)
+
+
+def _ship_kind(world, tag, port):
+    """The best ship this country can build at this port: galleon, carrack, else caravel."""
+    if port.level("shipyard"):
+        galleon = UNIT_KINDS.get("galleon")
+        if galleon is not None and world.has(tag, "galleon"):
+            return galleon
+        if world.has(tag, "carrack"):
+            return CARRACK
+    return CARAVEL
 
 
 # ----- money ---------------------------------------------------------------------------
@@ -249,7 +349,7 @@ def _colonise(world, tag):
     home = min(home_ports, key=lambda p: (geo.lonlat(p.pos)[0], -p.pop))
 
     if not ships and country.treasury > 140:
-        world.recruit(tag, home, CARRACK if home.level("shipyard") else CARAVEL)
+        world.recruit(tag, home, _ship_kind(world, tag, home))
         return
     colonies = len(world.colonies_of(tag))
     limit = 1 + int(country.balance // 20) + world.turn // 40

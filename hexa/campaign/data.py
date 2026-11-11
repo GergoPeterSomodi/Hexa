@@ -172,8 +172,11 @@ BUILDINGS = {b.key: b for b in (
              inputs={"cattle": 2.5}, outputs={"leather": 2.0}),
     Building("powder_mill", "Powder mill", 320, 3, 0.3, "Grinds saltpetre and charcoal into gunpowder",
              needs_burghers=2, inputs={"salt": 1.5, "timber": 1.0}, outputs={"gunpowder": 1.2}),
+    Building("university", "University", 300, 1, 0.5, "Scholars: +1 research a season", needs_burghers=3),
 )}
 MANUFACTORIES = ("weaver", "toolmaker", "armoury", "ropewalk", "glassworks", "tannery", "powder_mill")
+PLANTATION_GOODS = ("sugar", "tobacco", "cotton", "spices")   # investment levels 3+ need the Plantations tech
+MINE_GOODS = ("iron", "silver", "gold", "salt", "copper")     # the Mines tech raises their output
 BUILD_TURNS = 4
 
 # ----- province investment: five levels per goods tile ------------------------------------------
@@ -316,12 +319,15 @@ CARAVEL = UnitKind("caravel", "Caravel", 10 * SCALE, 3 * SCALE, naval=True, capa
                    goods={"timber": 8.0, "rope": 2.0}, upkeep=0.4)
 CARRACK = UnitKind("carrack", "Carrack", 8 * SCALE, 2 * SCALE, naval=True, capacity=8, gold=70,
                    goods={"timber": 14.0, "rope": 4.0, "iron": 2.0}, upkeep=0.8)
-UNIT_KINDS = {k.key: k for k in (SCOUT, GENERAL, WAGON, PIONEER, COLONIST, CARAVEL, CARRACK) + TROOPS}
+GALLEON = UnitKind("galleon", "Galleon", 9 * SCALE, 3 * SCALE, naval=True, capacity=10, gold=90,
+                   goods={"timber": 14.0, "rope": 6.0, "iron": 4.0}, upkeep=1.0)
+UNIT_KINDS = {k.key: k for k in (SCOUT, GENERAL, WAGON, PIONEER, COLONIST, CARAVEL, CARRACK, GALLEON) + TROOPS}
 COLONIST_PEOPLE = 1.0       # thousand peasants who leave home with each colonist unit
 
 # ----- war -----------------------------------------------------------------------------
 ERAS = {1: ("Age of Pikes", 1480, 0), 2: ("Age of Arquebus", 1520, 160), 3: ("Age of Musket", 1575, 420)}
-STACK_LIMIT = {1: 6, 2: 7, 3: 8}          # war units per hex
+STACK_BASE = 6                            # war units per hex before techs and ideas (world.stack_limit)
+STACK_LIMIT = {1: 6, 2: 7, 3: 8}          # war units per hex, the old era rule (kept for old tests)
 GENERAL_STACK = 2                          # a general lets the stack hold this many more
 CIVILIAN_LIMIT = 3                         # pioneers, colonists and scouts that may share a hex
 FRONT = 3                                  # units fighting in the front line

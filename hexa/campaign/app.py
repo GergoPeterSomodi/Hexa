@@ -5,10 +5,11 @@ import pygame
 
 
 from .. import settings as options
-from . import ai, geo, saves
+from . import ai, geo, saves, tech
 from .gamemenu import GameMenu
-from .data import (FOOD_PER_TROOP, MANPOWER, NEEDS, OUTPUT, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BRANCH_NAMES, ERAS, GENERAL, GENERAL_TRAITS, RESEARCH_FUND, SCOUT, UPGRADE_MAX, BUILDINGS, CARAVEL, CARRACK, CASTLES, COLONIST, COLONY_DONE, GOODS,
-                   SETTLEMENT_SLOTS, SETTLEMENTS, TAX_LEVELS, TERRAIN, UNIT_KINDS, WORKS, WORKS_BONUS, WORKS_ERA,
+from .techscreen import TechScreen
+from .data import (FOOD_PER_TROOP, NEEDS, WAGON, BRANCH_NAMES, ERAS, GENERAL, GENERAL_TRAITS, BUILDINGS, CARAVEL, CASTLES, COLONIST, COLONY_DONE, GOODS,
+                   SETTLEMENT_SLOTS, SETTLEMENTS, TAX_LEVELS, TERRAIN, WORKS, WORKS_BONUS, WORKS_ERA,
                    WORKS_LEVELS)
 from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
 from .world import CampaignWorld
@@ -63,7 +64,7 @@ class UI:
         self.hover_since = 0
 
 
-class CampaignApp(GameMenu):
+class CampaignApp(GameMenu, TechScreen):
     def __init__(self, tiles_dir=None, player=None, map="europe", seed=None, load=None):
         self.settings = options.load()
         self.apply_display()
@@ -252,6 +253,8 @@ class CampaignApp(GameMenu):
         self.busy = False
         self.refresh()
         self.autosave()
+        if self.player and not world.countries[self.player].researching and not self.idea_pending():
+            self.toast("Pick new research (T)")
 
     def _advance_orders(self):
         """Units with a far-away destination keep moving toward it each season, stacks together."""
@@ -288,6 +291,9 @@ class CampaignApp(GameMenu):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F9 and not self.busy:
             self.quickload()
             return
+        if self.tech_open or self.idea_pending():
+            self.tech_handle(event)
+            return
         if self.menu:
             self.menu_handle(event)
             return
@@ -303,6 +309,8 @@ class CampaignApp(GameMenu):
                     self.open_menu()
             elif key == pygame.K_m:
                 self.open_menu()
+            elif key == pygame.K_t and self.player:
+                self.tech_toggle()
             elif key in (pygame.K_SPACE, pygame.K_RETURN) and self.player:
                 self.end_turn()
             elif key == pygame.K_TAB and self.player:
@@ -478,6 +486,8 @@ class CampaignApp(GameMenu):
                 self.toast(world.upgrade_check(action[1], action[2])[1])
         elif kind == "raise":
             ui.panel, ui.province = "raise", action[1]
+        elif kind == "tech":
+            self.tech_toggle() if self.tech_open else self.open_tech()
         elif kind == "fund":
             if not world.fund_research(tag):
                 self.toast("Not enough ducats")
@@ -576,6 +586,7 @@ class CampaignApp(GameMenu):
                         f"{', '.join(c.name for c in self.world.ranking()[:3])} lead. Press L for the ledger.")
         if self.menu:
             self.draw_menu()
+        self.draw_tech()
 
     def _update_path(self):
         ui, world = self.ui, self.world
@@ -757,19 +768,20 @@ class CampaignApp(GameMenu):
         food = f" + {FOOD_PER_TROOP:g} grain" if kind.war else ""
         lines.append((f"Upkeep: {kind.upkeep:g} ducats{food} a season", TEXT))
         if kind.war:
-            lines.append((f"Takes {MANPOWER * 1000:,.0f} men from the province", TEXT))
+            lines.append((f"Takes {self.world.men_per_troop(self.player) * 1000:,.0f} men from the province", TEXT))
         return lines
 
     def troop_card(self, kind, prov=None):
         if not kind.war:
             about = {"general": ["Joins a stack: +2 stack room", "+20% in his speciality (random)"],
-                     "wagon": [f"Keeps its stack fed for {WAGON_SEASONS} seasons away from depots",
+                     "wagon": [f"Keeps its stack fed for {self.world.wagon_seasons(self.player)} seasons away from depots",
                                "Refills when back in supply"],
                      "scout": ["Moves 5, sees 3 hexes", "May cross enemy land in war"],
                      "pioneer": ["Builds fields, mines and lumber camps (press B on the tile)"],
                      "colonist": ["1,000 settlers: found a colony or trading post"],
                      "caravel": ["Fast explorer, sees far, carries 4 units"],
-                     "carrack": ["Big ship, carries 8 units (needs a shipyard)"]}[kind.key]
+                     "carrack": ["Big ship, carries 8 units (needs a shipyard)"],
+                     "galleon": ["Big gun ship, carries 10 units (needs a shipyard and the Galleon tech)"]}.get(kind.key, [])
             return kind.name, [(a, TEXT) for a in about] + self.cost_lines(prov, kind)
         strong = {"infantry": [("Strong: defending, holding castles (+30%)", GOOD_C),
                                ("Strong: against cavalry (+25% defense)", GOOD_C)],
@@ -841,7 +853,6 @@ class CampaignApp(GameMenu):
         return prov.name, lines
 
     def good_card(self, market, g):
-        world = self.world
         good = GOODS[g]
         price = market.price[g]
         lines = [(f"Price {price:.2f} ducats (normal {good.price:g})",
@@ -983,7 +994,7 @@ class CampaignApp(GameMenu):
                 self.text(self.font, label, (x, y + 3), TEXT if level else MUTED, 150)
                 if queued:
                     self.text(self.small, f"building, {queued[1]} season{'s' * (queued[1] != 1)} left", (x + 170, y + 5), GOLD)
-                elif level < b.max_level:
+                elif level < world.building_max(tag, key):
                     ok, reason = world.build_check(tag, prov, key)
                     self.button((x + 160, y, w - 160, 23), "Upgrade" if level else "Build", ok,
                                 ("build", prov, key), reason or b.hint, f"{world.build_cost(prov, key)}", small=True)
@@ -1021,7 +1032,7 @@ class CampaignApp(GameMenu):
         if troops and not unit.naval and not unit.carrier:
             state, count, limit = world.supply_state(group)
             colour = {"supplied": GOOD_C, "wagon": GOLD, "foraging": GOLD, "cut off": BAD_C}[state]
-            text = {"supplied": f"In supply (a depot within {SUPPLY_RANGE} hexes)",
+            text = {"supplied": f"In supply (a depot within {world.supply_reach(unit.owner)} hexes)",
                     "wagon": "Fed by the supply wagon", "foraging": "Foraging this season",
                     "cut off": "Cut off from supply: no healing, -1 HP a season"}[state]
             self.text(self.small, text, (x, y), colour, w - 130)
@@ -1030,7 +1041,7 @@ class CampaignApp(GameMenu):
             self.hoverable((x, y, w, 16), ("Supply", [
                 (f"Troops here eat {FOOD_PER_TROOP:g} grain each a season, bought on the local market.", TEXT),
                 ("Towns, castles and ports are depots. A stack within "
-                 f"{SUPPLY_RANGE} hexes of one, through land you control, is in supply.", TEXT),
+                 f"{world.supply_reach(unit.owner)} hexes of one, through land you control, is in supply.", TEXT),
                 ("Enemy armies cut supply lines. Cut-off troops lose 1 HP a season and cannot heal.", BAD_C),
                 (f"This land feeds {limit} troops (people and farms; half in foreign land).", TEXT),
                 ("Bigger stacks lose 1 HP a season. Wagons and foraging keep stacks fed.", MUTED)]))
@@ -1086,7 +1097,7 @@ class CampaignApp(GameMenu):
                 for i, stat in enumerate(("attack", "defense")):
                     ok, reason = world.upgrade_check(u, stat)
                     level = u.atk_up if stat == "attack" else u.def_up
-                    if level < UPGRADE_MAX:
+                    if level < world.drill_max(unit.owner):
                         cost = world.upgrade_cost(u, stat)
                         self.button((bx + 56 + i * 36, y, 32, 22), "+A" if stat == "attack" else "+D", ok,
                                     ("upgrade", u, stat), reason or f"Drill +1 {stat} for {cost} ducats", small=True)
@@ -1113,19 +1124,13 @@ class CampaignApp(GameMenu):
         y += 32
         self.text(self.bold, ERAS[country.era][0], (x, y), GOLD)
         y += 22
-        nxt = world.next_era(tag)
-        if nxt:
-            era, year, need = nxt
-            done = min(1.0, country.research / need)
-            pygame.draw.rect(self.screen, (50, 55, 64), (x, y + 2, w, 10), border_radius=4)
-            pygame.draw.rect(self.screen, GOLD, (x, y + 2, w * done, 10), border_radius=4)
-            self.text(self.small, f"Research {country.research:.0f}/{need} toward the {ERAS[era][0]} (not before {year})",
-                      (x, y + 14), MUTED, w)
-            y += 34
-            gold, points = RESEARCH_FUND
-            self.button((x, y, w, 24), f"Fund research: +{points}", country.treasury >= gold, ("fund",),
-                        "Burghers do research on their own; ducats speed it up", f"{gold} ducats", small=True)
-            y += 30
+        if country.researching:
+            cur = tech.tech(country.researching)
+            line = f"Researching {cur.name} {country.research:.0f}/{world.tech_cost(tag, cur.key)} · Technology (T)"
+        else:
+            line = "Nothing researched · Technology (T)"
+        self.button((x, y, w, 26), line, True, ("tech",), "Research, ideas and the tech tree (T)", small=True)
+        y += 32
         y = self._heading("Troops", y + 4)
         for kind in world.raise_options(tag):
             if kind.naval and not prov.coastal:
@@ -1174,6 +1179,8 @@ class CampaignApp(GameMenu):
             return
         if tag == self.player:
             y += 6
+            self.button((x, y, w, 26), "Technology (T)", True, ("tech",), "Research, ideas and the tech tree (T)", small=True)
+            y += 32
             y = self._heading("Treasury", y)
             self.text(self.font, f"{country.treasury:,.0f} ducats", (x, y), GOLD)
             y += 22

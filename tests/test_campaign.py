@@ -369,7 +369,8 @@ class WarTest(unittest.TestCase):
         old = place(w, troop("infantry", 1), "POR", capital.pos)[0]
         country.treasury = 5000
         self.assertFalse(w.refit_check(old)[0])
-        country.research = 1000
+        for key in ("drill_yards", "supply_trains", "siege_craft", "guilds"):     # the age gate: 4 era I techs
+            w.grant_tech("POR", key)
         while w.year() < 1520:
             w.turn += 4
         w._research()

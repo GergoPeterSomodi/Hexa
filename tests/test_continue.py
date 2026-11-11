@@ -24,6 +24,10 @@ def headless_window_code():
             mock.patch.dict(hexa.campaign.__dict__):
         for name in [n for n, m in sys.modules.items() if n.startswith("hexa.") and hasattr(m, "pygame")]:
             del sys.modules[name]
+            parent, _, child = name.rpartition(".")
+            package = sys.modules.get(parent)
+            if package is not None:                 # `from hexa.campaign import app` would reuse the old one
+                package.__dict__.pop(child, None)
         yield stub
 
 

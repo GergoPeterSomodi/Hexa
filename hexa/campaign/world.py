@@ -10,10 +10,10 @@ from collections import deque
 from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 
 from ..hexgrid import distance, neighbors, to_cube, within
-from . import geo, wfc
+from . import geo, tech, wfc
 from .data import (AREA, BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_ATTACK,
                    GARRISON_DEFENSE, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS, GENERAL_STACK,
-                   GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT, STACK_LIMIT,
+                   GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT, STACK_BASE,
                    SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_COST, UPGRADE_MAX, VETERAN_RANKS, UnitKind, troop,
                    BUILD_TURNS, ATTRITION, FARM_GOODS, FOOD_PER_TROOP, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER,
                    SUPPLY_BASE, SUPPLY_PER_FARM, SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, BURGHER_TAX, CARAVEL, CARRACK, COLONIST, COLONIST_PEOPLE,
@@ -35,7 +35,7 @@ RANDOM_KEPT = 2           # random worlds kept in those caches (the Europe snaps
 # World attributes a save from an older version may lack, with their defaults (callables build fresh ones).
 WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "visible": set, "over": False,
                   "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
-                  "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None}
+                  "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None, "_bonus_cache": dict}
 # World attributes no save can do without (from_state refuses a state that lacks one). Every other attribute
 # has a default above, is rebuilt on load (geo, _ids) or is added when first needed (_explored_from).
 WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countries", "markets", "cities", "landmass",
@@ -51,7 +51,13 @@ FORBIDDEN = [("mountains", t) for t in ("plains", "marsh", "beach", "steppe")] +
     [("taiga", t) for t in ("savanna", "beach")] + [("tundra", t) for t in ("jungle", "savanna")] + \
     [("marsh", "savanna")]
 CLASSES = ("peasants", "burghers", "nobles")
-from .data import CASTLE_GOODS, ERAS as _ERAS, MANUFACTORIES, SETTLEMENT_GOODS, WORKS_ERA, WORKS_GOODS, WORKS_LEVELS
+BIG_EMPIRE = 300                                        # provinces that start a country with drill yards
+ROUTE_KEYS = ("market_reach", "sea_range", "atlantic")  # effects that change the trade routes
+BUILDING_TECH = {"ropewalk": ("ropewalk", "ropewalk"), "powder_mill": ("powder_mill", "corned_powder"),
+                 "glassworks": ("glass_leather", "glass_leather"), "tannery": ("glass_leather", "glass_leather"),
+                 "university": ("university", "universities")}   # building -> (flag, tech key)
+from .data import (CASTLE_GOODS, ERAS as _ERAS, GALLEON, MANUFACTORIES, MINE_GOODS, PLANTATION_GOODS,
+                   SETTLEMENT_GOODS, WORKS_ERA, WORKS_GOODS, WORKS_LEVELS)
 
 
 # ----- state objects --------------------------------------------------------------------
@@ -168,6 +174,12 @@ class Country:
     research: float = 0.0
     explored: set = field(default_factory=set)
     memory: dict = field(default_factory=dict)
+    techs: set = field(default_factory=set)              # tech keys known (grid, national, regional)
+    researching: str = ""                               # the tech being researched (progress is `research`)
+    queue: list = field(default_factory=list)            # techs to research after it
+    ideas: set = field(default_factory=set)              # idea card keys adopted
+    national: str = ""                                  # the national (or regional default) tech key
+    pending_ideas: list = field(default_factory=list)    # idea keys offered at the last age, not yet picked
 
     @property
     def balance(self):
@@ -217,11 +229,11 @@ class Unit:
 class Garrison:
     """A castle's own defenders, fighting like a unit of infantry."""
 
-    def __init__(self, prov):
+    def __init__(self, prov, extra_defense=0):
         self.prov = prov
         self.owner = prov.controller
         self.kind = UnitKind("garrison", "Garrison", 0, 0, branch="infantry", hp=prov.castle * GARRISON_HP,
-                             attack=GARRISON_ATTACK, defense=GARRISON_DEFENSE + 2 * prov.castle)
+                             attack=GARRISON_ATTACK, defense=GARRISON_DEFENSE + 2 * prov.castle + extra_defense)
         self.hp = prov.garrison
         self.xp = self.atk_up = self.def_up = 0
 
@@ -300,6 +312,7 @@ class CampaignWorld:
         self._ids = itertools.count(1)
         self._owned = None
         self._castle_list = None
+        self._bonus_cache = {}
         self.visible = set()
         self.over = False
         self._build_map()
@@ -322,7 +335,7 @@ class CampaignWorld:
     # ----- saving --------------------------------------------------------------------
     def save_state(self):
         """Everything needed to rebuild this world (picklable; the map source is rebuilt from map + seed)."""
-        state = {k: v for k, v in self.__dict__.items() if k not in ("geo", "_ids")}
+        state = {k: v for k, v in self.__dict__.items() if k not in ("geo", "_ids", "_bonus_cache")}
         state["_next_id"] = next(self._ids)
         self._ids = itertools.count(state["_next_id"])
         return state
@@ -349,6 +362,10 @@ class CampaignWorld:
             for obj in group:
                 _fill_defaults(obj)
         self.units = [u for u in self.units if u.kind is not PIONEER]      # provinces invest from the panel now
+        self._bonus_cache = {}
+        for country in getattr(self, "countries", {}).values():
+            if not country.techs:
+                self._legacy_techs(country)
 
     @classmethod
     def from_state(cls, state):
@@ -760,6 +777,7 @@ class CampaignWorld:
                 max(coast, key=lambda p: (p.pop, p.pos)).buildings["port"] = 1
             country.treasury = 150 + 4 / AREA * len(self.provinces_of(country.tag))
         self.colonial = dict(getattr(self.geo, "COLONIAL", {}))
+        self._start_techs()
         self._build_roads()
 
     def _build_roads(self):
@@ -1004,6 +1022,7 @@ class CampaignWorld:
                 market.center = self._nearest_land(pos)
                 market.active = self.provinces[market.center].owner is not None
         active = [m for m in self.markets if m.active]
+        limits = [MARKET_REACH * (1 + self.bonus(self.market_owner(m), "market_reach")) for m in active]
         best = {}
         heap = []
         for i, market in enumerate(active):
@@ -1023,7 +1042,7 @@ class CampaignWorld:
                 else:
                     continue
                 new = cost + step
-                if new <= MARKET_REACH and new < best.get(n, (INF,))[0]:
+                if new <= limits[i] and new < best.get(n, (INF,))[0]:
                     best[n] = (new, i)
                     heapq.heappush(heap, (new, n, i))
         for market in self.markets:
@@ -1091,9 +1110,12 @@ class CampaignWorld:
                 atlantic = (a.colonial != b.colonial) and min(a.point[0], b.point[0]) < -20 and \
                     max(a.point[0], b.point[0]) < 12
                 both_colonial = a.colonial and b.colonial
+                owners = (self.market_owner(a), self.market_owner(b))
+                sea_range = SEA_ROUTE_RANGE * (1 + max(self.bonus(o, "sea_range") for o in owners))
+                flag_ok = any(self.has(o, "atlantic") for o in owners)
                 if land:
                     route = (distance(a.center, b.center), False)
-                elif sea_d <= SEA_ROUTE_RANGE or (sea_d <= ATLANTIC_RANGE and (atlantic or both_colonial)):
+                elif sea_d <= sea_range or (sea_d <= ATLANTIC_RANGE and flag_ok and (atlantic or both_colonial)):
                     route = (sea_d, True)
                 else:
                     continue
@@ -1124,7 +1146,7 @@ class CampaignWorld:
     def merchants(self, tag):
         levels = sum(p.level("marketplace") for p in self.provinces_of(tag))
         owns_market = any(m.active and self.market_owner(m) == tag for m in self.markets)
-        return min(6, 1 + owns_market + levels // 3)
+        return min(6, 1 + owns_market + levels // 3) + int(self.bonus(tag, "merchants"))
 
     def merchant_markets(self, tag):
         return {p.market for p in self.provinces_of(tag) if p.market}
@@ -1146,7 +1168,7 @@ class CampaignWorld:
                 amount = min(MERCHANT_CAPACITY, spare)
                 if amount < 0.5:
                     continue
-                margin = dst.price[g] - src.price[g] - route.cost
+                margin = dst.price[g] - src.price[g] - self.route_cost(route)
                 options.append((g, src, dst, margin, amount))
         options.sort(key=lambda o: -o[3] * o[4])
         return options
@@ -1198,7 +1220,7 @@ class CampaignWorld:
                 market.supply["grain"] += food
                 market.produced["grain"] += food
             if prov.good and prov.controller == prov.owner:
-                out = OUTPUT[prov.good] * prov.workers * (1 + WORKS_BONUS * prov.works)
+                out = OUTPUT[prov.good] * self._workers(prov) * self._works_factor(prov) * self._output_mult(prov)
                 if prov.remote:
                     out *= REMOTE_PENALTY
                 if prov.foraged and prov.foraged[1] >= self.turn - 1:
@@ -1256,6 +1278,65 @@ class CampaignWorld:
                 del market.history[g][:-40]
         self._incomes(profits)
 
+    # ----- what the techs and ideas change (keys in tech.EFFECT_KEYS) ------------------------------
+    def route_cost(self, route):
+        """Cost per unit on a trade route: a colonial market's owner may make colonial routes cheaper."""
+        cuts = [self.bonus(self.market_owner(m), "colonial_route_cost") for m in (route.a, route.b) if m.colonial]
+        return route.cost * (1 + min(cuts, default=0))
+
+    def men_per_troop(self, tag):
+        return MANPOWER / (1 + self.bonus(tag, "manpower"))
+
+    def drill_max(self, tag):
+        return UPGRADE_MAX + int(self.bonus(tag, "upgrade_max"))
+
+    def wagon_seasons(self, tag):
+        return WAGON_SEASONS + int(self.bonus(tag, "wagon_seasons"))
+
+    def building_max(self, tag, key):
+        if key in MANUFACTORIES:
+            return min(3, 2 + int(self.bonus(tag, "manufactory_max")))
+        return BUILDINGS[key].max_level
+
+    def castle_top(self, tag):
+        """The highest castle level this country can build (2 small castle, 3 large castle)."""
+        return min(3, 2 + int(self.bonus(tag, "castle_max")))
+
+    def supply_reach(self, tag):
+        return SUPPLY_RANGE + round(self.bonus(tag, "supply_range") * SCALE)
+
+    def unit_moves(self, unit):
+        if unit.naval:
+            return unit.kind.moves + round(self.bonus(unit.owner, "ship_moves") * SCALE)
+        return unit.kind.moves
+
+    def unit_sight(self, unit):
+        if unit.naval:
+            return unit.kind.sight + round(self.bonus(unit.owner, "ship_sight") * SCALE)
+        return unit.kind.sight
+
+    def _workers(self, prov):
+        if not prov.trading_post:
+            return prov.peasants
+        return prov.peasants + prov.natives * TRADING_POST_SHARE * (1 + self.bonus(prov.owner, "trading_post_share"))
+
+    def _works_factor(self, prov):
+        extra = self.bonus(prov.owner, "farm_works") if prov.good in FARM_GOODS else 0
+        return 1 + (WORKS_BONUS + extra) * prov.works
+
+    def _output_mult(self, prov):
+        if prov.good in MINE_GOODS:
+            return 1 + self.bonus(prov.owner, "mines")
+        if prov.good == "wool":
+            return 1 + self.bonus(prov.owner, "wool")
+        return 1
+
+    def _tax_growth(self, tag):
+        growth = TAX_GROWTH[self.countries[tag].tax]
+        if growth < 0:
+            return growth * max(0.0, 1 - self.bonus(tag, "tax_relief"))
+        return growth
+
     @staticmethod
     def _staffing(prov, key):
         need = BUILDINGS[key].needs_burghers * prov.level(key)
@@ -1301,7 +1382,7 @@ class CampaignWorld:
             src = route.a if route.a.name == src_name else route.b
             dst = route.other(src)
             amount = min(MERCHANT_CAPACITY, max(0.0, src.supply[g] - src.demand[g] * 0.5))
-            margin = dst.price[g] - src.price[g] - route.cost
+            margin = dst.price[g] - src.price[g] - self.route_cost(route)
             if amount > 0:
                 src.supply[g] -= amount
                 src.exports[g] += amount
@@ -1311,7 +1392,7 @@ class CampaignWorld:
 
     def _trade(self, route):
         capacity = self.route_capacity(route)
-        cost = route.cost
+        cost = self.route_cost(route)
         offers = []
         for g, good in GOODS.items():
             if good.kind == "money":
@@ -1348,7 +1429,7 @@ class CampaignWorld:
             for market in (route.a, route.b):
                 owner = self.market_owner(market)
                 if owner:
-                    trade[owner] = trade.get(owner, 0) + route.profit * TOLL_SHARE
+                    trade[owner] = trade.get(owner, 0) + route.profit * TOLL_SHARE * (1 + self.bonus(owner, "tolls"))
         food = {}
         for unit in self.units:
             if unit.kind.war and unit.carrier is None:
@@ -1358,24 +1439,25 @@ class CampaignWorld:
         for tag, country in self.countries.items():
             if not country.alive:
                 continue
-            rate = TAX_LEVELS[country.tax]
+            rate = TAX_LEVELS[country.tax] + (self.bonus(tag, "high_tax") if country.tax == "high" else 0)
             production = pop_tax = upkeep = colonies = 0.0
             for prov in self.provinces_of(tag):
                 if prov.controller != tag:
                     continue
                 market = prov.market
                 if market and prov.good:
-                    prov.value = prov.output * market.price[prov.good]
-                    production += prov.value * PRODUCTION_TAX * rate
+                    money = 1 + self.bonus(tag, "money_value") if GOODS[prov.good].kind == "money" else 1
+                    prov.value = prov.output * market.price[prov.good] * money
+                    production += prov.value * (PRODUCTION_TAX + self.bonus(tag, "production_tax")) * rate
                 everyday = market.satisfaction("cloth") if market else 0.5
-                pop_tax += rate * (prov.peasants * PEASANT_TAX + prov.burghers * BURGHER_TAX *
+                pop_tax += rate * (prov.peasants * PEASANT_TAX + prov.burghers * BURGHER_TAX * (1 + self.bonus(tag, "burgher_tax")) *
                                    (0.5 + 0.5 * everyday) * (1 + 0.15 * prov.level("marketplace"))) * \
                     (1 + SETTLEMENT_TAX[prov.settlement])
                 for key, level in prov.buildings.items():
                     upkeep += BUILDINGS[key].upkeep * level
                 upkeep += WORKS_UPKEEP * prov.works + SETTLEMENT_UPKEEP[prov.settlement] + CASTLE_UPKEEP[prov.castle]
                 if prov.colony:
-                    colonies += COLONY_UPKEEP
+                    colonies += COLONY_UPKEEP * (1 + self.bonus(tag, "colony_upkeep"))
             units = sum(u.kind.upkeep for u in self.units_of(tag)) + food.get(tag, 0.0)
             country.income = {"production": production, "taxes": pop_tax, "buildings": profits.get(tag, 0.0),
                               "trade": trade.get(tag, 0.0), "upkeep": -upkeep, "military": -units,
@@ -1394,12 +1476,11 @@ class CampaignWorld:
             if prov.owner is None:
                 prov.natives *= 1.0005
                 continue
-            country = self.countries[prov.owner]
             food = prov.market.food_satisfaction() if prov.market else 0.8
             prov.food = food
-            rate = BASE_GROWTH + TAX_GROWTH[country.tax] + min(0.0, food - 0.9) * 0.05
+            rate = BASE_GROWTH + self._tax_growth(prov.owner) + min(0.0, food - 0.9) * 0.05
             if prov.colony:
-                rate += COLONY_GROWTH
+                rate += COLONY_GROWTH * (1 + self.bonus(prov.owner, "colony_growth"))
                 prov.peasants += 0.04       # settlers keep arriving from home
             prov.peasants *= 1 + rate
             prov.nobles *= 1 + rate * 0.5
@@ -1409,7 +1490,7 @@ class CampaignWorld:
                 moving = min(prov.peasants * 0.006, jobs - prov.burghers)
                 prov.peasants -= moving
                 prov.burghers += moving
-            prov.burghers *= 1 + rate
+            prov.burghers *= 1 + rate * (1 + self.bonus(prov.owner, "burgher_growth"))
             if prov.natives > 0:
                 if prov.colony or prov.trading_post:
                     settled = prov.natives * 0.01
@@ -1481,7 +1562,7 @@ class CampaignWorld:
         if key == "settlement":
             base = SETTLEMENT_COST[min(3, prov.settlement + 1)]
         elif key == "castle":
-            base = CASTLE_COST[min(3, prov.castle + 1)]
+            base = CASTLE_COST[min(3, prov.castle + 1)] * (1 + self.bonus(prov.owner, "castle_cost"))
         else:
             return BUILDINGS[key].cost * (prov.level(key) + 1)
         return round(base + self.goods_price(prov, self.build_goods(prov, key)))
@@ -1510,13 +1591,19 @@ class CampaignWorld:
         elif key == "castle":
             if prov.castle >= 3:
                 return False, "Already a large castle"
+            if prov.castle >= self.castle_top(tag):
+                return False, "A large castle needs the Trace italienne tech"
             if prov.colony and prov.castle >= 1:
                 return False, "Young colonies can only build a tower"
         else:
             b = BUILDINGS[key]
             level = prov.level(key)
-            if level >= b.max_level:
+            if level >= self.building_max(tag, key):
                 return False, "Already at the highest level"
+            if key in BUILDING_TECH and not self.has(tag, BUILDING_TECH[key][0]):
+                return False, f"Needs the {tech.tech(BUILDING_TECH[key][1]).name} tech"
+            if key == "university" and prov.settlement < 3:
+                return False, "Universities need a city"
             if b.needs_coast and not prov.coastal:
                 return False, "Needs a coastal province"
             if key == "shipyard" and not prov.level("port"):
@@ -1554,7 +1641,10 @@ class CampaignWorld:
         """Ducats for the next level: a fee plus the goods it needs, at local prices."""
         if prov.works >= WORKS_LEVELS:
             return 0
-        return round(WORKS_COST[prov.works] + self.goods_price(prov, self.invest_goods(prov)))
+        cost = WORKS_COST[prov.works] + self.goods_price(prov, self.invest_goods(prov))
+        if prov.good in FARM_GOODS:
+            cost *= 1 + self.bonus(prov.owner, "farm_invest")
+        return round(cost)
 
     def invest_check(self, tag, prov):
         ok, reason = self._job_check(tag, prov)
@@ -1567,6 +1657,8 @@ class CampaignWorld:
         era = WORKS_ERA[prov.works]
         if self.countries[tag].era < era:
             return False, f"The next level needs the {_ERAS[era][0]}"
+        if prov.good in PLANTATION_GOODS and prov.works >= 2 and not self.has(tag, "plantations"):
+            return False, "Plantation levels 3 and up need the Plantations tech"
         if prov.colony and prov.works >= 2:
             return False, "Young colonies can only reach level 2"
         cost = self.invest_cost(prov)
@@ -1593,15 +1685,18 @@ class CampaignWorld:
         if kind.naval and prov.level("shipyard") and "timber" in goods:
             goods["timber"] *= 0.7
         price = sum(n * (market.price[g] if market else GOODS[g].price * 1.5) for g, n in goods.items())
-        return round(kind.gold + price)
+        gold = kind.gold * (1 + self.bonus(prov.owner, "cavalry_cost")) if kind.branch == "cavalry" else kind.gold
+        return round(gold + price)
 
     def raise_options(self, tag):
         era = self.countries[tag].era
-        return [troop(b, era) for b in BRANCHES] + [GENERAL, WAGON, SCOUT, COLONIST, CARAVEL, CARRACK]
+        return [troop(b, era) for b in BRANCHES] + [GENERAL, WAGON, SCOUT, COLONIST, CARAVEL, CARRACK, GALLEON]
 
     def stack_limit(self, tag, units=()):
-        bonus = GENERAL_STACK if any(u.kind is GENERAL for u in units) else 0
-        return STACK_LIMIT[self.countries[tag].era] + bonus
+        limit = STACK_BASE + self.bonus(tag, "stack")
+        if any(u.kind is GENERAL for u in units):
+            limit += GENERAL_STACK + self.bonus(tag, "general_stack")
+        return int(limit)
 
     def can_stand(self, group, pos, others=None):
         """Whether these units (all of one owner) may end their move together on pos."""
@@ -1637,17 +1732,21 @@ class CampaignWorld:
         if country.treasury < cost:
             return False, f"Costs {cost} ducats"
         if kind.naval:
+            if kind is CARRACK and not self.has(tag, "carrack"):
+                return False, "Carracks need the Carrack tech"
+            if kind is GALLEON and not self.has(tag, "galleon"):
+                return False, "Galleons need the Galleon tech"
             if not prov.level("port"):
                 return False, "Needs a port"
-            if kind is CARRACK and not prov.level("shipyard"):
-                return False, "Carracks need a shipyard"
+            if kind in (CARRACK, GALLEON) and not prov.level("shipyard"):
+                return False, f"{kind.name}s need a shipyard"
             if not any(self.is_sea(n) and all(u.owner == tag for u in self.units_at(n)) for n in neighbors(prov.pos)):
                 return False, "No free sea next to the port"
         elif self._land_spot(tag, prov, kind) is None:
             return False, "No room here or next door (stacks are full)"
         if kind is COLONIST and prov.peasants < 3:
             return False, "Needs at least 3k peasants to send settlers"
-        if kind.war and prov.peasants < MANPOWER + 2:
+        if kind.war and prov.peasants < self.men_per_troop(tag) + 2:
             return False, "Not enough men left here (each troop takes 1,000 peasants)"
         return True, ""
 
@@ -1663,14 +1762,14 @@ class CampaignWorld:
         if kind is COLONIST:
             prov.peasants -= COLONIST_PEOPLE
         if kind.war:
-            prov.peasants -= MANPOWER
+            prov.peasants -= self.men_per_troop(tag)
         if kind.naval:
             pos = next(n for n in neighbors(prov.pos) if self.is_sea(n) and all(u.owner == tag for u in self.units_at(n)))
         else:
             pos = self._land_spot(tag, prov, kind)
         unit = self._add_unit(kind, tag, pos)
         if kind is WAGON:
-            unit.supplies = WAGON_SEASONS
+            unit.supplies = self.wagon_seasons(tag)
         self.message(f"{prov.name}: raised {kind.name.lower()} for {cost} ducats.", tag)
         self.see_from(unit)
         return unit
@@ -1729,7 +1828,7 @@ class CampaignWorld:
         need = "foundry" if unit.kind.branch == "artillery" else "barracks"
         if unit.carrier or not prov or prov.owner != unit.owner or not prov.level(need):
             return False, f"Needs to stand in your province with a {need}"
-        if (unit.atk_up if stat == "attack" else unit.def_up) >= UPGRADE_MAX:
+        if (unit.atk_up if stat == "attack" else unit.def_up) >= self.drill_max(unit.owner):
             return False, f"{stat.title()} is fully drilled"
         if unit.moves_left <= 0 or unit.upgraded:
             return False, "No time left this season"
@@ -1749,30 +1848,263 @@ class CampaignWorld:
         unit.moves_left, unit.upgraded = 0, True
         return True
 
+    # ----- technology: research, ideas and the effects they give ---------------------------
+    def has(self, tag, flag):
+        """Whether a country has an unlock flag (a tech or idea whose effect is 1)."""
+        return bool(self.bonus(tag, flag))
+
+    def bonus(self, tag, key):
+        """A country's summed effect for `key` (see tech.EFFECT_KEYS). 0 when it has none."""
+        return self._effects(tag).get(key, 0)
+
+    def _effects(self, tag):
+        cache = self._bonus_cache
+        if tag not in cache:
+            country = getattr(self, "countries", {}).get(tag)
+            if country is None:
+                return {}
+            cache[tag] = tech.effects(country.techs - {country.national}, country.ideas, country.national)
+        return cache[tag]
+
+    def _tech_changed(self, tag):
+        self._bonus_cache.pop(tag, None)
+
+    @staticmethod
+    def _route_effects(effects):
+        return any(key in ROUTE_KEYS for key in effects)
+
+    @staticmethod
+    def _idea(key):
+        if key in tech.IDEAS:
+            return tech.IDEAS[key]
+        return next((i for lst in tech.NATIONAL_IDEAS.values() for i in lst if i.key == key), None)
+
+    def grant_tech(self, tag, key):
+        """Add a tech to what a country knows. Cartography explores its trade coasts; route effects redraw markets."""
+        country = self.countries[tag]
+        if key in country.techs:
+            return
+        country.techs.add(key)
+        self._tech_changed(tag)
+        if key == "cartography":
+            self._cartography(tag)
+        t = tech.tech(key)
+        if t is not None and self._route_effects(t.effects):
+            self.refresh_markets()
+
+    def pick_idea(self, tag, idea_key):
+        """Adopt one of the idea cards offered at the last age. The other cards are dropped."""
+        country = self.countries[tag]
+        idea = self._idea(idea_key)
+        if idea is None or idea_key not in country.pending_ideas:
+            return False
+        country.ideas.add(idea_key)
+        country.pending_ideas = []
+        self._tech_changed(tag)
+        if self._route_effects(idea.effects):
+            self.refresh_markets()
+        self.message(f"Idea adopted: {idea.name}. {idea.text}", tag)
+        return True
+
+    def fund_check(self, tag):
+        """Funding is allowed once a year (every 4 seasons) and costs RESEARCH_FUND[0] ducats."""
+        country = self.countries[tag]
+        last = country.memory.get("funded_turn")
+        if last is not None and self.turn - last < 4:
+            return False, f"Funded already: again in {4 - (self.turn - last)} season(s)"
+        if country.treasury < RESEARCH_FUND[0]:
+            return False, f"Costs {RESEARCH_FUND[0]} ducats"
+        return True, ""
+
     def fund_research(self, tag):
+        """60 ducats buy 15 research points (more with the Fund effect) for the current tech, once a year."""
         gold, points = RESEARCH_FUND
         country = self.countries[tag]
-        if country.treasury < gold or country.era >= 3:
+        if not self.fund_check(tag)[0]:
             return False
+        country.memory["funded_turn"] = self.turn
         country.treasury -= gold
-        country.research += points
+        country.research += points * (1 + self.bonus(tag, "fund"))
         return True
 
     def next_era(self, tag):
-        """(era, year it opens, research needed) for the next era, or None."""
-        era = self.countries[tag].era + 1
-        return (era,) + ERAS[era][1:] if era in ERAS else None
+        """(era, year it opens, era techs needed) for the next age, or None at the last one."""
+        country = self.countries[tag]
+        if country.era >= 3:
+            return None
+        era = country.era + 1
+        return era, tech.ERA_YEARS[era], tech.ERA_GATE_TECHS
+
+    def research_rate(self, tag):
+        """Research points this season as (total, parts). The parts add up to the total."""
+        country = self.countries[tag]
+        mult = 1 + self.bonus(tag, "research")
+        owned = self.provinces_of(tag)
+        burghers = sum(p.burghers for p in owned)
+        universities = sum(1 for p in owned if p.level("university"))
+        capital = self.provinces.get(country.capital)
+        coffee = self.bonus(tag, "coffee_research")
+        share = capital.market.satisfaction("coffee") if coffee and capital and capital.market else 0.0
+        total = tech.research_points(RESEARCH_BASE, burghers, universities, share,
+                                     {"research": self.bonus(tag, "research"), "coffee_research": coffee})
+        parts = {"base": RESEARCH_BASE * mult, "burghers": burghers / 40 * mult, "universities": universities * mult,
+                 "coffee": share * burghers / 40 * 0.25 * coffee * mult, "funding": 0.0}
+        return total, parts
+
+    def tech_cost(self, tag, key):
+        """Research points a tech costs this country. Each neighbour on its markets that knows it makes it cheaper."""
+        if key not in tech.TECHS:
+            return 0
+        bonuses = {"diffusion_cap": self.bonus(tag, "diffusion_cap"), "nav_cost": self.bonus(tag, "nav_cost")}
+        return tech.cost(key, self._know_nearby(tag, key), bonuses)
+
+    def _know_nearby(self, tag, key):
+        """Living countries owning provinces on the markets this country trades in, that know `key`."""
+        owners = {p.owner for m in self.merchant_markets(tag) for p in m.provinces}
+        owners.discard(None)
+        owners.discard(tag)
+        return sum(1 for o in owners if self.countries[o].alive and key in self.countries[o].techs)
+
+    def set_research(self, tag, key):
+        """Research `key` next: its unknown prerequisites first, then it. The rest of that path becomes the queue."""
+        country = self.countries[tag]
+        t = tech.TECHS.get(key)
+        if t is None or key in country.techs or t.era > country.era:
+            return False
+        path = tech.path_to(key, country.techs)
+        if not path:
+            return False
+        country.researching = path[0]
+        country.queue = path[1:]
+        return True
+
+    def unqueue(self, tag, key):
+        queue = self.countries[tag].queue
+        if key not in queue:
+            return False
+        queue.remove(key)
+        return True
 
     def _research(self):
         for tag, country in self.countries.items():
             if not country.alive:
                 continue
-            country.research += RESEARCH_BASE + sum(p.burghers for p in self.provinces_of(tag)) / 40
-            nxt = self.next_era(tag)
-            if nxt and self.year() >= nxt[1] and country.research >= nxt[2]:
-                country.era = nxt[0]
-                names = ", ".join(troop(b, country.era).name.lower() for b in BRANCHES)
-                self.message(f"{ERAS[country.era][0]}: you can now raise {names}. Refit old troops in your towns.", tag)
+            rate = self.research_rate(tag)[0]
+            country.research += rate
+            self._finish_research(tag)
+            if not country.researching:            # nothing chosen: points don't pile up for later
+                country.research = min(country.research, 2 * rate)
+            if tech.era_ready(country.era, self.year(), country.techs):
+                self._new_age(tag)
+
+    def _finish_research(self, tag):
+        """Spend the research points on the current tech, then the next in the queue, while they last."""
+        country = self.countries[tag]
+        if country.researching in country.techs:
+            country.researching = ""
+        if not country.researching and not self._advance(tag):
+            return
+        while country.researching:
+            key = country.researching
+            cost = self.tech_cost(tag, key)
+            if country.research < cost:
+                return
+            country.research -= cost
+            self.grant_tech(tag, key)
+            t = tech.TECHS[key]
+            self.message(f"Researched {t.name}: {t.text}", tag)
+            if not self._advance(tag) and tag == self.player:
+                self.message("Pick new research (T).", tag)
+
+    def _advance(self, tag):
+        """Start the next queued tech that is still to learn. False when nothing is left in the queue."""
+        country = self.countries[tag]
+        country.researching = ""
+        while country.queue:
+            key = country.queue.pop(0)
+            t = tech.TECHS.get(key)
+            if t is not None and key not in country.techs and t.era <= country.era:
+                country.researching = key
+                return True
+        return False
+
+    def _new_age(self, tag):
+        """The country reaches the next age: its troops change, and it is offered three idea cards."""
+        country = self.countries[tag]
+        country.era += 1
+        names = ", ".join(troop(b, country.era).name.lower() for b in BRANCHES)
+        self.message(f"{ERAS[country.era][0]}: you can now raise {names}. Refit old troops in your towns.", tag)
+        counts = {b: sum(1 for k in country.techs if k in tech.TECHS and tech.TECHS[k].branch == b)
+                  for b in tech.BRANCHES}
+        country.pending_ideas = [i.key for i in tech.draw_ideas(tag, counts, set(country.ideas), self.rng)]
+
+    def _cheapest_available(self, tag):
+        country = self.countries[tag]
+        options = tech.available(country.techs, country.era)
+        return min(options, key=lambda k: (tech.TECHS[k].cost, k), default="")
+
+    def _know_region(self, tag):
+        """The regional default tech's region, from the capital's position. Random worlds use 'default'."""
+        if self.map == "random":
+            return "default"
+        lon, lat = geo.lonlat(self.countries[tag].capital)
+        if 6 < lon < 19 and 37 < lat < 47.5:
+            return "italian"
+        if 5 < lon < 17 and 47 <= lat < 55:
+            return "german"
+        if lat < 37.5 and lon < 33 and lat > 20:
+            return "north_african"
+        return "default"
+
+    def _start_techs(self):
+        """Each country's national tech, its starting techs and its first research (build spec, start of game)."""
+        big = BIG_EMPIRE
+        for tag, country in self.countries.items():
+            nat = tech.national_tech(tag, self._know_region(tag))
+            owned = self.provinces_of(tag)
+            known = {nat.key, *nat.also_knows}
+            if self.colonial.get(tag, 999) <= 0:
+                known.update(("portolan", "astrolabe"))
+            if any(p.coastal for p in owned):
+                known.add("portolan")
+            if len(owned) >= big:
+                known.add("drill_yards")
+            country.national = nat.key
+            country.techs = known
+            self._tech_changed(tag)
+            country.researching = self._cheapest_available(tag)
+
+    def _legacy_techs(self, country):
+        """An old save's country: its national tech, and the cheapest gate techs of each age below its own."""
+        nat = tech.national_tech(country.tag, self._know_region(country.tag))
+        country.national = nat.key
+        known = {nat.key, *nat.also_knows}
+        for era in range(1, country.era):
+            gate = sorted((t for t in tech.TECHS.values() if t.era == era), key=lambda t: (t.cost, t.key))
+            for t in gate[:tech.ERA_GATE_TECHS]:
+                known.update(tech.path_to(t.key, known))
+        country.techs = known
+        self._tech_changed(country.tag)
+        country.researching = self._cheapest_available(country.tag)
+
+    def _cartography(self, tag):
+        """Explore the coast and sea around every market this country trades through."""
+        self.ensure_markets()
+        mine = self.merchant_markets(tag)
+        centres = set()
+        for route in self.routes:
+            if route.a in mine or route.b in mine:
+                centres.update((route.a.center, route.b.center))
+        centres.discard(None)
+        explored = self.countries[tag].explored
+        for centre in centres:
+            for pos in within(centre, SCALE):
+                prov = self.provinces.get(pos)
+                if pos in self.terrain and (self.is_sea(pos) or (prov and prov.coastal)):
+                    explored.add(pos)
+        if tag == self.player:
+            self.changed()
+            self.update_visibility()
 
     # ----- supply ------------------------------------------------------------------
     def supply_limit(self, tag, pos):
@@ -1781,6 +2113,8 @@ class CampaignWorld:
             return 0
         limit = SUPPLY_BASE + prov.pop / SUPPLY_PER_PEOPLE + \
             (prov.works * SUPPLY_PER_FARM if prov.good in FARM_GOODS else 0) + (prov.natives / 20)
+        if self.is_depot(tag, pos):
+            limit += self.bonus(tag, "depot_supply")
         if prov.owner != tag:
             limit *= FOREIGN_SUPPLY
         return max(1, int(limit))
@@ -1795,7 +2129,7 @@ class CampaignWorld:
         enemies = self.enemies(tag)
         blocked = {u.pos for u in self.units if u.owner in enemies and u.kind.war and u.carrier is None}
         seen, frontier = {pos}, [pos]
-        for _ in range(SUPPLY_RANGE + 1):
+        for _ in range(self.supply_reach(tag) + 1):
             nxt = []
             for p in frontier:
                 if self.is_depot(tag, p):
@@ -1870,7 +2204,7 @@ class CampaignWorld:
             state, count, limit = self.supply_state(group)
             for wagon in [u for u in group if u.kind is WAGON]:
                 if state == "supplied":
-                    wagon.supplies = WAGON_SEASONS
+                    wagon.supplies = self.wagon_seasons(tag)
                 elif state == "wagon" and wagon.supplies > 0:
                     wagon.supplies -= 1
                     break
@@ -1980,7 +2314,7 @@ class CampaignWorld:
         """Hexes the stack could reach by the end of next season (but not this one)."""
         if any(u.carrier for u in group):
             return {}
-        speed = min(u.kind.moves for u in group)
+        speed = min(self.unit_moves(u) for u in group)
         budget = min(u.moves_left for u in group) + speed
         occupied = self.owners_at()
         alone = self.can_stand(group, None, others=[])
@@ -1989,7 +2323,7 @@ class CampaignWorld:
 
     def path_to(self, group, goal, seasons=4):
         """[(pos, move cost so far)] from the stack to goal, or [] if it is too far or blocked."""
-        speed = min(u.kind.moves for u in group)
+        speed = min(self.unit_moves(u) for u in group)
         best = self.plan(group, min(u.moves_left for u in group) + speed * (seasons - 1))
         if goal not in best:
             return []
@@ -2020,7 +2354,7 @@ class CampaignWorld:
         # Walk the route hex by hex, looking around on the way (so fog clears along it, not just at the end).
         path = self.route(group, dest, best)
         self.last_move = ([u.id for u in group], path)
-        scout = max(group, key=lambda u: u.kind.sight)      # the stack sees as far as its best eyes
+        scout = max(group, key=lambda u: self.unit_sight(u))      # the stack sees as far as its best eyes
         for step in path[1:-1]:
             for unit in group:
                 unit.pos = step
@@ -2128,6 +2462,8 @@ class CampaignWorld:
             return False, "Colonies need land nobody owns"
         if prov.terrain == "desert" and not prov.coastal:
             return False, "Nobody can live in the open desert"
+        if not self.in_old_world(prov.pos) and not self.has(unit.owner, "atlantic"):
+            return False, "Crossing the Atlantic needs the Astrolabe tech"
         if trading_post:
             if not prov.coastal:
                 return False, "Trading posts must be on the coast"
@@ -2320,16 +2656,20 @@ class CampaignWorld:
         return next((u for u in units if u.kind is GENERAL), None)
 
     def _attack_value(self, unit, fight, general):
-        value = (unit.kind.attack + unit.atk_up) * FIGHT_ATTACK[unit.kind.branch][fight] * unit.rank[2]
-        if general and (general.trait == fight or (general.trait == "cavalry" and unit.kind.branch == "cavalry")):
+        tag, branch = unit.owner, unit.kind.branch
+        flat = unit.kind.attack + unit.atk_up + self.bonus(tag, f"{branch}_attack")
+        value = flat * FIGHT_ATTACK[branch][fight] * unit.rank[2] * (1 + self.bonus(tag, branch))
+        if general and (general.trait == fight or (general.trait == "cavalry" and branch == "cavalry")):
             value *= 1 + GENERAL_BONUS
         return value
 
     def _defense_value(self, unit, fight, prov, castle, versus, general):
-        value = (unit.kind.defense + unit.def_up) * FIGHT_DEFENSE[unit.kind.branch][fight] * unit.rank[2]
+        tag, branch = unit.owner, unit.kind.branch
+        value = (unit.kind.defense + unit.def_up) * FIGHT_DEFENSE[branch][fight] * unit.rank[2]
         value *= 1 + (CASTLE_DEFENSE * castle if fight == "garrison" else TERRAIN[prov.terrain].defense)
-        if unit.kind.branch == "infantry" and versus == "cavalry":
-            value *= PIKES_VS_HORSE
+        if branch == "infantry" and versus == "cavalry":
+            value *= PIKES_VS_HORSE * (1 + self.bonus(tag, "vs_horse"))
+        value *= 1 + self.bonus(tag, branch)
         if general and general.trait in ("defense", fight):
             value *= 1 + GENERAL_BONUS
         return value
@@ -2347,7 +2687,7 @@ class CampaignWorld:
         gen_d = self._general(here)
         defenders = [u for u in here if u.kind.war]
         if castle:
-            defenders.append(Garrison(prov))
+            defenders.append(Garrison(prov, self.bonus(def_tag, "garrison_defense")))
         names = (self.countries[att_tag].name, self.countries[def_tag].name if def_tag else "the natives")
         shown = None if self.player in (att_tag, def_tag) else "nobody"
         if not defenders:
@@ -2449,9 +2789,12 @@ class CampaignWorld:
                 continue
             if tag == prov.owner or self.at_war(tag, prov.controller):
                 general = self._general(self.units_at(prov.pos))
-                prov.siege += 1 + sum(u.kind.siege for u in here) + (1 if general and general.trait == "assault" else 0)
+                cannons = sum(u.kind.siege + (self.bonus(tag, "siege") if u.kind.branch == "artillery" else 0)
+                              for u in here)
+                prov.siege += 1 + cannons + (1 if general and general.trait == "assault" else 0)
                 defended = prov.controller == prov.owner
-                need = SIEGE_BASE + (prov.castle * CASTLE_SIEGE if defended else 0)
+                need = SIEGE_BASE + (prov.castle * (CASTLE_SIEGE + self.bonus(prov.owner, "siege_points"))
+                                     if defended else 0)
                 if prov.siege >= need:
                     prov.controller, prov.siege = tag, 0
                     prov.garrison = 0 if tag != prov.owner else prov.garrison
@@ -2472,7 +2815,7 @@ class CampaignWorld:
     # ----- turns --------------------------------------------------------------------------
     def start_units(self, tag):
         for unit in self.units_of(tag):
-            unit.moves_left = unit.kind.moves
+            unit.moves_left = self.unit_moves(unit)
             unit.acted = unit.attacked = unit.upgraded = False
             if unit.kind.war and unit.hp < unit.kind.hp and not unit.carrier and unit.supplied:
                 prov = self.provinces.get(unit.pos)
@@ -2537,7 +2880,7 @@ class CampaignWorld:
     def see_from(self, unit, radius=None, refresh=True):
         country = self.countries[unit.owner]
         before = len(country.explored)
-        for p in within(unit.pos, radius or unit.kind.sight):
+        for p in within(unit.pos, radius or self.unit_sight(unit)):
             if p in self.terrain:
                 country.explored.add(p)
         if unit.owner == self.player and refresh:
@@ -2554,7 +2897,7 @@ class CampaignWorld:
             seen.update(within(prov.pos, 1))
         for unit in self.units_of(self.player):
             if unit.carrier is None:
-                seen.update(within(unit.pos, unit.kind.sight))
+                seen.update(within(unit.pos, self.unit_sight(unit)))
         new = {p for p in seen if p in self.terrain}
         if new != self.visible:
             self.visible = new

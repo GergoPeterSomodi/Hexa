@@ -40,7 +40,10 @@ class GameMenu:
             self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         else:
             w, h = options.window_size(self.settings)
-            sizes = pygame.display.get_desktop_sizes() if hasattr(pygame.display, "get_desktop_sizes") else []
+            try:
+                sizes = pygame.display.get_desktop_sizes() if hasattr(pygame.display, "get_desktop_sizes") else []
+            except pygame.error:                # no video system yet: take the size as asked
+                sizes = []
             if sizes:
                 w, h = min(w, sizes[0][0]), min(h, sizes[0][1] - 60)
             self.screen = pygame.display.set_mode((max(1024, w), max(600, h)))

@@ -110,6 +110,26 @@ Hover anything for a moment to get a card explaining it: troops, buttons, provin
 what it can attack (red; "fire" for cannons), and "stop" where an enemy castle will halt it. Hover a hex to
 see the path, the move cost of each step and how many seasons it takes.
 
+### Technology
+- **T** (or **Technology** in the country panel) opens the tech tree.
+  - It has four branches: Military, Trade & Industry, Navigation and Statecraft.
+  - Each branch spans three eras and has 37 techs in all.
+  - Every country also starts with one national tech, such as Portugal's Sagres school.
+- **Researching:** one tech at a time. Click a far tech to queue its whole path; right-click removes a tech from the queue.
+- **Research points** come from:
+  - a base amount
+  - burghers
+  - universities, a city building unlocked by a tech
+  - coffee houses
+  - research bonuses, such as the Printing press
+  - **Fund research**: 60 ducats buy 15 points, once a year
+  - A tech is cheaper if countries you share markets with already know it.
+- **What techs give:** tactics, drill levels, siege, castles (the large castle needs Trace italienne), supply, and stack size (base 6). They also give merchants, taxes, new manufactories (ropewalk, powder mill, glassworks, tannery), carracks and galleons, Atlantic crossings, plantations, and more.
+- **Troop types still come with the eras.**
+  - Era II opens from 1520 once you know 4 era I techs.
+  - Era III opens from 1575 with 4 era II techs.
+  - At each new era you pick 1 of 3 idea cards (one is your nation's), which are permanent bonuses.
+
 ### Menu, saving and options
 - **Esc** (or **M**, or the **Menu** button) pauses the game and opens the menu: resume, save, load, options, back to the main menu, exit.
 - **Saving:** there are eight save slots plus a quicksave (**F5** saves, **F9** loads) and an autosave (every year by default). Each slot shows the country, the date and the map.

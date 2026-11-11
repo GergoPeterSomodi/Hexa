@@ -12,6 +12,7 @@ from .data import (COLONIST, GENERAL, GOODS, NATIVE_VILLAGE_SPRITE, PIONEER, SCO
 SQRT3 = math.sqrt(3)
 ZOOMS = (3, 5, 8, 13, 21, 34)     # hex radius in pixels
 TILE_FROM = 3                     # from this zoom level on, the map is drawn with tile art
+ART_KEYS = {"galleon": "carrack"}   # unit kinds drawn with another kind's figure until they get their own
 MINES = ("iron", "silver", "gold", "salt")
 BANK, RIVER_DARK, RIVER = (205, 190, 125), (40, 100, 170), (95, 160, 220)
 ROAD, ROAD_EDGE = (190, 150, 95), (120, 85, 50)
@@ -759,13 +760,13 @@ class MapView:
     def figure(self, key, color, size, faded):
         k = ("fig", key, color, size, faded)
         if k not in self._figures:
-            self._figures[k] = art.figure(key, color, size, faded=faded)
+            self._figures[k] = art.figure(ART_KEYS.get(key, key), color, size, faded=faded)
         return self._figures[k]
 
     def token_img(self, key, color, size, era, faded):
         k = ("tok", key, color, size, era, faded)
         if k not in self._figures:
-            self._figures[k] = art.token(key, color, size, era=era, faded=faded)
+            self._figures[k] = art.token(ART_KEYS.get(key, key), color, size, era=era, faded=faded)
         return self._figures[k]
 
     def _tired(self, units):
