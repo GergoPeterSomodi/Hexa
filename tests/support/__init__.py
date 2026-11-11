@@ -14,4 +14,5 @@ Nothing in this package may import pygame at module level; the unit suite has to
     pg           HAVE_PYGAME, @requires_pygame (skip without pygame unless HEXA_REQUIRE_PYGAME=1)
     harness      UITestCase and the Driver: the real windows run headless on fake time with scripted input
     monkey       seeded random-input sessions through a real window (tests/ui/test_monkey.py, tools/monkey.py)
+    golden       golden screenshots: check(), require_environment(), MANIFEST.json, UPDATE_GOLDEN (tests/ui/test_screenshots.py)
 """
