@@ -2,6 +2,7 @@
 python -m unittest discover -s tests -t ."""
 import contextlib
 import errno
+import importlib.util
 import io
 import json
 import operator
@@ -295,6 +296,7 @@ class FailedSaveTest(TempHome):
         self.assertEqual(saves.meta("auto")["turn"], 5)
 
 
+@unittest.skipUnless(importlib.util.find_spec("pygame"), "needs pygame")
 class AppLoadingTest(TempHome):
     @classmethod
     def setUpClass(cls):
