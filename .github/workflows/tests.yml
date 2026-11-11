@@ -60,7 +60,7 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
       - name: Run unit tests under coverage
         run: coverage run -m unittest discover -s tests -t .
-      # The ui job (T7) reuses requirements-dev.txt and .coveragerc for its own line-only report.
+      # The ui job reuses requirements-dev.txt and .coveragerc for its own line-only report.
       - name: Report coverage
         if: always()
         run: |
@@ -76,4 +76,65 @@ jobs:
         with:
           name: htmlcov
           path: htmlcov/
+          if-no-files-found: ignore
+
+  ui:
+    name: ui (Python 3.12, pygame 2.6.1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HEXA_HOME: ${{ runner.temp }}/hexa-home
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      # Without pygame the UI tests would skip and the job would pass: make that an error instead.
+      HEXA_REQUIRE_PYGAME: "1"
+      TZ: UTC
+      # Line coverage only: on 3.12 sys.monitoring can't measure branches, and branch coverage is about 5x slower.
+      # Branch and line data can't be combined, so this is a second table next to the coverage job's.
+      COVERAGE_CORE: sysmon
+      HEXA_COVERAGE_BRANCH: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # pygame 2.6.1 has wheels up to CPython 3.13 only. The wheel bundles SDL and the dummy drivers need
+          # no X server, so there is nothing to apt-get.
+          python-version: "3.12"
+      - name: Install pygame and coverage
+        run: python -m pip install pygame==2.6.1 -r requirements-dev.txt
+      - name: Run UI tests under coverage
+        run: coverage run -m unittest discover -s tests/ui -t . -v --durations 10
+      # The game's own window tests outside tests/ui import pygame at the top, so the unit job skips them: run them here.
+      - name: Run the other pygame tests under coverage
+        run: >-
+          coverage run --append -m unittest -v
+          tests.test_landscape tests.test_passes tests.test_playtest tests.test_techscreen
+          tests.test_uifixes tests.test_wfctiles tests.test_goodsobjects tests.test_mapview_polish
+          tests.test_town_labels
+      - name: Report coverage
+        if: ${{ !cancelled() }}
+        run: |
+          coverage report
+          {
+            echo "## Test coverage (UI tests, line coverage)"
+            echo
+            coverage report --format=markdown
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Write HTML report
+        if: ${{ !cancelled() }}
+        run: coverage html
+      - name: Upload HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: htmlcov-ui
+          path: htmlcov/
+          if-no-files-found: ignore
+      # A failing UI test saves its last frame here (tests/support/harness.py, HEXA_TEST_ARTIFACTS).
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: test-artifacts/
           if-no-files-found: ignore

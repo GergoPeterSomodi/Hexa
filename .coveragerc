@@ -1,7 +1,9 @@
 # Used by `coverage run` / `coverage report` (see "Development" in README.md and the coverage job in
 # .github/workflows/tests.yml).
 [run]
-branch = True
+# Branch coverage unless HEXA_COVERAGE_BRANCH=0. The ui job (Python 3.12, for pygame) measures lines only:
+# there COVERAGE_CORE=sysmon can't measure branches and coverage would fall back to its slow core.
+branch = ${HEXA_COVERAGE_BRANCH-True}
 # "source = hexa" plus "include = play.py" does not work: coverage ignores "include" when "source" is set,
 # so play.py would be missing. Measuring from the repo root and omitting what we don't want reports hexa/*
 # and play.py, and lists files no test imports (play.py today) at 0 % instead of leaving them out.

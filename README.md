@@ -371,7 +371,8 @@ All colonisation numbers are in `hexa/colony/rules.py`.
 
 Version history is in [CHANGELOG.md](CHANGELOG.md).
 
-The tests use Python's built-in `unittest` and don't need pygame:
+The tests use Python's built-in `unittest` and, apart from the window tests in `tests/ui/` and nine game modules
+that draw (skipped without pygame, see [Window tests](#window-tests-pygame)), don't need pygame:
 
 ```bash
 python -m unittest discover -s tests -t .                              # all tests (about 2.5 minutes)
@@ -414,7 +415,8 @@ To keep test runs or experiments away from your real saves and options, set `HEX
 
 Python 3.10 or newer is needed (the suite passes on 3.10, the oldest version CI tests). Every push and pull
 request runs the whole suite on GitHub Actions (`.github/workflows/tests.yml`) on Python 3.10, 3.13 and the
-newest release, without installing pygame. To reproduce a CI run locally:
+newest release, without installing pygame (the window tests show as skipped there; the `ui` job runs them).
+To reproduce a CI run locally:
 
 ```bash
 HEXA_HOME=$(mktemp -d) python -m unittest discover -s tests -t . -v
@@ -434,6 +436,45 @@ coverage report            # table in the terminal; coverage html writes htmlcov
 Every CI run also shows the coverage table on its summary page and attaches the HTML report as the `htmlcov`
 artifact. There is no minimum yet.
 
+### Window tests (pygame)
+
+`tests/ui/` drives the real windows (start menu, Conquest, Colonisation, Age of Discovery) through their own
+`run()` loops with no screen: SDL's dummy video and audio drivers, fake time and scripted mouse and keyboard
+input, then checks the game state. They need pygame, which has no wheels for Python 3.14 or newer yet, so use a
+Python 3.12 (or 3.13) virtual environment. Without pygame these tests show as skipped. So do nine test modules of
+the game's own that sit next to the unit tests but import pygame at the top (`tests/test_landscape.py`,
+`test_passes.py`, `test_playtest.py`, `test_techscreen.py`, `test_uifixes.py`, `test_wfctiles.py`,
+`test_goodsobjects.py`, `test_mapview_polish.py` and `test_town_labels.py`): each skips as a whole, and the `ui`
+job runs them.
+
+```bash
+python3.12 -m venv .venv && .venv/bin/pip install pygame==2.6.1 -r requirements-dev.txt
+HEXA_HOME=$(mktemp -d) .venv/bin/python -m unittest discover -s tests/ui -t . -v   # only the window tests (a few seconds)
+HEXA_HOME=$(mktemp -d) .venv/bin/python -m unittest discover -s tests -t .         # everything, window tests included
+HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .                 # without pygame: errors, not skips
+```
+
+`HEXA_REQUIRE_PYGAME=1` turns the skips into errors, so a run that is meant to test the windows can't pass by
+skipping them; CI's `ui` job sets it. When a window test fails it saves the last frame on screen to
+`test-artifacts/<test name>.png` (`HEXA_TEST_ARTIFACTS` picks another folder), and CI attaches that folder to
+the failed run. `SDL_VIDEODRIVER` and `SDL_AUDIODRIVER` default to `dummy`; set them (e.g. `SDL_VIDEODRIVER=x11`)
+to open a real window instead, though the scripted run doesn't slow down for you to watch.
+
+The helpers are in `tests/support/harness.py`: `UITestCase` (pygame set up, a temporary `HEXA_HOME`, the
+driver reset), `driver.at(frame, events)` and `driver.run_for(frames, until=...)` to script a run, the events
+`key`, `click`, `drag`, `wheel` and `hover`, and `button_rect`, `end_turn_rect`, `pause_button_rect`,
+`menu_option_rect`, `menu_start_rect` and `hex_pixel` to find things on screen from the window's own state. Test
+modules in `tests/ui/` import pygame and the window modules inside the tests, never at the top, so the
+pygame-free run can still import them.
+
+CI's `ui` job runs these tests on Python 3.12 with pygame 2.6.1 and adds a second coverage table, of lines
+only: on 3.12 branch coverage is slow, and `HEXA_COVERAGE_BRANCH=0` switches it off in `.coveragerc`. Locally:
+
+```bash
+HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon HEXA_HOME=$(mktemp -d) .venv/bin/coverage run -m unittest discover -s tests/ui -t .
+.venv/bin/coverage report
+```
+
 ## Project layout
 
 | File | What it does |
@@ -449,7 +490,7 @@ artifact. There is no minimum yet.
 | `hexa/ai.py` | The computer opponent |
 | `hexa/render.py` | Drawing the map, units and info bar |
 | `hexa/hexgrid.py` | Hex grid maths |
-| `tests/` | Rule tests (see Development); shared helpers in `tests/support/` |
+| `tests/` | Rule tests (see Development); shared helpers in `tests/support/`; headless window tests in `tests/ui/` |
 | `Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py`, `Read_XML.py` | The original map editor and its XML map loading (`map*.xml`) |
 
 Tile art: [Kenney Hexagon Pack](https://kenney.nl/assets/hexagon-pack) (CC0), in `hexagon-pack/`.

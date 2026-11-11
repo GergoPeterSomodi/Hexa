@@ -34,6 +34,12 @@ PYTHONHASHSEED=0 python -m tests.support.digest_run colony 5 --turns 30   # dige
 
 pip install -r requirements-dev.txt                                       # coverage.py (CI only; config in .coveragerc)
 coverage run -m unittest discover -s tests -t . && coverage report        # branch coverage; slow before Python 3.14
+
+# Window tests (tests/ui) need pygame, which has no wheels for 3.14+: use a 3.12/3.13 venv
+python3.12 -m venv .venv && .venv/bin/pip install pygame==2.6.1 -r requirements-dev.txt
+.venv/bin/python -m unittest discover -s tests/ui -t .                    # headless window tests only, a few seconds
+HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .        # error instead of skip without pygame (CI ui job)
+HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon .venv/bin/coverage run -m unittest discover -s tests/ui -t .   # line coverage, as the ui job
 ```
 
 Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fresh(player)` a mutable one,
@@ -43,9 +49,18 @@ Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fre
 seeded random players and the `Judge` that enforces the `*_check` contract below; `digests.py` digests a whole
 world (`world_digest` compares across processes, `quick_digest` within one); `games.py` plays all-AI games.
 
-Use `python3` where `python` isn't on PATH. Tests do not need pygame installed. `test_campaign` is the slowest (~1 min) because building the Europe map
-takes seconds; `test_properties` (~50 s: 20 random games per mode, determinism subprocesses) comes next;
-`test_game` runs in ~10 s.
+Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and nine game
+modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
+`test_techscreen.py`, `test_uifixes.py`, `test_wfctiles.py`, `test_goodsobjects.py`, `test_mapview_polish.py`,
+`test_town_labels.py`, which the CI `ui` job runs too): they skip without it (errors under `HEXA_REQUIRE_PYGAME=1`).
+Window tests subclass `tests/support/harness.py:UITestCase`
+(SDL dummy drivers, fake `Clock`/`get_ticks`, pinned fonts, temp `HEXA_HOME`), script input with
+`self.driver.at(frame, key(...)/click(...))` and `self.driver.run_for(frames, until=...)`, call the window's real
+`run()`, then assert on `app.world`/`app.ui`. They import pygame and window modules inside the test, never at
+module top. A failing one saves its last frame to `test-artifacts/` (`HEXA_TEST_ARTIFACTS`).
+
+`test_campaign` is the slowest (~1 min) because building the Europe map takes seconds; `test_properties` (~50 s:
+20 random games per mode, determinism subprocesses) comes next; `test_game` runs in ~10 s.
 
 ## Architecture
 
