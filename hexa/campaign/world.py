@@ -271,6 +271,12 @@ def _remember_snapshot(key, data):
         del _SNAPSHOTS[old]
 
 
+def _with_article(name):
+    """'a weaver', 'an armoury': the indefinite article for a level or building name."""
+    name = name.lower()
+    return ("an " if name[:1] in "aeiou" else "a ") + name
+
+
 def _fill_defaults(obj):
     """Give a dataclass object loaded from an older save the fields it is missing."""
     if not is_dataclass(obj):
@@ -1629,7 +1635,7 @@ class CampaignWorld:
         self._buy(prov, self.build_goods(prov, key))
         prov.queue.append([key, BUILD_TURNS])
         prov.busy = True
-        self.message(f"{prov.name}: started a {self.building_name(prov, key).lower()} "
+        self.message(f"{prov.name}: started {_with_article(self.building_name(prov, key))} "
                      f"(ready in {BUILD_TURNS} seasons).", tag)
         return True
 
@@ -1673,7 +1679,7 @@ class CampaignWorld:
         self._buy(prov, self.invest_goods(prov))
         prov.works += 1
         prov.busy = True
-        self.message(f"{prov.name}: now a {self.works_name(prov).lower()} "
+        self.message(f"{prov.name}: upgraded to {self.works_name(prov).lower()} "
                      f"(+{WORKS_BONUS * prov.works * 100:.0f}% {GOODS[prov.good].name.lower()}).", tag)
         self.changed()
         return True
@@ -2256,6 +2262,23 @@ class CampaignWorld:
             self._castle_list = [p for p in self.provinces.values() if p.castle and p.owner]
         return self._castle_list
 
+    def stuck_reason(self, group):
+        """Why a stack ordered to move cannot move this season, or "" if nothing in particular is in the way.
+        A stack moves at its slowest unit's pace, so one unit with no moves left holds the whole stack back."""
+        if min(u.moves_left for u in group) > 0:
+            return ""
+        lead = group[0]
+        prov = self.provinces.get(lead.pos)
+        if prov and prov.foraged == (lead.owner, self.turn):
+            return "They foraged this season and have no moves left."
+        fresh = [u for u in group if u.moves_left <= 0 and not u.acted and u.kind.moves > 0]
+        if not fresh:
+            return "They have already moved this season."
+        names = " and ".join(sorted({u.kind.name for u in fresh}))
+        if len(fresh) == 1:
+            return f"{names} was raised this season and can't move yet. Untick it to move the rest."
+        return f"{names} were raised this season and can't move yet. Untick them to move the rest."
+
     def reachable(self, unit):
         return self.reachable_group([unit])
 
@@ -2789,6 +2812,8 @@ class CampaignWorld:
                 elif prov.controller == prov.owner:
                     prov.siege = 0
                 continue
+            if len({u.owner for u in here}) > 1:
+                continue            # two armies on one hex: the battle decides it, no siege progress either way
             tag = here[0].owner
             if tag == prov.controller:
                 prov.siege = 0

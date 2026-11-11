@@ -4,6 +4,15 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
+## Unreleased (goes into v0.1.4 with kioba's milestone)
+Fixes from the 2026-11-11 playtest:
+- Log lines read "upgraded to open fields" and "started an armoury" instead of "now a open fields" / "a armoury"
+- Long button labels (Invest, ...) are cut with an ellipsis instead of running over the cost
+- Merchant order buttons follow the merchant rules; a loss-making order stays allowed but its hint warns in red
+- The game-over banner wraps inside the screen and names your own place and score
+- No siege progress on a hex where two sides' troops stand
+- A stack that can't move says why (a unit raised this season, already moved, or foraged), in a toast and in the unit panel
+
 ## v0.1.3: War and peace rules
 Fixes from kioba's war and logistics milestone (all merged PRs, with tests):
 - Cannons no longer bombard their own stack when it stands on an enemy castle hex (#63, fixes #12)

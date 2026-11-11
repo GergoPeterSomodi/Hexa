@@ -14,6 +14,11 @@ from .data import (FOOD_PER_TROOP, NEEDS, WAGON, BRANCH_NAMES, ERAS, GENERAL, GE
 from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
 from .world import CampaignWorld
 
+def _ordinal(n):
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
 WIDTH, HEIGHT = 1280, 720
 TOP = 46
 PANEL_W = 390
@@ -426,7 +431,7 @@ class CampaignApp(GameMenu, TechScreen):
                     self.animate()
                 self.toast("On their way: they keep moving there in the coming seasons.")
             else:
-                self.toast("They cannot get there.")
+                self.toast(world.stuck_reason(group) or "They cannot get there.")
         ui.group = [u for u in group if u in world.units]
         ui.picked = {u.id for u in ui.group}
         self.refresh()
@@ -536,10 +541,32 @@ class CampaignApp(GameMenu, TechScreen):
             self.clamp()
 
     # ----- drawing helpers --------------------------------------------------------------------
+    @staticmethod
+    def _fit(font, text, width):
+        """`text` cut down to `width` pixels, ending in an ellipsis when it had to be shortened."""
+        if font.size(text)[0] <= width:
+            return text
+        while text and font.size(text + "…")[0] > width:
+            text = text[:-1]
+        return text + "…" if text else ""
+
+    @staticmethod
+    def _wrap_words(font, text, width):
+        lines, line = [], ""
+        for word in text.split():
+            trial = f"{line} {word}".strip()
+            if not line or font.size(trial)[0] <= width:
+                line = trial
+            else:
+                lines.append(line)
+                line = word
+        if line:
+            lines.append(line)
+        return lines
+
     def text(self, font, text, pos, color=TEXT, width=None):
         if width:
-            while text and font.size(text)[0] > width:
-                text = text[:-2] + "…" if len(text) > 2 else ""
+            text = self._fit(font, text, width)
         img = font.render(text, True, color)
         self.screen.blit(img, pos)
         return img.get_width()
@@ -552,6 +579,7 @@ class CampaignApp(GameMenu, TechScreen):
         font = self.small if small else self.bold
         fg = TEXT if enabled else FAINT
         if detail:
+            label = self._fit(font, label, rect.width - 16 - self.small.size(detail)[0] - 8)
             img = font.render(label, True, fg)
             self.screen.blit(img, img.get_rect(midleft=(rect.x + 8, rect.centery)))
             img = self.small.render(detail, True, MUTED if enabled else FAINT)
@@ -582,8 +610,7 @@ class CampaignApp(GameMenu, TechScreen):
         if self.busy:
             self.banner("The other countries are making their moves...")
         if self.world.over:
-            self.banner(f"The year {self.world.year()} has come. Final ranking: "
-                        f"{', '.join(c.name for c in self.world.ranking()[:3])} lead. Press L for the ledger.")
+            self.banner(self.game_over_text())
         if self.menu:
             self.draw_menu()
         self.draw_tech()
@@ -600,12 +627,33 @@ class CampaignApp(GameMenu, TechScreen):
         ui.path_key = key
         ui.path = world.path_to(active, ui.hover) if ui.hover != active[0].pos else []
 
+    def game_over_text(self):
+        world = self.world
+        ranking = world.ranking()
+        text = (f"The year {world.year()} has come. Final ranking: "
+                f"{', '.join(c.name for c in ranking[:3])} lead.")
+        if self.player:
+            name = world.countries[self.player].name
+            place = next((i for i, c in enumerate(ranking) if c.tag == self.player), None)
+            if place is None:
+                text += f" {name} did not survive: score {world.score(self.player)}."
+            else:
+                text += f" {name}: {_ordinal(place + 1)} of {len(ranking)}, score {world.score(self.player)}."
+        return text + " Press L for the ledger."
+
     def banner(self, text):
-        img = self.title.render(text, True, TEXT)
-        box = img.get_rect(center=(WIDTH // 2 - (PANEL_W // 2 if self.ui.panel else 0), TOP + 40)).inflate(30, 16)
+        cx = WIDTH // 2 - (PANEL_W // 2 if self.ui.panel else 0)
+        room = 2 * min(cx, WIDTH - cx) - 40                  # the widest the banner may be, centred on cx
+        lines = [self.title.render(line, True, TEXT) for line in self._wrap_words(self.title, text, room - 30)]
+        box = pygame.Rect(0, 0, max(img.get_width() for img in lines) + 30,
+                          sum(img.get_height() for img in lines) + 4 * (len(lines) - 1) + 16)
+        box.center = (cx, TOP + 40)
         pygame.draw.rect(self.screen, (15, 18, 24), box, border_radius=8)
         pygame.draw.rect(self.screen, GOLD, box, 1, border_radius=8)
-        self.screen.blit(img, img.get_rect(center=box.center))
+        y = box.y + 8
+        for img in lines:
+            self.screen.blit(img, img.get_rect(midtop=(box.centerx, y)))
+            y += img.get_height() + 4
 
     def draw_choose_banner(self):
         self.banner("Choose your country: click any country on the map")
@@ -1074,6 +1122,13 @@ class CampaignApp(GameMenu, TechScreen):
         self.text(self.small, "Ticked units move and fight together. Right-click to move or attack;", (x, y), MUTED, w)
         self.text(self.small, "right-click far away to march over several seasons.", (x, y + 15), MUTED, w)
         y += 36
+        active = self.active()
+        stuck = world.stuck_reason(active) if active else ""
+        for line in self._wrap_words(self.small, stuck, w):
+            self.text(self.small, line, (x, y), GOLD)
+            y += 15
+        if stuck:
+            y += 6
         self.button((x, y, 110, 22), "Tick all / none", True, ("all",), small=True)
         y += 28
         for u in group[:13]:
@@ -1342,12 +1397,18 @@ class CampaignApp(GameMenu, TechScreen):
                     verb = "Export" if src in world.merchant_markets(tag) else "Import"
                     label = f"{verb} {GOODS[g].name.lower()}: {src.name} > {dst.name}"
                     detail = f"{margin:+.1f} x {amount:.0f} = {margin * amount:+.0f}"
-                    self.button((x + 10, y, w - 10, 22), label, margin > 0 or True, ("merchant", route, g, src), (
-                        f"{verb} {GOODS[g].name.lower()}", [
-                            (f"Buy {amount:.0f} at {src.price[g]:.2f} in {src.name}, sell at {dst.price[g]:.2f} in {dst.name}", TEXT),
-                            (f"Transport {route.cost:.2f} a unit: {margin:+.2f} a unit, about {margin * amount:+.0f} a season",
-                             GOOD_C if margin > 0 else BAD_C),
-                            ("Exporting raises the price at home; importing lowers it.", MUTED)]), detail, small=True)
+                    ok, reason = world.send_merchant_check(tag, route)
+                    lines = [
+                        (f"Buy {amount:.0f} at {src.price[g]:.2f} in {src.name}, sell at {dst.price[g]:.2f} in {dst.name}", TEXT),
+                        (f"Transport {route.cost:.2f} a unit: {margin:+.2f} a unit, about {margin * amount:+.0f} a season",
+                         GOOD_C if margin > 0 else BAD_C),
+                        ("Exporting raises the price at home; importing lowers it.", MUTED)]
+                    if margin <= 0:
+                        lines.append(("This order loses money on every unit.", BAD_C))
+                    if not ok:
+                        lines.insert(0, (reason, BAD_C))
+                    self.button((x + 10, y, w - 10, 22), label, ok, ("merchant", route, g, src),
+                                (f"{verb} {GOODS[g].name.lower()}", lines), detail, small=True)
                     y += 25
         if tag and not mine:
             self.text(self.small, "Your merchants can only work routes from markets where you own land.", (x, y + 4), MUTED, w)
