@@ -47,9 +47,14 @@ class GameMenu:
         if hasattr(self, "camera"):
             self.clamp()
 
+    def save_options(self):
+        """Keep the options for next time. If settings.json can't be written they still apply to this game."""
+        if not options.save(self.settings):
+            self.toast("Option changed, but it could not be saved for next time.")
+
     def toggle_fullscreen(self):
         self.settings["fullscreen"] = not self.settings["fullscreen"]
-        options.save(self.settings)
+        self.save_options()
         self.apply_display()
 
     # ----- saving --------------------------------------------------------------------
@@ -147,7 +152,7 @@ class GameMenu:
                 self.toggle_fullscreen()
             else:
                 options.cycle(self.settings, key)
-                options.save(self.settings)
+                self.save_options()
                 if key == "window":
                     self.apply_display()
         elif kind in ("menu", "exit"):

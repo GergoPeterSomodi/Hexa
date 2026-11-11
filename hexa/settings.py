@@ -1,6 +1,7 @@
 """Player options, kept in ~/.hexa/settings.json (or $HEXA_HOME/settings.json)."""
 import json
 import os
+import sys
 
 WINDOWS = ("1280x720", "1600x900", "1920x1080")
 AUTOSAVE = ("off", "year", "5 years")
@@ -29,9 +30,23 @@ def load():
 
 
 def save(settings):
-    os.makedirs(os.path.dirname(_path()), exist_ok=True)
-    with open(_path(), "w", encoding="utf-8") as f:
-        json.dump({k: settings[k] for k in DEFAULTS}, f, indent=2)
+    """Write the options for next time. Returns False if that fails (read-only folder, full disk...):
+    the options then last until the game closes, and the old file is left as it was."""
+    path = _path()
+    tmp = path + ".tmp"
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({k: settings[k] for k in DEFAULTS}, f, indent=2)
+        os.replace(tmp, path)               # never leave a half-written settings.json behind
+    except OSError as error:
+        print(f"Could not save options to {path}: {error}", file=sys.stderr)
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return False
+    return True
 
 
 def cycle(settings, key):
