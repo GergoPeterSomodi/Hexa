@@ -117,7 +117,7 @@ see the path, the move cost of each step and how many seasons it takes.
   - window size: 1280x720, 1600x900 or 1920x1080; the map fills the extra space
   - autosave: off, every year or every 5 years
   - scroll speed
-- Options are kept in `~/.hexa/settings.json`.
+- Options are kept in `~/.hexa/settings.json`. If that file can't be written (a read-only folder or a full disk), a changed option still applies until you quit, and a message says it wasn't saved.
 
 ### The map
 - **Two maps** (pick one in the menu, or with `--map europe|random`):
