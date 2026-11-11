@@ -82,8 +82,8 @@ jobs:
     name: ui (Python 3.12, pygame 2.6.1)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # No HEXA_HOME here: every UI test (harness.UITestCase) gets its own temporary one.
     env:
-      HEXA_HOME: ${{ runner.temp }}/hexa-home
       SDL_VIDEODRIVER: dummy
       SDL_AUDIODRIVER: dummy
       # Without pygame the UI tests would skip and the job would pass: make that an error instead.

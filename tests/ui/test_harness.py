@@ -96,6 +96,14 @@ class ScriptTest(harness.UITestCase):
         with self.assertRaises(harness.RunawayLoop):
             self.tick(5 + harness.GRACE_FRAMES + 1)
 
+    def test_the_grace_frames_count_from_an_early_quit_not_from_the_budget_end(self):
+        self.driver.run_for(1000, until=lambda: self.driver.frame == 3)
+        self.tick(3 + harness.GRACE_FRAMES)             # the QUIT came at frame 3: still within its grace
+        self.assertEqual(self.driver.stopped_by, "until")
+        with self.assertRaises(harness.RunawayLoop):
+            self.tick()
+        self.assertEqual(self.driver.frame, 3 + harness.GRACE_FRAMES + 1)
+
 
 class PatchTest(harness.UITestCase):
     def test_sysfont_is_the_bundled_font_whatever_the_name(self):

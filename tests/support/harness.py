@@ -257,6 +257,7 @@ class Driver:
         pygame = sys.modules["pygame"]
         pygame.event.post(pygame.event.Event(pygame.QUIT))
         self.stopped_by = reason
+        self._limit = self.frame + GRACE_FRAMES     # counts from the QUIT, which may come long before the budget
 
     def _post(self, items):
         pygame = sys.modules["pygame"]
