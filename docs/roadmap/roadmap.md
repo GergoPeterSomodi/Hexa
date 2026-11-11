@@ -8,6 +8,18 @@ Hexa started in 2020 as a pygame hex-tile map editor. It is becoming a playable 
 
 **Final goal: publish Hexa on Steam** (decided 2026-11-11; see `docs/roadmap/long-term-roadmap.md`, Phase 6).
 
+**GitHub milestones** (file issues against these):
+- feature milestones:
+  - [M3 Map look & UI polish](https://github.com/GergoPeterSomodi/Hexa/milestone/7), next up
+  - [M2 Battle system](https://github.com/GergoPeterSomodi/Hexa/milestone/8)
+  - [M4 Balance & fun pass](https://github.com/GergoPeterSomodi/Hexa/milestone/9)
+  - [M5 World & naming fixes](https://github.com/GergoPeterSomodi/Hexa/milestone/10)
+  - [Events & characters (Phase 3)](https://github.com/GergoPeterSomodi/Hexa/milestone/11)
+  - [1.0 Steam release](https://github.com/GergoPeterSomodi/Hexa/milestone/12)
+- bug-fix releases: v0.1.3 to v0.1.6
+- the testing foundation
+- M1 (the tech tree) shipped as v0.1.2.
+
 ## 2. Guiding principles
 
 - **Ask first, then build.** Confirm the look and play of any big feature with the user, with mockups, before any code is written.
