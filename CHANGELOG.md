@@ -4,7 +4,7 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
-## Unreleased (goes into v0.1.4 with kioba's milestone)
+## v0.1.4: New map look and playtest fixes
 **New map look (M3, first part):**
 - The two closest zooms draw a blended landscape: wavy edge transitions between every kind of ground, peaks and
   forests that rise over the hex behind, a treeline on the Alps, natural field systems on developed farms and
