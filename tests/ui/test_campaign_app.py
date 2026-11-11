@@ -1,11 +1,13 @@
 """The Age of Discovery window (hexa/campaign/app.py) driven through its own run() loop: choosing a country,
 ending the season (Space and the End season button), the quicksave (F5, F9) and the autosave, the map modes and
-goods views, zooming around the mouse, the side panels, and orders that take several seasons.
+goods views, zooming around the mouse, the side panels, and orders that take several seasons. The bugs #22
+(an attack kept the order) and #24 (× didn't close the country and market panels), fixed in v0.1.5, are plain
+tests now. The pause menu has its own module, test_pause_menu.py.
 
 Every test opens Europe 1480 the way the launcher does (CampaignApp(TILES_DIR, tag)), sometimes changes the zoom,
-the camera, the options or the turn before the loop starts, then plays the scenario with real mouse and keyboard
-events and checks the world, the window state and the files in the temporary HEXA_HOME. The first window of a
-process builds the map (about 2 s); later ones restore it from the world module's snapshot. Choosing a country
+the camera, the options, the turn or the wars before the loop starts, then plays the scenario with real mouse and
+keyboard events and checks the world, the window state and the files in the temporary HEXA_HOME. The first window
+of a process builds the map (about 2 s); later ones restore it from the world module's snapshot. Choosing a country
 zooms in on its capital (zoom 4, tile art) in the middle of the map and opens its panel on the right.
 
     Portugal (POR): pikemen in Lisbon (124, 61), a caravel offshore at (124, 60)
@@ -483,6 +485,32 @@ class PanelTest(CampaignCase):
                                 ("province", foreign.pos, None), (None, None, None)])
         self.assertIsNone(app.ui.selected, "clicking provinces selected no unit")
 
+    def test_the_close_button_closes_a_foreign_countrys_panel(self):
+        """Issue #24 (fixed in v0.1.5). The panel's × button sent ("panel", "country"), which press() treats as the top bar's
+        flag button: it opens your own country's panel instead of closing Castile's."""
+        self.start("POR")
+        foreign = self.province_on_screen("CAS")
+        seen = []
+        self.driver.at(1, self.on_hex(foreign.pos))
+        self.driver.at(2, self.on_button(action=("country", "CAS")))        # "Diplomacy with Castile"
+        self.driver.at(3, lambda: seen.append(self.state()))
+        self.driver.at(3, self.on_button("×"))
+        self.driver.at(4, lambda: seen.append(self.state()))
+        self.play(6)
+        self.assertEqual(seen, [("country", "CAS", None), (None, None, None)])
+
+    def test_the_close_button_closes_the_market_panel(self):
+        """Issue #24 (fixed in v0.1.5). The market panel's × sent ("panel", "market"), which press() treats as the top bar's Market
+        button: the panel stays open, on the market of the province last clicked or of your capital."""
+        self.start("POR")
+        seen = []
+        self.driver.at(1, self.on_button("Market", ("panel", "market")))
+        self.driver.at(2, lambda: seen.append(self.state()))
+        self.driver.at(2, self.on_button("×"))
+        self.driver.at(3, lambda: seen.append(self.state()))
+        self.play(5)
+        self.assertEqual(seen, [("market", "Lisbon", None), (None, None, None)])
+
 
 class OrdersTest(CampaignCase):
     """Castile's stack of five starts at (131, 59) and moves 4 a season. A right-click beyond this season's reach
@@ -534,6 +562,45 @@ class OrdersTest(CampaignCase):
                          [{goal}] * arrived + [{None}] * (len(trail) - arrived), "the order ends on arrival")
         self.assertEqual(hexes[arrived:], [goal] * (len(trail) - arrived), "and the stack stays there")
         self.assertEqual([turn for turn, _, _ in trail], list(range(1, len(trail) + 1)))
+
+    def test_an_attack_cancels_the_order(self):
+        """Issue #22 (fixed in v0.1.5). An attack (like drilling, founding or foraging) left the stack's multi-season order in place,
+        so at the end of the season _advance_orders marches it on toward the old destination, away from the fight.
+
+        Castile is at war with Granada, whose pikemen have come out of their capital into the hills at (133, 62).
+        The order to (136, 62) takes the stack to (133, 61) this season, right next to them, with one of the
+        bombards' 4 moves left (the next step costs more): enough to attack from where it stands. The war and the
+        pikemen's position are set up before the window runs; the order, the attack and the season are played."""
+        goal, foe_at, leg = (136, 62), (133, 62), (133, 61)
+        app = self.start("CAS")
+        world = self.world
+        self.assertTrue(world.declare_war("CAS", "GRA"))
+        foe = world.unit_at(world.countries["GRA"].capital)
+        self.assertEqual((foe.kind.name, world.provinces[foe_at].owner), ("Pikemen", "GRA"))
+        foe.pos = foe_at
+        world.changed()
+        app.view.zoom = 2
+        app.look_at(CASTILE_STACK)
+        stack = world.units_at(CASTILE_STACK)
+        seen = []
+        record = lambda: seen.append((world.turn, {u.pos for u in stack}, {u.goal for u in stack},   # noqa: E731
+                                      min(u.moves_left for u in stack)))
+        self.driver.at(0, self.on_hex(CASTILE_STACK))
+        self.driver.at(1, self.on_hex(goal, button=3))                       # the order: first leg at once
+        self.driver.at(2, record)
+        self.driver.at(2, lambda: seen.append(foe_at in app.ui.attacks))
+        self.driver.at(2, self.on_hex(foe_at, button=3))                     # the attack
+        self.driver.at(3, record)
+        self.driver.at(3, lambda: seen.append(foe.hp < foe.kind.hp or foe not in world.units))
+        self.driver.at(3, key("space"))
+        self.driver.at(4, record)
+        self.play(30, until=lambda: len(seen) == 5)
+
+        self.assertEqual(seen[:2], [(1, {leg}, {goal}, 1), True], "the order's first leg, then the foe in reach")
+        self.assertTrue(seen[3], "the attack was made")
+        self.assertEqual([seen[2], seen[4]], [(1, {leg}, {None}, 0), (2, {leg}, {None}, 4)],
+                         "(turn, hexes, goals, moves left) after the attack and next season: the attack ended the "
+                         "order, and the stack stays where it fought")
 
     @unittest.expectedFailure
     def test_an_order_whose_route_goes_around_foreign_land_gets_there(self):
