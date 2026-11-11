@@ -1,13 +1,23 @@
 """The shared test helpers in tests/support."""
+import importlib.util
 import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
 import unittest
 from unittest import mock
 
-from tests.support import slow, worlds
+from tests.support import pg, slow, worlds
 from tests.support.home import TempHome
 from tests.support.worlds import fresh, play_seasons, pristine, random_world
 
 TEST_SEED = 10 ** 6 + 7             # no real test builds this random world
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Runs the CI ui job's command in a Python where "import pygame" fails, whether or not pygame is installed.
+UI_SUITE_WITHOUT_PYGAME = ("import sys, unittest; sys.modules['pygame'] = None; "
+                           "unittest.main(module=None, argv=['unittest', 'discover', '-s', 'tests/ui', '-t', '.'])")
 
 
 def _run(case_class):
@@ -153,6 +163,78 @@ class PristineTest(unittest.TestCase):
         play_seasons(w, 1)
         with self.assertRaises(AssertionError):
             guard.check()
+
+
+class RequiresPygameTest(unittest.TestCase):
+    """tests/support/pg.py: UI tests skip without pygame, unless HEXA_REQUIRE_PYGAME=1 says they must run."""
+
+    def _run_sample(self, have, require=None):
+        """Run a one-test class decorated with @requires_pygame while pygame is (not) there."""
+        with mock.patch.object(pg, "HAVE_PYGAME", have), mock.patch.dict(os.environ):
+            os.environ.pop(pg.REQUIRE_VAR, None)
+            if require is not None:
+                os.environ[pg.REQUIRE_VAR] = require
+
+            @pg.requires_pygame
+            class Sample(unittest.TestCase):
+                def test_it(self):
+                    pass
+        return _run(Sample)
+
+    def test_have_pygame_says_whether_pygame_can_be_found(self):
+        self.assertEqual(pg.HAVE_PYGAME, importlib.util.find_spec("pygame") is not None)
+
+    def test_a_ui_test_runs_when_pygame_is_installed(self):
+        result = self._run_sample(True)
+        self.assertEqual((result.testsRun, len(result.skipped)), (1, 0))
+
+    def test_a_ui_test_is_skipped_without_pygame_and_says_how_to_force_it(self):
+        result = self._run_sample(False)
+        self.assertEqual((result.testsRun, len(result.skipped)), (1, 1))
+        self.assertIn(pg.REQUIRE_VAR, result.skipped[0][1])
+
+    def test_hexa_require_pygame_1_runs_it_even_without_pygame(self):
+        result = self._run_sample(False, "1")
+        self.assertEqual((result.testsRun, len(result.skipped)), (1, 0))
+
+    def test_only_the_value_1_requires_pygame(self):
+        for value in ("0", "", "yes"):
+            self.assertEqual(len(self._run_sample(False, value).skipped), 1, repr(value))
+
+
+class UISuiteWithoutPygameTest(unittest.TestCase):
+    """End to end, in a subprocess where pygame can't be imported: the ui job's command skips or errors."""
+
+    def _ui_suite(self, require):
+        home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, home, True)
+        env = dict(os.environ, HEXA_HOME=home)
+        env.pop(pg.REQUIRE_VAR, None)
+        if require:
+            env[pg.REQUIRE_VAR] = "1"
+        done = subprocess.run([sys.executable, "-c", UI_SUITE_WITHOUT_PYGAME], cwd=ROOT, env=env,
+                              capture_output=True, text=True, timeout=300)
+        ran = re.search(r"^Ran (\d+) tests?", done.stderr, re.MULTILINE)
+        self.assertIsNotNone(ran, done.stderr)
+        return done, int(ran.group(1)), done.stderr.strip().splitlines()[-1]
+
+    def test_without_pygame_every_ui_test_is_skipped(self):
+        done, ran, summary = self._ui_suite(require=False)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertGreaterEqual(ran, 4, "the smoke tests were found")
+        self.assertEqual(summary, f"OK (skipped={ran})", done.stderr)
+
+    def test_hexa_require_pygame_1_turns_the_skips_into_errors(self):
+        done, ran, summary = self._ui_suite(require=True)
+        self.assertNotEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(summary, f"FAILED (errors={ran})", done.stderr)
+        self.assertIn(pg.REQUIRE_VAR, done.stderr, "the error says why the tests did not skip")
+
+    def test_importing_the_harness_and_ui_tests_does_not_import_pygame(self):
+        code = ("import sys, tests.support.harness, tests.ui.test_smoke; "
+                "sys.exit(1 if 'pygame' in sys.modules else 0)")
+        done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.returncode, 0, f"pygame was imported at module level\n{done.stderr}")
 
 
 if __name__ == "__main__":

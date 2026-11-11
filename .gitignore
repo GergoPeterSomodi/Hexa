@@ -50,6 +50,8 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+# Frames and diffs saved by failing UI tests (HEXA_TEST_ARTIFACTS)
+test-artifacts/
 
 # Translations
 *.mo
