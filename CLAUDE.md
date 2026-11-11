@@ -26,6 +26,8 @@ HEXA_FAST=1 python -m unittest discover -s tests -t .                     # skip
 python -m unittest tests.test_game                                        # one module
 python -m unittest tests.test_campaign.WarTest                            # one class
 python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip      # one test
+HEXA_FUZZ_CASES=3000 python -m unittest tests.test_fuzz_files             # more settings/save-file fuzz cases (default 300)
+HEXA_FUZZ_SEED=20260110 HEXA_FUZZ_CASES=1 python -m unittest tests.test_fuzz_files   # replay one case; failures print this line
 
 pip install -r requirements-dev.txt                                       # coverage.py (CI only; config in .coveragerc)
 coverage run -m unittest discover -s tests -t . && coverage report        # branch coverage; slow before Python 3.14

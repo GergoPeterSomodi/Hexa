@@ -384,6 +384,12 @@ python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip   # one tes
 tests); they still count as tests, shown as skipped. CI always runs everything.
 `tests/test_campaign.py` is the slowest because it builds the full Europe map.
 
+`tests/test_fuzz_files.py` damages `settings.json` and save files at random (truncation, flipped bytes, wrong JSON
+types, binary garbage, a good header with a wrong-shaped world after it) and checks that loading them never raises.
+It runs 300 cases per test by default (a few seconds); `HEXA_FUZZ_CASES=3000` runs more, and `HEXA_FUZZ_SEED=<n>`
+sets the first seed. A failure prints the seed of the case and a command that replays only that case, e.g.
+`HEXA_FUZZ_SEED=20260110 HEXA_FUZZ_CASES=1 python3 -m unittest tests.test_fuzz_files`.
+
 Shared test helpers live in `tests/support/`: `europe()` (one read-only Europe world), `fresh(player)` (a world
 you may change), `random_world(seed)`, `play_seasons(world, n)`, `TempHome` and `@slow`. A test that changes a
 shared world fails the module's `tearDownModule` guard, so use `fresh()` for anything you mutate.
