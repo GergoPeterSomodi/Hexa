@@ -2159,7 +2159,7 @@ class CampaignWorld:
             state = "cut off"
         return state, len(troops), limit
 
-    def forage_check(self, group, tag=None):
+    def forage_check(self, group, tag=None, end_of_round=False):
         troops = [u for u in group if u.kind.war]
         if tag is not None and any(u.owner != tag for u in troops):
             return False, "Only your own troops can forage"
@@ -2171,20 +2171,21 @@ class CampaignWorld:
             return False, "Armies only forage in foreign land"
         if prov.foraged == (lead.owner, self.turn):
             return False, "Already foraged here this season"
-        if min(u.moves_left for u in troops) <= 0:
+        if not end_of_round and min(u.moves_left for u in troops) <= 0:
             return False, "No time left this season"
         return True, ""
 
-    def forage(self, group, tag=None):
-        if not self.forage_check(group, tag)[0]:
+    def forage(self, group, tag=None, end_of_round=False):
+        if not self.forage_check(group, tag, end_of_round)[0]:
             return False
         troops = [u for u in group if u.kind.war]
         prov = self.provinces[troops[0].pos]
         prov.foraged = (troops[0].owner, self.turn)
         prov.peasants *= 1 - FORAGE_LOSS
         prov.natives *= 1 - FORAGE_LOSS
-        for unit in troops:
-            unit.moves_left = 0
+        if not end_of_round:
+            for unit in troops:
+                unit.moves_left = 0
         self.message(f"Troops foraged around {prov.name}: they eat, the province suffers.", troops[0].owner)
         return True
 
@@ -2202,7 +2203,7 @@ class CampaignWorld:
             prov = self.provinces.get(pos)
             if tag != self.player and prov and prov.owner != tag and not self.in_supply(tag, pos) and \
                     not any(u.kind is WAGON and u.supplies > 0 for u in group):
-                self.forage(group)                 # computer armies forage when they must
+                self.forage(group, end_of_round=True)   # computer armies forage when they must, moves or not
             state, count, limit = self.supply_state(group)
             for wagon in [u for u in group if u.kind is WAGON]:
                 if state == "supplied":
