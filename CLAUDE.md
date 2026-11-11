@@ -45,7 +45,8 @@ takes seconds; `test_game` runs in ~10 s.
 ### One launcher, three modes
 
 `play.py:main()` loops: `hexa/menu.py:Menu` returns settings, the chosen app's `run()` returns `"menu"` or
-`"quit"`. The Conquest app class lives in `play.py` itself.
+`"quit"`. The Conquest app class lives in `play.py` itself. Command-line parsing lives in the pygame-free
+`hexa/cli.py` (`build_parser()`, `parse(argv)`), so `tests/test_cli.py` can test it.
 
 | Mode | State and rules | AI | Balance numbers | UI |
 |---|---|---|---|---|
