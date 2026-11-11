@@ -174,6 +174,16 @@ class RuleTest(unittest.TestCase):
         self.assertFalse(info["closed"])
         self.assertFalse(land.closed_pass(pos, "winter"))
 
+    def test_objects_can_wait_until_built(self):
+        """build=False returns None for a hex whose object list is not built yet (the frame budget), then it builds."""
+        land = L.Landscape(WORLD, TILES)
+        pos = next(hexes(WORLD, lambda p: WORLD.terrain[p] == "mountains"))
+        self.assertIsNone(land.objects(pos, 21, "summer", build=False))
+        n = land.object_builds
+        self.assertIsInstance(land.objects(pos, 21, "summer"), list)
+        self.assertEqual(land.object_builds, n + 1)
+        self.assertIsNotNone(land.objects(pos, 21, "summer", build=False))
+
     def test_grid_is_its_own_surface_the_size_of_the_ground(self):
         land = L.Landscape(WORLD, TILES)
         pos = next(hexes(WORLD, lambda p: WORLD.terrain[p] == "plains"))

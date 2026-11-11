@@ -1,4 +1,5 @@
 """Drawing the campaign map: a cached, zoomable political / terrain / goods / market map with fog."""
+import functools
 import math
 import os
 import time
@@ -14,8 +15,9 @@ SQRT3 = math.sqrt(3)
 ZOOMS = (3, 5, 8, 13, 21, 34)     # hex radius in pixels
 TILE_FROM = 3                     # from this zoom level on, the map is drawn with tile art
 LAND_FROM = 21                    # from this hex radius on, the map is drawn with the landscape art (_draw_landscape)
-LAND_BUILD_MS = 3.0               # time a frame may spend building ground composites (at least one); a hex not built
-                                  # yet is drawn with its old sprite
+LAND_BUILD_MS = 3.0               # time a frame may spend building composites and object lists (at least one of each);
+                                  # a hex not built yet is drawn with its old sprite, or without its objects
+LAND_IDLE_MS = 12.0               # a frame may prefetch the ring round the view until this many ms into the frame
 ART_KEYS = {"galleon": "carrack"}   # unit kinds drawn with another kind's figure until they get their own
 MINES = ("iron", "silver", "gold", "salt")
 BANK, RIVER_DARK, RIVER = (205, 190, 125), (40, 100, 170), (95, 160, 220)
@@ -49,11 +51,14 @@ WASTE = (215, 200, 165)
 MODES = ("political", "terrain", "goods", "markets")
 
 
+_CORNERS = [(math.cos(math.radians(60 * i - 30)), math.sin(math.radians(60 * i - 30))) for i in range(6)]
+
+
 def hex_points(cx, cy, r):
-    return [(cx + r * math.cos(math.radians(60 * i - 30)), cy + r * math.sin(math.radians(60 * i - 30)))
-            for i in range(6)]
+    return [(cx + r * c, cy + r * s) for c, s in _CORNERS]      # the corner table: same floats, no trig
 
 
+@functools.lru_cache(maxsize=2048)
 def tint(color, amount):
     return tuple(max(0, min(255, int(c + (255 - c) * amount))) if amount > 0 else max(0, int(c * (1 + amount)))
                  for c in color)
@@ -99,6 +104,10 @@ class MapView:
         self._overlay_base = {}       # TileDesc -> 120x140 overlay (generated a few per frame)
         self._gen_budget = 0
         self.land = landscape.Landscape(world, tiles_dir) if tiles_dir else None
+        self._pan = (0.0, 0.0)             # the last camera move, for prefetching ahead of a pan
+        self._last_cam = None
+        self._pf_done, self._pf_version = set(), None
+        self._frame_start, self._frame_objs = 0.0, 0
         self.grid_on = True                # the faint hex grid on the landscape zooms (the G key)
         self._roads = []
         for path in getattr(world, "road_paths", []):
@@ -666,10 +675,15 @@ class MapView:
         known, visible = self.known(), world.visible
         ox, oy = view_rect.x - camera[0], view_rect.y - camera[1]
         rows = self._visible_range(camera, view_rect)
+        if self._last_cam is not None and tuple(camera) != self._last_cam:
+            self._pan = (camera[0] - self._last_cam[0], camera[1] - self._last_cam[1])
+        self._last_cam = tuple(camera)
         bare = self.mode == "terrain" or (self.mode == "goods" and self.goods_view == "deposits")
         shown, hidden, dimmed, land_hexes = [], [], [], []
         self._gen_budget = 0                       # wfc overlays the fallback may build this frame (see _landscape_ground)
-        self._frame_builds, self._frame_deadline = 0, time.perf_counter() + LAND_BUILD_MS / 1000
+        self._frame_start = time.perf_counter()
+        self._frame_builds, self._frame_objs = 0, 0
+        self._frame_deadline = self._frame_start + LAND_BUILD_MS / 1000
         for row in range(rows[0], rows[1] + 1):
             for col in range(rows[2], rows[3] + 1):
                 pos = (col, row)
@@ -699,6 +713,7 @@ class MapView:
             self._owner_washes(screen, shown)
         if not bare:
             self._object_pass(screen, view_rect, (ox, oy), rows, known, season)
+        self._prefetch(view_rect, camera, rows, season)
         dim = self.overlay("dim")
         for cx, cy in dimmed:
             self._blit_centre(screen, dim, cx, cy)
@@ -729,21 +744,35 @@ class MapView:
             if img is not None:
                 self._blit_centre(screen, img, cx, cy)
 
+    def _objects_of(self, pos, r, season, build):
+        """The object list of a hex (None if not built and build is False), counting the builds of this frame."""
+        land = self.land
+        n0 = land.object_builds
+        objs = land.objects(pos, r, season, build=build)
+        self._frame_objs += land.object_builds - n0
+        return objs
+
     def _object_pass(self, screen, view_rect, origin, rows, known, season):
         """Every object of the known hexes in the view, plus one margin row and column, back to front by base y.
-        Objects only rise above their own hex, so one margin row and column is enough for the ones that reach in."""
-        world, r, land = self.world, self.r, self.land
+        A hex whose object list is not built yet (the frame's time is used up) is left out of this frame and
+        appears in a later one, or in the idle prefetch."""
+        world, r = self.world, self.r
         ox, oy = origin
         row0, row1, col0, col1 = rows[0] - 1, rows[1] + 1, rows[2] - 1, rows[3] + 1
+        end = time.perf_counter() + LAND_BUILD_MS / 1000        # the object lists get their own slice of time
         items = []
         for row in range(max(0, row0), min(world.rows - 1, row1) + 1):
             for col in range(max(0, col0), min(world.cols - 1, col1) + 1):
                 pos = (col, row)
                 if pos not in known:
                     continue
+                build = self._frame_objs == 0 or time.perf_counter() < end
+                objs = self._objects_of(pos, r, season, build)
+                if objs is None:
+                    continue
                 cx, cy = self.center(pos)
                 cx, cy = cx + ox, cy + oy
-                for surf, dx, dy, sort_y in land.objects(pos, r, season):
+                for surf, dx, dy, sort_y in objs:
                     w, h = surf.get_width(), surf.get_height()
                     x = int(round(cx + dx - w / 2))
                     y = int(round(cy + dy - h + 1))
@@ -752,6 +781,58 @@ class MapView:
         items.sort(key=lambda item: item[0])
         for _, x, y, surf in items:
             screen.blit(surf, (x, y))
+
+    def _prefetch(self, view_rect, camera, rows, season):
+        """Idle time: build the composites and object lists of the ring of hexes just beyond the view (ahead of the
+        last pan first), then of the view's middle at the neighbouring landscape zoom, so a zoom switch or a pan is
+        already warm. Stops at LAND_IDLE_MS of the frame, and never builds what is already built."""
+        world, land = self.world, self.land
+        end = self._frame_start + LAND_IDLE_MS / 1000
+        if self._pf_version != world.version:
+            self._pf_done.clear()
+            self._pf_version = world.version
+        known = self.known()
+        mx, my = camera[0] + view_rect.w / 2, camera[1] + view_rect.h / 2
+        plan = []
+        ring = []
+        for row in range(max(0, rows[0] - 2), min(world.rows - 1, rows[1] + 2) + 1):
+            for col in range(max(0, rows[2] - 2), min(world.cols - 1, rows[3] + 2) + 1):
+                if rows[0] <= row <= rows[1] and rows[2] <= col <= rows[3]:
+                    continue
+                ring.append((col, row))
+        ax, ay = self._pan
+        norm = (ax * ax + ay * ay) ** 0.5
+
+        def ahead(pos):
+            cx, cy = self.center(pos)
+            dx, dy = cx - mx, cy - my
+            score = (dx * dx + dy * dy) ** 0.5
+            if norm:
+                score -= 1.5 * (dx * ax + dy * ay) / norm      # cells in the pan direction first
+            return score
+        plan += [(self.r, pos) for pos in sorted(ring, key=ahead)]
+        other = {21: 34, 34: 21}.get(self.r)
+        if other is not None:
+            centre = self.hex_at(mx, my)
+            half_cols = int(view_rect.w / 2 / (other * SQRT3)) + 2
+            half_rows = int(view_rect.h / 2 / (1.5 * other)) + 2
+            near = [(c, rw) for rw in range(centre[1] - half_rows, centre[1] + half_rows + 1)
+                    for c in range(centre[0] - half_cols, centre[0] + half_cols + 1)
+                    if 0 <= rw < world.rows and 0 <= c < world.cols]
+            near.sort(key=lambda p: abs(p[0] - centre[0]) + abs(p[1] - centre[1]))
+            plan += [(other, pos) for pos in near]
+        for r, pos in plan:
+            if time.perf_counter() >= end:
+                return
+            if pos not in known or (r, pos, season) in self._pf_done:
+                continue
+            if land.ground(pos, r, season, build=False) is None:
+                land.ground(pos, r, season)
+            if time.perf_counter() >= end:
+                return
+            if land.objects(pos, r, season, build=False) is None:
+                land.objects(pos, r, season)
+            self._pf_done.add((r, pos, season))
 
     def land_sprite(self, prov):
         options = TERRAIN_SPRITES[prov.terrain]

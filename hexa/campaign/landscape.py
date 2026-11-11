@@ -842,6 +842,7 @@ class Landscape:
         self._grid = {}
         self._gquick = {}                   # (pos, r, season) -> (world version, composite key): skips the key work
         self.builds = 0                     # ground composites built so far (MapView budgets them per frame)
+        self.object_builds = 0              # object lists built so far (budgeted the same way)
         self._objs = OrderedDict()
         self._field_geo = {}
         self._chips = {}
@@ -1242,7 +1243,7 @@ class Landscape:
         return self._field_geo[key]
 
     # ----- objects
-    def objects(self, pos, r, season):
+    def objects(self, pos, r, season, build=True):
         """[(surface, dx, dy, sort_y)] of one hex at hex radius r: peaks, hills, trees, farm buildings, life and
         closed-pass markers. dx, dy: offset of the surface's base point (bottom centre) from the hex centre, in
         pixels. sort_y == dy: sort by (centre_y + sort_y) for the back-to-front order. Cached per
@@ -1253,6 +1254,9 @@ class Landscape:
         hit = _lru_get(self._objs, key)
         if hit is not None:
             return hit
+        if not build:                       # not built yet: None, and the caller draws the hex later
+            return None
+        self.object_builds += 1
         out = []
         c = self._cell(pos, season)
         if c is not None:
