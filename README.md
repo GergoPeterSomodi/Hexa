@@ -503,6 +503,51 @@ HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon HEXA_HOME=$(mktemp -d) .venv/bin/cov
 .venv/bin/coverage report
 ```
 
+### Golden screenshots
+
+`tests/ui/test_screenshots.py` draws 15 fixed-seed scenes (the start menu for each mode, Conquest map #42,
+Colonisation map #5, Europe 1480 before and after choosing Portugal at the flat and the tile-art zooms, its panels,
+the pause menu and its options, and random world #7) and compares each frame with its reviewed picture in
+`tests/golden/linux/`. The comparison is exact first (a sha256 of the pixels); otherwise a pixel counts as
+different when a channel is off by 8 or more, and a scene may have none (`max_pixels`, 0 by default). A failing
+scene writes `<scene>.actual.png`, `<scene>.golden.png` and `<scene>.diff.png` (the frame darkened, the differing
+pixels magenta) to `test-artifacts/` (`HEXA_TEST_ARTIFACTS`); CI attaches that folder to the failed run.
+
+Text rendering differs a little between operating systems (FreeType moves some glyphs by a pixel on macOS), so the
+goldens are made and compared on Linux, the CI reference. `tests/golden/linux/MANIFEST.json` records the
+environment they were made in: the OS, Python major.minor, the pygame, SDL, SDL_ttf and FreeType versions, a hash
+of pygame's bundled font, the smoothscale backend, the video driver and the desktop size. Where anything differs
+(on a Mac, the OS), the screenshot tests are skipped and the skip names what differs. Three environment variables
+change that:
+
+- `HEXA_GOLDEN_STRICT=1` makes a different environment a failure instead of a skip, for a CI job that must compare.
+- `HEXA_GOLDEN_ANY_OS=1` compares anyway, allowing 0.5 % of a frame's pixels to differ: a rough check on a Mac
+  (measured: macOS differs from the goldens by 160 to 1,500 pixels a frame, 0.02 to 0.21 %).
+- `UPDATE_GOLDEN=1` makes the goldens: every frame that isn't exactly its golden (or has none) is written as the new
+  golden, `MANIFEST.json` gets the running environment, and a summary is printed and kept in
+  `test-artifacts/golden-updates.txt`. It refuses to run anywhere but Linux.
+
+Linux arm64 and x86-64 draw the same bytes (the harness forces the GENERIC smoothscale backend), so on any machine
+with Docker, including an Apple Silicon Mac, this makes or checks the goldens exactly as CI's `ui` job does
+(`--user` keeps the new files yours; `HOME=/tmp` lets pip install pygame for that user):
+
+```bash
+docker run --rm --platform linux/arm64 --user "$(id -u):$(id -g)" -e HOME=/tmp -e UPDATE_GOLDEN=1 \
+  -v "$PWD":/work -w /work python:3.12-slim \
+  sh -c 'pip install -q pygame==2.6.1 && HEXA_HOME=$(mktemp -d) python -m unittest tests.ui.test_screenshots'
+```
+
+Leave out `-e UPDATE_GOLDEN=1` (or add `-e HEXA_GOLDEN_STRICT=1`) to run the comparison instead. Without Docker,
+the `goldens` workflow (`.github/workflows/goldens.yml`, run by hand from the Actions tab, optionally for another
+branch or commit) makes them on GitHub's runner and uploads them as the `goldens` artifact; it never commits. Either
+way, look at the new pictures (and `git diff --stat tests/golden/linux`) before committing them. A change that is
+meant to alter the look of a window ships with its new goldens; only rewritten scenes change, since a golden whose
+pixels are the same is left alone.
+
+The `ui` job compares the goldens but doesn't set `HEXA_GOLDEN_STRICT=1` yet: until a CI run has shown that the
+runner's environment matches `MANIFEST.json` (the scenes run, not skipped), a mismatch only skips them. Once one has,
+add `HEXA_GOLDEN_STRICT: "1"` to the `ui` job's `env`.
+
 ## Project layout
 
 | File | What it does |
@@ -518,7 +563,7 @@ HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon HEXA_HOME=$(mktemp -d) .venv/bin/cov
 | `hexa/ai.py` | The computer opponent |
 | `hexa/render.py` | Drawing the map, units and info bar |
 | `hexa/hexgrid.py` | Hex grid maths |
-| `tests/` | Rule tests (see Development); shared helpers in `tests/support/`; headless window tests in `tests/ui/` |
+| `tests/` | Rule tests (see Development); shared helpers in `tests/support/`; headless window tests in `tests/ui/`; golden screenshots in `tests/golden/linux/` |
 | `tools/` | Developer tools: `monkey.py` replays or hunts with the window tests' seeded monkey (`python -m tools.monkey`) |
 | `Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py`, `Read_XML.py` | The original map editor and its XML map loading (`map*.xml`) |
 

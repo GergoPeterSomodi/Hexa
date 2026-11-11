@@ -42,6 +42,10 @@ HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .        # erro
 HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon .venv/bin/coverage run -m unittest discover -s tests/ui -t .   # line coverage, as the ui job
 HEXA_MONKEY_SEEDS=30 HEXA_MONKEY_FRAMES=3000 HEXA_MONKEY_BURST=0.5 .venv/bin/python -m unittest tests.ui.test_monkey.MonkeyTest   # longer monkey runs (default seeds 1-2, 800 frames / campaign 300, burst 0.3)
 .venv/bin/python -m tools.monkey colony 7 800 --burst 0.5                 # replay one monkey session; a failure prints this line ("1-30" seeds: a batch)
+.venv/bin/python -m unittest tests.ui.test_screenshots                    # golden screenshots: skipped unless the environment matches tests/golden/linux/MANIFEST.json
+HEXA_GOLDEN_ANY_OS=1 .venv/bin/python -m unittest tests.ui.test_screenshots   # compare on macOS anyway, allowing 0.5 % of the pixels to differ
+# make the goldens as CI does (Linux only; leave out UPDATE_GOLDEN=1 to compare, HEXA_GOLDEN_STRICT=1 fails instead of skipping)
+docker run --rm --platform linux/arm64 --user "$(id -u):$(id -g)" -e HOME=/tmp -e UPDATE_GOLDEN=1 -v "$PWD":/work -w /work python:3.12-slim sh -c 'pip install -q pygame==2.6.1 && HEXA_HOME=$(mktemp -d) python -m unittest tests.ui.test_screenshots'
 ```
 
 Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fresh(player)` a mutable one,
@@ -62,6 +66,11 @@ Window tests subclass `tests/support/harness.py:UITestCase`
 `self.driver.at(frame, key(...)/click(...))` and `self.driver.run_for(frames, until=...)`, call the window's real
 `run()`, then assert on `app.world`/`app.ui`. They import pygame and window modules inside the test, never at
 module top. A failing one saves its last frame to `test-artifacts/` (`HEXA_TEST_ARTIFACTS`).
+`tests/ui/test_screenshots.py` compares 15 fixed-seed frames with `tests/golden/linux/*.png` through
+`tests/support/golden.py` (sha256 first, then at most `max_pixels` pixels off by 8 or more in a channel; a failure
+writes `<scene>.actual/.golden/.diff.png` to `test-artifacts/`). The goldens are made on Linux only (`UPDATE_GOLDEN=1`,
+the docker line above or the `goldens` workflow, which uploads them and never commits); a change that alters a
+window's look ships with its regenerated, reviewed goldens.
 
 `test_campaign` is the slowest (~1 min) because building the Europe map takes seconds; `test_properties` (~50 s:
 20 random games per mode, determinism subprocesses) comes next; `test_game` runs in ~10 s.

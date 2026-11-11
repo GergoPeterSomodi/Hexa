@@ -93,6 +93,9 @@ jobs:
       # Branch and line data can't be combined, so this is a second table next to the coverage job's.
       COVERAGE_CORE: sysmon
       HEXA_COVERAGE_BRANCH: "0"
+      # The golden screenshots (tests/ui/test_screenshots.py) skip where the environment differs from
+      # tests/golden/linux/MANIFEST.json. Once a run has shown that they are compared here, not skipped,
+      # add HEXA_GOLDEN_STRICT: "1" so that a mismatch fails instead.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

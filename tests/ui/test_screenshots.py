@@ -2,8 +2,9 @@
 
 Each scene opens a window the way the launcher does, plays a short script through the window's own run() loop
 (fake time, the bundled font, clicks that don't move the mouse unless the scene hovers on purpose), then draws it
-with the clock stopped until the frame stops changing (the campaign's tile art is made a few tiles a frame) and
-compares that frame with its golden (tests/support/golden.py):
+with the clock stopped until the frame stops changing (the campaign's tile art is made a few tiles a frame; the
+time limit on the landscape art of the close zooms is lifted) and compares that frame with its golden
+(tests/support/golden.py):
 
     menu_campaign          the start menu on Age of Discovery: Random world picked, Continue (a save), a load error
     menu_conquest          the start menu on Conquest (one row)
@@ -33,6 +34,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 from tests.support import golden, harness
 from tests.support.harness import click, hex_pixel, hover, key
@@ -167,7 +169,13 @@ class ScreenCase(harness.UITestCase):
         """The campaign window as the launcher opens it; the steps start at frame 1, after a first frame is drawn
         (the buttons and the pause menu are laid out when drawn)."""
         import play
+        from hexa.campaign import mapview
         from hexa.campaign.app import CampaignApp
+        # The landscape art is made a few hexes a frame, as many as LAND_BUILD_MS of real time allows, so a slow
+        # machine could settle on a frame with hexes still missing: lift the limit, every frame draws them all.
+        patcher = mock.patch.object(mapview, "LAND_BUILD_MS", 1e9)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.app = app = CampaignApp(play.TILES_DIR, tag, map, seed)
         self.script(steps, start=1)
         self.driver.run_for(frames or len(steps) + 3)
