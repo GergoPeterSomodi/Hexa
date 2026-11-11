@@ -1,6 +1,7 @@
 """The start menu: pick the game mode and, for colonisation, how to start and how to win."""
 import pygame
 
+from . import __version__
 from .campaign import saves
 from .colony.rules import GOAL_NAMES, START_NAMES
 
@@ -135,3 +136,5 @@ class Menu:
             screen.blit(text, text.get_rect(center=(cx, start.bottom + 34)))
         foot = self.font.render("Enter: start    Esc: quit", True, MUTED)
         screen.blit(foot, foot.get_rect(center=(cx, screen.get_height() - 30)))
+        version = self.font.render(f"v{__version__}", True, MUTED)
+        screen.blit(version, version.get_rect(bottomright=(screen.get_width() - 14, screen.get_height() - 12)))
