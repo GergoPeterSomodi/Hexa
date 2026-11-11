@@ -442,6 +442,25 @@ class SupplyTest(unittest.TestCase):
         home = w.provinces[w.countries["POR"].capital]
         self.assertTrue(w.in_supply("POR", home.pos))
 
+    def test_only_the_owner_can_forage_a_stack(self):
+        w = self.w
+        w.declare_war("POR", "CAS")
+        prov = next(p for p in w.provinces_of("POR") if not w.units_at(p.pos))
+        enemy = place(w, troop("infantry", 1), "CAS", prov.pos, 2)      # a Castilian army standing in Portuguese land
+        people = prov.peasants
+        self.assertTrue(w.forage_check(enemy)[0], "untagged check keeps the AI/logistics behaviour")
+        self.assertTrue(w.forage_check(enemy, tag="CAS")[0], "the owner may forage")
+        ok, reason = w.forage_check(enemy, tag="POR")
+        self.assertFalse(ok)
+        self.assertEqual(reason, "Only your own troops can forage")
+        self.assertFalse(w.forage(enemy, tag="POR"), "the player cannot forage an enemy stack")
+        self.assertTrue(all(u.moves_left > 0 for u in enemy), "the enemy keeps its moves")
+        self.assertEqual(prov.foraged, ())
+        self.assertEqual(prov.peasants, people)
+        self.assertTrue(w.forage(enemy, tag="CAS"))
+        self.assertTrue(all(u.moves_left == 0 for u in enemy))
+        self.assertEqual(prov.foraged, ("CAS", w.turn))
+
     def test_movement_preview(self):
         w = self.w
         capital = w.countries["POR"].capital

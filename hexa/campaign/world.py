@@ -1825,8 +1825,10 @@ class CampaignWorld:
             state = "cut off"
         return state, len(troops), limit
 
-    def forage_check(self, group):
+    def forage_check(self, group, tag=None):
         troops = [u for u in group if u.kind.war]
+        if tag is not None and any(u.owner != tag for u in troops):
+            return False, "Only your own troops can forage"
         if not troops:
             return False, "Only troops forage"
         lead = troops[0]
@@ -1839,8 +1841,8 @@ class CampaignWorld:
             return False, "No time left this season"
         return True, ""
 
-    def forage(self, group):
-        if not self.forage_check(group)[0]:
+    def forage(self, group, tag=None):
+        if not self.forage_check(group, tag)[0]:
             return False
         troops = [u for u in group if u.kind.war]
         prov = self.provinces[troops[0].pos]
