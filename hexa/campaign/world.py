@@ -2016,7 +2016,8 @@ class CampaignWorld:
             return False
         ship = None
         if not lead.naval:
-            ship = next((u for u in self.units_at(dest) if u.naval and u.owner == lead.owner), None)
+            ship = next((u for u in self.units_at(dest) if u.naval and u.owner == lead.owner
+                         and len(self.cargo(u)) + len(group) <= u.kind.capacity), None)
         # Walk the route hex by hex, looking around on the way (so fog clears along it, not just at the end).
         path = self.route(group, dest, best)
         self.last_move = ([u.id for u in group], path)
