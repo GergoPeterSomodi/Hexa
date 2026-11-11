@@ -2268,7 +2268,8 @@ class CampaignWorld:
         for prov in self.castles():
             if prov.controller in enemies and prov.garrison > 0:
                 found.add(prov.pos)
-        return found
+        ours = self.owners_at()
+        return {pos for pos in found if tag not in ours.get(pos, ())}      # never attack the hex we stand on
 
     def attack_options_group(self, group):
         """{target hex: hex to attack from, or "bombard" for cannons firing from where they stand}."""
@@ -2340,6 +2341,8 @@ class CampaignWorld:
         here = self.units_at(pos)
         att_tag = attackers[0].owner
         def_tag = here[0].owner if here else prov.controller
+        if def_tag == att_tag:
+            return                                  # a country never fights itself
         castle = prov.castle if prov.controller == def_tag and prov.garrison > 0 else 0
         fight = "assault" if castle else ("open" if prov.terrain in OPEN_GROUND else "rough")
         dfight = "garrison" if castle else ("open" if fight == "open" else "rough")

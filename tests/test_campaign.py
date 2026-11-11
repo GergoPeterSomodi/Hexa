@@ -322,6 +322,55 @@ class WarTest(unittest.TestCase):
         self.assertLess(enemy.hp if enemy in w.units else 0, enemy.kind.hp)
         self.assertTrue(all(g.hp == g.kind.hp for g in guns), "no counterattack against a bombardment")
 
+    def held_castle(self):
+        """War with Castile and a garrisoned Castilian castle next to Portuguese land: (castle, home hex)."""
+        w = self.w
+        w.declare_war("POR", "CAS")
+        target, home = self.border()
+        target.castle, target.garrison = 2, 12
+        w.changed(ownership=True)
+        return target, home
+
+    def test_stack_on_an_enemy_castle_has_no_attack_on_its_own_hex(self):
+        w = self.w
+        target, _ = self.held_castle()
+        guns = place(w, troop("artillery", 1), "POR", target.pos, 2)
+        pikes = place(w, troop("infantry", 1), "POR", target.pos, 1)
+        for group in (guns, pikes, guns + pikes):
+            self.assertNotIn(target.pos, w.attack_options_group(group))
+        log = list(w.log)
+        self.assertFalse(w.attack_group(guns, target.pos))
+        self.assertEqual(target.garrison, 12, "the garrison is untouched")
+        self.assertTrue(all(u.hp == u.kind.hp for u in guns + pikes), "we never hurt ourselves")
+        self.assertEqual(w.log, log, "no battle was fought")
+
+    def test_split_stack_cannot_attack_a_hex_a_friendly_stack_holds(self):
+        w = self.w
+        target, home = self.held_castle()
+        attacker = place(w, troop("infantry", 1), "POR", home, 1)
+        self.assertIn(target.pos, w.attack_options_group(attacker), "the castle is a target while we are outside")
+        place(w, troop("infantry", 1), "POR", target.pos, 1)
+        self.assertNotIn(target.pos, w.attack_options_group(attacker))
+        self.assertFalse(w.attack_group(attacker, target.pos))
+
+    def test_a_country_never_fights_itself(self):
+        w = self.w
+        target, _ = self.held_castle()
+        guns = place(w, troop("artillery", 1), "POR", target.pos, 2)
+        log = list(w.log)
+        w._battle(guns, target.pos, ranged=True)
+        self.assertEqual(target.garrison, 12)
+        self.assertTrue(all(u.hp == u.kind.hp for u in guns))
+        self.assertEqual(w.log, log)
+
+    def test_ai_siege_stack_on_a_castle_does_not_shoot_itself(self):
+        w = self.w
+        target, _ = self.held_castle()
+        guns = place(w, troop("artillery", 1), "POR", target.pos, 2)
+        ai._campaign(w, "POR", guns, w.enemies("POR"))
+        self.assertEqual(target.garrison, 12)
+        self.assertTrue(all(g.hp == g.kind.hp and g in w.units for g in guns))
+
     def test_castles_block_need_sieges_and_have_garrisons(self):
         w = self.w
         w.declare_war("POR", "CAS")
