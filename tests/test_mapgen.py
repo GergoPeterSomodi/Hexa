@@ -8,8 +8,15 @@ from hexa.campaign import geo, wfc
 from hexa.campaign.data import TERRAIN, troop
 from hexa.campaign.world import FORBIDDEN, CampaignWorld
 from hexa.hexgrid import neighbors
+from tests.support.slow import slow
+from tests.support.worlds import europe, play_seasons, pristine, random_world
 
-EUROPE = CampaignWorld()
+EUROPE = europe()                # shared and read-only
+_PRISTINE = pristine(EUROPE, "the shared EUROPE")
+
+
+def tearDownModule():
+    _PRISTINE.check()            # a test that needs to change a world must build its own
 
 
 class CollapseTest(unittest.TestCase):
@@ -136,8 +143,9 @@ class WalkingTest(unittest.TestCase):
 
 
 class RandomWorldTest(unittest.TestCase):
+    @slow
     def test_a_random_world_is_playable(self):
-        w = CampaignWorld(11, map="random")
+        w = random_world(11)
         self.assertTrue(w.geo.name.startswith("Random world"))
         self.assertGreaterEqual(len(w.countries), 25)
         for tag, country in w.countries.items():
@@ -155,7 +163,7 @@ class RandomWorldTest(unittest.TestCase):
         self.assertTrue(w.rivers and w.markets)
 
     def test_random_worlds_take_their_own_tags(self):
-        w = CampaignWorld(11, map="random")
+        w = random_world(11)
         tag, country = next(iter(w.countries.items()))
         self.assertEqual(w.find_country(tag.lower()), tag)
         self.assertEqual(w.find_country(country.name.upper()), tag)
@@ -164,19 +172,16 @@ class RandomWorldTest(unittest.TestCase):
         for t in foreign:
             self.assertIsNone(w.find_country(t))
 
+    @slow
     def test_the_same_seed_gives_the_same_world_and_others_differ(self):
         a, b = CampaignWorld(3, map="random"), CampaignWorld(3, map="random")
         c = CampaignWorld(4, map="random")
         self.assertEqual(a.terrain, b.terrain)
         self.assertNotEqual(a.terrain, c.terrain)
 
+    @slow
     def test_ai_runs_on_a_random_world(self):
-        from hexa.campaign import ai
-        w = CampaignWorld(5, map="random")
-        for _ in range(6):
-            for tag in w.countries:
-                ai.run(w, tag)
-            w.end_round()
+        w = play_seasons(CampaignWorld(5, map="random"), 6)
         for unit in w.units:
             if unit.carrier is None:
                 self.assertTrue(w.is_sea(unit.pos) if unit.naval else w.is_land(unit.pos))

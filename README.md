@@ -374,12 +374,19 @@ Version history is in [CHANGELOG.md](CHANGELOG.md).
 The tests use Python's built-in `unittest` and don't need pygame:
 
 ```bash
-python -m unittest discover -s tests -t .                              # all tests (about 2 minutes)
+python -m unittest discover -s tests -t .                              # all tests (about 1.5 to 2 minutes)
+HEXA_FAST=1 python -m unittest discover -s tests -t .                  # skip the slow tests (about 20 seconds)
 python -m unittest tests.test_game                                     # one file
 python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip   # one test
 ```
 
+`HEXA_FAST=1` skips the tests marked `@slow` (the 100-season AI history, the AI game loops, the random-world
+tests); they still count as tests, shown as skipped. CI always runs everything.
 `tests/test_campaign.py` is the slowest because it builds the full Europe map.
+
+Shared test helpers live in `tests/support/`: `europe()` (one read-only Europe world), `fresh(player)` (a world
+you may change), `random_world(seed)`, `play_seasons(world, n)`, `TempHome` and `@slow`. A test that changes a
+shared world fails the module's `tearDownModule` guard, so use `fresh()` for anything you mutate.
 
 The game rules, AI and map generation don't use pygame; only the window, menu and drawing code do.
 To keep test runs or experiments away from your real saves and options, set `HEXA_HOME` to another folder
@@ -409,7 +416,7 @@ HEXA_HOME=$(mktemp -d) python -m unittest discover -s tests -t . -v --durations 
 | `hexa/ai.py` | The computer opponent |
 | `hexa/render.py` | Drawing the map, units and info bar |
 | `hexa/hexgrid.py` | Hex grid maths |
-| `tests/` | Rule tests (see Development) |
+| `tests/` | Rule tests (see Development); shared helpers in `tests/support/` |
 | `Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py`, `Read_XML.py` | The original map editor and its XML map loading (`map*.xml`) |
 
 Tile art: [Kenney Hexagon Pack](https://kenney.nl/assets/hexagon-pack) (CC0), in `hexagon-pack/`.

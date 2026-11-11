@@ -3,6 +3,7 @@ import unittest
 
 from hexa.campaign import ai, tech
 from hexa.campaign.world import CampaignWorld
+from tests.support.slow import slow
 
 
 def fresh_with_techs(tag, techs):
@@ -59,6 +60,7 @@ class TechAITest(unittest.TestCase):
         self.assertEqual(len(country.ideas), ideas_before + 1)
         self.assertTrue(country.ideas & {"casa_da_india", "humanism", "fuggers_credit"})
 
+    @slow
     def test_sixty_seasons_of_research(self):
         w = CampaignWorld()
         empty_after_run = 0
@@ -74,6 +76,7 @@ class TechAITest(unittest.TestCase):
         self.assertGreaterEqual(sum(1 for n in known if n >= 4), len(known) * 0.6, "most countries know 4 or more")
         self.assertEqual(empty_after_run, 0, "no country is left without research after the AI moves")
 
+    @slow
     def test_era_two_opens_after_1520_with_four_era_one_techs(self):
         tag = "POR"
         era_one = ["drill_yards", "guilds", "portolan", "tax_rolls"]

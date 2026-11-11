@@ -22,10 +22,15 @@ Tests use stdlib `unittest` (no pytest, linter or formatter is configured):
 
 ```bash
 python -m unittest discover -s tests -t .                                 # everything, ~2 min
+HEXA_FAST=1 python -m unittest discover -s tests -t .                     # skips the @slow tests, ~20 s
 python -m unittest tests.test_game                                        # one module
 python -m unittest tests.test_campaign.WarTest                            # one class
 python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip      # one test
 ```
+
+Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fresh(player)` a mutable one,
+`play_seasons`, `random_world`, `TempHome`, `@slow`). A test that mutates a shared world fails the module's
+`tearDownModule` pristine guard, so use `fresh()` for anything you change.
 
 Use `python3` where `python` isn't on PATH. Tests do not need pygame installed. `test_campaign` is the slowest (~1 min) because building the Europe map
 takes seconds; `test_game` runs in ~10 s.

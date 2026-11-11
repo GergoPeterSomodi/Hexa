@@ -8,6 +8,7 @@ from hexa.colony.rules import (BRAVE, COLONISERS, COLONIST, CROWN, FAVOUR_FOR_CO
                                SURVIVE_TURNS, TENSION_WAR)
 from hexa.colony.world import ColonyWorld
 from hexa.hexgrid import distance, neighbors, within
+from tests.support.slow import slow
 
 
 def first(world, side, unit_type):
@@ -267,6 +268,7 @@ class AITest(unittest.TestCase):
                 self.assertGreaterEqual(len(w.colonies_of(side)), 2, f"seed {seed}: {side} did not expand")
                 self.assertGreaterEqual(w.population(side), 5, f"seed {seed}: {side} did not grow")
 
+    @slow
     def test_survival_games_end_on_time(self):
         for seed in range(4):
             w = self.play(ColonyWorld(seed, START_SEA, GOAL_SURVIVE))

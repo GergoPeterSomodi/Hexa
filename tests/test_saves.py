@@ -8,30 +8,16 @@ import json
 import operator
 import os
 import pickle
-import shutil
 import sys
-import tempfile
 import unittest
 from unittest import mock
 
 from hexa import settings
-from hexa.campaign import ai, saves
+from hexa.campaign import saves
 from hexa.campaign.data import GENERAL, troop
 from hexa.campaign.world import WORLD_DEFAULTS, WORLD_REQUIRED, CampaignWorld
-
-
-class TempHome(unittest.TestCase):
-    def setUp(self):
-        self.home = tempfile.mkdtemp()
-        self.old = os.environ.get("HEXA_HOME")
-        os.environ["HEXA_HOME"] = self.home
-
-    def tearDown(self):
-        if self.old is None:
-            os.environ.pop("HEXA_HOME", None)
-        else:
-            os.environ["HEXA_HOME"] = self.old
-        shutil.rmtree(self.home, ignore_errors=True)
+from tests.support.home import TempHome
+from tests.support.worlds import fresh, play_seasons
 
 
 class NotAnObjectTest(TempHome):
@@ -61,12 +47,7 @@ class NotAnObjectTest(TempHome):
 
 class SaveTest(TempHome):
     def test_a_saved_game_comes_back_exactly(self):
-        w = CampaignWorld(player="POR")
-        for _ in range(2):
-            for tag in w.countries:
-                if tag != "POR":
-                    ai.run(w, tag)
-            w.end_round()
+        w = play_seasons(fresh(), 2, player_ai=False)
         w.countries["POR"].treasury = 1234.5
         meta = saves.save(w, "3")
         self.assertEqual(meta["country"], "Portugal")
@@ -122,7 +103,7 @@ class OldAndBrokenSavesTest(TempHome):
 
     def test_a_removed_unit_kind_means_cant_load_not_a_crash(self):
         from hexa.campaign import data
-        w = CampaignWorld(player="POR")
+        w = fresh()
         saves.save(w, "2")
         gone = next(u.kind.key for u in w.units if u.kind.war)
         with mock.patch.dict(data.UNIT_KINDS):
@@ -131,7 +112,7 @@ class OldAndBrokenSavesTest(TempHome):
         self.assertIsNotNone(saves.load("2"), "the same save loads once the kind is back")
 
     def test_an_older_save_gets_defaults_for_newer_fields(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         state = pickle.loads(pickle.dumps(w.save_state()))
         for key in ("over", "wars", "_castle_list", "_known_world"):
             state.pop(key, None)
@@ -150,7 +131,7 @@ class OldAndBrokenSavesTest(TempHome):
         back.end_round()                         # and the game plays on
 
     def test_saves_from_a_newer_version_are_refused(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         self._write("4", w.save_state(), version=saves.VERSION + 1)
         self.assertIsNone(saves.meta("4"))
         self.assertIsNone(saves.load("4"))
@@ -168,7 +149,7 @@ class OldAndBrokenSavesTest(TempHome):
         self._refused("1", "an empty state")
         self._write("2", [1, 2, 3])
         self._refused("2", "a state that is not a dict")
-        w = CampaignWorld(player="POR")
+        w = fresh()
         for slot, name in (("3", "countries"), ("4", "markets"), ("5", "turn"), ("6", "cols")):
             state = w.save_state()
             del state[name]
@@ -176,7 +157,7 @@ class OldAndBrokenSavesTest(TempHome):
             self.assertIn(name, self._refused(slot, f"a world without {name}"))
 
     def test_a_player_country_that_is_not_in_the_world_is_refused(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         w.player = "XXX"                    # load_world() would look up its capital and crash
         saves.save(w, "1")
         self.assertIn("'XXX'", self._refused("1", "a world without the player's country"))
@@ -194,7 +175,7 @@ class OldAndBrokenSavesTest(TempHome):
         self.assertIn("IndexError", self._refused("2", "an IndexError while unpickling"))
 
     def test_every_saved_attribute_is_required_or_has_a_default(self):
-        state = CampaignWorld(player="POR").save_state()
+        state = fresh().save_state()
         restored = {"map", "seed", "_next_id"}           # _restore() handles these itself
         lazy = {"_explored_from"}                        # added when first needed
         self.assertEqual(set(state) - set(WORLD_REQUIRED) - set(WORLD_DEFAULTS) - restored - lazy, set(),
@@ -243,13 +224,13 @@ class FailedSaveTest(TempHome):
     def test_an_unwritable_folder_raises_a_save_error(self):
         self._unwritable()
         with self.assertRaises(saves.SAVE_ERRORS) as caught:
-            saves.save(CampaignWorld(player="POR"), "1")
+            saves.save(fresh(), "1")
         self.assertIsInstance(caught.exception, OSError)
         self.assertTrue(saves.failure(caught.exception))
 
     def test_a_failed_write_keeps_the_old_save_and_leaves_no_tmp_file(self):
         import errno
-        w = CampaignWorld(player="POR")
+        w = fresh()
         saves.save(w, "1")
         w.turn += 4
         full = OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
@@ -261,7 +242,7 @@ class FailedSaveTest(TempHome):
         self.assertEqual(saves.failure(caught.exception), os.strerror(errno.ENOSPC).lower())
 
     def test_a_world_that_cannot_be_pickled_raises_a_save_error(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         for junk in (lambda: 0, (i for i in ())):    # PicklingError, TypeError
             with self.subTest(junk=junk):
                 w.junk = junk
@@ -271,14 +252,14 @@ class FailedSaveTest(TempHome):
                 self.assertEqual(saves.failure(caught.exception), "the game could not be written")
 
     def test_f5_that_fails_says_why_and_the_game_goes_on(self):
-        game = self._game(CampaignWorld(player="POR"))
+        game = self._game(fresh())
         self._unwritable()
         self.assertFalse(game.save_to("quick"))
         self.assertEqual(len(game.toasts), 1)
         self.assertTrue(game.toasts[0].startswith("Could not save Quicksave: "), game.toasts[0])
 
     def test_an_autosave_that_fails_does_not_crash_the_season(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         w.turn = 5                                  # "every year" autosaves on turns 5, 9, 13...
         game = self._game(w)
         self._unwritable()
@@ -287,7 +268,7 @@ class FailedSaveTest(TempHome):
         self.assertTrue(game.toasts[0].startswith("Could not autosave: "), game.toasts[0])
 
     def test_saving_still_works(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         w.turn = 5
         game = self._game(w)
         self.assertTrue(game.save_to("quick"))
