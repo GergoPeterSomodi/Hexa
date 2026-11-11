@@ -28,6 +28,31 @@ class TempHome(unittest.TestCase):
         shutil.rmtree(self.home, ignore_errors=True)
 
 
+class NotAnObjectTest(TempHome):
+    """Valid JSON that isn't an object counts as a missing file (issue #7)."""
+
+    def test_save_header_that_is_not_an_object_is_an_empty_slot(self):
+        os.makedirs(saves.folder())
+        with open(saves.path("1"), "wb") as f:       # a readable save next to the bad one
+            f.write(b'{"version": %d, "saved": 5.0, "date": "Spring 1480", "map": "Europe 1480", '
+                    b'"country": "Portugal"}\n' % saves.VERSION)
+        for header in (b"1", b"null", b"[]", b'"text"', b"true"):
+            with self.subTest(header=header):
+                with open(saves.path("2"), "wb") as f:
+                    f.write(header + b"\n")
+                self.assertIsNone(saves.meta("2"))
+                self.assertIsNone(saves.load("2"))
+                self.assertIsNone(dict(saves.listing())["2"])
+                self.assertEqual(saves.latest(), "1", "the start menu still finds the good save")
+
+    def test_settings_file_that_is_not_an_object_gives_defaults(self):
+        for content in ("[]", "null", "1", '"text"', "true"):
+            with self.subTest(content=content):
+                with open(os.path.join(self.home, "settings.json"), "w", encoding="utf-8") as f:
+                    f.write(content)
+                self.assertEqual(settings.load(), settings.DEFAULTS)
+
+
 class SaveTest(TempHome):
     def test_a_saved_game_comes_back_exactly(self):
         w = CampaignWorld(player="POR")
