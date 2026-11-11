@@ -2705,6 +2705,7 @@ class CampaignWorld:
         def_back = [u for u in defenders if u not in def_front]
         att_support = min(SUPPORT_MAX, SUPPORT_BONUS * len(att_back))
         def_support = min(SUPPORT_MAX, SUPPORT_BONUS * len(def_back))
+        before = {id(u): u.hp for u in attackers + defenders}      # HP going in, to report what this fight cost
         rng = self.rng
 
         def strike(attacker, target, factor, support, gen_att, gen_def, att_fight, def_fight):
@@ -2730,8 +2731,8 @@ class CampaignWorld:
                     factor = COUNTER * (0.5 if unit.kind.branch == "artillery" else 1.0)
                     strike(unit, rng.choice(alive(att_front)), factor, def_support, gen_d, gen_a, counter_fight,
                            "open" if fight == "open" else "rough")
-        hp_a = sum(min(u.kind.hp, u.kind.hp - max(0, u.hp)) for u in attackers)
-        hp_d = sum(min(u.kind.hp, u.kind.hp - max(0, u.hp)) for u in defenders)
+        hp_a = sum(before[id(u)] - max(0, u.hp) for u in attackers)
+        hp_d = sum(before[id(u)] - max(0, u.hp) for u in defenders)
         lost_a = [u for u in attackers if u.hp <= 0]
         lost_d = [u for u in defenders if u.hp <= 0 and not isinstance(u, Garrison)]
         for unit in lost_a + lost_d:
