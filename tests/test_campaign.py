@@ -237,6 +237,54 @@ def place(w, kind, tag, pos, n=1):
     return units
 
 
+class BoardingTest(unittest.TestCase):
+    """Land stacks boarding when several own ships share one sea hex."""
+
+    def setUp(self):
+        self.w = w = fresh()
+        w.units = []
+        self.shore, self.sea = next((p.pos, n) for p in w.provinces_of("POR") if p.coastal
+                                    for n in sorted(neighbors(p.pos)) if w.is_sea(n))
+
+    def two_ships(self, first_load):
+        """Two caravels on the sea hex; the first carries `first_load` colonists."""
+        w = self.w
+        first, second = place(w, CARAVEL, "POR", self.sea, 2)
+        for passenger in place(w, COLONIST, "POR", self.sea, first_load):
+            passenger.carrier = first
+        return first, second
+
+    def test_group_boards_the_ship_with_room_not_the_first_one(self):
+        w = self.w
+        full, empty = self.two_ships(CARAVEL.capacity)
+        stack = place(w, troop("infantry", 1), "POR", self.shore, 2)
+        self.assertIn(self.sea, w.reachable_group(stack), "the empty caravel makes the hex reachable")
+        self.assertTrue(w.move_group(stack, self.sea))
+        self.assertEqual(len(w.cargo(full)), CARAVEL.capacity, "the full caravel takes nobody")
+        self.assertEqual(len(w.cargo(empty)), 2)
+        self.assertTrue(all(u.carrier is empty for u in stack))
+
+    def test_the_whole_group_needs_room_on_one_ship(self):
+        w = self.w
+        tight, roomy = self.two_ships(CARAVEL.capacity - 1)      # one free place against four
+        stack = place(w, troop("infantry", 1), "POR", self.shore, 2)
+        self.assertTrue(w.move_group(stack, self.sea))
+        self.assertEqual(len(w.cargo(tight)), CARAVEL.capacity - 1)
+        self.assertTrue(all(u.carrier is roomy for u in stack))
+
+    def test_no_ship_with_room_means_no_boarding(self):
+        w = self.w
+        tight, other = self.two_ships(CARAVEL.capacity - 1)
+        for passenger in place(w, COLONIST, "POR", self.sea, CARAVEL.capacity - 1):
+            passenger.carrier = other
+        stack = place(w, troop("infantry", 1), "POR", self.shore, 2)
+        self.assertNotIn(self.sea, w.reachable_group(stack))
+        self.assertFalse(w.move_group(stack, self.sea))
+        self.assertTrue(all(u.carrier is None and u.pos == self.shore for u in stack))
+        self.assertEqual(len(w.cargo(tight)), CARAVEL.capacity - 1)
+        self.assertEqual(len(w.cargo(other)), CARAVEL.capacity - 1)
+
+
 class WarTest(unittest.TestCase):
     def setUp(self):
         self.w = fresh()
