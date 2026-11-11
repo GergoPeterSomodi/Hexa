@@ -20,11 +20,14 @@ The start menu picks the mode and, for colonisation, how you start and how you w
 You can also skip the menu:
 
 ```bash
+python play.py --mode campaign --nation POR             # Age of Discovery as Portugal
+python play.py --mode campaign --map random --seed 7    # Age of Discovery on a random world
 python play.py --mode conquest --seed 42
 python play.py --mode colony --start land --goal independence
 ```
 
 `--seed` replays the same map. The map number is shown in the window title. **M** goes back to the menu.
+`python play.py --help` lists every option.
 
 ## Conquest
 
@@ -323,13 +326,30 @@ All colonisation numbers are in `hexa/colony/rules.py`.
 
 `python Hex.py` opens the original tile-painting map editor (it uses `map3.xml`).
 
+## Development
+
+The tests use Python's built-in `unittest` and don't need pygame:
+
+```bash
+python -m unittest discover -s tests -t .                              # all tests (about 2 minutes)
+python -m unittest tests.test_game                                     # one file
+python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip   # one test
+```
+
+`tests/test_campaign.py` is the slowest because it builds the full Europe map.
+
+The game rules, AI and map generation don't use pygame; only the window, menu and drawing code do.
+To keep test runs or experiments away from your real saves and options, set `HEXA_HOME` to another folder
+(the default is `~/.hexa`).
+
 ## Project layout
 
 | File | What it does |
 |---|---|
 | `play.py` | Starts the game: menu, then the conquest window (mouse, keyboard, enemy turn timing) |
 | `hexa/menu.py` | The start menu |
-| `hexa/campaign/` | Age of Discovery: `geo.py` (real map, countries, markets, rivers), `randomgeo.py` (random worlds), `wfc.py` (wave function collapse), `art.py` (code-drawn tiles, figures, tokens), `data.py` (goods, buildings, balance), `world.py` (economy, trade, colonies, war), `ai.py`, `mapview.py`, `app.py` |
+| `hexa/settings.py` | Player options, stored in `~/.hexa/settings.json` |
+| `hexa/campaign/` | Age of Discovery: `geo.py` (real map, countries, markets, rivers), `randomgeo.py` (random worlds), `wfc.py` (wave function collapse), `art.py` (code-drawn tiles, figures, tokens), `data.py` (goods, buildings, balance), `world.py` (economy, trade, colonies, war), `ai.py`, `mapview.py`, `app.py`, `gamemenu.py` (in-game menu), `saves.py` (save slots) |
 | `hexa/colony/` | Colonisation mode: `rules.py`, `mapgen.py`, `world.py` (rules), `ai.py` (rivals, natives, royal army), `render.py`, `app.py` (window) |
 | `hexa/rules.py` | Unit, terrain and balance numbers |
 | `hexa/world.py` | Game state and rules: movement, combat, fog of war, turns, winning |
@@ -337,6 +357,7 @@ All colonisation numbers are in `hexa/colony/rules.py`.
 | `hexa/ai.py` | The computer opponent |
 | `hexa/render.py` | Drawing the map, units and info bar |
 | `hexa/hexgrid.py` | Hex grid maths |
-| `tests/` | Rule tests: `python -m unittest discover -s tests -t .` |
+| `tests/` | Rule tests (see Development) |
+| `Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py`, `Read_XML.py` | The original map editor and its XML map loading (`map*.xml`) |
 
 Tile art: [Kenney Hexagon Pack](https://kenney.nl/assets/hexagon-pack) (CC0), in `hexagon-pack/`.
