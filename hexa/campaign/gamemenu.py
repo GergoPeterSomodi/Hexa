@@ -27,7 +27,8 @@ OPTION_TEXT = {
 class GameMenu:
     menu = None               # None, "main", "save", "load" or "options"
     menu_confirm = None       # the button waiting for a second click (overwrite, exit...)
-    menu_buttons = ()
+    menu_buttons = ()         # (rect, action, enabled) of the page on screen, set by draw_menu()
+    menu_rect = None          # the menu box on screen; None until draw_menu() has drawn the current page
     _slots = None
     _quickload_until = 0      # ticks until which a second F9 press loads the quicksave
 
@@ -102,9 +103,11 @@ class GameMenu:
     # ----- opening and closing ------------------------------------------------------
     def open_menu(self, page="main"):
         self.menu, self.menu_confirm, self._slots = page, None, None
+        self.menu_buttons, self.menu_rect = (), None        # the new page is laid out when it is drawn
 
     def close_menu(self):
         self.menu, self.menu_confirm = None, None
+        self.menu_buttons, self.menu_rect = (), None
 
     def menu_key(self, key):
         if key == pygame.K_ESCAPE:
@@ -121,6 +124,8 @@ class GameMenu:
         elif event.type == pygame.MOUSEMOTION:
             self.ui.mouse = event.pos
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.menu_rect is None:      # clicked before this page was drawn: nothing on screen to hit
+                return
             for rect, action, enabled in self.menu_buttons:
                 if enabled and rect.collidepoint(event.pos):
                     self.menu_press(action)
