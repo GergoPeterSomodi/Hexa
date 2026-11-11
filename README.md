@@ -351,6 +351,13 @@ All colonisation numbers are in `hexa/colony/rules.py`.
 
 ## Development
 
+**Plans and designs** live in [`docs/`](docs/README.md):
+- the [roadmap](docs/roadmap/roadmap.md) and the [long-term roadmap](docs/roadmap/long-term-roadmap.md), whose final goal is a Steam release
+- the approved designs (tech tree, battle system) with their mockups
+- playtest and issue-triage reports
+
+Version history is in [CHANGELOG.md](CHANGELOG.md).
+
 The tests use Python's built-in `unittest` and don't need pygame:
 
 ```bash
