@@ -243,5 +243,8 @@ class GameMenu:
                 y += row_h
             self._menu_button((x, y + 4, 120, 36), "Back", ("page", "main"))
             hint = "Options are saved for next time."
-        img = self.small.render(hint, True, MUTED)
+        if pygame.time.get_ticks() < self.ui.toast_until:     # the toast itself is hidden under the menu box
+            img = self.small.render(self.ui.toast, True, TEXT)
+        else:
+            img = self.small.render(hint, True, MUTED)
         screen.blit(img, img.get_rect(midtop=(box.centerx, box.bottom + 8)))
