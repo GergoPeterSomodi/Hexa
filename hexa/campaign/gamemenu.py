@@ -27,7 +27,8 @@ OPTION_TEXT = {
 class GameMenu:
     menu = None               # None, "main", "save", "load" or "options"
     menu_confirm = None       # the button waiting for a second click (overwrite, exit...)
-    menu_buttons = ()
+    menu_buttons = ()         # (rect, action, enabled) of the page on screen, set by draw_menu()
+    menu_rect = None          # the menu box on screen; None until draw_menu() has drawn the current page
     _slots = None
     _quickload_until = 0      # ticks until which a second F9 press loads the quicksave
 
@@ -47,9 +48,14 @@ class GameMenu:
         if hasattr(self, "camera"):
             self.clamp()
 
+    def save_options(self):
+        """Keep the options for next time. If settings.json can't be written they still apply to this game."""
+        if not options.save(self.settings):
+            self.toast("Option changed, but it could not be saved for next time.")
+
     def toggle_fullscreen(self):
         self.settings["fullscreen"] = not self.settings["fullscreen"]
-        options.save(self.settings)
+        self.save_options()
         self.apply_display()
 
     # ----- saving --------------------------------------------------------------------
@@ -57,7 +63,11 @@ class GameMenu:
         if not self.player:
             self.toast("Choose your country before saving.")
             return False
-        saves.save(self.world, slot)
+        try:
+            saves.save(self.world, slot)
+        except saves.SAVE_ERRORS as error:
+            self.toast(f"Could not save {saves.slot_name(slot)}: {saves.failure(error)}.")
+            return False
         self._slots = None
         self.toast(f"Saved: {saves.slot_name(slot)} ({self.world.date()}).")
         return True
@@ -90,16 +100,22 @@ class GameMenu:
     def autosave(self):
         every = options.AUTOSAVE_TURNS[self.settings["autosave"]]
         if every and self.player and self.world.turn % every == 1 and not self.world.over:
-            saves.save(self.world, "auto")
+            try:
+                saves.save(self.world, "auto")
+            except saves.SAVE_ERRORS as error:
+                self.toast(f"Could not autosave: {saves.failure(error)}.")
+                return
             self._slots = None
             self.toast("Autosaved.")
 
     # ----- opening and closing ------------------------------------------------------
     def open_menu(self, page="main"):
         self.menu, self.menu_confirm, self._slots = page, None, None
+        self.menu_buttons, self.menu_rect = (), None        # the new page is laid out when it is drawn
 
     def close_menu(self):
         self.menu, self.menu_confirm = None, None
+        self.menu_buttons, self.menu_rect = (), None
 
     def menu_key(self, key):
         if key == pygame.K_ESCAPE:
@@ -116,6 +132,8 @@ class GameMenu:
         elif event.type == pygame.MOUSEMOTION:
             self.ui.mouse = event.pos
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.menu_rect is None:      # clicked before this page was drawn: nothing on screen to hit
+                return
             for rect, action, enabled in self.menu_buttons:
                 if enabled and rect.collidepoint(event.pos):
                     self.menu_press(action)
@@ -147,7 +165,7 @@ class GameMenu:
                 self.toggle_fullscreen()
             else:
                 options.cycle(self.settings, key)
-                options.save(self.settings)
+                self.save_options()
                 if key == "window":
                     self.apply_display()
         elif kind in ("menu", "exit"):
@@ -235,5 +253,8 @@ class GameMenu:
                 y += row_h
             self._menu_button((x, y + 4, 120, 36), "Back", ("page", "main"))
             hint = "Options are saved for next time."
-        img = self.small.render(hint, True, MUTED)
+        if pygame.time.get_ticks() < self.ui.toast_until:     # the toast itself is hidden under the menu box
+            img = self.small.render(self.ui.toast, True, TEXT)
+        else:
+            img = self.small.render(hint, True, MUTED)
         screen.blit(img, img.get_rect(midtop=(box.centerx, box.bottom + 8)))

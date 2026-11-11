@@ -1,10 +1,15 @@
 """Save, load and settings tests (they use a temporary HEXA_HOME). Run with:
 python -m unittest discover -s tests -t ."""
+import contextlib
+import errno
 import importlib.util
+import io
 import json
+import operator
 import os
 import pickle
 import shutil
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -12,7 +17,7 @@ from unittest import mock
 from hexa import settings
 from hexa.campaign import ai, saves
 from hexa.campaign.data import GENERAL, troop
-from hexa.campaign.world import CampaignWorld
+from hexa.campaign.world import WORLD_DEFAULTS, WORLD_REQUIRED, CampaignWorld
 
 
 class TempHome(unittest.TestCase):
@@ -27,6 +32,31 @@ class TempHome(unittest.TestCase):
         else:
             os.environ["HEXA_HOME"] = self.old
         shutil.rmtree(self.home, ignore_errors=True)
+
+
+class NotAnObjectTest(TempHome):
+    """Valid JSON that isn't an object counts as a missing file (issue #7)."""
+
+    def test_save_header_that_is_not_an_object_is_an_empty_slot(self):
+        os.makedirs(saves.folder())
+        with open(saves.path("1"), "wb") as f:       # a readable save next to the bad one
+            f.write(b'{"version": %d, "saved": 5.0, "date": "Spring 1480", "map": "Europe 1480", '
+                    b'"country": "Portugal"}\n' % saves.VERSION)
+        for header in (b"1", b"null", b"[]", b'"text"', b"true"):
+            with self.subTest(header=header):
+                with open(saves.path("2"), "wb") as f:
+                    f.write(header + b"\n")
+                self.assertIsNone(saves.meta("2"))
+                self.assertIsNone(saves.load("2"))
+                self.assertIsNone(dict(saves.listing())["2"])
+                self.assertEqual(saves.latest(), "1", "the start menu still finds the good save")
+
+    def test_settings_file_that_is_not_an_object_gives_defaults(self):
+        for content in ("[]", "null", "1", '"text"', "true"):
+            with self.subTest(content=content):
+                with open(os.path.join(self.home, "settings.json"), "w", encoding="utf-8") as f:
+                    f.write(content)
+                self.assertEqual(settings.load(), settings.DEFAULTS)
 
 
 class SaveTest(TempHome):
@@ -125,6 +155,146 @@ class OldAndBrokenSavesTest(TempHome):
         self.assertIsNone(saves.meta("4"))
         self.assertIsNone(saves.load("4"))
 
+    def _refused(self, slot, why):
+        """load() gives None for the slot and says why on stderr; returns what it said."""
+        said = io.StringIO()
+        with contextlib.redirect_stderr(said):
+            self.assertIsNone(saves.load(slot), why)
+        self.assertIn(f"Could not load save {slot!r}", said.getvalue())
+        return said.getvalue()
+
+    def test_a_state_that_is_not_a_whole_world_is_refused(self):
+        self._write("1", {})                                        # the example in issue #6
+        self._refused("1", "an empty state")
+        self._write("2", [1, 2, 3])
+        self._refused("2", "a state that is not a dict")
+        w = CampaignWorld(player="POR")
+        for slot, name in (("3", "countries"), ("4", "markets"), ("5", "turn"), ("6", "cols")):
+            state = w.save_state()
+            del state[name]
+            self._write(slot, state)
+            self.assertIn(name, self._refused(slot, f"a world without {name}"))
+
+    def test_a_player_country_that_is_not_in_the_world_is_refused(self):
+        w = CampaignWorld(player="POR")
+        w.player = "XXX"                    # load_world() would look up its capital and crash
+        saves.save(w, "1")
+        self.assertIn("'XXX'", self._refused("1", "a world without the player's country"))
+
+    def test_errors_while_unpickling_are_refused(self):
+        class Fails:                        # pickles as a call that raises when the save is read back
+            def __init__(self, func, *args):
+                self.call = (func, args)
+
+            def __reduce__(self):
+                return self.call
+        self._write("1", Fails(int, "1", 2, 3))
+        self.assertIn("TypeError", self._refused("1", "a TypeError while unpickling"))
+        self._write("2", Fails(operator.getitem, (), 0))
+        self.assertIn("IndexError", self._refused("2", "an IndexError while unpickling"))
+
+    def test_every_saved_attribute_is_required_or_has_a_default(self):
+        state = CampaignWorld(player="POR").save_state()
+        restored = {"map", "seed", "_next_id"}           # _restore() handles these itself
+        lazy = {"_explored_from"}                        # added when first needed
+        self.assertEqual(set(state) - set(WORLD_REQUIRED) - set(WORLD_DEFAULTS) - restored - lazy, set(),
+                         "a new world attribute must go into WORLD_REQUIRED or WORLD_DEFAULTS")
+        self.assertTrue(set(WORLD_REQUIRED) <= set(state), "WORLD_REQUIRED only names real attributes")
+
+
+def _gamemenu():
+    """hexa.campaign.gamemenu without needing pygame: these tests never draw or open a window."""
+    import sys
+    try:
+        import pygame  # noqa: F401
+    except ImportError:
+        with mock.patch.dict(sys.modules, {"pygame": mock.MagicMock()}):
+            from hexa.campaign import gamemenu
+            return gamemenu
+    from hexa.campaign import gamemenu
+    return gamemenu
+
+
+class FailedSaveTest(TempHome):
+    """A save that can't be written is reported, and the game goes on (issue #5)."""
+    def tearDown(self):
+        if os.path.isfile(self.home):
+            os.remove(self.home)
+        super().tearDown()
+
+    def _unwritable(self):
+        os.rmdir(self.home)
+        with open(self.home, "w") as f:     # HEXA_HOME is a file: no saves folder can be made, even as root
+            f.write("not a folder")
+
+    def _game(self, world):
+        class Game(_gamemenu().GameMenu):
+            def __init__(self):
+                self.world, self.settings, self.toasts = world, settings.load(), []
+
+            @property
+            def player(self):
+                return self.world.player
+
+            def toast(self, text):
+                self.toasts.append(text)
+        return Game()
+
+    def test_an_unwritable_folder_raises_a_save_error(self):
+        self._unwritable()
+        with self.assertRaises(saves.SAVE_ERRORS) as caught:
+            saves.save(CampaignWorld(player="POR"), "1")
+        self.assertIsInstance(caught.exception, OSError)
+        self.assertTrue(saves.failure(caught.exception))
+
+    def test_a_failed_write_keeps_the_old_save_and_leaves_no_tmp_file(self):
+        import errno
+        w = CampaignWorld(player="POR")
+        saves.save(w, "1")
+        w.turn += 4
+        full = OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
+        with mock.patch.object(saves.os, "replace", side_effect=full):
+            with self.assertRaises(OSError) as caught:
+                saves.save(w, "1")
+        self.assertEqual(os.listdir(saves.folder()), ["1.sav"], "the half-written .tmp file is removed")
+        self.assertEqual(saves.meta("1")["turn"], w.turn - 4, "the slot keeps its previous save")
+        self.assertEqual(saves.failure(caught.exception), os.strerror(errno.ENOSPC).lower())
+
+    def test_a_world_that_cannot_be_pickled_raises_a_save_error(self):
+        w = CampaignWorld(player="POR")
+        for junk in (lambda: 0, (i for i in ())):    # PicklingError, TypeError
+            with self.subTest(junk=junk):
+                w.junk = junk
+                with self.assertRaises(saves.SAVE_ERRORS) as caught:
+                    saves.save(w, "2")
+                self.assertEqual(os.listdir(saves.folder()), [])
+                self.assertEqual(saves.failure(caught.exception), "the game could not be written")
+
+    def test_f5_that_fails_says_why_and_the_game_goes_on(self):
+        game = self._game(CampaignWorld(player="POR"))
+        self._unwritable()
+        self.assertFalse(game.save_to("quick"))
+        self.assertEqual(len(game.toasts), 1)
+        self.assertTrue(game.toasts[0].startswith("Could not save Quicksave: "), game.toasts[0])
+
+    def test_an_autosave_that_fails_does_not_crash_the_season(self):
+        w = CampaignWorld(player="POR")
+        w.turn = 5                                  # "every year" autosaves on turns 5, 9, 13...
+        game = self._game(w)
+        self._unwritable()
+        game.autosave()
+        self.assertEqual(len(game.toasts), 1)
+        self.assertTrue(game.toasts[0].startswith("Could not autosave: "), game.toasts[0])
+
+    def test_saving_still_works(self):
+        w = CampaignWorld(player="POR")
+        w.turn = 5
+        game = self._game(w)
+        self.assertTrue(game.save_to("quick"))
+        game.autosave()
+        self.assertEqual(game.toasts, [f"Saved: Quicksave ({w.date()}).", "Autosaved."])
+        self.assertEqual(saves.meta("auto")["turn"], 5)
+
 
 @unittest.skipUnless(importlib.util.find_spec("pygame"), "needs pygame")
 class AppLoadingTest(TempHome):
@@ -158,6 +328,26 @@ class AppLoadingTest(TempHome):
         app.world.end_round()
         self.assertFalse(app.quickload(), "the confirmation does not last forever")
 
+    def test_a_failed_save_or_autosave_keeps_the_game_running(self):
+        import pygame
+        from hexa.campaign.app import CampaignApp
+        app = CampaignApp(player="POR")
+        toasts = []
+        app.toast = toasts.append
+        os.rmdir(self.home)
+        with open(self.home, "w") as f:
+            f.write("not a folder")
+        try:
+            app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F5, mod=0, unicode="", scancode=0))
+            self.assertIn("Could not save Quicksave", toasts[-1])
+            for _ in range(4):                      # Space x4: the autosave at the start of the next year
+                app.end_turn()
+            self.assertEqual(app.world.turn, 5)
+            self.assertIn("Could not autosave", toasts[-1])
+            self.assertTrue(app.running)
+        finally:
+            os.remove(self.home)
+
 
 class SettingsTest(TempHome):
     def test_defaults_cycle_and_persist(self):
@@ -174,6 +364,72 @@ class SettingsTest(TempHome):
         odd = settings.load()
         self.assertEqual(odd["scroll"], "normal", "unknown values fall back to the default")
         self.assertEqual(odd["autosave"], "off")
+
+
+def _gamemenu():
+    """hexa.campaign.gamemenu without needing pygame: these tests never draw or open a window."""
+    try:
+        import pygame  # noqa: F401
+    except ImportError:
+        with mock.patch.dict(sys.modules, {"pygame": mock.MagicMock()}):
+            from hexa.campaign import gamemenu
+            return gamemenu
+    from hexa.campaign import gamemenu
+    return gamemenu
+
+
+class UnsavedOptionsTest(TempHome):
+    """Options that can't be written to settings.json still apply to this game (issue #10)."""
+    def _unwritable(self):
+        blocker = os.path.join(self.home, "a-file")
+        with open(blocker, "w") as f:
+            f.write("not a folder")
+        os.environ["HEXA_HOME"] = blocker       # writing under it fails with an OSError, even as root
+
+    def test_an_unwritable_folder_is_reported_not_raised(self):
+        self._unwritable()
+        s = settings.load()
+        settings.cycle(s, "scroll")
+        self.assertFalse(settings.save(s))
+        self.assertEqual(s["scroll"], "fast", "the change stays in memory")
+
+    def test_a_failed_write_keeps_the_old_file(self):
+        s = settings.load()
+        settings.cycle(s, "autosave")
+        self.assertTrue(settings.save(s))
+        settings.cycle(s, "autosave")
+        with mock.patch("hexa.settings.json.dump", side_effect=OSError(errno.ENOSPC, "No space left on device")):
+            self.assertFalse(settings.save(s))
+        self.assertEqual(settings.load()["autosave"], "5 years", "the last good options survive a full disk")
+        self.assertEqual(os.listdir(self.home), ["settings.json"], "no temporary file is left behind")
+
+    def test_f11_and_the_options_page_still_change_the_option(self):
+        gamemenu = _gamemenu()
+
+        class Game(gamemenu.GameMenu):
+            def __init__(self):
+                self.settings, self.toasts, self.displays = settings.load(), [], 0
+
+            def apply_display(self):
+                self.displays += 1
+
+            def toast(self, text):
+                self.toasts.append(text)
+
+        game = Game()
+        game.toggle_fullscreen()
+        self.assertEqual(game.toasts, [], "no warning when the options were saved")
+        self.assertTrue(settings.load()["fullscreen"])
+        self._unwritable()
+        game.toggle_fullscreen()                                  # F11
+        self.assertFalse(game.settings["fullscreen"])
+        self.assertEqual(game.displays, 2, "the screen mode still changes")
+        game.menu_press(("option", "scroll"))                     # Menu -> Options
+        game.menu_press(("option", "window"))
+        self.assertEqual((game.settings["scroll"], game.settings["window"]), ("fast", "1600x900"))
+        self.assertEqual(game.displays, 3)
+        self.assertEqual(len(game.toasts), 3)
+        self.assertTrue(all("next time" in t for t in game.toasts), game.toasts)
 
 
 if __name__ == "__main__":

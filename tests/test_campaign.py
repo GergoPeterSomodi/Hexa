@@ -47,6 +47,25 @@ class MapTest(unittest.TestCase):
             self.assertGreater(country.balance, 0, f"{tag} loses money from the start")
 
 
+class NationTest(unittest.TestCase):
+    def test_tags_match_in_any_case(self):
+        for text in ("POR", "por", " Por "):
+            self.assertEqual(WORLD.find_country(text), "POR", text)
+
+    def test_names_match_too(self):
+        self.assertEqual(WORLD.find_country("portugal"), "POR")
+        self.assertEqual(WORLD.find_country("W\u00dcRTTEMBERG"), "WUR")
+
+    def test_unknown_countries_are_none(self):
+        for text in ("XYZ", "", "   ", None, "Portugall"):
+            self.assertIsNone(WORLD.find_country(text), repr(text))
+
+    def test_a_world_only_takes_a_real_tag(self):
+        for tag in ("XYZ", "por"):
+            with self.assertRaises(ValueError):
+                CampaignWorld(player=tag)
+
+
 class EconomyTest(unittest.TestCase):
     def test_prices_follow_supply_and_demand(self):
         w = fresh()
