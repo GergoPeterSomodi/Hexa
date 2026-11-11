@@ -268,6 +268,37 @@ class WarTest(unittest.TestCase):
         self.assertEqual(target.owner, "POR")
         self.assertFalse(w.at_war("POR", "CAS"))
 
+    def test_peace_leaves_armies_fighting_a_third_country(self):
+        w = self.w
+        self.assertTrue(w.declare_war("CAS", "POR"))
+        self.assertTrue(w.declare_war("CAS", "ARA"))
+        free = lambda tag: next(p for p in w.provinces_of(tag) if not p.castle and not w.units_at(p.pos))
+        in_aragon = free("ARA")
+        in_portugal = free("POR")
+        besiegers = place(w, troop("infantry", 1), "CAS", in_aragon.pos, 2)
+        invaders = place(w, troop("infantry", 1), "CAS", in_portugal.pos, 2)
+        in_aragon.siege = 3
+        w.peace("CAS", "POR")
+        self.assertFalse(w.at_war("CAS", "POR"))
+        self.assertTrue(w.at_war("CAS", "ARA"), "the other war goes on")
+        self.assertTrue(all(u.pos == in_aragon.pos for u in besiegers), "the army in Aragon stays put")
+        self.assertEqual(in_aragon.siege, 3, "the siege is not lost")
+        for u in invaders:
+            self.assertNotEqual(u.pos, in_portugal.pos, "the army in Portugal goes home")
+            self.assertEqual(w.provinces[u.pos].owner, "CAS")
+
+    def test_peace_sends_both_sides_home_but_not_third_party_units(self):
+        w = self.w
+        self.assertTrue(w.declare_war("CAS", "POR"))
+        in_castile = next(p for p in w.provinces_of("CAS") if not p.castle and not w.units_at(p.pos))
+        portuguese = place(w, troop("infantry", 1), "POR", in_castile.pos)[0]
+        in_aragon = next(p for p in w.provinces_of("ARA") if not p.castle and not w.units_at(p.pos))
+        aragonese = place(w, troop("infantry", 1), "ARA", in_aragon.pos)[0]
+        w.peace("CAS", "POR")
+        self.assertNotEqual(portuguese.pos, in_castile.pos, "a Portuguese army in Castile goes home")
+        self.assertEqual(w.provinces[portuguese.pos].owner, "POR")
+        self.assertEqual(aragonese.pos, in_aragon.pos, "units of other countries are not touched")
+
     def test_stacks_have_a_limit_and_generals_raise_it(self):
         w = self.w
         prov = w.provinces[w.countries["POR"].capital]
