@@ -4,7 +4,7 @@ import unittest
 from hexa.campaign import ai, geo
 from hexa.campaign.data import (GENERAL, STACK_LIMIT, WAGON, troop, BUILD_TURNS, CARAVEL, CASTLE_SIEGE, COLONIST, COLONY_DONE, GOODS, PIONEER,
                                 SETTLEMENT_SLOTS, SIEGE_BASE, WORKS)
-from hexa.campaign.world import CampaignWorld
+from hexa.campaign.world import CampaignWorld, War
 from hexa.hexgrid import distance, neighbors
 
 WORLD = CampaignWorld()          # building the map takes a moment, so most tests share this pristine copy
@@ -267,6 +267,29 @@ class WarTest(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(target.owner, "POR")
         self.assertFalse(w.at_war("POR", "CAS"))
+
+    def test_white_peace_keeps_third_party_occupations(self):
+        w = self.w
+        capitals = {c.capital for c in w.countries.values()}
+        mine = [p for p in w.provinces_of("POR") if p.pos not in capitals]
+        theirs = [p for p in w.provinces_of("CAS") if p.pos not in capitals]
+        held_by_third, lost_to_cas, held_from_cas, third_holds_cas = mine[0], mine[1], theirs[0], theirs[1]
+        w.wars.append(War("POR", "CAS", w.turn - 5))     # long enough for a white peace
+        w.wars.append(War("POR", "MOR", w.turn - 5))     # a second, unrelated front
+        held_by_third.controller = "MOR"                 # MOR occupies a Portuguese province
+        third_holds_cas.controller = "MOR"               # ... and a Castilian one
+        lost_to_cas.controller = "CAS"                   # CAS occupies a Portuguese province
+        held_from_cas.controller = "POR"                 # POR occupies a Castilian province
+        ok, _ = w.peace_offer("POR", "CAS", "white")
+        self.assertTrue(ok)
+        self.assertFalse(w.at_war("POR", "CAS"))
+        self.assertTrue(w.at_war("POR", "MOR"), "the other war goes on")
+        self.assertEqual(held_by_third.controller, "MOR", "occupations by a third country stay")
+        self.assertEqual(third_holds_cas.controller, "MOR", "occupations by a third country stay")
+        self.assertEqual(lost_to_cas.controller, "POR")
+        self.assertEqual(lost_to_cas.owner, "POR")
+        self.assertEqual(held_from_cas.controller, "CAS")
+        self.assertEqual(held_from_cas.owner, "CAS", "white peace gives nothing away")
 
     def test_stacks_have_a_limit_and_generals_raise_it(self):
         w = self.w

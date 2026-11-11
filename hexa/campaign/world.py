@@ -2580,8 +2580,6 @@ class CampaignWorld:
             return True, "They accept your surrender."
         if terms == "white":
             if score >= -1 and length >= 4:
-                for prov in self.provinces_of(tag) + self.provinces_of(enemy):
-                    prov.controller = prov.owner
                 self.peace(tag, enemy, winner="nobody")
                 return True, "White peace signed."
             return False, "They refuse: they are winning, or the war has only just started"
