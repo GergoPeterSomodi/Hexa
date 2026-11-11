@@ -125,6 +125,100 @@ class OldAndBrokenSavesTest(TempHome):
         self.assertIsNone(saves.load("4"))
 
 
+def _gamemenu():
+    """hexa.campaign.gamemenu without needing pygame: these tests never draw or open a window."""
+    import sys
+    try:
+        import pygame  # noqa: F401
+    except ImportError:
+        with mock.patch.dict(sys.modules, {"pygame": mock.MagicMock()}):
+            from hexa.campaign import gamemenu
+            return gamemenu
+    from hexa.campaign import gamemenu
+    return gamemenu
+
+
+class FailedSaveTest(TempHome):
+    """A save that can't be written is reported, and the game goes on (issue #5)."""
+    def tearDown(self):
+        if os.path.isfile(self.home):
+            os.remove(self.home)
+        super().tearDown()
+
+    def _unwritable(self):
+        os.rmdir(self.home)
+        with open(self.home, "w") as f:     # HEXA_HOME is a file: no saves folder can be made, even as root
+            f.write("not a folder")
+
+    def _game(self, world):
+        class Game(_gamemenu().GameMenu):
+            def __init__(self):
+                self.world, self.settings, self.toasts = world, settings.load(), []
+
+            @property
+            def player(self):
+                return self.world.player
+
+            def toast(self, text):
+                self.toasts.append(text)
+        return Game()
+
+    def test_an_unwritable_folder_raises_a_save_error(self):
+        self._unwritable()
+        with self.assertRaises(saves.SAVE_ERRORS) as caught:
+            saves.save(CampaignWorld(player="POR"), "1")
+        self.assertIsInstance(caught.exception, OSError)
+        self.assertTrue(saves.failure(caught.exception))
+
+    def test_a_failed_write_keeps_the_old_save_and_leaves_no_tmp_file(self):
+        import errno
+        w = CampaignWorld(player="POR")
+        saves.save(w, "1")
+        w.turn += 4
+        full = OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
+        with mock.patch.object(saves.os, "replace", side_effect=full):
+            with self.assertRaises(OSError) as caught:
+                saves.save(w, "1")
+        self.assertEqual(os.listdir(saves.folder()), ["1.sav"], "the half-written .tmp file is removed")
+        self.assertEqual(saves.meta("1")["turn"], w.turn - 4, "the slot keeps its previous save")
+        self.assertEqual(saves.failure(caught.exception), os.strerror(errno.ENOSPC).lower())
+
+    def test_a_world_that_cannot_be_pickled_raises_a_save_error(self):
+        w = CampaignWorld(player="POR")
+        for junk in (lambda: 0, (i for i in ())):    # PicklingError, TypeError
+            with self.subTest(junk=junk):
+                w.junk = junk
+                with self.assertRaises(saves.SAVE_ERRORS) as caught:
+                    saves.save(w, "2")
+                self.assertEqual(os.listdir(saves.folder()), [])
+                self.assertEqual(saves.failure(caught.exception), "the game could not be written")
+
+    def test_f5_that_fails_says_why_and_the_game_goes_on(self):
+        game = self._game(CampaignWorld(player="POR"))
+        self._unwritable()
+        self.assertFalse(game.save_to("quick"))
+        self.assertEqual(len(game.toasts), 1)
+        self.assertTrue(game.toasts[0].startswith("Could not save Quicksave: "), game.toasts[0])
+
+    def test_an_autosave_that_fails_does_not_crash_the_season(self):
+        w = CampaignWorld(player="POR")
+        w.turn = 5                                  # "every year" autosaves on turns 5, 9, 13...
+        game = self._game(w)
+        self._unwritable()
+        game.autosave()
+        self.assertEqual(len(game.toasts), 1)
+        self.assertTrue(game.toasts[0].startswith("Could not autosave: "), game.toasts[0])
+
+    def test_saving_still_works(self):
+        w = CampaignWorld(player="POR")
+        w.turn = 5
+        game = self._game(w)
+        self.assertTrue(game.save_to("quick"))
+        game.autosave()
+        self.assertEqual(game.toasts, [f"Saved: Quicksave ({w.date()}).", "Autosaved."])
+        self.assertEqual(saves.meta("auto")["turn"], 5)
+
+
 class AppLoadingTest(TempHome):
     @classmethod
     def setUpClass(cls):
@@ -155,6 +249,26 @@ class AppLoadingTest(TempHome):
         self.assertIsNone(app.menu)
         app.world.end_round()
         self.assertFalse(app.quickload(), "the confirmation does not last forever")
+
+    def test_a_failed_save_or_autosave_keeps_the_game_running(self):
+        import pygame
+        from hexa.campaign.app import CampaignApp
+        app = CampaignApp(player="POR")
+        toasts = []
+        app.toast = toasts.append
+        os.rmdir(self.home)
+        with open(self.home, "w") as f:
+            f.write("not a folder")
+        try:
+            app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F5, mod=0, unicode="", scancode=0))
+            self.assertIn("Could not save Quicksave", toasts[-1])
+            for _ in range(4):                      # Space x4: the autosave at the start of the next year
+                app.end_turn()
+            self.assertEqual(app.world.turn, 5)
+            self.assertIn("Could not autosave", toasts[-1])
+            self.assertTrue(app.running)
+        finally:
+            os.remove(self.home)
 
 
 class SettingsTest(TempHome):

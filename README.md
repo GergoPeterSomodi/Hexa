@@ -107,7 +107,7 @@ see the path, the move cost of each step and how many seasons it takes.
 ### Menu, saving and options
 - **Esc** (or **M**, or the **Menu** button) pauses the game and opens the menu: resume, save, load, options, back to the main menu, exit.
 - **Saving:** there are eight save slots plus a quicksave (**F5** saves, **F9** loads) and an autosave (every year by default). Each slot shows the country, the date and the map.
-  - Saves are kept in `~/.hexa/saves`.
+  - Saves are kept in `~/.hexa/saves`. If a save can't be written (a read-only folder or a full disk), a message says why, the game carries on, and the slot keeps its previous save.
   - **Continue** on the start menu loads your latest save.
 - **Options:**
   - fullscreen (also **F11**)
