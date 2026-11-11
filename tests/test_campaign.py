@@ -442,6 +442,57 @@ class SupplyTest(unittest.TestCase):
         home = w.provinces[w.countries["POR"].capital]
         self.assertTrue(w.in_supply("POR", home.pos))
 
+    def _foreign_stack(self, tag, host, n=2):
+        """`n` infantry of `tag` standing in the `host` province farthest from any land of `tag`: out of supply."""
+        w = self.w
+        w.declare_war("POR", "CAS")
+        deep = max((p for p in w.provinces_of(host) if not w.units_at(p.pos)),
+                   key=lambda p: min(distance(p.pos, q.pos) for q in w.provinces_of(tag)))
+        self.assertFalse(w.in_supply(tag, deep.pos))
+        stack = place(w, troop("infantry", 1), tag, deep.pos, n)
+        for unit in stack:
+            unit.moves_left = 0
+        return stack, deep
+
+    def test_ai_stack_without_moves_still_forages_at_season_end(self):
+        w = self.w
+        stack, deep = self._foreign_stack("CAS", "POR")        # POR is the player, CAS is a computer country
+        people = deep.peasants
+        w.logistics()
+        self.assertEqual([u.hp for u in stack], [stack[0].kind.hp] * 2, "foraged, so no cut-off attrition")
+        self.assertTrue(all(u.supplied for u in stack))
+        self.assertEqual(w.supply_state(stack)[0], "foraging")
+        self.assertEqual(deep.foraged, ("CAS", w.turn))
+        self.assertLess(deep.peasants, people, "the province pays for it")
+        self.assertEqual([u.moves_left for u in stack], [0, 0])
+
+    def test_forage_flag_only_waives_the_moves_rule(self):
+        w = self.w
+        stack, deep = self._foreign_stack("CAS", "POR")
+        self.assertEqual(w.forage_check(stack), (False, "No time left this season"))
+        self.assertFalse(w.forage(stack), "the player's button still needs moves")
+        self.assertEqual(w.forage_check(stack, end_of_round=True), (True, ""))
+        stack[0].moves_left = 1
+        stack[1].moves_left = 1
+        self.assertTrue(w.forage(stack, end_of_round=True))
+        self.assertEqual([u.moves_left for u in stack], [1, 1], "end-of-round forage leaves the moves alone")
+        self.assertEqual(w.forage_check(stack, end_of_round=True), (False, "Already foraged here this season"))
+
+    def test_normal_forage_still_spends_the_moves(self):
+        w = self.w
+        stack, deep = self._foreign_stack("CAS", "POR")
+        for unit in stack:
+            unit.moves_left = 1
+        self.assertTrue(w.forage(stack))
+        self.assertEqual([u.moves_left for u in stack], [0, 0])
+
+    def test_player_stack_without_moves_is_not_foraged_for_them(self):
+        w = self.w
+        stack, deep = self._foreign_stack("POR", "CAS", n=1)   # the player's own stack in Castile
+        w.logistics()
+        self.assertEqual(stack[0].hp, stack[0].kind.hp - 1, "players must forage themselves")
+        self.assertNotEqual(deep.foraged, ("POR", w.turn))
+
     def test_movement_preview(self):
         w = self.w
         capital = w.countries["POR"].capital
