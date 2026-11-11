@@ -154,6 +154,16 @@ class RandomWorldTest(unittest.TestCase):
         self.assertTrue(any(w.sea_body.get(n) == biggest for p in new_world for n in neighbors(p.pos)))
         self.assertTrue(w.rivers and w.markets)
 
+    def test_random_worlds_take_their_own_tags(self):
+        w = CampaignWorld(11, map="random")
+        tag, country = next(iter(w.countries.items()))
+        self.assertEqual(w.find_country(tag.lower()), tag)
+        self.assertEqual(w.find_country(country.name.upper()), tag)
+        foreign = [t for t in ("POR", "ENG", "VEN") if t not in w.countries]
+        self.assertTrue(foreign, "seed 11 should not reuse every real tag")
+        for t in foreign:
+            self.assertIsNone(w.find_country(t))
+
     def test_the_same_seed_gives_the_same_world_and_others_differ(self):
         a, b = CampaignWorld(3, map="random"), CampaignWorld(3, map="random")
         c = CampaignWorld(4, map="random")

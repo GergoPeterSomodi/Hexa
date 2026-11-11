@@ -1,4 +1,6 @@
 """The Age of Discovery window: map, panels, mouse and keyboard."""
+import sys
+
 import pygame
 
 
@@ -79,7 +81,7 @@ class CampaignApp(GameMenu):
         loaded = saves.load(load) if load else None
         if load and loaded is None:          # never quietly start some other game instead
             raise saves.LoadError(f"{saves.slot_name(load)} could not be loaded.")
-        self.world = loaded or CampaignWorld(seed if seed is not None else 1480, player=player, map=map)
+        self.world = loaded or CampaignWorld(seed if seed is not None else 1480, map=map)
         pygame.display.set_caption(f"Hexa: Age of Discovery  -  {self.world.geo.name}")
         self.view = MapView(self.world, tiles_dir)
         self.ui = UI()
@@ -96,7 +98,7 @@ class CampaignApp(GameMenu):
             self.load_world(loaded)
             self.toast(f"Loaded {saves.slot_name(load)}: {loaded.date()}.")
         elif player:
-            self.choose(player)
+            self.choose_named(player)
 
     def load_world(self, world):
         """Switch to a loaded world: fresh map view and selection, camera on the player's capital."""
@@ -164,6 +166,16 @@ class CampaignApp(GameMenu):
         world.message(f"You lead {world.countries[tag].name}. Grow your economy, trade, and reach for the New World.")
         self.view.zoom = 4
         self.look_at(world.countries[tag].capital)
+
+    def choose_named(self, name):
+        """--nation: play the country given by tag or name; if there is none, say so and show the chooser."""
+        tag = self.world.find_country(name)
+        if tag:
+            self.choose(tag)
+            return
+        self.toast(f"There is no country '{name}' on this map: click a country to play it.")
+        print(f"--nation {name}: no such country on {self.world.geo.name}. Countries: "
+              + ", ".join(f"{t} ({c.name})" for t, c in sorted(self.world.countries.items())), file=sys.stderr)
 
     def toast(self, text):
         self.ui.toast = text

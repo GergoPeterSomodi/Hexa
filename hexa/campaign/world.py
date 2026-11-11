@@ -279,8 +279,7 @@ class CampaignWorld:
         if key in _SNAPSHOTS:
             _remember_snapshot(key, _SNAPSHOTS[key])
             self._restore(pickle.loads(_SNAPSHOTS[key]))
-            self.player = player
-            self.update_visibility()
+            self._set_player(player)
             return
         self.geo = source
         self.map = map
@@ -308,6 +307,11 @@ class CampaignWorld:
         self.economy()                   # first prices and incomes
         self.message(f"{date(1)}. The age of discovery begins.")
         _remember_snapshot(key, pickle.dumps(self.save_state(), protocol=pickle.HIGHEST_PROTOCOL))
+        self._set_player(player)
+
+    def _set_player(self, player):
+        if player is not None and player not in self.countries:
+            raise ValueError(f"no country {player!r} on {self.geo.name} (find_country() takes names and any case)")
         self.player = player
         self.update_visibility()
 
@@ -847,6 +851,19 @@ class CampaignWorld:
 
     def province(self, pos):
         return self.provinces.get(pos)
+
+    def find_country(self, name):
+        """The tag of a country given by tag or name in any case ('por', 'Portugal'), or None."""
+        key = (name or "").strip().casefold()
+        if not key:
+            return None
+        for tag in self.countries:
+            if tag.casefold() == key:
+                return tag
+        for tag, country in self.countries.items():
+            if country.name.casefold() == key:
+                return tag
+        return None
 
     def message(self, text, tag=None):
         if tag is None or tag == self.player:
