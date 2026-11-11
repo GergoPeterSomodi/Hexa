@@ -5,6 +5,16 @@ release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`)
 unless a release says otherwise.
 
 ## Unreleased (goes into v0.1.4 with kioba's milestone)
+**New map look (M3, first part):**
+- The two closest zooms draw a blended landscape: wavy edge transitions between every kind of ground, peaks and
+  forests that rise over the hex behind, a treeline on the Alps, natural field systems on developed farms and
+  forest clearings around towns. The map changes as provinces grow.
+- Winter covers the high mountains in snow. **Mountain passes close in winter**: Gotthard, Brenner, Mont Cenis,
+  Simplon, Great St Bernard, Roncesvalles, Dukla and Lupkow. Land armies can't enter them until spring (ships
+  and armies already standing on one are not stopped); the AI routes around them.
+- A faint hex grid, on by default: **G** or the options menu turns it off.
+- The Goods view no longer crashes on cattle, copper and the other new goods.
+
 Fixes from the 2026-11-11 playtest:
 - Log lines read "upgraded to open fields" and "started an armoury" instead of "now a open fields" / "a armoury"
 - Long button labels (Invest, ...) are cut with an ellipsis instead of running over the cost

@@ -330,6 +330,8 @@ class CampaignApp(GameMenu, TechScreen):
                 self.zoom(1)
             elif key in (pygame.K_MINUS, pygame.K_KP_MINUS):
                 self.zoom(-1)
+            elif key == pygame.K_g:
+                self.toggle_grid()
             elif key == pygame.K_l:
                 ui.panel = "ledger" if ui.panel != "ledger" else None
             elif key == pygame.K_c and self.player:
@@ -415,8 +417,11 @@ class CampaignApp(GameMenu, TechScreen):
             self.select_unit(None)
             return
         here = group[0].pos
+        ok, reason = world.move_check(group, pos)
         if pos in ui.attacks:
             world.attack_group(group, pos)
+        elif not ok and pos != here:
+            self.toast(reason)                       # a closed pass: say why
         elif pos in ui.reach and pos != here:
             for unit in group:
                 unit.goal = None
@@ -598,6 +603,7 @@ class CampaignApp(GameMenu, TechScreen):
         self.world.ensure_markets()
         self._update_path()
         self.screen.fill(BG)
+        self.view.grid_on = self.settings["grid"]
         self.view.draw(self.screen, self.view_rect(), self.camera, ui)
         self.draw_log()
         self.draw_minimap()
@@ -872,6 +878,8 @@ class CampaignApp(GameMenu, TechScreen):
         else:
             who = f"{prov.tribe} natives" if prov.natives > 0.5 else "Empty land"
         lines = [(f"{who}   ·   {t.name}: move {t.move}, defense +{t.defense * 100:.0f}%", TEXT)]
+        if world.pass_closed(pos):
+            lines.append(("Closed by snow until spring", BAD_C))
         if prov.good:
             line = f"{GOODS[prov.good].name}"
             if prov.owner:

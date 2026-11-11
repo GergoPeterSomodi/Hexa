@@ -7,8 +7,9 @@ WINDOWS = ("1280x720", "1600x900", "1920x1080")
 AUTOSAVE = ("off", "year", "5 years")
 AUTOSAVE_TURNS = {"off": 0, "year": 4, "5 years": 20}
 SCROLL = {"slow": 10, "normal": 18, "fast": 30}
-DEFAULTS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal"}
-CHOICES = {"fullscreen": (False, True), "window": WINDOWS, "autosave": AUTOSAVE, "scroll": tuple(SCROLL)}
+DEFAULTS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal", "grid": True}
+CHOICES = {"fullscreen": (False, True), "window": WINDOWS, "autosave": AUTOSAVE, "scroll": tuple(SCROLL),
+           "grid": (False, True)}
 
 
 def _path():

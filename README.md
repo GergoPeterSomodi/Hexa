@@ -103,7 +103,7 @@ One turn is one season, from spring 1480 to 1650. Every land hex is a province.
 a red-outlined enemy). Right-click far away to send a unit there over several seasons. Mouse wheel or
 **+/-** zooms, right-drag or **WASD** scrolls, **1-4** switch map modes (political, terrain, goods, markets;
 press **3** again to switch the goods view between chips, deposits and prices), **Tab** cycles units,
-**C** opens your country, **L** the ledger, **Space** ends the season.
+**C** opens your country, **L** the ledger, **G** shows or hides the faint hex grid, **Space** ends the season.
 Hover anything for a moment to get a card explaining it: troops, buttons, provinces, goods.
 
 **Moving:** a selected stack shows where it can go this season (green, bright edge), next season (blue),
@@ -165,6 +165,13 @@ see the path, the move cost of each step and how many seasons it takes.
   - Borders are ribbons in the country's colours.
   - Towns and cities grow extra houses, mines smoke, and ports get docks.
   - Northern Europe frosts over in winter.
+- **Close zoom** (hex radius 21 and 34): the landscape is drawn with the tile art. Peaks and forests cross hex borders,
+  treeline and snow follow the altitude, and farms grow field systems with hedgerows. The faint hex grid is on by default
+  (**G**, or Options > Hex grid).
+- **Mountain passes:** the main Alpine and Pyrenean passes (Gotthard, Brenner, Mont Cenis, Simplon, Great St Bernard,
+  Roncesvalles) and the Carpathian Dukla and Lupkow are closed by snow in winter (every fourth season, turn 4, 8, ...).
+  Land units cannot enter a closed pass; the move says "The Gotthard pass is closed by snow until spring." A unit already
+  on one may leave, and ships are not affected. The random world has no passes yet.
 - **Units:** close up, a stack shows up to three figures of what it holds, with a shield for its size. Zoomed out, it shows as a board-game token with era pips.
 
 ### Fog

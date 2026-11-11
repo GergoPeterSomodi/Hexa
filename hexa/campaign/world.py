@@ -885,6 +885,42 @@ class CampaignWorld:
     def is_sea(self, pos):
         return self.terrain.get(pos) == "ocean"
 
+    # ----- winter and mountain passes -----------------------------------------------------
+    def winter(self):
+        """Winter is every fourth turn (turn 4 is Winter in data.date)."""
+        return self.turn % 4 == 0
+
+    def passes(self):
+        """{pos: name} of the mountain passes on this map: the geography's PASSES rasterised on the hex grid.
+        Cached on the world (the geography is fixed for a map)."""
+        cached = self.__dict__.get("_pass_hexes")
+        if cached is None:
+            cached = {}
+            for name, lon, lat in getattr(self.geo, "PASSES", ()):
+                pos = geo.hex_of(lon, lat)
+                if self.terrain.get(pos) not in (None, "ocean", "lake"):
+                    cached.setdefault(pos, name)
+            self._pass_hexes = cached
+        return cached
+
+    def pass_name(self, pos):
+        return self.passes().get(pos, "")
+
+    def pass_closed(self, pos, winter=None):
+        """True if land units may not enter pos: a mountain pass in winter. winter=None means the current season.
+        Only land units are stopped (see may_enter and move_check); ships are not affected."""
+        if winter is None:
+            winter = self.winter()
+        return bool(winter) and pos in self.passes()
+
+    def move_check(self, group, dest):
+        """(ok, reason) for a stack walking onto dest this season. Snow closes the mountain passes to land units."""
+        if not group or dest is None:
+            return False, ""
+        if not group[0].naval and self.pass_closed(dest):
+            return False, f"The {self.pass_name(dest)} pass is closed by snow until spring."
+        return True, ""
+
     def province(self, pos):
         return self.provinces.get(pos)
 
@@ -2238,6 +2274,8 @@ class CampaignWorld:
         """Whether the unit may stand on `pos` (ignoring other units)."""
         if unit.naval:
             return self.is_sea(pos)
+        if self.pass_closed(pos):
+            return False
         prov = self.provinces.get(pos)
         if not prov:
             return False
@@ -2370,6 +2408,8 @@ class CampaignWorld:
         lead = group[0]
         if dest == lead.pos:
             return True
+        if not self.move_check(group, dest)[0]:
+            return False
         best = None if any(u.carrier for u in group) else self.plan(group, min(u.moves_left for u in group))
         reach = self.reachable_group(group, best)
         if dest not in reach:
@@ -2453,7 +2493,7 @@ class CampaignWorld:
                 if naval:
                     ok, step = self.is_sea(n), 1
                 else:
-                    ok = self.is_land(n)
+                    ok = self.is_land(n) and not self.pass_closed(n)
                     step = self.step_cost(n, pos) if ok and self.is_land(pos) else \
                         TERRAIN[self.terrain[n]].move if ok else 0
                 if ok and cost + step < field.get(n, INF):

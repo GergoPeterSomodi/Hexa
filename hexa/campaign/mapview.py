@@ -1,17 +1,21 @@
 """Drawing the campaign map: a cached, zoomable political / terrain / goods / market map with fog."""
 import math
 import os
+import time
 
 import pygame
 
 from ..hexgrid import neighbors
-from . import art, geo, goodsart, wfctiles
+from . import art, geo, goodsart, landscape, wfctiles
 from .data import (COLONIST, GENERAL, GOODS, NATIVE_VILLAGE_SPRITE, PIONEER, SCOUT,
                    TERRAIN, TERRAIN_SPRITES, WORKS)
 
 SQRT3 = math.sqrt(3)
 ZOOMS = (3, 5, 8, 13, 21, 34)     # hex radius in pixels
 TILE_FROM = 3                     # from this zoom level on, the map is drawn with tile art
+LAND_FROM = 21                    # from this hex radius on, the map is drawn with the landscape art (_draw_landscape)
+LAND_BUILD_MS = 3.0               # time a frame may spend building ground composites (at least one); a hex not built
+                                  # yet is drawn with its old sprite
 ART_KEYS = {"galleon": "carrack"}   # unit kinds drawn with another kind's figure until they get their own
 MINES = ("iron", "silver", "gold", "salt")
 BANK, RIVER_DARK, RIVER = (205, 190, 125), (40, 100, 170), (95, 160, 220)
@@ -29,6 +33,13 @@ DEPOSITS = {"iron": "rockGrey_large", "salt": "rockGrey_medium2", "silver": "cry
 ABBR = {"grain": "GRN", "fish": "FSH", "salt": "SLT", "wine": "WIN", "wool": "WOL", "cotton": "CTN", "timber": "TMB",
         "iron": "IRN", "sugar": "SUG", "tobacco": "TOB", "furs": "FUR", "ivory": "IVR", "spices": "SPC",
         "silver": "SLV", "gold": "GLD"}
+
+
+def abbr(good):
+    """The chip text of a good: its short form, or the first three letters of its name (not all goods have one)."""
+    return ABBR.get(good) or GOODS[good].name[:3].upper()
+
+
 BLACK_FOG = (14, 16, 22)
 SEA = (38, 74, 128)
 SHALLOW = (52, 104, 160)
@@ -87,6 +98,8 @@ class MapView:
         self._edges = self._edge_sockets(world)
         self._overlay_base = {}       # TileDesc -> 120x140 overlay (generated a few per frame)
         self._gen_budget = 0
+        self.land = landscape.Landscape(world, tiles_dir) if tiles_dir else None
+        self.grid_on = True                # the faint hex grid on the landscape zooms (the G key)
         self._roads = []
         for path in getattr(world, "road_paths", []):
             pts = [self.unit_point(q) for q in path]
@@ -291,7 +304,9 @@ class MapView:
         world = self.world
         screen.set_clip(view_rect)
         screen.fill(BLACK_FOG, view_rect)
-        if self.zoom >= TILE_FROM and self.tiles_dir:
+        if self.r >= LAND_FROM and self.land is not None:
+            self._draw_landscape(screen, view_rect, camera)
+        elif self.zoom >= TILE_FROM and self.tiles_dir:
             self._draw_tiles(screen, view_rect, camera)
         else:
             screen.blit(self.surface(), (view_rect.x - camera[0], view_rect.y - camera[1]))
@@ -581,11 +596,23 @@ class MapView:
         if self.mode != "political":
             self._mode_layer(screen, shown)
             return
+        self._owner_washes(screen, shown)
+        self._political_marks(screen, shown)
+
+    def _owner_washes(self, screen, shown):
+        """The owner's tint of each province (under the objects on the landscape zooms)."""
+        world = self.world
+        for prov, cx, cy in shown:
+            if prov.owner:
+                self._blit_centre(screen, self.wash(world.countries[prov.owner].color, 34), cx, cy)
+
+    def _political_marks(self, screen, shown):
+        """Owner borders, controller stripes, goods dots, town names and capital flags (over the objects)."""
+        world, r = self.world, self.r
         width = max(2, r // 8)
         for prov, cx, cy in shown:
             if prov.owner:
                 color = world.countries[prov.owner].color
-                blit(self.wash(color, 34), cx, cy)
                 outer = hex_points(cx, cy, r - width / 2 - 1)
                 inner = hex_points(cx, cy, r - width * 1.6 - 1)
                 near = list(neighbors(prov.pos))
@@ -614,6 +641,117 @@ class MapView:
                 screen.blit(name, name.get_rect(center=box.center))
             if prov.owner and world.countries[prov.owner].capital == prov.pos:
                 self._flag(screen, (cx + r * 0.35, cy - r * 0.85), world.countries[prov.owner].color)
+
+    # ----- landscape art (close zooms) -------------------------------------------------------
+    @staticmethod
+    def _blit_centre(screen, img, cx, cy):
+        screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
+
+    def _visible_range(self, camera, view_rect):
+        """(row0, row1, col0, col1): the hexes whose centres may be on view_rect, clipped to the map."""
+        world, r = self.world, self.r
+        w = r * SQRT3
+        row0 = max(0, int((camera[1] - self.MARGIN) / (1.5 * r)) - 1)
+        row1 = min(world.rows - 1, int((camera[1] + view_rect.h - self.MARGIN) / (1.5 * r)) + 1)
+        col0 = max(0, int((camera[0] - self.MARGIN) / w) - 1)
+        col1 = min(world.cols - 1, int((camera[0] + view_rect.w - self.MARGIN) / w) + 1)
+        return row0, row1, col0, col1
+
+    def _draw_landscape(self, screen, view_rect, camera):
+        """The close zooms, in draw order: ground composites, the faint grid, fog under the objects, the washes of
+        the view, ONE object pass over the visible hexes (plus one margin row and column, sorted by base y), the fog
+        dim, then the borders, labels and chips of the view."""
+        world, r, land = self.world, self.r, self.land
+        season = land.season_now()
+        known, visible = self.known(), world.visible
+        ox, oy = view_rect.x - camera[0], view_rect.y - camera[1]
+        rows = self._visible_range(camera, view_rect)
+        bare = self.mode == "terrain" or (self.mode == "goods" and self.goods_view == "deposits")
+        shown, hidden, dimmed, land_hexes = [], [], [], []
+        self._gen_budget = 0                       # wfc overlays the fallback may build this frame (see _landscape_ground)
+        self._frame_builds, self._frame_deadline = 0, time.perf_counter() + LAND_BUILD_MS / 1000
+        for row in range(rows[0], rows[1] + 1):
+            for col in range(rows[2], rows[3] + 1):
+                pos = (col, row)
+                cx, cy = self.center(pos)
+                cx, cy = cx + ox, cy + oy
+                if pos not in known:
+                    hidden.append((cx, cy))
+                    continue
+                prov = world.provinces.get(pos)
+                self._landscape_ground(screen, pos, cx, cy, prov, season, bare)
+                if prov is not None:
+                    shown.append((prov, cx, cy))
+                if world.is_land(pos):
+                    land_hexes.append((cx, cy))
+                if world.player and pos not in visible:
+                    dimmed.append((cx, cy))
+        if self.grid_on:
+            grid = land.grid(r)
+            for cx, cy in land_hexes:
+                self._blit_centre(screen, grid, cx, cy)
+        black = self.overlay("black")
+        for cx, cy in hidden:
+            self._blit_centre(screen, black, cx, cy)
+        if self.mode != "political":
+            self._mode_layer(screen, shown, chips=False)
+        else:
+            self._owner_washes(screen, shown)
+        if not bare:
+            self._object_pass(screen, view_rect, (ox, oy), rows, known, season)
+        dim = self.overlay("dim")
+        for cx, cy in dimmed:
+            self._blit_centre(screen, dim, cx, cy)
+        if self.mode != "political":
+            self._mode_layer(screen, shown, washes=False)
+            return
+        self._political_marks(screen, shown)
+
+    def _landscape_ground(self, screen, pos, cx, cy, prov, season, bare):
+        """One hex's ground: its baked composite if built (new ones while the frame has LAND_BUILD_MS), else the sprite."""
+        world, land = self.world, self.land
+        n0 = land.builds
+        in_time = time.perf_counter() < self._frame_deadline
+        img = land.ground(pos, self.r, season, build=self._frame_builds == 0 or in_time)
+        self._frame_builds += land.builds - n0
+        if img is not None:
+            self._blit_centre(screen, img, cx, cy)
+            return
+        if prov is None:
+            img = self.sea_img(pos) if world.is_sea(pos) else self.sprite(TERRAIN_SPRITES["lake"][0])
+            self._blit_centre(screen, img, cx, cy)
+            return
+        self._blit_centre(screen, self.sprite(self.land_sprite(prov) if bare else self.tile_sprite(prov)), cx, cy)
+        desc = self.overlay_desc(prov, bare)
+        if desc is not None:
+            self._gen_budget = 1 if in_time else 0           # a new wfc overlay costs ~10 ms: only inside the budget
+            img = self.overlay_img(desc)
+            if img is not None:
+                self._blit_centre(screen, img, cx, cy)
+
+    def _object_pass(self, screen, view_rect, origin, rows, known, season):
+        """Every object of the known hexes in the view, plus one margin row and column, back to front by base y.
+        Objects only rise above their own hex, so one margin row and column is enough for the ones that reach in."""
+        world, r, land = self.world, self.r, self.land
+        ox, oy = origin
+        row0, row1, col0, col1 = rows[0] - 1, rows[1] + 1, rows[2] - 1, rows[3] + 1
+        items = []
+        for row in range(max(0, row0), min(world.rows - 1, row1) + 1):
+            for col in range(max(0, col0), min(world.cols - 1, col1) + 1):
+                pos = (col, row)
+                if pos not in known:
+                    continue
+                cx, cy = self.center(pos)
+                cx, cy = cx + ox, cy + oy
+                for surf, dx, dy, sort_y in land.objects(pos, r, season):
+                    w, h = surf.get_width(), surf.get_height()
+                    x = int(round(cx + dx - w / 2))
+                    y = int(round(cy + dy - h + 1))
+                    if view_rect.colliderect(pygame.Rect(x, y, w, h)):
+                        items.append((cy + sort_y, x, y, surf))
+        items.sort(key=lambda item: item[0])
+        for _, x, y, surf in items:
+            screen.blit(surf, (x, y))
 
     def land_sprite(self, prov):
         options = TERRAIN_SPRITES[prov.terrain]
@@ -644,15 +782,16 @@ class MapView:
         pygame.draw.rect(screen, fill, box, border_radius=6)
         screen.blit(img, img.get_rect(center=box.center))
 
-    def _mode_layer(self, screen, shown):
-        """Close-up terrain, goods and market views drawn over the tiles."""
+    def _mode_layer(self, screen, shown, washes=True, chips=True):
+        """Close-up terrain, goods and market views: the washes (under the objects on the landscape zooms) and the
+        chips and labels (over them)."""
         world, r = self.world, self.r
         for prov, cx, cy in shown:
             if self.mode == "terrain":
                 t = TERRAIN[prov.terrain]
-                img = self.wash(TERRAIN_TINT[prov.terrain], 45)
-                screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
-                if r >= 20:
+                if washes:
+                    self._blit_centre(screen, self.wash(TERRAIN_TINT[prov.terrain], 45), cx, cy)
+                if chips and r >= 20:
                     if t.defense:
                         self.chip(screen, cx - r * 0.3, cy + r * 0.38, str(t.move), (70, 80, 95))
                         x, y = cx + r * 0.08, cy + r * 0.15
@@ -669,27 +808,27 @@ class MapView:
                     continue
                 good = GOODS[prov.good]
                 if self.goods_view == "deposits":
-                    img = self.wash(good.color, 70)
-                    screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
-                    img = self.object_sprite(DEPOSITS[prov.good])
-                    screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2 + 2))
+                    if washes:
+                        self._blit_centre(screen, self.wash(good.color, 70), cx, cy)
+                        img = self.object_sprite(DEPOSITS.get(prov.good, "box1"))   # goods without an icon: a crate
+                        screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2 + 2))
                     continue
                 if self.goods_view == "prices":
-                    if not prov.market:
-                        continue
-                    price = prov.market.price[prov.good]
-                    t = max(0.0, min(1.0, (price / good.price - 0.5) / 1.5))
-                    self.chip(screen, cx, cy - r * 0.08, ABBR[prov.good], (int(60 + 180 * t), int(170 - 110 * t), 70))
-                    self.chip(screen, cx, cy + r * 0.38, f"{price:.1f}d", (30, 34, 42))
+                    if chips and prov.market:
+                        price = prov.market.price[prov.good]
+                        t = max(0.0, min(1.0, (price / good.price - 0.5) / 1.5))
+                        self.chip(screen, cx, cy - r * 0.08, abbr(prov.good), (int(60 + 180 * t), int(170 - 110 * t), 70))
+                        self.chip(screen, cx, cy + r * 0.38, f"{price:.1f}d", (30, 34, 42))
                     continue
-                dark = sum(good.color) > 520
-                self.chip(screen, cx, cy - r * 0.08, ABBR[prov.good], good.color, (20, 20, 20) if dark else (255, 255, 255))
-                if prov.owner and r >= 20:
-                    self.chip(screen, cx, cy + r * 0.38, f"{prov.output:.1f}", (30, 34, 42))
+                if chips:
+                    dark = sum(good.color) > 520
+                    self.chip(screen, cx, cy - r * 0.08, abbr(prov.good), good.color, (20, 20, 20) if dark else (255, 255, 255))
+                    if prov.owner and r >= 20:
+                        self.chip(screen, cx, cy + r * 0.38, f"{prov.output:.1f}", (30, 34, 42))
             elif self.mode == "markets" and prov.market:
-                img = self.wash(market_color(world.markets.index(prov.market)), 95)
-                screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
-                if prov.pos == prov.market.center:
+                if washes:
+                    self._blit_centre(screen, self.wash(market_color(world.markets.index(prov.market)), 95), cx, cy)
+                if chips and prov.pos == prov.market.center:
                     self.chip(screen, cx, cy, prov.market.name, (40, 45, 55))
 
     def _movement(self, screen, at, ui):

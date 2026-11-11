@@ -21,6 +21,7 @@ OPTION_TEXT = {
     "window": ("Window size", str),
     "autosave": ("Autosave", lambda v: {"off": "Off", "year": "Every year", "5 years": "Every 5 years"}[v]),
     "scroll": ("Scroll speed", str.capitalize),
+    "grid": ("Hex grid", lambda v: "On" if v else "Off"),
 }
 
 
@@ -55,6 +56,12 @@ class GameMenu:
         """Keep the options for next time. If settings.json can't be written they still apply to this game."""
         if not options.save(self.settings):
             self.toast("Option changed, but it could not be saved for next time.")
+
+    def toggle_grid(self):
+        """The faint hex grid on the close zooms (G key and the options menu)."""
+        self.settings["grid"] = not self.settings["grid"]
+        self.save_options()
+        self.toast("Hex grid on." if self.settings["grid"] else "Hex grid off.")
 
     def toggle_fullscreen(self):
         self.settings["fullscreen"] = not self.settings["fullscreen"]
@@ -204,7 +211,7 @@ class GameMenu:
         screen.blit(shade, (0, 0))
         self.menu_buttons = []
         width = 300 if self.menu == "main" else 600
-        rows = {"main": 6, "save": 9, "load": 11, "options": 5}[self.menu]
+        rows = {"main": 6, "save": 9, "load": 11, "options": 6}[self.menu]
         row_h = 46 if self.menu == "main" else 52
         height = 90 + rows * row_h
         box = pygame.Rect(0, 0, width, height)
