@@ -21,13 +21,16 @@ python Hex.py                                        # legacy tile-painting map 
 Tests use stdlib `unittest` (no pytest, linter or formatter is configured):
 
 ```bash
-python -m unittest discover -s tests -t .                                 # everything, ~2 min
-HEXA_FAST=1 python -m unittest discover -s tests -t .                     # skips the @slow tests, ~20 s
+python -m unittest discover -s tests -t .                                 # everything, ~2.5 min
+HEXA_FAST=1 python -m unittest discover -s tests -t .                     # skips the @slow tests, ~30 s
 python -m unittest tests.test_game                                        # one module
 python -m unittest tests.test_campaign.WarTest                            # one class
 python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip      # one test
 HEXA_FUZZ_CASES=3000 python -m unittest tests.test_fuzz_files             # more settings/save-file fuzz cases (default 300)
 HEXA_FUZZ_SEED=20260110 HEXA_FUZZ_CASES=1 python -m unittest tests.test_fuzz_files   # replay one case; failures print this line
+HEXA_PROP_GAMES=100 python -m unittest tests.test_properties              # more random games per mode (default 20)
+HEXA_PROP_SEED=7 HEXA_PROP_GAMES=1 python -m unittest tests.test_properties.ColonyGamesTest   # replay one game; failures print this line
+PYTHONHASHSEED=0 python -m tests.support.digest_run colony 5 --turns 30   # digest of a fixed-seed all-AI game (determinism test)
 
 pip install -r requirements-dev.txt                                       # coverage.py (CI only; config in .coveragerc)
 coverage run -m unittest discover -s tests -t . && coverage report        # branch coverage; slow before Python 3.14
@@ -35,10 +38,14 @@ coverage run -m unittest discover -s tests -t . && coverage report        # bran
 
 Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fresh(player)` a mutable one,
 `play_seasons`, `random_world`, `TempHome`, `@slow`). A test that mutates a shared world fails the module's
-`tearDownModule` pristine guard, so use `fresh()` for anything you change.
+`tearDownModule` pristine guard, so use `fresh()` for anything you change. `tests/support/invariants.py`
+(`check_conquest`, `check_colony`, `check_campaign`) states what must hold after any action; `agents.py` has the
+seeded random players and the `Judge` that enforces the `*_check` contract below; `digests.py` digests a whole
+world (`world_digest` compares across processes, `quick_digest` within one); `games.py` plays all-AI games.
 
 Use `python3` where `python` isn't on PATH. Tests do not need pygame installed. `test_campaign` is the slowest (~1 min) because building the Europe map
-takes seconds; `test_game` runs in ~10 s.
+takes seconds; `test_properties` (~50 s: 20 random games per mode, determinism subprocesses) comes next;
+`test_game` runs in ~10 s.
 
 ## Architecture
 
@@ -65,6 +72,8 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - **`*_check` / action pairs.** A world exposes `x_check(...) -> (ok, reason)` next to `x(...)`, which checks
   again and then acts (`train_check`/`train`, `build_check`/`build`, `found_check`/`found`, ...). The UI uses
   the check to enable buttons and shows `reason` as the hover hint. New player actions should follow this.
+  `tests/test_properties.py` enforces it: when the check says no, `x` returns something falsy and changes
+  nothing; when it says yes, `x` succeeds. Add new pairs to the random players in `tests/support/agents.py`.
 - **Hex coordinates** (`hexa/hexgrid.py`) are pointy-top, "odd-r" offset `(col, row)` tuples (odd rows shift
   half a hex right). `hex_center`/`pixel_to_hex` assume the fixed 60x70 Kenney sprite and serve Conquest and
   Colonisation; the campaign's `MapView` has its own zoomable geometry (`ZOOMS`) and uses only `neighbors`.

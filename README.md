@@ -374,14 +374,14 @@ Version history is in [CHANGELOG.md](CHANGELOG.md).
 The tests use Python's built-in `unittest` and don't need pygame:
 
 ```bash
-python -m unittest discover -s tests -t .                              # all tests (about 1.5 to 2 minutes)
-HEXA_FAST=1 python -m unittest discover -s tests -t .                  # skip the slow tests (about 20 seconds)
+python -m unittest discover -s tests -t .                              # all tests (about 2.5 minutes)
+HEXA_FAST=1 python -m unittest discover -s tests -t .                  # skip the slow tests (about 30 seconds)
 python -m unittest tests.test_game                                     # one file
 python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip   # one test
 ```
 
 `HEXA_FAST=1` skips the tests marked `@slow` (the 100-season AI history, the AI game loops, the random-world
-tests); they still count as tests, shown as skipped. CI always runs everything.
+tests, the property-test games); they still count as tests, shown as skipped. CI always runs everything.
 `tests/test_campaign.py` is the slowest because it builds the full Europe map.
 
 `tests/test_fuzz_files.py` damages `settings.json` and save files at random (truncation, flipped bytes, wrong JSON
@@ -390,9 +390,23 @@ It runs 300 cases per test by default (a few seconds); `HEXA_FUZZ_CASES=3000` ru
 sets the first seed. A failure prints the seed of the case and a command that replays only that case, e.g.
 `HEXA_FUZZ_SEED=20260110 HEXA_FUZZ_CASES=1 python3 -m unittest tests.test_fuzz_files`.
 
+`tests/test_properties.py` checks whole games in all three modes. The same seed must play the same game under two
+`PYTHONHASHSEED` values (two processes; Conquest to the end, Colonisation 30 rounds, the campaign 4 seasons), and a
+campaign saved and loaded must play on exactly like the original. A seeded random player tries every `x_check` /
+`x` pair, legal and illegal: a refused action must change nothing and an allowed one must succeed. The world
+invariants in `tests/support/invariants.py` (units on legal hexes, cargo within capacity, stocks never negative,
+province owners alive, prices within their limits, ...) are checked after every turn of those games. It plays 20
+random games per mode (Conquest to the end, Colonisation 10 rounds, the campaign 3 seasons); `HEXA_PROP_GAMES=100`
+plays more and `HEXA_PROP_SEED=<n>` sets the first seed. `HEXA_FAST=1` keeps one short game per mode. A failing
+game prints its seed, its first problem and a command that replays only that game, e.g.
+`HEXA_PROP_SEED=7 HEXA_PROP_GAMES=1 python3 -m unittest tests.test_properties.ColonyGamesTest`. To see a
+determinism digest by hand: `PYTHONHASHSEED=0 python3 -m tests.support.digest_run colony 5 --turns 30`.
+
 Shared test helpers live in `tests/support/`: `europe()` (one read-only Europe world), `fresh(player)` (a world
-you may change), `random_world(seed)`, `play_seasons(world, n)`, `TempHome` and `@slow`. A test that changes a
-shared world fails the module's `tearDownModule` guard, so use `fresh()` for anything you mutate.
+you may change), `random_world(seed)`, `play_seasons(world, n)`, `TempHome` and `@slow`; the invariant checkers
+`check_conquest`, `check_colony` and `check_campaign`; the random players (`agents.py`), whole-world digests
+(`digests.py`) and all-AI game loops (`games.py`). A test that changes a shared world fails the module's
+`tearDownModule` guard, so use `fresh()` for anything you mutate.
 
 The game rules, AI and map generation don't use pygame; only the window, menu and drawing code do.
 To keep test runs or experiments away from your real saves and options, set `HEXA_HOME` to another folder
