@@ -63,7 +63,11 @@ class GameMenu:
         if not self.player:
             self.toast("Choose your country before saving.")
             return False
-        saves.save(self.world, slot)
+        try:
+            saves.save(self.world, slot)
+        except saves.SAVE_ERRORS as error:
+            self.toast(f"Could not save {saves.slot_name(slot)}: {saves.failure(error)}.")
+            return False
         self._slots = None
         self.toast(f"Saved: {saves.slot_name(slot)} ({self.world.date()}).")
         return True
@@ -96,7 +100,11 @@ class GameMenu:
     def autosave(self):
         every = options.AUTOSAVE_TURNS[self.settings["autosave"]]
         if every and self.player and self.world.turn % every == 1 and not self.world.over:
-            saves.save(self.world, "auto")
+            try:
+                saves.save(self.world, "auto")
+            except saves.SAVE_ERRORS as error:
+                self.toast(f"Could not autosave: {saves.failure(error)}.")
+                return
             self._slots = None
             self.toast("Autosaved.")
 
@@ -245,5 +253,8 @@ class GameMenu:
                 y += row_h
             self._menu_button((x, y + 4, 120, 36), "Back", ("page", "main"))
             hint = "Options are saved for next time."
-        img = self.small.render(hint, True, MUTED)
+        if pygame.time.get_ticks() < self.ui.toast_until:     # the toast itself is hidden under the menu box
+            img = self.small.render(self.ui.toast, True, TEXT)
+        else:
+            img = self.small.render(hint, True, MUTED)
         screen.blit(img, img.get_rect(midtop=(box.centerx, box.bottom + 8)))

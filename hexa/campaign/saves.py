@@ -35,8 +35,15 @@ def slot_name(slot):
     return NAMES.get(slot, f"Slot {slot}")
 
 
+# What a failed save raises: OSError when the folder can't be written (read-only, disk full, ~/.hexa is a file);
+# PicklingError, TypeError or (before Python 3.14) AttributeError when something in the world can't be pickled.
+SAVE_ERRORS = (OSError, pickle.PicklingError, TypeError, AttributeError)
+
+
 def save(world, slot):
-    """Write the world to a slot. Returns the meta data written."""
+    """Write the world to a slot. Returns the meta data written.
+
+    Raises one of SAVE_ERRORS if it can't; the slot then keeps its old save and no .tmp file is left behind."""
     os.makedirs(folder(), exist_ok=True)
     country = world.countries.get(world.player)
     meta = {"version": VERSION, "slot": slot, "saved": time.time(), "date": world.date(), "turn": world.turn,
@@ -44,11 +51,27 @@ def save(world, slot):
             "treasury": round(country.treasury) if country else 0}
     data = pickle.dumps(world.save_state(), protocol=pickle.HIGHEST_PROTOCOL)
     tmp = path(slot) + ".tmp"
-    with open(tmp, "wb") as f:
-        f.write(json.dumps(meta).encode("utf-8") + b"\n")
-        f.write(data)
-    os.replace(tmp, path(slot))            # never leave a half-written save behind
+    try:
+        with open(tmp, "wb") as f:
+            f.write(json.dumps(meta).encode("utf-8") + b"\n")
+            f.write(data)
+        os.replace(tmp, path(slot))        # never leave a half-written save behind
+    except OSError:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
     return meta
+
+
+def failure(error):
+    """Why a save failed, short enough for a toast: "permission denied", "no space left on device"...
+    The full error goes to stderr, as for a save that can't be loaded."""
+    print(f"Could not save: {type(error).__name__}: {error}", file=sys.stderr)
+    if isinstance(error, OSError) and error.strerror:
+        return error.strerror.lower()
+    return "the game could not be written"
 
 
 def meta(slot):
