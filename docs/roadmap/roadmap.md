@@ -209,6 +209,19 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
   - **Tribal nations in the New World:** tribes as their own nations, with lands, trade, alliances and resistance to colonisation. Designed with care.
   - **Kenney art audit:** track which Kenney Hexagon Pack art the game still uses. The owner likes it, but may replace it before the Steam release with similar art of our own. Keep a list and plan replacements.
   - **Map modes keep borders:** every map mode (terrain, goods, markets) keeps the country borders faintly, so you can see where your country ends. This is a small fix and is filed as a bug.
+- **Game music and sound (owner request, 2026-11-12):**
+  - **Music:** a soundtrack in a period style (late medieval and Renaissance: lute, viol, recorder, drums, choir), changing with the situation:
+    - calm in peace, tense in war, triumphant after a victory
+    - by era (1480 / 1520 / 1575)
+    - by season
+    - by region (Mediterranean, northern, the Ottoman lands, the New World)
+
+    It crossfades between pieces, with no hard cuts.
+  - **Sound effects:** clicks and UI feedback, end of season, march and battle, siege, a ship's bell, coins for trade, a fanfare for a new age, and a war alert. Sounds go with the floating text and event pop-ups.
+  - **Options:** music and effects volume and mute, and a "music only in menus" choice.
+  - **Rights:** only music and sound we may ship on Steam: commissioned, made for Hexa, or properly licensed (CC0 or a paid licence), with credits. Track every file and its licence, as with the Kenney art audit.
+  - **Tech:** pygame.mixer, with music streamed (OGG), and sound effects preloaded and limited. The event bus (architecture Phase 1) triggers the sounds.
+  - The design comes first (a short audio brief and a mood list for the owner's approval). Planned before the Steam release, after the event bus. An audio-director role joins the studio when it starts.
 - **Game studio of agents (owner request, 2026-11-12):** work like "Claude Code Game Studios": a team of specialised agents, with a creative or game director who reviews designs, plus a game designer, a level and map designer, an art director, a UI/UX designer, a systems/balance designer, a QA and playtest lead, a code reviewer, and a producer who keeps the roadmap. Each has a clear role, inputs, outputs and review gates. The owner approves the roster first.
 - **RPG-style event pop-ups:** interactive choices with good or bad outcomes. This is planned for the long-term roadmap's Phase 3 (History and events). Don't start it yet.
 - **Known loose ends:**
