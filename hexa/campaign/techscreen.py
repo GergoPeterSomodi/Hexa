@@ -8,6 +8,12 @@ import math
 
 import pygame
 
+from ..ui.kit import flat_button, shade, text as _text, wrap as _wrap
+from ..ui.theme import (font as _font, TECH_BAR as BAR, TECH_BG as BG, TECH_BUTTON as BUTTON, TECH_BUTTON_HOT as BUTTON_HOT,
+                        TECH_DARK_INK as DARK_INK, TECH_FAINT as FAINT,
+                        TECH_GOLD as GOLD, TECH_GREEN as GREEN, TECH_LINE as LINE, TECH_MUTED as MUTED,
+                        TECH_PANEL as PANEL, TECH_QUEUE_TEXT as QUEUE_TEXT, TECH_RED as RED, TECH_TEXT as TEXT,
+                        TECH_WHITE as WHITE)
 from . import tech
 from .data import BRANCHES, ERAS, RESEARCH_FUND, troop
 
@@ -20,22 +26,6 @@ BRANCH_GAP = 12
 LABEL_W = 104       # branch labels on the left of the grid
 BLOCK_H = 2 * NODE_H + NODE_GAP + BRANCH_GAP
 
-BAR = (15, 18, 24)
-BG = (21, 24, 31)
-PANEL = (27, 31, 39)
-LINE = (54, 60, 72)
-TEXT = (234, 237, 242)
-MUTED = (152, 160, 172)
-FAINT = (96, 104, 116)
-GOLD = (255, 206, 70)
-GREEN = (100, 200, 120)
-RED = (230, 100, 92)
-WHITE = (250, 250, 250)
-BUTTON = (50, 74, 112)
-BUTTON_HOT = (70, 95, 140)
-BUTTON_OFF = (44, 48, 56)
-DARK_INK = (30, 36, 46)
-QUEUE_TEXT = (200, 168, 88)
 BRANCH_COLOUR = {"military": (196, 72, 64), "trade": (206, 160, 52),
                  "navigation": (62, 130, 204), "statecraft": (146, 98, 198)}
 BRANCH_ICON = {"military": "pike", "trade": "scale", "navigation": "compass", "statecraft": "crown"}
@@ -49,61 +39,12 @@ STATE_STYLE = {
     "blocked": ((30, 30, 36), (84, 60, 60), 1),
     "later": ((26, 29, 35), (46, 51, 62), 1),
 }
-_fonts = {}
 
 
 # ----------------------------------------------------------------- small helpers
 
-def _font(size, bold=False, serif=False):
-    if not pygame.font.get_init():
-        pygame.font.init()
-    key = (size, bold, serif)
-    if key not in _fonts:
-        names = "georgia,timesnewroman,serif" if serif else "segoeui,arial"
-        _fonts[key] = pygame.font.SysFont(names, size, bold=bold)
-    return _fonts[key]
-
-
-def _fit(font, text, width):
-    if font.size(text)[0] <= width:
-        return text
-    while text and font.size(text + "…")[0] > width:
-        text = text[:-1]
-    return text + "…"
-
-
-def _wrap(font, text, width):
-    lines, line = [], ""
-    for word in text.split():
-        trial = word if not line else line + " " + word
-        if not line or font.size(trial)[0] <= width:
-            line = trial
-        else:
-            lines.append(line)
-            line = word
-    if line:
-        lines.append(line)
-    return lines
-
-
 def _mix(a, b, f):
     return tuple(int(x + (y - x) * f) for x, y in zip(a, b))
-
-
-def _text(surf, font, text, pos, colour=TEXT, width=None, align="left"):
-    """Draw text; align says which point of the text sits at pos. Returns the drawn rect."""
-    if width is not None:
-        text = _fit(font, text, width)
-    img = font.render(text, True, colour)
-    rect = img.get_rect()
-    if align == "center":
-        rect.midtop = pos
-    elif align == "right":
-        rect.topright = pos
-    else:
-        rect.topleft = pos
-    surf.blit(img, rect)
-    return rect
 
 
 def _join(words):
@@ -491,15 +432,7 @@ class TechScreen:
         self._draw_tech_toast(geo)
 
     def _tech_button(self, rect, label, action, enabled=True, detail=""):
-        rect = pygame.Rect(rect)
-        hovered = enabled and rect.collidepoint(self.ui.mouse)
-        colour = BUTTON_HOT if hovered else BUTTON if enabled else BUTTON_OFF
-        pygame.draw.rect(self.screen, colour, rect, border_radius=6)
-        fg = TEXT if enabled else FAINT
-        _text(self.screen, _font(13, True), label, (rect.x + 10, rect.centery - 8), fg)
-        if detail:
-            _text(self.screen, _font(11), detail, (rect.right - 10, rect.centery - 6),
-                  MUTED if enabled else FAINT, align="right")
+        rect = flat_button(self.screen, rect, label, _font(13, True), _font(11), self.ui.mouse, enabled, detail)
         self.tech_buttons.append((rect, action))
 
     def _draw_tech_topbar(self, geo, country):
@@ -890,9 +823,7 @@ class TechScreen:
         ideas = [i for i in (_idea(k) for k in country.pending_ideas) if i is not None]
         if not ideas:
             return
-        shade = pygame.Surface((W, H), pygame.SRCALPHA)
-        shade.fill((5, 7, 10, 160))
-        screen.blit(shade, (0, 0))
+        shade(screen, (0, 0, W, H), (5, 7, 10, 160))
         bw, bh = min(900, W - 48), min(470, H - 36)
         box = pygame.Rect(0, 0, bw, bh)
         box.center = (W // 2, H // 2)

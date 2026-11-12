@@ -194,6 +194,16 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - `gamemenu.GameMenu` is a mixin base class of `CampaignApp`: the Esc menu, save/load, options, and the screen
   mode (window size, fullscreen). Saving, loading and the autosave go through `app.game`, the `GameManager`
   (`game.save(slot)`, `GameManager.load(slot)`, `game.autosave()`); `app.world` is `app.game.world`.
+- **UI kit and panels** (`hexa/ui/`, `hexa/campaign/panels/`). `ui/theme.py` holds the colour tokens (the map window and
+  pause menu's plain names, the technology screen's `TECH_*`, the start menu's `MENU_BG`) and the font loader
+  (`new_font`, cached `font`); windows import from it and never call `pygame.font.SysFont` themselves. `ui/kit.py` has
+  the immediate-mode helpers in today's look: `button` (registers a hit box on `ctx.ui.buttons`), `menu_button`,
+  `flat_button`, `fit`, `wrap`, `text`, `shade`, `heading`, `tip`, `hover_card`, `panel_frame`. A `ctx` is the
+  drawing window (`CampaignApp`: `screen`, `ui`, fonts, `panel_rect()`, `view_rect()`). Each side panel is a
+  module of `campaign/panels/` with `draw(ctx, world, ui, subject)` (province, unit, country, market, raise_,
+  ledger; `panels.draw()` picks by `ui.panel`); `panels/cards.py` builds the hover cards from the world. Panels lay
+  out from `kit.panel_frame(ctx)` (never the app's `WIDTH`), read the world and register buttons; they never
+  change it. `CampaignApp.press(action)` looks `action[0]` up in the `PRESS` table (one `_do_<kind>` method each).
 - **Event bus** (`hexa/events.py`, pygame-free). `world.bus` is a transient `EventBus`: the rules call
   `world.bus.emit(kind, tag, pos, **data)` where state changes (capture, war, peace, raise, kills, desertion,
   seizure, passes, research, ages, colonies, buildings, sieges, battles; `world.message()` emits `message`), which
@@ -221,7 +231,7 @@ files are their data. `pygame-gui==0.5.7` is in `requirements.txt` only for this
 
 ## Structure rules (adopted 2026-11-12, see docs/architecture/review-2026-11-12.md)
 
-The target structure: files and folders named here appear as the refactor phases land. Until then, new code follows
+The target structure: files and folders named here appear as the refactor phases land (`ui/` and `campaign/panels/` have). Until then, new code follows
 the rules as far as the current layout allows, and never makes an allowlisted offender bigger.
 - **Layers, imports point down only:** data -> state -> systems -> world (facade) -> game manager -> screens/panels
   -> app. Systems take `world` as a parameter and never import world.py, ui, render or pygame. Render and

@@ -4,16 +4,18 @@ import sys
 
 import pygame
 
-
 from .. import settings as options
-from . import geo, saves, tech
+from ..ui.kit import button as draw_button, fit, hover_card, shade, text as draw_text, tip, wrap
+from ..ui.theme import BAD_C, BG, GOLD, GOOD_C, LINE, MUTED, PANEL_BG, TEXT, new_font
+from . import geo, saves
 from .gamemenu import GameMenu
 from .techscreen import TechScreen
-from .data import (FOOD_PER_TROOP, NEEDS, WAGON, BRANCH_NAMES, ERAS, GENERAL, GENERAL_TRAITS, BUILDINGS, CARAVEL, CASTLES, COLONIST, COLONY_DONE, GOODS,
-                   SETTLEMENT_SLOTS, SETTLEMENTS, TAX_LEVELS, TERRAIN, WORKS, WORKS_BONUS, WORKS_ERA,
-                   WORKS_LEVELS)
+from .data import COLONIST, GENERAL
 from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
 from .game import GameManager
+from . import panels
+from .panels.cards import province_card as card_of
+from .panels.country import research_line as research_text, war_line
 
 def _hint_text(hint):
     """One line for a toast from a button hint: the hint itself, or for a (title, lines) hover card the first
@@ -44,30 +46,9 @@ def _dashed_line(surface, colour, points, width, dash=10, gap=7):
             t += dash + gap
 
 
-def _tech_name(key):
-    """The tech's name, or its raw key when the tech is unknown (an old save or a renamed tech)."""
-    t = tech.tech(key)
-    return t.name if t else key
-
-
 WIDTH, HEIGHT = 1280, 720
 TOP = 46
 PANEL_W = 390
-BG = (24, 28, 34)
-PANEL_BG = (28, 32, 40)
-LINE = (60, 68, 80)
-TEXT = (235, 238, 242)
-MUTED = (150, 160, 172)
-FAINT = (105, 115, 128)
-GOLD = (255, 214, 70)
-GOOD_C = (120, 200, 120)
-BAD_C = (230, 110, 100)
-
-
-class Button:
-    def __init__(self, rect, label, enabled, action, hint="", detail=""):
-        self.rect, self.label, self.enabled, self.action, self.hint, self.detail = \
-            rect, label, enabled, action, hint, detail
 
 
 class UI:
@@ -106,11 +87,11 @@ class CampaignApp(GameMenu, TechScreen):
         self.tiles_dir = tiles_dir
         pygame.display.set_caption("Hexa: Age of Discovery")
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("segoeui,arial", 14)
-        self.small = pygame.font.SysFont("segoeui,arial", 12)
-        self.bold = pygame.font.SysFont("segoeui,arial", 15, bold=True)
-        self.title = pygame.font.SysFont("segoeui,arial", 20, bold=True)
-        self.big = pygame.font.SysFont("georgia,timesnewroman,serif", 30, bold=True)
+        self.font = new_font(14)
+        self.small = new_font(12)
+        self.bold = new_font(15, bold=True)
+        self.title = new_font(20, bold=True)
+        self.big = new_font(30, bold=True, serif=True)
         if map == "random" and seed is None:
             import random
             seed = random.randrange(1, 100000)
@@ -433,26 +414,11 @@ class CampaignApp(GameMenu, TechScreen):
                   ("Continue", ("resume",), False)])
 
     def _war_line(self, tag):
-        """'War: they declared war on you, 2 seasons ago.' for the country panel, or '' when there is no war."""
-        world, me = self.world, self.player
-        war = next((w for w in world.wars if {w.a, w.b} == {tag, me}), None)
-        if war is None:
-            return ""
-        ago = world.turn - war.start
-        when = "this season" if ago <= 0 else f"{ago} season{'s' * (ago != 1)} ago"
-        who = "they declared war on you" if war.b == me else "you declared war on them"
-        return f"War: {who}, {when}."
+        return war_line(self.world, tag)
 
     def research_line(self):
         """'Researching Drill yards: 12 / 40 RP, 2 queued' for the player, or 'Nothing is being researched'."""
-        country = self.world.countries[self.player]
-        if not country.researching:
-            return "Nothing is being researched"
-        cost = self.world.tech_cost(self.player, country.researching)
-        text = f"Researching {_tech_name(country.researching)}: {int(country.research)} / {cost} RP"
-        if country.queue:
-            text += f", {len(country.queue)} queued"
-        return text
+        return research_text(self.world)
 
     # ----- input -------------------------------------------------------------------------
     def handle(self, event):
@@ -627,97 +593,140 @@ class CampaignApp(GameMenu, TechScreen):
     def open_country(self, tag):
         self.ui.panel, self.ui.country = "country", tag
 
+    # ----- player actions: press() looks the action's kind up in PRESS ---------------------------------------
     def press(self, action):
-        world, ui, tag = self.world, self.ui, self.player
-        kind = action[0]
-        if kind == "game_menu":
-            self.open_menu()
-        elif kind == "close_panel":
-            ui.panel = None
-        elif kind == "mode":
-            self.view.mode = action[1]
-        elif kind == "panel":
-            if action[1] == "country":
-                self.open_country(tag)
-            elif action[1] == "market":
-                ui.panel = "market"
-                prov = ui.province if ui.province and ui.province.market else world.provinces[world.countries[tag].capital]
-                ui.market = prov.market
-            else:
-                ui.panel = action[1] if ui.panel != action[1] else None
-        elif kind == "choose":
-            self.choose(action[1])
-        elif kind == "end":
-            self.end_turn()
-        elif kind == "continue":
-            self.continue_march(self.active())
-        elif kind == "build":
-            world.build(tag, action[1], action[2])
-        elif kind == "recruit":
-            unit = world.recruit(tag, action[1], action[2])
-            if unit and not unit.kind.war and unit.kind is not GENERAL:
-                self.select_unit(unit, only=True)
-        elif kind == "invest":
-            if not world.invest(tag, action[1]):
-                self.toast(world.invest_check(tag, action[1])[1])
-        elif kind == "found":
-            founder = action[1]
-            prov = world.found(founder, trading_post=action[2])
-            if prov:
-                self._cancel_orders([founder])
-                ui.selected, ui.province, ui.panel = None, prov, "province"
-        elif kind == "pick":
-            self.select_unit(action[1], only=True)
-        elif kind == "toggle":
-            ui.picked ^= {action[1].id}
-        elif kind == "all":
-            ui.picked = {u.id for u in ui.group} if len(ui.picked) < len(ui.group) else set()
-        elif kind == "refit":
-            if not world.refit(action[1]):
-                self.toast(world.refit_check(action[1])[1])
-        elif kind == "upgrade":
-            if not world.upgrade(action[1], action[2]):
-                self.toast(world.upgrade_check(action[1], action[2])[1])
-        elif kind == "raise":
-            ui.panel, ui.province = "raise", action[1]
-        elif kind == "tech":
-            self.tech_toggle() if self.tech_open else self.open_tech()
-        elif kind == "fund":
-            if not world.fund_research(tag):
-                self.toast("Not enough ducats")
-        elif kind == "tax":
-            world.set_tax(tag, action[1])            # preview the new tax without rerunning the season
-        elif kind == "war":
-            world.declare_war(tag, action[1])
-        elif kind == "peace":
-            ok, text = world.peace_offer(tag, action[1], action[2])
-            self.toast(text)
-        elif kind == "merchant":
-            if len(action) > 2:
-                world.send_merchant(tag, action[1], action[2], action[3])
-                ui.order_route = None
-            else:
-                ui.order_route = None if ui.order_route is action[1] else action[1]
-        elif kind == "goods_view":
-            self.view.mode, self.view.goods_view = "goods", action[1]
-        elif kind == "forage":
-            acting = self.active()
-            if world.forage(acting, tag):
-                self._cancel_orders(acting)
-            else:
-                self.toast(world.forage_check(acting, tag)[1])
-        elif kind == "recall":
-            world.recall_merchant(tag, action[1], action[2] if len(action) > 2 else None)
-        elif kind == "market":
-            ui.panel, ui.market = "market", action[1]
-        elif kind == "country":
-            self.open_country(action[1])
-        elif kind == "province":
-            ui.province, ui.panel = action[1], "province"
-            self.look_at(action[1].pos)
-        elif kind == "goto":
-            self.look_at(action[1])
+        """Run an action tuple from a button or key: ``(kind, ...)`` goes to PRESS[kind]; then refresh."""
+        handler = self.PRESS.get(action[0])
+        if handler:
+            handler(self, action)
         self.refresh()
+
+    def _do_game_menu(self, action):
+        self.open_menu()
+
+    def _do_close_panel(self, action):
+        self.ui.panel = None
+
+    def _do_mode(self, action):
+        self.view.mode = action[1]
+
+    def _do_panel(self, action):
+        world, ui = self.world, self.ui
+        if action[1] == "country":
+            self.open_country(self.player)
+        elif action[1] == "market":
+            ui.panel = "market"
+            prov = ui.province if ui.province and ui.province.market else world.provinces[world.countries[self.player].capital]
+            ui.market = prov.market
+        else:
+            ui.panel = action[1] if ui.panel != action[1] else None
+
+    def _do_choose(self, action):
+        self.choose(action[1])
+
+    def _do_end(self, action):
+        self.end_turn()
+
+    def _do_continue(self, action):
+        self.continue_march(self.active())
+
+    def _do_build(self, action):
+        self.world.build(self.player, action[1], action[2])
+
+    def _do_recruit(self, action):
+        unit = self.world.recruit(self.player, action[1], action[2])
+        if unit and not unit.kind.war and unit.kind is not GENERAL:
+            self.select_unit(unit, only=True)
+
+    def _do_invest(self, action):
+        if not self.world.invest(self.player, action[1]):
+            self.toast(self.world.invest_check(self.player, action[1])[1])
+
+    def _do_found(self, action):
+        founder = action[1]
+        prov = self.world.found(founder, trading_post=action[2])
+        if prov:
+            self._cancel_orders([founder])
+            self.ui.selected, self.ui.province, self.ui.panel = None, prov, "province"
+
+    def _do_pick(self, action):
+        self.select_unit(action[1], only=True)
+
+    def _do_toggle(self, action):
+        self.ui.picked ^= {action[1].id}
+
+    def _do_all(self, action):
+        ui = self.ui
+        ui.picked = {u.id for u in ui.group} if len(ui.picked) < len(ui.group) else set()
+
+    def _do_refit(self, action):
+        if not self.world.refit(action[1]):
+            self.toast(self.world.refit_check(action[1])[1])
+
+    def _do_upgrade(self, action):
+        if not self.world.upgrade(action[1], action[2]):
+            self.toast(self.world.upgrade_check(action[1], action[2])[1])
+
+    def _do_raise(self, action):
+        self.ui.panel, self.ui.province = "raise", action[1]
+
+    def _do_tech(self, action):
+        self.tech_toggle() if self.tech_open else self.open_tech()
+
+    def _do_fund(self, action):
+        if not self.world.fund_research(self.player):
+            self.toast("Not enough ducats")
+
+    def _do_tax(self, action):
+        self.world.set_tax(self.player, action[1])            # preview the new tax without rerunning the season
+
+    def _do_war(self, action):
+        self.world.declare_war(self.player, action[1])
+
+    def _do_peace(self, action):
+        ok, text = self.world.peace_offer(self.player, action[1], action[2])
+        self.toast(text)
+
+    def _do_merchant(self, action):
+        if len(action) > 2:
+            self.world.send_merchant(self.player, action[1], action[2], action[3])
+            self.ui.order_route = None
+        else:
+            self.ui.order_route = None if self.ui.order_route is action[1] else action[1]
+
+    def _do_goods_view(self, action):
+        self.view.mode, self.view.goods_view = "goods", action[1]
+
+    def _do_forage(self, action):
+        acting = self.active()
+        if self.world.forage(acting, self.player):
+            self._cancel_orders(acting)
+        else:
+            self.toast(self.world.forage_check(acting, self.player)[1])
+
+    def _do_recall(self, action):
+        self.world.recall_merchant(self.player, action[1], action[2] if len(action) > 2 else None)
+
+    def _do_market(self, action):
+        self.ui.panel, self.ui.market = "market", action[1]
+
+    def _do_country(self, action):
+        self.open_country(action[1])
+
+    def _do_province(self, action):
+        self.ui.province, self.ui.panel = action[1], "province"
+        self.look_at(action[1].pos)
+
+    def _do_goto(self, action):
+        self.look_at(action[1])
+
+    PRESS = {"game_menu": _do_game_menu, "close_panel": _do_close_panel, "mode": _do_mode, "panel": _do_panel,
+             "choose": _do_choose, "end": _do_end, "continue": _do_continue, "build": _do_build,
+             "recruit": _do_recruit, "invest": _do_invest, "found": _do_found, "pick": _do_pick,
+             "toggle": _do_toggle, "all": _do_all, "refit": _do_refit, "upgrade": _do_upgrade, "raise": _do_raise,
+             "tech": _do_tech, "fund": _do_fund, "tax": _do_tax, "war": _do_war, "peace": _do_peace,
+             "merchant": _do_merchant, "goods_view": _do_goods_view, "forage": _do_forage, "recall": _do_recall,
+             "market": _do_market, "country": _do_country, "province": _do_province, "goto": _do_goto}
 
     def scroll(self):
         if self.menu:
@@ -731,55 +740,15 @@ class CampaignApp(GameMenu, TechScreen):
             self.camera[1] += dy * speed
             self.clamp()
 
-    # ----- drawing helpers --------------------------------------------------------------------
-    @staticmethod
-    def _fit(font, text, width):
-        """`text` cut down to `width` pixels, ending in an ellipsis when it had to be shortened."""
-        if font.size(text)[0] <= width:
-            return text
-        while text and font.size(text + "…")[0] > width:
-            text = text[:-1]
-        return text + "…" if text else ""
-
-    @staticmethod
-    def _wrap_words(font, text, width):
-        lines, line = [], ""
-        for word in text.split():
-            trial = f"{line} {word}".strip()
-            if not line or font.size(trial)[0] <= width:
-                line = trial
-            else:
-                lines.append(line)
-                line = word
-        if line:
-            lines.append(line)
-        return lines
+    # ----- drawing helpers (the work is in hexa/ui/kit.py) --------------------------------------------------
+    _fit = staticmethod(fit)
+    _wrap_words = staticmethod(wrap)
 
     def text(self, font, text, pos, color=TEXT, width=None):
-        if width:
-            text = self._fit(font, text, width)
-        img = font.render(text, True, color)
-        self.screen.blit(img, pos)
-        return img.get_width()
+        return draw_text(self.screen, font, text, pos, color, width).width
 
     def button(self, rect, label, enabled, action, hint="", detail="", small=False):
-        rect = pygame.Rect(rect)
-        hovered = rect.collidepoint(self.ui.mouse)
-        color = ((70, 95, 140) if hovered else (52, 74, 112)) if enabled else (44, 48, 56)
-        pygame.draw.rect(self.screen, color, rect, border_radius=5)
-        font = self.small if small else self.bold
-        fg = TEXT if enabled else FAINT
-        if detail:
-            label = self._fit(font, label, rect.width - 16 - self.small.size(detail)[0] - 8)
-            img = font.render(label, True, fg)
-            self.screen.blit(img, img.get_rect(midleft=(rect.x + 8, rect.centery)))
-            img = self.small.render(detail, True, MUTED if enabled else FAINT)
-            self.screen.blit(img, img.get_rect(midright=(rect.right - 8, rect.centery)))
-        else:
-            img = font.render(label, True, fg)
-            self.screen.blit(img, img.get_rect(center=rect.center))
-        self.ui.buttons.append(Button(rect, label, enabled, action, hint, detail))
-        return rect
+        return draw_button(self, rect, label, enabled, action, hint, detail, small)
 
     # ----- drawing ---------------------------------------------------------------------------
     def draw(self):
@@ -837,7 +806,7 @@ class CampaignApp(GameMenu, TechScreen):
     def banner(self, text):
         cx = WIDTH // 2 - (PANEL_W // 2 if self.ui.panel else 0)
         room = 2 * min(cx, WIDTH - cx) - 40                  # the widest the banner may be, centred on cx
-        lines = [self.title.render(line, True, TEXT) for line in self._wrap_words(self.title, text, room - 30)]
+        lines = [self.title.render(line, True, TEXT) for line in wrap(self.title, text, room - 30)]
         if not lines:
             return
         box = pygame.Rect(0, 0, max(img.get_width() for img in lines) + 30,
@@ -916,9 +885,7 @@ class CampaignApp(GameMenu, TechScreen):
             return
         width = 560
         box = pygame.Rect(8, HEIGHT - 12 - 18 * len(lines), width, 18 * len(lines) + 6)
-        shade = pygame.Surface(box.size, pygame.SRCALPHA)
-        shade.fill((10, 12, 16, 175))
-        self.screen.blit(shade, box)
+        shade(self.screen, box, (10, 12, 16, 175))
         for i, line in enumerate(lines):
             self.text(self.small, line, (box.x + 8, box.y + 3 + i * 18), TEXT if i == len(lines) - 1 else MUTED, width - 16)
 
@@ -963,7 +930,7 @@ class CampaignApp(GameMenu, TechScreen):
         ui, world = self.ui, self.world
         now = pygame.time.get_ticks()
         if now < ui.toast_until:
-            self._one_line(ui.toast)
+            tip(self, ui.toast)
             return
         hint, key = None, None
         for button in ui.buttons:
@@ -974,156 +941,18 @@ class CampaignApp(GameMenu, TechScreen):
                 if rect.collidepoint(ui.mouse):
                     hint, key = card, ("area", tuple(rect))
         if hint is None and ui.hover and ui.hover in world.terrain and not self.busy:
-            hint, key = self.province_card(ui.hover), ("hex", ui.hover)
+            hint, key = card_of(world, ui.hover), ("hex", ui.hover)
         if key != ui.hover_key:
             ui.hover_key, ui.hover_since = key, now
         if hint is None:
             return
         if isinstance(hint, str):
-            self._one_line(hint)
+            tip(self, hint)
         elif now - ui.hover_since >= 350:
-            self._card(*hint)
-
-    def _one_line(self, text):
-        ui = self.ui
-        img = self.font.render(text, True, TEXT)
-        box = img.get_rect(topleft=(ui.mouse[0] + 16, ui.mouse[1] + 18)).inflate(14, 8)
-        box.clamp_ip(pygame.Rect(0, TOP, WIDTH, HEIGHT - TOP))
-        pygame.draw.rect(self.screen, (12, 14, 18), box, border_radius=5)
-        pygame.draw.rect(self.screen, LINE, box, 1, border_radius=5)
-        self.screen.blit(img, img.get_rect(center=box.center))
-
-    def _card(self, title, lines):
-        ui = self.ui
-        width = max([self.bold.size(title)[0]] + [self.font.size(t)[0] for t, _ in lines]) + 22
-        width = min(width, 420)
-        box = pygame.Rect(ui.mouse[0] + 18, ui.mouse[1] + 18, width, 32 + 19 * len(lines))
-        box.clamp_ip(pygame.Rect(0, TOP, WIDTH, HEIGHT - TOP))
-        shade = pygame.Surface(box.size, pygame.SRCALPHA)
-        shade.fill((12, 14, 18, 240))
-        self.screen.blit(shade, box)
-        pygame.draw.rect(self.screen, GOLD, box, 1, border_radius=6)
-        self.text(self.bold, title, (box.x + 10, box.y + 6), GOLD, width - 20)
-        for i, (line, color) in enumerate(lines):
-            self.text(self.font, line, (box.x + 10, box.y + 28 + i * 19), color, width - 20)
-
-    def cost_lines(self, prov, kind):
-        world = self.world
-        market = prov.market if prov else None
-        parts = [f"{kind.gold} ducats"] + [f"{n:g} {GOODS[g].name.lower()}" for g, n in kind.goods.items()]
-        lines = [("Raise: " + " + ".join(parts), TEXT)]
-        if prov and market:
-            lines.append((f"   = {world.unit_cost(prov, kind)} ducats at the {market.name} market today", MUTED))
-        food = f" + {FOOD_PER_TROOP:g} grain" if kind.war else ""
-        lines.append((f"Upkeep: {kind.upkeep:g} ducats{food} a season", TEXT))
-        if kind.war:
-            lines.append((f"Takes {self.world.men_per_troop(self.player) * 1000:,.0f} men from the province", TEXT))
-        return lines
-
-    def troop_card(self, kind, prov=None):
-        if not kind.war:
-            about = {"general": ["Joins a stack: +2 stack room", "+20% in his speciality (random)"],
-                     "wagon": [f"Keeps its stack fed for {self.world.wagon_seasons(self.player)} seasons away from depots",
-                               "Refills when back in supply"],
-                     "scout": ["Moves 5, sees 3 hexes", "May cross enemy land in war"],
-                     "pioneer": ["Builds fields, mines and lumber camps (press B on the tile)"],
-                     "colonist": ["1,000 settlers: found a colony or trading post"],
-                     "caravel": ["Fast explorer, sees far, carries 4 units"],
-                     "carrack": ["Big ship, carries 8 units (needs a shipyard)"],
-                     "galleon": ["Big gun ship, carries 10 units (needs a shipyard and the Galleon tech)"]}.get(kind.key, [])
-            return kind.name, [(a, TEXT) for a in about] + self.cost_lines(prov, kind)
-        strong = {"infantry": [("Strong: defending, holding castles (+30%)", GOOD_C),
-                               ("Strong: against cavalry (+25% defense)", GOOD_C)],
-                  "cavalry": [("Strong: open land +40%, moves 5", GOOD_C),
-                              ("Weak: forests and hills -30%, castles -50%", BAD_C)],
-                  "artillery": [("Strong: castles x2, fires 2 hexes away, no reply", GOOD_C),
-                                (f"Speeds sieges (+{kind.siege} a season)", GOOD_C),
-                                ("Weak: helpless up close (half defense)", BAD_C)]}[kind.branch]
-        title = f"{kind.name}  ({BRANCH_NAMES[kind.branch].lower()}, {ERAS[kind.era][0]})"
-        lines = [(f"Attack {kind.attack}   Defense {kind.defense}   HP {kind.hp}   Moves {kind.moves}", TEXT)]
-        return title, lines + strong + self.cost_lines(prov, kind)
-
-    def unit_card(self, unit):
-        world = self.world
-        lines = []
-        if unit.kind.war:
-            lines.append((f"HP {unit.hp}/{unit.kind.hp}   Attack {unit.kind.attack}+{unit.atk_up}   "
-                          f"Defense {unit.kind.defense}+{unit.def_up}", TEXT))
-            rank = unit.rank
-            lines.append((f"Experience {unit.xp}" + (f" ({rank[1]}, +{(rank[2] - 1) * 100:.0f}%)" if rank[1] else
-                                                      " (3 = Veteran, 7 = Elite)"), MUTED))
-            lines.append(("Fed last season" if unit.supplied else "Hungry: no healing, loses strength",
-                          GOOD_C if unit.supplied else BAD_C))
-        elif unit.kind is WAGON:
-            lines.append((f"Food for {unit.supplies} more season{'s' * (unit.supplies != 1)} away from depots", TEXT))
-        lines.append((f"Moves {unit.moves_left}/{unit.kind.moves}", MUTED))
-        return f"{world.countries[unit.owner].name}: {unit.label}", lines
+            hover_card(self, *hint)
 
     def province_card(self, pos):
-        world, tag = self.world, self.player
-        if tag and pos not in world.countries[tag].explored:
-            return "Unknown", [("Nobody from your country has been here yet.", MUTED)]
-        prov = world.provinces.get(pos)
-        if not prov:
-            return ("Lake" if world.terrain[pos] == "lake" else "Sea"), [("Ships only." if world.is_sea(pos) else
-                                                                          "Nobody can cross it.", MUTED)]
-        t = TERRAIN[prov.terrain]
-        if prov.owner:
-            who = world.countries[prov.owner].name + (" (colony)" if prov.colony else " (trading post)" if prov.trading_post else "")
-        else:
-            who = f"{prov.tribe} natives" if prov.natives > 0.5 else "Empty land"
-        lines = [(f"{who}   ·   {t.name}: move {t.move}, defense +{t.defense * 100:.0f}%", TEXT)]
-        if world.pass_closed(pos):
-            seen = set()
-            for name, _, way in world.pass_edges_at(pos):
-                if (name, way) not in seen:
-                    seen.add((name, way))
-                    lines.append((f"The {name} pass (to the {way}) is closed by snow until spring", BAD_C))
-        if prov.good:
-            line = f"{GOODS[prov.good].name}"
-            if prov.owner:
-                line += f": {prov.output:.1f} a season, worth {prov.value:.1f} ducats"
-            if prov.works:
-                line += f"  ({world.works_name(prov).lower()})"
-            lines.append((line, TEXT))
-        if prov.owner:
-            lines.append((f"Peasants {prov.peasants:.0f}k  Burghers {prov.burghers:.0f}k  Nobles {prov.nobles:.0f}k"
-                          f"   ·   food {prov.food * 100:.0f}%", TEXT))
-            town = " ".join(x for x in (SETTLEMENTS[prov.settlement], CASTLES[prov.castle]) if x)
-            if town:
-                lines.append((town + (f"   garrison {prov.garrison}" if prov.castle else ""), MUTED))
-        if prov.natives >= 0.5:
-            lines.append((f"{prov.tribe} people: {prov.natives:.0f}k", MUTED))
-        if tag:
-            limit = world.supply_limit(tag, pos)
-            lines.append((f"Feeds {limit} of your troops" + ("" if prov.owner == tag else " (foreign land: half)"), GOOD_C))
-        if prov.market:
-            lines.append((f"Market: {prov.market.name}", MUTED))
-        here = world.units_at(pos)
-        if here and (here[0].owner == tag or pos in world.visible):
-            troops = [u for u in here if u.kind.war]
-            lines.append((f"{world.countries[here[0].owner].name}: {len(here)} unit{'s' * (len(here) != 1)}"
-                          + (f", {len(troops)} troops, power {world.stack_power(troops):.0f}" if troops else ""),
-                          BAD_C if here[0].owner != tag else TEXT))
-        return world.place(prov), lines
-
-    def good_card(self, market, g):
-        good = GOODS[g]
-        price = market.price[g]
-        lines = [(f"Price {price:.2f} ducats (normal {good.price:g})",
-                  BAD_C if price > good.price * 1.25 else GOOD_C if price < good.price * 0.8 else TEXT),
-                 (f"Supply {market.supply[g]:.1f}   Demand {market.demand[g]:.1f}", TEXT),
-                 (f"Made here {market.produced[g]:.1f}   In {market.imports[g]:.1f}   Out {market.exports[g]:.1f}", MUTED)]
-        makers = sorted((p for p in market.provinces if p.good == g), key=lambda p: -p.output)
-        if makers:
-            lines.append(("Made in: " + ", ".join(p.name for p in makers[:3]) + (" ..." if len(makers) > 3 else ""), TEXT))
-        users = [cls for cls, needs in NEEDS.items() if g in needs or (g in ("grain", "fish") and "food" in needs)]
-        built = [b.name.lower() for b in BUILDINGS.values() if g in b.inputs or (g == "cotton" and b.key == "weaver")]
-        if users or built:
-            lines.append(("Bought by: " + ", ".join(users + built), TEXT))
-        if g in ("grain", "fish"):
-            lines.append((f"Troops eat {FOOD_PER_TROOP:g} grain each a season", MUTED))
-        return f"{good.name} at {market.name}", lines
+        return card_of(self.world, pos)
 
     # ----- panels ------------------------------------------------------------------------
     def draw_panel(self):
@@ -1131,531 +960,7 @@ class CampaignApp(GameMenu, TechScreen):
         pygame.draw.rect(self.screen, PANEL_BG, rect)
         pygame.draw.line(self.screen, LINE, rect.topleft, rect.bottomleft)
         self.button((rect.right - 30, rect.y + 8, 22, 22), "×", True, ("close_panel",), "Close (Esc)")
-        panel = self.ui.panel
-        if panel == "province" and self.ui.province:
-            self.province_panel(self.ui.province)
-        elif panel == "unit" and self.ui.selected:
-            self.unit_panel(self.ui.selected)
-        elif panel == "raise" and self.ui.province:
-            self.raise_panel(self.ui.province)
-        elif panel == "country" and self.ui.country:
-            self.country_panel(self.ui.country)
-        elif panel == "market" and self.ui.market:
-            self.market_panel(self.ui.market)
-        elif panel == "ledger":
-            self.ledger_panel()
-
-    def _heading(self, text, y, x=None):
-        x = x if x is not None else WIDTH - PANEL_W + 14
-        self.text(self.bold, text, (x, y), GOLD)
-        pygame.draw.line(self.screen, LINE, (x, y + 20), (WIDTH - 14, y + 20))
-        return y + 26
-
-    def province_panel(self, prov):
-        world, tag = self.world, self.player
-        x, y = WIDTH - PANEL_W + 14, TOP + 10
-        w = PANEL_W - 28
-        self.text(self.title, prov.name, (x, y), width=w - 30)
-        y += 30
-        if prov.owner:
-            country = world.countries[prov.owner]
-            what = "Colony of " if prov.colony else "Trading post of " if prov.trading_post else ""
-            pygame.draw.rect(self.screen, country.color, (x, y + 3, 12, 12))
-            used = self.text(self.font, f"{what}{country.name}", (x + 18, y))
-            if prov.region and prov.region not in prov.name and w - 26 - used > 40:
-                self.text(self.small, f"·  {prov.region}", (x + 26 + used, y + 2), MUTED, w - 26 - used)
-        else:
-            land = prov.region if prov.region.endswith(" lands") else f"{prov.tribe} lands" if prov.tribe else ""
-            self.text(self.font, f"Unclaimed: {land}" if land else "Unclaimed land", (x, y), MUTED, w)
-        y += 20
-        market = f"   Market: {prov.market.name}" + (" (far: -30%)" if prov.remote else "") if prov.market else ""
-        self.text(self.small, f"{TERRAIN[prov.terrain].name}{', coast' if prov.coastal else ''}{market}", (x, y), MUTED, w)
-        y += 20
-        if prov.controller and prov.controller != prov.owner:
-            self.text(self.font, f"Occupied by {world.countries[prov.controller].name}", (x, y), BAD_C)
-            y += 20
-        if prov.good:
-            line = f"Produces {GOODS[prov.good].name.lower()}"
-            if prov.owner:
-                line += f": {prov.output:.1f} a season, worth {prov.value:.1f} ducats"
-            self.text(self.font, line, (x, y), width=w)
-        else:
-            self.text(self.font, "Produces nothing of value", (x, y), MUTED)
-        y += 26
-        y = self._heading("People", y)
-        if prov.owner:
-            self.text(self.font, f"Peasants {prov.peasants:.1f}k   Burghers {prov.burghers:.1f}k   Nobles {prov.nobles:.1f}k",
-                      (x, y), width=w)
-            y += 20
-            self.text(self.small, f"Food supply {prov.food * 100:.0f}%", (x, y), GOOD_C if prov.food >= 0.95 else BAD_C)
-            if tag:
-                self.text(self.small, f"Feeds {world.supply_limit(tag, prov.pos)} of your troops", (x + 130, y), MUTED)
-            y += 18
-        if prov.natives >= 0.1:
-            self.text(self.font, f"{prov.tribe or 'Native'} people {prov.natives:.1f}k", (x, y), MUTED)
-            y += 20
-        if prov.colony:
-            done = min(1.0, prov.pop / COLONY_DONE)
-            pygame.draw.rect(self.screen, (50, 55, 64), (x, y + 2, w, 10), border_radius=4)
-            pygame.draw.rect(self.screen, GOOD_C, (x, y + 2, w * done, 10), border_radius=4)
-            self.text(self.small, f"Colony: {prov.pop:.1f}k of {COLONY_DONE:.0f}k people to become a full province",
-                      (x, y + 14), MUTED)
-            y += 34
-        y += 4
-        if prov.owner == tag and tag:
-            if prov.busy:
-                self.text(self.small, "This province has done its job for this season.", (x, y), GOLD)
-                y += 18
-            y = self._heading("The tile", y)
-            if prov.good in WORKS:
-                level = prov.works
-                name = world.works_name(prov) or "Untouched land"
-                pips = "".join("*" if i < level else "." for i in range(WORKS_LEVELS))
-                self.text(self.font, f"{name}" + (f"  +{WORKS_BONUS * level * 100:.0f}%" if level else ""),
-                          (x, y + 3), TEXT if level else MUTED, 190)
-                self.text(self.small, pips, (x + 192, y + 5), GOLD)
-                if level < WORKS_LEVELS:
-                    nxt = WORKS[prov.good][level]
-                    ok, reason = world.invest_check(tag, prov)
-                    goods = ", ".join(f"{n:g} {GOODS[g].name.lower()}" for g, n in world.invest_goods(prov).items())
-                    hint = reason or (f"Invest: {nxt} (+{WORKS_BONUS * 100:.0f}% {GOODS[prov.good].name.lower()}). "
-                                      f"Needs {goods}, bought on the local market. Era {WORKS_ERA[level]}+.")
-                    self.button((x + 230, y, w - 230, 23), f"Invest: {nxt}", ok, ("invest", prov), hint,
-                                f"{world.invest_cost(prov)}", small=True)
-                else:
-                    self.text(self.small, "fully developed", (x + 240, y + 5), FAINT)
-                y += 26
-            for key, names in (("settlement", SETTLEMENTS), ("castle", CASTLES)):
-                level = prov.settlement if key == "settlement" else prov.castle
-                current = names[level] or ("Countryside" if key == "settlement" else "No castle")
-                self.text(self.font, current, (x, y + 3), TEXT if level else MUTED, 150)
-                queued = next((item for item in prov.queue if item[0] == key), None)
-                if queued:
-                    self.text(self.small, f"building, {queued[1]} season{'s' * (queued[1] != 1)} left", (x + 170, y + 5), GOLD)
-                elif level < 3:
-                    ok, reason = world.build_check(tag, prov, key)
-                    goods = ", ".join(f"{n:g} {GOODS[g].name.lower()}" for g, n in world.build_goods(prov, key).items())
-                    hint = reason or (("More people, taxes and building slots" if key == "settlement"
-                                       else "Defends the land: +defense, longer sieges") +
-                                      (f". Needs {goods} from the market." if goods else ""))
-                    self.button((x + 160, y, w - 160, 23), f"To {names[level + 1].lower()}", ok, ("build", prov, key),
-                                hint, f"{world.build_cost(prov, key)}", small=True)
-                y += 26
-            slots = SETTLEMENT_SLOTS[prov.settlement]
-            y = self._heading(f"Buildings ({world.slots_used(prov)}/{slots} slots)", y + 2)
-            for key, b in BUILDINGS.items():
-                if b.needs_coast and not prov.coastal:
-                    continue
-                level = prov.level(key)
-                queued = next((item for item in prov.queue if item[0] == key), None)
-                label = f"{b.name} {'I' * level}" if level else b.name
-                self.text(self.font, label, (x, y + 3), TEXT if level else MUTED, 150)
-                if queued:
-                    self.text(self.small, f"building, {queued[1]} season{'s' * (queued[1] != 1)} left", (x + 170, y + 5), GOLD)
-                elif level < world.building_max(tag, key):
-                    ok, reason = world.build_check(tag, prov, key)
-                    self.button((x + 160, y, w - 160, 23), "Upgrade" if level else "Build", ok,
-                                ("build", prov, key), reason or b.hint, f"{world.build_cost(prov, key)}", small=True)
-                else:
-                    self.text(self.small, "complete", (x + 170, y + 5), FAINT)
-                y += 26
-            y += 4
-            self.button((x, y, w, 28), "Raise units here...", not prov.busy, ("raise", prov),
-                        "Infantry, cavalry, cannons, generals, scouts, pioneers, colonists and ships" if not prov.busy
-                        else "This province already did its job this season", small=True)
-            y += 34
-        elif prov.owner and tag:
-            self.button((x, y, w, 26), f"Diplomacy with {world.countries[prov.owner].name}", True,
-                        ("country", prov.owner), small=True)
-            y += 32
-        if prov.market:
-            self.button((x, y, w, 26), f"Open the {prov.market.name} market", True, ("market", prov.market), small=True)
-
-    def unit_panel(self, unit):
-        world, ui = self.world, self.ui
-        x, y = WIDTH - PANEL_W + 14, TOP + 10
-        w = PANEL_W - 28
-        country = world.countries[unit.owner]
-        group = ui.group or [unit]
-        troops = [u for u in group if u.kind.war]
-        title = unit.label if len(group) == 1 else f"Stack of {len(group)}"
-        self.text(self.title, title, (x, y), width=w - 30)
-        y += 30
-        pygame.draw.rect(self.screen, country.color, (x, y + 3, 12, 12))
-        line = country.name
-        if troops and not unit.naval:
-            line += f"   ·   {len(troops)}/{world.stack_limit(unit.owner, group)} troops   ·   power {world.stack_power(troops):.0f}"
-        self.text(self.font, line, (x + 18, y), width=w - 18)
-        y += 22
-        if troops and not unit.naval and not unit.carrier:
-            state, count, limit = world.supply_state(group)
-            colour = {"supplied": GOOD_C, "wagon": GOLD, "foraging": GOLD, "cut off": BAD_C}[state]
-            text = {"supplied": f"In supply (a depot within {world.supply_reach(unit.owner)} hexes)",
-                    "wagon": "Fed by the supply wagon", "foraging": "Foraging this season",
-                    "cut off": "Cut off from supply: no healing, -1 HP a season"}[state]
-            self.text(self.small, text, (x, y), colour, w - 130)
-            over = count > limit
-            self.text(self.small, f"land feeds {count}/{limit}", (x + w - 120, y), BAD_C if over else MUTED)
-            self.hoverable((x, y, w, 16), ("Supply", [
-                (f"Troops here eat {FOOD_PER_TROOP:g} grain each a season, bought on the local market.", TEXT),
-                ("Towns, castles and ports are depots. A stack within "
-                 f"{world.supply_reach(unit.owner)} hexes of one, through land you control, is in supply.", TEXT),
-                ("Enemy armies cut supply lines. Cut-off troops lose 1 HP a season and cannot heal.", BAD_C),
-                (f"This land feeds {limit} troops (people and farms; half in foreign land).", TEXT),
-                ("Bigger stacks lose 1 HP a season. Wagons and foraging keep stacks fed.", MUTED)]))
-            y += 20
-            if unit.owner == self.player and (state == "cut off" or
-                                              (state != "supplied" and world.provinces.get(unit.pos) and
-                                               world.provinces[unit.pos].owner != unit.owner)):
-                ok, reason = world.forage_check(group, self.player)
-                self.button((x, y, w, 24), "Forage the land", ok, ("forage",),
-                            reason or "Feed the stack from this province: it loses people and half its goods", small=True)
-                y += 28
-        if unit.owner != self.player:
-            for u in group[:14]:
-                self.text(self.small, f"{u.label}   {u.hp}/{u.kind.hp} HP" if u.kind.war else u.label, (x, y), MUTED)
-                y += 18
-            return
-        if unit.naval:
-            moves = unit.moves_left
-            self.text(self.font, f"Moves left {moves}/{unit.kind.moves}", (x, y))
-            y += 24
-            cargo = world.cargo(unit)
-            y = self._heading(f"Cargo {len(cargo)}/{unit.kind.capacity}", y)
-            for passenger in cargo:
-                self.button((x, y, w, 24), passenger.label, True, ("pick", passenger),
-                            "Select it (tick more to land them together), then right-click the coast", small=True)
-                y += 28
-            if not cargo:
-                self.text(self.small, "Empty. Units board by moving onto the ship from the coast.", (x, y), MUTED, w)
-            return
-        self.text(self.small, "Ticked units move and fight together. Right-click to move or attack;", (x, y), MUTED, w)
-        self.text(self.small, "right-click far away to march over several seasons.", (x, y + 15), MUTED, w)
-        y += 36
-        active = self.active()
-        stuck = world.stuck_reason(active) if active else ""
-        for line in self._wrap_words(self.small, stuck, w):
-            self.text(self.small, line, (x, y), GOLD)
-            y += 15
-        if stuck:
-            y += 6
-        if any(self.is_marching(u) for u in active):
-            self.text(self.small, "On a march: it waits for your order each season.", (x, y), GOLD, w)
-            y += 16
-            self.button((x, y, w, 26), "Continue march (R)", True, ("continue",),
-                        "Walk on along the planned route (the dashed line)", small=True)
-            y += 32
-        self.button((x, y, 110, 22), "Tick all / none", True, ("all",), small=True)
-        y += 28
-        for u in group[:13]:
-            ticked = u.id in ui.picked
-            self.button((x, y, 22, 22), "x" if ticked else "", True, ("toggle", u),
-                        "Untick to leave this unit behind (split the stack)", small=True)
-            label = u.label
-            if u.kind.war:
-                label += f"   {u.hp}/{u.kind.hp}"
-            elif u.kind is GENERAL:
-                label = f"General: {GENERAL_TRAITS[u.trait]}"
-            color = TEXT if u.moves_left > 0 else MUTED
-            if u.kind.war and not u.supplied:
-                color = BAD_C
-            self.text(self.small, label, (x + 28, y + 3), color, 196 if u.kind.war else w - 30)
-            self.hoverable((x + 28, y, 196 if u.kind.war else w - 30, 22), self.unit_card(u))
-            if u.kind.war:
-                bx = x + w - 126
-                ok, reason = world.refit_check(u)
-                if u.kind.era < world.countries[u.owner].era:
-                    self.button((bx, y, 52, 22), "Refit", ok, ("refit", u), reason or "Re-equip as the newest troops", small=True)
-                for i, stat in enumerate(("attack", "defense")):
-                    ok, reason = world.upgrade_check(u, stat)
-                    level = u.atk_up if stat == "attack" else u.def_up
-                    if level < world.drill_max(unit.owner):
-                        cost = world.upgrade_cost(u, stat)
-                        self.button((bx + 56 + i * 36, y, 32, 22), "+A" if stat == "attack" else "+D", ok,
-                                    ("upgrade", u, stat), reason or f"Drill +1 {stat} for {cost} ducats", small=True)
-            y += 26
-        workers = [u for u in self.active() if u.kind is COLONIST]
-        if workers:
-            worker = workers[0]
-            y += 4
-            if True:
-                ok, reason = world.found_check(worker)
-                bw = (w - 6) // 2
-                self.button((x, y, bw, 26), "Found colony (B)", ok, ("found", worker, False),
-                            reason or "Settlers take this land; it grows into a full province", small=True)
-                ok, reason = world.found_check(worker, trading_post=True)
-                self.button((x + bw + 6, y, bw, 26), "Trading post", ok, ("found", worker, True),
-                            reason or "Trade with the natives here: they keep the land, you get their goods", small=True)
-
-    def raise_panel(self, prov):
-        world, tag = self.world, self.player
-        x, y = WIDTH - PANEL_W + 14, TOP + 10
-        w = PANEL_W - 28
-        country = world.countries[tag]
-        self.text(self.title, f"Raise in {self.world.place(prov)}", (x, y), width=w - 30)
-        y += 32
-        self.text(self.bold, ERAS[country.era][0], (x, y), GOLD)
-        y += 22
-        if country.researching:
-            cur = tech.tech(country.researching)
-            line = f"Researching {cur.name} {country.research:.0f}/{world.tech_cost(tag, cur.key)} · Technology (T)"
-        else:
-            line = "Nothing researched · Technology (T)"
-        self.button((x, y, w, 26), line, True, ("tech",), "Research, ideas and the tech tree (T)", small=True)
-        y += 32
-        y = self._heading("Troops", y + 4)
-        for kind in world.raise_options(tag):
-            if kind.naval and not prov.coastal:
-                continue
-            if kind is CARAVEL:
-                y = self._heading("Others", y + 4)
-            ok, reason = world.recruit_check(tag, prov, kind)
-            label = f"{kind.name}  {kind.attack}/{kind.defense}  mv {kind.moves}" if kind.war else kind.name
-            title, lines = self.troop_card(kind, prov)
-            if reason:
-                lines = [(reason, BAD_C)] + lines
-            self.button((x, y, w, 25), label, ok, ("recruit", prov, kind), (title, lines),
-                        f"{world.unit_cost(prov, kind)} ducats", small=True)
-            y += 29
-        self.button((x, y + 6, w, 24), "Back to the province", True, ("province", prov), small=True)
-
-    def country_panel(self, tag):
-        world = self.world
-        x, y = WIDTH - PANEL_W + 14, TOP + 10
-        w = PANEL_W - 28
-        country = world.countries[tag]
-        pygame.draw.rect(self.screen, country.color, (x, y + 4, 18, 18), border_radius=3)
-        self.text(self.title, country.name, (x + 26, y))
-        y += 32
-        provs = world.provinces_of(tag)
-        self.text(self.font, f"{len(provs)} provinces, {world.total_pop(tag):,.0f}k people, "
-                             f"army {world.army_strength(tag)} regiments", (x, y), width=w)
-        y += 20
-        colonies = world.colonies_of(tag)
-        if colonies:
-            self.text(self.font, f"{len(colonies)} colonies and trading posts", (x, y))
-            y += 20
-        if self.player is None:
-            y += 10
-            self.text(self.font, f"Treasury {country.treasury:,.0f} ducats, {country.balance:+.1f} a season", (x, y))
-            y += 30
-            self.button((x, y, w, 36), f"Play as {country.name}", True, ("choose", tag),
-                        "Start the campaign with this country")
-            y += 50
-            tips = {"POR": "Best placed to sail around Africa and across the Atlantic.",
-                    "CAS": "Big, rich, and close to the Atlantic.", "ENG": "An island with good harbours.",
-                    "VEN": "Rich in trade but walled in by the Mediterranean.",
-                    "TUR": "Huge and strong, far from the Atlantic."}
-            if tag in tips:
-                self.text(self.small, tips[tag], (x, y), MUTED, w)
-            return
-        if tag == self.player:
-            y += 6
-            self.button((x, y, w, 26), "Technology (T)", True, ("tech",), "Research, ideas and the tech tree (T)", small=True)
-            y += 32
-            self.text(self.small, self.research_line(), (x, y), GOLD, w)
-            y += 18
-            for i, key in enumerate(country.queue[:4]):
-                self.text(self.small, f"{i + 1}. {_tech_name(key)}", (x + 8, y), MUTED, w - 8)
-                y += 16
-            y += 6
-            y = self._heading("Treasury", y)
-            self.text(self.font, f"{country.treasury:,.0f} ducats", (x, y), GOLD)
-            y += 22
-            for key, label in (("production", "Taxes on goods produced"), ("taxes", "Taxes on people"),
-                               ("buildings", "Manufactories"), ("trade", "Trade (merchants and tolls)"),
-                               ("upkeep", "Building upkeep"), ("military", "Armies and ships"),
-                               ("colonies", "Young colonies"), ("interest", "Interest on debt")):
-                if key not in country.income:
-                    continue
-                value = country.income[key]
-                self.text(self.small, label, (x, y), MUTED)
-                self.text(self.small, f"{value:+.1f}", (x + w - 60, y), GOOD_C if value >= 0 else BAD_C)
-                y += 17
-            self.text(self.bold, "Each season", (x, y + 2))
-            self.text(self.bold, f"{country.balance:+.1f}", (x + w - 60, y + 2), GOOD_C if country.balance >= 0 else BAD_C)
-            y += 28
-            self.text(self.font, "Tax level", (x, y + 4))
-            bx = x + 90
-            for level in TAX_LEVELS:
-                r = self.button((bx, y, 82, 26), level.title(), True, ("tax", level),
-                                {"low": "Less money, people grow faster", "normal": "Balanced",
-                                 "high": "More money, people grow slower"}[level], small=True)
-                if country.tax == level:
-                    pygame.draw.rect(self.screen, GOLD, r, 1, border_radius=5)
-                bx += 88
-            y += 36
-            y = self._heading("Wars", y)
-            enemies = world.enemies(tag)
-            if not enemies:
-                self.text(self.small, "At peace. Click a neighbour's province to declare war.", (x, y), MUTED)
-                y += 20
-            for enemy in sorted(enemies):
-                name = world.countries[enemy].name
-                score = world.war_score(tag, enemy)
-                self.text(self.font, f"{name} (war score {score:+d})", (x, y))
-                y += 20
-                self.text(self.small, self._war_line(enemy), (x, y), BAD_C, w)
-                y += 18
-                bw = (w - 8) // 3
-                self.button((x, y, bw, 24), "Take land", True, ("peace", enemy, "take"),
-                            "Demand the provinces you occupy", small=True)
-                self.button((x + bw + 4, y, bw, 24), "White peace", True, ("peace", enemy, "white"),
-                            "Everyone keeps their own land", small=True)
-                self.button((x + 2 * bw + 8, y, bw, 24), "Give up", True, ("peace", enemy, "yield"),
-                            "They keep what they occupy", small=True)
-                y += 30
-            y += 4
-            y = self._heading(f"Merchants {len(country.orders)}/{world.merchants(tag)}", y)
-            for rid, g, src in country.orders[:6]:
-                route = next((r for r in world.routes if r.id == rid), None)
-                if not route:
-                    continue
-                dst = route.b.name if src == route.a.name else route.a.name
-                result = next((res for res in route.results if res[0] == tag and res[1] == g), None)
-                profit = f"{result[3]:+.0f}" if result else "new"
-                self.text(self.small, f"{GOODS[g].name}: {src} > {dst}  ({profit} last season)", (x, y + 4),
-                          BAD_C if result and result[3] < 0 else TEXT, w - 70)
-                self.button((x + w - 64, y, 64, 22), "Recall", True, ("recall", route, (g, src)), small=True)
-                y += 26
-            free = world.merchants(tag) - len(country.orders)
-            if free > 0:
-                self.text(self.small, f"{free} merchant{'s' * (free != 1)} free: open a market, press + on a route.",
-                          (x, y), GOLD)
-                y += 20
-            self.button((x, y + 4, w, 26), "Open your home market", True, ("panel", "market"), small=True)
-            return
-        # Another country
-        y += 6
-        relation = "at war with you" if world.at_war(tag, self.player) else "at peace with you"
-        self.text(self.font, f"Treasury about {country.treasury:,.0f} ducats; {relation}.", (x, y), width=w)
-        y += 28
-        if world.at_war(tag, self.player):
-            self.text(self.small, self._war_line(tag), (x, y), BAD_C, w)
-            y += 20
-            score = world.war_score(self.player, tag)
-            self.text(self.font, f"War score {score:+d}", (x, y))
-            y += 24
-            for label, terms, hint in (("Demand the land you occupy", "take", "They accept if you are clearly winning"),
-                                       ("Offer white peace", "white", "Everyone keeps their own land"),
-                                       ("Give up", "yield", "They keep what they occupy")):
-                self.button((x, y, w, 26), label, True, ("peace", tag, terms), hint, small=True)
-                y += 30
-        else:
-            ok, reason = world.war_check(self.player, tag)
-            self.button((x, y, w, 28), f"Declare war on {country.name}", ok, ("war", tag),
-                        reason or "Armies can then enter their land and occupy provinces", small=True)
-            y += 34
-        self.button((x, y, w, 26), "Show their capital", True, ("goto", country.capital), small=True)
-
-    def market_panel(self, market):
-        world, tag = self.world, self.player
-        x, y = WIDTH - PANEL_W + 14, TOP + 10
-        w = PANEL_W - 28
-        owner = world.market_owner(market)
-        self.text(self.title, f"{market.name} market", (x, y))
-        y += 28
-        self.text(self.small, f"Centre held by {world.countries[owner].name if owner else 'nobody'}, "
-                              f"{len(market.provinces)} provinces trade here", (x, y), MUTED, w)
-        y += 22
-        cols = (x, x + 92, x + 158, x + 220, x + 282)
-        for cx, label in zip(cols, ("Good", "Price", "Supply", "Demand", "Trade")):
-            self.text(self.small, label, (cx, y), MUTED)
-        y += 18
-        for g, good in GOODS.items():
-            supply, demand = market.supply.get(g, 0), market.demand.get(g, 0)
-            if supply < 0.05 and demand < 0.05 and good.kind != "money":
-                continue
-            price = market.price[g]
-            ratio = price / good.price
-            color = BAD_C if ratio > 1.25 else GOOD_C if ratio < 0.8 else TEXT
-            pygame.draw.rect(self.screen, good.color, (cols[0], y + 4, 8, 8))
-            self.text(self.small, good.name, (cols[0] + 12, y))
-            self.hoverable((x, y, w, 16), self.good_card(market, g))
-            self.text(self.small, f"{price:.2f}", (cols[1], y), color)
-            self.text(self.small, f"{supply:.1f}", (cols[2], y))
-            self.text(self.small, f"{demand:.1f}", (cols[3], y))
-            net = market.imports.get(g, 0) - market.exports.get(g, 0)
-            if abs(net) >= 0.05:
-                self.text(self.small, f"{'in' if net > 0 else 'out'} {abs(net):.1f}", (cols[4], y), GOOD_C if net > 0 else GOLD)
-            y += 16
-        y += 6
-        y = self._heading("Trade routes", y)
-        mine = tag and market in world.merchant_markets(tag)
-        routes = sorted(world.routes_of(market), key=lambda r: -r.profit)
-        if self.ui.order_route in routes:
-            routes.remove(self.ui.order_route)
-            routes.insert(0, self.ui.order_route)
-        for route in routes[:7]:
-            if y > HEIGHT - 40:
-                break
-            other = route.other(market)
-            goods = ", ".join(sorted({GOODS[f[0]].name.lower() for f in route.flows})[:3]) or "nothing"
-            self.text(self.small, f"{other.name}{' (sea)' if route.sea else ''}: trade carries {goods}",
-                      (x, y + 3), TEXT, w - 40)
-            self.hoverable((x, y, w - 40, 22), (f"{market.name} - {other.name}", [
-                ("Background trade moves goods from cheap to dear by itself.", TEXT),
-                (f"Moving a unit costs {route.cost:.2f} ducats; market owners take tolls.", MUTED),
-                ("Press + to give one of your merchants an order on this route:", TEXT),
-                ("export or import a good you choose. The profit (or loss) is yours.", GOOD_C)]))
-            if tag:
-                ok, reason = world.send_merchant_check(tag, route)
-                self.button((x + w - 34, y, 32, 22), "+", ok, ("merchant", route),
-                            reason or "Give a merchant an order on this route", small=True)
-            y += 25
-            if tag:
-                for owner, g, src in route.orders:
-                    if owner != tag:
-                        continue
-                    dst = route.b.name if src == route.a.name else route.a.name
-                    result = next((res for res in route.results if res[0] == tag and res[1] == g), None)
-                    note = f"{result[3]:+.0f} last season" if result else "starts next season"
-                    self.text(self.small, f"  your merchant: {GOODS[g].name.lower()} {src} > {dst}, {note}", (x, y + 2),
-                              BAD_C if result and result[3] < 0 else GOLD, w - 70)
-                    self.button((x + w - 64, y, 64, 20), "Recall", True, ("recall", route, (g, src)), small=True)
-                    y += 23
-            if tag and self.ui.order_route is route:
-                options = world.merchant_options(tag, route)[:5]
-                if not options:
-                    self.text(self.small, "  Nothing worth carrying on this route right now.", (x, y), MUTED)
-                    y += 20
-                for g, src, dst, margin, amount in options:
-                    verb = "Export" if src in world.merchant_markets(tag) else "Import"
-                    label = f"{verb} {GOODS[g].name.lower()}: {src.name} > {dst.name}"
-                    detail = f"{margin:+.1f} x {amount:.0f} = {margin * amount:+.0f}"
-                    ok, reason = world.send_merchant_check(tag, route)
-                    lines = [
-                        (f"Buy {amount:.0f} at {src.price[g]:.2f} in {src.name}, sell at {dst.price[g]:.2f} in {dst.name}", TEXT),
-                        (f"Transport {route.cost:.2f} a unit: {margin:+.2f} a unit, about {margin * amount:+.0f} a season",
-                         GOOD_C if margin > 0 else BAD_C),
-                        ("Exporting raises the price at home; importing lowers it.", MUTED)]
-                    if margin <= 0:
-                        lines.append(("This order loses money on every unit.", BAD_C))
-                    if not ok:
-                        lines.insert(0, (reason, BAD_C))
-                    self.button((x + 10, y, w - 10, 22), label, ok, ("merchant", route, g, src),
-                                (f"{verb} {GOODS[g].name.lower()}", lines), detail, small=True)
-                    y += 25
-        if tag and not mine:
-            self.text(self.small, "Your merchants can only work routes from markets where you own land.", (x, y + 4), MUTED, w)
-
-    def ledger_panel(self):
-        world = self.world
-        x, y = WIDTH - PANEL_W + 14, TOP + 10
-        self.text(self.title, "Ledger", (x, y))
-        y += 32
-        for cx, label in zip((x, x + 26, x + 190, x + 245, x + 305), ("#", "Country", "Score", "Income", "Colonies")):
-            self.text(self.small, label, (cx, y), MUTED)
-        y += 18
-        for i, country in enumerate(world.ranking()[:28]):
-            color = GOLD if country.tag == self.player else TEXT
-            self.text(self.small, str(i + 1), (x, y), MUTED)
-            pygame.draw.rect(self.screen, country.color, (x + 26, y + 4, 9, 9))
-            self.text(self.small, country.name, (x + 40, y), color, 145)
-            self.text(self.small, str(world.score(country.tag)), (x + 190, y), color)
-            self.text(self.small, f"{country.balance:.0f}", (x + 245, y), color)
-            self.text(self.small, str(len(world.colonies_of(country.tag))), (x + 305, y), color)
-            y += 20
+        panels.draw(self, self.world, self.ui)
 
     # ----- loop ---------------------------------------------------------------------------
     def run(self):

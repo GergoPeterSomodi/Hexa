@@ -5,17 +5,11 @@ A mixin for CampaignApp; it also owns the screen mode (window size and fullscree
 import pygame
 
 from .. import settings as options
+from ..ui.kit import menu_button as draw_menu_button, shade
+from ..ui.theme import GOLD, MUTED, PANEL_BG as PANEL, TEXT
 from . import saves
 from .game import GameManager
 
-TEXT = (235, 238, 242)
-MUTED = (150, 160, 172)
-GOLD = (255, 214, 70)
-PANEL = (28, 32, 40)
-BUTTON = (44, 50, 62)
-HOVER = (62, 70, 86)
-DISABLED = (34, 38, 46)
-WARN = (170, 60, 50)
 QUICKLOAD_CONFIRM_MS = 4000
 OPTION_TEXT = {
     "fullscreen": ("Fullscreen", lambda v: "On" if v else "Off"),
@@ -218,28 +212,13 @@ class GameMenu:
 
     # ----- drawing -------------------------------------------------------------------
     def _menu_button(self, rect, label, action, enabled=True, detail="", danger=False):
-        rect = pygame.Rect(rect)
-        hovered = enabled and rect.collidepoint(self.ui.mouse)
-        waiting = action == self.menu_confirm
-        color = WARN if waiting or (danger and hovered) else HOVER if hovered else BUTTON if enabled else DISABLED
-        pygame.draw.rect(self.screen, color, rect, border_radius=7)
-        if waiting:
-            pygame.draw.rect(self.screen, GOLD, rect, 2, border_radius=7)
-        img = self.bold.render(label, True, TEXT if enabled else MUTED)
-        if detail:
-            self.screen.blit(img, (rect.x + 14, rect.y + 5))
-            sub = self.small.render(detail, True, MUTED if not waiting else TEXT)
-            self.screen.blit(sub, (rect.x + 14, rect.y + 25))
-        else:
-            self.screen.blit(img, img.get_rect(center=rect.center))
+        rect = draw_menu_button(self, rect, label, enabled, detail, action == self.menu_confirm, danger)
         self.menu_buttons.append((rect, action, enabled))
 
     def draw_menu(self):
         screen = self.screen
         w, h = screen.get_size()
-        shade = pygame.Surface((w, h), pygame.SRCALPHA)
-        shade.fill((5, 7, 10, 165))
-        screen.blit(shade, (0, 0))
+        shade(screen, (0, 0, w, h), (5, 7, 10, 165))
         self.menu_buttons = []
         if self.menu == "question":
             width = 480

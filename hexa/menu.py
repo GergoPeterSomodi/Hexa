@@ -4,11 +4,8 @@ import pygame
 from . import __version__
 from .campaign import saves
 from .colony.rules import GOAL_NAMES, START_NAMES
+from .ui.theme import GOLD, MENU_BG as BG, MUTED, TEXT, new_font
 
-BG = (22, 28, 38)
-TEXT = (235, 238, 242)
-MUTED = (150, 160, 172)
-GOLD = (255, 214, 70)
 CREDITS = ("Hexa uses",
            "Place names: GeoNames (https://www.geonames.org), licensed CC BY 4.0",
            "(https://creativecommons.org/licenses/by/4.0/), pruned and adapted.",
@@ -33,10 +30,10 @@ class Menu:
     def __init__(self, screen, settings):
         self.screen = screen
         self.settings = dict(settings)
-        self.title = pygame.font.SysFont("segoeui,arial", 54, bold=True)
-        self.head = pygame.font.SysFont("segoeui,arial", 18, bold=True)
-        self.font = pygame.font.SysFont("segoeui,arial", 16)
-        self.button_font = pygame.font.SysFont("segoeui,arial", 17, bold=True)
+        self.title = new_font(54, bold=True)
+        self.head = new_font(18, bold=True)
+        self.font = new_font(16)
+        self.button_font = new_font(17, bold=True)
         self.hover = None
         self.credits = False                 # the credits box is open
         self.error = self.settings.pop("error", None)     # e.g. a save that could not be loaded
