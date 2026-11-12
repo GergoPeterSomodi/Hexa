@@ -19,7 +19,7 @@ LAND_BUILD_MS = 3.0               # time a frame may spend building composites a
                                   # a hex not built yet is drawn with its old sprite, or without its objects
 LAND_IDLE_MS = 8.0                # a frame may prefetch the ring round the view until this many ms into the frame
 WARM_MS = 250.0                   # the start-up warm of the view's hexes stops after this long (the rest: prefetch)
-LAND_STILL_MS = 12.0              # a frame whose camera did not move (same zoom) may spend this long building in total
+LAND_STILL_MS = 24.0              # a frame whose camera did not move (same zoom) may spend this long building in total
                                   # (overlays, composites, object lists), nearest the view centre first
 ART_KEYS = {"galleon": "carrack"}   # unit kinds drawn with another kind's figure until they get their own
 MINES = ("iron", "silver", "gold", "salt")
@@ -115,6 +115,12 @@ class MapView:
         self._warmed = False               # the start-up warm of the landscape zooms runs on the first draw
         self.warm_ms = 0.0
         self._last_r, self._still, self._build_spent = None, False, 0.0
+        self._fill_key, self._fill_seen = None, set()
+        self._filled = None                # (camera, r, season, world version) of the last still frame that built it all
+        self._pm_edges, self._pm_ver = {}, None      # (pos, r) -> owner border segments, for this world version
+        self._labels = {}                  # (town name, r) -> (shade box, name surface): drawn every frame, rendered once
+        self._late_labels = []             # (shade, name, centre-top point) of the far zooms: drawn over the unit tokens
+        self._pass_chips = {}              # r -> the small CLOSED marker of the far zooms
         self.grid_on = True                # the faint hex grid on the landscape zooms (the G key)
         self._roads = []
         for path in getattr(world, "road_paths", []):
@@ -323,6 +329,7 @@ class MapView:
             self.warm(camera, view_rect)
         screen.set_clip(view_rect)
         screen.fill(BLACK_FOG, view_rect)
+        self._late_labels = []
         if self.r >= LAND_FROM and self.land is not None:
             self._draw_landscape(screen, view_rect, camera)
         elif self.zoom >= TILE_FROM and self.tiles_dir:
@@ -335,6 +342,8 @@ class MapView:
         def at(pos):
             x, y = self.center(pos)
             return x + ox, y + oy
+        if r < LAND_FROM and world.winter():
+            self._closed_passes(screen, view_rect, at)
         if ui.selected and ui.reach:
             self._movement(screen, at, ui)
         if ui.province:
@@ -374,7 +383,43 @@ class MapView:
                     self._diorama(screen, stack, top, slide, True)
                 else:
                     self._token(screen, top, slide, True, len(stack))
+        for shade, name, box in self._late_labels:           # the town names over the tokens
+            screen.blit(shade, box)
+            screen.blit(name, name.get_rect(center=box.center))
+        self._late_labels = []
         screen.set_clip(None)
+
+    def pass_chip(self, r):
+        """The CLOSED chip of the landscape zooms (red box, dark edge, white letters), scaled down for the far zooms:
+        the word from hex radius 13, a bare bar on a red plate from 8, a red dot below that. Cached."""
+        if r not in self._pass_chips:
+            if r >= 13:
+                font = pygame.font.SysFont("segoeui,arial", 9, bold=True)
+                lab = font.render("CLOSED", True, (255, 255, 255))
+                size = (lab.get_width() + 6, lab.get_height() + 1)
+            else:
+                lab = None
+                size = (max(5, round(r * 1.3)), max(4, round(r * 0.8)))
+            surf = pygame.Surface(size, pygame.SRCALPHA)
+            pygame.draw.rect(surf, (190, 40, 38), surf.get_rect(), border_radius=3 if r >= 8 else 1)
+            pygame.draw.rect(surf, (90, 16, 16), surf.get_rect(), 1, border_radius=3 if r >= 8 else 1)
+            if lab is not None:
+                surf.blit(lab, (3, 0))
+            elif r >= 8:
+                pygame.draw.line(surf, (255, 255, 255), (2, size[1] // 2), (size[0] - 3, size[1] // 2), 2)
+            self._pass_chips[r] = surf
+        return self._pass_chips[r]
+
+    def _closed_passes(self, screen, view_rect, at):
+        """Winter: a small CLOSED marker on every closed pass the player knows, at the zooms that have no landscape art."""
+        world = self.world
+        chip = self.pass_chip(self.r)
+        known = self.known()
+        for pos in world.passes():
+            if pos in known and world.pass_closed(pos):
+                x, y = at(pos)
+                if view_rect.inflate(40, 40).collidepoint(x, y):
+                    screen.blit(chip, chip.get_rect(center=(x, y - self.r * 0.25)))
 
     STEP_MS = 70                    # how long a moving stack takes per hex
 
@@ -629,18 +674,30 @@ class MapView:
         """Owner borders, controller stripes, goods dots, town names and capital flags (over the objects)."""
         world, r = self.world, self.r
         width = max(2, r // 8)
+        if self._pm_ver != world.version:
+            self._pm_edges.clear()
+            self._pm_ver = world.version
+        draw_line = pygame.draw.line
         for prov, cx, cy in shown:
             if prov.owner:
-                color = world.countries[prov.owner].color
-                outer = hex_points(cx, cy, r - width / 2 - 1)
-                inner = hex_points(cx, cy, r - width * 1.6 - 1)
-                near = list(neighbors(prov.pos))
-                for edge in range(6):
-                    other = world.provinces.get(near[(6 - edge) % 6])
-                    if other is None or other.owner != prov.owner:
-                        a, b = (edge + 1) % 6, edge
-                        pygame.draw.line(screen, tint(color, -0.35), outer[b], outer[a], width)
-                        pygame.draw.line(screen, tint(color, 0.35), inner[b], inner[a], max(1, width // 2))
+                segs = self._pm_edges.get((prov.pos, r))
+                if segs is None:                    # the outline's segments as offsets from the hex centre
+                    color = world.countries[prov.owner].color
+                    dark, light = tint(color, -0.35), tint(color, 0.35)
+                    outer = hex_points(0, 0, r - width / 2 - 1)
+                    inner = hex_points(0, 0, r - width * 1.6 - 1)
+                    near = list(neighbors(prov.pos))
+                    segs = []
+                    for edge in range(6):
+                        other = world.provinces.get(near[(6 - edge) % 6])
+                        if other is None or other.owner != prov.owner:
+                            a, b = (edge + 1) % 6, edge
+                            segs.append((dark, outer[b], outer[a], light, inner[b], inner[a]))
+                    self._pm_edges[(prov.pos, r)] = segs
+                lw = max(1, width // 2)
+                for dark, ob, oa, light, ib, ia in segs:
+                    draw_line(screen, dark, (cx + ob[0], cy + ob[1]), (cx + oa[0], cy + oa[1]), width)
+                    draw_line(screen, light, (cx + ib[0], cy + ib[1]), (cx + ia[0], cy + ia[1]), lw)
             if prov.controller and prov.controller != prov.owner:
                 ctrl = world.countries[prov.controller].color
                 for k in (-0.4, 0.0, 0.4):
@@ -652,12 +709,19 @@ class MapView:
                     pygame.draw.circle(screen, GOODS[prov.good].color, dot, max(2, r // 9 - 1))
             named = not prov.name.startswith(("near ", "New ")) and "countryside" not in prov.name
             if (prov.settlement >= 2 or prov.castle) and named and (r >= 20 or prov.city):
-                name = self.small.render(prov.name, True, (245, 245, 245))
-                box = name.get_rect(midtop=(cx, cy + r * 0.72)).inflate(8, 2)
-                shade = pygame.Surface(box.size, pygame.SRCALPHA)
-                shade.fill((0, 0, 0, 150))
-                screen.blit(shade, box)
-                screen.blit(name, name.get_rect(center=box.center))
+                lab = self._labels.get((prov.name, r))
+                if lab is None:
+                    name = self.small.render(prov.name, True, (245, 245, 245))
+                    shade = pygame.Surface(name.get_rect().inflate(8, 2).size, pygame.SRCALPHA)
+                    shade.fill((0, 0, 0, 150))
+                    lab = self._labels[(prov.name, r)] = (shade, name)
+                shade, name = lab
+                box = shade.get_rect(midtop=(cx, cy + r * 0.72))
+                if r < LAND_FROM:                   # tokens stand on the hex centre and would cover the name
+                    self._late_labels.append((shade, name, box))
+                else:
+                    screen.blit(shade, box)
+                    screen.blit(name, name.get_rect(center=box.center))
             if prov.owner and world.countries[prov.owner].capital == prov.pos:
                 self._flag(screen, (cx + r * 0.35, cy - r * 0.85), world.countries[prov.owner].color)
 
@@ -782,6 +846,12 @@ class MapView:
         """Still frame: builds the view's hexes nearest the centre first, until LAND_STILL_MS of building is spent.
         The drawing order is unchanged; this only decides which composites and object lists are ready."""
         r = self.r
+        done = (tuple(camera), r, season, self.world.version, self.mode)
+        if self._filled == done:                                 # everything of this view is already built
+            return
+        if self._fill_key != done:
+            self._fill_key, self._fill_seen = done, set()
+        seen = self._fill_seen
         cx, cy = camera[0] + view_rect.w / 2, camera[1] + view_rect.h / 2
         todo = []
         for row in range(rows[0], rows[1] + 1):
@@ -791,9 +861,11 @@ class MapView:
         todo.sort()
         for _, pos in todo:
             if self._build_spent >= LAND_STILL_MS / 1000:
-                break
-            if pos in known:
+                return
+            if pos in known and pos not in seen:
                 self._build_hex(pos, r, season)
+                seen.add(pos)
+        self._filled = done
 
     def _build_hex(self, pos, r, season):
         """One hex's composite and object list, the first-use work first; the time goes to _build_spent."""
@@ -811,9 +883,12 @@ class MapView:
         """One hex's ground: its baked composite if built (new ones while the frame has LAND_BUILD_MS: first the
         hex's overlay and picture, then the composite), else the sprite."""
         world, land = self.world, self.land
-        in_time = time.perf_counter() < self._frame_deadline
         img = land.ground(pos, self.r, season, build=False)
-        if img is None and self._may_build(self._frame_builds):
+        if img is not None:
+            self._blit_centre(screen, img, cx, cy)
+            return
+        in_time = time.perf_counter() < self._frame_deadline
+        if self._may_build(self._frame_builds):
             t = time.perf_counter()
             if land.prepare(pos, self.r, season):
                 self._frame_ov += 1
@@ -862,6 +937,7 @@ class MapView:
         row0, row1, col0, col1 = rows[0] - 1, rows[1] + 1, rows[2] - 1, rows[3] + 1
         end = time.perf_counter() + LAND_BUILD_MS / 1000        # the object lists get their own slice of time
         items = []
+        vl, vt, vr, vb = view_rect.left, view_rect.top, view_rect.right, view_rect.bottom
         for row in range(max(0, row0), min(world.rows - 1, row1) + 1):
             for col in range(max(0, col0), min(world.cols - 1, col1) + 1):
                 pos = (col, row)
@@ -874,10 +950,10 @@ class MapView:
                 cx, cy = self.center(pos)
                 cx, cy = cx + ox, cy + oy
                 for surf, dx, dy, sort_y in objs:
-                    w, h = surf.get_width(), surf.get_height()
+                    w, h = surf.get_size()
                     x = int(round(cx + dx - w / 2))
                     y = int(round(cy + dy - h + 1))
-                    if view_rect.colliderect(pygame.Rect(x, y, w, h)):
+                    if x < vr and x + w > vl and y < vb and y + h > vt:
                         items.append((cy + sort_y, x, y, surf))
         items.sort(key=lambda item: item[0])
         for _, x, y, surf in items:

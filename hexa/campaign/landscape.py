@@ -516,13 +516,17 @@ def _blob_cached(c):
 
 
 def voronoi_cells(seeds, box):
-    """Convex Voronoi cells clipped to a box polygon (simple half-plane clipping)."""
+    """Convex Voronoi cells clipped to a box polygon (half-plane clipping, nearest seeds first: once the cell fits
+    inside half the distance to the next seed, no farther seed can cut it)."""
     cells = []
     for i, s in enumerate(seeds):
         poly = list(box)
-        for j, t in enumerate(seeds):
-            if i == j:
-                continue
+        reach2 = max((p[0] - s[0]) ** 2 + (p[1] - s[1]) ** 2 for p in poly)     # farthest corner of the cell so far
+        order = sorted((((t[0] - s[0]) ** 2 + (t[1] - s[1]) ** 2, j) for j, t in enumerate(seeds) if j != i))
+        for d2, j in order:
+            if d2 > 4 * reach2:
+                break
+            t = seeds[j]
             mx, my = (s[0] + t[0]) / 2, (s[1] + t[1]) / 2
             nx, ny = t[0] - s[0], t[1] - s[1]
             out = []
@@ -538,6 +542,7 @@ def voronoi_cells(seeds, box):
             poly = out
             if len(poly) < 3:
                 break
+            reach2 = max((p[0] - s[0]) ** 2 + (p[1] - s[1]) ** 2 for p in poly)
         cells.append(poly)
     return cells
 
@@ -1011,23 +1016,30 @@ class Landscape:
         model = self._model(season)                      # also syncs with world.version
         quick = (pos, r, season)
         hit = self._gquick.get(quick)
+        c = None
         if hit is not None and hit[0] == self._version:  # this hex's key was worked out for this world version
-            img = _lru_get(self._grounds, hit[1])
+            key = hit[1]
+            img = _lru_get(self._grounds, key)
             if img is not None:
                 return img
+            if not build:                                # not built yet (a frame asks again every frame while it waits)
+                return None
+        else:
+            key = None
         c = model.cells.get(pos)
         if c is None:
             return None
-        nbrs = list(neighbors(pos))
-        key = (pos, r, season, c.ground, c.variant, _base_name(c), c.desc, c.fields, round(c.clearing, 3),
-               c.impassable, c.landmark, c.owner, c.built, c.water,
-               tuple(self._nbr_sig(model, n) for n in nbrs))
-        self._gquick[quick] = (self._version, key)
-        hit = _lru_get(self._grounds, key)
-        if hit is not None:
-            return hit
-        if not build:
-            return None
+        if key is None:
+            nbrs = list(neighbors(pos))
+            key = (pos, r, season, c.ground, c.variant, _base_name(c), c.desc, c.fields, round(c.clearing, 3),
+                   c.impassable, c.landmark, c.owner, c.built, c.water,
+                   tuple(self._nbr_sig(model, n) for n in nbrs))
+            self._gquick[quick] = (self._version, key)
+            hit = _lru_get(self._grounds, key)
+            if hit is not None:
+                return hit
+            if not build:
+                return None
         self.builds += 1
         return _lru_put(self._grounds, key, self._build_ground(model, c, r), GROUND_CACHE)
 
@@ -1392,10 +1404,16 @@ class Landscape:
         segs = _corridor_segs(m, pos)
         for gi in range(int(math.floor((X - APO) / step)) - 2, int(math.floor((X + APO) / step)) + 3):
             for gj in range(int(math.floor((Y - 1) / step)) - 2, int(math.floor((Y + 1) / step)) + 3):
+                # the lattice point's jitter moves it by at most half a step: skip those that cannot reach this hex
+                mx = abs((gi + 0.5 * (gj & 1) + 0.25) * step + 0.5 * step * 0.5 - X)
+                my = abs((gj + 0.25) * step + 0.5 * step * 0.5 - Y)
+                if mx > APO + 0.2 or my > 1.2 or my + mx / SQ3 > 1.3:
+                    continue
                 jx, jy = _u("jx", gi, gj), _u("jy", gi, gj)
                 x = (gi + 0.5 * (gj & 1) + 0.25 + 0.5 * jx) * step
                 y = (gj + 0.25 + 0.5 * jy) * step
-                if _hex_at(x, y) != pos:
+                dx, dy = abs(x - X), abs(y - Y)                     # (x, y) lies in this hex (not a neighbour's)
+                if dx > APO or dy > 1 or dy + dx / SQ3 > 1:
                     continue
                 dens, kind = tree_density(m, c, x, y)
                 if dens <= 0 or _u("keep", gi, gj) > dens:
