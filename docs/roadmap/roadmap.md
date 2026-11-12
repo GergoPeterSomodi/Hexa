@@ -119,6 +119,11 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
   - text size and colour-blind options
   - The design comes with mockups for approval first.
   - It is planned with the polish round (M3), before the battle system, and the playtest report's UI ideas feed into it.
+- **Movement pace and floating action text (user request 2026-11-12):**
+  - **Slower visible movement.** Movement is too fast, especially for the computer's armies and ships. Units in the player's vision walk hex by hex at a readable pace, so the player can follow what each one does. Moves under fog of war stay instant. Speed comes from the scroll/animation option, with a key to skip or speed up the computer's turn (suggested).
+  - **Floating action text.** A short word rises from the hex where something happens and fades after about one second: "Attacked!", "Sieging", "Captured!", "Retreat", "Foraged", "Recruited", "+12 ducats". It shows for the player's own actions and for anything the player can see.
+  - **The look matters:** the font, size, colour, outline and motion must be right and readable over every terrain. A colour per kind of event: war red, gains gold, own green, neutral white (suggested). The design comes with mockups for approval first.
+  - Planned with the polish round (M3).
 - **RPG-style event pop-ups:** interactive choices with good or bad outcomes. This is planned for the long-term roadmap's Phase 3 (History and events). Don't start it yet.
 - **Known loose ends:**
   - balance
@@ -154,13 +159,15 @@ Each design is approved by the user before its build starts. M1 and M2 must run 
 
 **M3. Visual polish round**
 - Goal: the map looks smoother and more crafted, and the UI is cleaned up: a consistent button style, tidy panels, clearer layout.
-- In: tile blending, closer zoom, smoother fog, dirt and grass edges, and landmark tiles for a first set of cities.
+- In: tile blending, closer zoom, smoother fog, dirt and grass edges, landmark tiles for a first set of cities, slower visible movement, and floating action text.
 - Depends on: user approval of the mockups first. It touches different files from M1 and M2, so it can run in parallel (suggested).
 - Done when:
   - The user approves the mockups.
   - Zoom goes beyond the current 34 px radius.
   - Edges blend in screenshots.
   - At least five named cities have landmark tiles.
+  - Units the player can see move at a pace that can be followed, and moves under fog stay instant.
+  - Actions show floating text whose font and colours the user approved.
   - Screenshots are reviewed.
 
 **M4. Balance and playtest pass**
