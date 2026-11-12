@@ -185,6 +185,10 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
     - The full suite and the long-run invariant tests pass after each step.
   - **When:** after the current bug-fix round (v0.1.5), and before the bigger features (battle system, events), so they are built on the new structure. The event bus and UI kit go first, because the floating text, action log, resource bar and UI clean-up need them.
 - **Ideas from the owner's playtest (2026-11-12).** The bugs from the same playtest are filed as GitHub issues and fixed first.
+  - **Ridges as natural frontiers (owner, 2026-11-12):** the point of ridge crests is a natural block on expansion, for the player and the AI. Built (v0.1.7 work): crests block moves, supply, ZOC and roads, and passes close in winter. To do, with the balance pass (M4):
+    - the AI weighs crests when it picks war targets and colony sites (expand within its basin first, cross ridges at passes)
+    - claims and peace demands across a crest cost more
+    - the art keeps the crest readable as a frontier, toned down to the landscape (round-3 mockups)
   - **Mountains and passes (decided, revised):** mountain hexes stay walkable. Only the hex edges along the main ridge crests block movement, so armies cross a ridge at named pass edges, which close in winter. The crest gets its own art (options for approval). Being built now.
   - **End-of-turn reminders:** before End season, list unfinished things: an unassigned merchant, research to fund, idle armies, an empty build queue. It can be turned off in Options.
   - **Achievements:** design ideas wanted (for Steam too).
