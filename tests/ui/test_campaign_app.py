@@ -604,7 +604,6 @@ class OrdersTest(CampaignCase):
                          "(turn, hexes, goals, moves left) after the attack and next season: the attack ended the "
                          "order, and the stack stays where it fought")
 
-    @unittest.expectedFailure
     def test_an_order_whose_route_goes_around_foreign_land_gets_there(self):
         """New bug, no GitHub issue filed yet: orders walk a cost field (world.cost_field, used by
         step_toward_group) that ignores land the stack may not enter. Castile's route to (134, 52) has to go round

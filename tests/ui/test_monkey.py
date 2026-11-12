@@ -161,7 +161,8 @@ class SessionTest(MonkeyCase):
         def problems(world):
             return real(world) + extra
 
-        with mock.patch.object(invariants, "colony_problems", problems):
+        with mock.patch.object(invariants, "colony_problems", problems), \
+                mock.patch.dict(invariants.KNOWN_OPEN, {("colony", "colony-capital:"): "a made-up open bug"}):       # no real open bug is left to name
             extra[:] = ["colony-capital: crimson has 0 capitals among 1 colonies"]
             known = monkey.run_session("colony", 1, 100, 0.3)
             extra[:] = ["colony-pop: crimson colony Fort at (3, 4) has 0 people (1..8)"]

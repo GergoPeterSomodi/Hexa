@@ -47,7 +47,6 @@ class LoadTest(TempHome):
                 write(self.home, content)
                 self.assertEqual(settings.load(), settings.DEFAULTS)
 
-    @unittest.expectedFailure
     def test_very_deep_nesting_counts_as_missing(self):
         """New crash class, no GitHub issue filed yet. ``json.load`` raises RecursionError (not a ValueError)
         for a file nested deeper than the interpreter allows: about 1000 levels on Python 3.10, about 200000 on
@@ -85,7 +84,6 @@ class LoadTest(TempHome):
                     write(self.home, json.dumps({key: value}))     # NaN and Infinity are written as JS literals
                     self.assertEqual(settings.load(), settings.DEFAULTS)
 
-    @unittest.expectedFailure
     def test_a_number_is_not_a_boolean_fullscreen(self):
         """New: no GitHub issue filed yet. 0 == False and 1 == True, so ``{"fullscreen": 0}`` passes the
         ``value in CHOICES`` check and load() hands out the number 0 (or 1.0) instead of a bool. Harmless

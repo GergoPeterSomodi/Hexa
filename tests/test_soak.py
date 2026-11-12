@@ -38,12 +38,13 @@ class GameTest(unittest.TestCase):
     def test_a_known_open_bug_is_reported_but_does_not_fail(self):
         real = invariants.colony_problems
         capital = "colony-capital: crimson has 0 capitals among 1 colonies"
-        with mock.patch.object(invariants, "colony_problems", lambda world: real(world) + [capital]):
+        with mock.patch.object(invariants, "colony_problems", lambda world: real(world) + [capital]), \
+                mock.patch.dict(invariants.KNOWN_OPEN, {("colony", "colony-capital:"): "a made-up open bug"}):       # no real open bug is left to name
             game = soak.play_game("colony", 1, turns=2)
         self.assertFalse(game.failed, game.report())
         self.assertEqual(list(game.known), ["colony-capital"])
         self.assertIn("1 known open", game.summary())
-        self.assertIn(f"    at the start: {capital}  [{invariants.known_open('colony', capital)}]",
+        self.assertIn(f"    at the start: {capital}  [a made-up open bug]",
                       game.report().splitlines())
         self.assertEqual(game.report().splitlines()[-1], "Replay: python -m tools.soak colony 1 --turns 2")
 
@@ -131,11 +132,11 @@ class CommandTest(unittest.TestCase):
     def test_known_open_bugs_are_listed_in_the_summary(self):
         real = invariants.colony_problems
         dead = "dead-side-units: ['crimson'] still have units"
-        with mock.patch.object(invariants, "colony_problems", lambda world: real(world) + [dead]):
+        with mock.patch.object(invariants, "colony_problems", lambda world: real(world) + [dead]), \
+                mock.patch.dict(invariants.KNOWN_OPEN, {("colony", "dead-side-units:"): "a made-up open bug"}):       # no real open bug is left to name
             status, text = self.main("colony", "2", "--turns", "1")
         self.assertEqual(status, 0, text)
-        self.assertIn(f"known open: {invariants.known_open('colony', dead)}: 1 game(s), e.g. colony seed 2 at the "
-                      f"start", text)
+        self.assertIn("known open: a made-up open bug: 1 game(s), e.g. colony seed 2 at the start", text)
         with open(self.summary_file, encoding="utf-8") as f:
             self.assertIn("Known open bugs seen (they don't fail the run):", f.read())
 

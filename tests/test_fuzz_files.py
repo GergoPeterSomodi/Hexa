@@ -11,9 +11,7 @@ Anything else, an exception that escapes, fails the test.
                                                           replay one case: case N uses seed BASE+N, and a failure
                                                           prints the seed (and this command) to use
 
-Crash classes that are still open (see KNOWN_OPEN) are recognised by exception type and call site, and are pinned
-by ``@unittest.expectedFailure`` tests in test_settings.py and test_saves.py. Any other crash fails loudly, and
-so does a known-open exception on a file the open bug does not explain.
+Every crash fails loudly, with its seed: no crash class is excused any more.
 
 Needs no pygame. Everything happens in a temporary HEXA_HOME.
 """
@@ -41,16 +39,6 @@ CASES = int(os.environ.get("HEXA_FUZZ_CASES", "300"))
 BASE_SEED = int(os.environ.get("HEXA_FUZZ_SEED", "20260101"))
 SHOWN = 8                                  # failures listed in the message
 DEEP = 1000000                             # nesting that overflows json on every Python version we support
-
-# The crash classes found by this fuzzer that no GitHub issue covers yet. Each is tolerated only where the
-# check below can explain it from the file's content.
-KNOWN_OPEN = (
-    "json.load/loads raises RecursionError for deeply nested JSON (settings.load, saves.meta, listing, latest)",
-    "saves.latest raises KeyError/TypeError and saves.describe raises KeyError/TypeError/OverflowError/ValueError "
-    "for a header with the right version but a missing or odd saved/country/date/map",
-    "settings.load returns the number 0 or 1 for fullscreen (0 == False)",
-)
-
 
 # ----- generating values -------------------------------------------------------------------------------------
 
@@ -92,11 +80,6 @@ def dumps(value):
     return json.dumps(value).encode("utf-8")          # allow_nan: NaN and Infinity come out as JS literals
 
 
-def deeply_nested(raw):
-    """Could this JSON overflow the decoder's stack? (Python 3.10 gives up at about 1000 levels, 3.15 at 200000.)
-    Any file with that many brackets might, which is all the known-open RecursionError excuse needs."""
-    return raw.count(b"[") + raw.count(b"{") > 900
-
 
 def flip_bytes(rng, data, count):
     data = bytearray(data)
@@ -125,9 +108,16 @@ def mangle(rng, data):
 
 # ----- settings.json -----------------------------------------------------------------------------------------
 
-def strictly_legal(key, value):
-    """Is this value one of the choices for the key, of the choice's own type (so not 0 for False)?"""
-    return any(type(value) is type(c) and value == c for c in settings.CHOICES[key])
+def legal_choice(key, value):
+    """The choice this stored value stands for, or None. A number equal to a boolean choice (0, 1, 0.0, 1.0)
+    stands for that bool; everything else must be a choice of its own type."""
+    for c in settings.CHOICES[key]:
+        if isinstance(c, bool):
+            if type(value) in (bool, int, float) and value == c:
+                return c
+        elif type(value) is type(c) and value == c:
+            return c
+    return None
 
 
 def settings_file(rng):
@@ -174,8 +164,11 @@ def oracle_settings(raw):
         return dict(settings.DEFAULTS), None
     if not isinstance(stored, dict):
         return dict(settings.DEFAULTS), None
-    return {k: stored[k] if k in stored and strictly_legal(k, stored[k]) else d
-            for k, d in settings.DEFAULTS.items()}, stored
+    want = {}
+    for key, default in settings.DEFAULTS.items():
+        choice = legal_choice(key, stored[key]) if key in stored else None
+        want[key] = default if choice is None else choice
+    return want, stored
 
 
 class Crash(Exception):
@@ -229,20 +222,13 @@ class FuzzSettingsTest(TempHome):
         name, raw = settings_file(rng)
         with open(os.path.join(self.home, "settings.json"), "wb") as f:
             f.write(raw)
-        want, stored = oracle_settings(raw)
-        try:
-            got = call("settings.load", settings.load)
-        except Crash as crash:
-            if isinstance(crash.error, RecursionError) and deeply_nested(raw):
-                return                          # known open: deeply nested JSON
-            raise
+        want, _ = oracle_settings(raw)
+        got = call("settings.load", settings.load)
         if set(got) != set(settings.DEFAULTS):
             raise AssertionError(f"load() returned keys {sorted(got)}")
         for key, value in got.items():
             if value == want[key] and type(value) is type(want[key]):
                 continue
-            if key == "fullscreen" and type(value) in (int, float) and stored and stored.get(key) == value in (0, 1):
-                continue                        # known open: 0 == False, so the number comes back as it is
             raise AssertionError(f"{key}: loaded {value!r}, expected {want[key]!r}")
         w, h = call("settings.window_size", settings.window_size, got)
         if f"{w}x{h}" not in settings.WINDOWS:
@@ -328,19 +314,6 @@ def header_line(rng):
                        ("header only, bad utf-8", b'{"version": 1, "country": "\xff"}')))
 
 
-def ui_ready(info):
-    """Can the screens show this header? They read saved (as a time) and country, date and map."""
-    if not isinstance(info, dict) or any(k not in info for k in ("saved", "country", "date", "map")):
-        return False
-    saved = info["saved"]
-    if not isinstance(saved, (int, float)):
-        return False
-    try:
-        time.localtime(saved)
-    except (OverflowError, ValueError, OSError):
-        return False
-    return True
-
 
 class FuzzSaveHeaderTest(TempHome):
     """Headers of save files, with a junk body, in one to three slots."""
@@ -349,61 +322,31 @@ class FuzzSaveHeaderTest(TempHome):
         rng = random.Random(seed)
         shutil.rmtree(saves.folder(), ignore_errors=True)
         os.makedirs(saves.folder())
-        deep = False
         for slot in rng.sample(ALL_SLOTS, rng.randrange(1, 4)):
             _, raw = header_line(rng)
-            deep = deep or deeply_nested(raw)
             body = rng.choice((b"", b"x", b"garbage\n" * 3, pickle.dumps({})))
             with open(saves.path(slot), "wb") as f:
                 f.write(raw + b"\n" + body)
 
-        def known_deep(crash):                  # known open: deeply nested JSON
-            return deep and isinstance(crash.error, RecursionError)
-
-        infos = {}
-        for slot in ALL_SLOTS:
-            try:
-                infos[slot] = call(f"saves.meta({slot!r})", saves.meta, slot)
-            except Crash as crash:
-                if not known_deep(crash):
-                    raise
-                infos[slot] = None
+        infos = {slot: call(f"saves.meta({slot!r})", saves.meta, slot) for slot in ALL_SLOTS}
         for slot, info in infos.items():
             version = info.get("version") if info is not None else saves.VERSION
             if not (isinstance(version, int) and 1 <= version <= saves.VERSION):
                 raise AssertionError(f"meta({slot!r}) accepted {info!r}")
-        try:
-            listed = call("saves.listing", saves.listing)
-            if [s for s, _ in listed] != list(ALL_SLOTS):
-                raise AssertionError("listing() lost slots")
-        except Crash as crash:
-            if not known_deep(crash):
-                raise
+        listed = call("saves.listing", saves.listing)
+        if [s for s, _ in listed] != list(ALL_SLOTS):
+            raise AssertionError("listing() lost slots")
 
         readable = {s: m for s, m in infos.items() if m}
-        try:
-            latest = call("saves.latest", saves.latest)
-            if not deep:
-                if latest not in readable and not (latest is None and not readable):
-                    raise AssertionError(f"latest() gave {latest!r} for the readable slots {sorted(readable)}")
-                if readable and all(ui_ready(m) for m in readable.values()):
-                    best = max((m["saved"], s) for s, m in readable.items())[1]
-                    if latest != best:
-                        raise AssertionError(f"latest() gave {latest!r}, the newest save is {best!r}")
-        except Crash as crash:
-            # known open: KeyError for a header without saved, TypeError comparing saved values that are no numbers
-            odd_saved = any(not isinstance(m.get("saved"), (int, float)) for m in readable.values())
-            if not (known_deep(crash) or (isinstance(crash.error, (KeyError, TypeError)) and odd_saved)):
-                raise
+        latest = call("saves.latest", saves.latest)
+        if latest not in readable and not (latest is None and not readable):
+            raise AssertionError(f"latest() gave {latest!r} for the readable slots {sorted(readable)}")
+        if readable:
+            best = max((saves._saved_time(m) or 0.0, s) for s, m in readable.items())[1]
+            if latest != best:
+                raise AssertionError(f"latest() gave {latest!r}, the newest save is {best!r}")
         for slot, info in readable.items():
-            try:
-                text = call(f"saves.describe({slot!r})", saves.describe, info)
-            except Crash as crash:
-                # known open: a header that meta() accepts but the load page cannot show
-                if ui_ready(info) or not isinstance(crash.error, (KeyError, TypeError, OverflowError, ValueError,
-                                                                  OSError)):
-                    raise
-                continue
+            text = call(f"saves.describe({slot!r})", saves.describe, info)
             if not isinstance(text, str):
                 raise AssertionError(f"describe({slot!r}) gave {text!r}")
         for slot in ALL_SLOTS:
@@ -483,7 +426,7 @@ class FuzzSaveBodyTest(TempHome):
 
 class FuzzerSelfTest(TempHome):
     """The fuzzer has to see what it claims to see: replayable cases, every kind of damage, and a loud failure for
-    a crash it does not know (the known-open ones are excused only where their cause is in the file)."""
+    any crash (none is excused)."""
 
     def test_the_same_seed_makes_the_same_file(self):
         for make in (settings_file, header_line):
@@ -521,13 +464,17 @@ class FuzzerSelfTest(TempHome):
         self.assertIn(f"HEXA_FUZZ_SEED={BASE_SEED} HEXA_FUZZ_CASES=1 python3 -m unittest tests.test_fuzz_files", text)
         self.assertIn("KeyError", text)
 
-    def test_known_open_exception_types_are_excused_only_where_the_file_explains_them(self):
+    def test_no_crash_is_excused_any_more(self):
         case = FuzzSaveHeaderTest("test_damaged_save_headers_never_raise").run_case
         for target, error in (("describe", OverflowError("year out of range")), ("latest", KeyError("saved")),
                               ("meta", RecursionError("deep"))):
             with self.subTest(target), mock.patch.object(saves, target, side_effect=error):
                 self.assertTrue(self._failures(case, range(40)),
-                                f"{type(error).__name__} out of {target}() on complete headers went unnoticed")
+                                f"{type(error).__name__} out of {target}() went unnoticed")
+        fuzz = FuzzSettingsTest("test_damaged_settings_json_never_raises")
+        fuzz.home = self.home
+        with mock.patch.object(settings, "load", side_effect=RecursionError("deep")):
+            self.assertTrue(self._failures(fuzz.run_case, range(40)), "RecursionError out of load() went unnoticed")
         with mock.patch.object(saves, "latest", side_effect=ValueError("never seen before")):
             self.assertTrue(self._failures(case, range(40)), "a new kind of crash out of latest() went unnoticed")
 

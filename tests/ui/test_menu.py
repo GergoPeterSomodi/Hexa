@@ -302,7 +302,6 @@ class BadSaveHeaderTest(MenuCase):
         self.assertEqual(menu.last_save, "2")
         self.assertIsNotNone(harness.menu_continue_rect(menu))
 
-    @unittest.expectedFailure
     def test_a_header_with_the_right_version_but_no_saved_time_does_not_crash_the_menu(self):
         """New bug, no GitHub issue filed yet (the same crash as tests/test_saves.py HeaderFieldsTest, seen from
         the window): meta() accepts any object with a good ``version``, then ``latest()`` raises KeyError:

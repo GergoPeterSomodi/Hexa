@@ -25,6 +25,7 @@ import sys
 import traceback
 import unittest
 from collections import Counter
+from unittest import mock
 
 from hexa.campaign import geo, saves
 from hexa.campaign.data import CARAVEL, GARRISON_HP, STACK_LIMIT, troop
@@ -40,7 +41,7 @@ from tests.support.agents import Judge, campaign_player, colony_player, conquest
 from tests.support.digests import canonical, quick_digest, world_digest
 from tests.support.games import play_colony, play_conquest
 from tests.support.home import TempHome
-from tests.support.invariants import (campaign_problems, check_campaign, check_colony, check_conquest,
+from tests.support.invariants import (KNOWN_OPEN, campaign_problems, check_campaign, check_colony, check_conquest,
                                       colony_problems, conquest_problems, known_open)
 from tests.support.slow import slow
 from tests.support.worlds import fresh, play_seasons
@@ -705,11 +706,13 @@ class SmokeTest(unittest.TestCase):
             mode, play = "colony", staticmethod(broken)
 
         result = unittest.TestResult()
-        unittest.defaultTestLoader.loadTestsFromTestCase(Sample).run(result)
+        # No real open bug is left to name, so make one up.
+        with mock.patch.dict(KNOWN_OPEN, {("colony", "colony-capital:"): "a made-up open bug"}):
+            unittest.defaultTestLoader.loadTestsFromTestCase(Sample).run(result)
         text = "\n".join(message for _, message in result.failures)
         self.assertEqual(len(result.failures), 2, text)
         self.assertIn(f"seed {BASE_SEED}: turn 3, before golden's move: colony-capital:", text)
-        self.assertIn("known open bug: new bug, no GitHub issue filed yet", text)
+        self.assertIn("known open bug: a made-up open bug", text)
         self.assertIn(f"seed {BASE_SEED}: step 4: grow(Fort Hope)", text)
         self.assertIn(f"HEXA_PROP_SEED={BASE_SEED} HEXA_PROP_GAMES=1 python3 -m unittest "
                       f"tests.test_properties.Sample", text)
@@ -782,8 +785,8 @@ class KnownBugsTest(unittest.TestCase):
         self.assertEqual((len(w.cargo(w.units_at(sea)[0])), len(w.cargo(empty))), (CARAVEL.capacity, 0))
         w, home = crowded_colony_scenario()
         check_colony(w)
-        self.assertTrue(w.train_check(home, C_SOLDIER)[0])
-        self.assertTrue(w.colonist_check(home)[0])
+        self.assertFalse(w.train_check(home, C_SOLDIER)[0], "the only free hex is an enemy colony's: no room")
+        self.assertFalse(w.colonist_check(home)[0])
         w, raider, target = first_capture_scenario()
         check_colony(w)
         self.assertIn(target.pos, w.reachable(raider))
@@ -799,7 +802,6 @@ class KnownBugsTest(unittest.TestCase):
         self.assertTrue(w.move_group(stack, sea))
         check_campaign(w)
 
-    @unittest.expectedFailure
     def test_training_only_counts_room_the_new_unit_can_use(self):
         """New bug, no GitHub issue filed yet: train_check() and colonist_check() count an enemy colony's hex as
         room for the new unit but spawn() does not, so train() and make_colonist() pay (gold, a colonist's
@@ -817,7 +819,6 @@ class KnownBugsTest(unittest.TestCase):
             problems += judge.problems
         self.assertEqual(problems, [])
 
-    @unittest.expectedFailure
     def test_capturing_a_capital_as_your_first_colony_makes_it_your_capital(self):
         """New bug, no GitHub issue filed yet: _capture() asks capital_of(captor) after the colony already belongs
         to the captor, so a captured capital never becomes the captor's capital, and a side whose first colony it
@@ -828,7 +829,6 @@ class KnownBugsTest(unittest.TestCase):
         self.assertEqual(target.owner, CRIMSON)
         check_colony(w)
 
-    @unittest.expectedFailure
     def test_a_company_knocked_out_leaves_no_units_behind(self):
         """New bug, no GitHub issue filed yet: when a company loses its last colony and has no colonist, check_end()
         puts it out of the game (it gets no more turns) but leaves its other units on the map. They never move

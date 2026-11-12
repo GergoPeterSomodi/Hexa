@@ -129,7 +129,7 @@ class Menu:
             label = self.button_font.render("Continue", True, TEXT)
             screen.blit(label, label.get_rect(center=(resume.centerx, resume.centery - 8)))
             info = self.last_meta
-            sub = self.font.render(f"{info['country'] or 'Campaign'}, {info['date']}", True, (200, 210, 230))
+            sub = self.font.render(f"{info.get('country') or 'Campaign'}, {info.get('date', '')}", True, (200, 210, 230))
             screen.blit(sub, sub.get_rect(center=(resume.centerx, resume.centery + 13)))
         if self.error:
             text = self.head.render(self.error, True, (240, 120, 105))

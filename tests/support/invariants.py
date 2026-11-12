@@ -25,12 +25,7 @@ _LAST = weakref.WeakKeyDictionary()       # world -> {"turn": ..., "version": ..
 _SHOWN = 12                               # problems listed in one AssertionError
 
 # (mode, start of the problem text) -> the open bug behind it
-KNOWN_OPEN = {
-    ("colony", "colony-capital:"): "new bug, no GitHub issue filed yet: capturing a capital as your first colony "
-                                   "leaves you with no capital",
-    ("colony", "dead-side-units:"): "new bug, no GitHub issue filed yet: a company knocked out of the game leaves "
-                                    "its other units frozen on the map",
-}
+KNOWN_OPEN = {}
 
 
 def known_open(mode, problem):

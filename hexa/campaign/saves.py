@@ -4,6 +4,7 @@ A save file is one line of JSON (what the load screen shows) followed by the pic
 Files live in ~/.hexa/saves (or $HEXA_HOME/saves).
 """
 import json
+import math
 import os
 import pickle
 import sys
@@ -76,7 +77,7 @@ def meta(slot):
     try:
         with open(path(slot), "rb") as f:
             info = json.loads(f.readline().decode("utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):      # RecursionError: a header nested deeper than Python allows
         return None
     return info if _readable(info) else None
 
@@ -116,11 +117,23 @@ def listing():
 
 def latest():
     """The slot saved most recently, or None."""
-    found = [(m["saved"], slot) for slot, m in listing() if m]
+    found = [(_saved_time(m) or 0.0, slot) for slot, m in listing() if m]     # no (usable) time: oldest
     return max(found)[1] if found else None
 
 
+def _saved_time(info):
+    """The ``saved`` time of a header as a finite number, or None if it is missing or not a usable time."""
+    saved = info.get("saved")
+    if isinstance(saved, bool) or not isinstance(saved, (int, float)):
+        return None
+    return float(saved) if math.isfinite(saved) else None
+
+
 def describe(info):
-    when = time.strftime("%d %b %H:%M", time.localtime(info["saved"]))
-    who = info["country"] or "no country"
-    return f"{who}, {info['date']}  -  {info['map']}  -  saved {when}"
+    saved = _saved_time(info)
+    try:
+        when = time.strftime("%d %b %H:%M", time.localtime(saved)) if saved is not None else "at an unknown time"
+    except (OverflowError, OSError, ValueError):       # a time the C library cannot show
+        when = "at an unknown time"
+    who = info.get("country") or "no country"
+    return f"{who}, {info.get('date', '?')}  -  {info.get('map', '?')}  -  saved {when}"
