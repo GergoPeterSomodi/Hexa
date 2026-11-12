@@ -8,6 +8,7 @@
   - [tech tree](design/tech-tree.md), built in v0.1.2, with its [build spec](design/tech-tree-build-spec.md)
   - [battle system](design/battle.md), approved, not built yet
   - mockup images in [design/images](design/images/)
+  - [UI designs for upcoming features](design/ui/README.md): proposals for review (UI kit, resource bar, floating text, action log, recruiting, debt, trade, economy, events)
 - **Reports:**
   - [playtest, 2026-11-11](reports/playtest-2026-11-11.md)
   - [issue triage, 2026-11-11](reports/issue-triage-2026-11-11.md)
