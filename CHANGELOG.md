@@ -4,6 +4,25 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
+## v0.1.5: Bug-fix round
+**UI and controls** (kioba's milestone):
+- Right-clicking to close the pause menu no longer gives the selected stack an order (#16)
+- Loading a save slot asks first, as Main menu and Exit already did (#17)
+- The top bar lays out from the right edge, so End season never covers Menu; Market and Ledger hide when they don't fit (#18)
+- Esc clears the selected stack first; the next Esc opens the pause menu (#19)
+- Attacking, founding and foraging cancel the stack's standing move order (#22)
+- The panel close button closes the country and market panels (#24)
+
+**Economy:**
+- Debt limit of 6 seasons of running costs (at least 300 ducats); interest stops at the limit. Over it, with a deficit,
+  unpaid troops desert, then creditors seize buildings, works, castles and settlement levels. An AI in debt raises taxes,
+  stops spending and disbands troops. Interim rule until the debt and bankruptcy design (#69).
+
+**Map:**
+- Close-zoom panning is smooth and new ground fills in about a second; map overlays build about 6x faster (#67)
+- Closed passes are marked in winter at every zoom; town names draw over unit tokens at zoom 13 and out (#70)
+- Random worlds get up to 8 mountain passes that close in winter
+
 ## v0.1.4: New map look and playtest fixes
 **New map look (M3, first part):**
 - The two closest zooms draw a blended landscape: wavy edge transitions between every kind of ground, peaks and
