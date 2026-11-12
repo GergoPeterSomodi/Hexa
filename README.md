@@ -418,6 +418,7 @@ To keep test runs or experiments away from your real saves and options, set `HEX
 Python 3.10 or newer is needed (the suite passes on 3.10, the oldest version CI tests). Every push and pull
 request runs the whole suite on GitHub Actions (`.github/workflows/tests.yml`) on Python 3.10, 3.13 and the
 newest release, without installing pygame (the window tests show as skipped there; the `ui` job runs them).
+Pull requests that change `hexa/campaign/` also run the [save compatibility](#save-compatibility) job.
 To reproduce a CI run locally:
 
 ```bash
@@ -598,6 +599,43 @@ the perf job sets, makes that an error). The last row of the table is informatio
 module's caches keep as random worlds are built one after another (tracemalloc). `tests/test_memory.py` is the test of
 that (#29: the caches must stay bounded; it builds four random worlds, so it is `@slow`).
 
+### Save compatibility
+
+Players keep their saves when they update the game, so a change to `hexa/campaign/` must not break games saved by
+the code before it. The `save-compat` job of the tests workflow checks every pull request that changes
+`hexa/campaign/` (or the tool): it checks out the merge base (where the pull request leaves its target branch) into a
+`git worktree`, plays and saves three games with that code (`tools/save_compat.py write`: Europe 1480 as Portugal
+after 3 seasons, the random world of seed 7 after 2 seasons, and a quicksave in the middle of Portugal's war with
+Castile), then loads each one with the pull request's code and plays one more season (`check`). On other pull
+requests the job only finds that nothing there changed and stops (plain `git diff`, no paths-filter action).
+
+The rule, with `VERSION` in `hexa/campaign/saves.py`:
+
+- While `VERSION` stays the same, every old save must load, keep the world invariants and play on. So a new world
+  attribute or dataclass field needs a default for saves that don't have it: an entry in `WORLD_DEFAULTS` in
+  `hexa/campaign/world.py`, a field default (`CampaignWorld._migrate` fills those in), or `getattr` /
+  `__dict__.setdefault` where it is read. Renaming or moving a class that saves contain breaks them too.
+- When old saves can't be supported, bump `VERSION`. Old saves must still never crash the game: each one is either
+  refused quietly (`saves.load` returns `None` and the game says the save couldn't be loaded) or still loads and
+  plays. `saves.load` reads every version from 1 to `VERSION`, so make it refuse the old version too if the migration
+  can't handle it. Saves from a newer version are always refused.
+
+A failure names the save, the step that broke (loading or playing the season), the exception and the line of
+`hexa/` it came from, says how to fix it, and exits with status 1. To run it locally (any revision can be the base,
+and it needs no `tools/` folder of its own):
+
+```bash
+git worktree add --detach /tmp/hexa-base master
+python tools/save_compat.py write /tmp/hexa-base /tmp/hexa-compat   # saves made by /tmp/hexa-base's code (it prints which hexa it imported)
+python tools/save_compat.py check /tmp/hexa-compat                  # loaded by this checkout's code
+git worktree remove --force /tmp/hexa-base
+```
+
+`write` also writes `manifest.json` next to the saves (the base's `VERSION`, revision and what was saved). Exit
+status 2 means a usage error (no `hexa` package in the checkout, no manifest yet) and 3 that the base's code could not
+make the saves. `tests/test_save_compat.py` runs the tool end to end against temporary copies of `hexa/`: one with a
+bumped `VERSION` and a renamed class, one with a new attribute but no default, one with only a bumped `VERSION`.
+
 ## Project layout
 
 | File | What it does |
@@ -614,7 +652,7 @@ that (#29: the caches must stay bounded; it builds four random worlds, so it is 
 | `hexa/render.py` | Drawing the map, units and info bar |
 | `hexa/hexgrid.py` | Hex grid maths |
 | `tests/` | Rule tests (see Development); shared helpers in `tests/support/`; headless window tests in `tests/ui/`; golden screenshots in `tests/golden/linux/` |
-| `tools/` | Developer tools: `monkey.py` replays or hunts with the window tests' seeded monkey (`python -m tools.monkey`), `soak.py` plays long all-AI games checking the invariants every turn, `perf.py` times the slow parts against `tests/perf_budget.json` (both run nightly) |
+| `tools/` | Developer tools: `monkey.py` replays or hunts with the window tests' seeded monkey (`python -m tools.monkey`), `soak.py` plays long all-AI games checking the invariants every turn, `perf.py` times the slow parts against `tests/perf_budget.json` (both run nightly), `save_compat.py` checks that saves from an older revision still load (pull requests that touch `hexa/campaign/`) |
 | `Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py`, `Read_XML.py` | The original map editor and its XML map loading (`map*.xml`) |
 
 Tile art: [Kenney Hexagon Pack](https://kenney.nl/assets/hexagon-pack) (CC0), in `hexagon-pack/`.

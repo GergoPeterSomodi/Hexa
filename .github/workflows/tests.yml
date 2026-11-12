@@ -141,3 +141,57 @@ jobs:
           name: test-artifacts
           path: test-artifacts/
           if-no-files-found: ignore
+
+  save-compat:
+    name: save compatibility (Python 3.12)
+    # Pull requests only: games saved by the merge base's code (what players have) must still load and play with
+    # the pull request's, unless saves.VERSION was bumped (tools/save_compat.py). The job runs on every pull request,
+    # but its first step skips the rest unless hexa/campaign/ or the tool changed (plain git, no paths-filter action).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # runner.temp can't be used in a job-level env, so the folder is set by the first step.
+      - name: Isolate HEXA_HOME
+        run: echo "HEXA_HOME=$RUNNER_TEMP/hexa-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          # The whole history and every branch, so the merge base with the target branch can be found.
+          fetch-depth: 0
+      # HEAD is the pull request merged into its target branch, so the diff from the merge base is the pull request.
+      - name: Find the merge base and what changed since
+        id: changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          base=$(git merge-base "origin/$BASE_REF" HEAD)
+          changed=$(git diff --name-only "$base" HEAD -- hexa/campaign tools/save_compat.py)
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          if [ -n "$changed" ]; then
+            echo "campaign=true" >> "$GITHUB_OUTPUT"
+            echo "Changed since the merge base $base:"
+            echo "$changed"
+          else
+            echo "campaign=false" >> "$GITHUB_OUTPUT"
+            echo "No change to hexa/campaign/ since the merge base $base: nothing to check."
+            echo "Save compatibility: skipped, this pull request doesn't change hexa/campaign/." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/setup-python@v5
+        if: steps.changes.outputs.campaign == 'true'
+        with:
+          python-version: "3.12"
+      # No "pip install": the tool needs no pygame. The merge base needs no tools/ folder: the pull request's tool
+      # imports the base's hexa package from the worktree.
+      - name: Check out the merge base into a worktree
+        if: steps.changes.outputs.campaign == 'true'
+        env:
+          BASE_SHA: ${{ steps.changes.outputs.base }}
+        run: git worktree add --detach "$RUNNER_TEMP/base" "$BASE_SHA"
+      - name: Save three games with the merge base's code
+        if: steps.changes.outputs.campaign == 'true'
+        run: python tools/save_compat.py write "$RUNNER_TEMP/base" "$RUNNER_TEMP/compat"
+      # Writes its table to the job summary. Exit status 1: a save broke without a VERSION bump (the log says how
+      # to fix it).
+      - name: Load them with the pull request's code
+        if: steps.changes.outputs.campaign == 'true'
+        run: python tools/save_compat.py check "$RUNNER_TEMP/compat"

@@ -38,6 +38,12 @@ python -m tools.soak conquest 17                                          # repl
 python -m tools.perf                                                      # CPU-time medians vs tests/perf_budget.json (fails past "hard") + #29 memory row
 python -m tools.perf --only ai_season --runs 5                            # some metrics; MapView ones need the pygame venv (HEXA_REQUIRE_PYGAME=1: error, not skip)
 
+# Save compatibility (tests.yml's save-compat job, on pull requests that touch hexa/campaign/)
+git worktree add --detach /tmp/hexa-base master                           # the code whose saves must still load (CI: the merge base)
+python tools/save_compat.py write /tmp/hexa-base /tmp/hexa-compat         # 3 games saved by /tmp/hexa-base's own hexa (~6 s; prints which hexa it imported)
+python tools/save_compat.py check /tmp/hexa-compat                        # load + play a season with this checkout; exit 1: broke without a VERSION bump
+git worktree remove --force /tmp/hexa-base
+
 pip install -r requirements-dev.txt                                       # coverage.py (CI only; config in .coveragerc)
 coverage run -m unittest discover -s tests -t . && coverage report        # branch coverage; slow before Python 3.14
 
@@ -65,7 +71,10 @@ table withholds input that would hit a known open crash; keep it narrow and pin 
 `tools/soak.py` reuses `games.py` and the checkers and reports a broken invariant that `invariants.KNOWN_OPEN`
 explains as "known open" instead of failing; `tools/perf.py` is the only place anything is timed (never assert on time
 in a unit test; `tests/test_perf.py` uses fake metrics). Change `tests/perf_budget.json` (`soft`/`hard` CPU seconds,
-`measured`) in the PR that knowingly makes something slower.
+`measured`) in the PR that knowingly makes something slower. `tools/save_compat.py` must keep working against older
+revisions: `write` imports only the base checkout's `hexa` (never `tests/`) and uses its public API (`CampaignWorld`,
+`ai.run`, `end_round`, `declare_war`, `saves.save`), and must run in a fresh interpreter; `tests/test_save_compat.py`
+drives it against temporary copies of `hexa/` (a bumped `VERSION`, a renamed class, a new attribute without a default).
 
 Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and nine game
 modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
@@ -146,10 +155,14 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   player)`. Call `world.changed()` after any mutation that affects the map, and `world.changed(ownership=True)`
   when province owners change: that also clears the `provinces_of` cache (`_owned`) and `_castle_list`.
 - **Saves** (`campaign/saves.py`): one JSON header line, then a pickle of `world.save_state()` (the world's
-  `__dict__` minus `geo`, which is rebuilt from `map` + `seed` on load). Files with a different `VERSION` are
-  ignored. Renaming or adding attributes and dataclass fields changes what saves contain. Lazily added
+  `__dict__` minus `geo`, which is rebuilt from `map` + `seed` on load). Files from a newer `VERSION` are
+  ignored; older ones load, and `CampaignWorld._migrate` fills in what they lack (`WORLD_DEFAULTS`, dataclass
+  field defaults). Renaming or adding attributes and dataclass fields changes what saves contain. Lazily added
   attributes use `getattr`/`__dict__.setdefault` (`_known_world`, `_explored_from`) so older saves still load;
-  bump `VERSION` when compatibility breaks.
+  bump `VERSION` when compatibility breaks. The `save-compat` job of `tests.yml` enforces this `VERSION` policy
+  on pull requests that touch `hexa/campaign/` (`tools/save_compat.py`): games saved by the merge base's code must
+  load and play a season with the pull request's while `VERSION` is unchanged; after a bump each must be refused
+  quietly (`saves.load` returns `None`) or still play.
 - Saves and options (`hexa/settings.py`) live in `~/.hexa/`; the `HEXA_HOME` environment variable overrides
   this, and `tests/test_saves.py` uses it with a temporary folder.
 - `gamemenu.GameMenu` is a mixin base class of `CampaignApp`: the Esc menu, save/load, options, and the screen
