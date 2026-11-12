@@ -353,7 +353,7 @@ class CampaignWorld:
         for country in self.countries.values():
             self._explore_home(country)
         self.economy()                   # first prices and incomes
-        self.message(f"{date(1)}. The age of discovery begins.")
+        self.message(f"{date(1)}. The age of discovery begins.", notice="start")
         _remember_snapshot(key, pickle.dumps(self.save_state(), protocol=pickle.HIGHEST_PROTOCOL))
         self._set_player(player)
         self.bus.clear()                 # a new world starts with no events, built or restored
@@ -1237,12 +1237,14 @@ class CampaignWorld:
                 return tag
         return None
 
-    def message(self, text, tag=None):
+    def message(self, text, tag=None, notice=None, pos=None):
+        """A line for the message log. `notice` names a line that has no bus event of its own (feed.NOTICES): the
+        action log shows it; `pos` is the hex it is about."""
         shown = tag is None or tag == self.player
         if shown:
             self.log.append(text)
             del self.log[:-80]
-        self.bus.emit("message", tag, text=text, shown=shown)
+        self.bus.emit("message", tag, pos, text=text, shown=shown, notice=notice)
 
     def provinces_of(self, tag):
         if self._owned is None:
@@ -1556,7 +1558,7 @@ class CampaignWorld:
         route.orders.append((tag, good, name))
         self.countries[tag].orders.append((route.id, good, name))
         other = route.b.name if name == route.a.name else route.a.name
-        self.message(f"A merchant now carries {GOODS[good].name.lower()} from {name} to {other}.", tag)
+        self.message(f"A merchant now carries {GOODS[good].name.lower()} from {name} to {other}.", tag, "merchant")
         return True
 
     def recall_merchant(self, tag, route, order=None):
@@ -1976,7 +1978,7 @@ class CampaignWorld:
                 # more credit, so the debt is held at the limit instead of growing without bound.
                 country.treasury = -limit
                 self.message(f"The creditors of {country.name} refuse more credit: its debt is held at "
-                             f"{limit:,.0f} ducats.", tag)
+                             f"{limit:,.0f} ducats.", tag, "credit")
             if deserted:
                 counts = {}
                 for unit in deserted:
@@ -2021,7 +2023,7 @@ class CampaignWorld:
                     self.bus.emit("native_raid", prov.owner, prov.pos)
             if prov.colony and prov.pop >= COLONY_DONE:
                 prov.colony = False
-                self.message(f"{self.place(prov)} has grown into a full province.", prov.owner)
+                self.message(f"{self.place(prov)} has grown into a full province.", prov.owner, "growth", prov.pos)
             for item in list(prov.queue):
                 item[1] -= 1
                 if item[1] <= 0:
@@ -2427,7 +2429,7 @@ class CampaignWorld:
         self._tech_changed(tag)
         if self._route_effects(idea.effects):
             self.refresh_markets()
-        self.message(f"Idea adopted: {idea.name}. {idea.text}", tag)
+        self.message(f"Idea adopted: {idea.name}. {idea.text}", tag, "idea")
         return True
 
     def fund_check(self, tag):
@@ -2541,7 +2543,7 @@ class CampaignWorld:
             self.message(f"Researched {t.name}: {t.text}", tag)
             self.bus.emit("tech_researched", tag, key=key, cost=cost)
             if not self._advance(tag) and tag == self.player:
-                self.message("Pick new research (T).", tag)
+                self.message("Pick new research (T).", tag, "research")
 
     def _advance(self, tag):
         """Start the next queued tech that is still to learn. False when nothing is left in the queue."""
@@ -2757,7 +2759,7 @@ class CampaignWorld:
                 reported.add(pos)
                 why = "cut off from supply" if not fed else f"too many troops for the land ({count}/{limit})"
                 where = self.place(prov) if prov else "the field"
-                self.message(f"Your troops at {where} are {why}: they lose strength.")
+                self.message(f"Your troops at {where} are {why}: they lose strength.", None, "supply", pos)
 
     # ----- movement ------------------------------------------------------------------
     def may_enter(self, unit, pos, frm=None):
@@ -3414,7 +3416,7 @@ class CampaignWorld:
                 country.alive = False
                 self.units = [u for u in self.units if u.owner != tag]
                 self.wars = [w for w in self.wars if tag not in (w.a, w.b)]
-                self.message(f"{country.name} has disappeared from the map.")
+                self.message(f"{country.name} has disappeared from the map.", None, "extinct")
             elif country.alive and self.provinces[country.capital].owner != tag:
                 country.capital = max(self.provinces_of(tag), key=lambda p: p.pop).pos
 
@@ -3462,7 +3464,8 @@ class CampaignWorld:
         self.changed()
         if self.player:
             c = self.countries[self.player]
-            self.message(f"{self.date()}. Treasury {c.treasury:.0f} ducats ({c.balance:+.1f} per season).")
+            self.message(f"{self.date()}. Treasury {c.treasury:.0f} ducats ({c.balance:+.1f} per season).", None,
+                         "treasury")
 
     # ----- knowledge and sight ---------------------------------------------------------
     def _explore_home(self, country):

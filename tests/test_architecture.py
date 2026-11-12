@@ -54,7 +54,7 @@ WINDOW = {
     "hexa.campaign.landmarks", "hexa.campaign.life", "hexa.campaign.nature", "hexa.campaign.wfctiles",
 }
 WINDOW_PACKAGES = ("hexa.ui", "hexa.render", "hexa.campaign.panels", "hexa.campaign.screens", "hexa.campaign.render",
-                   "hexa.campaign.ui")
+                   "hexa.campaign.ui", "hexa.campaign.hud")
 
 # Modules that draw (art recipes) or build maps get the longer function limit.
 LONG_FUNCTIONS = ("art", "goodsart", "goodsobjects", "landscape", "landmarks", "life", "nature", "wfctiles",

@@ -3,8 +3,11 @@ Pygame-free.
 
 Run with: python -m unittest tests.test_hud_data
 """
+import ast
+import os
 import pickle
 import unittest
+from unittest import mock
 
 from hexa.campaign import feed, resources
 from hexa.campaign.data import troop
@@ -95,7 +98,7 @@ class ResourcesTest(unittest.TestCase):
         self.assertEqual(sorted(l.amount for l in snap["regiments"].lines), [-1, -1])
         self.assertEqual(sorted(l.label.split(":")[0] for l in snap["provinces"].lines), ["Gained in peace", "Occupied"])
         self.assertEqual(resources.snapshot(w, "CAS")["provinces"].lines[0].amount, -1)
-        self.assertIn("Creditors seized: castle at X", [l.label for l in snap["ducats"].lines])
+        self.assertIn("Creditors seized: castle at X (saves 3/season)", [l.label for l in snap["ducats"].lines])
         research = snap["research"].lines
         self.assertEqual(research[-1].amount, -20)
         self.assertTrue(research[-1].label.startswith("Finished"))
@@ -123,9 +126,60 @@ class ResourcesTest(unittest.TestCase):
 
     def test_a_broken_tap_cannot_stop_the_game(self):
         self.w.bus.tap(lambda e: 1 / 0)
-        self.game.end_season()
+        with self.assertLogs("hexa", "ERROR"):                  # it is logged, not printed to the player
+            self.game.end_season()
         self.assertTrue(self.w.bus.tap_errors)
         self.assertLessEqual(len(self.w.bus.tap_errors), 5)
+
+    def test_a_broken_tap_is_raised_when_hexa_debug_is_set(self):
+        self.w.bus.tap(lambda e: 1 / 0)
+        with mock.patch.dict(os.environ, {"HEXA_DEBUG": "1"}), self.assertLogs("hexa", "ERROR"):
+            with self.assertRaises(ZeroDivisionError):
+                self.w.bus.emit("forage", "POR", self.prov.pos)
+        with mock.patch.dict(os.environ, {"HEXA_DEBUG": "0"}), self.assertNoLogs("hexa", "ERROR"):
+            self.w.bus.emit("forage", "POR", self.prov.pos)         # anything but 1 keeps the game going (the
+                                                                    # traceback of this tap and kind was logged)
+
+    def test_the_history_counts_the_start_once(self):
+        tracker = self.game.tracker
+        self.assertEqual(len(tracker.series("POR", "ducats")), 1, "the start, which is also now")
+        for seasons in (1, 2, 3):
+            self.game.end_season()
+            series = tracker.series("POR", "ducats")
+            self.assertEqual(len(series), seasons + 1, "the start, each season's baseline, then now")
+            self.assertEqual(series[-1], self.w.countries["POR"].treasury)
+        self.assertEqual(len(tracker.history["POR"]["ducats"]), 3, "no baseline is stored twice")
+
+    def test_a_seizure_is_a_label_with_its_saving_and_no_amount(self):
+        self.w.bus.emit("debt_seized", "POR", what="castle at X", saving=3.0)
+        line = next(l for l in resources.snapshot(self.w, "POR")["ducats"].lines if l.label.startswith("Creditors"))
+        self.assertEqual(line.amount, 0.0, "the saving is in the season's upkeep line already")
+        self.assertIn("(saves 3/season)", line.label)
+
+    def test_the_ducats_lines_add_up_to_the_change_after_a_seizure(self):
+        """A real seizure, set up as the behaviour oracle's debt state does: castles to take, no troops, deep debt."""
+        w = self.w
+        w.disband("POR", 1e9)
+        for prov in w.provinces_of("POR"):
+            prov.castle, prov.settlement = 3, max(prov.settlement, 2)
+        w.countries["POR"].treasury = -200000.0
+        self.game.end_season()
+        self.assertTrue(w.bus.of("debt_seized"), "the creditors seized something")
+        reading = resources.snapshot(w, "POR")["ducats"]
+        self.assertTrue(any(l.label.startswith("Creditors seized") for l in reading.lines))
+        self.assertAlmostEqual(sum(l.amount for l in reading.lines), reading.delta, delta=0.01)
+        self.assertNotIn("Other", [l.label for l in reading.lines], "nothing is left unexplained")
+
+    def test_a_tap_that_keeps_failing_is_logged_once_per_kind_and_counted_every_time(self):
+        self.w.bus.tap(lambda e: 1 / 0)
+        with self.assertLogs("hexa", "ERROR") as first:
+            self.w.bus.emit("forage", "POR", self.prov.pos)
+        self.assertEqual(len(first.records), 1)
+        with self.assertNoLogs("hexa", "ERROR"):
+            self.w.bus.emit("forage", "POR", self.prov.pos)
+        with self.assertLogs("hexa", "ERROR"):                  # another kind: another line
+            self.w.bus.emit("native_raid", "POR", self.prov.pos)
+        self.assertEqual(len(self.w.bus.tap_errors), 3)
 
     def test_new_kinds_are_listed(self):
         for kind in ("money_spent", "forage", "native_raid"):
@@ -289,6 +343,106 @@ class FeedTest(unittest.TestCase):
             for item in items:
                 self.assertIn(item.colour_kind, feed.COLOUR_KINDS)
                 self.assertTrue(item.sentence)
+
+
+class NoticeTest(unittest.TestCase):
+    """The message lines that have no event of their own reach the action log (feed.NOTICES)."""
+
+    def setUp(self):
+        self.w = fresh("POR")
+        self.game = GameManager(self.w)
+        self.feed = self.game.feed
+
+    def kinds(self, filter="all"):
+        return [i.kind for _, _, items in self.feed.entries(filter) for i in items]
+
+    def test_every_notice_becomes_a_log_line(self):
+        for name, (colour, keyword) in feed.NOTICES.items():
+            with self.subTest(notice=name):
+                self.w.message(f"A line of the kind {name}.", "POR", name)
+        self.assertEqual(sorted(self.kinds("mine")), sorted(list(feed.NOTICES) + ["start"]), "and the first line")
+        for _, _, items in self.feed.entries():
+            for item in items:
+                self.assertFalse(item.floating, "a notice is a log line only")
+                self.assertIn(item.sentence, self.w.log)
+
+    def test_the_season_and_credit_lines_are_money(self):
+        self.w.message("Treasury line.", None, "treasury")
+        self.w.message("Credit line.", "POR", "credit")
+        self.w.message("Idea line.", "POR", "idea")
+        self.assertEqual(sorted(self.kinds("money")), ["credit", "treasury"])
+
+    def test_a_line_for_another_country_is_not_told(self):
+        self.w.message("Their idea.", "CAS", "idea")
+        self.assertEqual(self.kinds(), ["start"], "only the first line")
+
+    def test_a_played_season_tells_its_treasury_line(self):
+        self.game.end_season()
+        lines = [i.sentence for _, _, items in self.feed.entries("money") for i in items if i.kind == "treasury"]
+        self.assertEqual(len(lines), 1)
+        self.assertIn("Treasury", lines[0])
+        self.assertEqual(lines[0], self.w.log[-1])
+
+    def test_the_start_line_is_in_a_new_games_log(self):
+        self.assertEqual(self.kinds(), ["start"])
+        self.assertIn("age of discovery begins", self.feed.entries()[0][2][0].sentence)
+
+    def test_a_place_makes_the_line_a_link(self):
+        pos = self.w.provinces_of("POR")[0].pos
+        self.w.message("Grew.", "POR", "growth", pos)
+        item = self.feed.entries()[0][2][0]
+        self.assertEqual((item.kind, item.pos), ("growth", pos))
+
+    def test_every_message_call_of_the_rules_names_a_notice_or_has_an_event(self):
+        """A new world.message(...) with no event of its own must name a notice, or the action log never shows it. The
+        lines an event already tells (listed by a piece of their text) are the exception."""
+        covered = ("disbands", "declared war on you", "Unpaid troops desert", "Creditors seize", "Natives raided",
+                   "has grown into a {", "is finished", "finished.", "started ", "upgraded to", "raised {", "refitted",
+                   "Researched ", "you can now raise", "foraged", "founded a", "declared war on {", "War: ",
+                   "Peace between", "overran", "took control", "text + ")
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hexa", "campaign")
+        missing = []
+        for name in ("world.py", "app.py", "ai.py"):
+            with open(os.path.join(root, name), encoding="utf-8") as f:
+                tree = ast.parse(f.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "message" and node.args:
+                    text = ast.unparse(node.args[0])
+                    named = len(node.args) > 2 or any(k.arg == "notice" for k in node.keywords)
+                    if not named and not any(piece in text for piece in covered):
+                        missing.append(f"{name}:{node.lineno} {text[:60]}")
+        self.assertEqual(missing, [], "these messages reach only world.log; name a notice or emit an event")
+        for name in ("world.py", "app.py"):
+            with open(os.path.join(root, name), encoding="utf-8") as f:
+                for node in ast.walk(ast.parse(f.read())):
+                    if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "message":
+                        for kw in node.keywords:
+                            if kw.arg == "notice":
+                                self.assertIn(ast.literal_eval(kw.value), feed.NOTICES)
+                        if len(node.args) > 2 and isinstance(node.args[2], ast.Constant):
+                            self.assertIn(node.args[2].value, feed.NOTICES)
+
+
+class FloatingAgeTest(unittest.TestCase):
+    def test_what_is_older_than_the_limit_is_not_floated(self):
+        w = fresh("POR")
+        game = GameManager(w)
+        pos = w.provinces_of("POR")[0].pos
+        with mock.patch.object(feed.time, "monotonic", return_value=100.0):
+            w.bus.emit("unit_raised", "POR", pos, what="Pikemen", id=1)
+        with mock.patch.object(feed.time, "monotonic", return_value=101.0):
+            w.bus.emit("unit_raised", "POR", pos, what="Knights", id=2)
+        with mock.patch.object(feed.time, "monotonic", return_value=102.5):
+            fresh_only = game.feed.take_floating(max_age=2.0)
+        self.assertEqual(len(fresh_only), 1)
+        self.assertEqual(game.feed.take_floating(), [], "the queue is empty after a take")
+
+    def test_without_a_limit_everything_is_floated(self):
+        w = fresh("POR")
+        game = GameManager(w)
+        pos = w.provinces_of("POR")[0].pos
+        w.bus.emit("unit_raised", "POR", pos, what="Pikemen", id=1)
+        self.assertEqual(len(game.feed.take_floating()), 1)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,9 @@ Two rules:
 The campaign's event kinds (``CAMPAIGN_KINDS``) and their fields. ``tag`` is the
 country the event is about (the actor), ``pos`` the hex it happened on, and the rest goes to ``event.data``:
 
-    message           text, shown        a log line (shown: whether the player's log got it)
+    message           text, shown, notice  a log line (shown: whether the player's log got it). ``notice`` names a line
+                                         that has no event of its own (the action log shows those: see
+                                         feed.NOTICES); pos is the hex it is about, if any
     province_captured tag=captor, pos    loser, by ("siege", "storm" or "peace")
     siege_progress    tag=besieger, pos  progress, need
     battle            tag=attacker, pos  defender, ranged
@@ -41,8 +43,13 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
 
 ``bus.tap(handler)`` is the one other way to listen: a tap is called at once, inside ``emit``, with the event (the
 campaign's ``resources`` tracker and ``feed`` use it, so they need no drain). A tap never changes the world either, and
-an exception in one is caught (counted in ``bus.tap_errors``) so that a bug in a screen's bookkeeping cannot stop a game.
+an exception in one is caught (its traceback is logged once for each (tap, kind) with
+``logging.getLogger("hexa").exception``; every failure is kept in ``bus.tap_errors``) so
+that a bug in a screen's bookkeeping cannot stop a game; with the environment variable HEXA_DEBUG=1 it is raised
+instead.
 """
+import logging
+import os
 from collections import deque
 from dataclasses import dataclass
 
@@ -77,6 +84,7 @@ class EventBus:
         self._handlers = {}         # kind (None: every kind) -> [handler]
         self._taps = []             # called at once on emit (see the module docstring)
         self.tap_errors = []        # the exceptions taps raised (kept few)
+        self._reported = set()      # (tap, kind) whose traceback was logged already
 
     def emit(self, kind, tag=None, pos=None, **data):
         """Queue an event (and put it in the history). Returns it."""
@@ -90,6 +98,11 @@ class EventBus:
             try:
                 tap(event)
             except Exception as caught:         # a screen's bookkeeping must never stop the game
+                if (tap, kind) not in self._reported:       # a tap that fails on every event logs once, not 5000 times
+                    self._reported.add((tap, kind))
+                    logging.getLogger("hexa").exception("an event tap failed on %r", kind)
+                if os.environ.get("HEXA_DEBUG") == "1":         # developers want the crash, not a log line
+                    raise
                 self.tap_errors = (self.tap_errors + [caught])[-5:]
         return event
 

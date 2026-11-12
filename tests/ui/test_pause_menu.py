@@ -21,6 +21,10 @@ from tests.support import harness
 from tests.support.harness import click, hex_pixel, key
 from tests.ui.test_campaign_app import CASTILE_STACK, CampaignCase
 
+# topbar.plan() of Teutonic Order's bar with full-size fonts: (key goods shown, changes shown, wide End season, chips)
+PLAN_1280 = (False, True, True, 6)
+PLAN_1024 = (False, False, True, 6)
+
 SETTINGS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal", "grid": True,
             "pass_names": False}
 DEFAULT_FONT_SCALE = 0.6875   # pygame draws its bundled font, Font(None, size), at this fraction of size
@@ -216,6 +220,7 @@ class OpenCloseTest(PauseCase):
         def rects():
             end = next(b for b in app.ui.buttons if b.action == ("end",))
             seen.extend([app.screen.get_size(), harness.button_rect(app, "Menu"), end.rect, end.label])
+            self.planned = self.plan_of(app)
 
         self.driver.at(1, rects)
         self.driver.at(1, self.on_button("Menu", "game_menu"))
@@ -223,9 +228,19 @@ class OpenCloseTest(PauseCase):
         self.play(4)
         return seen
 
+    @staticmethod
+    def plan_of(app):
+        """What the top bar's plan() makes of the window as it is: (key goods, changes, wide End season, chips)."""
+        from hexa.campaign.hud import topbar
+        snap, _ = topbar.readings(app, app.hud)
+        rows = [topbar.Row(app, spec, snap) for spec in topbar.CHIPS + topbar.GOODS]
+        x = 12 + 30 + app.title.size(app.world.countries[app.player].name)[0] + 16
+        return topbar.layout(app, rows, x, app.screen.get_width())
+
     def test_with_full_size_fonts_the_menu_button_still_opens_the_menu(self):
         size, menu, end, label, page, turn = self.click_menu_button("TEU", harness.DESKTOP)
         self.assertEqual((size, label), ((1280, 720), "End season"))
+        self.assertEqual(self.planned, PLAN_1280, "the plan for this window, called directly")
         self.assertFalse(menu.colliderect(end), f"Menu {menu}, End season {end}")
         self.assertEqual((page, turn), ("main", 1))
 
@@ -235,7 +250,9 @@ class OpenCloseTest(PauseCase):
         at 0.6875 of its size, the top bar has room to spare even at 1024 wide; text as wide as a real system font
         draws it (full_size_sysfont) puts the Teutonic Order's Menu at x 964 to 1028, End at 950 to 1014."""
         size, menu, end, label, page, turn = self.click_menu_button("TEU", (1024, 768))
-        self.assertEqual((size, label), ((1024, 708), "End"))
+        self.assertEqual(size, (1024, 708))
+        self.assertEqual(self.planned, PLAN_1024, "the key goods and the changes go, End season stays whole")
+        self.assertEqual(label, "End season" if self.planned[2] else "End", "the button says what the plan said")
         self.assertEqual((page, turn), ("main", 1), f"a click on Menu {menu} opens the menu, and no season passes")
         self.assertFalse(menu.colliderect(end), f"Menu {menu} and End season {end} overlap")
 

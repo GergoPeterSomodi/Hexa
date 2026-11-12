@@ -5,14 +5,15 @@ import sys
 import pygame
 
 from .. import settings as options
-from ..ui.kit import button as draw_button, fit, hover_card, shade, text as draw_text, tip, wrap
-from ..ui.theme import BAD_C, BG, GOLD, GOOD_C, LINE, MUTED, PANEL_BG, TEXT, new_font
+from ..ui.kit import button as draw_button, fit, hover_card, text as draw_text, tip, wrap
+from ..ui.theme import BAD_C, BG, GOLD, LINE, PANEL_BG, TEXT, new_font
 from . import geo, saves
 from .gamemenu import GameMenu
 from .techscreen import TechScreen
 from .data import COLONIST, GENERAL
 from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
 from .game import GameManager
+from .hud import Hud
 from . import panels
 from .panels.cards import province_card as card_of
 from .panels.country import research_line as research_text, war_line
@@ -124,6 +125,7 @@ class CampaignApp(GameMenu, TechScreen):
 
     def _set_game(self, game):
         self.game = game                # the war alert listens to its world's event bus
+        self.hud = Hud()                # the ribbons, the action log and the top bar remember things between frames
         game.bus.subscribe("war_declared", self._war_declared)
 
     def load_world(self, game):
@@ -174,7 +176,7 @@ class CampaignApp(GameMenu, TechScreen):
 
     def hex_under(self, pixel):
         rect = self.view_rect()
-        if not rect.collidepoint(pixel):
+        if not rect.collidepoint(pixel) or self.hud.covers(self, pixel):
             return None
         return self.view.hex_at(pixel[0] - rect.x + self.camera[0], pixel[1] - rect.y + self.camera[1])
 
@@ -190,7 +192,8 @@ class CampaignApp(GameMenu, TechScreen):
         world.update_visibility()
         world.changed()
         self.ui.panel, self.ui.country = "country", tag
-        world.message(f"You lead {world.countries[tag].name}. Grow your economy, trade, and reach for the New World.")
+        world.message(f"You lead {world.countries[tag].name}. Grow your economy, trade, and reach for the New World.",
+                      notice="lead")
         self.view.zoom = 4
         self.look_at(world.countries[tag].capital)
 
@@ -312,7 +315,7 @@ class CampaignApp(GameMenu, TechScreen):
         if count:
             noun = "march waits" if count == 1 else "marches wait"
             text = f"{count} {noun} for your order: select the stack and press R (Continue march)."
-            self.world.message(text, self.player)
+            self.world.message(text, self.player, "march")
             self.toast(text)
 
     def continue_march(self, units):
@@ -343,7 +346,7 @@ class CampaignApp(GameMenu, TechScreen):
                 self.toast(text)
                 if logged.get(ids) != world.turn:
                     logged[ids] = world.turn
-                    world.message(text, self.player)
+                    world.message(text, self.player, "march", pos)
                 return
             for unit in group:
                 unit.goal = None
@@ -480,7 +483,7 @@ class CampaignApp(GameMenu, TechScreen):
                 if worker:
                     self.press(("found", worker, False))
         elif event.type == pygame.MOUSEWHEEL:
-            if not self.panel_rect().collidepoint(ui.mouse) or not ui.panel:
+            if not self.hud.wheel(self, event.y) and (not self.panel_rect().collidepoint(ui.mouse) or not ui.panel):
                 self.zoom(1 if event.y > 0 else -1, ui.mouse)
         elif event.type == pygame.MOUSEMOTION:
             ui.mouse = event.pos
@@ -494,7 +497,7 @@ class CampaignApp(GameMenu, TechScreen):
             if event.button == 1:
                 self.left_click(event.pos)
             elif event.button in (2, 3):
-                self.drag = 0
+                self.drag = None if self.hud.covers(self, event.pos) else 0       # no pan, no order from the HUD
         elif event.type == pygame.MOUSEBUTTONUP and event.button in (2, 3):
             if event.button == 3 and self.drag is not None and self.drag < 6:     # no press on the map: no order
                 self.right_click(event.pos)
@@ -505,8 +508,11 @@ class CampaignApp(GameMenu, TechScreen):
 
     def left_click(self, pixel):
         ui, world = self.ui, self.world
+        panel = ui.panel and self.panel_rect()
         for button in ui.buttons:
             if button.rect.collidepoint(pixel):
+                if panel and panel.collidepoint(pixel) and not panel.contains(button.rect):
+                    continue                    # the panel is on top of what pokes into it
                 if button.enabled:
                     self.press(button.action)
                 elif button.hint:
@@ -720,13 +726,17 @@ class CampaignApp(GameMenu, TechScreen):
     def _do_goto(self, action):
         self.look_at(action[1])
 
+    def _do_log(self, action):
+        self.hud.press(self, action)
+
     PRESS = {"game_menu": _do_game_menu, "close_panel": _do_close_panel, "mode": _do_mode, "panel": _do_panel,
              "choose": _do_choose, "end": _do_end, "continue": _do_continue, "build": _do_build,
              "recruit": _do_recruit, "invest": _do_invest, "found": _do_found, "pick": _do_pick,
              "toggle": _do_toggle, "all": _do_all, "refit": _do_refit, "upgrade": _do_upgrade, "raise": _do_raise,
              "tech": _do_tech, "fund": _do_fund, "tax": _do_tax, "war": _do_war, "peace": _do_peace,
              "merchant": _do_merchant, "goods_view": _do_goods_view, "forage": _do_forage, "recall": _do_recall,
-             "market": _do_market, "country": _do_country, "province": _do_province, "goto": _do_goto}
+             "market": _do_market, "country": _do_country, "province": _do_province, "goto": _do_goto,
+             "log": _do_log}
 
     def scroll(self):
         if self.menu:
@@ -761,9 +771,10 @@ class CampaignApp(GameMenu, TechScreen):
         self.view.pass_names_on = self.settings["pass_names"]
         self.view.draw(self.screen, self.view_rect(), self.camera, ui)
         self._draw_marches()
-        self.draw_log()
+        self.hud.draw_world(self)
+        self.hud.draw_log(self)
         self.draw_minimap()
-        self.draw_top()
+        self.hud.draw_top(self)
         if ui.panel:
             self.draw_panel()
         self.draw_hint()
@@ -821,73 +832,6 @@ class CampaignApp(GameMenu, TechScreen):
 
     def draw_choose_banner(self):
         self.banner("Choose your country: click any country on the map")
-
-    def draw_top(self):
-        world, screen = self.world, self.screen
-        pygame.draw.rect(screen, BG, (0, 0, WIDTH, TOP))
-        pygame.draw.line(screen, LINE, (0, TOP - 1), (WIDTH, TOP - 1))
-        x = 12
-        if self.player:
-            country = world.countries[self.player]
-            pygame.draw.rect(screen, country.color, (x, 12, 22, 22), border_radius=3)
-            pygame.draw.rect(screen, (10, 10, 10), (x, 12, 22, 22), 1, border_radius=3)
-            self.button((x - 2, 8, 28, 30), "", True, ("panel", "country"), "Your country: income, taxes, diplomacy (C)")
-            pygame.draw.rect(screen, country.color, (x, 12, 22, 22), border_radius=3)
-            x += 30
-            x += self.text(self.title, country.name, (x, 10)) + 16
-            balance = country.balance
-            x += self.text(self.bold, f"{country.treasury:,.0f} ducats", (x, 14), GOLD) + 4
-            x += self.text(self.small, f"({balance:+.1f}/season)", (x, 17), GOOD_C if balance >= 0 else BAD_C) + 14
-            x += self.text(self.font, f"Merchants {len(country.orders)}/{world.merchants(self.player)}", (x, 14), MUTED) + 14
-        x += self.text(self.bold, world.date(), (x, 14)) + 18
-        for mode in MODES:
-            w = self.small.size(mode.title())[0] + 16
-            r = self.button((x, 10, w, 26), mode.title(), True, ("mode", mode), f"{mode.title()} map ({MODES.index(mode) + 1})",
-                            small=True)
-            if self.view.mode == mode:
-                pygame.draw.rect(screen, GOLD, r, 1, border_radius=5)
-                if mode == "goods":
-                    sx = r.x
-                    for view in GOODS_VIEWS:
-                        sw = self.small.size(view.title())[0] + 12
-                        b = self.button((sx, TOP + 4, sw, 22), view.title(), True, ("goods_view", view),
-                                        {"chips": "What each tile makes", "deposits": "The goods as little objects on the land",
-                                         "prices": "Today's price: green cheap, red dear (press 3 again to switch)"}[view],
-                                        small=True)
-                        if self.view.goods_view == view:
-                            pygame.draw.rect(screen, GOLD, b, 1, border_radius=5)
-                        sx += sw + 3
-            x += w + 4
-        if self.player:
-            x += 10
-            # The right end is fixed: End season at the edge, Menu left of it. Market and Ledger stay only where
-            # they fit before Menu; the End button shortens to "End" before they go.
-            tabs = [(label, panel, self.small.size(label)[0] + 16) for label, panel in (("Market", "market"), ("Ledger", "ledger"))]
-            tabs_w = sum(w + 4 for _, _, w in tabs)
-            end_w = 120
-            if x + tabs_w + 10 + 64 + 6 + end_w + 10 > WIDTH:
-                end_w = 64
-            menu_x = WIDTH - 10 - end_w - 6 - 64
-            if x + tabs_w - 4 <= menu_x - 10:
-                for label, panel, w in tabs:
-                    self.button((x, 10, w, 26), label, True, ("panel", panel), small=True)
-                    x += w + 4
-            self.button((WIDTH - end_w - 10, 7, end_w, 32), "End season" if end_w >= 110 else "End",
-                        not self.busy and not world.over, ("end",), "Let the season pass (Space)")
-        else:
-            menu_x = WIDTH - 80
-        self.button((menu_x, 10, 64, 26), "Menu", True, ("game_menu",), "Save, load, options and exit (Esc)",
-                    small=True)
-
-    def draw_log(self):
-        lines = self.world.log[-5:]
-        if not lines:
-            return
-        width = 560
-        box = pygame.Rect(8, HEIGHT - 12 - 18 * len(lines), width, 18 * len(lines) + 6)
-        shade(self.screen, box, (10, 12, 16, 175))
-        for i, line in enumerate(lines):
-            self.text(self.small, line, (box.x + 8, box.y + 3 + i * 18), TEXT if i == len(lines) - 1 else MUTED, width - 16)
 
     def minimap_rect(self):
         w, h = self.world.cols + 1, self.world.rows

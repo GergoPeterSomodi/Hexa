@@ -109,6 +109,41 @@ press **3** again to switch the goods view between chips, deposits and prices), 
 stack's march (see Moving), **Space** ends the season.
 Hover anything for a moment to get a card explaining it: troops, buttons, provinces, goods.
 
+**The top bar** is one row. After your country's name come the resource chips, each an icon, its value and, in
+brackets, what changed since the season began: green for more, red for less, grey (±0) for no change.
+
+| Chip | Shows | Click opens |
+|---|---|---|
+| Ducats | the treasury | the ledger |
+| Research | points toward the current technology (and its cost); the change is what you gained | the technology screen |
+| Provinces | provinces you own | your country panel |
+| Regiments | war units | your country panel |
+| Merchants | busy / all | the home market |
+| Prestige | your score | the ledger |
+| Horses, gunpowder | the price at your capital's market; a rise is red, you pay more | the home market |
+
+Hover a chip for its card. The ducats card lists the season's income and spending and then the one-off items
+(raising troops, building, battles, seizures), the change since the season began, and the change expected next season. The
+other cards list their one-off items (units raised, lost or deserted; provinces taken or lost; technologies finished).
+Then come the date and season, the four map modes (icons: **1-4**), **Menu** and **End season**. In a narrow window the
+bar drops things in this order: the key goods, the changes (they stay in the cards), "End season" shortens to "End",
+then chips from the right.
+
+**Floating text:** what happens in view rises from its hex as a ribbon for about a second: **red** for war (battles,
+bombardments, a province taken from someone else), **amber** for a siege, **gold** for gains (a province, a finished
+building), **green** for what you did on purpose (recruited, built, foraged, founded), **rose** for your losses
+(units, a province, raids) and **white** for what other countries do in your sight. Several at one hex queue up and
+stack; nothing floats for hexes off screen, under the open panel or in the fog.
+
+**The action log** is in the bottom-left corner: collapsed it is one line, the newest entry, with a red "+N new" for
+what came since you last opened it. Click it to open the box: lines grouped by season, newest first, each with the icon
+and colour of its kind, with the filters **All**, **War**, **Money** and **Mine**. The mouse wheel scrolls it. Click a
+line (the place name is the link) and the camera glides there, rings the hex and selects your stack if one is there. It
+keeps the last two years; the saved message log (`world.log`) is the longer record. Besides battles, raising, building and
+the like it tells ideas adopted, colonies grown into provinces, troops cut off from supply, marches waiting for your order, and
+the season's treasury line and credit refusals (under **Money**). Clicks and drags on the box, the minimap and the top bar do not
+reach the map.
+
 **Moving:** a selected stack shows where it can go this season (green, bright edge), next season (blue),
 what it can attack (red; "fire" for cannons), and "stop" where an enemy castle will halt it. Hover a hex to
 see the path, the move cost of each step and how many seasons it takes.
@@ -673,7 +708,7 @@ bumped `VERSION` alone.
 | `play.py` | Starts the game: menu, then the conquest window (mouse, keyboard, enemy turn timing) |
 | `hexa/menu.py` | The start menu |
 | `hexa/settings.py` | Player options, stored in `~/.hexa/settings.json` |
-| `hexa/campaign/` | Age of Discovery: `geo.py` (real map, countries, markets, rivers), `randomgeo.py` (random worlds), `wfc.py` (wave function collapse), `art.py` (code-drawn tiles, figures, tokens), `data.py` (goods, buildings, balance), `world.py` (economy, trade, colonies, war), `ai.py`, `mapview.py`, `app.py`, `gamemenu.py` (in-game menu), `saves.py` (save slots) |
+| `hexa/campaign/` | Age of Discovery: `geo.py` (real map, countries, markets, rivers), `randomgeo.py` (random worlds), `wfc.py` (wave function collapse), `art.py` (code-drawn tiles, figures, tokens), `data.py` (goods, buildings, balance), `world.py` (economy, trade, colonies, war), `ai.py`, `mapview.py`, `app.py`, `gamemenu.py` (in-game menu), `saves.py` (save slots), `resources.py` and `feed.py` (what the top bar, the floating text and the action log show), `hud/` (their drawing: `topbar.py`, `floating.py`, `actionlog.py`) |
 | `hexa/colony/` | Colonisation mode: `rules.py`, `mapgen.py`, `world.py` (rules), `ai.py` (rivals, natives, royal army), `render.py`, `app.py` (window) |
 | `hexa/rules.py` | Unit, terrain and balance numbers |
 | `hexa/world.py` | Game state and rules: movement, combat, fog of war, turns, winning |

@@ -7,9 +7,10 @@ gets the action. Text helpers (``fit``, ``wrap``, ``text``) need only a font and
 """
 import pygame
 
+from .icons import icon
 from .theme import (BUTTON_FACE, BUTTON_FACE_HOT, BUTTON_FACE_OFF, FAINT, GOLD, LINE, MENU_BUTTON, MENU_DISABLED,
-                    MENU_HOVER, MENU_WARN, MUTED, SHADE, TECH_BUTTON, TECH_BUTTON_HOT, TECH_BUTTON_OFF, TECH_FAINT,
-                    TECH_MUTED, TECH_TEXT, TEXT)
+                    MENU_HOVER, MENU_WARN, MUTED, ROW_HOVER, SHADE, TECH_BUTTON, TECH_BUTTON_HOT, TECH_BUTTON_OFF,
+                    TECH_FAINT, TECH_MUTED, TECH_TEXT, TEXT, TOGGLE_FACE, TOGGLE_HOT)
 
 
 class Button:
@@ -22,12 +23,15 @@ class Button:
 
 # ----- text ----------------------------------------------------------------------------------------------------
 def fit(font, text, width):
-    """`text` cut down to `width` pixels, ending in an ellipsis when it had to be shortened."""
+    """`text` cut down to `width` pixels, ending in an ellipsis when it had to be shortened. When not even one
+    letter fits, the ellipsis alone if that fits, else nothing."""
     if font.size(text)[0] <= width:
         return text
     while text and font.size(text + "…")[0] > width:
         text = text[:-1]
-    return text + "…" if text else ""
+    if text:
+        return text + "…"
+    return "…" if font.size("…")[0] <= width else ""
 
 
 def wrap(font, text, width):
@@ -47,9 +51,13 @@ def wrap(font, text, width):
 
 def text(surface, font, text, pos, colour=TEXT, width=None, align="left"):
     """Draw text and return its rect. `align` says which point of the text sits at `pos`: left (top-left), center
-    (top-middle) or right (top-right). `width` shortens it with an ellipsis."""
-    if width:
+    (top-middle) or right (top-right). `width` shortens it with an ellipsis (a width of 0 leaves nothing)."""
+    if width is not None:
         text = fit(font, text, width)
+    if not text:                    # nothing fits or nothing was said, and pygame cannot render "" (zero width)
+        rect = pygame.Rect(0, 0, 0, 0)
+        setattr(rect, {"center": "midtop", "right": "topright"}.get(align, "topleft"), pos)
+        return rect
     img = font.render(text, True, colour)
     rect = img.get_rect()
     if align == "center":
@@ -89,6 +97,47 @@ def button(ctx, rect, label, enabled, action, hint="", detail="", small=False):
         img = font.render(label, True, fg)
         ctx.screen.blit(img, img.get_rect(center=rect.center))
     ctx.ui.buttons.append(Button(rect, label, enabled, action, hint, detail))
+    return rect
+
+
+def icon_button(ctx, rect, glyph, label, action, hint="", selected=False):
+    """A square toggle with an icon (the map modes, the log's arrow): draw it, register its hit box on
+    ctx.ui.buttons (`label` is what hints and tests call it) and return its rect. `selected` adds a gold edge."""
+    rect = pygame.Rect(rect)
+    hovered = rect.collidepoint(ctx.ui.mouse)
+    pygame.draw.rect(ctx.screen, TOGGLE_HOT if hovered else TOGGLE_FACE, rect, border_radius=5)
+    img = icon(glyph, min(rect.w, rect.h) - 10)
+    ctx.screen.blit(img, img.get_rect(center=rect.center))
+    if selected:
+        pygame.draw.rect(ctx.screen, GOLD, rect, 1, border_radius=5)
+    ctx.ui.buttons.append(Button(rect, label, True, action, hint))
+    return rect
+
+
+CHIP_PAD = 6        # space around a chip's icon and text
+
+
+def chip_width(ctx, value, delta="", compact=False):
+    """How wide `chip` is for these texts."""
+    font = ctx.font if compact else ctx.bold
+    return CHIP_PAD + 18 + 4 + font.size(value)[0] + (4 + ctx.small.size(delta)[0] if delta else 0) + CHIP_PAD + 2
+
+
+def chip(ctx, rect, glyph, value, delta, delta_colour, label, action, hint="", compact=False):
+    """A resource chip of the top bar: an icon, a value and the change in brackets, one hit box (`hint` is the hover
+    card: a (title, lines) pair for ``hover_card``). `compact` sets the value in the lighter font. Returns the rect."""
+    font = ctx.font if compact else ctx.bold
+    rect = pygame.Rect(rect)
+    if rect.collidepoint(ctx.ui.mouse):
+        pygame.draw.rect(ctx.screen, ROW_HOVER, rect, border_radius=5)
+        pygame.draw.rect(ctx.screen, LINE, rect, 1, border_radius=5)
+    img = icon(glyph, 18)
+    ctx.screen.blit(img, img.get_rect(midleft=(rect.x + CHIP_PAD, rect.centery)))
+    x = rect.x + CHIP_PAD + 22
+    x += text(ctx.screen, font, value, (x, rect.centery - font.get_height() // 2), TEXT).w + 4
+    if delta:
+        text(ctx.screen, ctx.small, delta, (x, rect.centery - ctx.small.get_height() // 2 + 1), delta_colour)
+    ctx.ui.buttons.append(Button(rect, label, True, action, hint))
     return rect
 
 
@@ -152,15 +201,41 @@ def tip(ctx, label):
     ctx.screen.blit(img, img.get_rect(center=box.center))
 
 
-def hover_card(ctx, title, lines):
-    """A hover card next to the mouse: a gold title and (text, colour) lines."""
+def _split(line):
+    """A card line's (left text, right text): a tab puts the rest in a right-aligned column (the amounts)."""
+    left, _, right = line.partition("\t")
+    return left, right
+
+
+def _colours(colour):
+    """(left, right) colours of a card line: one colour, or a pair for the label and the amount."""
+    return colour if isinstance(colour[0], tuple) else (colour, colour)
+
+
+def hover_card(ctx, title, lines, max_width=420):
+    """A hover card next to the mouse: a gold title and (text, colour) lines. A tab in a line's text starts a
+    right-aligned column (an amount); ("", None) is a thin rule between groups."""
     ui = ctx.ui
-    width = max([ctx.bold.size(title)[0]] + [ctx.font.size(t)[0] for t, _ in lines]) + 22
-    width = min(width, 420)
-    box = pygame.Rect(ui.mouse[0] + 18, ui.mouse[1] + 18, width, 32 + 19 * len(lines))
+    texts = [_split(t) for t, c in lines if c is not None]
+    widest = max([ctx.bold.size(title)[0]] + [ctx.font.size(a)[0] + (ctx.font.size(b)[0] + 24 if b else 0)
+                                              for a, b in texts])
+    width = min(widest + 22, max_width)
+    height = 34 + sum(19 if c is not None else 9 for t, c in lines)
+    box = pygame.Rect(ui.mouse[0] + 18, ui.mouse[1] + 18, width, height)
     box.clamp_ip(ctx.view_rect())
     shade(ctx.screen, box, (12, 14, 18, 240))
     pygame.draw.rect(ctx.screen, GOLD, box, 1, border_radius=6)
     ctx.text(ctx.bold, title, (box.x + 10, box.y + 6), GOLD, width - 20)
-    for i, (line, colour) in enumerate(lines):
-        ctx.text(ctx.font, line, (box.x + 10, box.y + 28 + i * 19), colour, width - 20)
+    y = box.y + 28
+    for line, colour in lines:
+        if colour is None:
+            pygame.draw.line(ctx.screen, LINE, (box.x + 10, y + 4), (box.right - 10, y + 4))
+            y += 9
+            continue
+        left, right = _split(line)
+        left_colour, right_colour = _colours(colour)
+        room = width - 20 - (ctx.font.size(right)[0] + 12 if right else 0)
+        ctx.text(ctx.font, left, (box.x + 10, y), left_colour, room)
+        if right:
+            text(ctx.screen, ctx.font, right, (box.right - 10, y), right_colour, align="right")
+        y += 19

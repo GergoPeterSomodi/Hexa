@@ -36,6 +36,7 @@ empties each frame with ``take_floating()``.
 ``entries(filter)`` gives the log for the screen, newest season first, with FILTERS "all", "war", "money" and "mine".
 ``unread`` counts the log lines since ``mark_read()`` (the collapsed log's "+8 new" badge).
 """
+import time
 import weakref
 from collections import deque
 from typing import NamedTuple, Optional
@@ -48,7 +49,17 @@ FILTERS = ("all", "war", "money", "mine")
 PER_SEASON = 60         # log items kept for each season
 KEEP_SEASONS = 8        # seasons of log kept (two years)
 FLOATING = 40           # floating items waiting for the screen
-MONEY_KINDS = ("money_spent", "unit_raised", "building_done", "investment_done", "debt_seized")
+MONEY_KINDS = ("money_spent", "unit_raised", "building_done", "investment_done", "debt_seized", "treasury", "credit",
+               "merchant")
+# Lines the rules write with ``world.message(text, tag, notice=name)`` because they have no event of their own:
+# name -> (colour kind, keyword). They are log lines only (no floating text); the "Money" filter takes the kinds
+# in MONEY_KINDS.
+NOTICES = {
+    "start": ("other", "Start"), "lead": ("other", "Start"), "treasury": ("other", "Treasury"),
+    "credit": ("loss", "Credit"), "merchant": ("own", "Trade"), "idea": ("gain", "Idea"),
+    "growth": ("gain", "Grown"), "supply": ("loss", "Supply"), "extinct": ("war", "Gone"),
+    "march": ("own", "March"), "research": ("other", "Research"),
+}
 LOSS_TEXT = {"battle": "Lost", "storm": "Lost", "overrun": "Overrun", "deserted": "Deserted", "starved": "Starved",
              "sunk": "Sunk", "evicted": "Evicted", "disbanded": "Disbanded"}
 LOSS_LOGGED = ("overrun", "starved", "sunk", "evicted", "disbanded")     # the others are told by their own items
@@ -90,10 +101,13 @@ class Feed:
         self._world = weakref.ref(world)
         self.groups = {}                    # season -> deque of FeedItem
         self.unread = 0
-        self._floating = deque(maxlen=FLOATING)
+        self._floating = deque(maxlen=FLOATING)     # (time.monotonic() when told, FeedItem)
         self._costs = {}                    # (tag, pos, reason) -> ducats, to put in the next matching sentence
         self._once = set()                  # (kind, season) told once a season
         world.bus.tap(self.on_event)
+        if world.turn == 1:                         # the line the world wrote before there was a feed to hear it
+            for text in world.log:
+                self._notice(None, "start", text)
 
     @property
     def world(self):
@@ -108,7 +122,7 @@ class Feed:
         if item is None:
             return
         if item.floating:
-            self._floating.append(item)
+            self._floating.append((time.monotonic(), item))
         if item.log:
             group = self.groups.get(item.season)
             if group is None:
@@ -118,9 +132,11 @@ class Feed:
             group.append(item)
             self.unread += 1
 
-    def take_floating(self):
-        """The floating items since the last call, oldest first."""
-        out = list(self._floating)
+    def take_floating(self, max_age=None):
+        """The floating items since the last call, oldest first. With `max_age` (seconds), those told longer ago are
+        left out: the screen was not showing the map and the moment has passed."""
+        now = time.monotonic()
+        out = [item for told, item in self._floating if max_age is None or now - told <= max_age]
         self._floating.clear()
         return out
 
@@ -174,7 +190,21 @@ class Feed:
         return FeedItem(event.kind, colour, text, place, event.tag, self.world.turn, sentence, mine,
                         floating and place is not None and (mine or self._seen(place)), log)
 
+    def _notice(self, event, name, text):
+        """Put a line that has no event into the log (the world's own start line, at the first turn)."""
+        colour, keyword = NOTICES[name]
+        item = FeedItem(name, colour, keyword, None, None, self.world.turn, text, True, False, True)
+        self.groups.setdefault(item.season, deque(maxlen=PER_SEASON)).append(item)
+
     # ----- one handler per event kind: each returns a FeedItem or None --------------------
+    def _message(self, event):
+        """A ``world.message`` that names a notice and was shown to the player: a log line of its own."""
+        spec = NOTICES.get(event.get("notice"))
+        if spec is None or not event.get("shown"):
+            return None
+        item = self._item(event, spec[0], spec[1], event.get("text"), True, floating=False)
+        return item._replace(kind=event.get("notice"))
+
     def _battle(self, event):
         att, dfn = event.tag, event.get("defender")
         mine = self._party(att, dfn)

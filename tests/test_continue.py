@@ -7,8 +7,6 @@ import sys
 import unittest
 from unittest import mock
 
-import hexa
-import hexa.campaign
 from hexa.campaign import saves
 from tests.support.home import TempHome
 
@@ -20,8 +18,13 @@ def headless_window_code():
     stub = mock.MagicMock()
     stub.display.get_desktop_sizes.return_value = [(1920, 1080)]
     stub.display.set_mode.return_value.get_size.return_value = (1280, 720)
-    with mock.patch.dict(sys.modules, {"pygame": stub}), mock.patch.dict(hexa.__dict__), \
-            mock.patch.dict(hexa.campaign.__dict__):
+    with contextlib.ExitStack() as undo:
+        undo.enter_context(mock.patch.dict(sys.modules, {"pygame": stub}))
+        # every package whose attributes the loop below removes (a loaded submodule is an attribute of its package):
+        # hexa, hexa.campaign, hexa.ui, hexa.campaign.panels, hexa.campaign.hud, ... whatever is loaded now
+        for name, package in list(sys.modules.items()):
+            if (name == "hexa" or name.startswith("hexa.")) and hasattr(package, "__path__"):
+                undo.enter_context(mock.patch.dict(package.__dict__))
         for name in [n for n, m in sys.modules.items() if n.startswith("hexa.") and hasattr(m, "pygame")]:
             del sys.modules[name]
             parent, _, child = name.rpartition(".")

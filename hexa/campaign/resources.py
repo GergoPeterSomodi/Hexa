@@ -22,7 +22,8 @@ season is played) the baseline is the starting values and the income lines are e
 
 HOW IT LEARNS ABOUT ONE-OFFS. The tracker is a tap on ``world.bus`` (hexa/events.py): it hears each event the moment it
 is emitted, so it needs no drain, and it never changes the world. Money spent goes through ``spend`` below, which
-emits ``money_spent``. Raised and lost units, captures, colonies, seizures and finished techs come from their own events.
+emits ``money_spent``. Raised and lost units, captures, colonies, seizures and finished techs come from their own
+events. A seizure is a line with no amount: its saving is in the season's upkeep line already (``world._unpaid``).
 
 NOT SAVED. The baseline, the 12-season history and the ledger live in the Tracker only (one per world, made on first
 use, found again by ``of(world)``). A loaded game starts a new baseline at the moment of loading: the chips read +0
@@ -108,6 +109,9 @@ class Tracker:
         self.ledger = {}        # tag -> deque of Item since the baseline
         self.collected = {}     # tag -> the income dict of the season just played (None before the first)
         self.season = world.turn
+        self._seasons = {}      # tag -> the turn of the newest history point
+        self.seized = {}        # tag -> ducats a season the creditors took off the upkeep this season (see round_done)
+        self.stamp = 0          # counts what the tracker heard or did: a snapshot a screen kept is stale when it moves
         self._kinds = {k.name: k for k in UNIT_KINDS.values()}
         world.bus.tap(self.on_event)
         self.begin_season()
@@ -122,28 +126,44 @@ class Tracker:
         ``GameManager.end_season`` just before the season is played."""
         world = self.world
         self.season = world.turn
+        self.stamp += 1
         for tag, country in world.countries.items():
             if not country.alive:
                 continue
             now = values(world, tag)
             self.start[tag] = now
             series = self.history.setdefault(tag, {})
+            same = self._seasons.get(tag) == world.turn         # the first season is played from the baseline the
+            self._seasons[tag] = world.turn                     # tracker took when it was made: one point, not two
             for name, value in now.items():
-                series.setdefault(name, deque(maxlen=HISTORY)).append(value)
+                points = series.setdefault(name, deque(maxlen=HISTORY))
+                if same and points:
+                    points.pop()
+                points.append(value)
             self.ledger[tag] = deque(maxlen=LEDGER)
             self.collected[tag] = None
+            self.seized[tag] = 0.0
 
     def round_done(self):
         """Remember the incomes the season just played collected. Called right after ``world.end_round``."""
+        self.stamp += 1
         for tag, country in self.world.countries.items():
             if country.alive:
-                self.collected[tag] = dict(country.income)
+                income = dict(country.income)
+                if self.seized.get(tag):
+                    # ``world.collect`` took this season's balance before ``_unpaid`` seized buildings and cut the
+                    # upkeep in ``income``: the treasury paid the upkeep as it was, so the line shows that.
+                    income["upkeep"] = income.get("upkeep", 0.0) - self.seized[tag]
+                self.collected[tag] = income
 
     def series(self, tag, name):
-        """The last HISTORY values of one resource, oldest first, ending with the value now."""
+        """The last HISTORY values of one resource, oldest first, ending with the value now. The newest baseline is
+        the same moment as "now" until a season has been played after it, so it is not counted twice."""
         past = list(self.history.get(tag, {}).get(name, ()))
         now = values(self.world, tag)[name]
-        return (past[:-1] + [now])[-HISTORY:] if past else [now]
+        if past and self._seasons.get(tag) == self.world.turn:
+            past.pop()
+        return (past + [now])[-HISTORY:]
 
     # ----- the ledger --------------------------------------------------------------------
     def _add(self, tag, resource, key, amount, pos=None, detail=""):
@@ -157,6 +177,7 @@ class Tracker:
     def on_event(self, event):
         """The bus tap: file what happened under the resource it changed."""
         kind, tag, pos = event.kind, event.tag, event.pos
+        self.stamp += 1
         if kind == "money_spent":
             self._add(tag, "ducats", event.get("reason"), -event.get("amount", 0), pos, self._place(pos))
         elif kind == "unit_raised" and self._war(event):
@@ -164,7 +185,10 @@ class Tracker:
         elif kind == "unit_lost" and self._war(event):
             self._add(tag, "regiments", event.get("why", "battle"), -1, pos, event.get("what"))
         elif kind == "debt_seized":
-            self._add(tag, "ducats", "seized", 0.0, None, event.get("what"))
+            # the saving is in income["upkeep"] already (and round_done corrects it): an amount here would count it twice
+            self.seized[tag] = self.seized.get(tag, 0.0) + event.get("saving", 0)
+            saves = f"{event.get('what')} (saves {event.get('saving', 0):g}/season)"
+            self._add(tag, "ducats", "seized", 0.0, None, saves)
         elif kind == "province_captured":
             peace = event.get("by") == "peace"
             self._add(tag, "provinces", "took" if peace else "occupied", int(peace), pos, self._place(pos))

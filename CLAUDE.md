@@ -198,12 +198,33 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   pause menu's plain names, the technology screen's `TECH_*`, the start menu's `MENU_BG`) and the font loader
   (`new_font`, cached `font`); windows import from it and never call `pygame.font.SysFont` themselves. `ui/kit.py` has
   the immediate-mode helpers in today's look: `button` (registers a hit box on `ctx.ui.buttons`), `menu_button`,
-  `flat_button`, `fit`, `wrap`, `text`, `shade`, `heading`, `tip`, `hover_card`, `panel_frame`. A `ctx` is the
+  `flat_button`, `icon_button`, `chip`, `fit`, `wrap`, `text`, `shade`, `heading`, `tip`, `hover_card`, `panel_frame`. A `ctx` is the
   drawing window (`CampaignApp`: `screen`, `ui`, fonts, `panel_rect()`, `view_rect()`). Each side panel is a
   module of `campaign/panels/` with `draw(ctx, world, ui, subject)` (province, unit, country, market, raise_,
   ledger; `panels.draw()` picks by `ui.panel`); `panels/cards.py` builds the hover cards from the world. Panels lay
   out from `kit.panel_frame(ctx)` (never the app's `WIDTH`), read the world and register buttons; they never
   change it. `CampaignApp.press(action)` looks `action[0]` up in the `PRESS` table (one `_do_<kind>` method each).
+- **HUD** (`hexa/campaign/hud/`, a window package). What is drawn over the map besides the side panels: `topbar.py` (the
+  resource chips of `resources.snapshot`: icon, value, change, a hover card per chip and a click that opens its panel; the
+  chips are buttons named "Ledger", "Research", "Provinces", "Army", "Market", "Prestige", so tests click them by label;
+  `plan()` drops key goods, changes, "End season" and chips as the window narrows), `floating.py` (ribbon tags rising from
+  hexes, fed by `feed.take_floating()`; `Floaters.add` keeps only what the camera sees: in view, not under the panel, not
+  fogged, 3 per hex, 16 in all), `actionlog.py` (the collapsible log of `feed.entries()`: filters, season groups, place
+  links) and `style.py` (the colour and icon of the six kinds). `Hud` (`hud/__init__.py`) holds their state and is made with
+  each game by `CampaignApp._set_game`; the window calls `hud.draw_world/draw_log/draw_top` from `draw()`, `hud.press` from
+  `PRESS["log"]` and `hud.wheel` from its wheel handler. `hud.covers(ctx, pixel)` is true over the top bar, the minimap
+  and the log's box: `hex_under`, a drag start and so a right-click or pan never reach the map there, and `left_click`
+  lets the open side panel win over a button that pokes into it. While the map is hidden (tech screen, pause menu) the HUD
+  draws nothing and leaves the feed's floating queue alone (`take_floating(max_age)` drops what is too old). HUD modules
+  read the world and register buttons; they hold their own fonts (`new_font`, not the cached `theme.font`, which can
+  outlive pygame; both are emptied by a `pygame.register_quit` hook) and never change the game. `ui/icons.py` draws the
+  icons into a `ui/cache.py` `BoundedCache` (registered by name, emptied on quit; `icon()` hands out copies); `ui/kit.py` has `chip`, `icon_button` and a `hover_card` whose lines may have a right-aligned amount
+  (text with a tab) and rules (`("", None)`).
+- **Lines for the action log.** Most log lines come from bus events (`feed.py` handlers). A `world.message()` that has no
+  event of its own must name a notice, `world.message(text, tag, "idea", pos)` (`feed.NOTICES`: start, lead, treasury,
+  credit, merchant, idea, growth, supply, extinct, march, research); `tests/test_hud_data.py` reads the source and fails
+  on a message that names none and is not one an event already tells. Notices are log lines only (the Money filter takes
+  treasury, credit and merchant).
 - **Event bus** (`hexa/events.py`, pygame-free). `world.bus` is a transient `EventBus`: the rules call
   `world.bus.emit(kind, tag, pos, **data)` where state changes (capture, war, peace, raise, kills, desertion,
   seizure, passes, research, ages, colonies, buildings, sieges, battles; `world.message()` emits `message`), which
@@ -212,7 +233,8 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   the `hexa/events.py` docstring (`CAMPAIGN_KINDS`). The bus is left out of `save_state()` and rebuilt in
   `_restore`, so saves and snapshots never contain it. Handlers must not change the game (the one exception is the
   "declared war on you" log line, kept for its text and place in the log). The war alert subscribes to
-  `war_declared`; it replaced the old before/after diff of the war list.
+  `war_declared`; it replaced the old before/after diff of the war list. A tap that raises is logged once per (tap, kind)
+  (`logging.getLogger("hexa")`), counted every time in `bus.tap_errors`; with `HEXA_DEBUG=1` it is raised, so a developer sees the bug.
 - **Markets** are rebuilt lazily (`world.refresh_markets()` marks them, `ensure_markets()` rebuilds). `draw()` no
   longer calls it: `refresh()`, `process_events()` and `end_season()` do, so drawing never changes the game.
 - `art.py` draws extra tiles, decorations, unit figures and tokens in code, in the Kenney style at 120x140.

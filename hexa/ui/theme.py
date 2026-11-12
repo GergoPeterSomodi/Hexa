@@ -21,6 +21,13 @@ BUTTON_FACE = (52, 74, 112)       # a panel or top-bar button, enabled
 BUTTON_FACE_HOT = (70, 95, 140)   # ... under the mouse
 BUTTON_FACE_OFF = (44, 48, 56)    # ... disabled
 SHADE = (12, 14, 18)              # hover cards and toasts
+INK = (12, 14, 18)                # the dark outline of icons and ribbons
+ROW_HOVER = (42, 49, 62)          # a chip or a log row under the mouse
+TOGGLE_FACE = (38, 44, 55)        # an icon toggle (the map modes), not selected
+TOGGLE_HOT = (50, 58, 72)         # ... under the mouse
+INFO_C = (120, 175, 235)          # links (the place names of the log)
+WARN_C = (240, 160, 70)           # warnings, sieges
+CARD_BG = (14, 16, 21)            # the action log's box
 
 # the pause menu's own buttons
 MENU_BUTTON = (44, 50, 62)
@@ -52,19 +59,37 @@ TECH_QUEUE_TEXT = (200, 168, 88)
 # ----- fonts ---------------------------------------------------------------------------------------------------
 SANS = "segoeui,arial"
 SERIF = "georgia,timesnewroman,serif"
+RIBBON = "palatinolinotype,palatino,georgia,timesnewroman,serif"       # the floating text's ribbons
 _fonts = {}
+_watching = False           # a pygame.quit() callback is registered (pygame forgets it when it quits)
 
 
-def new_font(size, bold=False, serif=False):
-    """A new font of the window's sans (or serif) family."""
+def _forget_fonts():
+    """Called by pygame.quit(): a font made before it is dead (using one crashes pygame), so the cache goes."""
+    global _watching
+    _fonts.clear()
+    _watching = False
+
+
+def _watch_quit():
+    global _watching
+    if not _watching:
+        pygame.register_quit(_forget_fonts)
+        _watching = True
+
+
+def new_font(size, bold=False, serif=False, names=None):
+    """A new font of the window's sans (or serif) family, or of the `names` given (a SysFont name list)."""
     if not pygame.font.get_init():
+        _fonts.clear()                  # fonts made before a pygame.quit() are dead
         pygame.font.init()
-    return pygame.font.SysFont(SERIF if serif else SANS, size, bold=bold)
+    return pygame.font.SysFont(names or (SERIF if serif else SANS), size, bold=bold)
 
 
-def font(size, bold=False, serif=False):
+def font(size, bold=False, serif=False, names=None):
     """The same font as new_font, made once and kept (for code that asks for a font on every frame)."""
-    key = (size, bold, serif)
+    key = (size, bold, serif, names)
+    _watch_quit()
     if key not in _fonts:
-        _fonts[key] = new_font(size, bold, serif)
+        _fonts[key] = new_font(size, bold, serif, names)
     return _fonts[key]
