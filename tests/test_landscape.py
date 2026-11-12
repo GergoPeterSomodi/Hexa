@@ -114,10 +114,6 @@ class ObjectTest(unittest.TestCase):
         self.assertGreaterEqual(self.land.cell_info(pos, "summer")["alt"], 0.86)
         self.assertNotIn("tree", cats(self.land.object_names(pos, "summer")))
 
-    def test_closed_pass_markers_are_objects_in_winter_only(self):
-        self.assertIn("barrier", [n for _, n in self.land.object_names(ALPS_PASS, "winter")])
-        self.assertNotIn("barrier", [n for _, n in self.land.object_names(ALPS_PASS, "summer")])
-        self.assertIsInstance(self.land.closed_marker(34), pygame.Surface)
 
 
 class RuleTest(unittest.TestCase):
@@ -160,24 +156,6 @@ class RuleTest(unittest.TestCase):
         self.assertIn(land.cell_info(pos, "summer")["ground"], ("alpine", "montane"))
         self.assertEqual(land.cell_info(pos, "winter")["ground"], "snow")
         self.assertIsNotNone(land.ground(pos, 34, "winter"))
-
-    def test_closed_pass_is_art_in_winter_only(self):
-        land = L.Landscape(WORLD, TILES)
-        self.assertTrue(land.closed_pass(ALPS_PASS, "winter"))
-        self.assertFalse(land.closed_pass(ALPS_PASS, "summer"))
-        self.assertFalse(land.closed_pass((120, 60), "winter"))         # not at a pass
-        self.assertTrue(land.cell_info(ALPS_PASS, "winter")["impassable"])
-
-    def test_only_closed_passes_get_the_hatch(self):
-        """Snow hexes are passable (move cost 3), so the snow turns white with no hatch; only closed passes get one."""
-        land = L.Landscape(WORLD, TILES)
-        pos = next(hexes(WORLD, lambda p: WORLD.terrain[p] == "mountains" and p not in WORLD.passes()
-                         and land.cell_info(p, "summer")["alt"] >= 0.6))
-        info = land.cell_info(pos, "winter")
-        self.assertEqual(info["ground"], "snow")
-        self.assertFalse(info["impassable"])
-        self.assertFalse(info["closed"])
-        self.assertFalse(land.closed_pass(pos, "winter"))
 
     def test_objects_can_wait_until_built(self):
         """build=False returns None for a hex whose object list is not built yet (the frame budget), then it builds."""

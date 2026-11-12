@@ -137,7 +137,7 @@ class MapView:
         self._label_stats = {}             # the last placement: placed, skipped, ms
         self._focus = None                 # the selected province's position: its town name is never hidden
         self._drawn_labels = []            # (pos, screen rect) of the town names drawn this frame
-        self._pass_chips = {}              # r -> the small CLOSED marker of the far zooms
+        self.pass_names_on = True          # pass names at the closest zoom (an option, like the grid)
         self.grid_on = True                # the faint hex grid on the landscape zooms (the G key)
         self._roads = []
         for path in getattr(world, "road_paths", []):
@@ -192,7 +192,7 @@ class MapView:
         return world.version, world.player, len(country.explored) if country else 0
 
     def surface(self):
-        key = (self.zoom, self.mode, self.fog_stamp())
+        key = (self.zoom, self.mode, self.fog_stamp(), self.world.winter())
         if key != self._key:
             self._key = key
             self._cache = self._render()
@@ -265,6 +265,9 @@ class MapView:
                 if pos in world.terrain:
                     pygame.draw.polygon(surf, BLACK_FOG, hex_points(*self.center(pos), r + 1.2))
         self._borders(surf, known)
+        if self.land is not None:                                  # the ridge crests' relief fold (per season)
+            m = self.MARGIN
+            landscape.draw_far_ridges(surf, r, world.winter(), lambda p: (m + p[0] * r, m + p[1] * r), self._ridge_items(known))
         self._decorations(surf, known)
         return surf
 
@@ -373,8 +376,6 @@ class MapView:
         def at(pos):
             x, y = self.center(pos)
             return x + ox, y + oy
-        if r < LAND_FROM and world.winter():
-            self._closed_passes(screen, view_rect, at)
         if ui.selected and ui.reach:
             self._movement(screen, at, ui)
         if ui.province:
@@ -420,37 +421,67 @@ class MapView:
         self._late_labels = []
         screen.set_clip(None)
 
-    def pass_chip(self, r):
-        """The CLOSED chip of the landscape zooms (red box, dark edge, white letters), scaled down for the far zooms:
-        the word from hex radius 13, a bare bar on a red plate from 8, a red dot below that. Cached."""
-        if r not in self._pass_chips:
-            if r >= 13:
-                font = pygame.font.SysFont("segoeui,arial", 9, bold=True)
-                lab = font.render("CLOSED", True, (255, 255, 255))
-                size = (lab.get_width() + 6, lab.get_height() + 1)
-            else:
-                lab = None
-                size = (max(5, round(r * 1.3)), max(4, round(r * 0.8)))
-            surf = pygame.Surface(size, pygame.SRCALPHA)
-            pygame.draw.rect(surf, (190, 40, 38), surf.get_rect(), border_radius=3 if r >= 8 else 1)
-            pygame.draw.rect(surf, (90, 16, 16), surf.get_rect(), 1, border_radius=3 if r >= 8 else 1)
-            if lab is not None:
-                surf.blit(lab, (3, 0))
-            elif r >= 8:
-                pygame.draw.line(surf, (255, 255, 255), (2, size[1] // 2), (size[0] - 3, size[1] // 2), 2)
-            self._pass_chips[r] = surf
-        return self._pass_chips[r]
+    # ----- ridge crests at the far zooms ------------------------------------------------------
+    def _ridge_items(self, known, keep=None):
+        """[((a, b), look, is_pass)] of the crest and pass edges of known hexes (a, b: the edge's corners in unit
+        points); keep(point pair) may drop the ones off screen."""
+        if self.land is None:
+            return []
+        out = []
+        for ha, hb, pts, look, is_pass in self.land.ridges().far_edges():
+            if ha in known and hb in known and (keep is None or keep(pts)):
+                out.append((pts, look, is_pass))
+        return out
 
-    def _closed_passes(self, screen, view_rect, at):
-        """Winter: a small CLOSED marker on every closed pass the player knows, at the zooms that have no landscape art."""
-        world = self.world
-        chip = self.pass_chip(self.r)
+    def _far_ridges(self, screen, view_rect, camera):
+        """r=13 (the tile art): the relief fold along the ridge crests, over the tiles and under the fog dim."""
+        r, m = self.r, self.MARGIN
+        ox, oy = view_rect.x - camera[0], view_rect.y - camera[1]
+
+        def px(p):
+            return (ox + m + p[0] * r - view_rect.x, oy + m + p[1] * r - view_rect.y)
+
+        def visible(pts):
+            x, y = px(pts[0])
+            return -2 * r <= x <= view_rect.w + 2 * r and -2 * r <= y <= view_rect.h + 2 * r
+        items = self._ridge_items(self.known(), visible)
+        if items:
+            landscape.draw_far_ridges(screen.subsurface(view_rect), r, self.world.winter(), px, items)
+
+    def _pass_names(self, screen):
+        """Pass names at r=34 (political map): a small plate at each pass saddle the player knows, kept clear of the
+        town names already drawn, of the other pass names and of the pass hospice."""
+        if self.r != 34 or not self.pass_names_on or self.land is None:
+            return
+        ridges, r = self.land.ridges(), self.r
         known = self.known()
-        for pos in world.passes():
-            if pos in known and world.pass_closed(pos):
-                x, y = at(pos)
-                if view_rect.inflate(40, 40).collidepoint(x, y):
-                    screen.blit(chip, chip.get_rect(center=(x, y - self.r * 0.25)))
+        view_rect, cam = self._view_rect, self._cam
+        ox, oy = view_rect.x - cam[0] + self.MARGIN, view_rect.y - cam[1] + self.MARGIN
+        taken = [box for _, box in self._drawn_labels]
+        seen = set()
+        for name, pos, other in ridges.pass_sites():
+            if name in seen or pos not in known or other not in known:
+                continue
+            seen.add(name)
+            (ax, ay), (bx, by) = landscape.hex_centre(pos), landscape.hex_centre(other)
+            mx, my = ox + (ax + bx) / 2 * r, oy + (ay + by) / 2 * r
+            if not view_rect.inflate(60, 40).collidepoint(mx, my):
+                continue
+            shade, text = self._label_surfaces(name)
+            w, h = shade.get_size()
+            avoid = list(taken)
+            hosp = ridges.hospice.get(name)
+            if hosp is not None:                      # the hospice stands near the hex centre: keep the plate off it
+                hx, hy = landscape.hospice_spot(*hosp)
+                avoid.append(pygame.Rect(round(ox + hx * r) - 24, round(oy + hy * r) - 40, 48, 44))
+            for dy in (0, -h - 4, h + 4, -2 * h - 8):
+                box = pygame.Rect(round(mx - w / 2), round(my - h / 2 + dy), w, h)
+                if not any(box.inflate(6, 4).colliderect(o) for o in avoid):
+                    screen.blit(shade, box)
+                    screen.blit(text, text.get_rect(center=box.center))
+                    taken.append(box)
+                    self._drawn_labels.append((("pass", name), box))
+                    break
 
     def _capture(self, screen, view_rect, camera):
         """Keep this frame's map (a plain copy, about 0.2 ms) in case the next frame is at another zoom."""
@@ -641,6 +672,8 @@ class MapView:
                 castle = prov.castle
         else:
             road = frozenset()
+        if road and self.land is not None:
+            road = road - frozenset(self.land.ridges().crest.get(prov.pos, ()))      # none over a crest
         if not (sea or river or road or town or castle):
             return None
         return wfctiles.TileDesc(sea=sea, river=river - sea, mouth=mouth, road=road - sea,
@@ -745,6 +778,8 @@ class MapView:
             self._tint(screen, [(FROST, cx, cy) for cx, cy in north])
             for cx, cy in north:
                 blit(frost, cx, cy)
+        if r == 13:
+            self._far_ridges(screen, view_rect, camera)
         self._capture(screen, view_rect, camera)
         self._tint(screen, [(DIM, cx, cy) for cx, cy in dimmed])
         black = self.overlay("black")
@@ -871,6 +906,7 @@ class MapView:
                     screen.blit(name, name.get_rect(center=box.center))
             if prov.owner and world.countries[prov.owner].capital == prov.pos:
                 self._flag(screen, (cx + r * 0.35, cy - r * 0.85), world.countries[prov.owner].color)
+        self._pass_names(screen)
 
     def _label_surfaces(self, name):
         """The shade box and the text of a town name at this zoom (rendered once)."""

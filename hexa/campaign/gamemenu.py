@@ -22,6 +22,7 @@ OPTION_TEXT = {
     "autosave": ("Autosave", lambda v: {"off": "Off", "year": "Every year", "5 years": "Every 5 years"}[v]),
     "scroll": ("Scroll speed", str.capitalize),
     "grid": ("Hex grid", lambda v: "On" if v else "Off"),
+    "pass_names": ("Pass names", lambda v: "On" if v else "Off"),
 }
 
 

@@ -789,6 +789,7 @@ class CampaignApp(GameMenu, TechScreen):
         self._update_path()
         self.screen.fill(BG)
         self.view.grid_on = self.settings["grid"]
+        self.view.pass_names_on = self.settings["pass_names"]
         self.view.draw(self.screen, self.view_rect(), self.camera, ui)
         self._draw_marches()
         self.draw_log()

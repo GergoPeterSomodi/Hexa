@@ -66,23 +66,8 @@ def count(screen, centre, colour, half=30):
     return n
 
 
-class ClosedPasses(unittest.TestCase):
-    def tearDown(self):
-        WORLD.turn = 1
-        WORLD.changed()
-
-    def test_marker_on_the_far_zooms_in_winter_only(self):
-        for r in (13, 8, 5):
-            _, summer, c = draw(WORLD, r, 2)
-            _, winter, c = draw(WORLD, r, 4)
-            self.assertEqual(count(summer, c, RED), 0, f"r={r}: no marker in summer")
-            self.assertGreater(count(winter, c, RED), 0, f"r={r}: a red marker on the closed pass")
-
-    def test_marker_shrinks_with_the_zoom(self):
-        view = mapview.MapView(WORLD, TILES)
-        sizes = [view.pass_chip(r).get_width() for r in (13, 8, 5, 3)]
-        self.assertEqual(sizes, sorted(sizes, reverse=True))
-        self.assertGreater(sizes[0], sizes[-1])
+class Passes(unittest.TestCase):
+    """Random worlds have passes (the pass art itself is tested in tests/test_ridge_art.py)."""
 
     def test_random_worlds_have_passes(self):
         world = CampaignWorld(7, map="random")

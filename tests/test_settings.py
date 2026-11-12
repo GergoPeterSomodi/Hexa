@@ -70,7 +70,7 @@ class LoadTest(TempHome):
         write(self.home, json.dumps({"fullscreen": True, "window": "800x600", "autosave": "5 years",
                                      "scroll": "warp", "grid": False}))
         self.assertEqual(settings.load(), {"fullscreen": True, "window": "1280x720", "autosave": "5 years",
-                                           "scroll": "normal", "grid": False})
+                                           "scroll": "normal", "grid": False, "pass_names": False})
 
     def test_values_of_the_wrong_type_fall_back_to_the_default(self):
         # JSON null, strings for booleans, numbers for strings, lists, objects, NaN, Infinity, huge numbers

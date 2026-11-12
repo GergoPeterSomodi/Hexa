@@ -7,9 +7,10 @@ WINDOWS = ("1280x720", "1600x900", "1920x1080")
 AUTOSAVE = ("off", "year", "5 years")
 AUTOSAVE_TURNS = {"off": 0, "year": 4, "5 years": 20}
 SCROLL = {"slow": 10, "normal": 18, "fast": 30}
-DEFAULTS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal", "grid": True}
+DEFAULTS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal", "grid": True,
+            "pass_names": False}
 CHOICES = {"fullscreen": (False, True), "window": WINDOWS, "autosave": AUTOSAVE, "scroll": tuple(SCROLL),
-           "grid": (False, True)}
+           "grid": (False, True), "pass_names": (False, True)}
 
 
 def home():

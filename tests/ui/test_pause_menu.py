@@ -21,7 +21,8 @@ from tests.support import harness
 from tests.support.harness import click, hex_pixel, key
 from tests.ui.test_campaign_app import CASTILE_STACK, CampaignCase
 
-SETTINGS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal", "grid": True}
+SETTINGS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal", "grid": True,
+            "pass_names": False}
 DEFAULT_FONT_SCALE = 0.6875   # pygame draws its bundled font, Font(None, size), at this fraction of size
 
 
@@ -441,7 +442,7 @@ class OptionsTest(PauseCase):
         record = lambda: seen.append((dict(app.settings), self.stored(), app.screen.get_size()))   # noqa: E731
         self.driver.at(0, key("m"))
         self.driver.at(1, self.on_pause(("page", "options")))
-        clicks = ["autosave", "autosave", "scroll", "grid", "window", "window", "window"]
+        clicks = ["autosave", "autosave", "scroll", "grid", "pass_names", "window", "window", "window"]
         for frame, option in enumerate(clicks, start=2):
             self.driver.at(frame, self.on_pause(("option", option)))
             self.driver.at(frame + 1, record)
@@ -451,10 +452,13 @@ class OptionsTest(PauseCase):
                     (dict(SETTINGS, autosave="off"), (1280, 720)),
                     (dict(SETTINGS, autosave="off", scroll="fast"), (1280, 720)),
                     (dict(SETTINGS, autosave="off", scroll="fast", grid=False), (1280, 720)),
-                    (dict(SETTINGS, autosave="off", scroll="fast", grid=False, window="1600x900"), (1600, 900)),
+                    (dict(SETTINGS, autosave="off", scroll="fast", grid=False, pass_names=True), (1280, 720)),
+                    (dict(SETTINGS, autosave="off", scroll="fast", grid=False, pass_names=True, window="1600x900"),
+                     (1600, 900)),
                     # 1920x1080 doesn't fit a 1920x1080 desktop with its task bar: 60 pixels less
-                    (dict(SETTINGS, autosave="off", scroll="fast", grid=False, window="1920x1080"), (1920, 1020)),
-                    (dict(SETTINGS, autosave="off", scroll="fast", grid=False), (1280, 720))]
+                    (dict(SETTINGS, autosave="off", scroll="fast", grid=False, pass_names=True, window="1920x1080"),
+                     (1920, 1020)),
+                    (dict(SETTINGS, autosave="off", scroll="fast", grid=False, pass_names=True), (1280, 720))]
         self.assertEqual([(now, size) for now, _, size in seen], expected)
         self.assertEqual([stored for _, stored, _ in seen], [now for now, _ in expected], "each change is saved")
         self.assertEqual(settings.load(), app.settings, "and read back next time")

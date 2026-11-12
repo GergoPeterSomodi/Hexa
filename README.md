@@ -151,6 +151,7 @@ says so each time you try.
   - window size: 1280x720, 1600x900 or 1920x1080; the map fills the extra space
   - autosave: off, every year or every 5 years
   - scroll speed
+  - hex grid (also **G**) and pass names: the mountain pass names shown on the closest zoom, off by default (the pass art and the winter snowflake mark on a closed pass always show)
 - Options are kept in `~/.hexa/settings.json`. If that file can't be written (a read-only folder or a full disk), a changed option still applies until you quit, and a message says it wasn't saved.
 
 ### The map

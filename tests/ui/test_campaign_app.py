@@ -256,7 +256,7 @@ class MapModeTest(CampaignCase):
         modes = [mode for mode, _, _ in seen]
         self.assertEqual(modes, ["political", "terrain", "goods", "markets", "political"])
         stamp = view.fog_stamp()
-        self.assertEqual([k for _, k, _ in seen], [(1, mode, stamp) for mode in modes],
+        self.assertEqual([k for _, k, _ in seen], [(1, mode, stamp, view.world.winter()) for mode in modes],
                          "the cached map is redrawn for each mode")
         pictures = {mode: picture for mode, _, picture in seen}
         self.assertEqual(seen[0][2], seen[-1][2], "political again looks as it did")
@@ -282,7 +282,7 @@ class MapModeTest(CampaignCase):
                           ("terrain", "chips"), ("goods", "chips")],
                          "3 cycles the goods view only when the goods map is already on")
         stamp = view.fog_stamp()
-        self.assertEqual([k for _, _, k in seen], [(1, mode, stamp) for mode, _, _ in seen],
+        self.assertEqual([k for _, _, k in seen], [(1, mode, stamp, view.world.winter()) for mode, _, _ in seen],
                          "zoomed out, the goods views share one cached picture: no redraw for a new view")
 
     def test_the_close_up_goods_map_shows_each_goods_view(self):

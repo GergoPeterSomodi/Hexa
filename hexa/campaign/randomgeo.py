@@ -777,6 +777,13 @@ def _mountains(tiles, centre, land, rng):
     return lines
 
 
+def _mountain_heights(mountains):
+    """The height (0.5 to 1.0) of each ridge line: the longest range is the highest, short spurs are low."""
+    lengths = [sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(line, line[1:])) for line in mountains]
+    top = max(lengths, default=0) or 1
+    return [round(0.5 + 0.5 * n / top, 2) for n in lengths]
+
+
 def _hills(mountains, land, dcoast, lonlats, rng):
     s = _scale()
     hills = []
@@ -1244,7 +1251,7 @@ def _attempt(seed, attempt):
         START=(round(start[0], 2), round(start[1], 2)),
         land_cells=land_cells, FORCE_LAND=[],
         CITIES=cities, COUNTRIES=countries, MARKETS=markets, TRIBES=tribes, RIVERS=rivers,
-        MOUNTAINS=mountains, HILLS=hills, FERTILE_RIVERS=fertile, PASSES=passes,
+        MOUNTAINS=mountains, MOUNTAIN_HEIGHT=_mountain_heights(mountains), HILLS=hills, FERTILE_RIVERS=fertile, PASSES=passes,
         desert_at=desert_at, steppe_at=steppe_at, marsh_at=marsh_at,
         KNOWN_WORLD=lambda lon, lat: lon > known_w and lat > 11.5,
         REGION=region_at, COLONISABLE=lambda lon, lat: region_at(lon, lat) != "old",

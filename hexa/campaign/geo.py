@@ -293,6 +293,10 @@ MOUNTAINS = [
     [(-78.0, -12.0), (-78.3, -6.0), (-79.0, -2.0), (-77.5, 1.5), (-75.5, 5.0), (-73.5, 8.5), (-67.5, 10.2)],
     [(37.5, 9.0), (39.0, 13.5)],
 ]
+# The height of each MOUNTAINS line (same order, 0..1): the range, not the local altitude. It caps how high a ridge crest
+# looks (alpine from 0.85, rocky from 0.48): Alps 1.0, Pyrenees 0.75, Carpathians 0.6, Apennines 0.5. Lines past the end
+# of the list (and worlds without it) get 0.6.
+MOUNTAIN_HEIGHT = [0.75, 0.55, 0.62, 1.0, 0.5, 0.5, 0.45, 0.6, 0.5, 0.95, 0.65, 0.7, 0.6, 0.8, 0.7, 0.7, 0.9, 0.6]
 # Mountain passes: (name, lon, lat). The crest of every MOUNTAINS ridge blocks the edges between the hexes it passes
 # between (world.ridge_edges), so armies can only cross a ridge at a pass: the one or two crest edges nearest each point
 # below stay open in summer and are shut by snow in winter (world.pass_edges, world.edge_blocked). world._join_pockets
