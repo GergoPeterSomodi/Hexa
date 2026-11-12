@@ -4,6 +4,10 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
+## Unreleased
+- New goods objects: all 32 goods have their own code-drawn object in the Goods view (Deposits), replacing borrowed
+  Kenney sprites and the crate fallback (fish is a basket of fish now, not a box)
+
 ## v0.1.6: Bug-fix round 2
 The rest of kioba's v0.1.6 and v0.1.7 milestones, and a seamless map:
 - With the hex grid off (G), tiles join with no gaps at any zoom; washes, fog and frost draw no lines between hexes (#71)

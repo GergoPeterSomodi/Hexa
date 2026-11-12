@@ -7,7 +7,7 @@ import time
 import pygame
 
 from ..hexgrid import neighbors
-from . import art, geo, goodsart, landscape, wfctiles
+from . import art, geo, goodsart, goodsobjects, landscape, wfctiles
 from .data import (GOODS, NATIVE_VILLAGE_SPRITE,
                    TERRAIN, TERRAIN_SPRITES, WORKS)
 
@@ -31,10 +31,6 @@ TERRAIN_TINT = {"plains": (150, 205, 90), "steppe": (215, 195, 110), "forest": (
                 "mountains": (150, 150, 165), "desert": (245, 215, 130), "jungle": (15, 115, 65), "tundra": (205, 215, 220),
                 "marsh": (80, 150, 130), "taiga": (60, 110, 90), "savanna": (220, 190, 90), "beach": (240, 220, 160),
                 "snow": (240, 245, 250)}
-DEPOSITS = {"iron": "rockGrey_large", "salt": "rockGrey_medium2", "silver": "crystals1", "gold": "crystals2",
-            "timber": "logPile", "grain": "hay", "wine": "farmland", "wool": "fence", "cotton": "farmland",
-            "sugar": "farmland", "tobacco": "farmland", "fish": "box1", "furs": "campingTent", "ivory": "box2",
-            "spices": "box2"}
 ABBR = {"grain": "GRN", "fish": "FSH", "salt": "SLT", "wine": "WIN", "wool": "WOL", "cotton": "CTN", "timber": "TMB",
         "iron": "IRN", "sugar": "SUG", "tobacco": "TOB", "furs": "FUR", "ivory": "IVR", "spices": "SPC",
         "silver": "SLV", "gold": "GLD"}
@@ -84,7 +80,6 @@ class MapView:
         self.tiles_dir = tiles_dir
         self._sprites = {}
         self._overlays = {}
-        self._objects = {}
         self.goods_view = "chips"
         self.zoom = 1
         self.mode = "political"
@@ -1062,15 +1057,6 @@ class MapView:
         options = TERRAIN_SPRITES[prov.terrain]
         return options[(prov.pos[0] * 5 + prov.pos[1] * 11) % len(options)]
 
-    def object_sprite(self, name):
-        key = (name, self.r)
-        if key not in self._objects:
-            path = os.path.join(os.path.dirname(self.tiles_dir), "Objects", name + ".png")
-            img = pygame.image.load(path).convert_alpha()
-            h = int(self.r * 0.95)
-            self._objects[key] = pygame.transform.smoothscale(img, (round(img.get_width() * h / img.get_height()), h))
-        return self._objects[key]
-
     def chip(self, screen, x, y, text, fill, fg=(255, 255, 255)):
         img = self.tiny.render(text, True, fg)
         box = img.get_rect(center=(x, y)).inflate(8, 3)
@@ -1113,8 +1099,8 @@ class MapView:
                 good = GOODS[prov.good]
                 if self.goods_view == "deposits":
                     if washes:
-                        img = self.object_sprite(DEPOSITS.get(prov.good, "box1"))   # goods without an icon: a crate
-                        screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2 + 2))
+                        obj = goodsobjects.draw_good(prov.good, round(2 * r))
+                        screen.blit(obj, (cx - obj.get_width() / 2, cy - obj.get_height() / 2))
                     continue
                 if self.goods_view == "prices":
                     if chips and prov.market:
