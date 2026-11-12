@@ -8,7 +8,7 @@ import pygame
 
 from ..hexgrid import neighbors
 from . import art, geo, goodsart, landscape, wfctiles
-from .data import (COLONIST, GENERAL, GOODS, NATIVE_VILLAGE_SPRITE, PIONEER, SCOUT,
+from .data import (GOODS, NATIVE_VILLAGE_SPRITE,
                    TERRAIN, TERRAIN_SPRITES, WORKS)
 
 SQRT3 = math.sqrt(3)
@@ -46,6 +46,8 @@ def abbr(good):
 
 
 BLACK_FOG = (14, 16, 22)
+DIM = (0, 0, 0, 105)               # the fog over hexes the player knows but cannot see now
+FROST = (245, 248, 255, 70)        # the winter frost of the north
 SEA = (38, 74, 128)
 SHALLOW = (52, 104, 160)
 SEA_DEEP = (30, 60, 108)
@@ -118,6 +120,8 @@ class MapView:
         self._fill_key, self._fill_seen = None, set()
         self._filled = None                # (camera, r, season, world version) of the last still frame that built it all
         self._pm_edges, self._pm_ver = {}, None      # (pos, r) -> owner border segments, for this world version
+        self._tint_sprites = {}            # (rgba, r) -> one translucent hex for _tint
+        self._tint_layers = {}             # clip size -> the layer _tint draws on
         self._labels = {}                  # (town name, r) -> (shade box, name surface): drawn every frame, rendered once
         self._late_labels = []             # (shade, name, centre-top point) of the far zooms: drawn over the unit tokens
         self._pass_chips = {}              # r -> the small CLOSED marker of the far zooms
@@ -166,9 +170,16 @@ class MapView:
         return rq + (rrr - (rrr & 1)) // 2, rrr
 
     # ----- cached map layer -----------------------------------------------------------
-    def surface(self):
+    def fog_stamp(self):
+        """What the cached map layers (here and the minimap) depend on: the world version, the player and how many
+        hexes the player has explored. A stack that walks several hexes adds what it sees on the way without bumping
+        the version, so the count is part of the key."""
         world = self.world
-        key = (self.zoom, self.mode, world.version, world.player)
+        country = world.countries.get(world.player)
+        return world.version, world.player, len(country.explored) if country else 0
+
+    def surface(self):
+        key = (self.zoom, self.mode, self.fog_stamp())
         if key != self._key:
             self._key = key
             self._cache = self._render()
@@ -444,8 +455,7 @@ class MapView:
         if key not in self._sprites and isinstance(path, tuple):
             _, good, level, variant = path
             img = goodsart.good_tile(good, level, self.tiles_dir, variant)
-            self._sprites[key] = wfctiles.scale_tile(img, int(round(self.r * SQRT3)) + 1,
-                                                     int(round(self.r * SPRITE_H)) + 1)
+            self._sprites[key] = self._seamless(img)
         if key not in self._sprites:
             if path.startswith("art:"):
                 _, name, variant = path.split(":")
@@ -454,9 +464,26 @@ class MapView:
                 image = self._art[(name, variant)]
             else:
                 image = pygame.image.load(os.path.join(self.tiles_dir, path)).convert_alpha()
-            w = int(round(self.r * SQRT3)) + 1
-            self._sprites[key] = pygame.transform.smoothscale(image, (w, int(round(self.r * SPRITE_H)) + 1))
+            self._sprites[key] = self._seamless(image)
         return self._sprites[key]
+
+    def _seamless(self, image):
+        """A 120 x 140 tile picture scaled to this zoom's sprite size so that neighbours join without a gap: the pack's
+        tiles have antialiased, half-transparent edge pixels (and blits land on whole pixels, the hex spacing does not),
+        so the picture is drawn a little large on a rim of its own colour and clipped to a hex grown to the sprite's
+        full width."""
+        r = self.r
+        w, h = int(round(r * SQRT3)) + 1, int(round(r * SPRITE_H)) + 1
+        big = wfctiles.scale_tile(image, round(w * 1.06), round(h * 1.06))
+        poly = hex_points(w / 2, h / 2, (w + 2) / SQRT3)
+        out = pygame.Surface((w, h), pygame.SRCALPHA)
+        rim = pygame.transform.average_color(big, big.get_rect().inflate(-big.get_width() // 3, -big.get_height() // 3))
+        pygame.draw.polygon(out, tuple(rim[:3]) + (255,), poly)
+        out.blit(big, ((w - big.get_width()) // 2, (h - big.get_height()) // 2))
+        mask = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.polygon(mask, (255, 255, 255, 255), poly)
+        out.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+        return out
 
     def overlay(self, name):
         key = (name, self.r)
@@ -467,14 +494,10 @@ class MapView:
             if name in ("ocean", "shallow"):
                 pygame.draw.polygon(surf, (38, 92, 158) if name == "ocean" else (62, 130, 190),
                                     hex_points(cx, cy, r + 0.6))
-                pygame.draw.polygon(surf, (30, 76, 136), hex_points(cx, cy, r - 0.5), 1)
                 for x, y in ((-0.45, -0.2), (0.05, 0.25), (0.2, -0.45)):
                     box = (cx + x * r, cy + y * r, r * 0.35, r * 0.2)
                     pygame.draw.arc(surf, (110, 160, 215), box, 0.3, 2.8, max(1, r // 16))
-            elif name == "dim":
-                pygame.draw.polygon(surf, (0, 0, 0, 105), hex_points(cx, cy, r - 0.2))
             elif name == "frost":
-                pygame.draw.polygon(surf, (245, 248, 255, 70), hex_points(cx, cy, r - 0.8))
                 for i in range(6):
                     a = math.radians(i * 67 + 20)
                     pygame.draw.circle(surf, (255, 255, 255), (cx + math.cos(a) * r * 0.5, cy + math.sin(a) * r * 0.45),
@@ -649,12 +672,12 @@ class MapView:
         # Winter frost in the north.
         if world.turn % 4 == 0 and not bare:
             frost = self.overlay("frost")
-            for prov, cx, cy in shown:
-                if self.lat[prov.pos] > 42:
-                    blit(frost, cx, cy)
-        dim, black = self.overlay("dim"), self.overlay("black")
-        for cx, cy in dimmed:
-            blit(dim, cx, cy)
+            north = [(cx, cy) for prov, cx, cy in shown if self.lat[prov.pos] > 42]
+            self._tint(screen, [(FROST, cx, cy) for cx, cy in north])
+            for cx, cy in north:
+                blit(frost, cx, cy)
+        self._tint(screen, [(DIM, cx, cy) for cx, cy in dimmed])
+        black = self.overlay("black")
         for cx, cy in hidden:
             blit(black, cx, cy)
         if self.mode != "political":
@@ -666,9 +689,33 @@ class MapView:
     def _owner_washes(self, screen, shown):
         """The owner's tint of each province (under the objects on the landscape zooms)."""
         world = self.world
-        for prov, cx, cy in shown:
-            if prov.owner:
-                self._blit_centre(screen, self.wash(world.countries[prov.owner].color, 34), cx, cy)
+        self._tint(screen, [(world.countries[prov.owner].color + (34,), cx, cy) for prov, cx, cy in shown if prov.owner])
+
+    def _tint(self, screen, items):
+        """Translucent hexes [(rgba, cx, cy)] over the map, drawn on one layer and blitted once. A tint blitted hex by
+        hex leaves a faint line (or a doubled one) along every shared edge, where the blits are rounded to whole
+        pixels, which reads as a grid even when the grid is off; here each hex is a little larger than its cell and
+        the polygons replace each other where they meet, so the tint is one even sheet."""
+        if not items:
+            return
+        clip = screen.get_clip() or screen.get_rect()
+        layer = self._tint_layers.get(clip.size)
+        if layer is None:
+            layer = self._tint_layers[clip.size] = pygame.Surface(clip.size, pygame.SRCALPHA)
+        layer.fill((0, 0, 0, 0))
+        r = self.r
+        sprites = self._tint_sprites
+        blit = layer.blit
+        ox, oy = clip.x + r + 2, clip.y + r + 2           # the sprite is 2 * (r + 2) square, centred on the hex
+        for rgba, cx, cy in items:
+            spr = sprites.get((rgba, r))
+            if spr is None:
+                n = int(2 * r) + 5
+                spr = sprites[(rgba, r)] = pygame.Surface((n, n), pygame.SRCALPHA)
+                pygame.draw.polygon(spr, rgba, hex_points(n / 2, n / 2, r + 1.0))
+            # MAX, not a blend: where two hexes overlap the tint stays what one hex gives (blits off the layer clip)
+            blit(spr, (cx - ox, cy - oy), special_flags=pygame.BLEND_RGBA_MAX)
+        screen.blit(layer, clip.topleft)
 
     def _political_marks(self, screen, shown):
         """Owner borders, controller stripes, goods dots, town names and capital flags (over the objects)."""
@@ -827,9 +874,7 @@ class MapView:
         if not bare:
             self._object_pass(screen, view_rect, (ox, oy), rows, known, season)
         self._prefetch(view_rect, camera, rows, season)
-        dim = self.overlay("dim")
-        for cx, cy in dimmed:
-            self._blit_centre(screen, dim, cx, cy)
+        self._tint(screen, [(DIM, cx, cy) for cx, cy in dimmed])
         if self.mode != "political":
             self._mode_layer(screen, shown, washes=False)
             return
@@ -1017,15 +1062,6 @@ class MapView:
         options = TERRAIN_SPRITES[prov.terrain]
         return options[(prov.pos[0] * 5 + prov.pos[1] * 11) % len(options)]
 
-    def wash(self, color, alpha):
-        key = ("wash", color, alpha, self.r)
-        if key not in self._overlays:
-            r = self.r
-            surf = pygame.Surface((int(r * SQRT3) + 2, int(2 * r) + 2), pygame.SRCALPHA)
-            pygame.draw.polygon(surf, color + (alpha,), hex_points(surf.get_width() / 2, surf.get_height() / 2, r - 0.8))
-            self._overlays[key] = surf
-        return self._overlays[key]
-
     def object_sprite(self, name):
         key = (name, self.r)
         if key not in self._objects:
@@ -1046,11 +1082,19 @@ class MapView:
         """Close-up terrain, goods and market views: the washes (under the objects on the landscape zooms) and the
         chips and labels (over them)."""
         world, r = self.world, self.r
+        if washes:
+            tints = []
+            for prov, cx, cy in shown:
+                if self.mode == "terrain":
+                    tints.append((TERRAIN_TINT[prov.terrain] + (45,), cx, cy))
+                elif self.mode == "goods" and self.goods_view == "deposits" and prov.good:
+                    tints.append((GOODS[prov.good].color + (70,), cx, cy))
+                elif self.mode == "markets" and prov.market:
+                    tints.append((market_color(world.markets.index(prov.market)) + (95,), cx, cy))
+            self._tint(screen, tints)
         for prov, cx, cy in shown:
             if self.mode == "terrain":
                 t = TERRAIN[prov.terrain]
-                if washes:
-                    self._blit_centre(screen, self.wash(TERRAIN_TINT[prov.terrain], 45), cx, cy)
                 if chips and r >= 20:
                     if t.defense:
                         self.chip(screen, cx - r * 0.3, cy + r * 0.38, str(t.move), (70, 80, 95))
@@ -1069,7 +1113,6 @@ class MapView:
                 good = GOODS[prov.good]
                 if self.goods_view == "deposits":
                     if washes:
-                        self._blit_centre(screen, self.wash(good.color, 70), cx, cy)
                         img = self.object_sprite(DEPOSITS.get(prov.good, "box1"))   # goods without an icon: a crate
                         screen.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2 + 2))
                     continue
@@ -1086,8 +1129,6 @@ class MapView:
                     if prov.owner and r >= 20:
                         self.chip(screen, cx, cy + r * 0.38, f"{prov.output:.1f}", (30, 34, 42))
             elif self.mode == "markets" and prov.market:
-                if washes:
-                    self._blit_centre(screen, self.wash(market_color(world.markets.index(prov.market)), 95), cx, cy)
                 if chips and prov.pos == prov.market.center:
                     self.chip(screen, cx, cy, prov.market.name, (40, 45, 55))
 
@@ -1099,10 +1140,7 @@ class MapView:
         now = {p for p in ui.reach if p in known}
         later = {p for p in getattr(ui, "reach2", {}) if p in known and p not in now}
         for area, color, alpha in ((later, (70, 160, 230), 50), (now - {start}, (70, 220, 120), 80)):
-            img = self.wash(color, alpha)
-            for pos in area:
-                x, y = at(pos)
-                screen.blit(img, (x - img.get_width() / 2, y - img.get_height() / 2))
+            self._tint(screen, [(color + (alpha,), *at(pos)) for pos in area])
         self._edge(screen, at, later | now, (130, 190, 255), 2)
         self._edge(screen, at, now, (120, 255, 160), max(2, r // 9))
         if r >= 14:
@@ -1110,10 +1148,9 @@ class MapView:
                 if pos in now:
                     x, y = at(pos)
                     self.chip(screen, x, y - r * 0.5, "stop", (200, 120, 30))
-        red = self.wash((230, 60, 50), 100)
+        self._tint(screen, [((230, 60, 50, 100), *at(pos)) for pos in ui.attacks])
         for pos, how in ui.attacks.items():
             x, y = at(pos)
-            screen.blit(red, (x - red.get_width() / 2, y - red.get_height() / 2))
             pygame.draw.polygon(screen, (255, 70, 60), hex_points(x, y, r - 1), max(2, r // 9))
             if r >= 14:
                 self.chip(screen, x, y + r * 0.62, "fire" if how == "bombard" else "attack", (170, 40, 35))
@@ -1238,65 +1275,6 @@ class MapView:
         screen.blit(img, (x - img.get_width() / 2, y - img.get_height() * 0.62))
         if count > 1 and r >= 8:
             self._badge(screen, (x + size * 0.45, y - size * 0.45), count, world.countries[unit.owner].color)
-
-    # ----- the old round unit icons ------------------------------------------
-    def _unit(self, screen, unit, at, selected, count=1):
-        world = self.world
-        x, y = at
-        r = self.r
-        color = world.countries[unit.owner].color
-        if unit.owner == world.player and unit.moves_left == 0:
-            color = tuple((c + 140) // 2 for c in color)
-        white = (255, 255, 255)
-        size = max(5, int(r * 0.45))
-        k = size / 15                       # icons are designed for a 15 px circle
-        if selected:
-            pygame.draw.circle(screen, (255, 214, 70), (x, y), size + 4, 2)
-        if unit.naval:
-            hull = [(x - 20 * k, y + 2 * k), (x + 20 * k, y + 2 * k), (x + 13 * k, y + 13 * k), (x - 13 * k, y + 13 * k)]
-            pygame.draw.polygon(screen, (90, 60, 35), hull)
-            pygame.draw.polygon(screen, (20, 20, 20), hull, 2 if r >= 14 else 1)
-            pygame.draw.line(screen, (60, 40, 25), (x, y + 2 * k), (x, y - 22 * k), max(1, int(3 * k)))
-            sail = [(x + 2 * k, y - 20 * k), (x + 17 * k, y - 4 * k), (x + 2 * k, y - 2 * k)]
-            pygame.draw.polygon(screen, color, sail)
-            pygame.draw.polygon(screen, white, sail, 1)
-            self._badge(screen, (x - 15 * k, y - 15 * k), len(world.cargo(unit)), color)
-            return
-        pygame.draw.circle(screen, (15, 18, 24), (x, y + max(1, int(2 * k))), size + 1)
-        pygame.draw.circle(screen, color, (x, y), size)
-        pygame.draw.circle(screen, (250, 250, 250), (x, y), size, max(1, int(2 * k)))
-        line = max(1, int(3 * k))
-        branch = unit.kind.branch
-        if unit.kind is PIONEER:
-            pygame.draw.line(screen, white, (x - 6 * k, y + 7 * k), (x + 4 * k, y - 3 * k), line)
-            pygame.draw.polygon(screen, white, [(x, y - 9 * k), (x + 9 * k, y), (x + 6 * k, y + 3 * k), (x - 3 * k, y - 6 * k)])
-        elif unit.kind is COLONIST:
-            pygame.draw.circle(screen, white, (x, y - 5 * k), max(1, 4 * k))
-            pygame.draw.polygon(screen, white, [(x - 7 * k, y + 8 * k), (x, y - k), (x + 7 * k, y + 8 * k)])
-        elif unit.kind is SCOUT:
-            pygame.draw.polygon(screen, white, [(x - 7 * k, y - 7 * k), (x + 8 * k, y), (x - 7 * k, y + 7 * k), (x - 3 * k, y)])
-        elif unit.kind is GENERAL:
-            pts = [(x + 9 * k * math.cos(math.radians(a - 90)) * (1 if i % 2 == 0 else 0.45),
-                    y + 9 * k * math.sin(math.radians(a - 90)) * (1 if i % 2 == 0 else 0.45))
-                   for i, a in enumerate(range(0, 360, 36))]
-            pygame.draw.polygon(screen, (255, 214, 70), pts)
-        elif branch == "cavalry":           # a horseshoe
-            pygame.draw.arc(screen, white, (x - 8 * k, y - 8 * k, 16 * k, 17 * k), math.radians(-40), math.radians(220), line)
-            pygame.draw.line(screen, white, (x - 6 * k, y + 5 * k), (x - 7 * k, y + 8 * k), line)
-            pygame.draw.line(screen, white, (x + 6 * k, y + 5 * k), (x + 7 * k, y + 8 * k), line)
-        elif branch == "artillery":         # a cannon on its wheel
-            pygame.draw.line(screen, white, (x - 8 * k, y + 3 * k), (x + 9 * k, y - 5 * k), max(2, int(4 * k)))
-            pygame.draw.circle(screen, white, (x - 2 * k, y + 5 * k), max(2, 4 * k), max(1, int(2 * k)))
-        else:                               # infantry: crossed swords
-            pygame.draw.line(screen, white, (x - 7 * k, y - 7 * k), (x + 7 * k, y + 7 * k), line)
-            pygame.draw.line(screen, white, (x + 7 * k, y - 7 * k), (x - 7 * k, y + 7 * k), line)
-        if unit.kind.war and r >= 14:
-            ratio = unit.hp / unit.kind.hp
-            bar = pygame.Rect(x - size, y + size + 3, size * 2, max(3, size // 4))
-            pygame.draw.rect(screen, (20, 20, 20), bar.inflate(2, 2))
-            fill = (80, 200, 90) if ratio > 0.6 else (240, 200, 60) if ratio > 0.3 else (230, 70, 60)
-            pygame.draw.rect(screen, fill, (bar.x, bar.y, max(2, round(bar.w * ratio)), bar.h))
-        self._badge(screen, (x + size, y - size), count, color)
 
     def _badge(self, screen, at, count, color):
         if count <= 1 or self.r < 9:

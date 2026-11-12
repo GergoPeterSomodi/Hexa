@@ -22,7 +22,6 @@ def _ordinal(n):
 WIDTH, HEIGHT = 1280, 720
 TOP = 46
 PANEL_W = 390
-SCROLL = 18
 BG = (24, 28, 34)
 PANEL_BG = (28, 32, 40)
 LINE = (60, 68, 80)
@@ -87,23 +86,24 @@ class CampaignApp(GameMenu, TechScreen):
         loaded = saves.load(load) if load else None
         if load and loaded is None:          # never quietly start some other game instead
             raise saves.LoadError(f"{saves.slot_name(load)} could not be loaded.")
-        self.world = loaded or CampaignWorld(seed if seed is not None else 1480, map=map)
-        pygame.display.set_caption(f"Hexa: Age of Discovery  -  {self.world.geo.name}")
-        self.view = MapView(self.world, tiles_dir)
-        self.ui = UI()
         self.camera = [0.0, 0.0]
         self.drag = None
         self.running = True
         self.result = None
-        self.busy = False
         self._mini = None
+        if loaded:                           # one map view: load_world builds it (and the caption, ui and camera)
+            self.load_world(loaded)
+            self.toast(f"Loaded {saves.slot_name(load)}: {loaded.date()}.")
+            return
+        self.world = CampaignWorld(seed if seed is not None else 1480, map=map)
+        pygame.display.set_caption(f"Hexa: Age of Discovery  -  {self.world.geo.name}")
+        self.view = MapView(self.world, tiles_dir)
+        self.ui = UI()
+        self.busy = False
         self._mini_key = None
         self.view.zoom = 1
         self.look_at(geo.hex_of(*self.world.geo.START))
-        if loaded:
-            self.load_world(loaded)
-            self.toast(f"Loaded {saves.slot_name(load)}: {loaded.date()}.")
-        elif player:
+        if player:
             self.choose_named(player)
 
     def load_world(self, world):
@@ -512,8 +512,7 @@ class CampaignApp(GameMenu, TechScreen):
             if not world.fund_research(tag):
                 self.toast("Not enough ducats")
         elif kind == "tax":
-            world.countries[tag].tax = action[1]
-            world.economy()
+            world.set_tax(tag, action[1])            # preview the new tax without rerunning the season
         elif kind == "war":
             world.declare_war(tag, action[1])
         elif kind == "peace":
@@ -752,7 +751,7 @@ class CampaignApp(GameMenu, TechScreen):
 
     def draw_minimap(self):
         world = self.world
-        key = (world.version, world.player)
+        key = self.view.fog_stamp()
         if key != self._mini_key:
             self._mini_key = key
             surf = pygame.Surface((world.cols + 1, world.rows))

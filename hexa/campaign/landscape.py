@@ -62,6 +62,7 @@ TERRAIN_GROUND = {"plains": "plains", "forest": "forest", "hills": "hills", "mou
 # object scale on top of the library size, so trees, peaks and herds read at one consistent scale
 OSCALE = {"peak": 1.42, "hill": 1.05, "tree": 0.62, "clutter": 0.8, "life": 0.62, "build": 0.62}
 MARKER_SCALE = {"barrier": 2.0, "pass_badge": 2.3}
+BASE_GROW = 1.08                   # the base picture is drawn this much larger than its hex (see _build_ground)
 MARKER_SORT = 1e9                   # closed-pass markers sort after every other object
 ALPINE_ALT = 0.66                   # mountain hexes above this are bare rock
 TREE_LINE = 0.66                    # no trees above this altitude
@@ -1067,8 +1068,11 @@ class Landscape:
         X, Y = hex_centre(c.pos)
         fr = _Frame(X, Y, P, cw, ch)
         gs = pygame.Surface((cw, ch), pygame.SRCALPHA)
-        # base picture
-        img = self._scaled(_base_name(c), P)
+        # base picture, on a rim of its own colour: the clip below grows past the picture's own (antialiased) edge
+        grow = (tw + 2) / (r * SQ3)
+        rim = [fr.px(*p) for p in hex_poly(X, Y, grow)]
+        gs.fill(self._avg(_base_name(c)) + (255,))              # (so the clip below keeps real colours at its edge)
+        img = self._scaled(_base_name(c), P, BASE_GROW)         # a little large: the pack's baked edge falls outside
         cx, cy = fr.px(X, Y)
         gs.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
         self._ground_detail(gs, fr, c, P)
@@ -1085,7 +1089,11 @@ class Landscape:
             gs.blit(hatch, (cx - hatch.get_width() / 2, cy - hatch.get_height() / 2))
         # the sprite is clipped to its hex (the grid is a separate overlay, see grid())
         mask = pygame.Surface((cw, ch), pygame.SRCALPHA)
-        pygame.draw.polygon(mask, (255, 255, 255, 255), [fr.px(*p) for p in hex_poly(X, Y, 1.0)])
+        # the clip is the hex grown to fill the whole sprite width: neighbours are blitted at whole pixels (spacing
+        # r*sqrt3 is not one), so a hex-sized clip leaves 1 px seams (and half-transparent antialiased edge pixels)
+        # that show the dark background; grown, the tiles overlap by about a pixel and the sprite's own left and
+        # right columns are fully opaque
+        pygame.draw.polygon(mask, (255, 255, 255, 255), rim)
         gs.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
         return pygame.transform.smoothscale(gs, (tw, th))
 

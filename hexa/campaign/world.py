@@ -2596,6 +2596,7 @@ class CampaignWorld:
         # Walk the route hex by hex, looking around on the way (so fog clears along it, not just at the end).
         path = self.route(group, dest, best)
         self.last_move = ([u.id for u in group], path)
+        explored_before = len(self.countries[lead.owner].explored)  # counted before the walk reveals anything (#26)
         scout = max(group, key=lambda u: self.unit_sight(u))      # the stack sees as far as its best eyes
         for step in path[1:-1]:
             for unit in group:
@@ -2623,11 +2624,10 @@ class CampaignWorld:
             for unit in group:
                 unit.moves_left = 0
         country = self.countries[lead.owner]
-        before = len(country.explored)
         for unit in group:
             self.see_from(unit, refresh=False)
         if lead.owner == self.player:
-            if len(country.explored) != before:
+            if len(country.explored) != explored_before:
                 self.changed()
             self.update_visibility()
         return True
