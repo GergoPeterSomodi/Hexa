@@ -32,6 +32,16 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
     building_done     tag, pos           what (a building key, "settlement" or "castle")
     investment_done   tag, pos           level (the works level now)
     season_ended      (GameManager)      turn
+    money_spent       tag, pos           amount, reason ("raise", "build", "invest", "refit", "upgrade", "research")
+    forage            tag, pos           (troops foraged in foreign land)
+    native_raid       tag, pos           (natives raided a colony)
+
+``battle`` also carries ``lost`` (units destroyed, (attacker, defender)) and ``hurt`` (strength lost, the same pair);
+``tech_researched`` the ``cost`` in research points; ``debt_seized`` the ``saving`` in ducats a season.
+
+``bus.tap(handler)`` is the one other way to listen: a tap is called at once, inside ``emit``, with the event (the
+campaign's ``resources`` tracker and ``feed`` use it, so they need no drain). A tap never changes the world either, and
+an exception in one is caught (counted in ``bus.tap_errors``) so that a bug in a screen's bookkeeping cannot stop a game.
 """
 from collections import deque
 from dataclasses import dataclass
@@ -40,7 +50,7 @@ from dataclasses import dataclass
 CAMPAIGN_KINDS = (
     "message", "province_captured", "siege_progress", "battle", "war_declared", "peace_made", "unit_raised",
     "unit_lost", "unit_deserted", "debt_seized", "pass_closed", "pass_opened", "tech_researched", "era_reached",
-    "colony_founded", "building_done", "investment_done", "season_ended",
+    "colony_founded", "building_done", "investment_done", "season_ended", "money_spent", "forage", "native_raid",
 )
 
 
@@ -65,6 +75,8 @@ class EventBus:
         self.history = deque(maxlen=history)
         self.dropped = 0
         self._handlers = {}         # kind (None: every kind) -> [handler]
+        self._taps = []             # called at once on emit (see the module docstring)
+        self.tap_errors = []        # the exceptions taps raised (kept few)
 
     def emit(self, kind, tag=None, pos=None, **data):
         """Queue an event (and put it in the history). Returns it."""
@@ -74,7 +86,21 @@ class EventBus:
         while len(self.queue) > self.QUEUE:
             self.queue.popleft()
             self.dropped += 1
+        for tap in self._taps:
+            try:
+                tap(event)
+            except Exception as caught:         # a screen's bookkeeping must never stop the game
+                self.tap_errors = (self.tap_errors + [caught])[-5:]
         return event
+
+    def tap(self, handler):
+        """Call ``handler(event)`` at once for every event emitted from now on. Returns handler."""
+        self._taps.append(handler)
+        return handler
+
+    def untap(self, handler):
+        if handler in self._taps:
+            self._taps.remove(handler)
 
     def subscribe(self, kind, handler):
         """Call ``handler(event)`` for each drained event of this kind (kind None: every kind). Returns handler."""

@@ -17,6 +17,16 @@ def date(turn):
     return f"{SEASONS[(turn - 1) % 4]} {START_YEAR + (turn - 1) // 4}"
 
 
+def with_article(name):
+    """'a weaver', 'an armoury': the indefinite article for a level or building name, by its sound: 'a university',
+    'a use'. An empty name gives an empty string."""
+    name = name.lower()
+    if not name:
+        return ""
+    vowel = name[0] in "aeiou" and not name.startswith(("uni", "use", "eu"))
+    return ("an " if vowel else "a ") + name
+
+
 # ----- goods -------------------------------------------------------------------------
 @dataclass(frozen=True)
 class Good:

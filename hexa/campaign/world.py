@@ -12,7 +12,7 @@ from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 
 from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, to_cube, within
-from . import geo, naming, tech, wfc
+from . import geo, naming, resources, tech, wfc
 from .specialgoods import special_good
 from .data import (AREA, BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_ATTACK,
                    GARRISON_DEFENSE, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS, GENERAL_STACK,
@@ -63,7 +63,8 @@ BUILDING_TECH = {"ropewalk": ("ropewalk", "ropewalk"), "powder_mill": ("powder_m
                  "glassworks": ("glass_leather", "glass_leather"), "tannery": ("glass_leather", "glass_leather"),
                  "university": ("university", "universities")}   # building -> (flag, tech key)
 from .data import (CASTLE_GOODS, ERAS as _ERAS, GALLEON, MANUFACTORIES, MINE_GOODS, PLANTATION_GOODS,
-                   SETTLEMENT_GOODS, WORKS_ERA, WORKS_GOODS, WORKS_LEVELS, DEBT_FLOOR, DEBT_INTEREST, DEBT_SEASONS)
+                   SETTLEMENT_GOODS, WORKS_ERA, WORKS_GOODS, WORKS_LEVELS, DEBT_FLOOR, DEBT_INTEREST, DEBT_SEASONS,
+                   with_article as _with_article)
 
 
 # ----- state objects --------------------------------------------------------------------
@@ -298,16 +299,6 @@ def _remember_snapshot(key, data):
     randoms = [k for k in _SNAPSHOTS if k[0] == "random"]
     for old in randoms[:-RANDOM_KEPT]:
         del _SNAPSHOTS[old]
-
-
-def _with_article(name):
-    """'a weaver', 'an armoury': the indefinite article for a level or building name, by its sound: 'a university',
-    'a use'. An empty name gives an empty string."""
-    name = name.lower()
-    if not name:
-        return ""
-    vowel = name[0] in "aeiou" and not name.startswith(("uni", "use", "eu"))
-    return ("an " if vowel else "a ") + name
 
 
 def _fill_defaults(obj):
@@ -1979,7 +1970,7 @@ class CampaignWorld:
                     break
                 country.income["upkeep"] = country.income.get("upkeep", 0.0) + taken[0]
                 need -= taken[0]
-                seized.append(taken[1])
+                seized.append(taken)
             if country.balance < 0 and country.treasury < -limit:
                 # Nothing is left to take and the running costs still outrun the income: the creditors refuse
                 # more credit, so the debt is held at the limit instead of growing without bound.
@@ -1994,8 +1985,8 @@ class CampaignWorld:
                 self.bus.emit("unit_deserted", tag, count=len(deserted), kinds=counts)
                 self.message(f"Unpaid troops desert {country.name}: {names}. The debt of {-country.treasury:,.0f} "
                              f"ducats is over the limit of {limit:,.0f}.", tag)
-            for label in seized:
-                self.bus.emit("debt_seized", tag, what=label)
+            for saving, label in seized:
+                self.bus.emit("debt_seized", tag, what=label, saving=saving)
                 self.message(f"Creditors seize the {label}, unpaid while {country.name} is in debt.", tag)
 
     def grow(self):
@@ -2027,6 +2018,7 @@ class CampaignWorld:
                 if prov.colony and prov.natives > prov.peasants * 2 and self.rng.random() < NATIVE_RAID_CHANCE:
                     prov.peasants *= 0.8
                     self.message(f"Natives raided the colony at {self.place(prov)}!", prov.owner)
+                    self.bus.emit("native_raid", prov.owner, prov.pos)
             if prov.colony and prov.pop >= COLONY_DONE:
                 prov.colony = False
                 self.message(f"{self.place(prov)} has grown into a full province.", prov.owner)
@@ -2154,7 +2146,7 @@ class CampaignWorld:
     def build(self, tag, prov, key):
         if not self.build_check(tag, prov, key)[0]:
             return False
-        self.countries[tag].treasury -= self.build_cost(prov, key)
+        resources.spend(self, tag, self.build_cost(prov, key), "build", prov.pos)
         self._buy(prov, self.build_goods(prov, key))
         prov.queue.append([key, BUILD_TURNS])
         prov.busy = True
@@ -2198,7 +2190,7 @@ class CampaignWorld:
     def invest(self, tag, prov):
         if not self.invest_check(tag, prov)[0]:
             return False
-        self.countries[tag].treasury -= self.invest_cost(prov)
+        resources.spend(self, tag, self.invest_cost(prov), "invest", prov.pos)
         self._buy(prov, self.invest_goods(prov))
         prov.works += 1
         prov.busy = True
@@ -2284,7 +2276,7 @@ class CampaignWorld:
         if not self.recruit_check(tag, prov, kind)[0]:
             return None
         cost = self.unit_cost(prov, kind)
-        self.countries[tag].treasury -= cost
+        resources.spend(self, tag, cost, "raise", prov.pos)
         prov.busy = True
         if prov.market:
             for g, n in kind.goods.items():
@@ -2338,7 +2330,7 @@ class CampaignWorld:
         country = self.countries[unit.owner]
         prov = self.provinces[unit.pos]
         new = troop(unit.kind.branch, country.era)
-        country.treasury -= self.unit_cost(prov, new) // 2
+        resources.spend(self, unit.owner, self.unit_cost(prov, new) // 2, "refit", prov.pos)
         unit.kind, unit.hp = new, new.hp
         unit.moves_left, unit.upgraded = 0, True
         self.message(f"{self.place(prov)}: refitted as {new.name.lower()}.", unit.owner)
@@ -2372,7 +2364,7 @@ class CampaignWorld:
     def upgrade(self, unit, stat):
         if not self.upgrade_check(unit, stat)[0]:
             return False
-        self.countries[unit.owner].treasury -= self.upgrade_cost(unit, stat)
+        resources.spend(self, unit.owner, self.upgrade_cost(unit, stat), "upgrade", unit.pos)
         if stat == "attack":
             unit.atk_up += 1
         else:
@@ -2455,7 +2447,7 @@ class CampaignWorld:
         if not self.fund_check(tag)[0]:
             return False
         country.memory["funded_turn"] = self.turn
-        country.treasury -= gold
+        resources.spend(self, tag, gold, "research")
         country.research += points * (1 + self.bonus(tag, "fund"))
         return True
 
@@ -2547,7 +2539,7 @@ class CampaignWorld:
             self.grant_tech(tag, key)
             t = tech.TECHS[key]
             self.message(f"Researched {t.name}: {t.text}", tag)
-            self.bus.emit("tech_researched", tag, key=key)
+            self.bus.emit("tech_researched", tag, key=key, cost=cost)
             if not self._advance(tag) and tag == self.player:
                 self.message("Pick new research (T).", tag)
 
@@ -2726,6 +2718,7 @@ class CampaignWorld:
             if not end_of_round:
                 unit.moves_left = 0
         self.message(f"Troops foraged around {self.place(prov)}: they eat, the province suffers.", troops[0].owner)
+        self.bus.emit("forage", troops[0].owner, prov.pos)
         return True
 
     def logistics(self):
@@ -3358,7 +3351,8 @@ class CampaignWorld:
                 text += f"; {names[0]} stormed the castle"
         elif not survivors_d and not ranged:
             self._lose([u for u in self.units_at(pos) if u.owner == def_tag], "storm")
-        self.bus.emit("battle", att_tag, pos, defender=def_tag, ranged=ranged)
+        self.bus.emit("battle", att_tag, pos, defender=def_tag, ranged=ranged, lost=(len(lost_a), len(lost_d)),
+                      hurt=(hp_a, hp_d))
         self.message(text + ".", shown)
 
     def _lose(self, units, why):         # off the map, with a unit_lost event each (why: see hexa/events.py)

@@ -7,8 +7,10 @@ input, and calls this for everything else; tests and tools play seasons through 
 ``end_season()`` runs one season in this fixed order:
 
     1. ``world.settle_preview()``   put back the incomes of the last real season (a tax preview may be on show)
+       ``tracker.begin_season()``   the resource baseline (campaign/resources.py): the chips' deltas count from here
     2. ``ai.run`` for every country except the player's (``player_ai=True``: for the player's too)
     3. ``world.end_round()``        logistics, sieges, war timeouts, economy, debt, growth, research, turn counter
+       ``tracker.round_done()``     keep the incomes that season collected (the ducats hover card's lines)
     4. ``orders()``                 the caller's end-of-season orders hook (the app's march reminders)
     5. the autosave                 if one is due
     6. ``world.ensure_markets()``   rebuild the markets the season changed (the screens no longer do it in draw())
@@ -18,7 +20,7 @@ The app drains the bus afterwards (``world.bus.drain()``) so its subscribers see
 """
 from typing import NamedTuple, Optional
 
-from . import ai, saves
+from . import ai, feed, resources, saves
 from .world import CampaignWorld
 
 
@@ -31,6 +33,8 @@ class GameManager:
     def __init__(self, world, autosave_every=0):
         self.world = world
         self.autosave_every = autosave_every        # seasons between autosaves; 0 is off (see settings.AUTOSAVE_TURNS)
+        self.tracker = resources.of(world)          # the top bar's numbers (never saved)
+        self.feed = feed.of(world)                  # floating text and the action log (never saved)
 
     @classmethod
     def new(cls, seed=1480, map="europe", player=None, autosave_every=0):
@@ -63,10 +67,12 @@ class GameManager:
         """Play the end of a season in the order of the module docstring. Returns a `SeasonResult`."""
         world = self.world
         world.settle_preview()
+        self.tracker.begin_season()
         for tag in list(world.countries):
             if player_ai or tag != world.player:
                 ai.run(world, tag)
         world.end_round()
+        self.tracker.round_done()
         if orders:
             orders()
         saved, error = False, None

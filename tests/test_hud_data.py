@@ -1,0 +1,295 @@
+"""The data behind the resource bar, the floating text and the action log (campaign/resources.py, campaign/feed.py).
+Pygame-free.
+
+Run with: python -m unittest tests.test_hud_data
+"""
+import pickle
+import unittest
+
+from hexa.campaign import feed, resources
+from hexa.campaign.data import troop
+from hexa.campaign.game import GameManager
+from hexa.campaign.tech import TECHS
+from hexa.campaign.world import CampaignWorld
+from hexa.events import CAMPAIGN_KINDS
+from tests.support.worlds import fresh
+
+
+def sentences(world, filter="all"):
+    return [i.sentence for _, _, items in feed.of(world).entries(filter) for i in items]
+
+
+class ResourcesTest(unittest.TestCase):
+    def setUp(self):
+        self.w = fresh("POR")
+        self.game = GameManager(self.w)
+        self.prov = self.w.provinces_of("POR")[0]
+
+    def test_names_and_a_fresh_game_has_no_change(self):
+        snap = resources.snapshot(self.w, "POR")
+        self.assertEqual(tuple(snap), resources.NAMES)
+        for name, (value, delta, lines) in snap.items():
+            self.assertEqual(delta, 0, name)
+            self.assertEqual(lines, [], name)
+        self.assertEqual(snap["ducats"].value, self.w.countries["POR"].treasury)
+        market = self.w.provinces[self.w.countries["POR"].capital].market
+        self.assertEqual(snap["horses"].value, round(market.price["horses"], 2))
+
+    def test_raising_troops_is_a_one_off_in_ducats_and_regiments(self):
+        before = resources.snapshot(self.w, "POR")
+        unit = self.w.recruit("POR", self.prov, troop("infantry", 1))
+        self.assertTrue(unit)
+        snap = resources.snapshot(self.w, "POR")
+        cost = before["ducats"].value - snap["ducats"].value
+        self.assertGreater(cost, 0)
+        self.assertEqual(snap["ducats"].delta, -cost)
+        self.assertEqual([(l.group, l.amount, l.pos) for l in snap["ducats"].lines], [("oneoff", -cost, unit.pos)])
+        self.assertIn("Raising troops", snap["ducats"].lines[0].label)
+        self.assertEqual(snap["regiments"].delta, 1)
+        self.assertEqual([(l.amount, l.pos) for l in snap["regiments"].lines], [(1, unit.pos)])
+
+    def test_lines_of_a_season_add_up_to_the_delta(self):
+        self.w.recruit("POR", self.prov, troop("infantry", 1))
+        self.game.end_season()
+        snap = resources.snapshot(self.w, "POR")["ducats"]
+        groups = {l.group for l in snap.lines}
+        self.assertIn("income", groups)
+        self.assertIn("spending", groups)
+        self.assertAlmostEqual(sum(l.amount for l in snap.lines), snap.delta, delta=0.01)
+        self.assertAlmostEqual(snap.delta, self.w.countries["POR"].treasury - self.game.tracker.start["POR"]["ducats"],
+                               delta=0.01)
+        for line in snap.lines:
+            if line.group != "oneoff":
+                self.assertEqual(line.amount > 0, line.group == "income")
+
+    def test_new_season_resets_the_one_offs(self):
+        self.w.recruit("POR", self.prov, troop("infantry", 1))
+        self.game.end_season()
+        snap = resources.snapshot(self.w, "POR")
+        self.assertEqual(snap["regiments"].lines, [])
+        self.assertEqual(snap["regiments"].delta, 0)
+
+    def test_every_purchase_goes_through_spend(self):
+        w = self.w
+        w.countries["POR"].treasury = 5000
+        w.recruit("POR", self.prov, troop("infantry", 1))
+        self.assertTrue(w.fund_research("POR"))
+        spent = [(e.get("reason"), e.get("amount")) for e in w.bus.of("money_spent")]
+        self.assertEqual([r for r, _ in spent], ["raise", "research"])
+        self.assertEqual(sum(a for _, a in spent), 5000 - w.countries["POR"].treasury)
+        self.assertIn("Funding research", [l.label for l in resources.snapshot(w, "POR")["ducats"].lines])
+
+    def test_events_fill_the_other_ledgers(self):
+        w, bus = self.w, self.w.bus
+        pos = self.prov.pos
+        key = next(iter(TECHS))
+        bus.emit("unit_lost", "POR", pos, what="Pikemen", why="battle")
+        bus.emit("unit_lost", "POR", pos, what="Pikemen", why="deserted")
+        bus.emit("unit_lost", "POR", pos, what="Colonist", why="sunk")        # not a regiment
+        bus.emit("unit_raised", "POR", pos, what="Wagon", id=1)               # not a regiment
+        bus.emit("province_captured", "POR", pos, loser="CAS", by="peace")
+        bus.emit("province_captured", "POR", pos, loser="CAS", by="siege")
+        bus.emit("debt_seized", "POR", what="castle at X", saving=3.0)
+        bus.emit("tech_researched", "POR", key=key, cost=20)
+        snap = resources.snapshot(w, "POR")
+        self.assertEqual(sorted(l.amount for l in snap["regiments"].lines), [-1, -1])
+        self.assertEqual(sorted(l.label.split(":")[0] for l in snap["provinces"].lines), ["Gained in peace", "Occupied"])
+        self.assertEqual(resources.snapshot(w, "CAS")["provinces"].lines[0].amount, -1)
+        self.assertIn("Creditors seized: castle at X", [l.label for l in snap["ducats"].lines])
+        research = snap["research"].lines
+        self.assertEqual(research[-1].amount, -20)
+        self.assertTrue(research[-1].label.startswith("Finished"))
+
+    def test_history_is_bounded_and_ends_with_now(self):
+        for _ in range(resources.HISTORY + 3):
+            self.game.end_season()
+        series = self.game.tracker.series("POR", "ducats")
+        self.assertEqual(len(series), resources.HISTORY)
+        self.assertEqual(series[-1], self.w.countries["POR"].treasury)
+        self.assertEqual(len(self.game.tracker.series("FRA", "provinces")), resources.HISTORY)       # the AI too
+        for ledger in self.game.tracker.ledger.values():
+            self.assertLessEqual(len(ledger), resources.LEDGER)
+
+    def test_expected_change(self):
+        self.game.end_season()
+        self.assertEqual(resources.expected(self.w, "POR")["ducats"], self.w.countries["POR"].balance)
+
+    def test_not_saved(self):
+        self.game.end_season()
+        state = self.w.save_state()
+        self.assertFalse(any(isinstance(v, (resources.Tracker, feed.Feed)) for v in state.values()))
+        loaded = CampaignWorld.from_state(pickle.loads(pickle.dumps(state)))
+        self.assertTrue(all(r.delta == 0 for r in resources.snapshot(loaded, "POR").values()))
+
+    def test_a_broken_tap_cannot_stop_the_game(self):
+        self.w.bus.tap(lambda e: 1 / 0)
+        self.game.end_season()
+        self.assertTrue(self.w.bus.tap_errors)
+        self.assertLessEqual(len(self.w.bus.tap_errors), 5)
+
+    def test_new_kinds_are_listed(self):
+        for kind in ("money_spent", "forage", "native_raid"):
+            self.assertIn(kind, CAMPAIGN_KINDS)
+
+
+class FeedTest(unittest.TestCase):
+    def setUp(self):
+        self.w = fresh("POR")
+        self.game = GameManager(self.w)
+        self.bus = self.w.bus
+        self.feed = feed.of(self.w)
+        self.mine = self.w.provinces_of("POR")[0].pos
+        self.fog = next(p for p in self.w.provinces if p not in self.w.visible)
+        self.seen = next(p for p in self.w.visible if p in self.w.provinces and self.w.provinces[p].owner != "POR")
+
+    def one(self, kind, tag, pos=None, **data):
+        self.feed.clear()
+        self.bus.emit(kind, tag, pos, **data)
+        items = [i for _, _, group in self.feed.entries() for i in group]
+        floating = self.feed.take_floating()
+        return (items[0] if items else floating[0] if floating else None), floating
+
+    def test_colour_kinds_are_the_six(self):
+        self.assertEqual(feed.COLOUR_KINDS, ("war", "siege", "gain", "own", "loss", "other"))
+
+    def test_item_per_kind_and_colour(self):
+        cases = [
+            (("unit_raised", "POR", self.mine, dict(what="Pikemen", id=1)), "own", "Recruited"),
+            (("forage", "POR", self.mine, {}), "own", "Foraged"),
+            (("battle", "POR", self.mine, dict(defender="CAS", ranged=False, lost=(1, 2), hurt=(3, 4))), "war",
+             "Battle!"),
+            (("battle", "POR", self.mine, dict(defender="CAS", ranged=True)), "war", "Bombardment"),
+            (("siege_progress", "POR", self.mine, dict(progress=2, need=5)), "siege", "Siege 2/5"),
+            (("province_captured", "POR", self.mine, dict(loser="CAS", by="siege")), "gain", "Captured!"),
+            (("province_captured", "CAS", self.mine, dict(loser="POR", by="storm")), "loss", "Lost!"),
+            (("province_captured", "FRA", self.seen, dict(loser="CAS", by="siege")), "war", "Captured"),
+            (("unit_lost", "POR", self.mine, dict(what="Pikemen", why="battle")), "loss", "Lost"),
+            (("unit_lost", "POR", self.mine, dict(what="Pikemen", why="deserted")), "loss", "Deserted"),
+            (("unit_lost", "POR", self.mine, dict(what="Pikemen", why="disbanded")), "own", "Disbanded"),
+            (("war_declared", "CAS", None, dict(target="POR")), "war", "War!"),
+            (("peace_made", "POR", None, dict(b="CAS", winner=None, moved=0)), "other", "Peace"),
+            (("tech_researched", "POR", None, dict(key="x", cost=1)), "gain", "Researched"),
+            (("era_reached", "POR", None, dict(era=2)), "gain", "New age!"),
+            (("building_done", "POR", self.mine, dict(what="weaver")), "gain", "Built"),
+            (("investment_done", "POR", self.mine, dict(level=2)), "own", "Upgraded"),
+            (("colony_founded", "POR", self.mine, dict(what="colony")), "own", "Founded"),
+            (("colony_founded", "FRA", self.seen, dict(what="colony")), "other", "Colony"),
+            (("native_raid", "POR", self.mine, {}), "loss", "Raided!"),
+            (("debt_seized", "POR", None, dict(what="castle at X", saving=1)), "loss", "Seized"),
+            (("unit_deserted", "POR", None, dict(count=2, kinds={"Pikemen": 2})), "loss", "Deserted"),
+            (("money_spent", "POR", self.mine, dict(amount=50, reason="build")), "own", "Building"),
+            (("forage", "FRA", self.seen, {}), "other", "Foraged"),
+        ]
+        for (kind, tag, pos, data), colour, text in cases:
+            item, _ = self.one(kind, tag, pos, **data)
+            self.assertIsNotNone(item, (kind, text))
+            self.assertEqual((item.colour_kind, item.text), (colour, text), kind)
+            self.assertEqual(item.kind, kind)
+            self.assertEqual(item.pos, pos)
+            self.assertEqual(item.season, self.w.turn)
+            self.assertTrue(item.sentence.endswith((".", "!")), item.sentence)
+
+    def test_sentences_name_places_and_countries(self):
+        item, _ = self.one("battle", "POR", self.mine, defender="CAS", ranged=False, lost=(1, 2))
+        self.assertIn(self.w.place(self.w.provinces[self.mine]), item.sentence)
+        self.assertIn("Portugal lost 1 unit, Castile lost 2 units", item.sentence)
+
+    def test_costs_join_the_sentence(self):
+        self.feed.clear()
+        self.bus.emit("money_spent", "POR", self.mine, amount=36, reason="raise")
+        self.assertEqual(sentences(self.w), [])
+        self.bus.emit("unit_raised", "POR", self.mine, what="Pikemen", id=1)
+        self.assertIn("for 36 ducats", sentences(self.w)[0])
+
+    def test_real_recruit_makes_one_log_line_and_one_floating_text(self):
+        self.feed.clear()
+        self.w.recruit("POR", self.w.provinces_of("POR")[0], troop("infantry", 1))
+        self.assertEqual(len(sentences(self.w)), 1)
+        self.assertEqual([f.text for f in self.feed.take_floating()], ["Recruited"])
+        self.assertEqual(self.feed.take_floating(), [])
+
+    def test_visibility(self):
+        # the other countries' doings are told only inside the player's vision
+        self.assertIsNone(self.one("battle", "FRA", self.fog, defender="CAS", ranged=False)[0])
+        self.assertIsNotNone(self.one("battle", "FRA", self.seen, defender="CAS", ranged=False)[0])
+        self.assertIsNone(self.one("forage", "FRA", self.fog)[0])
+        self.assertIsNone(self.one("province_captured", "FRA", self.fog, loser="CAS", by="siege")[0])
+        # ... but a party is told wherever it is, and the text floats
+        item, floating = self.one("battle", "FRA", self.fog, defender="POR", ranged=False)
+        self.assertIsNotNone(item)
+        self.assertEqual(len(floating), 1)
+        # the AI's recruiting, building and research are never told
+        for kind, data in (("unit_raised", dict(what="Pikemen", id=2)), ("building_done", dict(what="weaver")),
+                           ("tech_researched", dict(key="x", cost=1)), ("money_spent", dict(amount=1, reason="build"))):
+            self.assertIsNone(self.one(kind, "FRA", self.seen, **data)[0], kind)
+        self.assertIsNone(self.one("war_declared", "FRA", None, target="CAS")[0])
+        # seen but not a party: logged and floated, not "mine"
+        item, floating = self.one("battle", "FRA", self.seen, defender="CAS", ranged=False)
+        self.assertFalse(item.mine)
+        self.assertEqual(len(floating), 1)
+
+    def test_without_a_player_everything_with_a_place_is_told(self):
+        w = fresh(None)
+        feed.of(w)
+        w.bus.emit("battle", "FRA", w.provinces_of("FRA")[0].pos, defender="CAS", ranged=False)
+        self.assertEqual(len(feed.of(w).entries()), 1)
+
+    def test_siege_lines_only_for_the_players_sieges(self):
+        item, floating = self.one("siege_progress", "FRA", self.seen, progress=1, need=4)
+        self.assertEqual((item.log, len(floating)), (False, 1))
+        self.assertEqual(self.feed.entries(), [])
+
+    def test_passes_once_a_season(self):
+        self.feed.clear()
+        for _ in range(5):
+            self.bus.emit("pass_closed", None, (1, 1), name="p", id=1)
+        self.assertEqual(sentences(self.w), ["Winter closes the mountain passes."])
+
+    def test_filters_and_grouping(self):
+        self.feed.clear()
+        self.bus.emit("battle", "FRA", self.seen, defender="CAS", ranged=False)
+        self.bus.emit("money_spent", "POR", self.mine, amount=5, reason="build")
+        self.bus.emit("forage", "FRA", self.seen)
+        self.w.turn += 1
+        self.bus.emit("siege_progress", "POR", self.mine, progress=1, need=3)
+        groups = self.feed.entries()
+        self.assertEqual([g[0] for g in groups], [self.w.turn, self.w.turn - 1])       # newest season first
+        self.assertEqual(len(groups[1][2]), 3)
+        self.assertEqual(groups[1][2][0].kind, "forage")                                # newest line first
+        kinds = lambda f: [i.kind for _, _, g in self.feed.entries(f) for i in g]
+        self.assertEqual(kinds("war"), ["siege_progress", "battle"])
+        self.assertEqual(kinds("money"), ["money_spent"])
+        self.assertEqual(kinds("mine"), ["siege_progress", "money_spent"])
+        self.assertEqual(self.feed.unread, 4)
+        self.feed.mark_read()
+        self.assertEqual(self.feed.unread, 0)
+
+    def test_bounded(self):
+        self.feed.clear()
+        for _ in range(feed.PER_SEASON + 30):
+            self.bus.emit("forage", "POR", self.mine)
+        self.assertEqual(len(self.feed.groups[self.w.turn]), feed.PER_SEASON)
+        self.assertEqual(len(self.feed._floating), feed.FLOATING)
+        for _ in range(feed.KEEP_SEASONS + 4):
+            self.w.turn += 1
+            self.bus.emit("forage", "POR", self.mine)
+        self.assertEqual(len(self.feed.groups), feed.KEEP_SEASONS)
+        self.assertIn(self.w.turn, self.feed.groups)
+
+    def test_played_seasons_feed_the_log_without_errors(self):
+        w = fresh("POR")
+        game = GameManager(w)
+        for tag in w.neighbours_of("POR"):
+            if w.declare_war("POR", tag):
+                break
+        for _ in range(4):
+            game.end_season()
+        self.assertEqual(w.bus.tap_errors, [])
+        for _, _, items in feed.of(w).entries():
+            for item in items:
+                self.assertIn(item.colour_kind, feed.COLOUR_KINDS)
+                self.assertTrue(item.sentence)
+
+
+if __name__ == "__main__":
+    unittest.main()
