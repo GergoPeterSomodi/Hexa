@@ -174,6 +174,34 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - `art.py` draws extra tiles, decorations, unit figures and tokens in code, in the Kenney style at 120x140.
   `MapView` switches from flat colours to tile art at zoom index `TILE_FROM`.
 
+## Structure rules (adopted 2026-11-12, see docs/architecture/review-2026-11-12.md)
+
+The target structure: files and folders named here appear as the refactor phases land. Until then, new code follows
+the rules as far as the current layout allows, and never makes an allowlisted offender bigger.
+- **Layers, imports point down only:** data -> state -> systems -> world (facade) -> game manager -> screens/panels
+  -> app. Systems take `world` as a parameter and never import world.py, ui, render or pygame. Render and
+  panels read the world through public methods only and never assign to world or state objects.
+- **Player actions:** a new action is `x_check(world, ...)`/`x(world, ...)` in its system module, with a facade
+  on CampaignWorld and a pair in tests/support/agents.py. The UI and the AI change state only through actions.
+- **One owner per attribute:** each system module lists the world attributes it writes in `OWNS`;
+  tests/test_architecture.py enforces it. A new attribute goes in `WORLD_DEFAULTS` (or a dataclass default) in
+  the same PR. Derived caches are listed in `WORLD_CACHES` and are not saved.
+- **Events, not polling:** a system that changes something the player should notice calls
+  `world.bus.emit(kind, ...)`. Event handlers never change the world. The bus is never saved.
+- **Season order** lives in campaign/systems/season.py `PHASES` and nowhere else; the game manager runs it.
+- **Size limits:** a module over 800 lines needs a reason in its docstring; over 1,200 it is split. A function
+  over 60 lines needs a reason; over 100 it is split (art recipes and map generation: 150). Today's offenders
+  are allowlisted in tests/test_architecture.py and may not grow.
+- **No cross-module `_private` use** outside tests. Tests prefer public functions of system modules.
+- **UI:** buttons, panels, rows, tooltips and modals come from hexa/ui/kit.py, colours and fonts from
+  hexa/ui/theme.py. No new hand-drawn button.
+- **Render caches** are `render.cache.BoundedCache` instances, registered by name. No new module-level dict
+  cache. Time-sliced work uses `render.budget.FrameBudget`.
+- **Refactor PRs** change no behaviour: label them `refactor`; they must pass tools/same_behaviour.py,
+  save-compat and sha-identical goldens. Never mix a refactor and a gameplay change in one commit.
+- **Where new features go:** rules -> campaign/systems/<name>.py (+ numbers in data.py, + README table);
+  panel -> campaign/panels/; screen -> campaign/screens/; art -> its art module using render/draw.py.
+
 ### Legacy map editor
 
 `Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py` and `Read_XML.py` at the repo root are the original
