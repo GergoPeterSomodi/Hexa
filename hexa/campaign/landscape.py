@@ -115,6 +115,40 @@ def hex_poly(X, Y, rad):
     return [corner_pt(c, X, Y, rad) for c in range(6)]
 
 
+_COAST_WATER = {}
+
+
+def coast_water(desc):
+    """The water of a land hex's coast overlay as a mask at 2x tile resolution (cached): what in_water tests."""
+    key = (desc.sea, desc.variant, bool(desc.town))
+    mask = _COAST_WATER.get(key)
+    if mask is None:
+        if len(_COAST_WATER) > 600:
+            _COAST_WATER.clear()
+        geo = wfctiles._coast_geo(desc.sea, desc.variant, wfctiles.COAST_RD - 8 if desc.town else wfctiles.COAST_RD)
+        mask = _COAST_WATER[key] = pygame.mask.from_surface(geo["water"], 8)
+    return mask
+
+
+def in_water(mask, tx, ty, margin=4):
+    """Is the tile point (tx, ty) (120 x 140 tile pixels) in the mask's water, or within `margin` px of it (the sand)?"""
+    w, h = mask.get_size()
+    for dx, dy in ((0, 0), (-margin, 0), (margin, 0), (0, -margin * 0.6), (0, margin * 0.6)):
+        px, py = int((tx + dx) * wfctiles.K), int((ty + dy) * wfctiles.K)
+        if 0 <= px < w and 0 <= py < h and mask.get_at((px, py)):
+            return True
+    return False
+
+
+def clip_mask(size):
+    """A surface to draw a clip polygon on, for a BLEND_RGBA_MIN blit: white and transparent outside the polygon.
+    (Transparent *black* would zero the colour of the pixels it clips, and the antialiased edge pixels of the
+    result would be darkened: a dark hairline round every clipped picture.)"""
+    s = pygame.Surface(size, pygame.SRCALPHA)
+    s.fill((255, 255, 255, 0))
+    return s
+
+
 def _hex_at(X, Y):
     """The hex (col, row) whose centre is nearest to the unit point (X, Y)."""
     row0 = int(round((Y - 1) / 1.5))
@@ -486,7 +520,7 @@ def hatch_tile(P):
     step = max(4, int(P * 0.22))
     for k in range(-h, w + h, step):
         pygame.draw.line(s, (54, 66, 96, 92), (k, 0), (k + h * 0.6, h), max(2, int(P * 0.06)))
-    mk = pygame.Surface((w, h), pygame.SRCALPHA)
+    mk = clip_mask((w, h))
     pygame.draw.polygon(mk, (255, 255, 255, 255), hex_poly(w / 2, h / 2, P * 0.98))
     s.blit(mk, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
     tint_ = pygame.Surface((w, h), pygame.SRCALPHA)
@@ -1088,7 +1122,7 @@ class Landscape:
             hatch = hatch_tile(P)
             gs.blit(hatch, (cx - hatch.get_width() / 2, cy - hatch.get_height() / 2))
         # the sprite is clipped to its hex (the grid is a separate overlay, see grid())
-        mask = pygame.Surface((cw, ch), pygame.SRCALPHA)
+        mask = clip_mask((cw, ch))
         # the clip is the hex grown to fill the whole sprite width: neighbours are blitted at whole pixels (spacing
         # r*sqrt3 is not one), so a hex-sized clip leaves 1 px seams (and half-transparent antialiased edge pixels)
         # that show the dark background; grown, the tiles overlap by about a pixel and the sprite's own left and
@@ -1125,7 +1159,7 @@ class Landscape:
             tex = self._scaled(self._ground_src(kb, nb.variant), P, 1.0)
             layer = pygame.Surface((tw, th), pygame.SRCALPHA)
             layer.blit(tex, (tw / 2 - tex.get_width() / 2, th / 2 - tex.get_height() / 2))
-            mk = pygame.Surface((tw, th), pygame.SRCALPHA)
+            mk = clip_mask((tw, th))
             pygame.draw.polygon(mk, (255, 255, 255, 255), loc)
             layer.blit(mk, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
             gs.blit(layer, (cx - tw / 2, cy - th / 2))
@@ -1199,7 +1233,7 @@ class Landscape:
             for oy in (-1, 0, 1):
                 layer.blit(tex, (cx - bb.x - tex.get_width() / 2 + ox * P * SQ3,
                                  cy - bb.y - tex.get_height() / 2 + oy * P * 1.5))
-        mk = pygame.Surface(bb.size, pygame.SRCALPHA)
+        mk = clip_mask(bb.size)
         pygame.draw.polygon(mk, (255, 255, 255, 255), [(x - bb.x, y - bb.y) for x, y in pts])
         layer.blit(mk, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
         gs.blit(layer, bb.topleft)
@@ -1243,7 +1277,7 @@ class Landscape:
                 ox, oy = bb.w / 2 + (-uy) * k * step, bb.h / 2 + ux * k * step
                 L = bb.w + bb.h
                 pygame.draw.line(rows, lc, (ox - ux * L, oy - uy * L), (ox + ux * L, oy + uy * L), max(1, round(q * 0.9)))
-            mk = pygame.Surface(bb.size, pygame.SRCALPHA)
+            mk = clip_mask(bb.size)
             pygame.draw.polygon(mk, (255, 255, 255, 255), [(x - bb.x, y - bb.y) for x, y in ins])
             rows.blit(mk, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
             layer.blit(rows, bb.topleft)
@@ -1255,7 +1289,7 @@ class Landscape:
             pygame.draw.line(layer, hedge_c, pa, pb, max(2, round(q * 2.6)))
             for pt in (pa, pb):
                 pygame.draw.circle(layer, hedge_c, pt, q * 1.4)
-        mk = pygame.Surface(gs.get_size(), pygame.SRCALPHA)
+        mk = clip_mask(gs.get_size())
         pygame.draw.polygon(mk, (255, 255, 255, 255), [fr.px(*p) for p in blob])
         layer.blit(mk, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
         gs.blit(layer, (0, 0))
@@ -1368,6 +1402,10 @@ class Landscape:
             self._trees(out, m, c, winter)
             if c.fields:
                 self._farm(out, m, c, X, Y)
+            if c.desc is not None and c.desc.sea:               # no tree in the water the coast overlay draws
+                wet = coast_water(c.desc)
+                out = [o for o in out if o[0] != "tree"
+                       or not in_water(wet, (o[4] - X) * wfctiles.R + wfctiles.CX, (o[5] - Y) * wfctiles.R + wfctiles.CY)]
         if c.closed:
             out.append(("build", "barrier", "m", 0, X, Y + 0.22))
             out.append(("build", "pass_badge", "m", 0, X + 0.02, Y - 0.12))

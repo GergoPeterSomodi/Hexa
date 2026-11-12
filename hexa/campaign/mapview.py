@@ -17,6 +17,12 @@ TILE_FROM = 3                     # from this zoom level on, the map is drawn wi
 LAND_FROM = 21                    # from this hex radius on, the map is drawn with the landscape art (_draw_landscape)
 LAND_BUILD_MS = 3.0               # time a frame may spend building composites and object lists (at least one of each);
                                   # a hex not built yet is drawn with its old sprite, or without its objects
+PREFETCH_RING = 3                 # hexes beyond the view that idle frames build ahead (a pan stays on built ground)
+PREFETCH_FIT = 0.3                 # share of a build that must fit in the time left before it is started
+PREFETCH_LATE_MS = 17.0           # a frame already this long gets no extra slice
+PREFETCH_MIN_MS = 1.0             # a frame that is panning always spends this long on the ring, however late it is
+BACKDROP_MAX_K = 2.2              # no backdrop for a zoom jump bigger than this (13 to 34): it would be a smear
+BACKDROP_S = 2.5                  # a zoom's stand-in picture (the old frame, scaled) is dropped after this long at the latest
 LAND_IDLE_MS = 8.0                # a frame may prefetch the ring round the view until this many ms into the frame
 WARM_MS = 250.0                   # the start-up warm of the view's hexes stops after this long (the rest: prefetch)
 LAND_STILL_MS = 24.0              # a frame whose camera did not move (same zoom) may spend this long building in total
@@ -42,6 +48,7 @@ def abbr(good):
 
 
 BLACK_FOG = (14, 16, 22)
+MODE_BORDERS = 150                # alpha of the owner borders in the terrain, goods and markets modes
 DIM = (0, 0, 0, 105)               # the fog over hexes the player knows but cannot see now
 FROST = (245, 248, 255, 70)        # the winter frost of the north
 SEA = (38, 74, 128)
@@ -116,6 +123,12 @@ class MapView:
         self._fill_key, self._fill_seen = None, set()
         self._filled = None                # (camera, r, season, world version) of the last still frame that built it all
         self._pm_edges, self._pm_ver = {}, None      # (pos, r) -> owner border segments, for this world version
+        self._under_backdrop = set()
+        self._pf_plan = None               # (key, plan, cursor) of the prefetch: rebuilt only when its inputs change
+        self._pf_cost = {"g": 0.0015, "o": 0.0008}   # moving average of what one ground / object build costs (s)
+        self._frame = None                 # the last frame's map (before units and fog), kept for a zoom's backdrop
+        self._frame_at = None              # (r, camera) of that frame
+        self._backdrop = None              # (scaled old frame, its top-left in world px at the new r, drop time)
         self._tint_sprites = {}            # (rgba, r) -> one translucent hex for _tint
         self._tint_layers = {}             # clip size -> the layer _tint draws on
         self._labels = {}                  # (town name, r) -> (shade box, name surface): drawn every frame, rendered once
@@ -226,10 +239,9 @@ class MapView:
         surf.fill(BLACK_FOG)
         known = self.known()
         visible = world.visible
-        shade = pygame.Surface((int(r * SQRT3) + 2, int(2 * r) + 2), pygame.SRCALPHA)
         grow = 0.6 if r >= 9 else 1.1
-        pygame.draw.polygon(shade, (0, 0, 0, 85), hex_points(shade.get_width() / 2, shade.get_height() / 2, r + grow - 0.5))
         outline = r >= 13
+        unseen = []
         for pos in world.terrain:
             if pos not in known:
                 continue
@@ -240,7 +252,8 @@ class MapView:
             if outline and world.is_land(pos):
                 pygame.draw.polygon(surf, tint(color, -0.12), hex_points(cx, cy, r), 1)
             if pos not in visible and world.player:
-                surf.blit(shade, (cx - shade.get_width() / 2, cy - shade.get_height() / 2))
+                unseen.append(((0, 0, 0, 85), cx, cy))
+        self._tint(surf, unseen, cache=False)           # one sheet: a shade per hex would show every shared edge
         if r >= 5 and self.mode in ("political", "terrain"):
             m = self.MARGIN
             for pts, _ in self._rivers:
@@ -343,13 +356,17 @@ class MapView:
         screen.fill(BLACK_FOG, view_rect)
         self._late_labels = []
         self._drawn_labels = []
+        self._under_backdrop = set()                      # hexes this frame whose picture is the zoom backdrop's
         self._focus = ui.province.pos if ui.province else None
+        self._view_rect, self._cam = view_rect, camera
+        self._zoom_backdrop(screen, view_rect, camera)
         if self.r >= LAND_FROM and self.land is not None:
             self._draw_landscape(screen, view_rect, camera)
         elif self.zoom >= TILE_FROM and self.tiles_dir:
             self._draw_tiles(screen, view_rect, camera)
         else:
             screen.blit(self.surface(), (view_rect.x - camera[0], view_rect.y - camera[1]))
+            self._capture(screen, view_rect, camera)
         r = self.r
         ox, oy = view_rect.x - camera[0], view_rect.y - camera[1]
 
@@ -435,6 +452,55 @@ class MapView:
                 if view_rect.inflate(40, 40).collidepoint(x, y):
                     screen.blit(chip, chip.get_rect(center=(x, y - self.r * 0.25)))
 
+    def _capture(self, screen, view_rect, camera):
+        """Keep this frame's map (a plain copy, about 0.2 ms) in case the next frame is at another zoom."""
+        if self._frame is None or self._frame.get_size() != view_rect.size:
+            self._frame = pygame.Surface(view_rect.size)
+        self._frame.blit(screen, (0, 0), view_rect)
+        self._frame_at = (self.r, (camera[0], camera[1]))
+
+    def _zoom_backdrop(self, screen, view_rect, camera):
+        """After a zoom change the new zoom's hexes are built a few at a time (nearest the centre first), which shows as
+        a wave of flat old-style tiles turning into landscape. So the last frame, scaled to the new zoom, is drawn
+        first; the hexes built so far go over it and the unbuilt ones simply stay as the old picture shows them."""
+        r = self.r
+        if self._frame_at is not None and self._frame_at[0] != r and r >= LAND_FROM and self._frame is not None:
+            old_r, cam = self._frame_at
+            k = r / old_r
+            self._frame_at = (r, cam)                    # (taken once per zoom change)
+            self._backdrop = None
+            if k <= BACKDROP_MAX_K:                      # a bigger jump would be a blur of a few pixels
+                m = self.MARGIN
+                # the part of the old frame that lands in the new view, and only that part is scaled
+                want = pygame.Rect(0, 0, 0, 0)
+                want.x = int(m + (camera[0] - m) / k - cam[0]) - 2
+                want.y = int(m + (camera[1] - m) / k - cam[1]) - 2
+                want.w, want.h = int(view_rect.w / k) + 5, int(view_rect.h / k) + 5
+                src = want.clip(self._frame.get_rect())
+                if src.w > 8 and src.h > 8:
+                    surf = pygame.transform.smoothscale(self._frame.subsurface(src),
+                                                        (max(1, round(src.w * k)), max(1, round(src.h * k))))
+                    top = (m + (cam[0] + src.x - m) * k, m + (cam[1] + src.y - m) * k)
+                    self._backdrop = (surf, top, time.perf_counter() + BACKDROP_S, r)
+        bd = self._backdrop
+        if bd is None:
+            return
+        surf, top, until, bd_r = bd
+        if bd_r != r or time.perf_counter() > until:
+            self._backdrop = None
+            return
+        screen.blit(surf, (view_rect.x + top[0] - camera[0], view_rect.y + top[1] - camera[1]))
+
+    def _backdrop_covers(self, cx, cy, view_rect):
+        """Does the zoom backdrop cover the hex at the screen point (cx, cy)? (Then an unbuilt hex is left to it.)"""
+        bd = self._backdrop
+        if bd is None:
+            return False
+        surf, top, _, _ = bd
+        x, y = cx - view_rect.x + self._cam[0] - top[0], cy - view_rect.y + self._cam[1] - top[1]
+        m = self.r + 2                                    # the whole hex, not just its centre
+        return m <= x < surf.get_width() - m and m <= y < surf.get_height() - m
+
     STEP_MS = 70                    # how long a moving stack takes per hex
 
     def _sliding(self, ui, at):
@@ -483,7 +549,7 @@ class MapView:
         rim = pygame.transform.average_color(big, big.get_rect().inflate(-big.get_width() // 3, -big.get_height() // 3))
         pygame.draw.polygon(out, tuple(rim[:3]) + (255,), poly)
         out.blit(big, ((w - big.get_width()) // 2, (h - big.get_height()) // 2))
-        mask = pygame.Surface((w, h), pygame.SRCALPHA)
+        mask = landscape.clip_mask((w, h))
         pygame.draw.polygon(mask, (255, 255, 255, 255), poly)
         out.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
         return out
@@ -679,12 +745,14 @@ class MapView:
             self._tint(screen, [(FROST, cx, cy) for cx, cy in north])
             for cx, cy in north:
                 blit(frost, cx, cy)
+        self._capture(screen, view_rect, camera)
         self._tint(screen, [(DIM, cx, cy) for cx, cy in dimmed])
         black = self.overlay("black")
         for cx, cy in hidden:
             blit(black, cx, cy)
         if self.mode != "political":
             self._mode_layer(screen, shown)
+            self._owner_borders(screen, shown, MODE_BORDERS)
             return
         self._owner_washes(screen, shown)
         self._political_marks(screen, shown)
@@ -692,9 +760,11 @@ class MapView:
     def _owner_washes(self, screen, shown):
         """The owner's tint of each province (under the objects on the landscape zooms)."""
         world = self.world
-        self._tint(screen, [(world.countries[prov.owner].color + (34,), cx, cy) for prov, cx, cy in shown if prov.owner])
+        under = self._under_backdrop
+        self._tint(screen, [(world.countries[prov.owner].color + (34,), cx, cy) for prov, cx, cy in shown
+                            if prov.owner and (cx, cy) not in under])
 
-    def _tint(self, screen, items):
+    def _tint(self, screen, items, cache=True):
         """Translucent hexes [(rgba, cx, cy)] over the map, drawn on one layer and blitted once. A tint blitted hex by
         hex leaves a faint line (or a doubled one) along every shared edge, where the blits are rounded to whole
         pixels, which reads as a grid even when the grid is off; here each hex is a little larger than its cell and
@@ -702,10 +772,13 @@ class MapView:
         if not items:
             return
         clip = screen.get_clip() or screen.get_rect()
-        layer = self._tint_layers.get(clip.size)
+        layer = self._tint_layers.get(clip.size) if cache else None
         if layer is None:
-            layer = self._tint_layers[clip.size] = pygame.Surface(clip.size, pygame.SRCALPHA)
-        layer.fill((0, 0, 0, 0))
+            layer = pygame.Surface(clip.size, pygame.SRCALPHA)
+            if cache:
+                self._tint_layers[clip.size] = layer
+        else:
+            layer.fill((0, 0, 0, 0))
         r = self.r
         sprites = self._tint_sprites
         blit = layer.blit
@@ -720,35 +793,63 @@ class MapView:
             blit(spr, (cx - ox, cy - oy), special_flags=pygame.BLEND_RGBA_MAX)
         screen.blit(layer, clip.topleft)
 
-    def _political_marks(self, screen, shown):
-        """Owner borders, controller stripes, goods dots, town names and capital flags (over the objects)."""
+    def _owner_borders(self, screen, shown, alpha=255):
+        """The owner borders of the shown provinces. alpha < 255 draws them fainter, through a layer (the terrain, goods
+        and markets modes keep the borders so the player can see where a country ends)."""
         world, r = self.world, self.r
         width = max(2, r // 8)
-        plan = self._town_labels()
         if self._pm_ver != world.version:
             self._pm_edges.clear()
             self._pm_ver = world.version
-        draw_line = pygame.draw.line
+        target, draw_line = screen, pygame.draw.line
+        clip = screen.get_clip() or screen.get_rect()
+        if alpha < 255:
+            target = self._tint_layers.get(("borders", clip.size))      # (get, then create: setdefault would build a
+            if target is None:                                           # full-view surface every frame)
+                target = self._tint_layers[("borders", clip.size)] = pygame.Surface(clip.size, pygame.SRCALPHA)
+        ox, oy = (clip.x, clip.y) if alpha < 255 else (0, 0)
+        box = None
         for prov, cx, cy in shown:
-            if prov.owner:
-                segs = self._pm_edges.get((prov.pos, r))
-                if segs is None:                    # the outline's segments as offsets from the hex centre
-                    color = world.countries[prov.owner].color
-                    dark, light = tint(color, -0.35), tint(color, 0.35)
-                    outer = hex_points(0, 0, r - width / 2 - 1)
-                    inner = hex_points(0, 0, r - width * 1.6 - 1)
-                    near = list(neighbors(prov.pos))
-                    segs = []
-                    for edge in range(6):
-                        other = world.provinces.get(near[(6 - edge) % 6])
-                        if other is None or other.owner != prov.owner:
-                            a, b = (edge + 1) % 6, edge
-                            segs.append((dark, outer[b], outer[a], light, inner[b], inner[a]))
-                    self._pm_edges[(prov.pos, r)] = segs
-                lw = max(1, width // 2)
-                for dark, ob, oa, light, ib, ia in segs:
-                    draw_line(screen, dark, (cx + ob[0], cy + ob[1]), (cx + oa[0], cy + oa[1]), width)
-                    draw_line(screen, light, (cx + ib[0], cy + ib[1]), (cx + ia[0], cy + ia[1]), lw)
+            if not prov.owner:
+                continue
+            segs = self._pm_edges.get((prov.pos, r))
+            if segs is None:                    # the outline's segments as offsets from the hex centre
+                color = world.countries[prov.owner].color
+                dark, light = tint(color, -0.35), tint(color, 0.35)
+                outer = hex_points(0, 0, r - width / 2 - 1)
+                inner = hex_points(0, 0, r - width * 1.6 - 1)
+                near = list(neighbors(prov.pos))
+                segs = []
+                for edge in range(6):
+                    other = world.provinces.get(near[(6 - edge) % 6])
+                    if other is None or other.owner != prov.owner:
+                        a, b = (edge + 1) % 6, edge
+                        segs.append((dark, outer[b], outer[a], light, inner[b], inner[a]))
+                self._pm_edges[(prov.pos, r)] = segs
+            lw = max(1, width // 2)
+            x, y = cx - ox, cy - oy
+            for dark, ob, oa, light, ib, ia in segs:
+                if alpha < 255:
+                    dark, light = dark + (alpha,), light + (alpha,)
+                draw_line(target, dark, (x + ob[0], y + ob[1]), (x + oa[0], y + oa[1]), width)
+                draw_line(target, light, (x + ib[0], y + ib[1]), (x + ia[0], y + ia[1]), lw)
+            if alpha < 255 and segs:
+                if box is None:
+                    box = [x - r, y - r, x + r, y + r]
+                else:
+                    box = [min(box[0], x - r), min(box[1], y - r), max(box[2], x + r), max(box[3], y + r)]
+        if alpha < 255 and box is not None:
+            area = pygame.Rect(int(box[0]) - 2, int(box[1]) - 2, int(box[2] - box[0]) + 5,
+                               int(box[3] - box[1]) + 5).clip(target.get_rect())
+            screen.blit(target, (clip.x + area.x, clip.y + area.y), area)
+            target.fill((0, 0, 0, 0), area)               # clean for the next frame (only the part that was drawn on)
+
+    def _political_marks(self, screen, shown):
+        """Owner borders, controller stripes, goods dots, town names and capital flags (over the objects)."""
+        world, r = self.world, self.r
+        plan = self._town_labels()
+        self._owner_borders(screen, shown)
+        for prov, cx, cy in shown:
             if prov.controller and prov.controller != prov.owner:
                 ctrl = world.countries[prov.controller].color
                 for k in (-0.4, 0.0, 0.4):
@@ -957,9 +1058,13 @@ class MapView:
         if not bare:
             self._object_pass(screen, view_rect, (ox, oy), rows, known, season)
         self._prefetch(view_rect, camera, rows, season)
+        self._capture(screen, view_rect, camera)
+        if self._backdrop is not None and self._filled == (tuple(camera), r, season, world.version, self.mode):
+            self._backdrop = None                        # everything of the view is built: the stand-in goes
         self._tint(screen, [(DIM, cx, cy) for cx, cy in dimmed])
         if self.mode != "political":
             self._mode_layer(screen, shown, washes=False)
+            self._owner_borders(screen, shown, MODE_BORDERS)
             return
         self._political_marks(screen, shown)
 
@@ -1031,6 +1136,9 @@ class MapView:
             img = self.sea_img(pos) if world.is_sea(pos) else self.sprite(TERRAIN_SPRITES["lake"][0])
             self._blit_centre(screen, img, cx, cy)
             return
+        if self._backdrop is not None and self._backdrop_covers(cx, cy, self._view_rect):
+            self._under_backdrop.add((cx, cy))
+            return                                       # the zoom's stand-in picture shows here until this hex is built
         self._blit_centre(screen, self.sprite(self.land_sprite(prov) if bare else self.tile_sprite(prov)), cx, cy)
         desc = self.overlay_desc(prov, bare)
         if desc is not None:
@@ -1090,23 +1198,64 @@ class MapView:
     def _prefetch(self, view_rect, camera, rows, season):
         """Idle time: build the composites and object lists of the ring of hexes just beyond the view (ahead of the
         last pan first), then of the view's middle at the neighbouring landscape zoom, so a zoom switch or a pan is
-        already warm. Stops at LAND_IDLE_MS of the frame, and never builds what is already built."""
+        already warm. Stops at LAND_IDLE_MS of the frame (a panning frame that is not already late gets
+        PREFETCH_MIN_MS from now), and never builds what is already built. The plan is kept between frames, and a
+        build is only started if at least half of it fits in the time left."""
         world, land = self.world, self.land
+        now = time.perf_counter()
         end = self._frame_start + LAND_IDLE_MS / 1000
+        if self._pan != (0.0, 0.0) and now - self._frame_start < PREFETCH_LATE_MS / 1000:
+            end = max(end, now + PREFETCH_MIN_MS / 1000)
+        if now >= end:
+            return
         if self._pf_version != world.version:
             self._pf_done.clear()
             self._pf_version = world.version
         known = self.known()
+        ax, ay = self._pan
+        norm = (ax * ax + ay * ay) ** 0.5
+        heading = (round(ax / norm), round(ay / norm)) if norm else (0, 0)
+        centre = self.hex_at(camera[0] + view_rect.w / 2, camera[1] + view_rect.h / 2)
+        key = (tuple(rows), self.r, heading, centre, self.fog_stamp())
+        if self._pf_plan is None or self._pf_plan[0] != key:
+            self._pf_plan = [key, self._prefetch_plan(view_rect, camera, rows, norm), 0]
+        plan, i = self._pf_plan[1], self._pf_plan[2]
+        cost = self._pf_cost
+        done = self._pf_done
+        while i < len(plan):
+            r, pos = plan[i]
+            if pos not in known or (r, pos, season) in done:
+                i += 1
+                continue
+            t = time.perf_counter()
+            if land.ground(pos, r, season, build=False) is None:
+                if t + cost["g"] * PREFETCH_FIT >= end:
+                    break
+                land.prepare(pos, r, season)
+                land.ground(pos, r, season)
+                cost["g"] += (time.perf_counter() - t - cost["g"]) * 0.2
+            t = time.perf_counter()
+            if land.objects(pos, r, season, build=False) is None:
+                if t + cost["o"] * PREFETCH_FIT >= end:
+                    break
+                land.make_sprites(pos, r, season)
+                land.objects(pos, r, season)
+                cost["o"] += (time.perf_counter() - t - cost["o"]) * 0.2
+            done.add((r, pos, season))
+            i += 1
+        self._pf_plan[2] = i
+
+    def _prefetch_plan(self, view_rect, camera, rows, norm):
+        """[(r, pos)]: the ring beyond the view, the pan's side first, then the middle at the other landscape zoom."""
+        world = self.world
         mx, my = camera[0] + view_rect.w / 2, camera[1] + view_rect.h / 2
-        plan = []
+        ax, ay = self._pan
         ring = []
-        for row in range(max(0, rows[0] - 2), min(world.rows - 1, rows[1] + 2) + 1):
-            for col in range(max(0, rows[2] - 2), min(world.cols - 1, rows[3] + 2) + 1):
+        for row in range(max(0, rows[0] - PREFETCH_RING), min(world.rows - 1, rows[1] + PREFETCH_RING) + 1):
+            for col in range(max(0, rows[2] - PREFETCH_RING), min(world.cols - 1, rows[3] + PREFETCH_RING) + 1):
                 if rows[0] <= row <= rows[1] and rows[2] <= col <= rows[3]:
                     continue
                 ring.append((col, row))
-        ax, ay = self._pan
-        norm = (ax * ax + ay * ay) ** 0.5
 
         def ahead(pos):
             cx, cy = self.center(pos)
@@ -1115,7 +1264,7 @@ class MapView:
             if norm:
                 score -= 1.5 * (dx * ax + dy * ay) / norm      # cells in the pan direction first
             return score
-        plan += [(self.r, pos) for pos in sorted(ring, key=ahead)]
+        plan = [(self.r, pos) for pos in sorted(ring, key=ahead)]
         other = {21: 34, 34: 21}.get(self.r)
         if other is not None:
             centre = self.hex_at(mx, my)
@@ -1126,20 +1275,7 @@ class MapView:
                     if 0 <= rw < world.rows and 0 <= c < world.cols]
             near.sort(key=lambda p: abs(p[0] - centre[0]) + abs(p[1] - centre[1]))
             plan += [(other, pos) for pos in near]
-        for r, pos in plan:
-            if time.perf_counter() >= end:
-                return
-            if pos not in known or (r, pos, season) in self._pf_done:
-                continue
-            if land.ground(pos, r, season, build=False) is None:
-                land.prepare(pos, r, season)
-                land.ground(pos, r, season)
-            if time.perf_counter() >= end:
-                return
-            if land.objects(pos, r, season, build=False) is None:
-                land.make_sprites(pos, r, season)
-                land.objects(pos, r, season)
-            self._pf_done.add((r, pos, season))
+        return plan
 
     def land_sprite(self, prov):
         options = TERRAIN_SPRITES[prov.terrain]
@@ -1168,7 +1304,10 @@ class MapView:
         r = self.r
         if washes:
             tints = []
+            under = self._under_backdrop                 # (the backdrop already carries its tint)
             for prov, cx, cy in shown:
+                if (cx, cy) in under:
+                    continue
                 if self.mode == "terrain":
                     tints.append((TERRAIN_TINT[prov.terrain] + (45,), cx, cy))
                 elif self.mode == "goods" and self.goods_view == "deposits" and prov.good:

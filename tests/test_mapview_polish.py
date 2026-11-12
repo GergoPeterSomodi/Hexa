@@ -11,11 +11,13 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 import pygame  # noqa: E402
 
 from hexa.campaign import geo  # noqa: E402
+from hexa.campaign import wfctiles  # noqa: E402
 from hexa.campaign import landscape as L  # noqa: E402
 from hexa.campaign import mapview  # noqa: E402
 from hexa.campaign import app as appmod  # noqa: E402
 from hexa.campaign import saves  # noqa: E402
 from hexa.campaign.world import CampaignWorld  # noqa: E402
+from hexa.hexgrid import neighbors  # noqa: E402
 from tests.test_saves import TempHome  # noqa: E402
 
 TILES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hexagon-pack", "PNG", "Tiles")
@@ -208,6 +210,178 @@ class Cleanups(TempHome):
     def test_dead_code_is_gone(self):
         self.assertFalse(hasattr(appmod, "SCROLL"))
         self.assertFalse(hasattr(mapview.MapView, "_unit"))
+
+
+class Round4(unittest.TestCase):
+    """#93, #94, #95, #96, #98."""
+
+    @staticmethod
+    def ui():
+        return SimpleNamespace(selected=None, reach=None, province=None, hover=None, group=[], anim=None)
+
+    def test_trees_stay_out_of_the_water(self):
+        """#96: no tree stands in the water that a coast hex's overlay draws."""
+        land = L.Landscape(WORLD, TILES)
+        m = land._model("summer")
+        checked = 0
+        for pos in sorted(WORLD.terrain):
+            c = m.cells.get(pos)
+            if c is None or c.water or c.desc is None or not c.desc.sea or pos[0] % 3:
+                continue
+            X, Y = L.hex_centre(pos)
+            geo_ = wfctiles._coast_geo(c.desc.sea, c.desc.variant, wfctiles.COAST_RD - 8 if c.desc.town else wfctiles.COAST_RD)
+            for cat, _, _, _, x, y in land._specs(c, "summer"):
+                if cat == "tree":
+                    checked += 1
+                    tx, ty = wfctiles.CX + (x - X) * wfctiles.R, wfctiles.CY + (y - Y) * wfctiles.R
+                    self.assertFalse(wfctiles._covers(geo_["water"], tx, ty), f"tree in the sea of {pos}")
+        self.assertGreater(checked, 200)
+
+    def test_borders_stay_in_every_map_mode(self):
+        """#98: the terrain, goods and markets modes draw the owner borders (fainter)."""
+        for r in (21, 13):
+            for mode in ("terrain", "goods", "markets"):
+                view = mapview.MapView(WORLD, TILES)
+                view.zoom = mapview.ZOOMS.index(r)
+                view.mode = mode
+                calls = []
+                real = view._owner_borders
+                view._owner_borders = lambda screen, shown, alpha=255: (calls.append(alpha), real(screen, shown, alpha))
+                x, y = view.center(Seams.plains())
+                view.draw(pygame.Surface((700, 500)), pygame.Rect(0, 0, 700, 500), [x - 350, y - 250], self.ui())
+                self.assertEqual(calls, [mapview.MODE_BORDERS], f"r={r} {mode}")
+
+    def test_clip_mask_keeps_the_colour_it_clips(self):
+        """#93: the antialiased edge pixels of a clipped picture must not be darkened (a black mask zeroed them)."""
+        pic = pygame.Surface((40, 40), pygame.SRCALPHA)
+        pic.fill((60, 170, 90, 255))
+        mask = L.clip_mask((40, 40))
+        pygame.draw.polygon(mask, (255, 255, 255, 255), [(20, 2), (38, 12), (38, 30), (20, 38), (2, 30), (2, 12)])
+        pic.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+        small = pygame.transform.smoothscale(pic, (20, 20))
+        for y in range(20):
+            for x in range(20):
+                c = small.get_at((x, y))
+                if c.a:
+                    self.assertGreaterEqual(c.g, 165, f"darkened edge pixel {(x, y)} {tuple(c)}")
+
+    def test_ground_edge_pixels_are_not_darker_than_the_ground(self):
+        land = L.Landscape(WORLD, TILES)
+        pos = Seams.plains()
+        g = land.ground(pos, 34, "summer")
+        w, h = g.get_size()
+        inner = g.get_at((w // 2, int(h * 0.35)))
+        for x in range(w):
+            for y in range(h):
+                c = g.get_at((x, y))
+                if 0 < c.a < 255 and abs(c.g - inner.g) < 60:        # (band decorations are far from the ground's colour)
+                    self.assertGreaterEqual(c.g, inner.g * 0.8, f"dark edge pixel {(x, y)} {tuple(c)}")
+
+    def test_the_far_zoom_shade_is_one_sheet(self):
+        """#95: unseen hexes are shaded as one sheet, not hex by hex: no line over open sea."""
+        world = CampaignWorld(1480, player="POR")
+        country = world.countries[world.player]
+        country.explored = set(world.terrain)
+        world.visible = set()
+        world.changed()
+        for r in (3, 5, 8):
+            view = mapview.MapView(world, TILES)
+            view.zoom = mapview.ZOOMS.index(r)
+            surf = view.surface()
+            sea = [p for p, t in world.terrain.items() if t == "ocean"
+                   and all(world.terrain.get(n) == "ocean" for q in neighbors(p) for n in neighbors(q))]
+            x, y = view.center(sea[len(sea) // 2])
+            colours = {tuple(surf.get_at((int(x) + dx, int(y) + dy)))[:3] for dx in range(-3 * r, 3 * r)
+                       for dy in range(-r, r)}
+            self.assertLessEqual(len(colours), 2, f"r={r}: {len(colours)} colours over open sea")
+
+    def zoom_frames(self, r0, r1, mode="political", pos=None, frames=1):
+        """Draw at r0 until settled, then at r1: the first frame(s) after the change. Returns (view, screens)."""
+        view = mapview.MapView(WORLD, TILES)
+        view.mode = mode
+        x, y = view.center(pos or Seams.plains())
+        u = ((x - view.MARGIN) / view.r, (y - view.MARGIN) / view.r)           # the hex centre in hex radii
+        rect = pygame.Rect(0, 0, 700, 500)
+
+        def cam(r):
+            return [view.MARGIN + u[0] * r - 350, view.MARGIN + u[1] * r - 250]
+        screen = pygame.Surface((700, 500))
+        view.zoom = mapview.ZOOMS.index(r0)
+        for _ in range(8):
+            view.draw(screen, rect, cam(r0), self.ui())
+        view.zoom = mapview.ZOOMS.index(r1)
+        shots = []
+        for _ in range(frames):
+            view.draw(screen, rect, cam(r1), self.ui())
+            shots.append(screen.copy())
+        return view, shots, (rect, cam(r1))
+
+    def test_zoom_change_keeps_a_backdrop_until_the_view_is_built(self):
+        """#94: the old frame, scaled, stands in for the new zoom's unbuilt hexes (zooming in and out)."""
+        for r0, r1 in ((34, 21), (13, 21), (21, 34)):
+            view, _, (rect, cam) = self.zoom_frames(r0, r1)
+            self.assertIsNotNone(view._backdrop, f"{r0} to {r1}")
+            surf = view._backdrop[0]
+            k = r1 / r0
+            # only the part of the old frame that lands in the view is scaled: never much more than one view
+            self.assertLessEqual(surf.get_width(), rect.w + 8 * k, f"{r0} to {r1}")
+            self.assertLessEqual(surf.get_height(), rect.h + 8 * k, f"{r0} to {r1}")
+            screen = pygame.Surface((700, 500))
+            for _ in range(300):
+                view.draw(screen, rect, cam, self.ui())
+                if view._backdrop is None:
+                    break
+            self.assertIsNone(view._backdrop, f"{r0} to {r1}: the stand-in goes once the view is built")
+
+    def test_a_big_zoom_jump_has_no_backdrop(self):
+        view, _, _ = self.zoom_frames(13, 34)
+        self.assertIsNone(view._backdrop, "13 to 34 would be a smear: no stand-in")
+
+    def test_the_backdrop_carries_no_extra_tint(self):
+        """The washes are not laid on the stand-in a second time: its colour matches the built hex (markets mode)."""
+        pos = next(p for p, prov in WORLD.provinces.items() if prov.market is not None and prov.owner)
+        view, shots, _ = self.zoom_frames(34, 21, mode="markets", pos=pos, frames=1)
+        first = shots[0]
+        screen = pygame.Surface((700, 500))
+        _, _, (rect, cam) = self.zoom_frames(34, 21, mode="markets", pos=pos, frames=1)
+        view.mode = "markets"
+        for _ in range(300):
+            view.draw(screen, rect, cam, self.ui())
+            if view._backdrop is None:
+                break
+
+        def mean(img):
+            box = img.subsurface((350 - 8, 250 - 8, 16, 16))
+            return pygame.transform.average_color(box)[:3]
+        a, b = mean(first), mean(screen)
+        for ca, cb in zip(a, b):
+            self.assertLessEqual(abs(ca - cb), 3, f"stand-in {a} against built {b}")
+
+    def test_the_borders_layer_is_reused_and_borders_show(self):
+        """#98 (and the per-frame allocation): one layer for all frames; the faint borders are really on screen."""
+        view = mapview.MapView(WORLD, TILES)
+        view.zoom = mapview.ZOOMS.index(21)
+        view.mode = "terrain"
+        x, y = view.center(Seams.plains())
+        rect = pygame.Rect(0, 0, 700, 500)
+        cam = [x - 350, y - 250]
+        with_borders = pygame.Surface((700, 500))
+        view.draw(with_borders, rect, cam, self.ui())
+        layers = {k: v for k, v in view._tint_layers.items() if k[0] == "borders"}
+        self.assertEqual(len(layers), 1)
+        view.draw(pygame.Surface((700, 500)), rect, cam, self.ui())
+        self.assertEqual({k: v for k, v in view._tint_layers.items() if k[0] == "borders"}, layers)
+        for k, layer in layers.items():
+            self.assertIs(view._tint_layers[k], layer)
+        view2 = mapview.MapView(WORLD, TILES)
+        view2.zoom = view.zoom
+        view2.mode = "terrain"
+        view2._owner_borders = lambda *a, **k: None
+        without = pygame.Surface((700, 500))
+        view2.draw(without, rect, cam, self.ui())
+        differing = sum(1 for yy in range(0, 500, 2) for xx in range(0, 700, 2)
+                        if with_borders.get_at((xx, yy)) != without.get_at((xx, yy)))
+        self.assertGreater(differing, 40, "the borders show on screen")
 
 
 class Speedups(unittest.TestCase):
