@@ -185,7 +185,7 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
     - The full suite and the long-run invariant tests pass after each step.
   - **When:** after the current bug-fix round (v0.1.5), and before the bigger features (battle system, events), so they are built on the new structure. The event bus and UI kit go first, because the floating text, action log, resource bar and UI clean-up need them.
 - **Ideas from the owner's playtest (2026-11-12).** The bugs from the same playtest are filed as GitHub issues and fixed first.
-  - **Mountains and passes (decided):** high mountains block movement all year and funnel armies onto ridge passes, which close in winter. It is being built now.
+  - **Mountains and passes (decided, revised):** mountain hexes stay walkable. Only the hex edges along the main ridge crests block movement, so armies cross a ridge at named pass edges, which close in winter. The crest gets its own art (options for approval). Being built now.
   - **End-of-turn reminders:** before End season, list unfinished things: an unassigned merchant, research to fund, idle armies, an empty build queue. It can be turned off in Options.
   - **Achievements:** design ideas wanted (for Steam too).
   - **Random map types:** archipelago, one land (Pangaea), continents and more, as a later project. The random map is too much like Europe today. The map creator also needs less repetitive tiles.
