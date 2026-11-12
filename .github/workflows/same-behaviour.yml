@@ -1,0 +1,46 @@
+name: same behaviour
+
+# Refactor pull requests must play exactly the same games as their merge base (tools/same_behaviour.py).
+# Its own workflow, so that "labeled" can start it without re-running every job of tests.yml on each label.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+concurrency:
+  group: same-behaviour-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  same-behaviour:
+    name: same behaviour (Python 3.12)
+    # Pull requests labelled "refactor" only.
+    if: contains(github.event.pull_request.labels.*.name, 'refactor')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # runner.temp can't be used in a job-level env, so the folder is set by the first step.
+      - name: Isolate HEXA_HOME
+        run: echo "HEXA_HOME=$RUNNER_TEMP/hexa-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          # The whole history and every branch, so the merge base with the target branch can be found.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # No "pip install": the tool needs no pygame. The merge base needs only its hexa/ folder: the pull request's
+      # tools/oracle_runner.py plays both.
+      - name: Check out the merge base into a worktree
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          base=$(git merge-base "origin/$BASE_REF" HEAD)
+          echo "Merge base: $base"
+          git worktree add --detach "$RUNNER_TEMP/base" "$base"
+      # Exit status 1: BEHAVIOUR CHANGED (the log names the suite and the first step that differs) or
+      # ORACLE FAILED (a suite crashed in one of the checkouts, so nothing was compared).
+      - name: Play the same games with both
+        run: python tools/same_behaviour.py "$RUNNER_TEMP/base"

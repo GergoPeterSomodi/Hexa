@@ -44,6 +44,12 @@ python tools/save_compat.py write /tmp/hexa-base /tmp/hexa-compat         # 3 ga
 python tools/save_compat.py check /tmp/hexa-compat                        # load + play a season with this checkout; exit 1: a save broke (the log says which, why and how to fix it)
 git worktree remove --force /tmp/hexa-base
 
+# Behaviour oracle (.github/workflows/same-behaviour.yml, on pull requests labelled "refactor"): same fixed-seed games as the base?
+git worktree add --detach /tmp/hexa-base master                           # the base: master, or the merge base
+python tools/same_behaviour.py /tmp/hexa-base                             # 7 suites, ~21 s (below); a digest of the whole state every season; exit 1: BEHAVIOUR CHANGED (names suite and step) or ORACLE FAILED (a crash)
+python tools/same_behaviour.py /tmp/hexa-base --only conquest             # one suite (a name substring; repeatable); --quick: one season per suite
+git worktree remove --force /tmp/hexa-base
+
 pip install -r requirements-dev.txt                                       # coverage.py (CI only; config in .coveragerc)
 coverage run -m unittest discover -s tests -t . && coverage report        # branch coverage; slow before Python 3.14
 
@@ -77,6 +83,18 @@ revisions: `write` imports only the base checkout's `hexa` (never `tests/`) and 
 drives it against temporary copies of `hexa/` (a renamed class with and without a `VERSION` bump, a new attribute
 without a default, a header `meta()` refuses, a bump alone) and calls it in-process only for usage errors, which must
 leave `HEXA_HOME` as it was.
+
+`tools/same_behaviour.py` (the behaviour oracle for refactor PRs; `tools/oracle_runner.py` plays the games, importing
+nothing from `tests/` or `tools/` and using only the public API of the checkout's `hexa/`, so a base checkout needs
+nothing but its `hexa/` folder and a refactor of `tests/support` cannot change what it plays) digests the whole game state after every
+step in a fresh interpreter per suite and checkout, and the generated map (roads, rivers, cities, landmass, ...) at
+the first and last step. Suites: Europe 1480 and random seeds 7 and 11 (12 AI seasons each), Colonisation (30
+rounds), Conquest (to the end), a prepared turn-160 Europe (every country gets its age's techs: new age, ideas,
+cartography; forced wars, peace on all terms, drilling, refits, disbanding) and a debt state (desertion, disbanding,
+seizure). It does not cover drawing and input (goldens, ui tests), saves (save-compat), paths only a human move
+triggers, private `_caches`, or speed (`tools/perf.py`). Add a prepared state to `oracle_runner.py` when a refactor
+touches something none of them reaches. `tests/test_same_behaviour.py` plants a rule change, a lost road and a changed
+seizure order in copies of `hexa/` and a crash, and checks that each is caught (a crash reports ORACLE FAILED).
 
 Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and twelve game
 modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
