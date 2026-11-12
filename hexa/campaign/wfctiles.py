@@ -154,9 +154,13 @@ def _near_corner(e, c, f):
     return lerp(corner(c), corner(other), f)
 
 
+_SQ3 = math.sqrt(3)
+
+
 def _inside(x, y, r=R - 12):
     dx, dy = abs(x - CX), abs(y - CY)
-    return dy <= r and dx <= r * math.sqrt(3) / 2 and dx * 0.5 + dy * math.sqrt(3) / 2 <= r * math.sqrt(3) / 2
+    a = r * _SQ3 / 2
+    return dy <= r and dx <= a and dx * 0.5 + dy * _SQ3 / 2 <= a
 
 
 def _chaikin(pts, n=3, closed=False):
@@ -199,11 +203,16 @@ def _seg_x(p, q, r, s):
 def _crossings(pa, pb):
     """Points where polylines pa and pb cross: [(point, index in pa, unit direction of pa there)]."""
     out = []
+    boxes = [(min(p[0], q[0]), max(p[0], q[0]), min(p[1], q[1]), max(p[1], q[1])) for p, q in zip(pb, pb[1:])]
     for i in range(len(pa) - 1):
-        for j in range(len(pb) - 1):
-            x = _seg_x(pa[i], pa[i + 1], pb[j], pb[j + 1])
+        p, q = pa[i], pa[i + 1]
+        x0, x1, y0, y1 = min(p[0], q[0]), max(p[0], q[0]), min(p[1], q[1]), max(p[1], q[1])
+        for j, (bx0, bx1, by0, by1) in enumerate(boxes):
+            if bx1 < x0 or bx0 > x1 or by1 < y0 or by0 > y1:
+                continue
+            x = _seg_x(p, q, pb[j], pb[j + 1])
             if x and all(_dist(x[0], o[0]) > 6 for o in out):
-                out.append((x[0], i, _unit(_sub(pa[i + 1], pa[i]))))
+                out.append((x[0], i, _unit(_sub(q, p))))
     return out
 
 
@@ -446,6 +455,17 @@ _OFFS_THIN = [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, -1), (-1, 1), (1, 
 _MASKS = {}
 
 
+def _kernel(offs):
+    pad = max(max(abs(dx), abs(dy)) for dx, dy in offs)
+    k = pygame.mask.Mask((2 * pad + 1, 2 * pad + 1))
+    for dx, dy in offs:
+        k.set_at((pad + dx, pad + dy), 1)
+    return pad, k
+
+
+_KERNELS = {True: _kernel(_OFFS), False: _kernel(_OFFS_THIN)}
+
+
 def _hex_mask(r):
     if r not in _MASKS:
         m = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
@@ -454,50 +474,141 @@ def _hex_mask(r):
     return _MASKS[r]
 
 
+class _TrackPen(Pen):
+    """A Pen that remembers the box (in canvas pixels) its strokes can have touched, so `Canvas.stamp` does not have to
+    scan the whole layer for it (get_bounding_rect costs 0.2 ms). The box is a superset of the drawn pixels."""
+
+    def __init__(self, surf):
+        Pen.__init__(self, surf)
+        self.box = None
+
+    def _grow(self, x0, y0, x1, y1, pad=2):
+        b = self.box
+        x0, y0, x1, y1 = x0 * K - pad, y0 * K - pad, x1 * K + pad, y1 * K + pad
+        if b is None:
+            self.box = [x0, y0, x1, y1]
+        else:
+            if x0 < b[0]:
+                b[0] = x0
+            if y0 < b[1]:
+                b[1] = y0
+            if x1 > b[2]:
+                b[2] = x1
+            if y1 > b[3]:
+                b[3] = y1
+
+    def _pts(self, pts, w=0):
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        self._grow(min(xs), min(ys), max(xs), max(ys), 2 + w * K)
+
+    def poly(self, c, pts, w=0):
+        if len(pts) > 2:
+            self._pts(pts, 1 if w else 0)
+            Pen.poly(self, c, pts, w)
+
+    def circle(self, c, xy, r, w=0):
+        self._grow(xy[0] - r, xy[1] - r, xy[0] + r, xy[1] + r, 3)
+        Pen.circle(self, c, xy, r, w)
+
+    def ellipse(self, c, x, y, w, h, wd=0):
+        self._grow(x, y, x + w, y + h, 3)
+        Pen.ellipse(self, c, x, y, w, h, wd)
+
+    def line(self, c, a, b, w=1):
+        self._pts((a, b), max(1, w))
+        Pen.line(self, c, a, b, w)
+
+    def lines(self, c, pts, w=1, closed=False):
+        if len(pts) > 1:
+            self._pts(pts, max(1, w))
+            Pen.lines(self, c, pts, w, closed)
+
+    def rect(self, c, x, y, w, h, wd=0, br=0):
+        self._grow(x, y, x + w, y + h, 3)
+        Pen.rect(self, c, x, y, w, h, wd, br)
+
+    def take(self):
+        b, self.box = self.box, None
+        return b
+
+
+_SPRITES = {}
+_POOL = []                                  # spare (surf, layer, block) triples: allocating three 240 x 280 surfaces
+_SHADOWS = {}                               # costs 0.12 ms per tile, wiping a used one 0.02 ms
+_SPARE = {}
+
+
 class Canvas:
     """2x drawing surface for one tile: ground pen g, object layer pen o (stamped with an ink outline) and a block
-    layer recording where water, roads and walls are, so buildings and peaks keep clear of them."""
+    layer recording where water, roads and walls are, so buildings and peaks keep clear of them.
+    The surfaces are recycled: a canvas must not be used after finish()."""
 
-    def __init__(self):
-        size = (W * K, H * K)
-        self.surf = pygame.Surface(size, pygame.SRCALPHA)
-        self.layer = pygame.Surface(size, pygame.SRCALPHA)
-        self.block = pygame.Surface(size, pygame.SRCALPHA)
-        self.g, self.o, self.b = Pen(self.surf), Pen(self.layer), Pen(self.block)
-        self._bm = None
+    def __init__(self, size=None):
+        if size is not None:                        # a small scratch canvas (see _sprite): not recycled
+            self.surf = pygame.Surface(size, pygame.SRCALPHA)
+            self.layer = pygame.Surface(size, pygame.SRCALPHA)
+            self.block = None
+        elif _POOL:
+            self.surf, self.layer, self.block = _POOL.pop()
+        else:
+            size = (W * K, H * K)
+            self.surf = pygame.Surface(size, pygame.SRCALPHA)
+            self.layer = pygame.Surface(size, pygame.SRCALPHA)
+            self.block = pygame.Surface(size, pygame.SRCALPHA)
+        self.g, self.o, self.b = Pen(self.surf), _TrackPen(self.layer), Pen(self.block)
+        self._marked = False
+        self.sbox = None                            # where shadows were blitted (see _sprite)
 
     def blocked(self, x, y):
-        if self._bm is None:
-            self._bm = pygame.mask.from_surface(self.block, 8)
         xi, yi = int(x * K), int(y * K)
         if not (0 <= xi < W * K and 0 <= yi < H * K):
             return True
-        return bool(self._bm.get_at((xi, yi)))
+        return self.block.get_at((xi, yi))[3] > 8
 
     def free(self, x, y, w=8, h=6):
-        return not any(self.blocked(x + dx, y + dy) for dx, dy in
-                       ((0, 0), (-w / 2, 0), (w / 2, 0), (0, -h), (-w / 2, -h), (w / 2, -h)))
+        """Nothing blocked at the 6 points of a footprint w wide and h deep standing at (x, y)."""
+        get = self.block.get_at
+        xs = (int(x * K), int((x - w / 2) * K), int((x + w / 2) * K))
+        for yi in (int(y * K), int((y - h) * K)):
+            if not 0 <= yi < H * K:
+                return False
+            for xi in xs:
+                if not 0 <= xi < W * K or get((xi, yi))[3] > 8:
+                    return False
+        return True
 
     def mark(self, fn):
+        self._marked = True
         fn(self.b)
-        self._bm = None
 
     def shadow(self, x, y, w, h=None, a=45):
         h = h or w * 0.35
-        sh = pygame.Surface((max(1, int(w * K)), max(1, int(h * K))), pygame.SRCALPHA)
-        pygame.draw.ellipse(sh, (0, 0, 0, a), sh.get_rect())
-        self.surf.blit(sh, (round((x - w / 2) * K), round((y - h / 2) * K)))
+        key = (max(1, int(w * K)), max(1, int(h * K)), a)
+        sh = _SHADOWS.get(key)
+        if sh is None:
+            sh = _SHADOWS[key] = pygame.Surface(key[:2], pygame.SRCALPHA)
+            pygame.draw.ellipse(sh, (0, 0, 0, a), sh.get_rect())
+        pos = (round((x - w / 2) * K), round((y - h / 2) * K))
+        self.surf.blit(sh, pos)
+        r = sh.get_rect(topleft=pos)
+        self.sbox = r if self.sbox is None else self.sbox.union(r)
 
     def stamp(self, ink=2):
-        r = self.layer.get_bounding_rect(1)
-        if not r.w:
+        box = self.o.take()
+        if box is None:
             return
+        r = pygame.Rect(int(box[0]) - 1, int(box[1]) - 1, int(box[2] - box[0]) + 3, int(box[3] - box[1]) + 3)
         r = r.inflate(8, 8).clip(self.layer.get_rect())
+        if not r.w or not r.h:
+            return
         sub = self.layer.subsurface(r)
         if ink:
-            sil = pygame.mask.from_surface(sub, 40).to_surface(setcolor=INK + (255,), unsetcolor=(0, 0, 0, 0))
-            for dx, dy in (_OFFS if ink >= 2 else _OFFS_THIN):
-                self.surf.blit(sil, (r.x + dx, r.y + dy))
+            # the silhouette smeared to every offset of the outline pattern (a convolution with the pattern's bits)
+            pad, kern = _KERNELS[ink >= 2]
+            sil = pygame.mask.from_surface(sub, 40).convolve(kern).to_surface(setcolor=INK + (255,),
+                                                                              unsetcolor=(0, 0, 0, 0))
+            self.surf.blit(sil, (r.x - pad, r.y - pad))
         self.surf.blit(sub, r.topleft)
         self.layer.fill((0, 0, 0, 0), r)
 
@@ -507,9 +618,67 @@ class Canvas:
         if under is not None:
             surf = under.copy()
             surf.blit(self.surf, (0, 0))
-        surf.blit(_hex_mask(MASK_R), (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-        out = pygame.transform.smoothscale(_bleed(surf), (W, H))
+        out = _bleed_scale(surf)
+        self.surf.fill((0, 0, 0, 0))                # recycle
+        if self._marked:
+            self.block.fill((0, 0, 0, 0))
+        if self.o.box is not None:
+            self.layer.fill((0, 0, 0, 0))
+        _POOL.append((self.surf, self.layer, self.block))
+        self.surf = self.layer = self.block = None
         return out.convert_alpha() if pygame.display.get_surface() else out
+
+
+def _spare(name, size, alpha=False):
+    key = (name, size, alpha)
+    s = _SPARE.get(key)
+    if s is None:
+        s = _SPARE[key] = pygame.Surface(size, pygame.SRCALPHA if alpha else 0, 32)
+    return s
+
+
+def _keyed(name, size):
+    """A recycled opaque surface, black-filled, with no colour key set."""
+    s = _spare(name, size)
+    s.set_colorkey(None)
+    s.fill((0, 0, 0))
+    return s
+
+
+def _mask_1x():
+    """The hex mask at 1x: colour white, alpha = coverage (so a MIN blit only touches alpha)."""
+    s = _SPARE.get("mask1")
+    if s is None:
+        s = _SPARE["mask1"] = pygame.transform.smoothscale(_hex_mask(MASK_R), (W, H))
+        s.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
+    return s
+
+
+def _bleed_scale(surf):
+    """surf (2x, straight alpha, not yet masked; used up) -> 120 x 140, masked to the hex, where every pixel with any
+    alpha has the colour of the drawn pixels near it instead of transparent black (a plain smoothscale would average
+    black into the edges: dark hairlines between tiles, dark fringes on overlays).
+    The drawn colours are spread 1 px in all 8 directions at 2x (two separable passes of colour-keyed blits, black is
+    the key) and MAXed into the transparent pixels, which fills every 2 x 2 block that has a drawn pixel; that is all
+    the colour a pixel of alpha > 0 needs. Fully transparent pixels keep a black fringe: scale_tile bleeds them again
+    before every rescale. Drawn pixels that are exactly black are simply not spread (their own colour is right)."""
+    size = surf.get_size()
+    key = _keyed("k", size)
+    key.blit(surf, (0, 0))                                       # alpha-blended over black: shadows stay black
+    key.set_colorkey((0, 0, 0))
+    hz = _keyed("h", size)
+    hz.blit(key, (-1, 0))
+    hz.blit(key, (1, 0))
+    hz.blit(key, (0, 0))
+    hz.set_colorkey((0, 0, 0))
+    col = _keyed("c", size)
+    col.blit(hz, (0, -1))
+    col.blit(hz, (0, 1))
+    col.blit(hz, (0, 0))
+    surf.blit(col, (0, 0), special_flags=pygame.BLEND_RGB_MAX)     # transparent pixels (colour 0) take the bled colour
+    out = pygame.transform.smoothscale(surf, (W, H))
+    out.blit(_mask_1x(), (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+    return out
 
 
 _BLEED_OFFS = [(dx, dy) for r in (4, 3, 2, 1) for dx, dy in ((-r, 0), (r, 0), (0, -r), (0, r), (-r, -r), (r, -r),
@@ -547,6 +716,40 @@ def _bleed(surf):
     alpha.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
     out.blit(alpha, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
     return out
+
+
+SPRITE = (72, 64)                           # scratch size (1x px) for a prop; its anchor sits at (36, 52)
+_ANCHOR = (36, 52)
+
+
+def _sprite(key, draw, ink=1, ground_layer=False):
+    """Draw a prop once (draw(cv, ax, ay) puts it at the anchor of a scratch canvas, shadow and all, and it gets its
+    ink outline) and keep the picture: (surface, dx, dy), where (dx, dy) is the offset in canvas pixels from the
+    anchor to the surface's corner."""
+    s = _SPRITES.get(key)
+    if s is None:
+        cv = Canvas((SPRITE[0] * K, SPRITE[1] * K))
+        draw(cv, _ANCHOR[0], _ANCHOR[1])
+        r = None
+        if not ground_layer:
+            box = cv.o.box
+            if box is not None:                                 # the strokes' box, the shadows' and the ink's margin
+                r = pygame.Rect(int(box[0]), int(box[1]), int(box[2] - box[0]) + 1, int(box[3] - box[1]) + 1)
+                r = (r.union(cv.sbox) if cv.sbox is not None else r).inflate(2 * 3 + 2, 2 * 3 + 2)
+            cv.stamp(ink)
+        if r is None:
+            r = cv.surf.get_bounding_rect(1)
+        else:
+            r = r.clip(cv.surf.get_rect())
+        s = _SPRITES[key] = (cv.surf.subsurface(r).copy(), r.x - _ANCHOR[0] * K, r.y - _ANCHOR[1] * K)
+    return s
+
+
+def _prop(key, sort_y, x, y, draw, ink=1):
+    """An object (see _draw_objects) that is a cached picture blitted at (x, y)."""
+    spr, ox, oy = _sprite(key, draw, ink)
+    pos = (round(x * K) + ox, round(y * K) + oy)
+    return (sort_y, lambda cv: cv.surf.blit(spr, pos), 0)
 
 
 def _draw_objects(cv, objs):
@@ -1028,13 +1231,15 @@ def _wall_objects(cv, geo, water=None, centre=(CX, CY)):
             if any(_dist(q, X) < 9 for X, _ in geo["gates"]) or wet(q):
                 continue
             if level == 1:
-                objs.append((q[1] + 0.5, lambda cc, q=q: (
-                    cc.o.rect(WOOD, q[0] - 3.5, q[1] - 15, 7, 15),
-                    cc.o.rect(shade(WOOD, -0.25), q[0], q[1] - 15, 3.5, 15),
-                    cc.o.poly(DWOOD, [(q[0] - 5, q[1] - 15), (q[0] + 5, q[1] - 15), (q[0], q[1] - 21)])), 1))
+                def post(cc, x, y):
+                    cc.o.rect(WOOD, x - 3.5, y - 15, 7, 15)
+                    cc.o.rect(shade(WOOD, -0.25), x, y - 15, 3.5, 15)
+                    cc.o.poly(DWOOD, [(x - 5, y - 15), (x + 5, y - 15), (x, y - 21)])
+                objs.append(_prop(("wtower", 1), q[1] + 0.5, q[0], q[1], post))
             elif level == 2:
                 roof = ROOF_RED if int(q[0] + q[1]) % 3 else ROOF_SLATE
-                objs.append((q[1] + 0.5, lambda cc, q=q, roof=roof: tower(cc.o, q[0], q[1], 4.2, 13, col, roof, 7), 1))
+                objs.append(_prop(("wtower", 2, roof), q[1] + 0.5, q[0], q[1],
+                                  lambda cc, x, y, roof=roof: tower(cc.o, x, y, 4.2, 13, col, roof, 7)))
             else:
                 u = _unit(_sub(q, centre))
                 v = (-u[1], u[0])
@@ -1049,20 +1254,23 @@ def _wall_objects(cv, geo, water=None, centre=(CX, CY)):
         v = (-u[1], u[0])
         if abs(v[0]) < 0.3:
             v = (1.0, 0.0)
+        v = (round(v[0] * 6) / 6, round(v[1] * 6) / 6)            # a handful of gate orientations: draw each once
         a, b = _add(X, v, -5.5), _add(X, v, 5.5)
-        if level == 1:
-            def gate(cc, a=a, b=b):
+
+        def gate(cc, X0, Y0, v=v):
+            Xp = (X0, Y0)
+            a, b = _add(Xp, v, -5.5), _add(Xp, v, 5.5)
+            if level == 1:
                 for q in (a, b):
                     cc.o.rect(WOOD, q[0] - 1.6, q[1] - 13, 3.2, 13)
                 cc.o.line(DWOOD, (a[0] - 1, a[1] - 12), (b[0] + 1, b[1] - 12), 1.8)
-        else:
-            def gate(cc, a=a, b=b, X=X):
+            else:
                 cc.o.poly(shade(col, -0.05), [(a[0], a[1] - 11), (b[0], b[1] - 11), (b[0], b[1] - 6), (a[0], a[1] - 6)])
-                cc.o.rect(DARK, X[0] - 2.2, X[1] - 8, 4.4, 4)
+                cc.o.rect(DARK, Xp[0] - 2.2, Xp[1] - 8, 4.4, 4)
                 for q in (a, b):
                     tower(cc.o, q[0], q[1], 3.2, 12, col, ROOF_SLATE if level == 2 else None, 5,
                           crenel=level == 3)
-        objs.append((max(a[1], b[1]) + 0.6, gate, 1))
+        objs.append(_prop(("wgate", level, col, v), max(a[1], b[1]) + 0.6, X[0], X[1], gate))
     return objs
 
 
@@ -1095,24 +1303,30 @@ TOWN = {1: (3, 20, 12, 1.0, 0, 0), 2: (6, 26, 11, 0.95, 0, 0), 3: (11, 32, 10, 0
         4: (15, 36, 9.5, 0.85, 8, 0), 5: (22, 36, 8.5, 0.78, 9, 5), 6: (28, 35, 8.0, 0.74, 10, 9)}
 
 
-def _house(c, x, y, s, rng, roofs, tall=False):
-    w = rng.uniform(9, 12) * s
-    h = rng.uniform(6, 8) * s * (1.4 if tall else 1)
-    d = rng.uniform(6, 8) * s
-    kind = rng.choice(["front", "side", "side", "hip"])
-    wall = rng.choice(WALLS)
-    roof = rng.choice(roofs)
-    seed = rng.random()
+HOUSE_VARIANTS = 12                        # distinct houses per (scale, roof set): they are drawn once and blitted
 
-    def fn(cv):
-        cv.shadow(x + 3, y, w + 6, a=40)
-        building(cv.o, x, y, w, h, d, wall, roof, kind, rh=h * 0.75 if kind != "front" else None,
+
+def _house(c, x, y, s, rng, roofs, tall=False):
+    k = rng.randrange(HOUSE_VARIANTS)
+    roofs = tuple(roofs)
+
+    def draw(cv, ax, ay):
+        r = _rng("house", s, tall, roofs, k)
+        w = r.uniform(9, 12) * s
+        h = r.uniform(6, 8) * s * (1.4 if tall else 1)
+        d = r.uniform(6, 8) * s
+        kind = r.choice(["front", "side", "side", "hip"])
+        wall = r.choice(WALLS)
+        roof = r.choice(roofs)
+        seed = r.random()
+        cv.shadow(ax + 3, ay, w + 6, a=40)
+        building(cv.o, ax, ay, w, h, d, wall, roof, kind, rh=h * 0.75 if kind != "front" else None,
                  wins=2 if w > 10 else 1, door=seed < 0.7)
-    return (y, fn, 1)
+    return _prop(("house", s, tall, roofs, k), y, x, y, draw)
 
 
 def _church(x, y, big=False, spire=True):
-    def fn(cv):
+    def draw(cv, x, y):
         o = cv.o
         if big:
             cv.shadow(x + 6, y, 34, a=45)
@@ -1129,40 +1343,53 @@ def _church(x, y, big=False, spire=True):
             else:
                 o.rect(CREAM, x - 7.5, y - 13, 4, 13)
                 o.poly(ROOF_RED, [(x - 8.5, y - 13), (x - 2.5, y - 13), (x - 5.5, y - 17)])
-    return (y, fn, 1)
+    return _prop(("church", big, spire), y, x, y, draw)
 
 
 def _palace(x, y):
-    def fn(cv):
+    def draw(cv, x, y):
         cv.shadow(x + 5, y, 34, a=45)
         building(cv.o, x, y, 24, 11, 12, (236, 226, 204), (90, 104, 130), "hip", rh=7, wins=4)
         flag(cv.o, x, y - 20, 8, (200, 40, 50))
-    return (y, fn, 1)
+    return _prop(("palace",), y, x, y, draw)
 
 
 def _market(cv, J, rad, rng):
-    g = cv.g
+    k = rng.randrange(8)
+
+    def ground(cv, jx, jy):
+        r = _rng("market", rad, k)
+        g = cv.g
+        pts = [_add((jx, jy), (math.cos(math.radians(a)) * rad * 1.25, math.sin(math.radians(a)) * rad * 0.85))
+               for a in range(0, 360, 30)]
+        g.poly((150, 140, 120), [(x, y + 1) for x, y in pts])
+        g.poly((206, 196, 172), pts)
+        for _ in range(int(rad * 2)):
+            q = _add((jx, jy), (r.uniform(-rad, rad), r.uniform(-rad * 0.6, rad * 0.6)))
+            g.circle((186, 176, 152), q, 0.7)
     pts = [_add(J, (math.cos(math.radians(a)) * rad * 1.25, math.sin(math.radians(a)) * rad * 0.85))
            for a in range(0, 360, 30)]
-    g.poly((150, 140, 120), [(x, y + 1) for x, y in pts])
-    g.poly((206, 196, 172), pts)
-    for _ in range(int(rad * 2)):
-        q = _add(J, (rng.uniform(-rad, rad), rng.uniform(-rad * 0.6, rad * 0.6)))
-        g.circle((186, 176, 152), q, 0.7)
+    spr, ox, oy = _sprite(("market", rad, k), ground, 0, ground_layer=True)
+    cv.surf.blit(spr, (round(J[0] * K) + ox, round(J[1] * K) + oy))
     cv.mark(lambda b: b.poly((0, 0, 0, 255), [_add(J, _sub(q, J), 1.25) for q in pts]))
-    objs = [(J[1] + 1, lambda c: (c.o.circle((150, 150, 156), J, 3), c.o.circle(WATER, J, 1.8)), 1)]
+
+    def well(cc, J=J):
+        cc.o.circle((150, 150, 156), J, 3)
+        cc.o.circle(WATER, J, 1.8)
+    objs = [(J[1] + 1, well, 1)]
     cols = [(220, 60, 50), (60, 110, 200), (240, 190, 60), (80, 160, 80)]
     for i in range(min(4, int(rad / 3))):
         a = math.radians(40 + i * 95 + rng.uniform(-15, 15))
         q = _add(J, (math.cos(a) * rad * 0.8, math.sin(a) * rad * 0.5))
         col = cols[i % 4]
 
-        def stall(c, q=q, col=col):
-            c.o.line(DWOOD, (q[0] - 3, q[1]), (q[0] - 3, q[1] - 4), 0.8)
-            c.o.line(DWOOD, (q[0] + 3, q[1]), (q[0] + 3, q[1] - 4), 0.8)
-            c.o.poly(col, [(q[0] - 4, q[1] - 4), (q[0] + 4, q[1] - 4), (q[0] + 3, q[1] - 7), (q[0] - 3, q[1] - 7)])
-            c.o.line(WHITE, (q[0] - 1, q[1] - 4), (q[0] - 0.5, q[1] - 7), 0.8)
-        objs.append((q[1], stall, 1))
+        def draw(cv, qx, qy, col=col):
+            q = (qx, qy)
+            cv.o.line(DWOOD, (q[0] - 3, q[1]), (q[0] - 3, q[1] - 4), 0.8)
+            cv.o.line(DWOOD, (q[0] + 3, q[1]), (q[0] + 3, q[1] - 4), 0.8)
+            cv.o.poly(col, [(q[0] - 4, q[1] - 4), (q[0] + 4, q[1] - 4), (q[0] + 3, q[1] - 7), (q[0] - 3, q[1] - 7)])
+            cv.o.line(WHITE, (q[0] - 1, q[1] - 4), (q[0] - 0.5, q[1] - 7), 0.8)
+        objs.append(_prop(("stall", col), q[1], q[0], q[1], draw))
     return objs
 
 
@@ -1178,6 +1405,8 @@ def _fields(cv, rng, n, rmin, rmax):
         u = _dir(ang)
         v = _dir(ang + 80)
         w, h = rng.uniform(13, 18), rng.uniform(8, 11)
+        if not _inside(q[0], q[1], R - 8) or cv.blocked(*q):
+            continue
         quad = [_add(_add(q, u, s * w / 2), v, t * h / 2) for s, t in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
         if not all(_inside(x, y, R - 8) and not cv.blocked(x, y) for x, y in quad + [q]):
             continue
@@ -1258,29 +1487,35 @@ def _settlement_objects(cv, desc, wall_geo, coast, rng):
     if sq:
         objs += _market(cv, J, sq, rng)
     inside_test = (lambda x, y: not _covers(wall_geo["out"], x, y)) if wall_geo else (lambda x, y: True)
-    cand = []
+    cells = []                                   # the staggered grid the houses sit on (before their jitter)
     y = CY - 60
     row = 0
     while y < CY + 64:
         x = CX - 60 + (step / 2 if row % 2 else 0)
         while x < CX + 60:
-            px, py = x + rng.uniform(-0.3, 0.3) * step, y + rng.uniform(-0.25, 0.25) * step
-            cand.append((px, py, rng.random()))
+            cells.append((x, y))
             x += step
         y += step * 0.78
         row += 1
+
+    def spot(x, y):
+        return x + rng.uniform(-0.3, 0.3) * step, y + rng.uniform(-0.25, 0.25) * step, rng.random()
+    reach = (rad + 6 + 0.4 * step) ** 2           # a spot further out can never be an inner one: no need to jitter it
+    cand = [spot(x, y) for x, y in cells if (x - CX) ** 2 + (y - CY) ** 2 < reach]
     hw = 11 * s
     def ok(x, y):
         return _inside(x, y + 2, R - 10) and _inside(x, y - 14 * s, R - 6) and cv.free(x, y, hw, 6 * s)
-    inner = [(x, y, r) for x, y, r in cand if ok(x, y) and inside_test(x, y) and _dist((x, y), J) < rad + r * 6]
+    inner = [(x, y, r) for x, y, r in cand if _dist((x, y), J) < rad + r * 6 and ok(x, y) and inside_test(x, y)]
     inner.sort(key=lambda q: _dist((q[0], q[1]), J) + q[2] * 8)
     used = []
 
     def take(x, y, gap):
-        if all(_dist((x, y), u) > gap for u in used):
-            used.append((x, y))
-            return True
-        return False
+        g2 = gap * gap
+        for ux, uy in used:
+            if (x - ux) ** 2 + (y - uy) ** 2 <= g2:
+                return False
+        used.append((x, y))
+        return True
     if lvl >= 2:                                 # landmark first, close to the centre
         for x, y, _ in inner:
             if _dist((x, y), J) > sq + 4 and cv.free(x - 4, y, 22, 10) and cv.free(x + 6, y, 10, 8):
@@ -1308,13 +1543,14 @@ def _settlement_objects(cv, desc, wall_geo, coast, rng):
             objs.append(_house(cv, x, y, s, rng, roofs, tall=lvl >= 5 and r < 0.3))
             count += 1
     if sub:                                      # suburbs outside the wall
-        outer = [(x, y, r) for x, y, r in cand if ok(x, y) and not inside_test(x, y)]
-        rng.shuffle(outer)
+        order = list(cells)                      # try the grid in random order until there are enough
+        rng.shuffle(order)
         k = 0
-        for x, y, r in outer:
+        for gx, gy in order:
             if k >= sub:
                 break
-            if take(x, y, step * 0.9):
+            x, y, _ = spot(gx, gy)
+            if not inside_test(x, y) and ok(x, y) and take(x, y, step * 0.9):
                 objs.append(_house(cv, x, y, s * 0.95, rng, ROOFS[3]))
                 k += 1
     if lvl <= 2:
