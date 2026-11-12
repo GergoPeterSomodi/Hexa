@@ -184,6 +184,28 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
     - Old saves keep loading.
     - The full suite and the long-run invariant tests pass after each step.
   - **When:** after the current bug-fix round (v0.1.5), and before the bigger features (battle system, events), so they are built on the new structure. The event bus and UI kit go first, because the floating text, action log, resource bar and UI clean-up need them.
+- **Ideas from the owner's playtest (2026-11-12).** The bugs from the same playtest are filed as GitHub issues and fixed first.
+  - **Mountains and passes (decided):** high mountains block movement all year and funnel armies onto ridge passes, which close in winter. It is being built now.
+  - **End-of-turn reminders:** before End season, list unfinished things: an unassigned merchant, research to fund, idle armies, an empty build queue. It can be turned off in Options.
+  - **Achievements:** design ideas wanted (for Steam too).
+  - **Random map types:** archipelago, one land (Pangaea), continents and more, as a later project. The random map is too much like Europe today. The map creator also needs less repetitive tiles.
+  - **Focus on Age of Discovery:** maybe drop Conquest and Colonisation for now, focus on Age of Discovery, and bring the other modes back later on the same engine. Ideas are wanted for a **campaign mode** built on the Age of Discovery engine.
+  - **Buildings on mountains** should add to the mountain (a fort on the slope, a mine in the rock), not replace it. **Goods upgrades** should change the tile: wheat fields grow, a port or barracks appears on the village tile, without changing the tile's character. Design options with mockups first.
+  - **Seasons:** autumn trees (browns and oranges) and spring trees (blossom, fresh green). This needs a **climate map**, because not every place has four seasons: tropics wet and dry, the north long winters, deserts.
+  - **Menus:** brainstorm menu designs (the start menu, the Esc menu, options).
+  - **Diplomacy rework:** alliances, wars with war goals, claims to the throne.
+  - **Stop steamrolling:** big countries start with an advantage. Ideas: overextension, coalitions against aggressors, war exhaustion, administrative limits, unrest in conquered land.
+  - **Rebels:** unrest, revolts, independence movements.
+  - **Triangle trade, with the slave trade (sensitive).** The owner wants it in because it is history, but handled with care and balanced so it is never a free win. The owner's model: like a board game where slave-trade cards give a lot of production now, but count as negative points at the end for each card kept. Other costs could be unrest, diplomatic penalties with some countries, later abolition events and stability. The design will be written carefully, reviewed by the owner, and presented respectfully, never as a reward or glorified.
+  - **North Africa:** too much jungle; needs proper desert and savanna tiles. The terrain fix is a bug; the new tiles are art.
+  - **Colonisation rework:** the UI and gameplay. The colonist unit may not be needed: for example, colonies could be founded from the province panel or by ships.
+  - **Naval:** deep-sea exploration, blockades and ship battles, with design, UI and gameplay.
+  - **Animated coastline:** a moving surf line along the coasts. Feasible: the coast edges are already known per hex, so an animated band of a few frames, or a shifting alpha mask, drawn only at close zooms. It needs a frame-budget check.
+  - **City states:** design ideas wanted (for example, free cities like Venice, Genoa and the Hanse towns, with trade leagues and protection).
+  - **Tribal nations in the New World:** tribes as their own nations, with lands, trade, alliances and resistance to colonisation. Designed with care.
+  - **Kenney art audit:** track which Kenney Hexagon Pack art the game still uses. The owner likes it, but may replace it before the Steam release with similar art of our own. Keep a list and plan replacements.
+  - **Map modes keep borders:** every map mode (terrain, goods, markets) keeps the country borders faintly, so you can see where your country ends. This is a small fix and is filed as a bug.
+- **Game studio of agents (owner request, 2026-11-12):** work like "Claude Code Game Studios": a team of specialised agents, with a creative or game director who reviews designs, plus a game designer, a level and map designer, an art director, a UI/UX designer, a systems/balance designer, a QA and playtest lead, a code reviewer, and a producer who keeps the roadmap. Each has a clear role, inputs, outputs and review gates. The owner approves the roster first.
 - **RPG-style event pop-ups:** interactive choices with good or bad outcomes. This is planned for the long-term roadmap's Phase 3 (History and events). Don't start it yet.
 - **Known loose ends:**
   - balance
