@@ -158,6 +158,30 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
   - Clicking a resource opens its panel, such as the ledger or the tech screen (suggested).
   - It needs the world to remember each resource's value at the start of the season, and the reasons for one-off changes.
   - Planned with the UI clean-up (M3). Mockups come first, together with the button style.
+- **Architecture review and refactor (user request 2026-11-12):**
+  - The goal: avoid spaghetti code. Use reusable modules and a game manager system, so the game is easier to maintain, debug and extend toward Steam.
+  - **Today:** the campaign is about 20,000 lines. Some files do too much:
+    - `world.py` (about 3,100 lines): map building, economy, war, supply, tech, investment, debt and saves in one class
+    - `app.py` (about 1,500): input, every panel and the turn flow
+    - `mapview.py` and `landscape.py` (about 1,200-1,500 each)
+  - **Review first:** a written report with these parts, for the user's approval before any code moves:
+    - a dependency map
+    - the largest classes and functions
+    - duplicated code (for example, the three game modes each with their own app and render code)
+    - hidden coupling, global state and caches
+    - the proposed structure
+  - **Likely direction (suggested):**
+    - **A game manager:** owns the turn and season loop, the active screen and the save/load lifecycle. Systems register with it instead of the app calling everything directly.
+    - **Systems as modules:** economy, trade, military and supply, tech, investment, debt, diplomacy and seasons/weather, each with its own state, rules, `*_check`/action pairs and tests. `CampaignWorld` becomes a thin container.
+    - **An event bus:** a system announces what happened ("unit attacked", "province captured", "debt seized"), and the UI listens. This feeds the floating text, the action log and the resource bar without wiring each one by hand.
+    - **A reusable UI kit:** buttons, panels, lists, tooltips and modals, shared by every screen and by the UI clean-up's new button style.
+    - **A shared rendering layer and caches:** one cache and budget helper for map art instead of several hand-made ones.
+    - **Shared code across the three modes:** where it helps. Leave the legacy editor alone.
+  - **Rules:**
+    - Refactor in small, tested steps, with no gameplay change in the same commit.
+    - Old saves keep loading.
+    - The full suite and the long-run invariant tests pass after each step.
+  - **When:** after the current bug-fix round (v0.1.5), and before the bigger features (battle system, events), so they are built on the new structure. The event bus and UI kit go first, because the floating text, action log, resource bar and UI clean-up need them.
 - **RPG-style event pop-ups:** interactive choices with good or bad outcomes. This is planned for the long-term roadmap's Phase 3 (History and events). Don't start it yet.
 - **Known loose ends:**
   - balance
