@@ -119,6 +119,10 @@ class MapView:
         self._tint_layers = {}             # clip size -> the layer _tint draws on
         self._labels = {}                  # (town name, r) -> (shade box, name surface): drawn every frame, rendered once
         self._late_labels = []             # (shade, name, centre-top point) of the far zooms: drawn over the unit tokens
+        self._label_key, self._label_plan = None, {}   # the town names placed at this zoom, fog and focus (_town_labels)
+        self._label_stats = {}             # the last placement: placed, skipped, ms
+        self._focus = None                 # the selected province's position: its town name is never hidden
+        self._drawn_labels = []            # (pos, screen rect) of the town names drawn this frame
         self._pass_chips = {}              # r -> the small CLOSED marker of the far zooms
         self.grid_on = True                # the faint hex grid on the landscape zooms (the G key)
         self._roads = []
@@ -336,6 +340,8 @@ class MapView:
         screen.set_clip(view_rect)
         screen.fill(BLACK_FOG, view_rect)
         self._late_labels = []
+        self._drawn_labels = []
+        self._focus = ui.province.pos if ui.province else None
         if self.r >= LAND_FROM and self.land is not None:
             self._draw_landscape(screen, view_rect, camera)
         elif self.zoom >= TILE_FROM and self.tiles_dir:
@@ -716,6 +722,7 @@ class MapView:
         """Owner borders, controller stripes, goods dots, town names and capital flags (over the objects)."""
         world, r = self.world, self.r
         width = max(2, r // 8)
+        plan = self._town_labels()
         if self._pm_ver != world.version:
             self._pm_edges.clear()
             self._pm_ver = world.version
@@ -749,16 +756,11 @@ class MapView:
                     dot = (cx - r * 0.5 + i * r * 0.22, cy + r * 0.62)
                     pygame.draw.circle(screen, (20, 20, 20), dot, max(3, r // 9))
                     pygame.draw.circle(screen, GOODS[prov.good].color, dot, max(2, r // 9 - 1))
-            named = not prov.name.startswith(("near ", "New ")) and "countryside" not in prov.name
-            if (prov.settlement >= 2 or prov.castle) and named and (r >= 20 or prov.city):
-                lab = self._labels.get((prov.name, r))
-                if lab is None:
-                    name = self.small.render(prov.name, True, (245, 245, 245))
-                    shade = pygame.Surface(name.get_rect().inflate(8, 2).size, pygame.SRCALPHA)
-                    shade.fill((0, 0, 0, 150))
-                    lab = self._labels[(prov.name, r)] = (shade, name)
-                shade, name = lab
-                box = shade.get_rect(midtop=(cx, cy + r * 0.72))
+            hit = plan.get(prov.pos)
+            if hit is not None:                     # a town name the placement kept (see _town_labels)
+                dx, dy, shade, name = hit
+                box = pygame.Rect(round(cx + dx), round(cy + dy), shade.get_width(), shade.get_height())
+                self._drawn_labels.append((prov.pos, box))
                 if r < LAND_FROM:                   # tokens stand on the hex centre and would cover the name
                     self._late_labels.append((shade, name, box))
                 else:
@@ -766,6 +768,90 @@ class MapView:
                     screen.blit(name, name.get_rect(center=box.center))
             if prov.owner and world.countries[prov.owner].capital == prov.pos:
                 self._flag(screen, (cx + r * 0.35, cy - r * 0.85), world.countries[prov.owner].color)
+
+    def _label_surfaces(self, name):
+        """The shade box and the text of a town name at this zoom (rendered once)."""
+        key = (name, self.r)
+        lab = self._labels.get(key)
+        if lab is None:
+            text = self.small.render(name, True, (245, 245, 245))
+            shade = pygame.Surface(text.get_rect().inflate(8, 2).size, pygame.SRCALPHA)
+            shade.fill((0, 0, 0, 150))
+            lab = self._labels[key] = (shade, text)
+        return lab
+
+    def _town_labels(self):
+        """The town names of the political map at this zoom, placed over the whole known map:
+        {pos: (dx, dy, shade, text)}, the top left of the name's box as an offset from the hex centre.
+        Order: the player's capital, then the selected province (both always drawn), then capitals, cities and towns,
+        bigger towns first. Each name tries the spot below the hex (where it always was), then above, right and left;
+        a name that fits in none is skipped (the two always-drawn ones are placed anyway). Placement depends on the
+        zoom, the fog stamp (world version, player, explored hexes) and the focus only, so it is cached on those and
+        is the same whatever the window shows."""
+        world, r = self.world, self.r
+        key = (r, self.fog_stamp(), self._focus)
+        if key == self._label_key:
+            return self._label_plan
+        t0 = time.perf_counter()
+        known = self.known()
+        capitals = {c.capital for c in world.countries.values()}
+        home = world.countries.get(world.player)
+        home_capital = home.capital if home else None
+        cands = []
+        for pos, prov in world.provinces.items():
+            if pos not in known or not (prov.settlement >= 2 or prov.castle):
+                continue
+            if prov.name.startswith(("near ", "New ")) or "countryside" in prov.name:
+                continue
+            if r < 20 and not prov.city:
+                continue
+            if pos == home_capital:
+                group = 0
+            elif pos == self._focus:
+                group = 1
+            else:
+                group = 2
+            rank = 0 if pos in capitals else (1 if prov.city or prov.settlement >= 3 else 2)
+            cands.append((group, rank, -prov.pop, pos, prov))
+        cands.sort(key=lambda c: c[:4])
+        cell = 64
+        grid, plan, skipped = {}, {}, 0
+        hw = r * SQRT3 / 2
+
+        def cells(rect):
+            probe = rect.inflate(6, 6)                     # keeps a 3 px gap between names
+            for gx in range(probe.left // cell, probe.right // cell + 1):
+                for gy in range(probe.top // cell, probe.bottom // cell + 1):
+                    yield (gx, gy)
+
+        for group, _, _, pos, prov in cands:
+            cx, cy = self.center(pos)
+            shade, text = self._label_surfaces(prov.name)
+            w, h = shade.get_size()
+            spots = ((cx - w / 2, cy + r * 0.72),                 # below the hex: the old spot
+                     (cx - w / 2, cy - r * 0.72 - h),             # above
+                     (cx + hw + 2, cy - h / 2),                   # right
+                     (cx - hw - 2 - w, cy - h / 2))               # left
+            spot = None
+            for x, y in spots:
+                rect = pygame.Rect(round(x), round(y), w, h)
+                probe = rect.inflate(6, 6)
+                if not any(probe.colliderect(other) for c in cells(rect) for other in grid.get(c, ())):
+                    spot = (x, y, rect)
+                    break
+            if spot is None:
+                if group == 2:
+                    skipped += 1
+                    continue
+                x, y = spots[0]
+                spot = (x, y, pygame.Rect(round(x), round(y), w, h))
+            x, y, rect = spot
+            for c in cells(rect):
+                grid.setdefault(c, []).append(rect)
+            plan[pos] = (x - cx, y - cy, shade, text)
+        self._label_key, self._label_plan = key, plan
+        self._label_stats = {"placed": len(plan), "skipped": skipped, "ms": (time.perf_counter() - t0) * 1000}
+        return plan
 
     # ----- landscape art (close zooms) -------------------------------------------------------
     @staticmethod
