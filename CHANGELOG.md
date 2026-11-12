@@ -4,6 +4,29 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
+## v0.1.8: The new HUD and real place names
+**On screen:**
+- A new top bar: chips for ducats, provinces, research, regiments, merchants, prestige and more, each with its change
+  this season ("198 (+5)"), a hover card with the breakdown and a click that opens its panel. Map modes are icons; the
+  bar drops goods, changes and labels as the window narrows
+- Floating ribbons rise from the map when something happens where you can see it: Recruited, Battle!, Captured!,
+  Siege, Deserted, Colony, Built, in six colours
+- An action log in the corner: collapsed to one line, opens to the season's events with All, War, Money and Mine
+  filters; a click on a place moves the camera there and selects your troops
+
+**Map and names:**
+- Real historical regions and place names on the Europe map (#68), with a Credits button on the start menu (GeoNames,
+  CC BY 4.0)
+
+**Under the hood:**
+- The code clean-up's first three phases: a safety net for refactors (behaviour oracle, save checks), an event bus and
+  a game manager for the season, and a shared UI kit with one module per side panel. No rule changed
+- Code review fixes: clicks on the log, top bar and minimap no longer reach the map; the side panel always gets its
+  clicks; a castle seized for debt is counted once in the ducats card
+- Roadmap: playtest ideas, recruiting at buildings, debt and bankruptcy, trade and economy tests, music, multiplayer
+
+Old saves keep loading.
+
 ## v0.1.7: Mountains as natural borders
 **Mountains and passes:**
 - Ridge crests are natural borders: mountain hexes stay walkable, but land armies, supply, zones of control and roads
