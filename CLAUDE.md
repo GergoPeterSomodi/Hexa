@@ -174,6 +174,17 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - `art.py` draws extra tiles, decorations, unit figures and tokens in code, in the Kenney style at 120x140.
   `MapView` switches from flat colours to tile art at zoom index `TILE_FROM`.
 
+### Legacy map editor
+
+`Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py` and `Read_XML.py` at the repo root are the original
+pygame-gui tile editor (it loads `map3.xml`). They don't touch the `hexa` package, and the `map*.xml` / `.tmx`
+files are their data. `pygame-gui==0.5.7` is in `requirements.txt` only for this editor.
+
+### Assets
+
+`hexagon-pack/` is the Kenney Hexagon Pack (CC0). Every app gets `TILES_DIR` (`hexagon-pack/PNG/Tiles`) from
+`play.py`; the campaign's `art.py` finds object sprites in the sibling `Objects` folder.
+
 ## Structure rules (adopted 2026-11-12, see docs/architecture/review-2026-11-12.md)
 
 The target structure: files and folders named here appear as the refactor phases land. Until then, new code follows
@@ -201,14 +212,3 @@ the rules as far as the current layout allows, and never makes an allowlisted of
   save-compat and sha-identical goldens. Never mix a refactor and a gameplay change in one commit.
 - **Where new features go:** rules -> campaign/systems/<name>.py (+ numbers in data.py, + README table);
   panel -> campaign/panels/; screen -> campaign/screens/; art -> its art module using render/draw.py.
-
-### Legacy map editor
-
-`Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py` and `Read_XML.py` at the repo root are the original
-pygame-gui tile editor (it loads `map3.xml`). They don't touch the `hexa` package, and the `map*.xml` / `.tmx`
-files are their data. `pygame-gui==0.5.7` is in `requirements.txt` only for this editor.
-
-### Assets
-
-`hexagon-pack/` is the Kenney Hexagon Pack (CC0). Every app gets `TILES_DIR` (`hexagon-pack/PNG/Tiles`) from
-`play.py`; the campaign's `art.py` finds object sprites in the sibling `Objects` folder.
