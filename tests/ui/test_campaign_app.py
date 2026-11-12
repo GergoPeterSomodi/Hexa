@@ -610,7 +610,7 @@ class OrdersTest(CampaignCase):
         Aragon, as the route the map shows does (world.path_to), but the stack heads straight for the Aragonese
         border at (134, 57). There every hex it may enter is farther from the goal, so _advance_orders finds no
         step, quietly drops the order at the end of the first season and leaves the stack at the border."""
-        goal = (134, 52)
+        goal = (134, 53)
         trail = self.march(goal, 6)
         self.assertEqual(trail[-1][1:], ({goal}, {None}), f"6 seasons later; (turn, hexes, goals): {trail}")
 
