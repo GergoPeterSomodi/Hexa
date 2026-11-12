@@ -217,6 +217,15 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
     - by region (Mediterranean, northern, the Ottoman lands, the New World)
 
     It crossfades between pieces, with no hard cuts.
+  - **Main theme (owner, 2026-11-12):** an epic, memorable title theme for the start menu and the opening.
+    - **Mood references:** the owner named World of Warcraft's "Call to Arms", Baldur's Gate's opening theme, The Elder Scrolls opening themes, and Europa Universalis V. These set the feeling only. Nothing is copied: no melodies, no quotes, no sound-alikes.
+    - **What to aim for:** a quiet opening (a solo instrument, or a voice over a drone) that builds to a full sweep of horns, strings, choir and war drums. A short, singable motif, our own "Hexa" theme, that comes back in the game's music:
+      - softly in peace
+      - in brass in war
+      - as a fanfare at a new age
+    - **Period colour:** an orchestra with Renaissance colour (lute, shawm, recorder, frame drum), so it sounds like 1480-1650, not modern fantasy.
+    - **Shape:** about 2-3 minutes, with a loopable menu section and a short sting for the logo or Steam trailer.
+    - **First step:** a written brief for the owner to approve: the mood words, the instruments, the motif idea and the structure. Then commission a composer, or pick properly licensed music. Credit it in the game.
   - **Sound effects:** clicks and UI feedback, end of season, march and battle, siege, a ship's bell, coins for trade, a fanfare for a new age, and a war alert. Sounds go with the floating text and event pop-ups.
   - **Options:** music and effects volume and mute, and a "music only in menus" choice.
   - **Rights:** only music and sound we may ship on Steam: commissioned, made for Hexa, or properly licensed (CC0 or a paid licence), with credits. Track every file and its licence, as with the Kenney art audit.
