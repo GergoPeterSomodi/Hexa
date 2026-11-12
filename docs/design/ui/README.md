@@ -1,6 +1,6 @@
 # UI designs for upcoming features (proposals, 2026-11-12)
 
-Mockups for the owner's review: **not approved yet**. Every image is 1280x720, drawn over real game screenshots. Cyan boxes and numbered circles are review notes, not UI. Each section lists the open choices and what the game needs for it. Once a section is approved, it moves into the roadmap's milestone as built work.
+Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; the rest not yet**. Every image is 1280x720, drawn over real game screenshots. Cyan boxes and numbered circles are review notes, not UI. Each section lists the open choices and what the game needs for it. Once a section is approved, it moves into the roadmap's milestone as built work.
 
 ---
 
@@ -42,6 +42,8 @@ Mockups for the owner's review: **not approved yet**. Every image is 1280x720, d
 - Per-province income: taxes, manufactories and upkeep for each province. The world adds these up today, but doesn't keep them per province.
 
 ## 2. Resource bar
+
+**Approved 2026-11-12: top bar option A** (one row of icon chips with numbers and the change since last turn).
 **Images:** `02_topbar_before_after.png` (options A and B), `04_resource_bar.png` (in the game, with hover cards)
 
 **What they show:**
@@ -64,6 +66,8 @@ Mockups for the owner's review: **not approved yet**. Every image is 1280x720, d
 - The country's `income` dict, split into merchants and tolls (today it is one "trade" line).
 
 ## 3. Floating action text and the action log
+
+**Approved 2026-11-12: treatment C (ribbon tag) with six colours** (war red, siege amber, gains gold, own actions green, losses rose, others white). The action log is as mocked.
 **Images:** `05_floating_text_styles.png`, `06_floating_text_motion.png`, `07_action_log.png`
 
 **What they show:**
