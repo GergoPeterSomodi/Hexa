@@ -127,12 +127,16 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
   - Planned with the polish round (M3).
 - **Recruiting only at certain places (user request 2026-11-12):**
   - Today almost any owned province can raise troops. Only cannons (a town or a foundry), ships (a port or a shipyard) and generals (the capital) have place rules.
-  - Limit recruiting so that where you raise an army matters. The suggested rules:
-    - infantry in towns and cities, or with barracks
-    - cavalry in provinces with horses or a stable
-    - mercenaries in rich trade cities
-    - elite troops only with their building
-    - colonies raise only militia
+  - **Decided (2026-11-12): every unit type is raised only at its own building.** Where you raise an army then matters.
+    - Infantry: barracks (agreed).
+    - Cavalry: a new building, such as a stable or stud farm. It could also need horses in the province or market (suggested).
+    - Cannons: the foundry. Today a town is enough; that would go.
+    - Ships: the port, plus the shipyard for carracks and galleons (as today).
+    - The other units (scouts, supply wagons, colonists, generals): their building or place is to be decided. Generals already come from the capital.
+    - Elite troops: their building, if one is added.
+    - Colonies: what they can raise is to be decided (suggested: militia only).
+  - **Mercenaries: undecided.** Whether to have them at all, and where they are hired.
+  - The new buildings need art, costs and upkeep. Check them against the province investment levels and the era unlocks.
   - The province panel shows where each unit can be raised, and the hint explains why a place can't.
   - The AI needs to plan around it: build recruiting sites and march troops to the front.
   - Design first, with the user. Planned with the balance pass (M4), or with the battle system (M2) if its troop types change.
