@@ -22,7 +22,9 @@ from hexa.campaign.app import CampaignApp  # noqa: E402
 from hexa.campaign.data import troop  # noqa: E402
 from hexa.campaign.mapview import MapView  # noqa: E402
 from hexa.campaign.world import CampaignWorld, Market, _with_article  # noqa: E402
-from tests.test_passes import GOTTHARD, SUMMER, WINTER, infantry  # noqa: E402
+from tests.test_passes import SUMMER, WINTER, infantry  # noqa: E402
+
+GOTTHARD = (135, 52)                        # across the Roncesvalles pass edge from STALL: with the passes shut Iberia has no way in
 from tests.test_playtest import front, place  # noqa: E402
 
 
@@ -158,7 +160,7 @@ class ManualOrderTest(unittest.TestCase):
         self.assertEqual(b.goal, self.far, "the unticked unit keeps its march")
 
 
-STALL = (148, 43)                           # a Swiss hex whose only way on to the Gotthard is the closed pass in winter
+STALL = (135, 51)                           # a French hex whose only way on to GOTTHARD is the Roncesvalles pass edge, shut in winter
 
 
 class MarchAtPassTest(unittest.TestCase):
@@ -168,6 +170,8 @@ class MarchAtPassTest(unittest.TestCase):
         self.app = CampaignApp(player="SWI")
         self.w = self.app.world
         self.w.units = [u for u in self.w.units if u.pos not in (STALL, GOTTHARD)]
+        for pos in (STALL, GOTTHARD):
+            self.w.provinces[pos].owner = "SWI"          # so a Swiss stack may walk there
 
     def test_the_march_waits_at_the_closed_pass_and_says_so_once(self):
         w, app = self.w, self.app
@@ -179,7 +183,7 @@ class MarchAtPassTest(unittest.TestCase):
         self.assertEqual(unit.goal, GOTTHARD, "the march is kept")
         self.assertEqual(unit.pos, STALL)
         notes = [m for m in w.log[mark:] if "waits for spring" in m]
-        self.assertEqual(notes, ["The Gotthard pass is closed by snow; the march waits for spring."])
+        self.assertEqual(notes, ["The Roncesvalles pass is closed by snow; the march waits for spring."])
         self.assertIn("waits for spring", app.ui.toast)
         app.continue_march([unit])
         self.assertEqual(len([m for m in w.log[mark:] if "waits for spring" in m]), 1, "no repeated line")

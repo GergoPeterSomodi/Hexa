@@ -549,7 +549,7 @@ class OrdersTest(CampaignCase):
         return trail
 
     def test_a_far_destination_is_reached_over_several_seasons(self):
-        goal = (128, 51)                                     # north, in Castile all the way
+        goal = (128, 54)                                     # north, in Castile all the way (the ridge crest at 51 would add a pass crossing)
         trail = self.march(goal, 5)
         distance = self.world.cost_field(goal)
         self.assertTrue(all(len(hexes) == 1 for _, hexes, _ in trail), f"the stack stays together: {trail}")
@@ -610,7 +610,7 @@ class OrdersTest(CampaignCase):
         Aragon, as the route the map shows does (world.path_to), but the stack heads straight for the Aragonese
         border at (134, 57). There every hex it may enter is farther from the goal, so _advance_orders finds no
         step, quietly drops the order at the end of the first season and leaves the stack at the border."""
-        goal = (134, 52)
+        goal = (134, 53)
         trail = self.march(goal, 6)
         self.assertEqual(trail[-1][1:], ({goal}, {None}), f"6 seasons later; (turn, hexes, goals): {trail}")
 

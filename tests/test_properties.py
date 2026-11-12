@@ -683,7 +683,10 @@ class ColonyGamesTest(GamesMixin, unittest.TestCase):
 @slow
 class CampaignGamesTest(GamesMixin, unittest.TestCase):
     mode, play = "campaign", staticmethod(campaign_game)
-    both = ("invest", "recruit", "build", "forage", "declare_war", "move_group", "send_merchant")
+    # forage is allowed only for troops standing in foreign land, which random games reach rarely (2 of 20 games on
+    # the pre-ridge map, 0 after the ridge and terrain change): too fragile for this check. The forage rules have
+    # their own direct tests in test_campaign.
+    both = ("invest", "recruit", "build", "declare_war", "move_group", "send_merchant")
 
 
 class SmokeTest(unittest.TestCase):

@@ -285,6 +285,8 @@ class MarchTest(Home):
         self.app = CampaignApp(player="SWI")
         self.w = self.app.world
         self.w.units = [u for u in self.w.units if u.pos not in (STALL, GOTTHARD)]
+        for pos in (STALL, GOTTHARD):
+            self.w.provinces[pos].owner = "SWI"          # so a Swiss stack may walk there
 
     def test_the_end_of_a_season_keeps_the_march_where_it_is(self):
         w, app = self.w, self.app

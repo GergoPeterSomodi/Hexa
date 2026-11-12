@@ -116,7 +116,8 @@ see the path, the move cost of each step and how many seasons it takes.
 **Marches:** a right-click far away starts a march over several seasons. When the season ends, a march does not
 move on by itself: the stack waits for your order. Its planned route stays on the map as a dashed gold line, and
 Tab cycles to it. Press **R** or the **Continue march (R)** button in the unit panel to walk on for this season.
-A pass closed by snow stops the march until spring, and the message says so each time you try.
+You cannot cross a ridge crest except at a pass, and a pass closed by snow stops the march until spring; the message
+says so each time you try.
 
 ### Technology
 - **T** (or **Technology** in the country panel) opens the tech tree.
@@ -178,10 +179,26 @@ A pass closed by snow stops the march until spring, and the message says so each
 - **Close zoom** (hex radius 21 and 34): the landscape is drawn with the tile art. Peaks and forests cross hex borders,
   treeline and snow follow the altitude, and farms grow field systems with hedgerows. The faint hex grid is on by default
   (**G**, or Options > Hex grid).
-- **Mountain passes:** the main Alpine and Pyrenean passes (Gotthard, Brenner, Mont Cenis, Simplon, Great St Bernard,
-  Roncesvalles) and the Carpathian Dukla and Lupkow are closed by snow in winter (every fourth season, turn 4, 8, ...).
-  Land units cannot enter a closed pass; the move says "The Gotthard pass is closed by snow until spring." A unit already
-  on one may leave, and ships are not affected. A random world gets up to 8 passes on its longest ridges.
+- **Ridge crests and passes:** every hex can be entered, mountains and snowfields included, at its normal move cost.
+  But the edge between two hexes on opposite sides of a ridge crest (the Alps, Pyrenees, Carpathians, Apennines, Atlas,
+  Caucasus, Andes...) cannot be crossed in any season, so an army walks up its own valleys but must cross the ridge at a
+  **pass**. Supply, zones of control and roads do not cross a crest either, except at a pass. Ships are not affected.
+  - A pass is one or two crest edges that stay open. The real ones are Gotthard, Simplon, Great St Bernard, Mont Cenis,
+    Col de Larche, Brenner, Arlberg, Tauern, Semmering, Roncesvalles, Somport, Perthus, Pajares, Cisa, Dukla, Lupkow,
+    Verecke, Tihuta, Predeal, Iron Gates, Shipka, Darial, Cilician Gates and Tizi n'Tichka. Wherever the ridges would
+    still cut a landmass in two, the game opens one more pass there (named after the nearest city), so every landmass
+    stays in one piece in summer.
+  - In winter (every fourth season, turn 4, 8, ...) the passes are closed by snow: the move says "The Gotthard pass is
+    closed by snow until spring." A march that meets a closed pass waits for spring. With the passes shut there is
+    usually a long way round or none at all, not a short detour. Only the step across the pass is closed: no army is
+    ever stranded, because the hexes themselves stay open.
+  - Cannons can still fire over a crest (bombard reaches two hexes through mountains), and trade routes and market reach
+    ignore crests: goods cross the mountains in every season. Armies, supply, zones of control, recruiting and siege support
+    do not cross them.
+  - A march that would only get through a pass walks nowhere in winter: if the way round has become much longer, the
+    stack waits for spring ("The Gotthard pass is closed by snow; the march waits for spring."). The AI does the same.
+  - A random world gets crests on its own ridges, passes on its longest ridges (up to 8), and the extra passes it needs
+    to stay connected.
 - **Debt:** a country may go into debt down to a limit of 6 seasons of running costs (at least 300 ducats). It pays 2%
   interest a season on debt up to that limit. Over the limit with a deficit, unpaid troops desert, oldest first and never
   the general. With no troops left, creditors seize buildings, works, castles and then settlement levels, one at a time.
