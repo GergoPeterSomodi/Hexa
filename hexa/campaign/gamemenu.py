@@ -167,6 +167,9 @@ class GameMenu:
             if self.save_to(action[1]):
                 self.close_menu()
         elif kind == "load":
+            if confirm and self.player and not self.world.over:
+                self.menu_confirm = action
+                return
             if self.load_from(action[1]):
                 self.close_menu()
         elif kind == "option":
@@ -249,7 +252,8 @@ class GameMenu:
                 detail = saves.describe(info) if info else "Empty"
                 action = (self.menu, slot)
                 if action == self.menu_confirm:
-                    detail = "Click again to overwrite this save"
+                    detail = ("Click again to overwrite this save" if self.menu == "save"
+                              else "Click again: load and lose unsaved progress")
                 enabled = bool(info) if self.menu == "load" else True
                 self._menu_button((x, y, bw, 44), label, action, enabled, detail)
                 y += row_h

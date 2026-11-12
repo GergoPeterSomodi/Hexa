@@ -209,6 +209,11 @@ class CampaignApp(GameMenu, TechScreen):
         world = self.world
         return [u for u in self.ui.group if u.id in self.ui.picked and u in world.units]
 
+    def _cancel_orders(self, units):
+        """A manual order for the stack itself (attack, found, forage) replaces the multi-season move order of the stack."""
+        for unit in units:
+            unit.goal = None
+
     def refresh(self):
         ui, world = self.ui, self.world
         ui.group = [u for u in ui.group if u in world.units]
@@ -308,7 +313,8 @@ class CampaignApp(GameMenu, TechScreen):
             key = event.key
             if key == pygame.K_ESCAPE:
                 if ui.selected or ui.panel:
-                    ui.selected, ui.panel, ui.province = None, None, None
+                    self.select_unit(None)              # also clears the group, which refresh() would re-select
+                    ui.panel, ui.province = None, None
                     self.refresh()
                 else:
                     self.open_menu()
@@ -357,7 +363,7 @@ class CampaignApp(GameMenu, TechScreen):
             elif event.button in (2, 3):
                 self.drag = 0
         elif event.type == pygame.MOUSEBUTTONUP and event.button in (2, 3):
-            if event.button == 3 and (self.drag or 0) < 6:
+            if event.button == 3 and self.drag is not None and self.drag < 6:     # no press on the map: no order
                 self.right_click(event.pos)
             self.drag = None
 
@@ -419,7 +425,8 @@ class CampaignApp(GameMenu, TechScreen):
         here = group[0].pos
         ok, reason = world.move_check(group, pos)
         if pos in ui.attacks:
-            world.attack_group(group, pos)
+            if world.attack_group(group, pos):
+                self._cancel_orders(group)
         elif not ok and pos != here:
             self.toast(reason)                       # a closed pass: say why
         elif pos in ui.reach and pos != here:
@@ -454,6 +461,8 @@ class CampaignApp(GameMenu, TechScreen):
         kind = action[0]
         if kind == "game_menu":
             self.open_menu()
+        elif kind == "close_panel":
+            ui.panel = None
         elif kind == "mode":
             self.view.mode = action[1]
         elif kind == "panel":
@@ -481,6 +490,7 @@ class CampaignApp(GameMenu, TechScreen):
         elif kind == "found":
             prov = world.found(action[1], trading_post=action[2])
             if prov:
+                self._cancel_orders(ui.group)
                 ui.selected, ui.province, ui.panel = None, prov, "province"
         elif kind == "pick":
             self.select_unit(action[1], only=True)
@@ -518,7 +528,9 @@ class CampaignApp(GameMenu, TechScreen):
         elif kind == "goods_view":
             self.view.mode, self.view.goods_view = "goods", action[1]
         elif kind == "forage":
-            if not world.forage(self.active(), tag):
+            if world.forage(self.active(), tag):
+                self._cancel_orders(ui.group)
+            else:
                 self.toast(world.forage_check(self.active(), tag)[1])
         elif kind == "recall":
             world.recall_merchant(tag, action[1], action[2] if len(action) > 2 else None)
@@ -702,12 +714,18 @@ class CampaignApp(GameMenu, TechScreen):
             x += w + 4
         if self.player:
             x += 10
-            for label, panel in (("Market", "market"), ("Ledger", "ledger")):
-                w = self.small.size(label)[0] + 16
-                self.button((x, 10, w, 26), label, True, ("panel", panel), small=True)
-                x += w + 4
-            menu_x = x + 10
-            end_w = max(64, min(120, WIDTH - menu_x - 64 - 20))
+            # The right end is fixed: End season at the edge, Menu left of it. Market and Ledger stay only where
+            # they fit before Menu; the End button shortens to "End" before they go.
+            tabs = [(label, panel, self.small.size(label)[0] + 16) for label, panel in (("Market", "market"), ("Ledger", "ledger"))]
+            tabs_w = sum(w + 4 for _, _, w in tabs)
+            end_w = 120
+            if x + tabs_w + 10 + 64 + 6 + end_w + 10 > WIDTH:
+                end_w = 64
+            menu_x = WIDTH - 10 - end_w - 6 - 64
+            if x + tabs_w - 4 <= menu_x - 10:
+                for label, panel, w in tabs:
+                    self.button((x, 10, w, 26), label, True, ("panel", panel), small=True)
+                    x += w + 4
             self.button((WIDTH - end_w - 10, 7, end_w, 32), "End season" if end_w >= 110 else "End",
                         not self.busy and not world.over, ("end",), "Let the season pass (Space)")
         else:
@@ -931,7 +949,7 @@ class CampaignApp(GameMenu, TechScreen):
         rect = self.panel_rect()
         pygame.draw.rect(self.screen, PANEL_BG, rect)
         pygame.draw.line(self.screen, LINE, rect.topleft, rect.bottomleft)
-        self.button((rect.right - 30, rect.y + 8, 22, 22), "×", True, ("panel", self.ui.panel), "Close (Esc)")
+        self.button((rect.right - 30, rect.y + 8, 22, 22), "×", True, ("close_panel",), "Close (Esc)")
         panel = self.ui.panel
         if panel == "province" and self.ui.province:
             self.province_panel(self.ui.province)
