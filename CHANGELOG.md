@@ -4,9 +4,35 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
-## Unreleased
-- New goods objects: all 32 goods have their own code-drawn object in the Goods view (Deposits), replacing borrowed
-  Kenney sprites and the crate fallback (fish is a basket of fish now, not a box)
+## v0.1.7: Mountains as natural borders
+**Mountains and passes:**
+- Ridge crests are natural borders: mountain hexes stay walkable, but land armies, supply, zones of control and roads
+  cross a ridge only at a pass. There are 24 named passes plus extra ones wherever a ridge would split a landmass. Passes
+  close in winter: a march that meets a closed pass waits for spring, and the hover names the pass (#87)
+- The ridges live in the landscape tiles: five crest looks by range, altitude, terrain and climate; mountains draw about
+  half as many peaks; in summer a pass is a valley with a track and a hospice, in winter a snow-filled saddle with a
+  frozen snowflake mark (from mid zoom in). New option: Pass names (off by default)
+- Africa: Maghreb steppe and plains, Sahel savanna and steppe, jungle only in the tropics, on Europe and random worlds (#97)
+
+**Map:**
+- No grid lines with the grid off at any zoom (#93, #95); no wave of tiles after a zoom (#94); no trees in the water (#96);
+  borders stay in every map mode (#98); town names never overlap
+- All 32 goods have their own code-drawn object in the Goods view (Deposits), replacing borrowed Kenney sprites and the
+  crate fallback (fish is a basket of fish now, not a box)
+
+**Playtest fixes:**
+- Tech prerequisites enforced (#88); a "War on you!" alert (#89); the current research and queue marked (#90); Exit and
+  Main menu ask Yes or No (#91); long marches wait for you at the end of a season, R continues them (#92)
+
+**Code review and kioba's tests:**
+- Kioba's testing foundation merged (#72-#86): CI on GitHub Actions, window, monkey and golden-screenshot tests, nightly
+  soak and perf runs, a save-compatibility check
+- Every bug they pinned is fixed: damaged save and settings files, three Colonisation rules, a minimap click, and orders
+  round foreign land
+- Code review fixes: the tax preview no longer changes the season, "a university", stuck-stack reasons, and
+  greyed-out button hints
+
+Old saves keep loading; mountain passes are rebuilt when a save is loaded.
 
 ## v0.1.6: Bug-fix round 2
 The rest of kioba's v0.1.6 and v0.1.7 milestones, and a seamless map:

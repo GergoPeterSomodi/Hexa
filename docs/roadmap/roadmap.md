@@ -16,7 +16,7 @@ Hexa started in 2020 as a pygame hex-tile map editor. It is becoming a playable 
   - [M5 World & naming fixes](https://github.com/GergoPeterSomodi/Hexa/milestone/10)
   - [Events & characters (Phase 3)](https://github.com/GergoPeterSomodi/Hexa/milestone/11)
   - [1.0 Steam release](https://github.com/GergoPeterSomodi/Hexa/milestone/12)
-- bug-fix releases: v0.1.3, v0.1.5 and v0.1.6 (shipped; v0.1.6 also covered kioba's v0.1.7 milestone)
+- bug-fix releases: v0.1.3, v0.1.5, v0.1.6 and v0.1.7 (shipped; v0.1.7 also brought the ridge rule and art, M3)
 - the testing foundation
 - M1 (the tech tree) shipped as v0.1.2.
 - The first part of M3 (the blended map look and winter passes) shipped as v0.1.4.
