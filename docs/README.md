@@ -1,6 +1,7 @@
 # Hexa docs
 
 - **[The studio](studio.md):** how Hexa is made: the agent team, the review gates and the workflow.
+- **[Architecture review, 2026-11-12](architecture/review-2026-11-12.md):** today's structure, the refactor plan (game manager, event bus, UI kit, systems), and decisions for the owner. Draft for approval.
 - **[Roadmap](roadmap/roadmap.md):** the near-term milestones and decisions so far.
 - **[Dev diary](devlog/README.md):** how Hexa was built, step by step, with screenshots.
 - **[Debt and bankruptcy roadmap](roadmap/debt-and-bankruptcy.md):** the idea, steps and open questions.
