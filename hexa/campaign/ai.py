@@ -15,6 +15,8 @@ from .data import (BUILDINGS, CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARR
 
 # (tag: first turn it starts colonising; Portugal and Castile lead the way)
 MAX_WARS = 3
+DISTRESS_SEASONS = 2      # a deficit this many seasons in a row puts a country in distress (as does debt)
+DEBT_REPAY = 12           # in distress, a country sets aside a twelfth of its debt a season from its income
 
 
 def run(world, tag):
@@ -23,18 +25,49 @@ def run(world, tag):
         return
     memory = country.memory
     memory.setdefault("seed", sum(ord(ch) for ch in tag))
-    country.tax = "high" if country.treasury < 0 else "low" if country.treasury > 600 else "normal"
+    distressed = _distressed(country)
+    country.tax = "high" if distressed else "low" if country.treasury > 600 else "normal"
     _research(world, tag)
-    _fund(world, tag)
+    if not distressed:
+        _fund(world, tag)
     _pick_idea(world, tag)
     _merchants(world, tag)
-    for _ in range(1 + int(country.treasury > 1500) + int(country.treasury > 4000)):
-        _build(world, tag)
-    _army(world, tag)
-    _invest(world, tag)
-    if _colonial(world, tag):
-        _colonise(world, tag)
+    if distressed:
+        _disband(world, tag)
+    else:
+        for _ in range(1 + int(country.treasury > 1500) + int(country.treasury > 4000)):
+            _build(world, tag)
+    _army(world, tag, distressed)
+    if not distressed:
+        _invest(world, tag)
+        if _colonial(world, tag):
+            _colonise(world, tag)
     _diplomacy(world, tag)
+
+
+def _distressed(country):
+    """In distress: in debt, or in deficit for DISTRESS_SEASONS seasons. Taxes stay high, nothing new is paid
+    for, and troops are disbanded, until the treasury and the season are both positive again."""
+    memory = country.memory
+    deficit = memory.get("deficit", 0) + 1 if country.balance < 0 else 0
+    memory["deficit"] = deficit
+    if country.treasury < 0 or deficit >= DISTRESS_SEASONS:
+        memory["distress"] = True
+    elif country.treasury >= 0 and country.balance >= 0:
+        memory["distress"] = False
+    return memory.get("distress", False)
+
+
+def _disband(world, tag):
+    """Disband troops (the oldest, weakest and most distant first, see World.disband) until the season leaves
+    a surplus of a twelfth of the debt, so the debt is paid down; no troops are cut once it is covered."""
+    country = world.countries[tag]
+    need = -country.treasury / DEBT_REPAY - country.balance
+    if need <= 0:
+        return
+    _, gone = world.disband(tag, need)
+    if gone:
+        world.message(f"{country.name} disbands {len(gone)} troop{'s' * (len(gone) != 1)} to pay its debts.", tag)
 
 
 # ----- technology and ideas ----------------------------------------------------------------
@@ -228,15 +261,15 @@ def _invest(world, tag):
 
 
 # ----- armies and war ---------------------------------------------------------------------
-def _army(world, tag):
+def _army(world, tag, distressed=False):
     country = world.countries[tag]
     enemies = world.enemies(tag)
     troops = [u for u in world.units_of(tag) if u.kind.war]
     wanted = max(2, round(world.total_pop(tag) / 300 * (1.4 if enemies else 1.0)))
-    if len(troops) < wanted and country.treasury > 70 and country.balance > 0:
+    if len(troops) < wanted and not distressed and country.treasury > 70 and country.balance > 0:
         _raise(world, tag, troops)
     capital = world.provinces[country.capital]
-    if len(troops) >= 8 and country.treasury > 300 and not any(u.kind is GENERAL for u in world.units_of(tag)):
+    if len(troops) >= 8 and country.treasury > 300 and not distressed and             not any(u.kind is GENERAL for u in world.units_of(tag)):
         world.recruit(tag, capital, GENERAL)
     stacks = {}
     for unit in world.units_of(tag):
@@ -249,7 +282,7 @@ def _army(world, tag):
             _campaign(world, tag, stack, enemies)
         else:
             _gather(world, tag, stack)
-    if country.treasury > 400:
+    if country.treasury > 400 and not distressed:
         for unit in [u for u in world.units_of(tag) if u.kind.war]:
             if world.refit_check(unit)[0]:
                 world.refit(unit)

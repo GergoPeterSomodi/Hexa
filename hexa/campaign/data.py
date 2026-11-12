@@ -389,6 +389,11 @@ SEA_STEP = 0.5
 SUBSISTENCE = 0.15               # food every 1,000 peasants grow for themselves each season
 MANUFACTORY_TAX = 0.35           # share of manufactory profits that reaches the treasury
 TOLL_SHARE = 0.1                 # share of a route's profit each market owner takes as tolls
+# Debt: a country that owes more than its debt limit (DEBT_FLOOR, or DEBT_SEASONS seasons of its running
+# costs, whichever is more) loses unpaid troops to desertion, then buildings to its creditors.
+DEBT_FLOOR = 300                # ducats of debt tolerated before anything is lost
+DEBT_SEASONS = 6                # seasons of running costs (upkeep, army, colonies) tolerated as debt
+DEBT_INTEREST = 0.02            # interest a season on debt, on at most the debt limit
 MERCHANT_SHARE = 0.8             # (unused) kept for old saves
 SIEGE_BASE = 1
 WAR_LENGTH_AI = 16               # AI wars end after about this many turns

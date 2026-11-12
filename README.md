@@ -171,7 +171,11 @@ see the path, the move cost of each step and how many seasons it takes.
 - **Mountain passes:** the main Alpine and Pyrenean passes (Gotthard, Brenner, Mont Cenis, Simplon, Great St Bernard,
   Roncesvalles) and the Carpathian Dukla and Lupkow are closed by snow in winter (every fourth season, turn 4, 8, ...).
   Land units cannot enter a closed pass; the move says "The Gotthard pass is closed by snow until spring." A unit already
-  on one may leave, and ships are not affected. The random world has no passes yet.
+  on one may leave, and ships are not affected. A random world gets up to 8 passes on its longest ridges.
+- **Debt:** a country may go into debt down to a limit of 6 seasons of running costs (at least 300 ducats). It pays 2%
+  interest a season on debt up to that limit. Over the limit with a deficit, unpaid troops desert, oldest first and never
+  the general. With no troops left, creditors seize buildings, works, castles and then settlement levels, one at a time.
+  The log tells you each step.
 - **Units:** close up, a stack shows up to three figures of what it holds, with a shield for its size. Zoomed out, it shows as a board-game token with era pips.
 
 ### Fog

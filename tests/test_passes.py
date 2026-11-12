@@ -131,6 +131,44 @@ class PassRuleTest(unittest.TestCase):
                 w.move_check([unit], land[1])
 
 
+class RandomPassTest(unittest.TestCase):
+    """Random worlds get mountain passes of their own (randomgeo._passes), named and fixed per seed."""
+
+    def test_seeds_5_7_9_have_passes(self):
+        for seed in (5, 7, 9):
+            w = fresh(seed, map="random")
+            self.assertGreaterEqual(len(w.passes()), 1, seed)
+            for pos, name in w.passes().items():
+                self.assertTrue(w.is_land(pos), (seed, name))
+                self.assertTrue(name, seed)
+
+    def test_passes_are_deterministic_per_seed(self):
+        from hexa.campaign import randomgeo
+        first = randomgeo.generate(5).PASSES
+        self.assertEqual(first, randomgeo.generate(5).PASSES)
+        self.assertNotEqual(first, randomgeo.generate(7).PASSES)
+
+    def test_random_pass_has_lowland_on_both_sides_and_blocks_land_units_in_winter(self):
+        w = fresh(5, map="random")
+        passes = w.passes()
+        pos = min(passes)
+        prov = w.provinces.get(pos)
+        owner = prov.owner if prov and prov.owner else next(iter(w.countries))   # a unit at home may enter in summer
+        name = passes[pos]
+        # a pass joins lowland: some neighbour is a land hex that is not itself a pass
+        sides = [n for n in neighbors(pos) if w.is_land(n) and n not in passes]
+        self.assertGreaterEqual(len(sides), 2)
+        w.turn = WINTER
+        unit = infantry(w, sides[0], owner=owner, moves=99)
+        ok, reason = w.move_check([unit], pos)
+        self.assertFalse(ok)
+        self.assertIn(name, reason)
+        self.assertFalse(w.may_enter(unit, pos))
+        w.turn = SUMMER
+        self.assertTrue(w.move_check([unit], pos)[0])
+        self.assertTrue(w.may_enter(unit, pos))
+
+
 class AppTest(unittest.TestCase):
     """The app's reason on a closed pass, the hover card, and the G key."""
 

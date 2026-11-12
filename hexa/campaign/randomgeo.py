@@ -806,6 +806,37 @@ def _hills(mountains, land, dcoast, lonlats, rng):
     return hills
 
 
+MAX_PASSES = 8            # about as many as the Europe map has
+
+
+def _passes(mountains, land, nb, rng):
+    """Mountain passes: one on each of the MAX_PASSES longest ridges (a second one on a long ridge), on a
+    ridge hex with lowland on both sides (two lowland neighbours that are not next to each other), at least
+    5 hexes apart. Returns hex positions."""
+    ridge = _raster_lines(mountains, 0.0) & land
+    lines = sorted(((len(_raster_lines([line], 0.0) & land), i) for i, line in enumerate(mountains)), reverse=True)
+    out = []
+    for length, i in lines:
+        if len(out) >= MAX_PASSES:
+            break
+        cands = []
+        for p in sorted(_raster_lines([mountains[i]], 0.0) & land):
+            low = [n for n in nb[p] if n in land and n not in ridge]
+            if any(b not in nb[a] for i, a in enumerate(low) for b in low[i + 1:]):
+                cands.append(p)
+        if not cands:
+            continue
+        want = min(2 if length >= 20 else 1, MAX_PASSES - len(out))
+        picked = []
+        for p in rng.sample(cands, len(cands)):
+            if len(picked) >= want:
+                break
+            if all(q not in within(p, 4) for q in picked + out):
+                picked.append(p)
+        out.extend(picked)
+    return out
+
+
 def _raster_lines(lines, radius_deg):
     """Hexes within about radius_deg of any of the polylines."""
     out = set()
@@ -855,6 +886,11 @@ def _attempt(seed, attempt):
     mountains = _mountains(spec.tiles, spec.centre, land, rng)
     hills = _hills(mountains, land, dcoast, lonlats, rng)
     mount_hex = _raster_lines(mountains, 0.8) & land
+    prng = random.Random(f"hexa-random-passes:{seed}:{attempt}")
+    pass_hexes = _passes(mountains, land, nb, prng)
+    pass_lang = _Lang(prng)
+    pass_names = set()
+    passes = [(pass_lang.word("city", pass_names), *_pt(p)) for p in pass_hexes]
 
     # Climate bands.
     band = _Noise(rng, 4.5)
@@ -1202,7 +1238,7 @@ def _attempt(seed, attempt):
         START=(round(start[0], 2), round(start[1], 2)),
         land_cells=land_cells, FORCE_LAND=[],
         CITIES=cities, COUNTRIES=countries, MARKETS=markets, TRIBES=tribes, RIVERS=rivers,
-        MOUNTAINS=mountains, HILLS=hills, FERTILE_RIVERS=fertile,
+        MOUNTAINS=mountains, HILLS=hills, FERTILE_RIVERS=fertile, PASSES=passes,
         desert_at=desert_at, steppe_at=steppe_at, marsh_at=marsh_at,
         KNOWN_WORLD=lambda lon, lat: lon > known_w and lat > 11.5,
         COASTAL_KNOWLEDGE={}, COLONIAL=colonial,
