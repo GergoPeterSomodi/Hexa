@@ -2,6 +2,7 @@
 
 Every land hex is a province. Nothing in here uses pygame.
 """
+import hashlib
 import heapq
 import itertools
 import pickle
@@ -33,11 +34,12 @@ SCALE = geo.SCALE
 _RANDOM_GEOS = {}         # seed -> random geography (only the last few kept)
 _SNAPSHOTS = {}           # (map, seed) -> pickled freshly built world: building the map takes seconds
 RANDOM_KEPT = 2           # random worlds kept in those caches (the Europe snapshot always stays)
+PASS_RULE = 4             # the shape of the ridge edges and passes; a save with another number rebuilds them
 # World attributes a save from an older version may lack, with their defaults (callables build fresh ones).
 WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "visible": set, "over": False,
                   "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
                   "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None, "_bonus_cache": dict,
-                  "_settled": None}
+                  "_settled": None, "_pass_cache": None}
 # World attributes no save can do without (from_state refuses a state that lacks one). Every other attribute
 # has a default above, is rebuilt on load (geo, _ids) or is added when first needed (_explored_from).
 WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countries", "markets", "cities", "landmass",
@@ -397,6 +399,7 @@ class CampaignWorld:
                 _fill_defaults(obj)
         self.units = [u for u in self.units if u.kind is not PIONEER]      # provinces invest from the panel now
         self._bonus_cache = {}
+        self.__dict__.pop("_pass_hexes", None)               # the old one-hex passes (see _pass_data)
         for country in getattr(self, "countries", {}).values():
             if not country.techs:
                 self._legacy_techs(country)
@@ -476,6 +479,7 @@ class CampaignWorld:
             self.provinces[pos] = Province(pos, self.terrain[pos], None, coastal, "", city=pos in self.cities)
         for prov in self.provinces.values():
             prov.good = self._good_for(prov, rng)
+        self._pass_data()                # ridge edges and passes, kept in the snapshot
 
     def _trace(self, line):
         """The hexes a (lon, lat) polyline passes through, in order, without loops."""
@@ -523,13 +527,21 @@ class CampaignWorld:
         desert = g.desert_at(point)
         marsh = g.marsh_at(point)
         americas = lon < -30
+        maghreb = getattr(g, "maghreb_at", None)
+        north_africa = bool(maghreb and maghreb(point))     # Morocco to Egypt: steppe and desert, not forest
         if river:
             if desert:
                 return {"plains": 1.0, "marsh": 0.08 + marsh}
             return {"plains": 1.0, "marsh": 0.15 + marsh, "forest": 0.15, "hills": 0.05}
         if desert:
+            if -20 < lon < 40 and 12 < lat < 18.5:         # the Sahel: the desert fades into steppe and savanna
+                return {"desert": 0.55, "steppe": 0.3, "savanna": 0.3, "hills": 0.04 if hills else 0.0}
+            if north_africa and lat > 28.5:                # the northern edge of the Sahara
+                return {"desert": 1.0, "steppe": 0.22, "hills": 0.04 if hills else 0.0}
             return {"desert": 1.0, "steppe": 0.06, "hills": 0.04 if hills else 0.0}
         if hills:
+            if north_africa:
+                return {"hills": 0.7, "steppe": 0.25, "forest": 0.03, "mountains": 0.08 if mount < 1.2 else 0.0}
             w = {"hills": 0.7, "forest": 0.25, "mountains": 0.08 if mount < 1.2 else 0.0}
             if lat > 57:
                 w["taiga"] = 0.3
@@ -546,8 +558,8 @@ class CampaignWorld:
             if lat < 21.5:
                 if lon < -95 and lat > 16.5:
                     return {"plains": 0.6, "hills": 0.3, "savanna": 0.1}
-                w = {"jungle": 0.6, "plains": 0.15, "savanna": 0.3 if 2 < lat < 12 and lon > -72 else 0.1,
-                     "marsh": 0.04 + marsh}
+                w = {"jungle": 0.6 if lat < 14 else 0.35, "plains": 0.15 if lat < 14 else 0.3,
+                     "savanna": 0.3 if 2 < lat < 12 and lon > -72 else 0.1, "marsh": 0.04 + marsh}
                 if coastal:
                     w["beach"] = 0.3
                 return w
@@ -556,15 +568,24 @@ class CampaignWorld:
                 w["beach"] = 0.25
             return w
         if lat < 17:                                    # Africa south of the Sahara
-            if lat < 8:
-                w = {"jungle": 0.7, "plains": 0.12, "savanna": 0.18, "marsh": 0.04 + marsh}
-            else:
-                w = {"savanna": 0.65, "plains": 0.3, "steppe": 0.05}
+            if lat < 5.5:                               # the Guinea coast and the Congo: rainforest
+                w = {"jungle": 0.7, "plains": 0.1, "savanna": 0.15, "marsh": 0.04 + marsh}
+            elif lat < 8:                               # jungle thins into savanna
+                w = {"jungle": 0.45, "savanna": 0.45, "plains": 0.1, "marsh": 0.03 + marsh}
+            elif lat < 12.5:                            # savanna, with grassland
+                w = {"savanna": 0.65, "plains": 0.2, "steppe": 0.15}
+            else:                                       # the Sahel: dry savanna and steppe
+                w = {"savanna": 0.55, "steppe": 0.35, "plains": 0.1}
             if coastal:
                 w["beach"] = 0.2
             return w
         if g.steppe_at(point):
             return {"steppe": 1.0, "plains": 0.12, "marsh": marsh}
+        if north_africa:                                # the Maghreb: dry steppe and scrub, desert, a little woodland
+            w = {"steppe": 0.5, "plains": 0.3, "desert": 0.3 if lat < 34 else 0.1, "forest": 0.03}
+            if coastal:
+                w["beach"] = 0.18
+            return w
         if lat >= 58 or (lon > 24 and lat >= 55):
             w = {"taiga": 0.5, "forest": 0.25, "plains": 0.2, "marsh": 0.06 + marsh}
         elif lat >= 53:
@@ -818,6 +839,7 @@ class CampaignWorld:
         """Roads join each country's towns to the nearest town already on its network, and capitals to
         neighbouring capitals. Armies march along them at one move per hex."""
         self.roads, self.road_paths = set(), []
+        summer_walls = self._pass_data()[4]
 
         def connect(start, goals, limit, owner=None):
             best = {start: (0, None)}
@@ -834,7 +856,7 @@ class CampaignWorld:
                     return path[::-1]
                 for n in neighbors(pos):
                     prov = self.provinces.get(n)
-                    if prov is None or (owner and prov.owner != owner):
+                    if prov is None or (owner and prov.owner != owner) or (pos, n) in summer_walls:
                         continue
                     step = 0.5 if n in self.roads else TERRAIN[prov.terrain].move
                     if cost + step <= limit and cost + step < best.get(n, (INF,))[0]:
@@ -863,7 +885,14 @@ class CampaignWorld:
                         self.roads.update(path)
 
     def step_cost(self, frm, to):
-        """Move points to walk from one land hex into the next: roads and rivers make it cheaper."""
+        """Move points to walk from one land hex into the next: roads and rivers make it cheaper. A step across a
+        blocked edge (a ridge crest, or a pass shut by snow) is impossible: it costs INF."""
+        if (frm, to) in self._walls():
+            return INF
+        return self._move_cost(frm, to)
+
+    def _move_cost(self, frm, to):
+        """step_cost without the ridge edges (trade routes ignore the crests)."""
         move = TERRAIN[self.terrain[to]].move
         if to in self.roads and frm in self.roads:
             return 1
@@ -913,40 +942,96 @@ class CampaignWorld:
     def is_sea(self, pos):
         return self.terrain.get(pos) == "ocean"
 
-    # ----- winter and mountain passes -----------------------------------------------------
+    # ----- ridge crests, winter and mountain passes ------------------------------------
+    def _pass_data(self):
+        """(rule, ridge, passes, hexes, summer, winter), built from the geography once and kept with the world.
+        ridge: frozenset of frozenset({a, b}), the crest edges that are never open; passes: {edge: (name, id)}, the
+        crest edges that are open in summer and shut by snow in winter; hexes: {hex: pass name} for the hexes at the
+        ends of a pass edge; summer / winter: every blocked step as an ordered (from, to) pair, for the path searches.
+        A save made under another PASS_RULE (or before ridges had edges) is rebuilt here."""
+        cached = self.__dict__.get("_pass_cache")
+        key = (PASS_RULE, self._geo_key())
+        if cached is None or cached[0] != key:
+            self.__dict__.pop("_pass_hexes", None)
+            ridge, passes = self._build_edges()
+            hexes = {}
+            for edge, (name, _) in sorted(passes.items(), key=lambda kv: sorted(kv[0])):
+                for pos in edge:
+                    hexes.setdefault(pos, name)
+            summer = frozenset(pair for e in ridge for a, b in (sorted(e),) for pair in ((a, b), (b, a)))
+            shut = frozenset(pair for e in passes for a, b in (sorted(e),) for pair in ((a, b), (b, a)))
+            cached = self._pass_cache = (key, ridge, passes, hexes, summer, summer | shut)
+        return cached
+
+    def _geo_key(self):
+        """A short hash of the ridges and passes of the geography: a save or snapshot built from other ones (or an
+        older version of them) rebuilds its edges."""
+        key = getattr(self.geo, "_pass_geo_key", None)
+        if key is None:
+            text = repr((getattr(self.geo, "MOUNTAINS", ()), getattr(self.geo, "PASSES", ())))
+            key = hashlib.md5(text.encode("utf-8")).hexdigest()[:16]
+            try:
+                self.geo._pass_geo_key = key
+            except AttributeError:
+                pass
+        return key
+
     def winter(self):
         """Winter is every fourth turn (turn 4 is Winter in data.date)."""
         return self.turn % 4 == 0
 
+    def _walls(self):
+        """The ordered (from, to) steps land units cannot take this season."""
+        data = self._pass_data()
+        return data[5] if self.winter() else data[4]
+
+    def ridge_edges(self):
+        """The crest edges no army can cross in any season: a frozenset of frozenset({hex, hex})."""
+        return self._pass_data()[1]
+
+    def pass_edges(self):
+        """[(name, id, edge, closed now)] for every pass: the crest edges that are open in summer and closed by snow
+        in winter. `edge` is frozenset({hex, hex}); the list is sorted by id."""
+        closed = self.winter()
+        found = [(name, pid, edge, closed) for edge, (name, pid) in self._pass_data()[2].items()]
+        return sorted(found, key=lambda t: (t[1], sorted(t[2])))
+
+    def edge_blocked(self, a, b, winter=None):
+        """True if land units cannot step between the neighbouring hexes a and b: across a ridge crest, or through a
+        pass in winter (winter=None means the current season)."""
+        data = self._pass_data()
+        if (a, b) in data[4]:
+            return True
+        if winter is None:
+            winter = self.winter()
+        return bool(winter) and (a, b) in data[5]
+
     def passes(self):
-        """{pos: name} of the mountain passes on this map: the geography's PASSES rasterised on the hex grid.
-        Cached on the world (the geography is fixed for a map)."""
-        cached = self.__dict__.get("_pass_hexes")
-        if cached is None:
-            cached = {}
-            for name, lon, lat in getattr(self.geo, "PASSES", ()):
-                pos = geo.hex_of(lon, lat)
-                if self.terrain.get(pos) not in (None, "ocean", "lake"):
-                    cached.setdefault(pos, name)
-            self._pass_hexes = cached
-        return cached
+        """{pos: name} of the hexes at the ends of a mountain pass edge (the hexes themselves are always open)."""
+        return self._pass_data()[3]
 
     def pass_name(self, pos):
         return self.passes().get(pos, "")
 
     def pass_closed(self, pos, winter=None):
-        """True if land units may not enter pos: a mountain pass in winter. winter=None means the current season.
-        Only land units are stopped (see may_enter and move_check); ships are not affected."""
+        """True if pos is at a mountain pass that snow has closed (winter=None means the current season). Only the
+        step across the pass edge is closed (see edge_blocked); the hex itself can always be entered."""
         if winter is None:
             winter = self.winter()
         return bool(winter) and pos in self.passes()
 
     def move_check(self, group, dest):
-        """(ok, reason) for a stack walking onto dest this season. Snow closes the mountain passes to land units."""
+        """(ok, reason) for a stack stepping onto the next hex, dest. Ridge crests stop land units all year, and snow
+        closes the mountain passes to them in winter."""
         if not group or dest is None:
             return False, ""
-        if not group[0].naval and self.pass_closed(dest):
-            return False, f"The {self.pass_name(dest)} pass is closed by snow until spring."
+        lead = group[0]
+        if lead.naval or distance(lead.pos, dest) != 1:
+            return True, ""
+        if (lead.pos, dest) in self._pass_data()[4]:
+            return False, "Nobody can cross the ridge here; armies need a pass."
+        if self.edge_blocked(lead.pos, dest):
+            return False, f"The {self._pass_data()[2][frozenset((lead.pos, dest))][0]} pass is closed by snow until spring."
         return True, ""
 
     def pass_blocks(self, group, goal):
@@ -954,11 +1039,210 @@ class CampaignWorld:
         or "" if no pass holds it up. A march stopped this way waits for spring instead of being dropped."""
         if not group or group[0].naval or goal is None or not self.winter():
             return ""
-        passes, here = self.passes(), distance(group[0].pos, goal)
+        passes, here = self._pass_data()[2], distance(group[0].pos, goal)
         for n in neighbors(group[0].pos):
-            if n in passes and self.pass_closed(n) and distance(n, goal) < here:
-                return passes[n]
+            edge = passes.get(frozenset((group[0].pos, n)))
+            if edge and distance(n, goal) < here:
+                return edge[0]
+        return self.pass_wait(group, goal)
+
+    def _field_in(self, goal, winter, until):
+        """cost_field(goal) as it would be in winter (or not), whatever season it is now."""
+        turn = self.turn
+        self.turn = 4 if winter else 2
+        try:
+            return self.cost_field(goal, until=until)
+        finally:
+            self.turn = turn
+
+    def pass_wait(self, group, goal):
+        """The name of the closed pass a land stack should wait for spring at, or "". In winter, if the way to goal that
+        the summer route takes through a pass has become much longer (more than twice as far, or 2+ seasons of moves
+        more) or gone, the stack waits for the pass to open instead of walking off on a long detour and back."""
+        if not group or group[0].naval or goal is None or not self.winter() or group[0].pos == goal:
+            return ""
+        here = group[0].pos
+        summer = self._field_in(goal, False, [here])
+        near = summer.get(here)
+        if near is None:
+            return ""
+        far = self._field_in(goal, True, [here]).get(here)
+        speed = max(1, min(self.unit_moves(u) for u in group))
+        if far is not None and far <= 2 * near and far - near < 2 * speed:
+            return ""
+        passes, pos = self._pass_data()[2], here
+        while pos != goal:                              # follow the summer route to the pass it goes through
+            nxt = min((n for n in neighbors(pos) if summer.get(n, INF) < summer[pos]), key=lambda n: (summer[n], n),
+                      default=None)
+            if nxt is None:
+                break
+            edge = passes.get(frozenset((pos, nxt)))
+            if edge:
+                return edge[0]
+            pos = nxt
         return ""
+
+    def pass_edges_at(self, pos):
+        """[(pass name, hex across the pass edge, compass direction to it)] for the pass edges that start at pos."""
+        found = []
+        lon, lat = geo.lonlat(pos)
+        for edge, (name, _) in sorted(self._pass_data()[2].items(), key=lambda kv: sorted(kv[0])):
+            if pos in edge:
+                other = next(p for p in edge if p != pos)
+                olon, olat = geo.lonlat(other)
+                dx, dy = olon - lon, geo.merc(olat) - geo.merc(lat)
+                way = ("north" if dy > abs(dx) * 0.5 else "south" if -dy > abs(dx) * 0.5 else "") + \
+                    ("east" if dx > abs(dy) * 0.5 else "west" if -dx > abs(dy) * 0.5 else "")
+                found.append((name, other, way.replace("northeast", "north-east").replace("northwest", "north-west")
+                              .replace("southeast", "south-east").replace("southwest", "south-west") or "next door"))
+        return found
+
+    def _within_reach(self, a, b):
+        """Whether a hex at distance 2 or less from b can lend it support: no ridge crest or shut pass in the way."""
+        d = distance(a, b)
+        if d == 0:
+            return True
+        walls = self._walls()
+        if d == 1:
+            return (a, b) not in walls
+        if d == 2:
+            return any((a, m) not in walls and (m, b) not in walls for m in set(neighbors(a)) & set(neighbors(b)))
+        return False
+
+    # ----- ridge crests -------------------------------------------------------------------
+    @staticmethod
+    def _unit_point(lon, lat):
+        """A (lon, lat) in hex-grid units: hex centres are 1 apart along a row, 0.866 between rows."""
+        return (lon - geo.LON0) / geo.COL_DEG, (geo.Y_TOP - geo.merc(lat)) / geo.COL_DEG
+
+    @staticmethod
+    def _unit_centre(pos):
+        col, row = pos
+        return col + 0.5 * (row & 1) + 0.5, (row + 0.5) * 0.8660254
+
+    def _crest_edges(self, land):
+        """Every edge between two neighbouring land hexes that a ridge polyline of the geography crosses, i.e. the
+        polyline (in hex-grid units) cuts the segment joining the two hex centres an odd number of times. A curve that
+        crosses the grid of hex centres cannot slip between two blocked edges, so a ridge is a continuous wall."""
+        found = set()
+        shift = (1.3e-6, 2.1e-6)                       # keeps a vertex off an exact crossing, deterministically
+        for line in self.geo.MOUNTAINS:
+            crossings = {}
+            pts = [self._unit_point(lon, lat) for lon, lat in line]
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+                x0, y0, x1, y1 = x0 + shift[0], y0 + shift[1], x1 + shift[0], y1 + shift[1]
+                steps = max(1, int(max(abs(x1 - x0), abs(y1 - y0)) / 0.4) + 1)
+                near = set()
+                for i in range(steps + 1):
+                    t = i / steps
+                    x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+                    pos = geo.hex_of(geo.LON0 + x * geo.COL_DEG, geo.inv_merc(geo.Y_TOP - y * geo.COL_DEG))
+                    near.update(within(pos, 1))
+                for a in near:
+                    if a not in land:
+                        continue
+                    ax, ay = self._unit_centre(a)
+                    for b in neighbors(a):
+                        if b not in land or b < a:
+                            continue
+                        bx, by = self._unit_centre(b)
+                        if self._cross(x0, y0, x1, y1, ax, ay, bx, by):
+                            edge = frozenset((a, b))
+                            crossings[edge] = crossings.get(edge, 0) + 1
+            # a ridge that bends round an edge crosses it twice and does not separate its two hexes: only an odd
+            # number of crossings makes the edge part of the crest
+            found.update(e for e, n in crossings.items() if n % 2)
+        return found
+
+    @staticmethod
+    def _cross(x0, y0, x1, y1, ax, ay, bx, by):
+        """Whether the segments (x0, y0)-(x1, y1) and (a)-(b) cross."""
+        d1x, d1y, d2x, d2y = x1 - x0, y1 - y0, bx - ax, by - ay
+        den = d1x * d2y - d1y * d2x
+        if abs(den) < 1e-12:
+            return False
+        t = ((ax - x0) * d2y - (ay - y0) * d2x) / den
+        u = ((ax - x0) * d1y - (ay - y0) * d1x) / den
+        return 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0
+
+    def _build_edges(self):
+        """(ridge, passes): the crest edges of the geography, and the ones left open as passes (see _pass_data)."""
+        land = {p for p, t in self.terrain.items() if TERRAIN[t].move is not None}
+        crest = self._crest_edges(land)
+        passes = {}
+        for k, (name, lon, lat) in enumerate(getattr(self.geo, "PASSES", ()), 1):
+            px, py = self._unit_point(lon, lat)
+
+            def gap(edge):
+                (ax, ay), (bx, by) = (self._unit_centre(p) for p in sorted(edge))
+                return ((px - (ax + bx) / 2) ** 2 + (py - (ay + by) / 2) ** 2) ** 0.5, sorted(edge)
+            ranked = sorted((e for e in crest if e not in passes), key=gap)[:2]
+            if not ranked or gap(ranked[0])[0] > 2.5:
+                continue
+            passes[ranked[0]] = (name, k)
+            if len(ranked) > 1 and gap(ranked[1])[0] <= 1.0:
+                passes[ranked[1]] = (name, k)
+        self._join_pockets(land, crest, passes)
+        return frozenset(e for e in crest if e not in passes), passes
+
+    def _join_pockets(self, land, crest, passes):
+        """Open one more pass edge wherever the ridges (with their passes) would cut a landmass in two: the pieces
+        of a landmass are joined by the shortest chain of crest edges, one new pass per link, named after the
+        nearest city."""
+        shut = {e for e in crest if e not in passes}
+
+        def label(blocked):
+            ids, count = {}, 0
+            for p in sorted(land):
+                if p in ids:
+                    continue
+                count += 1
+                ids[p] = count
+                queue = deque([p])
+                while queue:
+                    cur = queue.popleft()
+                    for n in neighbors(cur):
+                        if n in land and n not in ids and frozenset((cur, n)) not in blocked:
+                            ids[n] = count
+                            queue.append(n)
+            return ids
+
+        flat = label(shut)
+        links = {}
+        for e in sorted(shut, key=sorted):
+            a, b = sorted(e)
+            if flat[a] != flat[b]:
+                links.setdefault(tuple(sorted((flat[a], flat[b]))), []).append(e)
+        parent = {}
+
+        def find(i):
+            parent.setdefault(i, i)
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        size = {}
+        for i in flat.values():
+            size[i] = size.get(i, 0) + 1
+        number = max((pid for _, pid in passes.values()), default=0)
+        for pair in sorted(links, key=lambda p: (-min(size[p[0]], size[p[1]]), p)):
+            i, j = pair
+            if find(i) == find(j):
+                continue
+            edge = links[pair][0]
+            number += 1
+            passes[edge] = (self._pass_name_near(sorted(edge)[0], {n for n, _ in passes.values()}), number)
+            parent[find(i)] = find(j)
+
+    def _pass_name_near(self, pos, taken):
+        """A name for a new pass: the nearest city's, with II, III... added when that name is already a pass."""
+        base = self.cities[min((distance(c, pos), c) for c in self.cities)[1]][0] if self.cities else "Mountain"
+        name, n = base, 1
+        while name in taken:
+            n += 1
+            name = f"{base} {'I' * n if n < 4 else 'IV' if n == 4 else str(n)}"
+        return name
 
     def province(self, pos):
         return self.provinces.get(pos)
@@ -1137,7 +1421,7 @@ class CampaignWorld:
                 if self.is_sea(n):
                     step = SEA_STEP if (self.is_sea(pos) or self.provinces.get(pos) and self.provinces[pos].coastal) else INF
                 elif self.is_land(n):
-                    step = self.step_cost(pos, n) if not self.is_sea(pos) else 1
+                    step = self._move_cost(pos, n) if not self.is_sea(pos) else 1
                 else:
                     continue
                 new = cost + step
@@ -2031,9 +2315,10 @@ class CampaignWorld:
     def _land_spot(self, tag, prov, kind):
         """Where a new land unit appears: the province itself, or a province of ours next to it with room."""
         probe = Unit(0, kind, tag, prov.pos, hp=kind.hp)
+        walls = self._walls()
         for pos in [prov.pos] + sorted(neighbors(prov.pos)):
             other = self.provinces.get(pos)
-            if other and other.owner == tag and self.can_stand([probe], pos):
+            if other and other.owner == tag and (prov.pos, pos) not in walls and self.can_stand([probe], pos):
                 return pos
         return None
 
@@ -2385,6 +2670,7 @@ class CampaignWorld:
         """Within SUPPLY_RANGE hexes of a depot, through land we control and no enemy armies."""
         enemies = self.enemies(tag)
         blocked = {u.pos for u in self.units if u.owner in enemies and u.kind.war and u.carrier is None}
+        walls = self._walls()
         seen, frontier = {pos}, [pos]
         for _ in range(self.supply_reach(tag) + 1):
             nxt = []
@@ -2393,7 +2679,7 @@ class CampaignWorld:
                     return True
                 for n in neighbors(p):
                     prov = self.provinces.get(n)
-                    if n in seen or not prov or prov.controller != tag or n in blocked:
+                    if n in seen or not prov or prov.controller != tag or n in blocked or (p, n) in walls:
                         continue
                     seen.add(n)
                     nxt.append(n)
@@ -2486,11 +2772,14 @@ class CampaignWorld:
                 self.message(f"Your troops at {where} are {why}: they lose strength.")
 
     # ----- movement ------------------------------------------------------------------
-    def may_enter(self, unit, pos):
-        """Whether the unit may stand on `pos` (ignoring other units)."""
+    def may_enter(self, unit, pos, frm=None):
+        """Whether the unit may step onto `pos` (ignoring other units), from `frm` (default: where it stands, when
+        that is next to pos): a ridge crest or a pass shut by snow between the two hexes stops it."""
         if unit.naval:
             return self.is_sea(pos)
-        if self.pass_closed(pos):
+        if frm is None and distance(unit.pos, pos) == 1:
+            frm = unit.pos
+        if frm is not None and (frm, pos) in self._walls():
             return False
         prov = self.provinces.get(pos)
         if not prov:
@@ -2505,10 +2794,10 @@ class CampaignWorld:
         enemies = self.enemies(tag)
         if not enemies:
             return set()
-        found = set()
+        found, walls = set(), self._walls()
         for prov in self.castles():
             if prov.controller in enemies and prov.garrison > 0:
-                found.update(neighbors(prov.pos))
+                found.update(n for n in neighbors(prov.pos) if (prov.pos, n) not in walls)
         return found
 
     def castles(self):
@@ -2572,6 +2861,7 @@ class CampaignWorld:
         lead = group[0]
         naval = lead.naval
         zoc = set() if naval else self.zoc(lead.owner)
+        walls = frozenset() if naval else self._walls()
         occupied, mine = self.owners_at(), {lead.owner}
         best = {lead.pos: (0, None)}
         heap = [(0, lead.pos)]
@@ -2582,7 +2872,7 @@ class CampaignWorld:
             if pos != lead.pos and pos in zoc:
                 continue
             for n in neighbors(pos):
-                if n not in self.terrain or not all(self.may_enter(u, n) for u in group):
+                if n not in self.terrain or (pos, n) in walls or not all(self.may_enter(u, n, pos) for u in group):
                     continue
                 if occupied.get(n, mine) != mine:
                     continue
@@ -2625,6 +2915,8 @@ class CampaignWorld:
 
     def move_toward_group(self, group, goal):
         """move_group(group, step_toward_group(group, goal)) with one path search, not two: the plan is shared."""
+        if self.pass_wait(group, goal):                  # behind a pass shut by snow: wait for spring
+            return False
         best = self._group_plan(group)
         dest = self.step_toward_group(group, goal, best=best)
         return self.move_group(group, dest, best=best)
@@ -2717,6 +3009,7 @@ class CampaignWorld:
         """Move costs to `goal` from everywhere (or until every hex in `until` is settled)."""
         field = {goal: 0}
         heap = [(0, goal)]
+        walls = frozenset() if naval else self._walls()
         left = set(until) if until else None
         while heap:
             cost, pos = heapq.heappop(heap)
@@ -2730,8 +3023,8 @@ class CampaignWorld:
                 if naval:
                     ok, step = self.is_sea(n), 1
                 else:
-                    ok = self.is_land(n) and not self.pass_closed(n)
-                    step = self.step_cost(n, pos) if ok and self.is_land(pos) else \
+                    ok = self.is_land(n) and (n, pos) not in walls
+                    step = self._move_cost(n, pos) if ok and self.is_land(pos) else \
                         TERRAIN[self.terrain[n]].move if ok else 0
                 if ok and cost + step < field.get(n, INF):
                     field[n] = cost + step
@@ -2925,8 +3218,9 @@ class CampaignWorld:
         reach = self.reachable_group(group)
         stands = {p: c for p, c in reach.items() if c < moves and not any(u.naval for u in self.units_at(p))}
         options = {}
+        walls = self._walls()
         for pos in targets:
-            near = [p for p in neighbors(pos) if p in stands]
+            near = [p for p in neighbors(pos) if p in stands and (p, pos) not in walls]
             if near:
                 options[pos] = min(near, key=lambda p: stands[p])
         if any(u.kind.branch == "artillery" for u in fighters):
@@ -3083,7 +3377,7 @@ class CampaignWorld:
                 if prov.castle and prov.controller == prov.owner and prov.garrison < cap:
                     prov.garrison = min(cap, prov.garrison + GARRISON_REGEN)
                 if prov.controller != prov.owner and not any(
-                        u.kind.war and u.owner == prov.controller and distance(u.pos, prov.pos) <= 2
+                        u.kind.war and u.owner == prov.controller and self._within_reach(u.pos, prov.pos)
                         for u in self.units if u.carrier is None):
                     prov.siege += 1
                     if prov.siege >= 6:           # the people drive out a garrison nobody supports

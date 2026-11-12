@@ -110,6 +110,11 @@ def steppe_at(point):
     return _in_any(point, _STEPPE_BOXES)
 
 
+def maghreb_at(point):
+    """True on the land of North Africa north of the Sahara's heart (Morocco to Egypt, the Mediterranean shore)."""
+    return _in_any(point, _MAGHREB_BOXES)
+
+
 def marsh_at(point):
     """How marshy the region is (0..1): the Low Countries, the Pripet, river deltas, Florida."""
     lon, lat = point
@@ -288,11 +293,20 @@ MOUNTAINS = [
     [(-78.0, -12.0), (-78.3, -6.0), (-79.0, -2.0), (-77.5, 1.5), (-75.5, 5.0), (-73.5, 8.5), (-67.5, 10.2)],
     [(37.5, 9.0), (39.0, 13.5)],
 ]
-# Mountain passes: (name, lon, lat). In winter the passes on land are closed to land units (world.pass_closed).
+# Mountain passes: (name, lon, lat). The crest of every MOUNTAINS ridge blocks the edges between the hexes it passes
+# between (world.ridge_edges), so armies can only cross a ridge at a pass: the one or two crest edges nearest each point
+# below stay open in summer and are shut by snow in winter (world.pass_edges, world.edge_blocked). world._join_pockets
+# opens any further pass a ridge needs to keep a landmass in one piece.
 PASSES = [
     ("Gotthard", 8.56, 46.56), ("Brenner", 11.51, 47.00), ("Mont Cenis", 6.97, 45.14),
     ("Simplon", 8.03, 46.26), ("Great St Bernard", 7.17, 45.87), ("Roncesvalles", -1.32, 43.01),
     ("Dukla", 21.24, 49.43), ("Lupkow", 22.18, 49.40),
+    ("Col de Larche", 6.9, 44.42), ("Arlberg", 10.2, 46.95), ("Tauern", 13.3, 47.1), ("Semmering", 15.7, 47.5),
+    ("Somport", -0.53, 42.79), ("Perthus", 2.87, 42.47), ("Pajares", -5.77, 43.0),
+    ("Cisa", 9.93, 44.43),
+    ("Verecke", 23.08, 48.8), ("Tihuta", 24.7, 47.3), ("Predeal", 25.55, 45.4), ("Iron Gates", 22.5, 44.65),
+    ("Shipka", 25.4, 42.76), ("Darial", 44.5, 42.4), ("Cilician Gates", 34.75, 37.25),
+    ("Tizi n'Tichka", -7.35, 31.3),
 ]
 HILLS = [
     [(-6.0, 40.3), (-3.5, 40.8)], [(2.5, 45.0), (3.5, 45.5)], [(9.0, 50.3), (13.0, 50.4)],
@@ -313,7 +327,11 @@ DESERTS = [
      (44.0, 14.5), (42.5, 16.5), (39.0, 22.0), (36.0, 27.0)],
 ]
 STEPPES = [[(28.5, 46.0), (31.0, 49.5), (38.0, 51.0), (48.0, 51.5), (48.0, 44.5), (40.0, 45.0), (35.0, 45.8)]]
+# The Maghreb and the Mediterranean shore of Libya and Egypt (north of lat 28): dry steppe and desert, not forest.
+MAGHREB = [[(-10.0, 28.0), (-10.0, 36.0), (-5.0, 36.15), (0.0, 36.15), (1.0, 37.4), (11.8, 37.6), (11.8, 34.0),
+            (21.5, 34.0), (34.2, 33.4), (34.2, 28.0)]]
 _DESERT_BOXES = [(bbox(p), p) for p in DESERTS]
+_MAGHREB_BOXES = [(bbox(p), p) for p in MAGHREB]
 _STEPPE_BOXES = [(bbox(p), p) for p in STEPPES]
 # (lon0, lat0, lon1, lat1, marsh weight)
 MARSHES = [(3.0, 51.3, 7.2, 53.6, 0.45), (23.5, 51.0, 31.0, 53.0, 0.5), (11.6, 44.5, 12.6, 45.6, 0.5),

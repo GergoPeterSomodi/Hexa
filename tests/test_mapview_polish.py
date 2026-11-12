@@ -50,7 +50,7 @@ def draw(world, r, turn):
     ui = SimpleNamespace(selected=None, reach=None, province=None, hover=None, group=[], anim=None)
     rect = pygame.Rect(0, 0, 700, 500)
     screen = pygame.Surface((700, 500))
-    pos = next(iter(world.passes()))
+    pos = next(p for p in world.passes() if world.pass_name(p) == "Gotthard")
     x, y = view.center(pos)
     camera = [x - 350, y - 250]
     view.draw(screen, rect, camera, ui)

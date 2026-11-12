@@ -347,7 +347,8 @@ class CampaignApp(GameMenu, TechScreen):
             self.toast("No moves left this season: the march goes on next season.")
             return
         reach = world.reachable_group(group)
-        dest = goal if goal in reach else world.step_toward_group(group, goal)
+        waiting = world.pass_wait(group, goal)          # behind a pass shut by snow: no long detour, wait for spring
+        dest = pos if waiting else goal if goal in reach else world.step_toward_group(group, goal)
         if dest == pos:
             pass_name = world.pass_blocks(group, goal)
             if pass_name:                   # a closed pass: every press says so; the log says it once a season
@@ -599,6 +600,10 @@ class CampaignApp(GameMenu, TechScreen):
                 unit.goal = None
             if world.move_group(group, pos):
                 self.animate()
+        elif pos != here and world.pass_wait(group, pos):
+            for unit in group:
+                unit.goal = pos                              # the march waits for spring behind the closed pass
+            self.toast(f"The {world.pass_wait(group, pos)} pass is closed by snow; the march waits for spring.")
         elif pos != here:
             dest = world.step_toward_group(group, pos)
             if dest != here:
@@ -1068,7 +1073,11 @@ class CampaignApp(GameMenu, TechScreen):
             who = f"{prov.tribe} natives" if prov.natives > 0.5 else "Empty land"
         lines = [(f"{who}   ·   {t.name}: move {t.move}, defense +{t.defense * 100:.0f}%", TEXT)]
         if world.pass_closed(pos):
-            lines.append(("Closed by snow until spring", BAD_C))
+            seen = set()
+            for name, _, way in world.pass_edges_at(pos):
+                if (name, way) not in seen:
+                    seen.add((name, way))
+                    lines.append((f"The {name} pass (to the {way}) is closed by snow until spring", BAD_C))
         if prov.good:
             line = f"{GOODS[prov.good].name}"
             if prov.owner:

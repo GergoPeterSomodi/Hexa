@@ -549,7 +549,7 @@ class OrdersTest(CampaignCase):
         return trail
 
     def test_a_far_destination_is_reached_over_several_seasons(self):
-        goal = (128, 51)                                     # north, in Castile all the way
+        goal = (128, 54)                                     # north, in Castile all the way (the ridge crest at 51 would add a pass crossing)
         trail = self.march(goal, 5)
         distance = self.world.cost_field(goal)
         self.assertTrue(all(len(hexes) == 1 for _, hexes, _ in trail), f"the stack stays together: {trail}")

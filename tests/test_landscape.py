@@ -165,7 +165,7 @@ class RuleTest(unittest.TestCase):
         land = L.Landscape(WORLD, TILES)
         self.assertTrue(land.closed_pass(ALPS_PASS, "winter"))
         self.assertFalse(land.closed_pass(ALPS_PASS, "summer"))
-        self.assertFalse(land.closed_pass((150, 44), "winter"))
+        self.assertFalse(land.closed_pass((120, 60), "winter"))         # not at a pass
         self.assertTrue(land.cell_info(ALPS_PASS, "winter")["impassable"])
 
     def test_only_closed_passes_get_the_hatch(self):
