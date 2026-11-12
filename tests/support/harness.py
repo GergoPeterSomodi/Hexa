@@ -482,7 +482,10 @@ def save_screen(name):
     if pygame is None or not pygame.display.get_init() or pygame.display.get_surface() is None:
         return None
     path = os.path.join(artifacts_dir(), re.sub(r"[^\w.-]", "_", name) + ".png")
-    pygame.image.save(pygame.display.get_surface(), path)
+    try:
+        pygame.image.save(pygame.display.get_surface(), path)
+    except (pygame.error, OSError):        # e.g. a path too long for Windows: report the failure, not this
+        return None
     return path
 
 

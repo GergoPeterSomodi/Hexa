@@ -261,19 +261,31 @@ class OpenCloseTest(PauseCase):
 
 
 class LeaveTest(PauseCase):
-    def test_main_menu_and_exit_need_a_second_click_while_you_play(self):
-        for action, result in (("menu", "menu"), ("exit", "quit")):
+    def test_main_menu_and_exit_ask_yes_or_no_while_you_play(self):
+        """#91: Main menu and Exit open a Yes/No question instead of waiting for a second click."""
+        for action, yes, result in (("menu", "menu_now", "menu"), ("exit", "exit_now", "quit")):
             with self.subTest(action=action):
                 self.driver.reset()
                 app = self.start("POR")
                 seen = []
                 self.driver.at(0, key("m"))
                 self.driver.at(1, self.on_pause((action,)))
-                self.driver.at(2, lambda: seen.append((self.page(), app.running)))
-                self.driver.at(2, self.on_pause((action,)))
+                self.driver.at(2, lambda: seen.append((app.menu, app.running)))
+                self.driver.at(2, self.on_pause((yes,)))
                 self.assertEqual(self.play(30), result)
                 self.assertEqual(self.driver.stopped_by, None, "run() ended before the frame budget")
-                self.assertEqual(seen, [(("main", (action,)), True)], "the first click only asked")
+                self.assertEqual(seen, [("question", True)], "the first click only asked")
+
+    def test_no_on_the_question_goes_back_to_the_pause_menu(self):
+        app = self.start("POR")
+        seen = []
+        self.driver.at(0, key("m"))
+        self.driver.at(1, self.on_pause(("exit",)))
+        self.driver.at(2, self.on_pause(("page", "main")))
+        self.driver.at(3, lambda: seen.append((app.menu, app.running)))
+        self.driver.at(4, key("escape"))
+        self.play(10)
+        self.assertEqual(seen, [("main", True)])
 
     def test_before_choosing_a_country_save_is_greyed_out_and_one_click_leaves(self):
         app = self.start(None)

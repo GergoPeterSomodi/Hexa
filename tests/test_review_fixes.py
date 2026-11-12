@@ -175,13 +175,13 @@ class MarchAtPassTest(unittest.TestCase):
         unit.goal = GOTTHARD
         w.turn = WINTER
         mark = len(w.log)
-        app._advance_orders()
+        app.continue_march([unit])
         self.assertEqual(unit.goal, GOTTHARD, "the march is kept")
         self.assertEqual(unit.pos, STALL)
         notes = [m for m in w.log[mark:] if "waits for spring" in m]
         self.assertEqual(notes, ["The Gotthard pass is closed by snow; the march waits for spring."])
         self.assertIn("waits for spring", app.ui.toast)
-        app._advance_orders()
+        app.continue_march([unit])
         self.assertEqual(len([m for m in w.log[mark:] if "waits for spring" in m]), 1, "no repeated line")
         self.assertEqual(unit.goal, GOTTHARD)
 
@@ -190,9 +190,9 @@ class MarchAtPassTest(unittest.TestCase):
         unit = infantry(w, STALL, owner="SWI")
         unit.goal = GOTTHARD
         w.turn = WINTER
-        app._advance_orders()
+        app.continue_march([unit])
         w.turn = SUMMER
-        app._advance_orders()
+        app.continue_march([unit])
         self.assertEqual(unit.pos, GOTTHARD)
         self.assertIsNone(unit.goal, "arrived, so the order is done")
 

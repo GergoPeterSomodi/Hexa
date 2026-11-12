@@ -428,6 +428,17 @@ def path_to(key: str, known: set) -> list:
     return out
 
 
+def dependants(key: str, queue: list) -> list:
+    """Techs in `queue` that need `key`, directly or through each other: they cannot be researched without it."""
+    out, names = [], {key}
+    for k in queue:
+        t = tech(k)
+        if t is not None and names.intersection(t.needs):
+            out.append(k)
+            names.add(k)
+    return out
+
+
 # Pacing: listed costs times this per era (tuned so a country learns most of the tree by 1650,
 # about a tech every few years; the design's numbers are the relative prices).
 COST_SCALE = {1: 2.5, 2: 2.5, 3: 4.0}

@@ -1,4 +1,5 @@
 """The Age of Discovery window: map, panels, mouse and keyboard."""
+import math
 import sys
 
 import pygame
@@ -14,9 +15,39 @@ from .data import (FOOD_PER_TROOP, NEEDS, WAGON, BRANCH_NAMES, ERAS, GENERAL, GE
 from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
 from .world import CampaignWorld
 
+def _hint_text(hint):
+    """One line for a toast from a button hint: the hint itself, or for a (title, lines) hover card the first
+    line in red (the reason it is greyed out), else the card's title."""
+    if isinstance(hint, str):
+        return hint
+    title, lines = hint
+    reason = next((text for text, color in lines if color == BAD_C), None)
+    return reason or title
+
+
 def _ordinal(n):
     suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
     return f"{n}{suffix}"
+
+
+def _dashed_line(surface, colour, points, width, dash=10, gap=7):
+    """A polyline drawn as dashes."""
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        length = math.hypot(x1 - x0, y1 - y0)
+        if length == 0:
+            continue
+        ux, uy = (x1 - x0) / length, (y1 - y0) / length
+        t = 0.0
+        while t < length:
+            e = min(t + dash, length)
+            pygame.draw.line(surface, colour, (x0 + ux * t, y0 + uy * t), (x0 + ux * e, y0 + uy * e), width)
+            t += dash + gap
+
+
+def _tech_name(key):
+    """The tech's name, or its raw key when the tech is unknown (an old save or a renamed tech)."""
+    t = tech.tech(key)
+    return t.name if t else key
 
 
 WIDTH, HEIGHT = 1280, 720
@@ -234,7 +265,8 @@ class CampaignApp(GameMenu, TechScreen):
         ui.path, ui.path_key = [], None
 
     def next_unit(self):
-        ready = [u for u in self.world.units_of(self.player) if u.moves_left > 0 and not isinstance(u.goal, tuple)]
+        ready = [u for u in self.world.units_of(self.player)
+                 if (u.moves_left > 0 and not isinstance(u.goal, tuple)) or self.is_marching(u)]
         if not ready:
             self.toast("All units have moved.")
             return
@@ -256,6 +288,7 @@ class CampaignApp(GameMenu, TechScreen):
         self.draw()
         pygame.display.flip()
         world.settle_preview()
+        before = self._war_keys()
         for tag in world.countries:
             if tag != self.player:
                 ai.run(world, tag)
@@ -264,44 +297,160 @@ class CampaignApp(GameMenu, TechScreen):
         self.busy = False
         self.refresh()
         self.autosave()
+        self._announce_wars(before)
         if self.player and not world.countries[self.player].researching and not self.idea_pending():
             self.toast("Pick new research (T)")
 
-    def _advance_orders(self):
-        """Units with a far-away destination keep moving toward it each season, stacks together. A march that a
-        pass closed by snow stops keeps its goal and waits for spring; the player is told once."""
-        world = self.world
-        known = getattr(self, "_pass_waits", set())
-        waiting = set()
+    MARCH_SEASONS = 12          # how far ahead a planned march route is looked up (for the dashed line)
+
+    def is_marching(self, unit):
+        """A player's unit on a multi-season march that has not arrived: it waits for the player's order."""
+        return (self.player is not None and unit.owner == self.player and isinstance(unit.goal, tuple)
+                and not unit.carrier and unit.pos != unit.goal and unit in self.world.units)
+
+    def waiting_marches(self):
+        """The player's stacks that are on a march, as {(pos, goal): [units]}."""
         orders = {}
-        for unit in world.units_of(self.player):
-            if isinstance(unit.goal, tuple) and not unit.carrier:
+        if not self.player:
+            return orders
+        for unit in self.world.units_of(self.player):
+            if self.is_marching(unit):
                 orders.setdefault((unit.pos, unit.goal), []).append(unit)
-        for (pos, goal), group in orders.items():
-            if pos == goal:
-                for unit in group:
-                    unit.goal = None
-                continue
-            reach = world.reachable_group(group)
-            dest = goal if goal in reach else world.step_toward_group(group, goal)
-            if dest == pos:
-                pass_name = world.pass_blocks(group, goal)
-                if pass_name:
-                    key = (pos, goal, tuple(sorted(u.id for u in group)))
-                    waiting.add(key)
-                    if key not in known:
-                        text = f"The {pass_name} pass is closed by snow; the march waits for spring."
-                        world.message(text, self.player)
-                        self.toast(text)
-                    continue
-                for unit in group:
-                    unit.goal = None
-            else:
-                world.move_group(group, dest)
-                if dest == goal:
-                    for unit in group:
-                        unit.goal = None
-        self._pass_waits = waiting
+        return orders
+
+    def _advance_orders(self):
+        """End of a season. Marches do not move on their own: each stack waits for the player's order (the
+        Continue march button, or R with the stack selected). Its planned route stays on the map."""
+        count = len(self.waiting_marches())
+        if count:
+            noun = "march waits" if count == 1 else "marches wait"
+            text = f"{count} {noun} for your order: select the stack and press R (Continue march)."
+            self.world.message(text, self.player)
+            self.toast(text)
+
+    def continue_march(self, units):
+        """Walk the player's stacks among `units` on along their march orders, with this season's moves only."""
+        orders = {}
+        for unit in units:
+            if self.is_marching(unit):
+                orders.setdefault((unit.pos, unit.goal), []).append(unit)
+        for (_pos, goal), group in orders.items():
+            self._march_step(group, goal)
+        self.refresh()
+
+    def _march_step(self, group, goal):
+        world = self.world
+        pos = group[0].pos
+        ids = tuple(sorted(u.id for u in group))
+        logged = self.__dict__.setdefault("_pass_waits", {})     # stack ids -> season of the last log line
+        if min(u.moves_left for u in group) <= 0:
+            self.toast("No moves left this season: the march goes on next season.")
+            return
+        reach = world.reachable_group(group)
+        dest = goal if goal in reach else world.step_toward_group(group, goal)
+        if dest == pos:
+            pass_name = world.pass_blocks(group, goal)
+            if pass_name:                   # a closed pass: every press says so; the log says it once a season
+                text = f"The {pass_name} pass is closed by snow; the march waits for spring."
+                self.toast(text)
+                if logged.get(ids) != world.turn:
+                    logged[ids] = world.turn
+                    world.message(text, self.player)
+                return
+            for unit in group:
+                unit.goal = None
+            logged.pop(ids, None)
+            return
+        world.move_group(group, dest)
+        logged.pop(ids, None)
+        if dest == goal:
+            for unit in group:
+                unit.goal = None
+
+    def march_routes(self):
+        """The planned route of each waiting march as [pos, ..., goal]. Cached until the map, the season or the
+        stacks' moves change (a pass closes in winter and opens in spring, so the route changes with the season)."""
+        marches = self.waiting_marches()
+        sig = tuple((pos, goal, tuple(sorted(u.id for u in group)), min(u.moves_left for u in group))
+                    for (pos, goal), group in sorted(marches.items()))
+        key = (self.world.version, self.world.turn, sig)
+        cache = self.__dict__.get("_route_cache")
+        if cache is None or cache[0] != key:
+            routes = []
+            for (pos, goal), group in marches.items():
+                steps = self.world.path_to(group, goal, seasons=self.MARCH_SEASONS)
+                if steps:
+                    routes.append([p for p, _ in steps])
+            cache = self._route_cache = (key, routes)
+        return cache[1]
+
+    def _draw_marches(self):
+        """The planned route of each waiting march: a dashed gold line over the map, ringed at its goal."""
+        view_rect = self.view_rect()
+        ox, oy = view_rect.x - self.camera[0], view_rect.y - self.camera[1]
+        self.screen.set_clip(view_rect)
+        for route in self.march_routes():
+            pts = [(x + ox, y + oy) for x, y in (self.view.center(p) for p in route)]
+            _dashed_line(self.screen, GOLD, pts, 3)
+            gx, gy = pts[-1]
+            pygame.draw.circle(self.screen, GOLD, (int(gx), int(gy)), max(5, self.view.r // 2), 2)
+        self.screen.set_clip(None)
+
+    def _war_keys(self):
+        return {(w.a, w.b, w.start) for w in self.world.wars}
+
+    def _announce_wars(self, before):
+        """Wars other countries declared on the player since `before` (a set from _war_keys): a log line each,
+        and the alert box, which waits until no idea card, tech screen or menu is open (_show_war_news)."""
+        world, me = self.world, self.player
+        if not me:
+            return
+        new = [w for w in world.wars if (w.a, w.b, w.start) not in before and w.b == me]
+        if not new:
+            return
+        pending = self.__dict__.setdefault("_war_news", [])
+        for war in new:
+            name = world.countries[war.a].name
+            world.message(f"{name} declared war on you! Their armies can now enter your land.", me)
+            pending.append(war.a)
+        self._show_war_news()
+
+    def _show_war_news(self):
+        """Open the war alert for the pending declarations, once nothing else is on screen."""
+        pending = self.__dict__.get("_war_news")
+        if not pending or not self.player or self.tech_open or self.idea_pending() or self.menu or self.busy:
+            return
+        world = self.world
+        attackers = list(dict.fromkeys(pending))
+        pending.clear()
+        lines = [f"{world.countries[tag].name} has declared war on you." for tag in attackers]
+        lines.append("Their armies can take your provinces. Their country panel shows the war.")
+        first = attackers[0]
+        self.ask("War on you!", lines,
+                 [(f"Show {world.countries[first].name}", ("country", first), False),
+                  ("Continue", ("resume",), False)])
+
+    def _war_line(self, tag):
+        """'War: they declared war on you, 2 seasons ago.' for the country panel, or '' when there is no war."""
+        world, me = self.world, self.player
+        war = next((w for w in world.wars if {w.a, w.b} == {tag, me}), None)
+        if war is None:
+            return ""
+        ago = world.turn - war.start
+        when = "this season" if ago <= 0 else f"{ago} season{'s' * (ago != 1)} ago"
+        who = "they declared war on you" if war.b == me else "you declared war on them"
+        return f"War: {who}, {when}."
+
+    def research_line(self):
+        """'Researching Drill yards: 12 / 40 RP, 2 queued' for the player, or 'Nothing is being researched'."""
+        country = self.world.countries[self.player]
+        if not country.researching:
+            return "Nothing is being researched"
+        cost = self.world.tech_cost(self.player, country.researching)
+        text = f"Researching {_tech_name(country.researching)}: {int(country.research)} / {cost} RP"
+        if country.queue:
+            text += f", {len(country.queue)} queued"
+        return text
 
     # ----- input -------------------------------------------------------------------------
     def handle(self, event):
@@ -354,6 +503,8 @@ class CampaignApp(GameMenu, TechScreen):
                 self.toggle_grid()
             elif key == pygame.K_l:
                 ui.panel = "ledger" if ui.panel != "ledger" else None
+            elif key == pygame.K_r and self.player and any(self.is_marching(u) for u in self.active()):
+                self.continue_march(self.active())          # R: the selected stack walks on along its march
             elif key == pygame.K_c and self.player:
                 self.open_country(self.player)
             elif key == pygame.K_b and ui.selected and ui.selected.owner == self.player:
@@ -391,7 +542,7 @@ class CampaignApp(GameMenu, TechScreen):
                 if button.enabled:
                     self.press(button.action)
                 elif button.hint:
-                    self.toast(button.hint)
+                    self.toast(_hint_text(button.hint))
                 return
         if ui.panel and self.panel_rect().collidepoint(pixel):
             return
@@ -492,6 +643,8 @@ class CampaignApp(GameMenu, TechScreen):
             self.choose(action[1])
         elif kind == "end":
             self.end_turn()
+        elif kind == "continue":
+            self.continue_march(self.active())
         elif kind == "build":
             world.build(tag, action[1], action[2])
         elif kind == "recruit":
@@ -632,6 +785,7 @@ class CampaignApp(GameMenu, TechScreen):
         self.screen.fill(BG)
         self.view.grid_on = self.settings["grid"]
         self.view.draw(self.screen, self.view_rect(), self.camera, ui)
+        self._draw_marches()
         self.draw_log()
         self.draw_minimap()
         self.draw_top()
@@ -1172,6 +1326,12 @@ class CampaignApp(GameMenu, TechScreen):
             y += 15
         if stuck:
             y += 6
+        if any(self.is_marching(u) for u in active):
+            self.text(self.small, "On a march: it waits for your order each season.", (x, y), GOLD, w)
+            y += 16
+            self.button((x, y, w, 26), "Continue march (R)", True, ("continue",),
+                        "Walk on along the planned route (the dashed line)", small=True)
+            y += 32
         self.button((x, y, 110, 22), "Tick all / none", True, ("all",), small=True)
         y += 28
         for u in group[:13]:
@@ -1280,6 +1440,12 @@ class CampaignApp(GameMenu, TechScreen):
             y += 6
             self.button((x, y, w, 26), "Technology (T)", True, ("tech",), "Research, ideas and the tech tree (T)", small=True)
             y += 32
+            self.text(self.small, self.research_line(), (x, y), GOLD, w)
+            y += 18
+            for i, key in enumerate(country.queue[:4]):
+                self.text(self.small, f"{i + 1}. {_tech_name(key)}", (x + 8, y), MUTED, w - 8)
+                y += 16
+            y += 6
             y = self._heading("Treasury", y)
             self.text(self.font, f"{country.treasury:,.0f} ducats", (x, y), GOLD)
             y += 22
@@ -1315,7 +1481,9 @@ class CampaignApp(GameMenu, TechScreen):
                 name = world.countries[enemy].name
                 score = world.war_score(tag, enemy)
                 self.text(self.font, f"{name} (war score {score:+d})", (x, y))
-                y += 22
+                y += 20
+                self.text(self.small, self._war_line(enemy), (x, y), BAD_C, w)
+                y += 18
                 bw = (w - 8) // 3
                 self.button((x, y, bw, 24), "Take land", True, ("peace", enemy, "take"),
                             "Demand the provinces you occupy", small=True)
@@ -1350,6 +1518,8 @@ class CampaignApp(GameMenu, TechScreen):
         self.text(self.font, f"Treasury about {country.treasury:,.0f} ducats; {relation}.", (x, y), width=w)
         y += 28
         if world.at_war(tag, self.player):
+            self.text(self.small, self._war_line(tag), (x, y), BAD_C, w)
+            y += 20
             score = world.war_score(self.player, tag)
             self.text(self.font, f"War score {score:+d}", (x, y))
             y += 24
@@ -1480,6 +1650,7 @@ class CampaignApp(GameMenu, TechScreen):
             for event in pygame.event.get():
                 self.handle(event)
             self.scroll()
+            self._show_war_news()
             self.draw()
             pygame.display.flip()
             self.clock.tick(60)

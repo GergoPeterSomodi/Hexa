@@ -528,8 +528,9 @@ class OrdersTest(CampaignCase):
         return app, stack
 
     def march(self, goal, seasons):
-        """Select the stack, right-click goal, then End season `seasons` times. Returns, after the right-click and
-        after each season: (turn, the hexes the stack is on, its goals)."""
+        """Select the stack, right-click goal, then End season and press R (continue the march, #92) `seasons`
+        times. Returns, after the right-click and after each season's march: (turn, the hexes the stack is on,
+        its goals)."""
         app, stack = self.order(goal)
         world = self.world
         trail, toasts = [], []
@@ -539,8 +540,9 @@ class OrdersTest(CampaignCase):
         self.driver.at(2, record)
         self.driver.at(2, lambda: toasts.append(app.ui.toast))
         for i in range(seasons):
-            self.driver.at(2 + i, key("space"))
-            self.driver.at(3 + i, record)
+            self.driver.at(2 + 3 * i, key("space"))
+            self.driver.at(3 + 3 * i, key("r"))
+            self.driver.at(4 + 3 * i, record)
         self.play(seasons + 30, until=lambda: len(trail) == seasons + 1)
         self.assertEqual(self.driver.stopped_by, "until")
         self.assertEqual(toasts, ["On their way: they keep moving there in the coming seasons."])

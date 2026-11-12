@@ -2233,10 +2233,12 @@ class CampaignWorld:
         return True
 
     def unqueue(self, tag, key):
+        """Take a tech out of the queue, with the queued techs that need it (they cannot come before it)."""
         queue = self.countries[tag].queue
         if key not in queue:
             return False
-        queue.remove(key)
+        drop = {key, *tech.dependants(key, queue)}
+        queue[:] = [k for k in queue if k not in drop]
         return True
 
     def _research(self):
@@ -2277,7 +2279,8 @@ class CampaignWorld:
         while country.queue:
             key = country.queue.pop(0)
             t = tech.TECHS.get(key)
-            if t is not None and key not in country.techs and t.era <= country.era:
+            if (t is not None and key not in country.techs and t.era <= country.era
+                    and all(n in country.techs for n in t.needs)):
                 country.researching = key
                 return True
         return False

@@ -27,7 +27,8 @@ OPTION_TEXT = {
 
 class GameMenu:
     menu = None               # None, "main", "save", "load" or "options"
-    menu_confirm = None       # the button waiting for a second click (overwrite, exit...)
+    menu_confirm = None       # the button waiting for a second click (overwrite a save, load over progress)
+    menu_question = None      # (title, text lines, [(label, action, danger)]) of the "question" page
     menu_buttons = ()         # (rect, action, enabled) of the page on screen, set by draw_menu()
     menu_rect = None          # the menu box on screen; None until draw_menu() has drawn the current page
     _slots = None
@@ -124,8 +125,17 @@ class GameMenu:
         self.menu_buttons, self.menu_rect = (), None        # the new page is laid out when it is drawn
 
     def close_menu(self):
-        self.menu, self.menu_confirm = None, None
+        self.menu, self.menu_confirm, self.menu_question = None, None, None
         self.menu_buttons, self.menu_rect = (), None
+
+    def ask(self, title, lines, choices):
+        """Open a Yes/No style question in the pause-menu box. choices: (label, action, danger) per button."""
+        self.open_menu("question")
+        self.menu_question = (title, list(lines), list(choices))
+
+    def leave(self, kind):
+        """Quit the program ("exit") or go to the main menu ("menu"), without asking."""
+        self.running, self.result = False, "menu" if kind in ("menu", "menu_now") else "quit"
 
     def menu_key(self, key):
         if key == pygame.K_ESCAPE:
@@ -160,6 +170,10 @@ class GameMenu:
             self.close_menu()
         elif kind == "page":
             self.open_menu(action[1])
+        elif kind == "country":                 # the war alert: show the enemy in the country panel
+            self.close_menu()
+            self.open_country(action[1])
+            return
         elif kind == "save":
             if saves.meta(action[1]) and confirm:
                 self.menu_confirm = action
@@ -182,10 +196,17 @@ class GameMenu:
                 if key == "window":
                     self.apply_display()
         elif kind in ("menu", "exit"):
-            if confirm and self.player and not self.world.over:
-                self.menu_confirm = action
+            if self.player and not self.world.over:          # a game would be lost: ask first
+                if kind == "menu":
+                    self.ask("Leave to the main menu?", ["Unsaved progress is lost. Save first to keep this game."],
+                             [("Yes, main menu", ("menu_now",), True), ("No, stay", ("page", "main"), False)])
+                else:
+                    self.ask("Exit to desktop?", ["Unsaved progress is lost. Save first to keep this game."],
+                             [("Yes, exit", ("exit_now",), True), ("No, stay", ("page", "main"), False)])
                 return
-            self.running, self.result = False, "menu" if kind == "menu" else "quit"
+            self.leave(kind)
+        elif kind in ("menu_now", "exit_now"):
+            self.leave(kind)
         self.menu_confirm = None
 
     # ----- drawing -------------------------------------------------------------------
@@ -213,16 +234,21 @@ class GameMenu:
         shade.fill((5, 7, 10, 165))
         screen.blit(shade, (0, 0))
         self.menu_buttons = []
-        width = 300 if self.menu == "main" else 600
-        rows = {"main": 6, "save": 9, "load": 11, "options": 6}[self.menu]
-        row_h = 46 if self.menu == "main" else 52
-        height = 90 + rows * row_h
+        if self.menu == "question":
+            width = 480
+            body_h = 22 * len(self.menu_question[1]) + 14
+            height = 90 + body_h + 58
+        else:
+            width = 300 if self.menu == "main" else 600
+            rows = {"main": 6, "save": 9, "load": 11, "options": 6}[self.menu]
+            row_h = 46 if self.menu == "main" else 52
+            height = 90 + rows * row_h
         box = pygame.Rect(0, 0, width, height)
         box.center = (w // 2, h // 2)
         self.menu_rect = box
         pygame.draw.rect(screen, PANEL, box, border_radius=12)
         pygame.draw.rect(screen, GOLD, box, 1, border_radius=12)
-        title = {"main": "Paused", "save": "Save game", "load": "Load game", "options": "Options"}[self.menu]
+        title = self.menu_question[0] if self.menu == "question" else             {"main": "Paused", "save": "Save game", "load": "Load game", "options": "Options"}[self.menu]
         img = self.title.render(title, True, GOLD)
         screen.blit(img, img.get_rect(midtop=(box.centerx, box.y + 16)))
         sub = f"{self.world.date()}  -  {self.world.geo.name}"
@@ -230,15 +256,26 @@ class GameMenu:
         screen.blit(img, img.get_rect(midtop=(box.centerx, box.y + 46)))
         x, y = box.x + 20, box.y + 74
         bw = width - 40
-        if self.menu == "main":
-            confirm = self.menu_confirm or ("",)
+        if self.menu == "question":
+            for line in self.menu_question[1]:
+                img = self.small.render(line, True, MUTED)
+                screen.blit(img, img.get_rect(midtop=(box.centerx, y)))
+                y += 22
+            y += 14
+            choices = self.menu_question[2]
+            gap = 10
+            cw = (bw - gap * (len(choices) - 1)) // len(choices)
+            for i, (label, action, danger) in enumerate(choices):
+                self._menu_button((x + i * (cw + gap), y, cw, 38), label, action, True, danger=danger)
+            hint = "Esc: go back"
+        elif self.menu == "main":
             for label, action, enabled in (
                     ("Resume", ("resume",), True),
                     ("Save game", ("page", "save"), bool(self.player) and not self.busy),
                     ("Load game", ("page", "load"), True),
                     ("Options", ("page", "options"), True),
-                    ("Click again: leave without saving" if confirm[0] == "menu" else "Main menu", ("menu",), True),
-                    ("Click again: quit without saving" if confirm[0] == "exit" else "Exit to desktop", ("exit",), True)):
+                    ("Main menu", ("menu",), True),
+                    ("Exit to desktop", ("exit",), True)):
                 self._menu_button((x, y, bw, 38), label, action, enabled, danger=action[0] in ("menu", "exit"))
                 y += row_h
             hint = "Esc: back to the game    F5: quicksave    F9: quickload    F11: fullscreen"

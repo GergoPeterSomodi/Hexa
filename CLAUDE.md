@@ -78,10 +78,10 @@ drives it against temporary copies of `hexa/` (a renamed class with and without 
 without a default, a header `meta()` refuses, a bump alone) and calls it in-process only for usage errors, which must
 leave `HEXA_HOME` as it was.
 
-Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and ten game
+Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and eleven game
 modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
 `test_techscreen.py`, `test_uifixes.py`, `test_wfctiles.py`, `test_goodsobjects.py`, `test_mapview_polish.py`,
-`test_town_labels.py`, `test_review_fixes.py`, which the CI `ui` job runs too): they skip without it (errors under `HEXA_REQUIRE_PYGAME=1`).
+`test_town_labels.py`, `test_review_fixes.py`, `test_playtest2.py`, which the CI `ui` job runs too): they skip without it (errors under `HEXA_REQUIRE_PYGAME=1`).
 Window tests subclass `tests/support/harness.py:UITestCase`
 (SDL dummy drivers, fake `Clock`/`get_ticks`, pinned fonts, temp `HEXA_HOME`), script input with
 `self.driver.at(frame, key(...)/click(...))` and `self.driver.run_for(frames, until=...)`, call the window's real

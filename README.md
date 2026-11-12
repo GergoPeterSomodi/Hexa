@@ -105,12 +105,18 @@ One turn is one season, from spring 1480 to 1650. Every land hex is a province.
 a red-outlined enemy). Right-click far away to send a unit there over several seasons. Mouse wheel or
 **+/-** zooms, right-drag or **WASD** scrolls, **1-4** switch map modes (political, terrain, goods, markets;
 press **3** again to switch the goods view between chips, deposits and prices), **Tab** cycles units,
-**C** opens your country, **L** the ledger, **G** shows or hides the faint hex grid, **Space** ends the season.
+**C** opens your country, **L** the ledger, **G** shows or hides the faint hex grid, **R** continues the selected
+stack's march (see Moving), **Space** ends the season.
 Hover anything for a moment to get a card explaining it: troops, buttons, provinces, goods.
 
 **Moving:** a selected stack shows where it can go this season (green, bright edge), next season (blue),
 what it can attack (red; "fire" for cannons), and "stop" where an enemy castle will halt it. Hover a hex to
 see the path, the move cost of each step and how many seasons it takes.
+
+**Marches:** a right-click far away starts a march over several seasons. When the season ends, a march does not
+move on by itself: the stack waits for your order. Its planned route stays on the map as a dashed gold line, and
+Tab cycles to it. Press **R** or the **Continue march (R)** button in the unit panel to walk on for this season.
+A pass closed by snow stops the march until spring, and the message says so each time you try.
 
 ### Technology
 - **T** (or **Technology** in the country panel) opens the tech tree.
@@ -134,6 +140,8 @@ see the path, the move cost of each step and how many seasons it takes.
 
 ### Menu, saving and options
 - **Esc** (or **M**, or the **Menu** button) pauses the game and opens the menu: resume, save, load, options, back to the main menu, exit.
+  **Exit to desktop** and **Main menu** ask Yes or No first, since unsaved progress is lost. Esc on that question
+  goes back to the menu.
 - **Saving:** there are eight save slots plus a quicksave (**F5** saves, **F9** loads) and an autosave (every year by default). Each slot shows the country, the date and the map.
   - Saves are kept in `~/.hexa/saves`. If a save can't be written (a read-only folder or a full disk), a message says why, the game carries on, and the slot keeps its previous save.
   - **Continue** on the start menu loads your latest save. If that save can't be read, the start menu says so instead of starting a new game.
@@ -272,6 +280,8 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
   people and half its goods).
 - Troops heal in their own land when fed (faster in towns). Declare war on a neighbour from their country panel;
   make peace from yours: demand the land you occupy, offer white peace, or give up.
+- **War on you:** when a neighbour declares war, a "War on you!" box opens once any idea card or the tech screen is
+  closed. The log says so too, and the country panel shows who declared the war and how many seasons ago.
 
 All numbers are in `hexa/campaign/data.py`; the map, countries and markets in `hexa/campaign/geo.py`.
 

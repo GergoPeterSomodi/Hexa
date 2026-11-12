@@ -444,6 +444,16 @@ class TechScreen:
             return "available"
         return "blocked"
 
+    def tech_order(self):
+        """Position of each tech on the research path: 0 is the tech being researched, 1 and up the queue."""
+        country = self.world.countries[self.player]
+        order = {}
+        if country.researching:
+            order[country.researching] = 0
+        for i, key in enumerate(country.queue):
+            order.setdefault(key, i + 1)
+        return order
+
     def _tech_cost(self, key):
         return self.world.tech_cost(self.player, key)
 
@@ -624,6 +634,7 @@ class TechScreen:
             if bi:
                 pygame.draw.line(screen, LINE, (0, y0), (geo["left"], y0))
         # prerequisite lines first, so the cards cover their ends
+        order = self.tech_order()
         for key, rect in rects.items():
             t = tech.tech(key)
             for need in t.needs:
@@ -641,8 +652,8 @@ class TechScreen:
                 else:
                     pts = [(a.centerx, a.top), (b.centerx, b.bottom)]
                 cross = tech.tech(need).branch != t.branch
-                if self.tech_selected in (key, need):
-                    colour = GOLD
+                if self.tech_selected in (key, need) or (key in order and need in order):
+                    colour = GOLD           # the selected tech, and the path being researched
                 elif need in country.techs and key in country.techs:
                     colour = (62, 124, 88)
                 else:
@@ -668,6 +679,15 @@ class TechScreen:
         if key == self.tech_selected:
             pygame.draw.rect(screen, WHITE, rect.inflate(6, 6), 1, border_radius=9)
         pygame.draw.rect(screen, border, rect, width, border_radius=7)
+        order = self.tech_order()
+        if key in order:                    # the research path: a gold ring and its place in line
+            pygame.draw.rect(screen, GOLD, rect.inflate(4, 4), 2, border_radius=9)
+            label = "NOW" if order[key] == 0 else str(order[key])
+            img = _font(11, True).render(label, True, DARK_INK)
+            pill = pygame.Rect(0, 0, max(18, img.get_width() + 8), 16)
+            pill.center = (rect.x + 4, rect.y + 2)
+            pygame.draw.rect(screen, GOLD, pill, border_radius=8)
+            screen.blit(img, img.get_rect(center=pill.center))
         col = BRANCH_COLOUR[t.branch]
         if state in ("blocked", "later"):
             col = _mix(col, (70, 74, 82), 0.6)

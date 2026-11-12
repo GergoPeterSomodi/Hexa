@@ -212,9 +212,8 @@ class NewBugsTest(MonkeyCase):
     bug's input let through (KNOWN_ISSUES withholds it in every other session, so they can find other bugs). The fix
     removes the decorator and the KNOWN_ISSUES row."""
 
-    @unittest.expectedFailure
     def test_campaign_25_300_burst_0_5(self):
-        """New bug, no GitHub issue filed yet (KNOWN_ISSUES "card-toast"): clicking a greyed-out troop button in the
+        """Fixed (KNOWN_ISSUES "card-toast"; app._hint_text toasts the card's reason line). It was: clicking a greyed-out troop button in the
         Raise panel crashes the game with TypeError: text must be a unicode or bytes. left_click() shows a disabled
         button's hint as a toast and draw_hint() draws the toast as one line of text, but the troop buttons' hint is
         a (title, lines) hover card. Austria at frame 204 here, clicking a troop its province can't raise this season.
