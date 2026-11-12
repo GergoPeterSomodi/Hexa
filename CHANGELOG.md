@@ -4,6 +4,15 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
+## v0.1.6: Bug-fix round 2
+The rest of kioba's v0.1.6 and v0.1.7 milestones, and a seamless map:
+- With the hex grid off (G), tiles join with no gaps at any zoom; washes, fog and frost draw no lines between hexes (#71)
+- Fog clears at once for hexes revealed partway through a move (#26)
+- Changing the tax level previews the income without rerunning the season's economy (#23)
+- Random worlds use their own Old World / New World regions instead of Europe's cut-offs (#31)
+- An AI march plans its path once and walks without rescanning cargo (#30)
+- One saves/options folder lookup (#32); loading builds the map view once; dead code removed (#33, #34)
+
 ## v0.1.5: Bug-fix round
 **UI and controls** (kioba's milestone):
 - Right-clicking to close the pause menu no longer gives the selected stack an order (#16)
