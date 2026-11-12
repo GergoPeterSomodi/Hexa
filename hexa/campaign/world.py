@@ -123,13 +123,15 @@ class Market:
     history: dict = field(default_factory=dict)
     provinces: list = field(default_factory=list)
 
-    def reset(self):
+    def reset(self, keep_pending=False):
+        """Clear the season's books. The pending purchases count as demand; they are used up unless keep_pending."""
         for d in (self.supply, self.demand, self.imports, self.exports, self.produced):
             for g in GOODS:
                 d[g] = 0.0
         for g, n in self.pending.items():
             self.demand[g] += n
-        self.pending = {}
+        if not keep_pending:
+            self.pending = {}
 
     def satisfaction(self, good):
         d = self.demand.get(good, 0)
@@ -248,6 +250,25 @@ class War:
     a: str
     b: str
     start: int
+
+
+def _europe_region(lon, lat):
+    """The real map's regions: the Old World, the colonial land in between, and the Americas (new) past 30 west."""
+    if lon < -30:
+        return "new"
+    if lon < -20 or (lat < 15 and lon < 20):
+        return "colonial"
+    return "old"
+
+
+def _europe_colonisable(lon, lat):
+    """Where the AI never picks a colony: the Old World core (east of 12 west and north of 20), and all land east of 20."""
+    return not (lon > -12 and lat > 20) and lon <= 20
+
+
+def _europe_tropical(lon, lat):
+    """Where a colony may found a trading post: Africa, south of 17 north and east of 20 west."""
+    return lat < 17 and lon > -20
 
 
 def map_source(map, seed):
@@ -973,18 +994,36 @@ class CampaignWorld:
                 found.setdefault(u.pos, set()).add(u.owner)
         return found
 
+    # The map's own geography decides these three (randomgeo defines them; Europe uses the defaults above).
+    def region(self, pos):
+        """'old' (the known Old World), 'new' (across the ocean) or 'colonial' (colonisable land in between)."""
+        return getattr(self.geo, "REGION", _europe_region)(*geo.lonlat(pos))
+
     def in_old_world(self, pos):
         """Whether a hex belongs to the known Old World (not a colony region)."""
-        if self.map == "random":
-            return pos in self._known_world
-        lon, lat = geo.lonlat(pos)
-        return not (lon < -20 or (lat < 15 and lon < 20))
+        return self.region(pos) == "old"
+
+    def colonisable(self, pos):
+        """Whether the AI may settle a colony on this land hex (the map's own rule; trade and terrain come on top)."""
+        return getattr(self.geo, "COLONISABLE", _europe_colonisable)(*geo.lonlat(pos))
+
+    def tropical(self, pos):
+        """Whether a trading post may be founded here (the tropics: Africa on Europe's map)."""
+        return getattr(self.geo, "TROPICAL", _europe_tropical)(*geo.lonlat(pos))
 
     def units_of(self, tag):
         return [u for u in self.units if u.owner == tag]
 
     def cargo(self, ship):
         return [u for u in self.units if u.carrier is ship]
+
+    def _aboard(self):
+        """{ship id: [units aboard]} in one pass over the units (what cargo() gives, for every ship at once)."""
+        found = {}
+        for u in self.units:
+            if u.carrier is not None:
+                found.setdefault(u.carrier.id, []).append(u)
+        return found
 
     def date(self):
         return date(self.turn)
@@ -1249,10 +1288,19 @@ class CampaignWorld:
         return True
 
     # ----- the economy (runs once per season, after everybody moved) --------------
-    def economy(self):
+    def set_tax(self, tag, level):
+        """Change a country's tax level and show the projected economy. This is only a preview: the pending
+        purchases and the price history are left alone, so the season's own economy still runs once, as it would
+        have without the change."""
+        self.countries[tag].tax = level
+        self.economy(preview=True)
+
+    def economy(self, preview=False):
+        """Work out prices, trade and incomes. preview=True projects them without using up the pending purchases
+        or adding a point to the price history."""
         self.ensure_markets()
         for market in self.markets:
-            market.reset()
+            market.reset(keep_pending=preview)
         for prov in self.provinces.values():
             prov.output = prov.value = 0.0
             market = prov.market
@@ -1316,6 +1364,8 @@ class CampaignWorld:
             self._trade(route)
         for market in self.markets:
             self._set_prices(market)
+            if preview:
+                continue
             for g in GOODS:
                 market.history[g].append(round(market.price[g], 2))
                 del market.history[g][:-40]
@@ -2447,8 +2497,9 @@ class CampaignWorld:
         reach = {p: c for p, c in costs.items()
                  if p == lead.pos or (alone if p not in occupied else self.can_stand(group, p))}
         if not naval:
+            aboard = self._aboard()
             for ship in self.units_of(lead.owner):
-                if ship.naval and len(self.cargo(ship)) + len(group) <= ship.kind.capacity:
+                if ship.naval and len(aboard.get(ship.id, ())) + len(group) <= ship.kind.capacity:
                     via = [costs[n] for n in neighbors(ship.pos) if n in costs]
                     if via and min(via) + 1 <= moves:
                         reach[ship.pos] = min(via) + 1
@@ -2506,7 +2557,24 @@ class CampaignWorld:
     def move(self, unit, dest):
         return self.move_group([unit], dest)
 
-    def move_group(self, group, dest):
+    def move_toward(self, unit, goal):
+        """move(unit, step_toward(unit, goal)): one step of a march, with one path search."""
+        return self.move_toward_group([unit], goal)
+
+    def move_toward_group(self, group, goal):
+        """move_group(group, step_toward_group(group, goal)) with one path search, not two: the plan is shared."""
+        best = self._group_plan(group)
+        dest = self.step_toward_group(group, goal, best=best)
+        return self.move_group(group, dest, best=best)
+
+    def _group_plan(self, group):
+        """plan() for the stack over its moves this season. None for units aboard a ship (they only step off)."""
+        if group[0].carrier:
+            return None
+        return self.plan(group, min(u.moves_left for u in group))
+
+    def move_group(self, group, dest, best=None):
+        """Walk a stack to dest this season. `best` is the stack's plan() if the caller already has one."""
         group = [u for u in group if u in self.units]
         if self.over or not group:
             return False
@@ -2515,14 +2583,16 @@ class CampaignWorld:
             return True
         if not self.move_check(group, dest)[0]:
             return False
-        best = None if any(u.carrier for u in group) else self.plan(group, min(u.moves_left for u in group))
+        if best is None:
+            best = self._group_plan(group)
         reach = self.reachable_group(group, best)
         if dest not in reach:
             return False
+        aboard = self._aboard()                  # looked up once: nobody gets on or off during the walk
         ship = None
         if not lead.naval:
             ship = next((u for u in self.units_at(dest) if u.naval and u.owner == lead.owner
-                         and len(self.cargo(u)) + len(group) <= u.kind.capacity), None)
+                         and len(aboard.get(u.id, ())) + len(group) <= u.kind.capacity), None)
         # Walk the route hex by hex, looking around on the way (so fog clears along it, not just at the end).
         path = self.route(group, dest, best)
         self.last_move = ([u.id for u in group], path)
@@ -2530,12 +2600,12 @@ class CampaignWorld:
         for step in path[1:-1]:
             for unit in group:
                 unit.pos = step
-                for passenger in self.cargo(unit):
+                for passenger in aboard.get(unit.id, ()):
                     passenger.pos = step
             self.see_from(scout, refresh=False)
         for unit in group:
             unit.pos = path[0]
-            for passenger in self.cargo(unit):
+            for passenger in aboard.get(unit.id, ()):
                 passenger.pos = path[0]
         for unit in group:
             if ship:
@@ -2546,7 +2616,7 @@ class CampaignWorld:
             else:
                 unit.moves_left -= reach[dest]
                 unit.pos = dest
-                for passenger in self.cargo(unit):
+                for passenger in aboard.get(unit.id, ()):
                     passenger.pos = dest
             unit.acted = True
         if not lead.naval and not ship and dest in self.zoc(lead.owner):
@@ -2609,9 +2679,12 @@ class CampaignWorld:
     def step_toward(self, unit, goal, field=None):
         return self.step_toward_group([unit], goal, field)
 
-    def step_toward_group(self, group, goal, field=None):
+    def step_toward_group(self, group, goal, field=None, best=None):
+        """The hex of the next stop on the way to goal. `best` is the stack's plan() if the caller has one at hand."""
         lead = group[0]
-        reach = self.reachable_group(group)
+        if best is None:
+            best = self._group_plan(group)
+        reach = self.reachable_group(group, best)
         if field is None:
             # Only wait for hexes this field can settle: a land field never reaches the sea hex of a
             # friendly ship in `reach`, and waiting for it would search the whole map.

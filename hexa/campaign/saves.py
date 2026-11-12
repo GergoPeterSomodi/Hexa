@@ -9,6 +9,7 @@ import pickle
 import sys
 import time
 
+from .. import settings
 from .world import CampaignWorld
 
 # The save format. Bump it only for changes the migration in CampaignWorld._migrate cannot handle:
@@ -19,12 +20,8 @@ SPECIAL = ("quick", "auto")
 NAMES = {"quick": "Quicksave", "auto": "Autosave"}
 
 
-def home():
-    return os.environ.get("HEXA_HOME") or os.path.join(os.path.expanduser("~"), ".hexa")
-
-
 def folder():
-    return os.path.join(home(), "saves")
+    return os.path.join(settings.home(), "saves")
 
 
 def path(slot):

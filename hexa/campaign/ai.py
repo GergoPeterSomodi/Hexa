@@ -312,7 +312,7 @@ def _gather(world, tag, stack):
     home = world.provinces.get(stack[0].pos)
     if home and home.owner == tag and distance(stack[0].pos, capital) <= 4 * SCALE:
         return
-    world.move_group(stack, world.step_toward_group(stack, capital))
+    world.move_toward_group(stack, capital)
 
 
 def _defence_power(world, pos):
@@ -348,7 +348,7 @@ def _campaign(world, tag, stack, enemies):
     goal = min(targets, key=lambda p: distance(p.pos, stack[0].pos)).pos
     if distance(goal, stack[0].pos) > 30 * SCALE:
         return
-    world.move_group(stack, world.step_toward_group(stack, goal))
+    world.move_toward_group(stack, goal)
 
 
 def _diplomacy(world, tag):
@@ -408,13 +408,13 @@ def _colonise(world, tag):
                 if unit:
                     world.move(unit, ship.pos)
             else:
-                world.move(ship, world.step_toward(ship, _sea_by(world, home.pos)))
+                world.move_toward(ship, _sea_by(world, home.pos))
         elif target is None or not colonists or (explore and not aboard):
             frontier = _frontier(world, tag, ship)
             if frontier:
-                world.move(ship, world.step_toward(ship, frontier))
+                world.move_toward(ship, frontier)
             else:
-                world.move(ship, world.step_toward(ship, _sea_by(world, home.pos)))
+                world.move_toward(ship, _sea_by(world, home.pos))
     for colonist in colonists:
         if colonist not in world.units or colonist.carrier:
             continue
@@ -433,13 +433,12 @@ def _sail_and_land(world, ship, aboard, target):
     if distance(ship.pos, target) > 1:
         dest = _sea_by(world, target)
         if dest:
-            world.move(ship, world.step_toward(ship, dest))
+            world.move_toward(ship, dest)
     if distance(ship.pos, target) <= 1:
         for unit in aboard:
             if world.unit_at(target) is None and world.provinces[target].owner is None:
                 if world.move(unit, target) and unit.kind is COLONIST:
-                    africa = geo.lonlat(target)[1] < 17 and geo.lonlat(target)[0] > -20
-                    if not world.found(unit, trading_post=africa and world.found_check(unit, True)[0]):
+                    if not world.found(unit, trading_post=world.tropical(target) and world.found_check(unit, True)[0]):
                         world.found(unit)
                     world.countries[unit.owner].memory["target"] = None
                     break
@@ -478,11 +477,8 @@ def _pick_site(world, tag, ship):
         prov = world.provinces.get(pos)
         if not prov or prov.owner is not None or not prov.coastal or not prov.good:
             continue
-        lon, lat = geo.lonlat(pos)
-        if (world.in_old_world(pos) if world.map == "random" else lon > -12 and lat > 20):
+        if not world.colonisable(pos) or prov.terrain == "desert":
             continue                              # the Old World is not for colonising
-        if prov.terrain == "desert" or lon > 20:
-            continue
         if not any(world.sea_body.get(n) == body for n in neighbors(pos)):
             continue
         price = GOODS[prov.good].price
@@ -499,9 +495,7 @@ def _pick_site(world, tag, ship):
 
 def _new_world(world, pos):
     """Land across the ocean: the Americas, or a random world's unknown continents."""
-    if world.map == "random":
-        return not world.in_old_world(pos) and geo.lonlat(pos)[0] < world.geo.START[0] - 30
-    return geo.lonlat(pos)[0] < -30
+    return world.region(pos) == "new"
 
 
 def _frontier(world, tag, ship):

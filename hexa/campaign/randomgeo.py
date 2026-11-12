@@ -1233,6 +1233,12 @@ def _attempt(seed, attempt):
         return set(lnd), set(lks)
 
     known_w = d.known_w
+
+    def region_at(lon, lat):
+        if lon > d.known_w and lat > 11.5:
+            return "old"
+        return "new" if lon < round(start[0], 2) - 30 else "colonial"
+
     world = SimpleNamespace(
         name=f"Random world #{seed}", seed=seed,
         START=(round(start[0], 2), round(start[1], 2)),
@@ -1241,6 +1247,8 @@ def _attempt(seed, attempt):
         MOUNTAINS=mountains, HILLS=hills, FERTILE_RIVERS=fertile, PASSES=passes,
         desert_at=desert_at, steppe_at=steppe_at, marsh_at=marsh_at,
         KNOWN_WORLD=lambda lon, lat: lon > known_w and lat > 11.5,
+        REGION=region_at, COLONISABLE=lambda lon, lat: region_at(lon, lat) != "old",
+        TROPICAL=lambda lon, lat: lat < 17 and region_at(lon, lat) != "new",
         COASTAL_KNOWLEDGE={}, COLONIAL=colonial,
         # the projection stays geo's; these forward to it so the object can stand in for the module
         lonlat=lambda pos: geo.lonlat(pos), hex_of=lambda lon, lat: geo.hex_of(lon, lat),

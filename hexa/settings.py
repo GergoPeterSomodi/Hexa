@@ -12,9 +12,13 @@ CHOICES = {"fullscreen": (False, True), "window": WINDOWS, "autosave": AUTOSAVE,
            "grid": (False, True)}
 
 
+def home():
+    """The folder for player data (options and saves): $HEXA_HOME, else ~/.hexa. The one place that decides it."""
+    return os.environ.get("HEXA_HOME") or os.path.join(os.path.expanduser("~"), ".hexa")
+
+
 def _path():
-    home = os.environ.get("HEXA_HOME") or os.path.join(os.path.expanduser("~"), ".hexa")
-    return os.path.join(home, "settings.json")
+    return os.path.join(home(), "settings.json")
 
 
 def load():
