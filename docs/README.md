@@ -1,5 +1,6 @@
 # Hexa docs
 
+- **[The studio](studio.md):** how Hexa is made: the agent team, the review gates and the workflow.
 - **[Roadmap](roadmap/roadmap.md):** the near-term milestones and decisions so far.
 - **[Dev diary](devlog/README.md):** how Hexa was built, step by step, with screenshots.
 - **[Debt and bankruptcy roadmap](roadmap/debt-and-bankruptcy.md):** the idea, steps and open questions.
