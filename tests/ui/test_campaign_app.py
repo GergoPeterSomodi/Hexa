@@ -605,8 +605,8 @@ class OrdersTest(CampaignCase):
                          "order, and the stack stays where it fought")
 
     def test_an_order_whose_route_goes_around_foreign_land_gets_there(self):
-        """New bug, no GitHub issue filed yet: orders walk a cost field (world.cost_field, used by
-        step_toward_group) that ignores land the stack may not enter. Castile's route to (134, 52) has to go round
+        """Fixed (cost_field(unit)). It was: orders walk a cost field (world.cost_field, used by
+        step_toward_group) that ignores land the stack may not enter. Castile's route to (134, 53) has to go round
         Aragon, as the route the map shows does (world.path_to), but the stack heads straight for the Aragonese
         border at (134, 57). There every hex it may enter is farther from the goal, so _advance_orders finds no
         step, quietly drops the order at the end of the first season and leaves the stack at the border."""
