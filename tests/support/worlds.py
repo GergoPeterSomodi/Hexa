@@ -4,7 +4,7 @@
     fresh(player)        a new Europe world you may change (cheap: restored from the world module's snapshot)
     random_world(seed)   a shared read-only random world, built once per seed. To change one, build your own
                          with ``CampaignWorld(seed, map="random")``.
-    play_seasons(w, n)   let the AI play n seasons
+    play_seasons(w, n)   let the AI play n seasons (through the GameManager: the order of a real season)
     pristine(w)          a guard that notices if a shared world was changed; call ``.check()`` in tearDownModule
 
 No pygame here.
@@ -12,7 +12,7 @@ No pygame here.
 import hashlib
 import pickle
 
-from hexa.campaign import ai
+from hexa.campaign.game import GameManager
 from hexa.campaign.world import CampaignWorld
 
 _EUROPE = None
@@ -47,11 +47,9 @@ def random_world(seed):
 def play_seasons(world, n, player_ai=True):
     """Let the AI move every country for n seasons, ending each round. With ``player_ai=False`` the player's
     own country is left alone, as in a real game. Returns the world."""
+    game = GameManager(world)
     for _ in range(n):
-        for tag in list(world.countries):
-            if player_ai or tag != world.player:
-                ai.run(world, tag)
-        world.end_round()
+        game.end_season(player_ai=player_ai)
     return world
 
 

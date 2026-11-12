@@ -6,6 +6,7 @@ import pygame
 
 from .. import settings as options
 from . import saves
+from .game import GameManager
 
 TEXT = (235, 238, 242)
 MUTED = (150, 160, 172)
@@ -76,7 +77,7 @@ class GameMenu:
             self.toast("Choose your country before saving.")
             return False
         try:
-            saves.save(self.world, slot)
+            self.game.save(slot)
         except saves.SAVE_ERRORS as error:
             self.toast(f"Could not save {saves.slot_name(slot)}: {saves.failure(error)}.")
             return False
@@ -85,12 +86,12 @@ class GameMenu:
         return True
 
     def load_from(self, slot):
-        world = saves.load(slot)
-        if world is None:
+        game = GameManager.load(slot)
+        if game is None:
             self.toast(f"{saves.slot_name(slot)} could not be loaded.")
             return False
-        self.load_world(world)
-        self.toast(f"Loaded {saves.slot_name(slot)}: {world.date()}.")
+        self.load_world(game)
+        self.toast(f"Loaded {saves.slot_name(slot)}: {game.world.date()}.")
         return True
 
     def quickload(self):
@@ -110,13 +111,18 @@ class GameMenu:
         return True
 
     def autosave(self):
-        every = options.AUTOSAVE_TURNS[self.settings["autosave"]]
-        if every and self.player and self.world.turn % every == 1 and not self.world.over:
-            try:
-                saves.save(self.world, "auto")
-            except saves.SAVE_ERRORS as error:
-                self.toast(f"Could not autosave: {saves.failure(error)}.")
-                return
+        self.game.autosave_every = options.AUTOSAVE_TURNS[self.settings["autosave"]]
+        try:
+            saved = self.game.autosave()
+        except saves.SAVE_ERRORS as error:
+            return self._autosave_toast(False, error)
+        self._autosave_toast(saved, None)
+
+    def _autosave_toast(self, saved, error):
+        """Tell the player how the autosave went (nothing if none was due)."""
+        if error:
+            self.toast(f"Could not autosave: {saves.failure(error)}.")
+        elif saved:
             self._slots = None
             self.toast("Autosaved.")
 

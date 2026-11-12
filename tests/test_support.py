@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from hexa.campaign import ai
 from tests.support import monkey, pg, slow, worlds
 from tests.support.home import TempHome
 from tests.support.worlds import fresh, play_seasons, pristine, random_world
@@ -124,11 +125,11 @@ class WorldsTest(unittest.TestCase):
 
     def test_play_seasons_can_leave_the_player_alone(self):
         w = fresh("POR")
-        with mock.patch.object(worlds.ai, "run") as run:
+        with mock.patch.object(ai, "run") as run:
             play_seasons(w, 2, player_ai=False)
         self.assertEqual(run.call_count, 2 * (len(w.countries) - 1))
         self.assertNotIn("POR", [call.args[1] for call in run.call_args_list])
-        with mock.patch.object(worlds.ai, "run") as run:
+        with mock.patch.object(ai, "run") as run:
             play_seasons(w, 1)
         self.assertEqual(run.call_count, len(w.countries))
 

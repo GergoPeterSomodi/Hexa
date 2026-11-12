@@ -6,14 +6,14 @@ import pygame
 
 
 from .. import settings as options
-from . import ai, geo, saves, tech
+from . import geo, saves, tech
 from .gamemenu import GameMenu
 from .techscreen import TechScreen
 from .data import (FOOD_PER_TROOP, NEEDS, WAGON, BRANCH_NAMES, ERAS, GENERAL, GENERAL_TRAITS, BUILDINGS, CARAVEL, CASTLES, COLONIST, COLONY_DONE, GOODS,
                    SETTLEMENT_SLOTS, SETTLEMENTS, TAX_LEVELS, TERRAIN, WORKS, WORKS_BONUS, WORKS_ERA,
                    WORKS_LEVELS)
 from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
-from .world import CampaignWorld
+from .game import GameManager
 
 def _hint_text(hint):
     """One line for a toast from a button hint: the hint itself, or for a (title, lines) hover card the first
@@ -114,7 +114,7 @@ class CampaignApp(GameMenu, TechScreen):
         if map == "random" and seed is None:
             import random
             seed = random.randrange(1, 100000)
-        loaded = saves.load(load) if load else None
+        loaded = GameManager.load(load) if load else None
         if load and loaded is None:          # never quietly start some other game instead
             raise saves.LoadError(f"{saves.slot_name(load)} could not be loaded.")
         self.camera = [0.0, 0.0]
@@ -124,9 +124,9 @@ class CampaignApp(GameMenu, TechScreen):
         self._mini = None
         if loaded:                           # one map view: load_world builds it (and the caption, ui and camera)
             self.load_world(loaded)
-            self.toast(f"Loaded {saves.slot_name(load)}: {loaded.date()}.")
+            self.toast(f"Loaded {saves.slot_name(load)}: {loaded.world.date()}.")
             return
-        self.world = CampaignWorld(seed if seed is not None else 1480, map=map)
+        self._set_game(GameManager.new(seed if seed is not None else 1480, map))
         pygame.display.set_caption(f"Hexa: Age of Discovery  -  {self.world.geo.name}")
         self.view = MapView(self.world, tiles_dir)
         self.ui = UI()
@@ -137,9 +137,18 @@ class CampaignApp(GameMenu, TechScreen):
         if player:
             self.choose_named(player)
 
-    def load_world(self, world):
-        """Switch to a loaded world: fresh map view and selection, camera on the player's capital."""
-        self.world = world
+    @property
+    def world(self):
+        return self.game.world
+
+    def _set_game(self, game):
+        self.game = game                # the war alert listens to its world's event bus
+        game.bus.subscribe("war_declared", self._war_declared)
+
+    def load_world(self, game):
+        """Switch to a loaded game: new map view, selection and camera."""
+        self._set_game(game)
+        world = game.world
         self.view = MapView(world, self.tiles_dir)
         self.ui = UI()
         self._mini_key = None
@@ -247,6 +256,7 @@ class CampaignApp(GameMenu, TechScreen):
 
     def refresh(self):
         ui, world = self.ui, self.world
+        world.ensure_markets()
         ui.group = [u for u in ui.group if u in world.units]
         if ui.selected not in ui.group:
             ui.selected = ui.group[0] if ui.group else None
@@ -285,19 +295,15 @@ class CampaignApp(GameMenu, TechScreen):
         if not self.player or world.over:
             return
         self.busy = True
+        world.ensure_markets()
         self.draw()
         pygame.display.flip()
-        world.settle_preview()
-        before = self._war_keys()
-        for tag in world.countries:
-            if tag != self.player:
-                ai.run(world, tag)
-        world.end_round()
-        self._advance_orders()
+        self.game.autosave_every = options.AUTOSAVE_TURNS[self.settings["autosave"]]
+        season = self.game.end_season(orders=self._advance_orders)
         self.busy = False
         self.refresh()
-        self.autosave()
-        self._announce_wars(before)
+        self._autosave_toast(season.saved, season.error)
+        self.process_events()
         if self.player and not world.countries[self.player].researching and not self.idea_pending():
             self.toast("Pick new research (T)")
 
@@ -397,24 +403,19 @@ class CampaignApp(GameMenu, TechScreen):
             pygame.draw.circle(self.screen, GOLD, (int(gx), int(gy)), max(5, self.view.r // 2), 2)
         self.screen.set_clip(None)
 
-    def _war_keys(self):
-        return {(w.a, w.b, w.start) for w in self.world.wars}
-
-    def _announce_wars(self, before):
-        """Wars other countries declared on the player since `before` (a set from _war_keys): a log line each,
-        and the alert box, which waits until no idea card, tech screen or menu is open (_show_war_news)."""
-        world, me = self.world, self.player
-        if not me:
-            return
-        new = [w for w in world.wars if (w.a, w.b, w.start) not in before and w.b == me]
-        if not new:
-            return
-        pending = self.__dict__.setdefault("_war_news", [])
-        for war in new:
-            name = world.countries[war.a].name
-            world.message(f"{name} declared war on you! Their armies can now enter your land.", me)
-            pending.append(war.a)
+    def process_events(self):
+        """Once a frame and after a season: rebuild changed markets, then hand queued events to their handlers."""
+        self.world.ensure_markets()
+        self.game.bus.drain()
         self._show_war_news()
+
+    def _war_declared(self, event):
+        """A war declared on the player: a log line now, the alert box later (_show_war_news)."""
+        world, me = self.world, self.player
+        if not me or event.get("target") != me or not world.at_war(me, event.tag):
+            return                      # not on us, or the war already ended this season
+        world.message(f"{world.countries[event.tag].name} declared war on you! Their armies can now enter your land.", me)
+        self.__dict__.setdefault("_war_news", []).append(event.tag)
 
     def _show_war_news(self):
         """Open the war alert for the pending declarations, once nothing else is on screen."""
@@ -785,7 +786,6 @@ class CampaignApp(GameMenu, TechScreen):
         ui = self.ui
         ui.buttons = []
         ui.hoverables = []
-        self.world.ensure_markets()
         self._update_path()
         self.screen.fill(BG)
         self.view.grid_on = self.settings["grid"]
@@ -1663,7 +1663,7 @@ class CampaignApp(GameMenu, TechScreen):
             for event in pygame.event.get():
                 self.handle(event)
             self.scroll()
-            self._show_war_news()
+            self.process_events()
             self.draw()
             pygame.display.flip()
             self.clock.tick(60)

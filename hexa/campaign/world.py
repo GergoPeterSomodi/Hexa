@@ -10,8 +10,10 @@ import random
 from collections import deque
 from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 
+from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, to_cube, within
 from . import geo, naming, tech, wfc
+from .specialgoods import special_good
 from .data import (AREA, BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_ATTACK,
                    GARRISON_DEFENSE, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS, GENERAL_STACK,
                    GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT, STACK_BASE,
@@ -346,6 +348,7 @@ class CampaignWorld:
         self.wars = []
         self.routes = []
         self.version = 0                 # bumps whenever the map needs redrawing
+        self.bus = EventBus()            # events for the screens; never saved
         self._ids = itertools.count(1)
         self._owned = None
         self._castle_list = None
@@ -362,6 +365,7 @@ class CampaignWorld:
         self.message(f"{date(1)}. The age of discovery begins.")
         _remember_snapshot(key, pickle.dumps(self.save_state(), protocol=pickle.HIGHEST_PROTOCOL))
         self._set_player(player)
+        self.bus.clear()                 # a new world starts with no events, built or restored
 
     def _set_player(self, player):
         if player is not None and player not in self.countries:
@@ -372,7 +376,7 @@ class CampaignWorld:
     # ----- saving --------------------------------------------------------------------
     def save_state(self):
         """Everything needed to rebuild this world (picklable; the map source is rebuilt from map + seed)."""
-        state = {k: v for k, v in self.__dict__.items() if k not in ("geo", "_ids", "_bonus_cache")}
+        state = {k: v for k, v in self.__dict__.items() if k not in ("geo", "_ids", "_bonus_cache", "bus")}
         state["_next_id"] = next(self._ids)
         self._ids = itertools.count(state["_next_id"])
         return state
@@ -385,6 +389,7 @@ class CampaignWorld:
         if next_id is None:
             next_id = max((u.id for u in self.__dict__.get("units", ())), default=0) + 1
         self._ids = itertools.count(next_id)
+        self.bus = EventBus()
         self.geo = map_source(self.map, self.seed)
         self._migrate()
 
@@ -605,7 +610,7 @@ class CampaignWorld:
         t, roll = prov.terrain, rng.random()
         americas, africa = lon < -30, lat < 17 and lon > -20
         near = lambda x, y, r=2.5: abs(lon - x) < r and abs(lat - y) < r
-        special = self._special_good(prov, lon, lat, t, rng.random(), americas, near)
+        special = special_good(prov, lon, lat, t, rng.random(), americas, near)
         if special:
             return special
         if t == "desert":
@@ -674,38 +679,6 @@ class CampaignWorld:
             return "salt"
         wool = 0.35 if (lon < 2 and lat > 50) or (-7 < lon < -1 and 39 < lat < 43) else 0.15
         return "wool" if roll < wool else "grain"
-
-    @staticmethod
-    def _special_good(prov, lon, lat, t, r, americas, near):
-        """Horses, cattle, stone, copper, hemp, olives, silk, dyes, cocoa and coffee, where they belonged in 1480."""
-        if t in ("mountains", "hills") and (near(15.5, 60.5, 3) or near(19.0, 48.7, 2) or near(13.0, 50.5, 1.5)
-                                           or near(33.0, 35.0, 1.5) or (americas and lon < -95)) and r < 0.35:
-            return "copper"
-        if t in ("hills", "mountains") and not americas and lat > 35 and r < (0.3 if near(10.5, 44.0, 3) else 0.16):
-            return "stone"
-        if t == "steppe" and r < 0.35:
-            return "horses"
-        if t in ("plains", "savanna") and (near(19.5, 47.0, 3) or near(-5.5, 37.5, 2)) and r < 0.3:
-            return "horses"
-        if t in ("plains", "marsh", "steppe") and not americas and 44 < lat < 56 and r < 0.12:
-            return "cattle"
-        if t == "savanna" and not americas and r < 0.15:
-            return "cattle"
-        if t in ("plains", "marsh") and not americas and lat > 50 and -6 < lon < 45 and r < 0.18:
-            return "hemp"
-        if t in ("plains", "hills") and (near(29.0, 40.0, 2.5) or near(10.5, 45.2, 1.8) or near(-3.6, 37.2, 1.0)) \
-                and r < 0.35:
-            return "silk"
-        if t in ("plains", "hills", "beach") and not americas and 30 < lat < 43.8 and -10 < lon < 37 and r < 0.3:
-            return "olives"
-        if americas and t in ("jungle", "savanna", "plains") and lat < 22 and lon > -98:
-            if r < 0.16:
-                return "cocoa" if lon < -75 else "dyes"
-            if r < 0.24:
-                return "dyes"
-        if t in ("hills", "mountains", "plains", "savanna") and lon > 36 and 8 < lat < 18 and r < 0.4:
-            return "coffee"
-        return None
 
     # ----- countries and people ----------------------------------------------------
     def _build_countries(self):
@@ -1274,9 +1247,11 @@ class CampaignWorld:
         return None
 
     def message(self, text, tag=None):
-        if tag is None or tag == self.player:
+        shown = tag is None or tag == self.player
+        if shown:
             self.log.append(text)
             del self.log[:-80]
+        self.bus.emit("message", tag, text=text, shown=shown)
 
     def provinces_of(self, tag):
         if self._owned is None:
@@ -1931,7 +1906,7 @@ class CampaignWorld:
         troops = [u for u in self.units_of(tag) if u.kind.war and not u.naval]
         return sorted(troops, key=lambda u: (u.kind.era, u.hp, -distance(u.pos, capital)))
 
-    def disband(self, tag, need):
+    def disband(self, tag, need, why="disbanded"):
         """Remove troops of tag (see _troop_order) until about `need` ducats a season are saved.
         Returns (ducats saved, the units removed)."""
         country = self.countries[tag]
@@ -1940,7 +1915,7 @@ class CampaignWorld:
             if saved >= need:
                 break
             saved += unit.kind.upkeep + TROOP_FOOD
-            self._kill(unit)
+            self._kill(unit, why)
             gone.append(unit)
         country.income["military"] = country.income.get("military", 0.0) + saved
         return saved, gone
@@ -1995,7 +1970,7 @@ class CampaignWorld:
                 continue
             limit = self.debt_limit(tag)
             need = -country.balance
-            saved, deserted = self.disband(tag, need)
+            saved, deserted = self.disband(tag, need, "deserted")
             need -= saved
             seized = []
             while need > 0:
@@ -2016,9 +1991,11 @@ class CampaignWorld:
                 for unit in deserted:
                     counts[unit.kind.name] = counts.get(unit.kind.name, 0) + 1
                 names = ", ".join(f"{n} {k}" for k, n in sorted(counts.items()))
+                self.bus.emit("unit_deserted", tag, count=len(deserted), kinds=counts)
                 self.message(f"Unpaid troops desert {country.name}: {names}. The debt of {-country.treasury:,.0f} "
                              f"ducats is over the limit of {limit:,.0f}.", tag)
             for label in seized:
+                self.bus.emit("debt_seized", tag, what=label)
                 self.message(f"Creditors seize the {label}, unpaid while {country.name} is in debt.", tag)
 
     def grow(self):
@@ -2068,6 +2045,7 @@ class CampaignWorld:
                     else:
                         prov.buildings[item[0]] = prov.level(item[0]) + 1
                         self.message(f"{self.place(prov)}: {self.building_name(prov, item[0])} finished.", prov.owner)
+                    self.bus.emit("building_done", prov.owner, prov.pos, what=item[0])
                     self.changed()
                     if item[0] == "marketplace":
                         self.refresh_markets()
@@ -2226,6 +2204,7 @@ class CampaignWorld:
         prov.busy = True
         self.message(f"{self.place(prov)}: upgraded to {self.works_name(prov).lower()} "
                      f"(+{WORKS_BONUS * prov.works * 100:.0f}% {GOODS[prov.good].name.lower()}).", tag)
+        self.bus.emit("investment_done", tag, prov.pos, level=prov.works)
         self.changed()
         return True
 
@@ -2322,6 +2301,7 @@ class CampaignWorld:
         if kind is WAGON:
             unit.supplies = self.wagon_seasons(tag)
         self.message(f"{self.place(prov)}: raised {kind.name.lower()} for {cost} ducats.", tag)
+        self.bus.emit("unit_raised", tag, unit.pos, what=kind.name, id=unit.id)
         self.see_from(unit)
         return unit
 
@@ -2567,6 +2547,7 @@ class CampaignWorld:
             self.grant_tech(tag, key)
             t = tech.TECHS[key]
             self.message(f"Researched {t.name}: {t.text}", tag)
+            self.bus.emit("tech_researched", tag, key=key)
             if not self._advance(tag) and tag == self.player:
                 self.message("Pick new research (T).", tag)
 
@@ -2587,6 +2568,7 @@ class CampaignWorld:
         """The country reaches the next age: its troops change, and it is offered three idea cards."""
         country = self.countries[tag]
         country.era += 1
+        self.bus.emit("era_reached", tag, era=country.era)
         names = ", ".join(troop(b, country.era).name.lower() for b in BRANCHES)
         self.message(f"{ERAS[country.era][0]}: you can now raise {names}. Refit old troops in your towns.", tag)
         counts = {b: sum(1 for k in country.techs if k in tech.TECHS and tech.TECHS[k].branch == b)
@@ -2777,7 +2759,7 @@ class CampaignWorld:
                     unit.hp -= loss
                     hurt += 1
                     if unit.hp <= 0:
-                        self._kill(unit)
+                        self._kill(unit, "starved")
             if hurt and tag == self.player and pos not in reported:
                 reported.add(pos)
                 why = "cut off from supply" if not fed else f"too many troops for the land ({count}/{limit})"
@@ -3110,6 +3092,7 @@ class CampaignWorld:
         country = self.countries[unit.owner]
         self.message(f"{country.name} founded a {what} at {self.place(prov)}.",
                      None if unit.owner == self.player or geo.lonlat(prov.pos)[0] < -20 else unit.owner)
+        self.bus.emit("colony_founded", unit.owner, prov.pos, what=what)
         self.see_from(unit, radius=2 * SCALE)
         return prov
 
@@ -3133,6 +3116,7 @@ class CampaignWorld:
         if not self.war_check(a, b)[0]:
             return False
         self.wars.append(War(a, b, self.turn))
+        self.bus.emit("war_declared", a, target=b)
         self.message(f"{self.countries[a].name} declared war on {self.countries[b].name}!",
                      None if self.player in (a, b) else "nobody")
         if self.player in (a, b):
@@ -3156,6 +3140,7 @@ class CampaignWorld:
                     if self.countries[prov.owner].capital == prov.pos:
                         prov.controller = prov.owner      # capitals return
                         continue
+                    self.bus.emit("province_captured", gainer, prov.pos, loser=prov.owner, by="peace")
                     prov.owner = gainer
                     moved += 1
                 prov.controller = prov.owner
@@ -3169,9 +3154,10 @@ class CampaignWorld:
                     if spot:
                         unit.pos = spot
                     else:
-                        self.units.remove(unit)
+                        self._lose([unit], "evicted")
         self.changed(ownership=True)
         self.refresh_markets()
+        self.bus.emit("peace_made", a, b=b, winner=winner, moved=moved)
         names = f"{self.countries[a].name} and {self.countries[b].name}"
         self.message(f"Peace between {names}" + (f": {moved} provinces changed hands." if moved else "."),
                      None if self.player in (a, b) else "nobody")
@@ -3310,8 +3296,7 @@ class CampaignWorld:
         names = (self.countries[att_tag].name, self.countries[def_tag].name if def_tag else "the natives")
         shown = None if self.player in (att_tag, def_tag) else "nobody"
         if not defenders:
-            for unit in here:
-                self.units.remove(unit)
+            self._lose(here, "overrun")
             self.message(f"{names[0]} overran {len(here)} unarmed unit{'s' * (len(here) != 1)} at {self.place(prov)}.", shown)
             return
         att_front = sorted(attackers, key=lambda u: -self._attack_value(u, fight, gen_a))[:FRONT]
@@ -3367,21 +3352,24 @@ class CampaignWorld:
             if ranged:
                 text += "; the castle walls are breached"
             else:
+                self.bus.emit("province_captured", att_tag, pos, loser=prov.controller, by="storm")
                 prov.controller, prov.siege = att_tag, 0
-                for unit in list(self.units_at(pos)):
-                    self.units.remove(unit)
+                self._lose(self.units_at(pos), "storm")
                 text += f"; {names[0]} stormed the castle"
         elif not survivors_d and not ranged:
-            for unit in list(self.units_at(pos)):
-                if unit.owner == def_tag:
-                    self.units.remove(unit)
+            self._lose([u for u in self.units_at(pos) if u.owner == def_tag], "storm")
+        self.bus.emit("battle", att_tag, pos, defender=def_tag, ranged=ranged)
         self.message(text + ".", shown)
 
-    def _kill(self, unit):
-        for passenger in self.cargo(unit):
-            self.units.remove(passenger)
-        if unit in self.units:
+    def _lose(self, units, why):         # off the map, with a unit_lost event each (why: see hexa/events.py)
+        for unit in list(units):
             self.units.remove(unit)
+            self.bus.emit("unit_lost", unit.owner, unit.pos, what=unit.kind.name, why=why)
+
+    def _kill(self, unit, why="battle"):
+        self._lose(self.cargo(unit), "sunk")
+        if unit in self.units:
+            self._lose([unit], why)
 
     def sieges(self):
         """Troops standing in enemy (or lost) provinces take control of them; castles hold out longer."""
@@ -3417,7 +3405,9 @@ class CampaignWorld:
                 defended = prov.controller == prov.owner
                 need = SIEGE_BASE + (prov.castle * (CASTLE_SIEGE + self.bonus(prov.owner, "siege_points"))
                                      if defended else 0)
+                self.bus.emit("siege_progress", tag, prov.pos, progress=prov.siege, need=need)
                 if prov.siege >= need:
+                    self.bus.emit("province_captured", tag, prov.pos, loser=prov.controller, by="siege")
                     prov.controller, prov.siege = tag, 0
                     prov.garrison = 0 if tag != prov.owner else prov.garrison
                     self.message(f"{self.countries[tag].name} took control of {self.place(prov)}.",
@@ -3463,7 +3453,9 @@ class CampaignWorld:
         self.grow()
         self._research()
         self._check_alive()
+        was_winter = self.winter()
         self.turn += 1
+        passes_changed(self, was_winter)
         if self.year() > END_YEAR:
             self.over = True
         for tag in self.countries:

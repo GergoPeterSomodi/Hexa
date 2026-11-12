@@ -50,7 +50,7 @@ class ContinueTest(TempHome):
         damage("1")
         with headless_window_code():
             from hexa.campaign import app
-            with mock.patch.object(app, "CampaignWorld", side_effect=AssertionError("started a new game")):
+            with mock.patch.object(app.GameManager, "new", side_effect=AssertionError("started a new game")):
                 with self.assertRaisesRegex(saves.LoadError, "Slot 1 could not be loaded"):
                     app.CampaignApp(load="1")
 

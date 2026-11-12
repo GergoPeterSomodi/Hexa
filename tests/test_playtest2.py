@@ -16,7 +16,6 @@ except ImportError:                     # the unit suite runs without pygame (th
     raise unittest.SkipTest("pygame is not installed (HEXA_REQUIRE_PYGAME=1 makes this an error)") from None
 
 from hexa.campaign import ai, tech  # noqa: E402
-from hexa.campaign import app as appmod  # noqa: E402
 from hexa.campaign.app import CampaignApp  # noqa: E402
 from hexa.campaign.world import CampaignWorld  # noqa: E402
 from tests.test_passes import SUMMER, WINTER, infantry  # noqa: E402
@@ -125,9 +124,8 @@ class WarAlertTest(Home):
         app = CampaignApp(player="POR")
         w = app.world
         enemy = self.neighbour_of_portugal(w)
-        before = app._war_keys()
         self.assertTrue(w.declare_war(enemy, "POR"))
-        app._announce_wars(before)
+        app.process_events()
         self.assertEqual(app.menu, "question", "the alert is a pause-style box")
         self.assertIn(f"{w.countries[enemy].name} declared war on you", " ".join(w.log))
         self.assertIn(w.countries[enemy].name, app.menu_question[1][0])
@@ -138,10 +136,20 @@ class WarAlertTest(Home):
         app = CampaignApp(player="POR")
         w = app.world
         enemy = self.neighbour_of_portugal(w)
-        before = app._war_keys()
         w.declare_war("POR", enemy)
-        app._announce_wars(before)
+        app.process_events()
         self.assertIsNone(app.menu)
+
+    def test_a_war_that_already_ended_shows_no_alert(self):
+        app = CampaignApp(player="POR")
+        w = app.world
+        enemy = self.neighbour_of_portugal(w)
+        w.declare_war(enemy, "POR")
+        w.peace(enemy, "POR")
+        n = len(w.log)
+        app.process_events()
+        self.assertIsNone(app.menu)
+        self.assertNotIn("declared war on you", " ".join(w.log[n:]))
 
     def test_the_end_of_a_season_raises_the_alert(self):
         app = CampaignApp(player="POR")
@@ -151,7 +159,7 @@ class WarAlertTest(Home):
         def ai_run(world, tag):
             if tag == enemy:
                 world.declare_war(enemy, "POR")
-        with mock.patch.object(appmod.ai, "run", side_effect=ai_run):
+        with mock.patch.object(ai, "run", side_effect=ai_run):
             app.end_turn()
         self.assertEqual(app.menu, "question")
         self.assertIn("declared war on you", " ".join(w.log))
@@ -192,9 +200,8 @@ class WarWaitTest(Home):
         c = w.countries["POR"]
         enemy = sorted(t for t in w.neighbours_of("POR") if t != "POR" and w.countries[t].alive)[0]
         c.pending_ideas = [next(iter(tech.IDEAS))]
-        before = app._war_keys()
         w.declare_war(enemy, "POR")
-        app._announce_wars(before)
+        app.process_events()
         self.assertIsNone(app.menu, "no alert over the idea card")
         self.assertIn("declared war on you", " ".join(w.log))
         c.pending_ideas = []

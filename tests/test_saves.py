@@ -14,6 +14,7 @@ from unittest import mock
 
 from hexa import settings
 from hexa.campaign import saves
+from hexa.campaign.game import GameManager
 from hexa.campaign.data import GENERAL, troop
 from hexa.campaign.world import WORLD_DEFAULTS, WORLD_REQUIRED, CampaignWorld
 from tests.support.home import TempHome
@@ -416,7 +417,11 @@ class FailedSaveTest(TempHome):
     def _game(self, world):
         class Game(_gamemenu().GameMenu):
             def __init__(self):
-                self.world, self.settings, self.toasts = world, settings.load(), []
+                self.game, self.settings, self.toasts = GameManager(world), settings.load(), []
+
+            @property
+            def world(self):
+                return self.game.world
 
             @property
             def player(self):

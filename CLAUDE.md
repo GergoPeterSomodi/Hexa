@@ -151,11 +151,15 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - **Conquest / Colonisation:** `ai.take_turn(world, side)` is a generator that yields after every unit action.
   The app's `update()` drains it and pauses `AI_STEP_MS` only when the acting unit is visible to the player.
   These AIs see the whole map.
-- **Campaign:** one turn is one season. `CampaignApp.end_turn()` runs `ai.run(world, tag)` synchronously for
-  every non-player country, then `world.end_round()` (logistics, sieges, war timeouts, economy, growth,
-  research, turn counter), then moves units along multi-season orders (`unit.goal`). Campaign AIs only know
-  what their country has explored (`country.explored`). `world.player = None` makes everything visible, as in
-  most tests.
+- **Campaign:** one turn is one season, played by `GameManager.end_season()` (`campaign/game.py`, pygame-free).
+  `CampaignApp.end_turn()` draws its busy frame and delegates to it; tests play seasons through it
+  (`tests/support/worlds.play_seasons`). The fixed order: `world.settle_preview()`, `ai.run(world, tag)` for every
+  non-player country, `world.end_round()` (logistics, sieges, war timeouts, economy, debt, growth, research, turn
+  counter), the caller's `orders` hook (the app's march reminders for `unit.goal` orders), the autosave if due,
+  `world.ensure_markets()`, and a `season_ended` event. Campaign AIs only know what their country has explored
+  (`country.explored`). `world.player = None` makes everything visible, as in most tests.
+  `tools/oracle_runner.py` and `tools/save_compat.py` keep their own season loops on purpose: they must run against
+  base checkouts that have no manager.
 
 ### Campaign internals
 
@@ -188,7 +192,19 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - Saves and options (`hexa/settings.py`) live in `~/.hexa/`; the `HEXA_HOME` environment variable overrides
   this, and `tests/test_saves.py` uses it with a temporary folder.
 - `gamemenu.GameMenu` is a mixin base class of `CampaignApp`: the Esc menu, save/load, options, and the screen
-  mode (window size, fullscreen).
+  mode (window size, fullscreen). Saving, loading and the autosave go through `app.game`, the `GameManager`
+  (`game.save(slot)`, `GameManager.load(slot)`, `game.autosave()`); `app.world` is `app.game.world`.
+- **Event bus** (`hexa/events.py`, pygame-free). `world.bus` is a transient `EventBus`: the rules call
+  `world.bus.emit(kind, tag, pos, **data)` where state changes (capture, war, peace, raise, kills, desertion,
+  seizure, passes, research, ages, colonies, buildings, sieges, battles; `world.message()` emits `message`), which
+  only queues an `Event` and records it in a bounded `bus.history`. The app drains the queue once a frame
+  (`process_events()`) and after each season; tests read `bus.history`. The kinds and their fields are listed in
+  the `hexa/events.py` docstring (`CAMPAIGN_KINDS`). The bus is left out of `save_state()` and rebuilt in
+  `_restore`, so saves and snapshots never contain it. Handlers must not change the game (the one exception is the
+  "declared war on you" log line, kept for its text and place in the log). The war alert subscribes to
+  `war_declared`; it replaced the old before/after diff of the war list.
+- **Markets** are rebuilt lazily (`world.refresh_markets()` marks them, `ensure_markets()` rebuilds). `draw()` no
+  longer calls it: `refresh()`, `process_events()` and `end_season()` do, so drawing never changes the game.
 - `art.py` draws extra tiles, decorations, unit figures and tokens in code, in the Kenney style at 120x140.
   `MapView` switches from flat colours to tile art at zoom index `TILE_FROM`.
 
