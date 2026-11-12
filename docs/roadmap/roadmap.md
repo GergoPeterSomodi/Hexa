@@ -28,6 +28,7 @@ Hexa started in 2020 as a pygame hex-tile map editor. It is becoming a playable 
 - **Be creative inside that style.** The user rejected look-alike tiles. Each good, unit and building should look distinct.
 - **Build big chunks.** The user prefers a whole feature built, tested and then shown, rather than many small steps.
 - **Push straight to master.** The user declined feature branches.
+- **Fix issues first (user rule, 2026-11-12).** Open bug issues get fixed and released before new features start. A feature round starts only when the bug list is empty or the user says otherwise.
 - **Haiku workers build, the main session plans and reviews.** Each task names the files to touch, the files not to touch, what done looks like, and the test or screenshot that proves it. The main session reads the diff, runs the tests and looks at screenshots before reporting. Tasks on the same file run one at a time.
 - **Saved ideas stay saved.** When the user says to save an idea for later, it goes in the backlog and is not built.
 - **Old saves keep working** (suggested, from the tech spec's migration plan).
@@ -224,6 +225,7 @@ Each design is approved by the user before its build starts. M1 and M2 must run 
   - The user approves the mockups.
   - Zoom goes beyond the current 34 px radius.
   - Edges blend in screenshots.
+  - With the hex grid off (G), there are no gaps between tiles at any zoom (#71).
   - At least five named cities have landmark tiles.
   - Units the player can see move at a pace that can be followed, and moves under fog stay instant.
   - Actions show floating text whose font and colours the user approved.
