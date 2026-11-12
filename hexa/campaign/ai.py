@@ -20,6 +20,7 @@ DEBT_REPAY = 12           # in distress, a country sets aside a twelfth of its d
 
 
 def run(world, tag):
+    world.settle_preview()          # decide on the real season's numbers, not a tax preview's
     country = world.countries[tag]
     if not country.alive or world.over:
         return

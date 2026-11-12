@@ -36,7 +36,8 @@ RANDOM_KEPT = 2           # random worlds kept in those caches (the Europe snaps
 # World attributes a save from an older version may lack, with their defaults (callables build fresh ones).
 WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "visible": set, "over": False,
                   "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
-                  "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None, "_bonus_cache": dict}
+                  "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None, "_bonus_cache": dict,
+                  "_settled": None}
 # World attributes no save can do without (from_state refuses a state that lacks one). Every other attribute
 # has a default above, is rebuilt on load (geo, _ids) or is added when first needed (_explored_from).
 WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countries", "markets", "cities", "landmass",
@@ -208,6 +209,7 @@ class Unit:
     upgraded: bool = False     # drilled or refitted this season
     supplied: bool = True      # fed last season (only fed troops heal)
     supplies: int = 0          # seasons of food left, for wagons
+    foraged_turn: int = -1     # the turn this unit's stack last foraged (see stuck_reason)
 
     @property
     def naval(self):
@@ -294,9 +296,13 @@ def _remember_snapshot(key, data):
 
 
 def _with_article(name):
-    """'a weaver', 'an armoury': the indefinite article for a level or building name."""
+    """'a weaver', 'an armoury': the indefinite article for a level or building name, by its sound: 'a university',
+    'a use'. An empty name gives an empty string."""
     name = name.lower()
-    return ("an " if name[:1] in "aeiou" else "a ") + name
+    if not name:
+        return ""
+    vowel = name[0] in "aeiou" and not name.startswith(("uni", "use", "eu"))
+    return ("an " if vowel else "a ") + name
 
 
 def _fill_defaults(obj):
@@ -943,6 +949,17 @@ class CampaignWorld:
             return False, f"The {self.pass_name(dest)} pass is closed by snow until spring."
         return True, ""
 
+    def pass_blocks(self, group, goal):
+        """The name of a mountain pass that snow has closed right in front of this land stack on its way to goal,
+        or "" if no pass holds it up. A march stopped this way waits for spring instead of being dropped."""
+        if not group or group[0].naval or goal is None or not self.winter():
+            return ""
+        passes, here = self.passes(), distance(group[0].pos, goal)
+        for n in neighbors(group[0].pos):
+            if n in passes and self.pass_closed(n) and distance(n, goal) < here:
+                return passes[n]
+        return ""
+
     def province(self, pos):
         return self.provinces.get(pos)
 
@@ -1292,13 +1309,51 @@ class CampaignWorld:
         """Change a country's tax level and show the projected economy. This is only a preview: the pending
         purchases and the price history are left alone, so the season's own economy still runs once, as it would
         have without the change."""
+        if self.__dict__.get("_settled") is None:
+            self._settled = self._settled_state()
         self.countries[tag].tax = level
         self.economy(preview=True)
+
+    def _settled_state(self):
+        """The incomes and outputs the last real season left (the AI decides on these, not on a preview)."""
+        return ({t: dict(c.income) for t, c in self.countries.items()},
+                {p.pos: (p.output, p.value) for p in self.provinces.values()})
+
+    def settle_preview(self):
+        """Put back the incomes and outputs of the last real season, so the AI decides as it would have without
+        a tax preview. The preview's projections stay on show until the season's own economy runs."""
+        saved = self.__dict__.get("_settled")
+        if saved is None:
+            return
+        incomes, outputs = saved
+        for tag, income in incomes.items():
+            self.countries[tag].income = income
+        for pos, (output, value) in outputs.items():
+            self.provinces[pos].output, self.provinces[pos].value = output, value
+        self._settled = None
+
+    def _trade_state(self):
+        """The prices and the route trade as the season left them. A preview puts them back, because the next
+        real economy reads last season's prices (the staffing of workshops) before it sets new ones."""
+        return ([(m, dict(m.price)) for m in self.markets],
+                [(r, r.flows, r.results, r.profit) for r in self.routes])
+
+    @staticmethod
+    def _restore_trade_state(state):
+        prices, routes = state
+        for market, price in prices:
+            market.price.clear()
+            market.price.update(price)
+        for route, flows, results, profit in routes:
+            route.flows, route.results, route.profit = flows, results, profit
 
     def economy(self, preview=False):
         """Work out prices, trade and incomes. preview=True projects them without using up the pending purchases
         or adding a point to the price history."""
         self.ensure_markets()
+        if not preview:
+            self._settled = None
+        held = self._trade_state() if preview else None
         for market in self.markets:
             market.reset(keep_pending=preview)
         for prov in self.provinces.values():
@@ -1370,6 +1425,8 @@ class CampaignWorld:
                 market.history[g].append(round(market.price[g], 2))
                 del market.history[g][:-40]
         self._incomes(profits)
+        if held is not None:
+            self._restore_trade_state(held)
 
     # ----- what the techs and ideas change (keys in tech.EFFECT_KEYS) ------------------------------
     def route_cost(self, route):
@@ -2380,8 +2437,9 @@ class CampaignWorld:
         prov.foraged = (troops[0].owner, self.turn)
         prov.peasants *= 1 - FORAGE_LOSS
         prov.natives *= 1 - FORAGE_LOSS
-        if not end_of_round:
-            for unit in troops:
+        for unit in troops:
+            unit.foraged_turn = self.turn
+            if not end_of_round:
                 unit.moves_left = 0
         self.message(f"Troops foraged around {prov.name}: they eat, the province suffers.", troops[0].owner)
         return True
@@ -2460,16 +2518,17 @@ class CampaignWorld:
         A stack moves at its slowest unit's pace, so one unit with no moves left holds the whole stack back."""
         if min(u.moves_left for u in group) > 0:
             return ""
-        lead = group[0]
-        prov = self.provinces.get(lead.pos)
-        if prov and prov.foraged == (lead.owner, self.turn):
+        if any(getattr(u, "foraged_turn", -1) == self.turn for u in group):
             return "They foraged this season and have no moves left."
         fresh = [u for u in group if u.moves_left <= 0 and not u.acted and u.kind.moves > 0]
         if not fresh:
             return "They have already moved this season."
-        names = " and ".join(sorted({u.kind.name for u in fresh}))
+        counts = {}
+        for u in fresh:
+            counts[u.kind.name] = counts.get(u.kind.name, 0) + 1
+        names = " and ".join(f"{n} {kind}" if n > 1 else kind for kind, n in sorted(counts.items()))
         if len(fresh) == 1:
-            return f"{names} was raised this season and can't move yet. Untick it to move the rest."
+            return f"{names} raised this season and can't move yet. Untick it to move the rest."
         return f"{names} were raised this season and can't move yet. Untick them to move the rest."
 
     def reachable(self, unit):

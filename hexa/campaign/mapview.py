@@ -78,6 +78,7 @@ class MapView:
     def __init__(self, world, tiles_dir=None):
         self.world = world
         self.tiles_dir = tiles_dir
+        self._market_index_key, self._market_index = None, {}
         self._sprites = {}
         self._overlays = {}
         self.goods_view = "chips"
@@ -211,7 +212,8 @@ class MapView:
         if self.mode == "markets":
             if prov.market is None:
                 return (95, 95, 95) if prov.owner else NATIVE_LAND
-            return market_color(world.markets.index(prov.market))
+            number = self._market_number(prov.market)
+            return market_color(number) if number is not None else (95, 95, 95)
         if prov.owner:
             color = world.countries[prov.owner].color
             return tint(color, 0.15) if not prov.colony else tint(color, 0.45)
@@ -1150,10 +1152,20 @@ class MapView:
         pygame.draw.rect(screen, fill, box, border_radius=6)
         screen.blit(img, img.get_rect(center=box.center))
 
+    def _market_number(self, market):
+        """The index of a market in world.markets, or None if it is not one of them. The table is rebuilt only when
+        the world changes (its version or its number of markets)."""
+        world = self.world
+        key = (id(world), world.version, len(world.markets))
+        if key != self._market_index_key:
+            self._market_index_key = key
+            self._market_index = {id(m): i for i, m in enumerate(world.markets)}
+        return self._market_index.get(id(market))
+
     def _mode_layer(self, screen, shown, washes=True, chips=True):
         """Close-up terrain, goods and market views: the washes (under the objects on the landscape zooms) and the
         chips and labels (over them)."""
-        world, r = self.world, self.r
+        r = self.r
         if washes:
             tints = []
             for prov, cx, cy in shown:
@@ -1161,8 +1173,8 @@ class MapView:
                     tints.append((TERRAIN_TINT[prov.terrain] + (45,), cx, cy))
                 elif self.mode == "goods" and self.goods_view == "deposits" and prov.good:
                     tints.append((GOODS[prov.good].color + (70,), cx, cy))
-                elif self.mode == "markets" and prov.market:
-                    tints.append((market_color(world.markets.index(prov.market)) + (95,), cx, cy))
+                elif self.mode == "markets" and prov.market and self._market_number(prov.market) is not None:
+                    tints.append((market_color(self._market_number(prov.market)) + (95,), cx, cy))
             self._tint(screen, tints)
         for prov, cx, cy in shown:
             if self.mode == "terrain":

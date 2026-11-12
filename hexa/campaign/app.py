@@ -255,6 +255,7 @@ class CampaignApp(GameMenu, TechScreen):
         self.busy = True
         self.draw()
         pygame.display.flip()
+        world.settle_preview()
         for tag in world.countries:
             if tag != self.player:
                 ai.run(world, tag)
@@ -267,8 +268,11 @@ class CampaignApp(GameMenu, TechScreen):
             self.toast("Pick new research (T)")
 
     def _advance_orders(self):
-        """Units with a far-away destination keep moving toward it each season, stacks together."""
+        """Units with a far-away destination keep moving toward it each season, stacks together. A march that a
+        pass closed by snow stops keeps its goal and waits for spring; the player is told once."""
         world = self.world
+        known = getattr(self, "_pass_waits", set())
+        waiting = set()
         orders = {}
         for unit in world.units_of(self.player):
             if isinstance(unit.goal, tuple) and not unit.carrier:
@@ -281,6 +285,15 @@ class CampaignApp(GameMenu, TechScreen):
             reach = world.reachable_group(group)
             dest = goal if goal in reach else world.step_toward_group(group, goal)
             if dest == pos:
+                pass_name = world.pass_blocks(group, goal)
+                if pass_name:
+                    key = (pos, goal, tuple(sorted(u.id for u in group)))
+                    waiting.add(key)
+                    if key not in known:
+                        text = f"The {pass_name} pass is closed by snow; the march waits for spring."
+                        world.message(text, self.player)
+                        self.toast(text)
+                    continue
                 for unit in group:
                     unit.goal = None
             else:
@@ -288,6 +301,7 @@ class CampaignApp(GameMenu, TechScreen):
                 if dest == goal:
                     for unit in group:
                         unit.goal = None
+        self._pass_waits = waiting
 
     # ----- input -------------------------------------------------------------------------
     def handle(self, event):
@@ -488,9 +502,10 @@ class CampaignApp(GameMenu, TechScreen):
             if not world.invest(tag, action[1]):
                 self.toast(world.invest_check(tag, action[1])[1])
         elif kind == "found":
-            prov = world.found(action[1], trading_post=action[2])
+            founder = action[1]
+            prov = world.found(founder, trading_post=action[2])
             if prov:
-                self._cancel_orders(ui.group)
+                self._cancel_orders([founder])
                 ui.selected, ui.province, ui.panel = None, prov, "province"
         elif kind == "pick":
             self.select_unit(action[1], only=True)
@@ -527,10 +542,11 @@ class CampaignApp(GameMenu, TechScreen):
         elif kind == "goods_view":
             self.view.mode, self.view.goods_view = "goods", action[1]
         elif kind == "forage":
-            if world.forage(self.active(), tag):
-                self._cancel_orders(ui.group)
+            acting = self.active()
+            if world.forage(acting, tag):
+                self._cancel_orders(acting)
             else:
-                self.toast(world.forage_check(self.active(), tag)[1])
+                self.toast(world.forage_check(acting, tag)[1])
         elif kind == "recall":
             world.recall_merchant(tag, action[1], action[2] if len(action) > 2 else None)
         elif kind == "market":
@@ -662,6 +678,8 @@ class CampaignApp(GameMenu, TechScreen):
         cx = WIDTH // 2 - (PANEL_W // 2 if self.ui.panel else 0)
         room = 2 * min(cx, WIDTH - cx) - 40                  # the widest the banner may be, centred on cx
         lines = [self.title.render(line, True, TEXT) for line in self._wrap_words(self.title, text, room - 30)]
+        if not lines:
+            return
         box = pygame.Rect(0, 0, max(img.get_width() for img in lines) + 30,
                           sum(img.get_height() for img in lines) + 4 * (len(lines) - 1) + 16)
         box.center = (cx, TOP + 40)
