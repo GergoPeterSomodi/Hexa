@@ -56,7 +56,7 @@ class LogGrammarTest(unittest.TestCase):
         message = w.log[-1]
         self.assertNotIn(" a ", message)
         self.assertIn(w.works_name(prov).lower(), message)
-        self.assertIn(f"{prov.name}: upgraded to", message)
+        self.assertIn(f"{w.place(prov)}: upgraded to", message)
 
 
 class ProvinceControlTest(unittest.TestCase):

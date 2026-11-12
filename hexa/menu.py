@@ -9,6 +9,10 @@ BG = (22, 28, 38)
 TEXT = (235, 238, 242)
 MUTED = (150, 160, 172)
 GOLD = (255, 214, 70)
+CREDITS = ("Hexa uses",
+           "Place names: GeoNames (https://www.geonames.org), licensed CC BY 4.0",
+           "(https://creativecommons.org/licenses/by/4.0/), pruned and adapted.",
+           "Tile art: Kenney Hexagon Pack (https://kenney.nl/assets/hexagon-pack), CC0.")
 
 MODES = {"campaign": ("Age of Discovery", "Europe and the Mediterranean in 1480. Pick any country, build an economy "
                                          "of markets and trade, and colonise the unknown world."),
@@ -34,6 +38,7 @@ class Menu:
         self.font = pygame.font.SysFont("segoeui,arial", 16)
         self.button_font = pygame.font.SysFont("segoeui,arial", 17, bold=True)
         self.hover = None
+        self.credits = False                 # the credits box is open
         self.error = self.settings.pop("error", None)     # e.g. a save that could not be loaded
         self.last_save = saves.latest()
         self.last_meta = saves.meta(self.last_save) if self.last_save else None
@@ -61,6 +66,9 @@ class Menu:
             start.x += 120
         return buttons, start
 
+    def _credits_rect(self):
+        return pygame.Rect(14, self.screen.get_height() - 46, 100, 32)
+
     def _continue_rect(self, start):
         return pygame.Rect(start.x - 240, start.y, 220, 54) if self.last_meta else None
 
@@ -71,13 +79,25 @@ class Menu:
         while True:
             buttons, start = self._layout()
             for event in pygame.event.get():
-                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                if event.type == pygame.QUIT:
                     return None
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    if not self.credits:
+                        return None
+                    self.credits = False
+                    continue
+                if self.credits:                       # the box is open: a click or a key closes it
+                    if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
+                        self.credits = False
+                    continue
                 if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE):
                     return self.settings
                 if event.type == pygame.MOUSEMOTION:
                     self.hover = event.pos
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if self._credits_rect().collidepoint(event.pos):
+                        self.credits = True
+                        continue
                     if start.collidepoint(event.pos):
                         return self.settings
                     resume = self._continue_rect(start)
@@ -134,7 +154,30 @@ class Menu:
         if self.error:
             text = self.head.render(self.error, True, (240, 120, 105))
             screen.blit(text, text.get_rect(center=(cx, start.bottom + 34)))
+        box = self._credits_rect()
+        pygame.draw.rect(screen, (58, 64, 76) if self.hover and box.collidepoint(self.hover) else (42, 47, 58), box,
+                         border_radius=8)
+        label = self.font.render("Credits", True, TEXT)
+        screen.blit(label, label.get_rect(center=box.center))
+        if self.credits:
+            self._draw_credits()
         foot = self.font.render("Enter: start    Esc: quit", True, MUTED)
         screen.blit(foot, foot.get_rect(center=(cx, screen.get_height() - 30)))
         version = self.font.render(f"v{__version__}", True, MUTED)
         screen.blit(version, version.get_rect(bottomright=(screen.get_width() - 14, screen.get_height() - 12)))
+
+    def _draw_credits(self):
+        screen = self.screen
+        w, h = 560, 190
+        box = pygame.Rect((screen.get_width() - w) // 2, (screen.get_height() - h) // 2, w, h)
+        pygame.draw.rect(screen, (30, 36, 48), box, border_radius=10)
+        pygame.draw.rect(screen, GOLD, box, 2, border_radius=10)
+        head = self.head.render("Credits", True, GOLD)
+        screen.blit(head, head.get_rect(midtop=(box.centerx, box.y + 14)))
+        y = box.y + 52
+        for line in CREDITS[1:]:
+            text = self.font.render(line, True, TEXT)
+            screen.blit(text, text.get_rect(midtop=(box.centerx, y)))
+            y += 26
+        hint = self.font.render("Click or press a key to close", True, MUTED)
+        screen.blit(hint, hint.get_rect(midbottom=(box.centerx, box.bottom - 10)))

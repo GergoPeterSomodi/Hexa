@@ -940,7 +940,7 @@ class MapView:
         for pos, prov in world.provinces.items():
             if pos not in known or not (prov.settlement >= 2 or prov.castle):
                 continue
-            if prov.name.startswith(("near ", "New ")) or "countryside" in prov.name:
+            if prov.name.startswith(("near ", "New ")) or "countryside" in prov.name or " lands" in prov.name:
                 continue
             if r < 20 and not prov.city:
                 continue

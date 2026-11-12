@@ -311,5 +311,27 @@ class BadSaveHeaderTest(MenuCase):
         menu.draw(*menu._layout())
 
 
+class CreditsTest(MenuCase):
+    def test_the_credits_button_opens_a_box_that_esc_closes_before_it_quits(self):
+        menu = self.menu()
+        centre = menu._credits_rect().center
+        self.script(click(centre), key("escape"), [], key("escape"))
+        self.assertIsNone(self.run_menu(menu))
+        self.assertIsNone(self.driver.stopped_by, "the second Esc closed the menu")
+        self.assertGreaterEqual(self.driver.frame, 3, "the first Esc only closed the credits box")
+        self.assertFalse(menu.credits)
+
+    def test_the_box_names_geonames_and_kenney(self):
+        from hexa.menu import CREDITS
+        text = " ".join(CREDITS)
+        self.assertIn("GeoNames", text)
+        self.assertIn("CC BY 4.0", text)
+        self.assertIn("Kenney", text)
+        self.assertIn("CC0", text)
+        menu = self.menu()
+        menu.credits = True
+        menu.draw(*menu._layout())
+
+
 if __name__ == "__main__":
     unittest.main()

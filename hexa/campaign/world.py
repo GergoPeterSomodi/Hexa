@@ -11,7 +11,7 @@ from collections import deque
 from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 
 from ..hexgrid import distance, neighbors, to_cube, within
-from . import geo, tech, wfc
+from . import geo, naming, tech, wfc
 from .data import (AREA, BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_ATTACK,
                    GARRISON_DEFENSE, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS, GENERAL_STACK,
                    GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT, STACK_BASE,
@@ -96,6 +96,7 @@ class Province:
     busy: bool = False       # already did its one job this season
     garrison: int = 0        # hit points of the castle's own defenders
     foraged: tuple = ()      # (country, turn) when an army last foraged here
+    region: str = ""          # the historical region (Europe map): "Minho" for Braga
 
     @property
     def pop(self):
@@ -403,6 +404,9 @@ class CampaignWorld:
         for country in getattr(self, "countries", {}).values():
             if not country.techs:
                 self._legacy_techs(country)
+        provinces = getattr(self, "provinces", None)
+        if self.map == "europe" and provinces and not any(p.region for p in provinces.values()):
+            naming.name_europe(self)          # an older save: the old "near Porto" names become real places
 
     @classmethod
     def from_state(cls, state):
@@ -750,15 +754,15 @@ class CampaignWorld:
             lon, lat = geo.lonlat(prov.pos)
             if prov.pos in self.cities:
                 prov.name = self.cities[prov.pos][0]
-            else:
+            elif self.map != "europe":
                 near = min(named, key=lambda kv: distance(kv[0], prov.pos))
                 if distance(near[0], prov.pos) <= 4 * SCALE:
                     prov.name = f"near {near[1][0]}"
             if prov.owner is None:
                 prov.tribe = min(self.geo.TRIBES, key=lambda t: (t[1] - lon) ** 2 + (t[2] - lat) ** 2)[0]
-                if not prov.name:
+                if not prov.name and self.map != "europe":
                     prov.name = f"{prov.tribe} lands"
-            elif not prov.name:
+            elif not prov.name and self.map != "europe":
                 prov.name = f"{self.countries[prov.owner].name} countryside"
             density = TERRAIN[prov.terrain].density * rng.uniform(0.75, 1.25)
             if prov.owner:
@@ -792,6 +796,11 @@ class CampaignWorld:
                 prov.natives = density * factor
                 if prov.pos in self.cities:
                     prov.natives += self.cities[prov.pos][1] * 0.5
+
+        if self.map == "europe":
+            naming.name_europe(self)          # real regions and places (naming.py)
+        else:
+            naming.make_unique(self.provinces)
 
         # Starting towns, castles, works and buildings.
         for prov in self.provinces.values():
@@ -1246,6 +1255,10 @@ class CampaignWorld:
 
     def province(self, pos):
         return self.provinces.get(pos)
+
+    def place(self, prov):
+        """The province's name with its region, for messages: "Braga (Minho)"."""
+        return naming.place(prov)
 
     def find_country(self, name):
         """The tag of a country given by tag or name in any case ('por', 'Portugal'), or None."""
@@ -1971,7 +1984,7 @@ class CampaignWorld:
             label = SETTLEMENTS[prov.settlement].lower()
             prov.settlement -= 1
         self.changed()
-        return saving, f"{label} at {prov.name}"
+        return saving, f"{label} at {self.place(prov)}"
 
     def _unpaid(self):
         """A country over its debt limit that is running a deficit cannot pay: its unpaid troops desert first,
@@ -2036,25 +2049,25 @@ class CampaignWorld:
                     prov.peasants += settled * 0.5
                 if prov.colony and prov.natives > prov.peasants * 2 and self.rng.random() < NATIVE_RAID_CHANCE:
                     prov.peasants *= 0.8
-                    self.message(f"Natives raided the colony at {prov.name}!", prov.owner)
+                    self.message(f"Natives raided the colony at {self.place(prov)}!", prov.owner)
             if prov.colony and prov.pop >= COLONY_DONE:
                 prov.colony = False
-                self.message(f"{prov.name} has grown into a full province.", prov.owner)
+                self.message(f"{self.place(prov)} has grown into a full province.", prov.owner)
             for item in list(prov.queue):
                 item[1] -= 1
                 if item[1] <= 0:
                     prov.queue.remove(item)
                     if item[0] == "settlement":
                         prov.settlement += 1
-                        self.message(f"{prov.name} has grown into a {SETTLEMENTS[prov.settlement].lower()}.", prov.owner)
+                        self.message(f"{self.place(prov)} has grown into a {SETTLEMENTS[prov.settlement].lower()}.", prov.owner)
                     elif item[0] == "castle":
                         prov.castle += 1
                         prov.garrison = prov.castle * GARRISON_HP
                         self._castle_list = None
-                        self.message(f"{prov.name}: the {CASTLES[prov.castle].lower()} is finished.", prov.owner)
+                        self.message(f"{self.place(prov)}: the {CASTLES[prov.castle].lower()} is finished.", prov.owner)
                     else:
                         prov.buildings[item[0]] = prov.level(item[0]) + 1
-                        self.message(f"{prov.name}: {self.building_name(prov, item[0])} finished.", prov.owner)
+                        self.message(f"{self.place(prov)}: {self.building_name(prov, item[0])} finished.", prov.owner)
                     self.changed()
                     if item[0] == "marketplace":
                         self.refresh_markets()
@@ -2167,7 +2180,7 @@ class CampaignWorld:
         self._buy(prov, self.build_goods(prov, key))
         prov.queue.append([key, BUILD_TURNS])
         prov.busy = True
-        self.message(f"{prov.name}: started {_with_article(self.building_name(prov, key))} "
+        self.message(f"{self.place(prov)}: started {_with_article(self.building_name(prov, key))} "
                      f"(ready in {BUILD_TURNS} seasons).", tag)
         return True
 
@@ -2211,7 +2224,7 @@ class CampaignWorld:
         self._buy(prov, self.invest_goods(prov))
         prov.works += 1
         prov.busy = True
-        self.message(f"{prov.name}: upgraded to {self.works_name(prov).lower()} "
+        self.message(f"{self.place(prov)}: upgraded to {self.works_name(prov).lower()} "
                      f"(+{WORKS_BONUS * prov.works * 100:.0f}% {GOODS[prov.good].name.lower()}).", tag)
         self.changed()
         return True
@@ -2308,7 +2321,7 @@ class CampaignWorld:
         unit = self._add_unit(kind, tag, pos)
         if kind is WAGON:
             unit.supplies = self.wagon_seasons(tag)
-        self.message(f"{prov.name}: raised {kind.name.lower()} for {cost} ducats.", tag)
+        self.message(f"{self.place(prov)}: raised {kind.name.lower()} for {cost} ducats.", tag)
         self.see_from(unit)
         return unit
 
@@ -2348,7 +2361,7 @@ class CampaignWorld:
         country.treasury -= self.unit_cost(prov, new) // 2
         unit.kind, unit.hp = new, new.hp
         unit.moves_left, unit.upgraded = 0, True
-        self.message(f"{prov.name}: refitted as {new.name.lower()}.", unit.owner)
+        self.message(f"{self.place(prov)}: refitted as {new.name.lower()}.", unit.owner)
         return True
 
     def upgrade_cost(self, unit, stat):
@@ -2730,7 +2743,7 @@ class CampaignWorld:
             unit.foraged_turn = self.turn
             if not end_of_round:
                 unit.moves_left = 0
-        self.message(f"Troops foraged around {prov.name}: they eat, the province suffers.", troops[0].owner)
+        self.message(f"Troops foraged around {self.place(prov)}: they eat, the province suffers.", troops[0].owner)
         return True
 
     def logistics(self):
@@ -2768,7 +2781,7 @@ class CampaignWorld:
             if hurt and tag == self.player and pos not in reported:
                 reported.add(pos)
                 why = "cut off from supply" if not fed else f"too many troops for the land ({count}/{limit})"
-                where = prov.name if prov else "the field"
+                where = self.place(prov) if prov else "the field"
                 self.message(f"Your troops at {where} are {why}: they lose strength.")
 
     # ----- movement ------------------------------------------------------------------
@@ -3089,13 +3102,13 @@ class CampaignWorld:
             prov.peasants = COLONIST_PEOPLE
             prov.settlement = 1
             what = "colony"
-        if prov.name.endswith(" lands") or prov.name.startswith("near "):
-            prov.name = f"{('New ' + prov.tribe) if prov.tribe else prov.name}" if not prov.city else prov.name
+        if naming.is_wild(prov.name) and prov.tribe and not prov.city:
+            prov.name = naming.colony_name(self, prov)
         self.units.remove(unit)
         self.changed(ownership=True)
         self.refresh_markets()
         country = self.countries[unit.owner]
-        self.message(f"{country.name} founded a {what} at {prov.name}.",
+        self.message(f"{country.name} founded a {what} at {self.place(prov)}.",
                      None if unit.owner == self.player or geo.lonlat(prov.pos)[0] < -20 else unit.owner)
         self.see_from(unit, radius=2 * SCALE)
         return prov
@@ -3299,7 +3312,7 @@ class CampaignWorld:
         if not defenders:
             for unit in here:
                 self.units.remove(unit)
-            self.message(f"{names[0]} overran {len(here)} unarmed unit{'s' * (len(here) != 1)} at {prov.name}.", shown)
+            self.message(f"{names[0]} overran {len(here)} unarmed unit{'s' * (len(here) != 1)} at {self.place(prov)}.", shown)
             return
         att_front = sorted(attackers, key=lambda u: -self._attack_value(u, fight, gen_a))[:FRONT]
         att_back = [u for u in attackers if u not in att_front]
@@ -3348,7 +3361,7 @@ class CampaignWorld:
             if unit.hp > 0 and not isinstance(unit, Garrison):
                 unit.xp += 1 + (0 if survivors_d or unit not in attackers else 1)
         dead = lambda n: f" ({n} unit{'s' * (n != 1)} destroyed)" if n else ""
-        text = (f"{'Bombardment' if ranged else 'Battle'} at {prov.name}: {names[0]} lost {hp_a} strength"
+        text = (f"{'Bombardment' if ranged else 'Battle'} at {self.place(prov)}: {names[0]} lost {hp_a} strength"
                 f"{dead(len(lost_a))}, {names[1]} lost {hp_d}{dead(len(lost_d))}")
         if castle and prov.garrison <= 0 and not [u for u in self.units_at(pos) if u.kind.war]:
             if ranged:
@@ -3407,7 +3420,7 @@ class CampaignWorld:
                 if prov.siege >= need:
                     prov.controller, prov.siege = tag, 0
                     prov.garrison = 0 if tag != prov.owner else prov.garrison
-                    self.message(f"{self.countries[tag].name} took control of {prov.name}.",
+                    self.message(f"{self.countries[tag].name} took control of {self.place(prov)}.",
                                  None if self.player in (tag, prov.owner) else "nobody")
                     self.changed()
 

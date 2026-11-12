@@ -1105,7 +1105,7 @@ class CampaignApp(GameMenu, TechScreen):
             lines.append((f"{world.countries[here[0].owner].name}: {len(here)} unit{'s' * (len(here) != 1)}"
                           + (f", {len(troops)} troops, power {world.stack_power(troops):.0f}" if troops else ""),
                           BAD_C if here[0].owner != tag else TEXT))
-        return prov.name, lines
+        return world.place(prov), lines
 
     def good_card(self, market, g):
         good = GOODS[g]
@@ -1161,9 +1161,12 @@ class CampaignApp(GameMenu, TechScreen):
             country = world.countries[prov.owner]
             what = "Colony of " if prov.colony else "Trading post of " if prov.trading_post else ""
             pygame.draw.rect(self.screen, country.color, (x, y + 3, 12, 12))
-            self.text(self.font, f"{what}{country.name}", (x + 18, y))
+            used = self.text(self.font, f"{what}{country.name}", (x + 18, y))
+            if prov.region and prov.region not in prov.name and w - 26 - used > 40:
+                self.text(self.small, f"·  {prov.region}", (x + 26 + used, y + 2), MUTED, w - 26 - used)
         else:
-            self.text(self.font, f"Unclaimed: {prov.tribe} lands" if prov.tribe else "Unclaimed land", (x, y), MUTED)
+            land = prov.region if prov.region.endswith(" lands") else f"{prov.tribe} lands" if prov.tribe else ""
+            self.text(self.font, f"Unclaimed: {land}" if land else "Unclaimed land", (x, y), MUTED, w)
         y += 20
         market = f"   Market: {prov.market.name}" + (" (far: -30%)" if prov.remote else "") if prov.market else ""
         self.text(self.small, f"{TERRAIN[prov.terrain].name}{', coast' if prov.coastal else ''}{market}", (x, y), MUTED, w)
@@ -1389,7 +1392,7 @@ class CampaignApp(GameMenu, TechScreen):
         x, y = WIDTH - PANEL_W + 14, TOP + 10
         w = PANEL_W - 28
         country = world.countries[tag]
-        self.text(self.title, f"Raise in {prov.name}", (x, y), width=w - 30)
+        self.text(self.title, f"Raise in {self.world.place(prov)}", (x, y), width=w - 30)
         y += 32
         self.text(self.bold, ERAS[country.era][0], (x, y), GOLD)
         y += 22

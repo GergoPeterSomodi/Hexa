@@ -685,4 +685,10 @@ bumped `VERSION` alone.
 | `tools/` | Developer tools: `monkey.py` replays or hunts with the window tests' seeded monkey (`python -m tools.monkey`), `soak.py` plays long all-AI games checking the invariants every turn, `perf.py` times the slow parts against `tests/perf_budget.json` (both run nightly), `save_compat.py` checks that saves from an older revision still load (pull requests that touch `hexa/campaign/`) |
 | `Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py`, `Read_XML.py` | The original map editor and its XML map loading (`map*.xml`) |
 
-Tile art: [Kenney Hexagon Pack](https://kenney.nl/assets/hexagon-pack) (CC0), in `hexagon-pack/`.
+## Credits
+
+- Tile art: [Kenney Hexagon Pack](https://kenney.nl/assets/hexagon-pack) (CC0), in `hexagon-pack/`.
+- Place names: GeoNames (https://www.geonames.org), licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/),
+  pruned and adapted. `hexa/campaign/placenames.py` holds the pruned copy: the three biggest places in each land hex of
+  the Europe map, without places that did not exist in 1480. Regions and spellings are hand-curated in `regions.py` and
+  `naming.py`. The start menu's Credits button shows these lines.
