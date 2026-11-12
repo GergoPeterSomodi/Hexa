@@ -149,6 +149,15 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
   - **Gameplay:** check the money curve over a full game. The 2026-11-11 playtest found about 9,000 ducats by 1517 with nothing to spend them on. Check the money sinks, investment payback times, the tax levels, debt (#69), and whether small and large countries both have interesting choices.
   - **Fun testing:** an economy-focused playtest of a full game: the pacing of growth, meaningful choices, and how rewarding it feels to see provinces develop. Write it up with findings and proposals, for approval before any redesign.
   - Both run as part of the balance and fun pass (M4). Their UI findings feed the UI clean-up (M3).
+- **Resource bar (user request 2026-11-12):**
+  - A bar at the top shows each resource with its current value and how much it changed since the last turn, for example "Ducats 3548 (+45)".
+  - Green for a gain, red for a loss.
+  - Today the top bar shows only ducats, with the expected income per season, not what really changed.
+  - Resources (suggested): ducats, research points, manpower or army size, merchants, prestige or score, and the country's key goods stock.
+  - Hovering over a resource shows why it changed: the season's income and spending lines, like the treasury breakdown, plus one-off items such as a building, a battle or a loan.
+  - Clicking a resource opens its panel, such as the ledger or the tech screen (suggested).
+  - It needs the world to remember each resource's value at the start of the season, and the reasons for one-off changes.
+  - Planned with the UI clean-up (M3). Mockups come first, together with the button style.
 - **RPG-style event pop-ups:** interactive choices with good or bad outcomes. This is planned for the long-term roadmap's Phase 3 (History and events). Don't start it yet.
 - **Known loose ends:**
   - balance
