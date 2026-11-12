@@ -125,6 +125,17 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
   - **Action log box.** Floating text is easy to miss, so every floating message is also written to a small log box on screen: forage, healing, recruiting, attacks, sieges and captures, own actions first. Each line names the place, and clicking a line jumps the camera there (suggested). It builds on today's message lines in the bottom-left corner. It can be collapsed and scrolls back through the season.
   - **The look matters:** the font, size, colour, outline and motion must be right and readable over every terrain. A colour per kind of event: war red, gains gold, own green, neutral white (suggested). The design comes with mockups for approval first.
   - Planned with the polish round (M3).
+- **Recruiting only at certain places (user request 2026-11-12):**
+  - Today almost any owned province can raise troops. Only cannons (a town or a foundry), ships (a port or a shipyard) and generals (the capital) have place rules.
+  - Limit recruiting so that where you raise an army matters. The suggested rules:
+    - infantry in towns and cities, or with barracks
+    - cavalry in provinces with horses or a stable
+    - mercenaries in rich trade cities
+    - elite troops only with their building
+    - colonies raise only militia
+  - The province panel shows where each unit can be raised, and the hint explains why a place can't.
+  - The AI needs to plan around it: build recruiting sites and march troops to the front.
+  - Design first, with the user. Planned with the balance pass (M4), or with the battle system (M2) if its troop types change.
 - **RPG-style event pop-ups:** interactive choices with good or bad outcomes. This is planned for the long-term roadmap's Phase 3 (History and events). Don't start it yet.
 - **Known loose ends:**
   - balance
