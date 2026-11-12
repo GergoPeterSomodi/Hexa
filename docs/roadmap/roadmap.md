@@ -209,6 +209,23 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
   - **Tribal nations in the New World:** tribes as their own nations, with lands, trade, alliances and resistance to colonisation. Designed with care.
   - **Kenney art audit:** track which Kenney Hexagon Pack art the game still uses. The owner likes it, but may replace it before the Steam release with similar art of our own. Keep a list and plan replacements.
   - **Map modes keep borders:** every map mode (terrain, goods, markets) keeps the country borders faintly, so you can see where your country ends. This is a small fix and is filed as a bug.
+- **Multiplayer (owner request, 2026-11-12):**
+  - Several human players in one Age of Discovery game, each a country. The other countries are AI.
+  - **Steps, cheapest first:**
+    1. **Hotseat:** players take turns on one computer. Fog and panels switch between players, with a "pass to the next player" screen.
+    2. **Online, turn-based:** everyone plans their season, then the season resolves for all, with a turn timer. Possibly async (play-by-mail style), with a small server or Steam lobby.
+    3. **Steam:** Steam lobbies, invites and networking (Steamworks), plus reconnect and save/resume for multiplayer games.
+  - **Gameplay:**
+    - simultaneous orders and how they resolve (battles when both move, contested markets)
+    - diplomacy between humans: alliances, trade deals and chat
+    - AI takeover when a player drops
+    - fairness: starting countries, and the steamrolling question
+    - victory rules (open question 1)
+  - **Tech (needs the architecture plan):**
+    - **Deterministic simulation:** seeded randomness and no hash-order effects. The same-behaviour oracle already checks determinism.
+    - The game manager runs the season loop, so orders can come from any source: local, network or AI.
+    - Saves double as the sync format, with desync detection using the world digest.
+  - **When:** after the core game is fun in single player (M4) and the architecture refactor (at least Phases 1 and 3). Hotseat could come earlier. The design comes first, for the owner's approval.
 - **Game music and sound (owner request, 2026-11-12):**
   - **Music:** a soundtrack in a period style (late medieval and Renaissance: lute, viol, recorder, drums, choir), changing with the situation:
     - calm in peace, tense in war, triumphant after a victory
@@ -312,7 +329,7 @@ Each design is approved by the user before its build starts. M1 and M2 must run 
 
 1. What does winning look like in Age of Discovery? The notes give win rules only for the old conquest game.
 2. How long should one game take? Age of Discovery spans 170 seasons, and the early notes said 15 to 30 minutes.
-3. Is this single-player only, or will multiplayer come later?
+3. ~~Is this single-player only, or will multiplayer come later?~~ Answered 2026-11-12: multiplayer is planned (see the backlog: hotseat, then online, then Steam).
 4. Which screen size is the target? The default is 1280x720, and the options go up to 1920x1080.
 5. How hard should the AI be, and should every country play the same?
 6. Does the new battle system replace the current three-unit front-line battles, or sit next to them?
