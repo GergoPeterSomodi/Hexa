@@ -843,7 +843,10 @@ class Landscape:
         self._gquick = {}                   # (pos, r, season) -> (world version, composite key): skips the key work
         self.builds = 0                     # ground composites built so far (MapView budgets them per frame)
         self.object_builds = 0              # object lists built so far (budgeted the same way)
+        self.sprite_builds = 0              # object sprites made so far (make_sprites; budgeted the same way)
+        self.overlay_builds = 0             # hexes whose wfc overlay / base picture was made by prepare()
         self._objs = OrderedDict()
+        self._specs_cache = {}
         self._field_geo = {}
         self._chips = {}
         self._version = None
@@ -862,6 +865,7 @@ class Landscape:
             self._models = {}
             self._rivers, self._roads = _edge_index(self.world)
             self._objs.clear()
+            self._specs_cache.clear()
 
     def _model(self, season):
         self._sync()
@@ -1247,7 +1251,8 @@ class Landscape:
         """[(surface, dx, dy, sort_y)] of one hex at hex radius r: peaks, hills, trees, farm buildings, life and
         closed-pass markers. dx, dy: offset of the surface's base point (bottom centre) from the hex centre, in
         pixels. sort_y == dy: sort by (centre_y + sort_y) for the back-to-front order. Cached per
-        (pos, world.version, season, r); do not mutate the returned list."""
+        (pos, world.version, season, r); do not mutate the returned list. A sprite that does not exist yet is made
+        here; make_sprites() makes them first, so a caller can budget that work on its own."""
         check_season(season)
         self._sync()
         key = (pos, self._version, season, r)
@@ -1261,18 +1266,69 @@ class Landscape:
         c = self._cell(pos, season)
         if c is not None:
             X, Y = hex_centre(pos)
-            for cat, name, size, seed, x, y in self._specs(c, season):
+            for cat, name, size, seed, x, y in self._specs_of(c, season):
                 dx, dy = (x - X) * r, (y - Y) * r
                 if cat == "chip":
                     surf = self.closed_marker(r)
                     dy = 0.3 * r + surf.get_height() - 1
                     out.append((surf, 0.0, dy, MARKER_SORT))
                     continue
-                flip = (seed >> 7) & 1 == 1 and cat in ("tree", "peak", "hill", "life")
-                surf = obj_sprite(name, size, seed, cat, r * MARKER_SCALE.get(name, 1.0), flip)
+                _, rs, flip = _sprite_key(cat, name, size, seed, r)
+                surf = obj_sprite(name, size, seed, cat, rs, flip)
                 out.append((surf, dx, dy, MARKER_SORT if name in MARKER_SCALE else dy))
             out.sort(key=lambda o: o[3])
         return _lru_put(self._objs, key, out, OBJECT_CACHE)
+
+    def make_sprites(self, pos, r, season):
+        """Makes the object sprites of one hex that do not exist yet (the first use of a sprite is the costly part of
+        objects()). Returns how many were made; objects() then only assembles the list. Counted in sprite_builds."""
+        c = self._cell(pos, check_season(season))
+        if c is None:
+            return 0
+        n = 0
+        for cat, name, size, seed, x, y in self._specs_of(c, season):
+            if cat == "chip":
+                if r not in self._chips:
+                    self.closed_marker(r)
+                    n += 1
+                continue
+            key, rs, flip = _sprite_key(cat, name, size, seed, r)
+            if key not in _OB:
+                obj_sprite(name, size, seed, cat, rs, flip)
+                self.sprite_builds += 1
+                n += 1
+        return n
+
+    def prepare(self, pos, r, season):
+        """The first-use work behind ground(pos): the hex's wfc overlay (4-15 ms the first time, the costly part of a
+        composite) and its base picture, so that the composite itself is cheap. True if anything was made."""
+        check_season(season)
+        c = self._model(season).cells.get(pos)
+        if c is None:
+            return False
+        names = [_base_name(c)]
+        if c.desc is not None and not c.landmark:
+            names.append(("wfc", c.desc))
+        made = False
+        for name in names:
+            if name not in self._src_cache:
+                self._src(name)
+                made = True
+        if made:
+            self.overlay_builds += 1
+        return made
+
+    def warm_sources(self):
+        """Loads the Kenney ground pictures the composites blend with (once; about a dozen images)."""
+        for kind, (sprites, _, _) in GROUND.items():
+            for v in range(len(sprites)):
+                self._src(self._ground_src(kind, v))
+
+    def _specs_of(self, c, season):
+        key = (c.pos, season)
+        if key not in self._specs_cache:
+            self._specs_cache[key] = self._specs(c, season)
+        return self._specs_cache[key]
 
     def object_names(self, pos, season):
         """[(category, object name)] of one hex, without rendering (for tests and debugging)."""
@@ -1409,6 +1465,13 @@ class Landscape:
         return {"terrain": c.terrain, "ground": c.ground, "alt": c.alt, "good": c.good, "works": c.works,
                 "fields": c.fields, "clearing": c.clearing, "built": c.built, "water": c.water,
                 "impassable": c.impassable, "closed": c.closed, "owner": c.owner}
+
+
+def _sprite_key(cat, name, size, seed, r):
+    """(cache key, scaled radius, flip) of an object sprite, as obj_sprite() keys it."""
+    rs = r * MARKER_SCALE.get(name, 1.0)
+    flip = (seed >> 7) & 1 == 1 and cat in ("tree", "peak", "hill", "life")
+    return (name, size, seed % 4, cat, rs, flip), rs, flip
 
 
 def _blocked_tall(m, pos):

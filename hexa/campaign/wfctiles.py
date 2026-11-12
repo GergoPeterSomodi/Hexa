@@ -516,16 +516,33 @@ _BLEED_OFFS = [(dx, dy) for r in (4, 3, 2, 1) for dx, dy in ((-r, 0), (r, 0), (0
                                                                (-r, r), (r, r))]
 
 
+_BLEED_KEYS = [(255, 0, 255), (0, 255, 255), (255, 255, 0), (255, 0, 128), (128, 255, 0), (0, 128, 255)]
+
+
+def _bleed_key(solid):
+    """A colour that no drawn (opaque) pixel of solid has, to key the transparent pixels with."""
+    for key in _BLEED_KEYS:
+        if pygame.mask.from_threshold(solid, key, (1, 1, 1, 255)).count() == 0:
+            return key
+    raise ValueError("no free colour key for the bleed")
+
+
 def _bleed(surf):
     """Give fully transparent pixels the colour of the nearest drawn pixel (alpha unchanged), so smoothscale does
-    not average transparent black into the edges (dark hairlines between tiles, dark fringes on overlays)."""
+    not average transparent black into the edges (dark hairlines between tiles, dark fringes on overlays).
+    The 33 offset copies are colour-keyed blits (same pixels as alpha blits of an opaque copy, much faster)."""
     solid = surf.copy()
     solid.fill((0, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MAX)
     solid = pygame.mask.from_surface(surf, 0).to_surface(setsurface=solid, unsetcolor=(0, 0, 0, 0))
+    key = _bleed_key(solid)
+    keyed = pygame.Surface(surf.get_size())
+    keyed.fill(key)
+    keyed.blit(solid, (0, 0))
+    keyed.set_colorkey(key)
     out = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
     for dx, dy in _BLEED_OFFS:
-        out.blit(solid, (dx, dy))
-    out.blit(solid, (0, 0))
+        out.blit(keyed, (dx, dy))
+    out.blit(keyed, (0, 0))
     alpha = surf.copy()
     alpha.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
     out.blit(alpha, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)

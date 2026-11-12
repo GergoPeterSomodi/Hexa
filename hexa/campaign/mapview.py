@@ -17,7 +17,10 @@ TILE_FROM = 3                     # from this zoom level on, the map is drawn wi
 LAND_FROM = 21                    # from this hex radius on, the map is drawn with the landscape art (_draw_landscape)
 LAND_BUILD_MS = 3.0               # time a frame may spend building composites and object lists (at least one of each);
                                   # a hex not built yet is drawn with its old sprite, or without its objects
-LAND_IDLE_MS = 12.0               # a frame may prefetch the ring round the view until this many ms into the frame
+LAND_IDLE_MS = 8.0                # a frame may prefetch the ring round the view until this many ms into the frame
+WARM_MS = 250.0                   # the start-up warm of the view's hexes stops after this long (the rest: prefetch)
+LAND_STILL_MS = 12.0              # a frame whose camera did not move (same zoom) may spend this long building in total
+                                  # (overlays, composites, object lists), nearest the view centre first
 ART_KEYS = {"galleon": "carrack"}   # unit kinds drawn with another kind's figure until they get their own
 MINES = ("iron", "silver", "gold", "salt")
 BANK, RIVER_DARK, RIVER = (205, 190, 125), (40, 100, 170), (95, 160, 220)
@@ -108,6 +111,10 @@ class MapView:
         self._last_cam = None
         self._pf_done, self._pf_version = set(), None
         self._frame_start, self._frame_objs = 0.0, 0
+        self._frame_sprites, self._frame_ov = 0, 0
+        self._warmed = False               # the start-up warm of the landscape zooms runs on the first draw
+        self.warm_ms = 0.0
+        self._last_r, self._still, self._build_spent = None, False, 0.0
         self.grid_on = True                # the faint hex grid on the landscape zooms (the G key)
         self._roads = []
         for path in getattr(world, "road_paths", []):
@@ -311,6 +318,9 @@ class MapView:
     # ----- per frame ------------------------------------------------------------------------
     def draw(self, screen, view_rect, camera, ui):
         world = self.world
+        if self.land is not None and not self._warmed and self.r >= LAND_FROM:
+            self._warmed = True
+            self.warm(camera, view_rect)
         screen.set_clip(view_rect)
         screen.fill(BLACK_FOG, view_rect)
         if self.r >= LAND_FROM and self.land is not None:
@@ -658,13 +668,47 @@ class MapView:
 
     def _visible_range(self, camera, view_rect):
         """(row0, row1, col0, col1): the hexes whose centres may be on view_rect, clipped to the map."""
-        world, r = self.world, self.r
+        return self._range_at(camera, view_rect, self.r)
+
+    def _range_at(self, camera, view_rect, r, margin=0):
+        """_visible_range at hex radius r, with `margin` more rows and columns on every side."""
+        world = self.world
         w = r * SQRT3
-        row0 = max(0, int((camera[1] - self.MARGIN) / (1.5 * r)) - 1)
-        row1 = min(world.rows - 1, int((camera[1] + view_rect.h - self.MARGIN) / (1.5 * r)) + 1)
-        col0 = max(0, int((camera[0] - self.MARGIN) / w) - 1)
-        col1 = min(world.cols - 1, int((camera[0] + view_rect.w - self.MARGIN) / w) + 1)
+        row0 = max(0, int((camera[1] - self.MARGIN) / (1.5 * r)) - 1 - margin)
+        row1 = min(world.rows - 1, int((camera[1] + view_rect.h - self.MARGIN) / (1.5 * r)) + 1 + margin)
+        col0 = max(0, int((camera[0] - self.MARGIN) / w) - 1 - margin)
+        col1 = min(world.cols - 1, int((camera[0] + view_rect.w - self.MARGIN) / w) + 1 + margin)
         return row0, row1, col0, col1
+
+    def warm(self, camera, view_rect, budget_ms=WARM_MS):
+        """Start-up: builds the ground composites, object sprites and object lists of the view's own hexes at the
+        current landscape zoom, nearest the view centre first, until budget_ms is spent. The rest is left to the idle
+        prefetch. Runs once, on the first landscape draw. Sets warm_ms."""
+        land, r = self.land, self.r
+        t0 = time.perf_counter()
+        end = t0 + budget_ms / 1000
+        land.warm_sources()
+        known = self.known()
+        season = land.season_now()
+        row0, row1, col0, col1 = self._range_at(camera, view_rect, r)
+        cx = camera[0] + view_rect.w / 2
+        cy = camera[1] + view_rect.h / 2
+        todo = []
+        for row in range(row0, row1 + 1):
+            for col in range(col0, col1 + 1):
+                x, y = self.center((col, row))
+                todo.append(((x - cx) ** 2 + (y - cy) ** 2, (col, row)))
+        todo.sort()
+        for _, pos in todo:
+            if time.perf_counter() >= end:
+                break
+            if pos not in known:
+                continue
+            land.prepare(pos, r, season)
+            land.ground(pos, r, season)
+            land.make_sprites(pos, r, season)
+            land.objects(pos, r, season)
+        self.warm_ms = (time.perf_counter() - t0) * 1000
 
     def _draw_landscape(self, screen, view_rect, camera):
         """The close zooms, in draw order: ground composites, the faint grid, fog under the objects, the washes of
@@ -675,15 +719,20 @@ class MapView:
         known, visible = self.known(), world.visible
         ox, oy = view_rect.x - camera[0], view_rect.y - camera[1]
         rows = self._visible_range(camera, view_rect)
+        self._still = self._last_cam == tuple(camera) and self._last_r == r
         if self._last_cam is not None and tuple(camera) != self._last_cam:
             self._pan = (camera[0] - self._last_cam[0], camera[1] - self._last_cam[1])
-        self._last_cam = tuple(camera)
+        self._last_cam, self._last_r = tuple(camera), r
         bare = self.mode == "terrain" or (self.mode == "goods" and self.goods_view == "deposits")
         shown, hidden, dimmed, land_hexes = [], [], [], []
         self._gen_budget = 0                       # wfc overlays the fallback may build this frame (see _landscape_ground)
         self._frame_start = time.perf_counter()
         self._frame_builds, self._frame_objs = 0, 0
+        self._frame_sprites, self._frame_ov = 0, 0
         self._frame_deadline = self._frame_start + LAND_BUILD_MS / 1000
+        self._build_spent = 0.0
+        if self._still:
+            self._fill_centre_first(camera, view_rect, rows, known, season)
         for row in range(rows[0], rows[1] + 1):
             for col in range(rows[2], rows[3] + 1):
                 pos = (col, row)
@@ -722,13 +771,56 @@ class MapView:
             return
         self._political_marks(screen, shown)
 
+    def _may_build(self, made, end=None):
+        """May the frame build one more hex of a kind? A still frame: while its builds total under LAND_STILL_MS. A
+        moving frame: the first of a kind always goes, then only while in time (end: the kind's deadline)."""
+        if self._still:
+            return self._build_spent < LAND_STILL_MS / 1000
+        return made == 0 or time.perf_counter() < (self._frame_deadline if end is None else end)
+
+    def _fill_centre_first(self, camera, view_rect, rows, known, season):
+        """Still frame: builds the view's hexes nearest the centre first, until LAND_STILL_MS of building is spent.
+        The drawing order is unchanged; this only decides which composites and object lists are ready."""
+        r = self.r
+        cx, cy = camera[0] + view_rect.w / 2, camera[1] + view_rect.h / 2
+        todo = []
+        for row in range(rows[0], rows[1] + 1):
+            for col in range(rows[2], rows[3] + 1):
+                x, y = self.center((col, row))
+                todo.append(((x - cx) ** 2 + (y - cy) ** 2, (col, row)))
+        todo.sort()
+        for _, pos in todo:
+            if self._build_spent >= LAND_STILL_MS / 1000:
+                break
+            if pos in known:
+                self._build_hex(pos, r, season)
+
+    def _build_hex(self, pos, r, season):
+        """One hex's composite and object list, the first-use work first; the time goes to _build_spent."""
+        land = self.land
+        t = time.perf_counter()
+        if land.ground(pos, r, season, build=False) is None:
+            land.prepare(pos, r, season)
+            land.ground(pos, r, season)
+        if land.objects(pos, r, season, build=False) is None:
+            land.make_sprites(pos, r, season)
+            land.objects(pos, r, season)
+        self._build_spent += time.perf_counter() - t
+
     def _landscape_ground(self, screen, pos, cx, cy, prov, season, bare):
-        """One hex's ground: its baked composite if built (new ones while the frame has LAND_BUILD_MS), else the sprite."""
+        """One hex's ground: its baked composite if built (new ones while the frame has LAND_BUILD_MS: first the
+        hex's overlay and picture, then the composite), else the sprite."""
         world, land = self.world, self.land
-        n0 = land.builds
         in_time = time.perf_counter() < self._frame_deadline
-        img = land.ground(pos, self.r, season, build=self._frame_builds == 0 or in_time)
-        self._frame_builds += land.builds - n0
+        img = land.ground(pos, self.r, season, build=False)
+        if img is None and self._may_build(self._frame_builds):
+            t = time.perf_counter()
+            if land.prepare(pos, self.r, season):
+                self._frame_ov += 1
+            n0 = land.builds
+            img = land.ground(pos, self.r, season)
+            self._frame_builds += land.builds - n0
+            self._build_spent += time.perf_counter() - t
         if img is not None:
             self._blit_centre(screen, img, cx, cy)
             return
@@ -745,11 +837,20 @@ class MapView:
                 self._blit_centre(screen, img, cx, cy)
 
     def _objects_of(self, pos, r, season, build):
-        """The object list of a hex (None if not built and build is False), counting the builds of this frame."""
+        """The object list of a hex (None if not built and build is False), counting the builds of this frame: first
+        its sprites that do not exist yet (make_sprites), then the list."""
         land = self.land
+        objs = land.objects(pos, r, season, build=False)
+        if objs is not None or not build:
+            return objs
+        t = time.perf_counter()
+        n0 = land.sprite_builds
+        land.make_sprites(pos, r, season)
+        self._frame_sprites += land.sprite_builds - n0
         n0 = land.object_builds
-        objs = land.objects(pos, r, season, build=build)
+        objs = land.objects(pos, r, season)
         self._frame_objs += land.object_builds - n0
+        self._build_spent += time.perf_counter() - t
         return objs
 
     def _object_pass(self, screen, view_rect, origin, rows, known, season):
@@ -766,7 +867,7 @@ class MapView:
                 pos = (col, row)
                 if pos not in known:
                     continue
-                build = self._frame_objs == 0 or time.perf_counter() < end
+                build = self._may_build(self._frame_objs, end)
                 objs = self._objects_of(pos, r, season, build)
                 if objs is None:
                     continue
@@ -827,10 +928,12 @@ class MapView:
             if pos not in known or (r, pos, season) in self._pf_done:
                 continue
             if land.ground(pos, r, season, build=False) is None:
+                land.prepare(pos, r, season)
                 land.ground(pos, r, season)
             if time.perf_counter() >= end:
                 return
             if land.objects(pos, r, season, build=False) is None:
+                land.make_sprites(pos, r, season)
                 land.objects(pos, r, season)
             self._pf_done.add((r, pos, season))
 

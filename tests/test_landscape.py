@@ -198,6 +198,29 @@ class RuleTest(unittest.TestCase):
         world.turn = 5
         self.assertEqual(land.season_now(), "summer")
 
+    def test_sprites_can_be_made_before_the_object_list(self):
+        """make_sprites() makes the sprites of a hex (counted in sprite_builds) and objects() then only assembles."""
+        L._OB.clear()                       # the sprite cache is module-level: start cold
+        land = L.Landscape(WORLD, TILES)
+        pos = next(p for p in hexes(WORLD, lambda p: WORLD.terrain[p] == "mountains")
+                   if land.object_names(p, "summer"))
+        made = land.make_sprites(pos, 21, "summer")
+        self.assertGreater(made, 0)
+        self.assertEqual(land.sprite_builds, made)
+        self.assertEqual(land.make_sprites(pos, 21, "summer"), 0)
+        self.assertIsNone(land.objects(pos, 21, "summer", build=False))
+        n = land.object_builds
+        self.assertIsInstance(land.objects(pos, 21, "summer"), list)
+        self.assertEqual(land.object_builds, n + 1)
+
+    def test_overlay_is_prepared_once(self):
+        """prepare() makes the hex's wfc overlay and base picture; the second call has nothing to make."""
+        land = L.Landscape(WORLD, TILES)
+        pos = next(hexes(WORLD, lambda p: WORLD.terrain[p] == "plains"))
+        self.assertTrue(land.prepare(pos, 34, "summer"))
+        self.assertFalse(land.prepare(pos, 34, "summer"))
+        self.assertFalse(land.prepare((-5, -5), 34, "summer"))
+
 
 class RandomWorldTest(unittest.TestCase):
     def test_runs_on_a_random_world(self):
