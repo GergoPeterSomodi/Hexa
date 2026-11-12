@@ -158,6 +158,7 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
   - Clicking a resource opens its panel, such as the ledger or the tech screen (suggested).
   - It needs the world to remember each resource's value at the start of the season, and the reasons for one-off changes.
   - Planned with the UI clean-up (M3). Mockups come first, together with the button style.
+- **Debt and bankruptcy (user request 2026-11-12):** a hard debt limit, and past it bankruptcy: a reset with long-lasting penalties (castles ruined, units desert, provinces lost to creditors, an economy penalty). The model and penalties are still open. It has its own roadmap: [debt-and-bankruptcy.md](debt-and-bankruptcy.md). The v0.1.5 debt rule (#69) is an interim fix until then. It's planned with M4.
 - **Architecture review and refactor (user request 2026-11-12):**
   - The goal: avoid spaghetti code. Use reusable modules and a game manager system, so the game is easier to maintain, debug and extend toward Steam.
   - **Today:** the campaign is about 20,000 lines. Some files do too much:
