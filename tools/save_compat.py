@@ -222,7 +222,7 @@ def _write(checkout, out, manifest_path):
             return WRITE_FAILED
         seconds = time.perf_counter() - started
         path = saves.path(slot)
-        entry = {"slot": slot, "file": os.path.relpath(path, out), "what": what, "map": getattr(world, "map", None),
+        entry = {"slot": slot, "file": os.path.relpath(path, out).replace(os.sep, "/"), "what": what, "map": getattr(world, "map", None),
                  "seed": getattr(world, "seed", None), "tag": world.player, "turn": world.turn, "date": world.date(),
                  "header_version": meta.get("version") if isinstance(meta, dict) else None,
                  "bytes": os.path.getsize(path), "seconds": round(seconds, 2)}
@@ -252,7 +252,7 @@ def _short(filename, checkout):
     """A traceback's file name, relative to the checkout or to this tool's tree when it is in one."""
     for tree in (checkout, ROOT):
         if _under(filename, tree):
-            return os.path.relpath(os.path.realpath(filename), os.path.realpath(tree))
+            return os.path.relpath(os.path.realpath(filename), os.path.realpath(tree)).replace(os.sep, "/")
     return filename
 
 

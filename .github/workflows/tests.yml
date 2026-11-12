@@ -113,7 +113,7 @@ jobs:
           coverage run --append -m unittest -v
           tests.test_landscape tests.test_passes tests.test_playtest tests.test_techscreen
           tests.test_uifixes tests.test_wfctiles tests.test_goodsobjects tests.test_mapview_polish
-          tests.test_town_labels
+          tests.test_town_labels tests.test_review_fixes
       - name: Report coverage
         if: ${{ !cancelled() }}
         run: |

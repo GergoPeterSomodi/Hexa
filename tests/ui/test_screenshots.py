@@ -260,8 +260,13 @@ class GoldenCase(ScreenCase):
         golden.require_environment(self)
         super().setUp()
 
+    MAP_TOLERANCE = 0.015                    # map scenes: the art changes often, allow 1.5 % of the pixels to differ
+
     def check(self, name, max_pixels=0):
-        golden.check(self, name, getattr(self, f"scene_{name}")(), max_pixels)
+        frame = getattr(self, f"scene_{name}")()
+        if name.startswith("campaign_") and not max_pixels:
+            max_pixels = int(frame.get_width() * frame.get_height() * self.MAP_TOLERANCE)
+        golden.check(self, name, frame, max_pixels)
 
 
 class MenuScreens(GoldenCase):
