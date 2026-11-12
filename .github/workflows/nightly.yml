@@ -1,0 +1,186 @@
+name: nightly
+
+# Long runs that are too slow for every push: the all-AI soak (tools/soak.py), the performance budgets
+# (tools/perf.py against tests/perf_budget.json) and long monkey sessions in the real windows
+# (tests/ui/test_monkey.py). Run by the schedule or by hand from the Actions tab, with smaller or bigger inputs.
+# When a scheduled run fails, the last job opens a "Nightly failure" issue, or comments on the open one.
+on:
+  schedule:
+    - cron: "17 3 * * *"          # 03:17 UTC every night
+  workflow_dispatch:
+    inputs:
+      soak:
+        description: "Soak scale: full (200 Conquest games, 50 Colonisation x 40 rounds, Europe 100 seasons, 3 random worlds x 40) or quick"
+        type: choice
+        options: [full, quick]
+        default: full
+      monkey_seeds:
+        description: Monkey seeds per mode (HEXA_MONKEY_SEEDS, a count, a range like 5-9 or a list like 3,8,12)
+        default: "50"
+      monkey_frames:
+        description: Monkey frames per session (HEXA_MONKEY_FRAMES, every mode and/or one, like 3000,campaign=600)
+        default: "3000,campaign=600"
+      monkey_burst:
+        description: Chance that a monkey frame gets a burst of actions (HEXA_MONKEY_BURST, 0 to 1)
+        default: "0.5"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # An explicit bash runs with -o pipefail, so "| tee" keeps the tool's exit status.
+    shell: bash
+
+jobs:
+  soak:
+    name: soak (Python 3.13)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # runner.temp can't be used in a job-level env, so the folder is set by the first step.
+      - name: Isolate HEXA_HOME
+        run: echo "HEXA_HOME=$RUNNER_TEMP/hexa-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # No "pip install": the soak needs no pygame. It writes its table to the job summary.
+      - name: Soak
+        env:
+          SOAK: ${{ inputs.soak || 'full' }}
+        run: |
+          if [ "$SOAK" = quick ]; then
+            python -m tools.soak --quick | tee soak.log
+          else
+            python -m tools.soak | tee soak.log
+          fi
+      - name: Keep the log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-log-soak
+          path: soak.log
+          if-no-files-found: ignore
+
+  perf:
+    name: perf (Python 3.12, pygame 2.6.1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      # The MapView metrics need pygame: fail instead of skipping them.
+      HEXA_REQUIRE_PYGAME: "1"
+    steps:
+      - name: Isolate HEXA_HOME
+        run: echo "HEXA_HOME=$RUNNER_TEMP/hexa-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # pygame 2.6.1 has wheels up to CPython 3.13 only; 3.12 is what the ui job uses.
+          python-version: "3.12"
+      - name: Install pygame
+        run: python -m pip install pygame==2.6.1
+      # Median of 3 runs per metric against tests/perf_budget.json; the table goes to the job summary. Fails only
+      # past a hard limit. The memory row (#29) is information only.
+      - name: Measure
+        run: python -m tools.perf | tee perf.log
+      - name: Keep the log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-log-perf
+          path: perf.log
+          if-no-files-found: ignore
+
+  monkey:
+    name: monkey ${{ matrix.mode }} (Python 3.12, pygame 2.6.1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [conquest, colony, campaign]
+    # No HEXA_HOME here: every monkey session gets its own temporary one.
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      HEXA_REQUIRE_PYGAME: "1"
+      TZ: UTC
+      HEXA_MONKEY_SEEDS: ${{ inputs.monkey_seeds || '50' }}
+      HEXA_MONKEY_FRAMES: ${{ inputs.monkey_frames || '3000,campaign=600' }}
+      HEXA_MONKEY_BURST: ${{ inputs.monkey_burst || '0.5' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pygame
+        run: python -m pip install pygame==2.6.1
+      # Only MonkeyTest reads the HEXA_MONKEY_* variables; the module's other tests (the monkey's own checks and
+      # the expected failures that pin known crashes) run in the tests workflow's ui job on every push. Input that
+      # would hit a known open crash is withheld (KNOWN_ISSUES in tests/support/monkey.py), so these sessions look
+      # for new bugs. A failing session prints "Replay: python -m tools.monkey ..." and saves its last frame.
+      - name: Monkey
+        run: python -m unittest -v "tests.ui.test_monkey.MonkeyTest.test_${{ matrix.mode }}" 2>&1 | tee "monkey-${{ matrix.mode }}.log"
+      - name: Keep the log and the last frames
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-log-monkey-${{ matrix.mode }}
+          path: |
+            monkey-${{ matrix.mode }}.log
+            test-artifacts/
+          if-no-files-found: ignore
+
+  report:
+    name: open or update the "Nightly failure" issue
+    needs: [soak, perf, monkey]
+    # Scheduled runs only: a run started by hand shows its result to whoever started it. A job that ran out of time
+    # counts too; a run cancelled by hand doesn't.
+    if: >-
+      ${{ !cancelled() && github.event_name == 'schedule'
+      && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Fetch the logs of the failed jobs
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: nightly-log-*
+          path: logs
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RESULTS: "soak: ${{ needs.soak.result }}, perf: ${{ needs.perf.result }}, monkey: ${{ needs.monkey.result }}"
+        run: |
+          title="Nightly failure"
+          {
+            echo "The nightly run of $(date -u +%Y-%m-%d) failed: $RUN_URL"
+            echo
+            echo "Jobs: $RESULTS (commit $GITHUB_SHA)."
+            echo
+            echo "Replay commands and over-budget metrics from the logs:"
+            echo
+            echo '```'
+            grep -rhE '^(Replay: |FAILED)' logs 2>/dev/null | sort -u | head -n 40 || true
+            echo '```'
+          } > body.md
+          number=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body-file body.md
+          else
+            gh issue create --title "$title" --body-file body.md
+          fi

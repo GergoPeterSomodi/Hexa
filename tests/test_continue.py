@@ -10,7 +10,7 @@ from unittest import mock
 import hexa
 import hexa.campaign
 from hexa.campaign import saves
-from tests.test_saves import TempHome
+from tests.support.home import TempHome
 
 
 @contextlib.contextmanager

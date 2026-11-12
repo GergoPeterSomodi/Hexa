@@ -1,0 +1,63 @@
+name: goldens
+
+# Makes the golden screenshots (tests/golden/linux/) on the same setup as the tests workflow's ui job and uploads
+# them as the "goldens" artifact. It never commits: download the artifact, unpack it over tests/golden/linux/,
+# look at what changed and commit it yourself.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to make the goldens for (empty for the branch this runs on)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  goldens:
+    name: goldens (Python 3.12, pygame 2.6.1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      # Without pygame the tests would skip and write nothing: make that an error instead.
+      HEXA_REQUIRE_PYGAME: "1"
+      TZ: UTC
+      UPDATE_GOLDEN: "1"
+    steps:
+      # runner.temp can't be used in a job-level env, so the folder is set by the first step.
+      - name: Isolate HEXA_HOME
+        run: echo "HEXA_HOME=$RUNNER_TEMP/hexa-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          # The ui job's Python and pygame: MANIFEST.json records them, and the goldens are compared only there.
+          python-version: "3.12"
+      - name: Install pygame
+        run: python -m pip install pygame==2.6.1
+      - name: Make the goldens
+        run: python -m unittest tests.ui.test_screenshots -v
+      - name: Summary
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "## Golden screenshots"
+            echo
+            echo '```'
+            cat test-artifacts/golden-updates.txt 2>/dev/null || echo "No summary: the screenshot tests did not run."
+            git status --short tests/golden/linux
+            echo '```'
+            echo
+            echo "Download the goldens artifact, unpack it over tests/golden/linux/, review and commit it."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the goldens
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldens
+          path: tests/golden/linux/
+          if-no-files-found: error

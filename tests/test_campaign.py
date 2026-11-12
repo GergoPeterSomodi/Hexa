@@ -6,12 +6,15 @@ from hexa.campaign.data import (GENERAL, STACK_LIMIT, WAGON, troop, BUILD_TURNS,
                                 SETTLEMENT_SLOTS, SIEGE_BASE, WORKS)
 from hexa.campaign.world import CampaignWorld, War
 from hexa.hexgrid import distance, neighbors
+from tests.support.slow import slow
+from tests.support.worlds import europe, fresh, play_seasons, pristine
 
-WORLD = CampaignWorld()          # building the map takes a moment, so most tests share this pristine copy
+WORLD = europe()                 # building the map takes a moment, so most tests share this read-only copy
+_PRISTINE = pristine(WORLD, "the shared WORLD")
 
 
-def fresh(player="POR"):
-    return CampaignWorld(player=player)
+def tearDownModule():
+    _PRISTINE.check()            # a test that needs to change a world must use fresh()
 
 
 class MapTest(unittest.TestCase):
@@ -380,6 +383,7 @@ class WarTest(unittest.TestCase):
         place(w, GENERAL, "POR", prov.pos)
         self.assertIn(prov.pos, w.reachable(extra), "a general makes room for more")
 
+    @slow
     def test_cavalry_wins_in_the_open_but_not_in_forests(self):
         def fight(terrain):
             wins = 0
@@ -708,12 +712,9 @@ class SupplyTest(unittest.TestCase):
 
 
 class AITest(unittest.TestCase):
+    @slow
     def test_thirty_years_of_history(self):
-        w = CampaignWorld()
-        for _ in range(100):
-            for tag in w.countries:
-                ai.run(w, tag)
-            w.end_round()
+        w = play_seasons(fresh(None), 100)
         colonies = [p for p in w.provinces.values() if p.owner and (p.colony or p.trading_post)]
         self.assertGreaterEqual(len(colonies), 5, "the Atlantic powers colonise")
         self.assertTrue(any(geo.lonlat(p.pos)[0] < -30 for p in w.provinces.values() if p.owner),

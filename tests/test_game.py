@@ -6,6 +6,7 @@ from hexa.hexgrid import distance, hex_center, neighbors, pixel_to_hex, within
 from hexa.rules import (AI, CASTLE_INCOME, IMPROVEMENTS, PLAYER, SCOUT, SETTLER, SOLDIER,
                         TURN_LIMIT, WORKER)
 from hexa.world import World
+from tests.support.slow import slow
 
 
 def free_neighbor(world, pos):
@@ -228,6 +229,7 @@ class AITest(unittest.TestCase):
             self.assertGreaterEqual(len(mine), 3, f"seed {seed}: AI built too little")
             self.assertGreaterEqual(len(w.towns_of(AI)), 2, f"seed {seed}: AI never settled")
 
+    @slow
     def test_ai_games_finish_without_errors(self):
         for seed in range(20):
             w = self.play_out(World(seed))

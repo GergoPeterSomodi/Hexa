@@ -1,0 +1,198 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: unit (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the floor, 3.x is the newest release.
+        python-version: ["3.10", "3.13", "3.x"]
+    steps:
+      # runner.temp can't be used in a job-level env, so the folder is set by the first step.
+      - name: Isolate HEXA_HOME
+        run: echo "HEXA_HOME=$RUNNER_TEMP/hexa-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # No "pip install": this job proves the suite needs no pygame.
+      - name: Choose test flags
+        # --durations only exists on Python 3.12 and newer.
+        run: |
+          if python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)'; then
+            echo "TEST_FLAGS=--durations 15" >> "$GITHUB_ENV"
+          fi
+      - name: Run unit tests
+        run: |
+          # shellcheck disable=SC2086  # TEST_FLAGS is empty or "--durations 15": split into words on purpose
+          python -m unittest discover -s tests -t . -v $TEST_FLAGS
+
+  coverage:
+    name: coverage (Python 3.14)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # runner.temp can't be used in a job-level env, so the folder is set by the first step.
+      - name: Isolate HEXA_HOME
+        run: echo "HEXA_HOME=$RUNNER_TEMP/hexa-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Pinned to 3.14: there coverage.py measures branches through sys.monitoring at almost no cost,
+          # while branch coverage is about 5x slower on 3.12. Settings live in .coveragerc.
+          python-version: "3.14"
+      # Installs coverage only, never pygame: this is the pygame-free suite.
+      - name: Install coverage
+        run: python -m pip install -r requirements-dev.txt
+      - name: Run unit tests under coverage
+        run: coverage run -m unittest discover -s tests -t .
+      # The ui job reuses requirements-dev.txt and .coveragerc for its own line-only report.
+      - name: Report coverage
+        if: always()
+        run: |
+          {
+            echo "## Test coverage (unit suite, branch coverage)"
+            echo
+            coverage report --format=markdown
+          } >> "$GITHUB_STEP_SUMMARY"
+          coverage html
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: htmlcov
+          path: htmlcov/
+          if-no-files-found: ignore
+
+  ui:
+    name: ui (Python 3.12, pygame 2.6.1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # No HEXA_HOME here: every UI test (harness.UITestCase) gets its own temporary one.
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      # Without pygame the UI tests would skip and the job would pass: make that an error instead.
+      HEXA_REQUIRE_PYGAME: "1"
+      TZ: UTC
+      # Line coverage only: on 3.12 sys.monitoring can't measure branches, and branch coverage is about 5x slower.
+      # Branch and line data can't be combined, so this is a second table next to the coverage job's.
+      COVERAGE_CORE: sysmon
+      HEXA_COVERAGE_BRANCH: "0"
+      # The golden screenshots (tests/ui/test_screenshots.py) skip where the environment differs from
+      # tests/golden/linux/MANIFEST.json. Once a run has shown that they are compared here, not skipped,
+      # add HEXA_GOLDEN_STRICT: "1" so that a mismatch fails instead.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # pygame 2.6.1 has wheels up to CPython 3.13 only. The wheel bundles SDL and the dummy drivers need
+          # no X server, so there is nothing to apt-get.
+          python-version: "3.12"
+      - name: Install pygame and coverage
+        run: python -m pip install pygame==2.6.1 -r requirements-dev.txt
+      - name: Run UI tests under coverage
+        run: coverage run -m unittest discover -s tests/ui -t . -v --durations 10
+      # The game's own window tests outside tests/ui import pygame at the top, so the unit job skips them: run them here.
+      - name: Run the other pygame tests under coverage
+        run: >-
+          coverage run --append -m unittest -v
+          tests.test_landscape tests.test_passes tests.test_playtest tests.test_techscreen
+          tests.test_uifixes tests.test_wfctiles tests.test_goodsobjects tests.test_mapview_polish
+          tests.test_town_labels
+      - name: Report coverage
+        if: ${{ !cancelled() }}
+        run: |
+          coverage report
+          {
+            echo "## Test coverage (UI tests, line coverage)"
+            echo
+            coverage report --format=markdown
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Write HTML report
+        if: ${{ !cancelled() }}
+        run: coverage html
+      - name: Upload HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: htmlcov-ui
+          path: htmlcov/
+          if-no-files-found: ignore
+      # A failing UI test saves its last frame here (tests/support/harness.py, HEXA_TEST_ARTIFACTS).
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: test-artifacts/
+          if-no-files-found: ignore
+
+  save-compat:
+    name: save compatibility (Python 3.12)
+    # Pull requests only: games saved by the merge base's code (what players have) must still load and play with
+    # the pull request's, unless saves.VERSION was bumped (tools/save_compat.py). The job runs on every pull request,
+    # but its first step skips the rest unless hexa/campaign/ or the tool changed (plain git, no paths-filter action).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # runner.temp can't be used in a job-level env, so the folder is set by the first step.
+      - name: Isolate HEXA_HOME
+        run: echo "HEXA_HOME=$RUNNER_TEMP/hexa-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          # The whole history and every branch, so the merge base with the target branch can be found.
+          fetch-depth: 0
+      # HEAD is the pull request merged into its target branch, so the diff from the merge base is the pull request.
+      - name: Find the merge base and what changed since
+        id: changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          base=$(git merge-base "origin/$BASE_REF" HEAD)
+          changed=$(git diff --name-only "$base" HEAD -- hexa/campaign tools/save_compat.py)
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          if [ -n "$changed" ]; then
+            echo "campaign=true" >> "$GITHUB_OUTPUT"
+            echo "Changed since the merge base $base:"
+            echo "$changed"
+          else
+            echo "campaign=false" >> "$GITHUB_OUTPUT"
+            echo "No change to hexa/campaign/ since the merge base $base: nothing to check."
+            echo "Save compatibility: skipped, this pull request doesn't change hexa/campaign/." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/setup-python@v5
+        if: steps.changes.outputs.campaign == 'true'
+        with:
+          python-version: "3.12"
+      # No "pip install": the tool needs no pygame. The merge base needs no tools/ folder: the pull request's tool
+      # imports the base's hexa package from the worktree.
+      - name: Check out the merge base into a worktree
+        if: steps.changes.outputs.campaign == 'true'
+        env:
+          BASE_SHA: ${{ steps.changes.outputs.base }}
+        run: git worktree add --detach "$RUNNER_TEMP/base" "$BASE_SHA"
+      - name: Save three games with the merge base's code
+        if: steps.changes.outputs.campaign == 'true'
+        run: python tools/save_compat.py write "$RUNNER_TEMP/base" "$RUNNER_TEMP/compat"
+      # Writes its table to the job summary. Exit status 1: a save broke (with VERSION unchanged it was refused or
+      # failed to play; after a bump it still loaded but failed), or this code's hexa.campaign can't be imported.
+      # The log names the save, the step and the exception, and says how to fix it.
+      - name: Load them with the pull request's code
+        if: steps.changes.outputs.campaign == 'true'
+        run: python tools/save_compat.py check "$RUNNER_TEMP/compat"

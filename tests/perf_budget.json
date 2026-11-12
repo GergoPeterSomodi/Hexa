@@ -1,0 +1,18 @@
+{
+  "_comment": [
+    "Budgets for python -m tools.perf (the nightly perf job): CPU seconds (time.process_time), the median of 3 runs.",
+    "Over 'soft' the table notes it; over 'hard' the nightly run fails. The unit tests and PRs never gate on time.",
+    "'measured' is the median when the limits were set: 2026-11-11 on macOS arm64 (Apple Silicon, 12 cores), Python 3.12.11 with pygame 2.6.1; Python 3.15.2 gave the same within 0.07 s.",
+    "Hard limits are about 4x 'measured' and soft limits about 2x, because shared CI runners are slower and noisier than that machine. Once the nightly job has a few runs, set 'soft' to about 1.5x the CI medians.",
+    "A change that makes something slower on purpose raises its limits in the same pull request and says why."
+  ],
+  "metrics": {
+    "europe_build": {"soft": 4.0, "hard": 8.0, "measured": 2.08},
+    "random_build": {"soft": 5.0, "hard": 10.0, "measured": 2.45},
+    "snapshot_restore": {"soft": 0.2, "hard": 0.4, "measured": 0.085},
+    "ai_season": {"soft": 0.25, "hard": 0.5, "measured": 0.125},
+    "ai_season_late": {"soft": 0.5, "hard": 1.0, "measured": 0.251},
+    "mapview_zoom1": {"soft": 0.2, "hard": 0.4, "measured": 0.103},
+    "mapview_zoom4": {"soft": 0.25, "hard": 0.5, "measured": 0.129}
+  }
+}

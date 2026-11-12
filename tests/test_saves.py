@@ -8,30 +8,16 @@ import json
 import operator
 import os
 import pickle
-import shutil
 import sys
-import tempfile
 import unittest
 from unittest import mock
 
 from hexa import settings
-from hexa.campaign import ai, saves
+from hexa.campaign import saves
 from hexa.campaign.data import GENERAL, troop
 from hexa.campaign.world import WORLD_DEFAULTS, WORLD_REQUIRED, CampaignWorld
-
-
-class TempHome(unittest.TestCase):
-    def setUp(self):
-        self.home = tempfile.mkdtemp()
-        self.old = os.environ.get("HEXA_HOME")
-        os.environ["HEXA_HOME"] = self.home
-
-    def tearDown(self):
-        if self.old is None:
-            os.environ.pop("HEXA_HOME", None)
-        else:
-            os.environ["HEXA_HOME"] = self.old
-        shutil.rmtree(self.home, ignore_errors=True)
+from tests.support.home import TempHome
+from tests.support.worlds import fresh, play_seasons
 
 
 class NotAnObjectTest(TempHome):
@@ -61,12 +47,7 @@ class NotAnObjectTest(TempHome):
 
 class SaveTest(TempHome):
     def test_a_saved_game_comes_back_exactly(self):
-        w = CampaignWorld(player="POR")
-        for _ in range(2):
-            for tag in w.countries:
-                if tag != "POR":
-                    ai.run(w, tag)
-            w.end_round()
+        w = play_seasons(fresh(), 2, player_ai=False)
         w.countries["POR"].treasury = 1234.5
         meta = saves.save(w, "3")
         self.assertEqual(meta["country"], "Portugal")
@@ -108,7 +89,8 @@ class SaveTest(TempHome):
         self.assertIsNone(saves.load("5"), "an empty slot loads nothing")
         with open(saves.path("6"), "wb") as f:
             f.write(b"not a save")
-        self.assertIsNone(saves.load("6"), "a broken file loads nothing")
+        with contextlib.redirect_stderr(io.StringIO()):          # load() says why on stderr
+            self.assertIsNone(saves.load("6"), "a broken file loads nothing")
         self.assertIsNone(saves.meta("6"))
 
 
@@ -122,16 +104,17 @@ class OldAndBrokenSavesTest(TempHome):
 
     def test_a_removed_unit_kind_means_cant_load_not_a_crash(self):
         from hexa.campaign import data
-        w = CampaignWorld(player="POR")
+        w = fresh()
         saves.save(w, "2")
         gone = next(u.kind.key for u in w.units if u.kind.war)
         with mock.patch.dict(data.UNIT_KINDS):
             del data.UNIT_KINDS[gone]
-            self.assertIsNone(saves.load("2"))
+            with contextlib.redirect_stderr(io.StringIO()):      # load() says why on stderr
+                self.assertIsNone(saves.load("2"))
         self.assertIsNotNone(saves.load("2"), "the same save loads once the kind is back")
 
     def test_an_older_save_gets_defaults_for_newer_fields(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         state = pickle.loads(pickle.dumps(w.save_state()))
         for key in ("over", "wars", "_castle_list", "_known_world"):
             state.pop(key, None)
@@ -150,7 +133,7 @@ class OldAndBrokenSavesTest(TempHome):
         back.end_round()                         # and the game plays on
 
     def test_saves_from_a_newer_version_are_refused(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         self._write("4", w.save_state(), version=saves.VERSION + 1)
         self.assertIsNone(saves.meta("4"))
         self.assertIsNone(saves.load("4"))
@@ -164,11 +147,13 @@ class OldAndBrokenSavesTest(TempHome):
         return said.getvalue()
 
     def test_a_state_that_is_not_a_whole_world_is_refused(self):
-        self._write("1", {})                                        # the example in issue #6
+        """Issue #6 (fixed): a save whose body is not a whole world is refused instead of crashing Continue,
+        Load or F9."""
+        self._write("1", {})                                      # the example in issue #6
         self._refused("1", "an empty state")
         self._write("2", [1, 2, 3])
         self._refused("2", "a state that is not a dict")
-        w = CampaignWorld(player="POR")
+        w = fresh()
         for slot, name in (("3", "countries"), ("4", "markets"), ("5", "turn"), ("6", "cols")):
             state = w.save_state()
             del state[name]
@@ -176,7 +161,7 @@ class OldAndBrokenSavesTest(TempHome):
             self.assertIn(name, self._refused(slot, f"a world without {name}"))
 
     def test_a_player_country_that_is_not_in_the_world_is_refused(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         w.player = "XXX"                    # load_world() would look up its capital and crash
         saves.save(w, "1")
         self.assertIn("'XXX'", self._refused("1", "a world without the player's country"))
@@ -194,12 +179,217 @@ class OldAndBrokenSavesTest(TempHome):
         self.assertIn("IndexError", self._refused("2", "an IndexError while unpickling"))
 
     def test_every_saved_attribute_is_required_or_has_a_default(self):
-        state = CampaignWorld(player="POR").save_state()
+        state = fresh().save_state()
         restored = {"map", "seed", "_next_id"}           # _restore() handles these itself
         lazy = {"_explored_from"}                        # added when first needed
         self.assertEqual(set(state) - set(WORLD_REQUIRED) - set(WORLD_DEFAULTS) - restored - lazy, set(),
                          "a new world attribute must go into WORLD_REQUIRED or WORLD_DEFAULTS")
         self.assertTrue(set(WORLD_REQUIRED) <= set(state), "WORLD_REQUIRED only names real attributes")
+
+
+GOOD_HEADER = {"version": saves.VERSION, "slot": "1", "saved": 1.0, "date": "Spring 1480", "turn": 1,
+               "map": "Europe 1480", "tag": "POR", "country": "Portugal", "treasury": 0}
+
+
+def put(slot, header, body=b""):
+    """Write a save file: a header (bytes as they are, or a dict as JSON) on one line, then the body bytes."""
+    os.makedirs(saves.folder(), exist_ok=True)
+    if not isinstance(header, bytes):
+        header = json.dumps(header).encode("utf-8")
+    with open(saves.path(slot), "wb") as f:
+        f.write(header + b"\n" + body)
+
+
+class UnreadableSaveTest(TempHome):
+    """Files that are not saves, or not saves this version reads: an empty slot, never a crash."""
+
+    def _assert_empty_slot(self, slot):
+        self.assertIsNone(saves.meta(slot))
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertIsNone(saves.load(slot))
+        self.assertIsNone(dict(saves.listing())[slot])
+        self.assertIsNone(saves.latest())
+
+    def test_headers_that_are_no_save_header_are_an_empty_slot(self):
+        headers = {"number": b"1", "null": b"null", "list": b"[]", "string": b'"text"', "true": b"true",  # #7
+                   "nothing": b"", "not utf-8": b"\xff\xfe\x00", "cut off": b'{"version": 1, "saved": ',
+                   "empty object": b"{}", "no version": json.dumps({k: v for k, v in GOOD_HEADER.items()
+                                                                       if k != "version"}).encode(),
+                   "version 0": b'{"version": 0}', "negative version": b'{"version": -1}',
+                   "huge version": b'{"version": %d}' % 2 ** 70, "text version": b'{"version": "1"}',
+                   "null version": b'{"version": null}', "float version": b'{"version": 1.0}',
+                   "list version": b'{"version": [1]}', "NaN version": b'{"version": NaN}',
+                   "version from the future": b'{"version": %d}' % (saves.VERSION + 1)}
+        for name, header in headers.items():
+            with self.subTest(name):
+                put("2", header, b"x")
+                self._assert_empty_slot("2")
+
+    @unittest.expectedFailure
+    def test_a_very_deeply_nested_header_is_an_empty_slot(self):
+        """New crash class, no GitHub issue filed yet: ``json.loads`` raises RecursionError (not a ValueError)
+        for a header nested deeper than the interpreter allows (about 1000 levels on Python 3.10, about 200000
+        on 3.15), and meta() only catches OSError and ValueError."""
+        for header in (b"[" * 1000000, b'{"a":' * 1000000):
+            with self.subTest(header=header[:5]):
+                put("2", header, b"x")
+                self._assert_empty_slot("2")
+
+    def test_a_save_from_a_newer_version_is_refused_quietly(self):
+        put("2", dict(GOOD_HEADER, version=saves.VERSION + 1), pickle.dumps({}))
+        said = io.StringIO()
+        with contextlib.redirect_stderr(said):
+            self.assertIsNone(saves.load("2"))
+        self.assertEqual(said.getvalue(), "", "a version mismatch is not an error worth printing")
+        self.assertIsNone(saves.meta("2"))
+
+    def test_a_file_without_any_newline_is_read_as_a_header(self):
+        os.makedirs(saves.folder())
+        with open(saves.path("3"), "wb") as f:
+            f.write(json.dumps(GOOD_HEADER).encode())
+        self.assertEqual(saves.meta("3")["country"], "Portugal")
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertIsNone(saves.load("3"), "there is no world after the header")
+
+    def test_a_good_header_with_a_body_of_the_wrong_shape_is_refused(self):       # issue #6
+        bodies = {"no body": b"", "text": b"not a pickle", "empty pickle": pickle.dumps(None),
+                  "number": pickle.dumps(5), "string": pickle.dumps("world"), "list": pickle.dumps([1, 2]),
+                  "empty dict": pickle.dumps({}), "dict of nonsense": pickle.dumps({"a": 1, "turn": "x"}),
+                  "set": pickle.dumps({1, 2}), "bytes": pickle.dumps(b"world"),
+                  "truncated pickle": pickle.dumps({"turn": 1, "units": list(range(100))})[:30],
+                  "pickle then junk": pickle.dumps({}) + b"junk", "protocol 0": pickle.dumps({}, protocol=0)}
+        for name, body in bodies.items():
+            with self.subTest(name):
+                put("4", GOOD_HEADER, body)
+                said = io.StringIO()
+                with contextlib.redirect_stderr(said):
+                    world = saves.load("4")
+                self.assertIsNone(world)
+                self.assertIn("Could not load save '4'", said.getvalue())
+                self.assertIsNotNone(saves.meta("4"), "the header is fine, so the slot still lists")
+
+    def test_a_real_save_cut_short_is_refused(self):
+        w = fresh()
+        saves.save(w, "5")
+        with open(saves.path("5"), "rb") as f:
+            whole = f.read()
+        header_end = whole.index(b"\n") + 1
+        for cut in (header_end, header_end + 1, header_end + 100, len(whole) // 2, len(whole) - 1):
+            with self.subTest(cut=cut):
+                with open(saves.path("5"), "wb") as f:
+                    f.write(whole[:cut])
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertIsNone(saves.load("5"))
+        with open(saves.path("5"), "wb") as f:
+            f.write(whole)
+        self.assertEqual(saves.load("5").turn, w.turn, "the whole file loads")
+
+    def test_a_folder_or_a_file_in_the_wrong_place_is_an_empty_slot(self):
+        os.makedirs(saves.path("6"))                             # a folder called 6.sav
+        self._assert_empty_slot("6")
+        os.rmdir(saves.path("6"))
+        os.rmdir(saves.folder())
+        with open(saves.folder(), "w") as f:                     # "saves" is a file, not a folder
+            f.write("not a folder")
+        self.assertTrue(all(m is None for _, m in saves.listing()))
+        self.assertIsNone(saves.latest())
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertIsNone(saves.load("1"))
+
+    def test_the_newest_readable_save_is_the_latest(self):
+        put("1", dict(GOOD_HEADER, saved=100.0))
+        put("2", dict(GOOD_HEADER, saved=300.5))
+        put("quick", dict(GOOD_HEADER, saved=200.0))
+        put("auto", b"damaged")
+        put("3", dict(GOOD_HEADER, saved=999.0, version=saves.VERSION + 1))
+        self.assertEqual(saves.latest(), "2")
+
+    def test_a_failed_pickle_leaves_the_old_save_and_no_tmp_file(self):
+        w = fresh()
+        saves.save(w, "1")
+        w.turn += 3
+        w.junk = lambda: 0                                       # cannot be pickled
+        with self.assertRaises(saves.SAVE_ERRORS):
+            saves.save(w, "1")
+        self.assertEqual(os.listdir(saves.folder()), ["1.sav"])
+        self.assertEqual(saves.meta("1")["turn"], w.turn - 3)
+
+    @unittest.skipIf(sys.platform == "win32" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+                     "folder permissions are not enforced here")
+    def test_a_read_only_saves_folder_raises_a_save_error_and_keeps_old_saves(self):     # issue #5
+        w = fresh()
+        saves.save(w, "1")
+        os.chmod(saves.folder(), 0o500)
+        self.addCleanup(os.chmod, saves.folder(), 0o700)
+        with self.assertRaises(saves.SAVE_ERRORS) as caught:
+            saves.save(w, "2")
+        self.assertIsInstance(caught.exception, PermissionError)
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(saves.failure(caught.exception), os.strerror(errno.EACCES).lower())
+        with self.assertRaises(saves.SAVE_ERRORS):
+            saves.save(w, "1")                                   # also over an existing save
+        self.assertEqual(os.listdir(saves.folder()), ["1.sav"])
+        self.assertIsNotNone(saves.load("1"))
+
+
+class HeaderFieldsTest(TempHome):
+    """What the load page and the start menu read from a header that meta() accepts: ``saved``, ``country``,
+    ``date`` and ``map``. meta() only checks ``version``, so a header with a missing or odd field is a slot that
+    lists fine and then crashes the screen that shows it.
+
+    New crash classes found by the file fuzzer (tests/test_fuzz_files.py); no GitHub issue filed yet."""
+
+    BAD_SAVED = {"text": "yesterday", "list": [1], "object": {}, "infinity": float("inf"), "NaN": float("nan"),
+                 "too big": 1e30, "int too big": 2 ** 70}
+
+    def _use_everything_the_screens_use(self):
+        """The calls the start menu (latest + meta) and the load page (listing + describe) make."""
+        slot = saves.latest()
+        info = saves.meta(slot) if slot else None
+        for _, info in saves.listing():
+            if info:
+                saves.describe(info)
+        return slot
+
+    @unittest.expectedFailure
+    def test_a_header_without_saved_does_not_crash_latest(self):
+        """New crash class, no GitHub issue filed yet: ``latest()`` raises KeyError: 'saved' for a header with the
+        right version and no ``saved``, so the start menu would crash at launch."""
+        put("1", {"version": saves.VERSION})
+        self._use_everything_the_screens_use()
+
+    @unittest.expectedFailure
+    def test_a_saved_of_the_wrong_type_does_not_crash_latest_or_describe(self):
+        """New crash class, no GitHub issue filed yet: ``describe()`` raises TypeError (text, list, object),
+        OverflowError (infinity, too big) or ValueError (NaN) from time.localtime, and ``latest()`` raises
+        TypeError comparing a text ``saved`` with a number."""
+        put("2", GOOD_HEADER)                                   # a good save next to the bad one
+        failures = []
+        for name, saved in self.BAD_SAVED.items():
+            put("1", dict(GOOD_HEADER, saved=saved))
+            try:
+                self._use_everything_the_screens_use()
+            except Exception as error:                          # noqa: BLE001 - collect every kind
+                failures.append(f"{name}: {type(error).__name__}")
+        self.assertEqual(failures, [])
+
+    @unittest.expectedFailure
+    def test_a_header_without_the_fields_describe_reads_does_not_crash(self):
+        """New crash class, no GitHub issue filed yet: ``describe()`` raises KeyError for a header with the right
+        version but no country, date or map (the start menu reads country and date the same way)."""
+        failures = []
+        for missing in ("saved", "country", "date", "map"):
+            put("1", {k: v for k, v in GOOD_HEADER.items() if k != missing})
+            try:
+                self._use_everything_the_screens_use()
+            except Exception as error:                          # noqa: BLE001
+                failures.append(f"no {missing}: {type(error).__name__}")
+        self.assertEqual(failures, [])
+
+    def test_describe_of_a_complete_header(self):
+        text = saves.describe(dict(GOOD_HEADER, saved=0.0))
+        self.assertTrue(text.startswith("Portugal, Spring 1480  -  Europe 1480  -  saved "), text)
+        self.assertTrue(saves.describe(dict(GOOD_HEADER, country="")).startswith("no country, "))
 
 
 def _gamemenu():
@@ -243,13 +433,14 @@ class FailedSaveTest(TempHome):
     def test_an_unwritable_folder_raises_a_save_error(self):
         self._unwritable()
         with self.assertRaises(saves.SAVE_ERRORS) as caught:
-            saves.save(CampaignWorld(player="POR"), "1")
+            saves.save(fresh(), "1")
         self.assertIsInstance(caught.exception, OSError)
-        self.assertTrue(saves.failure(caught.exception))
+        with contextlib.redirect_stderr(io.StringIO()):          # failure() prints the whole error there
+            self.assertTrue(saves.failure(caught.exception))
 
     def test_a_failed_write_keeps_the_old_save_and_leaves_no_tmp_file(self):
         import errno
-        w = CampaignWorld(player="POR")
+        w = fresh()
         saves.save(w, "1")
         w.turn += 4
         full = OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
@@ -258,36 +449,40 @@ class FailedSaveTest(TempHome):
                 saves.save(w, "1")
         self.assertEqual(os.listdir(saves.folder()), ["1.sav"], "the half-written .tmp file is removed")
         self.assertEqual(saves.meta("1")["turn"], w.turn - 4, "the slot keeps its previous save")
-        self.assertEqual(saves.failure(caught.exception), os.strerror(errno.ENOSPC).lower())
+        with contextlib.redirect_stderr(io.StringIO()):          # failure() prints the whole error there
+            self.assertEqual(saves.failure(caught.exception), os.strerror(errno.ENOSPC).lower())
 
     def test_a_world_that_cannot_be_pickled_raises_a_save_error(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         for junk in (lambda: 0, (i for i in ())):    # PicklingError, TypeError
             with self.subTest(junk=junk):
                 w.junk = junk
                 with self.assertRaises(saves.SAVE_ERRORS) as caught:
                     saves.save(w, "2")
                 self.assertEqual(os.listdir(saves.folder()), [])
-                self.assertEqual(saves.failure(caught.exception), "the game could not be written")
+                with contextlib.redirect_stderr(io.StringIO()):  # failure() prints the whole error there
+                    self.assertEqual(saves.failure(caught.exception), "the game could not be written")
 
     def test_f5_that_fails_says_why_and_the_game_goes_on(self):
-        game = self._game(CampaignWorld(player="POR"))
+        game = self._game(fresh())
         self._unwritable()
-        self.assertFalse(game.save_to("quick"))
+        with contextlib.redirect_stderr(io.StringIO()):          # the whole error goes to stderr
+            self.assertFalse(game.save_to("quick"))
         self.assertEqual(len(game.toasts), 1)
         self.assertTrue(game.toasts[0].startswith("Could not save Quicksave: "), game.toasts[0])
 
     def test_an_autosave_that_fails_does_not_crash_the_season(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         w.turn = 5                                  # "every year" autosaves on turns 5, 9, 13...
         game = self._game(w)
         self._unwritable()
-        game.autosave()
+        with contextlib.redirect_stderr(io.StringIO()):          # the whole error goes to stderr
+            game.autosave()
         self.assertEqual(len(game.toasts), 1)
         self.assertTrue(game.toasts[0].startswith("Could not autosave: "), game.toasts[0])
 
     def test_saving_still_works(self):
-        w = CampaignWorld(player="POR")
+        w = fresh()
         w.turn = 5
         game = self._game(w)
         self.assertTrue(game.save_to("quick"))
@@ -390,7 +585,8 @@ class UnsavedOptionsTest(TempHome):
         self._unwritable()
         s = settings.load()
         settings.cycle(s, "scroll")
-        self.assertFalse(settings.save(s))
+        with contextlib.redirect_stderr(io.StringIO()):          # save() says why on stderr
+            self.assertFalse(settings.save(s))
         self.assertEqual(s["scroll"], "fast", "the change stays in memory")
 
     def test_a_failed_write_keeps_the_old_file(self):
@@ -398,7 +594,8 @@ class UnsavedOptionsTest(TempHome):
         settings.cycle(s, "autosave")
         self.assertTrue(settings.save(s))
         settings.cycle(s, "autosave")
-        with mock.patch("hexa.settings.json.dump", side_effect=OSError(errno.ENOSPC, "No space left on device")):
+        with mock.patch("hexa.settings.json.dump", side_effect=OSError(errno.ENOSPC, "No space left on device")), \
+                contextlib.redirect_stderr(io.StringIO()):     # save() says why on stderr
             self.assertFalse(settings.save(s))
         self.assertEqual(settings.load()["autosave"], "5 years", "the last good options survive a full disk")
         self.assertEqual(os.listdir(self.home), ["settings.json"], "no temporary file is left behind")
@@ -421,11 +618,12 @@ class UnsavedOptionsTest(TempHome):
         self.assertEqual(game.toasts, [], "no warning when the options were saved")
         self.assertTrue(settings.load()["fullscreen"])
         self._unwritable()
-        game.toggle_fullscreen()                                  # F11
-        self.assertFalse(game.settings["fullscreen"])
-        self.assertEqual(game.displays, 2, "the screen mode still changes")
-        game.menu_press(("option", "scroll"))                     # Menu -> Options
-        game.menu_press(("option", "window"))
+        with contextlib.redirect_stderr(io.StringIO()):          # each failed settings.save() says why there
+            game.toggle_fullscreen()                              # F11
+            self.assertFalse(game.settings["fullscreen"])
+            self.assertEqual(game.displays, 2, "the screen mode still changes")
+            game.menu_press(("option", "scroll"))                 # Menu -> Options
+            game.menu_press(("option", "window"))
         self.assertEqual((game.settings["scroll"], game.settings["window"]), ("fast", "1600x900"))
         self.assertEqual(game.displays, 3)
         self.assertEqual(len(game.toasts), 3)

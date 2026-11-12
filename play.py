@@ -7,12 +7,11 @@
     python play.py --mode campaign --nation venice          # tag or name, any case
     python play.py --mode campaign --map random --seed 7    # Age of Discovery on a random world
 """
-import argparse
 import os
 
 import pygame
 
-from hexa import ai
+from hexa import ai, cli
 from hexa.campaign import saves
 from hexa.campaign.app import CampaignApp
 from hexa.colony.app import ColonyApp
@@ -247,19 +246,7 @@ class App:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Play Hexa.")
-    parser.add_argument("--mode", choices=("campaign", "conquest", "colony"), help="skip the menu and start this mode")
-    parser.add_argument("--nation", help="campaign: play this country straight away, by tag or name in any case "
-                        "(e.g. POR, eng, Venice); random worlds have their own countries")
-    parser.add_argument("--map", choices=("europe", "random"), default="europe",
-                        help="campaign: the real 1480 map or a random world")
-    parser.add_argument("--start", choices=("sea", "land"), default="sea", help="colonisation: how to start")
-    parser.add_argument("--goal", choices=("survive", "independence", "endless"), default="survive",
-                        help="colonisation: how to win")
-    parser.add_argument("--seed", type=int, help="map number, to replay the same map")
-    args = parser.parse_args()
-    settings = {"mode": args.mode or "campaign", "start": args.start, "goal": args.goal, "map": args.map}
-    skip_menu = args.mode is not None
+    settings, skip_menu, nation, seed = cli.parse()
     pygame.init()
     while True:
         screen = pygame.display.set_mode(WINDOW_SIZE)
@@ -276,12 +263,12 @@ def main():
                 settings["error"] = str(error)
                 result = "menu"
         elif settings["mode"] == "campaign":
-            result = CampaignApp(TILES_DIR, args.nation if skip_menu_once else None, settings.get("map", "europe"),
-                                 args.seed if skip_menu_once else None).run()
+            result = CampaignApp(TILES_DIR, nation if skip_menu_once else None, settings.get("map", "europe"),
+                                 seed if skip_menu_once else None).run()
         elif settings["mode"] == "conquest":
-            result = App(args.seed).run()
+            result = App(seed).run()
         else:
-            result = ColonyApp(screen, TILES_DIR, args.seed, settings["start"], settings["goal"]).run()
+            result = ColonyApp(screen, TILES_DIR, seed, settings["start"], settings["goal"]).run()
         if result != "menu":
             break
     pygame.quit()

@@ -8,7 +8,12 @@ from types import SimpleNamespace
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
-import pygame  # noqa: E402
+try:
+    import pygame  # noqa: E402
+except ImportError:                     # the unit suite runs without pygame (the CI unit job): skip the module
+    if os.environ.get("HEXA_REQUIRE_PYGAME") == "1":     # ... unless pygame tests must run (the ui job)
+        raise
+    raise unittest.SkipTest("pygame is not installed (HEXA_REQUIRE_PYGAME=1 makes this an error)") from None
 
 from hexa.campaign import geo  # noqa: E402
 from hexa.campaign import wfctiles  # noqa: E402
