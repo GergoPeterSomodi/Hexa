@@ -375,15 +375,17 @@ The tests use Python's built-in `unittest` and, apart from the window tests in `
 that draw (skipped without pygame, see [Window tests](#window-tests-pygame)), don't need pygame:
 
 ```bash
-python -m unittest discover -s tests -t .                              # all tests (about 2.5 minutes)
-HEXA_FAST=1 python -m unittest discover -s tests -t .                  # skip the slow tests (about 30 seconds)
+python -m unittest discover -s tests -t .                              # all tests (about 4 minutes)
+HEXA_FAST=1 python -m unittest discover -s tests -t .                  # skip the slow tests (about 45 seconds)
 python -m unittest tests.test_game                                     # one file
 python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip   # one test
 ```
 
-`HEXA_FAST=1` skips the tests marked `@slow` (the 100-season AI history, the AI game loops, the random-world
-tests, the property-test games); they still count as tests, shown as skipped. CI always runs everything.
-`tests/test_campaign.py` is the slowest because it builds the full Europe map.
+`HEXA_FAST=1` skips the tests marked `@slow` (the 100-season AI history and the other AI game loops, the tech AI's
+60 and 40 seasons among them, the cavalry battle statistics, the random-world tests, the property-test games and the
+world-cache memory test); they still count as tests, shown as skipped. CI always runs everything.
+`tests/test_tech_ai.py` (its two long AI runs) and `tests/test_campaign.py` (it builds the full Europe map) are the
+slowest.
 
 `tests/test_fuzz_files.py` damages `settings.json` and save files at random (truncation, flipped bytes, wrong JSON
 types, binary garbage, a good header with a wrong-shaped world after it) and checks that loading them never raises.
@@ -548,6 +550,54 @@ The `ui` job compares the goldens but doesn't set `HEXA_GOLDEN_STRICT=1` yet: un
 runner's environment matches `MANIFEST.json` (the scenes run, not skipped), a mismatch only skips them. Once one has,
 add `HEXA_GOLDEN_STRICT: "1"` to the `ui` job's `env`.
 
+### Nightly runs: soak, performance and long monkey sessions
+
+`.github/workflows/nightly.yml` runs every night at 03:17 UTC, and by hand from the Actions tab with inputs for the
+soak scale (`full` or `quick`) and the monkey's seeds, frames and burst. Its jobs:
+
+- **soak** (`tools/soak.py`, no pygame): all-AI games with the world invariants checked at the start and after every
+  turn (Conquest and Colonisation: every side's turn; the campaign: every season): 200 Conquest games to the end
+  (seeds 0-199, each must have a winner by the turn limit), 50 Colonisation games of 40 rounds (seeds 0-49; the start
+  and the goal vary with the seed), Europe 1480 for 100 seasons, and random worlds 1 to 3 for 40 seasons each. About 8
+  minutes on a fast machine.
+- **perf** (`tools/perf.py`, Python 3.12 with pygame): CPU time, the median of 3 runs, of building the Europe map and a
+  random world from scratch, restoring the cached Europe snapshot, one all-AI season in 1480 and one in 1490, and a new
+  `MapView`'s first draw at zoom 1 and 4, compared with `tests/perf_budget.json` (zoom 4 builds its landscape art a few
+  hexes a frame within a time limit, so that draw is one such frame, not the whole picture). The table goes to the
+  run's summary page. A time over its soft limit is noted; only one over its hard limit fails the job.
+- **monkey** (one job per mode, Python 3.12 with pygame): `tests.ui.test_monkey.MonkeyTest` with
+  `HEXA_MONKEY_SEEDS=50`, `HEXA_MONKEY_FRAMES=3000,campaign=600` and `HEXA_MONKEY_BURST=0.5` (a campaign session of
+  3,000 frames takes about 1.5 minutes, so the campaign plays 600).
+
+When a scheduled run fails, a last job opens an issue titled "Nightly failure" with the replay commands from the
+logs, or comments on the one that is already open. Runs started by hand never touch issues. The failed jobs' logs
+(and the monkey's last frames) are attached to the run.
+
+```bash
+python -m tools.soak --quick                    # every suite, a few short games (about 15 seconds)
+python -m tools.soak                            # the nightly scale (about 8 minutes)
+python -m tools.soak colony 0-9 --turns 20      # one suite (conquest, colony, europe, random), chosen seeds and length
+python -m tools.soak conquest 17                # replay one game: a failure prints this line
+python -m tools.perf                            # the timings against tests/perf_budget.json (about 1.5 minutes)
+python -m tools.perf --only ai_season --runs 5  # some metrics, more runs; --list shows them with their budgets
+.venv/bin/python -m tools.perf                  # with pygame, so the MapView metrics run too
+```
+
+A soak game fails on an exception or on a broken invariant that no known open bug explains (`KNOWN_OPEN` in
+`tests/support/invariants.py`); it stops there and prints its report, ending with the command that replays it. Broken
+invariants of known open bugs are counted as "known open" and don't fail. The same seed always plays the same game
+(`--digest` prints the final world's digest). Both tools print a summary table, append it as markdown to
+`$GITHUB_STEP_SUMMARY` when that is set, and exit with status 1 on a failure.
+
+`tests/perf_budget.json` holds a `soft` and a `hard` limit in CPU seconds for each metric, and `measured`, the median
+when the limits were set; its `_comment` says on what machine. The hard limits are about 4 times those medians and
+the soft ones about 2 times, because shared CI runners are slower and noisier. A change that makes something slower on
+purpose raises its limits in the same pull request. Timing never runs in the unit suite: `tests/test_perf.py` checks
+the tool with fake metrics. Without pygame the MapView metrics are skipped with a note (`HEXA_REQUIRE_PYGAME=1`, which
+the perf job sets, makes that an error). The last row of the table is information only: how much memory the world
+module's caches keep as random worlds are built one after another (tracemalloc). `tests/test_memory.py` is the test of
+that (#29: the caches must stay bounded; it builds four random worlds, so it is `@slow`).
+
 ## Project layout
 
 | File | What it does |
@@ -564,7 +614,7 @@ add `HEXA_GOLDEN_STRICT: "1"` to the `ui` job's `env`.
 | `hexa/render.py` | Drawing the map, units and info bar |
 | `hexa/hexgrid.py` | Hex grid maths |
 | `tests/` | Rule tests (see Development); shared helpers in `tests/support/`; headless window tests in `tests/ui/`; golden screenshots in `tests/golden/linux/` |
-| `tools/` | Developer tools: `monkey.py` replays or hunts with the window tests' seeded monkey (`python -m tools.monkey`) |
+| `tools/` | Developer tools: `monkey.py` replays or hunts with the window tests' seeded monkey (`python -m tools.monkey`), `soak.py` plays long all-AI games checking the invariants every turn, `perf.py` times the slow parts against `tests/perf_budget.json` (both run nightly) |
 | `Hex.py`, `Game.py`, `Setting.py`, `Create_xml.py`, `Read_XML.py` | The original map editor and its XML map loading (`map*.xml`) |
 
 Tile art: [Kenney Hexagon Pack](https://kenney.nl/assets/hexagon-pack) (CC0), in `hexagon-pack/`.

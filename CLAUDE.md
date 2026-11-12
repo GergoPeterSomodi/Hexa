@@ -21,8 +21,8 @@ python Hex.py                                        # legacy tile-painting map 
 Tests use stdlib `unittest` (no pytest, linter or formatter is configured):
 
 ```bash
-python -m unittest discover -s tests -t .                                 # everything, ~2.5 min
-HEXA_FAST=1 python -m unittest discover -s tests -t .                     # skips the @slow tests, ~30 s
+python -m unittest discover -s tests -t .                                 # everything, ~4 min
+HEXA_FAST=1 python -m unittest discover -s tests -t .                     # skips the @slow tests, ~45 s
 python -m unittest tests.test_game                                        # one module
 python -m unittest tests.test_campaign.WarTest                            # one class
 python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip      # one test
@@ -31,6 +31,12 @@ HEXA_FUZZ_SEED=20260110 HEXA_FUZZ_CASES=1 python -m unittest tests.test_fuzz_fil
 HEXA_PROP_GAMES=100 python -m unittest tests.test_properties              # more random games per mode (default 20)
 HEXA_PROP_SEED=7 HEXA_PROP_GAMES=1 python -m unittest tests.test_properties.ColonyGamesTest   # replay one game; failures print this line
 PYTHONHASHSEED=0 python -m tests.support.digest_run colony 5 --turns 30   # digest of a fixed-seed all-AI game (determinism test)
+
+# Nightly tools (.github/workflows/nightly.yml, 03:17 UTC or by hand); both append their table to $GITHUB_STEP_SUMMARY
+python -m tools.soak --quick                                              # all-AI games, invariants every turn (~15 s; no flag: the nightly ~8 min)
+python -m tools.soak conquest 17                                          # replay one soak game (suites: conquest, colony, europe, random); failures print this line
+python -m tools.perf                                                      # CPU-time medians vs tests/perf_budget.json (fails past "hard") + #29 memory row
+python -m tools.perf --only ai_season --runs 5                            # some metrics; MapView ones need the pygame venv (HEXA_REQUIRE_PYGAME=1: error, not skip)
 
 pip install -r requirements-dev.txt                                       # coverage.py (CI only; config in .coveragerc)
 coverage run -m unittest discover -s tests -t . && coverage report        # branch coverage; slow before Python 3.14
@@ -56,6 +62,10 @@ seeded random players and the `Judge` that enforces the `*_check` contract below
 world (`world_digest` compares across processes, `quick_digest` within one); `games.py` plays all-AI games;
 `monkey.py` is the seeded random-input engine of `tests/ui/test_monkey.py` and `tools/monkey.py` (its `KNOWN_ISSUES`
 table withholds input that would hit a known open crash; keep it narrow and pin each crash as an expected failure).
+`tools/soak.py` reuses `games.py` and the checkers and reports a broken invariant that `invariants.KNOWN_OPEN`
+explains as "known open" instead of failing; `tools/perf.py` is the only place anything is timed (never assert on time
+in a unit test; `tests/test_perf.py` uses fake metrics). Change `tests/perf_budget.json` (`soft`/`hard` CPU seconds,
+`measured`) in the PR that knowingly makes something slower.
 
 Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and nine game
 modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
@@ -72,8 +82,9 @@ writes `<scene>.actual/.golden/.diff.png` to `test-artifacts/`). The goldens are
 the docker line above or the `goldens` workflow, which uploads them and never commits); a change that alters a
 window's look ships with its regenerated, reviewed goldens.
 
-`test_campaign` is the slowest (~1 min) because building the Europe map takes seconds; `test_properties` (~50 s:
-20 random games per mode, determinism subprocesses) comes next; `test_game` runs in ~10 s.
+`test_tech_ai` is the slowest (~1 min: AI runs of 60 and 40 seasons, both `@slow`); `test_properties` (~50 s:
+20 random games per mode, determinism subprocesses) and `test_campaign` (~35 s: building the Europe map takes
+seconds) come next; `test_game` runs in ~10 s.
 
 ## Architecture
 

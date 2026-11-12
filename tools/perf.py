@@ -141,7 +141,9 @@ def mapview_zoom1():
 
 
 def mapview_zoom4():
-    """A new MapView's first draw at zoom 4 (tile art around Lisbon), Portugal 1480, 1280x720."""
+    """A new MapView's first draw at zoom 4 (tile art around Lisbon), Portugal 1480, 1280x720. The landscape art of
+    the close zooms is built a few hexes a frame, within mapview.LAND_BUILD_MS of real time, so this is the cost of
+    one such frame, not of the whole picture."""
     return _mapview(4)
 
 

@@ -1,7 +1,7 @@
 """Long all-AI games with the world invariants checked after every turn: the nightly soak, and bug hunting.
 
-    python -m tools.soak                          every suite at full scale (the nightly run, about 10 minutes)
-    python -m tools.soak --quick                  every suite, a few short games (a smoke run, about 20 seconds)
+    python -m tools.soak                          every suite at full scale (the nightly run, about 8 minutes)
+    python -m tools.soak --quick                  every suite, a few short games (a smoke run, about 15 seconds)
     python -m tools.soak colony                   one suite at full scale
     python -m tools.soak colony 0-9 --turns 20    chosen seeds ("17", a range "0-49" or a list "3,8,12") and turns
     python -m tools.soak conquest 17              replay one game: the line a failure prints
