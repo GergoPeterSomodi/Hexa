@@ -225,7 +225,6 @@ class UnreadableSaveTest(TempHome):
                 put("2", header, b"x")
                 self._assert_empty_slot("2")
 
-    @unittest.expectedFailure
     def test_a_very_deeply_nested_header_is_an_empty_slot(self):
         """New crash class, no GitHub issue filed yet: ``json.loads`` raises RecursionError (not a ValueError)
         for a header nested deeper than the interpreter allows (about 1000 levels on Python 3.10, about 200000
@@ -351,14 +350,12 @@ class HeaderFieldsTest(TempHome):
                 saves.describe(info)
         return slot
 
-    @unittest.expectedFailure
     def test_a_header_without_saved_does_not_crash_latest(self):
         """New crash class, no GitHub issue filed yet: ``latest()`` raises KeyError: 'saved' for a header with the
         right version and no ``saved``, so the start menu would crash at launch."""
         put("1", {"version": saves.VERSION})
         self._use_everything_the_screens_use()
 
-    @unittest.expectedFailure
     def test_a_saved_of_the_wrong_type_does_not_crash_latest_or_describe(self):
         """New crash class, no GitHub issue filed yet: ``describe()`` raises TypeError (text, list, object),
         OverflowError (infinity, too big) or ValueError (NaN) from time.localtime, and ``latest()`` raises
@@ -373,7 +370,6 @@ class HeaderFieldsTest(TempHome):
                 failures.append(f"{name}: {type(error).__name__}")
         self.assertEqual(failures, [])
 
-    @unittest.expectedFailure
     def test_a_header_without_the_fields_describe_reads_does_not_crash(self):
         """New crash class, no GitHub issue filed yet: ``describe()`` raises KeyError for a header with the right
         version but no country, date or map (the start menu reads country and date the same way)."""

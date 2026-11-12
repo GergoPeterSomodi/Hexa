@@ -364,7 +364,6 @@ class CameraTest(ColonyCase):
         self.assertIs(app.ui.selected, ship)
         self.assertEqual((ship.pos, ship.moves_left), ((26, 10), SHIP.moves), "the clicks went to the minimap only")
 
-    @unittest.expectedFailure
     def test_a_click_anywhere_on_a_hexs_minimap_cell_looks_at_that_hex(self):
         """New bug, no GitHub issue filed yet: ColonyApp.click() turns a minimap pixel into a column with the
         minimap's whole width, which includes the half cell odd rows are shifted by, and ignores that shift. So

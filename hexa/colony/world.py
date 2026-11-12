@@ -320,9 +320,10 @@ class ColonyWorld:
             return False, f"{colony.name} already did its job this turn"
         return ok, reason
 
-    def _room(self, pos):
+    def _room(self, pos, owner):
+        """Whether spawn() would find a hex for a new unit of owner near pos (it skips other sides' colonies)."""
         return any(self.is_land(p) and self.unit_at(p) is None and not self.village_at(p)
-                   for r in range(4) for p in within(pos, r))
+                   and self._colony_ok(owner, p) for r in range(4) for p in within(pos, r))
 
     def train_check(self, colony, unit_type):
         ok, reason = self._job_check(colony)
@@ -330,7 +331,7 @@ class ColonyWorld:
             return ok, reason
         if not self.can_afford(colony.owner, unit_type.cost):
             return False, f"A {unit_type.name.lower()} costs {cost_text(unit_type.cost)}"
-        if not self._room(colony.pos):
+        if not self._room(colony.pos, colony.owner):
             return False, "No room around the colony"
         return True, ""
 
@@ -357,7 +358,7 @@ class ColonyWorld:
             return False, "Needs at least 2 population"
         if self.stock[colony.owner]["food"] < COLONIST_FOOD:
             return False, f"Needs {COLONIST_FOOD} food for the journey"
-        if not self._room(colony.pos):
+        if not self._room(colony.pos, colony.owner):
             return False, "No room around the colony"
         return True, ""
 
@@ -776,10 +777,11 @@ class ColonyWorld:
 
     def _capture(self, colony, unit):
         loser = colony.owner
+        first = self.capital_of(unit.owner) is None       # asked before the colony changes hands
         colony.owner = unit.owner
         colony.pop = max(1, colony.pop - 1)
         colony.busy = True
-        was_capital, colony.capital = colony.capital, self.capital_of(unit.owner) is None
+        was_capital, colony.capital = colony.capital, first
         if was_capital:
             self._new_capital(loser)
         self.message(f"{unit.label} captured {colony.name}!")
@@ -1079,6 +1081,7 @@ class ColonyWorld:
             if side not in self.dead and self.eliminated(side):
                 self.dead.add(side)
                 if side != PLAYER:
+                    self.units = [u for u in self.units if u.owner != side]     # a dead side leaves nothing behind
                     self.message(f"The {SIDE_NAMES[side]} has been wiped out.")
         if PLAYER in self.dead:
             alive = [s for s in RIVALS if s not in self.dead]

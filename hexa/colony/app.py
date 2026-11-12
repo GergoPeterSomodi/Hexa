@@ -4,7 +4,7 @@ import pygame
 from ..hexgrid import pixel_to_hex
 from ..render import Button
 from . import ai
-from .render import (END_TURN_RECT, MAP_MARGIN, VIEW_H, WINDOW_SIZE, ColonyRenderer, button_rects,
+from .render import (END_TURN_RECT, MAP_MARGIN, MINI_CELL, VIEW_H, WINDOW_SIZE, ColonyRenderer, button_rects,
                      map_pixel_size, minimap_rect)
 from .rules import (BUYABLE, COLONIST, COLONIST_FOOD, FOOD_LOT, FOOD_LOT_PRICE, FUR_PRICE, GIFT_COST,
                     GOAL_INDEPENDENCE, GOAL_NAMES, GROW_COST, IMPROVEMENT_FOR_TERRAIN, INDEPENDENCE_TURNS,
@@ -272,8 +272,10 @@ class ColonyApp:
                 return
         mini = minimap_rect(self.world)
         if mini.collidepoint(pixel):
-            col = int((pixel[0] - mini.x) / mini.w * self.world.cols)
-            row = int((pixel[1] - mini.y) / mini.h * self.world.rows)
+            cell = MINI_CELL
+            row = min(max((pixel[1] - mini.y) // cell, 0), self.world.rows - 1)
+            shift = (row & 1) * cell // 2                     # odd rows are drawn half a cell to the right
+            col = min(max((pixel[0] - mini.x - shift) // cell, 0), self.world.cols - 1)
             self.look_at((col, row))
             return
         pos = self.hex_at(pixel)

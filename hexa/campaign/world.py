@@ -3005,8 +3005,10 @@ class CampaignWorld:
             pos = best[pos][1]
         return path[::-1]
 
-    def cost_field(self, goal, naval=False, tag=None, until=None):
-        """Move costs to `goal` from everywhere (or until every hex in `until` is settled)."""
+    def cost_field(self, goal, naval=False, tag=None, until=None, unit=None):
+        """Move costs to `goal` from everywhere (or until every hex in `until` is settled).
+        With `unit` (a land unit), routes only run through hexes it may enter (may_enter): land it may not
+        cross, such as a neighbour's, is no shortcut. Such hexes still get a cost as places to start from."""
         field = {goal: 0}
         heap = [(0, goal)]
         walls = frozenset() if naval else self._walls()
@@ -3019,6 +3021,8 @@ class CampaignWorld:
                 left.discard(pos)
                 if not left:
                     break
+            if unit is not None and pos != goal and not self.may_enter(unit, pos):
+                continue                       # a unit can start here but not walk on through it
             for n in neighbors(pos):
                 if naval:
                     ok, step = self.is_sea(n), 1
@@ -3045,7 +3049,7 @@ class CampaignWorld:
             # friendly ship in `reach`, and waiting for it would search the whole map.
             settles = self.is_sea if lead.naval else self.is_land
             until = [p for p in reach if settles(p)] or [goal]
-            field = self.cost_field(goal, lead.naval, until=until)
+            field = self.cost_field(goal, lead.naval, until=until, unit=None if lead.naval else lead)
         options = [p for p in reach if p == lead.pos or not any(u.naval for u in self.units_at(p)) or lead.naval]
         return min(options, key=lambda p: (field.get(p, distance(p, goal) * 4 + 1000), reach[p]))
 
