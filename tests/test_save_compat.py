@@ -3,10 +3,13 @@
 In CI the merge base writes the saves and the pull request loads them. Here this checkout writes them once, then
 check loads them with this checkout and with temporary copies of hexa/, each changed the way a pull request could:
 
-    bumped-renamed   saves.VERSION + 1, and the Province class renamed, so old saves can't be unpickled:
-                     they must be refused quietly (exit 0)
-    new-attribute    end_round reads a new world attribute that old saves lack, VERSION unchanged: exit 1,
-                     naming the attribute and the save
+    renamed          the Province class renamed, VERSION unchanged: old saves can't be unpickled, so load() refuses
+                     them, and that is the incompatibility the job is for (exit 1)
+    bumped-renamed   the same with saves.VERSION + 1: now they must be refused quietly (exit 0)
+    new-attribute    a new world attribute, set in __init__ and read by end_round, without a default for old saves,
+                     VERSION unchanged: they load but can't play a season (exit 1, naming the attribute and the save)
+    header-refused   meta() wants a new header entry that old headers lack while load() still reads them, VERSION
+                     unchanged: the menus would no longer list old saves (exit 1)
     bumped           saves.VERSION + 1 only: saves.load still reads older versions, so they must play on (exit 0)
 
 Every command runs in its own interpreter, as in CI, and the checks run in parallel (about 10 seconds in all).
@@ -24,16 +27,25 @@ import unittest
 
 import hexa
 from hexa.campaign import saves
+from tests.support.home import TempHome
 from tools import save_compat
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOL = os.path.join(ROOT, "tools", "save_compat.py")
 TIMEOUT = 300
 
-# Appended to the copied world.py: a new attribute that new worlds would get in __init__, missing from WORLD_DEFAULTS.
+# Appended to the copied world.py: a new world attribute that __init__ sets and end_round reads, missing from
+# WORLD_DEFAULTS. A loaded save skips __init__ (from_state uses __new__), so saves made before the change lack it.
 NEW_ATTRIBUTE = '''
 
-# Added by tests/test_save_compat.py: end_round reads a new world attribute that saves made before it lack.
+# Added by tests/test_save_compat.py: a new world attribute with no default for saves made before it.
+def _plague_init(init):
+    def init_with_plague(self, *args, **kwargs):
+        init(self, *args, **kwargs)
+        self.plague_years = 0
+    return init_with_plague
+
+
 def _plague_round(end_round):
     def end_round_with_plague(self):
         self.plague_years += 1
@@ -41,7 +53,21 @@ def _plague_round(end_round):
     return end_round_with_plague
 
 
+CampaignWorld.__init__ = _plague_init(CampaignWorld.__init__)
 CampaignWorld.end_round = _plague_round(CampaignWorld.end_round)
+'''
+
+# Appended to the copied saves.py: the save menus now want a "build" entry in the header, which older headers lack,
+# while load() still reads those saves.
+HEADER_FIELD = '''
+
+# Added by tests/test_save_compat.py: meta() refuses headers without a "build" entry.
+_meta = meta
+
+
+def meta(slot):
+    info = _meta(slot)
+    return info if info is not None and "build" in info else None
 '''
 
 
@@ -76,6 +102,10 @@ def _new_attribute(tree):
     _edit(tree, "world.py", lambda text: text + NEW_ATTRIBUTE)
 
 
+def _header_field(tree):
+    _edit(tree, "saves.py", lambda text: text + HEADER_FIELD)
+
+
 def _env(home, summary=None):
     env = {k: v for k, v in os.environ.items() if k not in ("GITHUB_STEP_SUMMARY", "PYTHONPATH")}
     env["HEXA_HOME"] = home
@@ -102,6 +132,7 @@ class SaveCompatTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, ignore_errors=True)     # runs even if setUpClass fails
         tmp = cls.tmp
         home = os.path.join(tmp, "home")
         os.makedirs(home)
@@ -117,7 +148,8 @@ class SaveCompatTest(unittest.TestCase):
         cls.stub = Run(stub_run)
         if cls.write.status != 0:
             raise AssertionError(f"write failed:\n{cls.write}")
-        trees = {"bumped-renamed": (_bump, _rename_province), "new-attribute": (_new_attribute,), "bumped": (_bump,)}
+        trees = {"renamed": (_rename_province,), "bumped-renamed": (_bump, _rename_province),
+                 "new-attribute": (_new_attribute,), "header-refused": (_header_field,), "bumped": (_bump,)}
         cls.trees = {}
         for name, changes in trees.items():
             tree = _copy_hexa(os.path.join(tmp, name))
@@ -128,10 +160,6 @@ class SaveCompatTest(unittest.TestCase):
         for name, tree in cls.trees.items():
             started[name] = _start(["check", cls.out, "--checkout", tree], _env(home), tmp)
         cls.checks = {name: Run(process) for name, process in started.items()}
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def test_write_uses_the_given_checkout_and_makes_three_real_saves(self):
         self.assertIn(f"write: hexa from {os.path.realpath(hexa.__file__)}", self.write.out)
@@ -193,14 +221,34 @@ class SaveCompatTest(unittest.TestCase):
         self.assertIn("bump VERSION in hexa/campaign/saves.py", run.out)
         self.assertIn("WORLD_DEFAULTS", run.out)
 
+    def test_saves_refused_without_a_version_bump_fail(self):
+        run = self.checks["renamed"]
+        self.assertEqual(run.status, save_compat.BROKEN, run)
+        self.assertIn(f"this code has VERSION {saves.VERSION} (unchanged", run.out)
+        self.assertIn("check: 0 of 3 saves compatible", run.out)
+        failed = [line for line in run.out.splitlines() if ": FAILED: saves.load() refused it: Could not load save "
+                  in line]
+        self.assertEqual(len(failed), 3, run)
+        self.assertTrue(failed[0].startswith("check: saves/1.sav (Europe 1480 as POR"), failed[0])
+        self.assertIn("'Province'", failed[0])
+        self.assertIn("bump VERSION in hexa/campaign/saves.py", run.out)
+        with self.subTest("the same change with a bump passes"):
+            self.assertEqual(self.checks["bumped-renamed"].status, 0)
+
+    def test_a_header_the_menus_refuse_without_a_bump_fails(self):
+        run = self.checks["header-refused"]
+        self.assertEqual(run.status, save_compat.BROKEN, run)
+        self.assertEqual(run.out.count(": FAILED: saves.load() read it but saves.meta() refused its header"), 3, run)
+
     def test_a_bump_alone_still_reads_older_saves_and_they_must_play(self):
         run = self.checks["bumped"]
         self.assertEqual(run.status, 0, run)
         self.assertEqual(run.out.count(": ok: still read (older saves are migrated); loaded "), 3, run)
 
 
-class UsageTest(unittest.TestCase):
-    """Usage errors, in this process (no world is built)."""
+class UsageTest(TempHome):
+    """Usage errors, in this process (no world is built). TempHome gives each test its own HEXA_HOME and puts the old
+    one back; the tool must leave it alone anyway (test_a_failing_call_leaves_the_environment_alone)."""
 
     def run_tool(self, *argv):
         out, err = io.StringIO(), io.StringIO()
@@ -239,6 +287,33 @@ class UsageTest(unittest.TestCase):
                 save_compat.import_hexa(tmp)
             self.assertEqual(sys.path, path, "sys.path is left alone")
         self.assertIn("run the tool in a fresh interpreter", str(caught.exception))
+
+    def test_a_failing_call_leaves_the_environment_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stub = os.path.join(tmp, "stub")
+            os.makedirs(os.path.join(stub, "hexa"))
+            open(os.path.join(stub, "hexa", "__init__.py"), "w").close()
+            listed = os.path.join(tmp, "listed")        # a manifest check accepts (its "save" is any existing file)
+            os.makedirs(listed)
+            with open(os.path.join(listed, "manifest.json"), "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "saves": [{"slot": "1", "file": "manifest.json", "what": "x", "turn": 1,
+                                                    "tag": "POR"}]}, f)
+            calls = {"write without hexa": ("write", tmp, os.path.join(tmp, "out")),
+                     "check without a manifest": ("check", tmp),
+                     # these two get past the argument checks and set HEXA_HOME before import_hexa refuses the stub
+                     # (this process imported the real hexa already)
+                     "write with another hexa": ("write", stub, os.path.join(tmp, "out2")),
+                     "check with another hexa": ("check", listed, "--checkout", stub)}
+            for name, argv in calls.items():
+                with self.subTest(name):
+                    env, path = dict(os.environ), list(sys.path)
+                    status, said = self.run_tool(*argv)
+                    self.assertEqual(status, save_compat.USAGE, said)
+                    changed = {k for k in set(env) | set(os.environ) if env.get(k) != os.environ.get(k)}
+                    self.assertEqual(changed, set(), "environment variables changed by the call")
+                    self.assertEqual(os.environ["HEXA_HOME"], self.home)
+                    self.assertEqual(sys.path, path)
+            self.assertFalse(os.path.exists(os.path.join(tmp, "out")), "a usage error creates no output folder")
 
     def test_no_command_is_a_usage_error(self):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:

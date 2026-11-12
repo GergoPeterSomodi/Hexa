@@ -41,7 +41,7 @@ python -m tools.perf --only ai_season --runs 5                            # some
 # Save compatibility (tests.yml's save-compat job, on pull requests that touch hexa/campaign/)
 git worktree add --detach /tmp/hexa-base master                           # the code whose saves must still load (CI: the merge base)
 python tools/save_compat.py write /tmp/hexa-base /tmp/hexa-compat         # 3 games saved by /tmp/hexa-base's own hexa (~6 s; prints which hexa it imported)
-python tools/save_compat.py check /tmp/hexa-compat                        # load + play a season with this checkout; exit 1: broke without a VERSION bump
+python tools/save_compat.py check /tmp/hexa-compat                        # load + play a season with this checkout; exit 1: a save broke (the log says which, why and how to fix it)
 git worktree remove --force /tmp/hexa-base
 
 pip install -r requirements-dev.txt                                       # coverage.py (CI only; config in .coveragerc)
@@ -74,7 +74,9 @@ in a unit test; `tests/test_perf.py` uses fake metrics). Change `tests/perf_budg
 `measured`) in the PR that knowingly makes something slower. `tools/save_compat.py` must keep working against older
 revisions: `write` imports only the base checkout's `hexa` (never `tests/`) and uses its public API (`CampaignWorld`,
 `ai.run`, `end_round`, `declare_war`, `saves.save`), and must run in a fresh interpreter; `tests/test_save_compat.py`
-drives it against temporary copies of `hexa/` (a bumped `VERSION`, a renamed class, a new attribute without a default).
+drives it against temporary copies of `hexa/` (a renamed class with and without a `VERSION` bump, a new attribute
+without a default, a header `meta()` refuses, a bump alone) and calls it in-process only for usage errors, which must
+leave `HEXA_HOME` as it was.
 
 Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and nine game
 modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
@@ -159,10 +161,12 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   ignored; older ones load, and `CampaignWorld._migrate` fills in what they lack (`WORLD_DEFAULTS`, dataclass
   field defaults). Renaming or adding attributes and dataclass fields changes what saves contain. Lazily added
   attributes use `getattr`/`__dict__.setdefault` (`_known_world`, `_explored_from`) so older saves still load;
-  bump `VERSION` when compatibility breaks. The `save-compat` job of `tests.yml` enforces this `VERSION` policy
-  on pull requests that touch `hexa/campaign/` (`tools/save_compat.py`): games saved by the merge base's code must
-  load and play a season with the pull request's while `VERSION` is unchanged; after a bump each must be refused
-  quietly (`saves.load` returns `None`) or still play.
+  bump `VERSION` when compatibility breaks. A bump alone doesn't refuse older saves (`saves.load` reads every
+  version from 1 to `VERSION`): either `_migrate` fills in what they lack, or `saves.py` must refuse the old version
+  too. The `save-compat` job of `tests.yml` enforces this `VERSION` policy on pull requests that touch
+  `hexa/campaign/` (`tools/save_compat.py`): games saved by the merge base's code must load and play a season with
+  the pull request's while `VERSION` is unchanged; after a bump each must be refused quietly (`saves.load` returns
+  `None`) or still play.
 - Saves and options (`hexa/settings.py`) live in `~/.hexa/`; the `HEXA_HOME` environment variable overrides
   this, and `tests/test_saves.py` uses it with a temporary folder.
 - `gamemenu.GameMenu` is a mixin base class of `CampaignApp`: the Esc menu, save/load, options, and the screen

@@ -36,11 +36,15 @@ check reads the manifest and compares the saves' saves.VERSION with this checkou
                 still read (saves.load reads every version from 1 to VERSION and CampaignWorld._migrate fills in
                 what older ones lack) must play a season like an unchanged one.
 
-Exit status: 0 compatible; 1 a save broke (the report names the save file, the step that failed and the exception,
-and says how to fix it); 2 usage error (bad arguments, no hexa package in the checkout, hexa already imported from
-elsewhere, no manifest: run write first); 3 write only: the checkout's code could not make the saves (an exception in
-that revision, or an API this tool uses is gone). check appends a markdown table to $GITHUB_STEP_SUMMARY when that is
-set. No pygame needed.
+Exit status: 0 compatible; 1 check only: a save broke (with VERSION unchanged it was refused or failed; after a bump
+it still loaded but failed), or this checkout's hexa.campaign can't be imported; the report names the save file, the
+step that failed and the exception, and says how to fix it; 2 usage error (bad arguments, no hexa package in the
+checkout, hexa already imported from elsewhere, no manifest: run write first); 3 write only: the checkout's code could
+not make the saves (an exception in that revision, or an API this tool uses is gone). check appends a markdown table
+to $GITHUB_STEP_SUMMARY when that is set. No pygame needed.
+
+write and check point HEXA_HOME at <out> while they run and put it back afterwards, so calling them in-process (as
+tests/test_save_compat.py does for usage errors) leaves the caller's environment as it was.
 """
 import argparse
 import contextlib
@@ -81,14 +85,32 @@ def _under(path, folder):
     return os.path.realpath(path).startswith(os.path.join(os.path.realpath(folder), ""))
 
 
+def _require_hexa(checkout):
+    if not os.path.isfile(os.path.join(checkout, "hexa", "__init__.py")):
+        raise Usage(f"{checkout} has no hexa package (hexa/__init__.py)")
+
+
+@contextlib.contextmanager
+def _home(folder):
+    """HEXA_HOME=folder while the block runs (saves.folder() reads it on every call), then as it was before."""
+    old = os.environ.get("HEXA_HOME")
+    os.environ["HEXA_HOME"] = folder
+    try:
+        yield
+    finally:
+        if old is None:
+            os.environ.pop("HEXA_HOME", None)
+        else:
+            os.environ["HEXA_HOME"] = old
+
+
 def import_hexa(checkout):
     """Import the hexa package of checkout (put first on sys.path) and return the path of its __init__.py.
 
     Raises Usage if checkout has no hexa package, or if hexa is already imported from somewhere else (a second
     import in the same interpreter would get the cached package: run the tool in a fresh interpreter)."""
     checkout = os.path.realpath(checkout)
-    if not os.path.isfile(os.path.join(checkout, "hexa", "__init__.py")):
-        raise Usage(f"{checkout} has no hexa package (hexa/__init__.py)")
+    _require_hexa(checkout)
     if "hexa" not in sys.modules:
         sys.path.insert(0, checkout)
     import hexa
@@ -165,11 +187,16 @@ GAMES = (_europe, _random, _war)
 def write(checkout, out):
     """Play and save the games with the checkout's code; returns the exit status."""
     checkout, out = os.path.realpath(checkout), os.path.abspath(out)
-    manifest_path = os.path.join(out, MANIFEST)
+    _require_hexa(checkout)
     os.makedirs(out, exist_ok=True)
+    manifest_path = os.path.join(out, MANIFEST)
     if os.path.exists(manifest_path):
         os.remove(manifest_path)               # a failed write leaves no manifest for check to trust
-    os.environ["HEXA_HOME"] = out              # saves.folder() is <out>/saves
+    with _home(out):                           # saves.folder() is <out>/saves; set before the base's code is imported
+        return _write(checkout, out, manifest_path)
+
+
+def _write(checkout, out, manifest_path):
     try:
         where = import_hexa(checkout)
         say(f"write: hexa from {where}")
@@ -379,7 +406,12 @@ def check(out, checkout):
     """Load the saves in out with the checkout's code; returns the exit status."""
     out, checkout = os.path.abspath(out), os.path.realpath(checkout)
     manifest = read_manifest(out)
-    os.environ["HEXA_HOME"] = out
+    _require_hexa(checkout)
+    with _home(out):                           # saves.load() reads <out>/saves
+        return _check(out, checkout, manifest)
+
+
+def _check(out, checkout, manifest):
     try:
         where = import_hexa(checkout)
         say(f"check: hexa from {where}")

@@ -620,9 +620,10 @@ The rule, with `VERSION` in `hexa/campaign/saves.py`:
   plays. `saves.load` reads every version from 1 to `VERSION`, so make it refuse the old version too if the migration
   can't handle it. Saves from a newer version are always refused.
 
-A failure names the save, the step that broke (loading or playing the season), the exception and the line of
-`hexa/` it came from, says how to fix it, and exits with status 1. To run it locally (any revision can be the base,
-and it needs no `tools/` folder of its own):
+A failure (exit status 1: a save broke under these rules, or the pull request's `hexa.campaign` can't even be
+imported) names the save, the step that broke (loading or playing the season), the exception and the line of `hexa/`
+it came from, and says how to fix it. To run it locally (any revision can be the base, and it needs no `tools/` folder
+of its own):
 
 ```bash
 git worktree add --detach /tmp/hexa-base master
@@ -633,8 +634,9 @@ git worktree remove --force /tmp/hexa-base
 
 `write` also writes `manifest.json` next to the saves (the base's `VERSION`, revision and what was saved). Exit
 status 2 means a usage error (no `hexa` package in the checkout, no manifest yet) and 3 that the base's code could not
-make the saves. `tests/test_save_compat.py` runs the tool end to end against temporary copies of `hexa/`: one with a
-bumped `VERSION` and a renamed class, one with a new attribute but no default, one with only a bumped `VERSION`.
+make the saves. `tests/test_save_compat.py` runs the tool end to end against temporary copies of `hexa/`: a renamed
+class with and without a `VERSION` bump, a new attribute without a default, a header the save menus refuse, and a
+bumped `VERSION` alone.
 
 ## Project layout
 

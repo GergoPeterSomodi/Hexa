@@ -190,8 +190,9 @@ jobs:
       - name: Save three games with the merge base's code
         if: steps.changes.outputs.campaign == 'true'
         run: python tools/save_compat.py write "$RUNNER_TEMP/base" "$RUNNER_TEMP/compat"
-      # Writes its table to the job summary. Exit status 1: a save broke without a VERSION bump (the log says how
-      # to fix it).
+      # Writes its table to the job summary. Exit status 1: a save broke (with VERSION unchanged it was refused or
+      # failed to play; after a bump it still loaded but failed), or this code's hexa.campaign can't be imported.
+      # The log names the save, the step and the exception, and says how to fix it.
       - name: Load them with the pull request's code
         if: steps.changes.outputs.campaign == 'true'
         run: python tools/save_compat.py check "$RUNNER_TEMP/compat"
