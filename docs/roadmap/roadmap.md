@@ -140,6 +140,15 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
   - The province panel shows where each unit can be raised, and the hint explains why a place can't.
   - The AI needs to plan around it: build recruiting sites and march troops to the front.
   - Design first, with the user. Planned with the balance pass (M4), or with the battle system (M2) if its troop types change.
+- **Trade: UI, gameplay and fun testing (user request 2026-11-12):**
+  - **UI:** review the market panel, the merchant orders and the trade routes on the map. Is it clear what sells where and for how much, and what a merchant earns? Can an order be set up in a few clicks? Can you see your trade flows on the map?
+  - **Gameplay:** do trade choices matter? Check route profits against tolls and transport, market competition with the AI, prices that react to supply, and whether merchants stay unused (the 2026-11-11 playtest found them unused).
+  - **Fun testing:** a playtest focused on trade only, in a full game. Is it interesting to play a trading country, such as Venice, Genoa or Portugal? Are there decisions every few seasons, or is it set-and-forget? Write it up with findings and proposals, for approval before any redesign.
+- **Economy: UI, gameplay and fun testing (user request 2026-11-12):**
+  - **UI:** review the treasury breakdown, the province panel, investment, buildings and the goods views. Can the player see where money comes from and goes, and what to build next? Are the numbers explained in the hover hints?
+  - **Gameplay:** check the money curve over a full game. The 2026-11-11 playtest found about 9,000 ducats by 1517 with nothing to spend them on. Check the money sinks, investment payback times, the tax levels, debt (#69), and whether small and large countries both have interesting choices.
+  - **Fun testing:** an economy-focused playtest of a full game: the pacing of growth, meaningful choices, and how rewarding it feels to see provinces develop. Write it up with findings and proposals, for approval before any redesign.
+  - Both run as part of the balance and fun pass (M4). Their UI findings feed the UI clean-up (M3).
 - **RPG-style event pop-ups:** interactive choices with good or bad outcomes. This is planned for the long-term roadmap's Phase 3 (History and events). Don't start it yet.
 - **Known loose ends:**
   - balance
@@ -189,13 +198,14 @@ Each design is approved by the user before its build starts. M1 and M2 must run 
 
 **M4. Balance and playtest pass**
 - Goal: a full 1480 to 1650 game feels right.
-- In: research pace and tech costs, battle numbers, economy and army upkeep, and AI pace, including colonisation.
+- In: research pace and tech costs, battle numbers, economy and army upkeep, and AI pace, including colonisation. It also includes the trade and economy UI, gameplay and fun tests (section 5).
 - Depends on: M1 and M2, because the numbers need the finished systems.
 - Done when:
   - Seeded full runs to 1650 hit the pace targets: 2 to 6 RP a season for a mid-sized country, a tech every 3 to 10 years, and about 70% of the tree by 1650.
   - The AI reaches era III in most runs.
   - No country stalls at zero research (suggested).
   - The findings are written up for the user.
+  - The trade and economy fun-test reports are done, and their approved proposals are built.
 
 **M5. World and naming fixes**
 - Goal: fix the loose ends that make the map feel unfinished.
