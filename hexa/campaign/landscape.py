@@ -24,7 +24,6 @@ import math
 import os
 import random
 import zlib
-from collections import OrderedDict
 from dataclasses import dataclass
 
 import pygame
@@ -32,6 +31,7 @@ import pygame
 from ..hexgrid import neighbors
 from . import art, geo, goodsart, landmarks, life, nature, wfctiles
 from .art import shade
+from .render.cache import BoundedCache
 
 SQ3 = math.sqrt(3)
 APO = SQ3 / 2                       # centre to edge midpoint, in hex radii
@@ -771,20 +771,6 @@ class _Frame:
         return self.w / 2 + (X - self.X) * self.S, self.h / 2 + (Y - self.Y) * self.S
 
 
-def _lru_get(cache, key):
-    hit = cache.get(key)
-    if hit is not None:
-        cache.move_to_end(key)
-    return hit
-
-
-def _lru_put(cache, key, value, cap):
-    cache[key] = value
-    if len(cache) > cap:
-        cache.popitem(last=False)
-    return value
-
-
 def check_season(season):
     if season not in SEASONS:
         raise ValueError(f"season must be 'summer' or 'winter', not {season!r}")
@@ -1129,14 +1115,14 @@ class Landscape:
         self.life = {}
         self._ridges = _ridges_of(getattr(getattr(world, "geo", None), "MOUNTAINS", None))
         self._src_cache, self._scaled_cache, self._avg_cache = {}, {}, {}
-        self._grounds = OrderedDict()
+        self._grounds = BoundedCache("landscape.grounds", GROUND_CACHE)
         self._grid = {}
         self._gquick = {}                   # (pos, r, season) -> (world version, composite key): skips the key work
         self.builds = 0                     # ground composites built so far (MapView budgets them per frame)
         self.object_builds = 0              # object lists built so far (budgeted the same way)
         self.sprite_builds = 0              # object sprites made so far (make_sprites; budgeted the same way)
         self.overlay_builds = 0             # hexes whose wfc overlay / base picture was made by prepare()
-        self._objs = OrderedDict()
+        self._objs = BoundedCache("landscape.objects", OBJECT_CACHE)
         self._specs_cache = {}
         self._field_geo = {}
         self._ridge = None                  # Ridges, built on first use
@@ -1303,7 +1289,7 @@ class Landscape:
         c = None
         if hit is not None and hit[0] == self._version:  # this hex's key was worked out for this world version
             key = hit[1]
-            img = _lru_get(self._grounds, key)
+            img = self._grounds.get(key)
             if img is not None:
                 return img
             if not build:                                # not built yet (a frame asks again every frame while it waits)
@@ -1319,13 +1305,13 @@ class Landscape:
                    self.ridges().key(pos, season), c.landmark, c.owner, c.built, c.water,
                    tuple(self._nbr_sig(model, n) for n in nbrs))
             self._gquick[quick] = (self._version, key)
-            hit = _lru_get(self._grounds, key)
+            hit = self._grounds.get(key)
             if hit is not None:
                 return hit
             if not build:
                 return None
         self.builds += 1
-        return _lru_put(self._grounds, key, self._build_ground(model, c, r), GROUND_CACHE)
+        return self._grounds.put(key, self._build_ground(model, c, r))
 
     def grid(self, r):
         """The faint hex outline at hex radius r, the size of ground(). Cached per radius."""
@@ -1557,7 +1543,7 @@ class Landscape:
         check_season(season)
         self._sync()
         key = (pos, self._version, season, r)
-        hit = _lru_get(self._objs, key)
+        hit = self._objs.get(key)
         if hit is not None:
             return hit
         if not build:                       # not built yet: None, and the caller draws the hex later
@@ -1573,7 +1559,7 @@ class Landscape:
                 surf = obj_sprite(name, size, seed, cat, rs, flip)
                 out.append((surf, dx, dy, dy))
             out.sort(key=lambda o: o[3])
-        return _lru_put(self._objs, key, out, OBJECT_CACHE)
+        return self._objs.put(key, out)
 
     def make_sprites(self, pos, r, season):
         """Makes the object sprites of one hex that do not exist yet (the first use of a sprite is the costly part of

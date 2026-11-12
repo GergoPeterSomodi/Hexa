@@ -218,7 +218,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   draws nothing and leaves the feed's floating queue alone (`take_floating(max_age)` drops what is too old). HUD modules
   read the world and register buttons; they hold their own fonts (`new_font`, not the cached `theme.font`, which can
   outlive pygame; both are emptied by a `pygame.register_quit` hook) and never change the game. `ui/icons.py` draws the
-  icons into a `ui/cache.py` `BoundedCache` (registered by name, emptied on quit; `icon()` hands out copies); `ui/kit.py` has `chip`, `icon_button` and a `hover_card` whose lines may have a right-aligned amount
+  icons into a `BoundedCache` (`campaign/render/cache.py`, re-exported by `ui/cache.py`; registered by name, emptied on quit; `icon()` hands out copies); `ui/kit.py` has `chip`, `icon_button` and a `hover_card` whose lines may have a right-aligned amount
   (text with a tab) and rules (`("", None)`).
 - **Lines for the action log.** Most log lines come from bus events (`feed.py` handlers). A `world.message()` that has no
   event of its own must name a notice, `world.message(text, tag, "idea", pos)` (`feed.NOTICES`: start, lead, treasury,
@@ -272,8 +272,9 @@ the rules as far as the current layout allows, and never makes an allowlisted of
 - **No cross-module `_private` use** outside tests. Tests prefer public functions of system modules.
 - **UI:** buttons, panels, rows, tooltips and modals come from hexa/ui/kit.py, colours and fonts from
   hexa/ui/theme.py. No new hand-drawn button.
-- **Render caches** are `render.cache.BoundedCache` instances, registered by name. No new module-level dict
-  cache. Time-sliced work uses `render.budget.FrameBudget`.
+- **Render caches** are `campaign/render/cache.py` `BoundedCache` instances, registered by name (`cache.stats()`; hits, misses
+  and bytes with `detail=True`). No new module-level dict cache; landscape's per-MapView caches use the same class (the registry
+  is weak and adds up caches of one name). Time-sliced work uses `render.budget.FrameBudget`.
 - **Refactor PRs** change no behaviour: label them `refactor`; they must pass tools/same_behaviour.py,
   save-compat and sha-identical goldens. Never mix a refactor and a gameplay change in one commit.
 - **Where new features go:** rules -> campaign/systems/<name>.py (+ numbers in data.py, + README table);
