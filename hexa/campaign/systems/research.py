@@ -15,7 +15,7 @@ ROUTE_KEYS = ("market_reach", "sea_range", "atlantic")  # effects that change th
 
 # What this module changes: the country's techs, ideas, research points, queue and national tech, its explored
 # tiles (cartography), the treasury (through resources.spend), the log, and the markets (refresh_markets).
-OWNS = ("countries", "log")
+OWNS = ("countries", "log", "_markets_dirty")
 
 
 def route_effects(effects):

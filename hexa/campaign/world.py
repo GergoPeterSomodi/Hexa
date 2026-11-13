@@ -1969,7 +1969,7 @@ class CampaignWorld:
         if unit in self.units:
             self._lose([unit], why)
 
-    kill = _kill                         # the public name the debt module uses
+    def kill(self, unit, why="battle"): return self._kill(unit, why)   # public name for the debt module
 
     def forget_castles(self):
         """Drop the cached list of fortified provinces (castles()), after a castle was lost or built."""

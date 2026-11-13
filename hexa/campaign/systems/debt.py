@@ -15,7 +15,7 @@ TROOP_FOOD = FOOD_PER_TROOP * 1.5       # grain a troop eats a season, at the 1.
 # What this module changes: the country's income lines (and its treasury, when the creditors cap the debt), the
 # troops it removes from world.units (through world.kill), the province's buildings, works, castle, settlement and
 # garrison it takes away, and the log.
-OWNS = ("countries", "units", "provinces", "log")
+OWNS = ("countries", "units", "provinces", "log", "_markets_dirty")
 
 
 def debt_limit(world, tag):
