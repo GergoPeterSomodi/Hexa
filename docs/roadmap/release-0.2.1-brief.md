@@ -85,6 +85,8 @@ then item 3 (the pop-up stays one more release, off by default).
    men and morale; flight below 10% morale (item 2). In 0.2.1 the choice is the standing order set before the fight; in the
    0.2.3 mini game it becomes a choice made between days.
 4. **Task flag:** B, one "N things to do" flag with a list (item 3).
+   Added the same day (owner): the flag shows Fund research whenever it can be bought (once a year), not only while the
+   current tech has no points; "nothing being researched" stays.
 
 ## Creative review (2026-11-13, draft 2)
 
