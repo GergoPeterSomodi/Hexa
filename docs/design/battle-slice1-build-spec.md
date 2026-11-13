@@ -6,7 +6,7 @@ follow this spec and tell the planning session.
 
 **In scope:** battles that stay on a hex for several seasons, three days a season, three lanes and a back line,
 fire / shock / flanks / morale / pursuit, killed and wounded, regiment and army morale, joining as reserve,
-Attack / Hold / Withdraw, rout, retreat and surrender, castle assaults with the garrison in the line, bombardment,
+Attack / Hold / Withdraw, rout, retreat and surrender, castle assaults with the garrison in the line, sieges on the same hex (no bombardment),
 the map badge, the battle panel, log lines and ribbons, the AI.
 
 **Not in scope (later slices):** cards, command points, the battle mini-map, lane ground from the real map,
