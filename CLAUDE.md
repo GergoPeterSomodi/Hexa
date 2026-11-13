@@ -244,7 +244,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - **Combat** (`systems/combat.py`): `general`, `attack_value` and `defense_value` (read through `world.bonus`; war.py
   re-exports the names), then the battle's day (battle slice 1, PR 2): `deploy` fills the three lanes, `fire`, `shock`,
   `flanks`, `morale`, `breaker` and `pursuit` work out one phase's hits and apply them together, `fight_day` runs a day,
-  `army_morale` measures a side. The numbers are in data.py (`SHOCK_LOSS`, `STANCE`, `BREAK`...). Nothing calls `fight_day`
+  `army_morale` measures a side. The numbers are in data.py (`SHOCK_LOSS`, `STANCE`, `FLEE_MORALE`...). Nothing calls `fight_day`
   except the battle's own season (below), the `battles` phase, which is first in PHASES. It writes the battle object, unit hp
   and morale, `prov.garrison`, and kills through `world.kill`; `OWNS` lists those.
 - **Battles** (`systems/battle.py`, battle slice 1; the `battles` phase is first in PHASES): `engage` (a stack attacks a hex: it steps

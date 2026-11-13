@@ -22,9 +22,9 @@ from hexa.campaign.data import (BATTLE_DAYS, BATTLE_LOG, CROSSING_PENALTY, FLEE_
                                 WITHDRAW_PURSUIT_ATTACKER)
 from hexa.campaign.battlelog import describe
 from hexa.campaign.state import Battle, War
-from hexa.campaign.systems import battle as battlesys, combat, military, movement, terrain
+from hexa.campaign.systems import battle as battlesys, combat, military, movement, terrain, war
 from hexa.events import CAMPAIGN_KINDS
-from hexa.hexgrid import neighbors, within
+from hexa.hexgrid import distance, neighbors, within
 from tests.support.battles import place, setup
 from tests.support.digests import canonical, world_state
 from tests.support.home import TempHome
@@ -773,6 +773,61 @@ class SeasonTest(unittest.TestCase):
         self.assertEqual(world.bus.of("battle_fought"), [])
 
 
+class BrokeNotDestroyedTest(unittest.TestCase):
+    def test_a_side_whose_flight_takes_its_last_regiment_is_broke_with_its_cause(self):
+        world = fresh("POR")
+        fight, battle = plain_battle(world, [("infantry", 1, 4)], [("artillery", 1, 1)])
+        for unit in fight.defenders:
+            unit.morale = 0.0
+            battle.routed.add(unit.id)
+        battlesys.battle_season(world)
+        data = world.bus.of("battle_ended")[0].data
+        self.assertEqual((data["how"], data["loser"], data["winner"]), ("broke", fight.defender, fight.attacker))
+        self.assertIn(data["cause"], ("centre", "lanes", "morale"))
+
+
+class FleeLandTest(unittest.TestCase):
+    """0.2.1 review: a flight takes any free land, but its own land first, so a side with an own hex in reach never runs
+    onto the winner's land when it has one, and a side that lands on a hex makes no siege progress there that season."""
+
+    def test_a_flight_prefers_its_own_land_to_a_nearer_enemy_hex(self):
+        world = fresh("POR")
+        fight, battle = plain_battle(world)
+        pos = fight.defend_pos
+        group = [u for u in world.units_at(pos) if u.owner == fight.defender and u.kind.war]
+        far = None
+        for p in sorted(within(pos, RETREAT_RANGE)):
+            prov = world.provinces.get(p)
+            if p == pos or prov is None or not world.is_land(p):
+                continue
+            prov.controller, prov.garrison = fight.attacker, 0          # the winner's land, free, all around
+            if distance(p, pos) == 2 and far is None:
+                far = p
+        world.provinces[far].controller = fight.defender                # one own hex, two steps out
+        world.changed(ownership=True)
+        self.assertEqual(world.retreat_spot(group, pos, own=False), far)
+
+    def test_a_side_that_landed_on_a_hex_makes_no_siege_progress_there_that_season(self):
+        world = fresh("POR")
+        world.rng = random.Random(3)
+        fight = setup(world, [("infantry", 1, 5)], [("infantry", 1, 2)])
+        world.attack_group(fight.attackers, fight.defend_pos)
+        battlesys.battle_season(world)
+        data = world.bus.of("battle_ended")[0].data
+        self.assertEqual(data["how"], "broke")
+        spot = data["retreat"]
+        self.assertIsNotNone(spot)
+        prov = world.provinces[spot]
+        fled, winner = data["loser"], data["winner"]                # the fleeing side's own hex, the winner's control
+        prov.owner, prov.controller, prov.siege = fled, winner, 0
+        world.changed(ownership=True)
+        war.sieges(world)
+        self.assertEqual((prov.siege, prov.controller), (0, winner))
+        world.turn += 1
+        war.sieges(world)                  # next season it is a siege: this open hex falls to it (no castle, one season)
+        self.assertEqual(prov.controller, fled)
+
+
 class ReinforceTest(unittest.TestCase):
     """0.2.1: a second stack that attacks the same hex in the same season joins the battle, and fights from day one. The
     attacks of a turn all come before its battles phase, so the second stack is in the battle before the first day."""
@@ -1237,7 +1292,7 @@ class GoneTest(unittest.TestCase):
 def _no_fight(world, battle):
     """A day that changes nothing but the day count: the day cap is what ends the fight."""
     battle.days += 1
-    return {"broke": None, "cause": None, "killed": {}, "wounded": {}, "morale": {}}
+    return {"broke": None, "cause": None, "killed": {}, "wounded": {}, "morale": {}, "fought_out": []}
 
 
 class DayCapTest(unittest.TestCase):
@@ -1271,10 +1326,22 @@ class DayCapTest(unittest.TestCase):
         for unit in fight.attackers:
             self.assertEqual(unit.pos, data["retreat"])
 
-    def test_when_the_lower_army_has_no_retreat_it_surrenders_at_the_cap(self):
+    def test_when_the_lower_army_cannot_move_the_other_side_withdraws_at_the_cap(self):
         world = fresh("POR")
         fight, battle = plain_battle(world)
-        no_retreat(world, fight.defend_pos, fight.attacker)
+        boxed_in(world, fight.defend_pos, fight.attacker, fight.defender)   # the lower side has no hex to run to
+        pursued = []
+        self.cap(world, battle, pursued)
+        data = world.bus.of("battle_ended")[0].data
+        self.assertEqual((data["how"], data["cause"], data["loser"]), ("withdrew", "cap", fight.defender))
+        self.assertEqual(data["winner"], fight.attacker)
+        self.assertIsNotNone(data["retreat"])
+
+    def test_when_neither_side_can_move_the_lower_one_surrenders_at_the_cap(self):
+        world = fresh("POR")
+        fight, battle = plain_battle(world)
+        boxed_in(world, fight.defend_pos, fight.attacker, fight.defender)
+        boxed_in(world, fight.defend_pos, fight.defender, fight.attacker)
         pursued = []
         self.cap(world, battle, pursued)
         data = world.bus.of("battle_ended")[0].data
@@ -1417,6 +1484,15 @@ class AIBattleTest(unittest.TestCase):
         no_retreat(self.world, fight.defend_pos, fight.attacker)
         ai._battles(self.world, fight.attacker)
         self.assertEqual(battle.stance[fight.attacker], "hold")
+
+    def test_an_ai_attacker_that_is_clearly_losing_withdraws_too(self):
+        fight = setup(self.world, [("infantry", 1, 2)], [("infantry", 1, 6)])
+        clear_castle(self.world, fight.defend_pos)
+        self.assertTrue(self.world.engage(fight.attackers, fight.defend_pos))
+        battle = self.world.battle_at(fight.defend_pos)
+        ai._answer(self.world, fight.defend_pos)
+        self.assertEqual(battle.stance[fight.attacker], "withdraw")
+        self.assertEqual(battle.stance[fight.defender], "hold")
 
     def test_a_shaken_stack_does_not_attack(self):
         fight = setup(self.world, [("infantry", 1, 3)], [("infantry", 1, 1)])

@@ -100,7 +100,7 @@ class DiceTest(unittest.TestCase):
 class LaneBreakTest(unittest.TestCase):
     """The owner's line model (refinement of 2026-11-13): a lane breaks when its regiment routs or dies and no reserve
     fills it by the next day's start; a broken centre breaks the army when no reserve can fill it; two broken lanes break
-    it; on narrow ground either lane does; the front-line morale under BREAK is the fallback."""
+    it; on narrow ground either lane does; the front-line morale under FLEE_MORALE is the fallback."""
 
     def setUp(self):
         self.world = fresh("POR")

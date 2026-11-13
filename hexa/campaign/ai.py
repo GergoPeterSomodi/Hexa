@@ -356,13 +356,16 @@ def _battles(world, tag):
 
 
 def _answer(world, pos):
-    """The AI defender of a battle that an attack has just begun (or joined) reads it at once, at its stance (0.2.1): a
-    battle is fought in the turn it starts, so no later AI turn would read it. The player's own battle is left to the
+    """The AI sides of a battle that an attack has just begun (or joined) read it at once, each at its stance (0.2.1): a
+    battle is fought in the turn it starts, so no later AI turn would read it. The player's own side is left to the
     player."""
     battle = world.battle_at(pos)
-    if battle is None or battle.defender == world.player or battle.defender not in world.countries:
+    if battle is None:
         return
-    world.battle_order(pos, battle.defender, _stance(world, battle, battle.defender, battle.attacker))
+    for tag in (battle.attacker, battle.defender):
+        if tag == world.player or tag not in world.countries:
+            continue
+        world.battle_order(pos, tag, _stance(world, battle, tag, _side_enemy(battle, tag)))
 
 
 def _stance(world, battle, tag, enemy):

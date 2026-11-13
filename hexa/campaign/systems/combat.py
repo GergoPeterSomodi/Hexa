@@ -557,6 +557,13 @@ def pursuit(day, loser):
         unit.morale = FLEE_MORALE_LEFT
 
 
+def _holds(world, battle, tag):
+    """Whether a side still has a fighting presence on the hex: a live war unit, or the garrison in an assault."""
+    if _war_units(world, battle, tag):
+        return True
+    return tag == battle.defender and battle.assault and world.provinces[battle.pos].garrison > 0
+
+
 def fight_day(world, battle):
     """One day of the battle: deploy, each side's d6 roll, fire, back line, shock, flanks, morale, then pursuit if an army
     breaks. Returns the day's report: {"broke": tag or None, "cause": "centre" | "lanes" | "morale" | None, "rolls":
@@ -573,10 +580,12 @@ def fight_day(world, battle):
     flanks(day)
     morale(day)
     broke, cause = breaker(day)
+    fought_out = [tag for tag in (att, dfn) if not _holds(world, battle, tag)]   # wiped out by the fight, before the flight
     if broke is not None:
         pursuit(day, broke)
     battle.days += 1
-    report = {"broke": broke, "cause": cause, "rolls": rolls, "killed": {}, "wounded": {}, "morale": {}}
+    report = {"broke": broke, "cause": cause, "rolls": rolls, "killed": {}, "wounded": {}, "morale": {},
+              "fought_out": fought_out}
     for tag in (att, dfn):
         report["killed"][tag] = battle.killed.get(tag, 0.0) - before[tag][0]
         report["wounded"][tag] = battle.wounded.get(tag, 0.0) - before[tag][1]
