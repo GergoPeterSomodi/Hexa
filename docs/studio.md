@@ -6,10 +6,11 @@ Hexa is built by the owner with a team of AI agents in Claude Code. It is a lean
 
 | Role | Model | What it does |
 |---|---|---|
-| Creative director | Opus | Reviews every design against the vision and the fun before the owner sees it |
+| Creative director | Opus | Reviews every design against the vision and the fun before the owner sees it, using the fun principles |
 | Technical director | Opus | Reviews architecture and big changes, and leads the architecture refactor |
 | Producer | Sonnet | Keeps the roadmap, milestones, issue triage, the changelog and release notes |
 | Game designer | Sonnet | Writes design docs for new systems: diplomacy, rebels, debt, colonisation, naval and more |
+| Market researcher | Sonnet | Researches what makes strategy games fun, what players and the Steam market want, and proposes improvements; keeps the fun principles in [research](research/fun-principles.md) |
 | Systems and economy designer | Sonnet | Balances the game with measured full games to 1650 |
 | Art director | Opus | Designs and reviews code-drawn art in one style; tracks the Kenney art still in use |
 | UI and UX designer | Opus | Makes screen and menu mockups (see [design/ui](design/ui/README.md)) |
