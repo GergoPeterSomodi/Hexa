@@ -9,6 +9,44 @@ and fixes inside it. 0.1.x is the foundations. **0.2.x is war:** battles (0.2.0)
 battle mini-map, and war goals and peace. Later phases (the living world, history and events, the sea, game feel)
 take 0.3.x onwards, and 0.9.x is the Steam Early Access line. 1.0 is the full Steam release.
 
+## v0.2.0: Battles that last
+**War:**
+- A stack that moves into an enemy stack starts a battle on that hex. It lasts several days a season until one side's line
+  breaks; neither side may leave except by Withdraw or a rout. Three lanes (left, centre, right) with reserves behind them;
+  friendly stacks that move in join as reserves
+- Each day runs fire, shock, flanks, morale and pursuit. Each side rolls a d6 a day (1 is x0.7 damage, 6 is x1.4), shown in
+  the log. A line break (centre, then flanks) and front-line army morale decide who routs; reserves count much less
+- Orders each season: Attack, Hold or Withdraw, and a standing order for when you are attacked (Hold or Withdraw)
+- Option: Battle timing. Clash (default) fights day 1 in the attacker's season and the rest after both sides could send help;
+  Quick battles fights every day at once
+- Terrain matters: crossing a pass and attacking uphill cost the attacker; the defender fights on its own ground
+- A routed side retreats to the nearest friendly hex, or surrenders if it has none. Losses split into killed and wounded;
+  some of the wounded come back after the battle if in supply
+- Strength is shown as men everywhere (panels, log, odds), not HP; regiments have morale
+- AI-vs-AI battles resolve the same way, leave one log line, and the AI picks its stance and sends reinforcements
+- Removed: bombardment and the old one-shot battle
+
+**On screen:**
+- The battle panel: both sides, men, the day's dice, front-line morale, the lanes, your order and standing order, a day log
+- On the map: a crossed-swords badge with a bar for the front line, the two stacks drawn facing each other
+- The odds card: one word before you attack (men, morale and ground behind it)
+- Every battle gets a name ("Battle of Redondela") and a year in the log; ribbons mark battles and their end
+- A reminder and ribbon while a battle is still on at the end of the season
+
+**Under the hood:**
+- Battle rules live in `systems/combat.py` and `systems/battle.py`; the screens read one cached read model; a battle stats
+  tool and baseline, seeded scenario tests and a perf row for the worst case
+- Save format 2 (battles, unit men and morale). Old saves load
+
+**Design docs for review:** war goals and peace, crown projects, reactive prices, battle size and frontage (width,
+back line, rotation, crossbowmen), a docked battle panel, and the research on what makes strategy games fun.
+
+Battle stats at release (clash timing): on plains the attacker wins 53% at 3v3, 77% at 4v3, 87% at 6v4 and 47% at 6v6;
+on hills 23%, 50%, 70% and 30%. In AI games the bigger side wins 57% when even, 64% at 1.3x, 89% at 2x and 95% above
+2.5x. No battle reached the six-season safety stop. 1,317 tests and 254 nightly soak games pass.
+
+Old saves keep loading.
+
 ## v0.1.9: Armies you can follow
 **Movement and reminders:**
 - After End season, the armies and ships you can see walk hex by hex instead of jumping; moves under fog stay instant,
