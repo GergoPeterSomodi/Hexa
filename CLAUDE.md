@@ -280,6 +280,8 @@ the rules as far as the current layout allows, and never makes an allowlisted of
   evicts only when worlds change. Time-sliced work uses `campaign/render/budget.py` `FrameBudget` (MapView's `LAND_*_MS` and `PREFETCH_*` constants stay in
   mapview.py and are read when a slice starts, so a test can lift them).
 - **Refactor PRs** change no behaviour: label them `refactor`; they must pass tools/same_behaviour.py,
-  save-compat and sha-identical goldens. Never mix a refactor and a gameplay change in one commit.
+  save-compat and sha-identical goldens. A change to an art module also keeps `tests/test_sprite_hashes.py` green (sha256
+  of 1,743 generated sprites; `UPDATE_SPRITES=1` rewrites the fixture only for a change of art on purpose). Never mix a
+  refactor and a gameplay change in one commit.
 - **Where new features go:** rules -> campaign/systems/<name>.py (+ numbers in data.py, + README table);
   panel -> campaign/panels/; screen -> campaign/screens/; art -> its art module using render/draw.py.
