@@ -379,6 +379,7 @@ ATTACK_MORALE = 0.5                        # a stack this shaken cannot start an
 PURSUIT, PURSUIT_FOOT, WITHDRAW_PURSUIT = 0.10, 0.04, 0.05   # share of men killed in a pursuit
 WOUNDED_SHARE, WOUNDED_RETURN = 0.5, 0.5  # share of hp lost that is wounded; share of wounded that come back
 RETREAT_MORALE, MORALE_RECOVERY = 0.3, 0.25
+RETREAT_RANGE = 3 * SCALE                 # hexes a beaten side may retreat (battle slice 1, spec 3.6)
 BATTLE_MAX_SEASONS = 6                     # a battle this long ends with the lower army withdrawing (owner decision)
 BATTLE_LOG = 24                            # log lines kept per battle
 NARROW_TERRAIN = ("mountains", "marsh", "jungle", "snow")   # the right lane is closed: two lanes fight

@@ -247,6 +247,28 @@ def move_group(world, group, dest, best=None):
     return True
 
 
+def step_in(world, group, pos):
+    """The last step of an attack (spec 3.1): the stack moves from the hex beside pos onto pos, the enemy's hex. Its units
+    have no moves left and have attacked. One unit_moved, with the walk (its hex, pos), as move_group emits. The caller
+    checks the attack first (battle.engage does)."""
+    group = [u for u in group if u in world.units]
+    if not group:
+        return False
+    lead = group[0]
+    path = (lead.pos, pos)
+    ids = [u.id for u in group]
+    for unit in group:
+        unit.pos, unit.moves_left, unit.acted, unit.attacked = pos, 0, True, True
+    world.last_move = (ids, list(path))
+    for unit in group:
+        world.see_from(unit, refresh=False)
+    if lead.owner == world.player:
+        world.update_visibility()
+    seen = tuple(lead.owner == world.player or p in world.visible for p in path)
+    world.bus.emit("unit_moved", lead.owner, pos, ids=ids, path=path, naval=lead.naval, seen=seen)
+    return True
+
+
 def route(world, group, dest, best=None):
     """The hexes the stack walks through to reach dest this season, start and end included."""
     lead = group[0]

@@ -23,7 +23,7 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
     peace_made        tag, b             winner, moved (provinces that changed hands)
     unit_raised       tag, pos           what (the troop's name), id
     unit_lost         tag=owner, pos     what (the troop's name), why ("battle", "storm", "overrun", "disbanded",
-                                         "deserted", "starved", "sunk" or "evicted")
+                                         "deserted", "starved", "sunk", "evicted" or "surrendered")
     unit_deserted     tag                count, kinds ({name: n})
     debt_seized       tag                what ("castle at X")
     pass_closed       pos                name, id        (every pass, when winter begins)
@@ -40,6 +40,14 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
     unit_moved        tag=owner, pos=end ids (the stack's unit ids), path (every hex from start to end), naval, seen
                                          (per hex of the path: in the player's vision when the stack moved). The
                                          window replays these walks, see campaign/replay.py; the state is already final
+    battle_started    tag=attacker, pos  defender, assault (a battle begins: both stacks stand on pos)
+    battle_joined     tag=joiner, pos    side ("attacker" or "defender"), men (a stack joins its side's reserve)
+    battle_fought     tag=attacker, pos  defender, days, morale {tag: share}, killed {tag: men}, wounded {tag: men};
+                                         one per battle per season
+    battle_ended      tag=attacker, pos  attacker, defender, winner, loser (tags; None for a draw), assault, how
+                                         ("broke", "withdrew", "surrendered", "stalemate", "peace" or "gone"), seasons,
+                                         killed {tag: men}, wounded {tag: men}, retreat (hex or None). Once per battle,
+                                         after it has left world.battles. A contract: docs/design/war-goals-and-peace.md 3.4
 
 ``battle`` also carries ``lost`` (units destroyed, (attacker, defender)) and ``hurt`` (strength lost, the same pair);
 ``tech_researched`` the ``cost`` in research points; ``debt_seized`` the ``saving`` in ducats a season.
@@ -61,7 +69,7 @@ CAMPAIGN_KINDS = (
     "message", "province_captured", "siege_progress", "battle", "war_declared", "peace_made", "unit_raised",
     "unit_lost", "unit_deserted", "debt_seized", "pass_closed", "pass_opened", "tech_researched", "era_reached",
     "colony_founded", "building_done", "investment_done", "season_ended", "money_spent", "forage", "native_raid",
-    "unit_moved",
+    "unit_moved", "battle_started", "battle_joined", "battle_fought", "battle_ended",
 )
 
 

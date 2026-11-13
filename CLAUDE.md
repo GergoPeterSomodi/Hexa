@@ -235,6 +235,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `in_supply`, `supply_state`, `forage_check`/`forage` and `logistics` (the season's feeding and attrition). Movement: `may_enter`,
   `zoc`, `stuck_reason`, `plan` (the Dijkstra over a stack's moves), `reachable`/`reachable_group`, `next_season_reach`, `path_to`,
   `route`, `move`/`move_toward`/`move_toward_group`, `move_group` (walks the route and emits `unit_moved`; it writes `last_move`),
+  `step_in` (the last step of an attack: one `unit_moved`, the stack has attacked and has no moves),
   `cost_field`, `step_toward`/`step_toward_group`, `group_plan` (the old `_group_plan`), `field_in` (the old `_field_in`) and
   `pass_wait`. `CampaignWorld` binds every one as a plain class attribute (`plan = movement.plan`), so a call costs what the
   method did, and the functions call each other through `world.` as before (tests wrap `world.plan` and `world.cost_field`);
@@ -243,9 +244,18 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - **Combat** (`systems/combat.py`): `general`, `attack_value` and `defense_value` (read through `world.bonus`; war.py
   re-exports the names), then the battle's day (battle slice 1, PR 2): `deploy` fills the three lanes, `fire`, `shock`,
   `flanks`, `morale`, `breaker` and `pursuit` work out one phase's hits and apply them together, `fight_day` runs a day,
-  `army_morale` measures a side. The numbers are in data.py (`SHOCK_LOSS`, `STANCE`, `BREAK`...). Nothing calls it yet:
-  the battle is wired into the season in PR 3. It writes the battle object, unit hp and morale, `prov.garrison`, and
-  kills through `world.kill`; `OWNS` lists those.
+  `army_morale` measures a side. The numbers are in data.py (`SHOCK_LOSS`, `STANCE`, `BREAK`...). Nothing calls `fight_day`
+  except the battle's own season (below), and that phase is not in PHASES until PR 4. It writes the battle object, unit hp
+  and morale, `prov.garrison`, and kills through `world.kill`; `OWNS` lists those.
+- **Battles** (`systems/battle.py`, battle slice 1, PR 3; not in PHASES until PR 4): `engage` (a stack attacks a hex: it steps
+  in with `movement.step_in`, then overruns the enemy's civilians, joins its side's battle through `join`, or starts a
+  `Battle` and deploys both sides), `fits` (the stack limit, per side), `battle_order_check`/`battle_order` (Attack, Hold,
+  Withdraw), `retreat_spot`, `battle_season` (the `battles` phase: withdrawals first, then up to three days through
+  `combat.fight_day`, then the safety stop at `BATTLE_MAX_SEASONS`), `end_battle` (pursuit, retreat or surrender,
+  experience, wounded back in supply, storm, then `battle_ended`) and `end_battles` (peace or a vanished country: a draw).
+  Events: `battle_started`, `battle_joined`, `battle_fought` (once per season) and `battle_ended` (the contract of
+  docs/design/war-goals-and-peace.md 3.4). `world.engage`, `battle_order_check`/`battle_order`, `end_battles`,
+  `retreat_spot` and `army_morale` are facades. The switch (PR 4) makes `attack_group` call `engage`.
 - **War** (`systems/war.py`; the battle system builds on it): `at_war`, `enemies`, `war_check`/`declare_war`, `war_score`, `peace`
   (and `free_spot_near`), `peace_offer`, `attack_options`/`attack` and their `_group` forms (with `targets`), `battle` (one fight: front
   line plus support, using the combat values below), `lose` (units off the map, a `unit_lost` event each), `kill`

@@ -12,6 +12,7 @@ from . import geo, naming, state, tech
 from .state import Unit, fill_defaults
 from .systems import (building, colonies, debt, economy, military, movement, research, season, supply, terrain, trade,
                       war, worldgen)
+from .systems import battle as battlesys
 from .data import (GENERAL, GENERAL_TRAITS, UPGRADE_MAX, MANPOWER, SUPPLY_RANGE, WAGON_SEASONS, BUILDINGS, PIONEER,
                    START_YEAR, TERRAIN, MANUFACTORIES, date)
 
@@ -723,6 +724,14 @@ class CampaignWorld:
     def battle_at(self, pos):
         """The battle fought on this hex, or None. A linear scan: there are rarely more than a few."""
         return next((b for b in self.battles if b.pos == pos), None)
+
+    # the battle's life (systems/battle.py): a stack attacks or joins, the orders, the retreat, the end of battles
+    engage = battlesys.engage
+    battle_order_check = battlesys.battle_order_check
+    battle_order = battlesys.battle_order
+    end_battles = battlesys.end_battles
+    retreat_spot = battlesys.retreat_spot
+    army_morale = battlesys.army_morale
 
     def forget_castles(self):
         """Drop the cached list of fortified provinces (castles()), after a castle was lost or built."""

@@ -398,10 +398,12 @@ def fight_day(world, battle):
         report["killed"][tag] = battle.killed.get(tag, 0.0) - before[tag][0]
         report["wounded"][tag] = battle.wounded.get(tag, 0.0) - before[tag][1]
         report["morale"][tag] = army_morale(world, battle, tag)
-    text = (f"Day {battle.days}: {att} {report['killed'][att]:.0f} killed, {report['wounded'][att]:.0f} wounded; "
-            f"{dfn} {report['killed'][dfn]:.0f} killed, {report['wounded'][dfn]:.0f} wounded")
+    names = {tag: world.countries[tag].name for tag in (att, dfn)}
+    text = (f"Day {battle.days}: {names[att]} {report['killed'][att]:.0f} killed, "
+            f"{report['wounded'][att]:.0f} wounded; {names[dfn]} {report['killed'][dfn]:.0f} killed, "
+            f"{report['wounded'][dfn]:.0f} wounded")
     if broke is not None:
-        text += f". {broke} broke"
+        text += f". {names[broke]} broke"
     battle.log.append((world.turn, battle.days, text))
     del battle.log[:-BATTLE_LOG]
     return report
