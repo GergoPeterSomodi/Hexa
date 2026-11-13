@@ -187,7 +187,8 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `starting_units` and their helpers (`terrain_prior`, `good_for`, `trace`, `crest_edges`, `build_edges`,
   `join_pockets`...). `CampaignWorld.__init__` calls them in order, with the start techs and the markets between
   (those are research and trade). The module never imports world.py; it reaches the running world only through
-  public methods (`passes`, `edge_blocked`, `add_unit`, `land_spot`, `provinces_of`, `total_pop`). `world.py` keeps
+  public methods (`passes`, `edge_blocked`, `add_unit`, `land_spot`, `provinces_of`, `total_pop`, `units_at`, `ridge_edges`,
+  `is_land`, `is_sea`). `world.py` keeps
   a facade only where something else calls: `_nearest_land` (markets), `_cross`, `_unit_point`, `_unit_centre` (tests),
   and `_pass_data`, which calls `worldgen.build_edges`. `OWNS` lists the world attributes the module sets.
 - **Colonies** (`systems/colonies.py`): `found_check`/`found` (facades on `CampaignWorld`) and the colonial part of the

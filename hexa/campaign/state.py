@@ -219,5 +219,5 @@ def fill_defaults(obj):
 
 
 # D5: saves refer to these classes as hexa.campaign.world.<Name>
-for _cls in (Province, Market, Route, Country, Unit, Garrison, War):
+for _cls in [c for c in globals().values() if isinstance(c, type) and c.__module__ == __name__]:
     _cls.__module__ = "hexa.campaign.world"

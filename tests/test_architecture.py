@@ -431,6 +431,25 @@ def map_layers(world):
                            for p in world.provinces.values())
 
 
+class StatePickleTest(unittest.TestCase):
+    """D5: every class defined in state.py pickles as hexa.campaign.world.<Name> (old saves and old builds depend on it)."""
+
+    def test_every_state_class_pickles_as_a_world_class(self):
+        import pickle
+        import pickletools
+        from hexa.campaign import state, world
+        classes = [c for c in vars(state).values() if isinstance(c, type) and c.__module__ in (state.__name__, "hexa.campaign.world")
+                   and getattr(c, "__qualname__", "") == c.__name__]
+        names = {c.__name__ for c in classes}
+        self.assertTrue({"Province", "Market", "Route", "Country", "Unit", "Garrison", "War"} <= names)
+        for cls in classes:
+            self.assertEqual(cls.__module__, "hexa.campaign.world", cls.__name__)
+            strings = [arg for op, arg, _ in pickletools.genops(pickle.dumps(cls)) if isinstance(arg, str)]
+            self.assertIn("hexa.campaign.world", strings, cls.__name__)
+            self.assertIn(cls.__name__, strings)
+            self.assertIs(getattr(world, cls.__name__), cls)
+
+
 class ScriptedVersionTest(unittest.TestCase):
     """One scripted action per kind of map change: it must change the map layers (else the setup is wrong) and bump
     world.version. A planted ``pass`` in place of ``changed()`` in found, move_group, attack_group, peace, sieges,
