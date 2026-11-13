@@ -26,7 +26,8 @@ PLAN_1280 = (False, True, True, 6)
 PLAN_1024 = (False, False, True, 6)
 
 SETTINGS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal", "grid": True,
-            "pass_names": False, "movement": "off", "reminders": False}     # the suite's defaults (tests/__init__.py)
+            "pass_names": False, "movement": "off", "reminders": False,
+            "battle_timing": "clash"}     # the suite's defaults (tests/__init__.py)
 DEFAULT_FONT_SCALE = 0.6875   # pygame draws its bundled font, Font(None, size), at this fraction of size
 
 

@@ -5,6 +5,7 @@ from hexa.campaign import ai, geo
 from hexa.campaign.data import (GENERAL, STACK_LIMIT, WAGON, troop, BUILD_TURNS, CARAVEL, CASTLE_SIEGE, COLONIST, COLONY_DONE, GOODS, PIONEER,
                                 SETTLEMENT_SLOTS, SIEGE_BASE, WORKS)
 from hexa.campaign.world import CampaignWorld, War
+from hexa.campaign.battlelog import describe
 from hexa.campaign.data import BATTLE_MAX_SEASONS, GARRISON_MEN
 from hexa.campaign.systems import battle as battlesys, combat
 from hexa.hexgrid import distance, neighbors
@@ -447,7 +448,7 @@ class WarTest(unittest.TestCase):
         self.assertGreater(lost_a + lost_d, 0, "the fight must have hurt someone")
         self.assertLessEqual(lost_a, 3 * 4 * combat.men_per_hp(attackers[0]) + 1e-6,
                              "a day costs no more men than the hit points left")
-        self.assertIn(w.countries['POR'].name, battle.log[-1][2])
+        self.assertIn(w.countries['POR'].name, describe(battle.log[-1], {t: c.name for t, c in w.countries.items()}))
 
     def test_battle_report_counts_garrison_damage_taken_not_missing(self):
         w = self.w

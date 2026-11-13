@@ -363,6 +363,8 @@ def _stance(world, battle, tag, enemy):
         return "withdraw"
     if _battle_men(world, battle, tag) >= AI_STANCE_RATIO * _battle_men(world, battle, enemy):
         return "attack"
+    if tag == battle.defender:          # no order of its own: the army's standing order (battle slice 1b)
+        return world.standing_of(battle.pos, tag)
     return "hold"
 
 

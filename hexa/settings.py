@@ -8,10 +8,12 @@ AUTOSAVE = ("off", "year", "5 years")
 AUTOSAVE_TURNS = {"off": 0, "year": 4, "5 years": 20}
 SCROLL = {"slow": 10, "normal": 18, "fast": 30}
 MOVEMENT = ("off", "normal", "slow")          # how fast the moves you can see are replayed (campaign/replay.py)
+BATTLE_TIMING = ("clash", "full")             # battle days: day 1 in the attack's season, or all days at once (systems/battle.py)
 DEFAULTS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal", "grid": True,
-            "pass_names": False, "movement": "normal", "reminders": True}
+            "pass_names": False, "movement": "normal", "reminders": True, "battle_timing": "clash"}
 CHOICES = {"fullscreen": (False, True), "window": WINDOWS, "autosave": AUTOSAVE, "scroll": tuple(SCROLL),
-           "grid": (False, True), "pass_names": (False, True), "movement": MOVEMENT, "reminders": (False, True)}
+           "grid": (False, True), "pass_names": (False, True), "movement": MOVEMENT, "reminders": (False, True),
+           "battle_timing": BATTLE_TIMING}
 
 
 def home():

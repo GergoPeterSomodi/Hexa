@@ -26,7 +26,8 @@ PASS_RULE = 4             # the shape of the ridge edges and passes; a save with
 WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "visible": set, "over": False,
                   "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
                   "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None, "_bonus_cache": dict,
-                  "_settled": None, "_pass_cache": None, "battles": list, "battle_names": dict}
+                  "_settled": None, "_pass_cache": None, "battles": list, "battle_names": dict,
+                  "battle_timing": "clash"}
 # World attributes no save can do without (from_state refuses a state that lacks one). Every other attribute
 # has a default above, is rebuilt on load (geo, _ids) or is added when first needed (_explored_from).
 WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countries", "markets", "cities", "landmass",
@@ -730,6 +731,9 @@ class CampaignWorld:
     engage_check = battlesys.engage_check
     battle_order_check = battlesys.battle_order_check
     battle_order = battlesys.battle_order
+    standing_check = battlesys.standing_check
+    standing_order = battlesys.standing_order
+    standing_of = battlesys.standing_of
     end_battles = battlesys.end_battles
     retreat_spot = battlesys.retreat_spot
     army_morale = battlesys.army_morale

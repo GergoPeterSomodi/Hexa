@@ -1,6 +1,6 @@
 """Battle statistics: the numbers the battle system (slice 1) is tuned against.
 
-    python tools/battle_stats.py [--root <checkout>] [--seeds 1,2,3,4] [--seasons 40] [--no-scenarios] [--json <file>]
+    python tools/battle_stats.py [--root <checkout>] [--seeds 1,2,3,4] [--seasons 40] [--no-scenarios] [--timing clash|full] [--json <file>]
 
 Two parts. (1) Scenarios: the fixed fights of tests/support/scenarios.py (3 v 3, 4 v 3, 6 v 4, 6 v 6 and the mixed ones)
 on plains and on hills, 30 seeds each: the attacker's win rate, the length in seasons (median, p90), the share that
@@ -31,6 +31,8 @@ import time
 from collections import Counter
 
 DEFAULT_SEEDS = (1, 2, 3, 4)
+TIMINGS = ("clash", "full")       # battle_timing (slice 1b): "clash" fights day 1 in the attack's season; "full" all days at once
+TIMING = "clash"                  # set by --timing before any game runs
 DEFAULT_SEASONS = 40
 SUITES = ("europe", "random")
 COUNTS = ("wars", "battles", "bombardments", "units_lost", "units_lost_battle", "surrenders", "provinces_sieged",
@@ -157,6 +159,15 @@ def land_top_share(world):
     return max(counts.values()) / total if total else 0.0
 
 
+def season_count(days, timing):
+    """The seasons a fight of ``days`` days lasts under a timing: "full" fights DAYS_PER_SEASON a season; "clash" fights one
+    day in the attack's season and the rest after it (battle.day_cap)."""
+    from hexa.campaign.data import DAYS_PER_SEASON
+    if timing == "clash":
+        return 1 if days <= 1 else 1 + math.ceil((days - 1) / DAYS_PER_SEASON)
+    return math.ceil(days / DAYS_PER_SEASON)
+
+
 def play(mode, seed, seasons):
     """One all-AI game; returns its counts, the lengths of its battles, its buckets, the biggest land share at the start
     and at the end, and the turn it ended on."""
@@ -165,6 +176,7 @@ def play(mode, seed, seasons):
     from hexa.campaign.world import CampaignWorld
     world = CampaignWorld(seed, map="random") if mode == "random" else CampaignWorld(seed)
     world.player = None
+    world.battle_timing = TIMING
     top_start = land_top_share(world)
     tally = Tally(BATTLE_MAX_SEASONS, world)
     world.bus.tap(tally)
@@ -255,7 +267,7 @@ def scenario_rows(root, seeds=None):
         for terrain in TERRAINS:
             rows = [play(world, seed, spec_a, spec_d, terrain) for seed in (seeds or SEEDS)]
             att = sum(1 for r in rows if r["winner"] == r["battle"].attacker)
-            seasons = [r["seasons"] for r in rows]
+            seasons = [season_count(r["days"], TIMING) for r in rows]
             losses = [r["loss"][r["battle"].attacker if r["winner"] != r["battle"].attacker else r["battle"].defender]
                       for r in rows]
             out[name][terrain] = {"attacker_win_rate": round(att / len(rows), 3),
@@ -335,7 +347,11 @@ def main(argv):
     parser.add_argument("--seasons", type=int, default=DEFAULT_SEASONS)
     parser.add_argument("--no-scenarios", action="store_true", help="skip the scenario table")
     parser.add_argument("--json", metavar="FILE", help="write the numbers here")
+    parser.add_argument("--timing", choices=TIMINGS, default="clash", help="battle_timing of every game (default clash)")
     args = parser.parse_args(argv)
+    global TIMING
+    TIMING = args.timing
+    print(f"battle timing: {TIMING}")
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
     result = {}
     if not args.no_scenarios:

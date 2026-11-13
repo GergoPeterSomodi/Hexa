@@ -279,6 +279,32 @@ as present. In an assault the garrison counts as present while it has hp.
 `start_units` raises every war unit's morale by `MORALE_RECOVERY` (0.25) a season, up to 1.0, if it is not in a
 battle and was fed. A new unit starts at 1.0.
 
+### 3.9 Slice 1b (owner decisions 2026-11-13, section 10 items 13 to 17)
+
+- **Dice.** Each battle day each side rolls a d6 from `world.rng`. Its damage that day is multiplied by `DICE` (1: 0.7,
+  2: 0.8, 3: 0.9, 4: 1.1, 5: 1.2, 6: 1.4). `combat.day_multiplier` is the one place that makes the multiplier; generals
+  and cards may add +1 or a re-roll there later. The rolls are in the day's log record.
+- **Lanes.** A lane is broken when it has held a regiment and is empty at the day's start with no reserve to fill it
+  (`Battle.held` remembers which lanes held one, so a side with fewer regiments than lanes has open flanks, not broken
+  ones). A broken lane is logged (`lane_broken`). A broken centre shakes every regiment of its side once (`CENTRE_SHOCK`).
+  Each day a broken flank stays open, its centre loses `FLANK_MORALE`. `Battle.broken` holds the lanes broken at the day's
+  start (saved, default {}).
+- **Back line.** While a side's centre is empty the enemy's reserve, guns included, hits its reserve at `BACKLINE_LOSS`
+  (`combat.backline`, after the fire).
+- **The break test.** `army_morale` is the men-weighted morale of the regiments in the lanes (reserves out). A side breaks
+  when its centre is empty with no reserve, or two lanes are (one on narrow ground), or its front morale is under `BREAK`
+  (the fallback). `combat.breaker` returns the side and the cause ("centre", "lanes" or "morale"); `battle_ended` carries
+  the cause. `strength_morale` (all regiments, reserves counted) is the strength the AI and the buckets compare by.
+- **Timing** (`world.battle_timing`, the Options page row "Battle timing", default "clash"). `battle.day_cap`: in "clash" a
+  battle's first day is fought in the season it starts (the attack's season) and the rest 3 a season after it; "full"
+  fights DAYS_PER_SEASON days in every season. The rules of a day do not change with the timing: only the seasons do.
+- **Standing orders.** `Unit.standing` ("hold" by default, or "withdraw"), set per stack by `standing_order` (with a
+  `standing_check`). A battle takes the defender's standing into its stance at the start (`standing_of`: withdraw only with
+  a retreat hex); a battle order given later overrides it. The AI's defending stance falls back to it (ai.py `_stance`).
+- **Log as data.** `Battle.log` holds structured records (`combat.record`: kind, turn, day and the numbers and tags). The
+  words are made by `hexa/campaign/battlelog.py` `describe` when shown. A `(turn, day, text)` line from an old save shows
+  as it was written.
+
 ## 4. Numbers (data.py)
 
 Starting numbers. PR 5 tunes them with the stats tool. Today's `FRONT = 3` stays and means three lanes.
@@ -356,6 +382,18 @@ The stats tool at 100 seeds gave 46% / 17% for the first row and 43% / 15% for t
 
 Every fight ends in 1 to 3 seasons (2 seasons median), and none reaches the safety stop. The AI games rarely start an
 even battle (the AI attacks when its power times morale is 1.1 times the defence's), so their buckets are thin: see 7.3.2.
+
+### Slice 1b numbers (2026-11-13, tuned with the scenario bands)
+
+Changed from the table above: `BREAK` 0.25 -> 0.05 (the fallback; the lanes decide), `MORALE_PER_LOSS` 2.5 -> 5.0,
+`FRONT_DRAIN` 0.04 -> 0.02, `RESERVE_DRAIN` back to 0.03 (reserves are out of the break test, so 0.125 is not needed).
+New: `DICE`, `FLANK_MORALE` 0.10, `CENTRE_SHOCK` 0.25, `BACKLINE_LOSS` 0.04, `BATTLE_TIMINGS`, `STANDING_ORDERS`.
+`HIT_SPREAD` stays 0.5: with 0.15 the bigger side in a 4 v 3 fell to 31% (a non-monotone result, not explained yet).
+Found by a random search and a hill-climb over the break and morale knobs (scratch, not in the repo), scored on the bands.
+Scenario win rates, attacker, 100 seeds, real dice, plains / hills: 3 v 3 42 / 23; 4 v 3 67 / 47; 6 v 4 74 / 62; 6 v 6
+43 / 27; mirror of 4 pikes, 2 knights, 1 gun 44 / 32. The 6 v 4 target (about 90) and the 4 v 3 target (70 to 85) are not
+met: see the report in the PR. Arms (6 each, plains, against 6 pikes): knights 15%, pikes 43%, 3 pikes and 3 guns 76%,
+mixed 62%, arquebusiers 92% (over the 80% line; lowering the shot rate does not fix it, so it is a unit-stat question).
 
 ## 5. The AI (`ai.py`)
 
@@ -614,3 +652,18 @@ is fine because nothing is released before PR 8.
    better than on plains.
 12. **Luck in each hit** (owner, 2026-11-13, with item 11): `HIT_SPREAD` 0.5, so the outcomes of close fights vary. Cards
    (next part) add upsets on top.
+13. **Dice** (owner, 2026-11-13, item 1 of the owner's decisions in the review): each side rolls a d6 each battle day;
+   its damage that day is times 0.7 / 0.8 / 0.9 / 1.1 / 1.2 / 1.4 for 1 to 6. The per-hit spread stays (`HIT_SPREAD` 0.5):
+   a 0.15 spread gave a non-monotone 4 v 3 (31%), so it is not reduced until that is explained. Generals and cards may
+   add +1 or a re-roll through `combat.day_multiplier`. Rolls and results are log records (section 3.9).
+14. **Break test** (owner, 2026-11-13, refined the same day): reserves are out of the army morale; a lane breaks when it
+   is empty with no reserve; a broken centre or two broken lanes break the army (one lane on narrow ground); a broken
+   flank drains its centre, a broken centre shakes its side and exposes its back line; the morale under `BREAK` is the
+   fallback. How the fights end (plains, 100 seeds, final numbers; centre / two lanes / morale): 3 v 3 84 / 14 / 2 %, 4 v 3 64 / 17 / 19 %, 6 v 4 39 / 30 / 46 %. The morale fallback decides most 6 v 4 fights; that is open (report).
+15. **Battle timing** (owner, 2026-11-13, item 3): `battle_timing` "clash" (default) or "full", an Options row, saved with
+   the options; a new game takes it and a save keeps its own. Both are in the stats tool (`--timing`).
+16. **Standing orders** (owner, 2026-11-13, item 3): Hold (default) or Withdraw, set per stack (`Unit.standing`) and used
+   when no battle order was given, by the player and by the AI. The panel control is PR 7 (not in this part).
+17. **Log as data** (owner, 2026-11-13, item 8 of the review): the battle log is structured records; the text is made by
+   `hexa/campaign/battlelog.py` when shown. Old text lines in old saves still show. Numbers in section 4 (slice 1b) are
+   provisional until the owner's playtest.

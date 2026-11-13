@@ -129,11 +129,25 @@ def ai_season_late():
 def battle_season():
     """One battles phase with 10 battles of 6 regiments a side (the stack limit without techs), on 10 pairs of hexes of
     the 1480 map. Only the phase is timed: the battles are started before the clock runs."""
+    return _battle_phase([("infantry", 1, 6)], [("infantry", 1, 6)])
+
+
+def battle_season_worst():
+    """The worst legal battle phase: 10 battles of 6 mixed regiments a side (pikes, knights and two guns each: the most
+    expensive arms at the stack limit of 6), on 10 pairs of hexes of the 1480 map. Only the phase is timed."""
+    mixed = [("infantry", 1, 3), ("cavalry", 1, 1), ("artillery", 1, 2)]
+    return _battle_phase(mixed, mixed, timing="full")       # full: all three days of a season are fought (clash fights one)
+
+
+def _battle_phase(spec_a, spec_d, timing="clash"):
+    """Start 10 battles on the 1480 map with the two sides' regiments (spec: (branch, era, count) lists), then time one
+    battles phase under the given battle_timing."""
     from hexa.campaign.data import troop
     from hexa.campaign.state import War
     from hexa.campaign.systems import battle as battlesys
     from hexa.hexgrid import neighbors
     w = _world_module().CampaignWorld()
+    w.battle_timing = timing
     used, started = set(), 0
     for prov in sorted(w.provinces.values(), key=lambda p: p.pos):
         if started == 10:
@@ -147,9 +161,11 @@ def battle_season():
             a, d = prov.owner, other.owner
             if not w.at_war(a, d):
                 w.wars.append(War(a, d, w.turn))
-            attackers = [w.add_unit(troop("infantry", 1), a, prov.pos, moves=0) for _ in range(6)]
-            for _ in range(6):
-                w.add_unit(troop("infantry", 1), d, n, moves=0)
+            attackers = [w.add_unit(troop(branch, era), a, prov.pos, moves=0)
+                         for branch, era, count in spec_a for _ in range(count)]
+            for branch, era, count in spec_d:
+                for _ in range(count):
+                    w.add_unit(troop(branch, era), d, n, moves=0)
             if w.engage(attackers, n):
                 used.update({prov.pos, n})
                 started += 1
@@ -207,7 +223,7 @@ def mapview_zoom4():
 
 
 METRICS = {f.__name__: f for f in (europe_build, random_build, snapshot_restore, ai_season, ai_season_late,
-                                   battle_season, mapview_zoom1, mapview_zoom4)}
+                                   battle_season, battle_season_worst, mapview_zoom1, mapview_zoom4)}
 PYGAME_METRICS = ("mapview_zoom1", "mapview_zoom4")
 
 

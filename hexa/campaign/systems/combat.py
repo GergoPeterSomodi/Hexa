@@ -11,8 +11,9 @@ once; ``morale`` routs regiments and ``breaker`` names the army that breaks; ``p
 PR 3. A day writes only the battle object, unit ``hp`` and ``morale``, ``prov.garrison`` and the units it kills
 (``world.kill``). Imports point down: never world.py, ui, render or pygame.
 """
-from ..data import (BATTLE_LOG, BREAK, CASTLE_DEFENSE, CROSSING_PENALTY, FIGHT_ATTACK, FIGHT_DEFENSE, FIRE_LOSS,
-                    FLANK_BONUS, FRONT_DRAIN, GARRISON_MEN, GENERAL, GENERAL_BONUS, GENERAL_MORALE, HUNGER_DRAIN, MEN,
+from ..data import (BACKLINE_LOSS, BATTLE_LOG, BREAK, CASTLE_DEFENSE, CENTRE_SHOCK, CROSSING_PENALTY, DICE, FIGHT_ATTACK,
+                    FIGHT_DEFENSE, FIRE_LOSS, FLANK_BONUS, FLANK_MORALE, FRONT_DRAIN, GARRISON_MEN, GENERAL, GENERAL_BONUS,
+                    GENERAL_MORALE, HUNGER_DRAIN, MEN,
                     MORALE_PER_LOSS, NARROW_TERRAIN, OPEN_GROUND, PIKES_VS_HORSE, PURSUIT, PURSUIT_FOOT, RESERVE_DRAIN,
                     HIT_SPREAD, RESERVE_SHAKEN, SHOCK_LOSS, SHOT_LOSS, STANCE, TERRAIN, UPHILL_PENALTY, WOUNDED_SHARE)
 from ..state import Garrison
@@ -92,14 +93,14 @@ def _side_men(world, battle, tag):
 
 
 def battle_strength(world, battle, tag):
-    """A side's strength in a battle: its men at the start times its army morale. The one measure the AI (ai.py) and
-    the stats tool (tools/battle_stats.py) compare sides by."""
-    return army_morale(world, battle, tag) * battle.men0.get(tag, 0)
+    """A side's strength in a battle: its men at the start times its strength morale (every regiment on the hex, the
+    reserve included). The one measure the AI (ai.py) and the stats tool (tools/battle_stats.py) compare sides by."""
+    return strength_morale(world, battle, tag) * battle.men0.get(tag, 0)
 
 
-def army_morale(world, battle, tag):
-    """A side's army morale, 0 to 1: the sum of morale times men over its war units and garrison (routed units
-    count 0), over the men it went in with (``battle.men0``)."""
+def strength_morale(world, battle, tag):
+    """A side's morale over every regiment it has on the hex, 0 to 1: the sum of morale times men over its war units and
+    garrison (routed ones counting 0), over the men it went in with (``battle.men0``). Reserves count here at full weight."""
     base = battle.men0.get(tag, 0)
     if base <= 0:
         return 0.0
@@ -107,6 +108,81 @@ def army_morale(world, battle, tag):
     if tag == battle.defender and battle.assault:
         total += battle.garrison_morale * GARRISON_MEN * world.provinces[battle.pos].garrison
     return min(1.0, total / base)
+
+
+def _front(world, battle, tag):
+    """(morale, men) of the regiments in a side's lanes, and of the garrison when it holds the centre."""
+    by_id = {u.id: u for u in _war_units(world, battle, tag)}
+    out = []
+    for key in battle.lanes.get(tag, (None, None, None)):
+        if key is None:
+            continue
+        if key == "garrison":
+            out.append((battle.garrison_morale, GARRISON_MEN * world.provinces[battle.pos].garrison))
+        elif key in by_id and key not in battle.routed:
+            out.append((by_id[key].morale, by_id[key].men))
+    return out
+
+
+def army_morale(world, battle, tag):
+    """A side's army morale for the break test, 0 to 1: the men-weighted average morale of the regiments in its lanes (the
+    front line, owner's refinement 2026-11-13). Reserves are left out: an army breaks when its front breaks. 0 when no
+    regiment is in a lane."""
+    front = _front(world, battle, tag)
+    total = sum(men for _, men in front)
+    if total <= 0:
+        return 0.0
+    return min(1.0, sum(morale * men for morale, men in front) / total)
+
+
+def record(world, battle, kind, **fields):
+    """Append one structured log record to the battle (kind plus numbers and tags; the text is made when it is shown,
+    see battlelog.py). The log keeps its last BATTLE_LOG records."""
+    battle.log.append({"kind": kind, "turn": world.turn, "day": battle.days, **fields})
+    del battle.log[:-BATTLE_LOG]
+
+
+def _shock(world, battle, tag):
+    """A broken centre shakes every regiment of its side once (CENTRE_SHOCK). One that reaches 0 routs."""
+    for unit in _war_units(world, battle, tag):
+        if unit.id in battle.routed:
+            continue
+        unit.morale = max(0.0, unit.morale - CENTRE_SHOCK)
+        if unit.morale <= 0:
+            _rout(battle, tag, unit.id)
+
+
+def _hold(battle, tag, lanes):
+    """Remember the lanes that have held a regiment. A lane that never had one (a side with fewer regiments than lanes) is
+    open ground, not a broken lane: the enemy wheels round it (flanks), but it does not break the army."""
+    held = battle.held.setdefault(tag, [])
+    for lane, key in enumerate(lanes):
+        if key is not None and lane not in held:
+            held.append(lane)
+
+
+def _lane_breaks(world, battle, tag, lanes, prov, units):
+    """After the day's fill (battle day > 0): the open lanes that have held a regiment and are still empty have no reserve to
+    fill them, so they are broken. A lane that breaks now is logged ("lane_broken", owner's refinement 2026-11-13). A newly
+    broken centre shocks the side once. Each day a flank stays broken, its centre regiment loses FLANK_MORALE."""
+    now = [lane for lane in battle.held.get(tag, []) if lane_open(prov, lane) and lanes[lane] is None]
+    before = battle.broken.get(tag, [])
+    battle.broken[tag] = now
+    for lane in now:
+        if lane not in before:
+            record(world, battle, "lane_broken", side=tag, lane=lane)
+            if lane == CENTRE:
+                _shock(world, battle, tag)
+    if any(lane != CENTRE for lane in now):
+        centre = lanes[CENTRE]
+        if centre == "garrison":
+            battle.garrison_morale = max(0.0, battle.garrison_morale - FLANK_MORALE)
+        elif centre is not None and centre not in battle.routed:
+            unit = next((u for u in units if u.id == centre), None)
+            if unit is not None:
+                unit.morale = max(0.0, unit.morale - FLANK_MORALE)
+                if unit.morale <= 0:
+                    _rout(battle, tag, centre)
 
 
 def _lane_rank(world, unit, lane, prov, general_here):
@@ -156,6 +232,9 @@ def deploy(world, battle):
                 lanes[lane] = pick.id
                 if battle.days > 0:             # a reserve that moves up into a broken lane arrives shaken (decision 2026-11-13)
                     moved.add(pick.id)
+        _hold(battle, tag, lanes)
+        if battle.days > 0:
+            _lane_breaks(world, battle, tag, lanes, prov, units)
     return moved
 
 
@@ -174,12 +253,19 @@ def _rout(battle, tag, key):
         battle.routed.add(key)
 
 
+def day_multiplier(world, battle, tag, roll):
+    """The share of its damage a side deals today, from its d6 roll (owner decision 2026-11-13). The one place that makes
+    it: generals and cards may add +1 or a re-roll here later."""
+    return DICE[roll]
+
+
 class _Day:
     """One day's working state: who stands where at dawn, the fighters that are left, and the hp each has lost."""
 
-    def __init__(self, world, battle, shaken=()):
+    def __init__(self, world, battle, shaken=(), rolls=None):
         self.world, self.battle = world, battle
         self.shaken = set(shaken)          # the regiments that moved up into a lane today (RESERVE_SHAKEN, this day only)
+        self.mult = {tag: day_multiplier(world, battle, tag, roll) for tag, roll in (rolls or {}).items()}
         prov = self.prov = world.provinces[battle.pos]
         fights = garrison_fights(world, battle)     # the assault is fought only while the garrison holds (item 7)
         self.fight = "assault" if fights else ("open" if prov.terrain in OPEN_GROUND else "rough")
@@ -256,7 +342,7 @@ class _Day:
         on_ground = st == self.battle.defender
         dfn = defense_value(world, target, t_fight, self.prov, self.castle, attacker.kind.branch, self.gen[st],
                             on_ground)
-        dealt = STANCE.get(self.battle.stance.get(sa, "hold"), (1.0, 1.0))[0] * self.ground(sa)
+        dealt = STANCE.get(self.battle.stance.get(sa, "hold"), (1.0, 1.0))[0] * self.ground(sa) * self.mult.get(sa, 1.0)
         if key_of(attacker) in self.shaken:
             dealt *= RESERVE_SHAKEN
         taken = STANCE.get(self.battle.stance.get(st, "hold"), (1.0, 1.0))[1]
@@ -328,6 +414,21 @@ def fire(day):
     day.resolve(hits)
 
 
+def backline(day):
+    """A side whose centre is empty (its lane broke and no reserve filled it) exposes its back line: the enemy's reserve,
+    guns included, hits its reserve at BACKLINE_LOSS. This is the gun stopgap of the arms matrix (spec 5.5)."""
+    hits = []
+    for tag, enemy in day.pairs():
+        if day.battle.lanes[enemy][CENTRE] is not None:
+            continue
+        targets = day.reserve(enemy)
+        for i, striker in enumerate(day.reserve(tag) if targets else ()):
+            target = targets[i % len(targets)]
+            dmg = day.hit(striker, target, BACKLINE_LOSS, day.fight_of(tag), day.defence_fight(enemy))
+            hits.append((target, dmg, WOUNDED_SHARE))
+    day.resolve(hits)
+
+
 def shock(day):
     """Each lane fights the same lane of the enemy, both ways at once."""
     hits = []
@@ -388,18 +489,41 @@ def morale(day):
                 _rout(battle, tag, key)
 
 
+def _lane_cause(day, tag):
+    """Why a side's army breaks through its lanes, after the day's morale, or None. Only a lane with no reserve to fill it
+    counts. An empty centre breaks the army. On open ground two empty lanes do; on narrow ground (two lanes) either does."""
+    battle, prov = day.battle, day.prov
+    if day.reserve(tag):
+        return None
+    lanes = battle.lanes[tag]
+    open_lanes = [lane for lane in range(3) if lane_open(prov, lane)]
+    held = battle.held.get(tag, [])
+    empty = [lane for lane in open_lanes if lanes[lane] is None and lane in held]
+    if not empty:
+        return None
+    if CENTRE in empty:
+        return "centre"
+    if len(open_lanes) == 2 or len(empty) >= 2:
+        return "lanes"
+    return None
+
+
 def breaker(day):
-    """The side whose army breaks today, or None. An army under BREAK breaks; when both are, the lower one (the
-    attacker on a tie)."""
+    """The side whose army breaks today and why: (tag, cause) with cause "centre", "lanes" or "morale", or (None, None).
+    A side breaks when its centre is empty with no reserve, when two lanes are (either one on narrow ground), or when its
+    front-line morale (army_morale) is under BREAK. When both break, the one with the lower front morale (the attacker on
+    a tie)."""
     att, dfn = day.tags()
     world, battle = day.world, day.battle
     ma, md = army_morale(world, battle, att), army_morale(world, battle, dfn)
-    under_a, under_d = ma < BREAK, md < BREAK
-    if under_a and under_d:
-        return att if ma <= md else dfn
-    if under_a:
-        return att
-    return dfn if under_d else None
+    cause = {}
+    for tag, morale in ((att, ma), (dfn, md)):
+        cause[tag] = _lane_cause(day, tag) or ("morale" if morale < BREAK else None)
+    broken = [tag for tag in (att, dfn) if cause[tag] is not None]
+    if not broken:
+        return None, None
+    tag = (att if ma <= md else dfn) if len(broken) == 2 else broken[0]
+    return tag, cause[tag]
 
 
 def pursuit(day, loser):
@@ -415,32 +539,30 @@ def pursuit(day, loser):
 
 
 def fight_day(world, battle):
-    """One day of the battle: deploy, fire, shock, flanks, morale, then pursuit if an army breaks. Returns the day's
-    report: {"broke": tag or None, "killed": {tag: men}, "wounded": {tag: men}, "morale": {tag: army morale}}. The
-    battle's counters and its log move with the day."""
+    """One day of the battle: deploy, each side's d6 roll, fire, back line, shock, flanks, morale, then pursuit if an army
+    breaks. Returns the day's report: {"broke": tag or None, "cause": "centre" | "lanes" | "morale" | None, "rolls":
+    {tag: d6}, "killed": {tag: men}, "wounded": {tag: men}, "morale": {tag: army morale}}. The battle's counters and its
+    log (one "day" record, structured) move with the day."""
     shaken = deploy(world, battle)
-    day = _Day(world, battle, shaken)
-    att, dfn = day.tags()
+    att, dfn = battle.attacker, battle.defender
+    rolls = {tag: world.rng.randint(1, 6) for tag in (att, dfn)}
+    day = _Day(world, battle, shaken, rolls)
     before = {tag: (battle.killed.get(tag, 0.0), battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}
     fire(day)
+    backline(day)
     shock(day)
     flanks(day)
     morale(day)
-    broke = breaker(day)
+    broke, cause = breaker(day)
     if broke is not None:
         pursuit(day, broke)
     battle.days += 1
-    report = {"broke": broke, "killed": {}, "wounded": {}, "morale": {}}
+    report = {"broke": broke, "cause": cause, "rolls": rolls, "killed": {}, "wounded": {}, "morale": {}}
     for tag in (att, dfn):
         report["killed"][tag] = battle.killed.get(tag, 0.0) - before[tag][0]
         report["wounded"][tag] = battle.wounded.get(tag, 0.0) - before[tag][1]
         report["morale"][tag] = army_morale(world, battle, tag)
-    names = {tag: world.countries[tag].name for tag in (att, dfn)}
-    text = (f"Day {battle.days}: {names[att]} {report['killed'][att]:.0f} killed, "
-            f"{report['wounded'][att]:.0f} wounded; {names[dfn]} {report['killed'][dfn]:.0f} killed, "
-            f"{report['wounded'][dfn]:.0f} wounded")
-    if broke is not None:
-        text += f". {names[broke]} broke"
-    battle.log.append((world.turn, battle.days, text))
-    del battle.log[:-BATTLE_LOG]
+    record(world, battle, "day", killed={tag: round(report["killed"][tag], 1) for tag in (att, dfn)},
+           wounded={tag: round(report["wounded"][tag], 1) for tag in (att, dfn)}, rolls=dict(rolls), broke=broke,
+           cause=cause)
     return report

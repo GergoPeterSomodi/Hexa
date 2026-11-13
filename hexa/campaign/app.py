@@ -90,7 +90,9 @@ class CampaignApp:
             self.load_world(loaded)
             self.toast(f"Loaded {saves.slot_name(load)}: {loaded.world.date()}.")
             return
-        self._set_game(GameManager.new(seed if seed is not None else 1480, map))
+        game = GameManager.new(seed if seed is not None else 1480, map)
+        game.world.battle_timing = self.settings["battle_timing"]     # a new game takes the option; a saved one keeps its own
+        self._set_game(game)
         pygame.display.set_caption(f"Hexa: Age of Discovery  -  {self.world.geo.name}")
         self.view = MapView(self.world, tiles_dir)
         self.ui = UI()

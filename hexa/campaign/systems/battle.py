@@ -17,8 +17,8 @@ first of PHASES (season.py). A battle is named when it starts (decision 5): "Bat
 import math
 
 from ...hexgrid import distance, neighbors, within
-from ..data import (ATTACK_MORALE, BATTLE_LOG, BATTLE_MAX_SEASONS, DAYS_PER_SEASON, ELEVATION, RETREAT_MORALE,
-                    RETREAT_RANGE, START_YEAR, TERRAIN, WITHDRAW_PURSUIT, WOUNDED_RETURN)
+from ..data import (ATTACK_MORALE, BATTLE_MAX_SEASONS, DAYS_PER_SEASON, ELEVATION, RETREAT_MORALE, RETREAT_RANGE,
+                    START_YEAR, STANDING_ORDERS, TERRAIN, WITHDRAW_PURSUIT, WOUNDED_RETURN)
 from ..naming import is_wild
 from ..state import Battle
 from . import combat, military, movement, terrain
@@ -39,11 +39,6 @@ def _name(world, tag):
 def _shown(world, *tags):
     """The tag a message is shown under: None when the player is one of the tags, else "nobody" (as war.battle did)."""
     return None if world.player in tags else "nobody"
-
-
-def _log(world, battle, text):
-    battle.log.append((world.turn, battle.days, text))
-    del battle.log[:-BATTLE_LOG]
 
 
 def _seasons(world, battle):
@@ -226,12 +221,12 @@ def _start(world, group, pos, defender, stand):
     name = _battle_name(world, pos)
     crossing = stand != pos and _crosses_pass(world, stand, pos)
     battle = Battle(pos=pos, attacker=owner, defender=defender, start=world.turn, assault=assault, name=name,
-                    stance={owner: "attack", defender: "hold"}, crossing=crossing, uphill=_uphill(world, stand, pos))
+                    stance={owner: "attack", defender: standing_of(world, pos, defender)}, crossing=crossing,
+                    uphill=_uphill(world, stand, pos))
     battle.members = {u.id for u in world.units_at(pos) if u.owner in (owner, defender)} | {u.id for u in group}
     world.battles.append(battle)
     combat.deploy(world, battle)
-    _log(world, battle, f"{_name(world, owner)} attacked {_name(world, defender)}"
-                        + (" in its castle" if assault else ""))
+    combat.record(world, battle, "attacked", attacker=owner, defender=defender, assault=assault)
     world.bus.emit("battle_started", owner, pos, defender=defender, assault=assault, name=name,
                    year=_year(world.turn))
     world.changed()
@@ -257,10 +252,43 @@ def join(world, battle, group):
     battle.members.update(u.id for u in group)
     battle.men0[tag] = battle.men0.get(tag, 0) + men
     side = "attacker" if tag == battle.attacker else "defender"
-    _log(world, battle, f"{_name(world, tag)} joined the {side} side with {men:,} men")
+    combat.record(world, battle, "joined", tag=tag, side=side, men=men)
     world.bus.emit("battle_joined", tag, battle.pos, side=side, men=men)
     world.changed()
     return True
+
+
+# ----- standing orders (what an army does when attacked and given no order; Unit.standing) ----------------------
+
+def standing_check(world, pos, tag, order):
+    """Whether side ``tag``'s regiments on pos may take the standing order (Hold or Withdraw): (ok, reason)."""
+    if order not in STANDING_ORDERS:
+        return False, "Unknown order"
+    if not any(u.owner == tag and u.kind.war for u in world.units_at(pos)):
+        return False, "No regiments here"
+    return True, ""
+
+
+def standing_order(world, pos, tag, order):
+    """Set the standing order of every unit of side ``tag`` on pos (the stack shares one). It is used when the stack is
+    attacked and no battle order was given. Returns False, and changes nothing, when the check says no."""
+    if not standing_check(world, pos, tag, order)[0]:
+        return False
+    for unit in world.units_at(pos):
+        if unit.owner == tag:
+            unit.standing = order
+    world.changed()
+    return True
+
+
+def standing_of(world, pos, tag):
+    """The stance a side takes into a battle on pos with no order of its own: its lowest-id war unit's standing order.
+    "withdraw" only when a retreat hex exists (else "hold"), so the stance is always one the battle can carry out."""
+    units = sorted((u for u in world.units_at(pos) if u.owner == tag and u.kind.war), key=lambda u: u.id)
+    if not units or units[0].standing != "withdraw":
+        return "hold"
+    group = [u for u in world.units_at(pos) if u.owner == tag and not u.naval]
+    return "withdraw" if retreat_spot(world, group, pos) is not None else "hold"
 
 
 # ----- orders ------------------------------------------------------------------------------------------------------
@@ -428,7 +456,7 @@ def _storm(world, battle, loser, how, had_field):
     return True
 
 
-def end_battle(world, battle, how, loser=None, pursuit=True):
+def end_battle(world, battle, how, loser=None, pursuit=True, cause=None):
     """End a battle (spec 3.6). ``how``: "broke" (the loser's army broke on a day; the pursuit was on that day), "withdrew"
     (the loser withdrew: on its order, or at the safety stop, which passes pursuit=False: half pursuit, or none, then the
     retreat), "destroyed" (the loser has no regiment or garrison left after a day: no retreat, the kills are already
@@ -453,7 +481,7 @@ def end_battle(world, battle, how, loser=None, pursuit=True):
         world.battles.remove(battle)
     world.changed(ownership=storm)
     world.bus.emit("battle_ended", att, pos, attacker=att, defender=dfn, winner=winner, loser=loser,
-                   assault=battle.assault, how=how, seasons=_seasons(world, battle), name=battle.name,
+                   assault=battle.assault, how=how, cause=cause, seasons=_seasons(world, battle), name=battle.name,
                    year=_year(battle.start),
                    killed={tag: round(battle.killed.get(tag, 0.0)) for tag in (att, dfn)},
                    wounded={tag: round(battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}, retreat=retreat)
@@ -477,6 +505,15 @@ def _shakier(world, battle):
     return battle.defender
 
 
+def day_cap(world, battle):
+    """The most days this battle fights in this season's battles phase. "full" fights DAYS_PER_SEASON at once. "clash"
+    fights only one day in the season the attack happens (the defender then has a season to answer, and allies and
+    reserves can join); the days after it are fought in the later seasons' phases."""
+    if getattr(world, "battle_timing", "clash") == "clash" and battle.start == world.turn:
+        return 1
+    return DAYS_PER_SEASON
+
+
 def _fight_season(world, battle):
     """One battle's season. A side with nothing left at its start has vanished between seasons: a draw ("gone"). A
     withdrawal takes effect next. Then up to DAYS_PER_SEASON days: a side left with nothing after a day was destroyed in
@@ -490,9 +527,10 @@ def _fight_season(world, battle):
         end_battle(world, battle, "withdrew", withdrawing[0] if len(withdrawing) == 1 else _shakier(world, battle))
         return
     before = {tag: (battle.killed.get(tag, 0.0), battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}
-    broke, days = None, 0
-    while days < DAYS_PER_SEASON and broke is None:
-        broke = combat.fight_day(world, battle)["broke"]
+    broke, cause, days = None, None, 0
+    while days < day_cap(world, battle) and broke is None:
+        report = combat.fight_day(world, battle)
+        broke, cause = report["broke"], report["cause"]
         days += 1
         if not (_present(world, battle, att) and _present(world, battle, dfn)):
             break
@@ -506,7 +544,7 @@ def _fight_season(world, battle):
     elif absent:
         end_battle(world, battle, "destroyed", absent[0])
     elif broke is not None:
-        end_battle(world, battle, "broke", broke)
+        end_battle(world, battle, "broke", broke, cause=cause)
     elif _seasons(world, battle) >= BATTLE_MAX_SEASONS:
         _safety_stop(world, battle)
 

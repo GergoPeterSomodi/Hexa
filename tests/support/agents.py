@@ -249,7 +249,7 @@ def _colony_step(w, rng, judge):
 
 # ----- Age of Discovery -----------------------------------------------------------------------------------------
 _CAMPAIGN_MOVES = (("move",) * 4 + ("improve", "recruit", "recruit", "build", "build", "found", "forage", "forage",
-                   "war", "refit", "upgrade", "merchant", "engage", "engage", "order"))
+                   "war", "refit", "upgrade", "merchant", "engage", "engage", "order", "standing"))
 _BUILD_KEYS = None
 
 
@@ -316,6 +316,14 @@ def _campaign_step(w, rng, judge, tag):
             good, src = rng.choice(sorted(g for g, info in GOODS.items() if info.kind != "money")), route.a
         judge.attempt("send_merchant", f"{who}, route {route.id}, {good}", lambda: w.send_merchant_check(who, route),
                       lambda: w.send_merchant(who, route, good, src))
+        return
+    if kind == "standing":                   # a stack's standing order for when it is attacked (battle slice 1b)
+        stacks_here = sorted({u.pos for u in w.units if u.owner == who and u.kind.war})
+        if not stacks_here:
+            return
+        pos, order = rng.choice(stacks_here), rng.choice(("hold", "withdraw", "charge"))
+        judge.attempt("standing_order", f"{pos}, {who}, {order}", lambda: w.standing_check(pos, who, order),
+                      lambda: w.standing_order(pos, who, order))
         return
     if kind == "order":                       # a battle's stance: an order the battle may refuse
         if not w.battles:

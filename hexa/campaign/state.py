@@ -161,6 +161,7 @@ class Unit:
     supplies: int = 0          # seasons of food left, for wagons
     foraged_turn: int = -1     # the turn this unit's stack last foraged (see stuck_reason)
     morale: float = 1.0        # 0 to 1: a beaten regiment routs (battle slice 1); recovers outside battle
+    standing: str = "hold"     # what this stack does when attacked and given no order: "hold" or "withdraw" (battle slice 1b)
 
     @property
     def men(self):
@@ -240,6 +241,8 @@ class Battle:
     members: set = field(default_factory=set)      # unit ids that have fought in it (start and joiners); each counts once
     name: str = ""                # "Battle of X, 1525", set when it starts (decision 5); "" for a battle made before names
     crossing: bool = False        # the attack came across a mountain pass: CROSSING_PENALTY on the first day (spec 3.4)
+    broken: dict = field(default_factory=dict)     # tag -> sorted lanes that are empty with no reserve to fill them (day start)
+    held: dict = field(default_factory=dict)       # tag -> lanes that have had a regiment in them; only those can break
     uphill: bool = False          # the attacker stood on lower ground: UPHILL_PENALTY for the whole battle (spec 3.4)
 
 
