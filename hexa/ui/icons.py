@@ -23,6 +23,7 @@ COLOURS = {
     "down": (230, 110, 100), "up": (120, 200, 120), "scroll": (230, 215, 180), "target": (120, 175, 235),
     "sun": GOLD, "snow": (220, 235, 250), "political": (200, 90, 90), "terrain": (150, 160, 170),
     "goods": (190, 140, 80), "markets": GOLD, "battle": (240, 232, 214), "tasks": (236, 200, 96),
+    "tower": (232, 214, 182),
 }
 NAMES = tuple(COLOURS)
 _cache = BoundedCache("icons", 256)
@@ -33,6 +34,29 @@ def shade(colour, k):
     if k >= 0:
         return tuple(int(v + (255 - v) * k) for v in colour[:3])
     return tuple(int(v * (1 + k)) for v in colour[:3])
+
+
+def gate_tower(s, colour, box=(0, 0, 64, 64)):
+    """A gate tower (the siege glyph) drawn on `s` in `colour` inside the square `box` (x, y, side): three merlons, a
+    body lit from the left, an arrow slit and a dark gate arch. Float coordinates, so it scales to any box: the
+    ``tower`` icon draws it on the 64 x 64 canvas, the siege badge (campaign/hud/siegebadge.py) inside its roundel."""
+    x0, y0, side = box[0], box[1], box[2]
+    k = side / 64
+
+    def pts(*xy):
+        return [(x0 + x * k, y0 + y * k) for x, y in xy]
+    lite, dark, deep = shade(colour, 0.25), shade(colour, -0.3), shade(colour, -0.72)
+    P = pygame.draw
+    P.polygon(s, colour, pts((15, 60), (15, 23), (49, 23), (49, 60)))                 # the body
+    P.polygon(s, dark, pts((37, 60), (37, 23), (49, 23), (49, 60)))                   # its shaded right side
+    P.polygon(s, colour, pts((11, 25), (11, 17), (53, 17), (53, 25)))                 # the parapet, wider than the body
+    P.polygon(s, dark, pts((39, 25), (39, 17), (53, 17), (53, 25)))
+    for mx, col in ((11, lite), (27, colour), (43, dark)):                            # three merlons
+        P.polygon(s, col, pts((mx, 18), (mx, 6), (mx + 10, 6), (mx + 10, 18)))
+    P.polygon(s, lite, pts((15, 60), (15, 25), (20, 25), (20, 60)))                   # the lit left edge
+    P.polygon(s, deep, pts((30, 29), (30, 38), (34, 38), (34, 29)))                   # the arrow slit
+    arch = [(24 + 8 - 8 * math.cos(math.radians(a)), 50 - 8 * math.sin(math.radians(a))) for a in range(0, 181, 15)]
+    P.polygon(s, deep, pts((24, 61), *arch, (40, 61)))                                # the gate
 
 
 def _hexagon(cx, cy, r):
@@ -142,6 +166,8 @@ def _glyph_more(name, s, c, dark, lite):
             P.line(s, (110, 72, 40), hilt, (hilt[0] + 7 * sx, hilt[1] + 7), 5)           # the grip
             P.line(s, GOLD, (hilt[0] - 5 * sx, hilt[1] + 5), (hilt[0] + 5 * sx, hilt[1] - 5), 4)   # the crossguard
             P.circle(s, GOLD, (hilt[0] + 8 * sx, hilt[1] + 8), 3)                        # the pommel
+    elif name == "tower":                       # a gate tower: the siege (log, panels, the siege badge's glyph)
+        gate_tower(s, c)
     elif name == "sun":
         P.circle(s, c, (32, 32), 14)
         for a in range(8):
