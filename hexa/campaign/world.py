@@ -9,13 +9,11 @@ import random
 from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, state, tech
-from .state import Garrison, Unit, War, fill_defaults
+from .state import Unit, fill_defaults
 from .systems import (building, colonies, debt, economy, military, movement, research, supply, terrain, trade,
-                      worldgen)
-from .data import (COUNTER, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS,
-                   GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX, MANPOWER,
-                   SUPPLY_RANGE, WAGON_SEASONS, BUILDINGS, END_YEAR, PIONEER, CASTLE_DEFENSE, CASTLE_SIEGE,
-                   SIEGE_BASE, START_YEAR, TERRAIN, WAR_LENGTH_AI, MANUFACTORIES, date)
+                      war, worldgen)
+from .data import (GENERAL, GENERAL_TRAITS, UPGRADE_MAX, MANPOWER, SUPPLY_RANGE, WAGON_SEASONS, BUILDINGS, END_YEAR,
+                   PIONEER, START_YEAR, TERRAIN, WAR_LENGTH_AI, MANUFACTORIES, date)
 
 INF = float("inf")
 SCALE = geo.SCALE
@@ -35,7 +33,9 @@ WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countr
 LAND_TILES = ("plains", "steppe", "forest", "hills", "mountains", "desert", "jungle", "tundra", "marsh", "taiga",
               "savanna", "beach", "snow")
 FORBIDDEN = worldgen.FORBIDDEN        # the terrain pairs that may not touch (wave function collapse)
-Province, Country, Market, Route = state.Province, state.Country, state.Market, state.Route   # saves pickle every state class as hexa.campaign.world.<Name>
+# saves pickle every state class as hexa.campaign.world.<Name>
+Province, Country, Market, Route, War, Garrison = (state.Province, state.Country, state.Market, state.Route, state.War,
+                                                   state.Garrison)
 
 
 def _europe_region(lon, lat):
@@ -687,340 +687,32 @@ class CampaignWorld:
     def found(self, unit, trading_post=False):
         return colonies.found(self, unit, trading_post)
 
-    # ----- war -----------------------------------------------------------------------------
-    def at_war(self, a, b):
-        return any({w.a, w.b} == {a, b} for w in self.wars)
-
-    def enemies(self, tag):
-        return {w.b if w.a == tag else w.a for w in self.wars if tag in (w.a, w.b)}
-
-    def war_check(self, a, b):
-        if a == b or not self.countries[b].alive:
-            return False, "Not possible"
-        if self.at_war(a, b):
-            return False, "Already at war"
-        if b not in self.neighbours_of(a):
-            return False, "Only neighbours can go to war"
-        return True, ""
-
-    def declare_war(self, a, b):
-        if not self.war_check(a, b)[0]:
-            return False
-        self.wars.append(War(a, b, self.turn))
-        self.bus.emit("war_declared", a, target=b)
-        self.message(f"{self.countries[a].name} declared war on {self.countries[b].name}!",
-                     None if self.player in (a, b) else "nobody")
-        if self.player in (a, b):
-            self.message(f"War: {self.countries[a].name} against {self.countries[b].name}.")
-        return True
-
-    def war_score(self, tag, enemy):
-        taken = sum(1 for p in self.provinces_of(enemy) if p.controller == tag)
-        lost = sum(1 for p in self.provinces_of(tag) if p.controller == enemy)
-        capital = self.provinces[self.countries[enemy].capital].controller == tag
-        return taken - lost + (3 if capital else 0)
-
-    def peace(self, a, b, winner=None):
-        """End the war. Each side keeps what it occupies if `winner` is None; otherwise only the winner gains."""
-        self.wars = [w for w in self.wars if {w.a, w.b} != {a, b}]
-        moved = 0
-        for prov in list(self.provinces_of(a)) + list(self.provinces_of(b)):
-            if prov.controller != prov.owner and prov.controller in (a, b):
-                gainer = prov.controller
-                if winner is None or gainer == winner:
-                    if self.countries[prov.owner].capital == prov.pos:
-                        prov.controller = prov.owner      # capitals return
-                        continue
-                    self.bus.emit("province_captured", gainer, prov.pos, loser=prov.owner, by="peace")
-                    prov.owner = gainer
-                    moved += 1
-                prov.controller = prov.owner
-                prov.siege = 0
-        for unit in list(self.units):
-            if unit.carrier is None and not unit.naval and unit.owner in (a, b):
-                prov = self.provinces.get(unit.pos)
-                if prov and prov.owner in (a, b) and prov.owner != unit.owner:
-                    home = self.countries[unit.owner].capital
-                    spot = self._free_spot_near(unit, home)
-                    if spot:
-                        unit.pos = spot
-                    else:
-                        self._lose([unit], "evicted")
-        self.changed(ownership=True)
-        self.refresh_markets()
-        self.bus.emit("peace_made", a, b=b, winner=winner, moved=moved)
-        names = f"{self.countries[a].name} and {self.countries[b].name}"
-        self.message(f"Peace between {names}" + (f": {moved} provinces changed hands." if moved else "."),
-                     None if self.player in (a, b) else "nobody")
-        self._check_alive()
-
-    def _free_spot_near(self, unit, pos):
-        for r in range(8):
-            for p in sorted(within(pos, r)):
-                prov = self.provinces.get(p)
-                if prov and prov.owner == unit.owner and self.can_stand([unit], p):
-                    return p
-        return None
-
-    def peace_offer(self, tag, enemy, terms):
-        """The player proposes peace. terms: 'take' (keep what you occupy), 'white' or 'yield'."""
-        if not self.at_war(tag, enemy):
-            return False, "Not at war"
-        war = next(w for w in self.wars if {w.a, w.b} == {tag, enemy})
-        score = self.war_score(tag, enemy)
-        length = self.turn - war.start
-        if terms == "yield":
-            self.peace(tag, enemy, winner=enemy)
-            return True, "They accept your surrender."
-        if terms == "white":
-            if score >= -1 and length >= 4:
-                self.peace(tag, enemy, winner="nobody")
-                return True, "White peace signed."
-            return False, "They refuse: they are winning, or the war has only just started"
-        if score >= 3 or (score >= 1 and self.army_strength(enemy) <= self.army_strength(tag)):
-            self.peace(tag, enemy, winner=tag)
-            return True, "They accept and give up the provinces you occupy."
-        return False, "They refuse: occupy more of their land or beat their army first"
-
-    def attack_options(self, unit):
-        return self.attack_options_group([unit])
-
-    def attack(self, unit, target_pos):
-        return self.attack_group([unit], target_pos)
-
-    def _targets(self, tag):
-        enemies = self.enemies(tag)
-        if not enemies:
-            return set()
-        found = {u.pos for u in self.units if u.carrier is None and not u.naval and u.owner in enemies}
-        for prov in self.castles():
-            if prov.controller in enemies and prov.garrison > 0:
-                found.add(prov.pos)
-        ours = self.owners_at()
-        return {pos for pos in found if tag not in ours.get(pos, ())}      # never attack the hex we stand on
-
-    def attack_options_group(self, group):
-        """{target hex: hex to attack from, or "bombard" for cannons firing from where they stand}."""
-        fighters = [u for u in group if u.kind.war and u.moves_left > 0 and not u.attacked]
-        if not fighters or any(u.carrier for u in group):
-            return {}
-        lead = group[0]
-        targets = self._targets(lead.owner)
-        if not targets:
-            return {}
-        moves = min(u.moves_left for u in group)
-        reach = self.reachable_group(group)
-        stands = {p: c for p, c in reach.items() if c < moves and not any(u.naval for u in self.units_at(p))}
-        options = {}
-        walls = self.walls()
-        for pos in targets:
-            near = [p for p in neighbors(pos) if p in stands and (p, pos) not in walls]
-            if near:
-                options[pos] = min(near, key=lambda p: stands[p])
-        if any(u.kind.branch == "artillery" for u in fighters):
-            for pos in targets:
-                if distance(pos, lead.pos) <= 2 and (pos not in options or
-                                                     all(u.kind.branch == "artillery" for u in fighters)):
-                    options[pos] = "bombard"
-        return options
-
-    def attack_group(self, group, target):
-        options = self.attack_options_group(group)
-        if target not in options:
-            return False
-        stand = options[target]
-        if stand == "bombard":
-            shooters = [u for u in group if u.kind.branch == "artillery" and u.moves_left > 0 and not u.attacked]
-            self._battle(shooters, target, ranged=True)
-            for unit in shooters:
-                unit.moves_left, unit.attacked, unit.acted = 0, True, True
-        else:
-            if stand != group[0].pos:
-                self.move_group(group, stand)
-            attackers = [u for u in group if u in self.units and u.kind.war]
-            if attackers:
-                self._battle(attackers, target)
-            for unit in group:
-                if unit in self.units:
-                    unit.moves_left, unit.attacked, unit.acted = 0, True, True
-        self.changed()
-        return True
-
-    def _general(self, units):
-        return next((u for u in units if u.kind is GENERAL), None)
-
-    def _attack_value(self, unit, fight, general):
-        tag, branch = unit.owner, unit.kind.branch
-        flat = unit.kind.attack + unit.atk_up + self.bonus(tag, f"{branch}_attack")
-        value = flat * FIGHT_ATTACK[branch][fight] * unit.rank[2] * (1 + self.bonus(tag, branch))
-        if general and (general.trait == fight or (general.trait == "cavalry" and branch == "cavalry")):
-            value *= 1 + GENERAL_BONUS
-        return value
-
-    def _defense_value(self, unit, fight, prov, castle, versus, general):
-        tag, branch = unit.owner, unit.kind.branch
-        value = (unit.kind.defense + unit.def_up) * FIGHT_DEFENSE[branch][fight] * unit.rank[2]
-        value *= 1 + (CASTLE_DEFENSE * castle if fight == "garrison" else TERRAIN[prov.terrain].defense)
-        if branch == "infantry" and versus == "cavalry":
-            value *= PIKES_VS_HORSE * (1 + self.bonus(tag, "vs_horse"))
-        value *= 1 + self.bonus(tag, branch)
-        if general and general.trait in ("defense", fight):
-            value *= 1 + GENERAL_BONUS
-        return value
-
-    def _battle(self, attackers, pos, ranged=False):
-        """Front line + support: the best 3 of each side fight, the rest support them."""
-        prov = self.provinces[pos]
-        here = self.units_at(pos)
-        att_tag = attackers[0].owner
-        def_tag = here[0].owner if here else prov.controller
-        if def_tag == att_tag:
-            return                                  # a country never fights itself
-        castle = prov.castle if prov.controller == def_tag and prov.garrison > 0 else 0
-        fight = "assault" if castle else ("open" if prov.terrain in OPEN_GROUND else "rough")
-        dfight = "garrison" if castle else ("open" if fight == "open" else "rough")
-        gen_a = self._general(self.units_at(attackers[0].pos))
-        gen_d = self._general(here)
-        defenders = [u for u in here if u.kind.war]
-        if castle:
-            defenders.append(Garrison(prov, self.bonus(def_tag, "garrison_defense")))
-        names = (self.countries[att_tag].name, self.countries[def_tag].name if def_tag else "the natives")
-        shown = None if self.player in (att_tag, def_tag) else "nobody"
-        if not defenders:
-            self._lose(here, "overrun")
-            self.message(f"{names[0]} overran {len(here)} unarmed unit{'s' * (len(here) != 1)} at {self.place(prov)}.", shown)
-            return
-        att_front = sorted(attackers, key=lambda u: -self._attack_value(u, fight, gen_a))[:FRONT]
-        att_back = [u for u in attackers if u not in att_front]
-        def_front = sorted(defenders, key=lambda u: -self._defense_value(u, dfight, prov, castle, None, gen_d))[:FRONT]
-        def_back = [u for u in defenders if u not in def_front]
-        att_support = min(SUPPORT_MAX, SUPPORT_BONUS * len(att_back))
-        def_support = min(SUPPORT_MAX, SUPPORT_BONUS * len(def_back))
-        before = {id(u): u.hp for u in attackers + defenders}      # HP going in, to report what this fight cost
-        rng = self.rng
-
-        def strike(attacker, target, factor, support, gen_att, gen_def, att_fight, def_fight):
-            hit = self._attack_value(attacker, att_fight, gen_att) * rng.uniform(0.8, 1.25) * (1 + support) * factor
-            block = self._defense_value(target, def_fight, prov, castle, attacker.kind.branch, gen_def) * 0.5
-            target.hp -= max(1, round(hit - block))
-
-        alive = lambda units: [u for u in units if u.hp > 0]
-        if ranged:
-            for gun in attackers:
-                if alive(def_front):
-                    strike(gun, rng.choice(alive(def_front)), 1.0, 0, gen_a, gen_d, fight, dfight)
-        else:
-            for gun in [u for u in att_back if u.kind.branch == "artillery"]:
-                if alive(def_front):
-                    strike(gun, rng.choice(alive(def_front)), 0.6, 0, gen_a, gen_d, fight, dfight)
-            for unit in att_front:
-                if alive(def_front):
-                    strike(unit, rng.choice(alive(def_front)), 1.0, att_support, gen_a, gen_d, fight, dfight)
-            counter_fight = "open" if fight == "assault" else fight
-            for unit in alive(def_front):
-                if alive(att_front):
-                    factor = COUNTER * (0.5 if unit.kind.branch == "artillery" else 1.0)
-                    strike(unit, rng.choice(alive(att_front)), factor, def_support, gen_d, gen_a, counter_fight,
-                           "open" if fight == "open" else "rough")
-        hp_a = sum(before[id(u)] - max(0, u.hp) for u in attackers)
-        hp_d = sum(before[id(u)] - max(0, u.hp) for u in defenders)
-        lost_a = [u for u in attackers if u.hp <= 0]
-        lost_d = [u for u in defenders if u.hp <= 0 and not isinstance(u, Garrison)]
-        for unit in lost_a + lost_d:
-            if unit in self.units:
-                self._kill(unit)
-        for unit in defenders:
-            if isinstance(unit, Garrison):
-                prov.garrison = max(0, unit.hp)
-        survivors_d = [u for u in defenders if u.hp > 0]
-        for unit in attackers + defenders:
-            if unit.hp > 0 and not isinstance(unit, Garrison):
-                unit.xp += 1 + (0 if survivors_d or unit not in attackers else 1)
-        dead = lambda n: f" ({n} unit{'s' * (n != 1)} destroyed)" if n else ""
-        text = (f"{'Bombardment' if ranged else 'Battle'} at {self.place(prov)}: {names[0]} lost {hp_a} strength"
-                f"{dead(len(lost_a))}, {names[1]} lost {hp_d}{dead(len(lost_d))}")
-        if castle and prov.garrison <= 0 and not [u for u in self.units_at(pos) if u.kind.war]:
-            if ranged:
-                text += "; the castle walls are breached"
-            else:
-                self.bus.emit("province_captured", att_tag, pos, loser=prov.controller, by="storm")
-                prov.controller, prov.siege = att_tag, 0
-                self._lose(self.units_at(pos), "storm")
-                text += f"; {names[0]} stormed the castle"
-        elif not survivors_d and not ranged:
-            self._lose([u for u in self.units_at(pos) if u.owner == def_tag], "storm")
-        self.bus.emit("battle", att_tag, pos, defender=def_tag, ranged=ranged, lost=(len(lost_a), len(lost_d)),
-                      hurt=(hp_a, hp_d))
-        self.message(text + ".", shown)
-
-    def _lose(self, units, why):         # off the map, with a unit_lost event each (why: see hexa/events.py)
-        for unit in list(units):
-            self.units.remove(unit)
-            self.bus.emit("unit_lost", unit.owner, unit.pos, what=unit.kind.name, why=why)
-
-    def _kill(self, unit, why="battle"):
-        self._lose(self.cargo(unit), "sunk")
-        if unit in self.units:
-            self._lose([unit], why)
-
-    def kill(self, unit, why="battle"): return self._kill(unit, why)   # public name for the debt module
+    # ----- war (systems/war.py) -------------------------------------------------------------
+    at_war = war.at_war
+    enemies = war.enemies
+    war_check = war.war_check
+    declare_war = war.declare_war
+    war_score = war.war_score
+    peace = war.peace
+    free_spot_near = war.free_spot_near
+    peace_offer = war.peace_offer
+    attack_options = war.attack_options
+    attack = war.attack
+    targets = war.targets
+    attack_options_group = war.attack_options_group
+    attack_group = war.attack_group
+    general = war.general
+    attack_value = war.attack_value
+    defense_value = war.defense_value
+    battle = _battle = war.battle        # the old private name: tests/test_campaign.py and test_events.py use it
+    lose = war.lose
+    kill = _kill = war.kill              # kill is the public name the debt module uses; _kill the old one (tests)
+    sieges = war.sieges
+    check_alive = war.check_alive
 
     def forget_castles(self):
         """Drop the cached list of fortified provinces (castles()), after a castle was lost or built."""
         self._castle_list = None
-
-    def sieges(self):
-        """Troops standing in enemy (or lost) provinces take control of them; castles hold out longer."""
-        for prov in self.provinces.values():
-            if prov.owner is None:
-                continue
-            here = [u for u in self.units_at(prov.pos) if u.kind.war]
-            cap = prov.castle * GARRISON_HP
-            if not here:
-                if prov.castle and prov.controller == prov.owner and prov.garrison < cap:
-                    prov.garrison = min(cap, prov.garrison + GARRISON_REGEN)
-                if prov.controller != prov.owner and not any(
-                        u.kind.war and u.owner == prov.controller and self.within_reach(u.pos, prov.pos)
-                        for u in self.units if u.carrier is None):
-                    prov.siege += 1
-                    if prov.siege >= 6:           # the people drive out a garrison nobody supports
-                        prov.controller, prov.siege = prov.owner, 0
-                        self.changed()
-                elif prov.controller == prov.owner:
-                    prov.siege = 0
-                continue
-            if len({u.owner for u in here}) > 1:
-                continue            # two armies on one hex: the battle decides it, no siege progress either way
-            tag = here[0].owner
-            if tag == prov.controller:
-                prov.siege = 0
-                continue
-            if tag == prov.owner or self.at_war(tag, prov.controller):
-                general = self._general(self.units_at(prov.pos))
-                cannons = sum(u.kind.siege + (self.bonus(tag, "siege") if u.kind.branch == "artillery" else 0)
-                              for u in here)
-                prov.siege += 1 + cannons + (1 if general and general.trait == "assault" else 0)
-                defended = prov.controller == prov.owner
-                need = SIEGE_BASE + (prov.castle * (CASTLE_SIEGE + self.bonus(prov.owner, "siege_points"))
-                                     if defended else 0)
-                self.bus.emit("siege_progress", tag, prov.pos, progress=prov.siege, need=need)
-                if prov.siege >= need:
-                    self.bus.emit("province_captured", tag, prov.pos, loser=prov.controller, by="siege")
-                    prov.controller, prov.siege = tag, 0
-                    prov.garrison = 0 if tag != prov.owner else prov.garrison
-                    self.message(f"{self.countries[tag].name} took control of {self.place(prov)}.",
-                                 None if self.player in (tag, prov.owner) else "nobody")
-                    self.changed()
-
-    def _check_alive(self):
-        for tag, country in self.countries.items():
-            if country.alive and not self.provinces_of(tag):
-                country.alive = False
-                self.units = [u for u in self.units if u.owner != tag]
-                self.wars = [w for w in self.wars if tag not in (w.a, w.b)]
-                self.message(f"{country.name} has disappeared from the map.", None, "extinct")
-            elif country.alive and self.provinces[country.capital].owner != tag:
-                country.capital = max(self.provinces_of(tag), key=lambda p: p.pop).pos
 
     # ----- turns --------------------------------------------------------------------------
     def start_units(self, tag):
@@ -1036,21 +728,22 @@ class CampaignWorld:
         """Everything that happens between seasons, after every country has moved."""
         self.logistics()
         self.sieges()
-        for war in list(self.wars):
-            if self.player in (war.a, war.b):
+        for conflict in list(self.wars):
+            if self.player in (conflict.a, conflict.b):
                 limit = WAR_LENGTH_AI * 2
             else:
                 limit = WAR_LENGTH_AI
-            score = self.war_score(war.a, war.b)
-            if self.turn - war.start >= limit or (self.player not in (war.a, war.b) and abs(score) >= 5):
-                winner = war.a if score > 0 else war.b if score < 0 else "nobody"
-                self.peace(war.a, war.b, winner=winner if self.player not in (war.a, war.b) else None)
+            score = self.war_score(conflict.a, conflict.b)
+            if self.turn - conflict.start >= limit or (self.player not in (conflict.a, conflict.b) and abs(score) >= 5):
+                winner = conflict.a if score > 0 else conflict.b if score < 0 else "nobody"
+                self.peace(conflict.a, conflict.b,
+                           winner=winner if self.player not in (conflict.a, conflict.b) else None)
         self.economy()
         self.collect()
         self._unpaid()
         self.grow()
         self._research()
-        self._check_alive()
+        self.check_alive()
         was_winter = self.winter()
         self.turn += 1
         passes_changed(self, was_winter)

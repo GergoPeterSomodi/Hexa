@@ -66,7 +66,7 @@ WORLD_MODULES = {"hexa.world", "hexa.colony.world", "hexa.campaign.world"}
 
 # ----- ALLOW: ONLY EVER SHRINK THESE -----------------------------------------------------------------------------
 ALLOW_MODULES = {
-    "hexa.campaign.world": 1131,
+    "hexa.campaign.world": 824,
     "hexa.campaign.goodsart": 2476,
     "hexa.campaign.wfctiles": 2375,
     "hexa.campaign.landscape": 2010,
@@ -91,7 +91,7 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.goodsart:_coffee": 86,
     "hexa.campaign.wfctiles:socket_collapse": 86,
     "hexa.campaign.goodsart:_stone": 85,
-    "hexa.campaign.world:CampaignWorld._battle": 85,
+    "hexa.campaign.systems.war:battle": 84,
     "hexa.campaign.goodsart:_furs": 84,
     "hexa.campaign.screens.gamemenu:PauseMenu.draw": 80,
     "hexa.campaign.landscape:decorate": 82,

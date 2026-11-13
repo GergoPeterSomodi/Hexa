@@ -10,5 +10,6 @@ trade (markets, routes, merchants and what moves along a route),
 economy (prices, production, incomes, tax previews, collecting and growth),
 terrain (movement cost, winter, ridge crests, mountain passes, where a new land unit appears),
 supply (who is fed, foraging and the season's attrition),
-movement (reach, paths, zones of control, the march and the cost field).
+movement (reach, paths, zones of control, the march and the cost field),
+war (war and peace, attacks, battles and sieges).
 """
