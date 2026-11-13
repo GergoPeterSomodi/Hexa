@@ -228,8 +228,17 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `pass_edges`, `edge_blocked`, `passes`, `pass_name`, `pass_closed`, `move_check`, `pass_blocks`, `pass_edges_at`, `within_reach`,
   `land_spot`, plus `pass_tables` and `geo_key` for the cache. `CampaignWorld` binds them as plain class attributes
   (`edge_blocked = terrain.edge_blocked`), so the hot ones cost no extra call. The `_pass_cache` stays owned by
-  `CampaignWorld.pass_data` (`_pass_data` is the old name, kept for tests); `pass_wait` and `_field_in` stay on the world until
-  3.11 because they run `cost_field`. `OWNS` is empty: the module writes nothing on the world.
+  `CampaignWorld.pass_data` (`_pass_data` is the old name, kept for tests); `pass_wait` (it runs `cost_field`) is in movement.py.
+  `OWNS` is empty: the module writes nothing on the world.
+- **Supply and movement** (`systems/supply.py`, `systems/movement.py`; the AI's hot path). Supply: `supply_limit`, `is_depot`,
+  `in_supply`, `supply_state`, `forage_check`/`forage` and `logistics` (the season's feeding and attrition). Movement: `may_enter`,
+  `zoc`, `stuck_reason`, `plan` (the Dijkstra over a stack's moves), `reachable`/`reachable_group`, `next_season_reach`, `path_to`,
+  `route`, `move`/`move_toward`/`move_toward_group`, `move_group` (walks the route and emits `unit_moved`; it writes `last_move`),
+  `cost_field`, `step_toward`/`step_toward_group`, `group_plan` (the old `_group_plan`), `field_in` (the old `_field_in`) and
+  `pass_wait`. `CampaignWorld` binds every one as a plain class attribute (`plan = movement.plan`), so a call costs what the
+  method did, and the functions call each other through `world.` as before (tests wrap `world.plan` and `world.cost_field`);
+  keep it that way, and add no call layer inside their loops. `castles()` (the `_castle_list` cache) and `aboard()` (the old
+  `_aboard`) stay on the world.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of

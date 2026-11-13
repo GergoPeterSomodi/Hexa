@@ -2,7 +2,6 @@
 
 Every land hex is a province. Nothing in here uses pygame.
 """
-import heapq
 import itertools
 import pickle
 import random
@@ -11,12 +10,12 @@ from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, state, tech
 from .state import Garrison, Unit, War, fill_defaults
-from .systems import building, colonies, debt, economy, military, research, terrain, trade, worldgen
+from .systems import (building, colonies, debt, economy, military, movement, research, supply, terrain, trade,
+                      worldgen)
 from .data import (COUNTER, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS,
-                   GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, SCOUT, SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX,
-                   ATTRITION, FARM_GOODS, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER, SUPPLY_BASE, SUPPLY_PER_FARM,
-                   SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, END_YEAR, PIONEER, CASTLE_DEFENSE,
-                   CASTLE_SIEGE, SIEGE_BASE, START_YEAR, TERRAIN, WAR_LENGTH_AI, MANUFACTORIES, date)
+                   GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX, MANPOWER,
+                   SUPPLY_RANGE, WAGON_SEASONS, BUILDINGS, END_YEAR, PIONEER, CASTLE_DEFENSE, CASTLE_SIEGE,
+                   SIEGE_BASE, START_YEAR, TERRAIN, WAR_LENGTH_AI, MANUFACTORIES, date)
 
 INF = float("inf")
 SCALE = geo.SCALE
@@ -237,42 +236,6 @@ class CampaignWorld:
 
     _pass_data = pass_data               # the old private name (tests)
 
-    def _field_in(self, goal, winter, until):
-        """cost_field(goal) as it would be in winter (or not), whatever season it is now."""
-        turn = self.turn
-        self.turn = 4 if winter else 2
-        try:
-            return self.cost_field(goal, until=until)
-        finally:
-            self.turn = turn
-
-    def pass_wait(self, group, goal):
-        """The name of the closed pass a land stack should wait for spring at, or "". In winter, if the way to goal that
-        the summer route takes through a pass has become much longer (more than twice as far, or 2+ seasons of moves
-        more) or gone, the stack waits for the pass to open instead of walking off on a long detour and back."""
-        if not group or group[0].naval or goal is None or not self.winter() or group[0].pos == goal:
-            return ""
-        here = group[0].pos
-        summer = self._field_in(goal, False, [here])
-        near = summer.get(here)
-        if near is None:
-            return ""
-        far = self._field_in(goal, True, [here]).get(here)
-        speed = max(1, min(self.unit_moves(u) for u in group))
-        if far is not None and far <= 2 * near and far - near < 2 * speed:
-            return ""
-        passes, pos = self.pass_data()[2], here
-        while pos != goal:                              # follow the summer route to the pass it goes through
-            nxt = min((n for n in neighbors(pos) if summer.get(n, INF) < summer[pos]), key=lambda n: (summer[n], n),
-                      default=None)
-            if nxt is None:
-                break
-            edge = passes.get(frozenset((pos, nxt)))
-            if edge:
-                return edge[0]
-            pos = nxt
-        return ""
-
     # ----- provinces and countries ------------------------------------------------------
     def province(self, pos):
         return self.provinces.get(pos)
@@ -356,7 +319,7 @@ class CampaignWorld:
     def cargo(self, ship):
         return [u for u in self.units if u.carrier is ship]
 
-    def _aboard(self):
+    def aboard(self):
         """{ship id: [units aboard]} in one pass over the units (what cargo() gives, for every ship at once)."""
         found = {}
         for u in self.units:
@@ -683,414 +646,39 @@ class CampaignWorld:
     def _know_region(self, tag):
         return research.know_region(self, tag)
 
-    # ----- supply ------------------------------------------------------------------
-    def supply_limit(self, tag, pos):
-        prov = self.provinces.get(pos)
-        if not prov:
-            return 0
-        limit = SUPPLY_BASE + prov.pop / SUPPLY_PER_PEOPLE + \
-            (prov.works * SUPPLY_PER_FARM if prov.good in FARM_GOODS else 0) + (prov.natives / 20)
-        if self.is_depot(tag, pos):
-            limit += self.bonus(tag, "depot_supply")
-        if prov.owner != tag:
-            limit *= FOREIGN_SUPPLY
-        return max(1, int(limit))
-
-    def is_depot(self, tag, pos):
-        prov = self.provinces.get(pos)
-        return bool(prov and prov.owner == tag and prov.controller == tag and
-                    (prov.settlement >= 2 or prov.castle or prov.level("port")))
-
-    def in_supply(self, tag, pos):
-        """Within SUPPLY_RANGE hexes of a depot, through land we control and no enemy armies."""
-        enemies = self.enemies(tag)
-        blocked = {u.pos for u in self.units if u.owner in enemies and u.kind.war and u.carrier is None}
-        walls = self.walls()
-        seen, frontier = {pos}, [pos]
-        for _ in range(self.supply_reach(tag) + 1):
-            nxt = []
-            for p in frontier:
-                if self.is_depot(tag, p):
-                    return True
-                for n in neighbors(p):
-                    prov = self.provinces.get(n)
-                    if n in seen or not prov or prov.controller != tag or n in blocked or (p, n) in walls:
-                        continue
-                    seen.add(n)
-                    nxt.append(n)
-            frontier = nxt
-        return False
-
-    def supply_state(self, group):
-        """('supplied' | 'wagon' | 'foraging' | 'cut off', troops, limit) for a stack."""
-        lead = group[0]
-        troops = [u for u in group if u.kind.war]
-        limit = self.supply_limit(lead.owner, lead.pos)
-        prov = self.provinces.get(lead.pos)
-        if self.in_supply(lead.owner, lead.pos):
-            state = "supplied"
-        elif any(u.kind is WAGON and u.supplies > 0 for u in group):
-            state = "wagon"
-        elif prov and prov.foraged == (lead.owner, self.turn):
-            state = "foraging"
-        else:
-            state = "cut off"
-        return state, len(troops), limit
-
-    def forage_check(self, group, tag=None, end_of_round=False):
-        troops = [u for u in group if u.kind.war]
-        if tag is not None and any(u.owner != tag for u in troops):
-            return False, "Only your own troops can forage"
-        if not troops:
-            return False, "Only troops forage"
-        lead = troops[0]
-        prov = self.provinces.get(lead.pos)
-        if not prov or prov.owner == lead.owner:
-            return False, "Armies only forage in foreign land"
-        if prov.foraged == (lead.owner, self.turn):
-            return False, "Already foraged here this season"
-        if not end_of_round and min(u.moves_left for u in troops) <= 0:
-            return False, "No time left this season"
-        return True, ""
-
-    def forage(self, group, tag=None, end_of_round=False):
-        if not self.forage_check(group, tag, end_of_round)[0]:
-            return False
-        troops = [u for u in group if u.kind.war]
-        prov = self.provinces[troops[0].pos]
-        prov.foraged = (troops[0].owner, self.turn)
-        prov.peasants *= 1 - FORAGE_LOSS
-        prov.natives *= 1 - FORAGE_LOSS
-        for unit in troops:
-            unit.foraged_turn = self.turn
-            if not end_of_round:
-                unit.moves_left = 0
-        self.message(f"Troops foraged around {self.place(prov)}: they eat, the province suffers.", troops[0].owner)
-        self.bus.emit("forage", troops[0].owner, prov.pos)
-        return True
-
-    def logistics(self):
-        """Once per season: feed every stack, or make it suffer attrition."""
-        stacks = {}
-        for unit in self.units:
-            if unit.carrier is None and not unit.naval:
-                stacks.setdefault((unit.pos, unit.owner), []).append(unit)
-        reported = set()
-        for (pos, tag), group in stacks.items():
-            troops = [u for u in group if u.kind.war]
-            if not troops:
-                continue
-            prov = self.provinces.get(pos)
-            if tag != self.player and prov and prov.owner != tag and not self.in_supply(tag, pos) and \
-                    not any(u.kind is WAGON and u.supplies > 0 for u in group):
-                self.forage(group, end_of_round=True)   # computer armies forage when they must, moves or not
-            state, count, limit = self.supply_state(group)
-            for wagon in [u for u in group if u.kind is WAGON]:
-                if state == "supplied":
-                    wagon.supplies = self.wagon_seasons(tag)
-                elif state == "wagon" and wagon.supplies > 0:
-                    wagon.supplies -= 1
-                    break
-            fed = state != "cut off"
-            hurt = 0
-            for unit in troops:
-                unit.supplied = fed
-                loss = (0 if fed else ATTRITION) + (ATTRITION if count > limit else 0)
-                if loss:
-                    unit.hp -= loss
-                    hurt += 1
-                    if unit.hp <= 0:
-                        self._kill(unit, "starved")
-            if hurt and tag == self.player and pos not in reported:
-                reported.add(pos)
-                why = "cut off from supply" if not fed else f"too many troops for the land ({count}/{limit})"
-                where = self.place(prov) if prov else "the field"
-                self.message(f"Your troops at {where} are {why}: they lose strength.", None, "supply", pos)
-
-    # ----- movement ------------------------------------------------------------------
-    def may_enter(self, unit, pos, frm=None):
-        """Whether the unit may step onto `pos` (ignoring other units), from `frm` (default: where it stands, when
-        that is next to pos): a ridge crest or a pass shut by snow between the two hexes stops it."""
-        if unit.naval:
-            return self.is_sea(pos)
-        if frm is None and distance(unit.pos, pos) == 1:
-            frm = unit.pos
-        if frm is not None and (frm, pos) in self.walls():
-            return False
-        prov = self.provinces.get(pos)
-        if not prov:
-            return False
-        owner = prov.owner
-        if owner in (None, unit.owner):
-            return True
-        return (unit.kind.war or unit.kind in (GENERAL, SCOUT)) and self.at_war(unit.owner, owner)
-
-    def zoc(self, tag):
-        """Hexes next to enemy castles: armies must stop when they walk into them."""
-        enemies = self.enemies(tag)
-        if not enemies:
-            return set()
-        found, walls = set(), self.walls()
-        for prov in self.castles():
-            if prov.controller in enemies and prov.garrison > 0:
-                found.update(n for n in neighbors(prov.pos) if (prov.pos, n) not in walls)
-        return found
+    # ----- supply (systems/supply.py) and movement (systems/movement.py) -----------------------
+    # Plain class attributes, so a call costs what the old method did (the AI's hot path).
+    supply_limit = supply.supply_limit
+    is_depot = supply.is_depot
+    in_supply = supply.in_supply
+    supply_state = supply.supply_state
+    forage_check = supply.forage_check
+    forage = supply.forage
+    logistics = supply.logistics
+    may_enter = movement.may_enter
+    zoc = movement.zoc
+    stuck_reason = movement.stuck_reason
+    reachable = movement.reachable
+    reachable_group = movement.reachable_group
+    plan = movement.plan
+    next_season_reach = movement.next_season_reach
+    path_to = movement.path_to
+    move = movement.move
+    move_toward = movement.move_toward
+    move_toward_group = movement.move_toward_group
+    group_plan = movement.group_plan
+    move_group = movement.move_group
+    route = movement.route
+    cost_field = movement.cost_field
+    step_toward = movement.step_toward
+    step_toward_group = movement.step_toward_group
+    field_in = movement.field_in
+    pass_wait = movement.pass_wait
 
     def castles(self):
         if self._castle_list is None:
             self._castle_list = [p for p in self.provinces.values() if p.castle and p.owner]
         return self._castle_list
-
-    def stuck_reason(self, group):
-        """Why a stack ordered to move cannot move this season, or "" if nothing in particular is in the way.
-        A stack moves at its slowest unit's pace, so one unit with no moves left holds the whole stack back."""
-        if min(u.moves_left for u in group) > 0:
-            return ""
-        if any(getattr(u, "foraged_turn", -1) == self.turn for u in group):
-            return "They foraged this season and have no moves left."
-        fresh = [u for u in group if u.moves_left <= 0 and not u.acted and u.kind.moves > 0]
-        if not fresh:
-            return "They have already moved this season."
-        counts = {}
-        for u in fresh:
-            counts[u.kind.name] = counts.get(u.kind.name, 0) + 1
-        names = " and ".join(f"{n} {kind}" if n > 1 else kind for kind, n in sorted(counts.items()))
-        if len(fresh) == 1:
-            return f"{names} raised this season and can't move yet. Untick it to move the rest."
-        return f"{names} were raised this season and can't move yet. Untick them to move the rest."
-
-    def reachable(self, unit):
-        return self.reachable_group([unit])
-
-    def reachable_group(self, group, best=None):
-        """{pos: move cost} the stack can reach this season. `best` is a plan() over its moves, if one is at hand."""
-        lead = group[0]
-        moves = min(u.moves_left for u in group)
-        if any(u.carrier for u in group):
-            ship = lead.carrier
-            if moves <= 0 or any(u.carrier is not ship for u in group):
-                return {lead.pos: 0}
-            reach = {lead.pos: 0}
-            for n in neighbors(lead.pos):
-                if all(self.may_enter(u, n) for u in group) and self.can_stand(group, n):
-                    reach[n] = 1
-            return reach
-        naval = lead.naval
-        occupied = self.owners_at()
-        if best is None:
-            best = self.plan(group, moves)
-        costs = {p: c for p, (c, _) in best.items()}
-        alone = self.can_stand(group, None, others=[])
-        reach = {p: c for p, c in costs.items()
-                 if p == lead.pos or (alone if p not in occupied else self.can_stand(group, p))}
-        if not naval:
-            aboard = self._aboard()
-            for ship in self.units_of(lead.owner):
-                if ship.naval and len(aboard.get(ship.id, ())) + len(group) <= ship.kind.capacity:
-                    via = [costs[n] for n in neighbors(ship.pos) if n in costs]
-                    if via and min(via) + 1 <= moves:
-                        reach[ship.pos] = min(via) + 1
-        return reach
-
-    def plan(self, group, budget):
-        """{pos: (cost, previous pos)} for this stack over `budget` move points, same rules as moving."""
-        lead = group[0]
-        naval = lead.naval
-        zoc = set() if naval else self.zoc(lead.owner)
-        walls = frozenset() if naval else self.walls()
-        occupied, mine = self.owners_at(), {lead.owner}
-        best = {lead.pos: (0, None)}
-        heap = [(0, lead.pos)]
-        while heap:
-            cost, pos = heapq.heappop(heap)
-            if cost > best[pos][0]:
-                continue
-            if pos != lead.pos and pos in zoc:
-                continue
-            for n in neighbors(pos):
-                if n not in self.terrain or (pos, n) in walls or not all(self.may_enter(u, n, pos) for u in group):
-                    continue
-                if occupied.get(n, mine) != mine:
-                    continue
-                new = cost + (1 if naval else self.step_cost(pos, n))
-                if new <= budget and new < best.get(n, (INF,))[0]:
-                    best[n] = (new, pos)
-                    heapq.heappush(heap, (new, n))
-        return best
-
-    def next_season_reach(self, group):
-        """Hexes the stack could reach by the end of next season (but not this one)."""
-        if any(u.carrier for u in group):
-            return {}
-        speed = min(self.unit_moves(u) for u in group)
-        budget = min(u.moves_left for u in group) + speed
-        occupied = self.owners_at()
-        alone = self.can_stand(group, None, others=[])
-        return {p: c for p, (c, _) in self.plan(group, budget).items()
-                if (alone if p not in occupied else self.can_stand(group, p))}
-
-    def path_to(self, group, goal, seasons=4):
-        """[(pos, move cost so far)] from the stack to goal, or [] if it is too far or blocked."""
-        speed = min(self.unit_moves(u) for u in group)
-        best = self.plan(group, min(u.moves_left for u in group) + speed * (seasons - 1))
-        if goal not in best:
-            return []
-        path = []
-        pos = goal
-        while pos is not None:
-            path.append((pos, best[pos][0]))
-            pos = best[pos][1]
-        return path[::-1]
-
-    def move(self, unit, dest):
-        return self.move_group([unit], dest)
-
-    def move_toward(self, unit, goal):
-        """move(unit, step_toward(unit, goal)): one step of a march, with one path search."""
-        return self.move_toward_group([unit], goal)
-
-    def move_toward_group(self, group, goal):
-        """move_group(group, step_toward_group(group, goal)) with one path search, not two: the plan is shared."""
-        if self.pass_wait(group, goal):                  # behind a pass shut by snow: wait for spring
-            return False
-        best = self._group_plan(group)
-        dest = self.step_toward_group(group, goal, best=best)
-        return self.move_group(group, dest, best=best)
-
-    def _group_plan(self, group):
-        """plan() for the stack over its moves this season. None for units aboard a ship (they only step off)."""
-        if group[0].carrier:
-            return None
-        return self.plan(group, min(u.moves_left for u in group))
-
-    def move_group(self, group, dest, best=None):
-        """Walk a stack to dest this season. `best` is the stack's plan() if the caller already has one."""
-        group = [u for u in group if u in self.units]
-        if self.over or not group:
-            return False
-        lead = group[0]
-        if dest == lead.pos:
-            return True
-        if not self.move_check(group, dest)[0]:
-            return False
-        if best is None:
-            best = self._group_plan(group)
-        reach = self.reachable_group(group, best)
-        if dest not in reach:
-            return False
-        aboard = self._aboard()                  # looked up once: nobody gets on or off during the walk
-        ship = None
-        if not lead.naval:
-            ship = next((u for u in self.units_at(dest) if u.naval and u.owner == lead.owner
-                         and len(aboard.get(u.id, ())) + len(group) <= u.kind.capacity), None)
-        # Walk the route hex by hex, looking around on the way (so fog clears along it, not just at the end).
-        path = self.route(group, dest, best)
-        self.last_move = ([u.id for u in group], path)
-        explored_before = len(self.countries[lead.owner].explored)  # counted before the walk reveals anything (#26)
-        scout = max(group, key=lambda u: self.unit_sight(u))      # the stack sees as far as its best eyes
-        for step in path[1:-1]:
-            for unit in group:
-                unit.pos = step
-                for passenger in aboard.get(unit.id, ()):
-                    passenger.pos = step
-            self.see_from(scout, refresh=False)
-        for unit in group:
-            unit.pos = path[0]
-            for passenger in aboard.get(unit.id, ()):
-                passenger.pos = path[0]
-        for unit in group:
-            if ship:
-                unit.carrier, unit.pos, unit.moves_left = ship, dest, 0
-            elif unit.carrier:
-                unit.carrier, unit.pos = None, dest
-                unit.moves_left -= 1
-            else:
-                unit.moves_left -= reach[dest]
-                unit.pos = dest
-                for passenger in aboard.get(unit.id, ()):
-                    passenger.pos = dest
-            unit.acted = True
-        if not lead.naval and not ship and dest in self.zoc(lead.owner):
-            for unit in group:
-                unit.moves_left = 0
-        country = self.countries[lead.owner]
-        for unit in group:
-            self.see_from(unit, refresh=False)
-        if lead.owner == self.player:
-            if len(country.explored) != explored_before:
-                self.changed()
-            self.update_visibility()
-        seen = [lead.owner == self.player or p in self.visible for p in path]
-        self.bus.emit("unit_moved", lead.owner, dest, ids=[u.id for u in group], path=tuple(path), naval=lead.naval,
-                      seen=tuple(seen))
-        return True
-
-    def route(self, group, dest, best=None):
-        """The hexes the stack walks through to reach dest this season, start and end included."""
-        lead = group[0]
-        if lead.carrier or distance(lead.pos, dest) <= 1:
-            return [lead.pos, dest]
-        if best is None:
-            best = self.plan(group, min(u.moves_left for u in group))
-        if dest not in best:                     # boarding a ship: walk to the shore next to it
-            shore = [n for n in neighbors(dest) if n in best]
-            if not shore:
-                return [lead.pos, dest]
-            last = min(shore, key=lambda n: best[n][0])
-            return self.route(group, last, best) + [dest] if last != lead.pos else [lead.pos, dest]
-        path, pos = [], dest
-        while pos is not None:
-            path.append(pos)
-            pos = best[pos][1]
-        return path[::-1]
-
-    def cost_field(self, goal, naval=False, tag=None, until=None, unit=None):
-        """Move costs to `goal` from everywhere (or until every hex in `until` is settled).
-        With `unit` (a land unit), routes only run through hexes it may enter (may_enter): land it may not
-        cross, such as a neighbour's, is no shortcut. Such hexes still get a cost as places to start from."""
-        field = {goal: 0}
-        heap = [(0, goal)]
-        walls = frozenset() if naval else self.walls()
-        left = set(until) if until else None
-        while heap:
-            cost, pos = heapq.heappop(heap)
-            if cost > field.get(pos, INF):
-                continue
-            if left is not None:
-                left.discard(pos)
-                if not left:
-                    break
-            if unit is not None and pos != goal and not self.may_enter(unit, pos):
-                continue                       # a unit can start here but not walk on through it
-            for n in neighbors(pos):
-                if naval:
-                    ok, step = self.is_sea(n), 1
-                else:
-                    ok = self.is_land(n) and (n, pos) not in walls
-                    step = self.move_cost(n, pos) if ok and self.is_land(pos) else \
-                        TERRAIN[self.terrain[n]].move if ok else 0
-                if ok and cost + step < field.get(n, INF):
-                    field[n] = cost + step
-                    heapq.heappush(heap, (cost + step, n))
-        return field
-
-    def step_toward(self, unit, goal, field=None):
-        return self.step_toward_group([unit], goal, field)
-
-    def step_toward_group(self, group, goal, field=None, best=None):
-        """The hex of the next stop on the way to goal. `best` is the stack's plan() if the caller has one at hand."""
-        lead = group[0]
-        if best is None:
-            best = self._group_plan(group)
-        reach = self.reachable_group(group, best)
-        if field is None:
-            # Only wait for hexes this field can settle: a land field never reaches the sea hex of a
-            # friendly ship in `reach`, and waiting for it would search the whole map.
-            settles = self.is_sea if lead.naval else self.is_land
-            until = [p for p in reach if settles(p)] or [goal]
-            field = self.cost_field(goal, lead.naval, until=until, unit=None if lead.naval else lead)
-        options = [p for p in reach if p == lead.pos or not any(u.naval for u in self.units_at(p)) or lead.naval]
-        return min(options, key=lambda p: (field.get(p, distance(p, goal) * 4 + 1000), reach[p]))
 
     # ----- colonies -------------------------------------------------------------------
     def found_check(self, unit, trading_post=False):
