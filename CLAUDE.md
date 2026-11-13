@@ -277,7 +277,8 @@ the rules as far as the current layout allows, and never makes an allowlisted of
   `@BoundedCache(name, n).memo` caches a function of positional arguments. Landscape's per-MapView caches use the same
   class (the registry is weak and adds up caches of one name). Sizes come from measurement (`python -m tools.perf`
   prints entries, MB, hits and misses per cache): a cache is bounded above what a full tour of the map needs, so it
-  evicts only when worlds change. Time-sliced work uses `render.budget.FrameBudget`.
+  evicts only when worlds change. Time-sliced work uses `campaign/render/budget.py` `FrameBudget` (MapView's `LAND_*_MS` and `PREFETCH_*` constants stay in
+  mapview.py and are read when a slice starts, so a test can lift them).
 - **Refactor PRs** change no behaviour: label them `refactor`; they must pass tools/same_behaviour.py,
   save-compat and sha-identical goldens. Never mix a refactor and a gameplay change in one commit.
 - **Where new features go:** rules -> campaign/systems/<name>.py (+ numbers in data.py, + README table);

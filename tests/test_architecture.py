@@ -70,7 +70,7 @@ ALLOW_MODULES = {
     "hexa.campaign.wfctiles": 2392,
     "hexa.campaign.landscape": 2020,
     "hexa.campaign.app": 975,
-    "hexa.campaign.mapview": 1546,
+    "hexa.campaign.mapview": 1544,
     "hexa.campaign.randomgeo": 1286,
     "hexa.campaign.life": 1200,
     "hexa.campaign.goodsobjects": 1155,
@@ -123,7 +123,6 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.goodsart:_iron": 64,
     "hexa.campaign.wfctiles:_castle_objects": 64,
     "hexa.campaign.mapview:MapView.__init__": 62,
-    "hexa.campaign.mapview:MapView._draw_landscape": 62,
     "hexa.campaign.techscreen:TechScreen._draw_tech_grid": 61,
 }
 

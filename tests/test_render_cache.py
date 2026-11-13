@@ -1,4 +1,4 @@
-"""render.cache.BoundedCache: the LRU, the byte bound, the statistics and the registry."""
+"""render.cache.BoundedCache (the LRU, the byte bound, the statistics, the registry) and render.budget.FrameBudget."""
 import ast
 import gc
 import os
@@ -8,6 +8,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 import pygame  # noqa: E402
 
 from hexa.campaign.render import cache  # noqa: E402
+from hexa.campaign.render.budget import FrameBudget  # noqa: E402
 
 
 class BoundedCacheTest(unittest.TestCase):
@@ -75,6 +76,46 @@ class NoLooseCachesTest(unittest.TestCase):
                     problems += [f"{name}.{node.name} uses {ast.unparse(d)}" for d in node.decorator_list
                                  if "lru_cache" in ast.unparse(d)]
         self.assertEqual(problems, [])
+
+
+class FrameBudgetTest(unittest.TestCase):
+    def setUp(self):
+        self.now = 100.0
+        self.budget = FrameBudget(3.0, clock=lambda: self.now)
+
+    def test_a_slice_lasts_ms_from_its_start(self):
+        self.budget.start()
+        self.assertTrue(self.budget.fits())
+        self.now += 0.0029
+        self.assertTrue(self.budget.fits())
+        self.assertAlmostEqual(self.budget.left(), 0.0001)
+        self.now += 0.0002
+        self.assertFalse(self.budget.fits())
+        self.assertEqual(self.budget.left(), 0.0)
+
+    def test_fits_looks_ahead_by_the_expected_cost(self):
+        self.budget.start()
+        self.now += 0.002
+        self.assertTrue(self.budget.fits(0.5))
+        self.assertFalse(self.budget.fits(1.5))
+        self.assertTrue(self.budget.fits(1.5, now=100.0))      # a reading taken earlier
+
+    def test_spend_adds_up_and_start_resets_it(self):
+        self.budget.start()
+        for _ in range(2):
+            t = self.budget.clock()
+            self.now += 0.001
+            self.budget.spend(t)
+        self.assertAlmostEqual(self.budget.spent, 0.002)
+        self.budget.start(5.0, t0=self.now)
+        self.assertEqual((self.budget.spent, self.budget.ms, self.budget.end), (0.0, 5.0, self.now + 0.005))
+
+    def test_extend_only_ever_lengthens(self):
+        self.budget.start()
+        self.budget.extend(self.now, 1.0)
+        self.assertEqual(self.budget.end, 100.003)
+        self.budget.extend(self.now + 0.01, 1.0)
+        self.assertEqual(self.budget.end, 100.011)
 
 
 if __name__ == "__main__":

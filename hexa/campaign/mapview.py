@@ -8,6 +8,7 @@ import pygame
 
 from ..hexgrid import neighbors
 from . import art, geo, goodsart, goodsobjects, landscape, wfctiles
+from .render.budget import FrameBudget
 from .data import (GOODS, NATIVE_VILLAGE_SPRITE,
                    TERRAIN, TERRAIN_SPRITES, WORKS)
 
@@ -115,11 +116,11 @@ class MapView:
         self._pan = (0.0, 0.0)             # the last camera move, for prefetching ahead of a pan
         self._last_cam = None
         self._pf_done, self._pf_version = set(), None
-        self._frame_start, self._frame_objs = 0.0, 0
+        self._budget, self._frame_objs = FrameBudget(LAND_BUILD_MS), 0      # the frame's slice for builds
         self._frame_sprites, self._frame_ov = 0, 0
         self._warmed = False               # the start-up warm of the landscape zooms runs on the first draw
         self.warm_ms = 0.0
-        self._last_r, self._still, self._build_spent = None, False, 0.0
+        self._last_r, self._still = None, False
         self._fill_key, self._fill_seen = None, set()
         self._filled = None                # (camera, r, season, world version) of the last still frame that built it all
         self._pm_edges, self._pm_ver = {}, None      # (pos, r) -> owner border segments, for this world version
@@ -1016,8 +1017,7 @@ class MapView:
         current landscape zoom, nearest the view centre first, until budget_ms is spent. The rest is left to the idle
         prefetch. Runs once, on the first landscape draw. Sets warm_ms."""
         land, r = self.land, self.r
-        t0 = time.perf_counter()
-        end = t0 + budget_ms / 1000
+        budget = FrameBudget(budget_ms).start()
         land.warm_sources()
         known = self.known()
         season = land.season_now()
@@ -1031,7 +1031,7 @@ class MapView:
                 todo.append(((x - cx) ** 2 + (y - cy) ** 2, (col, row)))
         todo.sort()
         for _, pos in todo:
-            if time.perf_counter() >= end:
+            if not budget.fits():
                 break
             if pos not in known:
                 continue
@@ -1039,7 +1039,7 @@ class MapView:
             land.ground(pos, r, season)
             land.make_sprites(pos, r, season)
             land.objects(pos, r, season)
-        self.warm_ms = (time.perf_counter() - t0) * 1000
+        self.warm_ms = (time.perf_counter() - budget.t0) * 1000
 
     def _draw_landscape(self, screen, view_rect, camera):
         """The close zooms, in draw order: ground composites, the faint grid, fog under the objects, the washes of
@@ -1057,11 +1057,9 @@ class MapView:
         bare = self.mode == "terrain" or (self.mode == "goods" and self.goods_view == "deposits")
         shown, hidden, dimmed, land_hexes = [], [], [], []
         self._gen_budget = 0                       # wfc overlays the fallback may build this frame (see _landscape_ground)
-        self._frame_start = time.perf_counter()
+        self._budget.start(LAND_BUILD_MS)
         self._frame_builds, self._frame_objs = 0, 0
         self._frame_sprites, self._frame_ov = 0, 0
-        self._frame_deadline = self._frame_start + LAND_BUILD_MS / 1000
-        self._build_spent = 0.0
         if self._still:
             self._fill_centre_first(camera, view_rect, rows, known, season)
         for row in range(rows[0], rows[1] + 1):
@@ -1104,12 +1102,12 @@ class MapView:
             return
         self._political_marks(screen, shown)
 
-    def _may_build(self, made, end=None):
+    def _may_build(self, made, budget=None):
         """May the frame build one more hex of a kind? A still frame: while its builds total under LAND_STILL_MS. A
-        moving frame: the first of a kind always goes, then only while in time (end: the kind's deadline)."""
+        moving frame: the first of a kind always goes, then only while in time (budget: the kind's own slice)."""
         if self._still:
-            return self._build_spent < LAND_STILL_MS / 1000
-        return made == 0 or time.perf_counter() < (self._frame_deadline if end is None else end)
+            return self._budget.spent < LAND_STILL_MS / 1000
+        return made == 0 or (budget or self._budget).fits()
 
     def _fill_centre_first(self, camera, view_rect, rows, known, season):
         """Still frame: builds the view's hexes nearest the centre first, until LAND_STILL_MS of building is spent.
@@ -1129,7 +1127,7 @@ class MapView:
                 todo.append(((x - cx) ** 2 + (y - cy) ** 2, (col, row)))
         todo.sort()
         for _, pos in todo:
-            if self._build_spent >= LAND_STILL_MS / 1000:
+            if self._budget.spent >= LAND_STILL_MS / 1000:
                 return
             if pos in known and pos not in seen:
                 self._build_hex(pos, r, season)
@@ -1137,7 +1135,7 @@ class MapView:
         self._filled = done
 
     def _build_hex(self, pos, r, season):
-        """One hex's composite and object list, the first-use work first; the time goes to _build_spent."""
+        """One hex's composite and object list, the first-use work first; the time goes to the frame budget's `spent`."""
         land = self.land
         t = time.perf_counter()
         if land.ground(pos, r, season, build=False) is None:
@@ -1146,7 +1144,7 @@ class MapView:
         if land.objects(pos, r, season, build=False) is None:
             land.make_sprites(pos, r, season)
             land.objects(pos, r, season)
-        self._build_spent += time.perf_counter() - t
+        self._budget.spend(t)
 
     def _landscape_ground(self, screen, pos, cx, cy, prov, season, bare):
         """One hex's ground: its baked composite if built (new ones while the frame has LAND_BUILD_MS: first the
@@ -1156,7 +1154,7 @@ class MapView:
         if img is not None:
             self._blit_centre(screen, img, cx, cy)
             return
-        in_time = time.perf_counter() < self._frame_deadline
+        in_time = self._budget.fits()
         if self._may_build(self._frame_builds):
             t = time.perf_counter()
             if land.prepare(pos, self.r, season):
@@ -1164,7 +1162,7 @@ class MapView:
             n0 = land.builds
             img = land.ground(pos, self.r, season)
             self._frame_builds += land.builds - n0
-            self._build_spent += time.perf_counter() - t
+            self._budget.spend(t)
         if img is not None:
             self._blit_centre(screen, img, cx, cy)
             return
@@ -1197,7 +1195,7 @@ class MapView:
         n0 = land.object_builds
         objs = land.objects(pos, r, season)
         self._frame_objs += land.object_builds - n0
-        self._build_spent += time.perf_counter() - t
+        self._budget.spend(t)
         return objs
 
     def _object_pass(self, screen, view_rect, origin, rows, known, season):
@@ -1207,7 +1205,7 @@ class MapView:
         world, r = self.world, self.r
         ox, oy = origin
         row0, row1, col0, col1 = rows[0] - 1, rows[1] + 1, rows[2] - 1, rows[3] + 1
-        end = time.perf_counter() + LAND_BUILD_MS / 1000        # the object lists get their own slice of time
+        objs_slice = FrameBudget(LAND_BUILD_MS).start()          # the object lists get their own slice of time
         items = []
         vl, vt, vr, vb = view_rect.left, view_rect.top, view_rect.right, view_rect.bottom
         for row in range(max(0, row0), min(world.rows - 1, row1) + 1):
@@ -1215,7 +1213,7 @@ class MapView:
                 pos = (col, row)
                 if pos not in known:
                     continue
-                build = self._may_build(self._frame_objs, end)
+                build = self._may_build(self._frame_objs, objs_slice)
                 objs = self._objects_of(pos, r, season, build)
                 if objs is None:
                     continue
@@ -1239,10 +1237,10 @@ class MapView:
         build is only started if at least half of it fits in the time left."""
         world, land = self.world, self.land
         now = time.perf_counter()
-        end = self._frame_start + LAND_IDLE_MS / 1000
-        if self._pan != (0.0, 0.0) and now - self._frame_start < PREFETCH_LATE_MS / 1000:
-            end = max(end, now + PREFETCH_MIN_MS / 1000)
-        if now >= end:
+        idle = FrameBudget(LAND_IDLE_MS).start(t0=self._budget.t0)
+        if self._pan != (0.0, 0.0) and now - self._budget.t0 < PREFETCH_LATE_MS / 1000:
+            idle.extend(now, PREFETCH_MIN_MS)
+        if not idle.fits(now=now):
             return
         if self._pf_version != world.version:
             self._pf_done.clear()
@@ -1265,14 +1263,14 @@ class MapView:
                 continue
             t = time.perf_counter()
             if land.ground(pos, r, season, build=False) is None:
-                if t + cost["g"] * PREFETCH_FIT >= end:
+                if not idle.fits(cost["g"] * PREFETCH_FIT * 1000, t):
                     break
                 land.prepare(pos, r, season)
                 land.ground(pos, r, season)
                 cost["g"] += (time.perf_counter() - t - cost["g"]) * 0.2
             t = time.perf_counter()
             if land.objects(pos, r, season, build=False) is None:
-                if t + cost["o"] * PREFETCH_FIT >= end:
+                if not idle.fits(cost["o"] * PREFETCH_FIT * 1000, t):
                     break
                 land.make_sprites(pos, r, season)
                 land.objects(pos, r, season)
