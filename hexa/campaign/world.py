@@ -13,15 +13,15 @@ from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, resources, state, tech
 from .state import Garrison, Market, Route, Unit, War, fill_defaults
-from .systems import colonies, worldgen
+from .systems import building, colonies, worldgen
 from .data import (BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP,
                    GARRISON_REGEN, GENERAL, GENERAL_BONUS, GENERAL_STACK, GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT, STACK_BASE,
                    SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_COST, UPGRADE_MAX, troop,
-                   BUILD_TURNS, ATTRITION, FARM_GOODS, FOOD_PER_TROOP, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER,
+                   ATTRITION, FARM_GOODS, FOOD_PER_TROOP, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER,
                    SUPPLY_BASE, SUPPLY_PER_FARM, SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, BURGHER_TAX, CARAVEL, CARRACK, COLONIST, COLONIST_PEOPLE,
-                   COLONY_DONE, COLONY_UPKEEP, ELASTICITY, END_YEAR, PIONEER, WORKS, WORKS_BONUS,
-                   WORKS_COST, WORKS_UPKEEP, SETTLEMENTS, SETTLEMENT_COST, SETTLEMENT_POP, SETTLEMENT_SLOTS,
-                   SETTLEMENT_TAX, SETTLEMENT_UPKEEP, CASTLES, CASTLE_COST, CASTLE_UPKEEP, CASTLE_DEFENSE,
+                   COLONY_DONE, COLONY_UPKEEP, ELASTICITY, END_YEAR, PIONEER, WORKS_BONUS,
+                   WORKS_UPKEEP, SETTLEMENTS,
+                   SETTLEMENT_TAX, SETTLEMENT_UPKEEP, CASTLES, CASTLE_UPKEEP, CASTLE_DEFENSE,
                    CASTLE_SIEGE,
                    GOODS, MARKET_REACH, MARKETPLACE_CAPACITY, MERCHANT_CAPACITY, NEEDS,
                    OUTPUT, PEASANT_TAX, PORT_CAPACITY, PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX, REMOTE_PENALTY,
@@ -52,12 +52,7 @@ Province, Country = state.Province, state.Country   # saves pickle every state c
 CLASSES = ("peasants", "burghers", "nobles")
 BIG_EMPIRE = 300                                        # provinces that start a country with drill yards
 ROUTE_KEYS = ("market_reach", "sea_range", "atlantic")  # effects that change the trade routes
-BUILDING_TECH = {"ropewalk": ("ropewalk", "ropewalk"), "powder_mill": ("powder_mill", "corned_powder"),
-                 "glassworks": ("glass_leather", "glass_leather"), "tannery": ("glass_leather", "glass_leather"),
-                 "university": ("university", "universities")}   # building -> (flag, tech key)
-from .data import (CASTLE_GOODS, ERAS as _ERAS, GALLEON, MANUFACTORIES, MINE_GOODS, PLANTATION_GOODS,
-                   SETTLEMENT_GOODS, WORKS_ERA, WORKS_GOODS, WORKS_LEVELS, DEBT_FLOOR, DEBT_INTEREST, DEBT_SEASONS,
-                   with_article as _with_article)
+from .data import GALLEON, MANUFACTORIES, MINE_GOODS, DEBT_FLOOR, DEBT_INTEREST, DEBT_SEASONS
 
 
 def _europe_region(lon, lat):
@@ -1237,161 +1232,38 @@ class CampaignWorld:
 
     # ----- building -----------------------------------------------------------------
     def building_name(self, prov, key):
-        if key == "settlement":
-            return SETTLEMENTS[min(3, prov.settlement + 1)]
-        if key == "castle":
-            return CASTLES[min(3, prov.castle + 1)]
-        return BUILDINGS[key].name
+        return building.building_name(self, prov, key)
 
     def works_name(self, prov, level=None):
-        level = prov.works if level is None else level
-        if not prov.good or prov.good not in WORKS or level <= 0:
-            return ""
-        return WORKS[prov.good][level - 1]
+        return building.works_name(self, prov, level)
 
     def slots_used(self, prov):
-        built = sum(1 for v in prov.buildings.values() if v)
-        return built + sum(1 for item in prov.queue if item[0] in BUILDINGS and not prov.level(item[0]))
-
-    def goods_price(self, prov, goods):
-        """What these goods cost on the province's market (ducats)."""
-        market = prov.market
-        return sum(n * (market.price[g] if market else GOODS[g].price * 1.5) for g, n in goods.items())
-
-    @staticmethod
-    def _buy(prov, goods):
-        """Book the goods as a purchase on the local market (it shows up in next season's demand)."""
-        if prov.market:
-            for g, n in goods.items():
-                prov.market.pending[g] = prov.market.pending.get(g, 0) + n
+        return building.slots_used(self, prov)
 
     def build_goods(self, prov, key):
-        if key == "settlement":
-            return SETTLEMENT_GOODS[min(3, prov.settlement + 1)]
-        if key == "castle":
-            return CASTLE_GOODS[min(3, prov.castle + 1)]
-        return {}
+        return building.build_goods(self, prov, key)
 
     def build_cost(self, prov, key):
-        if key == "settlement":
-            base = SETTLEMENT_COST[min(3, prov.settlement + 1)]
-        elif key == "castle":
-            base = CASTLE_COST[min(3, prov.castle + 1)] * (1 + self.bonus(prov.owner, "castle_cost"))
-        else:
-            return BUILDINGS[key].cost * (prov.level(key) + 1)
-        return round(base + self.goods_price(prov, self.build_goods(prov, key)))
-
-    def _job_check(self, tag, prov):
-        if prov.owner != tag:
-            return False, "Not your province"
-        if prov.controller != tag:
-            return False, "The province is occupied"
-        if prov.busy:
-            return False, "This province already did its job this season"
-        return True, ""
+        return building.build_cost(self, prov, key)
 
     def build_check(self, tag, prov, key):
-        ok, reason = self._job_check(tag, prov)
-        if not ok:
-            return ok, reason
-        if prov.queue:
-            return False, "Something is already under construction here"
-        if key == "settlement":
-            nxt = prov.settlement + 1
-            if nxt > 3:
-                return False, "Already a city"
-            if prov.pop < SETTLEMENT_POP[nxt]:
-                return False, f"A {SETTLEMENTS[nxt].lower()} needs {SETTLEMENT_POP[nxt]}k people (has {prov.pop:.0f}k)"
-        elif key == "castle":
-            if prov.castle >= 3:
-                return False, "Already a large castle"
-            if prov.castle >= self.castle_top(tag):
-                return False, "A large castle needs the Trace italienne tech"
-            if prov.colony and prov.castle >= 1:
-                return False, "Young colonies can only build a tower"
-        else:
-            b = BUILDINGS[key]
-            level = prov.level(key)
-            if level >= self.building_max(tag, key):
-                return False, "Already at the highest level"
-            if key in BUILDING_TECH and not self.has(tag, BUILDING_TECH[key][0]):
-                return False, f"Needs the {tech.tech(BUILDING_TECH[key][1]).name} tech"
-            if key == "university" and prov.settlement < 3:
-                return False, "Universities need a city"
-            if b.needs_coast and not prov.coastal:
-                return False, "Needs a coastal province"
-            if key == "shipyard" and not prov.level("port"):
-                return False, "Build a port first"
-            if not level and self.slots_used(prov) >= SETTLEMENT_SLOTS[prov.settlement]:
-                if not prov.settlement:
-                    return False, "Needs a village (or bigger) first"
-                return False, (f"No free building slots ({SETTLEMENT_SLOTS[prov.settlement]} in a "
-                               f"{SETTLEMENTS[prov.settlement].lower()})")
-            if b.needs_burghers and prov.burghers < b.needs_burghers * (level + 1) * 0.5:
-                return False, f"Needs about {b.needs_burghers * (level + 1):.0f}k burghers to staff it"
-            if prov.colony and key not in ("port", "marketplace"):
-                return False, "Colonies can only build ports and marketplaces"
-        cost = self.build_cost(prov, key)
-        if self.countries[tag].treasury < cost:
-            return False, f"Costs {cost} ducats"
-        return True, ""
+        return building.build_check(self, tag, prov, key)
 
     def build(self, tag, prov, key):
-        if not self.build_check(tag, prov, key)[0]:
-            return False
-        resources.spend(self, tag, self.build_cost(prov, key), "build", prov.pos)
-        self._buy(prov, self.build_goods(prov, key))
-        prov.queue.append([key, BUILD_TURNS])
-        prov.busy = True
-        self.message(f"{self.place(prov)}: started {_with_article(self.building_name(prov, key))} "
-                     f"(ready in {BUILD_TURNS} seasons).", tag)
-        return True
+        return building.build(self, tag, prov, key)
 
     # ----- province investment: raise a goods tile one level, from the province panel ------------
     def invest_goods(self, prov):
-        return dict(WORKS_GOODS[prov.works]) if prov.works < WORKS_LEVELS else {}
+        return building.invest_goods(self, prov)
 
     def invest_cost(self, prov):
-        """Ducats for the next level: a fee plus the goods it needs, at local prices."""
-        if prov.works >= WORKS_LEVELS:
-            return 0
-        cost = WORKS_COST[prov.works] + self.goods_price(prov, self.invest_goods(prov))
-        if prov.good in FARM_GOODS:
-            cost *= 1 + self.bonus(prov.owner, "farm_invest")
-        return round(cost)
+        return building.invest_cost(self, prov)
 
     def invest_check(self, tag, prov):
-        ok, reason = self._job_check(tag, prov)
-        if not ok:
-            return ok, reason
-        if not prov.good or prov.good not in WORKS:
-            return False, "Nothing to develop here"
-        if prov.works >= WORKS_LEVELS:
-            return False, f"Fully developed ({self.works_name(prov)})"
-        era = WORKS_ERA[prov.works]
-        if self.countries[tag].era < era:
-            return False, f"The next level needs the {_ERAS[era][0]}"
-        if prov.good in PLANTATION_GOODS and prov.works >= 2 and not self.has(tag, "plantations"):
-            return False, "Plantation levels 3 and up need the Plantations tech"
-        if prov.colony and prov.works >= 2:
-            return False, "Young colonies can only reach level 2"
-        cost = self.invest_cost(prov)
-        if self.countries[tag].treasury < cost:
-            return False, f"Costs {cost} ducats"
-        return True, ""
+        return building.invest_check(self, tag, prov)
 
     def invest(self, tag, prov):
-        if not self.invest_check(tag, prov)[0]:
-            return False
-        resources.spend(self, tag, self.invest_cost(prov), "invest", prov.pos)
-        self._buy(prov, self.invest_goods(prov))
-        prov.works += 1
-        prov.busy = True
-        self.message(f"{self.place(prov)}: upgraded to {self.works_name(prov).lower()} "
-                     f"(+{WORKS_BONUS * prov.works * 100:.0f}% {GOODS[prov.good].name.lower()}).", tag)
-        self.bus.emit("investment_done", tag, prov.pos, level=prov.works)
-        self.changed()
-        return True
+        return building.invest(self, tag, prov)
 
     # ----- units --------------------------------------------------------------------
     def unit_cost(self, prov, kind):
@@ -1429,7 +1301,7 @@ class CampaignWorld:
         return war <= self.stack_limit(owner, everyone) and civilians <= CIVILIAN_LIMIT and generals <= 1
 
     def recruit_check(self, tag, prov, kind):
-        ok, reason = self._job_check(tag, prov)
+        ok, reason = building.job_check(self, tag, prov)
         if not ok:
             return ok, reason
         country = self.countries[tag]

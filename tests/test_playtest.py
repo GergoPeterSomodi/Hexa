@@ -20,7 +20,8 @@ from hexa.campaign import app as appmod  # noqa: E402
 from hexa.campaign.app import CampaignApp, _ordinal  # noqa: E402
 from hexa.campaign.data import GENERAL, WORKS, troop  # noqa: E402
 from hexa.ui.kit import fit, wrap  # noqa: E402
-from hexa.campaign.world import CampaignWorld, _with_article  # noqa: E402
+from hexa.campaign.data import with_article as _with_article  # noqa: E402
+from hexa.campaign.world import CampaignWorld  # noqa: E402
 from hexa.hexgrid import neighbors  # noqa: E402
 
 

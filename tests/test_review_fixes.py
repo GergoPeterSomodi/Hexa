@@ -21,7 +21,8 @@ from hexa.campaign import ai  # noqa: E402
 from hexa.campaign.app import CampaignApp  # noqa: E402
 from hexa.campaign.data import troop  # noqa: E402
 from hexa.campaign.mapview import MapView  # noqa: E402
-from hexa.campaign.world import CampaignWorld, Market, _with_article  # noqa: E402
+from hexa.campaign.data import with_article as _with_article  # noqa: E402
+from hexa.campaign.world import CampaignWorld, Market  # noqa: E402
 from tests.test_passes import SUMMER, WINTER, infantry  # noqa: E402
 
 GOTTHARD = (135, 52)                        # across the Roncesvalles pass edge from STALL: with the passes shut Iberia has no way in

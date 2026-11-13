@@ -195,6 +195,10 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   season's `grow()` loop: `settlers` (the growth bonus and arriving settlers), `natives` (natives settling and raiding)
   and `graduate` (a colony becomes a province). `grow()` calls them where that code used to sit, so the order of
   changes and random draws is unchanged.
+- **Building** (`systems/building.py`): `build_check`/`build` and `invest_check`/`invest` with their helpers (`build_cost`,
+  `build_goods`, `invest_cost`, `invest_goods`, `building_name`, `works_name`, `slots_used`, `goods_price`) and `job_check`
+  (a province does one job a season; the military module shares it). `BUILDING_TECH` lives there. `CampaignWorld` keeps a
+  facade for each one called from outside; a `*_check` and its action stay a pair, and the facade is the same pair.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of
