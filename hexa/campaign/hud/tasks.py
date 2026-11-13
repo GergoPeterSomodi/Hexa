@@ -110,7 +110,9 @@ class Tasks:
         label = f"{len(found)} thing{'' if len(found) == 1 else 's'} to do"
         width = kit.flag_width(ctx, label)
         hint = "The things to do before the season ends: click for the list"
-        self.flag = kit.flag(ctx, (view.right - 10 - width, view.y + FLAG_TOP, width, FLAG_H), "tasks", label,
+        # under End season; with a side panel open, on the map beside the panel (its header and close button stay clear)
+        right = ctx.panel_rect().left - 10 if ctx.ui.panel else view.right - 10
+        self.flag = kit.flag(ctx, (right - width, view.y + FLAG_TOP, width, FLAG_H), "tasks", label,
                              ("tasks",), hint, self.open)
         if self.open:
             self._list(ctx, found)

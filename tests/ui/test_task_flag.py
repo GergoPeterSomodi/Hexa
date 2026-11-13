@@ -60,6 +60,7 @@ class FlagCase(harness.UITestCase):
 class ShowsTest(FlagCase):
     def test_the_flag_shows_the_count_under_end_season(self):
         app = self.start()
+        app.ui.panel = None                     # the campaign opens the country panel: the flag then sits beside it
         self.run_loop(3)
         n = len(self.tasks.lines(app))
         self.assertGreater(n, 0, "the start of Portugal has things to do")
@@ -175,9 +176,11 @@ class ListTest(FlagCase):
         app = self.start()
         app.open_country("POR")
         self.run_loop(3)
+        self.assertEqual(self.tasks.flag.right, app.panel_rect().left - 10, "beside the panel, on the map")
         self.click_flag()
         self.assertTrue(self.tasks.open)
         self.assertEqual(app.ui.panel, "country", "the click on the flag did not reach the panel")
+        self.assertLessEqual(self.tasks.box.right, app.panel_rect().left, "the list opens over the map")
 
     def test_the_list_never_changes_the_world(self):
         app = self.start()
