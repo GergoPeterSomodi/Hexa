@@ -3,6 +3,7 @@ the replay's own schedule (campaign/replay.py): visible steps only, countries in
 the ribbons waiting for a hex. Pygame-free. The window's side is in tests/ui/test_replay_window.py.
 Run with: python -m unittest tests.test_replay"""
 import unittest
+from types import SimpleNamespace
 
 from hexa.campaign.replay import MAX_FRAME, MIN_STEP, PACE, Replay
 from hexa.events import Event
@@ -241,6 +242,40 @@ def Replay_with(event, speed="normal"):
     r = Replay()
     r.record(event, speed)
     return r
+
+
+class SecondWalkTest(unittest.TestCase):
+    def test_a_unit_ordered_again_mid_replay_walks_its_second_leg_after_the_first(self):
+        r = Replay()
+        r.record(moved("FRA", row(5), ids=(1,)))
+        r.schedule()
+        for _ in range(4):
+            r.advance(16)
+        r.record(moved("FRA", [(4, 5), (5, 5), (6, 5)], ids=(1,)))
+        r.schedule()
+        first, second = r.legs
+        self.assertEqual(second.start, first.end, "after the first leg, not at once")
+        drawn = []
+        while r.active:
+            r.advance(16)
+            for pose in r.poses():
+                if pose.ids == (1,):
+                    drawn.append((pose.a, pose.b))
+        hexes = []
+        for a, b in drawn:
+            for h in (a, b):
+                if h not in hexes:
+                    hexes.append(h)
+        self.assertEqual(hexes, [(i, 5) for i in range(7)], "every hex of both legs, in order, no jump")
+
+    def test_pick_ignores_the_hex_of_a_stack_still_walking(self):
+        r = Replay()
+        r.record(moved("FRA", row(4), ids=(1,)))
+        world = SimpleNamespace(units_at=lambda pos: [SimpleNamespace(id=1)] if pos == (3, 5) else [])
+        self.assertIsNone(r.pick(world, (3, 5)), "its picture is not there yet")
+        self.assertEqual(r.pick(world, (2, 5)), (2, 5))
+        r.skip()
+        self.assertEqual(r.pick(world, (3, 5)), (3, 5))
 
 
 if __name__ == "__main__":

@@ -180,7 +180,7 @@ class CampaignApp:
         rect = self.view_rect()
         if not rect.collidepoint(pixel) or self.hud.covers(self, pixel):
             return None
-        return self.view.hex_at(pixel[0] - rect.x + self.camera[0], pixel[1] - rect.y + self.camera[1])
+        return self.ui.replay.pick(self.world, self.view.hex_at(pixel[0] - rect.x + self.camera[0], pixel[1] - rect.y + self.camera[1]))
 
     # ----- state -----------------------------------------------------------------------
     @property

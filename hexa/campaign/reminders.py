@@ -67,7 +67,7 @@ def idle_merchants(world, tag):
         return None
     mine = world.merchant_markets(tag)
     for route in world.routes:
-        if (route.a in mine or route.b in mine) and world.merchant_options(tag, route):
+        if (route.a in mine or route.b in mine) and any(o[3] > 0 for o in world.merchant_options(tag, route)):
             market = route.a if route.a in mine else route.b
             return Reminder("merchant", f"{_plural(free, 'merchant has', 'merchants have')} no orders",
                             "Open the market", ("market", market))
@@ -101,12 +101,22 @@ def _garrisoning(world, tag, unit):
     return bool(prov and prov.owner == tag and prov.castle)
 
 
+def _holding(world, tag, unit):
+    """Standing in one of the player's own towns or cities, or in an enemy province it occupies in a war."""
+    prov = world.provinces.get(unit.pos)
+    if not prov:
+        return False
+    if prov.owner == tag:
+        return prov.settlement >= 2
+    return prov.controller == tag and prov.owner is not None and world.at_war(tag, prov.owner)
+
+
 def idle_armies(world, tag):
     stacks = {}
     for unit in world.units_of(tag):
         if (unit.kind.war and not unit.naval and unit.carrier is None and unit.moves_left > 0 and unit.goal is None
                 and not (unit.acted or unit.attacked or unit.foraged_turn == world.turn)
-                and not _sieging(world, tag, unit) and not _garrisoning(world, tag, unit)):
+                and not _sieging(world, tag, unit) and not _garrisoning(world, tag, unit) and not _holding(world, tag, unit)):
             stacks.setdefault(unit.pos, []).append(unit)
     if not stacks:
         return None

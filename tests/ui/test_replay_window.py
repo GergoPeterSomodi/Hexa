@@ -231,6 +231,74 @@ class OwnMovesTest(ReplayCase):
         self.assertEqual(app.ui.replay.pending[0].count, 1)
 
 
+class HoverAndSelectionTest(ReplayCase):
+    def test_no_hover_or_pick_on_the_destination_of_a_walking_stack_and_it_is_not_drawn_selected(self):
+        app = self.start()
+        group, start, dest, path = self.season_with_walk(seen=True)
+        app.look_at(path[len(path) // 2])
+        app.draw()
+        pixel = hex_pixel(app, dest)
+        self.assertIsNone(app.hex_under(pixel), "the stack is still walking: nothing there")
+        drawn = []
+        real = app.view._draw_stack
+        app.view._draw_stack = lambda screen, stack, top, point, selected: (
+            drawn.append((group[0] in stack, selected)), real(screen, stack, top, point, selected))
+        app.ui.replay.t = app.ui.replay.legs[0].step * 1.5
+        app.draw()
+        self.assertIn((True, False), drawn, "an enemy stack walking is not drawn as the player's selection")
+        app.ui.replay.skip()
+        self.assertEqual(app.hex_under(pixel), dest)
+
+
+class ShippedDefaultsTest(harness.UITestCase):
+    def test_seasons_with_the_shipped_options_go_through_the_reminders_and_the_replay(self):
+        from unittest import mock
+        import play
+        from hexa import settings
+        from hexa.campaign import ai
+        from hexa.campaign.app import CampaignApp
+        from hexa.campaign.screens.reminders import ReminderScreen
+        from tests import SHIPPED_DEFAULTS
+        settings.save(dict(SHIPPED_DEFAULTS))
+        app = CampaignApp(play.TILES_DIR, "POR")
+        w = app.world
+        self.assertEqual((app.settings["movement"], app.settings["reminders"]), ("normal", True))
+        group = next(g for g in ([u for u in w.units_at(x.pos) if u.owner == "CAS"] for x in w.units_of("CAS")
+                                 if not x.naval) if any(len(w.route(g, p)) >= 4 for p in w.reachable_group(g)))
+        dest = next(p for p in sorted(w.reachable_group(group)) if len(w.route(group, p)) >= 4)
+        path = w.route(group, dest)
+        real, walked = ai.run, []
+
+        def run(world, who):
+            if who == "CAS" and not walked:
+                walked.append(1)
+                world.visible = world.visible | set(path)
+                world.move_group(group, dest)
+            return real(world, who)
+
+        def loop(frames, *steps, until=None):
+            self.driver.reset()
+            app.running, app.result = True, None
+            for frame, events in steps:
+                self.driver.at(frame, events)
+            self.driver.run_for(frames, until)
+            app.run()
+        with mock.patch.object(ai, "run", run):
+            loop(6, (1, harness.key("space")))
+            self.assertIsInstance(app.screens.top, ReminderScreen)
+            self.assertEqual(w.turn, 1)
+            loop(10, (1, harness.key("return")), until=lambda: w.turn == 2)
+        self.assertEqual(w.turn, 2)
+        self.assertTrue(app.ui.replay.active, "the walk of the other country is being shown")
+        loop(30, (1, harness.key("space")))                      # the first Space skips the replay
+        self.assertFalse(app.ui.replay.active)
+        self.assertEqual(w.turn, 2)
+        loop(6, (1, harness.key("space")))
+        self.assertIsInstance(app.screens.top, ReminderScreen)
+        loop(20, (1, harness.key("return")), until=lambda: w.turn == 3)
+        self.assertEqual(w.turn, 3)
+
+
 class DrawingTest(ReplayCase):
     def test_drawing_frames_never_changes_the_world(self):
         import pickle

@@ -528,7 +528,7 @@ class MapView:
         for ids, point in walking:
             stack = [u for u in world.units if u.id in ids]
             if stack:
-                self._draw_stack(screen, stack, max(stack, key=lambda u: (u.kind.war, u.kind.naval, u.id)), point, True)
+                self._draw_stack(screen, stack, max(stack, key=lambda u: (u.kind.war, u.kind.naval, u.id)), point, any(u in group for u in stack))
 
     def _draw_stack(self, screen, stack, top, point, selected):
         if self.zoom >= TILE_FROM and self.tiles_dir:

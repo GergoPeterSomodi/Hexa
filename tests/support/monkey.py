@@ -397,10 +397,10 @@ def _open(mode, setup, seed):
         return ColonyApp(pygame.display.set_mode(WINDOW_SIZE), play.TILES_DIR, setup["map"], setup["start"],
                          setup["goal"])
     from hexa.campaign.app import CampaignApp
-    app = CampaignApp(play.TILES_DIR, setup["nation"])
     if seed % 2:        # odd seeds play with the movement replay on, seeds 1, 5, 9 ... also with the reminders, as the game
-        app.settings.update(movement="normal", reminders=seed % 4 == 1)     # ships (tests/__init__.py turns both off)
-    return app
+        from hexa import settings           # ships: written to the session's HEXA_HOME before the window reads it
+        settings.save(dict(settings.DEFAULTS, movement="normal", reminders=seed % 4 == 1))
+    return CampaignApp(play.TILES_DIR, setup["nation"])
 
 
 class _Session:

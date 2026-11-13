@@ -137,6 +137,9 @@ class Replay:
             offsets, total = _span(group, step)
             for leg in group:
                 leg.start, leg.step = begin + offsets[leg], step
+                for old in self.legs:               # a unit ordered again walks on after its unfinished walk
+                    if set(old.ids) & set(leg.ids):
+                        leg.start = max(leg.start, old.end)
             begin += total
         self.legs.extend(legs)
 
@@ -165,6 +168,12 @@ class Replay:
                 claimed.update(ids)
                 out.append(pose._replace(ids=ids))
         return out
+
+    def pick(self, world, pos):
+        """The hex under the mouse, or None while a stack the replay is walking stands (in the world) on it: its
+        picture is elsewhere, so a hover card or a click there would name the wrong thing."""
+        walking = {uid for pose in self.poses() for uid in pose.ids}
+        return None if walking and any(u.id in walking for u in world.units_at(pos)) else pos
 
     def ready_at(self, pos):
         """The replay time (ms) at which a walk has got to `pos` or next to it: when the ribbons of a battle or a

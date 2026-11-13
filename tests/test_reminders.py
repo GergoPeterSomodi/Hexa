@@ -108,6 +108,14 @@ class MerchantTest(RuleCase):
         self.c.orders = [("r", "grain", "x")] * self.w.merchants("POR")
         self.assertIsNone(R.idle_merchants(self.w, "POR"))
 
+    def test_only_an_order_with_a_positive_margin_counts(self):
+        loss = (("grain", None, None, -1.0, 5.0),)
+        gain = (("grain", None, None, 0.5, 5.0),)
+        self.w.merchant_options = lambda tag, route: loss
+        self.assertIsNone(R.idle_merchants(self.w, "POR"))
+        self.w.merchant_options = lambda tag, route: gain
+        self.assertIsNotNone(R.idle_merchants(self.w, "POR"))
+
     def test_no_route_with_anything_to_carry_is_nothing_to_remind(self):
         self.w.merchant_options = lambda tag, route: []
         self.assertIsNone(R.idle_merchants(self.w, "POR"))
@@ -174,6 +182,22 @@ class ArmyTest(RuleCase):
         unit = self.army()
         prov = self.w.provinces[unit.pos]
         prov.controller = "CAS"                        # held by another country: the army is sieging it
+        self.w.at_war = lambda a, b: True
+        self.assertIsNone(R.idle_armies(self.w, "POR"))
+
+    def test_an_army_in_an_own_town_or_city_is_holding_not_idle(self):
+        unit = self.army()
+        prov = self.w.provinces[unit.pos]
+        for level, idle in ((0, True), (1, True), (2, False), (3, False)):
+            prov.settlement = level
+            self.assertEqual(R.idle_armies(self.w, "POR") is not None, idle, level)
+
+    def test_an_army_in_an_enemy_province_it_occupies_in_a_war_is_holding(self):
+        unit = self.army()
+        prov = self.w.provinces[unit.pos]
+        prov.owner, prov.controller = "CAS", "POR"
+        self.w.at_war = lambda a, b: False
+        self.assertIsNotNone(R.idle_armies(self.w, "POR"), "no war: nothing held")
         self.w.at_war = lambda a, b: True
         self.assertIsNone(R.idle_armies(self.w, "POR"))
 
