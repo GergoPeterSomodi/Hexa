@@ -202,6 +202,10 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - **Military** (`systems/military.py`): `unit_cost`, `raise_options`, `stack_limit`, `can_stand`, `recruit_check`/`recruit`,
   `refit_check`/`refit` and `upgrade_cost`/`upgrade_check`/`upgrade`, all with facades. `land_spot` stays on `CampaignWorld`
   (it reads the pass walls, which move with step 3.10); the module calls it as `world.land_spot`.
+- **Debt** (`systems/debt.py`): `debt_limit`, `troop_order` (who deserts first), `disband`, `seize_one` and `unpaid` (the
+  season's step: desertion, then seizures, then the credit cap). The facades are `debt_limit`, `disband` and `_unpaid`.
+  The module reaches the world's private parts only through two public names added for it: `world.kill` (the old
+  `_kill`) and `world.forget_castles()` (drops the `castles()` cache). The bankruptcy feature builds on these functions.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of

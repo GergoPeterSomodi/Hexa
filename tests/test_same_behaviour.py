@@ -82,7 +82,7 @@ class SameBehaviourTest(unittest.TestCase):
             "hills": (plant(cls.tmp, "hills", "rules.py", hills, hills[:-1] + "3"), "--only", "conquest"),
             "roads": (plant(cls.tmp, "roads", os.path.join("campaign", "world.py"), "", "", ROAD_PATHS),
                       "--only", "campaign europe"),
-            "seize": (plant(cls.tmp, "seize", os.path.join("campaign", "world.py"), seize,
+            "seize": (plant(cls.tmp, "seize", os.path.join("campaign", "systems", "debt.py"), seize,
                             seize.replace("(-saving", "(saving")), "--only", "debt"),
             "crash": (plant(cls.tmp, "crash", os.path.join("campaign", "world.py"), "", "", CRASH),
                       "--only", "campaign europe"),

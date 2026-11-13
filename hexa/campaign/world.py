@@ -13,7 +13,7 @@ from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, resources, state, tech
 from .state import Garrison, Market, Route, Unit, War, fill_defaults
-from .systems import building, colonies, military, worldgen
+from .systems import building, colonies, debt, military, worldgen
 from .data import (BRANCHES, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP, GARRISON_REGEN, GENERAL,
                    GENERAL_BONUS, GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT,
                    SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX, troop, ATTRITION, FARM_GOODS, FOOD_PER_TROOP,
@@ -27,7 +27,6 @@ from .data import (BRANCHES, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, 
                    SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE)
 
 INF = float("inf")
-TROOP_FOOD = FOOD_PER_TROOP * 1.5       # grain a troop eats a season, at the 1.5 ducat price used without a market
 SCALE = geo.SCALE
 _RANDOM_GEOS = {}         # seed -> random geography (only the last few kept)
 _SNAPSHOTS = {}           # (map, seed) -> pickled freshly built world: building the map takes seconds
@@ -49,7 +48,7 @@ Province, Country = state.Province, state.Country   # saves pickle every state c
 CLASSES = ("peasants", "burghers", "nobles")
 BIG_EMPIRE = 300                                        # provinces that start a country with drill yards
 ROUTE_KEYS = ("market_reach", "sea_range", "atlantic")  # effects that change the trade routes
-from .data import MANUFACTORIES, MINE_GOODS, DEBT_FLOOR, DEBT_INTEREST, DEBT_SEASONS
+from .data import MANUFACTORIES, MINE_GOODS, DEBT_INTEREST
 
 
 def _europe_region(lon, lat):
@@ -1078,110 +1077,13 @@ class CampaignWorld:
                 country.treasury += country.balance
 
     def debt_limit(self, tag):
-        """Ducats a country may owe before its creditors act: DEBT_FLOOR, or DEBT_SEASONS seasons of its
-        running costs (upkeep, army and colonies) if that is more. Interest stops at the limit too."""
-        income = self.countries[tag].income
-        costs = -(income.get("upkeep", 0.0) + income.get("military", 0.0) + income.get("colonies", 0.0))
-        return max(DEBT_FLOOR, DEBT_SEASONS * costs)
-
-    def _troop_order(self, tag):
-        """The land troops of tag in the order they desert or are disbanded: oldest era first, then the
-        weakest, then those furthest from the capital. The general is never among them."""
-        capital = self.countries[tag].capital
-        troops = [u for u in self.units_of(tag) if u.kind.war and not u.naval]
-        return sorted(troops, key=lambda u: (u.kind.era, u.hp, -distance(u.pos, capital)))
+        return debt.debt_limit(self, tag)
 
     def disband(self, tag, need, why="disbanded"):
-        """Remove troops of tag (see _troop_order) until about `need` ducats a season are saved.
-        Returns (ducats saved, the units removed)."""
-        country = self.countries[tag]
-        saved, gone = 0.0, []
-        for unit in self._troop_order(tag):
-            if saved >= need:
-                break
-            saved += unit.kind.upkeep + TROOP_FOOD
-            self._kill(unit, why)
-            gone.append(unit)
-        country.income["military"] = country.income.get("military", 0.0) + saved
-        return saved, gone
-
-    def _seize_one(self, tag):
-        """Creditors take one level of the costliest thing tag's provinces run (castle, settlement, works or
-        building). Returns (ducats a season saved, label) or None if there is nothing left to take."""
-        best = None
-        for prov in self.provinces_of(tag):
-            if prov.controller != tag:
-                continue
-            options = [(BUILDINGS[k].upkeep, "building", k) for k, lvl in prov.buildings.items() if lvl > 0]
-            if prov.works > 0:
-                options.append((WORKS_UPKEEP, "works", None))
-            if prov.castle > 0:
-                options.append((CASTLE_UPKEEP[prov.castle] - CASTLE_UPKEEP[prov.castle - 1], "castle", None))
-            if prov.settlement > 0:
-                options.append((SETTLEMENT_UPKEEP[prov.settlement] - SETTLEMENT_UPKEEP[prov.settlement - 1],
-                                "settlement", None))
-            for saving, kind, key in options:
-                rank = (-saving, prov.pos, kind, key or "")
-                if best is None or rank < best[0]:
-                    best = (rank, prov, saving, kind, key)
-        if best is None:
-            return None
-        _, prov, saving, kind, key = best
-        if kind == "building":
-            prov.buildings[key] -= 1
-            label = BUILDINGS[key].name
-            if key == "marketplace":
-                self.refresh_markets()
-        elif kind == "works":
-            label = self.works_name(prov)
-            prov.works -= 1
-        elif kind == "castle":
-            label = CASTLES[prov.castle].lower()
-            prov.castle -= 1
-            prov.garrison = min(prov.garrison, prov.castle * GARRISON_HP)
-            self._castle_list = None
-        else:
-            label = SETTLEMENTS[prov.settlement].lower()
-            prov.settlement -= 1
-        self.changed()
-        return saving, f"{label} at {self.place(prov)}"
+        return debt.disband(self, tag, need, why)
 
     def _unpaid(self):
-        """A country over its debt limit that is running a deficit cannot pay: its unpaid troops desert first,
-        then its creditors seize castles, settlements, works and buildings, costliest first, until the season
-        balances. If nothing is left to take, the creditors stop lending at the limit. Each step is logged."""
-        for tag, country in self.countries.items():
-            if not country.alive or country.balance >= 0 or country.treasury >= -self.debt_limit(tag):
-                continue
-            limit = self.debt_limit(tag)
-            need = -country.balance
-            saved, deserted = self.disband(tag, need, "deserted")
-            need -= saved
-            seized = []
-            while need > 0:
-                taken = self._seize_one(tag)
-                if taken is None:
-                    break
-                country.income["upkeep"] = country.income.get("upkeep", 0.0) + taken[0]
-                need -= taken[0]
-                seized.append(taken)
-            if country.balance < 0 and country.treasury < -limit:
-                # Nothing is left to take and the running costs still outrun the income: the creditors refuse
-                # more credit, so the debt is held at the limit instead of growing without bound.
-                country.treasury = -limit
-                self.message(f"The creditors of {country.name} refuse more credit: its debt is held at "
-                             f"{limit:,.0f} ducats.", tag, "credit")
-            if deserted:
-                counts = {}
-                for unit in deserted:
-                    counts[unit.kind.name] = counts.get(unit.kind.name, 0) + 1
-                names = ", ".join(f"{n} {k}" for k, n in sorted(counts.items()))
-                self.bus.emit("unit_deserted", tag, count=len(deserted), kinds=counts)
-                self.message(f"Unpaid troops desert {country.name}: {names}. The debt of {-country.treasury:,.0f} "
-                             f"ducats is over the limit of {limit:,.0f}.", tag)
-            for saving, label in seized:
-                self.bus.emit("debt_seized", tag, what=label, saving=saving)
-                self.message(f"Creditors seize the {label}, unpaid while {country.name} is in debt.", tag)
+        return debt.unpaid(self)
 
     def grow(self):
         """Population growth, colonies, native raids, building queues."""
@@ -2263,6 +2165,12 @@ class CampaignWorld:
         self._lose(self.cargo(unit), "sunk")
         if unit in self.units:
             self._lose([unit], why)
+
+    kill = _kill                         # the public name the debt module uses
+
+    def forget_castles(self):
+        """Drop the cached list of fortified provinces (castles()), after a castle was lost or built."""
+        self._castle_list = None
 
     def sieges(self):
         """Troops standing in enemy (or lost) provinces take control of them; castles hold out longer."""
