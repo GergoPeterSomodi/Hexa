@@ -7,17 +7,19 @@ import unittest
 
 from hexa import events
 from hexa.campaign import tech
-from hexa.campaign.data import COLONIST, troop
+from hexa.campaign.data import BATTLE_MAX_SEASONS, COLONIST, troop
+from hexa.campaign.systems import battle as battlesys
 from hexa.campaign.world import CampaignWorld, Unit
 from hexa.events import CAMPAIGN_KINDS, Event, EventBus
+from hexa.hexgrid import neighbors
 from tests.support.worlds import fresh
 
 
 class BusTest(unittest.TestCase):
     def test_emit_queues_and_records_history(self):
         bus = EventBus()
-        event = bus.emit("battle", "POR", (3, 4), defender="ESP")
-        self.assertEqual(event, Event("battle", "POR", (3, 4), {"defender": "ESP"}))
+        event = bus.emit("battle_started", "POR", (3, 4), defender="ESP")
+        self.assertEqual(event, Event("battle_started", "POR", (3, 4), {"defender": "ESP"}))
         self.assertEqual(event.get("defender"), "ESP")
         self.assertIsNone(event.get("nothing"))
         self.assertEqual(list(bus.queue), [event])
@@ -174,9 +176,11 @@ class WorldBusTest(unittest.TestCase):
         foe = Unit(9002, troop("infantry", 1), enemy, prov.pos, hp=10)
         mine = Unit(9003, troop("infantry", 1), "POR", prov.pos, hp=10)
         w.units += [foe, mine]
-        w._battle([mine], prov.pos)
-        event = self.one("battle")
-        self.assertEqual((event.tag, event.pos, event.get("defender"), event.get("ranged")), ("POR", prov.pos, enemy, False))
+        mine.pos, mine.moves_left = next(n for n in sorted(neighbors(prov.pos)) if w.is_land(n)), 2
+        w.attack_group([mine], prov.pos)
+        event = self.one("battle_started")
+        self.assertEqual((event.tag, event.pos, event.get("defender"), event.get("assault")), ("POR", prov.pos, enemy, False))
+        self.assertTrue(event.get("name").startswith("Battle of "), event.get("name"))
 
     def test_kind_unit_raised(self):
         w = self.w
@@ -203,7 +207,8 @@ class WorldBusTest(unittest.TestCase):
         w.units.append(here)
         mine = Unit(9011, troop("infantry", 1), "POR", w.countries["POR"].capital, hp=10)
         w.units.append(mine)
-        w._battle([mine], prov.pos)          # only an unarmed colonist defends: overrun
+        mine.pos, mine.moves_left = next(n for n in sorted(neighbors(prov.pos)) if w.is_land(n)), 2
+        w.attack_group([mine], prov.pos)     # only an unarmed colonist defends: overrun
         lost = self.kinds("unit_lost")
         self.assertEqual([(e.tag, e.get("why")) for e in lost], [(enemy, "overrun")])
         self.assertNotIn(here, w.units)
@@ -218,7 +223,13 @@ class WorldBusTest(unittest.TestCase):
         home = w.countries["POR"].capital
         strong = [Unit(9013 + i, troop("infantry", 1), "POR", home, hp=40) for i in range(3)]
         w.units += [weak] + strong
-        w._battle(strong, prov.pos)
+        for unit in strong:
+            unit.pos, unit.moves_left = next(n for n in sorted(neighbors(prov.pos)) if w.is_land(n)), 2
+        w.attack_group(strong, prov.pos)
+        for _ in range(BATTLE_MAX_SEASONS + 2):          # the battle runs its seasons until one side is gone
+            if w.battle_at(prov.pos) is None:
+                break
+            battlesys.battle_season(w)
         whys = {e.get("why") for e in self.kinds("unit_lost") if e.tag == foe}
         self.assertTrue(whys <= {"battle", "storm"} and whys, whys)
         w.bus.clear()

@@ -260,7 +260,7 @@ class FloatingTest(HudCase):
         from hexa.campaign import feed
         hidden = next(pos for pos in self.world.terrain if pos not in self.world.visible
                       and self.on_screen_ignoring_fog(pos))
-        item = feed.FeedItem("battle", "war", "Battle!", hidden, "CAS", 1, "x", False, True)
+        item = feed.FeedItem("battle_started", "war", "Battle!", hidden, "CAS", 1, "x", False, True)
         self.app.hud.floaters.add(self.app, [item], self.driver.now)
         self.assertEqual(self.live(), [])
 
@@ -302,7 +302,8 @@ class ActionLogTest(HudCase):
         pos = self.own_provinces()[0].pos
         for i in range(count):
             self.bus.emit("unit_raised", "POR", pos, what="Pikemen", id=i)
-        self.bus.emit("battle", "CAS", pos, defender="POR", ranged=False, lost=(1, 0), hurt=(2, 0))
+        self.bus.emit("battle_ended", "CAS", pos, attacker="CAS", defender="POR", winner="CAS", loser="POR",
+                      name="Battle of Y, 1480", seasons=1, killed={"CAS": 1, "POR": 2})
         self.frame()
 
     def test_collapsed_by_default_with_a_badge_for_new_lines(self):

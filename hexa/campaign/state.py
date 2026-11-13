@@ -217,7 +217,7 @@ class War:
 
 @dataclass(eq=False)
 class Battle:
-    """The fight on one hex, while both sides' stacks stand there (battle slice 1, PR 1: the data only).
+    """The fight on one hex, while both sides' stacks stand there (battle slice 1).
 
     Units are kept by id: a unit that died, deserted or left is missing, and the battle skips it.
     The battle keeps no unit objects, no bus events and no pygame objects."""
@@ -238,6 +238,7 @@ class Battle:
     garrison_morale: float = 1.0
     log: list = field(default_factory=list)        # (turn, day, text); the last BATTLE_LOG lines
     members: set = field(default_factory=set)      # unit ids that have fought in it (start and joiners); each counts once
+    name: str = ""                # "Battle of X, 1525", set when it starts (decision 5); "" for a battle made before names
 
 
 def fill_defaults(obj):

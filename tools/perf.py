@@ -99,6 +99,37 @@ def ai_season_late():
     return _cpu(lambda: play_seasons(world, 1))
 
 
+def battle_season():
+    """One battles phase with 10 battles of 6 regiments a side (the stack limit without techs), on 10 pairs of hexes of
+    the 1480 map. Only the phase is timed: the battles are started before the clock runs."""
+    from hexa.campaign.data import troop
+    from hexa.campaign.state import War
+    from hexa.campaign.systems import battle as battlesys
+    from hexa.hexgrid import neighbors
+    w = _world_module().CampaignWorld()
+    used, started = set(), 0
+    for prov in sorted(w.provinces.values(), key=lambda p: p.pos):
+        if started == 10:
+            break
+        if prov.owner is None or prov.pos in used or not w.is_land(prov.pos):
+            continue
+        for n in sorted(neighbors(prov.pos)):
+            other = w.provinces.get(n)
+            if other is None or other.owner in (None, prov.owner) or n in used or not w.is_land(n):
+                continue
+            a, d = prov.owner, other.owner
+            if not w.at_war(a, d):
+                w.wars.append(War(a, d, w.turn))
+            attackers = [w.add_unit(troop("infantry", 1), a, prov.pos, moves=0) for _ in range(6)]
+            for _ in range(6):
+                w.add_unit(troop("infantry", 1), d, n, moves=0)
+            if w.engage(attackers, n):
+                used.update({prov.pos, n})
+                started += 1
+            break
+    return _cpu(lambda: battlesys.battle_season(w))
+
+
 _SCREEN = {}
 
 
@@ -149,7 +180,7 @@ def mapview_zoom4():
 
 
 METRICS = {f.__name__: f for f in (europe_build, random_build, snapshot_restore, ai_season, ai_season_late,
-                                   mapview_zoom1, mapview_zoom4)}
+                                   battle_season, mapview_zoom1, mapview_zoom4)}
 PYGAME_METRICS = ("mapview_zoom1", "mapview_zoom4")
 
 

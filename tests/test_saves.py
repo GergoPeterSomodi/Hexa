@@ -211,7 +211,7 @@ class BattleSaveTest(TempHome):
                         men0={fight.attacker: sum(u.men for u in fight.attackers),
                               fight.defender: sum(u.men for u in fight.defenders)},
                         killed={fight.attacker: 100}, wounded={fight.defender: 50},
-                        log=[(w.turn, 0, "Hand-made battle")])
+                        log=[(w.turn, 0, "Hand-made battle")], name="Battle of Test, 1480")
         w.battles.append(battle)
         w.changed()
         return w, fight, battle
@@ -233,8 +233,10 @@ class BattleSaveTest(TempHome):
         self.assertIsNone(back.battle_at(fight.attack_pos))
         kept = next(u for u in back.units if u.id == fight.defenders[1].id)
         self.assertEqual(kept.morale, 0.6)
-        back.end_round()                    # PR 1: no rule acts on a battle yet, so it is still there after a season
-        self.assertIsNotNone(back.battle_at(fight.defend_pos))
+        days = again.days
+        back.end_round()                    # the battles phase fights its days first: the battle went on, or it ended
+        left = back.battle_at(fight.defend_pos)
+        self.assertTrue(left is None or left.days > days, "the next season plays the battle on")
         self.assertEqual(campaign_problems(back), [])
 
     def test_only_the_two_sides_may_share_a_battle_hex(self):

@@ -210,9 +210,11 @@ class FeedTest(unittest.TestCase):
         cases = [
             (("unit_raised", "POR", self.mine, dict(what="Pikemen", id=1)), "own", "Recruited"),
             (("forage", "POR", self.mine, {}), "own", "Foraged"),
-            (("battle", "POR", self.mine, dict(defender="CAS", ranged=False, lost=(1, 2), hurt=(3, 4))), "war",
+            (("battle_started", "POR", self.mine, dict(defender="CAS", assault=False, name="Battle of Y, 1480")), "war",
              "Battle!"),
-            (("battle", "POR", self.mine, dict(defender="CAS", ranged=True)), "war", "Bombardment"),
+            (("battle_ended", "POR", self.mine, dict(attacker="POR", defender="CAS", winner="POR", loser="CAS",
+                                                     name="Battle of Y, 1480", seasons=2,
+                                                     killed={"POR": 300, "CAS": 900})), "war", "Battle over"),
             (("siege_progress", "POR", self.mine, dict(progress=2, need=5)), "siege", "Siege 2/5"),
             (("province_captured", "POR", self.mine, dict(loser="CAS", by="siege")), "gain", "Captured!"),
             (("province_captured", "CAS", self.mine, dict(loser="POR", by="storm")), "loss", "Lost!"),
@@ -244,9 +246,10 @@ class FeedTest(unittest.TestCase):
             self.assertTrue(item.sentence.endswith((".", "!")), item.sentence)
 
     def test_sentences_name_places_and_countries(self):
-        item, _ = self.one("battle", "POR", self.mine, defender="CAS", ranged=False, lost=(1, 2))
-        self.assertIn(self.w.place(self.w.provinces[self.mine]), item.sentence)
-        self.assertIn("Portugal lost 1 unit, Castile lost 2 units", item.sentence)
+        item, _ = self.one("battle_ended", "POR", self.mine, attacker="POR", defender="CAS", winner="POR", loser="CAS",
+                           name="Battle of Y, 1480", seasons=2, killed={"POR": 300, "CAS": 1200})
+        self.assertIn("Battle of Y, 1480 (2 seasons): Portugal beat Castile.", item.sentence)
+        self.assertIn("Portugal lost 300 men, Castile lost 1,200 men", item.sentence)
 
     def test_costs_join_the_sentence(self):
         self.feed.clear()
@@ -264,12 +267,12 @@ class FeedTest(unittest.TestCase):
 
     def test_visibility(self):
         # the other countries' doings are told only inside the player's vision
-        self.assertIsNone(self.one("battle", "FRA", self.fog, defender="CAS", ranged=False)[0])
-        self.assertIsNotNone(self.one("battle", "FRA", self.seen, defender="CAS", ranged=False)[0])
+        self.assertIsNone(self.one("battle_ended", "FRA", self.fog, defender="CAS", winner=None, loser=None)[0])
+        self.assertIsNotNone(self.one("battle_ended", "FRA", self.seen, defender="CAS", winner=None, loser=None)[0])
         self.assertIsNone(self.one("forage", "FRA", self.fog)[0])
         self.assertIsNone(self.one("province_captured", "FRA", self.fog, loser="CAS", by="siege")[0])
         # ... but a party is told wherever it is, and the text floats
-        item, floating = self.one("battle", "FRA", self.fog, defender="POR", ranged=False)
+        item, floating = self.one("battle_ended", "FRA", self.fog, defender="POR", winner=None, loser=None)
         self.assertIsNotNone(item)
         self.assertEqual(len(floating), 1)
         # the AI's recruiting, building and research are never told
@@ -278,14 +281,14 @@ class FeedTest(unittest.TestCase):
             self.assertIsNone(self.one(kind, "FRA", self.seen, **data)[0], kind)
         self.assertIsNone(self.one("war_declared", "FRA", None, target="CAS")[0])
         # seen but not a party: logged and floated, not "mine"
-        item, floating = self.one("battle", "FRA", self.seen, defender="CAS", ranged=False)
+        item, floating = self.one("battle_ended", "FRA", self.seen, defender="CAS", winner=None, loser=None)
         self.assertFalse(item.mine)
         self.assertEqual(len(floating), 1)
 
     def test_without_a_player_everything_with_a_place_is_told(self):
         w = fresh(None)
         feed.of(w)
-        w.bus.emit("battle", "FRA", w.provinces_of("FRA")[0].pos, defender="CAS", ranged=False)
+        w.bus.emit("battle_ended", "FRA", w.provinces_of("FRA")[0].pos, defender="CAS", winner=None, loser=None)
         self.assertEqual(len(feed.of(w).entries()), 1)
 
     def test_siege_lines_only_for_the_players_sieges(self):
@@ -301,7 +304,7 @@ class FeedTest(unittest.TestCase):
 
     def test_filters_and_grouping(self):
         self.feed.clear()
-        self.bus.emit("battle", "FRA", self.seen, defender="CAS", ranged=False)
+        self.bus.emit("battle_ended", "FRA", self.seen, defender="CAS", winner=None, loser=None)
         self.bus.emit("money_spent", "POR", self.mine, amount=5, reason="build")
         self.bus.emit("forage", "FRA", self.seen)
         self.w.turn += 1
@@ -311,7 +314,7 @@ class FeedTest(unittest.TestCase):
         self.assertEqual(len(groups[1][2]), 3)
         self.assertEqual(groups[1][2][0].kind, "forage")                                # newest line first
         kinds = lambda f: [i.kind for _, _, g in self.feed.entries(f) for i in g]
-        self.assertEqual(kinds("war"), ["siege_progress", "battle"])
+        self.assertEqual(kinds("war"), ["siege_progress", "battle_ended"])
         self.assertEqual(kinds("money"), ["money_spent"])
         self.assertEqual(kinds("mine"), ["siege_progress", "money_spent"])
         self.assertEqual(self.feed.unread, 4)

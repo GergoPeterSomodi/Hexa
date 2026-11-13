@@ -47,7 +47,9 @@ def can_stand(world, group, pos, others=None):
     if others is None:
         others = [u for u in world.units_at(pos) if u not in group]
     if any(u.owner != owner for u in others):
-        return False
+        if world.battle_at(pos) is None:
+            return False
+        others = [u for u in others if u.owner == owner]     # a battle hex: each side counts on its own (spec 3.2)
     if group[0].naval:
         return True
     everyone = others + list(group)
@@ -59,6 +61,8 @@ def can_stand(world, group, pos, others=None):
 
 def recruit_check(world, tag, prov, kind):
     """(ok, reason): can this province raise this kind now?"""
+    if world.battle_at(prov.pos) is not None:
+        return False, "A battle is being fought here"
     ok, reason = job_check(world, tag, prov)
     if not ok:
         return ok, reason
@@ -128,6 +132,8 @@ def refit_check(world, unit):
     country = world.countries[unit.owner]
     if not unit.kind.war or unit.kind.era >= country.era:
         return False, "Already the newest kind"
+    if world.battle_at(unit.pos) is not None:
+        return False, "A battle is being fought here"
     prov = world.provinces.get(unit.pos)
     if unit.carrier or not prov or prov.owner != unit.owner or (prov.settlement < 2 and not prov.level("barracks")
                                                                   and not prov.level("foundry")):
@@ -170,6 +176,8 @@ def upgrade_check(world, unit, stat):
     """(ok, reason): can this troop be drilled one level in `stat` where it stands?"""
     if not unit.kind.war:
         return False, "Only troops can be drilled"
+    if world.battle_at(unit.pos) is not None:
+        return False, "A battle is being fought here"
     prov = world.provinces.get(unit.pos)
     need = "foundry" if unit.kind.branch == "artillery" else "barracks"
     if unit.carrier or not prov or prov.owner != unit.owner or not prov.level(need):

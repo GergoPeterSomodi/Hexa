@@ -10,23 +10,26 @@ How a battle ends: "broke", "withdrew" or "surrendered" (a loser), "stalemate" (
 draw), "peace" and "gone" (a draw: peace, a vanished country, or a side with no units or garrison left). A draw has no
 winner and no loser, so it scores nothing.
 
-Functions taking ``world``; World binds the public ones as facades. ``battle_season`` is not in the season's PHASES until
-the switch (PR 4), so nothing fights a battle in a game yet. Nothing here uses pygame, the window or a bus handler.
+Functions taking ``world``; World binds the public ones as facades. ``battle_season`` is the season's ``battles`` phase, the
+first of PHASES (season.py). A battle is named when it starts (decision 5): "Battle of X, 1525", "Second Battle of X,
+1525" for a repeat. Nothing here uses pygame, the window or a bus handler.
 """
 import math
 
-from ...hexgrid import distance, neighbors
+from ...hexgrid import distance, neighbors, within
 from ..data import (ATTACK_MORALE, BATTLE_LOG, BATTLE_MAX_SEASONS, DAYS_PER_SEASON, RETREAT_MORALE, RETREAT_RANGE,
-                    WITHDRAW_PURSUIT, WOUNDED_RETURN)
+                    START_YEAR, TERRAIN, WITHDRAW_PURSUIT, WOUNDED_RETURN)
+from ..naming import is_wild
 from ..state import Battle
 from . import combat, military, movement
 from .combat import army_morale
 
 # What this module changes: the battles, the units (position, hp, morale, experience; the dead are removed), the
-# provinces (controller, siege and garrison when a castle is stormed), the battle's log, and the map's version
-# (changed()).
-OWNS = ("battles", "units", "provinces", "log", "version", "_owned", "_castle_list", "_markets_dirty")
+# provinces (controller, siege and garrison when a castle is stormed), the battle's log, the names given so far, and
+# the map's version (changed()).
+OWNS = ("battles", "battle_names", "units", "provinces", "log", "version", "_owned", "_castle_list", "_markets_dirty")
 STANCES = ("attack", "hold", "withdraw")
+ORDINALS = ("First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth")
 
 
 def _name(world, tag):
@@ -89,10 +92,11 @@ def _defender(world, owner, pos):
     return None
 
 
-def engage_check(world, group, pos):
+def engage_check(world, group, pos, stand=None):
     """Whether the stack ``group`` may attack the hex pos, and why not: (ok, reason). ``engage`` makes the same checks
     and changes nothing when one fails (the *_check contract). The reasons are the attack options' hover hints. A stack
-    whose average morale is under ATTACK_MORALE cannot attack (spec 3.1)."""
+    whose average morale is under ATTACK_MORALE cannot attack (spec 3.1). ``stand`` is the hex it attacks from (default:
+    where it stands now); attack_options_group asks for each candidate stand."""
     group = [u for u in group if u in world.units]
     if not group:
         return False, "No units to attack with"
@@ -105,7 +109,7 @@ def engage_check(world, group, pos):
         return False, "Units aboard a ship cannot attack"
     if pos not in world.provinces or not world.is_land(pos):
         return False, "Not a land province"
-    stand = group[0].pos
+    stand = group[0].pos if stand is None else stand
     if stand != pos and pos not in neighbors(stand):
         return False, "Not beside the target"
     if stand != pos and (stand, pos) in world.walls():
@@ -167,19 +171,53 @@ def engage(world, group, pos):
     return _start(world, group, pos, defender)
 
 
+def _year(turn):
+    """The year of a season (the same rule as CampaignWorld.year)."""
+    return START_YEAR + (turn - 1) // 4
+
+
+def _ordinal(count):
+    return ORDINALS[count - 1] if count <= len(ORDINALS) else f"{count}th"
+
+
+def _place_name(world, pos):
+    """The name of the place a battle is fought at (decision 5): the hex's province name; in wild land, the nearest named
+    province within 3 hexes; else the terrain's name."""
+    prov = world.provinces.get(pos)
+    if prov is not None and not is_wild(prov.name):
+        return prov.name
+    for p in sorted(within(pos, 3), key=lambda p: (distance(pos, p), p)):
+        near = world.provinces.get(p)
+        if near is not None and not is_wild(near.name):
+            return near.name
+    return TERRAIN[prov.terrain].name if prov is not None and prov.terrain in TERRAIN else "open country"
+
+
+def _battle_name(world, pos):
+    """A new battle's name: "Battle of X, 1525", and "Second Battle of X, 1525" for each repeat on the same place. The
+    count is kept in world.battle_names, so a repeat stays a repeat after a save."""
+    base = _place_name(world, pos)
+    count = world.battle_names.get(base, 0) + 1
+    world.battle_names[base] = count
+    title = "Battle" if count == 1 else f"{_ordinal(count)} Battle"
+    return f"{title} of {base}, {_year(world.turn)}"
+
+
 def _start(world, group, pos, defender):
     """A new battle on pos for a stack that now stands there (see engage). Both sides are deployed."""
     owner = group[0].owner
     prov = world.provinces[pos]
     assault = prov.controller == defender and prov.castle > 0 and prov.garrison > 0
-    battle = Battle(pos=pos, attacker=owner, defender=defender, start=world.turn, assault=assault,
+    name = _battle_name(world, pos)
+    battle = Battle(pos=pos, attacker=owner, defender=defender, start=world.turn, assault=assault, name=name,
                     stance={owner: "attack", defender: "hold"})
     battle.members = {u.id for u in world.units_at(pos) if u.owner in (owner, defender)} | {u.id for u in group}
     world.battles.append(battle)
     combat.deploy(world, battle)
     _log(world, battle, f"{_name(world, owner)} attacked {_name(world, defender)}"
                         + (" in its castle" if assault else ""))
-    world.bus.emit("battle_started", owner, pos, defender=defender, assault=assault)
+    world.bus.emit("battle_started", owner, pos, defender=defender, assault=assault, name=name,
+                   year=_year(world.turn))
     world.changed()
     return True
 
@@ -373,29 +411,20 @@ def _storm(world, battle, loser, how, had_field):
     return True
 
 
-def end_battle(world, battle, how, loser=None):
+def end_battle(world, battle, how, loser=None, pursuit=True):
     """End a battle (spec 3.6). ``how``: "broke" (the loser's army broke on a day; the pursuit was on that day), "withdrew"
-    (the loser withdrew on its order: half pursuit, then the retreat), "stalemate" (the safety stop: the lower army
-    retreats with no pursuit; with no retreat hex the battle is a draw, nobody wins and nobody surrenders), "peace" or
-    "gone" (a draw: no loser, no pursuit, no retreat). A side with no retreat hex surrenders after "broke" or "withdrew".
-    The winner's survivors gain experience when the battle had days (the loser's survivors less); the wounded come back
-    in supply; a stormed castle goes to the attacker; the battle leaves world.battles, and then battle_ended is emitted
-    once."""
+    (the loser withdrew: on its order, or at the safety stop, which passes pursuit=False: half pursuit, or none, then the
+    retreat), "peace" or "gone" (a draw: no loser, no pursuit, no retreat). A side with no retreat hex surrenders after
+    "broke" or "withdrew". The winner's survivors gain experience when the battle had days (the loser's survivors less);
+    the wounded come back in supply; a stormed castle goes to the attacker; the battle leaves world.battles, and then
+    battle_ended is emitted once. ("stalemate" is no longer an end: decision 7 makes the stop a withdrawal.)"""
     att, dfn, pos = battle.attacker, battle.defender, battle.pos
     winner = None if loser is None else (dfn if loser == att else att)
     fighters = {tag: _side_units(world, battle, tag) for tag in (att, dfn)}
     had_field = any(u.kind.war for u in fighters[dfn])     # decided before the retreat moves the units
     retreat = None
-    if loser is not None and how == "stalemate":
-        group = [u for u in fighters[loser] if u in world.units]
-        spot = retreat_spot(world, group, pos) if group else None
-        if spot is None:
-            how, winner, loser = "stalemate", None, None
-        else:
-            _move_side(world, group, pos, spot)
-            retreat, how = spot, "withdrew"
-    elif loser is not None and how in ("broke", "withdrew"):
-        if how == "withdrew":
+    if loser is not None and how in ("broke", "withdrew"):
+        if how == "withdrew" and pursuit:
             _pursue(world, battle, loser, WITHDRAW_PURSUIT, fighters[loser])
         retreat, how = _retreat_or_surrender(world, battle, loser, fighters[loser], how)
     if loser is not None and battle.days > 0:
@@ -406,7 +435,8 @@ def end_battle(world, battle, how, loser=None):
         world.battles.remove(battle)
     world.changed(ownership=storm)
     world.bus.emit("battle_ended", att, pos, attacker=att, defender=dfn, winner=winner, loser=loser,
-                   assault=battle.assault, how=how, seasons=_seasons(world, battle),
+                   assault=battle.assault, how=how, seasons=_seasons(world, battle), name=battle.name,
+                   year=_year(battle.start),
                    killed={tag: round(battle.killed.get(tag, 0.0)) for tag in (att, dfn)},
                    wounded={tag: round(battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}, retreat=retreat)
 
@@ -457,7 +487,19 @@ def _fight_season(world, battle):
     elif broke is not None:
         end_battle(world, battle, "broke", broke)
     elif _seasons(world, battle) >= BATTLE_MAX_SEASONS:
-        end_battle(world, battle, "stalemate", _shakier(world, battle))
+        _safety_stop(world, battle)
+
+
+def _safety_stop(world, battle):
+    """The safety stop (spec 3.5, decision 7): a battle that has lasted BATTLE_MAX_SEASONS seasons ends with its lower army
+    withdrawing, with no pursuit. When that side has no retreat hex the other side withdraws instead. When neither can
+    retreat the battle goes on, and the stop is checked again next season. Two armies never sit on one hex unfought."""
+    low = _shakier(world, battle)
+    high = battle.defender if low == battle.attacker else battle.attacker
+    for tag in (low, high):
+        if retreat_spot(world, _side_units(world, battle, tag), battle.pos) is not None:
+            end_battle(world, battle, "withdrew", tag, pursuit=False)
+            return
 
 
 def battle_season(world):

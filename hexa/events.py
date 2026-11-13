@@ -18,7 +18,6 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
                                          feed.NOTICES); pos is the hex it is about, if any
     province_captured tag=captor, pos    loser, by ("siege", "storm" or "peace")
     siege_progress    tag=besieger, pos  progress, need
-    battle            tag=attacker, pos  defender, ranged
     war_declared      tag=aggressor      target
     peace_made        tag, b             winner, moved (provinces that changed hands)
     unit_raised       tag, pos           what (the troop's name), id
@@ -40,17 +39,16 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
     unit_moved        tag=owner, pos=end ids (the stack's unit ids), path (every hex from start to end), naval, seen
                                          (per hex of the path: in the player's vision when the stack moved). The
                                          window replays these walks, see campaign/replay.py; the state is already final
-    battle_started    tag=attacker, pos  defender, assault (a battle begins: both stacks stand on pos)
+    battle_started    tag=attacker, pos  defender, assault, name, year (a battle begins: both stacks stand on pos)
     battle_joined     tag=joiner, pos    side ("attacker" or "defender"), men (a stack joins its side's reserve)
     battle_fought     tag=attacker, pos  defender, days, morale {tag: share}, killed {tag: men}, wounded {tag: men};
                                          one per battle per season
-    battle_ended      tag=attacker, pos  attacker, defender, winner, loser (tags; None for a draw: stalemate, peace or gone score nothing), assault, how
-                                         ("broke", "withdrew", "surrendered", "stalemate", "peace" or "gone"), seasons,
-                                         killed {tag: men}, wounded {tag: men}, retreat (hex or None). Once per battle,
-                                         after it has left world.battles. A contract: docs/design/war-goals-and-peace.md 3.4
+    battle_ended      tag=attacker, pos  attacker, defender, winner, loser (tags; None for a draw: peace or gone score nothing),
+                                         assault, how ("broke", "withdrew", "surrendered", "peace" or "gone"), seasons,
+                                         name, year, killed {tag: men}, wounded {tag: men}, retreat (hex or None). Once per
+                                         battle, after it has left world.battles. A contract: docs/design/war-goals-and-peace.md 3.4
 
-``battle`` also carries ``lost`` (units destroyed, (attacker, defender)) and ``hurt`` (strength lost, the same pair);
-``tech_researched`` the ``cost`` in research points; ``debt_seized`` the ``saving`` in ducats a season.
+``tech_researched`` carries the ``cost`` in research points; ``debt_seized`` the ``saving`` in ducats a season.
 
 ``bus.tap(handler)`` is the one other way to listen: a tap is called at once, inside ``emit``, with the event (the
 campaign's ``resources`` tracker and ``feed`` use it, so they need no drain). A tap never changes the world either, and
@@ -66,7 +64,7 @@ from dataclasses import dataclass
 
 
 CAMPAIGN_KINDS = (
-    "message", "province_captured", "siege_progress", "battle", "war_declared", "peace_made", "unit_raised",
+    "message", "province_captured", "siege_progress", "war_declared", "peace_made", "unit_raised",
     "unit_lost", "unit_deserted", "debt_seized", "pass_closed", "pass_opened", "tech_researched", "era_reached",
     "colony_founded", "building_done", "investment_done", "season_ended", "money_spent", "forage", "native_raid",
     "unit_moved", "battle_started", "battle_joined", "battle_fought", "battle_ended",

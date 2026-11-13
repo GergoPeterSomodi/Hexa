@@ -161,7 +161,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `CampaignApp.end_turn(key, confirmed)` first lets a running movement replay block it (a key skips the replay) and the
   reminder list ask (see Screens), then draws its busy frame and delegates to it; tests play seasons through it
   (`tests/support/worlds.play_seasons`). The fixed order: `world.settle_preview()`, `ai.run(world, tag)` for every
-  non-player country, `world.end_round()` (walks the ordered `PHASES` table of `systems/season.py`: logistics, sieges, war timeouts, economy,
+  non-player country, `world.end_round()` (walks the ordered `PHASES` table of `systems/season.py`: battles, logistics, sieges, war timeouts, economy,
   collect, debt, growth, research, extinction, turn, units, exploration, vision, redraw, report; `tests/test_season.py` pins the
   names in order), the caller's `orders` hook (the app's march reminders for `unit.goal` orders), the autosave if due,
   `world.ensure_markets()`, and a `season_ended` event. Campaign AIs only know what their country has explored
@@ -245,27 +245,33 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   re-exports the names), then the battle's day (battle slice 1, PR 2): `deploy` fills the three lanes, `fire`, `shock`,
   `flanks`, `morale`, `breaker` and `pursuit` work out one phase's hits and apply them together, `fight_day` runs a day,
   `army_morale` measures a side. The numbers are in data.py (`SHOCK_LOSS`, `STANCE`, `BREAK`...). Nothing calls `fight_day`
-  except the battle's own season (below), and that phase is not in PHASES until PR 4. It writes the battle object, unit hp
+  except the battle's own season (below), the `battles` phase, which is first in PHASES. It writes the battle object, unit hp
   and morale, `prov.garrison`, and kills through `world.kill`; `OWNS` lists those.
-- **Battles** (`systems/battle.py`, battle slice 1, PR 3; not in PHASES until PR 4): `engage` (a stack attacks a hex: it steps
+- **Battles** (`systems/battle.py`, battle slice 1; the `battles` phase is first in PHASES): `engage` (a stack attacks a hex: it steps
   in with `movement.step_in`, then overruns the enemy's civilians, joins its side's battle through `join`, or starts a
   `Battle` and deploys both sides), `fits` (the stack limit, per side), `battle_order_check`/`battle_order` (Attack, Hold,
   Withdraw), `retreat_spot`, `battle_season` (the `battles` phase: withdrawals first, then up to three days through
   `combat.fight_day`, then the safety stop at `BATTLE_MAX_SEASONS`), `end_battle` (pursuit, retreat or surrender,
-  experience, wounded back in supply, storm, then `battle_ended`) and `end_battles` (peace or a vanished country: a draw).
+  experience, wounded back in supply, storm, then `battle_ended`) and `end_battles` (peace or a vanished country: a draw;
+  `war.peace` and `war.check_alive` call it first). `engage_check(world, group, pos, stand=None)` gives the reasons, and
+  `attack_options_group` asks it for each stand. The safety stop (`_safety_stop`) withdraws the lower army, or the other side
+  when the lower one has no retreat hex; with neither able to retreat the battle goes on (decision 7). A battle is named when
+  it starts (`Battle.name`, "Second Battle of X, 1525" for a repeat, the count in `world.battle_names`).
   Events: `battle_started`, `battle_joined`, `battle_fought` (once per season) and `battle_ended` (the contract of
   docs/design/war-goals-and-peace.md 3.4). `world.engage`, `battle_order_check`/`battle_order`, `end_battles`,
-  `retreat_spot` and `army_morale` are facades. The switch (PR 4) makes `attack_group` call `engage`.
+  `retreat_spot` and `army_morale` are facades. `attack_group` walks to the stand hex and calls `engage`. Units in a battle do
+  not move, raise, refit, drill or heal (`start_units`, `move_check`, `can_stand`, `recruit_check`, `refit_check`,
+  `upgrade_check`, `forage_check`); a siege skips a battle hex (`war.sieges`).
 - **War** (`systems/war.py`; the battle system builds on it): `at_war`, `enemies`, `war_check`/`declare_war`, `war_score`, `peace`
-  (and `free_spot_near`), `peace_offer`, `attack_options`/`attack` and their `_group` forms (with `targets`), `battle` (one fight: front
-  line plus support, using the combat values below), `lose` (units off the map, a `unit_lost` event each), `kill`
+  (and `free_spot_near`), `peace_offer`, `attack_options`/`attack` and their `_group` forms (with `targets`; an option means `engage_check` allows the
+  attack from that stand; there is no bombardment), `lose` (units off the map, a `unit_lost` event each), `kill`
   (`lose` for one unit and its cargo; `_kill` is the old name the tests use), `sieges` (the season's step) and `check_alive`. Facades are
   plain class attributes (`at_war = war.at_war`); `at_war` and `enemies` are called from every supply and path search. The bodies and the
-  bus events (`war_declared`, `peace_made`, `province_captured`, `battle`, `siege_progress`, `unit_lost`) are unchanged by the move.
+  bus events (`war_declared`, `peace_made`, `province_captured`, `siege_progress`, `unit_lost`) are emitted here; the battle events come from battle.py.
   `forget_castles()` and `castles()` stay on the world (they own `_castle_list`).
 - **Season** (`systems/season.py`): `PHASES`, the one ordered table of (name, function) pairs that `end_round` runs, and the only place
   the season's order is written (the game manager calls `world.end_round()`; to change the order, change the table and the pinned names in
-  `tests/test_season.py`). The phases name the functions of their systems (`supply.logistics`, `war.sieges`, `economy.collect`,
+  `tests/test_season.py`). The phases name the functions of their systems (`battle.battle_season`, `supply.logistics`, `war.sieges`, `economy.collect`,
   `debt.unpaid`, `economy.grow`, `research.research_season`, `war.check_alive`), so patching `world.logistics` and the like
   on an instance no longer changes the season: a test that needs to replace a phase patches `PHASES`; `war_timeouts`, `run_economy` (the world method, which owns
   the tax preview's `_settled`), `advance_turn`, `ready_units`, `explore_all`, `redraw` and `treasury_line` are small steps here. Vision and

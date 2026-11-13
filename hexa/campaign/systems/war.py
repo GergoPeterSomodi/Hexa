@@ -2,18 +2,18 @@
 
 Functions taking ``world``; ``CampaignWorld`` binds them as plain class attributes (``at_war = war.at_war``), so the hot
 ones (``at_war``, ``enemies``, called from every supply and path search) cost no extra call. The battle system builds on
-this module: ``attack_options_group`` says where a stack may strike, ``attack_group`` moves and fights, ``battle`` is one
-fight (front line plus support, the general's trait, castle garrison; ``ranged`` for guns firing from where they stand),
-``sieges`` is the season's step that gives a province to the army standing in it, ``peace`` ends a war and moves the
-provinces, ``lose`` takes units off the map with a ``unit_lost`` event each and ``kill`` is ``lose`` for one unit and what it
-carries. The bus events (``war_declared``, ``peace_made``, ``province_captured``, ``battle``, ``siege_progress``,
-``unit_lost``) and their order are the same as before the move. Imports point down: never world.py, ui, render or pygame.
+this module: ``attack_options_group`` says where a stack may strike (the checks are battle.engage_check's), ``attack_group``
+walks to the hex it attacks from and calls ``engage`` (battle.py: a battle, a join or an overrun), ``sieges`` is the
+season's step that gives a province to the army standing in it (never on a battle hex), ``peace`` ends a war (its battles
+end first) and moves the provinces, ``lose`` takes units off the map with a ``unit_lost`` event each and ``kill`` is ``lose``
+for one unit and what it carries. The bus events (``war_declared``, ``peace_made``, ``province_captured``,
+``siege_progress``, ``unit_lost``) are emitted here; the battle events come from battle.py. Imports point down: never
+world.py, ui, render or pygame.
 """
-from ...hexgrid import distance, neighbors, within
-from ..data import (CASTLE_SIEGE, COUNTER, FRONT, GARRISON_HP, GARRISON_REGEN, OPEN_GROUND,
-                    SIEGE_BASE, SUPPORT_BONUS, SUPPORT_MAX)
+from ...hexgrid import neighbors, within
+from ..data import CASTLE_SIEGE, GARRISON_HP, GARRISON_REGEN, SIEGE_BASE
 from . import combat
-from ..state import Garrison, War
+from ..state import War
 
 # What this module changes on the world: the wars, the provinces (owner, controller, siege, garrison), the units (hit
 # points, experience, positions; the dead are removed), the countries (alive, capital), the log, and what changed()
@@ -64,9 +64,21 @@ def war_score(world, tag, enemy):
     return taken - lost + (3 if capital else 0)
 
 
+def _shared_hexes(world, a, b):
+    """The hexes where a unit of a and a unit of b stand together (carried units aside)."""
+    here = {}
+    for unit in world.units:
+        if unit.carrier is None and not unit.naval and unit.owner in (a, b):
+            here.setdefault(unit.pos, set()).add(unit.owner)
+    return {pos for pos, tags in here.items() if len(tags) == 2}
+
+
 def peace(world, a, b, winner=None):
-    """End the war. Each side keeps what it occupies if `winner` is None; otherwise only the winner gains."""
+    """End the war. Each side keeps what it occupies if `winner` is None; otherwise only the winner gains. The battles
+    of the two end first (no pursuit, no retreat: battle.end_battles). Then the stacks in the other's land go home, and
+    so do the stacks that still stand together on a third country's hex (the larger tag of the two goes)."""
     world.wars = [w for w in world.wars if {w.a, w.b} != {a, b}]
+    world.end_battles(a, b)
     moved = 0
     for prov in list(world.provinces_of(a)) + list(world.provinces_of(b)):
         if prov.controller != prov.owner and prov.controller in (a, b):
@@ -80,10 +92,13 @@ def peace(world, a, b, winner=None):
                 moved += 1
             prov.controller = prov.owner
             prov.siege = 0
+    shared = _shared_hexes(world, a, b)
     for unit in list(world.units):
         if unit.carrier is None and not unit.naval and unit.owner in (a, b):
             prov = world.provinces.get(unit.pos)
-            if prov and prov.owner in (a, b) and prov.owner != unit.owner:
+            foreign = bool(prov and prov.owner in (a, b) and prov.owner != unit.owner)
+            third = unit.pos in shared and (prov is None or prov.owner not in (a, b))
+            if foreign or (third and unit.owner == max(a, b)):
                 home = world.countries[unit.owner].capital
                 spot = world.free_spot_near(unit, home)
                 if spot:
@@ -138,6 +153,8 @@ def attack(world, unit, target_pos):
 
 
 def targets(world, tag):
+    """The hexes a country's stacks may strike at: the enemy's stacks and garrisoned castles, never a hex the country
+    already stands on. A battle the country is a side of is a target too: a stack beside it joins (spec 3.1)."""
     enemies = world.enemies(tag)
     if not enemies:
         return set()
@@ -146,11 +163,14 @@ def targets(world, tag):
         if prov.controller in enemies and prov.garrison > 0:
             found.add(prov.pos)
     ours = world.owners_at()
-    return {pos for pos in found if tag not in ours.get(pos, ())}      # never attack the hex we stand on
+    joins = {b.pos for b in world.battles if tag in (b.attacker, b.defender)}
+    return {pos for pos in found if tag not in ours.get(pos, ())} | joins
 
 
 def attack_options_group(world, group):
-    """{target hex: hex to attack from, or "bombard" for cannons firing from where they stand}."""
+    """{target hex: the hex to attack from}. A target is an enemy's hex or a battle the stack's country is a side of (the
+    stack joins it). An option is offered only when the attack would be allowed from that hex: battle.engage_check says
+    so for each stand, the cheapest first. There is no bombardment: guns fight from the same hex (spec 3.7)."""
     fighters = [u for u in group if u.kind.war and u.moves_left > 0 and not u.attacked]
     if not fighters or any(u.carrier for u in group):
         return {}
@@ -162,126 +182,34 @@ def attack_options_group(world, group):
     reach = world.reachable_group(group)
     stands = {p: c for p, c in reach.items() if c < moves and not any(u.naval for u in world.units_at(p))}
     options = {}
-    walls = world.walls()
-    for pos in targets:
-        near = [p for p in neighbors(pos) if p in stands and (p, pos) not in walls]
-        if near:
-            options[pos] = min(near, key=lambda p: stands[p])
-    if any(u.kind.branch == "artillery" for u in fighters):
-        for pos in targets:
-            if distance(pos, lead.pos) <= 2 and (pos not in options or
-                                                 all(u.kind.branch == "artillery" for u in fighters)):
-                options[pos] = "bombard"
+    for pos in sorted(targets):
+        if pos == lead.pos:
+            continue
+        for stand in sorted((p for p in neighbors(pos) if p in stands), key=lambda p: (stands[p], p)):
+            if world.engage_check(group, pos, stand=stand)[0]:
+                options[pos] = stand
+                break
     return options
 
 
 def attack_group(world, group, target):
+    """The stack walks to the hex it attacks from (one unit_moved), then calls engage, which makes the one step onto the
+    target and starts the battle, joins it or overruns the civilians there. Nothing moves when engage refuses. Returns what
+    engage returned."""
     options = world.attack_options_group(group)
     if target not in options:
         return False
     stand = options[target]
-    if stand == "bombard":
-        shooters = [u for u in group if u.kind.branch == "artillery" and u.moves_left > 0 and not u.attacked]
-        world.battle(shooters, target, ranged=True)
-        for unit in shooters:
-            unit.moves_left, unit.attacked, unit.acted = 0, True, True
-    else:
-        if stand != group[0].pos:
-            world.move_group(group, stand)
-        attackers = [u for u in group if u in world.units and u.kind.war]
-        if attackers:
-            world.battle(attackers, target)
+    if stand != group[0].pos:
+        world.move_group(group, stand)
+    done = world.engage(group, target)
+    if done:
         for unit in group:
             if unit in world.units:
                 unit.moves_left, unit.attacked, unit.acted = 0, True, True
     world.changed()
-    return True
+    return done
 
-
-def battle(world, attackers, pos, ranged=False):
-    """Front line + support: the best 3 of each side fight, the rest support them."""
-    prov = world.provinces[pos]
-    here = world.units_at(pos)
-    att_tag = attackers[0].owner
-    def_tag = here[0].owner if here else prov.controller
-    if def_tag == att_tag:
-        return                                  # a country never fights itself
-    castle = prov.castle if prov.controller == def_tag and prov.garrison > 0 else 0
-    fight = "assault" if castle else ("open" if prov.terrain in OPEN_GROUND else "rough")
-    dfight = "garrison" if castle else ("open" if fight == "open" else "rough")
-    gen_a = world.general(world.units_at(attackers[0].pos))
-    gen_d = world.general(here)
-    defenders = [u for u in here if u.kind.war]
-    if castle:
-        defenders.append(Garrison(prov, world.bonus(def_tag, "garrison_defense")))
-    names = (world.countries[att_tag].name, world.countries[def_tag].name if def_tag else "the natives")
-    shown = None if world.player in (att_tag, def_tag) else "nobody"
-    if not defenders:
-        world.lose(here, "overrun")
-        world.message(f"{names[0]} overran {len(here)} unarmed unit{'s' * (len(here) != 1)} at {world.place(prov)}.", shown)
-        return
-    att_front = sorted(attackers, key=lambda u: -world.attack_value(u, fight, gen_a))[:FRONT]
-    att_back = [u for u in attackers if u not in att_front]
-    def_front = sorted(defenders, key=lambda u: -world.defense_value(u, dfight, prov, castle, None, gen_d))[:FRONT]
-    def_back = [u for u in defenders if u not in def_front]
-    att_support = min(SUPPORT_MAX, SUPPORT_BONUS * len(att_back))
-    def_support = min(SUPPORT_MAX, SUPPORT_BONUS * len(def_back))
-    before = {id(u): u.hp for u in attackers + defenders}      # HP going in, to report what this fight cost
-    rng = world.rng
-
-    def strike(attacker, target, factor, support, gen_att, gen_def, att_fight, def_fight):
-        hit = world.attack_value(attacker, att_fight, gen_att) * rng.uniform(0.8, 1.25) * (1 + support) * factor
-        block = world.defense_value(target, def_fight, prov, castle, attacker.kind.branch, gen_def) * 0.5
-        target.hp -= max(1, round(hit - block))
-
-    alive = lambda units: [u for u in units if u.hp > 0]
-    if ranged:
-        for gun in attackers:
-            if alive(def_front):
-                strike(gun, rng.choice(alive(def_front)), 1.0, 0, gen_a, gen_d, fight, dfight)
-    else:
-        for gun in [u for u in att_back if u.kind.branch == "artillery"]:
-            if alive(def_front):
-                strike(gun, rng.choice(alive(def_front)), 0.6, 0, gen_a, gen_d, fight, dfight)
-        for unit in att_front:
-            if alive(def_front):
-                strike(unit, rng.choice(alive(def_front)), 1.0, att_support, gen_a, gen_d, fight, dfight)
-        counter_fight = "open" if fight == "assault" else fight
-        for unit in alive(def_front):
-            if alive(att_front):
-                factor = COUNTER * (0.5 if unit.kind.branch == "artillery" else 1.0)
-                strike(unit, rng.choice(alive(att_front)), factor, def_support, gen_d, gen_a, counter_fight,
-                       "open" if fight == "open" else "rough")
-    hp_a = sum(before[id(u)] - max(0, u.hp) for u in attackers)
-    hp_d = sum(before[id(u)] - max(0, u.hp) for u in defenders)
-    lost_a = [u for u in attackers if u.hp <= 0]
-    lost_d = [u for u in defenders if u.hp <= 0 and not isinstance(u, Garrison)]
-    for unit in lost_a + lost_d:
-        if unit in world.units:
-            world.kill(unit)
-    for unit in defenders:
-        if isinstance(unit, Garrison):
-            prov.garrison = max(0, unit.hp)
-    survivors_d = [u for u in defenders if u.hp > 0]
-    for unit in attackers + defenders:
-        if unit.hp > 0 and not isinstance(unit, Garrison):
-            unit.xp += 1 + (0 if survivors_d or unit not in attackers else 1)
-    dead = lambda n: f" ({n} unit{'s' * (n != 1)} destroyed)" if n else ""
-    text = (f"{'Bombardment' if ranged else 'Battle'} at {world.place(prov)}: {names[0]} lost {hp_a} strength"
-            f"{dead(len(lost_a))}, {names[1]} lost {hp_d}{dead(len(lost_d))}")
-    if castle and prov.garrison <= 0 and not [u for u in world.units_at(pos) if u.kind.war]:
-        if ranged:
-            text += "; the castle walls are breached"
-        else:
-            world.bus.emit("province_captured", att_tag, pos, loser=prov.controller, by="storm")
-            prov.controller, prov.siege = att_tag, 0
-            world.lose(world.units_at(pos), "storm")
-            text += f"; {names[0]} stormed the castle"
-    elif not survivors_d and not ranged:
-        world.lose([u for u in world.units_at(pos) if u.owner == def_tag], "storm")
-    world.bus.emit("battle", att_tag, pos, defender=def_tag, ranged=ranged, lost=(len(lost_a), len(lost_d)),
-                  hurt=(hp_a, hp_d))
-    world.message(text + ".", shown)
 
 
 def lose(world, units, why):         # off the map, with a unit_lost event each (why: see hexa/events.py)
@@ -298,9 +226,10 @@ def kill(world, unit, why="battle"):
 
 def sieges(world):
     """Troops standing in enemy (or lost) provinces take control of them; castles hold out longer."""
+    battle_hexes = {b.pos for b in world.battles}
     for prov in world.provinces.values():
-        if prov.owner is None:
-            continue
+        if prov.owner is None or prov.pos in battle_hexes:
+            continue            # a battle hex: no siege progress, no garrison regrowth, while the battle lasts (spec 3.2)
         here = [u for u in world.units_at(prov.pos) if u.kind.war]
         cap = prov.castle * GARRISON_HP
         if not here:
@@ -344,6 +273,7 @@ def check_alive(world):
     for tag, country in world.countries.items():
         if country.alive and not world.provinces_of(tag):
             country.alive = False
+            world.end_battles(tag)           # its battles end first, while its units still stand (spec 3.6)
             world.units = [u for u in world.units if u.owner != tag]
             world.wars = [w for w in world.wars if tag not in (w.a, w.b)]
             world.message(f"{country.name} has disappeared from the map.", None, "extinct")

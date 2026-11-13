@@ -3,9 +3,9 @@
 ``of(world)`` is the world's feed (made, and tapped into ``world.bus``, on first use). Each event the player should
 hear about becomes one ``FeedItem``:
 
-    kind         the event kind ("battle", "unit_raised", ...)
+    kind         the event kind ("battle_ended", "unit_raised", ...)
     colour_kind  one of COLOUR_KINDS, the colour of the ribbon (the UI maps them to RGB):
-                     war     red     battles, bombardments, war declared, a province taken by storm or siege
+                     war     red     battles, war declared, a province taken by storm or siege
                      siege   amber   a siege going on
                      gain    gold    what the player wins: a province, a tech, an age, a finished building
                      own     green   what the player did on purpose: recruited, built, foraged, founded
@@ -205,16 +205,27 @@ class Feed:
         item = self._item(event, spec[0], spec[1], event.get("text"), True, floating=False)
         return item._replace(kind=event.get("notice"))
 
-    def _battle(self, event):
+    def _battle_started(self, event):
         att, dfn = event.tag, event.get("defender")
         mine = self._party(att, dfn)
         if not (mine or self._seen(event.pos)):
             return None
-        verb = "Bombardment" if event.get("ranged") else "Battle"
-        lost = event.get("lost", (0, 0))
-        sentence = (f"{verb} at {self._place(event.pos)}: {self._name(att)} attacked {self._name(dfn)}; "
-                    f"{self._name(att)} lost {units(lost[0])}, {self._name(dfn)} lost {units(lost[1])}.")
-        return self._item(event, "war", verb if verb == "Bombardment" else "Battle!", sentence, mine)
+        sentence = f"{event.get('name') or 'Battle'}: {self._name(att)} attacked {self._name(dfn)}."
+        return self._item(event, "war", "Battle!", sentence, mine)
+
+    def _battle_ended(self, event):
+        att, dfn = event.tag, event.get("defender")
+        mine = self._party(att, dfn)
+        if not (mine or self._seen(event.pos)):
+            return None
+        killed = event.get("killed", {})
+        if event.get("winner"):
+            verdict = f"{self._name(event.get('winner'))} beat {self._name(event.get('loser'))}"
+        else:
+            verdict = "no side won"
+        sentence = (f"{event.get('name') or 'Battle'} ({event.get('seasons', 1)} seasons): {verdict}. "
+                    f"{self._name(att)} lost {killed.get(att, 0):,} men, {self._name(dfn)} lost {killed.get(dfn, 0):,} men.")
+        return self._item(event, "war", "Battle over", sentence, mine)
 
     def _province_captured(self, event):
         captor, loser, how = event.tag, event.get("loser"), event.get("by")

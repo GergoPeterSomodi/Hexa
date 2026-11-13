@@ -593,16 +593,17 @@ class OrdersTest(CampaignCase):
         self.driver.at(2, lambda: seen.append(foe_at in app.ui.attacks))
         self.driver.at(2, self.on_hex(foe_at, button=3))                     # the attack
         self.driver.at(3, record)
-        self.driver.at(3, lambda: seen.append(foe.hp < foe.kind.hp or foe not in world.units))
+        self.driver.at(3, lambda: seen.append(world.battle_at(foe_at) is not None))
         self.driver.at(3, key("space"))
         self.driver.at(4, record)
         self.play(30, until=lambda: len(seen) == 5)
 
         self.assertEqual(seen[:2], [(1, {leg}, {goal}, 1), True], "the order's first leg, then the foe in reach")
-        self.assertTrue(seen[3], "the attack was made")
-        self.assertEqual([seen[2], seen[4]], [(1, {leg}, {None}, 0), (2, {leg}, {None}, 4)],
-                         "(turn, hexes, goals, moves left) after the attack and next season: the attack ended the "
-                         "order, and the stack stays where it fought")
+        self.assertEqual(seen[2], (1, {foe_at}, {None}, 0),
+                         "(turn, hexes, goals, moves left) after the attack: the attack ended the order, and the stack "
+                         "stepped onto the foe's hex, into the battle")
+        self.assertTrue(seen[3], "the battle began")
+        self.assertEqual(seen[4][::2], (2, {None}), "next season the order is still gone (the battle is played on)")
 
     def test_an_order_whose_route_goes_around_foreign_land_gets_there(self):
         """Fixed (cost_field(unit)). It was: orders walk a cost field (world.cost_field, used by

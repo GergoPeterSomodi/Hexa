@@ -708,7 +708,8 @@ class EventContractTest(unittest.TestCase):
         self.assertEqual((event.tag, event.pos), (fight.attacker, fight.defend_pos))
         self.assertEqual(set(event.data),
                          {"attacker", "defender", "winner", "loser", "assault", "how", "seasons", "killed", "wounded",
-                          "retreat"})
+                          "retreat", "name", "year"})
+        self.assertTrue(event.data["name"].startswith(("Battle of ", "Second Battle of ", "Third Battle of ")))
         self.assertEqual(set(event.data["killed"]), {fight.attacker, fight.defender})
 
     def test_battle_fought_is_once_per_season_with_its_fields(self):
@@ -1103,8 +1104,9 @@ class GoneTest(unittest.TestCase):
 
 
 class SafetyStopTest(unittest.TestCase):
-    """At the 6-season safety stop the lower army retreats with no pursuit; with no retreat hex the battle is a draw
-    (how "stalemate", no winner, no surrender) (decision 9). The stop is reached here without any fighting."""
+    """At the 6-season safety stop the lower army withdraws with no pursuit; when it has no retreat hex the other side
+    withdraws instead; when neither can retreat the battle goes on and the stop is checked again next season (decision
+    7). The stop is reached here without any fighting."""
 
     def stop(self, world, battle, pursued):
         original_day = combat.fight_day
@@ -1135,16 +1137,29 @@ class SafetyStopTest(unittest.TestCase):
             self.assertEqual(unit.pos, data["retreat"])
         self.assertEqual(data["killed"], {fight.attacker: 0, fight.defender: 0})
 
-    def test_with_no_retreat_hex_the_stop_is_a_draw_and_nobody_surrenders(self):
+    def test_when_the_lower_army_has_no_retreat_the_other_side_withdraws(self):
         world = fresh("POR")
         fight, battle = plain_battle(world)
-        no_retreat(world, fight.defend_pos, fight.attacker)
+        no_retreat(world, fight.defend_pos, fight.attacker)     # equal armies: the attacker is the shakier
         pursued = []
         self.stop(world, battle, pursued)
         self.assertEqual(pursued, [])
+        self.assertIsNone(world.battle_at(fight.defend_pos))
         data = world.bus.of("battle_ended")[0].data
-        self.assertEqual((data["how"], data["winner"], data["loser"]), ("stalemate", None, None))
-        self.assertEqual(data["retreat"], None)
+        self.assertEqual((data["how"], data["winner"], data["loser"]), ("withdrew", fight.attacker, fight.defender))
+        self.assertIsNotNone(data["retreat"])
+        self.assertEqual(world.bus.of("unit_lost"), [])
+
+    def test_when_neither_side_can_retreat_the_battle_goes_on_past_the_stop(self):
+        world = fresh("POR")
+        fight, battle = plain_battle(world)
+        no_retreat(world, fight.defend_pos, fight.attacker)
+        no_retreat(world, fight.defend_pos, fight.defender)
+        pursued = []
+        self.stop(world, battle, pursued)
+        self.stop(world, battle, pursued)            # the stop is checked again next season
+        self.assertEqual((pursued, world.bus.of("battle_ended")), ([], []))
+        self.assertIs(world.battle_at(fight.defend_pos), battle)
         self.assertEqual(world.bus.of("unit_lost"), [])
 
 

@@ -90,7 +90,6 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.goodsart:_coffee": 86,
     "hexa.campaign.wfctiles:socket_collapse": 86,
     "hexa.campaign.goodsart:_stone": 85,
-    "hexa.campaign.systems.war:battle": 84,
     "hexa.campaign.goodsart:_furs": 84,
     "hexa.campaign.screens.gamemenu:PauseMenu.draw": 80,
     "hexa.campaign.landscape:decorate": 82,
@@ -550,7 +549,10 @@ class ScriptedVersionTest(unittest.TestCase):
         prov.castle = 2
         prov.garrison = 2 * GARRISON_HP
         self.assertIn(prov.pos, world.attack_options_group(army))
-        self.bumps(lambda: world.attack_group(army, prov.pos))
+        version = world.version
+        self.assertTrue(world.attack_group(army, prov.pos))
+        self.assertIsNotNone(world.battle_at(prov.pos), "the attack starts a battle on the castle's hex")
+        self.assertNotEqual(world.version, version, "the battle is drawn on the map: world.version moves")
 
     def test_peace_hands_provinces_over(self):
         world = self.world

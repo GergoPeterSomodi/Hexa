@@ -5,6 +5,8 @@ from hexa.campaign import ai, geo
 from hexa.campaign.data import (GENERAL, STACK_LIMIT, WAGON, troop, BUILD_TURNS, CARAVEL, CASTLE_SIEGE, COLONIST, COLONY_DONE, GOODS, PIONEER,
                                 SETTLEMENT_SLOTS, SIEGE_BASE, WORKS)
 from hexa.campaign.world import CampaignWorld, War
+from hexa.campaign.data import BATTLE_MAX_SEASONS, GARRISON_MEN
+from hexa.campaign.systems import battle as battlesys, combat
 from hexa.hexgrid import distance, neighbors
 from tests.support.slow import slow
 from tests.support.worlds import europe, fresh, play_seasons, pristine
@@ -288,6 +290,16 @@ class BoardingTest(unittest.TestCase):
         self.assertEqual(len(w.cargo(other)), CARAVEL.capacity - 1)
 
 
+def fight_out(w, pos):
+    """Play the battle on pos to its end, one battles phase (a season) at a time. Returns the winner's tag, or None."""
+    for _ in range(BATTLE_MAX_SEASONS + 2):
+        if w.battle_at(pos) is None:
+            break
+        battlesys.battle_season(w)
+    ended = w.bus.of("battle_ended")
+    return ended[-1].get("winner") if ended else None
+
+
 class WarTest(unittest.TestCase):
     def setUp(self):
         self.w = fresh()
@@ -386,7 +398,8 @@ class WarTest(unittest.TestCase):
     @slow
     def test_cavalry_wins_in_the_open_but_not_in_forests(self):
         def fight(terrain):
-            wins = 0
+            """Men the pikes lost to the cavalry's attack, over 30 seeds: open ground lets the horse do its work."""
+            lost = 0
             for seed in range(30):
                 w = fresh()
                 w.units = []
@@ -397,10 +410,9 @@ class WarTest(unittest.TestCase):
                 riders = place(w, troop("cavalry", 1), "POR", home, 3)
                 place(w, troop("infantry", 1), "CAS", target.pos, 3)
                 w.attack_group(riders, target.pos)
-                lost_def = sum(u.kind.hp - u.hp for u in w.units_at(target.pos)) + 10 * (3 - len(w.units_at(target.pos)))
-                lost_att = sum(u.kind.hp - u.hp for u in riders if u in w.units) + 10 * sum(u not in w.units for u in riders)
-                wins += lost_def > lost_att
-            return wins
+                fight_out(w, target.pos)
+                lost += w.bus.of("battle_ended")[-1].data["killed"]["CAS"]
+            return lost
         self.assertGreater(fight("plains"), fight("forest"))
 
     def test_only_the_front_line_fights(self):
@@ -410,9 +422,13 @@ class WarTest(unittest.TestCase):
         attackers = place(w, troop("infantry", 1), "POR", home, 5)
         defenders = place(w, troop("infantry", 1), "CAS", target.pos, 5)
         w.attack_group(attackers, target.pos)
-        hurt = [u for u in attackers if u.hp < u.kind.hp or u not in w.units]
-        self.assertLessEqual(len(hurt), 3)
-        self.assertGreater(sum(u.hp < u.kind.hp or u not in w.units for u in defenders), 0)
+        battle = w.battle_at(target.pos)
+        combat.fight_day(w, battle)                            # one day: only the three lanes strike
+
+        def hit(unit):                 # hit points lost, or damage carried towards the next whole hit point
+            return unit.hp < unit.kind.hp or battle.carry.get(unit.id, 0) > 0 or unit not in w.units
+        self.assertLessEqual(sum(hit(u) for u in attackers), 3)
+        self.assertGreater(sum(hit(u) for u in defenders), 0)
 
     def test_battle_report_counts_only_hp_lost_in_this_fight(self):
         w = self.w
@@ -424,12 +440,14 @@ class WarTest(unittest.TestCase):
             unit.hp = 4                       # already wounded: 6 HP missing each before the fight
         w.rng.seed(1)
         w.attack_group(attackers, target.pos)
-        lost_a = sum(4 - max(0, u.hp) for u in attackers)
-        lost_d = sum(4 - max(0, u.hp) for u in defenders)
+        battle = w.battle_at(target.pos)
+        report = combat.fight_day(w, battle)
+        lost_a = report["killed"]["POR"] + report["wounded"]["POR"]
+        lost_d = report["killed"]["CAS"] + report["wounded"]["CAS"]
         self.assertGreater(lost_a + lost_d, 0, "the fight must have hurt someone")
-        report = w.log[-1]
-        self.assertRegex(report, rf"{w.countries['POR'].name} lost {lost_a} strength")
-        self.assertRegex(report, rf"{w.countries['CAS'].name} lost {lost_d}\b")
+        self.assertLessEqual(lost_a, 3 * 4 * combat.men_per_hp(attackers[0]) + 1e-6,
+                             "a day costs no more men than the hit points left")
+        self.assertIn(w.countries['POR'].name, battle.log[-1][2])
 
     def test_battle_report_counts_garrison_damage_taken_not_missing(self):
         w = self.w
@@ -440,9 +458,14 @@ class WarTest(unittest.TestCase):
         attackers = place(w, troop("infantry", 1), "POR", home, 3)
         w.rng.seed(1)
         w.attack_group(attackers, target.pos)
-        self.assertRegex(w.log[-1], rf"{w.countries['CAS'].name} lost {3 - target.garrison}\b")
+        report = combat.fight_day(w, w.battle_at(target.pos))
+        lost = report["killed"]["CAS"] + report["wounded"]["CAS"]
+        self.assertGreater(lost, 0)
+        self.assertLessEqual(lost, 3 * GARRISON_MEN + 1e-6, "only the 3 hit points the garrison has left")
 
-    def test_cannons_fire_from_two_hexes_without_reply(self):
+    def test_cannons_do_not_bombard_from_two_hexes_away(self):
+        """No bombardment (spec 3.7): guns two hexes off walk up and strike from the hex beside the target, and the
+        fight is the battle's days, not a shot from where they stand."""
         w = self.w
         w.declare_war("POR", "CAS")
         target, home = self.border()
@@ -451,10 +474,10 @@ class WarTest(unittest.TestCase):
         guns = place(w, troop("artillery", 1), "POR", far, 2)
         enemy = place(w, troop("infantry", 1), "CAS", target.pos)[0]
         options = w.attack_options_group(guns)
-        self.assertEqual(options.get(target.pos), "bombard")
-        w.attack_group(guns, target.pos)
-        self.assertLess(enemy.hp if enemy in w.units else 0, enemy.kind.hp)
-        self.assertTrue(all(g.hp == g.kind.hp for g in guns), "no counterattack against a bombardment")
+        self.assertEqual(distance(options[target.pos], target.pos), 1, "struck from beside the target, never from afar")
+        self.assertTrue(w.attack_group(guns, target.pos))
+        self.assertIsNotNone(w.battle_at(target.pos))
+        self.assertEqual(enemy.hp, enemy.kind.hp, "no damage at once: the blows fall in the battle's days")
 
     def held_castle(self):
         """War with Castile and a garrisoned Castilian castle next to Portuguese land: (castle, home hex)."""
@@ -487,15 +510,17 @@ class WarTest(unittest.TestCase):
         self.assertNotIn(target.pos, w.attack_options_group(attacker))
         self.assertFalse(w.attack_group(attacker, target.pos))
 
-    def test_a_country_never_fights_itself(self):
+    def test_a_stack_does_not_attack_the_hex_it_stands_on(self):
         w = self.w
         target, _ = self.held_castle()
         guns = place(w, troop("artillery", 1), "POR", target.pos, 2)
         log = list(w.log)
-        w._battle(guns, target.pos, ranged=True)
+        self.assertNotIn(target.pos, w.attack_options_group(guns))
+        self.assertFalse(w.attack_group(guns, target.pos))
         self.assertEqual(target.garrison, 12)
         self.assertTrue(all(u.hp == u.kind.hp for u in guns))
         self.assertEqual(w.log, log)
+        self.assertIsNone(w.battle_at(target.pos))
 
     def test_ai_siege_stack_on_a_castle_does_not_shoot_itself(self):
         w = self.w

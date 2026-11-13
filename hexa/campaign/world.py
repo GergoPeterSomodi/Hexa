@@ -26,7 +26,7 @@ PASS_RULE = 4             # the shape of the ridge edges and passes; a save with
 WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "visible": set, "over": False,
                   "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
                   "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None, "_bonus_cache": dict,
-                  "_settled": None, "_pass_cache": None, "battles": list}
+                  "_settled": None, "_pass_cache": None, "battles": list, "battle_names": dict}
 # World attributes no save can do without (from_state refuses a state that lacks one). Every other attribute
 # has a default above, is rebuilt on load (geo, _ids) or is added when first needed (_explored_from).
 WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countries", "markets", "cities", "landmass",
@@ -104,6 +104,7 @@ class CampaignWorld:
         self.units = []
         self.wars = []
         self.battles = []
+        self.battle_names = {}           # battles named so far, by place (battle.py); a repeat is "Second Battle of X"
         self.routes = []
         self.version = 0                 # bumps whenever the map needs redrawing
         self.bus = EventBus()            # events for the screens; never saved
@@ -714,7 +715,6 @@ class CampaignWorld:
     general = war.general
     attack_value = war.attack_value
     defense_value = war.defense_value
-    battle = _battle = war.battle        # the old private name: tests/test_campaign.py and test_events.py use it
     lose = war.lose
     kill = _kill = war.kill              # kill is the public name the debt module uses; _kill the old one (tests)
     sieges = war.sieges

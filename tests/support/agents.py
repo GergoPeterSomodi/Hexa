@@ -249,7 +249,7 @@ def _colony_step(w, rng, judge):
 
 # ----- Age of Discovery -----------------------------------------------------------------------------------------
 _CAMPAIGN_MOVES = (("move",) * 4 + ("improve", "recruit", "recruit", "build", "build", "found", "forage", "forage",
-                   "war", "refit", "upgrade", "merchant"))
+                   "war", "refit", "upgrade", "merchant", "engage", "engage", "order"))
 _BUILD_KEYS = None
 
 
@@ -317,6 +317,16 @@ def _campaign_step(w, rng, judge, tag):
         judge.attempt("send_merchant", f"{who}, route {route.id}, {good}", lambda: w.send_merchant_check(who, route),
                       lambda: w.send_merchant(who, route, good, src))
         return
+    if kind == "order":                       # a battle's stance: an order the battle may refuse
+        if not w.battles:
+            return
+        battle = rng.choice(sorted(w.battles, key=lambda b: b.pos))
+        side = rng.choice((battle.attacker, battle.defender))
+        stance = rng.choice(("attack", "hold", "withdraw", "retreat"))
+        judge.attempt("battle_order", f"{battle.pos}, {side}, {stance}",
+                      lambda: w.battle_order_check(battle.pos, side, stance),
+                      lambda: w.battle_order(battle.pos, side, stance))
+        return
     stacks = _stacks(w)
     if not stacks:
         return
@@ -332,6 +342,17 @@ def _campaign_step(w, rng, judge, tag):
     elif kind == "forage":
         judge.attempt("forage", f"stack of {len(group)} at {key[0]} ({key[1]})", lambda: w.forage_check(group),
                       lambda: w.forage(group))
+    elif kind == "engage":
+        options = sorted(w.attack_options_group(group))
+        if options and rng.random() < 0.7:
+            target = rng.choice(options)
+            judge.attempt("attack", f"stack of {len(group)} at {key[0]} ({key[1]}), {target}",
+                          lambda: (target in w.attack_options_group(group), ""),
+                          lambda: w.attack_group(group, target))
+        else:                                 # often refused: the check must say why, and nothing may move
+            target = _somewhere(rng, key[0], 2)
+            judge.attempt("engage", f"stack of {len(group)} at {key[0]} ({key[1]}), {target}",
+                          lambda: w.engage_check(group, target), lambda: w.engage(group, target))
     elif kind in ("refit", "upgrade"):
         unit = rng.choice(group)
         if kind == "refit":

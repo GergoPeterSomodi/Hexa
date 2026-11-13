@@ -1393,11 +1393,11 @@ class MapView:
                     x, y = at(pos)
                     self.chip(screen, x, y - r * 0.5, "stop", (200, 120, 30))
         self._tint(screen, [((230, 60, 50, 100), *at(pos)) for pos in ui.attacks])
-        for pos, how in ui.attacks.items():
+        for pos in ui.attacks:
             x, y = at(pos)
             pygame.draw.polygon(screen, (255, 70, 60), hex_points(x, y, r - 1), max(2, r // 9))
             if r >= 14:
-                self.chip(screen, x, y + r * 0.62, "fire" if how == "bombard" else "attack", (170, 40, 35))
+                self.chip(screen, x, y + r * 0.62, "attack", (170, 40, 35))
         path = getattr(ui, "path", [])
         if len(path) > 1:
             points = [at(p) for p, _ in path]

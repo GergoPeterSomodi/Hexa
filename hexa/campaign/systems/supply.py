@@ -85,7 +85,7 @@ def forage_check(world, group, tag=None, end_of_round=False):
         return False, "Armies only forage in foreign land"
     if prov.foraged == (lead.owner, world.turn):
         return False, "Already foraged here this season"
-    if not end_of_round and min(u.moves_left for u in troops) <= 0:
+    if not end_of_round and min(u.moves_left for u in troops) <= 0 and world.battle_at(lead.pos) is None:
         return False, "No time left this season"
     return True, ""
 

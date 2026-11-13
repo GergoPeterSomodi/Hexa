@@ -12,6 +12,7 @@
     "snapshot_restore": {"soft": 0.2, "hard": 0.4, "measured": 0.085},
     "ai_season": {"soft": 0.25, "hard": 0.5, "measured": 0.125},
     "ai_season_late": {"soft": 0.5, "hard": 1.0, "measured": 0.251},
+    "battle_season": {"soft": 0.005, "hard": 0.015, "measured": 0.0045},
     "mapview_zoom1": {"soft": 0.2, "hard": 0.4, "measured": 0.103},
     "mapview_zoom4": {"soft": 0.6, "hard": 1.5, "measured": 0.375}
   }

@@ -1,21 +1,24 @@
-"""Battle statistics of all-AI campaign games: the baseline the battle system (slice 1) is tuned against.
+"""Battle statistics of all-AI campaign games: the numbers the battle system (slice 1) is tuned against.
 
     python tools/battle_stats.py [--root <checkout>] [--seeds 1,2,3,4] [--seasons 40] [--json <file>]
 
 Plays all-AI games on the Europe map and on random maps, `--seasons` seasons each (the season of
 tools/oracle_runner.py: every country's AI, then the round's end), and counts the bus events of each game: wars,
-battles, bombardments, units lost, provinces that changed hands, storms and surrenders. Per war it gives battles,
-units lost and provinces. `--root` measures another checkout's hexa package (a base worktree, say); the tool
-refuses a hexa from anywhere else. Pygame-free: it uses the public API only (CampaignWorld, ai.run, end_round, and
-bus.tap to listen).
+battles (battle_started), units lost, provinces that changed hands, storms and surrenders. From each battle's end
+(battle_ended) it takes the length in seasons, who won (draws have no winner), the men killed and wounded, and whether
+the battle reached the safety stop (ended at or past BATTLE_MAX_SEASONS seasons). Per war it gives battles, units lost
+and provinces. `--root` measures another checkout's hexa package (a base worktree, say); the tool refuses a hexa from
+anywhere else. Pygame-free: it uses the public API only (CampaignWorld, ai.run, end_round, and bus.tap to listen).
 
-Numbers the battle system adds (battle length in seasons, the attacker's win rate, the killed and wounded shares)
-need the battle's own end event, so they read as null on a checkout without it. `--json` writes them all, for
-docs/design/battle-slice1-build-spec.md section 7.3.2 (the baseline PR 5 compares with).
+The numbers of docs/reports/battle-baseline.json keep their names: the old `battles` and `bombardments` were one-shot
+fights of the old war.battle(); from slice 1 on a battle is counted when it starts, and nothing bombards. `--json`
+writes them all (docs/design/battle-slice1-build-spec.md section 7.3.2: the baseline PR 5 compares with).
 """
 import argparse
 import json
+import math
 import os
+import statistics
 import sys
 import time
 from collections import Counter
@@ -25,6 +28,8 @@ DEFAULT_SEASONS = 40
 SUITES = ("europe", "random")
 COUNTS = ("wars", "battles", "bombardments", "units_lost", "units_lost_battle", "surrenders", "provinces_sieged",
           "storms", "provinces_peace", "battle_lost_units", "battle_strength_hurt")
+MEN_COUNTS = ("men_killed", "men_wounded", "battles_ended", "battles_stopped", "battles_draw", "battle_wins_attacker",
+              "battle_wins_defender")
 
 
 def load_hexa(root):
@@ -41,21 +46,19 @@ def load_hexa(root):
 class Tally:
     """Counts the events of one game. A bus tap: it never changes the game."""
 
-    def __init__(self):
+    def __init__(self, stop_seasons):
         self.count = Counter()
+        self.lengths = []
+        self.stop_seasons = stop_seasons
 
     def __call__(self, event):
         kind, count = event.kind, self.count
         if kind == "war_declared":
             count["wars"] += 1
-        elif kind == "battle":
-            if event.get("ranged"):
-                count["bombardments"] += 1
-            else:
-                count["battles"] += 1
-                lost, hurt = event.get("lost") or (0, 0), event.get("hurt") or (0, 0)
-                count["battle_lost_units"] += sum(lost)
-                count["battle_strength_hurt"] += sum(hurt)
+        elif kind == "battle_started":
+            count["battles"] += 1
+        elif kind == "battle_ended":
+            self.ended(event)
         elif kind == "unit_lost":
             count["units_lost"] += 1
             if event.get("why") == "battle":
@@ -70,42 +73,76 @@ class Tally:
         elif kind == "peace_made":
             count["provinces_peace"] += event.get("moved") or 0
 
+    def ended(self, event):
+        count = self.count
+        seasons = event.get("seasons") or 0
+        self.lengths.append(seasons)
+        count["battles_ended"] += 1
+        killed = sum((event.get("killed") or {}).values())
+        wounded = sum((event.get("wounded") or {}).values())
+        count["men_killed"] += round(killed)
+        count["men_wounded"] += round(wounded)
+        count["battle_strength_hurt"] += round(killed + wounded)
+        if seasons >= self.stop_seasons:
+            count["battles_stopped"] += 1
+        winner = event.get("winner")
+        if winner is None:
+            count["battles_draw"] += 1
+        elif winner == event.get("attacker"):
+            count["battle_wins_attacker"] += 1
+        else:
+            count["battle_wins_defender"] += 1
+
 
 def play(mode, seed, seasons):
-    """One all-AI game; returns its counts, the seasons it ran and the turn it ended on."""
+    """One all-AI game; returns its counts, the lengths of its battles and the turn it ended on."""
     from hexa.campaign import ai
+    from hexa.campaign.data import BATTLE_MAX_SEASONS
     from hexa.campaign.world import CampaignWorld
     world = CampaignWorld(seed, map="random") if mode == "random" else CampaignWorld(seed)
     world.player = None
-    tally = Tally()
+    tally = Tally(BATTLE_MAX_SEASONS)
     world.bus.tap(tally)
     for _ in range(seasons):
         for tag in list(world.countries):
             ai.run(world, tag)
         world.end_round()
-    return dict(tally.count), world.turn
+    return dict(tally.count), tally.lengths, world.turn
 
 
 def share(total, wars):
     return round(total / wars, 3) if wars else None
 
 
+def p90(values):
+    """The 90th percentile by nearest rank."""
+    ordered = sorted(values)
+    return ordered[math.ceil(0.9 * len(ordered)) - 1]
+
+
 def summary(rows):
-    """Totals over games, and per war: battles, units lost and provinces that changed hands."""
+    """Totals over games, and per war: battles, units lost, provinces, and the battles' own measures."""
     total = Counter()
+    lengths = []
     for row in rows:
-        total.update({k: row["counts"].get(k, 0) for k in COUNTS})
-    wars = total["wars"]
+        total.update({k: row["counts"].get(k, 0) for k in COUNTS + MEN_COUNTS})
+        lengths += row["lengths"]
+    wars, battles = total["wars"], total["battles"]
+    decided = total["battle_wins_attacker"] + total["battle_wins_defender"]
+    casualties = total["men_killed"] + total["men_wounded"]
     per_war = {
-        "battles_per_war": share(total["battles"], wars),
+        "battles_per_war": share(battles, wars),
         "units_lost_per_war": share(total["units_lost"], wars),
         "provinces_per_war": share(total["provinces_sieged"] + total["provinces_peace"], wars),
-        "battle_length_seasons": None,          # needs battle_ended (slice 1, PR 3)
-        "attacker_win_rate": None,              # needs battle_ended (slice 1, PR 3)
-        "killed_share": None,                   # needs battle_ended (slice 1, PR 3)
-        "wounded_share": None,                  # needs battle_ended (slice 1, PR 3)
+        "battle_length_seasons": {"median": statistics.median(lengths), "p90": p90(lengths)} if lengths else None,
+        "attacker_win_rate": round(total["battle_wins_attacker"] / decided, 3) if decided else None,
+        "draw_rate": share(total["battles_draw"], battles),
+        "stop_share": share(total["battles_stopped"], battles),
+        "killed_per_battle": share(total["men_killed"], battles),
+        "wounded_per_battle": share(total["men_wounded"], battles),
+        "wounded_share": round(total["men_wounded"] / casualties, 3) if casualties else None,
     }
-    return {"totals": {k: total[k] for k in COUNTS}, "per_war": per_war}
+    return {"totals": {k: total[k] for k in COUNTS + MEN_COUNTS}, "per_war": per_war}
 
 
 def run(root, seeds, seasons, quiet=False):
@@ -114,11 +151,11 @@ def run(root, seeds, seasons, quiet=False):
     for suite in SUITES:
         for seed in seeds:
             started = time.time()
-            counts, turn = play(suite, seed, seasons)
-            rows.append({"suite": suite, "seed": seed, "turn": turn, "counts": counts})
+            counts, lengths, turn = play(suite, seed, seasons)
+            rows.append({"suite": suite, "seed": seed, "turn": turn, "counts": counts, "lengths": lengths})
             if not quiet:
                 print(f"{suite:6} seed {seed:3}: {counts.get('wars', 0)} wars, {counts.get('battles', 0)} battles, "
-                      f"{counts.get('bombardments', 0)} bombardments ({time.time() - started:.1f} s)", flush=True)
+                      f"{counts.get('units_lost', 0)} units lost ({time.time() - started:.1f} s)", flush=True)
     return {"suites": list(SUITES), "seeds": list(seeds), "seasons": seasons, "games": rows, **summary(rows)}
 
 
@@ -126,10 +163,14 @@ def table(result):
     t, p = result["totals"], result["per_war"]
 
     def f(value):
-        return "n/a" if value is None else (f"{value:.2f}" if isinstance(value, float) else str(value))
+        if value is None:
+            return "n/a"
+        if isinstance(value, dict):
+            return ", ".join(f"{k} {v}" for k, v in value.items())
+        return f"{value:.3f}" if isinstance(value, float) else str(value)
 
     lines = ["| Measure | Value |", "|---|---|"]
-    for name in COUNTS:
+    for name in COUNTS + MEN_COUNTS:
         lines.append(f"| {name} (total) | {t[name]} |")
     for name, value in p.items():
         lines.append(f"| {name} | {f(value)} |")

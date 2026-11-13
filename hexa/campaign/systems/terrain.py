@@ -105,6 +105,9 @@ def move_check(world, group, dest):
     if not group or dest is None:
         return False, ""
     lead = group[0]
+    battle_here = world.battle_at(lead.pos)
+    if battle_here is not None and lead.owner in (battle_here.attacker, battle_here.defender) and not lead.naval:
+        return False, "In battle: order Withdraw to leave"
     if lead.naval or distance(lead.pos, dest) != 1:
         return True, ""
     if (lead.pos, dest) in world.pass_data()[4]:

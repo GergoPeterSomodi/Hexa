@@ -131,7 +131,7 @@ bar drops things in this order: the key goods, the changes (they stay in the car
 then chips from the right.
 
 **Floating text:** what happens in view rises from its hex as a ribbon for about a second: **red** for war (battles,
-bombardments, a province taken from someone else), **amber** for a siege, **gold** for gains (a province, a finished
+a province taken from someone else), **amber** for a siege, **gold** for gains (a province, a finished
 building), **green** for what you did on purpose (recruited, built, foraged, founded), **rose** for your losses
 (units, a province, raids) and **white** for what other countries do in your sight. Several at one hex queue up and
 stack; nothing floats for hexes off screen, under the open panel or in the fog.
@@ -248,8 +248,8 @@ says so each time you try.
     closed by snow until spring." A march that meets a closed pass waits for spring. With the passes shut there is
     usually a long way round or none at all, not a short detour. Only the step across the pass is closed: no army is
     ever stranded, because the hexes themselves stay open.
-  - Cannons can still fire over a crest (bombard reaches two hexes through mountains), and trade routes and market reach
-    ignore crests: goods cross the mountains in every season. Armies, supply, zones of control, recruiting and siege support
+  - Trade routes and market reach
+    ignore crests: goods cross the mountains in every season. Armies, battles, supply, zones of control, recruiting and siege support
     do not cross them.
   - A march that would only get through a pass walks nowhere in winter: if the way round has become much longer, the
     stack waits for spring ("The Gotthard pass is closed by snow; the march waits for spring."). The AI does the same.
@@ -332,10 +332,34 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 |---|---|---|---|---|
 | Infantry | Pikemen | Arquebusiers | Musketeers | Defending, holding castles, stopping cavalry |
 | Cavalry | Knights | Lancers | Cuirassiers | Fast; hits hard in open land, weak in forests, hills and against castles |
-| Cannons | Bombards | Culverins | Field guns | Fire 2 hexes away without reply, smash castles and speed up sieges; weak up close |
+| Cannons | Bombards | Culverins | Field guns | Fire from the back line of a battle, add siege points on their hex and smash castles; weak up close |
 
-- **Battles:** the best 3 units of each side form the front line; every unit behind adds +5% (up to +25%),
-  and cannons behind the line fire first. Defenders strike back. Terrain and castles help defenders.
+- **Battles:** an attack on an enemy stack or a garrisoned castle starts a battle on that hex, and a stack beside a battle
+  its country is in joins it. Both armies stand on the hex and fight up to **3 days a season**. Each side fights in three
+  **lanes** (left, centre, right; the right lane is closed on mountains, marsh, jungle and snow). The rest of the army is
+  the reserve, and guns of the back line fire at the enemy centre. A lane that empties is refilled from the reserve:
+  cavalry to the flanks, infantry to the centre. A flank with no enemy in front comes round for a bonus. Terrain, castles,
+  veterans, generals and pikes against horse count as they do in any fight. An army under 25% morale **breaks**: the
+  winner pursues it. The beaten army **retreats** to the nearest hex of its country within 3 hexes, or **surrenders** when
+  there is none. A battle that lasts **6 seasons** ends with the weaker army withdrawing, so no two armies stay locked for
+  long. Peace ends the battles of the two countries with no pursuit. Battles have names: "Battle of Toro, 1480", and
+  "Second Battle of Toro, 1481" for a repeat on the same place.
+- **In battle:** a stack cannot move, raise troops, refit, drill or heal. It still eats, and it can forage. A regiment under
+  half morale cannot attack. Outside battle a fed regiment wins back a quarter of its morale a season. Battle numbers:
+
+| Battle number | Value |
+|---|---|
+| Days fought a season | 3 |
+| Lanes | 3 (2 on narrow ground) |
+| Men in a full regiment | 1,000 |
+| A stack under this morale cannot attack | 50% |
+| An army under this morale breaks | 25% |
+| Pursuit of a broken army (cavalry on the winning side / on foot) | 10% / 4% of its men |
+| Pursuit of a withdrawing army | 5% of its men |
+| Wounded who come back when the battle ends in supply | half |
+| A beaten army's morale, at most | 30% |
+| Morale back a season outside battle | 25 points |
+| Safety stop | 6 seasons |
 - **Castles** have their own garrison (stronger with each level). They stop enemy armies walking past
   (armies must halt next to them) and must be **besieged** for several seasons (cannons and siege-master
   generals shorten it) or stormed. Taking a province without a castle needs one season.

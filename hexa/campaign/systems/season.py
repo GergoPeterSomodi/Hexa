@@ -15,8 +15,8 @@ called for every step of a march. Imports point down: never world.py, ui, render
 from ...events import passes_changed
 from ...hexgrid import within
 from .. import geo
-from ..data import END_YEAR, WAR_LENGTH_AI
-from . import debt, economy, research, supply, war
+from ..data import END_YEAR, MORALE_RECOVERY, WAR_LENGTH_AI
+from . import battle, debt, economy, research, supply, war
 
 SCALE = geo.SCALE
 
@@ -87,11 +87,24 @@ def treasury_line(world):
                       "treasury")
 
 
+def _in_battle(world, unit):
+    """Whether a unit stands in a battle: on the battle's hex, on one of its two sides."""
+    battle_here = world.battle_at(unit.pos)
+    return battle_here is not None and unit.owner in (battle_here.attacker, battle_here.defender)
+
+
 def start_units(world, tag):
+    """A country's units at the start of its turn: moves back (none while in a battle), healing for a fed regiment at
+    home, and morale back by MORALE_RECOVERY for a fed regiment outside battle (spec 3.2, 3.8)."""
     for unit in world.units_of(tag):
-        unit.moves_left = world.unit_moves(unit)
+        fighting = _in_battle(world, unit)
+        unit.moves_left = 0 if fighting else world.unit_moves(unit)
         unit.acted = unit.attacked = unit.upgraded = False
-        if unit.kind.war and unit.hp < unit.kind.hp and not unit.carrier and unit.supplied:
+        if fighting or not unit.kind.war or not unit.supplied:
+            continue
+        if unit.morale < 1.0:
+            unit.morale = min(1.0, unit.morale + MORALE_RECOVERY)
+        if unit.hp < unit.kind.hp and not unit.carrier:
             prov = world.provinces.get(unit.pos)
             if prov and prov.owner == tag and prov.controller == tag:
                 unit.hp = min(unit.kind.hp, unit.hp + (3 if prov.settlement >= 2 else 1))
@@ -161,6 +174,7 @@ def ranking(world):
 
 # The season's order. Names are what tests/test_season.py pins; add, move or remove a phase here and nowhere else.
 PHASES = (
+    ("battles", battle.battle_season),        # the days of every battle: losses first, then the survivors eat
     ("logistics", supply.logistics),          # feed every stack or starve it
     ("sieges", war.sieges),                   # troops in enemy provinces take them
     ("war_timeouts", war_timeouts),           # old wars end

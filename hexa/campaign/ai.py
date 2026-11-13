@@ -327,11 +327,11 @@ def _defence_power(world, pos):
 def _campaign(world, tag, stack, enemies):
     ours = world.stack_power(stack)
     best = None
-    for pos, stand in world.attack_options_group(stack).items():
+    for pos in world.attack_options_group(stack):
         theirs = _defence_power(world, pos)
         ratio = ours / max(1.0, theirs)
-        if stand == "bombard" or ratio >= 1.3:
-            value = ratio + (2 if stand == "bombard" else 0)
+        if ratio >= 1.3:
+            value = ratio
             if best is None or value > best[0]:
                 best = (value, pos)
     if best:

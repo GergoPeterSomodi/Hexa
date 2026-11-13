@@ -8,7 +8,7 @@ from unittest import mock
 from hexa.campaign.systems import season
 from tests.support.worlds import fresh
 
-ORDER = ["logistics", "sieges", "war_timeouts", "economy", "collect", "debt", "growth", "research", "extinction",
+ORDER = ["battles", "logistics", "sieges", "war_timeouts", "economy", "collect", "debt", "growth", "research", "extinction",
          "turn", "units", "exploration", "vision", "redraw", "report"]
 
 
