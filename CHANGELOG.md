@@ -4,6 +4,27 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
+## v0.1.9: Armies you can follow
+**Movement and reminders:**
+- After End season, the armies and ships you can see walk hex by hex instead of jumping; moves under fog stay instant,
+  the replay is capped at about 6 seconds and Space or Enter skips it. New option: Movement speed (Instant, Normal, Slow)
+- End-of-turn reminders: before a season ends, a list of what is unfinished (research with no points, merchants with a
+  profitable order, nothing being built, armies idle in open land, a pending idea card); a click goes there. New option:
+  End-of-turn reminders (on by default)
+
+**Fixes:**
+- The Options page's Back button no longer crosses the edge of the box
+- Loading a quicksave with the technology screen open no longer crashes
+
+**Under the hood:**
+- The code clean-up: the pause menu and technology screen are separate screens; the map drawing caches have size
+  limits and every generated sprite is checked in CI; most game rules moved out of `world.py` (3,500 lines to 730) into
+  systems modules, with the season order in one table. No rule changed; fixed-seed games play exactly as before
+- Design docs for review: stopping steamrolling (diplomacy, rebels), achievements, city states, a scenario mode; measured
+  trade and economy reports; an audit of the remaining Kenney art
+
+Old saves keep loading.
+
 ## v0.1.8: The new HUD and real place names
 **On screen:**
 - A new top bar: chips for ducats, provinces, research, regiments, merchants, prestige and more, each with its change
