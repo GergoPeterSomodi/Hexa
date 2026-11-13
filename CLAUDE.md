@@ -189,7 +189,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   (those are research and trade). The module never imports world.py; it reaches the running world only through
   public methods (`passes`, `edge_blocked`, `add_unit`, `land_spot`, `provinces_of`, `total_pop`, `units_at`, `ridge_edges`,
   `is_land`, `is_sea`). `world.py` keeps
-  a facade only where something else calls: `_nearest_land` (markets), `_cross`, `_unit_point`, `_unit_centre` (tests),
+  a facade only where something else calls: `_cross`, `_unit_point`, `_unit_centre` (tests),
   and `_pass_data`, which calls `worldgen.build_edges`. `OWNS` lists the world attributes the module sets.
 - **Colonies** (`systems/colonies.py`): `found_check`/`found` (facades on `CampaignWorld`) and the colonial part of the
   season's `grow()` loop: `settlers` (the growth bonus and arriving settlers), `natives` (natives settling and raiding)
@@ -211,6 +211,13 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   (with `finish_research`, `advance`, `new_age`) and the build-time `start_techs`/`legacy_techs`. `has`, `bonus`,
   `_effects` and `tech_changed` stay plain methods on `CampaignWorld` on purpose: they own the `_bonus_cache` and are
   called thousands of times a season, so no extra call layer. Never write `world._bonus_cache` from a system module.
+- **Trade** (`systems/trade.py`): the markets (`build_markets`, `rebuild_markets`, `ensure_markets`), the routes between them
+  (`build_routes`, `route_capacity`, `route_cost`), the merchants' orders (`merchants`, `merchant_options`, `send_merchant_check`/
+  `send_merchant`, `recall_merchant`) and the goods that move along a route each season (`merchants_trade`, `trade_route`, which
+  the economy step calls). Facades on `CampaignWorld` for everything the UI, AI and tests call. The two caches stay owned by
+  world.py behind public methods: `take_markets_dirty()` (reads and clears `_markets_dirty`, which `refresh_markets` raises;
+  `trade.ensure_markets` rebuilds when it says so) and `sea_distances(start)` (the `_sea_cache`; `trade.sea_walk` is the walk).
+  `move_cost` is the public name of the old `_move_cost` (step cost without the ridge walls).
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of

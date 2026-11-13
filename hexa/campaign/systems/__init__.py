@@ -5,5 +5,6 @@ function the rest of the game calls. A module lists the world attributes it writ
 Modules: worldgen (build time only), colonies (founding and colonial growth),
 building (investment and building), military (raising, refits, drill, stacks),
 debt (the debt limit, desertion and seizures),
-research (techs, idea cards, ages and start techs).
+research (techs, idea cards, ages and start techs),
+trade (markets, routes, merchants and what moves along a route).
 """

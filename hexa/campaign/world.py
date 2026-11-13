@@ -7,23 +7,21 @@ import heapq
 import itertools
 import pickle
 import random
-from collections import deque
 
 from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, state, tech
-from .state import Garrison, Market, Route, Unit, War, fill_defaults
-from .systems import building, colonies, debt, military, research, worldgen
+from .state import Garrison, Unit, War, fill_defaults
+from .systems import building, colonies, debt, military, research, trade, worldgen
 from .data import (COUNTER, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS,
                    GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, SCOUT, SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX,
                    ATTRITION, FARM_GOODS, FOOD_PER_TROOP, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER, SUPPLY_BASE,
                    SUPPLY_PER_FARM, SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, BURGHER_TAX,
                    COLONY_DONE, COLONY_UPKEEP, ELASTICITY, END_YEAR, PIONEER, WORKS_BONUS, WORKS_UPKEEP, SETTLEMENTS,
                    SETTLEMENT_TAX, SETTLEMENT_UPKEEP, CASTLES, CASTLE_UPKEEP, CASTLE_DEFENSE, CASTLE_SIEGE, GOODS,
-                   MARKET_REACH, MARKETPLACE_CAPACITY, MERCHANT_CAPACITY, NEEDS, OUTPUT, PEASANT_TAX, PORT_CAPACITY,
-                   PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX, REMOTE_PENALTY, ROUTE_BASE, SEA_ROUTE_RANGE, SEA_STEP,
-                   SIEGE_BASE, START_YEAR, TAX_GROWTH, TAX_LEVELS, TERRAIN, TRADING_POST_SHARE, WAR_LENGTH_AI,
-                   ATLANTIC_RANGE, BASE_GROWTH, date, SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE)
+                   NEEDS, OUTPUT, PEASANT_TAX, PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX, REMOTE_PENALTY, SIEGE_BASE,
+                   START_YEAR, TAX_GROWTH, TAX_LEVELS, TERRAIN, TRADING_POST_SHARE, WAR_LENGTH_AI, BASE_GROWTH, date,
+                   SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE)
 
 INF = float("inf")
 SCALE = geo.SCALE
@@ -43,7 +41,7 @@ WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countr
 LAND_TILES = ("plains", "steppe", "forest", "hills", "mountains", "desert", "jungle", "tundra", "marsh", "taiga",
               "savanna", "beach", "snow")
 FORBIDDEN = worldgen.FORBIDDEN        # the terrain pairs that may not touch (wave function collapse)
-Province, Country = state.Province, state.Country   # saves pickle every state class as hexa.campaign.world.<Name>
+Province, Country, Market, Route = state.Province, state.Country, state.Market, state.Route   # saves pickle every state class as hexa.campaign.world.<Name>
 CLASSES = ("peasants", "burghers", "nobles")
 from .data import MANUFACTORIES, MINE_GOODS, DEBT_INTEREST
 
@@ -201,9 +199,9 @@ class CampaignWorld:
         blocked edge (a ridge crest, or a pass shut by snow) is impossible: it costs INF."""
         if (frm, to) in self._walls():
             return INF
-        return self._move_cost(frm, to)
+        return self.move_cost(frm, to)
 
-    def _move_cost(self, frm, to):
+    def move_cost(self, frm, to):
         """step_cost without the ridge edges (trade routes ignore the crests)."""
         move = TERRAIN[self.terrain[to]].move
         if to in self.roads and frm in self.roads:
@@ -228,9 +226,6 @@ class CampaignWorld:
 
     def is_sea(self, pos):
         return self.terrain.get(pos) == "ocean"
-
-    def _nearest_land(self, pos):
-        return worldgen.nearest_land(self, pos)
 
     # the ridge geometry (systems/worldgen.py) that tests/test_passes.py probes
     _cross = staticmethod(worldgen.cross)
@@ -538,16 +533,9 @@ class CampaignWorld:
     def colonies_of(self, tag):
         return [p for p in self.provinces_of(tag) if p.colony or p.trading_post or not self.in_old_world(p.pos)]
 
-    # ----- markets and trade routes -------------------------------------------------
+    # ----- markets and trade routes (systems/trade.py) ------------------------------
     def _build_markets(self):
-        self.markets = []
-        for name, lon, lat, colonial in self.geo.MARKETS:
-            market = Market(name, (lon, lat), colonial)
-            for g, good in GOODS.items():
-                market.price[g] = good.price
-                market.history[g] = []
-            market.reset()
-            self.markets.append(market)
+        trade.build_markets(self)
         self._sea_cache = {}
         self._markets_dirty = True
         self.ensure_markets()
@@ -557,205 +545,52 @@ class CampaignWorld:
         self._markets_dirty = True
         self.version += 1
 
-    def ensure_markets(self):
-        if self._markets_dirty:
-            self._markets_dirty = False
-            self._rebuild_markets()
+    def take_markets_dirty(self):
+        """Whether the markets are stale; asking clears the flag (trade.ensure_markets then rebuilds them)."""
+        dirty, self._markets_dirty = self._markets_dirty, False
+        return dirty
 
-    def _rebuild_markets(self):
-        """Activate colonial markets, assign provinces to markets and rebuild trade routes."""
-        for market in self.markets:
-            pos = geo.hex_of(*market.point)
-            near = [self.provinces[p] for p in within(pos, 2) if p in self.provinces and self.provinces[p].owner]
-            if market.colonial:
-                market.active = bool(near)
-                market.center = min(near, key=lambda p: (distance(p.pos, pos), p.pos)).pos if near else None
-            else:
-                market.center = self._nearest_land(pos)
-                market.active = self.provinces[market.center].owner is not None
-        active = [m for m in self.markets if m.active]
-        limits = [MARKET_REACH * (1 + self.bonus(self.market_owner(m), "market_reach")) for m in active]
-        best = {}
-        heap = []
-        for i, market in enumerate(active):
-            best[market.center] = (0, i)
-            heapq.heappush(heap, (0, market.center, i))
-        while heap:
-            cost, pos, i = heapq.heappop(heap)
-            if best.get(pos, (INF,))[0] < cost:
-                continue
-            for n in neighbors(pos):
-                if n not in self.terrain:
-                    continue
-                if self.is_sea(n):
-                    step = SEA_STEP if (self.is_sea(pos) or self.provinces.get(pos) and self.provinces[pos].coastal) else INF
-                elif self.is_land(n):
-                    step = self._move_cost(pos, n) if not self.is_sea(pos) else 1
-                else:
-                    continue
-                new = cost + step
-                if new <= limits[i] and new < best.get(n, (INF,))[0]:
-                    best[n] = (new, i)
-                    heapq.heappush(heap, (new, n, i))
-        for market in self.markets:
-            market.provinces = []
-        capital_market = {}
-        for prov in self.provinces.values():
-            prov.market, prov.remote = None, False
-            if prov.owner is None:
-                continue
-            if prov.pos in best:
-                prov.market = active[best[prov.pos][1]]
-        for country in self.countries.values():
-            home = self.provinces[country.capital]
-            capital_market[country.tag] = home.market if home.owner == country.tag else None
-        for prov in self.provinces.values():
-            if prov.owner and prov.market is None:
-                prov.market, prov.remote = capital_market.get(prov.owner), True
-            if prov.market:
-                prov.market.provinces.append(prov)
-        self._build_routes(active)
-        self.changed()
+    def sea_distances(self, start):
+        """Ocean distances from the sea next to `start` (cached)."""
+        if start not in self._sea_cache:
+            self._sea_cache[start] = trade.sea_walk(self, start)
+        return self._sea_cache[start]
+
+    def ensure_markets(self):
+        return trade.ensure_markets(self)
 
     def market_owner(self, market):
-        prov = self.provinces.get(market.center)
-        return prov.owner if prov else None
-
-    def _sea_distances(self, start):
-        """Ocean distances from the sea next to `start` (cached)."""
-        if start in self._sea_cache:
-            return self._sea_cache[start]
-        dist = {}
-        queue = deque()
-        for n in within(start, 2):
-            if self.is_sea(n):
-                dist[n] = distance(n, start)
-                queue.append(n)
-        while queue:
-            pos = queue.popleft()
-            for n in neighbors(pos):
-                if self.is_sea(n) and n not in dist:
-                    dist[n] = dist[pos] + 1
-                    queue.append(n)
-        self._sea_cache[start] = dist
-        return dist
-
-    def _build_routes(self, active):
-        old = {(r.a.name, r.b.name): r for r in self.routes}
-        routes = []
-        adjacent = set()
-        for prov in self.provinces.values():
-            if not prov.market:
-                continue
-            for n in neighbors(prov.pos):
-                other = self.provinces.get(n)
-                if other and other.market and other.market is not prov.market:
-                    adjacent.add(frozenset((prov.market.name, other.market.name)))
-        for i, a in enumerate(active):
-            for b in active[i + 1:]:
-                land = frozenset((a.name, b.name)) in adjacent
-                sea_d = INF
-                if self.provinces[a.center].coastal or any(self.is_sea(n) for n in within(a.center, 1)):
-                    seas = self._sea_distances(a.center)
-                    near_b = [seas[n] for n in within(b.center, 2) if n in seas]
-                    sea_d = min(near_b) if near_b else INF
-                atlantic = (a.colonial != b.colonial) and min(a.point[0], b.point[0]) < -20 and \
-                    max(a.point[0], b.point[0]) < 12
-                both_colonial = a.colonial and b.colonial
-                owners = (self.market_owner(a), self.market_owner(b))
-                sea_range = SEA_ROUTE_RANGE * (1 + max(self.bonus(o, "sea_range") for o in owners))
-                flag_ok = any(self.has(o, "atlantic") for o in owners)
-                if land:
-                    route = (distance(a.center, b.center), False)
-                elif sea_d <= sea_range or (sea_d <= ATLANTIC_RANGE and flag_ok and (atlantic or both_colonial)):
-                    route = (sea_d, True)
-                else:
-                    continue
-                key = (a.name, b.name)
-                kept = old.get(key)
-                r = Route(len(routes), a, b, route[0], route[1])
-                if kept:
-                    r.orders = kept.orders
-                routes.append(r)
-        self.routes = routes
-        for country in self.countries.values():
-            country.orders = [(r.id, good, src) for r in routes for tag, good, src in r.orders if tag == country.tag]
+        return trade.market_owner(self, market)
 
     def routes_of(self, market):
-        return [r for r in self.routes if r.a is market or r.b is market]
+        return trade.routes_of(self, market)
 
     def route_capacity(self, route):
-        """Goods the background trade moves along a route each season (merchants come on top)."""
-        cap = ROUTE_BASE
-        for market in (route.a, route.b):
-            prov = self.provinces.get(market.center)
-            if prov:
-                cap += MARKETPLACE_CAPACITY * prov.level("marketplace")
-                if route.sea:
-                    cap += PORT_CAPACITY * prov.level("port")
-        return cap
+        return trade.route_capacity(self, route)
+
+    def route_cost(self, route):
+        return trade.route_cost(self, route)
 
     def merchants(self, tag):
-        levels = sum(p.level("marketplace") for p in self.provinces_of(tag))
-        owns_market = any(m.active and self.market_owner(m) == tag for m in self.markets)
-        return min(6, 1 + owns_market + levels // 3) + int(self.bonus(tag, "merchants"))
+        return trade.merchants(self, tag)
 
     def merchant_markets(self, tag):
-        return {p.market for p in self.provinces_of(tag) if p.market}
+        return trade.merchant_markets(self, tag)
 
     def market_named(self, name):
-        return next(m for m in self.markets if m.name == name)
+        return trade.market_named(self, name)
 
     def merchant_options(self, tag, route):
-        """What a merchant could do on this route: [(good, source, destination, profit per unit, amount)]."""
-        mine = self.merchant_markets(tag)
-        options = []
-        for g, good in GOODS.items():
-            if good.kind == "money":
-                continue
-            for src, dst in ((route.a, route.b), (route.b, route.a)):
-                if src not in mine and dst not in mine:
-                    continue
-                spare = max(0.0, src.supply[g] - src.demand[g] * 0.5)
-                amount = min(MERCHANT_CAPACITY, spare)
-                if amount < 0.5:
-                    continue
-                margin = dst.price[g] - src.price[g] - self.route_cost(route)
-                options.append((g, src, dst, margin, amount))
-        options.sort(key=lambda o: -o[3] * o[4])
-        return options
+        return trade.merchant_options(self, tag, route)
 
     def send_merchant_check(self, tag, route):
-        country = self.countries[tag]
-        if len(country.orders) >= self.merchants(tag):
-            return False, "All your merchants are busy (recall one first)"
-        if route.a not in self.merchant_markets(tag) and route.b not in self.merchant_markets(tag):
-            return False, "Merchants work routes from markets where you own land"
-        return True, ""
+        return trade.send_merchant_check(self, tag, route)
 
     def send_merchant(self, tag, route, good=None, src=None):
-        """Give a merchant an order: carry `good` from market `src` along the route."""
-        if not self.send_merchant_check(tag, route)[0]:
-            return False
-        if good is None:
-            options = self.merchant_options(tag, route)
-            if not options:
-                return False
-            good, src = options[0][0], options[0][1]
-        name = src.name if hasattr(src, "name") else src
-        route.orders.append((tag, good, name))
-        self.countries[tag].orders.append((route.id, good, name))
-        other = route.b.name if name == route.a.name else route.a.name
-        self.message(f"A merchant now carries {GOODS[good].name.lower()} from {name} to {other}.", tag, "merchant")
-        return True
+        return trade.send_merchant(self, tag, route, good, src)
 
     def recall_merchant(self, tag, route, order=None):
-        mine = [o for o in route.orders if o[0] == tag and (order is None or o[1:] == tuple(order[-2:]))]
-        if not mine:
-            return False
-        route.orders.remove(mine[-1])
-        self.countries[tag].orders.remove((route.id,) + mine[-1][1:])
-        return True
+        return trade.recall_merchant(self, tag, route, order)
 
     # ----- the economy (runs once per season, after everybody moved) --------------
     def set_tax(self, tag, level):
@@ -867,9 +702,9 @@ class CampaignWorld:
         for market in self.markets:
             self._set_prices(market)
         for route in self.routes:
-            self._merchants_trade(route)
+            trade.merchants_trade(self, route)
         for route in self.routes:
-            self._trade(route)
+            trade.trade_route(self, route)
         for market in self.markets:
             self._set_prices(market)
             if preview:
@@ -882,11 +717,6 @@ class CampaignWorld:
             self._restore_trade_state(held)
 
     # ----- what the techs and ideas change (keys in tech.EFFECT_KEYS) ------------------------------
-    def route_cost(self, route):
-        """Cost per unit on a trade route: a colonial market's owner may make colonial routes cheaper."""
-        cuts = [self.bonus(self.market_owner(m), "colonial_route_cost") for m in (route.a, route.b) if m.colonial]
-        return route.cost * (1 + min(cuts, default=0))
-
     def men_per_troop(self, tag):
         return MANPOWER / (1 + self.bonus(tag, "manpower"))
 
@@ -977,50 +807,6 @@ class CampaignWorld:
             return prov.market
         capital = self.provinces.get(self.countries[unit.owner].capital)
         return capital.market if capital else None
-
-    def _merchants_trade(self, route):
-        """Each merchant carries the good it was ordered to, profit or loss."""
-        route.results = []
-        for tag, g, src_name in route.orders:
-            src = route.a if route.a.name == src_name else route.b
-            dst = route.other(src)
-            amount = min(MERCHANT_CAPACITY, max(0.0, src.supply[g] - src.demand[g] * 0.5))
-            margin = dst.price[g] - src.price[g] - self.route_cost(route)
-            if amount > 0:
-                src.supply[g] -= amount
-                src.exports[g] += amount
-                dst.supply[g] += amount
-                dst.imports[g] += amount
-            route.results.append((tag, g, amount, amount * margin))
-
-    def _trade(self, route):
-        capacity = self.route_capacity(route)
-        cost = self.route_cost(route)
-        offers = []
-        for g, good in GOODS.items():
-            if good.kind == "money":
-                continue
-            for src, dst in ((route.a, route.b), (route.b, route.a)):
-                margin = dst.price[g] - src.price[g] - cost
-                if margin > 0:
-                    offers.append((margin, g, src, dst))
-        offers.sort(key=lambda o: -o[0])
-        route.flows, route.profit = [], 0.0
-        left = capacity
-        for margin, g, src, dst in offers:
-            if left <= 0.05:
-                break
-            amount = min(left, max(0.0, src.supply[g] - src.demand[g] * 0.7),
-                         max(0.0, dst.demand[g] - dst.supply[g] * 0.7))
-            if amount < 0.05:
-                continue
-            src.supply[g] -= amount
-            src.exports[g] += amount
-            dst.supply[g] += amount
-            dst.imports[g] += amount
-            route.flows.append((g, amount, src, dst))
-            route.profit += amount * margin
-            left -= amount
 
     def _incomes(self, profits):
         trade = {}
@@ -1661,7 +1447,7 @@ class CampaignWorld:
                     ok, step = self.is_sea(n), 1
                 else:
                     ok = self.is_land(n) and (n, pos) not in walls
-                    step = self._move_cost(n, pos) if ok and self.is_land(pos) else \
+                    step = self.move_cost(n, pos) if ok and self.is_land(pos) else \
                         TERRAIN[self.terrain[n]].move if ok else 0
                 if ok and cost + step < field.get(n, INF):
                     field[n] = cost + step
