@@ -22,16 +22,11 @@ import math
 import random
 import zlib
 
-import pygame
+from .art import shade
+from .goodsart import building, tower, dome, boat, flag, palm, pine, WHITE, DARK, DWOOD
+from .render import draw
+from .render.draw import CX, CY, R, lerp
 
-from .art import hex_pts, shade
-from .goodsart import building, tower, dome, boat, flag, palm, pine, INK, WHITE, DARK, DWOOD
-from .render.draw import Pen, lerp
-
-W, H = 120, 140
-CX, CY = W / 2, H / 2
-R = 69.3
-K = 2                                       # supersampling factor
 CITY_NAMES = ["venice", "constantinople", "paris", "london", "lisbon",
               "rome", "seville", "cairo", "moscow", "granada"]
 STAGE_NAMES = ["town", "city", "capital"]
@@ -52,45 +47,11 @@ GREEN = (116, 172, 92)
 GREEN_D = (74, 130, 66)
 
 
-class Canvas:
+class Canvas(draw.Canvas):
     """A 120 x 140 tile: ground pen `g`, object-layer pen `o` (outlined by `stamp`), `finish` clips to the hex."""
-
-    def __init__(self):
-        self.surf = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-        self.layer = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-        self.g = Pen(self.surf)
-        self.o = Pen(self.layer)
 
     def fill(self, color):
         self.surf.fill(color)
-
-    def shadow(self, x, y, w, h=None, a=45):
-        h = h or w * 0.35
-        sh = pygame.Surface((max(1, int(w * K)), max(1, int(h * K))), pygame.SRCALPHA)
-        pygame.draw.ellipse(sh, (0, 0, 0, a), sh.get_rect())
-        self.surf.blit(sh, (round((x - w / 2) * K), round((y - h / 2) * K)))
-
-    def stamp(self, ink=2):
-        """Commit the object layer with a dark outline around its silhouette (the Kenney ink look)."""
-        r = self.layer.get_bounding_rect(1)
-        if not r.w:
-            return
-        r = r.inflate(8, 8).clip(self.layer.get_rect())
-        sub = self.layer.subsurface(r)
-        if ink:
-            sil = pygame.mask.from_surface(sub, 40).to_surface(setcolor=INK + (255,), unsetcolor=(0, 0, 0, 0))
-            offs = [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, -2), (-2, 2), (2, 2)]
-            for dx, dy in offs:
-                self.surf.blit(sil, (r.x + dx, r.y + dy))
-        self.surf.blit(sub, r.topleft)
-        self.layer.fill((0, 0, 0, 0), r)
-
-    def finish(self):
-        mask = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-        pygame.draw.polygon(mask, (255, 255, 255, 255), [(x * K, y * K) for x, y in hex_pts(R - 0.3, CX, CY)])
-        self.surf.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-        out = pygame.transform.smoothscale(self.surf, (W, H))
-        return out.convert_alpha() if pygame.display.get_surface() else out
 
 
 def _rng(city, stage, variant, tag=""):
