@@ -412,7 +412,7 @@ AI_WITHDRAW_RATIO = 0.6                     # the AI withdraws when its battle s
 # The bands are the plains reading. The card divides the attack ratio by the defender's ground factor first (GROUND_ODDS,
 # CASTLE_ODDS), so the word matches what happens on that ground.
 ODDS_WORDS = (("Hopeless", 0.0, (0.00, 0.35)), ("Poor", 0.8, (0.35, 0.45)), ("Even", 1.0, (0.45, 0.60)),
-              ("Favourable", 1.2, (0.55, 0.85)), ("Overwhelming", 2.0, (0.65, 1.00)))
+              ("Favourable", 1.2, (0.55, 0.85)), ("Overwhelming", 2.5, (0.65, 1.00)))
 # The odds card's ground factor (battleview.odds_factor): the attack ratio is divided by it for the defender's hex.
 # Recalibrated 2026-11-13 for 0.2.1: 15 pike pairs (3 v 6 to 9 v 4) on each ground, 30 seeds each (tests/support/scenarios.play
 # with the ground set; scratch runs, not in the repo). The factor is the one that puts the most of the pairs' measured
@@ -428,7 +428,11 @@ GROUND_ODDS = {"plains": 1.0, "hills": 1.34, "forest": 1.40, "taiga": 1.40, "jun
 # does not fit. Level 1 is kept (1.51 would place one pair more; the v0.2.0 note says level 1 reads one band low, and a
 # higher factor reads lower). Level 3 garrisons alone are beaten 93-100% at ratios the card reads Hopeless (its best
 # factor, 1.33, is under level 2's, which the design does not allow): open for the owner, see the 0.2.1 report.
-CASTLE_ODDS = (1.0, 1.41, 1.58, 3.11)
+# The odds card's garrison weight (0.2.2, design 4.6; battleview.odds_view): in a storm the defence counts the field men
+# on the hex plus the garrison's men (after the siege cut) times this weight; alone, the weight by castle level 1-3.
+# Fitted 2026-11-13 against the garrison pairs of tests/test_odds_card.py (win rates measured in the engine, 30 seeds).
+GARRISON_ODDS = 3.1
+GARRISON_ODDS_ALONE = (1.8, 1.1, 1.0)
 RESEARCH_BASE = 0.6                        # research points per season, plus burghers / 40
 RESEARCH_FUND = (60, 15)                   # ducats -> research points
 
@@ -472,8 +476,23 @@ DEBT_FLOOR = 300                # ducats of debt tolerated before anything is lo
 DEBT_SEASONS = 6                # seasons of running costs (upkeep, army, colonies) tolerated as debt
 DEBT_INTEREST = 0.02            # interest a season on debt, on at most the debt limit
 MERCHANT_SHARE = 0.8             # (unused) kept for old saves
-SIEGE_BASE = 1
+# ----- sieges (0.2.2; design docs/design/sieges-and-retreats.md section 4) ----------------------------------------
+SIEGE_BASE_NEED = 4                      # points a place takes before its castle (4.2: need)
+SIEGE_MIN_SEASONS = 2                    # a place falls only after this many seasons of siege (the floor)
+SIEGE_HUNGER = 2                         # extra points a season once the garrison's stores run out (1 + castle level seasons)
+SIEGE_RATE_MAX = 6                       # the most points a season (crowd + guns + general)
+MILITIA_MEN = 500                        # the men holding a place with no castle (the crowd rule, 4.2)
+# The crowd: besieger's men over the garrison's men. Under 1x too few to hold a siege (0); 1x to 2x 1; 2x to 4x 2;
+# 4x and more 3 (the rule of war.crowd).
+CROWD_BANDS = ((2.0, 1), (4.0, 2))
+SIEGE_STORM_CUT = 0.5                    # a storm faces the garrison cut by this share of the siege's progress share
 WAR_LENGTH_AI = 16               # AI wars end after about this many turns
+# The AI's siege rules (campaign/ai.py, design 4.8)
+AI_SIEGE_MAX_SEASONS = 4                 # it besieges the nearest place that takes at most this many seasons
+AI_SIEGE_MAX_SEASONS_GUNS = 6            # ... with guns in the stack
+AI_STORM_SHARE = 0.5                     # it storms when its siege meter is at least this share of the way to the need
+AI_RELIEF_RATIO = 0.8                    # a defender sends relief when its army has this share of the besieger's power
+AI_RELIEF_SEASONS = 2                    # ... and the place is at most this many seasons of travel away
 SEA_ROUTE_RANGE = 18 * SCALE
 ATLANTIC_RANGE = 90 * SCALE
 TERRITORY_RADIUS = 4 * SCALE             # starting countries own land this close to one of their seeds

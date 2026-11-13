@@ -334,7 +334,7 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | Cavalry | Knights | Lancers | Cuirassiers | Fast; hits hard in open land, weak in forests, hills and against castles |
 | Cannons | Bombards | Culverins | Field guns | Fire from the back line of a battle, add siege points on their hex and smash castles; weak up close |
 
-- **Odds card:** with a stack selected, hovering a hex it can attack shows a card beside the hex: the men and morale of each side, the ground (the defender's ground counts for the defender), a castle or assault, a pass crossing or an attack uphill, the generals, and one word: **Hopeless**, **Poor**, **Even**, **Favourable** or **Overwhelming** (**Unknown** for an enemy you cannot see). The word is the strength ratio divided by the defender's ground factor: hills and forests 1.16, jungle 1.4, marsh 1.2, mountains 2.25, snow 2.65, and a castle with a garrison by level (1.41, 1.58, 3.11; the ground does not count in an assault). The factors are measured, so the word matches the win rate on that ground; the bands and factors are in `data.py` (`ODDS_WORDS`, `GROUND_ODDS`, `CASTLE_ODDS`).
+- **Odds card:** with a stack selected, hovering a hex it can attack shows a card beside the hex: the men and morale of each side, the ground (the defender's ground counts for the defender), a castle or assault, a pass crossing or an attack uphill, the generals, and one word: **Hopeless**, **Poor**, **Even**, **Favourable** or **Overwhelming** (**Unknown** for an enemy you cannot see). The word is the strength ratio divided by the defender's ground factor: hills and forests 1.16, jungle 1.4, marsh 1.2, mountains 2.25, snow 2.65; the ground does not count in an assault. A storm on a garrisoned castle is men against men: the garrison counts its men after any siege cut, weighted 3.1 times behind a field army and 1.8, 1.1 and 1.0 alone by castle level (`GARRISON_ODDS`, `GARRISON_ODDS_ALONE`). **Overwhelming** starts at a ratio of 2.5 (0.2.2; it was 2.0, where it read like Favourable). The factors are measured, so the word matches the win rate on that ground; the bands and factors are in `data.py` (`ODDS_WORDS`, `GROUND_ODDS`, `GARRISON_ODDS`).
 - **Battle reminders:** each battle you are in that is still on gets a line in the task flag's list ("... is on: send more troops before the season ends"); a click opens the battle panel. At the start of each season a "Battle on" ribbon marks the hex of each such battle.
 - **Battles:** an attack on an enemy stack or a garrisoned castle starts a battle on that hex, and a stack beside a battle
   its country is in joins it. Both armies stand on the hex and fight it out in the turn it starts: since 0.2.1 a battle is never carried into the next turn (there is no timing option), and a second stack that attacks the same hex that turn joins it on day 1. Each day each side rolls a **d6**: its damage that day is times 0.7 (roll 1) to 1.4 (roll 6). Each side fights in three
@@ -381,8 +381,35 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | Wounded who come back when the battle ends in supply | half |
 | Morale back a season outside battle | 25 points |
 - **Castles** have their own garrison (stronger with each level). They stop enemy armies walking past
-  (armies must halt next to them) and must be **besieged** for several seasons (cannons and siege-master
-  generals shorten it) or stormed. Taking a province without a castle needs one season.
+  (armies must halt next to them). A stack that moves onto a garrisoned castle **besieges** it (the default; no battle).
+  **Storm** is the assault battle at once, open every season of the siege. The choice is on the attack card.
+- **Sieges (0.2.2).** A besieged place has a meter (the card shows "falls in about N seasons", and warns when the war
+  ends first). The arrival season counts as the first. Each season the besieger adds its **rate** to the meter, and the
+  place falls at the end of a season in which the meter reaches its **need**, but never before **2 seasons** of siege:
+  no place falls in its first season, whatever the army.
+
+| Number | Value |
+|---|---|
+| Need | 4 points, + 3 per castle level (scaled by the garrison's share of its hit points left, rounded up), + 1 on hills, 2 on mountains and snow, + the siege-points tech per level |
+| Crowd (the besieger's men over the defenders') | under 1x: too few, no siege and no output loss; 1x to 2x: 1; 2x to 4x: 2; 4x and more: 3 |
+| Defenders' men | a castle's garrison: 100 men a hit point (600 a castle level); a place with no castle: a militia of 500 |
+| Rate | crowd + guns (each gun's siege points, the artillery tech as before) + 1 for a Siege master general; at most 6 |
+| Hunger | the garrison's stores last 1 + castle level seasons; after that the meter gains 2 points more a season |
+| Storm | the garrison faces its hit points cut by half of the meter's share of the need (a full meter halves it, half a meter cuts a quarter) |
+| Lifted | a relief army wins, the besieger leaves or peace is made: the meter, hunger and seasons go back to zero |
+
+- **Besieged places produce nothing** while the siege lasts. Besiegers forage the place for free.
+- **One regiment alone cannot take a castle of level 2 or 3** (too few men). Seasons to take a place with full garrisons
+  on plains (`python -m tools.siege_stats`, checked in `tests/test_sieges.py`):
+
+| Besieger | No castle | Castle 1 | Castle 2 | Castle 3 |
+|---|---|---|---|---|
+| 1 regiment | 2 | 4 | cannot | cannot |
+| 3 regiments | 2 | 3 | 4 | 7 |
+| 6 regiments | 2 | 3 | 4 | 6 |
+| 3 regiments + 1 bombard | 2 | 2 | 4 | 5 |
+| 6 regiments + 1 bombard | 2 | 2 | 3 | 5 |
+| 3 regiments + 2 culverins | 2 | 2 | 2 | 3 |
 - **Getting better:** research (burghers, or pay to fund it) unlocks new eras; **refit** old troops in a town.
   A **barracks** (infantry, cavalry) or **foundry** (cannons) lets you drill units for +attack / +defense.
   Units that survive battles become **Veteran** (+10%) and **Elite** (+20%). **Generals** (raised in your

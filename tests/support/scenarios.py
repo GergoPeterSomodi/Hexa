@@ -59,13 +59,13 @@ def stage(world, spec_a, spec_d, terrain="plains", castle=0):
     return battle, attackers, defenders
 
 
-def play(world, seed, spec_a, spec_d, terrain="plains"):
+def play(world, seed, spec_a, spec_d, terrain="plains", castle=0):
     """One scenario fight to its end, as the game fights it (0.2.1): days go by until a side breaks or flees, or until
     BATTLE_DAYS pass with nobody gone. Then the side with the lower army morale withdraws (the attacker on a tie) and
     pays the Withdraw price (battle.end_battle). Returns a dict: days, winner (tag), loss (share of its men lost per side,
     killed and wounded), the battle, and capped (the day cap was reached)."""
     world.rng = random.Random(seed)
-    battle, _, _ = stage(world, spec_a, spec_d, terrain=terrain)
+    battle, _, _ = stage(world, spec_a, spec_d, terrain=terrain, castle=castle)
     combat.deploy(world, battle)
     men0 = dict(battle.men0)
     broke, days = None, 0

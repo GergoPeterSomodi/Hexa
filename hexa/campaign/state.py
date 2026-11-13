@@ -42,6 +42,9 @@ class Province:
     castle: int = 0          # 1 tower, 2 small castle, 3 large castle
     busy: bool = False       # already did its one job this season
     garrison: int = 0        # hit points of the castle's own defenders
+    siege_turns: int = 0     # seasons this place has been besieged (the floor and the hunger clock, 0.2.2)
+    besieger: str = ""       # the country besieging it ("" when no siege runs: its output then flows)
+    siege_name: str = ""     # the siege's name in the log ("Siege of Lisbon, 1532")
     foraged: tuple = ()      # (country, turn) when an army last foraged here
     region: str = ""          # the historical region (Europe map): "Minho" for Braga
 
