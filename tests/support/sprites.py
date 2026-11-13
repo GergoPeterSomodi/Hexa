@@ -7,7 +7,7 @@ variant, so the hashes are the same on every run on one machine (pygame, SDL and
 a build of pygame draws, see environment()).
 
     python -m tests.support.sprites                 print the number of sprites and the time
-    UPDATE_SPRITES=1 python -m unittest tests.test_sprite_hashes      write the fixture
+    UPDATE_SPRITES=1 python -m unittest tests.test_sprite_hashes      write this platform's fixture
 """
 import hashlib
 import os
@@ -15,7 +15,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TILES = os.path.join(ROOT, "hexagon-pack", "PNG", "Tiles")
-FIXTURE = os.path.join(ROOT, "tests", "fixtures", "sprite_hashes.json")
+FIXTURES = os.path.join(ROOT, "tests", "fixtures", "sprite_hashes")
 FIGURES = ("pikemen", "arquebusiers", "musketeers", "knights", "lancers", "cuirassiers", "bombards", "culverins",
            "field_guns", "wagon", "general", "scout", "pioneer", "colonist", "caravel", "carrack")
 DECORATIONS = ("trees", "rocks", "hamlet", "fields", "smoke", "port", "town", "city")
@@ -29,6 +29,16 @@ def environment():
     return {"system": platform.system(), "python": f"{sys.version_info.major}.{sys.version_info.minor}",
             "pygame": pygame.version.ver, "sdl": ".".join(map(str, pygame.get_sdl_version(linked=True))),
             "smoothscale": pygame.transform.get_smoothscale_backend()}
+
+
+def platform_key(env=None):
+    """The fixture's name for this platform: OS, Python, pygame, SDL and smoothscale backend (what the pixels depend on)."""
+    env = env or environment()
+    return "-".join(str(env[k]).lower().replace(" ", "") for k in ("system", "python", "pygame", "sdl", "smoothscale")).replace(".", "_")
+
+
+def fixture_path(env=None):
+    return os.path.join(FIXTURES, platform_key(env) + ".json")
 
 
 def digest(surface):

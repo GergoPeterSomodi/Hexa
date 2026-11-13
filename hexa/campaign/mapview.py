@@ -67,7 +67,7 @@ def hex_points(cx, cy, r):
     return [(cx + r * c, cy + r * s) for c, s in _CORNERS]      # the corner table: same floats, no trig
 
 
-@functools.lru_cache(maxsize=2048)
+@functools.lru_cache(maxsize=2048)       # colour tuples only (no surfaces), bounded: not a render cache
 def tint(color, amount):
     return tuple(max(0, min(255, int(c + (255 - c) * amount))) if amount > 0 else max(0, int(c * (1 + amount)))
                  for c in color)

@@ -96,10 +96,10 @@ triggers, private `_caches`, or speed (`tools/perf.py`). Add a prepared state to
 touches something none of them reaches. `tests/test_same_behaviour.py` plants a rule change, a lost road and a changed
 seizure order in copies of `hexa/` and a crash, and checks that each is caught (a crash reports ORACLE FAILED).
 
-Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and twelve game
+Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and fourteen game
 modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
 `test_techscreen.py`, `test_uifixes.py`, `test_wfctiles.py`, `test_goodsobjects.py`, `test_mapview_polish.py`,
-`test_town_labels.py`, `test_review_fixes.py`, `test_playtest2.py`, `test_ridge_art.py`, which the CI `ui` job runs too): they skip without it (errors under `HEXA_REQUIRE_PYGAME=1`).
+`test_town_labels.py`, `test_review_fixes.py`, `test_playtest2.py`, `test_ridge_art.py`, `test_sprite_hashes.py`, `test_render_cache.py`, which the CI `ui` job runs too): they skip without it (errors under `HEXA_REQUIRE_PYGAME=1`).
 Window tests subclass `tests/support/harness.py:UITestCase`
 (SDL dummy drivers, fake `Clock`/`get_ticks`, pinned fonts, temp `HEXA_HOME`), script input with
 `self.driver.at(frame, key(...)/click(...))` and `self.driver.run_for(frames, until=...)`, call the window's real
@@ -284,7 +284,9 @@ the rules as far as the current layout allows, and never makes an allowlisted of
   mapview.py and are read when a slice starts, so a test can lift them).
 - **Refactor PRs** change no behaviour: label them `refactor`; they must pass tools/same_behaviour.py,
   save-compat and sha-identical goldens. A change to an art module also keeps `tests/test_sprite_hashes.py` green (sha256
-  of 1,743 generated sprites; `UPDATE_SPRITES=1` rewrites the fixture only for a change of art on purpose). Never mix a
+  of 1,743 generated sprites against `tests/fixtures/sprite_hashes/<platform>.json`, one fixture per OS, Python, pygame and SDL).
+  CI's `ui` job compares only on a platform that has a fixture and skips otherwise; the Linux fixture is made by the goldens
+  workflow, and `UPDATE_SPRITES=1` rewrites this platform's fixture only for a change of art on purpose. Never mix a
   refactor and a gameplay change in one commit.
 - **Where new features go:** rules -> campaign/systems/<name>.py (+ numbers in data.py, + README table);
   panel -> campaign/panels/; screen -> campaign/screens/; art -> its art module using render/draw.py.
