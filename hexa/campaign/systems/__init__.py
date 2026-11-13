@@ -3,5 +3,5 @@
 A system module never imports world.py, ui, render or pygame; ``CampaignWorld`` keeps a one-line facade for each
 function the rest of the game calls. A module lists the world attributes it writes in OWNS.
 Modules: worldgen (build time only), colonies (founding and colonial growth),
-building (investment and building).
+building (investment and building), military (raising, refits, drill, stacks).
 """

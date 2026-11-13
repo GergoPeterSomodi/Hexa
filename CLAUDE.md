@@ -199,6 +199,9 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `build_goods`, `invest_cost`, `invest_goods`, `building_name`, `works_name`, `slots_used`, `goods_price`) and `job_check`
   (a province does one job a season; the military module shares it). `BUILDING_TECH` lives there. `CampaignWorld` keeps a
   facade for each one called from outside; a `*_check` and its action stay a pair, and the facade is the same pair.
+- **Military** (`systems/military.py`): `unit_cost`, `raise_options`, `stack_limit`, `can_stand`, `recruit_check`/`recruit`,
+  `refit_check`/`refit` and `upgrade_cost`/`upgrade_check`/`upgrade`, all with facades. `land_spot` stays on `CampaignWorld`
+  (it reads the pass walls, which move with step 3.10); the module calls it as `world.land_spot`.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of

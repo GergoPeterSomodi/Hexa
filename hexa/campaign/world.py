@@ -13,21 +13,18 @@ from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, resources, state, tech
 from .state import Garrison, Market, Route, Unit, War, fill_defaults
-from .systems import building, colonies, worldgen
-from .data import (BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP,
-                   GARRISON_REGEN, GENERAL, GENERAL_BONUS, GENERAL_STACK, GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT, STACK_BASE,
-                   SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_COST, UPGRADE_MAX, troop,
-                   ATTRITION, FARM_GOODS, FOOD_PER_TROOP, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER,
-                   SUPPLY_BASE, SUPPLY_PER_FARM, SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, BURGHER_TAX, CARAVEL, CARRACK, COLONIST, COLONIST_PEOPLE,
-                   COLONY_DONE, COLONY_UPKEEP, ELASTICITY, END_YEAR, PIONEER, WORKS_BONUS,
-                   WORKS_UPKEEP, SETTLEMENTS,
-                   SETTLEMENT_TAX, SETTLEMENT_UPKEEP, CASTLES, CASTLE_UPKEEP, CASTLE_DEFENSE,
-                   CASTLE_SIEGE,
-                   GOODS, MARKET_REACH, MARKETPLACE_CAPACITY, MERCHANT_CAPACITY, NEEDS,
-                   OUTPUT, PEASANT_TAX, PORT_CAPACITY, PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX, REMOTE_PENALTY,
-                   ROUTE_BASE, SEA_ROUTE_RANGE, SEA_STEP, SIEGE_BASE, START_YEAR, TAX_GROWTH, TAX_LEVELS, TERRAIN,
-                   TRADING_POST_SHARE, WAR_LENGTH_AI, ATLANTIC_RANGE, BASE_GROWTH,
-                   date, SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE)
+from .systems import building, colonies, military, worldgen
+from .data import (BRANCHES, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP, GARRISON_REGEN, GENERAL,
+                   GENERAL_BONUS, GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT,
+                   SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX, troop, ATTRITION, FARM_GOODS, FOOD_PER_TROOP,
+                   FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER, SUPPLY_BASE, SUPPLY_PER_FARM, SUPPLY_PER_PEOPLE, SUPPLY_RANGE,
+                   WAGON, WAGON_SEASONS, BUILDINGS, BURGHER_TAX, COLONY_DONE, COLONY_UPKEEP, ELASTICITY, END_YEAR,
+                   PIONEER, WORKS_BONUS, WORKS_UPKEEP, SETTLEMENTS, SETTLEMENT_TAX, SETTLEMENT_UPKEEP, CASTLES,
+                   CASTLE_UPKEEP, CASTLE_DEFENSE, CASTLE_SIEGE, GOODS, MARKET_REACH, MARKETPLACE_CAPACITY,
+                   MERCHANT_CAPACITY, NEEDS, OUTPUT, PEASANT_TAX, PORT_CAPACITY, PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX,
+                   REMOTE_PENALTY, ROUTE_BASE, SEA_ROUTE_RANGE, SEA_STEP, SIEGE_BASE, START_YEAR, TAX_GROWTH,
+                   TAX_LEVELS, TERRAIN, TRADING_POST_SHARE, WAR_LENGTH_AI, ATLANTIC_RANGE, BASE_GROWTH, date,
+                   SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE)
 
 INF = float("inf")
 TROOP_FOOD = FOOD_PER_TROOP * 1.5       # grain a troop eats a season, at the 1.5 ducat price used without a market
@@ -52,7 +49,7 @@ Province, Country = state.Province, state.Country   # saves pickle every state c
 CLASSES = ("peasants", "burghers", "nobles")
 BIG_EMPIRE = 300                                        # provinces that start a country with drill yards
 ROUTE_KEYS = ("market_reach", "sea_range", "atlantic")  # effects that change the trade routes
-from .data import GALLEON, MANUFACTORIES, MINE_GOODS, DEBT_FLOOR, DEBT_INTEREST, DEBT_SEASONS
+from .data import MANUFACTORIES, MINE_GOODS, DEBT_FLOOR, DEBT_INTEREST, DEBT_SEASONS
 
 
 def _europe_region(lon, lat):
@@ -1267,100 +1264,22 @@ class CampaignWorld:
 
     # ----- units --------------------------------------------------------------------
     def unit_cost(self, prov, kind):
-        market = prov.market
-        goods = dict(kind.goods)
-        if kind.naval and prov.level("shipyard") and "timber" in goods:
-            goods["timber"] *= 0.7
-        price = sum(n * (market.price[g] if market else GOODS[g].price * 1.5) for g, n in goods.items())
-        gold = kind.gold * (1 + self.bonus(prov.owner, "cavalry_cost")) if kind.branch == "cavalry" else kind.gold
-        return round(gold + price)
+        return military.unit_cost(self, prov, kind)
 
     def raise_options(self, tag):
-        era = self.countries[tag].era
-        return [troop(b, era) for b in BRANCHES] + [GENERAL, WAGON, SCOUT, COLONIST, CARAVEL, CARRACK, GALLEON]
+        return military.raise_options(self, tag)
 
     def stack_limit(self, tag, units=()):
-        limit = STACK_BASE + self.bonus(tag, "stack")
-        if any(u.kind is GENERAL for u in units):
-            limit += GENERAL_STACK + self.bonus(tag, "general_stack")
-        return int(limit)
+        return military.stack_limit(self, tag, units)
 
     def can_stand(self, group, pos, others=None):
-        """Whether these units (all of one owner) may end their move together on pos."""
-        owner = group[0].owner
-        if others is None:
-            others = [u for u in self.units_at(pos) if u not in group]
-        if any(u.owner != owner for u in others):
-            return False
-        if group[0].naval:
-            return True
-        everyone = others + list(group)
-        war = sum(1 for u in everyone if u.kind.war)
-        generals = sum(1 for u in everyone if u.kind is GENERAL)
-        civilians = len(everyone) - war - generals
-        return war <= self.stack_limit(owner, everyone) and civilians <= CIVILIAN_LIMIT and generals <= 1
+        return military.can_stand(self, group, pos, others)
 
     def recruit_check(self, tag, prov, kind):
-        ok, reason = building.job_check(self, tag, prov)
-        if not ok:
-            return ok, reason
-        country = self.countries[tag]
-        if kind.war and kind.era != country.era:
-            return False, "Your armies have moved on to newer troops"
-        if kind.needs == "town" and prov.settlement < 2 and not prov.level("foundry"):
-            return False, "Cannons are cast in towns and cities (or anywhere with a foundry)"
-        if kind is GENERAL:
-            if prov.pos != country.capital:
-                return False, "Generals are appointed in your capital"
-            generals = sum(1 for u in self.units_of(tag) if u.kind is GENERAL)
-            if generals >= 1 + len(self.provinces_of(tag)) // 20:
-                return False, "Your country cannot support more generals"
-        cost = self.unit_cost(prov, kind)
-        if country.treasury < cost:
-            return False, f"Costs {cost} ducats"
-        if kind.naval:
-            if kind is CARRACK and not self.has(tag, "carrack"):
-                return False, "Carracks need the Carrack tech"
-            if kind is GALLEON and not self.has(tag, "galleon"):
-                return False, "Galleons need the Galleon tech"
-            if not prov.level("port"):
-                return False, "Needs a port"
-            if kind in (CARRACK, GALLEON) and not prov.level("shipyard"):
-                return False, f"{kind.name}s need a shipyard"
-            if not any(self.is_sea(n) and all(u.owner == tag for u in self.units_at(n)) for n in neighbors(prov.pos)):
-                return False, "No free sea next to the port"
-        elif self._land_spot(tag, prov, kind) is None:
-            return False, "No room here or next door (stacks are full)"
-        if kind is COLONIST and prov.peasants < 3:
-            return False, "Needs at least 3k peasants to send settlers"
-        if kind.war and prov.peasants < self.men_per_troop(tag) + 2:
-            return False, "Not enough men left here (each troop takes 1,000 peasants)"
-        return True, ""
+        return military.recruit_check(self, tag, prov, kind)
 
     def recruit(self, tag, prov, kind):
-        if not self.recruit_check(tag, prov, kind)[0]:
-            return None
-        cost = self.unit_cost(prov, kind)
-        resources.spend(self, tag, cost, "raise", prov.pos)
-        prov.busy = True
-        if prov.market:
-            for g, n in kind.goods.items():
-                prov.market.pending[g] = prov.market.pending.get(g, 0) + n
-        if kind is COLONIST:
-            prov.peasants -= COLONIST_PEOPLE
-        if kind.war:
-            prov.peasants -= self.men_per_troop(tag)
-        if kind.naval:
-            pos = next(n for n in neighbors(prov.pos) if self.is_sea(n) and all(u.owner == tag for u in self.units_at(n)))
-        else:
-            pos = self._land_spot(tag, prov, kind)
-        unit = self._add_unit(kind, tag, pos)
-        if kind is WAGON:
-            unit.supplies = self.wagon_seasons(tag)
-        self.message(f"{self.place(prov)}: raised {kind.name.lower()} for {cost} ducats.", tag)
-        self.bus.emit("unit_raised", tag, unit.pos, what=kind.name, id=unit.id)
-        self.see_from(unit)
-        return unit
+        return military.recruit(self, tag, prov, kind)
 
     def land_spot(self, tag, prov, kind):
         """Where a new land unit appears: the province itself, or a province of ours next to it with room."""
@@ -1376,68 +1295,19 @@ class CampaignWorld:
 
     # ----- refits, drill and research ---------------------------------------------------
     def refit_check(self, unit):
-        country = self.countries[unit.owner]
-        if not unit.kind.war or unit.kind.era >= country.era:
-            return False, "Already the newest kind"
-        prov = self.provinces.get(unit.pos)
-        if unit.carrier or not prov or prov.owner != unit.owner or (prov.settlement < 2 and not prov.level("barracks")
-                                                                      and not prov.level("foundry")):
-            return False, "Refit in one of your towns or cities"
-        if unit.moves_left <= 0 or unit.upgraded:
-            return False, "No time left this season"
-        new = troop(unit.kind.branch, country.era)
-        cost = self.unit_cost(prov, new) // 2
-        if country.treasury < cost:
-            return False, f"Costs {cost} ducats"
-        return True, ""
+        return military.refit_check(self, unit)
 
     def refit(self, unit):
-        if not self.refit_check(unit)[0]:
-            return False
-        country = self.countries[unit.owner]
-        prov = self.provinces[unit.pos]
-        new = troop(unit.kind.branch, country.era)
-        resources.spend(self, unit.owner, self.unit_cost(prov, new) // 2, "refit", prov.pos)
-        unit.kind, unit.hp = new, new.hp
-        unit.moves_left, unit.upgraded = 0, True
-        self.message(f"{self.place(prov)}: refitted as {new.name.lower()}.", unit.owner)
-        return True
+        return military.refit(self, unit)
 
     def upgrade_cost(self, unit, stat):
-        gold, goods = UPGRADE_COST[stat]
-        prov = self.provinces.get(unit.pos)
-        market = prov.market if prov else None
-        if unit.kind.branch == "artillery":
-            goods = {"tools": 1.0} if stat == "attack" else {"iron": 2.5}
-        return round(gold * (1 + (unit.atk_up if stat == "attack" else unit.def_up)) +
-                     sum(n * (market.price[g] if market else GOODS[g].price) for g, n in goods.items()))
+        return military.upgrade_cost(self, unit, stat)
 
     def upgrade_check(self, unit, stat):
-        if not unit.kind.war:
-            return False, "Only troops can be drilled"
-        prov = self.provinces.get(unit.pos)
-        need = "foundry" if unit.kind.branch == "artillery" else "barracks"
-        if unit.carrier or not prov or prov.owner != unit.owner or not prov.level(need):
-            return False, f"Needs to stand in your province with a {need}"
-        if (unit.atk_up if stat == "attack" else unit.def_up) >= self.drill_max(unit.owner):
-            return False, f"{stat.title()} is fully drilled"
-        if unit.moves_left <= 0 or unit.upgraded:
-            return False, "No time left this season"
-        cost = self.upgrade_cost(unit, stat)
-        if self.countries[unit.owner].treasury < cost:
-            return False, f"Costs {cost} ducats"
-        return True, ""
+        return military.upgrade_check(self, unit, stat)
 
     def upgrade(self, unit, stat):
-        if not self.upgrade_check(unit, stat)[0]:
-            return False
-        resources.spend(self, unit.owner, self.upgrade_cost(unit, stat), "upgrade", unit.pos)
-        if stat == "attack":
-            unit.atk_up += 1
-        else:
-            unit.def_up += 1
-        unit.moves_left, unit.upgraded = 0, True
-        return True
+        return military.upgrade(self, unit, stat)
 
     # ----- technology: research, ideas and the effects they give ---------------------------
     def has(self, tag, flag):
