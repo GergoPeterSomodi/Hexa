@@ -11,20 +11,19 @@ from collections import deque
 
 from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, within
-from . import geo, naming, resources, state, tech
+from . import geo, naming, state, tech
 from .state import Garrison, Market, Route, Unit, War, fill_defaults
-from .systems import building, colonies, debt, military, worldgen
-from .data import (BRANCHES, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP, GARRISON_REGEN, GENERAL,
-                   GENERAL_BONUS, GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT,
-                   SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX, troop, ATTRITION, FARM_GOODS, FOOD_PER_TROOP,
-                   FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER, SUPPLY_BASE, SUPPLY_PER_FARM, SUPPLY_PER_PEOPLE, SUPPLY_RANGE,
-                   WAGON, WAGON_SEASONS, BUILDINGS, BURGHER_TAX, COLONY_DONE, COLONY_UPKEEP, ELASTICITY, END_YEAR,
-                   PIONEER, WORKS_BONUS, WORKS_UPKEEP, SETTLEMENTS, SETTLEMENT_TAX, SETTLEMENT_UPKEEP, CASTLES,
-                   CASTLE_UPKEEP, CASTLE_DEFENSE, CASTLE_SIEGE, GOODS, MARKET_REACH, MARKETPLACE_CAPACITY,
-                   MERCHANT_CAPACITY, NEEDS, OUTPUT, PEASANT_TAX, PORT_CAPACITY, PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX,
-                   REMOTE_PENALTY, ROUTE_BASE, SEA_ROUTE_RANGE, SEA_STEP, SIEGE_BASE, START_YEAR, TAX_GROWTH,
-                   TAX_LEVELS, TERRAIN, TRADING_POST_SHARE, WAR_LENGTH_AI, ATLANTIC_RANGE, BASE_GROWTH, date,
-                   SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE)
+from .systems import building, colonies, debt, military, research, worldgen
+from .data import (COUNTER, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS,
+                   GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, SCOUT, SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX,
+                   ATTRITION, FARM_GOODS, FOOD_PER_TROOP, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER, SUPPLY_BASE,
+                   SUPPLY_PER_FARM, SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, BURGHER_TAX,
+                   COLONY_DONE, COLONY_UPKEEP, ELASTICITY, END_YEAR, PIONEER, WORKS_BONUS, WORKS_UPKEEP, SETTLEMENTS,
+                   SETTLEMENT_TAX, SETTLEMENT_UPKEEP, CASTLES, CASTLE_UPKEEP, CASTLE_DEFENSE, CASTLE_SIEGE, GOODS,
+                   MARKET_REACH, MARKETPLACE_CAPACITY, MERCHANT_CAPACITY, NEEDS, OUTPUT, PEASANT_TAX, PORT_CAPACITY,
+                   PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX, REMOTE_PENALTY, ROUTE_BASE, SEA_ROUTE_RANGE, SEA_STEP,
+                   SIEGE_BASE, START_YEAR, TAX_GROWTH, TAX_LEVELS, TERRAIN, TRADING_POST_SHARE, WAR_LENGTH_AI,
+                   ATLANTIC_RANGE, BASE_GROWTH, date, SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE)
 
 INF = float("inf")
 SCALE = geo.SCALE
@@ -46,8 +45,6 @@ LAND_TILES = ("plains", "steppe", "forest", "hills", "mountains", "desert", "jun
 FORBIDDEN = worldgen.FORBIDDEN        # the terrain pairs that may not touch (wave function collapse)
 Province, Country = state.Province, state.Country   # saves pickle every state class as hexa.campaign.world.<Name>
 CLASSES = ("peasants", "burghers", "nobles")
-BIG_EMPIRE = 300                                        # provinces that start a country with drill yards
-ROUTE_KEYS = ("market_reach", "sea_range", "atlantic")  # effects that change the trade routes
 from .data import MANUFACTORIES, MINE_GOODS, DEBT_INTEREST
 
 
@@ -125,7 +122,7 @@ class CampaignWorld:
         self.over = False
         worldgen.build_map(self)
         worldgen.build_countries(self)
-        self._start_techs()
+        research.start_techs(self)
         worldgen.build_roads(self)
         self._build_markets()
         worldgen.starting_units(self)
@@ -178,7 +175,7 @@ class CampaignWorld:
         self.__dict__.pop("_pass_hexes", None)               # the old one-hex passes (see _pass_data)
         for country in getattr(self, "countries", {}).values():
             if not country.techs:
-                self._legacy_techs(country)
+                research.legacy_techs(self, country)
         provinces = getattr(self, "provinces", None)
         if self.map == "europe" and provinces and not any(p.region for p in provinces.values()):
             naming.name_europe(self)          # an older save: the old "near Porto" names become real places
@@ -1232,247 +1229,53 @@ class CampaignWorld:
     def _tech_changed(self, tag):
         self._bonus_cache.pop(tag, None)
 
-    @staticmethod
-    def _route_effects(effects):
-        return any(key in ROUTE_KEYS for key in effects)
+    tech_changed = _tech_changed         # the public name the research module uses
 
     @staticmethod
     def _idea(key):
-        if key in tech.IDEAS:
-            return tech.IDEAS[key]
-        return next((i for lst in tech.NATIONAL_IDEAS.values() for i in lst if i.key == key), None)
+        return research.find_idea(key)
 
     def grant_tech(self, tag, key):
-        """Add a tech to what a country knows. Cartography explores its trade coasts; route effects redraw markets."""
-        country = self.countries[tag]
-        if key in country.techs:
-            return
-        country.techs.add(key)
-        self._tech_changed(tag)
-        if key == "cartography":
-            self._cartography(tag)
-        t = tech.tech(key)
-        if t is not None and self._route_effects(t.effects):
-            self.refresh_markets()
+        return research.grant_tech(self, tag, key)
 
     def pick_idea(self, tag, idea_key):
-        """Adopt one of the idea cards offered at the last age. The other cards are dropped."""
-        country = self.countries[tag]
-        idea = self._idea(idea_key)
-        if idea is None or idea_key not in country.pending_ideas:
-            return False
-        country.ideas.add(idea_key)
-        country.pending_ideas = []
-        self._tech_changed(tag)
-        if self._route_effects(idea.effects):
-            self.refresh_markets()
-        self.message(f"Idea adopted: {idea.name}. {idea.text}", tag, "idea")
-        return True
+        return research.pick_idea(self, tag, idea_key)
 
     def fund_check(self, tag):
-        """Funding is allowed once a year (every 4 seasons) and costs RESEARCH_FUND[0] ducats."""
-        country = self.countries[tag]
-        last = country.memory.get("funded_turn")
-        if last is not None and self.turn - last < 4:
-            return False, f"Funded already: again in {4 - (self.turn - last)} season(s)"
-        if country.treasury < RESEARCH_FUND[0]:
-            return False, f"Costs {RESEARCH_FUND[0]} ducats"
-        return True, ""
+        return research.fund_check(self, tag)
 
     def fund_research(self, tag):
-        """60 ducats buy 15 research points (more with the Fund effect) for the current tech, once a year."""
-        gold, points = RESEARCH_FUND
-        country = self.countries[tag]
-        if not self.fund_check(tag)[0]:
-            return False
-        country.memory["funded_turn"] = self.turn
-        resources.spend(self, tag, gold, "research")
-        country.research += points * (1 + self.bonus(tag, "fund"))
-        return True
+        return research.fund_research(self, tag)
 
     def next_era(self, tag):
-        """(era, year it opens, era techs needed) for the next age, or None at the last one."""
-        country = self.countries[tag]
-        if country.era >= 3:
-            return None
-        era = country.era + 1
-        return era, tech.ERA_YEARS[era], tech.ERA_GATE_TECHS
+        return research.next_era(self, tag)
 
     def research_rate(self, tag):
-        """Research points this season as (total, parts). The parts add up to the total."""
-        country = self.countries[tag]
-        mult = 1 + self.bonus(tag, "research")
-        owned = self.provinces_of(tag)
-        burghers = sum(p.burghers for p in owned)
-        universities = sum(1 for p in owned if p.level("university"))
-        capital = self.provinces.get(country.capital)
-        coffee = self.bonus(tag, "coffee_research")
-        share = capital.market.satisfaction("coffee") if coffee and capital and capital.market else 0.0
-        total = tech.research_points(RESEARCH_BASE, burghers, universities, share,
-                                     {"research": self.bonus(tag, "research"), "coffee_research": coffee})
-        parts = {"base": RESEARCH_BASE * mult, "burghers": burghers / 40 * mult, "universities": universities * mult,
-                 "coffee": share * burghers / 40 * 0.25 * coffee * mult, "funding": 0.0}
-        return total, parts
+        return research.research_rate(self, tag)
 
     def tech_cost(self, tag, key):
-        """Research points a tech costs this country. Each neighbour on its markets that knows it makes it cheaper."""
-        if key not in tech.TECHS:
-            return 0
-        bonuses = {"diffusion_cap": self.bonus(tag, "diffusion_cap"), "nav_cost": self.bonus(tag, "nav_cost")}
-        return tech.cost(key, self._know_nearby(tag, key), bonuses)
-
-    def _know_nearby(self, tag, key):
-        """Living countries owning provinces on the markets this country trades in, that know `key`."""
-        owners = {p.owner for m in self.merchant_markets(tag) for p in m.provinces}
-        owners.discard(None)
-        owners.discard(tag)
-        return sum(1 for o in owners if self.countries[o].alive and key in self.countries[o].techs)
+        return research.tech_cost(self, tag, key)
 
     def set_research(self, tag, key):
-        """Research `key` next: its unknown prerequisites first, then it. The rest of that path becomes the queue."""
-        country = self.countries[tag]
-        t = tech.TECHS.get(key)
-        if t is None or key in country.techs or t.era > country.era:
-            return False
-        path = tech.path_to(key, country.techs)
-        if not path:
-            return False
-        country.researching = path[0]
-        country.queue = path[1:]
-        return True
+        return research.set_research(self, tag, key)
 
     def unqueue(self, tag, key):
-        """Take a tech out of the queue, with the queued techs that need it (they cannot come before it)."""
-        queue = self.countries[tag].queue
-        if key not in queue:
-            return False
-        drop = {key, *tech.dependants(key, queue)}
-        queue[:] = [k for k in queue if k not in drop]
-        return True
+        return research.unqueue(self, tag, key)
 
     def _research(self):
-        for tag, country in self.countries.items():
-            if not country.alive:
-                continue
-            rate = self.research_rate(tag)[0]
-            country.research += rate
-            self._finish_research(tag)
-            if not country.researching:            # nothing chosen: points don't pile up for later
-                country.research = min(country.research, 2 * rate)
-            if tech.era_ready(country.era, self.year(), country.techs):
-                self._new_age(tag)
+        return research.research_season(self)
 
     def _finish_research(self, tag):
-        """Spend the research points on the current tech, then the next in the queue, while they last."""
-        country = self.countries[tag]
-        if country.researching in country.techs:
-            country.researching = ""
-        if not country.researching and not self._advance(tag):
-            return
-        while country.researching:
-            key = country.researching
-            cost = self.tech_cost(tag, key)
-            if country.research < cost:
-                return
-            country.research -= cost
-            self.grant_tech(tag, key)
-            t = tech.TECHS[key]
-            self.message(f"Researched {t.name}: {t.text}", tag)
-            self.bus.emit("tech_researched", tag, key=key, cost=cost)
-            if not self._advance(tag) and tag == self.player:
-                self.message("Pick new research (T).", tag, "research")
+        return research.finish_research(self, tag)
 
     def _advance(self, tag):
-        """Start the next queued tech that is still to learn. False when nothing is left in the queue."""
-        country = self.countries[tag]
-        country.researching = ""
-        while country.queue:
-            key = country.queue.pop(0)
-            t = tech.TECHS.get(key)
-            if (t is not None and key not in country.techs and t.era <= country.era
-                    and all(n in country.techs for n in t.needs)):
-                country.researching = key
-                return True
-        return False
+        return research.advance(self, tag)
 
     def _new_age(self, tag):
-        """The country reaches the next age: its troops change, and it is offered three idea cards."""
-        country = self.countries[tag]
-        country.era += 1
-        self.bus.emit("era_reached", tag, era=country.era)
-        names = ", ".join(troop(b, country.era).name.lower() for b in BRANCHES)
-        self.message(f"{ERAS[country.era][0]}: you can now raise {names}. Refit old troops in your towns.", tag)
-        counts = {b: sum(1 for k in country.techs if k in tech.TECHS and tech.TECHS[k].branch == b)
-                  for b in tech.BRANCHES}
-        country.pending_ideas = [i.key for i in tech.draw_ideas(tag, counts, set(country.ideas), self.rng)]
-
-    def _cheapest_available(self, tag):
-        country = self.countries[tag]
-        options = tech.available(country.techs, country.era)
-        return min(options, key=lambda k: (tech.TECHS[k].cost, k), default="")
+        return research.new_age(self, tag)
 
     def _know_region(self, tag):
-        """The regional default tech's region, from the capital's position. Random worlds use 'default'."""
-        if self.map == "random":
-            return "default"
-        lon, lat = geo.lonlat(self.countries[tag].capital)
-        if 6 < lon < 19 and 37 < lat < 47.5:
-            return "italian"
-        if 5 < lon < 17 and 47 <= lat < 55:
-            return "german"
-        if lat < 37.5 and lon < 33 and lat > 20:
-            return "north_african"
-        return "default"
-
-    def _start_techs(self):
-        """Each country's national tech, its starting techs and its first research (build spec, start of game)."""
-        big = BIG_EMPIRE
-        for tag, country in self.countries.items():
-            nat = tech.national_tech(tag, self._know_region(tag))
-            owned = self.provinces_of(tag)
-            known = {nat.key, *nat.also_knows}
-            if self.colonial.get(tag, 999) <= 0:
-                known.update(("portolan", "astrolabe"))
-            if any(p.coastal for p in owned):
-                known.add("portolan")
-            if len(owned) >= big:
-                known.add("drill_yards")
-            country.national = nat.key
-            country.techs = known
-            self._tech_changed(tag)
-            country.researching = self._cheapest_available(tag)
-
-    def _legacy_techs(self, country):
-        """An old save's country: its national tech, and the cheapest gate techs of each age below its own."""
-        nat = tech.national_tech(country.tag, self._know_region(country.tag))
-        country.national = nat.key
-        known = {nat.key, *nat.also_knows}
-        for era in range(1, country.era):
-            gate = sorted((t for t in tech.TECHS.values() if t.era == era), key=lambda t: (t.cost, t.key))
-            for t in gate[:tech.ERA_GATE_TECHS]:
-                known.update(tech.path_to(t.key, known))
-        country.techs = known
-        self._tech_changed(country.tag)
-        country.researching = self._cheapest_available(country.tag)
-
-    def _cartography(self, tag):
-        """Explore the coast and sea around every market this country trades through."""
-        self.ensure_markets()
-        mine = self.merchant_markets(tag)
-        centres = set()
-        for route in self.routes:
-            if route.a in mine or route.b in mine:
-                centres.update((route.a.center, route.b.center))
-        centres.discard(None)
-        explored = self.countries[tag].explored
-        for centre in centres:
-            for pos in within(centre, SCALE):
-                prov = self.provinces.get(pos)
-                if pos in self.terrain and (self.is_sea(pos) or (prov and prov.coastal)):
-                    explored.add(pos)
-        if tag == self.player:
-            self.changed()
-            self.update_visibility()
+        return research.know_region(self, tag)
 
     # ----- supply ------------------------------------------------------------------
     def supply_limit(self, tag, pos):

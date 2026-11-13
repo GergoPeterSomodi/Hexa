@@ -206,6 +206,11 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   season's step: desertion, then seizures, then the credit cap). The facades are `debt_limit`, `disband` and `_unpaid`.
   The module reaches the world's private parts only through two public names added for it: `world.kill` (the old
   `_kill`) and `world.forget_castles()` (drops the `castles()` cache). The bankruptcy feature builds on these functions.
+- **Research** (`systems/research.py`): techs, ideas, ages and the start techs: `grant_tech`, `pick_idea`, `fund_check`/
+  `fund_research`, `next_era`, `research_rate`, `tech_cost`, `set_research`, `unqueue`, the season step `research_season`
+  (with `finish_research`, `advance`, `new_age`) and the build-time `start_techs`/`legacy_techs`. `has`, `bonus`,
+  `_effects` and `tech_changed` stay plain methods on `CampaignWorld` on purpose: they own the `_bonus_cache` and are
+  called thousands of times a season, so no extra call layer. Never write `world._bonus_cache` from a system module.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of
