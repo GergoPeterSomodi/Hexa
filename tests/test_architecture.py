@@ -76,7 +76,6 @@ ALLOW_MODULES = {
     "hexa.campaign.goodsobjects": 1155,
     "hexa.colony.world": 1116,
     "hexa.campaign.techscreen": 885,
-    "hexa.campaign.nature": 808,
 }
 
 ALLOW_FUNCTIONS = {
