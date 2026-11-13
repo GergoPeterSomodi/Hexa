@@ -62,6 +62,20 @@ def _stance_text(stance):
     return f"Hold: {_change(dealt)} damage dealt, {_change(taken)} taken. You lose fewer men."
 
 
+def _balanced(font, text, width):
+    """`text` wrapped into the fewest lines that fit `width`, with the narrowest width that keeps that many lines, so
+    the lines are even and no single word is left alone on the last one ("ways." on its own, v0.2.0 backlog)."""
+    count = len(kit.wrap(font, text, width))
+    low, high = 1, width                          # the narrowest width that still gives `count` lines
+    while low < high:
+        mid = (low + high) // 2
+        if len(kit.wrap(font, text, mid)) <= count:
+            high = mid
+        else:
+            low = mid + 1
+    return kit.wrap(font, text, high)
+
+
 def _withdraw_tip():
     """The Withdraw order's hover (0.2.1): both prices, shown before the choice is made."""
     return (f"Withdraw after day {data.WITHDRAW_DAY}: {_pct(data.WITHDRAW_PURSUIT)} of men "
@@ -415,7 +429,7 @@ class BattleScreen(Screen):
             hint = _withdraw_tip() if tag == "withdraw" and ok else orders.get(tag, {}).get("reason", "")
             self.buttons.append((pygame.Rect(rect), ("stance", tag), ok, hint))
         y += 36
-        for index, line in enumerate(kit.wrap(ctx.small, _stance_text(stance or "hold"), w)[:2]):
+        for index, line in enumerate(_balanced(ctx.small, _stance_text(stance or "hold"), w)[:2]):
             ctx.text(ctx.small, line, (x, y + index * ctx.small.get_linesize()), MUTED, w)
         y += 46                                 # two lines of the hint, always: the stance changes its length
         ctx.text(ctx.small, "When attacked, with no order given:", (x, y), MUTED, w)

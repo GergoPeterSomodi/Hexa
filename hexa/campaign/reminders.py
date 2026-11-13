@@ -13,7 +13,7 @@ returns one `Reminder` or None:
                       carry
     nothing_built     no province has anything under construction while the treasury pays for at least one building
                       (``build_check`` says yes, so the line only shows what could really be started)
-    battles_on        one line for each battle the player is a side of that is still on (join, withdraw or fight on);
+    battles_on        one line for each battle the player is a side of that is still on (send more troops before the season ends);
                       its action opens the battle panel
     idle_armies       land stacks of war units that did nothing this season: not moved, attacked or foraged, no
                       march order, not sieging (standing in a province held against its owner or an enemy) and not
@@ -131,15 +131,15 @@ def idle_armies(world, tag):
 
 
 def battles_on(world, tag):
-    """One line per battle the player is a side of that is still on: the battles phase has not settled it. A list (the
-    rule can give several lines), empty when there is none."""
+    """One line per battle the player is a side of that is still on: a battle started this turn, which the battles phase
+    settles at the end of the season (0.2.1). A list (the rule can give several lines), empty when there is none."""
     lines = []
     for battle in world.battles:
         if tag not in (battle.attacker, battle.defender):
             continue
         view = battle_view(world, battle, tag)
         name = view["name"] if view is not None else "The battle"
-        lines.append(Reminder("battle", f"{name} is still on: join, withdraw or fight on", "Open the battle",
+        lines.append(Reminder("battle", f"{name} is on: send more troops before the season ends", "Open the battle",
                               ("battle", battle.pos)))
     return lines
 

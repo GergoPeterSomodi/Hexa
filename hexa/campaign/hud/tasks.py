@@ -7,7 +7,8 @@ end-of-turn pop-up pressed) and closes the list; a click elsewhere on the window
 the flag is gone. The flag never ends a season or asks anything, and it is off when the "Task flag" option is off
 (``settings["reminders"]``).
 
-The flag and its list are drawn last, over the side panel, and take the clicks on themselves first (``Tasks.click``);
+The flag sits under End season, or left of an open side panel; it is drawn before the hint and its list last, and they
+take the clicks on themselves first (``Tasks.click``);
 ``Hud.covers`` keeps the map from getting hovers and drags under them.
 """
 import pygame

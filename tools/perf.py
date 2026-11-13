@@ -127,9 +127,11 @@ def ai_season_late():
 
 
 def battle_season():
-    """One battles phase with 10 battles of 6 regiments a side (the stack limit without techs), on 10 pairs of hexes of
-    the 1480 map. Only the phase is timed: the battles are started before the clock runs."""
-    return _battle_phase([("infantry", 1, 6)], [("infantry", 1, 6)])
+    """One battles phase with 10 battles of 6 mixed regiments a side (the stack limit without techs: pikes, knights and
+    guns, two of each), on 10 pairs of hexes of the 1480 map. Only the phase is timed: the battles are started before the
+    clock runs. Pikes only measured the cheapest battle; the army of a real war has all three arms (measured 2026-11-13)."""
+    mixed = [("infantry", 1, 2), ("cavalry", 1, 2), ("artillery", 1, 2)]
+    return _battle_phase(mixed, mixed)
 
 
 def battle_season_worst():

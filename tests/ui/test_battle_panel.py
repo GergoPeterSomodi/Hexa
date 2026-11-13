@@ -173,3 +173,18 @@ class FitTest(BattlePanelCase):
                 self.assertTrue(self.app.battle.buttons, "the panel drew its buttons")
                 for rect, _, _, _ in self.app.battle.buttons:
                     self.assertTrue(frame.contains(rect), f"{rect} is outside {frame}")
+
+
+class OrderHintTest(harness.UITestCase):
+    def test_the_order_hint_never_leaves_one_word_alone_on_its_line(self):
+        """The hint under the stance buttons wraps into two even lines (battle._balanced): v0.2.0 left "ways." and
+        "morale." alone on the second line, at the side column's width (battlelayout.SIDE_W)."""
+        from hexa.campaign.screens import battle as B
+        from hexa.campaign.screens import battlelayout as lay
+        from hexa.ui.theme import new_font
+        font = new_font(12)
+        for stance in ("attack", "hold", "withdraw"):
+            lines = B._balanced(font, B._stance_text(stance), lay.SIDE_W)
+            self.assertLessEqual(len(lines), 2, stance)
+            for line in lines[1:]:
+                self.assertGreater(len(line.split()), 1, f"{stance}: {lines}")

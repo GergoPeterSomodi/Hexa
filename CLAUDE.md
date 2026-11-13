@@ -334,7 +334,8 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
     `("log", "goto", hex)`, `("battle", pos)`), cached per `world.version` and forgotten by `CampaignApp.refresh()`. A
     line click presses its action and closes the list; the flag and the list take their clicks before the map and the
     side panel (`app.left_click`), Esc and a click elsewhere close the list, and `Hud.covers` keeps the map off them.
-    The flag is drawn last, over the side panel, and hidden while a screen is up.
+    The flag sits on the map, left of an open side panel: it is drawn after the panel and before the hint, with its list
+    last of all. Both are hidden while a screen is up.
   - `screens/techscreen.py`: `TechScreen` (T; one instance for the life of the window, so the selected tech is kept):
     the grid is opaque, the idea modal is the same screen with the grid closed. It is on the stack while the grid is open
     or idea cards are pending: the idea cards are game state, not a click, so `app.tech.sync(app)` runs in `handle()`,

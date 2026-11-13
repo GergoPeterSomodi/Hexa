@@ -401,28 +401,33 @@ AI_STANCE_RATIO = 1.2                      # the AI's battle stance: Attack when
 AI_WITHDRAW_RATIO = 0.6                     # the AI withdraws when its battle strength (men x morale) is under this share of the enemy's
 # The odds card's one word (battleview.odds_word): the band of the strength ratio, attack strength over defence strength
 # (the measure of battleview.odds_view). Each band: (word, lowest ratio, the attacker's win rate the band must show).
-# Calibrated 2026-11-13 on plains, pike fights of tests/support/scenarios.py, 100 seeds each (the attacker's win rate):
-# 3 v 6 (ratio 0.50) 14%, 3 v 4 (0.75) 20%, 4 v 5 (0.80) 28%, 5 v 6 (0.83) 26%, 3 v 3 (1.00) 42%, 4 v 4 (1.00) 46%,
-# 6 v 5 (1.20) 67%, 5 v 4 (1.25) 67%, 4 v 3 (1.33) 71%, 7 v 5 (1.40) 74%, 6 v 4 (1.50) 78%, 5 v 3 (1.67) 80%,
-# 6 v 3 (2.00) 82%, 9 v 4 (2.25) 79%, 8 v 3 (2.67) 83%. The all-AI buckets of tools/battle_stats.py agree in order: even
-# 0.8-1.25 57% (7 battles), about 2x 89% (11), above 2.5 95% (83). The win rate of pikes at 2x to 2.7x is 79-83%, short of
-# the 90% the owner's target asks for: an open question. tests/test_odds_card.py ties every band to these numbers (its 30
-# seeds scatter by about 8 points: 3 v 4 gave 27% there, 20% here, so the Hopeless band reaches 30%).
+# Recalibrated 2026-11-13 for 0.2.1 (every battle ends in the turn it starts), on plains, pike fights of
+# tests/support/scenarios.py, 100 seeds each (the attacker's win rate): 3 v 6 (ratio 0.50) 22%, 3 v 4 (0.75) 26%,
+# 4 v 5 (0.80) 37%, 5 v 6 (0.83) 36%, 3 v 3 (1.00) 45%, 4 v 4 (1.00) 48%, 6 v 5 (1.20) 59%, 5 v 4 (1.25) 63%,
+# 4 v 3 (1.33) 66%, 7 v 5 (1.40) 62%, 6 v 4 (1.50) 65%, 5 v 3 (1.67) 72%, 6 v 3 (2.00) 72%, 9 v 4 (2.25) 66%,
+# 8 v 3 (2.67) 73%. Each band is the hull of its pairs' rates at 100 seeds and at the 30 seeds of the tests, widened
+# to the next 5 points (the lowest band starts at 0%, the highest ends at 100%). The two top words now read alike
+# (59-83% from ratio 1.2 up): an open question for the owner. tests/test_odds_card.py ties every band to these numbers;
+# its 30 seeds scatter by about 8 points (3 v 4 gave 33% there, 26% at 100 seeds).
 # The bands are the plains reading. The card divides the attack ratio by the defender's ground factor first (GROUND_ODDS,
 # CASTLE_ODDS), so the word matches what happens on that ground.
-ODDS_WORDS = (("Hopeless", 0.0, (0.00, 0.30)), ("Poor", 0.8, (0.20, 0.35)), ("Even", 1.0, (0.35, 0.55)),
-              ("Favourable", 1.2, (0.60, 0.90)), ("Overwhelming", 2.0, (0.75, 1.00)))
+ODDS_WORDS = (("Hopeless", 0.0, (0.00, 0.35)), ("Poor", 0.8, (0.35, 0.45)), ("Even", 1.0, (0.45, 0.60)),
+              ("Favourable", 1.2, (0.55, 0.85)), ("Overwhelming", 2.0, (0.65, 1.00)))
 # The odds card's ground factor (battleview.odds_factor): the attack ratio is divided by it for the defender's hex.
-# Measured 2026-11-13 with 15 pike pairs (3 v 6 to 9 v 4) on each ground, 30 seeds each (tests/support/scenarios.play with
-# the ground set; scratch runs in the v0.2.0 release check, not in the repo). The factor
-# is the one that puts the most of the pairs' measured win rates in their word's band (ties: the least squared error
-# against the plains curve). Defended ground: a defender on hills wins where the plains ratio says 1.16 times less; a
-# defender in a forest or a taiga the same; mountains and snow about 2.3 and 2.7 times (the hexes of two lanes). Plains and
-# the flat ground not listed (steppe, desert, tundra, savanna, coast) are 1.0.
-GROUND_ODDS = {"plains": 1.0, "hills": 1.16, "forest": 1.16, "taiga": 1.16, "jungle": 1.40, "marsh": 1.20,
-               "mountains": 2.25, "snow": 2.65}
+# Recalibrated 2026-11-13 for 0.2.1: 15 pike pairs (3 v 6 to 9 v 4) on each ground, 30 seeds each (tests/support/scenarios.play
+# with the ground set; scratch runs, not in the repo). The factor is the one that puts the most of the pairs' measured
+# win rates in their word's band (ties: the least squared error against the plains curve). Defended ground: a defender
+# on hills or in a forest or taiga wins where the plains ratio says 1.34 (1.40) times less; in the jungle, marsh, snow and
+# mountains the attacker wins only 20-37% at any ratio (2.92, 2.08, 2.92, 3.39), so the card reads Hopeless there. Mountains
+# and snow are the hexes of two lanes. Plains and the flat ground not listed (steppe, desert, tundra, savanna, coast) are 1.0.
+GROUND_ODDS = {"plains": 1.0, "hills": 1.34, "forest": 1.40, "taiga": 1.40, "jungle": 2.92, "marsh": 2.08,
+               "mountains": 3.39, "snow": 2.92}
 # A castle with a garrison (an assault): the garrison fights and the ground does not count. By castle level 0-3, measured
 # the same way on plains (level 1 and 2 also on hills: the same numbers within noise, so the ground does not count there).
+# Checked 2026-11-13 for 0.2.1 (30 seeds, levels 1-3, 31 pike pairs with and without a field army): one factor per level
+# does not fit. Level 1 is kept (1.51 would place one pair more; the v0.2.0 note says level 1 reads one band low, and a
+# higher factor reads lower). Level 3 garrisons alone are beaten 93-100% at ratios the card reads Hopeless (its best
+# factor, 1.33, is under level 2's, which the design does not allow): open for the owner, see the 0.2.1 report.
 CASTLE_ODDS = (1.0, 1.41, 1.58, 3.11)
 RESEARCH_BASE = 0.6                        # research points per season, plus burghers / 40
 RESEARCH_FUND = (60, 15)                   # ducats -> research points

@@ -24,7 +24,7 @@ class BattleReminderTest(unittest.TestCase):
         lines = battle_lines(R.unfinished(self.world, self.fight.attacker))
         self.assertEqual(len(lines), 1)
         name = battle_view(self.world, self.battle, self.fight.attacker)["name"]
-        self.assertEqual(lines[0].text, f"{name} is still on: join, withdraw or fight on")
+        self.assertEqual(lines[0].text, f"{name} is on: send more troops before the season ends")
         self.assertEqual(lines[0].action, ("battle", self.battle.pos))
         self.assertEqual(lines[0].hint, "Open the battle")
 

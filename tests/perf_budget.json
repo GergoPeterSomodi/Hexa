@@ -5,7 +5,7 @@
     "'measured' is the median when the limits were set: 2026-11-11 on macOS arm64 (Apple Silicon, 12 cores), Python 3.12.11 with pygame 2.6.1; Python 3.15.2 gave the same within 0.07 s.",
     "Hard limits are about 4x 'measured' and soft limits about 2x, because shared CI runners are slower and noisier than that machine. Once the nightly job has a few runs, set 'soft' to about 1.5x the CI medians.",
     "A change that makes something slower on purpose raises its limits in the same pull request and says why.",
-    "0.2.1 raised the two battle phases' limits: a battle is now fought to its end in its turn (it fought one day in its first season before), so a phase fights up to 8 days a battle. Their 'measured' is from Windows 11, Python 3.13.5, pygame 2.6.1 (the battle phase of 10 battles of 6 regiments: 0.024 s; the mixed one: 0.022 s)."
+    "0.2.1 raised the two battle phases' limits: a battle is now fought to its end in its turn (it fought one day in its first season before), so a phase fights up to 8 days a battle. Their 'measured' is from Windows 11, Python 3.13.5, pygame 2.6.1. 2026-11-13: battle_season is now a mixed-arms phase (10 battles of 2 pikes, 2 knights and 2 guns a side; it was 6 pikes a side, 0.024 s); measured 0.020 s, median of 3. battle_season_worst (3 pikes, 1 knight, 2 guns) is 0.022 s, unchanged. The budgets stay: the limits are still 2.5x and 5x the measure."
   ],
   "metrics": {
     "europe_build": {"soft": 4.0, "hard": 8.0, "measured": 2.08},
@@ -13,7 +13,7 @@
     "snapshot_restore": {"soft": 0.2, "hard": 0.4, "measured": 0.085},
     "ai_season": {"soft": 0.25, "hard": 0.5, "measured": 0.125},
     "ai_season_late": {"soft": 0.5, "hard": 1.0, "measured": 0.251},
-    "battle_season": {"soft": 0.05, "hard": 0.1, "measured": 0.024},
+    "battle_season": {"soft": 0.05, "hard": 0.1, "measured": 0.020},
     "battle_season_worst": {"soft": 0.05, "hard": 0.1, "measured": 0.022},
     "mapview_zoom1": {"soft": 0.2, "hard": 0.4, "measured": 0.103},
     "mapview_zoom4": {"soft": 0.6, "hard": 1.5, "measured": 0.375}

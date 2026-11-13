@@ -74,12 +74,13 @@ class CalibrationTest(unittest.TestCase):
 
 
 # The pikes on hills (the defender on the hill, the attacker on plains beside it): the same pairs, the word the ground
-# factor gives (the odds card's word, measured with 30 seeds), and the win rate measured on the hills. The factor is one
-# number per ground, so a pair near a band's edge can lie outside it: HILLS_SLACK allows the 30-seed scatter (about 9
-# points) plus the two pairs the one factor cannot place (6 v 5 and 8 v 3, each 5 points out of its band).
+# factor gives (GROUND_ODDS hills, recalibrated 2026-11-13 for 0.2.1 to 1.34), and the win rate measured on the hills
+# (30 seeds). The factor is one number per ground, so a pair near a band's edge can lie outside it: HILLS_SLACK allows
+# the 30-seed scatter (about 9 points) and the pairs the one factor places a band out. Measured on hills, every big
+# ratio stays at 60% (6 v 4, 6 v 3, 8 v 3), so 8 v 3 reads Favourable, not Overwhelming: the hills rates do not reach 65%.
 HILLS = ((3, 6, "Hopeless"), (3, 4, "Hopeless"), (4, 5, "Hopeless"), (5, 6, "Hopeless"),
-         (3, 3, "Poor"), (4, 4, "Poor"), (6, 5, "Even"), (4, 3, "Even"),
-         (6, 4, "Favourable"), (6, 3, "Favourable"), (8, 3, "Overwhelming"))
+         (3, 3, "Hopeless"), (4, 4, "Hopeless"), (6, 5, "Poor"), (4, 3, "Poor"),
+         (6, 4, "Even"), (6, 3, "Favourable"), (8, 3, "Favourable"))
 HILLS_SLACK = 0.10
 
 
@@ -121,11 +122,12 @@ class HillsCalibrationTest(unittest.TestCase):
             self.assertTrue(low - HILLS_SLACK <= rate <= high + HILLS_SLACK,
                             f"{label}: {view['word']} band {low:.0%}-{high:.0%}, attacker won {rate:.0%}")
 
-    def test_a_defender_on_hills_reads_one_band_lower_than_on_plains(self):
-        """3 v 3 is Even on plains and Poor on hills: the card no longer promises the plains fight."""
+    def test_a_defender_on_hills_reads_two_bands_lower_than_on_plains(self):
+        """3 v 3 is Even on plains (45-57% measured) and Hopeless on hills (23% measured): the card no longer promises
+        the plains fight."""
         hills = next(v for label, v, _, _ in self.points if label == "3 v 3 on hills")
         self.assertEqual(self.plains_33["word"], "Even")
-        self.assertEqual(hills["word"], "Poor")
+        self.assertEqual(hills["word"], "Hopeless")
 
 
 class FactorTest(unittest.TestCase):
