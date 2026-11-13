@@ -21,8 +21,19 @@ Principle 16 is not touched.
 ## What the v0.2.0 playtest found
 
 The owner played v0.2.0 on 2026-11-13 and approved the release. No bugs were reported. The verdict: "game wasn't really
-engaging". The battles work, but they don't yet make the game fun to play. Before this brief locks, find out what felt
-flat: battles, the turns between them, or the whole game. Check every item below against that question.
+engaging". The owner's notes, each with what the game does today:
+
+| # | Owner's note | Today |
+|---|---|---|
+| P1 | "Battles must be within the same turn, otherwise you lose out on the progress of it." | Clash (the default) fights day 1 in the attacker's season and the rest in the next one, so the player sees the start, ends the season and finds the rest already fought. Quick battles fights all the days at once but is an option, not the default. |
+| P2 | The end-of-turn pop-up for merchants and armies is not fun. Instead, a flag below the top bar's stats could show the unfinished tasks, so no pop-up is needed. ("Need to think about it.") | `reminders.unfinished` builds the list. A window shows it when End season is pressed, and a click goes to the item. Reminders are an option, on by default. |
+| P3 | The enemy withdraws from a battle too easily. Restrict it: an organised withdrawal is one thing, fleeing (just running away) is another. | Withdraw is open every season to any side with a retreat hex. It costs 5% of men (pursuit, all killed) and keeps morale, so it is the cheap way out of any losing battle. |
+| P4 | Castles are captured too quickly. Every place needs a basic defence that takes a couple of turns to take. Each turn the siege makes progress based on attack and defence values. An army that comes to relieve the place fights a battle with the besiegers. A siege needs a map marker like the battle badge. | A province with no castle needs 1 siege point and falls in **one season**. A level 1 castle needs 4: one season with two cannons, two with one. Progress is +1 a season, plus cannons and a siege general; the garrison, supply, terrain and the besieger's size do not count. Sieges show only as ribbons ("Siege 2/5"). A relief army moving in already starts a battle. |
+| P5 | *Idea:* an army could build a light field fort with a button (1 to 2 turns). An attacker then picks: besiege it (1 to 2 turns, the enemy can reinforce) or rush it (a battle at once, with a penalty). | Not in the game. The army's only orders are move, attack and forage. |
+
+What this says: the war doesn't feel engaging because its decisions are thin. Battles finish off-screen, losers walk away
+cheaply, and land changes hands in a season with no siege to fight over. P2 is a UI-noise point: the pop-up interrupts
+every season.
 
 ## Candidate items
 
