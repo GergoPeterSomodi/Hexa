@@ -103,7 +103,8 @@ Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; secti
 - Ships go on their own **Fleet** tab, shown only in coastal provinces, with the same row style.
 - The Stable buys horses from the home market; any province can build one. The horse price's hover card explains why it moved (supply and demand: herds lost, stables buying).
 - No mercenaries for now. Colonies raise militia only. Scouts, wagons and colonists can be raised in any owned town.
-- Revised mockup: `17_recruit_raise_v2.png`.
+- Clicking a greyed row does nothing; the hover card explains.
+- Revised mockup: `17_recruit_raise_v2.png` (its costs are placeholders; the galleon still needs its own figure; the mockup's click hint on greyed rows is out of date).
 **Images:** `08_recruit_raise_tab.png`, `08b_recruit_build_tab.png`
 
 **What they show:**
@@ -238,7 +239,7 @@ Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; secti
 ## 8. Event pop-up (Phase 3: the frame only)
 
 
-**Decided 2026-11-13:** option A only, for every event. Events wait until the AI turn is over. Pictures: still open; `16_event_art_compare.png` shows composed-from-tiles next to painted for the owner to pick.
+**Decided 2026-11-13:** option A only, for every event. Events wait until the AI turn is over. Pictures (see `16_event_art_compare.png`): composed from the game's tiles and figures by default; painted only for a few big moments (a new age, bankruptcy, a great discovery).
 **Image:** `15_event_popup_frame.png` (the bankruptcy pop-up, `10`, reuses it)
 
 **What it shows:**
