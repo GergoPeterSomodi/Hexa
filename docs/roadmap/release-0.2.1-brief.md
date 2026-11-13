@@ -87,6 +87,10 @@ then item 3 (the pop-up stays one more release, off by default).
 4. **Task flag:** B, one "N things to do" flag with a list (item 3).
    Added the same day (owner): the flag shows Fund research whenever it can be bought (once a year), not only while the
    current tech has no points; "nothing being researched" stays.
+5. **The 10% flee line, measured (asked during the build):** keep 10%. Measured: every battle ends in its turn (was 76%),
+   withdrawals 3% of battles (was 36%), the loser loses about 30% of its men (was 16%), the bigger side wins a bit less
+   (6 v 4 plains 87% -> 77%), AI attackers win 92% (was 87%, just past the 5-point band: accepted). 88% of beaten AI armies are
+   back to half strength within 10 seasons. The odds card's words are recalibrated to the new results (item 4).
 
 ## Creative review (2026-11-13, draft 2)
 
