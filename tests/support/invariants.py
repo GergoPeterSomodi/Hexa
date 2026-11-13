@@ -243,28 +243,20 @@ def check_colony(world):
 
 
 # ----- Age of Discovery ----------------------------------------------------------------------------------------
-def _no_retreat(world, battle, tag):
-    """True when a side of the battle has no hex to retreat to (its units, or nothing, standing on the battle's hex)."""
-    units = [u for u in world.units if u.pos == battle.pos and u.owner == tag]
-    return world.retreat_spot(units, battle.pos) is None
-
-
 def _battle_problems(world, battle, claimed):
     """Battle slice 1: the two sides are at war and stand on the battle's hex (the defender may hold its garrison
     there instead), every regiment in a lane is a living unit of its side on that hex, no unit is in two battles
     (`claimed` collects the ids of the regiments that fight on the hex), the damage carried is a fraction of a hit point,
-    the battle has a name, and it is not older than the safety stop allows (decision 7: a battle goes on past it only
-    while neither side can retreat)."""
-    from hexa.campaign.data import BATTLE_MAX_SEASONS
+    the battle has a name, and it is not more than one turn old (0.2.1: a battle is fought to its end in the turn it starts;
+    a battle in progress in an old save is fought in the next turn)."""
     where = f"battle at {battle.pos}"
     problems = []
     if not world.at_war(battle.attacker, battle.defender):
         problems.append(f"battle: {where} is not between two countries at war")
     if not battle.name:
         problems.append(f"battle: {where} has no name")
-    if world.turn - battle.start + 1 > BATTLE_MAX_SEASONS + 1 and not (
-            _no_retreat(world, battle, battle.attacker) and _no_retreat(world, battle, battle.defender)):
-        problems.append(f"battle: {where} is older than the safety stop and a side could still retreat")
+    if battle.start < world.turn - 1:
+        problems.append(f"battle: {where} began in turn {battle.start} and was not fought to its end")
     here = {u.owner for u in world.units if u.pos == battle.pos and u.kind.war}
     prov = world.provinces.get(battle.pos)
     garrison = prov is not None and prov.controller == battle.defender and prov.garrison > 0

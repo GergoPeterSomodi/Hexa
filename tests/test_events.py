@@ -7,7 +7,7 @@ import unittest
 
 from hexa import events
 from hexa.campaign import tech
-from hexa.campaign.data import BATTLE_MAX_SEASONS, COLONIST, troop
+from hexa.campaign.data import COLONIST, troop
 from hexa.campaign.systems import battle as battlesys
 from hexa.campaign.world import CampaignWorld, Unit
 from hexa.events import CAMPAIGN_KINDS, Event, EventBus
@@ -226,7 +226,7 @@ class WorldBusTest(unittest.TestCase):
         for unit in strong:
             unit.pos, unit.moves_left = next(n for n in sorted(neighbors(prov.pos)) if w.is_land(n)), 2
         w.attack_group(strong, prov.pos)
-        for _ in range(BATTLE_MAX_SEASONS + 2):          # the battle runs its seasons until one side is gone
+        for _ in range(2):                               # the battle is fought to its end in one battles phase (0.2.1)
             if w.battle_at(prov.pos) is None:
                 break
             battlesys.battle_season(w)

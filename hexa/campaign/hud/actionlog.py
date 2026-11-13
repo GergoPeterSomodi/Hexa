@@ -215,5 +215,6 @@ def _line(ctx, state, item, rect, hoverable):
         kit.text(ctx.screen, ctx.small, "jump", (rect.right - 28, rect.y + 2), INFO_C, align="right")
     if hoverable and item.pos:
         place = parts[1] or item.text
-        hint = f"Click: the camera goes to {place}" if parts[1] else "Click: show it on the map"
-        ctx.ui.buttons.append(kit.Button(rect, place, True, ("log", "goto", item.pos), hint))
+        hint = ("Click: the battle's day log" if item.link else
+                f"Click: the camera goes to {place}" if parts[1] else "Click: show it on the map")
+        ctx.ui.buttons.append(kit.Button(rect, place, True, item.link or ("log", "goto", item.pos), hint))

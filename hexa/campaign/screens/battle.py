@@ -54,11 +54,19 @@ def _change(mult):
 def _stance_text(stance):
     """What a stance does, from data.STANCE (the damage it deals and takes)."""
     if stance == "withdraw":
-        return "Withdraw: leave at the next day with half pursuit and keep your morale. Needs a retreat hex in reach."
+        return (f"Withdraw after day {data.WITHDRAW_DAY}: lose {_pct(data.WITHDRAW_PURSUIT)} of men "
+                f"({_pct(data.WITHDRAW_PURSUIT_ATTACKER)} as attacker) and {round(data.WITHDRAW_MORALE * 100)} morale.")
     dealt, taken = data.STANCE[stance]
     if stance == "attack":
         return f"Attack: {_change(dealt)} damage dealt, {_change(taken)} taken. You lose more men both ways."
     return f"Hold: {_change(dealt)} damage dealt, {_change(taken)} taken. You lose fewer men."
+
+
+def _withdraw_tip():
+    """The Withdraw order's hover (0.2.1): both prices, shown before the choice is made."""
+    return (f"Withdraw after day {data.WITHDRAW_DAY}: {_pct(data.WITHDRAW_PURSUIT)} of men "
+            f"({_pct(data.WITHDRAW_PURSUIT_ATTACKER)} as attacker), {round(data.WITHDRAW_MORALE * 100)} morale. "
+            f"Under {_pct(data.FLEE_MORALE)} morale: flee, {_pct(data.FLEE_PURSUIT)} of men, guns lost.")
 
 
 def _figure(ctx, name, colour):
@@ -99,6 +107,7 @@ class BattleScreen(Screen):
 
     def __init__(self):
         self.pos = None           # the hex of the battle on show (None: closed)
+        self.ended = None         # the day log of a battle that has ended (show_ended), or None
         self.buttons = []         # (rect, action, enabled, hint) of the last frame, for the clicks
 
     # ----- opening and closing ----------------------------------------------------------------------
@@ -118,10 +127,45 @@ class BattleScreen(Screen):
 
     def close(self, ctx):
         self.pos = None
+        self.ended = None
         ctx.screens.remove(self)
+
+    def show_ended(self, ctx, record):
+        """Show the day log of a battle that has ended (0.2.1): the record its log line kept (feed._day_record). No orders
+        and no field: the battle is over. Nothing here changes the game."""
+        self.pos, self.ended = None, record
+        if self not in ctx.screens:
+            ctx.screens.push(self)
 
     def on_exit(self, ctx):
         self.buttons = []
+
+    def _draw_ended(self, ctx):
+        """A battle that has ended: its name, how it ended (the feed's sentence) and its day log, the last lines that fit."""
+        record = self.ended
+        width, height = ctx.screen.get_size()
+        kit.shade(ctx.screen, (0, 0, width, height), SHADE)
+        frame = lay.panel(width, height)
+        pygame.draw.rect(ctx.screen, PANEL_BG, frame, border_radius=10)
+        pygame.draw.rect(ctx.screen, LINE, frame, 1, border_radius=10)
+        x, y, w, h = frame
+        ctx.text(ctx.big, record["name"], (x + lay.PAD, y + 10), TEXT, w - 420)
+        for index, text in enumerate(kit.wrap(ctx.font, record["headline"], w - 2 * lay.PAD)[:2]):
+            ctx.text(ctx.font, text, (x + lay.PAD, y + 48 + index * ctx.font.get_linesize()), MUTED, w - 2 * lay.PAD)
+        self._button(ctx, lay.close_button(frame), "Close", ("close", None), True)
+        top = y + 92
+        ctx.text(ctx.bold, "Battle log", (x + lay.PAD, top), GOLD, w)
+        pygame.draw.line(ctx.screen, LINE, (x + lay.PAD, top + 22), (x + w - lay.PAD, top + 22))
+        lines = []
+        for entry in record["lines"]:
+            lines += kit.wrap(ctx.small, entry, w - 2 * lay.PAD - 4) or [""]
+        if not lines:
+            ctx.text(ctx.small, "Nothing has been fought.", (x + lay.PAD, top + 30), MUTED, w - 2 * lay.PAD)
+            return
+        line_h = ctx.small.get_linesize()
+        room = max(1, (y + h - lay.PAD - (top + 30)) // line_h)
+        for index, text in enumerate(lines[-room:]):          # the end of the battle matters most: the last lines
+            ctx.text(ctx.small, text, (x + lay.PAD, top + 30 + index * line_h), TEXT, w - 2 * lay.PAD)
 
     def _view(self, ctx):
         """The battle on show as the player sees it, or None: closed, over, or the player is no side of it any more."""
@@ -153,7 +197,7 @@ class BattleScreen(Screen):
             self.close(ctx)
             return
         view = self._view(ctx)
-        if view is None:
+        if view is None and self.ended is None:
             return
         for rect, action, enabled, hint in self.buttons:
             if rect.collidepoint(event.pos):
@@ -186,6 +230,8 @@ class BattleScreen(Screen):
     # ----- drawing ----------------------------------------------------------------------------------
     def draw(self, ctx):
         self.buttons = []
+        if self.ended is not None:
+            return self._draw_ended(ctx)
         view = self._view(ctx)
         if view is None:
             return
@@ -200,7 +246,7 @@ class BattleScreen(Screen):
         self._side_column(ctx, view, frame)
         hover = ctx.ui.mouse
         for rect, action, enabled, hint in self.buttons:
-            if not enabled and hint and rect.collidepoint(hover):
+            if hint and rect.collidepoint(hover):
                 kit.tip(ctx, hint)
                 break
 
@@ -212,8 +258,6 @@ class BattleScreen(Screen):
         right = close[0] - 16
         kit.text(ctx.screen, ctx.small, f"Season {view['seasons']}  ·  {view['days']} days fought", (right, y + 16),
                  MUTED, align="right")
-        timing = "Quick battles" if view["timing"] == "full" else "Clash"
-        kit.text(ctx.screen, ctx.small, f"Timing: {timing}", (right, y + 36), MUTED, align="right")
         self._button(ctx, close, "Close", ("close", None), True)
 
     def _button(self, ctx, rect, label, action, enabled, hint=""):
@@ -229,7 +273,7 @@ class BattleScreen(Screen):
         share = att["front_morale"] / (att["front_morale"] + dfn["front_morale"]) \
             if att["front_morale"] + dfn["front_morale"] > 0 else 0.5
         ctx.text(ctx.bold, "Front-line morale", (x + lay.PAD, y + 1), TEXT)
-        kit.text(ctx.screen, ctx.small, f"breaks under {round(data.BREAK * 100)}%", (x + w - lay.PAD, y + 4), MUTED,
+        kit.text(ctx.screen, ctx.small, f"flees under {round(data.FLEE_MORALE * 100)}%", (x + w - lay.PAD, y + 4), MUTED,
                  align="right")
         bar = pygame.Rect(x + lay.PAD, y + 24, w - 2 * lay.PAD, 19)
         left_colour, right_colour = self._colour(ctx, left_tag), self._colour(ctx, right_tag)
@@ -240,8 +284,8 @@ class BattleScreen(Screen):
         self._bar_label(ctx, (bar.right - 8, bar.y + 3), f"{_pct(dfn['front_morale'])}  {names[right_tag]}",
                         right_colour, "right")
         if bar.collidepoint(ctx.ui.mouse):
-            kit.tip(ctx, f"The men-weighted morale of the lanes. A side breaks when its line breaks or falls under "
-                         f"{round(data.BREAK * 100)}%.")
+            kit.tip(ctx, f"The men-weighted morale of the lanes. A side whose line breaks, or whose morale falls under "
+                         f"{round(data.FLEE_MORALE * 100)}%, flees.")
 
     def _bar_label(self, ctx, pos, text, fill, align):
         """A label on the morale bar over its side's fill: INK on a light fill, white on a dark one, 1 px shadow."""
@@ -368,7 +412,8 @@ class BattleScreen(Screen):
         for (tag, label), rect in zip(STANCE_LABELS, lay.split(x, y, w, 3, 30)):
             ok = orders.get(tag, {}).get("ok", False)
             kit.choice(ctx, rect, label, enabled=ok, selected=tag == stance)
-            self.buttons.append((pygame.Rect(rect), ("stance", tag), ok, orders.get(tag, {}).get("reason", "")))
+            hint = _withdraw_tip() if tag == "withdraw" and ok else orders.get(tag, {}).get("reason", "")
+            self.buttons.append((pygame.Rect(rect), ("stance", tag), ok, hint))
         y += 36
         for index, line in enumerate(kit.wrap(ctx.small, _stance_text(stance or "hold"), w)[:2]):
             ctx.text(ctx.small, line, (x, y + index * ctx.small.get_linesize()), MUTED, w)
@@ -378,7 +423,7 @@ class BattleScreen(Screen):
         standing = ours["standing"]
         for (tag, label), rect in zip(STANDING_LABELS, lay.split(x, y, w, 2, 26)):
             ok = orders.get("withdraw", {}).get("ok", False) if tag == "withdraw" else True
-            reason = orders.get("withdraw", {}).get("reason", "") if tag == "withdraw" else ""
+            reason = (_withdraw_tip() if ok else orders.get("withdraw", {}).get("reason", "")) if tag == "withdraw" else ""
             kit.choice(ctx, rect, label, enabled=ok, selected=tag == standing)
             self.buttons.append((pygame.Rect(rect), ("standing", tag), ok, reason))
         return y + 34

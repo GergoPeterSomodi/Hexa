@@ -6,7 +6,7 @@ from hexa.campaign.data import (GENERAL, STACK_LIMIT, WAGON, troop, BUILD_TURNS,
                                 SETTLEMENT_SLOTS, SIEGE_BASE, WORKS)
 from hexa.campaign.world import CampaignWorld, War
 from hexa.campaign.battlelog import describe
-from hexa.campaign.data import BATTLE_MAX_SEASONS, GARRISON_MEN
+from hexa.campaign.data import GARRISON_MEN
 from hexa.campaign.systems import battle as battlesys, combat
 from hexa.hexgrid import distance, neighbors
 from tests.support.slow import slow
@@ -292,8 +292,8 @@ class BoardingTest(unittest.TestCase):
 
 
 def fight_out(w, pos):
-    """Play the battle on pos to its end, one battles phase (a season) at a time. Returns the winner's tag, or None."""
-    for _ in range(BATTLE_MAX_SEASONS + 2):
+    """Play the battle on pos to its end: one battles phase (0.2.1: a battle is over in its turn). Returns the winner's tag, or None."""
+    for _ in range(2):
         if w.battle_at(pos) is None:
             break
         battlesys.battle_season(w)

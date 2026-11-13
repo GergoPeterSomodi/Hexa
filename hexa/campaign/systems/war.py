@@ -233,6 +233,8 @@ def sieges(world):
     for prov in world.provinces.values():
         if prov.owner is None or prov.pos in battle_hexes:
             continue            # a battle hex: no siege progress, no garrison regrowth, while the battle lasts (spec 3.2)
+        if world.retreated.get(prov.pos) == world.turn:
+            continue            # a side fled or withdrew onto this hex this season: it is running, not besieging (0.2.1 review)
         here = [u for u in world.units_at(prov.pos) if u.kind.war]
         cap = prov.castle * GARRISON_HP
         if not here:

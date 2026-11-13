@@ -244,19 +244,18 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - **Combat** (`systems/combat.py`): `general`, `attack_value` and `defense_value` (read through `world.bonus`; war.py
   re-exports the names), then the battle's day (battle slice 1, PR 2): `deploy` fills the three lanes, `fire`, `shock`,
   `flanks`, `morale`, `breaker` and `pursuit` work out one phase's hits and apply them together, `fight_day` runs a day,
-  `army_morale` measures a side. The numbers are in data.py (`SHOCK_LOSS`, `STANCE`, `BREAK`...). Nothing calls `fight_day`
+  `army_morale` measures a side. The numbers are in data.py (`SHOCK_LOSS`, `STANCE`, `FLEE_MORALE`...). Nothing calls `fight_day`
   except the battle's own season (below), the `battles` phase, which is first in PHASES. It writes the battle object, unit hp
   and morale, `prov.garrison`, and kills through `world.kill`; `OWNS` lists those.
 - **Battles** (`systems/battle.py`, battle slice 1; the `battles` phase is first in PHASES): `engage` (a stack attacks a hex: it steps
   in with `movement.step_in`, then overruns the enemy's civilians, joins its side's battle through `join`, or starts a
   `Battle` and deploys both sides), `fits` (the stack limit, per side), `battle_order_check`/`battle_order` (Attack, Hold,
   Withdraw), `retreat_spot`, `battle_season` (the `battles` phase: withdrawals first, then up to three days through
-  `combat.fight_day` (`day_cap`: one day in the attack's season under the Clash timing, `battle_timing`; all three at once under
-  "full", Quick battles), then the safety stop at `BATTLE_MAX_SEASONS`), `end_battle` (pursuit, retreat or surrender,
+  `combat.fight_day` (since 0.2.1 the days go on until a side goes, up to `BATTLE_DAYS`; a Withdraw order from the end of day `WITHDRAW_DAY`;
+  the day cap withdraws the lower army; nothing carries over to the next turn), `end_battle` (pursuit, retreat or surrender,
   experience, wounded back in supply, storm, then `battle_ended`) and `end_battles` (peace or a vanished country: a draw;
   `war.peace` and `war.check_alive` call it first). `engage_check(world, group, pos, stand=None)` gives the reasons, and
-  `attack_options_group` asks it for each stand. The safety stop (`_safety_stop`) withdraws the lower army, or the other side
-  when the lower one has no retreat hex; with neither able to retreat the battle goes on (decision 7). A battle is named when
+  `attack_options_group` asks it for each stand. A battle is named when
   it starts (`Battle.name`, "Second Battle of X, 1525" for a repeat, the count in `world.battle_names`).
   Events: `battle_started`, `battle_joined`, `battle_fought` (once per season) and `battle_ended` (the contract of
   docs/design/war-goals-and-peace.md 3.4). `world.engage`, `battle_order_check`/`battle_order`, `end_battles`,

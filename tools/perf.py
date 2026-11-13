@@ -136,18 +136,17 @@ def battle_season_worst():
     """The worst legal battle phase: 10 battles of 6 mixed regiments a side (pikes, knights and two guns each: the most
     expensive arms at the stack limit of 6), on 10 pairs of hexes of the 1480 map. Only the phase is timed."""
     mixed = [("infantry", 1, 3), ("cavalry", 1, 1), ("artillery", 1, 2)]
-    return _battle_phase(mixed, mixed, timing="full")       # full: all three days of a season are fought (clash fights one)
+    return _battle_phase(mixed, mixed)
 
 
-def _battle_phase(spec_a, spec_d, timing="clash"):
+def _battle_phase(spec_a, spec_d):
     """Start 10 battles on the 1480 map with the two sides' regiments (spec: (branch, era, count) lists), then time one
-    battles phase under the given battle_timing."""
+    battles phase (every battle is fought to its end in it, 0.2.1)."""
     from hexa.campaign.data import troop
     from hexa.campaign.state import War
     from hexa.campaign.systems import battle as battlesys
     from hexa.hexgrid import neighbors
     w = _world_module().CampaignWorld()
-    w.battle_timing = timing
     used, started = set(), 0
     for prov in sorted(w.provinces.values(), key=lambda p: p.pos):
         if started == 10:

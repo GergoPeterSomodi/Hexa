@@ -1,6 +1,6 @@
 """The battle read model (hexa/campaign/battleview.py, PR 6a): the view matches the battle after days are fought, the cache
 is invalidated by world.changed() (battle orders included), the fog rules, sides as lists of tags, old text-log entries,
-and the odds card's inputs and ratio. Pygame-free; the timing of the view is in tools/perf.py, never asserted here."""
+and the odds card's inputs and ratio. Pygame-free."""
 import re
 import unittest
 
@@ -43,8 +43,6 @@ class ViewMatchesBattleTest(unittest.TestCase):
         self.assertEqual(self.view["name"], self.battle.name)
         self.assertEqual(self.view["year"], START_YEAR + (self.battle.start - 1) // 4)
         self.assertEqual(self.view["seasons"], 1)
-        self.assertEqual(self.view["timing"], self.world.battle_timing)
-        self.assertIn(self.view["timing"], ("clash", "full"))
 
     def test_numbers_are_the_battles(self):
         for tag in (self.a, self.d):

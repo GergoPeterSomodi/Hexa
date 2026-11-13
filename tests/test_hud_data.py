@@ -249,19 +249,19 @@ class FeedTest(unittest.TestCase):
 
     def test_sentences_name_places_and_countries(self):
         item, _ = self.one("battle_ended", "POR", self.mine, attacker="POR", defender="CAS", winner="POR", loser="CAS",
-                           name="Battle of Y, 1480", seasons=2, killed={"POR": 300, "CAS": 1200}, how="broke",
+                           name="Battle of Y, 1480", seasons=1, days=2, killed={"POR": 300, "CAS": 1200}, how="broke",
                            cause="centre")
-        self.assertIn("Battle of Y, 1480 ends: Portugal wins, centre broke after 2 seasons.", item.sentence)
+        self.assertIn("Battle of Y, 1480 ends: Portugal won in 2 days, centre broke.", item.sentence)
         self.assertIn("Portugal lost 300 men, Castile lost 1,200 men", item.sentence)
 
     def test_battle_ends_name_the_way_it_was_decided(self):
-        cases = [(dict(how="broke", cause="lanes"), "two lanes broke"), (dict(how="broke", cause="morale"), "the army broke"),
+        cases = [(dict(how="broke", cause="lanes"), "two lanes broke"), (dict(how="broke", cause="morale"), "the army fled"),
                  (dict(how="withdrew"), "the loser withdrew"), (dict(how="surrendered"), "the loser surrendered"),
                  (dict(how="destroyed"), "the loser was destroyed")]
         for extra, words in cases:
             item, _ = self.one("battle_ended", "FRA", self.seen, defender="CAS", winner="FRA", loser="CAS",
-                               name="Battle of Y, 1480", seasons=1, killed={}, **extra)
-            self.assertIn(f"Battle of Y, 1480 ends: France wins, {words} after 1 season.", item.sentence, extra)
+                               name="Battle of Y, 1480", seasons=1, days=1, killed={}, **extra)
+            self.assertIn(f"Battle of Y, 1480 ends: France won in 1 day, {words}.", item.sentence, extra)
 
     def test_a_battle_has_a_ribbon_for_the_player_and_war_news_for_the_rest(self):
         ends = {"victory": ("POR", "CAS", "gain", "Victory!"), "defeat": ("CAS", "POR", "loss", "Defeat!"),

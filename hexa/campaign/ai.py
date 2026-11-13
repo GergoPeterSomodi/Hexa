@@ -10,7 +10,7 @@ from ..hexgrid import distance, neighbors
 from . import geo, tech
 from .systems.combat import battle_strength
 SCALE = geo.SCALE
-from .data import (AI_ATTACK_POWER, AI_STANCE_RATIO, AI_WITHDRAW_LEAD, AI_WITHDRAW_MORALE, ATTACK_MORALE, BUILDINGS,
+from .data import (AI_ATTACK_POWER, AI_STANCE_RATIO, AI_WITHDRAW_RATIO, ATTACK_MORALE, BUILDINGS,
                    CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GOODS,
                    MANUFACTORIES, MANUFACTORY_TAX, UNIT_KINDS, troop,
                    SETTLEMENT_TAX, WORKS, WORKS_BONUS)
@@ -346,8 +346,8 @@ def _side_enemy(battle, tag):
 
 def _battles(world, tag):
     """The stances of the battles this country is in, once a season, before its armies move (spec 5). A defender in a
-    castle assault always holds. Otherwise the side withdraws when its army is beaten (under AI_WITHDRAW_MORALE, the enemy
-    at least AI_WITHDRAW_LEAD higher) and a retreat hex exists; it attacks when its men times morale are at least
+    castle assault always holds. Otherwise the side withdraws when it is clearly losing (its battle strength under
+    AI_WITHDRAW_RATIO of the enemy's, and a retreat hex is in reach); it attacks when its men times morale are at least
     AI_STANCE_RATIO times the enemy's; else it holds. A withdrawal with no retreat hex falls back to the other stances."""
     for battle in sorted(world.battles, key=lambda b: b.pos):
         if tag not in (battle.attacker, battle.defender):
@@ -355,13 +355,26 @@ def _battles(world, tag):
         world.battle_order(battle.pos, tag, _stance(world, battle, tag, _side_enemy(battle, tag)))
 
 
+def _answer(world, pos):
+    """The AI sides of a battle that an attack has just begun (or joined) read it at once, each at its stance (0.2.1): a
+    battle is fought in the turn it starts, so no later AI turn would read it. The player's own side is left to the
+    player."""
+    battle = world.battle_at(pos)
+    if battle is None:
+        return
+    for tag in (battle.attacker, battle.defender):
+        if tag == world.player or tag not in world.countries:
+            continue
+        world.battle_order(pos, tag, _stance(world, battle, tag, _side_enemy(battle, tag)))
+
+
 def _stance(world, battle, tag, enemy):
     if tag == battle.defender and battle.assault:
         return "hold"
-    mine, theirs = world.army_morale(battle, tag), world.army_morale(battle, enemy)
-    if mine < AI_WITHDRAW_MORALE and theirs >= mine + AI_WITHDRAW_LEAD and             world.battle_order_check(battle.pos, tag, "withdraw")[0]:
+    mine, theirs = _battle_men(world, battle, tag), _battle_men(world, battle, enemy)
+    if mine < AI_WITHDRAW_RATIO * theirs and world.battle_order_check(battle.pos, tag, "withdraw")[0]:
         return "withdraw"
-    if _battle_men(world, battle, tag) >= AI_STANCE_RATIO * _battle_men(world, battle, enemy):
+    if mine >= AI_STANCE_RATIO * theirs:
         return "attack"
     if tag == battle.defender:          # no order of its own: the army's standing order (battle slice 1b)
         return world.standing_of(battle.pos, tag)
@@ -390,6 +403,7 @@ def _campaign(world, tag, stack, enemies):
         battle = world.battle_at(pos)
         if battle is not None and _join(world, tag, battle):
             world.attack_group(stack, pos)
+            _answer(world, pos)
             return
     ours = _force(world, stack)
     best = None
@@ -404,6 +418,7 @@ def _campaign(world, tag, stack, enemies):
                 best = (value, pos)
     if best:
         world.attack_group(stack, best[1])
+        _answer(world, best[1])
         return
     here = world.provinces.get(stack[0].pos)
     if here and here.owner in enemies | {tag} and here.controller != tag:

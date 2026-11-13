@@ -13,7 +13,7 @@ are read-only by convention: the cache shares them. Keys are always present; seq
 
 battle_view keys: ``access`` ("exact", "seen" or "hidden", see the fog rule below), ``exact``, ``viewer``,
 ``viewer_role`` ("attacker", "defender" or None), ``pos``, ``name``, ``year`` (the year it began), ``start`` and
-``seasons`` (the turns so far, the first counts as one), ``days`` (battle.days), ``timing`` (world.battle_timing),
+``seasons`` (the turns so far, the first counts as one), ``days`` (battle.days),
 ``assault``, ``crossing``, ``uphill``, ``ground`` ({terrain, lanes, castle}), ``sides`` ({"attacker": [tags],
 "defender": [tags]}: lists, ready for alliances), ``side`` ({tag: side dict} for each tag in sides), ``dice`` (the
 last day's {day, rolls, mult} or None), ``log`` (battlelog.describe of each record, oldest first), and ``can_order``.
@@ -253,7 +253,7 @@ def _dice(battle):
 def _hidden(viewer):
     """The view of a battle the viewer cannot see: every key is there, nothing about the stacks."""
     return {"access": "hidden", "exact": False, "viewer": viewer, "viewer_role": None, "pos": None, "name": None,
-            "year": None, "start": None, "seasons": None, "days": None, "timing": None, "assault": None,
+            "year": None, "start": None, "seasons": None, "days": None, "assault": None,
             "crossing": None, "uphill": None, "ground": None, "sides": {"attacker": [], "defender": []}, "side": {},
             "dice": None, "log": (), "can_order": False}
 
@@ -270,7 +270,7 @@ def _battle(world, battle, viewer, access):
         "access": access, "exact": access == "exact", "viewer": viewer, "viewer_role": role,
         "pos": battle.pos, "name": _battle_name(world, battle), "year": _year(battle.start),
         "start": battle.start, "seasons": world.turn - battle.start + 1, "days": battle.days,
-        "timing": getattr(world, "battle_timing", "clash"), "assault": battle.assault,
+        "assault": battle.assault,
         "crossing": battle.crossing, "uphill": battle.uphill,
         "ground": {"terrain": terrain.name if terrain is not None else prov.terrain,
                    "lanes": sum(1 for lane in range(3) if combat.lane_open(prov, lane)),
@@ -292,7 +292,7 @@ def battle_view(world, battle_or_pos, viewer=None):
     if battle is None or battle not in world.battles:
         return None
     access = _access(world, battle.pos, (battle.attacker, battle.defender), viewer)
-    key = ("battle", battle.pos, viewer, access, world.turn, getattr(world, "battle_timing", "clash"))
+    key = ("battle", battle.pos, viewer, access, world.turn)
     return _memo(world, key, battle, lambda: _battle(world, battle, viewer, access))
 
 

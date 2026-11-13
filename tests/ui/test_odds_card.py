@@ -1,7 +1,6 @@
 """The odds card on the attack hover (battle slice 1, PR 7b; hexa/campaign/hud/odds.py): it shows when the selected stack
 can attack the hex under the mouse, draws the view's word, is made once and then reused while nothing changes, and is
-not shown without an attack hover. The timing options read "Clash (default)" and "Quick battles" (their stored values
-are unchanged). Run with: python -m unittest tests.ui.test_odds_card"""
+not shown without an attack hover. Run with: python -m unittest tests.ui.test_odds_card"""
 from unittest import mock
 
 from tests.support import harness
@@ -63,9 +62,6 @@ class HoverTest(OddsCardCase):
 
 
 class TimingLabelTest(harness.UITestCase):
-    def test_the_timing_options_read_clash_default_and_quick_battles(self):
+    def test_the_battle_timing_option_is_gone_from_the_options_page(self):
         from hexa.campaign.screens.gamemenu import OPTION_TEXT
-        label, text = OPTION_TEXT["battle_timing"]
-        self.assertEqual(label, "Battle timing")
-        self.assertEqual(text("clash"), "Clash (default)")
-        self.assertEqual(text("full"), "Quick battles")
+        self.assertNotIn("battle_timing", OPTION_TEXT)

@@ -1,8 +1,10 @@
 """Battle slice 1b (owner decisions 2026-11-13): the d6 day dice, the lane break test (reserves out of the army morale),
-the battle timing ("clash" or "full"), the standing orders (Hold or Withdraw when attacked) and the structured battle log
+the standing orders (Hold or Withdraw when attacked) and the structured battle log
 with the text of old saves. Pygame-free; the rules are in systems/combat.py and systems/battle.py, the words in
 battlelog.py, the numbers in data.py.
 """
+import json
+import os
 import pickle
 import random
 import unittest
@@ -10,10 +12,11 @@ from unittest import mock
 
 from hexa import settings
 from hexa.campaign.battlelog import describe
-from hexa.campaign.data import BATTLE_TIMINGS, BREAK, CENTRE_SHOCK, DAYS_PER_SEASON, DICE, FLANK_MORALE, STANDING_ORDERS
+from hexa.campaign.data import BATTLE_DAYS, CENTRE_SHOCK, DICE, FLANK_MORALE, FLEE_MORALE, STANDING_ORDERS
 from hexa.campaign.state import Battle, fill_defaults
 from hexa.campaign.systems import battle as battlesys, combat
 from tests.support.battles import setup
+from tests.support.home import TempHome
 from tests.support.scenarios import stage
 from tests.support.worlds import fresh
 from tests.test_battle import damage, plain_battle
@@ -97,7 +100,7 @@ class DiceTest(unittest.TestCase):
 class LaneBreakTest(unittest.TestCase):
     """The owner's line model (refinement of 2026-11-13): a lane breaks when its regiment routs or dies and no reserve
     fills it by the next day's start; a broken centre breaks the army when no reserve can fill it; two broken lanes break
-    it; on narrow ground either lane does; the front-line morale under BREAK is the fallback."""
+    it; on narrow ground either lane does; the front-line morale under FLEE_MORALE is the fallback."""
 
     def setUp(self):
         self.world = fresh("POR")
@@ -180,7 +183,7 @@ class LaneBreakTest(unittest.TestCase):
         battle, _, _ = stage(self.world, [("infantry", 1, 1)], [("infantry", 1, 3)])
         self.hold(battle)
         for lane in range(3):
-            lane_unit(self.world, battle, battle.defender, lane).morale = BREAK / 2
+            lane_unit(self.world, battle, battle.defender, lane).morale = FLEE_MORALE / 2
         day = combat._Day(self.world, battle, (), {})
         self.assertEqual(combat.breaker(day), (battle.defender, "morale"))
 
@@ -224,41 +227,35 @@ class LaneBreakTest(unittest.TestCase):
 
 
 class TimingTest(unittest.TestCase):
+    """0.2.1: the battle timing is gone. A battle is fought to its end in the turn it starts, and the option is not a
+    setting any more."""
+
     def setUp(self):
         self.world = fresh("POR")
         self.world.rng = random.Random(21)
 
-    def test_the_choices_are_clash_and_full_and_clash_is_the_default(self):
-        self.assertEqual(BATTLE_TIMINGS, ("clash", "full"))
-        self.assertEqual(fresh("POR").battle_timing, "clash")
-
-    def test_clash_fights_one_day_in_the_season_the_attack_happens(self):
-        self.world.battle_timing = "clash"
-        _, battle = plain_battle(self.world, [("infantry", 1, 6)], [("infantry", 1, 6)])
-        self.assertEqual(battlesys.day_cap(self.world, battle), 1)
-        battlesys.battle_season(self.world)
-        if battle in self.world.battles:
-            self.assertEqual(battle.days, 1)
-
-    def test_clash_fights_a_full_season_of_days_after_that(self):
-        self.world.battle_timing = "clash"
+    def test_a_battle_started_this_turn_is_over_this_turn(self):
         _, battle = plain_battle(self.world, [("infantry", 1, 6)], [("infantry", 1, 6)])
         battlesys.battle_season(self.world)
-        self.world.turn += 1
-        if battle in self.world.battles:
-            self.assertEqual(battlesys.day_cap(self.world, battle), DAYS_PER_SEASON)
-            battlesys.battle_season(self.world)
-            self.assertEqual(battle.days, 1 + DAYS_PER_SEASON)
+        self.assertNotIn(battle, self.world.battles)
+        ended = self.world.bus.of("battle_ended")
+        self.assertEqual(len(ended), 1)
+        self.assertEqual(ended[0].get("seasons"), 1)
+        self.assertLessEqual(battle.days, BATTLE_DAYS)
 
-    def test_full_fights_all_the_days_of_the_first_season_at_once(self):
-        self.world.battle_timing = "full"
-        _, battle = plain_battle(self.world, [("infantry", 1, 6)], [("infantry", 1, 6)])
-        self.assertEqual(battlesys.day_cap(self.world, battle), DAYS_PER_SEASON)
+    def test_the_timing_option_is_gone_from_the_settings_and_the_world(self):
+        self.assertNotIn("battle_timing", settings.DEFAULTS)
+        self.assertNotIn("battle_timing", settings.CHOICES)
+        self.assertFalse(hasattr(fresh("POR"), "battle_timing"))
 
-    def test_the_setting_is_saved_with_the_options(self):
-        self.assertEqual(settings.DEFAULTS["battle_timing"], "clash")
-        self.assertEqual(settings.CHOICES["battle_timing"], ("clash", "full"))
-        self.assertEqual(settings.cycle(dict(settings.DEFAULTS), "battle_timing"), "full")
+
+class OldSettingsTest(TempHome):
+    def test_an_old_settings_file_with_the_timing_key_still_loads(self):
+        with open(os.path.join(self.home, "settings.json"), "w", encoding="utf-8") as f:
+            json.dump({"battle_timing": "full", "window": "1600x900"}, f)
+        loaded = settings.load()
+        self.assertEqual(loaded["window"], "1600x900")
+        self.assertNotIn("battle_timing", loaded)
 
 
 class StandingTest(unittest.TestCase):

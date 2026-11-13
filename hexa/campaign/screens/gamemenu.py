@@ -25,7 +25,6 @@ OPTION_TEXT = {
     "pass_names": ("Pass names", lambda v: "On" if v else "Off"),
     "movement": ("Movement speed", {"off": "Instant", "normal": "Normal", "slow": "Slow"}.get),
     "reminders": ("Task flag", lambda v: "On" if v else "Off"),
-    "battle_timing": ("Battle timing", {"clash": "Clash (default)", "full": "Quick battles"}.get),
 }
 PAGE_TITLES = {"main": "Paused", "save": "Save game", "load": "Load game", "options": "Options"}
 

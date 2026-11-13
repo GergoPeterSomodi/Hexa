@@ -35,6 +35,7 @@ def describe(entry, names):
         parts = [f"{_name(names, t)} {killed[t]:.0f} killed, {wounded.get(t, 0):.0f} wounded" for t in tags]
         text = f"Day {entry['day']}: " + "; ".join(parts)
         if entry.get("broke") is not None:
-            text += f". {_name(names, entry['broke'])} broke ({entry.get('cause') or 'morale'})"
+            fate = "fled" if entry.get("cause") in (None, "morale") else f"broke ({entry['cause']})"
+            text += f". {_name(names, entry['broke'])} {fate}"
         return text
     return str(kind)
