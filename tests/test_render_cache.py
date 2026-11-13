@@ -113,9 +113,9 @@ class FrameBudgetTest(unittest.TestCase):
     def test_extend_only_ever_lengthens(self):
         self.budget.start()
         self.budget.extend(self.now, 1.0)
-        self.assertEqual(self.budget.end, 100.003)
+        self.assertAlmostEqual(self.budget.end, 100.003)
         self.budget.extend(self.now + 0.01, 1.0)
-        self.assertEqual(self.budget.end, 100.011)
+        self.assertAlmostEqual(self.budget.end, 100.011)
 
 
 if __name__ == "__main__":
