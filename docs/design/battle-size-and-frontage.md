@@ -324,3 +324,10 @@ Out of scope for slice A: 5 or 7 lanes, terrain frontage, army banner, a new arc
 - AI-only battles are lopsided. A playtest with close fights will show how often 5 lanes would apply.
 - The prototype is a quick copy, not tested code: it shows the shape of the curves, not final numbers. The relief and wheel numbers need tuning.
 - Timings come from a busy machine and are rough.
+
+## Owner's decisions (2026-11-13)
+1. **Battlefield width as an attribute, and smaller unit figures.** The width of the field (how many lanes) is its own attribute, set by the ground and the armies (and later techs and generals), not a fixed 3. The panel uses smaller unit figures (compact tiles) so a wide field fits. The revision proposes the attribute and its sources.
+2. **Back line:** ranged first, then spare regiments as a second rank.
+3. **Archers:** add an era 1 archer (or crossbow) unit, with art, data and rules.
+4. **Relief as an attribute:** a unit attribute for how quickly a reserve or second rank changes places with a tired front regiment (working name: "reverse fielding", to be named). The change takes time; while it happens, the enemy keeps fighting the other lanes (and the swapping lane is exposed). Measure how quickly it should happen.
+5. Still open: stack limit (recommended: keep 6/7/8 plus a general) and map clutter (recommended: the AI stacking rule, no map change).
