@@ -1,4 +1,5 @@
 """render.cache.BoundedCache: the LRU, the byte bound, the statistics and the registry."""
+import ast
 import gc
 import os
 import unittest
@@ -55,6 +56,25 @@ class BoundedCacheTest(unittest.TestCase):
         c.put(1, 1)
         cache.clear_all()
         self.assertEqual(len(c), 0)
+
+
+class NoLooseCachesTest(unittest.TestCase):
+    """The art modules keep what they draw in registered BoundedCaches: no module-level dict or lru_cache of their own."""
+    MODULES = ("art", "wfctiles", "goodsart", "goodsobjects", "life", "nature", "landscape", "landmarks")
+
+    def test_no_module_level_dict_caches(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        problems = []
+        for name in self.MODULES:
+            with open(os.path.join(here, "..", "hexa", "campaign", name + ".py"), encoding="utf-8") as f:
+                tree = ast.parse(f.read())
+            for node in tree.body:
+                if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict) and not node.value.keys and ast.unparse(node.targets[0]) != "_BUILD":   # a registry
+                    problems.append(f"{name}.{ast.unparse(node.targets[0])} is an empty dict")
+                if isinstance(node, ast.FunctionDef):
+                    problems += [f"{name}.{node.name} uses {ast.unparse(d)}" for d in node.decorator_list
+                                 if "lru_cache" in ast.unparse(d)]
+        self.assertEqual(problems, [])
 
 
 if __name__ == "__main__":

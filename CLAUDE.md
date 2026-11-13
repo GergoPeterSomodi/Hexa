@@ -273,8 +273,11 @@ the rules as far as the current layout allows, and never makes an allowlisted of
 - **UI:** buttons, panels, rows, tooltips and modals come from hexa/ui/kit.py, colours and fonts from
   hexa/ui/theme.py. No new hand-drawn button.
 - **Render caches** are `campaign/render/cache.py` `BoundedCache` instances, registered by name (`cache.stats()`; hits, misses
-  and bytes with `detail=True`). No new module-level dict cache; landscape's per-MapView caches use the same class (the registry
-  is weak and adds up caches of one name). Time-sliced work uses `render.budget.FrameBudget`.
+  and bytes with `detail=True`). No module-level dict cache or `lru_cache` in the art modules (`tests/test_render_cache.py` checks);
+  `@BoundedCache(name, n).memo` caches a function of positional arguments. Landscape's per-MapView caches use the same
+  class (the registry is weak and adds up caches of one name). Sizes come from measurement (`python -m tools.perf`
+  prints entries, MB, hits and misses per cache): a cache is bounded above what a full tour of the map needs, so it
+  evicts only when worlds change. Time-sliced work uses `render.budget.FrameBudget`.
 - **Refactor PRs** change no behaviour: label them `refactor`; they must pass tools/same_behaviour.py,
   save-compat and sha-identical goldens. Never mix a refactor and a gameplay change in one commit.
 - **Where new features go:** rules -> campaign/systems/<name>.py (+ numbers in data.py, + README table);

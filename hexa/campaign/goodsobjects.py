@@ -10,12 +10,12 @@ All drawing is in the 120 x 140 tile space (the object sits on the hex, ground l
 supersampling, and is scaled down at the end. `draw_good(key, size)` returns a transparent tile-frame surface
 `size` px tall (width size * 6 / 7): blit it centred on the hex, with size = the hex tile height (2 * r).
 """
-import functools
 import math
 
 import pygame
 
 from .art import shade
+from .render.cache import BoundedCache
 
 W, H = 120, 140
 CX, GY = 60, 100                 # object centre line and ground line
@@ -1146,7 +1146,7 @@ def _shrink(surf, w, h):
     return pygame.transform.smoothscale(surf, (w, h))
 
 
-@functools.lru_cache(maxsize=512)
+@BoundedCache("goodsobjects.goods", 512).memo
 def draw_good(key, size):
     """The object for good `key` on a transparent tile frame `size` px tall (and size * 6 / 7 wide).
 

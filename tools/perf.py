@@ -15,7 +15,8 @@ to $GITHUB_STEP_SUMMARY when that is set. The unit tests never time anything: on
 The MapView metrics need pygame (a Python 3.12 or 3.13 venv, see README, Window tests). Without it they are skipped
 with a note, or fail under HEXA_REQUIRE_PYGAME=1. The memory row (tracemalloc) shows how much memory stays in the
 world module's caches (_SNAPSHOTS, _RANDOM_GEOS) as more random worlds are built (#29). It is information only and
-never fails the run; tests/test_memory.py holds the actual check.
+never fails the run, and neither does the table of the render caches under it (entries, memory, hits);
+tests/test_memory.py holds the actual check.
 """
 import argparse
 import gc
@@ -186,6 +187,49 @@ def cache_memory(seeds=MEMORY_SEEDS):
     return kept, caches
 
 
+def render_cache_rows(zooms=(3, 4, 5), frames=6):
+    """What the render caches (hexa/campaign/render/cache.py) hold after a MapView has drawn Portugal 1480 at these
+    zooms, `frames` frames each with the build time limit lifted: [(name, caches, entries, max entries, MB, hits,
+    misses)]. Information only. Raises Skip without pygame."""
+    pygame, screen = _pygame()
+    from hexa.campaign import mapview
+    from hexa.campaign.app import UI
+    from hexa.campaign.render import cache
+    cache.clear_all()
+    world = _world_module().CampaignWorld(player="POR")
+    lisbon = world.provinces[world.countries["POR"].capital].pos
+    rect = pygame.Rect(0, 0, *SCREEN)
+    limit, mapview.LAND_BUILD_MS = mapview.LAND_BUILD_MS, 1e9
+    try:
+        for zoom in zooms:
+            view = mapview.MapView(world, TILES_DIR)
+            view.zoom = zoom
+            x, y = view.center(lisbon)
+            for _ in range(frames):
+                view.draw(screen, rect, (x - rect.w / 2, y - rect.h / 2), UI())
+        rows = [(name, r["caches"], r["entries"], r["max_entries"], r["bytes"] / 1e6, r["hits"], r["misses"])
+                for name, r in cache.stats(detail=True).items() if r["entries"]]
+    finally:
+        mapview.LAND_BUILD_MS = limit
+    return rows
+
+
+def cache_text(rows):
+    lines = ["render caches after Portugal 1480 at zooms 3-5 (information only):",
+             f"  {'cache':24}{'entries':>8}{'max':>7}{'MB':>8}{'hits':>9}{'misses':>8}"]
+    lines += [f"  {n:24}{e:8}{m:7}{mb:8.2f}{h:9}{x:8}" for n, _c, e, m, mb, h, x in rows]
+    lines.append(f"  {'total':24}{sum(r[2] for r in rows):8}{'':7}{sum(r[4] for r in rows):8.2f}")
+    return "\n".join(lines)
+
+
+def cache_markdown(rows):
+    lines = ["", "### Render caches (information only)", "",
+             "What `hexa/campaign/render/cache.py` caches hold after drawing Portugal 1480 at zooms 3-5.", "",
+             "| Cache | Entries | Max | MB | Hits | Misses |", "|---|--:|--:|--:|--:|--:|"]
+    lines += [f"| `{n}` | {e} | {m} | {mb:.2f} | {h} | {x} |" for n, _c, e, m, mb, h, x in rows]
+    return "\n".join(lines) + "\n"
+
+
 # ----- budgets and the table ------------------------------------------------------------------------------------------
 def load_budget(path=BUDGET_FILE):
     with open(path, encoding="utf-8") as f:
@@ -317,12 +361,18 @@ def main(argv=None, out=print):
     if args.runs < 1:
         parser.error("--runs: at least 1")
     results = measure(names, args.runs, budget, require_pygame=os.environ.get(REQUIRE_VAR) == "1", out=out)
-    memory = None
+    memory, rows = None, []
     if not args.no_memory and not args.only:
         memory = cache_memory()
+        try:
+            rows = render_cache_rows()
+        except Skip:
+            pass
     out("")
     out(text_table(results, memory))
-    write_step_summary(markdown(results, memory, args.runs))
+    if rows:
+        out(cache_text(rows))
+    write_step_summary(markdown(results, memory, args.runs) + (cache_markdown(rows) if rows else ""))
     failed = [r for r in results if r.failed]
     for r in failed:
         out(f"FAILED: {r.name} took {r.median:.3f} s, over its hard limit of {r.limits['hard']:g} s. "

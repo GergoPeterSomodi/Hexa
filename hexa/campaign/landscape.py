@@ -113,7 +113,7 @@ def hex_poly(X, Y, rad):
     return [corner_pt(c, X, Y, rad) for c in range(6)]
 
 
-_COAST_WATER = {}
+_COAST_WATER = BoundedCache("landscape.coast_water", 600)
 
 
 def coast_water(desc):
@@ -121,10 +121,8 @@ def coast_water(desc):
     key = (desc.sea, desc.variant, bool(desc.town))
     mask = _COAST_WATER.get(key)
     if mask is None:
-        if len(_COAST_WATER) > 600:
-            _COAST_WATER.clear()
         geo = wfctiles._coast_geo(desc.sea, desc.variant, wfctiles.COAST_RD - 8 if desc.town else wfctiles.COAST_RD)
-        mask = _COAST_WATER[key] = pygame.mask.from_surface(geo["water"], 8)
+        mask = _COAST_WATER.put(key, pygame.mask.from_surface(geo["water"], 8))
     return mask
 
 
@@ -424,8 +422,9 @@ def decorate(sf, kind_b, kind_a, curve, q, rng, inward, avg_b):
 
 
 # ----------------------------------------------------------------------------------------------- object sprites
-_OB = {}
-_PIECE = {}
+SPRITE_CACHE = 4096
+_OB = BoundedCache("landscape.sprites", SPRITE_CACHE)
+_PIECE = BoundedCache("landscape.pieces", 32)
 # farm buildings and markers made with the game's own goodsart pens (drawn at 2x, base point = bottom centre)
 PIECES = {"barn": (44, 36), "windmill": (56, 62), "farmhouse": (40, 34), "stump": (10, 6), "haystack": (14, 12),
           "hospice": (40, 40), "snowmark": (16, 26)}
@@ -433,8 +432,9 @@ PIECES = {"barn": (44, 36), "windmill": (56, 62), "farmhouse": (40, 34), "stump"
 
 def _piece(name, seed):
     key = (name, seed)
-    if key in _PIECE:
-        return _PIECE[key]
+    hit = _PIECE.get(key)
+    if hit is not None:
+        return hit
     w, h = PIECES[name]
     K2 = goodsart.K
     surf = pygame.Surface((w * K2, h * K2), pygame.SRCALPHA)
@@ -471,16 +471,15 @@ def _piece(name, seed):
             a = math.radians(90 + 60 * k)
             dx, dy = math.cos(a) * 4.2, math.sin(a) * 4.2
             p.line((70, 120, 190), (x - dx, y - 16 - dy), (x + dx, y - 16 + dy), 1.3)
-    res = (surf, w, h)
-    _PIECE[key] = res
-    return res
+    return _PIECE.put(key, (surf, w, h))
 
 
 def obj_sprite(name, size, seed, cat, r, flip=False):
     """An object at hex radius r. cat picks the OSCALE family. Base point = bottom centre. Cached."""
     key = (name, size, seed % 4, cat, r, flip)
-    if key in _OB:
-        return _OB[key]
+    hit = _OB.get(key)
+    if hit is not None:
+        return hit
     f = r / OBJ_R * OSCALE[cat]
     if name in NATURE_NAMES:
         s2, fw, fh = nature._get2x(name, size, seed % 4)
@@ -495,12 +494,11 @@ def obj_sprite(name, size, seed, cat, r, flip=False):
         raise KeyError(name)
     if flip:
         img = pygame.transform.flip(img, True, False)
-    _OB[key] = img
-    return img
+    return _OB.put(key, img)
 
 
 # ----------------------------------------------------------------------------------------------- clearings
-_BLOBS = {}
+_BLOBS = BoundedCache("landscape.blobs", 2048)
 
 
 def clearing_blob(c):
@@ -518,9 +516,7 @@ def clearing_blob(c):
 
 def _blob_cached(c):
     key = (c.pos, c.clearing)
-    if key not in _BLOBS:
-        _BLOBS[key] = clearing_blob(c)
-    return _BLOBS[key]
+    return _BLOBS.get(key, lambda: clearing_blob(c))
 
 
 def voronoi_cells(seeds, box):

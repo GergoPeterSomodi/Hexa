@@ -66,13 +66,13 @@ WORLD_MODULES = {"hexa.world", "hexa.colony.world", "hexa.campaign.world"}
 # ----- ALLOW: ONLY EVER SHRINK THESE -----------------------------------------------------------------------------
 ALLOW_MODULES = {
     "hexa.campaign.world": 3532,
-    "hexa.campaign.goodsart": 2592,
-    "hexa.campaign.wfctiles": 2399,
-    "hexa.campaign.landscape": 2038,
+    "hexa.campaign.goodsart": 2584,
+    "hexa.campaign.wfctiles": 2392,
+    "hexa.campaign.landscape": 2020,
     "hexa.campaign.app": 975,
     "hexa.campaign.mapview": 1546,
     "hexa.campaign.randomgeo": 1286,
-    "hexa.campaign.life": 1205,
+    "hexa.campaign.life": 1200,
     "hexa.campaign.goodsobjects": 1155,
     "hexa.colony.world": 1116,
     "hexa.campaign.techscreen": 885,

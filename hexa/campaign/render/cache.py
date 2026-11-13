@@ -13,14 +13,40 @@ imports against a stand-in pygame.
     hit = cache.get(key)                               # None on a miss (without make)
     cache.put(key, value)
 """
+import functools
+import itertools
 import weakref
 from collections import OrderedDict
+from collections.abc import Mapping
 
 import pygame
 
-REGISTRY = weakref.WeakValueDictionary()   # name -> the newest BoundedCache of that name
 _ALL = weakref.WeakSet()                    # every live cache
+_SERIAL = itertools.count()                 # which of two caches of one name is the newer
 _watching = False                           # a pygame.quit() callback is registered (pygame forgets it when it quits)
+
+
+class _Registry(Mapping):
+    """name -> the newest live BoundedCache of that name (read only)."""
+
+    def _newest(self):
+        found = {}
+        for cache in list(_ALL):
+            if cache.name not in found or cache._serial > found[cache.name]._serial:
+                found[cache.name] = cache
+        return found
+
+    def __getitem__(self, name):
+        return self._newest()[name]
+
+    def __iter__(self):
+        return iter(self._newest())
+
+    def __len__(self):
+        return len(self._newest())
+
+
+REGISTRY = _Registry()
 
 
 def clear_all():
@@ -67,7 +93,7 @@ class BoundedCache:
         self._items = OrderedDict()
         self._weights = {}
         self._held = 0                      # bytes held, kept only when there is a max_bytes
-        REGISTRY[name] = self
+        self._serial = next(_SERIAL)
         _ALL.add(self)
 
     @property
@@ -103,6 +129,14 @@ class BoundedCache:
         if make is None:
             return None
         return self.put(key, make())
+
+    def memo(self, fn):
+        """Decorator: fn(*args) made once per args (positional only) and kept in this cache, like lru_cache."""
+        @functools.wraps(fn)
+        def wrapper(*args):
+            return self.get(args, lambda: fn(*args))
+        wrapper.cache = self
+        return wrapper
 
     def put(self, key, value):
         """Keep `value` for `key` (the newest), dropping the oldest things beyond the bounds. Returns value."""

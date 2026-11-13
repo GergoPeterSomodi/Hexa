@@ -17,6 +17,7 @@ import zlib
 import pygame
 
 from .art import shade
+from .render.cache import BoundedCache
 from .goodsart import (DARK, DWOOD, INK, ROOF_RED, ROOF_SLATE, THATCH, WATER, WATER_L, WHITE, WOOD,
                        Pen, building, cow, ell, flag, horse, lerp, mix, pine, round_tree, sheep, tower, wheel)
 from .wfctiles import SAND, scale_tile
@@ -62,7 +63,6 @@ SKIN_C = (238, 200, 165)
 # ===================================================================================================
 OFFS = [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, -2), (-2, 2), (2, 2)]
 OFFS_THIN = [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, -1), (-1, 1), (1, 1)]
-_MASKS = {}
 
 
 class Frame:
@@ -1127,15 +1127,10 @@ WATER_OBJECTS = ("waterfall", "rapids", "sea_rocks", "sea_stack", "reef_surf", "
                  "sea_cliff", "lighthouse", "fishing_boat", "whale_spout", "seabirds", "iceberg", "shipwreck")
 
 
-_OBJ_CACHE = {}
-
-
+@BoundedCache("life.objects", 512).memo               # all 504 (name, size, seed) fit: 5 MB
 def _obj(name, size, seed):
     """Cached object render: scatter draws from 4 variants per object and size, so rejected candidates are free."""
-    key = (name, size, seed)
-    if key not in _OBJ_CACHE:
-        _OBJ_CACHE[key] = OBJECTS[name](size, seed)
-    return _OBJ_CACHE[key]
+    return OBJECTS[name](size, seed)
 
 
 # ===================================================================================================

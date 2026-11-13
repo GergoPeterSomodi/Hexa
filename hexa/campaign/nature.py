@@ -21,12 +21,13 @@ Tiles:    draw_tile(name, variant=0) -> 120 x 140 hex tile (2x supersampled), TI
 import math
 import random
 import zlib
-from functools import lru_cache, partial
+from functools import partial
 
 import pygame
 
 from .art import hex_pts, shade
 from .goodsart import ell
+from .render.cache import BoundedCache
 
 W, H = 120, 140
 CX, CY, R = 60.0, 70.0, 69.3
@@ -206,7 +207,7 @@ def _reg(name, w, h, shadow=0.0, **kw):
     return deco
 
 
-@lru_cache(maxsize=None)
+@BoundedCache("nature.sprites2x", 512).memo         # all 396 (name, size, seed) fit: 12 MB
 def _get2x(name, size, seed):
     """(surface at 2x, final width, final height). The base point is the bottom centre of the surface."""
     build, w, h, shadow = _BUILD[name]
@@ -216,7 +217,7 @@ def _get2x(name, size, seed):
     return c.finish(shadow), c.fw, c.fh
 
 
-@lru_cache(maxsize=None)
+@BoundedCache("nature.sprites", 512).memo
 def _pub(name, size, seed):
     surf, fw, fh = _get2x(name, size, seed)
     return pygame.transform.smoothscale(surf, (fw, fh))
@@ -708,7 +709,7 @@ def _draw_plan(surface, plan, scale):
         surface.blit(spr, (round(p["x"] * scale - spr.get_width() / 2), round(p["y"] * scale - spr.get_height())))
 
 
-@lru_cache(maxsize=None)
+@BoundedCache("nature.masks", 4).memo
 def _hex_mask(scale):
     m = pygame.Surface((W * scale, H * scale), pygame.SRCALPHA)
     pygame.draw.polygon(m, (255, 255, 255, 255), [(x * scale, y * scale) for x, y in hex_pts(R - 0.3)])

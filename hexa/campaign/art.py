@@ -10,12 +10,16 @@ import random
 
 import pygame
 
+from .render.cache import BoundedCache
+
 W, H = 120, 140
 CX, CY = W / 2, H / 2
 R = 69.3                                   # centre to corner of the pack's hexes
 OUTLINE = (45, 45, 50)
 GOLD = (255, 214, 70)
 INK = (30, 30, 38)
+RAW_CACHE = 256                              # the pack's sprites as loaded (sizes: python -m tools.perf)
+OBJECT_CACHE = 256                           # scaled / tinted object sprites
 
 
 def hex_pts(r=R, cx=CX, cy=CY):
@@ -69,19 +73,20 @@ def smooth(points, rounds=3, wobble=0.0, seed=0):
 
 
 # ----- loading the pack's sprites ------------------------------------------------------------------
-_CACHE = {}
+_RAW = BoundedCache("art.raw", RAW_CACHE)
+_OBJECTS = BoundedCache("art.objects", OBJECT_CACHE)
 
 
 def _load(path):
-    key = ("raw", path)
-    if key not in _CACHE:
+    img = _RAW.get(path)
+    if img is None:
         img = pygame.image.load(path)
         try:
             img = img.convert_alpha()
         except pygame.error:
             pass
-        _CACHE[key] = img
-    return _CACHE[key]
+        _RAW.put(path, img)
+    return img
 
 
 def _objects_dir(tiles_dir):
@@ -107,7 +112,8 @@ def _snowcap(img):
 
 def _obj(tiles_dir, name, scale=1.0, tint=None, snow=False):
     key = (tiles_dir, name, scale, tint, snow)
-    if key not in _CACHE:
+    img = _OBJECTS.get(key)
+    if img is None:
         img = _load(os.path.join(_objects_dir(tiles_dir), name + ".png"))
         if scale != 1.0:
             img = pygame.transform.smoothscale(img, (max(1, int(img.get_width() * scale)),
@@ -117,8 +123,8 @@ def _obj(tiles_dir, name, scale=1.0, tint=None, snow=False):
             img.fill(tuple(tint) + (255,), special_flags=pygame.BLEND_RGBA_MULT)
         if snow:
             img = _snowcap(img)
-        _CACHE[key] = img
-    return _CACHE[key]
+        _OBJECTS.put(key, img)
+    return img
 
 
 def _tile_img(tiles_dir, rel):

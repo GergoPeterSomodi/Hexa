@@ -16,6 +16,7 @@ import zlib
 import pygame
 
 from hexa.campaign.art import hex_pts, shade
+from hexa.campaign.render.cache import BoundedCache
 
 W, H = 120, 140
 CX, CY = W / 2, H / 2
@@ -121,29 +122,20 @@ def mix(c1, c2, t):
 
 
 # ----- sprites from the pack -----------------------------------------------------------------------------
-_SPR = {}
-
-
+@BoundedCache("goodsart.sprites", 128).memo
 def _spr(tiles_dir, name, scale=1.0):
-    key = (tiles_dir, name, scale)
-    if key not in _SPR:
-        img = pygame.image.load(os.path.join(os.path.dirname(tiles_dir), "Objects", name + ".png"))
-        if pygame.display.get_surface():
-            img = img.convert_alpha()
-        _SPR[key] = pygame.transform.smoothscale(img, (max(1, int(img.get_width() * scale * K)),
-                                                       max(1, int(img.get_height() * scale * K))))
-    return _SPR[key]
+    img = pygame.image.load(os.path.join(os.path.dirname(tiles_dir), "Objects", name + ".png"))
+    if pygame.display.get_surface():
+        img = img.convert_alpha()
+    return pygame.transform.smoothscale(img, (max(1, int(img.get_width() * scale * K)),
+                                              max(1, int(img.get_height() * scale * K))))
 
 
-_MASK = {}
-
-
+@BoundedCache("goodsart.mask", 1).memo
 def _hex_mask():
-    if "m" not in _MASK:
-        m = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-        pygame.draw.polygon(m, (255, 255, 255, 255), [(x * K, y * K) for x, y in hex_pts(R - 0.3)])
-        _MASK["m"] = m
-    return _MASK["m"]
+    m = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
+    pygame.draw.polygon(m, (255, 255, 255, 255), [(x * K, y * K) for x, y in hex_pts(R - 0.3)])
+    return m
 
 
 _OFFS = [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, -2), (-2, 2), (2, 2)]
