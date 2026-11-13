@@ -107,7 +107,7 @@ a red-outlined enemy). Right-click far away to send a unit there over several se
 press **3** again to switch the goods view between chips, deposits and prices), **Tab** cycles units,
 **C** opens your country, **L** the ledger, **G** shows or hides the faint hex grid, **R** continues the selected
 stack's march (see Moving), **Space** ends the season (while moves are being shown, **Space** or **Enter** skips them
-instead; see Watching moves; with something unfinished it asks first, see End-of-turn reminders).
+instead; see Watching moves). It never asks: the task flag under End season shows what is unfinished (see Task flag).
 Hover anything for a moment to get a card explaining it: troops, buttons, provinces, goods.
 
 **The top bar** is one row. After your country's name come the resource chips, each an icon, its value and, in
@@ -157,14 +157,14 @@ faster, never longer than about 6 seconds. The floating text of a battle or a ca
 The map still pans and zooms, **Space** or **Enter** skips the rest, and the **End season** button waits until it is over.
 The **Movement speed** option sets it: Instant (no replay), Normal or Slow (about 0.32 seconds a hex, up to 9 seconds).
 
-**End-of-turn reminders:** before the season ends, a small list shows what you left unfinished, if anything: an idea
-card waiting for your pick, no technology being researched, a technology with no points yet that you could fund, merchants
+**Task flag:** under **End season** a flag says how many things you have to do ("3 things to do"): an idea card
+waiting for your pick, no technology being researched, a technology with no points yet that you could fund, merchants
 without orders (while a route of yours has something to carry), nothing being built while you could pay for a building,
-and armies that did nothing this season (not moved, attacked, foraged or marching, not besieging and not sitting in
-one of your own castles). Click a line to go to the thing it names (the market, the technology screen, the province, the
-army). **End season anyway** (or **Enter**) ends the season, **Back** (or **Esc**, or a right-click) does not. **Space**
-does nothing on the list, so a double tap cannot end a season you were warned about. The **End-of-turn reminders** option
-turns the list off.
+armies that did nothing this season (not moved, attacked, foraged or marching, not besieging and not sitting in one of
+your own castles), and battles you are in that are still on. The most pressing comes first. A click on the flag opens
+the list; a click on a line goes to the thing it names (the market, the technology screen, the province, the army, the
+battle) and closes it. A click on the map or **Esc** closes it. The count drops as you finish things, and at 0 the flag
+is gone. The flag never ends or holds up a season. The **Task flag** option (in the options page) turns it off.
 
 **Marches:** a right-click far away starts a march over several seasons. When the season ends, a march does not
 move on by itself: the stack waits for your order. Its planned route stays on the map as a dashed gold line, and
@@ -205,7 +205,7 @@ says so each time you try.
   - autosave: off, every year or every 5 years
   - scroll speed
   - movement speed: instant, normal or slow (how fast the moves you can see are shown, see Watching moves)
-  - end-of-turn reminders: on or off (see End-of-turn reminders)
+  - task flag: on or off (see Task flag)
   - hex grid (also **G**) and pass names: the mountain pass names shown on the closest zoom, off by default (the pass art and the winter snowflake mark on a closed pass always show)
 - Options are kept in `~/.hexa/settings.json`. If that file can't be written (a read-only folder or a full disk), a changed option still applies until you quit, and a message says it wasn't saved.
 
@@ -335,7 +335,7 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | Cannons | Bombards | Culverins | Field guns | Fire from the back line of a battle, add siege points on their hex and smash castles; weak up close |
 
 - **Odds card:** with a stack selected, hovering a hex it can attack shows a card beside the hex: the men and morale of each side, the ground (the defender's ground counts for the defender), a castle or assault, a pass crossing or an attack uphill, the generals, and one word: **Hopeless**, **Poor**, **Even**, **Favourable** or **Overwhelming** (**Unknown** for an enemy you cannot see). The word is the strength ratio divided by the defender's ground factor: hills and forests 1.16, jungle 1.4, marsh 1.2, mountains 2.25, snow 2.65, and a castle with a garrison by level (1.41, 1.58, 3.11; the ground does not count in an assault). The factors are measured, so the word matches the win rate on that ground; the bands and factors are in `data.py` (`ODDS_WORDS`, `GROUND_ODDS`, `CASTLE_ODDS`).
-- **Battle reminders:** each battle you are in that is still on gets a line in the End-of-turn reminders ("... is still on: join, withdraw or fight on"); a click opens the battle panel. At the start of each season a "Battle on" ribbon marks the hex of each such battle.
+- **Battle reminders:** each battle you are in that is still on gets a line in the task flag's list ("... is still on: join, withdraw or fight on"); a click opens the battle panel. At the start of each season a "Battle on" ribbon marks the hex of each such battle.
 - **Battles:** an attack on an enemy stack or a garrisoned castle starts a battle on that hex, and a stack beside a battle
   its country is in joins it. Both armies stand on the hex and fight in the **timing** the Options page sets: **Clash** (the default) fights one day in the season the attack happens and then 3 a season, so the defender can give orders and allies can join; **Quick battles** (the option stored as `full`) fights all of a season's days at once. Each day each side rolls a **d6**: its damage that day is times 0.7 (roll 1) to 1.4 (roll 6). Each side fights in three
   **lanes** (left, centre, right; the right lane is closed on mountains, marsh, jungle and snow). The rest of the army is
@@ -599,7 +599,7 @@ screen from the window's own state. Test
 modules in `tests/ui/` import pygame and the window modules inside the tests, never at the top, so the
 pygame-free run can still import them.
 
-Importing the `tests` package turns the movement replay and the end-of-turn reminders off for the whole test run
+Importing the `tests` package turns the movement replay and the task flag off for the whole test run
 (`tests/__init__.py`; the game ships both on), so that the many tests that press End season get the next season at once.
 The tests of those two features switch them on.
 
@@ -609,7 +609,7 @@ anywhere or aimed at the window's own buttons, units, reachable hexes and minima
 and held scroll keys, one action a frame or, with the burst probability, 2 to 6 in the same frame. When Esc or M
 ends the loop it simply runs again until the frame budget is used. A session fails on any exception and on any
 broken world invariant that no known open bug explains (`KNOWN_OPEN` in `tests/support/invariants.py`). Each
-session has its own temporary `HEXA_HOME`, and the Age of Discovery sessions of odd seeds play with the movement replay on (seeds 1, 5, 9 and so on with the reminders too). By default it plays seeds 1 and 2 of each mode, 800 frames (the
+session has its own temporary `HEXA_HOME`, and the Age of Discovery sessions of odd seeds play with the movement replay on (seeds 1, 5, 9 and so on with the task flag too). By default it plays seeds 1 and 2 of each mode, 800 frames (the
 campaign 300), burst 0.3, in about 30 seconds; three environment variables scale it:
 
 ```bash

@@ -1,6 +1,7 @@
 """The heads-up display of the Age of Discovery window: what is drawn over the map, apart from the side panels.
 
     topbar.py     the resource chips, date, map modes, Menu and End season (``resources`` has the numbers)
+    tasks.py      the task flag under End season and its list of unfinished things (``campaign/reminders`` says what)
     floating.py   ribbons that rise from the hex where something happened (``feed`` says what)
     battles.py    the battle marks on the map: the crossed-swords badge and the front-line bar (``battleview`` says what)
     actionlog.py  the collapsible log in the bottom-left corner (``feed`` has its lines)
@@ -14,7 +15,7 @@ changes the game (selecting a stack and moving the camera are the window's own s
 import pygame
 
 from ...ui.theme import INFO_C, INK
-from . import actionlog, battles, odds, topbar
+from . import actionlog, battles, odds, tasks, topbar
 from .floating import Floaters
 
 GLIDE_MS = 260          # how long the camera takes to reach a place the log names
@@ -31,6 +32,7 @@ class Hud:
         self.glide = None               # (hex to show, start ms, ms of the last frame): the camera follows the hex
         self.ping = None                # (hex, start ms): the ring after a jump
         self.waiting = []               # (replay time, item): ribbons that wait for the replay to reach their hex
+        self.tasks = tasks.Tasks()      # the task flag and its open list (hud/tasks.py)
 
     # ----- drawing ----------------------------------------------------------------------------------
     @staticmethod
@@ -43,6 +45,8 @@ class Hud:
         """Whether the HUD, not the map, is under `pixel`: the top bar, the minimap, or the action log's box (open or
         the collapsed bar). Clicks, drags and hovers there never reach the map."""
         if pixel[1] < ctx.view_rect().y or ctx.minimap_rect().inflate(6, 6).collidepoint(pixel):
+            return True
+        if self.tasks.covers(pixel):
             return True
         return bool(self.log.box and self.log.box.collidepoint(pixel))
 
@@ -72,6 +76,13 @@ class Hud:
 
     def draw_top(self, ctx):
         topbar.draw(ctx, self)
+
+    def draw_tasks(self, ctx):
+        """The task flag and its list: drawn last, over the side panel. Nothing while a screen is up."""
+        if self.hidden(ctx):
+            self.tasks.clear()
+            return
+        self.tasks.draw(ctx)
 
     def draw_log(self, ctx):
         actionlog.draw(ctx, self)

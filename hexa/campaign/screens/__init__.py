@@ -1,8 +1,8 @@
 """Screens of the Age of Discovery window and the stack they live on.
 
 A screen is something that covers or dims the map and takes the input while it is up: the pause menu (Esc), the
-technology screen (T), the new-age idea modal and the end-of-turn reminder list (screens/reminders.py). The map itself is not a screen: it is what the window draws when
-no screen hides it.
+technology screen (T), the new-age idea modal and the pause menu's pages. The map itself is not a screen: it is what the
+window draws when no screen hides it. The task flag under End season is not a screen either (hud/tasks.py).
 
     Screen          the base class: draw(ctx), handle_event(ctx, event) -> consumed, update(ctx, dt),
                     opaque (it hides the map: the window does not draw the map or the HUD under it),
@@ -23,7 +23,7 @@ attributes and methods of it:
                 and ctx for the kit helpers (``menu_button(ctx, ...)``)
     the game    ctx.game (the GameManager: save, autosave), ctx.world, ctx.player, ctx.settings, ctx.busy,
                 ctx.toast(text), ctx.load_world(game), ctx.open_country(tag), ctx.apply_display(),
-                ctx.press(action) (a button's action tuple, for the reminder lines) and ctx.end_turn(confirmed=True)
+                ctx.press(action) (a button's action tuple) and ctx.end_turn()
     the loop    ctx.running and ctx.result (a screen that quits or leaves for the start menu sets them),
                 ctx.screens (the stack itself), ctx.pause (the PauseMenu), ctx.tech (the TechScreen),
                 ctx.quickload_until, ctx.close_menu()

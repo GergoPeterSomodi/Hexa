@@ -67,10 +67,10 @@ docker run --rm --platform linux/arm64 --user "$(id -u):$(id -g)" -e HOME=/tmp -
 ```
 
 Importing the `tests` package changes two defaults of `hexa.settings` for the whole test process (`tests/__init__.py`):
-`movement` is `"off"` (no movement replay) and `reminders` is `False` (no end-of-turn reminders), so the many tests that
+`movement` is `"off"` (no movement replay) and `reminders` is `False` (no task flag), so the many tests that
 press End season get the next season at once. The game ships `"normal"` and `True` (`tests.SHIPPED_DEFAULTS`). A test of
 those features sets `app.settings[...]` itself; the monkey plays odd seeds with the replay on, seeds 1, 5, 9... with the
-reminders too.
+task flag too.
 
 Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fresh(player)` a mutable one,
 `play_seasons`, `random_world`, `TempHome`, `@slow`). A test that mutates a shared world fails the module's
@@ -158,8 +158,8 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   The app's `update()` drains it and pauses `AI_STEP_MS` only when the acting unit is visible to the player.
   These AIs see the whole map.
 - **Campaign:** one turn is one season, played by `GameManager.end_season()` (`campaign/game.py`, pygame-free).
-  `CampaignApp.end_turn(key, confirmed)` first lets a running movement replay block it (a key skips the replay) and the
-  reminder list ask (see Screens), then draws its busy frame and delegates to it; tests play seasons through it
+  `CampaignApp.end_turn(key)` first lets a running movement replay block it (a key skips the replay), then draws its busy
+  frame and delegates to it (End season never asks: the task flag shows what is left); tests play seasons through it
   (`tests/support/worlds.play_seasons`). The fixed order: `world.settle_preview()`, `ai.run(world, tag)` for every
   non-player country, `world.end_round()` (walks the ordered `PHASES` table of `systems/season.py`: battles, logistics, sieges, war timeouts, economy,
   collect, debt, growth, research, extinction, turn, units, exploration, vision, redraw, report; `tests/test_season.py` pins the
@@ -328,14 +328,14 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
     `toggle_grid`, `toggle_fullscreen`, `save_options`. Saving, loading and the autosave go through `ctx.game`, the
     `GameManager` (`game.save(slot)`, `GameManager.load(slot)`, `game.autosave()`); `app.world` is `app.game.world`. The
     screen mode lives in `CampaignApp.apply_display` (`campaign/display.py` opens the window).
-  - `screens/reminders.py`: `ReminderScreen` and `ask(ctx)`, the end-of-turn list. `CampaignApp.end_turn(key, confirmed)`
-    calls `ask` after the replay check: with the "End-of-turn reminders" option on (`settings["reminders"]`) and something
-    unfinished it pushes the screen (not opaque, a shade over the map) and the season waits. The lines come from
-    `campaign/reminders.py` (pygame-free: one function per rule, `unfinished(world, tag)` returns `Reminder(kind, text,
-    hint, action)`; an `action` is a tuple `CampaignApp.press` understands: `("tech",)`, `("market", market)`,
-    `("province", prov)`, `("log", "goto", hex)`). A line click takes the screen off and presses its action; "End season
-    anyway" (Enter) takes it off and calls `end_turn(confirmed=True)`; Back (Esc, right-click, click outside) only takes it
-    off; Space is used up. Buttons are `ui/kit.menu_button`s, colours `ui/theme` tokens.
+  - The task flag is not a screen: `hud/tasks.py` (`Tasks`, held as `hud.tasks`) draws the flag under End season and its
+    list, with the option "Task flag" (`settings["reminders"]`) turning it off. The lines come from `campaign/reminders.py`
+    (pygame-free: one function per rule, `unfinished(world, tag)` returns `Reminder(kind, text, hint, action)`; an
+    `action` is a tuple `CampaignApp.press` understands: `("tech",)`, `("market", market)`, `("province", prov)`,
+    `("log", "goto", hex)`, `("battle", pos)`), cached per `world.version` and forgotten by `CampaignApp.refresh()`. A
+    line click presses its action and closes the list; the flag and the list take their clicks before the map and the
+    side panel (`app.left_click`), Esc and a click elsewhere close the list, and `Hud.covers` keeps the map off them.
+    The flag is drawn last, over the side panel, and hidden while a screen is up.
   - `screens/techscreen.py`: `TechScreen` (T; one instance for the life of the window, so the selected tech is kept):
     the grid is opaque, the idea modal is the same screen with the grid closed. It is on the stack while the grid is open
     or idea cards are pending: the idea cards are game state, not a click, so `app.tech.sync(app)` runs in `handle()`,

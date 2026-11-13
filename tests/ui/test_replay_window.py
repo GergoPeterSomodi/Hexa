@@ -251,13 +251,12 @@ class HoverAndSelectionTest(ReplayCase):
 
 
 class ShippedDefaultsTest(harness.UITestCase):
-    def test_seasons_with_the_shipped_options_go_through_the_reminders_and_the_replay(self):
+    def test_seasons_with_the_shipped_options_go_through_the_task_flag_and_the_replay(self):
         from unittest import mock
         import play
         from hexa import settings
         from hexa.campaign import ai
         from hexa.campaign.app import CampaignApp
-        from hexa.campaign.screens.reminders import ReminderScreen
         from tests import SHIPPED_DEFAULTS
         settings.save(dict(SHIPPED_DEFAULTS))
         app = CampaignApp(play.TILES_DIR, "POR")
@@ -284,18 +283,14 @@ class ShippedDefaultsTest(harness.UITestCase):
             self.driver.run_for(frames, until)
             app.run()
         with mock.patch.object(ai, "run", run):
-            loop(6, (1, harness.key("space")))
-            self.assertIsInstance(app.screens.top, ReminderScreen)
-            self.assertEqual(w.turn, 1)
-            loop(10, (1, harness.key("return")), until=lambda: w.turn == 2)
+            loop(10, (1, harness.key("space")), until=lambda: w.turn == 2)     # End season never asks
         self.assertEqual(w.turn, 2)
+        self.assertEqual(len(app.screens), 0)
         self.assertTrue(app.ui.replay.active, "the walk of the other country is being shown")
         loop(30, (1, harness.key("space")))                      # the first Space skips the replay
         self.assertFalse(app.ui.replay.active)
         self.assertEqual(w.turn, 2)
-        loop(6, (1, harness.key("space")))
-        self.assertIsInstance(app.screens.top, ReminderScreen)
-        loop(20, (1, harness.key("return")), until=lambda: w.turn == 3)
+        loop(20, (1, harness.key("space")), until=lambda: w.turn == 3)
         self.assertEqual(w.turn, 3)
 
 
