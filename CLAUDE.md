@@ -176,6 +176,12 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `world.py` reads geography only through `self.geo`, so any new attribute must exist on both sources, or be
   read with a `getattr` default as `COLONIAL` and `FORCE_SEA` are. Distances in `data.py` scale with
   `geo.SCALE`.
+- **State classes** (`hexa/campaign/state.py`): `Province`, `Market`, `Route`, `Country`, `Unit`, `Garrison`, `War` and
+  `fill_defaults` (what `_migrate` uses to give an old save's objects the fields they lack). `world.py` re-exports the
+  names, so `from hexa.campaign.world import Province` still works. Saves pickle these classes by module and name, so
+  state.py pins each class's `__module__` to `hexa.campaign.world` (decision D5): a save made now still opens in a build
+  from before the split, and an old save opens now. Never drop that loop, and never rename a class (that needs a
+  `VERSION` bump); `tools/save_compat.py` checks both directions.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `CampaignWorld._prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `campaign/world.py`.
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of
