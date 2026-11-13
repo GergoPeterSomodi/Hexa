@@ -288,6 +288,7 @@ already planned. Principle numbers refer to `fun-principles.md`.
 ## 7. How Hexa scores today against the principles
 
 Honest view from the fun tests, the playtest and the docs. "Planned" names the fix already on the roadmap.
+Numbering is the v2 list of `fun-principles.md`. The owner's decisions on this study's proposals and on the principles are in `2026-11-13-creative-review.md` (end of the file).
 
 | # | Principle | Today | Why | Planned fix |
 |---|---|---|---|---|
@@ -301,11 +302,12 @@ Honest view from the fun tests, the playtest and the docs. "Planned" names the f
 | 8 | Setbacks are stories | partial | debt almost never happens; wars end by a timer | bankruptcy, war goals, rebels |
 | 9 | Remembered moments | weak | one-line battles today; log and floating text help | v0.2.0, events (Phase 3) |
 | 10 | A goal from the first season | weak | only the 1650 ranking; winning undecided | none yet (aims proposed) |
-| 11 | Readable at a glance | partial | top bar and province panel praised; war opaque | UI clean-up, battle panel |
-| 12 | Less clicking as you grow | partial | reminders, march R, re-pick (approved); late game not measured | T2 |
-| 13 | AI is a rival | weak | 78 to 88% of AI orders carry nothing; AI hoards; random war roll | T2, war goals |
-| 14 | Fun in the first 30 minutes | partial | the map and first season are pleasant; merchants hidden; no goal | T5 |
-| 15 | Feels like 1480 to 1650 | good | real map, ridges and passes, history battle cards, Chronicles | keep |
+| 11 | Readable and light to run (old 11 + 12) | partial | top bar and province panel praised; war opaque; reminders, march R, re-pick (approved); late-game clicks not measured, no click counter | UI clean-up, battle panel, T2, click counter |
+| 12 | AI is a rival (old 13) | weak | 78 to 88% of AI orders carry nothing; AI hoards; random war roll | T2, war goals |
+| 13 | Fun in the first 30 minutes (old 14) | partial | the map and first season are pleasant; merchants hidden; no goal | T5 |
+| 14 | Feels like 1480 to 1650 (old 15) | good | real map, ridges and passes, history battle cards, Chronicles | keep |
+| 15 | More than one way to play well (new) | not measured | no seeded run of trader, conqueror and coloniser yet; Low tax and tolls suggest one dominant line [H1, H2] | E2, E3, T4; a run once scoring is decided |
+| 16 | History told honestly (new, hard line) | not measured | no aim, score or achievement touches the subject yet; colonies and the West African coast come with later designs | check every aim, achievement and Chronicle blurb; triangle trade design |
 
 Reading it: Hexa is strong on look and period, and fair early. It is weak where the whole genre is weak: the late
 game, the AI and the goal. The weakest lines all have a drafted or approved fix except principle 10 (a goal), which
