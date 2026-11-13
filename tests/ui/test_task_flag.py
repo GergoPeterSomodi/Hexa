@@ -262,3 +262,55 @@ class OptionTest(FlagCase):
         self.assertFalse(settings.load()["reminders"])
         app.pause.press(app, ("option", "reminders"))
         self.assertTrue(settings.load()["reminders"])
+
+
+class ReviewFixesTest(FlagCase):
+    """One test per fix from the review of 0.2.1 item 3."""
+
+    def test_a_change_made_without_a_refresh_is_counted(self):
+        """The tech screen funds research, sets research or picks an idea without world.changed(): the lines follow."""
+        app = self.start()
+        self.run_loop(3)
+        self.assertIn("fund", self.kinds())
+        self.world.fund_research("POR")                 # no refresh, no version bump
+        self.run_loop(3)
+        self.assertNotIn("fund", self.kinds(), "the fund line went when the points were bought")
+        self.assertEqual(self.flag_label(), f"{len(self.tasks.lines(app))} thing{'' if len(self.tasks.lines(app)) == 1 else 's'} to do")
+
+    def test_the_wheel_over_the_list_or_the_flag_does_not_zoom_the_map(self):
+        import pygame
+        app = self.start()
+        self.click_flag()
+        zoom = app.view.zoom
+        for pos in (self.tasks.box.center, self.tasks.flag.center):
+            app.ui.mouse = pos
+            app.handle(pygame.event.Event(pygame.MOUSEWHEEL, x=0, y=1))
+            self.assertEqual(app.view.zoom, zoom, f"the wheel over {pos} zooms nothing")
+
+    def test_the_flag_hint_is_drawn_while_the_flag_is_known(self):
+        """draw_hint runs after the flag registered its button, so a hover over the flag can show its hint."""
+        app = self.start()
+        self.run_loop(3)
+        seen = []
+        real = app.draw_hint
+        app.draw_hint = lambda: (seen.append(any(b.action == ("tasks",) for b in app.ui.buttons)), real())[1]
+        app.ui.mouse = self.tasks.flag.center
+        app.draw()
+        self.assertTrue(seen and seen[-1], "the flag's button is registered before the hint is drawn")
+
+    def test_a_top_bar_click_with_the_list_open_still_presses_its_button(self):
+        self.start()
+        self.click_flag()
+        self.assertTrue(self.tasks.open)
+        self.run_loop(6, (1, lambda: click(harness.end_turn_rect(self.app).center)),
+                      until=lambda: self.world.turn == 2)
+        self.assertEqual(self.world.turn, 2, "End season worked with one click")
+        self.assertFalse(self.tasks.open)
+
+    def test_pressing_the_flag_action_toggles_and_the_refresh_after_it_keeps_the_list(self):
+        app = self.start()
+        self.run_loop(3)
+        app.press(("tasks",))
+        self.assertTrue(self.tasks.open)
+        app.draw()
+        self.assertTrue(self.tasks.open, "the refresh after the action does not close the list")

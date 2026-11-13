@@ -288,6 +288,7 @@ class CampaignApp:
             return
         if self.ui.replay.active:               # the moves are still being shown: a key skips them, a click waits
             return self.ui.replay.skip() if key else self.toast("The moves are still playing: Space skips them.")
+        self.hud.tasks.close()                  # End season never asks: the task flag shows what is left (hud/tasks.py)
         self.busy = True
         world.ensure_markets()
         self.draw()
@@ -491,7 +492,7 @@ class CampaignApp:
                 if worker:
                     self.press(("found", worker, False))
         elif event.type == pygame.MOUSEWHEEL:
-            if not self.hud.wheel(self, event.y) and (not self.panel_rect().collidepoint(ui.mouse) or not ui.panel):
+            if not self.hud.tasks.covers(ui.mouse) and not self.hud.wheel(self, event.y) and (not self.panel_rect().collidepoint(ui.mouse) or not ui.panel):
                 self.zoom(1 if event.y > 0 else -1, ui.mouse)
         elif event.type == pygame.MOUSEMOTION:
             ui.mouse = event.pos
@@ -794,8 +795,8 @@ class CampaignApp:
         self.hud.draw_top(self)
         if ui.panel:
             self.draw_panel()
+        self.hud.draw_tasks(self)               # before the hint, so a hover over the flag shows its hint
         self.draw_hint()
-        self.hud.draw_tasks(self)
         if self.player is None:
             self.draw_choose_banner()
         if self.busy:

@@ -38,18 +38,20 @@ class Tasks:
 
     # ----- what is to do -------------------------------------------------------------------------------
     def lines(self, ctx):
-        """The unfinished things of the player, cached per world.version (and turn and country)."""
-        world = ctx.world
-        key = (world.version, world.turn, ctx.player)
+        """The unfinished things of the player, cached until something they depend on changes: the world's version and
+        turn, and the country's research, idea cards, treasury and funding (the tech screen changes these without a
+        world.changed(), so they are part of the key too)."""
+        world, tag = ctx.world, ctx.player
+        c = world.countries[tag]
+        key = (world.version, world.turn, tag, c.researching, c.research, len(c.pending_ideas), c.treasury,
+               c.memory.get("funded_turn"), len(c.techs))
         if self.cache is None or self.cache[0] is not world or self.cache[1] != key:
-            self.cache = (world, key, reminders.unfinished(world, ctx.player))
+            self.cache = (world, key, reminders.unfinished(world, tag))
         return self.cache[2]
 
     def forget(self):
-        """A player action or a season went through the window: the lines are worked out again on the next frame, and
-        the list closes (it is about what was left before)."""
+        """The window refreshed (a player action or a season): the lines are worked out again on the next frame."""
         self.cache = None
-        self.open = False
 
     # ----- the state of the list -----------------------------------------------------------------------
     def toggle(self):
@@ -92,7 +94,7 @@ class Tasks:
                     return True
             return True
         self.open = False
-        return True
+        return pixel[1] >= ctx.view_rect().y        # a click on the top bar closes the list and still does its job
 
     # ----- drawing -------------------------------------------------------------------------------------
     def draw(self, ctx):
