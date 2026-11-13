@@ -66,7 +66,7 @@ class BoundedCacheTest(unittest.TestCase):
 
 class NoLooseCachesTest(unittest.TestCase):
     """The art modules keep what they draw in registered BoundedCaches: no module-level dict or lru_cache of their own."""
-    MODULES = ("art", "wfctiles", "goodsart", "goodsobjects", "life", "nature", "landscape", "landmarks")
+    MODULES = ("art", "wfctiles", "goodsart", "goodsobjects", "life", "nature", "landscape", "landmarks", "hud/siegebadge")
 
     def test_no_module_level_dict_caches(self):
         here = os.path.dirname(os.path.abspath(__file__))

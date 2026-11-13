@@ -4,6 +4,7 @@
     tasks.py      the task flag under End season and its list of unfinished things (``campaign/reminders`` says what)
     floating.py   ribbons that rise from the hex where something happened (``feed`` says what)
     battles.py    the battle marks on the map: the crossed-swords badge and the front-line bar (``battleview`` says what)
+    siegebadge.py the siege badge sprite (a gate tower in an amber dial ring), drawn from numbers the caller gives
     actionlog.py  the collapsible log in the bottom-left corner (``feed`` has its lines)
     style.py      the colour and icon of each of the six kinds of event, shared by the ribbons and the log
 
