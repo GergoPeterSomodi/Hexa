@@ -22,36 +22,40 @@ OFFS = [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, -2), (-2, 2), (2, 2)]   
 OFFS_THIN = [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, -1), (-1, 1), (1, 1)]
 
 
-def _w(w):
-    return 0 if not w else max(1, round(w * K))
-
-
 class Pen:
-    """Draws in tile coordinates on a K x surface."""
+    """Draws in tile coordinates on a surface k x (K = 2) the size of the tile."""
 
-    def __init__(self, surf):
-        self.s = surf
+    def __init__(self, surf, k=K):
+        self.s, self.k = surf, k
+
+    def _w(self, w):
+        return 0 if not w else max(1, round(w * self.k))
 
     def poly(self, c, pts, w=0):
         if len(pts) > 2:
-            pygame.draw.polygon(self.s, c, [(x * K, y * K) for x, y in pts], _w(w))
+            k = self.k
+            pygame.draw.polygon(self.s, c, [(x * k, y * k) for x, y in pts], self._w(w))
 
     def circle(self, c, xy, r, w=0):
-        pygame.draw.circle(self.s, c, (xy[0] * K, xy[1] * K), max(0.5, r * K), _w(w))
+        k = self.k
+        pygame.draw.circle(self.s, c, (xy[0] * k, xy[1] * k), max(0.5, r * k), self._w(w))
 
     def ellipse(self, c, x, y, w, h, wd=0):
-        pygame.draw.ellipse(self.s, c, pygame.Rect(round(x * K), round(y * K), max(1, round(w * K)),
-                                                   max(1, round(h * K))), _w(wd))
+        k = self.k
+        pygame.draw.ellipse(self.s, c, pygame.Rect(round(x * k), round(y * k), max(1, round(w * k)),
+                                                   max(1, round(h * k))), self._w(wd))
 
     def oval(self, c, cx, cy, rx, ry, wd=0):
         self.ellipse(c, cx - rx, cy - ry, rx * 2, ry * 2, wd)
 
     def line(self, c, a, b, w=1):
-        pygame.draw.line(self.s, c, (a[0] * K, a[1] * K), (b[0] * K, b[1] * K), max(1, round(w * K)))
+        k = self.k
+        pygame.draw.line(self.s, c, (a[0] * k, a[1] * k), (b[0] * k, b[1] * k), max(1, round(w * k)))
 
     def lines(self, c, pts, w=1, closed=False):
         if len(pts) > 1:
-            pygame.draw.lines(self.s, c, closed, [(x * K, y * K) for x, y in pts], max(1, round(w * K)))
+            k = self.k
+            pygame.draw.lines(self.s, c, closed, [(x * k, y * k) for x, y in pts], max(1, round(w * k)))
 
     def band(self, c, pts, w):
         """A thick polyline with round joints (rivers, tracks, walls)."""
@@ -60,8 +64,9 @@ class Pen:
             self.circle(c, (x, y), w / 2 - 0.25)
 
     def rect(self, c, x, y, w, h, wd=0, br=0):
-        pygame.draw.rect(self.s, c, pygame.Rect(round(x * K), round(y * K), max(1, round(w * K)),
-                                                max(1, round(h * K))), _w(wd), round(br * K))
+        k = self.k
+        pygame.draw.rect(self.s, c, pygame.Rect(round(x * k), round(y * k), max(1, round(w * k)),
+                                                max(1, round(h * k))), self._w(wd), round(br * k))
 
 
 def ell(cx, cy, rx, ry, a0=0, a1=360, n=36):

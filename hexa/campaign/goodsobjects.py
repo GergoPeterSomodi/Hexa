@@ -15,7 +15,9 @@ import math
 import pygame
 
 from .art import shade
+from .render import draw
 from .render.cache import BoundedCache
+from .render.draw import ell
 
 W, H = 120, 140
 CX, GY = 60, 100                 # object centre line and ground line
@@ -39,15 +41,11 @@ def _w(w):
     return max(1, round(w * K))
 
 
-class Pen:
-    """Draws in tile coordinates on the K x canvas. `shape`, `disc` and `egg` add the darker part edge."""
+class Pen(draw.Pen):
+    """The shared pen on the K x canvas. `shape`, `disc` and `egg` add the darker part edge."""
 
     def __init__(self, surf):
-        self.s = surf
-
-    def poly(self, c, pts, w=0):
-        if len(pts) > 2:
-            pygame.draw.polygon(self.s, c, [(x * K, y * K) for x, y in pts], 0 if not w else _w(w))
+        super().__init__(surf, K)
 
     def stroke(self, c, pts, w=EDGE, closed=True):
         """A thick polyline with round joints (pygame leaves gaps at the joints of wide lines)."""
@@ -69,17 +67,9 @@ class Pen:
     def lines(self, c, pts, w=1.0):
         self.stroke(c, pts, w, closed=False)
 
-    def circle(self, c, xy, r, w=0):
-        pygame.draw.circle(self.s, c, (xy[0] * K, xy[1] * K), max(0.5, r * K), 0 if not w else _w(w))
-
     def disc(self, c, xy, r, edge=None, w=EDGE):
         self.circle(edge or shade(c, -0.38), xy, r + w / 2)
         self.circle(c, xy, r - w / 2)
-
-    def oval(self, c, cx, cy, rx, ry, w=0):
-        rect = pygame.Rect(round((cx - rx) * K), round((cy - ry) * K), max(1, round(2 * rx * K)),
-                           max(1, round(2 * ry * K)))
-        pygame.draw.ellipse(self.s, c, rect, 0 if not w else _w(w))
 
     def egg(self, c, cx, cy, rx, ry, edge=None, w=EDGE):
         self.oval(edge or shade(c, -0.38), cx, cy, rx + w / 2, ry + w / 2)
@@ -87,12 +77,6 @@ class Pen:
 
 
 # ----- geometry helpers -------------------------------------------------------------------------------------
-def ell(cx, cy, rx, ry, a0=0, a1=360, n=36):
-    """Points on an ellipse from angle a0 to a1 (degrees; 0 = right, 90 = down)."""
-    return [(cx + rx * math.cos(math.radians(a0 + (a1 - a0) * i / n)),
-             cy + ry * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
-
-
 def rot(pts, x, y, ang):
     """Local points rotated by ang degrees (clockwise on screen) and moved to (x, y)."""
     c, s = math.cos(math.radians(ang)), math.sin(math.radians(ang))
@@ -101,10 +85,6 @@ def rot(pts, x, y, ang):
 
 def rell(cx, cy, rx, ry, ang, n=20):
     return rot(ell(0, 0, rx, ry, 0, 360, n), cx, cy, ang)
-
-
-def mix(c1, c2, t):
-    return tuple(int(a + (b - a) * t) for a, b in zip(c1, c2))
 
 
 # ----- shared parts -----------------------------------------------------------------------------------------
