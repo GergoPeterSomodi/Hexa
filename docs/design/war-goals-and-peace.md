@@ -72,6 +72,8 @@ The side with the positive net can spend that net on peace terms. A side at zero
 
 Reading it: an attacker holds a city (15) and 6 empty hexes (6) and won two battles (8): gross 29. The defender holds 4 of the attacker's empty hexes and won one battle (5): gross 9. Net is +20 for the attacker.
 
+- (2026-11-13) `battle_ended` also carries `name` ("Battle of X") and `year`, for the log and the peace screen.
+
 ### 3.4 Battles and the war score
 
 The battle system (v0.2.0) leaves war score out of the battle code on purpose. This design reads **one event** at the end of each battle, `battle_ended`, and the battle build must emit it with these fields: the two tags, the hex, the **winner** (the side whose army did not break or withdraw; a draw has no winner, how `stalemate`, `peace` or `gone`), men **killed** and **wounded** per side, and whether the fight was a castle assault. Rules:
