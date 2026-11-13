@@ -339,9 +339,11 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
   **lanes** (left, centre, right; the right lane is closed on mountains, marsh, jungle and snow). The rest of the army is
   the reserve, and guns of the back line fire at the enemy centre. A lane that empties is refilled from the reserve:
   cavalry to the flanks, infantry to the centre. A flank with no enemy in front comes round for a bonus. Terrain, castles,
-  veterans, generals and pikes against horse count as they do in any fight. An army under 25% morale **breaks**: the
-  winner pursues it. The beaten army **retreats** to the nearest hex of its country within 3 hexes, or **surrenders** when
-  there is none. A battle that lasts **6 seasons** ends with the weaker army withdrawing, so no two armies stay locked for
+  veterans, generals and pikes against horse count as they do in any fight. An attack that comes **across a mountain
+  pass** deals 30% less damage on its first day, and an attacker from **lower ground** deals 10% less all battle. An army
+  under 25% morale **breaks**: the winner pursues it. The beaten army **retreats** to the nearest hex of its country within
+  3 hexes, or **surrenders** when there is none. A side whose last regiment or garrison is destroyed in the fight loses (the
+  other side wins); a side that vanishes between seasons (deserted, starved, disbanded, at peace) is a draw. A battle that lasts **6 seasons** ends with the weaker army withdrawing, so no two armies stay locked for
   long. Peace ends the battles of the two countries with no pursuit. Battles have names: "Battle of Toro, 1480", and
   "Second Battle of Toro, 1481" for a repeat on the same place.
 - **In battle:** a stack cannot move, raise troops, refit, drill or heal. It still eats, and it can forage. A regiment under
@@ -356,6 +358,8 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | An army under this morale breaks | 25% |
 | Pursuit of a broken army (cavalry on the winning side / on foot) | 10% / 4% of its men |
 | Pursuit of a withdrawing army | 5% of its men |
+| Damage an attack loses crossing a mountain pass (first day only) | 30% |
+| Damage an attacker loses fighting from lower ground (all battle) | 10% |
 | Wounded who come back when the battle ends in supply | half |
 | A beaten army's morale, at most | 30% |
 | Morale back a season outside battle | 25 points |

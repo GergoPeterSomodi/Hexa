@@ -6,9 +6,9 @@ The day's arithmetic is in combat.py; this module starts, orders, ends and recor
 Events: ``battle_started`` (a battle begins), ``battle_joined`` (a stack joins a side), ``battle_fought`` (once per
 battle per season, after its days) and ``battle_ended`` (once per battle, after it has left ``world.battles``). The
 ``battle_ended`` fields are the contract of docs/design/war-goals-and-peace.md section 3.4 (hexa/events.py lists them).
-How a battle ends: "broke", "withdrew" or "surrendered" (a loser), "stalemate" (the safety stop with no retreat hex: a
-draw), "peace" and "gone" (a draw: peace, a vanished country, or a side with no units or garrison left). A draw has no
-winner and no loser, so it scores nothing.
+How a battle ends: "broke", "withdrew" or "surrendered" (a loser), "destroyed" (a side with no regiment or garrison left
+after a day of the fight: the other side wins, as the loser), "peace" and "gone" (a draw: peace, a country that vanished
+between seasons, or both sides destroyed on one day). A draw has no winner and no loser, so it scores nothing.
 
 Functions taking ``world``; World binds the public ones as facades. ``battle_season`` is the season's ``battles`` phase, the
 first of PHASES (season.py). A battle is named when it starts (decision 5): "Battle of X, 1525", "Second Battle of X,
@@ -17,11 +17,11 @@ first of PHASES (season.py). A battle is named when it starts (decision 5): "Bat
 import math
 
 from ...hexgrid import distance, neighbors, within
-from ..data import (ATTACK_MORALE, BATTLE_LOG, BATTLE_MAX_SEASONS, DAYS_PER_SEASON, RETREAT_MORALE, RETREAT_RANGE,
-                    START_YEAR, TERRAIN, WITHDRAW_PURSUIT, WOUNDED_RETURN)
+from ..data import (ATTACK_MORALE, BATTLE_LOG, BATTLE_MAX_SEASONS, DAYS_PER_SEASON, ELEVATION, RETREAT_MORALE,
+                    RETREAT_RANGE, START_YEAR, TERRAIN, WITHDRAW_PURSUIT, WOUNDED_RETURN)
 from ..naming import is_wild
 from ..state import Battle
-from . import combat, military, movement
+from . import combat, military, movement, terrain
 from .combat import army_morale
 
 # What this module changes: the battles, the units (position, hp, morale, experience; the dead are removed), the
@@ -168,7 +168,7 @@ def engage(world, group, pos):
     if defender is None:
         _overrun(world, group, pos)
         return True
-    return _start(world, group, pos, defender)
+    return _start(world, group, pos, defender, stand)
 
 
 def _year(turn):
@@ -203,14 +203,30 @@ def _battle_name(world, pos):
     return f"{title} of {base}, {_year(world.turn)}"
 
 
-def _start(world, group, pos, defender):
-    """A new battle on pos for a stack that now stands there (see engage). Both sides are deployed."""
+def _crosses_pass(world, a, b):
+    """Whether the step from a to b goes through a mountain pass (an open pass edge of the geography, not a ridge)."""
+    edge = frozenset((a, b))
+    return any(e == edge for _, _, e, _ in terrain.pass_edges(world))
+
+
+def _uphill(world, stand, pos):
+    """Whether the stand hex is lower ground than the battle hex (ELEVATION of the two terrains, spec 3.4)."""
+    if stand == pos:
+        return False
+    low, high = world.provinces[stand].terrain, world.provinces[pos].terrain
+    return ELEVATION.get(low, 0) < ELEVATION.get(high, 0)
+
+
+def _start(world, group, pos, defender, stand):
+    """A new battle on pos for a stack that now stands there (see engage). Both sides are deployed. The attack's ground
+    (crossing a pass, coming up from lower ground) is kept on the battle for the day rules."""
     owner = group[0].owner
     prov = world.provinces[pos]
     assault = prov.controller == defender and prov.castle > 0 and prov.garrison > 0
     name = _battle_name(world, pos)
+    crossing = stand != pos and _crosses_pass(world, stand, pos)
     battle = Battle(pos=pos, attacker=owner, defender=defender, start=world.turn, assault=assault, name=name,
-                    stance={owner: "attack", defender: "hold"})
+                    stance={owner: "attack", defender: "hold"}, crossing=crossing, uphill=_uphill(world, stand, pos))
     battle.members = {u.id for u in world.units_at(pos) if u.owner in (owner, defender)} | {u.id for u in group}
     world.battles.append(battle)
     combat.deploy(world, battle)
@@ -402,7 +418,7 @@ def _storm(world, battle, loser, how, had_field):
     With no field units the garrison is the whole army (spec 3.6.5, decision 2026-11-13): its break stores the castle.
     With field units, the castle holds while its garrison has men and morale. True if stormed."""
     prov = world.provinces[battle.pos]
-    if loser != battle.defender or not battle.assault or how not in ("broke", "surrendered"):
+    if loser != battle.defender or not battle.assault or how not in ("broke", "surrendered", "destroyed"):
         return False
     if had_field and prov.garrison > 0 and battle.garrison_morale > 0:
         return False
@@ -414,7 +430,8 @@ def _storm(world, battle, loser, how, had_field):
 def end_battle(world, battle, how, loser=None, pursuit=True):
     """End a battle (spec 3.6). ``how``: "broke" (the loser's army broke on a day; the pursuit was on that day), "withdrew"
     (the loser withdrew: on its order, or at the safety stop, which passes pursuit=False: half pursuit, or none, then the
-    retreat), "peace" or "gone" (a draw: no loser, no pursuit, no retreat). A side with no retreat hex surrenders after
+    retreat), "destroyed" (the loser has no regiment or garrison left after a day: no retreat, the kills are already
+    booked), "peace" or "gone" (a draw: no loser, no pursuit, no retreat). A side with no retreat hex surrenders after
     "broke" or "withdrew". The winner's survivors gain experience when the battle had days (the loser's survivors less);
     the wounded come back in supply; a stormed castle goes to the attacker; the battle leaves world.battles, and then
     battle_ended is emitted once. ("stalemate" is no longer an end: decision 7 makes the stop a withdrawal.)"""
@@ -460,8 +477,9 @@ def _shakier(world, battle):
 
 
 def _fight_season(world, battle):
-    """One battle's season: a side with nothing left ends it (a draw); withdrawals take effect next; then up to
-    DAYS_PER_SEASON days (a side left with nothing ends it there too); then the safety stop."""
+    """One battle's season. A side with nothing left at its start has vanished between seasons: a draw ("gone"). A
+    withdrawal takes effect next. Then up to DAYS_PER_SEASON days: a side left with nothing after a day was destroyed in
+    the fight, so the other side wins ("destroyed"; both at once is "gone"). Then the safety stop."""
     att, dfn = battle.attacker, battle.defender
     if not (_present(world, battle, att) and _present(world, battle, dfn)):
         end_battle(world, battle, "gone")
@@ -471,19 +489,21 @@ def _fight_season(world, battle):
         end_battle(world, battle, "withdrew", withdrawing[0] if len(withdrawing) == 1 else _shakier(world, battle))
         return
     before = {tag: (battle.killed.get(tag, 0.0), battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}
-    broke, days, gone = None, 0, False
+    broke, days = None, 0
     while days < DAYS_PER_SEASON and broke is None:
         broke = combat.fight_day(world, battle)["broke"]
         days += 1
         if not (_present(world, battle, att) and _present(world, battle, dfn)):
-            gone = True
             break
+    absent = [tag for tag in (att, dfn) if not _present(world, battle, tag)]
     world.bus.emit("battle_fought", att, battle.pos, defender=dfn, days=days,
                    morale={tag: army_morale(world, battle, tag) for tag in (att, dfn)},
                    killed={tag: round(battle.killed.get(tag, 0.0) - before[tag][0]) for tag in (att, dfn)},
                    wounded={tag: round(battle.wounded.get(tag, 0.0) - before[tag][1]) for tag in (att, dfn)})
-    if gone:
+    if len(absent) == 2:
         end_battle(world, battle, "gone")
+    elif absent:
+        end_battle(world, battle, "destroyed", absent[0])
     elif broke is not None:
         end_battle(world, battle, "broke", broke)
     elif _seasons(world, battle) >= BATTLE_MAX_SEASONS:

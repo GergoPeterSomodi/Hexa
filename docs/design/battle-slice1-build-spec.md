@@ -10,7 +10,8 @@ Attack / Hold / Withdraw, rout, retreat and surrender, castle assaults with the 
 the map badge, the battle panel, log lines and ribbons, the AI.
 
 **Not in scope (later slices):** cards, command points, the battle mini-map, lane ground from the real map,
-deployment presets, battle events, troop quality, reserve and cannon orders.
+deployment presets, battle events, troop quality, reserve and cannon orders. **Slice 3:** rivers (a crossing penalty
+for attacks over a river, and the river data it needs: rivers are not game data yet).
 
 **Replaces:** today's one-shot `war.battle()`. The old function is deleted in PR 4. Nothing keeps it alive.
 
@@ -196,6 +197,19 @@ Damage lands through `carry`: whole hit points come off `hp`, the rest waits. `W
 lost to fire and shock goes to `wounded_hp` (and, in men, to `wounded[tag]`). A unit at `hp <= 0` is killed with `world.kill(unit, "battle")`.
 The garrison loses `prov.garrison` the same way.
 
+**Ground (PR 5, owner idea 2026-11-13).** Both penalties cut only the attacker's damage dealt (the striker's `dealt`
+in `combat.hit`, every phase), never a defender's:
+- **Crossing a pass.** `engage` sets `Battle.crossing` when the stand hex and the battle hex are joined by a mountain pass
+  edge of the geography (`terrain.pass_edges`, not a ridge). On day 1 only (`battle.days == 0`) the attacker deals
+  `CROSSING_PENALTY` (30%) less.
+- **Uphill.** `engage` sets `Battle.uphill` when the stand hex is lower ground than the battle hex: `ELEVATION` (hills 1,
+  mountains and snow 2, other terrain 0). Plains to hills, anything to mountains, hills to mountains. The attacker deals
+  `UPHILL_PENALTY` (10%) less for the whole battle.
+- Joiners of the attacker's side get the same penalty (it is a side's ground, not a unit's).
+- **Terrain is not defender-only.** `defense_value` applies the hex's terrain defence to whichever side is struck, so an
+  attacker on a hill is protected by it too (measured: a hill cuts the damage to both sides by 27%). Making it
+  defender-only is a rules change, not a number: the owner decides (see the PR 5 report).
+
 ### 3.5 Orders
 
 - `battle_order_check(world, pos, tag, stance) -> (ok, reason)` and `battle_order(world, pos, tag, stance)`. A new
@@ -213,8 +227,11 @@ The garrison loses `prov.garrison` the same way.
 ### 3.6 The end of a battle
 
 A battle ends when a side breaks, withdraws, has no war units (and no garrison) left, at the safety stop, or when
-peace is made or a side's country disappears. A side with nothing left on the hex ends it as `gone`: a draw, no winner,
-no loser, no score. Routed regiments still count as present. In an assault the garrison counts as present while it has hp.
+peace is made or a side's country disappears. A side that is destroyed in the fight (no regiment and no garrison left
+after a day: fire, shock, pursuit) ends it as `destroyed`: the other side wins, the destroyed side loses, and it gets the
+winner's experience. `gone` is only a side that vanished between seasons (desertion, starvation, disbanding, peace): a
+draw, no winner, no loser, no score. If both sides are destroyed on one day it is `gone` too. Routed regiments still count
+as present. In an assault the garrison counts as present while it has hp.
 
 1. **Retreat.** `retreat_spot(world, group, pos)`: a walk over land from `pos`, at most `RETREAT_RANGE` (3 * SCALE)
    steps, that never crosses a wall (`world.walls()`: the ridge crests, and the mountain passes in winter), the sea or a
@@ -281,6 +298,13 @@ RETREAT_MORALE, MORALE_RECOVERY = 0.3, 0.25
 BATTLE_MAX_SEASONS = 6
 BATTLE_LOG = 24
 NARROW_TERRAIN = ("mountains", "marsh", "jungle", "snow")
+ELEVATION = {"hills": 1, "mountains": 2, "snow": 2}   # PR 5: height of the ground (others 0), for UPHILL_PENALTY
+CROSSING_PENALTY = 0.3       # PR 5: an attack across a mountain pass, first day
+UPHILL_PENALTY = 0.1         # PR 5: an attacker from lower ground, all battle
+AI_ATTACK_POWER = 1.1        # PR 5 (was 1.3): the AI attacks when its power x morale is this many times the defence's
+AI_STANCE_RATIO = 1.2        # PR 5: the AI's stance is Attack when its men x morale are this many times the enemy's
+AI_WITHDRAW_MORALE, AI_WITHDRAW_LEAD = 0.4, 0.15   # PR 5: the AI withdraws when its army morale is under the first and
+                                                   # the enemy's is at least the second higher, with a retreat hex
 ```
 
 A quick model of these rules (pikemen and knights at their era 1 values, open ground, attacker on Attack, defender
@@ -300,7 +324,8 @@ terrain, generals, ranks and supply, so PR 5 must measure the real thing.
 
 ## 5. The AI (`ai.py`)
 
-- **Attack.** `_campaign` keeps its rule: attack when our power is at least 1.3 times theirs. Power becomes
+- **Attack.** `_campaign` keeps its rule, now at `AI_ATTACK_POWER` = 1.1 times theirs (was 1.3; PR 5 tuning, see the
+  stats table in the PR report): attack when our power is at least that many times theirs. Power becomes
   `world.power(u) * u.morale`, and `_defence_power` adds an ongoing battle's side the same way. Bombard is removed (see 3.7); previously it stayed as
   today.
 - **Join.** Before looking for new targets, a stack with moves joins a battle of its own side within reach (an
@@ -324,15 +349,17 @@ Add to `CAMPAIGN_KINDS` and the docstring:
 | `battle_started` | attacker, hex | `defender`, `assault` |
 | `battle_joined` | joiner, hex | `side` ("attacker" or "defender"), `men` |
 | `battle_fought` | attacker, hex | `defender`, `days`, `morale` {tag: share}, `killed` {tag: men}, `wounded` {tag: men}; one per battle per season |
-| `battle_ended` | attacker, hex | `attacker`, `defender`, `winner` (tag, or None), `loser` (tag, or None), `assault` (bool), `how` ("broke", "withdrew", "surrendered", "stalemate", "peace", "gone"), `seasons`, `killed` {tag: men}, `wounded` {tag: men}, `retreat` (hex or None) |
+| `battle_ended` | attacker, hex | `attacker`, `defender`, `winner` (tag, or None), `loser` (tag, or None), `assault` (bool), `how` ("broke", "withdrew", "surrendered", "destroyed", "peace", "gone"), `seasons`, `killed` {tag: men}, `wounded` {tag: men}, `retreat` (hex or None) |
 
 `battle_ended` is a contract with the war goals design (`docs/design/war-goals-and-peace.md`, section 3.4),
 which turns it into war score. Its fields are fixed by that design:
 - the two tags (`attacker`, `defender`) and the hex (`pos`);
-- `winner`: the side whose army did not break and did not withdraw. A side that withdraws or surrenders loses. The
-  safety stop counts as a withdrawal of the lower side, so it has a winner (how "withdrew", no pursuit), unless that
-  side has no retreat hex: then it is a draw (how "stalemate"). Peace, a vanished country and a side left with nothing
-  (how "peace", "gone") are draws too. A draw has `winner = None` and `loser = None`: worth nothing;
+- `winner`: the side whose army did not break and did not withdraw. A side that withdraws, surrenders or is destroyed
+  (how "destroyed": no regiment or garrison left after a day) loses. The safety stop counts as a withdrawal of the
+  lower side, so it has a winner (how "withdrew", no pursuit), unless that side has no retreat hex: then the other side
+  withdraws, and when neither can, the battle goes on. Peace and a country that vanished between seasons (how "peace",
+  "gone") are draws, and so is a battle where both sides are destroyed on one day (how "gone"). A draw has
+  `winner = None` and `loser = None`: worth nothing;
 - `killed` and `wounded`: men per side for the whole battle, keyed by tag, pursuit and surrender included (a
   surrendered side's men count as killed);
 - `assault`: whether it was a castle assault.

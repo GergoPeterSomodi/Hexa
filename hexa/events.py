@@ -44,7 +44,7 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
     battle_fought     tag=attacker, pos  defender, days, morale {tag: share}, killed {tag: men}, wounded {tag: men};
                                          one per battle per season
     battle_ended      tag=attacker, pos  attacker, defender, winner, loser (tags; None for a draw: peace or gone score nothing),
-                                         assault, how ("broke", "withdrew", "surrendered", "peace" or "gone"), seasons,
+                                         assault, how ("broke", "withdrew", "surrendered", "destroyed", "peace" or "gone"), seasons,
                                          name, year, killed {tag: men}, wounded {tag: men}, retreat (hex or None). Once per
                                          battle, after it has left world.battles. A contract: docs/design/war-goals-and-peace.md 3.4
 

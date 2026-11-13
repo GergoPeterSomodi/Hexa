@@ -383,6 +383,12 @@ RETREAT_RANGE = 3 * SCALE                 # hexes a beaten side may retreat (bat
 BATTLE_MAX_SEASONS = 6                     # a battle this long ends with the lower army withdrawing (owner decision)
 BATTLE_LOG = 24                            # log lines kept per battle
 NARROW_TERRAIN = ("mountains", "marsh", "jungle", "snow")   # the right lane is closed: two lanes fight
+ELEVATION = {"hills": 1, "mountains": 2, "snow": 2}          # height of a battle's ground; other terrain is 0 (spec 3.4)
+CROSSING_PENALTY = 0.3                     # an attack across a mountain pass deals this much less damage on its first day
+UPHILL_PENALTY = 0.1                       # an attacker from lower ground deals this much less damage for the whole battle
+AI_ATTACK_POWER = 1.1                      # the AI attacks a hex when its power times morale is this many times the defence's (PR 5: was 1.3; see the battle stats, docs/design/battle-slice1-build-spec.md 4)
+AI_STANCE_RATIO = 1.2                      # the AI's battle stance: Attack when its men times morale are this many times the enemy's
+AI_WITHDRAW_MORALE, AI_WITHDRAW_LEAD = 0.4, 0.15   # the AI withdraws when its army morale is under the first, the enemy's this much higher
 RESEARCH_BASE = 0.6                        # research points per season, plus burghers / 40
 RESEARCH_FUND = (60, 15)                   # ducats -> research points
 

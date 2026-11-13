@@ -76,11 +76,12 @@ Reading it: an attacker holds a city (15) and 6 empty hexes (6) and won two batt
 
 ### 3.4 Battles and the war score
 
-The battle system (v0.2.0) leaves war score out of the battle code on purpose. This design reads **one event** at the end of each battle, `battle_ended`, and the battle build must emit it with these fields: the two tags, the hex, the **winner** (the side whose army did not break or withdraw; a draw has no winner, how `stalemate`, `peace` or `gone`), men **killed** and **wounded** per side, and whether the fight was a castle assault. Rules:
+The battle system (v0.2.0) leaves war score out of the battle code on purpose. This design reads **one event** at the end of each battle, `battle_ended`, and the battle build must emit it with these fields: the two tags, the hex, the **winner** (the side whose army did not break, withdraw or get destroyed; a draw has no winner, how `peace` or `gone`), men **killed** and **wounded** per side, and whether the fight was a castle assault. Rules:
 
 - The winner gets `BATTLE_SCORE_WIN` (2) + `BATTLE_SCORE_PER_1000` (1) per 1,000 enemy men killed + half that per 1,000 wounded.
 - At most `BATTLE_SCORE_CAP` (25) battle points per side per war, so a war of battles alone cannot buy a city.
-- A drawn or ongoing battle gives nothing: a draw has `winner` None (how `stalemate`, `peace` or `gone`), so no score is booked. A battle in the winner's own land counts the same.
+- A drawn or ongoing battle gives nothing: a draw has `winner` None (how `peace` or `gone`), so no score is booked. A battle in the winner's own land counts the same.
+- (2026-11-13) A side destroyed in the fight (how `destroyed`: no regiment or garrison left after a day) is the loser and the other side the winner, so the winner is booked. `gone` is a side that vanished between seasons (desertion, starvation, disbanding, peace): a draw.
 - Taking a castle by storm or siege is occupation, not battle points.
 - The war stores `battle_a` and `battle_b` (floats).
 

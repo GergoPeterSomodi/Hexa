@@ -7,7 +7,10 @@
     python -m tools.perf --list                 the metrics and their budgets
 
 A time is the CPU time of this process (time.process_time), so waiting for the disk or for other processes doesn't
-count; the median of the runs is compared with the metric's budget. Over the soft limit the table notes it; over the
+count, where that clock is fine enough: its resolution must be 1 ms or better (Linux and macOS: 1 ns; CI runs Linux).
+Windows' process_time ticks every 15.6 ms, which is coarser than the 4 ms and 5 ms budgets, so there a metric is timed
+with time.perf_counter (wall clock, 100 ns). That also counts the time the process waited, so keep the machine idle.
+The clock in use is printed first. The median of the runs is compared with the metric's budget. Over the soft limit the table notes it; over the
 hard limit the run fails (exit status 1). Shared CI runners are slower and noisier than a desk machine, so the hard
 limits are at least 3 times what was measured when they were set. The table goes to the terminal and, as markdown,
 to $GITHUB_STEP_SUMMARY when that is set. The unit tests never time anything: only this tool does.
@@ -43,12 +46,36 @@ class Skip(Exception):
 
 
 # ----- the metrics ----------------------------------------------------------------------------------------------------
+def _tick():
+    """The smallest step process_time shows, measured by spinning until it changes. get_clock_info can say 100 ns where
+    the clock only ticks every 15.6 ms (Windows, Python 3.13), so the reported resolution is not trusted alone."""
+    limit = time.perf_counter() + 0.5
+    start = time.process_time()
+    while time.perf_counter() < limit:
+        now = time.process_time()
+        if now != start:
+            return now - start
+    return float("inf")
+
+
+def _clock():
+    """The clock a metric is timed with (see the docstring): process_time where it ticks in 1 ms or finer steps, else
+    perf_counter. Returns (name, function)."""
+    step = max(time.get_clock_info("process_time").resolution, _tick())
+    if step <= 1e-3:
+        return "process_time", time.process_time
+    return "perf_counter", time.perf_counter
+
+
+CLOCK_NAME, CLOCK = _clock()
+
+
 def _cpu(action):
-    """CPU seconds that action() takes."""
+    """Seconds that action() takes on CLOCK (CPU seconds where the clock allows it)."""
     gc.collect()
-    started = time.process_time()
+    started = CLOCK()
     action()
-    return time.process_time() - started
+    return CLOCK() - started
 
 
 def _world_module():
@@ -391,6 +418,7 @@ def main(argv=None, out=print):
             parser.error(f"--only: no metric {', '.join(unknown)} (there are {', '.join(METRICS)})")
     if args.runs < 1:
         parser.error("--runs: at least 1")
+    out(f"clock: {CLOCK_NAME} ({'CPU seconds' if CLOCK_NAME == 'process_time' else 'wall seconds: process_time ticks too coarsely here'})")
     results = measure(names, args.runs, budget, require_pygame=os.environ.get(REQUIRE_VAR) == "1", out=out)
     memory, rows = None, []
     if not args.no_memory and not args.only:

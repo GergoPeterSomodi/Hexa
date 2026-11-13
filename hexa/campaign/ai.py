@@ -9,7 +9,8 @@ from collections import deque
 from ..hexgrid import distance, neighbors
 from . import geo, tech
 SCALE = geo.SCALE
-from .data import (BUILDINGS, CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GOODS,
+from .data import (AI_ATTACK_POWER, AI_STANCE_RATIO, AI_WITHDRAW_LEAD, AI_WITHDRAW_MORALE, ATTACK_MORALE, BUILDINGS,
+                   CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GOODS,
                    MANUFACTORIES, MANUFACTORY_TAX, UNIT_KINDS, troop,
                    SETTLEMENT_TAX, WORKS, WORKS_BONUS)
 
@@ -38,6 +39,7 @@ def run(world, tag):
     else:
         for _ in range(1 + int(country.treasury > 1500) + int(country.treasury > 4000)):
             _build(world, tag)
+    _battles(world, tag)
     _army(world, tag, distressed)
     if not distressed:
         _invest(world, tag)
@@ -316,21 +318,84 @@ def _gather(world, tag, stack):
     world.move_toward_group(stack, capital)
 
 
+def _force(world, units):
+    """Fighting power times morale, summed over units (spec 5): a shaken army is worth less."""
+    return sum(world.power(u) * u.morale for u in units)
+
+
 def _defence_power(world, pos):
-    power = world.stack_power(world.units_at(pos))
+    """The defence of a hex: the force of every unit on it (a battle's two sides included, each at its morale) and the
+    garrison of a castle."""
+    power = _force(world, world.units_at(pos))
     prov = world.provinces.get(pos)
     if prov and prov.castle and prov.garrison > 0:
         power += (3 + GARRISON_DEFENSE + 2 * prov.castle) / 2 * prov.garrison / (prov.castle * GARRISON_HP) * 1.5
     return power
 
 
+def _shaken(stack):
+    """Whether the stack's average war regiment is under ATTACK_MORALE: such a stack does not attack (spec 5)."""
+    wars = [u for u in stack if u.kind.war]
+    return bool(wars) and sum(u.morale for u in wars) / len(wars) < ATTACK_MORALE
+
+
+def _side_enemy(battle, tag):
+    return battle.defender if tag == battle.attacker else battle.attacker
+
+
+def _battles(world, tag):
+    """The stances of the battles this country is in, once a season, before its armies move (spec 5). A defender in a
+    castle assault always holds. Otherwise the side withdraws when its army is beaten (under AI_WITHDRAW_MORALE, the enemy
+    at least AI_WITHDRAW_LEAD higher) and a retreat hex exists; it attacks when its men times morale are at least
+    AI_STANCE_RATIO times the enemy's; else it holds. A withdrawal with no retreat hex falls back to the other stances."""
+    for battle in sorted(world.battles, key=lambda b: b.pos):
+        if tag not in (battle.attacker, battle.defender):
+            continue
+        world.battle_order(battle.pos, tag, _stance(world, battle, tag, _side_enemy(battle, tag)))
+
+
+def _stance(world, battle, tag, enemy):
+    if tag == battle.defender and battle.assault:
+        return "hold"
+    mine, theirs = world.army_morale(battle, tag), world.army_morale(battle, enemy)
+    if mine < AI_WITHDRAW_MORALE and theirs >= mine + AI_WITHDRAW_LEAD and             world.battle_order_check(battle.pos, tag, "withdraw")[0]:
+        return "withdraw"
+    if _battle_men(world, battle, tag) >= AI_STANCE_RATIO * _battle_men(world, battle, enemy):
+        return "attack"
+    return "hold"
+
+
+def _battle_men(world, battle, tag):
+    """A side's men times its army morale (its men in the battle, shaken ones counting less)."""
+    return world.army_morale(battle, tag) * battle.men0.get(tag, 0)
+
+
+def _join(world, tag, battle):
+    """Whether a stack joins its side's battle (spec 5): when the side's army morale is not higher than the enemy's, or
+    it has fewer men."""
+    enemy = _side_enemy(battle, tag)
+    return (world.army_morale(battle, tag) <= world.army_morale(battle, enemy)
+            or battle.men0.get(tag, 0) < battle.men0.get(enemy, 0))
+
+
 def _campaign(world, tag, stack, enemies):
-    ours = world.stack_power(stack)
+    if _shaken(stack):
+        _gather(world, tag, stack)                  # a beaten army goes home to recover, it does not attack
+        return
+    options = world.attack_options_group(stack)
+    for pos in sorted(options):                      # joining a battle of our side wins over a new attack (spec 5)
+        battle = world.battle_at(pos)
+        if battle is not None and _join(world, tag, battle):
+            world.attack_group(stack, pos)
+            return
+    ours = _force(world, stack)
     best = None
-    for pos in world.attack_options_group(stack):
+    for pos in options:
+        if world.battle_at(pos) is not None:         # a battle hex is a join only (above)
+            continue
         theirs = _defence_power(world, pos)
         ratio = ours / max(1.0, theirs)
-        if ratio >= 1.3:
+        if ratio >= AI_ATTACK_POWER:
             value = ratio
             if best is None or value > best[0]:
                 best = (value, pos)

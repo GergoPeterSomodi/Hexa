@@ -29,7 +29,9 @@ SUITES = ("europe", "random")
 COUNTS = ("wars", "battles", "bombardments", "units_lost", "units_lost_battle", "surrenders", "provinces_sieged",
           "storms", "provinces_peace", "battle_lost_units", "battle_strength_hurt")
 MEN_COUNTS = ("men_killed", "men_wounded", "battles_ended", "battles_stopped", "battles_draw", "battle_wins_attacker",
-              "battle_wins_defender")
+              "battle_wins_defender", "battles_destroyed")
+ENDS = ("broke", "withdrew", "surrendered", "destroyed", "peace", "gone")     # battle_ended's "how", counted
+EVEN = (2 / 3, 3 / 2)            # an even battle: the attackers' men at the start are within these ratios of the defenders'
 
 
 def load_hexa(root):
@@ -44,12 +46,16 @@ def load_hexa(root):
 
 
 class Tally:
-    """Counts the events of one game. A bus tap: it never changes the game."""
+    """Counts the events of one game. A bus tap: it never changes the game. ``world`` gives the battle's men at its start
+    (battle_started is sent while the battle stands in world.battles)."""
 
-    def __init__(self, stop_seasons):
+    def __init__(self, stop_seasons, world=None):
         self.count = Counter()
         self.lengths = []
+        self.even_lengths = []
         self.stop_seasons = stop_seasons
+        self.world = world
+        self.even_at = {}          # pos -> whether the battle starts even (its men at the start)
 
     def __call__(self, event):
         kind, count = event.kind, self.count
@@ -57,6 +63,10 @@ class Tally:
             count["wars"] += 1
         elif kind == "battle_started":
             count["battles"] += 1
+            battle = self.world.battle_at(event.pos) if self.world is not None else None
+            if battle is not None:
+                men = [battle.men0.get(battle.attacker, 0), battle.men0.get(battle.defender, 0)]
+                self.even_at[event.pos] = bool(min(men) > 0 and EVEN[0] <= men[0] / men[1] <= EVEN[1])
         elif kind == "battle_ended":
             self.ended(event)
         elif kind == "unit_lost":
@@ -78,6 +88,12 @@ class Tally:
         seasons = event.get("seasons") or 0
         self.lengths.append(seasons)
         count["battles_ended"] += 1
+        how = event.get("how")
+        count[f"end_{how}"] += 1
+        if how == "destroyed":
+            count["battles_destroyed"] += 1
+        if self.even_at.pop(event.pos, False):
+            self.even_lengths.append(seasons)
         killed = sum((event.get("killed") or {}).values())
         wounded = sum((event.get("wounded") or {}).values())
         count["men_killed"] += round(killed)
@@ -95,19 +111,20 @@ class Tally:
 
 
 def play(mode, seed, seasons):
-    """One all-AI game; returns its counts, the lengths of its battles and the turn it ended on."""
+    """One all-AI game; returns its counts, the lengths of its battles, the lengths of its even battles and the turn it
+    ended on."""
     from hexa.campaign import ai
     from hexa.campaign.data import BATTLE_MAX_SEASONS
     from hexa.campaign.world import CampaignWorld
     world = CampaignWorld(seed, map="random") if mode == "random" else CampaignWorld(seed)
     world.player = None
-    tally = Tally(BATTLE_MAX_SEASONS)
+    tally = Tally(BATTLE_MAX_SEASONS, world)
     world.bus.tap(tally)
     for _ in range(seasons):
         for tag in list(world.countries):
             ai.run(world, tag)
         world.end_round()
-    return dict(tally.count), tally.lengths, world.turn
+    return dict(tally.count), tally.lengths, tally.even_lengths, world.turn
 
 
 def share(total, wars):
@@ -123,10 +140,11 @@ def p90(values):
 def summary(rows):
     """Totals over games, and per war: battles, units lost, provinces, and the battles' own measures."""
     total = Counter()
-    lengths = []
+    lengths, even = [], []
     for row in rows:
-        total.update({k: row["counts"].get(k, 0) for k in COUNTS + MEN_COUNTS})
+        total.update({k: row["counts"].get(k, 0) for k in COUNTS + MEN_COUNTS + tuple(f"end_{h}" for h in ENDS)})
         lengths += row["lengths"]
+        even += row.get("even_lengths", [])
     wars, battles = total["wars"], total["battles"]
     decided = total["battle_wins_attacker"] + total["battle_wins_defender"]
     casualties = total["men_killed"] + total["men_wounded"]
@@ -135,6 +153,9 @@ def summary(rows):
         "units_lost_per_war": share(total["units_lost"], wars),
         "provinces_per_war": share(total["provinces_sieged"] + total["provinces_peace"], wars),
         "battle_length_seasons": {"median": statistics.median(lengths), "p90": p90(lengths)} if lengths else None,
+        "even_battle_length_seasons": {"median": statistics.median(even), "p90": p90(even), "battles": len(even)}
+        if even else None,
+        "destroyed_share": share(total["battles_destroyed"], battles),
         "attacker_win_rate": round(total["battle_wins_attacker"] / decided, 3) if decided else None,
         "draw_rate": share(total["battles_draw"], battles),
         "stop_share": share(total["battles_stopped"], battles),
@@ -142,7 +163,7 @@ def summary(rows):
         "wounded_per_battle": share(total["men_wounded"], battles),
         "wounded_share": round(total["men_wounded"] / casualties, 3) if casualties else None,
     }
-    return {"totals": {k: total[k] for k in COUNTS + MEN_COUNTS}, "per_war": per_war}
+    return {"totals": {k: total[k] for k in COUNTS + MEN_COUNTS + tuple(f"end_{h}" for h in ENDS)}, "per_war": per_war}
 
 
 def run(root, seeds, seasons, quiet=False):
@@ -151,8 +172,9 @@ def run(root, seeds, seasons, quiet=False):
     for suite in SUITES:
         for seed in seeds:
             started = time.time()
-            counts, lengths, turn = play(suite, seed, seasons)
-            rows.append({"suite": suite, "seed": seed, "turn": turn, "counts": counts, "lengths": lengths})
+            counts, lengths, even, turn = play(suite, seed, seasons)
+            rows.append({"suite": suite, "seed": seed, "turn": turn, "counts": counts, "lengths": lengths,
+                         "even_lengths": even})
             if not quiet:
                 print(f"{suite:6} seed {seed:3}: {counts.get('wars', 0)} wars, {counts.get('battles', 0)} battles, "
                       f"{counts.get('units_lost', 0)} units lost ({time.time() - started:.1f} s)", flush=True)
@@ -170,7 +192,7 @@ def table(result):
         return f"{value:.3f}" if isinstance(value, float) else str(value)
 
     lines = ["| Measure | Value |", "|---|---|"]
-    for name in COUNTS + MEN_COUNTS:
+    for name in COUNTS + MEN_COUNTS + tuple(f"end_{h}" for h in ENDS):
         lines.append(f"| {name} (total) | {t[name]} |")
     for name, value in p.items():
         lines.append(f"| {name} | {f(value)} |")

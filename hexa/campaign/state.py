@@ -239,6 +239,8 @@ class Battle:
     log: list = field(default_factory=list)        # (turn, day, text); the last BATTLE_LOG lines
     members: set = field(default_factory=set)      # unit ids that have fought in it (start and joiners); each counts once
     name: str = ""                # "Battle of X, 1525", set when it starts (decision 5); "" for a battle made before names
+    crossing: bool = False        # the attack came across a mountain pass: CROSSING_PENALTY on the first day (spec 3.4)
+    uphill: bool = False          # the attacker stood on lower ground: UPHILL_PENALTY for the whole battle (spec 3.4)
 
 
 def fill_defaults(obj):

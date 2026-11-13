@@ -11,10 +11,10 @@ once; ``morale`` routs regiments and ``breaker`` names the army that breaks; ``p
 PR 3. A day writes only the battle object, unit ``hp`` and ``morale``, ``prov.garrison`` and the units it kills
 (``world.kill``). Imports point down: never world.py, ui, render or pygame.
 """
-from ..data import (BATTLE_LOG, BREAK, CASTLE_DEFENSE, FIGHT_ATTACK, FIGHT_DEFENSE, FIRE_LOSS, FLANK_BONUS, FRONT_DRAIN,
-                    GARRISON_MEN, GENERAL, GENERAL_BONUS, GENERAL_MORALE, HUNGER_DRAIN, MEN, MORALE_PER_LOSS,
-                    NARROW_TERRAIN, OPEN_GROUND, PIKES_VS_HORSE, PURSUIT, PURSUIT_FOOT, RESERVE_DRAIN, SHOCK_LOSS,
-                    SHOT_LOSS, STANCE, TERRAIN, WOUNDED_SHARE)
+from ..data import (BATTLE_LOG, BREAK, CASTLE_DEFENSE, CROSSING_PENALTY, FIGHT_ATTACK, FIGHT_DEFENSE, FIRE_LOSS,
+                    FLANK_BONUS, FRONT_DRAIN, GARRISON_MEN, GENERAL, GENERAL_BONUS, GENERAL_MORALE, HUNGER_DRAIN, MEN,
+                    MORALE_PER_LOSS, NARROW_TERRAIN, OPEN_GROUND, PIKES_VS_HORSE, PURSUIT, PURSUIT_FOOT, RESERVE_DRAIN,
+                    SHOCK_LOSS, SHOT_LOSS, STANCE, TERRAIN, UPHILL_PENALTY, WOUNDED_SHARE)
 from ..state import Garrison
 
 # The day writes only the battle object, unit hp and morale, prov.garrison and the units it kills.
@@ -190,6 +190,20 @@ class _Day:
         att, dfn = self.tags()
         return ((att, dfn), (dfn, att))
 
+    def ground(self, tag):
+        """The share of its damage a side keeps from the ground it attacks from (spec 3.4): an attacker that came up from
+        lower ground deals UPHILL_PENALTY less all battle, and one that came across a pass CROSSING_PENALTY less on the
+        first day (battle.days is 0 then). Defenders are never penalised."""
+        battle = self.battle
+        if tag != battle.attacker:
+            return 1.0
+        share = 1.0
+        if battle.uphill:
+            share *= 1 - UPHILL_PENALTY
+        if battle.crossing and battle.days == 0:
+            share *= 1 - CROSSING_PENALTY
+        return share
+
     def fight_of(self, tag):
         """The fight a side strikes in."""
         return self.fight if tag == self.battle.attacker else self.counter
@@ -223,7 +237,7 @@ class _Day:
         sa, st = self.side[key_of(attacker)], self.side[key_of(target)]
         att = attack_value(world, attacker, a_fight, self.gen[sa])
         dfn = defense_value(world, target, t_fight, self.prov, self.castle, attacker.kind.branch, self.gen[st])
-        dealt = STANCE.get(self.battle.stance.get(sa, "hold"), (1.0, 1.0))[0]
+        dealt = STANCE.get(self.battle.stance.get(sa, "hold"), (1.0, 1.0))[0] * self.ground(sa)
         taken = STANCE.get(self.battle.stance.get(st, "hold"), (1.0, 1.0))[1]
         strength = attacker.hp / max(1, attacker.kind.hp)
         return (base * target.kind.hp * att / max(dfn, 1e-9) * strength * dealt * taken * extra
