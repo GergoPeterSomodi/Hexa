@@ -6,14 +6,14 @@ import itertools
 import pickle
 import random
 
-from ..events import EventBus, passes_changed
+from ..events import EventBus
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, state, tech
 from .state import Unit, fill_defaults
-from .systems import (building, colonies, debt, economy, military, movement, research, supply, terrain, trade,
+from .systems import (building, colonies, debt, economy, military, movement, research, season, supply, terrain, trade,
                       war, worldgen)
-from .data import (GENERAL, GENERAL_TRAITS, UPGRADE_MAX, MANPOWER, SUPPLY_RANGE, WAGON_SEASONS, BUILDINGS, END_YEAR,
-                   PIONEER, START_YEAR, TERRAIN, WAR_LENGTH_AI, MANUFACTORIES, date)
+from .data import (GENERAL, GENERAL_TRAITS, UPGRADE_MAX, MANPOWER, SUPPLY_RANGE, WAGON_SEASONS, BUILDINGS, PIONEER,
+                   START_YEAR, TERRAIN, MANUFACTORIES, date)
 
 INF = float("inf")
 SCALE = geo.SCALE
@@ -117,7 +117,7 @@ class CampaignWorld:
         self._build_markets()
         worldgen.starting_units(self)
         for country in self.countries.values():
-            self._explore_home(country)
+            self.explore_home(country)
         self.economy()                   # first prices and incomes
         self.message(f"{date(1)}. The age of discovery begins.", notice="start")
         _remember_snapshot(key, pickle.dumps(self.save_state(), protocol=pickle.HIGHEST_PROTOCOL))
@@ -318,6 +318,13 @@ class CampaignWorld:
 
     def cargo(self, ship):
         return [u for u in self.units if u.carrier is ship]
+
+    def known_world(self):
+        """The hexes of the world every country knows at the start (the map's KNOWN_WORLD), worked out once. Lazy, so
+        a save from before it existed still loads; the cache is `_known_world` (in WORLD_DEFAULTS)."""
+        if getattr(self, "_known_world", None) is None:
+            self._known_world = {p for p in self.terrain if self.geo.KNOWN_WORLD(*geo.lonlat(p))}
+        return self._known_world
 
     def aboard(self):
         """{ship id: [units aboard]} in one pass over the units (what cargo() gives, for every ship at once)."""
@@ -714,111 +721,11 @@ class CampaignWorld:
         """Drop the cached list of fortified provinces (castles()), after a castle was lost or built."""
         self._castle_list = None
 
-    # ----- turns --------------------------------------------------------------------------
-    def start_units(self, tag):
-        for unit in self.units_of(tag):
-            unit.moves_left = self.unit_moves(unit)
-            unit.acted = unit.attacked = unit.upgraded = False
-            if unit.kind.war and unit.hp < unit.kind.hp and not unit.carrier and unit.supplied:
-                prov = self.provinces.get(unit.pos)
-                if prov and prov.owner == tag and prov.controller == tag:
-                    unit.hp = min(unit.kind.hp, unit.hp + (3 if prov.settlement >= 2 else 1))
-
-    def end_round(self):
-        """Everything that happens between seasons, after every country has moved."""
-        self.logistics()
-        self.sieges()
-        for conflict in list(self.wars):
-            if self.player in (conflict.a, conflict.b):
-                limit = WAR_LENGTH_AI * 2
-            else:
-                limit = WAR_LENGTH_AI
-            score = self.war_score(conflict.a, conflict.b)
-            if self.turn - conflict.start >= limit or (self.player not in (conflict.a, conflict.b) and abs(score) >= 5):
-                winner = conflict.a if score > 0 else conflict.b if score < 0 else "nobody"
-                self.peace(conflict.a, conflict.b,
-                           winner=winner if self.player not in (conflict.a, conflict.b) else None)
-        self.economy()
-        self.collect()
-        self._unpaid()
-        self.grow()
-        self._research()
-        self.check_alive()
-        was_winter = self.winter()
-        self.turn += 1
-        passes_changed(self, was_winter)
-        if self.year() > END_YEAR:
-            self.over = True
-        for tag in self.countries:
-            self.start_units(tag)
-        for prov in self.provinces.values():
-            prov.busy = False
-        for country in self.countries.values():
-            self._explore_home(country)
-        self.update_visibility()
-        self.changed()
-        if self.player:
-            c = self.countries[self.player]
-            self.message(f"{self.date()}. Treasury {c.treasury:.0f} ducats ({c.balance:+.1f} per season).", None,
-                         "treasury")
-
-    # ----- knowledge and sight ---------------------------------------------------------
-    def _explore_home(self, country):
-        if not country.explored:
-            if getattr(self, "_known_world", None) is None:
-                self._known_world = {p for p in self.terrain if self.geo.KNOWN_WORLD(*geo.lonlat(p))}
-            country.explored |= self._known_world
-            limit = self.geo.COASTAL_KNOWLEDGE.get(country.tag)
-            if limit is not None:
-                for pos in self.terrain:
-                    lon, lat = geo.lonlat(pos)
-                    if lat >= limit and lon > -19.5 and (
-                            self.is_sea(pos) or self.provinces.get(pos) and self.provinces[pos].coastal):
-                        country.explored.add(pos)
-        done = self.__dict__.setdefault("_explored_from", {}).setdefault(country.tag, set())
-        for prov in self.provinces_of(country.tag):
-            if prov.pos in done:
-                continue
-            done.add(prov.pos)
-            for p in within(prov.pos, SCALE):
-                if p in self.terrain:
-                    country.explored.add(p)
-
-    def see_from(self, unit, radius=None, refresh=True):
-        country = self.countries[unit.owner]
-        before = len(country.explored)
-        for p in within(unit.pos, radius or self.unit_sight(unit)):
-            if p in self.terrain:
-                country.explored.add(p)
-        if unit.owner == self.player and refresh:
-            if len(country.explored) != before:
-                self.changed()
-            self.update_visibility()
-
-    def update_visibility(self):
-        if not self.player:
-            self.visible = set(self.terrain)
-            return
-        seen = set()
-        for prov in self.provinces_of(self.player):
-            seen.update(within(prov.pos, 1))
-        for unit in self.units_of(self.player):
-            if unit.carrier is None:
-                seen.update(within(unit.pos, self.unit_sight(unit)))
-        new = {p for p in seen if p in self.terrain}
-        if new != self.visible:
-            self.visible = new
-            self.version += 1
-
-    # ----- scores ------------------------------------------------------------------------
-    def score(self, tag):
-        country = self.countries[tag]
-        if not country.alive:
-            return 0
-        pop = self.total_pop(tag)
-        colonial = sum(p.pop for p in self.colonies_of(tag))
-        return round(pop / 20 + max(0.0, country.balance) * 3 + colonial * 2 + max(0.0, country.treasury) / 50)
-
-    def ranking(self):
-        alive = [c for c in self.countries.values() if c.alive]
-        return sorted(alive, key=lambda c: -self.score(c.tag))
+    # ----- the season (systems/season.py): the phases, the turn's units, sight and scores --------------
+    end_round = season.end_round
+    start_units = season.start_units
+    explore_home = _explore_home = season.explore_home      # the old private name: tests/test_town_labels.py
+    see_from = season.see_from
+    update_visibility = season.update_visibility
+    score = season.score
+    ranking = season.ranking

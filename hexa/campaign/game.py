@@ -9,7 +9,7 @@ input, and calls this for everything else; tests and tools play seasons through 
     1. ``world.settle_preview()``   put back the incomes of the last real season (a tax preview may be on show)
        ``tracker.begin_season()``   the resource baseline (campaign/resources.py): the chips' deltas count from here
     2. ``ai.run`` for every country except the player's (``player_ai=True``: for the player's too)
-    3. ``world.end_round()``        logistics, sieges, war timeouts, economy, debt, growth, research, turn counter
+    3. ``world.end_round()``        the PHASES of systems/season.py: logistics, sieges, war timeouts, economy, debt, ... turn counter
        ``tracker.round_done()``     keep the incomes that season collected (the ducats hover card's lines)
     4. ``orders()``                 the caller's end-of-season orders hook (the app's march reminders)
     5. the autosave                 if one is due

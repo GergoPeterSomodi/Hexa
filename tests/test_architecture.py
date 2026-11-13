@@ -66,7 +66,6 @@ WORLD_MODULES = {"hexa.world", "hexa.colony.world", "hexa.campaign.world"}
 
 # ----- ALLOW: ONLY EVER SHRINK THESE -----------------------------------------------------------------------------
 ALLOW_MODULES = {
-    "hexa.campaign.world": 824,
     "hexa.campaign.goodsart": 2476,
     "hexa.campaign.wfctiles": 2375,
     "hexa.campaign.landscape": 2010,

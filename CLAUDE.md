@@ -161,8 +161,9 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `CampaignApp.end_turn(key, confirmed)` first lets a running movement replay block it (a key skips the replay) and the
   reminder list ask (see Screens), then draws its busy frame and delegates to it; tests play seasons through it
   (`tests/support/worlds.play_seasons`). The fixed order: `world.settle_preview()`, `ai.run(world, tag)` for every
-  non-player country, `world.end_round()` (logistics, sieges, war timeouts, economy, debt, growth, research, turn
-  counter), the caller's `orders` hook (the app's march reminders for `unit.goal` orders), the autosave if due,
+  non-player country, `world.end_round()` (walks the ordered `PHASES` table of `systems/season.py`: logistics, sieges, war timeouts, economy,
+  collect, debt, growth, research, extinction, turn, units, exploration, vision, redraw, report; `tests/test_season.py` pins the
+  names in order), the caller's `orders` hook (the app's march reminders for `unit.goal` orders), the autosave if due,
   `world.ensure_markets()`, and a `season_ended` event. Campaign AIs only know what their country has explored
   (`country.explored`). `world.player = None` makes everything visible, as in most tests.
   `tools/oracle_runner.py` and `tools/save_compat.py` keep their own season loops on purpose: they must run against
@@ -246,6 +247,13 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   plain class attributes (`at_war = war.at_war`); `at_war` and `enemies` are called from every supply and path search. The bodies and the
   bus events (`war_declared`, `peace_made`, `province_captured`, `battle`, `siege_progress`, `unit_lost`) are unchanged by the move.
   `forget_castles()` and `castles()` stay on the world (they own `_castle_list`).
+- **Season** (`systems/season.py`): `PHASES`, the one ordered table of (name, function) pairs that `end_round` runs, and the only place
+  the season's order is written (the game manager calls `world.end_round()`; to change the order, change the table and the pinned names in
+  `tests/test_season.py`). The phases name the functions of their systems (`supply.logistics`, `war.sieges`, `economy.collect`,
+  `debt.unpaid`, `economy.grow`, `research.research_season`, `war.check_alive`); `war_timeouts`, `run_economy` (the world method, which owns
+  the tax preview's `_settled`), `advance_turn`, `ready_units`, `explore_all`, `redraw` and `treasury_line` are small steps here. Vision and
+  scores live here too: `start_units`, `explore_home`, `see_from`, `update_visibility` (called for every step of a march), `score` and
+  `ranking`, all plain class-attribute facades. The known-world cache stays on the world behind `known_world()`.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of
