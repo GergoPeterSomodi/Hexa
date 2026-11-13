@@ -1,0 +1,161 @@
+{
+ "games": [
+  {
+   "counts": {
+    "battle_lost_units": 6,
+    "battle_strength_hurt": 72,
+    "battles": 11,
+    "provinces_peace": 11,
+    "provinces_sieged": 30,
+    "storms": 1,
+    "units_lost": 6,
+    "units_lost_battle": 6,
+    "wars": 5
+   },
+   "seed": 1,
+   "suite": "europe",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "provinces_peace": 0,
+    "wars": 2
+   },
+   "seed": 2,
+   "suite": "europe",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_lost_units": 7,
+    "battle_strength_hurt": 121,
+    "battles": 16,
+    "provinces_peace": 21,
+    "provinces_sieged": 55,
+    "storms": 2,
+    "units_lost": 26,
+    "units_lost_battle": 7,
+    "wars": 6
+   },
+   "seed": 3,
+   "suite": "europe",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_lost_units": 4,
+    "battle_strength_hurt": 51,
+    "battles": 5,
+    "provinces_peace": 15,
+    "provinces_sieged": 43,
+    "storms": 1,
+    "units_lost": 4,
+    "units_lost_battle": 4,
+    "wars": 5
+   },
+   "seed": 4,
+   "suite": "europe",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_lost_units": 8,
+    "battle_strength_hurt": 117,
+    "battles": 10,
+    "provinces_peace": 6,
+    "provinces_sieged": 26,
+    "storms": 2,
+    "units_lost": 27,
+    "units_lost_battle": 8,
+    "wars": 3
+   },
+   "seed": 1,
+   "suite": "random",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_lost_units": 34,
+    "battle_strength_hurt": 329,
+    "battles": 34,
+    "bombardments": 1,
+    "provinces_peace": 21,
+    "provinces_sieged": 79,
+    "storms": 1,
+    "units_lost": 44,
+    "units_lost_battle": 34,
+    "wars": 8
+   },
+   "seed": 2,
+   "suite": "random",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_lost_units": 13,
+    "battle_strength_hurt": 137,
+    "battles": 11,
+    "bombardments": 2,
+    "provinces_peace": 40,
+    "provinces_sieged": 92,
+    "storms": 1,
+    "units_lost": 17,
+    "units_lost_battle": 13,
+    "wars": 10
+   },
+   "seed": 3,
+   "suite": "random",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_lost_units": 20,
+    "battle_strength_hurt": 190,
+    "battles": 21,
+    "bombardments": 1,
+    "provinces_peace": 13,
+    "provinces_sieged": 44,
+    "storms": 1,
+    "units_lost": 35,
+    "units_lost_battle": 20,
+    "wars": 5
+   },
+   "seed": 4,
+   "suite": "random",
+   "turn": 41
+  }
+ ],
+ "per_war": {
+  "attacker_win_rate": null,
+  "battle_length_seasons": null,
+  "battles_per_war": 2.455,
+  "killed_share": null,
+  "provinces_per_war": 11.273,
+  "units_lost_per_war": 3.614,
+  "wounded_share": null
+ },
+ "seasons": 40,
+ "seeds": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "suites": [
+  "europe",
+  "random"
+ ],
+ "totals": {
+  "battle_lost_units": 92,
+  "battle_strength_hurt": 1017,
+  "battles": 108,
+  "bombardments": 4,
+  "provinces_peace": 127,
+  "provinces_sieged": 369,
+  "storms": 9,
+  "surrenders": 0,
+  "units_lost": 159,
+  "units_lost_battle": 92,
+  "wars": 44
+ }
+}

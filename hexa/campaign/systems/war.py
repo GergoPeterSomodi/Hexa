@@ -10,15 +10,21 @@ carries. The bus events (``war_declared``, ``peace_made``, ``province_captured``
 ``unit_lost``) and their order are the same as before the move. Imports point down: never world.py, ui, render or pygame.
 """
 from ...hexgrid import distance, neighbors, within
-from ..data import (CASTLE_DEFENSE, CASTLE_SIEGE, COUNTER, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP,
-                    GARRISON_REGEN, GENERAL, GENERAL_BONUS, OPEN_GROUND, PIKES_VS_HORSE, SIEGE_BASE, SUPPORT_BONUS,
-                    SUPPORT_MAX, TERRAIN)
+from ..data import (CASTLE_SIEGE, COUNTER, FRONT, GARRISON_HP, GARRISON_REGEN, OPEN_GROUND,
+                    SIEGE_BASE, SUPPORT_BONUS, SUPPORT_MAX)
+from . import combat
 from ..state import Garrison, War
 
 # What this module changes on the world: the wars, the provinces (owner, controller, siege, garrison), the units (hit
 # points, experience, positions; the dead are removed), the countries (alive, capital), the log, and what changed()
 # and refresh_markets() mark when a province changes hands.
 OWNS = ("wars", "provinces", "units", "countries", "log", "version", "_owned", "_castle_list", "_markets_dirty")
+
+# The combat values (general, attack_value, defense_value) live in combat.py. The names stay here, so the old
+# import paths (war.general and the world's facades) keep working.
+general = combat.general
+attack_value = combat.attack_value
+defense_value = combat.defense_value
 
 
 def at_war(world, a, b):
@@ -190,31 +196,6 @@ def attack_group(world, group, target):
                 unit.moves_left, unit.attacked, unit.acted = 0, True, True
     world.changed()
     return True
-
-
-def general(world, units):
-    return next((u for u in units if u.kind is GENERAL), None)
-
-
-def attack_value(world, unit, fight, general):
-    tag, branch = unit.owner, unit.kind.branch
-    flat = unit.kind.attack + unit.atk_up + world.bonus(tag, f"{branch}_attack")
-    value = flat * FIGHT_ATTACK[branch][fight] * unit.rank[2] * (1 + world.bonus(tag, branch))
-    if general and (general.trait == fight or (general.trait == "cavalry" and branch == "cavalry")):
-        value *= 1 + GENERAL_BONUS
-    return value
-
-
-def defense_value(world, unit, fight, prov, castle, versus, general):
-    tag, branch = unit.owner, unit.kind.branch
-    value = (unit.kind.defense + unit.def_up) * FIGHT_DEFENSE[branch][fight] * unit.rank[2]
-    value *= 1 + (CASTLE_DEFENSE * castle if fight == "garrison" else TERRAIN[prov.terrain].defense)
-    if branch == "infantry" and versus == "cavalry":
-        value *= PIKES_VS_HORSE * (1 + world.bonus(tag, "vs_horse"))
-    value *= 1 + world.bonus(tag, branch)
-    if general and general.trait in ("defense", fight):
-        value *= 1 + GENERAL_BONUS
-    return value
 
 
 def battle(world, attackers, pos, ranged=False):

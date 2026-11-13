@@ -240,9 +240,11 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   method did, and the functions call each other through `world.` as before (tests wrap `world.plan` and `world.cost_field`);
   keep it that way, and add no call layer inside their loops. `castles()` (the `_castle_list` cache) and `aboard()` (the old
   `_aboard`) stay on the world.
+- **Combat values** (`systems/combat.py`, writes nothing): `general`, `attack_value` and `defense_value`, read through
+  `world.bonus`; war.py re-exports the names. The battle system's day rules build on them.
 - **War** (`systems/war.py`; the battle system builds on it): `at_war`, `enemies`, `war_check`/`declare_war`, `war_score`, `peace`
   (and `free_spot_near`), `peace_offer`, `attack_options`/`attack` and their `_group` forms (with `targets`), `battle` (one fight: front
-  line plus support, with `general`, `attack_value` and `defense_value`), `lose` (units off the map, a `unit_lost` event each), `kill`
+  line plus support, using the combat values below), `lose` (units off the map, a `unit_lost` event each), `kill`
   (`lose` for one unit and its cargo; `_kill` is the old name the tests use), `sieges` (the season's step) and `check_alive`. Facades are
   plain class attributes (`at_war = war.at_war`); `at_war` and `enemies` are called from every supply and path search. The bodies and the
   bus events (`war_declared`, `peace_made`, `province_captured`, `battle`, `siege_progress`, `unit_lost`) are unchanged by the move.
