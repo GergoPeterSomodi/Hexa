@@ -164,8 +164,8 @@ class _Day:
     def __init__(self, world, battle):
         self.world, self.battle = world, battle
         prov = self.prov = world.provinces[battle.pos]
-        self.fight = "assault" if battle.assault else ("open" if prov.terrain in OPEN_GROUND else "rough")
-        fights = garrison_fights(world, battle)
+        fights = garrison_fights(world, battle)     # the assault is fought only while the garrison holds (item 7)
+        self.fight = "assault" if fights else ("open" if prov.terrain in OPEN_GROUND else "rough")
         self.castle = prov.castle if fights else 0
         self.dfight = "garrison" if fights else ("open" if self.fight == "open" else "rough")
         self.counter = "rough" if self.fight == "rough" else "open"   # what the defender strikes in
@@ -234,17 +234,19 @@ class _Day:
         rest waits in ``battle.carry``. The men lost are killed, or wounded for the share."""
         battle = self.battle
         for target, dmg, share in hits:
-            if dmg <= 0:
-                continue
             key = key_of(target)
             tag = self.side[key]
+            # a hit never takes more than the fighter has left, carry included, so booked men never exceed men lost
+            dmg = min(dmg, max(0.0, target.hp - battle.carry.get(key, 0.0)))
+            if dmg <= 0:
+                continue
             men = dmg * men_per_hp(target)
             self.lost[key] = self.lost.get(key, 0.0) + dmg
             battle.killed[tag] = battle.killed.get(tag, 0.0) + men * (1 - share)
             battle.wounded[tag] = battle.wounded.get(tag, 0.0) + men * share
             if share:
                 battle.wounded_hp[key] = battle.wounded_hp.get(key, 0.0) + dmg * share
-            total = battle.carry.get(key, 0.0) + dmg
+            total = round(battle.carry.get(key, 0.0) + dmg, 9)
             whole = int(total)
             battle.carry[key] = total - whole
             target.hp = max(0, target.hp - whole)
@@ -373,7 +375,7 @@ def pursuit(day, loser):
     mounted = any(f.kind.branch == "cavalry" for key, f in day.fighters.items()
                   if day.side[key] == winner and key not in battle.routed)
     share = PURSUIT if mounted else PURSUIT_FOOT
-    hits = [(f, share * f.kind.hp, 0.0) for key, f in day.fighters.items() if day.side[key] == loser]
+    hits = [(f, share * f.hp, 0.0) for key, f in day.fighters.items() if day.side[key] == loser]
     day.resolve(hits)
 
 

@@ -52,6 +52,7 @@ class Battle:
     wounded: dict = field(default_factory=dict)    # tag -> men wounded
     garrison_morale: float = 1.0
     log: list = field(default_factory=list)        # (turn, day, text); the last BATTLE_LOG lines
+    members: set = field(default_factory=set)      # unit ids that have fought in it (start and joiners); a unit counts once
 ```
 
 - Unit ids, never unit objects. A dead or deserted unit is just missing, and the battle skips it.
@@ -107,13 +108,21 @@ battle.py passes 600, split retreat and end into `systems/aftermath.py`.
   hexes means "join".
 - `attack_group(group, target)`:
   1. walks to the stand hex with `move_group` (as today, one `unit_moved` event);
-  2. calls `movement.step_in(group, target)`: sets `pos`, sets `moves_left = 0` and `acted = attacked = True`, and
-     emits `unit_moved` with path `(stand, target)` and `seen` worked out as in `move_group`. The replay already
-     plays two walks of one stack one after the other;
-  3. calls `world.engage(group, target)`.
-- `engage`:
+  2. calls `world.engage(group, target)`, and nothing else. `attack_group` must not call `movement.step_in`: `engage`
+     makes the one step itself, after its checks, so a refused attack moves nothing (decision 2026-11-13, review of
+     PRs 1-3).
+- `engage_check(world, group, target) -> (ok, reason)` and `engage`: a `*_check` pair. `engage` runs the check and changes
+  nothing when it says no. The check refuses, with the reason shown as the hover hint: a stack of more than one country;
+  ships (naval, or aboard one); a target that is not a land province; a target not beside the stack, or with a ridge or a
+  closed pass between ("Not beside the target", "A ridge or a closed pass lies between"); a stack with no war unit with hp
+  ("No regiments to attack with"); a stack whose average morale is under `ATTACK_MORALE` ("Too shaken to attack"); a stack
+  already in a battle on another hex ("Already in another battle"); a stack whose war units are all in this battle
+  ("Already in this battle"); a stack that does not fit (`fits`: `military.can_stand` per side, so the stack limit, one
+  general and the civilians' limit; "Too many units for this hex"); no enemy there ("No enemy here"); countries not at war.
+  After the checks `engage` steps in (`movement.step_in`, unless the stack already stands on the hex) and then:
   - Target has only civilians (no war units, no garrison): overrun as today (`lose(..., "overrun")`). No battle.
-  - Target is a battle hex: the stack joins its side's reserve. `men0[tag]` grows by its men. A log line.
+  - Target is a battle hex: the stack joins its side's reserve. Only its war units that are not yet in the battle
+    (`members`) count in `men0[tag]`; all its units become members. A log line.
   - Otherwise a new `Battle`: attacker is the group's owner, defender is the owner of the war units there, or the
     controller of the castle. `assault = True` when the defender controls a castle with `garrison > 0`. Stances:
     attacker `"attack"`, defender `"hold"`. Lanes are deployed at once (3.3), so the panel has something to show.
@@ -198,23 +207,30 @@ The garrison loses `prov.garrison` the same way.
   (`WITHDRAW_PURSUIT`, 5%, killed), keeps its morale and retreats (3.6). The other side wins without a fight.
 - The stance stays until changed. The AI sets its stances in `ai.run` (section 5).
 - Safety stop: a battle that reaches `BATTLE_MAX_SEASONS` (6) seasons ends with the side of lower army morale
-  withdrawing. This prevents two holding armies from sitting forever.
+  retreating, with no pursuit (decision 2026-11-13). With no retreat hex it is a draw: how `stalemate`, no winner, no
+  loser, and no surrender. This prevents two holding armies from sitting forever.
 
 ### 3.6 The end of a battle
 
 A battle ends when a side breaks, withdraws, has no war units (and no garrison) left, at the safety stop, or when
-peace is made or a side's country disappears.
+peace is made or a side's country disappears. A side with nothing left on the hex ends it as `gone`: a draw, no winner,
+no loser, no score. Routed regiments still count as present. In an assault the garrison counts as present while it has hp.
 
-1. **Retreat.** `retreat_spot(world, group, pos)`: the nearest land hex within `RETREAT_RANGE` (3 * SCALE) that the
-   side's country controls, with no enemy unit, no battle, and room (`can_stand`). Nearest by hex distance; ties go
-   to the hex farthest from the enemy's nearest unit, then the lowest `pos`. The whole side (routed or not,
+1. **Retreat.** `retreat_spot(world, group, pos)`: a walk over land from `pos`, at most `RETREAT_RANGE` (3 * SCALE)
+   steps, that never crosses a wall (`world.walls()`: the ridge crests, and the mountain passes in winter), the sea or a
+   hex with an enemy unit. The nearest hex on that walk that the side's country controls, with no battle and room
+   (`can_stand`). Nearest by steps; ties go to the hex farthest from the enemy's nearest unit, then the lowest `pos`.
+   Set on an order or a break, never per frame. The whole side (routed or not,
    generals and wagons too) moves there. Emit `unit_moved` with path `(pos, spot)`, so the replay shows it. Morale
    of a beaten side is set to at most `RETREAT_MORALE` (0.3).
-2. **Surrender.** No spot: the side is lost with `lose(units, "surrendered")` (a new `why`).
+2. **Surrender.** No spot: the side is lost with `lose(units, "surrendered")` (a new `why`). Its men count as
+   killed: war units only (generals, wagons and the rest have no men). The safety stop never surrenders: with no spot
+   it is a draw (3.5).
 3. **Wounded.** For every surviving unit of both sides: if `in_supply` where it ends up, `hp += floor(wounded_hp *
    WOUNDED_RETURN)` (half), capped at `kind.hp`. The rest of the wounded are gone.
-4. **Experience.** Survivors of the winner get +2 xp, of the loser +1.
-5. **Castle.** In an assault, if the defender breaks and the garrison is at 0 hp or 0 morale, the castle is
+4. **Experience.** Survivors of the winner get +2 xp, of the loser +1. None when the battle had no day (`days == 0`).
+5. **Castle.** In an assault, if the defender breaks and the garrison is at 0 hp or 0 morale, or the defender has no
+   field units left (the garrison is then the whole army, decision 2026-11-13), the castle is
    stormed: `province_captured` with `by="storm"`, controller to the attacker, siege 0, garrison 0. If the garrison
    still stands, the castle holds; the attacker stays and the normal siege goes on next season. If the attacker
    breaks, the garrison regrows as usual.
@@ -314,8 +330,9 @@ Add to `CAMPAIGN_KINDS` and the docstring:
 which turns it into war score. Its fields are fixed by that design:
 - the two tags (`attacker`, `defender`) and the hex (`pos`);
 - `winner`: the side whose army did not break and did not withdraw. A side that withdraws or surrenders loses. The
-  safety stop counts as a withdrawal of the lower side, so it has a winner. Peace and a vanished country (`how`
-  "peace" or "gone") end the battle with `winner = None` and `loser = None`: a draw, worth nothing;
+  safety stop counts as a withdrawal of the lower side, so it has a winner (how "withdrew", no pursuit), unless that
+  side has no retreat hex: then it is a draw (how "stalemate"). Peace, a vanished country and a side left with nothing
+  (how "peace", "gone") are draws too. A draw has `winner = None` and `loser = None`: worth nothing;
 - `killed` and `wounded`: men per side for the whole battle, keyed by tag, pursuit and surrender included (a
   surrendered side's men count as killed);
 - `assault`: whether it was a castle assault.

@@ -164,8 +164,9 @@ class Unit:
 
     @property
     def men(self):
-        """The regiment's strength in men. hp is the rule; men is what the player sees (battle slice 1)."""
-        return round(MEN * self.hp / self.kind.hp) if self.kind.hp else 0
+        """The regiment's strength in men. hp is the rule; men is what the player sees (battle slice 1). Only war units
+        have men: generals, wagons, pioneers and the other civilians have none."""
+        return round(MEN * self.hp / self.kind.hp) if self.kind.war and self.kind.hp else 0
 
     @property
     def naval(self):
@@ -236,6 +237,7 @@ class Battle:
     wounded: dict = field(default_factory=dict)    # tag -> men wounded
     garrison_morale: float = 1.0
     log: list = field(default_factory=list)        # (turn, day, text); the last BATTLE_LOG lines
+    members: set = field(default_factory=set)      # unit ids that have fought in it (start and joiners); each counts once
 
 
 def fill_defaults(obj):

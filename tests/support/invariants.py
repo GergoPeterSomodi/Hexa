@@ -308,6 +308,11 @@ def campaign_problems(world):
             battle = world.battle_at(pos)      # a battle hex holds its two sides and no one else
             if battle is None or owners != {battle.attacker, battle.defender}:
                 problems.append(f"one-country-per-hex: {sorted(owners)} at {pos}")
+            else:                             # each side of a battle hex keeps to the stack limit of its own country
+                for tag in sorted(owners):
+                    side = [u for u in stack if u.owner == tag]
+                    if not world.can_stand(side, pos, others=[]):
+                        problems.append(f"stack-limit: {tag}'s side of the battle at {pos} is too big")
         elif not stack[0].naval and stack[0].owner in countries and not world.can_stand(stack, pos, others=[]):
             kinds = ", ".join(sorted(u.kind.key for u in stack))
             problems.append(f"stack-limit: {stack[0].owner} stack at {pos} is too big ({kinds})")

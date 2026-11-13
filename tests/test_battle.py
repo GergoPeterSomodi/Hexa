@@ -8,19 +8,23 @@ of the spec's quick model (section 4) for 30 seeds each and assert the bands of 
 """
 import contextlib
 import math
+import pickle
 import random
 import statistics
 import unittest
 
+from hexa.campaign import saves
 from hexa.campaign.data import (BATTLE_LOG, BATTLE_MAX_SEASONS, DAYS_PER_SEASON, GARRISON_HP, GENERAL, GENERAL_MORALE,
-                                HUNGER_DRAIN, MEN, RESERVE_DRAIN, RETREAT_MORALE, RETREAT_RANGE, WAGON,
-                                WITHDRAW_PURSUIT)
+                                HUNGER_DRAIN, MEN, PIONEER, PURSUIT_FOOT, RESERVE_DRAIN, RETREAT_MORALE, RETREAT_RANGE,
+                                WAGON, WITHDRAW_PURSUIT)
 from hexa.campaign.state import Battle
-from hexa.campaign.systems import battle as battlesys, combat, military
+from hexa.campaign.systems import battle as battlesys, combat, military, movement
 from hexa.events import CAMPAIGN_KINDS
 from hexa.hexgrid import neighbors, within
 from tests.support.battles import place, setup
-from tests.support.invariants import check_campaign
+from tests.support.digests import canonical, world_state
+from tests.support.home import TempHome
+from tests.support.invariants import campaign_problems, check_campaign
 from tests.support.worlds import fresh
 
 
@@ -330,7 +334,7 @@ def play(world, seed, spec_a, spec_d):
     loss = {tag: (battle.killed.get(tag, 0.0) + battle.wounded.get(tag, 0.0)) / men0[tag]
             for tag in (battle.attacker, battle.defender)}
     return {"days": days, "seasons": math.ceil(days / DAYS_PER_SEASON), "winner": winner, "loss": loss,
-            "battle": battle}
+            "battle": battle, "stopped": broke is None}
 
 
 class ScenarioBandsTest(unittest.TestCase):
@@ -363,6 +367,10 @@ class ScenarioBandsTest(unittest.TestCase):
             shares.append(row["loss"][loser])
         self.assertGreaterEqual(statistics.median(shares), 0.15)
         self.assertLessEqual(statistics.median(shares), 0.50)
+
+    def test_few_battles_reach_the_safety_stop(self):
+        rows = [row for block in self.results.values() for row in block]
+        self.assertLess(sum(1 for row in rows if row["stopped"]) / len(rows), 0.05)
 
 
 # ----- the battle's life (PR 3): engage, joins, orders, the season and the end; spec 7.1, called directly -----------
@@ -665,18 +673,6 @@ class SeasonTest(unittest.TestCase):
         self.assertEqual(battle.days, days)
         self.assertEqual(world.bus.of("battle_fought"), [])
 
-    def test_the_safety_stop_ends_a_stalemate_at_six_seasons(self):
-        world = fresh("POR")
-        world.rng = random.Random(7)
-        fight, battle = plain_battle(world, [("infantry", 1, 6)], [("infantry", 1, 6)])
-        battle.start = world.turn - (BATTLE_MAX_SEASONS - 1)
-        battlesys.battle_season(world)
-        self.assertIsNone(world.battle_at(fight.defend_pos))
-        data = world.bus.of("battle_ended")[0].data
-        self.assertEqual((data["how"], data["seasons"]), ("withdrew", BATTLE_MAX_SEASONS))
-        self.assertIsNotNone(data["winner"])
-        check_campaign(world)
-
 
 class EndTest(unittest.TestCase):
     def test_peace_ends_a_battle_as_a_draw_with_no_pursuit_and_no_retreat(self):
@@ -723,6 +719,484 @@ class EventContractTest(unittest.TestCase):
         self.assertEqual(len(fought), 1)
         self.assertEqual(set(fought[0].data), {"defender", "days", "morale", "killed", "wounded"})
         self.assertEqual(set(fought[0].get("morale")), {fight.attacker, fight.defender})
+
+
+# ----- review fixes (code review of PRs 1-3): one regression test per repro, and the rules they fixed -----------------
+
+def walls_reach(world, src, rad):
+    """{hex: steps} of the land hexes a walk from src reaches in at most rad steps, never crossing a wall: the retreat's
+    own rule, written out here to check the retreat against."""
+    walls = world.walls()
+    seen = {src: 0}
+    frontier = [src]
+    for step in range(1, rad + 1):
+        nxt = []
+        for here in frontier:
+            for n in neighbors(here):
+                if n in seen or not world.is_land(n) or (here, n) in walls:
+                    continue
+                seen[n] = step
+                nxt.append(n)
+        frontier = nxt
+    return seen
+
+
+def men_lost(world, battle, start):
+    """Per side, the men its regiments have lost since the start: hp taken plus the carry, dead regiments at 0 hp."""
+    lost = {}
+    for tag in (battle.attacker, battle.defender):
+        total = 0.0
+        for unit, hp0, per_hp in start[tag]:
+            alive = unit in world.units
+            hp_now = unit.hp if alive else 0
+            carry = battle.carry.get(unit.id, 0.0) if alive else 0.0
+            total += per_hp * (hp0 - hp_now + carry)
+        lost[tag] = total
+    return lost
+
+
+class CivilianAndSeaTest(unittest.TestCase):
+    """Units that are not fighting men cannot start a battle, and a sea hex is refused (r6, r7)."""
+
+    def test_a_general_a_wagon_or_a_pioneer_alone_cannot_attack(self):
+        for kind in (GENERAL, WAGON, PIONEER):
+            world = fresh("POR")
+            fight = setup(world, [("infantry", 1, 2)], [("infantry", 1, 2)])
+            clear_castle(world, fight.defend_pos)
+            world.units = [u for u in world.units if u not in fight.attackers]
+            civilian = world.add_unit(kind, fight.attacker, fight.attack_pos, moves=kind.moves)
+            self.assertFalse(world.engage([civilian], fight.defend_pos), kind.name)
+            self.assertEqual(world.battles, [], kind.name)
+            self.assertEqual(civilian.pos, fight.attack_pos, kind.name)
+
+    def test_a_land_stack_cannot_attack_a_sea_hex(self):
+        world = fresh("POR")
+        pair = None
+        for p in sorted(world.provinces):
+            if world.provinces[p].owner is None or not world.is_land(p):
+                continue
+            sea = next((n for n in sorted(neighbors(p)) if world.is_sea(n)), None)
+            if sea is not None:
+                pair = (p, sea)
+                break
+        self.assertIsNotNone(pair)
+        p, sea = pair
+        stack = place(world, "infantry", 1, world.provinces[p].owner, p, 2)
+        self.assertFalse(world.engage(stack, sea))
+        self.assertEqual(world.battles, [])
+        self.assertTrue(all(u.pos == p for u in stack))
+
+
+class EngageRegressionTest(unittest.TestCase):
+    """Engage never moves a stack it refuses; a stack in a battle cannot join another; a stack joins only once (r6, r8,
+    r14, r16)."""
+
+    def setUp(self):
+        self.world = fresh("POR")
+        self.fight, self.battle = plain_battle(self.world)
+
+    def test_a_stack_already_in_a_battle_cannot_attack_another_hex(self):
+        world, fight = self.world, self.fight
+        p2 = next(n for n in sorted(neighbors(fight.defend_pos))
+                  if world.is_land(n) and n in world.provinces and n not in (fight.attack_pos,)
+                  and not world.units_at(n) and n != fight.defend_pos)
+        place(world, "infantry", 1, fight.defender, p2)
+        world.bus.history.clear()
+        self.assertFalse(world.engage(fight.attackers, p2))
+        self.assertEqual([b.pos for b in world.battles], [fight.defend_pos])
+        self.assertTrue(all(u.pos == fight.defend_pos for u in fight.attackers))
+        self.assertEqual(world.bus.of("unit_moved"), [])
+        self.assertEqual(world.bus.of("battle_joined"), [])
+        check_campaign(world)
+
+    def test_a_stack_already_in_this_battle_does_not_join_twice(self):
+        world, fight, battle = self.world, self.fight, self.battle
+        self.assertEqual(battle.men0[fight.attacker], 3000)
+        self.assertFalse(world.engage(fight.attackers, fight.defend_pos))
+        self.assertFalse(world.engage(fight.defenders, fight.defend_pos))
+        self.assertEqual(battle.men0, {fight.attacker: 3000, fight.defender: 3000})
+        self.assertEqual(world.bus.of("battle_joined"), [])
+
+    def test_a_refused_stack_that_is_too_big_does_not_move(self):
+        world, fight = self.world, self.fight
+        limit = military.stack_limit(world, fight.attacker)
+        n = joiner_hex(world, fight)
+        joiners = place(world, "infantry", 1, fight.attacker, n, limit - 2)      # 3 in the battle + limit - 2: one too many
+        world.bus.history.clear()
+        self.assertFalse(world.engage(joiners, fight.defend_pos))
+        self.assertTrue(all(u.pos == n for u in joiners))
+        self.assertEqual(world.bus.of("unit_moved"), [])
+
+    def test_a_stack_that_exactly_fills_the_hex_joins(self):
+        world, fight, battle = self.world, self.fight, self.battle
+        limit = military.stack_limit(world, fight.attacker)
+        n = joiner_hex(world, fight)
+        joiners = place(world, "infantry", 1, fight.attacker, n, limit - 3)
+        self.assertTrue(world.engage(joiners, fight.defend_pos))
+        self.assertEqual(battle.men0[fight.attacker], 3000 + 1000 * (limit - 3))
+        check_campaign(world)
+
+    def test_a_second_general_cannot_join_the_battle(self):
+        world, fight = self.world, self.fight
+        n = joiner_hex(world, fight)
+        first = place(world, "infantry", 1, fight.attacker, n) + [world.add_unit(GENERAL, fight.attacker, n, moves=GENERAL.moves)]
+        self.assertTrue(world.engage(first, fight.defend_pos))
+        walls = world.walls()
+        m = next(p for p in sorted(neighbors(fight.defend_pos))
+                 if p not in (fight.attack_pos, n) and world.is_land(p) and (p, fight.defend_pos) not in walls
+                 and not any(u.owner == fight.defender for u in world.units_at(p)))
+        second = place(world, "infantry", 1, fight.attacker, m) + [world.add_unit(GENERAL, fight.attacker, m, moves=GENERAL.moves)]
+        self.assertFalse(world.engage(second, fight.defend_pos))
+        self.assertEqual(sum(1 for u in world.units_at(fight.defend_pos) if u.kind is GENERAL), 1)
+        self.assertTrue(all(u.pos == m for u in second))
+
+    def test_step_in_moves_the_stack_once(self):
+        world = fresh("POR")
+        fight = setup(world, [("infantry", 1, 2)], [("infantry", 1, 2)])
+        world.bus.history.clear()
+        self.assertTrue(movement.step_in(world, fight.attackers, fight.defend_pos))
+        self.assertFalse(movement.step_in(world, fight.attackers, fight.defend_pos))
+        self.assertEqual([tuple(e.get("path")) for e in world.bus.of("unit_moved")],
+                         [(fight.attack_pos, fight.defend_pos)])
+
+
+class EngageCheckTest(unittest.TestCase):
+    """engage_check gives the reasons, and a shaken stack cannot attack (the *_check contract, spec 3.1)."""
+
+    def setUp(self):
+        self.world = fresh("POR")
+        self.fight = setup(self.world, [("infantry", 1, 2)], [("infantry", 1, 2)])
+        clear_castle(self.world, self.fight.defend_pos)
+
+    def test_the_check_says_yes_and_gives_a_reason_for_each_refusal(self):
+        world, fight = self.world, self.fight
+        self.assertEqual(world.engage_check(fight.attackers, fight.defend_pos), (True, ""))
+        far = next(p for p in sorted(world.provinces) if world.is_land(p) and p not in within(fight.attack_pos, 1))
+        self.assertEqual(world.engage_check(fight.attackers, far), (False, "Not beside the target"))
+        wagon = world.add_unit(WAGON, fight.attacker, fight.attack_pos, moves=WAGON.moves)
+        self.assertEqual(world.engage_check([wagon], fight.defend_pos), (False, "No regiments to attack with"))
+        self.assertEqual(world.engage_check([], fight.defend_pos)[0], False)
+
+    def test_a_shaken_stack_cannot_attack_and_nothing_changes(self):
+        world, fight = self.world, self.fight
+        for unit in fight.attackers:
+            unit.morale = 0.4
+        self.assertEqual(world.engage_check(fight.attackers, fight.defend_pos), (False, "Too shaken to attack"))
+        world.bus.history.clear()
+        self.assertFalse(world.engage(fight.attackers, fight.defend_pos))
+        self.assertEqual(world.battles, [])
+        self.assertTrue(all(u.pos == fight.attack_pos for u in fight.attackers))
+        self.assertEqual(world.bus.of("unit_moved"), [])
+
+    def test_an_average_morale_at_the_limit_may_attack(self):
+        world, fight = self.world, self.fight
+        fight.attackers[0].morale = 0.4
+        fight.attackers[1].morale = 0.6
+        self.assertEqual(world.engage_check(fight.attackers, fight.defend_pos), (True, ""))
+        self.assertTrue(world.engage(fight.attackers, fight.defend_pos))
+
+
+class BookingTest(unittest.TestCase):
+    """Booked killed and wounded never exceed the men lost, day by day (r1, r2, r15)."""
+
+    def test_booked_men_equal_the_men_lost_day_by_day(self):
+        for seed in range(6):
+            world = fresh("POR")
+            world.rng = random.Random(seed)
+            battle, att, dfn = stage(world, [("infantry", 1, 3), ("cavalry", 1, 1), ("artillery", 1, 1)],
+                                     [("infantry", 1, 3), ("artillery", 1, 1)])
+            start = {tag: [(u, u.hp, combat.men_per_hp(u)) for u in units]
+                     for tag, units in ((battle.attacker, att), (battle.defender, dfn))}
+            for _ in range(3):
+                combat.fight_day(world, battle)
+                lost = men_lost(world, battle, start)
+                for tag in (battle.attacker, battle.defender):
+                    booked = battle.killed.get(tag, 0.0) + battle.wounded.get(tag, 0.0)
+                    self.assertAlmostEqual(booked, lost[tag], delta=1e-3, msg=f"seed {seed} {tag}")
+
+    def test_a_weak_regiment_inside_a_strong_enemy_is_not_overkilled(self):
+        for seed in range(12):
+            world = fresh("POR")
+            world.rng = random.Random(seed)
+            battle, _, dfn = stage(world, [("infantry", 1, 6)], [("infantry", 1, 1)])
+            dfn[0].hp = 2
+            for _ in range(3):
+                combat.fight_day(world, battle)
+            booked = battle.killed.get(battle.defender, 0.0) + battle.wounded.get(battle.defender, 0.0)
+            self.assertLessEqual(booked, 2 * 100 + 1e-6, f"seed {seed}")
+
+    def test_pursuit_takes_a_share_of_the_men_present(self):
+        world = fresh("POR")
+        world.rng = FlatRng()
+        battle, _, dfn = stage(world, [("infantry", 1, 6)], [("infantry", 1, 6)])
+        for unit in dfn:
+            unit.hp = 3                       # 300 men each
+        combat.deploy(world, battle)
+        combat.pursuit(combat._Day(world, battle), battle.defender)
+        self.assertAlmostEqual(battle.killed[battle.defender], PURSUIT_FOOT * 6 * 300, places=6)
+        for unit in dfn:
+            self.assertEqual(unit.hp, 3)
+            self.assertAlmostEqual(battle.carry[unit.id], PURSUIT_FOOT * 3, places=9)
+
+
+class MenTest(unittest.TestCase):
+    """Only war units have men; a surrender counts the war units' men only (r11, r12)."""
+
+    def test_generals_and_wagons_have_no_men(self):
+        world = fresh("POR")
+        fight = setup(world, [("infantry", 1, 1)], [("infantry", 1, 1)])
+        general_here = world.add_unit(GENERAL, fight.attacker, fight.attack_pos, moves=GENERAL.moves)
+        wagon = world.add_unit(WAGON, fight.attacker, fight.attack_pos, moves=WAGON.moves)
+        self.assertEqual((general_here.men, wagon.men), (0, 0))
+        self.assertEqual(fight.attackers[0].men, MEN)
+        battle = Battle(pos=fight.attack_pos, attacker=fight.attacker, defender=fight.defender, start=0)
+        self.assertEqual(battlesys._men_now(battle, general_here), 0.0)
+
+    def test_a_surrender_counts_the_war_units_men_only(self):
+        world = fresh("POR")
+        world.rng = random.Random(4)
+        fight = setup(world, [("infantry", 1, 2)], [("infantry", 1, 6), ("cavalry", 1, 2)])
+        general_here = world.add_unit(GENERAL, fight.attacker, fight.attack_pos, moves=GENERAL.moves)
+        wagon = world.add_unit(WAGON, fight.attacker, fight.attack_pos, moves=WAGON.moves)
+        for p in within(fight.defend_pos, RETREAT_RANGE):
+            if p in world.provinces and world.provinces[p].controller == fight.attacker:
+                world.provinces[p].controller = fight.defender
+        world.bus.history.clear()
+        self.assertTrue(world.engage(fight.attackers + [general_here, wagon], fight.defend_pos))
+        for _ in range(6):
+            if not world.battles:
+                break
+            battlesys.battle_season(world)
+            world.turn += 1
+        ended = world.bus.of("battle_ended")
+        self.assertEqual(len(ended), 1)
+        data = ended[0].data
+        self.assertEqual(data["how"], "surrendered")
+        self.assertLessEqual(data["killed"][fight.attacker], 2 * MEN + 1e-6)
+        lost = [e.get("what") for e in world.bus.of("unit_lost") if e.get("why") == "surrendered"]
+        self.assertIn(general_here.kind.name, lost)
+        self.assertIn(wagon.kind.name, lost)
+
+
+class RetreatRegressionTest(unittest.TestCase):
+    """The retreat walks over land, not across walls or over the sea (r3, r4)."""
+
+    def test_a_retreat_never_crosses_a_wall(self):
+        world = fresh("POR")
+        walls = world.walls()
+        a, b = next((x, y) for (x, y) in sorted(walls)
+                    if world.is_land(x) and world.is_land(y) and x in world.provinces and y in world.provinces)
+        tag = world.player
+        other = next(t for t in world.countries if t != tag and world.countries[t].alive)
+        world.units = [u for u in world.units if u.pos not in set(within(a, 7))]
+        for p in within(a, RETREAT_RANGE):
+            if p in world.provinces:
+                world.provinces[p].controller = other
+        world.provinces[a].controller = tag
+        world.provinces[b].controller = tag              # the only hex the side may retreat to, across the wall
+        unit = place(world, "infantry", 1, tag, a)[0]
+        spot = world.retreat_spot([unit], a)
+        self.assertEqual(spot, b if b in walls_reach(world, a, RETREAT_RANGE) else None)
+        # with every way out of a walled, the old retreat still went to b across the wall: now there is no spot
+        world.walls = lambda: frozenset((a, n) for n in neighbors(a))
+        self.assertIsNone(world.retreat_spot([unit], a))
+
+    def test_a_retreat_is_reached_on_foot_inside_the_range(self):
+        world = fresh("POR")
+        pos, bad = (163, 53), (160, 47)
+        tag = world.player
+        other = next(t for t in world.countries if t != tag and world.countries[t].alive)
+        world.units = [u for u in world.units if u.pos not in set(within(pos, 7))]
+        for p in within(pos, RETREAT_RANGE):
+            if p in world.provinces:
+                world.provinces[p].controller = other
+        world.provinces[pos].controller = tag
+        world.provinces[bad].controller = tag
+        unit = place(world, "infantry", 1, tag, pos)[0]
+        spot = world.retreat_spot([unit], pos)
+        self.assertNotEqual(spot, bad)
+        self.assertTrue(spot is None or spot in walls_reach(world, pos, RETREAT_RANGE))
+
+
+class AssaultRegressionTest(unittest.TestCase):
+    """The garrison is the army when the field is empty; the assault is fought only while the garrison stands (r9,
+    r10, r17)."""
+
+    def test_a_garrison_alone_stores_the_castle_when_it_breaks(self):
+        for seed in range(6):
+            world = fresh("POR")
+            world.rng = random.Random(seed)
+            fight = setup(world, [("infantry", 1, 4), ("artillery", 1, 1)], [], castle=2)
+            prov = world.provinces[fight.defend_pos]
+            world.bus.history.clear()
+            self.assertTrue(world.engage(fight.attackers, fight.defend_pos))
+            for _ in range(7):
+                if not world.battles:
+                    break
+                battlesys.battle_season(world)
+                world.turn += 1
+            data = world.bus.of("battle_ended")[-1].data
+            self.assertEqual((data["how"], data["winner"]), ("broke", fight.attacker), f"seed {seed}")
+            self.assertEqual((prov.controller, prov.garrison), (fight.attacker, 0), f"seed {seed}")
+
+    def test_the_castle_falls_to_the_first_assault_that_breaks_its_garrison(self):
+        for seed in (0, 1, 2):
+            world = fresh("POR")
+            world.rng = random.Random(seed)
+            fight = setup(world, [("infantry", 1, 4), ("artillery", 1, 1)], [], castle=3)
+            prov = world.provinces[fight.defend_pos]
+            world.bus.history.clear()
+            self.assertTrue(world.engage(fight.attackers, fight.defend_pos))
+            for _ in range(7):
+                if not world.battles:
+                    break
+                battlesys.battle_season(world)
+                world.turn += 1
+            self.assertEqual(prov.controller, fight.attacker, f"seed {seed}")
+
+    def test_the_attack_is_an_open_or_rough_fight_once_the_garrison_has_fallen(self):
+        world = fresh("POR")
+        world.rng = FlatRng()
+        battle, _, _ = stage(world, [("cavalry", 1, 1)], [("infantry", 1, 1)], castle=2)
+        world.provinces[battle.pos].garrison = 0
+        world.battles.append(battle)
+        combat.deploy(world, battle)
+        self.assertFalse(combat.garrison_fights(world, battle))
+        self.assertNotEqual(combat._Day(world, battle).fight, "assault")
+
+
+class GoneTest(unittest.TestCase):
+    """A side with no units or garrison left ends the battle as a draw: how "gone", no winner, no loser (decision 10)."""
+
+    def test_a_side_with_nothing_left_ends_the_battle_as_gone(self):
+        for label in ("defender gone", "attacker gone", "both gone", "defender walked out"):
+            world = fresh("POR")
+            fight, battle = plain_battle(world)
+            xp = {u.id: u.xp for u in fight.attackers + fight.defenders}
+            if label in ("defender gone", "both gone"):
+                world.units = [u for u in world.units if u not in fight.defenders]
+            if label in ("attacker gone", "both gone"):
+                world.units = [u for u in world.units if u not in fight.attackers]
+            if label == "defender walked out":
+                for unit in fight.defenders:
+                    unit.pos = fight.attack_pos
+            battlesys.battle_season(world)
+            ended = world.bus.of("battle_ended")
+            self.assertEqual(len(ended), 1, label)
+            data = ended[0].data
+            self.assertEqual((data["how"], data["winner"], data["loser"]), ("gone", None, None), label)
+            self.assertEqual(world.bus.of("battle_fought"), [], label)
+            self.assertEqual(world.battles, [], label)
+            for unit in fight.attackers + fight.defenders:
+                self.assertEqual(unit.xp, xp[unit.id], label)
+
+    def test_a_battle_with_no_day_fought_gives_no_experience(self):
+        world = fresh("POR")
+        fight, battle = plain_battle(world)
+        self.assertTrue(world.battle_order(fight.defend_pos, fight.defender, "withdraw"))
+        battlesys.battle_season(world)
+        data = world.bus.of("battle_ended")[0].data
+        self.assertEqual((data["how"], data["winner"]), ("withdrew", fight.attacker))
+        self.assertEqual(battle.days, 0)
+        for unit in fight.attackers + fight.defenders:
+            self.assertEqual(unit.xp, 0)
+
+
+class SafetyStopTest(unittest.TestCase):
+    """At the 6-season safety stop the lower army retreats with no pursuit; with no retreat hex the battle is a draw
+    (how "stalemate", no winner, no surrender) (decision 9). The stop is reached here without any fighting."""
+
+    def stop(self, world, battle, pursued):
+        original_day = combat.fight_day
+        original_pursue = battlesys._pursue
+        combat.fight_day = lambda w, b: {"broke": None, "killed": {}, "wounded": {}, "morale": {}}
+        battlesys._pursue = lambda *args: pursued.append(args)
+        battle.start = world.turn - (BATTLE_MAX_SEASONS - 1)
+        try:
+            battlesys.battle_season(world)
+        finally:
+            combat.fight_day = original_day
+            battlesys._pursue = original_pursue
+
+    def test_the_lower_army_retreats_at_the_stop_without_pursuit(self):
+        world = fresh("POR")
+        fight, battle = plain_battle(world)
+        pursued = []
+        self.stop(world, battle, pursued)
+        self.assertEqual(pursued, [])
+        self.assertIsNone(world.battle_at(fight.defend_pos))
+        data = world.bus.of("battle_ended")[0].data
+        self.assertEqual((data["how"], data["seasons"]), ("withdrew", BATTLE_MAX_SEASONS))
+        loser = data["loser"]
+        self.assertEqual(loser, fight.attacker)              # equal armies: the attacker is the shakier on a tie
+        self.assertEqual(data["winner"], fight.defender)
+        self.assertIsNotNone(data["retreat"])
+        for unit in fight.attackers:
+            self.assertEqual(unit.pos, data["retreat"])
+        self.assertEqual(data["killed"], {fight.attacker: 0, fight.defender: 0})
+
+    def test_with_no_retreat_hex_the_stop_is_a_draw_and_nobody_surrenders(self):
+        world = fresh("POR")
+        fight, battle = plain_battle(world)
+        no_retreat(world, fight.defend_pos, fight.attacker)
+        pursued = []
+        self.stop(world, battle, pursued)
+        self.assertEqual(pursued, [])
+        data = world.bus.of("battle_ended")[0].data
+        self.assertEqual((data["how"], data["winner"], data["loser"]), ("stalemate", None, None))
+        self.assertEqual(data["retreat"], None)
+        self.assertEqual(world.bus.of("unit_lost"), [])
+
+
+def game_state(world):
+    """The world's digest without the redraw counter and the visible set: a save does not keep those two (they are
+    rebuilt), for any world with units on it, battle or not. Everything else must come back the same."""
+    return canonical({k: v for k, v in world_state(world).items() if k not in ("version", "visible")})
+
+
+class SaveMidBattleTest(TempHome):
+    """A save taken mid-battle round-trips (r13): the same game state, and the next season plays the battle on the same."""
+
+    def test_a_save_taken_mid_battle_round_trips(self):
+        checked = 0
+        for seed in range(4):
+            world = fresh("POR")
+            world.rng = random.Random(seed)
+            fight = setup(world, [("infantry", 1, 6)], [("infantry", 1, 6)], terrain="hills")
+            self.assertTrue(world.engage(fight.attackers, fight.defend_pos))
+            battlesys.battle_season(world)
+            world.turn += 1
+            if not world.battles:
+                continue
+            checked += 1
+            saves.save(world, "mid")
+            back = saves.load("mid")
+            self.assertEqual(game_state(world), game_state(back), f"seed {seed}")
+            self.assertEqual(campaign_problems(back), [], f"seed {seed}")
+            for game in (world, back):
+                battlesys.battle_season(game)
+                game.turn += 1
+            self.assertEqual(game_state(world), game_state(back), f"seed {seed} after a season")
+        self.assertGreater(checked, 0)
+
+
+class PickleTest(unittest.TestCase):
+    def test_a_battle_is_pinned_to_the_world_module_like_every_state_class(self):
+        self.assertEqual(Battle.__module__, "hexa.campaign.world")
+        self.assertIn(b"hexa.campaign.world", pickle.dumps(Battle((0, 0), "A", "B", 0)))
+
+
+class StackLimitInvariantTest(unittest.TestCase):
+    """The invariants check each side of a battle hex against the stack limit (r8 and decision 11)."""
+
+    def test_a_side_too_big_for_its_battle_hex_is_reported(self):
+        world = fresh("POR")
+        fight, battle = plain_battle(world)
+        self.assertEqual(campaign_problems(world), [])
+        limit = military.stack_limit(world, fight.attacker)
+        place(world, "infantry", 1, fight.attacker, fight.defend_pos, limit)      # too many, placed past the engage checks
+        problems = campaign_problems(world)
+        self.assertTrue(any(p.startswith("stack-limit") for p in problems), problems)
 
 
 if __name__ == "__main__":

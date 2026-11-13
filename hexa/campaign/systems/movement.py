@@ -250,9 +250,11 @@ def move_group(world, group, dest, best=None):
 def step_in(world, group, pos):
     """The last step of an attack (spec 3.1): the stack moves from the hex beside pos onto pos, the enemy's hex. Its units
     have no moves left and have attacked. One unit_moved, with the walk (its hex, pos), as move_group emits. The caller
-    checks the attack first (battle.engage does)."""
+    checks the attack first. Only battle.engage calls this, once, after its checks: attack_group must not call it (it
+    would strand the stack on the enemy hex when engage then refuses). Returns False, and moves nothing, when the stack
+    is empty or already stands on pos."""
     group = [u for u in group if u in world.units]
-    if not group:
+    if not group or group[0].pos == pos:
         return False
     lead = group[0]
     path = (lead.pos, pos)

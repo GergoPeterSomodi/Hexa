@@ -727,6 +727,7 @@ class CampaignWorld:
 
     # the battle's life (systems/battle.py): a stack attacks or joins, the orders, the retreat, the end of battles
     engage = battlesys.engage
+    engage_check = battlesys.engage_check
     battle_order_check = battlesys.battle_order_check
     battle_order = battlesys.battle_order
     end_battles = battlesys.end_battles

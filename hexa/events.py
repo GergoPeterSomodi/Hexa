@@ -44,7 +44,7 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
     battle_joined     tag=joiner, pos    side ("attacker" or "defender"), men (a stack joins its side's reserve)
     battle_fought     tag=attacker, pos  defender, days, morale {tag: share}, killed {tag: men}, wounded {tag: men};
                                          one per battle per season
-    battle_ended      tag=attacker, pos  attacker, defender, winner, loser (tags; None for a draw), assault, how
+    battle_ended      tag=attacker, pos  attacker, defender, winner, loser (tags; None for a draw: stalemate, peace or gone score nothing), assault, how
                                          ("broke", "withdrew", "surrendered", "stalemate", "peace" or "gone"), seasons,
                                          killed {tag: men}, wounded {tag: men}, retreat (hex or None). Once per battle,
                                          after it has left world.battles. A contract: docs/design/war-goals-and-peace.md 3.4

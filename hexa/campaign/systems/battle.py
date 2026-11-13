@@ -6,15 +6,18 @@ The day's arithmetic is in combat.py; this module starts, orders, ends and recor
 Events: ``battle_started`` (a battle begins), ``battle_joined`` (a stack joins a side), ``battle_fought`` (once per
 battle per season, after its days) and ``battle_ended`` (once per battle, after it has left ``world.battles``). The
 ``battle_ended`` fields are the contract of docs/design/war-goals-and-peace.md section 3.4 (hexa/events.py lists them).
+How a battle ends: "broke", "withdrew" or "surrendered" (a loser), "stalemate" (the safety stop with no retreat hex: a
+draw), "peace" and "gone" (a draw: peace, a vanished country, or a side with no units or garrison left). A draw has no
+winner and no loser, so it scores nothing.
 
 Functions taking ``world``; World binds the public ones as facades. ``battle_season`` is not in the season's PHASES until
 the switch (PR 4), so nothing fights a battle in a game yet. Nothing here uses pygame, the window or a bus handler.
 """
 import math
 
-from ...hexgrid import distance, neighbors, within
-from ..data import (BATTLE_LOG, BATTLE_MAX_SEASONS, DAYS_PER_SEASON, RETREAT_MORALE, RETREAT_RANGE, WITHDRAW_PURSUIT,
-                    WOUNDED_RETURN)
+from ...hexgrid import distance, neighbors
+from ..data import (ATTACK_MORALE, BATTLE_LOG, BATTLE_MAX_SEASONS, DAYS_PER_SEASON, RETREAT_MORALE, RETREAT_RANGE,
+                    WITHDRAW_PURSUIT, WOUNDED_RETURN)
 from ..state import Battle
 from . import combat, military, movement
 from .combat import army_morale
@@ -51,75 +54,127 @@ def _side_units(world, battle, tag):
     return [u for u in world.units_at(battle.pos) if u.owner == tag and not u.naval]
 
 
+def _present(world, battle, tag):
+    """Whether a side still has a fighting presence on the hex: a live war unit (a routed one too, it is still there) or,
+    in an assault, the defender's garrison. A side with neither is gone (spec 3.6, decision 2026-11-13)."""
+    if any(u.kind.war and u.hp > 0 and u.owner == tag for u in world.units_at(battle.pos)):
+        return True
+    return tag == battle.defender and battle.assault and world.provinces[battle.pos].garrison > 0
+
+
 def fits(world, group, pos):
-    """Whether the stack's war units may share pos with its side's units there: the stack limit of military.py, counted
-    per side. The enemy's units on the hex do not count, so a battle hex holds one stack of each side."""
+    """Whether the stack may stand on pos with its side's units already there: military.can_stand, counted per side. It
+    checks the stack limit, the general's limit (one general) and the civilians' limit. The enemy's units do not count:
+    a battle hex holds one stack of each side."""
     tag = group[0].owner
-    units = [u for u in world.units_at(pos) if u.owner == tag and u not in group] + list(group)
-    return sum(1 for u in units if u.kind.war) <= military.stack_limit(world, tag, units)
+    others = [u for u in world.units_at(pos) if u.owner == tag and u not in group]
+    return military.can_stand(world, list(group), pos, others)
 
 
-def engage(world, group, pos):
-    """The stack ``group`` attacks the hex ``pos`` (spec 3.1). It steps in from the hex beside pos (movement.step_in)
-    unless it already stands there, then one of three things happens:
-    - pos holds only the enemy's civilians (no war units, no garrison): they are overrun, and no battle starts;
-    - pos is a battle the stack's country is in: the stack joins its side's reserve;
-    - otherwise a battle starts. The defender is the enemy with war units on pos, or the controller of a castle with a
-      garrison. Both sides are deployed into their lanes at once.
-    Returns False, and changes nothing, when the attack cannot happen: the stack is not beside pos, the countries are not
-    at war, the stack does not fit, or pos is a battle the stack's country is not in. The caller checks the attack first
-    (the attack options of the war module)."""
+def _in_other_battle(world, group, pos):
+    """Whether a unit of the stack has fought in a battle on another hex (it is in that battle's members)."""
+    ids = {u.id for u in group}
+    return any(b.pos != pos and b.members & ids for b in world.battles)
+
+
+def _defender(world, owner, pos):
+    """The side a stack attacking pos meets: the enemy with war units there, else the controller of a castle with a
+    garrison, else None (only civilians, or nothing)."""
+    enemy_war = sorted({u.owner for u in world.units_at(pos) if u.owner != owner and u.kind.war})
+    if enemy_war:
+        return enemy_war[0]
+    prov = world.provinces[pos]
+    if prov.castle and prov.garrison > 0 and prov.controller not in (None, owner):
+        return prov.controller
+    return None
+
+
+def engage_check(world, group, pos):
+    """Whether the stack ``group`` may attack the hex pos, and why not: (ok, reason). ``engage`` makes the same checks
+    and changes nothing when one fails (the *_check contract). The reasons are the attack options' hover hints. A stack
+    whose average morale is under ATTACK_MORALE cannot attack (spec 3.1)."""
     group = [u for u in group if u in world.units]
-    if not group or any(u.naval or u.carrier is not None for u in group):
-        return False
+    if not group:
+        return False, "No units to attack with"
     owner = group[0].owner
     if any(u.owner != owner for u in group):
-        return False
+        return False, "One country's stack attacks at a time"
+    if any(u.naval for u in group):
+        return False, "Ships do not fight battles"
+    if any(u.carrier is not None for u in group):
+        return False, "Units aboard a ship cannot attack"
+    if pos not in world.provinces or not world.is_land(pos):
+        return False, "Not a land province"
     stand = group[0].pos
-    if stand != pos and (pos not in neighbors(stand) or (stand, pos) in world.walls()):
-        return False
-    if not fits(world, group, pos):
-        return False
+    if stand != pos and pos not in neighbors(stand):
+        return False, "Not beside the target"
+    if stand != pos and (stand, pos) in world.walls():
+        return False, "A ridge or a closed pass lies between"
+    wars = [u for u in group if u.kind.war and u.hp > 0]
+    if not wars:
+        return False, "No regiments to attack with"
+    if sum(u.morale for u in wars) / len(wars) < ATTACK_MORALE:
+        return False, "Too shaken to attack"
+    if _in_other_battle(world, group, pos):
+        return False, "Already in another battle"
     battle = world.battle_at(pos)
     if battle is not None:
         if owner not in (battle.attacker, battle.defender):
-            return False
-        if stand != pos:
-            movement.step_in(world, group, pos)
-        return join(world, battle, group)
-    return _start(world, group, pos)
-
-
-def _start(world, group, pos):
-    """A new battle on pos for a stack that is beside it (see engage)."""
-    owner = group[0].owner
-    stand = group[0].pos
-    others = [u for u in world.units_at(pos) if u.owner != owner]
-    prov = world.provinces[pos]
-    enemy_war = sorted({u.owner for u in others if u.kind.war})
-    if enemy_war:
-        defender = enemy_war[0]
-    elif prov.castle and prov.garrison > 0 and prov.controller not in (None, owner):
-        defender = prov.controller
-    else:
-        defender = None
+            return False, "Not your battle"
+        if all(u.id in battle.members for u in wars):
+            return False, "Already in this battle"
+    if not fits(world, group, pos):
+        return False, "Too many units for this hex"
+    if battle is not None:
+        return True, ""
+    defender = _defender(world, owner, pos)
     if defender is None:
-        if not others or not all(world.at_war(owner, u.owner) for u in others):
-            return False
-        if stand != pos:
-            movement.step_in(world, group, pos)
-        world.lose(others, "overrun")
-        world.message(f"{_name(world, owner)} overran {len(others)} unarmed unit{'s' * (len(others) != 1)} at "
-                      f"{world.place(prov)}.", _shown(world, owner, others[0].owner))
-        world.changed()
-        return True
+        others = [u for u in world.units_at(pos) if u.owner != owner]
+        if not others:
+            return False, "No enemy here"
+        if not all(world.at_war(owner, u.owner) for u in others):
+            return False, "Not at war"
+        return True, ""
     if not world.at_war(owner, defender):
+        return False, "Not at war"
+    return True, ""
+
+
+def engage(world, group, pos):
+    """The stack ``group`` attacks the hex ``pos`` (spec 3.1). ``engage_check`` runs first, and nothing moves when it says
+    no. Then this function makes the one step onto pos (movement.step_in, unless the stack already stands there), and one
+    of three things happens:
+    - pos holds only the enemy's civilians (no war units, no garrison): they are overrun, and no battle starts;
+    - pos is a battle the stack's country is in: the stack joins its side's reserve (only units not yet in it count);
+    - otherwise a battle starts. The defender is the enemy with war units on pos, or the controller of a castle with a
+      garrison. Both sides are deployed into their lanes at once.
+    The attack order does not step in itself: attack_group must call engage only (it must not call movement.step_in),
+    or the stack would stand on the enemy's hex when this refuses. Returns True when the attack happened."""
+    ok, _ = engage_check(world, group, pos)
+    if not ok:
         return False
+    group = [u for u in group if u in world.units]
+    owner, stand = group[0].owner, group[0].pos
+    battle = world.battle_at(pos)
+    defender = None if battle is not None else _defender(world, owner, pos)
     if stand != pos:
         movement.step_in(world, group, pos)
+    if battle is not None:
+        return join(world, battle, group)
+    if defender is None:
+        _overrun(world, group, pos)
+        return True
+    return _start(world, group, pos, defender)
+
+
+def _start(world, group, pos, defender):
+    """A new battle on pos for a stack that now stands there (see engage). Both sides are deployed."""
+    owner = group[0].owner
+    prov = world.provinces[pos]
     assault = prov.controller == defender and prov.castle > 0 and prov.garrison > 0
     battle = Battle(pos=pos, attacker=owner, defender=defender, start=world.turn, assault=assault,
                     stance={owner: "attack", defender: "hold"})
+    battle.members = {u.id for u in world.units_at(pos) if u.owner in (owner, defender)} | {u.id for u in group}
     world.battles.append(battle)
     combat.deploy(world, battle)
     _log(world, battle, f"{_name(world, owner)} attacked {_name(world, defender)}"
@@ -129,11 +184,23 @@ def _start(world, group, pos):
     return True
 
 
+def _overrun(world, group, pos):
+    """The stack overruns the enemy's civilians on pos: they are lost, and no battle starts."""
+    owner = group[0].owner
+    others = [u for u in world.units_at(pos) if u.owner != owner]
+    world.lose(others, "overrun")
+    world.message(f"{_name(world, owner)} overran {len(others)} unarmed unit{'s' * (len(others) != 1)} at "
+                  f"{world.place(world.provinces[pos])}.", _shown(world, owner, others[0].owner))
+    world.changed()
+
+
 def join(world, battle, group):
-    """A stack already on the battle's hex joins its side's reserve (spec 3.1). Its men count in ``men0`` from now on,
-    and it fights from the first day a gap opens in its side's lanes. Returns True."""
+    """A stack already on the battle's hex joins its side's reserve (spec 3.1). Only its war units that are not yet in the
+    battle count in ``men0``; every unit of the stack becomes a member. The joiners fight from the first day a gap opens
+    in their side's lanes. Returns True."""
     tag = group[0].owner
-    men = sum(u.men for u in group if u.kind.war)
+    men = sum(u.men for u in group if u.kind.war and u.hp > 0 and u.id not in battle.members)
+    battle.members.update(u.id for u in group)
     battle.men0[tag] = battle.men0.get(tag, 0) + men
     side = "attacker" if tag == battle.attacker else "defender"
     _log(world, battle, f"{_name(world, tag)} joined the {side} side with {men:,} men")
@@ -170,23 +237,38 @@ def battle_order(world, pos, tag, stance):
 # ----- the retreat -------------------------------------------------------------------------------------------------
 
 def retreat_spot(world, group, pos):
-    """The hex a beaten side retreats to (spec 3.6): the nearest land hex within RETREAT_RANGE that the side's country
-    controls, with no enemy unit, no battle, and room for the whole side (military.can_stand). Ties go to the hex
-    farthest from the enemy's nearest unit, then the lowest pos. None when there is no such hex."""
+    """The hex a beaten side retreats to (spec 3.6). Walking from pos over land, the nearest hex within RETREAT_RANGE
+    steps that the side's country controls, with no enemy unit, no battle and room for the whole side (military.can_stand).
+    The walk never crosses a wall (world.walls(): the ridge crests, and the mountain passes in winter), the sea or a hex
+    with an enemy unit. Ties go to the hex farthest from the enemy's nearest unit, then the lowest pos. None when there is
+    no such hex. It runs when an order is set or a side breaks, never per frame."""
     if not group:
         return None
     tag = group[0].owner
     enemies = world.enemies(tag)
     enemy_at = [u.pos for u in world.units if u.owner in enemies and u.carrier is None]
+    blocked = set(enemy_at)
+    walls = world.walls()
+    steps_to = {pos: 0}
+    frontier = [pos]
+    for step in range(1, RETREAT_RANGE + 1):
+        nxt = []
+        for here in frontier:
+            for n in neighbors(here):
+                if n in steps_to or n in blocked or not world.is_land(n) or (here, n) in walls:
+                    continue
+                steps_to[n] = step
+                nxt.append(n)
+        frontier = nxt
     best = None
-    for p in within(pos, RETREAT_RANGE):
-        if p == pos or not world.is_land(p) or p in enemy_at or world.battle_at(p) is not None:
+    for p, steps in steps_to.items():
+        if p == pos or world.battle_at(p) is not None:
             continue
         prov = world.provinces.get(p)
         if prov is None or prov.controller != tag or not military.can_stand(world, group, p):
             continue
         away = min((distance(p, f) for f in enemy_at), default=0)
-        key = (distance(pos, p), -away, p)
+        key = (steps, -away, p)
         if best is None or key < best:
             best = key
     return None if best is None else best[2]
@@ -207,13 +289,16 @@ def _move_side(world, group, pos, spot):
 
 
 def _pursue(world, battle, tag, share, units):
-    """A withdrawal's pursuit: each regiment of the side loses ``share`` of its hp, all of it killed, none wounded
-    (spec 3.4, 3.5). The garrison is not in ``units``: it stays in its castle."""
+    """A withdrawal's pursuit: each regiment of the side loses ``share`` of the men it has (its hp), all of it killed, none
+    wounded (spec 3.4, 3.5). Never more than the men it has left. The garrison is not in ``units``: it stays in its castle."""
     for unit in units:
         if unit not in world.units or not unit.kind.war:
             continue
-        hp = share * unit.kind.hp
-        total = battle.carry.get(unit.id, 0.0) + hp
+        carry = battle.carry.get(unit.id, 0.0)
+        hp = min(share * unit.hp, max(0.0, unit.hp - carry))
+        if hp <= 0:
+            continue
+        total = round(carry + hp, 9)
         whole = int(total)
         battle.carry[unit.id] = total - whole
         battle.killed[tag] = battle.killed.get(tag, 0.0) + hp * combat.men_per_hp(unit)
@@ -223,15 +308,16 @@ def _pursue(world, battle, tag, share, units):
 
 
 def _men_now(battle, unit):
-    """The men a regiment still has: its hp less the damage it has not yet taken (battle.carry), in men."""
-    if not unit.kind.hp:
+    """The men a regiment still has: its hp less the damage it has not yet taken (battle.carry), in men. Only war units
+    have men; generals, wagons and the other civilians have none (spec 6.5)."""
+    if not unit.kind.war or not unit.kind.hp:
         return 0.0
     return combat.men_per_hp(unit) * (unit.hp - battle.carry.get(unit.id, 0.0))
 
 
 def _surrender(world, battle, tag, group):
-    """No retreat hex: the side is lost. Its men count as killed (spec 6.1)."""
-    battle.killed[tag] = battle.killed.get(tag, 0.0) + sum(_men_now(battle, u) for u in group)
+    """No retreat hex: the side is lost. Its war units' men count as killed (spec 6.1)."""
+    battle.killed[tag] = battle.killed.get(tag, 0.0) + sum(_men_now(battle, u) for u in group if u.kind.war)
     world.lose(group, "surrendered")
 
 
@@ -273,13 +359,14 @@ def _settle_wounded(world, battle, fighters):
                 unit.hp = min(unit.kind.hp, unit.hp + back)
 
 
-def _storm(world, battle, loser, how):
-    """A castle falls to the attacker when the defender's army breaks or surrenders and its garrison is gone (no hp or
-    no morale). A garrison still standing holds the castle: the attacker stays and the siege goes on. True if stormed."""
+def _storm(world, battle, loser, how, had_field):
+    """A castle falls to the attacker when the defender's army breaks or surrenders and the castle has no defence left.
+    With no field units the garrison is the whole army (spec 3.6.5, decision 2026-11-13): its break stores the castle.
+    With field units, the castle holds while its garrison has men and morale. True if stormed."""
     prov = world.provinces[battle.pos]
     if loser != battle.defender or not battle.assault or how not in ("broke", "surrendered"):
         return False
-    if prov.garrison > 0 and battle.garrison_morale > 0:
+    if had_field and prov.garrison > 0 and battle.garrison_morale > 0:
         return False
     world.bus.emit("province_captured", battle.attacker, battle.pos, loser=prov.controller, by="storm")
     prov.controller, prov.siege, prov.garrison = battle.attacker, 0, 0
@@ -287,23 +374,34 @@ def _storm(world, battle, loser, how):
 
 
 def end_battle(world, battle, how, loser=None):
-    """End a battle (spec 3.6). ``how``: "broke" (the loser's army broke on a day; the pursuit was on that day),
-    "withdrew" (the loser withdrew, or the safety stop picked it), "peace" or "gone" (no loser: no pursuit, no retreat).
-    The loser retreats to retreat_spot or surrenders; the winner's survivors gain experience, the loser's survivors less;
-    the wounded come back in supply; a stormed castle goes to the attacker; the battle leaves world.battles, and then
-    battle_ended is emitted once."""
+    """End a battle (spec 3.6). ``how``: "broke" (the loser's army broke on a day; the pursuit was on that day), "withdrew"
+    (the loser withdrew on its order: half pursuit, then the retreat), "stalemate" (the safety stop: the lower army
+    retreats with no pursuit; with no retreat hex the battle is a draw, nobody wins and nobody surrenders), "peace" or
+    "gone" (a draw: no loser, no pursuit, no retreat). A side with no retreat hex surrenders after "broke" or "withdrew".
+    The winner's survivors gain experience when the battle had days (the loser's survivors less); the wounded come back
+    in supply; a stormed castle goes to the attacker; the battle leaves world.battles, and then battle_ended is emitted
+    once."""
     att, dfn, pos = battle.attacker, battle.defender, battle.pos
     winner = None if loser is None else (dfn if loser == att else att)
     fighters = {tag: _side_units(world, battle, tag) for tag in (att, dfn)}
+    had_field = any(u.kind.war for u in fighters[dfn])     # decided before the retreat moves the units
     retreat = None
-    if loser is not None and how in ("broke", "withdrew"):
+    if loser is not None and how == "stalemate":
+        group = [u for u in fighters[loser] if u in world.units]
+        spot = retreat_spot(world, group, pos) if group else None
+        if spot is None:
+            how, winner, loser = "stalemate", None, None
+        else:
+            _move_side(world, group, pos, spot)
+            retreat, how = spot, "withdrew"
+    elif loser is not None and how in ("broke", "withdrew"):
         if how == "withdrew":
             _pursue(world, battle, loser, WITHDRAW_PURSUIT, fighters[loser])
         retreat, how = _retreat_or_surrender(world, battle, loser, fighters[loser], how)
-    if loser is not None:
+    if loser is not None and battle.days > 0:
         _experience(world, fighters, winner, loser)
     _settle_wounded(world, battle, fighters)
-    storm = _storm(world, battle, loser, how)
+    storm = _storm(world, battle, loser, how, had_field)
     if battle in world.battles:
         world.battles.remove(battle)
     world.changed(ownership=storm)
@@ -332,25 +430,34 @@ def _shakier(world, battle):
 
 
 def _fight_season(world, battle):
-    """One battle's season: withdrawals take effect first, then up to DAYS_PER_SEASON days, then the safety stop."""
+    """One battle's season: a side with nothing left ends it (a draw); withdrawals take effect next; then up to
+    DAYS_PER_SEASON days (a side left with nothing ends it there too); then the safety stop."""
     att, dfn = battle.attacker, battle.defender
+    if not (_present(world, battle, att) and _present(world, battle, dfn)):
+        end_battle(world, battle, "gone")
+        return
     withdrawing = [tag for tag in (att, dfn) if battle.stance.get(tag) == "withdraw"]
     if withdrawing:
         end_battle(world, battle, "withdrew", withdrawing[0] if len(withdrawing) == 1 else _shakier(world, battle))
         return
     before = {tag: (battle.killed.get(tag, 0.0), battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}
-    broke, days = None, 0
+    broke, days, gone = None, 0, False
     while days < DAYS_PER_SEASON and broke is None:
         broke = combat.fight_day(world, battle)["broke"]
         days += 1
+        if not (_present(world, battle, att) and _present(world, battle, dfn)):
+            gone = True
+            break
     world.bus.emit("battle_fought", att, battle.pos, defender=dfn, days=days,
                    morale={tag: army_morale(world, battle, tag) for tag in (att, dfn)},
                    killed={tag: round(battle.killed.get(tag, 0.0) - before[tag][0]) for tag in (att, dfn)},
                    wounded={tag: round(battle.wounded.get(tag, 0.0) - before[tag][1]) for tag in (att, dfn)})
-    if broke is not None:
+    if gone:
+        end_battle(world, battle, "gone")
+    elif broke is not None:
         end_battle(world, battle, "broke", broke)
     elif _seasons(world, battle) >= BATTLE_MAX_SEASONS:
-        end_battle(world, battle, "withdrew", _shakier(world, battle))
+        end_battle(world, battle, "stalemate", _shakier(world, battle))
 
 
 def battle_season(world):
