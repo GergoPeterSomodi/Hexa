@@ -8,9 +8,11 @@ from collections import deque
 
 from ..hexgrid import distance, neighbors
 from . import geo, tech
+from .systems import war as warsys
 from .systems.combat import battle_strength
 SCALE = geo.SCALE
-from .data import (AI_ATTACK_POWER, AI_STANCE_RATIO, AI_WITHDRAW_RATIO, ATTACK_MORALE, BUILDINGS,
+from .data import (AI_ATTACK_POWER, AI_RELIEF_RATIO, AI_RELIEF_SEASONS, AI_SIEGE_MAX_SEASONS,
+                   AI_SIEGE_MAX_SEASONS_GUNS, AI_STANCE_RATIO, AI_STORM_SHARE, AI_WITHDRAW_RATIO, ATTACK_MORALE, BUILDINGS,
                    CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GOODS,
                    MANUFACTORIES, MANUFACTORY_TAX, UNIT_KINDS, troop,
                    SETTLEMENT_TAX, WORKS, WORKS_BONUS)
@@ -395,6 +397,10 @@ def _join(world, tag, battle):
 
 
 def _campaign(world, tag, stack, enemies):
+    """One stack of an AI country at war (0.2.2, design 4.8): a beaten army goes home; it joins a battle of its side, or
+    relieves its own place under siege; it storms a siege at half its meter when the odds allow; it attacks a field army it
+    beats by AI_ATTACK_POWER; it besieges the nearest place it can take in time; else it walks toward the nearest enemy
+    place. A siege is kept while the stack stays on the place (a shaken stack leaves it)."""
     if _shaken(stack):
         _gather(world, tag, stack)                  # a beaten army goes home to recover, it does not attack
         return
@@ -405,10 +411,18 @@ def _campaign(world, tag, stack, enemies):
             world.attack_group(stack, pos)
             _answer(world, pos)
             return
+    here = world.provinces.get(stack[0].pos)
+    if here is not None and here.besieger == tag and here.controller in enemies and world.siege_terms(here, tag, stack)["ok"]:
+        _storm_siege(world, tag, stack, enemies)     # storms when its meter is half way, else the siege goes on
+        return                                       # keep the siege going: a siege is not left for another target (0.2.2)
+    if _relieve(world, tag, stack, options):
+        return
+    if _storm_siege(world, tag, stack, enemies):
+        return
     ours = _force(world, stack)
     best = None
     for pos in options:
-        if world.battle_at(pos) is not None:         # a battle hex is a join only (above)
+        if world.battle_at(pos) is not None or world.besiege_target(stack, pos):   # castles: a siege below
             continue
         theirs = _defence_power(world, pos)
         ratio = ours / max(1.0, theirs)
@@ -420,9 +434,8 @@ def _campaign(world, tag, stack, enemies):
         world.attack_group(stack, best[1])
         _answer(world, best[1])
         return
-    here = world.provinces.get(stack[0].pos)
-    if here and here.owner in enemies | {tag} and here.controller != tag:
-        return                                      # keep the siege going
+    if _besiege_nearest(world, tag, stack, options, enemies):
+        return
     lost = [p for p in world.provinces_of(tag) if p.controller != tag]
     guns = any(u.kind.branch == "artillery" for u in stack)
     targets = lost or [p for e in enemies for p in world.provinces_of(e)
@@ -433,6 +446,99 @@ def _campaign(world, tag, stack, enemies):
     if distance(goal, stack[0].pos) > 30 * SCALE:
         return
     world.move_toward_group(stack, goal)
+
+
+def _season_limit(stack):
+    """The most seasons a siege may take this AI stack (AI_SIEGE_MAX_SEASONS, more with guns in the stack)."""
+    return AI_SIEGE_MAX_SEASONS_GUNS if any(u.kind.branch == "artillery" for u in stack) else AI_SIEGE_MAX_SEASONS
+
+
+def _war_seasons_left(world, prov, tag):
+    """The seasons the war between tag and the place's controller has left, the arrival season counted (None: no war)."""
+    war = next((w for w in world.wars if {w.a, w.b} == {tag, prov.controller}), None)
+    if war is None:
+        return None
+    return warsys.war_limit(world, war.a, war.b) - (world.turn - war.start) + 1
+
+
+def _besiege_nearest(world, tag, stack, options, enemies):
+    """The enemy place this stack can take nearest, in time (4.8): a siege of at most _season_limit seasons that the war
+    still has seasons for. Adjacent and garrisoned: besiege it now (attack_group makes it a siege); else march there.
+    True when the stack acted."""
+    limit, home = _season_limit(stack), stack[0].pos
+    best = None
+    for enemy in enemies:
+        for prov in world.provinces_of(enemy):
+            if prov.controller == tag or prov.controller not in enemies or distance(prov.pos, home) > 12 * SCALE:
+                continue
+            if world.battle_at(prov.pos) is not None:
+                continue
+            seasons = world.siege_forecast(prov, tag, stack, prov.siege if prov.besieger == tag else 0,
+                                           prov.siege_turns if prov.besieger == tag else 0)
+            left = _war_seasons_left(world, prov, tag)
+            if seasons is None or seasons > limit or (left is not None and seasons > left):
+                continue
+            key = (distance(prov.pos, home), seasons, prov.pos)
+            if best is None or key < best:
+                best = key
+    if best is None:
+        return False
+    goal = best[2]
+    if goal in options and world.besiege_target(stack, goal):
+        world.attack_group(stack, goal)
+        _answer(world, goal)
+        return True
+    world.move_toward_group(stack, goal)
+    return True
+
+
+def _storm_siege(world, tag, stack, enemies):
+    """A stack that besieges a place storms it once the meter is half of the need (AI_STORM_SHARE), when its men are at
+    least AI_ATTACK_POWER times the defence's (the garrison after the siege's cut, war.storm_defence). True when it stormed."""
+    pos = stack[0].pos
+    prov = world.provinces.get(pos)
+    if prov is None or prov.besieger != tag or prov.controller not in enemies:
+        return False
+    need = world.siege_terms(prov, tag, stack)["need"]
+    if prov.siege < AI_STORM_SHARE * need:
+        return False
+    defence, _ = warsys.storm_defence(world, pos, prov.controller)
+    men = sum(u.men for u in stack if u.kind.war)
+    if men < AI_ATTACK_POWER * defence or not world.storm_check(stack, pos)[0]:
+        return False
+    world.storm_group(stack, pos)
+    _answer(world, pos)
+    return True
+
+
+def _relieve(world, tag, stack, options):
+    """Relief (4.8): one of this country's places that an enemy stack besieges, where this stack is within AI_RELIEF_SEASONS
+    of travel and has at least AI_RELIEF_RATIO of the besieger's power. Castles of level 2 and 3 and the capital come
+    first. Adjacent: it attacks the besieger (a battle, as relief is); else it marches. True when the stack acted."""
+    mine = _force(world, stack)
+    capital = world.countries[tag].capital
+    best = None
+    for prov in world.provinces_of(tag):
+        if not prov.besieger or prov.besieger == tag or prov.besieger not in world.enemies(tag):
+            continue
+        besiegers = [u for u in world.units_at(prov.pos) if u.owner == prov.besieger and u.kind.war]
+        if not besiegers or mine < AI_RELIEF_RATIO * _force(world, besiegers):
+            continue
+        priority = prov.castle >= 2 or prov.pos == capital
+        key = (not priority, distance(prov.pos, stack[0].pos), prov.pos)
+        if best is None or key < best[0]:
+            best = (key, prov)
+    if best is None:
+        return False
+    prov = best[1]
+    if prov.pos in options and world.battle_at(prov.pos) is None:
+        world.attack_group(stack, prov.pos)
+        _answer(world, prov.pos)
+        return True
+    if world.path_to(stack, prov.pos, seasons=AI_RELIEF_SEASONS):
+        world.move_toward_group(stack, prov.pos)
+        return True
+    return False
 
 
 def _diplomacy(world, tag):
