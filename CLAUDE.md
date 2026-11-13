@@ -263,7 +263,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   not move, raise, refit, drill or heal (`start_units`, `move_check`, `can_stand`, `recruit_check`, `refit_check`,
   `upgrade_check`, `forage_check`); a siege skips a battle hex (`war.sieges`).
 - **Battle read model** (`battleview.py`, pygame-free; PR 6a): `battle_view(world, battle_or_pos, viewer)` is the one plain, read-only
-  view of a battle that the badge, the panel, the log and the odds card read: sides as lists of tags, per-side men, killed, wounded,
+  view of a battle that the badge (`hud/battles.py`), the panel, the log (`feed.py`) and the odds card read: sides as lists of tags, per-side men, killed, wounded,
   front morale (the break-test measure), strength, lanes, reserve, back line, stance, orders with their reasons, the last day's dice,
   the log through `battlelog.describe`. The fog rule (documented in the module): exact to a side or to no player, rounded when the
   player sees the hex, hidden otherwise; an ended battle has no view. `odds_view(world, group, target_pos, viewer)` gives the odds

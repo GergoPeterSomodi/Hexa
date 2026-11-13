@@ -8,6 +8,7 @@ import pygame
 
 from ..hexgrid import neighbors
 from . import art, geo, goodsart, goodsobjects, landscape, wfctiles
+from .render import battlemark
 from .render.budget import FrameBudget
 from .data import (GOODS, NATIVE_VILLAGE_SPRITE,
                    TERRAIN, TERRAIN_SPRITES, WORKS)
@@ -515,14 +516,16 @@ class MapView:
             elif pose.f > 0:
                 (x0, y0), (x1, y1) = at(pose.a), at(pose.b)
                 walking.append((pose.ids, (x0 + (x1 - x0) * pose.f, y0 + (y1 - y0) * pose.f)))
-        stacks = {}
+        stacks, battles = {}, {b.pos: b for b in world.battles}
         for unit in world.units:
             if unit.carrier is None and (unit.id not in away or unit.id in held):
-                stacks.setdefault(held.get(unit.id, unit.pos), []).append(unit)
-        for pos, stack in stacks.items():
+                here = held.get(unit.id, unit.pos)
+                stacks.setdefault(battlemark.slot(battles.get(here), here, unit.owner), []).append(unit)
+        for (pos, side), stack in stacks.items():
             if player and stack[0].owner != player and pos not in world.visible and stack[0].id not in held:
                 continue
             x, y = at(pos)
+            x += battlemark.shift(self.r, side)
             if view_rect.inflate(40, 40).collidepoint(x, y):
                 top = next((u for u in stack if u.kind.war), stack[0])
                 self._draw_stack(screen, stack, top, (x, y), any(u in group for u in stack))

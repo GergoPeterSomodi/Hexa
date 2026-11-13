@@ -8,9 +8,9 @@ gets the action. Text helpers (``fit``, ``wrap``, ``text``) need only a font and
 import pygame
 
 from .icons import icon
-from .theme import (BUTTON_FACE, BUTTON_FACE_HOT, BUTTON_FACE_OFF, FAINT, GOLD, LINE, MENU_BUTTON, MENU_DISABLED,
-                    MENU_HOVER, MENU_WARN, MUTED, ROW_HOVER, SHADE, TECH_BUTTON, TECH_BUTTON_HOT, TECH_BUTTON_OFF,
-                    TECH_FAINT, TECH_MUTED, TECH_TEXT, TEXT, TOGGLE_FACE, TOGGLE_HOT)
+from .theme import (BAD_C, BUTTON_FACE, BUTTON_FACE_HOT, BUTTON_FACE_OFF, FAINT, GOLD, GOOD_C, INFO_C, INK, LINE,
+                    MENU_BUTTON, MENU_DISABLED, MENU_HOVER, MENU_WARN, MUTED, ROW_HOVER, SHADE, TECH_BUTTON,
+                    TECH_BUTTON_HOT, TECH_BUTTON_OFF, TECH_FAINT, TECH_MUTED, TECH_TEXT, TEXT, TOGGLE_FACE, TOGGLE_HOT)
 
 
 class Button:
@@ -239,3 +239,90 @@ def hover_card(ctx, title, lines, max_width=420):
         if right:
             text(ctx.screen, ctx.font, right, (box.right - 10, y), right_colour, align="right")
         y += 19
+
+
+# ----- the battle panel's parts (battle slice 1, PR 7) ----------------------------------------------------------
+def choice(ctx, rect, label, enabled=True, selected=False):
+    """One of several choice buttons (a stance, a standing order): a menu button, with a gold edge when it is the
+    one chosen. Draws only; the caller keeps the hit box. Returns the rect."""
+    rect = menu_button(ctx, rect, label, enabled)
+    if selected:
+        pygame.draw.rect(ctx.screen, GOLD, rect, 2, border_radius=7)
+    return rect
+
+
+_PIPS = {1: ((1, 1),), 2: ((0, 0), (2, 2)), 3: ((0, 0), (1, 1), (2, 2)), 4: ((0, 0), (2, 0), (0, 2), (2, 2)),
+         5: ((0, 0), (2, 0), (1, 1), (0, 2), (2, 2)),
+         6: ((0, 0), (2, 0), (0, 1), (2, 1), (0, 2), (2, 2))}
+
+
+def die(surface, rect, roll, edge=None):
+    """A six-sided die face showing ``roll`` (1 to 6), in the kit's look: an ivory face, the right half in shadow, a
+    dark ink outline, dark pips. ``edge`` (a colour) is a thin band under the face, the side's colour."""
+    rect = pygame.Rect(rect)
+    pygame.draw.rect(surface, (226, 222, 208), rect, border_radius=max(3, rect.w // 6))
+    shade = pygame.Surface((rect.w // 2, rect.h), pygame.SRCALPHA)
+    shade.fill((0, 0, 0, 40))
+    surface.blit(shade, (rect.centerx, rect.y))
+    if edge is not None:
+        pygame.draw.rect(surface, edge, (rect.x + 3, rect.bottom - 4, rect.w - 6, 3), border_radius=2)
+    inset = rect.w * 0.2
+    span = (rect.w - 2 * inset)
+    radius = max(2, rect.w // 14)
+    for col, row in _PIPS.get(roll, ()):
+        cx = rect.x + inset + span * col / 2
+        cy = rect.y + inset + (rect.h - 2 * inset) * row / 2
+        pygame.draw.circle(surface, INK, (round(cx), round(cy)), radius)
+    pygame.draw.rect(surface, INK, rect, 2, border_radius=max(3, rect.w // 6))
+
+
+def tug_bar(surface, rect, share, left, right):
+    """A tug-of-war bar: the left colour takes ``share`` (0 to 1) of the bar from the left edge, the right colour the
+    rest. Returns the x where the two colours meet."""
+    rect = pygame.Rect(rect)
+    share = min(1.0, max(0.0, share))
+    split = rect.x + round(rect.w * share)
+    pygame.draw.rect(surface, right, rect, border_radius=5)
+    if split > rect.x:
+        pygame.draw.rect(surface, left, (rect.x, rect.y, split - rect.x, rect.h), border_radius=5)
+    pygame.draw.rect(surface, LINE, rect, 1, border_radius=5)
+    return split
+
+
+CARD_TONES = {"normal": (38, 44, 55), "muted": (30, 33, 40), "routing": (58, 36, 38)}
+
+
+def regiment_card(ctx, rect, figure, name, rank, state, men_text, men_share, morale, colour, tone="normal",
+                  state_colour=None):
+    """A regiment in the battle panel: the unit figure, its name and rank, a state tag (RESERVE, ROUTING, fires,
+    Garrison), the men with a bar of its strength, and a morale bar (blue; red when routing). ``tone`` "muted" greys
+    a lane that is closed or empty. Draws only; returns the rect."""
+    rect = pygame.Rect(rect)
+    pygame.draw.rect(ctx.screen, CARD_TONES.get(tone, CARD_TONES["normal"]), rect, border_radius=6)
+    pygame.draw.rect(ctx.screen, colour, rect, 2, border_radius=6)
+    x = rect.x + 6
+    if figure is not None:
+        ctx.screen.blit(figure, figure.get_rect(midleft=(x, rect.centery)))
+    x0 = rect.x + 56
+    width = rect.right - x0 - 8
+    ctx.text(ctx.font, name, (x0, rect.y + 6), TEXT if tone != "muted" else FAINT, width - 8)
+    if rank:
+        tag_w = ctx.small.size(rank)[0]
+        ctx.text(ctx.small, rank, (rect.right - 8 - tag_w, rect.y + 8), GOLD)
+    if state:
+        ctx.text(ctx.small, state, (x0, rect.y + 24), state_colour or MUTED, width)
+    line = ctx.small.size(men_text)[0]
+    ctx.text(ctx.small, men_text, (rect.right - 8 - line, rect.y + 24), MUTED if tone != "muted" else FAINT)
+    bar_y = rect.bottom - 16
+    track = pygame.Rect(x0, bar_y, width, 5)
+    pygame.draw.rect(ctx.screen, TOGGLE_FACE, track, border_radius=2)
+    fill = max(0.0, min(1.0, men_share))
+    if fill > 0:
+        pygame.draw.rect(ctx.screen, GOOD_C, (x0, bar_y, round(width * fill), 5), border_radius=2)
+    track = pygame.Rect(x0, bar_y + 8, width, 5)
+    pygame.draw.rect(ctx.screen, TOGGLE_FACE, track, border_radius=2)
+    fill = max(0.0, min(1.0, morale))
+    if fill > 0:
+        pygame.draw.rect(ctx.screen, BAD_C if tone == "routing" else INFO_C, (x0, bar_y + 8, round(width * fill), 5),
+                         border_radius=2)
+    return rect

@@ -3,6 +3,7 @@ import pygame
 
 from ...ui.kit import heading, panel_frame, wrap
 from ...ui.theme import BAD_C, GOLD, GOOD_C, MUTED, TEXT
+from ..battleview import battle_view
 from ..data import COLONIST, FOOD_PER_TROOP, GENERAL, GENERAL_TRAITS
 from .cards import unit_card
 
@@ -13,6 +14,8 @@ def draw(ctx, world, ui, unit):
     group = ui.group or [unit]
     troops = [u for u in group if u.kind.war]
     y = _header(ctx, world, unit, group, troops, x, y, w)
+    if unit.owner == world.player or _battle_of(world, unit):
+        y = _battle(ctx, world, unit, troops, x, y, w)
     if troops and not unit.naval and not unit.carrier:
         y = _supply(ctx, world, unit, group, x, y, w)
     if unit.owner != world.player:
@@ -32,9 +35,36 @@ def _header(ctx, world, unit, group, troops, x, y, w):
     pygame.draw.rect(ctx.screen, country.color, (x, y + 3, 12, 12))
     line = country.name
     if troops and not unit.naval:
-        line += f"   ·   {len(troops)}/{world.stack_limit(unit.owner, group)} troops   ·   power {world.stack_power(troops):.0f}"
+        men = sum(u.men for u in troops)
+        line += f"   ·   {len(troops)}/{world.stack_limit(unit.owner, group)} troops   ·   {men:,} men"
     ctx.text(ctx.font, line, (x + 18, y), width=w - 18)
     return y + 22
+
+
+STANDING = {"hold": "Hold: stands and fights where it is", "withdraw": "Withdraw: falls back if it has a hex to go to"}
+
+
+def _battle_of(world, unit):
+    """The battle view of the battle on the unit's hex, if one is there and the player may know of it (else None)."""
+    view = battle_view(world, unit.pos, world.player)
+    return view if view is not None and view["access"] != "hidden" else None
+
+
+def _battle(ctx, world, unit, troops, x, y, w):
+    """The battle on the stack's hex ("In battle: ..."), and the stack's standing order: what it does when it is attacked
+    and given no order. The order is shown only; the toggle waits for the battle panel (PR 7, its press action)."""
+    view = _battle_of(world, unit)
+    in_battle = view is not None and unit.owner in view["sides"]["attacker"] + view["sides"]["defender"]
+    own = bool(troops) and unit.owner == world.player
+    if not (in_battle or own):
+        return y
+    if in_battle:
+        ctx.text(ctx.small, f"In battle: {view['name']}", (x, y), GOLD, w)
+        y += 17
+    if own:
+        ctx.text(ctx.small, "If attacked with no order: " + STANDING.get(unit.standing, unit.standing), (x, y), MUTED, w)
+        y += 17
+    return y + 6
 
 
 SUPPLY_COLOUR = {"supplied": GOOD_C, "wagon": GOLD, "foraging": GOLD, "cut off": BAD_C}
@@ -71,7 +101,7 @@ def _supply(ctx, world, unit, group, x, y, w):
 
 def _foreign(ctx, group, x, y):
     for u in group[:14]:
-        ctx.text(ctx.small, f"{u.label}   {u.hp}/{u.kind.hp} HP" if u.kind.war else u.label, (x, y), MUTED)
+        ctx.text(ctx.small, f"{u.label}   {u.men:,} men" if u.kind.war else u.label, (x, y), MUTED)
         y += 18
 
 
@@ -121,7 +151,7 @@ def _row(ctx, world, ui, unit, u, x, y, w):
                "Untick to leave this unit behind (split the stack)", small=True)
     label = u.label
     if u.kind.war:
-        label += f"   {u.hp}/{u.kind.hp}"
+        label += f"   {u.men:,} men"
     elif u.kind is GENERAL:
         label = f"General: {GENERAL_TRAITS[u.trait]}"
     color = TEXT if u.moves_left > 0 else MUTED

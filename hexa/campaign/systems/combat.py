@@ -98,6 +98,20 @@ def battle_strength(world, battle, tag):
     return strength_morale(world, battle, tag) * battle.men0.get(tag, 0)
 
 
+def group_strength(world, units, garrison_pos=None):
+    """Men and strength (morale times men) of a group of units before any battle, as (men, strength): the live war units
+    of ``units``, and the garrison of the castle on ``garrison_pos`` when it is given (its morale is full before a battle).
+    battleview.odds_view uses it for both sides of the odds card. Once a battle is on, battle_strength is the same measure."""
+    wars = [u for u in units if u.kind.war and u.hp > 0]
+    men = float(sum(u.men for u in wars))
+    strength = float(sum(u.morale * u.men for u in wars))
+    if garrison_pos is not None:
+        garrison = GARRISON_MEN * world.provinces[garrison_pos].garrison
+        men += garrison
+        strength += garrison
+    return men, strength
+
+
 def strength_morale(world, battle, tag):
     """A side's morale over every regiment it has on the hex, 0 to 1: the sum of morale times men over its war units and
     garrison (routed ones counting 0), over the men it went in with (``battle.men0``). Reserves count here at full weight."""
@@ -564,5 +578,5 @@ def fight_day(world, battle):
         report["morale"][tag] = army_morale(world, battle, tag)
     record(world, battle, "day", killed={tag: round(report["killed"][tag], 1) for tag in (att, dfn)},
            wounded={tag: round(report["wounded"][tag], 1) for tag in (att, dfn)}, rolls=dict(rolls), broke=broke,
-           cause=cause)
+           cause=cause, shaken=sorted(shaken))
     return report

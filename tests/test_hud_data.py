@@ -214,7 +214,9 @@ class FeedTest(unittest.TestCase):
              "Battle!"),
             (("battle_ended", "POR", self.mine, dict(attacker="POR", defender="CAS", winner="POR", loser="CAS",
                                                      name="Battle of Y, 1480", seasons=2,
-                                                     killed={"POR": 300, "CAS": 900})), "war", "Battle over"),
+                                                     killed={"POR": 300, "CAS": 900})), "gain", "Victory!"),
+            (("battle_fought", "POR", self.mine, dict(defender="CAS", days=2, morale={"POR": 0.5, "CAS": 0.4},
+                                                      killed={"POR": 300, "CAS": 900}, wounded={})), "war", "Fought"),
             (("siege_progress", "POR", self.mine, dict(progress=2, need=5)), "siege", "Siege 2/5"),
             (("province_captured", "POR", self.mine, dict(loser="CAS", by="siege")), "gain", "Captured!"),
             (("province_captured", "CAS", self.mine, dict(loser="POR", by="storm")), "loss", "Lost!"),
@@ -247,9 +249,30 @@ class FeedTest(unittest.TestCase):
 
     def test_sentences_name_places_and_countries(self):
         item, _ = self.one("battle_ended", "POR", self.mine, attacker="POR", defender="CAS", winner="POR", loser="CAS",
-                           name="Battle of Y, 1480", seasons=2, killed={"POR": 300, "CAS": 1200})
-        self.assertIn("Battle of Y, 1480 (2 seasons): Portugal beat Castile.", item.sentence)
+                           name="Battle of Y, 1480", seasons=2, killed={"POR": 300, "CAS": 1200}, how="broke",
+                           cause="centre")
+        self.assertIn("Battle of Y, 1480 ends: Portugal wins, centre broke after 2 seasons.", item.sentence)
         self.assertIn("Portugal lost 300 men, Castile lost 1,200 men", item.sentence)
+
+    def test_battle_ends_name_the_way_it_was_decided(self):
+        cases = [(dict(how="broke", cause="lanes"), "two lanes broke"), (dict(how="broke", cause="morale"), "the army broke"),
+                 (dict(how="withdrew"), "the loser withdrew"), (dict(how="surrendered"), "the loser surrendered"),
+                 (dict(how="destroyed"), "the loser was destroyed")]
+        for extra, words in cases:
+            item, _ = self.one("battle_ended", "FRA", self.seen, defender="CAS", winner="FRA", loser="CAS",
+                               name="Battle of Y, 1480", seasons=1, killed={}, **extra)
+            self.assertIn(f"Battle of Y, 1480 ends: France wins, {words} after 1 season.", item.sentence, extra)
+
+    def test_a_battle_has_a_ribbon_for_the_player_and_war_news_for_the_rest(self):
+        ends = {"victory": ("POR", "CAS", "gain", "Victory!"), "defeat": ("CAS", "POR", "loss", "Defeat!"),
+                "others won": ("FRA", "CAS", "war", "Battle won"), "draw": (None, None, "war", "Battle over")}
+        for label, (winner, loser, colour, text) in ends.items():
+            item, _ = self.one("battle_ended", "FRA", self.seen, defender="CAS", winner=winner, loser=loser,
+                               how="peace" if winner is None else "withdrew", seasons=1, killed={})
+            self.assertEqual((item.colour_kind, item.text), (colour, text), label)
+        item, _ = self.one("battle_started", "FRA", self.seen, defender="CAS", assault=True,
+                           name="Battle of Y, 1480")
+        self.assertEqual(item.sentence, "Battle of Y, 1480 begins: France attacked Castile in its castle.")
 
     def test_costs_join_the_sentence(self):
         self.feed.clear()
@@ -346,6 +369,50 @@ class FeedTest(unittest.TestCase):
             for item in items:
                 self.assertIn(item.colour_kind, feed.COLOUR_KINDS)
                 self.assertTrue(item.sentence)
+
+
+class BattleLogTest(unittest.TestCase):
+    """The season's battle line for a real battle: its name, the last day's dice, the lanes broken now (battleview)."""
+
+    def setUp(self):
+        from tests.test_battle import plain_battle
+        self.w = fresh("POR")
+        self.feed = feed.of(self.w)
+        self.fight, self.battle = plain_battle(self.w, [("infantry", 1, 3)], [("infantry", 1, 3)])
+        self.a, self.d = self.fight.attacker, self.fight.defender
+        self.w.player = self.a
+
+    def fought(self, days=1):
+        from hexa.campaign.systems import combat
+        for _ in range(days):
+            combat.fight_day(self.w, self.battle)
+        self.w.changed()
+        self.feed.clear()
+        self.w.bus.emit("battle_fought", self.a, self.battle.pos, defender=self.d, days=days,
+                        morale={self.a: 0.5, self.d: 0.4}, killed={self.a: 300, self.d: 900},
+                        wounded={self.a: 100, self.d: 0})
+        return [i for _, _, items in self.feed.entries() for i in items]
+
+    def test_the_line_names_the_battle_and_gives_the_last_days_dice(self):
+        items = self.fought()
+        self.assertEqual([(i.kind, i.colour_kind, i.text) for i in items], [("battle_fought", "war", "Fought")])
+        sentence = items[0].sentence
+        self.assertTrue(sentence.startswith(f"{self.battle.name}, season 1: "), sentence)
+        name = {tag: self.w.countries[tag].name for tag in (self.a, self.d)}
+        self.assertIn(f"{name[self.a]} lost 300 men (100 wounded), {name[self.d]} lost 900 men (0 wounded).", sentence)
+        rolls = [rec for rec in self.battle.log if isinstance(rec, dict) and rec["kind"] == "day"][-1]["rolls"]
+        self.assertIn(f"Last day (1): {name[self.a]} rolled {rolls[self.a]}, {name[self.d]} rolled {rolls[self.d]}.",
+                      sentence)
+
+    def test_a_broken_lane_is_named_in_the_line(self):
+        self.battle.broken[self.d] = [0]
+        sentence = self.fought()[0].sentence
+        self.assertIn(f"{self.w.countries[self.d].name} lost its left lane.", sentence)
+        self.assertNotIn(f"{self.w.countries[self.a].name} lost its", sentence)
+
+    def test_a_battle_the_player_only_watches_has_no_line(self):
+        self.w.player = next(t for t in self.w.countries if t not in (self.a, self.d) and self.w.countries[t].alive)
+        self.assertEqual(self.fought(), [])
 
 
 class NoticeTest(unittest.TestCase):

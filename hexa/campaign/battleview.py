@@ -22,8 +22,9 @@ A side dict has ``access``, ``men`` (now), ``start`` (men that went in, joiners 
 ``strength`` (combat.battle_strength: men times strength morale, what the bar shows), ``lanes`` (three dicts, left,
 centre, right: lane, open, broken, id, kind, rank, men, morale, shaken), ``reserve``, ``back_line`` (artillery),
 ``routed``, ``general`` (trait or None), ``stance``, ``standing``, ``can_order`` and ``orders`` (for the viewer's own
-side: {"attack"|"hold"|"withdraw": {ok, reason}}, else None). ``shaken`` is always None: combat keeps the day's shaken
-regiments on the day object, not in the battle, so the view cannot know them.
+side: {"attack"|"hold"|"withdraw": {ok, reason}}, else None). Each lane's ``shaken`` is True for the regiment that moved up
+into it on the battle's last day (combat records the ids in the day's log record), False for another regiment, None for an
+empty lane or the garrison.
 
 Fog (decided in PR 6a; the panel and the log may say so):
 - exact: viewer None, or a side of the battle. Every number is exact; stances and standing orders are shown.
@@ -141,7 +142,16 @@ def _regiment(battle, unit, access):
             "men": _men_out(_unit_men(battle, unit), access), "morale": _morale_out(unit.morale, access)}
 
 
-def _lane(world, battle, tag, lane, key, by_id, access):
+def _shaken(battle):
+    """The ids of the regiments that moved up into a lane on the battle's last day (the day record's ``shaken``; empty
+    before the first day and in a battle saved before the record had it)."""
+    for rec in reversed(battle.log):
+        if isinstance(rec, dict) and rec.get("kind") == "day":
+            return frozenset(rec.get("shaken") or ())
+    return frozenset()
+
+
+def _lane(world, battle, tag, lane, key, by_id, access, shaken):
     """One lane of a side: the regiment in it (or the garrison), empty when nothing holds the lane."""
     prov = world.provinces[battle.pos]
     out = {"lane": LANES[lane], "open": combat.lane_open(prov, lane), "broken": lane in battle.broken.get(tag, ()),
@@ -152,7 +162,7 @@ def _lane(world, battle, tag, lane, key, by_id, access):
     elif key is not None and key in by_id:
         unit = by_id[key]
         out.update(id=unit.id, kind=unit.kind.name, rank=unit.rank[1], men=_men_out(_unit_men(battle, unit), access),
-                   morale=_morale_out(unit.morale, access))
+                   morale=_morale_out(unit.morale, access), shaken=unit.id in shaken)
     return out
 
 
@@ -171,7 +181,8 @@ def _side(world, battle, tag, viewer, access):
     by_id = {u.id: u for u in units}
     lanes_of = battle.lanes.get(tag, [None, None, None])
     in_lanes = {key for key in lanes_of if key is not None}
-    lanes = tuple(_lane(world, battle, tag, lane, lanes_of[lane], by_id, access) for lane in range(3))
+    shaken = _shaken(battle)
+    lanes = tuple(_lane(world, battle, tag, lane, lanes_of[lane], by_id, access, shaken) for lane in range(3))
     rest = [u for u in units if u.id not in in_lanes and u.id not in battle.routed]
     reserve = tuple(_regiment(battle, u, access) for u in rest if u.kind.branch != "artillery")
     back_line = tuple(_regiment(battle, u, access) for u in rest if u.kind.branch == "artillery")
@@ -302,13 +313,12 @@ def _enemy(world, owner, pos, battle):
 
 def _attack_raw(world, group, battle, owner):
     """The attacking side's men and strength: the group's regiments, joined to the side already in the battle."""
-    wars = [u for u in group if u.kind.war and u.hp > 0]
-    men = float(sum(u.men for u in wars))
-    strength = float(sum(u.morale * u.men for u in wars))
+    men, strength = combat.group_strength(world, group)
     if battle is not None and owner in (battle.attacker, battle.defender):
-        joiners = [u for u in wars if u.id not in battle.members]
-        men = _side_men(world, battle, owner) + sum(u.men for u in joiners)
-        strength = combat.battle_strength(world, battle, owner) + sum(u.morale * u.men for u in joiners)
+        joiners = [u for u in group if u.kind.war and u.hp > 0 and u.id not in battle.members]
+        joined_men, joined_strength = combat.group_strength(world, joiners)
+        men = _side_men(world, battle, owner) + joined_men
+        strength = combat.battle_strength(world, battle, owner) + joined_strength
     return men, strength
 
 
@@ -316,16 +326,10 @@ def _defence_raw(world, pos, battle, enemy):
     """The defending side's men and strength on the target hex (the battle's, or the hex's before one)."""
     if battle is not None:
         return _side_men(world, battle, enemy), combat.battle_strength(world, battle, enemy)
-    men = strength = 0.0
-    for unit in world.units_at(pos):
-        if unit.owner == enemy and unit.kind.war and unit.hp > 0:
-            men += unit.men
-            strength += unit.morale * unit.men
     prov = world.provinces[pos]
-    if prov.castle and prov.garrison > 0 and prov.controller == enemy:
-        men += GARRISON_MEN * prov.garrison
-        strength += GARRISON_MEN * prov.garrison          # the garrison's morale is full before the battle
-    return men, strength
+    garrison = prov.castle and prov.garrison > 0 and prov.controller == enemy       # full morale before the battle
+    return combat.group_strength(world, [u for u in world.units_at(pos) if u.owner == enemy],
+                                 pos if garrison else None)
 
 
 def _figures(raw, access):

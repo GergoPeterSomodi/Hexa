@@ -22,7 +22,7 @@ COLOURS = {
     "castle": (200, 200, 210), "flag": (230, 110, 100), "check": (120, 200, 120), "cross": (230, 110, 100),
     "down": (230, 110, 100), "up": (120, 200, 120), "scroll": (230, 215, 180), "target": (120, 175, 235),
     "sun": GOLD, "snow": (220, 235, 250), "political": (200, 90, 90), "terrain": (150, 160, 170),
-    "goods": (190, 140, 80), "markets": GOLD,
+    "goods": (190, 140, 80), "markets": GOLD, "battle": (240, 232, 214),
 }
 NAMES = tuple(COLOURS)
 _cache = BoundedCache("icons", 256)
@@ -129,6 +129,13 @@ def _glyph_more(name, s, c, dark, lite):
         P.circle(s, c, (32, 32), 7)
         for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1)):
             P.line(s, c, (32 + 24 * dx, 32 + 24 * dy), (32 + 31 * dx, 32 + 31 * dy), 6)
+    elif name == "battle":                      # crossed swords on a roundel: the mark of a battle on the map
+        P.circle(s, dark, (32, 32), 30)
+        P.circle(s, lite, (32, 32), 26, 3)
+        for a, b in (((12, 12), (52, 52)), ((52, 12), (12, 52))):
+            P.line(s, c, a, b, 7)
+        P.line(s, dark, (4, 22), (22, 4), 6)
+        P.line(s, dark, (42, 4), (60, 22), 6)
     elif name == "sun":
         P.circle(s, c, (32, 32), 14)
         for a in range(8):

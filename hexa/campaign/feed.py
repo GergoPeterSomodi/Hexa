@@ -41,6 +41,7 @@ import weakref
 from collections import deque
 from typing import NamedTuple, Optional
 
+from .battleview import battle_view
 from .data import BUILDINGS, ERAS, date
 from .tech import TECHS
 
@@ -63,6 +64,9 @@ NOTICES = {
 LOSS_TEXT = {"battle": "Lost", "storm": "Lost", "overrun": "Overrun", "deserted": "Deserted", "starved": "Starved",
              "sunk": "Sunk", "evicted": "Evicted", "disbanded": "Disbanded"}
 LOSS_LOGGED = ("overrun", "starved", "sunk", "evicted", "disbanded")     # the others are told by their own items
+BROKE_CAUSE = {"centre": "centre broke", "lanes": "two lanes broke", "morale": "the army broke"}
+BATTLE_HOW = {"withdrew": "the loser withdrew", "surrendered": "the loser surrendered", "destroyed": "the loser was destroyed"}
+DRAW_HOW = {"peace": "peace was made", "gone": "a side was gone"}
 SPENT = {"build": ("Building", "Started building at {}"), "refit": ("Refitted", "Refitted troops at {}"),
          "upgrade": ("Drilled", "Drilled troops at {}")}
 
@@ -160,8 +164,8 @@ class Feed:
 
     @staticmethod
     def _passes(item, filter):
-        if filter == "war":
-            return item.colour_kind in ("war", "siege")
+        if filter == "war":                     # a battle's lines are war news, whatever their ribbon's colour
+            return item.colour_kind in ("war", "siege") or item.kind.startswith("battle_")
         if filter == "money":
             return item.kind in MONEY_KINDS
         return item.mine if filter == "mine" else True
@@ -210,7 +214,8 @@ class Feed:
         mine = self._party(att, dfn)
         if not (mine or self._seen(event.pos)):
             return None
-        sentence = f"{event.get('name') or 'Battle'}: {self._name(att)} attacked {self._name(dfn)}."
+        castle = " in its castle" if event.get("assault") else ""
+        sentence = f"{event.get('name') or 'Battle'} begins: {self._name(att)} attacked {self._name(dfn)}{castle}."
         return self._item(event, "war", "Battle!", sentence, mine)
 
     def _battle_ended(self, event):
@@ -218,14 +223,54 @@ class Feed:
         mine = self._party(att, dfn)
         if not (mine or self._seen(event.pos)):
             return None
+        winner, loser, seasons = event.get("winner"), event.get("loser"), event.get("seasons", 1)
         killed = event.get("killed", {})
-        if event.get("winner"):
-            verdict = f"{self._name(event.get('winner'))} beat {self._name(event.get('loser'))}"
+        if winner:
+            verdict = f"{self._name(winner)} wins, {self._how(event)}"
         else:
-            verdict = "no side won"
-        sentence = (f"{event.get('name') or 'Battle'} ({event.get('seasons', 1)} seasons): {verdict}. "
+            verdict = f"no side wins, {DRAW_HOW.get(event.get('how'), 'the fight stopped')}"
+        sentence = (f"{event.get('name') or 'Battle'} ends: {verdict} after {seasons} season{'s' * (seasons != 1)}. "
                     f"{self._name(att)} lost {killed.get(att, 0):,} men, {self._name(dfn)} lost {killed.get(dfn, 0):,} men.")
-        return self._item(event, "war", "Battle over", sentence, mine)
+        player = self.world.player
+        if player is not None and player == winner:
+            colour, text = "gain", "Victory!"
+        elif player is not None and player == loser:
+            colour, text = "loss", "Defeat!"
+        else:                                   # the other battles are war news, a draw as well
+            colour, text = "war", "Battle won" if winner else "Battle over"
+        return self._item(event, colour, text, sentence, mine)
+
+    @staticmethod
+    def _how(event):
+        """How a battle with a winner was decided, in words (the loser's army broke, withdrew, ...)."""
+        how = event.get("how")
+        if how == "broke":
+            return BROKE_CAUSE.get(event.get("cause"), "the army broke")
+        return BATTLE_HOW.get(how, "the loser gave way")
+
+    def _battle_fought(self, event):
+        """The season's line of a battle a side of which is the player: the men lost on each side, the last day's dice and
+        the lanes that are broken now (battleview has them). A battle the player only watches gets no line; its end is told."""
+        att, dfn = event.tag, event.get("defender")
+        if not self._party(att, dfn):
+            return None
+        view = battle_view(self.world, event.pos, self.world.player)
+        name = view["name"] if view else (event.get("name") or "Battle")
+        seasons = view["seasons"] if view else self.world.turn
+        killed, wounded = event.get("killed", {}), event.get("wounded", {})
+        sentence = f"{name}, season {seasons}: " + ", ".join(
+            f"{self._name(t)} lost {killed.get(t, 0):,} men ({wounded.get(t, 0):,} wounded)" for t in (att, dfn)) + "."
+        dice = view["dice"] if view else None
+        if dice:
+            rolls = dice["rolls"]
+            sentence += f" Last day ({dice['day']}): " + ", ".join(
+                f"{self._name(t)} rolled {rolls[t]}" for t in (att, dfn) if t in rolls) + "."
+        for tag in (att, dfn):
+            side = view["side"].get(tag) if view else None
+            for lane in (side["lanes"] if side else ()):
+                if lane["broken"]:
+                    sentence += f" {self._name(tag)} lost its {lane['lane']} lane."
+        return self._item(event, "war", "Fought", sentence, True, floating=False)
 
     def _province_captured(self, event):
         captor, loser, how = event.tag, event.get("loser"), event.get("by")

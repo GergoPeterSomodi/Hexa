@@ -335,5 +335,82 @@ class OddsTest(unittest.TestCase):
         self.assertEqual(view["defence"]["men"], GARRISON_MEN * world.provinces[fight.defend_pos].garrison)
 
 
+class ShakenTest(unittest.TestCase):
+    """The lanes' shaken flag comes from the last day's record (combat writes the ids that moved up into a lane that day)."""
+
+    def setUp(self):
+        self.world = fresh("POR")
+        self.fight, self.battle = plain_battle(self.world, [("infantry", 1, 3)], [("infantry", 1, 3)])
+        self.a = self.fight.attacker
+        self.world.player = self.a
+        fight_days(self.world, self.battle, 2)
+
+    def last_day(self):
+        return [rec for rec in self.battle.log if isinstance(rec, dict) and rec["kind"] == "day"][-1]
+
+    def test_the_day_record_holds_the_shaken_ids_as_a_list(self):
+        self.assertEqual(self.last_day()["shaken"], sorted(self.last_day()["shaken"]))
+        self.assertTrue(all(isinstance(i, int) for i in self.last_day()["shaken"]))
+
+    def test_a_regiment_that_moved_up_on_the_last_day_is_shaken_in_the_view(self):
+        held = self.battle.lanes[self.a][1]
+        self.assertIsNotNone(held)
+        self.last_day()["shaken"] = [held]
+        self.world.changed()
+        lanes = battle_view(self.world, self.battle, self.a)["side"][self.a]["lanes"]
+        for index, lane in enumerate(lanes):
+            if lane["id"] is None:
+                self.assertIsNone(lane["shaken"], lane["lane"])
+            else:
+                self.assertIs(lane["shaken"], index == 1, lane["lane"])
+
+    def test_an_old_day_without_the_list_has_nobody_shaken(self):
+        self.last_day().pop("shaken", None)
+        self.world.changed()
+        for lane in battle_view(self.world, self.battle, self.a)["side"][self.a]["lanes"]:
+            self.assertIsNot(lane["shaken"], True)
+
+
+class GroupStrengthTest(unittest.TestCase):
+    """combat.group_strength: men and strength of a group before any battle (the odds card's numbers)."""
+
+    def test_men_and_strength_of_the_war_units_only(self):
+        world = fresh("POR")
+        fight = setup(world, [("infantry", 1, 3), ("infantry", 1, 2)], [], castle=0)
+        units = list(fight.attackers)
+        units[0].morale = 0.5
+        men, strength = combat.group_strength(world, units)
+        self.assertEqual(men, float(sum(u.men for u in units)))
+        self.assertEqual(strength, float(sum(u.morale * u.men for u in units)))
+        self.assertEqual(combat.group_strength(world, []), (0.0, 0.0))
+
+    def test_a_garrison_adds_its_men_at_full_morale(self):
+        world = fresh("POR")
+        fight = setup(world, [("infantry", 1, 3)], [], castle=1)
+        prov = world.provinces[fight.defend_pos]
+        prov.garrison = 2
+        men, strength = combat.group_strength(world, [], fight.defend_pos)
+        self.assertEqual((men, strength), (GARRISON_MEN * 2.0, GARRISON_MEN * 2.0))
+        self.assertEqual(combat.group_strength(world, []), (0.0, 0.0))
+
+
+class BattleMarkTest(unittest.TestCase):
+    """render/battlemark.py: the two stacks of a battle hex stand either side of the centre."""
+
+    def test_off_a_battle_nothing_moves(self):
+        from hexa.campaign.render import battlemark
+        self.assertEqual(battlemark.slot(None, (1, 2), "POR"), ((1, 2), None))
+        self.assertEqual(battlemark.shift(13, None), 0)
+
+    def test_the_attacker_left_the_defender_right_by_half_the_radius(self):
+        from hexa.campaign.render import battlemark
+        battle = type("B", (), {"pos": (1, 2), "attacker": "POR", "defender": "CAS"})()
+        self.assertEqual(battlemark.slot(battle, (1, 2), "POR"), ((1, 2), "attacker"))
+        self.assertEqual(battlemark.slot(battle, (1, 2), "CAS"), ((1, 2), "defender"))
+        self.assertEqual(battlemark.slot(battle, (1, 2), "FRA"), ((1, 2), None))
+        self.assertAlmostEqual(battlemark.shift(12, "attacker"), -6.0)
+        self.assertAlmostEqual(battlemark.shift(12, "defender"), 6.0)
+
+
 if __name__ == "__main__":
     unittest.main()

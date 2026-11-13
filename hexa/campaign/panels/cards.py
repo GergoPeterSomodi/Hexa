@@ -3,7 +3,7 @@
 Pure functions of the world (they draw nothing); ``kit.hover_card`` draws what they return.
 """
 from ...ui.theme import BAD_C, GOOD_C, MUTED, TEXT
-from ..data import (BRANCH_NAMES, BUILDINGS, CASTLES, ERAS, FOOD_PER_TROOP, GOODS, NEEDS, SETTLEMENTS, TERRAIN, WAGON)
+from ..data import (BRANCH_NAMES, BUILDINGS, CASTLES, ERAS, FOOD_PER_TROOP, GOODS, MEN, NEEDS, SETTLEMENTS, TERRAIN, WAGON)
 
 
 def cost_lines(world, prov, kind):
@@ -41,7 +41,7 @@ def troop_card(world, kind, prov=None):
                             (f"Speeds sieges (+{kind.siege} a season)", GOOD_C),
                             ("Weak: helpless up close (half defense)", BAD_C)]}[kind.branch]
     title = f"{kind.name}  ({BRANCH_NAMES[kind.branch].lower()}, {ERAS[kind.era][0]})"
-    lines = [(f"Attack {kind.attack}   Defense {kind.defense}   HP {kind.hp}   Moves {kind.moves}", TEXT)]
+    lines = [(f"Attack {kind.attack}   Defense {kind.defense}   {MEN:,} men when full   Moves {kind.moves}", TEXT)]
     return title, lines + strong + cost_lines(world, prov, kind)
 
 
@@ -49,7 +49,7 @@ def unit_card(world, unit):
     """The card of one unit in a stack: hit points, experience, supply and moves."""
     lines = []
     if unit.kind.war:
-        lines.append((f"HP {unit.hp}/{unit.kind.hp}   Attack {unit.kind.attack}+{unit.atk_up}   "
+        lines.append((f"{unit.men:,} men   Attack {unit.kind.attack}+{unit.atk_up}   "
                       f"Defense {unit.kind.defense}+{unit.def_up}", TEXT))
         rank = unit.rank
         lines.append((f"Experience {unit.xp}" + (f" ({rank[1]}, +{(rank[2] - 1) * 100:.0f}%)" if rank[1] else
@@ -114,7 +114,7 @@ def province_card(world, pos):
     if here and (here[0].owner == tag or pos in world.visible):
         troops = [u for u in here if u.kind.war]
         lines.append((f"{world.countries[here[0].owner].name}: {len(here)} unit{'s' * (len(here) != 1)}"
-                      + (f", {len(troops)} troops, power {world.stack_power(troops):.0f}" if troops else ""),
+                      + (f", {len(troops)} troops, {sum(u.men for u in troops):,} men" if troops else ""),
                       BAD_C if here[0].owner != tag else TEXT))
     return world.place(prov), lines
 

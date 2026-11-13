@@ -2,6 +2,7 @@
 
     topbar.py     the resource chips, date, map modes, Menu and End season (``resources`` has the numbers)
     floating.py   ribbons that rise from the hex where something happened (``feed`` says what)
+    battles.py    the battle marks on the map: the crossed-swords badge and the front-line bar (``battleview`` says what)
     actionlog.py  the collapsible log in the bottom-left corner (``feed`` has its lines)
     style.py      the colour and icon of each of the six kinds of event, shared by the ribbons and the log
 
@@ -13,7 +14,7 @@ changes the game (selecting a stack and moving the camera are the window's own s
 import pygame
 
 from ...ui.theme import INFO_C, INK
-from . import actionlog, topbar
+from . import actionlog, battles, topbar
 from .floating import Floaters
 
 GLIDE_MS = 260          # how long the camera takes to reach a place the log names
@@ -24,6 +25,7 @@ MAX_AGE = 2.0           # seconds: a ribbon for something told longer ago than t
 class Hud:
     def __init__(self):
         self.floaters = Floaters()
+        self.marks = battles.Marks()
         self.log = actionlog.LogState()
         self.readings = None            # the top bar's cached snapshot (topbar.readings)
         self.glide = None               # (hex to show, start ms, ms of the last frame): the camera follows the hex
@@ -54,6 +56,7 @@ class Hud:
         self._glide(ctx, now)
         self.floaters.add(ctx, self._timed(ctx, ctx.game.feed.take_floating(MAX_AGE)), now)
         self.floaters.draw(ctx, now)
+        self.marks.draw(ctx, self)
         self._ring(ctx, now)
 
     def _timed(self, ctx, items):
