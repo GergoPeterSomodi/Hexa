@@ -16,7 +16,7 @@ from .data import (COUNTER, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP, GAR
                    GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, SCOUT, SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX,
                    ATTRITION, FARM_GOODS, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER, SUPPLY_BASE, SUPPLY_PER_FARM,
                    SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, END_YEAR, PIONEER, CASTLE_DEFENSE,
-                   CASTLE_SIEGE, SIEGE_BASE, START_YEAR, TERRAIN, WAR_LENGTH_AI, date)
+                   CASTLE_SIEGE, SIEGE_BASE, START_YEAR, TERRAIN, WAR_LENGTH_AI, MANUFACTORIES, date)
 
 INF = float("inf")
 SCALE = geo.SCALE
@@ -37,7 +37,6 @@ LAND_TILES = ("plains", "steppe", "forest", "hills", "mountains", "desert", "jun
               "savanna", "beach", "snow")
 FORBIDDEN = worldgen.FORBIDDEN        # the terrain pairs that may not touch (wave function collapse)
 Province, Country, Market, Route = state.Province, state.Country, state.Market, state.Route   # saves pickle every state class as hexa.campaign.world.<Name>
-from .data import MANUFACTORIES
 
 
 def _europe_region(lon, lat):

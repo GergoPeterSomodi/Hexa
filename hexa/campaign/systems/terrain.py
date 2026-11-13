@@ -4,6 +4,8 @@ Functions taking ``world``. ``CampaignWorld`` binds them as methods with a plain
 terrain.edge_blocked``), so the hot ones (``edge_blocked``, ``step_walls``, ``winter``, ``step_cost``) cost no extra
 call. What stays on ``CampaignWorld`` is ``pass_data``, which owns the ``_pass_cache`` the pass tables are kept in
 (``pass_tables`` here builds them), and ``pass_wait``/``field_in``, which run the movement path search (step 3.11).
+Inside this module the functions call each other directly (``is_winter(world)``, ``step_walls(world)``, not
+``world.winter()``): they are the module's own functions, so there is no facade to go through.
 Imports point down: never world.py, ui, render or pygame.
 """
 import hashlib
