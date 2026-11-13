@@ -215,7 +215,7 @@ class ResearchShowTest(Home):
         c = app.world.countries["POR"]
         c.era = 3
         app.world.set_research("POR", "volley_fire")
-        self.assertEqual(app.tech_order(), {"drill_yards": 0, "tercio": 1, "volley_fire": 2})
+        self.assertEqual(app.tech.order(app), {"drill_yards": 0, "tercio": 1, "volley_fire": 2})
 
     def test_the_current_research_and_queue_are_named_outside_the_tech_screen(self):
         app = CampaignApp(player="POR")
@@ -235,49 +235,49 @@ class QuitDialogTest(Home):
     def test_exit_asks_yes_or_no_first(self):
         app = CampaignApp(player="POR")
         app.open_menu()
-        app.menu_press(("exit",))
+        app.pause.press(app, ("exit",))
         self.assertTrue(app.running, "one click does not quit")
         self.assertEqual(app.menu, "question")
-        app.menu_press(("page", "main"))                    # No
+        app.pause.press(app, ("page", "main"))                    # No
         self.assertEqual(app.menu, "main")
         self.assertTrue(app.running)
 
     def test_yes_quits(self):
         app = CampaignApp(player="POR")
         app.open_menu()
-        app.menu_press(("exit",))
-        app.menu_press(("exit_now",))                       # Yes
+        app.pause.press(app, ("exit",))
+        app.pause.press(app, ("exit_now",))                       # Yes
         self.assertFalse(app.running)
         self.assertEqual(app.result, "quit")
 
     def test_main_menu_asks_too(self):
         app = CampaignApp(player="POR")
         app.open_menu()
-        app.menu_press(("menu",))
+        app.pause.press(app, ("menu",))
         self.assertTrue(app.running)
         self.assertEqual(app.menu, "question")
-        app.menu_press(("menu_now",))
+        app.pause.press(app, ("menu_now",))
         self.assertFalse(app.running)
         self.assertEqual(app.result, "menu")
 
     def test_escape_on_the_question_goes_back_to_the_pause_menu(self):
         app = CampaignApp(player="POR")
         app.open_menu()
-        app.menu_press(("exit",))
-        app.menu_key(pygame.K_ESCAPE)
+        app.pause.press(app, ("exit",))
+        app.pause.key(app, pygame.K_ESCAPE)
         self.assertEqual(app.menu, "main")
         self.assertTrue(app.running)
 
     def test_without_a_game_exit_does_not_ask(self):
         app = CampaignApp()
         app.open_menu()
-        app.menu_press(("exit",))
+        app.pause.press(app, ("exit",))
         self.assertFalse(app.running)
 
     def test_the_dialog_is_drawn_with_yes_and_no(self):
         app = CampaignApp(player="POR")
         app.open_menu()
-        app.menu_press(("exit",))
+        app.pause.press(app, ("exit",))
         app.draw()
         actions = [action for _, action, _ in app.menu_buttons]
         self.assertIn(("exit_now",), actions)

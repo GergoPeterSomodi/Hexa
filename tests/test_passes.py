@@ -22,6 +22,7 @@ except ImportError:                     # the unit suite runs without pygame (th
 from hexa.campaign import ai, geo  # noqa: E402
 from hexa.campaign.app import CampaignApp  # noqa: E402
 from hexa.campaign.data import CARAVEL, troop  # noqa: E402
+from hexa.campaign.panels.cards import province_card  # noqa: E402
 from hexa.campaign.world import CampaignWorld, War  # noqa: E402
 from hexa.hexgrid import distance, neighbors  # noqa: E402
 
@@ -533,10 +534,10 @@ class AppTest(unittest.TestCase):
     def test_hover_card_says_closed_in_winter(self):
         app = self.app
         app.world.turn = WINTER
-        lines = app.province_card(PASS_N)[1]
+        lines = province_card(app.world, PASS_N)[1]
         self.assertIn("The Gotthard pass (to the south-west) is closed by snow until spring", [text for text, _ in lines])
         app.world.turn = SUMMER
-        lines = app.province_card(PASS_N)[1]
+        lines = province_card(app.world, PASS_N)[1]
         self.assertFalse([text for text, _ in lines if "closed by snow" in text])
 
     def test_right_click_across_a_closed_pass_gives_the_reason_and_does_not_move(self):

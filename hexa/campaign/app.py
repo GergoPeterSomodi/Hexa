@@ -5,28 +5,21 @@ import sys
 import pygame
 
 from .. import settings as options
-from ..ui.kit import button as draw_button, fit, hover_card, text as draw_text, tip, wrap
-from ..ui.theme import BAD_C, BG, GOLD, LINE, PANEL_BG, TEXT, new_font
+from ..ui.kit import button as draw_button, hover_card, text as draw_text, tip, wrap
+from ..ui.theme import BG, GOLD, LINE, PANEL_BG, TEXT, new_font
 from . import geo, saves
-from .gamemenu import GameMenu
-from .techscreen import TechScreen
+from .display import open_window
+from .screens import ScreenStack, gamemenu
+from .screens.gamemenu import PauseMenu
+from .screens.techscreen import TechScreen
 from .data import COLONIST, GENERAL
+from .uistate import UI, hint_text
 from .mapview import ZOOMS, GOODS_VIEWS, MODES, MapView
 from .game import GameManager
 from .hud import Hud
 from . import panels
 from .panels.cards import province_card as card_of
 from .panels.country import research_line as research_text, war_line
-
-def _hint_text(hint):
-    """One line for a toast from a button hint: the hint itself, or for a (title, lines) hover card the first
-    line in red (the reason it is greyed out), else the card's title."""
-    if isinstance(hint, str):
-        return hint
-    title, lines = hint
-    reason = next((text for text, color in lines if color == BAD_C), None)
-    return reason or title
-
 
 def _ordinal(n):
     suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
@@ -52,38 +45,27 @@ TOP = 46
 PANEL_W = 390
 
 
-class UI:
-    def __init__(self):
-        self.selected = None        # the unit shown on top of the selected stack
-        self.group = []             # every unit of the selected stack
-        self.picked = set()         # ids of the units in it that will move (tick boxes)
-        self.province = None
-        self.panel = None           # province, unit, country, market, ledger
-        self.country = None         # tag shown in the country panel
-        self.market = None
-        self.reach = {}
-        self.attacks = {}
-        self.hover = None
-        self.mouse = (0, 0)
-        self.buttons = []
-        self.toast = ""
-        self.toast_until = 0
-        self.reach2 = {}
-        self.stops = set()
-        self.path = []
-        self.path_key = None
-        self.speed = 3
-        self.first_moves = 3
-        self.order_route = None     # route whose merchant orders are open in the market panel
-        self.hoverables = []        # (rect, card) areas that show a hover card
-        self.anim = None            # (unit ids, route, start ms) of a move being shown
-        self.hover_key = None
-        self.hover_since = 0
+def _screen_attr(screen, name):
+    """A read-only view of one attribute of a screen of the window (app.menu, app.tech_open, ...)."""
+    return property(lambda self: getattr(getattr(self, screen), name))
 
 
-class CampaignApp(GameMenu, TechScreen):
+class CampaignApp:
+    menu = _screen_attr("pause", "page")                 # None, "main", "save", "load", "options" or "question"
+    menu_confirm = _screen_attr("pause", "confirm")
+    menu_question = _screen_attr("pause", "question")
+    menu_buttons = _screen_attr("pause", "buttons")      # (rect, action, enabled) of the pause page on screen
+    menu_rect = _screen_attr("pause", "rect")
+    tech_open = _screen_attr("tech", "grid_open")
+    tech_selected = _screen_attr("tech", "selected")
+    tech_buttons = _screen_attr("tech", "buttons")
+    quickload_until = 0         # ticks until which a second F9 press loads the quicksave
+
     def __init__(self, tiles_dir=None, player=None, map="europe", seed=None, load=None):
         self.settings = options.load()
+        self.screens = ScreenStack(self)        # what is on top of the map: the pause menu, the tech screen
+        self.pause = PauseMenu()
+        self.tech = TechScreen()
         self.apply_display()
         self.tiles_dir = tiles_dir
         pygame.display.set_caption("Hexa: Age of Discovery")
@@ -122,6 +104,25 @@ class CampaignApp(GameMenu, TechScreen):
     @property
     def world(self):
         return self.game.world
+
+    def apply_display(self):
+        """Open the window (or go fullscreen) as the settings say; the map fills whatever size it gets."""
+        global WIDTH, HEIGHT
+        self.screen = open_window(self.settings)
+        WIDTH, HEIGHT = self.screen.get_size()
+        if hasattr(self, "camera"):
+            self.clamp()
+
+    # ----- the screens on top of the map (hexa/campaign/screens/) ---------------------------------------
+    def open_menu(self, page="main"):
+        self.pause.open(self, page)
+
+    def close_menu(self):
+        self.pause.close(self)
+
+    def open_tech(self):
+        self.tech.open(self)
+
 
     def _set_game(self, game):
         self.game = game                # the war alert listens to its world's event bus
@@ -286,9 +287,9 @@ class CampaignApp(GameMenu, TechScreen):
         season = self.game.end_season(orders=self._advance_orders)
         self.busy = False
         self.refresh()
-        self._autosave_toast(season.saved, season.error)
+        gamemenu.autosave_toast(self, season.saved, season.error)
         self.process_events()
-        if self.player and not world.countries[self.player].researching and not self.idea_pending():
+        if self.player and not world.countries[self.player].researching and not self.tech.pending(self):
             self.toast("Pick new research (T)")
 
     MARCH_SEASONS = 12          # how far ahead a planned march route is looked up (for the dashed line)
@@ -403,8 +404,9 @@ class CampaignApp(GameMenu, TechScreen):
 
     def _show_war_news(self):
         """Open the war alert for the pending declarations, once nothing else is on screen."""
+        self.tech.sync(self)                            # the idea modal follows the pending cards
         pending = self.__dict__.get("_war_news")
-        if not pending or not self.player or self.tech_open or self.idea_pending() or self.menu or self.busy:
+        if not pending or not self.player or self.screens or self.busy:
             return
         world = self.world
         attackers = list(dict.fromkeys(pending))
@@ -412,7 +414,7 @@ class CampaignApp(GameMenu, TechScreen):
         lines = [f"{world.countries[tag].name} has declared war on you." for tag in attackers]
         lines.append("Their armies can take your provinces. Their country panel shows the war.")
         first = attackers[0]
-        self.ask("War on you!", lines,
+        self.pause.ask(self, "War on you!", lines,
                  [(f"Show {world.countries[first].name}", ("country", first), False),
                   ("Continue", ("resume",), False)])
 
@@ -426,20 +428,17 @@ class CampaignApp(GameMenu, TechScreen):
     # ----- input -------------------------------------------------------------------------
     def handle(self, event):
         ui = self.ui
+        self.tech.sync(self)
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
-            self.toggle_fullscreen()
+            gamemenu.toggle_fullscreen(self)
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F5 and not self.busy:
-            self.save_to("quick")
+            gamemenu.save_to(self, "quick")
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F9 and not self.busy:
-            self.quickload()
+            gamemenu.quickload(self)
             return
-        if self.tech_open or self.idea_pending():
-            self.tech_handle(event)
-            return
-        if self.menu:
-            self.menu_handle(event)
+        if self.screens.handle_event(event):            # the top screen first: a screen takes every event it is offered
             return
         if event.type == pygame.QUIT:
             self.running, self.result = False, "quit"
@@ -455,7 +454,7 @@ class CampaignApp(GameMenu, TechScreen):
             elif key == pygame.K_m:
                 self.open_menu()
             elif key == pygame.K_t and self.player:
-                self.tech_toggle()
+                self.tech.toggle(self)
             elif key in (pygame.K_SPACE, pygame.K_RETURN) and self.player:
                 self.end_turn()
             elif key == pygame.K_TAB and self.player:
@@ -471,7 +470,7 @@ class CampaignApp(GameMenu, TechScreen):
             elif key in (pygame.K_MINUS, pygame.K_KP_MINUS):
                 self.zoom(-1)
             elif key == pygame.K_g:
-                self.toggle_grid()
+                gamemenu.toggle_grid(self)
             elif key == pygame.K_l:
                 ui.panel = "ledger" if ui.panel != "ledger" else None
             elif key == pygame.K_r and self.player and any(self.is_marching(u) for u in self.active()):
@@ -516,7 +515,7 @@ class CampaignApp(GameMenu, TechScreen):
                 if button.enabled:
                     self.press(button.action)
                 elif button.hint:
-                    self.toast(_hint_text(button.hint))
+                    self.toast(hint_text(button.hint))
                 return
         if ui.panel and self.panel_rect().collidepoint(pixel):
             return
@@ -677,7 +676,7 @@ class CampaignApp(GameMenu, TechScreen):
         self.ui.panel, self.ui.province = "raise", action[1]
 
     def _do_tech(self, action):
-        self.tech_toggle() if self.tech_open else self.open_tech()
+        self.tech.toggle(self)
 
     def _do_fund(self, action):
         if not self.world.fund_research(self.player):
@@ -751,9 +750,6 @@ class CampaignApp(GameMenu, TechScreen):
             self.clamp()
 
     # ----- drawing helpers (the work is in hexa/ui/kit.py) --------------------------------------------------
-    _fit = staticmethod(fit)
-    _wrap_words = staticmethod(wrap)
-
     def text(self, font, text, pos, color=TEXT, width=None):
         return draw_text(self.screen, font, text, pos, color, width).width
 
@@ -762,9 +758,15 @@ class CampaignApp(GameMenu, TechScreen):
 
     # ----- drawing ---------------------------------------------------------------------------
     def draw(self):
+        self.tech.sync(self)
+        self.ui.buttons = []
+        self.ui.hoverables = []
+        if not self.screens.hides_map:                  # an opaque screen (the tech grid) covers all of it
+            self._draw_map()
+        self.screens.draw()
+
+    def _draw_map(self):
         ui = self.ui
-        ui.buttons = []
-        ui.hoverables = []
         self._update_path()
         self.screen.fill(BG)
         self.view.grid_on = self.settings["grid"]
@@ -784,9 +786,6 @@ class CampaignApp(GameMenu, TechScreen):
             self.banner("The other countries are making their moves...")
         if self.world.over:
             self.banner(self.game_over_text())
-        if self.menu:
-            self.draw_menu()
-        self.draw_tech()
 
     def _update_path(self):
         ui, world = self.ui, self.world
@@ -895,9 +894,6 @@ class CampaignApp(GameMenu, TechScreen):
         elif now - ui.hover_since >= 350:
             hover_card(self, *hint)
 
-    def province_card(self, pos):
-        return card_of(self.world, pos)
-
     # ----- panels ------------------------------------------------------------------------
     def draw_panel(self):
         rect = self.panel_rect()
@@ -908,12 +904,14 @@ class CampaignApp(GameMenu, TechScreen):
 
     # ----- loop ---------------------------------------------------------------------------
     def run(self):
+        dt = 0
         while self.running:
             for event in pygame.event.get():
                 self.handle(event)
             self.scroll()
             self.process_events()
+            self.screens.update(dt)
             self.draw()
             pygame.display.flip()
-            self.clock.tick(60)
+            dt = self.clock.tick(60)
         return self.result

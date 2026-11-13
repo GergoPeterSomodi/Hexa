@@ -50,6 +50,7 @@ NO_TOLERANCE_ABOVE = 2000
 WINDOW = {
     "hexa.menu", "hexa.render", "hexa.colony.app", "hexa.colony.render",
     "hexa.campaign.app", "hexa.campaign.mapview", "hexa.campaign.gamemenu", "hexa.campaign.techscreen",
+    "hexa.campaign.display", "hexa.campaign.uistate",
     "hexa.campaign.art", "hexa.campaign.goodsart", "hexa.campaign.goodsobjects", "hexa.campaign.landscape",
     "hexa.campaign.landmarks", "hexa.campaign.life", "hexa.campaign.nature", "hexa.campaign.wfctiles",
 }
@@ -69,20 +70,19 @@ ALLOW_MODULES = {
     "hexa.campaign.goodsart": 2592,
     "hexa.campaign.wfctiles": 2399,
     "hexa.campaign.landscape": 2038,
-    "hexa.campaign.app": 975,
+    "hexa.campaign.app": 917,
     "hexa.campaign.mapview": 1546,
     "hexa.campaign.randomgeo": 1286,
     "hexa.campaign.life": 1205,
     "hexa.campaign.goodsobjects": 1155,
     "hexa.colony.world": 1116,
-    "hexa.campaign.techscreen": 885,
     "hexa.campaign.nature": 808,
 }
 
 ALLOW_FUNCTIONS = {
     "hexa.campaign.randomgeo:_attempt": 395,
     "hexa.campaign.wfctiles:_generate": 325,
-    "hexa.campaign.techscreen:_glyph": 137,
+    "hexa.campaign.screens.techdraw:_glyph": 137,
     "hexa.campaign.world:CampaignWorld._build_countries": 135,
     "hexa.campaign.randomgeo:_design": 134,
     "hexa.campaign.randomgeo:_mask": 130,
@@ -94,7 +94,7 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.goodsart:_stone": 85,
     "hexa.campaign.world:CampaignWorld._battle": 85,
     "hexa.campaign.goodsart:_furs": 84,
-    "hexa.campaign.gamemenu:GameMenu.draw_menu": 80,
+    "hexa.campaign.screens.gamemenu:PauseMenu.draw": 80,
     "hexa.campaign.landscape:decorate": 82,
     "hexa.campaign.randomgeo:_mountains": 82,
     "hexa.campaign.goodsart:_horses": 81,
@@ -102,7 +102,7 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.goodsart:_fish": 80,
     "hexa.campaign.wfctiles:_settlement_objects": 80,
     "hexa.campaign.world:CampaignWorld.economy": 80,
-    "hexa.campaign.app:CampaignApp.handle": 78,
+    "hexa.campaign.app:CampaignApp.handle": 75,
     "hexa.campaign.art:_draw_figure": 78,
     "hexa.campaign.goodsart:_silk": 78,
     "hexa.campaign.goodsart:_gold": 75,
@@ -111,20 +111,20 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.mapview:MapView._town_labels": 72,
     "hexa.campaign.goodsart:_wine": 70,
     "hexa.campaign.mapview:MapView.draw": 70,
-    "hexa.campaign.techscreen:TechScreen._draw_idea_modal": 68,
+    "hexa.campaign.screens.techdraw:draw_idea_modal": 68,
     "hexa.colony.mapgen:generate": 69,
     "hexa.campaign.goodsart:_hemp": 68,
     "hexa.campaign.goodsart:_cocoa": 67,
-    "hexa.campaign.techscreen:TechScreen._side_sections": 67,
+    "hexa.campaign.screens.techdraw:_side_sections": 67,
     "hexa.campaign.mapview:MapView._draw_tiles": 66,
-    "hexa.campaign.techscreen:TechScreen._draw_tech_node": 66,
+    "hexa.campaign.screens.techdraw:_node": 66,
     "hexa.campaign.goodsart:_silver": 65,
     "hexa.campaign.goodsart:_cattle": 65,
     "hexa.campaign.goodsart:_iron": 64,
     "hexa.campaign.wfctiles:_castle_objects": 64,
     "hexa.campaign.mapview:MapView.__init__": 62,
     "hexa.campaign.mapview:MapView._draw_landscape": 62,
-    "hexa.campaign.techscreen:TechScreen._draw_tech_grid": 61,
+    "hexa.campaign.screens.techdraw:_grid": 61,
 }
 
 # (module, what it reaches into). Offenders of 2026-11-12; remove a line when the code stops doing it.
@@ -374,6 +374,23 @@ class ImportRulesTest(unittest.TestCase):
 
     def test_state_modules_do_not_import_window_modules(self):
         self.assertEqual(direction_problems(), [])
+
+    def test_the_screens_never_import_the_window(self):
+        """The app-gamemenu cycle is gone: the pause menu, the tech screen and everything else under
+        hexa.campaign.screens (and the old import paths) talk to the window through the ctx they are handed, never by
+        importing hexa.campaign.app, directly or through another module."""
+        screens = sorted(m for m in modules() if m.startswith("hexa.campaign.screens")) + [
+            "hexa.campaign.gamemenu", "hexa.campaign.techscreen"]
+        self.assertTrue(len(screens) >= 6, screens)
+        for name in screens:
+            with self.subTest(module=name):
+                self.assertNotIn("hexa.campaign.app", reach(name), f"{name} imports the window: take it as ctx")
+
+    def test_the_game_manager_stays_pygame_free_and_never_sees_a_screen(self):
+        """The stack of screens belongs to the window (screens/__init__.py), not to campaign/game.py."""
+        reached = reach("hexa.campaign.game")
+        self.assertNotIn("pygame", reached)
+        self.assertFalse([m for m in reached if m.startswith("hexa.campaign.screens")], sorted(reached))
 
     def test_the_import_reader_sees_lazy_and_relative_imports(self):
         """A lazy pygame import and a relative window import are found, so the two tests above would bite."""

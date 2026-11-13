@@ -152,7 +152,7 @@ class TechScreenTest(unittest.TestCase):
             country.pending_ideas = [i.key for i in tech.draw_ideas("POR", counts, set(), random.Random(7))]
             app.draw()
             country.pending_ideas = []
-            app.close_tech()
+            app.tech.close(app)
             country.era = 1
 
 

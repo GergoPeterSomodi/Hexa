@@ -708,7 +708,7 @@ bumped `VERSION` alone.
 | `play.py` | Starts the game: menu, then the conquest window (mouse, keyboard, enemy turn timing) |
 | `hexa/menu.py` | The start menu |
 | `hexa/settings.py` | Player options, stored in `~/.hexa/settings.json` |
-| `hexa/campaign/` | Age of Discovery: `geo.py` (real map, countries, markets, rivers), `randomgeo.py` (random worlds), `wfc.py` (wave function collapse), `art.py` (code-drawn tiles, figures, tokens), `data.py` (goods, buildings, balance), `world.py` (economy, trade, colonies, war), `ai.py`, `mapview.py`, `app.py`, `gamemenu.py` (in-game menu), `saves.py` (save slots), `resources.py` and `feed.py` (what the top bar, the floating text and the action log show), `hud/` (their drawing: `topbar.py`, `floating.py`, `actionlog.py`) |
+| `hexa/campaign/` | Age of Discovery: `geo.py` (real map, countries, markets, rivers), `randomgeo.py` (random worlds), `wfc.py` (wave function collapse), `art.py` (code-drawn tiles, figures, tokens), `data.py` (goods, buildings, balance), `world.py` (economy, trade, colonies, war), `ai.py`, `mapview.py`, `app.py`, `screens/` (the pause menu and the technology screen), `saves.py` (save slots), `resources.py` and `feed.py` (what the top bar, the floating text and the action log show), `hud/` (their drawing: `topbar.py`, `floating.py`, `actionlog.py`) |
 | `hexa/colony/` | Colonisation mode: `rules.py`, `mapgen.py`, `world.py` (rules), `ai.py` (rivals, natives, royal army), `render.py`, `app.py` (window) |
 | `hexa/rules.py` | Unit, terrain and balance numbers |
 | `hexa/world.py` | Game state and rules: movement, combat, fog of war, turns, winning |

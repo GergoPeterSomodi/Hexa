@@ -32,8 +32,9 @@ class Hud:
     # ----- drawing ----------------------------------------------------------------------------------
     @staticmethod
     def hidden(ctx):
-        """Whether the map is not on screen: the technology screen or the pause menu is over it."""
-        return bool(ctx.tech_open or ctx.idea_pending() or ctx.menu)
+        """Whether the map is not on screen: a screen (the technology screen, the idea modal, the pause menu) is over
+        it, so the window's stack is not empty."""
+        return bool(ctx.screens)
 
     def covers(self, ctx, pixel):
         """Whether the HUD, not the map, is under `pixel`: the top bar, the minimap, or the action log's box (open or

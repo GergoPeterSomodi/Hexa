@@ -84,7 +84,7 @@ class LoadConfirmTest(AppTest):
     def test_the_first_click_on_a_slot_only_asks(self):
         app = self.app
         app.open_menu("load")
-        app.menu_press(("load", "1"))
+        app.pause.press(app, ("load", "1"))
         self.assertIs(app.world, self.original)
         self.assertEqual(app.menu_confirm, ("load", "1"))
         self.assertEqual(app.menu, "load")
@@ -92,8 +92,8 @@ class LoadConfirmTest(AppTest):
     def test_the_second_click_loads_the_slot(self):
         app = self.app
         app.open_menu("load")
-        app.menu_press(("load", "1"))
-        app.menu_press(("load", "1"))
+        app.pause.press(app, ("load", "1"))
+        app.pause.press(app, ("load", "1"))
         self.assertIsNot(app.world, self.original)
         self.assertIsNone(app.menu)
 
@@ -101,7 +101,7 @@ class LoadConfirmTest(AppTest):
         app = self.app
         app.world.over = True
         app.open_menu("load")
-        app.menu_press(("load", "1"))
+        app.pause.press(app, ("load", "1"))
         self.assertIsNot(app.world, self.original)
 
     def test_f9_asks_once_then_loads_the_quicksave(self):

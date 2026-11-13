@@ -1,4 +1,4 @@
-"""The Age of Discovery pause menu (hexa/campaign/gamemenu.py) driven through CampaignApp.run(): opening it (Esc, M,
+"""The Age of Discovery pause menu (hexa/campaign/screens/gamemenu.py) driven through CampaignApp.run(): opening it (Esc, M,
 the Menu button) and closing it, its main, save, load and options pages, the second click that overwriting a save
 and leaving the game need, the options and F11 kept in settings.json, the F9 quickload confirmation, the fixed
 crashes #9 and #10, and the bugs around the menu (#16, #17, #18, #19), fixed in v0.1.5.
@@ -425,7 +425,7 @@ class SaveLoadTest(PauseCase):
     def test_f9_asks_first_and_the_second_press_must_come_soon(self):
         """Issue #17, the F9 half (fixed): one F9 used to load the quicksave at once. Now it asks, and only a second
         press within QUICKLOAD_CONFIRM_MS loads; a press after that asks again."""
-        from hexa.campaign.gamemenu import QUICKLOAD_CONFIRM_MS
+        from hexa.campaign.screens.gamemenu import QUICKLOAD_CONFIRM_MS
         app = self.start("POR")
         first = self.world
         app.view.zoom = 1                                  # a cheap frame: the test waits a few hundred of them

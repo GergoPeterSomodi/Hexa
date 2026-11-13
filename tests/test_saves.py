@@ -390,15 +390,15 @@ class HeaderFieldsTest(TempHome):
 
 
 def _gamemenu():
-    """hexa.campaign.gamemenu without needing pygame: these tests never draw or open a window."""
+    """hexa.campaign.screens.gamemenu without needing pygame: these tests never draw or open a window."""
     import sys
     try:
         import pygame  # noqa: F401
     except ImportError:
         with mock.patch.dict(sys.modules, {"pygame": mock.MagicMock()}):
-            from hexa.campaign import gamemenu
+            from hexa.campaign.screens import gamemenu
             return gamemenu
-    from hexa.campaign import gamemenu
+    from hexa.campaign.screens import gamemenu
     return gamemenu
 
 
@@ -415,9 +415,11 @@ class FailedSaveTest(TempHome):
             f.write("not a folder")
 
     def _game(self, world):
-        class Game(_gamemenu().GameMenu):
+        pause = _gamemenu().PauseMenu()
+
+        class Game:                         # the ctx the menu functions need: game, settings, toast, pause
             def __init__(self):
-                self.game, self.settings, self.toasts = GameManager(world), settings.load(), []
+                self.game, self.settings, self.toasts, self.pause = GameManager(world), settings.load(), [], pause
 
             @property
             def world(self):
@@ -468,7 +470,7 @@ class FailedSaveTest(TempHome):
         game = self._game(fresh())
         self._unwritable()
         with contextlib.redirect_stderr(io.StringIO()):          # the whole error goes to stderr
-            self.assertFalse(game.save_to("quick"))
+            self.assertFalse(_gamemenu().save_to(game, "quick"))
         self.assertEqual(len(game.toasts), 1)
         self.assertTrue(game.toasts[0].startswith("Could not save Quicksave: "), game.toasts[0])
 
@@ -478,7 +480,7 @@ class FailedSaveTest(TempHome):
         game = self._game(w)
         self._unwritable()
         with contextlib.redirect_stderr(io.StringIO()):          # the whole error goes to stderr
-            game.autosave()
+            _gamemenu().autosave(game)
         self.assertEqual(len(game.toasts), 1)
         self.assertTrue(game.toasts[0].startswith("Could not autosave: "), game.toasts[0])
 
@@ -486,8 +488,8 @@ class FailedSaveTest(TempHome):
         w = fresh()
         w.turn = 5
         game = self._game(w)
-        self.assertTrue(game.save_to("quick"))
-        game.autosave()
+        self.assertTrue(_gamemenu().save_to(game, "quick"))
+        _gamemenu().autosave(game)
         self.assertEqual(game.toasts, [f"Saved: Quicksave ({w.date()}).", "Autosaved."])
         self.assertEqual(saves.meta("auto")["turn"], 5)
 
@@ -507,22 +509,23 @@ class AppLoadingTest(TempHome):
 
     def test_f9_asks_first_then_loads_and_closes_the_menu(self):
         from hexa.campaign.app import CampaignApp
+        from hexa.campaign.screens import gamemenu
         app = CampaignApp(player="POR")
         app.toast = lambda text: setattr(app, "last_toast", text)
-        app.quickload()
+        gamemenu.quickload(app)
         self.assertIn("No quicksave", app.last_toast)
         saves.save(app.world, "quick")
         turn = app.world.turn
         app.world.end_round()
         app.open_menu("load")
-        self.assertFalse(app.quickload(), "the first F9 only asks")
+        self.assertFalse(gamemenu.quickload(app), "the first F9 only asks")
         self.assertEqual(app.world.turn, turn + 1)
         self.assertIn("F9 again", app.last_toast)
-        self.assertTrue(app.quickload())
+        self.assertTrue(gamemenu.quickload(app))
         self.assertEqual(app.world.turn, turn)
         self.assertIsNone(app.menu)
         app.world.end_round()
-        self.assertFalse(app.quickload(), "the confirmation does not last forever")
+        self.assertFalse(gamemenu.quickload(app), "the confirmation does not last forever")
 
     def test_a_failed_save_or_autosave_keeps_the_game_running(self):
         import pygame
@@ -563,14 +566,14 @@ class SettingsTest(TempHome):
 
 
 def _gamemenu():
-    """hexa.campaign.gamemenu without needing pygame: these tests never draw or open a window."""
+    """hexa.campaign.screens.gamemenu without needing pygame: these tests never draw or open a window."""
     try:
         import pygame  # noqa: F401
     except ImportError:
         with mock.patch.dict(sys.modules, {"pygame": mock.MagicMock()}):
-            from hexa.campaign import gamemenu
+            from hexa.campaign.screens import gamemenu
             return gamemenu
-    from hexa.campaign import gamemenu
+    from hexa.campaign.screens import gamemenu
     return gamemenu
 
 
@@ -604,9 +607,10 @@ class UnsavedOptionsTest(TempHome):
     def test_f11_and_the_options_page_still_change_the_option(self):
         gamemenu = _gamemenu()
 
-        class Game(gamemenu.GameMenu):
+        class Game:                         # the ctx the menu needs: settings, toast, apply_display, pause
             def __init__(self):
                 self.settings, self.toasts, self.displays = settings.load(), [], 0
+                self.pause = gamemenu.PauseMenu()
 
             def apply_display(self):
                 self.displays += 1
@@ -615,16 +619,16 @@ class UnsavedOptionsTest(TempHome):
                 self.toasts.append(text)
 
         game = Game()
-        game.toggle_fullscreen()
+        gamemenu.toggle_fullscreen(game)
         self.assertEqual(game.toasts, [], "no warning when the options were saved")
         self.assertTrue(settings.load()["fullscreen"])
         self._unwritable()
         with contextlib.redirect_stderr(io.StringIO()):          # each failed settings.save() says why there
-            game.toggle_fullscreen()                              # F11
+            gamemenu.toggle_fullscreen(game)                              # F11
             self.assertFalse(game.settings["fullscreen"])
             self.assertEqual(game.displays, 2, "the screen mode still changes")
-            game.menu_press(("option", "scroll"))                 # Menu -> Options
-            game.menu_press(("option", "window"))
+            game.pause.press(game, ("option", "scroll"))                 # Menu -> Options
+            game.pause.press(game, ("option", "window"))
         self.assertEqual((game.settings["scroll"], game.settings["window"]), ("fast", "1600x900"))
         self.assertEqual(game.displays, 3)
         self.assertEqual(len(game.toasts), 3)

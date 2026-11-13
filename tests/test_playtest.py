@@ -19,6 +19,7 @@ except ImportError:                     # the unit suite runs without pygame (th
 from hexa.campaign import app as appmod  # noqa: E402
 from hexa.campaign.app import CampaignApp, _ordinal  # noqa: E402
 from hexa.campaign.data import GENERAL, WORKS, troop  # noqa: E402
+from hexa.ui.kit import fit, wrap  # noqa: E402
 from hexa.campaign.world import CampaignWorld, _with_article  # noqa: E402
 from hexa.hexgrid import neighbors  # noqa: E402
 
@@ -163,10 +164,10 @@ class TextFitTest(unittest.TestCase):
 
     def test_fit_shortens_with_an_ellipsis(self):
         font = pygame.font.SysFont("segoeui,arial", 12)
-        short = CampaignApp._fit(font, "Invest: Terraced vineyard", 70)
+        short = fit(font, "Invest: Terraced vineyard", 70)
         self.assertLessEqual(font.size(short)[0], 70)
         self.assertTrue(short.endswith("…"))
-        self.assertEqual(CampaignApp._fit(font, "Invest", 500), "Invest")
+        self.assertEqual(fit(font, "Invest", 500), "Invest")
 
 
 class OrdinalTest(unittest.TestCase):
@@ -204,7 +205,7 @@ class GameOverTest(unittest.TestCase):
     def test_the_banner_wraps_inside_the_screen(self):
         w = 1280
         appmod.WIDTH = w
-        lines = self.app._wrap_words(self.app.title, self.app.game_over_text(), w - 100)
+        lines = wrap(self.app.title, self.app.game_over_text(), w - 100)
         self.assertGreater(len(lines), 1)
         for line in lines:
             self.assertLessEqual(self.app.title.size(line)[0], w - 100)

@@ -191,15 +191,39 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `None`) or still play.
 - Saves and options (`hexa/settings.py`) live in `~/.hexa/`; the `HEXA_HOME` environment variable overrides
   this, and `tests/test_saves.py` uses it with a temporary folder.
-- `gamemenu.GameMenu` is a mixin base class of `CampaignApp`: the Esc menu, save/load, options, and the screen
-  mode (window size, fullscreen). Saving, loading and the autosave go through `app.game`, the `GameManager`
-  (`game.save(slot)`, `GameManager.load(slot)`, `game.autosave()`); `app.world` is `app.game.world`.
+- **Screens** (`hexa/campaign/screens/`, a window package). `CampaignApp` is no longer built from mixins. What covers
+  or dims the map is a `Screen` (`screens/__init__.py`: `draw(ctx)`, `handle_event(ctx, event)` -> consumed,
+  `update(ctx, dt)`, `opaque` = hides the map, `on_enter/on_exit`) on `app.screens`, a `ScreenStack` (push, pop, remove,
+  replace, clear, top, `hides_map`). The stack belongs to the window, not to `GameManager`: a screen is drawn with pygame
+  and answers to the window's mouse, fonts and size, and the manager stays pygame-free and is played without a window (the
+  review's "the manager's stack" became the app's stack). `draw()` skips the map and the HUD while an opaque screen is up
+  and then draws the stack bottom to top; `handle()` offers every event to the top screen first (F5, F9 and F11 go before
+  it). A screen gets the app as `ctx` and uses only its public attributes and methods, listed in the `screens/__init__.py`
+  docstring (`screen`, `ui`, fonts, `game`, `world`, `player`, `settings`, `toast`, `load_world`, `open_country`,
+  `apply_display`, `running`/`result`, `screens`, `pause`); it never imports `hexa.campaign.app`
+  (`tests/test_architecture.py` checks it, so the old app-gamemenu cycle cannot come back).
+  - `screens/gamemenu.py`: `PauseMenu` (Esc or M; `page` is None, "main", "save", "load", "options" or "question",
+    plus `confirm`, `question`, `buttons`, `rect`; not opaque, the map shows under a shade) and the functions the menu and
+    the keys share, taking the app as ctx: `save_to`, `load_from`, `quickload`, `autosave`, `autosave_toast`,
+    `toggle_grid`, `toggle_fullscreen`, `save_options`. Saving, loading and the autosave go through `ctx.game`, the
+    `GameManager` (`game.save(slot)`, `GameManager.load(slot)`, `game.autosave()`); `app.world` is `app.game.world`. The
+    screen mode lives in `CampaignApp.apply_display` (`campaign/display.py` opens the window).
+  - `screens/techscreen.py`: `TechScreen` (T; one instance for the life of the window, so the selected tech is kept):
+    the grid is opaque, the idea modal is the same screen with the grid closed. It is on the stack while the grid is open
+    or idea cards are pending: the idea cards are game state, not a click, so `app.tech.sync(app)` runs in `handle()`,
+    `draw()` and the war-alert check. `techlayout.py` (geometry, node rects, state of a tech: no drawing) and
+    `techdraw.py` (all the drawing) are its parts. `campaign/gamemenu.py` and `campaign/techscreen.py` only re-export
+    the new names.
+  - The app keeps read-only views of the screens' state for tests and tools: `app.menu` (the page), `menu_confirm`,
+    `menu_question`, `menu_buttons`, `menu_rect`, `tech_open`, `tech_selected`, `tech_buttons`; `open_menu()`,
+    `close_menu()` and `open_tech()` open and close them. Change a screen through its own methods
+    (`app.pause.press(app, action)`, `app.tech.close(app)`), not by assigning to these views.
 - **UI kit and panels** (`hexa/ui/`, `hexa/campaign/panels/`). `ui/theme.py` holds the colour tokens (the map window and
   pause menu's plain names, the technology screen's `TECH_*`, the start menu's `MENU_BG`) and the font loader
   (`new_font`, cached `font`); windows import from it and never call `pygame.font.SysFont` themselves. `ui/kit.py` has
   the immediate-mode helpers in today's look: `button` (registers a hit box on `ctx.ui.buttons`), `menu_button`,
   `flat_button`, `icon_button`, `chip`, `fit`, `wrap`, `text`, `shade`, `heading`, `tip`, `hover_card`, `panel_frame`. A `ctx` is the
-  drawing window (`CampaignApp`: `screen`, `ui`, fonts, `panel_rect()`, `view_rect()`). Each side panel is a
+  drawing window (`CampaignApp`: `screen`, `ui`, fonts, `panel_rect()`, `view_rect()`); the screens below take it the same way. Each side panel is a
   module of `campaign/panels/` with `draw(ctx, world, ui, subject)` (province, unit, country, market, raise_,
   ledger; `panels.draw()` picks by `ui.panel`); `panels/cards.py` builds the hover cards from the world. Panels lay
   out from `kit.panel_frame(ctx)` (never the app's `WIDTH`), read the world and register buttons; they never
@@ -214,8 +238,9 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   each game by `CampaignApp._set_game`; the window calls `hud.draw_world/draw_log/draw_top` from `draw()`, `hud.press` from
   `PRESS["log"]` and `hud.wheel` from its wheel handler. `hud.covers(ctx, pixel)` is true over the top bar, the minimap
   and the log's box: `hex_under`, a drag start and so a right-click or pan never reach the map there, and `left_click`
-  lets the open side panel win over a button that pokes into it. While the map is hidden (tech screen, pause menu) the HUD
-  draws nothing and leaves the feed's floating queue alone (`take_floating(max_age)` drops what is too old). HUD modules
+  lets the open side panel win over a button that pokes into it. While a screen is up (`Hud.hidden(ctx)`: the window's
+  stack is not empty: tech screen, idea modal, pause menu) the HUD draws nothing and leaves the feed's floating queue
+  alone (`take_floating(max_age)` drops what is too old). HUD modules
   read the world and register buttons; they hold their own fonts (`new_font`, not the cached `theme.font`, which can
   outlive pygame; both are emptied by a `pygame.register_quit` hook) and never change the game. `ui/icons.py` draws the
   icons into a `ui/cache.py` `BoundedCache` (registered by name, emptied on quit; `icon()` hands out copies); `ui/kit.py` has `chip`, `icon_button` and a `hover_card` whose lines may have a right-aligned amount

@@ -512,7 +512,7 @@ class HiddenMapTest(HudCase):
         self.bus.emit("unit_raised", "POR", pos, what="Pikemen", id=1)
         self.frame()
         self.assertEqual(self.app.hud.floaters.live, [])
-        self.app.menu = None
+        self.app.close_menu()
         self.frame()
         self.assertEqual(len(self.app.hud.floaters.live), 1)
 
@@ -522,7 +522,7 @@ class HiddenMapTest(HudCase):
         self.app.open_menu()
         with mock.patch.object(feed.time, "monotonic", return_value=1000.0):
             self.bus.emit("unit_raised", "POR", pos, what="Pikemen", id=1)
-        self.app.menu = None
+        self.app.close_menu()
         with mock.patch.object(feed.time, "monotonic", return_value=1010.0):
             self.frame()
         self.assertEqual(self.app.hud.floaters.live, [], "ten seconds old")
