@@ -250,7 +250,8 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - **Season** (`systems/season.py`): `PHASES`, the one ordered table of (name, function) pairs that `end_round` runs, and the only place
   the season's order is written (the game manager calls `world.end_round()`; to change the order, change the table and the pinned names in
   `tests/test_season.py`). The phases name the functions of their systems (`supply.logistics`, `war.sieges`, `economy.collect`,
-  `debt.unpaid`, `economy.grow`, `research.research_season`, `war.check_alive`); `war_timeouts`, `run_economy` (the world method, which owns
+  `debt.unpaid`, `economy.grow`, `research.research_season`, `war.check_alive`), so patching `world.logistics` and the like
+  on an instance no longer changes the season: a test that needs to replace a phase patches `PHASES`; `war_timeouts`, `run_economy` (the world method, which owns
   the tax preview's `_settled`), `advance_turn`, `ready_units`, `explore_all`, `redraw` and `treasury_line` are small steps here. Vision and
   scores live here too: `start_units`, `explore_home`, `see_from`, `update_visibility` (called for every step of a march), `score` and
   `ranking`, all plain class-attribute facades. The known-world cache stays on the world behind `known_world()`.
