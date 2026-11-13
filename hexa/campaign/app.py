@@ -138,6 +138,7 @@ class CampaignApp:
         self.ui = UI()
         self._mini_key = None
         self.busy = False
+        self.tech.sync(self)        # closes the tech grid when the new game has no player
         pygame.display.set_caption(f"Hexa: Age of Discovery  -  {world.geo.name}")
         if world.player:
             self.view.zoom = 4

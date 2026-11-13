@@ -39,6 +39,8 @@ class TechScreen(Screen):
 
     def sync(self, ctx):
         """Keep the screen on the stack exactly while the grid is open or idea cards are pending."""
+        if not ctx.player:      # a game with no player was loaded: there is no tech grid to show
+            self.grid_open = False
         wanted = self.grid_open or bool(self.pending(ctx))
         if wanted and self not in ctx.screens:
             ctx.screens.push(self)

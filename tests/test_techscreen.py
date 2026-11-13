@@ -155,6 +155,17 @@ class TechScreenTest(unittest.TestCase):
             app.tech.close(app)
             country.era = 1
 
+    def test_loading_a_game_without_a_player_closes_the_grid(self):
+        from hexa.campaign.game import GameManager
+        app = self.app
+        app.open_tech()
+        self.assertTrue(app.tech.grid_open)
+        app.load_world(GameManager.new(1480, "europe"))
+        self.assertIsNone(app.world.player)
+        self.assertFalse(app.tech.grid_open)
+        self.assertNotIn(app.tech, app.screens)
+        app.draw()                                  # used to raise KeyError: None
+
 
 if __name__ == "__main__":
     unittest.main()
