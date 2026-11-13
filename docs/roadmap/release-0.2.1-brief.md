@@ -55,7 +55,10 @@ then item 3 (the pop-up stays one more release, off by default).
   garrison, guns, general, castle, terrain and hunger; Besiege or Storm on a garrisoned castle; a relief army that wins lifts
   the siege; the amber siege badge (`docs/design/ui/20_siege_badge.png`). Design: `docs/design/sieges-and-retreats.md`
   section 4. Its batch opens with four questions: the meter or a longer timer; the pace (with a 2-season floor); Besiege as
-  the default with Storm second; the badge's bar (A) or dial (B). A besieged place of yours shows in the task flag.
+  the default with Storm second; the badge's bar (A) or dial (B). A besieged place of yours shows in the task flag. Backlog from the 0.2.1 build for this patch: the odds card
+  reads castles with one factor per level, which fits poorly (a level 3 garrison alone loses 93-100% at 1.7x-3.3x, yet the card
+  says Hopeless); the siege model should give garrisons their own odds. Also: "Favourable" and "Overwhelming" now read alike
+  (55-85% and 65-100%); move the Overwhelming line or drop the word.
 - **0.2.3 The battle board, as a mini game inside the turn (owner decision 2):** draft 1 of this brief (back line, Rotation,
   the AI army-size rules, the docked panel) re-planned so the player watches the days and decides between them (Withdraw,
   Rotation, reserves), all inside the turn.
