@@ -110,7 +110,7 @@ TERRAIN = {t.key: t for t in (
     _terrain("plains", "Farmland", (150, 180, 95), 1, 0.0, 55),
     _terrain("steppe", "Steppe", (190, 190, 120), 1, 0.0, 18),
     _terrain("forest", "Forest", (70, 125, 70), 2, 0.25, 22),
-    _terrain("hills", "Hills", (160, 150, 105), 2, 0.25, 35),
+    _terrain("hills", "Hills", (160, 150, 105), 2, 0.05, 35),
     _terrain("mountains", "Mountains", (130, 120, 115), 3, 0.5, 12),
     _terrain("desert", "Desert", (225, 205, 150), 2, 0.0, 2),
     _terrain("jungle", "Jungle", (40, 110, 60), 3, 0.25, 15),
@@ -372,8 +372,10 @@ SHOT_LOSS = 0.03                           # era 2 and 3 infantry's shot, a day
 FLANK_BONUS = 1.25                         # a regiment that comes round an empty flank
 STANCE = {"attack": (1.2, 1.1), "hold": (0.9, 0.8)}   # stance: (damage dealt, damage taken)
 MORALE_PER_LOSS = 2.5                      # morale lost per share of the regiment's hp lost that day
-FRONT_DRAIN, RESERVE_DRAIN, HUNGER_DRAIN = 0.04, 0.03, 0.03   # morale a day: in a lane, in reserve, unfed
+FRONT_DRAIN, RESERVE_DRAIN, HUNGER_DRAIN = 0.04, 0.125, 0.03   # morale a day: in a lane, in reserve, unfed (tuned 2026-11-13: 0.03 let a fresh reserve hold a 4 v 3 army up to the break)
 GENERAL_MORALE = 0.15                      # a general on the side cuts the morale loss by this share
+RESERVE_SHAKEN = 0.5                       # a reserve that moves up into a lane deals this share of its damage on that first day
+HIT_SPREAD = 0.5                           # each hit is worked out times uniform(1 - this, 1 + this): the luck of a day (tuned 2026-11-13, was 0.15: the odds were a near-certainty without it)
 BREAK = 0.25                               # army morale under this breaks the army
 ATTACK_MORALE = 0.5                        # a stack this shaken cannot start an attack
 PURSUIT, PURSUIT_FOOT, WITHDRAW_PURSUIT = 0.10, 0.04, 0.05   # share of men killed in a pursuit
@@ -385,7 +387,7 @@ BATTLE_LOG = 24                            # log lines kept per battle
 NARROW_TERRAIN = ("mountains", "marsh", "jungle", "snow")   # the right lane is closed: two lanes fight
 ELEVATION = {"hills": 1, "mountains": 2, "snow": 2}          # height of a battle's ground; other terrain is 0 (spec 3.4)
 CROSSING_PENALTY = 0.3                     # an attack across a mountain pass deals this much less damage on its first day
-UPHILL_PENALTY = 0.1                       # an attacker from lower ground deals this much less damage for the whole battle
+UPHILL_PENALTY = 0.05                      # an attacker from lower ground deals this much less damage for the whole battle (tuned 2026-11-13, was 0.1)
 AI_ATTACK_POWER = 1.1                      # the AI attacks a hex when its power times morale is this many times the defence's (PR 5: was 1.3; see the battle stats, docs/design/battle-slice1-build-spec.md 4)
 AI_STANCE_RATIO = 1.2                      # the AI's battle stance: Attack when its men times morale are this many times the enemy's
 AI_WITHDRAW_MORALE, AI_WITHDRAW_LEAD = 0.4, 0.15   # the AI withdraws when its army morale is under the first, the enemy's this much higher

@@ -160,6 +160,11 @@ battle.py passes 600, split retreat and end into `systems/aftermath.py`.
 - Assault: the defender's centre is `"garrison"` while `prov.garrison > 0` and `garrison_morale > 0`. Its field units
   take the flanks first.
 
+- **A reserve that moves up arrives shaken (owner decision 2026-11-13, section 10 item 10).** A regiment that fills a lane
+  from the reserve after the battle has begun (`battle.days > 0`: a lane broke or emptied) fights its first day shaken: it
+  deals `RESERVE_SHAKEN` (half) of its damage that day. The first deploy of a battle (day 0) is not shaken. A joiner is shaken when it moves up later. The ids are kept on
+  the day only: `deploy` returns them and `fight_day` hands them to the day's state, so nothing is stored on `Battle`.
+
 ### 3.4 One day
 
 Each battle fights `DAYS_PER_SEASON` (3) days in the `battles` phase, fewer if it ends. Battles are fought in order
@@ -170,7 +175,7 @@ The damage one regiment `a` does to one target `t` in hp:
 
 ```
 loss = BASE * t_max_hp * attack_value(a, fight, gen_a) / defense_value(t, dfight, prov, castle, a.branch, gen_t)
-       * strength(a) * DEALT[stance_a] * TAKEN[stance_t] * extra * rng.uniform(0.85, 1.15)
+       * strength(a) * DEALT[stance_a] * TAKEN[stance_t] * extra * shaken(a) * rng.uniform(1 - HIT_SPREAD, 1 + HIT_SPREAD)
 strength(a) = a.hp / a.kind.hp     (a worn regiment hits less)
 ```
 
@@ -204,11 +209,11 @@ in `combat.hit`, every phase), never a defender's:
   `CROSSING_PENALTY` (30%) less.
 - **Uphill.** `engage` sets `Battle.uphill` when the stand hex is lower ground than the battle hex: `ELEVATION` (hills 1,
   mountains and snow 2, other terrain 0). Plains to hills, anything to mountains, hills to mountains. The attacker deals
-  `UPHILL_PENALTY` (10%) less for the whole battle.
+  `UPHILL_PENALTY` (5%) less for the whole battle.
 - Joiners of the attacker's side get the same penalty (it is a side's ground, not a unit's).
-- **Terrain is not defender-only.** `defense_value` applies the hex's terrain defence to whichever side is struck, so an
-  attacker on a hill is protected by it too (measured: a hill cuts the damage to both sides by 27%). Making it
-  defender-only is a rules change, not a number: the owner decides (see the PR 5 report).
+- **Terrain defence is the defender's only (owner decision 2026-11-13, section 10 item 9).** `defense_value(..., ground)`
+  applies the hex's terrain defence only to a unit on the side that held the hex when the battle began (`battle.defender`
+  and its joiners). The attacker stands on the same ground and gets none. A castle's bonus in an assault is unchanged.
 
 ### 3.5 Orders
 
@@ -288,8 +293,10 @@ SHOT_LOSS = 0.03           # era 2 and 3 infantry's shot
 FLANK_BONUS = 1.25
 STANCE = {"attack": (1.2, 1.1), "hold": (0.9, 0.8)}   # (damage dealt, damage taken)
 MORALE_PER_LOSS = 2.5      # morale lost per share of the regiment lost that day
-FRONT_DRAIN, RESERVE_DRAIN, HUNGER_DRAIN = 0.04, 0.03, 0.03
+FRONT_DRAIN, RESERVE_DRAIN, HUNGER_DRAIN = 0.04, 0.125, 0.03   # tuned 2026-11-13 (was 0.03)
 GENERAL_MORALE = 0.15
+RESERVE_SHAKEN = 0.5                       # a regiment that moves up into a lane deals this share on its first day
+HIT_SPREAD = 0.5                           # each hit is times uniform(1 - this, 1 + this); was 0.15
 BREAK = 0.25               # army morale under this breaks the army
 ATTACK_MORALE = 0.5        # a stack this shaken cannot start an attack
 PURSUIT, PURSUIT_FOOT, WITHDRAW_PURSUIT = 0.10, 0.04, 0.05
@@ -300,7 +307,7 @@ BATTLE_LOG = 24
 NARROW_TERRAIN = ("mountains", "marsh", "jungle", "snow")
 ELEVATION = {"hills": 1, "mountains": 2, "snow": 2}   # PR 5: height of the ground (others 0), for UPHILL_PENALTY
 CROSSING_PENALTY = 0.3       # PR 5: an attack across a mountain pass, first day
-UPHILL_PENALTY = 0.1         # PR 5: an attacker from lower ground, all battle
+UPHILL_PENALTY = 0.05         # PR 5: an attacker from lower ground, all battle
 AI_ATTACK_POWER = 1.1        # PR 5 (was 1.3): the AI attacks when its power x morale is this many times the defence's
 AI_STANCE_RATIO = 1.2        # PR 5: the AI's stance is Attack when its men x morale are this many times the enemy's
 AI_WITHDRAW_MORALE, AI_WITHDRAW_LEAD = 0.4, 0.15   # PR 5: the AI withdraws when its army morale is under the first and
@@ -321,6 +328,34 @@ on Hold, 300 seeds each) gives:
 Losses are before pursuit. That is the target shape: an even battle lasts 1 to 3 seasons, odds decide it, and
 attacking an equal army that holds usually fails. The model is too even (little spread). The real game adds
 terrain, generals, ranks and supply, so PR 5 must measure the real thing.
+
+### Tuned numbers (owner, 2026-11-13)
+
+The first numbers gave a near-certainty: a 4 v 3 on plains was won every time, and an even fight about a quarter of the
+time (`tools/battle_stats.py`, scenario table). Tuned in `data.py` (the values above):
+- `RESERVE_DRAIN` 0.03 -> **0.125** a day. The 4th regiment of a 4 v 3 sat in reserve at full morale until the break, and
+  its morale kept the attacker's army morale above `BREAK`; `RESERVE_SHAKEN` alone never fired, because no lane broke
+  first. Engaged-only morale (reserves not counted) made the 4th regiment useless (4 v 3 = 3 v 3), so it was not taken.
+- `HIT_SPREAD` 0.15 -> **0.5**: each hit is worked out times uniform(0.5, 1.5). The spread is the luck of the day, so 1.3x
+  is not a certainty. Without it the outcomes were a step function (0% or 100%).
+- `FRONT_DRAIN` and the other morale numbers, `STANCE` and `SHOCK_LOSS` unchanged. Attack stance stays 1.2 / 1.1.
+- Hills terrain defence 0.25 -> **0.05** and `UPHILL_PENALTY` 0.10 -> **0.05**. With the defender-only ground, the old
+  hill (25%) with uphill 10% cut the attacker to 0% on hills; 0.05 with 0.05 keeps the defender clearly better. (Hills
+  now show as +5% in the panels; forest stays at +25%. A panel line for the defender only is a follow-up, not done here.)
+
+Result, 30 seeds (the test bands, section 7.3.1) and 100 seeds (the stats tool), attacker win rate:
+
+| Scenario (30 seeds, the test bands) | Plains | Hills |
+|---|---|---|
+| 3 pikes v 3 pikes (even) | 53% | 20% |
+| 4 pikes v 3 pikes (1.33x) | 80% | 50% |
+| 6 pikes v 4 pikes (1.5x) | 93% | 60% |
+| 6 pikes v 6 pikes (even) | 43% | 13% |
+
+The stats tool at 100 seeds gave 46% / 17% for the first row and 43% / 15% for the last.
+
+Every fight ends in 1 to 3 seasons (2 seasons median), and none reaches the safety stop. The AI games rarely start an
+even battle (the AI attacks when its power times morale is 1.1 times the defence's), so their buckets are thin: see 7.3.2.
 
 ## 5. The AI (`ai.py`)
 
@@ -563,3 +598,19 @@ is fine because nothing is released before PR 8.
 6. **Odds card** on the attack hover, one word, no percentage: PR 7b.
 7. **Stalemate with no retreat** (planning session, 2026-11-13): at the safety stop, if the lower-morale side has no retreat spot, the other side withdraws instead (no pursuit); if neither can, the battle goes on and the stop is checked again next season. Two enemies never stand on one hex without a battle. Built in PR 4.
 8. **Save digest:** saves do not keep `world.version` or `world.visible` (rebuilt on load, as before this work); the round-trip test compares the state without them. Accepted.
+9. **Ground defence is the defender's** (owner, 2026-11-13). Terrain defence counts for the side that held the hex when
+   the battle began (the defender and its joiners). The attacker on the same hill gets none; castle bonuses are unchanged
+   (section 3.4).
+10. **Slow reserves** (owner, 2026-11-13: "4 v 3 always wins"). A regiment that moves up from the reserve after the battle
+   has begun fights its first day at `RESERVE_SHAKEN` (half), and a reserve's morale drains 12.5 points a day (was 3), so
+   a fresh regiment in reserve no longer props up the army's morale until it breaks. The shaken rule alone did not
+   remove the race (no lane broke before the army did), which is why the drain changed too. Kept on the day only (not
+   saved), so no save changes.
+11. **Measure by strength ratio** (owner, 2026-11-13). `tools/battle_stats.py` buckets every battle by its start ratio of
+   attacker men x morale to the defender's (under 0.8, even 0.8-1.25, about 1.3x 1.25-1.6, about 2x 1.6-2.5, overwhelming
+   above 2.5) and prints the attacker win rate, the length and the safety-stop share per bucket. It also prints the four
+   scenarios on plains and hills (`tests/support/scenarios.py`, the bands of `tests/test_battle.py`). Targets: even about
+   35-50% for the attacker, about 1.3x 70-85%, about 2x 90% or more, 4 v 3 on plains 70-85%, a defender on hills clearly
+   better than on plains.
+12. **Luck in each hit** (owner, 2026-11-13, with item 11): `HIT_SPREAD` 0.5, so the outcomes of close fights vary. Cards
+   (next part) add upsets on top.

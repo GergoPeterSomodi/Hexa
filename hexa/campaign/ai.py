@@ -8,6 +8,7 @@ from collections import deque
 
 from ..hexgrid import distance, neighbors
 from . import geo, tech
+from .systems.combat import battle_strength
 SCALE = geo.SCALE
 from .data import (AI_ATTACK_POWER, AI_STANCE_RATIO, AI_WITHDRAW_LEAD, AI_WITHDRAW_MORALE, ATTACK_MORALE, BUILDINGS,
                    CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GOODS,
@@ -366,8 +367,8 @@ def _stance(world, battle, tag, enemy):
 
 
 def _battle_men(world, battle, tag):
-    """A side's men times its army morale (its men in the battle, shaken ones counting less)."""
-    return world.army_morale(battle, tag) * battle.men0.get(tag, 0)
+    """A side's men times its army morale (its men in the battle, shaken ones counting less): combat.battle_strength."""
+    return battle_strength(world, battle, tag)
 
 
 def _join(world, tag, battle):

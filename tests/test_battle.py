@@ -7,16 +7,17 @@ random stream (every draw is 1.0), so one hit can be compared with another. The 
 of the spec's quick model (section 4) for 30 seeds each and assert the bands of section 7.3.
 """
 import contextlib
-import math
+import dataclasses
 import pickle
 import random
 import statistics
 import unittest
 
 from hexa.campaign import ai, saves
-from hexa.campaign.data import (BATTLE_LOG, BATTLE_MAX_SEASONS, CROSSING_PENALTY, DAYS_PER_SEASON, GARRISON_HP, GENERAL,
+from tests.support.scenarios import SCENARIOS, SEEDS, TERRAINS, play, stage
+from hexa.campaign.data import (BATTLE_LOG, BATTLE_MAX_SEASONS, CROSSING_PENALTY, DAYS_PER_SEASON, GENERAL,
                                 GENERAL_MORALE, HUNGER_DRAIN, MEN, PIONEER, PURSUIT_FOOT, RESERVE_DRAIN, RETREAT_MORALE,
-                                RETREAT_RANGE, UPHILL_PENALTY, WAGON, WITHDRAW_PURSUIT)
+                                RESERVE_SHAKEN, RETREAT_RANGE, TERRAIN, UPHILL_PENALTY, WAGON, WITHDRAW_PURSUIT)
 from hexa.campaign.state import Battle, War
 from hexa.campaign.systems import battle as battlesys, combat, military, movement, terrain
 from hexa.events import CAMPAIGN_KINDS
@@ -33,34 +34,6 @@ class FlatRng:
 
     def uniform(self, low, high):
         return 1.0
-
-
-def site(world):
-    """A land hex with an owner (the attacker's country) and another live country (the defender's)."""
-    pos = next(p.pos for p in sorted(world.provinces.values(), key=lambda p: p.pos)
-               if p.owner is not None and world.is_land(p.pos))
-    attacker = world.provinces[pos].owner
-    defender = next(t for t in sorted(world.countries) if t != attacker and world.countries[t].alive)
-    return pos, attacker, defender
-
-
-def stage(world, spec_a, spec_d, terrain="plains", castle=0):
-    """Both stacks on one hex, the attacker on Attack and the defender on Hold. A spec lists regiments as
-    (branch, era, count). Returns (battle, attacker units, defender units). ``castle`` gives the hex a castle of that
-    level with a full garrison, held by the defender: an assault."""
-    pos, a, d = site(world)
-    world.units = [u for u in world.units if not (u.pos == pos and u.kind.war)]
-    prov = world.provinces[pos]
-    prov.terrain = terrain
-    prov.owner = a
-    prov.controller = d if castle else a
-    prov.castle, prov.garrison = (castle, castle * GARRISON_HP) if castle else (0, 0)
-    attackers = [u for branch, era, n in spec_a for u in place(world, branch, era, a, pos, n)]
-    defenders = [u for branch, era, n in spec_d for u in place(world, branch, era, d, pos, n)]
-    world.changed()
-    battle = Battle(pos=pos, attacker=a, defender=d, start=world.turn, assault=bool(castle),
-                    stance={a: "attack", d: "hold"})
-    return battle, attackers, defenders
 
 
 def damage(battle, unit):
@@ -304,64 +277,52 @@ class BreakTest(unittest.TestCase):
         self.assertEqual(battle.log[-1][1], battle.days)
 
 
-# ----- fixed-seed scenario bands (spec section 7.3.1) ------------------------------------------------------------
-
-SCENARIOS = {
-    "3 pikes v 3 pikes": ([("infantry", 1, 3)], [("infantry", 1, 3)]),
-    "6 pikes v 6 pikes": ([("infantry", 1, 6)], [("infantry", 1, 6)]),
-    "4 pikes, 2 knights, 1 gun, both sides": ([("infantry", 1, 4), ("cavalry", 1, 2), ("artillery", 1, 1)],
-                                              [("infantry", 1, 4), ("cavalry", 1, 2), ("artillery", 1, 1)]),
-    "6 pikes v 4 pikes": ([("infantry", 1, 6)], [("infantry", 1, 4)]),
-    "8 mixed v 5 pikes": ([("infantry", 1, 4), ("cavalry", 1, 2), ("artillery", 1, 2)], [("infantry", 1, 5)]),
-}
-SEEDS = range(30)
-
-
-def play(world, seed, spec_a, spec_d):
-    """One scenario fight to its end, or to the safety stop. Returns a dict: days, seasons, winner (tag or None),
-    loss (share of its men lost per side, killed and wounded) and the battle."""
-    world.rng = random.Random(seed)
-    battle, _, _ = stage(world, spec_a, spec_d)
-    combat.deploy(world, battle)
-    men0 = dict(battle.men0)
-    broke, days = None, 0
-    for days in range(1, 3 * BATTLE_MAX_SEASONS + 1):
-        report = combat.fight_day(world, battle)
-        if report["broke"] is not None:
-            broke = report["broke"]
-            break
-    winner = None if broke is None else (battle.defender if broke == battle.attacker else battle.attacker)
-    loss = {tag: (battle.killed.get(tag, 0.0) + battle.wounded.get(tag, 0.0)) / men0[tag]
-            for tag in (battle.attacker, battle.defender)}
-    return {"days": days, "seasons": math.ceil(days / DAYS_PER_SEASON), "winner": winner, "loss": loss,
-            "battle": battle, "stopped": broke is None}
-
+# ----- fixed-seed scenario bands (spec section 7.3.1; owner decision 2026-11-13, spec section 4) -------------------
 
 class ScenarioBandsTest(unittest.TestCase):
+    """The fights of tests/support/scenarios.py on plains and on hills, 30 seeds each. Even fights are about a coin toss
+    for the attacker, 4 v 3 is won about 4 times in 5, 6 v 4 (1.5 to 1) nearly always, and a defender on hills is clearly
+    better than on plains."""
+
     @classmethod
     def setUpClass(cls):
         world = fresh("POR")
-        cls.results = {name: [play(world, seed, spec_a, spec_d) for seed in SEEDS]
-                       for name, (spec_a, spec_d) in SCENARIOS.items()}
+        cls.results = {(name, terrain): [play(world, seed, spec_a, spec_d, terrain) for seed in SEEDS]
+                       for name, (spec_a, spec_d) in SCENARIOS.items() for terrain in TERRAINS}
+
+    def win_rate(self, name, terrain):
+        rows = self.results[(name, terrain)]
+        return sum(1 for row in rows if row["winner"] == row["battle"].attacker) / len(rows)
 
     def test_every_scenario_ends_inside_the_safety_stop(self):
-        for name, rows in self.results.items():
+        for key, rows in self.results.items():
             for row in rows:
-                self.assertLessEqual(row["seasons"], BATTLE_MAX_SEASONS, name)
+                self.assertLessEqual(row["seasons"], BATTLE_MAX_SEASONS, key)
 
-    def test_even_three_v_three_lasts_one_to_three_seasons_in_most_seeds(self):
-        rows = self.results["3 pikes v 3 pikes"]
-        inside = sum(1 for row in rows if 1 <= row["seasons"] <= 3)
-        self.assertGreaterEqual(inside / len(rows), 0.8)
+    def test_even_fights_on_plains_are_about_a_coin_toss_for_the_attacker(self):
+        for name in ("3 pikes v 3 pikes", "6 pikes v 6 pikes"):
+            self.assertGreaterEqual(self.win_rate(name, "plains"), 0.35, name)
+            self.assertLessEqual(self.win_rate(name, "plains"), 0.55, name)
 
-    def test_one_and_a_half_to_one_is_won_by_the_attacker_in_most_seeds(self):
-        rows = self.results["6 pikes v 4 pikes"]
-        wins = sum(1 for row in rows if row["winner"] == row["battle"].attacker)
-        self.assertGreaterEqual(wins / len(rows), 0.85)
+    def test_four_v_three_on_plains_is_won_by_the_attacker_about_four_times_in_five(self):
+        self.assertGreaterEqual(self.win_rate("4 pikes v 3 pikes", "plains"), 0.70)
+        self.assertLessEqual(self.win_rate("4 pikes v 3 pikes", "plains"), 0.85)
+
+    def test_one_and_a_half_to_one_is_won_by_the_attacker_nearly_always(self):
+        self.assertGreaterEqual(self.win_rate("6 pikes v 4 pikes", "plains"), 0.85)
+
+    def test_a_defender_on_hills_is_clearly_better_than_on_plains(self):
+        for name in ("3 pikes v 3 pikes", "4 pikes v 3 pikes", "6 pikes v 4 pikes", "6 pikes v 6 pikes"):
+            self.assertLessEqual(self.win_rate(name, "hills") + 0.2, self.win_rate(name, "plains"), name)
+
+    def test_even_fights_are_short(self):
+        for name in ("3 pikes v 3 pikes", "6 pikes v 6 pikes"):
+            inside = sum(1 for row in self.results[(name, "plains")] if 1 <= row["seasons"] <= 3)
+            self.assertGreaterEqual(inside / len(SEEDS), 0.8, name)
 
     def test_the_loser_loses_between_fifteen_and_fifty_percent(self):
         shares = []
-        for row in self.results["6 pikes v 4 pikes"]:
+        for row in self.results[("6 pikes v 4 pikes", "plains")]:
             battle = row["battle"]
             loser = battle.defender if row["winner"] == battle.attacker else battle.attacker
             shares.append(row["loss"][loser])
@@ -371,6 +332,80 @@ class ScenarioBandsTest(unittest.TestCase):
     def test_few_battles_reach_the_safety_stop(self):
         rows = [row for block in self.results.values() for row in block]
         self.assertLess(sum(1 for row in rows if row["stopped"]) / len(rows), 0.05)
+
+
+class GroundDefenceTest(unittest.TestCase):
+    """Terrain defence counts for the defender only (spec 3.4, owner decision 2026-11-13): the side that held the hex when
+    the battle began. The attacker stands on the same hill and gets none."""
+
+    def test_the_hill_defends_the_defender_and_not_the_attacker(self):
+        world = fresh("POR")
+        battle, (att,), (dfn,) = stage(world, [("infantry", 1, 1)], [("infantry", 1, 1)], terrain="hills")
+        prov = world.provinces[battle.pos]
+        with_ground = combat.defense_value(world, dfn, "rough", prov, 0, "infantry", None, True)
+        without = combat.defense_value(world, dfn, "rough", prov, 0, "infantry", None, False)
+        self.assertAlmostEqual(with_ground / without, 1 + TERRAIN["hills"].defense, places=9)
+
+    def test_an_attacker_on_a_hill_takes_the_same_damage_whatever_the_hill_defends(self):
+        # Only the hill's defence number changes: hills fight as rough ground in both runs (FIGHT_DEFENSE), so the
+        # attacker's damage taken moves only if the ground gives it a defence.
+        def taken(defence):
+            world = fresh("POR")
+            world.rng = FlatRng()
+            battle, (att,), _ = stage(world, [("infantry", 1, 1)], [("infantry", 1, 1)], terrain="hills")
+            battle.uphill = False                       # the attacker's uphill penalty is a separate rule
+            saved = combat.TERRAIN["hills"]
+            combat.TERRAIN["hills"] = dataclasses.replace(saved, defense=defence)
+            try:
+                combat.fight_day(world, battle)
+            finally:
+                combat.TERRAIN["hills"] = saved
+            return damage(battle, att)
+        self.assertAlmostEqual(taken(0.0), taken(TERRAIN["hills"].defense), places=9)
+        self.assertGreater(taken(0.0), 0)
+
+
+class ReserveShakenTest(unittest.TestCase):
+    """A reserve regiment that moves up into a lane after the battle has begun fights its first day shaken: it deals
+    RESERVE_SHAKEN of its damage (spec 3.3). The battle keeps the ids for that one day, and fight_day clears them."""
+
+    def test_a_reserve_that_moves_up_arrives_shaken_and_only_for_that_day(self):
+        world = fresh("POR")
+        battle, _, _ = stage(world, [("infantry", 1, 4)], [("infantry", 1, 1)])
+        self.assertEqual(combat.deploy(world, battle), set())          # day 0: the opening line is not shaken
+        battle.days = 1
+        lane = battle.lanes[battle.attacker][0]
+        battle.routed.add(lane)
+        moved = combat.deploy(world, battle)
+        self.assertNotEqual(battle.lanes[battle.attacker][0], lane)
+        self.assertEqual(moved, {battle.lanes[battle.attacker][0]})
+        self.assertNotIn("shaken", vars(battle))                       # kept on the day, not saved on the battle
+        world.rng = FlatRng()
+        combat.fight_day(world, battle)
+        self.assertNotIn("shaken", vars(battle))
+
+    def test_a_shaken_reserve_deals_less_on_its_first_day(self):
+        def defender_hurt(shaken_share):
+            world = fresh("POR")
+            world.rng = FlatRng()
+            battle, _, _ = stage(world, [("infantry", 1, 4)], [("infantry", 1, 1)])
+            combat.deploy(world, battle)
+            battle.days = 1
+            battle.routed.add(battle.lanes[battle.attacker][0])
+            saved = combat.RESERVE_SHAKEN
+            combat.RESERVE_SHAKEN = shaken_share
+            try:
+                combat.fight_day(world, battle)
+            finally:
+                combat.RESERVE_SHAKEN = saved
+            return battle.killed.get(battle.defender, 0.0) + battle.wounded.get(battle.defender, 0.0)
+        self.assertLess(defender_hurt(RESERVE_SHAKEN), defender_hurt(1.0))
+
+
+class ShakenSaveTest(unittest.TestCase):
+    def test_a_battle_has_no_shaken_state_to_save(self):
+        battle = Battle(pos=(0, 0), attacker="A", defender="B", start=1)
+        self.assertNotIn("shaken", vars(battle))
 
 
 # ----- the battle's life (PR 3): engage, joins, orders, the season and the end; spec 7.1, called directly -----------

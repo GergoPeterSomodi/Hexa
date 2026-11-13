@@ -285,6 +285,7 @@ def battle_order(world, pos, tag, stance):
     if not battle_order_check(world, pos, tag, stance)[0]:
         return False
     world.battle_at(pos).stance[tag] = stance
+    world.changed()
     return True
 
 

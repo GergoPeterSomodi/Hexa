@@ -14,7 +14,7 @@ PR 3. A day writes only the battle object, unit ``hp`` and ``morale``, ``prov.ga
 from ..data import (BATTLE_LOG, BREAK, CASTLE_DEFENSE, CROSSING_PENALTY, FIGHT_ATTACK, FIGHT_DEFENSE, FIRE_LOSS,
                     FLANK_BONUS, FRONT_DRAIN, GARRISON_MEN, GENERAL, GENERAL_BONUS, GENERAL_MORALE, HUNGER_DRAIN, MEN,
                     MORALE_PER_LOSS, NARROW_TERRAIN, OPEN_GROUND, PIKES_VS_HORSE, PURSUIT, PURSUIT_FOOT, RESERVE_DRAIN,
-                    SHOCK_LOSS, SHOT_LOSS, STANCE, TERRAIN, UPHILL_PENALTY, WOUNDED_SHARE)
+                    HIT_SPREAD, RESERVE_SHAKEN, SHOCK_LOSS, SHOT_LOSS, STANCE, TERRAIN, UPHILL_PENALTY, WOUNDED_SHARE)
 from ..state import Garrison
 
 # The day writes only the battle object, unit hp and morale, prov.garrison and the units it kills.
@@ -36,10 +36,16 @@ def attack_value(world, unit, fight, general):
     return value
 
 
-def defense_value(world, unit, fight, prov, castle, versus, general):
+def defense_value(world, unit, fight, prov, castle, versus, general, ground=True):
+    """How well a unit holds. ``ground`` says whether the hex's terrain defence counts: only for the side that held the
+    hex when the battle began (the defender and its joiners, decision 2026-11-13). The attacker stood on the same ground
+    and gets none. A castle's bonus in an assault is the garrison's, and stays as it is."""
     tag, branch = unit.owner, unit.kind.branch
     value = (unit.kind.defense + unit.def_up) * FIGHT_DEFENSE[branch][fight] * unit.rank[2]
-    value *= 1 + (CASTLE_DEFENSE * castle if fight == "garrison" else TERRAIN[prov.terrain].defense)
+    if fight == "garrison":
+        value *= 1 + CASTLE_DEFENSE * castle
+    elif ground:
+        value *= 1 + TERRAIN[prov.terrain].defense
     if branch == "infantry" and versus == "cavalry":
         value *= PIKES_VS_HORSE * (1 + world.bonus(tag, "vs_horse"))
     value *= 1 + world.bonus(tag, branch)
@@ -85,6 +91,12 @@ def _side_men(world, battle, tag):
     return men
 
 
+def battle_strength(world, battle, tag):
+    """A side's strength in a battle: its men at the start times its army morale. The one measure the AI (ai.py) and
+    the stats tool (tools/battle_stats.py) compare sides by."""
+    return army_morale(world, battle, tag) * battle.men0.get(tag, 0)
+
+
 def army_morale(world, battle, tag):
     """A side's army morale, 0 to 1: the sum of morale times men over its war units and garrison (routed units
     count 0), over the men it went in with (``battle.men0``)."""
@@ -117,6 +129,7 @@ def deploy(world, battle):
     flanks. The side's men at the start (``men0``) are set the first time."""
     prov = world.provinces[battle.pos]
     fights = garrison_fights(world, battle)
+    moved = set()
     for tag in (battle.attacker, battle.defender):
         battle.men0.setdefault(tag, _side_men(world, battle, tag))
         lanes = battle.lanes.setdefault(tag, [None, None, None])
@@ -141,6 +154,9 @@ def deploy(world, battle):
                 pick = min(reserve, key=lambda u: _lane_rank(world, u, lane, prov, general_here))
                 reserve.remove(pick)
                 lanes[lane] = pick.id
+                if battle.days > 0:             # a reserve that moves up into a broken lane arrives shaken (decision 2026-11-13)
+                    moved.add(pick.id)
+    return moved
 
 
 def _pike(attacker, target):
@@ -161,8 +177,9 @@ def _rout(battle, tag, key):
 class _Day:
     """One day's working state: who stands where at dawn, the fighters that are left, and the hp each has lost."""
 
-    def __init__(self, world, battle):
+    def __init__(self, world, battle, shaken=()):
         self.world, self.battle = world, battle
+        self.shaken = set(shaken)          # the regiments that moved up into a lane today (RESERVE_SHAKEN, this day only)
         prov = self.prov = world.provinces[battle.pos]
         fights = garrison_fights(world, battle)     # the assault is fought only while the garrison holds (item 7)
         self.fight = "assault" if fights else ("open" if prov.terrain in OPEN_GROUND else "rough")
@@ -236,12 +253,16 @@ class _Day:
         world = self.world
         sa, st = self.side[key_of(attacker)], self.side[key_of(target)]
         att = attack_value(world, attacker, a_fight, self.gen[sa])
-        dfn = defense_value(world, target, t_fight, self.prov, self.castle, attacker.kind.branch, self.gen[st])
+        on_ground = st == self.battle.defender
+        dfn = defense_value(world, target, t_fight, self.prov, self.castle, attacker.kind.branch, self.gen[st],
+                            on_ground)
         dealt = STANCE.get(self.battle.stance.get(sa, "hold"), (1.0, 1.0))[0] * self.ground(sa)
+        if key_of(attacker) in self.shaken:
+            dealt *= RESERVE_SHAKEN
         taken = STANCE.get(self.battle.stance.get(st, "hold"), (1.0, 1.0))[1]
         strength = attacker.hp / max(1, attacker.kind.hp)
         return (base * target.kind.hp * att / max(dfn, 1e-9) * strength * dealt * taken * extra
-                * world.rng.uniform(0.85, 1.15))
+                * world.rng.uniform(1 - HIT_SPREAD, 1 + HIT_SPREAD))
 
     def resolve(self, hits):
         """Apply a phase's hits, (target, hp, wounded share), then cull the dead. Whole hit points come off now; the
@@ -397,8 +418,8 @@ def fight_day(world, battle):
     """One day of the battle: deploy, fire, shock, flanks, morale, then pursuit if an army breaks. Returns the day's
     report: {"broke": tag or None, "killed": {tag: men}, "wounded": {tag: men}, "morale": {tag: army morale}}. The
     battle's counters and its log move with the day."""
-    deploy(world, battle)
-    day = _Day(world, battle)
+    shaken = deploy(world, battle)
+    day = _Day(world, battle, shaken)
     att, dfn = day.tags()
     before = {tag: (battle.killed.get(tag, 0.0), battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}
     fire(day)

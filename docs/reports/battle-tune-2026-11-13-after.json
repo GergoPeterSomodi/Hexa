@@ -1,0 +1,412 @@
+{
+ "buckets": {
+  "about 1.3x 1.25-1.6": {
+   "attacker_win_rate": 0.867,
+   "battles": 15,
+   "length_seasons": {
+    "median": 1,
+    "p90": 1
+   },
+   "stop_share": 0.0
+  },
+  "about 2x 1.6-2.5": {
+   "attacker_win_rate": 0.897,
+   "battles": 29,
+   "length_seasons": {
+    "median": 1,
+    "p90": 2
+   },
+   "stop_share": 0.0
+  },
+  "even 0.8-1.25": {
+   "attacker_win_rate": 0.833,
+   "battles": 7,
+   "length_seasons": {
+    "median": 1,
+    "p90": 2
+   },
+   "stop_share": 0.0
+  },
+  "overwhelming above 2.5": {
+   "attacker_win_rate": 0.991,
+   "battles": 107,
+   "length_seasons": {
+    "median": 1,
+    "p90": 1
+   },
+   "stop_share": 0.0
+  },
+  "under 0.8": {
+   "attacker_win_rate": null,
+   "battles": 0,
+   "length_seasons": null,
+   "stop_share": null
+  }
+ },
+ "games": [
+  {
+   "counts": {
+    "battle_strength_hurt": 5868,
+    "battle_wins_attacker": 8,
+    "battle_wins_defender": 1,
+    "battles": 9,
+    "battles_destroyed": 1,
+    "battles_ended": 9,
+    "end_broke": 7,
+    "end_destroyed": 1,
+    "end_withdrew": 1,
+    "men_killed": 3333,
+    "men_wounded": 2535,
+    "provinces_peace": 10,
+    "provinces_sieged": 30,
+    "units_lost": 5,
+    "units_lost_battle": 1,
+    "wars": 2
+   },
+   "seed": 1,
+   "suite": "europe",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "provinces_peace": 0,
+    "wars": 2
+   },
+   "seed": 2,
+   "suite": "europe",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_strength_hurt": 9228,
+    "battle_wins_attacker": 12,
+    "battles": 12,
+    "battles_ended": 12,
+    "end_broke": 9,
+    "end_withdrew": 3,
+    "men_killed": 5282,
+    "men_wounded": 3946,
+    "provinces_peace": 22,
+    "provinces_sieged": 56,
+    "units_lost": 9,
+    "units_lost_battle": 2,
+    "wars": 6
+   },
+   "seed": 3,
+   "suite": "europe",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_strength_hurt": 6793,
+    "battle_wins_attacker": 10,
+    "battle_wins_defender": 2,
+    "battles": 12,
+    "battles_destroyed": 1,
+    "battles_ended": 12,
+    "end_broke": 9,
+    "end_destroyed": 1,
+    "end_withdrew": 2,
+    "men_killed": 3855,
+    "men_wounded": 2938,
+    "provinces_peace": 22,
+    "provinces_sieged": 55,
+    "storms": 2,
+    "units_lost": 2,
+    "units_lost_battle": 2,
+    "wars": 6
+   },
+   "seed": 4,
+   "suite": "europe",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_strength_hurt": 16240,
+    "battle_wins_attacker": 22,
+    "battles": 22,
+    "battles_destroyed": 4,
+    "battles_ended": 22,
+    "end_broke": 13,
+    "end_destroyed": 4,
+    "end_withdrew": 5,
+    "men_killed": 8952,
+    "men_wounded": 7288,
+    "provinces_peace": 29,
+    "provinces_sieged": 76,
+    "units_lost": 15,
+    "units_lost_battle": 4,
+    "wars": 6
+   },
+   "seed": 1,
+   "suite": "random",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_strength_hurt": 26380,
+    "battle_wins_attacker": 26,
+    "battle_wins_defender": 2,
+    "battles": 28,
+    "battles_destroyed": 1,
+    "battles_ended": 28,
+    "end_broke": 16,
+    "end_destroyed": 1,
+    "end_withdrew": 11,
+    "men_killed": 15202,
+    "men_wounded": 11178,
+    "provinces_peace": 18,
+    "provinces_sieged": 63,
+    "units_lost": 14,
+    "units_lost_battle": 6,
+    "wars": 6
+   },
+   "seed": 2,
+   "suite": "random",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_strength_hurt": 31789,
+    "battle_wins_attacker": 34,
+    "battle_wins_defender": 1,
+    "battles": 35,
+    "battles_destroyed": 2,
+    "battles_ended": 35,
+    "end_broke": 25,
+    "end_destroyed": 2,
+    "end_withdrew": 8,
+    "men_killed": 17253,
+    "men_wounded": 14536,
+    "provinces_peace": 41,
+    "provinces_sieged": 120,
+    "storms": 3,
+    "units_lost": 44,
+    "units_lost_battle": 12,
+    "wars": 10
+   },
+   "seed": 3,
+   "suite": "random",
+   "turn": 41
+  },
+  {
+   "counts": {
+    "battle_strength_hurt": 34934,
+    "battle_wins_attacker": 46,
+    "battle_wins_defender": 1,
+    "battles": 49,
+    "battles_destroyed": 4,
+    "battles_draw": 1,
+    "battles_ended": 48,
+    "end_broke": 34,
+    "end_destroyed": 4,
+    "end_peace": 1,
+    "end_withdrew": 9,
+    "men_killed": 19540,
+    "men_wounded": 15394,
+    "provinces_peace": 36,
+    "provinces_sieged": 122,
+    "storms": 2,
+    "units_lost": 61,
+    "units_lost_battle": 13,
+    "wars": 9
+   },
+   "seed": 4,
+   "suite": "random",
+   "turn": 41
+  }
+ ],
+ "per_war": {
+  "attacker_win_rate": 0.958,
+  "battle_length_seasons": {
+   "median": 1.0,
+   "p90": 1
+  },
+  "battles_per_war": 3.553,
+  "destroyed_share": 0.078,
+  "draw_rate": 0.006,
+  "killed_per_battle": 439.623,
+  "provinces_per_war": 14.894,
+  "stop_share": 0.0,
+  "units_lost_per_war": 3.191,
+  "wounded_per_battle": 346.198,
+  "wounded_share": 0.441
+ },
+ "scenarios": {
+  "3 pikes v 3 pikes": {
+   "hills": {
+    "attacker_win_rate": 0.2,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.256,
+    "stop_share": 0.0
+   },
+   "plains": {
+    "attacker_win_rate": 0.533,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.282,
+    "stop_share": 0.0
+   }
+  },
+  "4 pikes v 3 pikes": {
+   "hills": {
+    "attacker_win_rate": 0.5,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.248,
+    "stop_share": 0.0
+   },
+   "plains": {
+    "attacker_win_rate": 0.8,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.266,
+    "stop_share": 0.0
+   }
+  },
+  "4 pikes, 2 knights, 1 gun, both sides": {
+   "hills": {
+    "attacker_win_rate": 0.167,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.222,
+    "stop_share": 0.0
+   },
+   "plains": {
+    "attacker_win_rate": 0.433,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.251,
+    "stop_share": 0.0
+   }
+  },
+  "6 pikes v 4 pikes": {
+   "hills": {
+    "attacker_win_rate": 0.6,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.209,
+    "stop_share": 0.0
+   },
+   "plains": {
+    "attacker_win_rate": 0.933,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.229,
+    "stop_share": 0.0
+   }
+  },
+  "6 pikes v 6 pikes": {
+   "hills": {
+    "attacker_win_rate": 0.133,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.172,
+    "stop_share": 0.0
+   },
+   "plains": {
+    "attacker_win_rate": 0.433,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.187,
+    "stop_share": 0.0
+   }
+  },
+  "8 mixed v 5 pikes": {
+   "hills": {
+    "attacker_win_rate": 0.7,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.218,
+    "stop_share": 0.0
+   },
+   "plains": {
+    "attacker_win_rate": 1.0,
+    "in_1_to_3_seasons": 1.0,
+    "length_seasons": {
+     "median": 2.0,
+     "p90": 2
+    },
+    "loser_loss_median": 0.289,
+    "stop_share": 0.0
+   }
+  }
+ },
+ "seasons": 40,
+ "seeds": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "snowball": {
+  "top_share_end_max": 0.15,
+  "top_share_end_mean": 0.116,
+  "top_share_start_mean": 0.115
+ },
+ "suites": [
+  "europe",
+  "random"
+ ],
+ "totals": {
+  "battle_lost_units": 0,
+  "battle_strength_hurt": 131232,
+  "battle_wins_attacker": 158,
+  "battle_wins_defender": 7,
+  "battles": 167,
+  "battles_destroyed": 13,
+  "battles_draw": 1,
+  "battles_ended": 166,
+  "battles_stopped": 0,
+  "bombardments": 0,
+  "end_broke": 113,
+  "end_destroyed": 13,
+  "end_gone": 0,
+  "end_peace": 1,
+  "end_surrendered": 0,
+  "end_withdrew": 39,
+  "men_killed": 73417,
+  "men_wounded": 57815,
+  "provinces_peace": 178,
+  "provinces_sieged": 522,
+  "storms": 7,
+  "surrenders": 0,
+  "units_lost": 150,
+  "units_lost_battle": 40,
+  "wars": 47
+ }
+}
