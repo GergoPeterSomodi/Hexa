@@ -1,6 +1,26 @@
 # Hexa roadmap
 
-Status as of 2026-11-11. Sources: the project notes, `docs/design/tech-tree.md`, `docs/design/tech-tree-build-spec.md` and the Hexa README. Items marked "(suggested)" are my inferences, not decisions from the notes.
+Status as of 2026-11-13. Sources: the project notes, `docs/design/tech-tree.md`, `docs/design/tech-tree-build-spec.md` and the Hexa README. Items marked "(suggested)" are my inferences, not decisions from the notes.
+
+## Next up (decided 2026-11-13): one thing at a time, starting with war
+
+The owner asked for one delivery at a time, starting with war. The order:
+
+1. **Now: M2 battle system, slice 1, "Battles that last" (v0.2.0).** From `docs/design/battle.md`:
+   - A stack that moves into an enemy stack starts a battle on that hex. Neither side may leave except by Withdraw or a rout.
+   - Three rounds (days) a season, until one army's morale falls under 25%.
+   - Three front lanes (left, centre, right) and a back line of cannons and reserves. Each day runs fire, shock, flanks, morale and pursuit.
+   - Losses split into killed and wounded; about half the wounded come back after the battle if in supply. Morale per regiment and for the army.
+   - A friendly stack that moves in joins as a reserve. A routed side retreats to the nearest friendly hex, or surrenders if it has none.
+   - The player's orders each season: Attack, Hold or Withdraw.
+   - A battle panel and a crossed-swords badge with a morale bar on the map. AI-vs-AI battles resolve the same way and leave one log line.
+   - It **replaces** today's one-shot battle (answers open question 6). Sieges and castle assaults use the same lanes, with the garrison as a front-line card.
+   - Not in slice 1: cards, the battle mini-map, deployment presets, battle events, troop quality.
+2. **Then M2 slice 2:** battle cards from techs, generals and elites (command points, the hand, sneaky cards).
+3. **Then M2 slice 3:** the battle mini-map, lane ground from the real map, deployment, battle events, troop quality.
+4. **After M2, one at a time:** the war goals and peace design (wars end by peace terms); trade T1, T2 and T5; economy E2 to E5; then the Crown projects and reactive prices designs.
+
+Everything decided on 2026-11-13 stays recorded in its own doc and waits its turn.
 
 ## 1. Vision
 
@@ -332,7 +352,7 @@ Each design is approved by the user before its build starts. M1 and M2 must run 
 3. ~~Is this single-player only, or will multiplayer come later?~~ Answered 2026-11-12: multiplayer is planned (see the backlog: hotseat, then online, then Steam).
 4. Which screen size is the target? The default is 1280x720, and the options go up to 1920x1080.
 5. How hard should the AI be, and should every country play the same?
-6. Does the new battle system replace the current three-unit front-line battles, or sit next to them?
+6. ~~Does the new battle system replace the current three-unit front-line battles, or sit next to them?~~ Decided 2026-11-13: it replaces them.
 7. For province names: real regions or counties, generated local names, or a mix?
 8. In a random world, should the player choose the start country or get one at random?
 9. What matters more next: more depth (new systems) or more polish (look and feel)?
