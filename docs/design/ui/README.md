@@ -262,9 +262,71 @@ Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; secti
 - An event queue that the app shows between turns.
 - Planned for Phase 3, except the frame, which bankruptcy needs first.
 
+## 9. Battle panel v3: docked on the left
+
+**Status: proposal (2026-11-13).** Nothing is decided yet.
+**Images:** `18_battle_panel_v3_a_3lanes.png`, `18_battle_panel_v3_a_5lanes.png`, `18_battle_panel_v3_b_5lanes.png`, `18_battle_panel_v3_b_3lanes_log.png`, `18_battle_panel_v3_tiles.png`
+
+Today the battle panel is a centred modal that hides the map. Version 3 docks it on the left, under the top bar. The battle's hex, its badge and the front-line bar stay in view to the right. The board follows the battle-size draft (`docs/design/battle-size-and-frontage.md`):
+- 2 x lanes places a side: each lane has one back slot behind it. Ranged troops fill the back slots first, then spare regiments as "second rank".
+- The reserve pool shows as chips, with a "Marching in" line for stacks waiting next door.
+- There are 3 lanes today and 5 at most. 7 lanes appear only as a stretch note on the tiles sheet.
+
+**What they show (both options):**
+- **Face-off header:**
+  - The attacker on the left and the defender on the right, each with a country roundel (two-tone, with a banner), the side and "you", and the general with his trait (or "No general", greyed).
+  - In the middle, a small battle picture made from the hex's own terrain tiles. It shows the two sides' figures facing each other and the map's crossed-swords badge.
+  - The battle's name and year in the title band, with a jump-to-hex button and a close button.
+- **Stats, mirrored per side:**
+  - Men now and at the start, killed and wounded.
+  - The day's d6 next to each side, with its multiplier (green above 1, red below).
+  - Front-line morale as two halves growing out from the middle, with a red tick at the 5% break point in each half.
+- **Regiment tiles:**
+  - Each tile shows the game's unit figure, a men bar and a morale bar.
+  - Corner marks: routing (red tile and a red arrow), shaken ("!"), wavering (yellow dot), and in back slots "fires" (gold) or READY (green).
+  - Slots: a broken lane is dashed red, a lane closed by terrain is hatched, and an empty slot is dashed grey.
+  - A tile shows more text the wider it is: compact (none), medium (the men) and wide (name, men and tag). Hovering a tile shows the numbers card.
+- **Below the board:**
+  - The order (Attack, Hold or Withdraw) and the standing order "If attacked" (Hold or Withdraw).
+  - The terrain modifiers as chips (defender's ground, uphill, pass crossing). A stripe in the side's colour shows whom each one helps.
+  - The day log.
+  - While the dock is open, the map's action log line moves to the right of it.
+
+**Option A, a narrow dock (420 px)** (`_a_3lanes`, `_a_5lanes`):
+- The lanes run across, as in mockups 10 and 50. The enemy sits above the dashed front line (reserve chips, then back slots, then front), and you sit below (front, then back, then reserve).
+- The lanes share the width: 116 px wide tiles at 3 lanes, 67 px medium tiles at 5 lanes. Lane names sit under the front line.
+- With one modifier its chip has a word. With several they become icon chips, and the words show on hover.
+- The day log is always visible (4 lines), with a "full log (L)" link.
+
+**Option B, a wide dock (560 px)** (`_b_5lanes`, `_b_3lanes_log`):
+- The board mirrors the header. Your reserve, back and front columns are on the left and the enemy's on the right. Each lane is one row, with its name and the clash in the middle.
+- Tiles are 104 px wide and always show the name and the men. Rows are 52 px at 5 lanes and 66 px at 3.
+- Men, killed and wounded sit under each name, and the dice beside the picture.
+- Tabs: Regiments, Day log (with a red "+N" for new lines) and Ground. The footer, with the terrain chips (in full words), the orders and the standing order, shows on every tab.
+
+**Recommendation: A.**
+- It keeps the board the battle-size draft and the approved mockups 10 and 50 use (lanes across, back rows behind), so the panel, the doc and the later cards slice all speak of the same picture.
+- Orders, modifiers and the log fit on one screen with no tab, which means fewer clicks.
+- It covers a third of a 1280 px window instead of 44%.
+- B reads better at a glance (the true left-right mirror, names on every tile), and is the better choice if the owner wants the header's mirror carried into the board.
+
+**Open choices:**
+1. A or B (recommended: A).
+2. Which side sits nearer the front line in A? Proposed: the enemy always above and you below. The other way is attacker below and defender above, even when you defend.
+3. Front-line morale: two halves from the middle (proposed: shows each side's own break point), or today's single tug-of-war bar (it matches the map's bar).
+4. The day log: always visible in the panel (A), or in a tab (B)?
+5. Should the dock push the map's camera so the battle hex is never under it (proposed: yes, centre the battle in the free part of the map when the dock opens)?
+
+**Data and code needed:**
+- `battleview`: the lane count, `back` (a slot list per side), `pool`, the joiners marching in (the stack, where from, when), the general's name and trait, and each regiment's tag (fires or ready). It already has men, start, killed, wounded, front morale, dice, stance, standing order, uphill, crossing, ground and the log.
+- A battle picture made from the terrain's tile pair (data.py's terrain sprites) and two `art.figure`s, cached per battle.
+- `screens/battle.py` becomes a docked screen: not opaque, map input passes through to the right of the dock, and `view_rect()` narrows while it is open.
+- The country roundel and the d6 face as kit pieces (`ui/kit.py`), and the pool chip as a kit chip.
+- Generator: `mockups/ui-designs/gen_18_battle_v3.py`, drawn over the headless shots `base/battle_dock_a.png` and `battle_dock_b.png` (today's Battle of Redondela, no side panel). The 5-lane numbers are invented, so the map under them still shows today's 5-against-3 battle.
+
 ---
 
 ## Not designed here
-- **The battle UI:** it already has approved mockups in `docs/design/battle.md`.
+- **The rest of the battle UI:** it already has approved mockups in `docs/design/battle.md`. Only the docked panel (section 9) is proposed here.
 - **The outliner or alert list, text size, and colour-blind options:** these are in the M3 clean-up list but outside this brief. The kit's tokens and type scale are where they would plug in.
 - **The army list panel** (opened from the regiments chip) and the **Provinces and History tabs** of the treasury are named but not drawn.
