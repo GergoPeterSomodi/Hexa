@@ -30,6 +30,9 @@ from .combat import army_morale
 OWNS = ("battles", "battle_names", "units", "provinces", "log", "version", "_owned", "_castle_list", "_markets_dirty")
 STANCES = ("attack", "hold", "withdraw")
 ORDINALS = ("First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth")
+# id() of the battles whose day is being fought or that are being ended right now: their own code takes the dead out of
+# them (combat.cull, _pursue, _surrender), so units_left leaves them alone.
+_BUSY = set()
 
 
 def _name(world, tag):
@@ -421,6 +424,64 @@ def _retreat_or_surrender(world, battle, tag, units, how):
     return spot, how
 
 
+# ----- units that leave the map between days ----------------------------------------------------------------------
+
+def _listed(battle):
+    """The unit ids a battle keeps: its lanes, routed regiments, members, and the damage carried and wounded per unit."""
+    ids = set(battle.members) | set(battle.routed) | set(battle.carry) | set(battle.wounded_hp)
+    for lanes in battle.lanes.values():
+        ids.update(lanes)
+    return ids
+
+
+def _prune(battle, gone):
+    """Take the unit ids in ``gone`` out of a battle's lanes (the lane is empty; the reserve fills it on the next day),
+    its routed set, members, carried damage and wounded bookkeeping."""
+    for lanes in battle.lanes.values():
+        for lane, uid in enumerate(lanes):
+            if uid in gone:
+                lanes[lane] = None
+    battle.routed -= gone
+    battle.members -= gone
+    for book in (battle.carry, battle.wounded_hp):
+        for key in [k for k in book if k in gone]:
+            del book[key]
+
+
+def _leave_hex(world, battle, tag):
+    """A side with no fighting presence left on the battle's hex keeps its civilians there (generals, wagons): they retreat
+    to the nearest hex the side can stand on (retreat_spot), or are lost (unit_lost "surrendered") when there is none.
+    Without this the hex would hold two countries' units once the battle has ended."""
+    group = _side_units(world, battle, tag)
+    if not group:
+        return
+    spot = retreat_spot(world, group, battle.pos)
+    if spot is None:
+        world.lose(group, "surrendered")
+    else:
+        _move_side(world, group, battle.pos, spot)
+
+
+def units_left(world, units):
+    """Units that have just left the map outside a battle's day (war.lose: starvation, desertion, disbanding, attrition, a
+    sinking, an eviction...). Every battle they were in lets go of them at once (_prune), so no battle keeps a dead
+    regiment in a lane. A battle that then has no unit left on its hex on one side ends now as "gone" (a draw: no winner,
+    no score), and battle_ended is emitted once. A battle being fought or ended right now is left to its own code."""
+    gone = {u.id for u in units}
+    if not gone or not world.battles:
+        return
+    cells = {u.pos for u in units}
+    for battle in list(world.battles):
+        if id(battle) in _BUSY or not (battle.pos in cells or gone & _listed(battle)):
+            continue
+        _prune(battle, gone)
+        absent = [tag for tag in (battle.attacker, battle.defender) if not _present(world, battle, tag)]
+        if absent:
+            end_battle(world, battle, "gone")
+            for tag in absent:
+                _leave_hex(world, battle, tag)
+
+
 # ----- the end of a battle -----------------------------------------------------------------------------------------
 
 def _experience(world, fighters, winner, loser):
@@ -456,7 +517,7 @@ def _storm(world, battle, loser, how, had_field):
     return True
 
 
-def end_battle(world, battle, how, loser=None, pursuit=True, cause=None):
+def _end_battle(world, battle, how, loser=None, pursuit=True, cause=None):
     """End a battle (spec 3.6). ``how``: "broke" (the loser's army broke on a day; the pursuit was on that day), "withdrew"
     (the loser withdrew: on its order, or at the safety stop, which passes pursuit=False: half pursuit, or none, then the
     retreat), "destroyed" (the loser has no regiment or garrison left after a day: no retreat, the kills are already
@@ -479,12 +540,24 @@ def end_battle(world, battle, how, loser=None, pursuit=True, cause=None):
     storm = _storm(world, battle, loser, how, had_field)
     if battle in world.battles:
         world.battles.remove(battle)
+    if how == "destroyed":                   # the loser's civilians left on the hex (a general, wagons) retreat or are lost
+        _leave_hex(world, battle, loser)
     world.changed(ownership=storm)
     world.bus.emit("battle_ended", att, pos, attacker=att, defender=dfn, winner=winner, loser=loser,
                    assault=battle.assault, how=how, cause=cause, seasons=_seasons(world, battle), name=battle.name,
                    year=_year(battle.start),
                    killed={tag: round(battle.killed.get(tag, 0.0)) for tag in (att, dfn)},
                    wounded={tag: round(battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}, retreat=retreat)
+
+
+def end_battle(world, battle, how, loser=None, pursuit=True, cause=None):
+    """End a battle: _end_battle, with the battle marked busy meanwhile, so the units its pursuit, surrender or storm take
+    off the map do not end it a second time (units_left)."""
+    _BUSY.add(id(battle))
+    try:
+        _end_battle(world, battle, how, loser, pursuit, cause)
+    finally:
+        _BUSY.discard(id(battle))
 
 
 def end_battles(world, a, b=None):
@@ -528,12 +601,16 @@ def _fight_season(world, battle):
         return
     before = {tag: (battle.killed.get(tag, 0.0), battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}
     broke, cause, days = None, None, 0
-    while days < day_cap(world, battle) and broke is None:
-        report = combat.fight_day(world, battle)
-        broke, cause = report["broke"], report["cause"]
-        days += 1
-        if not (_present(world, battle, att) and _present(world, battle, dfn)):
-            break
+    _BUSY.add(id(battle))
+    try:
+        while days < day_cap(world, battle) and broke is None:
+            report = combat.fight_day(world, battle)
+            broke, cause = report["broke"], report["cause"]
+            days += 1
+            if not (_present(world, battle, att) and _present(world, battle, dfn)):
+                break
+    finally:
+        _BUSY.discard(id(battle))
     absent = [tag for tag in (att, dfn) if not _present(world, battle, tag)]
     world.bus.emit("battle_fought", att, battle.pos, defender=dfn, days=days,
                    morale={tag: army_morale(world, battle, tag) for tag in (att, dfn)},

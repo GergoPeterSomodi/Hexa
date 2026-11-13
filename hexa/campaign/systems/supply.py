@@ -80,12 +80,14 @@ def forage_check(world, group, tag=None, end_of_round=False):
     if not troops:
         return False, "Only troops forage"
     lead = troops[0]
+    if world.battle_at(lead.pos) is not None:
+        return False, "Can't forage during a battle"     # owner decision: a battle's stacks eat from their own stores
     prov = world.provinces.get(lead.pos)
     if not prov or prov.owner == lead.owner:
         return False, "Armies only forage in foreign land"
     if prov.foraged == (lead.owner, world.turn):
         return False, "Already foraged here this season"
-    if not end_of_round and min(u.moves_left for u in troops) <= 0 and world.battle_at(lead.pos) is None:
+    if not end_of_round and min(u.moves_left for u in troops) <= 0:
         return False, "No time left this season"
     return True, ""
 

@@ -6,13 +6,14 @@ this module: ``attack_options_group`` says where a stack may strike (the checks 
 walks to the hex it attacks from and calls ``engage`` (battle.py: a battle, a join or an overrun), ``sieges`` is the
 season's step that gives a province to the army standing in it (never on a battle hex), ``peace`` ends a war (its battles
 end first) and moves the provinces, ``lose`` takes units off the map with a ``unit_lost`` event each and ``kill`` is ``lose``
-for one unit and what it carries. The bus events (``war_declared``, ``peace_made``, ``province_captured``,
+for one unit and what it carries; ``lose`` also tells the battles (battle.units_left) so a battle never keeps a unit that
+has left the map. The bus events (``war_declared``, ``peace_made``, ``province_captured``,
 ``siege_progress``, ``unit_lost``) are emitted here; the battle events come from battle.py. Imports point down: never
 world.py, ui, render or pygame.
 """
 from ...hexgrid import neighbors, within
 from ..data import CASTLE_SIEGE, GARRISON_HP, GARRISON_REGEN, SIEGE_BASE
-from . import combat
+from . import battle as battlesys, combat
 from ..state import War
 
 # What this module changes on the world: the wars, the provinces (owner, controller, siege, garrison), the units (hit
@@ -213,9 +214,11 @@ def attack_group(world, group, target):
 
 
 def lose(world, units, why):         # off the map, with a unit_lost event each (why: see hexa/events.py)
-    for unit in list(units):
+    units = list(units)
+    for unit in units:
         world.units.remove(unit)
         world.bus.emit("unit_lost", unit.owner, unit.pos, what=unit.kind.name, why=why)
+    battlesys.units_left(world, units)      # the battles they were in let go of them now (battle.units_left)
 
 
 def kill(world, unit, why="battle"):

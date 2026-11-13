@@ -262,7 +262,8 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   docs/design/war-goals-and-peace.md 3.4). `world.engage`, `battle_order_check`/`battle_order`, `end_battles`,
   `retreat_spot` and `army_morale` are facades. `attack_group` walks to the stand hex and calls `engage`. Units in a battle do
   not move, raise, refit, drill or heal (`start_units`, `move_check`, `can_stand`, `recruit_check`, `refit_check`,
-  `upgrade_check`); they still eat, and `forage_check` lets a battle hex forage with no moves left (foreign land only). A
+  `upgrade_check`); they still eat, and `forage_check` refuses a stack on a battle hex ("Can't forage during a battle", the AI
+  path too). A
   siege skips a battle hex (`war.sieges`).
 - **Battle read model** (`battleview.py`, pygame-free; PR 6a): `battle_view(world, battle_or_pos, viewer)` is the one plain, read-only
   view of a battle that the badge (`hud/battles.py`), the panel, the log (`feed.py`) and the odds card read: sides as lists of tags, per-side men, killed, wounded,

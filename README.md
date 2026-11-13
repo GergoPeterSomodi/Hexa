@@ -352,7 +352,7 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
   long. Peace ends the battles of the two countries with no pursuit. Battles have names: "Battle of Toro, 1480", and
   "Second Battle of Toro, 1481" for a repeat on the same place.
 - **Standing orders:** each stack is set to **Hold** (default) or **Withdraw** for when it is attacked and gives no battle order. Withdraw leaves before the first day, with half pursuit.
-- **In battle:** a stack cannot move, raise troops, refit, drill or heal. It still eats, and it can forage in foreign land. A regiment under
+- **In battle:** a stack cannot move, raise troops, refit, drill or heal. It still eats, but it cannot forage (Can't forage during a battle). A regiment under
   half morale cannot attack. Outside battle a fed regiment wins back a quarter of its morale a season. Battle numbers:
 
 | Battle number | Value |
