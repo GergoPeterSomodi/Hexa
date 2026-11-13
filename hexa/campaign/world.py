@@ -13,17 +13,17 @@ from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, resources, state, tech
 from .state import Garrison, Market, Route, Unit, War, fill_defaults
-from .systems import worldgen
+from .systems import colonies, worldgen
 from .data import (BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP,
                    GARRISON_REGEN, GENERAL, GENERAL_BONUS, GENERAL_STACK, GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT, STACK_BASE,
                    SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_COST, UPGRADE_MAX, troop,
                    BUILD_TURNS, ATTRITION, FARM_GOODS, FOOD_PER_TROOP, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER,
                    SUPPLY_BASE, SUPPLY_PER_FARM, SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, BURGHER_TAX, CARAVEL, CARRACK, COLONIST, COLONIST_PEOPLE,
-                   COLONY_DONE, COLONY_GROWTH, COLONY_UPKEEP, ELASTICITY, END_YEAR, PIONEER, WORKS, WORKS_BONUS,
+                   COLONY_DONE, COLONY_UPKEEP, ELASTICITY, END_YEAR, PIONEER, WORKS, WORKS_BONUS,
                    WORKS_COST, WORKS_UPKEEP, SETTLEMENTS, SETTLEMENT_COST, SETTLEMENT_POP, SETTLEMENT_SLOTS,
                    SETTLEMENT_TAX, SETTLEMENT_UPKEEP, CASTLES, CASTLE_COST, CASTLE_UPKEEP, CASTLE_DEFENSE,
                    CASTLE_SIEGE,
-                   GOODS, MARKET_REACH, MARKETPLACE_CAPACITY, MERCHANT_CAPACITY, NATIVE_RAID_CHANCE, NEEDS,
+                   GOODS, MARKET_REACH, MARKETPLACE_CAPACITY, MERCHANT_CAPACITY, NEEDS,
                    OUTPUT, PEASANT_TAX, PORT_CAPACITY, PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX, REMOTE_PENALTY,
                    ROUTE_BASE, SEA_ROUTE_RANGE, SEA_STEP, SIEGE_BASE, START_YEAR, TAX_GROWTH, TAX_LEVELS, TERRAIN,
                    TRADING_POST_SHARE, WAR_LENGTH_AI, ATLANTIC_RANGE, BASE_GROWTH,
@@ -1201,8 +1201,7 @@ class CampaignWorld:
             prov.food = food
             rate = BASE_GROWTH + self._tax_growth(prov.owner) + min(0.0, food - 0.9) * 0.05
             if prov.colony:
-                rate += COLONY_GROWTH * (1 + self.bonus(prov.owner, "colony_growth"))
-                prov.peasants += 0.04       # settlers keep arriving from home
+                rate = colonies.settlers(self, prov, rate)
             prov.peasants *= 1 + rate
             prov.nobles *= 1 + rate * 0.5
             jobs = sum(BUILDINGS[k].needs_burghers * prov.level(k) for k in MANUFACTORIES) + \
@@ -1213,17 +1212,9 @@ class CampaignWorld:
                 prov.burghers += moving
             prov.burghers *= 1 + rate * (1 + self.bonus(prov.owner, "burgher_growth"))
             if prov.natives > 0:
-                if prov.colony or prov.trading_post:
-                    settled = prov.natives * 0.01
-                    prov.natives -= settled
-                    prov.peasants += settled * 0.5
-                if prov.colony and prov.natives > prov.peasants * 2 and self.rng.random() < NATIVE_RAID_CHANCE:
-                    prov.peasants *= 0.8
-                    self.message(f"Natives raided the colony at {self.place(prov)}!", prov.owner)
-                    self.bus.emit("native_raid", prov.owner, prov.pos)
+                colonies.natives(self, prov)
             if prov.colony and prov.pop >= COLONY_DONE:
-                prov.colony = False
-                self.message(f"{self.place(prov)} has grown into a full province.", prov.owner, "growth", prov.pos)
+                colonies.graduate(self, prov)
             for item in list(prov.queue):
                 item[1] -= 1
                 if item[1] <= 0:
@@ -2250,51 +2241,10 @@ class CampaignWorld:
 
     # ----- colonies -------------------------------------------------------------------
     def found_check(self, unit, trading_post=False):
-        if unit.kind is not COLONIST:
-            return False, "Only colonists can found colonies"
-        if unit.carrier:
-            return False, "Land first"
-        if unit.moves_left <= 0:
-            return False, "No moves left this season"
-        prov = self.provinces.get(unit.pos)
-        if not prov or prov.owner is not None:
-            return False, "Colonies need land nobody owns"
-        if prov.terrain == "desert" and not prov.coastal:
-            return False, "Nobody can live in the open desert"
-        if not self.in_old_world(prov.pos) and not self.has(unit.owner, "atlantic"):
-            return False, "Crossing the Atlantic needs the Astrolabe tech"
-        if trading_post:
-            if not prov.coastal:
-                return False, "Trading posts must be on the coast"
-            if prov.natives < 1.0:
-                return False, "Trading posts need a native population to trade with"
-        return True, ""
+        return colonies.found_check(self, unit, trading_post)
 
     def found(self, unit, trading_post=False):
-        if not self.found_check(unit, trading_post)[0]:
-            return None
-        prov = self.provinces[unit.pos]
-        prov.owner = prov.controller = unit.owner
-        if trading_post:
-            prov.trading_post = True
-            prov.peasants = 0.2
-            what = "trading post"
-        else:
-            prov.colony = True
-            prov.peasants = COLONIST_PEOPLE
-            prov.settlement = 1
-            what = "colony"
-        if naming.is_wild(prov.name) and prov.tribe and not prov.city:
-            prov.name = naming.colony_name(self, prov)
-        self.units.remove(unit)
-        self.changed(ownership=True)
-        self.refresh_markets()
-        country = self.countries[unit.owner]
-        self.message(f"{country.name} founded a {what} at {self.place(prov)}.",
-                     None if unit.owner == self.player or geo.lonlat(prov.pos)[0] < -20 else unit.owner)
-        self.bus.emit("colony_founded", unit.owner, prov.pos, what=what)
-        self.see_from(unit, radius=2 * SCALE)
-        return prov
+        return colonies.found(self, unit, trading_post)
 
     # ----- war -----------------------------------------------------------------------------
     def at_war(self, a, b):

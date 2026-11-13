@@ -190,6 +190,10 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   public methods (`passes`, `edge_blocked`, `add_unit`, `land_spot`, `provinces_of`, `total_pop`). `world.py` keeps
   a facade only where something else calls: `_nearest_land` (markets), `_cross`, `_unit_point`, `_unit_centre` (tests),
   and `_pass_data`, which calls `worldgen.build_edges`. `OWNS` lists the world attributes the module sets.
+- **Colonies** (`systems/colonies.py`): `found_check`/`found` (facades on `CampaignWorld`) and the colonial part of the
+  season's `grow()` loop: `settlers` (the growth bonus and arriving settlers), `natives` (natives settling and raiding)
+  and `graduate` (a colony becomes a province). `grow()` calls them where that code used to sit, so the order of
+  changes and random draws is unchanged.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of
