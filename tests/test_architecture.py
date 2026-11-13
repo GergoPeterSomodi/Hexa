@@ -67,16 +67,15 @@ WORLD_MODULES = {"hexa.world", "hexa.colony.world", "hexa.campaign.world"}
 # ----- ALLOW: ONLY EVER SHRINK THESE -----------------------------------------------------------------------------
 ALLOW_MODULES = {
     "hexa.campaign.world": 3532,
-    "hexa.campaign.goodsart": 2592,
-    "hexa.campaign.wfctiles": 2399,
-    "hexa.campaign.landscape": 2038,
+    "hexa.campaign.goodsart": 2476,
+    "hexa.campaign.wfctiles": 2375,
+    "hexa.campaign.landscape": 2010,
     "hexa.campaign.app": 917,
-    "hexa.campaign.mapview": 1533,
+    "hexa.campaign.mapview": 1531,
     "hexa.campaign.randomgeo": 1286,
-    "hexa.campaign.life": 1205,
-    "hexa.campaign.goodsobjects": 1155,
+    "hexa.campaign.life": 1182,
+    "hexa.campaign.goodsobjects": 1135,
     "hexa.colony.world": 1116,
-    "hexa.campaign.nature": 808,
 }
 
 ALLOW_FUNCTIONS = {
@@ -122,7 +121,6 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.goodsart:_iron": 64,
     "hexa.campaign.wfctiles:_castle_objects": 64,
     "hexa.campaign.mapview:MapView.__init__": 62,
-    "hexa.campaign.mapview:MapView._draw_landscape": 62,
     "hexa.campaign.screens.techdraw:_grid": 61,
 }
 

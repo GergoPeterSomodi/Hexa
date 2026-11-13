@@ -24,7 +24,6 @@ import math
 import os
 import random
 import zlib
-from collections import OrderedDict
 from dataclasses import dataclass
 
 import pygame
@@ -32,6 +31,9 @@ import pygame
 from ..hexgrid import neighbors
 from . import art, geo, goodsart, landmarks, life, nature, wfctiles
 from .art import shade
+from .render import draw
+from .render.cache import BoundedCache
+from .render.draw import in_poly
 
 SQ3 = math.sqrt(3)
 APO = SQ3 / 2                       # centre to edge midpoint, in hex radii
@@ -39,6 +41,7 @@ SPRITE_H = 70 / (60 / SQ3)          # the game's sprite height in hex radii (map
 OBJ_R = 69.3                        # the hex radius the object libraries are drawn for
 K = 2                               # supersampling of composites
 INK = (36, 38, 44)
+EPS = 1e-12                        # in_poly's guard against a zero division
 GROUND_CACHE = 3000
 OBJECT_CACHE = 6000
 
@@ -113,7 +116,7 @@ def hex_poly(X, Y, rad):
     return [corner_pt(c, X, Y, rad) for c in range(6)]
 
 
-_COAST_WATER = {}
+_COAST_WATER = BoundedCache("landscape.coast_water", 600)
 
 
 def coast_water(desc):
@@ -121,10 +124,8 @@ def coast_water(desc):
     key = (desc.sea, desc.variant, bool(desc.town))
     mask = _COAST_WATER.get(key)
     if mask is None:
-        if len(_COAST_WATER) > 600:
-            _COAST_WATER.clear()
         geo = wfctiles._coast_geo(desc.sea, desc.variant, wfctiles.COAST_RD - 8 if desc.town else wfctiles.COAST_RD)
-        mask = _COAST_WATER[key] = pygame.mask.from_surface(geo["water"], 8)
+        mask = _COAST_WATER.put(key, pygame.mask.from_surface(geo["water"], 8))
     return mask
 
 
@@ -192,18 +193,6 @@ def _seg_dist(p, a, b):
 
 def _poly_dist(p, pts):
     return min(_seg_dist(p, a, b) for a, b in zip(pts, pts[1:]))
-
-
-def _in_poly(x, y, poly):
-    inside = False
-    j = len(poly) - 1
-    for i in range(len(poly)):
-        xi, yi = poly[i]
-        xj, yj = poly[j]
-        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi + 1e-12) + xi:
-            inside = not inside
-        j = i
-    return inside
 
 
 def _wave(t, seed):
@@ -424,8 +413,8 @@ def decorate(sf, kind_b, kind_a, curve, q, rng, inward, avg_b):
 
 
 # ----------------------------------------------------------------------------------------------- object sprites
-_OB = {}
-_PIECE = {}
+_OB = BoundedCache("landscape.sprites", 4096)
+_PIECE = BoundedCache("landscape.pieces", 32)
 # farm buildings and markers made with the game's own goodsart pens (drawn at 2x, base point = bottom centre)
 PIECES = {"barn": (44, 36), "windmill": (56, 62), "farmhouse": (40, 34), "stump": (10, 6), "haystack": (14, 12),
           "hospice": (40, 40), "snowmark": (16, 26)}
@@ -433,12 +422,13 @@ PIECES = {"barn": (44, 36), "windmill": (56, 62), "farmhouse": (40, 34), "stump"
 
 def _piece(name, seed):
     key = (name, seed)
-    if key in _PIECE:
-        return _PIECE[key]
+    hit = _PIECE.get(key)
+    if hit is not None:
+        return hit
     w, h = PIECES[name]
     K2 = goodsart.K
     surf = pygame.Surface((w * K2, h * K2), pygame.SRCALPHA)
-    p = goodsart.Pen(surf)
+    p = draw.Pen(surf)
     x, y = w / 2, h - 1
     if name == "barn":
         goodsart.building(p, x - 4, y, 26, 12, 16, (184, 66, 50), (112, 82, 64), "side", rh=10, wins=0)
@@ -471,16 +461,15 @@ def _piece(name, seed):
             a = math.radians(90 + 60 * k)
             dx, dy = math.cos(a) * 4.2, math.sin(a) * 4.2
             p.line((70, 120, 190), (x - dx, y - 16 - dy), (x + dx, y - 16 + dy), 1.3)
-    res = (surf, w, h)
-    _PIECE[key] = res
-    return res
+    return _PIECE.put(key, (surf, w, h))
 
 
 def obj_sprite(name, size, seed, cat, r, flip=False):
     """An object at hex radius r. cat picks the OSCALE family. Base point = bottom centre. Cached."""
     key = (name, size, seed % 4, cat, r, flip)
-    if key in _OB:
-        return _OB[key]
+    hit = _OB.get(key)
+    if hit is not None:
+        return hit
     f = r / OBJ_R * OSCALE[cat]
     if name in NATURE_NAMES:
         s2, fw, fh = nature._get2x(name, size, seed % 4)
@@ -495,12 +484,11 @@ def obj_sprite(name, size, seed, cat, r, flip=False):
         raise KeyError(name)
     if flip:
         img = pygame.transform.flip(img, True, False)
-    _OB[key] = img
-    return img
+    return _OB.put(key, img)
 
 
 # ----------------------------------------------------------------------------------------------- clearings
-_BLOBS = {}
+_BLOBS = BoundedCache("landscape.blobs", 2048)
 
 
 def clearing_blob(c):
@@ -518,9 +506,7 @@ def clearing_blob(c):
 
 def _blob_cached(c):
     key = (c.pos, c.clearing)
-    if key not in _BLOBS:
-        _BLOBS[key] = clearing_blob(c)
-    return _BLOBS[key]
+    return _BLOBS.get(key, lambda: clearing_blob(c))
 
 
 def voronoi_cells(seeds, box):
@@ -581,14 +567,14 @@ def field_system(c):
     fields, hedges, trees = [], [], []
     for i, poly in enumerate(vcells):
         sx, sy = seeds[i]
-        if not _in_poly(sx, sy, blob) or len(poly) < 3:
+        if not in_poly(sx, sy, blob, EPS) or len(poly) < 3:
             continue
         crop = CROPS[_h("crop", c.pos, i) % len(CROPS)]
         fields.append((poly, crop, _u("ang", c.pos, i) * 3.14, i))
         for k in range(len(poly)):
             a, b = poly[k], poly[(k + 1) % len(poly)]
             mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-            if _u("hedge", c.pos, round(mid[0], 2), round(mid[1], 2)) < 0.62 + 0.06 * lvl and _in_poly(*mid, blob):
+            if _u("hedge", c.pos, round(mid[0], 2), round(mid[1], 2)) < 0.62 + 0.06 * lvl and in_poly(*mid, blob, EPS):
                 hedges.append((a, b))
                 if _u("ht", round(mid[0], 2), round(mid[1], 2)) < 0.26:
                     trees.append(mid)
@@ -620,7 +606,7 @@ def tree_density(m, c, x, y):
     for t in m.clearings_near(c.pos):
         tx, ty = hex_centre(t.pos)
         if abs(tx - x) < 3.2 and abs(ty - y) < 3.2:
-            if _in_poly(x, y, _blob_cached(t)):
+            if in_poly(x, y, _blob_cached(t), EPS):
                 return 0.0, None
             d = math.hypot(x - tx, y - ty)
             if d < 2.3:
@@ -769,20 +755,6 @@ class _Frame:
 
     def px(self, X, Y):
         return self.w / 2 + (X - self.X) * self.S, self.h / 2 + (Y - self.Y) * self.S
-
-
-def _lru_get(cache, key):
-    hit = cache.get(key)
-    if hit is not None:
-        cache.move_to_end(key)
-    return hit
-
-
-def _lru_put(cache, key, value, cap):
-    cache[key] = value
-    if len(cache) > cap:
-        cache.popitem(last=False)
-    return value
 
 
 def check_season(season):
@@ -1129,14 +1101,14 @@ class Landscape:
         self.life = {}
         self._ridges = _ridges_of(getattr(getattr(world, "geo", None), "MOUNTAINS", None))
         self._src_cache, self._scaled_cache, self._avg_cache = {}, {}, {}
-        self._grounds = OrderedDict()
+        self._grounds = BoundedCache("landscape.grounds", GROUND_CACHE)
         self._grid = {}
         self._gquick = {}                   # (pos, r, season) -> (world version, composite key): skips the key work
         self.builds = 0                     # ground composites built so far (MapView budgets them per frame)
         self.object_builds = 0              # object lists built so far (budgeted the same way)
         self.sprite_builds = 0              # object sprites made so far (make_sprites; budgeted the same way)
         self.overlay_builds = 0             # hexes whose wfc overlay / base picture was made by prepare()
-        self._objs = OrderedDict()
+        self._objs = BoundedCache("landscape.objects", OBJECT_CACHE)
         self._specs_cache = {}
         self._field_geo = {}
         self._ridge = None                  # Ridges, built on first use
@@ -1303,7 +1275,7 @@ class Landscape:
         c = None
         if hit is not None and hit[0] == self._version:  # this hex's key was worked out for this world version
             key = hit[1]
-            img = _lru_get(self._grounds, key)
+            img = self._grounds.get(key)
             if img is not None:
                 return img
             if not build:                                # not built yet (a frame asks again every frame while it waits)
@@ -1319,13 +1291,13 @@ class Landscape:
                    self.ridges().key(pos, season), c.landmark, c.owner, c.built, c.water,
                    tuple(self._nbr_sig(model, n) for n in nbrs))
             self._gquick[quick] = (self._version, key)
-            hit = _lru_get(self._grounds, key)
+            hit = self._grounds.get(key)
             if hit is not None:
                 return hit
             if not build:
                 return None
         self.builds += 1
-        return _lru_put(self._grounds, key, self._build_ground(model, c, r), GROUND_CACHE)
+        return self._grounds.put(key, self._build_ground(model, c, r))
 
     def grid(self, r):
         """The faint hex outline at hex radius r, the size of ground(). Cached per radius."""
@@ -1557,7 +1529,7 @@ class Landscape:
         check_season(season)
         self._sync()
         key = (pos, self._version, season, r)
-        hit = _lru_get(self._objs, key)
+        hit = self._objs.get(key)
         if hit is not None:
             return hit
         if not build:                       # not built yet: None, and the caller draws the hex later
@@ -1573,7 +1545,7 @@ class Landscape:
                 surf = obj_sprite(name, size, seed, cat, rs, flip)
                 out.append((surf, dx, dy, dy))
             out.sort(key=lambda o: o[3])
-        return _lru_put(self._objs, key, out, OBJECT_CACHE)
+        return self._objs.put(key, out)
 
     def make_sprites(self, pos, r, season):
         """Makes the object sprites of one hex that do not exist yet (the first use of a sprite is the costly part of
@@ -1722,7 +1694,7 @@ class Landscape:
         """Hedgerow trees and farm buildings of a natural field system (level c.fields)."""
         _, _, blob, trees = self._fields_of(c)
         for i, (x, y) in enumerate(trees):
-            if not _in_poly(x, y, blob) or not self._allowed(m, c, x, y):
+            if not in_poly(x, y, blob, EPS) or not self._allowed(m, c, x, y):
                 continue
             name = ("oak", "beech", "linden", "oak")[_h("hn", i, c.pos) % 4]
             out.append(("tree", name, ("small", "medium")[_h("hs", i, c.pos) % 2], _h("hv", i, c.pos), x, y + 0.02))

@@ -56,8 +56,10 @@ import pygame
 from hexa import hexgrid
 from hexa.campaign import wfc
 from hexa.campaign.art import hex_pts, shade
+from hexa.campaign.render.cache import BoundedCache
 from hexa.campaign.goodsart import (CREAM, DARK, DWOOD, INK, ROOF_RED, ROOF_SLATE, STONE, THATCH, WATER, WATER_L, WHITE,
-                                    WOOD, Pen, boat, building, flag, lerp, mix, mound, tower)
+                                    WOOD, boat, building, flag, mound, tower)
+from hexa.campaign.render.draw import OFFS, OFFS_THIN, Pen, hex_mask, lerp, mix, shadow_at
 
 W, H = 120, 140
 CX, CY = W / 2, H / 2
@@ -450,9 +452,6 @@ def river_ends(patch):
 # ===================================================================================================
 # canvas
 # ===================================================================================================
-_OFFS = [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, -2), (-2, 2), (2, 2)]
-_OFFS_THIN = [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, -1), (-1, 1), (1, 1)]
-_MASKS = {}
 
 
 def _kernel(offs):
@@ -463,15 +462,7 @@ def _kernel(offs):
     return pad, k
 
 
-_KERNELS = {True: _kernel(_OFFS), False: _kernel(_OFFS_THIN)}
-
-
-def _hex_mask(r):
-    if r not in _MASKS:
-        m = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-        pygame.draw.polygon(m, (255, 255, 255, 255), [(x * K, y * K) for x, y in hex_pts(r)])
-        _MASKS[r] = m
-    return _MASKS[r]
+_KERNELS = {True: _kernel(OFFS), False: _kernel(OFFS_THIN)}
 
 
 class _TrackPen(Pen):
@@ -533,10 +524,9 @@ class _TrackPen(Pen):
         return b
 
 
-_SPRITES = {}
+_SPRITES = BoundedCache("wfctiles.props", 512)
 _POOL = []                                  # spare (surf, layer, block) triples: allocating three 240 x 280 surfaces
-_SHADOWS = {}                               # costs 0.12 ms per tile, wiping a used one 0.02 ms
-_SPARE = {}
+_SPARE = BoundedCache("wfctiles.scratch", 64)
 
 
 class Canvas:
@@ -583,15 +573,7 @@ class Canvas:
         fn(self.b)
 
     def shadow(self, x, y, w, h=None, a=45):
-        h = h or w * 0.35
-        key = (max(1, int(w * K)), max(1, int(h * K)), a)
-        sh = _SHADOWS.get(key)
-        if sh is None:
-            sh = _SHADOWS[key] = pygame.Surface(key[:2], pygame.SRCALPHA)
-            pygame.draw.ellipse(sh, (0, 0, 0, a), sh.get_rect())
-        pos = (round((x - w / 2) * K), round((y - h / 2) * K))
-        self.surf.blit(sh, pos)
-        r = sh.get_rect(topleft=pos)
+        r = shadow_at(self.surf, x, y, w, h, a)
         self.sbox = r if self.sbox is None else self.sbox.union(r)
 
     def stamp(self, ink=2):
@@ -633,7 +615,7 @@ def _spare(name, size, alpha=False):
     key = (name, size, alpha)
     s = _SPARE.get(key)
     if s is None:
-        s = _SPARE[key] = pygame.Surface(size, pygame.SRCALPHA if alpha else 0, 32)
+        s = _SPARE.put(key, pygame.Surface(size, pygame.SRCALPHA if alpha else 0, 32))
     return s
 
 
@@ -649,7 +631,7 @@ def _mask_1x():
     """The hex mask at 1x: colour white, alpha = coverage (so a MIN blit only touches alpha)."""
     s = _SPARE.get("mask1")
     if s is None:
-        s = _SPARE["mask1"] = pygame.transform.smoothscale(_hex_mask(MASK_R), (W, H))
+        s = _SPARE.put("mask1", pygame.transform.smoothscale(hex_mask(MASK_R), (W, H)))
         s.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
     return s
 
@@ -741,7 +723,7 @@ def _sprite(key, draw, ink=1, ground_layer=False):
             r = cv.surf.get_bounding_rect(1)
         else:
             r = r.clip(cv.surf.get_rect())
-        s = _SPRITES[key] = (cv.surf.subsurface(r).copy(), r.x - _ANCHOR[0] * K, r.y - _ANCHOR[1] * K)
+        s = _SPRITES.put(key, (cv.surf.subsurface(r).copy(), r.x - _ANCHOR[0] * K, r.y - _ANCHOR[1] * K))
     return s
 
 
@@ -1749,43 +1731,37 @@ def _compose(desc):
     return cv
 
 
-_CACHE = {}
+_CACHE = BoundedCache("wfctiles.tiles", 1024)        # about 590 tiles cover Europe at zoom 3 (67 KB each)
 
 
+@_CACHE.memo
 def overlay(desc):
     """Transparent 120 x 140 overlay for a TileDesc (sea tiles are opaque). Cached."""
-    key = ("ov", desc)
-    if key not in _CACHE:
-        _CACHE[key] = _compose(desc).finish()
-    return _CACHE[key]
+    return _compose(desc).finish()
 
 
-_BASES = {}
-
-
+@BoundedCache("wfctiles.bases", 64).memo
 def base_tile(kind, tiles_dir=None):
     """The base picture for a land kind: the Kenney pack tile when tiles_dir (".../PNG/Tiles") is given, else flat."""
-    key = (kind, tiles_dir)
-    if key not in _BASES:
-        img = None
-        if tiles_dir and kind in BASE_SPRITES:
-            import os
-            path = os.path.join(tiles_dir, "Terrain", *BASE_SPRITES[kind].split("/")) + ".png"
-            if os.path.exists(path):
-                img = pygame.image.load(path)
-                img = img.convert_alpha() if pygame.display.get_surface() else img
-        if img is None:
-            img = pygame.Surface((W, H), pygame.SRCALPHA)
-            pygame.draw.polygon(img, BASE_COLOURS.get(kind, GRASS), hex_pts(R))
-        _BASES[key] = img
-    return _BASES[key]
+    img = None
+    if tiles_dir and kind in BASE_SPRITES:
+        import os
+        path = os.path.join(tiles_dir, "Terrain", *BASE_SPRITES[kind].split("/")) + ".png"
+        if os.path.exists(path):
+            img = pygame.image.load(path)
+            img = img.convert_alpha() if pygame.display.get_surface() else img
+    if img is None:
+        img = pygame.Surface((W, H), pygame.SRCALPHA)
+        pygame.draw.polygon(img, BASE_COLOURS.get(kind, GRASS), hex_pts(R))
+    return img
 
 
 def render_tile(desc, tiles_dir=None):
     """Full 120 x 140 tile: base terrain (Kenney / goodsart / flat) with the overlay composed at 2x. Cached."""
     key = ("full", desc, tiles_dir)
-    if key in _CACHE:
-        return _CACHE[key]
+    hit = _CACHE.get(key)
+    if hit is not None:
+        return hit
     cv = _compose(desc)
     if desc.base in SEA_BASES:
         out = cv.finish()
@@ -1801,8 +1777,7 @@ def render_tile(desc, tiles_dir=None):
         pygame.draw.polygon(under, rim[:3], [(x * K, y * K) for x, y in hex_pts(MASK_R + 1)])
         under.blit(pygame.transform.smoothscale(_bleed(base), (W * K, H * K)), (0, 0))
         out = cv.finish(under)
-    _CACHE[key] = out
-    return out
+    return _CACHE.put(key, out)
 
 
 # ----- convenience wrappers (all cached through overlay()) -----------------------------------------------
@@ -1829,15 +1804,16 @@ def road_overlay(edges, variant=0, kind="dirt", river_edges=(), crossing="bridge
     d = TileDesc(road=edges, paved=edges if kind == "paved" else frozenset(), river=_fs(river_edges),
                  crossing=crossing, variant=variant)
     key = ("road", d)
-    if key not in _CACHE:
+    out = _CACHE.get(key)
+    if out is None:
         cv = Canvas()
         river = _river_geo(d, None)
         road = _road_geo(d, river)
         if crossing != "ferry" or not river:
             _paint_road(cv, road, _rng("tile", d))
         _draw_objects(cv, _crossing_objects(cv, road, river, crossing))
-        _CACHE[key] = cv.finish()
-    return _CACHE[key]
+        out = _CACHE.put(key, cv.finish())
+    return out
 
 
 def wall_overlay(inside=(), level=2, gates=(), variant=0):

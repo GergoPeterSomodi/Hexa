@@ -618,9 +618,9 @@ class IconCacheTest(HudCase):
 
     def test_the_cache_is_bounded_registered_and_emptied_on_quit(self):
         from hexa.ui import cache, icons
-        for size in range(8, 8 + cache._REGISTRY["icons"].size + 20):
+        for size in range(8, 8 + cache.REGISTRY["icons"].size + 20):
             icons.icon("check", size)
-        self.assertLessEqual(cache.stats()["icons"], cache._REGISTRY["icons"].size)
+        self.assertLessEqual(cache.stats()["icons"], cache.REGISTRY["icons"].size)
         cache.clear_all()
         self.assertEqual(cache.stats()["icons"], 0)
         icons.icon("check", 16)

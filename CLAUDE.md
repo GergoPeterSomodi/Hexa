@@ -102,10 +102,10 @@ triggers, private `_caches`, or speed (`tools/perf.py`). Add a prepared state to
 touches something none of them reaches. `tests/test_same_behaviour.py` plants a rule change, a lost road and a changed
 seizure order in copies of `hexa/` and a crash, and checks that each is caught (a crash reports ORACLE FAILED).
 
-Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and twelve game
+Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and fourteen game
 modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
 `test_techscreen.py`, `test_uifixes.py`, `test_wfctiles.py`, `test_goodsobjects.py`, `test_mapview_polish.py`,
-`test_town_labels.py`, `test_review_fixes.py`, `test_playtest2.py`, `test_ridge_art.py`, which the CI `ui` job runs too): they skip without it (errors under `HEXA_REQUIRE_PYGAME=1`).
+`test_town_labels.py`, `test_review_fixes.py`, `test_playtest2.py`, `test_ridge_art.py`, `test_sprite_hashes.py`, `test_render_cache.py`, which the CI `ui` job runs too): they skip without it (errors under `HEXA_REQUIRE_PYGAME=1`).
 Window tests subclass `tests/support/harness.py:UITestCase`
 (SDL dummy drivers, fake `Clock`/`get_ticks`, pinned fonts, temp `HEXA_HOME`), script input with
 `self.driver.at(frame, key(...)/click(...))` and `self.driver.run_for(frames, until=...)`, call the window's real
@@ -258,7 +258,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   alone (`take_floating(max_age)` drops what is too old). HUD modules
   read the world and register buttons; they hold their own fonts (`new_font`, not the cached `theme.font`, which can
   outlive pygame; both are emptied by a `pygame.register_quit` hook) and never change the game. `ui/icons.py` draws the
-  icons into a `ui/cache.py` `BoundedCache` (registered by name, emptied on quit; `icon()` hands out copies); `ui/kit.py` has `chip`, `icon_button` and a `hover_card` whose lines may have a right-aligned amount
+  icons into a `BoundedCache` (`campaign/render/cache.py`, re-exported by `ui/cache.py`; registered by name, emptied on quit; `icon()` hands out copies); `ui/kit.py` has `chip`, `icon_button` and a `hover_card` whose lines may have a right-aligned amount
   (text with a tab) and rules (`("", None)`).
 - **Lines for the action log.** Most log lines come from bus events (`feed.py` handlers). A `world.message()` that has no
   event of its own must name a notice, `world.message(text, tag, "idea", pos)` (`feed.NOTICES`: start, lead, treasury,
@@ -289,6 +289,9 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   ribbons until `replay.ready_at(pos)`. Tests turn the option off (see below).
 - **Markets** are rebuilt lazily (`world.refresh_markets()` marks them, `ensure_markets()` rebuilds). `draw()` no
   longer calls it: `refresh()`, `process_events()` and `end_season()` do, so drawing never changes the game.
+- **Drawing primitives** (`campaign/render/draw.py`): `Pen` (tile coordinates at 2x), `Canvas` (ground layer, object layer,
+  `stamp` with the ink outline, `shadow`, `finish` to the hex), `ell`, `lerp`, `mix`, `in_poly`, `hex_mask`, `shadow_at`. The
+  art modules import them from there (goodsart's `Tile` and landmarks' canvas are `Canvas`es); a new art module does the same.
 - `art.py` draws extra tiles, decorations, unit figures and tokens in code, in the Kenney style at 120x140.
   `MapView` switches from flat colours to tile art at zoom index `TILE_FROM`.
 
@@ -324,9 +327,18 @@ the rules as far as the current layout allows, and never makes an allowlisted of
 - **No cross-module `_private` use** outside tests. Tests prefer public functions of system modules.
 - **UI:** buttons, panels, rows, tooltips and modals come from hexa/ui/kit.py, colours and fonts from
   hexa/ui/theme.py. No new hand-drawn button.
-- **Render caches** are `render.cache.BoundedCache` instances, registered by name. No new module-level dict
-  cache. Time-sliced work uses `render.budget.FrameBudget`.
+- **Render caches** are `campaign/render/cache.py` `BoundedCache` instances, registered by name (`cache.stats()`; hits, misses
+  and bytes with `detail=True`). No module-level dict cache or `lru_cache` in the art modules (`tests/test_render_cache.py` checks);
+  `@BoundedCache(name, n).memo` caches a function of positional arguments. Landscape's per-MapView caches use the same
+  class (the registry is weak and adds up caches of one name). Sizes come from measurement (`python -m tools.perf`
+  prints entries, MB, hits and misses per cache): a cache is bounded above what a full tour of the map needs, so it
+  evicts only when worlds change. Time-sliced work uses `campaign/render/budget.py` `FrameBudget` (MapView's `LAND_*_MS` and `PREFETCH_*` constants stay in
+  mapview.py and are read when a slice starts, so a test can lift them).
 - **Refactor PRs** change no behaviour: label them `refactor`; they must pass tools/same_behaviour.py,
-  save-compat and sha-identical goldens. Never mix a refactor and a gameplay change in one commit.
+  save-compat and sha-identical goldens. A change to an art module also keeps `tests/test_sprite_hashes.py` green (sha256
+  of 1,743 generated sprites against `tests/fixtures/sprite_hashes/<platform>.json`, one fixture per OS, Python, pygame and SDL).
+  CI's `ui` job compares only on a platform that has a fixture and skips otherwise; the Linux fixture is made by the goldens
+  workflow, and `UPDATE_SPRITES=1` rewrites this platform's fixture only for a change of art on purpose. Never mix a
+  refactor and a gameplay change in one commit.
 - **Where new features go:** rules -> campaign/systems/<name>.py (+ numbers in data.py, + README table);
   panel -> campaign/panels/; screen -> campaign/screens/; art -> its art module using render/draw.py.

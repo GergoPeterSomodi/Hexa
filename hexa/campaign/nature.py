@@ -21,16 +21,14 @@ Tiles:    draw_tile(name, variant=0) -> 120 x 140 hex tile (2x supersampled), TI
 import math
 import random
 import zlib
-from functools import lru_cache, partial
+from functools import partial
 
 import pygame
 
 from .art import hex_pts, shade
-from .goodsart import ell
+from .render.cache import BoundedCache
+from .render.draw import CX, CY, H, K, R, W, ell, hex_mask, in_poly
 
-W, H = 120, 140
-CX, CY, R = 60.0, 70.0, 69.3
-K = 2
 INK = (36, 38, 44)
 SNOW = (236, 242, 250)
 TRUNK = (118, 88, 60)
@@ -60,18 +58,6 @@ def clip(poly, keep):
     return out
 
 
-def _in_poly(x, y, poly):
-    ins = False
-    j = len(poly) - 1
-    for i in range(len(poly)):
-        xi, yi = poly[i]
-        xj, yj = poly[j]
-        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
-            ins = not ins
-        j = i
-    return ins
-
-
 def _in_hex(x, y, margin=0.0):
     r = R - margin
     dx, dy = abs(x - CX), abs(y - CY)
@@ -85,7 +71,7 @@ def _dots(rng, poly, n, fn):
     while got < n and tries < n * 14:
         tries += 1
         x, y = rng.uniform(min(xs), max(xs)), rng.uniform(min(ys), max(ys))
-        if _in_poly(x, y, poly):
+        if in_poly(x, y, poly):
             fn(x, y)
             got += 1
 
@@ -206,7 +192,7 @@ def _reg(name, w, h, shadow=0.0, **kw):
     return deco
 
 
-@lru_cache(maxsize=None)
+@BoundedCache("nature.sprites2x", 512).memo         # all 396 (name, size, seed) fit: 12 MB
 def _get2x(name, size, seed):
     """(surface at 2x, final width, final height). The base point is the bottom centre of the surface."""
     build, w, h, shadow = _BUILD[name]
@@ -216,7 +202,7 @@ def _get2x(name, size, seed):
     return c.finish(shadow), c.fw, c.fh
 
 
-@lru_cache(maxsize=None)
+@BoundedCache("nature.sprites", 512).memo
 def _pub(name, size, seed):
     surf, fw, fh = _get2x(name, size, seed)
     return pygame.transform.smoothscale(surf, (fw, fh))
@@ -337,7 +323,7 @@ def _hill_rolling(c, rng, col, tuft, hedge):
             for _ in range(3):
                 a = (rng.uniform(-24, -4), rng.uniform(-14, -3))
                 b = (a[0] + rng.uniform(6, 11), a[1] + rng.uniform(-2, 2))
-                if _in_poly(*a, prof) and _in_poly(*b, prof):
+                if in_poly(*a, prof) and in_poly(*b, prof):
                     c.line(shade(col, -0.35) if hedge else tuft, a, b, 1.0)
         _dots(rng, prof, 9, lambda x, y: c.line(tuft, (x, y), (x + 1.2, y - 1.8), 1.0))
 
@@ -708,19 +694,12 @@ def _draw_plan(surface, plan, scale):
         surface.blit(spr, (round(p["x"] * scale - spr.get_width() / 2), round(p["y"] * scale - spr.get_height())))
 
 
-@lru_cache(maxsize=None)
-def _hex_mask(scale):
-    m = pygame.Surface((W * scale, H * scale), pygame.SRCALPHA)
-    pygame.draw.polygon(m, (255, 255, 255, 255), [(x * scale, y * scale) for x, y in hex_pts(R - 0.3)])
-    return m
-
-
 def scatter(tile, kind, density=0.6, seed=0):
     """Draw a natural, varied cluster of `kind` onto a 120 x 140 tile surface, in place.
     density 0..1 scales how many objects are placed; seed gives a different arrangement."""
     layer = pygame.Surface((W, H), pygame.SRCALPHA)
     _draw_plan(layer, _plan(kind, density, seed), 1)
-    layer.blit(_hex_mask(1), (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+    layer.blit(hex_mask(R - 0.3, 1), (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
     tile.blit(layer, (0, 0))
     return tile
 
@@ -804,5 +783,5 @@ def draw_tile(name, variant=0):
     layer = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
     _draw_plan(layer, plan, K)
     surf.blit(layer, (0, 0))
-    surf.blit(_hex_mask(K), (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+    surf.blit(hex_mask(R - 0.3, K), (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
     return pygame.transform.smoothscale(surf, (W, H))

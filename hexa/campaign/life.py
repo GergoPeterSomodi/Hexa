@@ -17,15 +17,14 @@ import zlib
 import pygame
 
 from .art import shade
-from .goodsart import (DARK, DWOOD, INK, ROOF_RED, ROOF_SLATE, THATCH, WATER, WATER_L, WHITE, WOOD,
-                       Pen, building, cow, ell, flag, horse, lerp, mix, pine, round_tree, sheep, tower, wheel)
+from .render.cache import BoundedCache
+from .goodsart import (DARK, DWOOD, ROOF_RED, ROOF_SLATE, THATCH, WATER, WATER_L, WHITE, WOOD,
+                       building, cow, flag, horse, pine, round_tree, sheep, tower, wheel)
+from .render import draw
+from .render.draw import CX, CY, K, R, Pen, ell, lerp, mix
 from .wfctiles import SAND, scale_tile
 
-W, H = 120, 140
-CX, CY = W / 2, H / 2
-R = 69.3
 MASK_R = R + 1.0
-K = 2
 SIZES = {"s": 0.6, "m": 1.0, "l": 1.5}
 SIZE_MAX = {"monastery": "m", "aqueduct": "m", "camel_caravan": "m", "roman_ruins": "m", "ruined_castle": "m",
             "market_fair": "m", "native_village": "m", "windmill_post": "m", "cattle_herd": "m",
@@ -60,9 +59,6 @@ SKIN_C = (238, 200, 165)
 # ===================================================================================================
 # drawing frame: object units -> pixels, with a 2x ground layer, a 2x outline layer and stamping
 # ===================================================================================================
-OFFS = [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, -2), (-2, 2), (2, 2)]
-OFFS_THIN = [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, -1), (-1, 1), (1, 1)]
-_MASKS = {}
 
 
 class Frame:
@@ -106,7 +102,7 @@ class Frame:
         self.pen.rect(c, x0, y0, w * self.f, h * self.f, self._lw(wd), br * self.f)
 
 
-class Obj:
+class Obj(draw.Canvas):
     """One object: `g` = ground layer (shadows, foam, water; not outlined), `o` = object layer (outlined)."""
 
     def __init__(self, size, bw, bh, minf=0.0):
@@ -115,8 +111,7 @@ class Obj:
         self.cw, self.ch = max(4, round(bw * f)), max(4, round(bh * f))
         ox, oy = self.cw / 2, self.ch - 1
         self.ox, self.oy = ox, oy
-        self.surf = pygame.Surface((self.cw * K, self.ch * K), pygame.SRCALPHA)
-        self.layer = pygame.Surface((self.cw * K, self.ch * K), pygame.SRCALPHA)
+        super().__init__((self.cw * K, self.ch * K))
         self.g = Frame(self.surf, ox, oy, f)
         self.o = Frame(self.layer, ox, oy, f)
 
@@ -133,19 +128,6 @@ class Obj:
         tmp = pygame.Surface(self.surf.get_size(), pygame.SRCALPHA)
         pygame.draw.polygon(tmp, rgba, [((self.ox + x * self.f) * K, (self.oy + y * self.f) * K) for x, y in pts])
         self.surf.blit(tmp, (0, 0))
-
-    def stamp(self, ink=2):
-        r = self.layer.get_bounding_rect(1)
-        if not r.w:
-            return
-        r = r.inflate(8, 8).clip(self.layer.get_rect())
-        sub = self.layer.subsurface(r)
-        if ink:
-            sil = pygame.mask.from_surface(sub, 40).to_surface(setcolor=INK + (255,), unsetcolor=(0, 0, 0, 0))
-            for dx, dy in (OFFS if ink >= 2 else OFFS_THIN):
-                self.surf.blit(sil, (r.x + dx, r.y + dy))
-        self.surf.blit(sub, r.topleft)
-        self.layer.fill((0, 0, 0, 0), r)
 
     def finish(self, ink=2):
         self.stamp(ink)
@@ -1127,15 +1109,10 @@ WATER_OBJECTS = ("waterfall", "rapids", "sea_rocks", "sea_stack", "reef_surf", "
                  "sea_cliff", "lighthouse", "fishing_boat", "whale_spout", "seabirds", "iceberg", "shipwreck")
 
 
-_OBJ_CACHE = {}
-
-
+@BoundedCache("life.objects", 512).memo               # all 504 (name, size, seed) fit: 5 MB
 def _obj(name, size, seed):
     """Cached object render: scatter draws from 4 variants per object and size, so rejected candidates are free."""
-    key = (name, size, seed)
-    if key not in _OBJ_CACHE:
-        _OBJ_CACHE[key] = OBJECTS[name](size, seed)
-    return _OBJ_CACHE[key]
+    return OBJECTS[name](size, seed)
 
 
 # ===================================================================================================

@@ -21,6 +21,7 @@ from hexa.campaign import landscape as L  # noqa: E402
 from hexa.campaign import mapview  # noqa: E402
 from hexa.campaign import app as appmod  # noqa: E402
 from hexa.campaign import saves  # noqa: E402
+from hexa.campaign.render.draw import in_poly  # noqa: E402
 from hexa.campaign.world import CampaignWorld  # noqa: E402
 from hexa.hexgrid import neighbors  # noqa: E402
 from tests.test_saves import TempHome  # noqa: E402
@@ -386,7 +387,7 @@ class Speedups(unittest.TestCase):
         cells = L.voronoi_cells(seeds, box)
         self.assertAlmostEqual(sum(area(c) for c in cells), 4.0 * 3.6, places=6)
         for s, c in zip(seeds, cells):
-            self.assertTrue(L._in_poly(s[0], s[1], c))
+            self.assertTrue(in_poly(s[0], s[1], c, L.EPS))
 
     def test_ground_is_stable_for_a_built_hex(self):
         land = L.Landscape(WORLD, TILES)

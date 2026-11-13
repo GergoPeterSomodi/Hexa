@@ -62,18 +62,18 @@ class ObjectsTest(unittest.TestCase):
     def test_deterministic(self):
         for key in GOODS:
             first = goodsobjects.draw_good(key, size_of(34))
-            goodsobjects.draw_good.cache_clear()
+            goodsobjects.draw_good.cache.clear()
             again = goodsobjects.draw_good(key, size_of(34))
             with self.subTest(good=key):
                 self.assertEqual(pygame.image.tobytes(first, "RGBA"), pygame.image.tobytes(again, "RGBA"))
 
     def test_cached_per_size(self):
-        goodsobjects.draw_good.cache_clear()
+        goodsobjects.draw_good.cache.clear()
         a = goodsobjects.draw_good("grain", size_of(34))
-        hits = goodsobjects.draw_good.cache_info().hits
+        hits = goodsobjects.draw_good.cache.hits
         b = goodsobjects.draw_good("grain", size_of(34))
         self.assertIs(a, b)
-        self.assertEqual(goodsobjects.draw_good.cache_info().hits, hits + 1)
+        self.assertEqual(goodsobjects.draw_good.cache.hits, hits + 1)
         self.assertIsNot(a, goodsobjects.draw_good("grain", size_of(13)))
 
     def test_masters_are_not_kept(self):

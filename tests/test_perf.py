@@ -135,13 +135,17 @@ class CommandTest(unittest.TestCase):
             self.main({"fast": fake(0.5)}, "--only", "nothing")
 
     def test_the_memory_row_is_information_only(self):
-        with mock.patch.object(perf, "cache_memory", return_value=([12.1e6, 24.3e6, 24.5e6], (3, 2))):
+        rows = [("wfctiles.tiles", 1, 590, 1024, 39.6, 4402, 590), ("art.raw", 1, 15, 256, 0.1, 7, 15)]
+        with mock.patch.object(perf, "cache_memory", return_value=([12.1e6, 24.3e6, 24.5e6], (3, 2))), \
+                mock.patch.object(perf, "render_cache_rows", return_value=rows):
             lines = []
             with mock.patch.dict(perf.METRICS, {"fast": fake(0.5)}, clear=True):
                 status = perf.main(["--budget", self.budget_file], out=lines.append)
         self.assertEqual(status, 0)
         self.assertIn("world caches (#29, information only): 12.1, 24.3, 24.5 MB", "\n".join(lines))
         self.assertIn("| `world_cache_memory` (#29) | +0.2 MB | 12.1, 24.3, 24.5 MB | - | - | info |", self.summary())
+        self.assertRegex("\n".join(lines), r"wfctiles\.tiles +590 +1024 +39\.60 +4402 +590")
+        self.assertIn("| `art.raw` | 15 | 256 | 0.10 | 7 | 15 |", self.summary())
 
 
 class MapViewTest(unittest.TestCase):
