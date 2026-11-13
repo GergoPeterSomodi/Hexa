@@ -7,5 +7,6 @@ building (investment and building), military (raising, refits, drill, stacks),
 debt (the debt limit, desertion and seizures),
 research (techs, idea cards, ages and start techs),
 trade (markets, routes, merchants and what moves along a route),
-economy (prices, production, incomes, tax previews, collecting and growth).
+economy (prices, production, incomes, tax previews, collecting and growth),
+terrain (movement cost, winter, ridge crests, mountain passes, where a new land unit appears).
 """

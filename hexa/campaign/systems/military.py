@@ -2,9 +2,8 @@
 
 Functions taking ``world``; ``CampaignWorld`` keeps a one-line facade for each one the UI, the AI and the tests call.
 ``recruit_check``/``recruit``, ``refit_check``/``refit`` and ``upgrade_check``/``upgrade`` stay pairs: the action calls
-its check first and the facades keep that contract. ``land_spot`` (where a new land unit appears) stays on
-``CampaignWorld`` because it reads the pass walls; this module calls it as ``world.land_spot``. Imports point down:
-never world.py, ui, render or pygame.
+its check first and the facades keep that contract. ``land_spot`` (where a new land unit appears) is in terrain.py; this module calls
+it as ``world.land_spot``. Imports point down: never world.py, ui, render or pygame.
 """
 from ...hexgrid import neighbors
 from .. import resources

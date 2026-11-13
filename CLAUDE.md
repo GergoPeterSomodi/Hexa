@@ -200,8 +200,8 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   (a province does one job a season; the military module shares it). `BUILDING_TECH` lives there. `CampaignWorld` keeps a
   facade for each one called from outside; a `*_check` and its action stay a pair, and the facade is the same pair.
 - **Military** (`systems/military.py`): `unit_cost`, `raise_options`, `stack_limit`, `can_stand`, `recruit_check`/`recruit`,
-  `refit_check`/`refit` and `upgrade_cost`/`upgrade_check`/`upgrade`, all with facades. `land_spot` stays on `CampaignWorld`
-  (it reads the pass walls, which move with step 3.10); the module calls it as `world.land_spot`.
+  `refit_check`/`refit` and `upgrade_cost`/`upgrade_check`/`upgrade`, all with facades. `land_spot` is in `terrain.py`
+  and the module calls it as `world.land_spot`.
 - **Debt** (`systems/debt.py`): `debt_limit`, `troop_order` (who deserts first), `disband`, `seize_one` and `unpaid` (the
   season's step: desertion, then seizures, then the credit cap). The facades are `debt_limit`, `disband` and `_unpaid`.
   The module reaches the world's private parts only through two public names added for it: `world.kill` (the old
@@ -224,6 +224,12 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   in the old order and drops the castle cache with `world.forget_castles()`. The tax preview's saved state is `world._settled`,
   owned by `CampaignWorld.set_tax`/`settle_preview`/`economy`; the module only builds it (`settled_state`) and puts it back
   (`restore_settled`). It calls trade.py's functions directly.
+- **Terrain rules** (`systems/terrain.py`): `step_cost`, `move_cost`, `is_winter` (`world.winter`), `step_walls` (`world.walls`), `ridge_edges`,
+  `pass_edges`, `edge_blocked`, `passes`, `pass_name`, `pass_closed`, `move_check`, `pass_blocks`, `pass_edges_at`, `within_reach`,
+  `land_spot`, plus `pass_tables` and `geo_key` for the cache. `CampaignWorld` binds them as plain class attributes
+  (`edge_blocked = terrain.edge_blocked`), so the hot ones cost no extra call. The `_pass_cache` stays owned by
+  `CampaignWorld.pass_data` (`_pass_data` is the old name, kept for tests); `pass_wait` and `_field_in` stay on the world until
+  3.11 because they run `cost_field`. `OWNS` is empty: the module writes nothing on the world.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of
