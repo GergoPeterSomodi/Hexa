@@ -173,7 +173,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
 - **Geography sources.** A world is built from either the `hexa/campaign/geo.py` module (real 1480 map:
   lon/lat polygons rasterised onto the hex grid with a Mercator projection, `SCALE = 2`) or
   `randomgeo.generate(seed)`, which returns a `SimpleNamespace` that copies geo's interface and projection.
-  `world.py` reads geography only through `self.geo`, so any new attribute must exist on both sources, or be
+  `world.py` and `systems/worldgen.py` read geography only through `world.geo`, so any new attribute must exist on both sources, or be
   read with a `getattr` default as `COLONIAL` and `FORCE_SEA` are. Distances in `data.py` scale with
   `geo.SCALE`.
 - **State classes** (`hexa/campaign/state.py`): `Province`, `Market`, `Route`, `Country`, `Unit`, `Garrison`, `War` and
@@ -182,11 +182,20 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   state.py pins each class's `__module__` to `hexa.campaign.world` (decision D5): a save made now still opens in a build
   from before the split, and an old save opens now. Never drop that loop, and never rename a class (that needs a
   `VERSION` bump); `tools/save_compat.py` checks both directions.
-- **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `CampaignWorld._prior`
-  plus the `FORBIDDEN` adjacency pairs at the top of `campaign/world.py`.
+- **World generation** (`hexa/campaign/systems/worldgen.py`, the first module of the `systems/` package): everything
+  that only runs while a world is built, as functions taking `world`: `build_map`, `build_countries`, `build_roads`,
+  `starting_units` and their helpers (`terrain_prior`, `good_for`, `trace`, `crest_edges`, `build_edges`,
+  `join_pockets`...). `CampaignWorld.__init__` calls them in order, with the start techs and the markets between
+  (those are research and trade). The module never imports world.py; it reaches the running world only through
+  public methods (`passes`, `edge_blocked`, `add_unit`, `land_spot`, `provinces_of`, `total_pop`). `world.py` keeps
+  a facade only where something else calls: `_nearest_land` (markets), `_cross`, `_unit_point`, `_unit_centre` (tests),
+  and `_pass_data`, which calls `worldgen.build_edges`. `OWNS` lists the world attributes the module sets.
+- **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
+  plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of
   each fresh `(map, seed)` world in the module-level `_SNAPSHOTS` and restores later constructions from it.
-  `map_source` caches random geographies in `_RANDOM_GEOS`. Tests share one module-level `WORLD` for read-only
+  `map_source` caches random geographies in `_RANDOM_GEOS`. `_SNAPSHOTS`, `_RANDOM_GEOS` and the
+  snapshot logic stay in world.py (the `systems/worldgen.py` functions only build; they never touch the caches). Tests share one module-level `WORLD` for read-only
   checks and call `fresh()` when they mutate.
 - **Redraw invalidation.** `MapView` and the minimap cache surfaces keyed on `(zoom, mode, world.version,
   player)`. Call `world.changed()` after any mutation that affects the map, and `world.changed(ownership=True)`

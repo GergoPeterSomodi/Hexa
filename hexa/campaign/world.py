@@ -10,11 +10,11 @@ import random
 from collections import deque
 
 from ..events import EventBus, passes_changed
-from ..hexgrid import distance, neighbors, to_cube, within
-from . import geo, naming, resources, tech, wfc
-from .specialgoods import special_good
-from .state import Country, Garrison, Market, Province, Route, Unit, War, fill_defaults
-from .data import (AREA, BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP,
+from ..hexgrid import distance, neighbors, within
+from . import geo, naming, resources, state, tech
+from .state import Garrison, Market, Route, Unit, War, fill_defaults
+from .systems import worldgen
+from .data import (BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP,
                    GARRISON_REGEN, GENERAL, GENERAL_BONUS, GENERAL_STACK, GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, RESEARCH_BASE, RESEARCH_FUND, SCOUT, STACK_BASE,
                    SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_COST, UPGRADE_MAX, troop,
                    BUILD_TURNS, ATTRITION, FARM_GOODS, FOOD_PER_TROOP, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER,
@@ -26,7 +26,7 @@ from .data import (AREA, BRANCHES, CIVILIAN_LIMIT, COUNTER, ERAS, FIGHT_ATTACK, 
                    GOODS, MARKET_REACH, MARKETPLACE_CAPACITY, MERCHANT_CAPACITY, NATIVE_RAID_CHANCE, NEEDS,
                    OUTPUT, PEASANT_TAX, PORT_CAPACITY, PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX, REMOTE_PENALTY,
                    ROUTE_BASE, SEA_ROUTE_RANGE, SEA_STEP, SIEGE_BASE, START_YEAR, TAX_GROWTH, TAX_LEVELS, TERRAIN,
-                   TERRITORY_RADIUS, TRADING_POST_SHARE, WAR_LENGTH_AI, ATLANTIC_RANGE, BASE_GROWTH,
+                   TRADING_POST_SHARE, WAR_LENGTH_AI, ATLANTIC_RANGE, BASE_GROWTH,
                    date, SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE)
 
 INF = float("inf")
@@ -47,14 +47,8 @@ WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countr
                   "sea_body", "rivers", "river_at", "roads", "road_paths", "colonial")
 LAND_TILES = ("plains", "steppe", "forest", "hills", "mountains", "desert", "jungle", "tundra", "marsh", "taiga",
               "savanna", "beach", "snow")
-# Terrain that may not touch (wave function collapse rules): mountains rise through hills, deserts
-# fade through steppe and savanna, snow sits next to tundra, taiga and mountains...
-FORBIDDEN = [("mountains", t) for t in ("plains", "marsh", "beach", "steppe")] + \
-    [("desert", t) for t in ("jungle", "marsh", "taiga", "snow", "forest", "tundra")] + \
-    [("snow", t) for t in ("plains", "jungle", "savanna", "beach", "desert", "steppe", "marsh")] + \
-    [("jungle", t) for t in ("taiga", "tundra", "steppe")] + \
-    [("taiga", t) for t in ("savanna", "beach")] + [("tundra", t) for t in ("jungle", "savanna")] + \
-    [("marsh", "savanna")]
+FORBIDDEN = worldgen.FORBIDDEN        # the terrain pairs that may not touch (wave function collapse)
+Province, Country = state.Province, state.Country   # saves pickle every state class as hexa.campaign.world.<Name>
 CLASSES = ("peasants", "burghers", "nobles")
 BIG_EMPIRE = 300                                        # provinces that start a country with drill yards
 ROUTE_KEYS = ("market_reach", "sea_range", "atlantic")  # effects that change the trade routes
@@ -138,10 +132,12 @@ class CampaignWorld:
         self._bonus_cache = {}
         self.visible = set()
         self.over = False
-        self._build_map()
-        self._build_countries()
+        worldgen.build_map(self)
+        worldgen.build_countries(self)
+        self._start_techs()
+        worldgen.build_roads(self)
         self._build_markets()
-        self._starting_units()
+        worldgen.starting_units(self)
         for country in self.countries.values():
             self._explore_home(country)
         self.economy()                   # first prices and incomes
@@ -211,444 +207,7 @@ class CampaignWorld:
         world.update_visibility()
         return world
 
-    # ----- map ---------------------------------------------------------------------
-    def _build_map(self):
-        g = self.geo
-        land, lakes = g.land_cells(self.cols, self.rows)
-        self.terrain = {}
-        for r in range(self.rows):
-            for c in range(self.cols):
-                self.terrain[(c, r)] = "lake" if (c, r) in lakes else "ocean"
-        for lon, lat in list(g.FORCE_LAND) + [(x[1], x[2]) for x in g.CITIES]:
-            pos = geo.hex_of(lon, lat)
-            if pos in self.terrain:
-                land.add(pos)
-                lakes.discard(pos)
-        land -= lakes
-        for lon, lat in getattr(g, "FORCE_SEA", ()):
-            land.discard(geo.hex_of(lon, lat))
-
-        # Rivers, traced onto the hexes they flow through.
-        self.rivers, self.river_at = {}, {}
-        for name, line in g.RIVERS:
-            path = [p for p in self._trace(line) if p in land]
-            if len(path) >= 3:
-                self.rivers[name] = path
-                for pos in path:
-                    self.river_at.setdefault(pos, name)
-
-        # Terrain by wave function collapse: each hex gets odds from its geography, and
-        # neighbouring hexes must fit together.
-        coastal = {p for p in land if any(n in self.terrain and n not in land for n in neighbors(p))}
-        prior = {p: self._prior(p, p in coastal, p in self.river_at) for p in land}
-        tiles = wfc.collapse(sorted(land), prior, FORBIDDEN, neighbors, random.Random(self.seed), affinity=1.6)
-        for pos, tile in tiles.items():
-            self.terrain[pos] = tile
-        rng = random.Random(1480)
-
-        self.sea_body = {}
-        body = 0
-        for pos in self.terrain:
-            if self.terrain[pos] != "ocean" or pos in self.sea_body:
-                continue
-            body += 1
-            queue = deque([pos])
-            self.sea_body[pos] = body
-            while queue:
-                cur = queue.popleft()
-                for n in neighbors(cur):
-                    if self.terrain.get(n) == "ocean" and n not in self.sea_body:
-                        self.sea_body[n] = body
-                        queue.append(n)
-        self.cities = {}
-        for name, lon, lat, size in g.CITIES:
-            pos = geo.hex_of(lon, lat)
-            if self.is_land(pos):
-                self.cities[pos] = (name, size)
-        self.provinces = {}
-        for pos in sorted(p for p, t in self.terrain.items() if TERRAIN[t].move is not None):
-            coastal = any(self.terrain.get(n) == "ocean" for n in neighbors(pos))
-            self.provinces[pos] = Province(pos, self.terrain[pos], None, coastal, "", city=pos in self.cities)
-        for prov in self.provinces.values():
-            prov.good = self._good_for(prov, rng)
-        self._pass_data()                # ridge edges and passes, kept in the snapshot
-
-    def _trace(self, line):
-        """The hexes a (lon, lat) polyline passes through, in order, without loops."""
-        out = []
-        for (x0, y0), (x1, y1) in zip(line, line[1:]):
-            steps = max(1, int(max(abs(x1 - x0), abs(y1 - y0)) / geo.COL_DEG * 4))
-            for i in range(steps + 1):
-                t = i / steps
-                pos = geo.hex_of(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)
-                if pos not in self.terrain or (out and out[-1] == pos):
-                    continue
-                if pos in out:
-                    del out[out.index(pos) + 1:]
-                    continue
-                if out and distance(out[-1], pos) > 1:       # fill a skipped corner
-                    between = [n for n in neighbors(out[-1]) if distance(n, pos) == 1]
-                    if between:
-                        out.append(min(between))
-                out.append(pos)
-        return out
-
-    @staticmethod
-    def _near_line(point, lines, limit):
-        """Distance in degrees to the nearest line, or `limit` if none is closer."""
-        best = limit
-        lon, lat = point
-        for line in lines:
-            for (ax, ay), (bx, by) in zip(line, line[1:]):
-                if min(ax, bx) - limit > lon or max(ax, bx) + limit < lon or \
-                        min(ay, by) - limit > lat or max(ay, by) + limit < lat:
-                    continue
-                best = min(best, geo.seg_distance(point, (ax, ay), (bx, by)))
-        return best
-
-    def _prior(self, pos, coastal, river):
-        """Odds for each kind of terrain on a land hex, from what is known about the place."""
-        g = self.geo
-        point = geo.lonlat(pos)
-        lon, lat = point
-        mount = self._near_line(point, g.MOUNTAINS, 2.0)
-        if mount < 0.8:
-            return {"mountains": 1.0, "snow": 0.35 if lat > 45.5 or (lon < -30 and lat > 50) else 0.0,
-                    "hills": 0.15}
-        hills = mount < 1.6 or self._near_line(point, g.HILLS, 1.0) < 1.0
-        desert = g.desert_at(point)
-        marsh = g.marsh_at(point)
-        americas = lon < -30
-        maghreb = getattr(g, "maghreb_at", None)
-        north_africa = bool(maghreb and maghreb(point))     # Morocco to Egypt: steppe and desert, not forest
-        if river:
-            if desert:
-                return {"plains": 1.0, "marsh": 0.08 + marsh}
-            return {"plains": 1.0, "marsh": 0.15 + marsh, "forest": 0.15, "hills": 0.05}
-        if desert:
-            if -20 < lon < 40 and 12 < lat < 18.5:         # the Sahel: the desert fades into steppe and savanna
-                return {"desert": 0.55, "steppe": 0.3, "savanna": 0.3, "hills": 0.04 if hills else 0.0}
-            if north_africa and lat > 28.5:                # the northern edge of the Sahara
-                return {"desert": 1.0, "steppe": 0.22, "hills": 0.04 if hills else 0.0}
-            return {"desert": 1.0, "steppe": 0.06, "hills": 0.04 if hills else 0.0}
-        if hills:
-            if north_africa:
-                return {"hills": 0.7, "steppe": 0.25, "forest": 0.03, "mountains": 0.08 if mount < 1.2 else 0.0}
-            w = {"hills": 0.7, "forest": 0.25, "mountains": 0.08 if mount < 1.2 else 0.0}
-            if lat > 57:
-                w["taiga"] = 0.3
-            if lat < 17:
-                w["jungle" if lat < 8 else "savanna"] = 0.2
-            return w
-        if americas:
-            if lat >= 59:
-                return {"tundra": 1.0, "snow": 0.35, "taiga": 0.1}
-            if lat >= 55:
-                return {"tundra": 0.6, "taiga": 0.6, "marsh": 0.05}
-            if lat >= 47:
-                return {"taiga": 0.5, "forest": 0.4, "plains": 0.12, "marsh": 0.06 + marsh}
-            if lat < 21.5:
-                if lon < -95 and lat > 16.5:
-                    return {"plains": 0.6, "hills": 0.3, "savanna": 0.1}
-                w = {"jungle": 0.6 if lat < 14 else 0.35, "plains": 0.15 if lat < 14 else 0.3,
-                     "savanna": 0.3 if 2 < lat < 12 and lon > -72 else 0.1, "marsh": 0.04 + marsh}
-                if coastal:
-                    w["beach"] = 0.3
-                return w
-            w = {"forest": 0.75 if lat > 40 else 0.5, "plains": 0.3 if lat > 40 else 0.45, "marsh": 0.04 + marsh}
-            if coastal and lat < 36:
-                w["beach"] = 0.25
-            return w
-        if lat < 17:                                    # Africa south of the Sahara
-            if lat < 5.5:                               # the Guinea coast and the Congo: rainforest
-                w = {"jungle": 0.7, "plains": 0.1, "savanna": 0.15, "marsh": 0.04 + marsh}
-            elif lat < 8:                               # jungle thins into savanna
-                w = {"jungle": 0.45, "savanna": 0.45, "plains": 0.1, "marsh": 0.03 + marsh}
-            elif lat < 12.5:                            # savanna, with grassland
-                w = {"savanna": 0.65, "plains": 0.2, "steppe": 0.15}
-            else:                                       # the Sahel: dry savanna and steppe
-                w = {"savanna": 0.55, "steppe": 0.35, "plains": 0.1}
-            if coastal:
-                w["beach"] = 0.2
-            return w
-        if g.steppe_at(point):
-            return {"steppe": 1.0, "plains": 0.12, "marsh": marsh}
-        if north_africa:                                # the Maghreb: dry steppe and scrub, desert, a little woodland
-            w = {"steppe": 0.5, "plains": 0.3, "desert": 0.3 if lat < 34 else 0.1, "forest": 0.03}
-            if coastal:
-                w["beach"] = 0.18
-            return w
-        if lat >= 58 or (lon > 24 and lat >= 55):
-            w = {"taiga": 0.5, "forest": 0.25, "plains": 0.2, "marsh": 0.06 + marsh}
-        elif lat >= 53:
-            w = {"forest": 0.45, "plains": 0.45, "hills": 0.08, "marsh": 0.05 + marsh}
-        else:
-            w = {"plains": 0.64, "forest": 0.22, "hills": 0.1, "marsh": 0.02 + marsh}
-        if coastal and lat < 41:
-            w["beach"] = 0.18
-        return w
-
-    def _good_for(self, prov, rng):
-        lon, lat = geo.lonlat(prov.pos)
-        t, roll = prov.terrain, rng.random()
-        americas, africa = lon < -30, lat < 17 and lon > -20
-        near = lambda x, y, r=2.5: abs(lon - x) < r and abs(lat - y) < r
-        special = special_good(prov, lon, lat, t, rng.random(), americas, near)
-        if special:
-            return special
-        if t == "desert":
-            return ("salt" if roll < 0.5 else "fish") if prov.coastal else None
-        if t == "marsh":
-            return "fish" if prov.coastal and roll < 0.5 else "wool" if roll < 0.75 else "grain"
-        if t == "taiga":
-            return "furs" if roll < 0.5 else "timber"
-        if t == "snow":
-            return "furs" if roll < 0.6 else None
-        if t == "savanna":
-            if americas:
-                return "cotton" if roll < 0.4 else "grain" if roll < 0.8 else "tobacco"
-            return "ivory" if roll < 0.35 else "grain" if roll < 0.75 else "cotton"
-        if t == "beach":
-            if prov.coastal and roll < 0.45:
-                return "fish"
-            if americas or africa:
-                return "sugar" if roll < 0.75 else "cotton"
-            return "salt" if roll < 0.6 else "wine" if lat < 44 else "grain"
-        if t == "tundra":
-            return "fish" if prov.coastal and roll < 0.4 else "furs"
-        if t == "mountains" or (t == "hills" and roll < 0.3):
-            if americas and lon < -95:
-                return "silver"
-            if near(13.0, 50.5) or near(11.5, 47.3, 1.5):
-                return "silver"
-            if near(18.9, 48.7, 1.5) or near(-11, 13.5, 3) or near(-1.5, 6.5, 3):
-                return "gold"
-            if t == "hills" and americas:
-                return "furs" if lat > 42 else "timber"
-            return "iron" if roll < 0.8 or t == "hills" else "salt"
-        if t == "jungle":
-            if americas:
-                return "sugar" if prov.coastal and roll < 0.6 else "tobacco" if roll < 0.75 else "timber"
-            if near(-1.5, 6.5, 3.5):
-                return "gold" if roll < 0.5 else "ivory"
-            return "ivory" if roll < 0.6 else "timber"
-        if t == "forest":
-            if (americas and lat > 42) or (lon > 22 and lat > 57):
-                return "furs" if roll < 0.55 else "timber"
-            if prov.coastal and lat > 48 and roll < 0.25:
-                return "fish"
-            return "timber"
-        if t == "steppe":
-            return "grain" if roll < 0.55 else "wool"
-        if prov.coastal and (lat > 48 or (americas and lat > 40)) and roll < (0.6 if americas else 0.3):
-            return "fish"
-        if americas:
-            if lat < 25:
-                if lon < -95:
-                    return "grain" if roll < 0.6 else "cotton"
-                return "sugar" if roll < 0.5 else "tobacco" if roll < 0.75 else "cotton"
-            if 33 <= lat <= 39.5:
-                return "tobacco" if roll < 0.6 else "grain"
-            return "grain"
-        if africa:
-            return "grain" if roll < 0.5 else "ivory" if roll < 0.75 else "cotton"
-        if lat < 37.5 and lon > 29 and prov.coastal and roll < 0.45:
-            return "spices"
-        if lat < 44.5 and -10 < lon < 40:
-            if lon > 26 and roll < 0.25:
-                return "cotton"
-            return "grain" if roll < 0.55 else "wine" if roll < 0.9 else "wool"
-        if near(20.0, 50.0, 1) or near(10.4, 53.25, 1) or near(13.0, 47.8, 1):
-            return "salt"
-        wool = 0.35 if (lon < 2 and lat > 50) or (-7 < lon < -1 and 39 < lat < 43) else 0.15
-        return "wool" if roll < wool else "grain"
-
-    # ----- countries and people ----------------------------------------------------
-    def _build_countries(self):
-        land = list(self.provinces)
-        landmass, comp = {}, 0
-        for pos in land:
-            if pos in landmass:
-                continue
-            comp += 1
-            queue = deque([pos])
-            landmass[pos] = comp
-            while queue:
-                cur = queue.popleft()
-                for n in neighbors(cur):
-                    if n in self.provinces and n not in landmass:
-                        landmass[n] = comp
-                        queue.append(n)
-        self.landmass = landmass
-
-        self.countries = {}
-        seeds = []
-        for tag, (name, color, points) in self.geo.COUNTRIES.items():
-            capital = self._nearest_land(geo.hex_of(*points[0]))
-            self.countries[tag] = Country(tag, name, color, capital)
-            for lon, lat in points:
-                pos = self._nearest_land(geo.hex_of(lon, lat))
-                seeds.append((tag, pos, to_cube(pos), landmass[pos]))
-        reach = TERRITORY_RADIUS * (1.7 if self.map == "random" else 1)
-        for prov in self.provinces.values():
-            q, r, s = to_cube(prov.pos)
-            best = None
-            for tag, pos, (sq, sr, ss), mass in seeds:
-                d = max(abs(q - sq), abs(r - sr), abs(s - ss))
-                limit = reach if mass == landmass[prov.pos] else 1
-                if d <= limit and (best is None or d < best[0]):
-                    best = (d, tag)
-            if best and not (prov.terrain == "desert" and best[0] > 2 * SCALE):
-                prov.owner = prov.controller = best[1]
-        for tag, country in self.countries.items():
-            self.provinces[country.capital].owner = self.provinces[country.capital].controller = tag
-
-        # Names, natives and population.
-        rng = random.Random(7)
-        named = list(self.cities.items())
-        for prov in self.provinces.values():
-            lon, lat = geo.lonlat(prov.pos)
-            if prov.pos in self.cities:
-                prov.name = self.cities[prov.pos][0]
-            elif self.map != "europe":
-                near = min(named, key=lambda kv: distance(kv[0], prov.pos))
-                if distance(near[0], prov.pos) <= 4 * SCALE:
-                    prov.name = f"near {near[1][0]}"
-            if prov.owner is None:
-                prov.tribe = min(self.geo.TRIBES, key=lambda t: (t[1] - lon) ** 2 + (t[2] - lat) ** 2)[0]
-                if not prov.name and self.map != "europe":
-                    prov.name = f"{prov.tribe} lands"
-            elif not prov.name and self.map != "europe":
-                prov.name = f"{self.countries[prov.owner].name} countryside"
-            density = TERRAIN[prov.terrain].density * rng.uniform(0.75, 1.25)
-            if prov.owner:
-                factor = 1.0
-                if (-5 < lon < 17 and 40 < lat < 46) or (2 < lon < 7 and 50 < lat < 53):
-                    factor = 1.35
-                elif lon > 30 and lat > 50:
-                    factor = 0.45
-                elif lat > 58:
-                    factor = 0.4
-                elif lat < 37.5 and lon < 28:
-                    factor = 0.7
-                if self.geo.FERTILE_RIVERS and geo.line_distance((lon, lat), self.geo.FERTILE_RIVERS[0]) < 1:
-                    factor = 2.2
-                elif prov.pos in self.river_at:
-                    factor *= 1.3
-                prov.peasants = density * factor * 0.94
-                prov.burghers = density * factor * 0.03
-                prov.nobles = density * factor * 0.03
-                if prov.pos in self.cities:
-                    extra = self.cities[prov.pos][1]
-                    prov.peasants += extra * 0.4
-                    prov.burghers += extra * 0.55
-                    prov.nobles += extra * 0.05
-            else:
-                factor = 0.35 if lon < -30 else 0.6 if lat < 17 else 0.5
-                if prov.tribe in ("Mexica",):
-                    factor = 1.6
-                elif prov.tribe in ("Maya", "Muisca", "Benin", "Akan", "Yoruba", "Hausa"):
-                    factor = 0.9
-                prov.natives = density * factor
-                if prov.pos in self.cities:
-                    prov.natives += self.cities[prov.pos][1] * 0.5
-
-        if self.map == "europe":
-            naming.name_europe(self)          # real regions and places (naming.py)
-        else:
-            naming.make_unique(self.provinces)
-
-        # Starting towns, castles, works and buildings.
-        for prov in self.provinces.values():
-            if not prov.owner:
-                continue
-            capital = self.countries[prov.owner].capital == prov.pos
-            if prov.city:
-                prov.settlement = 3 if self.cities[prov.pos][1] >= 40 else 2
-            elif prov.pop >= SETTLEMENT_POP[1] * 2.5:
-                prov.settlement = 1
-            if capital:
-                prov.settlement = max(prov.settlement, 2)
-                prov.castle = 3 if self.cities.get(prov.pos, ("", 0))[1] >= 100 else 2
-            elif prov.settlement >= 2 and rng.random() < 0.3:
-                prov.castle = 1
-            if prov.coastal and (capital or (prov.city and self.cities[prov.pos][1] >= 25)):
-                prov.buildings["port"] = 1
-            if prov.burghers >= 14:
-                prov.buildings["weaver"] = 1
-            if prov.city and prov.burghers >= 8:            # the old trades of the big towns
-                h = (prov.pos[0] * 31 + prov.pos[1] * 17) % 7
-                if prov.level("port") or (prov.coastal and h < 3):
-                    prov.buildings["ropewalk"] = 1
-                if capital or h == 1:
-                    prov.buildings["powder_mill"] = 1
-                if h in (2, 5):
-                    prov.buildings["tannery"] = 1
-                if h == 4 or prov.name in ("Venice", "Genoa", "Antwerp", "Nuremberg", "Constantinople"):
-                    prov.buildings["glassworks"] = 1
-            if prov.burghers >= 30:
-                prov.buildings["marketplace"] = 1
-            if prov.good and prov.good in WORKS and rng.random() < 0.25:
-                prov.works = 2 if prov.pop > 20 and rng.random() < 0.4 else 1
-        for country in self.countries.values():
-            mine = self.provinces_of(country.tag)
-            coast = [p for p in mine if p.coastal]
-            if coast and not any(p.level("port") for p in mine):
-                max(coast, key=lambda p: (p.pop, p.pos)).buildings["port"] = 1
-            country.treasury = 150 + 4 / AREA * len(self.provinces_of(country.tag))
-        self.colonial = dict(getattr(self.geo, "COLONIAL", {}))
-        self._start_techs()
-        self._build_roads()
-
-    def _build_roads(self):
-        """Roads join each country's towns to the nearest town already on its network, and capitals to
-        neighbouring capitals. Armies march along them at one move per hex."""
-        self.roads, self.road_paths = set(), []
-        summer_walls = self._pass_data()[4]
-
-        def connect(start, goals, limit, owner=None):
-            best = {start: (0, None)}
-            heap = [(0, start)]
-            while heap:
-                cost, pos = heapq.heappop(heap)
-                if cost > best[pos][0]:
-                    continue
-                if pos in goals and pos != start:
-                    path = []
-                    while pos is not None:
-                        path.append(pos)
-                        pos = best[pos][1]
-                    return path[::-1]
-                for n in neighbors(pos):
-                    prov = self.provinces.get(n)
-                    if prov is None or (owner and prov.owner != owner) or (pos, n) in summer_walls:
-                        continue
-                    step = 0.5 if n in self.roads else TERRAIN[prov.terrain].move
-                    if cost + step <= limit and cost + step < best.get(n, (INF,))[0]:
-                        best[n] = (cost + step, pos)
-                        heapq.heappush(heap, (cost + step, n))
-            return None
-
-        for tag, country in self.countries.items():
-            towns = [p.pos for p in self.provinces_of(tag) if p.settlement >= 2 or p.city]
-            network = {country.capital}
-            for pos in sorted(towns, key=lambda q: distance(q, country.capital)):
-                if pos in network:
-                    continue
-                path = connect(pos, network, 14 * SCALE, owner=tag)
-                if path:
-                    self.road_paths.append(path)
-                    self.roads.update(path)
-                network.add(pos)
-        capitals = [c.capital for c in self.countries.values()]
-        for i, a in enumerate(capitals):
-            for b in capitals[i + 1:]:
-                if self.landmass.get(a) == self.landmass.get(b) and distance(a, b) <= 9 * SCALE:
-                    path = connect(a, {b}, 16 * SCALE)
-                    if path:
-                        self.road_paths.append(path)
-                        self.roads.update(path)
-
+    # ----- the map is built by systems/worldgen.py; what stays here is the movement cost ------
     def step_cost(self, frm, to):
         """Move points to walk from one land hex into the next: roads and rivers make it cheaper. A step across a
         blocked edge (a ridge crest, or a pass shut by snow) is impossible: it costs INF."""
@@ -666,39 +225,14 @@ class CampaignWorld:
             return max(1, move - 1)
         return move
 
-    def _starting_units(self):
-        for prov in self.provinces.values():
-            prov.garrison = prov.castle * GARRISON_HP
-        for tag, country in self.countries.items():
-            pop = self.total_pop(tag)
-            kinds = ([troop("infantry", 1)] * max(1, round(pop / 450)) + [troop("cavalry", 1)] * round(pop / 1000)
-                     + [troop("artillery", 1)] * (1 if pop > 900 else 0))
-            if pop > 1500:
-                kinds.append(GENERAL)
-            for kind in kinds:
-                spot = self._land_spot(tag, self.provinces[country.capital], kind)
-                if spot:
-                    self._add_unit(kind, tag, spot, moves=kind.moves)
-            if self.colonial.get(tag, 999) <= 40:
-                ports = [p for p in self.provinces_of(tag) if p.level("port")]
-                ports.sort(key=lambda p: (geo.lonlat(p.pos)[0], -p.pop))
-                for prov in ports:
-                    sea = [n for n in neighbors(prov.pos) if self.is_sea(n) and not self.units_at(n)]
-                    if sea:
-                        self._add_unit(CARAVEL, tag, sea[0], moves=CARAVEL.moves)
-                        break
-
-    def _add_unit(self, kind, owner, pos, moves=0):
+    def add_unit(self, kind, owner, pos, moves=0):
         unit = Unit(next(self._ids), kind, owner, pos, hp=kind.hp, moves_left=moves)
         if kind is GENERAL:
             unit.trait = self.rng.choice(sorted(GENERAL_TRAITS))
         self.units.append(unit)
         return unit
 
-    def _nearest_land(self, pos):
-        if pos in self.provinces:
-            return pos
-        return min(self.provinces, key=lambda p: (distance(p, pos), p))
+    _add_unit = add_unit                 # the old private name: the tests and this class still use it
 
     # ----- lookups -----------------------------------------------------------------
     def is_land(self, pos):
@@ -706,6 +240,14 @@ class CampaignWorld:
 
     def is_sea(self, pos):
         return self.terrain.get(pos) == "ocean"
+
+    def _nearest_land(self, pos):
+        return worldgen.nearest_land(self, pos)
+
+    # the ridge geometry (systems/worldgen.py) that tests/test_passes.py probes
+    _cross = staticmethod(worldgen.cross)
+    _unit_point = staticmethod(worldgen.unit_point)
+    _unit_centre = staticmethod(worldgen.unit_centre)
 
     # ----- ridge crests, winter and mountain passes ------------------------------------
     def _pass_data(self):
@@ -718,7 +260,7 @@ class CampaignWorld:
         key = (PASS_RULE, self._geo_key())
         if cached is None or cached[0] != key:
             self.__dict__.pop("_pass_hexes", None)
-            ridge, passes = self._build_edges()
+            ridge, passes = worldgen.build_edges(self)
             hexes = {}
             for edge, (name, _) in sorted(passes.items(), key=lambda kv: sorted(kv[0])):
                 for pos in edge:
@@ -874,141 +416,7 @@ class CampaignWorld:
             return any((a, m) not in walls and (m, b) not in walls for m in set(neighbors(a)) & set(neighbors(b)))
         return False
 
-    # ----- ridge crests -------------------------------------------------------------------
-    @staticmethod
-    def _unit_point(lon, lat):
-        """A (lon, lat) in hex-grid units: hex centres are 1 apart along a row, 0.866 between rows."""
-        return (lon - geo.LON0) / geo.COL_DEG, (geo.Y_TOP - geo.merc(lat)) / geo.COL_DEG
-
-    @staticmethod
-    def _unit_centre(pos):
-        col, row = pos
-        return col + 0.5 * (row & 1) + 0.5, (row + 0.5) * 0.8660254
-
-    def _crest_edges(self, land):
-        """Every edge between two neighbouring land hexes that a ridge polyline of the geography crosses, i.e. the
-        polyline (in hex-grid units) cuts the segment joining the two hex centres an odd number of times. A curve that
-        crosses the grid of hex centres cannot slip between two blocked edges, so a ridge is a continuous wall."""
-        found = set()
-        shift = (1.3e-6, 2.1e-6)                       # keeps a vertex off an exact crossing, deterministically
-        for line in self.geo.MOUNTAINS:
-            crossings = {}
-            pts = [self._unit_point(lon, lat) for lon, lat in line]
-            for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
-                x0, y0, x1, y1 = x0 + shift[0], y0 + shift[1], x1 + shift[0], y1 + shift[1]
-                steps = max(1, int(max(abs(x1 - x0), abs(y1 - y0)) / 0.4) + 1)
-                near = set()
-                for i in range(steps + 1):
-                    t = i / steps
-                    x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
-                    pos = geo.hex_of(geo.LON0 + x * geo.COL_DEG, geo.inv_merc(geo.Y_TOP - y * geo.COL_DEG))
-                    near.update(within(pos, 1))
-                for a in near:
-                    if a not in land:
-                        continue
-                    ax, ay = self._unit_centre(a)
-                    for b in neighbors(a):
-                        if b not in land or b < a:
-                            continue
-                        bx, by = self._unit_centre(b)
-                        if self._cross(x0, y0, x1, y1, ax, ay, bx, by):
-                            edge = frozenset((a, b))
-                            crossings[edge] = crossings.get(edge, 0) + 1
-            # a ridge that bends round an edge crosses it twice and does not separate its two hexes: only an odd
-            # number of crossings makes the edge part of the crest
-            found.update(e for e, n in crossings.items() if n % 2)
-        return found
-
-    @staticmethod
-    def _cross(x0, y0, x1, y1, ax, ay, bx, by):
-        """Whether the segments (x0, y0)-(x1, y1) and (a)-(b) cross."""
-        d1x, d1y, d2x, d2y = x1 - x0, y1 - y0, bx - ax, by - ay
-        den = d1x * d2y - d1y * d2x
-        if abs(den) < 1e-12:
-            return False
-        t = ((ax - x0) * d2y - (ay - y0) * d2x) / den
-        u = ((ax - x0) * d1y - (ay - y0) * d1x) / den
-        return 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0
-
-    def _build_edges(self):
-        """(ridge, passes): the crest edges of the geography, and the ones left open as passes (see _pass_data)."""
-        land = {p for p, t in self.terrain.items() if TERRAIN[t].move is not None}
-        crest = self._crest_edges(land)
-        passes = {}
-        for k, (name, lon, lat) in enumerate(getattr(self.geo, "PASSES", ()), 1):
-            px, py = self._unit_point(lon, lat)
-
-            def gap(edge):
-                (ax, ay), (bx, by) = (self._unit_centre(p) for p in sorted(edge))
-                return ((px - (ax + bx) / 2) ** 2 + (py - (ay + by) / 2) ** 2) ** 0.5, sorted(edge)
-            ranked = sorted((e for e in crest if e not in passes), key=gap)[:2]
-            if not ranked or gap(ranked[0])[0] > 2.5:
-                continue
-            passes[ranked[0]] = (name, k)
-            if len(ranked) > 1 and gap(ranked[1])[0] <= 1.0:
-                passes[ranked[1]] = (name, k)
-        self._join_pockets(land, crest, passes)
-        return frozenset(e for e in crest if e not in passes), passes
-
-    def _join_pockets(self, land, crest, passes):
-        """Open one more pass edge wherever the ridges (with their passes) would cut a landmass in two: the pieces
-        of a landmass are joined by the shortest chain of crest edges, one new pass per link, named after the
-        nearest city."""
-        shut = {e for e in crest if e not in passes}
-
-        def label(blocked):
-            ids, count = {}, 0
-            for p in sorted(land):
-                if p in ids:
-                    continue
-                count += 1
-                ids[p] = count
-                queue = deque([p])
-                while queue:
-                    cur = queue.popleft()
-                    for n in neighbors(cur):
-                        if n in land and n not in ids and frozenset((cur, n)) not in blocked:
-                            ids[n] = count
-                            queue.append(n)
-            return ids
-
-        flat = label(shut)
-        links = {}
-        for e in sorted(shut, key=sorted):
-            a, b = sorted(e)
-            if flat[a] != flat[b]:
-                links.setdefault(tuple(sorted((flat[a], flat[b]))), []).append(e)
-        parent = {}
-
-        def find(i):
-            parent.setdefault(i, i)
-            while parent[i] != i:
-                parent[i] = parent[parent[i]]
-                i = parent[i]
-            return i
-
-        size = {}
-        for i in flat.values():
-            size[i] = size.get(i, 0) + 1
-        number = max((pid for _, pid in passes.values()), default=0)
-        for pair in sorted(links, key=lambda p: (-min(size[p[0]], size[p[1]]), p)):
-            i, j = pair
-            if find(i) == find(j):
-                continue
-            edge = links[pair][0]
-            number += 1
-            passes[edge] = (self._pass_name_near(sorted(edge)[0], {n for n, _ in passes.values()}), number)
-            parent[find(i)] = find(j)
-
-    def _pass_name_near(self, pos, taken):
-        """A name for a new pass: the nearest city's, with II, III... added when that name is already a pass."""
-        base = self.cities[min((distance(c, pos), c) for c in self.cities)[1]][0] if self.cities else "Mountain"
-        name, n = base, 1
-        while name in taken:
-            n += 1
-            name = f"{base} {'I' * n if n < 4 else 'IV' if n == 4 else str(n)}"
-        return name
-
+    # ----- provinces and countries ------------------------------------------------------
     def province(self, pos):
         return self.provinces.get(pos)
 
@@ -2091,7 +1499,7 @@ class CampaignWorld:
         self.see_from(unit)
         return unit
 
-    def _land_spot(self, tag, prov, kind):
+    def land_spot(self, tag, prov, kind):
         """Where a new land unit appears: the province itself, or a province of ours next to it with room."""
         probe = Unit(0, kind, tag, prov.pos, hp=kind.hp)
         walls = self._walls()
@@ -2100,6 +1508,8 @@ class CampaignWorld:
             if other and other.owner == tag and (prov.pos, pos) not in walls and self.can_stand([probe], pos):
                 return pos
         return None
+
+    _land_spot = land_spot               # the old private name
 
     # ----- refits, drill and research ---------------------------------------------------
     def refit_check(self, unit):

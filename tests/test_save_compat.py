@@ -95,7 +95,7 @@ def _bump(tree):
 
 
 def _rename_province(tree):
-    for module in ("state.py", "world.py"):                  # the class lives in state.py; world.py imports it
+    for module in ("state.py", "world.py", "systems/worldgen.py"):    # defined in state.py, imported by the others
         _edit(tree, module, lambda text: re.sub(r"\bProvince\b", "Territory", text))
 
 

@@ -66,7 +66,7 @@ WORLD_MODULES = {"hexa.world", "hexa.colony.world", "hexa.campaign.world"}
 
 # ----- ALLOW: ONLY EVER SHRINK THESE -----------------------------------------------------------------------------
 ALLOW_MODULES = {
-    "hexa.campaign.world": 3324,
+    "hexa.campaign.world": 2734,
     "hexa.campaign.goodsart": 2476,
     "hexa.campaign.wfctiles": 2375,
     "hexa.campaign.landscape": 2010,
@@ -82,7 +82,7 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.randomgeo:_attempt": 395,
     "hexa.campaign.wfctiles:_generate": 325,
     "hexa.campaign.screens.techdraw:_glyph": 137,
-    "hexa.campaign.world:CampaignWorld._build_countries": 135,
+    "hexa.campaign.systems.worldgen:build_countries": 133,
     "hexa.campaign.randomgeo:_design": 134,
     "hexa.campaign.randomgeo:_mask": 130,
     "hexa.campaign.goodsart:_timber": 100,
@@ -97,7 +97,7 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.landscape:decorate": 82,
     "hexa.campaign.randomgeo:_mountains": 82,
     "hexa.campaign.goodsart:_horses": 81,
-    "hexa.campaign.world:CampaignWorld._prior": 81,
+    "hexa.campaign.systems.worldgen:terrain_prior": 81,
     "hexa.campaign.goodsart:_fish": 80,
     "hexa.campaign.wfctiles:_settlement_objects": 80,
     "hexa.campaign.world:CampaignWorld.economy": 80,
@@ -106,7 +106,7 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.goodsart:_silk": 78,
     "hexa.campaign.goodsart:_gold": 75,
     "hexa.campaign.wfc:collapse": 74,
-    "hexa.campaign.world:CampaignWorld._good_for": 74,
+    "hexa.campaign.systems.worldgen:good_for": 74,
     "hexa.campaign.mapview:MapView._town_labels": 72,
     "hexa.campaign.goodsart:_wine": 70,
     "hexa.campaign.screens.techdraw:draw_idea_modal": 68,
