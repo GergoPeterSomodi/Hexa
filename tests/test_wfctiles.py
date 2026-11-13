@@ -19,6 +19,7 @@ except ImportError:                     # the unit suite runs without pygame (th
 
 from hexa import hexgrid  # noqa: E402
 from hexa.campaign import wfctiles as w  # noqa: E402
+from hexa.campaign.render import cache as render_cache  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 T = w.tile
@@ -47,10 +48,7 @@ def pixels(img):
 
 
 def clear_caches():
-    w._CACHE.clear()
-    w._SPRITES.clear()
-    w._SHADOWS.clear()
-    w._SPARE.clear()
+    render_cache.clear_all()
     del w._POOL[:]
 
 

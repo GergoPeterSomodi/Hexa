@@ -112,10 +112,13 @@ def _shadow(w, h, a):
 
 
 def shadow_at(surf, x, y, w, h=None, a=45):
-    """A soft ground shadow w wide centred at (x, y) on a K x surface; returns the Rect it covered."""
+    """A soft ground shadow w wide centred at (x, y) on a K x surface; returns the Rect it covers (not clipped to the
+    surface)."""
     h = h or w * 0.35
     sh = _shadow(max(1, int(w * K)), max(1, int(h * K)), a)
-    return surf.blit(sh, (round((x - w / 2) * K), round((y - h / 2) * K)))
+    pos = (round((x - w / 2) * K), round((y - h / 2) * K))
+    surf.blit(sh, pos)
+    return sh.get_rect(topleft=pos)
 
 
 class Canvas:

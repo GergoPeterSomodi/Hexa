@@ -67,7 +67,7 @@ WORLD_MODULES = {"hexa.world", "hexa.colony.world", "hexa.campaign.world"}
 ALLOW_MODULES = {
     "hexa.campaign.world": 3532,
     "hexa.campaign.goodsart": 2476,
-    "hexa.campaign.wfctiles": 2391,
+    "hexa.campaign.wfctiles": 2375,
     "hexa.campaign.landscape": 2020,
     "hexa.campaign.app": 975,
     "hexa.campaign.mapview": 1544,

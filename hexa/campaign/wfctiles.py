@@ -59,7 +59,7 @@ from hexa.campaign.art import hex_pts, shade
 from hexa.campaign.render.cache import BoundedCache
 from hexa.campaign.goodsart import (CREAM, DARK, DWOOD, INK, ROOF_RED, ROOF_SLATE, STONE, THATCH, WATER, WATER_L, WHITE,
                                     WOOD, boat, building, flag, mound, tower)
-from hexa.campaign.render.draw import OFFS, OFFS_THIN, Pen, lerp, mix
+from hexa.campaign.render.draw import OFFS, OFFS_THIN, Pen, hex_mask, lerp, mix, shadow_at
 
 W, H = 120, 140
 CX, CY = W / 2, H / 2
@@ -465,13 +465,6 @@ def _kernel(offs):
 _KERNELS = {True: _kernel(OFFS), False: _kernel(OFFS_THIN)}
 
 
-@BoundedCache("wfctiles.masks", 8).memo
-def _hex_mask(r):
-    m = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-    pygame.draw.polygon(m, (255, 255, 255, 255), [(x * K, y * K) for x, y in hex_pts(r)])
-    return m
-
-
 class _TrackPen(Pen):
     """A Pen that remembers the box (in canvas pixels) its strokes can have touched, so `Canvas.stamp` does not have to
     scan the whole layer for it (get_bounding_rect costs 0.2 ms). The box is a superset of the drawn pixels."""
@@ -533,7 +526,6 @@ class _TrackPen(Pen):
 
 _SPRITES = BoundedCache("wfctiles.props", 512)
 _POOL = []                                  # spare (surf, layer, block) triples: allocating three 240 x 280 surfaces
-_SHADOWS = BoundedCache("wfctiles.shadows", 256)  # costs 0.12 ms per tile, wiping a used one 0.02 ms
 _SPARE = BoundedCache("wfctiles.scratch", 64)
 
 
@@ -581,15 +573,7 @@ class Canvas:
         fn(self.b)
 
     def shadow(self, x, y, w, h=None, a=45):
-        h = h or w * 0.35
-        key = (max(1, int(w * K)), max(1, int(h * K)), a)
-        sh = _SHADOWS.get(key)
-        if sh is None:
-            sh = _SHADOWS.put(key, pygame.Surface(key[:2], pygame.SRCALPHA))
-            pygame.draw.ellipse(sh, (0, 0, 0, a), sh.get_rect())
-        pos = (round((x - w / 2) * K), round((y - h / 2) * K))
-        self.surf.blit(sh, pos)
-        r = sh.get_rect(topleft=pos)
+        r = shadow_at(self.surf, x, y, w, h, a)
         self.sbox = r if self.sbox is None else self.sbox.union(r)
 
     def stamp(self, ink=2):
@@ -647,7 +631,7 @@ def _mask_1x():
     """The hex mask at 1x: colour white, alpha = coverage (so a MIN blit only touches alpha)."""
     s = _SPARE.get("mask1")
     if s is None:
-        s = _SPARE.put("mask1", pygame.transform.smoothscale(_hex_mask(MASK_R), (W, H)))
+        s = _SPARE.put("mask1", pygame.transform.smoothscale(hex_mask(MASK_R), (W, H)))
         s.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
     return s
 
