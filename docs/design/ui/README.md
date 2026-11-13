@@ -1,10 +1,13 @@
 # UI designs for upcoming features (proposals, 2026-11-12)
 
-Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; the rest not yet**. Every image is 1280x720, drawn over real game screenshots. Cyan boxes and numbered circles are review notes, not UI. Each section lists the open choices and what the game needs for it. Once a section is approved, it moves into the roadmap's milestone as built work.
+Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; sections 1 and 4-8 decided on 2026-11-13 (see each section's Decided block)**. Every image is 1280x720, drawn over real game screenshots. Cyan boxes and numbered circles are review notes, not UI. Each section lists the open choices and what the game needs for it. Once a section is approved, it moves into the roadmap's milestone as built work.
 
 ---
 
 ## 1. UI kit and button style (M3 UI clean-up)
+
+
+**Decided 2026-11-13:** the kit as drawn. Labels in Segoe Semibold 13. Province panel tabs Overview, Build and Raise (plus Fleet, see section 4); Trade stays the Market button in the footer. The top bar is option A (section 2).
 **Images:** `01_ui_kit.png`, `01b_ui_kit_panels.png`, `02_topbar_before_after.png`, `03_province_panel_before_after.png`
 
 **What they show:**
@@ -93,6 +96,14 @@ Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; the r
 - A small animation list in the app (start time, hex, image), drawn after the map and before the panels.
 
 ## 4. Recruiting at buildings
+
+
+**Decided 2026-11-13:**
+- Option A, lists: one row per unit with its stats and cost. No separate "Not here" section: units that can't be raised here stay in the list, greyed out, and the hover card gives the reason (the missing building with a Build shortcut, the nearest place that can raise it).
+- Ships go on their own **Fleet** tab, shown only in coastal provinces, with the same row style.
+- The Stable buys horses from the home market; any province can build one. The horse price's hover card explains why it moved (supply and demand: herds lost, stables buying).
+- No mercenaries for now. Colonies raise militia only. Scouts, wagons and colonists can be raised in any owned town.
+- Revised mockup: `17_recruit_raise_v2.png`.
 **Images:** `08_recruit_raise_tab.png`, `08b_recruit_build_tab.png`
 
 **What they show:**
@@ -121,6 +132,12 @@ Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; the r
 - The overlay needs a list, per kind, of the provinces that can raise it.
 
 ## 5. Debt and bankruptcy
+
+
+**Decided 2026-11-13:**
+- Option B, **loans**: lenders with amount, rate and term, a credit rating and offers.
+- At bankruptcy, for now **all penalties apply** (default on the creditors, provinces pledged, the army pays). Provinces go to the lender country. Penalties last a set number of years, and the debt is wiped.
+- Dev notes for later: let the player choose the penalty in the pop-up, with a fair value on each choice (a unit or a poor province must not clear 10,000 ducats; the deeper the debt, the more it takes). A repayment event could also offer to pay off part of a debt with provinces or units before bankruptcy.
 **Images:** `09_debt_bar_and_panel.png`, `10_bankruptcy_popup.png`
 
 **What they show:**
@@ -154,6 +171,9 @@ Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; the r
 - For B: a loan model (lender, principal, rate, term) and a credit rating.
 
 ## 6. Trade
+
+
+**Decided 2026-11-13:** the trade layer lives in the markets map mode (A). Recall and new orders also work from the route ribbons on the map.
 **Images:** `11_trade_map.png`, `12_market_panel_and_order.png`
 
 **What they show:**
@@ -182,6 +202,9 @@ Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; the r
 - Each market's price trend: the last season's price.
 
 ## 7. Economy
+
+
+**Decided 2026-11-13:** the Treasury is the wide window. Investment hints: the ranked panel (A) plus a "Best here" line in each province's Overview; no map badges. Research buildings get no payback figure; only money-making investments are ranked.
 **Images:** `13_economy_treasury.png`, `14_investment_hints.png`
 
 **What they show:**
@@ -213,6 +236,9 @@ Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; the r
 - A preview of the tax effect for each tax level.
 
 ## 8. Event pop-up (Phase 3: the frame only)
+
+
+**Decided 2026-11-13:** option A only, for every event. Events wait until the AI turn is over. Pictures: still open; `16_event_art_compare.png` shows composed-from-tiles next to painted for the owner to pick.
 **Image:** `15_event_popup_frame.png` (the bankruptcy pop-up, `10`, reuses it)
 
 **What it shows:**
