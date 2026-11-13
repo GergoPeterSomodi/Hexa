@@ -9,6 +9,9 @@ battle per season, after its days) and ``battle_ended`` (once per battle, after 
 How a battle ends: "broke", "withdrew" or "surrendered" (a loser), "destroyed" (a side with no regiment or garrison left
 after a day of the fight: the other side wins, as the loser), "peace" and "gone" (a draw: peace, a country that vanished
 between seasons, or both sides destroyed on one day). A draw has no winner and no loser, so it scores nothing.
+Since 0.2.1 every battle is fought to its end in the turn it starts (``battle_season``): a side that breaks or flees pays
+the flight price (combat.pursuit), a Withdraw ordered by the battle's stance takes effect from the end of day
+WITHDRAW_DAY and pays the Withdraw price, and at the day cap (BATTLE_DAYS) the side with the lower front morale withdraws.
 
 Functions taking ``world``; World binds the public ones as facades. ``battle_season`` is the season's ``battles`` phase, the
 first of PHASES (season.py). A battle is named when it starts (decision 5): "Battle of X, 1525", "Second Battle of X,
@@ -17,8 +20,8 @@ first of PHASES (season.py). A battle is named when it starts (decision 5): "Bat
 import math
 
 from ...hexgrid import distance, neighbors, within
-from ..data import (ATTACK_MORALE, BATTLE_MAX_SEASONS, DAYS_PER_SEASON, ELEVATION, RETREAT_MORALE, RETREAT_RANGE,
-                    START_YEAR, STANDING_ORDERS, TERRAIN, WITHDRAW_PURSUIT, WOUNDED_RETURN)
+from ..data import (ATTACK_MORALE, BATTLE_DAYS, ELEVATION, RETREAT_RANGE, START_YEAR, STANDING_ORDERS, TERRAIN,
+                    WITHDRAW_DAY, WITHDRAW_MORALE, WITHDRAW_PURSUIT, WITHDRAW_PURSUIT_ATTACKER, WOUNDED_RETURN)
 from ..naming import is_wild
 from ..state import Battle
 from . import combat, military, movement, terrain
@@ -322,12 +325,21 @@ def battle_order(world, pos, tag, stance):
 
 # ----- the retreat -------------------------------------------------------------------------------------------------
 
-def retreat_spot(world, group, pos):
+def _retreat_land(prov, tag, own):
+    """Whether a beaten side may run to this province's hex. A Withdraw (``own``) goes to land its country controls. A
+    flight (0.2.1) may take any free land: not a hex an enemy holds with a garrison in it."""
+    if own:
+        return prov.controller == tag
+    return prov.garrison <= 0 or prov.controller in (tag, None)
+
+
+def retreat_spot(world, group, pos, own=True):
     """The hex a beaten side retreats to (spec 3.6). Walking from pos over land, the nearest hex within RETREAT_RANGE
-    steps that the side's country controls, with no enemy unit, no battle and room for the whole side (military.can_stand).
-    The walk never crosses a wall (world.walls(): the ridge crests, and the mountain passes in winter), the sea or a hex
-    with an enemy unit. Ties go to the hex farthest from the enemy's nearest unit, then the lowest pos. None when there is
-    no such hex. It runs when an order is set or a side breaks, never per frame."""
+    steps that the side may run to (_retreat_land: its own land for a Withdraw, any free land for a flight), with no enemy
+    unit, no battle and room for the whole side (military.can_stand). The walk never crosses a wall (world.walls(): the
+    ridge crests, and the mountain passes in winter), the sea or a hex with an enemy unit. Ties go to the hex farthest
+    from the enemy's nearest unit, then the lowest pos. None when there is no such hex. It runs when an order is set or a
+    side breaks, never per frame."""
     if not group:
         return None
     tag = group[0].owner
@@ -351,7 +363,7 @@ def retreat_spot(world, group, pos):
         if p == pos or world.battle_at(p) is not None:
             continue
         prov = world.provinces.get(p)
-        if prov is None or prov.controller != tag or not military.can_stand(world, group, p):
+        if prov is None or not _retreat_land(prov, tag, own) or not military.can_stand(world, group, p):
             continue
         away = min((distance(p, f) for f in enemy_at), default=0)
         key = (steps, -away, p)
@@ -407,20 +419,27 @@ def _surrender(world, battle, tag, group):
     world.lose(group, "surrendered")
 
 
+def _pay_withdraw(world, battle, tag, group):
+    """A withdrawing side pays the Withdraw price (0.2.1): WITHDRAW_PURSUIT of its men (WITHDRAW_PURSUIT_ATTACKER for the
+    attacker), all of it killed, and WITHDRAW_MORALE off the morale of its regiments. The garrison stays in its castle."""
+    share = WITHDRAW_PURSUIT_ATTACKER if tag == battle.attacker else WITHDRAW_PURSUIT
+    _pursue(world, battle, tag, share, group)
+    for unit in group:
+        if unit in world.units and unit.kind.war:
+            unit.morale = max(0.0, unit.morale - WITHDRAW_MORALE)
+
+
 def _retreat_or_surrender(world, battle, tag, units, how):
-    """The beaten side retreats to retreat_spot, or surrenders when there is none. Returns (spot or None, how)."""
+    """The beaten side retreats to retreat_spot (a Withdraw to its own land, a broken or fleeing army to any free land near
+    by), or surrenders when there is none. Returns (spot or None, how)."""
     group = [u for u in units if u in world.units]
     if not group:
         return None, how
-    spot = retreat_spot(world, group, battle.pos)
+    spot = retreat_spot(world, group, battle.pos, own=how == "withdrew")
     if spot is None:
         _surrender(world, battle, tag, group)
         return None, "surrendered"
     _move_side(world, group, battle.pos, spot)
-    if how == "broke":                       # a withdrawing side keeps its morale; a broken one is at most this low
-        for unit in group:
-            if unit.kind.war:
-                unit.morale = min(unit.morale, RETREAT_MORALE)
     return spot, how
 
 
@@ -517,22 +536,23 @@ def _storm(world, battle, loser, how, had_field):
     return True
 
 
-def _end_battle(world, battle, how, loser=None, pursuit=True, cause=None):
-    """End a battle (spec 3.6). ``how``: "broke" (the loser's army broke on a day; the pursuit was on that day), "withdrew"
-    (the loser withdrew: on its order, or at the safety stop, which passes pursuit=False: half pursuit, or none, then the
-    retreat), "destroyed" (the loser has no regiment or garrison left after a day: no retreat, the kills are already
-    booked), "peace" or "gone" (a draw: no loser, no pursuit, no retreat). A side with no retreat hex surrenders after
-    "broke" or "withdrew". The winner's survivors gain experience when the battle had days (the loser's survivors less);
-    the wounded come back in supply; a stormed castle goes to the attacker; the battle leaves world.battles, and then
-    battle_ended is emitted once. ("stalemate" is no longer an end: decision 7 makes the stop a withdrawal.)"""
+def _end_battle(world, battle, how, loser=None, cause=None):
+    """End a battle (spec 3.6, 0.2.1). ``how``: "broke" (the loser's army broke or fled on a day: its flight price was paid
+    in that day, combat.pursuit; it retreats to any free land near by), "withdrew" (the loser withdrew: on its order from the
+    end of day WITHDRAW_DAY, or as the lower army at the day cap; it pays the Withdraw price and retreats to its own land),
+    "destroyed" (the loser has no regiment or garrison left after a day: no retreat, the kills are already booked), "peace"
+    or "gone" (a draw: no loser, no retreat). A side with no retreat hex surrenders after "broke" or "withdrew". The
+    winner's survivors gain experience when the battle had days (the loser's survivors less); the wounded come back in
+    supply; a stormed castle goes to the attacker; the battle leaves world.battles, and then battle_ended is emitted once.
+    ("stalemate" is no longer an end: the day cap makes the lower army withdraw.)"""
     att, dfn, pos = battle.attacker, battle.defender, battle.pos
     winner = None if loser is None else (dfn if loser == att else att)
     fighters = {tag: _side_units(world, battle, tag) for tag in (att, dfn)}
     had_field = any(u.kind.war for u in fighters[dfn])     # decided before the retreat moves the units
     retreat = None
     if loser is not None and how in ("broke", "withdrew"):
-        if how == "withdrew" and pursuit:
-            _pursue(world, battle, loser, WITHDRAW_PURSUIT, fighters[loser])
+        if how == "withdrew":
+            _pay_withdraw(world, battle, loser, fighters[loser])
         retreat, how = _retreat_or_surrender(world, battle, loser, fighters[loser], how)
     if loser is not None and battle.days > 0:
         _experience(world, fighters, winner, loser)
@@ -544,18 +564,18 @@ def _end_battle(world, battle, how, loser=None, pursuit=True, cause=None):
         _leave_hex(world, battle, loser)
     world.changed(ownership=storm)
     world.bus.emit("battle_ended", att, pos, attacker=att, defender=dfn, winner=winner, loser=loser,
-                   assault=battle.assault, how=how, cause=cause, seasons=_seasons(world, battle), name=battle.name,
-                   year=_year(battle.start),
+                   assault=battle.assault, how=how, cause=cause, seasons=_seasons(world, battle), days=battle.days,
+                   name=battle.name, year=_year(battle.start), log=list(battle.log),
                    killed={tag: round(battle.killed.get(tag, 0.0)) for tag in (att, dfn)},
                    wounded={tag: round(battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}, retreat=retreat)
 
 
-def end_battle(world, battle, how, loser=None, pursuit=True, cause=None):
+def end_battle(world, battle, how, loser=None, cause=None):
     """End a battle: _end_battle, with the battle marked busy meanwhile, so the units its pursuit, surrender or storm take
     off the map do not end it a second time (units_left)."""
     _BUSY.add(id(battle))
     try:
-        _end_battle(world, battle, how, loser, pursuit, cause)
+        _end_battle(world, battle, how, loser, cause)
     finally:
         _BUSY.discard(id(battle))
 
@@ -578,37 +598,33 @@ def _shakier(world, battle):
     return battle.defender
 
 
-def day_cap(world, battle):
-    """The most days this battle fights in this season's battles phase. "full" fights DAYS_PER_SEASON at once. "clash"
-    fights only one day in the season the attack happens (the defender then has a season to answer, and allies and
-    reserves can join); the days after it are fought in the later seasons' phases."""
-    if getattr(world, "battle_timing", "clash") == "clash" and battle.start == world.turn:
-        return 1
-    return DAYS_PER_SEASON
+def _withdrawing(battle):
+    """The sides on a Withdraw stance in this battle. The order is carried out from the end of day WITHDRAW_DAY."""
+    return [tag for tag in (battle.attacker, battle.defender) if battle.stance.get(tag) == "withdraw"]
 
 
 def _fight_season(world, battle):
-    """One battle's season. A side with nothing left at its start has vanished between seasons: a draw ("gone"). A
-    withdrawal takes effect next. Then up to DAYS_PER_SEASON days: a side left with nothing after a day was destroyed in
-    the fight, so the other side wins ("destroyed"; both at once is "gone"). Then the safety stop."""
+    """One battle's fight, all of it in this turn (0.2.1). A side with nothing left at its start has vanished between turns:
+    a draw ("gone"). Then the days follow one after another until a side goes: a side left with nothing after a day was
+    destroyed ("destroyed"; both at once is "gone"); a broken or fleeing army ends it ("broke", its price paid in the day);
+    a side on Withdraw leaves at the end of day WITHDRAW_DAY ("withdrew"); and at BATTLE_DAYS with nobody gone, the side
+    with the lower front morale withdraws ("withdrew"). Nothing carries over to the next turn."""
     att, dfn = battle.attacker, battle.defender
     if not (_present(world, battle, att) and _present(world, battle, dfn)):
         end_battle(world, battle, "gone")
         return
-    withdrawing = [tag for tag in (att, dfn) if battle.stance.get(tag) == "withdraw"]
-    if withdrawing:
-        end_battle(world, battle, "withdrew", withdrawing[0] if len(withdrawing) == 1 else _shakier(world, battle))
-        return
     before = {tag: (battle.killed.get(tag, 0.0), battle.wounded.get(tag, 0.0)) for tag in (att, dfn)}
-    broke, cause, days = None, None, 0
+    days, broke, cause = 0, None, None
     _BUSY.add(id(battle))
     try:
-        while days < day_cap(world, battle) and broke is None:
-            report = combat.fight_day(world, battle)
-            broke, cause = report["broke"], report["cause"]
-            days += 1
-            if not (_present(world, battle, att) and _present(world, battle, dfn)):
+        while broke is None and _present(world, battle, att) and _present(world, battle, dfn):
+            if _withdrawing(battle) and battle.days >= WITHDRAW_DAY:
                 break
+            if battle.days >= BATTLE_DAYS:
+                break
+            report = combat.fight_day(world, battle)
+            days += 1
+            broke, cause = report["broke"], report["cause"]
     finally:
         _BUSY.discard(id(battle))
     absent = [tag for tag in (att, dfn) if not _present(world, battle, tag)]
@@ -616,31 +632,24 @@ def _fight_season(world, battle):
                    morale={tag: army_morale(world, battle, tag) for tag in (att, dfn)},
                    killed={tag: round(battle.killed.get(tag, 0.0) - before[tag][0]) for tag in (att, dfn)},
                    wounded={tag: round(battle.wounded.get(tag, 0.0) - before[tag][1]) for tag in (att, dfn)})
+    withdrawing = _withdrawing(battle)
     if len(absent) == 2:
         end_battle(world, battle, "gone")
     elif absent:
         end_battle(world, battle, "destroyed", absent[0])
     elif broke is not None:
         end_battle(world, battle, "broke", broke, cause=cause)
-    elif _seasons(world, battle) >= BATTLE_MAX_SEASONS:
-        _safety_stop(world, battle)
-
-
-def _safety_stop(world, battle):
-    """The safety stop (spec 3.5, decision 7): a battle that has lasted BATTLE_MAX_SEASONS seasons ends with its lower army
-    withdrawing, with no pursuit. When that side has no retreat hex the other side withdraws instead. When neither can
-    retreat the battle goes on, and the stop is checked again next season. Two armies never sit on one hex unfought."""
-    low = _shakier(world, battle)
-    high = battle.defender if low == battle.attacker else battle.attacker
-    for tag in (low, high):
-        if retreat_spot(world, _side_units(world, battle, tag), battle.pos) is not None:
-            end_battle(world, battle, "withdrew", tag, pursuit=False)
-            return
+    elif withdrawing:
+        end_battle(world, battle, "withdrew", withdrawing[0] if len(withdrawing) == 1 else _shakier(world, battle),
+                   cause="order")
+    else:                                    # the day cap: nobody has gone, so the lower army withdraws
+        end_battle(world, battle, "withdrew", _shakier(world, battle), cause="cap")
 
 
 def battle_season(world):
-    """The ``battles`` phase (spec 3.4): every battle fights its days, in pos order. A battle that ends stops there, so it
-    never fights a day after it ended. The winner may start a siege in the same season (the phases that follow)."""
+    """The ``battles`` phase (spec 3.4, 0.2.1): every battle is fought to its end, in pos order, in this turn. A battle that
+    ends stops there, so it never fights a day after it ended. The winner may start a siege in the same turn (the phases
+    that follow)."""
     if not world.battles:
         return
     for battle in sorted(world.battles, key=lambda b: b.pos):

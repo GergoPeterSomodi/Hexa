@@ -365,7 +365,8 @@ GARRISON_REGEN = 2
 MEN = 1000                                 # men in a full regiment: battles show strength as men (rules keep hp)
 GARRISON_MEN = 100                         # men per garrison hit point (a level 3 castle: 1,800)
 # ----- battles (slice 1: the day rules of hexa/campaign/systems/combat.py; spec section 4) ------------------
-DAYS_PER_SEASON = 3                        # battle days fought each season
+BATTLE_DAYS = 8                            # the day cap (0.2.1): a battle no side has left by then ends in its turn, the lower army withdrawing
+WITHDRAW_DAY = 2                           # a Withdraw takes effect from the end of this battle day (0.2.1)
 SHOCK_LOSS = 0.08                          # share of a regiment's hp lost a day in an even lane fight
 FIRE_LOSS = 0.05                           # a gun's fire, a day
 SHOT_LOSS = 0.03                           # era 2 and 3 infantry's shot, a day
@@ -379,16 +380,17 @@ DICE = {1: 0.7, 2: 0.8, 3: 0.9, 4: 1.1, 5: 1.2, 6: 1.4}   # each side rolls a d6
 FLANK_MORALE = 0.10                        # morale the centre loses each day a flank lane stays broken (no regiment, no reserve)
 CENTRE_SHOCK = 0.25                        # morale every regiment of a side loses once when its centre lane breaks
 BACKLINE_LOSS = 0.04                       # a side with a broken centre exposes its back line: the enemy's reserve hits it this much a day
-BATTLE_TIMINGS = ("clash", "full")         # battle_timing: day 1 in the attack's season, the rest later; or all days at once
 STANDING_ORDERS = ("hold", "withdraw")     # what an army does when attacked and given no order (Unit.standing)
 HIT_SPREAD = 0.5                           # each hit is worked out times uniform(1 - this, 1 + this): the luck of a day (tuned 2026-11-13, was 0.15: the odds were a near-certainty without it)
-BREAK = 0.05                               # a side's front-line morale under this breaks the army (fallback to the lane rule; slice 1b: 0.25 -> 0.05, so lanes decide)
+FLEE_MORALE = 0.10                         # a side whose front-line morale falls under this flees (0.2.1; a line that breaks pays the same price)
 ATTACK_MORALE = 0.5                        # a stack this shaken cannot start an attack
-PURSUIT, PURSUIT_FOOT, WITHDRAW_PURSUIT = 0.10, 0.04, 0.05   # share of men killed in a pursuit
+FLEE_PURSUIT = 0.15                        # share of its men a side loses when it breaks or flees; its guns are lost too (0.2.1)
+FLEE_MORALE_LEFT = 0.15                    # the morale a fleeing or broken army is left with: no attack for about two seasons
+WITHDRAW_PURSUIT, WITHDRAW_PURSUIT_ATTACKER = 0.05, 0.10   # share of its men a withdrawing side loses (the attacker's share is larger)
+WITHDRAW_MORALE = 0.25                     # front-line morale a withdrawing side loses (points of morale)
 WOUNDED_SHARE, WOUNDED_RETURN = 0.5, 0.5  # share of hp lost that is wounded; share of wounded that come back
-RETREAT_MORALE, MORALE_RECOVERY = 0.3, 0.25
+MORALE_RECOVERY = 0.25
 RETREAT_RANGE = 3 * SCALE                 # hexes a beaten side may retreat (battle slice 1, spec 3.6)
-BATTLE_MAX_SEASONS = 6                     # a battle this long ends with the lower army withdrawing (owner decision)
 BATTLE_LOG = 24                            # log lines kept per battle
 NARROW_TERRAIN = ("mountains", "marsh", "jungle", "snow")   # the right lane is closed: two lanes fight
 ELEVATION = {"hills": 1, "mountains": 2, "snow": 2}          # height of a battle's ground; other terrain is 0 (spec 3.4)
@@ -396,7 +398,7 @@ CROSSING_PENALTY = 0.3                     # an attack across a mountain pass de
 UPHILL_PENALTY = 0.05                      # an attacker from lower ground deals this much less damage for the whole battle (tuned 2026-11-13, was 0.1)
 AI_ATTACK_POWER = 1.1                      # the AI attacks a hex when its power times morale is this many times the defence's (PR 5: was 1.3; see the battle stats, docs/design/battle-slice1-build-spec.md 4)
 AI_STANCE_RATIO = 1.2                      # the AI's battle stance: Attack when its men times morale are this many times the enemy's
-AI_WITHDRAW_MORALE, AI_WITHDRAW_LEAD = 0.4, 0.15   # the AI withdraws when its army morale is under the first, the enemy's this much higher
+AI_WITHDRAW_RATIO = 0.6                     # the AI withdraws when its battle strength (men x morale) is under this share of the enemy's
 # The odds card's one word (battleview.odds_word): the band of the strength ratio, attack strength over defence strength
 # (the measure of battleview.odds_view). Each band: (word, lowest ratio, the attacker's win rate the band must show).
 # Calibrated 2026-11-13 on plains, pike fights of tests/support/scenarios.py, 100 seeds each (the attacker's win rate):

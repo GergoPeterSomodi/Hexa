@@ -41,6 +41,7 @@ import weakref
 from collections import deque
 from typing import NamedTuple, Optional
 
+from .battlelog import describe
 from .battleview import battle_view
 from .data import BUILDINGS, ERAS, date
 from .tech import TECHS
@@ -64,7 +65,7 @@ NOTICES = {
 LOSS_TEXT = {"battle": "Lost", "storm": "Lost", "overrun": "Overrun", "deserted": "Deserted", "starved": "Starved",
              "sunk": "Sunk", "evicted": "Evicted", "disbanded": "Disbanded"}
 LOSS_LOGGED = ("overrun", "starved", "sunk", "evicted", "disbanded")     # the others are told by their own items
-BROKE_CAUSE = {"centre": "centre broke", "lanes": "two lanes broke", "morale": "the army broke"}
+BROKE_CAUSE = {"centre": "centre broke", "lanes": "two lanes broke", "morale": "the army fled"}
 BATTLE_HOW = {"withdrew": "the loser withdrew", "surrendered": "the loser surrendered", "destroyed": "the loser was destroyed"}
 DRAW_HOW = {"peace": "peace was made", "gone": "a side was gone"}
 SPENT = {"build": ("Building", "Started building at {}"), "refit": ("Refitted", "Refitted troops at {}"),
@@ -82,6 +83,7 @@ class FeedItem(NamedTuple):
     mine: bool = False
     floating: bool = False
     log: bool = True
+    link: Optional[tuple] = None      # what a click does instead of the camera: a battle's day log (0.2.1)
 
 
 def of(world):
@@ -227,13 +229,15 @@ class Feed:
         mine = self._party(att, dfn)
         if not (mine or self._seen(event.pos)):
             return None
-        winner, loser, seasons = event.get("winner"), event.get("loser"), event.get("seasons", 1)
+        winner, loser = event.get("winner"), event.get("loser")
         killed = event.get("killed", {})
+        days = event.get("days", 0)
+        when = f"in {days} day{'s' * (days != 1)}" if days else "with no day fought"
         if winner:
-            verdict = f"{self._name(winner)} wins, {self._how(event)}"
+            verdict = f"{self._name(winner)} won {when}, {self._how(event)}"
         else:
-            verdict = f"no side wins, {DRAW_HOW.get(event.get('how'), 'the fight stopped')}"
-        sentence = (f"{event.get('name') or 'Battle'} ends: {verdict} after {seasons} season{'s' * (seasons != 1)}. "
+            verdict = f"no side won {when}, {DRAW_HOW.get(event.get('how'), 'the fight stopped')}"
+        sentence = (f"{event.get('name') or 'Battle'} ends: {verdict}. "
                     f"{self._name(att)} lost {killed.get(att, 0):,} men, {self._name(dfn)} lost {killed.get(dfn, 0):,} men.")
         player = self.world.player
         if player is not None and player == winner:
@@ -242,7 +246,16 @@ class Feed:
             colour, text = "loss", "Defeat!"
         else:                                   # the other battles are war news, a draw as well
             colour, text = "war", "Battle won" if winner else "Battle over"
-        return self._item(event, colour, text, sentence, mine)
+        item = self._item(event, colour, text, sentence, mine)
+        return item._replace(link=("battle_log", self._day_record(event, sentence)))
+
+    def _day_record(self, event, sentence):
+        """A battle's day log for the battle window (0.2.1): its name, the sentence of its end, and each line of its log
+        (battlelog.describe, with the two sides' names). Kept by the log line; never saved."""
+        names = {tag: self._name(tag) for tag in (event.tag, event.get("defender")) if tag}
+        headline = sentence.split(" ends: ", 1)[-1]          # the name is the window's title
+        return {"name": event.get("name") or "Battle", "headline": headline,
+                "lines": [describe(rec, names) for rec in event.get("log", ())]}
 
     @staticmethod
     def _how(event):

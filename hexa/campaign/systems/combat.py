@@ -11,10 +11,11 @@ once; ``morale`` routs regiments and ``breaker`` names the army that breaks; ``p
 PR 3. A day writes only the battle object, unit ``hp`` and ``morale``, ``prov.garrison`` and the units it kills
 (``world.kill``). Imports point down: never world.py, ui, render or pygame.
 """
-from ..data import (BACKLINE_LOSS, BATTLE_LOG, BREAK, CASTLE_DEFENSE, CENTRE_SHOCK, CROSSING_PENALTY, DICE, FIGHT_ATTACK,
-                    FIGHT_DEFENSE, FIRE_LOSS, FLANK_BONUS, FLANK_MORALE, FRONT_DRAIN, GARRISON_MEN, GENERAL, GENERAL_BONUS,
+from ..data import (BACKLINE_LOSS, BATTLE_LOG, CASTLE_DEFENSE, CENTRE_SHOCK, CROSSING_PENALTY, DICE, FIGHT_ATTACK,
+                    FIGHT_DEFENSE, FIRE_LOSS, FLANK_BONUS, FLANK_MORALE, FLEE_MORALE, FLEE_MORALE_LEFT,
+                    FLEE_PURSUIT, FRONT_DRAIN, GARRISON_MEN, GENERAL, GENERAL_BONUS,
                     GENERAL_MORALE, HUNGER_DRAIN, MEN,
-                    MORALE_PER_LOSS, NARROW_TERRAIN, OPEN_GROUND, PIKES_VS_HORSE, PURSUIT, PURSUIT_FOOT, RESERVE_DRAIN,
+                    MORALE_PER_LOSS, NARROW_TERRAIN, OPEN_GROUND, PIKES_VS_HORSE, RESERVE_DRAIN,
                     HIT_SPREAD, RESERVE_SHAKEN, SHOCK_LOSS, SHOT_LOSS, STANCE, TERRAIN, UPHILL_PENALTY, WOUNDED_SHARE)
 from ..state import Garrison
 
@@ -525,14 +526,14 @@ def _lane_cause(day, tag):
 def breaker(day):
     """The side whose army breaks today and why: (tag, cause) with cause "centre", "lanes" or "morale", or (None, None).
     A side breaks when its centre is empty with no reserve, when two lanes are (either one on narrow ground), or when its
-    front-line morale (army_morale) is under BREAK. When both break, the one with the lower front morale (the attacker on
+    front-line morale (army_morale) is under FLEE_MORALE (a flight: it pays the same as a break). When both break, the one with the lower front morale (the attacker on
     a tie)."""
     att, dfn = day.tags()
     world, battle = day.world, day.battle
     ma, md = army_morale(world, battle, att), army_morale(world, battle, dfn)
     cause = {}
     for tag, morale in ((att, ma), (dfn, md)):
-        cause[tag] = _lane_cause(day, tag) or ("morale" if morale < BREAK else None)
+        cause[tag] = _lane_cause(day, tag) or ("morale" if morale < FLEE_MORALE else None)
     broken = [tag for tag in (att, dfn) if cause[tag] is not None]
     if not broken:
         return None, None
@@ -541,15 +542,19 @@ def breaker(day):
 
 
 def pursuit(day, loser):
-    """The broken side loses PURSUIT of its men when the winner still has a cavalry regiment, else PURSUIT_FOOT. All of
-    it is killed; none is wounded."""
+    """The flight price (0.2.1), paid by a side that breaks or flees: FLEE_PURSUIT of its men are killed, its guns (every
+    artillery regiment) with all their men, and its regiments' morale is set to FLEE_MORALE_LEFT. None is wounded. The
+    same whichever way the army broke (lanes or morale)."""
     battle = day.battle
-    winner = battle.defender if loser == battle.attacker else battle.attacker
-    mounted = any(f.kind.branch == "cavalry" for key, f in day.fighters.items()
-                  if day.side[key] == winner and key not in battle.routed)
-    share = PURSUIT if mounted else PURSUIT_FOOT
-    hits = [(f, share * f.hp, 0.0) for key, f in day.fighters.items() if day.side[key] == loser]
+    hits = []
+    for key, fighter in day.fighters.items():
+        if day.side[key] != loser:
+            continue
+        gun = key != "garrison" and fighter.kind.branch == "artillery"
+        hits.append((fighter, (1.0 if gun else FLEE_PURSUIT) * fighter.hp, 0.0))
     day.resolve(hits)
+    for unit in _war_units(day.world, battle, loser):
+        unit.morale = FLEE_MORALE_LEFT
 
 
 def fight_day(world, battle):
