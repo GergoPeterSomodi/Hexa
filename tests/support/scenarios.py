@@ -1,22 +1,21 @@
 """Scenario fights for the battle bands (battle slice 1, spec sections 4 and 7.3.1): one stack of regiments against
-another on one hex, fought day by day with a seeded rng until a side breaks or the safety stop. tests/test_battle.py
+another on one hex, fought day by day with a seeded rng until a side breaks or the day cap (0.2.1). tests/test_battle.py
 asserts the bands and tools/battle_stats.py prints the table, so both read the same scenarios.
 
     stage(world, spec_a, spec_d, terrain="plains", castle=0) -> (battle, attackers, defenders)
         Both stacks on one hex, the attacker on Attack and the defender on Hold. The attacker stands on plains beside it:
         on a hill or mountain hex the battle is uphill (ELEVATION), as engage sets it.
     play(world, seed, spec_a, spec_d, terrain="plains") -> dict
-        One fight to its end: days, seasons, winner, loss (share of its men lost per side, killed and wounded), the
-        battle, and stopped (no side broke within the safety stop).
+        One fight to its end: days, winner, loss (share of its men lost per side, killed and wounded), the battle, and
+        capped (no side went by the day cap; the lower army then withdrew).
 
 A spec lists regiments as (branch, era, count). Pygame-free.
 """
-import math
 import random
 
-from hexa.campaign.data import BATTLE_MAX_SEASONS, DAYS_PER_SEASON, ELEVATION, GARRISON_HP
+from hexa.campaign.data import BATTLE_DAYS, ELEVATION, GARRISON_HP
 from hexa.campaign.state import Battle
-from hexa.campaign.systems import combat
+from hexa.campaign.systems import battle as battlesys, combat
 from tests.support.battles import place
 
 SCENARIOS = {
@@ -61,26 +60,28 @@ def stage(world, spec_a, spec_d, terrain="plains", castle=0):
 
 
 def play(world, seed, spec_a, spec_d, terrain="plains"):
-    """One scenario fight to its end. At the safety stop the side with the lower army morale withdraws, as in the game
-    (spec 3.5; the attacker on a tie), so the other side wins. Returns a dict: days, seasons, winner (tag), loss (share
-    of its men lost per side, killed and wounded), the battle, and stopped (no side broke within the safety stop)."""
+    """One scenario fight to its end, as the game fights it (0.2.1): days go by until a side breaks or flees, or until
+    BATTLE_DAYS pass with nobody gone. Then the side with the lower army morale withdraws (the attacker on a tie) and
+    pays the Withdraw price (battle.end_battle). Returns a dict: days, winner (tag), loss (share of its men lost per side,
+    killed and wounded), the battle, and capped (the day cap was reached)."""
     world.rng = random.Random(seed)
     battle, _, _ = stage(world, spec_a, spec_d, terrain=terrain)
     combat.deploy(world, battle)
     men0 = dict(battle.men0)
     broke, days = None, 0
-    for days in range(1, 3 * BATTLE_MAX_SEASONS + 1):
+    while days < BATTLE_DAYS:
         report = combat.fight_day(world, battle)
+        days += 1
         if report["broke"] is not None:
             broke = report["broke"]
             break
-    stopped = broke is None
-    if stopped:
+    capped = broke is None
+    if capped:
         att = combat.army_morale(world, battle, battle.attacker)
         dfn = combat.army_morale(world, battle, battle.defender)
         broke = battle.attacker if att <= dfn else battle.defender
+        battlesys.end_battle(world, battle, "withdrew", broke)
     winner = battle.defender if broke == battle.attacker else battle.attacker
     loss = {tag: (battle.killed.get(tag, 0.0) + battle.wounded.get(tag, 0.0)) / men0[tag]
             for tag in (battle.attacker, battle.defender)}
-    return {"days": days, "seasons": math.ceil(days / DAYS_PER_SEASON), "winner": winner, "loss": loss,
-            "battle": battle, "stopped": stopped}
+    return {"days": days, "winner": winner, "loss": loss, "battle": battle, "capped": capped}

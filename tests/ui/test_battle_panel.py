@@ -64,6 +64,33 @@ class OpenTest(BattlePanelCase):
         self.assertFalse(self.is_open())
 
 
+class EndedLogTest(BattlePanelCase):
+    """0.2.1: a battle ends in its turn with no panel opening by itself. Its log line (the feed) opens its day log: the
+    battle as it ended (no field, no orders), closed by its Close button."""
+
+    def test_the_log_line_opens_the_day_log_and_close_takes_it_off(self):
+        import play
+        from hexa.campaign import feed
+        from hexa.campaign.app import CampaignApp
+        from hexa.campaign.systems import battle as battlesys
+        self.app = app = CampaignApp(play.TILES_DIR, "POR")
+        self.world = app.world
+        feed.of(self.world)
+        fight, battle = plain_battle(self.world, [("infantry", 1, 4), ("cavalry", 1, 2)], [("infantry", 1, 4)])
+        self.world.player = fight.attacker
+        self.world.changed()
+        battlesys.battle_season(self.world)
+        self.assertFalse(app.battle in app.screens, "no panel opens by itself")
+        item = next(i for _, _, group in feed.of(self.world).entries() for i in group if i.kind == "battle_ended")
+        app.press(item.link)
+        app.draw()
+        self.assertTrue(self.is_open())
+        self.assertIsNotNone(app.battle.ended)
+        self.assertEqual(app.battle.ended["name"], battle.name)
+        self.run_loop(4, (1, click(self.entry(("close", None))[0].center)))
+        self.assertFalse(self.is_open())
+
+
 class OrdersTest(BattlePanelCase):
     def test_hold_changes_the_stance_through_the_battle_order(self):
         self.start()
