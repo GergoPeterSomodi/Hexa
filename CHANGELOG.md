@@ -9,6 +9,29 @@ and fixes inside it. 0.1.x is the foundations. **0.2.x is war:** battles (0.2.0)
 battle mini-map, and war goals and peace. Later phases (the living world, history and events, the sea, game feel)
 take 0.3.x onwards, and 0.9.x is the Steam Early Access line. 1.0 is the full Steam release.
 
+## v0.2.1: War you can follow
+**War:**
+- Every battle ends in the turn it starts: days are fought until a side breaks, withdraws or flees, up to 8; at the cap the
+  side with the lower morale withdraws. The Battle timing option (Clash, Quick battles) is gone. A second stack that
+  attacks the same hex in the same season joins on day 1
+- Withdraw takes effect after 2 days of fighting and costs 5% of men (10% for an attacker) and 25 morale. Under 10% front
+  morale an army flees: 15% of men, its guns, morale 0.15 (about 2 seasons before it can attack). A broken line pays the
+  same. A flight goes to the side's own land first, then any free land, and cannot besiege where it lands that season
+- The AI uses the same rules and reads its stance as attacker and defender
+- The odds card is recalibrated to the new battles (word bands and ground factors)
+
+**On screen:**
+- A "N things to do" task flag under End season (or left of an open panel) replaces the End season pop-up; Fund research
+  shows whenever it can be bought. The option is now "Task flag"
+- A battle's log line says how it ended and in how many days, and opens its day log
+
+**Under the hood:**
+- Battle stats: 100% of battles end in their season (was 76%), 3% by withdrawal (was 36%), the loser loses 32% of its men
+  (median, was 16%); a mixed-arms battle perf metric
+- Design docs: sieges and retreats (the siege meter for 0.2.2, field forts); mockups of the task flag and the siege badge
+
+Old saves keep loading; a battle in progress finishes in the next season.
+
 ## v0.2.0: Battles that last
 **War:**
 - A stack that moves into an enemy stack starts a battle on that hex. It lasts several days a season until one side's line
