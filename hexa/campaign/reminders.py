@@ -1,14 +1,14 @@
-"""End-of-turn reminders: what the player has left unfinished when they press End season. Pygame-free, read-only.
+"""The task flag's lines: what the player has left unfinished. Pygame-free, read-only.
 
 ``unfinished(world, tag)`` returns the `Reminder` lines, most pressing first, or [] when nothing is left. The window
-(campaign/screens/reminders.py) lists them before the season ends and each line's ``action`` is a tuple the window's
-``press()`` already understands, so a click goes to the thing the line names. Every rule is a function of its own that
+(hud/tasks.py, the flag under End season) lists them and each line's ``action`` is a tuple the window's ``press()``
+already understands, so a click goes to the thing the line names. Every rule is a function of its own that
 returns one `Reminder` or None:
 
     idea_pending      an idea card offered at a new age and not picked yet
     research_missing  nothing is being researched while the grid has techs to pick (the picked tech, not the queue)
-    research_unfunded the tech being researched has no points yet and "Fund research" can be bought now (it is
-                      allowed once a year and costs ``RESEARCH_FUND`` ducats)
+    research_unfunded the tech being researched and "Fund research" can be bought now (it is allowed once a year and
+                      costs ``RESEARCH_FUND`` ducats), whatever the tech's points
     idle_merchants    merchants without an order while a route of one of the player's markets has something to
                       carry
     nothing_built     no province has anything under construction while the treasury pays for at least one building
@@ -20,7 +20,7 @@ returns one `Reminder` or None:
                       garrisoning one of the player's own castles. The game has no fortify order, so a castle
                       garrison is what "fortifying" means today.
 
-Nothing here changes the world, and the screen asks for it once, when End season is pressed.
+Nothing here changes the world. The flag asks for the lines again after every action and season (hud/tasks.py).
 """
 from typing import NamedTuple
 
@@ -56,11 +56,13 @@ def research_missing(world, tag):
 
 
 def research_unfunded(world, tag):
+    """Fund research can be bought now (fund_check: once a year, and the ducats are there) for the tech being researched,
+    whatever its points so far."""
     country = world.countries[tag]
-    if not country.researching or country.research > 0 or not world.fund_check(tag)[0]:
+    if not country.researching or not world.fund_check(tag)[0]:
         return None
-    name = tech.tech(country.researching).name
-    return Reminder("fund", f"{name} has no research points yet: fund it for {RESEARCH_FUND[0]} ducats",
+    points = RESEARCH_FUND[1] * (1 + world.bonus(tag, "fund"))
+    return Reminder("fund", f"Fund research is ready: +{points:g} points for {RESEARCH_FUND[0]} ducats (once a year)",
                     "Open the technology screen", ("tech",))
 
 

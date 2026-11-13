@@ -141,6 +141,29 @@ def chip(ctx, rect, glyph, value, delta, delta_colour, label, action, hint="", c
     return rect
 
 
+def flag_width(ctx, label):
+    """How wide `flag` is for this label."""
+    return FLAG_PAD * 2 + 22 + ctx.bold.size(label)[0]
+
+
+FLAG_PAD = 8
+
+
+def flag(ctx, rect, glyph, label, action, hint="", selected=False):
+    """A flag: a button with an icon at its left and a bold label, a gold edge while `selected` (its list is open). It
+    draws the flag, registers its hit box on ctx.ui.buttons and returns the rect."""
+    rect = pygame.Rect(rect)
+    hovered = rect.collidepoint(ctx.ui.mouse)
+    pygame.draw.rect(ctx.screen, BUTTON_FACE_HOT if hovered else BUTTON_FACE, rect, border_radius=6)
+    pygame.draw.rect(ctx.screen, GOLD if selected else LINE, rect, 1, border_radius=6)
+    img = icon(glyph, 18)
+    ctx.screen.blit(img, img.get_rect(midleft=(rect.x + FLAG_PAD, rect.centery)))
+    img = ctx.bold.render(label, True, TEXT)
+    ctx.screen.blit(img, img.get_rect(midleft=(rect.x + FLAG_PAD + 22, rect.centery)))
+    ctx.ui.buttons.append(Button(rect, label, True, action, hint))
+    return rect
+
+
 def menu_button(ctx, rect, label, enabled=True, detail="", waiting=False, danger=False):
     """A pause-menu button (rounder, with the detail under the label); `waiting` is the one that wants a second
     click. Draws only: the caller keeps the hit box. Returns the rect."""

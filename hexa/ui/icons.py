@@ -22,7 +22,7 @@ COLOURS = {
     "castle": (200, 200, 210), "flag": (230, 110, 100), "check": (120, 200, 120), "cross": (230, 110, 100),
     "down": (230, 110, 100), "up": (120, 200, 120), "scroll": (230, 215, 180), "target": (120, 175, 235),
     "sun": GOLD, "snow": (220, 235, 250), "political": (200, 90, 90), "terrain": (150, 160, 170),
-    "goods": (190, 140, 80), "markets": GOLD, "battle": (240, 232, 214),
+    "goods": (190, 140, 80), "markets": GOLD, "battle": (240, 232, 214), "tasks": (236, 200, 96),
 }
 NAMES = tuple(COLOURS)
 _cache = BoundedCache("icons", 256)
@@ -153,6 +153,13 @@ def _glyph_more(name, s, c, dark, lite):
             ang = math.radians(a * 60)
             P.line(s, c, (32 - 26 * math.cos(ang), 32 - 26 * math.sin(ang)),
                    (32 + 26 * math.cos(ang), 32 + 26 * math.sin(ang)), 6)
+    elif name == "tasks":                       # a clipboard with a tick: the task flag (not the idea card's glyph)
+        P.rect(s, dark, (12, 10, 40, 50))
+        P.rect(s, c, (15, 13, 34, 44))
+        P.rect(s, dark, (23, 4, 18, 13))
+        P.line(s, lite, (23, 7), (41, 7), 3)
+        P.lines(s, dark, False, [(20, 32), (27, 39), (41, 25)], 5)
+        P.line(s, dark, (20, 46), (42, 46), 4)
     else:
         _glyph_map(name, s, c, dark, lite)
 

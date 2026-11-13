@@ -9,7 +9,7 @@ from ..ui.kit import button as draw_button, hover_card, text as draw_text, tip, 
 from ..ui.theme import BG, GOLD, LINE, PANEL_BG, TEXT, new_font
 from . import geo, saves
 from .display import open_window
-from .screens import ScreenStack, gamemenu, reminders
+from .screens import ScreenStack, gamemenu
 from .screens.gamemenu import PauseMenu
 from .screens.techscreen import TechScreen
 from .screens.battle import BattleScreen
@@ -248,6 +248,7 @@ class CampaignApp:
     def refresh(self):
         ui, world = self.ui, self.world
         world.ensure_markets()
+        self.hud.tasks.forget()                 # the task flag counts again after any action or season
         ui.group = [u for u in ui.group if u in world.units]
         if ui.selected not in ui.group:
             ui.selected = ui.group[0] if ui.group else None
@@ -281,14 +282,13 @@ class CampaignApp:
         self.look_at(unit.pos)
 
     # ----- turns -----------------------------------------------------------------------
-    def end_turn(self, key=False, confirmed=False):
+    def end_turn(self, key=False):
         world = self.world
         if not self.player or world.over:
             return
         if self.ui.replay.active:               # the moves are still being shown: a key skips them, a click waits
             return self.ui.replay.skip() if key else self.toast("The moves are still playing: Space skips them.")
-        if not confirmed and reminders.ask(self):       # the unfinished things first (screens/reminders.py)
-            return
+        self.hud.tasks.close()                  # End season never asks: the task flag shows what is left (hud/tasks.py)
         self.busy = True
         world.ensure_markets()
         self.draw()
@@ -448,7 +448,7 @@ class CampaignApp:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F9 and not self.busy:
             gamemenu.quickload(self)
             return
-        if self.screens.handle_event(event):            # the top screen first: a screen takes every event it is offered
+        if self.screens.handle_event(event) or self.hud.tasks.key(event):     # a screen first; Esc closes the task list
             return
         if event.type == pygame.QUIT:
             self.running, self.result = False, "quit"
@@ -492,7 +492,7 @@ class CampaignApp:
                 if worker:
                     self.press(("found", worker, False))
         elif event.type == pygame.MOUSEWHEEL:
-            if not self.hud.wheel(self, event.y) and (not self.panel_rect().collidepoint(ui.mouse) or not ui.panel):
+            if not self.hud.tasks.covers(ui.mouse) and not self.hud.wheel(self, event.y) and (not self.panel_rect().collidepoint(ui.mouse) or not ui.panel):
                 self.zoom(1 if event.y > 0 else -1, ui.mouse)
         elif event.type == pygame.MOUSEMOTION:
             ui.mouse = event.pos
@@ -506,6 +506,7 @@ class CampaignApp:
             if event.button == 1:
                 self.left_click(event.pos)
             elif event.button in (2, 3):
+                self.hud.tasks.close()
                 self.drag = None if self.hud.covers(self, event.pos) else 0       # no pan, no order from the HUD
         elif event.type == pygame.MOUSEBUTTONUP and event.button in (2, 3):
             if event.button == 3 and self.drag is not None and self.drag < 6:     # no press on the map: no order
@@ -517,6 +518,8 @@ class CampaignApp:
 
     def left_click(self, pixel):
         ui, world = self.ui, self.world
+        if self.hud.tasks.click(self, pixel):           # the task flag and its list come first: they are over the panel
+            return
         panel = ui.panel and self.panel_rect()
         for button in ui.buttons:
             if button.rect.collidepoint(pixel):
@@ -738,6 +741,9 @@ class CampaignApp:
     def _do_battle(self, action):
         self.battle.open(self, action[1])
 
+    def _do_tasks(self, action):
+        self.hud.tasks.toggle()
+
     PRESS = {"game_menu": _do_game_menu, "close_panel": _do_close_panel, "mode": _do_mode, "panel": _do_panel,
              "choose": _do_choose, "end": _do_end, "continue": _do_continue, "build": _do_build,
              "recruit": _do_recruit, "invest": _do_invest, "found": _do_found, "pick": _do_pick,
@@ -745,7 +751,7 @@ class CampaignApp:
              "tech": _do_tech, "fund": _do_fund, "tax": _do_tax, "war": _do_war, "peace": _do_peace,
              "merchant": _do_merchant, "goods_view": _do_goods_view, "forage": _do_forage, "recall": _do_recall,
              "market": _do_market, "country": _do_country, "province": _do_province, "goto": _do_goto,
-             "log": _do_log, "battle": _do_battle}
+             "log": _do_log, "battle": _do_battle, "tasks": _do_tasks}
 
     def scroll(self):
         if self.menu:
@@ -789,6 +795,7 @@ class CampaignApp:
         self.hud.draw_top(self)
         if ui.panel:
             self.draw_panel()
+        self.hud.draw_tasks(self)               # before the hint, so a hover over the flag shows its hint
         self.draw_hint()
         if self.player is None:
             self.draw_choose_banner()

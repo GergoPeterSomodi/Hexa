@@ -1,5 +1,5 @@
 """The end-of-turn reminder rules (campaign/reminders.py): what counts as unfinished, and what stops counting. They read
-the world and change nothing. Pygame-free; the screen that lists them is tested in tests/ui/test_reminder_screen.py.
+the world and change nothing. Pygame-free; the flag that lists them is tested in tests/ui/test_task_flag.py.
 Run with: python -m unittest tests.test_reminders"""
 import dataclasses
 import unittest
@@ -65,12 +65,14 @@ class ResearchTest(RuleCase):
         self.c.techs |= set(R.tech.TECHS)
         self.assertIsNone(R.research_missing(self.w, "POR"))
 
-    def test_the_fund_is_offered_while_the_tech_has_no_points_and_funding_is_possible(self):
+    def test_the_fund_is_offered_whenever_funding_is_possible_whatever_the_points(self):
         line = R.research_unfunded(self.w, "POR")
         self.assertEqual((line.kind, line.action), ("fund", ("tech",)))
         self.assertIn(str(RESEARCH_FUND[0]), line.text)
+        self.assertIn(f"+{RESEARCH_FUND[1]:g} points", line.text)
+        self.assertIn("once a year", line.text)
         self.c.research = 3.0
-        self.assertIsNone(R.research_unfunded(self.w, "POR"), "it has points")
+        self.assertIsNotNone(R.research_unfunded(self.w, "POR"), "it has points, and funding is still possible")
         self.c.research = 0.0
         self.c.treasury = RESEARCH_FUND[0] - 1
         self.assertIsNone(R.research_unfunded(self.w, "POR"), "cannot pay")
