@@ -33,6 +33,7 @@ from . import art, geo, goodsart, landmarks, life, nature, wfctiles
 from .art import shade
 from .render import draw
 from .render.cache import BoundedCache
+from .render.draw import in_poly
 
 SQ3 = math.sqrt(3)
 APO = SQ3 / 2                       # centre to edge midpoint, in hex radii
@@ -40,6 +41,7 @@ SPRITE_H = 70 / (60 / SQ3)          # the game's sprite height in hex radii (map
 OBJ_R = 69.3                        # the hex radius the object libraries are drawn for
 K = 2                               # supersampling of composites
 INK = (36, 38, 44)
+EPS = 1e-12                        # in_poly's guard against a zero division
 GROUND_CACHE = 3000
 OBJECT_CACHE = 6000
 
@@ -191,18 +193,6 @@ def _seg_dist(p, a, b):
 
 def _poly_dist(p, pts):
     return min(_seg_dist(p, a, b) for a, b in zip(pts, pts[1:]))
-
-
-def _in_poly(x, y, poly):
-    inside = False
-    j = len(poly) - 1
-    for i in range(len(poly)):
-        xi, yi = poly[i]
-        xj, yj = poly[j]
-        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi + 1e-12) + xi:
-            inside = not inside
-        j = i
-    return inside
 
 
 def _wave(t, seed):
@@ -577,14 +567,14 @@ def field_system(c):
     fields, hedges, trees = [], [], []
     for i, poly in enumerate(vcells):
         sx, sy = seeds[i]
-        if not _in_poly(sx, sy, blob) or len(poly) < 3:
+        if not in_poly(sx, sy, blob, EPS) or len(poly) < 3:
             continue
         crop = CROPS[_h("crop", c.pos, i) % len(CROPS)]
         fields.append((poly, crop, _u("ang", c.pos, i) * 3.14, i))
         for k in range(len(poly)):
             a, b = poly[k], poly[(k + 1) % len(poly)]
             mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-            if _u("hedge", c.pos, round(mid[0], 2), round(mid[1], 2)) < 0.62 + 0.06 * lvl and _in_poly(*mid, blob):
+            if _u("hedge", c.pos, round(mid[0], 2), round(mid[1], 2)) < 0.62 + 0.06 * lvl and in_poly(*mid, blob, EPS):
                 hedges.append((a, b))
                 if _u("ht", round(mid[0], 2), round(mid[1], 2)) < 0.26:
                     trees.append(mid)
@@ -616,7 +606,7 @@ def tree_density(m, c, x, y):
     for t in m.clearings_near(c.pos):
         tx, ty = hex_centre(t.pos)
         if abs(tx - x) < 3.2 and abs(ty - y) < 3.2:
-            if _in_poly(x, y, _blob_cached(t)):
+            if in_poly(x, y, _blob_cached(t), EPS):
                 return 0.0, None
             d = math.hypot(x - tx, y - ty)
             if d < 2.3:
@@ -1704,7 +1694,7 @@ class Landscape:
         """Hedgerow trees and farm buildings of a natural field system (level c.fields)."""
         _, _, blob, trees = self._fields_of(c)
         for i, (x, y) in enumerate(trees):
-            if not _in_poly(x, y, blob) or not self._allowed(m, c, x, y):
+            if not in_poly(x, y, blob, EPS) or not self._allowed(m, c, x, y):
                 continue
             name = ("oak", "beech", "linden", "oak")[_h("hn", i, c.pos) % 4]
             out.append(("tree", name, ("small", "medium")[_h("hs", i, c.pos) % 2], _h("hv", i, c.pos), x, y + 0.02))
