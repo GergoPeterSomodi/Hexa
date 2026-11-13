@@ -20,8 +20,9 @@ Principle 16 is not touched.
 
 ## What the v0.2.0 playtest found
 
-[TBD, fill after the owner plays v0.2.0 with the checklist: bugs (each becomes an issue and goes first), what annoyed, what was fun,
-whether battles read at a glance, whether the odds word was trusted, how often "Clash" vs "Quick battles" was used.]
+The owner played v0.2.0 on 2026-11-13 and approved the release. No bugs were reported. The verdict: "game wasn't really
+engaging". The battles work, but they don't yet make the game fun to play. Before this brief locks, find out what felt
+flat: battles, the turns between them, or the whole game. Check every item below against that question.
 
 ## Candidate items
 
