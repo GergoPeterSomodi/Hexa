@@ -4,8 +4,8 @@ nothing in the world, and nothing it makes is saved.
 
 ``battle_view(world, battle_or_pos, viewer)`` returns a dict, or None when no battle is on that hex. ``battle_or_pos``
 is a state.Battle or the hex it is fought on. ``viewer`` is a country tag, or None for the whole picture (tools, tests).
-``odds_view(world, group, target_pos, viewer)`` returns the inputs of the odds card and their ratio; the word for the
-ratio is made in PR 7b, against the bucket table.
+``odds_view(world, group, target_pos, viewer)`` returns the inputs of the odds card, their ratio and the card's one word
+(``odds_word``, the bands of data.ODDS_WORDS).
 
 Both are cached per world on ``world.version``: a view is made again only after a ``world.changed()`` (or when the
 viewer, its access, the turn or the timing changes), so a frame that asks for one again gets the same object. The dicts
@@ -38,7 +38,11 @@ itself, rounded when its hex is seen, and None when hidden (then no ratio).
 
 odds_view keys: ``ok`` and ``reason`` (systems/battle.engage_check), ``attacker``, ``defender`` (tags or None), ``battle``
 (a battle is on the target), ``name``, ``attack`` and ``defence`` ({access, men, morale, strength}; defence also has
-``terrain``, ``castle``, ``assault``), and ``ratio`` (attack strength over defence strength, or None). The strength is
+``terrain``, ``castle``, ``assault``, ``general``), and ``ratio`` (attack strength over defence strength, or None). The
+``attack`` also has ``general``. ``word`` is the card's one word: "Unknown" when the enemy is hidden or there is no ratio,
+else odds_word(ratio) (unrounded). ``crossing`` and ``uphill`` say whether the attack crosses a pass or comes up from
+lower ground (the battle's own, or the ones an attack would have). ``place`` is the hex's place name, ``attacker_name``
+and ``defender_name`` the countries' names (``defender_name`` None when the enemy is hidden). The strength is
 the same measure as battle_strength: morale times men. With a battle on the hex it is battle_strength itself; before the
 battle, the same sum over the regiments on the hex (and the garrison of an assault) is worked out here, since
 battle_strength needs a battle to count on.
@@ -46,9 +50,9 @@ battle_strength needs a battle to count on.
 import weakref
 
 from .battlelog import describe
-from .data import DICE, GARRISON_MEN, START_YEAR, TERRAIN
+from .data import DICE, ELEVATION, GARRISON_MEN, ODDS_WORDS, START_YEAR, TERRAIN
 from .state import Battle
-from .systems import battle as battlesys, combat
+from .systems import battle as battlesys, combat, terrain as terrainsys
 
 ROUND_MEN = 100              # a seen (not exact) number of men is rounded to this
 ROUND_MORALE = 0.05          # and a morale to this share
@@ -293,6 +297,35 @@ def battle_view(world, battle_or_pos, viewer=None):
 
 # ----- the odds card's inputs -----------------------------------------------------------------------------------
 
+def odds_word(ratio):
+    """The odds card's one word for a strength ratio: the highest band (data.ODDS_WORDS) the ratio reaches. "Unknown"
+    when there is no ratio (no defenders). Pygame-free, and the same for every viewer."""
+    if ratio is None:
+        return "Unknown"
+    word = ODDS_WORDS[0][0]
+    for name, low, _ in ODDS_WORDS:
+        if ratio >= low:
+            word = name
+    return word
+
+
+def _country_name(world, tag):
+    return world.countries[tag].name if tag in world.countries else tag
+
+
+def _crosses_pass(world, a, b):
+    """Whether the step from a to b goes through a mountain pass (the rule of systems/battle.py engage)."""
+    edge = frozenset((a, b))
+    return any(e == edge for _, _, e, _ in terrainsys.pass_edges(world))
+
+
+def _general(world, pos, tag, access):
+    """The trait of ``tag``'s general on ``pos`` (its trait key, None for none or when the view does not show it)."""
+    if tag is None or access == "hidden":
+        return None
+    general = combat.general(world, [u for u in world.units_at(pos) if u.owner == tag])
+    return (general.trait or None) if general is not None else None
+
 def _enemy(world, owner, pos, battle):
     """The side a stack attacking ``pos`` meets: the other side of the battle there, else the enemy with war units on the
     hex, else the controller of a castle with a garrison (the rule of battle._defender). None when there is none."""
@@ -358,12 +391,27 @@ def _odds(world, group, target_pos, viewer, owner, stand):
     defence["castle"] = prov.castle if prov is not None and enemy is not None and prov.controller == enemy else 0
     defence["assault"] = battle.assault if battle is not None else bool(
         enemy is not None and prov is not None and prov.controller == enemy and prov.castle and prov.garrison > 0)
-    ratio = None
+    attack["general"] = _general(world, stand, owner, attack_access)
+    defence["general"] = _general(world, target_pos, enemy, defence_access)
+    ratio, raw = None, None
     if attack["strength"] is not None and defence["strength"]:
-        ratio = round(attack["strength"] / defence["strength"], 2)
+        raw = attack["strength"] / defence["strength"]
+        ratio = round(raw, 2)
+    if battle is not None:
+        crossing, uphill = battle.crossing, battle.uphill
+    elif stand != target_pos:
+        crossing = _crosses_pass(world, stand, target_pos)
+        uphill = ELEVATION.get(world.provinces[stand].terrain, 0) < ELEVATION.get(world.provinces[target_pos].terrain, 0)
+    else:
+        crossing = uphill = False
+    word = "Unknown" if enemy is None or defence_access == "hidden" else odds_word(raw)
     return {"target": target_pos, "attacker": owner, "defender": enemy, "battle": battle is not None,
-            "name": battle.name if battle is not None else None, "ok": ok, "reason": reason,
-            "attack": attack, "defence": defence, "ratio": ratio}
+            "name": _battle_name(world, battle) if battle is not None else None,
+            "place": world.place(prov) if prov is not None else None,
+            "attacker_name": _country_name(world, owner) if owner is not None else None,
+            "defender_name": _country_name(world, enemy) if enemy is not None and defence_access != "hidden" else None,
+            "ok": ok, "reason": reason, "attack": attack, "defence": defence, "ratio": ratio, "word": word,
+            "crossing": bool(crossing), "uphill": bool(uphill)}
 
 
 def odds_view(world, group, target_pos, viewer=None):

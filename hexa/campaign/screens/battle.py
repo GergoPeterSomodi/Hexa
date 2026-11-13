@@ -18,9 +18,9 @@ ends (the view is then None).
 import pygame
 
 from .. import data
-from ...ui import kit
+from ...ui import icons, kit
 from ...ui.cache import BoundedCache
-from ...ui.theme import FAINT, GOLD, LINE, MUTED, PANEL_BG, TEXT, WARN_C
+from ...ui.theme import FAINT, GOLD, INK, LINE, MUTED, PANEL_BG, TEXT, WARN_C
 from .. import art
 from ..battleview import battle_view
 from . import Screen
@@ -32,10 +32,17 @@ STANCE_LABELS = (("attack", "Attack"), ("hold", "Hold"), ("withdraw", "Withdraw"
 STANDING_LABELS = (("hold", "Hold"), ("withdraw", "Withdraw"))
 UNIT_KEY = {kind.name: key for key, kind in data.UNIT_KINDS.items()}      # the figure of a unit kind, by its name
 _FIGURES = BoundedCache("battle_figure", 96)                              # (kind name, colour) -> figure surface
+WHITE = (250, 248, 240)
 
 
 def _pct(share):
     return f"{round(share * 100)}%"
+
+
+def _ink_on(fill):
+    """INK on a light fill, white on a dark one: the labels on the morale bar."""
+    luminance = (0.299 * fill[0] + 0.587 * fill[1] + 0.114 * fill[2]) / 255
+    return INK if luminance > 0.6 else WHITE
 
 
 def _change(mult):
@@ -76,8 +83,8 @@ def _grid(side, back_first):
 
 def _ground(view):
     ground = view["ground"]
-    parts = [ground["terrain"].capitalize() if ground["terrain"] else "Open ground"]
-    parts.append("open ground" if ground["lanes"] >= 3 else f"narrow ground: {ground['lanes']} lanes")
+    parts = [ground["terrain"].capitalize() if ground["terrain"] else "Open country"]
+    parts.append("wide front, 3 lanes" if ground["lanes"] >= 3 else f"narrow front, {ground['lanes']} lanes")
     if view["assault"]:
         parts.append(f"assault on a level {ground['castle']} castle")
     if view.get("crossing"):
@@ -201,11 +208,11 @@ class BattleScreen(Screen):
         x, y, w, _ = frame
         close = lay.close_button(frame)
         ctx.text(ctx.big, view["name"], (x + lay.PAD, y + 10), TEXT, w - 420)
-        ctx.text(ctx.small, _ground(view), (x + lay.PAD, y + 48), MUTED, w - 420)
+        ctx.text(ctx.font, _ground(view), (x + lay.PAD, y + 48), MUTED, w - 420)
         right = close[0] - 16
         kit.text(ctx.screen, ctx.small, f"Season {view['seasons']}  ·  {view['days']} days fought", (right, y + 16),
                  MUTED, align="right")
-        timing = "Full" if view["timing"] == "full" else "Clash"
+        timing = "Quick battles" if view["timing"] == "full" else "Clash"
         kit.text(ctx.screen, ctx.small, f"Timing: {timing}", (right, y + 36), MUTED, align="right")
         self._button(ctx, close, "Close", ("close", None), True)
 
@@ -216,19 +223,32 @@ class BattleScreen(Screen):
 
     def _morale(self, ctx, view, frame):
         x, y, w, _ = lay.morale(frame)
-        att, dfn = view["side"][view["sides"]["attacker"][0]], view["side"][view["sides"]["defender"][0]]
+        left_tag, right_tag = view["sides"]["attacker"][0], view["sides"]["defender"][0]
+        att, dfn = view["side"][left_tag], view["side"][right_tag]
         names = self._names(ctx, view)
         share = att["front_morale"] / (att["front_morale"] + dfn["front_morale"]) \
             if att["front_morale"] + dfn["front_morale"] > 0 else 0.5
-        ctx.text(ctx.small, "FRONT-LINE MORALE: the men-weighted morale of the lanes. A side breaks when its line breaks"
-                 f" or falls under {round(data.BREAK * 100)}%.", (x + lay.PAD, y + 5), MUTED, w - 2 * lay.PAD)
-        bar = pygame.Rect(x + lay.PAD, y + 22, w - 2 * lay.PAD, 19)
-        kit.tug_bar(ctx.screen, bar, share, self._colour(ctx, view["sides"]["attacker"][0]),
-                    self._colour(ctx, view["sides"]["defender"][0]))
-        ctx.text(ctx.small, f"{names[view['sides']['attacker'][0]]}  {_pct(att['front_morale'])}", (bar.x + 8, bar.y + 3),
-                 TEXT)
-        kit.text(ctx.screen, ctx.small, f"{_pct(dfn['front_morale'])}  {names[view['sides']['defender'][0]]}",
-                 (bar.right - 8, bar.y + 3), TEXT, align="right")
+        ctx.text(ctx.bold, "Front-line morale", (x + lay.PAD, y + 1), TEXT)
+        kit.text(ctx.screen, ctx.small, f"breaks under {round(data.BREAK * 100)}%", (x + w - lay.PAD, y + 4), MUTED,
+                 align="right")
+        bar = pygame.Rect(x + lay.PAD, y + 24, w - 2 * lay.PAD, 19)
+        left_colour, right_colour = self._colour(ctx, left_tag), self._colour(ctx, right_tag)
+        kit.tug_bar(ctx.screen, bar, share, left_colour, right_colour)
+        pygame.draw.line(ctx.screen, GOLD, (bar.centerx, bar.y - 3), (bar.centerx, bar.bottom + 2), 2)
+        self._bar_label(ctx, (bar.x + 8, bar.y + 3), f"{names[left_tag]}  {_pct(att['front_morale'])}", left_colour,
+                        "left")
+        self._bar_label(ctx, (bar.right - 8, bar.y + 3), f"{_pct(dfn['front_morale'])}  {names[right_tag]}",
+                        right_colour, "right")
+        if bar.collidepoint(ctx.ui.mouse):
+            kit.tip(ctx, f"The men-weighted morale of the lanes. A side breaks when its line breaks or falls under "
+                         f"{round(data.BREAK * 100)}%.")
+
+    def _bar_label(self, ctx, pos, text, fill, align):
+        """A label on the morale bar over its side's fill: INK on a light fill, white on a dark one, 1 px shadow."""
+        colour = _ink_on(fill)
+        shadow = WHITE if colour == INK else INK
+        kit.text(ctx.screen, ctx.small, text, (pos[0] + 1, pos[1] + 1), shadow, align=align)
+        kit.text(ctx.screen, ctx.small, text, pos, colour, align=align)
 
     def _names(self, ctx, view):
         return {tag: (ctx.world.countries[tag].name if tag in ctx.world.countries else tag)
@@ -249,18 +269,24 @@ class BattleScreen(Screen):
         pygame.draw.rect(ctx.screen, (19, 22, 28), (fx, fy, fw, fh), border_radius=8)
         pygame.draw.rect(ctx.screen, LINE, (fx, fy, fw, fh), 1, border_radius=8)
         names = self._names(ctx, view)
-        ctx.text(ctx.small, f"{names[enemy].upper()}  back line and reserve", (fx + 10, slots["labels"]["top"] + 2),
-                 self._colour(ctx, enemy))
+        self._side_label(ctx, (fx + 10, slots["labels"]["top"] + 2), names[enemy], self._colour(ctx, enemy),
+                         "back line and reserve")
         for index, (regiment, group) in enumerate(top_units):
             self._regiment(ctx, slots["top"][index], regiment, group, enemy)
         castle = view["ground"]["castle"]
         self._lanes(ctx, slots["enemy"], theirs, enemy, slots["labels"]["enemy_lanes"], castle)
         self._front(ctx, slots, fx, fw, mine, theirs)
         self._lanes(ctx, slots["ours"], mine, ours, slots["labels"]["ours_lanes"], castle)
-        ctx.text(ctx.small, f"{names[ours].upper()}  reserve and back line", (fx + 10, slots["labels"]["bottom"] + 2),
-                 self._colour(ctx, ours))
+        self._side_label(ctx, (fx + 10, slots["labels"]["bottom"] + 2), names[ours], self._colour(ctx, ours),
+                         "reserve and back line")
         for index, (regiment, group) in enumerate(bottom_units):
             self._regiment(ctx, slots["bottom"][index], regiment, group, ours)
+
+    def _side_label(self, ctx, pos, name, colour, rest):
+        """A field's label: the country's name in a light shade of its colour, the rest muted."""
+        head = name.upper()
+        ctx.text(ctx.small, head, pos, icons.shade(colour, 0.45))
+        ctx.text(ctx.small, f"  {rest}", (pos[0] + ctx.small.size(head)[0], pos[1]), MUTED)
 
     def _lanes(self, ctx, rects, side, tag, label_y, castle=0):
         names = ("left flank", "centre", "right flank")
@@ -344,8 +370,9 @@ class BattleScreen(Screen):
             kit.choice(ctx, rect, label, enabled=ok, selected=tag == stance)
             self.buttons.append((pygame.Rect(rect), ("stance", tag), ok, orders.get(tag, {}).get("reason", "")))
         y += 36
-        ctx.text(ctx.small, _stance_text(stance or "hold"), (x, y), MUTED, w)
-        y += 30
+        for index, line in enumerate(kit.wrap(ctx.small, _stance_text(stance or "hold"), w)[:2]):
+            ctx.text(ctx.small, line, (x, y + index * ctx.small.get_linesize()), MUTED, w)
+        y += 46                                 # two lines of the hint, always: the stance changes its length
         ctx.text(ctx.small, "When attacked, with no order given:", (x, y), MUTED, w)
         y += 16
         standing = ours["standing"]

@@ -122,9 +122,13 @@ class Feed:
         handler = getattr(self, "_" + event.kind, None)
         if handler is None:
             return
-        item = handler(event)
-        if item is None:
-            return
+        found = handler(event)
+        for item in (found if isinstance(found, list) else [found]):
+            if item is not None:
+                self._keep(item)
+
+    def _keep(self, item):
+        """Queue an item for the floating text and, when it is a log line, for the action log."""
         if item.floating:
             self._floating.append((time.monotonic(), item))
         if item.log:
@@ -271,6 +275,22 @@ class Feed:
                 if lane["broken"]:
                     sentence += f" {self._name(tag)} lost its {lane['lane']} lane."
         return self._item(event, "war", "Fought", sentence, True, floating=False)
+
+    def _season_ended(self, event):
+        """The new season has begun: a "Battle on" ribbon on the hex of each battle the player is a side of that is still
+        on. The battles phase has fought the old season, so what stands goes on. Ribbons only, no log line."""
+        player = self.world.player
+        if player is None:
+            return None
+        items = []
+        for battle in self.world.battles:
+            if player not in (battle.attacker, battle.defender):
+                continue
+            view = battle_view(self.world, battle, player)
+            name = view["name"] if view is not None else "Battle"
+            items.append(FeedItem("battle_on", "war", "Battle on", battle.pos, battle.attacker, self.world.turn,
+                                  f"{name} is still on.", True, True, False))
+        return items
 
     def _province_captured(self, event):
         captor, loser, how = event.tag, event.get("loser"), event.get("by")

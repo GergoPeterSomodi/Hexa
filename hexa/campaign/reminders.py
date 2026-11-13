@@ -13,6 +13,8 @@ returns one `Reminder` or None:
                       carry
     nothing_built     no province has anything under construction while the treasury pays for at least one building
                       (``build_check`` says yes, so the line only shows what could really be started)
+    battles_on        one line for each battle the player is a side of that is still on (join, withdraw or fight on);
+                      its action opens the battle panel
     idle_armies       land stacks of war units that did nothing this season: not moved, attacked or foraged, no
                       march order, not sieging (standing in a province held against its owner or an enemy) and not
                       garrisoning one of the player's own castles. The game has no fortify order, so a castle
@@ -23,14 +25,15 @@ Nothing here changes the world, and the screen asks for it once, when End season
 from typing import NamedTuple
 
 from . import tech
+from .battleview import battle_view
 from .data import BUILDINGS, CASTLE_COST, RESEARCH_FUND, SETTLEMENT_COST
 
 
 class Reminder(NamedTuple):
-    kind: str           # "idea", "research", "fund", "merchant", "build" or "army"
+    kind: str           # "idea", "research", "fund", "merchant", "build", "army" or "battle"
     text: str           # the line: "2 merchants have no orders"
     hint: str           # what a click does: "Open the market"
-    action: tuple       # for CampaignApp.press: ("tech",), ("market", market), ("province", prov), ("log", "goto", hex)
+    action: tuple       # for CampaignApp.press: ("tech",), ("market", market), ("province", prov), ("log", "goto", hex), ("battle", hex)
 
 
 def _plural(n, one, many):
@@ -125,11 +128,32 @@ def idle_armies(world, tag):
                     ("log", "goto", first))
 
 
-RULES = (idea_pending, research_missing, research_unfunded, idle_merchants, nothing_built, idle_armies)
+def battles_on(world, tag):
+    """One line per battle the player is a side of that is still on: the battles phase has not settled it. A list (the
+    rule can give several lines), empty when there is none."""
+    lines = []
+    for battle in world.battles:
+        if tag not in (battle.attacker, battle.defender):
+            continue
+        view = battle_view(world, battle, tag)
+        name = view["name"] if view is not None else "The battle"
+        lines.append(Reminder("battle", f"{name} is still on: join, withdraw or fight on", "Open the battle",
+                              ("battle", battle.pos)))
+    return lines
+
+
+RULES = (battles_on, idea_pending, research_missing, research_unfunded, idle_merchants, nothing_built, idle_armies)
 
 
 def unfinished(world, tag):
     """The reminders for country `tag`, most pressing first (the order of RULES); [] when it has finished everything."""
     if tag is None or tag not in world.countries or world.over:
         return []
-    return [found for found in (rule(world, tag) for rule in RULES) if found is not None]
+    out = []
+    for rule in RULES:
+        found = rule(world, tag)
+        if isinstance(found, list):
+            out += found
+        elif found is not None:
+            out.append(found)
+    return out

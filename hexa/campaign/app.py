@@ -535,6 +535,10 @@ class CampaignApp:
             row = int((pixel[1] - mini.y) / mini.h * world.rows)
             self.look_at((col, row))
             return
+        battle = None if self.hud.covers(self, pixel) else self.hud.marks.at(pixel)
+        if battle is not None:                  # the badge or the bar of a battle opens its panel
+            self.press(("battle", battle))
+            return
         pos = self.hex_under(pixel)
         if pos is None or pos not in world.terrain:
             return

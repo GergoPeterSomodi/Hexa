@@ -14,7 +14,7 @@ changes the game (selecting a stack and moving the camera are the window's own s
 import pygame
 
 from ...ui.theme import INFO_C, INK
-from . import actionlog, battles, topbar
+from . import actionlog, battles, odds, topbar
 from .floating import Floaters
 
 GLIDE_MS = 260          # how long the camera takes to reach a place the log names
@@ -55,8 +55,9 @@ class Hud:
         now = pygame.time.get_ticks()
         self._glide(ctx, now)
         self.floaters.add(ctx, self._timed(ctx, ctx.game.feed.take_floating(MAX_AGE)), now)
+        self.marks.draw(ctx, self)              # under the ribbons: a ribbon covers the badge
+        odds.draw(ctx, self)                    # the odds card of the attack hover (hud/odds.py)
         self.floaters.draw(ctx, now)
-        self.marks.draw(ctx, self)
         self._ring(ctx, now)
 
     def _timed(self, ctx, items):

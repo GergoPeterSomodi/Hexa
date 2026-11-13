@@ -528,15 +528,15 @@ class MapView:
             x += battlemark.shift(self.r, side)
             if view_rect.inflate(40, 40).collidepoint(x, y):
                 top = next((u for u in stack if u.kind.war), stack[0])
-                self._draw_stack(screen, stack, top, (x, y), any(u in group for u in stack))
+                self._draw_stack(screen, stack, top, (x, y), any(u in group for u in stack), side)
         for ids, point in walking:
             stack = [u for u in world.units if u.id in ids]
             if stack:
                 self._draw_stack(screen, stack, max(stack, key=lambda u: (u.kind.war, u.kind.naval, u.id)), point, any(u in group for u in stack))
 
-    def _draw_stack(self, screen, stack, top, point, selected):
+    def _draw_stack(self, screen, stack, top, point, selected, side=None):
         if self.zoom >= TILE_FROM and self.tiles_dir:
-            self._diorama(screen, stack, top, point, selected)
+            self._diorama(screen, stack, top, point, selected, side)
         else:
             self._token(screen, top, point, selected, len(stack))
 
@@ -1452,11 +1452,18 @@ class MapView:
             self._figures[k] = art.token(ART_KEYS.get(key, key), color, size, era=era, faded=faded)
         return self._figures[k]
 
-    def _tired(self, units):
-        return units[0].owner == self.world.player and all(u.moves_left == 0 for u in units)
+    def _at_battle(self, pos):
+        return any(b.pos == pos for b in self.world.battles)
 
-    def _diorama(self, screen, stack, top, at, selected):
-        """Up to three figures showing what the stack is made of, with a shield for its size."""
+    def _tired(self, units):
+        """Whether the player's stack has no moves left (it is drawn greyed). A stack on a battle hex is never greyed:
+        the fight is on, whatever moves it has left."""
+        return (units[0].owner == self.world.player and not self._at_battle(units[0].pos)
+                and all(u.moves_left == 0 for u in units))
+
+    def _diorama(self, screen, stack, top, at, selected, side=None):
+        """Up to three figures showing what the stack is made of, with a shield for its size. On a battle hex `side` is
+        the stack's side: the attacker's shield stands on its left, and no health bar is drawn."""
         world = self.world
         x, y = at
         r = self.r
@@ -1482,7 +1489,7 @@ class MapView:
             img = self.figure(key, color, size, faded)
             screen.blit(img, (x + dx * r - img.get_width() / 2, y + dy * r - img.get_height() * 0.86))
         lead = next((u for u in stack if u.kind.war), None)
-        if lead and r >= 14:
+        if lead and r >= 14 and not self._at_battle(stack[0].pos):
             ratio = sum(u.hp for u in stack if u.kind.war) / sum(u.kind.hp for u in stack if u.kind.war)
             bar = pygame.Rect(0, 0, r * 1.0, max(3, r // 8))
             bar.midtop = (x, y + r * 0.55)
@@ -1490,7 +1497,8 @@ class MapView:
             fill = (80, 200, 90) if ratio > 0.6 else (240, 200, 60) if ratio > 0.3 else (230, 70, 60)
             pygame.draw.rect(screen, fill, (bar.x, bar.y, max(2, round(bar.w * ratio)), bar.h))
         if len(stack) > 1:
-            self._shield(screen, (x + r * 0.62, y - r * 0.5), len(stack), color)
+            at_x = x - r * 0.62 if side == "attacker" else x + r * 0.62
+            self._shield(screen, (at_x, y - r * 0.5), len(stack), color)
 
     def _shield(self, screen, at, count, color):
         if count <= 1:

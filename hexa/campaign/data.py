@@ -397,6 +397,19 @@ UPHILL_PENALTY = 0.05                      # an attacker from lower ground deals
 AI_ATTACK_POWER = 1.1                      # the AI attacks a hex when its power times morale is this many times the defence's (PR 5: was 1.3; see the battle stats, docs/design/battle-slice1-build-spec.md 4)
 AI_STANCE_RATIO = 1.2                      # the AI's battle stance: Attack when its men times morale are this many times the enemy's
 AI_WITHDRAW_MORALE, AI_WITHDRAW_LEAD = 0.4, 0.15   # the AI withdraws when its army morale is under the first, the enemy's this much higher
+# The odds card's one word (battleview.odds_word): the band of the strength ratio, attack strength over defence strength
+# (the measure of battleview.odds_view). Each band: (word, lowest ratio, the attacker's win rate the band must show).
+# Calibrated 2026-11-13 on plains, pike fights of tests/support/scenarios.py, 100 seeds each (the attacker's win rate):
+# 3 v 6 (ratio 0.50) 14%, 3 v 4 (0.75) 20%, 4 v 5 (0.80) 28%, 5 v 6 (0.83) 26%, 3 v 3 (1.00) 42%, 4 v 4 (1.00) 46%,
+# 6 v 5 (1.20) 67%, 5 v 4 (1.25) 67%, 4 v 3 (1.33) 71%, 7 v 5 (1.40) 74%, 6 v 4 (1.50) 78%, 5 v 3 (1.67) 80%,
+# 6 v 3 (2.00) 82%, 9 v 4 (2.25) 79%, 8 v 3 (2.67) 83%. The all-AI buckets of tools/battle_stats.py agree in order: even
+# 0.8-1.25 57% (7 battles), about 2x 89% (11), above 2.5 95% (83). The win rate of pikes at 2x to 2.7x is 79-83%, short of
+# the 90% the owner's target asks for: an open question. tests/test_odds_card.py ties every band to these numbers (its 30
+# seeds scatter by about 8 points: 3 v 4 gave 27% there, 20% here, so the Hopeless band reaches 30%).
+# Plains only: the same ratio wins less on defended ground (3 v 3 on hills 23%, 4 v 3 on hills 50%, against plains 53%
+# and 77% in the scenario table, 30 seeds), so the word is the plains reading and the card shows the ground beside it.
+ODDS_WORDS = (("Hopeless", 0.0, (0.00, 0.30)), ("Poor", 0.8, (0.20, 0.35)), ("Even", 1.0, (0.35, 0.55)),
+              ("Favourable", 1.2, (0.60, 0.90)), ("Overwhelming", 2.0, (0.75, 1.00)))
 RESEARCH_BASE = 0.6                        # research points per season, plus burghers / 40
 RESEARCH_FUND = (60, 15)                   # ducats -> research points
 

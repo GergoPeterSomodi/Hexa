@@ -129,13 +129,19 @@ def _glyph_more(name, s, c, dark, lite):
         P.circle(s, c, (32, 32), 7)
         for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1)):
             P.line(s, c, (32 + 24 * dx, 32 + 24 * dy), (32 + 31 * dx, 32 + 31 * dy), 6)
-    elif name == "battle":                      # crossed swords on a roundel: the mark of a battle on the map
-        P.circle(s, dark, (32, 32), 30)
-        P.circle(s, lite, (32, 32), 26, 3)
-        for a, b in (((12, 12), (52, 52)), ((52, 12), (12, 52))):
-            P.line(s, c, a, b, 7)
-        P.line(s, dark, (4, 22), (22, 4), 6)
-        P.line(s, dark, (42, 4), (60, 22), 6)
+    elif name == "battle":                      # crossed swords on a war-red roundel: the mark of a battle on the map
+        P.circle(s, (214, 72, 60), (32, 32), 30)            # the ring
+        P.circle(s, (38, 32, 34), (32, 32), 25)             # the inner disc, lit from the left
+        P.circle(s, (58, 50, 52), (30, 30), 22)
+        P.circle(s, (38, 32, 34), (35, 33), 20)
+        for sx in (1, -1):
+            tip, hilt = (32 - 16 * sx, 15), (32 + 10 * sx, 40)
+            mid = ((tip[0] + hilt[0]) // 2, (tip[1] + hilt[1]) // 2)
+            P.line(s, (240, 232, 214), tip, hilt, 7)                                     # the blade
+            P.line(s, (255, 255, 255), tip, mid, 2)                                      # its highlight
+            P.line(s, (110, 72, 40), hilt, (hilt[0] + 7 * sx, hilt[1] + 7), 5)           # the grip
+            P.line(s, GOLD, (hilt[0] - 5 * sx, hilt[1] + 5), (hilt[0] + 5 * sx, hilt[1] - 5), 4)   # the crossguard
+            P.circle(s, GOLD, (hilt[0] + 8 * sx, hilt[1] + 8), 3)                        # the pommel
     elif name == "sun":
         P.circle(s, c, (32, 32), 14)
         for a in range(8):

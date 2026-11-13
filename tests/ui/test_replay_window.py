@@ -92,10 +92,10 @@ class SeasonReplayTest(ReplayCase):
         drawn = []
         real = app.view._draw_stack
 
-        def spy(screen, stack, top, point, selected):
+        def spy(screen, stack, top, point, selected, side=None):
             if group[0] in stack:
                 drawn.append(point)
-            return real(screen, stack, top, point, selected)
+            return real(screen, stack, top, point, selected, side)
         app.view._draw_stack = spy
         app.look_at(path[len(path) // 2])
         app.draw()
@@ -241,8 +241,8 @@ class HoverAndSelectionTest(ReplayCase):
         self.assertIsNone(app.hex_under(pixel), "the stack is still walking: nothing there")
         drawn = []
         real = app.view._draw_stack
-        app.view._draw_stack = lambda screen, stack, top, point, selected: (
-            drawn.append((group[0] in stack, selected)), real(screen, stack, top, point, selected))
+        app.view._draw_stack = lambda screen, stack, top, point, selected, side=None: (
+            drawn.append((group[0] in stack, selected)), real(screen, stack, top, point, selected, side))
         app.ui.replay.t = app.ui.replay.legs[0].step * 1.5
         app.draw()
         self.assertIn((True, False), drawn, "an enemy stack walking is not drawn as the player's selection")
