@@ -15,7 +15,8 @@ from .world import CampaignWorld
 
 # The save format. Bump it only for changes the migration in CampaignWorld._migrate cannot handle:
 # saves from older versions still load (missing fields get defaults), newer ones are refused.
-VERSION = 1
+# 2: worlds may hold battles (state.Battle). A build at VERSION 1 refuses version 2 saves quietly.
+VERSION = 2
 SLOTS = tuple(str(i) for i in range(1, 9))
 SPECIAL = ("quick", "auto")
 NAMES = {"quick": "Quicksave", "auto": "Autosave"}

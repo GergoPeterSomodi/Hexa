@@ -25,7 +25,7 @@ PASS_RULE = 4             # the shape of the ridge edges and passes; a save with
 WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "visible": set, "over": False,
                   "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
                   "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None, "_bonus_cache": dict,
-                  "_settled": None, "_pass_cache": None}
+                  "_settled": None, "_pass_cache": None, "battles": list}
 # World attributes no save can do without (from_state refuses a state that lacks one). Every other attribute
 # has a default above, is rebuilt on load (geo, _ids) or is added when first needed (_explored_from).
 WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countries", "markets", "cities", "landmass",
@@ -36,6 +36,7 @@ FORBIDDEN = worldgen.FORBIDDEN        # the terrain pairs that may not touch (wa
 # saves pickle every state class as hexa.campaign.world.<Name>
 Province, Country, Market, Route, War, Garrison = (state.Province, state.Country, state.Market, state.Route, state.War,
                                                    state.Garrison)
+Battle = state.Battle                 # one fight on a hex (battle slice 1)
 
 
 def _europe_region(lon, lat):
@@ -101,6 +102,7 @@ class CampaignWorld:
         self.log = []
         self.units = []
         self.wars = []
+        self.battles = []
         self.routes = []
         self.version = 0                 # bumps whenever the map needs redrawing
         self.bus = EventBus()            # events for the screens; never saved
@@ -156,7 +158,7 @@ class CampaignWorld:
             if name not in self.__dict__:
                 setattr(self, name, default() if callable(default) else default)
         groups = (getattr(self, "provinces", {}).values(), getattr(self, "countries", {}).values(),
-                  self.units, getattr(self, "markets", ()), self.routes, self.wars)
+                  self.units, getattr(self, "markets", ()), self.routes, self.wars, self.battles)
         for group in groups:
             for obj in group:
                 fill_defaults(obj)
@@ -716,6 +718,11 @@ class CampaignWorld:
     kill = _kill = war.kill              # kill is the public name the debt module uses; _kill the old one (tests)
     sieges = war.sieges
     check_alive = war.check_alive
+
+    # ----- battles (state.Battle; the rules come in systems/battle.py, battle slice 1) -----------------
+    def battle_at(self, pos):
+        """The battle fought on this hex, or None. A linear scan: there are rarely more than a few."""
+        return next((b for b in self.battles if b.pos == pos), None)
 
     def forget_castles(self):
         """Drop the cached list of fortified provinces (castles()), after a castle was lost or built."""

@@ -16,8 +16,11 @@ from hexa import settings
 from hexa.campaign import saves
 from hexa.campaign.game import GameManager
 from hexa.campaign.data import GENERAL, troop
-from hexa.campaign.world import WORLD_DEFAULTS, WORLD_REQUIRED, CampaignWorld
+from hexa.campaign.world import WORLD_DEFAULTS, WORLD_REQUIRED, Battle, CampaignWorld
+from tests.support.battles import place, setup as fight_setup
+from tests.support.digests import world_digest
 from tests.support.home import TempHome
+from tests.support.invariants import campaign_problems
 from tests.support.worlds import fresh, play_seasons
 
 
@@ -186,6 +189,99 @@ class OldAndBrokenSavesTest(TempHome):
         self.assertEqual(set(state) - set(WORLD_REQUIRED) - set(WORLD_DEFAULTS) - restored - lazy, set(),
                          "a new world attribute must go into WORLD_REQUIRED or WORLD_DEFAULTS")
         self.assertTrue(set(WORLD_REQUIRED) <= set(state), "WORLD_REQUIRED only names real attributes")
+
+
+class BattleSaveTest(TempHome):
+    """Battle slice 1, PR 1: a battle on the world survives a save, and a version 1 save loads with no battles."""
+
+    def _battle_world(self):
+        """A world at war with a hand-made battle on the defender's hex: both stacks stand there."""
+        w = fresh()
+        fight = fight_setup(w, [("infantry", 1, 2)], [("infantry", 1, 2)])
+        for unit in fight.attackers:
+            unit.pos = fight.defend_pos
+        fight.defenders[1].morale = 0.6
+        w.changed()
+        w.update_visibility()             # what the game does after units move: then a save keeps it
+        battle = Battle(pos=fight.defend_pos, attacker=fight.attacker, defender=fight.defender, start=w.turn,
+                        stance={fight.attacker: "attack", fight.defender: "hold"},
+                        lanes={fight.attacker: [fight.attackers[0].id, fight.attackers[1].id, None],
+                               fight.defender: [fight.defenders[0].id, fight.defenders[1].id, None]},
+                        carry={fight.defenders[0].id: 0.4}, wounded_hp={fight.defenders[0].id: 1.5},
+                        men0={fight.attacker: sum(u.men for u in fight.attackers),
+                              fight.defender: sum(u.men for u in fight.defenders)},
+                        killed={fight.attacker: 100}, wounded={fight.defender: 50},
+                        log=[(w.turn, 0, "Hand-made battle")])
+        w.battles.append(battle)
+        w.changed()
+        return w, fight, battle
+
+    def test_a_save_taken_mid_battle_comes_back_exactly(self):
+        w, fight, battle = self._battle_world()
+        self.assertEqual(campaign_problems(w), [])
+        digest = world_digest(w)
+        saves.save(w, "2")
+        back = saves.load("2")
+        self.assertIsNotNone(back)
+        self.assertEqual(world_digest(back), digest)
+        again = back.battle_at(fight.defend_pos)
+        self.assertIsNotNone(again)
+        self.assertEqual((again.attacker, again.defender, again.start), (battle.attacker, battle.defender, battle.start))
+        self.assertEqual(again.lanes, battle.lanes)
+        self.assertEqual(again.carry, battle.carry)
+        self.assertEqual(again.log, battle.log)
+        self.assertIsNone(back.battle_at(fight.attack_pos))
+        kept = next(u for u in back.units if u.id == fight.defenders[1].id)
+        self.assertEqual(kept.morale, 0.6)
+        back.end_round()                    # PR 1: no rule acts on a battle yet, so it is still there after a season
+        self.assertIsNotNone(back.battle_at(fight.defend_pos))
+        self.assertEqual(campaign_problems(back), [])
+
+    def test_only_the_two_sides_may_share_a_battle_hex(self):
+        w, fight, _ = self._battle_world()
+        stranger = next(t for t in w.countries if t not in (fight.attacker, fight.defender) and w.countries[t].alive)
+        place(w, "infantry", 1, stranger, fight.defend_pos)
+        self.assertTrue(any(p.startswith("one-country-per-hex") for p in campaign_problems(w)),
+                        "a third country on a battle hex is still a broken invariant")
+
+    def test_a_battle_lane_must_hold_a_living_unit_of_its_side(self):
+        w, fight, battle = self._battle_world()
+        battle.lanes[fight.defender][0] = fight.attackers[0].id          # an attacker in the defender's lane
+        self.assertTrue(any(p.startswith("battle:") for p in campaign_problems(w)))
+        battle.lanes[fight.defender][0] = 10 ** 9                        # a unit that does not exist
+        self.assertTrue(any(p.startswith("battle:") for p in campaign_problems(w)))
+
+    def test_a_version_1_save_loads_with_no_battles_and_full_morale(self):
+        w = fresh()
+        state = pickle.loads(pickle.dumps(w.save_state()))       # the state as a version 1 build wrote it
+        state.pop("battles", None)
+        for unit in state["units"]:
+            unit.__dict__.pop("morale", None)
+        os.makedirs(saves.folder(), exist_ok=True)
+        header = {"version": 1, "slot": "1", "saved": 1.0, "date": "Spring 1480", "turn": 1, "map": "Europe 1480",
+                  "tag": "POR", "country": "Portugal", "treasury": 0}
+        with open(saves.path("1"), "wb") as f:
+            f.write(json.dumps(header).encode("utf-8") + b"\n" + pickle.dumps(state))
+        back = saves.load("1")
+        self.assertIsNotNone(back)
+        self.assertEqual(back.battles, [])
+        self.assertTrue(back.units and all(u.morale == 1.0 and "morale" in vars(u) for u in back.units))
+        self.assertEqual(campaign_problems(back), [])
+        back.end_round()
+
+    def test_a_unit_and_a_garrison_have_men(self):
+        from hexa.campaign.state import Garrison
+        w = fresh()
+        unit = w.units[0]
+        unit.hp = unit.kind.hp
+        self.assertEqual(unit.men, 1000)
+        unit.hp = unit.kind.hp // 2 or 1
+        self.assertEqual(unit.men, round(1000 * unit.hp / unit.kind.hp))
+        self.assertEqual(unit.morale, 1.0)
+        prov = next(p for p in w.provinces.values() if p.castle == 0)
+        prov.castle, prov.garrison = 3, 18
+        garrison = Garrison(prov)
+        self.assertEqual(garrison.men, 1800)
 
 
 GOOD_HEADER = {"version": saves.VERSION, "slot": "1", "saved": 1.0, "date": "Spring 1480", "turn": 1,

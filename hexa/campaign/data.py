@@ -362,6 +362,8 @@ GENERAL_BONUS = 0.2
 GARRISON_HP = 6                            # per castle level
 GARRISON_ATTACK, GARRISON_DEFENSE = 3, 3   # +2 defense per castle level
 GARRISON_REGEN = 2
+MEN = 1000                                 # men in a full regiment: battles show strength as men (rules keep hp)
+GARRISON_MEN = 100                         # men per garrison hit point (a level 3 castle: 1,800)
 RESEARCH_BASE = 0.6                        # research points per season, plus burghers / 40
 RESEARCH_FUND = (60, 15)                   # ducats -> research points
 

@@ -177,7 +177,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `world.py` and `systems/worldgen.py` read geography only through `world.geo`, so any new attribute must exist on both sources, or be
   read with a `getattr` default as `COLONIAL` and `FORCE_SEA` are. Distances in `data.py` scale with
   `geo.SCALE`.
-- **State classes** (`hexa/campaign/state.py`): `Province`, `Market`, `Route`, `Country`, `Unit`, `Garrison`, `War` and
+- **State classes** (`hexa/campaign/state.py`): `Province`, `Market`, `Route`, `Country`, `Unit`, `Garrison`, `War`, `Battle` and
   `fill_defaults` (what `_migrate` uses to give an old save's objects the fields they lack). `world.py` re-exports the
   names, so `from hexa.campaign.world import Province` still works. Saves pickle these classes by module and name, so
   state.py pins each class's `__module__` to `hexa.campaign.world` (decision D5): a save made now still opens in a build
@@ -272,7 +272,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   ignored; older ones load, and `CampaignWorld._migrate` fills in what they lack (`WORLD_DEFAULTS`, dataclass
   field defaults). Renaming or adding attributes and dataclass fields changes what saves contain. Lazily added
   attributes use `getattr`/`__dict__.setdefault` (`_known_world`, `_explored_from`) so older saves still load;
-  bump `VERSION` when compatibility breaks. A bump alone doesn't refuse older saves (`saves.load` reads every
+  bump `VERSION` when compatibility breaks. VERSION is 2 since `world.battles` (`state.Battle`) joined the save: a build at 1 refuses those saves quietly, and this build loads version 1 with `battles == []`. A bump alone doesn't refuse older saves (`saves.load` reads every
   version from 1 to `VERSION`): either `_migrate` fills in what they lack, or `saves.py` must refuse the old version
   too. The `save-compat` job of `tests.yml` enforces this `VERSION` policy on pull requests that touch
   `hexa/campaign/` (`tools/save_compat.py`): games saved by the merge base's code must load and play a season with

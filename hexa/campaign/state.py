@@ -1,5 +1,5 @@
 """Age of Discovery state objects: the dataclasses a saved world pickles (Province, Market, Route, Country, Unit,
-Garrison, War) and fill_defaults, which gives an object from an older save the fields it lacks.
+Garrison, War, Battle) and fill_defaults, which gives an object from an older save the fields it lacks.
 
 Nothing in here uses pygame or imports the world. Saves pickle these classes by module and name, so every one of them
 reports its module as ``hexa.campaign.world`` (decision D5 of docs/architecture/review-2026-11-12.md): a save made
@@ -7,8 +7,8 @@ now opens in a build from before this module existed, and an old save opens here
 """
 from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 
-from .data import (GARRISON_ATTACK, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GENERAL_TRAITS, GOODS,
-                   TRADING_POST_SHARE, VETERAN_RANKS, UnitKind)
+from .data import (GARRISON_ATTACK, GARRISON_DEFENSE, GARRISON_HP, GARRISON_MEN, GENERAL, GENERAL_TRAITS,
+                   GOODS, MEN, TRADING_POST_SHARE, VETERAN_RANKS, UnitKind)
 from .geo import SCALE
 
 
@@ -160,6 +160,12 @@ class Unit:
     supplied: bool = True      # fed last season (only fed troops heal)
     supplies: int = 0          # seasons of food left, for wagons
     foraged_turn: int = -1     # the turn this unit's stack last foraged (see stuck_reason)
+    morale: float = 1.0        # 0 to 1: a beaten regiment routs (battle slice 1); recovers outside battle
+
+    @property
+    def men(self):
+        """The regiment's strength in men. hp is the rule; men is what the player sees (battle slice 1)."""
+        return round(MEN * self.hp / self.kind.hp) if self.kind.hp else 0
 
     @property
     def naval(self):
@@ -196,12 +202,40 @@ class Garrison:
     def rank(self):
         return VETERAN_RANKS[0]
 
+    @property
+    def men(self):
+        return round(GARRISON_MEN * self.hp)
+
 
 @dataclass(eq=False)
 class War:
     a: str
     b: str
     start: int
+
+
+@dataclass(eq=False)
+class Battle:
+    """The fight on one hex, while both sides' stacks stand there (battle slice 1, PR 1: the data only).
+
+    Units are kept by id: a unit that died, deserted or left is missing, and the battle skips it.
+    The battle keeps no unit objects, no bus events and no pygame objects."""
+    pos: tuple                    # the hex; one battle per hex
+    attacker: str                 # country tag
+    defender: str                 # country tag
+    start: int                    # world.turn it began
+    assault: bool = False         # the defender held a castle with a garrison when it began
+    days: int = 0                 # days fought so far
+    stance: dict = field(default_factory=dict)     # tag -> "attack" | "hold" | "withdraw"
+    lanes: dict = field(default_factory=dict)      # tag -> [unit id | "garrison" | None] * 3 (left, centre, right)
+    routed: set = field(default_factory=set)       # unit ids out of the fight (they stay on the hex)
+    carry: dict = field(default_factory=dict)      # unit id or "garrison" -> damage not yet taken (hp, < 1)
+    wounded_hp: dict = field(default_factory=dict) # unit id -> hp lost as wounded (float)
+    men0: dict = field(default_factory=dict)       # tag -> men that have joined the fight (start + joiners)
+    killed: dict = field(default_factory=dict)     # tag -> men killed
+    wounded: dict = field(default_factory=dict)    # tag -> men wounded
+    garrison_morale: float = 1.0
+    log: list = field(default_factory=list)        # (turn, day, text); the last BATTLE_LOG lines
 
 
 def fill_defaults(obj):

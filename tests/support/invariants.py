@@ -243,6 +243,36 @@ def check_colony(world):
 
 
 # ----- Age of Discovery ----------------------------------------------------------------------------------------
+def _battle_problems(world, battle, claimed):
+    """Battle slice 1: the two sides are at war and stand on the battle's hex (the defender may hold its garrison
+    there instead), every regiment in a lane is a living unit of its side on that hex, no unit is in two battles
+    (`claimed` collects the ids), and the damage carried is a fraction of a hit point."""
+    where = f"battle at {battle.pos}"
+    problems = []
+    if not world.at_war(battle.attacker, battle.defender):
+        problems.append(f"battle: {where} is not between two countries at war")
+    here = {u.owner for u in world.units if u.pos == battle.pos and u.kind.war}
+    prov = world.provinces.get(battle.pos)
+    garrison = prov is not None and prov.controller == battle.defender and prov.garrison > 0
+    if battle.attacker not in here or (battle.defender not in here and not garrison):
+        problems.append(f"battle: {where} lacks one of its sides ({battle.attacker} v {battle.defender})")
+    living = {u.id: u for u in world.units}
+    for tag, lanes in battle.lanes.items():
+        for uid in lanes:
+            if uid is None or uid == "garrison":
+                continue
+            unit = living.get(uid)
+            if unit is None or unit.owner != tag or unit.pos != battle.pos:
+                problems.append(f"battle: {where} has unit #{uid} in a {tag} lane, which is not a living {tag} unit there")
+            elif uid in claimed:
+                problems.append(f"battle: unit #{uid} is in two battles")
+            claimed.add(uid)
+    for key, value in battle.carry.items():
+        if not 0 <= value < 1:
+            problems.append(f"battle: {where} carries {value!r} damage for {key}")
+    return problems
+
+
 def campaign_problems(world):
     from hexa.campaign import tech
     from hexa.campaign.data import END_YEAR, GARRISON_HP, GOODS, PRICE_CAP, PRICE_FLOOR
@@ -260,6 +290,8 @@ def campaign_problems(world):
         elif ship not in living or not ship.naval or ship.owner != u.owner or ship.pos != u.pos or u.naval:
             problems.append(f"cargo: {where} is aboard {ship.owner} {ship.kind.key} #{ship.id} at {ship.pos}, "
                             f"which can't carry it")
+        if not 0 <= u.morale <= 1:
+            problems.append(f"unit-morale: {where} has morale {u.morale!r}")
         if not 0 < u.hp <= u.kind.hp:
             problems.append(f"unit-hp: {where} has {u.hp} HP (max {u.kind.hp})")
         if not 0 <= u.moves_left <= u.kind.moves:
@@ -273,11 +305,16 @@ def campaign_problems(world):
     for pos, stack in _stacks(world.units).items():
         owners = {u.owner for u in stack}
         if len(owners) > 1:
-            problems.append(f"one-country-per-hex: {sorted(owners)} at {pos}")
+            battle = world.battle_at(pos)      # a battle hex holds its two sides and no one else
+            if battle is None or owners != {battle.attacker, battle.defender}:
+                problems.append(f"one-country-per-hex: {sorted(owners)} at {pos}")
         elif not stack[0].naval and stack[0].owner in countries and not world.can_stand(stack, pos, others=[]):
             kinds = ", ".join(sorted(u.kind.key for u in stack))
             problems.append(f"stack-limit: {stack[0].owner} stack at {pos} is too big ({kinds})")
     _unique_ids(world, problems)
+    claimed = set()
+    for battle in world.battles:
+        problems.extend(_battle_problems(world, battle, claimed))
     owned = {}
     for prov in world.provinces.values():
         where = f"{prov.name} at {prov.pos}"
