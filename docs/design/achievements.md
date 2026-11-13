@@ -2,6 +2,15 @@
 
 Status: design draft. Nothing is built. Requested in the playtest ideas of 2026-11-12 ("for Steam too").
 
+## Owner's decisions (2026-11-13)
+1. **All visible**, the odd ones included. No "???" entries.
+2. Only **Age of Discovery games with no cheat or debug option** count. Random worlds count, except achievements that name a real country or city.
+3. **No difficulty setting**; skill achievements use fixed conditions.
+4. **12 first**, the rest after a playtest.
+5. **Hard rule:** no achievement ever rewards the slave trade, raids on tribal nations or taking their land.
+6. **One string key per achievement**, mapped one-to-one to Steam.
+7. **Names:** we propose a list; the owner approves it.
+
 ## Questions for the owner
 1. **Hidden or shown?** Options: (a) all visible; (b) all visible, but "odd" ones show as "???" until earned; (c) all hidden. Recommend (b): it teaches the game and keeps the jokes fresh.
 2. **Which games count?** Options: (a) any game; (b) only Age of Discovery; (c) Age of Discovery only, and never a game with a cheat or debug option on. Recommend (c). Random worlds count, except achievements that name a real country or city.

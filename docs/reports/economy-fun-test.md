@@ -181,6 +181,14 @@ is 2 to 6. Of Portugal's 16.4 in 1600, 13.7 comes from "burghers / 40". Techs kn
 29 at 1600, 36 at 1649 (97%); PAL 23 (62%). With burghers / 100 the same game would give POR 8.2 (1600) and 17 (1649), still above
 target. A tech every 3 to 5 years is right until 1600; after that the tree is simply used up.
 
+## Owner's decisions (2026-11-13)
+- **E1:** design the Crown projects next, then decide.
+- **E2 yes, in full:** `PRODUCTION_TAX` 0.25, `WORKS_BONUS` 0.45, `MANUFACTORY_TAX` 0.25.
+- **E3 yes, both:** the tax hover forecast (income and population in 10 and 25 years), and High as a temporary emergency lever.
+- **E4 yes:** buildings say what they are for. A production building also shows what it adds to the income each season.
+- **E5 yes:** auto-recall an order that lost money two seasons in a row.
+- **E6 yes:** bankruptcy waits until the Crown projects exist.
+
 ## Proposals, ranked by value
 
 ### E1. Crown projects: a sink that scales with the economy (rule change, needs a design)

@@ -168,6 +168,13 @@ In 3 full games with 49 countries, only 3 debt episodes happened, and all came f
 while production and taxes added 8). Armies never caused debt. The AI recall rule only recalls an order after it loses
 and does so once a season, so a recalled order can be re-sent. This needs a look but is not a priority.
 
+## Owner's decisions (2026-11-13)
+- **T1 yes:** merchants run after the background trade.
+- **T2 yes, all three parts:** flagged and freed dead orders, the AI re-picking its best orders, and the player's "Re-pick best".
+- **T3:** write the design note, then decide.
+- **T4 not now:** revisit after T1 and T2.
+- **T5 yes:** the starter nudge. Merchant capacity stays 12 unless T1 proves too weak.
+
 ## Proposals, ranked by value
 
 ### T1. Run merchants after the background trade (rule change, one reordering)

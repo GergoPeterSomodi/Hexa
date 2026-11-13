@@ -9,6 +9,20 @@ The three parts are one system seen from three sides:
 
 They share three meters (regional unrest, country infamy, country war weariness), so they should be approved as one package and built in slices.
 
+## Owner's decisions (2026-11-13)
+1. **Three separate designs**, not one package: brakes, war goals and rebels are each designed and decided on their own.
+2. Brakes: **medium**. A big country must fight revolts and coalitions to keep growing.
+3. Unrest lives **per historical region**. Random worlds need generated regions first.
+4. **Home land is safe**: land held at the start, or for 40 seasons, has no foreign-region unrest and half the distance penalty.
+5. Overextension: **both**, with distance from the capital and admin centres doing most of the work.
+6. Coalitions form **against anyone**, the player included, with a warning at 60% and infamy shown before a peace.
+7. Rebels: **both, the rebel stack first**; independence and free states second.
+8. A dead country **can come back** as a free state from its old region (Europe map only for now).
+9. Claims: **a small table of historical claims, after the core**; personal unions later.
+10. Alliances: **the ally may refuse** a call to arms, at a cost in relations.
+11. Wars end **by peace terms**, with a 40-season safety timer only.
+12. Every tool against unrest **costs** ducats, troops or tax; no free button.
+
 ## Questions for the owner
 
 1. **One package or three?** Recommended: one design, built in three slices (brakes, then war goals, then rebels).

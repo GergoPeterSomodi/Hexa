@@ -2,6 +2,16 @@
 
 Status: design draft. Nothing is built. Requested in the playtest ideas of 2026-11-12.
 
+## Owner's decisions (2026-11-13)
+1. **Option B**: a new "city state" kind with its own rules, in two steps.
+2. **Soft cap**: the bonuses stop past the start size + 10, and the country becomes a normal state.
+3. **Buying:** only small city states (12 provinces or fewer), and **the price must be high**. Later, in the diplomacy rework, the city state must also **agree** to the sale, based on relations between the two states.
+4. **The AI does not buy** in the first version.
+5. **No mercenaries** (the owner decided this for recruiting too).
+6. **Ragusa, and the Hansa split into towns, in step 2.**
+7. **City states are playable** (Venice, Genoa, the Hansa).
+8. **The Swiss stay one normal country.** A league of cantons is parked for later.
+
 ## Questions for the owner
 1. **Which option?** (A) a label on today's countries; (B) a new "city state" kind with its own rules; (C) full diplomacy with leagues, protection and vassals. Recommend **B**, in two steps (see Options). Protection and leagues move to the diplomacy rework, because they need alliances, which do not exist yet.
 2. **Size rule:** a province is one hex, so Venice starts with 43 provinces, the Hansa 24 and Genoa 8. Options: (a) a hard cap on land; (b) a soft cap: the city-state bonuses stop when land grows past the start size + 10, and the country becomes a normal state; (c) no size rule. Recommend **(b)**: growing is allowed, but it is a real choice with a price.

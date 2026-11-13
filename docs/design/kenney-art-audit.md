@@ -6,6 +6,11 @@ our own code-drawn art before the Steam release. Roadmap item: "Kenney art audit
 Audited on the Europe 1480 map. Age of Discovery comes first. Conquest and Colonisation are frozen and are
 listed at the end.
 
+## Owner's decisions (2026-11-13)
+1. **Keep the Kenney art for now** (option C) and stop adding new uses. The replacement stays on the backlog as work we must do before Steam.
+2. **Conquest and Colonisation stay as they are** for now.
+3. The native camp replacement **varies by region** when it is made.
+
 ## Questions for the owner
 
 1. **Replace everything, or only the most visible?** Option A: replace all 30 live files (about 2 weeks of

@@ -2,6 +2,18 @@
 
 Status: design draft. Nothing is built. Requested in the playtest ideas of 2026-11-12 (focus on Age of Discovery, a campaign mode on the same engine).
 
+## Owner's decisions (2026-11-13)
+1. Shape: **a list of stand-alone scenarios first**, a chain later.
+2. The name in the menu is **"Chronicles"**; `scenario` in the code.
+3. The first scenario is **Portugal** down the African coast.
+4. **India is left out** for now; an abstract voyage is decided with the naval design.
+5. A missed goal gives **a grade** (gold, silver, bronze or fail), not a loss.
+6. A scenario **has its own end date and result screen**, with "Keep playing" to continue as free play.
+7. Conquest and Colonisation **become scenarios later**, after the engine works; they are not removed now.
+8. The Habsburg and Hanse scenarios **wait for the events and characters milestone**.
+9. **Fixed grades, no difficulty setting.**
+10. The Portugal blurb **says plainly** that the Atlantic slave trade is not modelled yet; the scenario is revised when the triangle trade design lands.
+
 ## Questions for the owner
 1. **Shape:** (A) a list of stand-alone scenarios; (B) a chain where each scenario carries something into the next; (C) a map of Europe where each step is a choice. Recommend **A first, B later**. The scenario engine is the same.
 2. **Name:** in the code, Age of Discovery is already called "campaign" (`--mode campaign`). Calling scenarios "Campaign" in the menu would confuse players and code. Options: "Scenarios", "Chronicles", "Voyages". Recommend **"Chronicles"** for players and `scenario` in the code.

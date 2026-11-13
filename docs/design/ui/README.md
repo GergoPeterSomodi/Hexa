@@ -138,6 +138,7 @@ Mockups for the owner's review: **sections 2 and 3 approved on 2026-11-12; secti
 **Decided 2026-11-13:**
 - Option B, **loans**: lenders with amount, rate and term, a credit rating and offers.
 - At bankruptcy, for now **all penalties apply** (default on the creditors, provinces pledged, the army pays). Provinces go to the lender country. Penalties last a set number of years, and the debt is wiped.
+- Bankruptcy is built only after the Crown projects exist (economy report E6), so money has a use first.
 - Dev notes for later: let the player choose the penalty in the pop-up, with a fair value on each choice (a unit or a poor province must not clear 10,000 ducats; the deeper the debt, the more it takes). A repayment event could also offer to pay off part of a debt with provinces or units before bankruptcy.
 **Images:** `09_debt_bar_and_panel.png`, `10_bankruptcy_popup.png`
 
