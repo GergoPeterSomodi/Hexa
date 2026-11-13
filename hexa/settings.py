@@ -9,9 +9,9 @@ AUTOSAVE_TURNS = {"off": 0, "year": 4, "5 years": 20}
 SCROLL = {"slow": 10, "normal": 18, "fast": 30}
 MOVEMENT = ("off", "normal", "slow")          # how fast the moves you can see are replayed (campaign/replay.py)
 DEFAULTS = {"fullscreen": False, "window": "1280x720", "autosave": "year", "scroll": "normal", "grid": True,
-            "pass_names": False, "movement": "normal"}
+            "pass_names": False, "movement": "normal", "reminders": True}
 CHOICES = {"fullscreen": (False, True), "window": WINDOWS, "autosave": AUTOSAVE, "scroll": tuple(SCROLL),
-           "grid": (False, True), "pass_names": (False, True), "movement": MOVEMENT}
+           "grid": (False, True), "pass_names": (False, True), "movement": MOVEMENT, "reminders": (False, True)}
 
 
 def home():

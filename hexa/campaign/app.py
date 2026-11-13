@@ -9,7 +9,7 @@ from ..ui.kit import button as draw_button, hover_card, text as draw_text, tip, 
 from ..ui.theme import BG, GOLD, LINE, PANEL_BG, TEXT, new_font
 from . import geo, saves
 from .display import open_window
-from .screens import ScreenStack, gamemenu
+from .screens import ScreenStack, gamemenu, reminders
 from .screens.gamemenu import PauseMenu
 from .screens.techscreen import TechScreen
 from .data import COLONIST, GENERAL
@@ -276,12 +276,14 @@ class CampaignApp:
         self.look_at(unit.pos)
 
     # ----- turns -----------------------------------------------------------------------
-    def end_turn(self, key=False):
+    def end_turn(self, key=False, confirmed=False):
         world = self.world
         if not self.player or world.over:
             return
         if self.ui.replay.active:               # the moves are still being shown: a key skips them, a click waits
             return self.ui.replay.skip() if key else self.toast("The moves are still playing: Space skips them.")
+        if not confirmed and reminders.ask(self):       # the unfinished things first (screens/reminders.py)
+            return
         self.busy = True
         world.ensure_markets()
         self.draw()

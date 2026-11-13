@@ -107,7 +107,7 @@ a red-outlined enemy). Right-click far away to send a unit there over several se
 press **3** again to switch the goods view between chips, deposits and prices), **Tab** cycles units,
 **C** opens your country, **L** the ledger, **G** shows or hides the faint hex grid, **R** continues the selected
 stack's march (see Moving), **Space** ends the season (while moves are being shown, **Space** or **Enter** skips them
-instead; see Watching moves).
+instead; see Watching moves; with something unfinished it asks first, see End-of-turn reminders).
 Hover anything for a moment to get a card explaining it: troops, buttons, provinces, goods.
 
 **The top bar** is one row. After your country's name come the resource chips, each an icon, its value and, in
@@ -157,6 +157,15 @@ faster, never longer than about 6 seconds. The floating text of a battle or a ca
 The map still pans and zooms, **Space** or **Enter** skips the rest, and the **End season** button waits until it is over.
 The **Movement speed** option sets it: Instant (no replay), Normal or Slow (about 0.32 seconds a hex, up to 9 seconds).
 
+**End-of-turn reminders:** before the season ends, a small list shows what you left unfinished, if anything: an idea
+card waiting for your pick, no technology being researched, a technology with no points yet that you could fund, merchants
+without orders (while a route of yours has something to carry), nothing being built while you could pay for a building,
+and armies that did nothing this season (not moved, attacked, foraged or marching, not besieging and not sitting in
+one of your own castles). Click a line to go to the thing it names (the market, the technology screen, the province, the
+army). **End season anyway** (or **Enter**) ends the season, **Back** (or **Esc**, or a right-click) does not. **Space**
+does nothing on the list, so a double tap cannot end a season you were warned about. The **End-of-turn reminders** option
+turns the list off.
+
 **Marches:** a right-click far away starts a march over several seasons. When the season ends, a march does not
 move on by itself: the stack waits for your order. Its planned route stays on the map as a dashed gold line, and
 Tab cycles to it. Press **R** or the **Continue march (R)** button in the unit panel to walk on for this season.
@@ -196,6 +205,7 @@ says so each time you try.
   - autosave: off, every year or every 5 years
   - scroll speed
   - movement speed: instant, normal or slow (how fast the moves you can see are shown, see Watching moves)
+  - end-of-turn reminders: on or off (see End-of-turn reminders)
   - hex grid (also **G**) and pass names: the mountain pass names shown on the closest zoom, off by default (the pass art and the winter snowflake mark on a closed pass always show)
 - Options are kept in `~/.hexa/settings.json`. If that file can't be written (a read-only folder or a full disk), a changed option still applies until you quit, and a message says it wasn't saved.
 
@@ -545,8 +555,9 @@ screen from the window's own state. Test
 modules in `tests/ui/` import pygame and the window modules inside the tests, never at the top, so the
 pygame-free run can still import them.
 
-Importing the `tests` package turns the movement replay option off for the whole test run (`tests/__init__.py`; the game
-ships it on), so that the many tests that press End season get the next season at once. The replay's own tests switch it on.
+Importing the `tests` package turns the movement replay and the end-of-turn reminders off for the whole test run
+(`tests/__init__.py`; the game ships both on), so that the many tests that press End season get the next season at once.
+The tests of those two features switch them on.
 
 `tests/ui/test_monkey.py` is a seeded monkey: it feeds each window random input through its own `run()` loop,
 keys from a whitelist (never QUIT; Space and Return end the turn now and then), left, right and middle clicks
@@ -554,7 +565,7 @@ anywhere or aimed at the window's own buttons, units, reachable hexes and minima
 and held scroll keys, one action a frame or, with the burst probability, 2 to 6 in the same frame. When Esc or M
 ends the loop it simply runs again until the frame budget is used. A session fails on any exception and on any
 broken world invariant that no known open bug explains (`KNOWN_OPEN` in `tests/support/invariants.py`). Each
-session has its own temporary `HEXA_HOME`, and the Age of Discovery sessions of odd seeds play with the movement replay on. By default it plays seeds 1 and 2 of each mode, 800 frames (the
+session has its own temporary `HEXA_HOME`, and the Age of Discovery sessions of odd seeds play with the movement replay on (seeds 1, 5, 9 and so on with the reminders too). By default it plays seeds 1 and 2 of each mode, 800 frames (the
 campaign 300), burst 0.3, in about 30 seconds; three environment variables scale it:
 
 ```bash

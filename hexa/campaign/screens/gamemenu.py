@@ -24,6 +24,7 @@ OPTION_TEXT = {
     "grid": ("Hex grid", lambda v: "On" if v else "Off"),
     "pass_names": ("Pass names", lambda v: "On" if v else "Off"),
     "movement": ("Movement speed", {"off": "Instant", "normal": "Normal", "slow": "Slow"}.get),
+    "reminders": ("End-of-turn reminders", lambda v: "On" if v else "Off"),
 }
 PAGE_TITLES = {"main": "Paused", "save": "Save game", "load": "Load game", "options": "Options"}
 

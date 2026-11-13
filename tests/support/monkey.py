@@ -398,8 +398,8 @@ def _open(mode, setup, seed):
                          setup["goal"])
     from hexa.campaign.app import CampaignApp
     app = CampaignApp(play.TILES_DIR, setup["nation"])
-    if seed % 2:        # odd seeds play with the movement replay on, as the game ships
-        app.settings["movement"] = "normal"             # (tests/__init__.py turns it off for the suite)
+    if seed % 2:        # odd seeds play with the movement replay on, seeds 1, 5, 9 ... also with the reminders, as the game
+        app.settings.update(movement="normal", reminders=seed % 4 == 1)     # ships (tests/__init__.py turns both off)
     return app
 
 

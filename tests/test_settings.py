@@ -26,21 +26,22 @@ def write(home, content):
 
 class LoadTest(TempHome):
     def test_the_shipped_defaults(self):
-        """tests/__init__.py turns the movement replay off for the suite; the game ships it on."""
+        """tests/__init__.py turns the movement replay and the reminders off for the suite; the game ships them on."""
         from tests import SHIPPED_DEFAULTS
-        self.assertEqual(SHIPPED_DEFAULTS["movement"], "normal")
-        self.assertEqual(settings.DEFAULTS["movement"], "off")
+        self.assertEqual((SHIPPED_DEFAULTS["movement"], SHIPPED_DEFAULTS["reminders"]), ("normal", True))
+        self.assertEqual((settings.DEFAULTS["movement"], settings.DEFAULTS["reminders"]), ("off", False))
         self.assertEqual(set(SHIPPED_DEFAULTS), set(settings.DEFAULTS))
 
-    def test_the_movement_option_round_trips(self):
+    def test_the_movement_and_reminder_options_round_trip(self):
         s = settings.load()
         self.assertEqual(settings.cycle(s, "movement"), "normal")
         self.assertEqual(settings.cycle(s, "movement"), "slow")
         self.assertEqual(settings.cycle(s, "movement"), "off")
+        settings.cycle(s, "reminders")
         s["movement"] = "slow"
         self.assertTrue(settings.save(s))
-        self.assertEqual(settings.load()["movement"], "slow")
-        write(self.home, json.dumps({"movement": "warp"}))
+        self.assertEqual((settings.load()["movement"], settings.load()["reminders"]), ("slow", True))
+        write(self.home, json.dumps({"movement": "warp", "reminders": "yes"}))
         self.assertEqual(settings.load(), settings.DEFAULTS)
 
     def test_no_file_gives_the_defaults_and_a_copy(self):
