@@ -31,6 +31,7 @@ import pygame
 from ..hexgrid import neighbors
 from . import art, geo, goodsart, landmarks, life, nature, wfctiles
 from .art import shade
+from .render import draw
 from .render.cache import BoundedCache
 
 SQ3 = math.sqrt(3)
@@ -422,8 +423,7 @@ def decorate(sf, kind_b, kind_a, curve, q, rng, inward, avg_b):
 
 
 # ----------------------------------------------------------------------------------------------- object sprites
-SPRITE_CACHE = 4096
-_OB = BoundedCache("landscape.sprites", SPRITE_CACHE)
+_OB = BoundedCache("landscape.sprites", 4096)
 _PIECE = BoundedCache("landscape.pieces", 32)
 # farm buildings and markers made with the game's own goodsart pens (drawn at 2x, base point = bottom centre)
 PIECES = {"barn": (44, 36), "windmill": (56, 62), "farmhouse": (40, 34), "stump": (10, 6), "haystack": (14, 12),
@@ -438,7 +438,7 @@ def _piece(name, seed):
     w, h = PIECES[name]
     K2 = goodsart.K
     surf = pygame.Surface((w * K2, h * K2), pygame.SRCALPHA)
-    p = goodsart.Pen(surf)
+    p = draw.Pen(surf)
     x, y = w / 2, h - 1
     if name == "barn":
         goodsart.building(p, x - 4, y, 26, 12, 16, (184, 66, 50), (112, 82, 64), "side", rh=10, wins=0)

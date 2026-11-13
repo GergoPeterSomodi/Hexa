@@ -237,6 +237,9 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   (`logging.getLogger("hexa")`), counted every time in `bus.tap_errors`; with `HEXA_DEBUG=1` it is raised, so a developer sees the bug.
 - **Markets** are rebuilt lazily (`world.refresh_markets()` marks them, `ensure_markets()` rebuilds). `draw()` no
   longer calls it: `refresh()`, `process_events()` and `end_season()` do, so drawing never changes the game.
+- **Drawing primitives** (`campaign/render/draw.py`): `Pen` (tile coordinates at 2x), `Canvas` (ground layer, object layer,
+  `stamp` with the ink outline, `shadow`, `finish` to the hex), `ell`, `lerp`, `mix`, `in_poly`, `hex_mask`, `shadow_at`. The
+  art modules import them from there (goodsart's `Tile` and landmarks' canvas are `Canvas`es); a new art module does the same.
 - `art.py` draws extra tiles, decorations, unit figures and tokens in code, in the Kenney style at 120x140.
   `MapView` switches from flat colours to tile art at zoom index `TILE_FROM`.
 

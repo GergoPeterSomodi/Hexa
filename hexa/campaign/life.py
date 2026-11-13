@@ -19,7 +19,8 @@ import pygame
 from .art import shade
 from .render.cache import BoundedCache
 from .goodsart import (DARK, DWOOD, INK, ROOF_RED, ROOF_SLATE, THATCH, WATER, WATER_L, WHITE, WOOD,
-                       Pen, building, cow, ell, flag, horse, lerp, mix, pine, round_tree, sheep, tower, wheel)
+                       building, cow, flag, horse, pine, round_tree, sheep, tower, wheel)
+from .render.draw import Pen, ell, lerp, mix
 from .wfctiles import SAND, scale_tile
 
 W, H = 120, 140

@@ -25,7 +25,8 @@ import zlib
 import pygame
 
 from .art import hex_pts, shade
-from .goodsart import Pen, building, tower, dome, boat, flag, palm, pine, lerp, INK, WHITE, DARK, DWOOD
+from .goodsart import building, tower, dome, boat, flag, palm, pine, INK, WHITE, DARK, DWOOD
+from .render.draw import Pen, lerp
 
 W, H = 120, 140
 CX, CY = W / 2, H / 2

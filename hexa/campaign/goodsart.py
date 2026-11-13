@@ -17,11 +17,8 @@ import pygame
 
 from hexa.campaign.art import hex_pts, shade
 from hexa.campaign.render.cache import BoundedCache
+from hexa.campaign.render.draw import CX, CY, K, R, W, Canvas, ell, in_poly, lerp, mix
 
-W, H = 120, 140
-CX, CY = W / 2, H / 2
-R = 69.3
-K = 2                                     # supersampling factor
 INK = (45, 45, 50)
 
 # shared palette
@@ -67,60 +64,6 @@ GOODS_ART = {
 }
 
 
-# ----- pen: draws in tile coordinates on the 2x canvas ------------------------------------------------
-def _w(w):
-    return 0 if not w else max(1, round(w * K))
-
-
-class Pen:
-    def __init__(self, surf):
-        self.s = surf
-
-    def poly(self, c, pts, w=0):
-        if len(pts) > 2:
-            pygame.draw.polygon(self.s, c, [(x * K, y * K) for x, y in pts], _w(w))
-
-    def circle(self, c, xy, r, w=0):
-        pygame.draw.circle(self.s, c, (xy[0] * K, xy[1] * K), max(0.5, r * K), _w(w))
-
-    def ellipse(self, c, x, y, w, h, wd=0):
-        pygame.draw.ellipse(self.s, c, pygame.Rect(round(x * K), round(y * K), max(1, round(w * K)),
-                                                   max(1, round(h * K))), _w(wd))
-
-    def oval(self, c, cx, cy, rx, ry, wd=0):
-        self.ellipse(c, cx - rx, cy - ry, rx * 2, ry * 2, wd)
-
-    def line(self, c, a, b, w=1):
-        pygame.draw.line(self.s, c, (a[0] * K, a[1] * K), (b[0] * K, b[1] * K), max(1, round(w * K)))
-
-    def lines(self, c, pts, w=1, closed=False):
-        if len(pts) > 1:
-            pygame.draw.lines(self.s, c, closed, [(x * K, y * K) for x, y in pts], max(1, round(w * K)))
-
-    def band(self, c, pts, w):
-        """A thick polyline with round joints (rivers, tracks, walls)."""
-        self.lines(c, pts, w)
-        for x, y in pts:
-            self.circle(c, (x, y), w / 2 - 0.25)
-
-    def rect(self, c, x, y, w, h, wd=0, br=0):
-        pygame.draw.rect(self.s, c, pygame.Rect(round(x * K), round(y * K), max(1, round(w * K)),
-                                                max(1, round(h * K))), _w(wd), round(br * K))
-
-
-def ell(cx, cy, rx, ry, a0=0, a1=360, n=36):
-    return [(cx + rx * math.cos(math.radians(a0 + (a1 - a0) * i / n)),
-             cy + ry * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
-
-
-def lerp(a, b, t):
-    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
-
-
-def mix(c1, c2, t):
-    return tuple(int(a + (b - a) * t) for a, b in zip(c1, c2))
-
-
 # ----- sprites from the pack -----------------------------------------------------------------------------
 @BoundedCache("goodsart.sprites", 128).memo
 def _spr(tiles_dir, name, scale=1.0):
@@ -131,27 +74,13 @@ def _spr(tiles_dir, name, scale=1.0):
                                               max(1, int(img.get_height() * scale * K))))
 
 
-@BoundedCache("goodsart.mask", 1).memo
-def _hex_mask():
-    m = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-    pygame.draw.polygon(m, (255, 255, 255, 255), [(x * K, y * K) for x, y in hex_pts(R - 0.3)])
-    return m
-
-
-_OFFS = [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, -2), (-2, 2), (2, 2)]
-_OFFS_THIN = [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, -1), (-1, 1), (1, 1)]
-
-
-class Tile:
+class Tile(Canvas):
     """Builder for one tile: ground pen `g`, object-layer pen `o`, `stamp()` commits the layer with an outline."""
 
     def __init__(self, good, level, variant, tiles_dir):
+        super().__init__()
         self.good, self.lv, self.v, self.td = good, level, variant % 3, tiles_dir
         self.flip = self.v == 1
-        self.surf = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-        self.layer = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-        self.g = Pen(self.surf)
-        self.o = Pen(self.layer)
 
     def r(self, tag=""):
         """A random source that depends on good, variant and tag only, so every level shares one layout."""
@@ -171,35 +100,11 @@ class Tile:
         if rim:
             self.g.poly(shade(color, -0.1), hex_pts(R - 1), 3)
 
-    def shadow(self, x, y, w, h=None, a=45):
-        h = h or w * 0.35
-        sh = pygame.Surface((max(1, int(w * K)), max(1, int(h * K))), pygame.SRCALPHA)
-        pygame.draw.ellipse(sh, (0, 0, 0, a), sh.get_rect())
-        self.surf.blit(sh, (round((x - w / 2) * K), round((y - h / 2) * K)))
-
-    def stamp(self, ink=2):
-        r = self.layer.get_bounding_rect(1)
-        if not r.w:
-            return
-        r = r.inflate(8, 8).clip(self.layer.get_rect())
-        sub = self.layer.subsurface(r)
-        if ink:
-            sil = pygame.mask.from_surface(sub, 40).to_surface(setcolor=INK + (255,), unsetcolor=(0, 0, 0, 0))
-            for dx, dy in (_OFFS if ink >= 2 else _OFFS_THIN):
-                self.surf.blit(sil, (r.x + dx, r.y + dy))
-        self.surf.blit(sub, r.topleft)
-        self.layer.fill((0, 0, 0, 0), r)
-
     def sprite(self, name, x, y, scale=1.0, flip=False):
         img = _spr(self.td, name, scale)
         if flip:
             img = pygame.transform.flip(img, True, False)
         self.surf.blit(img, (round(x * K - img.get_width() / 2), round(y * K - img.get_height())))
-
-    def finish(self):
-        self.surf.blit(_hex_mask(), (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-        out = pygame.transform.smoothscale(self.surf, (W, H))
-        return out.convert_alpha() if pygame.display.get_surface() else out
 
 
 # ----- shared object drawings (all on a pen, in tile coordinates) ---------------------------------------
@@ -561,22 +466,9 @@ def sea(t, shore_rel, far_rel, sand=(232, 214, 160)):
     r = t.r("waves")
     for _ in range(14):
         x, y = r.uniform(5, 115), r.uniform(10, 130)
-        if _in_poly((x, y), poly) and min(math.hypot(x - a, y - b) for a, b in shore) > 9:
+        if in_poly(x, y, poly, 1e-9) and min(math.hypot(x - a, y - b) for a, b in shore) > 9:
             ripple(g, x, y, 4)
     return poly
-
-
-def _in_poly(pt, poly):
-    x, y = pt
-    inside = False
-    j = len(poly) - 1
-    for i in range(len(poly)):
-        xi, yi = poly[i]
-        xj, yj = poly[j]
-        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi + 1e-9) + xi:
-            inside = not inside
-        j = i
-    return inside
 
 
 def _inside(x, y, r=R - 12):

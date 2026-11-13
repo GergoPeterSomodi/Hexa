@@ -58,7 +58,8 @@ from hexa.campaign import wfc
 from hexa.campaign.art import hex_pts, shade
 from hexa.campaign.render.cache import BoundedCache
 from hexa.campaign.goodsart import (CREAM, DARK, DWOOD, INK, ROOF_RED, ROOF_SLATE, STONE, THATCH, WATER, WATER_L, WHITE,
-                                    WOOD, Pen, boat, building, flag, lerp, mix, mound, tower)
+                                    WOOD, boat, building, flag, mound, tower)
+from hexa.campaign.render.draw import OFFS, OFFS_THIN, Pen, lerp, mix
 
 W, H = 120, 140
 CX, CY = W / 2, H / 2
@@ -451,8 +452,6 @@ def river_ends(patch):
 # ===================================================================================================
 # canvas
 # ===================================================================================================
-_OFFS = [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, -2), (-2, 2), (2, 2)]
-_OFFS_THIN = [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, -1), (-1, 1), (1, 1)]
 
 
 def _kernel(offs):
@@ -463,7 +462,7 @@ def _kernel(offs):
     return pad, k
 
 
-_KERNELS = {True: _kernel(_OFFS), False: _kernel(_OFFS_THIN)}
+_KERNELS = {True: _kernel(OFFS), False: _kernel(OFFS_THIN)}
 
 
 @BoundedCache("wfctiles.masks", 8).memo

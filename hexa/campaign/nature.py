@@ -26,7 +26,7 @@ from functools import partial
 import pygame
 
 from .art import hex_pts, shade
-from .goodsart import ell
+from .render.draw import ell
 from .render.cache import BoundedCache
 
 W, H = 120, 140
