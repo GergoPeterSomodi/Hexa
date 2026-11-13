@@ -28,6 +28,7 @@ class Hud:
         self.readings = None            # the top bar's cached snapshot (topbar.readings)
         self.glide = None               # (hex to show, start ms, ms of the last frame): the camera follows the hex
         self.ping = None                # (hex, start ms): the ring after a jump
+        self.waiting = []               # (replay time, item): ribbons that wait for the replay to reach their hex
 
     # ----- drawing ----------------------------------------------------------------------------------
     @staticmethod
@@ -51,9 +52,19 @@ class Hud:
             return
         now = pygame.time.get_ticks()
         self._glide(ctx, now)
-        self.floaters.add(ctx, ctx.game.feed.take_floating(MAX_AGE), now)
+        self.floaters.add(ctx, self._timed(ctx, ctx.game.feed.take_floating(MAX_AGE)), now)
         self.floaters.draw(ctx, now)
         self._ring(ctx, now)
+
+    def _timed(self, ctx, items):
+        """The ribbons to float now. While the movement replay runs (campaign/replay.py) a ribbon waits until the walks
+        have got to its hex, so the "Attacked!" shows when the army arrives; when it ends or is skipped, all go."""
+        replay = ctx.ui.replay
+        self.waiting += [(replay.ready_at(item.pos) if replay.active and item.pos else 0, item) for item in items]
+        now = replay.t if replay.active else float("inf")
+        ready = [item for when, item in self.waiting if when <= now]
+        self.waiting = [(when, item) for when, item in self.waiting if when > now]
+        return ready
 
     def draw_top(self, ctx):
         topbar.draw(ctx, self)

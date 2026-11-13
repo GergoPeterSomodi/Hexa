@@ -106,7 +106,8 @@ a red-outlined enemy). Right-click far away to send a unit there over several se
 **+/-** zooms, right-drag or **WASD** scrolls, **1-4** switch map modes (political, terrain, goods, markets;
 press **3** again to switch the goods view between chips, deposits and prices), **Tab** cycles units,
 **C** opens your country, **L** the ledger, **G** shows or hides the faint hex grid, **R** continues the selected
-stack's march (see Moving), **Space** ends the season.
+stack's march (see Moving), **Space** ends the season (while moves are being shown, **Space** or **Enter** skips them
+instead; see Watching moves).
 Hover anything for a moment to get a card explaining it: troops, buttons, provinces, goods.
 
 **The top bar** is one row. After your country's name come the resource chips, each an icon, its value and, in
@@ -148,6 +149,14 @@ reach the map.
 what it can attack (red; "fire" for cannons), and "stop" where an enemy castle will halt it. Hover a hex to
 see the path, the move cost of each step and how many seasons it takes.
 
+**Watching moves:** the game is played at once, but what you can see is shown slowly. After **End season** the armies and
+ships of the other countries walk hex by hex at about 0.18 seconds a hex (so you can follow them), and so does a stack
+you send more than a step. Only steps you saw are shown (a step counts when you could see either hex of it); a march in the
+fog is instant. Countries walk one after the other in turn order, the stacks of one country together; a long season is played
+faster, never longer than about 6 seconds. The floating text of a battle or a capture shows when the walkers get to the hex.
+The map still pans and zooms, **Space** or **Enter** skips the rest, and the **End season** button waits until it is over.
+The **Movement speed** option sets it: Instant (no replay), Normal or Slow (about 0.32 seconds a hex, up to 9 seconds).
+
 **Marches:** a right-click far away starts a march over several seasons. When the season ends, a march does not
 move on by itself: the stack waits for your order. Its planned route stays on the map as a dashed gold line, and
 Tab cycles to it. Press **R** or the **Continue march (R)** button in the unit panel to walk on for this season.
@@ -186,6 +195,7 @@ says so each time you try.
   - window size: 1280x720, 1600x900 or 1920x1080; the map fills the extra space
   - autosave: off, every year or every 5 years
   - scroll speed
+  - movement speed: instant, normal or slow (how fast the moves you can see are shown, see Watching moves)
   - hex grid (also **G**) and pass names: the mountain pass names shown on the closest zoom, off by default (the pass art and the winter snowflake mark on a closed pass always show)
 - Options are kept in `~/.hexa/settings.json`. If that file can't be written (a read-only folder or a full disk), a changed option still applies until you quit, and a message says it wasn't saved.
 
@@ -535,13 +545,16 @@ screen from the window's own state. Test
 modules in `tests/ui/` import pygame and the window modules inside the tests, never at the top, so the
 pygame-free run can still import them.
 
+Importing the `tests` package turns the movement replay option off for the whole test run (`tests/__init__.py`; the game
+ships it on), so that the many tests that press End season get the next season at once. The replay's own tests switch it on.
+
 `tests/ui/test_monkey.py` is a seeded monkey: it feeds each window random input through its own `run()` loop,
 keys from a whitelist (never QUIT; Space and Return end the turn now and then), left, right and middle clicks
 anywhere or aimed at the window's own buttons, units, reachable hexes and minimap, drags, wheel turns, mouse moves
 and held scroll keys, one action a frame or, with the burst probability, 2 to 6 in the same frame. When Esc or M
 ends the loop it simply runs again until the frame budget is used. A session fails on any exception and on any
 broken world invariant that no known open bug explains (`KNOWN_OPEN` in `tests/support/invariants.py`). Each
-session has its own temporary `HEXA_HOME`. By default it plays seeds 1 and 2 of each mode, 800 frames (the
+session has its own temporary `HEXA_HOME`, and the Age of Discovery sessions of odd seeds play with the movement replay on. By default it plays seeds 1 and 2 of each mode, 800 frames (the
 campaign 300), burst 0.3, in about 30 seconds; three environment variables scale it:
 
 ```bash

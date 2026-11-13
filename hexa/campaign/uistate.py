@@ -4,6 +4,7 @@
 one line a toast shows for a greyed-out button's hint.
 """
 from ..ui.theme import BAD_C
+from .replay import Replay
 
 
 def hint_text(hint):
@@ -40,6 +41,6 @@ class UI:
         self.first_moves = 3
         self.order_route = None     # route whose merchant orders are open in the market panel
         self.hoverables = []        # (rect, card) areas that show a hover card
-        self.anim = None            # (unit ids, route, start ms) of a move being shown
+        self.replay = Replay()      # the walks being played hex by hex (campaign/replay.py)
         self.hover_key = None
         self.hover_since = 0

@@ -66,6 +66,11 @@ HEXA_GOLDEN_ANY_OS=1 .venv/bin/python -m unittest tests.ui.test_screenshots   # 
 docker run --rm --platform linux/arm64 --user "$(id -u):$(id -g)" -e HOME=/tmp -e UPDATE_GOLDEN=1 -v "$PWD":/work -w /work python:3.12-slim sh -c 'pip install -q pygame==2.6.1 && HEXA_HOME=$(mktemp -d) python -m unittest tests.ui.test_screenshots'
 ```
 
+Importing the `tests` package changes a default of `hexa.settings` for the whole test process (`tests/__init__.py`):
+`movement` is `"off"` (no movement replay), so the many tests that press End season get the next season at once.
+The game ships `"normal"` (`tests.SHIPPED_DEFAULTS`). A test of the replay sets `app.settings["movement"]` itself;
+the monkey plays odd seeds with it on.
+
 Shared helpers live in `tests/support/` (`europe()` is one read-only world, `fresh(player)` a mutable one,
 `play_seasons`, `random_world`, `TempHome`, `@slow`). A test that mutates a shared world fails the module's
 `tearDownModule` pristine guard, so use `fresh()` for anything you change. `tests/support/invariants.py`
@@ -260,6 +265,18 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   "declared war on you" log line, kept for its text and place in the log). The war alert subscribes to
   `war_declared`; it replaced the old before/after diff of the war list. A tap that raises is logged once per (tap, kind)
   (`logging.getLogger("hexa")`), counted every time in `bus.tap_errors`; with `HEXA_DEBUG=1` it is raised, so a developer sees the bug.
+- **Movement replay** (`campaign/replay.py`, pygame-free). The world moves a stack at once and `move_group` emits
+  `unit_moved` (tag, end hex, `ids`, `path`, `naval`, and `seen`: per hex of the path, whether the player could see it
+  when the stack moved; the player's own walks are all seen). The window records those events in `ui.replay` (a
+  subscriber made in `_set_game`; the "Movement speed" option `settings["movement"]`: off, normal or slow) and plays
+  them as a picture: `MapView._draw_units` draws a walking stack where `replay.poses()` says (waiting on its first hex,
+  or between two hexes) instead of at its world position. A step is played when either end was seen; fogged steps are
+  instant and a fully fogged walk is not recorded. Countries play in turn order, the stacks of one country together;
+  about 0.18 s a hex, the whole replay capped at about 6 s (countries then play two, three... at a time, then the pace
+  rises, never below 40 ms a hex). `Replay.advance(dt)` runs from `CampaignApp.run()` (not while a screen is up);
+  nothing it does touches the world, so the oracle, saves and `world.version` are unaffected. While `replay.active`,
+  `end_turn()` is blocked (a click toasts, Space or Enter skips: `end_turn(key=True)`); `Hud._timed` holds the floating
+  ribbons until `replay.ready_at(pos)`. Tests turn the option off (see below).
 - **Markets** are rebuilt lazily (`world.refresh_markets()` marks them, `ensure_markets()` rebuilds). `draw()` no
   longer calls it: `refresh()`, `process_events()` and `end_season()` do, so drawing never changes the game.
 - `art.py` draws extra tiles, decorations, unit figures and tokens in code, in the Kenney style at 120x140.

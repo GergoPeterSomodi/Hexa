@@ -25,6 +25,24 @@ def write(home, content):
 
 
 class LoadTest(TempHome):
+    def test_the_shipped_defaults(self):
+        """tests/__init__.py turns the movement replay off for the suite; the game ships it on."""
+        from tests import SHIPPED_DEFAULTS
+        self.assertEqual(SHIPPED_DEFAULTS["movement"], "normal")
+        self.assertEqual(settings.DEFAULTS["movement"], "off")
+        self.assertEqual(set(SHIPPED_DEFAULTS), set(settings.DEFAULTS))
+
+    def test_the_movement_option_round_trips(self):
+        s = settings.load()
+        self.assertEqual(settings.cycle(s, "movement"), "normal")
+        self.assertEqual(settings.cycle(s, "movement"), "slow")
+        self.assertEqual(settings.cycle(s, "movement"), "off")
+        s["movement"] = "slow"
+        self.assertTrue(settings.save(s))
+        self.assertEqual(settings.load()["movement"], "slow")
+        write(self.home, json.dumps({"movement": "warp"}))
+        self.assertEqual(settings.load(), settings.DEFAULTS)
+
     def test_no_file_gives_the_defaults_and_a_copy(self):
         s = settings.load()
         self.assertEqual(s, settings.DEFAULTS)
@@ -69,8 +87,7 @@ class LoadTest(TempHome):
     def test_illegal_values_fall_back_one_option_at_a_time(self):
         write(self.home, json.dumps({"fullscreen": True, "window": "800x600", "autosave": "5 years",
                                      "scroll": "warp", "grid": False}))
-        self.assertEqual(settings.load(), {"fullscreen": True, "window": "1280x720", "autosave": "5 years",
-                                           "scroll": "normal", "grid": False, "pass_names": False})
+        self.assertEqual(settings.load(), dict(settings.DEFAULTS, fullscreen=True, autosave="5 years", grid=False))
 
     def test_values_of_the_wrong_type_fall_back_to_the_default(self):
         # JSON null, strings for booleans, numbers for strings, lists, objects, NaN, Infinity, huge numbers

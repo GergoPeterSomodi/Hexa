@@ -128,6 +128,7 @@ class CampaignApp:
         self.game = game                # the war alert listens to its world's event bus
         self.hud = Hud()                # the ribbons, the action log and the top bar remember things between frames
         game.bus.subscribe("war_declared", self._war_declared)
+        game.bus.subscribe("unit_moved", lambda e: self.ui.replay.record(e, self.settings["movement"]))   # replay.py
 
     def load_world(self, game):
         """Switch to a loaded game: new map view, selection and camera."""
@@ -275,10 +276,12 @@ class CampaignApp:
         self.look_at(unit.pos)
 
     # ----- turns -----------------------------------------------------------------------
-    def end_turn(self):
+    def end_turn(self, key=False):
         world = self.world
         if not self.player or world.over:
             return
+        if self.ui.replay.active:               # the moves are still being shown: a key skips them, a click waits
+            return self.ui.replay.skip() if key else self.toast("The moves are still playing: Space skips them.")
         self.busy = True
         world.ensure_markets()
         self.draw()
@@ -456,7 +459,7 @@ class CampaignApp:
             elif key == pygame.K_t and self.player:
                 self.tech.toggle(self)
             elif key in (pygame.K_SPACE, pygame.K_RETURN) and self.player:
-                self.end_turn()
+                self.end_turn(True)
             elif key == pygame.K_TAB and self.player:
                 self.next_unit()
             elif key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4):
@@ -570,8 +573,7 @@ class CampaignApp:
         elif pos in ui.reach and pos != here:
             for unit in group:
                 unit.goal = None
-            if world.move_group(group, pos):
-                self.animate()
+            world.move_group(group, pos)
         elif pos != here and world.pass_wait(group, pos):
             for unit in group:
                 unit.goal = pos                              # the march waits for spring behind the closed pass
@@ -581,19 +583,13 @@ class CampaignApp:
             if dest != here:
                 for unit in group:
                     unit.goal = pos
-                if world.move_group(group, dest):
-                    self.animate()
+                world.move_group(group, dest)
                 self.toast("On their way: they keep moving there in the coming seasons.")
             else:
                 self.toast(world.stuck_reason(group) or "They cannot get there.")
         ui.group = [u for u in group if u in world.units]
         ui.picked = {u.id for u in ui.group}
         self.refresh()
-
-    def animate(self):
-        """Slide the stack that just moved along its route on the map."""
-        ids, path = getattr(self.world, "last_move", ((), []))
-        self.ui.anim = (ids, path, pygame.time.get_ticks()) if len(path) > 1 else None
 
     def open_country(self, tag):
         self.ui.panel, self.ui.country = "country", tag
@@ -911,6 +907,8 @@ class CampaignApp:
             self.scroll()
             self.process_events()
             self.screens.update(dt)
+            if not self.screens:
+                self.ui.replay.advance(dt)
             self.draw()
             pygame.display.flip()
             dt = self.clock.tick(60)

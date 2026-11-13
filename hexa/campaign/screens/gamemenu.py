@@ -23,6 +23,7 @@ OPTION_TEXT = {
     "scroll": ("Scroll speed", str.capitalize),
     "grid": ("Hex grid", lambda v: "On" if v else "Off"),
     "pass_names": ("Pass names", lambda v: "On" if v else "Off"),
+    "movement": ("Movement speed", {"off": "Instant", "normal": "Normal", "slow": "Slow"}.get),
 }
 PAGE_TITLES = {"main": "Paused", "save": "Save game", "load": "Load game", "options": "Options"}
 
@@ -233,7 +234,7 @@ class PauseMenu(Screen):
             height = 90 + body_h + 58
         else:
             width = 300 if self.page == "main" else 600
-            rows = {"main": 6, "save": 9, "load": 11, "options": 6}[self.page]
+            rows = {"main": 6, "save": 9, "load": 11, "options": len(OPTION_TEXT)}[self.page]
             row_h = 46 if self.page == "main" else 52
             height = 90 + rows * row_h
         box = pygame.Rect(0, 0, width, height)

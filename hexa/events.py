@@ -37,6 +37,9 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
     money_spent       tag, pos           amount, reason ("raise", "build", "invest", "refit", "upgrade", "research")
     forage            tag, pos           (troops foraged in foreign land)
     native_raid       tag, pos           (natives raided a colony)
+    unit_moved        tag=owner, pos=end ids (the stack's unit ids), path (every hex from start to end), naval, seen
+                                         (per hex of the path: in the player's vision when the stack moved). The
+                                         window replays these walks, see campaign/replay.py; the state is already final
 
 ``battle`` also carries ``lost`` (units destroyed, (attacker, defender)) and ``hurt`` (strength lost, the same pair);
 ``tech_researched`` the ``cost`` in research points; ``debt_seized`` the ``saving`` in ducats a season.
@@ -58,6 +61,7 @@ CAMPAIGN_KINDS = (
     "message", "province_captured", "siege_progress", "battle", "war_declared", "peace_made", "unit_raised",
     "unit_lost", "unit_deserted", "debt_seized", "pass_closed", "pass_opened", "tech_researched", "era_reached",
     "colony_founded", "building_done", "investment_done", "season_ended", "money_spent", "forage", "native_raid",
+    "unit_moved",
 )
 
 

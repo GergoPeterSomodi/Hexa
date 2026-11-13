@@ -386,7 +386,7 @@ def _isolated(mode, seed):
         shutil.rmtree(home, ignore_errors=True)
 
 
-def _open(mode, setup):
+def _open(mode, setup, seed):
     import pygame
     import play
     if mode == "conquest":
@@ -397,7 +397,10 @@ def _open(mode, setup):
         return ColonyApp(pygame.display.set_mode(WINDOW_SIZE), play.TILES_DIR, setup["map"], setup["start"],
                          setup["goal"])
     from hexa.campaign.app import CampaignApp
-    return CampaignApp(play.TILES_DIR, setup["nation"])
+    app = CampaignApp(play.TILES_DIR, setup["nation"])
+    if seed % 2:        # odd seeds play with the movement replay on, as the game ships
+        app.settings["movement"] = "normal"             # (tests/__init__.py turns it off for the suite)
+    return app
 
 
 class _Session:
@@ -421,7 +424,7 @@ class _Session:
         began = time.perf_counter()
         with _isolated(self.mode, self.plan.seed) as self.held:
             try:
-                self.app = app = _open(self.mode, self.plan.setup)
+                self.app = app = _open(self.mode, self.plan.setup, self.plan.seed)
                 if prepare is not None:
                     prepare(app)
                 real = app.handle

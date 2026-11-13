@@ -2974,6 +2974,9 @@ class CampaignWorld:
             if len(country.explored) != explored_before:
                 self.changed()
             self.update_visibility()
+        seen = [lead.owner == self.player or p in self.visible for p in path]
+        self.bus.emit("unit_moved", lead.owner, dest, ids=[u.id for u in group], path=tuple(path), naval=lead.naval,
+                      seen=tuple(seen))
         return True
 
     def route(self, group, dest, best=None):

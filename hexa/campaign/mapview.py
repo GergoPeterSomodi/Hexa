@@ -382,39 +382,7 @@ class MapView:
             pygame.draw.polygon(screen, (255, 214, 70), hex_points(*at(ui.province.pos), r), 2)
         if ui.hover in world.terrain:
             pygame.draw.polygon(screen, (255, 255, 255), hex_points(*at(ui.hover), r), 1)
-        player = world.player
-        group = getattr(ui, "group", [])
-        done = set()
-        moving, slide = self._sliding(ui, at)
-        for unit in world.units:
-            if unit.carrier is not None or unit.pos in done:
-                continue
-            if unit.id in moving and slide:
-                continue
-            if player and unit.owner != player and unit.pos not in world.visible:
-                continue
-            done.add(unit.pos)
-            x, y = at(unit.pos)
-            if not view_rect.inflate(40, 40).collidepoint(x, y):
-                continue
-            stack = world.units_at(unit.pos)
-            if slide:                            # units still sliding in are not here yet
-                stack = [u for u in stack if u.id not in moving]
-            if not stack:
-                continue
-            top = next((u for u in stack if u.kind.war), stack[0])
-            if self.zoom >= TILE_FROM and self.tiles_dir:
-                self._diorama(screen, stack, top, (x, y), any(u in group for u in stack))
-            else:
-                self._token(screen, top, (x, y), any(u in group for u in stack), len(stack))
-        if slide:
-            stack = [u for u in world.units if u.id in moving and u.carrier is None]
-            if stack:
-                top = max(stack, key=lambda u: (u.kind.war, u.kind.naval, u.id))
-                if self.zoom >= TILE_FROM and self.tiles_dir:
-                    self._diorama(screen, stack, top, slide, True)
-                else:
-                    self._token(screen, top, slide, True, len(stack))
+        self._draw_units(screen, view_rect, at, ui)
         for shade, name, box in self._late_labels:           # the town names over the tokens
             screen.blit(shade, box)
             screen.blit(name, name.get_rect(center=box.center))
@@ -532,22 +500,41 @@ class MapView:
         m = self.r + 2                                    # the whole hex, not just its centre
         return m <= x < surf.get_width() - m and m <= y < surf.get_height() - m
 
-    STEP_MS = 70                    # how long a moving stack takes per hex
+    def _draw_units(self, screen, view_rect, at, ui):
+        """The figures on the map. While a replay runs (campaign/replay.py) the stacks it walks are drawn where it says,
+        not where the world has them: waiting ones on their first hex (with the units that stay there), walking ones
+        between two hexes."""
+        world, player = self.world, self.world.player
+        group = getattr(ui, "group", [])
+        held, walking, away = {}, [], set()        # id -> hex; (ids, screen point); every id the replay draws
+        for pose in (ui.replay.poses() if getattr(ui, "replay", None) else ()):
+            away.update(pose.ids)
+            if pose.f == 0 and pose.shown:
+                held.update({uid: pose.a for uid in pose.ids})
+            elif pose.f > 0:
+                (x0, y0), (x1, y1) = at(pose.a), at(pose.b)
+                walking.append((pose.ids, (x0 + (x1 - x0) * pose.f, y0 + (y1 - y0) * pose.f)))
+        stacks = {}
+        for unit in world.units:
+            if unit.carrier is None and (unit.id not in away or unit.id in held):
+                stacks.setdefault(held.get(unit.id, unit.pos), []).append(unit)
+        for pos, stack in stacks.items():
+            if player and stack[0].owner != player and pos not in world.visible and stack[0].id not in held:
+                continue
+            x, y = at(pos)
+            if view_rect.inflate(40, 40).collidepoint(x, y):
+                top = next((u for u in stack if u.kind.war), stack[0])
+                self._draw_stack(screen, stack, top, (x, y), any(u in group for u in stack))
+        for ids, point in walking:
+            stack = [u for u in world.units if u.id in ids]
+            if stack:
+                self._draw_stack(screen, stack, max(stack, key=lambda u: (u.kind.war, u.kind.naval, u.id)), point, True)
 
-    def _sliding(self, ui, at):
-        """(ids of the units in the move being animated, their current screen position) or (set(), None)."""
-        anim = getattr(ui, "anim", None)
-        if not anim:
-            return set(), None
-        ids, path, start = anim
-        t = (pygame.time.get_ticks() - start) / self.STEP_MS
-        if t >= len(path) - 1:
-            ui.anim = None
-            return set(), None
-        i = int(t)
-        (x0, y0), (x1, y1) = at(path[i]), at(path[i + 1])
-        f = t - i
-        return set(ids), (x0 + (x1 - x0) * f, y0 + (y1 - y0) * f)
+    def _draw_stack(self, screen, stack, top, point, selected):
+        if self.zoom >= TILE_FROM and self.tiles_dir:
+            self._diorama(screen, stack, top, point, selected)
+        else:
+            self._token(screen, top, point, selected, len(stack))
 
     # ----- tile art (zoomed in) ------------------------------------------------------------
     def sprite(self, path):
