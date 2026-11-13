@@ -406,10 +406,22 @@ AI_WITHDRAW_MORALE, AI_WITHDRAW_LEAD = 0.4, 0.15   # the AI withdraws when its a
 # 0.8-1.25 57% (7 battles), about 2x 89% (11), above 2.5 95% (83). The win rate of pikes at 2x to 2.7x is 79-83%, short of
 # the 90% the owner's target asks for: an open question. tests/test_odds_card.py ties every band to these numbers (its 30
 # seeds scatter by about 8 points: 3 v 4 gave 27% there, 20% here, so the Hopeless band reaches 30%).
-# Plains only: the same ratio wins less on defended ground (3 v 3 on hills 23%, 4 v 3 on hills 50%, against plains 53%
-# and 77% in the scenario table, 30 seeds), so the word is the plains reading and the card shows the ground beside it.
+# The bands are the plains reading. The card divides the attack ratio by the defender's ground factor first (GROUND_ODDS,
+# CASTLE_ODDS), so the word matches what happens on that ground.
 ODDS_WORDS = (("Hopeless", 0.0, (0.00, 0.30)), ("Poor", 0.8, (0.20, 0.35)), ("Even", 1.0, (0.35, 0.55)),
               ("Favourable", 1.2, (0.60, 0.90)), ("Overwhelming", 2.0, (0.75, 1.00)))
+# The odds card's ground factor (battleview.odds_factor): the attack ratio is divided by it for the defender's hex.
+# Measured 2026-11-13 with 15 pike pairs (3 v 6 to 9 v 4) on each ground, 30 seeds each (tests/support/scenarios.play with
+# the ground set; scratch runs in the v0.2.0 release check, not in the repo). The factor
+# is the one that puts the most of the pairs' measured win rates in their word's band (ties: the least squared error
+# against the plains curve). Defended ground: a defender on hills wins where the plains ratio says 1.16 times less; a
+# defender in a forest or a taiga the same; mountains and snow about 2.3 and 2.7 times (the hexes of two lanes). Plains and
+# the flat ground not listed (steppe, desert, tundra, savanna, coast) are 1.0.
+GROUND_ODDS = {"plains": 1.0, "hills": 1.16, "forest": 1.16, "taiga": 1.16, "jungle": 1.40, "marsh": 1.20,
+               "mountains": 2.25, "snow": 2.65}
+# A castle with a garrison (an assault): the garrison fights and the ground does not count. By castle level 0-3, measured
+# the same way on plains (level 1 and 2 also on hills: the same numbers within noise, so the ground does not count there).
+CASTLE_ODDS = (1.0, 1.41, 1.58, 3.11)
 RESEARCH_BASE = 0.6                        # research points per season, plus burghers / 40
 RESEARCH_FUND = (60, 15)                   # ducats -> research points
 

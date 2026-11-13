@@ -251,7 +251,8 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   in with `movement.step_in`, then overruns the enemy's civilians, joins its side's battle through `join`, or starts a
   `Battle` and deploys both sides), `fits` (the stack limit, per side), `battle_order_check`/`battle_order` (Attack, Hold,
   Withdraw), `retreat_spot`, `battle_season` (the `battles` phase: withdrawals first, then up to three days through
-  `combat.fight_day`, then the safety stop at `BATTLE_MAX_SEASONS`), `end_battle` (pursuit, retreat or surrender,
+  `combat.fight_day` (`day_cap`: one day in the attack's season under the Clash timing, `battle_timing`; all three at once under
+  "full", Quick battles), then the safety stop at `BATTLE_MAX_SEASONS`), `end_battle` (pursuit, retreat or surrender,
   experience, wounded back in supply, storm, then `battle_ended`) and `end_battles` (peace or a vanished country: a draw;
   `war.peace` and `war.check_alive` call it first). `engage_check(world, group, pos, stand=None)` gives the reasons, and
   `attack_options_group` asks it for each stand. The safety stop (`_safety_stop`) withdraws the lower army, or the other side
@@ -261,13 +262,15 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   docs/design/war-goals-and-peace.md 3.4). `world.engage`, `battle_order_check`/`battle_order`, `end_battles`,
   `retreat_spot` and `army_morale` are facades. `attack_group` walks to the stand hex and calls `engage`. Units in a battle do
   not move, raise, refit, drill or heal (`start_units`, `move_check`, `can_stand`, `recruit_check`, `refit_check`,
-  `upgrade_check`, `forage_check`); a siege skips a battle hex (`war.sieges`).
+  `upgrade_check`); they still eat, and `forage_check` lets a battle hex forage with no moves left (foreign land only). A
+  siege skips a battle hex (`war.sieges`).
 - **Battle read model** (`battleview.py`, pygame-free; PR 6a): `battle_view(world, battle_or_pos, viewer)` is the one plain, read-only
   view of a battle that the badge (`hud/battles.py`), the panel, the log (`feed.py`) and the odds card read: sides as lists of tags, per-side men, killed, wounded,
   front morale (the break-test measure), strength, lanes, reserve, back line, stance, orders with their reasons, the last day's dice,
   the log through `battlelog.describe`. The fog rule (documented in the module): exact to a side or to no player, rounded when the
   player sees the hex, hidden otherwise; an ended battle has no view. `odds_view(world, group, target_pos, viewer)` gives the odds
-  card's inputs and ratio (its word comes in PR 7b). Both are cached per `world.version` in a module-level `WeakKeyDictionary`, never
+  card's inputs, the plains ratio (`ratio`), the defender's `factor` (`odds_factor`: `data.GROUND_ODDS` by terrain, `CASTLE_ODDS`
+  by level in an assault) and the one word (`odds_word(ratio / factor)`). Both are cached per `world.version` in a module-level `WeakKeyDictionary`, never
   saved. The panel reads only these views, never `Battle` or `combat` directly.
 - **War** (`systems/war.py`; the battle system builds on it): `at_war`, `enemies`, `war_check`/`declare_war`, `war_score`, `peace`
   (and `free_spot_near`), `peace_offer`, `attack_options`/`attack` and their `_group` forms (with `targets`; an option means `engage_check` allows the

@@ -4,8 +4,8 @@ tests/support/scenarios.py, the same rules as the bands of tests/test_battle.py,
 and this test says which word lies. Pygame-free; the card's drawing is tests/ui/test_odds_card.py."""
 import unittest
 
-from hexa.campaign.battleview import odds_view, odds_word
-from hexa.campaign.data import ODDS_WORDS
+from hexa.campaign.battleview import odds_factor, odds_view, odds_word
+from hexa.campaign.data import CASTLE_ODDS, GROUND_ODDS, ODDS_WORDS
 from tests.support.scenarios import SEEDS, play, stage
 from tests.support.worlds import fresh
 
@@ -73,6 +73,72 @@ class CalibrationTest(unittest.TestCase):
             self.assertTrue(low <= rate <= high, f"{label}: {word} band {low:.0%}-{high:.0%}, attacker won {rate:.0%}")
 
 
+# The pikes on hills (the defender on the hill, the attacker on plains beside it): the same pairs, the word the ground
+# factor gives (the odds card's word, measured with 30 seeds), and the win rate measured on the hills. The factor is one
+# number per ground, so a pair near a band's edge can lie outside it: HILLS_SLACK allows the 30-seed scatter (about 9
+# points) plus the two pairs the one factor cannot place (6 v 5 and 8 v 3, each 5 points out of its band).
+HILLS = ((3, 6, "Hopeless"), (3, 4, "Hopeless"), (4, 5, "Hopeless"), (5, 6, "Hopeless"),
+         (3, 3, "Poor"), (4, 4, "Poor"), (6, 5, "Even"), (4, 3, "Even"),
+         (6, 4, "Favourable"), (6, 3, "Favourable"), (8, 3, "Overwhelming"))
+HILLS_SLACK = 0.10
+
+
+class HillsCalibrationTest(unittest.TestCase):
+    """The same calibration on hills: the word of each pair (the ratio over the hills factor) and the attacker's win rate
+    measured on the hills against the word's band, within HILLS_SLACK."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.world = fresh("POR")
+        cls.world.visible = set(cls.world.terrain)
+        cls.points = []
+        for att, dfn, expected in HILLS:
+            spec_a, spec_d = [("infantry", 1, att)], [("infantry", 1, dfn)]
+            _, attackers, _ = stage(cls.world, spec_a, spec_d, terrain="hills")
+            owner = attackers[0].owner
+            cls.world.player = owner
+            view = odds_view(cls.world, attackers, attackers[0].pos, owner)
+            wins = sum(1 for seed in SEEDS
+                       if play(cls.world, seed, spec_a, spec_d, "hills")["winner"] == owner)
+            cls.points.append((f"{att} v {dfn} on hills", view, expected, wins / len(SEEDS)))
+        _, plains, _ = stage(cls.world, [("infantry", 1, 3)], [("infantry", 1, 3)], terrain="plains")
+        cls.world.player = plains[0].owner
+        cls.plains_33 = odds_view(cls.world, plains, plains[0].pos, plains[0].owner)
+        cls.world.player = None
+
+    def test_the_hills_factor_is_the_measured_one(self):
+        for label, view, _, _ in self.points:
+            self.assertEqual(view["factor"], GROUND_ODDS["hills"], label)
+            self.assertEqual(view["defence"]["terrain"], "Hills", label)
+
+    def test_each_pair_on_hills_gives_its_expected_word(self):
+        for label, view, expected, _ in self.points:
+            self.assertEqual(view["word"], expected, f"{label} (ratio {view['ratio']})")
+
+    def test_each_word_on_hills_is_near_the_win_rate_measured_there(self):
+        for label, view, _, rate in self.points:
+            low, high = next((lo, hi) for name, _, (lo, hi) in ODDS_WORDS if name == view["word"])
+            self.assertTrue(low - HILLS_SLACK <= rate <= high + HILLS_SLACK,
+                            f"{label}: {view['word']} band {low:.0%}-{high:.0%}, attacker won {rate:.0%}")
+
+    def test_a_defender_on_hills_reads_one_band_lower_than_on_plains(self):
+        """3 v 3 is Even on plains and Poor on hills: the card no longer promises the plains fight."""
+        hills = next(v for label, v, _, _ in self.points if label == "3 v 3 on hills")
+        self.assertEqual(self.plains_33["word"], "Even")
+        self.assertEqual(hills["word"], "Poor")
+
+
+class FactorTest(unittest.TestCase):
+    def test_the_ground_and_castle_factors(self):
+        self.assertEqual(odds_factor("plains", 0, False), 1.0)
+        self.assertEqual(odds_factor("hills", 0, False), GROUND_ODDS["hills"])
+        self.assertEqual(odds_factor("mountains", 0, False), GROUND_ODDS["mountains"])
+        self.assertEqual(odds_factor("steppe", 0, False), 1.0, "a flat ground not measured reads as plains")
+        self.assertEqual(odds_factor("hills", 2, True), CASTLE_ODDS[2], "in an assault the garrison fights, not the ground")
+        self.assertEqual(odds_factor("hills", 1, False), GROUND_ODDS["hills"], "a castle with no assault is ground")
+        self.assertGreater(CASTLE_ODDS[3], CASTLE_ODDS[2])
+
+
 class HiddenEnemyTest(unittest.TestCase):
     def test_a_hidden_enemy_is_unknown_and_nameless(self):
         world = fresh("POR")
@@ -89,7 +155,7 @@ class HiddenEnemyTest(unittest.TestCase):
         _, attackers, _ = stage(world, [("infantry", 1, 3)], [("infantry", 1, 2)], terrain="hills")
         world.player = attackers[0].owner
         view = odds_view(world, attackers, attackers[0].pos, world.player)
-        self.assertEqual(view["word"], odds_word(view["ratio"]))
+        self.assertEqual(view["word"], odds_word(None if view["ratio"] is None else view["ratio"] / view["factor"]))
         self.assertIs(view["crossing"], False)
         self.assertIs(view["uphill"], False)
         self.assertIsNone(view["attack"]["general"])

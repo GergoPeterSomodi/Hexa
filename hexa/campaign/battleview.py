@@ -39,8 +39,9 @@ itself, rounded when its hex is seen, and None when hidden (then no ratio).
 odds_view keys: ``ok`` and ``reason`` (systems/battle.engage_check), ``attacker``, ``defender`` (tags or None), ``battle``
 (a battle is on the target), ``name``, ``attack`` and ``defence`` ({access, men, morale, strength}; defence also has
 ``terrain``, ``castle``, ``assault``, ``general``), and ``ratio`` (attack strength over defence strength, or None). The
-``attack`` also has ``general``. ``word`` is the card's one word: "Unknown" when the enemy is hidden or there is no ratio,
-else odds_word(ratio) (unrounded). ``crossing`` and ``uphill`` say whether the attack crosses a pass or comes up from
+``attack`` also has ``general``. ``factor`` is the defender's ground factor (odds_factor: GROUND_ODDS, or CASTLE_ODDS in
+an assault). ``word`` is the card's one word: "Unknown" when the enemy is hidden or there is no ratio, else
+odds_word(attack / defence / factor) (unrounded), so ``ratio`` itself is the plains reading. ``crossing`` and ``uphill`` say whether the attack crosses a pass or comes up from
 lower ground (the battle's own, or the ones an attack would have). ``place`` is the hex's place name, ``attacker_name``
 and ``defender_name`` the countries' names (``defender_name`` None when the enemy is hidden). The strength is
 the same measure as battle_strength: morale times men. With a battle on the hex it is battle_strength itself; before the
@@ -50,7 +51,7 @@ battle_strength needs a battle to count on.
 import weakref
 
 from .battlelog import describe
-from .data import DICE, ELEVATION, GARRISON_MEN, ODDS_WORDS, START_YEAR, TERRAIN
+from .data import CASTLE_ODDS, DICE, ELEVATION, GARRISON_MEN, GROUND_ODDS, ODDS_WORDS, START_YEAR, TERRAIN
 from .state import Battle
 from .systems import battle as battlesys, combat, terrain as terrainsys
 
@@ -309,6 +310,15 @@ def odds_word(ratio):
     return word
 
 
+def odds_factor(terrain, castle, assault):
+    """The factor the odds card divides the attack ratio by for the defender's hex: the castle's (CASTLE_ODDS by level)
+    in an assault, where the garrison fights and the ground does not count; else the ground's (GROUND_ODDS). 1.0 for
+    plains and for a ground not measured."""
+    if assault and 0 < castle < len(CASTLE_ODDS):
+        return CASTLE_ODDS[castle]
+    return GROUND_ODDS.get(terrain, 1.0)
+
+
 def _country_name(world, tag):
     return world.countries[tag].name if tag in world.countries else tag
 
@@ -397,6 +407,7 @@ def _odds(world, group, target_pos, viewer, owner, stand):
     if attack["strength"] is not None and defence["strength"]:
         raw = attack["strength"] / defence["strength"]
         ratio = round(raw, 2)
+    factor = odds_factor(prov.terrain if prov is not None else None, defence["castle"], defence["assault"])
     if battle is not None:
         crossing, uphill = battle.crossing, battle.uphill
     elif stand != target_pos:
@@ -404,13 +415,14 @@ def _odds(world, group, target_pos, viewer, owner, stand):
         uphill = ELEVATION.get(world.provinces[stand].terrain, 0) < ELEVATION.get(world.provinces[target_pos].terrain, 0)
     else:
         crossing = uphill = False
-    word = "Unknown" if enemy is None or defence_access == "hidden" else odds_word(raw)
+    word = "Unknown" if enemy is None or defence_access == "hidden" else odds_word(None if raw is None else raw / factor)
     return {"target": target_pos, "attacker": owner, "defender": enemy, "battle": battle is not None,
             "name": _battle_name(world, battle) if battle is not None else None,
             "place": world.place(prov) if prov is not None else None,
             "attacker_name": _country_name(world, owner) if owner is not None else None,
             "defender_name": _country_name(world, enemy) if enemy is not None and defence_access != "hidden" else None,
-            "ok": ok, "reason": reason, "attack": attack, "defence": defence, "ratio": ratio, "word": word,
+            "ok": ok, "reason": reason, "attack": attack, "defence": defence, "ratio": ratio, "factor": factor,
+            "word": word,
             "crossing": bool(crossing), "uphill": bool(uphill)}
 
 

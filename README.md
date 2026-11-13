@@ -334,30 +334,30 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | Cavalry | Knights | Lancers | Cuirassiers | Fast; hits hard in open land, weak in forests, hills and against castles |
 | Cannons | Bombards | Culverins | Field guns | Fire from the back line of a battle, add siege points on their hex and smash castles; weak up close |
 
-- **Odds card:** with a stack selected, hovering a hex it can attack shows a card beside the hex: the men and morale of each side, the ground (the defender's ground counts for the defender), a castle or assault, a pass crossing or an attack uphill, the generals, and one word: **Hopeless**, **Poor**, **Even**, **Favourable** or **Overwhelming** (**Unknown** for an enemy you cannot see). The word is worked out from the strength ratio on open ground; the bands are in `data.py` (`ODDS_WORDS`).
+- **Odds card:** with a stack selected, hovering a hex it can attack shows a card beside the hex: the men and morale of each side, the ground (the defender's ground counts for the defender), a castle or assault, a pass crossing or an attack uphill, the generals, and one word: **Hopeless**, **Poor**, **Even**, **Favourable** or **Overwhelming** (**Unknown** for an enemy you cannot see). The word is the strength ratio divided by the defender's ground factor: hills and forests 1.16, jungle 1.4, marsh 1.2, mountains 2.25, snow 2.65, and a castle with a garrison by level (1.41, 1.58, 3.11; the ground does not count in an assault). The factors are measured, so the word matches the win rate on that ground; the bands and factors are in `data.py` (`ODDS_WORDS`, `GROUND_ODDS`, `CASTLE_ODDS`).
 - **Battle reminders:** each battle you are in that is still on gets a line in the End-of-turn reminders ("... is still on: join, withdraw or fight on"); a click opens the battle panel. At the start of each season a "Battle on" ribbon marks the hex of each such battle.
 - **Battles:** an attack on an enemy stack or a garrisoned castle starts a battle on that hex, and a stack beside a battle
-  its country is in joins it. Both armies stand on the hex and fight in the **timing** the Options page sets: **Clash** (the default) fights the first day in the season the attack happens and the rest in the seasons after, 3 a season, so the defender can give orders and allies can join; **Quick battles** (the option stored as `full`) fights all of a season's days at once. Each day each side rolls a **d6**: its damage that day is times 0.7 (roll 1) to 1.4 (roll 6). Each side fights in three
+  its country is in joins it. Both armies stand on the hex and fight in the **timing** the Options page sets: **Clash** (the default) fights one day in the season the attack happens and then 3 a season, so the defender can give orders and allies can join; **Quick battles** (the option stored as `full`) fights all of a season's days at once. Each day each side rolls a **d6**: its damage that day is times 0.7 (roll 1) to 1.4 (roll 6). Each side fights in three
   **lanes** (left, centre, right; the right lane is closed on mountains, marsh, jungle and snow). The rest of the army is
   the reserve, and guns of the back line fire at the enemy centre. A lane that empties is refilled from the reserve:
   cavalry to the flanks, infantry to the centre. A regiment that moves up into a broken lane fights its first day at
-  **half strength**. A flank with no enemy in front comes round for a bonus. A broken flank drains its centre morale each day; a broken centre shakes every regiment of its side once, and the enemy's guns and reserve then hit its reserve. Castles, veterans, generals and pikes against
+  **half strength**. A flank with no enemy in front comes round for a bonus. A broken flank drains its centre morale each day; a broken centre shakes every regiment of its side once, and the enemy's reserve then hits its reserve and back line. Castles, veterans, generals and pikes against
   horse count as they do in any fight. The **ground** counts for the side that held the hex when the battle began: hills,
-  forest and mountains protect the defender, and an attacker standing on the same hill gets none. An attack that comes
+  forest, mountains and the other rough ground (marsh, jungle, taiga, snow) protect the defender, and an attacker standing on the same hill gets none. An attack that comes
   **across a mountain pass** deals 30% less damage on its first day, and an attacker from **lower ground** deals 5% less
   all battle. An army
-  **breaks** when its centre lane is empty with no reserve to fill it, or two lanes are (either one on narrow ground), or its front-line morale is under 5%: the winner pursues it. Reserves do not count in the morale. A lane is empty for good when its regiment routs or dies and no reserve has filled it by the next day. The beaten army **retreats** to the nearest hex of its country within
+  **breaks** when its centre lane is empty with no reserve to fill it, or two lanes are (on narrow ground, one empty lane is enough), or its front-line morale is under 5%: the winner pursues it. Reserves do not count in the morale. A lane is empty for good when its regiment routs or dies and no reserve has filled it by the next day. The beaten army **retreats** to the nearest hex of its country within
   3 hexes, or **surrenders** when there is none. A side whose last regiment or garrison is destroyed in the fight loses (the
   other side wins); a side that vanishes between seasons (deserted, starved, disbanded, at peace) is a draw. A battle that lasts **6 seasons** ends with the weaker army withdrawing, so no two armies stay locked for
   long. Peace ends the battles of the two countries with no pursuit. Battles have names: "Battle of Toro, 1480", and
   "Second Battle of Toro, 1481" for a repeat on the same place.
 - **Standing orders:** each stack is set to **Hold** (default) or **Withdraw** for when it is attacked and gives no battle order. Withdraw leaves before the first day, with half pursuit.
-- **In battle:** a stack cannot move, raise troops, refit, drill or heal. It still eats, and it can forage. A regiment under
+- **In battle:** a stack cannot move, raise troops, refit, drill or heal. It still eats, and it can forage in foreign land. A regiment under
   half morale cannot attack. Outside battle a fed regiment wins back a quarter of its morale a season. Battle numbers:
 
 | Battle number | Value |
 |---|---|
-| Days fought a season (Clash: the first day in the attack's season, then 3 a season) | 3 |
+| Days fought a season (Clash: 1 in the attack's season, then 3 a season) | 3 (1 under Clash in the attack's season) |
 | Lanes | 3 (2 on narrow ground) |
 | Men in a full regiment | 1,000 |
 | A stack under this morale cannot attack | 50% |
@@ -373,8 +373,9 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | Morale a day lost in a lane | 2 points |
 | Centre lane broken: morale lost once by every regiment of that side | 25 points |
 | Flank lane broken: morale lost a day by the centre | 10 points |
-| Back line hit a day while the enemy's centre is broken | 4% |
+| A side's reserve and back line hit a day by the enemy's reserve, while its centre is broken | 4% |
 | Morale a day lost in reserve | 3 points |
+| Morale a day lost unfed (on top) | 3 points |
 | Wounded who come back when the battle ends in supply | half |
 | A beaten army's morale, at most | 30% |
 | Morale back a season outside battle | 25 points |
