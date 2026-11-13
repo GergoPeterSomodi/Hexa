@@ -27,7 +27,7 @@ deployment presets, battle events, troop quality, reserve and cannon orders.
 | How a battle starts | The existing attack order. The stack walks next to the target, then steps in. | The UI (attack chips) and the AI (`attack_options_group`, `attack_group`) already use it. No change to `plan()`, the hot path. |
 | When days are fought | A new first phase `battles` in `PHASES`, before `logistics` | Losses first, then the survivors eat. A battle ended this season lets the winner start the siege in the same season. |
 | Save version | Bump `saves.VERSION` from 1 to 2 | A save with a `Battle` in it cannot open in an old build (unknown class). The bump makes old builds refuse it quietly. Old saves still load here. |
-| Bombardment | Kept. Guns fire one Fire phase at a target 2 hexes away, at once, with no battle | Keeps the AI's siege tool and today's map chip. Uses the same fire function as battles. See open question 1. |
+| Bombardment | **Dropped** (owner, 2026-11-13). Every fight and every siege happens with both sides on the same hex. Guns fight inside battles and add siege points on the hex. | The owner: "for siege and battles too both armies should be on the same tile". |
 
 ## 2. Data model
 
@@ -85,8 +85,8 @@ class Battle:
 | File | PR | Contents |
 |---|---|---|
 | `systems/combat.py` (new) | 0, 2 | Pure day resolution. PR 0 moves `general`, `attack_value`, `defense_value` here from war.py (facades unchanged). PR 2 adds `deploy`, `fire`, `shock`, `flanks`, `morale`, `pursuit`, `fight_day`. Writes only the battle object, unit `hp`/`morale` and `prov.garrison`. |
-| `systems/battle.py` (new) | 3, 4 | The battle's life: `engage`, `join`, `battle_order_check`/`battle_order`, `battle_season` (the phase), `end_battle`, `end_battles`, `retreat_spot`, `army_morale`, `bombard`. |
-| `systems/war.py` | 4 | `attack_group` calls `engage` or `bombard`. `battle()` is deleted. `peace` and `check_alive` call `world.end_battles`. |
+| `systems/battle.py` (new) | 3, 4 | The battle's life: `engage`, `join`, `battle_order_check`/`battle_order`, `battle_season` (the phase), `end_battle`, `end_battles`, `retreat_spot`, `army_morale`. |
+| `systems/war.py` | 4 | `attack_group` calls `engage`; the `"bombard"` attack option is removed. `battle()` is deleted. `peace` and `check_alive` call `world.end_battles`. |
 | `systems/movement.py` | 3 | `step_in(world, group, pos)`: the last step onto the battle hex, with its own `unit_moved` event. |
 | `systems/season.py` | 3 | `("battles", battle.battle_season)` first in `PHASES`. `start_units` skips healing and moves for units in battle; morale recovers outside battle. |
 | `systems/military.py`, `supply.py`, `terrain.py` | 3 | Stack limit per side, forage in battle, `move_check` reason. |
@@ -224,14 +224,17 @@ peace is made or a side's country disappears.
   existing eviction sends the units in foreign land home.
 - `check_alive` calls `world.end_battles(tag)` when a country disappears.
 
-### 3.7 Bombardment
+### 3.7 Same hex for battles and sieges (owner, 2026-11-13)
 
-- `attack_options_group` keeps the `"bombard"` option for guns 2 hexes from a target. Battle hexes are not bombard
-  targets (guns join the battle instead).
-- `battle.bombard(world, guns, pos)` runs one Fire phase from `combat.fire` against the target's front (a stack's
-  best defenders, or the garrison). No counter fire, no battle object. Hp and morale losses, `carry` dropped (whole
-  hp only, rounded up to at least 1), killed units die. It emits the old `battle` event with `ranged=True`, so the
-  feed's bombardment line stays as it is.
+- Both sides always stand on the same hex: a battle has both stacks on the battle hex, and a siege has the besieger
+  standing on the castle's hex (as today's `sieges` already requires).
+- Bombardment from 2 hexes away is **removed**: `attack_options_group` drops the `"bombard"` option and the AI's
+  bombard step goes. Guns help a siege by standing on the hex (their siege points, as today) and fight in battles in
+  the back line.
+- The map draws a siege like a battle: the besieging stack and the castle with its garrison together on the one hex,
+  with a siege badge and a progress bar (progress / need) instead of the morale bar.
+- The feed's bombardment line and the `ranged` flag of the old `battle` event go; the `battle` event itself goes with
+  `battle()` in PR 4.
 
 ### 3.8 Morale outside battle
 
@@ -282,7 +285,7 @@ terrain, generals, ranks and supply, so PR 5 must measure the real thing.
 ## 5. The AI (`ai.py`)
 
 - **Attack.** `_campaign` keeps its rule: attack when our power is at least 1.3 times theirs. Power becomes
-  `world.power(u) * u.morale`, and `_defence_power` adds an ongoing battle's side the same way. Bombard stays as
+  `world.power(u) * u.morale`, and `_defence_power` adds an ongoing battle's side the same way. Bombard is removed (see 3.7); previously it stayed as
   today.
 - **Join.** Before looking for new targets, a stack with moves joins a battle of its own side within reach (an
   attack option on a battle hex) when its side's army morale is not higher than the enemy's, or its side has fewer
@@ -321,7 +324,7 @@ from `world.battles` and after any `province_captured` of a storm. The battle co
 war goals subscribes to the event (its own system reads `bus.history` or a tap, never the battle object).
 Changing these fields later is a change to both designs.
 
-`battle` stays, now only for bombardment. `unit_lost` gains `why="surrendered"`.
+`battle` goes with bombardment (see 3.7). `unit_lost` gains `why="surrendered"`.
 
 ### 6.2 Log and ribbons (`feed.py`)
 
@@ -403,7 +406,7 @@ terrain=None, castle=0)` places two stacks next to each other at war).
 - Withdraw: half pursuit, morale kept, the other side wins.
 - Assault: the garrison stands in the centre; storm when it breaks; the castle holds when the field army breaks
   first.
-- Bombard: one Fire phase, no battle object, the old `battle` event with `ranged`.
+- No bombard: the `"bombard"` option is gone from `attack_options_group`, and a siege only progresses with the besieger on the hex.
 - Peace and extinction end battles. The safety stop ends a battle at 6 seasons.
 - `battle_ended` is emitted once per battle with every field of 6.1 (a contract test per `how`, including
   `winner = None` after peace), and `CAMPAIGN_KINDS` lists the four new kinds.
@@ -480,8 +483,8 @@ gameplay change. Keep each file's existing line endings.
 | 0 | **Refactor: combat values move to `systems/combat.py`; baseline stats.** Move `general`, `attack_value`, `defense_value` (facades unchanged). Add `tools/battle_stats.py` with the AI-game part, run on today's code. Add `tests/support/battles.py`. | war.py, combat.py (new), world.py facades, tools/battle_stats.py, tests/support/battles.py, test_architecture.py | Label `refactor`. Oracle identical, save-compat green, goldens identical. The baseline table is pasted in the PR. |
 | 1 | **Data model and save version.** `Battle`, `Unit.morale`, `Unit.men`, `WORLD_DEFAULTS["battles"]`, `battle_at`, `VERSION = 2`, invariants that allow battle hexes. Nothing creates a battle yet. | state.py, world.py, saves.py, data.py (`MEN`, `GARRISON_MEN`), invariants.py, test_saves.py | A hand-made battle round-trips through a save. Version 1 saves load. Save-compat green. Oracle: the only difference is the new fields (the reviewer checks the digest with them removed). |
 | 2 | **Day resolution, not wired.** `combat.deploy`, `fire`, `shock`, `flanks`, `morale`, `pursuit`, `fight_day`, the numbers in data.py. | combat.py, data.py, test_battle.py (day tests) | Day tests and the scenario bands in 7.3.1 pass. No caller in the game, so the oracle is identical. |
-| 3 | **The battle's life, not wired.** `battle.py`: `engage`, `join`, `battle_order_check`/`battle_order`, `battle_season`, `end_battle`, `end_battles`, `retreat_spot`, `army_morale`, `bombard`; `movement.step_in`; events. | battle.py (new), movement.py, events.py, world.py facades, test_battle.py | Contract tests of 7.1 pass when they call `engage` directly. The phase is not in `PHASES` yet, so the oracle is identical. |
-| 4 | **The switch (gameplay).** `attack_group` uses `engage`/`bombard`; `battle()` deleted; the `battles` phase; the locks of 3.2; peace and extinction; the agents pair; test updates (test_campaign, test_events, test_hud_data, tests/ui/test_hud); perf budget. | war.py, season.py, military.py, supply.py, terrain.py, test_season.py, agents.py, the tests above, perf_budget.json, README | Whole suite green. Soak `--quick` green with the new invariants. Save-compat green. The oracle reports the change by design; the PR says so. The game plays a war without a crash (the stats tool runs). |
+| 3 | **The battle's life, not wired.** `battle.py`: `engage`, `join`, `battle_order_check`/`battle_order`, `battle_season`, `end_battle`, `end_battles`, `retreat_spot`, `army_morale`; `movement.step_in`; events. | battle.py (new), movement.py, events.py, world.py facades, test_battle.py | Contract tests of 7.1 pass when they call `engage` directly. The phase is not in `PHASES` yet, so the oracle is identical. |
+| 4 | **The switch (gameplay).** `attack_group` uses `engage`; the bombard option removed; `battle()` deleted; the `battles` phase; the locks of 3.2; peace and extinction; the agents pair; test updates (test_campaign, test_events, test_hud_data, tests/ui/test_hud); perf budget. | war.py, season.py, military.py, supply.py, terrain.py, test_season.py, agents.py, the tests above, perf_budget.json, README | Whole suite green. Soak `--quick` green with the new invariants. Save-compat green. The oracle reports the change by design; the PR says so. The game plays a war without a crash (the stats tool runs). |
 | 5 | **AI and tuning.** `_battles`, joining, morale in power. Run `tools/battle_stats.py` and tune data.py to the targets of 7.3. | ai.py, data.py, README tables | The targets of 7.3 are met, or the PR shows the numbers and asks. `test_tech_ai` and the full soak green. Before/after table in the PR. |
 | 6 | **Log, ribbons, map badge.** Feed lines, the `battle` icon, `hud/battles.py`, the two-stack drawing, "In battle" in the unit panel, men instead of HP. | feed.py, hud/, ui/icons.py, render/battlemark.py (new), mapview.py (at most 15 lines), panels/unit.py, panels/cards.py | test_hud_data covers the new kinds. A screenshot of a battle on the map at two zooms, reviewed by the art director. mapview.py within its cap. |
 | 7 | **Battle panel.** `screens/battle.py`, `battlelayout.py`, `kit.regiment_card`, the press table entries. | screens/, ui/kit.py, app.py (press table only; app.py is at its cap of 917 lines and may not grow past 2%) | Window tests of 7.6 pass. Screenshot at 1280x720 and 1920x1080, compared with mockup 10 and reviewed. Goldens regenerated and reviewed. |
@@ -505,17 +508,9 @@ is fine because nothing is released before PR 8.
 | Size caps | mapview.py and app.py are at their caps. | New modules for drawing and the screen; at most a few lines in the old files. |
 | Test churn | 8 call sites of today's battle and attack in tests. | Rewritten in PR 4 only, each to the new rule, not deleted. |
 
-## 10. Open questions for the owner
+## 10. Owner's decisions (2026-11-13)
 
-1. **Bombardment.** Keep it as a one-off Fire phase from 2 hexes away (no battle), or drop it so guns only fight
-   inside battles?
-   *Recommendation: keep it.* The AI uses it to soften castles, the map already shows it, and it costs one function.
-   Slice 2's siege cards can grow it later.
-2. **Men everywhere?** Show strength as men ("760 men") in every panel and card, or only inside battles (HP
-   elsewhere)?
-   *Recommendation: men everywhere.* One number for one thing is easier to read. It is a display change only; the
-   rules keep `hp`.
-3. **The safety stop.** End a battle after 6 seasons (the side with lower morale withdraws), or let battles run until
-   someone breaks?
-   *Recommendation: 6 seasons.* Two holding armies could otherwise sit until the war ends. In the model even
-   battles end in 2 to 3 seasons, so the stop should almost never trigger (target: under 5%).
+1. **Bombardment is dropped.** Battles and sieges both have the two sides on the same hex (see 3.7).
+2. **Men everywhere.** Strength shows as men in every panel and card; the rules keep `hp`.
+3. **The safety stop is 6 seasons.** The side with lower morale withdraws; target under 5% of battles.
+4. Age of Discovery only. Conquest and Colonisation are not changed.
