@@ -207,6 +207,27 @@ class StormTest(unittest.TestCase):
         self.assertIsNotNone(world.battle_at(prov.pos))
 
 
+    def test_the_cut_lasts_for_the_storm_battle_only_and_the_losses_come_off_the_uncut_garrison(self):
+        from hexa.campaign.systems import battle as battlesys
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 3)
+        stack = place(world, "infantry", 1, "POR", prov.pos, 4)
+        world.sieges()
+        world.sieges()
+        uncut, progress = prov.garrison, prov.siege
+        self.assertTrue(world.storm_group(stack, prov.pos))
+        self.assertLess(prov.garrison, uncut, "the storm faces the cut garrison")
+        cut = prov.garrison
+        battlesys.battle_season(world)
+        if prov.controller == "CAS":
+            self.assertGreaterEqual(prov.garrison, uncut - (uncut - cut) - 0)
+            self.assertLessEqual(prov.garrison, uncut)
+            self.assertEqual(prov.siege, progress, "the meter keeps its progress: the cut is not taken twice")
+            self.assertTrue(all(b.storm_from == 0 for b in world.battles), "no cut left on a battle")
+        self.assertEqual(campaign_problems(world), [])
+
+
 class OutputAndNameTest(unittest.TestCase):
     def test_a_besieged_place_produces_nothing(self):
         world = fresh("POR")

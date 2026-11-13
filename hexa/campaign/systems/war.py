@@ -522,8 +522,14 @@ def storm(world, group, pos):
     if not ok:
         return False
     prov = world.provinces[pos]
-    prov.garrison = storm_garrison(world, prov)
+    uncut, cut = prov.garrison, storm_garrison(world, prov)
+    prov.garrison = cut                      # the cut lasts for this storm's battle only (battle._end_battle restores it)
     done = world.engage([u for u in group if u in world.units], pos)
+    battle = world.battle_at(pos)
+    if done and battle is not None and battle.assault and battle.storm_from == 0 and cut < uncut:
+        battle.storm_from, battle.storm_cut = uncut, cut
+    elif not done:
+        prov.garrison = uncut
     if done:
         for unit in group:
             if unit in world.units:

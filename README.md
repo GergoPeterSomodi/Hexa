@@ -410,6 +410,8 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | 3 regiments + 1 bombard | 2 | 2 | 4 | 5 |
 | 6 regiments + 1 bombard | 2 | 2 | 3 | 5 |
 | 3 regiments + 2 culverins | 2 | 2 | 2 | 3 |
+
+The bombard row is one season longer than the design's paper table (6 at castle 3). The cause is the rule, not a bonus: the bombard is a regiment with its own 1,000 men, and the crowd counts them too (4,000 men against 1,800 is crowd 2, rate 3, so 5 seasons). The paper table counted only the infantry.
 - **Getting better:** research (burghers, or pay to fund it) unlocks new eras; **refit** old troops in a town.
   A **barracks** (infantry, cavalry) or **foundry** (cannons) lets you drill units for +attack / +defense.
   Units that survive battles become **Veteran** (+10%) and **Elite** (+20%). **Generals** (raised in your
