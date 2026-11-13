@@ -262,6 +262,13 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   `retreat_spot` and `army_morale` are facades. `attack_group` walks to the stand hex and calls `engage`. Units in a battle do
   not move, raise, refit, drill or heal (`start_units`, `move_check`, `can_stand`, `recruit_check`, `refit_check`,
   `upgrade_check`, `forage_check`); a siege skips a battle hex (`war.sieges`).
+- **Battle read model** (`battleview.py`, pygame-free; PR 6a): `battle_view(world, battle_or_pos, viewer)` is the one plain, read-only
+  view of a battle that the badge, the panel, the log and the odds card read: sides as lists of tags, per-side men, killed, wounded,
+  front morale (the break-test measure), strength, lanes, reserve, back line, stance, orders with their reasons, the last day's dice,
+  the log through `battlelog.describe`. The fog rule (documented in the module): exact to a side or to no player, rounded when the
+  player sees the hex, hidden otherwise; an ended battle has no view. `odds_view(world, group, target_pos, viewer)` gives the odds
+  card's inputs and ratio (its word comes in PR 7b). Both are cached per `world.version` in a module-level `WeakKeyDictionary`, never
+  saved. The panel reads only these views, never `Battle` or `combat` directly.
 - **War** (`systems/war.py`; the battle system builds on it): `at_war`, `enemies`, `war_check`/`declare_war`, `war_score`, `peace`
   (and `free_spot_near`), `peace_offer`, `attack_options`/`attack` and their `_group` forms (with `targets`; an option means `engage_check` allows the
   attack from that stand; there is no bombardment), `lose` (units off the map, a `unit_lost` event each), `kill`
