@@ -6,5 +6,6 @@ Modules: worldgen (build time only), colonies (founding and colonial growth),
 building (investment and building), military (raising, refits, drill, stacks),
 debt (the debt limit, desertion and seizures),
 research (techs, idea cards, ages and start techs),
-trade (markets, routes, merchants and what moves along a route).
+trade (markets, routes, merchants and what moves along a route),
+economy (prices, production, incomes, tax previews, collecting and growth).
 """

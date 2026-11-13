@@ -218,6 +218,12 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   world.py behind public methods: `take_markets_dirty()` (reads and clears `_markets_dirty`, which `refresh_markets` raises;
   `trade.ensure_markets` rebuilds when it says so) and `sea_distances(start)` (the `_sea_cache`; `trade.sea_walk` is the walk).
   `move_cost` is the public name of the old `_move_cost` (step cost without the ridge walls).
+- **Economy** (`systems/economy.py`): `economy` (the season's prices, production, trade flows and incomes; `preview=True` projects
+  without using anything up), its helpers (`workers`, `works_factor`, `output_mult`, `staffing`, `goods_in`, `split_food`,
+  `set_prices`, `food_market`, `trade_state`, `incomes`), `collect` and `grow`. `grow` calls `colonies.settlers`/`natives`/`graduate`
+  in the old order and drops the castle cache with `world.forget_castles()`. The tax preview's saved state is `world._settled`,
+  owned by `CampaignWorld.set_tax`/`settle_preview`/`economy`; the module only builds it (`settled_state`) and puts it back
+  (`restore_settled`). It calls trade.py's functions directly.
 - **Terrain** comes from `wfc.collapse` (wave function collapse): per-hex priors from `worldgen.terrain_prior`
   plus the `FORBIDDEN` adjacency pairs at the top of `systems/worldgen.py` (`world.FORBIDDEN` is the same list).
 - **Build caching.** Building a world takes seconds, so `CampaignWorld.__init__` stores a pickled snapshot of

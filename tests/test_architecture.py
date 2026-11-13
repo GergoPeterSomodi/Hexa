@@ -66,7 +66,7 @@ WORLD_MODULES = {"hexa.world", "hexa.colony.world", "hexa.campaign.world"}
 
 # ----- ALLOW: ONLY EVER SHRINK THESE -----------------------------------------------------------------------------
 ALLOW_MODULES = {
-    "hexa.campaign.world": 1923,
+    "hexa.campaign.world": 1672,
     "hexa.campaign.goodsart": 2476,
     "hexa.campaign.wfctiles": 2375,
     "hexa.campaign.landscape": 2010,
@@ -100,7 +100,7 @@ ALLOW_FUNCTIONS = {
     "hexa.campaign.systems.worldgen:terrain_prior": 81,
     "hexa.campaign.goodsart:_fish": 80,
     "hexa.campaign.wfctiles:_settlement_objects": 80,
-    "hexa.campaign.world:CampaignWorld.economy": 80,
+    "hexa.campaign.systems.economy:economy": 78,
     "hexa.campaign.app:CampaignApp.handle": 75,
     "hexa.campaign.art:_draw_figure": 78,
     "hexa.campaign.goodsart:_silk": 78,

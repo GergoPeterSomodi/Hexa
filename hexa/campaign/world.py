@@ -12,16 +12,12 @@ from ..events import EventBus, passes_changed
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, state, tech
 from .state import Garrison, Unit, War, fill_defaults
-from .systems import building, colonies, debt, military, research, trade, worldgen
+from .systems import building, colonies, debt, economy, military, research, trade, worldgen
 from .data import (COUNTER, FIGHT_ATTACK, FIGHT_DEFENSE, FRONT, GARRISON_HP, GARRISON_REGEN, GENERAL, GENERAL_BONUS,
                    GENERAL_TRAITS, OPEN_GROUND, PIKES_VS_HORSE, SCOUT, SUPPORT_BONUS, SUPPORT_MAX, UPGRADE_MAX,
-                   ATTRITION, FARM_GOODS, FOOD_PER_TROOP, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER, SUPPLY_BASE,
-                   SUPPLY_PER_FARM, SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, BURGHER_TAX,
-                   COLONY_DONE, COLONY_UPKEEP, ELASTICITY, END_YEAR, PIONEER, WORKS_BONUS, WORKS_UPKEEP, SETTLEMENTS,
-                   SETTLEMENT_TAX, SETTLEMENT_UPKEEP, CASTLES, CASTLE_UPKEEP, CASTLE_DEFENSE, CASTLE_SIEGE, GOODS,
-                   NEEDS, OUTPUT, PEASANT_TAX, PRICE_CAP, PRICE_FLOOR, PRODUCTION_TAX, REMOTE_PENALTY, SIEGE_BASE,
-                   START_YEAR, TAX_GROWTH, TAX_LEVELS, TERRAIN, TRADING_POST_SHARE, WAR_LENGTH_AI, BASE_GROWTH, date,
-                   SUBSISTENCE, MANUFACTORY_TAX, TOLL_SHARE)
+                   ATTRITION, FARM_GOODS, FOREIGN_SUPPLY, FORAGE_LOSS, MANPOWER, SUPPLY_BASE, SUPPLY_PER_FARM,
+                   SUPPLY_PER_PEOPLE, SUPPLY_RANGE, WAGON, WAGON_SEASONS, BUILDINGS, END_YEAR, PIONEER, CASTLE_DEFENSE,
+                   CASTLE_SIEGE, SIEGE_BASE, START_YEAR, TERRAIN, WAR_LENGTH_AI, date)
 
 INF = float("inf")
 SCALE = geo.SCALE
@@ -42,8 +38,7 @@ LAND_TILES = ("plains", "steppe", "forest", "hills", "mountains", "desert", "jun
               "savanna", "beach", "snow")
 FORBIDDEN = worldgen.FORBIDDEN        # the terrain pairs that may not touch (wave function collapse)
 Province, Country, Market, Route = state.Province, state.Country, state.Market, state.Route   # saves pickle every state class as hexa.campaign.world.<Name>
-CLASSES = ("peasants", "burghers", "nobles")
-from .data import MANUFACTORIES, MINE_GOODS, DEBT_INTEREST
+from .data import MANUFACTORIES
 
 
 def _europe_region(lon, lat):
@@ -592,20 +587,12 @@ class CampaignWorld:
     def recall_merchant(self, tag, route, order=None):
         return trade.recall_merchant(self, tag, route, order)
 
-    # ----- the economy (runs once per season, after everybody moved) --------------
+    # ----- the economy (systems/economy.py; it runs once per season, after everybody moved) --------------
     def set_tax(self, tag, level):
-        """Change a country's tax level and show the projected economy. This is only a preview: the pending
-        purchases and the price history are left alone, so the season's own economy still runs once, as it would
-        have without the change."""
+        """Change a country's tax level and show the projected economy (a preview, see economy.preview_tax)."""
         if self.__dict__.get("_settled") is None:
-            self._settled = self._settled_state()
-        self.countries[tag].tax = level
-        self.economy(preview=True)
-
-    def _settled_state(self):
-        """The incomes and outputs the last real season left (the AI decides on these, not on a preview)."""
-        return ({t: dict(c.income) for t, c in self.countries.items()},
-                {p.pos: (p.output, p.value) for p in self.provinces.values()})
+            self._settled = economy.settled_state(self)
+        economy.preview_tax(self, tag, level)
 
     def settle_preview(self):
         """Put back the incomes and outputs of the last real season, so the AI decides as it would have without
@@ -613,108 +600,15 @@ class CampaignWorld:
         saved = self.__dict__.get("_settled")
         if saved is None:
             return
-        incomes, outputs = saved
-        for tag, income in incomes.items():
-            self.countries[tag].income = income
-        for pos, (output, value) in outputs.items():
-            self.provinces[pos].output, self.provinces[pos].value = output, value
+        economy.restore_settled(self, saved)
         self._settled = None
-
-    def _trade_state(self):
-        """The prices and the route trade as the season left them. A preview puts them back, because the next
-        real economy reads last season's prices (the staffing of workshops) before it sets new ones."""
-        return ([(m, dict(m.price)) for m in self.markets],
-                [(r, r.flows, r.results, r.profit) for r in self.routes])
-
-    @staticmethod
-    def _restore_trade_state(state):
-        prices, routes = state
-        for market, price in prices:
-            market.price.clear()
-            market.price.update(price)
-        for route, flows, results, profit in routes:
-            route.flows, route.results, route.profit = flows, results, profit
 
     def economy(self, preview=False):
         """Work out prices, trade and incomes. preview=True projects them without using up the pending purchases
         or adding a point to the price history."""
-        self.ensure_markets()
         if not preview:
             self._settled = None
-        held = self._trade_state() if preview else None
-        for market in self.markets:
-            market.reset(keep_pending=preview)
-        for prov in self.provinces.values():
-            prov.output = prov.value = 0.0
-            market = prov.market
-            if not prov.owner or not market:
-                continue
-            if prov.controller == prov.owner:
-                food = SUBSISTENCE * prov.peasants
-                market.supply["grain"] += food
-                market.produced["grain"] += food
-            if prov.good and prov.controller == prov.owner:
-                out = OUTPUT[prov.good] * self._workers(prov) * self._works_factor(prov) * self._output_mult(prov)
-                if prov.remote:
-                    out *= REMOTE_PENALTY
-                if prov.foraged and prov.foraged[1] >= self.turn - 1:
-                    out *= 0.5
-                prov.output = out
-                market.supply[prov.good] += out
-                market.produced[prov.good] += out
-            for cls in CLASSES:
-                people = getattr(prov, cls)
-                for need, amount in NEEDS[cls].items():
-                    market.demand[need if need != "food" else "grain"] += amount * people
-            for key in MANUFACTORIES:
-                level = prov.level(key)
-                if level:
-                    staff = self._staffing(prov, key)
-                    for g, n in self._inputs(prov, key).items():
-                        market.demand[g] += n * level * staff
-        for unit in self.units:
-            if unit.kind.war and unit.carrier is None:
-                market = self.food_market(unit)
-                if market:
-                    market.demand["grain"] += FOOD_PER_TROOP
-        for market in self.markets:
-            self._split_food(market)
-            self._set_prices(market)
-        # Workshops make their goods first, so merchants and trade routes can carry them.
-        profits = {}
-        for prov in self.provinces.values():
-            if not prov.owner or not prov.market or prov.controller != prov.owner:
-                continue
-            for key in MANUFACTORIES:
-                level = prov.level(key)
-                if not level:
-                    continue
-                market, staff = prov.market, self._staffing(prov, key)
-                inputs = self._inputs(prov, key)
-                share = min((market.satisfaction(g) for g in inputs), default=1.0) * staff * level
-                made = 0.0
-                for g, n in BUILDINGS[key].outputs.items():
-                    market.supply[g] += n * share
-                    market.produced[g] += n * share
-                    made += n * share * market.price[g]
-                cost = sum(n * share * market.price[g] for g, n in inputs.items())
-                profits[prov.owner] = profits.get(prov.owner, 0) + max(0.0, made - cost) * MANUFACTORY_TAX
-        for market in self.markets:
-            self._set_prices(market)
-        for route in self.routes:
-            trade.merchants_trade(self, route)
-        for route in self.routes:
-            trade.trade_route(self, route)
-        for market in self.markets:
-            self._set_prices(market)
-            if preview:
-                continue
-            for g in GOODS:
-                market.history[g].append(round(market.price[g], 2))
-                del market.history[g][:-40]
-        self._incomes(profits)
-        if held is not None:
-            self._restore_trade_state(held)
+        economy.economy(self, preview)
 
     # ----- what the techs and ideas change (keys in tech.EFFECT_KEYS) ------------------------------
     def men_per_troop(self, tag):
@@ -748,116 +642,11 @@ class CampaignWorld:
             return unit.kind.sight + round(self.bonus(unit.owner, "ship_sight") * SCALE)
         return unit.kind.sight
 
-    def _workers(self, prov):
-        if not prov.trading_post:
-            return prov.peasants
-        return prov.peasants + prov.natives * TRADING_POST_SHARE * (1 + self.bonus(prov.owner, "trading_post_share"))
-
-    def _works_factor(self, prov):
-        extra = self.bonus(prov.owner, "farm_works") if prov.good in FARM_GOODS else 0
-        return 1 + (WORKS_BONUS + extra) * prov.works
-
-    def _output_mult(self, prov):
-        if prov.good in MINE_GOODS:
-            return 1 + self.bonus(prov.owner, "mines")
-        if prov.good == "wool":
-            return 1 + self.bonus(prov.owner, "wool")
-        return 1
-
-    def _tax_growth(self, tag):
-        growth = TAX_GROWTH[self.countries[tag].tax]
-        if growth < 0:
-            return growth * max(0.0, 1 - self.bonus(tag, "tax_relief"))
-        return growth
-
-    @staticmethod
-    def _staffing(prov, key):
-        need = BUILDINGS[key].needs_burghers * prov.level(key)
-        return 1.0 if need <= 0 else min(1.0, prov.burghers / need)
-
-    @staticmethod
-    def _inputs(prov, key):
-        inputs = dict(BUILDINGS[key].inputs)
-        if key == "weaver" and prov.market and prov.market.price["cotton"] < prov.market.price["wool"] * 1.2 \
-                and prov.market.supply.get("cotton", 0) > prov.market.supply.get("wool", 0):
-            inputs = {"cotton": inputs.pop("wool")}
-        return inputs
-
-    @staticmethod
-    def _split_food(market):
-        want = market.demand["grain"]          # all food demand was booked as grain
-        grain, fish = market.supply["grain"], market.supply["fish"]
-        if grain + fish > 0:
-            market.demand["fish"] = want * fish / (grain + fish)
-            market.demand["grain"] = want - market.demand["fish"]
-
-    @staticmethod
-    def _set_prices(market):
-        for g, good in GOODS.items():
-            if good.kind == "money":
-                market.price[g] = good.price
-                continue
-            ratio = (market.demand[g] + 0.5) / (market.supply[g] + 0.5)
-            market.price[g] = good.price * max(PRICE_FLOOR, min(PRICE_CAP, ratio ** ELASTICITY))
-
     def food_market(self, unit):
-        """Where a troop buys its food: the market of the province it stands in, else its capital's."""
-        prov = self.provinces.get(unit.pos)
-        if prov and prov.market and prov.controller == unit.owner:
-            return prov.market
-        capital = self.provinces.get(self.countries[unit.owner].capital)
-        return capital.market if capital else None
-
-    def _incomes(self, profits):
-        trade = {}
-        for route in self.routes:
-            for tag, g, amount, profit in route.results:
-                trade[tag] = trade.get(tag, 0) + profit
-            if route.profit <= 0:
-                continue
-            for market in (route.a, route.b):
-                owner = self.market_owner(market)
-                if owner:
-                    trade[owner] = trade.get(owner, 0) + route.profit * TOLL_SHARE * (1 + self.bonus(owner, "tolls"))
-        food = {}
-        for unit in self.units:
-            if unit.kind.war and unit.carrier is None:
-                market = self.food_market(unit)
-                price = market.price["grain"] if market else 1.5
-                food[unit.owner] = food.get(unit.owner, 0) + FOOD_PER_TROOP * price
-        for tag, country in self.countries.items():
-            if not country.alive:
-                continue
-            rate = TAX_LEVELS[country.tax] + (self.bonus(tag, "high_tax") if country.tax == "high" else 0)
-            production = pop_tax = upkeep = colonies = 0.0
-            for prov in self.provinces_of(tag):
-                if prov.controller != tag:
-                    continue
-                market = prov.market
-                if market and prov.good:
-                    money = 1 + self.bonus(tag, "money_value") if GOODS[prov.good].kind == "money" else 1
-                    prov.value = prov.output * market.price[prov.good] * money
-                    production += prov.value * (PRODUCTION_TAX + self.bonus(tag, "production_tax")) * rate
-                everyday = market.satisfaction("cloth") if market else 0.5
-                pop_tax += rate * (prov.peasants * PEASANT_TAX + prov.burghers * BURGHER_TAX * (1 + self.bonus(tag, "burgher_tax")) *
-                                   (0.5 + 0.5 * everyday) * (1 + 0.15 * prov.level("marketplace"))) * \
-                    (1 + SETTLEMENT_TAX[prov.settlement])
-                for key, level in prov.buildings.items():
-                    upkeep += BUILDINGS[key].upkeep * level
-                upkeep += WORKS_UPKEEP * prov.works + SETTLEMENT_UPKEEP[prov.settlement] + CASTLE_UPKEEP[prov.castle]
-                if prov.colony:
-                    colonies += COLONY_UPKEEP * (1 + self.bonus(tag, "colony_upkeep"))
-            units = sum(u.kind.upkeep for u in self.units_of(tag)) + food.get(tag, 0.0)
-            country.income = {"production": production, "taxes": pop_tax, "buildings": profits.get(tag, 0.0),
-                              "trade": trade.get(tag, 0.0), "upkeep": -upkeep, "military": -units,
-                              "colonies": -colonies}
-            if country.treasury < 0:
-                country.income["interest"] = max(country.treasury, -self.debt_limit(tag)) * DEBT_INTEREST
+        return economy.food_market(self, unit)
 
     def collect(self):
-        for country in self.countries.values():
-            if country.alive:
-                country.treasury += country.balance
+        return economy.collect(self)
 
     def debt_limit(self, tag):
         return debt.debt_limit(self, tag)
@@ -870,47 +659,7 @@ class CampaignWorld:
 
     def grow(self):
         """Population growth, colonies, native raids, building queues."""
-        for prov in self.provinces.values():
-            if prov.owner is None:
-                prov.natives *= 1.0005
-                continue
-            food = prov.market.food_satisfaction() if prov.market else 0.8
-            prov.food = food
-            rate = BASE_GROWTH + self._tax_growth(prov.owner) + min(0.0, food - 0.9) * 0.05
-            if prov.colony:
-                rate = colonies.settlers(self, prov, rate)
-            prov.peasants *= 1 + rate
-            prov.nobles *= 1 + rate * 0.5
-            jobs = sum(BUILDINGS[k].needs_burghers * prov.level(k) for k in MANUFACTORIES) + \
-                3 * prov.level("marketplace")
-            if prov.burghers < jobs and prov.peasants > 2:
-                moving = min(prov.peasants * 0.006, jobs - prov.burghers)
-                prov.peasants -= moving
-                prov.burghers += moving
-            prov.burghers *= 1 + rate * (1 + self.bonus(prov.owner, "burgher_growth"))
-            if prov.natives > 0:
-                colonies.natives(self, prov)
-            if prov.colony and prov.pop >= COLONY_DONE:
-                colonies.graduate(self, prov)
-            for item in list(prov.queue):
-                item[1] -= 1
-                if item[1] <= 0:
-                    prov.queue.remove(item)
-                    if item[0] == "settlement":
-                        prov.settlement += 1
-                        self.message(f"{self.place(prov)} has grown into a {SETTLEMENTS[prov.settlement].lower()}.", prov.owner)
-                    elif item[0] == "castle":
-                        prov.castle += 1
-                        prov.garrison = prov.castle * GARRISON_HP
-                        self._castle_list = None
-                        self.message(f"{self.place(prov)}: the {CASTLES[prov.castle].lower()} is finished.", prov.owner)
-                    else:
-                        prov.buildings[item[0]] = prov.level(item[0]) + 1
-                        self.message(f"{self.place(prov)}: {self.building_name(prov, item[0])} finished.", prov.owner)
-                    self.bus.emit("building_done", prov.owner, prov.pos, what=item[0])
-                    self.changed()
-                    if item[0] == "marketplace":
-                        self.refresh_markets()
+        return economy.grow(self)
 
     # ----- building -----------------------------------------------------------------
     def building_name(self, prov, key):
