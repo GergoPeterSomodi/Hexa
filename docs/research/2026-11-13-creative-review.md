@@ -248,3 +248,11 @@ Changes:
   them twice.
 - None of the proposals was tested in the engine; the principles' numbers (15 seasons, 10 seasons back) are
   starting points.
+
+## Owner's decisions (2026-11-13)
+1. **Battles in v0.2.0:** names with the year ("Battle of X, 1525", "Second Battle of X") and `name` and `year` in `battle_ended`; the odds card on the attack hover as the last step (it may slip to a patch). One word for the odds, no percentage.
+2. **Aims of the crown:** yes. They add to the score behind the 1650 ranking, the AI picks them too, and they are built after the Crown projects, decided together with how winning works.
+3. **Price revolution:** parked. The owner sees it as inflation; revisit only as slowly rising prices inside reactive prices, if hoards remain after the Crown projects.
+4. **Rivals:** any runaway leader draws them (wealth draws rivals, aggression draws coalitions), the cause is shown in advance, and the player may name a rival.
+5. **Early Access price and demo:** not decided yet. About $20-25 stays the working figure; the demo is chosen after the triangle trade design.
+6. **Fun principles v2:** adopted. The market researcher applies the edits and keeps the list.

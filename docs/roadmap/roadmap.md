@@ -19,6 +19,7 @@ The owner asked for one delivery at a time, starting with war. The order:
 2. **Then M2 slice 2:** battle cards from techs, generals and elites (command points, the hand, sneaky cards).
 3. **Then M2 slice 3:** the battle mini-map, lane ground from the real map, deployment, battle events, troop quality.
 4. **After M2, one at a time:** the war goals and peace design (wars end by peace terms); trade T1, T2 and T5; economy E2 to E5; then the Crown projects and reactive prices designs.
+5. **Decided from the fun research (2026-11-13):** Aims of the crown (score, after the Crown projects, decided with how winning works); rivals for any runaway leader (in the brakes design); the price revolution is parked. See `docs/research/2026-11-13-creative-review.md`.
 
 Everything decided on 2026-11-13 stays recorded in its own doc and waits its turn.
 
