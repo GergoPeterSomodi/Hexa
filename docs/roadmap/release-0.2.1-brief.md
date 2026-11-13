@@ -1,8 +1,6 @@
-# Release 0.2.1 brief: DRAFT 2, cut by the creative director
+# Release 0.2.1 brief: LOCKED
 
-**DRAFT.** Redrafted on 2026-11-13 after the owner played v0.2.0, then cut by the creative director (review at the end).
-Planning on paper only: 0.2.1 code starts when the owner has decided the batch below. Draft 1 (the battle board) is in this
-file's git history; its items moved to 0.2.3 (see "The war line").
+**LOCKED on 2026-11-13.** The owner decided the batch below (their answers are under "Owner's decisions"). Scope is frozen: new ideas go to the backlog, bugs are the only exception. Draft 1 (the battle board) is in this file's git history; its items moved to 0.2.3 (see "The war line").
 
 ## Theme
 
@@ -41,8 +39,8 @@ every season.
 
 | # | Item | Source | Size | Status |
 |---|---|---|---|---|
-| 1 | **Battles end in the turn they start (P1).** A battle fights day after day in the attack's season until one side breaks, withdraws or flees, up to a day cap (proposed 8 days); a battle that reaches the cap carries on next season (rare). Clash goes; "Quick battles" is no longer an option, it is how battles work. To reinforce, attack the same hex with a second stack in the same season: it joins on day 1. No panel opens by itself: the log line ("Battle of Cremona: won in 4 days") and the Army task flag open the battle panel on the result, with the day log. | P1 | S to M | **In** |
-| 2 | **Withdraw or Flee (P3).** Withdraw is no longer a free exit before the fight. The standing order is **Hold** or **Withdraw**; Withdraw acts at the end of day 1 (and of each later day): a side that is still steady (front morale at least 60%) leaves in order, 5% of men, morale kept; an attacker pays 5% more (10%). A side under 60% cannot leave in order: it **flees**: 15% of men, morale to 0.15 (no attack for about 2 seasons), guns lost. A side that breaks pays the same as a flight. A fleeing army may run to any free land hex near by, not only its own land; with none it surrenders, as today. The AI follows the same rules. The order's hover shows both prices before the choice. | `docs/design/sieges-and-retreats.md` section 3 | S to M | **In** |
+| 1 | **Every battle ends in the turn it starts (P1, owner decision 2).** A battle fights day after day in the attack's season until one side breaks, withdraws or flees. Nothing carries over: if no side has gone by the day cap (proposed 8 days), the side with the lower front morale withdraws (it pays the Withdraw price) and the battle ends that turn. Clash goes; "Quick battles" is no longer an option, it is how battles work; `BATTLE_MAX_SEASONS` goes. To reinforce, attack the same hex with a second stack in the same season: it joins on day 1. No panel opens by itself: the log line ("Battle of Cremona: won in 4 days") and the task flag open the battle panel on the result, with the day log. | P1 | S to M | **In** |
+| 2 | **Withdraw or Flee (P3, owner decision 3).** Withdraw is no longer a free exit. The standing order is **Hold** or **Withdraw**; Withdraw takes effect only after a couple of days of fighting (from the end of day 2) and costs men and morale: 5% of men (10% for an attacker) and 25 points of morale (proposed). A side whose front morale falls under **10%** flees: 15% of men, its guns, morale to 0.15 (no attack for about 2 seasons). A side whose line breaks pays the same as a flight. A fleeing army may run to any free land hex near by, not only its own land; with none it surrenders, as today. The AI follows the same rules (it orders Withdraw when it is clearly losing). The order's hover shows both prices before the choice. The numbers are tuned in the build against the done-when bands. | owner; `docs/design/sieges-and-retreats.md` section 3 | S to M | **In** |
 | 3 | **Task flags instead of the End season pop-up (P2).** One "N things to do" flag under End season; a click opens the list (the reminder lines, most pressing first), a line goes there. The count drops as tasks are done; at 0 the flag is gone. End season never asks. The reminders option now turns the flag on and off. | mockup `docs/design/ui/19_task_strip_b.png` (A: `19_task_strip_a.png`) | S to M | **In** |
 | 4 | Small fixes: the level 1 castle odds band, the orphan word in the order hint, the perf metric that measures pikes only | v0.2.0 backlog | S each | **In**, first to cut |
 
@@ -58,8 +56,9 @@ then item 3 (the pop-up stays one more release, off by default).
   the siege; the amber siege badge (`docs/design/ui/20_siege_badge.png`). Design: `docs/design/sieges-and-retreats.md`
   section 4. Its batch opens with four questions: the meter or a longer timer; the pace (with a 2-season floor); Besiege as
   the default with Storm second; the badge's bar (A) or dial (B). A besieged place of yours shows in the task flag.
-- **0.2.3 The battle board:** draft 1 of this brief: back line, Rotation, the AI army-size rules, the docked panel. To be
-  re-read after 0.2.1: with one-season battles, orders given between days (Rotation) become orders set before the attack.
+- **0.2.3 The battle board, as a mini game inside the turn (owner decision 2):** draft 1 of this brief (back line, Rotation,
+  the AI army-size rules, the docked panel) re-planned so the player watches the days and decides between them (Withdraw,
+  Rotation, reserves), all inside the turn.
 - **Trade patch:** the `trade-fixes` branch and the forecast question, slotted after 0.2.2 or 0.2.3 (decision 1 below).
 - **Field forts (P5):** after sieges have been played; design section 6.
 - Then battle cards, the mini-map, war goals and peace, as the roadmap says.
@@ -67,31 +66,25 @@ then item 3 (the pop-up stays one more release, off by default).
 ## Done when (draft)
 
 - No open bug issue; tests, soak, save-compat and perf pass (the battles phase may fight up to 8 days a battle: measure it).
-- Battle stats: at least 95% of battles end in the season they start (the rest at the day cap); bigger-side win bands within
+- Battle stats: at least 95% of battles end in the season they start (all of them: none carries over); bigger-side win bands within
   5 points of v0.2.0; battles that end by Withdraw under 25% (measured before and after); the loser's share of men lost, before
   and after, in the stats table.
 - Setbacks (principle 8): in a seeded run, a mid-sized country that loses a battle can field half its old army within 10 seasons.
 - Owner playtest: start a battle and see its end the same turn; open its day log from the log line; give a weak army the
-  Withdraw order, and see it leave in order after day 1 or flee when it was already shaken, with the cost shown first; end
+  Withdraw order, and see it leave after day 2 paying men and morale, or flee once its morale is under 10%, with the cost shown first; end
   five seasons without a pop-up and use the task flag at least once.
 
-## Owner's decisions for 0.2.1 (one batch)
+## Owner's decisions (2026-11-13)
 
-Recommended choice first.
-
-1. **The order of the war line.** (a) **0.2.1 this brief, 0.2.2 sieges, 0.2.3 the battle board, then the trade patch.** Your
-   notes are about follow-ability and cost first; sieges bring the new decisions next. (b) Sieges in 0.2.1 too (one bigger
-   patch, a later playtest). (c) Keep draft 1: the board first.
-2. **How long a battle runs in one turn.** (a) **Until one side breaks, up to 8 days, all in the attack's season; Clash
-   removed.** You see every battle end the turn it starts; to reinforce, you attack with two stacks in the same season.
-   (b) Keep 3 days a season and make Quick the default: under half to most battles end in one season, the rest carry over
-   and can be reinforced next season.
-3. **Leaving a battle.** (a) **Withdraw acts after day 1: a steady army (60% morale or more) leaves for 5% of its men (10% for
-   an attacker); a shaken one flees: 15% of men, its guns, morale to 15%. A broken army pays the same as a flight. A fleeing army
-   may run to any free hex near by.** (b) As (a), but a fleeing army keeps its guns. (c) As (a), and also lose the wagons, 10%
-   of survivors desert and 20% of men against cavalry (the designer's fuller price).
-4. **Task flag.** (a) **One "N things to do" flag under End season, with a list (19_task_strip_b).** (b) Small flags under each
-   stat chip (19_task_strip_a). Both remove the pop-up.
+1. **The war line order:** as recommended. 0.2.1 this brief, 0.2.2 sieges, 0.2.3 the battle board, then the trade patch.
+2. **Battle length:** "It should end within the turn. A mini game on the battle board is the plan." Every battle ends in the
+   turn it starts; nothing carries over (item 1). The battle board (0.2.3) is to become a mini game played inside the turn;
+   its brief starts from that.
+3. **Leaving a battle:** "After a couple of turns within the battle mini game the player or AI can decide to retreat, or flee
+   when morale is too low. Like 10%? Withdraw costs morale and % of army." Withdraw only after a couple of days, at a cost in
+   men and morale; flight below 10% morale (item 2). In 0.2.1 the choice is the standing order set before the fight; in the
+   0.2.3 mini game it becomes a choice made between days.
+4. **Task flag:** B, one "N things to do" flag with a list (item 3).
 
 ## Creative review (2026-11-13, draft 2)
 
