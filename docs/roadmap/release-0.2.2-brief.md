@@ -1,8 +1,7 @@
-# Release 0.2.2 brief: DRAFT
+# Release 0.2.2 brief: LOCKED
 
-**DRAFT, 2026-11-13, cut by the creative director (review at the end).** Planning on paper only. Code starts when the owner
-has decided the batch below; then scope is frozen (docs/studio.md, "How a release runs"). The design is
-`docs/design/sieges-and-retreats.md` section 4.
+**LOCKED on 2026-11-13.** The owner took the recommended answer on all four questions and every default. Scope is frozen:
+new ideas go to the backlog, bugs are the only exception. The design is `docs/design/sieges-and-retreats.md` section 4.
 
 ## Theme
 
@@ -88,26 +87,15 @@ marked **look** change how the game feels most; they are the ones worth a minute
   in the log without help; storm a place late in a siege and see it cost less; as the defender, see the task flag line and
   the relief line, and choose to relieve or let go.
 
-## Owner's decisions for 0.2.2 (one batch)
+## Owner's decisions (2026-11-13)
 
-Four questions; everything else is in the defaults above, and you can overrule any of them. Recommended choice first.
-A *season* is one turn (four a year). A *regiment* is 1,000 men.
-
-1. **How a siege works.** (a) **A siege meter:** each turn the besieging army fills a meter on the town; more men, cannons and
-   a general who is a siege master fill it faster; bigger castles, hills and a full garrison need more; when the town runs out
-   of food it fills faster on its own. This is your "based on attack and defence". (b) Simple timers: each castle level just
-   takes a fixed number of turns. Easier to read, but bringing more men or cannons would not help.
-2. **How long sieges take** (with 3 regiments and no cannons: no castle / small castle / castle 2 / big castle; an AI war lasts
-   about 16 turns). (a) **2 / 3 / 4 / 7 turns; with 2 good cannons (culverins) 2 / 2 / 2 / 3.** (b) Faster: 2 / 2 / 4 / 7, and
-   big armies save a turn more. (c) Slower: 2 / 3 / 5 / 9 (a big castle without cannons takes over two years).
-3. **Marching on a castle with soldiers inside.** (a) **You choose: Besiege** (sit outside, no fighting, the meter fills each
-   turn) **is the default; Storm** (attack the walls now: a battle this turn, with losses) **is the second choice,** and stays
-   open every turn of the siege, getting cheaper as the garrison weakens. The *odds card* (the small card that shows one word
-   such as "Poor" or "Favourable" before you attack) then counts the garrison properly. (b) Always storm, as today; sieges then
-   happen only at places without soldiers.
-4. **How a siege looks on the map** (mockup `docs/design/ui/20_siege_badge.png`). (a) **A dial:** the round siege badge's ring
-   fills up like a clock as the siege goes on; it never overlaps a battle badge. (b) A bar under the town, like the battle bar:
-   easier to count, but at full zoom it runs into a battle next door.
+1. **How a siege works:** the siege meter (men, cannons, a siege general and hunger against the castle, the ground and the
+   garrison).
+2. **Pace:** as designed. 3 regiments with no cannons take 2 / 3 / 4 / 7 turns (no castle / castle 1 / 2 / 3); with 2 culverins
+   2 / 2 / 2 / 3.
+3. **A castle with soldiers inside:** Besiege by default, Storm as the second choice, open every turn.
+4. **Siege badge:** B, the dial in the ring.
+5. **Defaults:** all taken as listed.
 
 ## Creative review (2026-11-13)
 

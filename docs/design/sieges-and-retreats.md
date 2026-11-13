@@ -418,7 +418,7 @@ Measurable targets (the "How to prove it" list):
 - **Odds card:** each of the 31 garrison scenario pairs lands in its word's band (or one band low at the top, never one band
   high); the level 3 garrison alone at ratios 1.7 to 3.3 no longer reads Hopeless.
 - **AI war length** (seeded all-AI, the same 4 worlds, 240 seasons): at least 17 provinces moved per decade per world (70% of
-  today's 23.6), wars that move no province at most 20%, wars ended by the length limit at most 50%.
+  today's 23.6), wars that move no province at most 20%, wars ended by the length limit at most 35% (the release brief's target).
 - **Snowballing:** the largest country's land share by 1600 is not higher than today's in the stop-steamrolling run.
 - **AI time:** per season at most 10% more than today (`tools/perf.py`).
 - **Saves:** a mid-siege save has the same `world_digest` after load and plays on; the save-compat job passes.
