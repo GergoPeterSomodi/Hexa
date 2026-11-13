@@ -4,6 +4,11 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
+**Version numbers (decided 2026-11-13):** one MINOR number per phase of the roadmap; PATCH numbers are the steps
+and fixes inside it. 0.1.x is the foundations. **0.2.x is war:** battles (0.2.0), their patches, battle cards, the
+battle mini-map, and war goals and peace. Later phases (the living world, history and events, the sea, game feel)
+take 0.3.x onwards, and 0.9.x is the Steam Early Access line. 1.0 is the full Steam release.
+
 ## v0.1.9: Armies you can follow
 **Movement and reminders:**
 - After End season, the armies and ships you can see walk hex by hex instead of jumping; moves under fog stay instant,
