@@ -240,8 +240,12 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   method did, and the functions call each other through `world.` as before (tests wrap `world.plan` and `world.cost_field`);
   keep it that way, and add no call layer inside their loops. `castles()` (the `_castle_list` cache) and `aboard()` (the old
   `_aboard`) stay on the world.
-- **Combat values** (`systems/combat.py`, writes nothing): `general`, `attack_value` and `defense_value`, read through
-  `world.bonus`; war.py re-exports the names. The battle system's day rules build on them.
+- **Combat** (`systems/combat.py`): `general`, `attack_value` and `defense_value` (read through `world.bonus`; war.py
+  re-exports the names), then the battle's day (battle slice 1, PR 2): `deploy` fills the three lanes, `fire`, `shock`,
+  `flanks`, `morale`, `breaker` and `pursuit` work out one phase's hits and apply them together, `fight_day` runs a day,
+  `army_morale` measures a side. The numbers are in data.py (`SHOCK_LOSS`, `STANCE`, `BREAK`...). Nothing calls it yet:
+  the battle is wired into the season in PR 3. It writes the battle object, unit hp and morale, `prov.garrison`, and
+  kills through `world.kill`; `OWNS` lists those.
 - **War** (`systems/war.py`; the battle system builds on it): `at_war`, `enemies`, `war_check`/`declare_war`, `war_score`, `peace`
   (and `free_spot_near`), `peace_offer`, `attack_options`/`attack` and their `_group` forms (with `targets`), `battle` (one fight: front
   line plus support, using the combat values below), `lose` (units off the map, a `unit_lost` event each), `kill`

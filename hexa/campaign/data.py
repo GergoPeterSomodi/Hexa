@@ -364,6 +364,24 @@ GARRISON_ATTACK, GARRISON_DEFENSE = 3, 3   # +2 defense per castle level
 GARRISON_REGEN = 2
 MEN = 1000                                 # men in a full regiment: battles show strength as men (rules keep hp)
 GARRISON_MEN = 100                         # men per garrison hit point (a level 3 castle: 1,800)
+# ----- battles (slice 1: the day rules of hexa/campaign/systems/combat.py; spec section 4) ------------------
+DAYS_PER_SEASON = 3                        # battle days fought each season
+SHOCK_LOSS = 0.08                          # share of a regiment's hp lost a day in an even lane fight
+FIRE_LOSS = 0.05                           # a gun's fire, a day
+SHOT_LOSS = 0.03                           # era 2 and 3 infantry's shot, a day
+FLANK_BONUS = 1.25                         # a regiment that comes round an empty flank
+STANCE = {"attack": (1.2, 1.1), "hold": (0.9, 0.8)}   # stance: (damage dealt, damage taken)
+MORALE_PER_LOSS = 2.5                      # morale lost per share of the regiment's hp lost that day
+FRONT_DRAIN, RESERVE_DRAIN, HUNGER_DRAIN = 0.04, 0.03, 0.03   # morale a day: in a lane, in reserve, unfed
+GENERAL_MORALE = 0.15                      # a general on the side cuts the morale loss by this share
+BREAK = 0.25                               # army morale under this breaks the army
+ATTACK_MORALE = 0.5                        # a stack this shaken cannot start an attack
+PURSUIT, PURSUIT_FOOT, WITHDRAW_PURSUIT = 0.10, 0.04, 0.05   # share of men killed in a pursuit
+WOUNDED_SHARE, WOUNDED_RETURN = 0.5, 0.5  # share of hp lost that is wounded; share of wounded that come back
+RETREAT_MORALE, MORALE_RECOVERY = 0.3, 0.25
+BATTLE_MAX_SEASONS = 6                     # a battle this long ends with the lower army withdrawing (owner decision)
+BATTLE_LOG = 24                            # log lines kept per battle
+NARROW_TERRAIN = ("mountains", "marsh", "jungle", "snow")   # the right lane is closed: two lanes fight
 RESEARCH_BASE = 0.6                        # research points per season, plus burghers / 40
 RESEARCH_FUND = (60, 15)                   # ducats -> research points
 
