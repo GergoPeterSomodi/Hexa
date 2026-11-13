@@ -740,12 +740,6 @@ class CampaignApp:
     def _do_battle(self, action):
         self.battle.open(self, action[1])
 
-    def _do_tasks(self, action):
-        self.hud.tasks.toggle()
-
-    def _do_battle_log(self, action):
-        self.battle.show_ended(self, action[1])
-
     PRESS = {"game_menu": _do_game_menu, "close_panel": _do_close_panel, "mode": _do_mode, "panel": _do_panel,
              "choose": _do_choose, "end": _do_end, "continue": _do_continue, "build": _do_build,
              "recruit": _do_recruit, "invest": _do_invest, "found": _do_found, "pick": _do_pick,
@@ -753,7 +747,8 @@ class CampaignApp:
              "tech": _do_tech, "fund": _do_fund, "tax": _do_tax, "war": _do_war, "peace": _do_peace,
              "merchant": _do_merchant, "goods_view": _do_goods_view, "forage": _do_forage, "recall": _do_recall,
              "market": _do_market, "country": _do_country, "province": _do_province, "goto": _do_goto,
-             "log": _do_log, "battle": _do_battle, "tasks": _do_tasks, "battle_log": _do_battle_log}
+             "log": _do_log, "battle": _do_battle, "tasks": lambda self, action: self.hud.tasks.toggle(),
+             "battle_log": lambda self, action: self.battle.show_ended(self, action[1])}
 
     def scroll(self):
         if self.menu:
