@@ -125,9 +125,9 @@ class Canvas:
     """A 120 x 140 tile at K x: ground layer `surf` with pen `g`, object layer `layer` with pen `o` (stamp commits it
     with a dark outline), cut to the hex and scaled down by finish()."""
 
-    def __init__(self):
-        self.surf = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
-        self.layer = pygame.Surface((W * K, H * K), pygame.SRCALPHA)
+    def __init__(self, size=(W * K, H * K)):
+        self.surf = pygame.Surface(size, pygame.SRCALPHA)
+        self.layer = pygame.Surface(size, pygame.SRCALPHA)
         self.g = Pen(self.surf)
         self.o = Pen(self.layer)
 

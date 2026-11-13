@@ -72,7 +72,7 @@ ALLOW_MODULES = {
     "hexa.campaign.app": 975,
     "hexa.campaign.mapview": 1544,
     "hexa.campaign.randomgeo": 1286,
-    "hexa.campaign.life": 1200,
+    "hexa.campaign.life": 1182,
     "hexa.campaign.goodsobjects": 1155,
     "hexa.colony.world": 1116,
     "hexa.campaign.techscreen": 885,
