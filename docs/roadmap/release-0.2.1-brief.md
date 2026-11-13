@@ -1,22 +1,20 @@
-# Release 0.2.1 brief: DRAFT
+# Release 0.2.1 brief: DRAFT 2, cut by the creative director
 
-**DRAFT. Locked after the owner plays v0.2.0.** Planning on paper only: no 0.2.1 code starts until v0.2.0 ships (docs/studio.md,
-"How a release runs"). Reviewed by the creative director on 2026-11-13 (note at the end); the owner has not decided yet.
+**DRAFT.** Redrafted on 2026-11-13 after the owner played v0.2.0, then cut by the creative director (review at the end).
+Planning on paper only: 0.2.1 code starts when the owner has decided the batch below. Draft 1 (the battle board) is in this
+file's git history; its items moved to 0.2.3 (see "The war line").
 
 ## Theme
 
-**The battle board.** Battles get their second row (back line, refill, rotation), the AI stops making blobs, and the battle
-panel docks beside the map so you can watch the fight and the map at once. One war patch, no new systems, no economy changes.
+**War you can follow.** A battle is fought to its end in the turn you start it, losing costs something real, and the game stops
+interrupting End season. No new systems: this fixes what made v0.2.0 flat (P1, P2, P3 below). Sieges, the owner's other big
+note (P4), are the next patch, 0.2.2.
 
-Principles it is for (docs/research/fun-principles.md v2): **11** readable and light to run, **2** trade-offs, **12** the AI is a
-rival. Checked for harm: 1 (no new clicks a season), 3 (the odds card and the rotation toggle must show the price, see changes
-below), 6 (instant rotation is a snowball, so it is not allowed), 14 (ranks that relieve each other are the pike-and-shot period).
-Principle 16 is not touched.
+Principles it is for (docs/research/fun-principles.md v2): **9** you see what happened, **2** trade-offs (retreat has a price),
+**11** light to run (no pop-up at End season).
 
-## Open bugs
-
-`gh issue list --state open` returned no open issues on 2026-11-13. Anything the v0.2.0 playtest finds comes first
-("fix issues first"), and is added to the section below.
+**What to expect.** 0.2.1 takes away friction and free exits. It does not add a new war decision; that is 0.2.2 (besiege or
+storm, relieve or let it fall). Play 0.2.1 for "can I follow it, and does losing hurt", not yet for "is war engaging".
 
 ## What the v0.2.0 playtest found
 
@@ -27,7 +25,7 @@ engaging". The owner's notes, each with what the game does today:
 |---|---|---|
 | P1 | "Battles must be within the same turn, otherwise you lose out on the progress of it." | Clash (the default) fights day 1 in the attacker's season and the rest in the next one, so the player sees the start, ends the season and finds the rest already fought. Quick battles fights all the days at once but is an option, not the default. |
 | P2 | The end-of-turn pop-up for merchants and armies is not fun. Instead, a flag below the top bar's stats could show the unfinished tasks, so no pop-up is needed. ("Need to think about it.") | `reminders.unfinished` builds the list. A window shows it when End season is pressed, and a click goes to the item. Reminders are an option, on by default. |
-| P3 | The enemy withdraws from a battle too easily. Restrict it: an organised withdrawal is one thing, fleeing (just running away) is another. | Withdraw is open every season to any side with a retreat hex. It costs 5% of men (pursuit, all killed) and keeps morale, so it is the cheap way out of any losing battle. |
+| P3 | The enemy withdraws from a battle too easily. Restrict it: an organised withdrawal is one thing, fleeing (just running away) is another. | Withdraw is open every season to any side with a retreat hex, and a standing Withdraw takes effect before day 1 is fought. It costs 5% of men (pursuit, all killed) and keeps morale, so it is the cheap way out of any battle, even one not yet fought. |
 | P4 | Castles are captured too quickly. Every place needs a basic defence that takes a couple of turns to take. Each turn the siege makes progress based on attack and defence values. An army that comes to relieve the place fights a battle with the besiegers. A siege needs a map marker like the battle badge. | A province with no castle needs 1 siege point and falls in **one season**. A level 1 castle needs 4: one season with two cannons, two with one. Progress is +1 a season, plus cannons and a siege general; the garrison, supply, terrain and the besieger's size do not count. Sieges show only as ribbons ("Siege 2/5"). A relief army moving in already starts a battle. |
 | P5 | *Idea:* an army could build a light field fort with a button (1 to 2 turns). An attacker then picks: besiege it (1 to 2 turns, the enemy can reinforce) or rush it (a battle at once, with a penalty). | Not in the game. The army's only orders are move, attack and forage. |
 
@@ -35,122 +33,101 @@ What this says: the war doesn't feel engaging because its decisions are thin. Ba
 cheaply, and land changes hands in a season with no siege to fight over. P2 is a UI-noise point: the pop-up interrupts
 every season.
 
-## Candidate items
+## Open bugs
 
-| # | Item | Source | Size | Serves | Status |
-|---|---|---|---|---|---|
-| B | **Battle board, slice A:** back line (3 slots, ranged first, spares as second rank), refill rules, rotation (levy 2 days, drilled 1 day, Auto / Hold the line), AI army-size rules 1 to 4 (no blobs, second wave, garrisons, board-aware attack ratio) | `docs/design/battle-size-and-frontage.md` sections 4.2, 4.3, 5, 7 | L | 2, 12, 11 | **In** |
-| C | **Docked battle panel, smallest version:** option A or B (decision 2), 3 lanes with the back row, pool chips, a one-line "marching in", orders with the rotation toggle, terrain chips, day log, camera centring | `docs/design/ui/README.md` section 9 | M | 11, 9 | **In** |
-| E | **Panel legend** (the tile corner marks and slot styles) | `docs/design/battle-plan-review.md` 3.2 | S | 11, 13 | **In**, first to cut |
-| H | Small issues from the v0.2.0 release check and playtest; review leftovers (year rule copied in `battle.py`; the perf metric uses pikes only, which the back-line perf gate needs fixed) | review item 11 | S each | release hygiene | **In** |
-| A | Trade fixes (T1, T2, T5, review fixes; branch `trade-fixes`) and the order-card forecast fix | `docs/reports/trade-fun-test.md` | S to M | 3, 12, 13 | **Out of 0.2.1:** its own patch (decision 1) |
-| D | Sieges drawn like battles | battle-plan-review 3.2 | M, art | 11 | **Out:** 0.2.2 or later, with the width art |
-| F | Watch-only panel | same | S to M | 11 | **Out:** the log line covers it |
-| G | Second golden scene (map with a battle) | same | S | none | **Merged into C:** the docked panel's golden *is* the map with a battle; C ships with its regenerated goldens |
-| I | Tax forecast (E3), investment hints (E4) | `docs/reports/economy-fun-test.md` | S to M | 3, 5 | **Out:** economy, after war goals and peace (roadmap) |
+`gh issue list --state open` returned no open issues on 2026-11-13. The playtest reported no bugs.
 
-Also out of C for now: the header's battle picture made from terrain tiles (art and a cache; it comes with the width art) and the
-7-lane stretch note. The face-off header shows roundels, names, generals and the map's crossed-swords badge only.
+## Scope
 
-Not in 0.2.1: width 3/5/7 and Crossbowmen (slice B), battle cards, the mini-map, war goals and peace, reactive prices (T3).
+| # | Item | Source | Size | Status |
+|---|---|---|---|---|
+| 1 | **Battles end in the turn they start (P1).** A battle fights day after day in the attack's season until one side breaks, withdraws or flees, up to a day cap (proposed 8 days); a battle that reaches the cap carries on next season (rare). Clash goes; "Quick battles" is no longer an option, it is how battles work. To reinforce, attack the same hex with a second stack in the same season: it joins on day 1. No panel opens by itself: the log line ("Battle of Cremona: won in 4 days") and the Army task flag open the battle panel on the result, with the day log. | P1 | S to M | **In** |
+| 2 | **Withdraw or Flee (P3).** Withdraw is no longer a free exit before the fight. The standing order is **Hold** or **Withdraw**; Withdraw acts at the end of day 1 (and of each later day): a side that is still steady (front morale at least 60%) leaves in order, 5% of men, morale kept; an attacker pays 5% more (10%). A side under 60% cannot leave in order: it **flees**: 15% of men, morale to 0.15 (no attack for about 2 seasons), guns lost. A side that breaks pays the same as a flight. A fleeing army may run to any free land hex near by, not only its own land; with none it surrenders, as today. The AI follows the same rules. The order's hover shows both prices before the choice. | `docs/design/sieges-and-retreats.md` section 3 | S to M | **In** |
+| 3 | **Task flags instead of the End season pop-up (P2).** One "N things to do" flag under End season; a click opens the list (the reminder lines, most pressing first), a line goes there. The count drops as tasks are done; at 0 the flag is gone. End season never asks. The reminders option now turns the flag on and off. | mockup `docs/design/ui/19_task_strip_b.png` (A: `19_task_strip_a.png`) | S to M | **In** |
+| 4 | Small fixes: the level 1 castle odds band, the orphan word in the order hint, the perf metric that measures pikes only | v0.2.0 backlog | S each | **In**, first to cut |
 
-## Recommended scope (fits one patch)
+**Cut list, in order:** 4; then the "any free hex" flight rule in item 2 (a fleeing army in enemy land surrenders, as today);
+then item 3 (the pop-up stays one more release, off by default).
 
-**In:** playtest bugs first; B; C (smallest version above); E; H.
+**Order of work:** 1 (it changes when everything else happens), 2, 3, 4.
 
-**Cut list, in the order to drop if something grows:**
-1. E, the legend (the tile hover card already explains each mark).
-2. The "marching in" line (pool chips stay).
-3. The rotation toggle's UI (keep Auto, hide the switch; the AI already plays Auto).
+## The war line (0.2.x after this)
 
-Why this order of work: B changes the board the panel shows, so C is drawn once on the final 3-lane board, and C's layout already
-takes 5 lanes, so slice B does not redraw it.
-
-Order of work: playtest bugs, H's perf-metric fix (so B's perf gate measures something real), B rules, B AI, C on the new data, E,
-the rest of H.
-
-## Changes the creative review asks for (in the build)
-
-- **The odds card counts the board the way the AI does** (regiments that fit the board in full, the rest at half, frontage doc
-  section 5 rule 4). Otherwise the card promises that 11 pikes beat 4 and the board says no (principle 3).
-- **The rotation toggle's hover states its price:** "A swapping lane deals half and takes 25% more for 1 to 2 days" (principle 3).
-- **A rotation is a log line with the regiment's name** ("The Lisbon Tercio falls back; the Porto levy takes the centre") and the
-  tile shows "rotating, day 1 of 2" (principle 9; frontage doc 4.3).
-- The panel is checked at 1280x720 with the map's action log moved right of the dock.
+- **0.2.2 Sieges (P4):** every place holds out for at least 2 seasons; a siege meter from the besieger's men against the
+  garrison, guns, general, castle, terrain and hunger; Besiege or Storm on a garrisoned castle; a relief army that wins lifts
+  the siege; the amber siege badge (`docs/design/ui/20_siege_badge.png`). Design: `docs/design/sieges-and-retreats.md`
+  section 4. Its batch opens with four questions: the meter or a longer timer; the pace (with a 2-season floor); Besiege as
+  the default with Storm second; the badge's bar (A) or dial (B). A besieged place of yours shows in the task flag.
+- **0.2.3 The battle board:** draft 1 of this brief: back line, Rotation, the AI army-size rules, the docked panel. To be
+  re-read after 0.2.1: with one-season battles, orders given between days (Rotation) become orders set before the attack.
+- **Trade patch:** the `trade-fixes` branch and the forecast question, slotted after 0.2.2 or 0.2.3 (decision 1 below).
+- **Field forts (P5):** after sieges have been played; design section 6.
+- Then battle cards, the mini-map, war goals and peace, as the roadmap says.
 
 ## Done when (draft)
 
-- No open bug issue; tests, soak, save-compat and perf pass (battle phase under the 5 ms soft budget, measured with mixed arms, not
-  pikes only).
-- Seeded Europe run to 1600: stacks of 6 or more under 30% of stacks (45% today), at most 110 stacks (130 today), AI time per season
-  up by at most 10%.
-- Pike win-rate bands unchanged; 3 pikes + 3 guns under 70% against 6 pikes (75% today); 4 v 4 and 6 v 4 with rotation within 8
-  points of today.
-- Owner playtest: fight a battle with a back line, watch a rotation happen and find its log line, read who is winning with the dock
-  open, open and close the dock at 1280x720, and check that the odds word matched the result.
+- No open bug issue; tests, soak, save-compat and perf pass (the battles phase may fight up to 8 days a battle: measure it).
+- Battle stats: at least 95% of battles end in the season they start (the rest at the day cap); bigger-side win bands within
+  5 points of v0.2.0; battles that end by Withdraw under 25% (measured before and after); the loser's share of men lost, before
+  and after, in the stats table.
+- Setbacks (principle 8): in a seeded run, a mid-sized country that loses a battle can field half its old army within 10 seasons.
+- Owner playtest: start a battle and see its end the same turn; open its day log from the log line; give a weak army the
+  Withdraw order, and see it leave in order after day 1 or flee when it was already shaken, with the cost shown first; end
+  five seasons without a pop-up and use the task flag at least once.
 
-## Owner's decisions for 0.2.1 (one batch: 4, plus 1 only if trade stays in)
+## Owner's decisions for 0.2.1 (one batch)
 
-Recommended choice first in each.
+Recommended choice first.
 
-1. **Theme: is trade in this patch?** The trade branch is built, but it changes the AI's income and its season (the AI re-picks
-   orders every season, world merchant profit +17%). B's acceptance run measures the AI's stacks and AI time against today; with
-   trade in the same build, a miss cannot be traced to either change.
-   (a) **0.2.1 is the battle board only. Trade ships as its own small patch right after (0.2.2) with the forecast fix; width and
-   Crossbowmen move to 0.2.3.** Recommended: one theme, a clean acceptance run, and trade still ships soon.
-   (b) Trade first: 0.2.1 is the trade patch, the battle board is 0.2.2. Ships finished work sooner, but breaks "starting with war"
-   and puts the v0.2.0 battle feedback a release further away.
-   (c) Both in 0.2.1, as first drafted. Not recommended.
-   (This also settles the frontage doc's question 7, the release order: back line first, width second, cards after.)
+1. **The order of the war line.** (a) **0.2.1 this brief, 0.2.2 sieges, 0.2.3 the battle board, then the trade patch.** Your
+   notes are about follow-ability and cost first; sieges bring the new decisions next. (b) Sieges in 0.2.1 too (one bigger
+   patch, a later playtest). (c) Keep draft 1: the board first.
+2. **How long a battle runs in one turn.** (a) **Until one side breaks, up to 8 days, all in the attack's season; Clash
+   removed.** You see every battle end the turn it starts; to reinforce, you attack with two stacks in the same season.
+   (b) Keep 3 days a season and make Quick the default: under half to most battles end in one season, the rest carry over
+   and can be reinforced next season.
+3. **Leaving a battle.** (a) **Withdraw acts after day 1: a steady army (60% morale or more) leaves for 5% of its men (10% for
+   an attacker); a shaken one flees: 15% of men, its guns, morale to 15%. A broken army pays the same as a flight. A fleeing army
+   may run to any free hex near by.** (b) As (a), but a fleeing army keeps its guns. (c) As (a), and also lose the wagons, 10%
+   of survivors desert and 20% of men against cavalry (the designer's fuller price).
+4. **Task flag.** (a) **One "N things to do" flag under End season, with a list (19_task_strip_b).** (b) Small flags under each
+   stat chip (19_task_strip_a). Both remove the pop-up.
 
-2. **Rotation speed and cost** (the measurement the owner asked for, frontage doc 2.6). (a) **Levies 2 days, drilled regulars 1
-   day, never instant; while it swaps, the lane deals half and takes 25% more.** Measured: 1 to 2 days is close to today's results;
-   instant made the bigger side win 98% of 6 v 4 (85% today), a snowball. (b) Instant for Elite troops with a tech.
+## Creative review (2026-11-13, draft 2)
 
-3. **Dock: narrow or wide.** (a) **A, narrow (420 px): lanes across, the day log always visible.** Same picture as the frontage doc
-   and the approved mockups 10 and 50; covers a third of a 1280 px window. (b) B, wide (560 px): a true left-right mirror with names
-   on every tile, but 44% of the window and the log in a tab.
+**Verdict: approve with changes (made above).** The theme answers P1, P2 and P3 and stays one small patch. It removes
+friction more than it adds decisions, so it will not by itself make war "engaging"; the brief now says so, and the new war
+decisions come with sieges in 0.2.2. The war-line order is right.
 
-4. **Take the recommended defaults?** (a) **Yes, all of them:** the name is "Rotation"; the stack limit stays 6/7/8 plus a general;
-   no map change for clutter (the AI rule fixes blobs); in the dock the enemy is always above and you below; front-line morale shows
-   as two halves from the middle with each side's break tick; the camera centres the battle hex in the free part of the map when the
-   dock opens. (b) Yes, except the ones you name.
-
-5. **Only if decision 1 is (b) or (c): the trade order card's forecast.** The order card shows the profit an order *could* make;
-   what the merchant *delivers* is often less, because the source market has less stock than the card assumes. The same estimate
-   drives the AI, which re-picks every season on the card's figure, gets less, and swaps its orders again the next season (order
-   churn). (a) **The card and the AI both use the delivered estimate (capped by the source's stock, after other merchants' share),
-   and the card shows the stock behind it ("6 in stock, 3 produced here").** Recommended: one honest number for the player and the
-   AI, which ends the churn; done when the card and the delivered result agree within about 10%. (b) Keep the potential figure and
-   add a "delivered last season" line; the AI keeps planning on the potential, so the churn stays. With decision 1 (a), this
-   question opens the trade patch's batch instead, with the same recommendation.
-
-Decisions that only matter later (not in this batch):
-- Frontage doc question 3 (how the Crossbowman joins) and question 4 (width sources: tech and general): with slice B.
-- The 7-lane stretch note in the panel proposal: with slice B.
-- Cards timing, home ground and ground-only cards: cards slice.
-- Trade T3 prices that react and T4 tolls: their own design pass, after 0.2.x; E2 to E5 economy: after war goals and peace.
-
-## Risks
-
-- B is the big one: it changes how every battle plays and the AI's army shape. If the seeded run misses its targets, ship the back
-  line and the dock without B's AI rule only with owner approval.
-- B is L and C is M: together this is a full patch. If either grows, the cut list above applies before anything else slips.
-- Perf: back slots add a loop per battle; cache a day's values if the phase passes 5 ms.
-- The rotation numbers are from a prototype; they need tuning in the build, within the done-when bands.
-- With decision 1 (a), the trade branch waits one more release; its rebase onto B's AI changes (`ai.py`) is small but real.
-
-## Creative review (2026-11-13)
-
-**Verdict: approve with changes.** The draft was two patches (a war patch and an economy patch) plus four art and layout items.
 Changes made:
-- **Cut trade (A) to its own patch** (decision 1): a different theme, and it would confound B's acceptance run. Its forecast
-  question is rewritten plainly (decision 5): the card's expected profit against the delivered profit, and the AI's order churn it causes.
-- **Cut D, F and I outright** instead of "cut if it grows"; **merged G into C** (the dock's golden is the map with a battle);
-  **cut C's terrain battle picture** (art) to the width release.
-- **Decisions 12 to 4 (plus 1 conditional):** the order question (old 6) and the scope question (old 12) merged into decision 1;
-  the day-log question (old 10) follows from the dock choice; name, stack limit, map clutter, side placement, morale bar and camera
-  (old 2, 4, 5, 8, 9, 11) are one "take the defaults" decision.
-- **Added three build changes for principles 3 and 9:** the odds card counts the board as the AI does, the rotation toggle shows its
-  price, and a rotation is a named log line.
-- Each kept item names the principles it serves (table above).
+- **Withdraw no longer acts before day 1.** Today a standing Withdraw takes effect before any day is fought. With one-season
+  battles the only moment left is day 0, when every army is above 60%: the gate would never bite and the AI (weaker side,
+  morale at least 60%) would refuse every battle for 5%. That is P3 made worse. Now Withdraw acts at the end of day 1, so the
+  60% gate is a real test: measured, the loser is about at the line after day 1 in pike fights and well under it in mixed
+  fights, so reading the fight early pays (principles 2, 3).
+- **One order, two outcomes, no Flee button.** In a fight that ends in one turn there is no moment to press Flee. Flee is what a
+  Withdraw order becomes when the army is shaken, and the price of a break. One hover shows both prices (principle 3, 11).
+- **Flee is lighter:** 15% of men, morale 0.15, guns lost. Cut: the 20% against cavalry, lost wagons and 10% desertion. Stacked,
+  the draft cost about 24% of men plus guns and wagons on *every* lost battle (a break pays the flight price): a snowball for the
+  winner (principles 6, 8) and three hidden numbers. The fuller price stays as option 3c. A principle 8 check is in Done when.
+- **No auto-opening battle panel.** A panel opening by itself each season is the pop-up of P2 again. The result reaches the
+  player through the log line and the Army task flag.
+- **Task flag: B recommended** (one flag with a list). It is one widget, it sits where the eye is at the end of a season,
+  it survives narrow windows (the top bar drops chips as it narrows; A's flags would lose their chips), and it reuses the
+  reminder lines. Size S to M instead of M. A stays the second option; it matches the owner's words more literally.
+- **Reinforcing is said plainly.** One-season battles lose the "hold on, help is coming" moment: reinforcing moves to before
+  the attack (two stacks attack together). The defender's only answer to an AI attack is its standing order, which is why the
+  order must mean something (above). Option 2b keeps carry-overs for anyone who wants that drama back.
+- Cut list reordered (cavalry extra already cut); 0.2.3's board flagged for a re-read; Done when and the playtest checklist fixed to
+  match (the old line "try to withdraw, refused under 60%" could not happen in a one-turn battle).
+- Number to recheck: the draft said "35% to 78%" end within 3 days; the design doc's own counts give 40% to 78%.
+
+**Siege design (section 4): ready for 0.2.2 with changes.** The meter, hunger as the clock, free foraging and Besiege or Storm as
+the one new choice are good: a siege becomes a short story with a clock (principles 2, 9, 14). Changes before its batch:
+- A floor of 2 seasons. The table lets 3 regiments with one bombard take a place with no castle in 1 season, against the owner's
+  "a couple of turns" (P4).
+- Pick one badge. B (the dial) cannot run into the battle badge, as A does at full zoom; the hunger tick then goes in the hover.
+- Sync section 3 and section 5 with this brief's decisions 2 and 3 (they assume Clash and a Flee button).
+- Keep the AI war length check (a 6-season siege in a 16-season AI war) as a must-measure, not a risk note.
+- Owner questions trimmed to four: the model (meter or longer timer), the pace (with the 2-season floor), Besiege default with
+  Storm second, the badge A or B. Free foraging becomes the default, not a question; the fort questions wait for the fort patch.
