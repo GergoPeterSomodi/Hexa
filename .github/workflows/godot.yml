@@ -1,0 +1,216 @@
+name: godot
+
+# The Godot port (docs/roadmap/godot-port-plan.md, B10 to B13). Four jobs:
+# - changes: decides whether the Godot checks and the frozen-Python guard apply;
+# - frozen-python: a pull request that changes a file under hexa/ fails (hexa/ is frozen at v0.2.2, B13);
+# - checks: the lint, the import, the script parse, the main scene start and the GUT tests (on pull requests and
+#   pushes that touch godot/, tools/ or this workflow);
+# - export-windows and smoke-windows: on a tag v0.3.*, the Windows zip and a smoke start on a Windows runner.
+# The map rebuild, the map check and the goldens come with their releases.
+
+on:
+  pull_request:
+  push:
+    branches: ["**"]
+    tags: ["v0.3.*"]
+
+concurrency:
+  group: godot-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: what changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      godot: ${{ steps.changes.outputs.godot }}
+      hexa: ${{ steps.changes.outputs.hexa }}
+    steps:
+      # The whole history, so that the merge base with the target branch can be found.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Find what changed
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          IS_TAG: ${{ github.ref_type == 'tag' }}
+        run: |
+          set -euo pipefail
+          base=""
+          if [ "$EVENT" = "pull_request" ]; then
+            base=$(git merge-base "origin/$BASE_REF" HEAD)
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            base=$BEFORE
+          fi
+          # Without a known base the Godot checks run; the frozen-Python guard only needs pull requests, which always have one.
+          godot=true
+          hexa=false
+          if [ -n "$base" ]; then
+            changed=$(git diff --name-only "$base" HEAD)
+            if grep -q '^hexa/' <<< "$changed"; then hexa=true; fi
+            if grep -qE '^(godot/|tools/|\.github/workflows/godot\.yml|\.github/actions/setup-godot/)' <<< "$changed"; then
+              godot=true
+            else
+              godot=false
+            fi
+          fi
+          if [ "$IS_TAG" = "true" ]; then godot=true; fi
+          echo "godot=$godot" >> "$GITHUB_OUTPUT"
+          echo "hexa=$hexa" >> "$GITHUB_OUTPUT"
+          echo "base=${base:-none} godot=$godot hexa=$hexa"
+
+  frozen-python:
+    name: hexa/ stays frozen
+    needs: changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Refuse changes under hexa/
+        env:
+          HEXA_CHANGED: ${{ needs.changes.outputs.hexa }}
+        run: |
+          if [ "$HEXA_CHANGED" = "true" ]; then
+            echo "::error::This pull request changes a file under hexa/. The Python game is frozen at v0.2.2 (docs/roadmap/godot-port-plan.md, B13): fix it in godot/, or ask for the freeze to be lifted first."
+            exit 1
+          fi
+          echo "No change under hexa/."
+
+  checks:
+    name: lint, import, scripts, GUT
+    needs: changes
+    if: needs.changes.outputs.godot == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Godot
+        uses: ./.github/actions/setup-godot
+      # Every step that prints to the log is also checked for the engine's error and warning lines: the
+      # exit status alone misses some script errors. Warnings are errors in project.godot (B3).
+      - name: Import the project (fails on any script error or warning)
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot --import 2>&1 | tee import.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'ERROR|WARNING' import.log; then
+            echo "::error::The import reported errors or warnings (see the log)."
+            exit 1
+          fi
+      - name: Lint (layers, core/ rules, luck, Godot 3 spellings)
+        run: python3 tools/lint_godot.py godot
+      - name: Load every script (parse errors and warnings)
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot --script res://tools/check_scripts.gd 2>&1 | tee scripts.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error|check_scripts: cannot' scripts.log; then
+            echo "::error::A script does not parse (see the log)."
+            exit 1
+          fi
+      - name: Open the main scene headless
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot --quit 2>&1 | tee main.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|ERROR' main.log; then
+            echo "::error::The main scene did not open cleanly (see the log)."
+            exit 1
+          fi
+      - name: GUT tests (headless, JUnit report)
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd \
+            -gdir=res://tests -ginclude_subdirs -gexit \
+            -gjunit_xml_file="$RUNNER_TEMP/gut-junit.xml" 2>&1 | tee gut.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -q 'SCRIPT ERROR' gut.log; then
+            echo "::error::GUT reported a failing test or a script error (see the log)."
+            exit 1
+          fi
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## Godot checks"
+            echo
+            echo "- Import, script load and main scene: see the step logs."
+            if [ -f "$RUNNER_TEMP/gut-junit.xml" ]; then
+              echo "- GUT (JUnit): \`$(grep -o '<testsuites[^>]*>' "$RUNNER_TEMP/gut-junit.xml" | head -1)\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gut-junit
+          path: ${{ runner.temp }}/gut-junit.xml
+          if-no-files-found: ignore
+
+  export-windows:
+    name: Windows zip (tag)
+    needs: [changes, checks]
+    if: startsWith(github.ref, 'refs/tags/v0.3.')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Godot
+        uses: ./.github/actions/setup-godot
+      - name: Import the project
+        run: "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
+      - name: Export the Windows Desktop preset (release, 64-bit, data packed into the exe)
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot --export-release "Windows Desktop" "$GITHUB_WORKSPACE/godot/build/Hexa.exe" 2>&1 | tee export.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || [ ! -f godot/build/Hexa.exe ]; then
+            echo "::error::The Windows export failed (see the log)."
+            exit 1
+          fi
+      - name: Zip the build with its credits
+        run: |
+          set -euo pipefail
+          mkdir -p dist/Hexa
+          cp godot/build/Hexa.exe godot/CREDITS.md dist/Hexa/
+          (cd dist && zip -r "../Hexa-${GITHUB_REF_NAME}-windows.zip" Hexa)
+          mkdir -p artifact && mv "Hexa-${GITHUB_REF_NAME}-windows.zip" artifact/
+          ls -l artifact
+      - name: Keep the zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: hexa-windows-zip
+          path: artifact/*.zip
+          if-no-files-found: error
+
+  smoke-windows:
+    name: smoke start (Windows)
+    needs: export-windows
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hexa-windows-zip
+          path: download
+      # The exe starts, runs 60 frames headless and must exit with 0. Checks of the map file and its counts come
+      # with the map release (0.3.0 step 4).
+      - name: Start Hexa.exe
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem -Path download -Filter *.zip | Select-Object -First 1
+          Expand-Archive -Path $zip.FullName -DestinationPath smoke
+          $exe = Join-Path (Get-Location) "smoke/Hexa/Hexa.exe"
+          & $exe --headless --quit-after 60
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Hexa.exe exited with code $LASTEXITCODE"
+            exit 1
+          }
+          Write-Output "Hexa.exe started and quit with 0."

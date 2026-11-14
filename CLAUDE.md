@@ -6,6 +6,32 @@ Hexa is a turn-based hex strategy game in plain Python + pygame with three modes
 Age of Discovery) behind one launcher. `README.md` is the player-facing rules reference: its tables mirror the
 balance numbers in the rules/data modules, so update it when you change rules, numbers or controls.
 
+## Port rules (0.3.0, decided 2026-11-14)
+
+Hexa moves to Godot. The plan is `docs/roadmap/godot-port-plan.md`; the first release's brief is
+`docs/roadmap/release-0.3.0-brief.md`. The Python sections of this file (the modes, the architecture, the tests) describe
+the frozen v0.2.2 game: reference only.
+
+- **`hexa/` is frozen at v0.2.2.** No fixes, refactors or balance changes there. A CI guard (`frozen-python` in
+  `.github/workflows/godot.yml`) fails a pull request that changes a file under `hexa/`. The Python `tools/` folder may gain
+  the exporters (`export_data.py`, `export_geography.py`, `export_map_reference.py`, `bake_art.py`, ...); they import `hexa`
+  through its public API.
+- **New work goes to `godot/`.** Its layout and rules are in `godot/README.md`: the layers (data, state, systems, world,
+  game, views, shell), `core/` with no engine calls and extending `RefCounted`, luck only through `core/rng.gd`, Godot 4
+  only, typed GDScript, scenes as text, and autoloads only with a reason written in the README.
+- **Engine:** Godot 4.7.2-stable, pinned in `godot/project.godot`, in CI and in the README. Upgrade only between releases,
+  with the tests green before and after. Point `GODOT` at the engine executable; no local path is written into the repo.
+- **Godot commands** (run from the repository root):
+  ```bash
+  "$GODOT" --headless --path godot --import                       # import; fails on any error or warning
+  python tools/lint_godot.py godot                                 # layers, core/ rules, luck, Godot 3 spellings
+  "$GODOT" --headless --path godot --script res://tools/check_scripts.gd   # parse every script
+  "$GODOT" --headless --path godot --quit                          # open the main scene and quit
+  "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit   # GUT
+  "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe   # Windows build
+  ```
+- **Tests:** GUT tests live in `godot/tests/` (`test_*.gd`). The Python test suite runs for the frozen game only.
+
 ## Commands
 
 ```bash

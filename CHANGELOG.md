@@ -4,10 +4,21 @@ Versions follow `0.MINOR.PATCH` until the Steam release (1.0). Each release is a
 release. The save format has its own number (`hexa/campaign/saves.py` `VERSION`); older saves keep loading
 unless a release says otherwise.
 
+## 0.3.x: New engine (the Godot port)
+The game moves to Godot 4.7 (GDScript). Age of Discovery on Europe only; Windows builds only. Plan:
+`docs/roadmap/godot-port-plan.md`.
+- **v0.2.2 is the last Python release.** There is no Python 0.3.0. The Python game in `hexa/` is frozen.
+- **Python saves do not open in 0.3.x.** The save format number starts again at 1 in Godot, and saves may break
+  between 0.3.x builds.
+- The six releases: 0.3.0 The map; 0.3.1 The world turns; 0.3.2 Armies and battles; 0.3.3 The AI plays; 0.3.4 Your
+  turn; 0.3.5 Every screen.
+- Later phases take 0.4.x onwards, starting with the castles map mode (0.4.0) and the paused war features.
+
 **Version numbers (decided 2026-11-13):** one MINOR number per phase of the roadmap; PATCH numbers are the steps
 and fixes inside it. 0.1.x is the foundations. **0.2.x is war:** battles (0.2.0), their patches, battle cards, the
-battle mini-map, and war goals and peace. Later phases (the living world, history and events, the sea, game feel)
-take 0.3.x onwards, and 0.9.x is the Steam Early Access line. 1.0 is the full Steam release.
+battle mini-map, and war goals and peace. The Godot port takes 0.3.x ("New engine", above); later phases (the living
+world, history and events, the sea, game feel) take 0.4.x onwards, and 0.9.x is the Steam Early Access line. 1.0 is the
+full Steam release.
 
 ## v0.2.2: Sieges
 **War:**
