@@ -117,6 +117,11 @@ The owner played the build (Castile against Granada, 1484). Two notes:
   release. Design: `docs/design/castle-areas.md` (creative review in its section 12), mockup
   `docs/design/ui/21_castle_area.png`.
 
+**Split (owner, 2026-11-14):** castle areas were built (branch `r022-areas`) but stalled AI wars on the Europe map
+(provinces moved per decade 20 -> 10, wars moving none 13% -> 30%, wars ended by the limit 28% -> 53%; a shorter reach
+was worse). The owner chose the fallback: **0.2.2 ships with sieges and the clear move messages; castle areas move whole
+to 0.2.3**, with the AI work they need (armies gathering to take castles). The decisions below stand for 0.2.3.
+
 **Owner's decisions (2026-11-14), all as recommended:**
 1. A castle holds its own country's land within 3 / 4 / 5 hexes (tower / small castle / large castle), counted along its
    own land, the nearest castle winning.
