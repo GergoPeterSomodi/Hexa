@@ -104,6 +104,9 @@ def _besiege_rows(view):
         if siege["war_ends_first"]:
             left = siege["war_left"]
             rows.append((f"Warning: the war ends in {left} season{'s' * (left != 1)}, before it falls", WARN_C))
+    opens = siege.get("opens") or 0
+    if opens:                                       # castle areas (castle-areas.md 3): what the fall gives
+        rows[1:1] = [(f"Taking it opens {opens} province{'s' * (opens != 1)}", TEXT)]
     rows.append(("Right-click besieges. Shift-right-click storms", MUTED))
     return [None] + rows
 

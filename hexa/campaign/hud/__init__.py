@@ -17,7 +17,7 @@ changes the game (selecting a stack and moving the camera are the window's own s
 import pygame
 
 from ...ui.theme import INFO_C, INK
-from . import actionlog, battles, odds, sieges, tasks, topbar
+from . import actionlog, battles, movecard, odds, sieges, tasks, topbar
 from .floating import Floaters
 
 GLIDE_MS = 260          # how long the camera takes to reach a place the log names
@@ -36,6 +36,7 @@ class Hud:
         self.ping = None                # (hex, start ms): the ring after a jump
         self.waiting = []               # (replay time, item): ribbons that wait for the replay to reach their hex
         self.tasks = tasks.Tasks()      # the task flag and its open list (hud/tasks.py)
+        self.moves = movecard.MoveCard()  # the move card of the hovered hex (hud/movecard.py)
 
     # ----- drawing ----------------------------------------------------------------------------------
     @staticmethod
@@ -53,6 +54,11 @@ class Hud:
             return True
         return bool(self.log.box and self.log.box.collidepoint(pixel))
 
+    def hex_card_free(self, ctx):
+        """Whether the province card of the hovered hex may show: not under the odds card (an attack hover) and not
+        under the move card, which both have that hex."""
+        return ctx.ui.hover not in ctx.ui.attacks and not self.moves.why(ctx)
+
     def draw_world(self, ctx):
         """Over the map, under the panels: the camera glide, the ribbons and the ring of a jump. Nothing happens while
         the map is hidden: the feed keeps what it was told, and what is older than MAX_AGE seconds when the map
@@ -65,6 +71,7 @@ class Hud:
         self.marks.draw(ctx, self)              # under the ribbons: a ribbon covers the badge
         self.sieges.draw(ctx, self)
         odds.draw(ctx, self)                    # the odds card of the attack hover (hud/odds.py)
+        self.moves.draw(ctx, self)              # the move card of the hovered hex (hud/movecard.py)
         self.floaters.draw(ctx, now)
         self._ring(ctx, now)
 

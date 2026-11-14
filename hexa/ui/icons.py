@@ -23,7 +23,7 @@ COLOURS = {
     "down": (230, 110, 100), "up": (120, 200, 120), "scroll": (230, 215, 180), "target": (120, 175, 235),
     "sun": GOLD, "snow": (220, 235, 250), "political": (200, 90, 90), "terrain": (150, 160, 170),
     "goods": (190, 140, 80), "markets": GOLD, "battle": (240, 232, 214), "tasks": (236, 200, 96),
-    "tower": (232, 214, 182),
+    "tower": (232, 214, 182), "shield": (235, 238, 242), "shield_broken": (150, 150, 150),
 }
 NAMES = tuple(COLOURS)
 _cache = BoundedCache("icons", 256)
@@ -119,6 +119,8 @@ def _glyph(name, s, c):
         P.rect(s, dark, (12, 22, 40, 5))
         P.rect(s, dark, (12, 40, 40, 5))
         P.ellipse(s, lite, (20, 12, 10, 40), 3)
+    elif name in ("shield", "shield_broken"):    # castle areas (castle-areas.md 4): held land, fallen land
+        _shield(s, c, dark, lite, name == "shield_broken")
     else:
         _glyph_more(name, s, c, dark, lite)
 
@@ -188,6 +190,25 @@ def _glyph_more(name, s, c, dark, lite):
         P.line(s, dark, (20, 46), (42, 46), 4)
     else:
         _glyph_map(name, s, c, dark, lite)
+
+
+def _shield(s, c, dark, lite, broken):
+    """A heater shield on the 64 x 64 canvas, lit from the left, with a pale tower when whole. Broken: split along a
+    crack, the right half knocked aside (the land of a castle that has fallen)."""
+    P = pygame.draw
+    if not broken:
+        P.polygon(s, c, [(9, 7), (55, 7), (55, 30), (32, 58), (9, 30)])
+        P.polygon(s, dark, [(32, 7), (55, 7), (55, 30), (32, 58)])
+        tower = (245, 236, 214)
+        P.rect(s, tower, (26, 22, 12, 18))
+        for x in (24, 30, 36):
+            P.rect(s, tower, (x, 17, 4, 6))
+        P.rect(s, dark, (30, 32, 4, 8))
+    else:
+        left = [(9, 7), (33, 7), (27, 20), (35, 32), (29, 44), (31, 57), (9, 30)]
+        right = [(x + 6, y + 3) for x, y in [(33, 7), (55, 7), (55, 30), (31, 57), (29, 44), (35, 32), (27, 20)]]
+        P.polygon(s, c, left)
+        P.polygon(s, dark, right)
 
 
 def _glyph_map(name, s, c, dark, lite):
