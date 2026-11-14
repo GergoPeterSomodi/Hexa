@@ -262,9 +262,10 @@ jobs:
           $zip = Get-ChildItem -Path download -Filter *.zip | Select-Object -First 1
           Expand-Archive -Path $zip.FullName -DestinationPath smoke
           $exe = Join-Path (Get-Location) "smoke/Hexa/Hexa.exe"
-          & $exe --headless --quit-after 60
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Hexa.exe exited with code $LASTEXITCODE"
+          # Hexa.exe is a GUI program: wait for it, or PowerShell never sees its exit code.
+          $p = Start-Process -FilePath $exe -ArgumentList '--headless', '--quit-after', '60' -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            Write-Error "Hexa.exe exited with code $($p.ExitCode)"
             exit 1
           }
           Write-Output "Hexa.exe started and quit with 0."
