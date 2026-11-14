@@ -34,7 +34,8 @@ built. Europe in 1480, shown first on one region: **northern Italy and the weste
   *alpine pasture* and a flat Po plain, and valleys can cut into the Alps.
 - **Long things are drawn as lines on the map**, not painted inside hexes: rivers, coasts, mountain crests and
   borders run **along the edges between hexes**; roads run **from hex centre to hex centre**, crossing rivers at a
-  bridge, a ford or a ferry.
+  bridge, a ford or a ferry. One exception: in a short list of **river cities** (Florence, Paris, Prague, Rome...)
+  the river runs through the city hex and the bridge is inside the city (section 3).
 - **Forests, peaks and fields are scattered over the whole map**, not one per hex, so a forest or a range runs on
   across hex borders without a seam.
 - **Towns grow in steps** (hamlet, village, town, city, great city) and each step changes their picture, not their
@@ -68,7 +69,7 @@ what an earlier step made. If a check fails, the build stops and names the hex. 
 |---|---|---|
 | 0. Facts | Load the real coastline, rivers, lakes, ranges, passes and cities | The skeleton |
 | 1. Ground height | Compute each hex's height from the ranges, valleys and city heights | Where it is high and low |
-| 2. Water | Lay the real rivers on hex edges, always downhill; small streams follow the slope | Water finds its way to the sea |
+| 2. Water | Lay the real rivers on hex edges (and through the hex of each listed river city), always downhill; small streams follow the slope | Water finds its way to the sea |
 | 3. Ground cover | **Wave function collapse** (the "puzzle solver") picks farmland, woods, marsh, rock, snow | The only real puzzle: local and fast |
 | 4. Places | Real cities keep their hex; villages go where land, water and trade meet | Where people live |
 | 5. Roads | The cheapest paths between places; crests are walls, passes are gates; bridges where roads meet rivers | How people travel |
@@ -103,10 +104,38 @@ An edge has two kinds of place: its **length** (what runs along it: a river, a c
 | **Valleys** | A chain of lower hexes running down from a pass to the plain | Roads and rivers follow them; towns sit on their floor |
 | **Roads** | Through edge middles, from hex centre to hex centre | Track, road or highway; where a road crosses a river edge it gets a ford, bridge or ferry at that edge's middle |
 | **Cities** | Inside a hex, beside their river, at the road junction | Fields and suburbs spill into the neighbours as scattered pictures |
+| **River cities** | A hand-written list; the river runs through the city hex | See below |
 | **Borders** | Along edges | A band of the country's colour inside, a dark line on the edge |
 
 The exact edge record (what one edge stores) is thread 4's final list: `04-wfc-model.md` section 3. It replaces the
 socket names proposed in threads 1, 2, 3 and 5.
+
+### River cities (the owner's exception, 2026-11-14)
+
+The full rule, the list and the reasons are in `04-wfc-model.md` section 3.6. In short:
+
+- **Where:** only in cities on a hand-written list. A city gets on it if, in 1480, it stood on both banks (or on a
+  river island, or inside a loop of the river), had a permanent bridge, and its river was not a frontier there.
+- **How the river runs:** it comes along the edges to one **corner** of the city hex, crosses the hex over its
+  centre, and goes back onto the edges at another corner. The edge that reaches a hex corner from outside points
+  straight at the hex centre, so the river needs no kink. Straight across is the normal form (Florence, Paris); a
+  bend with the city inside it is the loop form (Toledo, Verona).
+- **The bridge is inside the city.** None of the city hex's six edges is a river edge, so roads come in from both
+  banks with no bridge, ford or ferry on those edges. Who holds the city holds the crossing.
+- **Borders:** a hex is never split, so the city has one owner on both banks. The river is still a frontier
+  everywhere outside the city; a border that follows the river goes round the city hex on one side.
+- **What it costs the model:** one hex fact (`river_through`: in corner, out corner) and two corner words
+  (`city_in`, `city_out`). **No new edge value.** The river step is told to pass through the listed hexes; six new
+  checks stop the build if a listed city does not get its river.
+- **Art:** the river inside the hex is the same drawn curve; the city is a city-on-river piece by level (9 pieces,
+  plus a bridge with houses on it in 3 directions).
+- **The first list (12):** Florence and Pisa (Arno), Rome (Tiber), Verona (Adige), Paris (Seine), London (Thames),
+  Prague (Vltava), Basel (Rhine), Toledo (Tagus), Geneva (Rhône), Novgorod (Volkhov), Liège (Meuse).
+- **Stay beside their river:** Cologne and Buda (no bridge in 1480: a ferry), Vienna (stood back from the main
+  stream), Seville (one bank, a boat bridge, an ocean port), Lyon (a confluence), Avignon (the Rhône was a frontier),
+  and in the prototype region Pavia and Turin (one-bank towns at a river join; "the bridge at Pavia" stays a
+  bridge you can see and fight over).
+- **In the prototype region:** Verona (loop) and Florence (straight) show both forms.
 
 ---
 
@@ -114,9 +143,9 @@ socket names proposed in threads 1, 2, 3 and 5.
 
 1. **Rivers along edges, not through hexes.** Thread 2 and thread 4 chose edges (the bank, the border, the bridge
    and "which side is the town on" all have one clear answer). Threads 3 and 5 and the close-up mockups still draw
-   rivers through the hex middle. **Settled: edges** (owner question 2 confirms it). Follow-up edits are listed in
-   section 10.
-2. **Hex size.** Threads 1, 3 and 5 drew at today's size (about 57 km; thread 3 says 55, the same grid), thread 3 at
+   rivers through the hex middle. **Settled: edges, except in the listed river cities** (the owner's answer to
+   question 2; section 3). The follow-up edits of section 10 are made.
+2. **Hex size.** Threads 1, 3 and 5 drew at today's size (about 57 km), thread 3 at
    28 km, thread 4 at both. **Settled for the prototype: 28 km**; for all of Europe after two measurements (owner
    question 1).
 3. **Relief levels.** Thread 4's test script used four rough classes as a stand-in. **Settled: thread 1's seven
@@ -132,7 +161,8 @@ socket names proposed in threads 1, 2, 3 and 5.
 7. **The ground list.** Thread 5 counts nine ground textures, thread 1 lists seven grounds for Europe. **Settled:
    thread 1's list**, plus sand for beaches; desert, savanna and jungle wait for the world outside Europe.
 8. **Kenney tiles.** The brief says start from the Kenney pack; thread 5 recommends drawing the ground in code and
-   using no Kenney art in the new map. **Open: owner question 4.**
+   using no Kenney art in the new map. **Settled by the owner's answer to question 4: no Kenney art in the new
+   map.**
 
 ---
 
@@ -168,6 +198,7 @@ pass heights and no city heights. For the region and then Europe we need:
 | **Valleys** | 13 (Aosta, Susa, Ticino, Valtellina, Adige...) | about 40 |
 | **Named gorges** (where a river cuts a range) | Rhône at Martigny, Ticino at the Alpine foot | a short list |
 | **City heights** | about 25 | one column on the city list |
+| **River cities** (city, river, form, bridge) | Verona, Florence; then Pisa and Geneva | 12 to start, about 25 at most |
 | **Notable places** | Como, Monza, Varese, Susa, Brig, Airolo; Bellinzona's castles; the hospices; the Certosa; the Po ferries | about 60 to start |
 
 **A shortcut to consider (owner question 3):** instead of setting heights by hand, we could read them from a **free
@@ -189,9 +220,10 @@ licence must be checked before use.
 | Its ridge, pass and hospice drawing | **Reworked** into crest and pass pieces |
 | Its river, road and coast tile code (about 1,370 small pictures) | Keep the geometry ideas; **replace the pictures** with lines drawn from the edges |
 | Its towns and castles | **Replaced** by the new level ladder (`../godot-look/08_closeup_upgrades.png`) |
-| Kenney Hexagon Pack ground textures | **Owner question 4** (thread 5 recommends code-drawn ground instead) |
+| Kenney Hexagon Pack ground textures | **Not used in the new map** (the owner's answer to question 4): the ground is drawn in code |
 
-**New art:** about 120 pieces (crests, passes, cliffs, bridges, towns, castles, farms, mines, quays...) and six
+**New art:** about 120 pieces (crests, passes, cliffs, bridges, towns, castles, farms, mines, quays...), 12 more for
+the river cities, and six
 drawing recipes (ground blend, coastline, river, road, border, fields). Today's art has 1,859 pictures; most of those
 are replaced by the recipes.
 
@@ -202,12 +234,12 @@ are replaced by the recipes.
 Small and showable: each step ends with a screenshot for you. The region first, Europe only after the region looks
 right.
 
-1. **Region data.** Write the region's ranges, valleys, passes, tributaries, lakes, gorges and notable places (or
-   read heights from the elevation map, question 3). *Show:* a plain list and a check that every name is in place.
+1. **Region data.** Write the region's ranges, valleys, passes, tributaries, lakes, gorges, notable places and river
+   cities (heights come from the elevation map, question 3). *Show:* a plain list and a check that every name is in place.
 2. **Ground height on 28 km hexes.** The region in flat colours by height, with crests and passes. *Show:* the
    Godot version of `01_alps_po_relief_by_hand.png`.
-3. **Water.** Rivers on edges with smooth curves, lakes, the three coasts, sea depth. *Show:* the Po network over the
-   height colours.
+3. **Water.** Rivers on edges with smooth curves, lakes, the three coasts, sea depth; the Adige through Verona and
+   the Arno through Florence. *Show:* the Po network over the height colours.
 4. **Ground cover.** The puzzle solver picks the grounds; the blend between grounds. *Show:* the region with soft
    ground colours.
 5. **Places and roads.** Cities, villages, roads, bridges, the three Alpine pass routes. *Show:* the Godot version
@@ -225,7 +257,8 @@ Steps 1 to 6 are the prototype. Game rules, units and the AI are not in it.
 ## 9. Decisions for the owner
 
 The five threads asked 15 questions. Eleven have a clear answer and become **defaults** (they stand unless you
-overrule one). Four are real questions.
+overrule one). Four are real questions. **All four were answered on 2026-11-14** (the box at the top of this page);
+the questions stay below as the record. One new default, D12, came out of the answer to Q2.
 
 ### The four questions
 
@@ -244,6 +277,8 @@ overrule one). Four are real questions.
   becomes an obstacle and a defence line).
 - Other: through the middle of hexes, as in the Python game. A town can straddle its river, but a river can never be
   a border or a crossing, and a bridge has no fixed place.
+- **Decided: yes, along the edges, but through the city in a short list of river cities.** How that exception is
+  built is default D12 and section 3.
 
 **Q3. Where do the heights come from, and how much do we write by hand?**
 - **Recommended: read heights from a free elevation map, and hand-write only what it cannot know** (passes, gorges,
@@ -276,16 +311,30 @@ overrule one). Four are real questions.
 | D9 | Crests come from the height step; a river may cut a crest only at a **named gorge**; any other clash stops the build | threads 1 and 4 |
 | D10 | Lit pieces (mountains, towns, bridges) are never rotated; light always from the upper left | thread 5 |
 | D11 | Game effects (river crossing cost, road speed, fertility, ferries) are **suggestions for the systems designer**, not decided here | all threads |
+| D12 (new) | **River cities**: a hand-written list (12 to start, about 25 at most). The river enters and leaves the city hex **at a corner**, not across an edge middle, so roads keep all six edges and no new edge value is needed; the bridge is inside the city; the city has one owner. Cologne, Vienna, Buda, Seville, Lyon, Avignon, Pavia and Turin stay beside their river | thread 4, section 3.6 |
 
 How the 15 thread questions map: thread 1 Q1 to D1, Q2 to D2, Q3 to Q3; thread 2 Q1 to Q2, Q2 to Q1, Q3 to D3;
 thread 3 Q1 to Q1, Q2 to D4, Q3 to D5 and Q3; thread 4 Q1 to D1, Q2 to Q1, Q3 to Q2; thread 5 Q1 to D6, Q2 to Q4,
 Q3 to D7.
 
+**What you can overrule in D12:**
+
+- **Where the river enters the city hex.** *Recommended: at a corner.* Other: across the middle of an edge. It can
+  look a little more natural, but the river must first run half way along a city edge, a road on that edge needs a
+  side lane again, and two new edge values are needed.
+- **The list.** *Recommended: the 12 above, grown with care.* Any city can be moved on or off it; the test is both
+  banks, a bridge, and no frontier on the river there. Every river city is a free crossing, so a long list weakens
+  rivers as barriers.
+- **Cities at a river join (Lyon).** *Recommended: beside the join for now.* Other: add a third form with two
+  rivers in and one out; it is a small extension, best decided when the Rhône is built.
+
 ---
 
 ## 10. Follow-up edits to the thread docs (after your decisions)
 
-The thread docs stay as the record of each thread's work. These edits bring them in line with this page:
+The thread docs stay as the record of each thread's work. These edits bring them in line with this page. **They were
+made on 2026-11-14**, together with the river-city rule (`04-wfc-model.md` section 3.6, with pointers in threads 2, 3
+and 5). The mockups were not redrawn.
 
 - **`03-settlements-and-roads.md`**: section 10 asks for a "river class crossing at the edge midpoint": reword to
   "the road crosses the river's edge at that edge's middle". Replace "elevation 0 to 1" and the four terrain kinds
@@ -301,7 +350,7 @@ The thread docs stay as the record of each thread's work. These edits bring them
 - **`01-terrain-and-relief.md`** section 8 and **`02-water.md`** section 10: socket names superseded by
   `04-wfc-model.md` section 3.5 (add a one-line note). In `02-water.md`, "pinned to every edge midpoint" means the
   middle of the river's own edge, where a road would cross it.
-- **`00-brief.md`**: the Kenney line follows the answer to Q4.
+- **`00-brief.md`**: the Kenney line follows the answer to Q4: no Kenney art in the new map.
 
 ---
 
@@ -339,5 +388,7 @@ follow-up edits of section 10 and one combined mockup (prototype step 6) before 
   time here. One measured AI season is needed before 28 km is final.
 - **River curves on edges**: no mockup in the final art shows them yet; the zigzag must be smoothed into a believable
   river.
-- **The elevation map** (if chosen): a true height map may give a lumpier picture than a hand-set skeleton; the
+- **River cities**: designed on paper; the test script has not built one yet. Verona and Florence must build with no
+  failed check before the water step is called done, and the city-on-river piece has no mockup.
+- **The elevation map** (chosen): a true height map may give a lumpier picture than a hand-set skeleton; the
   region test will show it.

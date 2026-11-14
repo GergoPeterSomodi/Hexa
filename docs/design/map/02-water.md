@@ -16,7 +16,8 @@ relief colours, because relief is thread 1's.
 **The river model in five lines:**
 
 1. A river is a **chain of hex edges** (the line between two hexes), running from hex corner to hex corner, never through a
-   hex centre.
+   hex centre. (One exception, decided by the owner on 2026-11-14: in a short authored list of **river cities** the river
+   runs through the city hex, corner to corner over the centre. The rule is `04-wfc-model.md` section 3.6.)
 2. It only runs **downhill**: every corner on the way is lower than the one before. It starts in hills or mountains and ends
    at a sea or a lake.
 3. Every corner has three edges, so a **confluence** is simply two edges flowing into one. The river grows one **size**
@@ -72,10 +73,12 @@ All numbers are named constants in a new data file `godot/data/water.json` (sect
     Lake Maggiore, Adda from Lake Como, Adige from Verona, in 1480 terms: the Ticino and Adda were navigable by boat; the
     Naviglio canals are a later feature).
   - `confluence`: set on the corner (and on its three edges) where two rivers join: a town site (Turin, Pavia, Alessandria).
-  - `crossing`: the **edge midpoint** is the crossing point. The drawn river curve is pinned to pass through every edge
-    midpoint (section A.3), so a road that crosses the edge crosses the river at the bridge, with no error.
+  - `crossing`: the crossing point is the **middle of the river's own edge**, where a road would cross it. The drawn river
+    curve is pinned to the middle of every edge it runs along (section A.3), so a road that crosses the edge crosses the
+    river at the bridge, with no error.
 - **The river is the border between its two hexes.** Provinces on both banks stay separate hexes; a river edge is a natural
-  frontier for the country borders thread 5 draws.
+  frontier for the country borders thread 5 draws. (A listed river city is the exception: the river is inside its hex, the
+  hex has one owner, and the bridge is in the city.)
 - **Hooks for the rules threads (suggested, not decided):** crossing a size 1 edge costs +1 movement point and a size 2 edge
   ends the move unless there is a bridge, ford or ferry; a size 3 edge needs a bridge or ferry. An attacker crossing a river
   edge fights at a penalty and a defender on the far bank gets a bonus. The numbers belong to the war and rules designers.
@@ -218,6 +221,11 @@ the same at both sizes (every rule above is written in edges and km2), so the ch
 
 Full drawings in `02_sockets.png`. This is the proposal for thread 4's final vocabulary.
 
+> **Superseded (2026-11-14):** the final names are in `04-wfc-model.md` section 3.5: `line = river1..3` or `lake` with
+> `flow` and `lake_width`, `line = shore` with `shore_kind`, `line = sea` with the hex tag `sea_depth`, `line = crest`.
+> The corner words are unchanged, with `city_in` and `city_out` added for river cities (section 3.6 there). The words
+> below are kept as this thread's record.
+
 **Edge words** (shared by both hexes; the two sides see mirrored words):
 
 | Word | Meaning |
@@ -260,8 +268,9 @@ Full drawings in `02_sockets.png`. This is the proposal for thread 4's final voc
    the hexes around the lake are not lower than its outlet.
 5. **Marsh share** where I need delta corners (the Po box, the Camargue, the Nile).
 
-**What thread 3 asked for, with answers:** river class per edge (stream, river, great river) crossing at the edge midpoint:
-yes, `river.1/2/3`, and the curve is pinned to the midpoints. Confluence flag: yes. Navigable and fordable flags: yes (3.1).
+**What thread 3 asked for, with answers:** river class per edge (stream, river, great river), with the road crossing the
+river's edge at that edge's middle: yes, `river.1/2/3` (the river runs along the edge), and the curve is pinned to those
+middles. Confluence flag: yes. Navigable and fordable flags: yes (3.1).
 Bay flag and harbour shelter: yes, hex tags (3.4). Marsh: yes, the `marsh` tag and `coast.marsh`. Po tributaries: not in the
 data, which has only the Po trunk; section A.4 lists the ten I worked and the others that need adding.
 
@@ -339,7 +348,9 @@ Baltea (1). The Python Po in the same frame: 11 hexes.
 
 Start with the corner polyline, densify to four points per edge, then Laplacian-smooth with each point clamped within
 `river_min_clamp_hex` of its lattice point; the ends and every join corner are pinned. For the bridge rule the curve is also
-pinned to each **edge midpoint** (thread 3), which the clamp then makes cheap. Optional meander: a slowly varying offset
+pinned to the **middle of each edge it runs along**, where a road would cross it (thread 3), which the clamp then makes
+cheap. In a river-city hex the polyline goes corner, hex centre, corner and is pinned at the centre, where the city's bridge
+stands (`04-wfc-model.md` section 3.6). Optional meander: a slowly varying offset
 along the normal, amplitude 0.1 hex, deterministic from the river's name. Width by size: 0.17, 0.27, 0.42 hex radii in my
 mockup. Lakes: discs along the chain with a sine profile (narrow 0.40, broad 0.78 hex radii wide; the fat end for Garda).
 The coast: render the land hexes as a mask, blur by about half a hex, threshold at 50 %; the sea bands come from heavier blurs

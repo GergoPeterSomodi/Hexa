@@ -319,6 +319,11 @@ need it. Choose by what threads 3 and 4 report on towns and WFC cost. If the hex
 
 For thread 4 to merge. Everything is on a hex edge unless said otherwise. Names are proposals.
 
+> **Superseded (2026-11-14):** the final names are in `04-wfc-model.md` section 3.5. `elev:K` and the scarp pair
+> became `step` (worked out from the two levels), `crest` and `crest:pass` became `line = crest` and `line = pass`,
+> the valley words became `floor`, and the two coast words became `shore_kind`. On the 28 km grid a pass is a saddle
+> hex whose two crest-side edges carry `pass`. The list below is kept as this thread's record.
+
 1. **`elev:K` (edge height code).** K runs 0, 0.5, 1 ... 6. Both hexes on an edge show the same code. A hex of
    level L has edges in {L-0.5, L, L+0.5}: an edge to a neighbour of the same level shows L; to a neighbour one
    level higher shows L+0.5 (and that neighbour shows the same L+0.5). This carries the "one level per step" slope

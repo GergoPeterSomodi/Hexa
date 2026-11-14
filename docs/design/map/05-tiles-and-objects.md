@@ -12,14 +12,22 @@ code was changed.** It reads threads 1 (relief), 2 (water), 3 (settlements and r
 | `05_piece_sheet.png` | 24 example pieces, each in a little map with its edge sockets labelled (rivers, roads, bridges, crests, a pass, a lake, a port, towns 1 to 5, castles 1 to 3, fields, the edge-river variant, the border). |
 | `05_milan_look.png` | Milan's dress: three border styles side by side, the arms at three sizes, the pennant, the plates and the country name. |
 
+> **Updated 2026-11-14 for the owner's decisions** (`README.md`, section 10): rivers run along hex edges, so the road's
+> side lane is gone; a short list of river cities has the river through the city hex (`04-wfc-model.md` section 3.6);
+> lakes follow thread 2's 0.6 rule; socket names and the ground list follow threads 4 and 1; no Kenney art in the new
+> map. **The mockups predate this:** `05_region_close.png`, `05_region_middle.png` and the river and "bank lane" cells of
+> `05_piece_sheet.png` still draw rivers through hexes. They are not redrawn; the prototype's step 6 picture replaces
+> them.
+
 ## 1. In plain words
 
 The map is not painted hex by hex. It is built in **layers**, and each layer is built in the way that suits it:
 
 1. **Ground** is a colour per hex (its cover and height), softly blended into the neighbours by a shader. No edge pieces at all.
-2. **Water and roads** are lines and shapes that are drawn from the hex edges they cross. Each edge says "a size 2 river
-   crosses here" or "a road crosses here"; both hexes draw their half through the same point at the same width, so the
-   line runs on without a seam. These are drawn as geometry, not as hundreds of pictures.
+2. **Water and roads** are lines drawn from the edge records. A river runs *along* its chain of edges, corner to corner
+   ("a size 2 river runs along this edge"); a road *crosses* an edge at its middle ("a road crosses here"). Both hexes
+   read the same edge record, so the line runs on without a seam. These are drawn as geometry, not as hundreds of
+   pictures.
 3. **Things that sit across hexes** (forests, mountain peaks, hills, fields, suburbs) are scattered on a grid laid over
    the whole map, not inside a hex. A forest ends where the ground changes, not at a hex edge.
 4. **Things that sit on an edge** (ridge crests, passes, cliffs, coasts, bridges, quays, borders) are pieces that live on
@@ -31,7 +39,7 @@ The map is not painted hex by hex. It is built in **layers**, and each layer is 
 
 Why this way: a hex picture that has to contain everything (ground + coast + river + road + town) multiplies into
 thousands of combinations. Kept in separate layers, each family stays small, and a change of level or owner redraws only
-its own layer. The whole library is **about 120 new drawn pieces plus 6 drawing recipes**, on top of about 100 objects
+its own layer. The whole library is **about 130 new drawn pieces plus 6 drawing recipes**, on top of about 100 objects
 reused from the Python game (section 6).
 
 ## 2. What can be reused (the inventory)
@@ -55,8 +63,9 @@ stays code-drawn (pygame recipes baked by the art baker, or Godot shaders and li
 
 ## 3. The ground
 
-**Base terrain per kind.** Each hex has a relief level (thread 1: lowland to high peaks) and a cover (farmland, grass,
-woods, marsh, rock, snow, tundra; sand and water). The ground colour is the cover's colour, tinted by level (a hill pasture
+**Base terrain per kind.** Each hex has a relief level (thread 1: lowland to high peaks) and a ground from thread 1's
+list (farmland, grass, woods, marsh, rock, snow, tundra), plus sand for beaches: eight textures. Desert, savanna and
+jungle wait for the world outside Europe. The ground colour is the cover's colour, tinted by level (a hill pasture
 is a shade darker and warmer than a plain pasture). Each cover has **one tileable texture** drawn in code: flat colour,
 seeded tufts and specks in two tones. The texture is sampled in world space, so it never repeats at a hex edge.
 
@@ -68,13 +77,14 @@ do (a blur over noisy hex shapes). Cost: one shader, one noise texture, zero pie
 including future ones.
 
 The alternative, **edge pieces** (a transition picture per pair of grounds and per edge, as `landscape.py` draws today),
-needs 9 covers x 9 covers x 6 edges, about 400 pictures, and still shows a straight join. It is kept only where the edge is
+needs 8 covers x 8 covers x 6 edges, about 400 pictures, and still shows a straight join. It is kept only where the edge is
 a real feature with a face: **cliffs, scarps and coasts** (section 4), which are edge pieces because they are drawn objects,
 not blends.
 
 **Hard edges stay crisp.** Sea and lake shores are not blended: the coast shape is cut out of a smoothed land mask (rounded
-hex corners, a sand rim, a foam line, a pale shallow band), drawn above the ground. Valley floors (thread 1) are a cover
-(pale meadow) along the valley's edges, so they blend like any ground.
+hex corners, a sand rim, a foam line, a pale shallow band), drawn above the ground. A valley floor is a hex flag (thread
+1), not a ground: the art draws it as a pale meadow ribbon along the floor, from edge middle to edge middle, over the
+hex's own ground.
 
 ## 4. Objects on and across hexes
 
@@ -82,50 +92,53 @@ Every object has an **anchor** (where it stands) and a **continuation rule** (ho
 
 | Object | Anchor | How it continues into the neighbour | Pieces |
 |---|---|---|---|
-| **Ground** | hex centre | blend shader | 0 (9 textures) |
+| **Ground** | hex centre | blend shader | 0 (8 textures) |
 | **Forests, scrub, olive groves** | world grid points (about 4 per hex width at close zoom) | the grid ignores hex edges; the cover at each point (with a noise wobble) picks the species; clearings come from a noise mask | reuse `nature.py` |
 | **Hills** (domes, outcrops) | coarse world grid | same | reuse |
 | **Mountains: three kinds** | coarse world grid | the kind is chosen from the *interpolated* height (thread 1), so a range fades from snowy peaks to rocky ranges to wooded hills across the edges | reuse: high peaks (`snow_peak`, `twin_peak`), rocky ranges (`crag`, `old_mountain`), low mountains (`foothills` + trees) |
 | **Ridge crests** | on the crest edge, corner to corner | a crest edge always ends in a corner where another crest continues (thread 1's corner rule); a **corner cap** (one larger peak) sits on any corner shared by two crest edges | 3 edge orientations x 2 variants x snow or rock = 12; caps 3 |
-| **Passes** | the crest edge carrying `crest:pass` | the saddle is the gap in the chain; the road track crosses only here; a hospice and a cairn stand at the edge midpoint on the higher side; the name in italics | saddles 3 orientations x 2 = 6; hospice 2, cairn 1 |
+| **Passes** | the saddle hex (28 km grid); its two crest-side edges carry `line = pass` | the saddle is the gap in the crest chain; the road track crosses only here; the hospice and a cairn stand on the saddle hex, beside the track; the name in italics | saddles 3 orientations x 2 = 6; hospice 2, cairn 1 |
 | **Scarps and cliffs** | on the edge, facing the lower hex | edge pieces meet at corners like crests | 6 facings x 2 = 12 |
-| **Rivers** | through the edge midpoints (thread 4's record) or along the edges (thread 2's option B) | the edge fixes the point, the direction and the width; the curve inside the hex is drawn from the hex's own river edges | geometry, 0 sprites (section 5) |
-| **Lakes** | narrow lakes: on edges (thread 2); broad lakes: lake hexes | narrow lakes are a wide river strip with a shore; lake hexes use the coast pieces | geometry |
+| **Rivers** | along the edges, corner to corner (`line = river1..3`) | the chain of edges fixes the course, the flow and the width; one smoothed curve per river, pinned at the middle of each of its edges and at every join corner | geometry, 0 sprites (appendix C) |
+| **Lakes** | a lake smaller than 0.6 of a hex: `line = lake` edges on the river's chain, narrow or broad (thread 2's rule); a larger one: lake hexes | an edge lake is a widened stretch of the river strip with a shore; lake hexes use the coast recipe and the drawn sea tile | geometry |
 | **Coasts** | the land mask, cut along the sea edges | the shoreline is one smoothed outline over all hexes; typed by the edge: beach (sand rim), cliff (cliff pieces), marsh (reeds, no rim), delta (river split) | cliff faces 12 (shared with scarps); beach and marsh: 0 |
-| **Roads** | edge midpoints, or the side lane where the road shares an edge with a river | curves from each road edge to the hex's junction point (the town's site if it has one); quality 1 to 3 changes width and colour; steep hexes draw switchbacks | geometry, 0 sprites |
-| **Bridges, fords, ferries** | where the road curve meets the river (on the edge midpoint in thread 2's model) | a bridge lies along the road; the river runs under it | wooden, stone, boat bridge, ferry: 4 x 3 axes = 12; ford: a pale stripe (0) |
+| **Roads** | edge midpoints, always (a river is along an edge, never through its middle, so there is no side lane) | curves from each road edge to the hex's junction point (the town's site if it has one); quality 1 to 3 changes width and colour; steep hexes draw switchbacks | geometry, 0 sprites |
+| **Bridges, fords, ferries** | the middle of the river edge that the road crosses | a bridge lies along the road; the river runs under it along the edge | wooden, stone, boat bridge, ferry: 4 x 3 axes = 12; ford: a pale stripe (0) |
 | **Fields by level** | world grid (about 3 parcels per hex width) | parcels spread from each farm's site; the farm level sets how far (level 1 a few strips, level 5 the whole hex and spilling over); parcels of two farms meet and mix | 0 (parcels are generated); 3 parcel styles (vines, orchards, terraces) |
 | **Farmsteads, mines, workshops** | the hex's site | level ladder of mockup 08; never more than one per hex | farm 5 levels x 2 = 10; mine 5; workshop 5 (rework from `goodsart`) |
-| **Settlements** | the hex's site: beside the river (never on it), at the road junction, towards the quay edge | the picture is a pure function of level, sockets and ground (thread 3); streets run to every road socket; from level 3 a gate where each road meets the wall; suburbs and fields spill into ring 1 and 2 on the world grid | towns 5 levels x 2 = 10; gates 3; capital palace 1; suburb houses reuse |
+| **Settlements** | the hex's site: beside the river (never on it, except a river city), at the road junction, towards the quay edge | the picture is a pure function of level, sockets and ground (thread 3); streets run to every road socket; from level 3 a gate where each road meets the wall; suburbs and fields spill into ring 1 and 2 on the world grid | towns 5 levels x 2 = 10; gates 3; capital palace 1; suburb houses reuse |
+| **River cities** (the authored list, `04-wfc-model.md` 3.6) | the hex centre; the river curve runs through the hex from its in corner to its out corner | `through` form: a city-on-river piece by level and river axis, the town on both banks, the bridge at the centre along a road axis; `loop` form: the ordinary town piece inside the bend, standard bridges where the far roads cross the curve | city on river 3 levels x 3 axes = 9; bridge with houses 3 axes = 3 |
 | **Castles** | beside the town, or alone at a chokepoint (pass foot, bridgehead) | none | 3 levels x 2 = 6 |
 | **Ports** | the quay edge (sea, lake or river) | the quay lies on the shore of that edge; boats on the water side | quays 3 kinds (rotatable); harbour sets 3 levels; lighthouse reuse |
-| **Monasteries, hospices, wayside crosses** | site, or the pass edge | none | reuse `life.py` |
+| **Monasteries, hospices, wayside crosses** | site; a hospice on its saddle hex | none | reuse `life.py` |
 | **Borders** | the owner change between two hexes | drawn from owners, not pieces (section 7) | 0 |
 
-**The site point** is computed, not stored: it starts at the hex centre, moves a third of a hex away from the river (to
-the dry bank), or towards the quay edge for a port; roads end there. It is a function of the sockets, so it never moves on a
+**The site point** is computed, not stored: it starts at the hex centre, moves a third of a hex away from the hex's river
+edges (to the dry side), or towards the quay edge for a port; roads end there. A river city's site is the hex centre. It is a function of the sockets, so it never moves on a
 level-up (thread 3's rule "sockets never move").
 
 ## 5. How the solved sockets pick the pieces
 
 ### The edge record (thread 4) and what the library reads
 
-Thread 4 stores one record per edge in four layers: **relief** (level, slope, scarp, floor, crest, pass), **water** (none,
-river 1 to 3 with flow, lake, shore, mouth, sea), **road** (none, track, road, highway; middle or bank lane; harbour) and
-**cover** (derived blend, never stored). Thread 3 adds `crossing` (ford, wooden or stone bridge, ferry, pass) and `quay`;
-thread 2 types the shore (beach, cliff, marsh, delta, lake). The library maps them as follows:
+Thread 4 stores one record per edge (`04-wfc-model.md` section 3.1; the names below are its final ones): `line` (what runs
+along the edge: `none`, `sea`, `shore`, `crest`, `pass`, `river1` to `river3`, `lake`) with `flow`, `shore_kind` (`beach`,
+`cliff`, `marsh`, `delta`, `lake`) and `lake_width`; `step` (`level`, `slope`, `scarp`, with the higher side) and `floor`
+(a valley floor crosses here); `road` (0 to 3) with `crossing` (`ford`, `bridge_wood`, `bridge_stone`, `ferry`, `pass`,
+`quay`); and `cover`, the blend, which is worked out and never stored. The library maps them as follows:
 
 | Layer | Socket values read | Family | How the piece is chosen |
 |---|---|---|---|
 | cover (hex) | cover, level | ground | texture and tint by cover and level; blend by shader |
-| relief (edge) | `crest`, `crest:pass` | crest | the edge's orientation (3 per hex: E, NE, NW are owned by the hex, the other three by the neighbours), a variant by hash |
-| relief (edge) | `scarp_top/foot`, `coast:cliff` | cliff | the facing (which side is low) |
+| relief (edge) | `line = crest`, `line = pass` | crest | the edge's orientation (3 per hex: E, NE, NW are owned by the hex, the other three by the neighbours), a variant by hash |
+| relief (edge) | `step = scarp`, `shore_kind = cliff` | cliff | the facing (which side is low) |
 | relief (corner) | two or more crests at a corner | crest cap | corner count |
-| water (edge) | `river.1..3`, `lake`, `mouth` | river geometry | the set of river edges and their sizes (shape class below) |
-| water (edge) | `coast.beach/cliff/marsh/delta/lake` | coast | the sea mask cuts the shore; the type picks rim and pieces |
-| road (edge) | quality 1 to 3, lane | road geometry | the set of road edges, their quality and lane |
-| road (edge) | `crossing` | bridge sprite | kind x the road's axis (3 axes) |
-| road (edge) | `quay` | quay | kind (sea, lake, river) rotated to the edge |
+| water (edge) | `line = river1..3` or `lake`, with `flow` and `lake_width` | river geometry | the river's chain of edges and their sizes; the corner words (`source`, `run`, `join`, `mouth`...) shape the ends and joins |
+| water (edge) | `line = shore` with `shore_kind` | coast | the sea mask cuts the shore; the kind picks rim and pieces |
+| road (edge) | `road` 1 to 3 | road geometry | the set of road edges and their quality |
+| road (edge) | `crossing` = `ford`, `bridge_wood`, `bridge_stone`, `ferry` | bridge sprite | kind x the road's axis (3 axes) |
+| road (edge) | `crossing = quay` | quay | kind (sea, lake, river) rotated to the edge |
+| hex fact | `river_through` (in corner, out corner) | river city | form from the two corners; city-on-river piece by level and river axis |
 | hex tags | settlement 0 to 5, capital, castle 0 to 3, landmark, farm level | site pieces | level ladder; variant by hash |
 | hex tag | owner | border | not a piece |
 
@@ -138,34 +151,34 @@ between runs and saves. This agrees with thread 3 ("WFC only picks the tile vari
 `<layer>.<family>.<key>.<variant>`, with the key spelled per edge in the neighbour order E, NE, NW, W, SW, SE (the order of
 `hexgrid.neighbors` and of the bake today):
 
-- `water.river.020020.v1`: a size 2 river through the E and W edges (straight).
-- `water.river.100210.v0`: a confluence (two streams in, a size 2 river out).
-- `road.way.003030.v0`: a highway through NW and SW, `road.way.0b0b00`: a road on the bank lane.
+- Rivers have no per-hex key: a river is one strip along its chain of edges (appendix C).
+- `road.way.003030.v0`: a highway through NW and SW.
+- `town.4.river.a1.v0`: a level 4 city on its river, river axis 1 (a river city).
 - `relief.crest.e1.snow.v1`: a crest on the NE edge, snowy.
 - `road.bridge.stone.axis0`, `town.4.v1`, `castle.3.v0`, `farm.2.v1`, `port.quay.sea`.
 
-For **flat** families (rivers, roads, quays, field parcels) the key is stored in its **canonical rotation** (the smallest
+For **flat** families (roads, quays, field parcels) the key is stored in its **canonical rotation** (the smallest
 of its six rotations) with a rotation 0 to 5 applied at draw time, so `020020`, `200200` and `002002` are one shape.
-**Lit** families (crests, cliffs, bridges, towns, everything with a left-lit face) are never rotated: light comes from the
+**Lit** families (crests, cliffs, bridges, towns, river cities, everything with a left-lit face) are never rotated: light comes from the
 upper left on every piece.
 
 ### How many shapes
 
 | Family | Distinct shapes | With sizes, kinds, variants | Drawn as |
 |---|---|---|---|
-| River (through midpoints) | 8 shape classes under rotation: spring 1, two-edge 3 (sharp, bend, straight), three-edge 4 (confluences) | x 3 sizes, widths per edge | geometry (a curve recipe) |
-| River (along edges, thread 2) | 5 corner words (source, run, join, mouth, split) x 3 sizes | | geometry |
-| Road | the same 8 classes plus 4-edge and more junctions (6 more) | x 3 qualities, 2 lanes | geometry |
+| River (along edges) | no per-hex shape: one strip per chain; 7 corner words (source, run, join, mouth, split, lake in, lake out) and the 2 river-city words | x 3 sizes, 2 lake widths | geometry (appendix C) |
+| Road | 8 shape classes under rotation: end 1, two-edge 3 (sharp, bend, straight), three-edge 4 (forks); plus 4-edge and more junctions (6 more) | x 3 qualities | geometry (appendix B) |
 | Coast | one outline from the land mask | 4 shore types | shader + 12 cliff faces |
 | Crest, pass, cliff | 3 orientations / 6 facings | 2 variants, snow or rock | 12 + 6 + 3 caps + 12 cliffs |
 | Bridges | 3 axes | wooden, stone, boat, ferry | 12 sprites |
 | Sites | levels | towns 10, castles 6, farms 10, mines 5, workshops 5, gates 3, palace 1, harbours 3, quays 3, hospice 2, cairn 1 | 49 sprites |
-| Ground | 9 covers | level tints by shader | 9 textures + 1 noise |
+| River cities | 3 river axes | city on river 3 levels x 3 axes = 9; bridge with houses x 3 axes = 3 | 12 sprites |
+| Ground | 8 covers | level tints by shader | 8 textures + 1 noise |
 | Field styles | 3 | | 3 |
 | Arms | 1 per country | 1 in the prototype, about 60 for Europe and the peoples | code-drawn vector |
 
-**Total for the prototype: about 120 new drawn pieces and 6 recipes** (ground blend, coastline, river strip, road strip,
-border ribbon, fields). Reused: 33 `nature.py` objects, 42 `life.py` objects, 25 goods objects and the `goodsart` building
+**Total for the prototype: about 130 new drawn pieces and 6 recipes** (ground blend, coastline, river strip, road strip,
+border ribbon, fields); it was about 120 before the river cities. Reused: 33 `nature.py` objects, 42 `life.py` objects, 25 goods objects and the `goodsart` building
 helpers, about 100 in all. For comparison, today's bake has 1,859 sprites, of which about 1,370 are per-mask coast, river,
 road and town pictures that this design replaces with the recipes.
 
@@ -173,27 +186,27 @@ road and town pictures that this design replaces with the recipes.
 
 1. **Layers never combine into one picture.** A coast with a river mouth and a road and a town is four layers, not one
    piece. Combinations add, they do not multiply.
-2. **Geometry for flat lines.** Rivers and roads are curves built from their edge sockets (the point, the direction and the
-   width are fixed per edge), drawn as textured strips. No mask pictures.
+2. **Geometry for flat lines.** A river is a curve along its chain of edges and a road is a curve through edge middles; the
+   course and the width are fixed by the edge records, and both are drawn as textured strips. No mask pictures.
 3. **Rotation for flat pieces only** (canonical key + rotation), never for lit ones.
 4. **Edge pieces have 3 orientations, not 6:** each hex owns its E, NE and NW edges; the opposite three belong to the
    neighbours.
 5. **The world grid** for everything that crosses edges (trees, peaks, fields, suburbs): no edge pieces at all.
 6. **Level ladders reuse one recipe:** the level n picture is the level n+1 recipe with fewer parts (mockup 08, thread 3).
 
-## 6. Scale: the ~55 km hex today and the ~28 km hex proposed by thread 3
+## 6. Scale: the ~57 km hex today and the ~28 km hex chosen for the prototype
 
 The pieces are sized in **hex units with a floor in screen pixels**, so they work at both sizes. The mockups use today's
-55 km hexes (the data as it is). What changes at 28 km:
+57 km hexes (the data as it is). What changes at 28 km:
 
-| | 55 km hex (today) | 28 km hex (thread 3's recommendation) |
+| | 57 km hex (today) | 28 km hex (the prototype's size) |
 |---|---|---|
 | Piece shapes and count | as above | the same; nothing new to draw |
 | Hexes on screen at one zoom | the same (zoom is in hex radius) | the same; the screen shows half the ground width |
 | Ridge crest | 3 peaks per edge at the close zoom | 2 peaks per edge (a 28 km edge is short); the chain gets one cap per corner |
-| Towns | a level 5 city fills the middle of its hex; neighbours are other places | the same picture; suburbs and fields spill into ring 1 as thread 3 designs (at 55 km the spill is cut to the own hex) |
-| Lakes | Maggiore, Como, Garda are shapes inside one hex (in the mockup) | they become edge lakes (thread 2) two or three hexes long; Geneva and Garda can be lake hexes |
-| Valleys | invisible (thread 1) | a one-hex ribbon of meadow cover with the river on its floor |
+| Towns | a level 5 city fills the middle of its hex; neighbours are other places | the same picture; suburbs and fields spill into ring 1 as thread 3 designs (at 57 km the spill is cut to the own hex) |
+| Lakes | Maggiore, Como, Garda are shapes inside one hex (in the mockup); by thread 2's rule each is one or two lake edges | Maggiore, Como and Garda are edge lakes (under 0.6 of a hex), three to six edges long; Geneva and Constance are over 0.6 of a hex and become lake hexes |
+| Valleys | invisible (thread 1) | a one-hex ribbon (the valley flag, drawn as meadow) with the river along its flank |
 | Scatter | world grid in hex units, so the same objects per hex | same; a real forest covers four times the hexes |
 | Cost | | the bake is unchanged; the map holds four times the hexes, so instance counts (trees, parcels) per *map* are four times higher but per *screen* the same; the ground texel map is four times bigger (still small: about 500 x 400 for Europe) |
 
@@ -221,25 +234,25 @@ lake shores, Pavia and Como as their own places), and the art is built for it.
 
 ## 8. Sockets I need
 
-Thread 4 owns the list. The library needs, per edge, exactly what is in thread 4's record plus:
+Thread 4 owns the list, and its final names are used here (`04-wfc-model.md` sections 3.1 to 3.5: `line = crest` or `pass`,
+`step = scarp`, `shore_kind`). The library needs, per edge, exactly what is in thread 4's record. How the five requests of
+the first draft ended:
 
-1. **River crossing point:** either at the edge midpoint (thread 4's picture, thread 3's bridges) or along the edge (thread
-   2's recommendation B). The library supports both; it needs **one decision**, because the bridge, the town site and the
-   road lane depend on it. In model B a bridge sits on the edge midpoint where a road crosses a river edge (a clean, fixed
-   place), and the river becomes an edge piece like the crest: the art side is slightly simpler with B.
-2. **Side lane positions in world terms:** a road on the bank lane sits a fixed distance along the edge, measured in one
-   world direction (towards larger x, then larger y), so both hexes put it at the same point. The mockup uses 0.3 of the
-   edge from the midpoint.
-3. **Shore type per edge** (thread 2's `coast.beach`, `.cliff`, `.marsh`, `.delta`, `.lake`) and thread 1's `coast:cliff`, merged into
-   one value.
-4. **Corner flags** for crest caps and river corner words (thread 2's corner words; thread 1's crest corner rule). Derived,
-   not solved.
-5. **Hex tags, not sockets:** cover, level, settlement level, capital, castle, landmark, farm or works level, quay edge,
-   owner. Changing any of them redraws only its own layer.
+1. **River crossing point: decided.** Rivers run along the edges (the owner, 2026-11-14; this draft's "model B"). A bridge
+   sits on the middle of the river edge that the road crosses, and the river is an edge line like the crest. The one
+   exception is a listed river city, where the river runs through the hex and the bridge is in the city piece.
+2. **Side lane positions: dropped.** A road and a river never pass through the same point side by side, so a road is
+   always on the edge middle and no lane value is stored.
+3. **Shore type per edge:** one value, `shore_kind` (`beach`, `cliff`, `marsh`, `delta`, `lake`).
+4. **Corner flags** for crest caps and the river corner words (thread 4, section 3.3, with `city_in` and `city_out` for
+   river cities). Derived, not solved.
+5. **Hex tags, not sockets:** cover, level, valley flag, saddle, settlement level, capital, castle, landmark, farm or works
+   level, port, `river_through`, owner. Changing any of them redraws only its own layer.
 
 ## 9. The Kenney list (for the new map)
 
-The new map uses **no Kenney art**. Today's uses and their replacements:
+The new map uses **no Kenney art** (decided by the owner on 2026-11-14, question 4 in `README.md`). Today's uses and their
+replacements:
 
 | Kenney file(s) | Used today for | In the new map |
 |---|---|---|
@@ -257,8 +270,9 @@ The 0.3.0 map keeps its Kenney tiles as decided; the list above applies to the n
 
 - **Busy ground.** At the close zoom the rocky ranges and forests are dense (as in mockup 07). The density is one number per
   cover; a calmer setting is cheap. Clearings under pieces are in.
-- **The rivers decision** (section 8, item 1) is open between threads 2 and 4; the mockups draw rivers through the
-  midpoints and show the edge model in one cell of the piece sheet.
+- **The rivers decision is closed:** rivers run along edges, with the river-city exception (section 8, item 1). The
+  mockups still draw rivers through the midpoints and show the edge model in one cell of the piece sheet; they are
+  replaced by the prototype's step 6 picture. No mockup shows a city-on-river piece yet.
 - **The mockup relief is a stand-in:** the data marks the Po plain as mountains; the mockup redraws it as farmland and
   marsh (thread 1 fixes it properly). The Ticino, Adda and Mincio and the five lakes are hand-placed (thread 2 gap). The
   village, farm and town levels are made up for the picture.
@@ -273,9 +287,10 @@ The 0.3.0 map keeps its Kenney tiles as decided; the list above applies to the n
 1. **How should a country's border look?** (a) **A band of the country colour inside the border with a dark line on it,
    and a faint wash over the land (recommended):** reads through forests and at every zoom; (b) a stronger wash over the
    whole land with a thin line; (c) a dark line only.
-2. **Should the new map be free of Kenney art from the start?** (a) **Yes: draw the nine ground textures in code (about a
-   day of art work); the props are already ours (recommended)**, so the new map never needs a replacement pass before Steam;
-   (b) use the Kenney ground textures first and replace them before Steam, as today.
+2. **Should the new map be free of Kenney art from the start?** (a) **Yes: draw the ground textures in code (eight by
+   thread 1's list; about a day of art work); the props are already ours (recommended)**, so the new map never needs a
+   replacement pass before Steam; (b) use the Kenney ground textures first and replace them before Steam, as today.
+   *Answered 2026-11-14: (a), no Kenney art in the new map.*
 3. **What shape should coasts have?** (a) **The hex shape with rounded corners, a sand rim and a foam line, as in the
    approved close-up 07 (recommended):** a coast hex is still easy to read as one hex; (b) a fully natural, wavy coastline
    that ignores the hex shape: prettier but the player cannot see which hexes touch the sea.
@@ -288,11 +303,11 @@ The 0.3.0 map keeps its Kenney tiles as decided; the list above applies to the n
 
 | Order | Layer | Godot node | Input |
 |---|---|---|---|
-| 1 | Ground | one quad, ground shader (texel map of cover, level, seed; 9 cover textures as a texture array; noise) | hex tags |
+| 1 | Ground | one quad, ground shader (texel map of cover, level, seed; 8 cover textures as a texture array; noise) | hex tags |
 | 2 | Sand rim, shallow band, sea, foam | coastline shader on a land mask texture (signed distance, rounded corners); waves as a scrolling detail | sea and shore sockets |
 | 3 | Fields | MultiMesh of parcels on the world grid (colour by hash, angle by low-frequency noise, extent by farm level from the site) | farm levels |
 | 4 | Country wash | the owner texel map in the ground shader (alpha about 15%) | owners |
-| 5 | Rivers, lakes | textured strip meshes built per hex from the river sockets (bank, water, highlight) | water sockets |
+| 5 | Rivers, lakes | textured strip meshes built per river chain from its edges, cut into the map's chunks (bank, water, highlight) | water sockets, `river_through` |
 | 6 | Sea cover | the coastline shader draws above river ends (a river ends under the sea) | |
 | 7 | Roads | strip meshes per hex from the road sockets, switchbacks on steep hexes | road sockets |
 | 8 | Border band | owner texel map + distance to the border edge in a shader | owners |
@@ -300,22 +315,34 @@ The 0.3.0 map keeps its Kenney tiles as decided; the list above applies to the n
 | 10 | Border line | Line2D along owner edges | owners |
 | 11 | Hex grid, labels, plates | lines, Labels, the UI theme | |
 
-## B. The river and road curve recipe (midpoint model)
+## B. The road curve recipe
 
-Per hex, the edges carrying the line are known. Port P(e) is the edge midpoint (plus the lane offset). A two-edge hex draws
-one smooth curve: two cubic Béziers from P(e1) to a hub and from the hub to P(e2), leaving each port along the inward
-normal with handle length 0.42 hex units, the hub slightly off centre (a hash of the position, about 0.08). A one-edge
-(spring) or three-edge (confluence) hex draws each port to the hub. Width is set per edge (the socket's size), so both
-hexes agree at the edge; inside the hex it is interpolated. Bank colour, water and a thin left-lit highlight are three
-strips. The bridge test is the intersection of the road and river curves of one hex.
+Per hex, the edges carrying a road are known. Port P(e) is the edge midpoint, always: there is no lane offset. A two-edge
+hex draws one smooth curve: two cubic Béziers from P(e1) to a hub and from the hub to P(e2), leaving each port along the
+inward normal with handle length 0.42 hex units, the hub slightly off centre (a hash of the position, about 0.08), or on the
+site point if the hex has a settlement. A one-edge (road end) or three-edge (fork) hex draws each port to the hub. Width
+is set per edge (the road's quality), so both hexes agree at the edge; inside the hex it is interpolated. Casing, surface
+and a thin left-lit highlight are three strips. Where a road edge is also a river edge, the bridge, ford or ferry piece
+sits on the edge midpoint along the road's axis; no curve intersection is needed.
 
-Sizes used in the mockup (hex units, radius 1): stream 0.06, river 0.085, great river 0.115; road 0.06, highway 0.075.
+Sizes used in the mockup (hex units, radius 1): road 0.06, highway 0.075.
 
-## C. The edge model for rivers (thread 2, option B)
+## C. The river recipe (rivers along edges)
 
-The river is a polyline along hex edges, corner to corner, smoothed within a third of a hex (Chaikin, 3 passes). It is
-an edge piece like the crest: it belongs to the edge record, both hexes draw the same strip. A road crossing a river edge
-puts its bridge on the edge midpoint along the road's axis. A town site moves to the dry side of its river edges.
+The river is a polyline along hex edges, corner to corner, smoothed within a third of a hex (Chaikin, 3 passes; thread 2's
+appendix A.3 has the full recipe: pinned at the middle of each edge it runs along and at every join corner). It is an edge
+line like the crest: it belongs to the edge record, and both hexes draw the same strip. Bank colour, water and a thin
+left-lit highlight are three strips. An edge lake is the same strip widened (narrow or broad). A town site moves to the
+dry side of its river edges.
+
+**In a river-city hex** (`04-wfc-model.md` section 3.6) the same polyline leaves the edges at the hex's in corner, goes to
+the hex centre and on to the out corner, and is pinned at all three (for the `loop` form, at a point about 0.45 of the hex
+radius beyond the centre instead, so the river swings round the town). The city-on-river piece is drawn over it with its
+channel on the curve; the bridge sits at the centre along the road axis that is at right angles to the river, so the
+library's three bridge axes are enough.
+
+Sizes used in the mockup (hex units, radius 1): stream 0.06, river 0.085, great river 0.115. Thread 2's mockup draws them
+wider (0.17, 0.27, 0.42); the prototype's step 3 picture settles the widths.
 
 ## D. Ground blend shader
 
@@ -328,7 +355,8 @@ gaps where a displacement was taken along each hex's own normal: always displace
 
 New recipes: crest chain pieces (12), caps (3), pass saddles (6), hospice (2), cairn (1), cliffs and scarps (12), bridges
 and ferries (12), towns (10), gates (3), palace (1), castles (6), farmsteads (10), mines (5), workshops (5), harbours (3),
-quays (3), field styles (3), ground textures (9), noise (1), arms (1 for the prototype). Reused from the Python bake:
+quays (3), city-on-river pieces (9), bridges with houses (3), field styles (3), ground textures (8), noise (1), arms (1 for
+the prototype). Reused from the Python bake:
 `nature.py` objects (33 x 3 sizes x 4 seeds), `life.py` objects (42), goods objects (25). Every sprite keeps the bake's
 conventions (2 px extruded border, anchor at the foot for upright pieces, the index with layer and sort offset).
 

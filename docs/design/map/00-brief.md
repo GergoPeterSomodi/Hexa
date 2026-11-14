@@ -15,9 +15,11 @@ before any more game code is written. Design first, mockups first, then the owne
   rivers, lakes, the Ligurian coast, passes, cities: every kind of connection in one frame).
 - **The look:** direction A "Hexa refined" (`docs/design/godot-look/README.md`, and the close-up mockups 07, 07b, 08 in
   that folder). Fresh design, not a copy of the Python art.
-- **Start from the existing tiles:** the Kenney hexagon pack (`hexagon-pack/`, CC0) and the code-drawn art of the Python
-  game (`hexa/campaign/art.py`, `landscape*.py`, `goodsart.py`, `landmarks.py`; baked copies in `godot/assets/baked/`, see
-  `docs/design/art-inventory.md`) are the starting library for the new mode's objects.
+- **Start from our own art:** the code-drawn art of the Python game (`hexa/campaign/art.py`, `landscape*.py`,
+  `goodsart.py`, `landmarks.py`; baked copies in `godot/assets/baked/`, see `docs/design/art-inventory.md`) is the
+  starting library for the new mode's objects. **No Kenney art in the new map** (the owner's decision of 2026-11-14,
+  question 4 in `README.md`): the ground is drawn in code as well. The Kenney hexagon pack (`hexagon-pack/`, CC0)
+  stays with the 0.3.0 map only. (This line first read "start from the Kenney hexagon pack and the code-drawn art".)
 
 ## The core question: how things connect
 

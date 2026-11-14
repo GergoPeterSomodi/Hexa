@@ -5,6 +5,11 @@ was changed.** Mockups: `03_prototype_network.png` (the prototype region worked 
 (how a city levels up, where places sit and why, the sockets). Relief and water in the mockups are stand-ins drawn by hand
 (threads 1 and 2 own the real ones); the sites, roads, bridges and passes are this thread's model.
 
+> **Updated 2026-11-14 for the owner's decisions** (`README.md`, section 10): rivers run along hex edges and a road
+> crosses the river's edge at its middle; a short list of river cities has the river through the city hex
+> (`04-wfc-model.md` section 3.6); relief is thread 1's height levels; the hospice stands on the saddle hex; today's grid
+> is about 57 km. The mockups were not redrawn.
+
 ## 1. The model in five lines
 
 1. **People live where land, water and trade meet:** river crossings, confluences, bays, valley mouths, pass feet, lake
@@ -33,7 +38,7 @@ a wall, a gate on every road, a stone bridge. The map tells the history of 1480 
 |---|---|---|
 | Cities | 102 `cities` with a size (0 to 250): position, name, rank. Level from size (section 5). | Snap to the best land hex within 1 hex of the true position (never on water). |
 | Other places | `placenames` (6,940 names, biggest first; a hex shows the best three). | A place's level from its rank in that list. Villages and hamlets with no name are generated and named from the region's name pool. |
-| Passes | 24 named `passes` plus the 72 pass edges the game derives. | Hospice on the pass hex; the track over it; the pass road's two approach valleys. |
+| Passes | 24 named `passes` plus the 72 pass edges the game derives. | Hospice on the saddle hex (the pass's own hex on the 28 km grid); the track over it; the pass road's two approach valleys. |
 | Regions, countries | `regions`, `countries`: who owns what in 1480. | Nothing. Roads cross borders; owners only change colour. |
 | Rivers, mountains, coasts | `rivers`, `terrain_shapes`, `land` (threads 1 and 2 turn these into relief and water). | Nothing; this thread reads relief and water. |
 | Castles | The Python rule: castle level from city size. | Standalone castles at chokepoints (pass foot, bridgehead, valley mouth). |
@@ -46,17 +51,17 @@ places" file is required (question 3), not optional.
 
 ## 4. Scale: the finding that decides the rest
 
-The existing grid (`SCALE = 2`) has a hex about 55 km across. Counting 43 real places of the prototype region:
+The existing grid (`SCALE = 2`) has a hex about 57 km across. Counting 43 real places of the prototype region:
 
 | Grid | Hex width | Hexes holding the 43 places | Worst hex |
 |---|---|---|---|
-| Today (`SCALE 2`) | about 55 km | 25 | Milan, Como, Monza, Lecco and Varese in one hex |
+| Today (`SCALE 2`) | about 57 km | 25 | Milan, Como, Monza, Lecco and Varese in one hex |
 | Half size (`SCALE 4`) | about 28 km | 37 (after snapping; 6 hexes share two places) | Milan and Monza |
 
-At 55 km a "city with suburbs spilling into its neighbours" is impossible, because its neighbours are the next city, and an
+At 57 km a "city with suburbs spilling into its neighbours" is impossible, because its neighbours are the next city, and an
 Alpine valley (3 to 5 km wide) is invisible. At 28 km Pavia, Lodi, Como, Monza and Bergamo each get a hex, a valley is a
 one-hex ribbon, and Milan to Pavia is one or two hexes (the grid quantises 30 km to 1 or 2 rows). The mockups use 28 km.
-The model is written with the places-per-hex count as a parameter, so it also works at 55 km (up to 3 places per hex, the
+The model is written with the places-per-hex count as a parameter, so it also works at 57 km (up to 3 places per hex, the
 best one drawn, the others as satellite names, as `naming.py` does today). The choice belongs to the owner with threads 1
 and 4 (question 1). Cost: about 4 times the hexes (Europe about 122,000 instead of 30,000), which thread 4 must check.
 
@@ -84,9 +89,9 @@ Other kinds, all as flags on a hex, never as extra hexes:
 | **Capital** | one per country, always a level 3 or more; a crown on the plate | Roads start here. |
 | **Port** | coast hex with at least one sea edge; quay on that edge; a bay scores higher | Trade routes, ships. Lake ports (Como, Lecco, Arona) and river landings (Po, Ticino) use the same quay socket on a lake or river edge. |
 | **Castle** (0 to 3) | with a town, or alone at a chokepoint: pass foot, bridgehead, valley mouth | Tower, keep, star fort. Standalone ones keep 3 hexes apart. |
-| **Hospice** | on every pass hex (Great St Bernard, Simplon, Gotthard, Mont Cenis, Splügen) | A shelter on the climb; draws the pass name. |
+| **Hospice** | on the saddle hex of every pass (Great St Bernard, Simplon, Gotthard, Mont Cenis, Splügen), never on an edge | A shelter on the climb; draws the pass name. |
 | **Monastery** | quiet ground, about one per 6 settled hexes (Certosa di Pavia, Sacra di San Michele, Bobbio) | Flavour, later a small economy hook. |
-| **Mine** | mountain or hills beside a valley road, over ore | Visual ladder in mockup 08; the economy thread decides output. |
+| **Mine** | hills, highland or mountains (levels 3 to 5) beside a valley road, over ore | Visual ladder in mockup 08; the economy thread decides output. |
 
 A hex holds at most one settlement level, one castle level and one landmark. A second real place in the same hex is a
 named satellite (Milan + Monza in the mockup).
@@ -105,21 +110,25 @@ Each land hex gets a score for "a settlement of level L could grow here" (`03b` 
 | Lake shore harbour | +2 | Como, Arona, Lecco |
 | Arable plain (fertility from thread 1) | +1 to +2 | the whole Po plain |
 | Next to an existing road | +1 | |
-| High mountain | -6 | |
+| High peaks (level 6) | -6 | |
 | Marsh | -3 | |
 | Ridge edge on the hex | -2 | |
 | Within the spacing of a town of equal or higher level | -4 | see below |
 
 **Spacing** (in hexes, from a place of the same or higher level; `SPACING` in the data file): level 5: 6; level 4: 4;
 level 3: 3 (2 for fixed places such as Milan and Pavia); level 2: 2; level 1: 1. The Po plain gets a density bonus (a
-village every 2 hexes), valleys and hills half of it, high mountains only the valley floors.
+village every 2 hexes), valleys and hills half of it, mountains and high peaks (levels 5 and 6) only the valley floors.
 
 Fixed cities do not use the score to exist, only to snap: the best-scoring land hex within 1 hex of the true position,
-ties kept where they are. This is why Genoa lands on the bay, not on the sea.
+ties kept where they are. This is why Genoa lands on the bay, not on the sea. A listed **river city** is not snapped: it
+keeps the hex of its true position, fixed before the water step, because the river is routed through that hex.
 
 ## 7. How a settlement looks and spills
 
-- **In its hex:** the town picture sits beside the river and the road junction, not on the river (as in mockup 07). Every
+- **In its hex:** the town picture sits beside the river and the road junction, not on the river. The river is on one or
+  more of the hex's edges, so "beside" means on the dry side of those edges. The one exception is a listed **river city**
+  (Florence, Verona, Paris...): the river runs through its hex, the town stands on both banks and the bridge is part of
+  its picture (`04-wfc-model.md` section 3.6). Every
   road socket becomes a street to the square; from level 3 each road passes a gate; from level 4 the gates are towers in
   the wall.
 - **Into the neighbours** (`03b` panel B): a derived layer. Ring 1 (the six neighbours) gets field patches on arable hexes
@@ -164,24 +173,25 @@ Routing is a shortest path (Dijkstra on the hex graph) with these step costs, al
 
 | Entering | Cost | Notes |
 |---|---|---|
-| Plain | 1.0 | |
-| Hills | 1.8 | |
-| Valley floor (mountain hex with a valley flag) | 1.6 | The valley rule: roads climb along rivers. |
-| Mountain | 3.6 | |
-| High mountain | 8 | Almost never chosen. |
-| Pass hex | 3.0 | |
+| Lowland and plain (levels 1 and 2) | 1.0 | |
+| Hills (level 3) | 1.8 | |
+| Valley floor (a hex of level 3 or higher with the valley flag) | 1.6 | The valley rule: roads climb along rivers. |
+| Highland (level 4) | 2.6 | New with thread 1's levels: between hills and mountains; to be tuned. |
+| Mountains (level 5) | 3.6 | |
+| High peaks (level 6) | 8 | Almost never chosen. |
+| Saddle hex (a pass) | 3.0 | |
 | Ridge edge | closed | Open only where the edge carries a pass. |
 | Sea, lake | closed | Roads follow the shore. |
 | Edge already carrying a road | 0.35 | So routes share roads and trunks form. |
-| River crossing | +0.4 stream, +0.6 or +2 river (cheap beside a place of level 2 or more), +1 or +4 great river (cheap beside a town) | This is why roads bunch at bridges. |
+| River crossing (the road crosses a river edge) | +0.4 stream, +0.6 or +2 river (cheap beside a place of level 2 or more), +1 or +4 great river (cheap beside a town) | This is why roads bunch at bridges. Entering or leaving a river city costs no crossing: its bridge is inside the hex. |
 
-**Switchbacks:** a road hex on steep ground (mountain or high, not a valley floor) draws zigzags; a valley floor draws a
-smooth curve. It needs only the hex's terrain and the two road edges, no extra socket.
+**Switchbacks:** a road hex on steep ground (level 5 or 6, not a valley floor) draws zigzags; a valley floor draws a
+smooth curve. It needs only the hex's level and the two road edges, no extra socket.
 
 ### Road quality (0 to 3)
 
 Quality is a property of an edge. Start: the highest rank among the links that use it (capital to city 3, city to town 2,
-the rest 1). Then: the number of links sharing it (traffic 4 or more: one step up) and a cap by ground (mountain and high:
+the rest 1). Then: the number of links sharing it (traffic 4 or more: one step up) and a cap by ground (levels 5 and 6:
 at most 2; a pass: 1 in 1480). In `03_prototype_network.png`: 14 highway edges, 27 road, 24 track.
 
 | Level | Name | Shown | In 1480 | Proposed march cost (tuned by systems design) |
@@ -193,7 +203,8 @@ at most 2; a pass: 1 in 1480). In `03_prototype_network.png`: 14 highway edges, 
 
 ### Bridges, fords, ferries
 
-Chosen after routing, per road edge that crosses a river edge (thread 2's river classes: stream, river, great river):
+Chosen after routing, per road edge that crosses a river edge (thread 2's river classes: stream, river, great river). The
+river runs along the edge and the road crosses it at the edge's middle, so the crossing has one fixed place:
 
 | River | Road track (1) | Road (2) | Highway (3) |
 |---|---|---|---|
@@ -205,6 +216,12 @@ A ferry is a weak link: slow (one hex of extra cost), one army at a time (capaci
 the first thing a navy cuts. A bridge is a chokepoint: a castle is likely beside it (the standalone castle rule).
 Known weakness the prototype exposed: the rule is rank-based, so Pavia's level pays for a Po bridge although in history that
 crossing was a ferry. The authored list (question 3) can override a crossing.
+
+**River cities.** In a city on the river-city list (`04-wfc-model.md` section 3.6) the river runs through the hex and the
+bridge is inside the city. None of that hex's edges is a river edge, so no crossing is chosen there: roads from both banks
+meet at the centre. The bridge kind (stone unless the list says wood) is written in the list, not worked out from rank.
+In the prototype region that is Verona and Florence; Pavia, Turin, Piacenza and Cremona stay beside their rivers, with
+the typed crossings of the table above.
 
 ## 9. The prototype region worked by hand
 
@@ -236,6 +253,10 @@ What the hand-work showed:
 Proposal for the shared vocabulary (thread 4 owns the final list). Each is carried on a **hex edge** (the midpoint), both
 hexes agree by construction because roads are routed over edges, not collapsed.
 
+> **Final names (2026-11-14):** `04-wfc-model.md` section 3.1. `road` and `crossing` are as proposed here; `quay` became
+> one of the values of `crossing` (`none`, `ford`, `bridge_wood`, `bridge_stone`, `ferry`, `pass`, `quay`). A river city
+> adds the hex fact `river_through` and the art tag `site = river_city`.
+
 | Socket | Values | Notes |
 |---|---|---|
 | `road` | 0 none, 1 track, 2 road, 3 highway | Edge quality. A hex with any road edge is a junction at its centre. |
@@ -251,16 +272,19 @@ the crossing kinds, the quay. **What it does not need:** a "town" socket, becaus
 
 ### What I need from thread 1 (relief)
 
-- Per hex: terrain kind (plain, hills, mountain, high), an elevation value 0 to 1, fertility (arable), an ore flag.
+- Per hex: thread 1's height level (0 sea, 1 lowland, 2 plain, 3 hills, 4 highland, 5 mountains, 6 high peaks) and its
+  height in metres, fertility (arable), an ore flag.
 - A **valley** flag per hex with its two axis edges (the floor), so the road can follow it and the art can draw a ribbon.
 - The **ridge** edge flag (already in the game) and a **slope step** between two hexes (for switchbacks).
-- Passes as edge flags on the ridge, with a name, and the hex that is the saddle.
+- Passes with a name: on the 28 km grid a saddle hex whose two crest-side edges carry the pass (the hospice stands on the
+  saddle hex).
 - Land touching the sea is hills at most (the Riviera strip): the mockup assumes it.
 
 ### What I need from thread 2 (water)
 
-- River class per edge (stream, river, great river) **crossing at the edge midpoint**, so a bridge sits on the road's own
-  edge socket. A river drawn as a free curve (mockup 07) must be built from those midpoints.
+- River class per edge (stream, river, great river). The river runs **along** the edge; **the road crosses the river's
+  edge at that edge's middle**, so a bridge sits on the road's own edge socket. The drawn river curve is pinned to the
+  middle of each of its edges, so the bridge always stands on water.
 - A **confluence** flag, a **navigable** flag, and whether a river edge is **fordable** (shallow, no gorge).
 - Lake and sea edges, a **bay** flag (a concave coast), shelter and depth for harbour quality, marsh and flood plain.
 - The Po's tributaries: Ticino, Adda, Sesia, Dora Baltea, Tanaro, Oglio, Lambro (the data has only the Po; I drew them by hand).
@@ -283,8 +307,8 @@ sockets are known; WFC (or a lookup) then only picks the **tile variant** from t
 | Ports, quays | a building in a coastal town | quay edge, lake and river landings |
 | Settlement | level 1 to 3 (5 art stages in the new mockups) on a province hex; castle level by city size | level 0 to 5, capital flag, castle, landmark; spill into neighbours |
 | Villages | names only | placed by a site score and spacing |
-| Passes | ridge exceptions only | hospice, track, valley approaches, a named saddle |
-| Scale | 55 km hex | 28 km recommended |
+| Passes | ridge exceptions only | a named saddle hex with its hospice, the track, the valley approaches |
+| Scale | 57 km hex | 28 km recommended |
 
 ## 12. Player and AI
 
@@ -317,7 +341,7 @@ in `docs/design/ui/` supply the hover card and name plate styles; this thread ne
 
 ## 15. Risks
 
-- **Scale (section 4):** at 55 km the whole design degrades into satellite names. Mitigation: question 1.
+- **Scale (section 4):** at 57 km the whole design degrades into satellite names. Mitigation: question 1.
 - **Roads that look drawn by a ruler:** straight stubs from edge midpoints. Mitigation: pairs of opposite edges draw as a
   curve; art adds wobble; the real tile variants (thread 5).
 - **Exploits and snowballing:** a highway trunk through the capital speeds the owner's armies; roads cross borders so the
@@ -334,7 +358,8 @@ in `docs/design/ui/` supply the hover card and name plate styles; this thread ne
 2. Generated villages and hamlets by site score and spacing, from `placenames` ranks.
 3. The road graph with only rules 1 to 5 (no coast or valley rules), routed by cost, quality from rank only, crossings by
    the table.
-4. Three edge sockets: `road`, `crossing`, `quay`. One tile art per level and per quality.
+4. Two edge fields: `road` and `crossing` (which includes `quay`), as in thread 4's list. One tile art per level and per
+   quality.
 5. No spill layer, no standalone castles, no monasteries or mines, no player road actions.
 
 This already gives Milan to Genoa over a bridge and a pass, and the three Alpine routes, readable in one frame.
@@ -343,7 +368,7 @@ This already gives Milan to Genoa over a bridge and a pass, and the three Alpine
 
 1. **How big is a hex?** (a) **About 28 km (half today's size), recommended:** Pavia, Como, Monza, Bergamo each get a
    hex, valleys become one-hex ribbons, cities can spill; costs about four times the hexes, which thread 4 must prove it can
-   build and draw. (b) Keep 55 km and let a hex hold up to three places (the best drawn, the others as satellite names);
+   build and draw. (b) Keep 57 km and let a hex hold up to three places (the best drawn, the others as satellite names);
    cheapest and the same as today, but Milan, Como, Monza, Lecco and Varese share one hex and valleys vanish.
 2. **Do roads change during play?** (a) **No, they are fixed at generation, and level-ups only change the tile picture and
    the surroundings, recommended for the first version.** (b) A city's level-up raises its roads one step (a small, visible
@@ -370,7 +395,7 @@ Constants are named; none in code.
 ### Pipeline order (after relief and water)
 
 1. Snap and level the fixed cities and notable places. 2. Score sites; place generated settlements in descending score, with
-spacing. 3. Place landmarks (hospices on pass hexes, monasteries, mines) and standalone castles. 4. Build the link list
+spacing. 3. Place landmarks (hospices on saddle hexes, monasteries, mines) and standalone castles. 4. Build the link list
 (section 8). 5. Route links in descending quality (highways first so they set the trunks), updating edge costs, then
 compute traffic and final quality. 6. Choose crossing kinds. 7. Derive the quay edges and the spill layer. 8. Emit the
 sockets. All randomness through `core/rng.gd` with a sub-stream per step so adding a step does not change the others.
@@ -378,7 +403,7 @@ sockets. All randomness through `core/rng.gd` with a sub-stream per step so addi
 ### Edge model
 
 Roads are stored per undirected edge (a pair of hexes) as one byte: bits 0 to 1 quality, bits 2 to 4 crossing kind, bit 5
-quay. Both hexes read the same byte, so they can never disagree. A hex's road junction is implied by any road edge. Pass edges
+quay (thread 4's appendix B has the final layout). Both hexes read the same byte, so they can never disagree. A hex's road junction is implied by any road edge. Pass edges
 reuse the game's `pass_edges`; this thread only adds a road on them.
 
 ### Evidence and reproducibility

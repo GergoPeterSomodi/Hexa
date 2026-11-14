@@ -1,6 +1,8 @@
 # The map, thread 4: how the map is generated
 
-Technical director, 2026-11-14. **Status: design for the owner. Nothing is built.** Reads with `00-brief.md`,
+Technical director, 2026-11-14. **Status: design for the owner. Nothing is built.** **Updated the same day for the
+owner's decisions** (quoted at the top of `README.md`): rivers run along hex edges, with the river-city exception of
+section 3.6. Reads with `00-brief.md`,
 `01-terrain-and-relief.md`, `02-water.md`, `03-settlements-and-roads.md` and `05-tiles-and-objects.md`. This thread owns the final **socket
 vocabulary** (section 3).
 
@@ -26,6 +28,10 @@ vocabulary** (section 3).
 - **One language joins the steps: edge sockets.** Every fact about the border between two hexes (a river runs along it,
   a road crosses it on a bridge, it is a crest, a pass, a shore) is stored **once, on the edge**. Both hexes read the
   same record, so they cannot disagree. Tiles are not solved; they are **looked up** from the six edge records.
+- **One exception, decided by the owner: river cities.** In a short hand-written list of cities (Florence, Paris,
+  Prague, Rome...) the river runs *through* the city hex, corner to corner over the centre, with the bridge inside
+  the city. Everywhere else rivers stay on edges. It costs one hex fact and two corner words, and no new edge value
+  (section 3.6). The prototype script has not been run with it yet.
 - **It works on the prototype region.** A script built the western Alps, the Po plain and the Ligurian coast from the
   repo's geography files plus a few added rivers and towns: 24 builds (8 seeds, 3 hex sizes), every river reached the
   sea or the map edge, every town was on the road network, every pass carried a road, and no check failed.
@@ -43,9 +49,9 @@ check, which stops the build and names the hex.
 
 | # | Step | Method | Reads | Writes |
 |---|---|---|---|---|
-| 0 | **Fixed facts** | Loaded from `godot/data/geography` | The coastline polygons, lakes, the big rivers, mountain lines with heights, named passes, cities | Land or sea per hex; the lines and points as given |
+| 0 | **Fixed facts** | Loaded from `godot/data/geography` | The coastline polygons, lakes, the big rivers, mountain lines with heights, named passes, cities, the river-city list (3.6) | Land or sea per hex; the lines and points as given; the pinned hex of each river city |
 | 1 | **Relief** | Thread 1's height model: the skeleton of ranges, valleys and anchors, plus seeded noise, cut into levels | Step 0 | A height level per hex; crest edges where a range's spine runs between two hexes; pass edges; valley floors |
-| 2 | **Water** | Thread 2's river pass: the real rivers snapped onto hex edges; everything else drains downhill | Steps 0-1 | River edges with size and flow direction; lake edges; mouths; shore kinds; sea depth |
+| 2 | **Water** | Thread 2's river pass: the real rivers snapped onto hex edges, and through the hex of each listed river city (3.6); everything else drains downhill | Steps 0-1 | River edges with size and flow direction; lake edges; mouths; shore kinds; sea depth; `river_through` on the river-city hexes |
 | 3 | **Ground cover** | **Wave function collapse** | Level, water, climate | One cover per hex (farmland, grass, woods, marsh, rock, snow...) |
 | 4 | **Settlements** | Thread 3's scoring: real cities keep their hex, the rest by site score with spacing | Steps 0-3 | Settlement level, castle, landmark, port per hex |
 | 5 | **Roads** | Thread 3's routing: cheapest paths on a cost field | Steps 1-4 | Road level per edge; the crossing kind where a road meets a river, a lake or a pass; quays |
@@ -66,7 +72,7 @@ What is fixed, what is generated:
 
 | Fixed from real geography | Computed from it (same every build) | Generated from the seed |
 |---|---|---|
-| Coastline, lakes, big rivers, mountain lines and heights, named passes, cities | Height levels, crest edges, which edge a named pass opens, the edge course of a real river, shore kinds | The noise on the heights, small streams, ground cover, villages, minor roads, picture variants |
+| Coastline, lakes, big rivers, mountain lines and heights, named passes, cities, the river-city list | Height levels, crest edges, which edge a named pass opens, the edge course of a real river, the two corners a river city's river uses, shore kinds | The noise on the heights, small streams, ground cover, villages, minor roads, picture variants |
 
 A **random world** uses the same steps 1 to 7. Only step 0 changes: a generator invents the coastline, the ranges, the
 river sources and the city sites, in the same file shapes. That keeps one pipeline, not two.
@@ -90,7 +96,8 @@ river sources and the city sites, in the same file shapes. That keeps one pipeli
    - **It was built and measured** in this thread's prototype: 24 builds, no failed check.
    What it costs: a river on edges zigzags and must be smoothed when drawn (thread 2's recipe), and a town is *beside*
    its river (on one or more of its edges), never astride it. This is a look-and-rules choice as well as a technical
-   one, so it is question 3 below; thread 2 asks the same question.
+   one, so it was question 3 below. **The owner decided it on 2026-11-14: edges, except in a short list of river
+   cities** (ruling 6).
 2. **Valleys (thread 1) stay a chain of hexes.** Thread 1 asked that mountain rivers follow valleys. With rivers on
    edges this becomes one checkable rule: *a river edge between two hexes of level 3 or higher must have a valley-floor
    hex on at least one side.* The river runs along the flank of the valley; the valley road runs through the hex
@@ -103,6 +110,11 @@ river sources and the city sites, in the same file shapes. That keeps one pipeli
 5. **Where a real river and a crest claim the same edge** (it happens: section 8), the river may win only at a
    **gorge that the relief data names**. An unnamed clash fails the build. The prototype lets the river win and reports
    each case, to show how often the present data clashes.
+6. **River cities (the owner's exception to ruling 1).** In a city on the authored list the river leaves the edges
+   at a corner of the city hex, runs over the hex centre to another corner and returns to the edges. The city and
+   its bridge sit on the river. The rule is section 3.6. It is built so that none of the four gains of ruling 1 is
+   lost: crossings elsewhere keep their fixed place, the six edges of the city hex stay free for roads (no side
+   lanes), the river is still a walk on corners, and the frontier rule holds everywhere outside the city.
 
 ---
 
@@ -130,7 +142,7 @@ a hex right, as today). The edge a hex calls `e` is the edge its neighbour calls
 | `border` | no, or the two country tags | along | later (thread 5 and the game) | Reserved. Follows the same corner rules as a shore. |
 | `cover` | `same` or `blend(a, b)` | across | derived from step 3 | Never stored: read from the two hexes. Decides the soft blend between ground colours. |
 
-Sixteen bits hold a record (appendix B).
+Sixteen bits hold a record (appendix B). River cities (3.6) add **no edge value**: their river is a hex fact.
 
 ### 3.2 Which values may share an edge
 
@@ -146,6 +158,9 @@ Sixteen bits hold a record (appendix B).
 | `shore` | no (a `quay` only) | `quay` | no | Land on the shore side is level 1 or 2 unless `cliff`. |
 | `sea` | no | | no | Depth is a hex tag; neighbouring depths differ by one step at most. |
 
+**River-city hexes** (3.6): none of the six edges of such a hex may have `line` = `river*` or `lake`. So a road into
+the city never needs a river `crossing` on those edges: the bridge is inside the hex.
+
 ### 3.3 Corner rules (checked by the build, not by WFC)
 
 Three edges meet at every corner. Lines must continue through corners; that is what makes a river a river.
@@ -159,6 +174,8 @@ Three edges meet at every corner. Lines must continue through corners; that is w
 | `mouth` | 1 / 0 | only at a corner that touches sea or a lake hex |
 | `split` | 1 / 2 | only at a delta corner (marsh coast, last corner before the sea) |
 | `lake_in`, `lake_out` | as `run` | a `lake` edge begins or ends here; the river keeps its size through the lake |
+| `city_in` | 1 / 0 | only at the in corner of a river-city hex (3.6); the river goes on through the hex, so this is not a `mouth` |
+| `city_out` | 0 / 1 | only at the out corner of a river-city hex; the out edge has the size of the in edge, so this is not a `source` |
 
 - **Shore:** every corner has 0 or 2 shore edges (true by construction from land and sea).
 - **Crest:** a corner has 0, 2 or 3 crest-or-pass edges; 1 only where a range ends (its levels fall off) or at the sea.
@@ -173,6 +190,7 @@ Never constrained across an edge by a socket; some are constrained by the cover 
 | Thread 1 | `level` 0 to 6, `height_m`, `valley` (with its axis edges), `saddle`, `cover` (the WFC result), fertility, ore |
 | Thread 2 | `sea_depth` (shelf, sea, deep), `bay`, `cape`, `harbour_shelter` 0-2, `marsh` share, `floodplain`, `lake_shore` |
 | Thread 3 | `settlement` 0-5, `capital`, `castle` 0-3, `landmark`, `port`, and the art tags (`site`, spill counts, switchback) |
+| Thread 4 | `river_through` (in corner, out corner), only on the hexes of the river-city list (3.6) |
 
 ### 3.5 What the earlier proposals became
 
@@ -193,6 +211,197 @@ Never constrained across an edge by a socket; some are constrained by the cover 
 | Thread 5 river crossing point (midpoint or along the edge) | Along the edge (its model B) |
 | Thread 5 side lane positions | Not needed: a road and a river never run through the same point side by side |
 | Thread 5 shore type, corner flags, hex tags | `shore_kind`; the corner words of 3.3 (derived, not solved); 3.4 |
+| The owner's exception: a river through a city (first sketched as edge values `river_in`, `river_out`) | The hex fact `river_through` and the corner words `city_in`, `city_out` (3.6); no edge value |
+
+### 3.6 River cities (the owner's exception to "rivers on edges")
+
+**In plain words.** In a few famous cities the river does not run past the city, it runs through it: Florence on the
+Arno, Paris on the Seine, Prague on the Vltava, Rome on the Tiber. For those cities only, the river leaves the hex
+edges at one corner of the city hex, crosses the hex over its centre and goes back onto the edges at another corner.
+The city stands on both banks and its bridge is inside the hex. The list is written by hand and stays short. Everywhere
+else ruling 1 holds: rivers on edges.
+
+**The geometry.** Corners are numbered like edges: corner `k` lies between edge `k` and edge `k + 1` (0 upper right,
+1 top, 2 upper left, 3 lower left, 4 bottom, 5 lower right). Three edges meet at a corner of a hex H. Two are H's own
+edges. The third lies between two of H's neighbours and points straight at H's centre: call it the corner's **spoke**.
+A river that comes down a spoke arrives at the corner already heading for the city centre. So the river chain:
+
+1. comes down the spoke of the **in corner** (a river or lake edge like any other),
+2. runs corner, centre, corner inside H,
+3. leaves by the spoke of the **out corner**.
+
+Nothing touches H's six edges or their middles.
+
+**Two forms**, written per city in the list:
+
+| Form | Corners | Picture | For |
+|---|---|---|---|
+| `through` (the default) | opposite: `out = in + 3` | The river runs straight across; the city is on both banks; the bridge is at the centre | Florence, Paris, Prague |
+| `loop` | two apart: `out = in + 2` or `in - 2` | The river swings round the far side of the centre; the city sits inside the bend | Toledo, Verona |
+
+Neighbouring corners are never used: that would be the edge between them, which is the normal model.
+
+**Why at the corners, and not across the edge middles.** The first sketch of this exception had the river cross two
+of H's edges at their middles (`river_in` and `river_out` as new edge values). Both were weighed:
+
+| | A. In and out at corners (chosen) | B. In and out across edge middles |
+|---|---|---|
+| Joining the edge river | Direct: a river on edges is always at a corner | Needs a half edge: the river must run half way along one of H's edges and turn in |
+| Roads into the city | All six edge middles stay free for roads | A road entering by the river's edge shares its point: the side lane comes back |
+| New edge values | None; the 16-bit record is unchanged | Two, each with a flow sense across the edge |
+| Banks | Each of H's edges lies wholly on one bank | The in and out edges lie on both banks at once |
+| Seams in the art | The river passes a point that three hexes already share | A new shared point on the edge middle |
+
+A is the model here. B stays possible if the owner prefers its look; it costs the items in its column.
+
+**What is stored.**
+
+- A hex fact `river_through` = (`in` corner, `out` corner), on the listed hexes only. The form follows from the two
+  corners and the size from the in spoke. It lives in a small side table, not in the per-hex arrays (appendix B).
+- Two corner words, `city_in` and `city_out` (3.3). Like all corner words they are worked out and checked, not stored.
+- **No edge value.** The art tag `site = river_city` (thread 3's `site` list) picks the town piece.
+- In the authored list: the city, its river, the form, and the bridge kind inside the city (`bridge_stone` unless the
+  entry says `bridge_wood`).
+
+**Rules.**
+
+1. **Listed only.** A hex has `river_through` if and only if it is the hex of a city on the list. The generator never
+   adds one on the Europe map. (A random world's step 0 may write its own list, in the same shape.)
+2. **Pinned hex.** A river city's hex is the hex that contains its true position. It is fixed in step 0, before the
+   water step, and step 4 does not move it. (Other real cities are snapped within one hex after the water is known;
+   a river city cannot wait for that, because the water needs its hex.)
+3. **Clean edges and corners.** None of H's six edges has `line` = `river*` or `lake`, and H's four other corners are
+   `dry`. So there is no second river beside the city, no confluence in it, and no stream starts at it. `shore`,
+   `crest` and `pass` edges are allowed on H; the in and out corners follow the crest rule of 3.3.
+4. **In corner:** exactly one river or lake edge, the spoke, flowing towards the corner. Or the **lake outlet** case:
+   the corner touches a lake hex and has no river edge (Geneva, where the Rhone leaves its lake through the city).
+5. **Out corner:** exactly one river edge, the spoke, flowing away, of the same size as the in spoke. Or the
+   **estuary** case: the corner touches sea or a lake hex and has no river edge; it is then the river's mouth (Pisa,
+   and Rome if its hex reaches the sea).
+6. **Downhill:** the out corner is not higher than the in corner. Thread 1's carving under a fixed river applies to H
+   as to any hex the river touches.
+7. **In the mountains:** an H of level 3 or higher must carry the `valley` flag (ruling 2, said for a hex).
+8. **A real town:** H holds a settlement of level 3 or more (town, city, great city). If not, the build stops and the
+   list is fixed.
+
+**Borders.** Borders run on edges, so a hex is never split: a river city has one owner, on both banks. Outside the
+city the river edge is still the natural frontier, as before. Where a frontier follows the river past a river city,
+the border leaves the river at the in corner, goes round the city hex on one side (three edges for a `through` city)
+and rejoins the river at the out corner. The owner of the city then holds a bridgehead on the far bank, which is
+what such cities were. No new border value and no new check: the border keeps the corner rules of a shore.
+
+**Crossings and roads.** By rule 3 no edge of H is a river edge, so **no `crossing` is ever placed on H's edges** for
+the river. Roads from both banks meet at the centre; the bridge is part of the city's picture. For the road builder,
+entering or leaving H costs no river crossing, so trunk roads are drawn through river cities, as in history. The
+direct step between the two neighbours on either side of a spoke is an ordinary river edge with the ordinary crossing
+rules. Which bank an edge of H lies on is worked out from the corners:
+
+| Form | One side | Other side |
+|---|---|---|
+| `through`, in corner `i` | edges `i + 1`, `i + 2`, `i + 3` | edges `i + 4`, `i + 5`, `i` |
+| `loop`, corners `i` and `i + 2` | edges `i + 1`, `i + 2`: the dry neck | the other four: across the river |
+
+A river city that is a port has its quay inside the hex too (there is no river edge to put it on): `port` together
+with `river_through` means a river quay in the city piece. The river stays navigable through H if it is navigable on
+both spokes.
+
+**Suggestions for the rules (default D11, not decided here).** Moving into or out of a river city never crosses a
+river. Whoever holds the city holds the crossing. An attacker reaches the city from either bank without the river
+penalty, because a quarter of the city stands on his bank; so a river city is a prize, not a stronger fortress. River
+boats pass through the hex, and its owner can close the river to them.
+
+**The river pass (step 2).** For every listed city on a river, before that river is snapped:
+
+1. H's six edges are taken out of the corner graph, and a node for H's centre is added, joined to H's six corners.
+   Each of H's corners can now be reached only by its spoke or from the centre.
+2. The river is snapped in legs: source to H's centre, then H's centre to the next river city or to the mouth, with
+   the usual cost (appendix C). The two corners used at H must fit the form. The pass tries the pairs the form allows
+   (6 for `through`, 12 for `loop`) and keeps the cheapest that runs downhill; ties go to the lower corner number.
+3. If no pair works (a crest, the sea, uphill), the build stops and reports the city. It is a data error.
+4. The drainage pass that makes the small streams treats H's edges as closed and H's four other corners as dry.
+
+**Checks (step 6).** Added to the list of section 9 and to the table of section 10:
+
+- The list and the `river_through` records match one to one; each hex is land and lies on the city's true position.
+- Rules 3 to 8, each by name, with the hex.
+- The two corners fit the form.
+- The river walk (every river edge leads, corner by corner, to the sea) steps from the in corner to the out corner of
+  a river-city hex as one step.
+- No edge of a river-city hex has a `crossing` of `ford`, `bridge_wood`, `bridge_stone` or `ferry`.
+
+**The art (for thread 5).**
+
+- **The river inside the hex** is the same strip recipe as on the edges: one curve pinned at the in corner, at the
+  centre and at the out corner (for a `loop`, at a point about 0.45 of the hex radius beyond the centre, away from the
+  neck). No sprite. The curve passes the two corners, which both neighbours share, so the seam test holds.
+- **The `through` city** is the town recipe of levels 3, 4 and 5 run with a clear channel for the river: 3 levels x 3
+  river axes (corners 1-4 upright, 0-3, 2-5) = **9 baked pieces**. They are lit, so they are baked per axis and never
+  turned. The flow direction does not change the picture.
+- **The bridge** sits at the centre. The river axis of a `through` city is at right angles to one of the three road
+  axes, so the three bridge sprites per kind that the library already has fit as they are. One new piece: a bridge
+  with houses on it for a great city, 3 axes = **3 pieces**. Embankment walls are an edging in the strip recipe.
+- **The `loop` city** is the ordinary town piece at the centre, moved a little towards the neck, with the river curve
+  round it and standard bridges where the roads of the four far edges cross the curve. No new piece.
+- **Level-ups** never change the corners ("sockets never move", thread 3): the picture changes, the river does not.
+- Named bridges (the Ponte Vecchio, the Charles Bridge, London Bridge) belong to the later landmark-cities work.
+
+**How a city gets on the list.** All five must hold in 1480:
+
+1. The walled city stood on both banks, on a river island, or inside a loop of the river.
+2. It had at least one permanent bridge.
+3. The river was not a frontier between countries at the city (a river city hides the river as a frontier).
+4. It is not at a confluence or in a delta (rule 3 needs clean corners).
+5. It is a town or more (level 3 and up), and its river is in the river data.
+
+**The first list for Europe** (12; a cap of about 25 for all of Europe is suggested):
+
+| City | River | Form | Bridge | Why |
+|---|---|---|---|---|
+| Florence | Arno | through | stone | Four stone bridges in 1480, the Ponte Vecchio among them; the Oltrarno quarter inside the walls. Named by the owner. |
+| Pisa | Arno | through | stone | Walled on both banks, bridges in the middle of the city. Close to the sea: the estuary case. |
+| Rome | Tiber | through | stone | Trastevere and the Borgo walled on the far bank; Ponte Sant'Angelo, Ponte Sisto (1470s), the island bridges. Named by the owner. |
+| Verona | Adige | loop | stone | The old city lies inside a tight bend of the Adige; the Roman Ponte Pietra and the Castelvecchio bridge. |
+| Paris | Seine | through | stone | The Ile de la Cite with bridges to both banks; the walls take in both banks. Named by the owner. |
+| London | Thames | through | stone | London Bridge, with houses on it, and Southwark as its bridgehead; the lowest bridge on the Thames. |
+| Prague | Vltava | through | stone | The Old Town and the Lesser Town, joined by the stone bridge. Named by the owner. |
+| Basel | Rhine | through | stone | Great Basel and Little Basel, both walled, joined since 1225 by the one bridge on that stretch of the Rhine. |
+| Toledo | Tagus | loop | stone | The Tagus gorge wraps the city on three sides; the Alcantara and San Martin bridges. |
+| Geneva | Rhone | through | wood | The Rhone leaves Lake Geneva through the city, with bridges over its island: the lake outlet case. |
+| Novgorod | Volkhov | through | wood | The Sophia side and the Trade side, joined by the Great Bridge. |
+| Liege | Meuse | through | stone | The Meuse runs through the city; the Pont des Arches joins the two parts. |
+
+In today's data the cities Pisa, Verona, Basel, Geneva and Liege are missing (they go on the notable places list), and
+so are the rivers Arno, Tiber, Adige, Vltava, Volkhov and Meuse (they go in the tributary file). Second wave, same
+test: Bern (a loop; it must first be a level 3 town), Zurich, Lucerne, Maastricht, Wurzburg, Nuremberg, Salzburg,
+Besancon, Dresden.
+
+**Cities that stay beside their river**, and why:
+
+| City | River | Why it stays on the edge |
+|---|---|---|
+| Cologne | Rhine | No bridge in 1480 (the Roman one was long gone); the city lies wholly on the left bank. A ferry. |
+| Vienna | Danube | The city stood back from the main stream, among side arms with wooden bridges. `bridge_wood`. |
+| Buda | Danube | Buda and Pest were two towns with no permanent bridge between them. A ferry. |
+| Seville | Guadalquivir | The city is on one bank, joined to Triana by a bridge of boats; and it is a port for ocean ships, which needs its quay on a river edge. |
+| Lyon | Rhone and Saone | A confluence: the join needs its corner (test 4). A "confluence city" form with two in corners is possible later. |
+| Avignon | Rhone | The Rhone there was the frontier of France: it must stay an edge (test 3). |
+| Regensburg | Danube | The city is on the south bank; its Stone Bridge is a typed crossing, an authored `bridge_stone` on a great river. |
+| Milan, Venice | | No river through them: Milan's canals and Venice's lagoon are art and later features. |
+
+**In the prototype region** (5.7 to 11.3 east, 43.25 to 47.15 north):
+
+| City | River | Ruling | Why |
+|---|---|---|---|
+| Verona | Adige | **River city, `loop`** | The clearest case in the region, and the Adige is already on the region's tributary list. |
+| Florence | Arno | **River city, `through`** | At the south-east corner of the window; the owner's own example. The Arno must be added. |
+| Pisa | Arno | River city, second step | Tests the estuary case once Florence works. |
+| Geneva | Rhone | River city, second step | Tests the lake outlet case. |
+| Turin | Po | **Stays beside** | In 1480 a small town on the left bank, at the join of the Po and the Dora Riparia: a confluence site (test 4), with a wooden bridge outside the walls. |
+| Pavia | Ticino | **Stays beside** | The city is on the left bank; its covered bridge leads to a small suburb. The Ticino is a frontier and "the bridge at Pavia" is the region's showpiece of a typed crossing; the join with the Po is one corner away. |
+| Piacenza, Cremona | Po | Stay beside | South-bank towns with a ferry or a boat bridge; the Po is the region's great barrier. |
+
+So the prototype shows both forms (Florence and Verona) and keeps its edge showpieces (Pavia, Turin, the Adda and
+Ticino frontiers).
 
 ---
 
@@ -354,7 +563,8 @@ The art step reads **only** the output of step 6. It makes no decisions that the
    2's recipe pins the curve to the **middle of every edge** it uses and rounds it off at the corners, so the zigzag
    becomes a meander and a bridge at the edge middle always sits on the water. Width comes from the river size.
    Because the curve is built from points that both neighbouring hexes share, it has no break at a hex border. Crests are a chain of peaks drawn
-   on the crest edges, with a saddle at a `pass`.
+   on the crest edges, with a saddle at a `pass`. In a river-city hex the same river curve leaves the edges at the
+   in corner, passes the hex centre and rejoins the edges at the out corner (3.6).
 3. **Routes drawn across edges.** A road is one curve from hex centre to hex centre through the **middle** of each
    edge it uses. A hex with three road edges gets a fork at its centre. The crossing piece (ford, bridge, ferry,
    hospice at a pass, quay) is placed on the edge middle. A valley floor is a pale ribbon through the same middles.
@@ -362,10 +572,11 @@ The art step reads **only** the output of step 6. It makes no decisions that the
    per hex (as mockup 07 does), so a wood or a range runs across hex borders without a seam. A hex's cover and level
    decide what may stand on the grid points inside it; lines and roads clear a strip.
 5. **Settlements** are one piece per level at the hex centre, with thread 3's spill of fields and suburbs on the same
-   grid.
+   grid. A river city uses the city-on-river piece for its level and river axis, with the bridge at the centre (3.6).
 
 What the library needs, at most: about 12 ground looks; line strokes for 3 river sizes, 2 lake widths, 4 shore kinds
-and the crest; road strokes for 3 levels; 6 crossing pieces; the object sets. **No piece exists per edge pattern.**
+and the crest; road strokes for 3 levels; 6 crossing pieces; 12 river-city pieces (3.6); the object sets. **No piece
+exists per edge pattern.**
 Variants (three looks of a wood, say) are picked by a hash of the hex position and the seed, so they never flicker.
 
 A useful test for thread 5: draw the same hex twice, once from each of two neighbouring chunks. The pixels along the
@@ -424,7 +635,8 @@ routes share an edge); thread 3's rules replace them.
 
 **Step 6, sockets and checks (panel 6).** One record per edge. The checks run: every river edge leads, corner by
 corner, to the sea or the map edge; no river on a crest or shore edge; no road over a crest; no road end outside a
-settlement or a pass; every road over a river has a crossing. **0 failures in 24 builds.**
+settlement or a pass; every road over a river has a crossing. **0 failures in 24 builds.** (The script has no river
+cities: the checks of 3.6 are designed, not yet run. Verona and Florence are the first two to add.)
 
 **Step 7, art.** Not drawn here. Panel 6 is exactly what thread 5's art would be given.
 
@@ -441,6 +653,7 @@ Measure, and fail the build on:
 | Same seed built twice, on Windows and Linux | identical map digest |
 | 200 random worlds | 0 failed river or road checks; last-resort list logged, under 0.1 % of hexes |
 | Named places: every city, pass and river of the geography files | present, within one hex of its true position |
+| River cities: the list against the map (3.6) | every listed city has its river through its own hex; 0 failed rules |
 | Generation time, Europe | under 2 s (57 km) or 5 s (28 km) on the reference PC |
 | Seam test (section 8) | identical pixels on shared edges |
 
@@ -464,6 +677,12 @@ output is a plain data block that the next step reads, so a step can be tested a
   but they must read the same edge records as the art, never a second copy.
 - **Delta splits** (one river into two at the sea) are allowed by the vocabulary but were not exercised: the Po's
   mouth lies outside the prototype window.
+- **River cities (3.6) are designed on paper only.** The prototype script was not re-run with them. Before the Godot
+  water step is called done: Verona (`loop`) and Florence (`through`) built at 28 km over 8 seeds with 0 failed
+  checks, and one build with a wrong entry (a river city on a confluence) that must stop and name the city. The
+  lake outlet and estuary cases (Geneva, Pisa) are allowed by the rules and need the same proof.
+- **A river city pulls roads.** Its crossing is free for the road builder, so trunks will bend towards it. That is
+  intended, but the list must stay short or every river gets a free bridge every few hexes.
 
 ---
 
@@ -481,7 +700,8 @@ output is a plain data block that the next step reads, so a step can be tested a
      seconds, 4 MB.
    - Other: stay at 57 km. Nothing to prove, but Milan, Como and Pavia share hexes and two Alpine passes lose their
      place to a river.
-3. **Do rivers run along the borders between hexes?** (Thread 2 asks the same.)
+3. **Do rivers run along the borders between hexes?** (Thread 2 asks the same.) *Answered 2026-11-14: yes, along the
+   edges, but through the city in a short authored list of river cities (section 3.6).*
    - **Recommended: yes.** A river is then a line on the map that you cross at a bridge, a ford or a ferry; it can be
      a border and a line of defence; Milan lies between the Ticino and the Adda; the generator and the art are both
      simpler and the prototype already works this way.
@@ -513,6 +733,8 @@ and shipped as a file**; random worlds are made fresh from their seed (section 5
 - **Corners.** Each hex owns two corners: its top (N) and its upper-right (NE). Corner index `i * 2 + k`.
 - **Edge record, 16 bits:** `line` 4, `flow` 2, `shore_kind` or `lake_width` 3, `step` with sign 3, `floor` with side
   2, `road` 2. `crossing` (3 bits) goes in a second small array that only road edges fill.
+- **River cities:** a side table of (hex index, in corner, out corner), one entry per listed city: a few dozen
+  entries for Europe, so no per-hex array and no change to the edge record.
 - **File size:** per hex about 4 bytes of hex facts and 6 bytes of edge records: 10 bytes. 30,450 hexes: 0.3 MB.
   121,800 hexes: 1.2 MB, before compression. Names, provinces and countries are extra and do not grow with hex count
   in the same way.
@@ -528,7 +750,8 @@ and shipped as a file**; random worlds are made fresh from their seed (section 5
 - **Snapping a real river.** A cheapest-path search on the corner graph from the corner nearest the source. An edge
   costs its length times `(1 + 4 * distance from the true course)`; a crest edge costs extra; edges touching sea are
   not allowed. The search may end at any corner on the sea, the map edge or an earlier river, at a price of six times
-  the distance from the true mouth, so it ends where the real river does.
+  the distance from the true mouth, so it ends where the real river does. A river with a listed river city is
+  searched in legs through that city's hex centre (3.6, "The river pass").
 - **Drainage.** Priority flood: start from all sea, map-edge and real-river corners in a heap ordered by height; pop
   the lowest; each undrained neighbour drains into it and is pushed at `max(its height, this height + a hair)`.
   Hollows are filled as the flood passes, so every corner gets a way down. Then flow is summed from the tops down.
