@@ -27,7 +27,7 @@ Nothing here changes the world. The flag asks for the lines again after every ac
 from typing import NamedTuple
 
 from . import tech
-from .battleview import battle_view, siege_view
+from .battleview import battle_view, besieged, siege_view
 from .data import BUILDINGS, CASTLE_COST, RESEARCH_FUND, SETTLEMENT_COST
 
 
@@ -151,9 +151,11 @@ def sieges_on(world, tag):
     view gives the seasons (None: the besiegers are too few, the place does not fall); a place the player cannot see is
     not listed (the view says hidden, never for its own owner)."""
     lines = []
-    for prov in world.provinces_of(tag):
-        if not prov.besieger:
+    for pos in besieged(world):
+        prov = world.provinces[pos]
+        if prov.controller != tag:                  # the defender is the one holding the place (an occupied castle's occupier)
             continue
+        # TODO(r022-sfix): pass relief=False once siege_view takes it (the task line does not need the relief armies)
         view = siege_view(world, prov.pos, tag)
         if view is None or view["access"] == "hidden":
             continue

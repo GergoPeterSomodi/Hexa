@@ -109,7 +109,6 @@ class Feed:
         self.unread = 0
         self._floating = deque(maxlen=FLOATING)     # (time.monotonic() when told, FeedItem)
         self._lifted = deque(maxlen=FLOATING)       # (time.monotonic(), pos, progress, need): sieges lifted (the grey flash)
-        self._starving = set()                      # (pos, name) of the sieges whose garrison has been told it starves
         self._costs = {}                    # (tag, pos, reason) -> ducats, to put in the next matching sentence
         self._once = set()                  # (kind, season) told once a season
         world.bus.tap(self.on_event)
@@ -341,9 +340,9 @@ class Feed:
         sentence = f"{self._name(event.tag)} besieges {self._place(event.pos)}: {progress} of {need}" + \
             f", season {event.get('seasons', 0)}."
         items = [self._item(event, "siege", f"Siege {progress}/{need}", sentence, mine, log=mine)]
-        key = (event.pos, event.get("name"))
-        if event.get("hunger") and key not in self._starving:       # the first season the stores are out (told once)
-            self._starving.add(key)
+        stores = 1 + (prov.castle if prov else 0)                   # a garrison's stores in seasons (war.siege_terms)
+        if event.get("hunger") and event.get("seasons") == stores + 1:   # the first season past the stores: told once, from
+            # the event alone, so a load in the middle of a starving siege does not announce it again
             items.append(self._item(event, "siege", "Starving", f"The garrison of {self._place(event.pos)} is starving.",
                                     mine, log=mine))
         return items
@@ -366,7 +365,6 @@ class Feed:
                "outnumbered": "the besiegers were too few", "peace": "peace ended it"}.get(event.get("why"), "it ended")
         name = event.get("name") or "Siege"
         sentence = f"{name} is lifted: {why}."
-        self._starving.discard((event.pos, event.get("name")))
         if mine or self._seen(event.pos):
             self._lifted.append((time.monotonic(), event.pos, event.get("progress", 0), event.get("need", 0)))
         return self._item(event, "siege", "Siege lifted", sentence, mine, log=True)

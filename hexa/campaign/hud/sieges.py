@@ -12,7 +12,7 @@ changes the game.
 import pygame
 
 from ...ui.theme import BAD_C, GOOD_C, MUTED, TEXT, WARN_C
-from ..battleview import siege_view
+from ..battleview import besieged, siege_view
 from . import siegebadge
 from .battles import MIN_ZOOM
 from .floating import screen_point
@@ -65,7 +65,8 @@ class Marks:
             return
         view_rect = ctx.view_rect()
         ctx.screen.set_clip(view_rect)
-        for pos in [pos for pos, prov in world.provinces.items() if prov.besieger]:
+        for pos in besieged(world):
+            # TODO(r022-sfix): once siege_view takes relief=False, the badge passes relief=False (it never shows the relief)
             view = siege_view(world, pos, world.player)
             if view is None or view["access"] == "hidden" or view["progress"] is None:
                 continue
