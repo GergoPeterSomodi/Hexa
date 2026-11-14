@@ -1,9 +1,8 @@
-## The Europe 1480 map builder, step 1 (the land layers): grid and projection, land and sea, lakes, the forced points,
-## rivers, the terrain by wave function collapse, the cities, the ridge edges and the passes. A port of the first half of
-## build_map in hexa/campaign/systems/worldgen.py (the Python reference; read, do not change).
-##
-## Step 2 (provinces with their goods, countries, towns and castles, roads, starting units) is not here yet: it will be
-## functions of its own, called from build_europe after the passes, reading the MapData this step leaves behind.
+## The Europe 1480 map builder. Step 1 (the land layers): grid and projection, land and sea, lakes, the forced points,
+## rivers, the terrain by wave function collapse, the cities, the ridge edges and the passes. Step 2 (0.3.0, this file's
+## second half): provinces with their goods, countries and their territories, names, people, towns, castles, works and
+## ports, roads and the starting units. A port of build_map and build_countries, build_roads and starting_units in
+## hexa/campaign/systems/worldgen.py (the Python reference; read, do not change).
 class_name MapBuilder
 extends RefCounted
 
@@ -23,6 +22,13 @@ static func build_europe(data: EuropeData) -> MapData:
 	LandBuilder.sea_bodies(map)
 	LandBuilder.cities(map, data, geo)
 	Passes.build(map, data, geo, _land_set(map))
+	# Step 2. One luck source for all of it, seeded from the map seed (the numbers are not Python's; see the data README).
+	var rng := Rng.new()
+	rng.seed_with(data.map_seed)
+	Provinces.build(map, geo, rng)
+	CountryBuilder.build(map, data, geo, rng)
+	RoadBuilder.build(map, data)
+	StartingUnits.build(map, data, geo)
 	return map
 
 
