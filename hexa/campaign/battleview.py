@@ -80,6 +80,12 @@ def _memo(world, key, obj, make):
     return hit[1]
 
 
+def besieged(world):
+    """The hexes a siege runs on, in province order (cached per world.version, so a frame or a task-flag rebuild does not
+    scan every province: the siege badges and the task flag read this). A siege starts, lifts or ends with world.changed()."""
+    return _memo(world, ("besieged",), None, lambda: tuple(pos for pos, prov in world.provinces.items() if prov.besieger))
+
+
 def _access(world, pos, tags, viewer):
     """"exact", "seen" or "hidden": what the viewer may know about the stacks of ``tags`` on ``pos`` (the fog rule above)."""
     if viewer is None or viewer in tags:

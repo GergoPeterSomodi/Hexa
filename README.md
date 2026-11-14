@@ -102,7 +102,7 @@ All numbers are in `hexa/rules.py` if you want to rebalance the game.
 One turn is one season, from spring 1480 to 1650. Every land hex is a province.
 
 **Controls:** left-click selects a province or unit, **right-click** moves the selected unit (or attacks
-a red-outlined enemy). Right-click far away to send a unit there over several seasons. Mouse wheel or
+a red-outlined enemy; on a garrisoned castle, right-click besieges it and **Shift**-right-click storms it). Right-click far away to send a unit there over several seasons. Mouse wheel or
 **+/-** zooms, right-drag or **WASD** scrolls, **1-4** switch map modes (political, terrain, goods, markets;
 press **3** again to switch the goods view between chips, deposits and prices), **Tab** cycles units,
 **C** opens your country, **L** the ledger, **G** shows or hides the faint hex grid, **R** continues the selected
@@ -382,7 +382,10 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | Morale back a season outside battle | 25 points |
 - **Castles** have their own garrison (stronger with each level). They stop enemy armies walking past
   (armies must halt next to them). A stack that moves onto a garrisoned castle **besieges** it (the default; no battle).
-  **Storm** is the assault battle at once, open every season of the siege. The choice is on the attack card.
+  **Storm** is the assault battle at once, open every season of the siege. The attack card shows both lines: right-click
+  besieges, **Shift**-right-click storms. A besieged place has a siege badge on the map (hover it for the meter, the stores
+  and the seasons), a Siege block in its province panel with **Storm now** for the besieger and, for the defender, a relief
+  line for each army that can reach it (click it to select the army), and a line on the task flag.
 - **Sieges (0.2.2).** A besieged place has a meter (the card shows "falls in about N seasons", and warns when the war
   ends first). The arrival season counts as the first. Each season the besieger adds its **rate** to the meter, and the
   place falls at the end of a season in which the meter reaches its **need**, but never before **2 seasons** of siege:

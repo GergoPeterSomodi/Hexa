@@ -540,3 +540,51 @@ class SaveTest(TempHome):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReviewFixesTest(unittest.TestCase):
+    """Review fixes: the task line goes to the occupier (the defender is the controller), the besieged list is cached per
+    world.version, and "starving" is told once from the event alone (a load does not repeat it)."""
+
+    def test_the_occupier_gets_the_task_line_and_the_owner_does_not(self):
+        from hexa.campaign import reminders
+        world = fresh()
+        prov = target(world, 2)                              # owned and held by Castile
+        prov.controller = "POR"                              # Portugal occupies it
+        prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "CAS", 3, 3, "Siege of X"
+        world.changed(ownership=True)
+        por = [r for r in reminders.unfinished(world, "POR") if r.kind == "siege"]
+        cas = [r for r in reminders.unfinished(world, "CAS") if r.kind == "siege"]
+        self.assertEqual(len(por), 1)
+        self.assertIn("is under siege:", por[0].text)
+        self.assertEqual(cas, [])
+
+    def test_the_besieged_list_is_cached_until_the_world_changes(self):
+        from hexa.campaign import battleview
+        world = fresh()
+        prov = target(world, 2)
+        self.assertEqual(battleview.besieged(world), ())
+        prov.besieger = "POR"
+        world.changed()
+        self.assertIn(prov.pos, battleview.besieged(world))
+        self.assertIs(battleview.besieged(world), battleview.besieged(world))
+
+    def test_starving_is_told_once_on_the_first_season_past_the_stores(self):
+        from hexa.campaign import feed as feeds
+        from hexa.campaign.feed import Feed
+        world = fresh()
+        prov = target(world, 2)                              # a castle of 2: stores for 1 + 2 = 3 seasons
+        prov.besieger = "POR"
+        world.changed()
+        mine = feeds.of(world)
+
+        def season(n, hunger):
+            world.bus.emit("siege_progress", "POR", prov.pos, progress=n, need=10, rate=2, hunger=hunger, seasons=n,
+                           name="Siege of X")
+            return [item.text for item in mine.take_floating() if item.text == "Starving"]
+
+        self.assertEqual(season(3, 0), [])
+        self.assertEqual(season(4, 2), ["Starving"], "the first season past the stores is told")
+        self.assertEqual(season(5, 2), [], "later seasons are not told again")
+        Feed(world)                                          # a load: a feed made again over the same world
+        self.assertEqual(season(5, 2), [], "a load in the middle of a starving siege does not repeat it")

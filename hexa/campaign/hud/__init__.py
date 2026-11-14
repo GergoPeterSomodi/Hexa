@@ -4,6 +4,7 @@
     tasks.py      the task flag under End season and its list of unfinished things (``campaign/reminders`` says what)
     floating.py   ribbons that rise from the hex where something happened (``feed`` says what)
     battles.py    the battle marks on the map: the crossed-swords badge and the front-line bar (``battleview`` says what)
+    sieges.py     the siege marks on the map: the dial badge, its hover card, the grey flash of a lifted siege
     siegebadge.py the siege badge sprite (a gate tower in an amber dial ring), drawn from numbers the caller gives
     actionlog.py  the collapsible log in the bottom-left corner (``feed`` has its lines)
     style.py      the colour and icon of each of the six kinds of event, shared by the ribbons and the log
@@ -16,7 +17,7 @@ changes the game (selecting a stack and moving the camera are the window's own s
 import pygame
 
 from ...ui.theme import INFO_C, INK
-from . import actionlog, battles, odds, tasks, topbar
+from . import actionlog, battles, odds, sieges, tasks, topbar
 from .floating import Floaters
 
 GLIDE_MS = 260          # how long the camera takes to reach a place the log names
@@ -28,6 +29,7 @@ class Hud:
     def __init__(self):
         self.floaters = Floaters()
         self.marks = battles.Marks()
+        self.sieges = sieges.Marks()    # the siege badges (0.2.2): a click opens the province
         self.log = actionlog.LogState()
         self.readings = None            # the top bar's cached snapshot (topbar.readings)
         self.glide = None               # (hex to show, start ms, ms of the last frame): the camera follows the hex
@@ -61,6 +63,7 @@ class Hud:
         self._glide(ctx, now)
         self.floaters.add(ctx, self._timed(ctx, ctx.game.feed.take_floating(MAX_AGE)), now)
         self.marks.draw(ctx, self)              # under the ribbons: a ribbon covers the badge
+        self.sieges.draw(ctx, self)
         odds.draw(ctx, self)                    # the odds card of the attack hover (hud/odds.py)
         self.floaters.draw(ctx, now)
         self._ring(ctx, now)

@@ -108,6 +108,7 @@ class Feed:
         self.groups = {}                    # season -> deque of FeedItem
         self.unread = 0
         self._floating = deque(maxlen=FLOATING)     # (time.monotonic() when told, FeedItem)
+        self._lifted = deque(maxlen=FLOATING)       # (time.monotonic(), pos, progress, need): sieges lifted (the grey flash)
         self._costs = {}                    # (tag, pos, reason) -> ducats, to put in the next matching sentence
         self._once = set()                  # (kind, season) told once a season
         world.bus.tap(self.on_event)
@@ -148,6 +149,15 @@ class Feed:
         now = time.monotonic()
         out = [item for told, item in self._floating if max_age is None or now - told <= max_age]
         self._floating.clear()
+        return out
+
+    def take_lifted(self, max_age=None):
+        """The sieges lifted since the last call, as (pos, progress, need) (the map's grey flash, hud/sieges.py), told
+        within `max_age` seconds like take_floating."""
+        now = time.monotonic()
+        out = [(pos, progress, need) for told, pos, progress, need in self._lifted
+               if max_age is None or now - told <= max_age]
+        self._lifted.clear()
         return out
 
     def mark_read(self):
@@ -329,7 +339,13 @@ class Feed:
         progress, need = event.get("progress", 0), event.get("need", 0)
         sentence = f"{self._name(event.tag)} besieges {self._place(event.pos)}: {progress} of {need}" + \
             f", season {event.get('seasons', 0)}."
-        return self._item(event, "siege", f"Siege {progress}/{need}", sentence, mine, log=mine)
+        items = [self._item(event, "siege", f"Siege {progress}/{need}", sentence, mine, log=mine)]
+        stores = 1 + (prov.castle if prov else 0)                   # a garrison's stores in seasons (war.siege_terms)
+        if event.get("hunger") and event.get("seasons") == stores + 1:   # the first season past the stores: told once, from
+            # the event alone, so a load in the middle of a starving siege does not announce it again
+            items.append(self._item(event, "siege", "Starving", f"The garrison of {self._place(event.pos)} is starving.",
+                                    mine, log=mine))
+        return items
 
     def _siege_started(self, event):
         prov = self.world.provinces.get(event.pos)
@@ -338,7 +354,7 @@ class Feed:
             return None
         name = event.get("name") or "Siege"
         sentence = f"{name}: {self._name(event.tag)} besieges {self._place(event.pos)} (needs {event.get('need', 0)})."
-        return self._item(event, "siege", "Siege begun", sentence, mine, floating=False, log=True)
+        return self._item(event, "siege", "Siege begun", sentence, mine, log=True)
 
     def _siege_lifted(self, event):
         prov = self.world.provinces.get(event.pos)
@@ -349,7 +365,9 @@ class Feed:
                "outnumbered": "the besiegers were too few", "peace": "peace ended it"}.get(event.get("why"), "it ended")
         name = event.get("name") or "Siege"
         sentence = f"{name} is lifted: {why}."
-        return self._item(event, "siege", "Siege lifted", sentence, mine, floating=False, log=True)
+        if mine or self._seen(event.pos):
+            self._lifted.append((time.monotonic(), event.pos, event.get("progress", 0), event.get("need", 0)))
+        return self._item(event, "siege", "Siege lifted", sentence, mine, log=True)
 
     def _war_declared(self, event):
         target = event.get("target")
