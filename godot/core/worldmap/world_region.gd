@@ -14,6 +14,8 @@ var lat_north: float = 0.0
 var hex_w_km: float = 0.0
 var deg_km: float = 0.0
 var ref_lat: float = 0.0
+## The seed of the ground cover (step 4): the same seed gives the same cover on the same relief.
+var cover_seed: int = 1480
 ## Each range: name (String), crest_level (int), line (PackedVector2Array of lon/lat).
 var ranges: Array[Dictionary] = []
 ## Each pass: name, pos (Vector2 lon/lat), metres (int), range (String).
@@ -51,6 +53,7 @@ static func from_text(text: String) -> WorldRegion:
 	out.hex_w_km = float(grid["hex_w_km"])
 	out.deg_km = float(grid["deg_km"])
 	out.ref_lat = float(grid["ref_lat"])
+	out.cover_seed = int(d.get("cover_seed", 1480))
 	for item: Variant in d["ranges"]:
 		var r: Dictionary = item
 		out.ranges.append({"name": str(r["name"]), "crest_level": int(r["crest_level"]), "line": _points(r["line"])})

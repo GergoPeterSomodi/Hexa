@@ -30,11 +30,23 @@ const RIVER := Color("#3d6f94")
 const STREAM := Color("#5d8fb0")
 const BEACH := Color("#e8d9a8")
 const CLIFF := Color("#5a4a3a")
+## Soft ground colours of the covers (WorldCover order: farmland, grassland, woods, marsh, rock, snow, tundra, sand).
+const COVER_COLOURS: Array[Color] = [
+	Color("#c9c27e"),
+	Color("#a9c27a"),
+	Color("#5f8c55"),
+	Color("#8ea58a"),
+	Color("#a39c93"),
+	Color("#f1f4f6"),
+	Color("#bdbfa8"),
+	Color("#e6d5a3"),
+]
 
 var grid: WorldGrid
 var region: WorldRegion
 var relief: WorldRelief
 var water: WorldWater = null
+var cover: WorldCover = null
 var centre_km: Vector2 = Vector2.ZERO
 var px_per_km: float = 2.0
 var title: String = "Alps and Po: relief on 28 km hexes"
@@ -54,6 +66,13 @@ func show_region(p_grid: WorldGrid, p_region: WorldRegion, p_relief: WorldRelief
 ## Adds the water (rivers, lakes, shores, sea depth, streams) to the picture.
 func show_water(p_water: WorldWater) -> void:
 	water = p_water
+	queue_redraw()
+
+
+## Shows the ground cover: soft colours that blend across the hex edges, shaded by the relief. The water and the crests
+## are drawn on top, as before.
+func show_cover(p_cover: WorldCover) -> void:
+	cover = p_cover
 	queue_redraw()
 
 
@@ -93,7 +112,10 @@ func _draw() -> void:
 	if _fit_pending and size.x > 0.0 and size.y > 0.0:
 		_apply_fit()
 		_fit_pending = false
-	_draw_hexes()
+	if cover != null:
+		_draw_cover_hexes()
+	else:
+		_draw_hexes()
 	if water != null:
 		_draw_water_bodies()
 	_draw_crests()
@@ -115,6 +137,50 @@ func _draw_hexes() -> void:
 		draw_colored_polygon(pts, _hex_colour(hex))
 		pts.append(pts[0])
 		draw_polyline(pts, HEX_LINE, 1.0)
+
+
+## Each hex is a polygon whose six corners carry the mean colour of the three hexes that meet there, so the colour runs
+## across every edge from one hex to the next without a seam. Land keeps its cover colour times its relief shade.
+func _draw_cover_hexes() -> void:
+	for hex: Vector2i in relief.levels.keys():
+		var corners := grid.corners_km(hex)
+		var pts := PackedVector2Array()
+		var cols := PackedColorArray()
+		for k: int in 6:
+			pts.append(km_to_px(corners[k]))
+			cols.append(_corner_colour(hex, k))
+		draw_polygon(pts, cols)
+
+
+## The mean colour of the hexes at corner k of a hex: the hex itself and the two neighbours whose edges meet there.
+func _corner_colour(hex: Vector2i, k: int) -> Color:
+	var r := 0.0
+	var g := 0.0
+	var b := 0.0
+	var count := 0
+	var hexes: Array[Vector2i] = [hex]
+	for d: int in 6:
+		var pair := WorldGrid.EDGE_CORNERS[d]
+		if pair.x == k or pair.y == k:
+			hexes.append(grid.neighbour(hex, d))
+	for h: Vector2i in hexes:
+		if h != hex and not relief.levels.has(h):
+			continue
+		var c := _cover_hex_colour(h)
+		r += c.r
+		g += c.g
+		b += c.b
+		count += 1
+	return Color(r / float(count), g / float(count), b / float(count))
+
+
+func _cover_hex_colour(hex: Vector2i) -> Color:
+	var c := cover.cover_at(hex)
+	if relief.level_at(hex) == ReliefLevels.SEA or c < 0:
+		return _hex_colour(hex)
+	var base := COVER_COLOURS[c]
+	var f := 1.0 + float(cover.shade.get(hex, 0.0))
+	return Color(clampf(base.r * f, 0.0, 1.0), clampf(base.g * f, 0.0, 1.0), clampf(base.b * f, 0.0, 1.0))
 
 
 func _hex_colour(hex: Vector2i) -> Color:
@@ -268,13 +334,19 @@ func _draw_legend() -> void:
 	var font := ThemeDB.fallback_font
 	draw_rect(Rect2(0.0, 0.0, size.x, MARGIN_TOP), PANEL)
 	draw_string(font, Vector2(12.0, 24.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, TEXT)
-	var top := size.y - 212.0
-	draw_rect(Rect2(8.0, top, 262.0, 204.0), PANEL)
-	for level: int in ReliefLevels.NAMES.size():
-		var y := top + 12.0 + float(level) * 18.0
-		draw_rect(Rect2(16.0, y, 14.0, 14.0), LEVEL_COLOURS[level])
-		draw_string(font, Vector2(36.0, y + 12.0), ReliefLevels.name_of(level), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEXT)
-	var crest_y := top + 12.0 + 7.0 * 18.0 + 10.0
+	var rows := COVER_COLOURS.size() if cover != null else ReliefLevels.NAMES.size()
+	var box := 68.0 + float(rows) * 18.0
+	var top := size.y - box - 8.0
+	draw_rect(Rect2(8.0, top, 262.0, box), PANEL)
+	for row: int in rows:
+		var y := top + 12.0 + float(row) * 18.0
+		if cover != null:
+			draw_rect(Rect2(16.0, y, 14.0, 14.0), COVER_COLOURS[row])
+			draw_string(font, Vector2(36.0, y + 12.0), WorldCover.NAMES[row], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEXT)
+		else:
+			draw_rect(Rect2(16.0, y, 14.0, 14.0), LEVEL_COLOURS[row])
+			draw_string(font, Vector2(36.0, y + 12.0), ReliefLevels.name_of(row), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEXT)
+	var crest_y := top + 12.0 + float(rows) * 18.0 + 10.0
 	draw_line(Vector2(16.0, crest_y), Vector2(30.0, crest_y), INK, CREST_PX)
 	draw_string(font, Vector2(36.0, crest_y + 4.0), "crest (spine at crest height)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEXT)
 	draw_line(Vector2(16.0, crest_y + 20.0), Vector2(30.0, crest_y + 20.0), GOLD, PASS_PX)

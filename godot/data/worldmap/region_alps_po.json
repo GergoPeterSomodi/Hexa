@@ -4,6 +4,7 @@
   "note": "Hand-written skeleton for the map prototype (docs/design/map/README.md section 8, step 1). Status of the hand-written lines: ranges (spines), passes, valleys (floor lines), rivers (course lines), lakes (axes) and gorges are hand-written, like the tributaries; their heights are not. Valley floors and mountain river heights are carved from ETOPO along these lines (tools/worldmap/extract_heights.py, carving rule in the heights file). Heights are NOT here: they come from NOAA ETOPO 2022 (60 arc-second, ice surface) through tools/worldmap/extract_heights.py, which writes godot/data/worldmap/heights_alps_po.json. Points are [longitude, latitude] in degrees. Lines are approximate (about 5 to 10 km); the heights are measured, the lines are drawn from the real valleys, ridges and river courses by hand. Real pass heights in metres are from the pass's official height; they are checked against the measured values in the extraction report.",
   "window": {"lon_west": 5.6, "lon_east": 11.9, "lat_south": 43.2, "lat_north": 47.3},
   "grid": {"hex_w_km": 28.0, "deg_km": 111.2, "ref_lat": 45.25},
+  "cover_seed": 1480,
   "coastline": "godot/data/geography/land.json",
   "elevation": {"source": "NOAA ETOPO 2022, 60 arc-second, surface elevation (ice surface); licence: free to use and redistribute, not for legal use (ERDDAP); credit: NOAA National Centers for Environmental Information. 2022: ETOPO 2022 15 Arc-Second Global Relief Model. doi:10.25921/fd45-gt74", "files": ["C:/hxr/data/etopo2022/etopo2022_60s_east.nc"], "outside_repo": true},
 

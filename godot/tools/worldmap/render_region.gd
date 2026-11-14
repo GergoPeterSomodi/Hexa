@@ -1,8 +1,9 @@
 ## Writes the pictures of the map prototype region as PNG files: flat colours by relief level, crests, passes and names
-## (the relief pictures), and with --water the rivers, lakes, shores, sea depth and streams (the water pictures).
+## (the relief pictures), with --water the rivers, lakes, shores, sea depth and streams (the water pictures), and with
+## --cover the ground cover (step 4: soft colours blended across the edges, shaded by the relief, water on top).
 ## Windowed: nothing is drawn headless.
 ## Run (from the repository root, with GODOT set):
-##   "$GODOT" --path godot -s res://tools/worldmap/render_region.gd -- --out=<absolute folder> [--water]
+##   "$GODOT" --path godot -s res://tools/worldmap/render_region.gd -- --out=<absolute folder> [--water | --cover]
 ## Options: --heights=<absolute path> draws another heights file (a comparison, e.g. --stat=centre from the extractor),
 ## --prefix=<text> is put in front of the picture names.
 extends SceneTree
@@ -21,7 +22,10 @@ func _render() -> void:
 	var heights_path := HEIGHTS
 	var prefix := ""
 	var with_water := false
+	var with_cover := false
 	for arg: String in OS.get_cmdline_user_args():
+		if arg == "--cover":
+			with_cover = true
 		if arg.begins_with("--out="):
 			out_dir = arg.substr("--out=".length())
 		elif arg.begins_with("--heights="):
@@ -46,7 +50,20 @@ func _render() -> void:
 	var view: WorldMapView = (load(VIEW_SCENE) as PackedScene).instantiate()
 	root.add_child(view)
 	view.show_region(grid, region, relief)
-	if with_water:
+	if with_cover:
+		var cover_water := WorldWater.build(grid, relief, heights, region)
+		var cover := WorldCover.build(grid, relief, heights, cover_water, region.cover_seed)
+		view.show_water(cover_water)
+		view.show_cover(cover)
+		view.title = "Alps and Po: ground cover on 28 km hexes, rivers and lakes on top"
+		await _shot(out_dir.path_join(prefix + "cover_region_whole.png"))
+		view.set_view(7.5, 45.85, 5.0)
+		await _shot(out_dir.path_join(prefix + "cover_alps_close.png"))
+		view.set_view(8.9, 45.2, 4.2)
+		await _shot(out_dir.path_join(prefix + "cover_po_plain.png"))
+		view.set_view(10.9, 43.6, 4.0)
+		await _shot(out_dir.path_join(prefix + "cover_tuscany.png"))
+	elif with_water:
 		var water := WorldWater.build(grid, relief, heights, region)
 		view.show_water(water)
 		view.title = "Alps and Po: rivers, lakes and sea depth on 28 km hexes"
