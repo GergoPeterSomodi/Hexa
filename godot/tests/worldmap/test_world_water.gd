@@ -63,9 +63,9 @@ func test_corner_words_name_every_corner_of_the_network() -> void:
 	var words: Dictionary = _water.summary()["words"]
 	assert_eq(int(words.get("source", 0)), 15, "source corners (river heads)")
 	assert_eq(int(words.get("join", 0)), 11, "join corners (tributaries meeting a river)")
-	# Three river cities are crossed (Verona, Pisa, Geneva); Florence is open (its straight form, see test_river_cities).
-	assert_eq(int(words.get("city_in", 0)), 3, "one city_in per crossed river city")
-	assert_eq(int(words.get("city_out", 0)), 3, "one city_out per crossed river city")
+	# Four river cities are crossed (Verona, Florence, Pisa, Geneva).
+	assert_eq(int(words.get("city_in", 0)), 4, "one city_in per crossed river city")
+	assert_eq(int(words.get("city_out", 0)), 4, "one city_out per crossed river city")
 
 
 func test_the_end_of_every_river_is_a_mouth() -> void:
@@ -87,18 +87,13 @@ func test_the_arno_ends_at_the_sea_below_pisa() -> void:
 	var last := chain[chain.size() - 1]
 	# The Arno's last corner is Pisa's outlet corner, which touches the sea: it is a city_out and a mouth.
 	assert_true(_water.is_mouth(last), "the Arno ends on a corner that touches the sea")
-	assert_eq(chain.size(), 9, "the Arno's chain: source, the south of Florence (open, see the report), Pisa, the sea")
+	assert_eq(chain.size(), 7, "the Arno's chain: source, Florence (two corners apart, the river bends in the hex), Pisa, the sea")
 
 
 func test_river_cities_are_crossed_through_their_hex() -> void:
 	if not _ready_or_fail():
 		return
 	for city: String in _water.city_hex.keys():
-		if city == "Florence":
-			# OPEN (the owner's call): Florence is listed as a straight city, but the Arno comes in from the south-east and
-			# leaves to the west. A straight crossing must leave to the north-west, so the router goes round the south.
-			pending("Florence: the straight form cannot carry the Arno (open, see the report)")
-			continue
 		var rv := _river(_water.city_river[city])
 		var hex: Vector2i = _water.city_hex[city]
 		var found := false
@@ -110,8 +105,13 @@ func test_river_cities_are_crossed_through_their_hex() -> void:
 				continue
 			found = true
 			var gap := _water.corner_pos(a).distance_to(_water.corner_pos(b))
-			var want := 2.0 * _grid.hex_r_km if _water.city_form[city] == "straight" else sqrt(3.0) * _grid.hex_r_km
-			assert_almost_eq(gap, want, 0.01, "%s: the two corners are %s apart" % [city, _water.city_form[city]])
+			# A straight city is crossed opposite (2 hex radii) or two apart (the river bends in the hex); a loop two apart.
+			var opposite := absf(gap - 2.0 * _grid.hex_r_km) < 0.01
+			var two_apart := absf(gap - sqrt(3.0) * _grid.hex_r_km) < 0.01
+			if _water.city_form[city] == "straight":
+				assert_true(opposite or two_apart, "%s: the two corners are opposite or two apart" % city)
+			else:
+				assert_true(two_apart, "%s: the loop's two corners are two apart" % city)
 			var passes := _water.river_points_km(_water.rivers.find(rv))
 			var nearest := INF
 			for p: Vector2 in passes:
@@ -221,7 +221,7 @@ func test_lake_inflow_and_outflow_corners() -> void:
 func test_streams_follow_the_fill_direction_graph() -> void:
 	if not _ready_or_fail():
 		return
-	assert_gte(_water.stream_edge.size(), 9, "about nine streams and more")
+	assert_gte(_water.stream_edge.size(), 30, "about forty streams (a stream needs four corners draining through it)")
 	for e: Vector4i in _water.stream_edge.keys():
 		assert_false(_water.river_edge.has(e), "a stream is not a river edge")
 		assert_false(_relief.crest_edges.has(e), "a stream does not cross a crest")

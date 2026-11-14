@@ -26,6 +26,8 @@ const DOWNHILL_TOLERANCE_M := 60.0
 ## Edge costs, in multiples of a hex's circumradius.
 const CORRIDOR_FREE := 0.15  # a fraction of a hex width: nearer than this to the course costs nothing extra
 const CORRIDOR_WEIGHT := 25.0
+## A river city crossed two corners apart (the river bends inside the hex) costs this many hex radii more than straight.
+const THROUGH_BEND_COST := 1.0
 const LAKE_CORRIDOR_FREE := 0.6  # lakes: corners are about 16 km apart, so a wider free corridor follows the axis
 const SEA_COST := 20.0
 const CREST_COST := 100.0
@@ -33,7 +35,7 @@ const SPINE_COST := 3.0  # an edge beside a spine hex (crest height) costs more:
 const TURN_COST := 1.2  # a full turn (180 degrees) costs this many circumradii
 const UPHILL_STEP_M := 50.0
 ## Generated streams are drawn where this many corners drain through an edge.
-const STREAM_MIN_CORNERS := 6
+const STREAM_MIN_CORNERS := 4
 ## Hexes at this crest level or higher are spine hexes.
 const SPINE_LEVEL := 5
 ## A crest crossing is named when a gorge of that river lies within this many hex widths of the step.
@@ -68,7 +70,7 @@ var unnamed_crest_steps: Array[String] = []  # river steps on a crest edge with 
 var stream_sinks: int = 0
 var _blocked: Dictionary[Vector4i, bool] = {}  # edges no river may use (the six edges of each river city hex)
 var _gorge_hex: Dictionary[Vector2i, bool] = {}  # hexes within a gorge's radius: a river may cross a spine here
-var _through_partner: Dictionary[Vector3i, Vector3i] = {}  # a river city's corner -> the corner its river leaves by
+var _through_partners: Dictionary[Vector3i, Array] = {}  # a river city's corner -> the corners its river may leave by (3.6)
 var _city_of_corner: Dictionary[Vector3i, String] = {}  # a river city's corner -> the city
 var _current_river := ""  # the river being routed (a river city is crossed only by its own river)
 var flow_height: Dictionary[Vector3i, float] = {}  # the drainage surface: corner heights with the sinks filled to their spill level
@@ -373,18 +375,21 @@ func _route_to_any(start: Vector3i, goals: Dictionary[Vector3i, bool], line: Pac
 		if dc > float(dist.get(key, INF)):
 			continue
 		var c: Vector3i = state_corner[key]
-		if _through_partner.has(c):
+		if _through_partners.has(c):
 			var city: String = _city_of_corner[c]
 			var came_from := pc_of_key(key)
 			var entered_from_outside: bool = not (came_from != NO_CORNER and str(_city_of_corner.get(came_from, "")) == city)
 			if entered_from_outside and city_river.get(city, "") == _current_river and not lake_route:
-				var partner: Vector3i = _through_partner[c]
-				var jump := _skey(partner, c)
-				if dc + 0.3 * grid.hex_r_km < float(dist.get(jump, INF)):
-					dist[jump] = dc + 0.3 * grid.hex_r_km
-					prev_state[jump] = key
-					state_corner[jump] = partner
-					_heap_push(heap, [dist[jump], jump])
+				var ps: Array = _through_partners[c]
+				for idx: int in ps.size():
+					var partner: Vector3i = ps[idx]
+					var jump := _skey(partner, c)
+					var jc := dc + 0.3 * grid.hex_r_km + (0.0 if idx == 0 else THROUGH_BEND_COST * grid.hex_r_km)
+					if jc < float(dist.get(jump, INF)):
+						dist[jump] = jc
+						prev_state[jump] = key
+						state_corner[jump] = partner
+						_heap_push(heap, [jc, jump])
 		if goals.has(c):
 			found = key
 			_last_cost = dc
@@ -520,18 +525,34 @@ func _build_cities() -> void:
 			_blocked[WorldGrid.edge_key(hex, grid.neighbour(hex, e))] = true
 
 
-## The six corners of each river city's hex, with the corner the river leaves by: straight across (3 round) or in a loop
-## (2 round). A search that reaches a city corner from outside may cross the hex to its partner at no cost.
+## The six corners of each river city's hex, and the corners its river may leave by. A straight city (through) is crossed
+## to the opposite corner (k + 3, preferred), or two apart (k + 2 or k + 4: the river bends inside the hex, the city still on
+## both banks). A loop city is crossed two apart only (k + 2). A search that reaches a city corner from outside may cross
+## the hex to a partner at no extra cost for the opposite corner (see THROUGH_BEND_COST).
 func _build_city_corners() -> void:
 	for city: String in city_hex.keys():
-		var far := 3 if city_form[city] == "straight" else 2
+		var offsets: Array[int] = [3, 2, 4]
+		if city_form[city] != "straight":
+			offsets = [2]
 		for k: int in 6:
 			var a := _hex_corner(city_hex[city], k)
-			var b := _hex_corner(city_hex[city], (k + far) % 6)
-			if a == NO_CORNER or b == NO_CORNER:
+			if a == NO_CORNER:
+				continue
+			var partners: Array = []
+			for off: int in offsets:
+				var b := _hex_corner(city_hex[city], (k + off) % 6)
+				if b != NO_CORNER:
+					partners.append(b)
+			if partners.is_empty():
 				continue
 			_city_of_corner[a] = city
-			_through_partner[a] = b
+			_through_partners[a] = partners
+
+
+## True when a river may cross a river city's hex from corner a to corner b (a and b are partners).
+func _is_through(a: Vector3i, b: Vector3i) -> bool:
+	var ps: Array = _through_partners.get(a, [])
+	return ps.has(b)
 
 
 func _city_at(river_name: String, km: Vector2) -> String:
@@ -540,12 +561,6 @@ func _city_at(river_name: String, km: Vector2) -> String:
 		if city_river[city] == river_name and city_hex[city] == hex:
 			return city
 	return ""
-
-
-## The two corners a river uses to cross a river city's hex, from corner k: straight across (k + 3) or in a loop (k + 2).
-func _through_corners(city: String, k: int) -> Array[Vector3i]:
-	var far := 3 if city_form[city] == "straight" else 2
-	return [_hex_corner(city_hex[city], k), _hex_corner(city_hex[city], (k + far) % 6)]
 
 
 func _route_lakes() -> void:
@@ -739,7 +754,7 @@ func _route_river(rv: Dictionary) -> void:
 	# Throughs that survive the loop cut are consecutive pairs of the chain.
 	var throughs: Array[Vector2i] = []
 	for i: int in chain.size() - 1:
-		if _through_partner.get(chain[i], NO_CORNER) == chain[i + 1]:
+		if _is_through(chain[i], chain[i + 1]):
 			throughs.append(Vector2i(i, i + 1))
 	var through_step: Dictionary[int, bool] = {}
 	for t: Vector2i in throughs:
