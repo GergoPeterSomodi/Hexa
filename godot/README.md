@@ -68,9 +68,50 @@ python tools/lint_godot.py godot
 
 # Windows build (needs the export templates of the same version installed)
 "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe
+
+# Build Europe 1480 and print every count beside the Python reference (exit 1 when a checked count is out of range);
+# add -- --seed=N after the script to build another seed
+"$GODOT" --headless --path godot -s res://tools/build_map.gd
 ```
 
 The editor: open `godot/project.godot` with the same engine. GUT shows in the editor's plugin list.
+
+## MapData fields
+
+`MapData` (`core/mapgen/map_data.gd`) is what `MapBuilder.build_europe(EuropeData.load_europe())` returns. The map view
+reads these fields; their names are stable, and a change of name or meaning is written here first. Hexes are
+`Vector2i(column, row)`; edges are `HexGrid.edge_key` (`Vector4i`).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `cols`, `rows` | int | the grid, 203 by 150 |
+| `terrain` | `Dictionary[Vector2i, String]` | every grid hex: a land kind of `terrain.json`, or `MapData.OCEAN` / `MapData.LAKE` |
+| `rivers`, `river_at` | Dictionary | river name to its hexes (3 or more); hex to the first river through it |
+| `sea_body` | `Dictionary[Vector2i, int]` | ocean hex to the number of its sea |
+| `city_names`, `city_sizes` | Dictionary | land hex to the city's name and size |
+| `ridge_edges` | `Dictionary[Vector4i, bool]` | crest edges no army crosses |
+| `pass_names`, `pass_ids`, `pass_hexes` | Dictionary | open crest edges to a pass name and id; hex at a pass end to the pass name |
+| `provinces` | `Dictionary[Vector2i, Province]` | every land hex, in (column, row) order |
+| `landmass` | `Dictionary[Vector2i, int]` | land hex to its landmass number |
+| `countries` | `Dictionary[String, Country]` | country tag to its country |
+| `country_order` | `Array[String]` | the tags in `geo.COUNTRIES` order |
+| `roads` | `Dictionary[Vector2i, bool]` | every hex on a road |
+| `road_paths` | `Array[Array]` | each road: an `Array` of `Vector2i`, from its town to the network it joined |
+| `units` | `Array[Unit]` | the starting units (not drawn in 0.3.0) |
+
+`Province` (`core/state/province.gd`): `pos`, `terrain`, `good` (`""` for none), `coastal`, `city`, `name`, `region`,
+`owner` (a country tag, `""` for none), `controller`, `tribe` (unowned hexes), `peasants`, `burghers`, `nobles`,
+`natives`, `works` (0 to 2), `settlement` (0 none, 1 village, 2 town, 3 city), `castle` (0 none, 1 tower, 2 small
+castle, 3 large castle), `port` (bool). `pop()` is peasants plus burghers plus nobles.
+
+`Country` (`core/state/country.gd`): `tag`, `name`, `colour` (`Color`), `capital` (`Vector2i`), `colonial_start`
+(999 when none). `Unit` (`core/state/unit.gd`): `id`, `kind` (the `units.json` key), `owner`, `pos`, `hp`, `moves`.
+
+Helpers on `MapData`: `is_land(pos)`, `land_hexes()`, `province(pos)`, `provinces_of(tag)`, `total_pop(tag)`,
+`units_at(pos)`, `is_ridge_step(a, b)`.
+
+Not built in 0.3.0 (later releases): the buildings other than ports and works, garrisons, treasuries, the general's
+trait, markets, start techs, random worlds.
 
 ## Checks in CI
 
