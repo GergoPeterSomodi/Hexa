@@ -1,5 +1,5 @@
-## The water of the map prototype region (step 3): the rivers as chains of hex edges snapped from the authored courses,
-## the lakes, the shores, the sea depth bands, the river cities, and the generated streams. Pure: no files, no engine.
+## The water of the map prototype region: the rivers and lakes as chains of hex edges that follow the authored courses,
+## the shores, the sea depth bands, the river cities, and the generated streams. Pure: no files, no engine.
 ##
 ## The model (docs/design/map/04-wfc-model.md sections 3.1 to 3.3, 3.6): a river runs along hex EDGES from CORNER to
 ## CORNER. A corner is the meeting point of three hexes, named by those three hexes. Each river step is one edge. A
@@ -7,6 +7,10 @@
 ## (straight: three corners round; loop: two corners round), and none of the six edges of the city hex carries water.
 ## Corner words (3.3): source (0 in, 1 out), run (1, 1), join (2, 1), mouth (1, 0: only at the sea, a lake or the edge of
 ## the map), city_in and city_out (the two corners of a river city's hex).
+##
+## Routing: the cheapest chain of corners, where the distance from the authored course dominates, a turn costs more the
+## sharper it is, no chain visits a corner twice, and a river steps downhill (corner heights are the lowest of their
+## three hexes). Where no downhill chain exists the router falls back to a plain chain, and the step is reported.
 class_name WorldWater
 extends RefCounted
 
@@ -14,40 +18,55 @@ const NO_CORNER := Vector3i(-1, -1, -1)
 const NO_EDGE := Vector4i(-1, -1, -1, -1)
 ## A lake at least this fraction of a hex wide is a whole water hex (decision D3); narrower lakes are ribbons on edges.
 const LAKE_WHOLE_FRACTION := 0.6
-## A river may not climb more than this from one corner to the next (metres). Checked and reported, not forced.
+## A river may not climb more than this from one corner to the next (metres).
 const DOWNHILL_TOLERANCE_M := 60.0
-## Edge costs, in multiples of a hex's circumradius. Crests are walls: a river crosses one only at great cost.
+## Edge costs, in multiples of a hex's circumradius.
+const CORRIDOR_FREE := 0.15  # a fraction of a hex width: nearer than this to the course costs nothing extra
+const CORRIDOR_WEIGHT := 25.0
 const SEA_COST := 20.0
 const CREST_COST := 100.0
-## Climbing along a river costs extra: one hex circumradius per UPHILL_STEP_M climbed beyond the tolerance.
+const SPINE_COST := 3.0  # an edge beside a spine hex (crest height) costs more: rivers keep to the valley floor
+const TURN_COST := 1.2  # a full turn (180 degrees) costs this many circumradii
 const UPHILL_STEP_M := 50.0
 ## Generated streams are drawn where this many corners drain through an edge.
 const STREAM_MIN_CORNERS := 6
+## Hexes at this crest level or higher are spine hexes.
+const SPINE_LEVEL := 5
+## A crest crossing is named when a gorge of that river lies within this many hex widths of the step.
+const GORGE_RADIUS_HEX := 1.2
 
 var grid: WorldGrid
 var relief: WorldRelief
 var heights: WorldHeights
 var region: WorldRegion
 var corner_set: Dictionary[Vector3i, bool] = {}  # every corner whose three hexes are in the grid
-var corner_word: Dictionary[Vector3i, String] = {}  # corners of a river or lake: source, run, join, mouth, city_in, city_out
+var corner_word: Dictionary[Vector3i, String] = {}  # corners of a river or lake
 var network: Dictionary[Vector3i, bool] = {}  # corners that any river or lake passes
-var rivers: Array[Dictionary] = []  # name, class, corners (Array[Vector3i]), steps (Array[Vector4i]), throughs (Array[Vector2i])
-var lakes: Array[Dictionary] = []  # name, width, whole (bool), corners, steps, hexes (whole water hexes)
+var rivers: Array[Dictionary] = []  # name, class, corners, steps (Array[Vector4i], NO_EDGE for a river city), throughs
+var lakes: Array[Dictionary] = []  # name, width, whole, corners, steps, hexes
 var river_edge: Dictionary[Vector4i, int] = {}  # edge -> index of the river that uses it
 var lake_edge: Dictionary[Vector4i, bool] = {}
 var lake_hex: Dictionary[Vector2i, bool] = {}  # whole water hexes of big lakes (drawn like the sea)
-var shore_edge: Dictionary[Vector4i, String] = {}  # land against sea or water: cliff (level 3 or higher), beach or lake
-var stream_edge: Dictionary[Vector4i, int] = {}  # generated streams: edge -> corners draining through it
-var sea_band: Dictionary[Vector2i, String] = {}  # sea hex -> shelf, sea, deep ("" when ETOPO has no sea cell there)
-var city_hex: Dictionary[String, Vector2i] = {}  # river city -> its hex
-var city_river: Dictionary[String, String] = {}  # river city -> the river through it
-var city_form: Dictionary[String, String] = {}  # river city -> straight or loop
-var downhill_violations: Array[String] = []  # river steps that climb more than the tolerance
-var unresolved_ends: Array[String] = []  # river ends that are not a mouth (sea, lake, map edge)
-var route_failures: Array[String] = []  # authored river or lake vertices the router could not reach
-var crest_steps: Array[String] = []  # river steps on a crest edge (none is named as a gorge in the region data)
-var stream_sinks: int = 0  # generated stream sources with no lower corner: basins
+var shore_edge: Dictionary[Vector4i, String] = {}
+var stream_edge: Dictionary[Vector4i, int] = {}
+var sea_band: Dictionary[Vector2i, String] = {}
+var city_hex: Dictionary[String, Vector2i] = {}
+var city_river: Dictionary[String, String] = {}
+var city_form: Dictionary[String, String] = {}
+var downhill_violations: Array[String] = []  # river steps that climb more than the tolerance (none expected)
+var fallback_steps: Array[String] = []  # steps routed without the downhill rule because no downhill chain existed
+var unresolved_ends: Array[String] = []
+var route_failures: Array[String] = []
+var named_crest_steps: Array[String] = []  # river steps on a crest edge that a named gorge (or a river head) explains
+var unnamed_crest_steps: Array[String] = []  # river steps on a crest edge with no gorge or head: none expected
+var stream_sinks: int = 0
 var _blocked: Dictionary[Vector4i, bool] = {}  # edges no river may use (the six edges of each river city hex)
+var _gorge_hex: Dictionary[Vector2i, bool] = {}  # hexes within a gorge's radius: a river may cross a spine here
+var _through_partner: Dictionary[Vector3i, Vector3i] = {}  # a river city's corner -> the corner its river leaves by
+var _city_of_corner: Dictionary[Vector3i, String] = {}  # a river city's corner -> the city
+var _current_river := ""  # the river being routed (a river city is crossed only by its own river)
+var flow_height: Dictionary[Vector3i, float] = {}  # the drainage surface: corner heights with the sinks filled to their spill level
+var filled_m: float = 0.0  # the largest amount a corner was raised to drain (reported)
 
 
 ## Builds the water from the relief, the heights (land heights, sea depths) and the region's river and lake courses.
@@ -58,7 +77,9 @@ static func build(p_grid: WorldGrid, p_relief: WorldRelief, p_heights: WorldHeig
 	out.heights = p_heights
 	out.region = p_region
 	out._build_corners()
+	out._build_flow()
 	out._build_cities()
+	out._build_city_corners()
 	out._route_lakes()
 	out._route_rivers()
 	out._assign_words()
@@ -81,10 +102,6 @@ static func _code(h: Vector2i) -> int:
 	return (h.y + 1000) * 4000 + (h.x + 1000)
 
 
-static func _hex_less(a: Vector2i, b: Vector2i) -> bool:
-	return a.y < b.y or (a.y == b.y and a.x < b.x)
-
-
 static func _corner_less(a: Vector3i, b: Vector3i) -> bool:
 	if a.x != b.x:
 		return a.x < b.x
@@ -99,6 +116,12 @@ func _build_corners() -> void:
 			var key := _hex_corner(hex, k)
 			if key != NO_CORNER:
 				corner_set[key] = true
+	for g: Dictionary in region.gorges:
+		var pos: Vector2 = g["pos"]
+		var centre := grid.km_of(pos.x, pos.y)
+		for hex: Vector2i in relief.levels.keys():
+			if grid.centre_km(hex).distance_to(centre) <= GORGE_RADIUS_HEX * grid.hex_w_km:
+				_gorge_hex[hex] = true
 
 
 ## The corner k (0 at the top, then anticlockwise) of a hex, or NO_CORNER when a neighbour is outside the grid.
@@ -115,7 +138,7 @@ func _hex_corner(hex: Vector2i, k: int) -> Vector3i:
 	return corner_key(hex, n1, n2)
 
 
-## The three hexes of a corner, in the order of their codes.
+## The three hexes of a corner.
 static func corner_hexes_of(key: Vector3i) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for code: int in [key.x, key.y, key.z]:
@@ -131,12 +154,55 @@ func corner_pos(key: Vector3i) -> Vector2:
 	return sum / 3.0
 
 
+## The drainage surface (priority flood): every land corner drains downhill to the sea, a lake or the map edge. A basin
+## with no way out is filled up to its spill level; the amount filled is reported. Rivers and streams flow on this surface.
+func _build_flow() -> void:
+	var heap: Array = []
+	var done: Dictionary[Vector3i, bool] = {}
+	for key: Vector3i in corner_set.keys():
+		if _is_outlet(key):
+			var h0 := corner_height(key)
+			flow_height[key] = h0
+			_heap_push(heap, [h0, key])
+	while not heap.is_empty():
+		var top: Array = _heap_pop(heap)
+		var c: Vector3i = top[1]
+		if done.has(c):
+			continue
+		done[c] = true
+		var fc: float = top[0]
+		for e: Vector4i in _corner_edges(c):
+			var o := _other_corner(e, c)
+			if o == NO_CORNER or done.has(o):
+				continue
+			var fo := maxf(corner_height(o), fc)
+			if not flow_height.has(o) or fo < flow_height[o]:
+				flow_height[o] = fo
+				_heap_push(heap, [fo, o])
+	for key: Vector3i in corner_set.keys():
+		if flow_height.has(key):
+			filled_m = maxf(filled_m, flow_height[key] - corner_height(key))
+
+
+func _is_outlet(key: Vector3i) -> bool:
+	return _touches_water(key) or _is_border(key)
+
+
+## The height water sees at a corner: the drainage surface (see _build_flow).
+func flow(key: Vector3i) -> float:
+	return float(flow_height.get(key, corner_height(key)))
+
+
+## The height a river sees at a corner: the lowest of its three hexes (water flows at the low side of a corner).
+## Sea and lake hexes count as 0.
 func corner_height(key: Vector3i) -> float:
-	var total := 0.0
+	var low := INF
 	for h: Vector2i in corner_hexes_of(key):
+		var v := 0.0
 		if relief.level_at(h) != ReliefLevels.SEA and not lake_hex.has(h):
-			total += float(heights.height_m.get(h, 0.0))
-	return total / 3.0
+			v = float(heights.height_m.get(h, 0.0))
+		low = minf(low, v)
+	return low
 
 
 ## The corners at the two ends of an edge (one when the far side is outside the grid).
@@ -191,27 +257,51 @@ func _nearest_corner(km: Vector2, only_network: bool, exclude: Vector3i = NO_COR
 	return best
 
 
+## The nearest corner on the edge of the map (a corner with a hex beside it outside the grid), other than exclude.
+func _nearest_border_corner(km: Vector2, exclude: Vector3i) -> Vector3i:
+	var best := NO_CORNER
+	var best_d := INF
+	for key: Vector3i in corner_set.keys():
+		if key == exclude or not _is_border(key):
+			continue
+		var d := corner_pos(key).distance_to(km)
+		if d < best_d:
+			best_d = d
+			best = key
+	return best
+
+
+func _is_border(key: Vector3i) -> bool:
+	for h: Vector2i in corner_hexes_of(key):
+		for n: Vector2i in grid.neighbours(h):
+			if not relief.levels.has(n):
+				return true
+	return false
+
+
 # ----- routing ------------------------------------------------------------------------------------------------------
-
-
-func _edge_cost(edge: Vector4i, line: PackedVector2Array) -> float:
-	var a := Vector2i(edge.x, edge.y)
-	var b := Vector2i(edge.z, edge.w)
-	var base := grid.hex_r_km
-	if lake_edge.has(edge):
-		return base * 0.5
-	var mid := (grid.centre_km(a) + grid.centre_km(b)) / 2.0
-	var off := _distance_to_line(mid, line)
-	var cost := base * (1.0 + 8.0 * maxf(0.0, off - 0.35 * grid.hex_w_km) / grid.hex_w_km)
-	if relief.crest_edges.has(edge):
-		cost += CREST_COST * base
-	if _is_sea(a) or _is_sea(b):
-		cost += SEA_COST * base
-	return cost
 
 
 func _is_sea(h: Vector2i) -> bool:
 	return relief.level_at(h) == ReliefLevels.SEA or lake_hex.has(h)
+
+
+func _edge_cost(edge: Vector4i, line: PackedVector2Array, lake_discount: bool) -> float:
+	var a := Vector2i(edge.x, edge.y)
+	var b := Vector2i(edge.z, edge.w)
+	var base := grid.hex_r_km
+	if lake_discount and lake_edge.has(edge):
+		return base * 0.5
+	var mid := (grid.centre_km(a) + grid.centre_km(b)) / 2.0
+	var off := _distance_to_line(mid, line)
+	var cost := base * (1.0 + CORRIDOR_WEIGHT * maxf(0.0, off - CORRIDOR_FREE * grid.hex_w_km) / grid.hex_w_km)
+	if relief.crest_edges.has(edge):
+		cost += CREST_COST * base
+	if _is_sea(a) or _is_sea(b):
+		cost += SEA_COST * base
+	if relief.crest_levels.get(a, 0) >= SPINE_LEVEL or relief.crest_levels.get(b, 0) >= SPINE_LEVEL:
+		cost += SPINE_COST * base
+	return cost
 
 
 static func _distance_to_line(p: Vector2, line: PackedVector2Array) -> float:
@@ -227,43 +317,131 @@ static func _distance_to_line(p: Vector2, line: PackedVector2Array) -> float:
 	return best
 
 
-## The cheapest chain of corners from start to goal (both included), or an empty array when there is none.
-func _route(start: Vector3i, goal: Vector3i, line: PackedVector2Array) -> Array[Vector3i]:
-	var dist: Dictionary[Vector3i, float] = {start: 0.0}
-	var prev: Dictionary[Vector3i, Vector3i] = {}
+static func _skey(c: Vector3i, prev: Vector3i) -> String:
+	return "%d,%d,%d|%d,%d,%d" % [c.x, c.y, c.z, prev.x, prev.y, prev.z]
+
+
+## The cheapest chain of corners from start to goal (both included), or an empty array when there is none. A state is a
+## corner and the corner before it, so a turn can cost more than going straight. Strict routes take only downhill
+## steps (lake edges excepted); the lake routes ignore the downhill rule and give lake edges a discount.
+var _last_cost := 0.0  # the cost of the last route found by _route
+
+
+func _route(start: Vector3i, goal: Vector3i, line: PackedVector2Array, strict: bool, lake_route: bool,
+		allow_spine: bool = false) -> Array[Vector3i]:
+	var goals: Dictionary[Vector3i, bool] = {goal: true}
+	return _route_to_any(start, goals, line, strict, lake_route, allow_spine)
+
+
+## The cheapest chain from start to the first of the goals reached (both ends included); empty when there is none.
+func _route_to_any(start: Vector3i, goals: Dictionary[Vector3i, bool], line: PackedVector2Array, strict: bool,
+		lake_route: bool, allow_spine: bool) -> Array[Vector3i]:
+	var dist: Dictionary[String, float] = {}
+	var prev_state: Dictionary[String, String] = {}
+	var state_corner: Dictionary[String, Vector3i] = {}
+	var start_key := _skey(start, NO_CORNER)
+	dist[start_key] = 0.0
+	state_corner[start_key] = start
 	var heap: Array = []
-	_heap_push(heap, [0.0, start])
+	_heap_push(heap, [0.0, start_key])
+	var found := ""
 	while not heap.is_empty():
 		var top: Array = _heap_pop(heap)
-		var c: Vector3i = top[1]
+		var key: String = top[1]
 		var dc: float = top[0]
-		if dc > float(dist.get(c, INF)):
+		if dc > float(dist.get(key, INF)):
 			continue
-		if c == goal:
+		var c: Vector3i = state_corner[key]
+		if _through_partner.has(c):
+			var city: String = _city_of_corner[c]
+			var came_from := pc_of_key(key)
+			var entered_from_outside: bool = not (came_from != NO_CORNER and str(_city_of_corner.get(came_from, "")) == city)
+			if entered_from_outside and city_river.get(city, "") == _current_river and not lake_route:
+				var partner: Vector3i = _through_partner[c]
+				var jump := _skey(partner, c)
+				if dc + 0.3 * grid.hex_r_km < float(dist.get(jump, INF)):
+					dist[jump] = dc + 0.3 * grid.hex_r_km
+					prev_state[jump] = key
+					state_corner[jump] = partner
+					_heap_push(heap, [dist[jump], jump])
+		if goals.has(c):
+			found = key
+			_last_cost = dc
 			break
+		var pc := _state_prev(key)
+		var pos_c := corner_pos(c)
+		var hc := flow(c)
 		for e: Vector4i in _corner_edges(c):
 			if _blocked.has(e):
 				continue
 			var other := _other_corner(e, c)
 			if other == NO_CORNER:
 				continue
-			var nd := dc + _edge_cost(e, line)
-			var climb := corner_height(other) - corner_height(c)
-			if climb > DOWNHILL_TOLERANCE_M:
+			var climb := flow(other) - hc
+			var is_lake := lake_edge.has(e)
+			if strict and not is_lake and climb > 0.5:
+				continue
+			if strict and not allow_spine and not is_lake and _edge_on_spine(e):
+				continue
+			var nd := dc + _edge_cost(e, line, lake_route)
+			if climb > DOWNHILL_TOLERANCE_M and not is_lake:
 				nd += grid.hex_r_km * climb / UPHILL_STEP_M
-			if nd < float(dist.get(other, INF)):
-				dist[other] = nd
-				prev[other] = c
-				_heap_push(heap, [nd, other])
+			if pc != NO_CORNER:
+				var turn := absf((pos_c - corner_pos(pc)).angle_to(corner_pos(other) - pos_c))
+				nd += grid.hex_r_km * TURN_COST * turn / PI
+			var nk := _skey(other, c)
+			if nd < float(dist.get(nk, INF)):
+				dist[nk] = nd
+				prev_state[nk] = key
+				state_corner[nk] = other
+				_heap_push(heap, [nd, nk])
 	var path: Array[Vector3i] = []
-	if not dist.has(goal):
+	if found == "":
 		return path
-	path.append(goal)
-	var cur := goal
-	while cur != start:
-		cur = prev[cur]
-		path.push_front(cur)
+	var cur := found
+	path.append(state_corner[cur])
+	while cur != start_key:
+		cur = prev_state[cur]
+		path.push_front(state_corner[cur])
 	return path
+
+
+## True when an edge has a spine hex on either side, except at a gorge (a river may cross a spine there).
+func _edge_on_spine(e: Vector4i) -> bool:
+	for h: Vector2i in WorldGrid.edge_hexes(e):
+		if relief.crest_levels.get(h, 0) >= SPINE_LEVEL and not _gorge_hex.has(h):
+			return true
+	return false
+
+
+## The corner before a state, from its key.
+static func pc_of_key(key: String) -> Vector3i:
+	return _state_prev(key)
+
+
+## The previous corner of a state key (the second part of the key).
+static func _state_prev(key: String) -> Vector3i:
+	var parts := key.split("|")
+	var p := parts[1].split(",")
+	if int(p[0]) == -1:
+		return NO_CORNER
+	return Vector3i(int(p[0]), int(p[1]), int(p[2]))
+
+
+## The chain with its loops taken out: when a corner comes back, the chain is cut back to its first visit.
+static func _without_loops(chain: Array[Vector3i]) -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	var index: Dictionary[Vector3i, int] = {}
+	for c: Vector3i in chain:
+		if index.has(c):
+			var j: int = index[c]
+			for k: int in range(j + 1, out.size()):
+				index.erase(out[k])
+			out.resize(j + 1)
+		else:
+			index[c] = out.size()
+			out.append(c)
+	return out
 
 
 static func _heap_push(heap: Array, item: Array) -> void:
@@ -321,6 +499,20 @@ func _build_cities() -> void:
 			_blocked[WorldGrid.edge_key(hex, grid.neighbour(hex, e))] = true
 
 
+## The six corners of each river city's hex, with the corner the river leaves by: straight across (3 round) or in a loop
+## (2 round). A search that reaches a city corner from outside may cross the hex to its partner at no cost.
+func _build_city_corners() -> void:
+	for city: String in city_hex.keys():
+		var far := 3 if city_form[city] == "straight" else 2
+		for k: int in 6:
+			var a := _hex_corner(city_hex[city], k)
+			var b := _hex_corner(city_hex[city], (k + far) % 6)
+			if a == NO_CORNER or b == NO_CORNER:
+				continue
+			_city_of_corner[a] = city
+			_through_partner[a] = b
+
+
 func _city_at(river_name: String, km: Vector2) -> String:
 	var hex := grid.hex_of_km(km)
 	for city: String in city_hex.keys():
@@ -329,34 +521,10 @@ func _city_at(river_name: String, km: Vector2) -> String:
 	return ""
 
 
-## The nearest corner on the edge of the map (a corner with a hex beside it outside the grid), other than exclude.
-func _nearest_border_corner(km: Vector2, exclude: Vector3i) -> Vector3i:
-	var best := NO_CORNER
-	var best_d := INF
-	for key: Vector3i in corner_set.keys():
-		if key == exclude or not _is_border(key):
-			continue
-		var d := corner_pos(key).distance_to(km)
-		if d < best_d:
-			best_d = d
-			best = key
-	return best
-
-
-func _is_border(key: Vector3i) -> bool:
-	for h: Vector2i in corner_hexes_of(key):
-		for n: Vector2i in grid.neighbours(h):
-			if not relief.levels.has(n):
-				return true
-	return false
-
-
 ## The two corners a river uses to cross a river city's hex, from corner k: straight across (k + 3) or in a loop (k + 2).
 func _through_corners(city: String, k: int) -> Array[Vector3i]:
 	var far := 3 if city_form[city] == "straight" else 2
-	var a := _hex_corner(city_hex[city], k)
-	var b := _hex_corner(city_hex[city], (k + far) % 6)
-	return [a, b]
+	return [_hex_corner(city_hex[city], k), _hex_corner(city_hex[city], (k + far) % 6)]
 
 
 func _route_lakes() -> void:
@@ -376,15 +544,18 @@ func _route_lakes() -> void:
 					lake_hex[hex] = true
 					hexes.append(hex)
 		else:
-			var path := _route(_nearest_corner(km[0], false), _nearest_corner(km[km.size() - 1], false), km)
+			# The lake is routed along its own axis (no downhill rule: a lake is flat water).
+			var path := _without_loops(_route(_nearest_corner(km[0], false), _nearest_corner(km[km.size() - 1], false),
+				km, false, false))
 			if path.is_empty():
 				route_failures.append("lake %s" % lk["name"])
-			for i: int in path.size() - 1:
-				var e := _shared_edge(path[i], path[i + 1])
-				steps.append(e)
-				lake_edge[e] = true
-				network[path[i]] = true
-			if not path.is_empty():
+			else:
+				for i: int in path.size() - 1:
+					var e := _shared_edge(path[i], path[i + 1])
+					if e != NO_EDGE:
+						steps.append(e)
+						lake_edge[e] = true
+						network[path[i]] = true
 				network[path[path.size() - 1]] = true
 				corners = path
 		lakes.append({"name": str(lk["name"]), "width": str(lk["width"]), "whole": whole,
@@ -407,59 +578,53 @@ func _route_river(rv: Dictionary) -> void:
 	for p: Vector2 in line:
 		km.append(grid.km_of(p.x, p.y))
 	var is_trunk := int(rv["class"]) >= 3
+	var n := km.size()
 	var chain: Array[Vector3i] = []
-	var throughs: Array[Vector2i] = []
-	var cur := _nearest_corner(km[0], false)
+	_current_river = name
+	var cur := _source_corner(km[0])
 	chain.append(cur)
-	for i: int in range(1, km.size()):
-		var p := km[i]
-		var last := i == km.size() - 1
-		if not relief.levels.has(grid.hex_of_km(p)):
-			# The river leaves the map: it runs to the nearest corner on the map edge, which is its mouth, and stops.
-			var edge_goal := _nearest_border_corner(p, cur)
-			if edge_goal != NO_CORNER:
-				var out_path := _route(cur, edge_goal, km)
-				for c: Vector3i in out_path.slice(1):
-					chain.append(c)
-			break
-		var city := _city_at(name, p)
-		if city != "" and not last:
-			var best_cost := INF
-			var best: Array[Vector3i] = []
-			var best_b := NO_CORNER
-			for k: int in 6:
-				var pair := _through_corners(city, k)
-				if pair[0] == NO_CORNER or pair[1] == NO_CORNER:
-					continue
-				var path := _route(cur, pair[0], km)
-				if path.is_empty():
-					continue
-				var cost := float(path.size()) + corner_pos(pair[1]).distance_to(km[i + 1]) / grid.hex_r_km
-				if cost < best_cost:
-					best_cost = cost
-					best = path
-					best_b = pair[1]
-			if best.is_empty():
-				route_failures.append("%s at %s (river city)" % [name, city])
+	# The last leg: to the map edge when the river leaves the map, else to the mouth or, for a tributary, to the nearest
+	# corner of a river already routed. River cities are crossed inside the search (see _build_city_corners).
+	var last_p := km[n - 1]
+	var goals: Dictionary[Vector3i, bool] = {}
+	if not relief.levels.has(grid.hex_of_km(last_p)):
+		for key: Vector3i in corner_set.keys():
+			if _is_border(key) and corner_pos(key).distance_to(last_p) <= 2.0 * grid.hex_w_km:
+				goals[key] = true
+		var edge_corner := _nearest_border_corner(last_p, cur)
+		if edge_corner != NO_CORNER:
+			goals[edge_corner] = true
+	elif not is_trunk:
+		# A tributary ends where it joins a river already routed (the nearest such corner within two hex widths).
+		for key: Vector3i in network.keys():
+			if key != cur and corner_pos(key).distance_to(last_p) <= 2.0 * grid.hex_w_km:
+				goals[key] = true
+		if goals.is_empty():
+			goals[_nearest_corner(last_p, false, cur)] = true
+	else:
+		# The mouth is an ordinary corner: a river city's own corners are never the end of a river.
+		var mouth := NO_CORNER
+		var mouth_d := INF
+		for key: Vector3i in corner_set.keys():
+			if key == cur or _city_of_corner.has(key):
 				continue
-			for c: Vector3i in best.slice(1):
-				chain.append(c)
-			throughs.append(Vector2i(chain.size() - 1, chain.size()))
-			chain.append(best_b)
-			cur = best_b
-			continue
-		var goal := _nearest_corner(p, false, cur if last else NO_CORNER)
-		if last and not is_trunk:
-			var on_network := _nearest_corner(p, true, cur)
-			if on_network != NO_CORNER and corner_pos(on_network).distance_to(p) <= grid.hex_w_km:
-				goal = on_network
-		var seg := _route(cur, goal, km)
-		if seg.is_empty():
-			route_failures.append("%s at vertex %d" % [name, i])
-			continue
-		for c: Vector3i in seg.slice(1):
+			var d := corner_pos(key).distance_to(last_p)
+			if d < mouth_d:
+				mouth_d = d
+				mouth = key
+		goals[mouth] = true
+	var tail := _leg(cur, goals, km, name)
+	if tail.is_empty():
+		route_failures.append("%s: no route to its end" % name)
+	else:
+		for c: Vector3i in tail.slice(1):
 			chain.append(c)
-		cur = goal
+	chain = _without_loops(chain)
+	# Throughs that survive the loop cut are consecutive pairs of the chain.
+	var throughs: Array[Vector2i] = []
+	for i: int in chain.size() - 1:
+		if _through_partner.get(chain[i], NO_CORNER) == chain[i + 1]:
+			throughs.append(Vector2i(i, i + 1))
 	var through_step: Dictionary[int, bool] = {}
 	for t: Vector2i in throughs:
 		through_step[t.x] = true
@@ -479,16 +644,55 @@ func _route_river(rv: Dictionary) -> void:
 			continue
 		river_edge[e] = index
 		if relief.crest_edges.has(e):
-			crest_steps.append("%s at %s-%s" % [name, Vector2i(e.x, e.y), Vector2i(e.z, e.w)])
+			var mid := (grid.centre_km(Vector2i(e.x, e.y)) + grid.centre_km(Vector2i(e.z, e.w))) / 2.0
+			if i <= 1 or _gorge_near(name, mid):
+				named_crest_steps.append("%s step %d" % [name, i])
+			else:
+				unnamed_crest_steps.append("%s step %d at %s-%s" % [name, i, Vector2i(e.x, e.y), Vector2i(e.z, e.w)])
 	for c: Vector3i in chain:
 		network[c] = true
 	for i: int in steps.size():
-		if steps[i] == NO_EDGE:
+		if steps[i] == NO_EDGE or lake_edge.has(steps[i]):
 			continue
-		var climb := corner_height(chain[i + 1]) - corner_height(chain[i])
-		if climb > DOWNHILL_TOLERANCE_M:
+		var climb := flow(chain[i + 1]) - flow(chain[i])
+		if climb > 0.5:
 			downhill_violations.append("%s step %d: %.0f m up" % [name, i, climb])
 	rivers.append({"name": name, "class": int(rv["class"]), "corners": chain, "steps": steps, "throughs": throughs})
+
+
+## One leg of a river: downhill only and off the spines (the strict routes); when that fails, the leg is routed downhill
+## across the spines, then plainly, and the leg is reported.
+func _leg(start: Vector3i, goals: Dictionary[Vector3i, bool], km: PackedVector2Array, river_name: String) -> Array[Vector3i]:
+	var path := _route_to_any(start, goals, km, true, false, false)
+	if not path.is_empty():
+		return path
+	path = _route_to_any(start, goals, km, true, false, true)
+	if not path.is_empty():
+		fallback_steps.append("%s (leg across a spine)" % river_name)
+		return path
+	path = _route_to_any(start, goals, km, false, false, true)
+	if not path.is_empty():
+		fallback_steps.append("%s (leg not downhill)" % river_name)
+	return path
+
+
+## A river rises on the highest corner within one hex width of its first point (the nearest corner when none is higher).
+func _source_corner(km: Vector2) -> Vector3i:
+	var best := _nearest_corner(km, false)
+	for key: Vector3i in corner_set.keys():
+		if corner_pos(key).distance_to(km) <= grid.hex_w_km and flow(key) > flow(best) + 0.5:
+			best = key
+	return best
+
+
+func _gorge_near(river_name: String, km: Vector2) -> bool:
+	for g: Dictionary in region.gorges:
+		if g["river"] != river_name:
+			continue
+		var pos: Vector2 = g["pos"]
+		if grid.km_of(pos.x, pos.y).distance_to(km) <= GORGE_RADIUS_HEX * grid.hex_w_km:
+			return true
+	return false
 
 
 # ----- words, shores, depths, streams -------------------------------------------------------------------------------
@@ -536,19 +740,16 @@ func _assign_words() -> void:
 	for rv: Dictionary in rivers:
 		var chain: Array[Vector3i] = rv["corners"]
 		var last := chain[chain.size() - 1]
-		if corner_word.get(last, "") == "mouth" and not _is_mouth(last):
+		if corner_word.get(last, "") == "mouth" and not is_mouth(last):
 			unresolved_ends.append(str(rv["name"]))
 
 
 ## A mouth corner touches the sea, a lake or the edge of the grid.
-func _is_mouth(key: Vector3i) -> bool:
+func is_mouth(key: Vector3i) -> bool:
 	for h: Vector2i in corner_hexes_of(key):
 		if _is_sea(h):
 			return true
-		for n: Vector2i in grid.neighbours(h):
-			if not relief.levels.has(n):
-				return true
-	return false
+	return _is_border(key)
 
 
 func _build_shores() -> void:
@@ -571,26 +772,44 @@ func _build_shores() -> void:
 			shore_edge[WorldGrid.edge_key(hex, nb)] = kind
 
 
+## Sea hexes with a depth get shelf, sea or deep. A sea hex with no ETOPO sea cell (depth 0) takes the band of the
+## nearest sea hex that has one (breadth-first over the neighbours), so every sea hex has a band.
 func _build_sea_bands() -> void:
+	var without: Array[Vector2i] = []
 	for hex: Vector2i in relief.levels.keys():
 		if relief.level_at(hex) != ReliefLevels.SEA or lake_hex.has(hex):
 			continue
 		var depth := float(heights.depth_m.get(hex, 0.0))
-		var band := "deep"
 		if depth == 0.0:
-			band = ""
-		elif depth >= -200.0:
-			band = "shelf"
-		elif depth >= -2000.0:
-			band = "sea"
-		sea_band[hex] = band
+			without.append(hex)
+			continue
+		sea_band[hex] = "shelf" if depth >= -200.0 else ("sea" if depth >= -2000.0 else "deep")
+	for hex: Vector2i in without:
+		sea_band[hex] = _nearest_band(hex)
+
+
+func _nearest_band(start: Vector2i) -> String:
+	var seen: Dictionary[Vector2i, bool] = {start: true}
+	var frontier: Array[Vector2i] = [start]
+	while not frontier.is_empty():
+		var next: Array[Vector2i] = []
+		for h: Vector2i in frontier:
+			for n: Vector2i in grid.neighbours(h):
+				if seen.has(n) or not relief.levels.has(n):
+					continue
+				seen[n] = true
+				if sea_band.has(n):
+					return sea_band[n]
+				next.append(n)
+		frontier = next
+	return "sea"
 
 
 func _build_streams() -> void:
 	var height_of: Dictionary[Vector3i, float] = {}
 	var sources: Array[Vector3i] = []
 	for key: Vector3i in corner_set.keys():
-		height_of[key] = corner_height(key)
+		height_of[key] = flow(key)
 		if network.has(key) or _touches_water(key):
 			continue
 		sources.append(key)
@@ -632,8 +851,8 @@ func _touches_water(key: Vector3i) -> bool:
 # ----- what the viewer and the tests read --------------------------------------------------------------------------
 
 
-## The points a river is drawn through, in kilometres: the corners' centre and the midpoints of its edges, and the
-## centre of a river city's hex where the river crosses it.
+## The points a river is drawn through, in kilometres: the source, the midpoint of each step's edge, the centre of a
+## river city's hex where the river crosses it, and the mouth. river_pins says which are fixed.
 func river_points_km(index: int) -> PackedVector2Array:
 	var rv: Dictionary = rivers[index]
 	var steps: Array[Vector4i] = rv["steps"]
@@ -650,17 +869,38 @@ func river_points_km(index: int) -> PackedVector2Array:
 	return out
 
 
+## Which points of river_points_km are fixed: the two ends and each river city crossing.
+func river_pins(index: int) -> Array[bool]:
+	var rv: Dictionary = rivers[index]
+	var steps: Array[Vector4i] = rv["steps"]
+	var pins: Array[bool] = [true]
+	for e: Vector4i in steps:
+		pins.append(e == NO_EDGE)
+	pins.append(true)
+	return pins
+
+
+## The points of a lake's routed chain (its edge midpoints), in kilometres.
+func lake_points_km(index: int) -> PackedVector2Array:
+	var lk: Dictionary = lakes[index]
+	var steps: Array[Vector4i] = lk["steps"]
+	var out := PackedVector2Array()
+	for e: Vector4i in steps:
+		out.append(edge_mid_km(e))
+	return out
+
+
+## The midpoint of an edge in kilometres.
+func edge_mid_km(e: Vector4i) -> Vector2:
+	return (grid.centre_km(Vector2i(e.x, e.y)) + grid.centre_km(Vector2i(e.z, e.w))) / 2.0
+
+
 func _city_hex_of_link(a: Vector3i, b: Vector3i) -> Vector2i:
 	var hb := corner_hexes_of(b)
 	for h: Vector2i in corner_hexes_of(a):
 		if hb.has(h):
 			return h
 	return Vector2i.ZERO
-
-
-## The midpoint of an edge in kilometres.
-func edge_mid_km(e: Vector4i) -> Vector2:
-	return (grid.centre_km(Vector2i(e.x, e.y)) + grid.centre_km(Vector2i(e.z, e.w))) / 2.0
 
 
 ## Counts for the report and the tests.
@@ -687,7 +927,9 @@ func summary() -> Dictionary:
 		"stream_edges": stream_edge.size(),
 		"stream_sinks": stream_sinks,
 		"downhill_violations": downhill_violations.size(),
+		"fallback_steps": fallback_steps.size(),
 		"unresolved_ends": unresolved_ends.size(),
 		"route_failures": route_failures.size(),
-		"crest_steps": crest_steps.size(),
+		"named_crest_steps": named_crest_steps.size(),
+		"unnamed_crest_steps": unnamed_crest_steps.size(),
 	}

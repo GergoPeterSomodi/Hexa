@@ -132,15 +132,20 @@ func _hex_colour(hex: Vector2i) -> Color:
 			return LEVEL_COLOURS[ReliefLevels.SEA]
 
 
-## The lakes are drawn as ribbons of their true width along the authored axis (the region file), so they read as lakes.
-## The edges that the core routes along the lake are the topology; their drawing is not yet checked (see the report).
+## The lakes are drawn from the routed chains of the core (the same edges the core uses), as ribbons of their width.
 func _draw_water_bodies() -> void:
-	for lk: Dictionary in region.lakes:
-		var axis: PackedVector2Array = lk["axis"]
-		var pts := PackedVector2Array()
-		for p: Vector2 in axis:
-			pts.append(km_to_px(grid.km_of(p.x, p.y)))
-		draw_polyline(_smooth(pts), LAKE, maxf(3.0, float(lk["width_km"]) * px_per_km * 0.8), true)
+	for i: int in water.lakes.size():
+		var lk: Dictionary = region.lakes[i]
+		var pts := water.lake_points_km(i)
+		if pts.size() < 2:
+			continue
+		var px := PackedVector2Array()
+		for km: Vector2 in pts:
+			px.append(km_to_px(km))
+		var pins: Array[bool] = []
+		for k: int in px.size():
+			pins.append(k == 0 or k == px.size() - 1)
+		draw_polyline(_chaikin(px, pins, 3), LAKE, maxf(3.0, float(lk["width_km"]) * px_per_km * 0.8), true)
 
 
 func _draw_shores() -> void:
@@ -160,35 +165,58 @@ func _draw_streams() -> void:
 		draw_line(km_to_px(seg[0]), km_to_px(seg[1]), STREAM, 1.5)
 
 
+## Each river: its edge midpoints, cut into a smooth curve (Chaikin) that keeps the pinned points (the source, the mouth
+## and each river city's crossing), and wider downstream: from the class width at the source to a wider mouth.
 func _draw_rivers() -> void:
 	for i: int in water.rivers.size():
 		var rv: Dictionary = water.rivers[i]
 		var px := PackedVector2Array()
 		for km: Vector2 in water.river_points_km(i):
 			px.append(km_to_px(km))
-		var width := 2.0 + 1.5 * float(int(rv["class"]))
-		draw_polyline(_smooth(px), RIVER, width)
+		var curve := _chaikin(px, water.river_pins(i), 3)
+		var klass := float(int(rv["class"]))
+		var w_source := 1.0 + 0.6 * klass
+		var w_mouth := 2.0 + 1.6 * klass
+		var chunks := 6
+		var n := curve.size()
+		for c: int in chunks:
+			var from := floori(float((n - 1) * c) / float(chunks))
+			var to := mini(floori(float((n - 1) * (c + 1)) / float(chunks)) + 1, n)
+			var part := curve.slice(from, to)
+			if part.size() < 2:
+				continue
+			var t := (float(c) + 0.5) / float(chunks)
+			draw_polyline(part, RIVER, lerpf(w_source, w_mouth, t), true)
 
 
-## A smooth curve through the points (Catmull-Rom, six steps per segment), so a river on edges reads as a river.
-static func _smooth(points: PackedVector2Array) -> PackedVector2Array:
-	var out := PackedVector2Array()
-	if points.size() < 3:
-		return points
-	var last := points.size() - 1
-	for i: int in last:
-		var p0 := points[maxi(i - 1, 0)]
-		var p1 := points[i]
-		var p2 := points[i + 1]
-		var p3 := points[mini(i + 2, last)]
-		for s: int in 6:
-			var t := float(s) / 6.0
-			var t2 := t * t
-			var t3 := t2 * t
-			out.append(0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
-				+ (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3))
-	out.append(points[last])
-	return out
+## Chaikin corner cutting, a few rounds, for an open line. A point flagged in pins keeps its place (the ends and the river
+## city crossings), so the curve passes through the points that a crossing or a bridge pins.
+static func _chaikin(points: PackedVector2Array, pins: Array[bool], rounds: int) -> PackedVector2Array:
+	var pts := points
+	var flags: Array[bool] = pins.duplicate()
+	for r: int in rounds:
+		var out := PackedVector2Array()
+		var out_flags: Array[bool] = []
+		var n := pts.size()
+		if n < 3:
+			break
+		for i: int in n - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			if flags[i]:
+				out.append(a)
+				out_flags.append(true)
+			else:
+				out.append(a * 0.75 + b * 0.25)
+				out_flags.append(false)
+			if not flags[i + 1]:
+				out.append(a * 0.25 + b * 0.75)
+				out_flags.append(false)
+		out.append(pts[n - 1])
+		out_flags.append(true)
+		pts = out
+		flags = out_flags
+	return pts
 
 
 func _draw_crests() -> void:
