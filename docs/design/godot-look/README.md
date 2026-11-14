@@ -38,6 +38,51 @@ game and its map data). Direction A is drawn over a real game frame. B and C rep
 | `04_pieces_compared.png` | The pieces of each direction, enlarged: armies (1 and 5 regiments, Castile next to Aragon, a ship), towns level 1-3, castles level 1-3. |
 | `05_far_zoom_compared.png` | The same Iberia at radius 13 and 8, in each direction. |
 | `06_play_zoom_detail.png` | Toledo at the play zoom, enlarged 2.5x, A, B and C side by side. |
+| `07_closeup_view.png` | The chosen look (A with the three borrowings) at the closest zoom: the Alps above Milan. |
+| `07b_closeup_compare.png` | The same frame in the Python v0.2.2 game (left, captured from the game) and in the new look (right). |
+| `08_closeup_upgrades.png` | One farm, one mine and one town at levels 1 to 5: Python v0.2.2 above, the new look below, large and at map size. |
+
+## The close-up in the chosen look (07, 07b, 08)
+
+Art director, 2026-11-14. A mockup of the closest zoom (hex radius 34) in direction A with the owner's three
+borrowings. It is a fresh design, not a copy of the Python close-up. The frame shows the same hexes as the Python
+game centred on Milan: the terrain, rivers, roads, ridge edges, passes, towns and borders come from the Europe 1480
+map data. The armies, the siege of Turin and the tile levels are made up for the picture.
+
+What is new compared with the 0.3.0 Godot map (flat basic tiles):
+
+- **Three kinds of mountain.** Snowy high peaks near the snowfields, rocky ranges along the ridge crests and passes,
+  and rolling green hills (domes lit from the left, some with a crag) elsewhere. Peaks and trees sit on a grid
+  across the whole map, not inside each hex, so ranges and forests run on across hex edges.
+- **Ridge crests are drawn** on the ridge edges as a chain of dark, sharp peaks with snow tips. A pass leaves a
+  saddle with a hospice and a cairn, and its name in italics (Simplon, Gotthard, Mont Cenis, Brenner...).
+- **Soft blends** between terrains (the ground colours are blurred across hex edges); a faint hex grid stays on top.
+  Coasts keep the hex shape with a sand rim, a foam line and a light shallow band; the sea is the drawn sea.
+- **Tiles change with their level.** A farm grows from a cottage and a few strips (1) to a barn, a farmstead with a
+  mill, a manor estate with an orchard (4) and an estate with a village (5); the fields spread over the whole hex
+  and join the fields of the next hex. A mine grows from an adit and a spoil heap to rails and a hut, a headframe,
+  a smelter and a stone mill house. A cloth workshop grows from a hut to a watermill to a manufactory. Towns grow
+  from a hamlet to a village, a palisaded town, a walled town and a walled city with suburbs.
+- **Rivers and roads** are drawn as smooth curves beside the hex centres (so towns sit by the river, not on it),
+  with a stone bridge wherever a road crosses a river.
+- **The pieces** follow the owner's decisions: a hex plate in the country's colour, figures about 20% larger than
+  today, a swallow-tailed pennant with simple arms (France, Milan's viper, the Swiss cross, Venice's lion), the
+  strength number in a badge (gold-ringed when selected), a lighter, calmer patch of ground under each piece, and
+  the season dial (2 of 4 filled) next to the besieged town's name. Siege tents and smoke stand round Turin.
+- **Names:** town plates with gold level dots and a crown on capitals (a red edge while besieged), country names in
+  spaced capitals, seas and rivers in italics.
+
+In `07`, the numbered pink markers and the dark legend box are notes on the mockup, not game UI. `07b` shows the
+same frame without them.
+
+Open points and limits:
+
+- The map data marks most of northern Italy (Milan, Turin, the Po valley, the Apennines) as mountains. The Python
+  game draws many of those hexes green; the new look draws what the data says, so the frame shows more mountains.
+  If the Po valley should look like a plain, the map data needs fixing, not the art.
+- The rocky ranges are dense. A lighter variant (fewer peaks between the crests) is easy if the owner finds it busy.
+- The fonts are Windows stand-ins (Segoe UI, Georgia); the arms are simplified sketches still to be checked.
+- At the play zoom (radius 21) the same art would need fewer, larger objects per hex; that is not shown here.
 
 ## Direction A: "Hexa refined"
 
