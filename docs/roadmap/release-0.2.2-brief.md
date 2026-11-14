@@ -99,6 +99,11 @@ All-AI, Europe 1480 and random worlds 7, 11 and 21, 240 seasons each, pooled:
   share at 1600 is 14.9% against 14.7% (one seed, within noise; 15.3% before the AI fix). Backlog: a longer relief reach or
   a defender's stack inside its own castle, after the owner has played sieges.
 - `WAR_LENGTH_AI` stays 16: 20 was measured and was worse on every missed item.
+- **After the code review fixes** (peace, storm and attack-option rules; final numbers): provinces per decade 20.2 / 22.7 /
+  20.5 / 15.0 (one world under 17), wars moving none 7.7%, ended by the limit 30.8%, AI castle 2/3 captures after a siege
+  76%, relief at castle 2/3 sieges 3 of 51 (6%). Accepted for this release; the AI's stuck-goal fix (a stack keeps marching
+  at a castle it cannot reach) was tried and made the AI worse, so it waits with relief for the AI pass after the playtest.
+  Allied stacks on one hex do not besiege together yet (backlog).
 
 ## Owner's decisions (2026-11-13)
 
