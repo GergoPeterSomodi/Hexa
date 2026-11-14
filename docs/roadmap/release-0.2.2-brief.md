@@ -10,7 +10,8 @@ relieves the place or lets it fall, and the map shows it. This answers the owner
 captured so quickly ... each turn the siege takes some progress based on attack and defence"). It is also the first new war
 *decision* since battles: 0.2.1 made war followable, 0.2.2 makes it a choice, on both sides of the wall:
 - **The attacker** chooses each season: keep starving the place (slow, no losses) or storm it now (fast, bloody; cheaper the
-  longer the siege has run, dearer if a relief army is coming).
+  longer the siege has run, dearer if a relief army is coming). The 2-season floor is for sieges: a Storm on arrival can
+  still take a place at once, at its cost (Storm is the fast, costly choice; Besiege the slow, cheap one).
 - **The defender** chooses: send the relief army and fight for the place, or let it fall and spend the army elsewhere.
 
 Principles it is for (docs/research/fun-principles.md v2): **2** trade-offs (besiege slowly and cheaply, or storm fast and
@@ -72,8 +73,8 @@ marked **look** change how the game feels most; they are the ones worth a minute
 ## Done when
 
 - No open bug issue; the full suite, soak, save-compat and perf pass; AI time per season up by at most 10%.
-- **Pace:** every cell of the seasons-to-take table within 1 season in the engine; no place falls in under 2 seasons in any
-  test or soak game; 1 regiment cannot take a castle 2 or 3.
+- **Pace:** every cell of the seasons-to-take table within 1 season in the engine; no place falls to a siege in under 2 seasons in any
+  test or soak game (a Storm on arrival can take a place at once, at its cost); 1 regiment cannot take a castle 2 or 3.
 - **Odds card:** each garrison test pair reads its word's band (one band low at most, never too high); a lone level 3
   garrison against 1.7 to 3.3 times its men no longer reads "Hopeless".
 - **A late storm is cheaper:** in seeded storm scenarios (40 seeds), storming at half the meter loses fewer men (median)

@@ -253,6 +253,9 @@ def _overrun(world, group, pos):
     world.changed()
 
 
+overrun = _overrun          # public for war.besiege (a siege overruns the enemy's civilians the same way)
+
+
 def join(world, battle, group):
     """A stack already on the battle's hex joins its side's reserve (spec 3.1). Only its war units that are not yet in the
     battle count in ``men0``; every unit of the stack becomes a member. The joiners fight from the first day a gap opens

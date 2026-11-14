@@ -20,7 +20,8 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
     siege_started     tag=besieger, pos  name (the siege's name), need, castle, garrison (its men), men (the besieger's)
     siege_progress    tag=besieger, pos  progress, need, rate, hunger (the points this season past the stores), seasons
                                          (seasons held, the arrival season first), name
-    siege_lifted      tag=besieger, pos  why ("relief", "left", "outnumbered" or "peace"), name, progress, seasons
+    siege_lifted      tag=besieger, pos  why ("relief", "left", "outnumbered" or "peace"), name, progress, need (the
+                                         place's siege need when it was lifted), seasons
     war_declared      tag=aggressor      target
     peace_made        tag, b             winner, moved (provinces that changed hands)
     unit_raised       tag, pos           what (the troop's name), id

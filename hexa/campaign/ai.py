@@ -470,7 +470,7 @@ def _besiege_nearest(world, tag, stack, options, enemies):
     beside a castle). Adjacent and garrisoned: besiege it now (attack_group makes it a siege); else march there.
     True when the stack acted."""
     limit, home = _season_limit(stack), stack[0].pos
-    best = None
+    ranked = []
     for enemy in enemies:
         for prov in world.provinces_of(enemy):
             if prov.controller == tag or prov.controller not in enemies or distance(prov.pos, home) > 12 * SCALE:
@@ -483,12 +483,10 @@ def _besiege_nearest(world, tag, stack, options, enemies):
             if seasons is None or seasons > limit or (left is not None and seasons > left):
                 continue
             priority = prov.castle >= 2 and (left is None or seasons <= left - 2)   # a castle 2/3 that falls in time first
-            key = (not priority, distance(prov.pos, home), seasons, prov.pos)
-            if best is None or key < best:
-                best = key
-    if best is None:
+            ranked.append((not priority, distance(prov.pos, home), seasons, prov.pos))
+    if not ranked:
         return False
-    goal = best[3]
+    goal = min(ranked)[3]
     if goal in options and world.besiege_target(stack, goal):
         world.attack_group(stack, goal)
         _answer(world, goal)
@@ -508,7 +506,7 @@ def _storm_siege(world, tag, stack, enemies):
     need = world.siege_terms(prov, tag, stack)["need"]
     if prov.siege < AI_STORM_SHARE * need or prov.siege_turns < SIEGE_MIN_SEASONS:
         return False      # a storm waits for the floor's second season: a siege first, the storm after (0.2.2)
-    defence, _ = warsys.storm_defence(world, pos, prov.controller)
+    defence, _ = warsys.storm_defence(world, pos, prov.controller, tag)
     men = sum(u.men for u in stack if u.kind.war)
     if men < AI_ATTACK_POWER * defence or not world.storm_check(stack, pos)[0]:
         return False

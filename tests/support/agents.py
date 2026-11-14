@@ -361,6 +361,16 @@ def _campaign_step(w, rng, judge, tag):
             target = _somewhere(rng, key[0], 2)
             judge.attempt("engage", f"stack of {len(group)} at {key[0]} ({key[1]}), {target}",
                           lambda: w.engage_check(group, target), lambda: w.engage(group, target))
+        # Besiege and Storm (0.2.2): the *_check pairs, at castles near the stack (refused unless it stands beside one)
+        castles = [p for p in sorted(within(key[0], 2)) if p in w.provinces and w.provinces[p].castle]
+        if castles and rng.random() < 0.5:
+            target = rng.choice(castles)
+            judge.attempt("besiege", f"stack of {len(group)} at {key[0]} ({key[1]}), {target}",
+                          lambda: w.besiege_check(group, target), lambda: w.besiege(group, target))
+        if castles and rng.random() < 0.5:
+            target = rng.choice(castles)
+            judge.attempt("storm", f"stack of {len(group)} at {key[0]} ({key[1]}), {target}",
+                          lambda: w.storm_check(group, target), lambda: w.storm(group, target))
     elif kind in ("refit", "upgrade"):
         unit = rng.choice(group)
         if kind == "refit":

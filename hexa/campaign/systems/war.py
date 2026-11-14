@@ -88,8 +88,10 @@ def peace(world, a, b, winner=None):
     world.wars = [w for w in world.wars if {w.a, w.b} != {a, b}]
     world.end_battles(a, b)
     moved = 0
+    changed_hands = set()
     for prov in list(world.provinces_of(a)) + list(world.provinces_of(b)):
         if prov.controller != prov.owner and prov.controller in (a, b):
+            changed_hands.add(prov.pos)
             gainer = prov.controller
             if winner is None or gainer == winner:
                 if world.countries[prov.owner].capital == prov.pos:
@@ -101,8 +103,13 @@ def peace(world, a, b, winner=None):
             prov.controller = prov.owner
             prov.siege = 0
     for prov in world.provinces.values():
-        if prov.besieger in (a, b):          # peace ends every siege, its progress lost (0.2.2 defaults)
-            _lift(world, prov, "peace")
+        # peace ends the sieges between the two parties, its progress lost (0.2.2 defaults); a third country's siege of
+        # one of their places goes on. A place this peace handed back has no siege left to report: no lift event.
+        if prov.besieger and not world.at_war(prov.besieger, prov.controller):
+            if prov.pos in changed_hands or prov.controller == prov.besieger:
+                _forget_siege(world, prov)
+            else:
+                _lift(world, prov, "peace")
     shared = _shared_hexes(world, a, b)
     for unit in list(world.units):
         if unit.carrier is None and not unit.naval and unit.owner in (a, b):
@@ -196,10 +203,16 @@ def attack_options_group(world, group):
     for pos in sorted(targets):
         if pos == lead.pos:
             continue
+        siege = world.besiege_target(group, pos)
         for stand in sorted((p for p in neighbors(pos) if p in stands), key=lambda p: (stands[p], p)):
-            if world.engage_check(group, pos, stand=stand)[0]:
-                options[pos] = stand
-                break
+            if not world.engage_check(group, pos, stand=stand)[0]:
+                continue
+            # a garrisoned castle is offered only as a siege Besiege allows (attack_group would refuse the rest); Storm
+            # stays open through storm_check and storm_group
+            if siege and not world.besiege_check(group, pos, stand=stand)[0]:
+                continue
+            options[pos] = stand
+            break
     return options
 
 
@@ -225,6 +238,21 @@ def attack_group(world, group, target):
     world.changed()
     return done
 
+
+
+def _storm_stand(world, group, target):
+    """The hex beside target a stack storms from: the cheapest one storm_check allows (attack_options_group's order), or
+    None. A stack already on the hex needs no stand (storm_group checks it itself)."""
+    if not group or any(u.carrier for u in group) or not any(u.kind.war and u.moves_left > 0 and not u.attacked
+                                                             for u in group):
+        return None
+    moves = min(u.moves_left for u in group)
+    reach = world.reachable_group(group)
+    stands = {p: c for p, c in reach.items() if c < moves and not any(u.naval for u in world.units_at(p))}
+    for stand in sorted((p for p in neighbors(target) if p in stands), key=lambda p: (stands[p], p)):
+        if world.storm_check(group, target, stand=stand)[0]:
+            return stand
+    return None
 
 
 def lose(world, units, why):         # off the map, with a unit_lost event each (why: see hexa/events.py)
@@ -329,12 +357,12 @@ def war_limit(world, a, b):
     return WAR_LENGTH_AI * (2 if world.player in (a, b) else 1)
 
 
-def storm_defence(world, pos, enemy):
+def storm_defence(world, pos, enemy, attacker=None):
     """The defence of a garrisoned castle in a storm (design 4.6), in men: the field men of ``enemy`` on the hex plus the
     garrison's men after the siege's cut (storm_garrison), weighted GARRISON_ODDS with a field army and by castle level
     alone otherwise (GARRISON_ODDS_ALONE). Returns (men, the garrison's numbers for the odds card)."""
     prov = world.provinces[pos]
-    hp = storm_garrison(world, prov)
+    hp = storm_garrison(world, prov, attacker)
     field = sum(u.men for u in world.units_at(pos) if u.owner == enemy and u.kind.war)
     weight = GARRISON_ODDS if field else GARRISON_ODDS_ALONE[min(prov.castle, len(GARRISON_ODDS_ALONE)) - 1]
     men = garrison_men(prov, hp)
@@ -342,10 +370,11 @@ def storm_defence(world, pos, enemy):
                                  "cut": hp < prov.garrison}
 
 
-def storm_garrison(world, prov):
+def storm_garrison(world, prov, attacker=None):
     """The garrison's hit points a storm faces (design 4.5): the garrison cut by the siege's progress,
-    hp x (1 - SIEGE_STORM_CUT x progress / need), rounded up. No siege progress, no cut."""
-    if not prov.besieger or prov.siege <= 0:
+    hp x (1 - SIEGE_STORM_CUT x progress / need), rounded up. No siege progress, no cut. ``attacker``: the storming
+    country; only its own siege's progress cuts the garrison (None: whoever besieges)."""
+    if not prov.besieger or prov.siege <= 0 or (attacker is not None and prov.besieger != attacker):
         return prov.garrison
     return math.ceil(prov.garrison * (1 - SIEGE_STORM_CUT * min(1.0, prov.siege / siege_need(world, prov))))
 
@@ -354,8 +383,15 @@ def _lift(world, prov, why):
     """The siege of a place is lifted: progress, hunger, seasons and name go to zero (a lifted siege starts from zero the
     next time, 0.2.2 defaults). ``why``: "left", "relief", "outnumbered" or "peace"."""
     tag, name, progress, turns = prov.besieger, prov.siege_name, prov.siege, prov.siege_turns
+    need = siege_need(world, prov)
     prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "", 0, 0, ""
-    world.bus.emit("siege_lifted", tag, prov.pos, why=why, name=name, progress=progress, seasons=turns)
+    world.bus.emit("siege_lifted", tag, prov.pos, why=why, name=name, progress=progress, need=need, seasons=turns)
+    world.changed()
+
+
+def _forget_siege(world, prov):
+    """A siege that has nothing left to hold (its place was handed back by a peace): cleared, with no event."""
+    prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "", 0, 0, ""
     world.changed()
 
 
@@ -465,7 +501,10 @@ def besiege_target(world, group, pos):
         return False
     if prov.controller in (None, owner) or not world.at_war(owner, prov.controller) or world.battle_at(pos) is not None:
         return False
-    return not any(u.kind.war and u.owner != owner for u in world.units_at(pos))
+    others = [u for u in world.units_at(pos) if u.owner != owner]
+    if any(u.kind.war for u in others):
+        return False
+    return all(world.at_war(owner, u.owner) for u in others)     # civilians of an enemy are overrun, others refuse
 
 
 def besiege_check(world, group, pos, stand=None):
@@ -498,6 +537,8 @@ def besiege(world, group, pos):
     group = [u for u in group if u in world.units]
     if group[0].pos != pos:
         movement.step_in(world, group, pos)
+    if any(u.owner != group[0].owner for u in world.units_at(pos)):
+        battlesys.overrun(world, group, pos)     # the enemy's wagons and generals on the castle hex are lost (no battle)
     world.changed()
     return True
 
@@ -512,6 +553,13 @@ def storm_check(world, group, pos, stand=None):
     owner = group[0].owner
     if prov is None or not prov.castle or prov.garrison <= 0 or prov.controller in (None, owner):
         return False, "Nothing to storm here"
+    if not world.at_war(owner, prov.controller):
+        return False, "Not at war"
+    if any(u.kind.war and u.owner not in (owner, prov.controller) for u in world.units_at(pos)):
+        return False, "Another army holds the hex"
+    battle = world.battle_at(pos)
+    if battle is not None and not battle.assault:
+        return False, "A battle is fought here"
     return battlesys.engage_check(world, group, pos, stand=stand)
 
 
@@ -521,14 +569,17 @@ def storm(world, group, pos):
     ok, _ = storm_check(world, group, pos)
     if not ok:
         return False
-    prov = world.provinces[pos]
-    uncut, cut = prov.garrison, storm_garrison(world, prov)
+    group = [u for u in group if u in world.units]
+    owner, prov = group[0].owner, world.provinces[pos]
+    joining = world.battle_at(pos) is not None      # an assault already on the hex: its garrison is already in the fight
+    uncut = prov.garrison
+    cut = uncut if joining else storm_garrison(world, prov, owner)
     prov.garrison = cut                      # the cut lasts for this storm's battle only (battle._end_battle restores it)
-    done = world.engage([u for u in group if u in world.units], pos)
+    done = world.engage(group, pos)
     battle = world.battle_at(pos)
-    if done and battle is not None and battle.assault and battle.storm_from == 0 and cut < uncut:
+    if done and not joining and battle is not None and battle.assault and battle.storm_from == 0 and cut < uncut:
         battle.storm_from, battle.storm_cut = uncut, cut
-    elif not done:
+    else:                                    # no assault, or no cut to keep: the garrison is what it was
         prov.garrison = uncut
     if done:
         for unit in group:
@@ -543,7 +594,7 @@ def storm_group(world, group, target):
     if group and group[0].pos == target:
         stand = target
     else:
-        stand = world.attack_options_group(group).get(target)
+        stand = _storm_stand(world, group, target)
         if stand is None:
             return False
     if not storm_check(world, group, target, stand=stand)[0]:
