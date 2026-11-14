@@ -363,6 +363,10 @@ GENERAL_BONUS = 0.2
 GARRISON_HP = 6                            # per castle level
 GARRISON_ATTACK, GARRISON_DEFENSE = 3, 3   # +2 defense per castle level
 GARRISON_REGEN = 2
+# A castle its country holds but does not own (taken in war, 0.2.2 replay): it regrows for its holder at half the rate,
+# up to this share of its full garrison. Only while no siege runs there and no enemy army stands on it.
+GARRISON_REGEN_HELD = 1
+GARRISON_HELD_SHARE = 0.5
 MEN = 1000                                 # men in a full regiment: battles show strength as men (rules keep hp)
 GARRISON_MEN = 100                         # men per garrison hit point (a level 3 castle: 1,800)
 # ----- battles (slice 1: the day rules of hexa/campaign/systems/combat.py; spec section 4) ------------------

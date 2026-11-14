@@ -382,6 +382,9 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | Morale back a season outside battle | 25 points |
 - **Castles** have their own garrison (stronger with each level). They stop enemy armies walking past
   (armies must halt next to them). A stack that moves onto a garrisoned castle **besieges** it (the default; no battle).
+  A castle taken in war is garrisoned by the country holding it: it regrows **1 hit point a season** (half the owner's
+  rate), up to **half** its full garrison, while no siege runs there and no enemy army stands on it. The owner then has to
+  besiege it. When the owner takes it back, the holder's garrison is lost and the owner's regrows from zero.
   **Storm** is the assault battle at once, open every season of the siege. The attack card shows both lines: right-click
   besieges, **Shift**-right-click storms. A besieged place has a siege badge on the map (hover it for the meter, the stores
   and the seasons), a Siege block in its province panel with **Storm now** for the besieger and, for the defender, a relief
@@ -398,11 +401,14 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 | Defenders' men | a castle's garrison: 100 men a hit point (600 a castle level); a place with no castle: a militia of 500 |
 | Rate | crowd + guns (each gun's siege points, the artillery tech as before) + 1 for a Siege master general; at most 6 |
 | Hunger | the garrison's stores last 1 + castle level seasons; after that the meter gains 2 points more a season |
+| Taken castle's garrison | regrows 1 hit point a season, up to half the full garrison (3, 6 and 9 hit points at castle levels 1 to 3) |
 | Storm | the garrison faces its hit points cut by half of the meter's share of the need (a full meter halves it, half a meter cuts a quarter) |
 | Lifted | a relief army wins, the besieger leaves or peace is made: the meter, hunger and seasons go back to zero |
 
 - **Besieged places produce nothing** while the siege lasts. Besiegers forage the place for free.
-- **One regiment alone cannot take a castle of level 2 or 3** (too few men). Seasons to take a place with full garrisons
+- **One regiment alone cannot take a castle of level 2 or 3** (too few men), while the castle holds its full garrison of
+  its owner. A taken castle at its half garrison has less to hold: a regiment takes it in 3, 5 or 6 seasons at castle
+  levels 1 to 3 (`tests/test_held_castles.py`). Seasons to take a place with full garrisons
   on plains (`python -m tools.siege_stats`, checked in `tests/test_sieges.py`):
 
 | Besieger | Open land (no castle holds it) | Castle 1 | Castle 2 | Castle 3 |
@@ -458,7 +464,8 @@ The bombard row is one season longer than the design's paper table (6 at castle 
 - **Feeding armies:** every troop takes 1,000 men from its province when raised and eats 0.5 grain a
   season from the local market (paid in ducats, it raises food prices). Each province **feeds** a number of
   troops (people and farms; half in foreign land): bigger stacks lose 1 HP a season. **Supply lines:** towns,
-  castles and ports are depots; a stack within 3 hexes of one through land you control is in supply. Enemy
+  ports and castles are depots (a castle is a depot for the country that holds it, so an army inside a castle its country
+  holds is in supply); a stack within 3 hexes of one through land you control is in supply. Enemy
   armies cut the line; cut-off troops cannot heal and lose 1 HP a season. A **supply wagon** feeds its stack for
   4 seasons away from depots (refills in supply), or the stack can **forage** foreign land (the province loses
   people and half its goods).

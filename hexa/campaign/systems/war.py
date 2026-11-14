@@ -15,7 +15,7 @@ import math
 
 from ...hexgrid import neighbors, within
 from ..data import (CASTLE_SIEGE, CROWD_BANDS, ELEVATION, GARRISON_HP, GARRISON_MEN, GARRISON_ODDS, GARRISON_ODDS_ALONE,
-                    GARRISON_REGEN, MILITIA_MEN,
+                    GARRISON_HELD_SHARE, GARRISON_REGEN, GARRISON_REGEN_HELD, MILITIA_MEN,
                     SIEGE_BASE_NEED, SIEGE_HUNGER, SIEGE_MIN_SEASONS, SIEGE_RATE_MAX, SIEGE_STORM_CUT, START_YEAR,
                     WAR_LENGTH_AI)
 from . import areas, battle as battlesys, combat, movement
@@ -96,10 +96,13 @@ def peace(world, a, b, winner=None):
             if winner is None or gainer == winner:
                 if world.countries[prov.owner].capital == prov.pos:
                     prov.controller = prov.owner      # capitals return
+                    prov.garrison = 0                 # the holder's garrison is lost (0.2.2 replay)
                     continue
                 world.bus.emit("province_captured", gainer, prov.pos, loser=prov.owner, by="peace")
                 prov.owner = gainer
                 moved += 1
+            else:
+                prov.garrison = 0                     # handed back to the owner: the holder's garrison is lost
             prov.controller = prov.owner
             prov.siege = 0
     for prov in world.provinces.values():
@@ -410,7 +413,7 @@ def _fall(world, prov, tag):
     world.bus.emit("province_captured", tag, prov.pos, loser=loser, by="siege", name=name, seasons=turns)
     prov.controller = tag
     prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "", 0, 0, ""
-    prov.garrison = 0 if tag != prov.owner else prov.garrison
+    prov.garrison = 0             # the defeated garrison is gone; the taker's garrison regrows from zero (0.2.2 replay)
     if prov.castle:
         areas.fell(world, prov)
     shown = None if world.player in (tag, prov.owner) else "nobody"
@@ -482,13 +485,26 @@ def _begin_siege(world, prov, tag):
     _siege_season(world, prov)
 
 
+def _grow_garrison(world, prov):
+    """One season of a castle's garrison regrowing (0.2.2 replay): GARRISON_REGEN a season while its owner holds it, up to
+    its full size; a castle its country holds but does not own regrows GARRISON_REGEN_HELD up to GARRISON_HELD_SHARE of that
+    size. The caller ensures no siege runs there and no enemy army stands on it."""
+    if not prov.castle:
+        return
+    if prov.controller == prov.owner:
+        cap, rate = prov.castle * GARRISON_HP, GARRISON_REGEN
+    else:
+        cap, rate = int(prov.castle * GARRISON_HP * GARRISON_HELD_SHARE), GARRISON_REGEN_HELD
+    if prov.garrison < cap:
+        prov.garrison = min(cap, prov.garrison + rate)
+
+
 def _regrow_or_rebel(world, prov):
-    """A place with no army on it: a castle regrows its garrison (GARRISON_REGEN) while its owner holds it; a place held by
-    an enemy with no army of its around is driven out after six seasons (the old rule, its counter in prov.siege)."""
-    cap = prov.castle * GARRISON_HP
-    if prov.castle and prov.controller == prov.owner and prov.garrison < cap:
-        prov.garrison = min(cap, prov.garrison + GARRISON_REGEN)
-    if prov.controller != prov.owner and not any(
+    """A place with no army on it: its castle regrows its garrison (_grow_garrison); a place held by an enemy with no army
+    of its around is driven out after six seasons (the old rule, its counter in prov.siege). A castle its holder garrisons
+    is not driven out: the garrison holds it."""
+    _grow_garrison(world, prov)
+    if prov.controller != prov.owner and not (prov.castle and prov.garrison > 0) and not any(
             u.kind.war and u.owner == prov.controller and world.within_reach(u.pos, prov.pos)
             for u in world.units if u.carrier is None):
         prov.siege += 1
@@ -522,6 +538,10 @@ def sieges(world):
         here = [u for u in world.units_at(prov.pos) if u.kind.war]
         if not here:
             _regrow_or_rebel(world, prov)
+            continue
+        if prov.castle and prov.controller != prov.owner and all(u.owner == prov.controller for u in here):
+            _grow_garrison(world, prov)     # a held castle garrisons on while its holder's own men stand in it (0.2.2 replay)
+            prov.siege = 0
             continue
         if len({u.owner for u in here}) > 1:
             continue            # two armies on one hex: the battle decides it, no siege progress either way

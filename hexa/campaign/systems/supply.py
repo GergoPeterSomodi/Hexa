@@ -30,9 +30,14 @@ def supply_limit(world, tag, pos):
 
 
 def is_depot(world, tag, pos):
+    """A depot of tag: a castle tag controls (held or owned, 0.2.2 replay: an army inside a castle its country holds is in
+    supply), or a town or port tag owns and controls."""
     prov = world.provinces.get(pos)
-    return bool(prov and prov.owner == tag and prov.controller == tag and
-                (prov.settlement >= 2 or prov.castle or prov.level("port")))
+    if not prov or prov.controller != tag:
+        return False
+    if prov.castle:
+        return True
+    return prov.owner == tag and (prov.settlement >= 2 or prov.level("port"))
 
 
 def in_supply(world, tag, pos):
