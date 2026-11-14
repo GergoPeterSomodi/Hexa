@@ -1,5 +1,9 @@
 # The Godot port plan
 
+
+> **Owner's last two answers (2026-11-14):** the Europe map is **rebuilt in Godot** (the map builder is ported; the
+> terrain will come out differently and the new Europe is reviewed like any map change), and the screens are **today's
+> screens as they are** (redesigns wait for 0.4.x).
 Technical director, 2026-11-14, second version. **A plan on paper: nothing is built or approved yet.** Part A is
 for the owner, in plain words. Part B is the technical appendix. Part C is the draft brief of the first release.
 
