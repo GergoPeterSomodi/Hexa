@@ -311,7 +311,7 @@ the questions stay below as the record. One new default, D12, came out of the an
 | D9 | Crests come from the height step; a river may cut a crest only at a **named gorge**; any other clash stops the build | threads 1 and 4 |
 | D10 | Lit pieces (mountains, towns, bridges) are never rotated; light always from the upper left | thread 5 |
 | D11 | Game effects (river crossing cost, road speed, fertility, ferries) are **suggestions for the systems designer**, not decided here | all threads |
-| D12 (new) | **River cities**: a hand-written list (12 to start, about 25 at most). The river enters and leaves the city hex **at a corner**, not across an edge middle, so roads keep all six edges and no new edge value is needed; the bridge is inside the city; the city has one owner. Cologne, Vienna, Buda, Seville, Lyon, Avignon, Pavia and Turin stay beside their river | thread 4, section 3.6 |
+| D12 (approved 2026-11-14) | **River cities**: a hand-written list (12 to start, about 25 at most). The river enters and leaves the city hex **at a corner**, not across an edge middle, so roads keep all six edges and no new edge value is needed; the bridge is inside the city; the city has one owner. Cologne, Vienna, Buda, Seville, Lyon, Avignon, Pavia and Turin stay beside their river | thread 4, section 3.6 |
 
 How the 15 thread questions map: thread 1 Q1 to D1, Q2 to D2, Q3 to Q3; thread 2 Q1 to Q2, Q2 to Q1, Q3 to D3;
 thread 3 Q1 to Q1, Q2 to D4, Q3 to D5 and Q3; thread 4 Q1 to D1, Q2 to Q1, Q3 to Q2; thread 5 Q1 to D6, Q2 to Q4,
