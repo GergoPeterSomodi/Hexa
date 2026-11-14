@@ -11,6 +11,9 @@
 ## Routing: the cheapest chain of corners, where the distance from the authored course dominates, a turn costs more the
 ## sharper it is, no chain visits a corner twice, and a river steps downhill (corner heights are the lowest of their
 ## three hexes). Where no downhill chain exists the router falls back to a plain chain, and the step is reported.
+## Stream burning: before the fill, every authored course is cut into the drainage surface (_build_courses and
+## _burn_courses): each corner of a course is lower than the one before it, so the router follows the course downhill
+## and the fill does not block it. A spine crossed on a course is allowed there and reported (see the crest lists).
 class_name WorldWater
 extends RefCounted
 
@@ -35,6 +38,8 @@ const STREAM_MIN_CORNERS := 6
 const SPINE_LEVEL := 5
 ## A crest crossing is named when a gorge of that river lies within this many hex widths of the step.
 const GORGE_RADIUS_HEX := 1.2
+## Stream burning: each corner of an authored course is this many metres lower than the corner before it.
+const BURN_STEP_M := 1.0
 
 var grid: WorldGrid
 var relief: WorldRelief
@@ -70,6 +75,13 @@ var flow_height: Dictionary[Vector3i, float] = {}  # the drainage surface: corne
 var filled_m: float = 0.0  # the largest amount a corner was raised to drain (reported)
 var _flood_parent: Dictionary[Vector3i, Vector3i] = {}  # the fill-direction graph: each corner drains to its flood parent
 var _flood_order: Array[Vector3i] = []  # corners in the order the flood finished them (parents before children)
+var _burn: Dictionary[Vector3i, float] = {}  # corners cut down to their river's course before the fill (stream burning)
+var _course_start: Dictionary[String, Vector3i] = {}  # river name -> the source corner its course starts from
+var _course_chain: Dictionary[String, Array] = {}  # river name -> its course: the corridor chain on the raw surface
+var _course_edge: Dictionary[Vector4i, bool] = {}  # edges on a burned course: a river may cross a spine there
+var _course_mode := false  # routing a course (the pass before the fill): no uphill penalty, the course is burned later
+var _course_corners: Dictionary[Vector3i, bool] = {}  # corners of the courses routed so far (a tributary's course joins them)
+var burn_climbs: Array[String] = []  # burned steps that still climb (a tributary sitting above its trunk): none expected
 var _lake_mode := false  # routing a lake: lakes cross the prealps at their gaps, so no crest cost
 
 
@@ -81,9 +93,11 @@ static func build(p_grid: WorldGrid, p_relief: WorldRelief, p_heights: WorldHeig
 	out.heights = p_heights
 	out.region = p_region
 	out._build_corners()
-	out._build_flow()
 	out._build_cities()
 	out._build_city_corners()
+	out._build_courses()
+	out._burn_courses()
+	out._build_flow()
 	out._route_lakes()
 	out._route_rivers()
 	out._assign_words()
@@ -165,7 +179,7 @@ func _build_flow() -> void:
 	var done: Dictionary[Vector3i, bool] = {}
 	for key: Vector3i in corner_set.keys():
 		if _is_outlet(key):
-			var h0 := corner_height(key)
+			var h0 := _base(key)
 			flow_height[key] = h0
 			_heap_push(heap, [h0, key])
 	while not heap.is_empty():
@@ -180,14 +194,14 @@ func _build_flow() -> void:
 			var o := _other_corner(e, c)
 			if o == NO_CORNER or done.has(o):
 				continue
-			var fo := maxf(corner_height(o), fc)
+			var fo := maxf(_base(o), fc)
 			if not flow_height.has(o) or fo < flow_height[o]:
 				flow_height[o] = fo
 				_flood_parent[o] = c
 				_heap_push(heap, [fo, o])
 	for key: Vector3i in corner_set.keys():
 		if flow_height.has(key):
-			filled_m = maxf(filled_m, flow_height[key] - corner_height(key))
+			filled_m = maxf(filled_m, flow_height[key] - _base(key))
 
 
 func _is_outlet(key: Vector3i) -> bool:
@@ -196,7 +210,7 @@ func _is_outlet(key: Vector3i) -> bool:
 
 ## The height water sees at a corner: the drainage surface (see _build_flow).
 func flow(key: Vector3i) -> float:
-	return float(flow_height.get(key, corner_height(key)))
+	return float(flow_height.get(key, _base(key)))
 
 
 ## The height a river sees at a corner: the lowest of its three hexes (water flows at the low side of a corner).
@@ -388,10 +402,10 @@ func _route_to_any(start: Vector3i, goals: Dictionary[Vector3i, bool], line: Pac
 			var is_lake := lake_edge.has(e)
 			if strict and not is_lake and climb > 0.5:
 				continue
-			if strict and not allow_spine and not is_lake and _edge_on_spine(e):
+			if strict and not allow_spine and not is_lake and not _course_edge.has(e) and _edge_on_spine(e):
 				continue
 			var nd := dc + _edge_cost(e, line, lake_route)
-			if climb > DOWNHILL_TOLERANCE_M and not is_lake:
+			if climb > DOWNHILL_TOLERANCE_M and not is_lake and not _course_mode:
 				nd += grid.hex_r_km * climb / UPHILL_STEP_M
 			if pc != NO_CORNER:
 				var turn := absf((pos_c - corner_pos(pc)).angle_to(corner_pos(other) - pos_c))
@@ -573,29 +587,104 @@ func _route_lakes() -> void:
 
 
 func _route_rivers() -> void:
+	for rv: Dictionary in _rivers_in_order():
+		_route_river(rv)
+
+
+## The rivers in routing order: the largest class first, so the trunks are routed before the tributaries that join them.
+func _rivers_in_order() -> Array[Dictionary]:
 	var order: Array[Dictionary] = []
 	for rv: Dictionary in region.rivers:
 		order.append(rv)
 	order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["class"]) > int(b["class"]))
-	for rv: Dictionary in order:
-		_route_river(rv)
+	return order
 
 
-func _route_river(rv: Dictionary) -> void:
-	var name := str(rv["name"])
-	var line: PackedVector2Array = rv["line"]
+func _km_line(line: PackedVector2Array) -> PackedVector2Array:
 	var km := PackedVector2Array()
 	for p: Vector2 in line:
 		km.append(grid.km_of(p.x, p.y))
-	var is_trunk := int(rv["class"]) >= 3
-	var n := km.size()
-	var chain: Array[Vector3i] = []
-	_current_river = name
-	var cur := _source_corner(km[0])
-	chain.append(cur)
-	# The last leg: to the map edge when the river leaves the map, else to the mouth or, for a tributary, to the nearest
-	# corner of a river already routed. River cities are crossed inside the search (see _build_city_corners).
-	var last_p := km[n - 1]
+	return km
+
+
+## The height a corner has on the drainage surface before the fill: its burned height on a course, else its height.
+func _base(key: Vector3i) -> float:
+	if _burn.has(key):
+		return _burn[key]
+	return corner_height(key)
+
+
+## The course of each authored river on the raw surface: the corridor chain nearest its line, with no downhill rule and
+## spines allowed (a river crosses a spine only where its line does). The source is kept for the routing.
+func _build_courses() -> void:
+	_course_mode = true
+	for rv: Dictionary in _rivers_in_order():
+		var name := str(rv["name"])
+		var line: PackedVector2Array = rv["line"]
+		var km := _km_line(line)
+		var start := _source_corner(km[0])
+		_current_river = name
+		var goals := _river_goals(start, km[km.size() - 1], int(rv["class"]) >= 3, _course_corners)
+		var chain := _route_to_any(start, goals, km, false, false, true)
+		_current_river = ""
+		if chain.is_empty():
+			continue  # no course: the routing reports the river
+		_course_start[name] = start
+		_course_chain[name] = chain
+		for c: Vector3i in chain:
+			_course_corners[c] = true
+	_course_mode = false
+
+
+## Stream burning (before the fill): along each course a corner gets the lowest height met so far on the course, minus
+## BURN_STEP_M for each step from the source, so the course is always downhill. A corner that a larger river has already
+## cut keeps its height (a confluence); the corners of this course above it are raised where they must be, so the course
+## still runs down into it. The burned steps that still climb are reported (burn_climbs).
+func _burn_courses() -> void:
+	for rv: Dictionary in _rivers_in_order():
+		var name := str(rv["name"])
+		if not _course_chain.has(name):
+			continue
+		var chain: Array[Vector3i] = _course_chain[name]
+		var n := chain.size()
+		var fixed: Array[bool] = []
+		var value: Array[float] = []
+		var run := INF
+		for i: int in n:
+			var c := chain[i]
+			if _burn.has(c):
+				run = minf(run, _burn[c])
+				fixed.append(true)
+				value.append(_burn[c])
+			else:
+				run = minf(run, corner_height(c))
+				fixed.append(false)
+				value.append(run - BURN_STEP_M * i)
+		for i: int in range(n - 2, -1, -1):
+			if not fixed[i]:
+				value[i] = maxf(value[i], value[i + 1] + BURN_STEP_M)
+		for i: int in n:
+			if not fixed[i]:
+				_burn[chain[i]] = value[i]
+		for i: int in n - 1:
+			var e := _shared_edge(chain[i], chain[i + 1])
+			if e != NO_EDGE:
+				_course_edge[e] = true
+	for rv: Dictionary in _rivers_in_order():
+		var name := str(rv["name"])
+		if not _course_chain.has(name):
+			continue
+		var chain: Array[Vector3i] = _course_chain[name]
+		for i: int in chain.size() - 1:
+			var climb := _base(chain[i + 1]) - _base(chain[i])
+			if climb > 0.001:
+				burn_climbs.append("%s step %d: %.0f m up" % [name, i, climb])
+
+
+## The corners a river's route may end on. A river that leaves the map ends on the map edge; a tributary ends on a corner
+## of a joinable river (the rivers routed so far, or the courses while they are burned; else the nearest corner); a trunk
+## ends on its mouth, or on any corner touching the sea within two hex widths. River city corners are never an end.
+func _river_goals(cur: Vector3i, last_p: Vector2, is_trunk: bool, joinable: Dictionary[Vector3i, bool]) -> Dictionary[Vector3i, bool]:
 	var goals: Dictionary[Vector3i, bool] = {}
 	if not relief.levels.has(grid.hex_of_km(last_p)):
 		for key: Vector3i in corner_set.keys():
@@ -605,14 +694,12 @@ func _route_river(rv: Dictionary) -> void:
 		if edge_corner != NO_CORNER:
 			goals[edge_corner] = true
 	elif not is_trunk:
-		# A tributary ends where it joins a river already routed (the nearest such corner within two hex widths).
-		for key: Vector3i in network.keys():
+		for key: Vector3i in joinable.keys():
 			if key != cur and corner_pos(key).distance_to(last_p) <= 2.0 * grid.hex_w_km:
 				goals[key] = true
 		if goals.is_empty():
 			goals[_nearest_corner(last_p, false, cur)] = true
 	else:
-		# The mouth is an ordinary corner: a river city's own corners are never the end of a river.
 		var mouth := NO_CORNER
 		var mouth_d := INF
 		for key: Vector3i in corner_set.keys():
@@ -623,12 +710,25 @@ func _route_river(rv: Dictionary) -> void:
 				mouth_d = d
 				mouth = key
 		goals[mouth] = true
-		if not is_trunk or _touches_water(mouth):
-			pass
-		# A river that ends at the sea may end on any corner touching the sea within two hex widths.
 		for key: Vector3i in corner_set.keys():
 			if _touches_water(key) and not _city_of_corner.has(key) and corner_pos(key).distance_to(last_p) <= 2.0 * grid.hex_w_km:
 				goals[key] = true
+	return goals
+
+
+func _route_river(rv: Dictionary) -> void:
+	var name := str(rv["name"])
+	var line: PackedVector2Array = rv["line"]
+	var km := _km_line(line)
+	var is_trunk := int(rv["class"]) >= 3
+	var n := km.size()
+	var chain: Array[Vector3i] = []
+	_current_river = name
+	# The source is the corner the course was burned from (_build_courses). The routing runs down the burned surface to the
+	# river's end; river cities are crossed inside the search (see _build_city_corners).
+	var cur: Vector3i = _course_start[name] if _course_start.has(name) else _source_corner(km[0])
+	chain.append(cur)
+	var goals := _river_goals(cur, km[n - 1], is_trunk, network)
 	var tail := _leg(cur, goals, km, name)
 	if tail.is_empty():
 		route_failures.append("%s: no route to its end" % name)
@@ -944,4 +1044,6 @@ func summary() -> Dictionary:
 		"route_failures": route_failures.size(),
 		"named_crest_steps": named_crest_steps.size(),
 		"unnamed_crest_steps": unnamed_crest_steps.size(),
+		"burned_corners": _burn.size(),
+		"burn_climbs": burn_climbs.size(),
 	}
