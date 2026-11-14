@@ -10,6 +10,7 @@ name: godot
 # report goes to the job summary. The goldens come with their releases.
 
 on:
+  workflow_dispatch:      # a playtest build of master: the Windows zip without a tag
   pull_request:
   push:
     branches: ["**"]
@@ -41,7 +42,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
           BEFORE: ${{ github.event.before }}
-          IS_TAG: ${{ github.ref_type == 'tag' }}
+          IS_TAG: ${{ github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           base=""
@@ -208,7 +209,7 @@ jobs:
   export-windows:
     name: Windows zip (tag)
     needs: [changes, checks, map]
-    if: startsWith(github.ref, 'refs/tags/v0.3.')
+    if: startsWith(github.ref, 'refs/tags/v0.3.') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
