@@ -122,6 +122,12 @@ The owner played the build (Castile against Granada, 1484). Two notes:
 was worse). The owner chose the fallback: **0.2.2 ships with sieges and the clear move messages; castle areas move whole
 to 0.2.3**, with the AI work they need (armies gathering to take castles). The decisions below stand for 0.2.3.
 
+**Reversed the same day (owner):** "It's ok if wars are slower." Castle areas come back into 0.2.2. The war-pace targets
+are relaxed for this release: the Europe numbers above (about 10 provinces per decade, about half of AI wars ending by the
+length limit) are accepted; the targets that still hold are no crash or stall in the soak, AI time within +10%, the largest
+country's land share not clearly higher, and AI armies not parked on held land. Faster AI castle-taking (armies gathering)
+stays a later AI task.
+
 **Owner's decisions (2026-11-14), all as recommended:**
 1. A castle holds its own country's land within 3 / 4 / 5 hexes (tower / small castle / large castle), counted along its
    own land, the nearest castle winning.
