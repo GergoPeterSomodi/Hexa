@@ -4,6 +4,8 @@ class_name TerrainStyle
 extends RefCounted
 
 const PATH := "res://data/terrain.json"
+## Python's political wash: the owner colour at alpha 34 of 255 over the tile (MapView._owner_washes).
+const OVERLAY_ALPHA := 34.0 / 255.0
 
 var names: Dictionary[String, String] = {}
 var colours: Dictionary[String, Color] = {}
@@ -59,7 +61,7 @@ func overlay_colours(map: MapData) -> PackedColorArray:
 			var colour := Color(0, 0, 0, 0)
 			if owned.has(pos):
 				colour = country_colour(map, owned[pos])
-				colour.a = 0.45
+				colour.a = OVERLAY_ALPHA
 			out[r * map.cols + c] = colour
 	return out
 

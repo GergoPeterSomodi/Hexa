@@ -1,5 +1,5 @@
-## The political helpers on a small fixture: owners, borders, capitals and the points where country names go, plus the
-## settlement and castle rule of the town layer.
+## The political helpers on a small fixture: owners, borders (with their shades), capitals and the points where country
+## names go, plus the settlement and castle rule of the town layer.
 extends GutTest
 
 
@@ -9,6 +9,15 @@ func _province(pos: Vector2i, owner: String) -> Province:
 	prov.terrain = "plains"
 	prov.owner = owner
 	return prov
+
+
+func _country(tag: String, name: String, capital: Vector2i, colour: Color) -> Country:
+	var country := Country.new()
+	country.tag = tag
+	country.name = name
+	country.capital = capital
+	country.colour = colour
+	return country
 
 
 func _fixture() -> MapData:
@@ -23,19 +32,18 @@ func _fixture() -> MapData:
 	map.provinces[Vector2i(1, 0)] = _province(Vector2i(1, 0), "POR")
 	map.provinces[Vector2i(2, 0)] = _province(Vector2i(2, 0), "CAS")
 	map.provinces[Vector2i(3, 0)] = _province(Vector2i(3, 0), "")
-	var por := Country.new()
-	por.tag = "POR"
-	por.name = "Portugal"
-	por.capital = Vector2i(1, 0)
-	map.countries["POR"] = por
+	map.countries["POR"] = _country("POR", "Portugal", Vector2i(1, 0), Color(0.2, 0.6, 0.3))
 	map.country_order.append("POR")
-	var cas := Country.new()
-	cas.tag = "CAS"
-	cas.name = "Castile"
-	cas.capital = Vector2i(2, 0)
-	map.countries["CAS"] = cas
+	map.countries["CAS"] = _country("CAS", "Castile", Vector2i(2, 0), Color(0.8, 0.5, 0.1))
 	map.country_order.append("CAS")
 	return map
+
+
+func _has_border(items: Array[Dictionary], a: Vector2i, b: Vector2i) -> bool:
+	for item: Dictionary in items:
+		if (item["a"] == a and item["b"] == b) or (item["a"] == b and item["b"] == a):
+			return true
+	return false
 
 
 func test_owners_skip_unowned_hexes() -> void:
@@ -46,12 +54,20 @@ func test_owners_skip_unowned_hexes() -> void:
 
 
 func test_borders_are_the_edges_between_different_owners() -> void:
-	var map := _fixture()
-	var edges := Political.border_edges(map)
+	var items := Political.border_items(_fixture())
 	# POR | CAS at (1, 0)-(2, 0), and CAS | nobody at (2, 0)-(3, 0). Not POR | POR, and nothing on the sea.
-	assert_eq(edges.size(), 2, "two border edges")
-	assert_true(edges.has(HexGrid.edge_key(Vector2i(1, 0), Vector2i(2, 0))), "POR-CAS border")
-	assert_true(edges.has(HexGrid.edge_key(Vector2i(2, 0), Vector2i(3, 0))), "CAS-nobody border")
+	assert_eq(items.size(), 2, "two border edges")
+	assert_true(_has_border(items, Vector2i(1, 0), Vector2i(2, 0)), "POR-CAS border")
+	assert_true(_has_border(items, Vector2i(2, 0), Vector2i(3, 0)), "CAS-nobody border")
+
+
+func test_border_shades_come_from_the_owner_colour() -> void:
+	var items := Political.border_items(_fixture())
+	var castile := Color(0.8, 0.5, 0.1)
+	for item: Dictionary in items:
+		if item["a"] == Vector2i(2, 0) and item["b"] == Vector2i(3, 0):
+			assert_almost_eq((item["dark"] as Color).r, castile.r * 0.65, 0.001, "dark shade: 65 percent")
+			assert_almost_eq((item["light"] as Color).r, castile.r + (1.0 - castile.r) * 0.35, 0.001, "light shade")
 
 
 func test_capitals_follow_the_country_order() -> void:
@@ -59,12 +75,23 @@ func test_capitals_follow_the_country_order() -> void:
 	assert_eq(caps, [Vector2i(1, 0), Vector2i(2, 0)] as Array[Vector2i], "capitals in order")
 
 
-func test_name_points_sit_on_an_owned_hex_of_the_country() -> void:
-	var points := Political.name_points(_fixture())
-	assert_eq(points.size(), 2, "two countries with land")
+func test_name_points_sit_on_the_largest_body() -> void:
+	# Portugal: a body of four hexes in a block, and a lone hex far away (not its largest body). Castile: three hexes.
+	var map := MapData.new()
+	for pos: Vector2i in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(9, 0)]:
+		map.provinces[pos] = _province(pos, "POR")
+	for pos: Vector2i in [Vector2i(4, 4), Vector2i(5, 4), Vector2i(4, 5)]:
+		map.provinces[pos] = _province(pos, "CAS")
+	map.countries["POR"] = _country("POR", "Portugal", Vector2i(0, 0), Color.WHITE)
+	map.countries["CAS"] = _country("CAS", "Castile", Vector2i(4, 4), Color.WHITE)
+	map.country_order = ["POR", "CAS"] as Array[String]
+	var points := Political.name_points(map)
+	assert_eq(points.size(), 2, "two countries with a body of 3 or more hexes")
 	assert_eq(points[0]["name"], "Portugal", "first name")
+	assert_eq(points[0]["area"], 4, "the largest body of Portugal")
 	var at: Vector2i = points[0]["at"]
-	assert_eq(Political.owner_of(_fixture(), at), "POR", "the name sits on Portugal")
+	assert_true(at in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)],
+			"the name sits in the largest body, not on the lone hex: %s" % [at])
 
 
 func test_settlement_pieces_follow_python() -> void:

@@ -51,7 +51,7 @@ func setup(p_map: MapData, p_atlas: AtlasIndex) -> void:
 	_build_far()
 	_marks = MapMarks.new()
 	_marks.map = map
-	_marks.borders = Political.border_edges(map)
+	_marks.borders = Political.border_items(map)
 	_marks.capitals = Political.capitals(map)
 	add_child(_marks)
 	_names = MapNames.new()
@@ -222,7 +222,7 @@ func _refresh() -> void:
 	# Decorations (trees, rocks) belong to the countries view only: Python's MapView draws them when not bare,
 	# and its terrain mode is bare.
 	_layers[TilePlan.DECO].visible = view_mode == VIEW_COUNTRIES
-	_names.zoom = zoom_now
+	_names.set_zoom(zoom_now)
 	var top_left := _world_at(Vector2.ZERO)
 	_names.view_rect = Rect2(top_left, _view_size() / zoom_now).grow(120.0)
 	_marks.show_borders = view_mode == VIEW_COUNTRIES
