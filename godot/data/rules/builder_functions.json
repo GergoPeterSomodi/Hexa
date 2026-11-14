@@ -1,0 +1,5631 @@
+{
+ "schema": "hexa-godot/builder-functions/1",
+ "note": "The Python map builder's functions as steps, read from the source by the AST (not run). Each step: when = the if-tests that hold (source text; an else is 'not (test)'); op = assign | set | return | loop | stmt. Values: literals, {name}, {dict: [[k, v]...]}, {list}, {expr: source}. Port them in order: a return ends the function, so a later step is reached only when the earlier returns did not fire.",
+ "functions": {
+  "hexa/hexgrid.py::neighbors": {
+   "file": "hexa/hexgrid.py",
+   "name": "neighbors",
+   "line": 21,
+   "params": [
+    "pos"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "col, row = pos"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (dc, dr) in _DIRS[row & 1]",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "yield (col + dc, row + dr)"
+      }
+     ]
+    }
+   ]
+  },
+  "hexa/hexgrid.py::to_cube": {
+   "file": "hexa/hexgrid.py",
+   "name": "to_cube",
+   "line": 27,
+   "params": [
+    "pos"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "col, row = pos"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "q",
+     "value": {
+      "expr": "col - (row - (row & 1)) // 2"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "name": "q"
+       },
+       {
+        "name": "row"
+       },
+       {
+        "expr": "-q - row"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/hexgrid.py::distance": {
+   "file": "hexa/hexgrid.py",
+   "name": "distance",
+   "line": 33,
+   "params": [
+    "a",
+    "b"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "aq, ar, as_ = to_cube(a)"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "bq, br, bs = to_cube(b)"
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "max(abs(aq - bq), abs(ar - br), abs(as_ - bs))"
+     }
+    }
+   ]
+  },
+  "hexa/hexgrid.py::within": {
+   "file": "hexa/hexgrid.py",
+   "name": "within",
+   "line": 39,
+   "params": [
+    "pos",
+    "radius"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "col, row = pos"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for r in range(row - radius, row + radius + 1)",
+     "body": [
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for c in range(col - radius - 1, col + radius + 2)",
+       "body": [
+        {
+         "when": [
+          "distance(pos, (c, r)) <= radius"
+         ],
+         "op": "stmt",
+         "text": "yield (c, r)"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::merc": {
+   "file": "hexa/campaign/geo.py",
+   "name": "merc",
+   "line": 16,
+   "params": [
+    "lat"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "math.degrees(math.log(math.tan(math.pi / 4 + math.radians(lat) / 2)))"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::inv_merc": {
+   "file": "hexa/campaign/geo.py",
+   "name": "inv_merc",
+   "line": 20,
+   "params": [
+    "y"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "math.degrees(2 * math.atan(math.exp(math.radians(y))) - math.pi / 2)"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::lonlat": {
+   "file": "hexa/campaign/geo.py",
+   "name": "lonlat",
+   "line": 29,
+   "params": [
+    "pos"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "col, row = pos"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "lon",
+     "value": {
+      "expr": "LON0 + (col + 0.5 * (row & 1) + 0.5) * COL_DEG"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "lat",
+     "value": {
+      "expr": "inv_merc(Y_TOP - (row + 0.5) * ROW_DEG)"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "name": "lon"
+       },
+       {
+        "name": "lat"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::hex_of": {
+   "file": "hexa/campaign/geo.py",
+   "name": "hex_of",
+   "line": 36,
+   "params": [
+    "lon",
+    "lat"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "row",
+     "value": {
+      "expr": "int(round((Y_TOP - merc(lat)) / ROW_DEG - 0.5))"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "col",
+     "value": {
+      "expr": "int(round((lon - LON0) / COL_DEG - 0.5 - 0.5 * (row & 1)))"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "name": "col"
+       },
+       {
+        "name": "row"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::inside": {
+   "file": "hexa/campaign/geo.py",
+   "name": "inside",
+   "line": 42,
+   "params": [
+    "point",
+    "poly"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "x, y = point"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "hit",
+     "value": false
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "j",
+     "value": {
+      "expr": "len(poly) - 1"
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for i in range(len(poly))",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "xi, yi = poly[i]"
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "xj, yj = poly[j]"
+      },
+      {
+       "when": [
+        "(yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi"
+       ],
+       "op": "assign",
+       "var": "hit",
+       "value": {
+        "expr": "not hit"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "j",
+       "value": {
+        "name": "i"
+       }
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "hit"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::bbox": {
+   "file": "hexa/campaign/geo.py",
+   "name": "bbox",
+   "line": 55,
+   "params": [
+    "poly"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "xs, ys = ([p[0] for p in poly], [p[1] for p in poly])"
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "expr": "min(xs)"
+       },
+       {
+        "expr": "min(ys)"
+       },
+       {
+        "expr": "max(xs)"
+       },
+       {
+        "expr": "max(ys)"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::seg_distance": {
+   "file": "hexa/campaign/geo.py",
+   "name": "seg_distance",
+   "line": 60,
+   "params": [
+    "p",
+    "a",
+    "b"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "k",
+     "value": {
+      "expr": "math.cos(math.radians(p[1]))"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "px, py = (p[0] * k, p[1])"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "ax, ay, bx, by = (a[0] * k, a[1], b[0] * k, b[1])"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "dx, dy = (bx - ax, by - ay)"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "t",
+     "value": {
+      "expr": "0 if dx == dy == 0 else max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "math.hypot(px - ax - t * dx, py - ay - t * dy)"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::line_distance": {
+   "file": "hexa/campaign/geo.py",
+   "name": "line_distance",
+   "line": 70,
+   "params": [
+    "p",
+    "line"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "min((seg_distance(p, line[i], line[i + 1]) for i in range(len(line) - 1)))"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::land_cells": {
+   "file": "hexa/campaign/geo.py",
+   "name": "land_cells",
+   "line": 79,
+   "params": [
+    "cols",
+    "rows"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "polys",
+     "value": {
+      "expr": "[EUROPE_ASIA, SCANDINAVIA, BRITAIN, IRELAND, AFRICA, NORTH_AMERICA, SOUTH_AMERICA] + ISLANDS"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "boxes",
+     "value": {
+      "expr": "[(bbox(p), p) for p in polys]"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "seas",
+     "value": {
+      "expr": "[(bbox(p), p) for p in SEAS]"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "lakes_",
+     "value": {
+      "expr": "[(bbox(p), p) for p in LAKES]"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "def hit(point, shapes):\n    return any((b[0] <= point[0] <= b[2] and b[1] <= point[1] <= b[3] and inside(point, p) for b, p in shapes))"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "land, lakes = (set(), set())"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for r in range(rows)",
+     "body": [
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for c in range(cols)",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "point",
+         "value": {
+          "expr": "lonlat((c, r))"
+         }
+        },
+        {
+         "when": [
+          "hit(point, lakes_)"
+         ],
+         "op": "stmt",
+         "text": "lakes.add((c, r))"
+        },
+        {
+         "when": [
+          "not (hit(point, lakes_))",
+          "hit(point, boxes) and (not hit(point, seas))"
+         ],
+         "op": "stmt",
+         "text": "land.add((c, r))"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "name": "land"
+       },
+       {
+        "name": "lakes"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::_in_any": {
+   "file": "hexa/campaign/geo.py",
+   "name": "_in_any",
+   "line": 100,
+   "params": [
+    "point",
+    "shapes"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "lon, lat = point"
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "any((b[0] <= lon <= b[2] and b[1] <= lat <= b[3] and inside(point, p) for b, p in shapes))"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::desert_at": {
+   "file": "hexa/campaign/geo.py",
+   "name": "desert_at",
+   "line": 105,
+   "params": [
+    "point"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "_in_any(point, _DESERT_BOXES)"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::steppe_at": {
+   "file": "hexa/campaign/geo.py",
+   "name": "steppe_at",
+   "line": 109,
+   "params": [
+    "point"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "_in_any(point, _STEPPE_BOXES)"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::maghreb_at": {
+   "file": "hexa/campaign/geo.py",
+   "name": "maghreb_at",
+   "line": 113,
+   "params": [
+    "point"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "_in_any(point, _MAGHREB_BOXES)"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/geo.py::marsh_at": {
+   "file": "hexa/campaign/geo.py",
+   "name": "marsh_at",
+   "line": 118,
+   "params": [
+    "point"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "lon, lat = point"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (x0, y0, x1, y1, k) in MARSHES",
+     "body": [
+      {
+       "when": [
+        "x0 <= lon <= x1 and y0 <= lat <= y1"
+       ],
+       "op": "return",
+       "value": {
+        "name": "k"
+       }
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": 0.0
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::build_map": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "build_map",
+   "line": 38,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "g",
+     "value": {
+      "expr": "world.geo"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "land, lakes = g.land_cells(world.cols, world.rows)"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.terrain = {}"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for r in range(world.rows)",
+     "body": [
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for c in range(world.cols)",
+       "body": [
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "world.terrain[c, r] = 'lake' if (c, r) in lakes else 'ocean'"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (lon, lat) in list(g.FORCE_LAND) + [(x[1], x[2]) for x in g.CITIES]",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "pos",
+       "value": {
+        "expr": "geo.hex_of(lon, lat)"
+       }
+      },
+      {
+       "when": [
+        "pos in world.terrain"
+       ],
+       "op": "stmt",
+       "text": "land.add(pos)"
+      },
+      {
+       "when": [
+        "pos in world.terrain"
+       ],
+       "op": "stmt",
+       "text": "lakes.discard(pos)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "land -= lakes"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (lon, lat) in getattr(g, 'FORCE_SEA', ())",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "land.discard(geo.hex_of(lon, lat))"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.rivers, world.river_at = ({}, {})"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (name, line) in g.RIVERS",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "path",
+       "value": {
+        "expr": "[p for p in trace(world, line) if p in land]"
+       }
+      },
+      {
+       "when": [
+        "len(path) >= 3"
+       ],
+       "op": "stmt",
+       "text": "world.rivers[name] = path"
+      },
+      {
+       "when": [
+        "len(path) >= 3"
+       ],
+       "op": "loop",
+       "head": "for pos in path",
+       "body": [
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "world.river_at.setdefault(pos, name)"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "coastal",
+     "value": {
+      "expr": "{p for p in land if any((n in world.terrain and n not in land for n in neighbors(p)))}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "prior",
+     "value": {
+      "expr": "{p: terrain_prior(world, p, p in coastal, p in world.river_at) for p in land}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "tiles",
+     "value": {
+      "expr": "wfc.collapse(sorted(land), prior, FORBIDDEN, neighbors, random.Random(world.seed), affinity=1.6)"
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (pos, tile) in tiles.items()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "world.terrain[pos] = tile"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "rng",
+     "value": {
+      "expr": "random.Random(1480)"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.sea_body = {}"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "body",
+     "value": 0
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for pos in world.terrain",
+     "body": [
+      {
+       "when": [
+        "world.terrain[pos] != 'ocean' or pos in world.sea_body"
+       ],
+       "op": "stmt",
+       "text": "continue"
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "body += 1"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "queue",
+       "value": {
+        "expr": "deque([pos])"
+       }
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "world.sea_body[pos] = body"
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "while queue",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "cur",
+         "value": {
+          "expr": "queue.popleft()"
+         }
+        },
+        {
+         "when": [],
+         "op": "loop",
+         "head": "for n in neighbors(cur)",
+         "body": [
+          {
+           "when": [
+            "world.terrain.get(n) == 'ocean' and n not in world.sea_body"
+           ],
+           "op": "stmt",
+           "text": "world.sea_body[n] = body"
+          },
+          {
+           "when": [
+            "world.terrain.get(n) == 'ocean' and n not in world.sea_body"
+           ],
+           "op": "stmt",
+           "text": "queue.append(n)"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.cities = {}"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (name, lon, lat, size) in g.CITIES",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "pos",
+       "value": {
+        "expr": "geo.hex_of(lon, lat)"
+       }
+      },
+      {
+       "when": [
+        "world.is_land(pos)"
+       ],
+       "op": "stmt",
+       "text": "world.cities[pos] = (name, size)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.provinces = {}"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for pos in sorted((p for p, t in world.terrain.items() if TERRAIN[t].move is not None))",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "coastal",
+       "value": {
+        "expr": "any((world.terrain.get(n) == 'ocean' for n in neighbors(pos)))"
+       }
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "world.provinces[pos] = Province(pos, world.terrain[pos], None, coastal, '', city=pos in world.cities)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for prov in world.provinces.values()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "prov.good = good_for(world, prov, rng)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.passes()"
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::trace": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "trace",
+   "line": 100,
+   "params": [
+    "world",
+    "line"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "out",
+     "value": {
+      "list": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for ((x0, y0), (x1, y1)) in zip(line, line[1:])",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "steps",
+       "value": {
+        "expr": "max(1, int(max(abs(x1 - x0), abs(y1 - y0)) / geo.COL_DEG * 4))"
+       }
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for i in range(steps + 1)",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "t",
+         "value": {
+          "expr": "i / steps"
+         }
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "pos",
+         "value": {
+          "expr": "geo.hex_of(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)"
+         }
+        },
+        {
+         "when": [
+          "pos not in world.terrain or (out and out[-1] == pos)"
+         ],
+         "op": "stmt",
+         "text": "continue"
+        },
+        {
+         "when": [
+          "pos in out"
+         ],
+         "op": "stmt",
+         "text": "del out[out.index(pos) + 1:]"
+        },
+        {
+         "when": [
+          "pos in out"
+         ],
+         "op": "stmt",
+         "text": "continue"
+        },
+        {
+         "when": [
+          "out and distance(out[-1], pos) > 1"
+         ],
+         "op": "assign",
+         "var": "between",
+         "value": {
+          "expr": "[n for n in neighbors(out[-1]) if distance(n, pos) == 1]"
+         }
+        },
+        {
+         "when": [
+          "out and distance(out[-1], pos) > 1",
+          "between"
+         ],
+         "op": "stmt",
+         "text": "out.append(min(between))"
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "out.append(pos)"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "out"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::near_line": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "near_line",
+   "line": 121,
+   "params": [
+    "point",
+    "lines",
+    "limit"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "best",
+     "value": {
+      "name": "limit"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "lon, lat = point"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for line in lines",
+     "body": [
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for ((ax, ay), (bx, by)) in zip(line, line[1:])",
+       "body": [
+        {
+         "when": [
+          "min(ax, bx) - limit > lon or max(ax, bx) + limit < lon or min(ay, by) - limit > lat or (max(ay, by) + limit < lat)"
+         ],
+         "op": "stmt",
+         "text": "continue"
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "best",
+         "value": {
+          "expr": "min(best, geo.seg_distance(point, (ax, ay), (bx, by)))"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "best"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::terrain_prior": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "terrain_prior",
+   "line": 134,
+   "params": [
+    "world",
+    "pos",
+    "coastal",
+    "river"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "g",
+     "value": {
+      "expr": "world.geo"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "point",
+     "value": {
+      "expr": "geo.lonlat(pos)"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "lon, lat = point"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "mount",
+     "value": {
+      "expr": "near_line(point, g.MOUNTAINS, 2.0)"
+     }
+    },
+    {
+     "when": [
+      "mount < 0.8"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "mountains",
+        1.0
+       ],
+       [
+        "snow",
+        {
+         "expr": "0.35 if lat > 45.5 or (lon < -30 and lat > 50) else 0.0"
+        }
+       ],
+       [
+        "hills",
+        0.15
+       ]
+      ]
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "hills",
+     "value": {
+      "expr": "mount < 1.6 or near_line(point, g.HILLS, 1.0) < 1.0"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "desert",
+     "value": {
+      "expr": "g.desert_at(point)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "marsh",
+     "value": {
+      "expr": "g.marsh_at(point)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "americas",
+     "value": {
+      "expr": "lon < -30"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "maghreb",
+     "value": {
+      "expr": "getattr(g, 'maghreb_at', None)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "north_africa",
+     "value": {
+      "expr": "bool(maghreb and maghreb(point))"
+     }
+    },
+    {
+     "when": [
+      "river",
+      "desert"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "plains",
+        1.0
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.08 + marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "river"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "plains",
+        1.0
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.15 + marsh"
+        }
+       ],
+       [
+        "forest",
+        0.15
+       ],
+       [
+        "hills",
+        0.05
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "desert",
+      "-20 < lon < 40 and 12 < lat < 18.5"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "desert",
+        0.55
+       ],
+       [
+        "steppe",
+        0.3
+       ],
+       [
+        "savanna",
+        0.3
+       ],
+       [
+        "hills",
+        {
+         "expr": "0.04 if hills else 0.0"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "desert",
+      "north_africa and lat > 28.5"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "desert",
+        1.0
+       ],
+       [
+        "steppe",
+        0.22
+       ],
+       [
+        "hills",
+        {
+         "expr": "0.04 if hills else 0.0"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "desert"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "desert",
+        1.0
+       ],
+       [
+        "steppe",
+        0.06
+       ],
+       [
+        "hills",
+        {
+         "expr": "0.04 if hills else 0.0"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "hills",
+      "north_africa"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "hills",
+        0.7
+       ],
+       [
+        "steppe",
+        0.25
+       ],
+       [
+        "forest",
+        0.03
+       ],
+       [
+        "mountains",
+        {
+         "expr": "0.08 if mount < 1.2 else 0.0"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "hills"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "hills",
+        0.7
+       ],
+       [
+        "forest",
+        0.25
+       ],
+       [
+        "mountains",
+        {
+         "expr": "0.08 if mount < 1.2 else 0.0"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "hills",
+      "lat > 57"
+     ],
+     "op": "set",
+     "var": "w",
+     "key": "taiga",
+     "value": 0.3
+    },
+    {
+     "when": [
+      "hills",
+      "lat < 17"
+     ],
+     "op": "set",
+     "var": "w",
+     "key": {
+      "expr": "'jungle' if lat < 8 else 'savanna'"
+     },
+     "value": 0.2
+    },
+    {
+     "when": [
+      "hills"
+     ],
+     "op": "return",
+     "value": {
+      "name": "w"
+     }
+    },
+    {
+     "when": [
+      "americas",
+      "lat >= 59"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "tundra",
+        1.0
+       ],
+       [
+        "snow",
+        0.35
+       ],
+       [
+        "taiga",
+        0.1
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "americas",
+      "lat >= 55"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "tundra",
+        0.6
+       ],
+       [
+        "taiga",
+        0.6
+       ],
+       [
+        "marsh",
+        0.05
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "americas",
+      "lat >= 47"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "taiga",
+        0.5
+       ],
+       [
+        "forest",
+        0.4
+       ],
+       [
+        "plains",
+        0.12
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.06 + marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "americas",
+      "lat < 21.5",
+      "lon < -95 and lat > 16.5"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "plains",
+        0.6
+       ],
+       [
+        "hills",
+        0.3
+       ],
+       [
+        "savanna",
+        0.1
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "americas",
+      "lat < 21.5"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "jungle",
+        {
+         "expr": "0.6 if lat < 14 else 0.35"
+        }
+       ],
+       [
+        "plains",
+        {
+         "expr": "0.15 if lat < 14 else 0.3"
+        }
+       ],
+       [
+        "savanna",
+        {
+         "expr": "0.3 if 2 < lat < 12 and lon > -72 else 0.1"
+        }
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.04 + marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "americas",
+      "lat < 21.5",
+      "coastal"
+     ],
+     "op": "set",
+     "var": "w",
+     "key": "beach",
+     "value": 0.3
+    },
+    {
+     "when": [
+      "americas",
+      "lat < 21.5"
+     ],
+     "op": "return",
+     "value": {
+      "name": "w"
+     }
+    },
+    {
+     "when": [
+      "americas"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "forest",
+        {
+         "expr": "0.75 if lat > 40 else 0.5"
+        }
+       ],
+       [
+        "plains",
+        {
+         "expr": "0.3 if lat > 40 else 0.45"
+        }
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.04 + marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "americas",
+      "coastal and lat < 36"
+     ],
+     "op": "set",
+     "var": "w",
+     "key": "beach",
+     "value": 0.25
+    },
+    {
+     "when": [
+      "americas"
+     ],
+     "op": "return",
+     "value": {
+      "name": "w"
+     }
+    },
+    {
+     "when": [
+      "lat < 17",
+      "lat < 5.5"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "jungle",
+        0.7
+       ],
+       [
+        "plains",
+        0.1
+       ],
+       [
+        "savanna",
+        0.15
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.04 + marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "lat < 17",
+      "not (lat < 5.5)",
+      "lat < 8"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "jungle",
+        0.45
+       ],
+       [
+        "savanna",
+        0.45
+       ],
+       [
+        "plains",
+        0.1
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.03 + marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "lat < 17",
+      "not (lat < 5.5)",
+      "not (lat < 8)",
+      "lat < 12.5"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "savanna",
+        0.65
+       ],
+       [
+        "plains",
+        0.2
+       ],
+       [
+        "steppe",
+        0.15
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "lat < 17",
+      "not (lat < 5.5)",
+      "not (lat < 8)",
+      "not (lat < 12.5)"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "savanna",
+        0.55
+       ],
+       [
+        "steppe",
+        0.35
+       ],
+       [
+        "plains",
+        0.1
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "lat < 17",
+      "coastal"
+     ],
+     "op": "set",
+     "var": "w",
+     "key": "beach",
+     "value": 0.2
+    },
+    {
+     "when": [
+      "lat < 17"
+     ],
+     "op": "return",
+     "value": {
+      "name": "w"
+     }
+    },
+    {
+     "when": [
+      "g.steppe_at(point)"
+     ],
+     "op": "return",
+     "value": {
+      "dict": [
+       [
+        "steppe",
+        1.0
+       ],
+       [
+        "plains",
+        0.12
+       ],
+       [
+        "marsh",
+        {
+         "name": "marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "north_africa"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "steppe",
+        0.5
+       ],
+       [
+        "plains",
+        0.3
+       ],
+       [
+        "desert",
+        {
+         "expr": "0.3 if lat < 34 else 0.1"
+        }
+       ],
+       [
+        "forest",
+        0.03
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "north_africa",
+      "coastal"
+     ],
+     "op": "set",
+     "var": "w",
+     "key": "beach",
+     "value": 0.18
+    },
+    {
+     "when": [
+      "north_africa"
+     ],
+     "op": "return",
+     "value": {
+      "name": "w"
+     }
+    },
+    {
+     "when": [
+      "lat >= 58 or (lon > 24 and lat >= 55)"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "taiga",
+        0.5
+       ],
+       [
+        "forest",
+        0.25
+       ],
+       [
+        "plains",
+        0.2
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.06 + marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "not (lat >= 58 or (lon > 24 and lat >= 55))",
+      "lat >= 53"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "forest",
+        0.45
+       ],
+       [
+        "plains",
+        0.45
+       ],
+       [
+        "hills",
+        0.08
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.05 + marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "not (lat >= 58 or (lon > 24 and lat >= 55))",
+      "not (lat >= 53)"
+     ],
+     "op": "assign",
+     "var": "w",
+     "value": {
+      "dict": [
+       [
+        "plains",
+        0.64
+       ],
+       [
+        "forest",
+        0.22
+       ],
+       [
+        "hills",
+        0.1
+       ],
+       [
+        "marsh",
+        {
+         "expr": "0.02 + marsh"
+        }
+       ]
+      ]
+     }
+    },
+    {
+     "when": [
+      "coastal and lat < 41"
+     ],
+     "op": "set",
+     "var": "w",
+     "key": "beach",
+     "value": 0.18
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "w"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::good_for": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "good_for",
+   "line": 217,
+   "params": [
+    "world",
+    "prov",
+    "rng"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "lon, lat = geo.lonlat(prov.pos)"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "t, roll = (prov.terrain, rng.random())"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "americas, africa = (lon < -30, lat < 17 and lon > -20)"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "near",
+     "value": {
+      "expr": "lambda x, y, r=2.5: abs(lon - x) < r and abs(lat - y) < r"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "special",
+     "value": {
+      "expr": "special_good(prov, lon, lat, t, rng.random(), americas, near)"
+     }
+    },
+    {
+     "when": [
+      "special"
+     ],
+     "op": "return",
+     "value": {
+      "name": "special"
+     }
+    },
+    {
+     "when": [
+      "t == 'desert'"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "('salt' if roll < 0.5 else 'fish') if prov.coastal else None"
+     }
+    },
+    {
+     "when": [
+      "t == 'marsh'"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'fish' if prov.coastal and roll < 0.5 else 'wool' if roll < 0.75 else 'grain'"
+     }
+    },
+    {
+     "when": [
+      "t == 'taiga'"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'furs' if roll < 0.5 else 'timber'"
+     }
+    },
+    {
+     "when": [
+      "t == 'snow'"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'furs' if roll < 0.6 else None"
+     }
+    },
+    {
+     "when": [
+      "t == 'savanna'",
+      "americas"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'cotton' if roll < 0.4 else 'grain' if roll < 0.8 else 'tobacco'"
+     }
+    },
+    {
+     "when": [
+      "t == 'savanna'"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'ivory' if roll < 0.35 else 'grain' if roll < 0.75 else 'cotton'"
+     }
+    },
+    {
+     "when": [
+      "t == 'beach'",
+      "prov.coastal and roll < 0.45"
+     ],
+     "op": "return",
+     "value": "fish"
+    },
+    {
+     "when": [
+      "t == 'beach'",
+      "americas or africa"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'sugar' if roll < 0.75 else 'cotton'"
+     }
+    },
+    {
+     "when": [
+      "t == 'beach'"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'salt' if roll < 0.6 else 'wine' if lat < 44 else 'grain'"
+     }
+    },
+    {
+     "when": [
+      "t == 'tundra'"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'fish' if prov.coastal and roll < 0.4 else 'furs'"
+     }
+    },
+    {
+     "when": [
+      "t == 'mountains' or (t == 'hills' and roll < 0.3)",
+      "americas and lon < -95"
+     ],
+     "op": "return",
+     "value": "silver"
+    },
+    {
+     "when": [
+      "t == 'mountains' or (t == 'hills' and roll < 0.3)",
+      "near(13.0, 50.5) or near(11.5, 47.3, 1.5)"
+     ],
+     "op": "return",
+     "value": "silver"
+    },
+    {
+     "when": [
+      "t == 'mountains' or (t == 'hills' and roll < 0.3)",
+      "near(18.9, 48.7, 1.5) or near(-11, 13.5, 3) or near(-1.5, 6.5, 3)"
+     ],
+     "op": "return",
+     "value": "gold"
+    },
+    {
+     "when": [
+      "t == 'mountains' or (t == 'hills' and roll < 0.3)",
+      "t == 'hills' and americas"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'furs' if lat > 42 else 'timber'"
+     }
+    },
+    {
+     "when": [
+      "t == 'mountains' or (t == 'hills' and roll < 0.3)"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'iron' if roll < 0.8 or t == 'hills' else 'salt'"
+     }
+    },
+    {
+     "when": [
+      "t == 'jungle'",
+      "americas"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'sugar' if prov.coastal and roll < 0.6 else 'tobacco' if roll < 0.75 else 'timber'"
+     }
+    },
+    {
+     "when": [
+      "t == 'jungle'",
+      "near(-1.5, 6.5, 3.5)"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'gold' if roll < 0.5 else 'ivory'"
+     }
+    },
+    {
+     "when": [
+      "t == 'jungle'"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'ivory' if roll < 0.6 else 'timber'"
+     }
+    },
+    {
+     "when": [
+      "t == 'forest'",
+      "americas and lat > 42 or (lon > 22 and lat > 57)"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'furs' if roll < 0.55 else 'timber'"
+     }
+    },
+    {
+     "when": [
+      "t == 'forest'",
+      "prov.coastal and lat > 48 and (roll < 0.25)"
+     ],
+     "op": "return",
+     "value": "fish"
+    },
+    {
+     "when": [
+      "t == 'forest'"
+     ],
+     "op": "return",
+     "value": "timber"
+    },
+    {
+     "when": [
+      "t == 'steppe'"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'grain' if roll < 0.55 else 'wool'"
+     }
+    },
+    {
+     "when": [
+      "prov.coastal and (lat > 48 or (americas and lat > 40)) and (roll < (0.6 if americas else 0.3))"
+     ],
+     "op": "return",
+     "value": "fish"
+    },
+    {
+     "when": [
+      "americas",
+      "lat < 25",
+      "lon < -95"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'grain' if roll < 0.6 else 'cotton'"
+     }
+    },
+    {
+     "when": [
+      "americas",
+      "lat < 25"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'sugar' if roll < 0.5 else 'tobacco' if roll < 0.75 else 'cotton'"
+     }
+    },
+    {
+     "when": [
+      "americas",
+      "33 <= lat <= 39.5"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'tobacco' if roll < 0.6 else 'grain'"
+     }
+    },
+    {
+     "when": [
+      "americas"
+     ],
+     "op": "return",
+     "value": "grain"
+    },
+    {
+     "when": [
+      "africa"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'grain' if roll < 0.5 else 'ivory' if roll < 0.75 else 'cotton'"
+     }
+    },
+    {
+     "when": [
+      "lat < 37.5 and lon > 29 and prov.coastal and (roll < 0.45)"
+     ],
+     "op": "return",
+     "value": "spices"
+    },
+    {
+     "when": [
+      "lat < 44.5 and -10 < lon < 40",
+      "lon > 26 and roll < 0.25"
+     ],
+     "op": "return",
+     "value": "cotton"
+    },
+    {
+     "when": [
+      "lat < 44.5 and -10 < lon < 40"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'grain' if roll < 0.55 else 'wine' if roll < 0.9 else 'wool'"
+     }
+    },
+    {
+     "when": [
+      "near(20.0, 50.0, 1) or near(10.4, 53.25, 1) or near(13.0, 47.8, 1)"
+     ],
+     "op": "return",
+     "value": "salt"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "wool",
+     "value": {
+      "expr": "0.35 if lon < 2 and lat > 50 or (-7 < lon < -1 and 39 < lat < 43) else 0.15"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "'wool' if roll < wool else 'grain'"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::build_countries": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "build_countries",
+   "line": 293,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "land",
+     "value": {
+      "expr": "list(world.provinces)"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "landmass, comp = ({}, 0)"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for pos in land",
+     "body": [
+      {
+       "when": [
+        "pos in landmass"
+       ],
+       "op": "stmt",
+       "text": "continue"
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "comp += 1"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "queue",
+       "value": {
+        "expr": "deque([pos])"
+       }
+      },
+      {
+       "when": [],
+       "op": "set",
+       "var": "landmass",
+       "key": {
+        "name": "pos"
+       },
+       "value": {
+        "name": "comp"
+       }
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "while queue",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "cur",
+         "value": {
+          "expr": "queue.popleft()"
+         }
+        },
+        {
+         "when": [],
+         "op": "loop",
+         "head": "for n in neighbors(cur)",
+         "body": [
+          {
+           "when": [
+            "n in world.provinces and n not in landmass"
+           ],
+           "op": "set",
+           "var": "landmass",
+           "key": {
+            "name": "n"
+           },
+           "value": {
+            "name": "comp"
+           }
+          },
+          {
+           "when": [
+            "n in world.provinces and n not in landmass"
+           ],
+           "op": "stmt",
+           "text": "queue.append(n)"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.landmass = landmass"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.countries = {}"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "seeds",
+     "value": {
+      "list": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (tag, (name, color, points)) in world.geo.COUNTRIES.items()",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "capital",
+       "value": {
+        "expr": "nearest_land(world, geo.hex_of(*points[0]))"
+       }
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "world.countries[tag] = Country(tag, name, color, capital)"
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for (lon, lat) in points",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "pos",
+         "value": {
+          "expr": "nearest_land(world, geo.hex_of(lon, lat))"
+         }
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "seeds.append((tag, pos, to_cube(pos), landmass[pos]))"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "reach",
+     "value": {
+      "expr": "TERRITORY_RADIUS * (1.7 if world.map == 'random' else 1)"
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for prov in world.provinces.values()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "q, r, s = to_cube(prov.pos)"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "best",
+       "value": null
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for (tag, pos, (sq, sr, ss), mass) in seeds",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "d",
+         "value": {
+          "expr": "max(abs(q - sq), abs(r - sr), abs(s - ss))"
+         }
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "limit",
+         "value": {
+          "expr": "reach if mass == landmass[prov.pos] else 1"
+         }
+        },
+        {
+         "when": [
+          "d <= limit and (best is None or d < best[0])"
+         ],
+         "op": "assign",
+         "var": "best",
+         "value": {
+          "list": [
+           {
+            "name": "d"
+           },
+           {
+            "name": "tag"
+           }
+          ]
+         }
+        }
+       ]
+      },
+      {
+       "when": [
+        "best and (not (prov.terrain == 'desert' and best[0] > 2 * SCALE))"
+       ],
+       "op": "stmt",
+       "text": "prov.owner = prov.controller = best[1]"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (tag, country) in world.countries.items()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "world.provinces[country.capital].owner = world.provinces[country.capital].controller = tag"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "rng",
+     "value": {
+      "expr": "random.Random(7)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "named",
+     "value": {
+      "expr": "list(world.cities.items())"
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for prov in world.provinces.values()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "lon, lat = geo.lonlat(prov.pos)"
+      },
+      {
+       "when": [
+        "prov.pos in world.cities"
+       ],
+       "op": "stmt",
+       "text": "prov.name = world.cities[prov.pos][0]"
+      },
+      {
+       "when": [
+        "not (prov.pos in world.cities)",
+        "world.map != 'europe'"
+       ],
+       "op": "assign",
+       "var": "near",
+       "value": {
+        "expr": "min(named, key=lambda kv: distance(kv[0], prov.pos))"
+       }
+      },
+      {
+       "when": [
+        "not (prov.pos in world.cities)",
+        "world.map != 'europe'",
+        "distance(near[0], prov.pos) <= 4 * SCALE"
+       ],
+       "op": "stmt",
+       "text": "prov.name = f'near {near[1][0]}'"
+      },
+      {
+       "when": [
+        "prov.owner is None"
+       ],
+       "op": "stmt",
+       "text": "prov.tribe = min(world.geo.TRIBES, key=lambda t: (t[1] - lon) ** 2 + (t[2] - lat) ** 2)[0]"
+      },
+      {
+       "when": [
+        "prov.owner is None",
+        "not prov.name and world.map != 'europe'"
+       ],
+       "op": "stmt",
+       "text": "prov.name = f'{prov.tribe} lands'"
+      },
+      {
+       "when": [
+        "not (prov.owner is None)",
+        "not prov.name and world.map != 'europe'"
+       ],
+       "op": "stmt",
+       "text": "prov.name = f'{world.countries[prov.owner].name} countryside'"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "density",
+       "value": {
+        "expr": "TERRAIN[prov.terrain].density * rng.uniform(0.75, 1.25)"
+       }
+      },
+      {
+       "when": [
+        "prov.owner"
+       ],
+       "op": "assign",
+       "var": "factor",
+       "value": 1.0
+      },
+      {
+       "when": [
+        "prov.owner",
+        "-5 < lon < 17 and 40 < lat < 46 or (2 < lon < 7 and 50 < lat < 53)"
+       ],
+       "op": "assign",
+       "var": "factor",
+       "value": 1.35
+      },
+      {
+       "when": [
+        "prov.owner",
+        "not (-5 < lon < 17 and 40 < lat < 46 or (2 < lon < 7 and 50 < lat < 53))",
+        "lon > 30 and lat > 50"
+       ],
+       "op": "assign",
+       "var": "factor",
+       "value": 0.45
+      },
+      {
+       "when": [
+        "prov.owner",
+        "not (-5 < lon < 17 and 40 < lat < 46 or (2 < lon < 7 and 50 < lat < 53))",
+        "not (lon > 30 and lat > 50)",
+        "lat > 58"
+       ],
+       "op": "assign",
+       "var": "factor",
+       "value": 0.4
+      },
+      {
+       "when": [
+        "prov.owner",
+        "not (-5 < lon < 17 and 40 < lat < 46 or (2 < lon < 7 and 50 < lat < 53))",
+        "not (lon > 30 and lat > 50)",
+        "not (lat > 58)",
+        "lat < 37.5 and lon < 28"
+       ],
+       "op": "assign",
+       "var": "factor",
+       "value": 0.7
+      },
+      {
+       "when": [
+        "prov.owner",
+        "world.geo.FERTILE_RIVERS and geo.line_distance((lon, lat), world.geo.FERTILE_RIVERS[0]) < 1"
+       ],
+       "op": "assign",
+       "var": "factor",
+       "value": 2.2
+      },
+      {
+       "when": [
+        "prov.owner",
+        "not (world.geo.FERTILE_RIVERS and geo.line_distance((lon, lat), world.geo.FERTILE_RIVERS[0]) < 1)",
+        "prov.pos in world.river_at"
+       ],
+       "op": "stmt",
+       "text": "factor *= 1.3"
+      },
+      {
+       "when": [
+        "prov.owner"
+       ],
+       "op": "stmt",
+       "text": "prov.peasants = density * factor * 0.94"
+      },
+      {
+       "when": [
+        "prov.owner"
+       ],
+       "op": "stmt",
+       "text": "prov.burghers = density * factor * 0.03"
+      },
+      {
+       "when": [
+        "prov.owner"
+       ],
+       "op": "stmt",
+       "text": "prov.nobles = density * factor * 0.03"
+      },
+      {
+       "when": [
+        "prov.owner",
+        "prov.pos in world.cities"
+       ],
+       "op": "assign",
+       "var": "extra",
+       "value": {
+        "expr": "world.cities[prov.pos][1]"
+       }
+      },
+      {
+       "when": [
+        "prov.owner",
+        "prov.pos in world.cities"
+       ],
+       "op": "stmt",
+       "text": "prov.peasants += extra * 0.4"
+      },
+      {
+       "when": [
+        "prov.owner",
+        "prov.pos in world.cities"
+       ],
+       "op": "stmt",
+       "text": "prov.burghers += extra * 0.55"
+      },
+      {
+       "when": [
+        "prov.owner",
+        "prov.pos in world.cities"
+       ],
+       "op": "stmt",
+       "text": "prov.nobles += extra * 0.05"
+      },
+      {
+       "when": [
+        "not (prov.owner)"
+       ],
+       "op": "assign",
+       "var": "factor",
+       "value": {
+        "expr": "0.35 if lon < -30 else 0.6 if lat < 17 else 0.5"
+       }
+      },
+      {
+       "when": [
+        "not (prov.owner)",
+        "prov.tribe in ('Mexica',)"
+       ],
+       "op": "assign",
+       "var": "factor",
+       "value": 1.6
+      },
+      {
+       "when": [
+        "not (prov.owner)",
+        "not (prov.tribe in ('Mexica',))",
+        "prov.tribe in ('Maya', 'Muisca', 'Benin', 'Akan', 'Yoruba', 'Hausa')"
+       ],
+       "op": "assign",
+       "var": "factor",
+       "value": 0.9
+      },
+      {
+       "when": [
+        "not (prov.owner)"
+       ],
+       "op": "stmt",
+       "text": "prov.natives = density * factor"
+      },
+      {
+       "when": [
+        "not (prov.owner)",
+        "prov.pos in world.cities"
+       ],
+       "op": "stmt",
+       "text": "prov.natives += world.cities[prov.pos][1] * 0.5"
+      }
+     ]
+    },
+    {
+     "when": [
+      "world.map == 'europe'"
+     ],
+     "op": "stmt",
+     "text": "naming.name_europe(world)"
+    },
+    {
+     "when": [
+      "not (world.map == 'europe')"
+     ],
+     "op": "stmt",
+     "text": "naming.make_unique(world.provinces)"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for prov in world.provinces.values()",
+     "body": [
+      {
+       "when": [
+        "not prov.owner"
+       ],
+       "op": "stmt",
+       "text": "continue"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "capital",
+       "value": {
+        "expr": "world.countries[prov.owner].capital == prov.pos"
+       }
+      },
+      {
+       "when": [
+        "prov.city"
+       ],
+       "op": "stmt",
+       "text": "prov.settlement = 3 if world.cities[prov.pos][1] >= 40 else 2"
+      },
+      {
+       "when": [
+        "not (prov.city)",
+        "prov.pop >= SETTLEMENT_POP[1] * 2.5"
+       ],
+       "op": "stmt",
+       "text": "prov.settlement = 1"
+      },
+      {
+       "when": [
+        "capital"
+       ],
+       "op": "stmt",
+       "text": "prov.settlement = max(prov.settlement, 2)"
+      },
+      {
+       "when": [
+        "capital"
+       ],
+       "op": "stmt",
+       "text": "prov.castle = 3 if world.cities.get(prov.pos, ('', 0))[1] >= 100 else 2"
+      },
+      {
+       "when": [
+        "not (capital)",
+        "prov.settlement >= 2 and rng.random() < 0.3"
+       ],
+       "op": "stmt",
+       "text": "prov.castle = 1"
+      },
+      {
+       "when": [
+        "prov.coastal and (capital or (prov.city and world.cities[prov.pos][1] >= 25))"
+       ],
+       "op": "stmt",
+       "text": "prov.buildings['port'] = 1"
+      },
+      {
+       "when": [
+        "prov.burghers >= 14"
+       ],
+       "op": "stmt",
+       "text": "prov.buildings['weaver'] = 1"
+      },
+      {
+       "when": [
+        "prov.city and prov.burghers >= 8"
+       ],
+       "op": "assign",
+       "var": "h",
+       "value": {
+        "expr": "(prov.pos[0] * 31 + prov.pos[1] * 17) % 7"
+       }
+      },
+      {
+       "when": [
+        "prov.city and prov.burghers >= 8",
+        "prov.level('port') or (prov.coastal and h < 3)"
+       ],
+       "op": "stmt",
+       "text": "prov.buildings['ropewalk'] = 1"
+      },
+      {
+       "when": [
+        "prov.city and prov.burghers >= 8",
+        "capital or h == 1"
+       ],
+       "op": "stmt",
+       "text": "prov.buildings['powder_mill'] = 1"
+      },
+      {
+       "when": [
+        "prov.city and prov.burghers >= 8",
+        "h in (2, 5)"
+       ],
+       "op": "stmt",
+       "text": "prov.buildings['tannery'] = 1"
+      },
+      {
+       "when": [
+        "prov.city and prov.burghers >= 8",
+        "h == 4 or prov.name in ('Venice', 'Genoa', 'Antwerp', 'Nuremberg', 'Constantinople')"
+       ],
+       "op": "stmt",
+       "text": "prov.buildings['glassworks'] = 1"
+      },
+      {
+       "when": [
+        "prov.burghers >= 30"
+       ],
+       "op": "stmt",
+       "text": "prov.buildings['marketplace'] = 1"
+      },
+      {
+       "when": [
+        "prov.good and prov.good in WORKS and (rng.random() < 0.25)"
+       ],
+       "op": "stmt",
+       "text": "prov.works = 2 if prov.pop > 20 and rng.random() < 0.4 else 1"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for country in world.countries.values()",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "mine",
+       "value": {
+        "expr": "world.provinces_of(country.tag)"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "coast",
+       "value": {
+        "expr": "[p for p in mine if p.coastal]"
+       }
+      },
+      {
+       "when": [
+        "coast and (not any((p.level('port') for p in mine)))"
+       ],
+       "op": "stmt",
+       "text": "max(coast, key=lambda p: (p.pop, p.pos)).buildings['port'] = 1"
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "country.treasury = 150 + 4 / AREA * len(world.provinces_of(country.tag))"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.colonial = dict(getattr(world.geo, 'COLONIAL', {}))"
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::build_roads": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "build_roads",
+   "line": 428,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "world.roads, world.road_paths = (set(), [])"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "summer_walls",
+     "value": {
+      "expr": "frozenset((pair for e in world.ridge_edges() for a, b in (sorted(e),) for pair in ((a, b), (b, a))))"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "def connect(start, goals, limit, owner=None):\n    best = {start: (0, None)}\n    heap = [(0, start)]\n    while heap:\n        cost, pos = heapq.heappop(heap)\n        if cost > best[pos][0]:\n            continue\n        if pos in goals and pos != start:\n            path = []\n            while pos is not None:\n                path.append(pos)\n                pos = best[pos][1]\n            return path[::-1]\n        for n in neighbors(pos):\n            prov = world.provinces.get(n)\n            if prov is None or (owner and prov.owner != owner) or (pos, n) in summer_walls:\n                continue\n            step = 0.5 if n in world.roads else TERRAIN[prov.terrain].move\n            if cost + step <= limit and cost + step < best.get(n, (INF,))[0]:\n                best[n] = (cost + step, pos)\n                heapq.heappush(heap, (cost + step, n))\n    return None"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (tag, country) in world.countries.items()",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "towns",
+       "value": {
+        "expr": "[p.pos for p in world.provinces_of(tag) if p.settlement >= 2 or p.city]"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "network",
+       "value": {
+        "expr": "{country.capital}"
+       }
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for pos in sorted(towns, key=lambda q: distance(q, country.capital))",
+       "body": [
+        {
+         "when": [
+          "pos in network"
+         ],
+         "op": "stmt",
+         "text": "continue"
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "path",
+         "value": {
+          "expr": "connect(pos, network, 14 * SCALE, owner=tag)"
+         }
+        },
+        {
+         "when": [
+          "path"
+         ],
+         "op": "stmt",
+         "text": "world.road_paths.append(path)"
+        },
+        {
+         "when": [
+          "path"
+         ],
+         "op": "stmt",
+         "text": "world.roads.update(path)"
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "network.add(pos)"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "capitals",
+     "value": {
+      "expr": "[c.capital for c in world.countries.values()]"
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (i, a) in enumerate(capitals)",
+     "body": [
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for b in capitals[i + 1:]",
+       "body": [
+        {
+         "when": [
+          "world.landmass.get(a) == world.landmass.get(b) and distance(a, b) <= 9 * SCALE"
+         ],
+         "op": "assign",
+         "var": "path",
+         "value": {
+          "expr": "connect(a, {b}, 16 * SCALE)"
+         }
+        },
+        {
+         "when": [
+          "world.landmass.get(a) == world.landmass.get(b) and distance(a, b) <= 9 * SCALE",
+          "path"
+         ],
+         "op": "stmt",
+         "text": "world.road_paths.append(path)"
+        },
+        {
+         "when": [
+          "world.landmass.get(a) == world.landmass.get(b) and distance(a, b) <= 9 * SCALE",
+          "path"
+         ],
+         "op": "stmt",
+         "text": "world.roads.update(path)"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::starting_units": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "starting_units",
+   "line": 478,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for prov in world.provinces.values()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "prov.garrison = prov.castle * GARRISON_HP"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (tag, country) in world.countries.items()",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "pop",
+       "value": {
+        "expr": "world.total_pop(tag)"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "kinds",
+       "value": {
+        "expr": "[troop('infantry', 1)] * max(1, round(pop / 450)) + [troop('cavalry', 1)] * round(pop / 1000) + [troop('artillery', 1)] * (1 if pop > 900 else 0)"
+       }
+      },
+      {
+       "when": [
+        "pop > 1500"
+       ],
+       "op": "stmt",
+       "text": "kinds.append(GENERAL)"
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for kind in kinds",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "spot",
+         "value": {
+          "expr": "world.land_spot(tag, world.provinces[country.capital], kind)"
+         }
+        },
+        {
+         "when": [
+          "spot"
+         ],
+         "op": "stmt",
+         "text": "world.add_unit(kind, tag, spot, moves=kind.moves)"
+        }
+       ]
+      },
+      {
+       "when": [
+        "world.colonial.get(tag, 999) <= 40"
+       ],
+       "op": "assign",
+       "var": "ports",
+       "value": {
+        "expr": "[p for p in world.provinces_of(tag) if p.level('port')]"
+       }
+      },
+      {
+       "when": [
+        "world.colonial.get(tag, 999) <= 40"
+       ],
+       "op": "stmt",
+       "text": "ports.sort(key=lambda p: (geo.lonlat(p.pos)[0], -p.pop))"
+      },
+      {
+       "when": [
+        "world.colonial.get(tag, 999) <= 40"
+       ],
+       "op": "loop",
+       "head": "for prov in ports",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "sea",
+         "value": {
+          "expr": "[n for n in neighbors(prov.pos) if world.is_sea(n) and (not world.units_at(n))]"
+         }
+        },
+        {
+         "when": [
+          "sea"
+         ],
+         "op": "stmt",
+         "text": "world.add_unit(CARAVEL, tag, sea[0], moves=CARAVEL.moves)"
+        },
+        {
+         "when": [
+          "sea"
+         ],
+         "op": "stmt",
+         "text": "break"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::nearest_land": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "nearest_land",
+   "line": 501,
+   "params": [
+    "world",
+    "pos"
+   ],
+   "steps": [
+    {
+     "when": [
+      "pos in world.provinces"
+     ],
+     "op": "return",
+     "value": {
+      "name": "pos"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "min(world.provinces, key=lambda p: (distance(p, pos), p))"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::unit_point": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "unit_point",
+   "line": 507,
+   "params": [
+    "lon",
+    "lat"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "expr": "(lon - geo.LON0) / geo.COL_DEG"
+       },
+       {
+        "expr": "(geo.Y_TOP - geo.merc(lat)) / geo.COL_DEG"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::unit_centre": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "unit_centre",
+   "line": 512,
+   "params": [
+    "pos"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "col, row = pos"
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "expr": "col + 0.5 * (row & 1) + 0.5"
+       },
+       {
+        "expr": "(row + 0.5) * 0.8660254"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::crest_edges": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "crest_edges",
+   "line": 517,
+   "params": [
+    "world",
+    "land"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "found",
+     "value": {
+      "expr": "set()"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "shift",
+     "value": {
+      "list": [
+       1.3e-06,
+       2.1e-06
+      ]
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for line in world.geo.MOUNTAINS",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "crossings",
+       "value": {
+        "dict": []
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "pts",
+       "value": {
+        "expr": "[unit_point(lon, lat) for lon, lat in line]"
+       }
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for ((x0, y0), (x1, y1)) in zip(pts, pts[1:])",
+       "body": [
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "x0, y0, x1, y1 = (x0 + shift[0], y0 + shift[1], x1 + shift[0], y1 + shift[1])"
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "steps",
+         "value": {
+          "expr": "max(1, int(max(abs(x1 - x0), abs(y1 - y0)) / 0.4) + 1)"
+         }
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "near",
+         "value": {
+          "expr": "set()"
+         }
+        },
+        {
+         "when": [],
+         "op": "loop",
+         "head": "for i in range(steps + 1)",
+         "body": [
+          {
+           "when": [],
+           "op": "assign",
+           "var": "t",
+           "value": {
+            "expr": "i / steps"
+           }
+          },
+          {
+           "when": [],
+           "op": "stmt",
+           "text": "x, y = (x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)"
+          },
+          {
+           "when": [],
+           "op": "assign",
+           "var": "pos",
+           "value": {
+            "expr": "geo.hex_of(geo.LON0 + x * geo.COL_DEG, geo.inv_merc(geo.Y_TOP - y * geo.COL_DEG))"
+           }
+          },
+          {
+           "when": [],
+           "op": "stmt",
+           "text": "near.update(within(pos, 1))"
+          }
+         ]
+        },
+        {
+         "when": [],
+         "op": "loop",
+         "head": "for a in near",
+         "body": [
+          {
+           "when": [
+            "a not in land"
+           ],
+           "op": "stmt",
+           "text": "continue"
+          },
+          {
+           "when": [],
+           "op": "stmt",
+           "text": "ax, ay = unit_centre(a)"
+          },
+          {
+           "when": [],
+           "op": "loop",
+           "head": "for b in neighbors(a)",
+           "body": [
+            {
+             "when": [
+              "b not in land or b < a"
+             ],
+             "op": "stmt",
+             "text": "continue"
+            },
+            {
+             "when": [],
+             "op": "stmt",
+             "text": "bx, by = unit_centre(b)"
+            },
+            {
+             "when": [
+              "cross(x0, y0, x1, y1, ax, ay, bx, by)"
+             ],
+             "op": "assign",
+             "var": "edge",
+             "value": {
+              "expr": "frozenset((a, b))"
+             }
+            },
+            {
+             "when": [
+              "cross(x0, y0, x1, y1, ax, ay, bx, by)"
+             ],
+             "op": "set",
+             "var": "crossings",
+             "key": {
+              "name": "edge"
+             },
+             "value": {
+              "expr": "crossings.get(edge, 0) + 1"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "found.update((e for e, n in crossings.items() if n % 2))"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "found"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::cross": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "cross",
+   "line": 552,
+   "params": [
+    "x0",
+    "y0",
+    "x1",
+    "y1",
+    "ax",
+    "ay",
+    "bx",
+    "by"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "d1x, d1y, d2x, d2y = (x1 - x0, y1 - y0, bx - ax, by - ay)"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "den",
+     "value": {
+      "expr": "d1x * d2y - d1y * d2x"
+     }
+    },
+    {
+     "when": [
+      "abs(den) < 1e-12"
+     ],
+     "op": "return",
+     "value": false
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "t",
+     "value": {
+      "expr": "((ax - x0) * d2y - (ay - y0) * d2x) / den"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "u",
+     "value": {
+      "expr": "((ax - x0) * d1y - (ay - y0) * d1x) / den"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "0.0 <= t <= 1.0 and 0.0 <= u <= 1.0"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::build_edges": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "build_edges",
+   "line": 563,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "land",
+     "value": {
+      "expr": "{p for p, t in world.terrain.items() if TERRAIN[t].move is not None}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "crest",
+     "value": {
+      "expr": "crest_edges(world, land)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "passes",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (k, (name, lon, lat)) in enumerate(getattr(world.geo, 'PASSES', ()), 1)",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "px, py = unit_point(lon, lat)"
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "def gap(edge):\n    (ax, ay), (bx, by) = (unit_centre(p) for p in sorted(edge))\n    return (((px - (ax + bx) / 2) ** 2 + (py - (ay + by) / 2) ** 2) ** 0.5, sorted(edge))"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "ranked",
+       "value": {
+        "expr": "sorted((e for e in crest if e not in passes), key=gap)[:2]"
+       }
+      },
+      {
+       "when": [
+        "not ranked or gap(ranked[0])[0] > 2.5"
+       ],
+       "op": "stmt",
+       "text": "continue"
+      },
+      {
+       "when": [],
+       "op": "set",
+       "var": "passes",
+       "key": {
+        "expr": "ranked[0]"
+       },
+       "value": {
+        "list": [
+         {
+          "name": "name"
+         },
+         {
+          "name": "k"
+         }
+        ]
+       }
+      },
+      {
+       "when": [
+        "len(ranked) > 1 and gap(ranked[1])[0] <= 1.0"
+       ],
+       "op": "set",
+       "var": "passes",
+       "key": {
+        "expr": "ranked[1]"
+       },
+       "value": {
+        "list": [
+         {
+          "name": "name"
+         },
+         {
+          "name": "k"
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "join_pockets(world, land, crest, passes)"
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "expr": "frozenset((e for e in crest if e not in passes))"
+       },
+       {
+        "name": "passes"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::join_pockets": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "join_pockets",
+   "line": 584,
+   "params": [
+    "world",
+    "land",
+    "crest",
+    "passes"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "shut",
+     "value": {
+      "expr": "{e for e in crest if e not in passes}"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "def label(blocked):\n    ids, count = ({}, 0)\n    for p in sorted(land):\n        if p in ids:\n            continue\n        count += 1\n        ids[p] = count\n        queue = deque([p])\n        while queue:\n            cur = queue.popleft()\n            for n in neighbors(cur):\n                if n in land and n not in ids and (frozenset((cur, n)) not in blocked):\n                    ids[n] = count\n                    queue.append(n)\n    return ids"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "flat",
+     "value": {
+      "expr": "label(shut)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "links",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for e in sorted(shut, key=sorted)",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "a, b = sorted(e)"
+      },
+      {
+       "when": [
+        "flat[a] != flat[b]"
+       ],
+       "op": "stmt",
+       "text": "links.setdefault(tuple(sorted((flat[a], flat[b]))), []).append(e)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "parent",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "def find(i):\n    parent.setdefault(i, i)\n    while parent[i] != i:\n        parent[i] = parent[parent[i]]\n        i = parent[i]\n    return i"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "size",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for i in flat.values()",
+     "body": [
+      {
+       "when": [],
+       "op": "set",
+       "var": "size",
+       "key": {
+        "name": "i"
+       },
+       "value": {
+        "expr": "size.get(i, 0) + 1"
+       }
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "number",
+     "value": {
+      "expr": "max((pid for _, pid in passes.values()), default=0)"
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for pair in sorted(links, key=lambda p: (-min(size[p[0]], size[p[1]]), p))",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "i, j = pair"
+      },
+      {
+       "when": [
+        "find(i) == find(j)"
+       ],
+       "op": "stmt",
+       "text": "continue"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "edge",
+       "value": {
+        "expr": "links[pair][0]"
+       }
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "number += 1"
+      },
+      {
+       "when": [],
+       "op": "set",
+       "var": "passes",
+       "key": {
+        "name": "edge"
+       },
+       "value": {
+        "list": [
+         {
+          "expr": "pass_name_near(world, sorted(edge)[0], {n for n, _ in passes.values()})"
+         },
+         {
+          "name": "number"
+         }
+        ]
+       }
+      },
+      {
+       "when": [],
+       "op": "set",
+       "var": "parent",
+       "key": {
+        "expr": "find(i)"
+       },
+       "value": {
+        "expr": "find(j)"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "hexa/campaign/systems/worldgen.py::pass_name_near": {
+   "file": "hexa/campaign/systems/worldgen.py",
+   "name": "pass_name_near",
+   "line": 635,
+   "params": [
+    "world",
+    "pos",
+    "taken"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "base",
+     "value": {
+      "expr": "world.cities[min(((distance(c, pos), c) for c in world.cities))[1]][0] if world.cities else 'Mountain'"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "name, n = (base, 1)"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "while name in taken",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "n += 1"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "name",
+       "value": {
+        "expr": "f\"{base} {('I' * n if n < 4 else 'IV' if n == 4 else str(n))}\""
+       }
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "name"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/terrain.py::pass_tables": {
+   "file": "hexa/campaign/systems/terrain.py",
+   "name": "pass_tables",
+   "line": 26,
+   "params": [
+    "world",
+    "key"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "ridge, passes = worldgen.build_edges(world)"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "hexes",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (edge, (name, _)) in sorted(passes.items(), key=lambda kv: sorted(kv[0]))",
+     "body": [
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for pos in edge",
+       "body": [
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "hexes.setdefault(pos, name)"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "summer",
+     "value": {
+      "expr": "frozenset((pair for e in ridge for a, b in (sorted(e),) for pair in ((a, b), (b, a))))"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "shut",
+     "value": {
+      "expr": "frozenset((pair for e in passes for a, b in (sorted(e),) for pair in ((a, b), (b, a))))"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "name": "key"
+       },
+       {
+        "name": "ridge"
+       },
+       {
+        "name": "passes"
+       },
+       {
+        "name": "hexes"
+       },
+       {
+        "name": "summer"
+       },
+       {
+        "expr": "summer | shut"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/terrain.py::ridge_edges": {
+   "file": "hexa/campaign/systems/terrain.py",
+   "name": "ridge_edges",
+   "line": 67,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "world.pass_data()[1]"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/terrain.py::pass_edges": {
+   "file": "hexa/campaign/systems/terrain.py",
+   "name": "pass_edges",
+   "line": 71,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "closed",
+     "value": {
+      "expr": "is_winter(world)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "found",
+     "value": {
+      "expr": "[(name, pid, edge, closed) for edge, (name, pid) in world.pass_data()[2].items()]"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "sorted(found, key=lambda t: (t[1], sorted(t[2])))"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/terrain.py::passes": {
+   "file": "hexa/campaign/systems/terrain.py",
+   "name": "passes",
+   "line": 88,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "world.pass_data()[3]"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/terrain.py::pass_name": {
+   "file": "hexa/campaign/systems/terrain.py",
+   "name": "pass_name",
+   "line": 92,
+   "params": [
+    "world",
+    "pos"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "passes(world).get(pos, '')"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/systems/terrain.py::geo_key": {
+   "file": "hexa/campaign/systems/terrain.py",
+   "name": "geo_key",
+   "line": 168,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "key",
+     "value": {
+      "expr": "getattr(world.geo, '_pass_geo_key', None)"
+     }
+    },
+    {
+     "when": [
+      "key is None"
+     ],
+     "op": "assign",
+     "var": "text",
+     "value": {
+      "expr": "repr((getattr(world.geo, 'MOUNTAINS', ()), getattr(world.geo, 'PASSES', ())))"
+     }
+    },
+    {
+     "when": [
+      "key is None"
+     ],
+     "op": "assign",
+     "var": "key",
+     "value": {
+      "expr": "hashlib.md5(text.encode('utf-8')).hexdigest()[:16]"
+     }
+    },
+    {
+     "when": [
+      "key is None"
+     ],
+     "op": "stmt",
+     "text": "try:\n    world.geo._pass_geo_key = key\nexcept AttributeError:\n    pass"
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "key"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::_anchors": {
+   "file": "hexa/campaign/naming.py",
+   "name": "_anchors",
+   "line": 56,
+   "params": [
+    "provinces",
+    "landmass"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "tags",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (name, _, _, tag) in regions.REGIONS",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "tags.setdefault(name, tag)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "found",
+     "value": {
+      "expr": "[(name, x, y, tag) for name, x, y, tag in regions.REGIONS]"
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (city, x, y, _) in geo.CITIES",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "region",
+       "value": {
+        "expr": "regions.CITY_REGION.get(city)"
+       }
+      },
+      {
+       "when": [
+        "region"
+       ],
+       "op": "stmt",
+       "text": "found.append((region, x, y, tags.get(region)))"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "out",
+     "value": {
+      "list": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (name, x, y, tag) in found",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "pos",
+       "value": {
+        "expr": "geo.hex_of(x, y)"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "mass",
+       "value": {
+        "expr": "landmass.get(pos)"
+       }
+      },
+      {
+       "when": [
+        "mass is None"
+       ],
+       "op": "assign",
+       "var": "mass",
+       "value": {
+        "expr": "next((landmass[p] for p in sorted(within(pos, 2), key=lambda q: (q != pos, q)) if p in landmass), None)"
+       }
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "out.append((name, x, y, tag, mass))"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "out"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::_grid": {
+   "file": "hexa/campaign/naming.py",
+   "name": "_grid",
+   "line": 76,
+   "params": [
+    "anchors"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "grid",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for anchor in anchors",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "grid.setdefault((int(anchor[1] // _CELL), int(anchor[2] // _CELL)), []).append(anchor)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "grid"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::region_of": {
+   "file": "hexa/campaign/naming.py",
+   "name": "region_of",
+   "line": 83,
+   "params": [
+    "grid",
+    "lon",
+    "lat",
+    "owner",
+    "mass"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "kx",
+     "value": {
+      "expr": "max(0.2, math.cos(math.radians(lat)))"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "cx, cy = (int(lon // _CELL), int(lat // _CELL))"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "best, best_d = (None, None)"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for ring in range(0, 40)",
+     "body": [
+      {
+       "when": [
+        "best is not None and (ring - 1) * _CELL * kx * OWN_WEIGHT >= best_d ** 0.5"
+       ],
+       "op": "stmt",
+       "text": "break"
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for gx in range(cx - ring, cx + ring + 1)",
+       "body": [
+        {
+         "when": [],
+         "op": "loop",
+         "head": "for gy in range(cy - ring, cy + ring + 1)",
+         "body": [
+          {
+           "when": [
+            "max(abs(gx - cx), abs(gy - cy)) != ring"
+           ],
+           "op": "stmt",
+           "text": "continue"
+          },
+          {
+           "when": [],
+           "op": "loop",
+           "head": "for (name, x, y, tag, amass) in grid.get((gx, gy), ())",
+           "body": [
+            {
+             "when": [],
+             "op": "assign",
+             "var": "d",
+             "value": {
+              "expr": "((lon - x) * kx) ** 2 + (lat - y) ** 2"
+             }
+            },
+            {
+             "when": [
+              "mass is not None and amass != mass"
+             ],
+             "op": "stmt",
+             "text": "d *= SEA_PENALTY"
+            },
+            {
+             "when": [
+              "owner is not None and tag == owner"
+             ],
+             "op": "stmt",
+             "text": "d *= OWN_WEIGHT * OWN_WEIGHT"
+            },
+            {
+             "when": [
+              "best is None or d < best_d or (d == best_d and name < best)"
+             ],
+             "op": "stmt",
+             "text": "best, best_d = (name, d)"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "best"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::assign_regions": {
+   "file": "hexa/campaign/naming.py",
+   "name": "assign_regions",
+   "line": 107,
+   "params": [
+    "provinces",
+    "landmass",
+    "cities"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "landmass",
+     "value": {
+      "expr": "landmass or {}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "grid",
+     "value": {
+      "expr": "_grid(_anchors(provinces, landmass))"
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for pos in sorted(provinces)",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "prov",
+       "value": {
+        "expr": "provinces[pos]"
+       }
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "lon, lat = geo.lonlat(pos)"
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "prov.region = region_of(grid, lon, lat, prov.owner, landmass.get(pos)) or ''"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (pos, (city, _)) in (cities or {}).items()",
+     "body": [
+      {
+       "when": [
+        "pos in provinces and city in regions.CITY_REGION"
+       ],
+       "op": "stmt",
+       "text": "provinces[pos].region = regions.CITY_REGION[city]"
+      }
+     ]
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::is_wild": {
+   "file": "hexa/campaign/naming.py",
+   "name": "is_wild",
+   "line": 135,
+   "params": [
+    "name"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "not name or name.startswith('near ') or ' lands' in name or name.endswith('countryside')"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::compass": {
+   "file": "hexa/campaign/naming.py",
+   "name": "compass",
+   "line": 140,
+   "params": [
+    "dx",
+    "dy"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "COMPASS[int(round(math.atan2(dy, dx) / (math.pi / 4))) % 8]"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::_descriptions": {
+   "file": "hexa/campaign/naming.py",
+   "name": "_descriptions",
+   "line": 144,
+   "params": [
+    "prov",
+    "river"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "words",
+     "value": {
+      "list": []
+     }
+    },
+    {
+     "when": [
+      "river"
+     ],
+     "op": "stmt",
+     "text": "words += [f'{river} {w}' for w in RIVER_WORDS]"
+    },
+    {
+     "when": [
+      "prov.coastal"
+     ],
+     "op": "stmt",
+     "text": "words += list(COAST_WORDS)"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "words += list(LAND_WORDS.get(prov.terrain, (prov.terrain,)))"
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "words"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::label_groups": {
+   "file": "hexa/campaign/naming.py",
+   "name": "label_groups",
+   "line": 155,
+   "params": [
+    "groups",
+    "taken",
+    "provinces",
+    "rivers"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "rivers",
+     "value": {
+      "expr": "rivers or {}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "out",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for base in sorted(groups)",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "members",
+       "value": {
+        "expr": "sorted(groups[base])"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "points",
+       "value": {
+        "expr": "{pos: geo.lonlat(pos) for pos in members}"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "mx",
+       "value": {
+        "expr": "sum((p[0] for p in points.values())) / len(points)"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "my",
+       "value": {
+        "expr": "sum((p[1] for p in points.values())) / len(points)"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "dist",
+       "value": {
+        "expr": "{pos: math.hypot((points[pos][0] - mx) * math.cos(math.radians(my)), points[pos][1] - my) for pos in members}"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "far",
+       "value": {
+        "expr": "sorted(dist.values())[len(members) // 2]"
+       }
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for pos in members",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "words",
+         "value": {
+          "expr": "_descriptions(provinces[pos], rivers.get(pos))"
+         }
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "way",
+         "value": {
+          "expr": "compass(points[pos][0] - mx, points[pos][1] - my)"
+         }
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "ring",
+         "value": {
+          "expr": "'outer' if dist[pos] > far else 'inner'"
+         }
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "turn",
+         "value": {
+          "expr": "(pos[0] * 7 + pos[1] * 13) % 4"
+         }
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "ordered",
+         "value": {
+          "expr": "words[turn:] + words[:turn] if len(words) > 1 else words"
+         }
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "tries",
+         "value": {
+          "expr": "[f'{base} ({w})' for w in ordered]"
+         }
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "tries += [f'{base} ({way} {w})' for w in ordered]"
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "tries += [f'{base} ({ring} {way} {w})' for w in ordered]"
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "name",
+         "value": {
+          "expr": "next((t for t in tries if t not in taken), None)"
+         }
+        },
+        {
+         "when": [],
+         "op": "assign",
+         "var": "n",
+         "value": 2
+        },
+        {
+         "when": [],
+         "op": "loop",
+         "head": "while name is None",
+         "body": [
+          {
+           "when": [],
+           "op": "assign",
+           "var": "cand",
+           "value": {
+            "expr": "f'{base} ({ring} {way} {ordered[0]} {n})'"
+           }
+          },
+          {
+           "when": [
+            "cand not in taken"
+           ],
+           "op": "assign",
+           "var": "name",
+           "value": {
+            "name": "cand"
+           }
+          },
+          {
+           "when": [],
+           "op": "stmt",
+           "text": "n += 1"
+          }
+         ]
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "taken.add(name)"
+        },
+        {
+         "when": [],
+         "op": "set",
+         "var": "out",
+         "key": {
+          "name": "pos"
+         },
+         "value": {
+          "name": "name"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "out"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::make_unique": {
+   "file": "hexa/campaign/naming.py",
+   "name": "make_unique",
+   "line": 191,
+   "params": [
+    "provinces"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "by_name",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (pos, prov) in provinces.items()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "by_name.setdefault(prov.name, []).append(pos)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "taken",
+     "value": {
+      "expr": "{name for name, poss in by_name.items() if len(poss) == 1}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "groups",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (name, poss) in by_name.items()",
+     "body": [
+      {
+       "when": [
+        "len(poss) == 1"
+       ],
+       "op": "stmt",
+       "text": "continue"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "cities",
+       "value": {
+        "expr": "sorted((p for p in poss if provinces[p].city))"
+       }
+      },
+      {
+       "when": [
+        "cities"
+       ],
+       "op": "stmt",
+       "text": "taken.add(name)"
+      },
+      {
+       "when": [
+        "cities"
+       ],
+       "op": "assign",
+       "var": "rest",
+       "value": {
+        "expr": "[p for p in poss if p != cities[0]]"
+       }
+      },
+      {
+       "when": [
+        "not (cities)"
+       ],
+       "op": "assign",
+       "var": "rest",
+       "value": {
+        "name": "poss"
+       }
+      },
+      {
+       "when": [
+        "rest"
+       ],
+       "op": "set",
+       "var": "groups",
+       "key": {
+        "name": "name"
+       },
+       "value": {
+        "name": "rest"
+       }
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (pos, name) in label_groups(groups, taken, provinces).items()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "provinces[pos].name = name"
+      }
+     ]
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::_places_by_hex": {
+   "file": "hexa/campaign/naming.py",
+   "name": "_places_by_hex",
+   "line": 215,
+   "params": [],
+   "steps": [
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "by_hex, order = ({}, [])"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for line in placenames.PLACES.strip().splitlines()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "lon, lat, name = line.split('|')"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "pos",
+       "value": {
+        "expr": "geo.hex_of(float(lon), float(lat))"
+       }
+      },
+      {
+       "when": [
+        "pos not in by_hex"
+       ],
+       "op": "set",
+       "var": "by_hex",
+       "key": {
+        "name": "pos"
+       },
+       "value": {
+        "list": []
+       }
+      },
+      {
+       "when": [
+        "pos not in by_hex"
+       ],
+       "op": "stmt",
+       "text": "order.append(pos)"
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "by_hex[pos].append(name)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "list": [
+       {
+        "name": "by_hex"
+       },
+       {
+        "name": "order"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::name_europe": {
+   "file": "hexa/campaign/naming.py",
+   "name": "name_europe",
+   "line": 227,
+   "params": [
+    "world"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "provs",
+     "value": {
+      "expr": "world.provinces"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "assign_regions(provs, getattr(world, 'landmass', None), world.cities)"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "used",
+     "value": {
+      "expr": "{p.name for p in provs.values() if p.name and (not is_wild(p.name))}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "cities",
+     "value": {
+      "expr": "{v[0] for v in world.cities.values()}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "todo",
+     "value": {
+      "expr": "{pos for pos, p in provs.items() if not p.city and is_wild(p.name)}"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "by_hex, order = _places_by_hex()"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for pos in order",
+     "body": [
+      {
+       "when": [
+        "pos not in todo"
+       ],
+       "op": "stmt",
+       "text": "continue"
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for raw in by_hex[pos]",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "name",
+         "value": {
+          "expr": "EXONYMS.get(raw, raw)"
+         }
+        },
+        {
+         "when": [
+          "raw in SKIP or name in used or name in cities"
+         ],
+         "op": "stmt",
+         "text": "continue"
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "provs[pos].name = name"
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "used.add(name)"
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "todo.discard(pos)"
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "break"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "groups",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for pos in todo",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "groups.setdefault(provs[pos].region or 'Wilderness', []).append(pos)"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (pos, name) in label_groups(groups, used, provs, getattr(world, 'river_at', None)).items()",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "provs[pos].name = name"
+      }
+     ]
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::place": {
+   "file": "hexa/campaign/naming.py",
+   "name": "place",
+   "line": 254,
+   "params": [
+    "prov"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "region",
+     "value": {
+      "expr": "prov.region"
+     }
+    },
+    {
+     "when": [
+      "not region or prov.name == region or prov.name.startswith(region + ' (') or region.endswith(' lands')"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "prov.name"
+     }
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "expr": "f'{prov.name} ({region})'"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/naming.py::colony_name": {
+   "file": "hexa/campaign/naming.py",
+   "name": "colony_name",
+   "line": 262,
+   "params": [
+    "world",
+    "prov"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "base",
+     "value": {
+      "expr": "'New ' + (prov.region.removesuffix(' lands') if prov.region else prov.tribe)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "taken",
+     "value": {
+      "expr": "{p.name for p in world.provinces.values()}"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "name, n = (base, 1)"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "while name in taken",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "n += 1"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "name",
+       "value": {
+        "expr": "f'{base} {n}'"
+       }
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "name"
+     }
+    }
+   ]
+  },
+  "hexa/campaign/specialgoods.py::special_good": {
+   "file": "hexa/campaign/specialgoods.py",
+   "name": "special_good",
+   "line": 4,
+   "params": [
+    "prov",
+    "lon",
+    "lat",
+    "t",
+    "r",
+    "americas",
+    "near"
+   ],
+   "steps": [
+    {
+     "when": [
+      "t in ('mountains', 'hills') and (near(15.5, 60.5, 3) or near(19.0, 48.7, 2) or near(13.0, 50.5, 1.5) or near(33.0, 35.0, 1.5) or (americas and lon < -95)) and (r < 0.35)"
+     ],
+     "op": "return",
+     "value": "copper"
+    },
+    {
+     "when": [
+      "t in ('hills', 'mountains') and (not americas) and (lat > 35) and (r < (0.3 if near(10.5, 44.0, 3) else 0.16))"
+     ],
+     "op": "return",
+     "value": "stone"
+    },
+    {
+     "when": [
+      "t == 'steppe' and r < 0.35"
+     ],
+     "op": "return",
+     "value": "horses"
+    },
+    {
+     "when": [
+      "t in ('plains', 'savanna') and (near(19.5, 47.0, 3) or near(-5.5, 37.5, 2)) and (r < 0.3)"
+     ],
+     "op": "return",
+     "value": "horses"
+    },
+    {
+     "when": [
+      "t in ('plains', 'marsh', 'steppe') and (not americas) and (44 < lat < 56) and (r < 0.12)"
+     ],
+     "op": "return",
+     "value": "cattle"
+    },
+    {
+     "when": [
+      "t == 'savanna' and (not americas) and (r < 0.15)"
+     ],
+     "op": "return",
+     "value": "cattle"
+    },
+    {
+     "when": [
+      "t in ('plains', 'marsh') and (not americas) and (lat > 50) and (-6 < lon < 45) and (r < 0.18)"
+     ],
+     "op": "return",
+     "value": "hemp"
+    },
+    {
+     "when": [
+      "t in ('plains', 'hills') and (near(29.0, 40.0, 2.5) or near(10.5, 45.2, 1.8) or near(-3.6, 37.2, 1.0)) and (r < 0.35)"
+     ],
+     "op": "return",
+     "value": "silk"
+    },
+    {
+     "when": [
+      "t in ('plains', 'hills', 'beach') and (not americas) and (30 < lat < 43.8) and (-10 < lon < 37) and (r < 0.3)"
+     ],
+     "op": "return",
+     "value": "olives"
+    },
+    {
+     "when": [
+      "americas and t in ('jungle', 'savanna', 'plains') and (lat < 22) and (lon > -98)",
+      "r < 0.16"
+     ],
+     "op": "return",
+     "value": {
+      "expr": "'cocoa' if lon < -75 else 'dyes'"
+     }
+    },
+    {
+     "when": [
+      "americas and t in ('jungle', 'savanna', 'plains') and (lat < 22) and (lon > -98)",
+      "r < 0.24"
+     ],
+     "op": "return",
+     "value": "dyes"
+    },
+    {
+     "when": [
+      "t in ('hills', 'mountains', 'plains', 'savanna') and lon > 36 and (8 < lat < 18) and (r < 0.4)"
+     ],
+     "op": "return",
+     "value": "coffee"
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": null
+    }
+   ]
+  },
+  "hexa/campaign/wfc.py::collapse": {
+   "file": "hexa/campaign/wfc.py",
+   "name": "collapse",
+   "line": 12,
+   "params": [
+    "cells",
+    "prior",
+    "forbidden",
+    "neighbours",
+    "rng",
+    "affinity",
+    "fixed"
+   ],
+   "steps": [
+    {
+     "when": [],
+     "op": "assign",
+     "var": "cells",
+     "value": {
+      "expr": "list(cells)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "tiles",
+     "value": {
+      "expr": "sorted({t for p in cells for t in prior[p]} | {t for pair in forbidden for t in pair} | set((fixed or {}).values()))"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "index",
+     "value": {
+      "expr": "{t: i for i, t in enumerate(tiles)}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "full",
+     "value": {
+      "expr": "(1 << len(tiles)) - 1"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "compat",
+     "value": {
+      "expr": "[full] * len(tiles)"
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (a, b) in forbidden",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "compat[index[a]] &= ~(1 << index[b])"
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "compat[index[b]] &= ~(1 << index[a])"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "support",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "def allowed_next(mask):\n    got = support.get(mask)\n    if got is None:\n        got = 0\n        m, i = (mask, 0)\n        while m:\n            if m & 1:\n                got |= compat[i]\n            m >>= 1\n            i += 1\n        support[mask] = got\n    return got"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "cellset",
+     "value": {
+      "expr": "set(cells)"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "near",
+     "value": {
+      "expr": "{p: [n for n in neighbours(p) if n in cellset] for p in cells}"
+     }
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "domain",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for p in cells",
+     "body": [
+      {
+       "when": [],
+       "op": "assign",
+       "var": "mask",
+       "value": 0
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for (t, w) in prior[p].items()",
+       "body": [
+        {
+         "when": [
+          "w > 0"
+         ],
+         "op": "stmt",
+         "text": "mask |= 1 << index[t]"
+        }
+       ]
+      },
+      {
+       "when": [],
+       "op": "set",
+       "var": "domain",
+       "key": {
+        "name": "p"
+       },
+       "value": {
+        "expr": "mask or full"
+       }
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "result",
+     "value": {
+      "dict": []
+     }
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "for (p, t) in (fixed or {}).items()",
+     "body": [
+      {
+       "when": [
+        "p in domain"
+       ],
+       "op": "set",
+       "var": "domain",
+       "key": {
+        "name": "p"
+       },
+       "value": {
+        "expr": "1 << index[t]"
+       }
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "def propagate(queue):\n    while queue:\n        p = queue.pop()\n        allow = allowed_next(domain[p])\n        for n in near[p]:\n            if n in result:\n                continue\n            nd = domain[n] & allow\n            if nd != domain[n] and nd:\n                domain[n] = nd\n                queue.append(n)\n                heapq.heappush(heap, (bin(nd).count('1'), rng.random(), n))"
+    },
+    {
+     "when": [],
+     "op": "assign",
+     "var": "heap",
+     "value": {
+      "expr": "[(bin(domain[p]).count('1'), rng.random(), p) for p in cells]"
+     }
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "heapq.heapify(heap)"
+    },
+    {
+     "when": [],
+     "op": "stmt",
+     "text": "propagate(list(cells))"
+    },
+    {
+     "when": [],
+     "op": "loop",
+     "head": "while heap",
+     "body": [
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "count, _, p = heapq.heappop(heap)"
+      },
+      {
+       "when": [
+        "p in result or count != bin(domain[p]).count('1')"
+       ],
+       "op": "stmt",
+       "text": "continue"
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "mask",
+       "value": {
+        "expr": "domain[p]"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "options",
+       "value": {
+        "expr": "[t for t in tiles if mask >> index[t] & 1]"
+       }
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "weights",
+       "value": {
+        "list": []
+       }
+      },
+      {
+       "when": [],
+       "op": "loop",
+       "head": "for t in options",
+       "body": [
+        {
+         "when": [],
+         "op": "assign",
+         "var": "same",
+         "value": {
+          "expr": "sum((1 for n in near[p] if result.get(n) == t))"
+         }
+        },
+        {
+         "when": [],
+         "op": "stmt",
+         "text": "weights.append(prior[p].get(t, 0.01) * (1 + affinity * same))"
+        }
+       ]
+      },
+      {
+       "when": [],
+       "op": "assign",
+       "var": "pick",
+       "value": {
+        "expr": "rng.choices(options, weights)[0]"
+       }
+      },
+      {
+       "when": [],
+       "op": "set",
+       "var": "result",
+       "key": {
+        "name": "p"
+       },
+       "value": {
+        "name": "pick"
+       }
+      },
+      {
+       "when": [],
+       "op": "set",
+       "var": "domain",
+       "key": {
+        "name": "p"
+       },
+       "value": {
+        "expr": "1 << index[pick]"
+       }
+      },
+      {
+       "when": [],
+       "op": "stmt",
+       "text": "propagate([p])"
+      }
+     ]
+    },
+    {
+     "when": [],
+     "op": "return",
+     "value": {
+      "name": "result"
+     }
+    }
+   ]
+  }
+ }
+}

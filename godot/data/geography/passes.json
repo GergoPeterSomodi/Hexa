@@ -1,0 +1,127 @@
+{
+ "schema": "hexa-godot/geography-passes/1",
+ "source": "hexa/campaign/geo.py (PASSES)",
+ "note": "The 24 named passes. The game has 72 pass edges and passes in all, derived from these and the mountain lines (terrain.passes, worldgen.build_edges); the map reference (godot/data/map_reference.json) counts them.",
+ "passes": [
+  {
+   "name": "Gotthard",
+   "lon": 8.56,
+   "lat": 46.56
+  },
+  {
+   "name": "Brenner",
+   "lon": 11.51,
+   "lat": 47.0
+  },
+  {
+   "name": "Mont Cenis",
+   "lon": 6.97,
+   "lat": 45.14
+  },
+  {
+   "name": "Simplon",
+   "lon": 8.03,
+   "lat": 46.26
+  },
+  {
+   "name": "Great St Bernard",
+   "lon": 7.17,
+   "lat": 45.87
+  },
+  {
+   "name": "Roncesvalles",
+   "lon": -1.32,
+   "lat": 43.01
+  },
+  {
+   "name": "Dukla",
+   "lon": 21.24,
+   "lat": 49.43
+  },
+  {
+   "name": "Lupkow",
+   "lon": 22.18,
+   "lat": 49.4
+  },
+  {
+   "name": "Col de Larche",
+   "lon": 6.9,
+   "lat": 44.42
+  },
+  {
+   "name": "Arlberg",
+   "lon": 10.2,
+   "lat": 46.95
+  },
+  {
+   "name": "Tauern",
+   "lon": 13.3,
+   "lat": 47.1
+  },
+  {
+   "name": "Semmering",
+   "lon": 15.7,
+   "lat": 47.5
+  },
+  {
+   "name": "Somport",
+   "lon": -0.53,
+   "lat": 42.79
+  },
+  {
+   "name": "Perthus",
+   "lon": 2.87,
+   "lat": 42.47
+  },
+  {
+   "name": "Pajares",
+   "lon": -5.77,
+   "lat": 43.0
+  },
+  {
+   "name": "Cisa",
+   "lon": 9.93,
+   "lat": 44.43
+  },
+  {
+   "name": "Verecke",
+   "lon": 23.08,
+   "lat": 48.8
+  },
+  {
+   "name": "Tihuta",
+   "lon": 24.7,
+   "lat": 47.3
+  },
+  {
+   "name": "Predeal",
+   "lon": 25.55,
+   "lat": 45.4
+  },
+  {
+   "name": "Iron Gates",
+   "lon": 22.5,
+   "lat": 44.65
+  },
+  {
+   "name": "Shipka",
+   "lon": 25.4,
+   "lat": 42.76
+  },
+  {
+   "name": "Darial",
+   "lon": 44.5,
+   "lat": 42.4
+  },
+  {
+   "name": "Cilician Gates",
+   "lon": 34.75,
+   "lat": 37.25
+  },
+  {
+   "name": "Tizi n'Tichka",
+   "lon": -7.35,
+   "lat": 31.3
+  }
+ ]
+}

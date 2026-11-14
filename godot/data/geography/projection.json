@@ -1,0 +1,20 @@
+{
+ "schema": "hexa-godot/geography-projection/1",
+ "source": "hexa/campaign/geo.py (projection, lonlat, hex_of, merc, inv_merc, land_cells; see builder_functions.json)",
+ "name": "Europe 1480",
+ "start": [
+  8.0,
+  46.0
+ ],
+ "lon0": -100.0,
+ "lon1": 46.5,
+ "lat_top": 62.5,
+ "lat_bottom": -13.0,
+ "scale": 2,
+ "col_deg": 0.725,
+ "row_deg": 0.6278684149999999,
+ "y_top": 80.65691151984889,
+ "cols": 203,
+ "rows": 150,
+ "note": "col_deg and row_deg are the values Python computes (1.45 / SCALE and COL_DEG * 0.8660254); use these exact doubles, do not recompute them. Odd rows are shifted half a hex (see lonlat and hex_of rules)."
+}

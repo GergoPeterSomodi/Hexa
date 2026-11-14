@@ -1,0 +1,442 @@
+{
+ "schema": "hexa-godot/goods/1",
+ "source": "hexa/campaign/data.py (GOODS, FOODS, NEEDS, OUTPUT, PRICE_FLOOR, PRICE_CAP, ELASTICITY, FARM_GOODS)",
+ "goods": [
+  {
+   "key": "grain",
+   "name": "Grain",
+   "price": 1.0,
+   "color": [
+    225,
+    200,
+    90
+   ],
+   "kind": "food"
+  },
+  {
+   "key": "fish",
+   "name": "Fish",
+   "price": 1.0,
+   "color": [
+    110,
+    170,
+    210
+   ],
+   "kind": "food"
+  },
+  {
+   "key": "salt",
+   "name": "Salt",
+   "price": 2.0,
+   "color": [
+    235,
+    235,
+    235
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "wine",
+   "name": "Wine",
+   "price": 2.5,
+   "color": [
+    150,
+    40,
+    90
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "wool",
+   "name": "Wool",
+   "price": 1.5,
+   "color": [
+    230,
+    220,
+    200
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "cotton",
+   "name": "Cotton",
+   "price": 2.0,
+   "color": [
+    250,
+    250,
+    240
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "timber",
+   "name": "Timber",
+   "price": 1.0,
+   "color": [
+    120,
+    85,
+    50
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "iron",
+   "name": "Iron",
+   "price": 2.0,
+   "color": [
+    120,
+    125,
+    135
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "cloth",
+   "name": "Cloth",
+   "price": 4.0,
+   "color": [
+    180,
+    110,
+    200
+   ],
+   "kind": "made"
+  },
+  {
+   "key": "tools",
+   "name": "Tools",
+   "price": 5.0,
+   "color": [
+    80,
+    90,
+    110
+   ],
+   "kind": "made"
+  },
+  {
+   "key": "weapons",
+   "name": "Weapons",
+   "price": 6.0,
+   "color": [
+    170,
+    60,
+    60
+   ],
+   "kind": "made"
+  },
+  {
+   "key": "sugar",
+   "name": "Sugar",
+   "price": 4.0,
+   "color": [
+    245,
+    240,
+    250
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "tobacco",
+   "name": "Tobacco",
+   "price": 4.0,
+   "color": [
+    140,
+    100,
+    50
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "furs",
+   "name": "Furs",
+   "price": 4.0,
+   "color": [
+    150,
+    110,
+    80
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "ivory",
+   "name": "Ivory",
+   "price": 5.0,
+   "color": [
+    240,
+    230,
+    200
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "spices",
+   "name": "Spices",
+   "price": 9.0,
+   "color": [
+    220,
+    120,
+    40
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "silver",
+   "name": "Silver",
+   "price": 7.0,
+   "color": [
+    200,
+    205,
+    215
+   ],
+   "kind": "money"
+  },
+  {
+   "key": "gold",
+   "name": "Gold",
+   "price": 10.0,
+   "color": [
+    250,
+    210,
+    60
+   ],
+   "kind": "money"
+  },
+  {
+   "key": "horses",
+   "name": "Horses",
+   "price": 3.0,
+   "color": [
+    150,
+    100,
+    60
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "cattle",
+   "name": "Cattle",
+   "price": 1.5,
+   "color": [
+    120,
+    80,
+    60
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "stone",
+   "name": "Stone",
+   "price": 1.0,
+   "color": [
+    185,
+    185,
+    180
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "copper",
+   "name": "Copper",
+   "price": 2.5,
+   "color": [
+    205,
+    125,
+    70
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "hemp",
+   "name": "Hemp & flax",
+   "price": 1.2,
+   "color": [
+    125,
+    165,
+    85
+   ],
+   "kind": "raw"
+  },
+  {
+   "key": "olives",
+   "name": "Olive oil",
+   "price": 2.5,
+   "color": [
+    165,
+    170,
+    90
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "silk",
+   "name": "Silk",
+   "price": 6.0,
+   "color": [
+    240,
+    200,
+    225
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "dyes",
+   "name": "Dyes",
+   "price": 5.0,
+   "color": [
+    95,
+    75,
+    205
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "cocoa",
+   "name": "Cocoa",
+   "price": 5.0,
+   "color": [
+    115,
+    70,
+    40
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "coffee",
+   "name": "Coffee",
+   "price": 5.0,
+   "color": [
+    90,
+    55,
+    35
+   ],
+   "kind": "luxury"
+  },
+  {
+   "key": "rope",
+   "name": "Rope & sails",
+   "price": 3.5,
+   "color": [
+    215,
+    195,
+    145
+   ],
+   "kind": "made"
+  },
+  {
+   "key": "glass",
+   "name": "Glass",
+   "price": 5.0,
+   "color": [
+    165,
+    220,
+    235
+   ],
+   "kind": "made"
+  },
+  {
+   "key": "leather",
+   "name": "Leather",
+   "price": 3.5,
+   "color": [
+    155,
+    105,
+    60
+   ],
+   "kind": "made"
+  },
+  {
+   "key": "gunpowder",
+   "name": "Gunpowder",
+   "price": 5.0,
+   "color": [
+    75,
+    75,
+    80
+   ],
+   "kind": "made"
+  }
+ ],
+ "foods": [
+  "grain",
+  "fish"
+ ],
+ "farm_goods": [
+  "grain",
+  "wine",
+  "wool",
+  "cotton",
+  "sugar",
+  "tobacco"
+ ],
+ "needs": {
+  "peasants": {
+   "food": 0.25,
+   "salt": 0.02,
+   "cloth": 0.02,
+   "wine": 0.01,
+   "olives": 0.005
+  },
+  "burghers": {
+   "food": 0.25,
+   "salt": 0.03,
+   "cloth": 0.08,
+   "wine": 0.05,
+   "tools": 0.03,
+   "sugar": 0.03,
+   "tobacco": 0.02,
+   "spices": 0.01,
+   "olives": 0.02,
+   "glass": 0.02,
+   "leather": 0.02,
+   "coffee": 0.01,
+   "dyes": 0.005
+  },
+  "nobles": {
+   "food": 0.25,
+   "cloth": 0.15,
+   "wine": 0.12,
+   "sugar": 0.08,
+   "spices": 0.06,
+   "furs": 0.06,
+   "tobacco": 0.04,
+   "ivory": 0.03,
+   "weapons": 0.03,
+   "silk": 0.05,
+   "cocoa": 0.03,
+   "glass": 0.03,
+   "dyes": 0.02,
+   "horses": 0.02,
+   "coffee": 0.02,
+   "olives": 0.02
+  }
+ },
+ "output": {
+  "grain": 0.42,
+  "fish": 0.4,
+  "salt": 0.2,
+  "wine": 0.2,
+  "wool": 0.25,
+  "cotton": 0.25,
+  "timber": 0.3,
+  "iron": 0.2,
+  "sugar": 0.22,
+  "tobacco": 0.22,
+  "furs": 0.12,
+  "ivory": 0.08,
+  "spices": 0.06,
+  "silver": 0.06,
+  "gold": 0.04,
+  "horses": 0.12,
+  "cattle": 0.25,
+  "stone": 0.3,
+  "copper": 0.15,
+  "hemp": 0.25,
+  "olives": 0.2,
+  "silk": 0.06,
+  "dyes": 0.08,
+  "cocoa": 0.1,
+  "coffee": 0.1
+ },
+ "price_floor": 0.3,
+ "price_cap": 3.5,
+ "elasticity": 0.6
+}

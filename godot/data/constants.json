@@ -1,0 +1,39 @@
+{
+ "schema": "hexa-godot/constants/1",
+ "source": "hexa/campaign/data.py, hexa/campaign/geo.py, hexa/campaign/world.py",
+ "area": 4,
+ "scale": 2,
+ "start_year": 1480,
+ "end_year": 1650,
+ "seasons": [
+  "Spring",
+  "Summer",
+  "Autumn",
+  "Winter"
+ ],
+ "eras": [
+  {
+   "era": 1,
+   "name": "Age of Pikes",
+   "start_year": 1480,
+   "third": 0
+  },
+  {
+   "era": 2,
+   "name": "Age of Arquebus",
+   "start_year": 1520,
+   "third": 160
+  },
+  {
+   "era": 3,
+   "name": "Age of Musket",
+   "start_year": 1575,
+   "third": 420
+  }
+ ],
+ "map_seed": 1480,
+ "territory_radius": 8,
+ "garrison_hp": 6,
+ "garrison_men": 100,
+ "men": 1000
+}
