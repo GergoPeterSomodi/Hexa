@@ -56,8 +56,8 @@ LUCK_FORBIDDEN = [
 ]
 GODOT3_FORBIDDEN = [
     (r"\byield\b", "yield is Godot 3 (use await, but not in core/)"),
-    (r"\bexport\s+var\b|\bexport\s*\(", "export var / export(...) is Godot 3 (use @export)"),
-    (r"\bonready\s+var\b", "onready var is Godot 3 (use @onready)"),
+    (r"(?<!@)\bexport\s+var\b|(?<!@)\bexport\s*\(", "export var / export(...) is Godot 3 (use @export)"),
+    (r"(?<!@)\bonready\s+var\b", "onready var is Godot 3 (use @onready)"),
     (r"\bsetget\b", "setget is Godot 3 (use a setter block)"),
     (r"\.instance\s*\(", "instance() is Godot 3 (use instantiate())"),
     (r"\.connect\s*\(\s*[\"']", "string connect() is Godot 3 (use signal.connect(callable))"),
