@@ -9,8 +9,10 @@ import math
 import unittest
 
 from hexa.campaign.battleview import odds_view, siege_view
+from unittest import mock
+
 from hexa.hexgrid import neighbors
-from hexa.campaign.data import GARRISON_HP, SIEGE_HUNGER
+from hexa.campaign.data import GARRISON_HP, SIEGE_HUNGER, WAGON
 from hexa.campaign.state import War
 from hexa.campaign import saves
 from hexa.campaign.systems import economy as ecosys, war
@@ -207,6 +209,27 @@ class StormTest(unittest.TestCase):
         self.assertIsNotNone(world.battle_at(prov.pos))
 
 
+    def test_the_cut_lasts_for_the_storm_battle_only_and_the_losses_come_off_the_uncut_garrison(self):
+        from hexa.campaign.systems import battle as battlesys
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 3)
+        stack = place(world, "infantry", 1, "POR", prov.pos, 4)
+        world.sieges()
+        world.sieges()
+        uncut, progress = prov.garrison, prov.siege
+        self.assertTrue(world.storm_group(stack, prov.pos))
+        self.assertLess(prov.garrison, uncut, "the storm faces the cut garrison")
+        cut = prov.garrison
+        battlesys.battle_season(world)
+        if prov.controller == "CAS":
+            self.assertGreaterEqual(prov.garrison, uncut - (uncut - cut) - 0)
+            self.assertLessEqual(prov.garrison, uncut)
+            self.assertEqual(prov.siege, progress, "the meter keeps its progress: the cut is not taken twice")
+            self.assertTrue(all(b.storm_from == 0 for b in world.battles), "no cut left on a battle")
+        self.assertEqual(campaign_problems(world), [])
+
+
 class OutputAndNameTest(unittest.TestCase):
     def test_a_besieged_place_produces_nothing(self):
         world = fresh("POR")
@@ -263,7 +286,7 @@ class SiegeViewTest(unittest.TestCase):
         world.units = []
         prov = target(world, 3)
         stack = place(world, "infantry", 1, "POR", stand(world, prov.pos), 3)
-        world.player = "POR"
+        world.player, world.visible = "POR", {prov.pos}      # the castle is seen: its garrison is not hidden
         view = odds_view(world, stack, prov.pos, "POR")
         self.assertIsNotNone(view["besiege"])
         self.assertEqual(view["besiege"]["seasons"], 7)
@@ -272,6 +295,226 @@ class SiegeViewTest(unittest.TestCase):
         self.assertIsNotNone(view["besiege"]["war_left"])
         self.assertFalse(view["besiege"]["war_ends_first"])
         world.player = None
+
+
+class PeaceLiftTest(unittest.TestCase):
+    def test_peace_with_a_third_country_keeps_a_siege_between_others(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        world.wars.append(War("POR", "FRA", world.turn))
+        place(world, "infantry", 1, "POR", prov.pos, 3)
+        world.sieges()
+        progress, lifted = prov.siege, []
+        world.bus.tap(lambda e: lifted.append(e) if e.kind == "siege_lifted" else None)
+        world.peace("POR", "FRA")
+        self.assertEqual((prov.besieger, prov.siege), ("POR", progress))
+        self.assertEqual(lifted, [])
+
+    def test_peace_between_besieger_and_defender_lifts_it_with_its_need(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        place(world, "infantry", 1, "POR", prov.pos, 3)
+        world.sieges()
+        need, lifted = war.siege_need(world, prov), []
+        world.bus.tap(lambda e: lifted.append(e) if e.kind == "siege_lifted" else None)
+        world.peace("POR", "CAS")
+        self.assertEqual(prov.besieger, "")
+        self.assertEqual(lifted[0].get("why"), "peace")
+        self.assertEqual(lifted[0].get("need"), need)
+
+    def test_a_place_handed_back_by_the_peace_has_no_lift_event(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        prov.controller = "POR"                     # POR holds the castle; CAS besieges it back
+        prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "CAS", 3, 2, "Siege of X, 1500"
+        lifted = []
+        world.bus.tap(lambda e: lifted.append(e) if e.kind == "siege_lifted" else None)
+        world.peace("POR", "CAS")
+        self.assertEqual(lifted, [], "a place the peace handed back reports no lift")
+        self.assertEqual((prov.besieger, prov.siege), ("", 0))
+
+
+class StormRulesTest(unittest.TestCase):
+    def test_a_storm_needs_a_war_with_the_defender(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        stack = place(world, "infantry", 1, "POR", prov.pos, 4)
+        world.sieges()
+        world.sieges()
+        world.wars = []
+        garrison = prov.garrison
+        self.assertEqual(world.storm_check(stack, prov.pos)[1], "Not at war")
+        self.assertFalse(world.storm(stack, prov.pos))
+        self.assertEqual(prov.garrison, garrison)
+
+    def test_a_storm_is_refused_while_another_country_besieges_the_place(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        world.wars.append(War("FRA", "CAS", world.turn))
+        world.wars.append(War("POR", "FRA", world.turn))
+        place(world, "infantry", 1, "FRA", prov.pos, 3)
+        world.sieges()
+        self.assertEqual(prov.besieger, "FRA")
+        stack = place(world, "infantry", 1, "POR", stand(world, prov.pos), 4)
+        self.assertEqual(world.storm_check(stack, prov.pos), (False, "Another army holds the hex"))
+
+    def test_only_the_besiegers_own_siege_cuts_the_garrison(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 3)
+        place(world, "infantry", 1, "POR", prov.pos, 3)
+        world.sieges()
+        world.sieges()
+        self.assertLess(war.storm_garrison(world, prov, "POR"), prov.garrison)
+        self.assertEqual(war.storm_garrison(world, prov, "FRA"), prov.garrison)
+        self.assertFalse(war.storm_defence(world, prov.pos, "CAS", "FRA")[1]["cut"])
+
+    def test_a_storm_without_an_assault_restores_the_garrison(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 3)
+        stack = place(world, "infantry", 1, "POR", prov.pos, 4)
+        world.sieges()
+        world.sieges()
+        uncut = prov.garrison
+        with mock.patch.object(world, "engage", return_value=True):
+            self.assertTrue(world.storm(stack, prov.pos))
+        self.assertEqual(prov.garrison, uncut, "no assault battle: the garrison is not cut")
+
+
+class AttackOptionsTest(unittest.TestCase):
+    def test_a_castle_besiege_refuses_is_not_offered_but_storm_stays_open(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        stack = place(world, "infantry", 1, "POR", stand(world, prov.pos), 1)
+        for u in stack:
+            u.moves_left = 5
+        self.assertNotIn(prov.pos, world.attack_options_group(stack))
+        before = [u.pos for u in stack]
+        self.assertFalse(world.attack_group(stack, prov.pos))
+        self.assertEqual([u.pos for u in stack], before)
+        self.assertTrue(world.storm_check(stack, prov.pos)[0])
+        self.assertTrue(world.storm_group(stack, prov.pos))
+        self.assertIsNotNone(world.battle_at(prov.pos))
+
+    def test_a_castle_the_stack_can_besiege_is_offered(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        stack = place(world, "infantry", 1, "POR", stand(world, prov.pos), 3)
+        for u in stack:
+            u.moves_left = 5
+        self.assertIn(prov.pos, world.attack_options_group(stack))
+
+
+class BesiegeOverrunTest(unittest.TestCase):
+    def test_a_siege_overruns_the_enemy_civilians_on_the_castle(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        wagon = world.add_unit(WAGON, "CAS", prov.pos)
+        stack = place(world, "infantry", 1, "POR", stand(world, prov.pos), 4)
+        for u in stack:
+            u.moves_left = 6
+        self.assertTrue(world.besiege_target(stack, prov.pos))
+        self.assertTrue(world.attack_group(stack, prov.pos))
+        self.assertNotIn(wagon, world.units)
+        self.assertEqual([u for u in world.units_at(prov.pos) if u.owner == "CAS"], [])
+        world.sieges()
+        self.assertEqual(prov.besieger, "POR")
+
+
+class ArrivalFeedTest(unittest.TestCase):
+    def test_a_stack_that_arrives_on_a_castle_is_fed_from_its_arrival(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        stack = place(world, "infantry", 1, "POR", prov.pos, 3)
+        self.assertEqual(world.supply_state(stack)[0], "cut off")
+        hp = [u.hp for u in stack]
+        world.logistics()
+        self.assertEqual([u.hp for u in stack], hp)
+        self.assertTrue(all(u.supplied for u in stack))
+
+    def test_a_stack_too_small_to_besiege_is_not_fed(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        stack = place(world, "infantry", 1, "POR", prov.pos, 1)
+        hp = [u.hp for u in stack]
+        world.logistics()
+        self.assertLess([u.hp for u in stack][0], hp[0])
+
+
+class SiegeSecrecyTest(unittest.TestCase):
+    def test_a_hidden_siege_shows_no_names_and_no_numbers(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 3)
+        place(world, "infantry", 1, "POR", prov.pos, 3)
+        world.sieges()
+        world.player, world.visible = "FRA", set()
+        view = siege_view(world, prov.pos, viewer="FRA")
+        self.assertEqual(view["access"], "hidden")
+        for key in ("name", "besieger", "besieger_name", "defender", "defender_name", "place", "progress", "need",
+                    "rate", "falls_in", "seasons"):
+            self.assertIsNone(view[key], key)
+        world.player = None
+
+    def test_a_seen_siege_keeps_its_meter_exact(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 3)
+        place(world, "infantry", 1, "POR", prov.pos, 3)
+        world.sieges()
+        world.player, world.visible = "FRA", {prov.pos}
+        view = siege_view(world, prov.pos, viewer="FRA")
+        self.assertEqual(view["access"], "seen")
+        self.assertEqual((view["progress"], view["name"]), (prov.siege, prov.siege_name))
+        world.player = None
+
+    def test_a_hidden_garrison_gives_no_garrison_or_besiege_entry(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 3)
+        stack = place(world, "infantry", 1, "POR", stand(world, prov.pos), 3)
+        world.player, world.visible = "FRA", set()
+        view = odds_view(world, stack, prov.pos, "POR")
+        self.assertIsNone(view["defence"]["garrison"])
+        self.assertIsNone(view["besiege"])
+        self.assertIsNone(view["defence"]["men"])
+        self.assertIsNone(view["defender_name"])
+        world.player = None
+
+    def test_a_seen_garrison_is_counted_in_rounded_men(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 3)
+        stack = place(world, "infantry", 1, "POR", stand(world, prov.pos), 3)
+        world.player, world.visible = "POR", {prov.pos}
+        view = odds_view(world, stack, prov.pos, "POR")
+        self.assertEqual(view["defence"]["access"], "seen")
+        self.assertEqual(view["defence"]["men"] % 100, 0)
+        world.player = None
+
+    def test_siege_view_without_relief_skips_the_search(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 2)
+        place(world, "infantry", 1, "POR", prov.pos, 3)
+        world.sieges()
+        place(world, "infantry", 1, "CAS", stand(world, prov.pos), 2)
+        with_relief = siege_view(world, prov.pos, viewer=None)
+        self.assertTrue(with_relief["relief"])
+        without = siege_view(world, prov.pos, viewer=None, relief=False)
+        self.assertEqual(without["relief"], ())
+        self.assertEqual(without["falls_in"], with_relief["falls_in"])
 
 
 class SaveTest(TempHome):

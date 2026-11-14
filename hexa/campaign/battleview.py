@@ -34,13 +34,15 @@ Fog (decided in PR 6a; the panel and the log may say so):
   numbers cannot be rounded).
 - hidden: anything else. The view keeps every key, with pos, name, year, sides, side, log, dice and numbers empty or None.
 The odds card uses the same rule for each side: the attacker's own stack is exact to its owner; an enemy is exact to
-itself, rounded when its hex is seen, and None when hidden (then no ratio).
+itself, rounded when its hex is seen, and None when hidden (then no ratio). When the defence is hidden the garrison
+(``defence["garrison"]``) and the Besiege entry (``besiege``) are None too; a seen garrison's men are rounded, and the
+Besiege reason's men with them.
 
 odds_view keys: ``ok`` and ``reason`` (systems/battle.engage_check), ``attacker``, ``defender`` (tags or None), ``battle``
 (a battle is on the target), ``name``, ``attack`` and ``defence`` ({access, men, morale, strength}; defence also has
 ``terrain``, ``castle``, ``assault``, ``general``), and ``ratio`` (attack strength over defence strength, or None). The
-``attack`` also has ``general``. ``factor`` is the defender's ground factor (odds_factor: GROUND_ODDS, or CASTLE_ODDS in
-an assault). ``word`` is the card's one word: "Unknown" when the enemy is hidden or there is no ratio, else
+``attack`` also has ``general``. ``factor`` is the defender's ground factor (odds_factor: GROUND_ODDS, or 1.0 in an assault, where
+the garrison's weight is in its men). ``word`` is the card's one word: "Unknown" when the enemy is hidden or there is no ratio, else
 odds_word(attack / defence / factor) (unrounded), so ``ratio`` itself is the plains reading. ``crossing`` and ``uphill`` say whether the attack crosses a pass or comes up from
 lower ground (the battle's own, or the ones an attack would have). ``place`` is the hex's place name, ``attacker_name``
 and ``defender_name`` the countries' names (``defender_name`` None when the enemy is hidden). The strength is
@@ -54,9 +56,10 @@ from .battlelog import describe
 from .data import DICE, ELEVATION, GARRISON_MEN, GROUND_ODDS, ODDS_WORDS, SIEGE_HUNGER, START_YEAR, TERRAIN
 from .state import Battle
 from .systems import battle as battlesys, combat, terrain as terrainsys, war as warsys
-from ..hexgrid import neighbors
+from ..hexgrid import distance, neighbors
 
 ROUND_MEN = 100              # a seen (not exact) number of men is rounded to this
+RELIEF_STACKS = 4            # the relief search of siege_view looks at the defender's four nearest stacks (cheap redraws)
 ROUND_MORALE = 0.05          # and a morale to this share
 LANES = ("left", "centre", "right")
 _VIEWS = weakref.WeakKeyDictionary()    # world -> (world.version, {key: (object, view)}); never saved
@@ -319,7 +322,7 @@ def odds_word(ratio):
 
 def odds_factor(terrain, castle, assault):
     """The factor the odds card divides the attack ratio by for the defender's hex: 1.0 in an assault (the garrison fights
-    and the ground does not count; the garrison's own weight is in the men, see _storm_defence), else the ground's
+    and the ground does not count; the garrison's own weight is in the men, see war.storm_defence), else the ground's
     (GROUND_ODDS). 1.0 for plains and for a ground not measured. ``castle`` is kept for the callers' shape."""
     if assault:
         return 1.0
@@ -392,7 +395,7 @@ def _figures(raw, access):
             "strength": _men_out(strength, access)}
 
 
-def _besiege(world, group, target_pos, owner, stand):
+def _besiege(world, group, target_pos, owner, stand, defence_access):
     """The Besiege entry of the odds card (0.2.2, design 4.6): None when the place is not a garrisoned castle with no field
     army on it. Else: ``ok`` and ``reason`` (the men rule included), ``seasons`` (falls in about N seasons, the arrival
     season counted; None when the stack is too small), ``need``, ``rate``, ``stores`` (the garrison's seasons of stores),
@@ -408,6 +411,9 @@ def _besiege(world, group, target_pos, owner, stand):
     held = prov.besieger == owner
     progress, turns = (prov.siege, prov.siege_turns) if held else (0, 0)
     terms = warsys.siege_terms(world, prov, owner, units)
+    if not ok and not terms["ok"] and reason.startswith("Too few men"):      # the garrison's men as the viewer has them
+        reason = (f"Too few men to hold a siege (need {_men_out(terms['garrison_men'], defence_access):,}, "
+                  f"you have {terms['men']:,})")
     seasons = warsys.siege_forecast(world, prov, owner, units, progress, turns)
     war = next((w for w in world.wars if {w.a, w.b} == {owner, prov.controller}), None)
     left = None if war is None else warsys.war_limit(world, war.a, war.b) - (world.turn - war.start) + 1
@@ -432,8 +438,10 @@ def _odds(world, group, target_pos, viewer, owner, stand):
         enemy is not None and prov is not None and prov.controller == enemy and prov.castle and prov.garrison > 0)
     garrison = None
     if battle is None and assault and enemy is not None:
-        defence_men, garrison = warsys.storm_defence(world, target_pos, enemy)   # a storm: men against men (0.2.2)
+        defence_men, garrison = warsys.storm_defence(world, target_pos, enemy, owner)   # a storm: men against men (0.2.2)
         raw_defence = (defence_men, defence_men)
+        if defence_access == "hidden":
+            garrison = None                                              # the garrison is the defender's secret
         if raw_attack is not None:
             raw_attack = (raw_attack[0], raw_attack[0])
     attack = _figures(raw_attack, attack_access)
@@ -466,7 +474,9 @@ def _odds(world, group, target_pos, viewer, owner, stand):
             "attacker_name": _country_name(world, owner) if owner is not None else None,
             "defender_name": _country_name(world, enemy) if enemy is not None and defence_access != "hidden" else None,
             "ok": ok, "reason": reason, "attack": attack, "defence": defence, "ratio": ratio, "factor": factor,
-            "word": word, "besiege": None if battle is not None else _besiege(world, group, target_pos, owner, stand),
+            "word": word,
+            "besiege": None if battle is not None or defence_access == "hidden"
+            else _besiege(world, group, target_pos, owner, stand, defence_access),
             "crossing": bool(crossing), "uphill": bool(uphill)}
 
 
@@ -486,29 +496,34 @@ SIEGE_KEYS = ("access", "pos", "name", "besieger", "besieger_name", "defender", 
               "need", "rate", "hunger", "seasons", "stores_left", "starving", "falls_in", "relief")
 
 
-def siege_view(world, pos, viewer=None):
+def siege_view(world, pos, viewer=None, relief=True):
     """The one read-only view of a running siege (the badge, the province panel, the log and the task flag read it): the
     meter (``progress`` of ``need``), ``rate`` a season, ``hunger`` the points the next season adds past the stores, ``seasons``
     held, ``stores_left`` (seasons of food the garrison has, 0 when it starves), ``starving``, ``falls_in`` (seasons, from
     now, the place falls at this rate; None when the besieger is too small), and ``relief``: for the defender (or the whole
     picture), its armies that can reach the hex, each {pos, men, seasons} nearest first. None when no siege runs there.
-    The fog rule of the battle view (_access): exact to a side or to no player, hidden otherwise (numbers None)."""
+    The fog rule of the battle view (_access): exact to a side or to no player; seen keeps the meter exact and rounds the
+    men (the garrison's); hidden gives None for the names, the place and every number. ``relief=False`` skips the relief
+    search (the badge and the task flag need only falls_in): ``relief`` is then ()."""
     prov = world.provinces.get(tuple(pos))
     if prov is None or not prov.besieger:
         return None
     access = _access(world, prov.pos, (prov.besieger, prov.controller), viewer)
-    key = ("siege", prov.pos, viewer, access, world.turn)
-    return _memo(world, key, prov, lambda: _siege(world, prov, viewer, access))
+    key = ("siege", prov.pos, viewer, access, world.turn, relief)
+    return _memo(world, key, prov, lambda: _siege(world, prov, viewer, access, relief))
 
 
-def _siege(world, prov, viewer, access):
+def _siege(world, prov, viewer, access, relief=True):
     tag, defender = prov.besieger, prov.controller
-    base = {"access": access, "pos": prov.pos, "name": prov.siege_name, "besieger": tag,
-            "besieger_name": _country_name(world, tag), "defender": defender,
-            "defender_name": _country_name(world, defender), "place": world.place(prov), "progress": None,
+    hidden = access == "hidden"
+    base = {"access": access, "pos": prov.pos, "name": None if hidden else prov.siege_name,
+            "besieger": None if hidden else tag, "besieger_name": None if hidden else _country_name(world, tag),
+            "defender": None if hidden else defender,
+            "defender_name": None if hidden else _country_name(world, defender),
+            "place": None if hidden else world.place(prov), "progress": None,
             "need": None, "rate": None, "hunger": None, "seasons": None, "stores_left": None, "starving": None,
             "falls_in": None, "relief": ()}
-    if access == "hidden":
+    if hidden:
         return base
     units = [u for u in world.units_at(prov.pos) if u.owner == tag]
     terms = warsys.siege_terms(world, prov, tag, units)
@@ -517,21 +532,23 @@ def _siege(world, prov, viewer, access):
                 hunger=SIEGE_HUNGER if prov.siege_turns >= stores else 0, seasons=prov.siege_turns,
                 stores_left=max(0, stores - prov.siege_turns), starving=prov.siege_turns >= stores,
                 falls_in=warsys.siege_forecast(world, prov, tag, units, prov.siege, prov.siege_turns))
-    if viewer is None or viewer == defender:
+    if relief and (viewer is None or viewer == defender):
         base["relief"] = _relief(world, prov, defender)
     return base
 
 
 def _relief(world, prov, defender):
     """The defender's armies that can reach the besieged hex: each {pos, men, seasons} with seasons the first season in which
-    it can stand beside the hex (1 is this season's moves), nearest first, at most four seasons away."""
+    it can stand beside the hex (1 is this season's moves), nearest first, at most four seasons away. Only the
+    RELIEF_STACKS nearest stacks (by hex distance) are looked at."""
     stands = [p for p in neighbors(prov.pos) if p in world.provinces and world.is_land(p)]
     stacks = {}
     for unit in world.units:
         if unit.owner == defender and unit.kind.war and unit.carrier is None and unit.pos != prov.pos:
             stacks.setdefault(unit.pos, []).append(unit)
+    nearest = sorted(stacks.items(), key=lambda item: (distance(item[0], prov.pos), item[0]))[:RELIEF_STACKS]
     found = []
-    for pos, group in sorted(stacks.items()):
+    for pos, group in sorted(nearest):
         men = sum(u.men for u in group)
         for seasons in range(1, 5):
             if any(world.path_to(group, stand, seasons=seasons) for stand in stands):

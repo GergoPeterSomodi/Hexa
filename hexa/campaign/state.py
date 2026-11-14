@@ -247,6 +247,8 @@ class Battle:
     broken: dict = field(default_factory=dict)     # tag -> sorted lanes that are empty with no reserve to fill them (day start)
     held: dict = field(default_factory=dict)       # tag -> lanes that have had a regiment in them; only those can break
     uphill: bool = False          # the attacker stood on lower ground: UPHILL_PENALTY for the whole battle (spec 3.4)
+    storm_from: int = 0           # a storm's battle: the garrison's hit points before the storm cut (0: no cut; 0.2.2)
+    storm_cut: int = 0            # a storm's battle: the garrison's hit points the storm faced
 
 
 def fill_defaults(obj):

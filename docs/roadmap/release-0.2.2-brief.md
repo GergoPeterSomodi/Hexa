@@ -10,7 +10,8 @@ relieves the place or lets it fall, and the map shows it. This answers the owner
 captured so quickly ... each turn the siege takes some progress based on attack and defence"). It is also the first new war
 *decision* since battles: 0.2.1 made war followable, 0.2.2 makes it a choice, on both sides of the wall:
 - **The attacker** chooses each season: keep starving the place (slow, no losses) or storm it now (fast, bloody; cheaper the
-  longer the siege has run, dearer if a relief army is coming).
+  longer the siege has run, dearer if a relief army is coming). The 2-season floor is for sieges: a Storm on arrival can
+  still take a place at once, at its cost (Storm is the fast, costly choice; Besiege the slow, cheap one).
 - **The defender** chooses: send the relief army and fight for the place, or let it fall and spend the army elsewhere.
 
 Principles it is for (docs/research/fun-principles.md v2): **2** trade-offs (besiege slowly and cheaply, or storm fast and
@@ -72,8 +73,8 @@ marked **look** change how the game feels most; they are the ones worth a minute
 ## Done when
 
 - No open bug issue; the full suite, soak, save-compat and perf pass; AI time per season up by at most 10%.
-- **Pace:** every cell of the seasons-to-take table within 1 season in the engine; no place falls in under 2 seasons in any
-  test or soak game; 1 regiment cannot take a castle 2 or 3.
+- **Pace:** every cell of the seasons-to-take table within 1 season in the engine; no place falls to a siege in under 2 seasons in any
+  test or soak game (a Storm on arrival can take a place at once, at its cost); 1 regiment cannot take a castle 2 or 3.
 - **Odds card:** each garrison test pair reads its word's band (one band low at most, never too high); a lone level 3
   garrison against 1.7 to 3.3 times its men no longer reads "Hopeless".
 - **A late storm is cheaper:** in seeded storm scenarios (40 seeds), storming at half the meter loses fewer men (median)
@@ -86,6 +87,18 @@ marked **look** change how the game feels most; they are the ones worth a minute
 - **Owner playtest:** besiege a level 2 or 3 castle and follow its seasons, its hunger and a relief battle on the badge and
   in the log without help; storm a place late in a siege and see it cost less; as the defender, see the task flag line and
   the relief line, and choose to relieve or let go.
+
+## Measured in the build (2026-11-14)
+
+All-AI, Europe 1480 and random worlds 7, 11 and 21, 240 seasons each, pooled:
+- Provinces changing hands: at least 17 per decade in every world (met). Wars moving no province: 12% (met). Wars ended by
+  the length limit: 29% (met pooled; one world 40%). AI castle 2/3 captures after 2+ seasons of siege: 61% (met; was 1 in 21
+  before the AI fix). AI time per season unchanged (met).
+- **Accepted misses:** relief battles at AI castle 2/3 sieges 10% (target 20%): with the 2-season floor a defender has about
+  one season to arrive and is often further away; a gather rule is built and works when it can. The largest country's land
+  share at 1600 is 14.9% against 14.7% (one seed, within noise; 15.3% before the AI fix). Backlog: a longer relief reach or
+  a defender's stack inside its own castle, after the owner has played sieges.
+- `WAR_LENGTH_AI` stays 16: 20 was measured and was worse on every missed item.
 
 ## Owner's decisions (2026-11-13)
 

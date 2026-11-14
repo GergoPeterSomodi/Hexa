@@ -507,7 +507,7 @@ class WarTest(unittest.TestCase):
     def test_split_stack_cannot_attack_a_hex_a_friendly_stack_holds(self):
         w = self.w
         target, home = self.held_castle()
-        attacker = place(w, troop("infantry", 1), "POR", home, 1)
+        attacker = place(w, troop("infantry", 1), "POR", home, 3)     # three regiments: the castle can be besieged
         self.assertIn(target.pos, w.attack_options_group(attacker), "the castle is a target while we are outside")
         place(w, troop("infantry", 1), "POR", target.pos, 1)
         self.assertNotIn(target.pos, w.attack_options_group(attacker))
@@ -688,6 +688,8 @@ class SupplyTest(unittest.TestCase):
     def test_ai_stack_without_moves_still_forages_at_season_end(self):
         w = self.w
         stack, deep = self._foreign_stack("CAS", "POR")        # POR is the player, CAS is a computer country
+        deep.castle, deep.garrison = 0, 0                      # an open place: a garrisoned castle is besieged, fed free
+        w.changed(ownership=True)
         people = deep.peasants
         w.logistics()
         self.assertEqual([u.hp for u in stack], [stack[0].kind.hp] * 2, "foraged, so no cut-off attrition")

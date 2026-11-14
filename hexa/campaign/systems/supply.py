@@ -109,6 +109,25 @@ def forage(world, group, tag=None, end_of_round=False):
     return True
 
 
+def _besieging(world, prov, tag, group):
+    """Whether a stack besieges the place it stands on, the arrival season counted (0.2.2): the holder of its meter, or a
+    stack alone on an enemy place with men enough, which war.sieges starts this season. A stack that arrived on the place
+    is fed from its arrival, not from the season after."""
+    if prov is None:
+        return False
+    if prov.besieger:
+        return prov.besieger == tag
+    if not prov.castle or prov.garrison <= 0:          # the arrival rule is for a garrisoned castle (an open place: as before)
+        return False
+    if prov.owner is None or prov.controller in (None, tag) or not world.at_war(tag, prov.controller):
+        return False
+    if world.battle_at(prov.pos) is not None or world.retreated.get(prov.pos) == world.turn:
+        return False
+    if any(u.owner != tag and u.kind.war for u in world.units_at(prov.pos)):
+        return False
+    return bool(world.siege_terms(prov, tag, group)["ok"])
+
+
 def logistics(world):
     """Once per season: feed every stack, or make it suffer attrition."""
     stacks = {}
@@ -121,7 +140,7 @@ def logistics(world):
         if not troops:
             continue
         prov = world.provinces.get(pos)
-        besieging = bool(prov and prov.besieger == tag)     # a besieger forages the place it holds for free (0.2.2)
+        besieging = _besieging(world, prov, tag, group)     # a besieger forages the place it holds for free (0.2.2)
         if tag != world.player and prov and prov.owner != tag and not besieging and not world.in_supply(tag, pos) and \
                 not any(u.kind is WAGON and u.supplies > 0 for u in group):
             world.forage(group, end_of_round=True)   # computer armies forage when they must, moves or not

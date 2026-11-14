@@ -253,6 +253,9 @@ def _overrun(world, group, pos):
     world.changed()
 
 
+overrun = _overrun          # public for war.besiege (a siege overruns the enemy's civilians the same way)
+
+
 def join(world, battle, group):
     """A stack already on the battle's hex joins its side's reserve (spec 3.1). Only its war units that are not yet in the
     battle count in ``men0``; every unit of the stack becomes a member. The joiners fight from the first day a gap opens
@@ -566,6 +569,10 @@ def _end_battle(world, battle, how, loser=None, cause=None):
     if loser is not None and battle.days > 0:
         _experience(world, fighters, winner, loser)
     _settle_wounded(world, battle, fighters)
+    if battle.storm_from:                    # a storm's cut: the garrison keeps its uncut strength minus the men the storm took
+        prov = world.provinces[pos]
+        lost = max(0, battle.storm_cut - prov.garrison)
+        prov.garrison = max(0, battle.storm_from - lost)
     storm = _storm(world, battle, loser, how, had_field)
     if battle in world.battles:
         world.battles.remove(battle)

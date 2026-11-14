@@ -269,12 +269,13 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   front morale (the break-test measure), strength, lanes, reserve, back line, stance, orders with their reasons, the last day's dice,
   the log through `battlelog.describe`. The fog rule (documented in the module): exact to a side or to no player, rounded when the
   player sees the hex, hidden otherwise; an ended battle has no view. `odds_view(world, group, target_pos, viewer)` gives the odds
-  card's inputs, the plains ratio (`ratio`), the defender's `factor` (`odds_factor`: `data.GROUND_ODDS` by terrain, `CASTLE_ODDS`
-  by level in an assault) and the one word (`odds_word(ratio / factor)`). Both are cached per `world.version` in a module-level `WeakKeyDictionary`, never
+  card's inputs, the plains ratio (`ratio`), the defender's `factor` (`odds_factor`: `data.GROUND_ODDS` by terrain, 1.0
+  in an assault, where the garrison's weight is in its men) and the one word (`odds_word(ratio / factor)`). Both are cached per `world.version` in a module-level `WeakKeyDictionary`, never
   saved. The panel reads only these views, never `Battle` or `combat` directly.
 - **War** (`systems/war.py`; the battle system builds on it): `at_war`, `enemies`, `war_check`/`declare_war`, `war_score`, `peace`
   (and `free_spot_near`), `peace_offer`, `attack_options`/`attack` and their `_group` forms (with `targets`; an option means `engage_check` allows the
-  attack from that stand; there is no bombardment), `lose` (units off the map, a `unit_lost` event each), `kill`
+  attack from that stand, and for a garrisoned castle `besiege_check` too (Storm is `storm_check`/`storm_group`, not an option);
+  there is no bombardment), `lose` (units off the map, a `unit_lost` event each), `kill`
   (`lose` for one unit and its cargo; `_kill` is the old name the tests use), `sieges` (the season's step) and `check_alive`. Facades are
   plain class attributes (`at_war = war.at_war`); `at_war` and `enemies` are called from every supply and path search. The bodies and the
   bus events (`war_declared`, `peace_made`, `province_captured`, `siege_progress`, `unit_lost`) are emitted here; the battle events come from battle.py.
