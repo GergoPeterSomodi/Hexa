@@ -211,6 +211,18 @@ earlier builds. Keep Python 0.2.2 open beside it.
 8. Resize the window and play at your usual size. Does anything break?
 9. Read the map report (one page) and the speed table in the release notes. Anything surprising?
 
+## Scope change (2026-11-14, owner): the map is built in the new look
+
+After seeing the close-up mockup (`docs/design/godot-look/07_closeup_view.png`, `07b_closeup_compare.png`), the owner
+asked "why don't you build this close up instead of the previous version?" 0.3.0's map is now drawn in direction A
+instead of the baked v0.2.2 tiles: ground that blends between hexes, three mountain types (snowy peaks, rocky ranges,
+rolling hills, the ranges kept light so pieces stand out), drawn ridge crests and passes, forests and fields spread across
+hexes, towns and tile upgrades by level, at every zoom from the far map to the close-up. The map data stays as built
+(checked against Python), except that **the Po valley around Milan and Turin becomes plains and farmland** (the data
+marked it as mountains). Defaults taken for the owner (overrule any): the Po fix, the lighter ranges, the strength badge
+right of the army token. About 3 to 5 weeks more for 0.3.0. The baked v0.2.2 tiles stay as the fallback until the new art
+covers every terrain kind.
+
 ## Owner's decisions (2026-11-14)
 
 1. **One Europe for every game:** Godot builds Europe once from a fixed seed; the owner approves it; every game starts on it.
