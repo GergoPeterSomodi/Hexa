@@ -165,7 +165,8 @@ jobs:
       - name: Set up Godot
         uses: ./.github/actions/setup-godot
       - name: Import the project
-        run: "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
+        run: |
+          "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
       - name: Export the Windows Desktop preset (release, 64-bit, data packed into the exe)
         run: |
           set -uo pipefail
