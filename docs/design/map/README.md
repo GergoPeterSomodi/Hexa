@@ -1,5 +1,13 @@
 # The map: one design (2026-11-14)
 
+> **Owner's decisions (2026-11-14):** Q1 hex size **about 28 km** (prototype region now; Europe confirmed after measuring
+> drawing and AI path cost). Q2 rivers **along hex edges, but some rivers run through cities in some cases**: a short
+> authored list of river cities (e.g. Florence on the Arno, Paris on the Seine, Prague on the Vltava, Rome on the Tiber)
+> where the river passes through the city hex with the bridge inside the city; everywhere else rivers stay on edges.
+> Q3 heights from **real elevation data** (a free dataset after a licence check; nothing is downloaded without the
+> owner's go), with only passes, lakes, tributaries, notable places and 1480 fixes written by hand. Q4 **no Kenney art**
+> in the new map: our own code-drawn ground. Defaults D1 to D11 stand (not overruled).
+
 **Status: for the owner to decide. Nothing is built.** This page joins the five map threads into one design. Read
 this page first; the thread docs (`01` to `05`) hold the detail and the numbers behind it.
 
