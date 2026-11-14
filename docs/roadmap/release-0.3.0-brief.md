@@ -1,8 +1,7 @@
-# Release 0.3.0 brief: READY TO LOCK
+# Release 0.3.0 brief: LOCKED
 
-**Not locked yet.** It is locked by the owner's go and the two answers at the end. After that the scope is frozen: new
-ideas go to the backlog, bugs are the only exception. The plan behind it is `docs/roadmap/godot-port-plan.md` (the map
-builder and its check are in B5, the layout in B2, the code rules in B3).
+**LOCKED on 2026-11-14.** The owner answered both questions (below) and gave the go to install Godot. Scope is
+frozen: new ideas go to the backlog, bugs are the only exception. The plan behind it is `docs/roadmap/godot-port-plan.md`.
 
 Built on the owner's answers of 2026-11-14: the game moves to Godot; only Age of Discovery on the Europe map; Windows
 only; GDScript; the Europe map is **rebuilt in Godot**; the screens stay today's; and *"Build the map first and we can
@@ -212,19 +211,13 @@ earlier builds. Keep Python 0.2.2 open beside it.
 8. Resize the window and play at your usual size. Does anything break?
 9. Read the map report (one page) and the speed table in the release notes. Anything surprising?
 
-## Owner decisions left (two)
+## Owner's decisions (2026-11-14)
 
-**1. One Europe for every game, or a new roll each game?**
-- **(Recommended) One Europe.** The builder makes it once, you approve it, and every game starts on that map, as today.
-  Bugs can be repeated, and the later balance work is measured on a map that stands still.
-- A new roll each game: the same coasts and cities, but the forests, hills and small towns differ every time. More
-  variety, but nobody has reviewed the map you are playing, and each game starts with a wait of some seconds.
-  It can be added later without rework.
-
-**2. How finished should the map look up close in this first build?**
-- **(Recommended) Tiles, rivers, roads, towns, castles and names now; the ground blends, the drawn ridge crests and the
-  close-up landscape (trees, hills, winter) in 0.3.1 and 0.3.5, as planned.** The release stays at 6 to 8 weeks. Up
-  close the map will look plainer than Python's for one or two releases; from the middle zooms outward it should look
-  the same.
-- Ground blends and ridge crests already in 0.3.0. The close-up look is nearly today's from the first build, for
-  about 1 to 1.5 weeks more. The close-up landscape still comes in 0.3.5.
+1. **One Europe for every game:** Godot builds Europe once from a fixed seed; the owner approves it; every game starts on it.
+2. **Basic map look now, polish later:** tiles, rivers, roads, towns, castles and names in 0.3.0; ground blends, drawn ridge
+   crests and the close-up landscape later.
+3. **Godot:** the owner approved downloading the official Godot 4 stable for Windows (64-bit zip) onto the build machine.
+4. **The game elements are redesigned for Godot** (owner, same day, asked what "start designing the game elements" meant):
+   while 0.3.0 is built, the design team redesigns units, towns, castles, panels and the HUD for the Godot version, with
+   mockups first for the owner. This replaces "today's screens as they are" for the later releases; the port plan's
+   0.3.4-0.3.5 are re-planned once those designs are approved. 0.3.0's map look is unaffected.
