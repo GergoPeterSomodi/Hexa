@@ -87,6 +87,18 @@ marked **look** change how the game feels most; they are the ones worth a minute
   in the log without help; storm a place late in a siege and see it cost less; as the defender, see the task flag line and
   the relief line, and choose to relieve or let go.
 
+## Measured in the build (2026-11-14)
+
+All-AI, Europe 1480 and random worlds 7, 11 and 21, 240 seasons each, pooled:
+- Provinces changing hands: at least 17 per decade in every world (met). Wars moving no province: 12% (met). Wars ended by
+  the length limit: 29% (met pooled; one world 40%). AI castle 2/3 captures after 2+ seasons of siege: 61% (met; was 1 in 21
+  before the AI fix). AI time per season unchanged (met).
+- **Accepted misses:** relief battles at AI castle 2/3 sieges 10% (target 20%): with the 2-season floor a defender has about
+  one season to arrive and is often further away; a gather rule is built and works when it can. The largest country's land
+  share at 1600 is 14.9% against 14.7% (one seed, within noise; 15.3% before the AI fix). Backlog: a longer relief reach or
+  a defender's stack inside its own castle, after the owner has played sieges.
+- `WAR_LENGTH_AI` stays 16: 20 was measured and was worse on every missed item.
+
 ## Owner's decisions (2026-11-13)
 
 1. **How a siege works:** the siege meter (men, cannons, a siege general and hunger against the castle, the ground and the
