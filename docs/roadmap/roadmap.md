@@ -25,13 +25,13 @@ Everything decided on 2026-11-13 stays recorded in its own doc and waits its tur
 
 **The war line as of 2026-11-14** (one release at a time; each has its brief in `docs/roadmap/`):
 - v0.2.0 "Battles that last" and v0.2.1 "War you can follow" are released.
-- **0.2.2 Sieges** is being built: the siege meter, Besiege or Storm, castle areas (a castle holds the land around it) and
-  clear move messages.
-- **Next after 0.2.2: a castles map mode** (owner's request, 2026-11-14). A map mode, next to terrain, goods and markets,
-  that shows every castle and the land each one holds: the area in the owner's colour, the castle's level, castles under
-  siege and fallen castles, for all countries (not only while a war stack is selected, as in 0.2.2). It builds on the
-  castle-area rule of `docs/design/castle-areas.md`; its design and mockup come in the next planning batch.
-- Then the battle board as a mini game inside the turn (0.2.3 brief draft), the trade patch, field forts, battle cards,
+- **0.2.2 Sieges** is being finished: the siege meter, Besiege or Storm, and clear move messages.
+- **0.2.3 Castle areas** (split out of 0.2.2 by the owner, 2026-11-14): a castle holds the land around it (3 / 4 / 5 hexes),
+  open land falls in one season. Built on branch `r022-areas`, but it stalled AI wars on the Europe map, so 0.2.3 adds the
+  AI work it needs (armies gathering to take castles) and its screen part (mockup 21). The **castles map mode** (owner's
+  request): a map mode next to terrain, goods and markets that shows every castle, its level and the land it holds in the
+  owner's colour, castles under siege and fallen castles, for all countries. Design: `docs/design/castle-areas.md`.
+- Then the battle board as a mini game inside the turn (its brief draft, renumbered after 0.2.3), the trade patch, field forts, battle cards,
   the battle mini-map, war goals and peace.
 
 ## 1. Vision
