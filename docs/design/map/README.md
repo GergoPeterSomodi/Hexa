@@ -1,5 +1,12 @@
 # The map: one design (2026-11-14)
 
+> **Art reset (owner, 2026-11-14), after the first art pass (map-proto step 6a):** the pass mixed two view angles (side-view
+> towns and trees on a top-down ground), scattered mountains as random triangles instead of ranges, drew the Ligurian
+> coast as a wall of cliffs, left flat grey rock, and the map was over-full (183 places, 262 road edges). Decisions: **one
+> small style frame first** (about 6x6 hexes with a valley, a range, a town, a road, a river joining another and some coast),
+> approved by the owner before anything is redrawn in bulk; **one view angle for every piece: a slight 3/4 view** (as
+> mockup 07); far fewer places and roads; no level dots by names.
+
 > **Owner's decisions (2026-11-14):** Q1 hex size **about 28 km** (prototype region now; Europe confirmed after measuring
 > drawing and AI path cost). Q2 rivers **along hex edges, but some rivers run through cities in some cases**: a short
 > authored list of river cities (e.g. Florence on the Arno, Paris on the Seine, Prague on the Vltava, Rome on the Tiber)
