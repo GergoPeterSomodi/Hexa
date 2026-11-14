@@ -1,5 +1,11 @@
 # The Godot port plan
 
+
+> **Owner (2026-11-14, after seeing the 0.3.0 map):** "I'm not focusing on matching the exact version of the game."
+> The Python look is no longer the target for the map art: the close-up landscape, mountain types, ridge crests, tiles
+> that change with upgrades, towns that grow and the rest are designed fresh within the chosen look (direction A,
+> `docs/design/godot-look/README.md`), not ported one to one. The map *data* (coasts, rivers, cities, passes, castles,
+> countries) stays checked against Python as before.
 Technical director, 2026-11-14, third version. **A plan on paper: nothing is built yet.** Part A is for the
 owner, in plain words. Part B is the technical appendix. The first release has its own brief:
 `docs/roadmap/release-0.3.0-brief.md`.
