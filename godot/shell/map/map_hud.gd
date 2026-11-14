@@ -5,17 +5,14 @@ extends CanvasLayer
 
 const HINT := "Drag, WASD or arrows to pan    Wheel to zoom    1 terrain, 2 countries    Esc to quit"
 
-var _view_button: Button
-var _hint: Label
-var _tip: Label
+@onready var _view_button: Button = $Layout/ViewButton
+@onready var _hint: Label = $Layout/Hint
+@onready var _tip: Label = $Layout/HoverTip
 var _view: MapView
 
 
 func bind(view: MapView) -> void:
 	_view = view
-	_view_button = get_node("Layout/ViewButton") as Button
-	_hint = get_node("Layout/Hint") as Label
-	_tip = get_node("Layout/HoverTip") as Label
 	_view.view_changed.connect(_on_view_changed)
 	_view.hover_changed.connect(_on_hover_changed)
 	_view_button.pressed.connect(_on_button_pressed)

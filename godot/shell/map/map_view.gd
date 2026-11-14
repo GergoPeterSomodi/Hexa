@@ -217,6 +217,9 @@ func _refresh() -> void:
 	_far_terrain.visible = _far and view_mode == VIEW_TERRAIN
 	_far_countries.visible = _far and view_mode == VIEW_COUNTRIES
 	_overlay.visible = not _far and view_mode == VIEW_COUNTRIES
+	# Decorations (trees, rocks) belong to the countries view only: Python's MapView draws them when not bare,
+	# and its terrain mode is bare.
+	_layers[TilePlan.DECO].visible = view_mode == VIEW_COUNTRIES
 	_names.zoom = zoom_now
 	_names.visible = zoom_now >= NAME_ZOOM
 	_names.queue_redraw()

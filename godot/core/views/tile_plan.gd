@@ -127,7 +127,8 @@ func _ground(map: MapData) -> void:
 		if kind == MapData.OCEAN:
 			key = _family_key("sea/sea", variant(pos, 3))
 		elif kind == MapData.LAKE:
-			key = _family_key("terrain/lake", 0)
+			# Owner's default (decision 1): a lake is the drawn sea tile, not the Kenney lake tile.
+			key = _family_key("sea/sea", variant(pos, 3))
 		else:
 			key = _family_key("terrain/" + kind, pos.x * 5 + pos.y * 11)
 		_put(GROUND, pos, key)

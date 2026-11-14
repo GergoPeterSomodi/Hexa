@@ -61,19 +61,22 @@ func _find_view() -> MapView:
 
 
 func _shot_list() -> Array[Dictionary]:
+	# Zooms are Python's radius / 60, so the hex is the same size on both sides: far r=3, tile zoom r=13.
 	var europe := _view.map
 	var whole := MapGeometry.map_size(europe.cols, europe.rows) * 0.5
 	var iberia_mid := (_city("Lisbon") + _city("Granada")) * 0.5
 	var italy_mid := (_city("Rome") + _city("Venice")) * 0.5
+	var far := 3.0 / 60.0
+	var middle := 13.0 / 60.0
 	var shots: Array[Dictionary] = []
-	shots.append({"name": "far_europe_terrain", "centre": whole, "zoom": 0.0, "view": MapView.VIEW_TERRAIN})
-	shots.append({"name": "far_europe_countries", "centre": whole, "zoom": 0.0, "view": MapView.VIEW_COUNTRIES})
-	shots.append({"name": "middle_iberia_terrain", "centre": iberia_mid, "zoom": 0.25, "view": MapView.VIEW_TERRAIN})
+	shots.append({"name": "far_europe_terrain", "centre": whole, "zoom": far, "view": MapView.VIEW_TERRAIN})
+	shots.append({"name": "far_europe_countries", "centre": whole, "zoom": far, "view": MapView.VIEW_COUNTRIES})
+	shots.append({"name": "middle_iberia_terrain", "centre": iberia_mid, "zoom": middle, "view": MapView.VIEW_TERRAIN})
+	shots.append({"name": "middle_po_terrain", "centre": _city("Milan"), "zoom": middle, "view": MapView.VIEW_TERRAIN})
+	shots.append({"name": "middle_italy_terrain", "centre": italy_mid, "zoom": middle, "view": MapView.VIEW_TERRAIN})
+	shots.append({"name": "middle_italy_countries", "centre": italy_mid, "zoom": middle, "view": MapView.VIEW_COUNTRIES})
 	shots.append({"name": "close_lisbon_terrain", "centre": _city("Lisbon"), "zoom": 0.5, "view": MapView.VIEW_TERRAIN})
-	shots.append({"name": "middle_italy_terrain", "centre": italy_mid, "zoom": 0.25, "view": MapView.VIEW_TERRAIN})
-	shots.append({"name": "middle_italy_countries", "centre": italy_mid, "zoom": 0.25, "view": MapView.VIEW_COUNTRIES})
 	shots.append({"name": "close_venice_terrain", "centre": _city("Venice"), "zoom": 0.5, "view": MapView.VIEW_TERRAIN})
-	shots.append({"name": "close_venice_countries", "centre": _city("Venice"), "zoom": 0.5, "view": MapView.VIEW_COUNTRIES})
 	return shots
 
 

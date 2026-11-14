@@ -60,8 +60,10 @@ func test_views_switch_the_far_and_the_overlay() -> void:
 	assert_false(_shown("FarTerrain"), "no terrain far map in countries view")
 	_view.frame(MapGeometry.centre(Vector2i(100, 75)), 0.4)
 	assert_true(_shown("CountriesOverlay"), "overlay at tile zoom in countries view")
+	assert_true((_view.get_node("Tiles/deco") as CanvasItem).visible, "decorations in countries view")
 	_view.set_view(MapView.VIEW_TERRAIN)
 	assert_false(_shown("CountriesOverlay"), "no overlay in terrain view")
+	assert_false((_view.get_node("Tiles/deco") as CanvasItem).visible, "no decorations in terrain view")
 
 
 func test_zoom_is_clamped_to_the_python_range() -> void:

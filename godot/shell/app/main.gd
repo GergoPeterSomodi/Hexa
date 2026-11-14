@@ -7,8 +7,8 @@ const MAP_VIEW := preload("res://shell/map/map_view.tscn")
 const MAP_HUD := preload("res://shell/map/map_hud.tscn")
 const BACKGROUND := Color(0.04, 0.05, 0.07)
 
-var _centre: CenterContainer
-var _status: Label
+@onready var _centre: CenterContainer = $Centre
+@onready var _status: Label = $Centre/Status
 
 var _view: MapView
 var _hud: MapHud
@@ -17,8 +17,6 @@ var _hud: MapHud
 func _ready() -> void:
 	get_window().title = WINDOW_TITLE
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_centre = get_node("Centre") as CenterContainer
-	_status = get_node("Centre/Status") as Label
 	RenderingServer.set_default_clear_color(BACKGROUND)
 	_status.text = "Building Europe..."
 	# Let the first frame draw the message before the builder takes its second.
