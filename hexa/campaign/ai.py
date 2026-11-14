@@ -13,6 +13,7 @@ from .systems.combat import battle_strength
 SCALE = geo.SCALE
 from .data import (AI_ATTACK_POWER, AI_RELIEF_RATIO, AI_RELIEF_SEASONS, AI_SIEGE_MAX_SEASONS,
                    AI_SIEGE_MAX_SEASONS_GUNS, AI_STANCE_RATIO, AI_STORM_SHARE, AI_WITHDRAW_RATIO, ATTACK_MORALE, BUILDINGS,
+                   SIEGE_MIN_SEASONS,
                    CARAVEL, CARRACK, COLONIST, GARRISON_DEFENSE, GARRISON_HP, GENERAL, GOODS,
                    MANUFACTORIES, MANUFACTORY_TAX, UNIT_KINDS, troop,
                    SETTLEMENT_TAX, WORKS, WORKS_BONUS)
@@ -462,8 +463,9 @@ def _war_seasons_left(world, prov, tag):
 
 
 def _besiege_nearest(world, tag, stack, options, enemies):
-    """The enemy place this stack can take nearest, in time (4.8): a siege of at most _season_limit seasons that the war
-    still has seasons for. Adjacent and garrisoned: besiege it now (attack_group makes it a siege); else march there.
+    """The enemy place this stack can take, in time (4.8): a siege of at most _season_limit seasons that the war still has
+    seasons for. Castles of level 2 and 3 come first, then the nearest (0.2.2: open places fell to the stacks that were
+    beside a castle). Adjacent and garrisoned: besiege it now (attack_group makes it a siege); else march there.
     True when the stack acted."""
     limit, home = _season_limit(stack), stack[0].pos
     best = None
@@ -478,12 +480,12 @@ def _besiege_nearest(world, tag, stack, options, enemies):
             left = _war_seasons_left(world, prov, tag)
             if seasons is None or seasons > limit or (left is not None and seasons > left):
                 continue
-            key = (distance(prov.pos, home), seasons, prov.pos)
+            key = (prov.castle < 2, distance(prov.pos, home), seasons, prov.pos)   # castles 2 and 3 first (0.2.2 fix)
             if best is None or key < best:
                 best = key
     if best is None:
         return False
-    goal = best[2]
+    goal = best[3]
     if goal in options and world.besiege_target(stack, goal):
         world.attack_group(stack, goal)
         _answer(world, goal)
@@ -493,15 +495,16 @@ def _besiege_nearest(world, tag, stack, options, enemies):
 
 
 def _storm_siege(world, tag, stack, enemies):
-    """A stack that besieges a place storms it once the meter is half of the need (AI_STORM_SHARE), when its men are at
-    least AI_ATTACK_POWER times the defence's (the garrison after the siege's cut, war.storm_defence). True when it stormed."""
+    """A stack that besieges a place storms it once the meter is half of the need (AI_STORM_SHARE) and the siege has run
+    SIEGE_MIN_SEASONS seasons, when its men are at least AI_ATTACK_POWER times the defence's (the garrison after the
+    siege's cut, war.storm_defence). True when it stormed."""
     pos = stack[0].pos
     prov = world.provinces.get(pos)
     if prov is None or prov.besieger != tag or prov.controller not in enemies:
         return False
     need = world.siege_terms(prov, tag, stack)["need"]
-    if prov.siege < AI_STORM_SHARE * need:
-        return False
+    if prov.siege < AI_STORM_SHARE * need or prov.siege_turns < SIEGE_MIN_SEASONS:
+        return False      # a storm waits for the floor's second season: a siege first, the storm after (0.2.2)
     defence, _ = warsys.storm_defence(world, pos, prov.controller)
     men = sum(u.men for u in stack if u.kind.war)
     if men < AI_ATTACK_POWER * defence or not world.storm_check(stack, pos)[0]:
@@ -517,7 +520,7 @@ def _relieve(world, tag, stack, options):
     first. Adjacent: it attacks the besieger (a battle, as relief is); else it marches. True when the stack acted."""
     mine = _force(world, stack)
     capital = world.countries[tag].capital
-    best = None
+    found = []
     for prov in world.provinces_of(tag):
         if not prov.besieger or prov.besieger == tag or prov.besieger not in world.enemies(tag):
             continue
@@ -525,19 +528,17 @@ def _relieve(world, tag, stack, options):
         if not besiegers or mine < AI_RELIEF_RATIO * _force(world, besiegers):
             continue
         priority = prov.castle >= 2 or prov.pos == capital
-        key = (not priority, distance(prov.pos, stack[0].pos), prov.pos)
-        if best is None or key < best[0]:
-            best = (key, prov)
-    if best is None:
-        return False
-    prov = best[1]
-    if prov.pos in options and world.battle_at(prov.pos) is None:
-        world.attack_group(stack, prov.pos)
-        _answer(world, prov.pos)
-        return True
-    if world.path_to(stack, prov.pos, seasons=AI_RELIEF_SEASONS):
-        world.move_toward_group(stack, prov.pos)
-        return True
+        found.append(((not priority, distance(prov.pos, stack[0].pos), prov.pos), prov))
+    # The candidates in order: a place out of reach in AI_RELIEF_SEASONS does not stop the next one (0.2.2 fix).
+    for _, prov in sorted(found, key=lambda item: item[0]):
+        if prov.pos in options and world.battle_at(prov.pos) is None:
+            if world.attack_group(stack, prov.pos):
+                _answer(world, prov.pos)
+                return True
+            continue
+        if world.path_to(stack, prov.pos, seasons=AI_RELIEF_SEASONS):
+            world.move_toward_group(stack, prov.pos)
+            return True
     return False
 
 
