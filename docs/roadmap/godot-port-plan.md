@@ -1,5 +1,11 @@
 # The Godot port plan
 
+
+> **Owner's decisions (2026-11-14), to be worked into a revised plan:** (1) the Godot game may play *somewhat
+> differently* from Python: no exact season-by-season match, no own-dice/rounding work, checked by measured balance
+> (battle, siege and war-pace numbers close to Python's) and by the owner's play; (2) **Europe only**: random worlds are
+> not ported; (3) saves do not carry over, and bugs found during the port are fixed in Godot only (Python is frozen as
+> v0.2.2); (4) builds are **Windows only**. Language: GDScript (web/mobile wanted later).
 Technical director, 2026-11-14. **A plan on paper: nothing is built or approved yet.** Part A is for the owner, in
 plain words. Part B is the technical appendix. Part C is the draft brief of the first release.
 
