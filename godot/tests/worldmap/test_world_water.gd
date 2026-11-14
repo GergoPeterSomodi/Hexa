@@ -317,3 +317,20 @@ func test_no_stream_starts_at_or_runs_along_a_river_city() -> void:
 				continue
 			for h: Vector2i in WorldWater.corner_hexes_of(WorldWater.corner_key(a, b, n)):
 				assert_false(city_hexes.has(h), "%s: no stream starts at a river city corner" % str(e))
+
+
+## The joins (the owner's review, 2026-11-14: tributaries end on the main river's line). Each join corner is a point of the
+## smoothed drawn curve of the tributary and of the river (or lake) it meets: the same curves the viewer draws.
+func test_every_join_is_a_point_of_both_drawn_curves() -> void:
+	if not _ready_or_fail():
+		return
+	assert_gte(_water.join_anchors.size(), 10, "the tributaries join their rivers at corners")
+	assert_eq(_water.join_failures().size(), 0, "every join point lies on both drawn curves")
+	for a: Dictionary in _water.join_anchors:
+		var t: int = a["tributary"]
+		var mine := WorldWater.smooth_line(_water.river_points_km(t), _water.river_pins(t), WorldWater.DRAW_ROUNDS)
+		var km: Vector2 = a["km"]
+		var best := INF
+		for p: Vector2 in mine:
+			best = minf(best, p.distance_to(km))
+		assert_lte(best, 0.01, "%s: its join point is on its own line" % _water.rivers[t]["name"])

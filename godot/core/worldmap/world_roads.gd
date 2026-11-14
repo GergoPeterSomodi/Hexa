@@ -1,7 +1,9 @@
 ## The roads of the map prototype region (docs/design/map/03-settlements-and-roads.md section 8; 04-wfc-model.md section 3.1):
 ## the link graph (the capital to the cities of its reach, each city to its nearest cities, every fixed place of level 2 and
-## up to the network, villages and hamlets by a short spur, each pass to a settlement on each side, the ports along the
-## coast), routed by the cheapest path on the relief and water cost field. Each road edge gets a quality 0 to 3 and, where
+## up to the network, each pass to a settlement on each side, the ports along the coast), routed by the cheapest path on the
+## relief and water cost field. Then the sparse rules of the owner's review (2026-11-14): a link that runs parallel to a road
+## already kept (within one hex for more than PARALLEL_RUN hexes in a row) is dropped, and a village that no road reaches gets
+## a track (the only villages with tracks). Each road edge gets a quality 0 to 3 (3 only on the capital's links) and, where
 ## it crosses a river, a stream, a lake or a pass, a crossing kind (ford, bridge_wood, bridge_stone, ferry, pass).
 ##
 ## Routing: valley floors are cheap, crests are closed except at the pass edges, sea and lakes are closed, a river or a
@@ -35,12 +37,16 @@ const TRAFFIC_UP := 4
 const CAPITAL_RANGE := 16
 const RANK_CAPITAL := 3
 ## A main road (quality 2): the city links, joins between towns of level 3+, the coast links and the links over a pass with
-## a hospice. Only spurs to villages and hamlets, and joins of smaller places, stay tracks (quality 1).
+## a hospice. Only the spurs to cut-off villages, and joins of smaller places, stay tracks (quality 1).
 const RANK_CITY := 2
 const RANK_OTHER := 1
 ## Quality caps: the mountains (levels 5 and 6) take at most a road of quality 2; a pass is a track in 1480.
 const MOUNTAIN_CAP := 2
 const PASS_QUALITY := 1
+## A link is parallel to a kept road when more than this many of its hexes in a row lie within one hex of that road (and off it).
+const PARALLEL_RUN := 2
+## A pass carries at most this many branches (one per side of the crest; owner's review, 2026-11-14).
+const PASS_SIDES := 2
 
 ## Road edges: quality 1 to 3 (after _finish). Edges without a road are absent.
 var quality: Dictionary[Vector4i, int] = {}
@@ -63,6 +69,8 @@ var _saddles: Dictionary[Vector2i, int] = {}  # saddle hex -> pass index (passes
 var _city_edge: Dictionary[Vector4i, bool] = {}  # the six edges of each river city's hex
 var _valley: Dictionary[Vector2i, bool] = {}  # hexes of level 3 to 5 beside a river or stream: the valley floor
 var _pairs: Dictionary[String, bool] = {}  # city pairs already linked
+var pruned_links := 0  # links dropped as parallel to a kept road (the owner's rule)
+var rejoined := 0  # towns joined again to the network after the prune
 
 
 ## The roads of the region, from the relief, the water and the places.
@@ -78,9 +86,10 @@ static func build(p_grid: WorldGrid, p_relief: WorldRelief, p_water: WorldWater,
 	out._link_capital()
 	out._link_city_pairs()
 	out._link_fixed_places()
-	out._link_villages()
 	out._link_passes()
 	out._link_ports()
+	out._prune_parallel()
+	out._link_villages()
 	out._finish()
 	out._cross_all()
 	return out
@@ -168,6 +177,8 @@ func summary() -> Dictionary:
 		"links_by_kind": by_link,
 		"link_failures": link_failures.size(),
 		"network_hexes": network.size(),
+		"pruned_links": pruned_links,
+		"rejoined": rejoined,
 	}
 
 
@@ -431,18 +442,26 @@ func _link_fixed_places() -> void:
 		var at: Vector2i = pl["hex"]
 		if network.has(at):
 			continue
-		var path := _search([at], _town_goals(), NO_EDGE, 0)
-		if path.is_empty():
-			path = _search([at], _network_goals(), NO_EDGE, 0)
-		if path.is_empty():
-			link_failures.append("join: %s has no route to the network" % str(pl["name"]))
-			continue
-		var target: Vector2i = path[path.size() - 1]
-		var rank := RANK_CITY if (int(pl["level"]) >= 3 and places.level_at(target) >= 3) else RANK_OTHER
-		_add_path(path, rank, "join", "")
+		_join_place(pl)
 
 
-## Rule 4: a village joins the nearest road within 2 hexes by a spur, a hamlet within 1 hex; a village may stand alone.
+## One fixed place to the network: a town joins a town or a city (the nearest), else the nearest road. A join between two
+## towns of level 3 or more is a road; any other join is a track.
+func _join_place(pl: Dictionary) -> void:
+	var at: Vector2i = pl["hex"]
+	var path := _search([at], _town_goals(), NO_EDGE, 0)
+	if path.is_empty():
+		path = _search([at], _network_goals(), NO_EDGE, 0)
+	if path.is_empty():
+		link_failures.append("join: %s has no route to the network" % str(pl["name"]))
+		return
+	var target: Vector2i = path[path.size() - 1]
+	var rank := RANK_CITY if (int(pl["level"]) >= 3 and places.level_at(target) >= 3) else RANK_OTHER
+	_add_path(path, rank, "join", "")
+
+
+## Rule 4 (thinned, owner's review 2026-11-14): a village that no road reaches gets a track to the nearest road, however far;
+## a village on a road needs nothing. Hamlets are not places at this zoom.
 func _link_villages() -> void:
 	for pl: Dictionary in places.places:
 		if not bool(pl["generated"]):
@@ -450,14 +469,15 @@ func _link_villages() -> void:
 		var at: Vector2i = pl["hex"]
 		if network.has(at):
 			continue
-		var limit := 2 if int(pl["level"]) == 2 else 1
-		var path := _search([at], _network_goals(), NO_EDGE, limit)
+		var path := _search([at], _network_goals(), NO_EDGE, 0)
 		if path.size() >= 2:
 			_add_path(path, RANK_OTHER, "spur", "")
 
 
-## Rule 5: every pass with a crest saddle joins a settlement on each side: from the saddle, one branch per pass edge that no
-## road uses yet, to the nearest settlement of level 2 or more reached through that edge.
+## Rule 5 (thinned, owner's review 2026-11-14): every pass with a crest saddle joins a settlement on each side. From the saddle,
+## a branch is routed through each open pass edge that no road uses yet, to the nearest settlement of level 2 or more or to a road
+## already laid. Of the branches, at most PASS_SIDES are kept: the shortest, then the shortest whose first hex is not beside the
+## first (the other side of the pass). The rest would only run beside a kept branch.
 func _link_passes() -> void:
 	for p: int in places.pass_saddles.keys():
 		var saddle: Vector2i = places.pass_saddles[p]
@@ -467,14 +487,45 @@ func _link_passes() -> void:
 			var hex: Vector2i = pl["hex"]
 			if int(pl["level"]) >= 2 and hex != saddle:
 				goals[hex] = true
+		# A branch may also end on a road already laid (shared with the valley roads).
+		for h: Vector2i in network.keys():
+			if h != saddle:
+				goals[h] = true
 		var hospice: bool = int(region.passes[p]["metres"]) >= WorldPlaces.HOSPICE_MIN_METRES
+		var branches: Array[Array] = []
 		for e: Vector4i in pass_branch_edges(p):
-			if _rank.has(e):
-				continue
+			# An edge already carrying a road is still a branch: the search then ends at once on the road beside it, and the
+			# pass keeps its road even when the link that carried the edge is pruned.
 			var path := _search([saddle], goals, e, 0)
-			if path.size() < 2:
+			if path.size() >= 2:
+				branches.append(path)
+		branches.sort_custom(func(a: Array, b: Array) -> bool: return a.size() < b.size())
+		var kept_paths: Array[Array] = []
+		for path: Array in branches:
+			if kept_paths.size() >= PASS_SIDES:
+				break
+			if not _diverges(path, kept_paths):
 				continue
-			_add_path(path, RANK_CITY if hospice else RANK_OTHER, "pass", pass_name)
+			kept_paths.append(path)
+			var kept: Array[Vector2i] = []
+			for item: Variant in path:
+				kept.append(item)
+			_add_path(kept, RANK_CITY if hospice else RANK_OTHER, "pass", pass_name)
+
+
+## True when a branch of a pass leaves on its own side: it shares no hex with a kept branch, and past its first hex it never runs
+## beside one. Two branches that run side by side from the saddle are the same side of the pass.
+static func _diverges(path: Array, kept_paths: Array[Array]) -> bool:
+	for k: Array in kept_paths:
+		for i: int in range(1, path.size()):
+			for j: int in range(1, k.size()):
+				var a: Vector2i = path[i]
+				var b: Vector2i = k[j]
+				if a == b:
+					return false
+				if i >= 2 and j >= 2 and WorldPlaces.hex_distance(a, b) <= 1:
+					return false
+	return true
 
 
 ## Rule 6: the sea ports, from west to east, each to the next along the coast.
@@ -497,15 +548,103 @@ static func _pair_key(a: String, b: String) -> String:
 	return (a + "|" + b) if a < b else (b + "|" + a)
 
 
+# ----- the sparse network (owner's review, 2026-11-14) -----------------------------------------------------------------
+
+
+## Drops the parallel links: links are taken in order of rank (highest first) and then shorter first, and a link that runs
+## within one hex of a road already kept for more than PARALLEL_RUN hexes in a row is dropped. The towns that lost their road
+## are joined again to the kept network (the rejoin), so every town stays on a road.
+func _prune_parallel() -> void:
+	var order: Array[int] = []
+	for i: int in links.size():
+		order.append(i)
+	order.sort_custom(func(a: int, b: int) -> bool:
+		var la: Dictionary = links[a]
+		var lb: Dictionary = links[b]
+		if int(la["rank"]) != int(lb["rank"]):
+			return int(la["rank"]) > int(lb["rank"])
+		var pa: Array = la["path"]
+		var pb: Array = lb["path"]
+		if pa.size() != pb.size():
+			return pa.size() < pb.size()
+		return a < b)
+	var kept_hex: Dictionary[Vector2i, bool] = {}
+	var keep: Dictionary[int, bool] = {}
+	for i: int in order:
+		var path: Array = links[i]["path"]
+		var run := 0
+		var best := 0
+		for item: Variant in path:
+			var h: Vector2i = item
+			if kept_hex.has(h):
+				run = 0
+			elif _beside_kept(h, kept_hex):
+				run += 1
+				best = maxi(best, run)
+			else:
+				run = 0
+		# A pass branch is never pruned: every pass with a saddle keeps its road (the owner's check).
+		if best > PARALLEL_RUN and str(links[i]["kind"]) != "pass":
+			pruned_links += 1
+			continue
+		keep[i] = true
+		for item: Variant in path:
+			var h: Vector2i = item
+			kept_hex[h] = true
+	var kept: Array[Dictionary] = []
+	for i: int in links.size():
+		if keep.has(i):
+			kept.append(links[i])
+	links = kept
+	_rebuild_network()
+	for pl: Dictionary in places.places:
+		if bool(pl["generated"]) or int(pl["level"]) < 2:
+			continue
+		var at: Vector2i = pl["hex"]
+		if not network.has(at):
+			_join_place(pl)
+			rejoined += 1
+
+
+## True when a hex lies within one hex of a kept road hex (the hex itself is not counted).
+func _beside_kept(h: Vector2i, kept_hex: Dictionary[Vector2i, bool]) -> bool:
+	for nb: Vector2i in grid.neighbours(h):
+		if kept_hex.has(nb):
+			return true
+	return false
+
+
+## The road edges, hexes and traffic of the kept links, from scratch.
+func _rebuild_network() -> void:
+	network.clear()
+	_rank.clear()
+	_traffic.clear()
+	for ln: Dictionary in links:
+		var path: Array = ln["path"]
+		var rank := int(ln["rank"])
+		for i: int in path.size() - 1:
+			var a: Vector2i = path[i]
+			var b: Vector2i = path[i + 1]
+			var e := WorldGrid.edge_key(a, b)
+			_rank[e] = maxi(int(_rank.get(e, 0)), rank)
+			_traffic[e] = int(_traffic.get(e, 0)) + 1
+		for item: Variant in path:
+			var h: Vector2i = item
+			network[h] = true
+
+
 # ----- quality and crossings (03 section 8, quality and bridges) --------------------------------------------------------
 
 
 func _finish() -> void:
 	for e: Vector4i in _rank.keys():
 		var pair := WorldGrid.edge_hexes(e)
-		var q := int(_rank[e])
+		var rank := int(_rank[e])
+		var q := rank
 		if int(_traffic.get(e, 0)) >= TRAFFIC_UP:
 			q += 1
+		if rank < RANK_CAPITAL:
+			q = mini(q, RANK_CITY)  # only the capital's links are highways (owner's review: sparse network)
 		q = mini(q, 3)
 		if relief.level_at(pair[0]) >= 5 or relief.level_at(pair[1]) >= 5:
 			q = mini(q, MOUNTAIN_CAP)

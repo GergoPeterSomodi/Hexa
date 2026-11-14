@@ -92,6 +92,16 @@ var _course_mode := false  # routing a course (the pass before the fill): no uph
 var _routed_chain: Dictionary[String, Array] = {}  # river name -> its routed chain (a tributary joins the chain it names)
 var burn_climbs: Array[String] = []  # burned steps that still climb (a tributary sitting above its trunk): none expected
 var _lake_mode := false  # routing a lake: lakes cross the prealps at their gaps, so no crest cost
+## The drawn curves (kilometres, with the pinned points) of each river and each ribbon lake: built by _build_drawn_lines.
+var _river_curve: Array[PackedVector2Array] = []
+var _river_pin: Array[Array] = []
+var _lake_curve: Array[PackedVector2Array] = []
+var _lake_pin: Array[Array] = []
+## Each join: a tributary's end corner (or a river's start corner at a lake) that is a point of the curve it meets. Keys: corner,
+## km, tributary (river index), host_kind ("river" or "lake") and host (its index). Checked by join_failures.
+var join_anchors: Array[Dictionary] = []
+## River ends that meet no other curve (the sea, a whole lake, the window edge): not joins, counted for the report.
+var free_ends := 0
 
 
 ## Builds the water from the relief, the heights (land heights, sea depths) and the region's river and lake courses.
@@ -114,6 +124,7 @@ static func build(p_grid: WorldGrid, p_relief: WorldRelief, p_heights: WorldHeig
 	out._build_shores()
 	out._build_sea_bands()
 	out._build_streams()
+	out._build_drawn_lines()
 	return out
 
 
@@ -1095,43 +1106,218 @@ func _touches_water(key: Vector3i) -> bool:
 # ----- what the viewer and the tests read --------------------------------------------------------------------------
 
 
+## Smoothing rounds of every drawn curve (rivers, lakes): the viewer and the join check use the same curve.
+const DRAW_ROUNDS := 3
+
+
 ## The points a river is drawn through, in kilometres: the source, the midpoint of each step's edge, the centre of a
-## river city's hex where the river crosses it, and the mouth. river_pins says which are fixed.
+## river city's hex where the river crosses it, the joins of its tributaries and the mouth. river_pins says which are fixed.
 func river_points_km(index: int) -> PackedVector2Array:
-	var rv: Dictionary = rivers[index]
-	var steps: Array[Vector4i] = rv["steps"]
-	var chain: Array[Vector3i] = rv["corners"]
-	var out := PackedVector2Array()
-	out.append(corner_pos(chain[0]))
-	for i: int in steps.size():
-		var e := steps[i]
-		if e == NO_EDGE:
-			out.append(grid.centre_km(_city_hex_of_link(chain[i], chain[i + 1])))
-		else:
-			out.append(edge_mid_km(e))
-	out.append(corner_pos(chain[chain.size() - 1]))
-	return out
+	return _river_curve[index]
 
 
-## Which points of river_points_km are fixed: the two ends and each river city crossing.
+## Which points of river_points_km are fixed: the two ends, each river city crossing and each join.
 func river_pins(index: int) -> Array[bool]:
-	var rv: Dictionary = rivers[index]
-	var steps: Array[Vector4i] = rv["steps"]
-	var pins: Array[bool] = [true]
-	for e: Vector4i in steps:
-		pins.append(e == NO_EDGE)
-	pins.append(true)
-	return pins
-
-
-## The points of a lake's routed chain (its edge midpoints), in kilometres.
-func lake_points_km(index: int) -> PackedVector2Array:
-	var lk: Dictionary = lakes[index]
-	var steps: Array[Vector4i] = lk["steps"]
-	var out := PackedVector2Array()
-	for e: Vector4i in steps:
-		out.append(edge_mid_km(e))
+	var out: Array[bool] = []
+	out.assign(_river_pin[index])
 	return out
+
+
+## The points of a ribbon lake's drawn curve, in kilometres (its edge midpoints and the joins of the rivers that meet it).
+func lake_points_km(index: int) -> PackedVector2Array:
+	return _lake_curve[index]
+
+
+## Which points of lake_points_km are fixed: the two ends and each join.
+func lake_pins(index: int) -> Array[bool]:
+	var out: Array[bool] = []
+	out.assign(_lake_pin[index])
+	return out
+
+
+## Chaikin corner cutting, a few rounds, for an open line. A point flagged in pins keeps its place (the ends, the river city
+## crossings and the joins), so the curve passes through the points that are pinned. The viewer draws every curve with it.
+static func smooth_line(points: PackedVector2Array, pins: Array[bool], rounds: int) -> PackedVector2Array:
+	var pts := points
+	var flags: Array[bool] = pins.duplicate()
+	for r: int in rounds:
+		var out := PackedVector2Array()
+		var out_flags: Array[bool] = []
+		var n := pts.size()
+		if n < 3:
+			break
+		for i: int in n - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			if flags[i]:
+				out.append(a)
+				out_flags.append(true)
+			else:
+				out.append(a * 0.75 + b * 0.25)
+				out_flags.append(false)
+			if not flags[i + 1]:
+				out.append(a * 0.25 + b * 0.75)
+				out_flags.append(false)
+		out.append(pts[n - 1])
+		out_flags.append(true)
+		pts = out
+		flags = out_flags
+	return pts
+
+
+## Builds the drawn curves. A river is a polyline through its steps (edge midpoints, river city centres) from its source to
+## its mouth. A ribbon lake is a polyline through its steps. Then each join is pinned into the curve it meets: a tributary's
+## end corner becomes a point of the main river's curve (inserted at that corner), and a river that starts or ends on a
+## lake's chain becomes a point of the lake's curve. So the tributary's line ends exactly on the main line, and the river
+## meets the lake shore exactly: the corner is a vertex of both curves, so both pass through it.
+func _build_drawn_lines() -> void:
+	var r_pts: Array[Array] = []
+	var r_pin: Array[Array] = []
+	var r_cor: Array[Array] = []
+	for i: int in rivers.size():
+		var chain: Array[Vector3i] = rivers[i]["corners"]
+		var steps: Array[Vector4i] = rivers[i]["steps"]
+		var pts: Array[Vector2] = [corner_pos(chain[0])]
+		var pin: Array[bool] = [true]
+		var cor: Array[Vector3i] = [chain[0]]
+		for j: int in steps.size():
+			var e := steps[j]
+			if e == NO_EDGE:
+				pts.append(grid.centre_km(_city_hex_of_link(chain[j], chain[j + 1])))
+				pin.append(true)
+			else:
+				pts.append(edge_mid_km(e))
+				pin.append(false)
+			cor.append(NO_CORNER)
+		pts.append(corner_pos(chain[chain.size() - 1]))
+		pin.append(true)
+		cor.append(chain[chain.size() - 1])
+		r_pts.append(pts)
+		r_pin.append(pin)
+		r_cor.append(cor)
+	var l_pts: Array[Array] = []
+	var l_pin: Array[Array] = []
+	var l_cor: Array[Array] = []
+	for i: int in lakes.size():
+		var steps: Array[Vector4i] = lakes[i]["steps"]
+		var pts: Array[Vector2] = []
+		var pin: Array[bool] = []
+		var cor: Array[Vector3i] = []
+		for e: Vector4i in steps:
+			pts.append(edge_mid_km(e))
+			pin.append(false)
+			cor.append(NO_CORNER)
+		if not pin.is_empty():
+			pin[0] = true
+			pin[pin.size() - 1] = true
+		l_pts.append(pts)
+		l_pin.append(pin)
+		l_cor.append(cor)
+	# The joins: each end corner of a river that is a corner of another curve (a river, or a ribbon lake's chain).
+	var inserts: Array[Dictionary] = []
+	join_anchors.clear()
+	free_ends = 0
+	for t: int in rivers.size():
+		var chain: Array[Vector3i] = rivers[t]["corners"]
+		for c: Vector3i in [chain[0], chain[chain.size() - 1]]:
+			var host := _host_of(c, t)
+			if host.is_empty():
+				free_ends += 1
+				continue
+			var kind := str(host["kind"])
+			var idx := int(host["index"])
+			var at := int(host["at"])
+			join_anchors.append({"corner": c, "km": corner_pos(c), "tributary": t, "host_kind": kind, "host": idx})
+			var host_size := (rivers[idx]["corners"] as Array).size() if kind == "river" else (lakes[idx]["corners"] as Array).size()
+			# A river's own curve already starts and ends on its corners; a lake's curve starts on its first step's midpoint,
+			# so a lake corner at either end is pinned too.
+			if kind == "lake" or (at > 0 and at < host_size - 1):
+				inserts.append({"kind": kind, "index": idx, "at": at, "corner": c})
+	# Largest corner index first within a curve, so the earlier positions stay valid while inserting.
+	inserts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if str(a["kind"]) != str(b["kind"]):
+			return str(a["kind"]) > str(b["kind"])
+		if int(a["index"]) != int(b["index"]):
+			return int(a["index"]) < int(b["index"])
+		return int(a["at"]) > int(b["at"]))
+	for ins: Dictionary in inserts:
+		var idx := int(ins["index"])
+		var at := int(ins["at"])
+		var c: Vector3i = ins["corner"]
+		var at_km := corner_pos(c)
+		if str(ins["kind"]) == "river":
+			# Entries are [source, step 0, ..., step N-1, mouth]: corner k sits between step k-1 and step k.
+			(r_pts[idx] as Array).insert(at + 1, at_km)
+			(r_pin[idx] as Array).insert(at + 1, true)
+			(r_cor[idx] as Array).insert(at + 1, c)
+		else:
+			# Entries are the steps only: corner k sits before step k.
+			(l_pts[idx] as Array).insert(at, at_km)
+			(l_pin[idx] as Array).insert(at, true)
+			(l_cor[idx] as Array).insert(at, c)
+	_river_curve.clear()
+	_river_pin.clear()
+	_lake_curve.clear()
+	_lake_pin.clear()
+	for i: int in rivers.size():
+		_river_curve.append(PackedVector2Array(r_pts[i]))
+		_river_pin.append(r_pin[i])
+	for i: int in lakes.size():
+		_lake_curve.append(PackedVector2Array(l_pts[i]))
+		_lake_pin.append(l_pin[i])
+
+
+## The curve that a river end corner meets, other than river t itself: the river holding the corner (the highest class
+## first), else a ribbon lake whose chain holds it. "at" is the corner's index in that chain (0 and the last index are the
+## curve's own ends). Empty when no other curve holds the corner.
+func _host_of(c: Vector3i, t: int) -> Dictionary:
+	var best := {}
+	var best_class := -1
+	for r: int in rivers.size():
+		if r == t:
+			continue
+		var chain: Array[Vector3i] = rivers[r]["corners"]
+		var at := chain.find(c)
+		if at >= 0 and int(rivers[r]["class"]) > best_class:
+			best_class = int(rivers[r]["class"])
+			best = {"kind": "river", "index": r, "at": at}
+	if not best.is_empty():
+		return best
+	for k: int in lakes.size():
+		var corners: Array[Vector3i] = lakes[k]["corners"]
+		var at := corners.find(c)
+		if at >= 0:
+			return {"kind": "lake", "index": k, "at": at}
+	return best
+
+
+## The join check (the renderer's proof, kept in core so the tests run it): every join point is on the smoothed drawn curve of
+## the tributary and on the smoothed curve of the river or lake it meets, within 0.01 km. Returns one line per failure.
+func join_failures() -> Array[String]:
+	var out: Array[String] = []
+	for a: Dictionary in join_anchors:
+		var km: Vector2 = a["km"]
+		var t: int = a["tributary"]
+		var host_kind := str(a["host_kind"])
+		var host: int = a["host"]
+		var mine := smooth_line(river_points_km(t), river_pins(t), DRAW_ROUNDS)
+		var theirs: PackedVector2Array
+		if host_kind == "river":
+			theirs = smooth_line(river_points_km(host), river_pins(host), DRAW_ROUNDS)
+		else:
+			theirs = smooth_line(lake_points_km(host), lake_pins(host), DRAW_ROUNDS)
+		if _distance_to_curve(km, mine) > 0.01:
+			out.append("%s: the join at %s is off the tributary's line" % [rivers[t]["name"], str(a["corner"])])
+		if _distance_to_curve(km, theirs) > 0.01:
+			out.append("%s: the join at %s is off the line it meets" % [rivers[t]["name"], str(a["corner"])])
+	return out
+
+
+static func _distance_to_curve(p: Vector2, curve: PackedVector2Array) -> float:
+	var best := INF
+	for i: int in curve.size():
+		best = minf(best, p.distance_to(curve[i]))
+	return best
 
 
 ## The midpoint of an edge in kilometres.
@@ -1178,4 +1364,7 @@ func summary() -> Dictionary:
 		"unnamed_crest_steps": unnamed_crest_steps.size(),
 		"burned_corners": _burn.size(),
 		"burn_climbs": burn_climbs.size(),
+		"joins": join_anchors.size(),
+		"join_failures": join_failures().size(),
+		"free_ends": free_ends,
 	}

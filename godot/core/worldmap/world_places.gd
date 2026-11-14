@@ -1,27 +1,23 @@
 ## The settlements of the map prototype region (docs/design/map/03-settlements-and-roads.md sections 3, 5, 6 and 7): the
 ## authored places snapped to their hexes (the river cities keep their pinned hex, 04 section 3.6), levels 0 to 5 with the
 ## capital and the castles, a hospice on the saddle of each pass with a crest and at least 2000 metres, the standalone
-## castle and the monastery, the ports with their quays, and the generated villages and hamlets by site score and spacing.
+## castle and the monastery, the ports with their quays, and the generated villages (the farmland budget, by site score and spacing).
 ## Pure: it reads the relief, the water and the cover; no files, no engine calls.
 ##
 ## Levels (03 section 5): 0 none, 1 hamlet, 2 village, 3 town, 4 city, 5 great city. Settlements are one per hex; a hex may
-## also carry a landmark (hospice, monastery). Generated places are only villages (2) and hamlets (1): the region's data has
-## no rank list for the other names, so the towns and cities are the authored ones.
+## also carry a landmark (hospice, monastery). Generated places are only villages (2): at the region zoom hamlets are not places
+## (they become decoration later). Authored towns that crowd a bigger place are demoted or dropped (_demote_crowded).
 class_name WorldPlaces
 extends RefCounted
 
 ## A generated place is at least this many hexes from every settlement (03 section 6, spacing).
 const SPACING := 2
-## Site score a generated place needs: a village at VILLAGE_SCORE or more (kept SPACING hexes from every settlement), a
-## hamlet at HAMLET_SCORE or more (kept HAMLET_SPACING hexes from every settlement, and HAMLET_GAP hexes from every other
-## hamlet: a hamlet may stand beside a village, so the countryside is not empty but not every good hex is a hamlet).
-## Tuned for the 40 to 60 hamlets of the region (docs/design/map/03 section 6): at 1.0 the region had about 100.
+## A generated village needs this site score (kept SPACING hexes from every settlement). Its pool is the farmland and grassland
+## hexes of the plain and the hills (levels 1 to VILLAGE_MAX_LEVEL): one village for every VILLAGE_EVERY hexes of that pool,
+## the best sites first (the owner's review, 2026-11-14: 6 to 8 land hexes per village, no more).
 const VILLAGE_SCORE := 3.0
-const HAMLET_SCORE := 4.0
-const HAMLET_SPACING := 1
-const HAMLET_GAP := 2
-## Generated places stay off the hexes of level 5 and 6 (the mountains and the peaks).
-const MAX_GENERATED_LEVEL := 4
+const VILLAGE_EVERY := 7
+const VILLAGE_MAX_LEVEL := 3
 ## Passes with a crest saddle at or above this height (metres) carry a hospice.
 const HOSPICE_MIN_METRES := 2000
 ## Authored settlement level by the region's kind (city, town, castle_town), and by name where the size says otherwise.
@@ -66,6 +62,12 @@ var pass_saddles: Dictionary[int, Vector2i] = {}
 ## The crest edges of each resolved saddle (edge to pass index): the open pass edges that roads may cross.
 var pass_edges: Dictionary[Vector4i, int] = {}
 var _region: WorldRegion
+## The farmland and grassland hexes that the village budget counts, and the villages the budget allows.
+var village_pool := 0
+var village_budget := 0
+## Authored towns demoted to villages (their names stay on the map) and authored places dropped for crowding a bigger place.
+var demoted: Array[String] = []
+var dropped: Array[String] = []
 
 
 ## The places of the region: authored places first (river cities pinned), then hospices, then generated places.
@@ -81,6 +83,7 @@ static func build(p_grid: WorldGrid, p_relief: WorldRelief, p_water: WorldWater,
 	out._score_all()
 	out._reserve_river_cities()
 	out._place_authored(region)
+	out._demote_crowded()
 	out._place_hospices(region)
 	out._place_generated()
 	out._find_ports()
@@ -160,6 +163,10 @@ func summary() -> Dictionary:
 		"hospices": hospices,
 		"monasteries": monasteries,
 		"failures": failures.size(),
+		"demoted": demoted.size(),
+		"dropped": dropped.size(),
+		"village_pool": village_pool,
+		"village_budget": village_budget,
 	}
 
 
@@ -287,17 +294,19 @@ func _place_hospices(region: WorldRegion) -> void:
 		_landmark_hexes[saddle] = true
 
 
-## Villages and hamlets: the land hexes by site score, best first. Villages go first: each is kept SPACING hexes from every
-## settlement. Then the hamlets take the sites that are still free, HAMLET_SPACING hexes from every settlement and HAMLET_GAP
-## hexes from every other hamlet (so a hamlet may sit beside a village, and the hamlets are thinned, not every good hex).
+## Villages: the farmland and grassland hexes of the plain and the hills are the pool, and one village is put down for every
+## VILLAGE_EVERY of them, best site score first, each kept SPACING hexes from every settlement. No hamlets: at the region zoom
+## they are decoration, not places.
 func _place_generated() -> void:
 	var cands: Array[Vector2i] = []
+	village_pool = 0
 	for hex: Vector2i in site_score.keys():
+		if not _farmland_or_grass(hex):
+			continue
+		village_pool += 1
 		if _index.has(hex) or _landmark_hexes.has(hex):
 			continue
-		if _relief.level_at(hex) > MAX_GENERATED_LEVEL:
-			continue
-		if site_score[hex] >= minf(VILLAGE_SCORE, HAMLET_SCORE):
+		if site_score[hex] >= VILLAGE_SCORE:
 			cands.append(hex)
 	cands.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 		var sa: float = site_score[a]
@@ -305,21 +314,67 @@ func _place_generated() -> void:
 		if sa != sb:
 			return sa > sb
 		return a.y < b.y or (a.y == b.y and a.x < b.x))
+	village_budget = floori(float(village_pool) / float(VILLAGE_EVERY))
+	var villages := 0
 	for hex: Vector2i in cands:
-		if site_score[hex] >= VILLAGE_SCORE and not settled_within(hex, SPACING):
-			_add("", hex, 2, false, 0, false, true)
-	for hex: Vector2i in cands:
-		if site_score[hex] >= HAMLET_SCORE and not _index.has(hex) and not settled_within(hex, HAMLET_SPACING) \
-				and not _hamlet_within(hex, HAMLET_GAP):
-			_add("", hex, 1, false, 0, false, true)
+		if villages >= village_budget:
+			break
+		if settled_within(hex, SPACING):
+			continue
+		_add("", hex, 2, false, 0, false, true)
+		villages += 1
 
 
-## True when a hamlet (level 1, generated) lies less than radius hexes from the hex.
-func _hamlet_within(hex: Vector2i, radius: int) -> bool:
+## True for a land hex of the plain or the hills (levels 1 to VILLAGE_MAX_LEVEL) with farmland or grassland on it.
+func _farmland_or_grass(hex: Vector2i) -> bool:
+	if not _is_land(hex) or _relief.level_at(hex) > VILLAGE_MAX_LEVEL:
+		return false
+	var c := _cover.cover_at(hex)
+	return c == WorldCover.FARMLAND or c == WorldCover.GRASSLAND
+
+
+## Authored towns that crowd a bigger place (03 section 5, the owner's review of 2026-11-14): a town (level 3) within one hex of a
+## bigger place becomes a village (its name stays on the map, smaller); a village within one hex of a bigger place is dropped.
+## Both are judged on the levels before any change. River cities and castles are never demoted or dropped.
+func _demote_crowded() -> void:
+	var to_demote: Array[Dictionary] = []
+	var to_drop: Dictionary[Vector2i, bool] = {}
 	for pl: Dictionary in places:
-		if int(pl["level"]) == 1 and bool(pl["generated"]) and hex_distance(hex, pl["hex"]) < radius:
-			return true
-	return false
+		if bool(pl["generated"]) or bool(pl["river_city"]):
+			continue
+		var level := int(pl["level"])
+		if level < 2 or level > 3:
+			continue
+		var hex: Vector2i = pl["hex"]
+		var bigger := false
+		for other: Dictionary in places:
+			var oh: Vector2i = other["hex"]
+			if oh != hex and int(other["level"]) > level and hex_distance(hex, oh) <= 1:
+				bigger = true
+				break
+		if not bigger:
+			continue
+		if level == 3:
+			to_demote.append(pl)
+		else:
+			to_drop[hex] = true
+	for pl: Dictionary in to_demote:
+		pl["level"] = 2
+		demoted.append(str(pl["name"]))
+	if to_drop.is_empty():
+		return
+	var kept: Array[Dictionary] = []
+	for pl: Dictionary in places:
+		var hex: Vector2i = pl["hex"]
+		if to_drop.has(hex):
+			dropped.append(str(pl["name"]))
+		else:
+			kept.append(pl)
+	places = kept
+	_index.clear()
+	for i: int in places.size():
+		var ih: Vector2i = places[i]["hex"]
+		_index[ih] = i
 
 
 ## Snaps an authored place to the best land hex within one hex of its true position (03 section 6). The true hex is kept on

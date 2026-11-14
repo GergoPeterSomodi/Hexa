@@ -39,6 +39,9 @@ const BRIDGE := Color("#5a4632")
 const FORD := Color("#eef6fb")
 const QUAY := Color("#1f3f5c")
 const CASTLE_INK := Color("#2b2622")
+const PLATE := Color("#fbf7eee6")  # the name plate of a settlement (parchment, a little see-through)
+const PLATE_PAD := 4.0  # the plate's side padding, in pixels
+const NETWORK_LEGEND_HEIGHT := 292.0  # the roads and places legend, top right (its panel box is kept clear of the names)
 ## Soft ground colours of the covers (WorldCover order: farmland, grassland, woods, marsh, rock, snow, tundra, sand).
 ## The soft band at each hex edge, as a share of the hex radius (the owner's v2: 20 to 25 per cent).
 const BLEND_BAND := 0.22
@@ -241,10 +244,8 @@ func _draw_water_bodies() -> void:
 		var px := PackedVector2Array()
 		for km: Vector2 in pts:
 			px.append(km_to_px(km))
-		var pins: Array[bool] = []
-		for k: int in px.size():
-			pins.append(k == 0 or k == px.size() - 1)
-		draw_polyline(_chaikin(px, pins, 3), LAKE, maxf(3.0, float(lk["width_km"]) * px_per_km * 0.8), true)
+		draw_polyline(WorldWater.smooth_line(px, water.lake_pins(i), WorldWater.DRAW_ROUNDS), LAKE,
+			maxf(3.0, float(lk["width_km"]) * px_per_km * 0.8), true)
 
 
 func _draw_shores() -> void:
@@ -272,7 +273,7 @@ func _draw_rivers() -> void:
 		var px := PackedVector2Array()
 		for km: Vector2 in water.river_points_km(i):
 			px.append(km_to_px(km))
-		var curve := _chaikin(px, water.river_pins(i), 3)
+		var curve := WorldWater.smooth_line(px, water.river_pins(i), WorldWater.DRAW_ROUNDS)
 		var klass := float(int(rv["class"]))
 		var w_source := 1.0 + 0.6 * klass
 		var w_mouth := 2.0 + 1.6 * klass
@@ -286,36 +287,6 @@ func _draw_rivers() -> void:
 				continue
 			var t := (float(c) + 0.5) / float(chunks)
 			draw_polyline(part, RIVER, lerpf(w_source, w_mouth, t), true)
-
-
-## Chaikin corner cutting, a few rounds, for an open line. A point flagged in pins keeps its place (the ends and the river
-## city crossings), so the curve passes through the points that a crossing or a bridge pins.
-static func _chaikin(points: PackedVector2Array, pins: Array[bool], rounds: int) -> PackedVector2Array:
-	var pts := points
-	var flags: Array[bool] = pins.duplicate()
-	for r: int in rounds:
-		var out := PackedVector2Array()
-		var out_flags: Array[bool] = []
-		var n := pts.size()
-		if n < 3:
-			break
-		for i: int in n - 1:
-			var a := pts[i]
-			var b := pts[i + 1]
-			if flags[i]:
-				out.append(a)
-				out_flags.append(true)
-			else:
-				out.append(a * 0.75 + b * 0.25)
-				out_flags.append(false)
-			if not flags[i + 1]:
-				out.append(a * 0.25 + b * 0.75)
-				out_flags.append(false)
-		out.append(pts[n - 1])
-		out_flags.append(true)
-		pts = out
-		flags = out_flags
-	return pts
 
 
 func _draw_crests() -> void:
@@ -419,7 +390,7 @@ func _draw_roads() -> void:
 			var pins: Array[bool] = []
 			for k: int in run.size():
 				pins.append(k == 0 or k == run.size() - 1)
-			_draw_road_run(_chaikin(run, pins, 3), q)
+			_draw_road_run(WorldWater.smooth_line(run, pins, WorldWater.DRAW_ROUNDS), q)
 			i = j + 1
 
 
@@ -463,14 +434,15 @@ func _draw_crossings() -> void:
 		draw_line(km_to_px(seg[0]), km_to_px(seg[1]), QUAY, 3.0)
 
 
-## Settlements as markers by level (hamlet dot, village ring dot, town square, city square, great city square with a ring),
-## a gold ring for the capital, a small tower for a castle. Landmarks: a gold diamond for a hospice on its saddle, a cross for a
-## monastery. The names (WorldLabels) come from the town level up, more of them as the view zooms in, and a name that would
-## collide with a marker, a panel or another name is moved to another spot or dropped.
+## Settlements as name plates only (owner's review, 2026-11-14: no level dots; importance shows by the plate and the font size).
+## Each settlement's name sits on a cream plate beside its hex: the great city largest, then the city, the town and the village.
+## The capital's plate has a gold edge. A castle is a small tower, a hospice a gold diamond on its saddle, a monastery a cross.
+## The names (WorldLabels) come from the largest level down, and a name that would collide with a hex, a panel or another name
+## moves to another spot or is dropped.
 func _draw_settlements() -> void:
 	var font := ThemeDB.fallback_font
 	var reach := Rect2(Vector2.ZERO, size).grow(40.0)
-	var boxes: Array[Rect2] = []  # the boxes the names keep off: every marker in reach, and the panels
+	var boxes: Array[Rect2] = []  # the boxes the names keep off: every hex in reach (a small box at its centre), the panels
 	var names: Array[Dictionary] = []
 	for pl: Dictionary in places.places:
 		var hex: Vector2i = pl["hex"]
@@ -479,27 +451,13 @@ func _draw_settlements() -> void:
 			continue
 		var level := int(pl["level"])
 		var capital := bool(pl["capital"])
-		var half := _marker_half(level, capital)
-		boxes.append(Rect2(at - Vector2(half, half), Vector2(2.0 * half, 2.0 * half)))
+		boxes.append(Rect2(at - Vector2(3.0, 3.0), Vector2(6.0, 6.0)))
 		var label := str(pl["name"])
 		if label != "" and _label_tier(level):
-			var fs := 14 if level >= 4 else 12
-			names.append({"name": label, "at": at, "width": font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x,
-				"size": float(fs), "rank": level * 10 + (5 if capital else 0), "half": half})
-		match level:
-			1:
-				draw_circle(at, 2.2, TEXT)
-			2:
-				draw_circle(at, 3.8, Color("#fbf7ee"))
-				draw_circle(at, 3.8, INK, false, 1.2)
-			3:
-				_draw_square(at, 5.0)
-			4:
-				_draw_square(at, 7.0)
-			_:
-				_draw_square(at, 9.0)
-		if level >= 5 or capital:
-			draw_arc(at, 12.0, 0.0, TAU, 32, GOLD, 2.0, true)
+			var fs := _font_size(level)
+			var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 2.0 * PLATE_PAD
+			names.append({"name": label, "at": at, "width": width, "size": float(fs),
+				"rank": level * 10 + (5 if capital else 0), "half": 3.0, "capital": capital})
 		if int(pl["castle"]) > 0:
 			draw_rect(Rect2(at + Vector2(7.0, -13.0), Vector2(6.0, 7.0)), CASTLE_INK)
 	for lm: Dictionary in places.landmarks:
@@ -524,22 +482,26 @@ func _draw_settlements() -> void:
 		var box: Rect2 = item["box"]
 		label_boxes.append(box)
 		label_names.append(str(item["name"]))
-		draw_string(font, box.position + Vector2(0.0, float(item["size"]) + 1.0), str(item["name"]),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, int(item["size"]), TEXT)
+		_draw_plate(font, box, str(item["name"]), int(item["size"]), bool(item["capital"]))
 
 
-## The half size of a settlement's marker on the map (the ring of the great city and the capital is the largest).
-func _marker_half(level: int, capital: bool) -> float:
-	if level >= 5 or capital:
-		return 12.0
+## A name on its plate: the cream plate with an ink edge (a gold edge for the capital), and the text inside it.
+func _draw_plate(font: Font, box: Rect2, text: String, fs: int, capital: bool) -> void:
+	draw_rect(box, PLATE)
+	draw_rect(box, GOLD if capital else INK, false, 2.0 if capital else 1.0)
+	draw_string(font, box.position + Vector2(PLATE_PAD, float(fs) + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, TEXT)
+
+
+## The font size of a settlement's name by its level: the great city largest, the village smallest.
+func _font_size(level: int) -> int:
 	match level:
-		1:
-			return 3.0
-		2:
-			return 5.0
+		5:
+			return 17
+		4:
+			return 15
 		3:
-			return 6.0
-	return 8.0
+			return 13
+	return 11
 
 
 ## The names shown at a level and zoom: the great cities, cities and capitals always; towns from a zoom of 1 pixel per km;
@@ -561,14 +523,8 @@ func _panel_boxes() -> Array[Rect2]:
 		var box := 68.0 + float(rows) * 18.0
 		out.append(Rect2(8.0, size.y - box - 16.0, 262.0, box + 8.0))
 	if roads != null:
-		out.append(Rect2(size.x - 258.0, MARGIN_TOP + 8.0, 250.0, 278.0))
+		out.append(Rect2(size.x - 258.0, MARGIN_TOP + 8.0, 250.0, NETWORK_LEGEND_HEIGHT))
 	return out
-
-
-func _draw_square(at: Vector2, r: float) -> void:
-	draw_rect(Rect2(at - Vector2(r, r), Vector2(2.0 * r, 2.0 * r)), Color("#fbf7ee"))
-	draw_rect(Rect2(at - Vector2(r, r), Vector2(2.0 * r, 2.0 * r)), INK, false, 1.5)
-	draw_rect(Rect2(at - Vector2(r - 2.0, r - 2.0), Vector2(2.0 * r - 4.0, 2.0 * r - 4.0)), TEXT)
 
 
 func _draw_network_legend() -> void:
@@ -576,11 +532,9 @@ func _draw_network_legend() -> void:
 	var w := 250.0
 	var x := size.x - w - 8.0
 	var y := MARGIN_TOP + 8.0
-	var lines: Array[String] = ["Highway (quality 3)", "Road (quality 2)", "Track (quality 1)", "Stone bridge",
+	var lines: Array[String] = ["Highway (capital's roads)", "Road (quality 2)", "Track (quality 1)", "Stone bridge",
 		"Wooden bridge", "Ford", "Ferry", "Pass (gold edge)", "Quay"]
-	var marks: Array[String] = ["Great city", "City", "Town", "Village", "Hamlet", "Capital"]
-	var height := 30.0 + float(lines.size() + marks.size()) * 16.0 + 8.0
-	draw_rect(Rect2(x, y, w, height), PANEL)
+	draw_rect(Rect2(x, y, w, NETWORK_LEGEND_HEIGHT), PANEL)
 	draw_string(font, Vector2(x + 10.0, y + 16.0), "Roads and places", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEXT)
 	for i: int in lines.size():
 		var ly := y + 30.0 + float(i) * 16.0
@@ -609,25 +563,15 @@ func _draw_network_legend() -> void:
 			8:
 				draw_line(Vector2(x0, ly), Vector2(x1, ly), QUAY, 3.0)
 		draw_string(font, Vector2(x + 56.0, ly + 4.0), lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, TEXT)
-	var base := y + 30.0 + float(lines.size()) * 16.0
-	for i: int in marks.size():
-		var my := base + float(i) * 16.0
-		var mx := x + 28.0
-		match i:
-			0:
-				_draw_square(Vector2(mx, my), 9.0)
-			1:
-				_draw_square(Vector2(mx, my), 7.0)
-			2:
-				_draw_square(Vector2(mx, my), 5.0)
-			3:
-				draw_circle(Vector2(mx, my), 3.8, Color("#fbf7ee"))
-				draw_circle(Vector2(mx, my), 3.8, INK, false, 1.2)
-			4:
-				draw_circle(Vector2(mx, my), 2.2, TEXT)
-			_:
-				draw_arc(Vector2(mx, my), 6.0, 0.0, TAU, 16, GOLD, 2.0, true)
-		draw_string(font, Vector2(x + 56.0, my + 4.0), marks[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, TEXT)
+	# The places: the name plates by size (importance), and the capital's gold edge.
+	var base := y + 30.0 + float(lines.size()) * 16.0 + 6.0
+	var samples: Array[String] = ["Great city", "City", "Town", "Village", "Capital"]
+	var sizes: Array[int] = [17, 15, 13, 11, 13]
+	for i: int in samples.size():
+		var fs := sizes[i]
+		var text_w := font.get_string_size(samples[i], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 2.0 * PLATE_PAD
+		var top := base + float(i) * 22.0
+		_draw_plate(font, Rect2(x + 12.0, top, text_w, float(fs) + 4.0), samples[i], fs, i == 4)
 
 
 func _gui_input(event: InputEvent) -> void:

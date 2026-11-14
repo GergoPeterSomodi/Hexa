@@ -1,8 +1,9 @@
 ## The settlements of the map prototype region (core/worldmap/world_places.gd): every authored place snapped to a free land hex
 ## within one hex of its true position, the river cities on their pinned hexes, the levels, castles and capital of the named
 ## places, one hospice on each saddle of a pass with a crest at 2000 metres or more (no two passes share a saddle), generated
-## places only at levels 1 and 2 and at least SPACING hexes apart, and every port with a quay on its own shore or lake edge.
-## The counts pin what the first build showed.
+## places only villages (level 2, no hamlets at this zoom) on the farmland and grassland of the plain and the hills, one for every
+## VILLAGE_EVERY hexes of that pool and at least SPACING hexes apart; authored towns that crowd a bigger place are demoted or
+## dropped; and every port has a quay on its own shore or lake edge. The counts pin what the first build showed.
 extends GutTest
 
 const HEIGHTS := "res://data/worldmap/heights_alps_po.json"
@@ -151,18 +152,21 @@ func test_a_hospice_stands_on_each_saddle_of_a_high_pass() -> void:
 	assert_eq(expected, 11, "eleven such passes in the region")
 
 
-func test_generated_places_are_villages_and_hamlets_kept_apart() -> void:
+func test_generated_places_are_villages_on_the_farmland_within_the_budget() -> void:
 	if not _ready_or_fail():
 		return
 	var generated: Array[Dictionary] = []
 	for pl: Dictionary in _places.places:
 		if bool(pl["generated"]):
 			generated.append(pl)
-			assert_true(int(pl["level"]) == 1 or int(pl["level"]) == 2,
-				"generated place %s is a hamlet or a village" % str(pl["hex"]))
-	assert_gte(generated.size(), 15, "the region gets generated villages")
-	# Villages keep SPACING hexes from every village and every authored place; hamlets only take their own hex (spacing 1),
-	# so they may stand beside a place and the countryside is not empty.
+			assert_eq(int(pl["level"]), 2, "generated place %s is a village (no hamlets at the region zoom)" % str(pl["hex"]))
+			var hex: Vector2i = pl["hex"]
+			assert_true(_places._farmland_or_grass(hex), "%s stands on farmland or grassland of the plain or the hills" % str(hex))
+	assert_gte(generated.size(), 8, "the region gets generated villages")
+	assert_lte(generated.size(), _places.village_budget, "no more villages than the budget")
+	assert_eq(_places.village_budget, floori(float(_places.village_pool) / float(WorldPlaces.VILLAGE_EVERY)),
+		"the budget is one village per %d farmland hexes" % WorldPlaces.VILLAGE_EVERY)
+	# Villages keep SPACING hexes from every village and every authored place.
 	for pl: Dictionary in _places.places:
 		if not bool(pl["generated"]) or int(pl["level"]) != 2:
 			continue
@@ -180,6 +184,33 @@ func test_generated_places_are_villages_and_hamlets_kept_apart() -> void:
 		for other: Dictionary in _places.places:
 			if other["hex"] == a:
 				assert_true(other == pl, "%s: one place per hex" % str(a))
+
+
+func test_no_hamlets_and_the_region_has_60_to_80_places() -> void:
+	if not _ready_or_fail():
+		return
+	var hamlets := 0
+	for pl: Dictionary in _places.places:
+		hamlets += int(int(pl["level"]) == 1)
+	assert_eq(hamlets, 0, "no hamlets are places at the region zoom")
+	assert_gte(_places.places.size(), 60, "about 60 to 80 places in the region (the owner's review)")
+	assert_lte(_places.places.size(), 80, "about 60 to 80 places in the region (the owner's review)")
+
+
+func test_no_authored_town_stands_beside_a_bigger_place() -> void:
+	if not _ready_or_fail():
+		return
+	for pl: Dictionary in _places.places:
+		if bool(pl["generated"]) or int(pl["level"]) != 3:
+			continue
+		var hex: Vector2i = pl["hex"]
+		for other: Dictionary in _places.places:
+			var oh: Vector2i = other["hex"]
+			if oh == hex:
+				continue
+			if WorldPlaces.hex_distance(hex, oh) <= 1:
+				assert_lte(int(other["level"]), 3, "%s (a town) does not stand beside %s" % [pl["name"], other["name"]])
+	assert_gt(_places.demoted.size(), 0, "some crowding towns were demoted to villages")
 
 
 func test_generated_places_avoid_the_river_cities_and_landmarks() -> void:
@@ -270,9 +301,12 @@ func test_counts_are_the_first_build_counts() -> void:
 	if not _ready_or_fail():
 		return
 	var s := _places.summary()
-	assert_eq(s["places"], 123, "123 places (authored, castles, generated)")
-	assert_eq(s["generated"], 64, "64 generated places: 26 villages and 38 hamlets (the target is about 40 to 60; 100 before the tuning)")
-	assert_eq(s["ports"], 25, "25 ports (the Riviera, the lagoon, the Adriatic coast)")
+	assert_eq(s["places"], 72, "72 places (authored towns and cities, castles, generated villages); 123 before the thinning")
+	assert_eq(s["generated"], 13, "13 generated villages (the budget is 14: the spacing takes one)")
+	assert_eq(s["demoted"], 9, "9 authored towns demoted to villages for crowding a bigger place")
+	assert_eq(s["dropped"], 0, "no authored place dropped")
+	assert_eq(s["village_pool"], 104, "104 farmland and grassland hexes of the plain and the hills")
+	assert_eq(s["ports"], 14, "14 ports (the generated coastal villages are no longer places)")
 	assert_eq(s["capitals"], 1, "one capital")
 	assert_eq(s["monasteries"], 1, "the Certosa")
 	assert_eq(s["failures"], 0, "no failures")

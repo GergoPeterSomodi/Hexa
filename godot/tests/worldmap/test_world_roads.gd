@@ -2,7 +2,8 @@
 ## the network, every link routes, every pass with a saddle carries a road (the three Alpine routes over two sides), no road
 ## lies on a crest except over a pass, every road over water has a crossing that fits its edge (none on the six edges of a
 ## river city), the bridges over the Ticino and the Po at Pavia are there, and the qualities and crossing kinds are in their
-## ranges. The counts pin what the first build showed.
+## ranges. The owner's review (2026-11-14) thinned the network: highways only on the capital's links, parallel links dropped,
+## a village on a track only when no road reaches it. The counts pin what the first build showed.
 extends GutTest
 
 const HEIGHTS := "res://data/worldmap/heights_alps_po.json"
@@ -165,7 +166,7 @@ func test_qualities_and_crossings_are_in_their_ranges() -> void:
 	assert_gte(int(kinds.get("ford", 0)), 1, "fords")
 	assert_gte(int(kinds.get("bridge_wood", 0)), 1, "wooden bridges")
 	assert_gte(int(kinds.get("bridge_stone", 0)), 1, "stone bridges")
-	assert_gte(int(kinds.get("ferry", 0)), 1, "ferries")
+	assert_eq(int(kinds.get("ferry", 0)), 0, "no ferry: the thinned network has no lake crossing (the owner's review)")
 
 
 func test_every_quay_has_a_port_at_its_hex() -> void:
@@ -183,14 +184,38 @@ func test_the_build_is_repeatable_and_the_counts_are_the_first_build_counts() ->
 	var again := WorldRoads.build(_grid, _relief, _water, _places, _region)
 	assert_eq(again.summary(), _roads.summary(), "the same inputs give the same network")
 	var s := _roads.summary()
-	assert_eq(int(s["edges"]), 233, "233 road edges")
-	assert_eq(int(s["links"]), 158, "158 links")
+	assert_eq(int(s["edges"]), 175, "175 road edges (233 before the thinning)")
+	assert_eq(int(s["links"]), 112, "112 links")
 	assert_eq(int(s["link_failures"]), 0, "no link failures")
-	assert_eq(int(s["network_hexes"]), 199, "199 hexes on a road")
+	assert_eq(int(s["network_hexes"]), 161, "161 hexes on a road")
 	var q: Array = s["qualities"]
-	assert_eq(int(q[1]), 98, "98 track edges (spurs to villages and hamlets, passes without a hospice)")
-	assert_eq(int(q[2]), 88, "88 road edges (joins between towns, the coast, the passes with a hospice)")
-	assert_eq(int(q[3]), 47, "47 highway edges (from Milan and between the cities)")
+	assert_eq(int(q[1]), 64, "64 track edges (spurs to cut-off villages, passes without a hospice, the valley tails)")
+	assert_eq(int(q[2]), 71, "71 road edges (joins between towns, the coast, the passes with a hospice)")
+	assert_eq(int(q[3]), 40, "40 highway edges (the capital's links only)")
+
+
+func test_highways_are_the_capitals_links_only() -> void:
+	if not _ready_or_fail():
+		return
+	var on_capital: Dictionary[Vector4i, bool] = {}
+	for ln: Dictionary in _roads.links:
+		if str(ln["kind"]) != "capital":
+			continue
+		var path: Array = ln["path"]
+		for i: int in path.size() - 1:
+			on_capital[WorldGrid.edge_key(path[i], path[i + 1])] = true
+	for e: Vector4i in _roads.quality.keys():
+		if _roads.quality_of(e) == 3:
+			assert_true(on_capital.has(e), "%s: a highway lies on a link from the capital" % str(e))
+
+
+func test_every_village_stands_on_a_road() -> void:
+	if not _ready_or_fail():
+		return
+	for pl: Dictionary in _places.places:
+		if bool(pl["generated"]):
+			var hex: Vector2i = pl["hex"]
+			assert_true(_roads.network.has(hex), "the village at %s is on a road (a track if it was cut off)" % str(hex))
 
 
 func test_main_roads_join_towns_and_cross_hospice_passes() -> void:
