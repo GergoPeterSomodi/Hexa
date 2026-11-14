@@ -148,14 +148,30 @@ class WorldBusTest(unittest.TestCase):
         self.assertEqual((event.tag, event.pos, event.get("loser"), event.get("by")), ("POR", prov.pos, enemy, "peace"))
         self.assertEqual(prov.owner, "POR")
 
+    def test_kind_province_captured_by_walk_on_open_land(self):
+        w = self.w
+        enemy = self.neighbour()
+        w.declare_war("POR", enemy)
+        prov = next(p for p in w.provinces_of(enemy) if not p.castle and w.castle_of(p.pos) is None)
+        w.units[:] = [u for u in w.units if u.pos != prov.pos]
+        w.units.append(Unit(9001, troop("infantry", 1), "POR", prov.pos, hp=10))
+        w.sieges()
+        self.assertEqual(prov.controller, "POR")
+        self.assertFalse(self.kinds("siege_progress"), "open land has no meter")
+        event = self.one("province_captured")
+        self.assertEqual((event.tag, event.pos, event.get("loser"), event.get("by")), ("POR", prov.pos, enemy, "walk"))
+
     def test_kind_province_captured_and_siege_progress(self):
+        from tests.support.battles import place
+        from hexa.campaign.data import GARRISON_HP
         w = self.w
         enemy = self.neighbour()
         w.declare_war("POR", enemy)
         prov = next(p for p in w.provinces_of(enemy) if not p.castle)
         w.units[:] = [u for u in w.units if u.pos != prov.pos]
-        troops = Unit(9001, troop("infantry", 1), "POR", prov.pos, hp=10)
-        w.units.append(troops)
+        prov.castle, prov.garrison = 2, 2 * GARRISON_HP            # a castle: the siege and its meter
+        w.changed(ownership=True)
+        place(w, "infantry", 1, "POR", prov.pos, 6)
         for _ in range(12):
             w.sieges()
             if prov.controller == "POR":

@@ -1,11 +1,13 @@
 """The siege pace table (0.2.2, design sieges-and-retreats.md section 4.3): the seasons it takes each besieger to take a place
-with no castle and castles 1 to 3, played in the engine (war.sieges, season by season), next to the design's numbers.
+with no castle (open land, castle areas 2.3) and castles 1 to 3, played in the engine (war.sieges, season by season), next
+to the design's numbers.
 
     python -m tools.siege_stats            # the table, and whether every cell is within one season of the design
     python -m tools.siege_stats --forecast # also the card's forecast (war.siege_forecast) for each cell
 
-Plains, full garrisons, no general, no hunger before the stores run out (the table's conditions). A place with no castle
-falls to a militia of 500 men. Pygame-free; it changes a fresh world only. tests/test_sieges.py asserts the same table.
+Plains, full garrisons, no general, no hunger before the stores run out (the table's conditions). Open land (no standing
+castle holds it) falls in the season an army of 500 men or more stands on it alone. Pygame-free; it changes a fresh world
+only. tests/test_sieges.py asserts the same table.
 """
 import sys
 
@@ -14,14 +16,14 @@ from hexa.campaign.state import War
 from hexa.campaign.world import CampaignWorld
 from tests.support.battles import place
 
-# (besieger, regiments and guns as (branch, era, count), the design's seasons: no castle, castle 1, 2, 3; None = cannot)
+# (besieger, regiments and guns as (branch, era, count), the seasons: open land (no castle), castle 1, 2, 3; None = cannot)
 DESIGN = (
-    ("1 regiment, no guns", [("infantry", 1, 1)], (2, 4, None, None)),
-    ("3 regiments, no guns", [("infantry", 1, 3)], (2, 3, 4, 7)),
-    ("6 regiments, no guns", [("infantry", 1, 6)], (2, 3, 4, 6)),
-    ("3 regiments + 1 bombard", [("infantry", 1, 3), ("artillery", 1, 1)], (2, 2, 4, 6)),
-    ("6 regiments + 1 bombard", [("infantry", 1, 6), ("artillery", 1, 1)], (2, 2, 3, 5)),
-    ("3 regiments + 2 culverins", [("infantry", 1, 3), ("artillery", 2, 2)], (2, 2, 2, 3)),
+    ("1 regiment, no guns", [("infantry", 1, 1)], (1, 4, None, None)),
+    ("3 regiments, no guns", [("infantry", 1, 3)], (1, 3, 4, 7)),
+    ("6 regiments, no guns", [("infantry", 1, 6)], (1, 3, 4, 6)),
+    ("3 regiments + 1 bombard", [("infantry", 1, 3), ("artillery", 1, 1)], (1, 2, 4, 6)),
+    ("6 regiments + 1 bombard", [("infantry", 1, 6), ("artillery", 1, 1)], (1, 2, 3, 5)),
+    ("3 regiments + 2 culverins", [("infantry", 1, 3), ("artillery", 2, 2)], (1, 2, 2, 3)),
 )
 LIMIT = 40
 
@@ -31,10 +33,12 @@ def _world():
 
 
 def _castle_target(world, castle):
-    """An empty Castilian province, not its capital, set to ``castle`` levels with a full garrison (none for level 0)."""
+    """An empty Castilian province, not its capital, set to ``castle`` levels with a full garrison (none for level 0: open
+    land, which no standing castle holds)."""
     world.wars.append(War("POR", "CAS", world.turn))
     prov = next(p for p in sorted(world.provinces_of("CAS"), key=lambda p: p.pos)
-                if p.pos != world.countries["CAS"].capital and not world.units_at(p.pos))
+                if p.pos != world.countries["CAS"].capital and not world.units_at(p.pos)
+                and (castle or world.castle_of(p.pos) is None))
     prov.terrain, prov.castle = "plains", castle
     prov.garrison = castle * GARRISON_HP
     prov.controller, prov.siege, prov.besieger, prov.siege_turns, prov.siege_name = "CAS", 0, "", 0, ""

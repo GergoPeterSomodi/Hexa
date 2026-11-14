@@ -18,7 +18,7 @@ from ..data import (CASTLE_SIEGE, CROWD_BANDS, ELEVATION, GARRISON_HP, GARRISON_
                     GARRISON_REGEN, MILITIA_MEN,
                     SIEGE_BASE_NEED, SIEGE_HUNGER, SIEGE_MIN_SEASONS, SIEGE_RATE_MAX, SIEGE_STORM_CUT, START_YEAR,
                     WAR_LENGTH_AI)
-from . import battle as battlesys, combat, movement
+from . import areas, battle as battlesys, combat, movement
 from ..state import War
 
 # What this module changes on the world: the wars, the provinces (owner, controller, siege, garrison), the units (hit
@@ -323,7 +323,12 @@ def siege_terms(world, prov, tag, units, hp=None):
 def siege_forecast(world, prov, tag, units, progress=0, turns=0):
     """Seasons until a place falls at the rate the stack has now, counting the season it arrives in as the first (the odds
     card's "falls in about N seasons"). A running siege counts on from its meter (``progress``, ``turns`` seasons held).
-    None when the stack is too small to hold it."""
+    None when the stack is too small to hold it. Land with no castle (castle areas, 2.3): None when a standing castle holds
+    it (no siege there), else 1 season for a stack with the militia's men."""
+    if not prov.castle:
+        if areas.is_held(world, prov):
+            return None
+        return 1 if sum(u.men for u in units if u.kind.war) >= MILITIA_MEN else None
     terms = siege_terms(world, prov, tag, units)
     if not terms["ok"]:
         return None
@@ -381,7 +386,8 @@ def storm_garrison(world, prov, attacker=None):
 
 def _lift(world, prov, why):
     """The siege of a place is lifted: progress, hunger, seasons and name go to zero (a lifted siege starts from zero the
-    next time, 0.2.2 defaults). ``why``: "left", "relief", "outnumbered" or "peace"."""
+    next time, 0.2.2 defaults). ``why``: "left", "relief", "outnumbered", "peace" or "area" (an old save's siege of land
+    that has no castle: the castle areas took it over)."""
     tag, name, progress, turns = prov.besieger, prov.siege_name, prov.siege, prov.siege_turns
     need = siege_need(world, prov)
     prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "", 0, 0, ""
@@ -396,12 +402,35 @@ def _forget_siege(world, prov):
 
 
 def _fall(world, prov, tag):
-    """The place falls to the besieger (province_captured, by "siege")."""
+    """The place falls to the besieger (province_captured, by "siege"). A castle's fall opens its area (castle areas, 2.3):
+    the log says how much land lies open; the army takes it by walking in, from the next season."""
     name, turns, loser = prov.siege_name, prov.siege_turns, prov.controller
+    opened = areas.opens(world, prov.pos)
     world.bus.emit("province_captured", tag, prov.pos, loser=loser, by="siege", name=name, seasons=turns)
     prov.controller = tag
     prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "", 0, 0, ""
     prov.garrison = 0 if tag != prov.owner else prov.garrison
+    shown = None if world.player in (tag, prov.owner) else "nobody"
+    world.message(f"{world.countries[tag].name} took control of {world.place(prov)}.", shown)
+    if opened:
+        world.message(f"The castle of {world.place(prov)} has fallen: its land lies open ({opened} provinces).", shown)
+    world.changed()
+
+
+def _open_to(world, prov, tag, up):
+    """Whether an army of tag on this place takes it at the end of the season (castle areas, 2.3): no standing castle holds
+    it (``up``: the castles that stood at the start of the step), and the army has more men than the militia."""
+    if areas.is_held(world, prov, up):
+        return False
+    return sum(u.men for u in world.units_at(prov.pos) if u.owner == tag and u.kind.war) >= MILITIA_MEN
+
+
+def _walk_in(world, prov, tag):
+    """Land no standing castle holds changes hands at once: the army stands on it at the end of the season (open land, the
+    land of a fallen castle, or own land taken from its owner). No meter, no floor: province_captured by "walk"."""
+    loser = prov.controller
+    world.bus.emit("province_captured", tag, prov.pos, loser=loser, by="walk")
+    prov.controller, prov.siege = tag, 0
     world.message(f"{world.countries[tag].name} took control of {world.place(prov)}.",
                   None if world.player in (tag, prov.owner) else "nobody")
     world.changed()
@@ -466,17 +495,24 @@ def _regrow_or_rebel(world, prov):
 
 
 def sieges(world):
-    """The season's siege step (0.2.2, design 4.1 to 4.2): a running siege advances (or is lifted); a stack alone on an
-    enemy place with men enough starts one; a place with no army regrows its garrison or is driven out. A battle hex and
-    a hex a side fled or withdrew onto this season make no progress (0.2.1)."""
+    """The season's siege step (0.2.2, design 4.1 to 4.2; castle areas, castle-areas.md 2.3): a running siege at a castle
+    advances (or is lifted); a stack alone on an enemy castle with men enough starts one. Land with no castle is not
+    besieged: a stack with men enough alone on land that no standing castle holds takes it at the end of the season, and
+    held land (the castle that holds it stands) is not taken. A place with no army regrows its garrison or is driven out.
+    A battle hex and a hex a side fled or withdrew onto this season make no progress (0.2.1). The standing castles are read
+    once, at the start, so a castle that falls in this step opens its land from the next season."""
     battle_hexes = {b.pos for b in world.battles}
+    up = areas.standing(world)
     for prov in list(world.provinces.values()):
         if prov.owner is None or prov.pos in battle_hexes:
             continue            # a battle hex: no progress, no garrison regrowth, while the battle lasts (spec 3.2)
         if world.retreated.get(prov.pos) == world.turn:
             continue            # a side fled or withdrew onto this hex this season: it is running, not besieging (0.2.1 review)
         if prov.besieger:
-            _siege_season(world, prov)
+            if prov.castle:
+                _siege_season(world, prov)
+            else:
+                _lift(world, prov, "area")      # an old save's siege of land with no castle: the areas take it over
             continue
         here = [u for u in world.units_at(prov.pos) if u.kind.war]
         if not here:
@@ -488,8 +524,12 @@ def sieges(world):
         if tag == prov.controller:
             prov.siege = 0
             continue
-        if world.at_war(tag, prov.controller):
+        if not world.at_war(tag, prov.controller):
+            continue
+        if prov.castle:
             _begin_siege(world, prov, tag)
+        elif _open_to(world, prov, tag, up):
+            _walk_in(world, prov, tag)
 
 
 def besiege_target(world, group, pos):

@@ -12,5 +12,6 @@ terrain (movement cost, winter, ridge crests, mountain passes, where a new land 
 supply (who is fed, foraging and the season's attrition),
 movement (reach, paths, zones of control, the march and the cost field),
 war (war and peace, attacks, battles and sieges),
+areas (castle areas: the land a castle holds, held, fallen and open land; a cache, see world.area_table),
 season (the ordered PHASES of end_round, the turn's units, sight and scores).
 """

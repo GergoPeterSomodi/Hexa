@@ -400,7 +400,8 @@ def _besiege(world, group, target_pos, owner, stand, defence_access):
     army on it. Else: ``ok`` and ``reason`` (the men rule included), ``seasons`` (falls in about N seasons, the arrival
     season counted; None when the stack is too small), ``need``, ``rate``, ``stores`` (the garrison's seasons of stores),
     ``war_left`` (the seasons the war has left, the arrival season counted, None when there is no war) and
-    ``war_ends_first`` (the place would fall after the war ends)."""
+    ``war_ends_first`` (the place would fall after the war ends), and ``opens`` (the provinces its fall opens to the
+    taker: the castle's area land its owner still holds, castle areas 2.3)."""
     prov = world.provinces.get(target_pos)
     if not group or prov is None or not prov.castle or prov.garrison <= 0:
         return None
@@ -418,7 +419,7 @@ def _besiege(world, group, target_pos, owner, stand, defence_access):
     war = next((w for w in world.wars if {w.a, w.b} == {owner, prov.controller}), None)
     left = None if war is None else warsys.war_limit(world, war.a, war.b) - (world.turn - war.start) + 1
     return {"ok": ok, "reason": reason, "seasons": seasons, "need": terms["need"], "rate": terms["rate"],
-            "stores": terms["stores"], "war_left": left,
+            "stores": terms["stores"], "war_left": left, "opens": world.area_opens(target_pos),
             "war_ends_first": bool(seasons is not None and left is not None and seasons > left)}
 
 

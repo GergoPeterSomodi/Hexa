@@ -171,6 +171,10 @@ class WarMessageTest(unittest.TestCase):
         self.assertTrue(w.declare_war("POR", "CAS"))
         target = w.provinces[(126, 54)]
         self.assertEqual(target.owner, "POR")
+        holder = w.castle_of(target.pos)                 # its own castle holds it: that castle has fallen (castle areas)
+        if holder is not None:
+            w.provinces[holder].controller = "CAS"
+            w.changed(ownership=True)
         w.units = []
         for _ in range(3):
             w._add_unit(troop("infantry", 1), "CAS", target.pos, moves=1)

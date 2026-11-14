@@ -362,7 +362,8 @@ class Feed:
         if not (mine or self._seen(event.pos)):
             return None
         why = {"relief": "a relief army broke it", "left": "the besieger left",
-               "outnumbered": "the besiegers were too few", "peace": "peace ended it"}.get(event.get("why"), "it ended")
+               "outnumbered": "the besiegers were too few", "peace": "peace ended it",
+               "area": "the castle's area took the land"}.get(event.get("why"), "it ended")
         name = event.get("name") or "Siege"
         sentence = f"{name} is lifted: {why}."
         if mine or self._seen(event.pos):

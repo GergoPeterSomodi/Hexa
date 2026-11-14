@@ -22,14 +22,15 @@ from tests.support.home import TempHome
 from tests.support.invariants import campaign_problems
 from tests.support.worlds import fresh
 
-# design 4.3: the seasons to take with a full garrison on plains, no general (no castle, castle 1, 2, 3); None: cannot
+# design 4.3: the seasons to take with a full garrison on plains, no general (open land, castle 1, 2, 3); None: cannot.
+# Open land (no castle holds it, castle areas 2.3) is taken in the season its army stands on it: 1.
 PACE = (
-    ("1 regiment, no guns", [("infantry", 1, 1)], (2, 4, None, None)),
-    ("3 regiments, no guns", [("infantry", 1, 3)], (2, 3, 4, 7)),
-    ("6 regiments, no guns", [("infantry", 1, 6)], (2, 3, 4, 6)),
-    ("3 regiments + 1 bombard", [("infantry", 1, 3), ("artillery", 1, 1)], (2, 2, 4, 6)),
-    ("6 regiments + 1 bombard", [("infantry", 1, 6), ("artillery", 1, 1)], (2, 2, 3, 5)),
-    ("3 regiments + 2 culverins", [("infantry", 1, 3), ("artillery", 2, 2)], (2, 2, 2, 3)),
+    ("1 regiment, no guns", [("infantry", 1, 1)], (1, 4, None, None)),
+    ("3 regiments, no guns", [("infantry", 1, 3)], (1, 3, 4, 7)),
+    ("6 regiments, no guns", [("infantry", 1, 6)], (1, 3, 4, 6)),
+    ("3 regiments + 1 bombard", [("infantry", 1, 3), ("artillery", 1, 1)], (1, 2, 4, 6)),
+    ("6 regiments + 1 bombard", [("infantry", 1, 6), ("artillery", 1, 1)], (1, 2, 3, 5)),
+    ("3 regiments + 2 culverins", [("infantry", 1, 3), ("artillery", 2, 2)], (1, 2, 2, 3)),
 )
 
 
@@ -37,8 +38,10 @@ def target(world, castle, garrison=True):
     """An empty Castilian province (not the capital) made a castle of ``castle`` levels with a full garrison, and a war
     between Portugal and Castile. Returns the province."""
     world.wars.append(War("POR", "CAS", world.turn))
+    # no castle: land that no standing castle holds (castle areas, 2.3), so it is open
     prov = next(p for p in sorted(world.provinces_of("CAS"), key=lambda p: p.pos)
-                if p.pos != world.countries["CAS"].capital and not world.units_at(p.pos))
+                if p.pos != world.countries["CAS"].capital and not world.units_at(p.pos)
+                and (castle or world.castle_of(p.pos) is None))
     prov.terrain = "plains"
     prov.castle = castle
     prov.garrison = castle * GARRISON_HP if garrison else 0
@@ -73,21 +76,33 @@ class PaceTest(unittest.TestCase):
                 for branch, era, count in spec:
                     place(world, branch, era, "POR", prov.pos, count)
                 got = seasons_to_fall(world, prov)
-                if want is None:
+                if castle == 0:
+                    self.assertEqual(got, 1, f"{label}: open land falls in the season its army stands on it (2.3)")
+                elif want is None:
                     self.assertIsNone(got, f"{label}, castle {castle}: cannot take it")
                 else:
                     self.assertIsNotNone(got, f"{label}, castle {castle}")
                     self.assertLessEqual(abs(got - want), 1, f"{label}, castle {castle}: {got} against {want}")
 
-    def test_no_place_falls_in_under_two_seasons(self):
+    def test_open_land_falls_in_the_season_an_army_stands_on_it(self):
         world = fresh("POR")
         world.units = []
         prov = target(world, 0, garrison=False)
-        place(world, "infantry", 1, "POR", prov.pos, 6)          # guns or not, the floor holds
+        place(world, "infantry", 1, "POR", prov.pos, 6)
         world.sieges()
-        self.assertEqual(prov.controller, "CAS", "the arrival season does not take the place")
-        world.sieges()
+        self.assertEqual(prov.controller, "POR", "open land: the arrival season takes it (castle areas, 2.3)")
+
+    def test_a_castle_falls_in_two_seasons_at_the_least(self):
+        world = fresh("POR")
+        world.units = []
+        prov = target(world, 1)
+        place(world, "infantry", 1, "POR", prov.pos, 6)          # guns or not, the castle's floor holds
+        seasons = 0
+        while prov.controller == "CAS" and seasons < 20:
+            world.sieges()
+            seasons += 1
         self.assertEqual(prov.controller, "POR")
+        self.assertGreaterEqual(seasons, 2, "the arrival season does not take a castle (the floor, 0.2.2)")
 
 
 class CrowdAndFloorTest(unittest.TestCase):

@@ -386,10 +386,10 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
   besieges, **Shift**-right-click storms. A besieged place has a siege badge on the map (hover it for the meter, the stores
   and the seasons), a Siege block in its province panel with **Storm now** for the besieger and, for the defender, a relief
   line for each army that can reach it (click it to select the army), and a line on the task flag.
-- **Sieges (0.2.2).** A besieged place has a meter (the card shows "falls in about N seasons", and warns when the war
+- **Sieges (0.2.2).** A besieged castle has a meter (the card shows "falls in about N seasons", and warns when the war
   ends first). The arrival season counts as the first. Each season the besieger adds its **rate** to the meter, and the
-  place falls at the end of a season in which the meter reaches its **need**, but never before **2 seasons** of siege:
-  no place falls in its first season, whatever the army.
+  castle falls at the end of a season in which the meter reaches its **need**, but never before **2 seasons** of siege:
+  no castle falls in its first season, whatever the army. Land with no castle is not besieged: see **Castle areas** below.
 
 | Number | Value |
 |---|---|
@@ -405,16 +405,51 @@ untick units in the side panel to leave them behind. Right-click moves the ticke
 - **One regiment alone cannot take a castle of level 2 or 3** (too few men). Seasons to take a place with full garrisons
   on plains (`python -m tools.siege_stats`, checked in `tests/test_sieges.py`):
 
-| Besieger | No castle | Castle 1 | Castle 2 | Castle 3 |
+| Besieger | Open land (no castle holds it) | Castle 1 | Castle 2 | Castle 3 |
 |---|---|---|---|---|
-| 1 regiment | 2 | 4 | cannot | cannot |
-| 3 regiments | 2 | 3 | 4 | 7 |
-| 6 regiments | 2 | 3 | 4 | 6 |
-| 3 regiments + 1 bombard | 2 | 2 | 4 | 5 |
-| 6 regiments + 1 bombard | 2 | 2 | 3 | 5 |
-| 3 regiments + 2 culverins | 2 | 2 | 2 | 3 |
+| 1 regiment | 1 | 4 | cannot | cannot |
+| 3 regiments | 1 | 3 | 4 | 7 |
+| 6 regiments | 1 | 3 | 4 | 6 |
+| 3 regiments + 1 bombard | 1 | 2 | 4 | 5 |
+| 6 regiments + 1 bombard | 1 | 2 | 3 | 5 |
+| 3 regiments + 2 culverins | 1 | 2 | 2 | 3 |
 
 The bombard row is one season longer than the design's paper table (6 at castle 3). The cause is the rule, not a bonus: the bombard is a regiment with its own 1,000 men, and the crowd counts them too (4,000 men against 1,800 is crowd 2, rate 3, so 5 seasons). The paper table counted only the infantry.
+
+- **Castle areas (0.2.2).** A castle holds the land of its own country around it: **3 hexes** for a tower, **4** for a
+  small castle, **5** for a large castle, counted along the country's own land (a hex across foreign land is not
+  reached). Each piece of land belongs to the nearest castle that reaches it (a tie goes to the higher level).
+  - **Held land** (a castle that stands holds it): an enemy army may walk in, stand and forage there, but cannot take
+    it. A right-click on it says why.
+  - **Open land** (no castle holds it, or its owner has lost it): an army with more than 500 men that stands on it
+    alone at the end of a season takes it at once. No floor, no meter.
+  - **A fallen castle** opens its land from the next season: each army walks in and takes the hex it stands on at the
+    end of a season, one per stack a season. The log says how much land lies open.
+  - **Your own land** that an enemy took is retaken the same way (one season), even inside a castle's area.
+  - Peace and capitals work as before. A capital with no castle holds nothing.
+  - The AI attacks castles first and walks onto open land when no castle is in time, and a defender walks back onto
+    its own land first.
+- **Why an army cannot get there.** A right-click on a hex the stack cannot reach says why, with the way out (the red
+  line; a **note** in the normal colour says the move happens, slowly or in parts):
+
+| Case | The message |
+|---|---|
+| The stack is in a battle | In battle: order Withdraw to leave. |
+| A ridge crest between the hexes | Nobody can cross the ridge here; armies need a pass. |
+| A pass shut by snow (winter) | The Brenner pass is closed by snow until spring. |
+| A land stack and the sea | Armies cannot walk on water. Load them onto a ship first. |
+| A unit has no moves left | They foraged this season and have no moves left. / They have already moved this season. |
+| Land of a country you are not at war with | Not at war with Portugal: their land is closed to your army. Declare war first, or go round. |
+| Wagons, settlers on enemy land | Only soldiers, generals and scouts may enter enemy land. Split off the wagons and settlers. |
+| An enemy army on the hex | An enemy army stands there (4,200 men). Right-click again to attack. |
+| Another country's army on the hex | Another country's army stands there: pick another hex. |
+| The stack limit (6 troops, more with a general) | No room: the stack there has 4 of 6 troops and you are sending 4. Split the army or pick another hex. |
+| Settlers, scouts or generals over the limit | A hex holds 3 settlers and scouts. / A hex holds one general. |
+| The march halts beside an enemy castle (note) | Stops beside the castle of Granada this season: enemy castles halt a march. Goes on next season. |
+| The march takes more than one season (note) | About 3 seasons away: the bombard (4 moves) and the mountains (3 each) slow the march. |
+| No land route within 4 seasons | Too far: more than 4 seasons away. / No way there by land: a ridge or the sea lies between. |
+| Held land (note) | Moves in, but cannot take it: held by the castle of Toledo. Take the castle first. |
+| Anything else | They cannot get there. |
 - **Getting better:** research (burghers, or pay to fund it) unlocks new eras; **refit** old troops in a town.
   A **barracks** (infantry, cavalry) or **foundry** (cannons) lets you drill units for +attack / +defense.
   Units that survive battles become **Veteran** (+10%) and **Elite** (+20%). **Generals** (raised in your

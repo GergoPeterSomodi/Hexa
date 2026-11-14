@@ -442,7 +442,8 @@ def _campaign(world, tag, stack, enemies):
     lost = [p for p in world.provinces_of(tag) if p.controller != tag]
     guns = any(u.kind.branch == "artillery" for u in stack)
     targets = lost or [p for e in enemies for p in world.provinces_of(e)
-                       if p.controller != tag and (guns or p.castle == 0 or len(stack) >= 5)]
+                       if p.controller != tag and world.castle_of(p.pos) is None      # held land is no target (2.3)
+                       and (guns or p.castle == 0 or len(stack) >= 5)]
     if not targets:
         return
     goal = min(targets, key=lambda p: distance(p.pos, stack[0].pos)).pos
@@ -465,28 +466,47 @@ def _war_seasons_left(world, prov, tag):
 
 
 def _besiege_nearest(world, tag, stack, options, enemies):
-    """The enemy place this stack can take, in time (4.8): a siege of at most _season_limit seasons that the war still has
-    seasons for. Castles of level 2 and 3 come first, then the nearest (0.2.2: open places fell to the stacks that were
-    beside a castle). Adjacent and garrisoned: besiege it now (attack_group makes it a siege); else march there.
-    True when the stack acted."""
-    limit, home = _season_limit(stack), stack[0].pos
+    """The place this stack can take, in time (4.8; castle-areas.md 3): a siege of at most _season_limit seasons that the war
+    still has seasons for. In order: the country's own land that an enemy holds (a defender retakes its own land first, in
+    one season), a castle of level 2 or 3 it can take in time, open land (one season: land no castle holds, or a fallen
+    castle's), then the rest (a castle of level 1 at its siege). Held land is never a target (its forecast is None). Open
+    land is claimed for this season by one stack, so spare stacks fan out over an opened area. Beside a castle, attack_group
+    makes it a siege; else the stack marches there. True when the stack acted."""
+    limit, home, turn = _season_limit(stack), stack[0].pos, world.turn
+    claims = world.countries[tag].memory.setdefault("claims", {})
+    for key in [k for k, claim in claims.items() if claim[0] != turn]:
+        del claims[key]                                  # a claim lasts the season it was made in
     ranked = []
-    for enemy in enemies:
-        for prov in world.provinces_of(enemy):
-            if prov.controller == tag or prov.controller not in enemies or distance(prov.pos, home) > 12 * SCALE:
-                continue
-            if world.battle_at(prov.pos) is not None:
-                continue
-            seasons = world.siege_forecast(prov, tag, stack, prov.siege if prov.besieger == tag else 0,
-                                           prov.siege_turns if prov.besieger == tag else 0)
-            left = _war_seasons_left(world, prov, tag)
-            if seasons is None or seasons > limit or (left is not None and seasons > left):
-                continue
-            priority = prov.castle >= 2 and (left is None or seasons <= left - 2)   # a castle 2/3 that falls in time first
-            ranked.append((not priority, distance(prov.pos, home), seasons, prov.pos))
+    candidates = [p for enemy in enemies for p in world.provinces_of(enemy)]
+    candidates += [p for p in world.provinces_of(tag) if p.controller in enemies]    # own land taken: retaken first
+    for prov in candidates:
+        if prov.controller == tag or prov.controller not in enemies or distance(prov.pos, home) > 12 * SCALE:
+            continue
+        if world.battle_at(prov.pos) is not None:
+            continue
+        seasons = world.siege_forecast(prov, tag, stack, prov.siege if prov.besieger == tag else 0,
+                                       prov.siege_turns if prov.besieger == tag else 0)
+        left = _war_seasons_left(world, prov, tag)
+        if seasons is None or seasons > limit or (left is not None and seasons > left):
+            continue
+        claim = claims.get(str(prov.pos))
+        if not prov.castle and claim is not None and claim[1] != stack[0].id:
+            continue                                     # another stack of ours goes for this open land this season
+        if prov.owner == tag:
+            tier = 0
+        elif prov.castle >= 2 and (left is None or seasons <= left - 2):   # a castle 2/3 that falls in time first
+            tier = 1
+        elif not prov.castle:
+            tier = 2
+        else:
+            tier = 3
+        ranked.append((tier, distance(prov.pos, home), seasons, prov.pos))
     if not ranked:
         return False
     goal = min(ranked)[3]
+    prov = world.provinces[goal]
+    if not prov.castle:
+        claims[str(goal)] = (turn, stack[0].id)
     if goal in options and world.besiege_target(stack, goal):
         world.attack_group(stack, goal)
         _answer(world, goal)
