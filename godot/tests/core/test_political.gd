@@ -114,3 +114,25 @@ func test_settlement_pieces_follow_python() -> void:
 	var tower := _province(Vector2i.ZERO, "POR")
 	tower.castle = 3
 	assert_eq(TilePlan.settlement_pieces(tower), Vector2i(0, 3), "a castle alone")
+
+
+func test_capital_flags_need_the_capital_owned_by_its_country() -> void:
+	var map := _fixture()
+	var flags := Political.capital_flags(map)
+	assert_eq(flags.size(), 2, "both capitals are held by their countries")
+	assert_eq(flags[0]["pos"], Vector2i(1, 0), "Portugal's capital")
+	assert_eq(flags[1]["pos"], Vector2i(2, 0), "Castile's capital")
+	map.provinces[Vector2i(2, 0)].owner = "POR"
+	flags = Political.capital_flags(map)
+	assert_eq(flags.size(), 1, "a capital that the country lost has no flag")
+	assert_eq(flags[0]["pos"], Vector2i(1, 0), "only Portugal's flag is left")
+
+
+func test_control_items_are_the_hexes_held_by_another_country() -> void:
+	var map := _fixture()
+	assert_eq(Political.control_items(map).size(), 0, "no controller differs from its owner")
+	map.provinces[Vector2i(1, 0)].controller = "CAS"
+	var items := Political.control_items(map)
+	assert_eq(items.size(), 1, "one hex held by another country")
+	assert_eq(items[0]["pos"], Vector2i(1, 0), "the hex")
+	assert_eq(items[0]["colour"], map.countries["CAS"].colour, "in the controller's colour")
