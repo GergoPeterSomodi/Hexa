@@ -600,7 +600,8 @@ class CampaignApp:
                 world.move_group(group, dest)
                 self.toast("On their way: they keep moving there in the coming seasons.")
             else:
-                self.toast(world.stuck_reason(group) or "They cannot get there.")
+                why = world.refusal(group, pos)          # the reason, and the way out (movement.refusal, castle-areas 5)
+                self.toast(" ".join(part for part in why[1:] if part) if why else "They cannot get there.")
         ui.group = [u for u in group if u in world.units]
         ui.picked = {u.id for u in ui.group}
         self.refresh()
@@ -899,7 +900,7 @@ class CampaignApp:
             for rect, card in ui.hoverables:
                 if rect.collidepoint(ui.mouse):
                     hint, key = card, ("area", tuple(rect))
-        if hint is None and ui.hover and ui.hover in world.terrain and not self.busy:
+        if hint is None and ui.hover and ui.hover in world.terrain and not self.busy and self.hud.hex_card_free(self):
             hint, key = card_of(world, ui.hover), ("hex", ui.hover)
         if key != ui.hover_key:
             ui.hover_key, ui.hover_since = key, now

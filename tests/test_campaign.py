@@ -310,7 +310,7 @@ class WarTest(unittest.TestCase):
         """A Castilian province without a castle next to Portuguese land."""
         w = self.w
         for prov in w.provinces_of("CAS"):
-            if prov.castle or w.units_at(prov.pos):
+            if prov.castle or w.units_at(prov.pos) or w.castle_of(prov.pos) is not None:
                 continue
             for n in neighbors(prov.pos):
                 if w.provinces.get(n) and w.provinces[n].owner == "POR" and not w.units_at(n):
@@ -326,9 +326,7 @@ class WarTest(unittest.TestCase):
         self.assertTrue(w.move_group(stack, target.pos))
         self.assertTrue(all(u.pos == target.pos for u in stack), "the stack moves together")
         w.sieges()
-        self.assertEqual(target.controller, "CAS", "no place falls in its first season (the 2-season floor, 0.2.2)")
-        w.sieges()
-        self.assertEqual(target.controller, "POR")
+        self.assertEqual(target.controller, "POR", "open land falls in the season its army stands on it (castle areas, 2.3)")
         ok, _ = w.peace_offer("POR", "CAS", "take")
         self.assertTrue(ok)
         self.assertEqual(target.owner, "POR")

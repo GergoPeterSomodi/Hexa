@@ -10,7 +10,7 @@ from ..events import EventBus
 from ..hexgrid import distance, neighbors, within
 from . import geo, naming, state, tech
 from .state import Unit, fill_defaults
-from .systems import (building, colonies, debt, economy, military, movement, research, season, supply, terrain, trade,
+from .systems import (areas, building, colonies, debt, economy, military, movement, research, season, supply, terrain, trade,
                       war, worldgen)
 from .systems import battle as battlesys
 from .data import (GENERAL, GENERAL_TRAITS, UPGRADE_MAX, MANPOWER, SUPPLY_RANGE, WAGON_SEASONS, BUILDINGS, PIONEER,
@@ -27,7 +27,9 @@ WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "vis
                   "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
                   "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None, "_bonus_cache": dict,
                   "_settled": None, "_pass_cache": None, "battles": list, "battle_names": dict,
-                  "retreated": dict, "siege_names": dict}
+                  "retreated": dict, "siege_names": dict, "castle_fell": dict, "_areas": None}
+# Derived caches: rebuilt from the rest of the state, never saved (save_state leaves them out).
+WORLD_CACHES = ("_areas",)
 # World attributes no save can do without (from_state refuses a state that lacks one). Every other attribute
 # has a default above, is rebuilt on load (geo, _ids) or is added when first needed (_explored_from).
 WORLD_REQUIRED = ("cols", "rows", "turn", "rng", "terrain", "provinces", "countries", "markets", "cities", "landmass",
@@ -106,6 +108,7 @@ class CampaignWorld:
         self.wars = []
         self.battles = []
         self.retreated = {}              # hex -> turn: a side that fled or withdrew landed there (battle.py, war.sieges)
+        self.castle_fell = {}            # castle hex -> turn it changed hands (areas.fell): its land opens the season after
         self.battle_names = {}           # battles named so far, by place (battle.py); a repeat is "Second Battle of X"
         self.siege_names = {}            # sieges named so far, by place (war.siege_name); a repeat is "Second Siege of X"
         self.routes = []
@@ -114,6 +117,7 @@ class CampaignWorld:
         self._ids = itertools.count(1)
         self._owned = None
         self._castle_list = None
+        self._areas = None               # castle areas (systems/areas.py), a cache: area_table()
         self._bonus_cache = {}
         self.visible = set()
         self.over = False
@@ -140,7 +144,7 @@ class CampaignWorld:
     # ----- saving --------------------------------------------------------------------
     def save_state(self):
         """Everything needed to rebuild this world (picklable; the map source is rebuilt from map + seed)."""
-        state = {k: v for k, v in self.__dict__.items() if k not in ("geo", "_ids", "_bonus_cache", "bus")}
+        state = {k: v for k, v in self.__dict__.items() if k not in ("geo", "_ids", "_bonus_cache", "bus") + WORLD_CACHES}
         state["_next_id"] = next(self._ids)
         self._ids = itertools.count(state["_next_id"])
         return state
@@ -286,6 +290,7 @@ class CampaignWorld:
         if ownership:
             self._owned = None
             self._castle_list = None
+            self._areas = None
 
     def unit_at(self, pos):
         """The unit on top of the stack at pos (a war unit if there is one)."""
@@ -672,6 +677,7 @@ class CampaignWorld:
     may_enter = movement.may_enter
     zoc = movement.zoc
     stuck_reason = movement.stuck_reason
+    refusal = movement.refusal
     reachable = movement.reachable
     reachable_group = movement.reachable_group
     plan = movement.plan
@@ -731,6 +737,13 @@ class CampaignWorld:
     sieges = war.sieges
     check_alive = war.check_alive
 
+    # ----- castle areas (systems/areas.py, 0.2.2): who a castle holds, and the state of a hex's land
+    castle_of = areas.castle_of
+    area = areas.area
+    area_state = areas.area_state
+    area_opens = areas.opens
+    standing_castles = areas.standing
+
     # ----- battles (state.Battle; the rules come in systems/battle.py, battle slice 1) -----------------
     def battle_at(self, pos):
         """The battle fought on this hex, or None. A linear scan: there are rarely more than a few."""
@@ -751,6 +764,13 @@ class CampaignWorld:
     def forget_castles(self):
         """Drop the cached list of fortified provinces (castles()), after a castle was lost or built."""
         self._castle_list = None
+        self._areas = None
+
+    def area_table(self):
+        """The castle areas' membership (systems/areas.py), built on the first ask after the owners or the castles changed."""
+        if self._areas is None:
+            self._areas = areas.build(self)
+        return self._areas
 
     # ----- the season (systems/season.py): the phases, the turn's units, sight and scores --------------
     end_round = season.end_round

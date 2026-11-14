@@ -10,6 +10,7 @@ from ..hexgrid import neighbors
 from . import art, geo, goodsart, goodsobjects, landscape, wfctiles
 from .render import battlemark
 from .render.budget import FrameBudget
+from .render.warareas import WarAreas
 from .data import (GOODS, NATIVE_VILLAGE_SPRITE,
                    TERRAIN, TERRAIN_SPRITES, WORKS)
 
@@ -380,6 +381,7 @@ class MapView:
             return x + ox, y + oy
         if ui.selected and ui.reach:
             self._movement(screen, at, ui)
+        self._war_stack_layer().draw(screen, view_rect, (ox, oy), ui, world, r, self.center, self.known(), self._tint)
         if ui.province:
             pygame.draw.polygon(screen, (255, 214, 70), hex_points(*at(ui.province.pos), r), 2)
         if ui.hover in world.terrain:
@@ -392,6 +394,13 @@ class MapView:
         screen.set_clip(None)
 
     # ----- ridge crests at the far zooms ------------------------------------------------------
+    def _war_stack_layer(self):
+        """The war-stack layer (render/warareas.py), made on first use: its geometry is kept between frames."""
+        layer = getattr(self, "_war_layer", None)
+        if layer is None:
+            layer = self._war_layer = WarAreas()
+        return layer
+
     def _ridge_items(self, known, keep=None):
         """[((a, b), look, is_pass)] of the crest and pass edges of known hexes (a, b: the edge's corners in unit
         points); keep(point pair) may drop the ones off screen."""

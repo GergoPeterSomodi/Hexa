@@ -248,6 +248,7 @@ CASTLE_GOODS = ({}, {"timber": 2.0, "stone": 1.0}, {"stone": 5.0}, {"stone": 10.
 CASTLE_UPKEEP = (0.0, 0.4, 1.0, 2.0)
 CASTLE_DEFENSE = 0.25                   # extra defense per level for the owner's armies
 CASTLE_SIEGE = 3                        # extra siege points needed per level (cannons add points)
+CASTLE_AREA = (0, 3, 4, 5)              # the hexes of its own land a castle holds, by level: tower, small, large (0.2.2 areas)
 
 # ----- units ------------------------------------------------------------------------
 @dataclass(frozen=True)

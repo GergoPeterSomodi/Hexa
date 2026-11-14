@@ -13,7 +13,7 @@ never world.py, ui, render or pygame.
 import heapq
 
 from ...hexgrid import distance, neighbors
-from ..data import GENERAL, SCOUT, TERRAIN
+from ..data import CIVILIAN_LIMIT, GENERAL, SCOUT, TERRAIN
 
 # What this module changes on the world: the units it moves (position, moves left, boarding), the movement record
 # last_move, and, for the moment field_in runs, the turn (put back before it returns).
@@ -106,11 +106,12 @@ def reachable_group(world, group, best=None):
     return reach
 
 
-def plan(world, group, budget):
-    """{pos: (cost, previous pos)} for this stack over `budget` move points, same rules as moving."""
+def plan(world, group, budget, zoc_halts=True):
+    """{pos: (cost, previous pos)} for this stack over `budget` move points, same rules as moving. ``zoc_halts=False``
+    walks past the enemy castles (refusal's free walk: the halt is what it explains)."""
     lead = group[0]
     naval = lead.naval
-    zoc = set() if naval else world.zoc(lead.owner)
+    zoc = set() if naval or not zoc_halts else world.zoc(lead.owner)
     walls = frozenset() if naval else world.walls()
     occupied, mine = world.owners_at(), {lead.owner}
     best = {lead.pos: (0, None)}
@@ -378,3 +379,114 @@ def pass_wait(world, group, goal):
             return edge[0]
         pos = nxt
     return ""
+
+
+# ----- why a move does not happen (castle-areas.md section 5) --------------------------------------------------------
+
+def refusal(world, group, pos):
+    """Why the stack ``group`` cannot get to ``pos`` this season, in the words of castle-areas.md section 5, or a note that
+    the move happens all the same. Returns (kind, text, way_out): kind "refusal" (the move does not happen) or "note" (it
+    does: slowly, in parts, or onto land it cannot take); text is the cause, way_out the way out (or None). None when the
+    move simply happens, and for the stack's own hex. The cases are tried in the table's order (rows 1 to 16) and the first
+    that fits is the answer; the rules are those of move_check, may_enter, stuck_reason, plan (zones of control), can_stand
+    and the stack and civilian limits. Pygame-free, and changes nothing."""
+    group = [u for u in group if u in world.units]
+    if not group or pos == group[0].pos or pos not in world.terrain:
+        return None
+    lead, owner = group[0], group[0].owner
+    ok, reason = world.move_check(group, pos)                         # rows 1 to 3: a battle, a ridge, a closed pass
+    if not ok and reason:
+        return ("refusal", reason, None)
+    prov = world.provinces.get(pos)
+    foreign = prov is not None and prov.owner not in (None, owner)
+    if not lead.naval and world.is_sea(pos) and not any(u.naval and u.owner == owner for u in world.units_at(pos)):
+        return ("refusal", "Armies cannot walk on water.", "Load them onto a ship first.")       # row 4
+    if min(u.moves_left for u in group) <= 0:                         # row 5: no moves left this season
+        why = world.stuck_reason(group)
+        if why:
+            return ("refusal", why, None)
+    if not lead.naval and foreign:
+        name = world.countries[prov.owner].name
+        if not world.at_war(owner, prov.owner):                       # row 6
+            way = (f"Declare war on {name} first, or go round." if world.war_check(owner, prov.owner)[0]
+                   else "Go round their land.")
+            return ("refusal", f"Not at war with {name}: their land is closed to your army.", way)
+        if any(not (u.kind.war or u.kind in (GENERAL, SCOUT)) for u in group):      # row 7
+            return ("refusal", "Only soldiers, generals and scouts may enter enemy land.",
+                    "Split off the wagons and settlers.")
+    here = world.units_at(pos)
+    if not world.can_stand(group, pos):
+        enemy_war = [u for u in here if u.kind.war and u.owner != owner and world.at_war(owner, u.owner)]
+        if enemy_war:                                                 # row 8
+            ok, why = world.engage_check(group, pos)
+            way = "Right-click again to attack." if ok else why
+            return ("refusal", f"An enemy army stands there ({sum(u.men for u in enemy_war):,} men).", way)
+        if any(u.owner != owner and not world.at_war(owner, u.owner) for u in here):      # row 9
+            return ("refusal", "Another country's army stands there: pick another hex.", None)
+        own = [u for u in here if u.owner == owner and u.carrier is None]
+        war_here = sum(1 for u in own if u.kind.war)
+        sending = sum(1 for u in group if u.kind.war)
+        limit = world.stack_limit(owner, own + group)
+        if war_here + sending > limit:                                # row 10
+            text = (f"No room: the stack there has {limit} of {limit} troops." if war_here >= limit else
+                    f"No room: the stack there has {war_here} of {limit} troops and you are sending {sending}.")
+            return ("refusal", text, "Split the army or pick another hex.")
+        civilians = sum(1 for u in own + group if not u.kind.war and u.kind is not GENERAL)
+        if civilians > CIVILIAN_LIMIT:                                # row 11
+            return ("refusal", f"A hex holds {CIVILIAN_LIMIT} settlers and scouts.", "Pick another hex.")
+        if sum(1 for u in own + group if u.kind is GENERAL) > 1:
+            return ("refusal", "A hex holds one general.", "Pick another hex.")
+    if pos in world.reachable_group(group):
+        castle = world.castle_of(pos)
+        if castle is not None and foreign and world.at_war(owner, prov.owner):     # row 15: it moves in, cannot take it
+            return ("note", "Moves in, but cannot take it: held by the castle of "
+                            f"{world.place(world.provinces[castle])}.", "Take the castle first.")
+        return None
+    if lead.naval and not world.is_sea(pos):
+        return ("refusal", "They cannot get there.", None)            # row 16: a ship cannot sail onto land
+    moves = min(u.moves_left for u in group)
+    speed = max(1, min(world.unit_moves(u) for u in group))
+    if not lead.naval:
+        halt = _zoc_halt(world, group, pos, moves, speed)             # row 12: the march halts beside an enemy castle
+        if halt:
+            return ("note", f"Stops beside the castle of {halt} this season: enemy castles halt a march.",
+                    "Goes on next season.")
+    path = world.path_to(group, pos, seasons=4)
+    if path:                                                          # row 13: it gets there, in more than one season
+        seasons = 1 + max(0, -(-(path[-1][1] - moves) // speed))
+        return ("note", _slow_text(world, group, path, seasons), None)
+    if pos in world.plan(group, moves + speed * 11, zoc_halts=False):  # row 14
+        return ("refusal", "Too far: more than 4 seasons away.", None)
+    return ("refusal", "No way there by land: a ridge or the sea lies between.", None)
+
+
+def _zoc_halt(world, group, pos, moves, speed):
+    """Row 12: the name of the enemy castle beside which the way to pos (over this season and the next three) halts the
+    stack, or None. The way is walked past the castles (plan with zoc_halts=False); it halts at the first hex beside one."""
+    free = world.plan(group, moves + speed * 3, zoc_halts=False)
+    if pos not in free:
+        return None
+    halts, enemies, walls = world.zoc(group[0].owner), world.enemies(group[0].owner), world.walls()
+    hop, walked = free[pos][1], []
+    while hop is not None and hop != group[0].pos:
+        walked.append(hop)
+        hop = free[hop][1]
+    for hex_ in reversed(walked):
+        if hex_ not in halts:
+            continue
+        for n in neighbors(hex_):
+            castle = world.provinces.get(n)
+            if castle and castle.castle and castle.controller in enemies and castle.garrison > 0                     and (n, hex_) not in walls:              # a ridge between the castle and this hex: no halt from it
+                return world.place(castle)
+    return None
+
+
+def _slow_text(world, group, path, seasons):
+    """Row 13: the seasons the march takes, the slowest unit and the dearest ground of the route (the data of unit_moves
+    and TERRAIN)."""
+    slow = min(group, key=world.unit_moves)
+    text = f"About {seasons} seasons away: the {slow.kind.name} ({world.unit_moves(slow)} moves)"
+    dear = max((TERRAIN[world.terrain[pos]] for pos, _ in path[1:]), key=lambda t: t.move or 0)
+    if (dear.move or 0) > 1:
+        text += f" and the {dear.name.lower()} ({dear.move} each)"
+    return text + " slow the march."
