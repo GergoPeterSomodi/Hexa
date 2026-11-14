@@ -1,8 +1,9 @@
 """The province panel: who owns it, its people, the tile and its buildings, and what the player can do there."""
 import pygame
 
-from ...ui.kit import heading, panel_frame
-from ...ui.theme import BAD_C, FAINT, GOLD, GOOD_C, MUTED, TEXT
+from ...ui.kit import heading, panel_frame, wrap
+from ...ui.theme import BAD_C, FAINT, GOLD, GOOD_C, MUTED, TEXT, WARN_C
+from ..battleview import odds_view, siege_view
 from ..data import (BUILDINGS, CASTLES, COLONY_DONE, GOODS, SETTLEMENT_SLOTS, SETTLEMENTS, TERRAIN, WORKS,
                     WORKS_BONUS, WORKS_ERA, WORKS_LEVELS)
 
@@ -12,6 +13,7 @@ def draw(ctx, world, ui, prov):
     tag = world.player
     x, y, w = panel_frame(ctx)
     y = _header(ctx, world, prov, x, y, w)
+    y = _siege(ctx, world, prov, tag, x, y, w)
     y = heading(ctx, "People", y)
     y = _people(ctx, world, prov, tag, x, y, w)
     if prov.owner == tag and tag:
@@ -23,6 +25,60 @@ def draw(ctx, world, ui, prov):
         y += 32
     if prov.market:
         ctx.button((x, y, w, 26), f"Open the {prov.market.name} market", True, ("market", prov.market), small=True)
+
+
+def _siege(ctx, world, prov, tag, x, y, w):
+    """The Siege block of a place under siege (0.2.2, design 4.7): the meter and its rate, the stores or the hunger, the
+    seasons it falls in. The besieger gets "Storm now" (its word; storm_check's reason as the hover when it is off); the
+    defender gets a relief line for each army that can reach the place (a click selects it). Nothing when no siege runs
+    there or the viewer cannot see it. Reads the siege view only; the buttons press ("siege", ...) (siegeacts.py)."""
+    view = siege_view(world, prov.pos, tag)
+    if view is None or view["access"] == "hidden" or view["progress"] is None:
+        return y
+    y = heading(ctx, "Siege", y)
+    falls = view["falls_in"]
+    lines = [(f"Besieged by {view['besieger_name']}: {round(view['progress'])} of {round(view['need'])}, "
+              f"+{round(view['rate'])} a season", TEXT),
+             ("Too few men to take it" if falls is None else f"Falls in about {falls} season{'s' * (falls != 1)}",
+              WARN_C if falls is None else TEXT)]
+    if view["starving"]:
+        lines.append((f"The garrison is starving: +{view['hunger']} a season", BAD_C))
+    else:
+        left = view["stores_left"]
+        lines.append((f"Stores for {left} more season{'s' * (left != 1)}", MUTED))
+    for text, colour in lines:
+        for line in wrap(ctx.font, text, w):
+            ctx.text(ctx.font, line, (x, y), colour)
+            y += ctx.font.get_linesize()
+    if tag and view["besieger"] == tag:
+        y = _storm_now(ctx, world, prov, tag, x, y + 4, w)
+    elif tag and view["defender"] == tag:
+        y = _relief(ctx, view, x, y + 4, w)
+    return y + 6
+
+
+def _storm_now(ctx, world, prov, tag, x, y, w):
+    """The besieger's "Storm now" button: the odds word of its stack on the place, or storm_check's reason when it is off."""
+    units = [u for u in world.units_at(prov.pos) if u.owner == tag and u.kind.war]
+    ok, reason = world.storm_check(units, prov.pos)
+    word = odds_view(world, units, prov.pos, tag)["word"] if ok else ""
+    ctx.button((x, y, w, 26), "Storm now", ok, ("siege", "storm", prov.pos),
+               "The assault now: the garrison is cut by the siege's progress" if ok else reason, word, small=True)
+    return y + 32
+
+
+def _relief(ctx, view, x, y, w):
+    """The defender's relief line for each army that can reach the place (the nearest first), a button that selects it."""
+    if not view["relief"]:
+        ctx.text(ctx.small, "No army of yours can reach it within four seasons", (x, y), MUTED, w)
+        return y + 20
+    for army in view["relief"][:2]:
+        seasons = army["seasons"]
+        ctx.button((x, y, w, 26), f"Relief: your army of {army['men']:,} men can reach it in {seasons} "
+                   f"season{'s' * (seasons != 1)}", True, ("siege", "relief", army["pos"]),
+                   "Select this army and look at it", small=True)
+        y += 30
+    return y
 
 
 def _owner_line(ctx, world, prov, x, y, w):

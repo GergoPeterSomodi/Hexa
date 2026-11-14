@@ -7,7 +7,7 @@ import pygame
 from .. import settings as options
 from ..ui.kit import button as draw_button, hover_card, text as draw_text, tip, wrap
 from ..ui.theme import BG, GOLD, LINE, PANEL_BG, TEXT, new_font
-from . import geo, saves
+from . import geo, saves, siegeacts
 from .display import open_window
 from .screens import ScreenStack, gamemenu
 from .screens.gamemenu import PauseMenu
@@ -125,7 +125,6 @@ class CampaignApp:
 
     def open_tech(self):
         self.tech.open(self)
-
 
     def _set_game(self, game):
         self.game = game                # the war alert listens to its world's event bus
@@ -537,6 +536,8 @@ class CampaignApp:
             row = int((pixel[1] - mini.y) / mini.h * world.rows)
             self.look_at((col, row))
             return
+        if self.hud.sieges.click(self, pixel):          # a siege badge opens its province
+            return
         battle = None if self.hud.covers(self, pixel) else self.hud.marks.at(pixel)
         if battle is not None:                  # the badge or the bar of a battle opens its panel
             self.press(("battle", battle))
@@ -579,7 +580,7 @@ class CampaignApp:
         here = group[0].pos
         ok, reason = world.move_check(group, pos)
         if pos in ui.attacks:
-            if world.attack_group(group, pos):
+            if siegeacts.attack(self, group, pos, bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)):
                 self._cancel_orders(group)
         elif not ok and pos != here:
             self.toast(reason)                       # a closed pass: say why
@@ -748,7 +749,8 @@ class CampaignApp:
              "merchant": _do_merchant, "goods_view": _do_goods_view, "forage": _do_forage, "recall": _do_recall,
              "market": _do_market, "country": _do_country, "province": _do_province, "goto": _do_goto,
              "log": _do_log, "battle": _do_battle, "tasks": lambda self, action: self.hud.tasks.toggle(),
-             "battle_log": lambda self, action: self.battle.show_ended(self, action[1])}
+             "battle_log": lambda self, action: self.battle.show_ended(self, action[1]),
+             "siege": lambda self, action: siegeacts.press(self, action)}
 
     def scroll(self):
         if self.menu:

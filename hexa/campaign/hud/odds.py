@@ -84,7 +84,28 @@ def _rows(view):
     for who, figures in (("Your", att), ("Their", dfn)):
         if figures.get("general"):
             rows.append((f"{who} general: {GENERAL_TRAITS.get(figures['general'], figures['general'])}", MUTED))
-    return rows
+    return rows + _besiege_rows(view)
+
+
+def _besiege_rows(view):
+    """The Besiege reading of a garrisoned castle (0.2.2, design 4.6): the seasons it falls in, or why not (the men), and the
+    war's clock when the war ends first. The word under the card is then the Storm's (the attack's word). Nothing for a
+    field battle, which has no siege."""
+    siege = view["besiege"]
+    if siege is None:
+        return []
+    if not siege["ok"]:
+        rows = [(f"Besiege: {siege['reason']}", WARN_C)]
+    elif siege["seasons"] is None:
+        rows = [("Besiege: it does not fall at this rate", WARN_C)]
+    else:
+        n = siege["seasons"]
+        rows = [(f"Besiege: falls in about {n} season{'s' * (n != 1)}", TEXT)]
+        if siege["war_ends_first"]:
+            left = siege["war_left"]
+            rows.append((f"Warning: the war ends in {left} season{'s' * (left != 1)}, before it falls", WARN_C))
+    rows.append(("Right-click besieges. Shift-right-click storms", MUTED))
+    return [None] + rows
 
 
 def _title(view):
@@ -124,7 +145,7 @@ def _render(ctx, view):
         for line in lines:
             y += _blit(surface, ctx.font, line, (PAD, y), colour)
     y += 6
-    y += _blit(surface, ctx.small, "Odds", (PAD, y), MUTED)
+    y += _blit(surface, ctx.small, "Storm" if view["besiege"] is not None else "Odds", (PAD, y), MUTED)
     _blit(surface, ctx.title, view["word"], (PAD, y), WORD_COLOUR.get(view["word"], TEXT))
     return surface
 

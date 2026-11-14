@@ -15,16 +15,13 @@ from ...ui.cache import BoundedCache
 from ...ui.icons import icon
 from ..battleview import battle_view
 from . import floating
+from .siegebadge import badge_size as _badge_size      # the size formula: shared with the siege badge (0.2.2)
 
 MIN_ZOOM = 2            # from this zoom index on (hex radius 8 px) the battles show on the map
 BAR_ZOOM = 3            # from this one the front-line bar shows under the badge
 INK = (12, 14, 18)
 GOLD = (255, 214, 70)
 _BADGES = BoundedCache("battle_badge", 8)       # zoom index -> the badge sprite
-
-
-def _badge_size(r):
-    return min(32, round(12 + 0.6 * r))
 
 
 def _badge(zoom, r):

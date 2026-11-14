@@ -15,6 +15,8 @@ returns one `Reminder` or None:
                       (``build_check`` says yes, so the line only shows what could really be started)
     battles_on        one line for each battle the player is a side of that is still on (send more troops before the season ends);
                       its action opens the battle panel
+    sieges_on         one line for each place of the player's under siege: when it falls (the seasons the siege view forecasts),
+                      or that the besiegers are too few; its action opens the province (0.2.2, design 4.7)
     idle_armies       land stacks of war units that did nothing this season: not moved, attacked or foraged, no
                       march order, not sieging (standing in a province held against its owner or an enemy) and not
                       garrisoning one of the player's own castles. The game has no fortify order, so a castle
@@ -25,7 +27,7 @@ Nothing here changes the world. The flag asks for the lines again after every ac
 from typing import NamedTuple
 
 from . import tech
-from .battleview import battle_view
+from .battleview import battle_view, siege_view
 from .data import BUILDINGS, CASTLE_COST, RESEARCH_FUND, SETTLEMENT_COST
 
 
@@ -144,7 +146,26 @@ def battles_on(world, tag):
     return lines
 
 
-RULES = (battles_on, idea_pending, research_missing, research_unfunded, idle_merchants, nothing_built, idle_armies)
+def sieges_on(world, tag):
+    """One line for each place of `tag`'s that is under siege (0.2.2): "X is under siege: falls in about N seasons". The siege
+    view gives the seasons (None: the besiegers are too few, the place does not fall); a place the player cannot see is
+    not listed (the view says hidden, never for its own owner)."""
+    lines = []
+    for prov in world.provinces_of(tag):
+        if not prov.besieger:
+            continue
+        view = siege_view(world, prov.pos, tag)
+        if view is None or view["access"] == "hidden":
+            continue
+        falls = view["falls_in"]
+        text = (f"{world.place(prov)} is under siege: too few besiegers to take it" if falls is None else
+                f"{world.place(prov)} is under siege: falls in about {falls} season{'s' * (falls != 1)}")
+        lines.append(Reminder("siege", text, "Open the province", ("province", prov)))
+    return lines
+
+
+RULES = (battles_on, sieges_on, idea_pending, research_missing, research_unfunded, idle_merchants, nothing_built,
+         idle_armies)
 
 
 def unfinished(world, tag):

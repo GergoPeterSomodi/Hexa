@@ -24,7 +24,7 @@ FLAG_H, FLAG_TOP = 24, 2            # the flag's height, and the gap under the t
 LOOK = {                            # kind of reminder -> (colour kind of hud/style.py, icon)
     "battle": ("war", "battle"), "army": ("siege", "army"), "idea": ("gain", "research"),
     "research": ("gain", "research"), "fund": ("gain", "ducats"), "merchant": ("gain", "merchants"),
-    "build": ("other", "castle"),
+    "build": ("other", "castle"), "siege": ("siege", "castle"),
 }
 NOTE = "Click a line to go there  ·  Esc or a click elsewhere closes the list"
 
