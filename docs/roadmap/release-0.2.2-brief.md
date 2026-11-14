@@ -145,6 +145,15 @@ line. **Fallback:** if the build runs long, the move messages ship alone in 0.2.
 seasons in at least half; no more than 6 provinces taken in the season after a castle falls without a look), plus the
 war-pace targets above, a test per refusal row, and an owner replay.
 
+## Replay (2026-11-14): a taken castle went back
+
+The owner took Granada's castle; a couple of seasons later it was Granada's again. The rule was working: a taken castle
+has no garrison and never raised one for its new holder, so once the army moved on, Granada's army besieged its empty
+castle and took it back in the 2-season minimum (the log called it the "Fourth Siege of Granada"); an army left inside was
+cut off from supply. **Owner's decision:** a taken castle builds a garrison for its holder, slowly (half the normal rate,
+up to half its full size), and an army inside a castle its country holds is in supply. The owner then has to besiege it
+properly to get it back.
+
 ## Owner's decisions (2026-11-13)
 
 1. **How a siege works:** the siege meter (men, cannons, a siege general and hunger against the castle, the ground and the
