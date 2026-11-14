@@ -7,6 +7,15 @@
 > Q3 heights from **real elevation data** (a free dataset after a licence check; nothing is downloaded without the
 > owner's go), with only passes, lakes, tributaries, notable places and 1480 fixes written by hand. Q4 **no Kenney art**
 > in the new map: our own code-drawn ground. Defaults D1 to D11 stand (not overruled).
+>
+> **Elevation data (owner approved the download, 2026-11-14):** NOAA ETOPO 2022, 60 arc-second, surface elevation (land
+> heights and sea depth), cut to lon -25..60, lat 25..72 from NOAA's ERDDAP server (dataset `ETOPO_2022_v1_60s`) in two
+> NetCDF pieces (west 335-360 and east 0-60 degrees, 57 MB together). The raw files stay outside the repo; only derived
+> per-hex heights are shipped. ERDDAP's licence line: "The data may be used and redistributed for free but is not
+> intended for legal use, since it may contain inaccuracies." Credit in the game's credits: "NOAA National Centers for
+> Environmental Information. 2022: ETOPO 2022 15 Arc-Second Global Relief Model. doi:10.25921/fd45-gt74". Land or sea is
+> decided by the coastline, not by height below 0 (the Netherlands, the Caspian shore); the 1480 hand fixes (Zuiderzee,
+> drained fens and marshes, modern reservoirs) are listed in section 6.
 
 **Status: for the owner to decide. Nothing is built.** This page joins the five map threads into one design. Read
 this page first; the thread docs (`01` to `05`) hold the detail and the numbers behind it.
