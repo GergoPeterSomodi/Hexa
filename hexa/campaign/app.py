@@ -342,6 +342,8 @@ class CampaignApp:
         pos = group[0].pos
         ids = tuple(sorted(u.id for u in group))
         logged = self.__dict__.setdefault("_pass_waits", {})     # stack ids -> season of the last log line
+        if siegeacts.march_attack(self, group, goal):
+            return
         if min(u.moves_left for u in group) <= 0:
             self.toast("No moves left this season: the march goes on next season.")
             return
@@ -357,15 +359,13 @@ class CampaignApp:
                     logged[ids] = world.turn
                     world.message(text, self.player, "march", pos)
                 return
-            for unit in group:
-                unit.goal = None
+            siegeacts.end_march(group)
             logged.pop(ids, None)
             return
         world.move_group(group, dest)
         logged.pop(ids, None)
         if dest == goal:
-            for unit in group:
-                unit.goal = None
+            siegeacts.end_march(group)
 
     def march_routes(self):
         """The planned route of each waiting march as [pos, ..., goal]. Cached until the map, the season or the

@@ -41,6 +41,25 @@ def in_range(ctx, group, pos):
     return any(p in near for p in neighbors(pos))
 
 
+def end_march(group):
+    """The march order of every unit of `group` is done."""
+    for unit in group:
+        unit.goal = None
+
+
+def march_attack(ctx, group, goal):
+    """A march whose goal is an attack hex (an enemy castle, stack or town) ends with the attack once the stack can make it
+    this season: a garrisoned castle is besieged (the default of a right-click), anything else is attacked. Without this
+    the march stopped one hex short, beside the castle, and the order was dropped. A refused siege toasts its reason and
+    ends the march. False when the goal is not an attack within reach yet (the march walks on)."""
+    if min(u.moves_left for u in group) <= 0 or not (goal in ctx.world.attack_options_group(group)
+                                                     or in_range(ctx, group, goal)):
+        return False
+    attack(ctx, group, goal)
+    end_march(group)
+    return True
+
+
 def storm_now(ctx, pos):
     """The province panel's "Storm now": the player's stack on the besieged hex storms it now (the same battle as Storm)."""
     world = ctx.world

@@ -266,3 +266,30 @@ class BesiegeLineTest(harness.UITestCase):
     def test_no_siege_no_lines(self):
         from hexa.campaign.hud import odds
         self.assertEqual(odds._besiege_rows({"besiege": None}), [])
+
+
+class MarchTest(SiegeWindowCase):
+    """A march ordered onto an enemy castle ends with the siege once the castle is in reach (the owner's replay: the army
+    stopped one hex short and the order was dropped)."""
+
+    def test_a_march_onto_a_castle_besieges_it_on_arrival(self):
+        app = self.start()
+        world, fight = app.world, self.fight
+        for unit in fight.attackers:
+            unit.goal = fight.defend_pos
+        app.continue_march(fight.attackers)
+        self.assertTrue(all(u.goal is None for u in fight.attackers), "the march order is done")
+        self.assertIsNone(world.battle_at(fight.defend_pos), "a besiege is no battle")
+        world.sieges()
+        self.assertEqual(world.provinces[fight.defend_pos].besieger, fight.attacker)
+
+    def test_a_march_with_no_moves_left_waits(self):
+        app = self.start()
+        world, fight = app.world, self.fight
+        for unit in fight.attackers:
+            unit.goal = fight.defend_pos
+            unit.moves_left = 0
+        app.continue_march(fight.attackers)
+        self.assertTrue(all(u.goal == fight.defend_pos for u in fight.attackers), "the order waits for next season")
+        world.sieges()
+        self.assertNotEqual(world.provinces[fight.defend_pos].besieger, fight.attacker)
