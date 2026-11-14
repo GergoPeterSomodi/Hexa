@@ -47,7 +47,9 @@ func test_layers_have_the_planned_cells() -> void:
 func test_far_zoom_shows_the_far_maps_and_tile_zoom_shows_tiles() -> void:
 	_view.frame(MapGeometry.map_size(_map.cols, _map.rows) * 0.5, MapView.ZOOM_MIN)
 	assert_true(_view.is_far(), "far at the minimum zoom")
-	assert_false(_shown("Tiles"), "tiles hidden far")
+	# The tiles stay visible under the opaque far maps (hiding them cost a 25 to 56 ms frame at each zoom band).
+	assert_true(_shown("Tiles"), "tiles kept under the far maps")
+	assert_true(_shown("FarTerrain"), "far terrain shown far")
 	_view.frame(MapGeometry.centre(Vector2i(100, 75)), MapView.TILE_ZOOM + 0.01)
 	assert_false(_view.is_far(), "tiles from the first tile zoom")
 	assert_true(_shown("Tiles"), "tiles shown")

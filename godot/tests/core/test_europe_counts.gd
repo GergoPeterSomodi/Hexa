@@ -16,14 +16,6 @@ func before_all() -> void:
 	_rows = MapCounts.new(_map, _reference).run()
 
 
-## Rows that miss their rule on the default seed and wait for a decision of the owner or the systems designer (see the
-## report of the step). They show as pending, not as failures; a row that misses and is not listed here fails.
-const OPEN_MISSES := {
-	"goods (25 kinds)": "stone is 141 (the rule needs 143 or more): the terrain mix of this seed gives fewer stone hexes",
-	"kinds per country (49)": "BOH has one knight: its people pass 500, which Python's eight seeds never reached there",
-}
-
-
 func _check_group(group: String) -> void:
 	var checked := 0
 	for row: MapCounts.Row in _rows:
@@ -31,8 +23,8 @@ func _check_group(group: String) -> void:
 			checked += 1
 			if row.ok:
 				continue
-			if OPEN_MISSES.has(row.label):
-				pending("open: %s (%s)" % [row.label, OPEN_MISSES[row.label]])
+			if row.open_note != "":
+				pending("open: %s (%s)" % [row.label, row.open_note])
 			else:
 				assert_true(false, "%s: godot %s, python %s" % [row.label, row.godot, row.reference])
 	assert_gt(checked, 0, "group %s has rows" % group)

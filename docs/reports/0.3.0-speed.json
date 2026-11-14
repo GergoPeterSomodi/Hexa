@@ -1,0 +1,101 @@
+{
+	"machine": "AMD Ryzen 7 9800X3D 8-Core Processor, Windows",
+	"note": "Godot 4.7.2 headless (the builder runs as a tool). Times are wall-clock milliseconds.",
+	"rows": [
+		[
+			"builder: Land and sea",
+			"316.6 ms",
+			"one run"
+		],
+		[
+			"builder: Rivers",
+			"1.9 ms",
+			"one run"
+		],
+		[
+			"builder: Terrain",
+			"665.6 ms",
+			"one run"
+		],
+		[
+			"builder: Coasts and cities",
+			"34.8 ms",
+			"one run"
+		],
+		[
+			"builder: Ridges and passes",
+			"112.9 ms",
+			"one run"
+		],
+		[
+			"builder: Provinces",
+			"117.4 ms",
+			"one run"
+		],
+		[
+			"builder: Countries, towns and castles",
+			"1034.8 ms",
+			"one run"
+		],
+		[
+			"builder: Roads",
+			"1961.6 ms",
+			"one run"
+		],
+		[
+			"builder: Starting units",
+			"103.4 ms",
+			"one run"
+		],
+		[
+			"builder: total",
+			"4349.0 ms",
+			"all nine stages, one build (the shell's progress bar)"
+		],
+		[
+			"territory (nearest seed for every land hex)",
+			"446.3 ms",
+			"GDScript, best of 3"
+		],
+		[
+			"road search, GDScript (114 town pairs)",
+			"174.5 ms",
+			"RoadBuilder._connect, best of 3"
+		],
+		[
+			"road search, AStar2D (same pairs)",
+			"100.0 ms",
+			"Godot's built-in path finder, best of 3"
+		],
+		[
+			"ratio GDScript / AStar2D",
+			"1.7",
+			"above 1: AStar2D is faster"
+		],
+		[
+			"path costs equal (AStar2D against GDScript)",
+			"110 of 114",
+			"the same cost is the same route to the same goal"
+		],
+		[
+			"road search as built (stage 7)",
+			"1961.6 ms",
+			"the whole roads stage, one run"
+		],
+		[
+			"map file: read",
+			"2.3 ms",
+			"2824788 bytes"
+		],
+		[
+			"map file: parse to MapData",
+			"149.9 ms",
+			"best of 3"
+		],
+		[
+			"map file: load (read and parse)",
+			"152.3 ms",
+			"the game's start, before the view"
+		]
+	]
+}

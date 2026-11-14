@@ -6,7 +6,8 @@ name: godot
 # - checks: the lint, the import, the script parse, the main scene start and the GUT tests (on pull requests and
 #   pushes that touch godot/, tools/ or this workflow);
 # - export-windows and smoke-windows: on a tag v0.3.*, the Windows zip and a smoke start on a Windows runner.
-# The map rebuild, the map check and the goldens come with their releases.
+# The map job (0.3.0 item 4): the builder rebuilds the map file, which must equal the committed one, and the map check
+# report goes to the job summary. The goldens come with their releases.
 
 on:
   pull_request:
@@ -154,9 +155,56 @@ jobs:
           path: ${{ runner.temp }}/gut-junit.xml
           if-no-files-found: ignore
 
+  map:
+    name: map rebuild, map check and report
+    needs: changes
+    if: needs.changes.outputs.godot == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Godot
+        uses: ./.github/actions/setup-godot
+      - name: Import the project
+        run: |
+          "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
+      # The builder runs with the committed seed and must write the committed map file byte for byte (B5): a change
+      # of the builder or the data shows here as a difference. The counts are checked by the same run (open misses
+      # are listed, not failed).
+      - name: Rebuild the map file and compare it with the committed one
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --out="$RUNNER_TEMP/europe_1480.json" 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|map file: the text|map file: cannot' build.log; then
+            echo "::error::The map builder failed or a count is out of range (see the log)."
+            exit 1
+          fi
+          if ! cmp -s "$RUNNER_TEMP/europe_1480.json" godot/data/maps/europe_1480.json; then
+            echo "::error::The rebuilt map file differs from godot/data/maps/europe_1480.json. Rebuild it with build_map.gd -- --out=res://data/maps/europe_1480.json and review the diff."
+            exit 1
+          fi
+          echo "The rebuilt map file is byte-identical to the committed one."
+      - name: Map report in the job summary
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot -s res://tools/map_report.gd -- --out="$RUNNER_TEMP/map-check.md" > report.log 2>&1 || { cat report.log; exit 1; }
+          {
+            echo "## Map check (Europe 1480)"
+            echo
+            cat "$RUNNER_TEMP/map-check.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the map report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-check
+          path: ${{ runner.temp }}/map-check.md
+          if-no-files-found: ignore
+
   export-windows:
     name: Windows zip (tag)
-    needs: [changes, checks]
+    needs: [changes, checks, map]
     if: startsWith(github.ref, 'refs/tags/v0.3.')
     runs-on: ubuntu-latest
     timeout-minutes: 30
