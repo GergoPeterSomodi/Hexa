@@ -222,6 +222,7 @@ jobs:
       - name: Export the Windows Desktop preset (release, 64-bit, data packed into the exe)
         run: |
           set -uo pipefail
+          mkdir -p godot/build
           "$GODOT" --headless --path godot --export-release "Windows Desktop" "$GITHUB_WORKSPACE/godot/build/Hexa.exe" 2>&1 | tee export.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ] || [ ! -f godot/build/Hexa.exe ]; then
