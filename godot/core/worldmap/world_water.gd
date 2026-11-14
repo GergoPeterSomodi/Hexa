@@ -23,6 +23,7 @@ const DOWNHILL_TOLERANCE_M := 60.0
 ## Edge costs, in multiples of a hex's circumradius.
 const CORRIDOR_FREE := 0.15  # a fraction of a hex width: nearer than this to the course costs nothing extra
 const CORRIDOR_WEIGHT := 25.0
+const LAKE_CORRIDOR_FREE := 0.6  # lakes: corners are about 16 km apart, so a wider free corridor follows the axis
 const SEA_COST := 20.0
 const CREST_COST := 100.0
 const SPINE_COST := 3.0  # an edge beside a spine hex (crest height) costs more: rivers keep to the valley floor
@@ -67,6 +68,9 @@ var _city_of_corner: Dictionary[Vector3i, String] = {}  # a river city's corner 
 var _current_river := ""  # the river being routed (a river city is crossed only by its own river)
 var flow_height: Dictionary[Vector3i, float] = {}  # the drainage surface: corner heights with the sinks filled to their spill level
 var filled_m: float = 0.0  # the largest amount a corner was raised to drain (reported)
+var _flood_parent: Dictionary[Vector3i, Vector3i] = {}  # the fill-direction graph: each corner drains to its flood parent
+var _flood_order: Array[Vector3i] = []  # corners in the order the flood finished them (parents before children)
+var _lake_mode := false  # routing a lake: lakes cross the prealps at their gaps, so no crest cost
 
 
 ## Builds the water from the relief, the heights (land heights, sea depths) and the region's river and lake courses.
@@ -170,6 +174,7 @@ func _build_flow() -> void:
 		if done.has(c):
 			continue
 		done[c] = true
+		_flood_order.append(c)
 		var fc: float = top[0]
 		for e: Vector4i in _corner_edges(c):
 			var o := _other_corner(e, c)
@@ -178,6 +183,7 @@ func _build_flow() -> void:
 			var fo := maxf(corner_height(o), fc)
 			if not flow_height.has(o) or fo < flow_height[o]:
 				flow_height[o] = fo
+				_flood_parent[o] = c
 				_heap_push(heap, [fo, o])
 	for key: Vector3i in corner_set.keys():
 		if flow_height.has(key):
@@ -294,8 +300,9 @@ func _edge_cost(edge: Vector4i, line: PackedVector2Array, lake_discount: bool) -
 		return base * 0.5
 	var mid := (grid.centre_km(a) + grid.centre_km(b)) / 2.0
 	var off := _distance_to_line(mid, line)
-	var cost := base * (1.0 + CORRIDOR_WEIGHT * maxf(0.0, off - CORRIDOR_FREE * grid.hex_w_km) / grid.hex_w_km)
-	if relief.crest_edges.has(edge):
+	var free := (LAKE_CORRIDOR_FREE if _lake_mode else CORRIDOR_FREE) * grid.hex_w_km
+	var cost := base * (1.0 + CORRIDOR_WEIGHT * maxf(0.0, off - free) / grid.hex_w_km)
+	if relief.crest_edges.has(edge) and not _lake_mode:
 		cost += CREST_COST * base
 	if _is_sea(a) or _is_sea(b):
 		cost += SEA_COST * base
@@ -544,9 +551,12 @@ func _route_lakes() -> void:
 					lake_hex[hex] = true
 					hexes.append(hex)
 		else:
-			# The lake is routed along its own axis (no downhill rule: a lake is flat water).
+			# The lake is routed along its own axis (no downhill rule: a lake is flat water; no crest cost: the Adda and the
+			# Lecco gap cross the prealps).
+			_lake_mode = true
 			var path := _without_loops(_route(_nearest_corner(km[0], false), _nearest_corner(km[km.size() - 1], false),
 				km, false, false))
+			_lake_mode = false
 			if path.is_empty():
 				route_failures.append("lake %s" % lk["name"])
 			else:
@@ -613,6 +623,12 @@ func _route_river(rv: Dictionary) -> void:
 				mouth_d = d
 				mouth = key
 		goals[mouth] = true
+		if not is_trunk or _touches_water(mouth):
+			pass
+		# A river that ends at the sea may end on any corner touching the sea within two hex widths.
+		for key: Vector3i in corner_set.keys():
+			if _touches_water(key) and not _city_of_corner.has(key) and corner_pos(key).distance_to(last_p) <= 2.0 * grid.hex_w_km:
+				goals[key] = true
 	var tail := _leg(cur, goals, km, name)
 	if tail.is_empty():
 		route_failures.append("%s: no route to its end" % name)
@@ -677,11 +693,20 @@ func _leg(start: Vector3i, goals: Dictionary[Vector3i, bool], km: PackedVector2A
 
 
 ## A river rises on the highest corner within one hex width of its first point (the nearest corner when none is higher).
+## A river's source is never a river city's corner (the river would start inside the city and lose its upper course).
 func _source_corner(km: Vector2) -> Vector3i:
-	var best := _nearest_corner(km, false)
+	var best := NO_CORNER
+	var best_d := INF
 	for key: Vector3i in corner_set.keys():
-		if corner_pos(key).distance_to(km) <= grid.hex_w_km and flow(key) > flow(best) + 0.5:
+		if _city_of_corner.has(key):
+			continue
+		var d := corner_pos(key).distance_to(km)
+		if d <= 0.5 * grid.hex_w_km and (best == NO_CORNER or flow(key) > flow(best) + 0.5):
 			best = key
+		elif best == NO_CORNER and d < best_d:
+			best_d = d
+	if best == NO_CORNER:
+		best = _nearest_corner(km, false)
 	return best
 
 
@@ -805,40 +830,27 @@ func _nearest_band(start: Vector2i) -> String:
 	return "sea"
 
 
+## Generated streams: every land corner that is not on a river or lake drains along the fill-direction graph (its flood
+## parent). The corners that drain through a corner are counted (flow accumulation); an edge carries a stream when at least
+## STREAM_MIN_CORNERS corners drain across it. Streams never use a river, lake or crest edge.
 func _build_streams() -> void:
-	var height_of: Dictionary[Vector3i, float] = {}
-	var sources: Array[Vector3i] = []
-	for key: Vector3i in corner_set.keys():
-		height_of[key] = flow(key)
-		if network.has(key) or _touches_water(key):
-			continue
-		sources.append(key)
-	sources.sort_custom(func(a: Vector3i, b: Vector3i) -> bool:
-		if height_of[a] != height_of[b]:
-			return height_of[a] > height_of[b]
-		return _corner_less(a, b))
 	var acc: Dictionary[Vector3i, int] = {}
-	for key: Vector3i in sources:
-		acc[key] = int(acc.get(key, 0)) + 1
-		var best := NO_CORNER
-		var best_edge := NO_EDGE
-		var best_h: float = height_of[key]
-		for e: Vector4i in _corner_edges(key):
-			if relief.crest_edges.has(e) or river_edge.has(e) or lake_edge.has(e):
-				continue
-			var other := _other_corner(e, key)
-			if other == NO_CORNER:
-				continue
-			if height_of[other] < best_h:
-				best_h = height_of[other]
-				best = other
-				best_edge = e
-		if best == NO_CORNER:
-			stream_sinks += 1
+	for key: Vector3i in corner_set.keys():
+		acc[key] = 1
+	for i: int in range(_flood_order.size() - 1, -1, -1):
+		var c := _flood_order[i]
+		if not _flood_parent.has(c):
 			continue
-		acc[best] = int(acc.get(best, 0)) + int(acc[key])
-		if int(acc[key]) >= STREAM_MIN_CORNERS:
-			stream_edge[best_edge] = int(acc[key])
+		var p := _flood_parent[c]
+		acc[p] = int(acc.get(p, 1)) + int(acc[c])
+		if network.has(c) or _touches_water(c):
+			continue
+		var e := _shared_edge(c, p)
+		if e == NO_EDGE or river_edge.has(e) or lake_edge.has(e) or relief.crest_edges.has(e):
+			continue
+		if int(acc[c]) >= STREAM_MIN_CORNERS:
+			stream_edge[e] = int(acc[c])
+	stream_sinks = 0
 
 
 func _touches_water(key: Vector3i) -> bool:

@@ -103,7 +103,8 @@
     {"name": "Dora Baltea at Bard", "lon": 7.71, "lat": 45.60, "river": "Dora Baltea", "range": "Graian Alps"},
     {"name": "Adige at Chiusa", "lon": 11.37, "lat": 46.64, "river": "Adige", "range": "Eastern Alps (Ortler, Stubai)"},
     {"name": "Rhone at Fort de l'Ecluse (through the Jura)", "lon": 5.92, "lat": 46.20, "river": "Rhone", "range": "Jura"},
-    {"name": "Po at its source (Pian del Re, under Monviso)", "lon": 7.12, "lat": 44.67, "river": "Po", "range": "Cottian Alps"}
+    {"name": "Po at its source (Pian del Re, under Monviso)", "lon": 7.12, "lat": 44.67, "river": "Po", "range": "Cottian Alps"},
+    {"name": "Rhone at Gletsch (its source under the Furka)", "lon": 8.37, "lat": 46.57, "river": "Rhone", "range": "Bernese Alps"}
   ],
 
   "places": [
