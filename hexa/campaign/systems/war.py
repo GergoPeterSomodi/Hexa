@@ -11,15 +11,22 @@ has left the map. The bus events (``war_declared``, ``peace_made``, ``province_c
 ``siege_progress``, ``unit_lost``) are emitted here; the battle events come from battle.py. Imports point down: never
 world.py, ui, render or pygame.
 """
+import math
+
 from ...hexgrid import neighbors, within
-from ..data import CASTLE_SIEGE, GARRISON_HP, GARRISON_REGEN, SIEGE_BASE
-from . import battle as battlesys, combat
+from ..data import (CASTLE_SIEGE, CROWD_BANDS, ELEVATION, GARRISON_HP, GARRISON_MEN, GARRISON_ODDS, GARRISON_ODDS_ALONE,
+                    GARRISON_REGEN, MILITIA_MEN,
+                    SIEGE_BASE_NEED, SIEGE_HUNGER, SIEGE_MIN_SEASONS, SIEGE_RATE_MAX, SIEGE_STORM_CUT, START_YEAR,
+                    WAR_LENGTH_AI)
+from . import battle as battlesys, combat, movement
 from ..state import War
 
 # What this module changes on the world: the wars, the provinces (owner, controller, siege, garrison), the units (hit
 # points, experience, positions; the dead are removed), the countries (alive, capital), the log, and what changed()
 # and refresh_markets() mark when a province changes hands.
-OWNS = ("wars", "provinces", "units", "countries", "log", "version", "_owned", "_castle_list", "_markets_dirty")
+OWNS = ("wars", "provinces", "units", "countries", "log", "version", "_owned", "_castle_list", "_markets_dirty",
+        "siege_names")
+SIEGE_FORECAST_MAX = 60         # seasons the forecast counts before it gives up (a place falls well before this)
 
 # The combat values (general, attack_value, defense_value) live in combat.py. The names stay here, so the old
 # import paths (war.general and the world's facades) keep working.
@@ -93,6 +100,9 @@ def peace(world, a, b, winner=None):
                 moved += 1
             prov.controller = prov.owner
             prov.siege = 0
+    for prov in world.provinces.values():
+        if prov.besieger in (a, b):          # peace ends every siege, its progress lost (0.2.2 defaults)
+            _lift(world, prov, "peace")
     shared = _shared_hexes(world, a, b)
     for unit in list(world.units):
         if unit.carrier is None and not unit.naval and unit.owner in (a, b):
@@ -195,15 +205,19 @@ def attack_options_group(world, group):
 
 def attack_group(world, group, target):
     """The stack walks to the hex it attacks from (one unit_moved), then calls engage, which makes the one step onto the
-    target and starts the battle, joins it or overruns the civilians there. Nothing moves when engage refuses. Returns what
-    engage returned."""
+    target and starts the battle, joins it or overruns the civilians there. A move onto a garrisoned castle is a siege
+    instead (0.2.2, the default: besiege, no battle; the meter starts in the season's siege step); Storm is storm_group.
+    Nothing moves when the attack is refused. Returns what it returned."""
     options = world.attack_options_group(group)
     if target not in options:
         return False
     stand = options[target]
+    siege = world.besiege_target(group, target)
+    if siege and not world.besiege_check(group, target, stand=stand)[0]:
+        return False
     if stand != group[0].pos:
         world.move_group(group, stand)
-    done = world.engage(group, target)
+    done = world.besiege(group, target) if siege else world.engage(group, target)
     if done:
         for unit in group:
             if unit in world.units:
@@ -227,28 +241,210 @@ def kill(world, unit, why="battle"):
         world.lose([unit], why)
 
 
+def garrison_men(prov, hp=None):
+    """The men a place's defence counts for the crowd (4.2): the militia of a place with no castle, else the castle's
+    garrison in men (GARRISON_MEN a hit point). ``hp`` replaces the garrison's hit points (a storm's cut)."""
+    if not prov.castle:
+        return MILITIA_MEN
+    return (prov.garrison if hp is None else hp) * GARRISON_MEN
+
+
+def crowd(men, defenders):
+    """The crowd rule (4.2): the besieger's men over the defenders' men. Under 1x too few to hold a siege (0); 1x to 2x
+    1; 2x to 4x 2; 4x and more 3 (data.CROWD_BANDS)."""
+    if men < defenders:
+        return 0
+    if defenders <= 0:
+        return 3
+    ratio = men / defenders
+    for limit, value in CROWD_BANDS:
+        if ratio < limit:
+            return value
+    return 3
+
+
+def siege_need(world, prov, hp=None):
+    """The points a place takes (4.2): SIEGE_BASE_NEED, the ground's elevation, and each castle level's CASTLE_SIEGE (plus
+    the defender's siege_points tech) times the garrison's share of its full hit points, rounded up. ``hp`` replaces the
+    garrison's hit points (a storm's cut)."""
+    extra = 0
+    if prov.castle:
+        full = prov.castle * GARRISON_HP
+        share = min(1.0, (prov.garrison if hp is None else hp) / full)
+        extra = prov.castle * (CASTLE_SIEGE + world.bonus(prov.controller, "siege_points")) * share
+    return math.ceil(SIEGE_BASE_NEED + ELEVATION.get(prov.terrain, 0) + extra)
+
+
+def siege_terms(world, prov, tag, units, hp=None):
+    """The besieger's numbers against a place (4.1 and 4.2), the same for the meter, the forecast and the odds card: its
+    men, the defenders' men, the crowd, guns (the units' siege points, the artillery tech as today), the general, the
+    rate (points a season, at most SIEGE_RATE_MAX; 0 when the crowd is too small), the need, and the garrison's stores in
+    seasons (1 + castle level). ``ok`` is False when the stack is too small to hold the place."""
+    wars = [u for u in units if u.kind.war]
+    men = sum(u.men for u in wars)
+    defenders = garrison_men(prov, hp)
+    level = crowd(men, defenders)
+    guns = sum(u.kind.siege + (world.bonus(tag, "siege") if u.kind.branch == "artillery" else 0) for u in wars)
+    general = combat.general(world, units)
+    assault = 1 if general is not None and general.trait == "assault" else 0
+    rate = min(SIEGE_RATE_MAX, level + guns + assault) if level else 0
+    return {"men": men, "garrison_men": defenders, "crowd": level, "guns": guns, "general": bool(assault), "rate": rate,
+            "need": siege_need(world, prov, hp), "stores": 1 + prov.castle, "ok": level > 0}
+
+
+def siege_forecast(world, prov, tag, units, progress=0, turns=0):
+    """Seasons until a place falls at the rate the stack has now, counting the season it arrives in as the first (the odds
+    card's "falls in about N seasons"). A running siege counts on from its meter (``progress``, ``turns`` seasons held).
+    None when the stack is too small to hold it."""
+    terms = siege_terms(world, prov, tag, units)
+    if not terms["ok"]:
+        return None
+    points, count = progress, turns
+    for _ in range(SIEGE_FORECAST_MAX):
+        count += 1
+        points += terms["rate"] + (SIEGE_HUNGER if count > terms["stores"] else 0)
+        if count >= SIEGE_MIN_SEASONS and points >= terms["need"]:
+            return count - turns
+    return None
+
+
+def siege_name(world, pos):
+    """A siege's name (like a battle's): "Siege of Lisbon, 1532", "Second Siege of Lisbon, 1532" for each repeat on the
+    same place. The count is kept in world.siege_names, so a repeat stays a repeat after a save."""
+    base = battlesys.place_name(world, pos)
+    count = world.siege_names.get(base, 0) + 1
+    world.siege_names[base] = count
+    ordinal = battlesys.ORDINALS[count - 1] if count <= len(battlesys.ORDINALS) else f"{count}th"
+    title = "Siege" if count == 1 else f"{ordinal} Siege"
+    return f"{title} of {base}, {START_YEAR + (world.turn - 1) // 4}"
+
+
+def besieged(prov):
+    """Whether a place is under siege: a besieger holds its meter (its output stops, the stack forages free)."""
+    return bool(prov.besieger)
+
+
+def war_limit(world, a, b):
+    """The seasons a war between a and b may last: WAR_LENGTH_AI, twice as long when the player is in it (season.py)."""
+    return WAR_LENGTH_AI * (2 if world.player in (a, b) else 1)
+
+
+def storm_defence(world, pos, enemy):
+    """The defence of a garrisoned castle in a storm (design 4.6), in men: the field men of ``enemy`` on the hex plus the
+    garrison's men after the siege's cut (storm_garrison), weighted GARRISON_ODDS with a field army and by castle level
+    alone otherwise (GARRISON_ODDS_ALONE). Returns (men, the garrison's numbers for the odds card)."""
+    prov = world.provinces[pos]
+    hp = storm_garrison(world, prov)
+    field = sum(u.men for u in world.units_at(pos) if u.owner == enemy and u.kind.war)
+    weight = GARRISON_ODDS if field else GARRISON_ODDS_ALONE[min(prov.castle, len(GARRISON_ODDS_ALONE)) - 1]
+    men = garrison_men(prov, hp)
+    return field + men * weight, {"hp": hp, "full": prov.castle * GARRISON_HP, "men": men, "weight": weight,
+                                 "cut": hp < prov.garrison}
+
+
+def storm_garrison(world, prov):
+    """The garrison's hit points a storm faces (design 4.5): the garrison cut by the siege's progress,
+    hp x (1 - SIEGE_STORM_CUT x progress / need), rounded up. No siege progress, no cut."""
+    if not prov.besieger or prov.siege <= 0:
+        return prov.garrison
+    return math.ceil(prov.garrison * (1 - SIEGE_STORM_CUT * min(1.0, prov.siege / siege_need(world, prov))))
+
+
+def _lift(world, prov, why):
+    """The siege of a place is lifted: progress, hunger, seasons and name go to zero (a lifted siege starts from zero the
+    next time, 0.2.2 defaults). ``why``: "left", "relief", "outnumbered" or "peace"."""
+    tag, name, progress, turns = prov.besieger, prov.siege_name, prov.siege, prov.siege_turns
+    prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "", 0, 0, ""
+    world.bus.emit("siege_lifted", tag, prov.pos, why=why, name=name, progress=progress, seasons=turns)
+    world.changed()
+
+
+def _fall(world, prov, tag):
+    """The place falls to the besieger (province_captured, by "siege")."""
+    name, turns, loser = prov.siege_name, prov.siege_turns, prov.controller
+    world.bus.emit("province_captured", tag, prov.pos, loser=loser, by="siege", name=name, seasons=turns)
+    prov.controller = tag
+    prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "", 0, 0, ""
+    prov.garrison = 0 if tag != prov.owner else prov.garrison
+    world.message(f"{world.countries[tag].name} took control of {world.place(prov)}.",
+                  None if world.player in (tag, prov.owner) else "nobody")
+    world.changed()
+
+
+def _siege_season(world, prov):
+    """One season of a running siege (4.2): the besieger's stack must still stand on the place with men enough, and the
+    meter gains its rate, plus SIEGE_HUNGER once the stores are out. A place falls at the end of a season in which the
+    meter reaches the need and the siege has lasted SIEGE_MIN_SEASONS. A battle on the hex never reaches here."""
+    tag = prov.besieger
+    units = [u for u in world.units_at(prov.pos) if u.owner == tag]
+    if prov.controller == tag:
+        prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "", 0, 0, ""
+        return
+    if not any(u.kind.war for u in units) or not world.at_war(tag, prov.controller):
+        relieved = any(u.owner == prov.controller and u.kind.war for u in world.units_at(prov.pos))
+        _lift(world, prov, "relief" if relieved else "left")
+        return
+    terms = siege_terms(world, prov, tag, units)
+    if not terms["ok"]:
+        _lift(world, prov, "outnumbered")
+        return
+    prov.siege_turns += 1
+    hunger = SIEGE_HUNGER if prov.siege_turns > terms["stores"] else 0
+    prov.siege += terms["rate"] + hunger
+    world.bus.emit("siege_progress", tag, prov.pos, progress=prov.siege, need=terms["need"], rate=terms["rate"],
+                   hunger=hunger, seasons=prov.siege_turns, name=prov.siege_name)
+    if prov.siege_turns >= SIEGE_MIN_SEASONS and prov.siege >= terms["need"]:
+        _fall(world, prov, tag)
+
+
+def _begin_siege(world, prov, tag):
+    """A stack that stands on an enemy place with no battle starts its siege (the arrival season counts). Too few men
+    start none: no meter, no hunger, and the place keeps its output."""
+    units = [u for u in world.units_at(prov.pos) if u.owner == tag]
+    if not siege_terms(world, prov, tag, units)["ok"]:
+        return
+    prov.besieger, prov.siege, prov.siege_turns = tag, 0, 0
+    prov.siege_name = siege_name(world, prov.pos)
+    terms = siege_terms(world, prov, tag, units)
+    world.bus.emit("siege_started", tag, prov.pos, name=prov.siege_name, need=terms["need"], castle=prov.castle,
+                   garrison=terms["garrison_men"], men=terms["men"])
+    world.changed()
+    _siege_season(world, prov)
+
+
+def _regrow_or_rebel(world, prov):
+    """A place with no army on it: a castle regrows its garrison (GARRISON_REGEN) while its owner holds it; a place held by
+    an enemy with no army of its around is driven out after six seasons (the old rule, its counter in prov.siege)."""
+    cap = prov.castle * GARRISON_HP
+    if prov.castle and prov.controller == prov.owner and prov.garrison < cap:
+        prov.garrison = min(cap, prov.garrison + GARRISON_REGEN)
+    if prov.controller != prov.owner and not any(
+            u.kind.war and u.owner == prov.controller and world.within_reach(u.pos, prov.pos)
+            for u in world.units if u.carrier is None):
+        prov.siege += 1
+        if prov.siege >= 6:           # the people drive out a garrison nobody supports
+            prov.controller, prov.siege = prov.owner, 0
+            world.changed()
+    elif prov.controller == prov.owner:
+        prov.siege = 0
+
+
 def sieges(world):
-    """Troops standing in enemy (or lost) provinces take control of them; castles hold out longer."""
+    """The season's siege step (0.2.2, design 4.1 to 4.2): a running siege advances (or is lifted); a stack alone on an
+    enemy place with men enough starts one; a place with no army regrows its garrison or is driven out. A battle hex and
+    a hex a side fled or withdrew onto this season make no progress (0.2.1)."""
     battle_hexes = {b.pos for b in world.battles}
-    for prov in world.provinces.values():
+    for prov in list(world.provinces.values()):
         if prov.owner is None or prov.pos in battle_hexes:
-            continue            # a battle hex: no siege progress, no garrison regrowth, while the battle lasts (spec 3.2)
+            continue            # a battle hex: no progress, no garrison regrowth, while the battle lasts (spec 3.2)
         if world.retreated.get(prov.pos) == world.turn:
             continue            # a side fled or withdrew onto this hex this season: it is running, not besieging (0.2.1 review)
+        if prov.besieger:
+            _siege_season(world, prov)
+            continue
         here = [u for u in world.units_at(prov.pos) if u.kind.war]
-        cap = prov.castle * GARRISON_HP
         if not here:
-            if prov.castle and prov.controller == prov.owner and prov.garrison < cap:
-                prov.garrison = min(cap, prov.garrison + GARRISON_REGEN)
-            if prov.controller != prov.owner and not any(
-                    u.kind.war and u.owner == prov.controller and world.within_reach(u.pos, prov.pos)
-                    for u in world.units if u.carrier is None):
-                prov.siege += 1
-                if prov.siege >= 6:           # the people drive out a garrison nobody supports
-                    prov.controller, prov.siege = prov.owner, 0
-                    world.changed()
-            elif prov.controller == prov.owner:
-                prov.siege = 0
+            _regrow_or_rebel(world, prov)
             continue
         if len({u.owner for u in here}) > 1:
             continue            # two armies on one hex: the battle decides it, no siege progress either way
@@ -256,22 +452,105 @@ def sieges(world):
         if tag == prov.controller:
             prov.siege = 0
             continue
-        if tag == prov.owner or world.at_war(tag, prov.controller):
-            general = world.general(world.units_at(prov.pos))
-            cannons = sum(u.kind.siege + (world.bonus(tag, "siege") if u.kind.branch == "artillery" else 0)
-                          for u in here)
-            prov.siege += 1 + cannons + (1 if general and general.trait == "assault" else 0)
-            defended = prov.controller == prov.owner
-            need = SIEGE_BASE + (prov.castle * (CASTLE_SIEGE + world.bonus(prov.owner, "siege_points"))
-                                 if defended else 0)
-            world.bus.emit("siege_progress", tag, prov.pos, progress=prov.siege, need=need)
-            if prov.siege >= need:
-                world.bus.emit("province_captured", tag, prov.pos, loser=prov.controller, by="siege")
-                prov.controller, prov.siege = tag, 0
-                prov.garrison = 0 if tag != prov.owner else prov.garrison
-                world.message(f"{world.countries[tag].name} took control of {world.place(prov)}.",
-                             None if world.player in (tag, prov.owner) else "nobody")
-                world.changed()
+        if world.at_war(tag, prov.controller):
+            _begin_siege(world, prov, tag)
+
+
+def besiege_target(world, group, pos):
+    """Whether a stack's attack on pos is a siege, not a battle: a castle of an enemy with a garrison, no enemy war unit on
+    the hex and no battle there (the move-in of design 4.5, the default)."""
+    prov = world.provinces.get(pos)
+    owner = group[0].owner if group else None
+    if prov is None or not prov.castle or prov.garrison <= 0 or owner is None:
+        return False
+    if prov.controller in (None, owner) or not world.at_war(owner, prov.controller) or world.battle_at(pos) is not None:
+        return False
+    return not any(u.kind.war and u.owner != owner for u in world.units_at(pos))
+
+
+def besiege_check(world, group, pos, stand=None):
+    """(ok, reason) for a stack's move onto a garrisoned castle to besiege it (design 4.5, the default). The reasons are the
+    attack's: engage_check, then the men (too few men hold no siege: the card says so)."""
+    group = [u for u in group if u in world.units]
+    if not group:
+        return False, "No units to attack with"
+    if not besiege_target(world, group, pos):
+        return False, "Nothing to besiege here"
+    ok, reason = battlesys.engage_check(world, group, pos, stand=stand)
+    if not ok:
+        return ok, reason
+    prov = world.provinces[pos]
+    owner = group[0].owner
+    stack = list(group) + [u for u in world.units_at(pos) if u.owner == owner and u not in group]
+    terms = siege_terms(world, prov, owner, stack)
+    if not terms["ok"]:
+        return False, (f"Too few men to hold a siege (need {terms['garrison_men']:,}, "
+                       f"you have {terms['men']:,})")
+    return True, ""
+
+
+def besiege(world, group, pos):
+    """The stack moves onto the garrisoned castle pos and besieges it: one step, no battle; the meter starts in the season's
+    siege step. Returns True when the stack moved in."""
+    ok, _ = besiege_check(world, group, pos)
+    if not ok:
+        return False
+    group = [u for u in group if u in world.units]
+    if group[0].pos != pos:
+        movement.step_in(world, group, pos)
+    world.changed()
+    return True
+
+
+def storm_check(world, group, pos, stand=None):
+    """(ok, reason) for a storm of the garrisoned castle pos now: the assault battle of today, the garrison cut by the
+    siege's progress (SIEGE_STORM_CUT). Any time during a siege (a place with no siege is stormed on arrival)."""
+    group = [u for u in group if u in world.units]
+    if not group:
+        return False, "No units to attack with"
+    prov = world.provinces.get(pos)
+    owner = group[0].owner
+    if prov is None or not prov.castle or prov.garrison <= 0 or prov.controller in (None, owner):
+        return False, "Nothing to storm here"
+    return battlesys.engage_check(world, group, pos, stand=stand)
+
+
+def storm(world, group, pos):
+    """Storm the castle pos: the garrison is cut by the siege's progress first, then the assault battle starts (engage).
+    Returns what engage returned (False, and nothing changes, when it refuses)."""
+    ok, _ = storm_check(world, group, pos)
+    if not ok:
+        return False
+    prov = world.provinces[pos]
+    uncut, cut = prov.garrison, storm_garrison(world, prov)
+    prov.garrison = cut                      # the cut lasts for this storm's battle only (battle._end_battle restores it)
+    done = world.engage([u for u in group if u in world.units], pos)
+    battle = world.battle_at(pos)
+    if done and battle is not None and battle.assault and battle.storm_from == 0 and cut < uncut:
+        battle.storm_from, battle.storm_cut = uncut, cut
+    elif not done:
+        prov.garrison = uncut
+    if done:
+        for unit in group:
+            if unit in world.units:
+                unit.moves_left, unit.attacked, unit.acted = 0, True, True
+    world.changed()
+    return done
+
+
+def storm_group(world, group, target):
+    """The stack walks to the hex it storms from (a running siege's stack is already there) and storms the castle."""
+    if group and group[0].pos == target:
+        stand = target
+    else:
+        stand = world.attack_options_group(group).get(target)
+        if stand is None:
+            return False
+    if not storm_check(world, group, target, stand=stand)[0]:
+        return False
+    if stand != group[0].pos:
+        world.move_group(group, stand)
+    return storm(world, group, target)
 
 
 def check_alive(world):

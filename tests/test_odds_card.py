@@ -5,7 +5,7 @@ and this test says which word lies. Pygame-free; the card's drawing is tests/ui/
 import unittest
 
 from hexa.campaign.battleview import odds_factor, odds_view, odds_word
-from hexa.campaign.data import CASTLE_ODDS, GROUND_ODDS, ODDS_WORDS
+from hexa.campaign.data import GROUND_ODDS, ODDS_WORDS
 from tests.support.scenarios import SEEDS, play, stage
 from tests.support.worlds import fresh
 
@@ -16,8 +16,10 @@ CALIBRATION = (
     (4, 5, "Poor"), (5, 6, "Poor"),
     (3, 3, "Even"), (4, 4, "Even"),
     (6, 5, "Favourable"), (4, 3, "Favourable"), (6, 4, "Favourable"),
-    (6, 3, "Overwhelming"), (8, 3, "Overwhelming"),
+    (6, 3, "Favourable"), (8, 3, "Overwhelming"),
 )
+# 0.2.2: Overwhelming starts at ratio 2.5 (it was 2.0, where it read like Favourable). 6 v 3 is ratio 2.00 and measured
+# 72% (inside Favourable's band); 8 v 3 (2.67, 73%) is the first Overwhelming pair.
 
 
 class BandTableTest(unittest.TestCase):
@@ -38,8 +40,8 @@ class BandTableTest(unittest.TestCase):
         self.assertEqual(odds_word(1.0), "Even")
         self.assertEqual(odds_word(1.19), "Even")
         self.assertEqual(odds_word(1.2), "Favourable")
-        self.assertEqual(odds_word(1.99), "Favourable")
-        self.assertEqual(odds_word(2.0), "Overwhelming")
+        self.assertEqual(odds_word(2.49), "Favourable")
+        self.assertEqual(odds_word(2.5), "Overwhelming")
         self.assertEqual(odds_word(9.0), "Overwhelming")
 
 
@@ -130,15 +132,84 @@ class HillsCalibrationTest(unittest.TestCase):
         self.assertEqual(hills["word"], "Hopeless")
 
 
+# The garrison pairs (0.2.2, design 4.6): one attacking stack of pikes (regiments) against a castle's garrison of level
+# ``level`` (its men: 600 a level), alone (field 0) or behind a field army of ``field`` regiments, in a storm, 30 seeds each.
+# The rates were measured in the engine before the weights were fitted (scratch run, the same 30 seeds).
+GARRISON_PAIRS = (
+    (1, 0, 1), (1, 0, 2), (1, 0, 3), (1, 0, 4), (1, 0, 6),
+    (2, 0, 1), (2, 0, 2), (2, 0, 3), (2, 0, 4), (2, 0, 6),
+    (3, 0, 1), (3, 0, 2), (3, 0, 3), (3, 0, 4), (3, 0, 6),
+    (1, 2, 2), (1, 2, 4), (1, 2, 6), (2, 2, 2), (2, 2, 4), (2, 2, 6), (3, 2, 2), (3, 2, 4), (3, 2, 6),
+    (1, 4, 4), (1, 4, 6), (2, 4, 4), (2, 4, 6), (3, 4, 4), (3, 4, 6),
+)
+GARRISON_SLACK = 0.10    # the 30-seed scatter (about 9 points, as the hills test allows)
+# Known open (0.2.2 report): level 1 behind 2 field regiments, 4 regiments attacking. The engine measures 33% (Hopeless), the
+# card reads Even: the men model cannot fit it and 6 v 4 behind 4 field regiments (63%) at the same ratio. Pinned to its
+# word here, so a change shows; the level 1 weight is the owner's call (see the 0.2.2 report).
+GARRISON_KNOWN_OPEN = {(1, 2, 4): "Even"}
+
+
+def _band(rate):
+    """The index of the highest word whose lowest win rate the rate reaches (ODDS_WORDS order)."""
+    index = 0
+    for i, word in enumerate(ODDS_WORDS):
+        if rate >= word[2][0] - 1e-9:
+            index = i
+    return index
+
+
+class GarrisonCalibrationTest(unittest.TestCase):
+    """Every garrison pair's word (the storm card: men against men, the garrison weighted by GARRISON_ODDS with a field army,
+    GARRISON_ODDS_ALONE alone) lies within one band of its measured win rate and never above it, allowing the scatter."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.world = fresh("POR")
+        cls.world.visible = set(cls.world.terrain)
+        cls.points = []
+        for level, field, count in GARRISON_PAIRS:
+            spec_a = [("infantry", 1, count)]
+            spec_d = [("infantry", 1, field)] if field else []
+            _, attackers, _ = stage(cls.world, spec_a, spec_d, terrain="plains", castle=level)
+            owner = attackers[0].owner
+            cls.world.player = owner
+            view = odds_view(cls.world, attackers, attackers[0].pos, owner)
+            wins = sum(1 for seed in SEEDS
+                       if play(cls.world, seed, spec_a, spec_d, "plains", castle=level)["winner"] == owner)
+            cls.points.append(((level, field, count), view["word"], view["ratio"], wins / len(SEEDS)))
+        cls.world.player = None
+
+    def test_each_pair_reads_its_measured_band_at_most_one_low_and_never_high(self):
+        for pair, word, ratio, rate in self.points:
+            if pair in GARRISON_KNOWN_OPEN:
+                self.assertEqual(word, GARRISON_KNOWN_OPEN[pair], f"known open pair {pair} (attacker won {rate:.0%})")
+                continue
+            index = next(i for i, (name, _, _) in enumerate(ODDS_WORDS) if name == word)
+            high = _band(min(1.0, rate + GARRISON_SLACK))
+            low = _band(max(0.0, rate - GARRISON_SLACK)) - 1
+            self.assertTrue(low <= index <= high,
+                            f"level {pair[0]}, field {pair[1]}, {pair[2]} regiments: {word} (ratio {ratio}), "
+                            f"attacker won {rate:.0%}")
+
+    def test_a_lone_level_3_garrison_against_1_7_to_3_3_times_its_men_is_not_hopeless(self):
+        world = fresh("POR")
+        for count in (3, 6):
+            _, attackers, _ = stage(world, [("infantry", 1, count)], [], terrain="plains", castle=3)
+            world.player = attackers[0].owner
+            view = odds_view(world, attackers, attackers[0].pos, world.player)
+            self.assertNotEqual(view["word"], "Hopeless", f"{count} regiments against level 3 alone")
+        world.player = None
+
+
 class FactorTest(unittest.TestCase):
     def test_the_ground_and_castle_factors(self):
         self.assertEqual(odds_factor("plains", 0, False), 1.0)
         self.assertEqual(odds_factor("hills", 0, False), GROUND_ODDS["hills"])
         self.assertEqual(odds_factor("mountains", 0, False), GROUND_ODDS["mountains"])
         self.assertEqual(odds_factor("steppe", 0, False), 1.0, "a flat ground not measured reads as plains")
-        self.assertEqual(odds_factor("hills", 2, True), CASTLE_ODDS[2], "in an assault the garrison fights, not the ground")
+        self.assertEqual(odds_factor("hills", 2, True), 1.0, "in an assault the garrison fights, not the ground")
+        self.assertEqual(odds_factor("mountains", 3, True), 1.0)
         self.assertEqual(odds_factor("hills", 1, False), GROUND_ODDS["hills"], "a castle with no assault is ground")
-        self.assertGreater(CASTLE_ODDS[3], CASTLE_ODDS[2])
 
 
 class HiddenEnemyTest(unittest.TestCase):

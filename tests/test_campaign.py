@@ -2,8 +2,8 @@
 import unittest
 
 from hexa.campaign import ai, geo
-from hexa.campaign.data import (GENERAL, STACK_LIMIT, WAGON, troop, BUILD_TURNS, CARAVEL, CASTLE_SIEGE, COLONIST, COLONY_DONE, GOODS, PIONEER,
-                                SETTLEMENT_SLOTS, SIEGE_BASE, WORKS)
+from hexa.campaign.data import (GENERAL, STACK_LIMIT, WAGON, troop, BUILD_TURNS, CARAVEL, COLONIST, COLONY_DONE, GOODS, PIONEER,
+                                SETTLEMENT_SLOTS, WORKS)
 from hexa.campaign.world import CampaignWorld, War
 from hexa.campaign.battlelog import describe
 from hexa.campaign.data import GARRISON_MEN
@@ -326,6 +326,8 @@ class WarTest(unittest.TestCase):
         self.assertTrue(w.move_group(stack, target.pos))
         self.assertTrue(all(u.pos == target.pos for u in stack), "the stack moves together")
         w.sieges()
+        self.assertEqual(target.controller, "CAS", "no place falls in its first season (the 2-season floor, 0.2.2)")
+        w.sieges()
         self.assertEqual(target.controller, "POR")
         ok, _ = w.peace_offer("POR", "CAS", "take")
         self.assertTrue(ok)
@@ -458,7 +460,7 @@ class WarTest(unittest.TestCase):
         w.changed(ownership=True)
         attackers = place(w, troop("infantry", 1), "POR", home, 3)
         w.rng.seed(1)
-        w.attack_group(attackers, target.pos)
+        self.assertTrue(w.storm_group(attackers, target.pos), "a storm is the assault battle (0.2.2: a move-in besieges)")
         report = combat.fight_day(w, w.battle_at(target.pos))
         lost = report["killed"]["CAS"] + report["wounded"]["CAS"]
         self.assertGreater(lost, 0)
@@ -550,7 +552,7 @@ class WarTest(unittest.TestCase):
         w.move_group(stack, target.pos)
         w.sieges()
         self.assertEqual(target.controller, "CAS", "a small castle holds out")
-        for _ in range(SIEGE_BASE + 2 * CASTLE_SIEGE):
+        for _ in range(3):              # 3 regiments take a level 2 castle in 4 seasons (design 4.3): this one was the first
             w.sieges()
         self.assertEqual(target.controller, "POR")
 
@@ -560,7 +562,7 @@ class WarTest(unittest.TestCase):
             w.units = []
             w.declare_war("POR", "CAS")
             target, home = self.border.__func__(type("X", (), {"w": w})())
-            target.castle, target.garrison = 3, 0
+            target.castle, target.garrison = 3, 18          # a full garrison: an empty castle falls in 2 seasons whatever
             place(w, troop("infantry", 1), "POR", target.pos, 2)
             if with_guns:
                 place(w, troop("artillery", 1), "POR", target.pos, 2)

@@ -543,6 +543,8 @@ class ScriptedVersionTest(unittest.TestCase):
         self.bumps_within(10, lambda: prov.controller == self.A, world.sieges)
 
     def test_attack_a_castle(self):
+        """0.2.2: an attack on a garrisoned castle is a siege (Besiege, the default: the army moves in, no battle); Storm
+        is the assault battle, and it starts the battle on the castle's hex."""
         from hexa.campaign.data import GARRISON_HP
         world = self.world
         prov, army = self.at_war_next_to_an_enemy_province()
@@ -551,8 +553,11 @@ class ScriptedVersionTest(unittest.TestCase):
         self.assertIn(prov.pos, world.attack_options_group(army))
         version = world.version
         self.assertTrue(world.attack_group(army, prov.pos))
-        self.assertIsNotNone(world.battle_at(prov.pos), "the attack starts a battle on the castle's hex")
-        self.assertNotEqual(world.version, version, "the battle is drawn on the map: world.version moves")
+        self.assertIsNone(world.battle_at(prov.pos), "Besiege: no battle, the army moves in")
+        self.assertTrue(all(u.pos == prov.pos for u in army))
+        self.assertNotEqual(world.version, version, "the move is drawn on the map: world.version moves")
+        self.assertTrue(world.storm_group(army, prov.pos), "Storm is the assault battle")
+        self.assertIsNotNone(world.battle_at(prov.pos), "the storm starts the battle on the castle's hex")
 
     def test_peace_hands_provinces_over(self):
         world = self.world

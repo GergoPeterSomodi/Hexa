@@ -313,6 +313,8 @@ class Feed:
         verb = {"storm": "stormed", "siege": "took", "peace": "gained"}.get(how, "took")
         sentence = f"{self._name(captor)} {verb} {self._place(event.pos)} from {self._name(loser)}" + \
             (" in the peace." if how == "peace" else ".")
+        if how == "siege" and event.get("name"):
+            sentence = f"{event.get('name')}: {sentence[:-1]} after {event.get('seasons', 0)} seasons."
         if self._party(captor):
             return self._item(event, "gain", "Gained!" if how == "peace" else "Captured!", sentence, True)
         if self._party(loser):
@@ -325,8 +327,29 @@ class Feed:
         if not (mine or self._seen(event.pos)):
             return None
         progress, need = event.get("progress", 0), event.get("need", 0)
-        sentence = f"{self._name(event.tag)} besieges {self._place(event.pos)}: {progress} of {need}."
+        sentence = f"{self._name(event.tag)} besieges {self._place(event.pos)}: {progress} of {need}" + \
+            f", season {event.get('seasons', 0)}."
         return self._item(event, "siege", f"Siege {progress}/{need}", sentence, mine, log=mine)
+
+    def _siege_started(self, event):
+        prov = self.world.provinces.get(event.pos)
+        mine = self._party(event.tag, prov.owner if prov else None, prov.controller if prov else None)
+        if not (mine or self._seen(event.pos)):
+            return None
+        name = event.get("name") or "Siege"
+        sentence = f"{name}: {self._name(event.tag)} besieges {self._place(event.pos)} (needs {event.get('need', 0)})."
+        return self._item(event, "siege", "Siege begun", sentence, mine, floating=False, log=True)
+
+    def _siege_lifted(self, event):
+        prov = self.world.provinces.get(event.pos)
+        mine = self._party(event.tag, prov.owner if prov else None, prov.controller if prov else None)
+        if not (mine or self._seen(event.pos)):
+            return None
+        why = {"relief": "a relief army broke it", "left": "the besieger left",
+               "outnumbered": "the besiegers were too few", "peace": "peace ended it"}.get(event.get("why"), "it ended")
+        name = event.get("name") or "Siege"
+        sentence = f"{name} is lifted: {why}."
+        return self._item(event, "siege", "Siege lifted", sentence, mine, floating=False, log=True)
 
     def _war_declared(self, event):
         target = event.get("target")

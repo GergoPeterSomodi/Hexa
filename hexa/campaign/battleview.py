@@ -51,9 +51,10 @@ battle_strength needs a battle to count on.
 import weakref
 
 from .battlelog import describe
-from .data import CASTLE_ODDS, DICE, ELEVATION, GARRISON_MEN, GROUND_ODDS, ODDS_WORDS, START_YEAR, TERRAIN
+from .data import DICE, ELEVATION, GARRISON_MEN, GROUND_ODDS, ODDS_WORDS, SIEGE_HUNGER, START_YEAR, TERRAIN
 from .state import Battle
-from .systems import battle as battlesys, combat, terrain as terrainsys
+from .systems import battle as battlesys, combat, terrain as terrainsys, war as warsys
+from ..hexgrid import neighbors
 
 ROUND_MEN = 100              # a seen (not exact) number of men is rounded to this
 ROUND_MORALE = 0.05          # and a morale to this share
@@ -311,11 +312,11 @@ def odds_word(ratio):
 
 
 def odds_factor(terrain, castle, assault):
-    """The factor the odds card divides the attack ratio by for the defender's hex: the castle's (CASTLE_ODDS by level)
-    in an assault, where the garrison fights and the ground does not count; else the ground's (GROUND_ODDS). 1.0 for
-    plains and for a ground not measured."""
-    if assault and 0 < castle < len(CASTLE_ODDS):
-        return CASTLE_ODDS[castle]
+    """The factor the odds card divides the attack ratio by for the defender's hex: 1.0 in an assault (the garrison fights
+    and the ground does not count; the garrison's own weight is in the men, see _storm_defence), else the ground's
+    (GROUND_ODDS). 1.0 for plains and for a ground not measured. ``castle`` is kept for the callers' shape."""
+    if assault:
+        return 1.0
     return GROUND_ODDS.get(terrain, 1.0)
 
 
@@ -385,6 +386,30 @@ def _figures(raw, access):
             "strength": _men_out(strength, access)}
 
 
+def _besiege(world, group, target_pos, owner, stand):
+    """The Besiege entry of the odds card (0.2.2, design 4.6): None when the place is not a garrisoned castle with no field
+    army on it. Else: ``ok`` and ``reason`` (the men rule included), ``seasons`` (falls in about N seasons, the arrival
+    season counted; None when the stack is too small), ``need``, ``rate``, ``stores`` (the garrison's seasons of stores),
+    ``war_left`` (the seasons the war has left, the arrival season counted, None when there is no war) and
+    ``war_ends_first`` (the place would fall after the war ends)."""
+    prov = world.provinces.get(target_pos)
+    if not group or prov is None or not prov.castle or prov.garrison <= 0:
+        return None
+    if not warsys.besiege_target(world, group, target_pos):
+        return None
+    ok, reason = warsys.besiege_check(world, group, target_pos, stand=stand)
+    units = list(group) + [u for u in world.units_at(target_pos) if u.owner == owner and u not in group]
+    held = prov.besieger == owner
+    progress, turns = (prov.siege, prov.siege_turns) if held else (0, 0)
+    terms = warsys.siege_terms(world, prov, owner, units)
+    seasons = warsys.siege_forecast(world, prov, owner, units, progress, turns)
+    war = next((w for w in world.wars if {w.a, w.b} == {owner, prov.controller}), None)
+    left = None if war is None else warsys.war_limit(world, war.a, war.b) - (world.turn - war.start) + 1
+    return {"ok": ok, "reason": reason, "seasons": seasons, "need": terms["need"], "rate": terms["rate"],
+            "stores": terms["stores"], "war_left": left,
+            "war_ends_first": bool(seasons is not None and left is not None and seasons > left)}
+
+
 def _odds(world, group, target_pos, viewer, owner, stand):
     battle = world.battle_at(target_pos)
     if group:
@@ -394,13 +419,26 @@ def _odds(world, group, target_pos, viewer, owner, stand):
     enemy = _enemy(world, owner, target_pos, battle)
     attack_access = _access(world, stand, (owner,), viewer) if owner is not None else "hidden"
     defence_access = _access(world, target_pos, (enemy,), viewer) if enemy is not None else "hidden"
-    attack = _figures(_attack_raw(world, group, battle, owner) if group else None, attack_access)
     prov = world.provinces.get(target_pos)
-    defence = _figures(_defence_raw(world, target_pos, battle, enemy) if enemy is not None else None, defence_access)
+    raw_attack = _attack_raw(world, group, battle, owner) if group else None
+    raw_defence = _defence_raw(world, target_pos, battle, enemy) if enemy is not None else None
+    assault = battle.assault if battle is not None else bool(
+        enemy is not None and prov is not None and prov.controller == enemy and prov.castle and prov.garrison > 0)
+    garrison = None
+    if battle is None and assault and enemy is not None:
+        defence_men, garrison = warsys.storm_defence(world, target_pos, enemy)   # a storm: men against men (0.2.2)
+        raw_defence = (defence_men, defence_men)
+        if raw_attack is not None:
+            raw_attack = (raw_attack[0], raw_attack[0])
+    attack = _figures(raw_attack, attack_access)
+    defence = _figures(raw_defence, defence_access)
+    if garrison is not None and defence_access != "hidden":       # men as they are; the weight is in the strength
+        field = sum(u.men for u in world.units_at(target_pos) if u.owner == enemy and u.kind.war)
+        defence["men"] = _men_out(field + garrison["men"], defence_access)
     defence["terrain"] = TERRAIN[prov.terrain].name if prov is not None and prov.terrain in TERRAIN else None
     defence["castle"] = prov.castle if prov is not None and enemy is not None and prov.controller == enemy else 0
-    defence["assault"] = battle.assault if battle is not None else bool(
-        enemy is not None and prov is not None and prov.controller == enemy and prov.castle and prov.garrison > 0)
+    defence["assault"] = assault
+    defence["garrison"] = garrison
     attack["general"] = _general(world, stand, owner, attack_access)
     defence["general"] = _general(world, target_pos, enemy, defence_access)
     ratio, raw = None, None
@@ -422,7 +460,7 @@ def _odds(world, group, target_pos, viewer, owner, stand):
             "attacker_name": _country_name(world, owner) if owner is not None else None,
             "defender_name": _country_name(world, enemy) if enemy is not None and defence_access != "hidden" else None,
             "ok": ok, "reason": reason, "attack": attack, "defence": defence, "ratio": ratio, "factor": factor,
-            "word": word,
+            "word": word, "besiege": None if battle is not None else _besiege(world, group, target_pos, owner, stand),
             "crossing": bool(crossing), "uphill": bool(uphill)}
 
 
@@ -434,3 +472,63 @@ def odds_view(world, group, target_pos, viewer=None):
     stand = group[0].pos if group else target_pos
     key = ("odds", tuple(u.id for u in group), target_pos, stand, viewer, world.turn)
     return _memo(world, key, None, lambda: _odds(world, group, target_pos, viewer, owner, stand))
+
+
+# ----- the siege read model (0.2.2, design 4.7) ----------------------------------------------------------------------
+
+SIEGE_KEYS = ("access", "pos", "name", "besieger", "besieger_name", "defender", "defender_name", "place", "progress",
+              "need", "rate", "hunger", "seasons", "stores_left", "starving", "falls_in", "relief")
+
+
+def siege_view(world, pos, viewer=None):
+    """The one read-only view of a running siege (the badge, the province panel, the log and the task flag read it): the
+    meter (``progress`` of ``need``), ``rate`` a season, ``hunger`` the points the next season adds past the stores, ``seasons``
+    held, ``stores_left`` (seasons of food the garrison has, 0 when it starves), ``starving``, ``falls_in`` (seasons, from
+    now, the place falls at this rate; None when the besieger is too small), and ``relief``: for the defender (or the whole
+    picture), its armies that can reach the hex, each {pos, men, seasons} nearest first. None when no siege runs there.
+    The fog rule of the battle view (_access): exact to a side or to no player, hidden otherwise (numbers None)."""
+    prov = world.provinces.get(tuple(pos))
+    if prov is None or not prov.besieger:
+        return None
+    access = _access(world, prov.pos, (prov.besieger, prov.controller), viewer)
+    key = ("siege", prov.pos, viewer, access, world.turn)
+    return _memo(world, key, prov, lambda: _siege(world, prov, viewer, access))
+
+
+def _siege(world, prov, viewer, access):
+    tag, defender = prov.besieger, prov.controller
+    base = {"access": access, "pos": prov.pos, "name": prov.siege_name, "besieger": tag,
+            "besieger_name": _country_name(world, tag), "defender": defender,
+            "defender_name": _country_name(world, defender), "place": world.place(prov), "progress": None,
+            "need": None, "rate": None, "hunger": None, "seasons": None, "stores_left": None, "starving": None,
+            "falls_in": None, "relief": ()}
+    if access == "hidden":
+        return base
+    units = [u for u in world.units_at(prov.pos) if u.owner == tag]
+    terms = warsys.siege_terms(world, prov, tag, units)
+    stores = terms["stores"]
+    base.update(progress=prov.siege, need=terms["need"], rate=terms["rate"],
+                hunger=SIEGE_HUNGER if prov.siege_turns >= stores else 0, seasons=prov.siege_turns,
+                stores_left=max(0, stores - prov.siege_turns), starving=prov.siege_turns >= stores,
+                falls_in=warsys.siege_forecast(world, prov, tag, units, prov.siege, prov.siege_turns))
+    if viewer is None or viewer == defender:
+        base["relief"] = _relief(world, prov, defender)
+    return base
+
+
+def _relief(world, prov, defender):
+    """The defender's armies that can reach the besieged hex: each {pos, men, seasons} with seasons the first season in which
+    it can stand beside the hex (1 is this season's moves), nearest first, at most four seasons away."""
+    stands = [p for p in neighbors(prov.pos) if p in world.provinces and world.is_land(p)]
+    stacks = {}
+    for unit in world.units:
+        if unit.owner == defender and unit.kind.war and unit.carrier is None and unit.pos != prov.pos:
+            stacks.setdefault(unit.pos, []).append(unit)
+    found = []
+    for pos, group in sorted(stacks.items()):
+        men = sum(u.men for u in group)
+        for seasons in range(1, 5):
+            if any(world.path_to(group, stand, seasons=seasons) for stand in stands):
+                found.append({"pos": pos, "men": men, "seasons": seasons})
+                break
+    return tuple(sorted(found, key=lambda r: (r["seasons"], -r["men"], r["pos"]))[:3])

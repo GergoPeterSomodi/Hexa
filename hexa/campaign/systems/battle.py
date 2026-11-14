@@ -195,6 +195,9 @@ def _place_name(world, pos):
     return TERRAIN[prov.terrain].name if prov is not None and prov.terrain in TERRAIN else "open country"
 
 
+place_name = _place_name        # public for the sieges' names (war.siege_name)
+
+
 def _battle_name(world, pos):
     """A new battle's name: "Battle of X, 1525", and "Second Battle of X, 1525" for each repeat on the same place. The
     count is kept in world.battle_names, so a repeat stays a repeat after a save."""
@@ -535,8 +538,10 @@ def _storm(world, battle, loser, how, had_field):
         return False
     if had_field and prov.garrison > 0 and battle.garrison_morale > 0:
         return False
-    world.bus.emit("province_captured", battle.attacker, battle.pos, loser=prov.controller, by="storm")
+    world.bus.emit("province_captured", battle.attacker, battle.pos, loser=prov.controller, by="storm",
+                   name=prov.siege_name, seasons=prov.siege_turns)
     prov.controller, prov.siege, prov.garrison = battle.attacker, 0, 0
+    prov.besieger, prov.siege_turns, prov.siege_name = "", 0, ""
     return True
 
 
@@ -561,6 +566,10 @@ def _end_battle(world, battle, how, loser=None, cause=None):
     if loser is not None and battle.days > 0:
         _experience(world, fighters, winner, loser)
     _settle_wounded(world, battle, fighters)
+    if battle.storm_from:                    # a storm's cut: the garrison keeps its uncut strength minus the men the storm took
+        prov = world.provinces[pos]
+        lost = max(0, battle.storm_cut - prov.garrison)
+        prov.garrison = max(0, battle.storm_from - lost)
     storm = _storm(world, battle, loser, how, had_field)
     if battle in world.battles:
         world.battles.remove(battle)

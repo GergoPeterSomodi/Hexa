@@ -16,8 +16,11 @@ country the event is about (the actor), ``pos`` the hex it happened on, and the 
     message           text, shown, notice  a log line (shown: whether the player's log got it). ``notice`` names a line
                                          that has no event of its own (the action log shows those: see
                                          feed.NOTICES); pos is the hex it is about, if any
-    province_captured tag=captor, pos    loser, by ("siege", "storm" or "peace")
-    siege_progress    tag=besieger, pos  progress, need
+    province_captured tag=captor, pos    loser, by ("siege", "storm" or "peace"); a siege also gives name, seasons
+    siege_started     tag=besieger, pos  name (the siege's name), need, castle, garrison (its men), men (the besieger's)
+    siege_progress    tag=besieger, pos  progress, need, rate, hunger (the points this season past the stores), seasons
+                                         (seasons held, the arrival season first), name
+    siege_lifted      tag=besieger, pos  why ("relief", "left", "outnumbered" or "peace"), name, progress, seasons
     war_declared      tag=aggressor      target
     peace_made        tag, b             winner, moved (provinces that changed hands)
     unit_raised       tag, pos           what (the troop's name), id
@@ -67,7 +70,8 @@ from dataclasses import dataclass
 
 
 CAMPAIGN_KINDS = (
-    "message", "province_captured", "siege_progress", "war_declared", "peace_made", "unit_raised",
+    "message", "province_captured", "siege_started", "siege_progress", "siege_lifted", "war_declared", "peace_made",
+    "unit_raised",
     "unit_lost", "unit_deserted", "debt_seized", "pass_closed", "pass_opened", "tech_researched", "era_reached",
     "colony_founded", "building_done", "investment_done", "season_ended", "money_spent", "forage", "native_raid",
     "unit_moved", "battle_started", "battle_joined", "battle_fought", "battle_ended",

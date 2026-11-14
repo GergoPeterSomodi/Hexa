@@ -824,7 +824,10 @@ class FleeLandTest(unittest.TestCase):
         war.sieges(world)
         self.assertEqual((prov.siege, prov.controller), (0, winner))
         world.turn += 1
-        war.sieges(world)                  # next season it is a siege: this open hex falls to it (no castle, one season)
+        war.sieges(world)                  # next season it is a siege: this open hex falls after the 2-season floor (0.2.2)
+        self.assertEqual(prov.controller, winner)
+        world.turn += 1
+        war.sieges(world)
         self.assertEqual(prov.controller, fled)
 
 

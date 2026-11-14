@@ -35,11 +35,12 @@ def economy(world, preview=False):
         market = prov.market
         if not prov.owner or not market:
             continue
-        if prov.controller == prov.owner:
+        under_siege = bool(prov.besieger)          # a besieged place produces nothing (0.2.2): its stores are the garrison's
+        if prov.controller == prov.owner and not under_siege:
             food = SUBSISTENCE * prov.peasants
             market.supply["grain"] += food
             market.produced["grain"] += food
-        if prov.good and prov.controller == prov.owner:
+        if prov.good and prov.controller == prov.owner and not under_siege:
             out = OUTPUT[prov.good] * workers(world, prov) * works_factor(world, prov) * output_mult(world, prov)
             if prov.remote:
                 out *= REMOTE_PENALTY

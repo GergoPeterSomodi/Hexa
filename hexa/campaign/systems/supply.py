@@ -121,7 +121,8 @@ def logistics(world):
         if not troops:
             continue
         prov = world.provinces.get(pos)
-        if tag != world.player and prov and prov.owner != tag and not world.in_supply(tag, pos) and \
+        besieging = bool(prov and prov.besieger == tag)     # a besieger forages the place it holds for free (0.2.2)
+        if tag != world.player and prov and prov.owner != tag and not besieging and not world.in_supply(tag, pos) and \
                 not any(u.kind is WAGON and u.supplies > 0 for u in group):
             world.forage(group, end_of_round=True)   # computer armies forage when they must, moves or not
         state, count, limit = world.supply_state(group)
@@ -131,11 +132,11 @@ def logistics(world):
             elif state == "wagon" and wagon.supplies > 0:
                 wagon.supplies -= 1
                 break
-        fed = state != "cut off"
+        fed = state != "cut off" or besieging
         hurt = 0
         for unit in troops:
             unit.supplied = fed
-            loss = (0 if fed else ATTRITION) + (ATTRITION if count > limit else 0)
+            loss = (0 if fed else ATTRITION) + (ATTRITION if count > limit and not besieging else 0)
             if loss:
                 unit.hp -= loss
                 hurt += 1
