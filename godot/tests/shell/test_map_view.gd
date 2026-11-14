@@ -39,8 +39,9 @@ func test_layers_have_the_planned_cells() -> void:
 	var counts := _view.layer_cells()
 	assert_eq(counts[TilePlan.GROUND], 14411 + 15956 + 83, "ground: every hex (land, ocean, lake)")
 	assert_eq(counts[TilePlan.COAST], _coast_cells(), "coast cells")
-	assert_eq(counts[TilePlan.TOWN], _map.city_names.size(), "one town per city on land")
-	assert_eq(counts[TilePlan.ROAD], 0, "roads wait for step 2")
+	assert_gt(counts[TilePlan.TOWN], 0, "towns and castles from the provinces")
+	assert_gt(counts[TilePlan.ROAD], 0, "roads from the builder")
+	assert_eq(_view.plan.missing, 0, "every planned key exists in the atlas")
 
 
 func test_far_zoom_shows_the_far_maps_and_tile_zoom_shows_tiles() -> void:

@@ -1,12 +1,13 @@
 ## The tile layers of the map view: which baked sprite each hex shows on each layer, as Python's map view draws the
 ## tile zoom (docs/design/art-inventory.md, "How Godot layers the pieces"). Pure: the shell turns each key into a cell
-## of the TileSet. Layers: ground, coast (or a river mouth), river, road, decoration, town (or a harbour).
+## of the TileSet. Layers: ground, coast (or a river mouth), river, road (or a bridge), decoration, town (a town, its
+## harbour or gates, or a castle).
 ##
 ## Edge masks are bit e of hexgrid.neighbours order (0 E, 1 NE, 2 NW, 3 W, 4 SW, 5 SE), the order of the atlas keys.
 ## Godot's TileMap neighbour order is never used: each key is chosen here by its mask.
 ##
-## Data not in MapData yet (step 2 of the builder: roads, castles, owners) gives no cells here, so those layers stay
-## empty until the builder fills the fields (godot/README.md "MapData fields"). Each such place is marked TODO-WIRE.
+## Towns and castles come from the provinces' settlement and castle levels (Python's overlay_desc rule); a map without
+## provinces (the small fixtures of the tests) falls back to the city sizes.
 class_name TilePlan
 extends RefCounted
 
@@ -21,6 +22,10 @@ const LAYERS: PackedStringArray = ["ground", "coast", "river", "road", "deco", "
 var layers: Dictionary[String, Dictionary] = {}  # layer name -> Dictionary[Vector2i, String] (hex -> sprite key)
 var missing: int = 0  # keys the plan wanted that the atlas does not hold (should stay 0)
 var _atlas: AtlasIndex
+var _rivers: Dictionary[Vector2i, int] = {}  # hex -> river edge mask (before the sea is taken away)
+var _roads: Dictionary[Vector2i, int] = {}  # hex -> road edge mask
+var _harbours: Dictionary[Vector2i, bool] = {}  # coastal towns with a harbour piece (no coast of their own)
+var _towns: Dictionary[Vector2i, bool] = {}  # hexes with a town piece or a castle
 
 
 ## Builds every layer for the map. The atlas must be loaded (AtlasIndex.load_index).
@@ -29,14 +34,15 @@ static func build(map: MapData, atlas: AtlasIndex) -> TilePlan:
 	plan._atlas = atlas
 	for name: String in LAYERS:
 		plan.layers[name] = {}
-	var edges := _river_edges(map)
-	plan._ground(map)
+	plan._rivers = _edge_masks(map.rivers)
+	plan._roads = _edge_masks_of_paths(map.road_paths)
 	var mouths: Dictionary[Vector2i, bool] = {}
-	plan._rivers(map, edges, mouths)
-	plan._coast(map, edges, mouths)
-	plan._decoration(map, edges)
-	plan._towns(map)
-	plan._roads(map)
+	plan._ground(map)
+	plan._rivers_layer(map, mouths)
+	plan._towns_layer(map)
+	plan._coast(map, mouths)
+	plan._roads_layer(map)
+	plan._decoration(map)
 	return plan
 
 
@@ -57,13 +63,33 @@ static func variant(pos: Vector2i, count: int) -> int:
 	return int((pos.x * 73856093) ^ (pos.y * 19349663)) % count
 
 
-## Town level from the city size of the builder (its population in thousands, the Python CITIES table), as
-## worldgen's settlement rule and overlay_desc's levels: 40 or more is a city (5), 60 or more a great city (6), else a
-## market town (3). Walls (4) and villages (2) need the castle and the province population of step 2 (TODO-WIRE).
+## Town level of a city size (its population in thousands, the Python CITIES table), for maps without provinces:
+## 40 or more is a city (5), 60 or more a great city (6), else a market town (3).
 static func town_level(size: int) -> int:
 	if size >= 40:
 		return 6 if size >= 60 else 5
 	return 3
+
+
+## Town level and castle level of a province, as Python's overlay_desc: a village (settlement 1) is level 2, a town
+## (settlement 2) is 3, or 4 (walled) with a castle, a city (settlement 3) is 5, or 6 (great) at 60 or more people.
+## A castle is drawn only where no town is, except that a village with a castle shows the castle.
+## Returns Vector2i(town level, castle level), with 0 for none.
+static func settlement_pieces(prov: Province) -> Vector2i:
+	var s := prov.settlement
+	var c := prov.castle
+	if s > 0:
+		var town := 0
+		if s == 1:
+			town = 2
+		elif s == 2:
+			town = 4 if c > 0 else 3
+		else:
+			town = 6 if prov.pop() >= 60.0 else 5
+		if s == 1 and c > 0:
+			return Vector2i(0, c)
+		return Vector2i(town, 0)
+	return Vector2i(0, c)
 
 
 ## Bit of the edge from `from` to its neighbour `to` in hexgrid order, or 0 when they are not neighbours.
@@ -87,11 +113,20 @@ static func sea_mask(map: MapData, pos: Vector2i) -> int:
 	return mask
 
 
-## Mask of the river edges of every hex: each river joins its consecutive hexes.
-static func _river_edges(map: MapData) -> Dictionary[Vector2i, int]:
+## Number of set bits of a mask.
+static func bit_count(mask: int) -> int:
+	var n := 0
+	var m := mask
+	while m != 0:
+		n += m & 1
+		m >>= 1
+	return n
+
+
+## Edge masks of a set of paths (each path joins its consecutive hexes).
+static func _edge_masks_of_paths(paths: Array) -> Dictionary[Vector2i, int]:
 	var edges: Dictionary[Vector2i, int] = {}
-	for name: String in map.rivers.keys():
-		var path: Array = map.rivers[name]
+	for path: Array in paths:
 		for i in range(1, path.size()):
 			var a: Vector2i = path[i - 1]
 			var b: Vector2i = path[i]
@@ -100,6 +135,14 @@ static func _river_edges(map: MapData) -> Dictionary[Vector2i, int]:
 			edges[a] = edges.get(a, 0) | edge_bit(a, b)
 			edges[b] = edges.get(b, 0) | edge_bit(b, a)
 	return edges
+
+
+## Edge masks of the rivers: the river names map to their hex paths.
+static func _edge_masks(rivers: Dictionary) -> Dictionary[Vector2i, int]:
+	var paths: Array = []
+	for name: String in rivers.keys():
+		paths.append(rivers[name])
+	return _edge_masks_of_paths(paths)
 
 
 func _put(layer: String, pos: Vector2i, key: String) -> void:
@@ -134,75 +177,110 @@ func _ground(map: MapData) -> void:
 		_put(GROUND, pos, key)
 
 
-func _rivers(map: MapData, edges: Dictionary[Vector2i, int], mouths: Dictionary[Vector2i, bool]) -> void:
-	for pos: Vector2i in edges.keys():
-		var river: int = edges[pos] & ~sea_mask(map, pos)
+func _rivers_layer(map: MapData, mouths: Dictionary[Vector2i, bool]) -> void:
+	for pos: Vector2i in _rivers.keys():
+		var sea := sea_mask(map, pos)
+		var river: int = _rivers[pos] & ~sea
 		if river == 0:
 			continue
-		var sea := sea_mask(map, pos)
-		if sea != 0 and _single_bit(river) >= 0:
+		var edge := _single_bit(river)
+		if sea != 0 and edge >= 0:
 			# A river mouth: its piece holds the river and the coast of the one edge the river comes in by.
 			mouths[pos] = true
-			_put(RIVER, pos, "mouth/%d/%d" % [_single_bit(river), sea])
+			_put(RIVER, pos, "mouth/%d/%d" % [edge, sea])
 		else:
 			_put(RIVER, pos, _family_key("river/%d" % river, variant(pos, 3)))
 
 
-func _coast(map: MapData, edges: Dictionary[Vector2i, int], mouths: Dictionary[Vector2i, bool]) -> void:
+## The town (or castle) of each hex. Sets _towns and _harbours for the other layers.
+func _towns_layer(map: MapData) -> void:
+	if map.provinces.is_empty():
+		for pos: Vector2i in map.city_names.keys():
+			if map.is_land(pos):
+				_town_at(map, pos, Vector2i(town_level(map.city_sizes.get(pos, 1)), 0))
+		return
+	for pos: Vector2i in map.provinces.keys():
+		var prov: Province = map.provinces[pos]
+		var pieces := settlement_pieces(prov)
+		if pieces.x > 0 or pieces.y > 0:
+			_town_at(map, pos, pieces)
+
+
+## A town: the harbour on the coast; else the gates where roads meet it; else the plain town. A castle (no town) is its
+## own piece.
+func _town_at(map: MapData, pos: Vector2i, pieces: Vector2i) -> void:
+	var level := pieces.x
+	if level > 0:
+		var sea := sea_mask(map, pos)
+		var harbour := "harbour/%d/%d" % [level, sea]
+		if sea != 0 and _atlas.has(harbour):
+			_harbours[pos] = true
+			_put(TOWN, pos, harbour)
+		else:
+			var road: int = _roads.get(pos, 0) & ~sea
+			var gates := "town/%d/gates/%d" % [level, road]
+			if road != 0 and _atlas.has(gates):
+				_put(TOWN, pos, gates)
+			else:
+				_put(TOWN, pos, _family_key("town/%d" % level, variant(pos, 3)))
+		_towns[pos] = true
+	elif pieces.y > 0:
+		_put(TOWN, pos, _family_key("castle/%d" % pieces.y, variant(pos, 3)))
+		_towns[pos] = true
+
+
+func _coast(map: MapData, mouths: Dictionary[Vector2i, bool]) -> void:
 	for pos: Vector2i in map.land_hexes():
 		var sea := sea_mask(map, pos)
-		if sea == 0 or mouths.has(pos) or _harbour_key(map, pos) != "":
+		if sea == 0 or mouths.has(pos) or _harbours.has(pos):
 			continue
 		_put(COAST, pos, _family_key("coast/%d" % sea, variant(pos, 3)))
 
 
-func _decoration(map: MapData, edges: Dictionary[Vector2i, int]) -> void:
+## Roads and bridges: a road piece by its edge mask on every road hex, except where a town holds the street. A road
+## over a river, with two edges of each, is a bridge where the key exists.
+func _roads_layer(map: MapData) -> void:
+	for pos: Vector2i in map.roads.keys():
+		if _towns.has(pos):
+			continue
+		var sea := sea_mask(map, pos)
+		var road: int = _roads.get(pos, 0) & ~sea
+		if road == 0:
+			continue
+		var river: int = _rivers.get(pos, 0) & ~sea
+		if bit_count(road) == 2 and bit_count(river) == 2:
+			var bridge := "bridge/%d/%d" % [road, river]
+			if _atlas.has(bridge):
+				_put(ROAD, pos, bridge)
+				continue
+		_put(ROAD, pos, "road/dirt/%d" % road)
+
+
+## Trees, rocks, fields and hamlets, by Python's decorations_for: only on open land of plains, steppe or savanna that
+## has no building, no river, coast or road. Fields and hamlets need an owner (a hamlet also more than 10 people).
+func _decoration(map: MapData) -> void:
 	for pos: Vector2i in map.land_hexes():
 		var kind: String = map.terrain[pos]
 		if kind != "plains" and kind != "steppe" and kind != "savanna":
 			continue
-		if map.city_names.has(pos) or edges.has(pos) or sea_mask(map, pos) != 0:
+		if map.city_names.has(pos) or _rivers.has(pos) or _roads.has(pos) or sea_mask(map, pos) != 0:
 			continue
-		# Python's decorations_for: the same hash of the position, trees and rocks on undeveloped open land.
+		var prov: Province = map.provinces.get(pos) as Province
+		if prov != null and (prov.settlement > 0 or prov.castle > 0 or prov.works > 0):
+			continue
 		var h := int((pos.x * 73856093) ^ (pos.y * 19349663)) & 0xFFFF
+		var owned := prov != null and prov.owner != ""
 		var kind_name := ""
 		if h % 6 == 0:
 			kind_name = "trees"
 		elif h % 9 == 1:
 			kind_name = "rocks"
+		elif owned and h % 7 == 2:
+			kind_name = "fields"
+		elif owned and prov.pop() > 10.0 and h % 11 == 3:
+			kind_name = "hamlet"
 		if kind_name != "":
 			_put(DECO, pos, "deco/%s/%d" % [kind_name, h % 4])
-
-
-## The harbour piece of a coastal town (it holds the coast too, so the town has no coast cell), or "".
-func _harbour_key(map: MapData, pos: Vector2i) -> String:
-	if not map.city_names.has(pos) or not map.is_land(pos):
-		return ""
-	var sea := sea_mask(map, pos)
-	if sea == 0:
-		return ""
-	var level := town_level(map.city_sizes.get(pos, 1))
-	var key := "harbour/%d/%d" % [level, sea]
-	return key if _atlas.has(key) else ""
-
-
-func _towns(map: MapData) -> void:
-	for pos: Vector2i in map.city_names.keys():
-		if not map.is_land(pos):
-			continue
-		var harbour := _harbour_key(map, pos)
-		if harbour != "":
-			_put(TOWN, pos, harbour)
-		else:
-			var level := town_level(map.city_sizes.get(pos, 1))
-			_put(TOWN, pos, _family_key("town/%d" % level, variant(pos, 3)))
-	# TODO-WIRE: castles (castle/<level>/<v>) need the castle levels of step 2; the castle hexes are not in MapData yet.
-
-
-func _roads(_map: MapData) -> void:
-	# TODO-WIRE: roads (road/dirt/<mask>, road/paved/<mask>, bridge/<road>/<river>) need the road edges of step 2.
-	# The road layer stays empty until then.
-	pass
 
 
 static func _single_bit(mask: int) -> int:

@@ -77,7 +77,7 @@ func test_town_on_land_and_no_roads_or_castles_yet() -> void:
 	# A size 2 city is a market town, level 3; it is not on the coast so it has no harbour.
 	assert_true(_plan.key_at(TilePlan.TOWN, Vector2i(3, 2)).begins_with("town/3/"), "market town")
 	assert_eq(_plan.count(TilePlan.TOWN), 1, "one town")
-	assert_eq(_plan.count(TilePlan.ROAD), 0, "roads wait for the builder's step 2")
+	assert_eq(_plan.count(TilePlan.ROAD), 0, "the fixture has no road paths")
 
 
 func test_decoration_only_on_open_plains() -> void:

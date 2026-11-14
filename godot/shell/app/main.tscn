@@ -20,8 +20,19 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Status" type="Label" parent="Centre"]
+[node name="Box" type="VBoxContainer" parent="Centre"]
+layout_mode = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Status" type="Label" parent="Centre/Box"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 36
 text = "Building Europe..."
 horizontal_alignment = 1
+
+[node name="Bar" type="ProgressBar" parent="Centre/Box"]
+custom_minimum_size = Vector2(480, 24)
+layout_mode = 2
+max_value = 1.0
+show_percentage = false

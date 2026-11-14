@@ -12,7 +12,6 @@ const VIEW_COUNTRIES := "countries"
 const ZOOM_MIN := 3.0 / 60.0  # Python's far radius 3, as a fraction of the baked radius 60
 const ZOOM_MAX := 34.0 / 60.0  # Python's closest radius 34 (the close landscape comes later)
 const TILE_ZOOM := 13.0 / 60.0  # Python's first tile radius: below it the far maps show
-const NAME_ZOOM := 0.3  # names of towns and passes from here on
 const ZOOM_STEP := 1.15  # per wheel notch
 const ZOOM_EASE := 14.0  # how fast the zoom follows its target (per second)
 const PAN_SPEED := 800.0  # screen pixels a second with the keys
@@ -52,9 +51,12 @@ func setup(p_map: MapData, p_atlas: AtlasIndex) -> void:
 	_build_far()
 	_marks = MapMarks.new()
 	_marks.map = map
+	_marks.borders = Political.border_edges(map)
+	_marks.capitals = Political.capitals(map)
 	add_child(_marks)
 	_names = MapNames.new()
 	_names.map = map
+	_names.countries = Political.name_points(map)
 	add_child(_names)
 	_camera = Camera2D.new()
 	_camera.position_smoothing_enabled = false
@@ -221,7 +223,9 @@ func _refresh() -> void:
 	# and its terrain mode is bare.
 	_layers[TilePlan.DECO].visible = view_mode == VIEW_COUNTRIES
 	_names.zoom = zoom_now
-	_names.visible = zoom_now >= NAME_ZOOM
+	var top_left := _world_at(Vector2.ZERO)
+	_names.view_rect = Rect2(top_left, _view_size() / zoom_now).grow(120.0)
+	_marks.show_borders = view_mode == VIEW_COUNTRIES
 	_names.queue_redraw()
 	_marks.hover = _hover
 	_marks.queue_redraw()

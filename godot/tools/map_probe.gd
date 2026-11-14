@@ -74,6 +74,7 @@ func _shot_list() -> Array[Dictionary]:
 	shots.append({"name": "middle_iberia_terrain", "centre": iberia_mid, "zoom": middle, "view": MapView.VIEW_TERRAIN})
 	shots.append({"name": "middle_po_terrain", "centre": _city("Milan"), "zoom": middle, "view": MapView.VIEW_TERRAIN})
 	shots.append({"name": "middle_italy_terrain", "centre": italy_mid, "zoom": middle, "view": MapView.VIEW_TERRAIN})
+	shots.append({"name": "middle_iberia_countries", "centre": iberia_mid, "zoom": middle, "view": MapView.VIEW_COUNTRIES})
 	shots.append({"name": "middle_italy_countries", "centre": italy_mid, "zoom": middle, "view": MapView.VIEW_COUNTRIES})
 	shots.append({"name": "close_lisbon_terrain", "centre": _city("Lisbon"), "zoom": 0.5, "view": MapView.VIEW_TERRAIN})
 	shots.append({"name": "close_venice_terrain", "centre": _city("Venice"), "zoom": 0.5, "view": MapView.VIEW_TERRAIN})

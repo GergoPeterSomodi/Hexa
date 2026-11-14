@@ -20,24 +20,15 @@ static func load_default() -> TerrainStyle:
 	return style
 
 
-## Owner of each hex (a country tag) when the builder has them, else an empty dictionary.
-## TODO-WIRE: MapData field `owner_of` (Dictionary[Vector2i, String]) from step 2 of the builder.
+## Owner of each land hex (a country tag). See Political.owners.
 static func owners(map: MapData) -> Dictionary:
-	var raw: Variant = map.get(&"owner_of")
-	if raw is Dictionary:
-		return raw
-	return {}
+	return Political.owners(map)
 
 
-## Colour of each country tag: the field `country_colours` (Dictionary[String, Color]) when the builder has it, else a
-## colour made from the tag, so that owners still show when the colours are missing.
-## TODO-WIRE: MapData field `country_colours` from step 2 of the builder.
+## Colour of a country: its Country.colour; a colour made from the tag when the tag is not a country.
 static func country_colour(map: MapData, tag: String) -> Color:
-	var raw: Variant = map.get(&"country_colours")
-	if raw is Dictionary:
-		var table: Dictionary = raw
-		if table.has(tag):
-			return table[tag]
+	if map.countries.has(tag):
+		return map.countries[tag].colour
 	return Color.from_hsv(float(absi(tag.hash()) % 360) / 360.0, 0.55, 0.85)
 
 
