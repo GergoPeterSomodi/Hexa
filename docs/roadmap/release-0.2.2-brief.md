@@ -105,6 +105,17 @@ All-AI, Europe 1480 and random worlds 7, 11 and 21, 240 seasons each, pooled:
   at a castle it cannot reach) was tried and made the AI worse, so it waits with relief for the AI pass after the playtest.
   Allied stacks on one hex do not besiege together yet (backlog).
 
+## Playtest (2026-11-14) and the scope change
+
+The owner played the build (Castile against Granada, 1484). Two notes:
+- **"Can't move units to occupied land ... could not enter the enemy territory."** Not a 0.2.2 regression (the same save
+  gives the same reach on v0.2.1). The causes: Granada's hills and mountains with slow bombards in the stack (about one hex
+  a season), the zone of control beside a garrisoned enemy castle (an army must stop there), and the stack limit when moving
+  onto an own stack. The game only says "They cannot get there." **In scope now:** clear refusal messages.
+- **"I wasn't sure if I want to siege every province rather just the main castles."** Asked, the owner chose
+  **"Castle holds its area": open land around a castle cannot be taken until that castle falls**, built in 0.2.2 before
+  release. Design: `docs/design/castle-areas.md` (in progress); a short owner batch follows before the build.
+
 ## Owner's decisions (2026-11-13)
 
 1. **How a siege works:** the siege meter (men, cannons, a siege general and hunger against the castle, the ground and the
