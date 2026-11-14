@@ -1,0 +1,4215 @@
+{
+ "schema": "hexa-godot/geography-regions/1",
+ "source": "hexa/campaign/regions.py (REGIONS, CITY_REGION)",
+ "note": "tag is the country in 1480, or null. city_region maps a geo city to its region; each city is also an anchor of its region. Every land hex takes the region of its nearest anchor (naming.py).",
+ "regions": [
+  {
+   "name": "Minho",
+   "lon": -8.35,
+   "lat": 41.75,
+   "tag": "POR"
+  },
+  {
+   "name": "Douro",
+   "lon": -8.2,
+   "lat": 41.05,
+   "tag": "POR"
+  },
+  {
+   "name": "Trás-os-Montes",
+   "lon": -7.1,
+   "lat": 41.6,
+   "tag": "POR"
+  },
+  {
+   "name": "Beira Alta",
+   "lon": -7.6,
+   "lat": 40.6,
+   "tag": "POR"
+  },
+  {
+   "name": "Beira Litoral",
+   "lon": -8.5,
+   "lat": 40.2,
+   "tag": "POR"
+  },
+  {
+   "name": "Beira Baixa",
+   "lon": -7.4,
+   "lat": 39.9,
+   "tag": "POR"
+  },
+  {
+   "name": "Ribatejo",
+   "lon": -8.5,
+   "lat": 39.3,
+   "tag": "POR"
+  },
+  {
+   "name": "Estremadura",
+   "lon": -9.0,
+   "lat": 39.0,
+   "tag": "POR"
+  },
+  {
+   "name": "Alto Alentejo",
+   "lon": -7.6,
+   "lat": 38.9,
+   "tag": "POR"
+  },
+  {
+   "name": "Baixo Alentejo",
+   "lon": -8.0,
+   "lat": 37.9,
+   "tag": "POR"
+  },
+  {
+   "name": "Algarve",
+   "lon": -8.1,
+   "lat": 37.2,
+   "tag": "POR"
+  },
+  {
+   "name": "Madeira",
+   "lon": -16.9,
+   "lat": 32.7,
+   "tag": "POR"
+  },
+  {
+   "name": "Azores",
+   "lon": -27.5,
+   "lat": 38.6,
+   "tag": "POR"
+  },
+  {
+   "name": "Galicia",
+   "lon": -8.0,
+   "lat": 42.7,
+   "tag": "CAS"
+  },
+  {
+   "name": "Asturias",
+   "lon": -5.9,
+   "lat": 43.3,
+   "tag": "CAS"
+  },
+  {
+   "name": "Cantabria",
+   "lon": -4.1,
+   "lat": 43.1,
+   "tag": "CAS"
+  },
+  {
+   "name": "Biscay",
+   "lon": -2.9,
+   "lat": 43.2,
+   "tag": "CAS"
+  },
+  {
+   "name": "Guipúzcoa",
+   "lon": -2.2,
+   "lat": 43.1,
+   "tag": "CAS"
+  },
+  {
+   "name": "Álava",
+   "lon": -2.7,
+   "lat": 42.85,
+   "tag": "CAS"
+  },
+  {
+   "name": "León",
+   "lon": -5.7,
+   "lat": 42.6,
+   "tag": "CAS"
+  },
+  {
+   "name": "Tierra de Campos",
+   "lon": -4.9,
+   "lat": 42.0,
+   "tag": "CAS"
+  },
+  {
+   "name": "Old Castile",
+   "lon": -3.7,
+   "lat": 42.3,
+   "tag": "CAS"
+  },
+  {
+   "name": "Soria",
+   "lon": -2.5,
+   "lat": 41.8,
+   "tag": "CAS"
+  },
+  {
+   "name": "Salamanca",
+   "lon": -5.8,
+   "lat": 40.9,
+   "tag": "CAS"
+  },
+  {
+   "name": "Segovia",
+   "lon": -4.1,
+   "lat": 40.9,
+   "tag": "CAS"
+  },
+  {
+   "name": "New Castile",
+   "lon": -3.5,
+   "lat": 39.9,
+   "tag": "CAS"
+  },
+  {
+   "name": "Alcarria",
+   "lon": -2.6,
+   "lat": 40.6,
+   "tag": "CAS"
+  },
+  {
+   "name": "New Castile",
+   "lon": -3.7,
+   "lat": 40.4,
+   "tag": "CAS"
+  },
+  {
+   "name": "La Mancha",
+   "lon": -3.0,
+   "lat": 39.0,
+   "tag": "CAS"
+  },
+  {
+   "name": "Extremadura",
+   "lon": -6.2,
+   "lat": 39.0,
+   "tag": "CAS"
+  },
+  {
+   "name": "Seville",
+   "lon": -5.8,
+   "lat": 37.4,
+   "tag": "CAS"
+  },
+  {
+   "name": "Córdoba",
+   "lon": -4.8,
+   "lat": 37.9,
+   "tag": "CAS"
+  },
+  {
+   "name": "Jaén",
+   "lon": -3.8,
+   "lat": 37.9,
+   "tag": "CAS"
+  },
+  {
+   "name": "Cádiz",
+   "lon": -6.0,
+   "lat": 36.5,
+   "tag": "CAS"
+  },
+  {
+   "name": "Granada",
+   "lon": -3.4,
+   "lat": 37.0,
+   "tag": "GRA"
+  },
+  {
+   "name": "Almería",
+   "lon": -2.4,
+   "lat": 37.0,
+   "tag": "GRA"
+  },
+  {
+   "name": "Murcia",
+   "lon": -1.4,
+   "lat": 38.0,
+   "tag": "CAS"
+  },
+  {
+   "name": "Valencia",
+   "lon": -0.7,
+   "lat": 39.5,
+   "tag": "ARA"
+  },
+  {
+   "name": "Alicante",
+   "lon": -0.6,
+   "lat": 38.5,
+   "tag": "ARA"
+  },
+  {
+   "name": "Aragon",
+   "lon": -0.8,
+   "lat": 41.7,
+   "tag": "ARA"
+  },
+  {
+   "name": "Upper Aragon",
+   "lon": -0.2,
+   "lat": 42.3,
+   "tag": "ARA"
+  },
+  {
+   "name": "Teruel",
+   "lon": -1.1,
+   "lat": 40.4,
+   "tag": "ARA"
+  },
+  {
+   "name": "Catalonia",
+   "lon": 1.5,
+   "lat": 41.8,
+   "tag": "ARA"
+  },
+  {
+   "name": "Lleida",
+   "lon": 0.8,
+   "lat": 41.6,
+   "tag": "ARA"
+  },
+  {
+   "name": "Roussillon",
+   "lon": 2.6,
+   "lat": 42.65,
+   "tag": "ARA"
+  },
+  {
+   "name": "Navarre",
+   "lon": -1.6,
+   "lat": 42.7,
+   "tag": null
+  },
+  {
+   "name": "La Rioja",
+   "lon": -2.4,
+   "lat": 42.3,
+   "tag": "CAS"
+  },
+  {
+   "name": "Majorca",
+   "lon": 2.9,
+   "lat": 39.6,
+   "tag": "ARA"
+  },
+  {
+   "name": "Ibiza",
+   "lon": 1.4,
+   "lat": 38.9,
+   "tag": "ARA"
+  },
+  {
+   "name": "Malta",
+   "lon": 14.4,
+   "lat": 35.9,
+   "tag": "ARA"
+  },
+  {
+   "name": "Cagliari",
+   "lon": 9.1,
+   "lat": 39.3,
+   "tag": "ARA"
+  },
+  {
+   "name": "Logudoro",
+   "lon": 8.9,
+   "lat": 40.5,
+   "tag": "ARA"
+  },
+  {
+   "name": "Gallura",
+   "lon": 9.3,
+   "lat": 41.0,
+   "tag": "ARA"
+  },
+  {
+   "name": "Corsica",
+   "lon": 9.1,
+   "lat": 42.1,
+   "tag": "GEN"
+  },
+  {
+   "name": "Val di Mazara",
+   "lon": 12.9,
+   "lat": 37.8,
+   "tag": "ARA"
+  },
+  {
+   "name": "Val Demone",
+   "lon": 14.8,
+   "lat": 38.0,
+   "tag": "ARA"
+  },
+  {
+   "name": "Val di Noto",
+   "lon": 14.8,
+   "lat": 37.0,
+   "tag": "ARA"
+  },
+  {
+   "name": "Île-de-France",
+   "lon": 2.4,
+   "lat": 48.8,
+   "tag": "FRA"
+  },
+  {
+   "name": "Picardy",
+   "lon": 2.8,
+   "lat": 49.8,
+   "tag": "FRA"
+  },
+  {
+   "name": "Normandy",
+   "lon": 0.2,
+   "lat": 49.0,
+   "tag": "FRA"
+  },
+  {
+   "name": "Caux",
+   "lon": 1.0,
+   "lat": 49.7,
+   "tag": "FRA"
+  },
+  {
+   "name": "Brittany",
+   "lon": -2.8,
+   "lat": 48.2,
+   "tag": "BRI"
+  },
+  {
+   "name": "Cornouaille",
+   "lon": -4.0,
+   "lat": 48.0,
+   "tag": "BRI"
+  },
+  {
+   "name": "Léon",
+   "lon": -4.4,
+   "lat": 48.5,
+   "tag": "BRI"
+  },
+  {
+   "name": "Maine",
+   "lon": -0.2,
+   "lat": 48.0,
+   "tag": "FRA"
+  },
+  {
+   "name": "Anjou",
+   "lon": -0.5,
+   "lat": 47.4,
+   "tag": "FRA"
+  },
+  {
+   "name": "Touraine",
+   "lon": 0.7,
+   "lat": 47.4,
+   "tag": "FRA"
+  },
+  {
+   "name": "Orléanais",
+   "lon": 1.9,
+   "lat": 47.9,
+   "tag": "FRA"
+  },
+  {
+   "name": "Berry",
+   "lon": 2.0,
+   "lat": 47.0,
+   "tag": "FRA"
+  },
+  {
+   "name": "Nivernais",
+   "lon": 3.4,
+   "lat": 47.0,
+   "tag": "FRA"
+  },
+  {
+   "name": "Bourbonnais",
+   "lon": 3.3,
+   "lat": 46.3,
+   "tag": "FRA"
+  },
+  {
+   "name": "Auvergne",
+   "lon": 3.1,
+   "lat": 45.5,
+   "tag": "FRA"
+  },
+  {
+   "name": "Limousin",
+   "lon": 1.5,
+   "lat": 45.6,
+   "tag": "FRA"
+  },
+  {
+   "name": "La Marche",
+   "lon": 2.0,
+   "lat": 46.2,
+   "tag": "FRA"
+  },
+  {
+   "name": "Poitou",
+   "lon": -0.3,
+   "lat": 46.6,
+   "tag": "FRA"
+  },
+  {
+   "name": "Saintonge",
+   "lon": -0.8,
+   "lat": 45.8,
+   "tag": "FRA"
+  },
+  {
+   "name": "Angoumois",
+   "lon": 0.1,
+   "lat": 45.7,
+   "tag": "FRA"
+  },
+  {
+   "name": "Guyenne",
+   "lon": -0.2,
+   "lat": 44.6,
+   "tag": "FRA"
+  },
+  {
+   "name": "Gascony",
+   "lon": 0.2,
+   "lat": 43.8,
+   "tag": "FRA"
+  },
+  {
+   "name": "Landes",
+   "lon": -0.9,
+   "lat": 44.0,
+   "tag": "FRA"
+  },
+  {
+   "name": "Béarn",
+   "lon": -0.5,
+   "lat": 43.2,
+   "tag": "FRA"
+  },
+  {
+   "name": "Foix",
+   "lon": 1.6,
+   "lat": 42.9,
+   "tag": "FRA"
+  },
+  {
+   "name": "Languedoc",
+   "lon": 3.0,
+   "lat": 43.5,
+   "tag": "FRA"
+  },
+  {
+   "name": "Rouergue",
+   "lon": 2.4,
+   "lat": 44.3,
+   "tag": "FRA"
+  },
+  {
+   "name": "Quercy",
+   "lon": 1.5,
+   "lat": 44.6,
+   "tag": "FRA"
+  },
+  {
+   "name": "Périgord",
+   "lon": 0.8,
+   "lat": 45.1,
+   "tag": "FRA"
+  },
+  {
+   "name": "Gévaudan",
+   "lon": 3.5,
+   "lat": 44.6,
+   "tag": "FRA"
+  },
+  {
+   "name": "Vivarais",
+   "lon": 4.5,
+   "lat": 44.8,
+   "tag": "FRA"
+  },
+  {
+   "name": "Provence",
+   "lon": 5.8,
+   "lat": 43.7,
+   "tag": "FRA"
+  },
+  {
+   "name": "Dauphiné",
+   "lon": 5.7,
+   "lat": 45.0,
+   "tag": "FRA"
+  },
+  {
+   "name": "Lyonnais",
+   "lon": 4.6,
+   "lat": 45.9,
+   "tag": "FRA"
+  },
+  {
+   "name": "Burgundy",
+   "lon": 4.7,
+   "lat": 47.2,
+   "tag": "BUR"
+  },
+  {
+   "name": "Franche-Comté",
+   "lon": 5.9,
+   "lat": 47.0,
+   "tag": "BUR"
+  },
+  {
+   "name": "Champagne",
+   "lon": 4.3,
+   "lat": 48.6,
+   "tag": "FRA"
+  },
+  {
+   "name": "Lorraine",
+   "lon": 6.2,
+   "lat": 48.7,
+   "tag": null
+  },
+  {
+   "name": "Alsace",
+   "lon": 7.5,
+   "lat": 48.3,
+   "tag": null
+  },
+  {
+   "name": "Comtat Venaissin",
+   "lon": 4.9,
+   "lat": 44.0,
+   "tag": "PAP"
+  },
+  {
+   "name": "Bresse",
+   "lon": 5.2,
+   "lat": 46.2,
+   "tag": "SAV"
+  },
+  {
+   "name": "Artois",
+   "lon": 2.6,
+   "lat": 50.4,
+   "tag": "BUR"
+  },
+  {
+   "name": "Flanders",
+   "lon": 3.2,
+   "lat": 51.0,
+   "tag": "BUR"
+  },
+  {
+   "name": "Brabant",
+   "lon": 4.7,
+   "lat": 50.9,
+   "tag": "BUR"
+  },
+  {
+   "name": "Hainaut",
+   "lon": 3.9,
+   "lat": 50.4,
+   "tag": "BUR"
+  },
+  {
+   "name": "Namur",
+   "lon": 4.9,
+   "lat": 50.3,
+   "tag": "BUR"
+  },
+  {
+   "name": "Luxembourg",
+   "lon": 6.0,
+   "lat": 49.8,
+   "tag": "BUR"
+  },
+  {
+   "name": "Liège",
+   "lon": 5.6,
+   "lat": 50.6,
+   "tag": null
+  },
+  {
+   "name": "Limburg",
+   "lon": 5.8,
+   "lat": 51.1,
+   "tag": "BUR"
+  },
+  {
+   "name": "Holland",
+   "lon": 4.6,
+   "lat": 52.2,
+   "tag": "BUR"
+  },
+  {
+   "name": "Zeeland",
+   "lon": 3.8,
+   "lat": 51.5,
+   "tag": "BUR"
+  },
+  {
+   "name": "Utrecht",
+   "lon": 5.1,
+   "lat": 52.1,
+   "tag": null
+  },
+  {
+   "name": "Guelders",
+   "lon": 5.9,
+   "lat": 52.0,
+   "tag": "BUR"
+  },
+  {
+   "name": "Overijssel",
+   "lon": 6.3,
+   "lat": 52.4,
+   "tag": null
+  },
+  {
+   "name": "Friesland",
+   "lon": 5.8,
+   "lat": 53.1,
+   "tag": null
+  },
+  {
+   "name": "Groningen",
+   "lon": 6.6,
+   "lat": 53.2,
+   "tag": null
+  },
+  {
+   "name": "Cleves",
+   "lon": 6.2,
+   "lat": 51.7,
+   "tag": null
+  },
+  {
+   "name": "Oldenburg Marsh",
+   "lon": 8.0,
+   "lat": 53.5,
+   "tag": null
+  },
+  {
+   "name": "Middlesex",
+   "lon": -0.3,
+   "lat": 51.55,
+   "tag": "ENG"
+  },
+  {
+   "name": "Surrey",
+   "lon": -0.4,
+   "lat": 51.3,
+   "tag": "ENG"
+  },
+  {
+   "name": "Cornwall",
+   "lon": -4.8,
+   "lat": 50.4,
+   "tag": "ENG"
+  },
+  {
+   "name": "Devon",
+   "lon": -3.7,
+   "lat": 50.7,
+   "tag": "ENG"
+  },
+  {
+   "name": "Somerset",
+   "lon": -2.8,
+   "lat": 51.1,
+   "tag": "ENG"
+  },
+  {
+   "name": "Dorset",
+   "lon": -2.3,
+   "lat": 50.8,
+   "tag": "ENG"
+  },
+  {
+   "name": "Hampshire",
+   "lon": -1.3,
+   "lat": 51.0,
+   "tag": "ENG"
+  },
+  {
+   "name": "Sussex",
+   "lon": -0.4,
+   "lat": 50.95,
+   "tag": "ENG"
+  },
+  {
+   "name": "Kent",
+   "lon": 0.7,
+   "lat": 51.2,
+   "tag": "ENG"
+  },
+  {
+   "name": "Essex",
+   "lon": 0.5,
+   "lat": 51.8,
+   "tag": "ENG"
+  },
+  {
+   "name": "East Anglia",
+   "lon": 1.0,
+   "lat": 52.5,
+   "tag": "ENG"
+  },
+  {
+   "name": "The Fens",
+   "lon": 0.0,
+   "lat": 52.6,
+   "tag": "ENG"
+  },
+  {
+   "name": "Wiltshire",
+   "lon": -1.9,
+   "lat": 51.3,
+   "tag": "ENG"
+  },
+  {
+   "name": "Thames Valley",
+   "lon": -1.2,
+   "lat": 51.6,
+   "tag": "ENG"
+  },
+  {
+   "name": "Gloucestershire",
+   "lon": -2.2,
+   "lat": 51.9,
+   "tag": "ENG"
+  },
+  {
+   "name": "Warwickshire",
+   "lon": -1.5,
+   "lat": 52.3,
+   "tag": "ENG"
+  },
+  {
+   "name": "Staffordshire",
+   "lon": -1.9,
+   "lat": 52.8,
+   "tag": "ENG"
+  },
+  {
+   "name": "Leicestershire",
+   "lon": -1.0,
+   "lat": 52.7,
+   "tag": "ENG"
+  },
+  {
+   "name": "Lincolnshire",
+   "lon": -0.2,
+   "lat": 53.1,
+   "tag": "ENG"
+  },
+  {
+   "name": "Nottinghamshire",
+   "lon": -1.0,
+   "lat": 53.1,
+   "tag": "ENG"
+  },
+  {
+   "name": "Welsh Marches",
+   "lon": -2.8,
+   "lat": 52.5,
+   "tag": "ENG"
+  },
+  {
+   "name": "West Riding",
+   "lon": -1.8,
+   "lat": 53.8,
+   "tag": "ENG"
+  },
+  {
+   "name": "North Riding",
+   "lon": -1.1,
+   "lat": 54.3,
+   "tag": "ENG"
+  },
+  {
+   "name": "East Riding",
+   "lon": -0.5,
+   "lat": 53.9,
+   "tag": "ENG"
+  },
+  {
+   "name": "Lancashire",
+   "lon": -2.6,
+   "lat": 53.8,
+   "tag": "ENG"
+  },
+  {
+   "name": "Cheshire",
+   "lon": -2.6,
+   "lat": 53.2,
+   "tag": "ENG"
+  },
+  {
+   "name": "Cumberland",
+   "lon": -3.0,
+   "lat": 54.6,
+   "tag": "ENG"
+  },
+  {
+   "name": "Durham",
+   "lon": -1.6,
+   "lat": 54.7,
+   "tag": "ENG"
+  },
+  {
+   "name": "Northumberland",
+   "lon": -1.9,
+   "lat": 55.2,
+   "tag": "ENG"
+  },
+  {
+   "name": "North Wales",
+   "lon": -3.9,
+   "lat": 53.0,
+   "tag": "ENG"
+  },
+  {
+   "name": "Mid Wales",
+   "lon": -3.7,
+   "lat": 52.4,
+   "tag": "ENG"
+  },
+  {
+   "name": "South Wales",
+   "lon": -3.6,
+   "lat": 51.7,
+   "tag": "ENG"
+  },
+  {
+   "name": "Dyfed",
+   "lon": -4.7,
+   "lat": 51.9,
+   "tag": "ENG"
+  },
+  {
+   "name": "Lothian",
+   "lon": -3.2,
+   "lat": 55.9,
+   "tag": "SCO"
+  },
+  {
+   "name": "The Borders",
+   "lon": -2.8,
+   "lat": 55.5,
+   "tag": "SCO"
+  },
+  {
+   "name": "Galloway",
+   "lon": -4.3,
+   "lat": 55.0,
+   "tag": "SCO"
+  },
+  {
+   "name": "Clydesdale",
+   "lon": -4.0,
+   "lat": 55.7,
+   "tag": "SCO"
+  },
+  {
+   "name": "Fife",
+   "lon": -3.1,
+   "lat": 56.2,
+   "tag": "SCO"
+  },
+  {
+   "name": "Atholl",
+   "lon": -3.9,
+   "lat": 56.6,
+   "tag": "SCO"
+  },
+  {
+   "name": "Angus",
+   "lon": -2.8,
+   "lat": 56.7,
+   "tag": "SCO"
+  },
+  {
+   "name": "Mar",
+   "lon": -2.7,
+   "lat": 57.3,
+   "tag": "SCO"
+  },
+  {
+   "name": "Moray",
+   "lon": -3.5,
+   "lat": 57.5,
+   "tag": "SCO"
+  },
+  {
+   "name": "Ross",
+   "lon": -4.7,
+   "lat": 57.7,
+   "tag": "SCO"
+  },
+  {
+   "name": "Sutherland",
+   "lon": -4.3,
+   "lat": 58.2,
+   "tag": "SCO"
+  },
+  {
+   "name": "Caithness",
+   "lon": -3.4,
+   "lat": 58.4,
+   "tag": "SCO"
+  },
+  {
+   "name": "Argyll",
+   "lon": -5.2,
+   "lat": 56.2,
+   "tag": "SCO"
+  },
+  {
+   "name": "Lordship of the Isles",
+   "lon": -6.2,
+   "lat": 57.0,
+   "tag": null
+  },
+  {
+   "name": "Orkney",
+   "lon": -3.0,
+   "lat": 59.0,
+   "tag": "SCO"
+  },
+  {
+   "name": "Ulster",
+   "lon": -6.8,
+   "lat": 54.7,
+   "tag": "IRE"
+  },
+  {
+   "name": "Connacht",
+   "lon": -8.8,
+   "lat": 53.7,
+   "tag": "IRE"
+  },
+  {
+   "name": "Munster",
+   "lon": -8.8,
+   "lat": 52.2,
+   "tag": "IRE"
+  },
+  {
+   "name": "Leinster",
+   "lon": -7.0,
+   "lat": 52.9,
+   "tag": "IRE"
+  },
+  {
+   "name": "The Pale",
+   "lon": -6.5,
+   "lat": 53.6,
+   "tag": "IRE"
+  },
+  {
+   "name": "Desmond",
+   "lon": -9.5,
+   "lat": 52.0,
+   "tag": "IRE"
+  },
+  {
+   "name": "Zealand",
+   "lon": 11.8,
+   "lat": 55.4,
+   "tag": "DAN"
+  },
+  {
+   "name": "Funen",
+   "lon": 10.4,
+   "lat": 55.3,
+   "tag": "DAN"
+  },
+  {
+   "name": "Jutland",
+   "lon": 9.3,
+   "lat": 56.2,
+   "tag": "DAN"
+  },
+  {
+   "name": "North Jutland",
+   "lon": 9.9,
+   "lat": 57.2,
+   "tag": "DAN"
+  },
+  {
+   "name": "Scania",
+   "lon": 13.4,
+   "lat": 55.9,
+   "tag": "DAN"
+  },
+  {
+   "name": "Halland",
+   "lon": 12.7,
+   "lat": 56.9,
+   "tag": "DAN"
+  },
+  {
+   "name": "Blekinge",
+   "lon": 15.0,
+   "lat": 56.3,
+   "tag": "DAN"
+  },
+  {
+   "name": "Slesvig",
+   "lon": 9.5,
+   "lat": 54.7,
+   "tag": "DAN"
+  },
+  {
+   "name": "Holstein",
+   "lon": 9.9,
+   "lat": 54.0,
+   "tag": "DAN"
+  },
+  {
+   "name": "Bornholm",
+   "lon": 14.9,
+   "lat": 55.1,
+   "tag": "DAN"
+  },
+  {
+   "name": "Gotland",
+   "lon": 18.5,
+   "lat": 57.5,
+   "tag": "DAN"
+  },
+  {
+   "name": "Viken",
+   "lon": 10.8,
+   "lat": 59.5,
+   "tag": "DAN"
+  },
+  {
+   "name": "Opplandene",
+   "lon": 10.8,
+   "lat": 61.2,
+   "tag": "DAN"
+  },
+  {
+   "name": "Agder",
+   "lon": 7.8,
+   "lat": 58.4,
+   "tag": "DAN"
+  },
+  {
+   "name": "Rogaland",
+   "lon": 6.0,
+   "lat": 59.0,
+   "tag": "DAN"
+  },
+  {
+   "name": "Hordaland",
+   "lon": 6.0,
+   "lat": 60.4,
+   "tag": "DAN"
+  },
+  {
+   "name": "Sogn",
+   "lon": 7.0,
+   "lat": 61.2,
+   "tag": "DAN"
+  },
+  {
+   "name": "Møre",
+   "lon": 7.5,
+   "lat": 62.3,
+   "tag": "DAN"
+  },
+  {
+   "name": "Västergötland",
+   "lon": 13.2,
+   "lat": 58.2,
+   "tag": "SWE"
+  },
+  {
+   "name": "Östergötland",
+   "lon": 15.4,
+   "lat": 58.4,
+   "tag": "SWE"
+  },
+  {
+   "name": "Småland",
+   "lon": 14.8,
+   "lat": 57.2,
+   "tag": "SWE"
+  },
+  {
+   "name": "Närke",
+   "lon": 15.0,
+   "lat": 59.3,
+   "tag": "SWE"
+  },
+  {
+   "name": "Södermanland",
+   "lon": 16.7,
+   "lat": 59.1,
+   "tag": "SWE"
+  },
+  {
+   "name": "Uppland",
+   "lon": 17.6,
+   "lat": 59.9,
+   "tag": "SWE"
+  },
+  {
+   "name": "Västmanland",
+   "lon": 16.2,
+   "lat": 59.7,
+   "tag": "SWE"
+  },
+  {
+   "name": "Värmland",
+   "lon": 13.1,
+   "lat": 59.7,
+   "tag": "SWE"
+  },
+  {
+   "name": "Dalarna",
+   "lon": 14.8,
+   "lat": 60.9,
+   "tag": "SWE"
+  },
+  {
+   "name": "Gästrikland",
+   "lon": 16.8,
+   "lat": 60.8,
+   "tag": "SWE"
+  },
+  {
+   "name": "Hälsingland",
+   "lon": 16.0,
+   "lat": 61.8,
+   "tag": "SWE"
+  },
+  {
+   "name": "Medelpad",
+   "lon": 16.8,
+   "lat": 62.4,
+   "tag": "SWE"
+  },
+  {
+   "name": "Finland Proper",
+   "lon": 22.3,
+   "lat": 60.5,
+   "tag": "SWE"
+  },
+  {
+   "name": "Nyland",
+   "lon": 25.0,
+   "lat": 60.4,
+   "tag": "SWE"
+  },
+  {
+   "name": "Tavastia",
+   "lon": 24.8,
+   "lat": 61.2,
+   "tag": "SWE"
+  },
+  {
+   "name": "Savonia",
+   "lon": 27.5,
+   "lat": 62.2,
+   "tag": "SWE"
+  },
+  {
+   "name": "Ostrobothnia",
+   "lon": 22.5,
+   "lat": 62.3,
+   "tag": "SWE"
+  },
+  {
+   "name": "Åland",
+   "lon": 20.0,
+   "lat": 60.2,
+   "tag": "SWE"
+  },
+  {
+   "name": "Karelia",
+   "lon": 30.0,
+   "lat": 61.5,
+   "tag": "MOS"
+  },
+  {
+   "name": "Mecklenburg",
+   "lon": 12.0,
+   "lat": 53.7,
+   "tag": null
+  },
+  {
+   "name": "Brunswick-Lüneburg",
+   "lon": 10.5,
+   "lat": 52.8,
+   "tag": "BRU"
+  },
+  {
+   "name": "Hanover",
+   "lon": 9.7,
+   "lat": 52.4,
+   "tag": "BRU"
+  },
+  {
+   "name": "Oldenburg",
+   "lon": 8.2,
+   "lat": 53.1,
+   "tag": null
+  },
+  {
+   "name": "East Frisia",
+   "lon": 7.4,
+   "lat": 53.4,
+   "tag": null
+  },
+  {
+   "name": "Westphalia",
+   "lon": 7.8,
+   "lat": 51.7,
+   "tag": "COL"
+  },
+  {
+   "name": "Electorate of Cologne",
+   "lon": 7.0,
+   "lat": 50.8,
+   "tag": "COL"
+  },
+  {
+   "name": "Berg",
+   "lon": 7.2,
+   "lat": 51.1,
+   "tag": "COL"
+  },
+  {
+   "name": "Hesse",
+   "lon": 9.2,
+   "lat": 51.1,
+   "tag": "HES"
+  },
+  {
+   "name": "Wetterau",
+   "lon": 8.6,
+   "lat": 50.3,
+   "tag": "HES"
+  },
+  {
+   "name": "Thuringia",
+   "lon": 11.0,
+   "lat": 50.9,
+   "tag": "SAX"
+  },
+  {
+   "name": "Electoral Saxony",
+   "lon": 12.7,
+   "lat": 51.7,
+   "tag": "SAX"
+  },
+  {
+   "name": "Meissen",
+   "lon": 13.5,
+   "lat": 51.1,
+   "tag": "SAX"
+  },
+  {
+   "name": "Lusatia",
+   "lon": 14.5,
+   "lat": 51.4,
+   "tag": "BOH"
+  },
+  {
+   "name": "Altmark",
+   "lon": 11.5,
+   "lat": 52.7,
+   "tag": "BRA"
+  },
+  {
+   "name": "Mittelmark",
+   "lon": 13.2,
+   "lat": 52.4,
+   "tag": "BRA"
+  },
+  {
+   "name": "Neumark",
+   "lon": 15.0,
+   "lat": 52.7,
+   "tag": "BRA"
+  },
+  {
+   "name": "Uckermark",
+   "lon": 13.8,
+   "lat": 53.1,
+   "tag": "BRA"
+  },
+  {
+   "name": "West Pomerania",
+   "lon": 13.5,
+   "lat": 53.9,
+   "tag": "POM"
+  },
+  {
+   "name": "East Pomerania",
+   "lon": 16.5,
+   "lat": 54.1,
+   "tag": "POM"
+  },
+  {
+   "name": "Upper Bavaria",
+   "lon": 11.8,
+   "lat": 48.0,
+   "tag": "BAV"
+  },
+  {
+   "name": "Lower Bavaria",
+   "lon": 12.7,
+   "lat": 48.6,
+   "tag": "BAV"
+  },
+  {
+   "name": "Upper Palatinate",
+   "lon": 12.0,
+   "lat": 49.5,
+   "tag": "BAV"
+  },
+  {
+   "name": "Swabia",
+   "lon": 9.7,
+   "lat": 48.2,
+   "tag": "WUR"
+  },
+  {
+   "name": "Württemberg",
+   "lon": 9.2,
+   "lat": 48.7,
+   "tag": "WUR"
+  },
+  {
+   "name": "Franconia",
+   "lon": 10.3,
+   "lat": 49.8,
+   "tag": null
+  },
+  {
+   "name": "Baden",
+   "lon": 8.3,
+   "lat": 48.8,
+   "tag": null
+  },
+  {
+   "name": "Palatinate",
+   "lon": 8.1,
+   "lat": 49.3,
+   "tag": "PAL"
+  },
+  {
+   "name": "Rhineland",
+   "lon": 7.3,
+   "lat": 50.2,
+   "tag": "PAL"
+  },
+  {
+   "name": "Hunsrück",
+   "lon": 7.2,
+   "lat": 49.8,
+   "tag": "PAL"
+  },
+  {
+   "name": "Swiss Plateau",
+   "lon": 7.9,
+   "lat": 47.1,
+   "tag": "SWI"
+  },
+  {
+   "name": "Central Switzerland",
+   "lon": 8.5,
+   "lat": 46.9,
+   "tag": "SWI"
+  },
+  {
+   "name": "Graubünden",
+   "lon": 9.5,
+   "lat": 46.7,
+   "tag": "SWI"
+  },
+  {
+   "name": "Valais",
+   "lon": 7.6,
+   "lat": 46.1,
+   "tag": null
+  },
+  {
+   "name": "Savoy",
+   "lon": 6.2,
+   "lat": 45.6,
+   "tag": "SAV"
+  },
+  {
+   "name": "Piedmont",
+   "lon": 7.8,
+   "lat": 44.8,
+   "tag": "SAV"
+  },
+  {
+   "name": "Aosta",
+   "lon": 7.3,
+   "lat": 45.7,
+   "tag": "SAV"
+  },
+  {
+   "name": "Lombardy",
+   "lon": 9.7,
+   "lat": 45.5,
+   "tag": "MLO"
+  },
+  {
+   "name": "Montferrat",
+   "lon": 8.3,
+   "lat": 45.0,
+   "tag": null
+  },
+  {
+   "name": "Liguria",
+   "lon": 8.8,
+   "lat": 44.4,
+   "tag": "GEN"
+  },
+  {
+   "name": "Emilia",
+   "lon": 10.9,
+   "lat": 44.6,
+   "tag": null
+  },
+  {
+   "name": "Mantua",
+   "lon": 10.8,
+   "lat": 45.3,
+   "tag": null
+  },
+  {
+   "name": "Romagna",
+   "lon": 12.0,
+   "lat": 44.3,
+   "tag": "PAP"
+  },
+  {
+   "name": "The Marches",
+   "lon": 13.2,
+   "lat": 43.4,
+   "tag": "PAP"
+  },
+  {
+   "name": "Umbria",
+   "lon": 12.5,
+   "lat": 42.9,
+   "tag": "PAP"
+  },
+  {
+   "name": "Lazio",
+   "lon": 12.8,
+   "lat": 41.8,
+   "tag": "PAP"
+  },
+  {
+   "name": "Tuscany",
+   "lon": 11.0,
+   "lat": 43.4,
+   "tag": "TUS"
+  },
+  {
+   "name": "Maremma",
+   "lon": 11.1,
+   "lat": 42.7,
+   "tag": "TUS"
+  },
+  {
+   "name": "Trentino",
+   "lon": 11.1,
+   "lat": 46.2,
+   "tag": null
+  },
+  {
+   "name": "Veneto",
+   "lon": 11.8,
+   "lat": 45.6,
+   "tag": "VEN"
+  },
+  {
+   "name": "Friuli",
+   "lon": 13.1,
+   "lat": 46.1,
+   "tag": "VEN"
+  },
+  {
+   "name": "Istria",
+   "lon": 13.9,
+   "lat": 45.2,
+   "tag": "VEN"
+  },
+  {
+   "name": "Abruzzo",
+   "lon": 13.9,
+   "lat": 42.2,
+   "tag": "NAP"
+  },
+  {
+   "name": "Molise",
+   "lon": 14.7,
+   "lat": 41.6,
+   "tag": "NAP"
+  },
+  {
+   "name": "Campania",
+   "lon": 14.8,
+   "lat": 40.9,
+   "tag": "NAP"
+  },
+  {
+   "name": "Apulia",
+   "lon": 16.3,
+   "lat": 41.0,
+   "tag": "NAP"
+  },
+  {
+   "name": "Salento",
+   "lon": 18.1,
+   "lat": 40.2,
+   "tag": "NAP"
+  },
+  {
+   "name": "Basilicata",
+   "lon": 16.0,
+   "lat": 40.5,
+   "tag": "NAP"
+  },
+  {
+   "name": "Calabria",
+   "lon": 16.4,
+   "lat": 39.0,
+   "tag": "NAP"
+  },
+  {
+   "name": "Tyrol",
+   "lon": 11.2,
+   "lat": 47.1,
+   "tag": "AUS"
+  },
+  {
+   "name": "Salzburg",
+   "lon": 13.1,
+   "lat": 47.6,
+   "tag": null
+  },
+  {
+   "name": "Upper Austria",
+   "lon": 14.2,
+   "lat": 48.2,
+   "tag": "AUS"
+  },
+  {
+   "name": "Lower Austria",
+   "lon": 15.8,
+   "lat": 48.3,
+   "tag": "AUS"
+  },
+  {
+   "name": "Styria",
+   "lon": 15.0,
+   "lat": 47.2,
+   "tag": "AUS"
+  },
+  {
+   "name": "Carinthia",
+   "lon": 14.1,
+   "lat": 46.7,
+   "tag": "AUS"
+  },
+  {
+   "name": "Carniola",
+   "lon": 14.5,
+   "lat": 46.0,
+   "tag": "AUS"
+  },
+  {
+   "name": "Bohemia",
+   "lon": 14.9,
+   "lat": 50.0,
+   "tag": "BOH"
+  },
+  {
+   "name": "Moravia",
+   "lon": 16.9,
+   "lat": 49.4,
+   "tag": "BOH"
+  },
+  {
+   "name": "Lower Silesia",
+   "lon": 16.5,
+   "lat": 51.1,
+   "tag": "BOH"
+  },
+  {
+   "name": "Upper Silesia",
+   "lon": 18.0,
+   "lat": 50.4,
+   "tag": "BOH"
+  },
+  {
+   "name": "Greater Poland",
+   "lon": 17.2,
+   "lat": 52.2,
+   "tag": "POL"
+  },
+  {
+   "name": "Kuyavia",
+   "lon": 18.5,
+   "lat": 52.7,
+   "tag": "POL"
+  },
+  {
+   "name": "Chełmno Land",
+   "lon": 18.7,
+   "lat": 53.2,
+   "tag": "POL"
+  },
+  {
+   "name": "Pomerelia",
+   "lon": 18.2,
+   "lat": 53.9,
+   "tag": "POL"
+  },
+  {
+   "name": "Royal Prussia",
+   "lon": 19.8,
+   "lat": 54.1,
+   "tag": "POL"
+  },
+  {
+   "name": "Lesser Poland",
+   "lon": 20.3,
+   "lat": 50.2,
+   "tag": "POL"
+  },
+  {
+   "name": "Masovia",
+   "lon": 21.0,
+   "lat": 52.4,
+   "tag": "POL"
+  },
+  {
+   "name": "Podlachia",
+   "lon": 22.8,
+   "lat": 52.8,
+   "tag": "POL"
+  },
+  {
+   "name": "Sandomierz",
+   "lon": 21.7,
+   "lat": 50.7,
+   "tag": "POL"
+  },
+  {
+   "name": "Lublin Land",
+   "lon": 22.8,
+   "lat": 51.2,
+   "tag": "POL"
+  },
+  {
+   "name": "Red Ruthenia",
+   "lon": 24.0,
+   "lat": 49.8,
+   "tag": "POL"
+  },
+  {
+   "name": "Podolia",
+   "lon": 26.7,
+   "lat": 49.0,
+   "tag": "POL"
+  },
+  {
+   "name": "Prussia",
+   "lon": 21.0,
+   "lat": 54.3,
+   "tag": "TEU"
+  },
+  {
+   "name": "Nadruvia",
+   "lon": 21.3,
+   "lat": 54.7,
+   "tag": "TEU"
+  },
+  {
+   "name": "Samland",
+   "lon": 20.4,
+   "lat": 54.9,
+   "tag": "TEU"
+  },
+  {
+   "name": "Masuria",
+   "lon": 21.6,
+   "lat": 53.7,
+   "tag": "TEU"
+  },
+  {
+   "name": "Samogitia",
+   "lon": 22.8,
+   "lat": 55.7,
+   "tag": "LIT"
+  },
+  {
+   "name": "Lithuania",
+   "lon": 24.6,
+   "lat": 54.9,
+   "tag": "LIT"
+  },
+  {
+   "name": "Black Ruthenia",
+   "lon": 25.7,
+   "lat": 53.4,
+   "tag": "LIT"
+  },
+  {
+   "name": "Polesia",
+   "lon": 27.5,
+   "lat": 52.0,
+   "tag": "LIT"
+  },
+  {
+   "name": "Volhynia",
+   "lon": 25.5,
+   "lat": 51.0,
+   "tag": "LIT"
+  },
+  {
+   "name": "White Ruthenia",
+   "lon": 29.5,
+   "lat": 54.0,
+   "tag": "LIT"
+  },
+  {
+   "name": "Vitebsk",
+   "lon": 30.0,
+   "lat": 55.3,
+   "tag": "LIT"
+  },
+  {
+   "name": "Smolensk",
+   "lon": 32.0,
+   "lat": 54.8,
+   "tag": "LIT"
+  },
+  {
+   "name": "Kiev Land",
+   "lon": 30.7,
+   "lat": 50.4,
+   "tag": "LIT"
+  },
+  {
+   "name": "Chernihiv",
+   "lon": 31.5,
+   "lat": 51.5,
+   "tag": "LIT"
+  },
+  {
+   "name": "Severia",
+   "lon": 34.0,
+   "lat": 52.0,
+   "tag": "LIT"
+  },
+  {
+   "name": "Livonia",
+   "lon": 25.0,
+   "lat": 57.0,
+   "tag": "LIV"
+  },
+  {
+   "name": "Estonia",
+   "lon": 25.3,
+   "lat": 58.8,
+   "tag": "LIV"
+  },
+  {
+   "name": "Courland",
+   "lon": 22.5,
+   "lat": 56.8,
+   "tag": "LIV"
+  },
+  {
+   "name": "Semigallia",
+   "lon": 23.5,
+   "lat": 56.4,
+   "tag": "LIV"
+  },
+  {
+   "name": "Wild Fields",
+   "lon": 33.5,
+   "lat": 48.2,
+   "tag": "HOR"
+  },
+  {
+   "name": "Zaporozhia",
+   "lon": 35.0,
+   "lat": 47.5,
+   "tag": "HOR"
+  },
+  {
+   "name": "Crimea",
+   "lon": 34.5,
+   "lat": 45.0,
+   "tag": "CRI"
+  },
+  {
+   "name": "Budjak",
+   "lon": 30.0,
+   "lat": 45.7,
+   "tag": "MOL"
+  },
+  {
+   "name": "Bessarabia",
+   "lon": 29.0,
+   "lat": 46.8,
+   "tag": "MOL"
+  },
+  {
+   "name": "Don Steppe",
+   "lon": 40.5,
+   "lat": 48.0,
+   "tag": "HOR"
+  },
+  {
+   "name": "Kuban",
+   "lon": 38.5,
+   "lat": 45.2,
+   "tag": "HOR"
+  },
+  {
+   "name": "Volga Steppe",
+   "lon": 45.5,
+   "lat": 50.0,
+   "tag": "HOR"
+  },
+  {
+   "name": "Circassia",
+   "lon": 40.2,
+   "lat": 44.2,
+   "tag": null
+  },
+  {
+   "name": "Dagestan",
+   "lon": 46.3,
+   "lat": 43.0,
+   "tag": null
+  },
+  {
+   "name": "Muscovy",
+   "lon": 37.6,
+   "lat": 55.8,
+   "tag": "MOS"
+  },
+  {
+   "name": "Novgorod Land",
+   "lon": 32.0,
+   "lat": 58.5,
+   "tag": "MOS"
+  },
+  {
+   "name": "Pskov",
+   "lon": 28.3,
+   "lat": 57.8,
+   "tag": "MOS"
+  },
+  {
+   "name": "Tver",
+   "lon": 35.9,
+   "lat": 56.9,
+   "tag": "MOS"
+  },
+  {
+   "name": "Yaroslavl",
+   "lon": 39.9,
+   "lat": 57.6,
+   "tag": "MOS"
+  },
+  {
+   "name": "Vladimir-Suzdal",
+   "lon": 40.4,
+   "lat": 56.1,
+   "tag": "MOS"
+  },
+  {
+   "name": "Ryazan",
+   "lon": 39.7,
+   "lat": 54.6,
+   "tag": "MOS"
+  },
+  {
+   "name": "Meshchera",
+   "lon": 41.5,
+   "lat": 55.0,
+   "tag": "MOS"
+  },
+  {
+   "name": "Mordovia",
+   "lon": 44.0,
+   "lat": 54.2,
+   "tag": null
+  },
+  {
+   "name": "Nizhny Novgorod Land",
+   "lon": 44.0,
+   "lat": 56.3,
+   "tag": "MOS"
+  },
+  {
+   "name": "Kazan Khanate",
+   "lon": 47.0,
+   "lat": 56.0,
+   "tag": null
+  },
+  {
+   "name": "Kostroma",
+   "lon": 41.5,
+   "lat": 58.0,
+   "tag": "MOS"
+  },
+  {
+   "name": "Vyatka",
+   "lon": 46.0,
+   "lat": 58.5,
+   "tag": null
+  },
+  {
+   "name": "Tula",
+   "lon": 37.0,
+   "lat": 53.9,
+   "tag": "MOS"
+  },
+  {
+   "name": "Beloozero",
+   "lon": 37.8,
+   "lat": 60.0,
+   "tag": "MOS"
+  },
+  {
+   "name": "Vologda",
+   "lon": 40.0,
+   "lat": 59.2,
+   "tag": "MOS"
+  },
+  {
+   "name": "Onega",
+   "lon": 38.0,
+   "lat": 62.0,
+   "tag": "MOS"
+  },
+  {
+   "name": "Kargopol",
+   "lon": 38.8,
+   "lat": 61.2,
+   "tag": "MOS"
+  },
+  {
+   "name": "Vytegra",
+   "lon": 36.0,
+   "lat": 61.2,
+   "tag": "MOS"
+  },
+  {
+   "name": "Sarpa Steppe",
+   "lon": 44.5,
+   "lat": 48.0,
+   "tag": "HOR"
+  },
+  {
+   "name": "Manych Steppe",
+   "lon": 43.0,
+   "lat": 46.0,
+   "tag": "HOR"
+  },
+  {
+   "name": "Khoper Steppe",
+   "lon": 42.0,
+   "lat": 51.5,
+   "tag": "HOR"
+  },
+  {
+   "name": "Donets Steppe",
+   "lon": 38.0,
+   "lat": 49.3,
+   "tag": "HOR"
+  },
+  {
+   "name": "Saratov Steppe",
+   "lon": 46.0,
+   "lat": 51.6,
+   "tag": "HOR"
+  },
+  {
+   "name": "Volga Delta",
+   "lon": 46.3,
+   "lat": 46.5,
+   "tag": "HOR"
+  },
+  {
+   "name": "Terek Steppe",
+   "lon": 45.0,
+   "lat": 43.8,
+   "tag": null
+  },
+  {
+   "name": "Kalmyk Steppe",
+   "lon": 44.5,
+   "lat": 45.5,
+   "tag": "HOR"
+  },
+  {
+   "name": "Ingria",
+   "lon": 30.5,
+   "lat": 59.6,
+   "tag": "MOS"
+  },
+  {
+   "name": "Seversk Steppe",
+   "lon": 37.0,
+   "lat": 51.0,
+   "tag": "MOS"
+  },
+  {
+   "name": "Transdanubia",
+   "lon": 17.8,
+   "lat": 47.0,
+   "tag": "HUN"
+  },
+  {
+   "name": "Upper Hungary",
+   "lon": 19.0,
+   "lat": 48.8,
+   "tag": "HUN"
+  },
+  {
+   "name": "Alföld",
+   "lon": 20.0,
+   "lat": 46.8,
+   "tag": "HUN"
+  },
+  {
+   "name": "Transylvania",
+   "lon": 24.0,
+   "lat": 46.2,
+   "tag": "HUN"
+  },
+  {
+   "name": "Banat",
+   "lon": 21.2,
+   "lat": 45.6,
+   "tag": "HUN"
+  },
+  {
+   "name": "Slavonia",
+   "lon": 18.0,
+   "lat": 45.4,
+   "tag": "HUN"
+  },
+  {
+   "name": "Croatia",
+   "lon": 15.9,
+   "lat": 45.4,
+   "tag": "HUN"
+  },
+  {
+   "name": "Carpathian Ruthenia",
+   "lon": 23.3,
+   "lat": 48.4,
+   "tag": "HUN"
+  },
+  {
+   "name": "Dalmatia",
+   "lon": 16.0,
+   "lat": 43.7,
+   "tag": "VEN"
+  },
+  {
+   "name": "Ragusa",
+   "lon": 18.1,
+   "lat": 42.65,
+   "tag": null
+  },
+  {
+   "name": "Bosnia",
+   "lon": 17.9,
+   "lat": 44.1,
+   "tag": "TUR"
+  },
+  {
+   "name": "Herzegovina",
+   "lon": 18.2,
+   "lat": 43.2,
+   "tag": "TUR"
+  },
+  {
+   "name": "Serbia",
+   "lon": 21.0,
+   "lat": 43.8,
+   "tag": "TUR"
+  },
+  {
+   "name": "Kosovo",
+   "lon": 21.0,
+   "lat": 42.6,
+   "tag": "TUR"
+  },
+  {
+   "name": "Zeta",
+   "lon": 19.2,
+   "lat": 42.5,
+   "tag": "VEN"
+  },
+  {
+   "name": "Albania",
+   "lon": 20.0,
+   "lat": 41.0,
+   "tag": "TUR"
+  },
+  {
+   "name": "Epirus",
+   "lon": 20.8,
+   "lat": 39.6,
+   "tag": "TUR"
+  },
+  {
+   "name": "Thessaly",
+   "lon": 22.2,
+   "lat": 39.6,
+   "tag": "TUR"
+  },
+  {
+   "name": "Macedonia",
+   "lon": 22.0,
+   "lat": 41.0,
+   "tag": "TUR"
+  },
+  {
+   "name": "Thrace",
+   "lon": 26.5,
+   "lat": 41.3,
+   "tag": "TUR"
+  },
+  {
+   "name": "Bulgaria",
+   "lon": 25.0,
+   "lat": 43.0,
+   "tag": "TUR"
+  },
+  {
+   "name": "Dobruja",
+   "lon": 28.4,
+   "lat": 44.3,
+   "tag": "TUR"
+  },
+  {
+   "name": "Wallachia",
+   "lon": 25.0,
+   "lat": 44.6,
+   "tag": "WAL"
+  },
+  {
+   "name": "Oltenia",
+   "lon": 23.7,
+   "lat": 44.5,
+   "tag": "WAL"
+  },
+  {
+   "name": "Moldavia",
+   "lon": 27.0,
+   "lat": 47.0,
+   "tag": "MOL"
+  },
+  {
+   "name": "Bukovina",
+   "lon": 25.8,
+   "lat": 47.8,
+   "tag": "MOL"
+  },
+  {
+   "name": "Morea",
+   "lon": 22.1,
+   "lat": 37.5,
+   "tag": "TUR"
+  },
+  {
+   "name": "Boeotia",
+   "lon": 23.3,
+   "lat": 38.4,
+   "tag": "TUR"
+  },
+  {
+   "name": "Attica",
+   "lon": 23.7,
+   "lat": 38.0,
+   "tag": "TUR"
+  },
+  {
+   "name": "Negroponte",
+   "lon": 23.8,
+   "lat": 38.5,
+   "tag": "VEN"
+  },
+  {
+   "name": "Ionian Islands",
+   "lon": 20.5,
+   "lat": 38.5,
+   "tag": "VEN"
+  },
+  {
+   "name": "Aegean Islands",
+   "lon": 25.5,
+   "lat": 37.5,
+   "tag": "VEN"
+  },
+  {
+   "name": "Rhodes",
+   "lon": 28.0,
+   "lat": 36.2,
+   "tag": null
+  },
+  {
+   "name": "Crete",
+   "lon": 25.0,
+   "lat": 35.2,
+   "tag": "VEN"
+  },
+  {
+   "name": "Cyprus",
+   "lon": 33.2,
+   "lat": 35.0,
+   "tag": "VEN"
+  },
+  {
+   "name": "Bithynia",
+   "lon": 30.0,
+   "lat": 40.3,
+   "tag": "TUR"
+  },
+  {
+   "name": "Ionia",
+   "lon": 27.8,
+   "lat": 38.2,
+   "tag": "TUR"
+  },
+  {
+   "name": "Phrygia",
+   "lon": 30.5,
+   "lat": 39.0,
+   "tag": "TUR"
+  },
+  {
+   "name": "Caria",
+   "lon": 28.3,
+   "lat": 37.2,
+   "tag": "TUR"
+  },
+  {
+   "name": "Lycia",
+   "lon": 30.0,
+   "lat": 36.8,
+   "tag": "TUR"
+  },
+  {
+   "name": "Karaman",
+   "lon": 32.5,
+   "lat": 37.4,
+   "tag": "TUR"
+  },
+  {
+   "name": "Galatia",
+   "lon": 32.5,
+   "lat": 39.8,
+   "tag": "TUR"
+  },
+  {
+   "name": "Paphlagonia",
+   "lon": 33.5,
+   "lat": 41.2,
+   "tag": "TUR"
+  },
+  {
+   "name": "Pontus",
+   "lon": 37.5,
+   "lat": 40.8,
+   "tag": "TUR"
+  },
+  {
+   "name": "Cappadocia",
+   "lon": 34.8,
+   "lat": 38.5,
+   "tag": "TUR"
+  },
+  {
+   "name": "Rum",
+   "lon": 37.0,
+   "lat": 39.7,
+   "tag": null
+  },
+  {
+   "name": "Cilicia",
+   "lon": 35.0,
+   "lat": 36.9,
+   "tag": "MAM"
+  },
+  {
+   "name": "Dulkadir",
+   "lon": 37.0,
+   "lat": 37.8,
+   "tag": "MAM"
+  },
+  {
+   "name": "Upper Armenia",
+   "lon": 41.0,
+   "lat": 40.0,
+   "tag": "AKK"
+  },
+  {
+   "name": "Armenia",
+   "lon": 44.0,
+   "lat": 40.0,
+   "tag": "AKK"
+  },
+  {
+   "name": "Karabakh",
+   "lon": 46.4,
+   "lat": 39.9,
+   "tag": "AKK"
+  },
+  {
+   "name": "Azerbaijan",
+   "lon": 46.0,
+   "lat": 38.0,
+   "tag": "AKK"
+  },
+  {
+   "name": "Diyar Bakr",
+   "lon": 40.2,
+   "lat": 37.9,
+   "tag": "AKK"
+  },
+  {
+   "name": "Jazira",
+   "lon": 41.0,
+   "lat": 36.8,
+   "tag": "AKK"
+  },
+  {
+   "name": "Kurdistan",
+   "lon": 43.5,
+   "lat": 37.5,
+   "tag": "AKK"
+  },
+  {
+   "name": "Iraq",
+   "lon": 44.3,
+   "lat": 33.3,
+   "tag": "AKK"
+  },
+  {
+   "name": "Kartli",
+   "lon": 44.3,
+   "lat": 41.9,
+   "tag": "GEO"
+  },
+  {
+   "name": "Imereti",
+   "lon": 42.8,
+   "lat": 42.2,
+   "tag": "GEO"
+  },
+  {
+   "name": "Samegrelo",
+   "lon": 41.8,
+   "lat": 42.6,
+   "tag": "GEO"
+  },
+  {
+   "name": "Northern Syria",
+   "lon": 37.0,
+   "lat": 36.2,
+   "tag": "MAM"
+  },
+  {
+   "name": "Syria",
+   "lon": 36.3,
+   "lat": 33.5,
+   "tag": "MAM"
+  },
+  {
+   "name": "Lebanon",
+   "lon": 35.7,
+   "lat": 34.0,
+   "tag": "MAM"
+  },
+  {
+   "name": "Palestine",
+   "lon": 35.0,
+   "lat": 31.8,
+   "tag": "MAM"
+  },
+  {
+   "name": "Transjordan",
+   "lon": 36.0,
+   "lat": 30.8,
+   "tag": "MAM"
+  },
+  {
+   "name": "Hejaz",
+   "lon": 39.5,
+   "lat": 22.5,
+   "tag": "MAM"
+  },
+  {
+   "name": "Midian",
+   "lon": 36.0,
+   "lat": 27.5,
+   "tag": "MAM"
+  },
+  {
+   "name": "Tihama",
+   "lon": 42.0,
+   "lat": 17.0,
+   "tag": "MAM"
+  },
+  {
+   "name": "Asir",
+   "lon": 43.0,
+   "lat": 19.0,
+   "tag": null
+  },
+  {
+   "name": "Najran",
+   "lon": 44.5,
+   "lat": 17.8,
+   "tag": null
+  },
+  {
+   "name": "Yemen",
+   "lon": 44.0,
+   "lat": 14.8,
+   "tag": null
+  },
+  {
+   "name": "Hadhramaut",
+   "lon": 46.0,
+   "lat": 15.5,
+   "tag": null
+  },
+  {
+   "name": "Sinai",
+   "lon": 33.8,
+   "lat": 29.0,
+   "tag": "MAM"
+  },
+  {
+   "name": "Lower Egypt",
+   "lon": 31.2,
+   "lat": 30.5,
+   "tag": "MAM"
+  },
+  {
+   "name": "Middle Egypt",
+   "lon": 30.9,
+   "lat": 28.0,
+   "tag": "MAM"
+  },
+  {
+   "name": "Upper Egypt",
+   "lon": 32.7,
+   "lat": 25.5,
+   "tag": "MAM"
+  },
+  {
+   "name": "Western Desert",
+   "lon": 28.0,
+   "lat": 28.0,
+   "tag": null
+  },
+  {
+   "name": "Cyrenaica",
+   "lon": 21.5,
+   "lat": 32.2,
+   "tag": "TUN"
+  },
+  {
+   "name": "Tripolitania",
+   "lon": 13.5,
+   "lat": 32.5,
+   "tag": "TUN"
+  },
+  {
+   "name": "Ifriqiya",
+   "lon": 10.0,
+   "lat": 35.8,
+   "tag": "TUN"
+  },
+  {
+   "name": "Djerid",
+   "lon": 8.5,
+   "lat": 33.8,
+   "tag": "TUN"
+  },
+  {
+   "name": "Constantine",
+   "lon": 6.6,
+   "lat": 36.4,
+   "tag": "TUN"
+  },
+  {
+   "name": "Bejaia",
+   "lon": 5.1,
+   "lat": 36.6,
+   "tag": "TUN"
+  },
+  {
+   "name": "Kabylia",
+   "lon": 4.2,
+   "lat": 36.7,
+   "tag": null
+  },
+  {
+   "name": "Tlemcen",
+   "lon": -1.3,
+   "lat": 34.9,
+   "tag": "TLE"
+  },
+  {
+   "name": "Oran",
+   "lon": -0.6,
+   "lat": 35.7,
+   "tag": "TLE"
+  },
+  {
+   "name": "Titteri",
+   "lon": 3.0,
+   "lat": 36.2,
+   "tag": "TLE"
+  },
+  {
+   "name": "Fez",
+   "lon": -5.0,
+   "lat": 34.0,
+   "tag": "MOR"
+  },
+  {
+   "name": "Rif",
+   "lon": -4.0,
+   "lat": 35.0,
+   "tag": "MOR"
+  },
+  {
+   "name": "Tingitana",
+   "lon": -5.8,
+   "lat": 35.7,
+   "tag": "MOR"
+  },
+  {
+   "name": "Haouz",
+   "lon": -8.0,
+   "lat": 31.6,
+   "tag": "MOR"
+  },
+  {
+   "name": "Souss",
+   "lon": -9.0,
+   "lat": 30.0,
+   "tag": "MOR"
+  },
+  {
+   "name": "Tafilalt",
+   "lon": -4.4,
+   "lat": 31.3,
+   "tag": "MOR"
+  },
+  {
+   "name": "Middle Atlas",
+   "lon": -5.5,
+   "lat": 32.8,
+   "tag": "MOR"
+  },
+  {
+   "name": "Inuit lands",
+   "lon": -62.0,
+   "lat": 58.5,
+   "tag": null
+  },
+  {
+   "name": "Innu lands",
+   "lon": -64.0,
+   "lat": 52.0,
+   "tag": null
+  },
+  {
+   "name": "Naskapi lands",
+   "lon": -67.0,
+   "lat": 55.5,
+   "tag": null
+  },
+  {
+   "name": "Cree lands",
+   "lon": -84.0,
+   "lat": 51.0,
+   "tag": null
+  },
+  {
+   "name": "Eastern Cree lands",
+   "lon": -77.0,
+   "lat": 52.5,
+   "tag": null
+  },
+  {
+   "name": "Swampy Cree lands",
+   "lon": -93.0,
+   "lat": 53.0,
+   "tag": null
+  },
+  {
+   "name": "Assiniboine lands",
+   "lon": -100.0,
+   "lat": 50.5,
+   "tag": null
+  },
+  {
+   "name": "Dakota lands",
+   "lon": -97.0,
+   "lat": 45.0,
+   "tag": null
+  },
+  {
+   "name": "Ojibwe lands",
+   "lon": -90.0,
+   "lat": 47.0,
+   "tag": null
+  },
+  {
+   "name": "Odawa lands",
+   "lon": -85.0,
+   "lat": 45.5,
+   "tag": null
+  },
+  {
+   "name": "Menominee lands",
+   "lon": -88.5,
+   "lat": 45.0,
+   "tag": null
+  },
+  {
+   "name": "Ho-Chunk lands",
+   "lon": -89.0,
+   "lat": 43.5,
+   "tag": null
+  },
+  {
+   "name": "Illinois lands",
+   "lon": -89.0,
+   "lat": 40.0,
+   "tag": null
+  },
+  {
+   "name": "Miami lands",
+   "lon": -85.5,
+   "lat": 40.8,
+   "tag": null
+  },
+  {
+   "name": "Potawatomi lands",
+   "lon": -86.0,
+   "lat": 42.0,
+   "tag": null
+  },
+  {
+   "name": "Shawnee lands",
+   "lon": -84.0,
+   "lat": 39.0,
+   "tag": null
+  },
+  {
+   "name": "Erie lands",
+   "lon": -81.0,
+   "lat": 41.5,
+   "tag": null
+  },
+  {
+   "name": "Huron lands",
+   "lon": -80.0,
+   "lat": 45.0,
+   "tag": null
+  },
+  {
+   "name": "Neutral lands",
+   "lon": -79.5,
+   "lat": 43.0,
+   "tag": null
+  },
+  {
+   "name": "Iroquois lands",
+   "lon": -76.0,
+   "lat": 43.0,
+   "tag": null
+  },
+  {
+   "name": "Susquehannock lands",
+   "lon": -77.0,
+   "lat": 41.0,
+   "tag": null
+  },
+  {
+   "name": "Lenape lands",
+   "lon": -75.0,
+   "lat": 40.0,
+   "tag": null
+  },
+  {
+   "name": "Abenaki lands",
+   "lon": -71.5,
+   "lat": 44.5,
+   "tag": null
+  },
+  {
+   "name": "Massachusett lands",
+   "lon": -71.0,
+   "lat": 42.3,
+   "tag": null
+  },
+  {
+   "name": "Narragansett lands",
+   "lon": -71.5,
+   "lat": 41.5,
+   "tag": null
+  },
+  {
+   "name": "Maliseet lands",
+   "lon": -67.0,
+   "lat": 46.5,
+   "tag": null
+  },
+  {
+   "name": "Mi'kmaq lands",
+   "lon": -64.0,
+   "lat": 46.0,
+   "tag": null
+  },
+  {
+   "name": "Beothuk lands",
+   "lon": -56.0,
+   "lat": 49.0,
+   "tag": null
+  },
+  {
+   "name": "Powhatan lands",
+   "lon": -77.0,
+   "lat": 37.5,
+   "tag": null
+  },
+  {
+   "name": "Tuscarora lands",
+   "lon": -77.5,
+   "lat": 35.3,
+   "tag": null
+  },
+  {
+   "name": "Catawba lands",
+   "lon": -81.0,
+   "lat": 34.8,
+   "tag": null
+  },
+  {
+   "name": "Cherokee lands",
+   "lon": -84.0,
+   "lat": 35.5,
+   "tag": null
+  },
+  {
+   "name": "Yamasee lands",
+   "lon": -81.5,
+   "lat": 32.0,
+   "tag": null
+  },
+  {
+   "name": "Muscogee lands",
+   "lon": -85.5,
+   "lat": 32.5,
+   "tag": null
+  },
+  {
+   "name": "Apalachee lands",
+   "lon": -84.0,
+   "lat": 30.5,
+   "tag": null
+  },
+  {
+   "name": "Timucua lands",
+   "lon": -82.0,
+   "lat": 29.0,
+   "tag": null
+  },
+  {
+   "name": "Calusa lands",
+   "lon": -81.5,
+   "lat": 26.5,
+   "tag": null
+  },
+  {
+   "name": "Choctaw lands",
+   "lon": -89.0,
+   "lat": 33.0,
+   "tag": null
+  },
+  {
+   "name": "Chickasaw lands",
+   "lon": -89.8,
+   "lat": 35.2,
+   "tag": null
+  },
+  {
+   "name": "Natchez lands",
+   "lon": -91.0,
+   "lat": 31.5,
+   "tag": null
+  },
+  {
+   "name": "Caddo lands",
+   "lon": -95.0,
+   "lat": 32.0,
+   "tag": null
+  },
+  {
+   "name": "Atakapa lands",
+   "lon": -93.0,
+   "lat": 30.0,
+   "tag": null
+  },
+  {
+   "name": "Osage lands",
+   "lon": -94.0,
+   "lat": 37.5,
+   "tag": null
+  },
+  {
+   "name": "Pawnee lands",
+   "lon": -98.0,
+   "lat": 41.0,
+   "tag": null
+  },
+  {
+   "name": "Comanche lands",
+   "lon": -99.0,
+   "lat": 31.0,
+   "tag": null
+  },
+  {
+   "name": "Chichimec lands",
+   "lon": -100.0,
+   "lat": 25.0,
+   "tag": null
+  },
+  {
+   "name": "Huastec lands",
+   "lon": -98.5,
+   "lat": 22.5,
+   "tag": null
+  },
+  {
+   "name": "Totonac lands",
+   "lon": -97.5,
+   "lat": 20.3,
+   "tag": null
+  },
+  {
+   "name": "Mexica lands",
+   "lon": -99.0,
+   "lat": 19.5,
+   "tag": null
+  },
+  {
+   "name": "Mixtec lands",
+   "lon": -97.5,
+   "lat": 17.2,
+   "tag": null
+  },
+  {
+   "name": "Zapotec lands",
+   "lon": -96.3,
+   "lat": 16.9,
+   "tag": null
+  },
+  {
+   "name": "Maya lands",
+   "lon": -89.0,
+   "lat": 18.0,
+   "tag": null
+  },
+  {
+   "name": "Yucatec Maya lands",
+   "lon": -88.8,
+   "lat": 20.6,
+   "tag": null
+  },
+  {
+   "name": "Highland Maya lands",
+   "lon": -91.0,
+   "lat": 15.0,
+   "tag": null
+  },
+  {
+   "name": "Chorotega lands",
+   "lon": -85.5,
+   "lat": 11.5,
+   "tag": null
+  },
+  {
+   "name": "Miskito lands",
+   "lon": -84.0,
+   "lat": 13.0,
+   "tag": null
+  },
+  {
+   "name": "Talamanca lands",
+   "lon": -82.8,
+   "lat": 9.5,
+   "tag": null
+  },
+  {
+   "name": "Cueva lands",
+   "lon": -79.0,
+   "lat": 8.8,
+   "tag": null
+  },
+  {
+   "name": "Muisca lands",
+   "lon": -74.0,
+   "lat": 5.0,
+   "tag": null
+  },
+  {
+   "name": "Tairona lands",
+   "lon": -73.8,
+   "lat": 11.0,
+   "tag": null
+  },
+  {
+   "name": "Sinú lands",
+   "lon": -76.0,
+   "lat": 9.0,
+   "tag": null
+  },
+  {
+   "name": "Quimbaya lands",
+   "lon": -75.8,
+   "lat": 4.7,
+   "tag": null
+  },
+  {
+   "name": "Lucayan lands",
+   "lon": -76.0,
+   "lat": 24.0,
+   "tag": null
+  },
+  {
+   "name": "Cubanacán lands",
+   "lon": -79.0,
+   "lat": 22.0,
+   "tag": null
+  },
+  {
+   "name": "Taíno lands",
+   "lon": -72.5,
+   "lat": 19.0,
+   "tag": null
+  },
+  {
+   "name": "Xaymaca lands",
+   "lon": -77.3,
+   "lat": 18.1,
+   "tag": null
+  },
+  {
+   "name": "Borikén lands",
+   "lon": -66.5,
+   "lat": 18.2,
+   "tag": null
+  },
+  {
+   "name": "Carib lands",
+   "lon": -61.5,
+   "lat": 14.0,
+   "tag": null
+  },
+  {
+   "name": "Kalinago lands",
+   "lon": -66.0,
+   "lat": 9.5,
+   "tag": null
+  },
+  {
+   "name": "Caquetío lands",
+   "lon": -69.8,
+   "lat": 11.3,
+   "tag": null
+  },
+  {
+   "name": "Arawak lands",
+   "lon": -60.0,
+   "lat": 6.0,
+   "tag": null
+  },
+  {
+   "name": "Galibi lands",
+   "lon": -54.0,
+   "lat": 4.5,
+   "tag": null
+  },
+  {
+   "name": "Amazon lands",
+   "lon": -60.0,
+   "lat": -5.0,
+   "tag": null
+  },
+  {
+   "name": "Manao lands",
+   "lon": -62.0,
+   "lat": -3.5,
+   "tag": null
+  },
+  {
+   "name": "Tapajó lands",
+   "lon": -55.0,
+   "lat": -3.0,
+   "tag": null
+  },
+  {
+   "name": "Omagua lands",
+   "lon": -72.0,
+   "lat": -4.0,
+   "tag": null
+  },
+  {
+   "name": "Jivaro lands",
+   "lon": -77.5,
+   "lat": -3.0,
+   "tag": null
+  },
+  {
+   "name": "Quitu lands",
+   "lon": -78.5,
+   "lat": -1.0,
+   "tag": null
+  },
+  {
+   "name": "Pasto lands",
+   "lon": -77.5,
+   "lat": 1.0,
+   "tag": null
+  },
+  {
+   "name": "Chachapoya lands",
+   "lon": -77.8,
+   "lat": -6.0,
+   "tag": null
+  },
+  {
+   "name": "Chimú lands",
+   "lon": -79.0,
+   "lat": -8.0,
+   "tag": null
+  },
+  {
+   "name": "Quechua lands",
+   "lon": -74.0,
+   "lat": -10.0,
+   "tag": null
+  },
+  {
+   "name": "Tupinambá lands",
+   "lon": -45.0,
+   "lat": -3.0,
+   "tag": null
+  },
+  {
+   "name": "Potiguar lands",
+   "lon": -35.8,
+   "lat": -5.5,
+   "tag": null
+  },
+  {
+   "name": "Tupi lands",
+   "lon": -38.0,
+   "lat": -8.0,
+   "tag": null
+  },
+  {
+   "name": "Caeté lands",
+   "lon": -36.0,
+   "lat": -9.5,
+   "tag": null
+  },
+  {
+   "name": "Tupiniquim lands",
+   "lon": -39.5,
+   "lat": -12.5,
+   "tag": null
+  },
+  {
+   "name": "Wolof lands",
+   "lon": -16.0,
+   "lat": 15.0,
+   "tag": null
+  },
+  {
+   "name": "Sanhaja lands",
+   "lon": -10.0,
+   "lat": 21.0,
+   "tag": null
+  },
+  {
+   "name": "Mandinka lands",
+   "lon": -12.0,
+   "lat": 11.0,
+   "tag": null
+  },
+  {
+   "name": "Mali lands",
+   "lon": -8.0,
+   "lat": 12.5,
+   "tag": null
+  },
+  {
+   "name": "Songhai lands",
+   "lon": -2.0,
+   "lat": 15.5,
+   "tag": null
+  },
+  {
+   "name": "Mossi lands",
+   "lon": -1.5,
+   "lat": 12.0,
+   "tag": null
+  },
+  {
+   "name": "Gonja lands",
+   "lon": -1.0,
+   "lat": 9.0,
+   "tag": null
+  },
+  {
+   "name": "Akan lands",
+   "lon": -1.5,
+   "lat": 6.5,
+   "tag": null
+  },
+  {
+   "name": "Kru lands",
+   "lon": -8.0,
+   "lat": 5.5,
+   "tag": null
+  },
+  {
+   "name": "Yoruba lands",
+   "lon": 4.0,
+   "lat": 8.0,
+   "tag": null
+  },
+  {
+   "name": "Nupe lands",
+   "lon": 5.5,
+   "lat": 9.5,
+   "tag": null
+  },
+  {
+   "name": "Benin lands",
+   "lon": 5.6,
+   "lat": 6.5,
+   "tag": null
+  },
+  {
+   "name": "Igbo lands",
+   "lon": 7.5,
+   "lat": 6.0,
+   "tag": null
+  },
+  {
+   "name": "Jukun lands",
+   "lon": 10.0,
+   "lat": 8.0,
+   "tag": null
+  },
+  {
+   "name": "Hausa lands",
+   "lon": 8.5,
+   "lat": 12.0,
+   "tag": null
+  },
+  {
+   "name": "Aïr lands",
+   "lon": 8.5,
+   "lat": 18.0,
+   "tag": null
+  },
+  {
+   "name": "Tuareg lands",
+   "lon": 4.0,
+   "lat": 23.0,
+   "tag": null
+  },
+  {
+   "name": "Tebu lands",
+   "lon": 17.0,
+   "lat": 21.5,
+   "tag": null
+  },
+  {
+   "name": "Kanem lands",
+   "lon": 15.0,
+   "lat": 13.0,
+   "tag": null
+  },
+  {
+   "name": "Zaghawa lands",
+   "lon": 24.0,
+   "lat": 15.0,
+   "tag": null
+  },
+  {
+   "name": "Fang lands",
+   "lon": 11.0,
+   "lat": 1.0,
+   "tag": null
+  },
+  {
+   "name": "Loango lands",
+   "lon": 12.0,
+   "lat": -4.3,
+   "tag": null
+  },
+  {
+   "name": "Kongo lands",
+   "lon": 14.5,
+   "lat": -5.5,
+   "tag": null
+  },
+  {
+   "name": "Kuba lands",
+   "lon": 21.0,
+   "lat": -5.0,
+   "tag": null
+  },
+  {
+   "name": "Ndongo lands",
+   "lon": 15.5,
+   "lat": -9.5,
+   "tag": null
+  },
+  {
+   "name": "Lunda lands",
+   "lon": 22.0,
+   "lat": -10.0,
+   "tag": null
+  },
+  {
+   "name": "Luba lands",
+   "lon": 25.0,
+   "lat": -8.0,
+   "tag": null
+  },
+  {
+   "name": "Bantu lands",
+   "lon": 25.0,
+   "lat": 0.0,
+   "tag": null
+  },
+  {
+   "name": "Great Lakes lands",
+   "lon": 30.5,
+   "lat": -1.0,
+   "tag": null
+  },
+  {
+   "name": "Alodia lands",
+   "lon": 33.0,
+   "lat": 14.0,
+   "tag": null
+  },
+  {
+   "name": "Nubian lands",
+   "lon": 33.0,
+   "lat": 18.5,
+   "tag": null
+  },
+  {
+   "name": "Abyssinian lands",
+   "lon": 38.5,
+   "lat": 11.0,
+   "tag": null
+  },
+  {
+   "name": "Somali lands",
+   "lon": 45.0,
+   "lat": 6.0,
+   "tag": null
+  },
+  {
+   "name": "Swahili lands",
+   "lon": 39.0,
+   "lat": -5.0,
+   "tag": null
+  },
+  {
+   "name": "Makua lands",
+   "lon": 38.0,
+   "lat": -12.0,
+   "tag": null
+  },
+  {
+   "name": "Bedouin lands",
+   "lon": 42.0,
+   "lat": 25.0,
+   "tag": null
+  },
+  {
+   "name": "Guanche lands",
+   "lon": -15.5,
+   "lat": 28.3,
+   "tag": null
+  },
+  {
+   "name": "Ungava Inuit lands",
+   "lon": -73.0,
+   "lat": 60.5,
+   "tag": null
+  },
+  {
+   "name": "Atikamekw lands",
+   "lon": -74.0,
+   "lat": 48.0,
+   "tag": null
+  },
+  {
+   "name": "Algonquin lands",
+   "lon": -77.5,
+   "lat": 46.0,
+   "tag": null
+  },
+  {
+   "name": "Moose Cree lands",
+   "lon": -83.0,
+   "lat": 53.5,
+   "tag": null
+  },
+  {
+   "name": "Severn Cree lands",
+   "lon": -88.0,
+   "lat": 56.5,
+   "tag": null
+  },
+  {
+   "name": "Western Cree lands",
+   "lon": -98.0,
+   "lat": 57.0,
+   "tag": null
+  },
+  {
+   "name": "Chipewyan lands",
+   "lon": -99.0,
+   "lat": 60.5,
+   "tag": null
+  },
+  {
+   "name": "Saulteaux lands",
+   "lon": -96.5,
+   "lat": 50.0,
+   "tag": null
+  },
+  {
+   "name": "Maasai lands",
+   "lon": 36.5,
+   "lat": -2.5,
+   "tag": null
+  },
+  {
+   "name": "Gikuyu lands",
+   "lon": 37.0,
+   "lat": -0.5,
+   "tag": null
+  },
+  {
+   "name": "Nyamwezi lands",
+   "lon": 33.0,
+   "lat": -5.0,
+   "tag": null
+  },
+  {
+   "name": "Gogo lands",
+   "lon": 36.0,
+   "lat": -6.8,
+   "tag": null
+  },
+  {
+   "name": "Oromo lands",
+   "lon": 39.5,
+   "lat": 5.0,
+   "tag": null
+  },
+  {
+   "name": "Ogaden lands",
+   "lon": 44.0,
+   "lat": 7.8,
+   "tag": null
+  },
+  {
+   "name": "Afar lands",
+   "lon": 41.0,
+   "lat": 12.0,
+   "tag": null
+  },
+  {
+   "name": "Tigray lands",
+   "lon": 39.0,
+   "lat": 13.5,
+   "tag": null
+  },
+  {
+   "name": "Shewa lands",
+   "lon": 39.5,
+   "lat": 9.0,
+   "tag": null
+  },
+  {
+   "name": "Gojjam lands",
+   "lon": 37.5,
+   "lat": 11.0,
+   "tag": null
+  },
+  {
+   "name": "Sidama lands",
+   "lon": 38.0,
+   "lat": 6.5,
+   "tag": null
+  },
+  {
+   "name": "Fezzan lands",
+   "lon": 13.5,
+   "lat": 26.0,
+   "tag": null
+  },
+  {
+   "name": "Kufra lands",
+   "lon": 23.0,
+   "lat": 24.0,
+   "tag": null
+  },
+  {
+   "name": "Adrar lands",
+   "lon": -8.0,
+   "lat": 20.5,
+   "tag": null
+  },
+  {
+   "name": "Azawad lands",
+   "lon": -2.0,
+   "lat": 19.0,
+   "tag": null
+  },
+  {
+   "name": "Tenere lands",
+   "lon": 10.0,
+   "lat": 16.5,
+   "tag": null
+  },
+  {
+   "name": "Bilma lands",
+   "lon": 14.0,
+   "lat": 19.0,
+   "tag": null
+  },
+  {
+   "name": "Wadai lands",
+   "lon": 20.5,
+   "lat": 13.0,
+   "tag": null
+  },
+  {
+   "name": "Libyan Desert lands",
+   "lon": 27.0,
+   "lat": 23.0,
+   "tag": null
+  },
+  {
+   "name": "Eastern Desert lands",
+   "lon": 34.5,
+   "lat": 24.0,
+   "tag": null
+  },
+  {
+   "name": "Mongo lands",
+   "lon": 22.0,
+   "lat": -1.5,
+   "tag": null
+  },
+  {
+   "name": "Teke lands",
+   "lon": 16.0,
+   "lat": -2.0,
+   "tag": null
+  },
+  {
+   "name": "Azande lands",
+   "lon": 27.0,
+   "lat": 4.0,
+   "tag": null
+  },
+  {
+   "name": "Bemba lands",
+   "lon": 30.0,
+   "lat": -11.0,
+   "tag": null
+  },
+  {
+   "name": "Chokwe lands",
+   "lon": 21.5,
+   "lat": -10.0,
+   "tag": null
+  },
+  {
+   "name": "Xingu lands",
+   "lon": -52.0,
+   "lat": -11.0,
+   "tag": null
+  },
+  {
+   "name": "Ge lands",
+   "lon": -46.5,
+   "lat": -10.0,
+   "tag": null
+  },
+  {
+   "name": "Juruá lands",
+   "lon": -68.0,
+   "lat": -7.0,
+   "tag": null
+  },
+  {
+   "name": "Madeira lands",
+   "lon": -62.0,
+   "lat": -9.0,
+   "tag": null
+  },
+  {
+   "name": "Mojos lands",
+   "lon": -65.0,
+   "lat": -12.5,
+   "tag": null
+  },
+  {
+   "name": "Napo lands",
+   "lon": -75.0,
+   "lat": -1.5,
+   "tag": null
+  },
+  {
+   "name": "Yanomami lands",
+   "lon": -64.0,
+   "lat": 2.0,
+   "tag": null
+  },
+  {
+   "name": "Rio Negro lands",
+   "lon": -67.0,
+   "lat": 0.0,
+   "tag": null
+  },
+  {
+   "name": "Orinoco lands",
+   "lon": -67.0,
+   "lat": 6.5,
+   "tag": null
+  },
+  {
+   "name": "Macushi lands",
+   "lon": -60.5,
+   "lat": 3.5,
+   "tag": null
+  },
+  {
+   "name": "Guajajara lands",
+   "lon": -47.5,
+   "lat": -5.0,
+   "tag": null
+  },
+  {
+   "name": "Torngat lands",
+   "lon": -64.0,
+   "lat": 59.8,
+   "tag": null
+  },
+  {
+   "name": "Ungava Bay lands",
+   "lon": -68.0,
+   "lat": 59.0,
+   "tag": null
+  },
+  {
+   "name": "Hudson Strait lands",
+   "lon": -73.0,
+   "lat": 62.0,
+   "tag": null
+  },
+  {
+   "name": "Labrador lands",
+   "lon": -60.0,
+   "lat": 54.5,
+   "tag": null
+  },
+  {
+   "name": "Mistassini lands",
+   "lon": -72.0,
+   "lat": 51.0,
+   "tag": null
+  },
+  {
+   "name": "Caniapiscau lands",
+   "lon": -70.0,
+   "lat": 56.5,
+   "tag": null
+  },
+  {
+   "name": "Saguenay lands",
+   "lon": -71.0,
+   "lat": 49.0,
+   "tag": null
+  },
+  {
+   "name": "Churchill River lands",
+   "lon": -62.0,
+   "lat": 53.5,
+   "tag": null
+  },
+  {
+   "name": "Michikamau lands",
+   "lon": -65.0,
+   "lat": 54.0,
+   "tag": null
+  },
+  {
+   "name": "James Bay lands",
+   "lon": -79.0,
+   "lat": 53.5,
+   "tag": null
+  },
+  {
+   "name": "Eastmain lands",
+   "lon": -76.0,
+   "lat": 53.0,
+   "tag": null
+  },
+  {
+   "name": "Great Whale lands",
+   "lon": -76.0,
+   "lat": 55.8,
+   "tag": null
+  },
+  {
+   "name": "Winisk lands",
+   "lon": -87.0,
+   "lat": 54.5,
+   "tag": null
+  },
+  {
+   "name": "Attawapiskat lands",
+   "lon": -83.0,
+   "lat": 52.5,
+   "tag": null
+  },
+  {
+   "name": "Lac Seul lands",
+   "lon": -91.0,
+   "lat": 50.5,
+   "tag": null
+  },
+  {
+   "name": "Red Lake lands",
+   "lon": -94.5,
+   "lat": 48.5,
+   "tag": null
+  },
+  {
+   "name": "Island Lake lands",
+   "lon": -94.0,
+   "lat": 53.5,
+   "tag": null
+  },
+  {
+   "name": "Cumberland lands",
+   "lon": -99.0,
+   "lat": 54.0,
+   "tag": null
+  },
+  {
+   "name": "Oxford lands",
+   "lon": -95.0,
+   "lat": 54.8,
+   "tag": null
+  },
+  {
+   "name": "Reindeer Lake lands",
+   "lon": -99.5,
+   "lat": 57.8,
+   "tag": null
+  },
+  {
+   "name": "Churchill lands",
+   "lon": -94.0,
+   "lat": 58.8,
+   "tag": null
+  },
+  {
+   "name": "Seal River lands",
+   "lon": -98.0,
+   "lat": 60.0,
+   "tag": null
+  },
+  {
+   "name": "Hoggar lands",
+   "lon": 6.0,
+   "lat": 23.5,
+   "tag": null
+  },
+  {
+   "name": "Tanezrouft lands",
+   "lon": 1.0,
+   "lat": 24.5,
+   "tag": null
+  },
+  {
+   "name": "Ajjer lands",
+   "lon": 9.0,
+   "lat": 25.5,
+   "tag": null
+  },
+  {
+   "name": "Tademait lands",
+   "lon": 2.0,
+   "lat": 28.0,
+   "tag": null
+  },
+  {
+   "name": "Tagant lands",
+   "lon": -11.0,
+   "lat": 18.0,
+   "tag": null
+  },
+  {
+   "name": "Hodh lands",
+   "lon": -8.0,
+   "lat": 17.0,
+   "tag": null
+  },
+  {
+   "name": "Zemmour lands",
+   "lon": -12.0,
+   "lat": 24.0,
+   "tag": null
+  },
+  {
+   "name": "Draa lands",
+   "lon": -8.0,
+   "lat": 28.0,
+   "tag": null
+  },
+  {
+   "name": "Erg Iguidi lands",
+   "lon": -6.0,
+   "lat": 26.5,
+   "tag": null
+  },
+  {
+   "name": "Ghat lands",
+   "lon": 10.5,
+   "lat": 25.0,
+   "tag": null
+  },
+  {
+   "name": "Awbari lands",
+   "lon": 12.5,
+   "lat": 26.5,
+   "tag": null
+  },
+  {
+   "name": "Sirtica lands",
+   "lon": 18.0,
+   "lat": 30.0,
+   "tag": null
+  },
+  {
+   "name": "Jufra lands",
+   "lon": 16.0,
+   "lat": 28.0,
+   "tag": null
+  },
+  {
+   "name": "Zaramo lands",
+   "lon": 38.5,
+   "lat": -7.5,
+   "tag": null
+  },
+  {
+   "name": "Rufiji lands",
+   "lon": 37.5,
+   "lat": -8.8,
+   "tag": null
+  },
+  {
+   "name": "Ruvuma lands",
+   "lon": 37.0,
+   "lat": -10.8,
+   "tag": null
+  },
+  {
+   "name": "Yao lands",
+   "lon": 36.0,
+   "lat": -12.5,
+   "tag": null
+  },
+  {
+   "name": "Pokomo lands",
+   "lon": 40.0,
+   "lat": -2.0,
+   "tag": null
+  },
+  {
+   "name": "Mijikenda lands",
+   "lon": 39.3,
+   "lat": -3.5,
+   "tag": null
+  },
+  {
+   "name": "Usambara lands",
+   "lon": 38.3,
+   "lat": -4.8,
+   "tag": null
+  },
+  {
+   "name": "Kilimanjaro lands",
+   "lon": 37.3,
+   "lat": -3.2,
+   "tag": null
+  },
+  {
+   "name": "Tana lands",
+   "lon": 39.5,
+   "lat": -1.0,
+   "tag": null
+  },
+  {
+   "name": "Turkana lands",
+   "lon": 35.5,
+   "lat": 3.2,
+   "tag": null
+  },
+  {
+   "name": "Pokot lands",
+   "lon": 35.5,
+   "lat": 1.5,
+   "tag": null
+  },
+  {
+   "name": "Karamojong lands",
+   "lon": 34.3,
+   "lat": 2.8,
+   "tag": null
+  },
+  {
+   "name": "Mangbetu lands",
+   "lon": 28.0,
+   "lat": 2.8,
+   "tag": null
+  },
+  {
+   "name": "Ubangi lands",
+   "lon": 22.0,
+   "lat": 4.0,
+   "tag": null
+  },
+  {
+   "name": "Dar Runga lands",
+   "lon": 21.0,
+   "lat": 10.0,
+   "tag": null
+  },
+  {
+   "name": "Dinka lands",
+   "lon": 28.5,
+   "lat": 7.5,
+   "tag": null
+  },
+  {
+   "name": "Nuer lands",
+   "lon": 31.0,
+   "lat": 8.5,
+   "tag": null
+  },
+  {
+   "name": "Shilluk lands",
+   "lon": 31.5,
+   "lat": 10.5,
+   "tag": null
+  },
+  {
+   "name": "Bahr el Ghazal lands",
+   "lon": 26.0,
+   "lat": 8.5,
+   "tag": null
+  },
+  {
+   "name": "Batha lands",
+   "lon": 18.0,
+   "lat": 13.5,
+   "tag": null
+  },
+  {
+   "name": "Bahr Salamat lands",
+   "lon": 19.5,
+   "lat": 10.5,
+   "tag": null
+  },
+  {
+   "name": "Ennedi lands",
+   "lon": 23.0,
+   "lat": 17.5,
+   "tag": null
+  },
+  {
+   "name": "Chari lands",
+   "lon": 16.5,
+   "lat": 11.0,
+   "tag": null
+  },
+  {
+   "name": "Borkou lands",
+   "lon": 17.5,
+   "lat": 17.5,
+   "tag": null
+  },
+  {
+   "name": "Darfur lands",
+   "lon": 25.5,
+   "lat": 13.0,
+   "tag": null
+  },
+  {
+   "name": "Kordofan lands",
+   "lon": 30.0,
+   "lat": 12.5,
+   "tag": null
+  },
+  {
+   "name": "Nuba lands",
+   "lon": 30.5,
+   "lat": 11.0,
+   "tag": null
+  },
+  {
+   "name": "Butana lands",
+   "lon": 34.5,
+   "lat": 16.0,
+   "tag": null
+  },
+  {
+   "name": "Atbara lands",
+   "lon": 33.5,
+   "lat": 17.8,
+   "tag": null
+  },
+  {
+   "name": "Jaghbub lands",
+   "lon": 24.5,
+   "lat": 29.5,
+   "tag": null
+  },
+  {
+   "name": "Dakhla lands",
+   "lon": 29.0,
+   "lat": 25.5,
+   "tag": null
+  },
+  {
+   "name": "Tocantins lands",
+   "lon": -49.0,
+   "lat": -6.0,
+   "tag": null
+  },
+  {
+   "name": "Araguaia lands",
+   "lon": -50.0,
+   "lat": -10.0,
+   "tag": null
+  },
+  {
+   "name": "Iriri lands",
+   "lon": -54.0,
+   "lat": -7.0,
+   "tag": null
+  },
+  {
+   "name": "Jamanxim lands",
+   "lon": -56.0,
+   "lat": -6.5,
+   "tag": null
+  },
+  {
+   "name": "Teles Pires lands",
+   "lon": -56.0,
+   "lat": -10.5,
+   "tag": null
+  },
+  {
+   "name": "Trombetas lands",
+   "lon": -57.0,
+   "lat": -1.0,
+   "tag": null
+  },
+  {
+   "name": "Jari lands",
+   "lon": -53.0,
+   "lat": 0.5,
+   "tag": null
+  },
+  {
+   "name": "Marajó lands",
+   "lon": -50.0,
+   "lat": -1.0,
+   "tag": null
+  },
+  {
+   "name": "Gurupi lands",
+   "lon": -46.0,
+   "lat": -3.5,
+   "tag": null
+  },
+  {
+   "name": "Purus lands",
+   "lon": -65.0,
+   "lat": -8.5,
+   "tag": null
+  },
+  {
+   "name": "Guaporé lands",
+   "lon": -62.5,
+   "lat": -12.0,
+   "tag": null
+  }
+ ],
+ "city_region": {
+  "Aleppo": "Northern Syria",
+  "Alexandria": "Lower Egypt",
+  "Algiers": "Titteri",
+  "Amsterdam": "Holland",
+  "Ankara": "Galatia",
+  "Antwerp": "Brabant",
+  "Athens": "Attica",
+  "Augsburg": "Swabia",
+  "Baghdad": "Iraq",
+  "Barcelona": "Catalonia",
+  "Belgrade": "Serbia",
+  "Benin": "Benin lands",
+  "Bergen": "Hordaland",
+  "Berlin": "Mittelmark",
+  "Bern": "Swiss Plateau",
+  "Bologna": "Emilia",
+  "Bordeaux": "Guyenne",
+  "Bremen": "Oldenburg",
+  "Bristol": "Gloucestershire",
+  "Bruges": "Flanders",
+  "Brussels": "Brabant",
+  "Buda": "Transdanubia",
+  "Burgos": "Old Castile",
+  "Bursa": "Bithynia",
+  "Cairo": "Lower Egypt",
+  "Candia": "Crete",
+  "Cologne": "Electorate of Cologne",
+  "Constantinople": "Thrace",
+  "Copenhagen": "Zealand",
+  "Cusco": "Quechua lands",
+  "Damascus": "Syria",
+  "Danzig": "Pomerelia",
+  "Dijon": "Burgundy",
+  "Diyarbakır": "Diyar Bakr",
+  "Dresden": "Meissen",
+  "Dublin": "The Pale",
+  "Edinburgh": "Lothian",
+  "Edirne": "Thrace",
+  "Fez": "Fez",
+  "Florence": "Tuscany",
+  "Frankfurt": "Wetterau",
+  "Galway": "Connacht",
+  "Genoa": "Liguria",
+  "Ghent": "Flanders",
+  "Granada": "Granada",
+  "Hamburg": "Holstein",
+  "Jerusalem": "Palestine",
+  "Kaffa": "Crimea",
+  "Kiev": "Kiev Land",
+  "Konya": "Karaman",
+  "Kraków": "Lesser Poland",
+  "Königsberg": "Samland",
+  "Lisbon": "Estremadura",
+  "London": "Middlesex",
+  "Lyon": "Lyonnais",
+  "Lübeck": "Holstein",
+  "Marrakesh": "Haouz",
+  "Marseille": "Provence",
+  "Mecca": "Hejaz",
+  "Medina": "Hejaz",
+  "Milan": "Lombardy",
+  "Moscow": "Muscovy",
+  "Mosul": "Jazira",
+  "Munich": "Upper Bavaria",
+  "Nantes": "Brittany",
+  "Naples": "Campania",
+  "Novgorod": "Novgorod Land",
+  "Nuremberg": "Franconia",
+  "Oslo": "Viken",
+  "Palermo": "Val di Mazara",
+  "Paris": "Île-de-France",
+  "Porto": "Douro",
+  "Poznań": "Greater Poland",
+  "Prague": "Bohemia",
+  "Rennes": "Brittany",
+  "Riga": "Livonia",
+  "Rome": "Lazio",
+  "Rouen": "Normandy",
+  "Seville": "Seville",
+  "Smyrna": "Ionia",
+  "Sofia": "Bulgaria",
+  "Stockholm": "Uppland",
+  "Suceava": "Bukovina",
+  "Tbilisi": "Kartli",
+  "Tenochtitlan": "Mexica lands",
+  "Thessaloniki": "Macedonia",
+  "Timbuktu": "Songhai lands",
+  "Tlemcen": "Tlemcen",
+  "Toledo": "New Castile",
+  "Toulouse": "Languedoc",
+  "Trebizond": "Pontus",
+  "Tripoli": "Tripolitania",
+  "Tunis": "Ifriqiya",
+  "Turin": "Piedmont",
+  "Valencia": "Valencia",
+  "Valladolid": "Old Castile",
+  "Venice": "Veneto",
+  "Vienna": "Lower Austria",
+  "Vilnius": "Lithuania",
+  "York": "North Riding",
+  "Zagreb": "Croatia",
+  "Zaragoza": "Aragon"
+ }
+}

@@ -1,0 +1,253 @@
+{
+ "schema": "hexa-godot/geography-markets/1",
+ "source": "hexa/campaign/geo.py (MARKETS)",
+ "note": "colonial markets open once a colonial power owns land next to them.",
+ "markets": [
+  {
+   "name": "Lisbon",
+   "lon": -9.14,
+   "lat": 38.72,
+   "colonial": false
+  },
+  {
+   "name": "Seville",
+   "lon": -5.99,
+   "lat": 37.39,
+   "colonial": false
+  },
+  {
+   "name": "Barcelona",
+   "lon": 2.17,
+   "lat": 41.39,
+   "colonial": false
+  },
+  {
+   "name": "Bordeaux",
+   "lon": -0.58,
+   "lat": 44.84,
+   "colonial": false
+  },
+  {
+   "name": "Paris",
+   "lon": 2.35,
+   "lat": 48.86,
+   "colonial": false
+  },
+  {
+   "name": "London",
+   "lon": -0.12,
+   "lat": 51.5,
+   "colonial": false
+  },
+  {
+   "name": "Antwerp",
+   "lon": 4.4,
+   "lat": 51.22,
+   "colonial": false
+  },
+  {
+   "name": "Cologne",
+   "lon": 6.96,
+   "lat": 50.94,
+   "colonial": false
+  },
+  {
+   "name": "Lübeck",
+   "lon": 10.69,
+   "lat": 53.87,
+   "colonial": false
+  },
+  {
+   "name": "Danzig",
+   "lon": 18.65,
+   "lat": 54.35,
+   "colonial": false
+  },
+  {
+   "name": "Novgorod",
+   "lon": 31.27,
+   "lat": 58.52,
+   "colonial": false
+  },
+  {
+   "name": "Moscow",
+   "lon": 37.62,
+   "lat": 55.75,
+   "colonial": false
+  },
+  {
+   "name": "Kraków",
+   "lon": 19.94,
+   "lat": 50.06,
+   "colonial": false
+  },
+  {
+   "name": "Vienna",
+   "lon": 16.37,
+   "lat": 48.21,
+   "colonial": false
+  },
+  {
+   "name": "Venice",
+   "lon": 12.33,
+   "lat": 45.44,
+   "colonial": false
+  },
+  {
+   "name": "Genoa",
+   "lon": 8.93,
+   "lat": 44.41,
+   "colonial": false
+  },
+  {
+   "name": "Naples",
+   "lon": 14.27,
+   "lat": 40.85,
+   "colonial": false
+  },
+  {
+   "name": "Constantinople",
+   "lon": 28.97,
+   "lat": 41.01,
+   "colonial": false
+  },
+  {
+   "name": "Kaffa",
+   "lon": 35.38,
+   "lat": 45.03,
+   "colonial": false
+  },
+  {
+   "name": "Aleppo",
+   "lon": 37.16,
+   "lat": 36.2,
+   "colonial": false
+  },
+  {
+   "name": "Alexandria",
+   "lon": 29.92,
+   "lat": 31.2,
+   "colonial": false
+  },
+  {
+   "name": "Tunis",
+   "lon": 10.18,
+   "lat": 36.8,
+   "colonial": false
+  },
+  {
+   "name": "Fez",
+   "lon": -5.0,
+   "lat": 34.03,
+   "colonial": false
+  },
+  {
+   "name": "Stockholm",
+   "lon": 18.07,
+   "lat": 59.33,
+   "colonial": false
+  },
+  {
+   "name": "Havana",
+   "lon": -82.36,
+   "lat": 23.13,
+   "colonial": true
+  },
+  {
+   "name": "Santo Domingo",
+   "lon": -69.9,
+   "lat": 18.48,
+   "colonial": true
+  },
+  {
+   "name": "Veracruz",
+   "lon": -96.13,
+   "lat": 19.17,
+   "colonial": true
+  },
+  {
+   "name": "Cartagena",
+   "lon": -75.5,
+   "lat": 10.4,
+   "colonial": true
+  },
+  {
+   "name": "Recife",
+   "lon": -34.88,
+   "lat": -8.05,
+   "colonial": true
+  },
+  {
+   "name": "Bahia",
+   "lon": -38.5,
+   "lat": -12.6,
+   "colonial": true
+  },
+  {
+   "name": "Chesapeake",
+   "lon": -76.4,
+   "lat": 37.1,
+   "colonial": true
+  },
+  {
+   "name": "Manhattan",
+   "lon": -74.0,
+   "lat": 40.7,
+   "colonial": true
+  },
+  {
+   "name": "Boston",
+   "lon": -71.06,
+   "lat": 42.36,
+   "colonial": true
+  },
+  {
+   "name": "Quebec",
+   "lon": -71.2,
+   "lat": 46.8,
+   "colonial": true
+  },
+  {
+   "name": "Newfoundland",
+   "lon": -53.5,
+   "lat": 47.6,
+   "colonial": true
+  },
+  {
+   "name": "Elmina",
+   "lon": -1.35,
+   "lat": 5.08,
+   "colonial": true
+  },
+  {
+   "name": "Senegal",
+   "lon": -16.5,
+   "lat": 15.0,
+   "colonial": true
+  },
+  {
+   "name": "Luanda",
+   "lon": 13.23,
+   "lat": -8.84,
+   "colonial": true
+  },
+  {
+   "name": "Guiana",
+   "lon": -55.2,
+   "lat": 5.9,
+   "colonial": true
+  },
+  {
+   "name": "Charleston",
+   "lon": -79.9,
+   "lat": 32.8,
+   "colonial": true
+  },
+  {
+   "name": "Yucatan",
+   "lon": -89.6,
+   "lat": 20.9,
+   "colonial": true
+  }
+ ]
+}

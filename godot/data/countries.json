@@ -1,0 +1,659 @@
+{
+ "schema": "hexa-godot/countries/1",
+ "source": "hexa/campaign/geo.py (COUNTRIES, COLONIAL, COASTAL_KNOWLEDGE, KNOWN_WORLD)",
+ "note": "Order is the dict order of geo.COUNTRIES and must be kept: the builder iterates in it. The capital is the first seed point; all seed points are in geography/countries.json. known_world_rule is the Python lambda, as text.",
+ "countries": [
+  {
+   "tag": "POR",
+   "name": "Portugal",
+   "colour": [
+    40,
+    130,
+    70
+   ],
+   "capital": {
+    "lon": -9.14,
+    "lat": 38.72
+   }
+  },
+  {
+   "tag": "CAS",
+   "name": "Castile",
+   "colour": [
+    200,
+    170,
+    40
+   ],
+   "capital": {
+    "lon": -4.02,
+    "lat": 39.86
+   }
+  },
+  {
+   "tag": "ARA",
+   "name": "Aragon",
+   "colour": [
+    220,
+    200,
+    90
+   ],
+   "capital": {
+    "lon": -0.88,
+    "lat": 41.65
+   }
+  },
+  {
+   "tag": "GRA",
+   "name": "Granada",
+   "colour": [
+    170,
+    60,
+    60
+   ],
+   "capital": {
+    "lon": -3.6,
+    "lat": 37.18
+   }
+  },
+  {
+   "tag": "FRA",
+   "name": "France",
+   "colour": [
+    40,
+    70,
+    170
+   ],
+   "capital": {
+    "lon": 2.35,
+    "lat": 48.86
+   }
+  },
+  {
+   "tag": "BRI",
+   "name": "Brittany",
+   "colour": [
+    90,
+    90,
+    90
+   ],
+   "capital": {
+    "lon": -1.68,
+    "lat": 48.11
+   }
+  },
+  {
+   "tag": "BUR",
+   "name": "Burgundy",
+   "colour": [
+    150,
+    60,
+    140
+   ],
+   "capital": {
+    "lon": 4.35,
+    "lat": 50.85
+   }
+  },
+  {
+   "tag": "ENG",
+   "name": "England",
+   "colour": [
+    190,
+    40,
+    40
+   ],
+   "capital": {
+    "lon": -0.12,
+    "lat": 51.5
+   }
+  },
+  {
+   "tag": "SCO",
+   "name": "Scotland",
+   "colour": [
+    70,
+    90,
+    160
+   ],
+   "capital": {
+    "lon": -3.19,
+    "lat": 55.95
+   }
+  },
+  {
+   "tag": "IRE",
+   "name": "Ireland",
+   "colour": [
+    60,
+    160,
+    90
+   ],
+   "capital": {
+    "lon": -6.26,
+    "lat": 53.35
+   }
+  },
+  {
+   "tag": "DAN",
+   "name": "Denmark",
+   "colour": [
+    200,
+    70,
+    80
+   ],
+   "capital": {
+    "lon": 12.57,
+    "lat": 55.68
+   }
+  },
+  {
+   "tag": "SWE",
+   "name": "Sweden",
+   "colour": [
+    40,
+    90,
+    200
+   ],
+   "capital": {
+    "lon": 18.07,
+    "lat": 59.33
+   }
+  },
+  {
+   "tag": "HAN",
+   "name": "Hansa",
+   "colour": [
+    160,
+    110,
+    60
+   ],
+   "capital": {
+    "lon": 10.69,
+    "lat": 53.87
+   }
+  },
+  {
+   "tag": "BRA",
+   "name": "Brandenburg",
+   "colour": [
+    80,
+    80,
+    110
+   ],
+   "capital": {
+    "lon": 13.4,
+    "lat": 52.52
+   }
+  },
+  {
+   "tag": "POM",
+   "name": "Pomerania",
+   "colour": [
+    120,
+    150,
+    190
+   ],
+   "capital": {
+    "lon": 14.5,
+    "lat": 53.8
+   }
+  },
+  {
+   "tag": "SAX",
+   "name": "Saxony",
+   "colour": [
+    100,
+    160,
+    100
+   ],
+   "capital": {
+    "lon": 13.74,
+    "lat": 51.05
+   }
+  },
+  {
+   "tag": "BOH",
+   "name": "Bohemia",
+   "colour": [
+    200,
+    180,
+    120
+   ],
+   "capital": {
+    "lon": 14.42,
+    "lat": 50.08
+   }
+  },
+  {
+   "tag": "BAV",
+   "name": "Bavaria",
+   "colour": [
+    90,
+    150,
+    210
+   ],
+   "capital": {
+    "lon": 11.58,
+    "lat": 48.14
+   }
+  },
+  {
+   "tag": "AUS",
+   "name": "Austria",
+   "colour": [
+    230,
+    230,
+    230
+   ],
+   "capital": {
+    "lon": 16.37,
+    "lat": 48.21
+   }
+  },
+  {
+   "tag": "PAL",
+   "name": "Palatinate",
+   "colour": [
+    130,
+    190,
+    160
+   ],
+   "capital": {
+    "lon": 8.68,
+    "lat": 49.4
+   }
+  },
+  {
+   "tag": "COL",
+   "name": "Cologne",
+   "colour": [
+    210,
+    210,
+    170
+   ],
+   "capital": {
+    "lon": 6.96,
+    "lat": 50.94
+   }
+  },
+  {
+   "tag": "BRU",
+   "name": "Brunswick",
+   "colour": [
+    180,
+    140,
+    80
+   ],
+   "capital": {
+    "lon": 10.5,
+    "lat": 52.27
+   }
+  },
+  {
+   "tag": "HES",
+   "name": "Hesse",
+   "colour": [
+    110,
+    110,
+    160
+   ],
+   "capital": {
+    "lon": 9.5,
+    "lat": 51.0
+   }
+  },
+  {
+   "tag": "WUR",
+   "name": "Württemberg",
+   "colour": [
+    190,
+    120,
+    50
+   ],
+   "capital": {
+    "lon": 9.18,
+    "lat": 48.78
+   }
+  },
+  {
+   "tag": "SWI",
+   "name": "Switzerland",
+   "colour": [
+    190,
+    50,
+    50
+   ],
+   "capital": {
+    "lon": 7.45,
+    "lat": 46.95
+   }
+  },
+  {
+   "tag": "SAV",
+   "name": "Savoy",
+   "colour": [
+    130,
+    150,
+    120
+   ],
+   "capital": {
+    "lon": 7.69,
+    "lat": 45.07
+   }
+  },
+  {
+   "tag": "MLO",
+   "name": "Milan",
+   "colour": [
+    60,
+    140,
+    150
+   ],
+   "capital": {
+    "lon": 9.19,
+    "lat": 45.46
+   }
+  },
+  {
+   "tag": "VEN",
+   "name": "Venice",
+   "colour": [
+    30,
+    160,
+    140
+   ],
+   "capital": {
+    "lon": 12.33,
+    "lat": 45.44
+   }
+  },
+  {
+   "tag": "GEN",
+   "name": "Genoa",
+   "colour": [
+    190,
+    60,
+    110
+   ],
+   "capital": {
+    "lon": 8.93,
+    "lat": 44.41
+   }
+  },
+  {
+   "tag": "TUS",
+   "name": "Florence",
+   "colour": [
+    140,
+    50,
+    160
+   ],
+   "capital": {
+    "lon": 11.25,
+    "lat": 43.77
+   }
+  },
+  {
+   "tag": "PAP",
+   "name": "Papal States",
+   "colour": [
+    240,
+    230,
+    160
+   ],
+   "capital": {
+    "lon": 12.5,
+    "lat": 41.9
+   }
+  },
+  {
+   "tag": "NAP",
+   "name": "Naples",
+   "colour": [
+    100,
+    170,
+    200
+   ],
+   "capital": {
+    "lon": 14.27,
+    "lat": 40.85
+   }
+  },
+  {
+   "tag": "HUN",
+   "name": "Hungary",
+   "colour": [
+    160,
+    200,
+    120
+   ],
+   "capital": {
+    "lon": 19.04,
+    "lat": 47.5
+   }
+  },
+  {
+   "tag": "POL",
+   "name": "Poland",
+   "colour": [
+    210,
+    90,
+    100
+   ],
+   "capital": {
+    "lon": 19.94,
+    "lat": 50.06
+   }
+  },
+  {
+   "tag": "LIT",
+   "name": "Lithuania",
+   "colour": [
+    180,
+    200,
+    80
+   ],
+   "capital": {
+    "lon": 25.28,
+    "lat": 54.69
+   }
+  },
+  {
+   "tag": "TEU",
+   "name": "Teutonic Order",
+   "colour": [
+    220,
+    220,
+    220
+   ],
+   "capital": {
+    "lon": 20.51,
+    "lat": 54.71
+   }
+  },
+  {
+   "tag": "LIV",
+   "name": "Livonian Order",
+   "colour": [
+    150,
+    150,
+    150
+   ],
+   "capital": {
+    "lon": 24.11,
+    "lat": 56.95
+   }
+  },
+  {
+   "tag": "MOS",
+   "name": "Muscovy",
+   "colour": [
+    130,
+    50,
+    40
+   ],
+   "capital": {
+    "lon": 37.62,
+    "lat": 55.75
+   }
+  },
+  {
+   "tag": "CRI",
+   "name": "Crimea",
+   "colour": [
+    100,
+    170,
+    90
+   ],
+   "capital": {
+    "lon": 34.1,
+    "lat": 44.95
+   }
+  },
+  {
+   "tag": "HOR",
+   "name": "Great Horde",
+   "colour": [
+    170,
+    150,
+    100
+   ],
+   "capital": {
+    "lon": 44.5,
+    "lat": 48.5
+   }
+  },
+  {
+   "tag": "MOL",
+   "name": "Moldavia",
+   "colour": [
+    200,
+    150,
+    40
+   ],
+   "capital": {
+    "lon": 26.25,
+    "lat": 47.65
+   }
+  },
+  {
+   "tag": "WAL",
+   "name": "Wallachia",
+   "colour": [
+    150,
+    120,
+    70
+   ],
+   "capital": {
+    "lon": 26.1,
+    "lat": 44.43
+   }
+  },
+  {
+   "tag": "TUR",
+   "name": "Ottomans",
+   "colour": [
+    80,
+    150,
+    60
+   ],
+   "capital": {
+    "lon": 28.97,
+    "lat": 41.01
+   }
+  },
+  {
+   "tag": "GEO",
+   "name": "Georgia",
+   "colour": [
+    200,
+    120,
+    120
+   ],
+   "capital": {
+    "lon": 44.79,
+    "lat": 41.72
+   }
+  },
+  {
+   "tag": "AKK",
+   "name": "Aq Qoyunlu",
+   "colour": [
+    90,
+    100,
+    60
+   ],
+   "capital": {
+    "lon": 40.22,
+    "lat": 37.91
+   }
+  },
+  {
+   "tag": "MAM",
+   "name": "Mamluks",
+   "colour": [
+    210,
+    190,
+    90
+   ],
+   "capital": {
+    "lon": 31.24,
+    "lat": 30.04
+   }
+  },
+  {
+   "tag": "TUN",
+   "name": "Tunis",
+   "colour": [
+    220,
+    140,
+    140
+   ],
+   "capital": {
+    "lon": 10.18,
+    "lat": 36.8
+   }
+  },
+  {
+   "tag": "TLE",
+   "name": "Tlemcen",
+   "colour": [
+    150,
+    130,
+    190
+   ],
+   "capital": {
+    "lon": -1.31,
+    "lat": 34.88
+   }
+  },
+  {
+   "tag": "MOR",
+   "name": "Morocco",
+   "colour": [
+    180,
+    70,
+    40
+   ],
+   "capital": {
+    "lon": -5.0,
+    "lat": 34.03
+   }
+  }
+ ],
+ "colonial_start": {
+  "POR": 0,
+  "CAS": 0,
+  "ENG": 30,
+  "FRA": 30,
+  "BUR": 40,
+  "DAN": 80,
+  "SWE": 100,
+  "SCO": 100
+ },
+ "coastal_knowledge": {
+  "POR": 0.0,
+  "CAS": 10.0
+ },
+ "known_world_rule": "lon > -19.5 and lat > 11.5 and not (lat < 20 and lon > 20)"
+}

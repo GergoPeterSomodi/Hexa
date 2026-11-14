@@ -1,0 +1,287 @@
+{
+ "schema": "hexa-godot/geography-tribes/1",
+ "source": "hexa/campaign/geo.py (TRIBES)",
+ "note": "Land nobody owns takes the tribe of the nearest point (worldgen.build_countries).",
+ "tribes": [
+  {
+   "name": "Taíno",
+   "lon": -73.0,
+   "lat": 19.5
+  },
+  {
+   "name": "Taíno",
+   "lon": -79.0,
+   "lat": 22.0
+  },
+  {
+   "name": "Carib",
+   "lon": -61.5,
+   "lat": 14.0
+  },
+  {
+   "name": "Maya",
+   "lon": -89.0,
+   "lat": 18.5
+  },
+  {
+   "name": "Mexica",
+   "lon": -99.0,
+   "lat": 19.5
+  },
+  {
+   "name": "Huastec",
+   "lon": -98.5,
+   "lat": 22.5
+  },
+  {
+   "name": "Chichimec",
+   "lon": -100.0,
+   "lat": 25.0
+  },
+  {
+   "name": "Muscogee",
+   "lon": -85.0,
+   "lat": 32.5
+  },
+  {
+   "name": "Timucua",
+   "lon": -82.0,
+   "lat": 29.0
+  },
+  {
+   "name": "Cherokee",
+   "lon": -84.0,
+   "lat": 35.5
+  },
+  {
+   "name": "Powhatan",
+   "lon": -77.0,
+   "lat": 37.5
+  },
+  {
+   "name": "Lenape",
+   "lon": -75.0,
+   "lat": 40.0
+  },
+  {
+   "name": "Iroquois",
+   "lon": -76.0,
+   "lat": 43.0
+  },
+  {
+   "name": "Huron",
+   "lon": -80.0,
+   "lat": 45.0
+  },
+  {
+   "name": "Mi'kmaq",
+   "lon": -64.0,
+   "lat": 46.0
+  },
+  {
+   "name": "Innu",
+   "lon": -64.0,
+   "lat": 52.0
+  },
+  {
+   "name": "Cree",
+   "lon": -85.0,
+   "lat": 51.0
+  },
+  {
+   "name": "Beothuk",
+   "lon": -56.0,
+   "lat": 49.0
+  },
+  {
+   "name": "Natchez",
+   "lon": -91.0,
+   "lat": 31.5
+  },
+  {
+   "name": "Caddo",
+   "lon": -95.0,
+   "lat": 32.0
+  },
+  {
+   "name": "Comanche",
+   "lon": -99.0,
+   "lat": 31.0
+  },
+  {
+   "name": "Inuit",
+   "lon": -60.0,
+   "lat": 59.0
+  },
+  {
+   "name": "Ojibwe",
+   "lon": -90.0,
+   "lat": 47.0
+  },
+  {
+   "name": "Shawnee",
+   "lon": -84.0,
+   "lat": 39.0
+  },
+  {
+   "name": "Miskito",
+   "lon": -84.0,
+   "lat": 13.0
+  },
+  {
+   "name": "Muisca",
+   "lon": -74.0,
+   "lat": 5.0
+  },
+  {
+   "name": "Arawak",
+   "lon": -60.0,
+   "lat": 6.0
+  },
+  {
+   "name": "Tupi",
+   "lon": -38.0,
+   "lat": -8.0
+  },
+  {
+   "name": "Tupinambá",
+   "lon": -45.0,
+   "lat": -3.0
+  },
+  {
+   "name": "Quechua",
+   "lon": -78.0,
+   "lat": -8.0
+  },
+  {
+   "name": "Amazonians",
+   "lon": -60.0,
+   "lat": -5.0
+  },
+  {
+   "name": "Kalinago",
+   "lon": -66.0,
+   "lat": 9.0
+  },
+  {
+   "name": "Wolof",
+   "lon": -16.0,
+   "lat": 15.0
+  },
+  {
+   "name": "Mali",
+   "lon": -8.0,
+   "lat": 12.5
+  },
+  {
+   "name": "Songhai",
+   "lon": -2.0,
+   "lat": 15.5
+  },
+  {
+   "name": "Mossi",
+   "lon": -1.5,
+   "lat": 12.0
+  },
+  {
+   "name": "Akan",
+   "lon": -1.5,
+   "lat": 6.5
+  },
+  {
+   "name": "Benin",
+   "lon": 5.6,
+   "lat": 6.5
+  },
+  {
+   "name": "Hausa",
+   "lon": 8.5,
+   "lat": 12.0
+  },
+  {
+   "name": "Kanem",
+   "lon": 15.0,
+   "lat": 13.0
+  },
+  {
+   "name": "Kongo",
+   "lon": 14.5,
+   "lat": -5.5
+  },
+  {
+   "name": "Ndongo",
+   "lon": 15.5,
+   "lat": -9.5
+  },
+  {
+   "name": "Nubians",
+   "lon": 33.0,
+   "lat": 17.0
+  },
+  {
+   "name": "Ethiopia",
+   "lon": 38.5,
+   "lat": 11.0
+  },
+  {
+   "name": "Somali",
+   "lon": 45.0,
+   "lat": 6.0
+  },
+  {
+   "name": "Bedouin",
+   "lon": 42.0,
+   "lat": 25.0
+  },
+  {
+   "name": "Tuareg",
+   "lon": 5.0,
+   "lat": 22.0
+  },
+  {
+   "name": "Guanche",
+   "lon": -15.5,
+   "lat": 28.3
+  },
+  {
+   "name": "Kru",
+   "lon": -8.0,
+   "lat": 5.5
+  },
+  {
+   "name": "Mandinka",
+   "lon": -12.0,
+   "lat": 11.0
+  },
+  {
+   "name": "Igbo",
+   "lon": 7.5,
+   "lat": 6.0
+  },
+  {
+   "name": "Luba",
+   "lon": 25.0,
+   "lat": -8.0
+  },
+  {
+   "name": "Swahili",
+   "lon": 39.0,
+   "lat": -5.0
+  },
+  {
+   "name": "Bantu",
+   "lon": 25.0,
+   "lat": 0.0
+  },
+  {
+   "name": "Fang",
+   "lon": 11.0,
+   "lat": 1.0
+  },
+  {
+   "name": "Yoruba",
+   "lon": 4.0,
+   "lat": 8.0
+  }
+ ]
+}

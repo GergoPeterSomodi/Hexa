@@ -1,0 +1,619 @@
+{
+ "schema": "hexa-godot/geography-cities/1",
+ "source": "hexa/campaign/geo.py (CITIES)",
+ "note": "size is the city's size as in the Python table (it sets the starting settlement and castle).",
+ "cities": [
+  {
+   "name": "Lisbon",
+   "lon": -9.14,
+   "lat": 38.72,
+   "size": 60
+  },
+  {
+   "name": "Porto",
+   "lon": -8.61,
+   "lat": 41.15,
+   "size": 15
+  },
+  {
+   "name": "Seville",
+   "lon": -5.99,
+   "lat": 37.39,
+   "size": 50
+  },
+  {
+   "name": "Toledo",
+   "lon": -4.02,
+   "lat": 39.86,
+   "size": 30
+  },
+  {
+   "name": "Burgos",
+   "lon": -3.7,
+   "lat": 42.34,
+   "size": 15
+  },
+  {
+   "name": "Valladolid",
+   "lon": -4.72,
+   "lat": 41.65,
+   "size": 20
+  },
+  {
+   "name": "Granada",
+   "lon": -3.6,
+   "lat": 37.18,
+   "size": 50
+  },
+  {
+   "name": "Barcelona",
+   "lon": 2.17,
+   "lat": 41.39,
+   "size": 30
+  },
+  {
+   "name": "Valencia",
+   "lon": -0.38,
+   "lat": 39.47,
+   "size": 40
+  },
+  {
+   "name": "Zaragoza",
+   "lon": -0.88,
+   "lat": 41.65,
+   "size": 20
+  },
+  {
+   "name": "Paris",
+   "lon": 2.35,
+   "lat": 48.86,
+   "size": 150
+  },
+  {
+   "name": "Lyon",
+   "lon": 4.84,
+   "lat": 45.76,
+   "size": 40
+  },
+  {
+   "name": "Bordeaux",
+   "lon": -0.58,
+   "lat": 44.84,
+   "size": 25
+  },
+  {
+   "name": "Toulouse",
+   "lon": 1.44,
+   "lat": 43.6,
+   "size": 25
+  },
+  {
+   "name": "Rouen",
+   "lon": 1.1,
+   "lat": 49.44,
+   "size": 40
+  },
+  {
+   "name": "Marseille",
+   "lon": 5.37,
+   "lat": 43.3,
+   "size": 25
+  },
+  {
+   "name": "Rennes",
+   "lon": -1.68,
+   "lat": 48.11,
+   "size": 15
+  },
+  {
+   "name": "Nantes",
+   "lon": -1.55,
+   "lat": 47.22,
+   "size": 15
+  },
+  {
+   "name": "Dijon",
+   "lon": 5.04,
+   "lat": 47.32,
+   "size": 15
+  },
+  {
+   "name": "London",
+   "lon": -0.12,
+   "lat": 51.5,
+   "size": 50
+  },
+  {
+   "name": "York",
+   "lon": -1.08,
+   "lat": 53.96,
+   "size": 12
+  },
+  {
+   "name": "Bristol",
+   "lon": -2.59,
+   "lat": 51.45,
+   "size": 12
+  },
+  {
+   "name": "Edinburgh",
+   "lon": -3.19,
+   "lat": 55.95,
+   "size": 15
+  },
+  {
+   "name": "Dublin",
+   "lon": -6.26,
+   "lat": 53.35,
+   "size": 10
+  },
+  {
+   "name": "Galway",
+   "lon": -9.05,
+   "lat": 53.27,
+   "size": 4
+  },
+  {
+   "name": "Antwerp",
+   "lon": 4.4,
+   "lat": 51.22,
+   "size": 40
+  },
+  {
+   "name": "Bruges",
+   "lon": 3.22,
+   "lat": 51.21,
+   "size": 35
+  },
+  {
+   "name": "Ghent",
+   "lon": 3.72,
+   "lat": 51.05,
+   "size": 50
+  },
+  {
+   "name": "Amsterdam",
+   "lon": 4.9,
+   "lat": 52.37,
+   "size": 15
+  },
+  {
+   "name": "Brussels",
+   "lon": 4.35,
+   "lat": 50.85,
+   "size": 30
+  },
+  {
+   "name": "Cologne",
+   "lon": 6.96,
+   "lat": 50.94,
+   "size": 40
+  },
+  {
+   "name": "Frankfurt",
+   "lon": 8.68,
+   "lat": 50.11,
+   "size": 15
+  },
+  {
+   "name": "Nuremberg",
+   "lon": 11.08,
+   "lat": 49.45,
+   "size": 30
+  },
+  {
+   "name": "Augsburg",
+   "lon": 10.9,
+   "lat": 48.37,
+   "size": 25
+  },
+  {
+   "name": "Munich",
+   "lon": 11.58,
+   "lat": 48.14,
+   "size": 15
+  },
+  {
+   "name": "Vienna",
+   "lon": 16.37,
+   "lat": 48.21,
+   "size": 30
+  },
+  {
+   "name": "Prague",
+   "lon": 14.42,
+   "lat": 50.08,
+   "size": 40
+  },
+  {
+   "name": "Dresden",
+   "lon": 13.74,
+   "lat": 51.05,
+   "size": 10
+  },
+  {
+   "name": "Berlin",
+   "lon": 13.4,
+   "lat": 52.52,
+   "size": 10
+  },
+  {
+   "name": "Lübeck",
+   "lon": 10.69,
+   "lat": 53.87,
+   "size": 25
+  },
+  {
+   "name": "Hamburg",
+   "lon": 9.99,
+   "lat": 53.55,
+   "size": 15
+  },
+  {
+   "name": "Bremen",
+   "lon": 8.8,
+   "lat": 53.08,
+   "size": 15
+  },
+  {
+   "name": "Copenhagen",
+   "lon": 12.57,
+   "lat": 55.68,
+   "size": 10
+  },
+  {
+   "name": "Bergen",
+   "lon": 5.32,
+   "lat": 60.39,
+   "size": 7
+  },
+  {
+   "name": "Oslo",
+   "lon": 10.75,
+   "lat": 59.91,
+   "size": 4
+  },
+  {
+   "name": "Stockholm",
+   "lon": 18.07,
+   "lat": 59.33,
+   "size": 7
+  },
+  {
+   "name": "Danzig",
+   "lon": 18.65,
+   "lat": 54.35,
+   "size": 25
+  },
+  {
+   "name": "Königsberg",
+   "lon": 20.51,
+   "lat": 54.71,
+   "size": 10
+  },
+  {
+   "name": "Riga",
+   "lon": 24.11,
+   "lat": 56.95,
+   "size": 8
+  },
+  {
+   "name": "Kraków",
+   "lon": 19.94,
+   "lat": 50.06,
+   "size": 20
+  },
+  {
+   "name": "Poznań",
+   "lon": 16.93,
+   "lat": 52.41,
+   "size": 8
+  },
+  {
+   "name": "Vilnius",
+   "lon": 25.28,
+   "lat": 54.69,
+   "size": 15
+  },
+  {
+   "name": "Kiev",
+   "lon": 30.52,
+   "lat": 50.45,
+   "size": 10
+  },
+  {
+   "name": "Moscow",
+   "lon": 37.62,
+   "lat": 55.75,
+   "size": 50
+  },
+  {
+   "name": "Novgorod",
+   "lon": 31.27,
+   "lat": 58.52,
+   "size": 25
+  },
+  {
+   "name": "Buda",
+   "lon": 19.04,
+   "lat": 47.5,
+   "size": 25
+  },
+  {
+   "name": "Zagreb",
+   "lon": 15.98,
+   "lat": 45.81,
+   "size": 5
+  },
+  {
+   "name": "Venice",
+   "lon": 12.33,
+   "lat": 45.44,
+   "size": 100
+  },
+  {
+   "name": "Milan",
+   "lon": 9.19,
+   "lat": 45.46,
+   "size": 100
+  },
+  {
+   "name": "Genoa",
+   "lon": 8.93,
+   "lat": 44.41,
+   "size": 60
+  },
+  {
+   "name": "Florence",
+   "lon": 11.25,
+   "lat": 43.77,
+   "size": 70
+  },
+  {
+   "name": "Rome",
+   "lon": 12.5,
+   "lat": 41.9,
+   "size": 50
+  },
+  {
+   "name": "Bologna",
+   "lon": 11.34,
+   "lat": 44.49,
+   "size": 40
+  },
+  {
+   "name": "Naples",
+   "lon": 14.27,
+   "lat": 40.85,
+   "size": 120
+  },
+  {
+   "name": "Palermo",
+   "lon": 13.36,
+   "lat": 38.12,
+   "size": 50
+  },
+  {
+   "name": "Turin",
+   "lon": 7.69,
+   "lat": 45.07,
+   "size": 15
+  },
+  {
+   "name": "Bern",
+   "lon": 7.45,
+   "lat": 46.95,
+   "size": 5
+  },
+  {
+   "name": "Constantinople",
+   "lon": 28.97,
+   "lat": 41.01,
+   "size": 200
+  },
+  {
+   "name": "Edirne",
+   "lon": 26.56,
+   "lat": 41.68,
+   "size": 30
+  },
+  {
+   "name": "Thessaloniki",
+   "lon": 22.94,
+   "lat": 40.64,
+   "size": 25
+  },
+  {
+   "name": "Athens",
+   "lon": 23.73,
+   "lat": 37.98,
+   "size": 10
+  },
+  {
+   "name": "Bursa",
+   "lon": 29.06,
+   "lat": 40.19,
+   "size": 40
+  },
+  {
+   "name": "Ankara",
+   "lon": 32.85,
+   "lat": 39.93,
+   "size": 15
+  },
+  {
+   "name": "Belgrade",
+   "lon": 20.46,
+   "lat": 44.79,
+   "size": 10
+  },
+  {
+   "name": "Sofia",
+   "lon": 23.32,
+   "lat": 42.7,
+   "size": 10
+  },
+  {
+   "name": "Trebizond",
+   "lon": 39.72,
+   "lat": 41.0,
+   "size": 15
+  },
+  {
+   "name": "Suceava",
+   "lon": 26.25,
+   "lat": 47.65,
+   "size": 10
+  },
+  {
+   "name": "Kaffa",
+   "lon": 35.38,
+   "lat": 45.03,
+   "size": 40
+  },
+  {
+   "name": "Tbilisi",
+   "lon": 44.79,
+   "lat": 41.72,
+   "size": 15
+  },
+  {
+   "name": "Diyarbakır",
+   "lon": 40.22,
+   "lat": 37.91,
+   "size": 20
+  },
+  {
+   "name": "Cairo",
+   "lon": 31.24,
+   "lat": 30.04,
+   "size": 250
+  },
+  {
+   "name": "Alexandria",
+   "lon": 29.92,
+   "lat": 31.2,
+   "size": 60
+  },
+  {
+   "name": "Damascus",
+   "lon": 36.29,
+   "lat": 33.51,
+   "size": 80
+  },
+  {
+   "name": "Aleppo",
+   "lon": 37.16,
+   "lat": 36.2,
+   "size": 70
+  },
+  {
+   "name": "Jerusalem",
+   "lon": 35.21,
+   "lat": 31.77,
+   "size": 15
+  },
+  {
+   "name": "Tunis",
+   "lon": 10.18,
+   "lat": 36.8,
+   "size": 60
+  },
+  {
+   "name": "Tripoli",
+   "lon": 13.19,
+   "lat": 32.89,
+   "size": 20
+  },
+  {
+   "name": "Algiers",
+   "lon": 3.06,
+   "lat": 36.75,
+   "size": 20
+  },
+  {
+   "name": "Tlemcen",
+   "lon": -1.31,
+   "lat": 34.88,
+   "size": 40
+  },
+  {
+   "name": "Fez",
+   "lon": -5.0,
+   "lat": 34.03,
+   "size": 100
+  },
+  {
+   "name": "Marrakesh",
+   "lon": -7.99,
+   "lat": 31.63,
+   "size": 50
+  },
+  {
+   "name": "Timbuktu",
+   "lon": -3.0,
+   "lat": 16.77,
+   "size": 40
+  },
+  {
+   "name": "Benin",
+   "lon": 5.62,
+   "lat": 6.34,
+   "size": 40
+  },
+  {
+   "name": "Tenochtitlan",
+   "lon": -99.13,
+   "lat": 19.43,
+   "size": 200
+  },
+  {
+   "name": "Cusco",
+   "lon": -72.0,
+   "lat": -13.0,
+   "size": 0
+  },
+  {
+   "name": "Candia",
+   "lon": 25.13,
+   "lat": 35.34,
+   "size": 15
+  },
+  {
+   "name": "Mecca",
+   "lon": 39.83,
+   "lat": 21.42,
+   "size": 20
+  },
+  {
+   "name": "Medina",
+   "lon": 39.61,
+   "lat": 24.47,
+   "size": 15
+  },
+  {
+   "name": "Baghdad",
+   "lon": 44.36,
+   "lat": 33.31,
+   "size": 50
+  },
+  {
+   "name": "Mosul",
+   "lon": 43.13,
+   "lat": 36.34,
+   "size": 20
+  },
+  {
+   "name": "Smyrna",
+   "lon": 27.14,
+   "lat": 38.42,
+   "size": 10
+  },
+  {
+   "name": "Konya",
+   "lon": 32.49,
+   "lat": 37.87,
+   "size": 20
+  }
+ ]
+}

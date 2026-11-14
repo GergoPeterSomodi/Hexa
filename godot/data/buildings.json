@@ -1,0 +1,530 @@
+{
+ "schema": "hexa-godot/buildings/1",
+ "source": "hexa/campaign/data.py (BUILDINGS, WORKS*, SETTLEMENT*, CASTLE*, MANUFACTORIES...)",
+ "note": "Sprite file names are art, not game numbers: they are not exported (the art baker reads them).",
+ "buildings": [
+  {
+   "key": "weaver",
+   "name": "Weaver",
+   "cost": 280,
+   "max_level": 3,
+   "upkeep": 0.3,
+   "hint": "Turns wool or cotton into cloth",
+   "needs_coast": false,
+   "needs_burghers": 2,
+   "inputs": {
+    "wool": 3.0
+   },
+   "outputs": {
+    "cloth": 2.0
+   }
+  },
+  {
+   "key": "toolmaker",
+   "name": "Toolmaker",
+   "cost": 320,
+   "max_level": 3,
+   "upkeep": 0.3,
+   "hint": "Turns iron into tools",
+   "needs_coast": false,
+   "needs_burghers": 2,
+   "inputs": {
+    "iron": 2.5
+   },
+   "outputs": {
+    "tools": 1.6
+   }
+  },
+  {
+   "key": "armoury",
+   "name": "Armoury",
+   "cost": 360,
+   "max_level": 3,
+   "upkeep": 0.3,
+   "hint": "Turns iron and tools into weapons",
+   "needs_coast": false,
+   "needs_burghers": 2,
+   "inputs": {
+    "iron": 1.5,
+    "tools": 0.5
+   },
+   "outputs": {
+    "weapons": 1.5
+   }
+  },
+  {
+   "key": "marketplace",
+   "name": "Marketplace",
+   "cost": 200,
+   "max_level": 3,
+   "upkeep": 0.2,
+   "hint": "+trade capacity, +burgher taxes and growth",
+   "needs_coast": false,
+   "needs_burghers": 0,
+   "inputs": {},
+   "outputs": {}
+  },
+  {
+   "key": "port",
+   "name": "Port",
+   "cost": 150,
+   "max_level": 1,
+   "upkeep": 0.3,
+   "hint": "Builds ships; +sea trade capacity",
+   "needs_coast": true,
+   "needs_burghers": 0,
+   "inputs": {},
+   "outputs": {}
+  },
+  {
+   "key": "shipyard",
+   "name": "Shipyard",
+   "cost": 250,
+   "max_level": 1,
+   "upkeep": 0.3,
+   "hint": "Needed for carracks; ships cost less timber",
+   "needs_coast": true,
+   "needs_burghers": 0,
+   "inputs": {},
+   "outputs": {}
+  },
+  {
+   "key": "barracks",
+   "name": "Barracks",
+   "cost": 220,
+   "max_level": 1,
+   "upkeep": 0.4,
+   "hint": "Drill infantry and cavalry here for +attack or +defense",
+   "needs_coast": false,
+   "needs_burghers": 0,
+   "inputs": {},
+   "outputs": {}
+  },
+  {
+   "key": "foundry",
+   "name": "Foundry",
+   "cost": 260,
+   "max_level": 1,
+   "upkeep": 0.4,
+   "hint": "Cast cannons here; improve cannons for +attack or +defense",
+   "needs_coast": false,
+   "needs_burghers": 0,
+   "inputs": {},
+   "outputs": {}
+  },
+  {
+   "key": "ropewalk",
+   "name": "Ropewalk",
+   "cost": 260,
+   "max_level": 3,
+   "upkeep": 0.3,
+   "hint": "Twists hemp into rope and sails for ships",
+   "needs_coast": false,
+   "needs_burghers": 2,
+   "inputs": {
+    "hemp": 2.5
+   },
+   "outputs": {
+    "rope": 2.0
+   }
+  },
+  {
+   "key": "glassworks",
+   "name": "Glassworks",
+   "cost": 300,
+   "max_level": 3,
+   "upkeep": 0.3,
+   "hint": "Melts stone (sand) with timber into glass",
+   "needs_coast": false,
+   "needs_burghers": 2,
+   "inputs": {
+    "stone": 1.5,
+    "timber": 1.0
+   },
+   "outputs": {
+    "glass": 1.2
+   }
+  },
+  {
+   "key": "tannery",
+   "name": "Tannery",
+   "cost": 240,
+   "max_level": 3,
+   "upkeep": 0.3,
+   "hint": "Tans cattle hides into leather",
+   "needs_coast": false,
+   "needs_burghers": 2,
+   "inputs": {
+    "cattle": 2.5
+   },
+   "outputs": {
+    "leather": 2.0
+   }
+  },
+  {
+   "key": "powder_mill",
+   "name": "Powder mill",
+   "cost": 320,
+   "max_level": 3,
+   "upkeep": 0.3,
+   "hint": "Grinds saltpetre and charcoal into gunpowder",
+   "needs_coast": false,
+   "needs_burghers": 2,
+   "inputs": {
+    "salt": 1.5,
+    "timber": 1.0
+   },
+   "outputs": {
+    "gunpowder": 1.2
+   }
+  },
+  {
+   "key": "university",
+   "name": "University",
+   "cost": 300,
+   "max_level": 1,
+   "upkeep": 0.5,
+   "hint": "Scholars: +1 research a season",
+   "needs_coast": false,
+   "needs_burghers": 3,
+   "inputs": {},
+   "outputs": {}
+  }
+ ],
+ "manufactories": [
+  "weaver",
+  "toolmaker",
+  "armoury",
+  "ropewalk",
+  "glassworks",
+  "tannery",
+  "powder_mill"
+ ],
+ "plantation_goods": [
+  "sugar",
+  "tobacco",
+  "cotton",
+  "spices"
+ ],
+ "mine_goods": [
+  "iron",
+  "silver",
+  "gold",
+  "salt",
+  "copper"
+ ],
+ "build_turns": 4,
+ "works": {
+  "levels": 5,
+  "bonus": 0.3,
+  "cost": [
+   25,
+   45,
+   75,
+   112,
+   162
+  ],
+  "goods": [
+   {
+    "timber": 0.5
+   },
+   {
+    "timber": 0.75,
+    "tools": 0.25
+   },
+   {
+    "tools": 0.5,
+    "stone": 0.5
+   },
+   {
+    "tools": 0.75,
+    "iron": 0.5,
+    "stone": 0.75
+   },
+   {
+    "tools": 1.0,
+    "iron": 0.75,
+    "stone": 1.0
+   }
+  ],
+  "era": [
+   1,
+   1,
+   2,
+   2,
+   3
+  ],
+  "upkeep": 0.05,
+  "level_names": {
+   "grain": [
+    "Wheat strips",
+    "Open fields",
+    "Grange barn",
+    "Windmill farm",
+    "Manor estate"
+   ],
+   "wine": [
+    "Hillside vines",
+    "Terraced vineyard",
+    "Press house",
+    "Wine cellars",
+    "Chateau"
+   ],
+   "wool": [
+    "Upland grazing",
+    "Walled pastures",
+    "Shepherd's hut",
+    "Sheepfolds",
+    "Wool barn"
+   ],
+   "cotton": [
+    "Cotton patch",
+    "Cotton fields",
+    "Drying sheds",
+    "Cotton farm",
+    "Gin house"
+   ],
+   "sugar": [
+    "Cane patch",
+    "Cane fields",
+    "Boiling house",
+    "Sugar works",
+    "Sugar mill"
+   ],
+   "tobacco": [
+    "Tobacco patch",
+    "Tobacco fields",
+    "Curing barn",
+    "Tobacco farm",
+    "Tobacco warehouse"
+   ],
+   "timber": [
+    "Woodcutters' clearing",
+    "Logging camp",
+    "Sawpit",
+    "Sawmill",
+    "Timber yard"
+   ],
+   "iron": [
+    "Iron diggings",
+    "Iron mine",
+    "Ore tramway",
+    "Bloomery",
+    "Ironworks"
+   ],
+   "silver": [
+    "Silver vein",
+    "Silver mine",
+    "Deep workings",
+    "Stamp mill",
+    "Royal mint"
+   ],
+   "gold": [
+    "Gold panning",
+    "Placer claim",
+    "Sluice works",
+    "Gold diggings",
+    "Fortified gold mine"
+   ],
+   "salt": [
+    "Salt pans",
+    "Salt marsh works",
+    "Salt mounds",
+    "Saltern",
+    "Salt house"
+   ],
+   "fish": [
+    "Fishing beach",
+    "Fishing jetty",
+    "Fishing village",
+    "Fishing pier",
+    "Fishing harbour"
+   ],
+   "furs": [
+    "Trapline",
+    "Trapper's lodge",
+    "Trapping camp",
+    "Fur post",
+    "Fur trading fort"
+   ],
+   "ivory": [
+    "Elephant grounds",
+    "Hunting camp",
+    "Trading hut",
+    "Ivory market",
+    "Ivory fort"
+   ],
+   "spices": [
+    "Spice garden",
+    "Spice grove",
+    "Drying yard",
+    "Spice plantation",
+    "Spice warehouse"
+   ],
+   "horses": [
+    "Horse corral",
+    "Round paddock",
+    "Stables",
+    "Stud farm",
+    "Royal stud"
+   ],
+   "cattle": [
+    "Grazing meadow",
+    "Cattle pasture",
+    "Cattle barn",
+    "Cattle ranch",
+    "Cattle estate"
+   ],
+   "stone": [
+    "Stone cutting",
+    "Quarry",
+    "Crane quarry",
+    "Deep quarry",
+    "Marble works"
+   ],
+   "copper": [
+    "Copper outcrop",
+    "Copper diggings",
+    "Copper mine",
+    "Roasting yard",
+    "Copper smelter"
+   ],
+   "hemp": [
+    "Hemp & flax plot",
+    "Hemp fields",
+    "Retting ponds",
+    "Rope yard",
+    "Ropewalk"
+   ],
+   "olives": [
+    "Olive trees",
+    "Olive terraces",
+    "Olive farm",
+    "Oil jars",
+    "Olive press"
+   ],
+   "silk": [
+    "Mulberry hedges",
+    "Mulberry orchard",
+    "Silkworm sheds",
+    "Silk farm",
+    "Silk caravanserai"
+   ],
+   "dyes": [
+    "Dye vats",
+    "Dye yard",
+    "Dye works",
+    "Cloth dyers",
+    "Dye house"
+   ],
+   "cocoa": [
+    "Cocoa grove",
+    "Cocoa clearing",
+    "Drying mats",
+    "Cocoa plantation",
+    "Cocoa hacienda"
+   ],
+   "coffee": [
+    "Coffee shrubs",
+    "Coffee terraces",
+    "Drying patios",
+    "Coffee estate",
+    "Coffee tower house"
+   ]
+  }
+ },
+ "settlements": [
+  {
+   "level": 0,
+   "name": "",
+   "cost": 0,
+   "goods": {},
+   "pop": 0,
+   "slots": 0,
+   "tax": 0.0,
+   "upkeep": 0.0
+  },
+  {
+   "level": 1,
+   "name": "Village",
+   "cost": 120,
+   "goods": {
+    "timber": 2.0
+   },
+   "pop": 6,
+   "slots": 1,
+   "tax": 0.05,
+   "upkeep": 0.2
+  },
+  {
+   "level": 2,
+   "name": "Town",
+   "cost": 400,
+   "goods": {
+    "stone": 3.0,
+    "timber": 2.0
+   },
+   "pop": 20,
+   "slots": 3,
+   "tax": 0.15,
+   "upkeep": 0.5
+  },
+  {
+   "level": 3,
+   "name": "City",
+   "cost": 900,
+   "goods": {
+    "stone": 6.0,
+    "glass": 1.0
+   },
+   "pop": 45,
+   "slots": 5,
+   "tax": 0.3,
+   "upkeep": 1.0
+  }
+ ],
+ "castles": [
+  {
+   "level": 0,
+   "name": "",
+   "cost": 0,
+   "goods": {},
+   "upkeep": 0.0,
+   "area": 0
+  },
+  {
+   "level": 1,
+   "name": "Tower",
+   "cost": 150,
+   "goods": {
+    "timber": 2.0,
+    "stone": 1.0
+   },
+   "upkeep": 0.4,
+   "area": 3
+  },
+  {
+   "level": 2,
+   "name": "Small castle",
+   "cost": 400,
+   "goods": {
+    "stone": 5.0
+   },
+   "upkeep": 1.0,
+   "area": 4
+  },
+  {
+   "level": 3,
+   "name": "Large castle",
+   "cost": 800,
+   "goods": {
+    "stone": 10.0,
+    "gunpowder": 2.0
+   },
+   "upkeep": 2.0,
+   "area": 5
+  }
+ ],
+ "castle_defense": 0.25,
+ "castle_siege": 3
+}

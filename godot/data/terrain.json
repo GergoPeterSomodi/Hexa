@@ -1,0 +1,215 @@
+{
+ "schema": "hexa-godot/terrain/1",
+ "source": "hexa/campaign/data.py (TERRAIN, ROUGH, NARROW_TERRAIN, OPEN_GROUND, ELEVATION)",
+ "note": "density is people per hex in thousands, already divided by AREA. move null = not walkable.",
+ "terrain": [
+  {
+   "key": "plains",
+   "name": "Farmland",
+   "color": [
+    150,
+    180,
+    95
+   ],
+   "move": 1,
+   "defense": 0.0,
+   "density": 13.75
+  },
+  {
+   "key": "steppe",
+   "name": "Steppe",
+   "color": [
+    190,
+    190,
+    120
+   ],
+   "move": 1,
+   "defense": 0.0,
+   "density": 4.5
+  },
+  {
+   "key": "forest",
+   "name": "Forest",
+   "color": [
+    70,
+    125,
+    70
+   ],
+   "move": 2,
+   "defense": 0.25,
+   "density": 5.5
+  },
+  {
+   "key": "hills",
+   "name": "Hills",
+   "color": [
+    160,
+    150,
+    105
+   ],
+   "move": 2,
+   "defense": 0.05,
+   "density": 8.75
+  },
+  {
+   "key": "mountains",
+   "name": "Mountains",
+   "color": [
+    130,
+    120,
+    115
+   ],
+   "move": 3,
+   "defense": 0.5,
+   "density": 3.0
+  },
+  {
+   "key": "desert",
+   "name": "Desert",
+   "color": [
+    225,
+    205,
+    150
+   ],
+   "move": 2,
+   "defense": 0.0,
+   "density": 0.5
+  },
+  {
+   "key": "jungle",
+   "name": "Jungle",
+   "color": [
+    40,
+    110,
+    60
+   ],
+   "move": 3,
+   "defense": 0.25,
+   "density": 3.75
+  },
+  {
+   "key": "tundra",
+   "name": "Tundra",
+   "color": [
+    175,
+    185,
+    180
+   ],
+   "move": 2,
+   "defense": 0.0,
+   "density": 0.5
+  },
+  {
+   "key": "marsh",
+   "name": "Marsh",
+   "color": [
+    95,
+    140,
+    110
+   ],
+   "move": 3,
+   "defense": 0.15,
+   "density": 3.5
+  },
+  {
+   "key": "taiga",
+   "name": "Taiga",
+   "color": [
+    90,
+    120,
+    100
+   ],
+   "move": 2,
+   "defense": 0.25,
+   "density": 1.5
+  },
+  {
+   "key": "savanna",
+   "name": "Savanna",
+   "color": [
+    200,
+    180,
+    95
+   ],
+   "move": 1,
+   "defense": 0.0,
+   "density": 3.5
+  },
+  {
+   "key": "beach",
+   "name": "Coast",
+   "color": [
+    230,
+    215,
+    160
+   ],
+   "move": 1,
+   "defense": 0.0,
+   "density": 7.5
+  },
+  {
+   "key": "snow",
+   "name": "Snowfield",
+   "color": [
+    232,
+    238,
+    244
+   ],
+   "move": 3,
+   "defense": 0.25,
+   "density": 0.25
+  },
+  {
+   "key": "lake",
+   "name": "Lake",
+   "color": [
+    90,
+    150,
+    200
+   ],
+   "move": null,
+   "defense": 0.0,
+   "density": 0.0
+  },
+  {
+   "key": "ocean",
+   "name": "Sea",
+   "color": [
+    40,
+    85,
+    150
+   ],
+   "move": null,
+   "defense": 0.0,
+   "density": 0.0
+  }
+ ],
+ "rough": [
+  "forest",
+  "hills",
+  "mountains",
+  "jungle",
+  "marsh",
+  "taiga",
+  "snow"
+ ],
+ "narrow": [
+  "mountains",
+  "marsh",
+  "jungle",
+  "snow"
+ ],
+ "open_ground": [
+  "plains",
+  "steppe",
+  "desert",
+  "tundra",
+  "savanna",
+  "beach"
+ ],
+ "elevation": {
+  "hills": 1,
+  "mountains": 2,
+  "snow": 2
+ }
+}
