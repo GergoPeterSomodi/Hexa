@@ -1,5 +1,13 @@
 # The game elements on Godot: three looks
 
+> **Owner's decisions (2026-11-14):** direction **A "Hexa refined" with the three borrowings** (simple arms per country
+> on pennants, panels and hover cards; the strength number on the army token and the season dial for sieges; calmer ground
+> under pieces and pieces about 20% bigger). The army badge shows **strength**; the regiment count is in the hover card.
+> **Every country gets simple arms**, code-drawn, researched with care for non-European peoples. Fonts must be
+> open-licence. This look applies from 0.3.2 (armies) on; 0.3.0's map keeps today's basic art. Art-baker defaults taken
+> by the planning session: lakes use the drawn sea tile, not the flat lake hex; landmarks wait for the town redesign; the
+> bake stays in `godot/assets/baked/`.
+
 Art director, 2026-11-14. **Status: mockups for the owner. Nothing is built.**
 
 The owner decided on 2026-11-14 that units, towns, castles, panels and the HUD are redesigned for the Godot
