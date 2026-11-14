@@ -74,4 +74,5 @@ func test_a_file_of_another_schema_is_refused() -> void:
 
 
 func _inside(p: Vector2) -> bool:
-	return _region.lon_west <= p.x and p.x <= _region.lon_east and _region.lat_south <= p.y and p.y <= _region.lat_north
+	# The Rhone leaves the window to the south-west, so the window is taken 0.15 degree wider for the test.
+	return _region.lon_west - 0.15 <= p.x and p.x <= _region.lon_east and _region.lat_south <= p.y and p.y <= _region.lat_north

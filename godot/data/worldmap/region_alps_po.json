@@ -1,7 +1,7 @@
 {
   "schema": "hexa-godot/worldmap-region/1",
   "name": "Alps and Po (prototype region, 1480)",
-  "note": "Hand-written skeleton for the map prototype (docs/design/map/README.md section 8, step 1). Heights are NOT here: they come from NOAA ETOPO 2022 (60 arc-second, ice surface) through tools/worldmap/extract_heights.py, which writes godot/data/worldmap/heights_alps_po.json. Points are [longitude, latitude] in degrees. Lines are approximate (about 5 to 10 km); the heights are measured, the lines are drawn from the real valleys, ridges and river courses by hand. Real pass heights in metres are from the pass's official height; they are checked against the measured values in the extraction report.",
+  "note": "Hand-written skeleton for the map prototype (docs/design/map/README.md section 8, step 1). Status of the hand-written lines: ranges (spines), passes, valleys (floor lines), rivers (course lines), lakes (axes) and gorges are hand-written, like the tributaries; their heights are not. Valley floors and mountain river heights are carved from ETOPO along these lines (tools/worldmap/extract_heights.py, carving rule in the heights file). Heights are NOT here: they come from NOAA ETOPO 2022 (60 arc-second, ice surface) through tools/worldmap/extract_heights.py, which writes godot/data/worldmap/heights_alps_po.json. Points are [longitude, latitude] in degrees. Lines are approximate (about 5 to 10 km); the heights are measured, the lines are drawn from the real valleys, ridges and river courses by hand. Real pass heights in metres are from the pass's official height; they are checked against the measured values in the extraction report.",
   "window": {"lon_west": 5.6, "lon_east": 11.9, "lat_south": 43.2, "lat_north": 47.3},
   "grid": {"hex_w_km": 28.0, "deg_km": 111.2, "ref_lat": 45.25},
   "coastline": "godot/data/geography/land.json",
@@ -80,7 +80,7 @@
     {"name": "Mincio", "class": 1, "line": [[10.69, 45.44], [10.76, 45.25], [10.79, 45.16], [10.92, 45.03]]},
     {"name": "Adige", "class": 2, "line": [[10.51, 46.84], [10.60, 46.64], [11.16, 46.67], [11.35, 46.50], [11.25, 46.30], [11.12, 46.07], [11.04, 45.89], [10.99, 45.44], [11.31, 45.19], [11.55, 45.15]]},
     {"name": "Arno", "class": 2, "line": [[11.70, 43.88], [11.66, 43.70], [11.55, 43.62], [11.40, 43.66], [11.25, 43.77], [10.95, 43.72], [10.64, 43.66], [10.40, 43.72], [10.28, 43.68]]},
-    {"name": "Rhone", "class": 2, "line": [[8.38, 46.56], [8.30, 46.56], [7.99, 46.32], [7.80, 46.28], [7.36, 46.23], [7.07, 46.10], [6.95, 46.25], [6.92, 46.40], [6.60, 46.38], [6.15, 46.20], [5.90, 46.10], [5.73, 46.07]]},
+    {"name": "Rhone", "class": 2, "line": [[8.38, 46.56], [8.30, 46.56], [7.99, 46.32], [7.80, 46.28], [7.36, 46.23], [7.07, 46.10], [6.95, 46.25], [6.92, 46.40], [6.60, 46.38], [6.15, 46.20], [5.90, 46.10], [5.73, 46.07], [5.50, 46.00]]},
     {"name": "Rhine (Alpine)", "class": 2, "line": [[8.67, 46.60], [8.85, 46.70], [9.20, 46.78], [9.53, 46.85], [9.50, 47.00], [9.45, 47.10]]},
     {"name": "Lambro", "class": 1, "line": [[9.30, 45.84], [9.27, 45.58], [9.31, 45.42], [9.46, 45.27], [9.55, 45.12]]},
     {"name": "Taro", "class": 1, "line": [[9.93, 44.43], [10.05, 44.52], [10.12, 44.66], [10.33, 44.80], [10.48, 44.96]]}

@@ -182,6 +182,141 @@ def line_points(line: list, step_deg: float = 0.01) -> list:
     return pts
 
 
+CARVE_RADIUS_KM = 4.0  # floor samples: the low 10 per cent of the ETOPO cells within this distance of a valley line
+CARVE_MIN_VALLEY_M = 400.0  # a valley is carved only on hexes of hills level or higher; the plain is never carved
+CARVE_MIN_RIVER_M = 900.0  # a river is carved only where it runs in the mountains (highland and up)
+CARVE_SAMPLE_DEG = 0.005  # about 0.5 km along a line
+
+
+def near_low(block: list, i0: int, j0: int, lat_axis: list, lon_axis: list, d_lat: float, d_lon: float,
+             lon: float, lat: float, radius_km: float) -> object:
+    """The 10th percentile of the land cells (z >= 0) within radius_km of a point, or None when there are none."""
+    dlat = radius_km / 111.2
+    dlon = radius_km / (111.2 * max(0.2, math.cos(math.radians(lat))))
+    ia = max(0, int(math.floor((lat - dlat - lat_axis[0]) / d_lat)))
+    ib = int(math.ceil((lat + dlat - lat_axis[0]) / d_lat))
+    ja = max(0, int(math.floor((lon - dlon - lon_axis[0]) / d_lon)))
+    jb = int(math.ceil((lon + dlon - lon_axis[0]) / d_lon))
+    vals = []
+    for i in range(ia, ib + 1):
+        ii = i - i0
+        if ii < 0 or ii >= len(block):
+            continue
+        row = block[ii]
+        for j in range(ja, jb + 1):
+            jj = j - j0
+            if jj < 0 or jj >= len(row):
+                continue
+            z = row[jj]
+            if math.isnan(z) or z < 0.0:
+                continue
+            dx = (lon_axis[j] - lon) * 111.2 * math.cos(math.radians(lat))
+            dy = (lat_axis[i] - lat) * 111.2
+            if dx * dx + dy * dy <= radius_km * radius_km:
+                vals.append(z)
+    if not vals:
+        return None
+    vals.sort()
+    return percentile(vals, 0.10)
+
+
+def carve_valleys(grid: Grid, region: dict, out_hexes: list, block: list, i0: int, j0: int, lat_axis: list,
+                  lon_axis: list, d_lat: float, d_lon: float) -> list:
+    """Valley floors from the data. Along each hand-written valley line, and each river line where it runs in the
+    mountains, the floor of a hex is the low ETOPO ground near the line. Rules: the head hex (the pass) keeps its
+    height; a hex with a range spine in it keeps its height (crests stay continuous); plain is not carved; a floor
+    never rises downstream (checked along every line, to a fixed point); a floor is never above the hex's own
+    height. Only the hex height changes; inner_max is kept, and the crests are read from inner_max (core/worldmap).
+    Returns one report row per line."""
+    by_hex = {(e["c"], e["r"]): e for e in out_hexes}
+    spine_hexes = set()
+    for rg in region["ranges"]:
+        for lon, lat in line_points(rg["line"], CARVE_SAMPLE_DEG):
+            spine_hexes.add(grid.hex_of(lon, lat))
+    lines = []  # (name, kind, [(hex, floor)] in downstream order, carvable hexes only)
+    for kind, items, minimum in (("valley", region["valleys"], CARVE_MIN_VALLEY_M),
+                                 ("river", region["rivers"], CARVE_MIN_RIVER_M)):
+        for item in items:
+            line = item["floor"] if kind == "valley" else item["line"]
+            seq = []
+            index = {}
+            for lon, lat in line_points(line, CARVE_SAMPLE_DEG):
+                h = grid.hex_of(lon, lat)
+                if h not in by_hex or not by_hex[h]["land"]:
+                    continue
+                z = near_low(block, i0, j0, lat_axis, lon_axis, d_lat, d_lon, lon, lat, CARVE_RADIUS_KM)
+                if z is None:
+                    continue
+                if h not in index:
+                    index[h] = len(seq)
+                    seq.append([h, z])
+                elif z < seq[index[h]][1]:
+                    seq[index[h]][1] = z
+            carve = []
+            for k, (h, z) in enumerate(seq):
+                e = by_hex[h]
+                if k == 0 or h in spine_hexes or e["inner_max"] < minimum:
+                    continue
+                carve.append((h, z))
+            lines.append((item["name"], kind, seq, carve))
+    floor: dict = {}
+    for _name, _kind, _seq, carve in lines:
+        for h, z in carve:
+            floor[h] = min(floor.get(h, math.inf), z)
+    changed = True
+    while changed:  # fixed point: the floors never rise downstream along any line
+        changed = False
+        for _name, _kind, _seq, carve in lines:
+            running = math.inf
+            for h, _z in carve:
+                if floor[h] > running:
+                    floor[h] = running
+                    changed = True
+                running = min(running, floor[h])
+    rows = []
+    for name, kind, seq, carve in lines:
+        rises = 0
+        prev = math.inf
+        for h, _z in carve:
+            if floor[h] > prev:
+                rises += 1
+            prev = floor[h]
+        rows.append((name, kind, len(seq), len(carve), rises))
+    for h, f in floor.items():
+        e = by_hex[h]
+        f = max(0.0, f)
+        height = round(min(e["inner_max"], f), 1)
+        e["valley_floor_m"] = round(f, 1)
+        e["height_m"] = height
+        e["level"] = level_of(height)
+        e["carved"] = True
+    return rows
+
+
+def sea_depths(grid: Grid, out_hexes: list, block: list, i0: int, j0: int, lat_axis: list, lon_axis: list) -> None:
+    """Sea hexes get depth_m: the mean of the ETOPO sea cells (z < 0) inside the hex."""
+    by_hex = {(e["c"], e["r"]): e for e in out_hexes}
+    total: dict = {}
+    count: dict = {}
+    for ii, row in enumerate(block):
+        lat = lat_axis[i0 + ii]
+        if not (grid.lat_s <= lat <= grid.lat_n):
+            continue
+        for jj, z in enumerate(row):
+            if math.isnan(z) or z >= 0.0:
+                continue
+            lon = lon_axis[j0 + jj]
+            if not grid.in_window(lon, lat):
+                continue
+            h = grid.hex_of(lon, lat)
+            if h in by_hex and not by_hex[h]["land"]:
+                total[h] = total.get(h, 0.0) + z
+                count[h] = count.get(h, 0) + 1
+    for h, e in by_hex.items():
+        if not e["land"]:
+            e["depth_m"] = round(total[h] / count[h], 1) if h in count else 0.0
+
+
 def main(argv: list) -> int:
     args = {}
     quiet = "--quiet" in argv
@@ -379,8 +514,18 @@ def main(argv: list) -> int:
                 touched.append(h)
         line_rows.append(("lakes", lake["name"], len([h for h in touched if h in hexes]), 0, 0))
 
+    carve_rows = carve_valleys(grid, region, out_hexes, block, i0, j0, lat_axis, lon_axis, d_lat, d_lon)
+    sea_depths(grid, out_hexes, block, i0, j0, lat_axis, lon_axis)
+    if not quiet:
+        print("valley and river carving (name, kind, hexes on the line, carved hexes, floor rises):")
+        for row in carve_rows:
+            print("  " + "  |  ".join(str(x) for x in row))
+        print("")
     result = {
         "schema": SCHEMA_HEIGHTS,
+        "carving": {"radius_km": CARVE_RADIUS_KM, "min_valley_m": CARVE_MIN_VALLEY_M,
+                    "min_river_m": CARVE_MIN_RIVER_M,
+                    "rule": "floor = low 10 per cent of ETOPO land cells within radius of the line; head, spine hexes and plain kept; floors never rise downstream"},
         "source": "NOAA ETOPO 2022, 60 arc-second, surface elevation. Credit: NOAA National Centers for Environmental "
                   "Information. 2022: ETOPO 2022 15 Arc-Second Global Relief Model. doi:10.25921/fd45-gt74",
         "region": region["name"],

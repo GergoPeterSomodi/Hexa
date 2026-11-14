@@ -1,5 +1,11 @@
 {
  "schema": "hexa-godot/worldmap-heights/1",
+ "carving": {
+  "radius_km": 4.0,
+  "min_valley_m": 400.0,
+  "min_river_m": 900.0,
+  "rule": "floor = low 10 per cent of ETOPO land cells within radius of the line; head, spine hexes and plain kept; floors never rise downstream"
+ },
  "source": "NOAA ETOPO 2022, 60 arc-second, surface elevation. Credit: NOAA National Centers for Environmental Information. 2022: ETOPO 2022 15 Arc-Second Global Relief Model. doi:10.25921/fd45-gt74",
  "region": "Alps and Po (prototype region, 1480)",
  "window": {
@@ -283,8 +289,10 @@
     2050.9
    ],
    "centre_z": 1544.6,
-   "height_m": 2021.9,
-   "level": 5
+   "height_m": 482.2,
+   "level": 3,
+   "valley_floor_m": 482.2,
+   "carved": true
   },
   {
    "c": 11,
@@ -715,8 +723,10 @@
     2666.8
    ],
    "centre_z": 578.2,
-   "height_m": 2469.3,
-   "level": 5
+   "height_m": 482.5,
+   "level": 3,
+   "valley_floor_m": 482.5,
+   "carved": true
   },
   {
    "c": 11,
@@ -1099,8 +1109,10 @@
     3193.6
    ],
    "centre_z": 1567.8,
-   "height_m": 2937.6,
-   "level": 6
+   "height_m": 823.8,
+   "level": 3,
+   "valley_floor_m": 823.8,
+   "carved": true
   },
   {
    "c": 10,
@@ -1123,8 +1135,10 @@
     2817.5
    ],
    "centre_z": 1935.0,
-   "height_m": 2817.5,
-   "level": 6
+   "height_m": 640.3,
+   "level": 3,
+   "valley_floor_m": 640.3,
+   "carved": true
   },
   {
    "c": 11,
@@ -1195,8 +1209,10 @@
     2899.0
    ],
    "centre_z": 2622.2,
-   "height_m": 2899.0,
-   "level": 6
+   "height_m": 889.6,
+   "level": 3,
+   "valley_floor_m": 889.6,
+   "carved": true
   },
   {
    "c": 14,
@@ -1243,8 +1259,10 @@
     3184.9
    ],
    "centre_z": 1660.3,
-   "height_m": 2913.5,
-   "level": 6
+   "height_m": 272.2,
+   "level": 2,
+   "valley_floor_m": 272.2,
+   "carved": true
   },
   {
    "c": 16,
@@ -1267,8 +1285,10 @@
     2498.2
    ],
    "centre_z": 2330.1,
-   "height_m": 2498.2,
-   "level": 5
+   "height_m": 595.1,
+   "level": 3,
+   "valley_floor_m": 595.1,
+   "carved": true
   },
   {
    "c": 17,
@@ -1675,8 +1695,10 @@
     1826.1
    ],
    "centre_z": 554.5,
-   "height_m": 1662.1,
-   "level": 4
+   "height_m": 219.5,
+   "level": 2,
+   "valley_floor_m": 219.5,
+   "carved": true
   },
   {
    "c": 16,
@@ -1771,8 +1793,10 @@
     1862.1
    ],
    "centre_z": 1291.6,
-   "height_m": 1638.9,
-   "level": 4
+   "height_m": 368.0,
+   "level": 2,
+   "valley_floor_m": 368.0,
+   "carved": true
   },
   {
    "c": 3,
@@ -1795,8 +1819,10 @@
     2605.7
    ],
    "centre_z": 1739.1,
-   "height_m": 2003.9,
-   "level": 5
+   "height_m": 368.0,
+   "level": 2,
+   "valley_floor_m": 368.0,
+   "carved": true
   },
   {
    "c": 4,
@@ -1939,8 +1965,10 @@
     2510.8
    ],
    "centre_z": 296.1,
-   "height_m": 2510.8,
-   "level": 5
+   "height_m": 199.8,
+   "level": 2,
+   "valley_floor_m": 199.8,
+   "carved": true
   },
   {
    "c": 10,
@@ -1963,8 +1991,10 @@
     2756.5
    ],
    "centre_z": 822.6,
-   "height_m": 2495.9,
-   "level": 5
+   "height_m": 197.5,
+   "level": 2,
+   "valley_floor_m": 197.5,
+   "carved": true
   },
   {
    "c": 11,
@@ -1987,8 +2017,10 @@
     3136.9
    ],
    "centre_z": 2394.5,
-   "height_m": 3077.0,
-   "level": 6
+   "height_m": 285.6,
+   "level": 2,
+   "valley_floor_m": 285.6,
+   "carved": true
   },
   {
    "c": 12,
@@ -2035,8 +2067,10 @@
     3064.8
    ],
    "centre_z": 2485.2,
-   "height_m": 2916.4,
-   "level": 6
+   "height_m": 1120.2,
+   "level": 4,
+   "valley_floor_m": 1120.2,
+   "carved": true
   },
   {
    "c": 14,
@@ -2155,8 +2189,10 @@
     1433.6
    ],
    "centre_z": 625.1,
-   "height_m": 1388.2,
-   "level": 4
+   "height_m": 368.0,
+   "level": 2,
+   "valley_floor_m": 368.0,
+   "carved": true
   },
   {
    "c": 1,
@@ -2227,8 +2263,10 @@
     3379.9
    ],
    "centre_z": 1668.4,
-   "height_m": 3281.0,
-   "level": 6
+   "height_m": 460.9,
+   "level": 3,
+   "valley_floor_m": 460.9,
+   "carved": true
   },
   {
    "c": 4,
@@ -2323,8 +2361,10 @@
     2124.3
    ],
    "centre_z": 1710.8,
-   "height_m": 1933.8,
-   "level": 5
+   "height_m": 198.6,
+   "level": 2,
+   "valley_floor_m": 198.6,
+   "carved": true
   },
   {
    "c": 8,
@@ -2347,8 +2387,10 @@
     1749.4
    ],
    "centre_z": 1087.2,
-   "height_m": 1588.2,
-   "level": 4
+   "height_m": 193.0,
+   "level": 2,
+   "valley_floor_m": 193.0,
+   "carved": true
   },
   {
    "c": 9,
@@ -2419,8 +2461,10 @@
     2577.5
    ],
    "centre_z": 1906.9,
-   "height_m": 2577.5,
-   "level": 5
+   "height_m": 285.6,
+   "level": 2,
+   "valley_floor_m": 285.6,
+   "carved": true
   },
   {
    "c": 12,
@@ -2515,8 +2559,10 @@
     2155.0
    ],
    "centre_z": 1603.7,
-   "height_m": 2124.2,
-   "level": 5
+   "height_m": 219.5,
+   "level": 2,
+   "valley_floor_m": 219.5,
+   "carved": true
   },
   {
    "c": 16,
@@ -2731,8 +2777,10 @@
     2154.4
    ],
    "centre_z": 731.0,
-   "height_m": 1917.8,
-   "level": 5
+   "height_m": 338.6,
+   "level": 2,
+   "valley_floor_m": 338.6,
+   "carved": true
   },
   {
    "c": 8,
@@ -2755,8 +2803,10 @@
     980.1
    ],
    "centre_z": 231.1,
-   "height_m": 932.3,
-   "level": 4
+   "height_m": 193.0,
+   "level": 2,
+   "valley_floor_m": 193.0,
+   "carved": true
   },
   {
    "c": 9,
@@ -2803,8 +2853,10 @@
     2070.5
    ],
    "centre_z": 261.3,
-   "height_m": 1829.3,
-   "level": 5
+   "height_m": 197.5,
+   "level": 2,
+   "valley_floor_m": 197.5,
+   "carved": true
   },
   {
    "c": 11,
@@ -2875,8 +2927,10 @@
     2497.6
    ],
    "centre_z": 1255.9,
-   "height_m": 2342.1,
-   "level": 5
+   "height_m": 283.0,
+   "level": 2,
+   "valley_floor_m": 283.0,
+   "carved": true
   },
   {
    "c": 14,
@@ -2923,8 +2977,10 @@
     2032.2
    ],
    "centre_z": 1817.7,
-   "height_m": 2030.2,
-   "level": 5
+   "height_m": 178.0,
+   "level": 2,
+   "valley_floor_m": 178.0,
+   "carved": true
   },
   {
    "c": 16,
@@ -3019,8 +3075,10 @@
     2181.1
    ],
    "centre_z": 316.7,
-   "height_m": 2107.9,
-   "level": 5
+   "height_m": 336.3,
+   "level": 2,
+   "valley_floor_m": 336.3,
+   "carved": true
   },
   {
    "c": 2,
@@ -3091,8 +3149,10 @@
     3528.3
    ],
    "centre_z": 2590.7,
-   "height_m": 3528.3,
-   "level": 6
+   "height_m": 571.9,
+   "level": 3,
+   "valley_floor_m": 571.9,
+   "carved": true
   },
   {
    "c": 5,
@@ -3115,8 +3175,10 @@
     2596.5
    ],
    "centre_z": 622.9,
-   "height_m": 2596.5,
-   "level": 5
+   "height_m": 256.2,
+   "level": 2,
+   "valley_floor_m": 256.2,
+   "carved": true
   },
   {
    "c": 6,
@@ -3139,8 +3201,10 @@
     2183.0
    ],
    "centre_z": 651.9,
-   "height_m": 1886.3,
-   "level": 5
+   "height_m": 338.6,
+   "level": 2,
+   "valley_floor_m": 338.6,
+   "carved": true
   },
   {
    "c": 7,
@@ -3331,8 +3395,10 @@
     1868.2
    ],
    "centre_z": 802.0,
-   "height_m": 1666.1,
-   "level": 4
+   "height_m": 164.1,
+   "level": 2,
+   "valley_floor_m": 164.1,
+   "carved": true
   },
   {
    "c": 15,
@@ -3451,8 +3517,10 @@
     2726.7
    ],
    "centre_z": 1188.5,
-   "height_m": 2507.1,
-   "level": 5
+   "height_m": 621.8,
+   "level": 3,
+   "valley_floor_m": 621.8,
+   "carved": true
   },
   {
    "c": 3,
@@ -3547,8 +3615,10 @@
     1087.5
    ],
    "centre_z": 220.0,
-   "height_m": 653.3,
-   "level": 3
+   "height_m": 215.6,
+   "level": 2,
+   "valley_floor_m": 215.6,
+   "carved": true
   },
   {
    "c": 7,
@@ -3763,8 +3833,10 @@
     584.7
    ],
    "centre_z": 35.2,
-   "height_m": 403.8,
-   "level": 3
+   "height_m": 19.0,
+   "level": 1,
+   "valley_floor_m": 19.0,
+   "carved": true
   },
   {
    "c": 16,
@@ -3859,8 +3931,10 @@
     3112.4
    ],
    "centre_z": 1462.3,
-   "height_m": 3112.4,
-   "level": 6
+   "height_m": 621.8,
+   "level": 3,
+   "valley_floor_m": 621.8,
+   "carved": true
   },
   {
    "c": 2,
@@ -3883,8 +3957,10 @@
     3270.2
    ],
    "centre_z": 1390.0,
-   "height_m": 3270.2,
-   "level": 6
+   "height_m": 955.9,
+   "level": 4,
+   "valley_floor_m": 955.9,
+   "carved": true
   },
   {
    "c": 3,
@@ -3931,8 +4007,10 @@
     2622.5
    ],
    "centre_z": 1060.8,
-   "height_m": 2138.1,
-   "level": 5
+   "height_m": 331.8,
+   "level": 2,
+   "valley_floor_m": 331.8,
+   "carved": true
   },
   {
    "c": 5,
@@ -4339,8 +4417,10 @@
     2559.8
    ],
    "centre_z": 1084.6,
-   "height_m": 2529.9,
-   "level": 5
+   "height_m": 418.7,
+   "level": 3,
+   "valley_floor_m": 418.7,
+   "carved": true
   },
   {
    "c": 5,
@@ -4363,8 +4443,10 @@
     708.9
    ],
    "centre_z": 248.4,
-   "height_m": 549.2,
-   "level": 3
+   "height_m": 234.5,
+   "level": 2,
+   "valley_floor_m": 234.5,
+   "carved": true
   },
   {
    "c": 6,
@@ -4771,8 +4853,10 @@
     1654.7
    ],
    "centre_z": 277.7,
-   "height_m": 1092.2,
-   "level": 4
+   "height_m": 249.1,
+   "level": 2,
+   "valley_floor_m": 249.1,
+   "carved": true
   },
   {
    "c": 5,
@@ -4819,8 +4903,10 @@
     611.5
    ],
    "centre_z": 149.2,
-   "height_m": 533.7,
-   "level": 3
+   "height_m": 118.0,
+   "level": 2,
+   "valley_floor_m": 118.0,
+   "carved": true
   },
   {
    "c": 7,
@@ -5227,8 +5313,10 @@
     762.1
    ],
    "centre_z": 291.4,
-   "height_m": 708.3,
-   "level": 3
+   "height_m": 214.1,
+   "level": 2,
+   "valley_floor_m": 214.1,
+   "carved": true
   },
   {
    "c": 7,
@@ -5371,8 +5459,10 @@
     1399.0
    ],
    "centre_z": 1228.6,
-   "height_m": 1340.3,
-   "level": 4
+   "height_m": 199.0,
+   "level": 2,
+   "valley_floor_m": 199.0,
+   "carved": true
   },
   {
    "c": 13,
@@ -5659,8 +5749,10 @@
     1638.1
    ],
    "centre_z": 837.3,
-   "height_m": 1167.8,
-   "level": 4
+   "height_m": 362.6,
+   "level": 2,
+   "valley_floor_m": 362.6,
+   "carved": true
   },
   {
    "c": 7,
@@ -6102,7 +6194,8 @@
    "cells": 278,
    "votes": 1,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1334.8
   },
   {
    "c": 9,
@@ -6111,7 +6204,8 @@
    "cells": 286,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1148.7
   },
   {
    "c": 10,
@@ -6120,7 +6214,8 @@
    "cells": 277,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -581.9
   },
   {
    "c": 11,
@@ -6129,7 +6224,8 @@
    "cells": 285,
    "votes": 6,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -148.0
   },
   {
    "c": 12,
@@ -6426,7 +6522,8 @@
    "cells": 286,
    "votes": 3,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -374.4
   },
   {
    "c": 7,
@@ -6435,7 +6532,8 @@
    "cells": 278,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1442.7
   },
   {
    "c": 8,
@@ -6444,7 +6542,8 @@
    "cells": 285,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1557.9
   },
   {
    "c": 9,
@@ -6453,7 +6552,8 @@
    "cells": 277,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -967.3
   },
   {
    "c": 10,
@@ -6462,7 +6562,8 @@
    "cells": 284,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -444.2
   },
   {
    "c": 11,
@@ -6471,7 +6572,8 @@
    "cells": 276,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -88.8
   },
   {
    "c": 12,
@@ -6720,7 +6822,8 @@
    "cells": 286,
    "votes": 1,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1072.1
   },
   {
    "c": 6,
@@ -6729,7 +6832,8 @@
    "cells": 278,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1678.9
   },
   {
    "c": 7,
@@ -6738,7 +6842,8 @@
    "cells": 285,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2320.7
   },
   {
    "c": 8,
@@ -6747,7 +6852,8 @@
    "cells": 277,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2394.9
   },
   {
    "c": 9,
@@ -6756,7 +6862,8 @@
    "cells": 285,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1773.9
   },
   {
    "c": 10,
@@ -6765,7 +6872,8 @@
    "cells": 277,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -990.0
   },
   {
    "c": 11,
@@ -6774,7 +6882,8 @@
    "cells": 285,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -429.2
   },
   {
    "c": 12,
@@ -6783,7 +6892,8 @@
    "cells": 277,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -64.4
   },
   {
    "c": 13,
@@ -6878,8 +6988,10 @@
     1397.5
    ],
    "centre_z": 228.2,
-   "height_m": 1397.5,
-   "level": 4
+   "height_m": 125.9,
+   "level": 2,
+   "valley_floor_m": 125.9,
+   "carved": true
   },
   {
    "c": 17,
@@ -6984,7 +7096,8 @@
    "cells": 285,
    "votes": 6,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -833.3
   },
   {
    "c": 4,
@@ -6993,7 +7106,8 @@
    "cells": 277,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1857.3
   },
   {
    "c": 5,
@@ -7002,7 +7116,8 @@
    "cells": 277,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2300.9
   },
   {
    "c": 6,
@@ -7011,7 +7126,8 @@
    "cells": 286,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2485.4
   },
   {
    "c": 7,
@@ -7020,7 +7136,8 @@
    "cells": 278,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2580.9
   },
   {
    "c": 8,
@@ -7029,7 +7146,8 @@
    "cells": 286,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2305.5
   },
   {
    "c": 9,
@@ -7038,7 +7156,8 @@
    "cells": 278,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1384.0
   },
   {
    "c": 10,
@@ -7047,7 +7166,8 @@
    "cells": 286,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -551.1
   },
   {
    "c": 11,
@@ -7056,7 +7176,8 @@
    "cells": 278,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -245.0
   },
   {
    "c": 12,
@@ -7065,7 +7186,8 @@
    "cells": 286,
    "votes": 1,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -67.9
   },
   {
    "c": 13,
@@ -7170,7 +7292,8 @@
    "cells": 176,
    "votes": 4,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": 0.0
   },
   {
    "c": 1,
@@ -7179,7 +7302,8 @@
    "cells": 182,
    "votes": 6,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": 0.0
   },
   {
    "c": 2,
@@ -7212,7 +7336,8 @@
    "cells": 181,
    "votes": 1,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -904.0
   },
   {
    "c": 4,
@@ -7221,7 +7346,8 @@
    "cells": 174,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2180.5
   },
   {
    "c": 5,
@@ -7230,7 +7356,8 @@
    "cells": 180,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2320.2
   },
   {
    "c": 6,
@@ -7239,7 +7366,8 @@
    "cells": 174,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2498.5
   },
   {
    "c": 7,
@@ -7248,7 +7376,8 @@
    "cells": 180,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2569.3
   },
   {
    "c": 8,
@@ -7257,7 +7386,8 @@
    "cells": 174,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -2506.3
   },
   {
    "c": 9,
@@ -7266,7 +7396,8 @@
    "cells": 181,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -1951.3
   },
   {
    "c": 10,
@@ -7275,7 +7406,8 @@
    "cells": 175,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -690.7
   },
   {
    "c": 11,
@@ -7284,7 +7416,8 @@
    "cells": 182,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -390.1
   },
   {
    "c": 12,
@@ -7293,7 +7426,8 @@
    "cells": 176,
    "votes": 0,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -158.4
   },
   {
    "c": 13,
@@ -7302,7 +7436,8 @@
    "cells": 176,
    "votes": 2,
    "height_m": 0.0,
-   "level": 0
+   "level": 0,
+   "depth_m": -43.7
   },
   {
    "c": 14,

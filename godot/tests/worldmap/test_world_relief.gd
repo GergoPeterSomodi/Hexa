@@ -41,7 +41,7 @@ func test_level_histogram_is_the_extraction_histogram() -> void:
 		return
 	var summary := _relief.summary(_region.passes.size())
 	assert_eq(summary["hexes"], 333, "every hex of the window")
-	assert_eq(summary["levels"], [41, 19, 33, 45, 62, 79, 54], "sea, then lowland to high peaks (land counts)")
+	assert_eq(summary["levels"], [41, 20, 63, 51, 54, 60, 44], "sea, then lowland to high peaks (carved valleys included)")
 
 
 func test_every_level_follows_from_its_metres() -> void:
@@ -61,7 +61,7 @@ func test_every_crest_edge_joins_two_land_hexes_at_the_range_crest_level() -> vo
 		var range_index: int = _relief.crest_edges[key]
 		var crest_level: int = _region.ranges[range_index]["crest_level"]
 		var pair := WorldGrid.edge_hexes(key)
-		assert_gte(mini(_relief.level_at(pair[0]), _relief.level_at(pair[1])), crest_level,
+		assert_gte(mini(_relief.crest_level_at(pair[0]), _relief.crest_level_at(pair[1])), crest_level,
 			"crest %s-%s of %s" % [pair[0], pair[1], _region.ranges[range_index]["name"]])
 
 

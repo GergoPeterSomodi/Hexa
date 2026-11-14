@@ -52,7 +52,8 @@ func test_known_hexes_hold_the_measured_heights() -> void:
 	var milan := Vector2i(10, 8)
 	assert_almost_eq(_heights.height_m[milan], 125.3, 0.05, "Milan's hex, 125 m (plain)")
 	var aosta := Vector2i(4, 7)
-	assert_gt(_heights.height_m[aosta], 2000.0, "Aosta's hex reads high under inner max: the valley question")
+	assert_gt(float(_heights.stats[aosta]["inner_max"]), 2000.0, "Aosta's hex is high ground under inner max")
+	assert_lt(_heights.height_m[aosta], 1000.0, "carved: the Aosta valley floor reads low (the owner's valley decision)")
 
 
 func test_each_land_hex_has_its_statistics_and_a_consistent_level() -> void:
@@ -62,7 +63,10 @@ func test_each_land_hex_has_its_statistics_and_a_consistent_level() -> void:
 	for hex: Vector2i in _heights.height_m.keys():
 		var stats: Dictionary = _heights.stats[hex]
 		assert_true(stats.has("inner_max") and stats.has("mean") and stats.has("centre_z"), "stats of %s" % [hex])
-		assert_almost_eq(_heights.height_m[hex], float(stats["inner_max"]), 0.01, "height of %s is inner_max" % [hex])
+		if bool(stats.get("carved", false)):
+			assert_lte(_heights.height_m[hex], float(stats["inner_max"]) + 0.01, "a carved hex is at most its inner max")
+		else:
+			assert_almost_eq(_heights.height_m[hex], float(stats["inner_max"]), 0.01, "height of %s is inner_max" % [hex])
 		assert_gte(float(stats["inner_max"]), float(stats["inner_mean"]), "max >= mean in %s" % [hex])
 
 

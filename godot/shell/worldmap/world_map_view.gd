@@ -23,10 +23,18 @@ const CREST_PX := 3.0
 const PASS_PX := 4.5
 const ZOOM_MIN := 0.6
 const ZOOM_MAX := 40.0
+const SHELF := Color("#8fb8cc")
+const DEEP := Color("#4f7189")
+const LAKE := Color("#7fa9c2")
+const RIVER := Color("#3d6f94")
+const STREAM := Color("#5d8fb0")
+const BEACH := Color("#e8d9a8")
+const CLIFF := Color("#5a4a3a")
 
 var grid: WorldGrid
 var region: WorldRegion
 var relief: WorldRelief
+var water: WorldWater = null
 var centre_km: Vector2 = Vector2.ZERO
 var px_per_km: float = 2.0
 var title: String = "Alps and Po: relief on 28 km hexes"
@@ -40,6 +48,12 @@ func show_region(p_grid: WorldGrid, p_region: WorldRegion, p_relief: WorldRelief
 	region = p_region
 	relief = p_relief
 	_fit_pending = true
+	queue_redraw()
+
+
+## Adds the water (rivers, lakes, shores, sea depth, streams) to the picture.
+func show_water(p_water: WorldWater) -> void:
+	water = p_water
 	queue_redraw()
 
 
@@ -80,8 +94,14 @@ func _draw() -> void:
 		_apply_fit()
 		_fit_pending = false
 	_draw_hexes()
+	if water != null:
+		_draw_water_bodies()
 	_draw_crests()
 	_draw_passes()
+	if water != null:
+		_draw_shores()
+		_draw_streams()
+		_draw_rivers()
 	_draw_places()
 	_draw_legend()
 
@@ -92,9 +112,83 @@ func _draw_hexes() -> void:
 		var pts := PackedVector2Array()
 		for corner: Vector2 in corners:
 			pts.append(km_to_px(corner))
-		draw_colored_polygon(pts, LEVEL_COLOURS[relief.level_at(hex)])
+		draw_colored_polygon(pts, _hex_colour(hex))
 		pts.append(pts[0])
 		draw_polyline(pts, HEX_LINE, 1.0)
+
+
+func _hex_colour(hex: Vector2i) -> Color:
+	var level := relief.level_at(hex)
+	if level != ReliefLevels.SEA or water == null:
+		return LEVEL_COLOURS[level]
+	if water.lake_hex.has(hex):
+		return LAKE
+	match str(water.sea_band.get(hex, "")):
+		"shelf":
+			return SHELF
+		"deep":
+			return DEEP
+		_:
+			return LEVEL_COLOURS[ReliefLevels.SEA]
+
+
+## The lakes are drawn as ribbons of their true width along the authored axis (the region file), so they read as lakes.
+## The edges that the core routes along the lake are the topology; their drawing is not yet checked (see the report).
+func _draw_water_bodies() -> void:
+	for lk: Dictionary in region.lakes:
+		var axis: PackedVector2Array = lk["axis"]
+		var pts := PackedVector2Array()
+		for p: Vector2 in axis:
+			pts.append(km_to_px(grid.km_of(p.x, p.y)))
+		draw_polyline(_smooth(pts), LAKE, maxf(3.0, float(lk["width_km"]) * px_per_km * 0.8), true)
+
+
+func _draw_shores() -> void:
+	for e: Vector4i in water.shore_edge.keys():
+		var pair := WorldGrid.edge_hexes(e)
+		var seg := grid.edge_segment_km(pair[0], pair[1])
+		var kind: String = water.shore_edge[e]
+		if kind == "lake":
+			continue
+		draw_line(km_to_px(seg[0]), km_to_px(seg[1]), BEACH if kind == "beach" else CLIFF, 3.0)
+
+
+func _draw_streams() -> void:
+	for e: Vector4i in water.stream_edge.keys():
+		var pair := WorldGrid.edge_hexes(e)
+		var seg := grid.edge_segment_km(pair[0], pair[1])
+		draw_line(km_to_px(seg[0]), km_to_px(seg[1]), STREAM, 1.5)
+
+
+func _draw_rivers() -> void:
+	for i: int in water.rivers.size():
+		var rv: Dictionary = water.rivers[i]
+		var px := PackedVector2Array()
+		for km: Vector2 in water.river_points_km(i):
+			px.append(km_to_px(km))
+		var width := 2.0 + 1.5 * float(int(rv["class"]))
+		draw_polyline(_smooth(px), RIVER, width)
+
+
+## A smooth curve through the points (Catmull-Rom, six steps per segment), so a river on edges reads as a river.
+static func _smooth(points: PackedVector2Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	if points.size() < 3:
+		return points
+	var last := points.size() - 1
+	for i: int in last:
+		var p0 := points[maxi(i - 1, 0)]
+		var p1 := points[i]
+		var p2 := points[i + 1]
+		var p3 := points[mini(i + 2, last)]
+		for s: int in 6:
+			var t := float(s) / 6.0
+			var t2 := t * t
+			var t3 := t2 * t
+			out.append(0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+				+ (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3))
+	out.append(points[last])
+	return out
 
 
 func _draw_crests() -> void:

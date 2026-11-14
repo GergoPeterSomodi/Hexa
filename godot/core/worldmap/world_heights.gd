@@ -16,6 +16,7 @@ var lon_east: float = 0.0
 var lat_south: float = 0.0
 var land: Dictionary[Vector2i, bool] = {}
 var height_m: Dictionary[Vector2i, float] = {}  # land hexes only
+var depth_m: Dictionary[Vector2i, float] = {}  # sea hexes only (negative metres: the mean of the ETOPO sea cells)
 var stats: Dictionary[Vector2i, Dictionary] = {}  # every statistic the file holds, per hex
 var anchors: Array[Dictionary] = []  # named places, passes and gorges: kind, name, c, r, z (and metres for passes)
 
@@ -46,6 +47,8 @@ static func from_text(text: String) -> WorldHeights:
 		out.land[hex] = is_land
 		if is_land:
 			out.height_m[hex] = float(h["height_m"])
+		elif h.has("depth_m"):
+			out.depth_m[hex] = float(h["depth_m"])
 		out.stats[hex] = h
 	for item: Variant in d["anchors"]:
 		var anchor: Dictionary = item

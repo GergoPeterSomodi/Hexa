@@ -15,7 +15,8 @@ extends RefCounted
 const PASS_CREST_RANGE_HEXES := 1.0
 
 var grid: WorldGrid
-var levels: Dictionary[Vector2i, int] = {}  # every hex of the heights file: 0 sea, 1 to 6 land
+var levels: Dictionary[Vector2i, int] = {}  # every hex of the heights file: 0 sea, 1 to 6 land (carved valleys included)
+var crest_levels: Dictionary[Vector2i, int] = {}  # the same from the uncarved inner maximum: crests are structure, not valleys
 var crest_edges: Dictionary[Vector4i, int] = {}  # edge key -> index of the range in region.ranges
 var pass_edges: Dictionary[Vector4i, int] = {}  # edge key -> index of the pass in region.passes (a subset of crest_edges)
 var pass_hex: Dictionary[int, Vector2i] = {}  # pass index -> its saddle hex (or the nearest land hex)
@@ -32,8 +33,11 @@ static func build(grid: WorldGrid, heights: WorldHeights, region: WorldRegion) -
 	for hex: Vector2i in heights.land.keys():
 		if heights.is_land(hex):
 			out.levels[hex] = ReliefLevels.level_of(heights.height_m[hex])
+			var stats: Dictionary = heights.stats.get(hex, {})
+			out.crest_levels[hex] = ReliefLevels.level_of(float(stats.get("inner_max", heights.height_m[hex])))
 		else:
 			out.levels[hex] = ReliefLevels.SEA
+			out.crest_levels[hex] = ReliefLevels.SEA
 	out._find_crests(region)
 	out._find_passes(region)
 	out._find_dangling_corners()
@@ -42,6 +46,10 @@ static func build(grid: WorldGrid, heights: WorldHeights, region: WorldRegion) -
 
 func level_at(hex: Vector2i) -> int:
 	return int(levels.get(hex, ReliefLevels.SEA))
+
+
+func crest_level_at(hex: Vector2i) -> int:
+	return int(crest_levels.get(hex, ReliefLevels.SEA))
 
 
 ## Counts for the report: hexes per level (index 0 is sea), crest edges, pass edges, passes with a crest saddle, gaps.
@@ -95,7 +103,7 @@ func _find_crests(region: WorldRegion) -> void:
 				if counts[i] % 2 == 0:
 					continue
 				var crest_level: int = region.ranges[i]["crest_level"]
-				var lower: int = mini(level_at(hex), level_at(nb))
+				var lower: int = mini(crest_level_at(hex), crest_level_at(nb))
 				if lower >= crest_level:
 					if not crest_edges.has(key):
 						crest_edges[key] = i
