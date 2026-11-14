@@ -187,9 +187,15 @@ static func _province_items(map: MapData) -> PackedStringArray:
 	var out := PackedStringArray()
 	for prov: Province in map.provinces.values():
 		out.append(JSON.stringify([prov.pos.x, prov.pos.y, prov.terrain, prov.good, prov.coastal, prov.city, prov.name,
-				prov.region, prov.owner, prov.controller, prov.tribe, prov.peasants, prov.burghers, prov.nobles,
-				prov.natives, prov.works, prov.settlement, prov.castle, prov.port]))
+				prov.region, prov.owner, prov.controller, prov.tribe, _people(prov.peasants), _people(prov.burghers),
+				_people(prov.nobles), _people(prov.natives), prov.works, prov.settlement, prov.castle, prov.port]))
 	return out
+
+
+## People are written to six decimals: the last digits of the builder's float maths differ between Windows and Linux
+## (about 1 province in 160), and the committed map file must be the same on every machine (the CI map job compares it).
+static func _people(value: float) -> float:
+	return snappedf(value, 0.000001)
 
 
 static func _country_items(map: MapData) -> PackedStringArray:
