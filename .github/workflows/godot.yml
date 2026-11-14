@@ -181,6 +181,7 @@ jobs:
             exit 1
           fi
           if ! cmp -s "$RUNNER_TEMP/europe_1480.json" godot/data/maps/europe_1480.json; then
+            diff "$RUNNER_TEMP/europe_1480.json" godot/data/maps/europe_1480.json | cut -c1-300 | head -40 || true
             echo "::error::The rebuilt map file differs from godot/data/maps/europe_1480.json. Rebuild it with build_map.gd -- --out=res://data/maps/europe_1480.json and review the diff."
             exit 1
           fi
@@ -194,12 +195,14 @@ jobs:
             echo
             cat "$RUNNER_TEMP/map-check.md"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Keep the map report
+      - name: Keep the map report and the rebuilt map file
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: map-check
-          path: ${{ runner.temp }}/map-check.md
+          path: |
+            ${{ runner.temp }}/map-check.md
+            ${{ runner.temp }}/europe_1480.json
           if-no-files-found: ignore
 
   export-windows:
