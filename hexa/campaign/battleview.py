@@ -419,7 +419,7 @@ def _besiege(world, group, target_pos, owner, stand, defence_access):
     war = next((w for w in world.wars if {w.a, w.b} == {owner, prov.controller}), None)
     left = None if war is None else warsys.war_limit(world, war.a, war.b) - (world.turn - war.start) + 1
     return {"ok": ok, "reason": reason, "seasons": seasons, "need": terms["need"], "rate": terms["rate"],
-            "stores": terms["stores"], "war_left": left, "opens": world.area_opens(target_pos),
+            "stores": terms["stores"], "war_left": left, "opens": world.area_opens(target_pos, owner),
             "war_ends_first": bool(seasons is not None and left is not None and seasons > left)}
 
 

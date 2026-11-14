@@ -476,6 +476,7 @@ def _besiege_nearest(world, tag, stack, options, enemies):
     claims = world.countries[tag].memory.setdefault("claims", {})
     for key in [k for k, claim in claims.items() if claim[0] != turn]:
         del claims[key]                                  # a claim lasts the season it was made in
+    reach = None                                         # what the stack reaches this season: read once, when open land comes up
     ranked = []
     candidates = [p for enemy in enemies for p in world.provinces_of(enemy)]
     candidates += [p for p in world.provinces_of(tag) if p.controller in enemies]    # own land taken: retaken first
@@ -489,9 +490,17 @@ def _besiege_nearest(world, tag, stack, options, enemies):
         left = _war_seasons_left(world, prov, tag)
         if seasons is None or seasons > limit or (left is not None and seasons > left):
             continue
-        claim = claims.get(str(prov.pos))
-        if not prov.castle and claim is not None and claim[1] != stack[0].id:
-            continue                                     # another stack of ours goes for this open land this season
+        if not prov.castle:
+            standing_here = any(u.owner == tag and u.kind.war for u in world.units_at(prov.pos))
+            if standing_here and prov.pos != home:
+                continue                                 # a stack of ours already stands on this open land: it wins the claim
+            if not standing_here:
+                claim = claims.get(str(prov.pos))
+                if claim is not None and claim[1] != stack[0].id:
+                    if reach is None:
+                        reach = world.reachable_group(stack)
+                    if prov.pos in reach:
+                        continue                         # another stack of ours goes for this open land this season
         if prov.owner == tag:
             tier = 0
         elif prov.castle >= 2 and (left is None or seasons <= left - 2):   # a castle 2/3 that falls in time first
@@ -506,7 +515,10 @@ def _besiege_nearest(world, tag, stack, options, enemies):
     goal = min(ranked)[3]
     prov = world.provinces[goal]
     if not prov.castle:
-        claims[str(goal)] = (turn, stack[0].id)
+        if reach is None:
+            reach = world.reachable_group(stack)
+        if goal in reach:                                # a claim only for land this stack reaches this season
+            claims[str(goal)] = (turn, stack[0].id)
     if goal in options and world.besiege_target(stack, goal):
         world.attack_group(stack, goal)
         _answer(world, goal)
