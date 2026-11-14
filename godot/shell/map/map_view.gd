@@ -52,7 +52,8 @@ func setup(p_map: MapData, p_atlas: AtlasIndex) -> void:
 	_marks = MapMarks.new()
 	_marks.map = map
 	_marks.borders = Political.border_items(map)
-	_marks.capitals = Political.capitals(map)
+	_marks.flags = Political.capital_flags(map)
+	_marks.controls = Political.control_items(map)
 	add_child(_marks)
 	_names = MapNames.new()
 	_names.map = map
@@ -224,10 +225,18 @@ func _refresh() -> void:
 	# Decorations (trees, rocks) belong to the countries view only: Python's MapView draws them when not bare,
 	# and its terrain mode is bare.
 	_layers[TilePlan.DECO].visible = view_mode == VIEW_COUNTRIES
+	# Python's terrain mode is bare: no towns, castles or roads (its overlay_desc), and no names (its political marks).
+	_layers[TilePlan.TOWN].visible = view_mode == VIEW_COUNTRIES
+	_layers[TilePlan.ROAD].visible = view_mode == VIEW_COUNTRIES
+	var countries := view_mode == VIEW_COUNTRIES
+	_names.visible = countries
 	_names.set_zoom(zoom_now)
 	var top_left := _world_at(Vector2.ZERO)
-	_names.view_rect = Rect2(top_left, _view_size() / zoom_now).grow(120.0)
-	_marks.show_borders = view_mode == VIEW_COUNTRIES
+	# A name lies on the map: its box must be inside the visible part of the map, not inside the window (the margin past
+	# the map is black, and a name cut there or drawn on it would read as a flaw).
+	_names.view_rect = Rect2(top_left, _view_size() / zoom_now).intersection(Rect2(Vector2.ZERO, _map_size))
+	_marks.show_borders = countries
+	_marks.show_tile_marks = countries and not _far
 	_marks.set_zoom(zoom_now)
 	_names.queue_redraw()
 	_marks.hover = _hover

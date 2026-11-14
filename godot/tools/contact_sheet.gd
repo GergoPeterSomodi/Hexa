@@ -53,6 +53,7 @@ func _process(_delta: float) -> bool:
 		return true
 	var job: Dictionary = _jobs[_job]
 	if _settle == 0:
+		_hide_hud()  # before the picture: the frame drawn now is the one the picture takes
 		_view.set_view(str(job["mode"]))
 		var centre: Vector2i = job["centre"]
 		var radius: float = float(job["radius"])

@@ -105,6 +105,31 @@ static func name_points(map: MapData) -> Array[Dictionary]:
 	return out
 
 
+## The flag of each country (Python's _political_marks: a pennant at the capital, in the owner's colour): the capital
+## hex, when its owner is the country. Returns Array of {"pos": Vector2i, "colour": Color}, in geo.COUNTRIES order.
+static func capital_flags(map: MapData) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for tag: String in map.country_order:
+		if not map.countries.has(tag):
+			continue
+		var country: Country = map.countries[tag]
+		if owner_of(map, country.capital) == tag:
+			out.append({"pos": country.capital, "colour": country.colour})
+	return out
+
+
+## The hexes held by a country other than their owner (Python's controller stripes, in the controller's colour).
+## Returns Array of {"pos": Vector2i, "colour": Color}, in (column, row) order.
+static func control_items(map: MapData) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for pos: Vector2i in map.provinces.keys():
+		var prov: Province = map.provinces[pos]
+		if prov.controller == "" or prov.controller == prov.owner or not map.countries.has(prov.controller):
+			continue
+		out.append({"pos": pos, "colour": map.countries[prov.controller].colour})
+	return out
+
+
 ## The hexes of one owner joined to `start` through neighbours with the same owner. `seen` gets every hex of the body.
 static func _body(owned: Dictionary, start: Vector2i, seen: Dictionary) -> Array[Vector2i]:
 	var tag: String = owned[start]
