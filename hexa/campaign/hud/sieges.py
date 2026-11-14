@@ -66,8 +66,7 @@ class Marks:
         view_rect = ctx.view_rect()
         ctx.screen.set_clip(view_rect)
         for pos in besieged(world):
-            # TODO(r022-sfix): once siege_view takes relief=False, the badge passes relief=False (it never shows the relief)
-            view = siege_view(world, pos, world.player)
+            view = siege_view(world, pos, world.player, relief=False)    # the badge never shows the relief
             if view is None or view["access"] == "hidden" or view["progress"] is None:
                 continue
             self._mark(ctx, hud, view_rect, siegebadge.siege_badge(ctx.view.r, view["progress"], view["need"],

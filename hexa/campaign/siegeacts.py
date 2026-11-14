@@ -3,6 +3,9 @@ default, or Storm with Shift held), what the province panel's "Storm now" and re
 refused one. Each one is a ``*_check`` the world already has: the window asks it first, shows its reason when it says no,
 and only then calls the action. Pygame-free: the window passes whether Shift is held.
 """
+from ..hexgrid import neighbors
+
+
 def stack_at(world, pos, tag):
     """The war units of country `tag` standing on hex pos (the besieger's stack of a running siege)."""
     return [u for u in world.units_at(pos) if u.owner == tag and u.kind.war]
@@ -27,6 +30,15 @@ def attack(ctx, group, pos, storm=False):
         ctx.toast(reason)
         return False
     return world.attack_group(group, pos)
+
+
+def in_range(ctx, group, pos):
+    """A garrisoned castle the stack could reach to attack but is not offered (too few men to besiege): the right-click
+    still goes to `attack`, which storms on Shift or toasts why it cannot besiege. A far castle stays a march order."""
+    if not ctx.world.besiege_target(group, pos):
+        return False
+    near = set(ctx.ui.reach) | {group[0].pos}
+    return any(p in near for p in neighbors(pos))
 
 
 def storm_now(ctx, pos):

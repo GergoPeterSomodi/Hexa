@@ -579,7 +579,7 @@ class CampaignApp:
             return
         here = group[0].pos
         ok, reason = world.move_check(group, pos)
-        if pos in ui.attacks:
+        if pos in ui.attacks or siegeacts.in_range(self, group, pos):
             if siegeacts.attack(self, group, pos, bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)):
                 self._cancel_orders(group)
         elif not ok and pos != here:

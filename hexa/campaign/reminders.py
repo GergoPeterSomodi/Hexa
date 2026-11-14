@@ -155,8 +155,7 @@ def sieges_on(world, tag):
         prov = world.provinces[pos]
         if prov.controller != tag:                  # the defender is the one holding the place (an occupied castle's occupier)
             continue
-        # TODO(r022-sfix): pass relief=False once siege_view takes it (the task line does not need the relief armies)
-        view = siege_view(world, prov.pos, tag)
+        view = siege_view(world, prov.pos, tag, relief=False)    # the task line does not need the relief armies
         if view is None or view["access"] == "hidden":
             continue
         falls = view["falls_in"]
