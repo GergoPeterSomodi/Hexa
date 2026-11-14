@@ -63,6 +63,7 @@ func _render() -> void:
 		view.show_network(places, roads)
 		view.title = "Alps and Po: settlements and roads on 28 km hexes, over the ground cover"
 		await _shot(out_dir.path_join(prefix + "places_region_whole.png"))
+		_report_labels(view)
 		view.set_view(9.19, 45.46, 9.0)
 		await _shot(out_dir.path_join(prefix + "places_milan_close.png"))
 		view.set_view(7.9, 46.2, 4.6)
@@ -101,6 +102,8 @@ func _render() -> void:
 		await _shot(out_dir.path_join(prefix + "water_florence.png"))
 		view.set_view(8.9, 45.2, 4.2)
 		await _shot(out_dir.path_join(prefix + "water_po_plain.png"))
+		view.set_view(12.35, 45.35, 9.0)
+		await _shot(out_dir.path_join(prefix + "water_venice.png"))
 	else:
 		await _shot(out_dir.path_join(prefix + "region_whole.png"))
 		view.set_view(8.0, 45.7, 2.6)
@@ -111,6 +114,18 @@ func _render() -> void:
 		await _shot(out_dir.path_join(prefix + "region_po_plain.png"))
 	print("render_region: pictures written to " + out_dir)
 	quit(0)
+
+
+## Counts the settlement names drawn in the last frame and the pairs whose boxes overlap (the names must not collide).
+func _report_labels(view: WorldMapView) -> void:
+	var overlaps := 0
+	var n := view.label_boxes.size()
+	for i: int in n:
+		for j: int in range(i + 1, n):
+			if view.label_boxes[i].intersects(view.label_boxes[j]):
+				overlaps += 1
+				printerr("render_region: names overlap: %s and %s" % [view.label_names[i], view.label_names[j]])
+	print("render_region: %d names drawn, %d overlapping pairs" % [n, overlaps])
 
 
 func _shot(path: String) -> void:

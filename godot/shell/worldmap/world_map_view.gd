@@ -24,6 +24,7 @@ const PASS_PX := 4.5
 const ZOOM_MIN := 0.6
 const ZOOM_MAX := 40.0
 const SHELF := Color("#8fb8cc")
+const LAGOON := Color("#b9dbe0")  # shallow lagoon water (the Venetian lagoon): lighter than the shelf
 const DEEP := Color("#4f7189")
 const LAKE := Color("#7fa9c2")
 const RIVER := Color("#3d6f94")
@@ -59,6 +60,9 @@ var water: WorldWater = null
 var cover: WorldCover = null
 var places: WorldPlaces = null
 var roads: WorldRoads = null
+## The boxes of the settlement names drawn in the last frame, and their names (checked by the region renderer).
+var label_boxes: Array[Rect2] = []
+var label_names: Array[String] = []
 var centre_km: Vector2 = Vector2.ZERO
 var px_per_km: float = 2.0
 var title: String = "Alps and Po: relief on 28 km hexes"
@@ -217,6 +221,8 @@ func _hex_colour(hex: Vector2i) -> Color:
 	if water.lake_hex.has(hex):
 		return LAKE
 	match str(water.sea_band.get(hex, "")):
+		"lagoon":
+			return LAGOON
 		"shelf":
 			return SHELF
 		"deep":
@@ -512,8 +518,12 @@ func _draw_settlements() -> void:
 			draw_line(at + Vector2(0.0, -4.0), at + Vector2(0.0, 4.0), INK, 1.5)
 	boxes.append_array(_panel_boxes())
 	var bounds := Rect2(0.0, MARGIN_TOP, size.x, size.y - MARGIN_TOP)
+	label_boxes.clear()
+	label_names.clear()
 	for item: Dictionary in WorldLabels.place(names, boxes, bounds):
 		var box: Rect2 = item["box"]
+		label_boxes.append(box)
+		label_names.append(str(item["name"]))
 		draw_string(font, box.position + Vector2(0.0, float(item["size"]) + 1.0), str(item["name"]),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, int(item["size"]), TEXT)
 

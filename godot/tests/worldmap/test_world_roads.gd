@@ -125,14 +125,16 @@ func test_pavia_is_bridged_over_the_ticino_and_the_po() -> void:
 	for e: Vector4i in _water.river_edge.keys():
 		var river: String = _water.rivers[int(_water.river_edge[e])]["name"]
 		var pair := WorldGrid.edge_hexes(e)
-		var near := WorldPlaces.hex_distance(pavia, pair[0]) <= 1 or WorldPlaces.hex_distance(pavia, pair[1]) <= 1
+		# The Ticino meets the Po two hexes west of Pavia (the Po's mouths moved in step 5b), so its reach is two hexes.
+		var reach := 2 if river == "Ticino" else 1
+		var near := WorldPlaces.hex_distance(pavia, pair[0]) <= reach or WorldPlaces.hex_distance(pavia, pair[1]) <= reach
 		if not near or _roads.quality_of(e) == 0:
 			continue
 		if river == "Ticino":
 			ticino = _roads.crossing_of(e)
 		elif river == "Po":
 			po = _roads.crossing_of(e)
-	assert_true(ticino.begins_with("bridge"), "a road bridges the Ticino beside Pavia (%s)" % ticino)
+	assert_true(ticino.begins_with("bridge"), "a road bridges the Ticino within two hexes of Pavia (%s)" % ticino)
 	assert_true(po.begins_with("bridge"), "a road bridges the Po beside Pavia (%s)" % po)
 
 
@@ -181,13 +183,13 @@ func test_the_build_is_repeatable_and_the_counts_are_the_first_build_counts() ->
 	var again := WorldRoads.build(_grid, _relief, _water, _places, _region)
 	assert_eq(again.summary(), _roads.summary(), "the same inputs give the same network")
 	var s := _roads.summary()
-	assert_eq(int(s["edges"]), 262, "262 road edges")
-	assert_eq(int(s["links"]), 198, "198 links")
+	assert_eq(int(s["edges"]), 233, "233 road edges")
+	assert_eq(int(s["links"]), 158, "158 links")
 	assert_eq(int(s["link_failures"]), 0, "no link failures")
-	assert_eq(int(s["network_hexes"]), 227, "227 hexes on a road")
+	assert_eq(int(s["network_hexes"]), 199, "199 hexes on a road")
 	var q: Array = s["qualities"]
-	assert_eq(int(q[1]), 121, "121 track edges (spurs to villages and hamlets, passes without a hospice)")
-	assert_eq(int(q[2]), 94, "94 road edges (joins between towns, the coast, the passes with a hospice)")
+	assert_eq(int(q[1]), 98, "98 track edges (spurs to villages and hamlets, passes without a hospice)")
+	assert_eq(int(q[2]), 88, "88 road edges (joins between towns, the coast, the passes with a hospice)")
 	assert_eq(int(q[3]), 47, "47 highway edges (from Milan and between the cities)")
 
 

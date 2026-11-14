@@ -61,11 +61,36 @@ func test_corner_words_name_every_corner_of_the_network() -> void:
 		assert_true(_water.corner_word.has(key), "corner %s has a word" % [key])
 		assert_true(allowed.has(_water.corner_word[key]), "corner word %s is a known word" % _water.corner_word[key])
 	var words: Dictionary = _water.summary()["words"]
-	assert_eq(int(words.get("source", 0)), 17, "source corners (river heads)")
-	assert_eq(int(words.get("join", 0)), 13, "join corners (tributaries meeting a river)")
+	assert_eq(int(words.get("source", 0)), 18, "source corners (river heads)")
+	assert_eq(int(words.get("join", 0)), 10, "join corners: the 10 authored tributaries of the Po (the Adige, Brenta and Piave have their own mouths)")
 	# Four river cities are crossed (Verona, Florence, Pisa, Geneva).
 	assert_eq(int(words.get("city_in", 0)), 4, "one city_in per crossed river city")
 	assert_eq(int(words.get("city_out", 0)), 4, "one city_out per crossed river city")
+
+
+func test_the_adige_brenta_and_piave_have_their_own_mouths_and_only_named_tributaries_join() -> void:
+	if not _ready_or_fail():
+		return
+	for river_name: String in ["Adige", "Brenta", "Piave"]:
+		var own: Array[Vector3i] = _river(river_name)["corners"]
+		assert_true(_water.is_mouth(own[own.size() - 1]), "%s ends on its own mouth (the sea or the lagoon)" % river_name)
+	var po: Array[Vector3i] = _river("Po")["corners"]
+	for river_name: String in ["Ticino", "Adda", "Dora Baltea", "Dora Riparia", "Tanaro", "Sesia", "Oglio", "Mincio", "Lambro", "Taro"]:
+		var chain: Array[Vector3i] = _river(river_name)["corners"]
+		assert_true(po.has(chain[chain.size() - 1]), "%s joins the Po (its authored join)" % river_name)
+
+
+func test_venice_is_land_on_the_edge_of_the_one_hex_lagoon() -> void:
+	if not _ready_or_fail():
+		return
+	var venice := _grid.hex_of(12.33, 45.44)
+	assert_eq(_relief.level_at(venice) == ReliefLevels.SEA, false, "Venice is a land hex")
+	var lagoon_beside := 0
+	for n: Vector2i in _grid.neighbours(venice):
+		if _water.lagoon.has(n):
+			lagoon_beside += 1
+	assert_gt(lagoon_beside, 0, "Venice touches the lagoon (a port on the lagoon)")
+	assert_eq(_water.lagoon.size(), 2, "the lagoon is two hexes at 28 km (east of Treviso and east of Venice)")
 
 
 func test_the_end_of_every_river_is_a_mouth() -> void:
@@ -87,7 +112,7 @@ func test_the_arno_ends_at_the_sea_below_pisa() -> void:
 	var last := chain[chain.size() - 1]
 	# The Arno's last corner is Pisa's outlet corner, which touches the sea: it is a city_out and a mouth.
 	assert_true(_water.is_mouth(last), "the Arno ends on a corner that touches the sea")
-	assert_eq(chain.size(), 8, "the Arno's chain: source, Florence (two corners apart, the river bends in the hex), Pisa, the sea")
+	assert_eq(chain.size(), 9, "the Arno's chain: source, Florence (two corners apart, the river bends in the hex), Pisa, the sea (one corner more than the first build: its mouth is taken within 1.5 hex widths)")
 
 
 func test_river_cities_are_crossed_through_their_hex() -> void:
@@ -248,8 +273,9 @@ func test_shores_are_land_against_water_and_sea_depths_are_bands() -> void:
 		assert_true(_relief.level_at(a) == ReliefLevels.SEA or _relief.level_at(b) == ReliefLevels.SEA
 			or _water.lake_hex.has(a) or _water.lake_hex.has(b), "a shore has water on one side")
 	var bands: Dictionary = _water.summary()["sea_bands"]
-	var banded := int(bands.get("deep", 0)) + int(bands.get("sea", 0)) + int(bands.get("shelf", 0)) + int(bands.get("", 0))
-	assert_eq(banded, 47, "all 47 sea hexes have a band (or none where ETOPO has no sea cell)")
+	var banded := int(bands.get("deep", 0)) + int(bands.get("sea", 0)) + int(bands.get("shelf", 0)) + int(bands.get("", 0)) + int(bands.get("lagoon", 0))
+	assert_eq(banded, 55, "all 55 sea hexes have a band (or none where ETOPO has no sea cell)")
+	assert_eq(int(bands.get("lagoon", 0)), 2, "the Venetian lagoon is two shallow hexes (the lagoon band)")
 	assert_eq(int(bands.get("", 0)), 0, "every sea hex has a band (the two without ETOPO take the nearest)")
 
 

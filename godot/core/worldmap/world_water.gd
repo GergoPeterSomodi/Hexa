@@ -45,6 +45,8 @@ const SPINE_LEVEL := 5
 const GORGE_RADIUS_HEX := 1.2
 ## Stream burning: each corner of an authored course is this many metres lower than the corner before it.
 const BURN_STEP_M := 1.0
+## A river's mouth is a corner that touches the sea, a lagoon or a lake within this many hex widths of its last point.
+const MOUTH_REACH_HEX := 1.5
 
 var grid: WorldGrid
 var relief: WorldRelief
@@ -58,6 +60,8 @@ var lakes: Array[Dictionary] = []  # name, width, whole, corners, steps, hexes
 var river_edge: Dictionary[Vector4i, int] = {}  # edge -> index of the river that uses it
 var lake_edge: Dictionary[Vector4i, bool] = {}
 var lake_hex: Dictionary[Vector2i, bool] = {}  # whole water hexes of big lakes (drawn like the sea)
+var lagoon: Dictionary[Vector2i, bool] = {}  # sea hexes inside the region's lagoon ring (shallow: sea band lagoon)
+var marsh_zone: Dictionary[Vector2i, bool] = {}  # hexes inside a region marsh zone (the cover step forces marsh on the low ones)
 var shore_edge: Dictionary[Vector4i, String] = {}
 var stream_edge: Dictionary[Vector4i, int] = {}
 var sea_band: Dictionary[Vector2i, String] = {}
@@ -85,7 +89,7 @@ var _course_start: Dictionary[String, Vector3i] = {}  # river name -> the source
 var _course_chain: Dictionary[String, Array] = {}  # river name -> its course: the corridor chain on the raw surface
 var _course_edge: Dictionary[Vector4i, bool] = {}  # edges on a burned course: a river may cross a spine there
 var _course_mode := false  # routing a course (the pass before the fill): no uphill penalty, the course is burned later
-var _course_corners: Dictionary[Vector3i, bool] = {}  # corners of the courses routed so far (a tributary's course joins them)
+var _routed_chain: Dictionary[String, Array] = {}  # river name -> its routed chain (a tributary joins the chain it names)
 var burn_climbs: Array[String] = []  # burned steps that still climb (a tributary sitting above its trunk): none expected
 var _lake_mode := false  # routing a lake: lakes cross the prealps at their gaps, so no crest cost
 
@@ -98,6 +102,7 @@ static func build(p_grid: WorldGrid, p_relief: WorldRelief, p_heights: WorldHeig
 	out.heights = p_heights
 	out.region = p_region
 	out._build_corners()
+	out._build_zones()
 	out._build_cities()
 	out._build_city_corners()
 	out._build_courses()
@@ -145,6 +150,31 @@ func _build_corners() -> void:
 		for hex: Vector2i in relief.levels.keys():
 			if grid.centre_km(hex).distance_to(centre) <= GORGE_RADIUS_HEX * grid.hex_w_km:
 				_gorge_hex[hex] = true
+
+
+## The hexes inside the region's lagoon ring and marsh zones (by the centre of each hex, in longitude and latitude).
+func _build_zones() -> void:
+	for hex: Vector2i in relief.levels.keys():
+		var ll := grid.lonlat_of(grid.centre_km(hex))
+		if region.lagoon.size() >= 3 and _in_ring(ll, region.lagoon):
+			lagoon[hex] = true
+		for mz: Dictionary in region.marsh_zones:
+			var ring: PackedVector2Array = mz["ring"]
+			if _in_ring(ll, ring):
+				marsh_zone[hex] = true
+
+
+## True when a point lies inside a closed ring of points (even-odd rule).
+static func _in_ring(p: Vector2, ring: PackedVector2Array) -> bool:
+	var inside := false
+	var j := ring.size() - 1
+	for i: int in ring.size():
+		var a := ring[i]
+		var b := ring[j]
+		if (a.y > p.y) != (b.y > p.y) and p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x:
+			inside = not inside
+		j = i
+	return inside
 
 
 ## The corner k (0 at the top, then anticlockwise) of a hex, or NO_CORNER when a neighbour is outside the grid.
@@ -675,15 +705,13 @@ func _build_courses() -> void:
 		var km := _km_line(line)
 		var start := _source_corner(km[0])
 		_current_river = name
-		var goals := _river_goals(start, km[km.size() - 1], int(rv["class"]) >= 3, _course_corners)
+		var goals := _river_goals(start, km[km.size() - 1], _joined_corners(rv, true), _has_join(rv), _leaves(rv))
 		var chain := _route_to_any(start, goals, km, false, false, true)
 		_current_river = ""
 		if chain.is_empty():
 			continue  # no course: the routing reports the river
 		_course_start[name] = start
 		_course_chain[name] = chain
-		for c: Vector3i in chain:
-			_course_corners[c] = true
 	_course_mode = false
 
 
@@ -732,46 +760,85 @@ func _burn_courses() -> void:
 				burn_climbs.append("%s step %d: %.0f m up" % [name, i, climb])
 
 
-## The corners a river's route may end on. A river that leaves the map ends on the map edge; a tributary ends on a corner
-## of a joinable river (the rivers routed so far, or the courses while they are burned; else the nearest corner); a trunk
-## ends on its mouth, or on any corner touching the sea within two hex widths. River city corners are never an end.
-func _river_goals(cur: Vector3i, last_p: Vector2, is_trunk: bool, joinable: Dictionary[Vector3i, bool]) -> Dictionary[Vector3i, bool]:
+## The corners a river's route may end on. A river that leaves the window ends on the window's edge. A tributary (an authored
+## join, `joins` in the region) ends on a corner of the river it names, within two hex widths of its last point (else the
+## nearest corner of that river). Every other river has its own mouth: a corner touching the sea, a lagoon or a lake within
+## MOUTH_REACH_HEX hex widths of its last point (else the nearest such corner). So no river joins another one by accident.
+## River city corners are never an end.
+func _river_goals(cur: Vector3i, last_p: Vector2, joinable: Dictionary[Vector3i, bool], has_join: bool,
+		leaves: bool) -> Dictionary[Vector3i, bool]:
 	var goals: Dictionary[Vector3i, bool] = {}
-	if not relief.levels.has(grid.hex_of_km(last_p)):
+	if leaves or not relief.levels.has(grid.hex_of_km(last_p)):
 		for key: Vector3i in corner_set.keys():
 			if _is_border(key) and corner_pos(key).distance_to(last_p) <= 2.0 * grid.hex_w_km:
 				goals[key] = true
 		var edge_corner := _nearest_border_corner(last_p, cur)
 		if edge_corner != NO_CORNER:
 			goals[edge_corner] = true
-	elif not is_trunk:
+	elif has_join:
 		for key: Vector3i in joinable.keys():
 			if key != cur and corner_pos(key).distance_to(last_p) <= 2.0 * grid.hex_w_km:
 				goals[key] = true
 		if goals.is_empty():
-			goals[_nearest_corner(last_p, false, cur)] = true
+			var near := _nearest_of(joinable.keys(), last_p, cur)
+			if near != NO_CORNER:
+				goals[near] = true
 	else:
-		var mouth := NO_CORNER
-		var mouth_d := INF
+		var reach := MOUTH_REACH_HEX * grid.hex_w_km
+		var sea_keys: Array = []
 		for key: Vector3i in corner_set.keys():
-			if key == cur or _city_of_corner.has(key):
+			if key == cur or _city_of_corner.has(key) or not _touches_water(key):
 				continue
-			var d := corner_pos(key).distance_to(last_p)
-			if d < mouth_d:
-				mouth_d = d
-				mouth = key
-		goals[mouth] = true
-		for key: Vector3i in corner_set.keys():
-			if _touches_water(key) and not _city_of_corner.has(key) and corner_pos(key).distance_to(last_p) <= 2.0 * grid.hex_w_km:
+			sea_keys.append(key)
+			if corner_pos(key).distance_to(last_p) <= reach:
 				goals[key] = true
+		if goals.is_empty():
+			var mouth := _nearest_of(sea_keys, last_p, cur)
+			if mouth != NO_CORNER:
+				goals[mouth] = true
 	return goals
+
+
+## True when a river names the river it flows into (its authored join).
+static func _has_join(rv: Dictionary) -> bool:
+	return str(rv.get("joins", "")) != ""
+
+
+## True when a river leaves the window by an edge (its authored `leaves`): it ends on the window's edge.
+static func _leaves(rv: Dictionary) -> bool:
+	return str(rv.get("leaves", "")) != ""
+
+
+## The corners of the river a tributary joins: its course on the raw surface (courses true) or its routed chain.
+func _joined_corners(rv: Dictionary, courses: bool) -> Dictionary[Vector3i, bool]:
+	var out: Dictionary[Vector3i, bool] = {}
+	var target := str(rv.get("joins", ""))
+	if target == "":
+		return out
+	var chain: Array = _course_chain.get(target, []) if courses else _routed_chain.get(target, [])
+	for c: Vector3i in chain:
+		out[c] = true
+	return out
+
+
+## The corner of a list nearest a point, other than exclude (NO_CORNER for an empty list).
+func _nearest_of(keys: Array, p: Vector2, exclude: Vector3i) -> Vector3i:
+	var best := NO_CORNER
+	var best_d := INF
+	for key: Vector3i in keys:
+		if key == exclude:
+			continue
+		var d := corner_pos(key).distance_to(p)
+		if d < best_d:
+			best_d = d
+			best = key
+	return best
 
 
 func _route_river(rv: Dictionary) -> void:
 	var name := str(rv["name"])
 	var line: PackedVector2Array = rv["line"]
 	var km := _km_line(line)
-	var is_trunk := int(rv["class"]) >= 3
 	var n := km.size()
 	var chain: Array[Vector3i] = []
 	_current_river = name
@@ -779,7 +846,7 @@ func _route_river(rv: Dictionary) -> void:
 	# river's end; river cities are crossed inside the search (see _build_city_corners).
 	var cur: Vector3i = _course_start[name] if _course_start.has(name) else _source_corner(km[0])
 	chain.append(cur)
-	var goals := _river_goals(cur, km[n - 1], is_trunk, network)
+	var goals := _river_goals(cur, km[n - 1], _joined_corners(rv, false), _has_join(rv), _leaves(rv))
 	var tail := _leg(cur, goals, km, name)
 	if tail.is_empty():
 		route_failures.append("%s: no route to its end" % name)
@@ -787,6 +854,7 @@ func _route_river(rv: Dictionary) -> void:
 		for c: Vector3i in tail.slice(1):
 			chain.append(c)
 	chain = _without_loops(chain)
+	_routed_chain[name] = chain
 	# Throughs that survive the loop cut are consecutive pairs of the chain.
 	var throughs: Array[Vector2i] = []
 	for i: int in chain.size() - 1:
@@ -954,6 +1022,9 @@ func _build_sea_bands() -> void:
 	var without: Array[Vector2i] = []
 	for hex: Vector2i in relief.levels.keys():
 		if relief.level_at(hex) != ReliefLevels.SEA or lake_hex.has(hex):
+			continue
+		if lagoon.has(hex):
+			sea_band[hex] = "lagoon"
 			continue
 		var depth := float(heights.depth_m.get(hex, 0.0))
 		if depth == 0.0:

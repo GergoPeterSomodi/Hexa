@@ -10,7 +10,7 @@
  "region": "Alps and Po (prototype region, 1480)",
  "window": {
   "lon_west": 5.6,
-  "lon_east": 12.6,
+  "lon_east": 13.0,
   "lat_south": 43.2,
   "lat_north": 47.3
  },
@@ -490,24 +490,48 @@
    "c": 19,
    "r": 0,
    "land": true,
-   "cells": 164,
+   "cells": 277,
    "votes": 13,
-   "inner_mean": 2088.4,
-   "inner_median": 2160.7,
-   "inner_p75": 2423.1,
-   "inner_max": 2884.8,
-   "mean": 2001.6,
-   "median": 2049.6,
+   "inner_mean": 2183.3,
+   "inner_median": 2234.8,
+   "inner_p75": 2515.0,
+   "inner_max": 3241.8,
+   "mean": 2115.9,
+   "median": 2192.7,
    "min": 816.3,
-   "max": 2884.8,
-   "p90": 2575.6,
+   "max": 3324.2,
+   "p90": 2807.3,
    "peak": [
-    12.5917,
+    12.6917,
     47.075,
-    2884.8
+    3324.2
    ],
    "centre_z": 1812.8,
-   "height_m": 2884.8,
+   "height_m": 3241.8,
+   "level": 6
+  },
+  {
+   "c": 20,
+   "r": 0,
+   "land": true,
+   "cells": 206,
+   "votes": 13,
+   "inner_mean": 1875.8,
+   "inner_median": 1826.4,
+   "inner_p75": 2319.9,
+   "inner_max": 2949.5,
+   "mean": 1901.9,
+   "median": 1881.7,
+   "min": 859.4,
+   "max": 3057.3,
+   "p90": 2578.7,
+   "peak": [
+    12.7583,
+    47.1583,
+    3057.3
+   ],
+   "centre_z": 2053.1,
+   "height_m": 2949.5,
    "level": 6
   },
   {
@@ -967,6 +991,30 @@
    "centre_z": 2448.9,
    "height_m": 2788.6,
    "level": 5
+  },
+  {
+   "c": 19,
+   "r": 1,
+   "land": true,
+   "cells": 286,
+   "votes": 13,
+   "inner_mean": 2011.3,
+   "inner_median": 2097.2,
+   "inner_p75": 2468.9,
+   "inner_max": 2899.7,
+   "mean": 1853.9,
+   "median": 1893.5,
+   "min": 659.9,
+   "max": 2953.9,
+   "p90": 2598.6,
+   "peak": [
+    12.725,
+    47.0583,
+    2953.9
+   ],
+   "centre_z": 2412.4,
+   "height_m": 2899.7,
+   "level": 6
   },
   {
    "c": 0,
@@ -1438,17 +1486,17 @@
    "c": 19,
    "r": 2,
    "land": true,
-   "cells": 164,
+   "cells": 278,
    "votes": 13,
-   "inner_mean": 1784.9,
-   "inner_median": 1828.9,
-   "inner_p75": 2056.2,
+   "inner_mean": 1755.2,
+   "inner_median": 1778.4,
+   "inner_p75": 2012.5,
    "inner_max": 2425.3,
-   "mean": 1798.4,
-   "median": 1788.7,
-   "min": 1032.2,
+   "mean": 1764.6,
+   "median": 1763.6,
+   "min": 954.8,
    "max": 2620.2,
-   "p90": 2292.9,
+   "p90": 2197.9,
    "peak": [
     12.5083,
     46.825,
@@ -1456,6 +1504,30 @@
    ],
    "centre_z": 1894.1,
    "height_m": 2425.3,
+   "level": 5
+  },
+  {
+   "c": 20,
+   "r": 2,
+   "land": true,
+   "cells": 206,
+   "votes": 13,
+   "inner_mean": 1404.8,
+   "inner_median": 1367.3,
+   "inner_p75": 1718.2,
+   "inner_max": 2415.7,
+   "mean": 1477.9,
+   "median": 1492.8,
+   "min": 641.4,
+   "max": 2415.7,
+   "p90": 2046.7,
+   "peak": [
+    12.8083,
+    46.7583,
+    2415.7
+   ],
+   "centre_z": 1617.4,
+   "height_m": 2415.7,
    "level": 5
   },
   {
@@ -1917,6 +1989,30 @@
    "level": 3,
    "valley_floor_m": 689.1,
    "carved": true
+  },
+  {
+   "c": 19,
+   "r": 3,
+   "land": true,
+   "cells": 286,
+   "votes": 13,
+   "inner_mean": 1321.5,
+   "inner_median": 1357.5,
+   "inner_p75": 1612.1,
+   "inner_max": 2129.6,
+   "mean": 1341.1,
+   "median": 1395.5,
+   "min": 411.9,
+   "max": 2163.3,
+   "p90": 1892.8,
+   "peak": [
+    12.725,
+    46.625,
+    2163.3
+   ],
+   "centre_z": 1296.0,
+   "height_m": 2129.6,
+   "level": 5
   },
   {
    "c": 0,
@@ -2392,17 +2488,17 @@
    "c": 19,
    "r": 4,
    "land": true,
-   "cells": 164,
+   "cells": 278,
    "votes": 13,
-   "inner_mean": 1200.0,
-   "inner_median": 1156.4,
-   "inner_p75": 1577.2,
+   "inner_mean": 1207.4,
+   "inner_median": 1212.0,
+   "inner_p75": 1518.3,
    "inner_max": 2007.7,
-   "mean": 1266.9,
-   "median": 1257.4,
-   "min": 498.5,
+   "mean": 1192.4,
+   "median": 1193.0,
+   "min": 409.7,
    "max": 2229.8,
-   "p90": 1818.1,
+   "p90": 1733.2,
    "peak": [
     12.425,
     46.3417,
@@ -2411,6 +2507,30 @@
    "centre_z": 1127.6,
    "height_m": 2007.7,
    "level": 5
+  },
+  {
+   "c": 20,
+   "r": 4,
+   "land": true,
+   "cells": 206,
+   "votes": 13,
+   "inner_mean": 754.7,
+   "inner_median": 761.6,
+   "inner_p75": 953.8,
+   "inner_max": 1642.2,
+   "mean": 674.0,
+   "median": 657.6,
+   "min": 117.6,
+   "max": 1642.2,
+   "p90": 1140.1,
+   "peak": [
+    12.8417,
+    46.3417,
+    1642.2
+   ],
+   "centre_z": 519.2,
+   "height_m": 1642.2,
+   "level": 4
   },
   {
    "c": 0,
@@ -2885,6 +3005,30 @@
    "carved": true
   },
   {
+   "c": 19,
+   "r": 5,
+   "land": true,
+   "cells": 285,
+   "votes": 13,
+   "inner_mean": 137.0,
+   "inner_median": 130.6,
+   "inner_p75": 187.9,
+   "inner_max": 282.9,
+   "mean": 152.2,
+   "median": 121.4,
+   "min": 20.8,
+   "max": 1155.3,
+   "p90": 268.3,
+   "peak": [
+    12.5917,
+    46.1417,
+    1155.3
+   ],
+   "centre_z": 135.4,
+   "height_m": 282.9,
+   "level": 2
+  },
+  {
    "c": 0,
    "r": 6,
    "land": true,
@@ -3356,24 +3500,48 @@
    "c": 19,
    "r": 6,
    "land": true,
-   "cells": 164,
+   "cells": 276,
    "votes": 13,
-   "inner_mean": 13.7,
-   "inner_median": 12.8,
-   "inner_p75": 17.3,
+   "inner_mean": 12.5,
+   "inner_median": 12.0,
+   "inner_p75": 15.8,
    "inner_max": 25.2,
-   "mean": 16.4,
-   "median": 14.8,
-   "min": 3.1,
-   "max": 47.8,
-   "p90": 29.6,
+   "mean": 14.3,
+   "median": 12.8,
+   "min": 1.6,
+   "max": 48.9,
+   "p90": 25.2,
    "peak": [
-    12.5917,
+    12.6083,
     45.975,
-    47.8
+    48.9
    ],
    "centre_z": 9.9,
    "height_m": 25.2,
+   "level": 1
+  },
+  {
+   "c": 20,
+   "r": 6,
+   "land": true,
+   "cells": 206,
+   "votes": 13,
+   "inner_mean": 14.7,
+   "inner_median": 12.3,
+   "inner_p75": 20.7,
+   "inner_max": 39.9,
+   "mean": 16.5,
+   "median": 13.5,
+   "min": 0.4,
+   "max": 51.3,
+   "p90": 37.2,
+   "peak": [
+    12.8917,
+    45.975,
+    51.3
+   ],
+   "centre_z": 10.6,
+   "height_m": 39.9,
    "level": 1
   },
   {
@@ -3824,7 +3992,6 @@
    "land": true,
    "cells": 276,
    "votes": 13,
-   "forced": "city point (builder rule: cities are land)",
    "inner_mean": 6.7,
    "inner_median": 5.9,
    "inner_p75": 9.2,
@@ -3842,6 +4009,17 @@
    "centre_z": 4.9,
    "height_m": 19.6,
    "level": 1
+  },
+  {
+   "c": 19,
+   "r": 7,
+   "land": false,
+   "cells": 285,
+   "votes": 7,
+   "forced": "lagoon (region)",
+   "height_m": 0.0,
+   "level": 0,
+   "depth_m": -3.2
   },
   {
    "c": 0,
@@ -4287,7 +4465,6 @@
    "land": true,
    "cells": 285,
    "votes": 11,
-   "forced": "city point (builder rule: cities are land)",
    "inner_mean": 2.5,
    "inner_median": 2.6,
    "inner_p75": 3.6,
@@ -4310,12 +4487,22 @@
    "c": 19,
    "r": 8,
    "land": false,
-   "cells": 164,
+   "cells": 276,
    "votes": 1,
-   "forced": "lagoon_sea (region)",
+   "forced": "lagoon (region)",
    "height_m": 0.0,
    "level": 0,
-   "depth_m": -13.8
+   "depth_m": -15.8
+  },
+  {
+   "c": 20,
+   "r": 8,
+   "land": false,
+   "cells": 207,
+   "votes": 0,
+   "height_m": 0.0,
+   "level": 0,
+   "depth_m": -24.6
   },
   {
    "c": 0,
@@ -4781,6 +4968,16 @@
    "level": 1
   },
   {
+   "c": 19,
+   "r": 9,
+   "land": false,
+   "cells": 285,
+   "votes": 0,
+   "height_m": 0.0,
+   "level": 0,
+   "depth_m": -28.4
+  },
+  {
    "c": 0,
    "r": 10,
    "land": true,
@@ -5244,11 +5441,21 @@
    "c": 19,
    "r": 10,
    "land": false,
-   "cells": 164,
+   "cells": 276,
    "votes": 0,
    "height_m": 0.0,
    "level": 0,
-   "depth_m": -13.1
+   "depth_m": -19.8
+  },
+  {
+   "c": 20,
+   "r": 10,
+   "land": false,
+   "cells": 207,
+   "votes": 0,
+   "height_m": 0.0,
+   "level": 0,
+   "depth_m": -33.2
   },
   {
    "c": 0,
@@ -5695,6 +5902,16 @@
    "height_m": 0.0,
    "level": 0,
    "depth_m": -12.0
+  },
+  {
+   "c": 19,
+   "r": 11,
+   "land": false,
+   "cells": 286,
+   "votes": 0,
+   "height_m": 0.0,
+   "level": 0,
+   "depth_m": -32.8
   },
   {
    "c": 0,
@@ -6160,11 +6377,21 @@
    "c": 19,
    "r": 12,
    "land": false,
-   "cells": 164,
+   "cells": 277,
    "votes": 0,
    "height_m": 0.0,
    "level": 0,
-   "depth_m": -24.2
+   "depth_m": -27.4
+  },
+  {
+   "c": 20,
+   "r": 12,
+   "land": false,
+   "cells": 206,
+   "votes": 0,
+   "height_m": 0.0,
+   "level": 0,
+   "depth_m": -39.7
   },
   {
    "c": 0,
@@ -6612,6 +6839,16 @@
    "depth_m": -10.7
   },
   {
+   "c": 19,
+   "r": 13,
+   "land": false,
+   "cells": 286,
+   "votes": 0,
+   "height_m": 0.0,
+   "level": 0,
+   "depth_m": -32.8
+  },
+  {
    "c": 0,
    "r": 14,
    "land": true,
@@ -7015,11 +7252,21 @@
    "c": 19,
    "r": 14,
    "land": false,
-   "cells": 164,
+   "cells": 278,
    "votes": 6,
    "height_m": 0.0,
    "level": 0,
-   "depth_m": -9.9
+   "depth_m": -11.9
+  },
+  {
+   "c": 20,
+   "r": 14,
+   "land": false,
+   "cells": 206,
+   "votes": 0,
+   "height_m": 0.0,
+   "level": 0,
+   "depth_m": -26.1
   },
   {
    "c": 0,
@@ -7394,6 +7641,30 @@
    "level": 4
   },
   {
+   "c": 19,
+   "r": 15,
+   "land": true,
+   "cells": 286,
+   "votes": 12,
+   "inner_mean": 113.7,
+   "inner_median": 93.7,
+   "inner_p75": 149.9,
+   "inner_max": 348.7,
+   "mean": 134.9,
+   "median": 111.6,
+   "min": 2.4,
+   "max": 411.3,
+   "p90": 271.2,
+   "peak": [
+    12.8083,
+    43.775,
+    411.3
+   ],
+   "centre_z": 130.1,
+   "height_m": 348.7,
+   "level": 2
+  },
+  {
    "c": 0,
    "r": 16,
    "land": true,
@@ -7743,17 +8014,17 @@
    "c": 19,
    "r": 16,
    "land": true,
-   "cells": 164,
+   "cells": 278,
    "votes": 13,
-   "inner_mean": 407.5,
-   "inner_median": 389.4,
-   "inner_p75": 452.3,
+   "inner_mean": 378.6,
+   "inner_median": 364.5,
+   "inner_p75": 423.7,
    "inner_max": 769.9,
-   "mean": 451.7,
-   "median": 408.3,
-   "min": 178.5,
+   "mean": 408.7,
+   "median": 376.0,
+   "min": 140.0,
    "max": 1282.4,
-   "p90": 626.4,
+   "p90": 566.7,
    "peak": [
     12.525,
     43.5583,
@@ -7761,6 +8032,30 @@
    ],
    "centre_z": 353.8,
    "height_m": 769.9,
+   "level": 3
+  },
+  {
+   "c": 20,
+   "r": 16,
+   "land": true,
+   "cells": 206,
+   "votes": 13,
+   "inner_mean": 202.2,
+   "inner_median": 183.4,
+   "inner_p75": 254.2,
+   "inner_max": 485.5,
+   "mean": 240.3,
+   "median": 213.1,
+   "min": 33.8,
+   "max": 821.1,
+   "p90": 409.6,
+   "peak": [
+    12.7583,
+    43.625,
+    821.1
+   ],
+   "centre_z": 183.0,
+   "height_m": 485.5,
    "level": 3
   },
   {
@@ -8080,6 +8375,30 @@
    "level": 3
   },
   {
+   "c": 19,
+   "r": 17,
+   "land": true,
+   "cells": 285,
+   "votes": 13,
+   "inner_mean": 615.2,
+   "inner_median": 549.6,
+   "inner_p75": 718.1,
+   "inner_max": 1450.2,
+   "mean": 571.7,
+   "median": 524.8,
+   "min": 280.4,
+   "max": 1450.2,
+   "p90": 855.3,
+   "peak": [
+    12.7083,
+    43.4583,
+    1450.2
+   ],
+   "centre_z": 846.0,
+   "height_m": 1450.2,
+   "level": 4
+  },
+  {
    "c": 0,
    "r": 18,
    "land": false,
@@ -8357,17 +8676,17 @@
    "c": 19,
    "r": 18,
    "land": true,
-   "cells": 102,
+   "cells": 174,
    "votes": 13,
-   "inner_mean": 516.7,
-   "inner_median": 519.3,
-   "inner_p75": 589.5,
+   "inner_mean": 489.2,
+   "inner_median": 473.0,
+   "inner_p75": 555.6,
    "inner_max": 760.7,
-   "mean": 502.5,
-   "median": 512.3,
+   "mean": 492.8,
+   "median": 489.2,
    "min": 227.3,
    "max": 760.7,
-   "p90": 626.5,
+   "p90": 624.8,
    "peak": [
     12.4917,
     43.2917,
@@ -8376,6 +8695,30 @@
    "centre_z": 476.9,
    "height_m": 760.7,
    "level": 3
+  },
+  {
+   "c": 20,
+   "r": 18,
+   "land": true,
+   "cells": 129,
+   "votes": 13,
+   "inner_mean": 674.0,
+   "inner_median": 652.6,
+   "inner_p75": 838.2,
+   "inner_max": 1325.8,
+   "mean": 616.1,
+   "median": 581.5,
+   "min": 272.3,
+   "max": 1325.8,
+   "p90": 988.6,
+   "peak": [
+    12.825,
+    43.2083,
+    1325.8
+   ],
+   "centre_z": 681.9,
+   "height_m": 1325.8,
+   "level": 4
   }
  ],
  "anchors": [

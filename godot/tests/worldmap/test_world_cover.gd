@@ -339,3 +339,14 @@ func test_an_unsatisfiable_instance_is_undone_restarted_and_reported() -> void:
 	assert_eq(out.restarts, WorldCover.RETRIES + 1, "every attempt failed and was restarted")
 	assert_eq(out.last_resort.size(), 4, "the greedy fill placed every cell and listed it")
 	assert_gt(out.last_resort_violations, 0, "and reported the pairs it had to allow")
+
+
+func test_the_low_hexes_of_a_marsh_zone_are_marsh() -> void:
+	var low := 0
+	for hex: Vector2i in _water.marsh_zone.keys():
+		var level := _relief.level_at(hex)
+		if level == ReliefLevels.SEA or level > 2:
+			continue
+		low += 1
+		assert_eq(_cover.cover_at(hex), WorldCover.MARSH, "the low hex %s of a marsh zone is marsh" % str(hex))
+	assert_gt(low, 0, "the Po delta and the lagoon edges have low hexes")

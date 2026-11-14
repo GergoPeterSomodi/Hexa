@@ -270,9 +270,9 @@ func test_counts_are_the_first_build_counts() -> void:
 	if not _ready_or_fail():
 		return
 	var s := _places.summary()
-	assert_eq(s["places"], 183, "183 places (authored, castles, generated)")
-	assert_eq(s["generated"], 124, "124 generated places: 24 villages and 100 hamlets")
-	assert_eq(s["ports"], 31, "31 ports (the Riviera, the lagoon, the Adriatic coast)")
+	assert_eq(s["places"], 123, "123 places (authored, castles, generated)")
+	assert_eq(s["generated"], 64, "64 generated places: 26 villages and 38 hamlets (the target is about 40 to 60; 100 before the tuning)")
+	assert_eq(s["ports"], 25, "25 ports (the Riviera, the lagoon, the Adriatic coast)")
 	assert_eq(s["capitals"], 1, "one capital")
 	assert_eq(s["monasteries"], 1, "the Certosa")
 	assert_eq(s["failures"], 0, "no failures")

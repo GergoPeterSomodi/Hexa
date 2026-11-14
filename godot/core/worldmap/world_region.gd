@@ -22,7 +22,9 @@ var ranges: Array[Dictionary] = []
 var passes: Array[Dictionary] = []
 ## Each valley: name, head (String), floor (PackedVector2Array), mouth (String).
 var valleys: Array[Dictionary] = []
-## Each river: name, class (int), line (PackedVector2Array).
+## Each river: name, class (int), line (PackedVector2Array), joins (String: the river it flows into, "" for a river that
+## reaches the sea, a lake or the edge of the window on its own; only an authored join may join another river), leaves
+## (String: the edge of the window it leaves by, "" when it does not leave; its last point is then on that edge's side).
 var rivers: Array[Dictionary] = []
 ## Each lake: name, width (String), width_km (float), axis (PackedVector2Array).
 var lakes: Array[Dictionary] = []
@@ -32,6 +34,10 @@ var gorges: Array[Dictionary] = []
 var places: Array[Dictionary] = []
 ## Each river city: name, river (String), form (String: straight or loop), bridge (String).
 var river_cities: Array[Dictionary] = []
+## The Venetian lagoon: a ring of lon/lat points; a hex whose centre lies inside it is lagoon sea (shallow water).
+var lagoon: PackedVector2Array = PackedVector2Array()
+## Each marsh zone: name (String), ring (PackedVector2Array of lon/lat). Lowland and plain hexes inside are marsh.
+var marsh_zones: Array[Dictionary] = []
 
 
 ## The region of a file's text, or null when the text is not a region file of this schema.
@@ -67,7 +73,8 @@ static func from_text(text: String) -> WorldRegion:
 			"mouth": str(v["mouth"])})
 	for item: Variant in d["rivers"]:
 		var rv: Dictionary = item
-		out.rivers.append({"name": str(rv["name"]), "class": int(rv["class"]), "line": _points(rv["line"])})
+		out.rivers.append({"name": str(rv["name"]), "class": int(rv["class"]), "line": _points(rv["line"]),
+			"joins": str(rv.get("joins", "")), "leaves": str(rv.get("leaves", ""))})
 	for item: Variant in d["lakes"]:
 		var lk: Dictionary = item
 		out.lakes.append({"name": str(lk["name"]), "width": str(lk["width"]), "width_km": float(lk["width_km"]),
@@ -80,6 +87,12 @@ static func from_text(text: String) -> WorldRegion:
 		var pl: Dictionary = item
 		out.places.append({"name": str(pl["name"]), "pos": _point(pl), "kind": str(pl["kind"]),
 			"source": str(pl["source"])})
+	if d.has("lagoon"):
+		var lg: Dictionary = d["lagoon"]
+		out.lagoon = _points(lg["ring"])
+	for item: Variant in d.get("marsh_zones", []):
+		var mz: Dictionary = item
+		out.marsh_zones.append({"name": str(mz["name"]), "ring": _points(mz["ring"])})
 	for item: Variant in d["river_cities"]:
 		var rc: Dictionary = item
 		out.river_cities.append({"name": str(rc["name"]), "river": str(rc["river"]), "form": str(rc["form"]),

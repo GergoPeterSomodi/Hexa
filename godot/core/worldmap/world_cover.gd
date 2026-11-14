@@ -110,6 +110,7 @@ var _frame_start: PackedInt32Array = PackedInt32Array()
 var _rng: Rng = null
 var _attempt_backtracks: int = 0
 var _hollows: Dictionary[Vector2i, bool] = {}  # land hexes with three or more higher neighbours (a basin or valley)
+var _marsh_zone: Dictionary[Vector2i, bool] = {}  # hexes in a region marsh zone (Po delta, Venetian lagoon edges)
 
 
 ## The cover of every land hex of the relief, from the grid, the relief, the heights, the water and one seed.
@@ -259,6 +260,7 @@ func _collect(relief: WorldRelief, heights: WorldHeights, water: WorldWater) -> 
 		_metres[i] = float(heights.height_m.get(hex, 0.0))
 		_lat[i] = float(_grid.lonlat_of(_grid.centre_km(hex)).y)
 		coastal[hex] = sea_near
+		_marsh_zone[hex] = water.marsh_zone.has(hex)
 		cliff[hex] = cliff_here
 		river_side[hex] = river_here
 		lake_side[hex] = lake_here
@@ -343,6 +345,13 @@ func _build_priors() -> void:
 			if w > 0.0:
 				_prior[i * COUNT + c] = w
 				mask = mask | (1 << c)
+		if bool(_marsh_zone.get(hex, false)) and cell_allowed(MARSH, level, metres, sea, cl, lat):
+			# A marsh zone (the Po delta, the lagoon edges): the low hexes are marsh and nothing else (a rule of the
+			# region data, not a weight). Hexes above level 2 keep their own choice.
+			for c: int in COUNT:
+				if c != MARSH:
+					_prior[i * COUNT + c] = 0.0
+			mask = 1 << MARSH
 		_initial[i] = mask
 		if mask == 0:
 			# No cover is allowed here: a rule error in the inputs. Reported by the search (input_dead_ends).

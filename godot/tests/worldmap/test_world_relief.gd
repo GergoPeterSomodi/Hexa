@@ -40,8 +40,8 @@ func test_level_histogram_is_the_extraction_histogram() -> void:
 	if not _ready_or_fail():
 		return
 	var summary := _relief.summary(_region.passes.size())
-	assert_eq(summary["hexes"], 371, "every hex of the window")
-	assert_eq(summary["levels"], [47, 31, 68, 56, 57, 65, 47], "sea, then lowland to high peaks (carved valleys included)")
+	assert_eq(summary["hexes"], 390, "every hex of the window")
+	assert_eq(summary["levels"], [55, 32, 70, 57, 60, 67, 49], "sea, then lowland to high peaks (carved valleys included)")
 
 
 func test_every_level_follows_from_its_metres() -> void:

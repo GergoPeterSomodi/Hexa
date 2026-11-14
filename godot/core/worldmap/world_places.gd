@@ -13,11 +13,13 @@ extends RefCounted
 ## A generated place is at least this many hexes from every settlement (03 section 6, spacing).
 const SPACING := 2
 ## Site score a generated place needs: a village at VILLAGE_SCORE or more (kept SPACING hexes from every settlement), a
-## hamlet at HAMLET_SCORE or more (kept HAMLET_SPACING hexes from every settlement: it may stand beside another place, so the
-## countryside is not empty).
+## hamlet at HAMLET_SCORE or more (kept HAMLET_SPACING hexes from every settlement, and HAMLET_GAP hexes from every other
+## hamlet: a hamlet may stand beside a village, so the countryside is not empty but not every good hex is a hamlet).
+## Tuned for the 40 to 60 hamlets of the region (docs/design/map/03 section 6): at 1.0 the region had about 100.
 const VILLAGE_SCORE := 3.0
-const HAMLET_SCORE := 1.0
+const HAMLET_SCORE := 4.0
 const HAMLET_SPACING := 1
+const HAMLET_GAP := 2
 ## Generated places stay off the hexes of level 5 and 6 (the mountains and the peaks).
 const MAX_GENERATED_LEVEL := 4
 ## Passes with a crest saddle at or above this height (metres) carry a hospice.
@@ -286,8 +288,8 @@ func _place_hospices(region: WorldRegion) -> void:
 
 
 ## Villages and hamlets: the land hexes by site score, best first. Villages go first: each is kept SPACING hexes from every
-## settlement. Then the hamlets take the lower-scoring sites that are still free, HAMLET_SPACING hexes from every settlement
-## (one hex: a hamlet may sit beside another place, so the countryside is not empty).
+## settlement. Then the hamlets take the sites that are still free, HAMLET_SPACING hexes from every settlement and HAMLET_GAP
+## hexes from every other hamlet (so a hamlet may sit beside a village, and the hamlets are thinned, not every good hex).
 func _place_generated() -> void:
 	var cands: Array[Vector2i] = []
 	for hex: Vector2i in site_score.keys():
@@ -295,7 +297,7 @@ func _place_generated() -> void:
 			continue
 		if _relief.level_at(hex) > MAX_GENERATED_LEVEL:
 			continue
-		if site_score[hex] >= HAMLET_SCORE:
+		if site_score[hex] >= minf(VILLAGE_SCORE, HAMLET_SCORE):
 			cands.append(hex)
 	cands.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 		var sa: float = site_score[a]
@@ -307,8 +309,17 @@ func _place_generated() -> void:
 		if site_score[hex] >= VILLAGE_SCORE and not settled_within(hex, SPACING):
 			_add("", hex, 2, false, 0, false, true)
 	for hex: Vector2i in cands:
-		if not _index.has(hex) and not settled_within(hex, HAMLET_SPACING):
+		if site_score[hex] >= HAMLET_SCORE and not _index.has(hex) and not settled_within(hex, HAMLET_SPACING) \
+				and not _hamlet_within(hex, HAMLET_GAP):
 			_add("", hex, 1, false, 0, false, true)
+
+
+## True when a hamlet (level 1, generated) lies less than radius hexes from the hex.
+func _hamlet_within(hex: Vector2i, radius: int) -> bool:
+	for pl: Dictionary in places:
+		if int(pl["level"]) == 1 and bool(pl["generated"]) and hex_distance(hex, pl["hex"]) < radius:
+			return true
+	return false
 
 
 ## Snaps an authored place to the best land hex within one hex of its true position (03 section 6). The true hex is kept on
