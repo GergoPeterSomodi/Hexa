@@ -105,5 +105,5 @@ func test_named_places_and_passes_land_in_the_hexes_the_extraction_script_chose(
 		assert_eq(grid.hex_of(pos.x, pos.y), expected["pass:" + str(ps["name"])], "pass %s" % ps["name"])
 		checked += 1
 	assert_eq(checked, region.places.size() + region.passes.size(), "every place and every pass is checked")
-	assert_eq(checked, 80, "56 places and 24 passes")
+	assert_eq(checked, 87, "63 places and 24 passes")
 	assert_eq(grid.hex_of(7.07, 46.10), Vector2i(3, 5), "a point from the region's gorge list (Martigny)")

@@ -26,14 +26,14 @@ func test_counts_are_the_extraction_report_counts() -> void:
 	if _heights == null:
 		fail_test("the file must read")
 		return
-	assert_eq(_heights.land.size(), 333, "every hex of the window")
+	assert_eq(_heights.land.size(), 371, "every hex of the window (the window runs to 12.6 E)")
 	var land := 0
 	for hex: Vector2i in _heights.land.keys():
 		if _heights.is_land(hex):
 			land += 1
-	assert_eq(land, 292, "292 land hexes (the coastline decides)")
-	assert_eq(_heights.height_m.size(), 292, "a height for every land hex")
-	assert_eq(_heights.anchors.size(), 56 + 24 + 4, "56 places, 24 passes and 4 gorges are anchored")
+	assert_eq(land, 324, "324 land hexes (the coastline decides)")
+	assert_eq(_heights.height_m.size(), 324, "a height for every land hex")
+	assert_eq(_heights.anchors.size(), 63 + 24 + 7, "63 places, 24 passes and 7 gorges are anchored")
 
 
 func test_known_hexes_hold_the_measured_heights() -> void:
@@ -47,7 +47,7 @@ func test_known_hexes_hold_the_measured_heights() -> void:
 	for hex: Vector2i in _heights.land.keys():
 		if not _heights.is_land(hex):
 			sea += 1
-	assert_eq(sea, 41, "41 sea hexes (the Ligurian and Tyrrhenian sea, the Gulf of Lion edge)")
+	assert_eq(sea, 47, "47 sea hexes (the Ligurian and Tyrrhenian sea, the Gulf of Lion edge, the lagoon of Venice)")
 	assert_false(_heights.has_hex(Vector2i(-40, -40)), "a hex outside the window is not in the file")
 	var milan := Vector2i(10, 8)
 	assert_almost_eq(_heights.height_m[milan], 125.3, 0.05, "Milan's hex, 125 m (plain)")

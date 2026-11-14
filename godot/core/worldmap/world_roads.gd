@@ -34,6 +34,8 @@ const TRAFFIC_UP := 4
 ## The capital links to every city (level 4 or more) within this many hexes.
 const CAPITAL_RANGE := 16
 const RANK_CAPITAL := 3
+## A main road (quality 2): the city links, joins between towns of level 3+, the coast links and the links over a pass with
+## a hospice. Only spurs to villages and hamlets, and joins of smaller places, stay tracks (quality 1).
 const RANK_CITY := 2
 const RANK_OTHER := 1
 ## Quality caps: the mountains (levels 5 and 6) take at most a road of quality 2; a pass is a track in 1480.
@@ -436,7 +438,7 @@ func _link_fixed_places() -> void:
 			link_failures.append("join: %s has no route to the network" % str(pl["name"]))
 			continue
 		var target: Vector2i = path[path.size() - 1]
-		var rank := RANK_CITY if (int(pl["level"]) >= 4 or places.level_at(target) >= 4) else RANK_OTHER
+		var rank := RANK_CITY if (int(pl["level"]) >= 3 and places.level_at(target) >= 3) else RANK_OTHER
 		_add_path(path, rank, "join", "")
 
 
@@ -465,13 +467,14 @@ func _link_passes() -> void:
 			var hex: Vector2i = pl["hex"]
 			if int(pl["level"]) >= 2 and hex != saddle:
 				goals[hex] = true
+		var hospice: bool = int(region.passes[p]["metres"]) >= WorldPlaces.HOSPICE_MIN_METRES
 		for e: Vector4i in pass_branch_edges(p):
 			if _rank.has(e):
 				continue
 			var path := _search([saddle], goals, e, 0)
 			if path.size() < 2:
 				continue
-			_add_path(path, RANK_OTHER, "pass", pass_name)
+			_add_path(path, RANK_CITY if hospice else RANK_OTHER, "pass", pass_name)
 
 
 ## Rule 6: the sea ports, from west to east, each to the next along the coast.
@@ -487,7 +490,7 @@ func _link_ports() -> void:
 	for i: int in range(ports.size() - 1):
 		var a: Vector2i = ports[i]["hex"]
 		var b: Vector2i = ports[i + 1]["hex"]
-		_connect(a, b, RANK_OTHER, "coast")
+		_connect(a, b, RANK_CITY, "coast")
 
 
 static func _pair_key(a: String, b: String) -> String:

@@ -86,6 +86,11 @@ func test_the_named_levels_capital_and_castles() -> void:
 	assert_eq(int(_places.find("Genoa")["level"]), 4, "Genoa is a city")
 	assert_true(bool(_places.find("Genoa")["port"]), "Genoa is a port")
 	assert_eq(int(_places.find("Genoa")["castle"]), 2, "Genoa has a castle of level 2")
+	var venice := _places.find("Venice")
+	assert_eq(int(venice["level"]), 5, "Venice is a great city on the lagoon")
+	assert_true(bool(venice["port"]), "Venice is a port (its quay is on the lagoon's sea edge)")
+	assert_eq(int(_places.find("Padua")["level"]), 4, "Padua is a city")
+	assert_eq(int(_places.find("Ferrara")["level"]), 4, "Ferrara is a city on the Po")
 	assert_eq(int(_places.find("Turin")["level"]), 3, "Turin is a town (size 15)")
 	assert_eq(int(_places.find("Bern")["level"]), 2, "Bern is a village (size 5)")
 	assert_eq(int(_places.find("Pavia")["level"]), 4, "Pavia is a city")
@@ -156,16 +161,25 @@ func test_generated_places_are_villages_and_hamlets_kept_apart() -> void:
 			assert_true(int(pl["level"]) == 1 or int(pl["level"]) == 2,
 				"generated place %s is a hamlet or a village" % str(pl["hex"]))
 	assert_gte(generated.size(), 15, "the region gets generated villages")
+	# Villages keep SPACING hexes from every village and every authored place; hamlets only take their own hex (spacing 1),
+	# so they may stand beside a place and the countryside is not empty.
+	for pl: Dictionary in _places.places:
+		if not bool(pl["generated"]) or int(pl["level"]) != 2:
+			continue
+		var a: Vector2i = pl["hex"]
+		for other: Dictionary in _places.places:
+			var b: Vector2i = other["hex"]
+			if b == a or int(other["level"]) < 2:
+				continue
+			assert_gte(WorldPlaces.hex_distance(a, b), WorldPlaces.SPACING,
+				"village %s and %s are kept apart" % [str(a), str(b)])
 	for pl: Dictionary in _places.places:
 		if not bool(pl["generated"]):
 			continue
 		var a: Vector2i = pl["hex"]
 		for other: Dictionary in _places.places:
-			var b: Vector2i = other["hex"]
-			if b == a or int(other["level"]) < 1:
-				continue
-			assert_gte(WorldPlaces.hex_distance(a, b), WorldPlaces.SPACING,
-				"%s and %s are kept apart" % [str(a), str(b)])
+			if other["hex"] == a:
+				assert_true(other == pl, "%s: one place per hex" % str(a))
 
 
 func test_generated_places_avoid_the_river_cities_and_landmarks() -> void:
@@ -256,8 +270,9 @@ func test_counts_are_the_first_build_counts() -> void:
 	if not _ready_or_fail():
 		return
 	var s := _places.summary()
-	assert_eq(s["places"], 75, "75 places (authored, castles, generated)")
-	assert_eq(s["generated"], 23, "23 generated villages")
+	assert_eq(s["places"], 183, "183 places (authored, castles, generated)")
+	assert_eq(s["generated"], 124, "124 generated places: 24 villages and 100 hamlets")
+	assert_eq(s["ports"], 31, "31 ports (the Riviera, the lagoon, the Adriatic coast)")
 	assert_eq(s["capitals"], 1, "one capital")
 	assert_eq(s["monasteries"], 1, "the Certosa")
 	assert_eq(s["failures"], 0, "no failures")

@@ -458,11 +458,14 @@ func _draw_crossings() -> void:
 
 
 ## Settlements as markers by level (hamlet dot, village ring dot, town square, city square, great city square with a ring),
-## a gold ring for the capital, a small tower for a castle, names from the town level up. Landmarks: a gold diamond for a
-## hospice on its saddle, a cross for a monastery.
+## a gold ring for the capital, a small tower for a castle. Landmarks: a gold diamond for a hospice on its saddle, a cross for a
+## monastery. The names (WorldLabels) come from the town level up, more of them as the view zooms in, and a name that would
+## collide with a marker, a panel or another name is moved to another spot or dropped.
 func _draw_settlements() -> void:
 	var font := ThemeDB.fallback_font
 	var reach := Rect2(Vector2.ZERO, size).grow(40.0)
+	var boxes: Array[Rect2] = []  # the boxes the names keep off: every marker in reach, and the panels
+	var names: Array[Dictionary] = []
 	for pl: Dictionary in places.places:
 		var hex: Vector2i = pl["hex"]
 		var at := km_to_px(grid.centre_km(hex))
@@ -470,6 +473,13 @@ func _draw_settlements() -> void:
 			continue
 		var level := int(pl["level"])
 		var capital := bool(pl["capital"])
+		var half := _marker_half(level, capital)
+		boxes.append(Rect2(at - Vector2(half, half), Vector2(2.0 * half, 2.0 * half)))
+		var label := str(pl["name"])
+		if label != "" and _label_tier(level):
+			var fs := 14 if level >= 4 else 12
+			names.append({"name": label, "at": at, "width": font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x,
+				"size": float(fs), "rank": level * 10 + (5 if capital else 0), "half": half})
 		match level:
 			1:
 				draw_circle(at, 2.2, TEXT)
@@ -486,15 +496,12 @@ func _draw_settlements() -> void:
 			draw_arc(at, 12.0, 0.0, TAU, 32, GOLD, 2.0, true)
 		if int(pl["castle"]) > 0:
 			draw_rect(Rect2(at + Vector2(7.0, -13.0), Vector2(6.0, 7.0)), CASTLE_INK)
-		var label := str(pl["name"])
-		if label != "" and (level >= 3 or (level == 2 and px_per_km >= 5.0)):
-			draw_string(font, at + Vector2(10.0, -6.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1,
-				14 if level >= 4 else 12, TEXT)
 	for lm: Dictionary in places.landmarks:
 		var lh: Vector2i = lm["hex"]
 		var at := km_to_px(grid.centre_km(lh))
 		if not reach.has_point(at):
 			continue
+		boxes.append(Rect2(at - Vector2(7.0, 7.0), Vector2(14.0, 14.0)))
 		if str(lm["kind"]) == "hospice":
 			var diamond := PackedVector2Array([at + Vector2(0.0, -6.0), at + Vector2(6.0, 0.0),
 				at + Vector2(0.0, 6.0), at + Vector2(-6.0, 0.0)])
@@ -503,6 +510,49 @@ func _draw_settlements() -> void:
 		else:
 			draw_line(at + Vector2(-4.0, 0.0), at + Vector2(4.0, 0.0), INK, 1.5)
 			draw_line(at + Vector2(0.0, -4.0), at + Vector2(0.0, 4.0), INK, 1.5)
+	boxes.append_array(_panel_boxes())
+	var bounds := Rect2(0.0, MARGIN_TOP, size.x, size.y - MARGIN_TOP)
+	for item: Dictionary in WorldLabels.place(names, boxes, bounds):
+		var box: Rect2 = item["box"]
+		draw_string(font, box.position + Vector2(0.0, float(item["size"]) + 1.0), str(item["name"]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, int(item["size"]), TEXT)
+
+
+## The half size of a settlement's marker on the map (the ring of the great city and the capital is the largest).
+func _marker_half(level: int, capital: bool) -> float:
+	if level >= 5 or capital:
+		return 12.0
+	match level:
+		1:
+			return 3.0
+		2:
+			return 5.0
+		3:
+			return 6.0
+	return 8.0
+
+
+## The names shown at a level and zoom: the great cities, cities and capitals always; towns from a zoom of 1 pixel per km;
+## villages from 3 pixels per km.
+func _label_tier(level: int) -> bool:
+	if level >= 4:
+		return true
+	if level == 3:
+		return px_per_km >= 1.0
+	return level == 2 and px_per_km >= 3.0
+
+
+## The boxes of the panels drawn over the map: the title bar is outside the names' bounds; the cover legend (bottom left) and
+## the network legend (top right) are kept clear.
+func _panel_boxes() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	if cover != null:
+		var rows := COVER_COLOURS.size()
+		var box := 68.0 + float(rows) * 18.0
+		out.append(Rect2(8.0, size.y - box - 16.0, 262.0, box + 8.0))
+	if roads != null:
+		out.append(Rect2(size.x - 258.0, MARGIN_TOP + 8.0, 250.0, 278.0))
+	return out
 
 
 func _draw_square(at: Vector2, r: float) -> void:

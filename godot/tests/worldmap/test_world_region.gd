@@ -28,10 +28,10 @@ func test_counts_of_every_kind() -> void:
 	assert_eq(_region.ranges.size(), 12, "12 ranges")
 	assert_eq(_region.passes.size(), 24, "24 passes")
 	assert_eq(_region.valleys.size(), 16, "16 valleys")
-	assert_eq(_region.rivers.size(), 15, "15 rivers, tributaries included")
+	assert_eq(_region.rivers.size(), 17, "17 rivers: tributaries, the Brenta and the Piave included")
 	assert_eq(_region.lakes.size(), 8, "8 lake axes (Como has a south arm)")
 	assert_eq(_region.gorges.size(), 7, "7 named gorges (+ Rhone at Gletsch) (Rhone at Martigny, Ticino at Biaschina, Dora Baltea at Bard, Adige at Chiusa, Rhone at Fort de l'Ecluse, Po at its source)")
-	assert_eq(_region.places.size(), 56, "56 notable places in the window")
+	assert_eq(_region.places.size(), 63, "63 notable places in the window (Venice, Padua, Vicenza, Treviso, Chioggia, Ravenna, Ferrara added)")
 	assert_eq(_region.river_cities.size(), 4, "Verona, Florence, Pisa and Geneva")
 
 

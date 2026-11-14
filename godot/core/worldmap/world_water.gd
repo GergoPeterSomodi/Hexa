@@ -21,6 +21,9 @@ const NO_CORNER := Vector3i(-1, -1, -1)
 const NO_EDGE := Vector4i(-1, -1, -1, -1)
 ## A lake at least this fraction of a hex wide is a whole water hex (decision D3); narrower lakes are ribbons on edges.
 const LAKE_WHOLE_FRACTION := 0.6
+## A ribbon lake's routed chain is clipped to its authored axis ends: no step may lie further than this many hex widths
+## beyond an end of the axis (the lake ends where it ends; the routing corners are about a hex apart).
+const LAKE_CLIP_HEX := 0.5
 ## A river may not climb more than this from one corner to the next (metres).
 const DOWNHILL_TOLERANCE_M := 60.0
 ## Edge costs, in multiples of a hex's circumradius.
@@ -581,10 +584,10 @@ func _route_lakes() -> void:
 					hexes.append(hex)
 		else:
 			# The lake is routed along its own axis (no downhill rule: a lake is flat water; no crest cost: the Adda and the
-			# Lecco gap cross the prealps).
+			# Lecco gap cross the prealps). The chain is then clipped to the axis ends (LAKE_CLIP_HEX).
 			_lake_mode = true
-			var path := _without_loops(_route(_nearest_corner(km[0], false), _nearest_corner(km[km.size() - 1], false),
-				km, false, false))
+			var path := _clip_to_axis(_without_loops(_route(_nearest_corner(km[0], false),
+				_nearest_corner(km[km.size() - 1], false), km, false, false)), km)
 			_lake_mode = false
 			if path.is_empty():
 				route_failures.append("lake %s" % lk["name"])
@@ -599,6 +602,39 @@ func _route_lakes() -> void:
 				corners = path
 		lakes.append({"name": str(lk["name"]), "width": str(lk["width"]), "whole": whole,
 			"corners": corners, "steps": steps, "hexes": hexes})
+
+
+## The chain with its steps beyond the axis ends taken off: while the first (or last) step's midpoint lies more than
+## LAKE_CLIP_HEX hex widths beyond the axis end, that corner goes. A chain keeps at least two corners.
+func _clip_to_axis(path: Array[Vector3i], km: PackedVector2Array) -> Array[Vector3i]:
+	var out := path.duplicate()
+	var limit := LAKE_CLIP_HEX * grid.hex_w_km
+	while out.size() > 2 and _beyond_axis(_corner_mid(out[0], out[1]), km, limit, true):
+		out.remove_at(0)
+	while out.size() > 2 and _beyond_axis(_corner_mid(out[out.size() - 2], out[out.size() - 1]), km, limit, false):
+		out.remove_at(out.size() - 1)
+	return out
+
+
+## The midpoint of the edge between two corners that share one (the midpoint of their corner points when they do not).
+func _corner_mid(a: Vector3i, b: Vector3i) -> Vector2:
+	var e := _shared_edge(a, b)
+	if e != NO_EDGE:
+		return edge_mid_km(e)
+	return (corner_pos(a) + corner_pos(b)) / 2.0
+
+
+## True when a point lies beyond an end of the axis by more than limit: along the first segment before its start (at_start),
+## or along the last segment past its end.
+static func _beyond_axis(p: Vector2, km: PackedVector2Array, limit: float, at_start: bool) -> bool:
+	var n := km.size()
+	if n < 2:
+		return false
+	if at_start:
+		var dir := (km[1] - km[0]).normalized()
+		return (p - km[0]).dot(dir) < -limit
+	var last := (km[n - 1] - km[n - 2]).normalized()
+	return (p - km[n - 1]).dot(last) > limit
 
 
 func _route_rivers() -> void:
@@ -958,7 +994,7 @@ func _build_streams() -> void:
 			continue
 		var p := _flood_parent[c]
 		acc[p] = int(acc.get(p, 1)) + int(acc[c])
-		if network.has(c) or _touches_water(c):
+		if network.has(c) or _touches_water(c) or _touches_city(c) or _touches_city(p):
 			continue
 		var e := _shared_edge(c, p)
 		if e == NO_EDGE or river_edge.has(e) or lake_edge.has(e) or relief.crest_edges.has(e):
@@ -966,6 +1002,16 @@ func _build_streams() -> void:
 		if int(acc[c]) >= STREAM_MIN_CORNERS:
 			stream_edge[e] = int(acc[c])
 	stream_sinks = 0
+
+
+## True when a corner touches a river city's hex. No stream starts there or runs along the city's six edges (04 section 3.6:
+## none of them carries water, and the city's bridge is inside the hex).
+func _touches_city(key: Vector3i) -> bool:
+	for h: Vector2i in corner_hexes_of(key):
+		for city: String in city_hex.keys():
+			if city_hex[city] == h:
+				return true
+	return false
 
 
 func _touches_water(key: Vector3i) -> bool:

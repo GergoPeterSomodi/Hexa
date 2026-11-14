@@ -1,8 +1,8 @@
 {
   "schema": "hexa-godot/worldmap-region/1",
   "name": "Alps and Po (prototype region, 1480)",
-  "note": "Hand-written skeleton for the map prototype (docs/design/map/README.md section 8, step 1). Status of the hand-written lines: ranges (spines), passes, valleys (floor lines), rivers (course lines), lakes (axes) and gorges are hand-written, like the tributaries; their heights are not. Valley floors and mountain river heights are carved from ETOPO along these lines (tools/worldmap/extract_heights.py, carving rule in the heights file). Heights are NOT here: they come from NOAA ETOPO 2022 (60 arc-second, ice surface) through tools/worldmap/extract_heights.py, which writes godot/data/worldmap/heights_alps_po.json. Points are [longitude, latitude] in degrees. Lines are approximate (about 5 to 10 km); the heights are measured, the lines are drawn from the real valleys, ridges and river courses by hand. Real pass heights in metres are from the pass's official height; they are checked against the measured values in the extraction report.",
-  "window": {"lon_west": 5.6, "lon_east": 11.9, "lat_south": 43.2, "lat_north": 47.3},
+  "note": "Hand-written skeleton for the map prototype (docs/design/map/README.md section 8, step 1; the window widened to 12.6 E in step 5 for Venice, the lagoon and the Po delta). Status of the hand-written lines: ranges (spines), passes, valleys (floor lines), rivers (course lines), lakes (axes) and gorges are hand-written, like the tributaries; their heights are not. Valley floors and mountain river heights are carved from ETOPO along these lines (tools/worldmap/extract_heights.py, carving rule in the heights file). Heights are NOT here: they come from NOAA ETOPO 2022 (60 arc-second, ice surface) through tools/worldmap/extract_heights.py, which writes godot/data/worldmap/heights_alps_po.json. Points are [longitude, latitude] in degrees. Lines are approximate (about 5 to 10 km); the heights are measured, the lines are drawn from the real valleys, ridges and river courses by hand. Real pass heights in metres are from the pass's official height; they are checked against the measured values in the extraction report.",
+  "window": {"lon_west": 5.6, "lon_east": 12.6, "lat_south": 43.2, "lat_north": 47.3},
   "grid": {"hex_w_km": 28.0, "deg_km": 111.2, "ref_lat": 45.25},
   "cover_seed": 1480,
   "coastline": "godot/data/geography/land.json",
@@ -70,7 +70,7 @@
   ],
 
   "rivers": [
-    {"name": "Po", "class": 3, "line": [[7.10, 44.67], [7.20, 44.72], [7.49, 44.64], [7.68, 44.93], [7.68, 45.06], [7.88, 45.19], [8.03, 45.22], [8.27, 45.20], [8.45, 45.13], [8.63, 45.00], [9.00, 45.03], [9.18, 45.02], [9.70, 45.05], [10.03, 45.05], [10.43, 44.99], [10.66, 44.93], [11.12, 44.98], [11.62, 44.85]]},
+    {"name": "Po", "class": 3, "line": [[7.10, 44.67], [7.20, 44.72], [7.49, 44.64], [7.68, 44.93], [7.68, 45.06], [7.88, 45.19], [8.03, 45.22], [8.27, 45.20], [8.45, 45.13], [8.63, 45.00], [9.00, 45.03], [9.18, 45.02], [9.70, 45.05], [10.03, 45.05], [10.43, 44.99], [10.66, 44.93], [11.12, 44.98], [11.62, 44.85], [11.85, 44.88], [12.05, 44.93], [12.25, 44.93], [12.42, 44.92]], "note": "the lower Po is the 1480 course, approximate: its mouth follows the 1480 coast of the coastline file (about 12.4 E), further west than the modern delta (about 12.5 E)"},
     {"name": "Ticino", "class": 2, "line": [[8.60, 46.52], [8.78, 46.42], [8.97, 46.36], [9.02, 46.19], [8.80, 46.17], [8.63, 45.73], [8.66, 45.50], [8.85, 45.32], [9.02, 45.22], [9.16, 45.19]]},
     {"name": "Adda", "class": 2, "line": [[10.13, 46.54], [10.16, 46.21], [9.87, 46.17], [9.60, 46.14], [9.38, 46.15], [9.40, 45.86], [9.52, 45.55], [9.50, 45.31], [9.70, 45.10]]},
     {"name": "Dora Baltea", "class": 2, "line": [[6.97, 45.80], [7.10, 45.76], [7.32, 45.74], [7.50, 45.68], [7.70, 45.58], [7.87, 45.47], [7.92, 45.33], [7.88, 45.19]]},
@@ -79,10 +79,12 @@
     {"name": "Sesia", "class": 2, "line": [[7.85, 45.93], [8.00, 45.80], [8.25, 45.73], [8.30, 45.60], [8.40, 45.40], [8.42, 45.32], [8.43, 45.12]]},
     {"name": "Oglio", "class": 2, "line": [[10.30, 46.00], [10.18, 45.85], [10.05, 45.72], [9.97, 45.67], [9.92, 45.40], [10.18, 45.22], [10.45, 45.02]]},
     {"name": "Mincio", "class": 1, "line": [[10.69, 45.44], [10.76, 45.25], [10.79, 45.16], [10.92, 45.03]]},
-    {"name": "Adige", "class": 2, "line": [[10.51, 46.84], [10.60, 46.64], [11.16, 46.67], [11.35, 46.50], [11.25, 46.30], [11.12, 46.07], [11.04, 45.89], [10.99, 45.44], [11.31, 45.19], [11.55, 45.15]]},
+    {"name": "Adige", "class": 2, "line": [[10.51, 46.84], [10.60, 46.64], [11.16, 46.67], [11.35, 46.50], [11.25, 46.30], [11.12, 46.07], [11.04, 45.89], [10.99, 45.44], [11.31, 45.19], [11.55, 45.15], [11.79, 45.08], [12.03, 45.14], [12.22, 45.20]], "note": "the lower Adige (below Legnago) is approximate: a 1480 course to the lagoon mouths at Chioggia"},
     {"name": "Arno", "class": 2, "line": [[11.70, 43.88], [11.66, 43.70], [11.55, 43.62], [11.40, 43.66], [11.25, 43.77], [10.95, 43.72], [10.64, 43.66], [10.40, 43.72], [10.28, 43.68]]},
     {"name": "Rhone", "class": 2, "line": [[8.38, 46.56], [8.30, 46.56], [7.99, 46.32], [7.80, 46.28], [7.36, 46.23], [7.07, 46.10], [6.95, 46.25], [6.92, 46.40], [6.60, 46.38], [6.15, 46.20], [5.90, 46.10], [5.73, 46.07], [5.50, 46.00]]},
     {"name": "Rhine (Alpine)", "class": 2, "line": [[8.67, 46.60], [8.85, 46.70], [9.20, 46.78], [9.53, 46.85], [9.50, 47.00], [9.45, 47.10]]},
+    {"name": "Brenta", "class": 2, "line": [[11.65, 46.02], [11.73, 45.77], [11.85, 45.60], [11.95, 45.41], [12.10, 45.30], [12.26, 45.22]], "note": "approximate: from the Brenta's head to its mouth in the lagoon at Brondolo"},
+    {"name": "Piave", "class": 2, "line": [[12.46, 46.62], [12.22, 46.14], [12.05, 45.77], [12.25, 45.72], [12.46, 45.66], [12.58, 45.52]], "note": "approximate: from Monte Peralba to the sea (the mouth is at the window's edge, about 12.6 E)"},
     {"name": "Lambro", "class": 1, "line": [[9.30, 45.84], [9.27, 45.58], [9.31, 45.42], [9.46, 45.27], [9.55, 45.12]]},
     {"name": "Taro", "class": 1, "line": [[9.93, 44.43], [10.05, 44.52], [10.12, 44.66], [10.33, 44.80], [10.48, 44.96]]}
   ],
@@ -164,8 +166,17 @@
     {"name": "Hospice Great St Bernard", "lon": 7.17, "lat": 45.87, "kind": "hospice", "source": "hand"},
     {"name": "Hospice Simplon", "lon": 8.03, "lat": 46.26, "kind": "hospice", "source": "hand"},
     {"name": "Hospice St Gotthard", "lon": 8.56, "lat": 46.56, "kind": "hospice", "source": "hand"},
-    {"name": "Bard fort", "lon": 7.71, "lat": 45.60, "kind": "castle", "source": "hand"}
+    {"name": "Bard fort", "lon": 7.71, "lat": 45.60, "kind": "castle", "source": "hand"},
+    {"name": "Venice", "lon": 12.33, "lat": 45.44, "kind": "city", "source": "hand", "note": "on the lagoon: a great city and a port"},
+    {"name": "Padua", "lon": 11.88, "lat": 45.41, "kind": "city", "source": "hand"},
+    {"name": "Vicenza", "lon": 11.55, "lat": 45.55, "kind": "town", "source": "hand"},
+    {"name": "Treviso", "lon": 12.25, "lat": 45.67, "kind": "town", "source": "hand"},
+    {"name": "Chioggia", "lon": 12.28, "lat": 45.22, "kind": "town", "source": "hand"},
+    {"name": "Ravenna", "lon": 12.20, "lat": 44.42, "kind": "town", "source": "hand"},
+    {"name": "Ferrara", "lon": 11.62, "lat": 44.84, "kind": "city", "source": "hand", "note": "on the Po"}
   ],
+
+  "lagoon_sea": [[12.26, 45.50], [12.30, 45.38], [12.38, 45.30], [12.27, 45.25], [12.42, 45.45], [12.36, 45.52]],
 
   "river_cities": [
     {"name": "Verona", "river": "Adige", "form": "loop", "bridge": "inside", "note": "the Adige loops round the city (10.99, 45.44)"},
@@ -174,5 +185,5 @@
     {"name": "Geneva", "river": "Rhone", "form": "straight", "bridge": "inside", "note": "the Rhone leaves the lake and crosses the city (6.14, 46.20)"}
   ],
 
-  "not_in_window": ["Constance (lake, lat 47.5)", "Basel (Rhine river city, lat 47.56)", "Venice (lon 12.33)", "Po delta and Adriatic (lon above 11.9)", "Lyon, Marseille, Dijon (lon below 5.6)"]
+  "not_in_window": ["Constance (lake, lat 47.5)", "Basel (Rhine river city, lat 47.56)", "Trieste and the Istrian coast (lon above 12.6)", "Lyon, Marseille, Dijon (lon below 5.6)"]
 }

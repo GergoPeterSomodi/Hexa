@@ -181,10 +181,40 @@ func test_the_build_is_repeatable_and_the_counts_are_the_first_build_counts() ->
 	var again := WorldRoads.build(_grid, _relief, _water, _places, _region)
 	assert_eq(again.summary(), _roads.summary(), "the same inputs give the same network")
 	var s := _roads.summary()
-	assert_eq(int(s["edges"]), 202, "202 road edges")
-	assert_eq(int(s["links"]), 114, "114 links")
+	assert_eq(int(s["edges"]), 262, "262 road edges")
+	assert_eq(int(s["links"]), 198, "198 links")
 	assert_eq(int(s["link_failures"]), 0, "no link failures")
-	assert_eq(int(s["network_hexes"]), 168, "168 hexes on a road")
+	assert_eq(int(s["network_hexes"]), 227, "227 hexes on a road")
+	var q: Array = s["qualities"]
+	assert_eq(int(q[1]), 121, "121 track edges (spurs to villages and hamlets, passes without a hospice)")
+	assert_eq(int(q[2]), 94, "94 road edges (joins between towns, the coast, the passes with a hospice)")
+	assert_eq(int(q[3]), 47, "47 highway edges (from Milan and between the cities)")
+
+
+func test_main_roads_join_towns_and_cross_hospice_passes() -> void:
+	if not _ready_or_fail():
+		return
+	for ln: Dictionary in _roads.links:
+		if str(ln["kind"]) == "join":
+			var a: Vector2i = ln["from"]
+			var b: Vector2i = ln["to"]
+			if _places.level_at(a) >= 3 and _places.level_at(b) >= 3:
+				for i: int in (ln["path"] as Array).size() - 1:
+					var e := WorldGrid.edge_key((ln["path"] as Array)[i], (ln["path"] as Array)[i + 1])
+					if not _places.pass_edges.has(e):
+						assert_gte(_roads.quality_of(e), 2, "a join between towns of level 3+ is a road")
+		if str(ln["kind"]) == "pass":
+			var p := _pass_index(str(ln["via"]))
+			if p < 0 or int(_region.passes[p]["metres"]) < WorldPlaces.HOSPICE_MIN_METRES:
+				continue
+			for i: int in (ln["path"] as Array).size() - 1:
+				var e2 := WorldGrid.edge_key((ln["path"] as Array)[i], (ln["path"] as Array)[i + 1])
+				if not _places.pass_edges.has(e2):
+					assert_gte(_roads.quality_of(e2), 2, "%s: the link to a hospice pass is a road" % ln["via"])
+	for p: int in _places.pass_saddles.keys():
+		assert_gte(_roads.road_edges_of_pass(p), 1, "%s: a road over the pass" % _region.passes[p]["name"])
+	assert_gte(_roads.road_edges_of_pass(_pass_index("Furka")), 2, "Furka: a road on both sides")
+	assert_gte(_roads.road_edges_of_pass(_pass_index("Bernina")), 2, "Bernina: a road on both sides")
 
 
 func _is_city_edge(e: Vector4i) -> bool:

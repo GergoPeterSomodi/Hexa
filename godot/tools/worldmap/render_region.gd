@@ -73,6 +73,8 @@ func _render() -> void:
 		await _shot(out_dir.path_join(prefix + "places_apennine_crossings.png"))
 		view.set_view(9.16, 45.12, 9.0)
 		await _shot(out_dir.path_join(prefix + "places_pavia_po.png"))
+		view.set_view(12.1, 45.3, 8.0)
+		await _shot(out_dir.path_join(prefix + "places_venice.png"))
 	elif with_cover:
 		var cover_water := WorldWater.build(grid, relief, heights, region)
 		var cover := WorldCover.build(grid, relief, heights, cover_water, region.cover_seed)

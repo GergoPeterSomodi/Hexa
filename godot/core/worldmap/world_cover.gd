@@ -329,7 +329,8 @@ func _build_priors() -> void:
 					w *= 1.25 if level >= 3 and level <= 5 else 1.0
 				MARSH:
 					w *= 1.0 + 2.5 * float(flood) + 2.0 * float(lake) + 1.0 * float(basin)
-					w *= 1.5 if sea and wet else 1.0
+					# A river mouth on the low coast is a delta (step 5: the Po delta is marsh): four times the weight.
+					w *= (4.0 if level <= 1 else 1.5) if sea and wet else 1.0
 				ROCK:
 					if level == 3:
 						w *= 3.0 if cl else 1.0

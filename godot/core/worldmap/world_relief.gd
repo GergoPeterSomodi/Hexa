@@ -6,13 +6,18 @@
 ## spine segments, the same test as the Python ridge walls), and both hexes are at or above the range's crest level.
 ## A spine crossing an edge whose hex is lower is a gap, reported and not drawn as a crest.
 ## Pass: the crest hex nearest to the pass is its saddle; the crest edges of the saddle carry the pass. A pass with no
-## crest hex near it (a low pass such as Giovi) gets the nearest land hex and no pass edges.
+## crest hex near it (a low pass such as Giovi) gets the nearest land hex and no pass edges. At 28 km two passes can share
+## the nearest crest hex (Gotthard and Furka, Splugen and San Bernardino, Julier and Bernina): the pass nearest its saddle
+## keeps it, and the other takes the nearest free crest hex of its own range within SADDLE_REACH_HEXES hex widths. Every pass
+## with a crest therefore has its own saddle and its own pass edges (the open crest edges beside it).
 ## Pure: no files, no engine calls.
 class_name WorldRelief
 extends RefCounted
 
 ## A pass whose nearest crest hex is farther than this many hex widths gets no crest saddle.
 const PASS_CREST_RANGE_HEXES := 1.0
+## A pass whose nearest crest hex is taken by a nearer pass takes the nearest free crest hex of its range within this reach.
+const SADDLE_REACH_HEXES := 1.5
 
 var grid: WorldGrid
 var levels: Dictionary[Vector2i, int] = {}  # every hex of the heights file: 0 sea, 1 to 6 land (carved valleys included)
@@ -22,6 +27,8 @@ var pass_edges: Dictionary[Vector4i, int] = {}  # edge key -> index of the pass 
 var pass_hex: Dictionary[int, Vector2i] = {}  # pass index -> its saddle hex (or the nearest land hex)
 var pass_km: Dictionary[int, float] = {}  # pass index -> distance in km from the pass to its saddle hex centre
 var pass_has_crest: Dictionary[int, bool] = {}  # pass index -> its saddle hex carries crest edges
+var pass_saddles: Dictionary[int, Vector2i] = {}  # pass index -> its own saddle hex, for the passes with a crest (no two share)
+var saddle_failures: Array[String] = []  # passes with a crest whose saddle found no free crest hex of their range (none expected)
 var gaps: Array[String] = []  # spine crossings on edges with a hex below the range's crest level
 var dangling_corners: Array[String] = []  # corners where exactly one crest edge meets: ends of a crest chain
 
@@ -119,9 +126,12 @@ func _find_passes(region: WorldRegion) -> void:
 		for h: Vector2i in WorldGrid.edge_hexes(key):
 			crest_hexes[h] = true
 	var limit := PASS_CREST_RANGE_HEXES * grid.hex_w_km
+	var pos_of: Dictionary[int, Vector2] = {}
+	var crest_order: Array[Dictionary] = []  # each pass with a crest: its nearest crest hex and the distance (km)
 	for p: int in region.passes.size():
 		var lonlat: Vector2 = region.passes[p]["pos"]
 		var pos := grid.km_of(lonlat.x, lonlat.y)
+		pos_of[p] = pos
 		var best := Vector2i.ZERO
 		var best_km := INF
 		for h: Vector2i in crest_hexes.keys():
@@ -129,24 +139,88 @@ func _find_passes(region: WorldRegion) -> void:
 			if dist < best_km:
 				best_km = dist
 				best = h
-		var crest := best_km <= limit
-		if not crest:
-			best_km = INF
-			for h: Vector2i in levels.keys():
-				if level_at(h) == ReliefLevels.SEA:
-					continue
-				var dist := grid.centre_km(h).distance_to(pos)
-				if dist < best_km:
-					best_km = dist
-					best = h
-		pass_hex[p] = best
-		pass_km[p] = best_km
-		pass_has_crest[p] = crest
-		if crest:
-			for d: int in 6:
-				var key := WorldGrid.edge_key(best, grid.neighbour(best, d))
-				if crest_edges.has(key):
-					pass_edges[key] = p
+		if best_km <= limit:
+			pass_has_crest[p] = true
+			crest_order.append({"p": p, "hex": best, "km": best_km})
+		else:
+			pass_has_crest[p] = false
+			_set_land_saddle(p, pos)
+	# The pass nearest its crest hex keeps it; a pass that finds its hex taken takes the nearest free crest hex of its range.
+	crest_order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["km"]) < float(b["km"]))
+	var taken: Dictionary[Vector2i, bool] = {}
+	var deferred: Array[int] = []
+	for item: Dictionary in crest_order:
+		var p: int = item["p"]
+		var desired: Vector2i = item["hex"]
+		if taken.has(desired):
+			deferred.append(p)
+		else:
+			_take_saddle(p, desired, pos_of[p], taken)
+	for p: int in deferred:
+		var at: Vector2 = pos_of[p]
+		var range_index := _range_index(region, str(region.passes[p]["range"]))
+		var best := Vector2i.ZERO
+		var best_km := INF
+		for h: Vector2i in crest_hexes.keys():
+			if taken.has(h) or not _crest_of_range(h, range_index):
+				continue
+			var dist := grid.centre_km(h).distance_to(at)
+			if dist < best_km:
+				best_km = dist
+				best = h
+		if best_km <= SADDLE_REACH_HEXES * grid.hex_w_km:
+			_take_saddle(p, best, at, taken)
+		else:
+			pass_has_crest[p] = false
+			_set_land_saddle(p, at)
+			saddle_failures.append("pass %s: no free crest hex of its range for its saddle" % str(region.passes[p]["name"]))
+	for p: int in pass_saddles.keys():
+		var s: Vector2i = pass_saddles[p]
+		for d: int in 6:
+			var key := WorldGrid.edge_key(s, grid.neighbour(s, d))
+			if crest_edges.has(key) and not pass_edges.has(key):
+				pass_edges[key] = p
+
+
+## A pass gets its saddle: the hex is its pass hex, its saddle, and its distance from the pass is recorded.
+func _take_saddle(p: int, hex: Vector2i, at: Vector2, taken: Dictionary[Vector2i, bool]) -> void:
+	pass_hex[p] = hex
+	pass_km[p] = grid.centre_km(hex).distance_to(at)
+	pass_has_crest[p] = true
+	pass_saddles[p] = hex
+	taken[hex] = true
+
+
+## A pass without a crest saddle gets the nearest land hex to it, and no pass edges.
+func _set_land_saddle(p: int, at: Vector2) -> void:
+	var best := Vector2i.ZERO
+	var best_km := INF
+	for h: Vector2i in levels.keys():
+		if level_at(h) == ReliefLevels.SEA:
+			continue
+		var dist := grid.centre_km(h).distance_to(at)
+		if dist < best_km:
+			best_km = dist
+			best = h
+	pass_hex[p] = best
+	pass_km[p] = best_km
+
+
+## The index of a range by its name in the region, or -1 when the region has no range of that name (any range then).
+static func _range_index(region: WorldRegion, range_name: String) -> int:
+	for i: int in region.ranges.size():
+		if str(region.ranges[i]["name"]) == range_name:
+			return i
+	return -1
+
+
+## True when a crest edge of the hex belongs to the range (any crest edge when range_index is -1).
+func _crest_of_range(hex: Vector2i, range_index: int) -> bool:
+	for d: int in 6:
+		var key := WorldGrid.edge_key(hex, grid.neighbour(hex, d))
+		if crest_edges.has(key) and (range_index == -1 or int(crest_edges[key]) == range_index):
+			return true
+	return false
 
 
 func _find_dangling_corners() -> void:

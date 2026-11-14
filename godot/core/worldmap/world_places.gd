@@ -12,9 +12,12 @@ extends RefCounted
 
 ## A generated place is at least this many hexes from every settlement (03 section 6, spacing).
 const SPACING := 2
-## Site score a generated place needs: a village at VILLAGE_SCORE or more, a hamlet at HAMLET_SCORE or more.
+## Site score a generated place needs: a village at VILLAGE_SCORE or more (kept SPACING hexes from every settlement), a
+## hamlet at HAMLET_SCORE or more (kept HAMLET_SPACING hexes from every settlement: it may stand beside another place, so the
+## countryside is not empty).
 const VILLAGE_SCORE := 3.0
-const HAMLET_SCORE := 2.0
+const HAMLET_SCORE := 1.0
+const HAMLET_SPACING := 1
 ## Generated places stay off the hexes of level 5 and 6 (the mountains and the peaks).
 const MAX_GENERATED_LEVEL := 4
 ## Passes with a crest saddle at or above this height (metres) carry a hospice.
@@ -23,7 +26,7 @@ const HOSPICE_MIN_METRES := 2000
 ## Sizes come from godot/data/geography/cities.json (level from size, 03 section 5): Milan 100, Florence 70, Genoa 60,
 ## Bologna 40, Turin 15, Bern 5. Milan is the great city and the capital of the Duchy of Milan.
 const LEVEL_BY_KIND := {"city": 4, "town": 3, "castle_town": 3}
-const LEVEL_OVERRIDE := {"Milan": 5, "Turin": 3, "Bern": 2}
+const LEVEL_OVERRIDE := {"Milan": 5, "Venice": 5, "Turin": 3, "Bern": 2}
 ## Castle levels (0 to 3) of authored places (03 section 5: castles with towns and at chokepoints).
 const CASTLE_OVERRIDE := {"Milan": 3, "Turin": 2, "Genoa": 2, "Pavia": 2, "Bellinzona": 3}
 const CAPITAL := "Milan"
@@ -60,7 +63,6 @@ var _saddles: Dictionary[Vector2i, bool] = {}  # saddle hexes of the passes with
 var pass_saddles: Dictionary[int, Vector2i] = {}
 ## The crest edges of each resolved saddle (edge to pass index): the open pass edges that roads may cross.
 var pass_edges: Dictionary[Vector4i, int] = {}
-var _taken: Dictionary[Vector2i, bool] = {}  # resolved saddle hexes
 var _region: WorldRegion
 
 
@@ -73,7 +75,7 @@ static func build(p_grid: WorldGrid, p_relief: WorldRelief, p_water: WorldWater,
 	out._water = p_water
 	out._cover = p_cover
 	out._region = region
-	out._resolve_saddles(region)
+	out._adopt_saddles()
 	out._score_all()
 	out._reserve_river_cities()
 	out._place_authored(region)
@@ -162,60 +164,16 @@ func summary() -> Dictionary:
 # ----- the site score (03 section 6) -------------------------------------------------------------------------------
 
 
-## The saddle of each pass with a crest. The relief gives each pass its nearest crest hex, and at 28 km several passes
-## share one (Gotthard and Furka, Splugen and San Bernardino, Julier and Bernina): the pass nearest its saddle keeps it,
-## and the other takes the nearest free crest hex within SADDLE_REACH_HEXES. Then the crest edges of each saddle are open.
-func _resolve_saddles(region: WorldRegion) -> void:
-	var crest_hexes: Dictionary[Vector2i, bool] = {}
-	for key: Vector4i in _relief.crest_edges.keys():
-		for h: Vector2i in WorldGrid.edge_hexes(key):
-			crest_hexes[h] = true
-	var order: Array[Dictionary] = []
-	for p: int in region.passes.size():
-		if not bool(_relief.pass_has_crest.get(p, false)):
-			continue
-		var ps: Dictionary = region.passes[p]
-		var lonlat: Vector2 = ps["pos"]
-		var desired: Vector2i = _relief.pass_hex[p]
-		order.append({"p": p, "d": grid.centre_km(desired).distance_to(grid.km_of(lonlat.x, lonlat.y))})
-	order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["d"]) < float(b["d"]))
-	var deferred: Array[int] = []
-	for item: Dictionary in order:
-		var p: int = item["p"]
-		var desired: Vector2i = _relief.pass_hex[p]
-		if _taken.has(desired):
-			deferred.append(p)
-		else:
-			_assign_saddle(p, desired)
-	for p: int in deferred:
-		var ps: Dictionary = region.passes[p]
-		var lonlat: Vector2 = ps["pos"]
-		var at := grid.km_of(lonlat.x, lonlat.y)
-		var best := NO_HEX
-		var best_d := INF
-		for h: Vector2i in crest_hexes.keys():
-			if _taken.has(h):
-				continue
-			var dist := grid.centre_km(h).distance_to(at)
-			if dist < best_d:
-				best_d = dist
-				best = h
-		if best != NO_HEX and best_d <= SADDLE_REACH_HEXES * grid.hex_w_km:
-			_assign_saddle(p, best)
-		else:
-			failures.append("pass %s: no free crest hex for its saddle" % str(ps["name"]))
-	for p: int in pass_saddles.keys():
-		var s := pass_saddles[p]
-		for d: int in 6:
-			var e := WorldGrid.edge_key(s, grid.neighbour(s, d))
-			if _relief.crest_edges.has(e) and not pass_edges.has(e):
-				pass_edges[e] = p
-
-
-func _assign_saddle(p: int, hex: Vector2i) -> void:
-	pass_saddles[p] = hex
-	_taken[hex] = true
-	_saddles[hex] = true
+## The saddles and the pass edges come from the relief (world_relief: one saddle per pass with a crest, no two passes share one;
+## a second pass takes the nearest free crest hex of its range). The crest edges of each saddle are open for roads.
+func _adopt_saddles() -> void:
+	for p: int in _relief.pass_saddles.keys():
+		var s: Vector2i = _relief.pass_saddles[p]
+		pass_saddles[p] = s
+		_saddles[s] = true
+	for e: Vector4i in _relief.pass_edges.keys():
+		pass_edges[e] = int(_relief.pass_edges[e])
+	failures.append_array(_relief.saddle_failures)
 
 
 func _score_all() -> void:
@@ -327,7 +285,9 @@ func _place_hospices(region: WorldRegion) -> void:
 		_landmark_hexes[saddle] = true
 
 
-## Villages and hamlets: the land hexes by site score, best first, each kept SPACING hexes from every settlement.
+## Villages and hamlets: the land hexes by site score, best first. Villages go first: each is kept SPACING hexes from every
+## settlement. Then the hamlets take the lower-scoring sites that are still free, HAMLET_SPACING hexes from every settlement
+## (one hex: a hamlet may sit beside another place, so the countryside is not empty).
 func _place_generated() -> void:
 	var cands: Array[Vector2i] = []
 	for hex: Vector2i in site_score.keys():
@@ -344,10 +304,11 @@ func _place_generated() -> void:
 			return sa > sb
 		return a.y < b.y or (a.y == b.y and a.x < b.x))
 	for hex: Vector2i in cands:
-		if settled_within(hex, SPACING):
-			continue
-		var level := 2 if site_score[hex] >= VILLAGE_SCORE else 1
-		_add("", hex, level, false, 0, false, true)
+		if site_score[hex] >= VILLAGE_SCORE and not settled_within(hex, SPACING):
+			_add("", hex, 2, false, 0, false, true)
+	for hex: Vector2i in cands:
+		if not _index.has(hex) and not settled_within(hex, HAMLET_SPACING):
+			_add("", hex, 1, false, 0, false, true)
 
 
 ## Snaps an authored place to the best land hex within one hex of its true position (03 section 6). The true hex is kept on

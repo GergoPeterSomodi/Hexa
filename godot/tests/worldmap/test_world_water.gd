@@ -41,7 +41,7 @@ func _river(river_name: String) -> Dictionary:
 func test_every_river_is_a_chain_of_edges_that_reaches_its_end() -> void:
 	if not _ready_or_fail():
 		return
-	assert_eq(_water.rivers.size(), 15, "15 rivers, tributaries included")
+	assert_eq(_water.rivers.size(), 17, "17 rivers, tributaries included")
 	assert_eq(_water.route_failures.size(), 0, "every authored vertex is reached")
 	for rv: Dictionary in _water.rivers:
 		var chain: Array[Vector3i] = rv["corners"]
@@ -61,8 +61,8 @@ func test_corner_words_name_every_corner_of_the_network() -> void:
 		assert_true(_water.corner_word.has(key), "corner %s has a word" % [key])
 		assert_true(allowed.has(_water.corner_word[key]), "corner word %s is a known word" % _water.corner_word[key])
 	var words: Dictionary = _water.summary()["words"]
-	assert_eq(int(words.get("source", 0)), 15, "source corners (river heads)")
-	assert_eq(int(words.get("join", 0)), 11, "join corners (tributaries meeting a river)")
+	assert_eq(int(words.get("source", 0)), 17, "source corners (river heads)")
+	assert_eq(int(words.get("join", 0)), 13, "join corners (tributaries meeting a river)")
 	# Four river cities are crossed (Verona, Florence, Pisa, Geneva).
 	assert_eq(int(words.get("city_in", 0)), 4, "one city_in per crossed river city")
 	assert_eq(int(words.get("city_out", 0)), 4, "one city_out per crossed river city")
@@ -87,7 +87,7 @@ func test_the_arno_ends_at_the_sea_below_pisa() -> void:
 	var last := chain[chain.size() - 1]
 	# The Arno's last corner is Pisa's outlet corner, which touches the sea: it is a city_out and a mouth.
 	assert_true(_water.is_mouth(last), "the Arno ends on a corner that touches the sea")
-	assert_eq(chain.size(), 7, "the Arno's chain: source, Florence (two corners apart, the river bends in the hex), Pisa, the sea")
+	assert_eq(chain.size(), 8, "the Arno's chain: source, Florence (two corners apart, the river bends in the hex), Pisa, the sea")
 
 
 func test_river_cities_are_crossed_through_their_hex() -> void:
@@ -249,5 +249,45 @@ func test_shores_are_land_against_water_and_sea_depths_are_bands() -> void:
 			or _water.lake_hex.has(a) or _water.lake_hex.has(b), "a shore has water on one side")
 	var bands: Dictionary = _water.summary()["sea_bands"]
 	var banded := int(bands.get("deep", 0)) + int(bands.get("sea", 0)) + int(bands.get("shelf", 0)) + int(bands.get("", 0))
-	assert_eq(banded, 41, "all 41 sea hexes have a band (or none where ETOPO has no sea cell)")
+	assert_eq(banded, 47, "all 47 sea hexes have a band (or none where ETOPO has no sea cell)")
 	assert_eq(int(bands.get("", 0)), 0, "every sea hex has a band (the two without ETOPO take the nearest)")
+
+
+## Lakes end where their axes end: each ribbon lake's routed chain starts and ends within 0.6 of a hex width of its axis ends
+## (the corners of the routing are about a hex apart, so the nearest corner can sit that far out).
+func test_ribbon_lakes_end_within_the_axis_ends() -> void:
+	if not _ready_or_fail():
+		return
+	for i: int in _water.lakes.size():
+		var lk: Dictionary = _water.lakes[i]
+		if bool(lk["whole"]):
+			continue
+		var pts := _water.lake_points_km(i)
+		if pts.size() < 2:
+			continue
+		var axis: PackedVector2Array = _region.lakes[i]["axis"]
+		var a0 := _grid.km_of(axis[0].x, axis[0].y)
+		var a1 := _grid.km_of(axis[axis.size() - 1].x, axis[axis.size() - 1].y)
+		var reach := 0.6 * _grid.hex_w_km
+		assert_lte(pts[0].distance_to(a0), reach, "%s starts at its north or west end" % lk["name"])
+		assert_lte(pts[pts.size() - 1].distance_to(a1), reach, "%s ends at its south or east end" % lk["name"])
+
+
+## Streams never start at a river city or run along its six edges (04 section 3.6: none of them carries water).
+func test_no_stream_starts_at_or_runs_along_a_river_city() -> void:
+	if not _ready_or_fail():
+		return
+	var city_hexes: Array[Vector2i] = []
+	for city: String in _water.city_hex.keys():
+		city_hexes.append(_water.city_hex[city])
+	for e: Vector4i in _water.stream_edge.keys():
+		var pair := WorldGrid.edge_hexes(e)
+		var a: Vector2i = pair[0]
+		var b: Vector2i = pair[1]
+		for h: Vector2i in [a, b]:
+			assert_false(city_hexes.has(h), "%s: no stream on an edge of a river city" % str(e))
+		for n: Vector2i in _grid.neighbours(a):
+			if n == b or not _grid.neighbours(b).has(n):
+				continue
+			for h: Vector2i in WorldWater.corner_hexes_of(WorldWater.corner_key(a, b, n)):
+				assert_false(city_hexes.has(h), "%s: no stream starts at a river city corner" % str(e))

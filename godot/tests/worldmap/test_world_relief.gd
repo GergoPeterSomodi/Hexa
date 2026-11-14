@@ -40,8 +40,8 @@ func test_level_histogram_is_the_extraction_histogram() -> void:
 	if not _ready_or_fail():
 		return
 	var summary := _relief.summary(_region.passes.size())
-	assert_eq(summary["hexes"], 333, "every hex of the window")
-	assert_eq(summary["levels"], [41, 20, 63, 51, 54, 60, 44], "sea, then lowland to high peaks (carved valleys included)")
+	assert_eq(summary["hexes"], 371, "every hex of the window")
+	assert_eq(summary["levels"], [47, 31, 68, 56, 57, 65, 47], "sea, then lowland to high peaks (carved valleys included)")
 
 
 func test_every_level_follows_from_its_metres() -> void:
@@ -69,8 +69,8 @@ func test_crest_and_pass_edge_counts() -> void:
 	if not _ready_or_fail():
 		return
 	var summary := _relief.summary(_region.passes.size())
-	assert_eq(summary["crest_edges"], 88, "crest edges drawn from the 12 spines")
-	assert_eq(summary["pass_edges"], 43, "pass edges: the crest edges of each saddle (22 passes with a crest)")
+	assert_eq(summary["crest_edges"], 89, "crest edges drawn from the 12 spines")
+	assert_eq(summary["pass_edges"], 45, "pass edges: the crest edges of each saddle (22 passes with a crest)")
 	assert_eq(summary["passes_with_crest"], 22, "22 of the 24 passes have a crest saddle")
 	assert_eq(summary["gaps"], 16, "spine crossings below the crest level (Jura, Apennines, one Cottian hex)")
 
@@ -90,9 +90,36 @@ func test_saddles_of_named_passes() -> void:
 	assert_eq(_relief.pass_hex[_pass_index("Great St Bernard")], Vector2i(4, 6), "Great St Bernard is hex (4, 6)")
 	assert_eq(_relief.pass_hex[_pass_index("Simplon")], Vector2i(6, 4), "Simplon is hex (6, 4)")
 	assert_eq(_relief.pass_hex[_pass_index("Stelvio")], Vector2i(13, 3), "Stelvio is hex (13, 3)")
-	# Three pairs of passes share one saddle hex at 28 km (the report's finding): the same hex, both passes named.
-	assert_eq(_relief.pass_hex[_pass_index("Gotthard")], _relief.pass_hex[_pass_index("Furka")], "Gotthard and Furka share (7, 3)")
-	assert_eq(_relief.pass_hex[_pass_index("Julier")], _relief.pass_hex[_pass_index("Bernina")], "Julier and Bernina share (11, 3)")
+	# The three pairs of passes that shared a saddle hex at 28 km (Gotthard and Furka, Splugen and San Bernardino, Julier and
+	# Bernina): the nearer pass keeps the hex, the other takes the nearest free crest hex of its range (step 5).
+	assert_eq(_relief.pass_hex[_pass_index("Furka")], Vector2i(7, 3), "Furka keeps (7, 3), the nearer crest hex")
+	assert_eq(_relief.pass_hex[_pass_index("Gotthard")], Vector2i(8, 2), "Gotthard takes (8, 2), its own crest hex")
+	assert_eq(_relief.pass_hex[_pass_index("Julier")], Vector2i(11, 3), "Julier keeps (11, 3)")
+	assert_eq(_relief.pass_hex[_pass_index("Bernina")], Vector2i(12, 3), "Bernina takes (12, 3), its own crest hex")
+	assert_eq(_relief.pass_hex[_pass_index("San Bernardino")], Vector2i(9, 3), "San Bernardino keeps (9, 3)")
+	assert_eq(_relief.pass_hex[_pass_index("Splugen")], Vector2i(10, 3), "Splugen takes (10, 3), its own crest hex")
+
+
+func test_no_two_passes_share_a_saddle_and_each_has_its_own_pass_edges() -> void:
+	if not _ready_or_fail():
+		return
+	var seen: Dictionary[Vector2i, bool] = {}
+	for p: int in _relief.pass_saddles.keys():
+		var s: Vector2i = _relief.pass_saddles[p]
+		assert_false(seen.has(s), "%s: no two passes share a saddle" % _region.passes[p]["name"])
+		seen[s] = true
+		var open := 0
+		for d: int in 6:
+			var key := WorldGrid.edge_key(s, _grid.neighbour(s, d))
+			if _relief.crest_edges.has(key) and _relief.pass_edges.has(key):
+				open += 1
+		assert_gte(open, 1, "%s: its saddle has open crest edges" % _region.passes[p]["name"])
+	assert_eq(_relief.saddle_failures.size(), 0, "every pass with a crest found its saddle")
+	for name: String in ["Furka", "Gotthard", "San Bernardino", "Splugen", "Julier", "Bernina"]:
+		var p := _pass_index(name)
+		assert_true(_relief.pass_saddles.has(p), "%s has a saddle" % name)
+		assert_true(_relief.pass_has_crest[p], "%s carries a crest" % name)
+		assert_lte(_relief.pass_km[p], 1.5 * _grid.hex_w_km + 0.001, "%s: its saddle within 1.5 hex widths" % name)
 
 
 func test_low_passes_without_a_crest_near_them_get_no_saddle_edges() -> void:

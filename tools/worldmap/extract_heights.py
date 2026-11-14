@@ -363,6 +363,12 @@ def main(argv: list) -> int:
         if h in hexes:
             hexes[h]["land"] = True
             hexes[h]["forced"] = "force_land"
+    # The lagoon of Venice (region file "lagoon_sea"): sea, so the city stands on the water's edge (step 5).
+    for lon, lat in region.get("lagoon_sea", []):
+        h = grid.hex_of(lon, lat)
+        if h in hexes:
+            hexes[h]["land"] = False
+            hexes[h]["forced"] = "lagoon_sea (region)"
     places = region["places"]
     for p in places:
         h = grid.hex_of(p["lon"], p["lat"])
