@@ -5,7 +5,7 @@ extends Node2D
 
 const RIDGE_INK := Color(0.12, 0.09, 0.07, 0.9)
 const PASS_MARK := Color(0.93, 0.78, 0.35, 0.95)
-const BORDER_WIDTH := 6.0
+const BORDER_RADIUS := 60.0  # the radius the world is drawn at; the zoom is radius / 60
 const CAPITAL_FILL := Color(0.98, 0.84, 0.3, 1.0)
 const CAPITAL_EDGE := Color(0.12, 0.09, 0.05, 1.0)
 const HOVER_LINE := Color(1.0, 0.97, 0.75, 0.9)
@@ -16,6 +16,23 @@ var hover: Vector2i = Vector2i(-1, -1)
 var borders: Array[Dictionary] = []  # the border edges with their shades (Political.border_items)
 var capitals: Array[Vector2i] = []  # the capitals (Political.capitals)
 var show_borders := false
+## Border widths in world pixels for the zoom now: Python's widths in screen pixels (MapView._owner_borders: the dark
+## line max(2, r // 8) wide, the light line half of it), divided by the zoom, so that they read the same at every zoom.
+var _border_world := 6.0
+var _inner_world := 2.5
+
+
+## Sets the border widths for a zoom (the radius of a hex on screen is 60 * zoom). Redraws only when they change.
+func set_zoom(zoom: float) -> void:
+	var radius_px := BORDER_RADIUS * zoom
+	var dark_px := maxf(2.0, floorf(radius_px / 8.0))
+	var light_px := maxf(1.0, floorf(dark_px / 2.0))
+	var dark_world := dark_px / zoom
+	var inner_world := light_px / zoom
+	if dark_world != _border_world or inner_world != _inner_world:
+		_border_world = dark_world
+		_inner_world = inner_world
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -25,9 +42,9 @@ func _draw() -> void:
 		for item: Dictionary in borders:
 			# Python's owner borders: a dark line and a light line inside it, widths in world pixels at radius 60.
 			var edge := _edge_segment(item["a"], item["b"], HALF_SIDE)
-			draw_line(edge[0], edge[1], item["dark"], BORDER_WIDTH, true)
+			draw_line(edge[0], edge[1], item["dark"], _border_world, true)
 			var inner := _edge_segment(item["a"], item["b"], HALF_SIDE - 4.0)
-			draw_line(inner[0], inner[1], item["light"], BORDER_WIDTH * 0.42, true)
+			draw_line(inner[0], inner[1], item["light"], _inner_world, true)
 	for key: Vector4i in map.ridge_edges.keys():
 		var seg := _edge_segment(Vector2i(key.x, key.y), Vector2i(key.z, key.w), HALF_SIDE)
 		draw_line(seg[0], seg[1], RIDGE_INK, 6.0, true)

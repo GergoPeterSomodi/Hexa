@@ -70,9 +70,39 @@ python tools/lint_godot.py godot
 "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe
 
 # Build Europe 1480 and print every count beside the Python reference (exit 1 when a checked count is out of range);
-# add -- --seed=N after the script to build another seed
-"$GODOT" --headless --path godot -s res://tools/build_map.gd
+# add -- --seed=N after the script to build another seed; -- --out=PATH writes the map file (see "The map file")
+"$GODOT" --headless --path godot -s res://tools/build_map.gd -- --out=res://data/maps/europe_1480.json
+
+# The map check report (markdown, every count OK / OPEN / OUT, the owners against Python, the speed rows)
+"$GODOT" --headless --path godot -s res://tools/map_report.gd -- --out=<absolute path of the .md>
+
+# The speed probe: builder stages, road search against AStar2D, map file load (writes docs/reports/0.3.0-speed.json)
+"$GODOT" --headless --path godot -s res://tools/speed_probe.gd -- --out=<absolute path of the .json>
+
+# Windowed (not headless: nothing is drawn headless). Contact sheet frames: the twelve regions and the whole map, both
+# views, 1280 x 720 PNGs; the Python frames come from tools/contact_sheet_python.py (see the map check report)
+"$GODOT" --path godot -s res://tools/contact_sheet.gd -- --out=<absolute folder>
+# Start-up probe: time from the script's start to the map view on screen (windowed)
+"$GODOT" --path godot -s res://tools/startup_probe.gd
 ```
+
+## The map file
+
+`godot/data/maps/europe_1480.json` is the Europe 1480 map as text (a JSON object, about 2.8 MB, one line per province,
+country, unit, crest edge and terrain row; schema `hexa-godot/map/1`). It is the map every game starts on (0.3.0
+decision 1): `shell/app/main.gd` reads it, and falls back to the staged builder when the file is missing or does not
+read. `-- --build-map` (after the user arguments) forces the builder: the dev path.
+
+- Written by `tools/build_map.gd -- --out=res://data/maps/europe_1480.json` (the committed seed, 1480). Reads back to
+  the same text, byte for byte (the tool checks it, and so does a GUT test).
+- Format: a hex is `[column, row]`; an edge is `[a, b, c, d]` (`HexGrid.edge_key`); `terrain` is one array per grid row
+  (index = column); a province is an array of `[column, row, terrain, good, coastal, city, name, region, owner,
+  controller, tribe, peasants, burghers, nobles, natives, works, settlement, castle, port]`. `MapFile` (core/mapgen)
+  reads and writes the text; the file reads and writes are in the shell and the tools.
+- Changing the builder or the geography changes the file: rebuild with `--out`, review the diff. CI rebuilds the map
+  and fails when the rebuilt file differs from the committed one (the `map` job of `.github/workflows/godot.yml`).
+- Start-up: reading and parsing the file takes about 0.15 s on the build PC; the map view is on screen about 0.9 s
+  after the script starts (speed probe and `tools/startup_probe.gd`).
 
 The editor: open `godot/project.godot` with the same engine. GUT shows in the editor's plugin list.
 
@@ -119,5 +149,6 @@ trait, markets, start techs, random worlds.
 the GUT tests and the main-scene start. On a tag `v0.3.*`, the Windows zip and a smoke start on a Windows runner.
 A guard job fails any pull request that changes a file under `hexa/` (frozen since v0.2.2).
 
-Still to come with their releases (not in 0.3.0 step 1): the map rebuild and map check, the goldens (screenshot tests
-per scene), the bands and soak jobs, and the speed probe.
+The `map` job (0.3.0 item 4) rebuilds the map file, compares it byte for byte with the committed one, and puts the map
+check report in the job summary. Still to come with their releases: the goldens (screenshot tests per scene), the bands
+and soak jobs.

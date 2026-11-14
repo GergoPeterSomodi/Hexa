@@ -215,7 +215,9 @@ func _zoom_at(screen: Vector2, factor: float) -> void:
 func _refresh() -> void:
 	var zoom_now := _camera.zoom.x
 	_far = zoom_now < TILE_ZOOM
-	_tiles.visible = not _far
+	# The tile layers stay visible at every zoom: the far maps are opaque and drawn over them. Hiding and showing them at
+	# the zoom band cost a frame of 25 to 56 ms each time (the zoom probe of 0.3.0, tools/tint_probe.gd history).
+	_tiles.visible = true
 	_far_terrain.visible = _far and view_mode == VIEW_TERRAIN
 	_far_countries.visible = _far and view_mode == VIEW_COUNTRIES
 	_overlay.visible = not _far and view_mode == VIEW_COUNTRIES
@@ -226,6 +228,7 @@ func _refresh() -> void:
 	var top_left := _world_at(Vector2.ZERO)
 	_names.view_rect = Rect2(top_left, _view_size() / zoom_now).grow(120.0)
 	_marks.show_borders = view_mode == VIEW_COUNTRIES
+	_marks.set_zoom(zoom_now)
 	_names.queue_redraw()
 	_marks.hover = _hover
 	_marks.queue_redraw()

@@ -1,0 +1,23 @@
+{
+  "schema": "hexa-contact-sheet-regions/1",
+  "note": "The frames of the 0.3.0 contact sheet (brief, 'The new Europe is checked'). Each region is centred on the hex of a named city of the Europe 1480 map (col, row), at the middle zoom: hex radius 13 px (Python's ZOOMS[3]; Godot zoom 13/60). The whole map is centred on the middle of the grid at hex radius 3 (Python's far radius; Godot zoom 3/60). Both sides render 1280 x 720 frames. The views: terrain (Python 'terrain' mode; Godot key 1) and countries (Python 'political' mode; Godot key 2).",
+  "frame": [1280, 720],
+  "middle_radius": 13,
+  "whole_radius": 3,
+  "views": ["terrain", "countries"],
+  "regions": [
+    {"id": "iberia", "title": "Iberia", "centre": [130, 60], "near": "Toledo"},
+    {"id": "france", "title": "France", "centre": [140, 39], "near": "Paris"},
+    {"id": "british-isles", "title": "British Isles", "centre": [134, 26], "near": "London, Edinburgh, Dublin"},
+    {"id": "low-countries", "title": "Low Countries and the Rhine", "centre": [147, 33], "near": "Cologne"},
+    {"id": "alps-north-italy", "title": "The Alps and northern Italy", "centre": [150, 46], "near": "Milan"},
+    {"id": "southern-italy", "title": "Southern Italy", "centre": [157, 57], "near": "Naples"},
+    {"id": "holy-roman-empire", "title": "The Holy Roman Empire", "centre": [157, 36], "near": "Prague"},
+    {"id": "scandinavia", "title": "Scandinavia", "centre": [162, 10], "near": "Stockholm"},
+    {"id": "poland-lithuania", "title": "Poland and Lithuania", "centre": [172, 23], "near": "Vilnius"},
+    {"id": "balkans", "title": "The Balkans", "centre": [166, 48], "near": "Belgrade"},
+    {"id": "anatolia-levant", "title": "Anatolia and the Levant", "centre": [185, 62], "near": "Ankara, Aleppo"},
+    {"id": "north-africa", "title": "North Africa", "centre": [141, 65], "near": "Algiers"}
+  ],
+  "whole": {"id": "whole-map", "title": "The whole map", "centre": [101, 75]}
+}
