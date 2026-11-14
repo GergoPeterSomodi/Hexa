@@ -9,6 +9,31 @@ and fixes inside it. 0.1.x is the foundations. **0.2.x is war:** battles (0.2.0)
 battle mini-map, and war goals and peace. Later phases (the living world, history and events, the sea, game feel)
 take 0.3.x onwards, and 0.9.x is the Steam Early Access line. 1.0 is the full Steam release.
 
+## v0.2.2: Sieges
+**War:**
+- Castles hold out at least 2 seasons. A siege meter fills from the besieger's men, cannons and a siege general against the
+  castle, the ground and the garrison; a garrison that runs out of stores starves. A relief army that wins lifts the siege
+- Besiege or Storm: right-click besieges, Shift-right-click storms at once; "Storm now" storms a garrison weakened by the
+  siege. Besiegers forage the province for free; a besieged province produces nothing. Sieges are named in the log
+- Castle areas: a castle holds its country's land within 3 / 4 / 5 hexes (tower / small / large castle). Held land cannot
+  be taken while its castle stands; a fallen castle's land opens, one province per army per season; open land is taken in
+  one season
+- A taken castle builds a garrison for its holder (half rate, half size) and supplies its army; a march onto an enemy
+  castle besieges it on arrival
+- The AI besieges, storms late, gathers relief and fans out over opened land. Wars are slower, on purpose
+
+**On screen:**
+- The siege badge (a dial), the odds card's Besiege and Storm lines and "Taking it opens N provinces", the province panel's
+  Siege section with the relief line, a task flag line for your besieged places
+- Enemy castle areas outlined while an army at war is selected; the province panel says which castle holds a province
+- Clear move messages: a hover says why a move is refused or slow before the click
+
+**Under the hood:**
+- The odds card reads garrisons by their men; "Favourable" and "Overwhelming" moved apart
+- Design docs: sieges and retreats, castle areas, engine and language studies
+
+Old saves keep loading.
+
 ## v0.2.1: War you can follow
 **War:**
 - Every battle ends in the turn it starts: days are fought until a side breaks, withdraws or flees, up to 8; at the cap the
