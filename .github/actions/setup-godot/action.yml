@@ -1,0 +1,57 @@
+name: Set up Godot
+description: >-
+  Downloads the pinned Godot Linux build and its export templates from the official release, checks both against the
+  release's SHA512-SUMS.txt, and sets GODOT to the executable. Cached by version (plan B12).
+
+inputs:
+  release:
+    description: The Godot release, as its tag name.
+    default: "4.7.2-stable"
+
+runs:
+  using: composite
+  steps:
+    - name: Cache Godot and its export templates
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/godot
+          ~/.local/share/godot/export_templates
+        key: godot-${{ inputs.release }}-linux-x86_64
+
+    - name: Download, check and install Godot
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        RELEASE: ${{ inputs.release }}
+      run: |
+        set -euo pipefail
+        version="${RELEASE%-stable}"
+        base="https://github.com/godotengine/godot/releases/download/$RELEASE"
+        work="$RUNNER_TEMP/godot-download"
+        mkdir -p "$work" && cd "$work"
+        curl -fsSLO "$base/SHA512-SUMS.txt"
+        engine="Godot_v${RELEASE}_linux.x86_64.zip"
+        templates="Godot_v${RELEASE}_export_templates.tpz"
+        for file in "$engine" "$templates"; do
+          curl -fsSLO "$base/$file"
+          grep " $file\$" SHA512-SUMS.txt | sha512sum -c -
+        done
+        mkdir -p "$HOME/godot"
+        unzip -q -o "$engine" -d "$HOME/godot"
+        mv "$HOME/godot/Godot_v${RELEASE}_linux.x86_64" "$HOME/godot/godot"
+        chmod +x "$HOME/godot/godot"
+        # The templates' folder name uses the version without the "-stable" tag suffix (4.7.2.stable).
+        unzip -q -o "$templates" -d "$work/templates"
+        dest="$HOME/.local/share/godot/export_templates/$version.stable"
+        mkdir -p "$dest"
+        cp -r "$work/templates/templates/." "$dest/"
+
+    - name: Point GODOT at the engine
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -x "$HOME/godot/godot"
+        echo "GODOT=$HOME/godot/godot" >> "$GITHUB_ENV"
+        "$HOME/godot/godot" --version

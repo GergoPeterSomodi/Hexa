@@ -2,9 +2,19 @@
 
 Status as of 2026-11-13. Sources: the project notes, `docs/design/tech-tree.md`, `docs/design/tech-tree-build-spec.md` and the Hexa README. Items marked "(suggested)" are my inferences, not decisions from the notes.
 
-## Next up (decided 2026-11-13): one thing at a time, starting with war
+## Next up (decided 2026-11-14): the Godot port first, then war
 
-The owner asked for one delivery at a time, starting with war. The order:
+**The port (decided 2026-11-14, the 0.3.0 brief locked):** the game moves to Godot, Europe only, Windows builds. The
+Python game is frozen at v0.2.2, the last Python release. The "New engine" line is 0.3.x, six releases, each with its
+own brief in `docs/roadmap/`:
+- **0.3.0 The map** (brief locked: `docs/roadmap/release-0.3.0-brief.md`): Europe 1480 built by the Godot map builder,
+  pan and zoom, the terrain and countries views, names.
+- **0.3.1 The world turns**, **0.3.2 Armies and battles**, **0.3.3 The AI plays**, **0.3.4 Your turn**, **0.3.5 Every
+  screen**: planned in `docs/roadmap/godot-port-plan.md`, Part A3.
+- The war features below move to 0.4.x, and the castles map mode to 0.4.0.
+
+**The war line (written before the port; its order now follows the port):** one delivery at a time, starting with war.
+The order:
 
 1. **Now: M2 battle system, slice 1, "Battles that last" (v0.2.0).** From `docs/design/battle.md`:
    - A stack that moves into an enemy stack starts a battle on that hex. Neither side may leave except by Withdraw or a rout.
@@ -27,10 +37,10 @@ Everything decided on 2026-11-13 stays recorded in its own doc and waits its tur
 - v0.2.0 "Battles that last" and v0.2.1 "War you can follow" are released.
 - **0.2.2 Sieges** is being finished: the siege meter, Besiege or Storm, castle areas (a castle holds the land around it;
   the owner accepted slower wars) and clear move messages.
-- **Next: the castles map mode** (owner's request, 2026-11-14): a map mode next to terrain, goods and markets that shows
+- **Moved to 0.4.0: the castles map mode** (owner's request, 2026-11-14): a map mode next to terrain, goods and markets that shows
   every castle, its level and the land it holds in the owner's colour, castles under siege and fallen castles, for all
   countries. With it, the AI work to take castles faster (armies gathering). Design: `docs/design/castle-areas.md`.
-- Then the battle board as a mini game inside the turn (its brief draft, renumbered after 0.2.3), the trade patch, field forts, battle cards,
+- **0.4.x, after the port:** the battle board as a mini game inside the turn (its brief draft), the trade patch, field forts, battle cards,
   the battle mini-map, war goals and peace.
 
 ## 1. Vision

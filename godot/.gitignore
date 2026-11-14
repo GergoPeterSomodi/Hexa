@@ -1,0 +1,4 @@
+# Godot's per-machine cache: rebuilt by every import.
+.godot/
+# Local exports (the CI builds its own).
+/build/
