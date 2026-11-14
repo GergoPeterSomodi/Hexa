@@ -23,6 +23,7 @@ func _render() -> void:
 	var prefix := ""
 	var with_water := false
 	var with_cover := false
+	var with_network := false
 	for arg: String in OS.get_cmdline_user_args():
 		if arg == "--cover":
 			with_cover = true
@@ -34,6 +35,8 @@ func _render() -> void:
 			prefix = arg.substr("--prefix=".length())
 		elif arg == "--water":
 			with_water = true
+		elif arg == "--network":
+			with_network = true
 	if out_dir == "":
 		printerr("render_region: give --out=<absolute folder>")
 		quit(1)
@@ -50,7 +53,27 @@ func _render() -> void:
 	var view: WorldMapView = (load(VIEW_SCENE) as PackedScene).instantiate()
 	root.add_child(view)
 	view.show_region(grid, region, relief)
-	if with_cover:
+	if with_network:
+		var net_water := WorldWater.build(grid, relief, heights, region)
+		var net_cover := WorldCover.build(grid, relief, heights, net_water, region.cover_seed)
+		var places := WorldPlaces.build(grid, relief, net_water, net_cover, region)
+		var roads := WorldRoads.build(grid, relief, net_water, places, region)
+		view.show_water(net_water)
+		view.show_cover(net_cover)
+		view.show_network(places, roads)
+		view.title = "Alps and Po: settlements and roads on 28 km hexes, over the ground cover"
+		await _shot(out_dir.path_join(prefix + "places_region_whole.png"))
+		view.set_view(9.19, 45.46, 9.0)
+		await _shot(out_dir.path_join(prefix + "places_milan_close.png"))
+		view.set_view(7.9, 46.2, 4.6)
+		await _shot(out_dir.path_join(prefix + "places_alpine_passes.png"))
+		view.set_view(8.93, 44.41, 8.0)
+		await _shot(out_dir.path_join(prefix + "places_genoa.png"))
+		view.set_view(9.9, 44.5, 5.5)
+		await _shot(out_dir.path_join(prefix + "places_apennine_crossings.png"))
+		view.set_view(9.16, 45.12, 9.0)
+		await _shot(out_dir.path_join(prefix + "places_pavia_po.png"))
+	elif with_cover:
 		var cover_water := WorldWater.build(grid, relief, heights, region)
 		var cover := WorldCover.build(grid, relief, heights, cover_water, region.cover_seed)
 		view.show_water(cover_water)

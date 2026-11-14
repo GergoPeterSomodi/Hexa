@@ -30,6 +30,14 @@ const RIVER := Color("#3d6f94")
 const STREAM := Color("#5d8fb0")
 const BEACH := Color("#e8d9a8")
 const CLIFF := Color("#5a4a3a")
+const ROAD_TRACK := Color("#8c6d4f")
+const ROAD_ROAD := Color("#d2b178")
+const ROAD_HIGHWAY := Color("#f2ead6")
+const ROAD_CASING := Color("#3b3026")
+const BRIDGE := Color("#5a4632")
+const FORD := Color("#eef6fb")
+const QUAY := Color("#1f3f5c")
+const CASTLE_INK := Color("#2b2622")
 ## Soft ground colours of the covers (WorldCover order: farmland, grassland, woods, marsh, rock, snow, tundra, sand).
 ## The soft band at each hex edge, as a share of the hex radius (the owner's v2: 20 to 25 per cent).
 const BLEND_BAND := 0.22
@@ -49,6 +57,8 @@ var region: WorldRegion
 var relief: WorldRelief
 var water: WorldWater = null
 var cover: WorldCover = null
+var places: WorldPlaces = null
+var roads: WorldRoads = null
 var centre_km: Vector2 = Vector2.ZERO
 var px_per_km: float = 2.0
 var title: String = "Alps and Po: relief on 28 km hexes"
@@ -126,8 +136,16 @@ func _draw() -> void:
 		_draw_shores()
 		_draw_streams()
 		_draw_rivers()
-	_draw_places()
+	if roads != null:
+		_draw_roads()
+		_draw_crossings()
+	if places != null:
+		_draw_settlements()
+	else:
+		_draw_places()
 	_draw_legend()
+	if roads != null:
+		_draw_network_legend()
 
 
 func _draw_hexes() -> void:
@@ -360,6 +378,196 @@ func _draw_legend() -> void:
 	draw_string(font, Vector2(36.0, crest_y + 4.0), "crest (spine at crest height)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEXT)
 	draw_line(Vector2(16.0, crest_y + 20.0), Vector2(30.0, crest_y + 20.0), GOLD, PASS_PX)
 	draw_string(font, Vector2(36.0, crest_y + 24.0), "pass edge; gold dot = saddle hex", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEXT)
+
+
+## Shows the settlements and the roads (step 5 of the prototype) over the picture: the places by level, the roads by quality,
+## the crossings of the rivers, streams and lakes, and the quays.
+func show_network(p_places: WorldPlaces, p_roads: WorldRoads) -> void:
+	places = p_places
+	roads = p_roads
+	queue_redraw()
+
+
+## Each link is drawn as smooth lines through the hex centres, split where its road quality changes: highways with a dark
+## casing, roads tan, tracks thin brown. Each run is pinned at its two ends, so the runs join without a gap.
+func _draw_roads() -> void:
+	for ln: Dictionary in roads.links:
+		var path: Array = ln["path"]
+		var n := path.size()
+		if n < 2:
+			continue
+		var hexes: Array[Vector2i] = []
+		for item: Variant in path:
+			var h: Vector2i = item
+			hexes.append(h)
+		var centres := PackedVector2Array()
+		for h: Vector2i in hexes:
+			centres.append(km_to_px(grid.centre_km(h)))
+		var i := 0
+		while i < n - 1:
+			var q := roads.quality_of(WorldGrid.edge_key(hexes[i], hexes[i + 1]))
+			var j := i
+			while j + 1 < n - 1 and roads.quality_of(WorldGrid.edge_key(hexes[j + 1], hexes[j + 2])) == q:
+				j += 1
+			var run := centres.slice(i, j + 2)
+			var pins: Array[bool] = []
+			for k: int in run.size():
+				pins.append(k == 0 or k == run.size() - 1)
+			_draw_road_run(_chaikin(run, pins, 3), q)
+			i = j + 1
+
+
+func _draw_road_run(curve: PackedVector2Array, q: int) -> void:
+	if q >= 3:
+		draw_polyline(curve, ROAD_CASING, 5.0, true)
+		draw_polyline(curve, ROAD_HIGHWAY, 3.0, true)
+	elif q == 2:
+		draw_polyline(curve, ROAD_ROAD, 2.6, true)
+	else:
+		draw_polyline(curve, ROAD_TRACK, 1.6, true)
+
+
+## The crossings: a bridge is drawn over its river edge (stone pale, wood brown), a ford is a dashed line on the edge, a ferry
+## a round badge at the edge middle. Quays are a blue bar on their shore or lake edge.
+func _draw_crossings() -> void:
+	for e: Vector4i in roads.quality.keys():
+		var kind := roads.crossing_of(e)
+		if kind == "none" or kind == "pass":
+			continue
+		var pair := WorldGrid.edge_hexes(e)
+		var seg := grid.edge_segment_km(pair[0], pair[1])
+		var a := km_to_px(seg[0])
+		var b := km_to_px(seg[1])
+		match kind:
+			"bridge_stone":
+				draw_line(a, b, ROAD_CASING, 6.0)
+				draw_line(a, b, ROAD_HIGHWAY, 3.5)
+			"bridge_wood":
+				draw_line(a, b, ROAD_CASING, 6.0)
+				draw_line(a, b, BRIDGE, 3.5)
+			"ford":
+				draw_dashed_line(a, b, FORD, 2.5, 4.0)
+			"ferry":
+				var mid := (a + b) / 2.0
+				draw_circle(mid, 4.5, QUAY)
+				draw_circle(mid, 4.5, FORD, false, 1.5)
+	for e: Vector4i in places.quay_edges.keys():
+		var pair := WorldGrid.edge_hexes(e)
+		var seg := grid.edge_segment_km(pair[0], pair[1])
+		draw_line(km_to_px(seg[0]), km_to_px(seg[1]), QUAY, 3.0)
+
+
+## Settlements as markers by level (hamlet dot, village ring dot, town square, city square, great city square with a ring),
+## a gold ring for the capital, a small tower for a castle, names from the town level up. Landmarks: a gold diamond for a
+## hospice on its saddle, a cross for a monastery.
+func _draw_settlements() -> void:
+	var font := ThemeDB.fallback_font
+	var reach := Rect2(Vector2.ZERO, size).grow(40.0)
+	for pl: Dictionary in places.places:
+		var hex: Vector2i = pl["hex"]
+		var at := km_to_px(grid.centre_km(hex))
+		if not reach.has_point(at):
+			continue
+		var level := int(pl["level"])
+		var capital := bool(pl["capital"])
+		match level:
+			1:
+				draw_circle(at, 2.2, TEXT)
+			2:
+				draw_circle(at, 3.8, Color("#fbf7ee"))
+				draw_circle(at, 3.8, INK, false, 1.2)
+			3:
+				_draw_square(at, 5.0)
+			4:
+				_draw_square(at, 7.0)
+			_:
+				_draw_square(at, 9.0)
+		if level >= 5 or capital:
+			draw_arc(at, 12.0, 0.0, TAU, 32, GOLD, 2.0, true)
+		if int(pl["castle"]) > 0:
+			draw_rect(Rect2(at + Vector2(7.0, -13.0), Vector2(6.0, 7.0)), CASTLE_INK)
+		var label := str(pl["name"])
+		if label != "" and (level >= 3 or (level == 2 and px_per_km >= 5.0)):
+			draw_string(font, at + Vector2(10.0, -6.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1,
+				14 if level >= 4 else 12, TEXT)
+	for lm: Dictionary in places.landmarks:
+		var lh: Vector2i = lm["hex"]
+		var at := km_to_px(grid.centre_km(lh))
+		if not reach.has_point(at):
+			continue
+		if str(lm["kind"]) == "hospice":
+			var diamond := PackedVector2Array([at + Vector2(0.0, -6.0), at + Vector2(6.0, 0.0),
+				at + Vector2(0.0, 6.0), at + Vector2(-6.0, 0.0)])
+			draw_colored_polygon(diamond, GOLD)
+			draw_polyline(PackedVector2Array([diamond[0], diamond[1], diamond[2], diamond[3], diamond[0]]), INK, 1.2)
+		else:
+			draw_line(at + Vector2(-4.0, 0.0), at + Vector2(4.0, 0.0), INK, 1.5)
+			draw_line(at + Vector2(0.0, -4.0), at + Vector2(0.0, 4.0), INK, 1.5)
+
+
+func _draw_square(at: Vector2, r: float) -> void:
+	draw_rect(Rect2(at - Vector2(r, r), Vector2(2.0 * r, 2.0 * r)), Color("#fbf7ee"))
+	draw_rect(Rect2(at - Vector2(r, r), Vector2(2.0 * r, 2.0 * r)), INK, false, 1.5)
+	draw_rect(Rect2(at - Vector2(r - 2.0, r - 2.0), Vector2(2.0 * r - 4.0, 2.0 * r - 4.0)), TEXT)
+
+
+func _draw_network_legend() -> void:
+	var font := ThemeDB.fallback_font
+	var w := 250.0
+	var x := size.x - w - 8.0
+	var y := MARGIN_TOP + 8.0
+	var lines: Array[String] = ["Highway (quality 3)", "Road (quality 2)", "Track (quality 1)", "Stone bridge",
+		"Wooden bridge", "Ford", "Ferry", "Pass (gold edge)", "Quay"]
+	var marks: Array[String] = ["Great city", "City", "Town", "Village", "Hamlet", "Capital"]
+	var height := 30.0 + float(lines.size() + marks.size()) * 16.0 + 8.0
+	draw_rect(Rect2(x, y, w, height), PANEL)
+	draw_string(font, Vector2(x + 10.0, y + 16.0), "Roads and places", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEXT)
+	for i: int in lines.size():
+		var ly := y + 30.0 + float(i) * 16.0
+		var x0 := x + 12.0
+		var x1 := x + 44.0
+		match i:
+			0:
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), ROAD_CASING, 5.0)
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), ROAD_HIGHWAY, 3.0)
+			1:
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), ROAD_ROAD, 2.6)
+			2:
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), ROAD_TRACK, 1.6)
+			3:
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), ROAD_CASING, 6.0)
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), ROAD_HIGHWAY, 3.5)
+			4:
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), ROAD_CASING, 6.0)
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), BRIDGE, 3.5)
+			5:
+				draw_dashed_line(Vector2(x0, ly), Vector2(x1, ly), TEXT, 2.5, 4.0)
+			6:
+				draw_circle(Vector2((x0 + x1) / 2.0, ly), 4.5, QUAY)
+			7:
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), GOLD, PASS_PX)
+			8:
+				draw_line(Vector2(x0, ly), Vector2(x1, ly), QUAY, 3.0)
+		draw_string(font, Vector2(x + 56.0, ly + 4.0), lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, TEXT)
+	var base := y + 30.0 + float(lines.size()) * 16.0
+	for i: int in marks.size():
+		var my := base + float(i) * 16.0
+		var mx := x + 28.0
+		match i:
+			0:
+				_draw_square(Vector2(mx, my), 9.0)
+			1:
+				_draw_square(Vector2(mx, my), 7.0)
+			2:
+				_draw_square(Vector2(mx, my), 5.0)
+			3:
+				draw_circle(Vector2(mx, my), 3.8, Color("#fbf7ee"))
+				draw_circle(Vector2(mx, my), 3.8, INK, false, 1.2)
+			4:
+				draw_circle(Vector2(mx, my), 2.2, TEXT)
+			_:
+				draw_arc(Vector2(mx, my), 6.0, 0.0, TAU, 16, GOLD, 2.0, true)
+		draw_string(font, Vector2(x + 56.0, my + 4.0), marks[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, TEXT)
 
 
 func _gui_input(event: InputEvent) -> void:
