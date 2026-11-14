@@ -71,7 +71,7 @@ func test_the_cell_rules_hold_on_every_hex() -> void:
 			_relief.level_at(hex)])
 
 
-func test_snow_only_on_the_high_peaks_and_the_top_of_mountains() -> void:
+func test_snow_only_on_the_highest_ground() -> void:
 	if not _ready_or_fail():
 		return
 	for hex: Vector2i in _cover.cover.keys():
@@ -79,7 +79,18 @@ func test_snow_only_on_the_high_peaks_and_the_top_of_mountains() -> void:
 			continue
 		var level := _relief.level_at(hex)
 		var metres := float(_heights.height_m.get(hex, 0.0))
-		assert_true(level == 6 or (level == 5 and metres >= WorldCover.SNOW_TOP_M), "snow at %s is high (level %d, %d m)" % [hex, level, metres])
+		assert_eq(level, 6, "snow at %s is on the highest ground (%d m)" % [hex, metres])
+
+
+func test_woods_stop_at_the_tree_line_and_rock_fills_the_bare_ground_above_it() -> void:
+	if not _ready_or_fail():
+		return
+	for hex: Vector2i in _cover.cover.keys():
+		var metres := float(_heights.height_m.get(hex, 0.0))
+		if _cover.cover_at(hex) == WorldCover.WOODS and _relief.level_at(hex) == 5:
+			assert_lt(metres, WorldCover.TREE_LINE_M, "woods on level 5 only below the tree line at %s" % [hex])
+		if _relief.level_at(hex) == 5 and metres >= WorldCover.TREE_LINE_M:
+			assert_ne(_cover.cover_at(hex), WorldCover.WOODS, "no woods above the tree line at %s" % [hex])
 
 
 func test_woods_never_on_high_peaks_and_marsh_only_on_lowland_and_plain() -> void:
@@ -169,7 +180,8 @@ func test_the_po_plain_is_farmland_and_grass() -> void:
 		if _cover.cover_at(hex) == WorldCover.FARMLAND:
 			farmland += 1
 	assert_gt(plain, 15, "the Po plain window has lowland and plain hexes (%d)" % plain)
-	assert_gte(float(open) / float(plain), 0.8, "at least 80%% of the plain is farmland or grass (%d of %d)" % [open, plain])
+	# v2 (tree-line woods) moves woods onto the lowest prealp hexes, so the bar is 70% (v1 was 80%+).
+	assert_gte(float(open) / float(plain), 0.7, "at least 70%% of the plain is farmland or grass (%d of %d)" % [open, plain])
 	assert_gt(farmland, 0, "some farmland on the plain")
 
 

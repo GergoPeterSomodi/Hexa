@@ -31,6 +31,8 @@ const STREAM := Color("#5d8fb0")
 const BEACH := Color("#e8d9a8")
 const CLIFF := Color("#5a4a3a")
 ## Soft ground colours of the covers (WorldCover order: farmland, grassland, woods, marsh, rock, snow, tundra, sand).
+## The soft band at each hex edge, as a share of the hex radius (the owner's v2: 20 to 25 per cent).
+const BLEND_BAND := 0.22
 const COVER_COLOURS: Array[Color] = [
 	Color("#c9c27e"),
 	Color("#a9c27a"),
@@ -144,12 +146,19 @@ func _draw_hexes() -> void:
 func _draw_cover_hexes() -> void:
 	for hex: Vector2i in relief.levels.keys():
 		var corners := grid.corners_km(hex)
-		var pts := PackedVector2Array()
-		var cols := PackedColorArray()
+		var centre := grid.centre_km(hex)
+		var own := _cover_hex_colour(hex)
+		# The flat middle of the hex is its own colour; a band of BLEND_BAND of the radius at each edge fades into the
+		# mean colour of the three hexes meeting at each corner, so the hex still reads as a hex.
+		var inner := PackedVector2Array()
 		for k: int in 6:
-			pts.append(km_to_px(corners[k]))
-			cols.append(_corner_colour(hex, k))
-		draw_polygon(pts, cols)
+			inner.append(km_to_px(centre + (corners[k] - centre) * (1.0 - BLEND_BAND)))
+		draw_colored_polygon(inner, own)
+		for k: int in 6:
+			var k2 := (k + 1) % 6
+			var pts := PackedVector2Array([km_to_px(corners[k]), km_to_px(corners[k2]), inner[k2], inner[k]])
+			var cols := PackedColorArray([_corner_colour(hex, k), _corner_colour(hex, k2), own, own])
+			draw_polygon(pts, cols)
 
 
 ## The mean colour of the hexes at corner k of a hex: the hex itself and the two neighbours whose edges meet there.

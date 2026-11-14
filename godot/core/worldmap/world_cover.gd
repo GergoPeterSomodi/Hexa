@@ -4,7 +4,7 @@
 ## The skeleton is fixed before this step: the relief levels, the crests and passes, the water and the coast. The solver
 ## only chooses the cover: farmland, grassland, woods, marsh, rock, snow and ice, tundra and sand.
 ##
-## Cell rules (hard, checked before any choice; see cell_allowed): snow only on level 6 and on the top of level 5, woods
+## Cell rules (hard, checked before any choice; see cell_allowed): snow only on level 6 (the highest ground), woods
 ## not on level 6, marsh only on levels 1 and 2, farmland not above level 4, rock from level 4 (and on a cliff coast at
 ## level 3), tundra only north of 58 degrees, sand only on coastal lowland.
 ##
@@ -38,8 +38,8 @@ const COUNT := 8
 const NAMES: Array[String] = ["Farmland", "Grassland", "Woods", "Marsh", "Rock", "Snow and ice", "Tundra", "Sand"]
 ## Relief levels 0 (sea, unused here) to 6: the rows of the weight table have this many columns.
 const LEVELS := 7
-## Level 5 hexes at or above this height may carry snow (the top shoulder of the level, 01 section 4).
-const SNOW_TOP_M := 2300.0
+## Woods stop at the tree line: level 5 hexes below this height may carry woods (the Alps); above it, rock.
+const TREE_LINE_M := 2000.0
 ## Tundra is only drawn north of this latitude (Lapland and the far north coast).
 const TUNDRA_LAT := 58.0
 ## Slope (metres per kilometre, along the light) that gives the full shading of 0.2.
@@ -56,8 +56,8 @@ const BASE: Array[float] = [
 	0.0, 0.6, 0.7, 0.8, 0.9, 0.5, 0.0,  # grassland
 	0.0, 0.6, 0.8, 1.0, 0.9, 0.5, 0.0,  # woods
 	0.0, 0.25, 0.2, 0.0, 0.0, 0.0, 0.0,  # marsh
-	0.0, 0.0, 0.0, 0.1, 0.6, 1.0, 1.0,  # rock
-	0.0, 0.0, 0.0, 0.0, 0.0, 0.6, 1.5,  # snow and ice
+	0.0, 0.0, 0.0, 0.1, 0.6, 1.0, 0.0,  # rock
+	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.5,  # snow and ice
 	0.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0,  # tundra
 	0.0, 1.0, 0.6, 0.0, 0.0, 0.0, 0.0,  # sand
 ]
@@ -131,14 +131,16 @@ static func cell_allowed(cover_id: int, level: int, metres: float, is_coastal: b
 	match cover_id:
 		FARMLAND:
 			return level >= 1 and level <= 4
-		GRASSLAND, WOODS:
+		GRASSLAND:
 			return level >= 1 and level <= 5
+		WOODS:
+			return (level >= 1 and level <= 4) or (level == 5 and metres < TREE_LINE_M)
 		MARSH:
 			return level == 1 or level == 2
 		ROCK:
-			return level >= 4 or (level == 3 and is_cliff)
+			return (level >= 4 and level <= 5) or (level == 3 and is_cliff)
 		SNOW:
-			return level == 6 or (level == 5 and metres >= SNOW_TOP_M)
+			return level == 6
 		TUNDRA:
 			return lat >= TUNDRA_LAT and level >= 1 and level <= 5
 		SAND:
@@ -331,11 +333,10 @@ func _build_priors() -> void:
 				ROCK:
 					if level == 3:
 						w *= 3.0 if cl else 1.0
-					elif level == 4 or level == 5:
+					elif level == 4:
 						w *= clampf((metres - 1000.0) / 800.0 + 0.5, 0.5, 2.0)
-				SNOW:
-					if level == 5:
-						w *= 1.0 + clampf((metres - SNOW_TOP_M) / 400.0, 0.0, 1.0)
+					elif level == 5:
+						w *= 2.0 if metres >= TREE_LINE_M else 0.5
 				_:
 					pass
 			if w > 0.0:
