@@ -114,7 +114,25 @@ The owner played the build (Castile against Granada, 1484). Two notes:
   onto an own stack. The game only says "They cannot get there." **In scope now:** clear refusal messages.
 - **"I wasn't sure if I want to siege every province rather just the main castles."** Asked, the owner chose
   **"Castle holds its area": open land around a castle cannot be taken until that castle falls**, built in 0.2.2 before
-  release. Design: `docs/design/castle-areas.md` (in progress); a short owner batch follows before the build.
+  release. Design: `docs/design/castle-areas.md` (creative review in its section 12), mockup
+  `docs/design/ui/21_castle_area.png`.
+
+**Owner's decisions (2026-11-14), all as recommended:**
+1. A castle holds its own country's land within 3 / 4 / 5 hexes (tower / small castle / large castle), counted along its
+   own land, the nearest castle winning.
+2. When a castle falls, its land opens: armies take it by walking in, one province per stack per season.
+3. Open land (held by no castle) is taken at the end of the season an army stands on it alone; the 2-season floor and the
+   siege meter are for castles only.
+
+**Added to scope:** item 7, castle areas (rule, AI targets, the war-stack map layer, the province panel chip, the odds
+card line "Taking it opens N provinces"), and item 8, clear move refusals and notes (the 16 rows of the design, section 5).
+**Never cut:** the rule, the AI target change, the war-stack map layer, the panel chip, and the messages for the cases the
+owner met (slow march, halt beside an enemy castle, stack full, held land). **Cut order:** item 6; the settler and
+general limit messages; message 7's way-out text; the AI fan-out (only if the targets are met without it); the odds-card
+line. **Fallback:** if the build runs long, the move messages ship alone in 0.2.2 and castle areas move to 0.2.3 whole.
+**Done when** (added): the design's section 9 targets (AI wars that move land include a castle taken or besieged 2+
+seasons in at least half; no more than 6 provinces taken in the season after a castle falls without a look), plus the
+war-pace targets above, a test per refusal row, and an owner replay.
 
 ## Owner's decisions (2026-11-13)
 
