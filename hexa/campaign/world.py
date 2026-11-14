@@ -27,7 +27,7 @@ WORLD_DEFAULTS = {"log": list, "units": list, "wars": list, "routes": list, "vis
                   "version": 0, "player": None, "_owned": None, "_castle_list": None, "_sea_cache": dict,
                   "_markets_dirty": True, "_known_world": None, "_neighbour_cache": None, "_bonus_cache": dict,
                   "_settled": None, "_pass_cache": None, "battles": list, "battle_names": dict,
-                  "retreated": dict, "siege_names": dict, "_areas": None}
+                  "retreated": dict, "siege_names": dict, "castle_fell": dict, "_areas": None}
 # Derived caches: rebuilt from the rest of the state, never saved (save_state leaves them out).
 WORLD_CACHES = ("_areas",)
 # World attributes no save can do without (from_state refuses a state that lacks one). Every other attribute
@@ -108,6 +108,7 @@ class CampaignWorld:
         self.wars = []
         self.battles = []
         self.retreated = {}              # hex -> turn: a side that fled or withdrew landed there (battle.py, war.sieges)
+        self.castle_fell = {}            # castle hex -> turn it changed hands (areas.fell): its land opens the season after
         self.battle_names = {}           # battles named so far, by place (battle.py); a repeat is "Second Battle of X"
         self.siege_names = {}            # sieges named so far, by place (war.siege_name); a repeat is "Second Siege of X"
         self.routes = []

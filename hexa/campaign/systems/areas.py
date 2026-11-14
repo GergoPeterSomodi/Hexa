@@ -21,7 +21,7 @@ from collections import deque
 from ...hexgrid import neighbors
 from ..data import CASTLE_AREA
 
-OWNS = ()     # writes nothing: the table is the world's cache (CampaignWorld.area_table)
+OWNS = ("castle_fell",)     # the season each castle fell (fell()); the table is the world's cache (CampaignWorld.area_table)
 
 
 def reach(castle_level):
@@ -31,8 +31,10 @@ def reach(castle_level):
 
 def build(world):
     """The membership table: {"of": {pos: castle}, "dist": {pos: hexes}, "paths": {castle: {pos: parent}},
-    "members": {castle: [pos, ...]}}, the members of each area nearest first (the castle first)."""
+    "members": {castle: [pos, ...]}}, the members of each area nearest first (the castle first). The reach is walked
+    along land an army can walk: a ridge crest (pass_data()[4], the static ridge, never a pass) is not a step."""
     provinces = world.provinces
+    crest = world.pass_data()[4]                # the ordered (from, to) steps across a ridge crest, in every season
     best = {}                                   # pos -> (sort key, castle): nearest, then higher level, then position
     paths = {}
     for castle in sorted(world.castles(), key=lambda p: p.pos):
@@ -43,7 +45,7 @@ def build(world):
             if depth[pos] >= limit:
                 continue
             for n in neighbors(pos):
-                if n in tree:
+                if n in tree or (pos, n) in crest:
                     continue
                 prov = provinces.get(n)
                 if prov is None or prov.owner != castle.owner:
@@ -62,9 +64,17 @@ def build(world):
     return {"of": {pos: holder for pos, (_, holder) in best.items()}, "dist": dist, "paths": paths, "members": members}
 
 
+def fell(world, prov):
+    """Stamp the season a castle changed hands (a storm in the battles phase or a siege in the sieges step): its land
+    opens from the next season, so the step of this season still reads the castle as standing (standing())."""
+    world.castle_fell[prov.pos] = world.turn
+
+
 def standing(world):
-    """The castles that stand now: the castle hexes their owner still controls."""
-    return {p.pos for p in world.castles() if p.controller == p.owner}
+    """The castles that stand now: the castle hexes their owner still controls, and the castles that fell this season
+    (fell()): the snapshot the siege step takes at its start counts them, so their land opens from the next season."""
+    fell_now = world.castle_fell
+    return {p.pos for p in world.castles() if p.controller == p.owner or fell_now.get(p.pos) == world.turn}
 
 
 def is_held(world, prov, up=None):
@@ -96,10 +106,11 @@ def area(world, castle_pos):
     return list(world.area_table()["members"].get(castle_pos, ()))
 
 
-def opens(world, castle_pos):
-    """The provinces a castle's fall opens to its taker: the area's provinces its owner still controls (the castle aside)."""
+def opens(world, castle_pos, taker=None):
+    """The provinces a castle's fall opens to its taker: the area's provinces its owner still controls (the castle aside).
+    0 when the owner takes its own castle back (``taker`` is the owner: its land is held again, nothing opens)."""
     castle = world.provinces.get(castle_pos)
-    if castle is None or not castle.castle or castle.owner is None:
+    if castle is None or not castle.castle or castle.owner is None or taker == castle.owner:
         return 0
     return sum(1 for pos in area(world, castle_pos)
                if pos != castle_pos and world.provinces[pos].controller == castle.owner)

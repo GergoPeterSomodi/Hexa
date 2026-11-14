@@ -403,17 +403,22 @@ def _forget_siege(world, prov):
 
 def _fall(world, prov, tag):
     """The place falls to the besieger (province_captured, by "siege"). A castle's fall opens its area (castle areas, 2.3):
-    the log says how much land lies open; the army takes it by walking in, from the next season."""
+    the log says how much land lies open; the army takes it by walking in, from the next season (areas.fell). A castle the
+    owner takes back opens nothing: its land is held again."""
     name, turns, loser = prov.siege_name, prov.siege_turns, prov.controller
-    opened = areas.opens(world, prov.pos)
+    opened = areas.opens(world, prov.pos, tag)
     world.bus.emit("province_captured", tag, prov.pos, loser=loser, by="siege", name=name, seasons=turns)
     prov.controller = tag
     prov.besieger, prov.siege, prov.siege_turns, prov.siege_name = "", 0, 0, ""
     prov.garrison = 0 if tag != prov.owner else prov.garrison
+    if prov.castle:
+        areas.fell(world, prov)
     shown = None if world.player in (tag, prov.owner) else "nobody"
     world.message(f"{world.countries[tag].name} took control of {world.place(prov)}.", shown)
     if opened:
         world.message(f"The castle of {world.place(prov)} has fallen: its land lies open ({opened} provinces).", shown)
+    elif prov.castle and tag == prov.owner:
+        world.message(f"The castle of {world.place(prov)} is ours again: its land is held again.", shown)
     world.changed()
 
 

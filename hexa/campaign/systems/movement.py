@@ -466,7 +466,7 @@ def _zoc_halt(world, group, pos, moves, speed):
     free = world.plan(group, moves + speed * 3, zoc_halts=False)
     if pos not in free:
         return None
-    halts, enemies = world.zoc(group[0].owner), world.enemies(group[0].owner)
+    halts, enemies, walls = world.zoc(group[0].owner), world.enemies(group[0].owner), world.walls()
     hop, walked = free[pos][1], []
     while hop is not None and hop != group[0].pos:
         walked.append(hop)
@@ -476,7 +476,7 @@ def _zoc_halt(world, group, pos, moves, speed):
             continue
         for n in neighbors(hex_):
             castle = world.provinces.get(n)
-            if castle and castle.castle and castle.controller in enemies and castle.garrison > 0:
+            if castle and castle.castle and castle.controller in enemies and castle.garrison > 0                     and (n, hex_) not in walls:              # a ridge between the castle and this hex: no halt from it
                 return world.place(castle)
     return None
 

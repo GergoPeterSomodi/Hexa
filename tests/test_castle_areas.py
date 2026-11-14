@@ -7,12 +7,14 @@ section 5, and the AI's targets (held land is no target, the defender retakes it
 different open land). Pygame-free. Each test changes a fresh world, except the stub worlds of the rule tests.
 """
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 from hexa.campaign import battleview, world as worldmod
 from hexa.campaign.data import CARAVEL, CASTLE_AREA, CIVILIAN_LIMIT, GARRISON_HP, GENERAL, MILITIA_MEN, WAGON
 from hexa.campaign.state import Province, War
 from hexa.campaign import ai
-from hexa.campaign.systems import areas, movement
+from hexa.campaign.systems import areas, battle as battlesys, movement, war as warsys
 from hexa.hexgrid import distance, neighbors
 from tests.support.battles import place, setup
 from tests.support.worlds import fresh
@@ -32,6 +34,10 @@ class Stub:
         if self._table is None:
             self._table = areas.build(self)
         return self._table
+
+    def pass_data(self):
+        """No ridges and no passes in this little world (areas.build reads the static ridge through it)."""
+        return (None, frozenset(), {}, {}, frozenset(), frozenset())
 
 
 def land(owner, xs, controller=None, row=0):
@@ -97,7 +103,7 @@ class AreaRuleTest(unittest.TestCase):
                         continue
                     for n in neighbors(pos):
                         prov = world.provinces.get(n)
-                        if prov is not None and prov.owner == castle.owner and n not in depth:
+                        if prov is not None and prov.owner == castle.owner and n not in depth                                 and (pos, n) not in world.pass_data()[4]:       # a ridge crest is no step (castle-areas 2.2)
                             depth[n] = depth[pos] + 1
                             nxt.append(n)
                 frontier = nxt
@@ -108,6 +114,19 @@ class AreaRuleTest(unittest.TestCase):
         self.assertEqual(set(table["of"]), set(best))
         for pos, key in best.items():
             self.assertEqual((table["of"][pos], table["dist"][pos]), (key[2], key[0]), pos)
+
+    def test_the_reach_is_never_walked_across_a_ridge_crest(self):
+        world = fresh("POR")
+        crest = world.pass_data()[4]
+        self.assertTrue(crest, "the Europe map has ridges")
+        table = world.area_table()
+        steps = 0
+        for pos, holder in table["of"].items():
+            path = areas._path(table, holder, pos)
+            for step in zip(path, path[1:]):
+                steps += 1
+                self.assertNotIn(step, crest, f"the way from the castle to {pos} crosses a ridge")
+        self.assertGreater(steps, 0)
 
     def test_states_held_fallen_open_and_the_castle_itself(self):
         provs = land("A", range(5))
@@ -159,7 +178,7 @@ class AreaRuleTest(unittest.TestCase):
         self.assertIn("_areas", worldmod.WORLD_DEFAULTS)
         self.assertIn("_areas", worldmod.WORLD_CACHES)
         self.assertNotIn("_areas", world.save_state())
-        self.assertEqual(areas.OWNS, ())
+        self.assertEqual(areas.OWNS, ("castle_fell",))
 
 
 def clean(world):
@@ -322,6 +341,102 @@ class HeldLandTest(unittest.TestCase):
         self.assertIsNotNone(view["besiege"])
         self.assertEqual(view["besiege"]["opens"], w.area_opens(castle.pos))
         self.assertGreater(view["besiege"]["opens"], 0)
+
+
+class FallOpensTest(unittest.TestCase):
+    """A castle that changes hands opens its land from the next season, whether a storm (battles phase, first) or a
+    siege (sieges step) took it; the owner taking its own castle back opens nothing (castle-areas 2.3, items 4 and 5)."""
+
+    def setUp(self):
+        self.w = clean(fresh("POR"))
+        at_war(self.w)
+
+    def near(self, castle):
+        return next(n for n in sorted(neighbors(castle.pos)) if n in self.w.provinces and self.w.is_land(n)
+                    and self.w.provinces[n].owner == "CAS" and self.w.castle_of(n) == castle.pos)
+
+    def storm(self, castle):
+        battle = SimpleNamespace(pos=castle.pos, attacker="POR", defender="CAS", assault=True)
+        return battlesys._storm(self.w, battle, "CAS", "broke", False)
+
+    def test_a_storm_opens_the_land_from_the_next_season_as_a_siege_does(self):
+        w = self.w
+        castle = castle_in_war(w, level=1)
+        near = self.near(castle)
+        place(w, "infantry", 1, "POR", near, 2)
+        self.assertTrue(self.storm(castle))
+        self.assertEqual(castle.controller, "POR")
+        self.assertEqual(w.castle_fell[castle.pos], w.turn, "the fall is stamped with its season")
+        w.sieges()                                                    # the same season: the storm's own step
+        self.assertEqual(w.provinces[near].controller, "CAS", "a storm does not open its land in the season it falls")
+        w.turn += 1
+        w.sieges()
+        self.assertEqual(w.provinces[near].controller, "POR", "from the next season the army walks in")
+
+    def test_a_storm_logs_the_fall_and_the_land_it_opens(self):
+        w = self.w
+        castle = castle_in_war(w, level=1)
+        opened = w.area_opens(castle.pos, "POR")
+        self.assertGreater(opened, 0)
+        before = len(w.log)
+        self.storm(castle)
+        lines = w.log[before:]
+        self.assertIn(f"The castle of {w.place(castle)} has fallen: its land lies open ({opened} provinces).", lines)
+
+    def test_a_siege_fall_is_stamped_too(self):
+        w = self.w
+        castle = castle_in_war(w, level=1)
+        place(w, "infantry", 1, "POR", castle.pos, 6)
+        for _ in range(20):
+            w.sieges()
+            if castle.controller == "POR":
+                break
+            w.turn += 1
+        self.assertEqual(castle.controller, "POR")
+        self.assertEqual(w.castle_fell[castle.pos], w.turn)
+
+    def test_an_old_fall_no_longer_holds_the_land(self):
+        w = self.w
+        castle = castle_in_war(w, level=1)
+        self.storm(castle)
+        w.turn += 1
+        self.assertNotIn(castle.pos, warsys.areas.standing(w), "a fall of an earlier season: the land is open")
+
+    def test_the_owner_taking_its_castle_back_opens_nothing_and_says_it_is_held_again(self):
+        w = self.w
+        castle = castle_in_war(w, level=1)
+        castle.controller = "POR"
+        w.changed(ownership=True)
+        w.player = "CAS"                                 # the owner reads its own log lines
+        self.assertGreater(w.area_opens(castle.pos, "POR"), 0, "the enemy's fall would open land")
+        self.assertEqual(w.area_opens(castle.pos, "CAS"), 0, "the owner's retake opens nothing")
+        before = len(w.log)
+        warsys._fall(w, castle, "CAS")
+        lines = w.log[before:]
+        self.assertFalse(any("lies open" in line for line in lines), lines)
+        self.assertIn(f"The castle of {w.place(castle)} is ours again: its land is held again.", lines)
+
+    def test_the_owner_retaking_by_storm_opens_nothing(self):
+        w = self.w
+        castle = castle_in_war(w, level=1)
+        castle.controller = "POR"
+        w.changed(ownership=True)
+        battle = SimpleNamespace(pos=castle.pos, attacker="CAS", defender="POR", assault=True)
+        before = len(w.log)
+        self.assertTrue(battlesys._storm(w, battle, "POR", "broke", False))
+        self.assertEqual(castle.controller, "CAS")
+        self.assertFalse(any("lies open" in line for line in w.log[before:]))
+
+    def test_the_odds_card_of_an_owner_retake_opens_nothing(self):
+        w = self.w
+        castle = castle_in_war(w, level=2)
+        castle.controller = "POR"
+        w.changed(ownership=True)
+        stand = next(n for n in sorted(neighbors(castle.pos)) if n in w.provinces and w.is_land(n))
+        stack = place(w, "infantry", 1, "CAS", stand, 6)
+        view = battleview.odds_view(w, stack, castle.pos)
+        self.assertIsNotNone(view["besiege"])
+        self.assertEqual(view["besiege"]["opens"], 0)
 
 
 class PeaceTest(unittest.TestCase):
@@ -513,6 +628,26 @@ class RefusalRowsTest(unittest.TestCase):
         self.assertTrue(text.endswith(" this season: enemy castles halt a march."), text)
         self.assertNotIn(found[0], w.reachable_group(group))
 
+    def test_row_12_a_ridge_between_a_castle_and_the_halt_is_no_halt_from_that_castle(self):
+        w = self.w
+        at_war(w)
+        hex_ = next(p for p in sorted(w.provinces) if w.is_land(p) and not w.provinces[p].castle
+                    and all(n in w.provinces and w.is_land(n) for n in neighbors(p)))
+        first, second, *_ = neighbors(hex_)                  # the first neighbour is the one the old loop named
+        for pos in (first, second):
+            prov = w.provinces[pos]
+            prov.castle, prov.garrison, prov.controller = 1, GARRISON_HP, "CAS"
+        w.changed(ownership=True)
+        start = next(n for n in neighbors(hex_) if n not in (first, second))
+        group = self.stack("infantry", start, 3)
+        pos = next(n for n in neighbors(hex_) if n not in (first, second, start))
+        chain = {pos: (2, hex_), hex_: (1, start), start: (0, None)}
+        with mock.patch.object(w, "plan", return_value=chain), \
+                mock.patch.object(w, "zoc", return_value={hex_}), \
+                mock.patch.object(w, "walls", return_value=frozenset({(first, hex_)})):
+            halt = movement._zoc_halt(w, group, pos, 1, 1)
+        self.assertEqual(halt, w.place(w.provinces[second]), "the walled castle does not halt the march")
+
     def test_row_13_a_march_of_more_seasons_is_a_note_that_names_the_slow_unit(self):
         w = self.w
         start = next(p.pos for p in sorted(w.provinces_of("POR"), key=lambda p: p.pos) if w.is_land(p.pos))
@@ -594,6 +729,34 @@ class AiCastleAreasTest(unittest.TestCase):
         ai._besiege_nearest(w, "POR", stack, w.attack_options_group(stack), {"CAS"})
         self.assertEqual(memory["claims"].get(str(target.pos), (w.turn,))[0], w.turn,
                          "a claim lasts the season it was made in: an old one is forgotten")
+
+    def test_a_stack_already_on_open_land_wins_it_over_a_spare_stack(self):
+        w = self.w
+        target = open_land(w, "CAS")
+        stand = next(n for n in sorted(neighbors(target.pos)) if n in w.provinces and w.is_land(n)
+                     and not w.units_at(n))
+        place(w, "infantry", 1, "POR", target.pos, 2)                 # the stack standing on the open land
+        spare = place(w, "infantry", 1, "POR", stand, 6)
+        options = w.attack_options_group(spare)
+        only = {"CAS": [target], "POR": []}                           # the target is the one open hex in view
+        with mock.patch.object(w, "provinces_of", side_effect=lambda tag: only.get(tag, [])):
+            ai._besiege_nearest(w, "POR", spare, options, {"CAS"})
+        self.assertNotEqual(spare[0].pos, target.pos, "the spare stack does not walk onto the stack that holds it")
+        self.assertNotEqual(w.countries["POR"].memory.get("claims", {}).get(str(target.pos), (0, None))[1],
+                            spare[0].id, "and it does not claim it either")
+
+    def test_a_claim_is_made_only_for_open_land_the_stack_reaches_this_season(self):
+        w = self.w
+        target = open_land(w, "CAS")
+        stand = next(n for n in sorted(neighbors(target.pos)) if n in w.provinces and w.is_land(n)
+                     and not w.units_at(n))
+        stack = place(w, "infantry", 1, "POR", stand, 6)
+        home = {stand: 0}
+        only = {"CAS": [target], "POR": []}
+        with mock.patch.object(w, "reachable_group", return_value=home),                 mock.patch.object(w, "provinces_of", side_effect=lambda tag: only.get(tag, [])):
+            ai._besiege_nearest(w, "POR", stack, w.attack_options_group(stack), {"CAS"})
+        self.assertNotIn(str(target.pos), w.countries["POR"].memory.get("claims", {}),
+                         "no claim on land this stack cannot reach this season")
 
     def test_no_ai_stack_stays_on_held_land_for_more_than_two_seasons(self):
         from hexa.campaign.game import GameManager

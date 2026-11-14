@@ -24,7 +24,7 @@ from ..data import (ATTACK_MORALE, BATTLE_DAYS, ELEVATION, RETREAT_RANGE, START_
                     WITHDRAW_DAY, WITHDRAW_MORALE, WITHDRAW_PURSUIT, WITHDRAW_PURSUIT_ATTACKER, WOUNDED_RETURN)
 from ..naming import is_wild
 from ..state import Battle
-from . import combat, military, movement, terrain
+from . import areas, combat, military, movement, terrain
 from .combat import army_morale
 
 # What this module changes: the battles, the units (position, hp, morale, experience; the dead are removed), the
@@ -541,10 +541,18 @@ def _storm(world, battle, loser, how, had_field):
         return False
     if had_field and prov.garrison > 0 and battle.garrison_morale > 0:
         return False
-    world.bus.emit("province_captured", battle.attacker, battle.pos, loser=prov.controller, by="storm",
+    tag = battle.attacker
+    opened = areas.opens(world, battle.pos, tag)
+    world.bus.emit("province_captured", tag, battle.pos, loser=prov.controller, by="storm",
                    name=prov.siege_name, seasons=prov.siege_turns)
-    prov.controller, prov.siege, prov.garrison = battle.attacker, 0, 0
+    prov.controller, prov.siege, prov.garrison = tag, 0, 0
     prov.besieger, prov.siege_turns, prov.siege_name = "", 0, ""
+    areas.fell(world, prov)                  # its land opens from the next season (castle areas, 2.3), as a siege's fall
+    shown = None if world.player in (tag, prov.owner) else "nobody"
+    if opened:
+        world.message(f"The castle of {world.place(prov)} has fallen: its land lies open ({opened} provinces).", shown)
+    elif tag == prov.owner:
+        world.message(f"The castle of {world.place(prov)} is ours again: its land is held again.", shown)
     return True
 
 
