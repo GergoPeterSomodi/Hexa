@@ -23,6 +23,17 @@ The owner asked for one delivery at a time, starting with war. The order:
 
 Everything decided on 2026-11-13 stays recorded in its own doc and waits its turn.
 
+**The war line as of 2026-11-14** (one release at a time; each has its brief in `docs/roadmap/`):
+- v0.2.0 "Battles that last" and v0.2.1 "War you can follow" are released.
+- **0.2.2 Sieges** is being built: the siege meter, Besiege or Storm, castle areas (a castle holds the land around it) and
+  clear move messages.
+- **Next after 0.2.2: a castles map mode** (owner's request, 2026-11-14). A map mode, next to terrain, goods and markets,
+  that shows every castle and the land each one holds: the area in the owner's colour, the castle's level, castles under
+  siege and fallen castles, for all countries (not only while a war stack is selected, as in 0.2.2). It builds on the
+  castle-area rule of `docs/design/castle-areas.md`; its design and mockup come in the next planning batch.
+- Then the battle board as a mini game inside the turn (0.2.3 brief draft), the trade patch, field forts, battle cards,
+  the battle mini-map, war goals and peace.
+
 ## 1. Vision
 
 Hexa started in 2020 as a pygame hex-tile map editor. It is becoming a playable turn-based strategy game against the computer. The main mode, Age of Discovery, is a Europa Universalis-like game from 1480 to 1650 on a hex map. The player picks a real country (or a random world), runs its economy of goods, markets and trade routes, grows towns and castles, colonises the Americas and Africa, and goes to war with neighbours. The art stays in the Kenney hexagon tile style, but each part should look distinct and creative, not like a copy of another part. The two smaller modes, a medieval conquest match and a colonisation survival mode, remain as they are.
