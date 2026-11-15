@@ -32,6 +32,10 @@ SETS = {"spring": ("spring", "snow"), "summer": ("summer", "snow"), "autumn": ("
 CHUNK = 24
 QUICK_COAST = [(3, 0, "beach", False), (48, 2, "beach", True), (9, 4, "cliff", False), (6, 1, "beach", False)]
 QUICK_MODULES = ("wheat", "harbour")
+# Landmarks a place of the map can carry that the kit draws no monument for (it knows the ten famous cities, at levels 4 and
+# 5). The settlement stands as usual, under the landmark's own tile name, at every settlement level: MapCells names
+# piece/settlements/<level>/<variant>/<mirror>/<landmark>/<part> for any level of such a place.
+PLAIN_LANDMARKS = ("hospice", "monastery")
 
 
 # ---------------------------------------------------------------- the names (no drawing: the tests count with these)
@@ -127,6 +131,9 @@ def run_task(task):
         marks.add("mark/select", F.select_tile())
         marks.add("mark/target", F.target_tile())
         marks.add("mark/white", F.white_tile())
+        import mark_tiles as MT
+        for tname, surf, sort in MT.all_tiles():            # fords, bridges, ferries and pass marks (T15)
+            marks.add(tname, surf, y_sort=sort)
         return task, {a.name: (a.region, [(t["name"], _raw(s)) for t, s in zip(a.tiles, a.surfs)]) for a in (shade, marks)}
     if kind == "trees":
         import art
@@ -179,6 +186,9 @@ def _surf(raw, size):
 def piece_specs(quick=False):
     import pieces_bake as PB
     specs = PB.enumerate_specs()
+    plain = [s for s in specs if s["family"] == "settlements" and s["extra"] == "-"]
+    for name in PLAIN_LANDMARKS:
+        specs += [dict(s, extra=name) for s in plain]
     if quick:
         specs = [s for s in specs if s["module"] in QUICK_MODULES and s["level"] <= 2]
     return specs
@@ -343,13 +353,14 @@ def run(out_root, sets=None, jobs=None, quick=False, log=print):
         log("   piece error %s" % (e,))
     # the files shared by every set
     from tile_atlas import GridAtlas
+    import mark_tiles as MT
     shared_dir = os.path.join(out_root, "_shared")
     os.makedirs(shared_dir, exist_ok=True)
     shared = {"_dir": shared_dir}
     for aname, (region, tiles) in shared_res.items():
         atlas = GridAtlas(aname, region)
         for tname, raw in tiles:
-            atlas.add(tname, _surf(raw, region))
+            atlas.add(tname, _surf(raw, region), y_sort=MT.y_sort(tname))
         shared[aname] = atlas.save(shared_dir)
     plan, problems = plan_pieces(specs, piece_res)
     for p in problems:

@@ -1,0 +1,219 @@
+## The names of the places on screen (docs/architecture/m1-build-spec.md section 5, layer "names", z 100): a dark rounded
+## plate under each place, sized by the place's level, placed without overlaps (the collision placement of the prototype's
+## WorldLabels, adapted: a plate tries the spot below its hex first, then above, then to the sides, and is dropped when
+## none is free; the great places are placed first, so on a conflict the smaller name goes). It holds no facts: the places
+## are read from MapData, the hexes' pixels from MapTiles, and the screen position from the viewport's canvas transform,
+## so it follows the camera by itself.
+##
+## OFF by default (owner, 2026-11-15: no plates on the normal map for now). Key N toggles it, set_visible(bool) turns it on
+## and off from code, and `toggled(on)` tells whoever listens. Put it in a CanvasLayer above the map (screen space).
+class_name MapLabels
+extends Control
+
+signal toggled(on: bool)
+
+## The key that toggles the names.
+const TOGGLE_KEY := KEY_N
+## Plate padding (px) round the text, and the gap between a hex's middle and its plate.
+const PAD_X := 7.0
+const PAD_Y := 2.0
+const GAP := 9.0
+## Half the size of the box a place keeps clear of other plates (the hex's middle).
+const MARKER_HALF := 5.0
+const TEXT_COLOUR := Color(0.98, 0.965, 0.918)
+const PLATE_MAJOR := Color(0.118, 0.141, 0.220, 0.91)
+const PLATE_MINOR := Color(0.204, 0.227, 0.290, 0.84)
+const GOLD := Color(0.839, 0.729, 0.431)
+## Where a plate may sit, in order: below, above, right, left, then the four corners.
+enum Spot { BELOW, ABOVE, RIGHT, LEFT, BELOW_RIGHT, BELOW_LEFT, ABOVE_RIGHT, ABOVE_LEFT }
+const SPOTS: Array[int] = [Spot.BELOW, Spot.ABOVE, Spot.RIGHT, Spot.LEFT, Spot.BELOW_RIGHT, Spot.BELOW_LEFT,
+	Spot.ABOVE_RIGHT, Spot.ABOVE_LEFT]
+
+## Boxes in screen px the plates keep off (the hex panel, the top bar...): the scene sets them.
+var obstacles: Array[Rect2] = []
+
+var _map: MapData = null
+var _placed: Array[Dictionary] = []
+var _last_transform := Transform2D()
+var _last_size := Vector2.ZERO
+var _dirty := true
+var _major: StyleBoxFlat = null
+var _minor: StyleBoxFlat = null
+var _capital: StyleBoxFlat = null
+
+
+func _init() -> void:
+	visible = false  # off by default
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	z_index = 100
+	_major = _box(PLATE_MAJOR, null)
+	_minor = _box(PLATE_MINOR, null)
+	_capital = _box(PLATE_MAJOR, GOLD)
+
+
+func _ready() -> void:
+	visibility_changed.connect(_on_visibility_changed)
+
+
+## The map whose places are named. Call once (and again for another map).
+func setup(map: MapData) -> void:
+	_map = map
+	_dirty = true
+	queue_redraw()
+
+
+## Forces a new layout at the next frame (a place was added, a panel moved).
+func refresh() -> void:
+	_dirty = true
+
+
+## What is placed now: [{name, level, capital, hex, box (screen px)}], great places first.
+func placed() -> Array[Dictionary]:
+	return _placed
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo and key.keycode == TOGGLE_KEY:
+		set_visible(not visible)
+		toggled.emit(visible)
+		get_viewport().set_input_as_handled()
+
+
+func _on_visibility_changed() -> void:
+	_dirty = true
+	set_process(visible)
+	queue_redraw()
+
+
+func _process(_delta: float) -> void:
+	if not visible or _map == null:
+		return
+	var xform := get_viewport().get_canvas_transform()
+	var screen := get_viewport_rect().size
+	if _dirty or xform != _last_transform or screen != _last_size:
+		_last_transform = xform
+		_last_size = screen
+		_dirty = false
+		_placed = layout(_map, xform, Rect2(Vector2.ZERO, screen), ThemeDB.fallback_font, obstacles)
+		queue_redraw()
+
+
+func _draw() -> void:
+	if not visible:
+		return
+	var font := ThemeDB.fallback_font
+	for item: Dictionary in _placed:
+		var box: Rect2 = item["box"]
+		var level := int(item["level"])
+		var plate := _capital if bool(item["capital"]) or level >= 4 else (_major if level >= 2 else _minor)
+		draw_style_box(plate, box)
+		var fs := font_size(level)
+		draw_string(font, box.position + Vector2(PAD_X, PAD_Y + font.get_ascent(fs)), str(item["name"]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, fs, TEXT_COLOUR)
+
+
+static func _box(fill: Color, edge: Variant) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = fill
+	s.set_corner_radius_all(8)
+	if edge != null:
+		s.border_color = edge as Color
+		s.set_border_width_all(1)
+	return s
+
+
+## The font size of a name by its place's level: the great city largest, the hamlet smallest.
+static func font_size(level: int) -> int:
+	if level >= 5:
+		return 17
+	if level == 4:
+		return 15
+	if level == 3:
+		return 13
+	if level == 2:
+		return 12
+	return 11
+
+
+## The places of `map` that are on screen, with their plates placed. `to_screen` carries map px (MapTiles.cell_centre) to
+## screen px, `screen` is the area the plates must stay in, `blocked` the boxes they keep off. Returns
+## [{name, level, capital, hex, box}] in placing order (rank: level, capital first, then by name).
+static func layout(map: MapData, to_screen: Transform2D, screen: Rect2, font: Font, blocked: Array[Rect2]) -> Array[Dictionary]:
+	var items: Array[Dictionary] = []
+	var taken: Array[Rect2] = blocked.duplicate()
+	var reach := screen.grow(40.0)
+	for place: Dictionary in map.places:
+		var hex: Vector2i = place["hex"]
+		var at: Vector2 = to_screen * MapTiles.cell_centre(hex)
+		if not reach.has_point(at):
+			continue
+		taken.append(Rect2(at - Vector2(MARKER_HALF, MARKER_HALF), Vector2(MARKER_HALF, MARKER_HALF) * 2.0))
+		var label := str(place.get("name", ""))
+		if label == "":
+			continue
+		var level := int(place.get("level", 0))
+		var fs := font_size(level)
+		var text := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
+		items.append({"name": label, "level": level, "capital": bool(place.get("capital", false)), "hex": hex, "at": at,
+			"size": Vector2(text.x + 2.0 * PAD_X, text.y + 2.0 * PAD_Y)})
+	return _place(items, taken, screen)
+
+
+## The collision placement: by rank, each plate takes the first free spot inside `bounds`.
+static func _place(items: Array[Dictionary], taken: Array[Rect2], bounds: Rect2) -> Array[Dictionary]:
+	var order := items.duplicate()
+	order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var ra := int(a["level"]) * 10 + (5 if bool(a["capital"]) else 0)
+		var rb := int(b["level"]) * 10 + (5 if bool(b["capital"]) else 0)
+		if ra != rb:
+			return ra > rb
+		return str(a["name"]) < str(b["name"]))
+	var placed: Array[Dictionary] = []
+	for item: Dictionary in order:
+		var chosen := Rect2()
+		for spot: int in SPOTS:
+			var box := box_at(spot, item["at"] as Vector2, item["size"] as Vector2)
+			if not bounds.encloses(box):
+				continue
+			var clear := true
+			for other: Rect2 in taken:
+				if other.intersects(box):
+					clear = false
+					break
+			if clear:
+				chosen = box
+				break
+		if chosen.size == Vector2.ZERO:
+			continue
+		taken.append(chosen)
+		placed.append({"name": item["name"], "level": item["level"], "capital": item["capital"], "hex": item["hex"],
+			"box": chosen})
+	return placed
+
+
+## The box of a plate of `size` at a spot round the point `at`.
+static func box_at(spot: int, at: Vector2, size: Vector2) -> Rect2:
+	var x := at.x - size.x / 2.0
+	var y := at.y + GAP
+	match spot:
+		Spot.ABOVE:
+			y = at.y - GAP - size.y
+		Spot.RIGHT:
+			x = at.x + GAP
+			y = at.y - size.y / 2.0
+		Spot.LEFT:
+			x = at.x - GAP - size.x
+			y = at.y - size.y / 2.0
+		Spot.BELOW_RIGHT:
+			x = at.x + GAP * 0.5
+		Spot.BELOW_LEFT:
+			x = at.x - GAP * 0.5 - size.x
+		Spot.ABOVE_RIGHT:
+			x = at.x + GAP * 0.5
+			y = at.y - GAP - size.y
+		Spot.ABOVE_LEFT:
+			x = at.x - GAP * 0.5 - size.x
+			y = at.y - GAP - size.y
+	return Rect2(Vector2(x, y), size)

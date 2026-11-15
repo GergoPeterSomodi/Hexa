@@ -3,10 +3,6 @@
 ## cell, and the far picture takes over when zoomed out.
 extends GutTest
 
-## A landmark the north Italy map has on a level 3 settlement and the full tile bake draws only at level 4 (T9's gap, to be
-## closed in the bake: then this goes).
-const KNOWN_BAKE_GAP := "/hospice/"
-
 var _scene: MapScene = null
 var _hexes_changed: Array[Vector2i] = []
 
@@ -27,7 +23,7 @@ func _unexplained_missing() -> Array[String]:
 	var out: Array[String] = []
 	for tile_name: String in _scene.view().missing_names():
 		var blank_part := tile_name.begins_with("piece/") and (tile_name.ends_with("/back") or tile_name.ends_with("/shadow"))
-		if not blank_part and not tile_name.contains(KNOWN_BAKE_GAP):
+		if not blank_part:
 			out.append(tile_name)
 	return out
 

@@ -1,0 +1,111 @@
+## The place names (shell/mapview/map_labels.gd): off by default, N toggles them, names for the places on screen only, dark
+## plates sized by level that never overlap each other or the blocked boxes, and a layout that follows the camera.
+extends GutTest
+
+const SCREEN := Rect2(0.0, 0.0, 1280.0, 720.0)
+
+
+func _map() -> MapData:
+	var map := MapData.new()
+	map.allocate(8, 6)
+	var names: Array[String] = ["Milano", "Como", "Lodi", "Monza", "Pavia", "Varese"]
+	var hexes: Array[Vector2i] = [Vector2i(2, 2), Vector2i(3, 2), Vector2i(2, 3), Vector2i(3, 3), Vector2i(7, 5), Vector2i(0, 0)]
+	var levels: Array[int] = [5, 2, 1, 3, 2, 1]
+	for i: int in names.size():
+		map.places.append({"name": names[i], "hex": hexes[i], "level": levels[i], "capital": i == 0, "landmark": ""})
+		map.place_id[map.index_of(hexes[i])] = i
+	return map
+
+
+func _shift(offset: Vector2, zoom: float = 1.0) -> Transform2D:
+	return Transform2D(Vector2(zoom, 0.0), Vector2(0.0, zoom), offset)
+
+
+func _layout(map: MapData, xform: Transform2D, blocked: Array[Rect2] = []) -> Array[Dictionary]:
+	return MapLabels.layout(map, xform, SCREEN, ThemeDB.fallback_font, blocked)
+
+
+func _overlaps(placed: Array[Dictionary]) -> int:
+	var n := 0
+	for i: int in placed.size():
+		for j: int in range(i + 1, placed.size()):
+			if (placed[i]["box"] as Rect2).intersects(placed[j]["box"] as Rect2):
+				n += 1
+	return n
+
+
+func test_off_by_default_and_set_visible() -> void:
+	var labels := MapLabels.new()
+	add_child_autofree(labels)
+	assert_false(labels.visible, "no plates on the normal map")
+	labels.set_visible(true)
+	assert_true(labels.visible)
+	labels.set_visible(false)
+	assert_false(labels.visible)
+
+
+func test_key_n_toggles() -> void:
+	var labels := MapLabels.new()
+	add_child_autofree(labels)
+	var heard: Array[bool] = []
+	labels.toggled.connect(func(on: bool) -> void: heard.append(on))
+	var press := InputEventKey.new()
+	press.keycode = KEY_N
+	press.pressed = true
+	labels._unhandled_key_input(press)
+	assert_true(labels.visible)
+	labels._unhandled_key_input(press)
+	assert_false(labels.visible)
+	assert_eq(heard, [true, false])
+	var other := InputEventKey.new()
+	other.keycode = KEY_M
+	other.pressed = true
+	labels._unhandled_key_input(other)
+	assert_false(labels.visible, "another key does nothing")
+
+
+func test_names_for_the_places_on_screen_without_overlaps() -> void:
+	var map := _map()
+	var placed := _layout(map, _shift(Vector2(300.0, 200.0)))
+	assert_gt(placed.size(), 3)
+	assert_eq(_overlaps(placed), 0)
+	assert_eq(str(placed[0]["name"]), "Milano", "the great place is placed first")
+	for item: Dictionary in placed:
+		assert_true(SCREEN.encloses(item["box"] as Rect2), "inside the screen")
+
+
+func test_crowded_names_lose_the_smaller_place() -> void:
+	var map := _map()
+	# zoomed far out: the places lie within a few px of each other, so not all names fit; nothing overlaps
+	var placed := _layout(map, _shift(Vector2(600.0, 300.0), 0.04))
+	assert_lt(placed.size(), 6)
+	assert_eq(_overlaps(placed), 0)
+	assert_eq(str(placed[0]["name"]), "Milano")
+
+
+func test_only_places_on_screen_are_named() -> void:
+	var map := _map()
+	assert_eq(_layout(map, _shift(Vector2(-5000.0, -5000.0))).size(), 0)
+	var centre := MapTiles.cell_centre(Vector2i(2, 2))
+	var here := _layout(map, _shift(SCREEN.size / 2.0 - centre))
+	var found := false
+	for item: Dictionary in here:
+		found = found or str(item["name"]) == "Milano"
+	assert_true(found)
+
+
+func test_a_blocked_box_is_kept_clear_and_moving_the_camera_moves_the_plates() -> void:
+	var map := _map()
+	var centre := MapTiles.cell_centre(Vector2i(2, 2))
+	var free := _layout(map, _shift(SCREEN.size / 2.0 - centre))
+	var blocked: Array[Rect2] = [(free[0]["box"] as Rect2)]
+	var kept := _layout(map, _shift(SCREEN.size / 2.0 - centre), blocked)
+	for item: Dictionary in kept:
+		assert_false((item["box"] as Rect2).intersects(blocked[0]), "%s keeps off the panel" % str(item["name"]))
+	var panned := _layout(map, _shift(SCREEN.size / 2.0 - centre + Vector2(40.0, 0.0)))
+	assert_almost_eq((panned[0]["box"] as Rect2).position.x, (free[0]["box"] as Rect2).position.x + 40.0, 0.001)
+
+
+func test_bigger_places_have_bigger_type() -> void:
+	assert_gt(MapLabels.font_size(5), MapLabels.font_size(3))
+	assert_gt(MapLabels.font_size(3), MapLabels.font_size(1))

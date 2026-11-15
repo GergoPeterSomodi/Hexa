@@ -209,7 +209,14 @@ class QuickBakeTest(unittest.TestCase):
     def test_contents(self):
         ix = self.indexes["summer"]
         by = {s["name"]: s for s in ix["sources"]}
-        self.assertEqual(len(by["marks"]["tiles"]), 4)
+        marks = {t["name"]: t for t in by["marks"]["tiles"]}
+        self.assertEqual(len(marks), 4 + 30)                          # grid, select, target, white + 5 crossings x 6 directions
+        for n in ("mark/grid", "mark/select", "mark/target", "mark/white", "mark/ford/0", "mark/bridge_wood/1",
+                  "mark/bridge_stone/2", "mark/ferry/4", "mark/pass/5"):
+            self.assertIn(n, marks)
+        self.assertEqual(marks["mark/bridge_stone/1"]["y_sort"], -37)       # on the NE edge, 38 px above the middle
+        self.assertEqual(marks["mark/ford/0"]["y_sort"], 1)
+        self.assertEqual(marks["mark/grid"]["y_sort"], 0)
         self.assertEqual(len(by["shade"]["tiles"]), 16)
         self.assertEqual(by["ground"]["region"], [172, 170])
         self.assertEqual(by["shade"]["region"], [252, 216])
@@ -230,6 +237,35 @@ class QuickBakeTest(unittest.TestCase):
     def test_summer_and_winter_differ(self):
         self.assertNotEqual(self.read(os.path.join(self.out, "summer", "ground.png")),
                             self.read(os.path.join(self.out, "winter_frost", "ground.png")))
+
+
+@unittest.skipIf(pygame is None, "pygame is not installed")
+class CrossingTilesTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        _setup()
+        import mark_tiles
+        cls.M = mark_tiles
+
+    def test_names_and_pictures(self):
+        names = self.M.all_names()
+        self.assertEqual(len(names), 30)
+        self.assertEqual(len(set(names)), 30)
+        for kind in self.M.KINDS:
+            for d in range(6):
+                surf = self.M.crossing_tile(kind, d)
+                self.assertEqual(surf.get_size(), (172, 170))
+                box = surf.get_bounding_rect()
+                self.assertGreater(box.width, 4, (kind, d))
+                ex, ey = self.M.edge_middle(d)
+                # the sprite lies on the middle of its edge, inside the picture
+                self.assertTrue(abs(box.centerx - (86 + ex)) < 14 and abs(box.centery - (85 + ey)) < 14, (kind, d, box))
+
+    def test_sort_is_the_edge_height(self):
+        self.assertEqual(self.M.y_sort("mark/ferry/1"), self.M.y_sort("mark/ferry/2"))
+        self.assertLess(self.M.y_sort("mark/ferry/1"), 0)
+        self.assertGreater(self.M.y_sort("mark/ferry/4"), 0)
+        self.assertEqual(self.M.y_sort("mark/grid"), 0)
 
 
 @unittest.skipIf(pygame is None, "pygame is not installed")
