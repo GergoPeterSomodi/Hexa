@@ -1,0 +1,128 @@
+[gd_resource type="Theme" format=3]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_o3li3"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.14, 0.14, 0.16, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.22, 0.22, 0.25, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sxw42"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.88, 0.74, 0.46, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_uhp86"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.25, 0.26, 0.31, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.5, 0.5, 0.56, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_deqfy"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.19, 0.2, 0.24, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.36, 0.36, 0.42, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_oaryp"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.14, 0.15, 0.18, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.88, 0.74, 0.46, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_scju8"]
+content_margin_left = 14.0
+content_margin_top = 6.0
+content_margin_right = 14.0
+content_margin_bottom = 6.0
+bg_color = Color(0.1, 0.11, 0.14, 0.94)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.3, 0.34, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[resource]
+Button/colors/font_color = Color(0.93, 0.92, 0.88, 1)
+Button/colors/font_disabled_color = Color(0.5, 0.5, 0.52, 1)
+Button/colors/font_hover_color = Color(1, 0.97, 0.9, 1)
+Button/colors/font_pressed_color = Color(0.88, 0.74, 0.46, 1)
+Button/font_sizes/font_size = 13
+Button/styles/disabled = SubResource("StyleBoxFlat_o3li3")
+Button/styles/focus = SubResource("StyleBoxFlat_sxw42")
+Button/styles/hover = SubResource("StyleBoxFlat_uhp86")
+Button/styles/normal = SubResource("StyleBoxFlat_deqfy")
+Button/styles/pressed = SubResource("StyleBoxFlat_oaryp")
+GridContainer/constants/h_separation = 12
+GridContainer/constants/separation = 4
+HexKey/base_type = &"Label"
+HexKey/colors/font_color = Color(0.66, 0.67, 0.71, 1)
+HexKey/font_sizes/font_size = 13
+HexReason/base_type = &"Label"
+HexReason/colors/font_color = Color(0.66, 0.67, 0.71, 1)
+HexReason/font_sizes/font_size = 12
+HexSection/base_type = &"Label"
+HexSection/colors/font_color = Color(0.88, 0.74, 0.46, 1)
+HexSection/font_sizes/font_size = 12
+HexTitle/base_type = &"Label"
+HexTitle/colors/font_color = Color(0.93, 0.92, 0.88, 1)
+HexTitle/font_sizes/font_size = 18
+HexValue/base_type = &"Label"
+HexValue/colors/font_color = Color(0.93, 0.92, 0.88, 1)
+HexValue/font_sizes/font_size = 13
+PanelContainer/styles/panel = SubResource("StyleBoxFlat_scju8")
+VBoxContainer/constants/separation = 6

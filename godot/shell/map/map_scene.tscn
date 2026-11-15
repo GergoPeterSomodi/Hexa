@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="res://shell/mapview/tile_map_view.gd" id="2_view"]
 [ext_resource type="Script" path="res://shell/mapview/far_map.gd" id="3_far"]
 [ext_resource type="Script" path="res://shell/input/map_input.gd" id="4_input"]
-[ext_resource type="Script" path="res://shell/map/simple_hex_panel.gd" id="5_panel"]
+[ext_resource type="PackedScene" path="res://shell/panels/hex_panel.tscn" id="5_panel"]
 
 [sub_resource type="LabelSettings" id="label_title"]
 font_size = 18
@@ -70,7 +70,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="Panel" type="PanelContainer" parent="Hud/Margin/Row"]
+[node name="Panel" parent="Hud/Margin/Row" instance=ExtResource("5_panel")]
 layout_mode = 2
 size_flags_vertical = 0
-script = ExtResource("5_panel")
