@@ -26,6 +26,10 @@ Boats: spring and summer they are out at sea, in autumn the first and third lie 
 up (bare masts). The ships stay in the basin; the beached boat stays on the sand. In every winter the boats are laid
 up; snow (moles, roofs, the lighthouse cap, the hull) lies only where snow lies (p.winter): a mild winter is white nowhere.
 
+On the map's curved shores the huts, rack, beached boat, warehouses, slip and people are kept inside the hex (on_land,
+rack_spot: moved inland or left out), the moles start at the water's edge and a short spur that would lie along the
+beach is left out.
+
 python harbour.py          writes docs/design/map/pieces/harbour.png, harbour_variants.png, harbour_sides.png
 """
 import os
@@ -156,6 +160,39 @@ def afloat(p, s, u, v, sc, sail):
         p.boat(*at, sc, sail=sail)
 
 
+def on_land(s, u, v, tall, wide, slide=14.0):
+    """(u, v) for a standing thing on land that must stay inside the hex (a hut, the net rack, a beached boat, a person):
+    where it fits, the place itself; else the place moved inland (v smaller) up to `slide` px until it does; else None
+    (leave it out). On a bent or slanted shore the hex's edge can lie right behind the shore (guide section 10)."""
+    q = v
+    while q >= v - slide - 1e-6:
+        if s.fits(u, q, tall, wide, margin=kit.MARGIN):
+            return (u, q)
+        q -= 1.0
+    return None
+
+
+def rack_spot(s, r, slide=14.0):
+    """The net rack's two posts, (u, v) each, moved inland together until both stand inside the hex, or None. A
+    mirrored piece moves the rack as a block, so the posts' feet are also tried with the other post's height."""
+    dv = 0.0
+    while dv >= -slide - 1e-6:
+        a, b = (r[0], r[1] + dv), (r[2], r[3] + dv)
+        xa, ya = s.pt(*a)
+        xb, yb = s.pt(*b)
+        if all(kit.in_hex(x + dx, y + dy, kit.MARGIN) for x, y in ((xa, ya), (xb, yb), (xa, yb), (xb, ya))
+               for dx in (-0.5, 0.5) for dy in (-5.0, 1.0)):
+            return a, b
+        dv -= 1.0
+    return None
+
+
+def dry(s, u, v, du=2.5):
+    """False where a point (u, v) out from the shore, or either side of it by du, is on land (a mole, a spur): on a
+    steep shore a straight run out from the beach lies along the sand instead of in the water."""
+    return not any(s.land(*s.at(u, v, d)) for d in (-du, 0.0, du))
+
+
 def line_at(s, u0, u1, v, step=12):
     """Points along the shore from u0 to u1 at v out from it, so a quay follows the shore's waves."""
     n = max(1, int(abs(u1 - u0) // step))
@@ -188,28 +225,43 @@ def draw(level, season, variant=0, mirror=False, sea=None, shore=None, bay=None,
     if level >= 2:
         p.jetty(line_at(s, L["quay"][0], L["quay"][1], L["quay"][2]), None, 3.2, stone=True, snow=True)
     if level >= 3:
-        for pts in L["moles"]:                                                               # the moles close a basin
-            p.jetty([s.pt(*q) for q in pts], None, 3.6, stone=True, snow=True)
+        root = -1.0 if p.shore_line is None else 0.0     # a mole starts at the water's edge: on the map's own shore line
+        for pts in L["moles"]:                           # (a bent shore) at v = 0, not 1 px inland
+            pts = [(pts[0][0], root)] + list(pts[1:])
+            if len(pts) == 2 and not all(dry(s, pts[1][0], v) for v in (pts[1][1] * 0.5, pts[1][1])):
+                continue                                 # a short spur that would lie along the beach: left out
+            p.jetty([s.pt(*q) for q in pts], None, 3.6, stone=True, snow=True)                # the moles close a basin
 
     # ---- standing things
     if land and level >= 1:
         for u, v, sm in L["huts"]:
-            p.house(*s.pt(u, v), 5.5, 3.5, 3.0, roof="thatch", smoke=sm)
-        net_rack(p, *s.pt(L["rack"][0], L["rack"][1]), *s.pt(L["rack"][2], L["rack"][3]))
+            at = on_land(s, u, v, 15.0 if sm else 7.0, 8.5)   # smoke: 14.5 px up in winter (any season: places must not follow it)
+            if at is not None:
+                p.house(*s.pt(*at), 5.5, 3.5, 3.0, roof="thatch", smoke=sm)
+        rack = rack_spot(s, L["rack"])
+        if rack is not None:
+            net_rack(p, *s.pt(*rack[0]), *s.pt(*rack[1]))
     if level >= 1:
-        p.boat(*s.pt(*L["beached"]), 0.55, sail=False)
+        at = on_land(s, L["beached"][0], L["beached"][1], 7.0, 7.0)
+        if at is not None:
+            p.boat(*s.pt(*at), 0.55, sail=False)
     if land and level >= 2:
         for i, (u, v) in enumerate(L["warehouses"][:2]):
-            p.house(*s.pt(u, v), 11.5, 5.2, 4.4, wall=(1, 3)[i], kind="ridge", roof="tile", door=False)
+            at = on_land(s, u, v, 11.0, 14.0)
+            if at is not None:
+                p.house(*s.pt(*at), 11.5, 5.2, 4.4, wall=(1, 3)[i], kind="ridge", roof="tile", door=False)
     if level >= 2:
         for (u, v), frm in L["ships"]:
             if level >= frm:
                 afloat(p, s, u, v, 1.0, not wi)
     if level >= 3:
         if land:
-            u, v = L["warehouses"][2]
-            p.house(*s.pt(u, v), 11.5, 5.2, 4.4, wall=4, kind="ridge", roof="tile", door=False)
-        hull_on_slip(p, *s.pt(*L["slip"]))
+            at = on_land(s, *L["warehouses"][2], 11.0, 14.0)
+            if at is not None:
+                p.house(*s.pt(*at), 11.5, 5.2, 4.4, wall=4, kind="ridge", roof="tile", door=False)
+        at = on_land(s, *L["slip"], 8.0, 16.0)
+        if at is not None:
+            hull_on_slip(p, *s.pt(*at))
         light = s.first(L["lights"], *LIGHT_SIZE)
         if light is not None:
             lighthouse(p, *s.pt(*light))
@@ -220,9 +272,13 @@ def draw(level, season, variant=0, mirror=False, sea=None, shore=None, bay=None,
         afloat(p, s, *(out if at_sea else home), BOAT_SC, not wi)
     # ---- season activity
     if land and (sp or su) and level >= 1:
-        p.person(*s.pt(*L["fisher"]))                    # a fisherman at the net rack
+        at = on_land(s, *L["fisher"], 4.0, 3.0)
+        if at is not None:
+            p.person(*s.pt(*at))                         # a fisherman at the net rack
     if land and (sp or su or au) and level >= 2:
-        p.person(*s.pt(*L["quayman"]), (70, 96, 150))    # a man on the quay
+        at = on_land(s, *L["quayman"], 4.0, 3.0)
+        if at is not None:
+            p.person(*s.pt(*at), (70, 96, 150))          # a man on the quay
     return p.finish(label="harbour L%d%s" % (level, " addon" if addon else ""))
 
 

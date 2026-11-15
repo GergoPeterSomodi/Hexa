@@ -13,6 +13,9 @@ rows), the heaps in a row along the inland side, the store and the jetty at the 
 On a lagoon (bay=) the pans lie at the lagoon's shore as at any other; the jetty and the boat keep inside it.
 Winter: pans frozen only where the water freezes (p.frozen); in a mild winter they are filled as in spring.
 
+On the map's curved shores every standing thing is kept inside the hex (on_land: moved inland or left out), layout 1
+claims its channel strip and keeps its pans within 6 px of the shore's height at the channel.
+
 python salt.py             writes docs/design/map/pieces/salt.png, salt_variants.png and salt_sides.png
 """
 import os
@@ -76,7 +79,7 @@ LAYOUT = [
          channel=[(CH_U, 0.0), (CH_U, -10.0), (CH_U, -22.0), (CH_U, -31.0)], sluice=(CH_U, -17.0), store=(-27.0, -5.0),
          jetty_u=-22.0, boat=(-14.0, 9.0), drift=(22.0, -4.0, 8, 3),
          rakers=[(-17.0, -12.5), (17.0, -12.5, (70, 96, 150))],
-         yard=(-2.0, -35.0, 78, 9)),     # trodden ground behind the pans where the heaps stand (level 3)
+         yard=(-2.0, -35.0, 78, 9), ref_u=CH_U),     # trodden ground behind the pans where the heaps stand (level 3)
 ]
 
 
@@ -113,6 +116,27 @@ def pan(p, s, u, v, i):
     if p.season == "summer" and i % 3 != 1:
         a, b = at(s, u, v, -w2 + 2.4, 1.6), at(s, u, v, w2 - 3.0, 1.6)
         p.over(lambda pen: pen.line(a, b, kit.shade(kit.SALT, 0.93), 0.5), 0.85)
+
+
+def on_land(s, u, v, tall, wide, slide=14.0):
+    """(u, v) for a standing thing on land that must stay inside the hex (the hut, a heap, the store, the sluice, a
+    raker): where it fits, the place itself; else the place moved inland, then seaward, a px at a time (never nearer
+    to the water than v = -1.5) up to `slide` px, until it does; else None: leave it out. On a bent or slanted
+    shore the hex's edge can lie close behind the pans (guide section 10)."""
+    for k in range(int(slide) + 1):
+        for q in ((v,) if k == 0 else (v - k, v + k)):
+            if q <= -1.5 and s.fits(u, q, tall, wide, margin=kit.MARGIN):
+                return (u, q)
+    return None
+
+
+def keep_near(s, u, v, ref_u, reach=6.0):
+    """v for a flat thing at u that follows the shore (shore.pt(u, v)) but, on a bent shore, strays at most `reach` px
+    out of line with the shore at ref_u (where the channel meets the water): the first row of pans stays in a row."""
+    d = s.h(u) - s.h(ref_u)
+    if abs(d) <= reach:
+        return v
+    return v + (s.h(ref_u) + (reach if d > 0 else -reach)) - s.h(u)
 
 
 def sluice(p, x, y):
@@ -162,12 +186,16 @@ def draw(level, season, variant=0, mirror=False, sea=None, shore=None, bay=None)
         edge = kit.ICE_D if p.frozen else p.pal["river_edge"]
         line = [s.pt(*q) for q in L["channel"]]
         p.over(lambda pen: (pen.lines(line, edge, 3.2), pen.lines(line, col, 2.2)), 0.8)
+    if level >= 1 and "ref_u" in L:                   # the strip of the feeder channel is the piece's: no wild tree in it
+        cu = L["ref_u"]
+        p.claim(s.rect(cu, -16.0, 7.0, 34.0))
     if level >= 3 and "yard" in L:
         quadr = s.rect(*L["yard"])                    # turns with the shore, unlike a blob
         p.over(lambda pen: pen.poly(quadr, soil, None), 0.35)
+    ref = L.get("ref_u") if b is None else None       # layout 1: the pans keep in line with the shore at the channel (not in a lagoon)
     for i, (u, v, frm) in enumerate(L["pans"]):
         if level >= frm:
-            pan(p, s, u, v, i)
+            pan(p, s, u, v if ref is None else keep_near(s, u, v, ref), i)
     if level >= 3 and jend >= 4.0:
         p.jetty(s.pt(ju, -1), s.pt(ju, jend), 2.2, snow=True)
     if p.winter:
@@ -175,26 +203,39 @@ def draw(level, season, variant=0, mirror=False, sea=None, shore=None, bay=None)
 
     # ---- standing things
     if level >= 1:
-        p.house(*s.pt(*L["hut"]), 5.5, 3.5, 3.0, roof="thatch", smoke=True)
+        at = on_land(s, *L["hut"], 15.0, 8.5)           # smoke rises 14.5 px in winter (any season: places must not follow it)
+        if at is not None:
+            p.house(*s.pt(*at), 5.5, 3.5, 3.0, roof="thatch", smoke=True)
     if level >= 2:
-        sluice(p, *s.pt(*L["sluice"]))
+        at = on_land(s, *L["sluice"], 7.0, 7.0, slide=6.0)    # stays on the channel: moved along it only
+        if at is not None:
+            sluice(p, *s.pt(*at))
     covered = au or wi
     for hu, frm in L["heaps"]:
         if level >= frm:
-            x, y = s.pt(hu, L["heap_v"])
+            at = on_land(s, hu, L["heap_v"], 5.5, 8.0)
+            if at is None:
+                continue
+            x, y = s.pt(*at)
             if covered:
                 p.heap(x, y, 8, 5.5, kit.THATCH, kit.THATCH_D)
             else:
                 p.heap(x, y, 8, 5.5, kit.SALT, kit.shade(kit.SALT, 0.86))
     if level >= 3:
-        p.house(*s.pt(*L["store"]), 16, 5.4, 4.6, wall=3, kind="ridge", roof="tile", door=False)
+        at = on_land(s, *L["store"], 10.0, 18.5, slide=6.0)
+        if at is not None:
+            p.house(*s.pt(*at), 16, 5.4, 4.6, wall=3, kind="ridge", roof="tile", door=False)
         if boat is not None:
-            p.boat(*s.pt(*boat), 0.7, sail=not wi)
+            at = s.fit(boat[0], boat[1], 9.5, 9.5, v_min=3.0)     # sails stand upright: nearer in where the hex is short
+            if at is not None:
+                p.boat(*at, 0.7, sail=not wi)
     # ---- season activity: two rakers in summer
     if su:
         for k, r in enumerate(L["rakers"]):
             if level >= k + 1:
-                p.person(*s.pt(r[0], r[1]), *r[2:])
+                at = on_land(s, r[0], r[1], 4.0, 3.0)
+                if at is not None:
+                    p.person(*s.pt(*at), *r[2:])
     return p.finish(label="salt L%d" % level)
 
 
