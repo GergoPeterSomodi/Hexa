@@ -38,6 +38,24 @@ func line_count() -> int:
 	return _lines.size()
 
 
+## The mesh is one surface (or none when there is nothing to draw).
+func surface_count() -> int:
+	return 0 if _mesh == null else _mesh.get_surface_count()
+
+
+## The mesh's triangles, for tests that draw them without a window.
+func vertices() -> PackedVector2Array:
+	return _vertices
+
+
+func colours() -> PackedColorArray:
+	return _colours
+
+
+func indices() -> PackedInt32Array:
+	return _indices
+
+
 func _draw() -> void:
 	if _mesh != null:
 		draw_mesh(_mesh, _rim_texture())
@@ -90,18 +108,22 @@ func _build() -> void:
 func _pass(kind: String, wider: float, colour: Color) -> void:
 	for line: Dictionary in _lines:
 		if str(line["kind"]) == kind:
-			_stroke(line["points"], float(line["width"]) + wider, colour)
+			_stroke(line["points"], float(line["width"]) + wider, colour, line.get("before"), line.get("after"))
 
 
 ## One thick line as a ribbon of triangles: two vertices a point, set square to the line's run there.
-func _stroke(points: PackedVector2Array, width: float, colour: Color) -> void:
+## `before` and `after` (a Vector2 or null) are the points of the line just outside this piece: they only turn the
+## stroke at the ends, so two pieces of one line that share an end point set it square the same way and meet exactly.
+func _stroke(points: PackedVector2Array, width: float, colour: Color, before: Variant = null, after: Variant = null) -> void:
 	var count := points.size()
 	if count < 2:
 		return
 	var half := width / 2.0 + SOFT
 	var first := _vertices.size()
 	for i: int in count:
-		var run := (points[mini(i + 1, count - 1)] - points[maxi(i - 1, 0)]).normalized()
+		var behind: Vector2 = points[i - 1] if i > 0 else (before if before != null else points[0])
+		var ahead: Vector2 = points[i + 1] if i < count - 1 else (after if after != null else points[count - 1])
+		var run := (ahead - behind).normalized()
 		var side := Vector2(-run.y, run.x) * half
 		_vertices.append(points[i] + side)
 		_vertices.append(points[i] - side)

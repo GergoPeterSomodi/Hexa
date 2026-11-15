@@ -5,6 +5,8 @@ from relief import *
 from relief2 import *
 import slopes
 import sites
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tileset_bake"))
+import art                                                    # the wild things' drawing, shared with the tile bake
 
 FIELDS = Fields(WORLD)
 COAST_SHIFT_KM = sites.apply_coves(FIELDS)                   # a port hex gets a shore of its own
@@ -397,198 +399,21 @@ class Frame:
             self.add(by, bx, (lambda a, b, c, s: lambda: self.draw_hill(a, b, c, s))(bx, by, h, rnd.random()))
             self.shadows.append(("ell", bx + h * 0.9, by + 1, h * 2.6, h * 0.5))
 
+    def art(self):
+        """The drawing of the wild things (trees, hills, ranges, snow) is tileset_bake/art.py, on this frame's surface."""
+        return art.Painter("summer", k=self.k, mid=self.mid, slopes=bool(SLOPES), ground_tone=self.ground_tone).on(self.surf)
+
     def style(self, m, seed):
-        m = m + (seed - 0.5) * 220
-        if m < 1700:
-            return dict(lit=(132, 166, 86), sh=(92, 128, 70), ink=(48, 66, 42), green=True)
-        if m < 2250:
-            return dict(lit=(172, 162, 138), sh=(122, 114, 100), ink=(56, 50, 46), green=False, skirt=True)
-        return dict(lit=(184, 175, 162), sh=(126, 118, 116), ink=(56, 50, 52), green=False)
+        return self.art().style(m, seed)
 
     def draw_range(self, g):
-        k = self.k
-        s = self.surf
-        # the silhouette along the top: peak, shoulder, saddle, shoulder, peak...
-        top = []
-        info = []
-        n = len(g)
-        geo = []
-        st = self.style(max(p["m"] for p in g), g[0]["seed"])
-        green = st.get("green")
-        for p in g:
-            r = random.Random(p["seed"])
-            w = p["h"] * r.uniform(1.0, 1.2) * (1.3 if green else 1.0)
-            geo.append((p["x"] + r.uniform(-0.06, 0.06) * w, p["y"] - p["h"], w, r))
-        for idx, p in enumerate(g):
-            ax, ay, w, r = geo[idx]
-            by, h = p["y"], p["h"]
-            if not p["apex"]:
-                if idx == 0:
-                    top.append((p["x"] - h * 1.2, by + h * 0.1))
-                top.append((p["x"], ay))
-                if idx == n - 1:
-                    top.append((p["x"] + h * 1.2, by + h * 0.1))
-                continue
-            if idx == 0:
-                top.append((ax - w, by + h * 0.08))
-            lx, ly = top[-1]
-            kx, ky = lx + (ax - lx) * 0.55, ly + (ay - ly) * 0.55 - h * 0.07 * r.uniform(-0.8, 1.6)
-            if lx + 2 < kx < ax - 2:
-                top.append((kx, ky))
-            if green:   # wooded mountains have rounded tops, never a spike
-                top.append((ax - w * 0.16, ay + h * 0.1))
-                ia = len(top)
-                top.append((ax + w * 0.02, ay + h * 0.005))
-                top.append((ax + w * 0.17, ay + h * 0.11))
-            else:
-                ia = len(top)
-                top.append((ax, ay))
-            if idx < n - 1 and g[idx + 1]["apex"]:
-                ax2, ay2, w2, _ = geo[idx + 1]
-                q = g[idx + 1]
-                sx = ax + (ax2 - ax) * r.uniform(0.42, 0.58)
-                sy = (by + q["y"]) / 2 - min(h, q["h"]) * r.uniform(0.52, 0.76)
-            elif idx < n - 1:
-                q = g[idx + 1]
-                sx, sy = q["x"], q["y"] - q["h"]
-            else:
-                sx, sy = ax + w, by + h * 0.08
-            kx, ky = ax + (sx - ax) * 0.45, ay + (sy - ay) * 0.5 - h * 0.07 * r.uniform(-0.8, 1.6)
-            if ax + 2 < kx < sx - 2:
-                top.append((kx, ky))
-            if idx < n - 1 and g[idx + 1]["apex"] or idx == n - 1:
-                top.append((sx, sy))
-            info.append((ia, ax, by, h, w, p))
-        base = [(p["x"], p["y"] + p["h"] * 0.1 + 1.5 * k) for p in reversed(g)]
-        poly = top + [(top[-1][0], base[0][1])] + base + [(top[0][0], base[-1][1])]
-        st = self.style(max(p["m"] for p in g), g[0]["seed"])
-        if st.get("green") and SLOPES:
-            mid_p = g[len(g) // 2]
-            st["lit"] = self.ground_tone(mid_p["x"], mid_p["y"] + mid_p["h"] * 0.1 + 3 * k, st["lit"], 0.3)
-            st["sh"] = shade(st["lit"], 0.74)
-        pygame.draw.polygon(s, st["lit"], poly)
-        # shadow faces: right of a fall line from each peak
-        for ia, ax, by, h, w, p in info:
-            r = random.Random(p["seed"] + 1)
-            right = []
-            j = ia + 1
-            while j < len(top):
-                right.append(top[j])
-                if j > ia + 1 and top[j][1] > top[ia][1] + h * 0.15 and (j + 1 >= len(top) or top[j + 1][1] < top[j][1]):
-                    break
-                j += 1
-            if not right:
-                continue
-            ex, ey = right[-1]
-            # the valley line runs from the saddle down to the foot at a slant; the fall line from the peak likewise
-            vx = ex + (by - ey) * 0.22 if j < len(top) - 1 else ex
-            fx = ax + w * r.uniform(0.22, 0.38)
-            shp = [top[ia]] + right + [(vx, by + h * 0.1), (fx, by + h * 0.1),
-                                       (ax + w * r.uniform(0.08, 0.16), by - h * 0.45)]
-            pygame.draw.polygon(s, st["sh"], shp)
-            # snow by height
-            if p["m"] > 2250:
-                sf = 0.2 + 0.26 * smoothstep(2250, 3300, p["m"])
-                ys = by - h * (1 - sf)
-                self.snow(top, ia, ax, by, h, ys, r)
-            elif st.get("green"):
-                pass
-            # strata on rock
-            if not st.get("green") and not self.mid:
-                for q in range(2):
-                    t = r.uniform(0.35, 0.7)
-                    x0 = ax - w * t * 0.5
-                    y0 = by - h * (1 - t)
-                    pygame.draw.line(s, shade(st["lit"], 0.84), (x0, y0), (x0 + w * 0.18, y0 + h * 0.12), 1)
-        if st.get("skirt"):
-            xs = [q[0] for q in top]
-            def sil(xq):
-                for q in range(len(top) - 1):
-                    a, b = top[q], top[q + 1]
-                    if a[0] <= xq <= b[0] and b[0] > a[0]:
-                        return a[1] + (b[1] - a[1]) * (xq - a[0]) / (b[0] - a[0])
-                return None
-            def base_y(xq):
-                best = None
-                for p in g:
-                    d = abs(p["x"] - xq)
-                    if best is None or d < best[0]:
-                        best = (d, p["y"], p["h"])
-                return best[1], best[2]
-            r = random.Random(g[0]["seed"] + 9)
-            x = xs[0]
-            band = []
-            while x <= xs[-1]:
-                sy = sil(x)
-                if sy is not None:
-                    byq, hq = base_y(x)
-                    yt = byq - hq * (0.36 + 0.1 * math.sin(x * 0.21 + r.random() * 6))
-                    band.append((x, max(yt, sy + 1.2 * k), byq + hq * 0.1 + 1.5 * k))
-                x += 2.0 * k
-            for q in range(len(band) - 1):
-                (x0, t0, b0), (x1, t1, b1) = band[q], band[q + 1]
-                shadowed = any(ax + w * 0.14 < x0 < ax + w * 1.0 for _, ax, _, _, w, _ in info)
-                col = (90, 130, 68) if shadowed else (122, 162, 82)
-                pygame.draw.polygon(s, col, [(x0, t0), (x1 + 0.6, t1), (x1 + 0.6, b1), (x0, b0)])
-            pts = [(q[0], q[1]) for q in band]
-            if len(pts) > 1:
-                pygame.draw.lines(s, (70, 104, 56), False, pts, 1)
-        # a skirt of trees along the foot of green and middle mountains
-        if (st.get("green") or st.get("skirt")) and not self.mid:
-            for ia, ax, by, h, w, p in info:
-                r = random.Random(p["seed"] + 2)
-                n = int(w / (3.2 * k)) if st.get("green") else int(w / (5 * k))
-                for q in range(n):
-                    tx = ax + r.uniform(-0.85, 0.85) * w
-                    ty = by + h * 0.05 - r.uniform(0, 0.32) * h * (1 - abs(tx - ax) / w)
-                    rr = r.uniform(1.6, 2.3) * k
-                    lit = tx < ax + w * 0.12
-                    pygame.draw.circle(s, (70, 122, 58) if lit else (56, 100, 50), (tx, ty), rr)
-                    pygame.draw.circle(s, (98, 150, 72) if lit else (74, 118, 60), (tx - rr * 0.3, ty - rr * 0.3), rr * 0.5)
-        main = g[0].get("kind") == "crest"
-        pygame.draw.lines(s, st["ink"] if main else shade(st["ink"], 1.25), False, top, max(1, int(round((2 if main else 1.3) * k))))
+        self.art().draw_range(g)
 
     def snow(self, top, ia, ax, by, h, ys, r):
-        s = self.surf
-
-        def walk(dirn):
-            j = ia
-            while 0 <= j + dirn < len(top):
-                a, b = top[j], top[j + dirn]
-                if b[1] >= ys:
-                    t = (ys - a[1]) / ((b[1] - a[1]) or 1e-6)
-                    return [(a[0] + (b[0] - a[0]) * t, ys)], j
-                j += dirn
-            return [top[j]], j
-        lp, jl = walk(-1)
-        rp, jr = walk(1)
-        lefts = [top[q] for q in range(jl + 1, ia)] if jl < ia else []
-        rights = [top[q] for q in range(ia + 1, jr + 1)] if jr > ia else []
-        rights = [q for q in rights if q[1] < ys]
-        x0, x1 = lp[0][0], rp[0][0]
-        teeth = []
-        n = max(2, int((x1 - x0) / (3 * self.k)))
-        for q in range(n + 1):
-            tx = x1 - (x1 - x0) * q / n
-            teeth.append((tx, ys + (r.uniform(1.0, 3.2) * self.k if q % 2 else -0.5)))
-        poly = lp + lefts + [top[ia]] + rights + rp + teeth
-        if len(poly) >= 3:
-            pygame.draw.polygon(s, C_SNOW, poly)
-            fx = ax + (x1 - ax) * 0.25
-            shp = [top[ia]] + rights + rp + [q for q in teeth if q[0] > fx] + [(fx, ys + 1)]
-            if len(shp) >= 3:
-                pygame.draw.polygon(s, (204, 212, 230), shp)
+        self.art().snow(top, ia, ax, by, h, ys, r)
 
     def draw_hill(self, x, y, h, seed):
-        s = self.surf
-        k = self.k
-        w = h * 2.5
-        pts = [(x - w / 2 + w * t, y - h * math.sin(math.pi * t) ** 0.8) for t in [i / 14 for i in range(15)]]
-        lit = self.ground_tone(x, y + 2 * k, (134, 172, 86), 0.35)
-        pygame.draw.polygon(s, lit, pts + [(x + w / 2, y + 1), (x - w / 2, y + 1)])
-        shp = [(x + w * 0.04, y - h * 0.98)] + [p for p in pts if p[0] > x + w * 0.04] + [(x + w / 2, y + 1), (x + w * 0.16, y + 1), (x + w * 0.12, y - h * 0.4)]
-        pygame.draw.polygon(s, shade(lit, 0.79) if SLOPES else (106, 146, 74), shp)
-        pygame.draw.lines(s, (66, 94, 52), False, pts, 1)
+        self.art().draw_hill(x, y, h, seed)
 
     def trees(self):
         k = self.k
@@ -609,24 +434,10 @@ class Frame:
             self.shadows.append(("ell", bx + 3.2 * sc, by + 0.5, 7 * sc, 2.4 * sc))
 
     def draw_tree(self, x, y, sc, f=1.0):
-        s = self.surf
-        pygame.draw.line(s, (92, 70, 50), (x, y), (x, y - 3 * sc), max(1, int(1.4 * sc)))
-        r = 4.4 * sc
-        cy = y - 3 * sc - r * 0.75
-        pygame.draw.circle(s, (38, 60, 38), (x, cy), r + 1)
-        pygame.draw.circle(s, shade((70, 128, 60), f), (x, cy), r)
-        pygame.draw.circle(s, shade((96, 158, 72), f), (x - r * 0.28, cy - r * 0.28), r * 0.66)
-        pygame.draw.circle(s, shade((130, 186, 92), f), (x - r * 0.45, cy - r * 0.45), r * 0.26)
+        self.art().draw_tree(x, y, sc, f)
 
     def draw_conifer(self, x, y, sc, f=1.0):
-        s = self.surf
-        h, w = 12.5 * sc, 7.2 * sc
-        pygame.draw.line(s, (92, 70, 50), (x, y), (x, y - 2.5 * sc), max(1, int(1.3 * sc)))
-        pts = [(x, y - h), (x + w / 2, y - 2 * sc), (x - w / 2, y - 2 * sc)]
-        pygame.draw.polygon(s, shade((66, 120, 70), f), pts)
-        pygame.draw.polygon(s, shade((46, 92, 58), f), [(x, y - h), (x + w / 2, y - 2 * sc), (x + w * 0.06, y - 2 * sc)])
-        pygame.draw.line(s, shade((60, 108, 64), f), (x - w * 0.3, y - h * 0.45), (x + w * 0.05, y - h * 0.38), 1)
-        pygame.draw.polygon(s, (34, 56, 40), pts, 1)
+        self.art().draw_conifer(x, y, sc, f)
 
     # ------------------------------------------------------------ towns, bridges, harbours
     def towns(self):

@@ -1,4 +1,4 @@
-"""The flat tiles: ground cover, sea, relief shade and light, the hex grid line. Colours are the style frame's
+"""The flat tiles: ground cover, sea, relief shade and light, and the hex marks (marks.png). Colours are the style frame's
 (tools/worldmap/style_frame/frame.py); nothing here reads a map.
 
 Ground and sea tiles are opaque inside their hex and fade out over SPILL px beyond it, so a tile of a higher rank
@@ -253,6 +253,53 @@ def grid_tile():
     return s
 
 
+MARK_SS = 4                     # the marks are drawn at 4 x and shrunk to the tile, so their edges are smooth
+GOLD = (255, 214, 70)           # the selection's gold (hexa/campaign/art.py GOLD)
+INK = (40, 30, 18)              # the dark edge under a mark's line
+CREAM = (246, 244, 226)         # the build target's dashes
+
+
+def _mark(draw):
+    """One mark: draw(surface, corners) paints it at MARK_SS times the tile's size, then the picture shrinks to the tile."""
+    big = blank((G_W * MARK_SS, G_H * MARK_SS))
+    pts = [((x + G_W / 2.0) * MARK_SS, (y + G_H / 2.0) * MARK_SS) for x, y in LT.hex_points()]
+    draw(big, pts)
+    return pygame.transform.smoothscale(big, (G_W, G_H))
+
+
+def _ring(surf, pts, colour, width):
+    """A closed line of width px (before the shrink) on the hex's edges."""
+    pygame.draw.polygon(surf, colour, pts, width * MARK_SS)
+
+
+def select_tile():
+    """The selected hex: a light fill, a gold edge over a dark one."""
+    def draw(s, pts):
+        pygame.draw.polygon(s, (255, 255, 255, 60), pts)
+        _ring(s, pts, INK + (255,), 4)
+        _ring(s, pts, GOLD + (255,), 2)
+    return _mark(draw)
+
+
+def target_tile():
+    """A build target: a light fill and a dashed cream edge over a dark one."""
+    def draw(s, pts):
+        pygame.draw.polygon(s, (255, 255, 255, 40), pts)
+        _ring(s, pts, INK + (255,), 4)
+        for i in range(6):
+            a, b = pts[i], pts[(i + 1) % 6]
+            for k in (0, 2):                    # every second quarter of each side is a dash
+                p = (a[0] + (b[0] - a[0]) * k / 4.0, a[1] + (b[1] - a[1]) * k / 4.0)
+                q = (a[0] + (b[0] - a[0]) * (k + 1) / 4.0, a[1] + (b[1] - a[1]) * (k + 1) / 4.0)
+                pygame.draw.line(s, CREAM + (255,), p, q, 2 * MARK_SS)
+    return _mark(draw)
+
+
+def white_tile():
+    """A white hex for tinting (M2): opaque inside the hex, smooth at the edge."""
+    return _mark(lambda s, pts: pygame.draw.polygon(s, (255, 255, 255, 255), pts))
+
+
 def bake(covers=COVERS, log=print):
     ground = GridAtlas("ground", (G_W, G_H))
     for cover in covers:
@@ -263,8 +310,14 @@ def bake(covers=COVERS, log=print):
     for depth in ("shelf", "sea", "deep"):
         for v in range(SEA_VARIANTS):
             ground.add("sea/%s/%d" % (depth, v), sea_tile(depth, v), z=SEA_RANK[depth])
-    ground.add("grid/line", grid_tile())
+    ground.add("grid/line", grid_tile())    # the old place of the grid: tile_trial.gd still draws its grid from here
     shade = GridAtlas("shade", (S_W, S_H))
     shade_tiles(shade)
     log("shade: %d tiles of %d x %d" % (len(shade.tiles), S_W, S_H))
-    return [ground, shade]
+    marks = GridAtlas("marks", (G_W, G_H))
+    marks.add("mark/grid", grid_tile())
+    marks.add("mark/select", select_tile())
+    marks.add("mark/target", target_tile())
+    marks.add("mark/white", white_tile())
+    log("marks: %d tiles of %d x %d" % (len(marks.tiles), G_W, G_H))
+    return [ground, shade, marks]

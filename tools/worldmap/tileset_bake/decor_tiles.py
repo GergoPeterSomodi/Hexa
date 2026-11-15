@@ -1,5 +1,5 @@
 """Wild decor tiles: trees by wedge, hills and mountain ridges by hex. The drawing is the style frame's own
-(render.Frame.draw_tree, draw_conifer, draw_hill, draw_range), called on a blank picture; no map is read.
+(art.Painter: draw_tree, draw_conifer, draw_hill, draw_range), called on a blank picture; no map is read.
 
 TREES BY WEDGE. A hex is six wedges (the triangle from its middle to each edge). Each wedge is its own tile on its
 own layer, so the view can pick per wedge: full wood, a bank kept clear along a river edge, a corridor kept clear
@@ -15,6 +15,7 @@ import random
 
 import pygame
 
+import art
 import lattice as LT
 from tile_atlas import blank
 
@@ -62,24 +63,6 @@ def _spoke_distance(x, y, d):
     if along < 0:
         return math.hypot(x, y)
     return abs(-x * ny + y * nx)
-
-
-class Painter:
-    """The style frame's Frame, without its world: only the draw_* methods are used."""
-
-    def __init__(self, render):
-        self.R = render
-        f = render.Frame.__new__(render.Frame)
-        f.rpx, f.k, f.mid = 60, 1.0, False
-        f.S = 60.0 / render.R_KM
-        f.W, f.H = R_W, R_H
-        f.objs, f.shadows, f.labels = [], [], []
-        f.tones = None
-        self.f = f
-
-    def on(self, surf):
-        self.f.surf = surf
-        return self.f
 
 
 def _hp(m):
@@ -209,8 +192,8 @@ def relief_sort(form):
     return -14 if form == "back" else 20
 
 
-def bake(render, tree_atlas, relief_atlas, log=print):
-    painter = Painter(render)
+def bake(tree_atlas, relief_atlas, season="summer", climate="snow", log=print):
+    painter = art.Painter(season, climate)
     for kind in TREE_KINDS:
         for opt in TREE_OPTS:
             for d in range(6):

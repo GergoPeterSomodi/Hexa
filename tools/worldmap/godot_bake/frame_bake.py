@@ -18,6 +18,8 @@ sys.path.insert(0, HERE)
 
 import compose as CP                    # imports the style frame (render) and the kit
 import atlas as AT
+sys.path.insert(0, os.path.join(HERE, "..", "tileset_bake"))
+import art as ART                   # the wild things' drawing (trees, hills, ranges) in every season, without a world
 
 R = CP.R
 kit = CP.kit
@@ -118,15 +120,7 @@ class BakeFrame(CP.PieceFrame):
             return CP.PieceFrame.draw_tree(self, x, y, sc, f)
         if self.season == "summer":
             return R.Frame.draw_tree(self, x, y, sc, f)
-        s = self.surf                       # spring or autumn: the kit's leaf colours (autumn: its three-colour mix by index)
-        oc, dk, mid, lit = kit.LEAF_AUTUMN[i % 3] if self.season == "autumn" else kit.PAL[self.season]["leaf"]
-        pygame.draw.line(s, (92, 70, 50), (x, y), (x, y - 3 * sc), max(1, int(1.4 * sc)))
-        r = 4.4 * sc
-        cy = y - 3 * sc - r * 0.75
-        pygame.draw.circle(s, oc, (x, cy), r + 1)
-        pygame.draw.circle(s, dk, (x, cy), r)
-        pygame.draw.circle(s, mid, (x - r * 0.28, cy - r * 0.28), r * 0.66)
-        pygame.draw.circle(s, lit, (x - r * 0.45, cy - r * 0.45), r * 0.26)
+        return ART.Painter(self.season).on(self.surf).draw_tree(x, y, sc, f, i)     # spring or autumn: the kit's leaf colours
 
     def draw_conifer(self, x, y, sc, f=1.0, i=0):
         if self.rec is not None:
@@ -136,15 +130,7 @@ class BakeFrame(CP.PieceFrame):
             return CP.PieceFrame.draw_conifer(self, x, y, sc, f)
         if self.season == "summer":
             return R.Frame.draw_conifer(self, x, y, sc, f)
-        s = self.surf
-        oc, lit, dk = kit.PAL[self.season]["conifer"]
-        h, w = 12.5 * sc, 7.2 * sc
-        pygame.draw.line(s, (92, 70, 50), (x, y), (x, y - 2.5 * sc), max(1, int(1.3 * sc)))
-        pts = [(x, y - h), (x + w / 2, y - 2 * sc), (x - w / 2, y - 2 * sc)]
-        pygame.draw.polygon(s, lit, pts)
-        pygame.draw.polygon(s, dk, [(x, y - h), (x + w / 2, y - 2 * sc), (x + w * 0.06, y - 2 * sc)])
-        pygame.draw.line(s, kit.mix(lit, dk, 0.4), (x - w * 0.3, y - h * 0.45), (x + w * 0.05, y - h * 0.38), 1)
-        pygame.draw.polygon(s, oc, pts, 1)
+        return ART.Painter(self.season).on(self.surf).draw_conifer(x, y, sc, f, i)
 
     def draw_range(self, g):
         if self.rec is not None:

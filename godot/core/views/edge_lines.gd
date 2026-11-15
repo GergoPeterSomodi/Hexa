@@ -3,7 +3,7 @@
 ## data gives the same lines.
 ##
 ## A line is a Dictionary: {kind ("river", "stream", "road", "track"), points (PackedVector2Array, map px), width (px),
-## rank (the river's class or the road's quality)}.
+## rank (the river's class or the road's quality)}. A piece cut out by `cut` may also have `before` and `after`.
 class_name EdgeLines
 extends RefCounted
 
@@ -13,6 +13,68 @@ const ROAD_WIDTH: Array[float] = [0.0, 1.3, 2.5, 3.4]  # by quality 1 to 3; qual
 const ROAD_SWING := 2.2  # px a road wanders either side of its straight run
 const RIVER_STEP := 4.4  # px between a river's points after smoothing
 const MEANDER := 2.4  # px a river swings either side of its edge
+const CHUNK := 32  # cells a side of one chunk of lines (one mesh each)
+
+
+## The chunk (32 x 32 cells) a hex belongs to.
+static func chunk_of(hex: Vector2i) -> Vector2i:
+	return Vector2i(floori(float(hex.x) / CHUNK), floori(float(hex.y) / CHUNK))
+
+
+## The hex whose middle is nearest to a point of the map (the hex under it).
+static func hex_of_point(px: Vector2) -> Vector2i:
+	var row0 := roundi((px.y - float(MapTiles.CELL.y) / 2.0) / MapTiles.ROW)
+	var best := Vector2i.ZERO
+	var best_d := INF
+	for row: int in range(row0 - 1, row0 + 2):
+		var shift := 0.5 * float(row & 1)
+		var col0 := floori(px.x / MapTiles.CELL.x - 0.5 - shift)
+		for col: int in range(col0, col0 + 2):
+			var d := px.distance_squared_to(MapTiles.cell_centre(Vector2i(col, row)))
+			if d < best_d:
+				best_d = d
+				best = Vector2i(col, row)
+	return best
+
+
+static func chunk_of_point(px: Vector2) -> Vector2i:
+	return chunk_of(hex_of_point(px))
+
+
+## Cuts lines where they leave a chunk. Returns {chunk: Array of lines}. A piece belongs to the chunk of the hex its
+## first point lies in, and runs on to the first point of the next chunk, so neighbouring pieces share that point. Each
+## piece also carries `before` and `after` (the points either side of it, when there are some): the drawer sets the
+## stroke square to the run through the shared point from both sides, so the pieces meet without a gap or a seam.
+static func cut(lines: Array[Dictionary]) -> Dictionary[Vector2i, Array]:
+	var out: Dictionary[Vector2i, Array] = {}
+	for line: Dictionary in lines:
+		var points: PackedVector2Array = line["points"]
+		var count := points.size()
+		if count < 2:
+			continue
+		var start := 0
+		var here := chunk_of_point(points[0])
+		for i: int in range(1, count):
+			var there := chunk_of_point(points[i])
+			if there != here:
+				_emit_piece(out, here, line, start, i)
+				start = i
+				here = there
+		_emit_piece(out, here, line, start, count - 1)
+	return out
+
+
+static func _emit_piece(out: Dictionary[Vector2i, Array], chunk: Vector2i, line: Dictionary, first: int, last: int) -> void:
+	var points: PackedVector2Array = line["points"]
+	var piece := line.duplicate()
+	piece["points"] = points.slice(first, last + 1)
+	if first > 0:
+		piece["before"] = points[first - 1]
+	if last < points.size() - 1:
+		piece["after"] = points[last + 1]
+	if not out.has(chunk):
+		out[chunk] = []
+	out[chunk].append(piece)
 
 
 ## Corner cutting (Chaikin): each round replaces every corner by two points a quarter along its sides.

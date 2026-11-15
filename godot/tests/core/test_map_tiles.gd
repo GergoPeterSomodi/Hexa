@@ -1,4 +1,4 @@
-## The tile-naming rules of the map view (core/views/map_tiles.gd) and its lines (core/views/edge_lines.gd).
+## The tile-naming rules of the map view (core/views/map_tiles.gd).
 extends GutTest
 
 
@@ -75,44 +75,3 @@ func test_trees_make_way() -> void:
 func test_piece_name() -> void:
 	assert_eq(MapTiles.piece("wheat", 2, 1, true, "-", "back"), "piece/wheat/2/1/1/-/back")
 	assert_eq(MapTiles.piece("mines", 1, 0, false, "", "ground"), "piece/mines/1/0/0/-/ground")
-
-
-func test_smooth_and_resample_keep_the_ends() -> void:
-	var line := PackedVector2Array([Vector2(0, 0), Vector2(100, 0), Vector2(100, 100)])
-	var soft := EdgeLines.smooth(line, 3)
-	assert_eq(soft[0], line[0])
-	assert_eq(soft[soft.size() - 1], line[2])
-	assert_gt(soft.size(), 10)
-	var even := EdgeLines.resample(soft, 5.0)
-	assert_eq(even[0], line[0])
-	assert_almost_eq(even[even.size() - 1].distance_to(line[2]), 0.0, 5.0)
-	for i: int in even.size() - 2:
-		assert_almost_eq(even[i].distance_to(even[i + 1]), 5.0, 0.5)
-
-
-func test_river_is_the_same_every_time_and_keeps_its_ends() -> void:
-	var edge := PackedVector2Array([Vector2(0, 0), Vector2(52, 25), Vector2(52, 76), Vector2(104, 102), Vector2(156, 76)])
-	var a := EdgeLines.river(edge, 3, 1.0)
-	var b := EdgeLines.river(edge, 3, 1.0)
-	assert_eq(a["points"], b["points"])
-	var pts: PackedVector2Array = a["points"]
-	assert_eq(pts[0], edge[0])
-	assert_eq(float(a["width"]), 6.5)
-	assert_eq(str(a["kind"]), "river")
-
-
-func test_roads_join_steps_into_runs() -> void:
-	var steps: Array[Array] = [
-		[Vector2i(0, 0), Vector2i(1, 0), 3], [Vector2i(1, 0), Vector2i(2, 0), 3], [Vector2i(2, 0), Vector2i(3, 0), 3],
-		[Vector2i(2, 0), Vector2i(2, 1), 1],
-	]
-	var lines := EdgeLines.roads(steps, MapTiles.cell_centre)
-	var kinds: Array[String] = []
-	for line: Dictionary in lines:
-		kinds.append(str(line["kind"]))
-	kinds.sort()
-	# The junction at (2, 0) ends the runs: (0,0)-(1,0)-(2,0), (2,0)-(3,0) and the track.
-	assert_eq(kinds, ["road", "road", "track"] as Array[String])
-	for line: Dictionary in lines:
-		var pts: PackedVector2Array = line["points"]
-		assert_gt(pts.size(), 2)

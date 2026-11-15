@@ -3,7 +3,7 @@ whole-map bake (docs/design/map/m1_trial/notes.md).
 
     python tools/worldmap/tileset_bake/bake_trial.py --layers <layers.json> --needs <names.json> [--out DIR] [--jobs N]
 
---layers: the layers file the style frame reads (its drawing code is imported for the trees and the relief).
+--layers: not needed any more (the decor stage draws with tileset_bake/art.py and reads no map); kept so old calls work.
 --needs:  the tile names the trial view asks for, written by godot/tools/mapview/dump_trial_tiles.gd; only the coast
           and piece tiles named there are baked (the other kinds are baked whole). Without it: no coast, no pieces.
 Writes <out>/<source>.png and <out>/index.json (default out: godot/assets/tiles/trial). Summer only. Needs pygame.
@@ -62,15 +62,10 @@ def main(argv=None):
         print("coast: %d tiles" % len(coast.tiles))
         atlases.append(coast)
     if "decor" in stages:
-        if not a.layers:
-            sys.exit("the decor stage needs --layers (or STYLE_FRAME_LAYERS): the style frame's drawing code is imported")
-        os.environ["STYLE_FRAME_LAYERS"] = os.path.abspath(a.layers)
-        sys.path.insert(0, os.path.join(HERE, "..", "style_frame"))
-        import render
         import decor_tiles
         trees = GridAtlas("trees", (decor_tiles.T_W, decor_tiles.T_H))
         relief = GridAtlas("relief", (decor_tiles.R_W, decor_tiles.R_H))
-        decor_tiles.bake(render, trees, relief)
+        decor_tiles.bake(trees, relief)
         atlases += [trees, relief]
     if "pieces" in stages:
         baked = piece_tiles.BakedPieces(a.pieces)
@@ -97,7 +92,7 @@ def main(argv=None):
         atlases.append(pieces)
     for atlas in atlases:
         sources[atlas.name] = atlas.save(a.out)
-    order = ["ground", "shade", "coast", "trees", "relief", "pieces"]
+    order = ["ground", "shade", "coast", "trees", "relief", "pieces", "marks"]
     index = {"version": 1, "cell": [LT.CELL_W, LT.CELL_H], "season": "summer",
              "sources": [sources[n] for n in order if n in sources]}
     with open(index_path, "w", encoding="utf-8") as f:
