@@ -91,20 +91,8 @@ def pelt_frame(p, x, y, full):
 
 
 def tent(p, x, y):
-    """The level 1 landmark: a pale hide cone, 6 wide and 7 tall, its poles crossing above the top. It smokes in autumn
-    and winter (the fire inside)."""
-    p.cast(x, y, 6)
-
-    def fn(pen):
-        pen.poly([(x - 3.0, y), (x + 3.0, y), (x, y - 7.0)], HIDE, None)
-        pen.poly([(x, y - 7.0), (x + 3.0, y), (x + 1.0, y)], HIDE_D, None)
-        pen.poly([(x - 0.4, y), (x + 1.2, y), (x + 0.4, y - 2.8)], kit.DOOR, None)            # the flap
-        if p.winter:
-            pen.poly([(x - 1.5, y - 4.3), (x, y - 7.0), (x + 1.5, y - 4.3), (x + 0.4, y - 4.9), (x - 0.5, y - 4.1)], kit.SNOW, None)
-        pen.poly([(x - 3.0, y), (x + 3.0, y), (x, y - 7.0)], None, kit.INK, 0.5)
-        pen.line((x - 1.3, y - 8.6), (x + 0.5, y - 6.2), kit.TIMBER_D, 0.8)                   # the poles cross
-        pen.line((x + 1.3, y - 8.6), (x - 0.5, y - 6.2), kit.TIMBER_D, 0.8)
-    h = p.stand(y, fn, x=x)
+    """The level 1 landmark: the kit's hide tent (6 wide, 7 tall, crossed poles). It smokes in autumn and winter."""
+    h = p.tent(x, y, 6.0, 7.0, col=HIDE, poles=True)
     p.smoke(x, y - 8.8, foot=y, on=h)                                                           # autumn and winter
     return h
 
@@ -139,65 +127,20 @@ def log_house(p, x, y, w, smoke=False):
 
 
 def bales(p, x, y):
-    """The level 3 stack of fur bales: three `PELT` boxes, two below and one on top."""
-    p.cast(x, y, 8)
-
-    def fn(pen):
-        for bx, by in ((x - 2.3, y), (x + 2.3, y), (x, y - 3.0)):
-            pen.box(bx, by, 4.2, 3.0, kit.PELT, kit.INK)
-            pen.line((bx - 2.1, by - 1.5), (bx + 2.1, by - 1.5), kit.PELT_D, 0.5)
-        if p.winter:
-            pen.rect(x - 2.1, y - 6.4, 4.2, 0.7, kit.SNOW, None)
-    return p.stand(y, fn, x=x)
-
-
-def _stake(pen, sx, y, w, h, snow):
-    """One stake: pointed, lit on the left, shaded on the right."""
-    pen.poly([(sx, y), (sx, y - h + 1.6), (sx + w / 2, y - h), (sx + w, y - h + 1.6), (sx + w, y)], kit.TIMBER, None)
-    pen.poly([(sx + w / 2, y - h), (sx + w, y - h + 1.6), (sx + w, y), (sx + w * 0.55, y)], kit.TIMBER_D, None)
-    pen.line((sx, y - h + 1.6), (sx, y), kit.TRUNK, 0.4)
-    if snow:
-        pen.poly([(sx + w * 0.2, y - h + 1.0), (sx + w / 2, y - h), (sx + w * 0.8, y - h + 1.0)], kit.SNOW, None)
+    """The level 3 stack of fur bales: three `PELT` bales, two below and one on top (the kit's)."""
+    p.hold([(x - 2.3, y), (x + 2.3, y)], side=3.0, back=5.0, front=6.0)          # no wild tree over or in front of the stack
+    p.bale(x - 2.3, y, 4.2, 3.0, col=kit.PELT)
+    p.bale(x + 2.3, y, 4.2, 3.0, col=kit.PELT)
+    return p.bale(x, y, 4.2, 3.0, col=kit.PELT, lift=3.0)
 
 
 def stockade(p, cx, yb, yf, w):
-    """The level 3 stockade: a square of stakes, open to the front. The back side lies across the back, two sides run
-    from the back corners towards the front, and four corner posts stand a little taller. No gate, no tower, no stone,
-    no banner. Its inside is claimed (held ground). Every part turns round the same axis x = cx."""
-    sh, pw = 4.8, 1.9
+    """The level 3 stockade: the kit's palisade on three sides (back and the two sides, corner posts), open to the
+    front. The plan is unmirrored; the kit turns it round. The yard inside is claimed and trodden."""
     x0, x1 = cx - w / 2, cx + w / 2
-    n = int(w // pw)
-    pw_b = w / n
     p.claim([(x0, yb - 1), (x1, yb - 1), (x1, yf + 4), (cx + 9, yf + 4), (cx + 9, yf + 9), (cx - 9, yf + 9), (cx - 9, yf + 4), (x0, yf + 4)])
     p.blob(cx, (yb + yf) / 2 + 0.5, w - 3, yf - yb - 1.5, p.pal["soil"], alpha=0.4)      # the trodden yard inside
-    p.cast(cx, yb, w)
-    p.cast(cx, yf, w, 3)
-
-    def back(pen):
-        for i in range(n):
-            _stake(pen, x0 + i * pw_b, yb, pw_b, sh, p.winter)
-    p.stand(yb, back, x=cx)
-
-    def side(sx):
-        def fn(pen):
-            m = 9
-            for k in range(m):
-                _stake(pen, sx - 1.1 + (0.5 if k % 2 else -0.5), yb + 1.0 + (yf - yb - 1.0) * k / (m - 1), 2.2, sh, p.winter)
-        return fn
-    p.stand(yf, side(x0 + pw / 2), x=cx)
-    p.stand(yf, side(x1 - pw / 2), x=cx)
-
-    def post(px, py):
-        def fn(pen):
-            pen.rect(px - 1.1, py - 5.8, 2.2, 5.8, kit.TIMBER, None)
-            pen.rect(px + 0.1, py - 5.8, 1.0, 5.8, kit.TIMBER_D, None)
-            pen.poly([(px - 1.1, py - 5.8), (px, py - 7.0), (px + 1.1, py - 5.8)], kit.TIMBER_D, None)
-            pen.rect(px - 1.1, py - 5.8, 2.2, 5.8, None, kit.INK, 0.5)
-            if p.winter:
-                pen.poly([(px - 0.9, py - 5.9), (px, py - 7.0), (px + 0.9, py - 5.9)], kit.SNOW, None)
-        return fn
-    for px, py in ((x0, yb), (x1, yb), (x0, yf), (x1, yf)):
-        p.stand(py + 0.1, post(px, py), x=cx)
+    return p.stockade([(x0, yf), (x0, yb), (x1, yb), (x1, yf)], kind="palisade", height=4.8, closed=False)
 
 
 def draw(level, season, variant=0, mirror=False):
@@ -229,9 +172,12 @@ def draw(level, season, variant=0, mirror=False):
         if level >= frm:
             full = wi or (au and k % 3 != 2) or (k % 2 == 0)
             pelt_frame(p, x, y, full)
-    row = [f for f in L["frames"] if f[2] <= level and f[1] == max(g[1] for g in L["frames"] if g[2] <= level)]
-    p.claim([(row[0][0] - 3.5, row[0][1] - 1), (row[-1][0] + 3.5, row[0][1] - 1),         # nothing wild stands in front of the front row
-             (row[-1][0] + 3.5, row[0][1] + FRONT), (row[0][0] - 3.5, row[0][1] + FRONT)])
+    rows = {}
+    for x, y, frm in L["frames"]:                                                          # nothing wild in or in front of the frame rows
+        if frm <= level:
+            rows.setdefault(y, []).append((x, y))
+    for pts in rows.values():
+        p.hold(pts, front=FRONT if pts[0][1] == max(rows) else 8.0)
     # ---- season activity: one trapper by the tent in spring and summer
     if sp or su:
         p.person(*L["trapper"], kit.TRUNK)
