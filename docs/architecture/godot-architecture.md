@@ -433,3 +433,12 @@ Only game and scope. The recommendation is first.
 - **Godot details to confirm in M1 with a test, not by reading:** that *stacked* layout shifts odd rows right as
   our grid does, and that y-sorting across several layers in one group orders tall tiles as needed.
 - Not covered: sound, localisation, Steam integration. Each gets a short note when it nears.
+
+## Owner's answers (2026-11-15)
+
+- **v0.2.2 rules and the district map:** the district map is the game's map (one hex, one district with its use and level); the
+  systems of v0.2.2 (economy, people, armies, war, sieges, AI, research...) are rebuilt on it. The tiles drawn in Python are
+  reused through the tileset bake.
+- **North Italy until when:** until the owner is happy with the features; then Europe.
+- **First public Godot release:** land game only (no ships, exploration or colonies).
+- **Coastline:** the hex-edge coast with a drawn wobble is accepted.
