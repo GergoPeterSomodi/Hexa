@@ -24,7 +24,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
-NAMES = ("venice", "constantinople", "paris", "moscow")
+FIRST = ("venice", "constantinople", "paris", "moscow")
+NAMES = FIRST + ("london", "rome", "seville", "lisbon", "cairo", "granada")
 WALL = {"moscow": kit.BRICK}
 CAPS = {"moscow": kit.SLATE}
 CLEAR = {
@@ -32,6 +33,12 @@ CLEAR = {
     "constantinople": {4: (-14, -20, 14, 9), 5: (-16, -22, 16, 9)},
     "paris": {4: (-11, -22, 11, 9), 5: (-11, -24, 11, 9)},
     "moscow": {4: (-10, -20, 10, 9), 5: (-15, -22, 15, 9)},
+    "london": {4: (-9, -18, 9, 9), 5: (-14, -22, 14, 9)},
+    "rome": {4: (-10, -18, 10, 9), 5: (-15, -22, 15, 9)},
+    "seville": {4: (-7, -23, 7, 9), 5: (-14, -23, 14, 9)},
+    "lisbon": {4: (-8, -20, 8, 9), 5: (-16, -20, 16, 9)},
+    "cairo": {4: (-14, -20, 14, 9), 5: (-14, -20, 14, 9)},
+    "granada": {4: (-15, -17, 15, 9), 5: (-15, -22, 15, 9)},
 }
 
 INK = kit.INK
@@ -260,7 +267,272 @@ def moscow(p, level, x, y):
     return p.stand(y, fn, x=x)
 
 
-_DRAW = {"venice": venice, "constantinople": constantinople, "paris": paris, "moscow": moscow}
+def _tower_top(pen, x0, yt, w, cd, snow):
+    """A parapet on a square tower (x0 .. x0 + w, its top edge at yt): a darker ledge with two crenels."""
+    pen.rect(x0 - 0.4, yt - 0.9, w + 0.8, 1.2, cd, INK, 0.5)
+    pen.rect(x0 + 0.1, yt - 1.6, 1.0, 0.8, cd, None)
+    pen.rect(x0 + w - 1.1, yt - 1.6, 1.0, 0.8, cd, None)
+    if snow:
+        pen.rect(x0 - 0.4, yt - 1.3, w * 0.62, 0.8, SNOW, None)
+
+
+def _cyl(pen, cx, yb, w, h, col, cd, snow):
+    """A round drum seen from the front: a lit body with a darker right quarter, a curved foot, an elliptical top."""
+    eh = w * 0.15
+    n = 10
+    foot = [(cx + w / 2 * math.cos(math.pi * k / n), yb + eh * math.sin(math.pi * k / n)) for k in range(n + 1)]
+    body = [(cx - w / 2, yb - h), (cx + w / 2, yb - h)] + foot
+    pen.poly(body, col, None)
+    k4 = 4                                                  # the darker right quarter: from foot[0] to foot[k4]
+    pen.poly([(foot[k4][0], yb - h), (cx + w / 2, yb - h)] + foot[:k4 + 1], cd, None)
+    pen.poly(body, None, INK, 0.5)
+    pen.ellipse(cx, yb - h, w, w * 0.3, SNOW if snow else kit.shade(col, 1.06), INK, 0.5)
+
+
+def _ribs(pen, cx, yb, r, ry, col, us):
+    """Meridian ribs on a dome: they meet at the top."""
+    for u in us:
+        pen.lines([(cx + u * r * math.cos(t), yb - ry * math.sin(t)) for t in [math.pi / 2 * k / 6 for k in range(7)]], col, 0.5)
+
+
+def london(p, level, x, y):
+    """The White Tower: a broad white keep with four corner turrets under slate caps; at level 5 the old cathedral
+    stands beside it with a tall thin grey spire (the keep gets narrower and moves to the left of the axis)."""
+    sn = p.winter
+    kw = 12.0 if level < 5 else 10.2                      # the keep's width
+    kx = x if level < 5 else x - 5.2
+    hw = kw / 2
+    p.cast(kx, y, kw)
+    if level >= 5:
+        p.cast(x + p.m * 6.3, y, 9)
+    wd = kit.shade(WHITE, 0.84)
+
+    def turret(pen, cx, yb, w, h, front):
+        _block(pen, cx - w / 2, yb, w, h, WHITE, wd, 0.34)
+        _cone(pen, cx, yb - h, w + 0.8, 2.2, kit.SLATE, kit.SLATE_D, sn, ink=front)
+
+    def fn(pen):
+        if level >= 5:
+            nx = x + 1.8                                  # old St Paul's: a grey nave, a tower, the spire
+            _block(pen, nx, y, 9.0, 5.4, kit.STONE_GREY, kit.STONE_GREY_D, 0.3)
+            for k in range(3):
+                pen.rect(nx + 1.2 + k * 2.6, y - 3.4, 0.8, 2.0, kit.DOOR, None)
+            _block(pen, nx + 2.7, y - 5.4, 3.6, 4.2, kit.STONE_GREY, kit.STONE_GREY_D, 0.3)
+            pen.rect(nx + 4.1, y - 8.4, 0.8, 1.6, kit.DOOR, None)
+            _cone(pen, nx + 4.5, y - 9.6, 4.4, 9.6, kit.SLATE, kit.SLATE_D, sn)
+        for sx in (-1, 1):                                # the back turrets, inset and a little lower
+            turret(pen, kx + sx * 2.6, y - 9.0, 2.6, 2.6, False)
+        _block(pen, kx - hw, y, kw, 9.0, WHITE, wd, 0.26)
+        pen.rect(kx - hw - 0.4, y - 9.7, kw + 0.8, 1.1, wd, INK, 0.5)                    # the parapet
+        for k in range(3):
+            pen.rect(kx - hw + 1.6 + k * (kw - 4.2) / 2, y - 6.6, 1.0, 1.6, kit.DOOR, None)     # the upper windows
+        pen.poly([(kx - 0.8, y), (kx - 0.8, y - 2.2), (kx, y - 3.0), (kx + 0.8, y - 2.2), (kx + 0.8, y)], kit.DOOR, None)
+        pen.line((kx - hw, y - 4.0), (kx + hw, y - 4.0), kit.shade(wd, 0.9), 0.5)
+        if sn:
+            pen.rect(kx - hw - 0.4, y - 10.1, kw * 0.6, 0.8, SNOW, None)
+        for sx in (-1, 1):                                # the front turrets at the corners
+            turret(pen, kx + sx * hw, y - 0.2, 3.2, 12.6, True)
+    return p.stand(y, fn, x=x)
+
+
+def rome(p, level, x, y):
+    """The round castle (a wide stone drum with a small block on top) at level 4; at level 5 it stands to the left
+    of St Peter's: a tall drum with pilasters, a ribbed LEAD dome and a lantern."""
+    sn = p.winter
+    cx = x if level < 5 else x - 7.2
+    dx = x + 5.8
+    p.cast(cx, y, 14 if level < 5 else 11)
+    if level >= 5:
+        p.cast(x + p.m * 5.8, y, 9.5)
+    cw, ch = (14.0, 7.2) if level < 5 else (10.2, 5.6)
+
+    def fn(pen):
+        _cyl(pen, cx, y, cw, ch, kit.STONE, kit.STONE_D, sn)
+        for k in (-1, 0, 1):                                                 # arrow slits on the drum
+            pen.rect(cx + k * cw * 0.26 - 0.4, y - ch * 0.7, 0.8, 1.6, kit.DOOR, None)
+        pen.line((cx - cw / 2, y - ch * 0.38), (cx + cw / 2, y - ch * 0.38), kit.STONE_D, 0.5)
+        bw = cw * 0.52
+        _block(pen, cx - bw / 2, y - ch, bw, 3.0, kit.STONE, kit.STONE_D, 0.3)       # the block on top
+        pen.rect(cx - 0.4, y - ch - 2.0, 0.8, 1.2, kit.DOOR, None)
+        _cyl(pen, cx, y - ch - 3.0, bw * 0.46, 2.0, kit.STONE, kit.STONE_D, sn)      # and a small drum
+        pen.dot(cx, y - ch - 5.6, kit.GILT, 1.0)
+        if level >= 5:
+            r, dh = 5.0, 7.4
+            pd = kit.shade(kit.PLASTER[0], 0.84)
+            _block(pen, dx - r, y, 2 * r, dh, kit.PLASTER[0], pd, 0.26)              # the tall drum
+            for k in range(4):
+                pen.line((dx - r + 1.2 + k * 2.2, y - 0.4), (dx - r + 1.2 + k * 2.2, y - dh + 0.8), kit.STONE_D, 0.5)
+            for k in (-1, 1):
+                pen.rect(dx + k * 2.2 - 0.4, y - 5.2, 0.8, 2.2, kit.DOOR, None)
+            pen.rect(dx - r - 0.4, y - dh - 0.9, 2 * r + 0.8, 1.1, kit.STONE_D, INK, 0.5)           # the ledge
+            by = y - dh - 0.4
+            _dome(pen, dx, by, r, 6.4, kit.LEAD, kit.LEAD_D, sn)
+            _ribs(pen, dx, by, r, 6.4, kit.shade(kit.LEAD_D, 0.86), (-0.62, 0.0, 0.62))
+            _block(pen, dx - 1.0, by - 6.2, 2.0, 2.4, kit.MARBLE, kit.MARBLE_D, 0.3)               # the lantern
+            pen.rect(dx - 0.3, by - 7.8, 0.6, 1.2, kit.DOOR, None)
+            pen.dot(dx, by - 9.1, kit.GILT, 1.1)
+    return p.stand(y, fn, x=x)
+
+
+def seville(p, level, x, y):
+    """The Giralda: a tall pale square tower with three dark bands, a belfry and a small red cap; at level 5 it
+    stands to the right of the axis and a long low cathedral lies at its foot."""
+    sn = p.winter
+    tx = x if level < 5 else x + 4.8
+    p.cast(tx, y, 6)
+    if level >= 5:
+        p.cast(x + p.m * -5.9, y, 14)
+    sand = kit.PLASTER[4]
+    sd = kit.shade(sand, 0.82)
+
+    def fn(pen):
+        if level >= 5:
+            c0 = x - 13.4                                 # the cathedral: x - 13.4 .. x + 1.6
+            cd = kit.shade(kit.CHURCH, 0.84)
+            _block(pen, c0, y, 15.0, 5.4, kit.CHURCH, cd, 0.2)
+            roof = [(c0 - 0.5, y - 5.4), (c0 + 15.5, y - 5.4), (c0 + 13.0, y - 8.0), (c0 + 2.0, y - 8.0)]
+            pen.poly(roof, kit.ROOF, None)
+            pen.poly([(c0 + 15.5, y - 5.4), (c0 + 13.0, y - 8.0), (c0 + 11.6, y - 8.0), (c0 + 13.2, y - 5.4)], kit.ROOF_D, None)
+            if sn:
+                pen.poly([(c0 - 0.5, y - 5.4), (c0 + 2.0, y - 8.0), (c0 + 8.0, y - 8.0), (c0 + 6.6, y - 5.4)], SNOW, None)
+            pen.poly(roof, None, INK, 0.5)
+            for k in range(5):
+                pen.rect(c0 + 1.4 + k * 2.8, y - 4.4, 0.9, 2.6, kit.DOOR, None)
+            pen.rect(c0 + 12.4, y - 3.0, 1.6, 3.0, kit.DOOR, None)
+        _block(pen, tx - 2.7, y, 5.4, 14.2, sand, sd, 0.3)                                  # the shaft
+        for k in range(3):                                                                    # three dark bands
+            pen.rect(tx - 2.7, y - 4.2 - k * 3.6, 5.4, 1.6, kit.TIMBER_D, None)
+        pen.rect(tx - 2.7, y - 14.2, 5.4, 14.2, None, INK, 0.5)
+        pen.rect(tx - 0.4, y - 1.8, 0.8, 1.8, kit.DOOR, None)
+        _block(pen, tx - 2.1, y - 14.2, 4.2, 3.0, sand, sd, 0.3)                              # the belfry
+        pen.rect(tx - 1.3, y - 16.3, 0.9, 1.6, kit.DOOR, None)
+        pen.rect(tx + 0.4, y - 16.3, 0.9, 1.6, kit.DOOR, None)
+        _cone(pen, tx, y - 17.2, 5.0, 2.2, kit.ROOF, kit.ROOF_D, sn)                         # the cap
+        pen.line((tx, y - 19.1), (tx, y - 19.4), kit.GILT, 0.5)
+    return p.stand(y, fn, x=x)
+
+
+def lisbon(p, level, x, y):
+    """The Belem tower: a white tower on a low stone base, a balcony with two corner turrets and a red cap; at
+    level 5 it stands to the left of the axis and a long arcaded monastery front lies beside it."""
+    sn = p.winter
+    tx = x if level < 5 else x - 6.8
+    p.cast(tx, y, 9)
+    if level >= 5:
+        p.cast(x + p.m * 5.0, y, 12)
+    wd = kit.shade(WHITE, 0.84)
+
+    def bartizan(pen, cx, yb):
+        _block(pen, cx - 1.0, yb, 2.0, 3.2, WHITE, wd, 0.34)
+        _cone(pen, cx, yb - 3.2, 2.8, 1.8, kit.ROOF, kit.ROOF_D, sn)
+
+    def fn(pen):
+        if level >= 5:
+            m0 = x - 1.2                                  # the monastery: x - 1.2 .. x + 11.2
+            _block(pen, m0, y, 12.4, 6.0, kit.STONE, kit.STONE_D, 0.18)
+            pen.rect(m0 - 0.4, y - 6.9, 13.2, 1.1, kit.STONE_D, INK, 0.5)
+            for k in range(6):
+                a = m0 + 0.9 + k * 1.9
+                pen.poly([(a, y), (a, y - 2.0), (a + 0.4, y - 2.8), (a + 0.8, y - 2.0), (a + 0.8, y)], kit.DOOR, None)
+                pen.rect(a + 0.2, y - 5.2, 0.5, 1.0, kit.DOOR, None)
+            if sn:
+                pen.rect(m0 - 0.4, y - 7.3, 8.6, 0.8, SNOW, None)
+            _block(pen, m0 + 4.6, y - 6.9, 3.2, 3.2, kit.STONE, kit.STONE_D, 0.3)           # the centre pavilion
+            _cone(pen, m0 + 6.2, y - 10.1, 4.2, 3.2, kit.ROOF, kit.ROOF_D, sn)
+        _block(pen, tx - 4.6, y, 9.2, 3.2, kit.STONE, kit.STONE_D, 0.26)                     # the low base
+        for k in (-1, 0, 1):
+            pen.rect(tx + k * 2.8 - 0.4, y - 2.2, 0.8, 1.2, kit.DOOR, None)
+        _block(pen, tx - 3.1, y - 3.2, 6.2, 9.6, WHITE, wd, 0.3)                             # the tower
+        pen.rect(tx - 0.5, y - 5.6, 1.0, 1.8, kit.DOOR, None)
+        pen.rect(tx - 4.2, y - 7.9, 8.4, 1.2, kit.STONE_D, INK, 0.5)                         # the balcony
+        for k in range(5):
+            pen.line((tx - 3.6 + k * 1.8, y - 6.7), (tx - 3.6 + k * 1.8, y - 7.9), INK, 0.5)
+        bartizan(pen, tx - 3.6, y - 8.0)
+        bartizan(pen, tx + 3.6, y - 8.0)
+        _block(pen, tx - 2.4, y - 12.8, 4.8, 3.4, WHITE, wd, 0.3)                            # the upper storey
+        pen.rect(tx - 0.4, y - 12.0, 0.8, 1.4, kit.DOOR, None)
+        _cone(pen, tx, y - 16.2, 5.6, 3.3, kit.ROOF, kit.ROOF_D, sn)
+    return p.stand(y, fn, x=x)
+
+
+def _banded_minaret(pen, cx, yb, h, snow):
+    """A thick stone minaret: courses of STONE and STONE_D, a balcony, a green pointed cap."""
+    cap = 3.6
+    sh = h - cap
+    w = 3.0
+    pen.rect(cx - w / 2, yb - sh, w, sh, kit.STONE, None)
+    k = 0
+    while yb - 1.6 - k * 2.4 > yb - sh * 0.66 - 1.0:                  # the dark courses
+        pen.rect(cx - w / 2, yb - 1.6 - k * 2.4, w, 1.1, kit.STONE_D, None)
+        k += 1
+    pen.rect(cx + w * 0.2, yb - sh, w * 0.3, sh, kit.shade(kit.STONE_D, 0.9), None)
+    pen.rect(cx - w / 2, yb - sh, w, sh, None, INK, 0.5)
+    by = yb - sh * 0.66                                               # the balcony
+    pen.rect(cx - w / 2 - 0.9, by - 0.9, w + 1.8, 0.9, kit.STONE_D, INK, 0.5)
+    _cone(pen, cx, yb - sh, 3.4, cap, kit.VERDIGRIS, kit.VERDIGRIS_D, snow)
+
+
+def cairo(p, level, x, y):
+    """Banded stone minarets with green caps behind a low crenelled wall and a small ribbed dome: two minarets at
+    level 4, four of different heights at level 5. No great dome."""
+    sn = p.winter
+    p.cast(x, y, 20)
+    wy = y - 3.4                                                    # the minarets' feet: behind the wall
+
+    def fn(pen):
+        specs = ((-7.5, 12.5), (7.2, 15.8)) if level < 5 else ((-9.0, 11.5), (-4.8, 15.6), (4.2, 13.6), (8.8, 15.8))
+        for dx, mh in specs:
+            _banded_minaret(pen, x + dx, wy, mh, sn)
+        _block(pen, x - 11.0, y, 22.0, 4.4, kit.STONE, kit.STONE_D, 0.2)                     # the wall
+        for k in range(8):
+            pen.rect(x - 10.6 + k * 2.84, y - 5.5, 1.4, 1.1, kit.STONE, INK, 0.5)           # the crenels
+        for k in range(5):
+            pen.rect(x - 8.4 + k * 3.5, y - 2.8, 0.8, 1.6, kit.DOOR, None)
+        pen.rect(x + 8.6, y - 3.0, 1.8, 3.0, kit.DOOR, None)
+        if sn:
+            pen.rect(x - 11.0, y - 5.9, 11.0, 0.7, SNOW, None)
+        d0 = x - 1.0 if level >= 5 else x - 0.5
+        pen.rect(d0 - 3.7, y - 7.4, 7.4, 2.0, kit.STONE_D, INK, 0.5)                          # the dome's drum, over the wall
+        pen.rect(d0 - 3.7, y - 7.4, 5.2, 2.0, kit.STONE, None)
+        _dome(pen, d0, y - 7.4, 3.8, 3.6, kit.STONE, kit.STONE_D, sn)
+        _ribs(pen, d0, y - 7.4, 3.8, 3.6, kit.shade(kit.STONE_D, 0.82), (-0.55, 0.0, 0.55))
+        pen.dot(d0, y - 11.5, kit.GILT, 0.8)
+    return p.stand(y, fn, x=x)
+
+
+def granada(p, level, x, y):
+    """The red palace wall: a long low BRICK wall with three square towers and a row of pale arches; at level 5 a
+    taller square tower stands behind it at the left."""
+    sn = p.winter
+    p.cast(x, y, 20)
+    bd = kit.BRICK_D
+
+    def tower(pen, cx, yb, w, h):
+        _block(pen, cx - w / 2, yb, w, h, kit.BRICK, bd, 0.3)
+        _tower_top(pen, cx - w / 2, yb - h, w, bd, sn)
+        pen.rect(cx - 0.4, yb - h + 2.2, 0.8, 1.6, kit.DOOR, None)
+
+    def fn(pen):
+        if level >= 5:
+            tower(pen, x - 6.4, y - 3.0, 6.0, 14.6)                    # the tall tower behind the wall
+            pen.rect(x - 6.8, y - 11.6, 0.8, 1.6, kit.DOOR, None)
+        _block(pen, x - 11.0, y, 22.0, 5.2, kit.BRICK, bd, 0.2)         # the long wall
+        pen.rect(x - 11.0, y - 5.9, 22.0, 0.9, bd, INK, 0.5)
+        for k in range(9):
+            pen.rect(x - 10.6 + k * 2.55, y - 6.6, 1.2, 0.8, bd, None)
+        for k in range(5):                                              # the row of pale arches
+            a = x - 5.6 + k * 2.2
+            pen.poly([(a, y), (a, y - 2.0), (a + 0.5, y - 2.8), (a + 1.0, y - 2.0), (a + 1.0, y)], kit.MARBLE, None)
+        for tx, tw, th in ((-9.2, 4.6, 9.4), (0.6, 4.8, 10.2), (9.2, 4.6, 9.0)):
+            tower(pen, x + tx, y + 0.4, tw, th)
+        pen.rect(x + 5.6, y - 3.4, 1.8, 3.4, kit.DOOR, None)
+        if sn:
+            pen.rect(x - 11.0, y - 6.9, 9.0, 0.8, SNOW, None)
+    return p.stand(y, fn, x=x)
+
+
+_DRAW = {"venice": venice, "constantinople": constantinople, "paris": paris, "moscow": moscow, "london": london,
+         "rome": rome, "seville": seville, "lisbon": lisbon, "cairo": cairo, "granada": granada}
 
 
 def draw(p, name, level, x, y):
@@ -297,7 +569,7 @@ def sheet(path):
     cw = kit.SIZE + pad * 2
     n = 8
     W = left + n * (cw + gap) + 16
-    strip_h = 2 * (cw // 2 + gap) + 56
+    strip_h = 4 * (cw // 2 + gap) + 64
     H = top + len(rows) * (cw + gap) + 30 + strip_h
     out = pygame.Surface((W, H))
     out.fill(kit.SHEET_BG)
@@ -314,19 +586,23 @@ def sheet(path):
         out.blit(f_h.render(name.capitalize(), True, kit.SHEET_TEXT), (12, y + 52))
         for j, (lv, se, cl, v, img) in enumerate(cells):
             out.blit(kit._cell(img, se, 1.0, pad, "grass", cl), (left + j * (cw + gap), y))
-    # the 50% strip: a plain level 5 city at its head, then every monument at level 4 and 5 (summer, layout 0)
+    # the 50% strips: a plain level 5 city at the head, then every monument at level 4 and 5 (layout 0); two lines
+    # of eleven for summer, two for winter
     sy = top + len(rows) * (cw + gap) + 8
-    out.blit(f_h.render("50%: a plain level 5 city, then each city's levels 4 and 5 (summer, layout 0; below: winter)", True, kit.SHEET_TEXT), (12, sy))
+    out.blit(f_h.render("50%: a plain level 5 city, then each city's levels 4 and 5 (layout 0; summer above, winter below)", True, kit.SHEET_TEXT), (12, sy))
     hw = cw // 2
     for r, (se, cl) in enumerate(seasons):
-        y = sy + 30 + r * (hw + gap)
-        x = 12
         items = [("plain", kit.with_wild(settlements.draw, 5, se, climate=cl))]
         for name in NAMES:
             for lv in (4, 5):
                 items.append((name, kit.with_wild(settlements.draw, lv, se, landmark=name, climate=cl)))
         for k, (nm, img) in enumerate(items):
-            out.blit(kit._cell(img, se, 0.5, pad, "grass", cl), (x + k * (hw + 3), y))
+            line, col = divmod(k, 11)
+            y = sy + 30 + (r * 2 + line) * (hw + gap)
+            out.blit(kit._cell(img, se, 0.5, pad, "grass", cl), (12 + col * (hw + 3), y))
+    ty = sy + 30 + 4 * (hw + gap) + 4
+    out.blit(f_s.render("order in each line: plain, " + ", ".join(NAMES[:5]) + "  /  " + ", ".join(NAMES[5:]), True, kit.SHEET_DIM), (12, ty))
+    out.blit(f_s.render("(each city: level 4 then level 5; the first line is plain + the first five cities, the second the last five)", True, kit.SHEET_DIM), (12, ty + 20))
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     pygame.image.save(out, path)
     return out
