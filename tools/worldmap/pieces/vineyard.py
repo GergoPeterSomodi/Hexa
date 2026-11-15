@@ -2,7 +2,8 @@
 
 0 the map's wild land - 1 two young blocks and a thatched hut - 2 four blocks of full rows, a tiled house, the press
 house with two vats - 3 six blocks, two of them terraced, a track, the wine estate with a tower and cypresses.
-Two layouts (LAYOUT[0], LAYOUT[1]) with the same landmarks, counts and coverage; the map also mirrors either one.
+Three layouts (LAYOUT[0], LAYOUT[1], LAYOUT[2]) with the same landmarks, counts and coverage; the map also mirrors them.
+Layout 2 is a different kind of plan: the six blocks are sectors of one set of contour rows round the chateau.
 
 python vineyard.py         writes docs/design/map/pieces/vineyard.png and vineyard_variants.png
 """
@@ -14,13 +15,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(0, 4)
-VARIANTS = 2
+VARIANTS = 3
 NAMES = {0: "wild land (the map's)", 1: "young vines", 2: "press house", 3: "estate"}
 
 # The layouts are fixed tables: a level adds to the level below and never moves anything. Blocks: cx, cy, w, h,
 # angle, rows, from level, shelves (terraces). Layout 0: hut left of the middle, press house in the middle, estate at
 # the back; layout 1: hut at the back right, press house on the east side, estate on the west flank, the terraced
-# blocks at the front.
+# blocks at the front. Layout 2 (contour rows round the chateau) has its own keys: the centre of the rings, the
+# rings (first radius, step, rows per sector, flattening), six sectors as angle pairs in degrees (0 east, 90 the front,
+# 180 west) with a from level and the number of terrace walls, and the same hut, press, vats, estate, tower, cypress,
+# track. The opening at the back (220 to 320 degrees) holds the press house; the hut stands in the front gap.
 LAYOUT = [
     dict(
         hut=(-14, 8),                                 # the hut, later the tiled house: same foot at every level
@@ -55,6 +59,25 @@ LAYOUT = [
             (13, 26, 14, 10, 0, 5, 3, 2),
         ],
         track=[(11, 2), (8, 12), (3, 22), (-2, 32), (-5, 38)],
+    ),
+    dict(
+        centre=(0, -4),
+        rings=dict(r0=14.5, step=4.4, n=6, flat=0.78),
+        sectors=[                                     # a0, a1, from level, terrace walls on the two outermost rows
+            (107, 139, 1, 0),                         # front left, then round to the west
+            (147, 179, 1, 0),
+            (41, 73, 2, 0),                           # front right, then round to the east
+            (1, 33, 2, 0),
+            (187, 219, 3, 2),                         # the back sectors stand on terrace walls
+            (-39, -7, 3, 2),
+        ],
+        hut=(2.5, 22),
+        press=(-9, -25),
+        vats=[(-1.5, -23.5), (3.5, -22)],
+        estate=(-3.5, -1),
+        tower=(4.1, -0.4),
+        cypress=[(-10.5, -1.5), (9.5, -1.5)],
+        track=[(-1, 2), (-2, 12), (-4, 20), (-5, 28), (-5, 38)],
     ),
 ]
 GATES = {"south": (-5, 38)}                           # the track ends here in both layouts; the map's road layer carries it on
@@ -110,11 +133,54 @@ def basket(p, x, y):
     return p.stand(y, lambda pen: (pen.rect(x - 1.1, y - 1.5, 2.2, 1.5, kit.TIMBER, kit.INK, 0.5), pen.rect(x - 1.1, y - 1.5, 2.2, 0.5, (150, 60, 66), None)), x=x)
 
 
+def ring_band(L, i):
+    R = L["rings"]
+    rx = R["r0"] + i * R["step"]
+    return rx, rx * R["flat"]
+
+
+def contour_ground(p, L, level, season):
+    """Layout 2: the sectors of contour rows. Each sector's soil is a patch between two ring lines; the rows are arcs."""
+    cx, cy = L["centre"]
+    R = L["rings"]
+    flat, n = R["flat"], R["n"]
+    soil = kit.crop("vine_soil", season)[0]
+    vine = kit.crop("vine", season)[0]
+    r_in, r_out = R["r0"] - 2.0, R["r0"] + (n - 1) * R["step"] + 2.2
+    p.blob(cx, cy, r_in * 1.6, r_in * flat * 1.6, p.pal["soil"], alpha=0.28)          # the faint trodden knoll
+    for a0, a1, frm, shelves in L["sectors"]:
+        if frm > level:
+            continue
+        span = int(abs(a1 - a0) // 3) + 2
+        inner = kit.ring_points(cx, cy, r_in, r_in * flat, math.radians(a0), math.radians(a1), span)
+        outer = kit.ring_points(cx, cy, r_out, r_out * flat, math.radians(a0), math.radians(a1), span)
+        pts = inner + outer[::-1]
+        if p.winter:
+            p.patch(pts, kit.SNOW)
+            for i in (0, 3):                          # a band in three shows earth between the rows
+                ra, rb = R["r0"] + (i + 0.5) * R["step"] - 1.1, R["r0"] + (i + 0.5) * R["step"] + 1.1
+                ba = kit.ring_points(cx, cy, ra, ra * flat, math.radians(a0), math.radians(a1), span)
+                bb = kit.ring_points(cx, cy, rb, rb * flat, math.radians(a0), math.radians(a1), span)
+                p.patch(ba + bb[::-1], p.pal["soil"])
+        else:
+            p.patch(pts, soil, kit.shade(soil, 0.8))
+        young = level == 1 and frm == 1
+        for i in range(n):
+            rx, ry = ring_band(L, i)
+            p.arc(cx, cy, rx, ry, min(a0, a1) + 1.5, max(a0, a1) - 1.5, col=vine, lw=1.5, dashed=young)
+        for i in range(n - shelves, n):               # terrace walls under the outermost rows
+            rx, ry = ring_band(L, i)
+            rx, ry = rx + 2.0, ry + 2.0 * flat
+            p.terrace(kit.ring_points(cx, cy, rx, ry, math.radians(min(a0, a1) + 1.5), math.radians(max(a0, a1) - 1.5), span), face=2)
+
+
 def draw(level, season, variant=0, mirror=False):
     if level == 0:                                    # no piece: the sheets show the map's wild land
         return kit.wild(season, "grass", seed=2)
     p = kit.Piece(season, ground="grass", seed=2, mirror=mirror)
     L = LAYOUT[variant]
+    if "rings" in L:
+        return draw_contour(p, L, level, season)
     sp, su, au, wi = season == "spring", season == "summer", season == "autumn", season == "winter"
     soil = kit.crop("vine_soil", season)[0]
     vine = kit.crop("vine", season)[0]
@@ -172,6 +238,48 @@ def draw(level, season, variant=0, mirror=False):
             p.person(cx + w * 0.1, cy, (70, 96, 150))
         elif sp and level >= 2:
             p.person(cx - w * 0.1, cy + 1, (110, 80, 60))
+    return p.finish(label="vineyard L%d" % level)
+
+
+def draw_contour(p, L, level, season):
+    """Layout 2: the same landmarks, counts and seasons as layouts 0 and 1 on one set of contour rows."""
+    sp, su, au = season == "spring", season == "summer", season == "autumn"
+    cx, cy = L["centre"]
+    R = L["rings"]
+    sectors = [s for s in L["sectors"] if s[2] <= level]
+    if level >= 3:
+        p.road(L["track"], 1.6, track=True)
+    contour_ground(p, L, level, season)
+    hut = L["hut"]
+    if level == 1:
+        p.house(hut[0], hut[1], 5.5, 3.5, 3.0, wall=0, roof="thatch", smoke=True)
+    else:
+        p.house(hut[0], hut[1], 7.5, 4.8, 3.6, wall=0, roof="thatch", smoke=True)
+    if level >= 2:
+        press_house(p, *L["press"])
+        for x, y in L["vats"]:
+            vat(p, x, y)
+    if level >= 3:
+        p.house(L["estate"][0], L["estate"][1], 12.0, 6.5, 3.4, wall=kit.PLASTER[1], roof="tile")
+        p.tower(L["tower"][0], L["tower"][1], 3.6, 8.6, col=kit.PLASTER[1], top="cone", roof=kit.ROOF)
+        for i, (x, y) in enumerate(L["cypress"]):
+            p.tree(x, y, 1.0, "poplar", i)
+
+    def at(r, a):                                     # a point on the rings: radius of the first row's scale, angle in degrees
+        return cx + math.cos(math.radians(a)) * r, cy + math.sin(math.radians(a)) * r * R["flat"]
+    a0, a1 = sectors[-1][:2]
+    am = (a0 + a1) / 2.0
+    mid = R["r0"] + 2.5 * R["step"]
+    if au:
+        p.person(*at(mid, am - 8), (110, 80, 60))
+        p.person(*at(mid + R["step"], am + 6), (196, 72, 60))
+        for q in (-1, 0, 1):
+            bx, by = at(R["r0"] + 5 * R["step"] + 1.6, am + q * 6.5)
+            basket(p, bx, by)
+    elif su:
+        p.person(*at(mid, am), (70, 96, 150))
+    elif sp and level >= 2:
+        p.person(*at(mid, am - 6), (110, 80, 60))
     return p.finish(label="vineyard L%d" % level)
 
 
