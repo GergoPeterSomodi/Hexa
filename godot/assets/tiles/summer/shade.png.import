@@ -3,20 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bpg0y3qycee3d"
-path="res://.godot/imported/shade.png-4c9ed23f2c6d52481944c426ac1f788e.ctex"
+path.bptc="res://.godot/imported/shade.png-4c9ed23f2c6d52481944c426ac1f788e.bptc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/summer/shade.png"
-dest_files=["res://.godot/imported/shade.png-4c9ed23f2c6d52481944c426ac1f788e.ctex"]
+dest_files=["res://.godot/imported/shade.png-4c9ed23f2c6d52481944c426ac1f788e.bptc.ctex"]
 
 [params]
 
-compress/mode=0
-compress/high_quality=false
+compress/mode=2
+compress/high_quality=true
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0

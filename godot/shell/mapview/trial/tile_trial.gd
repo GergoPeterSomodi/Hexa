@@ -72,7 +72,7 @@ func _load() -> bool:
 	for entry: Variant in table:
 		var row: Dictionary = entry
 		_meta[Vector2i(int(row["c"]), int(row["r"]))] = row
-	improve = WorldImprove.build(table, seed_value)
+	improve = WorldImprove.build(load("res://data/maps/north_italy.tres") as MapData, seed_value, null, _meta)
 	var crests: Array = facts["crests"]
 	for entry: Variant in crests:
 		var e: Array = entry
