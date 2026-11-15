@@ -18,9 +18,7 @@ const SELECT_TILE := "mark/select"
 ## A map of at most this many hexes is loaded at once when the game starts; a larger one a slice a frame.
 const SYNC_LOAD_HEXES := 4000
 ## Milliseconds a frame the loading and a season swap may use (a layer or a chunk is never split, so one can pass it).
-const SLICE_MS := 8.0
-## Hexes a step of the sliced fill (the view's own is 4,000 a frame, about 100 ms on a big map).
-const FILL_STEP := 120
+const SLICE_MS := 5.0
 const HELP := "1-4 season   R new seed   G grid   F whole map   H hide   U upgrade   Esc clear\nclick a hex   drag or WASD move   wheel zoom"
 
 ## The map the scene shows (a Session.new_game id); a tool may set it before the scene enters the tree.
@@ -36,9 +34,8 @@ var _tiles: TilesetBuilder = null
 var _fps_clock := 0.0
 var _line_queue: Array[Vector2i] = []
 var _loading_map: MapData = null
+var _pending_season := ""  # a season asked for before its pictures were loaded: swapped when they are
 var _loading_state: MapState = null
-var _swap_queue: Array[String] = []
-var _swap_tiles: TilesetBuilder = null
 
 @onready var _camera: Camera2D = $Camera
 @onready var _view: TileMapView = $View
@@ -95,8 +92,8 @@ func _on_game_started() -> void:
 	var state := Session.game.state
 	select_hex(NO_HEX)
 	_view.set_climates(map.cols, map.climate)
-	_view.begin_fill(map.cols, map.rows, func(hex: Vector2i) -> Dictionary: return MapCells.of_hex(map, state, hex),
-		_hex_under_camera())
+	_view.begin_fill(map.cols, map.rows, func(hex: Vector2i, names: PackedStringArray) -> void: MapCells.fill_hex(map, state, hex, names),
+		_hex_under_camera(), MapCells.LAYERS)
 	_view.set_process(false)  # the scene slices the fill by time (_load_step)
 	_loading_map = map
 	_loading_state = state
@@ -129,8 +126,8 @@ func _load_step(budget_ms: float) -> void:
 	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
 	if _far.is_building():
 		_far.step(budget_ms)
-	while _view.is_filling() and Time.get_ticks_usec() < until:
-		_view.fill_step(FILL_STEP)
+	if _view.is_filling():
+		_view.fill_for(float(until - Time.get_ticks_usec()) / 1000.0)
 	if Time.get_ticks_usec() < until:
 		_line_step(float(until - Time.get_ticks_usec()) / 1000.0)
 
@@ -196,9 +193,15 @@ func _on_season_requested(index: int) -> void:
 
 
 ## Swaps the season: the TileSet of every layer is replaced and no cell is written. Godot rebuilds a layer when its TileSet
-## changes (about 1 ms a thousand cells), so a big map is swapped a few layers a frame (SLICE_MS); a small one in one frame.
+## changes (about 1 ms a thousand cells), so the view swaps a chunk of a layer at a time (SLICE_MS a frame), the chunks on the
+## screen first; a small map is done in the first step.
 func set_season(value: String) -> void:
+	_pending_season = ""
 	if value == season or not TilesetBuilder.SEASONS.has(value):
+		return
+	if preload_next_season and DisplayServer.get_name() != "headless" and not TilesetBuilder.is_loaded(value):
+		TilesetBuilder.request_season(value)  # not loaded yet (a key jumped over the next season): the frames go on meanwhile
+		_pending_season = value
 		return
 	var tiles := TilesetBuilder.load_season(value)
 	if tiles.tile_set == null:
@@ -206,39 +209,26 @@ func set_season(value: String) -> void:
 		return
 	season = value
 	_tiles = tiles
-	_swap_tiles = tiles
-	_swap_queue.clear()
-	for layer_name: String in TileMapView.LAYERS:
-		_swap_queue.append(layer_name)
-	for layer_name: String in TileMapView.OVERLAYS:
-		_swap_queue.append(layer_name)
-	_swap_step(SLICE_MS)
+	_view.begin_season_swap(tiles, _hexes_on_screen())
+	_view.swap_step(SLICE_MS)
 	_request_next_season()
 
 
 func is_swapping() -> bool:
-	return not _swap_queue.is_empty()
+	return _view.is_swapping()
 
 
 ## Does the rest of a season swap now.
 func finish_swap() -> void:
-	_swap_step(1.0e9)
+	_view.swap_step(1.0e9)
 
 
-func _swap_step(budget_ms: float) -> void:
-	if _swap_tiles == null:
-		return
-	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
-	while not _swap_queue.is_empty():
-		var layer_name: String = _swap_queue.pop_front()
-		var layer := _view.layer(layer_name)
-		layer.tile_set = _swap_tiles.tile_set
-		layer.update_internals()  # the rebuild happens here, inside the slice, not at the end of the frame
-		if Time.get_ticks_usec() >= until:
-			break
-	if _swap_queue.is_empty():
-		_view.set_season(_swap_tiles)  # the layers have it: this only tells the view
-		_swap_tiles = null
+## The hexes the camera sees (a Rect2i), for what is done nearest the screen first.
+func _hexes_on_screen() -> Rect2i:
+	var half := get_viewport_rect().size / (2.0 * _camera.zoom.x)
+	var low := _view.hex_at(_camera.position - half)
+	var high := _view.hex_at(_camera.position + half)
+	return Rect2i(low, high - low + Vector2i.ONE).abs()
 
 
 ## The next season in the year's order is loaded on another thread, so the usual swap is quick.
@@ -312,8 +302,10 @@ func _apply_zoom() -> void:
 
 func _process(delta: float) -> void:
 	_apply_zoom()
-	if _swap_tiles != null:
-		_swap_step(SLICE_MS)
+	if _pending_season != "" and TilesetBuilder.is_loaded(_pending_season):
+		set_season(_pending_season)
+	if _view.is_swapping():
+		_view.swap_step(SLICE_MS)
 	elif is_loading():
 		_load_step(SLICE_MS)
 	_fps_clock += delta

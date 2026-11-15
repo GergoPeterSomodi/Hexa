@@ -56,6 +56,11 @@ var _facts: Array[Dictionary] = []
 var _fixed: PackedByteArray = PackedByteArray()  # 1: the data decides this hex (a place)
 var _nbr: PackedInt32Array = PackedInt32Array()  # six per cell: the neighbouring land cell or -1
 var _ring2: Array[PackedInt32Array] = []  # per cell: the land cells exactly two hexes away
+## Set by `over`: the facts, the neighbour tables and the distances are not built for every cell (that was a search of
+## every cell against every settlement) but for the hex that is asked about, and kept until a settlement changes.
+var _lazy := false
+var _settled: Dictionary[Vector2i, int] = {}  # lazy: the hexes with a settlement, their level
+var _facts_lazy: Dictionary[int, Dictionary] = {}  # lazy: cell -> facts, for the cells asked about
 var _prior: PackedFloat32Array = PackedFloat32Array()  # one per cell and option; zero when not allowed
 var _initial: PackedInt64Array = PackedInt64Array()
 var _dom: PackedInt64Array = PackedInt64Array()  # the solver's result: per cell, the option left
@@ -87,8 +92,9 @@ static func over(p_map: MapData, p_state: MapState) -> WorldImprove:
 	var out := WorldImprove.new()
 	out.map = p_map
 	out.state = p_state
+	out._lazy = true
 	out._make_options()
-	out._collect()
+	out._collect_cells()
 	out._count_state()
 	out._refresh_distances()
 	return out
@@ -118,7 +124,7 @@ func level_at(hex: Vector2i) -> int:
 func facts_at(hex: Vector2i) -> Dictionary:
 	if not _index.has(hex):
 		return {}
-	return _facts[int(_index[hex])]
+	return _facts_of(int(_index[hex]))
 
 
 ## What the map draws on a hex: {} for a wild hex, else the facts of Improve.piece_of.
@@ -155,17 +161,30 @@ static func _verdict(ok: bool, reason: String = "") -> Dictionary:
 func _pair_conflict(hex: Vector2i, family_id: int, level_value: int) -> String:
 	var i := int(_index[hex])
 	for d: int in 6:
-		var k := int(_nbr[i * 6 + d])
+		var k := _neighbour_cell(i, d)
 		if k >= 0:
 			var why := _pair_against(k, family_id, level_value, 1)
 			if why != "":
 				return why
-	if i < _ring2.size():
-		for k: int in _ring2[i]:
-			var why := _pair_against(k, family_id, level_value, 2)
-			if why != "":
-				return why
+	for k: int in _ring2_of(i):
+		var why := _pair_against(k, family_id, level_value, 2)
+		if why != "":
+			return why
 	return ""
+
+
+## The land cell next to cell `i` in direction `d`, or -1.
+func _neighbour_cell(i: int, d: int) -> int:
+	if not _lazy:
+		return int(_nbr[i * 6 + d])
+	return int(_index.get(ImproveRules.neighbour(_cells[i], d), -1))
+
+
+## The land cells exactly two hexes from cell `i`, in cell order.
+func _ring2_of(i: int) -> PackedInt32Array:
+	if not _lazy:
+		return _ring2[i] if i < _ring2.size() else PackedInt32Array()
+	return _ring_of(_cells[i])
 
 
 func _pair_against(cell: int, family_id: int, level_value: int, radius: int) -> String:
@@ -280,12 +299,26 @@ func _put(hex: Vector2i, family_id: int, level_value: int) -> void:
 	by_family[family_id] += 1
 	by_level[family_id * 6 + level_value] += 1
 	if family_id == ImproveRules.SETTLEMENT or old_f == ImproveRules.SETTLEMENT:
-		_refresh_distances()
+		if _lazy:
+			if family_id == ImproveRules.SETTLEMENT:
+				_settled[hex] = level_value
+			else:
+				_settled.erase(hex)
+			_facts_lazy.clear()
+		else:
+			_refresh_distances()
 
 
 ## The distances to the nearest place, town and city from the settlements as they stand now (a village that grew into a
 ## town opens the town-near levels round it).
 func _refresh_distances() -> void:
+	if _lazy:
+		_settled.clear()
+		_facts_lazy.clear()
+		for hex: Vector2i in hexes:
+			if family_at(hex) == ImproveRules.SETTLEMENT:
+				_settled[hex] = level_at(hex)
+		return
 	var settled: Array[Vector3i] = []
 	for hex: Vector2i in hexes:
 		if family_at(hex) == ImproveRules.SETTLEMENT:
@@ -317,7 +350,7 @@ func violations() -> Array[String]:
 		var f := family_at(hex)
 		var lv := level_at(hex)
 		var i := int(_index[hex])
-		if _fixed[i] == 0 and f != ImproveRules.NONE and f != ImproveRules.CASTLE and not ImproveRules.cell_allowed(f, lv, _facts[i]):
+		if _fixed[i] == 0 and f != ImproveRules.NONE and f != ImproveRules.CASTLE and not ImproveRules.cell_allowed(f, lv, _facts_of(i)):
 			out.append("%s: %s %d breaks a cell rule" % [hex, ImproveRules.NAMES[f], lv])
 		if f == ImproveRules.NONE:
 			continue
@@ -422,17 +455,7 @@ func _collect() -> void:
 				_nbr[i * 6 + d] = int(_index[nb])
 	for i: int in n:
 		var hex := _cells[i]
-		var ring := PackedInt32Array()
-		var seen: Dictionary[int, bool] = {}
-		for d: int in 6:
-			var first := ImproveRules.neighbour(hex, d)
-			for e: int in 6:
-				var second := ImproveRules.neighbour(first, e)
-				if _index.has(second) and ImproveRules.hex_distance(hex, second) == 2 and not seen.has(int(_index[second])):
-					seen[int(_index[second])] = true
-					ring.append(int(_index[second]))
-		ring.sort()
-		_ring2.append(ring)
+		_ring2.append(_ring_of(hex))
 		var facts := _facts[i]
 		var near_place := 99
 		var near_town := 99
@@ -462,6 +485,105 @@ func _collect() -> void:
 			var distance := ImproveRules.hex_distance(ha, hb)
 			if distance <= 2 and not ImproveRules.pair_allowed(ImproveRules.SETTLEMENT, settled[a].z, ImproveRules.SETTLEMENT, settled[b].z, distance):
 				fixed_conflicts.append("%s (level %d) and %s (level %d)" % [ha, settled[a].z, hb, settled[b].z])
+
+
+## The land cells exactly two hexes from a hex, in cell order.
+func _ring_of(hex: Vector2i) -> PackedInt32Array:
+	var ring := PackedInt32Array()
+	var seen: Dictionary[int, bool] = {}
+	for d: int in 6:
+		var first := ImproveRules.neighbour(hex, d)
+		for e: int in 6:
+			var second := ImproveRules.neighbour(first, e)
+			if _index.has(second) and ImproveRules.hex_distance(hex, second) == 2 and not seen.has(int(_index[second])):
+				seen[int(_index[second])] = true
+				ring.append(int(_index[second]))
+	ring.sort()
+	return ring
+
+
+## What `over` needs and no search: the land cells, which of them are places of the data, and the pairs of those
+## places that break a pair rule (found by looking at the hexes within two of each place, not at every pair).
+func _collect_cells() -> void:
+	for i: int in map.hex_count():
+		if map.land[i] == 1:
+			_cells.append(map.hex_of(i))
+	var n := _cells.size()
+	for i: int in n:
+		_index[_cells[i]] = i
+	_fixed.resize(n)
+	_fixed.fill(0)
+	var places: Array[int] = []  # the cells of the data's places, in cell order
+	var place_level: Dictionary[int, int] = {}
+	var top := ImproveRules.TOP_LEVEL[ImproveRules.SETTLEMENT]
+	for i: int in n:
+		var place := Improve.place_of(map, _cells[i])
+		var lv := clampi(int(place.get("level", 0)), 0, top) if not place.is_empty() else 0
+		if lv > 0:
+			_fixed[i] = 1
+			places.append(i)
+			place_level[i] = lv
+	var rank: Dictionary[int, int] = {}
+	for a: int in places.size():
+		rank[places[a]] = a
+	for a: int in places.size():
+		var ha := _cells[places[a]]
+		var near: Array[int] = []
+		for d: int in 6:
+			var first := ImproveRules.neighbour(ha, d)
+			near.append(int(_index.get(first, -1)))
+			for e: int in 6:
+				near.append(int(_index.get(ImproveRules.neighbour(first, e), -1)))
+		var later: Dictionary[int, bool] = {}
+		for k: int in near:
+			if k >= 0 and rank.has(k) and int(rank[k]) > a and ImproveRules.hex_distance(ha, _cells[k]) <= 2:
+				later[int(rank[k])] = true
+		var order: Array[int] = []
+		order.assign(later.keys())
+		order.sort()
+		for b: int in order:
+			var hb := _cells[places[b]]
+			var distance := ImproveRules.hex_distance(ha, hb)
+			var la := int(place_level[places[a]])
+			var lb := int(place_level[places[b]])
+			if not ImproveRules.pair_allowed(ImproveRules.SETTLEMENT, la, ImproveRules.SETTLEMENT, lb, distance):
+				fixed_conflicts.append("%s (level %d) and %s (level %d)" % [ha, la, hb, lb])
+
+
+## The facts of cell `i`: `build` keeps them for every cell; `over` builds them when asked and keeps them until a
+## settlement changes (the distances read the settlements as they stand now, port_near the ports of the data).
+func _facts_of(i: int) -> Dictionary:
+	if not _lazy:
+		return _facts[i]
+	if _facts_lazy.has(i):
+		return _facts_lazy[i]
+	var hex := _cells[i]
+	var facts := Improve.facts_of(map, hex)
+	var near_place := 99
+	var near_town := 99
+	var near_city := 99
+	for s: Vector2i in _settled:
+		var distance := ImproveRules.hex_distance(hex, s)
+		if distance == 0:
+			continue
+		var lv := int(_settled[s])
+		near_place = mini(near_place, distance)
+		if lv >= 3:
+			near_town = mini(near_town, distance)
+		if lv >= 4:
+			near_city = mini(near_city, distance)
+	var port_near := bool(facts["port"])
+	for d: int in 6:
+		var beside := ImproveRules.neighbour(hex, d)
+		if _index.has(beside):
+			var place := Improve.place_of(map, beside)
+			port_near = port_near or (not place.is_empty() and int(place.get("level", 0)) >= 1 and bool(place.get("port", false)))
+	facts["place_distance"] = near_place
+	facts["town_distance"] = near_town
+	facts["city_distance"] = near_city
+	facts["port_near"] = port_near
+	_facts_lazy[i] = facts
+	return facts
 
 
 # ----- the cell rules and the weights -------------------------------------------------------------------------------

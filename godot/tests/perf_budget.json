@@ -4,10 +4,12 @@
   "limits": {
     "frame_worst_ms": {"limit": 16.0, "class": "gpu", "what": "worst frame at any zoom while panning"},
     "frame_mean_ms": {"limit": 8.0, "class": "gpu", "what": "mean frame at any zoom while panning"},
-    "fill_first_ms": {"limit": 100.0, "class": "cpu", "what": "first slice of the fill (the screen at the camera), CPU time"},
-    "fill_all_ms": {"limit": 3000.0, "class": "cpu", "what": "whole map filled, CPU time of the slices"},
+    "fill_first_ms": {"limit": 100.0, "class": "cpu", "what": "fill: CPU time until the screen at the camera (zoom 0.5, about 1,000 hexes) is in"},
+    "fill_all_ms": {"limit": 3000.0, "class": "cpu", "what": "whole map filled, CPU time of the slices (5 ms a frame)"},
+    "fill_frame_worst_ms": {"limit": 16.0, "class": "cpu", "what": "worst frame while the fill runs (slice + what the engine builds + drawing)"},
     "build_action_ms": {"limit": 2.0, "class": "cpu", "what": "one build: MapCells.of_hex and set_tile for the touched hexes, worst of the samples"},
-    "season_swap_ms": {"limit": 100.0, "class": "cpu", "what": "swap to a season that was requested ahead: load_season and set_season, worst"},
+    "season_swap_ms": {"limit": 100.0, "class": "cpu", "what": "swap to a season that was requested ahead: load_season and the swap of the chunks on the screen at zoom 1, worst"},
+    "season_swap_frame_worst_ms": {"limit": 100.0, "class": "cpu", "what": "worst frame of a whole swap (the rest of the map goes 5 ms a frame)"},
     "chunk_rebuild_ms": {"limit": 80.0, "class": "cpu", "what": "EdgeLines.for_chunk and set_chunk_lines for one chunk, worst"},
     "cells_static_mb": {"limit": 400.0, "class": "mem", "what": "static memory of the filled cells"},
     "video_mb_per_season": {"limit": 512.0, "class": "mem", "what": "video memory of one season's TileSet (the standard's budget for the map)"}

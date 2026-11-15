@@ -120,17 +120,30 @@ func _stroke(points: PackedVector2Array, width: float, colour: Color, before: Va
 		return
 	var half := width / 2.0 + SOFT
 	var first := _vertices.size()
+	_vertices.resize(first + 2 * count)
+	_colours.resize(first + 2 * count)
+	_uvs.resize(first + 2 * count)
+	var at := first
 	for i: int in count:
 		var behind: Vector2 = points[i - 1] if i > 0 else (before if before != null else points[0])
 		var ahead: Vector2 = points[i + 1] if i < count - 1 else (after if after != null else points[count - 1])
 		var run := (ahead - behind).normalized()
 		var side := Vector2(-run.y, run.x) * half
-		_vertices.append(points[i] + side)
-		_vertices.append(points[i] - side)
-		_colours.append(colour)
-		_colours.append(colour)
-		_uvs.append(Vector2(0.5, 0.0))
-		_uvs.append(Vector2(0.5, 1.0))
+		_vertices[at] = points[i] + side
+		_vertices[at + 1] = points[i] - side
+		_colours[at] = colour
+		_colours[at + 1] = colour
+		_uvs[at] = Vector2(0.5, 0.0)
+		_uvs[at + 1] = Vector2(0.5, 1.0)
+		at += 2
+	var written := _indices.size()
+	_indices.resize(written + 6 * (count - 1))
 	for i: int in count - 1:
 		var a := first + 2 * i
-		_indices.append_array(PackedInt32Array([a, a + 1, a + 2, a + 1, a + 3, a + 2]))
+		_indices[written] = a
+		_indices[written + 1] = a + 1
+		_indices[written + 2] = a + 2
+		_indices[written + 3] = a + 1
+		_indices[written + 4] = a + 3
+		_indices[written + 5] = a + 2
+		written += 6

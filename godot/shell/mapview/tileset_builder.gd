@@ -24,6 +24,11 @@ const ALL_SETS: Array[String] = ["spring", "summer", "autumn", "winter_snow", "w
 
 ## Tile name -> Vector3i(source in the index, atlas column, atlas row), the same in every set. Shared, read only.
 static var _season_names: Dictionary[String, Vector3i] = {}
+## The TileSet of the marks alone and the index source it holds (see marks_set).
+static var _marks_set: TileSet = null
+static var _marks_source := -1
+## The tile that tells which source holds the marks.
+const MARK_TILE := "mark/grid"
 
 ## The TileSet, or null when the index is missing.
 var tile_set: TileSet = null
@@ -122,12 +127,54 @@ static func load_season(season_name: String) -> TilesetBuilder:
 	return out
 
 
+## A TileSet of the marks source alone (the grid line, the selection ring), the same picture in every season, with the
+## source at the id a season's TileSet gives its slot 0 (CLIMATES * source). The layers that hold only marks use it, so
+## a season swap never rebuilds them (the grid layer has a cell on every hex). Null when the index is missing.
+static func marks_set() -> TileSet:
+	if _marks_set != null:
+		return _marks_set
+	var reader := TilesetBuilder.new()
+	var folder := ROOT + "summer/"
+	var index := _read_index(folder, reader)
+	if index.is_empty():
+		return null
+	var sources: Array = index["sources"]
+	for s: int in sources.size():
+		var source: Dictionary = sources[s]
+		var holds := false
+		var rows: Array = source["tiles"]
+		for row: Variant in rows:
+			var tile: Dictionary = row
+			holds = holds or str(tile["name"]) == MARK_TILE
+		if not holds:
+			continue
+		var texture := _texture(folder + str(source["file"]))
+		if texture == null:
+			return null
+		var tiles := _new_tile_set(index)
+		_add_atlas(tiles, source, texture, CLIMATES * s, s, {})
+		_marks_set = tiles
+		_marks_source = s
+		return tiles
+	return null
+
+
+## The index source that holds the marks (-1 before marks_set found it).
+static func marks_source() -> int:
+	return _marks_source
+
+
 ## Starts loading a season's TileSet and pictures on another thread (the swap then does not wait for the disk:
 ## load_season finds the resource ready). Ask a moment before the swap, e.g. when the season is about to change.
 static func request_season(season_name: String) -> void:
 	var path := tres_path(season_name)
 	if ResourceLoader.exists(path):
 		ResourceLoader.load_threaded_request(path)
+
+
+## Whether a season's TileSet has been loaded (by request_season) and waits to be taken by load_season.
+static func is_loaded(season_name: String) -> bool:
+	return ResourceLoader.load_threaded_get_status(tres_path(season_name)) == ResourceLoader.THREAD_LOAD_LOADED
 
 
 static func tres_path(season_name: String) -> String:

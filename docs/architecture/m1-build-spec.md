@@ -204,7 +204,11 @@ M1 has only these two. `OWNS` of the improvement system lists both.
 
 ## 5. The layer stack (`shell/mapview/tile_map_view.gd`, exists)
 
-All layers share the season's TileSet. z values are fixed so that a tile's own `z` (0 to 7) never reaches the next layer.
+All layers except `grid` and `marks` share the season's TileSet; those two have a TileSet of their own (the marks source, the same
+in every season) and one `TileMapLayer` each, so a season swap never rebuilds them. Every other layer is cut into chunks, one
+`TileMapLayer` per layer and chunk (128 x 64 cells; 64 x 32 on a map bigger than one chunk), made when the first cell lands in
+it; a swap then goes a chunk and a layer at a time (see below). z values are fixed so that a tile's own `z` (0 to 7) never reaches
+the next layer.
 
 | z | Layer | Kind | Cell holds | Filled by (`core/views/map_cells.gd`) |
 |---|---|---|---|---|
@@ -252,8 +256,15 @@ static func touched_by(map: MapData, hex: Vector2i) -> Array[Vector2i]          
 says `hex_changed(hex)`, the map scene calls `of_hex` for `touched_by(hex)` and `set_tile` for what differs: about
 100 `set_cell` calls, and Godot redraws only the quadrants touched.
 
-Filling a whole map is sliced: 4,000 hexes a frame (about 8 ms), nearest the camera first, so a 122,000-hex map
-appears at once where you look and is complete within a second.
+Filling a whole map is sliced by time: 5 ms a frame (`TileMapView.fill_for`), blocks of 16 x 16 hexes nearest the camera first,
+so a 122,000-hex map appears at once where you look and is complete in a few seconds (2.4 s of slices on the fake Europe,
+about 370 frames). `MapCells.fill_hex` writes a hex's names into a packed array (no dictionary) and the view writes the
+cells without comparing (the view is empty when a fill starts).
+
+**Season swap.** Godot rebuilds a `TileMapLayer` when its TileSet changes (about 1 ms for 1,000 cells; 600 ms for the whole fake
+Europe at once). `begin_season_swap(tiles, focus)` queues the chunks, those that hold a hex of `focus` (the screen) first, and
+`swap_step(ms)` gives the new TileSet to one layer of one chunk at a time and rebuilds it inside the slice; the map scene takes
+5 ms a frame and asks for a season that is not loaded yet on another thread first. `set_season` does it all at once.
 
 ---
 
@@ -362,9 +373,10 @@ action to the next frame; a season swap; static memory and video memory.
 | Budget | Limit | First reading in the trial (made-up map, trial tileset, 1920 x 1080; `docs/design/map/m1_trial/notes.md`) |
 |---|---|---|
 | Frame, every zoom, panning | 16 ms worst, 8 ms mean | zoom 2: 2.3 ms (worst 3.7); zoom 1: 2.6 (3.8); 0.5: 3.3 (5.1); 0.25: 4.7 (6.3); 0.12: 8.6 (11.7) |
-| Fill of the whole map | first screen in 100 ms, all in 3 s | 2.7 s in one go for 474,550 cells (not sliced yet) |
-| One build action to the screen | 2 ms | not measured yet |
-| Season swap | 100 ms | not measured yet |
+| Fill of the whole map | first screen (zoom 0.5) in 100 ms; all slices in 3 s; no frame over 16 ms while filling | 2.7 s in one go for 474,550 cells (not sliced yet). Now: 18 ms, 2.4 s, 14.5 ms (was 92 ms, 3.2 s, slices up to 134 ms) |
+| One build action to the screen | 2 ms | 0.4 ms CPU (mean) |
+| Season swap | the screen at zoom 1 in 100 ms; no frame over 100 ms | Now: 28 ms for the screen, worst frame 34 ms, the rest of the map over 40 frames (was 12 ms of CPU and a 625 ms first frame: the rebuild was deferred to the frame) |
+| Lines of one chunk, rebuilt | 80 ms | mean 8 ms, worst 19-27 ms (was mean 23, worst 58) |
 | Memory of the cells | 400 MB | 269 MB (about 570 bytes a cell: the standard's "a few bytes" was wrong) |
 
 Never assert on time in GUT. `perf_map.gd` runs nightly and before a release and fails past the limit (as

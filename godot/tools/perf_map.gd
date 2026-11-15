@@ -20,6 +20,7 @@ const SETTLE := 20
 const SWAPS: Array[String] = ["winter", "autumn", "spring", "summer"]
 const BUILDS := 24
 const MB := 1048576.0
+const FILL_MS := 5.0  # what the map scene's loading takes of a frame (a little less than its SLICE_MS)
 
 var _cols := 494
 var _rows := 247
@@ -110,31 +111,43 @@ func _video_mb() -> float:
 	return Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / MB
 
 
-## The sliced fill, a slice a frame, nearest the middle first; the CPU time is the time inside the slices.
+## The sliced fill as the map scene does it: FILL_MS of fill_for a frame, nearest the middle first. The CPU time is the
+## time inside the slices; `fill_first_ms` is the time until the screen at zoom 0.5 (about 1,000 hexes) is in; the frame
+## times while filling are the time from one frame to the next (the slice, what the engine builds after it, the drawing).
 func _fill() -> void:
 	var static_before := Performance.get_monitor(Performance.MEMORY_STATIC)
 	var map := _map
 	var state := _state
-	var provider := func(hex: Vector2i) -> Dictionary: return MapCells.of_hex(map, state, hex)
+	var provider := func(hex: Vector2i, names: PackedStringArray) -> void: MapCells.fill_hex(map, state, hex, names)
 	var wall := Time.get_ticks_usec()
-	_view.begin_fill(_cols, _rows, provider, Vector2i(_cols >> 1, _rows >> 1))
+	_view.begin_fill(_cols, _rows, provider, Vector2i(_cols >> 1, _rows >> 1), MapCells.LAYERS)
 	_view.set_process(false)  # the slices are taken by hand here, so each is timed
+	_camera.position = Vector2(float(_cols) * MapTiles.CELL.x, float(_rows) * MapTiles.ROW) * 0.5
+	_camera.zoom = Vector2(0.5, 0.5)
+	var screen := 1000.0 / float(_cols * _rows)
 	var cpu := 0.0
 	var slices := 0
-	var first := 0.0
+	var first := -1.0
 	var worst := 0.0
+	var frame_worst := 0.0
+	var last := Time.get_ticks_usec()
 	while _view.is_filling():
 		var s := Time.get_ticks_usec()
-		_view.fill_step(TileMapView.FILL_PER_FRAME)
+		_view.fill_for(FILL_MS)
 		var one := _ms_since(s)
-		if slices == 0:
-			first = one
 		worst = maxf(worst, one)
 		cpu += one
 		slices += 1
+		if first < 0.0 and _view.fill_progress() >= screen:
+			first = cpu
 		await process_frame
-	_r["fill_first_ms"] = first
+		var now := Time.get_ticks_usec()
+		if slices > 1:
+			frame_worst = maxf(frame_worst, float(now - last) / 1000.0)
+		last = now
+	_r["fill_first_ms"] = maxf(first, 0.0)
 	_r["fill_slice_worst_ms"] = worst
+	_r["fill_frame_worst_ms"] = frame_worst
 	_r["fill_all_ms"] = cpu
 	_r["fill_wall_ms"] = _ms_since(wall)
 	_r["fill_slices"] = slices
@@ -260,12 +273,20 @@ func _builds() -> void:
 	_r["build_to_frame_ms"] = frame_worst
 
 
-## Swaps through the seasons: each requested ahead (the load is done before the swap, as the game does it), then the
-## swap back to summer cold. The video memory is read once the old season's pictures are freed.
+## Swaps through the seasons, each requested ahead (the load is done before the swap, as the game does it), then the
+## swap back to summer cold. As the scene does it: the screen at zoom 1 first (`cpu_ms`, the time until its chunks have
+## the new TileSet), then the rest FILL_MS a frame; `to_frame_ms` is the first frame after the first step and
+## `frame_worst_ms` the worst frame of the whole swap. The video memory is read once the old season's pictures are freed.
 func _season_swaps(video_before: float) -> void:
 	var swaps: Array = []
 	var writes := _view.cell_writes
 	var worst := 0.0
+	var frame_worst_all := 0.0
+	_camera.zoom = Vector2.ONE
+	_camera.position = Vector2(float(_cols) * MapTiles.CELL.x, float(_rows) * MapTiles.ROW) * 0.5
+	var middle := _view.hex_at(_camera.position)
+	var half := Vector2i(int(float(FRAME.x) / MapTiles.CELL.x / 2.0) + 1, int(float(FRAME.y) / MapTiles.ROW / 2.0) + 1)
+	var focus := Rect2i(middle - half, half * 2 + Vector2i.ONE)
 	for season: String in SWAPS:
 		var ahead := season != "summer"  # the last one (summer again) is cold: nobody asked for it
 		if ahead:
@@ -275,19 +296,39 @@ func _season_swaps(video_before: float) -> void:
 				await process_frame
 		var t := Time.get_ticks_usec()
 		var next := TilesetBuilder.load_season(season)
-		_view.set_season(next)
+		var load_ms := _ms_since(t)
+		var started := Time.get_ticks_usec()
+		_view.begin_season_swap(next, focus)
 		_tiles = next
-		var cpu := _ms_since(t)
+		while not _view.swap_focus_done() and _view.swap_step(FILL_MS):
+			pass
+		var cpu := _ms_since(started)
 		await process_frame
-		var to_frame := _ms_since(t)
+		var to_frame := _ms_since(started)
+		var frame_worst := to_frame
+		var last := Time.get_ticks_usec()
+		var rest_cpu := 0.0
+		var frames := 0
+		while _view.is_swapping():
+			var r := Time.get_ticks_usec()
+			_view.swap_step(FILL_MS)
+			rest_cpu += _ms_since(r)
+			await process_frame
+			var now := Time.get_ticks_usec()
+			frame_worst = maxf(frame_worst, float(now - last) / 1000.0)
+			last = now
+			frames += 1
 		await process_frame
 		await process_frame
-		swaps.append({"season": season, "ahead": ahead, "cpu_ms": cpu, "to_frame_ms": to_frame,
+		frame_worst_all = maxf(frame_worst_all, frame_worst)
+		swaps.append({"season": season, "ahead": ahead, "cpu_ms": cpu, "load_ms": load_ms, "to_frame_ms": to_frame,
+			"rest_ms": rest_cpu, "rest_frames": frames, "frame_worst_ms": frame_worst,
 			"video_mb": _video_mb() - video_before})
 		if ahead:
-			worst = maxf(worst, cpu)
+			worst = maxf(worst, cpu + load_ms)
 	_r["swaps"] = swaps
 	_r["season_swap_ms"] = worst
+	_r["season_swap_frame_worst_ms"] = frame_worst_all
 	_r["season_swap_cell_writes"] = _view.cell_writes - writes
 	var most := float(_r["video_mb_summer"])
 	for row: Dictionary in swaps:
@@ -353,8 +394,8 @@ func _markdown(limit_rows: String) -> String:
 			row["mean_ms"], row["worst_ms"], row["draw_calls"], row["objects"]]
 	s += "\n| Fill | value |\n|---|---|\n"
 	s += "| map built (FakeMap) | %.0f ms |\n" % _r["map_build_ms"]
-	s += "| first slice | %.1f ms |\n| all slices (CPU) | %.0f ms in %d slices, worst slice %.1f ms |\n" % [
-		_r["fill_first_ms"], _r["fill_all_ms"], _r["fill_slices"], _r["fill_slice_worst_ms"]]
+	s += "| first screen (zoom 0.5) | %.1f ms |\n| all slices (CPU) | %.0f ms in %d slices, worst slice %.1f ms, worst frame while filling %.1f ms |\n" % [
+		_r["fill_first_ms"], _r["fill_all_ms"], _r["fill_slices"], _r["fill_slice_worst_ms"], _r["fill_frame_worst_ms"]]
 	s += "| all, wall clock | %.0f ms |\n| cells set | %d (missing tile names: %d %s) |\n" % [
 		_r["fill_wall_ms"], _r["cells"], _r["missing_tiles"], _r["missing_names"]]
 	s += "| chunk lines, all %d chunks | %.0f ms (rebuild of one: mean %.2f, worst %.2f ms) |\n" % [
@@ -362,10 +403,10 @@ func _markdown(limit_rows: String) -> String:
 	s += "| far picture built | %.1f ms |\n" % _r["far_build_ms"]
 	s += "| one build action | CPU mean %.2f, worst %.2f ms; to the next frame worst %.1f ms (%d samples) |\n" % [
 		_r["build_action_mean_ms"], _r["build_action_ms"], _r["build_to_frame_ms"], _r["build_samples"]]
-	s += "\n| Season swap | CPU ms | to next frame ms | video MB (all, since start) |\n|---|---|---|---|\n"
+	s += "\n| Season swap | screen CPU ms | load ms | to next frame ms | rest ms in frames | worst frame ms | video MB (all, since start) |\n|---|---|---|---|---|---|---|\n"
 	for row: Dictionary in _r["swaps"]:
-		s += "| %s (%s) | %.1f | %.1f | %.0f |\n" % [row["season"], "requested ahead" if row["ahead"] else "cold",
-			row["cpu_ms"], row["to_frame_ms"], row["video_mb"]]
+		s += "| %s (%s) | %.1f | %.1f | %.1f | %.0f in %d | %.1f | %.0f |\n" % [row["season"], "requested ahead" if row["ahead"] else "cold",
+			row["cpu_ms"], row["load_ms"], row["to_frame_ms"], row["rest_ms"], row["rest_frames"], row["frame_worst_ms"], row["video_mb"]]
 	s += "\nCell writes during the swaps: %d. Static memory: cells %.0f MB, whole process %.0f MB. Video memory of the first season (summer): %.0f MB.\n" % [
 		_r["season_swap_cell_writes"], _r["cells_static_mb"], _r["static_mb_total"], _r["video_mb_summer"]]
 	s += "\n| Limit | measured | limit | class | verdict |\n|---|---|---|---|---|\n" + limit_rows

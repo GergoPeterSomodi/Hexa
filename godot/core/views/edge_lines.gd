@@ -14,6 +14,21 @@ const ROAD_SWING := 2.2  # px a road wanders either side of its straight run
 const RIVER_STEP := 4.4  # px between a river's points after smoothing
 const MEANDER := 2.4  # px a river swings either side of its edge
 const CHUNK := 32  # cells a side of one chunk of lines (one mesh each)
+## px: a point this far inside or outside the box of a chunk's hex middles needs no look at which hex it is on (the
+## nearest middle of any point is under 56 px away: the middles are 104 px apart in a row and the rows 76.5 px apart).
+const SURE := 60.0
+## px: the most a road's line moves from one point to the next (a point every 3 px, and a swing of 2.2 px either way).
+const ROAD_MAX_STEP := 8.0
+
+## The rivers of the last map asked about: their corners in map px, the box of each, and the line each makes (a river is
+## built once, not once for every chunk it comes near). Kept for one map (a weak reference), whatever it is.
+static var _rivers_of: WeakRef = null
+static var _river_points: Array[PackedVector2Array] = []
+static var _river_box: Array[Rect2] = []
+static var _river_lines: Dictionary[int, Dictionary] = {}
+static var _river_steps: Dictionary[int, float] = {}  # the longest step from one point of a river's line to the next
+## The longest steps of the lines the last `_rivers_near` returned, in the same order (0: a line to scan whole).
+static var _near_steps := PackedFloat32Array()
 
 
 ## The chunk (32 x 32 cells) a hex belongs to.
@@ -26,11 +41,14 @@ static func hex_of_point(px: Vector2) -> Vector2i:
 	var row0 := roundi((px.y - float(MapTiles.CELL.y) / 2.0) / MapTiles.ROW)
 	var best := Vector2i.ZERO
 	var best_d := INF
+	var half_row := float(MapTiles.CELL.y) / 2.0
 	for row: int in range(row0 - 1, row0 + 2):
 		var shift := 0.5 * float(row & 1)
 		var col0 := floori(px.x / MapTiles.CELL.x - 0.5 - shift)
 		for col: int in range(col0, col0 + 2):
-			var d := px.distance_squared_to(MapTiles.cell_centre(Vector2i(col, row)))
+			# (MapTiles.cell_centre of the hex, written out)
+			var middle := Vector2(float(MapTiles.CELL.x) * (float(col) + 0.5 + shift), half_row + MapTiles.ROW * float(row))
+			var d := px.distance_squared_to(middle)
 			if d < best_d:
 				best_d = d
 				best = Vector2i(col, row)
@@ -220,18 +238,20 @@ static func for_chunk(map: MapData, _state: MapState, chunk: Vector2i) -> Array[
 	var high := (chunk + Vector2i.ONE) * CHUNK
 	var lines: Array[Dictionary] = []
 	lines.append_array(_rivers_near(map, chunk))
+	var steps := _near_steps.duplicate()
 	lines.append_array(_streams_between(map, low, high))
+	steps.resize(lines.size())  # a stream is short: scanned whole
 	for run: Dictionary in _road_runs_between(map, low, high):
 		var chain: Array[Vector2i] = []
 		chain.assign(run["chain"])
 		lines.append(road_line(chain, int(run["quality"]), MapTiles.cell_centre))
-	var pieces: Array[Dictionary] = []
-	pieces.assign(cut(lines).get(chunk, []))
-	return pieces
+		steps.append(ROAD_MAX_STEP)
+	return pieces_in(lines, chunk, steps)
 
 
 ## The chunks to rebuild when a road is laid or taken up on an edge of `hex`: every chunk the road run through the hex
-## has a hex in, each with its eight neighbours (a piece of a line can lie in a chunk its hexes are not in).
+## has a hex in, each with its eight neighbours (a piece of a line can lie in a chunk its hexes are not in, and a run
+## that ends at a junction leaves a piece beside the junction in the next chunk over).
 static func chunks_of_run(map: MapData, hex: Vector2i) -> Array[Vector2i]:
 	var seen: Dictionary[Vector2i, bool] = {chunk_of(hex): true}
 	for d: int in 6:
@@ -251,31 +271,124 @@ static func chunks_of_run(map: MapData, hex: Vector2i) -> Array[Vector2i]:
 	return out
 
 
+## The pieces of `lines` that `cut` would give one chunk, found without cutting the lines for every other chunk: a
+## line far from the chunk is passed over at once and a point far from its border is placed by a box test, so the cost
+## is what lies near the chunk.
+static func pieces_in(lines: Array[Dictionary], chunk: Vector2i, steps: PackedFloat32Array = PackedFloat32Array()) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var low := Vector2(float(MapTiles.CELL.x) * (float(chunk.x * CHUNK) + 0.5), float(MapTiles.CELL.y) / 2.0 + MapTiles.ROW * float(chunk.y * CHUNK))
+	var high := Vector2(float(MapTiles.CELL.x) * float(chunk.x * CHUNK + CHUNK), float(MapTiles.CELL.y) / 2.0 + MapTiles.ROW * float((chunk.y + 1) * CHUNK - 1))
+	var near_low := low - Vector2(SURE, SURE)
+	var near_high := high + Vector2(SURE, SURE)
+	var deep_low := low + Vector2(SURE, SURE)
+	var deep_high := high - Vector2(SURE, SURE)
+	for n: int in lines.size():
+		var line := lines[n]
+		var points: PackedVector2Array = line["points"]
+		var count := points.size()
+		if count < 2:
+			continue
+		# `step` is the most the line moves from one point to the next (0: not known, look at every point): a point
+		# that is g px from the box of the chunk, or from the inside of it, has the next g / step points on the same side.
+		var step := steps[n] if n < steps.size() else 0.0
+		var in_run := false
+		var first := 0
+		var k := 0
+		while k < count:
+			var p := points[k]
+			if p.x < near_low.x or p.x > near_high.x or p.y < near_low.y or p.y > near_high.y:
+				if in_run:
+					_emit_piece_in(out, line, first, mini(k, count - 1))  # on to the first point of the next chunk
+					in_run = false
+				if step > 0.0:
+					var gap := maxf(maxf(near_low.x - p.x, p.x - near_high.x), maxf(near_low.y - p.y, p.y - near_high.y))
+					k += floori(gap / step)
+				k += 1
+				continue
+			var deep := p.x >= deep_low.x and p.x <= deep_high.x and p.y >= deep_low.y and p.y <= deep_high.y
+			if deep or chunk_of_point(p) == chunk:
+				if not in_run:
+					in_run = true
+					first = k
+				if deep and step > 0.0:
+					var room := minf(minf(p.x - deep_low.x, deep_high.x - p.x), minf(p.y - deep_low.y, deep_high.y - p.y))
+					k += floori(room / step)
+			elif in_run:
+				_emit_piece_in(out, line, first, mini(k, count - 1))
+				in_run = false
+			k += 1
+		if in_run:
+			_emit_piece_in(out, line, first, count - 1)
+	return out
+
+
+static func _emit_piece_in(out: Array[Dictionary], line: Dictionary, first: int, last: int) -> void:
+	var points: PackedVector2Array = line["points"]
+	var piece := line.duplicate()
+	piece["points"] = points.slice(first, last + 1)
+	if first > 0:
+		piece["before"] = points[first - 1]
+	if last < points.size() - 1:
+		piece["after"] = points[last + 1]
+	out.append(piece)
+
+
 ## Rivers whose course comes near the chunk, as `river` lines (phase = the river's index, class from the list).
 static func _rivers_near(map: MapData, chunk: Vector2i) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	var scale := Vector2(float(MapTiles.CELL.x) / map.hex_w_km, MapTiles.ROW / map.grid().hex_h_km)
+	_know_rivers(map)
 	var low := MapTiles.cell_centre(chunk * CHUNK) - Vector2(MapTiles.CELL) * 2.0
 	var high := MapTiles.cell_centre((chunk + Vector2i.ONE) * CHUNK) + Vector2(MapTiles.CELL) * 2.0
-	for n: int in map.rivers.size():
-		var corners: PackedVector2Array = map.rivers[n]["corners"]
-		var pts := PackedVector2Array()
+	_near_steps = PackedFloat32Array()
+	for n: int in _river_points.size():
+		var box := _river_box[n]
+		if box.position.x > high.x or box.end.x < low.x or box.position.y > high.y or box.end.y < low.y:
+			continue
 		var near := false
-		for p: Vector2 in corners:
-			var q := p * scale
-			pts.append(q)
-			near = near or (q.x >= low.x and q.x <= high.x and q.y >= low.y and q.y <= high.y)
+		for q: Vector2 in _river_points[n]:
+			if q.x >= low.x and q.x <= high.x and q.y >= low.y and q.y <= high.y:
+				near = true
+				break
 		if near:
-			out.append(river(pts, int(map.rivers[n]["class"]), float(n) * 1.7))
+			if not _river_lines.has(n):
+				var line := river(_river_points[n], int(map.rivers[n]["class"]), float(n) * 1.7)
+				_river_lines[n] = line
+				var pts: PackedVector2Array = line["points"]
+				var longest := 0.0
+				for k: int in range(1, pts.size()):
+					longest = maxf(longest, pts[k].distance_to(pts[k - 1]))
+				_river_steps[n] = longest + 0.01
+			out.append(_river_lines[n])
+			_near_steps.append(float(_river_steps[n]))
 	return out
+
+
+## Scales the corners of the map's rivers to map px, once for each map.
+static func _know_rivers(map: MapData) -> void:
+	if _rivers_of != null and _rivers_of.get_ref() == map and _river_points.size() == map.rivers.size():
+		return
+	_rivers_of = weakref(map)
+	_river_points.clear()
+	_river_box.clear()
+	_river_lines.clear()
+	_river_steps.clear()
+	var scale := Vector2(float(MapTiles.CELL.x) / map.hex_w_km, MapTiles.ROW / map.grid().hex_h_km)
+	for entry: Dictionary in map.rivers:
+		var corners: PackedVector2Array = entry["corners"]
+		var pts := PackedVector2Array()
+		var box := Rect2()
+		for k: int in corners.size():
+			var q := corners[k] * scale
+			pts.append(q)
+			box = Rect2(q, Vector2.ZERO) if k == 0 else box.expand(q)
+		_river_points.append(pts)
+		_river_box.append(box)
 
 
 ## Streams (river class 4) on the edges that the hexes low..high (inclusive) own, in edge-index order.
 static func _streams_between(map: MapData, low: Vector2i, high: Vector2i) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	for e: int in _owned_edges_between(map, low, high):
-		if map.river[e] != 4:
-			continue
+	for e: int in _owned_edges_where(map, low, high, map.river, 4):
 		var ends := _ends_of(map, e)
 		var mid := (MapTiles.cell_centre(ends[0]) + MapTiles.cell_centre(ends[1])) / 2.0
 		var across := MapTiles.cell_centre(ends[1]) - MapTiles.cell_centre(ends[0])
@@ -291,9 +404,23 @@ static func _owned_edges_between(map: MapData, low: Vector2i, high: Vector2i) ->
 	var out: Array[int] = []
 	for row: int in range(maxi(low.y, 0), mini(high.y, map.rows - 1) + 1):
 		for col: int in range(maxi(low.x, 0), mini(high.x, map.cols - 1) + 1):
-			var base := MapData.OWNED_EDGES * map.index_of(Vector2i(col, row))
+			var base := MapData.OWNED_EDGES * (row * map.cols + col)
 			for k: int in MapData.OWNED_EDGES:
 				out.append(base + k)
+	return out
+
+
+## The same edges, only those whose value in `values` is `want` (or, with want 0, anything but 0).
+static func _owned_edges_where(map: MapData, low: Vector2i, high: Vector2i, values: PackedByteArray, want: int) -> Array[int]:
+	var out: Array[int] = []
+	var first_col := maxi(low.x, 0)
+	var last_col := mini(high.x, map.cols - 1)
+	for row: int in range(maxi(low.y, 0), mini(high.y, map.rows - 1) + 1):
+		var base := MapData.OWNED_EDGES * (row * map.cols + first_col)
+		for e: int in range(base, base + MapData.OWNED_EDGES * (last_col - first_col + 1)):
+			var value := values[e]
+			if (value == want) if want != 0 else (value != 0):
+				out.append(e)
 	return out
 
 
@@ -302,8 +429,8 @@ static func _owned_edges_between(map: MapData, low: Vector2i, high: Vector2i) ->
 static func _road_runs_between(map: MapData, low: Vector2i, high: Vector2i) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var seen: Dictionary[int, bool] = {}
-	for e: int in _owned_edges_between(map, low, high):
-		if map.road[e] == 0 or seen.has(e):
+	for e: int in _owned_edges_where(map, low, high, map.road, 0):
+		if seen.has(e):
 			continue
 		var run := _road_run(map, e)
 		var members: Array = run["edges"]
