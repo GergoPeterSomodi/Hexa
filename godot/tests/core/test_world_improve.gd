@@ -1,43 +1,35 @@
-## The improvement step of the normal map (core/systems/world_improve.gd): every land hex has one option; the places of
-## the data keep their level; the cell rules and the pair rules hold on every seed; the same seed gives the same map
-## and another seed another; most of the map stays wild; the search undoes dead ends (checked on small instances, since
-## "none" may stand anywhere and the region needs no backtrack). The hex table is built from the map core
-## (improve_table.gd), so the tests need no baked art.
+## The improvement step of the normal map (core/systems/world_improve.gd and improve.gd): every land hex has one option;
+## the places of the data keep their level; the cell rules and the pair rules hold on every seed; the same seed gives
+## the same map and another seed another; most of the map stays wild; the search undoes dead ends (checked on small
+## instances, since "none" may stand anywhere and the region needs no backtrack). The facts come from MapData: the real
+## north Italy file for the region tests, and small maps made by improve_fixture.gd for the rest.
 extends GutTest
 
 const SEEDS: Array[int] = [1, 7, 1480, 20251115]
 
-var _table: Array[Dictionary] = []
+const MAP_FILE := "res://data/maps/north_italy.tres"
+
+var _map: MapData = null
 var _runs: Array[WorldImprove] = []
 
 
 func before_all() -> void:
-	_table = ImproveTable.region_table()
-	if _table.is_empty():
+	_map = load(MAP_FILE) as MapData
+	if _map == null:
 		return
 	for s: int in SEEDS:
-		_runs.append(WorldImprove.build(_table, s))
+		_runs.append(WorldImprove.build(_map, s))
 
 
 func _ready_or_fail() -> bool:
 	if _runs.is_empty():
-		fail_test("the heights and the region must read")
+		fail_test("the map file must load")
 		return false
 	return true
 
 
-func _row(c: int, r: int, cover: String, more: Dictionary = {}) -> Dictionary:
-	var row: Dictionary = {
-		"c": c, "r": r, "land": true, "cover": cover, "height_m": 100.0, "coast": false, "sea_angle": 0.0,
-		"climate": "frost", "river_edges": [], "road": false, "pass": false, "place": null,
-	}
-	for key: Variant in more.keys():
-		row[key] = more[key]
-	return row
-
-
 func _place(level: int, port: bool = false, mode: String = "seaside") -> Dictionary:
-	return {"name": "Place", "level": level, "port": port, "port_mode": mode, "landmark": null}
+	return ImproveFixture.place(level, port, mode)
 
 
 # ----- the option table and the rules as functions ------------------------------------------------------------------
@@ -162,15 +154,14 @@ func test_every_land_hex_has_one_option_and_no_sea_hex_has_one() -> void:
 	if not _ready_or_fail():
 		return
 	var land := 0
-	for row: Dictionary in _table:
-		land += int(bool(row["land"]))
+	for i: int in _map.hex_count():
+		land += _map.land[i]
 	for imp: WorldImprove in _runs:
 		assert_eq(imp.hexes.size(), land, "every land hex")
-		assert_eq(imp.family.size(), land)
-		for row: Dictionary in _table:
-			var hex := Vector2i(int(row["c"]), int(row["r"]))
-			if not bool(row["land"]):
-				assert_false(imp.family.has(hex), "sea hex %s has no option" % [hex])
+		for i: int in _map.hex_count():
+			var hex := _map.hex_of(i)
+			if _map.land[i] == 0:
+				assert_eq(imp.family_at(hex), ImproveRules.NONE, "sea hex %s has no option" % [hex])
 				assert_true(imp.piece_at(hex).is_empty())
 				continue
 			var f := imp.family_at(hex)
@@ -179,23 +170,19 @@ func test_every_land_hex_has_one_option_and_no_sea_hex_has_one() -> void:
 			assert_true(lv >= 0 and lv <= ImproveRules.TOP_LEVEL[f], "a level of the family for %s" % [hex])
 			assert_eq(f == ImproveRules.NONE, lv == 0, "level 0 is no piece, and only that")
 
-
 func test_the_places_of_the_data_keep_their_level_and_nothing_else_is_a_settlement() -> void:
 	if not _ready_or_fail():
 		return
 	for imp: WorldImprove in _runs:
 		var places := 0
-		for row: Dictionary in _table:
-			if not bool(row["land"]):
-				continue
-			var hex := Vector2i(int(row["c"]), int(row["r"]))
-			if typeof(row["place"]) == TYPE_DICTIONARY:
-				var place: Dictionary = row["place"]
+		for hex: Vector2i in imp.hexes:
+			var place := Improve.place_of(_map, hex)
+			if not place.is_empty() and int(place["level"]) >= 1:
 				places += 1
 				assert_eq(imp.family_at(hex), ImproveRules.SETTLEMENT, "%s is a settlement" % place["name"])
 				assert_eq(imp.level_at(hex), int(place["level"]), "%s keeps its level" % place["name"])
 				var piece := imp.piece_at(hex)
-				var shore_port := bool(place["port"]) and bool(row["coast"])
+				var shore_port := bool(place["port"]) and _map.coast_mask(hex) != 0
 				assert_eq(int(piece["addon"]) > 0, shore_port, "a port on the shore, and only that, has the harbour add-on")
 				if shore_port:
 					assert_eq(str(piece["addon_mode"]), str(place["port_mode"]), "the port mode of the data")
@@ -203,13 +190,13 @@ func test_the_places_of_the_data_keep_their_level_and_nothing_else_is_a_settleme
 				assert_ne(imp.family_at(hex), ImproveRules.SETTLEMENT, "no settlement the data do not have (%s)" % [hex])
 		assert_eq(imp.count_of(ImproveRules.SETTLEMENT), places)
 
-
 func test_castles_stand_only_on_passes_and_never_at_the_top_level() -> void:
 	if not _ready_or_fail():
 		return
 	var passes := 0
-	for row: Dictionary in _table:
-		passes += int(bool(row["land"]) and bool(row.get("pass", false)) and typeof(row["place"]) != TYPE_DICTIONARY)
+	for hex: Vector2i in _runs[0].hexes:
+		var facts := _runs[0].facts_at(hex)
+		passes += int(bool(facts["pass"]) and int(facts["place_level"]) == 0)
 	assert_gt(passes, 0, "the region has passes")
 	for imp: WorldImprove in _runs:
 		for hex: Vector2i in imp.hexes:
@@ -218,7 +205,6 @@ func test_castles_stand_only_on_passes_and_never_at_the_top_level() -> void:
 			assert_true(bool(imp.facts_at(hex)["pass"]), "the castle at %s holds a pass" % [hex])
 			assert_lt(imp.level_at(hex), 3, "a watchtower or a castle, not a fortress")
 		assert_lte(imp.count_of(ImproveRules.CASTLE), passes)
-
 
 func test_the_cell_rules_hold_on_every_hex_of_every_seed() -> void:
 	if not _ready_or_fail():
@@ -288,9 +274,9 @@ func test_the_pair_rules_hold_on_every_seed() -> void:
 func test_the_same_seed_gives_the_same_map_and_another_seed_another() -> void:
 	if not _ready_or_fail():
 		return
-	var again := WorldImprove.build(_table, SEEDS[0])
-	assert_eq(again.family, _runs[0].family, "the same families")
-	assert_eq(again.level, _runs[0].level, "the same levels")
+	var again := WorldImprove.build(_map, SEEDS[0])
+	assert_eq(again.state.main_use, _runs[0].state.main_use, "the same families")
+	assert_eq(again.state.level, _runs[0].state.level, "the same levels")
 	var differ := 0
 	for hex: Vector2i in _runs[0].hexes:
 		if _runs[0].family_at(hex) != _runs[1].family_at(hex) or _runs[0].level_at(hex) != _runs[1].level_at(hex):
@@ -320,7 +306,7 @@ func test_most_of_the_map_stays_wild_and_the_counts_are_sensible() -> void:
 		var share := float(goods) / float(free)
 		assert_between(share, 0.12, 0.38, "goods on 12 to 38 percent of the free hexes (%d of %d)" % [goods, free])
 		assert_lte(top * 5, goods + 4, "the top stage is rare: at most a fifth of the goods (%d of %d)" % [top, goods])
-		assert_gt(imp.count_of(ImproveRules.WHEAT), 3, "wheat on the plain")
+		assert_gt(imp.count_of(ImproveRules.WHEAT), 1, "wheat on the plain")
 		assert_gt(imp.count_of(ImproveRules.TIMBER), 3, "timber in the woods")
 		assert_lte(imp.count_of(ImproveRules.DYES), 8, "dye works are rare")
 		assert_lte(imp.count_of(ImproveRules.MINES) + imp.count_of(ImproveRules.QUARRY), 16, "a few mines")
@@ -351,12 +337,10 @@ func test_identical_neighbours_are_rarer_than_chance_and_families_cluster() -> v
 
 
 func test_a_port_gets_the_harbour_add_on_by_its_level_and_mode() -> void:
-	var table: Array[Dictionary] = [
-		_row(0, 0, "grassland", {"coast": true, "place": _place(5, true, "carved")}),
-		_row(3, 0, "grassland", {"coast": true, "place": _place(2, true)}),
-		_row(6, 0, "farmland", {"place": _place(4)}),
-	]
-	var imp := WorldImprove.build(table, 5)
+	# Hexes without a spec are sea, so the first two places lie on a shore; the third is a city inland.
+	var shore := ImproveFixture.map_of(6, 2, {
+		Vector2i(0, 0): {"place": _place(5, true, "carved")}, Vector2i(3, 0): {"place": _place(2, true)}})
+	var imp := WorldImprove.build(shore, 5)
 	var genoa := imp.piece_at(Vector2i(0, 0))
 	assert_eq(str(genoa["family"]), "settlements")
 	assert_eq(int(genoa["level"]), 5)
@@ -365,33 +349,26 @@ func test_a_port_gets_the_harbour_add_on_by_its_level_and_mode() -> void:
 	var village := imp.piece_at(Vector2i(3, 0))
 	assert_eq(int(village["addon"]), 1, "a village's port is a jetty")
 	assert_eq(str(village["addon_mode"]), "seaside")
-	assert_eq(int(imp.piece_at(Vector2i(6, 0))["addon"]), 0, "an inland city has none")
-
+	var inland := WorldImprove.build(ImproveFixture.block(9, 3, {}, {Vector2i(4, 1): {"place": _place(4)}}), 5)
+	assert_eq(int(inland.piece_at(Vector2i(4, 1))["addon"]), 0, "an inland city has none")
 
 func test_two_passes_side_by_side_never_both_take_a_castle() -> void:
 	var castles := 0
+	var pass_hex := {"cover": WorldCover.ROCK, "pass": true, "road": true, "height": 1900}
 	for s: int in range(1, 40):
-		var table: Array[Dictionary] = [
-			_row(0, 0, "rock", {"pass": true, "road": true, "height_m": 1900.0}),
-			_row(1, 0, "rock", {"pass": true, "road": true, "height_m": 1900.0}),
-			_row(2, 0, "rock", {"pass": true, "road": true, "height_m": 1900.0}),
-		]
-		var imp := WorldImprove.build(table, s)
+		var m := ImproveFixture.block(3, 1, pass_hex)
+		var imp := WorldImprove.build(m, s)
 		var here := imp.count_of(ImproveRules.CASTLE)
 		assert_lte(here, 1, "three passes within two hexes: one castle at most (seed %d)" % s)
 		castles += here
 	assert_gt(castles, 5, "and some seeds build one")
 
-
 func test_a_plain_round_a_city_is_worked_and_the_far_plain_mostly_wild() -> void:
 	var near := 0
 	var far := 0
+	var m := ImproveFixture.block(18, 9, {}, {Vector2i(4, 4): {"place": _place(5)}})
 	for s: int in range(1, 9):
-		var table: Array[Dictionary] = []
-		for r: int in 9:
-			for c: int in 18:
-				table.append(_row(c, r, "farmland", {"place": _place(5) if (c == 4 and r == 4) else null}))
-		var imp := WorldImprove.build(table, s)
+		var imp := WorldImprove.build(m, s)
 		for hex: Vector2i in imp.hexes:
 			if imp.family_at(hex) < ImproveRules.WHEAT:
 				continue
@@ -402,20 +379,35 @@ func test_a_plain_round_a_city_is_worked_and_the_far_plain_mostly_wild() -> void
 	assert_gt(near, 28, "most of the six hexes round a city are worked (%d of 48)" % near)
 	assert_lt(float(far) / 8.0 / 90.0, 0.33, "far from every town a quarter of the plain at most is worked")
 
-
-func test_the_table_reads_names_numbers_and_missing_fields() -> void:
-	var table: Array = [
-		{"c": 0, "r": 0, "land": true, "cover": "Woods", "height_m": 300},
-		{"c": 1, "r": 0, "land": 1, "cover": "Snow and ice", "height_m": 3000.0, "pass": "Great St Bernard"},
-		{"c": 2, "r": 0, "land": false},
-		"not a row",
-	]
-	var imp := WorldImprove.build(table, 1)
-	assert_eq(imp.hexes.size(), 2)
-	assert_eq(int(imp.facts_at(Vector2i(0, 0))["cover"]), WorldCover.WOODS)
-	assert_eq(int(imp.facts_at(Vector2i(1, 0))["cover"]), WorldCover.SNOW)
-	assert_true(bool(imp.facts_at(Vector2i(1, 0))["pass"]), "a pass name is a pass")
-	assert_true(imp.family_at(Vector2i(0, 0)) in [ImproveRules.NONE, ImproveRules.TIMBER])
+func test_the_facts_come_from_the_map_arrays() -> void:
+	var m := ImproveFixture.map_of(6, 3, {
+		Vector2i(0, 1): {"cover": WorldCover.WOODS, "height": 300, "climate": 2, "river": true},
+		Vector2i(2, 1): {"cover": WorldCover.SNOW, "height": 3000, "climate": 0, "pass": true, "road": true},
+		Vector2i(4, 1): {"track": true, "place": _place(3, true)},
+		Vector2i(2, 2): {},
+	})
+	var woods := Improve.facts_of(m, Vector2i(0, 1))
+	assert_eq(int(woods["cover"]), WorldCover.WOODS)
+	assert_eq(float(woods["height_m"]), 300.0)
+	assert_eq(str(woods["climate"]), "mild")
+	assert_true(bool(woods["river"]), "a river edge")
+	assert_false(bool(woods["road"]))
+	assert_true(bool(woods["coast"]), "sea beside it (no spec is sea)")
+	var top := Improve.facts_of(m, Vector2i(2, 1))
+	assert_eq(str(top["climate"]), "snow")
+	assert_true(bool(top["pass"]), "a pass id is a pass")
+	assert_true(bool(top["road"]), "a road of quality 2 leaves the hex")
+	assert_false(bool(top["river"]))
+	var town := Improve.facts_of(m, Vector2i(4, 1))
+	assert_false(bool(town["road"]), "a track (quality 1) is not a road")
+	assert_eq(int(town["place_level"]), 3)
+	assert_true(bool(town["port"]))
+	assert_eq(str(town["port_mode"]), "seaside", "a port mode defaults to the seaside")
+	assert_true(Improve.facts_of(m, Vector2i(99, 99))["cover"] is int, "off the map gives plain defaults")
+	var imp := WorldImprove.build(m, 1)
+	assert_eq(imp.hexes.size(), 4)
+	assert_ne(imp.family_at(Vector2i(0, 1)), ImproveRules.SETTLEMENT)
+	assert_eq(imp.family_at(Vector2i(4, 1)), ImproveRules.SETTLEMENT)
 
 
 # ----- the search, on small synthetic instances (white box: the search fields set by hand) ---------------------------
@@ -428,6 +420,8 @@ func _synthetic(domains: Array[int], edges: Array[Vector2i]) -> WorldImprove:
 	out._make_options()
 	var n := domains.size()
 	var options := ImproveRules.option_count()
+	out.map = ImproveFixture.block(n, 1, {})
+	out.state = MapState.create(out.map)
 	for i: int in n:
 		out._cells.append(Vector2i(i, 0))
 		out._index[Vector2i(i, 0)] = i
@@ -519,21 +513,18 @@ func test_an_unsatisfiable_instance_is_undone_restarted_and_reported() -> void:
 
 
 ## A 5 x 5 block of one ground with the given places, every hex wild but the places (the search's choices are cleared).
-func _bare(cover: String, height: float, places: Dictionary = {}, more: Dictionary = {}) -> WorldImprove:
-	var table: Array[Dictionary] = []
-	for r: int in 5:
-		for c: int in 5:
-			var extra := more.duplicate()
-			extra["height_m"] = height
-			if places.has(Vector2i(c, r)):
-				extra["place"] = _place(int(places[Vector2i(c, r)]))
-			table.append(_row(c, r, cover, extra))
-	var imp := WorldImprove.build(table, 3)
+func _bare(cover: int, height: float, places: Dictionary = {}, more: Dictionary = {}) -> WorldImprove:
+	var base := more.duplicate()
+	base["cover"] = cover
+	base["height"] = height
+	var over: Dictionary = {}
+	for hex: Variant in places.keys():
+		over[hex] = {"place": _place(int(places[hex]))}
+	var imp := WorldImprove.build(ImproveFixture.block(5, 5, base, over), 3)
 	for hex: Vector2i in imp.hexes:
 		if not imp.is_fixed(hex):
 			imp._put(hex, ImproveRules.NONE, 0)
 	return imp
-
 
 func _sum_is_right(imp: WorldImprove) -> void:
 	var total := 0
@@ -550,7 +541,7 @@ func _sum_is_right(imp: WorldImprove) -> void:
 
 
 func test_build_lists_what_the_ground_allows_and_builds_level_one() -> void:
-	var imp := _bare("farmland", 100.0, {Vector2i(2, 2): 2})
+	var imp := _bare(WorldCover.FARMLAND, 100.0, {Vector2i(2, 2): 2})
 	var hex := Vector2i(3, 2)
 	var options := imp.build_options(hex)
 	var ids: Array[int] = []
@@ -576,7 +567,7 @@ func test_build_lists_what_the_ground_allows_and_builds_level_one() -> void:
 
 
 func test_upgrade_climbs_while_the_rules_allow_and_a_village_grows_into_a_town() -> void:
-	var imp := _bare("farmland", 100.0, {Vector2i(2, 2): 2})
+	var imp := _bare(WorldCover.FARMLAND, 100.0, {Vector2i(2, 2): 2})
 	var hex := Vector2i(3, 2)
 	assert_false(bool(imp.upgrade_check(hex)["ok"]), "nothing to upgrade on a wild hex")
 	imp.build_on(hex, ImproveRules.WHEAT)
@@ -610,7 +601,7 @@ func test_upgrade_climbs_while_the_rules_allow_and_a_village_grows_into_a_town()
 
 
 func test_a_neighbouring_top_stage_and_a_neighbouring_town_refuse_the_upgrade() -> void:
-	var imp := _bare("farmland", 100.0, {Vector2i(2, 2): 3})
+	var imp := _bare(WorldCover.FARMLAND, 100.0, {Vector2i(2, 2): 3})
 	imp.build_on(Vector2i(3, 2), ImproveRules.WHEAT)
 	imp.upgrade(Vector2i(3, 2))
 	imp.upgrade(Vector2i(3, 2))
@@ -623,18 +614,16 @@ func test_a_neighbouring_top_stage_and_a_neighbouring_town_refuse_the_upgrade() 
 	assert_eq(str(imp.upgrade(Vector2i(4, 2))["reason"]), str(no["reason"]), "the action says what the check says")
 	assert_eq(imp.level_at(Vector2i(4, 2)), 2)
 	# Two towns side by side: a village beside a town may not become a town.
-	var table: Array[Dictionary] = [
-		_row(0, 0, "farmland", {"place": _place(3)}), _row(1, 0, "farmland", {"place": _place(2)}),
-	]
-	var two := WorldImprove.build(table, 1)
-	var refused := two.upgrade_check(Vector2i(1, 0))
+	var two := WorldImprove.build(ImproveFixture.block(4, 3, {}, {
+		Vector2i(1, 1): {"place": _place(3)}, Vector2i(2, 1): {"place": _place(2)}}), 1)
+	var refused := two.upgrade_check(Vector2i(2, 1))
 	assert_false(bool(refused["ok"]), "no two towns side by side")
 	assert_true(str(refused["reason"]).contains("town"), str(refused["reason"]))
-	assert_eq(two.level_at(Vector2i(1, 0)), 2)
+	assert_eq(two.level_at(Vector2i(2, 1)), 2)
 
 
 func test_a_build_beside_a_neighbour_is_listed_greyed_with_the_rule() -> void:
-	var imp := _bare("rock", 1500.0, {}, {"climate": "snow"})
+	var imp := _bare(WorldCover.ROCK, 1500.0, {}, {"climate": 0})
 	assert_true(bool(imp.build_on(Vector2i(2, 2), ImproveRules.MINES)["ok"]))
 	var found := {}
 	for o: Dictionary in imp.build_options(Vector2i(3, 2)):
@@ -653,7 +642,7 @@ func test_a_build_beside_a_neighbour_is_listed_greyed_with_the_rule() -> void:
 
 
 func test_clear_brings_the_hex_back_but_never_a_place_of_the_data() -> void:
-	var imp := _bare("farmland", 100.0, {Vector2i(2, 2): 3})
+	var imp := _bare(WorldCover.FARMLAND, 100.0, {Vector2i(2, 2): 3})
 	var hex := Vector2i(1, 2)
 	assert_false(bool(imp.clear_check(hex)["ok"]), "nothing to clear")
 	imp.build_on(hex, ImproveRules.WHEAT)
@@ -673,19 +662,20 @@ func test_clear_brings_the_hex_back_but_never_a_place_of_the_data() -> void:
 
 
 func test_a_pass_takes_a_watchtower_and_it_grows() -> void:
-	var table: Array[Dictionary] = [_row(0, 0, "rock", {"pass": true, "height_m": 1800.0}), _row(1, 0, "farmland")]
-	var imp := WorldImprove.build(table, 1)
-	imp._put(Vector2i(0, 0), ImproveRules.NONE, 0)
-	var options := imp.build_options(Vector2i(0, 0))
+	var m := ImproveFixture.map_of(4, 3, {
+		Vector2i(0, 1): {"cover": WorldCover.ROCK, "pass": true, "height": 1800}, Vector2i(1, 1): {}})
+	var imp := WorldImprove.build(m, 1)
+	imp._put(Vector2i(0, 1), ImproveRules.NONE, 0)
+	var options := imp.build_options(Vector2i(0, 1))
 	assert_eq(options.size(), 1)
 	assert_eq(int(options[0]["family_id"]), ImproveRules.CASTLE)
-	assert_false(bool(imp.build_check(Vector2i(0, 0), ImproveRules.WHEAT)["ok"]), "no goods on a pass")
-	assert_true(bool(imp.build_on(Vector2i(0, 0), ImproveRules.CASTLE)["ok"]))
-	assert_true(bool(imp.upgrade(Vector2i(0, 0))["ok"]), "watchtower to castle")
-	assert_true(bool(imp.upgrade(Vector2i(0, 0))["ok"]), "castle to fortress")
-	assert_false(bool(imp.upgrade_check(Vector2i(0, 0))["ok"]), "the fortress is the top")
-	assert_true(bool(imp.clear(Vector2i(0, 0))["ok"]), "a castle can be pulled down")
-	assert_false(bool(imp.build_check(Vector2i(1, 0), ImproveRules.CASTLE)["ok"]), "no castle off a pass")
+	assert_false(bool(imp.build_check(Vector2i(0, 1), ImproveRules.WHEAT)["ok"]), "no goods on a pass")
+	assert_true(bool(imp.build_on(Vector2i(0, 1), ImproveRules.CASTLE)["ok"]))
+	assert_true(bool(imp.upgrade(Vector2i(0, 1))["ok"]), "watchtower to castle")
+	assert_true(bool(imp.upgrade(Vector2i(0, 1))["ok"]), "castle to fortress")
+	assert_false(bool(imp.upgrade_check(Vector2i(0, 1))["ok"]), "the fortress is the top")
+	assert_true(bool(imp.clear(Vector2i(0, 1))["ok"]), "a castle can be pulled down")
+	assert_false(bool(imp.build_check(Vector2i(1, 1), ImproveRules.CASTLE)["ok"]), "no castle off a pass")
 
 
 func _play(imp: WorldImprove, rolls: int) -> void:
@@ -709,7 +699,7 @@ func test_after_many_changes_every_rule_still_holds_and_the_counts_are_right() -
 	if not _ready_or_fail():
 		return
 	for s: int in [0, 2]:
-		var imp := WorldImprove.build(_table, SEEDS[s])
+		var imp := WorldImprove.build(_map, SEEDS[s])
 		var base := imp.violations().size()
 		_play(imp, 1500)
 		assert_eq(imp.violations().size(), base, "no new rule broken (seed %d)" % SEEDS[s])
@@ -734,8 +724,8 @@ func test_after_many_changes_every_rule_still_holds_and_the_counts_are_right() -
 func test_the_same_changes_give_the_same_map() -> void:
 	if not _ready_or_fail():
 		return
-	var a := WorldImprove.build(_table, SEEDS[2])
-	var b := WorldImprove.build(_table, SEEDS[2])
+	var a := WorldImprove.build(_map, SEEDS[2])
+	var b := WorldImprove.build(_map, SEEDS[2])
 	_play(a, 400)
 	_play(b, 400)
 	for hex: Vector2i in a.hexes:

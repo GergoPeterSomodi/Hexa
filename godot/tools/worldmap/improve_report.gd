@@ -1,21 +1,25 @@
-## The improvement step on a baked hex table, in numbers: per seed the search time, the backtracks, the pieces by family
+## The improvement step on a map file (MapData), in numbers: per seed the search time, the backtracks, the pieces by family
 ## and level, the rule breaks (none expected), and a small map of letters. Headless:
-##   godot --headless --path godot -s res://tools/worldmap/improve_report.gd -- [--meta=<path of meta.json>] [--seeds=1,2,3]
+##   godot --headless --path godot -s res://tools/worldmap/improve_report.gd -- [--map=<path of a MapData file>] [--window=x,y,w,h] [--seeds=1,2,3]
 extends SceneTree
 
-const META := "res://assets/worldmap/north_italy/meta.json"
+const MAP := "res://data/maps/north_italy.tres"
 const LETTERS: Array[String] = [".", "#", "C", "w", "h", "s", "d", "v", "o", "g", "t", "m", "q", "S", "H"]
 
 
 func _init() -> void:
-	var path := _argument("--meta=", META)
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if typeof(parsed) != TYPE_DICTIONARY:
-		printerr("improve report: %s does not read" % path)
+	var path := _argument("--map=", MAP)
+	var map := load(path) as MapData
+	if map == null:
+		printerr("improve report: %s does not load" % path)
 		quit(1)
 		return
-	var meta: Dictionary = parsed
-	var table: Array = meta.get("hexes", [])
+	var region: Dictionary = {}
+	var window := _argument("--window=", "")
+	if window != "":
+		var parts := window.split(",")
+		if parts.size() == 4:
+			region = WorldImprove.window(Rect2i(int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])))
 	var seeds: Array[int] = []
 	for text: String in _argument("--seeds=", "1480,1481,1482,1483,1484,1485").split(","):
 		seeds.append(int(text))
@@ -23,7 +27,7 @@ func _init() -> void:
 	var bad := 0
 	for s: int in seeds:
 		var start := Time.get_ticks_usec()
-		var imp := WorldImprove.build(table, s)
+		var imp := WorldImprove.build(map, s, null, region)
 		var ms := float(Time.get_ticks_usec() - start) / 1000.0
 		total_ms += ms
 		var breaks := imp.violations()
@@ -58,7 +62,7 @@ func _print_map(imp: WorldImprove) -> void:
 		var line := "   " + (" " if (r & 1) == 1 else "")
 		for c: int in range(low.x, high.x + 1):
 			var hex := Vector2i(c, r)
-			if not imp.family.has(hex):
+			if not imp.map.is_land(hex):
 				line += "~ "
 			elif imp.family_at(hex) == ImproveRules.NONE:
 				line += ". "

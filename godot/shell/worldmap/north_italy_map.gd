@@ -51,6 +51,7 @@ var with_villages: bool = true
 var seed_value: int = START_SEED
 var season: String = "summer"
 var improve: WorldImprove = null
+var _map_data: MapData = null
 ## Counts of the last build, for the panel and the tools.
 var stats: Dictionary = {}
 
@@ -649,18 +650,22 @@ static func _dict(value: Variant) -> Dictionary:
 
 
 func _run_wfc() -> void:
-	var table := _hex_rows
-	if not with_villages:
-		table = []
-		for entry: Variant in _hex_rows:
-			var row := _dict(entry)
-			if str(_dict(row.get("place", null)).get("name", "x")) == "":
-				row = row.duplicate()
-				row["place"] = null
-			table.append(row)
+	# The improvement reads the fixed map (MapData) since M1; the V switch (villages off) is dropped with this scene.
 	var start := Time.get_ticks_usec()
-	improve = WorldImprove.build(table, seed_value)
+	improve = WorldImprove.build(_fixed_map(), seed_value, null, _row_of)
 	_wfc_ms = float(Time.get_ticks_usec() - start) / 1000.0
+
+
+## The fixed map of north Italy (loaded once).
+func _fixed_map() -> MapData:
+	if _map_data == null:
+		_map_data = load("res://data/maps/north_italy.tres") as MapData
+	return _map_data
+
+
+## The side of the sea of a coast hex ("E" ... "NE"), from the map's coast mask.
+func _sea_side(hex: Vector2i) -> String:
+	return MapTiles.sea_side(_fixed_map().coast_mask(hex))
 
 
 ## The index key of a piece, or "" when the bake has no such picture. A picture that is missing in one layout or with
@@ -713,7 +718,7 @@ func _placed_pieces() -> Array[Dictionary]:
 		var variant := int(piece["variant"])
 		var mirror := int(bool(piece["mirror"]))
 		var coast_family := family == "harbour" or family == "salt"
-		var extra := str(piece["sea"]) if coast_family else str(piece["extra"])
+		var extra := _sea_side(hex) if coast_family else str(piece["extra"])
 		var town := _one_piece(hex, row, family, level, climate, variant, mirror, extra, coast_family, false)
 		if town.is_empty():
 			missing.append("%s %d at %s" % [family, level, hex])
@@ -721,7 +726,7 @@ func _placed_pieces() -> Array[Dictionary]:
 			out.append(town)
 		var addon := int(piece["addon"])
 		if addon > 0:
-			var side := "carved" if str(piece["addon_mode"]) == "carved" else str(piece["sea"])
+			var side := "carved" if str(piece["addon_mode"]) == "carved" else _sea_side(hex)
 			var harbour := _one_piece(hex, row, "harbour_addon", addon, climate, variant, mirror, side, true, true)
 			if harbour.is_empty():
 				missing.append("harbour_addon %d %s at %s" % [addon, side, hex])

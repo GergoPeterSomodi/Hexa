@@ -102,64 +102,11 @@ static func touched_by(map: MapData, hex: Vector2i) -> Array[Vector2i]:
 	return out
 
 
-## What stands on a hex: {} for a wild hex, else family (the piece module's name), family_id, level, variant, mirror,
-## extra ("-", an animal, an ore or a landmark's name), addon (the harbour add-on's level, 0 for none) and addon_mode
-## ("carved", "seaside" or "" when there is no add-on). The same facts WorldImprove.piece_at gives for the same hex
-## and the same improvement (the harbour's sea side is left to the caller: it comes from the coast mask).
+## What stands on a hex ({} for a wild hex): the facts of Improve.piece_of, the one place that decides them.
 static func piece_of(map: MapData, state: MapState, hex: Vector2i) -> Dictionary:
-	var i := map.index_of(hex)
-	if i < 0 or map.land[i] == 0 or i >= state.main_use.size():
-		return {}
-	var f := int(state.main_use[i])
-	if f <= ImproveRules.NONE or f >= ImproveRules.FAMILIES:
-		return {}
-	var lv := int(state.level[i])
-	var chosen := ImproveRules.pick(hex, ImproveRules.VARIANTS[f])
-	var place := _place_of(map, i)
-	var port := bool(place.get("port", false))
-	var extra := "-"
-	var h := _hash(hex)
-	if f == ImproveRules.GRAZING:
-		# Cattle on the low meadows, horses on some of them, sheep on the hills and the high pastures.
-		var metres := float(map.height_m[i])
-		if metres < 300.0:
-			extra = ImproveRules.ANIMALS[2] if h % 3 == 0 else ImproveRules.ANIMALS[1]
-		else:
-			extra = ImproveRules.ANIMALS[1] if (metres < 700.0 and h % 4 == 0) else ImproveRules.ANIMALS[0]
-	elif f == ImproveRules.MINES:
-		extra = ImproveRules.ORES[0] if h % 10 < 5 else (ImproveRules.ORES[1] if h % 10 < 8 else ImproveRules.ORES[2])
-	elif f == ImproveRules.SETTLEMENT and str(place.get("landmark", "")) != "":
-		extra = str(place["landmark"])
-	var addon := 0
-	if f == ImproveRules.SETTLEMENT and port and map.coast_mask(hex) != 0:
-		addon = ImproveRules.ADDON_LEVEL[clampi(lv, 0, 5)]  # a port whose hex has no shore shows no harbour
-	var mode := ""
-	if addon > 0:
-		mode = str(place.get("port_mode", ""))
-		if mode == "":
-			mode = "seaside"
-	return {
-		"family": ImproveRules.NAMES[f],
-		"family_id": f,
-		"level": lv,
-		"variant": chosen.x,
-		"mirror": chosen.y == 1,
-		"extra": extra,
-		"addon": addon,
-		"addon_mode": mode,
-	}
+	return Improve.piece_of(map, state, hex)
 
 
 ## The place on a hex (a MapData.places entry), or {}.
 static func _place_of(map: MapData, index: int) -> Dictionary:
-	var p := map.place_id[index]
-	if p < 0 or p >= map.places.size():
-		return {}
-	return map.places[p]
-
-
-## A stable number for a hex (the same as WorldImprove's, which picks the animal or the ore).
-static func _hash(hex: Vector2i) -> int:
-	var h := ((hex.x * 73856093) ^ (hex.y * 19349663)) & 0xffffffff
-	h = ((h ^ (h >> 13)) * 0x5bd1e995) & 0xffffffff
-	return (h >> 7) & 0xffff
+	return Improve.place_of(map, map.hex_of(index))

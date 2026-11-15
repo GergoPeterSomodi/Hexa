@@ -3,7 +3,7 @@
 ## Headless:  godot --headless --path godot -s res://tools/mapview/dump_trial_pieces.gd -- --out=<absolute file> [--seed=N]
 extends SceneTree
 
-const META := "res://assets/worldmap/north_italy/meta.json"
+const MAP := "res://data/maps/north_italy.tres"
 
 
 func _initialize() -> void:
@@ -14,14 +14,12 @@ func _initialize() -> void:
 			out = arg.substr(6)
 		elif arg.begins_with("--seed="):
 			seed_value = int(arg.substr(7))
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(META))
-	if out == "" or typeof(parsed) != TYPE_DICTIONARY:
-		printerr("dump_trial_pieces: needs --out=<file> and the baked meta.json")
+	var map := load(MAP) as MapData
+	if out == "" or map == null:
+		printerr("dump_trial_pieces: needs --out=<file> and the map file")
 		quit(1)
 		return
-	var meta: Dictionary = parsed
-	var table: Array = meta["hexes"]
-	var improve := WorldImprove.build(table, seed_value)
+	var improve := WorldImprove.build(map, seed_value, null, WorldImprove.window(Rect2i(1, 8, 14, 11)))
 	var rows: Array[Dictionary] = []
 	for hex: Vector2i in improve.hexes:
 		var piece := improve.piece_at(hex)

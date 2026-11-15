@@ -2,9 +2,10 @@
 ## docs/design/map/pieces/GUIDE.md sections 6, 8 and 10): which piece family stands on a hex and at which level, chosen
 ## by wave function collapse, so that a hex's piece fits its own ground and its neighbours' pieces.
 ##
-## The input is the baked hex table of a region (meta.json "hexes": c, r, land, cover, height_m, coast, sea_angle,
-## climate, river_edges, road, pass, place). The ground (cover, relief, water, roads, places) is fixed before this
-## step: the solver only chooses the improvement.
+## The input is the fixed map (MapData); the facts of each land hex come from Improve.facts_of. The ground (cover,
+## relief, water, roads, places) is fixed before this step: the solver only chooses the improvement. The result lives
+## in a MapState (main_use and level), the one place that says what stands on a hex; this class keeps only what the
+## rules derive from it (facts, neighbour tables, counts) and writes the state through _put.
 ##
 ## An option is a (family, level) pair: "none" (level 0: no piece, the hex stays wild), settlements 1 to 5, castles 1
 ## to 3 and twelve goods families 1 to 3. Furs and cotton have no place in north Italy and are not in the list.
@@ -34,9 +35,9 @@ class_name WorldImprove
 extends RefCounted
 
 
-## The family and the level of each land hex (family NONE and level 0 for a wild hex).
-var family: Dictionary[Vector2i, int] = {}
-var level: Dictionary[Vector2i, int] = {}
+## The fixed map and the state this class reads and writes (what stands on each hex).
+var map: MapData = null
+var state: MapState = null
 ## The land hexes in (row, column) order.
 var hexes: Array[Vector2i] = []
 var by_family: PackedInt32Array = PackedInt32Array()  # index: family; the count of hexes
@@ -48,6 +49,7 @@ var input_dead_ends: int = 0  # hexes with no option before any choice (a data e
 var fixed_conflicts: Array[String] = []  # pairs of fixed places that break a pair rule (data, not a choice)
 var last_resort: Array[Vector2i] = []  # hexes left wild by the fallback (none expected)
 
+var _only: Dictionary = {}  # empty: the whole map
 var _cells: Array[Vector2i] = []
 var _index: Dictionary[Vector2i, int] = {}
 var _facts: Array[Dictionary] = []
@@ -64,23 +66,51 @@ var _opt_level: PackedInt32Array = PackedInt32Array()
 var _all: int = 0  # every option's bit
 
 
-## The improvement of every land hex of a baked hex table (meta.json "hexes"), from one seed.
-static func build(hex_table: Array, seed_value: int) -> WorldImprove:
+## The improvement of every land hex of a map, from one seed. It fills `state` (a new MapState when none is given).
+## `only` (a Dictionary whose keys are hexes; empty for the whole map) limits it to those hexes: the prototype scene
+## shows only the district it has art for. Hexes outside are left wild and the rules do not see them.
+static func build(p_map: MapData, seed_value: int, p_state: MapState = null, only: Dictionary = {}) -> WorldImprove:
 	var out := WorldImprove.new()
+	out.map = p_map
+	out._only = only
+	out.state = p_state if p_state != null else MapState.create(p_map)
 	out._make_options()
-	out._collect(hex_table)
+	out._collect()
 	out._build_priors()
 	out._search(seed_value)
 	out._finish()
 	return out
 
 
+## The rules' working context over a state that already exists (a loaded game, a test): no search.
+static func over(p_map: MapData, p_state: MapState) -> WorldImprove:
+	var out := WorldImprove.new()
+	out.map = p_map
+	out.state = p_state
+	out._make_options()
+	out._collect()
+	out._count_state()
+	out._refresh_distances()
+	return out
+
+
+## The hexes of a window of columns and rows as a set (for build's `only`).
+static func window(rect: Rect2i) -> Dictionary:
+	var out: Dictionary = {}
+	for r: int in range(rect.position.y, rect.end.y):
+		for c: int in range(rect.position.x, rect.end.x):
+			out[Vector2i(c, r)] = true
+	return out
+
+
 func family_at(hex: Vector2i) -> int:
-	return int(family.get(hex, ImproveRules.NONE))
+	var i := map.index_of(hex)
+	return int(state.main_use[i]) if i >= 0 else ImproveRules.NONE
 
 
 func level_at(hex: Vector2i) -> int:
-	return int(level.get(hex, 0))
+	var i := map.index_of(hex)
+	return int(state.level[i]) if i >= 0 else 0
 
 
 ## The facts the rules read for a land hex: cover (a WorldCover number), height_m, coast, river, road, pass, climate,
@@ -91,43 +121,9 @@ func facts_at(hex: Vector2i) -> Dictionary:
 	return _facts[int(_index[hex])]
 
 
-## What the map draws on a hex: {} for a wild hex, else family (the piece module's name), family_id, level, variant,
-## mirror, extra ("-", an animal, an ore or a landmark's name), sea (the sea side of a coast hex, "" inland), and for a
-## port addon (the harbour add-on's level, 0 for none) and addon_mode ("carved" or "seaside").
+## What the map draws on a hex: {} for a wild hex, else the facts of Improve.piece_of.
 func piece_at(hex: Vector2i) -> Dictionary:
-	var f := family_at(hex)
-	if f == ImproveRules.NONE:
-		return {}
-	var facts := facts_at(hex)
-	var lv := level_at(hex)
-	var chosen := ImproveRules.pick(hex, ImproveRules.VARIANTS[f])
-	var extra := "-"
-	var h := _hash(hex)
-	if f == ImproveRules.GRAZING:
-		# Cattle on the low meadows, horses on some of them, sheep on the hills and the high pastures.
-		var metres := float(facts.get("height_m", 0.0))
-		if metres < 300.0:
-			extra = ImproveRules.ANIMALS[2] if h % 3 == 0 else ImproveRules.ANIMALS[1]
-		else:
-			extra = ImproveRules.ANIMALS[1] if (metres < 700.0 and h % 4 == 0) else ImproveRules.ANIMALS[0]
-	elif f == ImproveRules.MINES:
-		extra = ImproveRules.ORES[0] if h % 10 < 5 else (ImproveRules.ORES[1] if h % 10 < 8 else ImproveRules.ORES[2])
-	elif f == ImproveRules.SETTLEMENT and str(facts.get("landmark", "")) != "":
-		extra = str(facts.get("landmark", ""))
-	var addon := 0
-	if f == ImproveRules.SETTLEMENT and bool(facts.get("port", false)) and bool(facts.get("coast", false)):
-		addon = ImproveRules.ADDON_LEVEL[clampi(lv, 0, 5)]  # a port whose hex has no shore on this map shows no harbour
-	return {
-		"family": ImproveRules.NAMES[f],
-		"family_id": f,
-		"level": lv,
-		"variant": chosen.x,
-		"mirror": chosen.y == 1,
-		"extra": extra,
-		"addon": addon,
-		"sea": ImproveRules.sea_side(float(facts.get("sea_angle", 90.0))) if bool(facts.get("coast", false)) else "",
-		"addon_mode": str(facts.get("port_mode", "seaside")) if addon > 0 else "",
-	}
+	return Improve.piece_of(map, state, hex)
 
 
 func count_of(family_id: int) -> int:
@@ -278,8 +274,9 @@ func _put(hex: Vector2i, family_id: int, level_value: int) -> void:
 	var old_l := level_at(hex)
 	by_family[old_f] -= 1
 	by_level[old_f * 6 + old_l] -= 1
-	family[hex] = family_id
-	level[hex] = level_value
+	var at := map.index_of(hex)
+	state.main_use[at] = family_id
+	state.level[at] = level_value
 	by_family[family_id] += 1
 	by_level[family_id * 6 + level_value] += 1
 	if family_id == ImproveRules.SETTLEMENT or old_f == ImproveRules.SETTLEMENT:
@@ -396,54 +393,10 @@ func _make_options() -> void:
 		_compat2[a] = far
 
 
-## Whether a value of the hex table says yes: true, a number that is not zero, a name, a list with something in it.
-static func _flag(value: Variant) -> bool:
-	match typeof(value):
-		TYPE_BOOL:
-			return bool(value)
-		TYPE_INT, TYPE_FLOAT:
-			return float(value) != 0.0
-		TYPE_STRING, TYPE_STRING_NAME:
-			var text := str(value)
-			return text != "" and text != "none" and text != "-"
-		TYPE_ARRAY:
-			var list: Array = value
-			return not list.is_empty()
-		TYPE_DICTIONARY:
-			var table: Dictionary = value
-			return not table.is_empty()
-	return false
-
-
-static func _cover_id(value: Variant) -> int:
-	if typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT:
-		return int(value)
-	var word := str(value).to_lower().get_slice(" ", 0)
-	for c: int in ImproveRules.COVER_WORDS.size():
-		if word == ImproveRules.COVER_WORDS[c] or word == ImproveRules.COVER_WORDS[c].trim_suffix("land") or word + "s" == ImproveRules.COVER_WORDS[c]:
-			return c
-	return -1
-
-
-static func _hash(hex: Vector2i) -> int:
-	var h := ((hex.x * 73856093) ^ (hex.y * 19349663)) & 0xffffffff
-	h = ((h ^ (h >> 13)) * 0x5bd1e995) & 0xffffffff
-	return (h >> 7) & 0xffff
-
-
-func _collect(hex_table: Array) -> void:
-	var rows: Dictionary[Vector2i, Dictionary] = {}
-	for entry: Variant in hex_table:
-		if typeof(entry) != TYPE_DICTIONARY:
-			continue
-		var row: Dictionary = entry
-		if not _flag(row.get("land", false)):
-			continue
-		var hex := Vector2i(int(row.get("c", 0)), int(row.get("r", 0)))
-		rows[hex] = row
-		_cells.append(hex)
-	_cells.sort_custom(func(p: Vector2i, q: Vector2i) -> bool:
-		return p.y < q.y or (p.y == q.y and p.x < q.x))
+func _collect() -> void:
+	for i: int in map.hex_count():
+		if map.land[i] == 1 and (_only.is_empty() or _only.has(map.hex_of(i))):
+			_cells.append(map.hex_of(i))
 	var n := _cells.size()
 	for i: int in n:
 		_index[_cells[i]] = i
@@ -455,30 +408,9 @@ func _collect(hex_table: Array) -> void:
 	var ports: Array[Vector2i] = []
 	for i: int in n:
 		var hex := _cells[i]
-		var row: Dictionary = rows[hex]
-		var facts: Dictionary = {
-			"cover": _cover_id(row.get("cover", "")),
-			"height_m": float(row.get("height_m", 0.0)),
-			"coast": _flag(row.get("coast", false)),
-			"sea_angle": float(row.get("sea_angle", 0.0)) if typeof(row.get("sea_angle")) in [TYPE_INT, TYPE_FLOAT] else 0.0,
-			# Water at the hex's border: a river edge, or a stream edge (hemp rets in either).
-			"river": _flag(row.get("river_edges", null)) or _flag(row.get("stream_edges", null)),
-			"road": _flag(row.get("road", false)),
-			"pass": _flag(row.get("pass", false)),
-			"climate": str(row.get("climate", "frost")),
-			"place_level": 0,
-			"port": false,
-			"port_mode": "",
-			"landmark": "",
-		}
-		var place: Variant = row.get("place", null)
-		if typeof(place) == TYPE_DICTIONARY:
-			var p: Dictionary = place
-			var lv := clampi(int(p.get("level", 1)), 1, ImproveRules.TOP_LEVEL[ImproveRules.SETTLEMENT])
-			facts["place_level"] = lv
-			facts["port"] = _flag(p.get("port", false))
-			facts["port_mode"] = str(p.get("port_mode", "seaside")) if bool(facts["port"]) else ""
-			facts["landmark"] = str(p.get("landmark", "")) if _flag(p.get("landmark", null)) else ""
+		var facts := Improve.facts_of(map, hex)
+		var lv := int(facts["place_level"])
+		if lv > 0:
 			settled.append(Vector3i(hex.x, hex.y, lv))
 			if bool(facts["port"]):
 				ports.append(hex)
@@ -612,19 +544,24 @@ func _search(seed_value: int) -> void:
 
 
 func _finish() -> void:
+	for i: int in _cells.size():
+		var opt := maxi(ImproveSolver.lowest_bit(int(_dom[i])), 0)
+		var at := map.index_of(_cells[i])
+		state.main_use[at] = _opt_family[opt]
+		state.level[at] = _opt_level[opt]
+	_count_state()
+	_prior.clear()
+	_dom.clear()
+
+
+## Fills hexes and the counts from the state.
+func _count_state() -> void:
 	by_family.resize(ImproveRules.FAMILIES)
 	by_family.fill(0)
 	by_level.resize(ImproveRules.FAMILIES * 6)
 	by_level.fill(0)
 	hexes = _cells.duplicate()
-	for i: int in _cells.size():
-		var opt := maxi(ImproveSolver.lowest_bit(int(_dom[i])), 0)
-		var f := _opt_family[opt]
-		var lv := _opt_level[opt]
-		family[_cells[i]] = f
-		level[_cells[i]] = lv
+	for hex: Vector2i in _cells:
+		var f := family_at(hex)
 		by_family[f] += 1
-		by_level[f * 6 + lv] += 1
-	_prior.clear()
-	_dom.clear()
-
+		by_level[f * 6 + level_at(hex)] += 1
