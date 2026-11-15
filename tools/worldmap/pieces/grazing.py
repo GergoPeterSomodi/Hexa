@@ -1,13 +1,16 @@
 """Grazing, levels 0-3, for sheep, cattle or horses (see docs/design/map/pieces/GUIDE.md, section 8).
 
 0 the map's wild land (no piece) - 1 loose animals on a trodden patch, a shepherd, a hut - 2 a fenced meadow, the byre -
-3 three meadows, the market hall. Two layouts (LAYOUT) and the mirror. One layout table for all three animals:
+3 three meadows, the market hall. Three layouts (LAYOUT) and the mirror; layout 2 is the upland pens (stone-walled
+pastures and a round stone fold for sheep and cattle, three round paddocks for horses). One layout table for all three animals:
 draw(level, season, variant=0, mirror=False, animal="sheep"|"cattle"|"horses"). Only the animal, the byre's openings
 and the market hall's goods differ. The piece draws no wild land: the map's trees and scrub stand round the work.
 
-python grazing.py          writes grazing_sheep.png, grazing_cattle.png, grazing_horses.png and grazing_sheep_variants.png
+python grazing.py          writes grazing_sheep.png, grazing_cattle.png, grazing_horses.png, grazing_sheep_variants.png
+                           and grazing_horses_variants.png
 python grazing.py DIR      the same, into DIR
 """
+import math
 import os
 import sys
 
@@ -16,7 +19,7 @@ import kit
 
 LEVELS = range(0, 4)
 NAMES = {0: "wild land (the map's)", 1: "loose herd, hut", 2: "meadow, byre", 3: "3 meadows, hall"}
-VARIANTS = 2
+VARIANTS = 3
 ANIMALS = ("sheep", "cattle", "horses")
 KIND = {"sheep": "sheep", "cattle": "cow", "horses": "horse"}
 HALL_NAME = {"sheep": "wool hall", "cattle": "dairy", "horses": "stud house"}
@@ -63,7 +66,42 @@ LAYOUT = [
         hay=[(4, -19, 1.0, 2), (-35, 22, 0.9, 3)], haymaking=(38, -6), shepherd=(-6, 4),
         track=[(16, -11), (6, -8), (-3, -6), (-6, -3.5), (-8, 0), (-8, 12), (-9, 24), GATES["south"]],
     ),
+    dict(  # layout 2: the upland pens. The hut at the back right, the byre at the back left of the middle, the hall at the back left.
+        # Its meadows have two forms, by the animal (FORM): "walled" (sheep, cattle) = odd pastures inside dry-stone walls and
+        # a round stone fold; "round" (horses) = three round paddocks. hut, byre, hall, hay, haymaking, shepherd and track are shared;
+        # the herd's places differ by form. Herd entries: x, y, from level, the animals that stay out in winter; young: as above.
+        hut=(16, -24), byre=(-10, -3, 13.0), hall=(-26, -16, 16.0),
+        hay=[(6, -20, 1.0, 2), (38, -18, 0.9, 3)], haymaking=(22, -22), shepherd=(-17, 4),
+        track=[(-10, 0), (-14, 8), (-14, 20), (-12, 28), GATES["south"]],
+        walled=dict(
+            # the pastures: from level, corners. P1 and P3 share the side (12, 4)-(28, 12): the walls are drawn once.
+            pastures=[
+                (2, [(-6, 9), (12, 4), (28, 12), (23, 28), (-3, 24)]),
+                (3, [(-22, 9), (-35, 3), (-40, 16), (-30, 25), (-20, 24)]),
+                (3, [(12, 4), (28, 12), (40, 4), (34, -12), (17, -10)]),
+            ],
+            patch=(8, 17, 36, 16),
+            fold=(-28, -4, 6.0),                         # the round stone fold by the byre, from level 2
+            herd=[
+                (2, 11, 1, ("sheep", "cattle")), (7, 21, 1, ()), (13, 14, 1, ("cattle",)), (19, 22, 1, ()), (23, 16, 1, ()),
+                (-31.5, -4.5, 2, ("sheep",)), (-24.5, -3, 2, ("sheep",)), (12, 9, 2, ("cattle",)),
+                (20, -2, 3, ()), (30, 1, 3, ()), (24, -8, 3, ()), (-30, 14, 3, ()), (-26, 22, 3, ()),
+            ],
+            young=[(3.2, 11.8, 1), (14.2, 14.8, 1), (13.2, 9.8, 2)],
+        ),
+        round=dict(
+            rings=[(8, 16, 16, 2), (-26, 14, 11, 3), (27, -3, 11, 3)],      # cx, cy, radius, from level
+            patch=(8, 16, 32, 18),
+            herd=[
+                (5, 10, 1, ("horses",)), (0, 14, 1, ("horses",)), (8, 20, 1, ()), (14, 12, 1, ("horses",)), (18, 19, 1, ()),
+                (-3, 19, 2, ()), (12, 24, 2, ()), (21, 15, 2, ()),
+                (-31, 16, 3, ()), (-25, 19, 3, ()), (-28, 12, 3, ()), (24, -3, 3, ()), (31, 0, 3, ()),
+            ],
+            young=[(6.2, 10.8, 1), (1.2, 14.8, 1), (13.2, 24.8, 2)],
+        ),
+    ),
 ]
+FORM = {"sheep": "walled", "cattle": "walled", "horses": "round"}
 
 
 def longhouse(p, x, y, w, kind):
@@ -151,10 +189,106 @@ def meadow(p, cx, cy, w, h, season):
     p.fence(pts + [pts[0]])
 
 
+def meadow_poly(p, pts, season):
+    """A pasture of one pale colour inside dry-stone walls (the walls are drawn once for all pastures: upland_walls).
+    In winter snow with two hoof-trodden patches, as meadow()."""
+    xs, ys = [q[0] for q in pts], [q[1] for q in pts]
+    cx, cy, w, h = sum(xs) / len(xs), sum(ys) / len(ys), max(xs) - min(xs), max(ys) - min(ys)
+    if p.winter:
+        p.patch(pts, kit.SNOW)
+        p.blob(cx - w * 0.14, cy + h * 0.10, w * 0.26, h * 0.24, kit.SNOW_D, alpha=0.85)
+        p.blob(cx + w * 0.14, cy - h * 0.10, w * 0.20, h * 0.22, kit.SNOW_D, alpha=0.85)
+    else:
+        col = MEADOW[season]
+        p.patch(pts, col, kit.shade(col, 0.78))
+
+
+def meadow_ring(p, cx, cy, r, season):
+    """The inside of a round pen: the meadow colour (snow in winter), drawn before the ring."""
+    pts = kit.ring_points(cx, cy, r, r * kit.TILT, 0, 2 * math.pi, max(16, int(r * 2.2)))
+    if p.winter:
+        p.patch(pts, kit.SNOW)
+        p.blob(cx - r * 0.2, cy + r * 0.12, r * 0.7, r * 0.5, kit.SNOW_D, alpha=0.85)
+    else:
+        col = MEADOW[season]
+        p.patch(pts, col, kit.shade(col, 0.78))
+
+
+def upland_walls(p, pastures):
+    """The dry-stone walls of the pastures: every side once, so two pastures that share a side get one wall."""
+    seen, runs = set(), []
+    for pts in pastures:
+        for a, b in zip(pts, pts[1:] + pts[:1]):
+            key = frozenset((a, b))
+            if key not in seen:
+                seen.add(key)
+                runs.append((a, b))
+    for a, b in runs:
+        p.drystone([a, b])
+
+
+def draw_upland(level, season, animal, mirror):
+    """Layout 2, the upland pens: the same hut, byre, hall, haystacks, track, herd counts and seasons as layouts 0 and 1."""
+    kind = KIND[animal]
+    p = kit.Piece(season, ground="grass", seed=2, mirror=mirror)
+    L = LAYOUT[2]
+    F = L[FORM[animal]]
+    sp, su, wi = season == "spring", season == "summer", season == "winter"
+    hut, byre, hall = L["hut"], L["byre"], L["hall"]
+    px, py, pw, ph = F["patch"]
+    p.blob(px, py, pw, ph, p.pal["soil"], alpha=0.3)                                 # where the herd gathers (the level 1 footprint)
+    p.blob(hut[0] + 1, hut[1] + 3.5, 14, 7, p.pal["soil"], alpha=0.3)
+    if level >= 2:
+        p.blob(byre[0], byre[1] + 3, byre[2] + 6, 7, p.pal["soil"], alpha=0.3)
+    if level >= 3:
+        p.road(L["track"], 1.6, track=True)
+    if FORM[animal] == "walled":
+        pastures = [pts for frm, pts in F["pastures"] if level >= frm]
+        for pts in pastures:
+            meadow_poly(p, pts, season)
+        upland_walls(p, pastures)
+        if level >= 2:
+            fx, fy, fr = F["fold"]
+            meadow_ring(p, fx, fy, fr, season)
+            p.ring(fx, fy, fr, kind="stone", gate=90)
+    else:
+        for cx, cy, r, frm in F["rings"]:
+            if level >= frm:
+                p.blob(cx, cy + 1, r * 2 + (9 if frm == 2 else 5), r * 1.7 + (7 if frm == 2 else 4), p.pal["soil"], alpha=0.3)    # the trodden apron round the paddock
+                meadow_ring(p, cx, cy, r, season)
+                if frm == 2:
+                    p.blob(cx, cy + 1, r * 1.0, r * 0.7, p.pal["soil"], alpha=0.3)   # the trodden middle
+                p.ring(cx, cy, r, kind="fence")
+
+    p.house(hut[0], hut[1], 5.5, 3.5, 3.0, wall=4, kind="ridge", roof="thatch", smoke=True)
+    if level >= 2:
+        longhouse(p, byre[0], byre[1], byre[2], kind)
+    for x, y, sc, frm in L["hay"]:
+        if level >= frm and not sp:
+            p.haystack(x, y, sc)
+    if level >= 3:
+        market_hall(p, hall[0], hall[1], hall[2], animal)
+
+    for x, y, frm, stays in F["herd"]:
+        if level >= frm and (not wi or animal in stays):
+            p.animal(x, y, kind, flip=x > 4)
+    if sp:
+        for x, y, frm in F["young"]:
+            if level >= frm:
+                p.animal(x, y, kind, flip=x > 4, sc=0.7)
+    if not wi:
+        p.person(L["shepherd"][0], L["shepherd"][1], (110, 80, 60))
+    if su and level >= 2:
+        p.haystack(L["haymaking"][0], L["haymaking"][1])
+    return p.finish(label="grazing %s L%d v2%s" % (animal, level, "m" if mirror else ""))
+
+
 def draw(level, season, variant=0, mirror=False, animal="sheep"):
     assert animal in ANIMALS, animal
     if level == 0:                                    # no piece on the map: the sheet shows the wild land
         return kit.wild(season, "grass", seed=2)
+    if variant == 2:
+        return draw_upland(level, season, animal, mirror)
     kind = KIND[animal]
     p = kit.Piece(season, ground="grass", seed=2, mirror=mirror)
     L = LAYOUT[variant]
@@ -219,4 +353,7 @@ if __name__ == "__main__":
         print("wrote", os.path.normpath(out))
     out = os.path.join(outdir, "grazing_sheep_variants.png")
     kit.variant_sheet(_draw_for("sheep"), LEVELS, "Grazing (sheep): layouts and mirror", out, NAMES, ground="grass")
+    print("wrote", os.path.normpath(out))
+    out = os.path.join(outdir, "grazing_horses_variants.png")
+    kit.variant_sheet(_draw_for("horses"), LEVELS, "Grazing (horses): layouts and mirror", out, {**NAMES, 3: HALL_NAME["horses"]}, ground="grass")
     print("wrote", os.path.normpath(out))
