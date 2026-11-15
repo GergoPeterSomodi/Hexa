@@ -27,6 +27,7 @@ CORE_RANK = [
     ("hexgrid.gd", 0),
     ("geo.gd", 0),
     ("bus.gd", 0),
+    ("worldmap/", 0),  # the Alps and Po map prototype (docs/design/map): pure geometry and parsing, no state
     ("data/", 1),
     ("state/", 2),
     ("mapgen/", 3),

@@ -241,6 +241,8 @@ Nothing touches H's six edges or their middles.
 
 Neighbouring corners are never used: that would be the edge between them, which is the normal model.
 
+**Through may bend (2026-11-14, coordinator's ruling, Florence).** A `through` city may also take corners two apart (`out = in + 2` or `in + 4`): the river bends inside the hex, the city stays on both banks and the bridge stays at the centre. The opposite corner is preferred when both fit; `loop` keeps its own meaning (the city sits inside the bend) and is the art form for loops.
+
 **Why at the corners, and not across the edge middles.** The first sketch of this exception had the river cross two
 of H's edges at their middles (`river_in` and `river_out` as new edge values). Both were weighed:
 
