@@ -7,7 +7,9 @@ upgraded in place to a row of three miners' houses.
 
 Ores: draw(..., ore="iron" | "silver" | "copper") keeps every layout and changes the heap and ore colours, one detail
 and the level 3 landmark, which stands on the smelter's foot (iron: the blast furnace, silver: the mint, copper: the
-roasting yard). ore=None is the plain mine, pixel for pixel as before.
+roasting yard). ore="gold" has layout tables of its own (GOLD): tents for huts, a sluice on a long race in
+the headframe's place (level 2), the strongroom on the smelter's foot (level 3); no wheel, no headframe, no fort.
+ore=None is the plain mine, pixel for pixel as before.
 
 python mines.py            writes docs/design/map/pieces/mines.png, mines_variants.png and one sheet per ore
 """
@@ -20,7 +22,7 @@ import kit
 
 LEVELS = range(0, 4)
 VARIANTS = 2
-ORES = (None, "iron", "silver", "copper")
+ORES = (None, "iron", "silver", "copper", "gold")
 NAMES = {0: "wild land (the map's)", 1: "adit", 2: "headframe", 3: "smelter, row"}
 
 # Named tokens that are new to this family (rock and ore are not in the kit's list):
@@ -85,6 +87,52 @@ LAYOUT = [
         houses=[(25, -6, 1), (26, 5, 2), (27, 16, 3)],
         yards=[(-26, -2, 40, 22, 1), (27, -8, 18, 8, 1),
                (4, -4, 40, 22, 2), (28, 3, 18, 8, 2),
+               (-2, 24, 34, 22, 3), (27, 6, 14, 30, 3)],
+    ),
+]
+# ---- gold: its own two tables. The outcrop, adit, heaps, track, yards, ore pile and the house feet are the plain
+# mine's (the family's signature stays); what differs: no headframe and no wheel, so the race ("stream") is longer, runs
+# along the sluice and ends in a pond at each end, all inside the hex; "sluice" is the trough's foot (middle) and its
+# length (26-30 px); "tents" are the huts' feet at levels 1 and 2 (x, y, from level); "smelter" is the strongroom's foot.
+GOLD = [
+    dict(
+        blocks=[
+            (-21.0, [(-33, 0), (-32, 5), (-27, 8), (-21, 8.5), (-17, 6), (-16, 0)], -23),
+            (-20.6, [(-2, 0), (-1, 5), (2, 6.5), (5, 4.5), (7, 0)], 1),
+            (-20.0, [(-20, 0), (-19, 6), (-14, 9.5), (-8, 10.5), (-2, 8.5), (0, 4), (0.8, 0)], -11),
+        ],
+        shadows=[(-13, -19.2, 42, 4.5, 17)],
+        adit=(-9, -19.4),
+        track=[(-9, -18), (-7, -8), (-3, 2), (-1, 14), (-3, 30), (-4, 38)],
+        heaps=[(-18, -10, 14.0, 7.5, 1), (24, 12, 10.0, 5.6, 2), (16, 20, 9.0, 5.0, 3)],
+        stream=[(5, 6), (14, 6.4), (24, 6.4), (35, 6)],
+        sluice=(21, 5.6, 26),
+        smelter=(-24, 6),
+        ore=(-9, 9),
+        tents=[(-33, 22, 1), (-21, 22, 2)],
+        houses=[(-33, 22, 1), (-21, 22, 2), (-9, 23, 3)],
+        yards=[(-12, -8, 46, 20, 1), (-31, 20, 18, 8, 1),
+               (14, 7, 40, 14, 2), (-19, 20, 18, 8, 2),
+               (-22, 9, 34, 22, 3), (-12, 21, 42, 10, 3)],
+    ),
+    dict(
+        blocks=[
+            (-22.0, [(-28, 0), (-27, 5), (-22, 8), (-16, 8.5), (-12, 6), (-11, 0)], -19),
+            (6.0, [(-42, 0), (-41, 4.5), (-37, 6.5), (-33, 4.5), (-32, 0)], -37),
+            (-7.0, [(-42, 0), (-41, 6), (-36, 9.5), (-30, 10.5), (-24, 8.5), (-22, 4), (-21.2, 0)], -32),
+        ],
+        shadows=[(-19, -20.2, 22, 4.0, 10), (-31.5, -5.2, 22, 4.0, 10), (-37, 7.8, 14, 3.5, 8)],
+        adit=(-31, -5.4),
+        track=[(-31, -2), (-29, 6), (-26, 16), (-21, 26), (-16, 33)],
+        heaps=[(-19, 5, 14.0, 7.5, 1), (-6, 12, 10.0, 5.6, 2), (14, 14, 9.0, 5.0, 3)],
+        stream=[(-12, -3), (-3, -3.4), (8, -3.4), (19, -3)],
+        sluice=(3, -3.0, 26),
+        smelter=(-4, 26),
+        ore=(12, 28),
+        tents=[(25, -6, 1), (26, 5, 2)],
+        houses=[(25, -6, 1), (26, 5, 2), (27, 16, 3)],
+        yards=[(-26, -2, 40, 22, 1), (27, -8, 18, 8, 1),
+               (3, -3, 40, 14, 2), (28, 3, 18, 8, 2),
                (-2, 24, 34, 22, 3), (27, 6, 14, 30, 3)],
     ),
 ]
@@ -302,7 +350,55 @@ def roasting_yard(p, x, y):
         p.smoke(hx, y - 5.6, always=True, foot=y, on=h)
 
 
-LANDMARKS = {None: smelter, "iron": blast_furnace, "silver": mint, "copper": roasting_yard}      # gold: task 17
+def strongroom(p, x, y):
+    """Gold, level 3, on the smelter's foot: one small grey stone house with a slate roof and a barred dark door. No
+    ring, no tower, no banner, no smoke of its own."""
+    house = p.house(x, y, 9.0, 6.4, 3.4, wall=kit.STONE_GREY, kind="ridge", roof="slate", door=False)
+
+    def fn(pen):
+        pen.rect(x - 1.5, y - 4.2, 3.0, 4.2, kit.DOOR, None)                                  # the dark door
+        for bx in (x - 0.7, x + 0.7):                                                           # its bars
+            pen.line((bx, y - 4.0), (bx, y - 0.2), kit.STONE_GREY, 0.4)
+        pen.line((x - 1.4, y - 2.2), (x + 1.4, y - 2.2), kit.STONE_GREY, 0.4)
+    return p.stand(y + 0.1, fn, x=x, on=house)
+
+
+def sluice(p, x, y, length):
+    """Gold, level 2, where the headframe is in the other ores: a timber trough on trestles (4 px tall, `length` long)
+    lying along the race; water shows along its top, frozen where water freezes."""
+    p.cast(x, y, length - 4)
+    h = length / 2.0
+
+    def fn(pen):
+        for tx in (-h + 2.0, -h / 3.0, h / 3.0, h - 2.0):                                       # trestles: pairs of legs
+            pen.line((x + tx - 0.9, y), (x + tx, y - 2.4), kit.TIMBER_D, 0.9)
+            pen.line((x + tx + 0.9, y), (x + tx, y - 2.4), kit.TIMBER_D, 0.9)
+        pen.rect(x - h, y - 4.0, length, 2.2, kit.TIMBER, kit.INK, 0.5)                            # the trough's front
+        pen.rect(x + h - 5.5, y - 4.0, 5.5, 2.2, kit.TIMBER_D, None)                              # the shaded right end
+        pen.rect(x - h, y - 4.0, length, 0.9, kit.ICE if p.frozen else p.pal["river"], None)     # the water in it
+        for k in range(1, 6):                                                                   # riffle battens
+            pen.line((x - h + k * length / 6.0, y - 3.0), (x - h + k * length / 6.0, y - 1.9), kit.TIMBER_D, 0.5)
+        pen.rect(x - h, y - 4.0, length, 2.2, None, kit.INK, 0.5)
+        if p.winter:
+            pen.line((x - h + 0.5, y - 4.5), (x + h - 0.5, y - 4.5), kit.SNOW, 0.9)
+    return p.stand(y, fn, x=x)
+
+
+def tent(p, x, y, i=0):
+    """Gold's hut at levels 1 and 2: a pale cone 5 px wide and 6 tall, lit left, shaded right, a dark flap."""
+    p.cast(x, y, 5)
+
+    def fn(pen):
+        pen.poly([(x - 2.5, y), (x, y - 6.0), (x + 2.5, y)], kit.PLASTER[3], None)
+        pen.poly([(x + 0.2, y), (x, y - 6.0), (x + 2.5, y)], kit.shade(kit.PLASTER[3], 0.85), None)
+        pen.poly([(x - 0.8, y), (x, y - 2.8), (x + 0.8, y)], kit.DOOR, None)
+        if p.winter:
+            pen.poly([(x - 0.9, y - 4.6), (x, y - 6.0), (x + 0.9, y - 4.6)], kit.SNOW, None)
+        pen.poly([(x - 2.5, y), (x, y - 6.0), (x + 2.5, y)], None, kit.INK, 0.5)
+    return p.stand(y, fn, x=x)
+
+
+LANDMARKS = {None: smelter, "iron": blast_furnace, "silver": mint, "copper": roasting_yard, "gold": strongroom}
 
 
 def draw(level, season, variant=0, mirror=False, ore=None):
@@ -310,7 +406,8 @@ def draw(level, season, variant=0, mirror=False, ore=None):
     if level == 0:                                    # no piece: the sheets show the map's wild rock
         return kit.wild(season, "rock", seed=4)
     p = kit.Piece(season, ground="rock", seed=4, mirror=mirror)
-    L = LAYOUT[variant]
+    gold = ore == "gold"
+    L = (GOLD if gold else LAYOUT)[variant]
     # ---- ground plane
     for x, y, w, h, lo in L["yards"]:                      # worked ground under each landmark, growing with the level
         if level >= lo:
@@ -328,9 +425,12 @@ def draw(level, season, variant=0, mirror=False, ore=None):
     for x, y, w, h, lo in L["heaps"]:
         if level >= lo:
             p.heap(x, y, w, h, spoil, spoil_d)
-    if level >= 2:
+    if gold and level >= 2:
+        sluice(p, *L["sluice"])
+    elif level >= 2:
         water_wheel(p, *L["wheel"])
         headframe(p, *L["headframe"])
+    if level >= 2:
         if ore == "iron":                                 # the second, small ore pile by the headframe
             p.heap(IRON_PILE[variant][0], IRON_PILE[variant][1], 6.0, 3.4, pile, pile_d)
     if level >= 3:
@@ -339,10 +439,16 @@ def draw(level, season, variant=0, mirror=False, ore=None):
     for i, (x, y, lo) in enumerate(L["houses"]):
         if level < lo:
             continue
+        if gold and level < 3:                        # gold: tents (GOLD's "tents") stand in the huts' place
+            continue
         if level >= 3:                                # upgraded in place: the same foot, a bigger house
             p.house(x, y, 7.6, 4.6, 3.6, wall=i + 1, kind="ridge" if i % 2 else "gable", roof="thatch", smoke=(i == 2 and ore != "copper"))
         else:
             p.house(x, y, 5.5, 3.5, 3.0, wall=i, kind="ridge", roof="thatch", smoke=(i == 0))
+    if gold and level < 3:
+        for x, y, lo in L["tents"]:
+            if level >= lo:
+                tent(p, x, y)
     return p.finish(label="mines L%d v%d%s" % (level, variant, "m" if mirror else ""))
 
 
