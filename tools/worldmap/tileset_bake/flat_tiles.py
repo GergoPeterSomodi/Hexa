@@ -48,14 +48,57 @@ K_RADIUS = 1.2 * LT.CELL_W
 S_W, S_H = 2 * int(K_RADIUS) + 4, 2 * int(K_RADIUS * LT.TILT) + 4
 
 
-def band_colour(cover, band):
-    c = BASE[cover]
+def _scaled(col, ref, to):
+    return tuple(max(0, min(255, int(round(col[i] * to[i] / float(ref[i]))))) for i in range(3))
+
+
+def palette(season="summer", climate="snow"):
+    """The colours of one tile set: ground covers, the three seas and the coast's sand, foam and light band.
+    Summer is the constants of this module; the other seasons take the pieces kit's tokens (kit.PAL, kit.WINTER[climate]),
+    and what the kit has no token for (marsh, tundra, the high tint, alpine stone, the deep sea) is scaled the same way."""
+    if season == "summer":
+        sea, shelf, deep = C_SEA, SEA_COL["shelf"], SEA_COL["deep"]
+        return {"base": dict(BASE), "high": HIGH_TINT, "alpine": C_ALPINE,
+                "sea": {"shelf": shelf, "sea": sea, "deep": deep},
+                "sand": C_SAND, "foam": (226, 242, 248), "shelf": (83, 155, 201), "light": (122, 192, 222)}
+    import art
+    k = art.kit()
+    p = k.WINTER[climate] if season == "winter" else k.PAL[season]
+    grass = _scaled
+    base = dict(BASE)
+    base.update(farmland=p["farm"], grassland=p["grass"], woods=p["wood"], rock=p["rock"], sand=p["sand"],
+                marsh=grass(C_MARSH, C_GRASS, p["grass"]), tundra=grass(C_TUNDRA, C_GRASS, p["grass"]),
+                snow=grass(C_ALPINE, C_ROCK, p["rock"]))
+    sea = p["sea"]
+    shallow = p["shallow"]
+    shelf = tuple((a + b) // 2 for a, b in zip(shallow, sea))
+    seas = {"shelf": shelf, "sea": sea, "deep": grass(SEA_COL["deep"], C_SEA, sea)}
+    light = tuple(max(0, min(255, c + shelf[i] - s)) for i, (c, s) in enumerate(zip((122, 192, 222), (83, 155, 201))))
+    return {"base": base, "high": grass(HIGH_TINT, C_GRASS, p["grass"]), "alpine": grass(C_ALPINE, C_ROCK, p["rock"]),
+            "sea": seas, "sand": p["sand"], "foam": p["foam"], "shelf": shelf, "light": light}
+
+
+SUMMER = None           # palette("summer"), made on first use
+
+
+def _pal(pal):
+    global SUMMER
+    if pal is not None:
+        return pal
+    if SUMMER is None:
+        SUMMER = palette("summer")
+    return SUMMER
+
+
+def band_colour(cover, band, pal=None):
+    pal = _pal(pal)
+    c = pal["base"][cover]
     if cover not in GREEN:
         return c
     t = 0.1 * min(band, 3)
-    c = tuple(c[i] + (HIGH_TINT[i] - c[i]) * t for i in range(3))
+    c = tuple(c[i] + (pal["high"][i] - c[i]) * t for i in range(3))
     if band == 4:
-        c = tuple(c[i] + (C_ALPINE[i] - c[i]) * 0.55 for i in range(3))
+        c = tuple(c[i] + (pal["alpine"][i] - c[i]) * 0.55 for i in range(3))
     return c
 
 
@@ -65,10 +108,10 @@ def _edge_alpha(h, n):
     return int(255 * (1.0 - LT.smoothstep(0.0, SPILL * (0.3 + 0.7 * n), h)))
 
 
-def ground_tile(cover, band, variant):
+def ground_tile(cover, band, variant, pal=None):
     seed = 1000 + COVERS.index(cover) * 31 + band * 7 + variant
     nz = LT.ValueNoise(seed)
-    base = band_colour(cover, band)
+    base = band_colour(cover, band, pal)
     stony = cover in STONY or band == 4
     buf = bytearray(G_W * G_H * 4)
     ox, oy = G_W / 2.0, G_H / 2.0
@@ -150,9 +193,9 @@ def _reeds(surf, rnd):
                 pygame.draw.line(surf, (88, 124, 70), (x + ox + q * 2, y + oy), (x + ox + q * 2 - 1, y + oy - 4), 1)
 
 
-def sea_tile(depth, variant):
+def sea_tile(depth, variant, pal=None):
     nz = LT.ValueNoise(77 + variant + 10 * SEA_RANK[depth])
-    col = SEA_COL[depth]
+    col = _pal(pal)["sea"][depth]
     hard = depth == "shelf"
     buf = bytearray(G_W * G_H * 4)
     ox, oy = G_W / 2.0, G_H / 2.0
@@ -301,6 +344,7 @@ def white_tile():
 
 
 def bake(covers=COVERS, log=print):
+    """The trial's flat stage (summer; the grid line also stays in ground for the trial scene)."""
     ground = GridAtlas("ground", (G_W, G_H))
     for cover in covers:
         for band in range(BANDS if cover in GREEN else 1):

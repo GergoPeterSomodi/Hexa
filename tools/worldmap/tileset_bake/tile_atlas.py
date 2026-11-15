@@ -20,6 +20,28 @@ def from_rgba(buf, size):
     return pygame.image.frombuffer(bytes(buf), size, "RGBA").copy()
 
 
+def capacity(region, sep=2):
+    """How many tiles of this picture size fit one atlas of at most MAX_SIDE px a side."""
+    w, h = region
+    return ((MAX_SIDE + sep) // (w + sep)) * ((MAX_SIDE + sep) // (h + sep))
+
+
+class Packer:
+    """Atlases of one picture size that start a new source (<prefix><n>) when one is full. `first` numbers the sources;
+    `anchor` is the default anchor of a tile (a tile may bring its own)."""
+
+    def __init__(self, prefix, region, anchor=None, first=0, sep=2):
+        self.prefix, self.region, self.anchor, self.sep = prefix, tuple(region), anchor, sep
+        self.next = first
+        self.atlases = []
+
+    def add(self, name, surf, anchor=None, y_sort=0, z=0):
+        if not self.atlases or len(self.atlases[-1].tiles) >= capacity(self.region, self.sep):
+            self.atlases.append(GridAtlas("%s%d" % (self.prefix, self.next), self.region, self.anchor, self.sep))
+            self.next += 1
+        self.atlases[-1].add(name, surf, anchor, y_sort, z)
+
+
 class GridAtlas:
     def __init__(self, name, region, anchor=None, sep=2):
         self.name = name

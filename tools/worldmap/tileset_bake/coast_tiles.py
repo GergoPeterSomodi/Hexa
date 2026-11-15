@@ -33,6 +33,7 @@ _WX = LT.Waves(11, [(1, 1), (2, -1), (3, 1), (1, -2), (4, 0), (5, 2), (7, -1)], 
 _WY = LT.Waves(12, [(1, -1), (2, 1), (3, -1), (2, 2), (4, 1), (6, -1), (5, -2)], 6.5)
 ROUND = 12.0                    # px: the radius of the ring the shore is averaged over (rounds the hex corners)
 _RING = [(ROUND * math.cos(math.radians(a)), ROUND * math.sin(math.radians(a)) * LT.TILT) for a in range(0, 360, 60)]
+PERIOD_X, PERIOD_Y = 312, 153        # the lattice's period in px (3 cells across, 2 rows down)
 INSIDE = 30.0                   # px inside the hex beyond which nothing of the coast shows
 
 
@@ -41,8 +42,11 @@ def _bay(x, y):
     return max(abs(x) - BAY_HALF, BAY_BACK - y)
 
 
-def coast_tile(mask, lv, style, bay=False):
-    """mask: bit d set = the neighbour in direction d is sea (1 to 63). lv: the lattice variant of the cell."""
+def coast_tile(mask, lv, style, bay=False, pal=None):
+    """mask: bit d set = the neighbour in direction d is sea (1 to 63). lv: the lattice variant of the cell.
+    pal: a flat_tiles.palette() (the set's sand, foam, shelf and light colours); None: the constants above (summer)."""
+    c_sand, c_foam = (pal["sand"], pal["foam"]) if pal else (C_SAND, C_FOAM)
+    c_shelf, c_light = (pal["shelf"], pal["light"]) if pal else (C_SHELF, C_LIGHT)
     sea = [LT.NEIGHBOUR[d] for d in range(6) if mask >> d & 1]
     land = [LT.NEIGHBOUR[d] for d in range(6) if not mask >> d & 1]
     vx, vy = LT.variant_centre(lv)
@@ -103,17 +107,17 @@ def coast_tile(mask, lv, style, bay=False):
                 v = hex_h(px - sx, py - sy)
                 if v < raw_sea:
                     raw_sea = v
-            hsh = LT.pixel_hash(int(x + vx), int(y + vy))
+            hsh = LT.pixel_hash(int(x + vx) % PERIOD_X, int(y + vy) % PERIOD_Y)     # on the lattice: tiles of one shore agree
             col = None
             alpha = 255
             if s > 0.0:
                 if s < strip:
                     if style == "beach":
-                        col = C_SAND
+                        col = c_sand
                     else:
                         col = (150, 138, 118) if hsh > 90 else (122, 112, 98)
                 elif raw_sea <= SEA_BLEED:              # land the wobble pushed out over the sea tile
-                    col = C_SAND if style == "beach" else C_STONE
+                    col = c_sand if style == "beach" else C_STONE
             else:
                 dy = y - last_land[x]
                 d = -s
@@ -121,20 +125,20 @@ def coast_tile(mask, lv, style, bay=False):
                     if dy <= 1:
                         col = (70, 58, 50)
                     else:
-                        wxi = int(x + vx)
+                        wxi = int(x + vx) % PERIOD_X
                         hs = ((wxi * 2654435761) >> 7) & 31
                         k = 0.78 + 0.22 * (1 - dy / face)
                         col = ((150 + hs * 0.6) * k, (128 + hs * 0.5) * k, (104 + hs * 0.4) * k)
                         if (wxi // 3) & 3 == 0:
                             col = (col[0] * 0.86, col[1] * 0.86, col[2] * 0.86)
                 elif (face > 0.0 and dy <= face + FOAM) or d < FOAM:
-                    col = C_FOAM
+                    col = c_foam
                 else:
                     t = max(0.0, 1.0 - d / REACH) * 0.85
                     if raw_sea > 0.0:                    # the pixel lies in a land hex: the sea must cover the ground
-                        col = tuple(C_SHELF[i] + (C_LIGHT[i] - C_SHELF[i]) * t for i in range(3))
+                        col = tuple(c_shelf[i] + (c_light[i] - c_shelf[i]) * t for i in range(3))
                     elif t > 0.0:
-                        col = C_LIGHT
+                        col = c_light
                         alpha = int(255 * t)
             if col is None or alpha <= 0:
                 continue
@@ -148,6 +152,26 @@ def coast_tile(mask, lv, style, bay=False):
 
 def tile_name(mask, lv, style, bay=False):
     return "coast/%s/%d/%d%s" % (style, mask, lv, "/bay" if bay else "")
+
+
+def all_tiles():
+    """Every coast tile of a set, in the order of the atlases: beach (with its bays), then cliff. (mask, lv, style, bay)."""
+    out = []
+    for style in STYLES:
+        for mask in range(1, 64):
+            for lv in range(6):
+                out.append((mask, lv, style, False))
+        if style == "beach":
+            out += [(mask, lv, style, True) for mask in range(1, 64) if mask & 0b110000 == 0b110000 for lv in range(6)]
+    return out
+
+
+def bake_sets(args):
+    """Pool entry: (mask, lv, style, bay) and the palettes of the sets -> (name, [RGBA bytes per palette]); the
+    geometry is worked out once per palette (the colours are in the loop), which costs about 0.5 s a tile."""
+    import pygame
+    (mask, lv, style, bay), pals = args
+    return tile_name(mask, lv, style, bay), [pygame.image.tobytes(coast_tile(mask, lv, style, bay, p), "RGBA") for p in pals]
 
 
 def bake_one(args):
