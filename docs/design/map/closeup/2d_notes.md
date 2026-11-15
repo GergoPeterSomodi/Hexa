@@ -4,8 +4,12 @@ Art director. **Status: a mockup for the owner to compare with the 3D test. Noth
 
 | File | What it shows |
 |---|---|
-| `2d_genoa_close.png` | The closest zoom, 1280x720: Savona to Chiavari, the Giovi pass at the top, Genoa in the middle |
-| `2d_genoa_compare.png` | Left: the style frame simply enlarged 4x (sharp but empty). Right: this mockup |
+| `2d_genoa_close_slopes.png` | **The current picture** (redrawn 2026-11-15 to the rule "one city, one hex", see the last section) |
+| `2d_genoa_close.png` | Before: the first version, 1280x720: Savona to Chiavari, the Giovi pass at the top, Genoa in the middle |
+| `2d_genoa_compare.png` | Before: the style frame simply enlarged 4x (left) and the first version (right) |
+| `2d_genoa_slopes_compare.png`, `compare_2d_3d.png` | Before: comparisons made with the first version |
+
+The sections below describe the first version; where the current picture differs, the last section says so.
 
 The view is the same patch as the style frame, at hex radius 240 (one 28 km hex is about a third of the screen
 width). The coast, the town sites, the pass and the ridges come from the same data as the frame, so both pictures
@@ -117,6 +121,24 @@ draws it again.
   is still hand-painted.
 - Heights: NOAA National Centers for Environmental Information. 2022: ETOPO 2022 15 Arc-Second Global Relief Model.
   doi:10.25921/fd45-gt74 (a small derived grid, kept outside the repository).
+
+## One city, one hex (2026-11-15)
+
+The owner's rule: one city, one hex, drawn inside it. `2d_genoa_close_slopes.png` was redrawn to it and is now the
+same picture as panel 3 of the growing map (`../growing/notes.md` has the rule, the district table and the alignment
+sheet). What changed against the first version:
+
+- Genoa stands in the middle of its own hex (8,13) instead of across the border of two hexes. It is smaller (about
+  half the hex's width); its basin is the corner of sea inside the hex and both moles stay inside it.
+- Savona and Chiavari moved inside their hexes. The seven unnamed hamlets are gone: each hex has one seat.
+- The coast is the normal map's line with three small harbour coves (at most 3.5 km from it); the hand-carved bay and
+  capes are gone.
+- One torrent, the map's stream on the hex border (Bisagno); the Polcevera is not in the map data and is gone.
+- The roads follow the normal map's lines and meet at the centre of Genoa's hex, behind the north gate; the Giovi
+  hairpins are gone.
+- Farms and field parcels are placed per hex and never cross a border.
+- `scene.py` has the hex helpers and the map's lines; `stages.py` the district table; `closeup.py` without `--stage`
+  draws panel 3.
 
 ## For the owner to decide
 

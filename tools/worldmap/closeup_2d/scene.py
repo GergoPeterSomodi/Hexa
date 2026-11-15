@@ -1,7 +1,10 @@
 """Geography for the 2D close-up of Genoa: the style frame's world, seen at hex radius 240.
 
-The land, coast, towns, roads and ridges come from the style-frame generator (read only), so the view is the
-same patch as the frame's 4x crop. Only the Genoa harbour bay is carved by hand.
+The land, coast, roads, the torrent and the ridges come from the style-frame generator (read only), so the view is
+the same patch as the frame's 4x crop. The rule of this zoom is "one city, one hex, drawn inside it": every settlement
+stands inside its own 28 km hex (see stages.DISTRICTS), and the helpers below say which hex a point lies in and how
+far it is from the border. The coast is the frame's line; the only local changes are three small harbour coves
+(COAST_MODS), each within COAST_REACH_KM of the frame's line.
 """
 import math, os, sys, random
 
@@ -44,14 +47,58 @@ SAVONA = WORLD["towns"]["Savona"]
 CHIAVARI = WORLD["towns"]["Chiavari"]
 GIOVI = WORLD["passes"]["Giovi"]
 
+# ---------------------------------------------------------------- the hexes of the normal map
+APOTHEM = W_KM / 2.0            # centre to border, km
+
+
+def hex_at(x, y):
+    """The hex (column, row) under a point in drawing px."""
+    return hex_of_km(*K(x, y))
+
+
+def hex_margin(x, y, hx=None):
+    """How far (km) a point in drawing px lies inside hex hx (its own hex when not given); negative when outside."""
+    kx, ky = K(x, y)
+    if hx is None:
+        hx = hex_of_km(kx, ky)
+    cx, cy = centre(*hx)
+    dx, dy = abs(kx - cx), abs(ky - cy)
+    return APOTHEM - max(dx, dx * 0.5 + dy * 0.8660254)
+
+
+def in_hex(x, y, hx, margin=1.0):
+    """True when the point (drawing px) lies in hex hx, at least margin km from its border."""
+    return hex_margin(x, y, hx) >= margin
+
+
+def hex_px(hx):
+    return [P(*p) for p in corners(*hx)]
+
+
+def frame_line(pts):
+    """A line of the normal map (km) in drawing px, cut to the view."""
+    out = [P(*p) for p in pts]
+    return [p for p in out if -260 < p[0] < W + 260 and -260 < p[1] < H + 260]
+
+
+FRAME_ROADS = [frame_line(rd["pts"]) for rd in WORLD["roads"]]
+FRAME_ROADS = [ln for ln in FRAME_ROADS if len(ln) > 1]
+FRAME_STREAMS = [ln for ln in (frame_line(st) for st in WORLD["streams"]) if len(ln) > 1]
+
 # ---------------------------------------------------------------- the coast
+COAST_REACH_KM = 3.5            # no local change moves the shore further than this from the frame's line
 # Local changes to the frame's coast: ("sea" or "land", x, y, rx, ry) ellipses in km, applied in order. Set by build_coast.
 MODS = []
 
 
+def frame_land(x, y):
+    """The normal map's own land value (the frame's coast is its 0.5 line)."""
+    return FIELDS.at(FIELDS.land, x, y)
+
+
 def land_value(x, y):
     v = FIELDS.at(FIELDS.land, x, y)
-    # small coves and points that only show at this zoom
+    # small coves and points that only show at this zoom (they move the shore by a few hundred metres at most)
     edge = max(0.0, 1 - abs(v - 0.5) * 5.0)
     v += ((vnoise(x, y, 1.3, 31) - 0.5) * 0.10 + (vnoise(x, y, 0.55, 32) - 0.5) * 0.05) * edge
     for (kind, hx, hy, rx, ry) in MODS:
@@ -111,6 +158,27 @@ def build_coast(mods):
     m = 6
     loops = contours(land_value, VX - m, VY - m, VX + VW_KM + m, VY + VH_KM + m, 0.4)
     return [chaikin(lp, 2, closed=True) for lp in loops]
+
+
+def coast_drift(loops, step=4):
+    """The largest distance (km) from the close-up's shore to the normal map's shore, and where (km)."""
+    worst, at = 0.0, None
+    for lp in loops:
+        for x, y in lp[::step]:
+            if not (VX < x < VX + VW_KM and VY < y < VY + VH_KM):
+                continue
+            inside = frame_land(x, y) > 0.5
+            d = 0.0
+            found = False
+            while d < 8.0 and not found:
+                d += 0.25
+                for a in range(0, 360, 20):
+                    if (frame_land(x + math.cos(math.radians(a)) * d, y + math.sin(math.radians(a)) * d) > 0.5) != inside:
+                        found = True
+                        break
+            if d > worst:
+                worst, at = d, (x, y)
+    return worst, at
 
 
 def poly_area(pts):

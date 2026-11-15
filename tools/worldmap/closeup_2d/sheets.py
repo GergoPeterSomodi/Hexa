@@ -32,7 +32,7 @@ def contact_sheet(pics, path, pw=800, ph=450):
     img = pygame.Surface((w, h))
     img.fill(BG)
     text(img, "The growing map: the Genoa close-up at five moments in time", (gap, 12), 30, bold=True)
-    text(img, "Same camera, coast, hills, torrents and palette in every panel. Only what stands on the land changes.", (gap + 900, 24), 18, DIM)
+    text(img, "One city, one hex: every district grows inside its own hex. Same camera, coast, hills and palette in every panel.", (gap + 900, 24), 18, DIM)
     slots = {"1": (0, 0), "2": (1, 0), "3": (2, 0), "4a": (0, 1), "4b": (1, 1)}
     for key, (cx, cy) in slots.items():
         st = ST.STAGES[key]
@@ -46,8 +46,9 @@ def contact_sheet(pics, path, pw=800, ph=450):
     x, y = gap + 2 * (pw + gap), top + (head + ph + gap) + 6
     text(img, "How to read it", (x + 8, y), 24, bold=True)
     lines = [
-        ("Never changes", "coast, ground tones, hill and ridge shapes, torrents,"),
+        ("Never changes", "coast, ground tones, hill and ridge shapes, the torrent,"),
         ("", "town sites, road lines, the camera and the palette"),
+        ("One hex", "one district, one seat, one stage: nothing crosses a border"),
         ("Settlement", "hamlet (3 houses) > village (church) > big village;"),
         ("", "Savona and Chiavari: village > walled town or port town"),
         ("Fields", "open strips > hedged blocks > estates (4b: grain, mills, barns)"),
@@ -55,8 +56,8 @@ def contact_sheet(pics, path, pw=800, ph=450):
         ("Woods", "down to the valley floors > clearings > thinned from the foot up"),
         ("Harbour", "old mole, small quay > full quay, new mole, Lanterna >"),
         ("", "great port: long moles, warehouses, three hulls, twice the ships"),
-        ("Roads", "mule track and fords > cart road, timber bridge >"),
-        ("", "road, stone bridges, hospice > highway, inn (4a)"),
+        ("Roads", "mule track and a ford > cart road, timber bridge >"),
+        ("", "road, stone bridge, hospice > highway, inn (4a)"),
         ("Castles", "one watchtower > three > bastion fortress, pass castle, flags (4b)"),
         ("1650", "4a and 4b are two different players' maps of the same land"),
     ]
@@ -81,11 +82,11 @@ def plates(img, k, e=1):
     def at(x, y):
         return (x * e // k, y * e // k)
     if k <= 4:
-        C.plate(img, "Genoa", at(631, 300), 1, "midbottom")
-        C.plate(img, "Savona", at(100, 548), 1)
-        C.plate(img, "Chiavari", at(1128, 506), 1)
+        C.plate(img, "Genoa", at(442, 318), 1, "midbottom")
+        C.plate(img, "Savona", at(118, 420), 1, "midbottom")
+        C.plate(img, "Chiavari", at(930, 472), 1, "midleft")
     else:
-        C.plate(img, "Genoa", at(631, 310), 1, "midbottom")
+        C.plate(img, "Genoa", at(442, 326), 1, "midbottom")
 
 
 def zoom_strips(pics, path, keys=("1", "3", "4a")):

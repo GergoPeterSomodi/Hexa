@@ -1,5 +1,10 @@
 """The 2D close-up mockup of Genoa (hex radius 240): the style frame's patch with the detail of the closest zoom.
 
+The rule: one city, one hex, drawn inside it. Genoa stands in the middle of its own hex (8,13 of the normal map), its
+harbour is the corner of sea inside that hex, and the coast, the torrent and the roads are the normal map's lines
+(scene.FRAME_ROADS, scene.FRAME_STREAMS); the roads meet at the hex centre behind the town, as they do on the map.
+The picture itself is stage 3 of the growing map (growth.py, stages.py).
+
 Run from the repository root, with STYLE_FRAME_LAYERS pointing at the exported layers file:
     python tools/worldmap/closeup_2d/closeup.py OUT_DIR [EMPTY_CROP.png]
 Writes 2d_genoa_close.png and, when the frame's plain 4x crop is given, 2d_genoa_compare.png.
@@ -9,7 +14,7 @@ Set CLOSEUP_KEEP_2X=1 to also save the 2x drawing (for checking details).
 
 The growing map (the same view at several moments in time, see growth.py and stages.py):
     python tools/worldmap/closeup_2d/closeup.py OUT_DIR --stage 1|2|3|4a|4b|all
-Without --stage the picture is drawn exactly as before.
+Without --stage the picture is stage 3.
 Authored positions are in drawing px (2x of the 1280x720 picture).
 """
 import math, os, random, sys, time
@@ -19,6 +24,7 @@ from scene import *
 from frame import seg_x
 import paint as A
 import terrain as T
+import stages as ST
 
 pygame.init()
 INK = A.INK
@@ -27,19 +33,28 @@ C_RIVER, C_RIVER_EDGE = (84, 156, 212), (44, 92, 140)
 QUAY = (224, 210, 180)
 
 # ---------------------------------------------------------------- Genoa: the bay, the walls, the routes
-BAY = (1235, 1000, 215, 100)            # the harbour basin: centre and radii
-CAPE = (985, 1047, 82, 50)              # Capo di Faro, where the lighthouse stands
-POINT = (1478, 1036, 96, 56)            # the old-town point, root of the old mole
-WALL = [(1003, 990), (985, 930), (1002, 860), (1055, 795), (1130, 742), (1205, 712), (1262, 700), (1325, 715), (1400, 750),
-        (1470, 800), (1520, 860), (1545, 915), (1554, 985), (1550, 1046)]
-WEST_GATE, EAST_GATE, CASTLE = (985, 930), (1545, 915), (1262, 700)
-POLCEVERA = [(1040, -30), (1028, 70), (1022, 180), (1004, 290), (1000, 400), (990, 520), (962, 660), (915, 800), (892, 925), (876, 1000), (868, 1060)]
-BISAGNO = [(1850, 300), (1800, 420), (1750, 540), (1700, 680), (1660, 800), (1646, 905), (1642, 980), (1648, 1070)]
-ROAD_GIOVI = [(985, 930), (958, 890), (962, 800), (1005, 670), (1046, 540), (1070, 430), (1090, 372), (1150, 350), (1236, 338), (1252, 312),
-              (1160, 296), (1082, 280), (1066, 252), (1150, 236), (1236, 222), (1250, 194), (1170, 178), (1110, 160), (1104, 132),
-              (1142, 100), (1150, 40), (1160, -30)]
-ROAD_WEST = [(-40, 1000), (60, 978), (190, 968), (330, 905), (480, 884), (640, 902), (780, 930), (862, 927), (924, 925), (985, 930)]
-ROAD_EAST = [(1545, 915), (1614, 906), (1678, 904), (1780, 928), (1900, 962), (2040, 968), (2230, 985), (2420, 1000), (2620, 1010)]
+GENOA_HEX = (8, 13)
+BAY = (884, 1030, 165, 64)              # the harbour basin: centre and radii
+CAPE = (704, 1002, 32, 20)              # the rock at the root of the new mole, where the lighthouse stands
+POINT = (1066, 1000, 40, 20)            # the old-town point, root of the old mole
+WALL = [(698, 1005), (684, 968), (694, 912), (734, 858), (784, 818), (836, 792), (912, 775), (966, 790), (1020, 820), (1070, 860),
+        (1100, 908), (1112, 955), (1108, 985)]
+WEST_GATE, NORTH_GATE, EAST_GATE, CASTLE = (684, 968), (836, 792), (1112, 955), (912, 775)
+WALL_FOOT = [(1080, 1100), (730, 1100)]                # closes the wall polygon across the basin
+DOME_BASE = 925                         # the foot of the town hill
+JUNCTION = (850, 700)                   # where the roads meet: the hex centre, behind the town's north gate
+# The lines of the normal map. The torrent is the map's stream on the border of Genoa's and Chiavari's hexes; the
+# roads follow the map's roads and end at the junction (the map draws its Genoa on the hex border, see the notes).
+BISAGNO = [(1290, 440), (1296, 484)] + [p for p in FRAME_STREAMS[0]]
+ROAD_WEST = [(286, 912), (340, 862), (396, 795), (531, 684), (640, 655), (713, 651), (790, 672), (850, 700)]
+ROAD_EAST = [(850, 700), (912, 694), (1000, 696), (1080, 740), (1150, 790), (1229, 832), (1310, 815), (1399, 776), (1539, 671),
+             (1640, 668), (1719, 698), (1840, 700), (1990, 712), (2131, 723), (2300, 728), (2620, 725)]
+ROAD_GIOVI = [(850, 700), (905, 640), (980, 590), (1080, 520), (1170, 440), (1205, 300), (1172, 160), (1148, 84), (1122, -30)]
+ROAD_SPUR = [(1719, 698), (1744, 800), (1732, 900), (1716, 962)]         # from the centre of Chiavari's hex down to the village
+ROAD_GATE = [(850, 700), (846, 748), (836, 792)]
+COAST_MODS = (("sea", BAY), ("land", CAPE), ("land", POINT),
+              ("sea", (240, 1090, 84, 78)),          # Savona's cove: the sea comes up to the town inside its hex
+              ("sea", (1715, 1086, 82, 40)))          # Chiavari's cove
 
 
 def arc(a, off=0.0):
@@ -174,10 +189,11 @@ FIELD_COLS = [(222, 198, 104), (196, 208, 102), (210, 180, 96), (186, 196, 120),
 FIELD_MIX = ("wheat", "wheat", "green", "fallow", "vine", "olive", "green")
 
 
-def field_block(cv, cx, cy, ang, cols, rows, cw, ch, seed, mix=None, hedge=True):
+def field_block(cv, cx, cy, ang, cols, rows, cw, ch, seed, mix=None, hedge=True, hx=None):
     """A block of strip fields on the ground: wheat, green crops, fallow, vines and olive groves, hedged.
     mix (growing map): the crops to draw from; the parcels then keep their shape whatever grows on them.
-    hedge: True (hedged), False (open strips with a thin balk) or "trees" (hedges with trees at the corners)."""
+    hedge: True (hedged), False (open strips with a thin balk) or "trees" (hedges with trees at the corners).
+    hx: the hex the block belongs to; a parcel that would touch the border is left out."""
     r = random.Random(seed)
     s = cv.s
     ca, sa = math.cos(math.radians(ang)), math.sin(math.radians(ang))
@@ -197,6 +213,8 @@ def field_block(cv, cx, cy, ang, cols, rows, cw, ch, seed, mix=None, hedge=True)
             ua, ub = u0, u0 + ww
             u0 += ww
             if r.random() < 0.1 or not all(is_land(*K(*q), 0.03) for q in quad) or not cv.keep.clear(mx, my, min(ww, hh) * 0.55):
+                continue
+            if hx is not None and not all(in_hex(q[0], q[1], hx, 0.8) for q in quad):
                 continue
             if mix is not None:
                 if not cv.sites.clear(mx, my, min(ww, hh) * 0.55):
@@ -267,7 +285,7 @@ def farmstead(cv, x, y, seed):
 
 
 def town(cv, cx, cy, rx, ry, n, seed, sc=1.3, walled=False, church=None, front_open=True, big=0,
-         church_built=True, wall_frac=1.0, scaffold=False, flags=False, paved=True, pave_k=1.0):
+         church_built=True, wall_frac=1.0, scaffold=False, flags=False, paved=True, pave_k=1.0, hx=None):
     """A town or hamlet: houses packed in an ellipse, a church, paving, and a wall round the land side.
     Growing map: church_built=False keeps the church plot empty, wall_frac is the share of the wall that stands
     (built from the west), scaffold marks the stretch in work, flags puts garrison flags on the wall towers."""
@@ -285,22 +303,24 @@ def town(cv, cx, cy, rx, ry, n, seed, sc=1.3, walled=False, church=None, front_o
     while len(houses) < n and tries < 900:
         tries += 1
         a, d = r.uniform(0, 2 * math.pi), math.sqrt(r.random()) * 0.9
-        hx, hy = cx + math.cos(a) * rx * d, cy + math.sin(a) * ry * d
-        if not is_land(*K(hx, hy + 6), 0.03) or not is_land(*K(hx, hy - 20), 0.03):
+        hx_, hy = cx + math.cos(a) * rx * d, cy + math.sin(a) * ry * d
+        if not is_land(*K(hx_, hy + 6), 0.03) or not is_land(*K(hx_, hy - 20), 0.03):
             continue
-        if any(abs(hx - q[0]) < 30 * sc and abs(hy - q[1]) < 17 * sc for q in houses):
+        if hx is not None and not (in_hex(hx_ - 22 * sc, hy + 4, hx, 0.7) and in_hex(hx_ + 22 * sc, hy + 4, hx, 0.7)):
             continue
-        if church and abs(hx - church[0]) < 50 * sc and abs(hy - church[1]) < 22 * sc:
+        if any(abs(hx_ - q[0]) < 30 * sc and abs(hy - q[1]) < 17 * sc for q in houses):
             continue
-        houses.append((hx, hy))
-    for i, (hx, hy) in enumerate(houses):
+        if church and abs(hx_ - church[0]) < 50 * sc and abs(hy - church[1]) < 22 * sc:
+            continue
+        houses.append((hx_, hy))
+    for i, (hx_, hy) in enumerate(houses):
         rr = random.Random(seed * 31 + i)
         if i < big:
-            cv.add(hy, (lambda a=hx, b=hy, d=rr: A.palazzo(cv.s, a, b, d, sc=sc * 0.95, floors=3, arcade=False)))
-            cv.sh_box(hx, hy, 34 * sc, 60 * sc)
+            cv.add(hy, (lambda a=hx_, b=hy, d=rr: A.palazzo(cv.s, a, b, d, sc=sc * 0.95, floors=3, arcade=False)))
+            cv.sh_box(hx_, hy, 34 * sc, 60 * sc)
         else:
-            cv.add(hy, (lambda a=hx, b=hy, d=rr: A.house(cv.s, a, b, d, sc=sc)))
-            cv.sh_box(hx, hy, 30 * sc, 44 * sc)
+            cv.add(hy, (lambda a=hx_, b=hy, d=rr: A.house(cv.s, a, b, d, sc=sc)))
+            cv.sh_box(hx_, hy, 30 * sc, 44 * sc)
     if church and church_built:
         kw = dict(church[2])
         cv.add(church[1], (lambda: A.church(cv.s, church[0], church[1], random.Random(seed + 5), **kw)))
@@ -357,21 +377,7 @@ def jetty(cv, x, y, length=70, w=15, along=0.0):
 
 # ---------------------------------------------------------------- Genoa
 # What Genoa has today (about 1600). The growing map passes other values (stages.py); the layout never changes.
-GENOA_NOW = dict(
-    rows=232,                        # how far up the hill the house rows reach (offset from the quay)
-    churches=4,
-    quay=(184, 357),                 # the stone quay round the basin, in degrees of the harbour ellipse
-    piers=((226, 52), (258, 62), (288, 60), (318, 50)),
-    moles=(([(1420, 1058), (1372, 1074), (1310, 1080), (1262, 1076)], 22), ([(1052, 1070), (1090, 1084), (1136, 1086)], 20)),
-    lights=((1262, 1080, 14, 34, 1082), (1136, 1090, 12, 26, 1092)),
-    slips=((1052, 968), (1084, 954)),
-    hulls=((1052, 962, 975), (1086, 948, 962)),
-    crane=True,
-    goods=(214, 236, 262, 284, 300, 326),
-    lanterna=True,
-    castle=True,
-    suburbs=((930, 905), (902, 960), (1600, 935), (1596, 880), (940, 968)),
-)
+GENOA_NOW = ST.GENOA_1600
 
 
 def genoa_ground(cv, g=None):
@@ -383,27 +389,27 @@ def genoa_ground(cv, g=None):
     def edge(a, off):         # where there is no quay yet the paving stops short of the strand
         return arc(a, off if q0 <= a <= q1 else 17)
 
+    # paving and lanes are laid inside the wall; a grown town also paves a strip outside it, where the suburbs stand
+    lay = pygame.Surface((W, H), pygame.SRCALPHA)
     pave = [arc(a, 196) for a in range(190, 351, 4)] + [edge(a, -3) for a in range(350, 189, -4)]
-    if g.get("pave_in_wall"):      # a smaller town: no paved suburbs yet, the paving ends at the wall
-        lay = pygame.Surface((W, H), pygame.SRCALPHA)
-        pygame.draw.polygon(lay, (214, 200, 164, 255), pave)
-        pygame.draw.polygon(lay, (226, 212, 176, 255), [arc(a, 120) for a in range(196, 345, 4)] + [edge(a, 0) for a in range(344, 195, -4)])
-        m = pygame.Surface((W, H), pygame.SRCALPHA)
-        pygame.draw.polygon(m, (255, 255, 255, 255), [(p[0], p[1]) for p in WALL] + [(1570, 1110), (975, 1110)])
-        lay.blit(m, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-        s.blit(lay, (0, 0))
-    else:
-        pygame.draw.polygon(s, (214, 200, 164), pave)
-        pygame.draw.polygon(s, (226, 212, 176), [arc(a, 120) for a in range(196, 345, 4)] + [edge(a, 0) for a in range(344, 195, -4)])
-    e = pygame.Rect(0, 0, POINT[2] * 1.75, POINT[3] * 1.7)
-    e.center = (POINT[0] - 6, POINT[1] - 6)
-    pygame.draw.ellipse(s, (220, 206, 170), e)
+    pygame.draw.polygon(lay, (214, 200, 164, 255), pave)
+    pygame.draw.polygon(lay, (226, 212, 176, 255), [arc(a, 120) for a in range(196, 345, 4)] + [edge(a, 0) for a in range(344, 195, -4)])
+    e = pygame.Rect(0, 0, POINT[2] * 2.2, POINT[3] * 2.0)
+    e.center = (POINT[0], POINT[1] - 8)
+    pygame.draw.ellipse(lay, (220, 206, 170, 255), e)
     # streets: a few darker lanes running up from the quay
     for a in (212, 232, 252, 276, 298, 318, 336):
-        pygame.draw.line(s, (196, 180, 146), arc(a, 10 if q0 <= a <= q1 else 22), arc(a + 3, 186), 5)
+        pygame.draw.line(lay, (196, 180, 146, 255), arc(a, 10 if q0 <= a <= q1 else 22), arc(a + 3, 186), 5)
     for off in (48, 88, 126, 163):
         pts = [arc(a, off) for a in range(198, 344, 4)]
-        pygame.draw.lines(s, (198, 182, 148), False, pts, 4)
+        pygame.draw.lines(lay, (198, 182, 148, 255), False, pts, 4)
+    m = pygame.Surface((W, H), pygame.SRCALPHA)
+    pygame.draw.polygon(m, (255, 255, 255, 255), WALL + WALL_FOOT)
+    if not g.get("pave_in_wall"):
+        for gate_ in (WEST_GATE, EAST_GATE):
+            pygame.draw.ellipse(m, (255, 255, 255, 255), (gate_[0] - 52, gate_[1] - 44, 104, 76))
+    lay.blit(m, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    s.blit(lay, (0, 0))
     # the quay
     outer = [arc(a, 15) for a in range(q0, q1, 3)]
     inner = [arc(a, -5) for a in range(q0, q1, 3)]
@@ -417,11 +423,11 @@ def genoa_ground(cv, g=None):
     # piers into the basin
     for a, ln in g["piers"]:
         x0, y0 = arc(a, -2)
-        dx, dy = BAY[0] - x0, (BAY[1] + 40) - y0
+        dx, dy = BAY[0] - x0, (BAY[1] + 24) - y0
         d = math.hypot(dx, dy)
         x1, y1 = x0 + dx / d * ln, y0 + dy / d * ln
-        pygame.draw.line(s, INK, (x0, y0), (x1, y1), 17)
-        pygame.draw.line(s, QUAY, (x0, y0), (x1, y1), 12)
+        pygame.draw.line(s, INK, (x0, y0), (x1, y1), 15)
+        pygame.draw.line(s, QUAY, (x0, y0), (x1, y1), 10)
         pygame.draw.line(s, (246, 238, 214), (x0 - 3, y0), (x1 - 3, y1), 2)
         for t in (0.35, 0.7, 1.0):
             pygame.draw.rect(s, (88, 66, 54), (x0 + (x1 - x0) * t - 2, y0 + (y1 - y0) * t - 4, 4, 6))
@@ -465,9 +471,9 @@ def genoa(cv, g=None):
     s = cv.s
     g = g or GENOA_NOW
     r = random.Random(1492)
-    wallpoly = WALL + [(1480, 1100), (1000, 1100)]
-    sc = 1.42
-    marks = [(1318, 846, 60), (1118, 876, 44), (1440, 902, 44), (1212, 808, 40), (1262, 742, 60)]
+    wallpoly = WALL + WALL_FOOT
+    sc = 1.36
+    marks = [(950, 900, 60), (790, 925, 44), (1046, 946, 44), (866, 866, 40), (CASTLE[0], CASTLE[1] + 36, 60)]
     placed = []
 
     def free(x, y, w):
@@ -479,14 +485,14 @@ def genoa(cv, g=None):
         x, y = arc(a, 24)
         w = r.uniform(30, 40)
         a = arc_step(a, 24, w * 1.3)
-        if not in_poly(x, y, wallpoly) or abs(x - 1236) < 40:
+        if not in_poly(x, y, wallpoly) or abs(x - BAY[0]) < 40:
             continue
         rr = random.Random(int(a * 13))
         fl = rr.choice((3, 4, 4, 5))
         cv.add(y, (lambda x=x, y=y, w=w, rr=rr, fl=fl: A.palazzo(cv.s, x, y, rr, sc=1.28, w=w, floors=fl)))
         cv.sh_box(x, y, w * 1.28, 80)
     # Palazzo San Giorgio on the quay, with its painted front
-    cv.add(arc(270, 24)[1] + 1, lambda: A.palazzo(cv.s, 1236, arc(270, 24)[1] + 1, random.Random(5), sc=1.5, w=50, floors=4,
+    cv.add(arc(270, 24)[1] + 1, lambda: A.palazzo(cv.s, BAY[0], arc(270, 24)[1] + 1, random.Random(5), sc=1.5, w=50, floors=4,
                                                  wall=(226, 150, 118), roof=A.SLATE))
     # rows of houses climbing behind
     for off, kinds in ((62, "pph"), (98, "phh"), (134, "hhp"), (168, "hhh"), (200, "hhh"), (232, "hh-")):
@@ -512,26 +518,25 @@ def genoa(cv, g=None):
             cv.sh_box(x, y, w * sc, 56)
             placed.append((x, y))
     # the old quarter on the point, by the mole
-    for yy in (992, 1014, 1038, 1060):
-        x = POINT[0] - 84 + (yy % 3) * 6
-        while x < POINT[0] + 70:
-            w = r.uniform(27, 35)
-            d = math.hypot((x - POINT[0]) / (POINT[2] - 12), (yy - POINT[1]) / (POINT[3] - 6))
-            if d < 0.93 and in_poly(x, yy, wallpoly) and is_land(*K(x, yy + 5), 0.03):
+    for yy in (972, 992):
+        x = POINT[0] - 36 + (yy % 3) * 6
+        while x < POINT[0] + 40:
+            w = r.uniform(27, 33)
+            if in_poly(x, yy, wallpoly) and is_land(*K(x, yy + 5), 0.03) and in_hex(x + 20, yy + 6, GENOA_HEX, 0.7):
                 rr = random.Random(int(x * 3 + yy))
-                cv.add(yy, (lambda x=x, y=yy, w=w, rr=rr: A.house(cv.s, x, y, rr, sc=1.3, w=w, floors=rr.choice((2, 3)))))
-                cv.sh_box(x, yy, w * 1.3, 50)
-            x += w * 1.3
+                cv.add(yy, (lambda x=x, y=yy, w=w, rr=rr: A.house(cv.s, x, y, rr, sc=1.25, w=w, floors=rr.choice((2, 3)))))
+                cv.sh_box(x, yy, w * 1.25, 50)
+            x += w * 1.25
     # the cathedral of San Lorenzo: striped front, dome and bell tower
-    cv.add(848, lambda: A.church(cv.s, 1318, 848, random.Random(1), sc=1.72, stripes=True, dome=True, cap="dome"))
+    cv.add(902, lambda: A.church(cv.s, 950, 902, random.Random(1), sc=1.6, stripes=True, dome=True, cap="dome"))
     if g["churches"] > 1:
-        cv.add(877, lambda: A.church(cv.s, 1118, 877, random.Random(2), sc=1.2, side="left"))
+        cv.add(926, lambda: A.church(cv.s, 790, 926, random.Random(2), sc=1.15, side="left"))
     if g["churches"] > 2:
-        cv.add(903, lambda: A.church(cv.s, 1440, 903, random.Random(3), sc=1.2, stripes=True))
+        cv.add(947, lambda: A.church(cv.s, 1046, 947, random.Random(3), sc=1.15, stripes=True))
     if g["churches"] > 3:
-        cv.add(809, lambda: A.church(cv.s, 1212, 809, random.Random(4), sc=1.05, cap="dome", side="left"))
+        cv.add(867, lambda: A.church(cv.s, 866, 867, random.Random(4), sc=1.0, cap="dome", side="left"))
     # tower houses of the old families
-    for x, y, h in ((1262, 846, 118), (1392, 872, 100), (1172, 842, 92), (1466, 962, 84)):
+    for x, y, h in ((904, 898, 104), (1006, 918, 88), (832, 896, 82), (1076, 968, 72)):
         cv.add(y, (lambda x=x, y=y, h=h: A.tower(cv.s, x, y, 19, h, col=(218, 182, 144))))
         cv.sh_box(x, y, 19, h)
     # the walls: up the hill to the castle and down again, a tower at every turn
@@ -540,15 +545,16 @@ def genoa(cv, g=None):
         cv.add(max(a[1], b[1]) - 8, (lambda a=a, b=b: A.wall_run(cv.s, [a, b], 22)))
     cv.sh_poly([(p[0] + 4, p[1]) for p in pieces] + [(p[0] + 16, p[1] + 8) for p in pieces[::-1]])
     for i, (x, y) in enumerate(WALL):
-        if (x, y) in (WEST_GATE, EAST_GATE, CASTLE):
+        if (x, y) in (WEST_GATE, NORTH_GATE, EAST_GATE, CASTLE):
             continue
         cv.add(y - 6, (lambda x=x, y=y: A.tower(cv.s, x, y + 3, 22, 52)))
         cv.sh_box(x, y + 3, 22, 52)
     cv.add(WEST_GATE[1] - 2, lambda: A.gate(cv.s, WEST_GATE[0], WEST_GATE[1] + 4, 1.15))
-    cv.add(EAST_GATE[1] - 2, lambda: A.gate(cv.s, EAST_GATE[0], EAST_GATE[1] + 4, 1.3))
+    cv.add(EAST_GATE[1] - 2, lambda: A.gate(cv.s, EAST_GATE[0], EAST_GATE[1] + 4, 1.15))
+    cv.add(NORTH_GATE[1] - 2, lambda: A.gate(cv.s, NORTH_GATE[0], NORTH_GATE[1] + 4, 1.2))
 
     def castle():
-        x, y = CASTLE[0], CASTLE[1] + 6
+        x, y = CASTLE[0] + 6, CASTLE[1] + 6
         A.tower(s, x - 38, y - 2, 24, 58)
         A.tower(s, x + 38, y - 2, 24, 58)
         A.rect(s, (224, 212, 184), x - 36, y - 40, 72, 42, INK, 2)
@@ -605,19 +611,19 @@ def genoa(cv, g=None):
                     pygame.draw.ellipse(s, INK, (px - 3, y - 8, 7, 9), 1)
         cv.add(y + 26, goods)
     # the Lanterna on its rock
-    lx, ly = CAPE[0] - 10, CAPE[1] + 6
+    lx, ly = CAPE[0] - 4, CAPE[1] + 2
 
     def lantern():
         rr = random.Random(9)
-        A.rock(s, lx - 26, ly + 12, 46, rr, col=(160, 148, 130))
-        A.rock(s, lx + 24, ly + 14, 40, rr, col=(150, 140, 126))
-        A.rock(s, lx, ly + 18, 60, rr, col=(170, 158, 138))
-        top = A.lanterna(s, lx, ly, 1.42)
+        A.rock(s, lx - 16, ly + 8, 30, rr, col=(160, 148, 130))
+        A.rock(s, lx + 14, ly + 9, 26, rr, col=(150, 140, 126))
+        A.rock(s, lx, ly + 12, 40, rr, col=(170, 158, 138))
+        top = A.lanterna(s, lx, ly, 1.2)
         for dx, dy in ((-34, -6), (-30, 8), (34, -6), (30, 8)):      # the beam of the light
             pygame.draw.line(s, (255, 238, 170), (lx + dx * 0.45, top + 14 + dy * 0.45), (lx + dx, top + 14 + dy), 2)
     if g["lanterna"]:
         cv.add(ly + 20, lantern)
-        cv.sh_box(lx, ly + 6, 36, 190)
+        cv.sh_box(lx, ly + 6, 32, 160)
     # small harbour lights at the ends of the moles
     for tx_, ty_, tw_, th_, tk_ in g["lights"]:
         cv.add(tk_, (lambda a=tx_, b=ty_, c=tw_, d=th_: A.tower(s, a, b, c, d, cap="spire")))
@@ -642,7 +648,7 @@ def flock(s, x, y, seed):
 def gulls(s):
     """Gulls over the harbour and the cliffs: two short strokes each."""
     r = random.Random(12)
-    for cx, cy in ((1210, 1128), (1420, 1150), (1905, 1140), (2450, 1190), (320, 1080), (930, 1120)):
+    for cx, cy in ((884, 1150), (1080, 1120), (1715, 1150), (2450, 1190), (320, 1150), (640, 1100)):
         for i in range(r.randint(2, 4)):
             x, y = cx + r.uniform(-60, 60), cy + r.uniform(-34, 34)
             w = r.uniform(6, 9)
@@ -652,23 +658,7 @@ def gulls(s):
 
 def ships(cv, fleet=None):
     s = cv.s
-    fleet = fleet or [
-        (A.carrack, 1168, 1012, dict(sc=1.0, d=1, furled=True)),
-        (A.galley, 1322, 1030, dict(sc=0.86, d=-1, sail=False)),
-        (A.boat, 1126, 966, dict(sc=1.0, d=1, sail=False)),
-        (A.boat, 1262, 946, dict(sc=1.0, d=-1, sail=False)),
-        (A.boat, 1372, 982, dict(sc=1.05, d=-1)),
-        (A.carrack, 1560, 1262, dict(sc=1.75, d=-1)),
-        (A.galley, 760, 1216, dict(sc=1.3, d=1)),
-        (A.carrack, 330, 1352, dict(sc=1.15, d=1, cross=False)),
-        (A.carrack, 2330, 1336, dict(sc=1.3, d=-1)),
-        (A.boat, 2010, 1152, dict(sc=1.3, d=1)),
-        (A.boat, 2140, 1206, dict(sc=1.15, d=-1)),
-        (A.boat, 1880, 1300, dict(sc=1.2, d=1)),
-        (A.boat, 380, 1136, dict(sc=1.25, d=1)),
-        (A.boat, 470, 1190, dict(sc=1.1, d=-1)),
-        (A.boat, 1030, 1180, dict(sc=1.15, d=1)),
-    ]
+    fleet = fleet or [({"carrack": A.carrack, "galley": A.galley, "boat": A.boat}[k], x, y, kw) for k, x, y, kw in ST.FLEET_1600]
     for fn, x, y, kw in fleet:
         cv.add(y, (lambda fn=fn, x=x, y=y, kw=kw: fn(s, x, y, **kw)))
 
@@ -704,169 +694,29 @@ def halo_text(surf, text, size, col, halo, pos, anchor="center", font="georgia")
 
 
 def names(out):
-    plate(out, "Genoa", (631, 286), 3, "midbottom")
-    plate(out, "Savona", (92, 552), 2)
-    plate(out, "Chiavari", (1128, 500), 1)
-    halo_text(out, "Giovi", 21, (58, 48, 44), (244, 238, 222), (626, 52), "midleft")
-    halo_text(out, "Polcevera", 15, (34, 84, 136), (206, 232, 244), (452, 372))
-    halo_text(out, "Bisagno", 15, (34, 84, 136), (206, 232, 244), (892, 330))
+    plate(out, "Genoa", (442, 306), 3, "midbottom")
+    plate(out, "Savona", (118, 398), 2, "midbottom")
+    plate(out, "Chiavari", (930, 472), 1, "midleft")
+    halo_text(out, "Giovi", 21, (58, 48, 44), (244, 238, 222), (640, 44), "midleft")
+    halo_text(out, "Bisagno", 15, (34, 84, 136), (206, 232, 244), (704, 442))
     halo_text(out, "G u l f   o f   G e n o a", 28, (170, 212, 236), None, (640, 688))
 
 
 # ---------------------------------------------------------------- the picture
 def main(out_dir, empty_crop=None):
+    """Today's picture is stage 3 of the growing map; there is one layout, in stages.py."""
+    import growth
     t0 = time.time()
-    if SF.SLOPES:      # the slope rule: the two authored torrents lie in their valleys too
-        SF.SLOPES.add_water([[K(*p) for p in smooth(line, 3, 12.0)] for line in (POLCEVERA, BISAGNO)])
-        T.TONES = SF.SLOPES.level(1.0)
-    loops = build_coast([ell_km("sea", BAY), ell_km("land", CAPE), ell_km("land", POINT)])
-    loops_px = [[P(*p) for p in lp] for lp in loops]
-    cv = T.Canvas()
-    sx, sy = P(SAVONA["x"], SAVONA["y"])
-    cx, cy = P(CHIAVARI["x"], CHIAVARI["y"])
-    T.paint_sea(cv, loops_px)
-    T.paint_land(cv, loops_px)
-    runs = T.shore_points(loops_px)
-
-    def in_basin(x, y):
-        return math.hypot((x - BAY[0]) / (BAY[2] + 16), (y - BAY[1]) / (BAY[3] + 16)) < 1.0 and y < BAY[1] + 30
-
-    T.paint_shore(cv, runs, [(in_basin, "quay"),
-                             (lambda x, y: math.hypot(x - BAY[0], (y - BAY[1]) * 1.5) < 420, "sand"),
-                             (lambda x, y: math.hypot(x - sx, y - sy) < 230, "sand"),
-                             (lambda x, y: math.hypot(x - cx, y - cy) < 170, "sand")])
-    T.paint_waves(cv)
-    ctab = {}
-
-    def coast_y(x):
-        k = int(x // 16)
-        if k not in ctab:
-            y = 500.0
-            while y < H + 200 and land_value(*K(k * 16 + 8, y)) > 0.5:
-                y += 6
-            ctab[k] = y
-        return ctab[k]
-
-    # ---- the hill behind Genoa, painted flat first so that the town, its walls and the road can climb it
-    wallpoly = WALL + [(1480, 1100), (1000, 1100)]
-    dome = [dict(x=930, y=884, h=118, apex=False, m=300), dict(x=1085, y=884, h=214, apex=False, m=420), dict(x=1262, y=884, h=262, apex=True, m=480),
-            dict(x=1425, y=884, h=214, apex=False, m=420), dict(x=1580, y=884, h=124, apex=False, m=300)]
-    dome_top = T.ridge(cv, dome, 0.37, main=False, wood=0.34, pre=True,
-                       terraces=lambda x, y: not in_poly(x, y, wallpoly) or y < arc(270, 200)[1] + abs(x - BAY[0]) * 0.2)
-    # ---- the ground plane: streams, roads, fields, the harbour works
-    pol = paint_stream(cv, POLCEVERA, 7, 15, 3)
-    bis = paint_stream(cv, BISAGNO, 6, 13, 4)
-    giovi = paint_road(cv, ROAD_GIOVI, 11, wig=0, clear=16)
-    west = paint_road(cv, ROAD_WEST, 10)
-    east = paint_road(cv, ROAD_EAST, 10)
-    # towns and hamlets claim their ground before the fields do
-    for x in range(960, 1600, 40):
-        for y in range(700, 1090, 40):
-            if in_poly(x, y, wallpoly):
-                cv.keep.add(x, y, 44)
-    cv.keep.add(CAPE[0], CAPE[1], 90)
-    cv.routes.add(1262, 830, 330)
-    cv.routes.add(1040, 860, 200)
-    cv.routes.add(1480, 860, 200)
-    town(cv, sx + 40, sy - 62, 150, 62, 15, 21, sc=1.3, walled=True, big=3,
-         church=(sx + 50, sy - 70, dict(sc=1.3, side="right")))
-    town(cv, cx - 10, cy - 34, 104, 40, 8, 22, sc=1.25, church=(cx + 6, cy - 44, dict(sc=1.1, side="left", cap="dome")))
-    farms = ((330, 800), (900, 596), (1730, 880), (2440, 962), (500, 930), (1960, 742), (1325, 560), (150, 842))
-    hamlets = [(1330, 410, 23, "right"), (566, 640, 24, "left"), (1808, 640, 25, "right"), (2300, 892, 26, "left"), (676, 968, 27, "right"),
-               (1420, 420, 28, "left"), (2050, 600, 29, "right")]
-    # cart tracks from every hamlet and farm to the nearest road
-    main_roads = giovi[::4] + west[::4] + east[::4]
-    for hx, hy in [(h[0], h[1] + 20) for h in hamlets] + [(f[0], f[1] + 4) for f in farms]:
-        q = min(main_roads, key=lambda p: (p[0] - hx) ** 2 + (p[1] - hy) ** 2)
-        d = math.dist(q, (hx, hy))
-        if 50 < d < 460:
-            mid = ((hx + q[0]) / 2 + (q[1] - hy) * 0.16, (hy + q[1]) / 2 - (q[0] - hx) * 0.16)
-            track = wiggle(smooth([(hx, hy), mid, q], 3, 2.0), 4, 80.0, int(hx) % 40 + 3)
-            stroke(cv.s, track, 7, (156, 134, 88))
-            stroke(cv.s, track, 4.5, (224, 206, 158))
-            cv.keep.add_line(track, 9)
-    for hx, hy, sd, side in hamlets:
-        town(cv, hx, hy, 74, 30, 5, sd, sc=1.2, church=(hx + (10 if side == "right" else -6), hy - 8, dict(sc=0.95, side=side)))
-    blocks = [(420, 968, -8, 4, 2, 62, 40), (560, 716, 6, 4, 2, 60, 40), (700, 620, -10, 2, 2, 60, 42), (836, 700, 14, 2, 4, 54, 42),
-              (880, 520, 16, 2, 3, 56, 44), (1130, 470, 14, 2, 2, 56, 40), (1380, 490, -6, 2, 2, 60, 42), (1740, 760, 12, 2, 4, 56, 42),
-              (1900, 660, -8, 3, 2, 58, 40), (1790, 990, 6, 3, 2, 60, 38), (1960, 1040, 4, 3, 1, 62, 42), (2210, 940, -6, 3, 2, 60, 40),
-              (2400, 900, 8, 3, 2, 60, 40), (300, 860, -14, 3, 2, 60, 42), (90, 900, 8, 3, 2, 60, 40), (2060, 690, 8, 3, 2, 56, 40),
-              (1420, 500, 6, 3, 2, 56, 38), (760, 880, -4, 3, 1, 60, 38), (640, 1010, -3, 3, 1, 56, 34), (2160, 1060, 3, 2, 1, 60, 36)]
-    for i, b in enumerate(blocks):
-        field_block(cv, b[0], b[1], b[2], b[3], b[4], b[5] * 1.4, b[6] * 1.35, seed=100 + i)
-    for i, (x, y) in enumerate(farms):
-        if cv.keep.clear(x, y, 20):
-            farmstead(cv, x, y, 300 + i)
-    genoa_ground(cv)
-    genoa_gardens(cv, wallpoly)
-    # ---- standing things
-    T.data_relief(cv, skip=lambda x, y: math.hypot((x - 1258) / 430.0, (y - 800) / 300.0) < 1.0, drop=0.3)
-    genoa(cv)
-    ships(cv)
-    # two stone bridges on the coast road, and the pass
-    for road, water in ((west, pol), (east, bis)):
-        hit = None
-        for i in range(0, len(road) - 2, 2):
-            for j in range(0, len(water) - 2, 2):
-                hit = hit or seg_x(road[i], road[i + 2], water[j], water[j + 2])
-        if hit:
-            cv.add(hit[1] + 14, (lambda q=hit: A.bridge(cv.s, (q[0] - 36, q[1] + 1), (q[0] + 36, q[1] - 1), 3, 9)))
-            cv.keep.add(hit[0], hit[1], 50)
-    px, py = 1142, 100
-
-    def the_pass():
-        A.cairn(cv.s, px - 34, py + 8, 1.15)
-        A.house(cv.s, px + 44, py + 4, random.Random(8), sc=1.35, kind="eaves", floors=2, wall=(222, 214, 198), roof=(128, 116, 110), w=40)
-        A.tower(cv.s, px + 84, py + 2, 15, 50, cap="spire", roof=(128, 116, 110))
-    cv.add(py + 10, the_pass)
-    cv.keep.add(px + 30, py, 80)
-    # travellers on the roads
-    for i, d in ((int(len(giovi) * 0.33), -1), (int(len(giovi) * 0.62), 1)):
-        mx, my = giovi[i]
-        cv.add(my + 2, (lambda a=mx, b=my, d=d: A.mule_train(cv.s, a, b + 2, d)))
-    # a watchtower on the eastern headland, a monastery hill above the Bisagno
-    for wx, wy in ((1876, 1070), (2470, 1090), (560, 990)):
-        px_, py_, nx, ny = nearest_shore(cv, wx, wy)
-        tx, ty = px_ - nx * 26, py_ - ny * 26 - 4
-        cv.add(ty, (lambda a=tx, b=ty: A.tower(cv.s, a, b, 20, 46, col=(214, 196, 164))))
-        cv.sh_box(tx, ty, 20, 46)
-        cv.keep.add(tx, ty, 40)
-    # fishing strands: jetties and boats pulled up on the sand
-    for (tx, ty, ln) in ((sx + 190, sy - 10, 84), (cx + 20, cy + 30, 70)):
-        end = jetty(cv, tx, ty, ln)
-        cv.add(end[1] + 16, (lambda e=end: A.boat(cv.s, e[0] - 34, e[1] + 14, 1.15, 1)))
-    for (tx, ty) in ((cx - 70, cy + 20), (cx - 30, cy + 26), (sx + 20, sy + 40), (700, 1010), (1700, 1040)):
-        qx, qy, nx, ny = nearest_shore(cv, tx, ty)
-        cv.add(qy, (lambda a=qx - nx * 6, b=qy - ny * 6 + 4, k=int(tx): A.boat(cv.s, a, b, 0.9, 1 if k % 2 else -1, sail=False,
-                                                                           col=((60, 96, 140), (176, 60, 50), (236, 226, 200))[k % 3])))
-    def on_dome(x, y):
-        ty = T.sil_y(dome_top, x)
-        if ty is None or y > 890:
-            return False
-        if y > ty + 24:
-            return (int(x * 7 + y * 3) % 10) < 7           # a few trees stand on the slope
-        return y > ty - 110                                   # none close behind the crest
-
-    T.grow_trees(cv, coast_y, veto=on_dome)
-    for i, (fx, fy) in enumerate(((1290, 150), (700, 760), (2150, 800), (240, 720))):     # sheep on the pastures
-        if cv.keep.clear(fx, fy, 10):
-            cv.add(fy + 12, (lambda a=fx, b=fy, k=i: flock(cv.s, a, b, k)))
-    cv.flush_shadows()
-    cv.flush_objects()
-    gulls(cv.s)
-    out = pygame.transform.smoothscale(cv.s, (OUT_W, OUT_H))
-    names(out)
-    pygame.draw.rect(out, (40, 36, 40), out.get_rect(), 1)
+    out, big = growth.render("3")
     os.makedirs(out_dir, exist_ok=True)
     stem = "2d_genoa_close_slopes" if SF.SLOPES else "2d_genoa_close"
-    path = os.path.join(out_dir, stem + ".png")
-    pygame.image.save(out, path)
+    pygame.image.save(out, os.path.join(out_dir, stem + ".png"))
     if os.environ.get("CLOSEUP_KEEP_2X"):
-        pygame.image.save(cv.s, os.path.join(out_dir, stem + "_2x.png"))
+        pygame.image.save(big, os.path.join(out_dir, stem + "_2x.png"))
     print("rendered in %.1f s" % (time.time() - t0))
     if empty_crop:
         compare(out, pygame.image.load(empty_crop), os.path.join(out_dir, "2d_genoa_compare.png"))
-    return cv, out
+    return out
 
 
 def compare(new, old, path):
