@@ -71,7 +71,7 @@ it is stable between runs and saves.
 mirrored** (D10): crests, cliffs, bridges, quays and towns come in one picture per orientation. Pieces with
 `tint: true` are white for the renderer to tint (the arms frame, the pennant, the calm patch).
 
-**Edges.** Directions are 0 E, 1 NE, 2 NW, 3 W, 4 SW, 5 SE (`WorldGrid.neighbour`); corner k sits at -90 + 60k
+**Edges.** Directions are 0 E, 1 NE, 2 NW, 3 W, 4 SW, 5 SE (`HexGrid.neighbour`); corner k sits at -90 + 60k
 degrees. An edge's orientation is `e` (directions 0 and 3, a vertical edge), `ne` (1 and 4) or `nw` (2 and 5); crest
 and saddle pieces are chosen by orientation, cliffs, beach rims and quays by the direction from the land (or town) hex
 to the other side, bridges by the axis of the road (0 for an E/W edge, 1 for NE/SW, 2 for NW/SE).

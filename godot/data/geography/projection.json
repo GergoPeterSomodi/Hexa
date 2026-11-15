@@ -1,6 +1,6 @@
 {
  "schema": "hexa-godot/geography-projection/1",
- "source": "hexa/campaign/geo.py (projection, lonlat, hex_of, merc, inv_merc, land_cells; see builder_functions.json)",
+ "source": "hexa/campaign/geo.py (projection, lonlat, hex_of, merc, inv_merc, land_cells; the Python source is the reference)",
  "name": "Europe 1480",
  "start": [
   8.0,

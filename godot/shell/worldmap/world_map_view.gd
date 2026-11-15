@@ -1,6 +1,6 @@
 ## The map prototype's viewer, step 2 (docs/design/map/README.md section 8): the region's hexes in flat colours by relief
 ## level, crest chains as dark lines on the edges, pass edges and saddles in gold, and the names of places and passes.
-## Mouse wheel zooms about the pointer, dragging pans. Shell only: it draws what core/worldmap computed.
+## Mouse wheel zooms about the pointer, dragging pans. Shell only: it draws what core/mapgen computed.
 class_name WorldMapView
 extends Control
 
@@ -56,7 +56,7 @@ const COVER_COLOURS: Array[Color] = [
 	Color("#e6d5a3"),
 ]
 
-var grid: WorldGrid
+var grid: HexGrid
 var region: WorldRegion
 var relief: WorldRelief
 var water: WorldWater = null
@@ -74,7 +74,7 @@ var _fit_pending := false
 
 
 ## Shows a region's relief and sets the view to the whole region.
-func show_region(p_grid: WorldGrid, p_region: WorldRegion, p_relief: WorldRelief) -> void:
+func show_region(p_grid: HexGrid, p_region: WorldRegion, p_relief: WorldRelief) -> void:
 	grid = p_grid
 	region = p_region
 	relief = p_relief
@@ -194,7 +194,7 @@ func _corner_colour(hex: Vector2i, k: int) -> Color:
 	var count := 0
 	var hexes: Array[Vector2i] = [hex]
 	for d: int in 6:
-		var pair := WorldGrid.EDGE_CORNERS[d]
+		var pair := HexGrid.EDGE_CORNERS[d]
 		if pair.x == k or pair.y == k:
 			hexes.append(grid.neighbour(hex, d))
 	for h: Vector2i in hexes:
@@ -250,7 +250,7 @@ func _draw_water_bodies() -> void:
 
 func _draw_shores() -> void:
 	for e: Vector4i in water.shore_edge.keys():
-		var pair := WorldGrid.edge_hexes(e)
+		var pair := HexGrid.edge_hexes(e)
 		var seg := grid.edge_segment_km(pair[0], pair[1])
 		var kind: String = water.shore_edge[e]
 		if kind == "lake":
@@ -260,7 +260,7 @@ func _draw_shores() -> void:
 
 func _draw_streams() -> void:
 	for e: Vector4i in water.stream_edge.keys():
-		var pair := WorldGrid.edge_hexes(e)
+		var pair := HexGrid.edge_hexes(e)
 		var seg := grid.edge_segment_km(pair[0], pair[1])
 		draw_line(km_to_px(seg[0]), km_to_px(seg[1]), STREAM, 1.5)
 
@@ -293,14 +293,14 @@ func _draw_crests() -> void:
 	for key: Vector4i in relief.crest_edges.keys():
 		if relief.pass_edges.has(key):
 			continue
-		var pair := WorldGrid.edge_hexes(key)
+		var pair := HexGrid.edge_hexes(key)
 		var seg := grid.edge_segment_km(pair[0], pair[1])
 		draw_line(km_to_px(seg[0]), km_to_px(seg[1]), INK, CREST_PX)
 
 
 func _draw_passes() -> void:
 	for key: Vector4i in relief.pass_edges.keys():
-		var pair := WorldGrid.edge_hexes(key)
+		var pair := HexGrid.edge_hexes(key)
 		var seg := grid.edge_segment_km(pair[0], pair[1])
 		draw_line(km_to_px(seg[0]), km_to_px(seg[1]), GOLD, PASS_PX)
 	for p: int in relief.pass_hex.keys():
@@ -382,9 +382,9 @@ func _draw_roads() -> void:
 			centres.append(km_to_px(grid.centre_km(h)))
 		var i := 0
 		while i < n - 1:
-			var q := roads.quality_of(WorldGrid.edge_key(hexes[i], hexes[i + 1]))
+			var q := roads.quality_of(HexGrid.edge_key(hexes[i], hexes[i + 1]))
 			var j := i
-			while j + 1 < n - 1 and roads.quality_of(WorldGrid.edge_key(hexes[j + 1], hexes[j + 2])) == q:
+			while j + 1 < n - 1 and roads.quality_of(HexGrid.edge_key(hexes[j + 1], hexes[j + 2])) == q:
 				j += 1
 			var run := centres.slice(i, j + 2)
 			var pins: Array[bool] = []
@@ -411,7 +411,7 @@ func _draw_crossings() -> void:
 		var kind := roads.crossing_of(e)
 		if kind == "none" or kind == "pass":
 			continue
-		var pair := WorldGrid.edge_hexes(e)
+		var pair := HexGrid.edge_hexes(e)
 		var seg := grid.edge_segment_km(pair[0], pair[1])
 		var a := km_to_px(seg[0])
 		var b := km_to_px(seg[1])
@@ -429,7 +429,7 @@ func _draw_crossings() -> void:
 				draw_circle(mid, 4.5, QUAY)
 				draw_circle(mid, 4.5, FORD, false, 1.5)
 	for e: Vector4i in places.quay_edges.keys():
-		var pair := WorldGrid.edge_hexes(e)
+		var pair := HexGrid.edge_hexes(e)
 		var seg := grid.edge_segment_km(pair[0], pair[1])
 		draw_line(km_to_px(seg[0]), km_to_px(seg[1]), QUAY, 3.0)
 

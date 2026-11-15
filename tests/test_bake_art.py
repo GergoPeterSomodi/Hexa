@@ -1,9 +1,7 @@
 """The art baker (tools/bake_art.py, release 0.3.0 item 5): it runs, its index matches its atlases, the sizes are the
-pinned ones (hex radius 60, tile 104 x 120, sprites 106 x 122 with a 2 px extruded border, pages at most 2048 px), and
-the committed bake under godot/assets/baked/ is what the baker makes now (the same sprites at the same places; the same
-bytes too when it was baked on this platform)."""
+pinned ones (hex radius 60, tile 104 x 120, sprites 106 x 122 with a 2 px extruded border, pages at most 2048 px). The
+committed bake under godot/assets/baked/ is gone (the 0.3.0 map is retired); the baker stays for tools/worldmap."""
 import hashlib
-import json
 import os
 import tempfile
 import unittest
@@ -101,20 +99,6 @@ class BakeArtTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.out, "kenney", "License.txt")))
         for rel in self.index["kenney"]["files"]:
             self.assertTrue(os.path.exists(os.path.join(self.out, "kenney", *rel.split("/"))), rel)
-
-    def test_the_committed_bake_is_current(self):
-        path = os.path.join(bake_art.OUT_DIR, "index.json")
-        if not os.path.exists(path):
-            self.skipTest("no committed bake")
-        with open(path, encoding="utf-8") as f:
-            committed = json.load(f)
-        fresh = self.index
-        self.assertEqual({n: s["rect"] + [s["atlas"]] for n, s in committed["sprites"].items()},
-                         {n: s["rect"] + [s["atlas"]] for n, s in fresh["sprites"].items()})
-        if committed["platform"] == fresh["platform"]:
-            self.assertEqual({n: p["sha256"] for n, p in committed["atlases"].items()},
-                             {n: p["sha256"] for n, p in fresh["atlases"].items()},
-                             "the art changed: re-run python -m tools.bake_art")
 
 
 if __name__ == "__main__":

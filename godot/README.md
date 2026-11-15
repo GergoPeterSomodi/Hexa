@@ -1,7 +1,11 @@
-# Hexa in Godot (0.3.x)
+# Hexa in Godot
 
-The Godot port of Age of Discovery (`docs/roadmap/godot-port-plan.md`, Part B2 and B3). Europe only, Windows builds.
-The Python game in `hexa/` is frozen at v0.2.2 and is the reference, not something to edit.
+The Godot version of Age of Discovery. The standard is `docs/architecture/godot-architecture.md` (decided 2026-11-15);
+this page is its short form for the folder. Windows builds only. The Python game in `hexa/` is frozen at v0.2.2 and is
+the gameplay reference, not something to edit. The game itself arrives milestone by milestone (section 9 of the
+standard). Today the project opens on the **north Italy map** (`shell/worldmap/north_italy_map.tscn`, the main scene):
+the 28 km district map with its pieces, the four seasons, select, build, upgrade and clear. The 0.3.0 Europe map, its
+builder and the Kenney bake are retired.
 
 ## Engine
 
@@ -14,37 +18,54 @@ The Python game in `hexa/` is frozen at v0.2.2 and is the reference, not somethi
 ## Layout
 
 ```
-project.godot           engine pin, warning levels (B3), main scene, GUT plugin
-core/                   pure GDScript, extends RefCounted, no Node, no scene tree, runs headless
-  rng.gd                the only source of luck in core/ (wraps one seeded RandomNumberGenerator)
-  data/ state/ systems/ mapgen/ views/ ai/    empty until their releases; the layers are listed below
+project.godot           engine pin, warning levels, main scene, GUT plugin
+core/                   plain GDScript, extends RefCounted, no Node, no scene tree, runs headless
+  rng.gd  hexgrid.gd  geo.gd   luck (the only source), the one hex grid (HexGrid), the Mercator projection
+  defs/                 definitions (Resource classes)                 empty until M1
+  state/                the facts: WorldRegion, WorldHeights, ReliefLevels (the fixed map data)
+  systems/              the rules: WorldImprove (the improvement of each hex) with ImproveRules (tables and cell and
+                        pair rules) and ImproveSolver (the wave function collapse search)
+  game/ ai/ views/      Game, the action table, the season table, AI, "what to draw" lists   empty until their milestones
+  mapgen/               generators, run in tools and tests only: WorldRelief, WorldWater (with WaterCurves and
+                        WaterSearch), WorldCover, WorldPlaces, WorldRoads
 shell/                  everything with Nodes
-  app/                  main scene (main.tscn) and the window
-  map/ hud/ panels/ screens/ ui/              empty until their releases
-tests/core/ tests/shell/ tests/fixtures/     GUT tests (test_*.gd); fixtures for the map check later
-tools/                  headless GDScript tools (check_scripts.gd; build_map.gd and others come with the map)
-data/                   data exported once from Python (geography/, maps/)
-assets/atlases/         art baked by the Python tool (png and json, committed)
+  worldmap/             the north Italy map scene and its layers (replaced by shell/map in M1)
+  app/ map/ hud/ panels/ screens/ ui/ input/ editor/ autoload/   empty until their milestones
+tests/core/ tests/shell/ tests/fixtures/     GUT tests (test_*.gd)
+tools/                  headless GDScript tools (check_scripts.gd; worldmap/ for the map: improve_report.gd,
+                        shot_north_italy.gd, render_region.gd, compose_side_by_side.gd)
+data/                   data: geography/ (JSON from Python), worldmap/ (the north Italy region and heights), the
+                        exported goods, units, buildings, countries and terrain. See data/README.md
+assets/worldmap/        the baked map art (see assets/worldmap/README.md)
 addons/gut/             GUT 9.7.1, copied unchanged from its release (MIT, see addons/gut/LICENSE.md)
 ```
 
-## Rules (B3)
+## Rules
 
-- **Layers:** data, then state, systems, world, game, views, shell. A file may use files of its own layer or a lower
-  one, never a higher one. `tools/lint_godot.py` checks the `res://` paths; class names are not checked by it.
+- **Layers, one way:** bottom to top `defs`, `state`, `systems`, `game`, `ai`, `views`, `shell`. A file may use its own
+  layer or a lower one, never a higher one. `mapgen` sits beside `systems` and runs only in tools and tests.
+  `tools/lint_godot.py` checks the `res://` paths; class names are not checked by it.
 - **`core/` has no engine calls:** no Node, no scene tree (`get_tree`, `get_node`, `$`), no `Input`, `OS`, `Time`,
   `Engine`, `DisplayServer`, no `await`, no `Thread`, `Mutex` or `WorkerThreadPool`. Files only under `res://` and
   `user://`.
 - **Luck through `rng.gd` only:** no `randi`, `randf`, `randomize`, `shuffle`, `pick_random` or `RandomNumberGenerator`
   in `core/` outside `rng.gd`.
+- **Node, RefCounted or Resource:** designed ahead and read-only in play is a Resource (`core/defs/`, files in `data/`);
+  changing during a game is a RefCounted or a packed array; seen or clicked is a Node (`shell/`). Nodes hold no facts.
+- **Actions are pairs:** `x_check(...)` and `x(...)`; later they are registered in `core/game/actions.gd` and go through
+  `Game.act`. The shell changes state only through actions.
+- **Autoloads:** exactly two, both in the shell, both arriving with the milestone that needs them: `Session` (holds the
+  current `Game`; the only door from the shell to the rules) and `Events` (the bus, one signal per event kind). None
+  exists yet. `core/` never reads an autoload. Any other autoload needs a line here and a reason reviewed by the
+  technical director.
+- **Size limits:** a script over 800 lines needs a reason (an entry in `SIZE_REASONS` of `tools/lint_godot.py`), over
+  1,200 it is split; a function over 100 lines is split. The lint checks both.
 - **Godot 4 only:** no `yield`, `export var`, `onready var`, `setget`, string `connect(...)`, `.instance()`, `tool`
   (use `@tool`) or the old `TileMap` node.
-- **Actions are pairs:** `x_check(world, ...)` and `x(world, ...)`. The shell changes state only through actions.
 - **Typed GDScript:** the warnings for untyped declarations, unsafe property and method access, integer division and
   narrowing conversions are errors (`project.godot`). Write `int(a / b)` only with a comment, and `7 / 2` is 3 here.
 - **Scenes are text** (`.tscn`), laid out with containers and the one Theme. No hand-placed pixel positions.
-- **Autoloads:** none in 0.3.0. `core/` never reads an autoload. A new autoload needs a line in this file and a reason
-  reviewed by the technical director; the shell owns the game through the main scene.
+- **A refactor never rides with a behaviour change.**
 
 ## Commands
 
@@ -57,10 +78,10 @@ Run from the repository root (the folder that holds `godot/`), with `GODOT` set.
 # Load every script: parse errors and warnings show here
 "$GODOT" --headless --path godot --script res://tools/check_scripts.gd
 
-# Architecture and Godot 3 lint (text scan, plain Python, no pip packages)
+# Layers, size limits, core/ rules, luck, Godot 3 spellings (text scan, plain Python, no pip packages)
 python tools/lint_godot.py godot
 
-# Open the main scene and quit at once (the window opens and closes)
+# Open the main scene (the north Italy map) and quit at once
 "$GODOT" --headless --path godot --quit
 
 # GUT tests, headless, with a JUnit report
@@ -69,86 +90,26 @@ python tools/lint_godot.py godot
 # Windows build (needs the export templates of the same version installed)
 "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe
 
-# Build Europe 1480 and print every count beside the Python reference (exit 1 when a checked count is out of range);
-# add -- --seed=N after the script to build another seed; -- --out=PATH writes the map file (see "The map file")
-"$GODOT" --headless --path godot -s res://tools/build_map.gd -- --out=res://data/maps/europe_1480.json
+# The improvement step in numbers per seed: search time, backtracks, pieces by family and level, rule breaks
+"$GODOT" --headless --path godot -s res://tools/worldmap/improve_report.gd -- --seeds=1480,1481
 
-# The map check report (markdown, every count OK / OPEN / OUT, the owners against Python, the speed rows)
-"$GODOT" --headless --path godot -s res://tools/map_report.gd -- --out=<absolute path of the .md>
-
-# The speed probe: builder stages, road search against AStar2D, map file load (writes docs/reports/0.3.0-speed.json)
-"$GODOT" --headless --path godot -s res://tools/speed_probe.gd -- --out=<absolute path of the .json>
-
-# Windowed (not headless: nothing is drawn headless). Contact sheet frames: the twelve regions and the whole map, both
-# views, 1280 x 720 PNGs; the Python frames come from tools/contact_sheet_python.py (see the map check report)
-"$GODOT" --path godot -s res://tools/contact_sheet.gd -- --out=<absolute folder>
-# Start-up probe: time from the script's start to the map view on screen (windowed)
-"$GODOT" --path godot -s res://tools/startup_probe.gd
+# Pictures of the north Italy scene and its frame rate (windowed: nothing is drawn headless)
+"$GODOT" --path godot -s res://tools/worldmap/shot_north_italy.gd -- --out=<absolute folder>
 ```
-
-## The map file
-
-`godot/data/maps/europe_1480.json` is the Europe 1480 map as text (a JSON object, about 2.8 MB, one line per province,
-country, unit, crest edge and terrain row; schema `hexa-godot/map/1`). It is the map every game starts on (0.3.0
-decision 1): `shell/app/main.gd` reads it, and falls back to the staged builder when the file is missing or does not
-read. `-- --build-map` (after the user arguments) forces the builder: the dev path.
-
-- Written by `tools/build_map.gd -- --out=res://data/maps/europe_1480.json` (the committed seed, 1480). Reads back to
-  the same text, byte for byte (the tool checks it, and so does a GUT test).
-- Format: a hex is `[column, row]`; an edge is `[a, b, c, d]` (`HexGrid.edge_key`); `terrain` is one array per grid row
-  (index = column); a province is an array of `[column, row, terrain, good, coastal, city, name, region, owner,
-  controller, tribe, peasants, burghers, nobles, natives, works, settlement, castle, port]`. `MapFile` (core/mapgen)
-  reads and writes the text; the file reads and writes are in the shell and the tools.
-- Changing the builder or the geography changes the file: rebuild with `--out`, review the diff. CI rebuilds the map
-  and fails when the rebuilt file differs from the committed one (the `map` job of `.github/workflows/godot.yml`).
-- Start-up: reading and parsing the file takes about 0.15 s on the build PC; the map view is on screen about 0.9 s
-  after the script starts (speed probe and `tools/startup_probe.gd`).
 
 The editor: open `godot/project.godot` with the same engine. GUT shows in the editor's plugin list.
 
-## MapData fields
+## The map scene
 
-`MapData` (`core/mapgen/map_data.gd`) is what `MapBuilder.build_europe(EuropeData.load_europe())` returns. The map view
-reads these fields; their names are stable, and a change of name or meaning is written here first. Hexes are
-`Vector2i(column, row)`; edges are `HexGrid.edge_key` (`Vector4i`).
-
-| Field | Type | Meaning |
-|---|---|---|
-| `cols`, `rows` | int | the grid, 203 by 150 |
-| `terrain` | `Dictionary[Vector2i, String]` | every grid hex: a land kind of `terrain.json`, or `MapData.OCEAN` / `MapData.LAKE` |
-| `rivers`, `river_at` | Dictionary | river name to its hexes (3 or more); hex to the first river through it |
-| `sea_body` | `Dictionary[Vector2i, int]` | ocean hex to the number of its sea |
-| `city_names`, `city_sizes` | Dictionary | land hex to the city's name and size |
-| `ridge_edges` | `Dictionary[Vector4i, bool]` | crest edges no army crosses |
-| `pass_names`, `pass_ids`, `pass_hexes` | Dictionary | open crest edges to a pass name and id; hex at a pass end to the pass name |
-| `provinces` | `Dictionary[Vector2i, Province]` | every land hex, in (column, row) order |
-| `landmass` | `Dictionary[Vector2i, int]` | land hex to its landmass number |
-| `countries` | `Dictionary[String, Country]` | country tag to its country |
-| `country_order` | `Array[String]` | the tags in `geo.COUNTRIES` order |
-| `roads` | `Dictionary[Vector2i, bool]` | every hex on a road |
-| `road_paths` | `Array[Array]` | each road: an `Array` of `Vector2i`, from its town to the network it joined |
-| `units` | `Array[Unit]` | the starting units (not drawn in 0.3.0) |
-
-`Province` (`core/state/province.gd`): `pos`, `terrain`, `good` (`""` for none), `coastal`, `city`, `name`, `region`,
-`owner` (a country tag, `""` for none), `controller`, `tribe` (unowned hexes), `peasants`, `burghers`, `nobles`,
-`natives`, `works` (0 to 2), `settlement` (0 none, 1 village, 2 town, 3 city), `castle` (0 none, 1 tower, 2 small
-castle, 3 large castle), `port` (bool). `pop()` is peasants plus burghers plus nobles.
-
-`Country` (`core/state/country.gd`): `tag`, `name`, `colour` (`Color`), `capital` (`Vector2i`), `colonial_start`
-(999 when none). `Unit` (`core/state/unit.gd`): `id`, `kind` (the `units.json` key), `owner`, `pos`, `hp`, `moves`.
-
-Helpers on `MapData`: `is_land(pos)`, `land_hexes()`, `province(pos)`, `provinces_of(tag)`, `total_pop(tag)`,
-`units_at(pos)`, `is_ridge_step(a, b)`.
-
-Not built in 0.3.0 (later releases): the buildings other than ports and works, garrisons, treasuries, the general's
-trait, markets, start techs, random worlds.
+Keys: 1 to 4 the season, R a new seed, V the unnamed villages on or off, G the hex grid, F the whole map, H the panel;
+drag or WASD to move, the wheel to zoom. A left click selects a hex; the panel builds, upgrades (U) and clears it; a
+right click or Esc clears the selection. The art is baked by `tools/worldmap/bake_map_art.py` and
+`tools/worldmap/godot_bake/` (Python); the rules are `core/systems/world_improve.gd`.
 
 ## Checks in CI
 
-`.github/workflows/godot.yml`: on pull requests (and pushes) that touch `godot/`, the lint, the import, the script load,
-the GUT tests and the main-scene start. On a tag `v0.3.*`, the Windows zip and a smoke start on a Windows runner.
-A guard job fails any pull request that changes a file under `hexa/` (frozen since v0.2.2).
-
-The `map` job (0.3.0 item 4) rebuilds the map file, compares it byte for byte with the committed one, and puts the map
-check report in the job summary. Still to come with their releases: the goldens (screenshot tests per scene), the bands
-and soak jobs.
+`.github/workflows/godot.yml`: on pull requests (and pushes) that touch `godot/` or `tools/`, the lint, the import, the
+script load, the main-scene start and the GUT tests. On a tag `v0.3.*` (or by hand), the Windows zip and a smoke start
+on a Windows runner. A guard job fails any pull request that changes a file under `hexa/` (frozen since v0.2.2). Still to
+come with their milestones: the map rebuild check (the committed map file is what the builder makes), the goldens, the
+performance and soak jobs.

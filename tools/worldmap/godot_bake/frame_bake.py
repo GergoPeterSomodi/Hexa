@@ -25,7 +25,7 @@ pygame = CP.pygame
 WORLD, FIELDS = CP.WORLD, CP.FIELDS
 MARGIN = 100                            # px of canvas round the frame for the wild sprites that hang over its edge
 
-COVER_NAMES = ["farmland", "grassland", "woods", "marsh", "rock", "snow", "tundra", "sand"]      # godot/core/worldmap/world_cover.gd
+COVER_NAMES = ["farmland", "grassland", "woods", "marsh", "rock", "snow", "tundra", "sand"]      # godot/core/mapgen/world_cover.gd
 _INIT = False
 
 

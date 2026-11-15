@@ -1,10 +1,9 @@
-"""Export the Age of Discovery game numbers and the Python builder's rules to godot/data/ (JSON).
+"""Export the Age of Discovery game numbers to godot/data/ (JSON).
 
 Run from anywhere:  python tools/export_data.py [--out DIR]
 
 Reads the frozen game (`hexa/`, imported and never edited) and writes:
 - constants.json, terrain.json, goods.json, buildings.json, units.json, countries.json, wfc.json
-- rules/builder_functions.json: the Python functions of the map builder as steps (see godot_export_common.function_ir)
 
 The schema of every file is in godot/data/README.md. tests/test_godot_export.py runs this module into a temporary
 folder and compares the result with the committed files.
@@ -18,24 +17,12 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.godot_export_common import CAMPAIGN_DIR, DATA_DIR, REPO, dump, function_ir, plain  # noqa: E402
+from tools.godot_export_common import CAMPAIGN_DIR, DATA_DIR, dump, plain  # noqa: E402
 
 from hexa.campaign import data, geo, wfc  # noqa: E402
 from hexa.campaign.systems import worldgen  # noqa: E402
 
 SCHEMA = "hexa-godot/{}/1"
-
-# The Python functions the Godot map builder ports, by file (None = every top-level function of the file).
-BUILDER_FUNCTIONS = {
-    "hexa/hexgrid.py": ["neighbors", "to_cube", "distance", "within"],
-    "hexa/campaign/geo.py": None,
-    "hexa/campaign/systems/worldgen.py": None,
-    "hexa/campaign/systems/terrain.py": ["pass_tables", "ridge_edges", "pass_edges", "passes", "pass_name", "geo_key"],
-    "hexa/campaign/naming.py": None,
-    "hexa/campaign/specialgoods.py": None,
-    "hexa/campaign/wfc.py": None,
-}
-
 
 def levels(names, **columns):
     """One object per level (0 is the empty place or castle), from parallel tables."""
@@ -174,17 +161,6 @@ def payload():
         "affinity_in_build_map": affinity_in_build_map(),
         "affinity_default": inspect.signature(wfc.collapse).parameters["affinity"].default,
         "rng_seed_for_terrain": "world.seed (the map seed, see constants.json map_seed)",
-    }
-    rules = {}
-    for path, names in BUILDER_FUNCTIONS.items():
-        for name, entry in function_ir(REPO / path, names).items():
-            rules[f"{path}::{name}"] = {"file": path, "name": name, **entry}
-    files["rules/builder_functions.json"] = {
-        "schema": SCHEMA.format("builder-functions"),
-        "note": "The Python map builder's functions as steps, read from the source by the AST (not run). Each step: "
-                "when = the if-tests that hold (source text; an else is 'not (test)'); op = assign | set | return | "
-                "loop | stmt. Values: literals, {name}, {dict: [[k, v]...]}, {list}, {expr: source}. Port them in order: a return ends the function, so a later step is reached only when the earlier returns did not fire.",
-        "functions": rules,
     }
     return files
 

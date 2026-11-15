@@ -51,9 +51,22 @@ func lonlat(pos: Vector2i) -> PackedFloat64Array:
 
 ## The hex that holds (lon, lat), with the rounding of geo.hex_of.
 func hex_of(lon: float, lat: float) -> Vector2i:
-	var row := HexGrid.round_half_even((y_top - merc(lat)) / row_deg - 0.5)
-	var col := HexGrid.round_half_even((lon - lon0) / col_deg - 0.5 - 0.5 * float(row & 1))
+	var row := round_half_even((y_top - merc(lat)) / row_deg - 0.5)
+	var col := round_half_even((lon - lon0) / col_deg - 0.5 - 0.5 * float(row & 1))
 	return Vector2i(col, row)
+
+
+## Python's round() of a float: halves go to the even integer. GDScript's round() goes away from zero, so the
+## places that copy a Python round() use this.
+static func round_half_even(x: float) -> int:
+	var f := floorf(x)
+	var diff := x - f
+	var n := int(f)
+	if diff > 0.5:
+		return n + 1
+	if diff < 0.5:
+		return n
+	return n if n % 2 == 0 else n + 1
 
 
 static func point_count(path: PackedFloat64Array) -> int:

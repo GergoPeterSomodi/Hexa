@@ -18,7 +18,9 @@ Hexa is built with Godot Engine 4.7.2, released under the MIT licence. Its notic
 
 ## Art
 
-The tile art is the Kenney hexagon pack (CC0), as in the Python game.
+The map art is drawn in code for Hexa (tools/worldmap/) and baked into the game's atlases. No third-party art is used
+in the Godot game. The relief comes from NOAA National Centers for Environmental Information, 2022: ETOPO 2022 15
+Arc-Second Global Relief Model, doi:10.25921/fd45-gt74.
 
 ## Place names
 

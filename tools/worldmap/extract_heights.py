@@ -11,7 +11,7 @@ down by the sea cells beside its land. Lakes are land (the coastline has none in
 Usage:  python tools/worldmap/extract_heights.py [--region PATH] [--out PATH] [--etopo PATH] [--quiet]
 Run from the repository root (the folder that holds godot/). Stdlib only (the project venv has no numpy or scipy).
 
-Grid (shared with godot/core/worldmap/world_grid.gd; the GUT test checks a few points against this script):
+Grid (shared with godot/core/hexgrid.gd; the GUT test checks a few points against this script):
   x_km = (lon - lon_west) * deg_km * cos(ref_lat);  y_km = (lat_north - lat) * deg_km          (y grows south)
   pointy-top hexes, circumradius R = W / sqrt(3), W = hex_w_km; odd rows shifted half a hex right
   centre of hex (c, r):  x = W * (c + 0.5) + (r & 1) * W / 2,  y = R + 1.5 * R * r
@@ -226,7 +226,7 @@ def carve_valleys(grid: Grid, region: dict, out_hexes: list, block: list, i0: in
     mountains, the floor of a hex is the low ETOPO ground near the line. Rules: the head hex (the pass) keeps its
     height; a hex with a range spine in it keeps its height (crests stay continuous); plain is not carved; a floor
     never rises downstream (checked along every line, to a fixed point); a floor is never above the hex's own
-    height. Only the hex height changes; inner_max is kept, and the crests are read from inner_max (core/worldmap).
+    height. Only the hex height changes; inner_max is kept, and the crests are read from inner_max (core/mapgen).
     Returns one report row per line."""
     by_hex = {(e["c"], e["r"]): e for e in out_hexes}
     spine_hexes = set()

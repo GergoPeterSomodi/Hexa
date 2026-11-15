@@ -1,4 +1,4 @@
-"""Shared helpers for the Godot exporters: `export_data.py`, `export_geography.py` and `export_map_reference.py`.
+"""Shared helpers for the Godot exporters: `export_data.py` and `export_geography.py`.
 
 The exporters only read the frozen Python game (`hexa/`, imported, never edited) and write plain JSON under
 `godot/data/`. Nothing here is game logic. The helpers:

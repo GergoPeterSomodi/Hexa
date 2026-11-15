@@ -1,5 +1,5 @@
 ## The north Italy normal map (docs/design/map/pieces/GUIDE.md, 06-growing-map.md): the baked ground of the style frame
-## with an improvement piece on the hexes the wave function collapse chose (core/worldmap/world_improve.gd).
+## with an improvement piece on the hexes the wave function collapse chose (core/systems/world_improve.gd).
 ##
 ## Reads res://assets/worldmap/north_italy/ (tools/worldmap/godot_bake): meta.json (the hex table), ground_ and
 ## overlay_<season>.png, land_mask.png, wild.json with its atlases, pieces/index.json with its atlases, and
@@ -282,8 +282,8 @@ func _add_note(text: String, size: int = 13) -> void:
 
 
 static func _top_level(family_name: String) -> int:
-	var id := WorldImprove.NAMES.find(family_name)
-	return WorldImprove.TOP_LEVEL[id] if id >= 0 else 0
+	var id := ImproveRules.NAMES.find(family_name)
+	return ImproveRules.TOP_LEVEL[id] if id >= 0 else 0
 
 
 ## The name of a level for a button: "village (level 2)".
@@ -799,17 +799,7 @@ func _rebuild() -> void:
 	_shadows.clear_items()
 	_standing.clear_items()
 	var placed := _placed_pieces()
-	var by_hex: Dictionary[Vector2i, Array] = {}
-	for piece: Dictionary in placed:
-		var hex: Vector2i = piece["hex"]
-		var around: Array[Vector2i] = [hex]
-		if bool(piece["addon"]):
-			for d: int in 6:
-				around.append(WorldImprove.neighbour(hex, d))
-		for h: Vector2i in around:
-			if not by_hex.has(h):
-				by_hex[h] = []
-			by_hex[h].append(piece)
+	var by_hex := _pieces_by_hex(placed)
 	var things: Array[Array] = []  # [sort y, sort x, texture, region, position]
 	var built := 0
 	var left_out := 0
@@ -896,6 +886,22 @@ func _rebuild() -> void:
 	_write_info()  # a new seed or season may change what stands on the selected hex
 
 
+## The placed pieces by the hexes they cover: a piece's own hex, and the six round it for a port's harbour add-on.
+func _pieces_by_hex(placed: Array[Dictionary]) -> Dictionary[Vector2i, Array]:
+	var by_hex: Dictionary[Vector2i, Array] = {}
+	for piece: Dictionary in placed:
+		var hex: Vector2i = piece["hex"]
+		var around: Array[Vector2i] = [hex]
+		if bool(piece["addon"]):
+			for d: int in 6:
+				around.append(ImproveRules.neighbour(hex, d))
+		for h: Vector2i in around:
+			if not by_hex.has(h):
+				by_hex[h] = []
+			by_hex[h].append(piece)
+	return by_hex
+
+
 ## Whether a wild thing gives way to a piece (the compositor's rules): a tree whose foot lies in a footprint; a rounded
 ## hill in a hex that takes a piece; a peak or a piece of a range that stands in a footprint or up to RANGE_FRONT px in
 ## front of one (a peak hides what lies behind it).
@@ -906,7 +912,7 @@ func _cleared(item: Dictionary, foot: Vector2, hex: Vector2i, by_hex: Dictionary
 	if kind == "range":
 		behind = RANGE_FRONT
 		for d: int in 6:
-			around.append(WorldImprove.neighbour(hex, d))
+			around.append(ImproveRules.neighbour(hex, d))
 	var seen: Dictionary[String, bool] = {}
 	for h: Vector2i in around:
 		if not by_hex.has(h):

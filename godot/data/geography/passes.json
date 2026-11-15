@@ -1,7 +1,7 @@
 {
  "schema": "hexa-godot/geography-passes/1",
  "source": "hexa/campaign/geo.py (PASSES)",
- "note": "The 24 named passes. The game has 72 pass edges and passes in all, derived from these and the mountain lines (terrain.passes, worldgen.build_edges); the map reference (godot/data/map_reference.json) counts them.",
+ "note": "The 24 named passes. The game has 72 pass edges and passes in all, derived from these and the mountain lines (terrain.passes, worldgen.build_edges).",
  "passes": [
   {
    "name": "Gotthard",

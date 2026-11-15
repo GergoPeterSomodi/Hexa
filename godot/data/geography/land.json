@@ -1,7 +1,7 @@
 {
  "schema": "hexa-godot/geography-land/1",
  "source": "hexa/campaign/geo.py (EUROPE_ASIA... ISLANDS, LAKES, SEAS, FORCE_SEA, FORCE_LAND)",
- "note": "land_cells tests a hex centre against the land polygons in the order of `landmasses` then `islands`; a centre inside a lake polygon is a lake; a centre inside a sea polygon is not land; a centre inside no polygon is ocean. force_sea points are removed from land, force_land points added. The city points are also forced land (builder rule, builder_functions.json).",
+ "note": "land_cells tests a hex centre against the land polygons in the order of `landmasses` then `islands`; a centre inside a lake polygon is a lake; a centre inside a sea polygon is not land; a centre inside no polygon is ocean. force_sea points are removed from land, force_land points added. The city points are also forced land (a rule of the Python builder).",
  "landmasses": [
   {
    "name": "europe_asia",

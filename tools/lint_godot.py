@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Lint for the Godot port (godot/): the rules of docs/roadmap/godot-port-plan.md, B3.
+"""Lint for the Godot port (godot/): the layers of docs/architecture/godot-architecture.md (sections 2, 6 and 7).
 
 A text scan with no third-party packages (it runs in CI as it is). It checks:
 
-- the layers: a file may use res:// scripts and scenes of its own layer or a lower one; shell/ never
-  uses core/state or core/systems directly (it reads views);
+- the layers: a file may use res:// scripts and scenes of its own layer or a lower one. Bottom to top: defs, state,
+  systems, game, ai, views, shell. mapgen sits beside systems and is used only by tools and tests (it runs in tools);
 - core/ files extend RefCounted and make no engine calls (no Node, scene tree, Input, OS, Time, Engine,
   threads, await);
 - core/ takes its luck only through core/rng.gd;
-- no Godot 3 spellings in godot/ (yield, export var, onready var, setget, string connect, instance(), tool).
+- no Godot 3 spellings in godot/ (yield, export var, onready var, setget, string connect, instance(), tool);
+- the size limits (section 6): a script over 1,200 lines or a function over 100 lines fails; a script over 800 lines
+  needs an entry with its reason in SIZE_REASONS below.
 
 Limits: class_name references are not followed, only res:// paths. A new file under core/ must be listed in
-LAYER_RANK. Comments are removed before the scan; string contents are not.
+CORE_RANK. Comments are removed before the scan; string contents are not.
 
 Usage: python tools/lint_godot.py godot      (exit status 1 and one line per finding when something fails)
 """
@@ -21,31 +23,37 @@ import sys
 from pathlib import Path
 
 # Rank of each part of core/. A file may use res:// files of its own rank or a lower one.
-# Order from B3: data -> state -> systems -> world -> game -> views -> shell.
 CORE_RANK = [
     ("rng.gd", 0),
     ("hexgrid.gd", 0),
     ("geo.gd", 0),
-    ("bus.gd", 0),
-    ("worldmap/", 0),  # the Alps and Po map prototype (docs/design/map): pure geometry and parsing, no state
-    ("data/", 1),
+    ("defs/", 1),
     ("state/", 2),
-    ("mapgen/", 3),
     ("systems/", 3),
-    ("world.gd", 4),
-    ("saves.gd", 4),
-    ("game.gd", 5),
+    ("mapgen/", 3),  # beside systems: generators, run in tools (MAPGEN_USERS)
+    ("game/", 4),
     ("ai/", 5),
-    ("views/", 5),
+    ("views/", 6),
 ]
-SHELL_RANK = 6
+SHELL_RANK = 7
 TOP_RANK = 9  # tests/ and tools/ may use everything
-SHELL_FORBIDDEN_PREFIXES = ("core/state/", "core/systems/")
+# Who may name res://core/mapgen/ paths: mapgen itself, tools and tests.
+MAPGEN_USERS = ("core/mapgen/", "tools/", "tests/")
+
+# Size limits (architecture section 6).
+FILE_LIMIT = 1200
+FILE_NEEDS_REASON = 800
+FUNC_LIMIT = 100
+SIZE_REASONS = {
+    "core/mapgen/world_water.gd": "one routing model: corners, courses, the flood and the router share their state; "
+                                  "split again when the Europe map arrives",
+    "shell/worldmap/north_italy_map.gd": "the prototype scene; M1 replaces it with the layered map view",
+}
 
 CORE_FORBIDDEN = [
     (r"\bawait\b", "await is not allowed in core/ (no coroutines)"),
     (r"(?<![\w.])(Input|OS|Time|Engine|DisplayServer|ProjectSettings|Thread|Mutex|Semaphore|WorkerThreadPool)\.",
-     "engine singleton in core/ (B3: core/ runs headless with no engine calls)"),
+     "engine singleton in core/ (core/ runs headless with no engine calls)"),
     (r"\bget_tree\s*\(|\bget_node\s*\(|\$[A-Za-z_]|\bget_window\s*\(",
      "scene tree access in core/ (core/ has no Node)"),
 ]
@@ -105,6 +113,24 @@ def rank_of(rel: str):
     return TOP_RANK
 
 
+def function_lengths(lines: list):
+    """(line, length, name) of every top-level func: from its first line to its last indented or blank line."""
+    starts = [i for i, line in enumerate(lines) if re.match(r"(static )?func \w+", line)]
+    out = []
+    for i in starts:
+        end = len(lines)
+        for j in range(i + 1, len(lines)):
+            line = lines[j]
+            if line and line[0] not in " \t#":
+                end = j
+                break
+        while end - 1 > i and (lines[end - 1].strip() == "" or lines[end - 1].lstrip().startswith("#")):
+            end -= 1
+        name = re.match(r"(?:static )?func (\w+)", lines[i]).group(1)
+        out.append((i + 1, end - i, name))
+    return out
+
+
 def lint_file(root: Path, path: Path, findings: list) -> None:
     rel = path.relative_to(root).as_posix()
     is_gd = path.suffix == ".gd"
@@ -113,6 +139,15 @@ def lint_file(root: Path, path: Path, findings: list) -> None:
 
     def report(lineno: int, message: str) -> None:
         findings.append(f"{root.name}/{rel}:{lineno}: {message}")
+
+    if is_gd:
+        if len(raw_lines) > FILE_LIMIT:
+            report(1, f"{len(raw_lines)} lines: over {FILE_LIMIT}, split it (architecture section 6)")
+        elif len(raw_lines) > FILE_NEEDS_REASON and rel not in SIZE_REASONS:
+            report(1, f"{len(raw_lines)} lines: over {FILE_NEEDS_REASON} needs a reason in SIZE_REASONS (tools/lint_godot.py)")
+        for start, length, name in function_lengths(raw_lines):
+            if length > FUNC_LIMIT:
+                report(start, f"function {name} is {length} lines: over {FUNC_LIMIT}, split it (architecture section 6)")
 
     in_core = rel.startswith("core/")
     rank = rank_of(rel)
@@ -136,20 +171,20 @@ def lint_file(root: Path, path: Path, findings: list) -> None:
         if is_gd and in_core and line.lstrip().startswith("extends "):
             base = line.split("extends ", 1)[1].strip()
             if base != "RefCounted" and not base.startswith('"res://core/'):
-                report(lineno, f"core/ files extend RefCounted, not {base} (B3)")
+                report(lineno, f"core/ files extend RefCounted, not {base}")
 
         for match in RES_REF.finditer(line):
             target = match.group(0)[len("res://"):]
             if not target.endswith((".gd", ".tscn")):
                 continue
-            if rel.startswith("shell/") and target.startswith(SHELL_FORBIDDEN_PREFIXES):
-                report(lineno, f"shell/ reads {target} directly; go through a view in core/views/ (B3)")
+            if target.startswith("core/mapgen/") and not rel.startswith(MAPGEN_USERS):
+                report(lineno, f"{rel} uses {target}: mapgen runs only in tools (architecture section 2)")
                 continue
             target_rank = rank_of(target)
             if target_rank is None:
                 report(lineno, f"{target} is not listed in CORE_RANK (tools/lint_godot.py)")
             elif rank is not None and target_rank > rank:
-                report(lineno, f"{rel} uses {target}, a higher layer (B3: references point down only)")
+                report(lineno, f"{rel} uses {target}, a higher layer (architecture section 2: references point down only)")
 
 
 def main(argv: list) -> int:

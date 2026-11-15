@@ -1,6 +1,6 @@
 """Checks that the prototype's hex grid (style_frame/geo.py, the Python the base is drawn in) and Godot's WorldGrid
-(godot/core/worldmap/world_grid.gd) agree: the same hex centres in km, the same hex of a point, the same neighbours and
-corners, the same longitude/latitude to km. world_grid.gd is ported line by line below (there is no Godot on the build
+(godot/core/hexgrid.gd) agree: the same hex centres in km, the same hex of a point, the same neighbours and
+corners, the same longitude/latitude to km. hexgrid.gd is ported line by line below (there is no Godot on the build
 machine); STYLE_FRAME_LAYERS must be set (geo.py reads it).
 
     python tools/worldmap/godot_bake/grid_check.py
@@ -21,7 +21,7 @@ ODD = [(1, 0), (1, -1), (0, -1), (-1, 0), (0, 1), (1, 1)]                    # _
 
 
 class WorldGrid:
-    """world_grid.gd: _init, km_of, centre_km, hex_of_km, neighbours, corners_km."""
+    """hexgrid.gd: _init, km_of, centre_km, hex_of_km, neighbours, corners_km."""
 
     def __init__(self, hex_w_km, deg_km, ref_lat, lon_west, lat_north):
         self.w = hex_w_km

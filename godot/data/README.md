@@ -1,6 +1,6 @@
-# godot/data: the contract for the Godot map builder
+# godot/data: the data the Godot project reads
 
-Written once from the frozen Python game (v0.2.2 model) by the exporters in `tools/`. The Godot project reads these
+The numbers and the geography are written once from the frozen Python game (v0.2.2 model) by the exporters in `tools/`; the `worldmap/` files are the map prototype's own data. The Godot project reads these
 files; it never imports Python. Every file is UTF-8 JSON, written with Python's `repr` floats (shortest exact form),
 so each float reads back to the same double. Each file has a `schema` key (`hexa-godot/<name>/1`); a change of
 shape bumps the number.
@@ -9,7 +9,6 @@ Regenerate (only if an exporter had a mistake):
 
     python tools/export_data.py
     python tools/export_geography.py
-    python tools/export_map_reference.py      # about 15 s: builds the Python Europe at 8 seeds
 
 `tests/test_godot_export.py` runs the exporters into a temporary folder and checks that the committed files are
 byte-for-byte what they write, that the counts are right, and that the floats round-trip.
@@ -29,7 +28,6 @@ the builder relies on (`geo.COUNTRIES` order, `geo.CITIES` order, the row-by-row
 | `units.json` | 10,212 | unit kinds (all), troops by branch and era, stack limits, manpower | export_data |
 | `countries.json` | 8,008 | 49 countries: tag, name, colour, capital; colonial start turns; coastal knowledge | export_data |
 | `wfc.json` | 1,505 | forbidden neighbour pairs, the affinity used by the builder, the default affinity, the terrain seed | export_data |
-| `rules/builder_functions.json` | 108,381 | the Python builder's functions as steps (see below) | export_data |
 | `geography/projection.json` | 632 | Mercator projection constants (computed values, exact) | export_geography |
 | `geography/land.json` | 28,603 | land outlines (7 masses, 17 islands), lakes, seas, forced sea and land points | export_geography |
 | `geography/terrain_shapes.json` | 7,739 | deserts, steppes, Maghreb, marsh boxes, hills, fertile rivers, 18 mountain lines with heights | export_geography |
@@ -42,7 +40,8 @@ the builder relies on (`geo.COUNTRIES` order, `geo.CITIES` order, the row-by-row
 | `geography/regions.json` | 58,870 | 684 regions (name, point, country tag) and the city-to-region table | export_geography |
 | `geography/naming.json` | 4,428 | compass words, anchor weights, exonyms, skip list, landform words | export_geography |
 | `geography/placenames.json` | 302,333 | 6,940 real places with the GeoNames credit | export_geography |
-| `map_reference.json` | 102,589 | the Python Europe measured at seeds 1480 and 1 to 7 (the check, see below) | export_map_reference |
+| `worldmap/region_alps_po.json` | | the north Italy map's skeleton: the window, the grid, rivers, lakes, places and gorges (by hand) | by hand |
+| `worldmap/heights_alps_po.json` | | the per-hex heights of the same window | `tools/worldmap/extract_heights.py` |
 
 Total about 0.7 MB. No file is gzipped (none is large enough to need it).
 
@@ -97,7 +96,7 @@ north_america, south_america), `islands` (17 `{name, points}`), `lakes` (5 `{poi
 **geography/rivers.json**: `rivers` (35 `{name, points}`, in `geo.RIVERS` order).
 
 **geography/passes.json**: `passes` (24 `{name, lon, lat}`). The game's 72 pass hexes and 47 pass edges are derived
-from these and the mountain lines by the builder (`terrain.passes`, `terrain.pass_edges`); the map reference counts them.
+from these and the mountain lines by the builder (`terrain.passes`, `terrain.pass_edges`).
 
 **geography/cities.json**: `cities` (102 `{name, lon, lat, size}`), in `geo.CITIES` order.
 
@@ -118,38 +117,7 @@ first being the capital. Names and colours are in `countries.json` (data).
 `[longitude, latitude, name]`, biggest first). **The GeoNames credit (CC BY 4.0) must appear in the credits file of
 the Windows zip.** The credit text is copied from the Python module.
 
-**map_reference.json**: `equal` (facts that must match Godot's Europe exactly: `{value, same_in_all_seeds}`, plus
-`per_seed` if the seeds disagree), `close` (counts that luck moves: `{value, min, median, max}` over the eight seeds;
-per-country and per-kind facts are maps of the same), `hexes_1480` (per-hex facts of seed 1480: `class_rows`, one
-string per row of `L` land, `O` ocean, `K` lake, one character per hex; `owner_rows`, one string per row with a
-code per hex from `owner_codes` (`_` = none)). The Python values are the reference numbers of the brief's "The new
-Europe is checked" section; the rules for "close" values are applied by the checker, not by the exporter.
-
-## rules/builder_functions.json: the Python builder as steps
-
-Some of the builder is code, not numbers: the terrain priors, the goods rules, the population factors, the road
-search, the naming. Retyping them would invite drift, so the exporter reads them from the Python source with the
-`ast` module (nothing is run) and writes each function as a list of steps. Keys are `hexa/...py::name`; each entry
-has `file`, `name`, `line` (the Python line of its `def`), `params` and `steps`.
-
-A step is an object with `when` (a list of if-test texts that must all hold; an `else` branch is the negated test,
-written `not (...)`), and an `op`:
-- `assign`: `var` = `value`
-- `set`: `var[key]` = `value` (the Python dict `var` is a Godot Dictionary)
-- `return`: the function returns `value`
-- `loop`: `head` (the `for` or `while` line as text) and `body` (its steps, run per iteration)
-- `stmt`: any other statement, as source text (`continue`, `break`, a lambda, a call)
-
-A value is a literal, `{"name": x}` (a local or parameter), `{"dict": [[k, v], ...]}`, `{"list": [...]}`, or
-`{"expr": "source text"}`. Port the steps in order: a `return` ends the function, so a later step is reached only when the earlier returns did not fire. An `expr` is Python source to be written in GDScript by hand.
-The functions are: `hexa/hexgrid.py` (neighbours, cube coordinates, distance, within); `geo.py` (all: Mercator,
-`lonlat`, `hex_of`, the outline tests, `land_cells`, the desert, steppe, Maghreb and marsh tests, the distances);
-`systems/worldgen.py` (all: `build_map`, `trace`, `near_line`, `terrain_prior`, `good_for`, `build_countries`,
-`build_roads`, `starting_units`, the ridge and pass functions); `systems/terrain.py` (`pass_tables`, `ridge_edges`,
-`pass_edges`, `passes`, `pass_name`, `geo_key`); `naming.py` (all: anchors, regions, labels, unique names, the
-Europe names); `specialgoods.py` (`special_good`); `wfc.py` (`collapse`).
-
-## What the builder cannot take straight from the data (read this before porting)
+## Notes for a map builder that reads these files (kept from the 0.3.0 work)
 
 1. **The random stream.** Python uses `random.Random(seed)` with `random()` and `choices()`, and the builder draws in
    a fixed order. GDScript's generator is different, so Godot's Europe will not be Python's terrain hex for hex, and
@@ -160,19 +128,13 @@ Europe names); `specialgoods.py` (`special_good`); `wfc.py` (`collapse`).
    `sorted` in the pass lists). Where Python iterates a dict, the order is insertion order: the terrain dict is filled
    row by row (`for r`, then `for c`), countries in `geo.COUNTRIES` order, provinces in sorted position order. Keep
    these orders in GDScript or the random draws land in different places.
-3. **Numbers inside the steps.** The population factors, the burgher and noble shares, the natives' factors and the
-   road reaches (14, 16 and 9 times `SCALE`) are literal numbers in the steps of `build_countries` and `build_roads`.
-   They are Python literals in the steps, not named constants: port them as written.
-4. **72 passes against 24.** `geo.PASSES` lists 24 named passes; the game has 72 pass hexes (`terrain.passes`) and 47
+3. **72 passes against 24.** `geo.PASSES` lists 24 named passes; the game has 72 pass hexes (`terrain.passes`) and 47
    pass edges. The derived ones are the builder's job, not the data's.
-5. **Floating-point maths.** Mercator uses `log`, `tan` and `degrees`; Godot's doubles agree to the last digit in
-   almost all cases but not guaranteed. The map file is made once in CI and shipped; other machines check counts
-   (brief, risk 7).
-6. **Art.** Sprite names are not exported (the Python art baker and the art inventory own them). Colours of terrain and
+4. **Floating-point maths.** Mercator uses `log`, `tan` and `degrees`; Godot's doubles agree to the last digit in
+   almost all cases but not guaranteed. The committed map file is what the builder makes (docs/architecture/godot-architecture.md section 4.2).
+5. **Art.** Sprite names are not exported (the Python art baker and the art inventory own them). Colours of terrain and
    goods are exported; the tile art is not.
-7. **Random worlds** are not exported (not in 0.3.0).
-8. **Lambdas and text rules.** `KNOWN_WORLD` and the `near` helper inside `good_for` are Python lambdas; their text is
-   in the data (`known_world_rule`, and the `stmt` steps of `good_for`).
-9. **The tech tree and the special goods' art** are not in this release (0.3.1 and later).
-10. **Place names.** `naming.name_europe` takes the three biggest places per hex from `placenames.json`, then the
+6. **Random worlds** are not exported (not in 0.3.0).
+7. **The tech tree and the special goods' art** are not in this release (0.3.1 and later).
+8. **Place names.** `naming.name_europe` takes the three biggest places per hex from `placenames.json`, then the
     region names. The 1480 names of exonyms are in `naming.json`.

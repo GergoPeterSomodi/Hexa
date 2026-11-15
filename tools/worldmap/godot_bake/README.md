@@ -15,7 +15,7 @@ by climate) are called.
 ## Frame and km (checked)
 Image px (0,0) is km `origin_km` = (70, 214). `px = ((kx - ox) * px_per_km, (ky - oy) * px_per_km * tilt)`, px_per_km =
 60 / (28 / sqrt 3) = 3.7115, tilt 0.85, hex radius 60 px, image 1280 x 720 (345 x 228 km).
-**The grid matches `core/worldmap/world_grid.gd`**: same `centre_km`, `hex_of_km`, neighbour tables (0 E, 1 NE, 2 NW, 3 W, 4 SW,
+**The grid matches `core/hexgrid.gd`**: same `centre_km`, `hex_of_km`, neighbour tables (0 E, 1 NE, 2 NW, 3 W, 4 SW,
 5 SE), corners and lon/lat to km. `grid_check.py` ports the GDScript (no Godot on the build machine) and compares all 390 hexes,
 20000 points and 2000 lon/lat points: every difference is 0. `centre_px` in meta is the centre rounded to whole pixels (as
 compose.py does; within 0.5 px of the formula). No transform is needed.

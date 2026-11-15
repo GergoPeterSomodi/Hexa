@@ -190,6 +190,10 @@ Everything else in this plan is a technical default; the owner may overrule any 
 
 ## Part B. Technical appendix
 
+> **Replaced (2026-11-15):** Parts B2 (the project layout) and B3 (the style rules) are replaced by
+> `docs/architecture/godot-architecture.md`, which wins where the two disagree. The layers, folders, autoloads and size
+> limits there are what `godot/README.md`, `CLAUDE.md` and `tools/lint_godot.py` follow.
+
 ### B1. Evidence (measured in the repo, 2026-11-14, at v0.2.2)
 
 - `hexa/campaign/` and `hexa/ui/`: about 39,800 lines. Rules (`systems/`, 19 modules), `world.py` 782, `ai.py` 806,

@@ -57,10 +57,10 @@ func before_each() -> void:
 ## A wild hex that offers wheat.
 func _wild_wheat_hex() -> Vector2i:
 	for hex: Vector2i in _map.improve.hexes:
-		if _map.improve.family_at(hex) != WorldImprove.NONE:
+		if _map.improve.family_at(hex) != ImproveRules.NONE:
 			continue
 		for o: Dictionary in _map.improve.build_options(hex):
-			if int(o["family_id"]) == WorldImprove.WHEAT and bool(o["ok"]):
+			if int(o["family_id"]) == ImproveRules.WHEAT and bool(o["ok"]):
 				return hex
 	return NorthItalyMap.NO_HEX
 
@@ -96,7 +96,7 @@ func test_build_then_upgrade_changes_the_piece_and_keeps_the_selection() -> void
 	_map.select_hex(hex)
 	var pieces_before := int(_map.stats["pieces"])
 	_button("Build Wheat").pressed.emit()
-	assert_eq(_map.improve.family_at(hex), WorldImprove.WHEAT)
+	assert_eq(_map.improve.family_at(hex), ImproveRules.WHEAT)
 	assert_eq(_map.selected, hex, "the selection stays")
 	assert_eq(int(_map.stats["pieces"]), pieces_before + 1, "the map is drawn again")
 	assert_eq(_map.change_count(), 1)
@@ -110,7 +110,7 @@ func test_build_then_upgrade_changes_the_piece_and_keeps_the_selection() -> void
 	else:
 		assert_ne(up.tooltip_text, "", "a refused upgrade says why")
 	_map.clear_selected()
-	assert_eq(_map.improve.family_at(hex), WorldImprove.NONE)
+	assert_eq(_map.improve.family_at(hex), ImproveRules.NONE)
 	assert_eq(_map.selected, hex)
 	assert_null(_button("Upgrade"))
 	assert_not_null(_button("Build Wheat"), "wild again: the list is back")
@@ -122,7 +122,7 @@ func test_a_refused_button_is_disabled_with_the_reason() -> void:
 		return
 	var town := NorthItalyMap.NO_HEX
 	for hex: Vector2i in _map.improve.hexes:
-		if _map.improve.is_fixed(hex) and _map.improve.family_at(hex) == WorldImprove.SETTLEMENT:
+		if _map.improve.is_fixed(hex) and _map.improve.family_at(hex) == ImproveRules.SETTLEMENT:
 			town = hex
 			break
 	_map.select_hex(town)
@@ -141,12 +141,12 @@ func test_changes_survive_a_season_and_v_and_r_drops_them() -> void:
 		return
 	var hex := _wild_wheat_hex()
 	_map.select_hex(hex)
-	_map.build_selected(WorldImprove.WHEAT)
+	_map.build_selected(ImproveRules.WHEAT)
 	_map.set_season("winter")
-	assert_eq(_map.improve.family_at(hex), WorldImprove.WHEAT, "a new season keeps it")
+	assert_eq(_map.improve.family_at(hex), ImproveRules.WHEAT, "a new season keeps it")
 	_map.set_season("summer")
 	_map.set_villages(false)
-	assert_eq(_map.change_count() == 1, _map.improve.family_at(hex) == WorldImprove.WHEAT, "V played the change again")
+	assert_eq(_map.change_count() == 1, _map.improve.family_at(hex) == ImproveRules.WHEAT, "V played the change again")
 	_map.set_villages(true)
 	_map.reroll(NorthItalyMap.START_SEED + 1)
 	assert_eq(_map.change_count(), 0, "a new seed starts a new map")

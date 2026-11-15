@@ -6,27 +6,34 @@ Hexa is a turn-based hex strategy game in plain Python + pygame with three modes
 Age of Discovery) behind one launcher. `README.md` is the player-facing rules reference: its tables mirror the
 balance numbers in the rules/data modules, so update it when you change rules, numbers or controls.
 
-## Port rules (0.3.0, decided 2026-11-14)
+## Port rules (the Godot standard, decided 2026-11-15)
 
-Hexa moves to Godot. The plan is `docs/roadmap/godot-port-plan.md`; the first release's brief is
-`docs/roadmap/release-0.3.0-brief.md`. The Python sections of this file (the modes, the architecture, the tests) describe
-the frozen v0.2.2 game: reference only.
+Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (it replaces the technical appendix of
+`docs/roadmap/godot-port-plan.md`); `godot/README.md` is its short form for the folder. The Python sections of this file
+(the modes, the architecture, the tests) describe the frozen v0.2.2 game: the gameplay reference only.
 
 - **`hexa/` is frozen at v0.2.2.** No fixes, refactors or balance changes there. A CI guard (`frozen-python` in
   `.github/workflows/godot.yml`) fails a pull request that changes a file under `hexa/`. The Python `tools/` folder may gain
-  the exporters (`export_data.py`, `export_geography.py`, `export_map_reference.py`, `bake_art.py`, ...); they import `hexa`
-  through its public API.
-- **New work goes to `godot/`.** Its layout and rules are in `godot/README.md`: the layers (data, state, systems, world,
-  game, views, shell), `core/` with no engine calls and extending `RefCounted`, luck only through `core/rng.gd`, Godot 4
-  only, typed GDScript, scenes as text, and autoloads only with a reason written in the README.
+  the exporters (`export_data.py`, `export_geography.py`, ...) and the map art tools (`tools/worldmap/`, `bake_art.py`); they
+  import `hexa` through its public API.
+- **New work goes to `godot/`.** The map is the north Italy district map (`shell/worldmap/north_italy_map.tscn`, the main
+  scene); the 0.3.0 Europe map, its builder and the Kenney bake are retired. The layers, bottom to top: `defs`, `state`,
+  `systems`, `game`, `ai`, `views`, `shell` (`mapgen` sits beside `systems` and runs only in tools). A file uses its own
+  layer or a lower one. `core/` has no engine calls and extends `RefCounted`; luck only through `core/rng.gd`; Godot 4 only,
+  typed GDScript, scenes as text. A script over 800 lines needs a reason in `tools/lint_godot.py`, over 1,200 it is split; a
+  function over 100 lines is split.
+- **Autoloads:** two, both in the shell, each arriving with its milestone: `Session` (holds the game, the one door to the
+  rules) and `Events` (the bus). `core/` never reads an autoload; any other autoload needs a reason in `godot/README.md`.
+- **A refactor never rides with a behaviour change.** One system per milestone (section 9 of the standard), each playable
+  and tested before the next starts.
 - **Engine:** Godot 4.7.2-stable, pinned in `godot/project.godot`, in CI and in the README. Upgrade only between releases,
   with the tests green before and after. Point `GODOT` at the engine executable; no local path is written into the repo.
 - **Godot commands** (run from the repository root):
   ```bash
   "$GODOT" --headless --path godot --import                       # import; fails on any error or warning
-  python tools/lint_godot.py godot                                 # layers, core/ rules, luck, Godot 3 spellings
+  python tools/lint_godot.py godot                                 # layers, size limits, core/ rules, luck, Godot 3 spellings
   "$GODOT" --headless --path godot --script res://tools/check_scripts.gd   # parse every script
-  "$GODOT" --headless --path godot --quit                          # open the main scene and quit
+  "$GODOT" --headless --path godot --quit                          # open the main scene (the north Italy map) and quit
   "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit   # GUT
   "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe   # Windows build
   ```

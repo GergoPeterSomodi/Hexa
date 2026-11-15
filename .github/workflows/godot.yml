@@ -1,13 +1,13 @@
 name: godot
 
-# The Godot port (docs/roadmap/godot-port-plan.md, B10 to B13). Four jobs:
+# The Godot game (docs/architecture/godot-architecture.md, section 6). Jobs:
 # - changes: decides whether the Godot checks and the frozen-Python guard apply;
-# - frozen-python: a pull request that changes a file under hexa/ fails (hexa/ is frozen at v0.2.2, B13);
-# - checks: the lint, the import, the script parse, the main scene start and the GUT tests (on pull requests and
-#   pushes that touch godot/, tools/ or this workflow);
-# - export-windows and smoke-windows: on a tag v0.3.*, the Windows zip and a smoke start on a Windows runner.
-# The map job (0.3.0 item 4): the builder rebuilds the map file, which must equal the committed one, and the map check
-# report goes to the job summary. The goldens come with their releases.
+# - frozen-python: a pull request that changes a file under hexa/ fails (hexa/ is frozen at v0.2.2, the reference);
+# - checks: the lint (layers, size limits), the import, the script parse, the main scene start (the north Italy map)
+#   and the GUT tests (on pull requests and pushes that touch godot/, tools/ or this workflow);
+# - export-windows and smoke-windows: on a tag v0.3.*, or by hand, the Windows zip and a smoke start on a Windows runner.
+# The 0.3.0 map job (rebuild of europe_1480.json) is gone with that map (M0, step R3). A check of the committed map
+# file against its builder comes back with the new map file (architecture section 4.2); the goldens come with M1.
 
 on:
   workflow_dispatch:      # a playtest build of master: the Windows zip without a tag
@@ -80,7 +80,7 @@ jobs:
           HEXA_CHANGED: ${{ needs.changes.outputs.hexa }}
         run: |
           if [ "$HEXA_CHANGED" = "true" ]; then
-            echo "::error::This pull request changes a file under hexa/. The Python game is frozen at v0.2.2 (docs/roadmap/godot-port-plan.md, B13): fix it in godot/, or ask for the freeze to be lifted first."
+            echo "::error::This pull request changes a file under hexa/. The Python game is frozen at v0.2.2 (docs/architecture/godot-architecture.md, section 8): fix it in godot/, or ask for the freeze to be lifted first."
             exit 1
           fi
           echo "No change under hexa/."
@@ -96,7 +96,7 @@ jobs:
       - name: Set up Godot
         uses: ./.github/actions/setup-godot
       # Every step that prints to the log is also checked for the engine's error and warning lines: the
-      # exit status alone misses some script errors. Warnings are errors in project.godot (B3).
+      # exit status alone misses some script errors. Warnings are errors in project.godot.
       - name: Import the project (fails on any script error or warning)
         run: |
           set -uo pipefail
@@ -106,7 +106,7 @@ jobs:
             echo "::error::The import reported errors or warnings (see the log)."
             exit 1
           fi
-      - name: Lint (layers, core/ rules, luck, Godot 3 spellings)
+      - name: Lint (layers, size limits, core/ rules, luck, Godot 3 spellings)
         run: python3 tools/lint_godot.py godot
       - name: Load every script (parse errors and warnings)
         run: |
@@ -117,7 +117,7 @@ jobs:
             echo "::error::A script does not parse (see the log)."
             exit 1
           fi
-      - name: Open the main scene headless
+      - name: Open the main scene headless (the north Italy map)
         run: |
           set -uo pipefail
           "$GODOT" --headless --path godot --quit 2>&1 | tee main.log
@@ -156,59 +156,9 @@ jobs:
           path: ${{ runner.temp }}/gut-junit.xml
           if-no-files-found: ignore
 
-  map:
-    name: map rebuild, map check and report
-    needs: changes
-    if: needs.changes.outputs.godot == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Godot
-        uses: ./.github/actions/setup-godot
-      - name: Import the project
-        run: |
-          "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
-      # The builder runs with the committed seed and must write the committed map file byte for byte (B5): a change
-      # of the builder or the data shows here as a difference. The counts are checked by the same run (open misses
-      # are listed, not failed).
-      - name: Rebuild the map file and compare it with the committed one
-        run: |
-          set -uo pipefail
-          "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --out="$RUNNER_TEMP/europe_1480.json" 2>&1 | tee build.log
-          status=${PIPESTATUS[0]}
-          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|map file: the text|map file: cannot' build.log; then
-            echo "::error::The map builder failed or a count is out of range (see the log)."
-            exit 1
-          fi
-          if ! cmp -s "$RUNNER_TEMP/europe_1480.json" godot/data/maps/europe_1480.json; then
-            diff "$RUNNER_TEMP/europe_1480.json" godot/data/maps/europe_1480.json | cut -c1-300 | head -40 || true
-            echo "::error::The rebuilt map file differs from godot/data/maps/europe_1480.json. Rebuild it with build_map.gd -- --out=res://data/maps/europe_1480.json and review the diff."
-            exit 1
-          fi
-          echo "The rebuilt map file is byte-identical to the committed one."
-      - name: Map report in the job summary
-        run: |
-          set -uo pipefail
-          "$GODOT" --headless --path godot -s res://tools/map_report.gd -- --out="$RUNNER_TEMP/map-check.md" > report.log 2>&1 || { cat report.log; exit 1; }
-          {
-            echo "## Map check (Europe 1480)"
-            echo
-            cat "$RUNNER_TEMP/map-check.md"
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Keep the map report and the rebuilt map file
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: map-check
-          path: |
-            ${{ runner.temp }}/map-check.md
-            ${{ runner.temp }}/europe_1480.json
-          if-no-files-found: ignore
-
   export-windows:
     name: Windows zip (tag)
-    needs: [changes, checks, map]
+    needs: [changes, checks]
     if: startsWith(github.ref, 'refs/tags/v0.3.') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -254,8 +204,7 @@ jobs:
         with:
           name: hexa-windows-zip
           path: download
-      # The exe starts, runs 60 frames headless and must exit with 0. Checks of the map file and its counts come
-      # with the map release (0.3.0 step 4).
+      # The exe starts on its main scene (the north Italy map), runs 60 frames headless and must exit with 0.
       - name: Start Hexa.exe
         shell: pwsh
         run: |

@@ -48,7 +48,7 @@ func _render() -> void:
 		printerr("render_region: the region or the heights file does not read")
 		quit(1)
 		return
-	var grid := WorldGrid.new(region.hex_w_km, region.deg_km, region.ref_lat, region.lon_west, region.lat_north)
+	var grid := HexGrid.new(region.hex_w_km, region.deg_km, region.ref_lat, region.lon_west, region.lat_north)
 	var relief := WorldRelief.build(grid, heights, region)
 	var view: WorldMapView = (load(VIEW_SCENE) as PackedScene).instantiate()
 	root.add_child(view)

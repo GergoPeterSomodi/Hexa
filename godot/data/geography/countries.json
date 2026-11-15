@@ -1,7 +1,7 @@
 {
  "schema": "hexa-godot/geography-countries/1",
  "source": "hexa/campaign/geo.py (COUNTRIES)",
- "note": "Territory seeds: each land hex belongs to the nearest seed (worldgen.build_countries), with the rules in builder_functions.json. The first seed is the capital. Names and colours are in data/countries.json.",
+ "note": "Territory seeds: each land hex belongs to the nearest seed (worldgen.build_countries), with the rules of the Python builder (hexa/campaign/systems/worldgen.py). The first seed is the capital. Names and colours are in data/countries.json.",
  "countries": [
   {
    "tag": "POR",

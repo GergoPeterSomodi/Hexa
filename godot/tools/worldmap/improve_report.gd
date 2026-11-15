@@ -29,15 +29,15 @@ func _init() -> void:
 		var breaks := imp.violations()
 		bad += breaks.size()
 		var summary := imp.summary()
-		var goods := int(summary["pieces"]) - imp.count_of(WorldImprove.SETTLEMENT) - imp.count_of(WorldImprove.CASTLE)
+		var goods := int(summary["pieces"]) - imp.count_of(ImproveRules.SETTLEMENT) - imp.count_of(ImproveRules.CASTLE)
 		print("seed %d: %.1f ms, %d land hexes, %d settlements, %d castles, %d goods, %d wild; backtracks %d, restarts %d, rule breaks %d, fixed place pairs %d" % [
-			s, ms, imp.hexes.size(), imp.count_of(WorldImprove.SETTLEMENT), imp.count_of(WorldImprove.CASTLE), goods,
+			s, ms, imp.hexes.size(), imp.count_of(ImproveRules.SETTLEMENT), imp.count_of(ImproveRules.CASTLE), goods,
 			int(summary["wild"]), imp.backtracks, imp.restarts, breaks.size(), imp.fixed_conflicts.size()])
 		var line := "   "
 		var levels: Dictionary = summary["by_level"]
-		for f: int in range(WorldImprove.CASTLE, WorldImprove.FAMILIES):
+		for f: int in range(ImproveRules.CASTLE, ImproveRules.FAMILIES):
 			if imp.count_of(f) > 0:
-				line += "%s %s  " % [WorldImprove.NAMES[f], str(levels[WorldImprove.NAMES[f]])]
+				line += "%s %s  " % [ImproveRules.NAMES[f], str(levels[ImproveRules.NAMES[f]])]
 		print(line)
 		for text: String in breaks:
 			print("   BREAK ", text)
@@ -60,7 +60,7 @@ func _print_map(imp: WorldImprove) -> void:
 			var hex := Vector2i(c, r)
 			if not imp.family.has(hex):
 				line += "~ "
-			elif imp.family_at(hex) == WorldImprove.NONE:
+			elif imp.family_at(hex) == ImproveRules.NONE:
 				line += ". "
 			else:
 				line += LETTERS[imp.family_at(hex)] + str(imp.level_at(hex))

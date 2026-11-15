@@ -1,6 +1,6 @@
 {
  "schema": "hexa-godot/geography-naming/1",
- "source": "hexa/campaign/naming.py (the constants; the functions are in builder_functions.json)",
+ "source": "hexa/campaign/naming.py (the constants; the functions are in hexa/campaign/naming.py)",
  "compass": [
   "east",
   "north-east",

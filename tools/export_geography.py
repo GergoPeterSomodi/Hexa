@@ -29,7 +29,7 @@ def points(poly):
 def projection():
     return {
         "schema": SCHEMA.format("projection"),
-        "source": "hexa/campaign/geo.py (projection, lonlat, hex_of, merc, inv_merc, land_cells; see builder_functions.json)",
+        "source": "hexa/campaign/geo.py (projection, lonlat, hex_of, merc, inv_merc, land_cells; the Python source is the reference)",
         "name": geo.name,
         "start": plain(geo.START),
         "lon0": geo.LON0,
@@ -56,7 +56,7 @@ def land():
         "note": "land_cells tests a hex centre against the land polygons in the order of `landmasses` then `islands`; "
                 "a centre inside a lake polygon is a lake; a centre inside a sea polygon is not land; a centre inside "
                 "no polygon is ocean. force_sea points are removed from land, force_land points added. The city "
-                "points are also forced land (builder rule, builder_functions.json).",
+                "points are also forced land (a rule of the Python builder).",
         "landmasses": polys,
         "islands": islands,
         "lakes": [{"points": points(p)} for p in geo.LAKES],
@@ -100,7 +100,7 @@ def passes():
         "schema": SCHEMA.format("passes"),
         "source": "hexa/campaign/geo.py (PASSES)",
         "note": "The 24 named passes. The game has 72 pass edges and passes in all, derived from these and the mountain "
-                "lines (terrain.passes, worldgen.build_edges); the map reference (godot/data/map_reference.json) counts them.",
+                "lines (terrain.passes, worldgen.build_edges).",
         "passes": [{"name": name, "lon": lon, "lat": lat} for name, lon, lat in geo.PASSES],
     }
 
@@ -118,8 +118,8 @@ def countries():
     return {
         "schema": SCHEMA.format("countries"),
         "source": "hexa/campaign/geo.py (COUNTRIES)",
-        "note": "Territory seeds: each land hex belongs to the nearest seed (worldgen.build_countries), with the rules in "
-                "builder_functions.json. The first seed is the capital. Names and colours are in data/countries.json.",
+        "note": "Territory seeds: each land hex belongs to the nearest seed (worldgen.build_countries), with the rules of the Python builder "
+                "(hexa/campaign/systems/worldgen.py). The first seed is the capital. Names and colours are in data/countries.json.",
         "countries": [{"tag": tag, "seeds": points(seeds)} for tag, (_, _, seeds) in geo.COUNTRIES.items()],
     }
 
@@ -160,7 +160,7 @@ def naming():
                                "COAST_WORDS", "RIVER_WORDS"])
     return {
         "schema": SCHEMA.format("naming"),
-        "source": "hexa/campaign/naming.py (the constants; the functions are in builder_functions.json)",
+        "source": "hexa/campaign/naming.py (the constants; the functions are in hexa/campaign/naming.py)",
         "compass": plain(consts["COMPASS"]),
         "own_weight": consts["OWN_WEIGHT"],
         "sea_penalty": consts["SEA_PENALTY"],

@@ -9,7 +9,7 @@ config_version=5
 config/name="Hexa"
 config/description="Hexa: Age of Discovery, Godot port"
 config/version="0.3.0"
-run/main_scene="res://shell/app/main.tscn"
+run/main_scene="res://shell/worldmap/north_italy_map.tscn"
 config/features=PackedStringArray("4.7", "Compatibility")
 
 [display]
