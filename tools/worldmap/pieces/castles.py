@@ -29,13 +29,14 @@ RING_H = 4.0                                         # ring wall height
 FORT_A, FORT_B = 26.0, 16.5                          # level 3: half sizes of the curtain walls, in plan (before the tilt)
 FORT_H = 4.6                                         # fortress wall height
 FORT_T = 3.4                                         # fortress wall thickness (plan)
-MOAT_W = 3.6                                         # visible width of the moat
+MOAT_W = 3.0                                         # visible width of the moat
 TREES = [                                            # x, y, kind, size, gone from level
     (-36, -12, "round", 1.0, 3), (35, -14, "round", 0.95, 3), (29, -20, "round", 0.9, 2),
     (-38, 12, "round", 1.0, 2), (40, 10, "round", 0.9, 3), (-13, -29, "round", 0.85, 9), (12, -29, "round", 0.85, 9),
     (-24, 27, "bush", 1.0, 2), (26, 29, "bush", 1.0, 2), (-31, -6, "bush", 1.0, 2), (5, 32, "bush", 1.0, 3),
     (36, 24, "conifer", 0.9, 2),
 ]
+GATES = {"south": (-5, 36)}                          # where the map's road layer joins the lane (10+ px inside the border)
 STONES = [(-16, 20, 1.8, 2), (20, 18, 1.6, 2), (-32, 6, 1.6, 3)]     # x, y, r, gone from level
 
 
@@ -46,7 +47,7 @@ def _banner(pen, x, y, flag, h=4.6):
     pen.poly([(x, y - h), (x + 3.4, y - h + 0.9), (x, y - h + 1.9)], flag, None)
 
 
-def _tower(pen, winter, x, y, w, h, top="battlement", flag=None, door=True, roof_h=None, slit=False):
+def _tower(pen, winter, x, y, w, h, top="battlement", flag=None, door=True, roof_h=None, slit=False, banner_h=4.6):
     """A stone tower, foot middle at (x, y): lit left, shaded right strip, and a battlement or a slate cone."""
     lit, dk = kit.STONE_GREY, kit.STONE_GREY_D
     x0 = x - w / 2
@@ -80,19 +81,12 @@ def _tower(pen, winter, x, y, w, h, top="battlement", flag=None, door=True, roof
         pen.rect(x - 0.5, y - h * 0.62, 1.0, 2.0, kit.DOOR, None)
         pen.rect(x + w * 0.18, y - h * 0.82, 0.8, 1.6, kit.DOOR, None)
     if flag:
-        _banner(pen, x, apex, flag)
+        _banner(pen, x, apex, flag, banner_h)
 
 
 def add_tower(p, x, y, w, h, top="battlement", flag=None, door=True, roof_h=None, slit=False):
     p.cast(x, y, w + 1)
     p.stand(y, lambda pen: _tower(pen, p.winter, x, y, w, h, top, flag, door, roof_h, slit))
-
-
-def _keep_smoke(pen, x, y):
-    """Smoke from the keep: the kit's puffs are white, which vanishes on snow, so this one is a little greyer."""
-    col = kit.mix(kit.SMOKE, kit.STONE_GREY_D, 0.3)
-    for dx, dy, r in ((0.0, -1.5, 1.0), (0.8, -3.6, 1.3), (2.0, -5.8, 1.6), (3.6, -8.2, 1.9)):
-        pen.circle(x + dx, y + dy, r, col)
 
 
 def mound(p):
@@ -233,18 +227,24 @@ def fort_wall(p, outer, inner, h):
 
 
 def moat(p, outer):
-    """Water on the ground all round the wall: a thick closed line, half of it hidden by the courtyard fill later."""
+    """Water on the ground all round the wall: a thick closed line, half of it hidden by the courtyard fill later.
+    A quiet water (river mixed with the shallow sea), so it reads as water round a wall, not as a blue outline."""
     pts = outer + [outer[0]]
     w = MOAT_W * 2 + 1
-    frozen = p.winter
-    edge = p.pal["river_edge"] if not frozen else kit.ICE_D
-    fill = p.pal["river"] if not frozen else kit.ICE
-    p.gp.lines(pts, edge, w + 1.4)
-    for q in outer:
-        p.gp.ellipse(q[0], q[1], w + 1.4, (w + 1.4) * kit.TILT, edge)
-    p.gp.lines(pts, fill, w)
-    for q in outer:
-        p.gp.ellipse(q[0], q[1], w, w * kit.TILT, fill)
+    if p.winter:
+        edge, fill = kit.ICE_D, kit.ICE
+    else:
+        fill = kit.mix(p.pal["river"], p.pal["shallow"], 0.5)
+        edge = kit.mix(p.pal["river_edge"], fill, 0.5)
+
+    def fn(pen):
+        pen.lines(pts, edge, w + 1.4)
+        for q in outer:
+            pen.ellipse(q[0], q[1], w + 1.4, (w + 1.4) * kit.TILT, edge)
+        pen.lines(pts, fill, w)
+        for q in outer:
+            pen.ellipse(q[0], q[1], w, w * kit.TILT, fill)
+    p.over(fn, 1.0)
 
 
 def draw(level, season, flag=kit.FLAG):
@@ -258,20 +258,21 @@ def draw(level, season, flag=kit.FLAG):
     p.tufts(10 if level == 1 else 6 if level == 2 else 4, avoid=[(CX, CY, 20)])     # first: later levels cover some of them
     if level >= 3:
         moat(p, outer)
-        p.patch(outer, kit.mix(p.pal["grass"], kit.ROAD, 0.45) if not winter else (204, 198, 188))
+        yard = kit.ROAD if not winter else (172, 160, 140)      # the trodden yard: an overlay on whatever ground there is
+        p.over(lambda pen: pen.poly(outer, yard, None), 0.45)
     mound(p)
     gate_y = CY + (RING2[1] if level >= 2 else RING1[1])
     if level == 1:
-        p.road([(CX, gate_y - 1), (CX - 1, gate_y + 8), (CX - 5, 34), (CX - 8, 48)], 1.4, track=True)
+        p.road([(CX, gate_y - 1), (CX - 1, gate_y + 8), GATES["south"]], 1.4, track=True)
     elif level == 2:
-        p.road([(CX, gate_y - 1), (CX - 1, gate_y + 8), (CX - 5, 34), (CX - 8, 48)], 2.0)
+        p.road([(CX, gate_y - 1), (CX - 1, gate_y + 8), GATES["south"]], 2.0)
     else:
-        p.road([(CX, gate_y - 1), (CX, 22), (CX - 4, 36), (CX - 8, 48)], 2.0)
+        p.road([(CX, gate_y - 1), (CX, 22), GATES["south"]], 2.0)
         gy = CY + FORT_B * kit.TILT                        # the bridge over the moat, from the gate tower
         p.patch([(CX - 2.6, gy - 1), (CX + 2.6, gy - 1), (CX + 2.6, gy + MOAT_W + 1.8), (CX - 2.6, gy + MOAT_W + 1.8)], kit.TIMBER, kit.INK, 0.5)
         for k in range(5):
             y = gy + 0.5 + k * 1.7
-            p.gp.line((CX - 2.6, y), (CX + 2.6, y), kit.TIMBER_D, 0.5)
+            p.over(lambda pen, y=y: pen.line((CX - 2.6, y), (CX + 2.6, y), kit.TIMBER_D, 0.5), 1.0)
     p.stones([(x, y, r) for x, y, r, gone in STONES if level < gone])
 
     # ---- standing things
@@ -286,9 +287,9 @@ def draw(level, season, flag=kit.FLAG):
         ring_wall(p, CX, CY, RING2[0], RING2[1])
         keep_h = 14.5
         p.cast(KEEP[0], KEEP[1], 11)
-        p.stand(KEEP[1], lambda pen: _tower(pen, winter, KEEP[0], KEEP[1], 10.0, keep_h, "battlement", flag, True, slit=True))
-        if winter:                                         # the keep smokes in winter only
-            p.stand(KEEP[1] + 30, lambda pen: _keep_smoke(pen, KEEP[0] + 3.6, KEEP[1] - keep_h - 3.4))
+        p.stand(KEEP[1], lambda pen: _tower(pen, winter, KEEP[0], KEEP[1], 10.0, keep_h, "battlement", flag, True, slit=True, banner_h=3.2))
+        if winter:                                         # the keep smokes in winter only (the kit's smoke is grey on snow)
+            p.smoke(KEEP[0] + 3.6, KEEP[1] - keep_h - 3.4, always=False, foot=KEEP[1])
     if level >= 3:
         fort_wall(p, outer, inner, FORT_H)
         gy = CY + FORT_B * kit.TILT

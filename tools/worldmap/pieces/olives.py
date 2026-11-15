@@ -6,6 +6,7 @@ The olive tree is evergreen: its colours never change with the season, only the 
 
 python olives.py           writes docs/design/map/pieces/olives.png
 """
+import math
 import os
 import sys
 
@@ -34,12 +35,40 @@ WILD = [                                                      # x, y, kind, gone
     (18, -30, "bush", 9),
 ]
 STONES = [(22, 18, 1.8, 3), (-38, -2, 1.6, 2), (35, -18, 1.6, 9), (8, 34, 1.6, 9)]
-TRACK = [(28, 12), (24, 22), (22, 34), (24, 48)]
+TRACK = [(28, 12), (24, 20), (16, 29), (8, 36)]
+GATES = {"south": (8, 36)}                            # the track ends here; the map's road layer carries it on
+# level 0: where the shelves will come, a few rough patches of darker scrub (x, y, w, h)
+SCRUB = [(-29, -20, 22, 8), (-24, -22.5, 12, 5), (-13, -4, 30, 9), (-33, 11, 20, 8), (-22, 14, 16, 7), (-13, 25, 26, 8),
+         (-27, 26, 12, 6)]
 
 
 def wall_pts(y, x0, x1):
     n = 8
     return [(x0 + (x1 - x0) * i / n, y + 1.4 * ((i / n - 0.5) ** 2) * -4 + 1.0) for i in range(n + 1)]
+
+
+def clip(pts, shrink=10.0):
+    """The polygon pts cut to the hex pulled in by `shrink` px: ground work keeps 10 px clear of the border (GUIDE C3)."""
+    hx = kit.hex_points(shrink)
+    sgn = 1 if sum(hx[i][0] * hx[(i + 1) % 6][1] - hx[(i + 1) % 6][0] * hx[i][1] for i in range(6)) > 0 else -1
+    out = list(pts)
+    for i in range(6):
+        a, b = hx[i], hx[(i + 1) % 6]
+
+        def side(q):
+            return sgn * ((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]))
+        src, out = out, []
+        for j, q in enumerate(src):
+            r = src[j - 1]
+            sq, sr = side(q), side(r)
+            if (sq >= 0) != (sr >= 0):
+                t = sr / (sr - sq)
+                out.append((r[0] + (q[0] - r[0]) * t, r[1] + (q[1] - r[1]) * t))
+            if sq >= 0:
+                out.append(q)
+        if not out:
+            break
+    return out
 
 
 def oil_mill(p, x, y):
@@ -73,25 +102,25 @@ def draw(level, season):
     p = kit.Piece(season, ground="grass", seed=3)
     sp, su, au, wi = season == "spring", season == "summer", season == "autumn", season == "winter"
     soil = kit.crop("olive_soil", season)[0]
+    if wi:                                            # the shelves take snow; the walls stay stone
+        soil = kit.mix(soil, kit.SNOW, 0.6)
     trees = [t for t in TREES if t[2] <= level]
     walls = [w for w in WALLS if w[3] <= level]
 
     # ---- ground plane
     if level == 0:                                    # wild land, with darker patches where the groves will come
-        for y, x0, x1, _ in WALLS:
-            p.blob((x0 + x1) / 2, y - 5, (x1 - x0) * 0.9, 9, kit.mix(p.pal["grass"], p.pal["wood"], 0.5))
+        for x, y, w, h in SCRUB:
+            p.scrub(x, y, w, h, dark=0.09)
     for x, y, frm in trees:                           # pale ochre soil under every tree
-        p.blob(x + 0.5, y + 1.5, 11, 6.5, soil)
+        p.patch(clip(ellipse_pts(x + 0.5, y + 1.5, 5.5, 3.25)), soil)
     for y, x0, x1, _ in walls:                        # the terrace strip north of each wall
-        p.patch([(x0, y - 11), (x1, y - 11), (x1, y), (x0, y)], soil)
-    for y, x0, x1, _ in walls:
-        pts = wall_pts(y, x0, x1)
-        p.patch(pts + [(x1, y + 3.6), (x0, y + 3.6)], kit.STONE, kit.STONE_D, 0.5)          # the wall face: never under snow
-        p.patch(pts + [(x1, pts[-1][1] + 0.8), (x0, pts[0][1] + 0.8)], kit.SNOW if wi else (238, 230, 210), None)
+        p.patch(clip([(x0, y - 11), (x1, y - 11), (x1, y), (x0, y)]), soil)
+    for y, x0, x1, _ in walls:                        # the wall: a stone face under a pale top line, never under snow
+        p.terrace([q for q in wall_pts(y, x0, x1) if kit.in_hex(q[0], q[1] + 3, 10)], face=3)
     if level >= 3:
         p.road(TRACK, 1.6, track=True)
-        p.patch(ellipse_pts(*STONE_AT, 5.6, 3.6), kit.STONE, kit.STONE_D, 0.5)                  # the millstone, flat on the ground
-        p.patch(ellipse_pts(STONE_AT[0], STONE_AT[1], 1.5, 1.0), kit.DOOR, None)
+        p.blob(STONE_AT[0], STONE_AT[1], 11.2, 7.2, kit.STONE, edge=kit.STONE_D)                 # the millstone, flat on the ground
+        p.blob(STONE_AT[0], STONE_AT[1], 3.0, 2.0, kit.DOOR)
     avoid = [(MILL[0], MILL[1], 16), (FARM[0], FARM[1], 8)] + [(x, y, 6) for x, y, _ in trees]
     p.tufts(14 if level == 0 else 8 if level == 1 else 4, avoid=avoid if level else ())
     p.stones([(x, y, r) for x, y, r, g in STONES if level < g or g == 9])
@@ -103,7 +132,7 @@ def draw(level, season):
     new = [t for t in trees if t[2] == level]
     if au:                                            # the harvest: pale cloths under three of the newest trees
         for x, y, _ in new[:3]:
-            p.patch([(x - 4.5, y + 0.5), (x + 4.5, y + 0.5), (x + 5.5, y + 3.8), (x - 5.5, y + 3.8)], kit.SAIL_D, kit.STONE_D, 0.5)
+            p.patch(clip([(x - 4.5, y + 0.5), (x + 4.5, y + 0.5), (x + 5.5, y + 3.8), (x - 5.5, y + 3.8)]), kit.SAIL_D, kit.STONE_D, 0.5)
 
     # ---- standing things
     for i, (x, y, kind, gone) in enumerate(WILD):
@@ -130,7 +159,6 @@ def draw(level, season):
 
 
 def ellipse_pts(cx, cy, rx, ry, n=16):
-    import math
     return [(cx + math.cos(2 * math.pi * i / n) * rx, cy + math.sin(2 * math.pi * i / n) * ry) for i in range(n)]
 
 

@@ -19,18 +19,19 @@ NAMES = {0: "scrub", 1: "young vines", 2: "press house", 3: "estate"}
 HUT = (-14, 8)                                        # the hut, later the tiled house: same foot at every level
 PRESS = (3, -2)                                       # the press house (level 2)
 VATS = [(13.5, -0.5), (18.5, 1.8)]
-ESTATE = (-3, -24)                                    # the estate house (level 3)
-TOWER = (-10.5, -24)
-CYPRESS = [(6, -23), (10, -25.5)]
+ESTATE = (-4, -22)                                    # the estate: one broad two-storey ochre house (level 3)
+TOWER = (3.6, -21.4)                                  # its tower stands on the right-hand end, not above the ridge
+CYPRESS = [(9.5, -21), (13.5, -23.5)]
 BLOCKS = [                                            # cx, cy, w, h, angle, rows, from level, shelves (terraces)
     (26, 14, 24, 17, -8, 6, 1, 1),
-    (-26, 22, 22, 15, 6, 5, 1, 1),
-    (28, -9, 24, 16, 18, 6, 2, 1),
-    (-28, -10, 22, 16, -14, 5, 2, 1),
-    (-28, -26, 18, 14, 0, 5, 3, 2),
-    (28, -28, 18, 14, 0, 5, 3, 2),
+    (-21, 21, 18, 12, 6, 5, 1, 1),
+    (27, -7, 22, 15, 18, 6, 2, 1),
+    (-27, -8, 21, 15, -14, 5, 2, 1),
+    (-22, -22, 14, 10, 0, 5, 3, 2),
+    (22, -22, 14, 10, 0, 5, 3, 2),
 ]
-TRACK = [(-12, 11), (-10, 20), (-6, 32), (-4, 46)]
+TRACK = [(-12, 11), (-10, 20), (-6, 32), (-5, 41)]
+GATES = {"south": (-5, 41)}                           # the track ends here; the map's road layer carries it on
 WILD = [                                              # x, y, kind, size, gone from level (9 = never)
     (-26, -26, "bush", 1.0, 3), (28, -27, "bush", 1.0, 3), (-30, -6, "bush", 1.0, 2), (30, 18, "bush", 1.0, 1),
     (-30, 24, "bush", 1.0, 1), (3, -40, "bush", 1.0, 9), (-42, 4, "bush", 1.0, 9), (42, 2, "bush", 1.0, 9),
@@ -103,7 +104,7 @@ def draw(level, season):
     # ---- ground plane
     if level == 0:                                    # wild land, with darker patches where the vines will come
         for b in BLOCKS:
-            p.blob(b[0], b[1], b[2] * 1.1, b[3] * 0.9, kit.mix(p.pal["grass"], p.pal["wood"], 0.5))
+            p.scrub(b[0], b[1], b[2] * 1.1, b[3] * 0.9, dark=0.08)
     if level >= 3:
         p.road(TRACK, 1.6, track=True)
     for b in blocks:
@@ -119,9 +120,7 @@ def draw(level, season):
             p.field(cx, sy, w, sh, ang, strips, n if wi else 1, along=False)
             p.rows(cx, sy, w, sh, ang, n, col=vine, soil=False, lw=1.5)
             ya = sy + sh / 2 * kit.TILT
-            wall = [(cx - w / 2 - 0.5, ya + 0.4), (cx + w / 2 + 0.5, ya + 0.4)]
-            p.patch([wall[0], wall[1], (wall[1][0], wall[1][1] + 2.2), (wall[0][0], wall[0][1] + 2.2)], kit.STONE, kit.STONE_D, 0.5)
-            p.patch([wall[0], wall[1], (wall[1][0], wall[1][1] + 0.7), (wall[0][0], wall[0][1] + 0.7)], kit.SNOW if wi else (236, 228, 208), None)
+            p.terrace([(cx - w / 2 - 0.5, ya + 0.4), (cx + w / 2 + 0.5, ya + 0.4)], face=2)
     avoid = [(b[0], b[1], max(b[2], b[3]) * 0.62) for b in blocks] + [(HUT[0], HUT[1], 8)]
     if level >= 2:
         avoid += [(PRESS[0] + 6, PRESS[1], 14)]
@@ -135,15 +134,15 @@ def draw(level, season):
     if level >= 1:
         if level == 1:
             p.house(HUT[0], HUT[1], 5.5, 3.5, 3.0, wall=0, roof="thatch", smoke=True)
-        else:
-            p.house(HUT[0], HUT[1], 7.5, 4.8, 3.6, wall=0, roof="tile", smoke=True)
+        else:                                         # the hut grows into a house but keeps its thatch: the tile roofs are the press and the estate
+            p.house(HUT[0], HUT[1], 7.5, 4.8, 3.6, wall=0, roof="thatch", smoke=True)
     if level >= 2:
         press_house(p, PRESS[0], PRESS[1])
         for x, y in VATS:
             vat(p, x, y)
     if level >= 3:
-        p.tower(TOWER[0], TOWER[1], 4.4, 11.5, col=kit.PLASTER[3], top="cone", roof=kit.ROOF)
-        p.house(ESTATE[0], ESTATE[1], 12.0, 6.4, 4.4, wall=kit.PLASTER[0], roof="tile")
+        p.house(ESTATE[0], ESTATE[1], 12.0, 6.5, 3.4, wall=kit.PLASTER[1], roof="tile")
+        p.tower(TOWER[0], TOWER[1], 3.6, 8.6, col=kit.PLASTER[1], top="cone", roof=kit.ROOF)
         for i, (x, y) in enumerate(CYPRESS):
             p.tree(x, y, 1.0, "poplar", i)
 

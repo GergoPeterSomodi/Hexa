@@ -31,18 +31,24 @@ OUTCROP_BLOCKS = [
     (1.0, [(-20, 0), (-19, 6), (-14, 9.5), (-8, 10.5), (-2, 8.5), (0, 4), (0.8, 0)], -11),
 ]
 ADIT = (-9, OUTCROP_BASE + 1.6)             # foot of the adit's mouth, in the middle block
-TRACK = [(-9, -18), (-7, -8), (-3, 2), (-1, 14), (-3, 30), (-7, 48)]
-HEAPS = [(-18, -10, 11.5, 6.2, 1), (24, 10, 10.0, 5.6, 2), (16, 19, 9.0, 5.0, 3)]       # x, y, w, h, from level
+TRACK = [(-9, -18), (-7, -8), (-3, 2), (-1, 14), (-3, 30), (-4, 38)]       # ends at the gate point, 13 px inside the border
+GATES = {"south": (-4, 38)}                 # where the map's road layer joins the track
+HEAPS = [(-18, -10, 14.0, 7.5, 1), (24, 10, 10.0, 5.6, 2), (16, 19, 9.0, 5.0, 3)]       # x, y, w, h, from level
 HEADFRAME = (11, 2)                         # foot of the headframe, from level 2
 STREAM = [(52, -14), (44, -11), (36, -6), (33, 0), (36, 7), (43, 12), (52, 18)]
 WHEEL = (34.5, -2.5)                        # foot of the water wheel, on the stream
 SMELTER = (-24, 6)                          # foot of the smelter, from level 3
-ORE_PILE = (-14, 12)                        # from level 3
+ORE_PILE = (-9, 9)                          # from level 3
 # huts become houses in place; the row's third house is new at level 3: x, y, from level
 HOUSES = [(-33, 22, 1), (-21, 22, 2), (-9, 23, 3)]
 BOULDERS = [(-37, 8, 6.0, 4.6, 9), (25, -12, 7.5, 5.4, 9), (7, 27, 6.5, 4.8, 9), (31, 25, 6.8, 5.0, 9)]   # x, y, w, h, gone from level
 CONIFERS = [(36, -15, 0.95, 9), (-40, -8, 0.9, 9)]                                      # x, y, size, gone from level
 WORK_PATCHES = [(-33, 22, 14, 7), (-18, -10, 17, 8), (11, 2, 16, 8), (-24, 6, 20, 9)]    # level 0: darker rock where the work will come
+# the worked yard grows with the level: trodden earth laid over the rock (x, y, w, h, from level)
+YARDS = [(-12, -8, 46, 20, 1), (-31, 20, 18, 8, 1),               # under the adit and the first heap; the hut
+         (12, 4, 40, 22, 2), (-19, 20, 18, 8, 2),                  # under the headframe and its heap; the second hut
+         (-22, 9, 34, 22, 3), (-12, 21, 42, 10, 3)]               # under the smelter; along the row of houses
+YARD_ALPHA = 0.35
 MOSS = [(-28, 12, 14, 6), (18, 24, 16, 7), (22, -24, 12, 5), (-2, 36, 18, 6), (-40, 0, 9, 5)]
 
 
@@ -53,12 +59,13 @@ def boulder(p, x, y, w, h):
 
     def fn(pen):
         hw = w / 2
-        body = [(x - hw, y), (x - hw * 0.85, y - h * 0.55), (x - hw * 0.35, y - h), (x + hw * 0.3, y - h * 0.95),
-                (x + hw * 0.9, y - h * 0.5), (x + hw, y)]
+        body = [(x - hw, y), (x - hw * 0.95, y - h * 0.4), (x - hw * 0.6, y - h * 0.8), (x - hw * 0.2, y - h), (x + hw * 0.3, y - h * 0.92),
+                (x + hw * 0.8, y - h * 0.6), (x + hw, y - h * 0.2), (x + hw * 0.9, y)]
         pen.poly(body, OUTCROP, None)
-        pen.poly([(x + hw * 0.1, y), (x + hw * 0.05, y - h * 0.85), (x + hw * 0.3, y - h * 0.95), (x + hw * 0.9, y - h * 0.5), (x + hw, y)], OUTCROP_D, None)
+        pen.poly([(x + hw * 0.1, y), (x + hw * 0.05, y - h * 0.85), (x + hw * 0.3, y - h * 0.92), (x + hw * 0.8, y - h * 0.6), (x + hw, y - h * 0.2), (x + hw * 0.9, y)], OUTCROP_D, None)
+        pen.line((x - hw * 0.5, y - h * 0.45), (x + hw * 0.05, y - h * 0.15), OUTCROP_D, 0.5)               # a facet line: boulders are lumpy, heaps are smooth
         if winter:
-            pen.poly([(x - hw * 0.8, y - h * 0.62), (x - hw * 0.35, y - h), (x + hw * 0.3, y - h * 0.95), (x + hw * 0.7, y - h * 0.6),
+            pen.poly([(x - hw * 0.8, y - h * 0.62), (x - hw * 0.2, y - h), (x + hw * 0.3, y - h * 0.92), (x + hw * 0.7, y - h * 0.6),
                       (x, y - h * 0.68)], kit.SNOW, None)
         pen.poly(body, None, kit.INK, 0.5)
     p.stand(y, fn)
@@ -83,7 +90,7 @@ def outcrop(p):
                 pen.poly(top + [(x + 0.4, y + 2.6) for x, y in reversed(top)], kit.SNOW, None)
             pen.poly(body, None, kit.INK, 0.5)
             for k in range(1, len(top) - 1, 2):              # cracks
-                pen.line((top[k][0] + 0.6, top[k][1] + 2.4), (top[k][0] + 1.4, base - 0.8), OUTCROP_D if top[k][0] < ridge else kit.INK, 0.5)
+                pen.line((top[k][0] + 0.6, top[k][1] + 2.4), (top[k][0] + 1.4, base - 0.8), OUTCROP_D, 0.5)
         p.stand(base, fn)
 
 
@@ -170,11 +177,8 @@ def smelter(p, x, y):
         pen.poly([(cxm - 2.0, chy), (cxm + 2.0, chy), (cxm + 1.5, chy - h), (cxm - 1.5, chy - h)], None, kit.INK, 0.5)
         if winter:
             pen.line((cxm - 2.0, chy - h - 1.4), (cxm + 2.0, chy - h - 1.4), kit.SNOW, 0.9)
-        # the plume: five puffs drifting to the left, in every season
-        tx, ty = cxm, chy - h - 1.6
-        for dx, dy, r in ((-0.2, -1.6, 1.3), (-1.6, -4.0, 1.7), (-3.0, -6.8, 2.1), (-5.6, -8.8, 2.3), (-8.4, -10.0, 2.2)):
-            pen.circle(tx + dx, ty + dy, r, kit.mix(kit.SMOKE, kit.STONE_GREY_D, 0.6) if winter else kit.SMOKE)
     p.stand(y - 0.5, chimney)
+    p.smoke(cxm, chy - 19.5 - 1.6, always=True, foot=y - 0.5)       # smokes in every season
     p.house(x, y, 12.5, 6.2, 3.8, wall=kit.STONE_GREY, kind="ridge", roof="slate", door=False)
     # the furnace mouth: a dark arch with a red glow, the one warm spot
     p.stand(y + 0.1, lambda pen: (pen.rect(x - 2.0, y - 3.4, 4.0, 3.4, kit.DOOR, None), pen.rect(x - 1.0, y - 1.6, 2.0, 1.4, kit.ROOF, None)))
@@ -186,12 +190,15 @@ def draw(level, season):
     # ---- ground plane
     if level == 0:                                    # wild rock: darker patches where the work will come
         for x, y, w, h in WORK_PATCHES:
-            p.blob(x, y, w, h, kit.shade(p.pal["rock"], 0.9))
+            p.scrub(x, y, w, h, dark=0.10)
+    for x, y, w, h, lo in YARDS:                      # worked ground under each landmark, growing with the level
+        if level >= lo:
+            p.blob(x, y, w, h, p.pal["soil"], alpha=YARD_ALPHA)
     moss = {"spring": (0.62, 0.0), "summer": (0.22, 0.0), "autumn": (0.30, 1.0)}.get(season)
     if moss:                                          # a little green on the rock: fresh in spring, dry and olive in autumn
-        col = kit.mix(p.pal["rock"], kit.mix(p.pal["grass"], (150, 130, 70), moss[1] * 0.6), moss[0])
+        col = kit.mix(p.pal["grass"], (150, 130, 70), moss[1] * 0.6)
         for x, y, w, h in MOSS:
-            p.blob(x, y, w, h, col)
+            p.blob(x, y, w, h, col, alpha=moss[0])
     elif winter:
         for x, y, w, h in MOSS:
             p.snow_patch(x, y, w * 0.8, h * 0.8)
@@ -200,8 +207,6 @@ def draw(level, season):
         p.water(STREAM, 3.0)
     if level >= 1:
         p.road(TRACK, 1.5, track=True)
-        if winter:                                    # the trodden track shows through the snow
-            p.gp.lines(TRACK, kit.mix(p.pal["rock"], p.pal["soil"], 0.55), 1.0)
     p.tufts(10, avoid=[(-9, -18, 14), (11, 2, 14), (-24, 6, 16)])
     if level < 2:
         p.stones([(10, 8, 1.8), (-30, -4, 1.6), (36, 6, 1.5)])
