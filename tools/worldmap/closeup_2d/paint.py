@@ -42,9 +42,11 @@ TREE_INK = (36, 58, 38)
 TRUNK = (96, 72, 52)
 
 
-def broadleaf(s, x, y, sc, r, tone=0, ink=True):
-    """A round tree of three lobes: ink rim, shadow side, lit lobes, a highlight."""
+def broadleaf(s, x, y, sc, r, tone=0, ink=True, f=1.0):
+    """A round tree of three lobes: ink rim, shadow side, lit lobes, a highlight. f: brightness (the slope it stands on)."""
     d, m, l, hl = LEAF[tone % 3] if tone < 9 else OLIVE
+    if f != 1.0:
+        d, m, l, hl = sh(d, f), sh(m, f), sh(l, f), sh(hl, f)
     R = 11.0 * sc
     th = 6.0 * sc
     pygame.draw.line(s, TRUNK, (x, y), (x, y - th - R * 0.4), max(2, int(2.6 * sc)))
@@ -63,11 +65,11 @@ def broadleaf(s, x, y, sc, r, tone=0, ink=True):
     pygame.draw.circle(s, hl, (x - R * 0.8, cy + R * 0.02), R * 0.13)
 
 
-def conifer(s, x, y, sc, r):
-    """A fir in three tiers, shaded on the right."""
+def conifer(s, x, y, sc, r, f=1.0):
+    """A fir in three tiers, shaded on the right. f: brightness (the slope it stands on)."""
     h, w = 34 * sc, 19 * sc
     pygame.draw.line(s, TRUNK, (x, y), (x, y - 6 * sc), max(2, int(2.4 * sc)))
-    lit, dk, hl = (62, 116, 70), (42, 86, 58), (92, 146, 84)
+    lit, dk, hl = sh((62, 116, 70), f), sh((42, 86, 58), f), sh((92, 146, 84), f)
     for i in range(3):
         t0 = i / 3.0
         yb = y - 5 * sc - h * t0 * 0.8

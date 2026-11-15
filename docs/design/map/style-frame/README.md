@@ -9,6 +9,7 @@ triangles, varied coasts, no flat grey, fewer places and roads, clean names, one
 | `style_frame_close.png` | The close zoom (hex radius 60), 1280x720 |
 | `style_frame_middle.png` | The same patch at the middle zoom (hex radius 30), 640x360: what simplifies |
 | `style_frame_tilt_ab.png` | Owner's choice: the ground plane at 85% height (A) or full height as in 07 (B) |
+| `slope_before_after.png` | The slope rule: the close zoom before and after, with the Genoa area enlarged |
 
 **The patch: the Gulf of Genoa.** It has everything the brief asks for, plus a sea coast (the owner's sore point):
 the Ligurian Apennines with their crest and the Giovi pass, Genoa (a city and port) and the villages of Serravalle
@@ -82,6 +83,47 @@ in the art):
      of the trees (drawn bigger).
    - **Towns** become compact 3-6-house icons with one church or dome.
    - **Kept:** passes, roads, bridges and coasts.
+
+## The slope rule (added 2026-11-15, for the owner to see; nothing is rolled out)
+
+The land rises as one body from the coast to the crest; it is not flat ground with separate humps on it. The ground
+plane stays flat in the view (rule 1): the rise is shown with tone only. See `slope_before_after.png` (the frame, before
+and after, with the Genoa area enlarged) and `../closeup/2d_genoa_slopes_compare.png`.
+
+- **One height field.** Real heights, smoothed to about 11 px on screen at each zoom (3 km at radius 60, 1 km in the
+  close-up), so the shapes are broad and soft, not a relief map.
+- **Slope tone.** Slopes that face the light are a little lighter and warmer (up to 16%), slopes turned away a little
+  darker and cooler (up to 16%). The tone is nearly two-tone, like the standing hills, with soft edges. The light comes
+  from the left and a little from above, as on the standing mountains; a light from straight above-left would put
+  every coast that faces the viewer in the shade.
+- **Valley floors** are up to 10% darker, crests up to 5% lighter. **High green ground** goes a little paler (up to
+  30% towards a pale green at 850 m). Stone takes about half of every tone, so it stays light.
+- **Flat land stays plain.** Ground that rises less than about 7 m per km gets no tone; the dark tones start later
+  (15 m per km), because a dark tone on a gentle ramp reads as a stain.
+- **Drawn water lies in a valley.** The height field is pressed down along the drawn rivers and streams, so the
+  shading always agrees with the map.
+- **Woods follow the land.** Every tree takes the tone of the slope it stands on.
+- **Hills and ranges sit on the slope.** Green hills and wooded ranges take the slope tone at their foot and a third
+  of the ground colour. A rounded hill is left out on a valley floor and on flat ground, and one in two to four is
+  left out where the shaded slope already shows the rise (here 187 of the 396 hills in view go).
+- **Not changed:** the high ranges, snow, coasts, places, roads and names.
+
+**Data.** The fine heights are NOAA ETOPO 2022 (60 arc-second), cut to a small derived grid that is kept outside
+the repository. The map's coast is the hex coast, which lies up to about 20 km off the real one (Genoa stands 21 km
+south of its real place), so the heights are read through a soft warp that carries the real shore onto the drawn
+shore and fades out inland. Without the derived grid the generator falls back to the per-hex heights: the land still
+rises, but the valleys are missing.
+
+**Switch.** `STYLE_FRAME_SLOPES=0` turns the rule off and gives the earlier pictures again, pixel for pixel;
+`STYLE_FRAME_HEIGHTS` names the derived grid. The code is `tools/worldmap/style_frame/slopes.py`.
+
+**Known limits.** The shading follows the real land, the standing hills and ranges follow the hex data, so a lit
+slope and a drawn hill do not always meet. West of Turin the real Alps reach further east than the drawn peaks, and
+the shaded flank shows as a dark green wedge on ground drawn as meadow. The high Alps gain little: their ground is
+mostly hidden by the peaks, and the peaks are still separate cut-outs (see the report).
+
+Credit for the heights: NOAA National Centers for Environmental Information. 2022: ETOPO 2022 15 Arc-Second Global
+Relief Model. doi:10.25921/fd45-gt74
 
 ## For the owner to decide
 

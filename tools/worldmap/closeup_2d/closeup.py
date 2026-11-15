@@ -3,6 +3,8 @@
 Run from the repository root, with STYLE_FRAME_LAYERS pointing at the exported layers file:
     python tools/worldmap/closeup_2d/closeup.py OUT_DIR [EMPTY_CROP.png]
 Writes 2d_genoa_close.png and, when the frame's plain 4x crop is given, 2d_genoa_compare.png.
+With the slope rule on (the default; see tools/worldmap/style_frame/slopes.py) the picture is written as
+2d_genoa_close_slopes.png instead; STYLE_FRAME_SLOPES=0 gives the first picture again.
 Set CLOSEUP_KEEP_2X=1 to also save the 2x drawing (for checking details).
 Authored positions are in drawing px (2x of the 1280x720 picture).
 """
@@ -587,6 +589,9 @@ def names(out):
 # ---------------------------------------------------------------- the picture
 def main(out_dir, empty_crop=None):
     t0 = time.time()
+    if SF.SLOPES:      # the slope rule: the two authored torrents lie in their valleys too
+        SF.SLOPES.add_water([[K(*p) for p in smooth(line, 3, 12.0)] for line in (POLCEVERA, BISAGNO)])
+        T.TONES = SF.SLOPES.level(1.0)
     loops = build_coast([ell_km("sea", BAY), ell_km("land", CAPE), ell_km("land", POINT)])
     loops_px = [[P(*p) for p in lp] for lp in loops]
     cv = T.Canvas()
@@ -726,10 +731,11 @@ def main(out_dir, empty_crop=None):
     names(out)
     pygame.draw.rect(out, (40, 36, 40), out.get_rect(), 1)
     os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, "2d_genoa_close.png")
+    stem = "2d_genoa_close_slopes" if SF.SLOPES else "2d_genoa_close"
+    path = os.path.join(out_dir, stem + ".png")
     pygame.image.save(out, path)
     if os.environ.get("CLOSEUP_KEEP_2X"):
-        pygame.image.save(cv.s, os.path.join(out_dir, "2d_genoa_close_2x.png"))
+        pygame.image.save(cv.s, os.path.join(out_dir, stem + "_2x.png"))
     print("rendered in %.1f s" % (time.time() - t0))
     if empty_crop:
         compare(out, pygame.image.load(empty_crop), os.path.join(out_dir, "2d_genoa_compare.png"))

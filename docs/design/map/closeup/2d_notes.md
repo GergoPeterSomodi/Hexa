@@ -101,6 +101,23 @@ building set and its landmark cities.
 - **Nothing moves.** Waves, flags, ships and smoke are still; animation would be extra work.
 - Fonts are the frame's stand-ins, as before.
 
+## Slope shading (added 2026-11-15)
+
+`2d_genoa_close_slopes.png` is the same picture with the frame's slope rule (see the style-frame README), and
+`2d_genoa_slopes_compare.png` shows it before and after. `2d_genoa_close.png` is unchanged; `STYLE_FRAME_SLOPES=0`
+draws it again.
+
+- The ground is toned from real heights smoothed to 1 km: lit west flanks, shaded east flanks, darker floors along
+  the Polcevera and the Bisagno (both torrents are pressed into the height field), paler ground towards the crest.
+- The noise that faked rolling ground before is cut to a light texture.
+- Trees take the tone of their slope; ranges take it at their foot; hills on floors and flat ground are left out.
+- Limits: the heights are real but warped, because the map's Genoa stands 21 km south of the real shore, so about
+  15 km of real slope is drawn over 36 km. The data has one height per 1.3 x 1.9 km, so there is no relief finer than
+  about 30 px here. The ground stays flat in the view: houses, roads and fields do not climb. The hill under Genoa
+  is still hand-painted.
+- Heights: NOAA National Centers for Environmental Information. 2022: ETOPO 2022 15 Arc-Second Global Relief Model.
+  doi:10.25921/fd45-gt74 (a small derived grid, kept outside the repository).
+
 ## For the owner to decide
 
 1. **2D or 3D for the closest zoom?** Compare with the 3D test of the same area.

@@ -4,6 +4,9 @@ import pygame
 from scene import *
 from scene import FIELDS as F
 import paint as A
+import slopes as SLP
+
+TONES = None                   # the slope tones of this zoom (set by the close-up when the slope rule is on)
 
 C_FARM = (178, 198, 98)
 C_GRASS = (146, 186, 86)
@@ -141,6 +144,11 @@ def land_colour(x, y):
     dh = F.at(F.height, x - 1.5, y - 1.5) - F.at(F.height, x + 1.5, y + 1.5)
     roll = vnoise(x - 0.7, y - 0.7, 4.5, 71) - vnoise(x + 0.7, y + 0.7, 4.5, 71)
     roll2 = vnoise(x - 0.35, y - 0.35, 1.7, 73) - vnoise(x + 0.35, y + 0.35, 1.7, 73)
+    if TONES:      # the slope rule: the real rise of the land carries the shading, the noise is only a little texture
+        f = 1.0 + roll * 0.2 + roll2 * 0.14 + (vnoise(x, y, 2.2, 72) - 0.5) * 0.07
+        c = SLP.tone(c[0] * f, c[1] * f, c[2] * f, TONES.soft(TONES.shade, x, y), TONES.soft(TONES.valley, x, y),
+                     TONES.soft(TONES.height, x, y))
+        return (clamp8(c[0]), clamp8(c[1]), clamp8(c[2]))
     f = 1.0 + max(-0.13, min(0.13, dh * 0.0006)) + roll * 0.55 + roll2 * 0.22 + (vnoise(x, y, 2.2, 72) - 0.5) * 0.07
     return (clamp8(c[0] * f), clamp8(c[1] * f), clamp8(c[2] * f))
 
@@ -500,6 +508,20 @@ def ridge(cv, g, seed, main=True, wood=0.62, key=None, rocky_from=1700, pre=Fals
 
     def draw():
         s = cv.s
+        HILL_LIT, HILL_HI, HILL_SH, HILL_DEEP = (globals()[q] for q in ("HILL_LIT", "HILL_HI", "HILL_SH", "HILL_DEEP"))
+        if TONES and not pre:      # the range takes part of its tone from the shaded ground at its foot
+            acc, cnt = [0, 0, 0], 0
+            for t in (0.2, 0.35, 0.5, 0.65, 0.8):
+                qx = x0 + (x1 - x0) * t
+                qy = base_y(qx) + 16
+                if 0 <= qx < W and 0 <= qy < H:
+                    gc = s.get_at((int(qx), int(qy)))
+                    if gc[1] > gc[0] and gc[1] > gc[2] + 40:
+                        acc = [acc[i] + gc[i] for i in range(3)]
+                        cnt += 1
+            if cnt:
+                HILL_LIT = mix(HILL_LIT, tuple(v / cnt for v in acc), 0.45)
+                HILL_HI, HILL_SH, HILL_DEEP = A.sh(HILL_LIT, 1.1), A.sh(HILL_LIT, 0.8), A.sh(HILL_LIT, 0.68)
         pygame.draw.polygon(s, HILL_LIT, top + foot)
         rock_polys = []
         for f in faces:
@@ -643,6 +665,8 @@ def data_relief(cv, skip=None, drop=0.0):
         h = (5.0 + 7.5 * smoothstep(360, 900, hl["m"])) * k * 1.2
         if sd < drop or (skip and skip(bx, by)) or not cv.routes.clear(bx, by - h * 0.2, h * 1.2, reach=5):
             continue
+        if TONES and not TONES.keeps_hill(hl["x"], hl["y"]):
+            continue      # the shaded ground carries the shape there
         coastal = F.at(F.land, hl["x"], hl["y"] + 9) < 0.75 or F.at(F.farm, hl["x"], hl["y"]) > 0.3
         wd = 0.3 + 0.5 * F.at(F.woods, hl["x"], hl["y"])
         if 0.42 < sd < 0.72:      # a lower shoulder behind, so the hills are not all single humps
@@ -672,14 +696,15 @@ def grow_trees(cv, coast_y, veto=None):
             m = F.at(F.height, kx, ky)
             sc = r.uniform(1.2, 2.05)
             roll = r.random()
+            tf = SLP.canopy_tone(TONES.soft(TONES.shade, kx, ky), TONES.soft(TONES.valley, kx, ky)) if TONES else 1.0
             if cd < 200 and roll < 0.14:
                 fn, w = (lambda a, b, c, d=random.Random(roll): A.stone_pine(cv.s, a, b, c * 1.05, d)), 26
             elif cd < 260 and roll < 0.25:
                 fn, w = (lambda a, b, c, d=random.Random(roll): A.cypress(cv.s, a, b, c * 1.1, d)), 8
             elif m > 700 and roll > 0.62 - (m - 700) / 1400.0:
-                fn, w = (lambda a, b, c, d=random.Random(roll): A.conifer(cv.s, a, b, c * 1.1, d)), 16
+                fn, w = (lambda a, b, c, d=random.Random(roll), f=tf: A.conifer(cv.s, a, b, c * 1.1, d, f)), 16
             else:
                 tone = int(vnoise(kx, ky, 2.0, 83) * 3.2) % 3
-                fn, w = (lambda a, b, c, d=random.Random(roll), t=tone: A.broadleaf(cv.s, a, b, c, d, t)), 22
+                fn, w = (lambda a, b, c, d=random.Random(roll), t=tone, f=tf: A.broadleaf(cv.s, a, b, c, d, t, f=f)), 22
             cv.add(y, (lambda f=fn, a=x, b=y, c=sc: f(a, b, c)))
             cv.sh_ell(x + w * sc * 0.45, y + 2, w * sc * 1.25, w * sc * 0.42)

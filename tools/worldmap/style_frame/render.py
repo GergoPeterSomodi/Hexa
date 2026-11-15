@@ -3,12 +3,14 @@ import math, random, sys, os, time
 from frame import *
 from relief import *
 from relief2 import *
+import slopes
 
 FIELDS = Fields(WORLD)
 build_roads(WORLD)
 RELIEF, HILLS, RGRID = build_relief(WORLD, FIELDS)
 TREES = build_trees(WORLD, FIELDS, RGRID)
 PARCELS = build_parcels(WORLD, FIELDS)
+SLOPES = slopes.Slopes(WORLD, FIELDS) if slopes.ON else None     # the slope rule: see slopes.py and the README
 
 PARCEL_COLS = [(222, 198, 104), (196, 208, 102), (210, 180, 96), (186, 196, 120), (232, 212, 128)]
 WALLS = [(240, 228, 196), (232, 200, 140), (234, 192, 166), (246, 240, 228), (226, 210, 170)]
@@ -27,6 +29,8 @@ class Frame:
         self.objs = []
         self.shadows = []
         self.labels = []
+        # the slope tones are smoothed to about 11 px on screen, so the land reads as broad shapes at every zoom
+        self.tones = SLOPES.level(3.0 if not mid else 4.5) if SLOPES else None
 
     def P(self, x, y):
         return ((x - X0) * self.S, (y - Y0) * self.S * TILT)
@@ -53,6 +57,10 @@ class Frame:
         A = pack(F.land, F.height, F.cliff, 255, 255 / 3300.0, 255)
         B = pack(F.farm, F.woods, F.rock, 255, 255, 255)
         C = pack(F.depth, nz1, nz2, 255, 255, 255)
+        SL = self.tones
+        if SL:
+            D = pack([v * 0.5 + 0.5 for v in SL.shade], [v * 0.5 + 0.5 for v in SL.valley], SL.height, 255, 255, 255 / 3300.0)
+        tone = slopes.tone
         W, H = self.W, self.H
         out = bytearray(W * H * 3)
         k = self.k
@@ -95,8 +103,12 @@ class Frame:
                         dh = A[i0 + 1] - A[i1 + 1]
                     else:
                         dh = 0
-                    f = 1.0 + max(-0.16, min(0.16, dh * 0.016)) + n1 * 0.00045 + (hsh - 128) * 0.0002
-                    r, g, b = r * f, g * f, b * f
+                    if SL:      # the slope rule: lit and shaded slopes, darker valley floors, paler high ground
+                        f = 1.0 + n1 * 0.00045 + (hsh - 128) * 0.0002
+                        r, g, b = tone(r * f, g * f, b * f, (D[i] - 127.5) / 127.5, (D[i + 1] - 127.5) / 127.5, D[i + 2] * 12.94)
+                    else:
+                        f = 1.0 + max(-0.16, min(0.16, dh * 0.016)) + n1 * 0.00045 + (hsh - 128) * 0.0002
+                        r, g, b = r * f, g * f, b * f
                     cl = A[i + 2] / 255.0
                     # the shore: a sand strip on low coasts, wet rocks on steeper ones
                     if lv < 0.535 and cl < 0.35:
@@ -142,6 +154,28 @@ class Frame:
                     out[i + 1] = max(0, min(255, int(g)))
                     out[i + 2] = max(0, min(255, int(b)))
         self.surf.blit(pygame.image.frombuffer(bytes(out), (W, H), "RGB"), (0, 0))
+        self.ground_img = self.surf.copy()
+
+    def ground_tone(self, x, y, base, share):
+        """A standing hill takes the slope tone of the ground at its foot, and on green ground part of its colour too,
+        so it grows out of the slope."""
+        if not self.tones:
+            return base
+        T = self.tones
+        kx, ky = X0 + x / self.S, Y0 + y / (self.S * TILT)
+        base = shade(base, slopes.canopy_tone(T.at(T.shade, kx, ky), T.at(T.valley, kx, ky)))
+        acc = [0, 0, 0]
+        n = 0
+        for dx, dy in ((0, 0), (-5, 1), (5, 1), (-10, 2), (10, 2), (0, 4)):
+            px, py = int(x + dx * self.k), int(y + dy * self.k)
+            if 0 <= px < self.W and 0 <= py < self.H:
+                c = self.ground_img.get_at((px, py))
+                if c[1] > c[0] + 8 and c[1] > c[2] + 40:          # green ground: not stone, sand or water
+                    acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2]
+                    n += 1
+        if n < 3:
+            return base
+        return mix(base, (acc[0] / n, acc[1] / n, acc[2] / n), share)
 
     # ------------------------------------------------------------ flat things on the ground plane
     def hexgrid(self):
@@ -339,6 +373,8 @@ class Frame:
                         w = p["h"] * 1.15
                         self.shadows.append(("ell", p["x"] + w * 0.35, p["y"] + p["h"] * 0.05, w * 1.3, max(3, p["h"] * 0.28)))
         for hl in HILLS:
+            if self.tones and not self.tones.keeps_hill(hl["x"], hl["y"]):
+                continue      # the shaded ground carries the shape there: no hump on a floor or on flat ground
             if self.mid and rnd.random() < 0.4:
                 continue
             bx, by = self.P(hl["x"], hl["y"])
@@ -411,6 +447,10 @@ class Frame:
         base = [(p["x"], p["y"] + p["h"] * 0.1 + 1.5 * k) for p in reversed(g)]
         poly = top + [(top[-1][0], base[0][1])] + base + [(top[0][0], base[-1][1])]
         st = self.style(max(p["m"] for p in g), g[0]["seed"])
+        if st.get("green") and SLOPES:
+            mid_p = g[len(g) // 2]
+            st["lit"] = self.ground_tone(mid_p["x"], mid_p["y"] + mid_p["h"] * 0.1 + 3 * k, st["lit"], 0.3)
+            st["sh"] = shade(st["lit"], 0.74)
         pygame.draw.polygon(s, st["lit"], poly)
         # shadow faces: right of a fall line from each peak
         for ia, ax, by, h, w, p in info:
@@ -529,9 +569,10 @@ class Frame:
         k = self.k
         w = h * 2.5
         pts = [(x - w / 2 + w * t, y - h * math.sin(math.pi * t) ** 0.8) for t in [i / 14 for i in range(15)]]
-        pygame.draw.polygon(s, (134, 172, 86), pts + [(x + w / 2, y + 1), (x - w / 2, y + 1)])
+        lit = self.ground_tone(x, y + 2 * k, (134, 172, 86), 0.35)
+        pygame.draw.polygon(s, lit, pts + [(x + w / 2, y + 1), (x - w / 2, y + 1)])
         shp = [(x + w * 0.04, y - h * 0.98)] + [p for p in pts if p[0] > x + w * 0.04] + [(x + w / 2, y + 1), (x + w * 0.16, y + 1), (x + w * 0.12, y - h * 0.4)]
-        pygame.draw.polygon(s, (106, 146, 74), shp)
+        pygame.draw.polygon(s, shade(lit, 0.79) if SLOPES else (106, 146, 74), shp)
         pygame.draw.lines(s, (66, 94, 52), False, pts, 1)
 
     def trees(self):
@@ -543,30 +584,33 @@ class Frame:
             if bx < -10 or bx > self.W + 10 or by < -5 or by > self.H + 20:
                 continue
             sc = t["s"] * k * (1.4 if self.mid else 1.0)
+            f = 1.0
+            if self.tones:      # the woods follow the land: lighter on lit slopes, darker on shaded ones and in valleys
+                f = slopes.canopy_tone(self.tones.at(self.tones.shade, t["x"], t["y"]), self.tones.at(self.tones.valley, t["x"], t["y"]))
             if t["con"]:
-                self.add(by, bx, (lambda a, b, c: lambda: self.draw_conifer(a, b, c))(bx, by, sc))
+                self.add(by, bx, (lambda a, b, c, d: lambda: self.draw_conifer(a, b, c, d))(bx, by, sc, f))
             else:
-                self.add(by, bx, (lambda a, b, c: lambda: self.draw_tree(a, b, c))(bx, by, sc))
+                self.add(by, bx, (lambda a, b, c, d: lambda: self.draw_tree(a, b, c, d))(bx, by, sc, f))
             self.shadows.append(("ell", bx + 3.2 * sc, by + 0.5, 7 * sc, 2.4 * sc))
 
-    def draw_tree(self, x, y, sc):
+    def draw_tree(self, x, y, sc, f=1.0):
         s = self.surf
         pygame.draw.line(s, (92, 70, 50), (x, y), (x, y - 3 * sc), max(1, int(1.4 * sc)))
         r = 4.4 * sc
         cy = y - 3 * sc - r * 0.75
         pygame.draw.circle(s, (38, 60, 38), (x, cy), r + 1)
-        pygame.draw.circle(s, (70, 128, 60), (x, cy), r)
-        pygame.draw.circle(s, (96, 158, 72), (x - r * 0.28, cy - r * 0.28), r * 0.66)
-        pygame.draw.circle(s, (130, 186, 92), (x - r * 0.45, cy - r * 0.45), r * 0.26)
+        pygame.draw.circle(s, shade((70, 128, 60), f), (x, cy), r)
+        pygame.draw.circle(s, shade((96, 158, 72), f), (x - r * 0.28, cy - r * 0.28), r * 0.66)
+        pygame.draw.circle(s, shade((130, 186, 92), f), (x - r * 0.45, cy - r * 0.45), r * 0.26)
 
-    def draw_conifer(self, x, y, sc):
+    def draw_conifer(self, x, y, sc, f=1.0):
         s = self.surf
         h, w = 12.5 * sc, 7.2 * sc
         pygame.draw.line(s, (92, 70, 50), (x, y), (x, y - 2.5 * sc), max(1, int(1.3 * sc)))
         pts = [(x, y - h), (x + w / 2, y - 2 * sc), (x - w / 2, y - 2 * sc)]
-        pygame.draw.polygon(s, (66, 120, 70), pts)
-        pygame.draw.polygon(s, (46, 92, 58), [(x, y - h), (x + w / 2, y - 2 * sc), (x + w * 0.06, y - 2 * sc)])
-        pygame.draw.line(s, (60, 108, 64), (x - w * 0.3, y - h * 0.45), (x + w * 0.05, y - h * 0.38), 1)
+        pygame.draw.polygon(s, shade((66, 120, 70), f), pts)
+        pygame.draw.polygon(s, shade((46, 92, 58), f), [(x, y - h), (x + w / 2, y - 2 * sc), (x + w * 0.06, y - 2 * sc)])
+        pygame.draw.line(s, shade((60, 108, 64), f), (x - w * 0.3, y - h * 0.45), (x + w * 0.05, y - h * 0.38), 1)
         pygame.draw.polygon(s, (34, 56, 40), pts, 1)
 
     # ------------------------------------------------------------ towns, bridges, harbours
