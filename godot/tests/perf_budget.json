@@ -1,0 +1,15 @@
+{
+  "comment": "Limits of docs/architecture/m1-build-spec.md section 9, read by tools/perf_map.gd. class: cpu = the fill, swap and rebuild times (CPU side, fail the run), mem = memory (fails the run), gpu = frame times (fail only with --gpu-limits, on real hardware). Never read by a GUT test.",
+  "map": {"cols": 494, "rows": 247, "seed": 1480},
+  "limits": {
+    "frame_worst_ms": {"limit": 16.0, "class": "gpu", "what": "worst frame at any zoom while panning"},
+    "frame_mean_ms": {"limit": 8.0, "class": "gpu", "what": "mean frame at any zoom while panning"},
+    "fill_first_ms": {"limit": 100.0, "class": "cpu", "what": "first slice of the fill (the screen at the camera), CPU time"},
+    "fill_all_ms": {"limit": 3000.0, "class": "cpu", "what": "whole map filled, CPU time of the slices"},
+    "build_action_ms": {"limit": 2.0, "class": "cpu", "what": "one build: MapCells.of_hex and set_tile for the touched hexes, worst of the samples"},
+    "season_swap_ms": {"limit": 100.0, "class": "cpu", "what": "swap to a season that was requested ahead: load_season and set_season, worst"},
+    "chunk_rebuild_ms": {"limit": 80.0, "class": "cpu", "what": "EdgeLines.for_chunk and set_chunk_lines for one chunk, worst"},
+    "cells_static_mb": {"limit": 400.0, "class": "mem", "what": "static memory of the filled cells"},
+    "video_mb_per_season": {"limit": 512.0, "class": "mem", "what": "video memory of one season's TileSet (the standard's budget for the map)"}
+  }
+}

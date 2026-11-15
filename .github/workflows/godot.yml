@@ -5,12 +5,15 @@ name: godot
 # - frozen-python: a pull request that changes a file under hexa/ fails (hexa/ is frozen at v0.2.2, the reference);
 # - checks: the lint (layers, size limits), the import, the script parse, the main scene start (the north Italy map)
 #   and the GUT tests (on pull requests and pushes that touch godot/, tools/ or this workflow);
+# - perf: nightly and by hand, tools/perf_map.gd on the made-up Europe map with the full tileset (m1-build-spec section 9);
 # - export-windows and smoke-windows: on a tag v0.3.*, or by hand, the Windows zip and a smoke start on a Windows runner.
 # The 0.3.0 map job (rebuild of europe_1480.json) is gone with that map (M0, step R3). A check of the committed map
 # file against its builder comes back with the new map file (architecture section 4.2); the goldens come with M1.
 
 on:
-  workflow_dispatch:      # a playtest build of master: the Windows zip without a tag
+  workflow_dispatch:      # a playtest build of master: the Windows zip without a tag (and the speed job)
+  schedule:
+    - cron: "41 3 * * *"  # the nightly speed job (perf) only
   pull_request:
   push:
     branches: ["**"]
@@ -26,6 +29,7 @@ permissions:
 jobs:
   changes:
     name: what changed
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -126,6 +130,25 @@ jobs:
             echo "::error::The main scene did not open cleanly (see the log)."
             exit 1
           fi
+      # The generated files must be current: the four TileSets (assets/tiles/tiles_<season>.tres) and the north Italy map.
+      - name: Generated TileSets are current (build_tileset --check)
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot -s res://tools/build_tileset.gd -- --check 2>&1 | tee tileset.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error' tileset.log; then
+            echo "::error::A committed assets/tiles/tiles_*.tres differs from what tools/build_tileset.gd builds: run it and commit the files."
+            exit 1
+          fi
+      - name: Generated map is current (build_map --check)
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --check 2>&1 | tee map.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error' map.log; then
+            echo "::error::The committed map file differs from what tools/build_map.gd builds: run it and commit the file."
+            exit 1
+          fi
       - name: GUT tests (headless, JUnit report)
         run: |
           set -uo pipefail
@@ -154,6 +177,43 @@ jobs:
         with:
           name: gut-junit
           path: ${{ runner.temp }}/gut-junit.xml
+          if-no-files-found: ignore
+
+  # The speed job: no GPU on the runner, so the window is Mesa's software OpenGL (llvmpipe) under xvfb. Frame times
+  # are reported, not enforced (tests/perf_budget.json: class gpu; run `--gpu-limits` on real hardware). The CPU limits
+  # (fill, season swap, chunk rebuild, one build) and the memory limits fail the job; the runner is about twice as slow
+  # as the PC the limits were read on, hence --cpu-scale.
+  perf:
+    name: map speed (fake Europe)
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Godot
+        uses: ./.github/actions/setup-godot
+      - name: Software OpenGL and a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0 libegl1 mesa-utils
+      - name: Import the project
+        run: |
+          "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
+      - name: Measure (section 9 table in the job summary)
+        run: |
+          set -uo pipefail
+          xvfb-run -a -s "-screen 0 1920x1080x24" "$GODOT" --path godot --rendering-driver opengl3             -s res://tools/perf_map.gd -- --cpu-scale=2.0 --out="$RUNNER_TEMP/perf.json" --summary="$GITHUB_STEP_SUMMARY" 2>&1 | tee perf.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::error::The map is over a CPU or memory limit of godot/tests/perf_budget.json (see the job summary)."
+            exit 1
+          fi
+      - name: Keep the numbers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-map
+          path: ${{ runner.temp }}/perf.json
           if-no-files-found: ignore
 
   export-windows:
