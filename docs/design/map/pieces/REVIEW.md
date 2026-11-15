@@ -1,8 +1,9 @@
 # Normal-map pieces: the review
 
 Art director, 2026-11-15. **Status: the owner answered the three questions on 2026-11-15 (section 6). All six fix
-tasks are done and reviewed a second time: all ten families pass ("Round 2" below). Nothing in the game is
-changed.**
+tasks are done and reviewed a second time: all ten families pass ("Round 2" below). Round 3 (the same day) adds
+the owner's two further answers, two port modes and winter by climate, to the kit, the guide and the in-map test,
+and writes task 9. Nothing in the game is changed.**
 
 All ten families are drawn. This is the review of the eight new ones against `GUIDE.md` (the two reference
 families were checked again too), with the findings of the in-map test (`../pieces_in_map/notes.md`) folded in.
@@ -10,6 +11,71 @@ families were checked again too), with the findings of the in-map test (`../piec
 **Look at `overview.png` first**: every family and every level on one page (summer on top, six families in winter
 below). The per-family sheets (`<family>.png`) show all four seasons and the 50% test. `kit_contract.png` shows what
 the owner's answers mean in the kit: wild land, the coast on any side, the footprint, the mirror.
+
+## Round 3: ports in two modes, winter by climate (2026-11-15)
+
+The owner answered the two questions of round 2 and asked for one thing more:
+
+| | The owner's answer | What was done |
+|---|---|---|
+| Ports | **"Some to carve a port to the tile, and some will need just to add a port to the seaside."** | Two port modes. **Carved**: the map cuts a bay into the port's own hex and the harbour sits in it. **Seaside**: the add-on at the shore as it is. The rule, the bay's shape and its limits: guide section 10. Kit: `kit.carve`, `Piece(bay=)`, `shore.bay`. In the map: Genoa carved, Savona, Nice, Chiavari and Pisa's outport seaside |
+| Winter | **"Not all of the map gets snowed. For example south Italy doesn't get that much snow. Might need some in between tiles?"** | Three winters by climate: **snow**, **frost** (the in-between) and **mild**. One rule from latitude, height and distance to the sea: guide section 7. Kit: `take_apart(climate=)`, `kit.winter_of`. No module is called differently |
+
+**Show the owner:** `winters.png` (every family's wild land and top level in the three winters), `ports.png` (the
+harbour and the salt pans on an open shore and in a bay), then `../pieces_in_map/winter.png` and `winter_crop.png`
+(snow in the Alps and the high Apennines, frost on the Po plain and the hills, the Ligurian coast mild) and
+`summer.png` (Genoa's harbour in its bay, inside its own hex).
+
+### What was seen
+
+- **The three winters read at a glance**, on the sheet and in the map, at 100% and 50%: white, pale grey-green
+  with snow patches, dull green with red roofs. The frost winter differs from the snow winter by the ground, not
+  by the buildings (roofs carry snow in both); that is enough, and it keeps the two from fighting.
+- **No module needed a new call.** One line was added to `grazing.py` (a meadow colour for a winter without snow:
+  its own colour table had no winter entry). Everything else comes from the kit: the palette, the crops, bare
+  trees without snow, open water.
+- **The mild winter is still winter**: bare broadleaves and vines, boats laid up, smoke, few animals. It is told
+  from autumn by the bare trees and the dark earth.
+- **The carved harbour fits its hex.** Genoa's bay moves the shore 13 px (4.2 km) to 18 px from the hex centre,
+  just in front of the city wall; the level 3 add-on then lies wholly inside the hex (no standing thing outside
+  it; before, the canvas was pushed 18 px into the sea hex). The town piece is clipped at the bay like at any
+  shore (71 px of ground detail, one standing thing).
+- **For now Genoa's bay is 84 px wide**, the hex's whole front, because `harbour.py` has only its open-shore
+  layout (64 px from mole to mole). The bay of the guide is 72 px with its two horns inside the hex; it needs the
+  carved layout of task 9.
+- Weak spots, all for task 9 or a small later sweep (below): in a mild winter the salt pans are a strong blue
+  (the safety net's open-water colour); the olive shelves are a little muddy; the timber raft is still gone.
+
+### Old lines to move from the season to the snow (a small sweep, no layout change)
+
+The kit's safety net covers them, so nothing is wrong on the map today:
+
+| Module | Line | Change |
+|---|---|---|
+| `salt.py` | `pan_col` returns `kit.ICE` for winter; the channel is `kit.ICE if wi` | Frozen only `if p.frozen`; in a mild winter the pans are filled as in spring (task 9) |
+| `olives.py` | `if wi:` mixes the shelves' soil with snow | `if p.winter:` |
+| `vineyard.py` | `if wi:` makes the snow strips | `if p.winter:` for the snow strips; the mild winter keeps the soil block with bare stakes |
+| `timber.py` | `if not wi:` the raft | `if not p.frozen:` (the pond is open in a mild winter) |
+
+### Kit, guide and tool changes in this round
+
+All 650 pictures of the ten modules (every level, season, layout and mirror, and the coast modules on three more
+sea sides) are **pixel-equal** before and after the kit change; the default winter is the snow winter.
+
+| Change | What it is for |
+|---|---|
+| `kit.CLIMATES`, `kit.WINTER[climate]`, `kit.WINTER_CROPS`, `kit.climate(name)` (a `with` block), `take_apart(climate=)`, `with_wild(climate=)`, `wild(climate=)`, `backdrop(climate=)` | The three winters. `kit.crop(name, "winter")` and `p.pal` follow the hex's winter |
+| `p.winter` now means "snow lies" (snow and frost); new `p.frozen`, `p.climate`, `p.cold` | What a module asks before drawing snow or ice |
+| `kit.cold_index(lat, m, sea)`, `kit.winter_of(lat, m, sea)`, `kit.MILD_BELOW`, `kit.SNOW_FROM` | The rule: which hex has which winter |
+| Trees: bare without the snow dab, a brown bush, in a mild winter; frost ground mottled with snow patches | The kit's own primitives in the new winters |
+| `kit.carve(sea, shore, bay)`, `kit.bay_profile`, `kit.BAY_WIDTH`, `BAY_BACK`, `BAY_REACH` | The bay's shape, for the map to cut |
+| `Piece(bay=)`, `take_apart(bay=)`, `with_wild(bay=)`, `shore.bay` (a `kit.Bay`: `u0`, `west`, `east`, `pt`, `room`, `uv`) | The piece in a carved port; on the sheets the kit carves the stand-in shore |
+| `tools/worldmap/pieces/winters.py` writes `winters.png` and `ports.png` | The two contract sheets of this round |
+| `grazing.py`: `MEADOW["winter"]` | The one module line (a meadow colour for the mild winter) |
+
+`compose.py`: `port_mode()`, `carve_ports()`, the `Climate` field (the rule on the frame's km grid), the stand-in
+winter ground in three palettes laid over each other through the cold index, and trees, hills, parcels and rivers
+by the same index. See `../pieces_in_map/notes.md`, round 4.
 
 ## Round 2: the second review (2026-11-15)
 
@@ -174,7 +240,7 @@ For the planning session, not made (the map's side, for when the real map is bui
   need (`NEED`); a hex with less takes a lower level.
 - **Ports.** Town piece first, then the harbour add-on at the shore; add-on things inside the town's footprint are
   left out.
-- **Names.** No plates. Where town names show at this zoom is open (guide section 12, point 5).
+- **Names.** No plates. Where town names show at this zoom is open (guide section 12, point 7).
 
 ## 4. Fix tasks
 
@@ -189,6 +255,7 @@ as the record:
 | 4 | `salt.py`, `harbour.py` | The first fixes, the wild-land rules, **the coast contract**, the harbour add-on |
 | 5 | `wheat.py`, `settlements.py` | The rule fixes, the wild-land rules, **wheat's second layout**; settlements: roads to gates, no plate strip |
 | 6 | `vineyard.py`, `castles.py`, `mines.py`, `olives.py` | **Vineyard's second layout**; the wild-land rules and the mirror check for all four |
+| 9 (open, round 3) | `salt.py`, `harbour.py` | **Second layouts for both, the carved port in `harbour.py`**, salt on a lagoon, the three winters. The brief is at the end of this section |
 
 Each worker: read `GUIDE.md` (sections 1, 6, 8, 10, 11) and look at `kit_contract.png` first. Change only the
 named modules. Run them to rewrite the sheets, check that no `PIECE PROBLEM` line is printed, and look at every
@@ -423,7 +490,108 @@ Castles, mines, olives (`VARIANTS = 1`; mirror check only)
 - Sheets: each family sheet with `wild=True` (`ground="rock"` for mines), and the three `_variants.png`.
 
 **Later round, not now:** second layouts for olives, salt, mines, harbour, settlements and castles (the owner's
-"then the rest"), once tasks 3 to 6 show how much variety one second layout buys on the map.
+"then the rest"), once tasks 3 to 6 show how much variety one second layout buys on the map. (Started in round 3:
+olives, mines, settlements and castles by two workers; salt and harbour are task 9.)
+
+**Task 9: `salt.py` and `harbour.py`** (second layouts for both, the carved port in `harbour.py`, the three winters)
+
+Read `GUIDE.md` sections 6 (second layout), 7 (the three winters), 8 (the two tables), 10 (the coast, the two port
+modes) and 11, and look at `ports.png` and `winters.png` first. Change only these two modules. Do not edit the kit,
+the guide, `overview.py`, `contract.py` or `winters.py`, and do not run those three scripts (they write shared
+pictures). Report gaps in the kit instead of working round them. Trial pictures go in your own scratch folder. The
+rules C1 to C8 above still hold. **The open-shore pictures of layout 0 must not change**: before you start, save
+every level and season of both modules (plain, mirrored, sea S, E and NW) and compare pixel by pixel at the end.
+
+Harbour, part A: the carved port (the new mode)
+
+- The signature becomes `draw(level, season, variant=0, mirror=False, sea=None, shore=None, bay=None,
+  addon=False)`. Pass `bay=bay` to `kit.Piece` and to `kit.wild` (level 0). After `s = p.coast(**COAST)` read
+  `b = s.bay`. `b is None`: the open shore, today's layout, untouched. `b` set: the **carved layout**, from a table
+  of its own (`CARVED = dict(...)`), never as offsets of the open-shore tables.
+- What the map gives (guide section 10): a bay `kit.BAY_WIDTH` (72 px) wide from horn `b.west` to horn `b.east`,
+  its back straight for 25 px to each side of `b.u0`, 6 to 19 px deep (`b.depth`; `b.room(u)` is the water from
+  the back out to the mouth line at u). `s.pt(u, v)` measures from the bay's own shore; `b.pt(u, v)` measures v
+  from the **mouth line** (horn to horn). Write every u of the carved table relative to `b.u0`.
+- The carved layout, same levels and landmarks as the open shore:
+  - Level 1: the jetty from the back of the bay, `s.pt(b.u0 + 6, -1)` out to `min(13, b.room(b.u0 + 6) - 3)`,
+    with its T head; two fishing boats and the beached boat inside the bay; huts and net rack on the land behind
+    the back (v from -8 to -24, u within 30 px of `b.u0`).
+  - Level 2: the stone quay along the straight back, `b.u0 - 24` to `b.u0 + 24` at v = -1.5; the two warehouses
+    behind it; the first ship at the quay.
+  - Level 3: **two short moles from the horns along the mouth line**, closing the mouth to 26-30 px: west
+    `b.pt(b.west + 1, 0)`, `b.pt(b.west + 16, 1.5)`, then turned in to `b.pt(b.west + 21, -2.5)`; east the same
+    from `b.east`. `p.jetty([...], None, 3.6, stone=True, snow=True)`. The lighthouse stands on the west mole's
+    root, at the horn: choose with `s.first([b.uv(b.west + 3, 0), b.uv(b.east - 3, 0), b.uv(b.west + 16, 1.5), ...],
+    *LIGHT_SIZE)`. The slip and its hull on the back shore at `b.u0 + 21` (east of the quay's end: shorten the quay
+    to `b.u0 + 16` at level 3 if they touch); the third warehouse; the second ship.
+  - Ships and boats: berths inside the bay, at least 3 px from the shore and from the mouth line; the "out at sea"
+    berths of spring and summer lie at most 6 px beyond the mouth line. Keep using `afloat()` (`s.fit`).
+  - A shallow bay (`b.depth` under 10): the same works; the ships lie nearer the quay, and a boat that does not
+    fit is left out. Nothing is laid out by `b.depth` except through `b.room`.
+- **The carved mode has one layout**: `variant` is ignored in a bay (the mirror still applies). Say so in the
+  module's header.
+- `addon=True` in a bay: jetty, quay, moles, lighthouse, slip and hull, ships and boats, as on the open shore.
+- Add `BAY = dict(width=kit.BAY_WIDTH, back=COAST["y0"])` (what the harbour asks of the map) and
+  `REACH = {1: px, 2: px, 3: px}`: how far out from the shore each level's works and berths reach on an open
+  shore (measure it; the map uses it to tell whether a seaside harbour fits its own water).
+- Checks, in your scratch folder: every level, full piece and add-on, with `bay=(0, kit.BAY_WIDTH, d)` for
+  d = 8, 13 and 19, on all eight sea sides, plain and mirrored, summer and winter: no `PIECE PROBLEM`; nothing of
+  the piece more than 6 px beyond the mouth line; the quay lies on the back shore and the moles meet the horns
+  (no mole on land, none starting in open water); at 50% level 3 reads as a closed basin with a lighthouse and
+  level 1 as a jetty in a cove. `harbour_sides.png` gets three more rows: the carved levels 1 to 3 (summer,
+  `bay=(0, kit.BAY_WIDTH, 13)`) on S, E and NW, plain and mirrored.
+
+Harbour, part B: the second layout on the open shore (`VARIANTS = 2`, C8)
+
+- Layout 0 (as it is): huts at the west, the jetty right of the middle, the quay west of the jetty, two bent moles
+  of equal size with the lighthouse on the west mole's bend, the slip at the east.
+- Layout 1: **one long mole and a spur.** The long mole leaves the shore at the west end (u = -32), runs out 15 px
+  and sweeps round in two bends to end at about (8, 21); a short straight spur from the east shore (u = 32) runs
+  out 9 px; the mouth is at the east, about 22 px wide. The lighthouse stands at the **head** of the long mole
+  (fall-backs as today, through `s.first`). The jetty at u = -14; the quay from u = -4 to +28; the warehouses
+  behind it; the slip at the west (u = -24); the first hut at about (0, -23) with the second beside it at
+  (10, -19) (the yard: 14 px from layout 0's huts and from their mirror image); the net rack and the beached boat
+  at the east end. Same counts: 2 huts, 3 warehouses, 2 ships, 3 boats, the hull on the slip.
+- Tables side by side: `LAYOUT = [dict(...), dict(...)]`; the carved table stays apart. At 50% layout 1 must be told
+  from layout 0 and from layout 0 mirrored: the single long arm is what does it. All eight sea sides, plain and
+  mirrored, both layouts: no `PIECE PROBLEM`, the lighthouse there on every side.
+
+Salt, part A: the second layout (`VARIANTS = 2`, C8)
+
+- Layout 0 (as it is): one block of pans in three rows in the middle, the hut and the sluice at the west, the
+  store behind the pans, the heaps in a row in front of them, the jetty at the east.
+- Layout 1: **two blocks of pans either side of the feeder channel.** The channel runs from the shore straight
+  inland at u = 0 with the sluice on it; west of it a block 3 pans wide, east of it a block 4 pans wide, 2 rows
+  each (14 pans, in the same order of levels: level 1 the four pans nearest the shore, two on each side; level 2
+  the rest of the first rows and the channel; level 3 the back rows). The heaps stand in a row along the inland
+  side of the pans (not in front), the store at the west end near the shore (about (-30, -8)), the hut at the east
+  end (about (32, -14)), the jetty at the west (u = -22) with the boat. Same counts: 4 / 8 / 14 pans, 1 / 3 / 5
+  heaps, the strict grid inside each block, the same pan size and dykes.
+- Coverage in the bands (15-30 / 35-60 / 60-85% of the margin hex); `NEED` true for both layouts. The accepted
+  3 px corner on slanted shores holds for layout 1 too, no more.
+
+Salt, part B: the lagoon (no layout of its own)
+
+- The signature takes `bay=None` and passes it to `kit.Piece` and `kit.wild`. On a lagoon the map hands the
+  lagoon's shore and its bay; the pans lie at that shore as at any other. Only two things look at `s.bay`: the
+  jetty ends at most `b.room(u) - 2` px out, and the boat lies inside the lagoon. Check both layouts with
+  `bay=(0, kit.BAY_WIDTH, 10)` on all eight sides.
+
+Both: the three winters (guide section 7)
+
+- Look at every level with `kit.with_wild(draw, lv, "winter", climate=c)` for `"snow"`, `"frost"` and `"mild"`.
+  The snow winter must be the picture of today.
+- Snow hangs on `p.winter`, ice on `p.frozen`, the season's doings on `season == "winter"`. Salt: `pan_col` and the
+  feeder channel are frozen only `if p.frozen`; in a mild winter the pans are filled as in spring
+  (`kit.mix(pal["shallow"], pal["sand"], 0.45)`), the heaps stay covered, nobody is out. Harbour: the boats are
+  laid up in every winter; nothing is white in the mild one (it is right today; check the lighthouse cap and the
+  hull).
+- Never read `kit.PAL["winter"]`; colours come from `p.pal` and `kit.crop`.
+
+Sheets and report: `salt.png`, `salt_variants.png`, `salt_sides.png`, `harbour.png`, `harbour_variants.png`,
+`harbour_sides.png` (run the two modules). Send with the report: the pixel comparison of layout 0 on the open
+shore; a strip of each module in the three winters; the carved harbour at depth 8, 13 and 19; coverage per level
+and layout; `REACH`; and every place where the kit's bay was not enough.
 
 ## 5. Kit changes made in this review
 
@@ -459,6 +627,8 @@ Not added to the kit, because one family uses them: stumps, raft, hull on a slip
 They stay local to their modules.
 
 ## 6. Owner questions: answered on 2026-11-15
+
+(The two answers of round 3, ports and winters, are in "Round 3" at the top and in the guide's section 12.)
 
 | | Question | Options offered | **The owner's answer** |
 |---|---|---|---|
@@ -502,3 +672,23 @@ New, smaller questions the answers raise (none blocks the tasks; guide section 1
 - The 10 px rule shrinks the usable hex. Level 3 coverage of "about 70%" is now measured inside that margin.
 - Spring against summer (section 2) is open until someone tries the stronger spring tone on the map.
 - Winter in the map test is still a stand-in.
+
+**Round 3**
+
+- **The carved harbour is not drawn yet.** Until task 9 the open-shore layout stands in Genoa's bay, and the bay
+  is cut 84 px wide for it instead of 72. The picture shows that the harbour fits the hex, not the final basin.
+- **A carved bay moves the coast further than the style frame's cove rule** (4.2 km against 3.5; 6.8 km from the
+  frame's first line with the frame's own cove). Guide section 12, point 1.
+- **The bay eats the town's front.** A city fills its hex; the bay's back lies 18 px from the centre, just in
+  front of the wall, and the suburb houses and plots there are left out. Settlements' second layout should keep
+  the front of the ring free of anything that matters.
+- **The winter rule is tuned on one region.** Coastal hexes with high mountains behind them (Savona 758 m,
+  the Riviera 1,100 m) are mild only because the height is counted less near the sea; the same trick may be wrong
+  for a fjord coast. Tune on the whole map (guide section 12, point 2).
+- **A piece takes one winter, the test's ground follows the index point by point.** At the border of two winters
+  a snow-roofed piece can stand on ground that is half green (the olives west of Savona). It reads as a
+  transition; if it bothers, the map can pull the border to the hex.
+- **The safety net hides old lines** (the table in "Round 3"). A new module that paints snow by the season will
+  look right on the sheets and wrong only in the mild winter; the checklist now asks for the three winters.
+- `winters.png` shows settlements as the module stood while its second layout was being drawn; run
+  `winters.py` again when that task is back. `overview.png` was not run in this round for the same reason.

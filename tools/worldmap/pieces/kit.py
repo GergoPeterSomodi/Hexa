@@ -223,8 +223,103 @@ CROPS = {
 }
 CROP_EDGE = dict(spring=(104, 130, 62), summer=(128, 124, 60), autumn=(100, 78, 54), winter=(140, 152, 176))
 
+# ------------------------------------------------------------------ the three winters (guide section 7)
+# Winter is not the same everywhere. The map gives every hex one of three winters, by its climate (winter_of()):
+#   "snow"   the hard winter: everything under snow (PAL["winter"], as before; the default)
+#   "frost"  the light winter: snow on roofs, trees and worked ground and in patches on the wild ground, which
+#            shows through pale and frosted; still water frozen
+#   "mild"   the Mediterranean winter: no snow and no ice. Rain-darkened green-grey ground, bare broadleaves and
+#            vines, dark wet soil, young winter corn; olives and conifers stay green
+# A module still draws draw(level, "winter"): the kit knows the hex's winter (climate(), take_apart(climate=)).
+CLIMATES = ("snow", "frost", "mild")
+CLIMATE = "snow"              # the winter of the hex being drawn (set by climate(); take_apart and with_wild set it)
+WINTER = {
+    "snow": PAL["winter"],
+    "frost": dict(
+        PAL["winter"],
+        grass=(190, 200, 172), farm=(198, 204, 176), wood=(176, 190, 164), rock=(196, 194, 186), sand=(230, 222, 196),
+        soil=(170, 148, 126), soil_d=(144, 122, 104), tuft=(140, 144, 104)),
+    "mild": dict(
+        grass=(140, 160, 102), farm=(154, 164, 106), wood=(114, 142, 86), rock=(158, 148, 128), sand=(222, 206, 160),
+        soil=(132, 100, 72), soil_d=(106, 78, 56), tuft=(110, 126, 76), hedge=(104, 108, 62), hedge_d=(72, 78, 50),
+        leaf=((70, 54, 44), (104, 82, 62), (104, 82, 62), (104, 82, 62)),               # bare: only twigs are drawn
+        conifer=((34, 56, 40), (62, 112, 68), (44, 88, 56)),
+        sea=(62, 122, 166), shallow=(104, 158, 194), foam=(232, 242, 248), river=(78, 134, 182), river_edge=(48, 92, 136),
+        blossom=None),
+}
+WINTER_CROPS = {
+    "frost": dict(                                         # a thin snow: the pattern and more of the ground show
+        wheat=[(228, 233, 232), (198, 208, 184), (234, 238, 240), (176, 156, 134)],
+        garden=[(222, 228, 226), (200, 208, 188), (190, 174, 154)],
+        meadow=[(214, 222, 204)], vine_soil=[(210, 204, 194)], vine=[(96, 76, 60)], olive_soil=[(218, 212, 190)]),
+    "mild": dict(                                          # no snow: young winter corn and dark wet earth
+        wheat=[(128, 160, 84), (138, 108, 78), (120, 150, 80), (150, 118, 84)],
+        garden=[(136, 106, 76), (122, 150, 82), (146, 114, 80)],
+        meadow=[(158, 176, 104)], vine_soil=[(160, 128, 94)], vine=[(96, 76, 60)], olive_soil=[(196, 180, 130)]),
+}
+WINTER_EDGE = {"snow": CROP_EDGE["winter"], "frost": (136, 144, 150), "mild": (96, 96, 60)}
+# In a mild winter nothing is white. A module asks p.winter before it draws snow (False in a mild winter), but a
+# few older lines use the snow and ice tokens whenever the season is winter. While a mild piece is drawn the kit
+# therefore reads those four tokens as wet earth and open water: a safety net, not a way to draw (guide section 7).
+_MILD_TOKENS = dict(SNOW=(176, 158, 124), SNOW_D=(156, 138, 108), ICE=(104, 150, 186), ICE_D=(48, 92, 136))
+_COLD_TOKENS = {}
+
+
+def cold_index(lat, height_m=0.0, sea_km=None):
+    """How hard the winter of a hex is, as one number (see winter_of()). lat: degrees north; height_m: the hex's
+    mean height (ETOPO); sea_km: km from the hex centre to the nearest sea (None: far inland). Within 25 km of
+    the sea the height counts less (not at all on the shore): a coastal hex is settled at sea level, whatever
+    mountains stand behind it."""
+    sea = 400.0 if sea_km is None else max(0.0, sea_km)
+    warm = max(0.25, min(1.0, (50.0 - lat) / 8.0))          # the sea warms the south; it does little in the north
+    height_m = height_m * min(1.0, sea / 25.0)
+    return (0.5 * (lat - 36.0) + height_m / 300.0
+            - warm * (3.5 * max(0.0, 1 - sea / 40.0) + 2.0 * max(0.0, 1 - sea / 15.0)) + min(2.0, sea / 300.0))
+
+
+MILD_BELOW, SNOW_FROM = 4.5, 8.0
+
+
+def winter_of(lat, height_m=0.0, sea_km=None):
+    """The winter of a hex: "snow", "frost" or "mild", from its latitude, its height and its distance to the sea
+    (guide section 7). The same hex has the same winter in every year."""
+    c = cold_index(lat, height_m, sea_km)
+    return "mild" if c < MILD_BELOW else "frost" if c < SNOW_FROM else "snow"
+
+
+class climate:
+    """with kit.climate("mild"): ...   Winter pieces drawn inside are drawn for that winter ("snow", "frost" or
+    "mild"; None leaves it as it is). Other seasons are not touched. take_apart(), with_wild() and wild() take
+    climate= and do this themselves."""
+
+    def __init__(self, name):
+        assert name is None or name in CLIMATES, name
+        self.name = name
+
+    def __enter__(self):
+        global CLIMATE
+        self.old = CLIMATE
+        if self.name is not None:
+            CLIMATE = self.name
+            _tokens()
+        return self
+
+    def __exit__(self, *a):
+        global CLIMATE
+        CLIMATE = self.old
+        _tokens()
+
+
+def _tokens():
+    g = globals()
+    if not _COLD_TOKENS:
+        _COLD_TOKENS.update({k: g[k] for k in _MILD_TOKENS})
+    g.update(_MILD_TOKENS if CLIMATE == "mild" else _COLD_TOKENS)
+
 
 def crop(name, season):
+    if season == "winter" and CLIMATE != "snow":
+        return WINTER_CROPS[CLIMATE][name]
     return CROPS[name][season]
 
 
@@ -318,6 +413,7 @@ class Shore:
         self.out = out
         self.along = (out[1], -out[0])
         self.h = h
+        self.bay = None                 # a Bay, in a carved port (see Bay); None on an open shore
         self.front = out[1] > 0.3
         d = 0.0
         while d < 2 * R and in_hex(*self.pt(0, -d - 1)):
@@ -374,6 +470,74 @@ class Shore:
         return self.h(x)
 
 
+# ------------------------------------------------------------------ the carved bay (ports, guide section 10)
+BAY_REACH = 19.0            # px: a carved bay moves the shore at most this far inland (5 km at this zoom)
+BAY_WIDTH = 72.0            # px: a bay's width, horn to horn: the same for every carved port
+BAY_BACK = 13.0             # px: the back of a bay comes no nearer to the hex centre than this
+
+
+def bay_profile(t):
+    """How deep the bay is across its width: t = -1 and 1 are the horns, 0 the middle. A flat back over the middle
+    70 per cent and a rounded shoulder up to each horn: a basin, not a notch."""
+    t = abs(t)
+    if t >= 1.0:
+        return 0.0
+    if t <= 0.7:
+        return 1.0
+    return 0.5 + 0.5 * math.cos((t - 0.7) / 0.3 * math.pi)
+
+
+def _carved(h, u0, width, depth):
+    """The shore h with a bay cut into it: the back of the bay is a straight line, depth px inland of the old
+    shore at the bay's middle, whatever waves the old shore had."""
+    back = h(u0) - depth
+    return lambda u: h(u) - max(0.0, h(u) - back) * bay_profile((u - u0) / (width / 2.0))
+
+
+def carve(sea, shore, bay):
+    """FOR THE MAP: the shore of a hex with a bay carved into it, as a Shore. sea, shore: where the map has the
+    sea now (as for take_apart); bay: (u0, width, depth) in px: the middle of the bay along the shore, its width
+    horn to horn and how far its back lies inland of the old shore. The map turns to sea every point of the hex
+    for which carve(...).land(x, y) is False, then hands the piece its new shore line and the same bay=."""
+    out = sea_vector(sea)
+    return Shore(out, _carved(_shore_h(shore, out), *bay))
+
+
+class Bay:
+    """The bay of a carved port, as shore.bay gives it to a coast piece (None on an open shore).
+        bay.u0, bay.width, bay.depth    the middle (u along the shore), the width horn to horn, the depth (px)
+        bay.west, bay.east              the u of the two horns (the headlands on the old coast)
+        bay.pt(u, v)    the point u along the shore and v px out from the MOUTH LINE (the straight line from horn
+                        to horn, where the old coast ran): moles that close the bay are laid along it
+        bay.room(u)     px of water from the bay's shore out to the mouth line at u
+        bay.uv(u, v)    bay.pt(u, v) as shore coordinates, for shore.fits / fit / first
+    shore.pt(u, v) still measures from the water's edge, which is now the bay's own shore: a quay at v = -1 lies
+    along the back of the bay by itself."""
+
+    def __init__(self, shore, u0, width, depth):
+        self.shore, self.u0, self.width, self.depth = shore, u0, width, depth
+        self.west, self.east = u0 - width / 2.0, u0 + width / 2.0
+        self._a, self._b = shore.h(self.west), shore.h(self.east)
+
+    def mouth(self, u):
+        """The mouth line's distance out from the hex centre at u (between the horns; the shore itself outside)."""
+        if not self.west <= u <= self.east:
+            return self.shore.h(u)
+        return self._a + (self._b - self._a) * (u - self.west) / self.width
+
+    def pt(self, u, v=0.0):
+        s, d = self.shore, self.mouth(u) + v
+        return (s.along[0] * u + s.out[0] * d, s.along[1] * u + s.out[1] * d)
+
+    def room(self, u):
+        return self.mouth(u) - self.shore.h(u)
+
+    def uv(self, u, v=0.0):
+        """The same point as bay.pt(u, v), in shore coordinates (u, v from the water's edge): for shore.fits,
+        shore.fit and shore.first, which take shore coordinates."""
+        return (u, self.room(u) + v)
+
+
 def _shore_h(line, out):
     """h(u) for a shore line the map gives as piece-px points: the line's distance out from the centre at u."""
     along = (out[1], -out[0])
@@ -405,10 +569,17 @@ class Piece:
     """One hex picture. Ground-plane calls draw at once, in call order. Standing calls are queued and drawn back to
     front (by the y of their foot) in finish()."""
 
-    def __init__(self, season, ground="grass", seed=0, texture=True, base=None, mirror=None, sea=None, shore=None):
+    def __init__(self, season, ground="grass", seed=0, texture=True, base=None, mirror=None, sea=None, shore=None, bay=None):
         """mirror: draw the layout turned round (x to -x); every standing thing keeps its light from the upper left.
-        sea, shore: where the map has the sea in this hex (see coast()). All three default to what take_apart()
-        was told, so a module that does not pass them on still follows the map."""
+        sea, shore: where the map has the sea in this hex (see coast()). bay: the bay the map has carved for a
+        port, (u0, width, depth) in px (see coast() and Bay). All default to what take_apart() was told, so a
+        module that does not pass them on still follows the map.
+
+        Winter: p.season is "winter" in every climate; p.climate is the hex's winter ("snow", "frost", "mild";
+        None in the other seasons). p.winter is True where SNOW LIES (snow and frost winters): ask it before
+        drawing snow. p.frozen is True where still water is frozen (the same two). In a mild winter both are False
+        and the palette is the mild one; what belongs to the season and not to the snow (boats laid up, few
+        animals out, smoke, bare trees) hangs on season == "winter"."""
         assert season in SEASONS, season
         self.mirror = bool(SITE.get("mirror")) if mirror is None else bool(mirror)
         self.m = -1 if self.mirror else 1
@@ -417,6 +588,8 @@ class Piece:
         # the sea in the module's own (unmirrored) coordinates: the kit turns it round with everything else
         self.sea = None if sea is None else (lambda v: (v[0] * self.m, v[1]))(sea_vector(sea))
         self.shore_line = None if line is None else [(x * self.m, y) for x, y in line]
+        bay = SITE.get("bay") if bay is None else bay
+        self.bay_spec = None if not bay else (bay[0] * self.m, bay[1], bay[2])
         self.shore = None               # the Shore, once coast() is called
         self.dx = {}                    # mirrored pieces: how far each standing thing was moved
         self.box = {}                   # the bounding box of each standing thing (filled by footprint())
@@ -425,8 +598,11 @@ class Piece:
         self.wild_done = False
         self.seed = seed
         self.season = season
-        self.pal = PAL[season]
-        self.winter = season == "winter"
+        self.cold = season == "winter"                     # the season, in every climate
+        self.climate = CLIMATE if self.cold else None
+        self.pal = WINTER[CLIMATE] if self.cold else PAL[season]
+        self.winter = self.cold and CLIMATE != "mild"      # snow lies (snow and frost winters)
+        self.frozen = self.winter                          # still water is frozen
         big = (SIZE * SS, SIZE * SS)
         self.g = pygame.Surface(big, pygame.SRCALPHA)      # the ground plane
         self.sh = pygame.Surface(big)                      # soft shadows
@@ -459,7 +635,9 @@ class Piece:
             x, y = rnd.uniform(-52, 52), rnd.uniform(-50, 50)
             w, h = rnd.uniform(10, 26), rnd.uniform(5, 11)
             f = 1.035 if i % 2 else 0.965
-            if self.winter:
+            if self.climate == "frost":              # patches of thin snow on the frosted ground
+                c2 = mix(col, SNOW, 0.8) if i % 2 else shade(col, 0.965)
+            elif self.winter:
                 f = 1.0 if i % 2 else 0.972          # snow never goes brighter than its base, only bluer
                 c2 = mix(shade(col, f), SNOW_D, 0.0 if i % 2 else 0.25)
             else:
@@ -523,7 +701,7 @@ class Piece:
         cols: strip colours, cycled (use kit.crop(name, season)). along=True: strips run along w.
         furrows: thin darker lines inside each strip (ploughed earth, winter furrows). Returns the corner points."""
         cols = cols or crop("wheat", self.season)
-        edge = edge or CROP_EDGE[self.season]
+        edge = edge or (WINTER_EDGE[self.climate] if self.cold else CROP_EDGE[self.season])
         ca, sa = math.cos(math.radians(angle)), math.sin(math.radians(angle))
 
         def P(u, v):
@@ -664,6 +842,9 @@ class Piece:
         """The shore of this hex. Returns a Shore (see the class): lay out everything that belongs to the water's
         edge with shore.pt(u, v).
 
+        A CARVED PORT: Piece(bay=(u0, width, depth)) or take_apart(..., bay=). The map has cut a bay into the hex;
+        shore.bay then tells the piece where it lies (see Bay), and shore.pt() measures from the bay's own shore.
+
         THE MAP OWNS THE COAST. Where the sea lies comes from the map: Piece(sea=..., shore=...) or take_apart(...,
         sea=, shore=). sea is the side (or sides, or an angle) the sea is on; shore is the map's shore line through
         the hex as piece-px points. On the map nothing is drawn here: the map has its own sea, sand and foam.
@@ -675,11 +856,16 @@ class Piece:
         ph = [rnd.uniform(0, 6.28) for _ in range(3)]
         out = self.sea or SIDES["S"]
         if self.shore_line:
-            h = _shore_h(self.shore_line, out)
+            h = _shore_h(self.shore_line, out)          # the map's line: a carved bay is already in it
         else:
             def h(u):
                 return y0 + amp * (math.sin(u * 0.07 + ph[0]) * 0.6 + math.sin(u * 0.17 + ph[1]) * 0.3 + math.sin(u * 0.4 + ph[2]) * 0.1)
+            if self.bay_spec:                           # the sheets: the kit carves the stand-in shore itself,
+                u0, bw, bd = self.bay_spec              # the back of the bay lying where the open shore lay
+                h = _carved(lambda u, h=h: h(u) + bd, u0, bw, bd)
         shore = self.shore = Shore(out, h)
+        if self.bay_spec:
+            shore.bay = Bay(shore, *self.bay_spec)
         if not self.has_base:
             return shore
         line = [shore.pt(u) for u in range(-90, 92, 2)]
@@ -882,7 +1068,7 @@ class Piece:
     def tree(self, x, y, sc=1.0, kind="round", i=0):
         """A tree with its foot at (x, y). kind: 'round' (broadleaf), 'conifer', 'poplar' (tall, thin), 'bush',
         'olive' (silver green, evergreen), 'fruit' (small, blossom in spring). i: the tree's index (autumn colour mix)."""
-        season, pal, winter = self.season, self.pal, self.winter
+        season, pal, winter, bare = self.season, self.pal, self.winter, self.cold
         self.cast(x, y, {"conifer": 4.5, "poplar": 3.5, "bush": 4.0}.get(kind, 5.5) * sc)
 
         def fn(p):
@@ -901,7 +1087,7 @@ class Piece:
                 oc, dk, mid, lt = pal["leaf"] if season != "autumn" else LEAF_AUTUMN[1]
                 h, w = 15 * sc, 4.2 * sc
                 p.line((x, y), (x, y - 3 * sc), TRUNK, 1.0 * sc)
-                if winter:
+                if bare:
                     for q in (-1, 0, 1):
                         p.line((x, y - 3 * sc), (x + q * 1.4 * sc, y - h), TRUNK, 0.5)
                     return
@@ -921,15 +1107,20 @@ class Piece:
             th = {"round": 3.0, "bush": 0.6, "fruit": 2.4}[kind] * sc
             cy = y - th - r * 0.75
             if kind != "bush":
-                p.line((x, y), (x, y - th - (r * 0.4 if not winter else 0)), TRUNK, 1.4 * sc)
-            if winter:          # bare twigs with a dab of snow; a bush is a snow mound with twigs
+                p.line((x, y), (x, y - th - (r * 0.4 if not bare else 0)), TRUNK, 1.4 * sc)
+            if bare:            # bare twigs with a dab of snow; a bush is a snow mound with twigs
                 if kind == "bush":
+                    if not winter:                  # a mild winter: a bare brown thicket, no snow
+                        p.ellipse(x, y - r * 0.6, r * 2, r * 1.3, pal["hedge_d"])
+                        p.ellipse(x - r * 0.2, y - r * 0.75, r * 1.5, r * 0.9, pal["hedge"])
+                        return
                     p.ellipse(x, y - r * 0.6, r * 2, r * 1.3, SNOW_D)
                     p.ellipse(x - r * 0.2, y - r * 0.75, r * 1.5, r * 0.9, SNOW)
                     return
                 for dx, dy in ((-0.9, -0.5), (-0.45, -1.0), (0.1, -1.15), (0.6, -0.95), (0.95, -0.45)):
                     p.line((x, y - th), (x + dx * r, y - th + dy * r * 1.25), pal["leaf"][0], 0.8)
-                p.line((x - r * 0.7, y - th - r * 0.75), (x - r * 0.1, y - th - r * 1.3), SNOW, 0.5)
+                if winter:
+                    p.line((x - r * 0.7, y - th - r * 0.75), (x - r * 0.1, y - th - r * 1.3), SNOW, 0.5)
                 return
             oc, dk, mid, lt = pal["leaf"] if season != "autumn" else LEAF_AUTUMN[i % 3]
             p.circle(x, cy, r + 0.5, oc)
@@ -1287,7 +1478,7 @@ def variants_of(draw):
     return int(getattr(_sys.modules.get(getattr(draw, "__module__", "")), "VARIANTS", 1))
 
 
-def take_apart(draw, level, season, hex=None, variant=None, mirror=None, sea=None, shore=None, **kw):
+def take_apart(draw, level, season, hex=None, variant=None, mirror=None, sea=None, shore=None, bay=None, climate=None, **kw):
     """Draw one piece for the map: without its ground base, and returned as layers (see Piece.layers()), so the map
     can lay the ground detail on its own ground, sort every standing thing into its own back-to-front list and thin
     its wild land under the piece's footprint.
@@ -1295,6 +1486,9 @@ def take_apart(draw, level, season, hex=None, variant=None, mirror=None, sea=Non
     Level 0 is no piece: returns None (the map draws the wild land itself).
     hex=(col, row): the layout and the mirror are chosen from the hex by pick(); or give variant= and mirror=.
     sea=, shore=: where the map has the sea in this hex (see Piece.coast()); None for an inland hex.
+    bay=(u0, width, depth): the bay the map carved for a port in this hex (see carve() and Bay).
+    climate=: the hex's winter, "snow", "frost" or "mild" (see winter_of()); it only matters when season is
+    "winter". None: the kit's current one (snow unless set).
     Works with every family module as it is: what a module's draw() does not take yet (variant, mirror, sea) is
     handed to the kit instead, so the mirror and the sea side still apply."""
     global NO_BASE, SITE
@@ -1306,13 +1500,14 @@ def take_apart(draw, level, season, hex=None, variant=None, mirror=None, sea=Non
         mirror = m if mirror is None else mirror
     variant, mirror = variant or 0, bool(mirror)
     names = _accepts(draw)
-    for k, v in (("variant", variant), ("mirror", mirror), ("sea", sea), ("shore", shore)):
+    for k, v in (("variant", variant), ("mirror", mirror), ("sea", sea), ("shore", shore), ("bay", bay)):
         if k in names:
             kw[k] = v
     NO_BASE, old = True, SITE
-    SITE = {"mirror": mirror, "sea": sea, "shore": shore}
+    SITE = {"mirror": mirror, "sea": sea, "shore": shore, "bay": bay}
     try:
-        draw(level, season, **kw)
+        with globals()["climate"](climate):
+            draw(level, season, **kw)
     finally:
         NO_BASE, SITE = False, old
     lay = LAST.layers()
@@ -1320,39 +1515,46 @@ def take_apart(draw, level, season, hex=None, variant=None, mirror=None, sea=Non
     return lay
 
 
-def with_wild(draw, level, season, variant=0, mirror=False, sea=None, shore=None, **kw):
+def with_wild(draw, level, season, variant=0, mirror=False, sea=None, shore=None, bay=None, climate=None, **kw):
     """A piece as the sheets show it once the map draws the wild land: the flat picture standing in the terrain's
-    wild scatter (Piece.wild()), thinned by the piece's own footprint. Level 0: draw() itself (kit.wild)."""
+    wild scatter (Piece.wild()), thinned by the piece's own footprint. Level 0: draw() itself (kit.wild).
+    climate=: the winter to show ("snow", "frost", "mild"); bay=: a carved port's bay (see take_apart())."""
     global WILD, CHECK, SITE
     names = _accepts(draw)
-    site = {"variant": variant, "mirror": mirror, "sea": sea, "shore": shore}
-    if level == 0:
-        return draw(level, season, **dict(kw, **{k: v for k, v in site.items() if k in names and k != "variant"}))
-    CHECK = False
-    try:
-        lay = take_apart(draw, level, season, **dict(kw, **site))
-    finally:
-        CHECK = True
-    kw = dict(kw, **{k: v for k, v in site.items() if k in names})
-    WILD, old = lay["footprint"], SITE
-    SITE = {"mirror": mirror, "sea": sea, "shore": shore}
-    try:
-        return draw(level, season, **kw)
-    finally:
-        WILD, SITE = None, old
+    site = {"variant": variant, "mirror": mirror, "sea": sea, "shore": shore, "bay": bay}
+    with globals()["climate"](climate):
+        if level == 0:
+            old, SITE = SITE, (dict(SITE, bay=bay) if bay is not None else SITE)
+            try:
+                return draw(level, season, **dict(kw, **{k: v for k, v in site.items() if k in names and k != "variant"}))
+            finally:
+                SITE = old
+        CHECK = False
+        try:
+            lay = take_apart(draw, level, season, **dict(kw, **site))
+        finally:
+            CHECK = True
+        kw = dict(kw, **{k: v for k, v in site.items() if k in names})
+        WILD, old = lay["footprint"], SITE
+        SITE = {"mirror": mirror, "sea": sea, "shore": shore, "bay": bay}
+        try:
+            return draw(level, season, **kw)
+        finally:
+            WILD, SITE = None, old
 
 
-def wild(season, ground="grass", seed=0, coast=None, thin=None, mix=None, label="wild", **site):
+def wild(season, ground="grass", seed=0, coast=None, thin=None, mix=None, label="wild", climate=None, **site):
     """The level 0 picture of a family: the wild land of its terrain, as the map draws it. FOR THE SHEETS ONLY.
     Use the family's own ground and seed. coast: the keywords of the family's p.coast() call, for a coast family
     (coast={} for the defaults). A module's draw() returns this for level 0:
         if level == 0:
             return kit.wild(season, "farm", seed=1)"""
-    p = Piece(season, ground, seed, **site)
-    if coast is not None:
-        p.coast(**coast)
-    p.wild(thin, mix)
-    return p.finish(label=label)
+    with globals()["climate"](climate):
+        p = Piece(season, ground, seed, **site)
+        if coast is not None:
+            p.coast(**coast)
+        p.wild(thin, mix)
+        return p.finish(label=label)
 
 
 _MASK = None
@@ -1395,16 +1597,17 @@ def _font(size, bold=False):
     return f
 
 
-def backdrop(season, w, h, ground="grass"):
-    """A patch of plain season ground to show pieces on, so the blend at the hex border can be judged."""
+def backdrop(season, w, h, ground="grass", climate=None):
+    """A patch of plain season ground to show pieces on, so the blend at the hex border can be judged.
+    climate: the winter to show (default: the kit's current one)."""
     s = pygame.Surface((w, h))
-    s.fill(PAL[season][ground])
+    s.fill(WINTER[climate or CLIMATE][ground] if season == "winter" else PAL[season][ground])
     return s
 
 
-def _cell(piece, season, scale=1.0, pad=6, ground="grass"):
+def _cell(piece, season, scale=1.0, pad=6, ground="grass", climate=None):
     w = int((SIZE + pad * 2) * scale)
-    s = backdrop(season, w, w, ground)
+    s = backdrop(season, w, w, ground, climate)
     img = piece if scale == 1.0 else pygame.transform.smoothscale(piece, (int(SIZE * scale), int(SIZE * scale)))
     s.blit(img, (int(pad * scale), int(pad * scale)))
     lay = pygame.Surface((w, w), pygame.SRCALPHA)

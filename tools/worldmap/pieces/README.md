@@ -12,6 +12,7 @@ they are the pattern to copy.
 | `<family>.py` | One module per family: `castles`, `vineyard`, `olives`, `grazing`, `salt`, `mines`, `timber`, `harbour` |
 | `contract.py` | The kit's map contract on one page (`kit_contract.png`): wild land, coast sides, footprint, mirror, `pick`. Its `fishing()` is the pattern for a coast piece |
 | `overview.py` | Every family on one page (`overview.png`) |
+| `winters.py` | The three winters (`winters.png`) and the two port modes (`ports.png`) |
 
 ## The module contract
 
@@ -35,8 +36,13 @@ def draw(level, season, variant=0, mirror=False):     # season: "spring" | "summ
 - **Mirror**: pass `mirror=mirror` on and draw in unmirrored coordinates. The kit turns the ground round and moves
   each standing thing to its mirrored place without flipping it, so the light stays upper left. Never write
   `if mirror:`. Landmark functions `return p.stand(y, fn)`; a part of another thing gets `on=<that handle>`.
-- **Coast families** also take `sea=None, shore=None`, pass them to `kit.Piece`, call `shore = p.coast(...)` once
-  and place everything at the water's edge with `shore.pt(u, v)` (u along the shore, v out to sea).
+- **Coast families** also take `sea=None, shore=None, bay=None`, pass them to `kit.Piece`, call
+  `shore = p.coast(...)` once and place everything at the water's edge with `shore.pt(u, v)` (u along the shore, v
+  out to sea). In a carved port `shore.bay` is set (a `kit.Bay`: `u0`, `west`, `east`, `pt(u, v)` from the mouth
+  line, `room(u)`, `uv(u, v)`); on an open shore it is `None`.
+- **Winter**: the module is called `draw(level, "winter")` in every climate; the kit knows the hex's winter. Ask
+  `p.winter` before drawing snow (False in a mild winter), `p.frozen` before drawing ice, and `season == "winter"`
+  for what the season does. Colours only from `p.pal` and `kit.crop`.
 - Extra keyword arguments with defaults are allowed (`animal="sheep"`, `flag=kit.FLAG`, `addon=False`).
 - Positions are fixed tables at the top of the module. No position may depend on the season. Random numbers only
   from a fixed seed, never from the season or the level.
@@ -103,18 +109,24 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 
 | Call | Gives |
 |---|---|
-| `kit.take_apart(draw, level, season, hex=(col, row), sea=, shore=)` | The piece without its ground base, as layers: `ground` (the detail, 2x), `shadow`, `standing` (`(foot_y, order_y, fn)` back to front), `footprint` (a mask: the map draws no wild tree or bush with its foot in it), `shore`, `mirror`, `variant`. **Level 0 gives `None`.** Layout and mirror come from the hex. Works with every module as it is |
+| `kit.take_apart(draw, level, season, hex=(col, row), sea=, shore=, bay=, climate=)` | The piece without its ground base, as layers: `ground` (the detail, 2x), `shadow`, `standing` (`(foot_y, order_y, fn)` back to front), `footprint` (a mask: the map draws no wild tree or bush with its foot in it), `shore`, `mirror`, `variant`. **Level 0 gives `None`.** Layout and mirror come from the hex. Works with every module as it is |
+| `kit.winter_of(lat, height_m, sea_km)` | The hex's winter: `"snow"`, `"frost"` or `"mild"` (give it as `climate=`); `kit.cold_index(...)` is the number behind it |
+| `kit.carve(sea, shore, (u0, width, depth))` | A carved port: the shore with the bay cut in, as a `Shore`; the map turns to sea what is not `.land(x, y)`, then hands the piece the new shore line and the same `bay=`. `kit.BAY_WIDTH`, `BAY_BACK`, `BAY_REACH` are the bay's size and limits |
 | `kit.pick(col, row, variants)` | `(variant, mirror)` for a hex: always the same; with two layouts no two neighbours equal |
 | `kit.in_footprint(mask, x, y)` | True if the piece-px point is in the footprint |
 | `kit.mirror_gates(GATES, mirror, variant)` | The gate points as they lie in a mirrored piece; `GATES` is one dict, or a list with one dict per layout |
 
-**For the sheets.** `kit.wild(season, ground, seed, coast=)` is the level 0 picture; `kit.sheet(..., wild=True)`
+**For the sheets.** `kit.with_wild(draw, level, "winter", climate="mild")` shows a piece in another winter and
+`kit.with_wild(..., bay=(0, kit.BAY_WIDTH, 13))` in a carved bay (the kit carves the stand-in shore);
+`with kit.climate("frost"): ...` sets the winter round any other call.
+`kit.wild(season, ground, seed, coast=)` is the level 0 picture; `kit.sheet(..., wild=True)`
 shows every piece in the terrain's wild land thinned by its footprint; `kit.variant_sheet(...)` shows the layouts,
 their mirrors and a block of hexes chosen by `pick`; `kit.with_wild(draw, level, season, variant=, mirror=)` gives
 one such picture.
 
 **Colours**: fixed tokens `kit.INK`, `kit.ROOF`, `kit.STONE` ...; season tokens `p.pal["grass"]` ...; crops
-`kit.crop("wheat", season)`; helpers `kit.mix(c1, c2, t)`, `kit.shade(c, f)`; flags `p.winter`, `p.season`.
+`kit.crop("wheat", season)`; helpers `kit.mix(c1, c2, t)`, `kit.shade(c, f)`; flags `p.season`, `p.winter` (snow
+lies), `p.frozen`, `p.climate`.
 
 For a landmark of your own, copy the shape of `windmill()` in `wheat.py`: call `p.cast`, define `fn(pen)`, draw the
 lit body, the shaded right part, the snow variant, then the ink, and queue it with `p.stand(foot_y, fn)`.

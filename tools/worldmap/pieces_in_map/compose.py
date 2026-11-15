@@ -21,6 +21,16 @@ salt on a flat shore, fishing villages, and the PORTS as a town piece plus the h
     sea hex next door; add-on things inside the town's footprint are left out.
   - Relief rule K: range samples that stand in or in front of a footprint are dropped (the range is cut there).
 
+Round 4 (the owner's answers on ports and winters; GUIDE sections 7 and 10):
+  - TWO PORT MODES. A CARVED port (port_mode(): a great port, here Genoa) gets a bay cut into its own hex
+    (carve_ports(), with the kit's bay shape kit.carve); the town piece is clipped at the new shore and the harbour
+    add-on sits in the bay, inside the port's own hex. A SEASIDE port (Savona, Nice, Chiavari, Pisa's outport)
+    keeps the shore as it is: the add-on is anchored at the shore and may reach into the sea hex next door.
+  - WINTER BY CLIMATE. Every hex has one of three winters, kit.winter_of(latitude, height, km to the sea): snow
+    (the Alps and the high Apennines), frost (the Po plain and the hills) and mild (the Ligurian coast). Each piece
+    is drawn for its hex's winter (take_apart(climate=)); the stand-in winter ground, trees, hills, parcels and
+    rivers follow the same index point by point, so the snow line follows the mountains.
+
 What the compositor does (the frame and the pieces are used read only; no file of either is changed):
   - A hex that takes a piece loses the frame's own town, field parcels and rounded hills, and the trees that stand
     in the piece's footprint. Ranges, rivers, roads, coasts and the other trees stay.
@@ -31,12 +41,12 @@ What the compositor does (the frame and the pieces are used read only; no file o
   - Every standing thing of a piece is put into the frame's own back-to-front list by the y of its foot, so a
     piece's houses and the map's trees and hills cover each other correctly.
   - A town's site moves to the middle of its piece and the roads are led there.
-  - Winter: the frame has no winter of its own, so a stand-in is made here (snow ground from the pieces' palette,
-    bare broadleaves, snow on conifers and hills). It is a stand-in, not a design.
+  - Winter: the frame has no winter of its own, so a stand-in is made here (the ground from the pieces' three
+    winter palettes, bare broadleaves, snow on conifers and hills where snow lies). It is a stand-in, not a design.
 
 Run (the frame's environment: STYLE_FRAME_LAYERS must name the exported layers file):
     python tools/worldmap/pieces_in_map/compose.py [OUT_DIR] [summer|winter|both]
-Writes summer.png, winter.png, plain_crop.png, hills_coast_crop.png and prints the measurements. (base_kept_crop.png in the docs folder is
+Writes summer.png, winter.png, plain_crop.png, hills_coast_crop.png, winter_crop.png and prints the measurements. (base_kept_crop.png in the docs folder is
 from round 1 and is no longer written.)
 """
 import contextlib
@@ -90,6 +100,22 @@ GOODS = {
 COAST_FAMILIES = (salt, harbour)                     # they build at the map's shore: on the water too
 # A port is a town piece plus the harbour add-on at the hex's own shore: town -> the add-on's level.
 PORTS = {"Genoa": 3, "Pisa": 3, "Savona": 2, "Nice": 2, "Chiavari": 1}
+
+# The two port modes (GUIDE section 10). CARVED: the map cuts a bay into the port's hex and the harbour sits in it,
+# inside its own hex. SEASIDE: the harbour is added along the shore as it is. The mode comes from the map data and
+# never changes in play: a place that is a city (rank 3) and a sea port in the data is a great port and is carved.
+BAY_WIDTH = 84.0            # px, horn to horn. FOR NOW the hex's whole front: harbour.py still has only its open-shore
+                            # layout, 64 px from mole to mole. With the carved layout of review task 9 this becomes
+                            # kit.BAY_WIDTH (72 px) and the two horns stand inside the hex as headlands.
+BAY_U0 = 2.0                # the harbour's works are centred 2 px off the shore's middle
+BAY_BACK = {5: 18.0, 4: 16.0}      # px from the hex centre to the back of the bay: clear of a city's wall (others: kit.BAY_BACK)
+BAYS = {}                   # town -> (u0, width, depth) once carve_ports() has cut it
+
+
+def port_mode(t):
+    return "carved" if t["rank"] == 3 and t["port"] else "seaside"
+
+
 SITE_DY = -6.0              # the middle of a settlement piece lies 6 px above the hex centre (CY + 1 in settlements.py)
 SS, SIZE, C = kit.SS, kit.SIZE, kit.C
 
@@ -111,11 +137,11 @@ def feather_mask():
     return _MASK
 
 
-def take_apart(draw, level, season, hx, sea=None, shore=None, **kw):
+def take_apart(draw, level, season, hx, sea=None, shore=None, bay=None, climate=None, **kw):
     """The piece of one hex from the kit, ready for the frame. Returns a dict:
     ground (112x112, premultiplied alpha), shadow (2x, white = none), things [(foot_y, order, image, rect)] with
     premultiplied images cut to their boxes, footprint (the kit's mask), mirror, variant."""
-    lay = kit.take_apart(draw, level, season, hex=hx, sea=sea, shore=shore, **kw)
+    lay = kit.take_apart(draw, level, season, hex=hx, sea=sea, shore=shore, bay=bay, climate=climate, **kw)
     g = lay["ground"].premul_alpha()                 # overlays are half-transparent: premultiply before scaling
     g.blit(feather_mask(), (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
     ground = pygame.transform.smoothscale(g, (SIZE, SIZE))
@@ -131,24 +157,111 @@ def take_apart(draw, level, season, hx, sea=None, shore=None, **kw):
             "mirror": lay["mirror"], "variant": lay["variant"], "shore": lay["shore"]}
 
 
-# ---------------------------------------------------------------- winter stand-in for the frame
+# ---------------------------------------------------------------- winter by climate
+class Climate:
+    """The winter of every point of the frame: the kit's cold index (kit.cold_index: latitude, height, km to the
+    sea) on the frame's km grid. of_hex() is THE RULE for a hex (its centre's latitude, the hex's mean height from
+    the height data, the km from its centre to the sea); at() and of() give the same index point by point, for the
+    stand-in ground, so the snow line follows the mountains instead of the hex borders."""
+
+    def __init__(self):
+        F = FIELDS
+        w, h = F.w, F.h
+        INF = 1e12
+
+        def edt(f):                                      # the exact squared distance along one line (Felzenszwalb)
+            n = len(f)
+            out, v, z, k = [0.0] * n, [0] * n, [0.0] * (n + 1), 0
+            z[0], z[1] = -INF, INF
+            for q in range(1, n):
+                while True:
+                    p_ = v[k]
+                    x = ((f[q] + q * q) - (f[p_] + p_ * p_)) / (2.0 * q - 2.0 * p_)
+                    if x <= z[k] and k > 0:
+                        k -= 1
+                    else:
+                        break
+                k += 1
+                v[k], z[k], z[k + 1] = q, x, INF
+            k = 0
+            for q in range(n):
+                while z[k + 1] < q:
+                    k += 1
+                out[q] = (q - v[k]) ** 2 + f[v[k]]
+            return out
+        d = [0.0 if F.land[k] <= 0.5 else 1e8 for k in range(w * h)]     # the distance to the sea in km
+        for i in range(w):
+            d[i::w] = edt(d[i::w])
+        for j in range(h):
+            d[j * w:(j + 1) * w] = edt(d[j * w:(j + 1) * w])
+        d = [math.sqrt(v) for v in d]
+        self.sea = d
+        self.cold = [kit.cold_index(R.LAT_N - (F.y0 + k // w) / R.DEG, F.height[k], d[k]) for k in range(w * h)]
+
+    def at(self, x_km, y_km):
+        return FIELDS.at(self.cold, x_km, y_km)
+
+    def of(self, x_km, y_km):
+        c = self.at(x_km, y_km)
+        return "mild" if c < kit.MILD_BELOW else "frost" if c < kit.SNOW_FROM else "snow"
+
+    def hex_values(self, hx):
+        x, y = R.centre(*hx)
+        return R.LAT_N - y / R.DEG, float(R.HEX[hx].get("m", 0.0)), FIELDS.at(self.sea, x, y)
+
+    def of_hex(self, hx):
+        return kit.winter_of(*self.hex_values(hx))
+
+
+_CLIMATE = None
+
+
+def climate_field():
+    global _CLIMATE
+    if _CLIMATE is None:
+        _CLIMATE = Climate()
+    return _CLIMATE
+
+
+def is_green(col):
+    return col[1] > col[0] + 10 and col[1] > col[2] + 25
+
+
 def snowy(col):
     """A green of the frame's hills and ranges as snow of the same lightness."""
-    r, g, b = col[0], col[1], col[2]
-    if not (g > r + 10 and g > b + 25):
+    if not is_green(col):
         return col
+    r, g, b = col[0], col[1], col[2]
     t = max(0.0, min(1.0, ((r + g + b) / 3.0 - 45) / 95.0))
     return kit.mix((96, 104, 124), (240, 243, 248), t) + tuple(col[3:])
 
 
+def frosty(col):
+    """The same green in a frost winter: half way to snow, the frosted ground's own tone showing."""
+    if not is_green(col):
+        return col
+    t = max(0.0, min(1.0, ((col[0] + col[1] + col[2]) / 3.0 - 45) / 95.0))
+    return kit.mix(kit.mix((92, 104, 96), kit.WINTER["frost"]["grass"], t), snowy(col), 0.45) + tuple(col[3:])
+
+
+def mildy(col):
+    """The same green in a mild winter: duller and greyer, no snow."""
+    if not is_green(col):
+        return col
+    return kit.mix(col, kit.shade(kit.WINTER["mild"]["grass"], (col[0] + col[1] + col[2]) / 400.0), 0.8) + tuple(col[3:])
+
+
+WINTER_TONE = {"snow": snowy, "frost": frosty, "mild": mildy}
+
+
 @contextlib.contextmanager
-def snow_draw():
-    """While open, the frame's green drawing comes out as snow (for its hills and wooded ranges)."""
+def tone_draw(tone):
+    """While open, the frame's green drawing comes out in the winter tone (for its hills and wooded ranges)."""
     d = pygame.draw
     old = {n: getattr(d, n) for n in ("polygon", "circle", "lines", "line", "ellipse")}
 
     def wrap(fn):
-        return lambda surf, col, *a, **k: fn(surf, snowy(col), *a, **k)
+        return lambda surf, col, *a, **k: fn(surf, tone(col), *a, **k)
     for n, fn in old.items():
         setattr(d, n, wrap(fn))
     try:
@@ -162,15 +275,22 @@ SUMMER_COLS = {n: getattr(R, n) for n in ("C_FARM", "C_GRASS", "C_WOOD", "C_ROCK
                                           "C_RIVER", "C_RIVER_EDGE")}
 
 
-def season_cols(season):
-    pal = kit.PAL[season]
+def season_cols(season, climate="snow"):
     cols = dict(SUMMER_COLS)
     if season == "winter":
+        pal = kit.WINTER[climate]
         cols.update(C_FARM=pal["farm"], C_GRASS=pal["grass"], C_WOOD=pal["wood"], C_ROCK=pal["rock"], C_SAND=pal["sand"],
                     C_SEA=pal["sea"], C_SHELF=pal["shallow"], C_DEEP=kit.shade(pal["sea"], 0.8),
                     C_RIVER=pal["river"], C_RIVER_EDGE=pal["river_edge"])
     for n, c in cols.items():
         setattr(R, n, c)
+
+
+PARCEL_WINTER = {
+    "snow": ([(238, 241, 245), (214, 224, 236), (232, 236, 242), (190, 170, 148), (226, 232, 240)], (140, 152, 176, 150)),
+    "frost": ([(228, 233, 232), (198, 208, 184), (234, 238, 240), (176, 156, 134), (214, 222, 204)], (136, 144, 150, 150)),
+    "mild": ([(128, 160, 84), (138, 108, 78), (120, 150, 80), (150, 118, 84), (158, 176, 104)], (96, 96, 60, 150)),
+}
 
 
 # ---------------------------------------------------------------- the frame with pieces
@@ -222,6 +342,10 @@ class PieceFrame(R.Frame):
                 return True
         return False
 
+    def winter_at(self, x, y):
+        """The winter at a map px."""
+        return climate_field().of(*self.km(x, y))
+
     def sea_of(self, hx):
         """Where the map has the sea in this hex, for the kit: (sea, shore) = the direction to the sea as an angle
         on screen and the shore line as piece-px points; (None, None) for a hex without sea."""
@@ -255,10 +379,11 @@ class PieceFrame(R.Frame):
     def parcels(self):
         keep = [p for p in R.PARCELS if not self.in_piece(p["x"], p["y"])]
         self.stats["parcels dropped"] = len(R.PARCELS) - len(keep)
-        cols = R.PARCEL_COLS if not self.winter else [(238, 241, 245), (214, 224, 236), (232, 236, 242), (190, 170, 148), (226, 232, 240)]
-        edge = (104, 120, 60, 150) if not self.winter else (140, 152, 176, 150)
+        cols, edge = R.PARCEL_COLS, (104, 120, 60, 150)
         lay = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
         for p in keep:
+            if self.winter:
+                cols, edge = PARCEL_WINTER[climate_field().of(p["x"], p["y"])]
             ca, sa = math.cos(p["a"]), math.sin(p["a"])
             pts = []
             for u, v in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
@@ -272,16 +397,28 @@ class PieceFrame(R.Frame):
         if not self.winter:
             return R.Frame.water(self)
         k = self.k                      # winter: the same lines without the green valley band
+        cold, mild = kit.WINTER["snow"], kit.WINTER["mild"]     # streams freeze where snow lies; in a mild winter all water runs
         for st in WORLD["streams"]:
-            self.stroke(st, 1.6 * k + 1.6, 2.6 * k + 1.6, kit.ICE_D)
+            self.stroke2(st, 1.6 * k + 1.6, 2.6 * k + 1.6, kit.ICE_D, mild["river_edge"])
         for rv in WORLD["rivers"]:
             w = {3: 6.5, 2: 4.6, 1: 3.4}[rv["cls"]] * k
-            self.stroke(rv["pts"], w * 0.75 + 2, w + 2, R.C_RIVER_EDGE, clip_land=False)
+            self.stroke2(rv["pts"], w * 0.75 + 2, w + 2, cold["river_edge"], mild["river_edge"], clip_land=False)
         for st in WORLD["streams"]:
-            self.stroke(st, 1.2 * k, 2.4 * k, kit.ICE)
+            self.stroke2(st, 1.2 * k, 2.4 * k, kit.ICE, mild["river"])
         for rv in WORLD["rivers"]:
             w = {3: 6.5, 2: 4.6, 1: 3.4}[rv["cls"]] * k
-            self.stroke(rv["pts"], w * 0.75, w, R.C_RIVER, clip_land=False)
+            self.stroke2(rv["pts"], w * 0.75, w, cold["river"], mild["river"], clip_land=False)
+
+    def stroke2(self, pts_km, w0, w1, col, col_mild, clip_land=True, step=0.35):
+        """The frame's stroke(), with the colour chosen point by point: col_mild where the winter is mild."""
+        pts = R.resample(pts_km, step)
+        n = len(pts)
+        cf = climate_field()
+        for i, q in enumerate(pts):
+            if clip_land and not FIELDS.is_land(q[0], q[1], -0.035):
+                continue
+            w = w0 + (w1 - w0) * i / max(1, n - 1)
+            pygame.draw.circle(self.surf, col_mild if cf.at(*q) < kit.MILD_BELOW else col, self.P(*q), max(0.6, w / 2))
 
     def relief(self):
         # Relief rule K (review section 3): no range, spur or hill stands inside or in front of a piece's footprint.
@@ -337,11 +474,43 @@ class PieceFrame(R.Frame):
             t.pop("_label_at", None)
         self.place_pieces()
 
-    # ---- winter stand-in
+    # ---- winter stand-in, by climate
     def ground(self):
-        R.Frame.ground(self)
         if not self.winter:
-            return
+            return R.Frame.ground(self)
+        # The frame's ground three times, in the three winter palettes, laid over each other through the cold index.
+        layers = {}
+        for c in ("mild", "frost", "snow"):
+            season_cols("winter", c)
+            R.Frame.ground(self)
+            if c == "snow":
+                self.high_snow()
+            if c == "frost":
+                self.frost_patches()
+            layers[c] = self.surf.copy()
+        season_cols("winter", "snow")
+        self.surf.blit(layers["mild"], (0, 0))
+        for c, edge, band in (("frost", kit.MILD_BELOW, 0.3), ("snow", kit.SNOW_FROM, 0.4)):
+            lay = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
+            lay.blit(layers[c], (0, 0))
+            lay.blit(self.cold_mask(edge, band), (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            self.surf.blit(lay, (0, 0))
+        self.ground_img = self.surf.copy()
+
+    def cold_mask(self, edge, band):
+        """White with alpha: opaque where the cold index lies above edge, fading over +/- band."""
+        F, cf = FIELDS, climate_field()
+        small = pygame.Surface((F.w, F.h), pygame.SRCALPHA)
+        for k, c in enumerate(cf.cold):
+            a = int(255 * R.smoothstep(edge - band, edge + band, c))
+            small.set_at((k % F.w, k // F.w), (255, 255, 255, a))
+        big = pygame.transform.smoothscale(small, (int(F.w * self.S), int(F.h * self.S * R.TILT)))
+        out = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
+        out.fill((255, 255, 255, 0))
+        out.blit(big, (-2 * self.S, -2 * self.S * R.TILT), special_flags=pygame.BLEND_RGBA_MAX)
+        return out
+
+    def high_snow(self):
         # The frame turns high ground to bare stone with a fixed colour; under snow it is snow with some stone showing.
         s = self.surf
         for y in range(self.H):
@@ -350,46 +519,67 @@ class PieceFrame(R.Frame):
                 if r > g > b and r - b > 18 and r < 215 and FIELDS.at(FIELDS.land, *self.km(x, y)) > 0.56:
                     t = max(0.0, min(1.0, ((r + g + b) / 3.0 - 120) / 60.0))
                     s.set_at((x, y), kit.mix((r, g, b), kit.mix((186, 194, 212), kit.SNOW, t), 0.8))
-        self.ground_img = s.copy()
+
+    def frost_patches(self):
+        """A frost winter's ground: patches of thin snow on the frosted ground, as the kit's sheets show it."""
+        rnd = random.Random(77)
+        cf = climate_field()
+        lay = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
+        for _ in range(5200):
+            x, y = rnd.uniform(0, self.W), rnd.uniform(0, self.H)
+            w, h = rnd.uniform(10, 30), rnd.uniform(5, 12)
+            kx, ky = self.km(x, y)
+            if R.vnoise(kx, ky, 9.0, 61) < 0.52:         # in drifts, not as a pattern
+                continue
+            if not (kit.MILD_BELOW - 0.4 < cf.at(kx, ky) < kit.SNOW_FROM + 0.5):
+                continue
+            if not all(FIELDS.is_land(*self.km(x + dx, y + dy), 0.04) for dx, dy in ((-w / 2, 0), (w / 2, 0), (0, -h / 2), (0, h / 2))):
+                continue
+            pygame.draw.ellipse(lay, kit.SNOW + (185,), (x - w / 2, y - h / 2, w, h))
+        self.surf.blit(lay, (0, 0))
 
     def draw_range(self, g):
         if not self.winter:
             return R.Frame.draw_range(self, g)
-        with snow_draw():
+        q = g[len(g) // 2]
+        with tone_draw(WINTER_TONE[self.winter_at(q["x"], q["y"])]):
             R.Frame.draw_range(self, g)
 
     def draw_hill(self, x, y, h, seed):
         if not self.winter:
             return R.Frame.draw_hill(self, x, y, h, seed)
-        with snow_draw():
+        with tone_draw(WINTER_TONE[self.winter_at(x, y)]):
             R.Frame.draw_hill(self, x, y, h, seed)
 
     def ground_tone(self, x, y, base, share):
         if self.winter:
-            base = snowy(base)
+            base = WINTER_TONE[self.winter_at(x, y)](base)
         return R.Frame.ground_tone(self, x, y, base, share)
 
     def draw_tree(self, x, y, sc, f=1.0):
         if not self.winter:
             return R.Frame.draw_tree(self, x, y, sc, f)
-        s = self.surf                   # bare twigs with a dab of snow, as kit.Piece.tree draws them
+        s = self.surf                   # bare twigs, with a dab of snow where snow lies, as kit.Piece.tree draws them
         r, th = 4.4 * sc, 3.0 * sc
         pygame.draw.line(s, kit.TRUNK, (x, y), (x, y - th), max(1, int(1.4 * sc)))
         for dx, dy in ((-0.9, -0.5), (-0.45, -1.0), (0.1, -1.15), (0.6, -0.95), (0.95, -0.45)):
             pygame.draw.line(s, (70, 54, 44), (x, y - th), (x + dx * r, y - th + dy * r * 1.25), 1)
-        pygame.draw.line(s, kit.SNOW, (x - r * 0.7, y - th - r * 0.75), (x - r * 0.1, y - th - r * 1.3), 1)
+        if self.winter_at(x, y) != "mild":
+            pygame.draw.line(s, kit.SNOW, (x - r * 0.7, y - th - r * 0.75), (x - r * 0.1, y - th - r * 1.3), 1)
 
     def draw_conifer(self, x, y, sc, f=1.0):
         if not self.winter:
             return R.Frame.draw_conifer(self, x, y, sc, f)
+        clim = self.winter_at(x, y)
         s = self.surf
         h, w = 12.5 * sc, 7.2 * sc
-        oc, lit, dk = kit.PAL["winter"]["conifer"]
+        oc, lit, dk = kit.WINTER[clim]["conifer"]
         pygame.draw.line(s, kit.TRUNK, (x, y), (x, y - 2.5 * sc), max(1, int(1.3 * sc)))
         pts = [(x, y - h), (x + w / 2, y - 2 * sc), (x - w / 2, y - 2 * sc)]
         pygame.draw.polygon(s, R.shade(lit, f), pts)
         pygame.draw.polygon(s, R.shade(dk, f), [(x, y - h), (x + w / 2, y - 2 * sc), (x + w * 0.06, y - 2 * sc)])
-        pygame.draw.polygon(s, kit.SNOW, [(x, y - h), (x - w * 0.5, y - 2 * sc), (x - w * 0.16, y - 2 * sc), (x - w * 0.02, y - h * 0.5)])
+        if clim != "mild":
+            pygame.draw.polygon(s, kit.SNOW, [(x, y - h), (x - w * 0.5, y - 2 * sc), (x - w * 0.16, y - 2 * sc), (x - w * 0.02, y - h * 0.5)])
         pygame.draw.polygon(s, oc, pts, 1)
 
     # ---- the pieces
@@ -400,14 +590,20 @@ class PieceFrame(R.Frame):
         self.addons = {}
         self.stats["coast pieces (family, level asked, level given, land depth px)"] = {}
         self.stats["coast pieces left out (no shore in the hex)"] = []
+        self.stats["winter of the piece hexes"] = {}
+        self.stats["port modes"] = {}
         for hx, (mod, lv, t) in sorted(self.assign.items()):
             sea, shore = self.sea_of(hx)
+            clim = None
+            if self.winter:                              # the rule: the hex's latitude, mean height and km to the sea
+                clim = climate_field().of_hex(hx)
+                self.stats["winter of the piece hexes"][hx] = clim
             if mod in COAST_FAMILIES:
-                pc = self.coast_piece(mod, lv, hx, sea, shore, **self.kw.get(hx, {}))
+                pc = self.coast_piece(mod, lv, hx, sea, shore, climate=clim, **self.kw.get(hx, {}))
                 if pc is None:
                     continue
             else:
-                pc = take_apart(mod.draw, lv, self.season, hx, sea, shore, **self.kw.get(hx, {}))
+                pc = take_apart(mod.draw, lv, self.season, hx, sea, shore, climate=clim, **self.kw.get(hx, {}))
             pc["coast"] = mod in COAST_FAMILIES
             self.pieces[hx] = pc
             if sea is not None:
@@ -424,9 +620,12 @@ class PieceFrame(R.Frame):
                 ax, ay = int(round(cx + out[0] * shift)), int(round(cy + out[1] * shift))
                 sea2, shore2 = self.sea_at(ax, ay)
                 if sea2 is not None:
-                    ad = self.coast_piece(harbour, PORTS[t["name"]], hx, sea2, shore2, addon=True)
+                    bay = BAYS.get(t["name"])            # a carved port: the harbour is told its bay (shore.bay)
+                    ad = self.coast_piece(harbour, PORTS[t["name"]], hx, sea2, shore2, addon=True, bay=bay, climate=clim)
                     ad["coast"] = True
                     ad["centre"] = (ax, ay)
+                    ad["home"] = bay is not None         # a carved harbour stays inside the port's own hex
+                    self.stats["port modes"][t["name"]] = "carved, bay (u0, width, depth) = (%d, %d, %d) px" % bay if bay else "seaside"
                     ad["under"] = pc["footprint"]        # add-on things inside the town's footprint are left out
                     self.addons[hx] = ad
                     self.stats.setdefault("harbour add-on anchor (px from the hex centre)", {})[t["name"]] = int(round(shift))
@@ -476,6 +675,7 @@ class PieceFrame(R.Frame):
         owns the shore: a thing whose foot would stand in the water is left out."""
         wet = {}
         hidden = {}
+        outside = {}
         count = 0
         for hx, pc in self.all_pieces():
             cx, cy = self.centre_of(hx, pc)
@@ -483,18 +683,22 @@ class PieceFrame(R.Frame):
             for y, n, img, box in pc["things"]:
                 pos = (cx - C + box.x, cy - C + box.y)
                 foot_y = min(cy + y, pos[1] + box.height)               # smoke is queued 30 px low: use the picture's foot
+                if pc.get("home") and not kit.in_hex(pos[0] + box.width / 2 - tx, foot_y - ty, 0):
+                    outside["standing"] = outside.get("standing", 0) + 1      # counted, still drawn
                 if not pc["coast"] and y < 60 and any(not FIELDS.is_land(*self.km(fx, foot_y)) for fx in (pos[0] + 1, pos[0] + box.width // 2, pos[0] + box.width - 1)):
                     wet[hx] = wet.get(hx, 0) + 1
                     continue
                 if pc["coast"] and not kit.in_hex(box.centerx - C, foot_y - cy, 1):
                     hidden[hx] = hidden.get(hx, 0) + 1                  # the map's shore pushed it out of its canvas hex
                     continue
-                if pc.get("under") is not None and kit.in_footprint(pc["under"], pos[0] + box.width / 2 - tx, foot_y - ty):
+                if (pc.get("under") is not None and kit.in_footprint(pc["under"], pos[0] + box.width / 2 - tx, foot_y - ty)
+                        and FIELDS.is_land(*self.km(pos[0] + box.width / 2, foot_y))):       # (what stands on the water is the harbour's)
                     hidden[hx] = hidden.get(hx, 0) + 1                  # an add-on thing inside the town: left out
                     continue
                 self.add(cy + y + n * 1e-5, cx, (lambda im, p: lambda: self.surf.blit(im, p, special_flags=pygame.BLEND_PREMULTIPLIED))(img, pos))
                 count += 1
         self.stats["standing things placed"] = count
+        self.stats["carved harbours: things with their foot outside the port's own hex"] = outside
         self.stats["standing things left out at the sea"] = wet
         self.stats["coast things left out (inside the town, or pushed out of the hex by the shore)"] = hidden
 
@@ -574,6 +778,58 @@ def move_sites(towns=TOWN_LEVEL):
     R.PARCELS = R.build_parcels(WORLD, FIELDS)
 
 
+def carve_ports(towns=TOWN_LEVEL):
+    """The carved ports: cuts the kit's bay (kit.carve) into the frame's land field, in the port's own hex. The
+    back of the bay is put where the harbour wants its shore (BAY_BACK px from the hex centre: clear of a city's
+    wall); the shore moves at most kit.BAY_REACH px. Run once, before the frame's trees and fields are built."""
+    f = PieceFrame("summer", with_pieces=False)
+    F = FIELDS
+    report = {}
+    for name in PORTS:
+        t = WORLD["towns"][name]
+        if port_mode(t) != "carved":
+            continue
+        cx, cy = f.hex_px(t["hex"])
+        sea, shore = f.sea_at(cx, cy)
+        if sea is None:
+            continue
+        out = kit.sea_vector(sea)
+        along = (out[1], -out[0])
+        d0 = kit._shore_h(shore, out)(BAY_U0)
+        back = max(kit.BAY_BACK, BAY_BACK.get(towns.get(name, 0), kit.BAY_BACK))
+        depth = min(kit.BAY_REACH, d0 - back)
+        if depth < 3:
+            report[name] = "not carved: the shore already lies %d px from the centre" % d0
+            continue
+        bay = (BAY_U0, BAY_WIDTH, depth)
+        new = kit.carve(sea, shore, (BAY_U0, BAY_WIDTH + 6, depth))      # 6 px wider: the land field is a 1 km grid and rounds the cut
+        cells = 0
+        for j in range(F.h):
+            for i in range(F.w):
+                x, y = f.P(F.x0 + i, F.y0 + j)
+                x, y = x - cx, y - cy
+                if abs(x) > 60 or abs(y) > 60 or not kit.in_hex(x, y, 1.5):
+                    continue                             # the bay never leaves the port's own hex
+                u, d = x * along[0] + y * along[1], x * out[0] + y * out[1]
+                if abs(u - BAY_U0) > BAY_WIDTH / 2 + 3:
+                    continue
+                wet = d - new.h(u)                       # px beyond the bay's shore (below 0: land)
+                if wet > -8:
+                    k = j * F.w + i
+                    v = 0.5 - max(-0.3, min(0.3, wet / 6.0))
+                    if v < F.land[k]:
+                        cells += F.land[k] > 0.5 >= v
+                        F.land[k] = v
+        BAYS[name] = bay
+        report[name] = "bay %d px wide, shore moved %d px (%.1f km) inland to %d px from the hex centre; %d km2 of land turned to sea" % (
+            BAY_WIDTH, depth, depth / (f.S * (abs(out[0]) + abs(out[1]) * R.TILT)), back, cells)
+    for name, line in report.items():
+        print("   carved port %s: %s" % (name, line))
+    print("   coast drift after carving: %.1f km from the frame's first line (the frame's cove rule: %.1f km)" % (
+        R.sites.coast_shift(F), R.sites.COAST_REACH_KM))
+    return report
+
+
 def probe():
     """Lists the farmland hexes in view: where wheat pieces can go."""
     f = R.Frame(60)
@@ -593,6 +849,7 @@ def probe():
 
 CROP = (460, 0, 640, 360)      # the Po plain: Asti to Piacenza
 CROP2 = (130, 230, 640, 360)   # the Alps to Genoa: mines, the castle at the pass, grazing, vineyards, olives, two ports
+CROP3 = (300, 60, 640, 420)    # winter: the Po plain (frost), the Apennines (snow) and the Ligurian coast (mild)
 
 
 def main():
@@ -602,6 +859,7 @@ def main():
     out = args[0] if args else os.path.join(HERE, "..", "..", "..", "docs", "design", "map", "pieces_in_map")
     which = args[1] if len(args) > 1 else "both"
     os.makedirs(out, exist_ok=True)
+    carve_ports()
     move_sites()
     if which in ("both", "summer"):
         f = PieceFrame("summer")
@@ -611,7 +869,15 @@ def main():
         crop = f.surf.subsurface(pygame.Rect(CROP2)).copy()
         pygame.image.save(pygame.transform.scale(crop, (CROP2[2] * 2, CROP2[3] * 2)), os.path.join(out, "hills_coast_crop.png"))
     if which in ("both", "winter"):
-        PieceFrame("winter").render(os.path.join(out, "winter.png"))
+        f = PieceFrame("winter")
+        f.render(os.path.join(out, "winter.png"))
+        crop = f.surf.subsurface(pygame.Rect(CROP3)).copy()
+        pygame.image.save(pygame.transform.scale(crop, (CROP3[2] * 2, CROP3[3] * 2)), os.path.join(out, "winter_crop.png"))
+        cf = climate_field()
+        for name in ("Genoa", "Savona", "Pisa", "Pavia", "Asti", "Turin", "Serravalle", "Cuneo", "Susa"):
+            hx = WORLD["towns"][name]["hex"]
+            lat, m, sea = cf.hex_values(hx)
+            print("   winter rule %-11s lat %.2f, %4d m, %3d km to the sea: cold %.1f = %s" % (name, lat, m, sea, kit.cold_index(lat, m, sea), cf.of_hex(hx)))
 
 
 if __name__ == "__main__":

@@ -90,7 +90,7 @@ def main(path):
     out.blit(kit._font(18).render("Summer, 100% (hex radius 60). Each piece on its own terrain, in the wild land the map draws.", True, kit.SHEET_DIM), (470, 18))
     for i, (title, mod, ground, extras) in enumerate(FAMILIES):
         row(out, 16 + (i // n_top) * BLOCK_W, top + (i % n_top) * ROW_H, title, mod, ground, extras, "summer")
-    out.blit(kit._font(18).render("Winter (snow roofs keep a roof-colour eave; still water frozen, the sea open)", True, kit.SHEET_DIM), (16, mid - 22))
+    out.blit(kit._font(18).render("Winter, the snow winter (snow roofs keep a roof-colour eave; still water frozen, the sea open). The frost and mild winters: winters.png", True, kit.SHEET_DIM), (16, mid - 22))
     by = {f[0]: f for f in FAMILIES}
     for i, name in enumerate(WINTER):
         title, mod, ground, extras = by[name]

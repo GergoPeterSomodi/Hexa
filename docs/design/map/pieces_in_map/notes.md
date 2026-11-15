@@ -3,6 +3,51 @@
 Art director, 2026-11-15. **Status: a test for the owner and the planning session. Nothing in the game, the style
 frame or the pieces is changed.**
 
+## Round 4: two port modes, winter by climate (2026-11-15)
+
+The owner's two answers of round 3 of the pieces (`../pieces/REVIEW.md`, "Round 3"; guide sections 7 and 10).
+`summer.png`, `winter.png` and the three crops are rendered again; `winter_crop.png` is new (the Po plain, the
+Apennines and the coast, 2x).
+
+**Ports**
+
+| Port | Data | Mode | In the picture |
+|---|---|---|---|
+| Genoa | City, sea port | **Carved** | A bay cut into its hex: the shore moved 13 px (4.2 km) inland, to 18 px from the hex centre, just in front of the city wall. The level 3 add-on lies wholly inside the hex; its canvas moves 5 px (it was 18) |
+| Savona, Nice | Towns, sea ports | Seaside | As before: the add-on anchored at the shore, 29 and 36 px from the hex centre, reaching into the sea hex |
+| Chiavari | Village, sea port | Seaside | As before (28 px) |
+| Pisa | City, no sea port in the data | Seaside | Its outport on the open shore, as before (34 px) |
+
+- `port_mode()` is the rule: a place that is a city and a sea port in the data is carved; every other port is
+  seaside. `carve_ports()` cuts the bay with the kit's shape (`kit.carve`) into the frame's land field, once,
+  before the frame's trees and fields are built, and only inside the port's own hex.
+- The town piece is clipped at the bay like at any shore (71 px of ground detail, one standing thing). An add-on
+  thing is left out inside the town's footprint only where that is land: what stands on the water is the
+  harbour's.
+- **For now the bay is 84 px wide** (the hex's whole front), because the harbour has only its open-shore layout.
+  With the carved layout of review task 9 it becomes the guide's 72 px, with two headlands inside the hex.
+- The coast at Genoa now lies 6.8 km from the frame's first line (the frame's own cove rule is 3.5 km): an open
+  question in the guide (section 12, point 1).
+
+**Winter**
+
+- `Climate` holds the kit's cold index (`kit.cold_index`: latitude, height, km to the sea) on the frame's km
+  grid; the distance to the sea is an exact distance transform of the frame's land field.
+- **Each piece takes the winter of its hex** (`Climate.of_hex`: the hex centre's latitude, the hex's mean height
+  from the height data, the km from its centre to the sea): of the 44 piece hexes 6 are snow (the Alps, one high
+  Apennine hex), 29 frost (the Po plain, the hills, the foothills) and 9 mild (every hex on the coast).
+- **The stand-in ground follows the same index point by point**: the frame's ground is painted three times, in
+  the three winter palettes, and laid over each other through the index with a soft edge, so the snow line runs
+  along the mountains. Trees, hills and ranges, the frame's own field parcels and the rivers take the winter of
+  the point they stand on (rivers and streams run open in the mild zone, streams are frozen elsewhere). The frost
+  ground gets drifts of thin snow, as the kit's sheets show it.
+- Seen: snow in the Alps and on the Apennine crest, a frosted Po plain with white roofs, a green-grey Riviera
+  with red roofs, bare woods and laid-up boats. The three zones read at a glance. Still a stand-in, not a design
+  of the winter map.
+- Left for the map's side: a piece has one winter while the ground blends, so at a border a frosted piece can
+  stand on half-green ground (the olives west of Savona); the mild zone's hills keep a little too much of their
+  summer green; the salt pans south of Pisa are too blue in the mild winter (review task 9).
+
 ## Round 3: every family in the map (2026-11-15)
 
 `summer.png`, `winter.png`, `plain_crop.png` and the new `hills_coast_crop.png` (the Alps to Genoa, 2x) now carry

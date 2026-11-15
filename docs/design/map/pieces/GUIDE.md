@@ -2,7 +2,8 @@
 
 Art director, 2026-11-15. **Status: the owner answered the three open questions on 2026-11-15 (section 12); this
 guide is rewritten to those answers and was made sharper after the second review (coverage, the mirror axis, boat
-sizes, coast pieces on every sea side). Nothing in the game is changed.**
+sizes, coast pieces on every sea side). Round 3 (the same day) adds the owner's two further answers: **two port
+modes** (section 10) and **winter by climate** (section 7). Nothing in the game is changed.**
 
 A **piece** is the picture of one hex's improvement at one level in one season, at the normal map zoom (the style
 frame's close zoom: hex radius 60 px, one hex = one district). This guide and the drawing kit
@@ -23,13 +24,15 @@ growing-map plan (`../06-growing-map.md`, sections 2 and 5).
 | Wild land: woods, single trees, bushes, scrub, tufts, stones | **The map** | None. The piece reports its **footprint** and the map thins the wild land there (section 6) |
 | Level 0 | **Nobody: it is no piece** | On the sheets the level 0 column is `kit.wild()`: the wild land as the map draws it |
 | The coast: sea, sand, foam, the shore line | **The map** | The piece is told where the sea is and builds at that shore (section 10) |
+| A port's bay (a carved port) | **The map**, with the kit's bay shape | The harbour is told its bay and builds in it (section 10) |
+| The winter of a hex: snow, frost or mild | **The map**, by the hex's climate | None: the piece is drawn `draw(level, "winter")` as always; the kit is told the winter (section 7) |
 | Rivers, streams, roads between hexes | The map | Gate points for roads (section 10); no water or road to the hex border |
 | Town name plates | **Nobody, for now** | None. No plate, no plate strip |
 | Repetition | The map picks by the hex | Every family has a mirrored version and a second layout (section 6) |
 
 Contents: 1 canvas, 2 camera, 3 light and ink, 4 palette, 5 sizes, 6 how a level reads (level 0, footprint,
-mirror and second layout), 7 seasons, 8 the family tables, 9 readability, 10 terrain fit and the coast, 11 the
-reviewer's checklist, 12 the owner's decisions and what is still open.
+mirror and second layout), 7 seasons (and the three winters), 8 the family tables, 9 readability, 10 terrain fit,
+the coast and the two port modes, 11 the reviewer's checklist, 12 the owner's decisions and what is still open.
 
 ---
 
@@ -137,6 +140,10 @@ the top of the family module and list it in your report.
 | `leaf` (broadleaf: dark, mid, light) | 86,150,66 / 118,180,80 / 156,208,104 | 70,128,60 / 96,158,72 / 130,186,92 | a fixed mix of rust, gold and late green (`LEAF_AUTUMN`) | bare twigs |
 | `conifer` (lit, shaded) | 66,120,70 / 46,92,58 | the same | 66,116,68 / 46,90,56 | 62,106,72 / 44,82,60, snow on the left |
 | `hedge` / `hedge_d` | 84,140,66 / 56,100,52 | 70,128,60 / 46,92,50 | 150,112,52 / 108,78,44 | 108,96,76 / 78,68,56 |
+
+The winter column is the **snow winter**. The frost and the mild winter have palettes of their own
+(`kit.WINTER["frost"]`, `kit.WINTER["mild"]`; section 7). A piece never picks one: `p.pal[...]` and
+`kit.crop(name, "winter")` already give the colours of the hex's winter. **Never read `kit.PAL["winter"]` directly.**
 
 **Crop colours** come from `kit.crop(name, season)`: `wheat`, `garden`, `meadow`, `vine_soil`, `vine`, `olive_soil`.
 
@@ -319,9 +326,78 @@ zero in layout**.
 | Smoke | None | None | From 1 house in 3 | From 1 house in 3; grey (`SMOKE_SNOW`) so it shows on snow |
 | People, animals | A few | The most (work in the fields) | A few (harvest, ploughing) | None outdoors, or 1-3 by the buildings |
 
-**Snow rules.**
+### Winter by climate: the three winters
+
+The owner's answer (round 3): **not all of the map gets snow.** Winter has three steps, and every hex has one of
+them for good. Sheet: `winters.png`.
+
+| | **Snow** (the hard winter) | **Frost** (the light winter) | **Mild** (the Mediterranean winter) |
+|---|---|---|---|
+| Where | The Alps, high ground, the north and the inland east | Lowlands between: the Po plain, the hills, north-west Europe | The Mediterranean coasts and the south |
+| Ground | Snow: pale blue-white | Frosted, pale grey-green, with patches of thin snow | **No snow.** Rain-darkened green-grey; dark wet earth |
+| Worked ground | Under snow, the pattern showing | Under a thin snow, the pattern and more earth showing | Bare: young winter corn in dark earth, bare vine stakes on brown soil, dull meadows |
+| Roofs, heaps, walls | Snow caps | Snow caps | Their own colours: a red town stays red |
+| Broadleaves, fruit trees, vines | Bare, a dab of snow | Bare, a dab of snow | Bare, no snow |
+| Conifers, olives | Snow on the lit side | Snow on the lit side | Unchanged: **olives stay green** |
+| Still water, canals, streams | Frozen | Frozen | Open |
+| Sea | Darker, never frozen | The same | The same |
+| Smoke, people, animals, boats | The winter rules of the table above | The same | The same: it is still winter (boats laid up, few animals out, smoke) |
+
+**The contract: a module does not change.** It is still called `draw(level, "winter")`. The map tells the kit the
+hex's winter: `kit.take_apart(draw, level, "winter", ..., climate="frost")`; on a sheet
+`kit.with_wild(draw, level, "winter", climate="mild")`; around any other call `with kit.climate("mild"): ...`.
+Without it the winter is the snow winter, as before, so every existing sheet is the same picture.
+
+What a module must know:
+
+- `p.season == "winter"` (and a module's own `season == "winter"`) is **the season**, in every climate. Hang on it
+  what the season does: boats laid up, few animals out, smoke, no people in the fields, the winter log pile.
+- `p.winter` is True where **snow lies** (snow and frost winters). Ask it, and nothing else, before drawing snow:
+  `kit.SNOW if p.winter else ...`. In a mild winter it is False.
+- `p.frozen` is True where still water is frozen (the same two winters). Ask it before using `kit.ICE`.
+- `p.climate` is `"snow"`, `"frost"` or `"mild"` in winter and `None` otherwise. A module should not need it.
+- Colours: `p.pal[...]` and `kit.crop(name, season)` only. A module that keeps a table of its own colours per
+  season needs a winter entry for the mild winter too (grazing's `MEADOW["winter"]`).
+- The safety net: while a mild piece is drawn the kit reads `kit.SNOW`, `kit.SNOW_D`, `kit.ICE` and `kit.ICE_D` as
+  wet earth and open water, so an older line that paints snow whenever the season is winter cannot turn a
+  Mediterranean hex white. It is a net, not a way to draw: such lines are moved to `p.winter` and `p.frozen`
+  when the module is next opened (review, "Round 3").
+
+**The rule: which hex has which winter.** From three numbers of the map data, the same in every year:
+
+- `lat`: the latitude of the hex centre (degrees north);
+- `m`: the hex's mean height in metres (the ETOPO heights of the map data);
+- `sea`: km from the hex centre to the nearest sea.
+
+`kit.winter_of(lat, m, sea)` gives the name; `kit.cold_index(lat, m, sea)` the number behind it:
+
+```
+warm = (50 - lat) / 8, kept between 0.25 and 1          the sea warms the south, hardly the north
+m'   = m x min(1, sea / 25)                             a coastal hex is settled at sea level
+cold = 0.5 x (lat - 36) + m' / 300
+       - warm x (3.5 x max(0, 1 - sea / 40) + 2 x max(0, 1 - sea / 15))
+       + min(2, sea / 300)                              far from any sea it is colder
+mild below 4.5;  frost from 4.5;  snow from 8.0
+```
+
+| Hex | lat, m, sea | cold | Winter |
+|---|---|---|---|
+| Genoa | 44.3, 367 m, 5 km | 1.4 | mild |
+| Savona; Pisa | 44.3, 758 m, 13 km; 43.7, 374 m, 12 km | 3.7; 2.2 | mild |
+| Pavia, Asti, Turin (the Po plain) | 45.2, 91 m, 104 km ... | 5.2 to 6.3 | frost |
+| Serravalle (Apennine foothills) | 44.8, 498 m, 54 km | 6.2 | frost |
+| Cuneo; Susa (the Alps) | 44.3, 2062 m; 45.2, 3320 m | 11.2; 16.2 | snow |
+
+The map may let its own ground follow the same number point by point instead of hex by hex, so the snow line
+runs along the mountains and not along hex borders (the in-map test does this); a **piece** always takes the one
+winter of its hex. The rule is a first cut for this region: on the whole map it is to be tuned against a list of
+known places before it is fixed (the Atlantic west and the head of the Adriatic are the doubtful ones).
+
+**Snow rules** (where snow lies: the snow and frost winters).
 - Snow is `SNOW` on lit and flat tops and `SNOW_D` on shaded sides. It never covers a wall face, a door, a tower
   shaft, a hull or the sea.
+- In a frost winter a piece is drawn as in a snow winter; only its palette is the frost one (thin snow on the
+  worked ground, frosted ground between). In a mild winter there is no snow, no ice and no snow cap anywhere.
 - A worked pattern must still read under snow: draw strips, rows and pans in two snow tones with their edges, and
   leave **one strip in four showing earth**. Hedges, fences, terrace walls and roads stay visible.
 - Heaps, haystacks, battlements, wall tops and log piles get a snow cap. The kit does this for its own primitives.
@@ -400,7 +476,9 @@ Animals always stand inside the fences from level 2.
 | 3 | 14 pans in 3 rows, 5 heaps in a row, a short jetty with 1 boat | The salt store: a long warehouse |
 
 Everything is laid out in shore coordinates (`shore.pt(u, v)`): the rows of pans run along the shore, the channel
-and the jetty run out to it. Pans are `p.patch` squares of 9-11 px with a `STONE_D` edge, laid as a strict grid. Seasons: spring pans filled,
+and the jetty run out to it. **On a lagoon** (a hex the map data marks as lagoon) the map draws a shallow bay with
+the same bay shape as a carved port and the pans lie on its shore: no layout of its own, the jetty and the boat
+only keep inside the lagoon (`shore.bay.room(u)`). Pans are `p.patch` squares of 9-11 px with a `STONE_D` edge, laid as a strict grid. Seasons: spring pans filled,
 blue-grey (mix of `shallow` and `sand`); summer pans white and pale pink as they dry (`SALT`), the heaps at full
 size, 2 rakers; autumn grey pans, heaps covered (thatch colour); winter pans frozen (`ICE`) with snow edges, heaps
 covered with a snow cap, nobody out.
@@ -447,6 +525,11 @@ out from it, huts inland. The sea is wherever the map has it; the sheets show it
 summer the boats are out at sea with sails; autumn half of them are at the jetty; winter all boats are laid up at
 the jetty or quay with bare masts (`sail=False`), snow on roofs and moles, the sea darker. The lighthouse lamp is
 yellow in every season.
+
+**Two port modes** (section 10): on an open shore the harbour is built out from it (**seaside**, the table above);
+in a bay the map has carved for a great port it is built into the bay (**carved**): the quay along the back of
+the bay, two short moles from the bay's horns across its mouth, the lighthouse on a horn, ships and boats inside.
+Same levels, same landmarks.
 
 **The harbour as an add-on.** A port town is a settlement piece plus the harbour's works at the hex's own shore
 (the owner's answer 2). `draw(level, season, ..., addon=True)` draws only what stands at the water's edge: jetty,
@@ -561,14 +644,56 @@ colour never changes with the season.
   family sheet, write `<family>_sides.png` (S, E, NW, plain and mirrored) and check all eight sides in your scratch
   folder before you report. On a slanted shore a strict grid (salt's back row) may come up to 3 px into the margin
   at one corner; that is accepted.
-- **The add-on is anchored at the shore, not at the hex centre.** A port's hex often has only a strip of water. The
+- **The add-on is anchored at the shore, not at the hex centre** (a seaside port). A port's hex often has only a strip of water. The
   map puts the add-on's canvas so that the shore lies where the harbour expects it (`COAST["y0"]` px out from the
   middle); the basin then reaches into the sea hex next door, which is free.
 - A piece that is not a coast family (a town, a wheat hex on the coast) does nothing: the map clips its ground
   detail at the shore and leaves out any standing thing whose foot would be in the water.
 - **Ports.** A town with a harbour is the settlement piece in the middle of the hex, as always, plus the harbour
   family's add-on at the hex's own shore (section 8). They are two calls; the map leaves out add-on things that
-  would stand inside the town's footprint.
+  would stand on land inside the town's footprint.
+
+**Two port modes** (the owner's answer, round 3: "some to carve a port to the tile, and some will need just to add
+a port to the seaside"). Sheet: `ports.png`; in the map: Genoa carved, the others seaside.
+
+| | **Carved** | **Seaside** |
+|---|---|---|
+| What the map does | Cuts a **bay** into the port's own hex, in front of the town | Nothing: the shore stays as it is |
+| Where the harbour is | In the bay, **wholly inside the port's hex** | Along the shore; its basin may reach into the sea hex next door |
+| The add-on's canvas | The bay's back lies where the harbour expects its shore; the canvas moves at most a few px | Anchored at the shore (above) |
+| The town piece | Clipped at the bay like at any shore: plots and houses in the water are left out | Unchanged |
+
+- **Which port is which: from the map data, once, never in play.** A port is **carved** when the place data marks
+  it as a great port: on the Europe map a hand-set `harbour: "bay"` flag for the great natural harbours; where the
+  flag is missing (and on random worlds), a place that **starts** as a city (the highest rank) and is a sea port.
+  Every other port is **seaside**: fishing villages, small and middle ports, a city's outport on an open shore,
+  and any harbour built during a game. A seaside port that grows into a city in play keeps its shore: the coast
+  never changes during a game.
+- Carving also needs room. No bay when the hex already has the water (the shore lies within 20 px of the hex
+  centre), or when the bay would leave less than 60% of the hex as land; the port is then seaside.
+- **In this map:** Genoa (a city and a sea port) is carved. Savona and Nice (towns) and Chiavari (a village) are
+  seaside. Pisa is a city, but the data do not have it as a sea port (it stands on the Arno): its harbour is an
+  outport on the open shore, seaside.
+- **The bay's shape** is the kit's: `kit.carve(sea, shore, (u0, width, depth))` gives the carved shore, and the map
+  turns to sea every point of the port's hex for which `.land(x, y)` is False.
+  - Width `kit.BAY_WIDTH` = 72 px horn to horn, the same for every carved port. The back is straight over the
+    middle 70% (50 px) and rises in a rounded shoulder to each horn (`kit.bay_profile`): a basin, not a notch.
+  - The back lies `kit.BAY_BACK` = 13 px out from the hex centre (the harbour's own `COAST["y0"]`); in front of a
+    walled town 16 px and of a city 18 px, so the wall stays dry.
+  - **Limits.** The shore moves at most `kit.BAY_REACH` = 19 px (5 km) inland; the bay never leaves the port's
+    hex; its horns stay inside the hex as headlands. (The style frame's small coves move a shore at most 3.5 km;
+    a basin for a level 3 harbour needs more: Genoa's is 13 px, 4.2 km. The limit is an open question, section 12.)
+  - A bay belongs to the hex, not to the harbour's level: it is there from the first day, and a fishing jetty sits
+    in it as well as a mole harbour.
+- **The piece in a bay.** The map hands the piece the carved shore line and `bay=(u0, width, depth)`
+  (`kit.take_apart(..., bay=)`, `kit.Piece(bay=)`). `shore.pt(u, v)` then measures from the bay's own shore, so
+  what lies along the shore (the quay, the slip) follows the back of the bay by itself. `shore.bay` (None on an
+  open shore) gives the rest: `bay.u0`, `bay.west`, `bay.east` (the horns), `bay.pt(u, v)` (v px out from the
+  **mouth line**, the straight line from horn to horn: moles are laid along it), `bay.room(u)` (px of water from
+  the shore to the mouth line) and `bay.uv(u, v)` (the same point in shore coordinates, for `shore.fits`).
+  A carved harbour keeps every work and every boat inside the bay or at most 6 px beyond the mouth line.
+- On the sheets `kit.Piece(bay=...)` (or `kit.with_wild(..., bay=)`) carves the stand-in shore, so a module can
+  be judged in a bay on every sea side.
 
 ## 11. The reviewer's checklist
 
@@ -605,6 +730,9 @@ Tick every line for every family. One "no" sends the sheet back.
 - [ ] Spring, summer, autumn and winter are told apart at a glance, also at 50%.
 - [ ] Winter: the pattern and the landmark still read on snow; walls, doors, hulls and the sea have no snow.
 - [ ] Still water is frozen in winter; the sea is not.
+- [ ] **The three winters** (`kit.with_wild(draw, level, "winter", climate=...)` for snow, frost and mild): the
+      layout is the same in all three; in the mild winter nothing is white or frozen and the piece is still told
+      from autumn (bare trees, bare soil, laid-up boats); snow hangs on `p.winter`, ice on `p.frozen`.
 - [ ] Smoke only in autumn and winter (except the listed chimneys). At most three activity details.
 - [ ] Nothing from the "what not to add" list.
 
@@ -623,6 +751,9 @@ Tick every line for every family. One "no" sends the sheet back.
       PROBLEM`, nothing stands in the water that should not, the works still meet the shore, the mirrored piece
       is not the same picture as the plain one, the top landmark is there on every side.
 - [ ] Harbour: `addon=True` draws only the works at the water's edge.
+- [ ] **In a bay** (`bay=(0, kit.BAY_WIDTH, depth)` for depth 8, 13 and 19, on all eight sides): no `PIECE
+      PROBLEM`; the harbour is a closed basin inside the bay, nothing more than 6 px beyond the mouth line; salt's
+      jetty and boat stay inside the lagoon.
 
 **Readability and fit**
 - [ ] At 50% the family is recognised by its signature and the top level by its landmark.
@@ -644,21 +775,36 @@ Tick every line for every family. One "no" sends the sheet back.
 | 2 | Coasts and ports | **"Map draws shore."** | The map owns the coastline; coast pieces are told the sea side and build at that shore; in a town's hex the harbour is an add-on at its own shore (sections 8, 10) |
 | 3 | Wild land and variety | **"Map + 2nd layout."** | The map draws woods and scrub and thins them under the piece's footprint; level 0 is no piece; every family gets a mirror and a second layout chosen by the hex, wheat, grazing, timber and vineyard first (section 6) |
 
+**Decided in round 3** (the same day):
+
+| | Question | The owner's answer | What it means here |
+|---|---|---|---|
+| 4 | Ports: the harbour did not fit the port's own strip of water | **"Some to carve a port to the tile, and some will need just to add a port to the seaside."** | Two port modes: carved (the map cuts a bay into the port's hex; great ports) and seaside (the add-on at the shore as it is). Section 10 |
+| 5 | Winter snow everywhere? | **"Not all of the map gets snowed. For example south Italy doesn't get that much snow. Might need some in between tiles?"** | Three winters by climate: snow, frost (the in-between) and mild. A rule from latitude, height and distance to the sea. Section 7 |
+
 **Still open** (none blocks the fix tasks):
 
-1. **Winter snow.** As drawn: full snow on every hex in winter (recommended for a clear season signal). Option:
-   full snow only in the north and on high ground, and a "frost" winter (grey-green ground, bare trees, no snow) for
-   the Mediterranean families (olives, salt, vineyards). That is one more palette column, no new drawing.
-2. **Wheat landmarks.** As drawn: barn at level 2, windmill at level 3 (the windmill is the strongest silhouette, so
+1. **How far may a carved bay move the coast?** As drawn: at most 19 px (5 km); Genoa's bay is 13 px (4.2 km),
+   and with the style frame's own cove the coast there lies 6.8 km from the frame's first line. The frame's cove
+   rule is 3.5 km. Options: (a) 5 km for carved ports only (recommended: it is what puts a level 3 harbour inside
+   its hex; there are few of them); (b) keep 3.5 km: the moles and outer berths then reach about 6 px into the sea
+   hex next door.
+2. **The winter rule on the whole map.** The three steps and the rule are in (section 7); the numbers are tuned
+   on this region only. Before the full map is built: check a list of known places (the rule puts London on the
+   edge of snow and Venice in the mild winter) and decide whether the map's ground follows the cold index point
+   by point (recommended, as in the test) or hex by hex.
+3. **Mild-winter woods.** As drawn: broadleaves are bare in every winter, also on the Mediterranean coast.
+   Option: an evergreen broadleaf (holm oak, dull dark green) for the mild zone's woods, in the map's wild land.
+4. **Wheat landmarks.** As drawn: barn at level 2, windmill at level 3 (the windmill is the strongest silhouette, so
    it marks the top). The growing-map plan has "a mill" at stage 2; option: a watermill at level 2 and the windmill
    kept for level 3.
-3. **A hex with a settlement and a good.** Answered for ports (answer 2: the harbour is an add-on). For the other
+5. **A hex with a settlement and a good.** Answered for ports (answer 2: the harbour is an add-on). For the other
    goods the pieces still assume one piece per hex. Options: (a) one piece per hex, the settlement wins
    (recommended for now); (b) half-size goods pieces round a settlement, to be designed later.
-4. **Banner colour.** Castles take the owner's colour as a parameter; the sheet shows red.
-5. **Where do town names show, if not on plates?** "No plates for now" leaves the normal map without town names.
+6. **Banner colour.** Castles take the owner's colour as a parameter; the sheet shows red.
+7. **Where do town names show, if not on plates?** "No plates for now" leaves the normal map without town names.
    Options: (a) nothing at this zoom, names on hover and in the panel (recommended for now: it is what was
    decided); (b) small plain text under the town, no plate, to be tried when the UI round comes.
-6. **The timber piece's water.** Streams are the map's, so the sawmill gets a short mill race with a pond at each
+8. **The timber piece's water.** Streams are the map's, so the sawmill gets a short mill race with a pond at each
    end, inside the hex (as wheat's canal). Option: no water, a horse-driven saw and the raft dropped. Recommended:
    the mill race (it keeps the water wheel and the raft, the family's landmarks).

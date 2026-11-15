@@ -27,6 +27,7 @@ GATES = {"south": (-8, 34)}
 # (named token, not in the kit). The colours are fixed per season, so they do not depend on the map's ground.
 MEADOW_TINT = (232, 228, 150)
 MEADOW = {s: kit.mix(kit.PAL[s]["grass"], MEADOW_TINT, 0.5) for s in ("spring", "summer", "autumn")}
+MEADOW["winter"] = kit.mix(kit.WINTER["mild"]["grass"], MEADOW_TINT, 0.4)     # a mild winter: no snow lies (p.winter is False)
 
 # The layouts are fixed tables: a level adds to the level below and never moves anything.
 #   hut, byre (x, foot y, width), hall (x, foot y, width): the buildings;
