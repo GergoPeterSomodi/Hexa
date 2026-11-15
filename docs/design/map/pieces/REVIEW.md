@@ -1218,3 +1218,8 @@ New, smaller questions the answers raise (none blocks the tasks; guide section 1
   the picture.
 - Whether the map data will place these goods, sites and landmark cities at all is a game question; the pieces
   only wait for it.
+
+### Owner's answers to the round 5 questions (2026-11-15)
+
+- Landmark monuments: **leave as is** (20 x 24 px, current drawings). Task 26 is dropped.
+- Furs, cotton and the landmark cities: **sheets are enough** until the real map is built; no second test frame.
