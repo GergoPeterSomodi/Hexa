@@ -9,8 +9,8 @@ Two layouts (LAYOUT) and the mirror. The piece draws no wild land.
 A hemp block is near-square (14 x 12), has two strips at most and is never gold or light green (guide section 4: the
 crowding table, hemp against spring wheat). Spring: bare earth with dashed rows; summer: the darkest green on the map
 with a darker band along each block's front edge; autumn: pale stubble, the stooks on the newest blocks, two pale
-bundles steeping on every pond, smoke; winter: two snow tones with their edges and earth-coloured dashed rows, the
-ponds frozen where water freezes (p.frozen), no stooks.
+bundles steeping on every pond, smoke; winter: two snow tones with their edges and, in the snow and frost winters, stubble (four rows of two short dark
+dashes; the mild winter keeps dark earth with its dashed rows), the ponds frozen where water freezes (p.frozen), no stooks.
 
 python hemp.py            writes docs/design/map/pieces/hemp.png and hemp_variants.png
 python hemp.py DIR        the same, into DIR
@@ -79,6 +79,23 @@ def block_corners(cx, cy, angle):
             ((-BW / 2, -BH / 2), (BW / 2, -BH / 2), (BW / 2, BH / 2), (-BW / 2, BH / 2))]
 
 
+STUBBLE = {"snow": (92, 78, 66), "frost": (104, 88, 70)}   # dark cut stalks: much darker than either snow tone
+
+
+def stubble(p, cx, cy, angle):
+    """Winter stubble under snow or frost: four rows across the block, each a run of two short dark dashes (2.4 px
+    long, 1.1 px thick), so the near-square block shows a pattern of marks and not an empty outline at 50%."""
+    ca, sa = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+
+    def P(u, v):
+        return (cx + ca * u - sa * v, cy + (sa * u + ca * v) * kit.TILT)
+    col = STUBBLE[p.climate]
+    for i in range(4):
+        u = -BW / 2 + BW * (i + 0.5) / 4
+        for v0 in (-3.9, 1.5):
+            p.gp.line(P(u, v0), P(u, v0 + 2.4), col, 1.1)
+
+
 def hemp_block(p, cx, cy, angle, i):
     """One near-square block of two strips. Spring: bare earth with dashed young rows; summer: the darkest green with a
     darker band along the front edge (the crop stands tall); autumn: stubble; winter: two snow tones, earth-coloured
@@ -86,7 +103,9 @@ def hemp_block(p, cx, cy, angle, i):
     cols = kit.crop("hemp", p.season)
     cols = cols[i % 2:] + cols[:i % 2]
     pts = p.field(cx, cy, BW, BH, angle, cols, 2, furrows=False)
-    if p.season != "summer":
+    if p.season == "winter" and p.climate != "mild":
+        stubble(p, cx, cy, angle)
+    elif p.season != "summer":
         p.rows(cx, cy, BW, BH, angle, 4, col=kit.crop("hemp_row", p.season)[0], lw=0.9, soil=False, dashed=True)
     else:
         a, b = pts[3], pts[2]                                      # the front edge: a darker band 1.2 px deep
@@ -174,6 +193,8 @@ def draw(level, season, variant=0, mirror=False):
     if level >= 3:
         p.house(*L["house2"], 6.5, 4.2, 3.2, wall=1, kind="ridge", roof="thatch")
         ropewalk(p, *L["walk"])
+    if level >= 2:                                    # the claim round the stooks, drawn or not (the wild land never changes)
+        p.hold([(x, y) for x, y, frm in L["stooks"] if level >= frm], side=2.5, back=4.0, front=3.0)
     if au or su:                                      # stooks stand in summer (the first half) and autumn (all)
         here = [(x, y) for x, y, frm in L["stooks"] if level >= frm]
         for x, y in here if au else here[:len(here) // 2]:
