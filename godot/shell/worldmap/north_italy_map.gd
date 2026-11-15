@@ -12,7 +12,8 @@
 ##
 ## Keys: 1 to 4 the season, R a new seed, V the unnamed villages on or off, G the hex grid, F the whole map, H the panel;
 ## drag or WASD to move, the wheel to zoom. A left click selects a hex (outline and a panel of what is on it); a right
-## click or Esc clears it.
+## click or Esc clears it. The panel builds, upgrades and clears the selected hex (U upgrades): the changes survive a new
+## season and V (they are played again on the new map), and R, a new seed, drops them.
 ## Shell only: what stands where is the core's answer; this file looks pictures up and puts them down.
 class_name NorthItalyMap
 extends Node2D
@@ -69,6 +70,9 @@ var _select: HexSelectLayer = null
 var _info_panel: PanelContainer = null
 var _info_title: Label = null
 var _info_text: Label = null
+var _info_actions: VBoxContainer = null
+## The player's changes in order: {op ("build", "upgrade" or "clear"), hex, family_id}; played again after V.
+var _changes: Array[Dictionary] = []
 ## The selected hex, or NO_HEX.
 var selected: Vector2i = NO_HEX
 var _press_at := Vector2.ZERO
@@ -134,8 +138,9 @@ func _add_selection() -> void:
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.add_child(margin)
 	_info_panel = PanelContainer.new()
-	_info_panel.custom_minimum_size = Vector2(280.0, 0.0)
-	_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info_panel.name = "InfoPanel"
+	_info_panel.custom_minimum_size = Vector2(300.0, 0.0)
+	_info_panel.mouse_filter = Control.MOUSE_FILTER_STOP  # a click on the panel never reaches the map
 	margin.add_child(_info_panel)
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -146,6 +151,9 @@ func _add_selection() -> void:
 	_info_text = Label.new()
 	_info_text.add_theme_font_size_override("font_size", 13)
 	box.add_child(_info_text)
+	_info_actions = VBoxContainer.new()
+	_info_actions.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(_info_actions)
 	_info_panel.visible = false
 
 
@@ -215,7 +223,150 @@ func _write_info() -> void:
 		if not extras.is_empty():
 			lines.append(", ".join(extras).capitalize())
 	_info_text.text = "\n".join(lines)
+	_write_actions(selected, piece, bool(row.get("land", false)))
 	_info_panel.visible = true
+
+
+## The buttons under the facts: Upgrade and Clear for a built hex, a list of Build buttons for a wild one. A refused
+## one is disabled, with the reason as its tooltip and as a short grey line under it.
+func _write_actions(hex: Vector2i, piece: Dictionary, land: bool) -> void:
+	for child: Node in _info_actions.get_children():
+		_info_actions.remove_child(child)
+		child.queue_free()
+	if improve == null or not land:
+		return
+	if piece.is_empty():
+		var options := improve.build_options(hex)
+		if options.is_empty():
+			_add_note("Nothing can be built on this ground.")
+			return
+		_add_note("Build here:")
+		for option: Dictionary in options:
+			var family_id := int(option["family_id"])
+			_add_action("Build " + _family_word(str(option["family"]), "-"), bool(option["ok"]), str(option["reason"]),
+				_build_selected.bind(family_id))
+		return
+	var family_name := str(piece["family"])
+	var level := int(piece["level"])
+	var up := improve.upgrade_check(hex)
+	_add_action("Upgrade to %s" % _level_name(family_name, level + 1) if level < _top_level(family_name) else "Upgrade",
+		bool(up["ok"]), str(up["reason"]), upgrade_selected)
+	var down := improve.clear_check(hex)
+	_add_action("Clear", bool(down["ok"]), str(down["reason"]), clear_selected)
+
+
+func _add_action(text: String, ok: bool, reason: String, on_press: Callable) -> void:
+	var button := Button.new()
+	button.text = text
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE  # a key (U, R, 1 to 4) never presses a button that was clicked
+	button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_info_actions.add_child(button)
+	if ok:
+		button.pressed.connect(on_press)
+		return
+	button.disabled = true
+	button.tooltip_text = reason
+	_add_note(reason, 11)
+
+
+func _add_note(text: String, size: int = 13) -> void:
+	var note := Label.new()
+	note.text = text
+	note.add_theme_font_size_override("font_size", size)
+	note.add_theme_color_override("font_color", Color(0.62, 0.62, 0.62))
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.custom_minimum_size = Vector2(280.0, 0.0)
+	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info_actions.add_child(note)
+
+
+static func _top_level(family_name: String) -> int:
+	var id := WorldImprove.NAMES.find(family_name)
+	return WorldImprove.TOP_LEVEL[id] if id >= 0 else 0
+
+
+## The name of a level for a button: "village (level 2)".
+static func _level_name(family_name: String, level: int) -> String:
+	var word := ""
+	if LEVEL_WORDS.has(family_name):
+		var words: Array = LEVEL_WORDS[family_name]
+		if level < words.size():
+			word = str(words[level])
+	elif level < STAGE_WORDS.size():
+		word = STAGE_WORDS[level]
+	return "%s (level %d)" % [word, level] if word != "" else "level %d" % level
+
+
+# ----- the player's changes -----------------------------------------------------------------------------------------
+
+
+## Does one change on the map's improvement and, when it worked, keeps it (for V) and draws the map again; the selection
+## stays. Returns the verdict {ok, reason}.
+func _change(op: String, hex: Vector2i, family_id: int) -> Dictionary:
+	if improve == null or hex == NO_HEX:
+		return {"ok": false, "reason": "no hex is selected"}
+	var verdict: Dictionary = {}
+	match op:
+		"build":
+			verdict = improve.build_on(hex, family_id)
+		"upgrade":
+			verdict = improve.upgrade(hex)
+		_:
+			verdict = improve.clear(hex)
+	if bool(verdict["ok"]):
+		_changes.append({"op": op, "hex": hex, "family_id": family_id})
+		_rebuild()
+	return verdict
+
+
+func upgrade_selected() -> Dictionary:
+	return _change("upgrade", selected, 0)
+
+
+func clear_selected() -> Dictionary:
+	return _change("clear", selected, 0)
+
+
+func _build_selected(family_id: int) -> Dictionary:
+	return _change("build", selected, family_id)
+
+
+func build_selected(family_id: int) -> Dictionary:
+	return _build_selected(family_id)
+
+
+## The buttons of the panel, in order (the tests and the tools press them).
+func action_buttons() -> Array[Button]:
+	var out: Array[Button] = []
+	if _info_actions == null:
+		return out
+	for child: Node in _info_actions.get_children():
+		if child is Button:
+			out.append(child as Button)
+	return out
+
+
+func change_count() -> int:
+	return _changes.size()
+
+
+## Plays the player's changes again on a new improvement (after V); one the new map refuses is dropped.
+func _replay_changes() -> void:
+	var before := _changes
+	_changes = []
+	for change: Dictionary in before:
+		var hex: Vector2i = change["hex"]
+		var verdict: Dictionary = {}
+		match str(change["op"]):
+			"build":
+				verdict = improve.build_on(hex, int(change["family_id"]))
+			"upgrade":
+				verdict = improve.upgrade(hex)
+			_:
+				verdict = improve.clear(hex)
+		if bool(verdict["ok"]):
+			_changes.append(change)
 
 
 static func _family_word(family: String, extra: String) -> String:
@@ -259,6 +410,7 @@ func set_villages(value: bool) -> void:
 	with_villages = value
 	if _loaded:
 		_run_wfc()
+		_replay_changes()
 		_rebuild()
 
 
@@ -267,6 +419,7 @@ func reroll(value: int) -> void:
 	if not _loaded:
 		return
 	seed_value = value
+	_changes.clear()  # a new map: what the player changed is gone with the old one
 	_run_wfc()
 	_rebuild()
 
@@ -333,6 +486,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				reroll(seed_value + 1)
 			KEY_V:
 				set_villages(not with_villages)
+			KEY_U:
+				upgrade_selected()
 			KEY_F:
 				frame_all()
 			KEY_H:
@@ -344,6 +499,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	if _dragging and not (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)
+			or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)):
+		_dragging = false  # the release went to the panel, not here
 	var step := Vector2.ZERO
 	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
 		step.x -= 1.0
@@ -791,5 +949,8 @@ func _write_hud() -> void:
 	lines.append("%d wild things, %d cleared for pieces" % [int(stats["wild_shown"]), int(stats["wild_dropped"])])
 	if int(stats.get("missing_pictures", 0)) > 0:
 		lines.append("%d pieces have no picture in the bake" % int(stats["missing_pictures"]))
-	lines.append("1-4 season   R new seed   V villages   G grid   click a hex   F whole map   H hide")
+	if not _changes.is_empty():
+		lines.append("%d changes by you (kept over seasons and V)" % _changes.size())
+	lines.append("1-4 season   R new seed (drops your changes)   V villages   G grid   F whole map   H hide")
+	lines.append("click a hex: build, upgrade (U), clear")
 	_stats_label.text = "\n".join(lines)

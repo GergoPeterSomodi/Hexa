@@ -264,18 +264,60 @@ static func cell_allowed(family_id: int, level_value: int, facts: Dictionary) ->
 
 ## Whether two options may stand `radius` (1 or 2) hexes apart (the pair rules).
 static func pair_allowed(family_a: int, level_a: int, family_b: int, level_b: int, radius: int) -> bool:
+	return pair_reason(family_a, level_a, family_b, level_b, radius) == ""
+
+
+## The reason of the first pair rule two options break at a distance, or "" when they may stand there.
+static func pair_reason(family_a: int, level_a: int, family_b: int, level_b: int, radius: int) -> String:
 	for rule: Array in PAIR_RULES:
 		if radius > int(rule[4]):
 			continue
 		var a := _rule_side(int(rule[0]), int(rule[1]), family_a, level_a)
 		var b := _rule_side(int(rule[2]), int(rule[3]), family_b, level_b)
 		if a and b:
-			return false
+			return str(rule[5])
 		a = _rule_side(int(rule[0]), int(rule[1]), family_b, level_b)
 		b = _rule_side(int(rule[2]), int(rule[3]), family_a, level_a)
 		if a and b:
-			return false
-	return true
+			return str(rule[5])
+	return ""
+
+
+## What a family needs of the ground, for a refusal (index: family).
+const GROUND_NEEDS: Array[String] = [
+	"", "", "castles stand on passes", "wheat needs low farmland", "hemp needs farmland at a river or stream",
+	"silk needs farmland or meadow within two hexes of a town", "a dye works needs farmland or meadow beside a town",
+	"vines need sunny farmland or hills", "olives need the mild winter on the warm coast or its hills",
+	"grazing needs meadow or upland woods", "timber needs woods", "a mine needs rock or high ground",
+	"a quarry needs rock or upland", "salt pans need a low shore", "a fishing harbour needs a coast with no port beside it",
+]
+
+
+## Why a family at a level does not fit a free hex with these facts, in plain words; "" when it does (cell_allowed).
+static func cell_reason(family_id: int, level_value: int, facts: Dictionary) -> String:
+	if cell_allowed(family_id, level_value, facts):
+		return ""
+	if family_id <= NONE or family_id >= FAMILIES or family_id == SETTLEMENT or family_id == CASTLE:
+		return "nothing of that kind can be built here"
+	var cover_id := int(facts.get("cover", -1))
+	var metres := float(facts.get("height_m", 0.0))
+	if metres > TOP_M:
+		return "too high: the rock and snow above stay wild"
+	if cover_id == WorldCover.SNOW or cover_id == WorldCover.TUNDRA:
+		return "snow and tundra stay wild"
+	if cover_id == WorldCover.MARSH and family_id != SALT:
+		return "marsh stays wild"
+	var mining := family_id == MINES or family_id == QUARRY
+	if level_value >= 2 and not (int(facts.get("place_distance", 99)) <= 2 or bool(facts.get("road", false))):
+		return "level %d needs a place within two hexes or a road" % level_value
+	if level_value == 3:
+		if int(facts.get("town_distance", 99)) > 2:
+			return "level 3 needs a town within two hexes"
+		if mining and not bool(facts.get("road", false)):
+			return "level 3 needs a road"
+		if not mining and not bool(facts.get("coast", false)) and metres > HIGH_M - 200.0:
+			return "too high for the third stage"
+	return GROUND_NEEDS[family_id] if GROUND_NEEDS[family_id] != "" else "the ground does not fit"
 
 
 static func _rule_side(rule_family: int, rule_level: int, family_id: int, level_value: int) -> bool:
@@ -415,6 +457,180 @@ func count_of(family_id: int) -> int:
 
 func count_at(family_id: int, level_value: int) -> int:
 	return int(by_level[family_id * 6 + level_value])
+
+
+# ----- the player's changes (build, upgrade, clear) -----------------------------------------------------------------
+#
+# Each is a check/action pair: x_check(...) -> {ok, reason}, and x(...), which checks again and then acts. A change
+# keeps by_family and by_level right. The picture of a hex (variant and mirror) comes from the hex and the family
+# alone (pick), so an upgrade never makes it jump. Places of the data are "fixed": they may grow but not go.
+# (The static `build` makes the whole map; the player's build on one hex is build_on.)
+
+
+func is_fixed(hex: Vector2i) -> bool:
+	return _index.has(hex) and _fixed[int(_index[hex])] == 1
+
+
+static func _verdict(ok: bool, reason: String = "") -> Dictionary:
+	return {"ok": ok, "reason": "" if ok else reason}
+
+
+## The first pair rule that the option (family, level) on a hex breaks against the pieces within two hexes, as a
+## reason with the neighbour's place; "" when none.
+func _pair_conflict(hex: Vector2i, family_id: int, level_value: int) -> String:
+	var i := int(_index[hex])
+	for d: int in 6:
+		var k := int(_nbr[i * 6 + d])
+		if k >= 0:
+			var why := _pair_against(k, family_id, level_value, 1)
+			if why != "":
+				return why
+	if i < _ring2.size():
+		for k: int in _ring2[i]:
+			var why := _pair_against(k, family_id, level_value, 2)
+			if why != "":
+				return why
+	return ""
+
+
+func _pair_against(cell: int, family_id: int, level_value: int, radius: int) -> String:
+	var other := _cells[cell]
+	var f := family_at(other)
+	if f == NONE:
+		return ""
+	var why := pair_reason(family_id, level_value, f, level_at(other), radius)
+	if why == "":
+		return ""
+	return "%s (%s %d at %d, %d)" % [why, NAMES[f], level_at(other), other.x, other.y]
+
+
+## The pieces a wild hex may take, each {family_id, family, level (1), ok, reason}: every family its ground allows at
+## level 1; ok is false (the reason is the pair rule) when a neighbour forbids it. A pass offers a watchtower. Empty
+## for a hex that is not wild land, and for wild land no family fits.
+func build_options(hex: Vector2i) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not _index.has(hex) or family_at(hex) != NONE:
+		return out
+	var facts := facts_at(hex)
+	var candidates: Array[int] = []
+	if bool(facts.get("pass", false)):
+		candidates.append(CASTLE)
+	else:
+		for f: int in range(WHEAT, FAMILIES):
+			if cell_allowed(f, 1, facts):
+				candidates.append(f)
+	for f: int in candidates:
+		var why := _pair_conflict(hex, f, 1)
+		out.append({"family_id": f, "family": NAMES[f], "level": 1, "ok": why == "", "reason": why})
+	return out
+
+
+func build_check(hex: Vector2i, family_id: int) -> Dictionary:
+	if not _index.has(hex):
+		return _verdict(false, "not a land hex")
+	if family_at(hex) != NONE:
+		return _verdict(false, "something already stands here")
+	for option: Dictionary in build_options(hex):
+		if int(option["family_id"]) == family_id:
+			return _verdict(bool(option["ok"]), str(option["reason"]))
+	if family_id <= NONE or family_id >= FAMILIES:
+		return _verdict(false, "no such piece")
+	if bool(facts_at(hex).get("pass", false)):
+		return _verdict(false, "only a watchtower can stand on a pass")
+	return _verdict(false, cell_reason(family_id, 1, facts_at(hex)))
+
+
+## Builds level 1 of a family on a wild hex (after checking again). Returns the verdict.
+func build_on(hex: Vector2i, family_id: int) -> Dictionary:
+	var verdict := build_check(hex, family_id)
+	if bool(verdict["ok"]):
+		_put(hex, family_id, 1)
+	return verdict
+
+
+func upgrade_check(hex: Vector2i) -> Dictionary:
+	if not _index.has(hex):
+		return _verdict(false, "not a land hex")
+	var f := family_at(hex)
+	if f == NONE:
+		return _verdict(false, "nothing is built here: build something first")
+	var lv := level_at(hex)
+	if lv >= TOP_LEVEL[f]:
+		return _verdict(false, "already at its highest level")
+	if f != SETTLEMENT and f != CASTLE:
+		var why := cell_reason(f, lv + 1, facts_at(hex))
+		if why != "":
+			return _verdict(false, why)
+	var conflict := _pair_conflict(hex, f, lv + 1)
+	if conflict != "":
+		return _verdict(false, conflict)
+	return _verdict(true)
+
+
+## One level up for the piece on a hex (after checking again). A village of the data may grow into a town.
+func upgrade(hex: Vector2i) -> Dictionary:
+	var verdict := upgrade_check(hex)
+	if bool(verdict["ok"]):
+		_put(hex, family_at(hex), level_at(hex) + 1)
+	return verdict
+
+
+func clear_check(hex: Vector2i) -> Dictionary:
+	if not _index.has(hex):
+		return _verdict(false, "not a land hex")
+	if family_at(hex) == NONE:
+		return _verdict(false, "nothing is built here")
+	if is_fixed(hex):
+		return _verdict(false, "a place of the map is never pulled down")
+	return _verdict(true)
+
+
+## Takes the piece off a hex: it is wild again (after checking again).
+func clear(hex: Vector2i) -> Dictionary:
+	var verdict := clear_check(hex)
+	if bool(verdict["ok"]):
+		_put(hex, NONE, 0)
+	return verdict
+
+
+## Sets the piece of a hex and keeps the counts; a changed settlement level moves the distances the rules read.
+func _put(hex: Vector2i, family_id: int, level_value: int) -> void:
+	var old_f := family_at(hex)
+	var old_l := level_at(hex)
+	by_family[old_f] -= 1
+	by_level[old_f * 6 + old_l] -= 1
+	family[hex] = family_id
+	level[hex] = level_value
+	by_family[family_id] += 1
+	by_level[family_id * 6 + level_value] += 1
+	if family_id == SETTLEMENT or old_f == SETTLEMENT:
+		_refresh_distances()
+
+
+## The distances to the nearest place, town and city from the settlements as they stand now (a village that grew into a
+## town opens the town-near levels round it).
+func _refresh_distances() -> void:
+	var settled: Array[Vector3i] = []
+	for hex: Vector2i in hexes:
+		if family_at(hex) == SETTLEMENT:
+			settled.append(Vector3i(hex.x, hex.y, level_at(hex)))
+	for i: int in _cells.size():
+		var near_place := 99
+		var near_town := 99
+		var near_city := 99
+		for s: Vector3i in settled:
+			var distance := hex_distance(_cells[i], Vector2i(s.x, s.y))
+			if distance == 0:
+				continue
+			near_place = mini(near_place, distance)
+			if s.z >= 3:
+				near_town = mini(near_town, distance)
+			if s.z >= 4:
+				near_city = mini(near_city, distance)
+		var facts := _facts[i]
+		facts["place_distance"] = near_place
+		facts["town_distance"] = near_town
+		facts["city_distance"] = near_city
 
 
 ## Every pair rule and cell rule the result breaks, as text (none expected; the tests and the tools print it).

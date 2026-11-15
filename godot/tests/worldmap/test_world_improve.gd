@@ -513,3 +513,232 @@ func test_an_unsatisfiable_instance_is_undone_restarted_and_reported() -> void:
 	assert_gt(out.contradictions, 0, "found by propagation")
 	assert_eq(out.restarts, WorldImprove.RETRIES + 1, "every attempt failed and was restarted")
 	assert_gt(out.last_resort.size(), 0, "the fallback placed the open cells and listed them")
+
+
+# ----- the changes of the player: build, upgrade, clear -------------------------------------------------------------
+
+
+## A 5 x 5 block of one ground with the given places, every hex wild but the places (the search's choices are cleared).
+func _bare(cover: String, height: float, places: Dictionary = {}, more: Dictionary = {}) -> WorldImprove:
+	var table: Array[Dictionary] = []
+	for r: int in 5:
+		for c: int in 5:
+			var extra := more.duplicate()
+			extra["height_m"] = height
+			if places.has(Vector2i(c, r)):
+				extra["place"] = _place(int(places[Vector2i(c, r)]))
+			table.append(_row(c, r, cover, extra))
+	var imp := WorldImprove.build(table, 3)
+	for hex: Vector2i in imp.hexes:
+		if not imp.is_fixed(hex):
+			imp._put(hex, WorldImprove.NONE, 0)
+	return imp
+
+
+func _sum_is_right(imp: WorldImprove) -> void:
+	var total := 0
+	for f: int in WorldImprove.FAMILIES:
+		total += imp.count_of(f)
+	assert_eq(total, imp.hexes.size(), "every hex is counted once")
+	var by_hex := {}
+	for hex: Vector2i in imp.hexes:
+		var key := imp.family_at(hex) * 6 + imp.level_at(hex)
+		by_hex[key] = int(by_hex.get(key, 0)) + 1
+	for f: int in WorldImprove.FAMILIES:
+		for lv: int in range(0, 6):
+			assert_eq(imp.count_at(f, lv), int(by_hex.get(f * 6 + lv, 0)), "count of family %d level %d" % [f, lv])
+
+
+func test_build_lists_what_the_ground_allows_and_builds_level_one() -> void:
+	var imp := _bare("farmland", 100.0, {Vector2i(2, 2): 2})
+	var hex := Vector2i(3, 2)
+	var options := imp.build_options(hex)
+	var ids: Array[int] = []
+	for o: Dictionary in options:
+		ids.append(int(o["family_id"]))
+		assert_eq(int(o["level"]), 1)
+		assert_true(bool(o["ok"]), "nothing forbids it yet: %s" % o["family"])
+	assert_true(ids.has(WorldImprove.WHEAT), "wheat on farmland")
+	assert_false(ids.has(WorldImprove.TIMBER), "no timber on farmland")
+	assert_false(ids.has(WorldImprove.CASTLE), "no castle off the passes")
+	assert_true(imp.build_options(Vector2i(2, 2)).is_empty(), "a place has no build list")
+	assert_true(imp.build_options(Vector2i(50, 50)).is_empty(), "nor does the sea")
+	assert_false(bool(imp.build_check(hex, WorldImprove.TIMBER)["ok"]), "timber refused")
+	assert_ne(str(imp.build_check(hex, WorldImprove.TIMBER)["reason"]), "", "with a reason")
+	var done := imp.build_on(hex, WorldImprove.WHEAT)
+	assert_true(bool(done["ok"]))
+	assert_eq(imp.family_at(hex), WorldImprove.WHEAT)
+	assert_eq(imp.level_at(hex), 1)
+	assert_eq(str(imp.piece_at(hex)["family"]), "wheat")
+	assert_false(bool(imp.build_check(hex, WorldImprove.WHEAT)["ok"]), "no second piece on one hex")
+	assert_true(imp.build_options(hex).is_empty(), "a built hex has no build list")
+	_sum_is_right(imp)
+
+
+func test_upgrade_climbs_while_the_rules_allow_and_a_village_grows_into_a_town() -> void:
+	var imp := _bare("farmland", 100.0, {Vector2i(2, 2): 2})
+	var hex := Vector2i(3, 2)
+	assert_false(bool(imp.upgrade_check(hex)["ok"]), "nothing to upgrade on a wild hex")
+	imp.build_on(hex, WorldImprove.WHEAT)
+	var look := imp.piece_at(hex)
+	assert_true(bool(imp.upgrade(hex)["ok"]), "level 2 beside a village")
+	assert_eq(imp.level_at(hex), 2)
+	var no := imp.upgrade_check(hex)
+	assert_false(bool(no["ok"]), "level 3 needs a town")
+	assert_true(str(no["reason"]).contains("town"), str(no["reason"]))
+	assert_false(bool(imp.upgrade(hex)["ok"]))
+	assert_eq(imp.level_at(hex), 2, "a refused upgrade changes nothing")
+	# The village (a place of the data) grows: a village of level 2 to a town of level 3 and on.
+	var village := Vector2i(2, 2)
+	assert_true(imp.is_fixed(village))
+	assert_true(bool(imp.upgrade(village)["ok"]), "village to town")
+	assert_eq(imp.level_at(village), 3)
+	assert_eq(imp.count_at(WorldImprove.SETTLEMENT, 3), 1, "counts follow")
+	assert_true(bool(imp.upgrade(hex)["ok"]), "the town opens level 3 beside it")
+	assert_eq(imp.level_at(hex), 3)
+	assert_false(bool(imp.upgrade(hex)["ok"]), "no level 4 for goods")
+	assert_true(bool(imp.upgrade(village)["ok"]), "town to walled town")
+	assert_true(bool(imp.upgrade(village)["ok"]), "walled town to city")
+	assert_false(bool(imp.upgrade_check(village)["ok"]), "a city is the top")
+	assert_eq(imp.level_at(village), 5)
+	# The picture of the wheat did not jump.
+	var after := imp.piece_at(hex)
+	assert_eq(after["variant"], look["variant"])
+	assert_eq(after["mirror"], look["mirror"])
+	assert_eq(imp.piece_at(village)["family_id"], WorldImprove.SETTLEMENT)
+	_sum_is_right(imp)
+
+
+func test_a_neighbouring_top_stage_and_a_neighbouring_town_refuse_the_upgrade() -> void:
+	var imp := _bare("farmland", 100.0, {Vector2i(2, 2): 3})
+	imp.build_on(Vector2i(3, 2), WorldImprove.WHEAT)
+	imp.upgrade(Vector2i(3, 2))
+	imp.upgrade(Vector2i(3, 2))
+	assert_eq(imp.level_at(Vector2i(3, 2)), 3)
+	imp.build_on(Vector2i(4, 2), WorldImprove.VINEYARD)
+	assert_true(bool(imp.upgrade(Vector2i(4, 2))["ok"]), "level 2 is fine beside a level 3")
+	var no := imp.upgrade_check(Vector2i(4, 2))
+	assert_false(bool(no["ok"]), "two level 3 districts never touch")
+	assert_true(str(no["reason"]).contains("top stage"), str(no["reason"]))
+	assert_eq(str(imp.upgrade(Vector2i(4, 2))["reason"]), str(no["reason"]), "the action says what the check says")
+	assert_eq(imp.level_at(Vector2i(4, 2)), 2)
+	# Two towns side by side: a village beside a town may not become a town.
+	var table: Array[Dictionary] = [
+		_row(0, 0, "farmland", {"place": _place(3)}), _row(1, 0, "farmland", {"place": _place(2)}),
+	]
+	var two := WorldImprove.build(table, 1)
+	var refused := two.upgrade_check(Vector2i(1, 0))
+	assert_false(bool(refused["ok"]), "no two towns side by side")
+	assert_true(str(refused["reason"]).contains("town"), str(refused["reason"]))
+	assert_eq(two.level_at(Vector2i(1, 0)), 2)
+
+
+func test_a_build_beside_a_neighbour_is_listed_greyed_with_the_rule() -> void:
+	var imp := _bare("rock", 1500.0, {}, {"climate": "snow"})
+	assert_true(bool(imp.build_on(Vector2i(2, 2), WorldImprove.MINES)["ok"]))
+	var found := {}
+	for o: Dictionary in imp.build_options(Vector2i(3, 2)):
+		found[int(o["family_id"])] = o
+	assert_true(found.has(WorldImprove.MINES) and found.has(WorldImprove.QUARRY), "both fit rock")
+	var mines: Dictionary = found[WorldImprove.MINES]
+	assert_false(bool(mines["ok"]), "one mining district per valley")
+	assert_ne(str(mines["reason"]), "")
+	var quarry: Dictionary = found[WorldImprove.QUARRY]
+	assert_false(bool(quarry["ok"]), "mine and quarry apart")
+	assert_false(bool(imp.build_on(Vector2i(3, 2), WorldImprove.MINES)["ok"]))
+	assert_eq(imp.family_at(Vector2i(3, 2)), WorldImprove.NONE, "a refused build changes nothing")
+	for o: Dictionary in imp.build_options(Vector2i(4, 4)):
+		assert_true(bool(o["ok"]), "two hexes or more away nothing is forbidden: %s" % o["family"])
+	_sum_is_right(imp)
+
+
+func test_clear_brings_the_hex_back_but_never_a_place_of_the_data() -> void:
+	var imp := _bare("farmland", 100.0, {Vector2i(2, 2): 3})
+	var hex := Vector2i(1, 2)
+	assert_false(bool(imp.clear_check(hex)["ok"]), "nothing to clear")
+	imp.build_on(hex, WorldImprove.WHEAT)
+	imp.upgrade(hex)
+	assert_true(bool(imp.clear(hex)["ok"]))
+	assert_eq(imp.family_at(hex), WorldImprove.NONE)
+	assert_eq(imp.level_at(hex), 0)
+	assert_true(imp.piece_at(hex).is_empty())
+	var town := imp.clear_check(Vector2i(2, 2))
+	assert_false(bool(town["ok"]), "towns are not demolished")
+	assert_ne(str(town["reason"]), "")
+	assert_false(bool(imp.clear(Vector2i(2, 2))["ok"]))
+	assert_eq(imp.family_at(Vector2i(2, 2)), WorldImprove.SETTLEMENT)
+	imp.upgrade(Vector2i(2, 2))
+	assert_false(bool(imp.clear_check(Vector2i(2, 2))["ok"]), "nor a town that grew")
+	_sum_is_right(imp)
+
+
+func test_a_pass_takes_a_watchtower_and_it_grows() -> void:
+	var table: Array[Dictionary] = [_row(0, 0, "rock", {"pass": true, "height_m": 1800.0}), _row(1, 0, "farmland")]
+	var imp := WorldImprove.build(table, 1)
+	imp._put(Vector2i(0, 0), WorldImprove.NONE, 0)
+	var options := imp.build_options(Vector2i(0, 0))
+	assert_eq(options.size(), 1)
+	assert_eq(int(options[0]["family_id"]), WorldImprove.CASTLE)
+	assert_false(bool(imp.build_check(Vector2i(0, 0), WorldImprove.WHEAT)["ok"]), "no goods on a pass")
+	assert_true(bool(imp.build_on(Vector2i(0, 0), WorldImprove.CASTLE)["ok"]))
+	assert_true(bool(imp.upgrade(Vector2i(0, 0))["ok"]), "watchtower to castle")
+	assert_true(bool(imp.upgrade(Vector2i(0, 0))["ok"]), "castle to fortress")
+	assert_false(bool(imp.upgrade_check(Vector2i(0, 0))["ok"]), "the fortress is the top")
+	assert_true(bool(imp.clear(Vector2i(0, 0))["ok"]), "a castle can be pulled down")
+	assert_false(bool(imp.build_check(Vector2i(1, 0), WorldImprove.CASTLE)["ok"]), "no castle off a pass")
+
+
+func _play(imp: WorldImprove, rolls: int) -> void:
+	var rng := Rng.new()
+	rng.seed_with(99)
+	for _n: int in rolls:
+		var hex: Vector2i = imp.hexes[rng.randi_range(0, imp.hexes.size() - 1)]
+		var which := rng.randi_range(0, 9)
+		if imp.family_at(hex) == WorldImprove.NONE:
+			var options := imp.build_options(hex)
+			if not options.is_empty():
+				var o: Dictionary = options[rng.randi_range(0, options.size() - 1)]
+				imp.build_on(hex, int(o["family_id"]))
+		elif which < 7:
+			imp.upgrade(hex)
+		else:
+			imp.clear(hex)
+
+
+func test_after_many_changes_every_rule_still_holds_and_the_counts_are_right() -> void:
+	if not _ready_or_fail():
+		return
+	for s: int in [0, 2]:
+		var imp := WorldImprove.build(_table, SEEDS[s])
+		var base := imp.violations().size()
+		_play(imp, 1500)
+		assert_eq(imp.violations().size(), base, "no new rule broken (seed %d)" % SEEDS[s])
+		_sum_is_right(imp)
+		var summary := imp.summary()
+		assert_eq(int(summary["pieces"]) + int(summary["wild"]), int(summary["hexes"]))
+		# A check that passes always acts, and one that refuses changes nothing.
+		var tried := 0
+		for hex: Vector2i in imp.hexes:
+			var verdict := imp.upgrade_check(hex)
+			var before := imp.level_at(hex)
+			var done := imp.upgrade(hex)
+			assert_eq(bool(done["ok"]), bool(verdict["ok"]), "check and action agree at %s" % hex)
+			assert_eq(imp.level_at(hex), before + 1 if bool(verdict["ok"]) else before)
+			tried += 1
+			if bool(done["ok"]):
+				assert_eq(imp.violations().size(), base, "an upgrade at %s kept the rules" % hex)
+				break
+		assert_gt(tried, 0)
+
+
+func test_the_same_changes_give_the_same_map() -> void:
+	if not _ready_or_fail():
+		return
+	var a := WorldImprove.build(_table, SEEDS[2])
+	var b := WorldImprove.build(_table, SEEDS[2])
+	_play(a, 400)
+	_play(b, 400)
+	for hex: Vector2i in a.hexes:
+		assert_eq(a.family_at(hex), b.family_at(hex))
+		assert_eq(a.level_at(hex), b.level_at(hex))
+		assert_eq(a.piece_at(hex), b.piece_at(hex))
