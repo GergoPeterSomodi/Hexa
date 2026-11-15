@@ -67,7 +67,7 @@ def draw(level, season):
     n, rx, ry, wall = SPEC[level]
     # ---- ground plane
     if level >= 3:                                    # trodden ground inside the ring
-        p.blob(CX, CY + 1, rx * 2 - 2, ry * 2 - 1, kit.mix(p.pal["grass"], kit.ROAD, 0.45) if not p.winter else (204, 198, 188))
+        p.blob(CX, CY + 1, rx * 2 - 2, ry * 2 - 1, kit.ROAD if not p.winter else (204, 198, 188), alpha=0.45 if not p.winter else 1.0)
     for cx, cy, w, h, ang, st, lo, hi in PLOTS:
         if lo <= level <= hi:
             p.field(cx, cy, w, h, ang, kit.crop("garden", season), st, furrows=True)

@@ -25,13 +25,17 @@ tables, 9 readability, 10 terrain fit, 11 the reviewer's checklist, 12 for the o
 | Canvas | 112 x 112 px, the hex centred, alpha outside |
 | Drawing | At 2x, then smooth-scaled to 1x. The kit does this; you always work in 100% pixels |
 | Coordinates | Origin at the hex centre, x to the right, y down. The hex spans x -52 to +52 and y -51 to +51 |
-| Ground base | The season colour of the terrain, with soft mottling, fading to transparent over the last **5 px** at the hex border so it blends with the neighbours |
+| Ground base | The season colour of the terrain, with soft mottling, fading to transparent over the last **5 px** at the hex border so it blends with the neighbours. **The base is for the sheets only: on the map it is not drawn.** The map paints the ground and takes the piece apart into ground detail, shadows and standing things (`kit.take_apart`) |
+| Ground work | Fields, plots, pans, yards, canals, ponds and activity details stay **10 px clear of the hex border** (the map's rivers and roads run along the borders). Soft scrub patches and tufts may come closer |
 | Standing things | Must lie wholly inside the hex, **3 px clear of the border**. The kit checks this and prints `PIECE PROBLEM` if not |
 | Safe area | Put the main picture inside x -42 to +42, y -38 to +38. Remember the corners are cut: at y = +/-38 only x -18 to +18 is inside |
 
 - Start every picture with `kit.Piece(season, ground=..., seed=N)`. Use **one seed per family**, the same for every
   level and season, so the ground mottling never changes.
 - Ground-plane shapes near the border are faded by the kit; do not try to stop them exactly at the border.
+- **A change of the ground itself is an overlay, not a colour.** Scrub, rough or trodden ground, cleared ground and
+  tracks are laid half-transparent over whatever ground the map has: use `p.scrub(...)`, `p.blob(..., alpha=)` and
+  `p.road(..., track=True)`. Never mix a colour with the base ground colour yourself; the map's ground may differ.
 - Never draw outside the kit (no drawing on the returned surface, no own scaling).
 
 ## 2. Camera
@@ -90,7 +94,7 @@ the top of the family module and list it in your report.
 | `SALT` | 248, 246, 240 | Salt heaps and crystallising pans |
 | `SPOIL`, `SPOIL_D` | 150,140,132 / 112,104,100 | Mine waste heaps |
 | `FLAG` | 196, 52, 48 | Castle banners (stand-in for the owner's colour) |
-| `SMOKE` | 236, 236, 232 | Smoke puffs |
+| `SMOKE`, `SMOKE_SNOW` | 236,236,232 / 186,190,202 | Smoke puffs; the winter smoke |
 
 **Season tokens** (`p.pal[...]` or `kit.PAL[season][...]`)
 
@@ -100,7 +104,7 @@ the top of the family module and list it in your report.
 | `farm` (plain, worked land) | 176,202,104 | 178,198,98 | 188,178,98 | 232,236,240 |
 | `wood` (forest floor) | 120,172,82 | 112,164,78 | 152,152,76 | 216,224,230 |
 | `rock` | 170,156,130 | 170,156,130 | 166,150,126 | 208,208,208 |
-| `sand` | 234,216,162 | 234,216,162 | 230,212,160 | 226,218,186 |
+| `sand` | 234,216,162 | 234,216,162 | 230,212,160 | 234,230,214 (snow on sand) |
 | `soil` / `soil_d` (bare earth) | 152,114,78 / 124,92,64 | 162,126,86 / 132,100,70 | 140,102,70 / 112,80,56 | 176,156,136 / 150,128,110 |
 | `sea` / `shallow` | 71,143,192 / 96,168,210 | the same | 66,134,182 / 92,160,202 | 62,122,166 / 104,158,194 |
 | `river` | 74,146,206 | 74,146,206 | 70,138,196 | frozen: `ICE` |
@@ -198,10 +202,10 @@ zero in layout**.
 | Conifers, olives | Unchanged | Unchanged | Unchanged | Snow on the lit (left) side |
 | Fruit trees | White blossom dots | Green | Autumn colours | Bare |
 | Crops | Young and green, some bare soil | Ripe (the family's signature colour at its strongest) | Harvested: stubble, bare soil, red vines | Under snow, with the pattern still showing |
-| Roofs | Normal | Normal | Normal | Snow, with a thin line of the roof colour at the eave |
+| Roofs | Normal | Normal | Normal | Snow, with a 1 px band of the roof colour at the eave (so a red town stays red-rimmed on snow) |
 | Still water, canals, streams | Open | Open | Open | Frozen (`ICE`) |
 | Sea | Open | Open | Slightly darker | Darker, **never frozen** |
-| Smoke | None | None | From 1 house in 3 | From 1 house in 3 |
+| Smoke | None | None | From 1 house in 3 | From 1 house in 3; grey (`SMOKE_SNOW`) so it shows on snow |
 | People, animals | A few | The most (work in the fields) | A few (harvest, ploughing) | None outdoors, or 1-3 by the buildings |
 
 **Snow rules.**
@@ -231,7 +235,7 @@ no fallen-leaf carpets, no animals in the fields of crop families beyond the one
 | 0 | Rough grass: 6 darker scrub patches, 6 round trees, 5 bushes, stones, tufts | None |
 | 1 | A thatched farmhouse with a fruit tree, 1 block of 6 strips, a track | The farmhouse |
 | 2 | 3 blocks with hedges on two sides, the house re-roofed in tile, a second fruit tree, a haystack | The thatched barn |
-| 3 | 5 blocks, a canal with 3 poplars, a second house, a second haystack | The windmill |
+| 3 | 5 blocks, a canal with 3 poplars that **ends in a small pond at each end, inside the hex** (it never runs to the border), a second house, a second haystack | The windmill |
 
 Seasons: spring green shoots with one bare strip in four; summer gold, the newest block half cut, with sheaves and
 1-2 reapers; autumn ploughed earth and stubble with furrow lines, a plough team on the first block, smoke; winter
@@ -387,8 +391,10 @@ colour never changes with the season.
 - The base ground is the **terrain**, never the improvement: it does not change with the level.
 - Pieces are flat-land pictures. Hills, ridges and slope shading belong to the landscape layer and are not drawn in
   a piece (the castle's mound and the mine's outcrop are the only raised ground).
-- Roads between hexes are another layer. A piece may draw only its own track or road from its yard or gate to the
-  hex border, leaving by the south or the east or west side.
+- Roads between hexes are another layer. **A piece draws no road or track to the hex border.** It may keep a lane
+  inside its yard or ring, ending at a **gate point**: a named spot at least 10 px inside the border on the south,
+  east or west side (a `GATES = {"south": (x, y), ...}` table in the module). The map's road layer joins the gate
+  points to its roads.
 - Pass the family's ground to `kit.sheet(..., ground=...)` so the sheet shows the piece on its own terrain.
 
 ## 11. The reviewer's checklist
@@ -426,6 +432,8 @@ Tick every line for every family. One "no" sends the sheet back.
 - [ ] At 50% the family is recognised by its signature and the top level by its landmark.
 - [ ] The piece cannot be mistaken for another family (compare the sheets side by side).
 - [ ] In the "side by side" row the hex borders do not show as hard lines on matching terrain.
+- [ ] No worked ground or activity detail within 10 px of the hex border; no road or track runs to the border.
+- [ ] Scrub, trodden ground and tracks are overlays (`scrub`, `blob(alpha=)`, `road(track=True)`), not mixed colours.
 - [ ] Goods pieces have at most 3 houses and no banner.
 - [ ] Settlements keep the plate strip (y from +26) free.
 

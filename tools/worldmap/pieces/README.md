@@ -54,14 +54,16 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 
 | Call | Draws |
 |---|---|
-| `p.blob(x, y, w, h, col)` | A soft patch (scrub, trodden ground) |
+| `p.scrub(x, y, w, h, dark=0.07)` | A darker patch of the ground itself (scrub, where work will come): an overlay |
+| `p.blob(x, y, w, h, col, alpha=, edge=)` | A soft ellipse: trodden or cleared ground (give `alpha`), a mound or disc (give `edge`) |
+| `p.over(fn, alpha)` | Any ground drawing `fn(pen)` laid half-transparent |
 | `p.patch(pts, col, ink)` | A flat shape (a yard, a pan) |
 | `p.field(cx, cy, w, h, angle, cols, strips, furrows=)` | A block of strips; returns its corners |
 | `p.rows(cx, cy, w, h, angle, n, dashed=)` | Plant rows on a soil block |
-| `p.hedge(pts)`, `p.fence(pts)`, `p.terrace(pts)` | Lines on the ground |
-| `p.road(pts, w, track=)`, `p.water(pts, w)`, `p.pond(pts)` | Roads, streams and canals (frozen in winter), ponds |
+| `p.hedge(pts)`, `p.fence(pts)`, `p.terrace(pts, face=)` | Lines on the ground; `face=2` gives a terrace wall a visible front |
+| `p.road(pts, w, track=)`, `p.water(pts, w)`, `p.pond(pts, col=, edge=)` | Roads, streams and canals (frozen in winter), ponds. Tracks are overlays |
 | `p.coast(y0)` | The sea on the south side; returns `shore(x)` |
-| `p.jetty(a, b, stone=)` | A jetty, quay or mole |
+| `p.jetty(a, b, stone=, snow=)` or `p.jetty([pts], ...)` | A jetty, quay or mole; a list of points makes a bent mole; `snow=True` caps it in winter |
 | `p.tufts(n, avoid=)`, `p.stones(spots)`, `p.scree(n)` | Ground scatter |
 | `p.snow_patch(x, y, w, h)` | A drift (winter only) |
 
@@ -73,13 +75,18 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 | `p.house(x, y, w, h, roof_h, wall, kind, roof, door, smoke)` | `kind`: `ridge` or `gable`; `roof`: `tile`, `thatch`, `slate` |
 | `p.church(x, y, size, sc)` | `chapel`, `church`, `cathedral` |
 | `p.tower(x, y, w, h, col, top, flag)` | `top`: `battlement`, `cone`, `flat` |
-| `p.wall(cx, cy, rx, ry, kind, towers, gate, back_towers)` | A ring wall: `palisade` or `stone` |
+| `p.wall(cx, cy, rx, ry, kind, towers, gate, back_towers, col=)` | A ring wall: `palisade` or `stone`; `col=kit.STONE_GREY` for castles |
 | `p.boat(x, y, sc, sail)` | A ship (1.0) or fishing boat (0.55) |
-| `p.person(x, y, col)`, `p.animal(x, y, kind, flip)` | `sheep`, `cow`, `horse` |
+| `p.person(x, y, col)`, `p.animal(x, y, kind, flip, sc=, col=)` | `sheep`, `cow`, `horse`; `sc=0.7` for young, `col` for another coat |
 | `p.haystack(x, y)`, `p.heap(x, y, w, h, col)`, `p.logs(x, y, n)` | Stacks, cone heaps, log piles |
-| `p.smoke(x, y)` | Smoke (autumn and winter only) |
-| `p.stand(y, fn)` | Your own landmark: `fn(pen)` draws with `pen.poly`, `pen.rect`, `pen.box`, `pen.line`, `pen.lines`, `pen.circle`, `pen.ellipse`, `pen.dot` |
+| `p.smoke(x, y, always=, foot=)` | Smoke (autumn and winter only; `always=True` for the listed chimneys). Never call `kit._smoke` |
+| `p.stand(y, fn, lift=)` | Your own landmark: `fn(pen)` draws with `pen.poly`, `pen.rect`, `pen.box`, `pen.line`, `pen.lines`, `pen.circle`, `pen.ellipse`, `pen.dot` |
 | `p.cast(x, y, w)` | The ground shadow for your own landmark |
+
+**For the map: layers.** `kit.take_apart(draw, level, season)` draws a piece without its ground base and returns
+`{"ground", "shadow", "standing"}`: the ground detail (2x, transparent where nothing is drawn), the shadow layer,
+and the standing things as `(foot_y, order_y, fn)` back to front, so the map can sort each one into its own list.
+It works with every module as it is. `draw()` still returns the flat 112x112 picture for the sheets.
 
 **Colours**: fixed tokens `kit.INK`, `kit.ROOF`, `kit.STONE` ...; season tokens `p.pal["grass"]` ...; crops
 `kit.crop("wheat", season)`; helpers `kit.mix(c1, c2, t)`, `kit.shade(c, f)`; flags `p.winter`, `p.season`.

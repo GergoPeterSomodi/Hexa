@@ -74,7 +74,7 @@ def draw(level, season):
     blocks = [b for b in BLOCKS if b[6] <= level]
     if level == 0:                                    # wild land: darker scrub patches where the fields will come
         for x, y, w, h in SCRUB:
-            p.blob(x, y, w, h, kit.mix(p.pal["farm"], p.pal["wood"], 0.55))
+            p.blob(x, y, w, h, p.pal["wood"], alpha=0.55)
     if level >= 3:
         p.water(CANAL, 1.4)
     if level >= 1:

@@ -36,6 +36,10 @@ SHADOW = (30, 50, 30)
 SHADOW_ALPHA = 46
 
 
+NO_BASE = False               # set by take_apart(): pieces are then drawn without their ground base (for the map)
+LAST = None                   # the Piece most recently finished (take_apart() reads it)
+
+
 def hex_points(shrink=0.0):
     """The six corners in piece px (origin at the centre), pulled in by `shrink` px."""
     r = R - shrink / math.cos(math.radians(30))
@@ -87,6 +91,7 @@ ROAD_EDGE = (128, 100, 66)
 SNOW = (242, 245, 250)
 SNOW_D = (206, 214, 228)        # the shaded side of snow
 SMOKE = (236, 236, 232)
+SMOKE_SNOW = (186, 190, 202)     # smoke in winter: grey, so it shows against snow
 FLAG = (196, 52, 48)
 SALT = (248, 246, 240)
 SPOIL = (150, 140, 132)         # mine waste heaps
@@ -116,7 +121,7 @@ PAL = {
         sea=(66, 134, 182), shallow=(92, 160, 202), foam=(226, 242, 248), river=(70, 138, 196), river_edge=(44, 92, 140),
         blossom=None),
     "winter": dict(
-        grass=(228, 233, 238), farm=(232, 236, 240), wood=(216, 224, 230), rock=(208, 208, 208), sand=(226, 218, 186),
+        grass=(228, 233, 238), farm=(232, 236, 240), wood=(216, 224, 230), rock=(208, 208, 208), sand=(234, 230, 214),
         soil=(176, 156, 136), soil_d=(150, 128, 110), tuft=(150, 150, 110), hedge=(108, 96, 76), hedge_d=(78, 68, 56),
         leaf=((70, 54, 44), (104, 82, 62), (104, 82, 62), (104, 82, 62)),               # bare: only twigs are drawn
         conifer=((34, 56, 40), (62, 106, 72), (44, 82, 60)),
@@ -229,7 +234,7 @@ class Piece:
     """One hex picture. Ground-plane calls draw at once, in call order. Standing calls are queued and drawn back to
     front (by the y of their foot) in finish()."""
 
-    def __init__(self, season, ground="grass", seed=0, texture=True):
+    def __init__(self, season, ground="grass", seed=0, texture=True, base=None):
         assert season in SEASONS, season
         self.season = season
         self.pal = PAL[season]
@@ -242,20 +247,25 @@ class Piece:
         self.o = pygame.Surface(big, pygame.SRCALPHA)      # standing things
         self.gp = Pen(self.g)
         self.op = Pen(self.o)
-        self.queue = []
+        self.queue = []                 # (order y, n, fn); the true foot y of entry n is self.foot[n]
+        self.foot = {}
         self.n = 0
         self.rnd = random.Random(seed * 7919 + 13)          # never seeded by the season: the same ground in all seasons
         self.ground_kind = ground
+        self.has_base = (not NO_BASE) if base is None else base     # False: only the ground detail, for the map
         self.base(ground, texture)
 
     # -------------------------------------------------------------- ground plane
     def base(self, kind, texture=True):
         """The season ground: a flat fill with soft mottling. The same mottling in every season and level."""
         col = self.pal[kind]
+        rnd = random.Random(self.rnd.random())          # drawn from in every case, so the scatter never shifts
+        if not self.has_base:
+            self.g.fill((0, 0, 0, 0))
+            return
         self.g.fill(col + (255,))
         if not texture:
             return
-        rnd = random.Random(self.rnd.random())
         for i in range(26):
             x, y = rnd.uniform(-52, 52), rnd.uniform(-50, 50)
             w, h = rnd.uniform(10, 26), rnd.uniform(5, 11)
@@ -295,8 +305,28 @@ class Piece:
         """A flat shape on the ground (a yard, a pan, a clearing)."""
         self.gp.poly(pts, col, ink, w)
 
-    def blob(self, x, y, w, h, col):
-        self.gp.ellipse(x, y, w, h, col)
+    def over(self, fn, alpha=0.5):
+        """Draw fn(pen) on the ground half-transparent (alpha 0..1), so it tints whatever ground lies under it.
+        Use it for everything that is a change of the ground itself: trodden earth, scrub, tracks, yards."""
+        if alpha >= 0.999:
+            fn(self.gp)
+            return
+        lay = pygame.Surface(self.g.get_size(), pygame.SRCALPHA)
+        fn(Pen(lay))
+        a = pygame.Surface(self.g.get_size(), pygame.SRCALPHA)
+        a.fill((255, 255, 255, int(round(255 * alpha))))
+        lay.blit(a, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        self.g.blit(lay, (0, 0))
+
+    def blob(self, x, y, w, h, col, alpha=1.0, edge=None, lw=0.5):
+        """A soft ellipse on the ground, centre (x, y). alpha < 1 lays it half-transparent over the ground (use this
+        for trodden or cleared ground). edge: a darker rim colour (a mound, a millstone, a clearing)."""
+        self.over(lambda pen: pen.ellipse(x, y, w, h, col, edge, lw), alpha)
+
+    def scrub(self, x, y, w, h, dark=0.07):
+        """A darker patch of the ground itself (scrub, rough grass, the place where work will come): a
+        half-transparent shade, so it works on any ground colour. dark 0.07 = the ground colour x 0.93."""
+        self.over(lambda pen: pen.ellipse(x, y, w, h, (0, 0, 0)), dark)
 
     def field(self, cx, cy, w, h, angle=0.0, cols=None, strips=5, along=True, edge=None, furrows=False):
         """A block of field strips on the ground. cx, cy: centre; w, h: size before the tilt; angle in degrees.
@@ -351,8 +381,16 @@ class Piece:
                     t = (q + 0.5) / m
                     self.gp.dot(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, col, lw)
 
-    def terrace(self, pts):
-        """A dry-stone terrace wall along a line on the ground: a pale stone line with a dark foot below it."""
+    def terrace(self, pts, face=0.0):
+        """A dry-stone terrace wall along a line on the ground: a pale stone line with a dark foot below it.
+        face > 0: the wall shows a front face that many px tall under the top line (a retaining wall seen from the
+        front: olives, vineyards, any walled shelf)."""
+        if face > 0:
+            low = [(p[0], p[1] + face) for p in pts]
+            self.gp.poly(list(pts) + low[::-1], STONE_D, None)
+            self.gp.lines(low, shade(STONE_D, 0.72), 0.5)
+            self.gp.lines(pts, (222, 212, 190) if not self.winter else SNOW, 1.0)
+            return
         self.gp.lines([(p[0], p[1] + 0.8) for p in pts], shade(self.pal[self.ground_kind], 0.72), 1.0)
         self.gp.lines(pts, (222, 212, 190) if not self.winter else SNOW, 1.0)
 
@@ -374,10 +412,21 @@ class Piece:
             self.gp.line((x + 2, y), (x + 2 + ln * 0.3, y + ln * 0.65), col, 0.5)
             done += 1
 
-    def jetty(self, a, b, w=2.2, stone=False):
-        """A timber jetty (or a stone quay or mole with stone=True) from a to b, lying on the ground or water."""
-        self.gp.line(a, b, INK, w + 1.6)
-        self.gp.line(a, b, STONE if stone else TIMBER, w)
+    def jetty(self, a, b=None, w=2.2, stone=False, snow=False):
+        """A timber jetty (or a stone quay or mole with stone=True) lying on the ground or water. Either from a to b,
+        or along a list of points given as a (a bent mole). snow=True: a snow line on its top in winter."""
+        if b is not None and not snow:
+            self.gp.line(a, b, INK, w + 1.6)
+            self.gp.line(a, b, STONE if stone else TIMBER, w)
+            return
+        pts = [a, b] if b is not None else list(a)
+        col = STONE if stone else TIMBER
+        for c, ww in ((INK, w + 1.6), (col, w)):
+            self.gp.lines(pts, c, ww)
+            for q in pts[1:-1]:                     # round the bends
+                self.gp.ellipse(q[0], q[1], ww, ww, c)
+        if snow and self.winter:
+            self.gp.lines([(q[0], q[1] - w * 0.2) for q in pts], SNOW, max(0.5, w * 0.55))
 
     def hedge(self, pts, w=1.6):
         """A hedge along a line on the ground: a dark base line with a lighter top line."""
@@ -401,7 +450,9 @@ class Piece:
         col = ROAD if not self.winter else (214, 206, 190)
         if not track:
             self.gp.lines(pts, ROAD_EDGE, w + 1)
-        self.gp.lines(pts, col if not track else mix(col, self.pal[self.ground_kind], 0.25), w if not track else max(1.0, w * 0.6))
+            self.gp.lines(pts, col, w)
+        else:                                       # a track is worn ground: laid 75% over whatever is there
+            self.over(lambda pen: pen.lines(pts, col, max(1.0, w * 0.6)), 0.75)
 
     def water(self, pts, w=3.0, frozen=None):
         """A stream or canal along a line. Freezes in winter unless frozen=False."""
@@ -409,10 +460,12 @@ class Piece:
         self.gp.lines(pts, self.pal["river_edge"] if not frozen else ICE_D, w + 1)
         self.gp.lines(pts, self.pal["river"] if not frozen else ICE, w)
 
-    def pond(self, pts, frozen=None, ink=True):
-        """Still water as a shape (a pond, a salt pan uses patch() instead). Freezes in winter."""
+    def pond(self, pts, frozen=None, ink=True, col=None, edge=None):
+        """Still water as a shape (a pond, a salt pan uses patch() instead). Freezes in winter.
+        col, edge: the open-water colours (default the river's); the frozen colours are always ICE."""
         frozen = self.winter if frozen is None else frozen
-        self.gp.poly(pts, self.pal["river"] if not frozen else ICE, (self.pal["river_edge"] if not frozen else ICE_D) if ink else None, 0.5)
+        col, edge = col or self.pal["river"], edge or self.pal["river_edge"]
+        self.gp.poly(pts, col if not frozen else ICE, (edge if not frozen else ICE_D) if ink else None, 0.5)
         if frozen:
             a, b = pts[0], pts[len(pts) // 2]
             self.gp.line(((a[0] * 2 + b[0]) / 3, (a[1] * 2 + b[1]) / 3), ((a[0] + b[0] * 2) / 3, (a[1] + b[1] * 2) / 3), SNOW, 0.5)
@@ -456,10 +509,21 @@ class Piece:
         self.shadow(x + w * 0.35, y + 0.6, w * 1.5, h or max(2.0, w * 0.5))
 
     # -------------------------------------------------------------- standing things
-    def stand(self, y, fn):
-        """Queue fn(pen) to be drawn at depth y (the y of the thing's foot). Use for a family's own landmarks."""
-        self.queue.append((y, self.n, fn))
+    def stand(self, y, fn, lift=0.0):
+        """Queue fn(pen) to be drawn at depth y (the y of the thing's foot). Use for a family's own landmarks.
+        lift: draw it that many px later in the order than its foot says (smoke: it must lie over its chimney)."""
+        self.queue.append((y + lift, self.n, fn))
+        self.foot[self.n] = y
         self.n += 1
+
+    def layers(self):
+        """The piece taken apart for the map (see take_apart()):
+        'ground'   the ground-plane layer at 2x (with base=False: only the detail, transparent elsewhere), not yet
+                   feathered at the hex border;
+        'shadow'   the 2x shadow layer (white = none; blend it with SHADOW_ALPHA);
+        'standing' the standing things, back to front: (foot_y, order_y, fn), fn(pen) draws one of them."""
+        st = [(self.foot[q[1]], q[0], q[2]) for q in sorted(self.queue, key=lambda q: (q[0], q[1]))]
+        return {"ground": self.g, "shadow": self.sh, "standing": st}
 
     def tree(self, x, y, sc=1.0, kind="round", i=0):
         """A tree with its foot at (x, y). kind: 'round' (broadleaf), 'conifer', 'poplar' (tall, thin), 'bush',
@@ -529,7 +593,7 @@ class Piece:
         Winter puts snow on the roof. smoke=True adds chimney smoke in autumn and winter only."""
         wallc = PLASTER[wall % len(PLASTER)] if isinstance(wall, int) else wall
         r1, r2 = {"tile": (ROOF, ROOF_D), "thatch": (THATCH, THATCH_D), "slate": (SLATE, SLATE_D)}[roof]
-        eave = r2
+        eave_l = r1
         if self.winter:
             r1, r2 = SNOW, SNOW_D
         self.cast(x, y, w)
@@ -543,27 +607,31 @@ class Piece:
                 rf = [(x0 - 1, top + 0.3), (x0 + w + 1, top + 0.3), (x0 + w - 0.6, top - roof_h), (x0 + 0.6, top - roof_h)]
                 p.poly(rf, r1, None)
                 p.poly([rf[1], rf[2], (x0 + w * 0.72, top - roof_h), (x0 + w * 0.78, top + 0.3)], r2, None)
-                if self.winter:
-                    p.line(rf[0], rf[1], eave, 0.5)
+                if self.winter:                 # the eave keeps the roof colour: a 1 px band, so roofs stay roofs
+                    p.poly([rf[0], rf[1], (rf[1][0] - 0.3, rf[1][1] - 1.1), (rf[0][0] + 0.3, rf[0][1] - 1.1)], eave_l, None)
                 p.poly(rf, None, INK, 0.5)
             else:
                 p.rect(x0, top, w, h, wallc, None)
                 p.poly([(x0, top), (x0 + w / 2, top - roof_h), (x0 + w, top)], wallc, None)
                 slope = [(x0 + w / 2, top - roof_h), (x0 + w / 2 + 2.6, top - roof_h - 2.2), (x0 + w + 2.8, top - 2.2), (x0 + w + 0.6, top + 0.4)]
                 p.poly(slope, r2, INK, 0.5)
+                if self.winter:
+                    p.line((slope[3][0] + 0.2, slope[3][1] - 0.5), (slope[2][0] - 0.2, slope[2][1] - 0.5), eave_l, 1.0)
                 p.line((x0 - 0.6, top + 0.4), (x0 + w / 2, top - roof_h), r1, 1.4)
                 p.line((x0, top), (x0 + w / 2, top - roof_h), INK, 0.5)
             if door:
                 p.rect(x0 + w * 0.4, y - 2.2, 1.4, 2.2, DOOR, None)
             p.rect(x0, top, w, h, None, INK, 0.5)
             if smoky:
-                _smoke(p, x + w * 0.2, top - roof_h - 0.5)
+                _smoke(p, x + w * 0.2, top - roof_h - 0.5, self.winter)
         self.stand(y, fn)
 
-    def smoke(self, x, y):
-        """Chimney smoke rising from (x, y). Autumn and winter only (does nothing in spring and summer)."""
-        if self.season in ("autumn", "winter"):
-            self.stand(y + 30, lambda p: _smoke(p, x, y))
+    def smoke(self, x, y, always=False, foot=None):
+        """Chimney smoke rising from (x, y). Autumn and winter only, unless always=True (the listed chimneys: the
+        smelter, the charcoal mound). Grey in winter so it shows on snow. foot: the foot y of the thing that smokes."""
+        if always or self.season in ("autumn", "winter"):
+            fy = y if foot is None else foot
+            self.stand(fy, lambda p: _smoke(p, x, y, self.winter), lift=y + 30 - fy)
 
     def church(self, x, y, size="church", sc=1.0):
         """size: 'chapel' (village), 'church' (town), 'cathedral' (city: a dome and a tall bell tower).
@@ -582,7 +650,8 @@ class Piece:
             rf = [(x - w / 2 - 0.5, y - hw), (x + w / 2 + 0.5, y - hw), (x + w / 2 - 0.5, y - hw - rh), (x - w / 2 + 0.5, y - hw - rh)]
             p.poly(rf, r1, INK, 0.5)
             if self.winter:
-                p.line(rf[0], rf[1], ROOF_D, 0.5)
+                p.poly([rf[0], rf[1], (rf[1][0] - 0.3, rf[1][1] - 1.1), (rf[0][0] + 0.3, rf[0][1] - 1.1)], ROOF, None)
+                p.poly(rf, None, INK, 0.5)
             p.rect(x - w / 2, y - hw, w, hw, None, INK, 0.5)
             p.rect(x - 0.8 * sc, y - 2.6 * sc, 1.6 * sc, 2.6 * sc, DOOR, None)
             if size == "cathedral":
@@ -628,11 +697,11 @@ class Piece:
                 p.poly([(x, ty - 4.5), (x + 3.2, ty - 3.6), (x, ty - 2.6)], flag, None)
         self.stand(y, fn)
 
-    def wall(self, cx, cy, rx, ry, kind="stone", towers=(0.25, 0.5, 0.75), gate=0.5, back_towers=(), height=4.0):
+    def wall(self, cx, cy, rx, ry, kind="stone", towers=(0.25, 0.5, 0.75), gate=0.5, back_towers=(), height=4.0, col=None):
         """A ring wall round (cx, cy). kind: 'palisade' (timber stakes, no towers unless asked) or 'stone'
         (battlements). towers and gate are positions along the front half, 0 = right end, 1 = left end
         (0.5 = the middle of the front). The back half is queued behind everything inside, the front half before it."""
-        col = STONE if kind == "stone" else TIMBER
+        col = col or (STONE if kind == "stone" else TIMBER)       # col=STONE_GREY for castles
         back = ring_points(cx, cy, rx, ry, math.pi, 2 * math.pi)
         front = ring_points(cx, cy, rx, ry, 0, math.pi)
         hw = height
@@ -704,9 +773,24 @@ class Piece:
             p.rect(x - 0.6, y - 3.4, 1.2, 1.1, INK, None)
         self.stand(y, fn)
 
-    def animal(self, x, y, kind="sheep", flip=False):
-        """An animal as a blob: 'sheep' (white, 3x2), 'cow' (brown and white, 4x2.5), 'horse' (dark, 4x3 on legs)."""
+    def animal(self, x, y, kind="sheep", flip=False, sc=1.0, col=None):
+        """An animal as a blob: 'sheep' (white, 3x2), 'cow' (brown and white, 4x2.5), 'horse' (dark, 4x3 on legs).
+        sc: 0.7 for a young one. col: another coat colour."""
         d = -1 if flip else 1
+        if sc != 1.0 or col is not None:
+            def fy(p):
+                body = col or {"sheep": (244, 240, 230), "cow": (150, 92, 60), "horse": (96, 66, 50)}[kind]
+                if kind == "horse":
+                    p.line((x - 1.2 * sc, y), (x - 1.2 * sc, y - 1.6 * sc), INK, 0.5)
+                    p.line((x + 1.2 * sc, y), (x + 1.2 * sc, y - 1.6 * sc), INK, 0.5)
+                    p.ellipse(x, y - 2.4 * sc, 4.4 * sc, 2.2 * sc, body, INK, 0.5)
+                    p.line((x + 1.8 * d * sc, y - 2.8 * sc), (x + 2.6 * d * sc, y - 4.4 * sc), body, 1.0)
+                else:
+                    w, h = ((3.2, 2.2) if kind == "sheep" else (4.4, 2.6))
+                    p.ellipse(x, y - h * sc * 0.58, w * sc, h * sc, body, (120, 110, 100) if kind == "sheep" else INK, 0.5)
+                    p.dot(x + w * 0.48 * d * sc, y - h * sc * 0.75, INK if kind == "sheep" else shade(body, 0.72), 1.0)
+            self.stand(y, fy)
+            return
 
         def fn(p):
             if kind == "sheep":
@@ -767,8 +851,10 @@ class Piece:
     def finish(self, check=True, label=""):
         """Compose the piece: ground (faded at the hex border), shadows, then standing things back to front.
         Returns a SIZE x SIZE surface with alpha. With check=True, prints a line if a standing thing leaves the hex."""
-        for _, _, fn in sorted(self.queue, key=lambda q: (q[0], q[1])):
-            fn(self.op)
+        global LAST
+        LAST = self
+        for q in sorted(self.queue, key=lambda q: (q[0], q[1])):
+            q[2](self.op)
         mask = _hex_mask()
         ground = self.g.copy()
         sh = pygame.Surface(self.g.get_size(), pygame.SRCALPHA)
@@ -785,9 +871,22 @@ class Piece:
         return out
 
 
-def _smoke(p, x, y):
+def _smoke(p, x, y, winter=False):
     for i, (dx, dy, r) in enumerate(((0.0, -1.5, 1.0), (0.8, -3.6, 1.3), (2.0, -5.8, 1.6))):
-        p.circle(x + dx, y + dy, r, SMOKE)
+        p.circle(x + dx, y + dy, r, SMOKE_SNOW if winter else SMOKE)
+
+
+def take_apart(draw, level, season, **kw):
+    """Draw one piece for the map: without its ground base, and returned as layers (see Piece.layers()), so the map
+    can lay the ground detail on its own ground and sort every standing thing into its own back-to-front list.
+    Works with every family module as it is: take_apart(wheat.draw, 2, "summer")."""
+    global NO_BASE
+    NO_BASE = True
+    try:
+        draw(level, season, **kw)
+    finally:
+        NO_BASE = False
+    return LAST.layers()
 
 
 _MASK = None
