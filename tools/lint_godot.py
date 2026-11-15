@@ -5,7 +5,7 @@ A text scan with no third-party packages (it runs in CI as it is). It checks:
 
 - the layers: a file may use res:// scripts and scenes of its own layer or a lower one. Bottom to top: defs, state,
   systems, game, ai, views, shell. mapgen sits beside systems and is used only by tools and tests (it runs in tools);
-- core/ files extend RefCounted and make no engine calls (no Node, scene tree, Input, OS, Time, Engine,
+- core/ files extend RefCounted (core/defs/ files may extend Resource: the definitions are Resources) and make no engine calls (no Node, scene tree, Input, OS, Time, Engine,
   threads, await);
 - core/ takes its luck only through core/rng.gd;
 - no Godot 3 spellings in godot/ (yield, export var, onready var, setget, string connect, instance(), tool);
@@ -170,7 +170,8 @@ def lint_file(root: Path, path: Path, findings: list) -> None:
                         report(lineno, message)
         if is_gd and in_core and line.lstrip().startswith("extends "):
             base = line.split("extends ", 1)[1].strip()
-            if base != "RefCounted" and not base.startswith('"res://core/'):
+            defs_resource = rel.startswith("core/defs/") and base == "Resource"
+            if base != "RefCounted" and not defs_resource and not base.startswith('"res://core/'):
                 report(lineno, f"core/ files extend RefCounted, not {base}")
 
         for match in RES_REF.finditer(line):
