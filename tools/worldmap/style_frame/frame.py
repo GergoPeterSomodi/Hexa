@@ -150,6 +150,83 @@ def cover_w(kind):
     return lambda c, r: 1.0 if is_land_hex(c, r) and HEX[(c, r)]["cover"] == kind else 0.0
 
 
+def seg_nearest(p, a, b):
+    """The point of segment a-b nearest to p."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    n = dx * dx + dy * dy
+    t = 0.0 if n == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / n))
+    return (a[0] + t * dx, a[1] + t * dy)
+
+
+def nearest_on_lines(p, lines):
+    """(distance, point, line index) of the nearest point on any of the polylines."""
+    best = (1e9, None, -1)
+    for k, ln in enumerate(lines):
+        for i in range(len(ln) - 1):
+            q = seg_nearest(p, ln[i], ln[i + 1])
+            d = math.dist(p, q)
+            if d < best[0]:
+                best = (d, q, k)
+    return best
+
+
+MOUTH_REACH_KM = 8.0      # a river that ends this near another river (and not in the sea) flows into it
+MOUTH_RAMP_KM = 11.0      # the last stretch of the river that is eased onto the receiver
+
+
+def snap_mouths(rivers):
+    """Rivers end ON their receiving river: the last stretch of the line is displaced, more and more towards the end
+    (smoothstep, so no kink and no hook), until the end lies exactly on the receiver's centre line. A river that ends in
+    the sea, or far from any other river (it leaves the map), is left alone. Sources (first points) are never touched."""
+    order = sorted(range(len(rivers)), key=lambda i: -rivers[i]["cls"])        # the bigger river is final first
+    for i in order:
+        rv = rivers[i]
+        pts = rv["pts"]
+        end = pts[-1]
+        if not is_land_hex(*hex_of_km(*end)) and hex_of_km(*end) in HEX:
+            continue                                                         # in the sea or a lake
+        others = [r["pts"] for j, r in enumerate(rivers) if j != i and r["cls"] >= rv["cls"]]
+        d, q, _ = nearest_on_lines(end, others)
+        if q is None or d > MOUTH_REACH_KM or d < 0.02:
+            continue
+        # arclength from the end, going up the river
+        acc = [0.0]
+        for k in range(len(pts) - 1, 0, -1):
+            acc.append(acc[-1] + math.dist(pts[k], pts[k - 1]))
+        total = acc[-1]
+        ramp = min(MOUTH_RAMP_KM, total * 0.6)
+        dx, dy = q[0] - end[0], q[1] - end[1]
+        out = list(pts)
+        for k in range(len(pts)):
+            s_ = acc[len(pts) - 1 - k]
+            if s_ >= ramp:
+                continue
+            f = 1 - s_ / ramp
+            f = f * f * (3 - 2 * f)
+            out[k] = (pts[k][0] + dx * f, pts[k][1] + dy * f)
+        out[-1] = q
+        rv["pts"] = out
+
+
+def water_problems(rivers, streams, is_water, box):
+    """Every river or stream end that is neither a source nor on its receiving water (within ~1 px = 0.27 km): another
+    river or stream centre line, or the sea or a lake (is_water(x, y)). A river's first point and a stream's first point
+    (its upstream end) are sources. Only ends inside box (x0, y0, x1, y1 in km) are listed: the rest are off the picture.
+    Returns a list of text lines."""
+    lines = [("river " + r["name"], r["pts"]) for r in rivers] + [("stream %d" % i, s) for i, s in enumerate(streams)]
+    bad = []
+    for n, (name, pts) in enumerate(lines):
+        e = pts[-1]
+        if not (box[0] <= e[0] <= box[2] and box[1] <= e[1] <= box[3]):
+            continue
+        if is_water(*e):
+            continue
+        d, _, _ = nearest_on_lines(e, [ln for m, (nm, ln) in enumerate(lines) if m != n])
+        if d > 0.27:
+            bad.append("%s ends %.2f km short of any water at km (%.1f, %.1f)" % (name, d, e[0], e[1]))
+    return bad
+
+
 def build_world():
     w = {}
     # rivers: the edge lines of the data, smoothed, with a little meander
@@ -170,6 +247,7 @@ def build_world():
             else:
                 out.append(p)
         rivers.append(dict(name=rv["name"], cls=rv["class"], pts=out))
+    snap_mouths(rivers)
     # streams: one edge each; keep those whose lower end reaches a river or the sea within a short step
     rgrid = Grid(3.0)
     for rv in rivers:
@@ -195,15 +273,8 @@ def build_world():
         line = [hi, ((hi[0] + lo[0]) / 2 + 1.2, (hi[1] + lo[1]) / 2), lo]
         if not best[2]:
             # carry it on to the river
-            d, _ = rgrid.near(lo[0], lo[1], 10)
-            bx = by = None
-            bd = 1e9
-            for rv in rivers:
-                for p in rv["pts"]:
-                    dd = math.dist(p, lo)
-                    if dd < bd:
-                        bd, bx, by = dd, p[0], p[1]
-            line.append((bx, by))
+            _, q, _ = nearest_on_lines(lo, [rv["pts"] for rv in rivers])      # the nearest point of the centre line
+            line.append(q)
         else:
             # run on into the sea
             dx, dy = lo[0] - hi[0], lo[1] - hi[1]

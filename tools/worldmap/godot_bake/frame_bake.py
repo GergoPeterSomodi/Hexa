@@ -35,6 +35,7 @@ def init():
     if not _INIT:
         CP.carve_ports()
         CP.move_sites()
+        R.check_water()                 # rivers and streams must end on water: prints the problems (none expected)
         _INIT = True
 
 

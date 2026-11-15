@@ -16,6 +16,17 @@ TREES = build_trees(WORLD, FIELDS, RGRID)
 PARCELS = build_parcels(WORLD, FIELDS)
 SLOPES = slopes.Slopes(WORLD, FIELDS) if slopes.ON else None     # the slope rule: see slopes.py and the README
 
+def check_water(verbose=True):
+    """Every water-line end must be a source or lie on its receiving water (a river, a stream, the sea or a lake)."""
+    box = (X0, Y0, X0 + 1280 / (60 / R_KM), Y0 + 720 / (60 / R_KM * TILT))
+    bad = water_problems(WORLD["rivers"], WORLD["streams"], lambda x, y: not FIELDS.is_land(x, y, 0.0), box)
+    if verbose:
+        print("water check: %d problem%s" % (len(bad), "" if len(bad) == 1 else "s"))
+        for b in bad:
+            print("   " + b)
+    return bad
+
+
 PARCEL_COLS = [(222, 198, 104), (196, 208, 102), (210, 180, 96), (186, 196, 120), (232, 212, 128)]
 WALLS = [(240, 228, 196), (232, 200, 140), (234, 192, 166), (246, 240, 228), (226, 210, 170)]
 ROOF = (204, 94, 62)
@@ -1146,6 +1157,7 @@ class Frame:
 if __name__ == "__main__":
     for note in sites.DATA_NOTES:
         print("DATA:", note)
+    check_water()
     print("coast: the harbour coves move it at most %.1f km from the first line (limit %.1f)" % (COAST_SHIFT_KM, sites.COAST_REACH_KM))
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.abspath(__file__))
     which = sys.argv[2] if len(sys.argv) > 2 else "both"
