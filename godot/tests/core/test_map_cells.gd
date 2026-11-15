@@ -6,6 +6,7 @@ extends GutTest
 
 const FIXTURE := "res://tests/fixtures/trial_cells.json"
 const TRIAL_INDEX := "res://assets/tiles/trial/index.json"
+const TRIAL_GRID_TILE := "grid/line"
 
 var _fixture: Dictionary = {}
 var _seed := 12345
@@ -71,6 +72,8 @@ func test_of_hex_gives_the_names_the_trial_scene_gives() -> void:
 		var hex := Vector2i(int(at[0]), int(at[1]))
 		var want: Dictionary = expected["%d,%d" % [hex.x, hex.y]]
 		var got := MapCells.of_hex(m, s, hex)
+		if got["grid"] == MapCells.GRID_TILE:
+			got["grid"] = TRIAL_GRID_TILE  # the trial tileset's name for the grid line
 		for layer_name: String in MapCells.LAYERS:  # the trial view clears a cell whose tile the trial bake lacks
 			if not have.has(str(got[layer_name])):
 				got[layer_name] = ""
@@ -109,7 +112,7 @@ func test_only_pieces_are_missing_from_the_trial_tileset() -> void:
 		var cells := MapCells.of_hex(m, s, Vector2i(int(at[0]), int(at[1])))
 		for layer_name: String in cells:
 			var n := str(cells[layer_name])
-			if not have.has(n) and not n.begins_with("piece/"):
+			if not have.has(n) and not n.begins_with("piece/") and n != MapCells.GRID_TILE:
 				missing[n] = true
 	# (The trial bake drew only the pieces of its own improvement, so some piece tiles are not in it.)
 	assert_eq(missing.size(), 0, "tiles that are not pieces and not in the trial tileset: %s" % [missing.keys()])

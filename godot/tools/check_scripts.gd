@@ -4,7 +4,7 @@
 extends SceneTree
 
 
-func _init() -> void:
+func _initialize() -> void:  # not _init: the autoloads (Session, Events) are known to the parser only from here on
 	var paths := _find_scripts("res://")
 	var failed := 0
 	for path in paths:

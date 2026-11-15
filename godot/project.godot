@@ -9,7 +9,7 @@ config_version=5
 config/name="Hexa"
 config/description="Hexa: Age of Discovery, Godot port"
 config/version="0.3.0"
-run/main_scene="res://shell/worldmap/north_italy_map.tscn"
+run/main_scene="res://shell/map/map_scene.tscn"
 config/features=PackedStringArray("4.7", "Compatibility")
 
 [display]
@@ -17,6 +17,12 @@ config/features=PackedStringArray("4.7", "Compatibility")
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/size/resizable=true
+
+[autoload]
+
+; The two autoloads of the standard (docs/architecture/godot-architecture.md 4.4): the bus and the one door to the rules.
+Events="*res://shell/autoload/events.gd"
+Session="*res://shell/autoload/session.gd"
 
 [editor_plugins]
 

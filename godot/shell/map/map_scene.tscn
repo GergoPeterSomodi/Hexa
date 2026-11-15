@@ -1,0 +1,76 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://shell/map/map_scene.gd" id="1_scene"]
+[ext_resource type="Script" path="res://shell/mapview/tile_map_view.gd" id="2_view"]
+[ext_resource type="Script" path="res://shell/mapview/far_map.gd" id="3_far"]
+[ext_resource type="Script" path="res://shell/input/map_input.gd" id="4_input"]
+[ext_resource type="Script" path="res://shell/map/simple_hex_panel.gd" id="5_panel"]
+
+[sub_resource type="LabelSettings" id="label_title"]
+font_size = 18
+
+[node name="MapScene" type="Node2D"]
+script = ExtResource("1_scene")
+
+[node name="Camera" type="Camera2D" parent="."]
+
+[node name="View" type="Node2D" parent="."]
+script = ExtResource("2_view")
+
+[node name="Far" type="Node2D" parent="."]
+z_index = 95
+script = ExtResource("3_far")
+
+[node name="Input" type="Node" parent="."]
+script = ExtResource("4_input")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="Margin" type="MarginContainer" parent="Hud"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="Row" type="HBoxContainer" parent="Hud/Margin"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Info" type="PanelContainer" parent="Hud/Margin/Row"]
+layout_mode = 2
+size_flags_vertical = 0
+mouse_filter = 2
+
+[node name="Box" type="VBoxContainer" parent="Hud/Margin/Row/Info"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Hud/Margin/Row/Info/Box"]
+layout_mode = 2
+text = "North Italy"
+label_settings = SubResource("label_title")
+
+[node name="Stats" type="Label" parent="Hud/Margin/Row/Info/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+
+[node name="Help" type="Label" parent="Hud/Margin/Row/Info/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 12
+
+[node name="Spacer" type="Control" parent="Hud/Margin/Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Hud/Margin/Row"]
+layout_mode = 2
+size_flags_vertical = 0
+script = ExtResource("5_panel")

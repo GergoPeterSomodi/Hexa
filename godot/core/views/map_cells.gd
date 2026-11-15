@@ -11,8 +11,8 @@ const LAYERS: Array[String] = [
 	"trees0", "trees1", "trees2", "trees3", "trees4", "trees5",
 	"piece_ground", "piece_shadow", "piece_back", "piece_front", "addon_ground", "addon_shadow", "addon",
 ]
-## The grid line tile (the bake moves it to "mark/grid" with the marks).
-const GRID_TILE := "grid/line"
+## The grid line tile (in the marks source of every set).
+const GRID_TILE := "mark/grid"
 const PIECE_PARTS: Array[String] = ["ground", "shadow", "back", "front"]
 const ADDON_PARTS: Array[String] = ["ground", "shadow", "front"]  # a harbour's standing things are one tile
 
