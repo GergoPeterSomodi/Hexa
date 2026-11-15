@@ -7,9 +7,12 @@ castle, a moat, a gate tower; the castle of level 2 stands inside it unchanged).
 All three stand on the same low mound. The banner colour is a parameter: draw(level, season, flag=kit.FLAG).
 The tower of level 1 and the keep of level 2 share one foot (KEEP): the keep is the tower grown in place.
 
-Two layouts (LAYOUT) and the mirror. Layout 0: a round castle in the middle of the hex, a four-bastion fortress.
+Three layouts (LAYOUT) and the mirror. Layout 0: a round castle in the middle of the hex, a four-bastion fortress.
 Layout 1: a spur castle: a long mound and an elongated ring lying from the lower left to the upper right, the keep at
 its upper end and the gate at the lower end; the fortress is a pentagon with five bastions round it.
+Layout 2: motte and bailey: a small steep motte at the back left with the tower (later the keep, in a small palisade) and
+a ring of its own, the bailey, in front of it to the right, joined by a lane; the fortress is one lopsided wall with four
+bastions and the moat round both places.
 
 python castles.py          writes docs/design/map/pieces/castles.png
 """
@@ -21,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(1, 4)
-VARIANTS = 2
+VARIANTS = 3
 NAMES = {1: "watchtower", 2: "castle, keep", 3: "bastion fortress"}
 
 # ---- the fixed layout: nothing here depends on the level except where a "from level" is given
@@ -35,7 +38,7 @@ FORT_A, FORT_B = 26.0, 16.5                          # level 3: half sizes of th
 FORT_H = 4.6                                         # fortress wall height
 FORT_T = 3.4                                         # fortress wall thickness (plan)
 MOAT_W = 3.0                                         # visible width of the moat
-GATES = [{"south": (-5, 36)}, {"south": (-12, 33)}]   # where the map's road layer joins the lane (10+ px inside the border)
+GATES = [{"south": (-5, 36)}, {"south": (-12, 33)}, {"south": (5, 36)}]   # where the map's road layer joins the lane (10+ px inside the border)
 # The layouts side by side. Layout 1 (the spur): rot turns the mound and the rings in the plan; ring1: the small palisade
 # round the tower (cx, cy, a, b: half axes in the plan); ring2: the stone ring; fort: the pentagon's middle and radius.
 ROT1 = -22.0
@@ -43,6 +46,16 @@ LAYOUT = [
     dict(keep=KEEP, mound=MOUND, rot=0.0, ring1=RING1, ring2=RING2, fort=None, person=(CX + 5, CY + RING2[1] + 7)),
     dict(keep=(15, -4), mound=(1, 1, 24, 10.5), rot=ROT1, ring1=(15, 0, 11, 6.5), ring2=(1, 1, 22, 10), fort=(3, 3, 29.0),
          person=(-4, 19)),
+    # Layout 2 (motte and bailey) has its own keys: the motte (x, y, w, h of the mound) with the keep's foot on its crown
+    # and the small palisade round the crown (cx, cy, rx, ry); the bailey (centre, ring radii at level 1 and from level 2);
+    # the lane from the motte's foot to the bailey's gate road; the fortress (corners of the wall in px, which corners
+    # carry a bastion, bastion shoulder and reach, wall thickness, the gate tower's x and the wall's y there).
+    dict(keep=(-14, -18), motte=(-14, -15.2, 22, 12), crown=(-14, -16.2, 8.0, 3.6),
+         bailey=(9, 6.5), bailey1=(13.0, 7.15), bailey2=(17.0, 9.35), keep_h=13.5,
+         lane=[(-12, -9.5), (-17.5, -1), (-14.5, 9.5), (-6, 15.8), (4, 18.2), (9, 19.5)],
+         fort=dict(corners=[(-31, -15), (-23, -25), (-5, -25), (28, -3), (33, 8), (24, 22), (-2, 23), (-12, 14)],
+                   bastions=(0, 2, 4, 6), da=5.5, dt=4.5, thick=3.0, gate=(11, 22.5)),
+         person=(13, 8)),
 ]
 
 
@@ -365,9 +378,105 @@ def moat(p, outer):
     p.over(fn, 1.0)
 
 
+# ------------------------------------------------------------------ layout 2: motte and bailey
+def motte_mound(p, x, y, w, h):
+    """The motte: a low steep mound, its front edge a visibly darker band, a lit crown."""
+    g = p.pal["grass"]
+    if p.winter:
+        rim, top = kit.mix(kit.SNOW_D, (160, 172, 192), 0.35), kit.SNOW
+    else:
+        rim, top = kit.shade(g, 0.66), kit.shade(g, 1.08)
+    p.blob(x + 1.2, y + 2.6, w + 1, h + 1.5, rim)
+    p.blob(x, y + 0.9, w - 1.5, h - 2.0, kit.mix(rim, top, 0.5))
+    p.blob(x - 0.6, y - 0.5, w - 5.0, h - 5.5, top)
+
+
+def fort_plan_free(corners, bastions, da, dt):
+    """The wall's outline in plan (u, v) before the tilt, clockwise, from corners given in px on screen: a bastion
+    (two shoulders and a point) on each corner listed in bastions, a plain angle on the others."""
+    pl = [(x, y / kit.TILT) for x, y in corners]
+    n = len(pl)
+    out = []
+    for i, V in enumerate(pl):
+        if i not in bastions:
+            out.append(V)
+            continue
+        P, N = pl[i - 1], pl[(i + 1) % n]
+        up = ((P[0] - V[0]) / math.dist(P, V), (P[1] - V[1]) / math.dist(P, V))
+        un = ((N[0] - V[0]) / math.dist(N, V), (N[1] - V[1]) / math.dist(N, V))
+        ox, oy = -(up[0] + un[0]), -(up[1] + un[1])
+        ln = math.hypot(ox, oy)
+        ox, oy = ox / ln, oy / ln
+        out += [(V[0] + up[0] * da, V[1] + up[1] * da), (V[0] + ox * dt, V[1] + oy * dt), (V[0] + un[0] * da, V[1] + un[1] * da)]
+    return out
+
+
+def draw_motte(p, L, level, flag):
+    """Layout 2: the motte at the back left, the bailey in front of it to the right, a lane between them. Level 1 the
+    tower on the motte and a palisade bailey; 2 the grey ring with towers and gatehouse, the keep grown in place, a small
+    palisade on the motte; 3 the bastion wall and the moat round both. Unmirrored coordinates; the kit mirrors."""
+    winter, spring, summer = p.winter, p.season == "spring", p.season == "summer"
+    gates = GATES[2]
+    kx, ky = L["keep"]
+    bx, by = L["bailey"]
+    F = L["fort"]
+    plan = fort_plan_free(F["corners"], F["bastions"], F["da"], F["dt"])
+    outer = tilt(plan, 0, 0)
+    inner = tilt(offset_poly(plan, F["thick"]), 0, 0)
+    m = p.m
+    if m < 0:                  # the wall is lopsided: turn every point round and keep the clockwise order (queued with x=0)
+        outer_m, inner_m = [(-q[0], q[1]) for q in outer][::-1], [(-q[0], q[1]) for q in inner][::-1]
+    else:
+        outer_m, inner_m = outer, inner
+    gx, gy = F["gate"]
+    ring_h = L["bailey2"] if level >= 2 else L["bailey1"]
+    gate_y = by + ring_h[1]
+
+    # ---- ground plane
+    if level >= 3:
+        moat(p, outer)
+        yard = kit.ROAD if not winter else (172, 160, 140)
+        p.over(lambda pen: pen.poly(outer, yard, None), 0.45)
+    motte_mound(p, *L["motte"])
+    p.road(L["lane"], 1.4, track=True)
+    if level == 1:
+        p.road([(bx, gate_y - 1), (bx + 1, gate_y + 8), (7, 28), gates["south"]], 1.4, track=True)
+    elif level == 2:
+        p.road([(bx, gate_y - 1), (bx + 1, gate_y + 8), (7, 28), gates["south"]], 2.0)
+    else:
+        p.road([(bx, gate_y - 1), (gx, gy - 1)], 2.0)
+        p.road([(gx, gy - 1), (gx - 3, gy + 6), gates["south"]], 2.0)
+        p.patch([(gx - 2.6, gy - 1), (gx + 2.6, gy - 1), (gx + 2.6, gy + MOAT_W + 1.8), (gx - 2.6, gy + MOAT_W + 1.8)], kit.TIMBER, kit.INK, 0.5)
+        for k in range(5):
+            y = gy + 0.5 + k * 1.7
+            p.over(lambda pen, y=y: pen.line((gx - 2.6, y), (gx + 2.6, y), kit.TIMBER_D, 0.5), 1.0)
+
+    # ---- standing things
+    if level == 1:
+        p.wall(bx, by, ring_h[0], ring_h[1], "palisade", towers=(), gate=0.5, height=3.4)
+        add_tower(p, kx, ky, 6.4, 8.8, "cone", flag, door=False, roof_h=5.6)
+    else:
+        ring_wall(p, bx, by, ring_h[0], ring_h[1])
+        p.wall(*L["crown"], "palisade", towers=(), gate=None, height=2.8)       # the motte's crown
+        keep_h = L["keep_h"]
+        p.cast(kx, ky, 10)
+        keep = p.stand(ky, lambda pen: _tower(pen, winter, kx, ky, 9.0, keep_h, "battlement", flag, True, slit=True, banner_h=3.2), x=kx)
+        if winter:
+            p.smoke(kx + 3.0, ky - keep_h + 0.3, always=False, foot=ky, on=keep)
+    if level >= 3:
+        fort_wall(p, outer_m, inner_m, FORT_H, ax=0)
+        p.cast(gx, gy, 8)
+        p.stand(gy + 0.9, lambda pen: _tower(pen, winter, gx, gy + 0.9, 8.4, 8.0, "battlement", flag, True), x=gx)
+    if (spring or summer) and level >= 2:
+        p.person(L["person"][0], L["person"][1], (70, 96, 150))
+    return p.finish(label="castle L%d v2%s" % (level, "m" if p.mirror else ""))
+
+
 def draw(level, season, variant=0, mirror=False, flag=kit.FLAG):
     p = kit.Piece(season, ground="grass", seed=3, mirror=mirror)
     L = LAYOUT[variant]
+    if "bailey" in L:
+        return draw_motte(p, L, level, flag)
     gates = GATES[variant]
     keep_at = L["keep"]
     winter, spring, summer = p.winter, season == "spring", season == "summer"
