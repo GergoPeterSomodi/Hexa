@@ -97,6 +97,7 @@ LAYOUT = [
 # mine's (the family's signature stays); what differs: no headframe and no wheel, so the race ("stream") is longer, runs
 # along the sluice and ends in a pond at each end, all inside the hex; "sluice" is the trough's foot (middle) and its
 # length (26-30 px); "tents" are the huts' feet at levels 1 and 2 (x, y, from level); "smelter" is the strongroom's foot.
+GOLD_HEAP_FLAT = 0.8                  # gold's gravel heaps are flatter (height at most 45% of the width), so the tents stand out
 GOLD = [
     dict(
         blocks=[
@@ -387,20 +388,6 @@ def sluice(p, x, y, length):
     return p.stand(y, fn, x=x)
 
 
-def tent(p, x, y, i=0):
-    """Gold's hut at levels 1 and 2: a pale cone 5 px wide and 6 tall, lit left, shaded right, a dark flap."""
-    p.cast(x, y, 5)
-
-    def fn(pen):
-        pen.poly([(x - 2.5, y), (x, y - 6.0), (x + 2.5, y)], kit.PLASTER[3], None)
-        pen.poly([(x + 0.2, y), (x, y - 6.0), (x + 2.5, y)], kit.shade(kit.PLASTER[3], 0.85), None)
-        pen.poly([(x - 0.8, y), (x, y - 2.8), (x + 0.8, y)], kit.DOOR, None)
-        if p.winter:
-            pen.poly([(x - 0.9, y - 4.6), (x, y - 6.0), (x + 0.9, y - 4.6)], kit.SNOW, None)
-        pen.poly([(x - 2.5, y), (x, y - 6.0), (x + 2.5, y)], None, kit.INK, 0.5)
-    return p.stand(y, fn, x=x)
-
-
 LANDMARKS = {None: smelter, "iron": blast_furnace, "silver": mint, "copper": roasting_yard, "gold": strongroom}
 
 
@@ -427,7 +414,7 @@ def draw(level, season, variant=0, mirror=False, ore=None):
     adit(p, rock[2], L["adit"])                                  # cut into the middle block: it moves with it
     for x, y, w, h, lo in L["heaps"]:
         if level >= lo:
-            p.heap(x, y, w, h, spoil, spoil_d)
+            p.heap(x, y, w, h * GOLD_HEAP_FLAT if gold else h, spoil, spoil_d)
     if gold and level >= 2:
         sluice(p, *L["sluice"])
     elif level >= 2:
@@ -451,7 +438,7 @@ def draw(level, season, variant=0, mirror=False, ore=None):
     if gold and level < 3:
         for x, y, lo in L["tents"]:
             if level >= lo:
-                tent(p, x, y)
+                p.tent(x, y, 6.0, 7.0)               # the kit's tent: canvas white, a dark flap
     return p.finish(label="mines L%d v%d%s" % (level, variant, "m" if mirror else ""))
 
 
