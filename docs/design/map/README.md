@@ -7,6 +7,11 @@
 > approved by the owner before anything is redrawn in bulk; **one view angle for every piece: a slight 3/4 view** (as
 > mockup 07); far fewer places and roads; no level dots by names.
 
+> **2D, not 3D (owner, 2026-11-15):** after the close-zoom mockups of Genoa (2D code-drawn against a 3D Godot test,
+> on the map-proto branch in `docs/design/map/closeup/`), the owner chose **2D drawn in code** for the whole map,
+> including the closest zoom. The closest zoom gets its own detail level (walled cities, harbours, terraces, ships); the
+> 3D test stays a prototype only.
+
 > **Owner's decisions (2026-11-14):** Q1 hex size **about 28 km** (prototype region now; Europe confirmed after measuring
 > drawing and AI path cost). Q2 rivers **along hex edges, but some rivers run through cities in some cases**: a short
 > authored list of river cities (e.g. Florence on the Arno, Paris on the Seine, Prague on the Vltava, Rome on the Tiber)
