@@ -3,7 +3,9 @@
 Art director, 2026-11-15. **Status: the owner answered the three questions on 2026-11-15 (section 6). All six fix
 tasks are done and reviewed a second time: all ten families pass ("Round 2" below). Round 3 (the same day) adds
 the owner's two further answers, two port modes and winter by climate, to the kit, the guide and the in-map test,
-and writes task 9. Nothing in the game is changed.**
+and writes task 9. Round 4 (the same day): task 9 is back, the owner picked the Python art to bring over (the
+catalogue's top 10) and answered the two port questions; the guide has the tables, the kit the tools, and section 4
+the worker tasks 10 to 25. Nothing in the game is changed.**
 
 All ten families are drawn. This is the review of the eight new ones against `GUIDE.md` (the two reference
 families were checked again too), with the findings of the in-map test (`../pieces_in_map/notes.md`) folded in.
@@ -11,6 +13,71 @@ families were checked again too), with the findings of the in-map test (`../piec
 **Look at `overview.png` first**: every family and every level on one page (summer on top, six families in winter
 below). The per-family sheets (`<family>.png`) show all four seasons and the 50% test. `kit_contract.png` shows what
 the owner's answers mean in the kit: wild land, the coast on any side, the footprint, the mirror.
+
+## Round 4: the Python art, the port answers (2026-11-15)
+
+| | The owner's answer | What was done |
+|---|---|---|
+| Python art (`../python_art/catalogue.md`) | **"Top 10 (Recommended)."** | Guide section 8 has the tables, written in one pass so the signatures cannot collide: Quarry, Dye works, Hemp, Cotton, Silk, Furs, Sites; the four ores (`ore=`); the ten landmark cities (`landmark=`, levels 4-5); the third layouts of vineyard, grazing and castles. Section 4 has the new tokens, the seven new signatures and a table of the pairs that crowd each other with the rule that keeps each apart. Tasks 10 to 25 below |
+| The carved bay | **Up to 5 km, carved ports only; the cove limit stays 3.5 km.** | Guide section 10. `kit.BAY_REACH` was 19 px (5 km) already; `kit.COVE_REACH` = 13.3 px is new, for the map |
+| A port's mode | **Fixed by the map data: carved from the start; the coast never changes in play.** | Guide section 10 |
+
+**Show the owner:** `../pieces_in_map/summer.png` and `winter.png` (Genoa's harbour is now the carved one: the
+guide's bay of 72 px with its horns inside the hex, the quay on the back of the bay, two short moles across the
+mouth, the lighthouse on the west horn; nothing stands outside Genoa's hex), `ports.png`, and `kit_additions.png`
+(the new kit calls and colours; demonstrations, not designs).
+
+### The art director's calls (guide section 12 has them; the owner may overrule any)
+
+- **The iron furnace glows**: one `GLOW` spot of 2 x 2 px, iron level 3. With the lighthouse lamp it is one of two
+  lights on the map; no more.
+- **Gold has no fort**; its top landmark is a strongroom. **The fur post's stockade is square and open to the
+  front.** Both so that nothing but a castle reads as a castle.
+- **Hemp against spring wheat**: near-square blocks of at most two strips, bare earth with dashed rows in spring,
+  the darkest green in summer, always a pond.
+- **Furs against timber**: no stumps, piles, mound or mill; coverage bands of its own (10-20 / 20-35 / 35-50%).
+- The mint has a slate roof (no red in mines). Cotton's strongest season is autumn. Cattle take the sheep's
+  walled pastures in the third grazing layout.
+- **Venice** is drawn for now as a city at a lagoon shore with its monument; the town on islands is an open
+  design question (guide section 12, point 1).
+
+### Kit, guide and tool changes in this round
+
+All 1,754 pictures of the ten modules (every level, season, layout and mirror; grazing's three animals; the two
+coast modules on four sea sides, in a bay of 8, 13 and 19 px and as the add-on; every top picture in the frost and
+mild winters) and `kit.pick` for one and two layouts on 144 hexes are **equal before and after**, hash for hash.
+
+| Change | What it is for |
+|---|---|
+| `p.drystone(pts, closed=)` | The dry-stone field wall (grazing's third layout, the monastery's wall) |
+| `p.ring(cx, cy, rx, ry=, kind="fence" / "stone", gate=, claim=)` | The round paddock and the round sheepfold; claims its inside |
+| `p.arc(cx, cy, rx, ry, a0, a1, col=, lw=, dashed=)` | A curved plant row (vineyard's contour layout) |
+| `p.tree(..., "mulberry")` | Silk's pollarded trees |
+| Crops `hemp`, `hemp_row`, `cotton_soil`, `cotton`, `mulberry_soil`, each with the frost and mild winters | The new crop families |
+| Tokens `MARBLE`, `PIT`, `DYE`, `RET`, `BOLL`, `DOME_TILE`, `PELT`, `GLOW`, `VERDIGRIS`, `ORES`, `BRICK`, `LEAD`, `GILT`, `ONION` (guide section 4) | One place for the new signature colours, so two workers cannot pick the same |
+| `kit.pick(col, row, 3)`: with three layouts or more each of the grid's three classes shows its own layout, plain or mirrored by the hash | Third layouts. One and two layouts answer as before |
+| `kit.COVE_REACH` | The 3.5 km limit, beside `BAY_REACH` |
+| `tools/worldmap/pieces/additions.py` writes `kit_additions.png` | The new calls in four seasons and three winters, the token swatches, `pick` with three layouts |
+| `compose.py`: `BAY_WIDTH = kit.BAY_WIDTH` (was 84 px for the stand-in) | Genoa's bay is the guide's now that `harbour.py` has its carved layout |
+| `winters.py`: the stale line under `ports.png` | - |
+
+`overview.py`, `winters.py`, `contract.py` and `compose.py` were run again; `overview.png`, `winters.png`,
+`ports.png`, `kit_contract.png` and the five in-map pictures are new.
+
+### What the in-map test showed (task 9 in the map)
+
+- **Genoa, carved: good.** A closed basin inside the city's own hex, the lighthouse on the west horn, the wall
+  dry. In winter (mild there) the boats are laid up and nothing is white.
+- **Four `PIECE PROBLEM` lines on the map's real shores**, all on seaside hexes and all from standing things
+  outside the hex margin: harbour level 1 (6 px, hex 5,15), harbour level 2 (15 px, hex 10,13), the level 2 add-on
+  (9 px) and **salt level 3 (159 px, hex 13,17, layout 1 mirrored)**. The sheets' straight shores do not show
+  them; the map's slanted, curved ones do.
+- **Salt, layout 1, south of Pisa:** a wild tree stands between the two blocks of pans (the feeder channel's
+  strip is not footprint), and the channel and the pans lie well back from a shore that bends away.
+- **Pisa's outport, layout 1:** on that west-facing, curved shore the long mole starts on land and the short
+  spur lies across the beach; the lighthouse stands free in the water at the mole's head.
+- These are for task 24 (below). Nothing else in the map changed in kind; the pictures differ from round 3's
+  everywhere because the second layouts of salt, harbour, olives, mines, settlements and castles are in.
 
 ## Round 3: ports in two modes, winter by climate (2026-11-15)
 
@@ -255,7 +322,8 @@ as the record:
 | 4 | `salt.py`, `harbour.py` | The first fixes, the wild-land rules, **the coast contract**, the harbour add-on |
 | 5 | `wheat.py`, `settlements.py` | The rule fixes, the wild-land rules, **wheat's second layout**; settlements: roads to gates, no plate strip |
 | 6 | `vineyard.py`, `castles.py`, `mines.py`, `olives.py` | **Vineyard's second layout**; the wild-land rules and the mirror check for all four |
-| 9 (open, round 3) | `salt.py`, `harbour.py` | **Second layouts for both, the carved port in `harbour.py`**, salt on a lagoon, the three winters. The brief is at the end of this section |
+| 9 (done, round 3) | `salt.py`, `harbour.py` | **Second layouts for both, the carved port in `harbour.py`**, salt on a lagoon, the three winters. Follow-ups from the map: task 24 |
+| 10 to 25 (open, round 4) | one module each | **The Python art**: six new families, the ores, the third layouts, the landmark cities, the sites. The briefs are at the end of this section |
 
 Each worker: read `GUIDE.md` (sections 1, 6, 8, 10, 11) and look at `kit_contract.png` first. Change only the
 named modules. Run them to rewrite the sheets, check that no `PIECE PROBLEM` line is printed, and look at every
@@ -593,6 +661,256 @@ Sheets and report: `salt.png`, `salt_variants.png`, `salt_sides.png`, `harbour.p
 shore; a strip of each module in the three winters; the carved harbour at depth 8, 13 and 19; coverage per level
 and layout; `REACH`; and every place where the kit's bay was not enough.
 
+### Round 4: tasks 10 to 25, the Python art
+
+Sixteen tasks, sized for one worker each. **Every task touches its own files only**, so tasks in the same group
+run side by side.
+
+| Group | Tasks | When |
+|---|---|---|
+| **A: parallel, now** | 10 Quarry, 11 Dye works, 12 Hemp, 13 Silk, 14 Furs, 15 Cotton, 16 Ores (iron, silver, copper), 18 Vineyard layout 2, 19 Grazing layout 2, 20 Castles layout 2, 21 Landmarks (first four), 23 Sites, 24 Coast follow-ups | All thirteen at once: no two share a file |
+| **B: after one task of A** | 17 Gold (after 16: the same file), 22 Landmarks (the other six; after 21: the same file) | When its forerunner is reviewed |
+| **C: last** | 25 Overview and in-map test (the art director) | When A and B are reviewed |
+
+If thirteen sheets at once are too many to review well, send a first wave of five that between them try every
+kind of task: **10 Quarry, 11 Dye works, 16 Ores, 18 Vineyard layout 2, 23 Sites**; then the rest.
+
+**Common to tasks 10 to 24**
+
+- N1. **Read first:** `GUIDE.md` sections 1 to 7, your family's table in section 8, the signature and crowding
+  tables in section 4, and the checklist (section 11). Look at `kit_additions.png`, `overview.png`, `winters.png`
+  and the catalogue page named in your task (`../python_art/catalogue_<n>_....png`; the ids are under the
+  pictures). `wheat.py` and `settlements.py` are the pattern; `tools/worldmap/pieces/README.md` is the kit on one
+  page.
+- N2. **The catalogue picture is the model for the idea, not for the drawing.** Nothing of the Python code is
+  reused and nothing is copied or scaled: redraw with the kit. What always changes (the catalogue's "standard
+  conversion"): no ground fill (coloured soil only as a patch 10 px inside the border); no wild land, relief, sea
+  or river; buildings seen from the front in two flat tones; 0.5 px `INK`, none on people, animals, trees or
+  ground shapes; a house is 8 px and the tallest thing 20, so the idea becomes **more, smaller units**; three
+  levels from the old levels 1, 3 and 5, one new landmark each; fixed layout tables, additive by level; four
+  seasons and three winters; coverage 15-30 / 35-60 / 60-85% of the margin hex unless the table says otherwise.
+- N3. **Files.** Change or create only the files named in your task. Do not edit `kit.py`, the guide,
+  `overview.py`, `contract.py`, `winters.py`, `additions.py` or `compose.py`, and do not run those five scripts.
+  If the kit lacks something, say so in the report and draw it locally with `p.stand` and the `pen`.
+- N4. **Colours.** The kit's tokens only; your family's signature tokens are already in the kit (guide section 4).
+  Any further colour is a named token at the top of your module and a line in your report.
+- N5. **The contract.** `LEVELS`, `NAMES`, `VARIANTS`, `LAYOUT = [dict, dict]` (tables side by side), `GATES`,
+  `draw(level, season, variant=0, mirror=False, ...)`; level 0 returns `kit.wild(season, <ground>, seed=<seed>)`;
+  no wild scatter; `mirror=mirror` to `kit.Piece`, never `if mirror:`; landmarks through `p.stand` (with `x=` on
+  every part that shares an axis, `on=` for a part of another thing) and `p.cast`; roads end at gate points;
+  ground work 10 px inside the border; snow on `p.winter`, ice on `p.frozen`, the season's doings on
+  `season == "winter"`.
+- N6. **A new family has two layouts** (guide section 6): the yard 14 px from layout 0's yard and its mirror
+  image, told from layout 0 and its mirror at 50%.
+- N7. **Sheets.** `<family>.png` (`kit.sheet(..., wild=True)`) and `<family>_variants.png` (`kit.variant_sheet`).
+  No `PIECE PROBLEM` line. Look at every sheet at 100% and 50%, whole and in enlarged crops, and at each level in
+  the three winters (`kit.with_wild(draw, lv, "winter", climate=c)`).
+- N8. **Look-alikes.** Put your top level beside every family named with yours in the crowding table (guide
+  section 4), at 50%, and send that strip.
+- N9. **An existing module keeps its pictures.** Where a task adds a keyword or a layout to an existing module,
+  everything the module drew before must be pixel-equal after (every level, season, layout and mirror): hash them
+  before you start and send the comparison.
+- N10. **Report:** what you drew; the sheets; coverage per level and layout (the footprint's share of the margin
+  hex, summer); the crowding strip; new tokens; every place where the guide's table could not be met and what
+  you did instead; kit gaps.
+
+**Task 10 (A1): Quarry.** New file `quarry.py`; sheets `quarry.png`, `quarry_variants.png`.
+- Models: `stone1`, `stone3`, `stone5` (catalogue page 1). Guide: "Quarry". Ground `rock`, seed 11.
+- What changes from the model: the old tile is a pit seen from straight above with a grey floor. Here it is a
+  **stepped face rising to the back**, seen from the front: 1 / 3 / 4 ledges, each a `PIT` top over a `PIT` face
+  with a `PIT_D` right quarter, built back to front with `p.stand(..., x=)`. The big crane becomes a 12 px
+  treadwheel crane, the marble columns a row of three 9 px columns; blocks are 3 x 2 px `MARBLE` boxes in stacks.
+- Watch: it must not read as Mines. No dark opening, no cone heap, no smoke. Pale and angular. Level 1 must be
+  told from wild rock at 50% (the white blocks and the pale face do it). Winter: snow on tops, faces bare.
+- Layout 1: the face on the west flank, running back to front, the yard and the crane to its east.
+
+**Task 11 (A2): Dye works.** New file `dyes.py`; sheets `dyes.png`, `dyes_variants.png`.
+- Models: `dyes1`, `dyes3`, `dyes5` (page 1). Guide: "Dye works". Ground `grass`, seed 12.
+- What changes: the coloured stream is dropped (a plain rinsing channel between two ponds, inside the hex); the
+  vats are flat ellipses on the ground, 3 / 6 / 9, in `kit.DYE` colours, in rows; the old cloth racks become
+  thin standing lines of small cloths; the striped dye house becomes a plain stone building with a chimney.
+- Watch: the only many-coloured piece on the map: keep the colours to the vats and the cloth, everything else
+  quiet. The vats keep their colour in winter (snow on the rims only): check the three winters. The chimney
+  smokes in every season (`always=True`, `on=` the house). Against salt: round, never a grid of squares.
+- Layout 1: the vats in one long double row along the channel instead of a block, the dye house at the other end.
+
+**Task 12 (A3): Hemp.** New file `hemp.py`; sheets `hemp.png`, `hemp_variants.png`.
+- Models: `hemp1`, `hemp3`, `hemp5` (page 1). Guide: "Hemp and the ropewalk". Ground `farm`, seed 13.
+- What changes: the old tile's bushy plant clumps become flat near-square blocks (`p.field(..., kit.crop("hemp",
+  season), 2)`), the blue ponds dull-green `RET` ponds (`p.pond(pts, col=kit.RET, edge=kit.RET_D)`), the orange
+  stooks thin tripods, and the ropewalk a 28 px open thatched shed.
+- Watch: **spring wheat** (the crowding table). Put hemp level 3 beside wheat level 3 in spring, summer and autumn
+  at 50%; if they can be confused, make the blocks squarer and fewer-striped, not the colours brighter. Spring:
+  bare earth with dashed `hemp_row` rows. Ponds frozen only `if p.frozen`.
+- Layout 1: the ropewalk at the back instead of the front (it is a front-view building: it always lies level),
+  the blocks in two groups either side of a pond in the middle.
+
+**Task 13 (A4): Silk.** New file `silk.py`; sheets `silk.png`, `silk_variants.png`.
+- Models: `silk1`, `silk3`, `silk5` (page 1). Guide: "Silk". Ground `grass`, seed 14.
+- What changes: the old tile's hedge bands across the whole hex become single-file rows of `mulberry` trees on
+  pale `mulberry_soil` strips, 2 / 4 / 6 rows, inside the margin; the brown sheds become long low thatched sheds
+  lying between rows; the big blue-domed hall becomes a small court wall with a 6 px `DOME_TILE` dome.
+- Watch: olives (a grid of silver trees on terraces) and the cathedral dome; the rows must read as lines at 50%.
+  Summer's stripped trees: draw every second tree of the two newest rows as the kit draws the bare one (ask in
+  the report if the kit should offer it; a local copy of the bare pollard is fine). Autumn at 50% must not read
+  as a row of haystacks: if it does, say so. Check the mild winter first: it is silk's usual one.
+- Layout 1: the rows at another angle (about 20 degrees) and the caravanserai at the front instead of the back.
+
+**Task 14 (A5): Furs.** New file `furs.py`; sheets `furs.png`, `furs_variants.png`.
+- Models: `furs1`, `furs3`, `furs5` (page 1). Guide: "Furs". Ground `wood`, seed 15 (`kit.sheet(..., ground="wood",
+  wild=True)`: the kit's wild wood shows what the map will do).
+- What changes: the snow and the pines of the old tile are the season's and the map's; the round palisade fort
+  becomes a **square stockade open to the front** (your own `p.stand` drawing: back side behind, the two sides,
+  corner posts; `p.claim` its inside); pelts are small `PELT` diamonds on pale timber frames.
+- Watch: Timber and Castle 1 (the crowding table). No stumps, log piles, mound or water. Coverage bands 10-20 /
+  20-35 / 35-50%. The clearing is an overlay of two or three blobs, never one ellipse. Winter is the high season
+  (all frames full, every cabin smokes, three smokes at most).
+- Layout 1: the clearing on the east side, the frames in an L round the cabins instead of rows in front.
+
+**Task 15 (A6): Cotton.** New file `cotton.py`; sheets `cotton.png`, `cotton_variants.png`.
+- Models: `cotton1`, `cotton3`, `cotton5` (page 1). Guide: "Cotton". Ground `farm`, seed 16.
+- What changes: the red earth filled the hex; here it is 1 / 3 / 5 patches of `cotton_soil` (22 x 16 px) with
+  rows along the long side (`p.rows(..., col=kit.crop("cotton", season)[0], soil=kit.crop("cotton_soil",
+  season)[0])`); the bolls are 1 px `BOLL` dots on the rows; the white heaps become 2 / 4 banded bales (salt owns
+  white cone heaps in a row); the tall gin house is a two-storey plastered house with a hoist beam.
+- Watch: the vineyard (the crowding table). Autumn is the white season, summer half white, winter has no white:
+  check that mild-winter cotton beside mild-winter vineyard is still told apart at 50% (red earth, big patches,
+  the gin house).
+- Layout 1: the patches in an L round the gin house in a corner, rows at right angles to layout 0's.
+
+**Task 16 (B1): Ores: iron, silver, copper.** File `mines.py`; sheets `mines_iron.png`, `mines_silver.png`,
+`mines_copper.png` (the plain `mines.png` and `mines_variants.png` must come out pixel-equal: N9).
+- Models: `iron1`-`iron5`, `silver1`-`silver5`, `copper1`-`copper5` (page 2). Guide: "The four ores".
+- Add `ore=None` to `draw` and a constant `ORES = (None, "iron", "silver", "copper")`. The layouts stay. An ore
+  changes: the heap colours (`kit.ORES[ore]["spoil"]`, `["spoil_d"]`), the ore pile (`["ore"]`, `["ore_d"]`), one
+  detail and the level 3 landmark **on the smelter's foot in both layouts**: the blast furnace with its `GLOW`
+  mouth (iron), the mint with its stamp frame (silver), the roasting yard of three smoking heaps (copper).
+- What changes from the models: the mountain backdrops, snow peaks, sparkles, the tramway and the red-roofed
+  mint go. The copper stain is 3-4 flat `VERDIGRIS` patches on the outcrop's lit faces.
+- Watch: the four pictures (plain and three ores) of level 3 side by side at 50% must be four different
+  pictures; levels 1 and 2 differ by colour only, and that is accepted. Smoke: the furnace always, the three
+  roasting heaps always, the mint never. `on=` for every smoke.
+- Write the landmark as one function per ore taking the foot, so task 17 can add gold beside them.
+
+**Task 17 (B2): Ore: gold.** After task 16. File `mines.py`; sheet `mines_gold.png` (all other mines sheets
+pixel-equal: N9).
+- Models: `gold1`, `gold3`, `gold5` (page 2). Guide: "The four ores", the gold line.
+- Gold is the one ore with **its own layout tables** (`GOLD = [dict, dict]`, beside `LAYOUT`): the outcrop and
+  adit stay at level 1; tents on the huts' feet at levels 1 and 2; at level 2 **the sluice** (a timber trough on
+  trestles, 26-30 px long, along a longer race with a pond at each end, inside the hex) stands where the
+  headframe is in the other ores; at level 3 the strongroom, three houses, three gravel heaps, the ore pile.
+- What changes from the model: the river is the map's (the race is the piece's own water); the yellow ground
+  goes (the map's); the palisade fort is **dropped** (the art director's call: gold has no fort).
+- Watch: a castle (no ring of any kind); the timber sawmill's race (gold's race carries the long trough and no
+  wheel); the sluice must be the first thing seen at 50%.
+
+**Task 18 (C1): Vineyard, the third layout.** File `vineyard.py`; sheets `vineyard.png`, `vineyard_variants.png`
+(layouts 0 and 1 pixel-equal: N9).
+- Models: `wine4`, `wine5` (page 2). Guide: "Vineyard", "The third layout: contour rows round the chateau".
+- `VARIANTS = 3`, a third dict in `LAYOUT` with its own keys (centre, ring radii, sectors as angle pairs with a
+  "from level", hut, press, estate). Rows with `p.arc`; each sector's soil a `p.patch` between two
+  `kit.ring_points` lines; the demonstration in `additions.py` (`contour()`) shows the calls, not the design.
+- What changes from the model: no hill, no slope shading, no cellar door in a slope; the chateau is the
+  family's estate house in the middle of the rings.
+- Watch: counts and coverage as layouts 0 and 1 (6 blocks, at least 5 rows each; measure the footprint); the
+  press house at level 2 must not hide behind rows; the rows must still read in winter (snow soil, dark stakes)
+  and under the mild winter; at 50% it must be told from layouts 0 and 1 and both mirrors (it will be: it is the
+  only curved one). If the track ends elsewhere, `GATES` becomes a list of three.
+
+**Task 19 (C2): Grazing, the third layout.** File `grazing.py`; sheets `grazing_sheep.png`, `grazing_cattle.png`,
+`grazing_horses.png`, `grazing_sheep_variants.png`, and new `grazing_horses_variants.png` (layouts 0 and 1 of all
+three animals pixel-equal: N9).
+- Models: `wool2`-`wool4` and `horses2`-`horses5` (page 2). Guide: "Grazing", "The third layout: upland pens".
+- `VARIANTS = 3`. Layout 2 has two forms of its meadows, by the animal: sheep and cattle get odd-shaped pastures
+  inside `p.drystone` walls and a round stone ring (`p.ring(kind="stone")`); horses get three round paddocks
+  (`p.ring`, radius 16, 11, 11). Keep one table with both forms' shapes; hut, byre, hall, haystacks and the herd's
+  count are shared, the herd's places may differ by form.
+- What changes from the models: the grey paths across the wool tile go (roads are the map's); the striped
+  tents, the galloping horses and the red stable roof go; horses stand, at kit size.
+- Watch: the meadow colour inside every wall and ring (a wall alone is a thin line and no footprint); animals
+  inside the walls from level 2; walls sharing a side must not double; the stone fold must not read as a well;
+  10 px margin at every pasture corner; winter's three animals stand in the fold or the paddock by the byre.
+
+**Task 20 (C3): Castles, the third layout.** File `castles.py`; sheets `castles.png`, `castles_variants.png`
+(layouts 0 and 1 pixel-equal: N9).
+- Model: `K1` (page 3). Guide: "Castles", "The third layout: motte and bailey".
+- `VARIANTS = 3`; a third dict in `LAYOUT` and a third in `GATES`. The motte (back left) and the bailey (front
+  right) are two places joined by a lane; levels 2 and 3 grow on them as the table says.
+- What changes from the model: the old timber keep becomes the family's grey stone tower with slate cone and
+  banner; the mound is low (a 22 x 12 px mound with a darker front edge; nothing above 20 px over the keep's
+  foot); the palisade is the kit's ring (`p.wall(kind="palisade")`).
+- Watch: the level 3 bastion wall must go round both places without leaving the margin (it is the widest thing
+  in the family: measure it, mirrored too); the keep must not be hidden by the bailey's back wall; `x=` on every
+  part of the motte's tower and of each ring; the banner colour stays the `flag` keyword.
+
+**Task 21 (D1): Landmark cities: Venice, Constantinople, Paris, Moscow.** New file `landmarks.py`, a hook in
+`settlements.py`; new sheet `landmarks.png` (`settlements.png` and `settlements_variants.png` pixel-equal: N9).
+- Models: `venice2`/`venice3`, `constantinople2`/`3`, `paris2`/`3`, `moscow2`/`3` (page 3): stage 2 is the model
+  for level 4, stage 3 for level 5. Guide: "Landmark cities".
+- `landmarks.py`: `NAMES`, `draw(p, name, level, x, y)` (returns the handle; every part `p.stand(..., x=x)`, the
+  shadow `p.cast`), `CLEAR[name][level]` (the box, in px round the foot, in which the settlement draws no house),
+  `WALL[name]` (a ring-wall colour, where the city has one: Moscow `kit.BRICK`). `settlements.py`:
+  `draw(..., landmark=None)`; at levels 4 and 5 with a landmark, call it in place of the church or cathedral on
+  the same spot **in both layouts**, skip the houses in `CLEAR`, pass `WALL` to `p.wall(col=)`. Below level 4
+  and with `None` nothing changes.
+- The sheet (write it from `landmarks.py`): one row per city, levels 4 and 5, summer and winter, both layouts,
+  and a 50% strip with a plain level 5 city at its head.
+- What changes from the models: the water, river, island, sea walls and gondolas are the map's or are dropped;
+  the monuments shrink from 40-60 px to at most 20 x 24 px, so each keeps **one silhouette idea**: the campanile
+  beside low domes; the wide dome between four needles; two square towers; the cluster of coloured onions over a
+  red wall. Venice is drawn at a shore like any city (guide: "Venice and the water"); do not draw water.
+- Watch: each monument against the plain cathedral and against the other three at 50%; snow on domes lies on the
+  upper left only and the colour must still show; minarets and the campanile are thin: give them 1 px minimum
+  and thin ink so they survive the 50% test; no house pokes through a monument.
+
+**Task 22 (D2): Landmark cities: London, Rome, Seville, Lisbon, Cairo, Granada.** After task 21. File
+`landmarks.py` only (`landmarks.png` grows by six rows; the first four rows pixel-equal).
+- Models: `london2`/`3`, `rome2`/`3`, `seville2`/`3`, `lisbon2`/`3`, `cairo2`/`3`, `granada2`/`3` (page 3). Guide:
+  "Landmark cities", the last six lines.
+- What changes from the models: London's bridge, Lisbon's ships, Cairo's Nile and desert, Granada's hill and
+  snow peaks, Seville's palms all go; Lisbon's tower stands on the church's spot for now.
+- Watch: Cairo against Constantinople (Cairo has no great dome), Rome's dome against the plain cathedral's and
+  Constantinople's (Rome's stands on a tall drum with a lantern), Granada's and Moscow's red (Granada is a long
+  low wall, Moscow a ring with onions), the Giralda and the campanile (bands against a plain shaft with a green
+  cap). All ten in one 50% strip.
+
+**Task 23 (E1): Sites.** New file `sites.py`; sheets `sites.png` (one row per site: the wild land, the site in
+four seasons, the three winters, 50%) and `sites_variants.png`.
+- Models: `L-monastery`, `L-roman_ruins`, `L-aqueduct`, `L-standing_stones`, `L-ruined_castle`,
+  `L-pilgrimage_chapel` (page 4). Guide: "Sites".
+- `LEVELS = (0, 1)`, `VARIANTS = 6`, `SITES = (...)`: **the variant is the site**. `kit.sheet` shows levels, so
+  write the sheet with a small loop of your own over the six variants (`kit.with_wild(draw, 1, season,
+  variant=i)` and `kit._cell`, as `winters.py` does); `kit.variant_sheet` works as it is (twelve columns).
+- What changes from the models: front view, thin ink, at most 20 px tall; the old pictures are one big object:
+  here each is a small group with a footprint of 8-20% of the margin hex, so the wild land stands close round it.
+- Watch: the ruined castle against castle 1 and the monastery against a village (the crowding table); the
+  chapel against the settlement's level 2; the standing stones against the map's own stones (a clear ring, taller
+  stones, the trodden circle); the aqueduct must stay inside the hex mirrored too. Each site gets a `GATES` entry
+  only if it has a track (the chapel, the monastery).
+
+**Task 24: Coast follow-ups from the map** (task 9's modules). Files `salt.py`, `harbour.py`; all six coast
+sheets again.
+- Seen in the in-map test of round 4 (above): `PIECE PROBLEM` on real shores for harbour level 1 (6 px), harbour
+  level 2 (15 px) and its add-on (9 px), and salt level 3 (159 px; layout 1, mirrored, sea at 111 degrees). The
+  map's shores are curved and slanted and the land is sometimes only a strip.
+- Reproduce without the map: call the modules with a bent shore line, `shore=[(-52, 8), (-20, 20), (10, 16),
+  (52, -6)]` and its like, on `sea=` angles 16, 66, 77, 111 and 163 degrees, plain and mirrored, both layouts.
+  Every thing that would leave the hex is slid in with `shore.fit` or left out (`shore.fits`); nothing may print
+  `PIECE PROBLEM`.
+- Salt layout 1: `p.claim` the strip of the feeder channel between the two blocks (a wild tree stands there in
+  the map), and keep the first row of pans within 6 px of the shore at the channel on a bent shore (the pans
+  follow `shore.pt`; the channel must reach the water).
+- Harbour layout 1 on a bent shore: the long mole must start at the water's edge (not on land) and the spur must
+  not lie across the beach: root both with `shore.pt(u, 0)` at their own `u`, and drop the spur where
+  `shore.land` says its far end is on land.
+- The straight-shore pictures of the sheets must not change (N9).
+
+**Task 25 (F1): Overview and in-map test with the new families** (the art director, last).
+- `overview.py`: the six new families, an ore row, a sites row, a landmark row and the third layouts;
+  `winters.py`: the new families. `compose.py`: place a quarry, a dye works and a site in the test region and
+  give Genoa no landmark (it has none); render and review. Then the look-alike review of all sixteen families on
+  one page, at 50%.
+
 ## 5. Kit changes made in this review
 
 All new arguments are optional; modules run unchanged. Pictures were compared before and after, pixel by pixel.
@@ -678,7 +996,7 @@ New, smaller questions the answers raise (none blocks the tasks; guide section 1
 - **The carved harbour is not drawn yet.** Until task 9 the open-shore layout stands in Genoa's bay, and the bay
   is cut 84 px wide for it instead of 72. The picture shows that the harbour fits the hex, not the final basin.
 - **A carved bay moves the coast further than the style frame's cove rule** (4.2 km against 3.5; 6.8 km from the
-  frame's first line with the frame's own cove). Guide section 12, point 1.
+  frame's first line with the frame's own cove). **Answered in round 4:** up to 5 km for carved ports only.
 - **The bay eats the town's front.** A city fills its hex; the bay's back lies 18 px from the centre, just in
   front of the wall, and the suburb houses and plots there are left out. Settlements' second layout should keep
   the front of the ring free of anything that matters.
@@ -692,3 +1010,29 @@ New, smaller questions the answers raise (none blocks the tasks; guide section 1
   look right on the sheets and wrong only in the mild winter; the checklist now asks for the three winters.
 - `winters.png` shows settlements as the module stood while its second layout was being drawn; run
   `winters.py` again when that task is back. `overview.png` was not run in this round for the same reason.
+
+**Round 4**
+
+- **Sixteen families is a crowd.** The crowding table (guide section 4) names the pairs and the rules, but the
+  rules are untested until the sheets are back; expect to send hemp, cotton and silk back once (they are all
+  "rows or blocks on farm land"). Task 25's one-page look-alike review is the real test.
+- **Big ideas, small units.** The old tiles are loved for one bold object filling the hex. At this scale the
+  quarry is an 18 px face and Hagia Sophia a 12 px dome. The owner may find them less striking than the tiles he
+  picked from; the first wave (quarry, dye works, ores, vineyard, sites) shows it early.
+- **Landmarks at 20 x 24 px** carry one silhouette idea each; minarets and the campanile are 1-4 px wide and may
+  vanish at 50%. If they do, the fix is a taller limit for landmark cities (an owner question then, not now).
+- **Venice is not Venice without water.** It is drawn as a city at a lagoon shore until the island rule is
+  designed (guide section 12, point 1).
+- **The quarry's stepped face and the fur post's stockade are local drawings** (`p.stand`), not kit calls; their
+  mirrors need the `x=` care of section 6. If two families end up wanting a straight palisade, it moves to the kit.
+- **Third layouts change `kit.pick` for those families**: with three layouts every hex of a class shows that
+  class's layout, so the in-map pictures of vineyard, grazing and castles all change when tasks 18 to 20 land.
+- **Mulberry's autumn** (gold and late green by turns) may read as a row of small haystacks at 50%; task 13
+  reports on it.
+- **Task 9 was reviewed in the map only** this round (Genoa, and the four findings of task 24), not line by line
+  against its brief.
+- **The tables give counts and sizes that were not drawn first.** Coverage for the contour vineyard, the three
+  paddocks and the furs bands is estimated; a worker who cannot meet a number reports it rather than bending
+  the picture.
+- Whether the map data will place these goods, sites and landmark cities at all is a game question; the pieces
+  only wait for it.

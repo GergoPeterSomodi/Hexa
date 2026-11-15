@@ -3,13 +3,17 @@
 Art director, 2026-11-15. **Status: the owner answered the three open questions on 2026-11-15 (section 12); this
 guide is rewritten to those answers and was made sharper after the second review (coverage, the mirror axis, boat
 sizes, coast pieces on every sea side). Round 3 (the same day) adds the owner's two further answers: **two port
-modes** (section 10) and **winter by climate** (section 7). Nothing in the game is changed.**
+modes** (section 10) and **winter by climate** (section 7). Round 4 (the same day) records the owner's pick from
+the Python-art catalogue (`../python_art/catalogue.md`, the top 10) and his two port answers, and writes the tables
+for it in one pass: six new goods families, the four ores, the landmark cities, the Sites family and the third
+layouts (sections 4, 6, 8, 10, 12). Nothing in the game is changed.**
 
 A **piece** is the picture of one hex's improvement at one level in one season, at the normal map zoom (the style
 frame's close zoom: hex radius 60 px, one hex = one district). This guide and the drawing kit
 (`tools/worldmap/pieces/kit.py`) are everything an artist needs to draw a family of pieces. Two families are the
 reference: `wheat.png` and `settlements.png` in this folder (code: `wheat.py`, `settlements.py` next to the kit).
-`kit_contract.png` shows the kit's side of the map contract (wild land, coast, footprint, mirror) on one page.
+`kit_contract.png` shows the kit's side of the map contract (wild land, coast, footprint, mirror) on one page;
+`kit_additions.png` the calls, crops and tokens added for the families of round 4.
 **When this guide and a reference sheet seem to disagree, follow this guide and report the gap**: the reference
 sheets were drawn before the owner's answers and are brought up to date in review task 5.
 
@@ -28,7 +32,8 @@ growing-map plan (`../06-growing-map.md`, sections 2 and 5).
 | The winter of a hex: snow, frost or mild | **The map**, by the hex's climate | None: the piece is drawn `draw(level, "winter")` as always; the kit is told the winter (section 7) |
 | Rivers, streams, roads between hexes | The map | Gate points for roads (section 10); no water or road to the hex border |
 | Town name plates | **Nobody, for now** | None. No plate, no plate strip |
-| Repetition | The map picks by the hex | Every family has a mirrored version and a second layout (section 6) |
+| Repetition | The map picks by the hex | Every family has a mirrored version and a second layout; vineyard, grazing and castles a third (section 6) |
+| Which ore, which landmark city, which site | **The map data** | A keyword or the variant: `ore=`, `landmark=`, the site's number (section 8) |
 
 Contents: 1 canvas, 2 camera, 3 light and ink, 4 palette, 5 sizes, 6 how a level reads (level 0, footprint,
 mirror and second layout), 7 seasons (and the three winters), 8 the family tables, 9 readability, 10 terrain fit,
@@ -125,6 +130,30 @@ the top of the family module and list it in your report.
 | `FLAG` | 196, 52, 48 | Castle banners (stand-in for the owner's colour) |
 | `SMOKE`, `SMOKE_SNOW` | 236,236,232 / 186,190,202 | Smoke puffs; the winter smoke |
 
+**Signature tokens of the round 4 families** (fixed; in the kit, so no two families can pick the same colour;
+swatches on `kit_additions.png`). Each has one owner. A second user is named here or it is not allowed.
+
+| Token | RGB | Owner |
+|---|---|---|
+| `MARBLE`, `MARBLE_D` | 240,236,226 / 200,196,188 | Quarry: cut blocks, columns. Also Venice's fronts and the Roman ruins |
+| `PIT`, `PIT_D` | 212,202,180 / 164,152,132 | Quarry: ledge tops and cut faces |
+| `DYE["blue" / "red" / "yellow" / "purple"]` | 58,98,172 / 192,54,60 / 234,192,62 / 128,72,152 | Dye works: vats and cloth. Nothing else on the map is many-coloured |
+| `RET`, `RET_D` | 98,132,118 / 64,92,86 | Hemp: the retting pond |
+| `BOLL` | 250,248,240 | Cotton: the bolls and the bales |
+| `DOME_TILE`, `DOME_TILE_D` | 64,150,168 / 44,112,132 | Silk: the caravanserai's dome |
+| `PELT`, `PELT_D` | 146,94,58 / 106,68,46 | Furs: the pelts |
+| `ORES[ore]`: `spoil`, `spoil_d`, `ore`, `ore_d` | see the kit | Mines, by ore (section 8) |
+| `GLOW` | 250,150,50 | Mines, iron: the furnace mouth |
+| `VERDIGRIS`, `VERDIGRIS_D` | 96,160,140 / 66,122,110 | Mines, copper: the stained rock. Also the cap of Venice's campanile |
+| `BRICK`, `BRICK_D` | 178,74,60 / 136,56,48 | Landmarks: Moscow, Granada |
+| `LEAD`, `LEAD_D` | 118,140,168 / 88,108,136 | Landmarks: the domes of Constantinople and Venice |
+| `GILT` | 228,188,84 | Landmarks: a gilded dome or finial, 2 px at most |
+| `ONION[0..3]` | gold, green, blue, red | Landmarks: Moscow's onion domes |
+
+**Light sources.** The map has two: the harbour's lighthouse lamp and the iron furnace's mouth (`GLOW`, a spot of
+at most 2 x 2 px, iron level 3 only, the same in every season). They are the only exceptions to "no highlights";
+no other family may add one.
+
 **Season tokens** (`p.pal[...]` or `kit.PAL[season][...]`)
 
 | Token | Spring | Summer | Autumn | Winter |
@@ -145,7 +174,8 @@ The winter column is the **snow winter**. The frost and the mild winter have pal
 (`kit.WINTER["frost"]`, `kit.WINTER["mild"]`; section 7). A piece never picks one: `p.pal[...]` and
 `kit.crop(name, "winter")` already give the colours of the hex's winter. **Never read `kit.PAL["winter"]` directly.**
 
-**Crop colours** come from `kit.crop(name, season)`: `wheat`, `garden`, `meadow`, `vine_soil`, `vine`, `olive_soil`.
+**Crop colours** come from `kit.crop(name, season)`: `wheat`, `garden`, `meadow`, `vine_soil`, `vine`, `olive_soil`,
+and for round 4 `hemp`, `hemp_row`, `cotton_soil`, `cotton`, `mulberry_soil` (all with their three winters).
 
 **Each family owns one signature.** No other family may use it, so two hexes never look alike:
 
@@ -161,9 +191,35 @@ The winter column is the **snow winter**. The frost and the mild winter have pal
 | Harbour | Jetty, quay and moles of pale stone, sails | Lighthouse |
 | Settlements | A cluster of red roofs round a church | Church, wall, cathedral dome |
 | Castles | Grey stone on a mound, slate roofs, a red banner | The keep |
+| Quarry | A pale stepped rock face and white cut blocks: light, angular, no dark opening | The treadwheel crane; the columns |
+| Dye works | Round vats in four strong colours, cloth on lines | The dye house |
+| Hemp | Near-square blocks of the darkest green beside dull-green ponds | The ropewalk: the longest building on the map |
+| Cotton | White dots in rows on a red-earth patch | The gin house |
+| Silk | Single-file rows of low pollarded trees on pale strips, long sheds between | The caravanserai with a small turquoise dome |
+| Furs | Brown pelts on frames in a small clearing, the wood left standing | The log post in an open square stockade |
+| Sites | One old stone thing alone in the wild land, no fields, no work | The site itself |
 
 Banners belong to castles only. Red tile roofs in a cluster of four or more belong to settlements only: goods
-families have **at most three** houses, mostly thatch.
+families have **at most three** houses, mostly thatch. A landmark city is a settlement: its monument takes the
+church's place and adds no signature of its own to the list.
+
+**Pairs that crowd each other, and what keeps them apart** (round 4; a reviewer checks each pair side by side at
+50%):
+
+| Pair | The rule |
+|---|---|
+| Hemp / spring wheat | Wheat owns long strips (3-4.5 px wide, 28-38 long, 4-6 to a block) and gold. A hemp block is near-square (14 x 12), has **at most two strips** and is never gold or light green: in spring it is **bare earth with dashed rows** (hemp is sown late), in summer the darkest green on the map. Every hemp level shows a pond. No hedges, canal, poplars, haystacks or mill in hemp; stooks are thin three-line tripods, never round stacks |
+| Furs / timber | Timber owns stumps, log piles, the sawmill, the smoking mound and a clearing that grows to 65%. Furs has **none of these**, and its clearing stays small (coverage bands 10-20 / 20-35 / 35-50%): the wood is left standing. Furs is told by the pelt frames, always in front |
+| Furs / castle 1 | The castle is a **round** ring on a mound with a stone tower and a banner. The fur post's stockade is **square, three-sided and open to the front**, on flat ground, timber only: no tower, no gate tower, no banner, nothing of stone |
+| Gold / castle | **Gold has no fort.** The old tile's fortified mine is dropped: gold's top landmark is the strongroom, one small grey stone house with a slate roof, no ring, no tower, no banner. Gold is told by its long sluice and its pale gravel heaps |
+| Quarry / mines | Mines own grey spoil cones, the dark adit, the headframe and smoke. The quarry has no opening, no cone heap and **never smokes**; its blocks are boxes, its rock pale |
+| Dye works / salt | Salt's pans are square, in a strict grid, white to pale pink. Vats are round, in strong colours, at most nine |
+| Cotton / vineyard | Vines: 6 small blocks at changing angles, thin dark rows **across** the short side, pale brown soil. Cotton: at most 5 big patches (22 x 16) of **red** earth, rows **along** the long side with white dots; no terraces |
+| Silk / olives | Olives: round silver trees in a grid on ochre terraces with walls. Mulberries: green, flat-topped, on a pale stem, in **single lines** at least 9 px apart with sheds between; no walls |
+| Silk's dome / the cathedral dome / Constantinople | The caravanserai's dome is 6 px wide, turquoise, on a courtyard wall. The cathedral's is `DOME` grey-green on a church. Constantinople's is `LEAD` grey-blue, 12 px wide, with minarets |
+| Ruined castle (site) / castle 1 | The ruin has a broken, jagged top, a gap in its wall, no roof, no banner, no ring and no mound |
+| Monastery (site) / village | The monastery is one joined block round a court, slate roofs, inside a low wall: no single houses, no red roofs |
+| Spices / dyes | Not needed now (spices are batch 2). If they come: spices are pointed heaps in a row, dyes stay round vats |
 
 ## 5. Sizes and scale
 
@@ -193,6 +249,10 @@ The scale is symbolic (a hex is 28 km): a house stands for a hamlet's worth of h
 | Haystack, heap | 4.6x4.6; heaps 5-12 wide, 4-7 tall | `p.haystack`, `p.heap` |
 | Road / track | 2 px with an edge / 1 px, no edge | `p.road(pts, w, track)` |
 | Canal, stream | 1.4 / 3 px | `p.water(pts, w)` |
+| Dry-stone field wall | 1.2 px, grey, a dark foot | `p.drystone(pts, closed=)` |
+| Round pen | Sheepfold: radius 5-7 (stone). Paddock: radius 11-17 (post and rail). A gate gap of 4 px | `p.ring(cx, cy, rx, kind="stone" / "fence", gate=)` |
+| Contour row | 1.2 px, rows 4-5 px apart, as `rows` | `p.arc(cx, cy, rx, ry, a0, a1, dashed=)` |
+| Mulberry | Crown 5.6 x 3.6 on a pale stem, about 6.5 tall; 5 px apart in a row | `p.tree(x, y, 1.0, "mulberry", i)` |
 
 Ring walls are ellipses with ry = 0.55 x rx (the tilt). Keep at least 5.5 px between house feet sideways and 3.4 px
 front to back, or roofs merge into one red mass.
@@ -206,6 +266,8 @@ A level is the **character of the whole district**, not one building. Four thing
    footprint's share of the margin hex** (the hex pulled in 10 px: the only ground a piece may work), in summer,
    layout 0. Bands that pass: level 1 15-30%, level 2 35-60%, level 3 60-85%. Of the whole hex that is about
    12-20%, 23-40% and 40-58%, so a full level 3 still leaves a quarter of the hex plain.
+   Two families have bands of their own (section 8): **furs** 10-20 / 20-35 / 35-50% and **sites** 8-20% (one
+   level).
 2. **Silhouette.** The tallest thing gets taller: level 1 up to 9 px, level 2 up to 13 px, level 3 up to 20 px.
 3. **Density.** More of the same unit: blocks, rows, pans, heaps, houses, animals.
 4. **One landmark per level.** Each level adds exactly one new landmark that no lower level has. It stands at or
@@ -307,6 +369,16 @@ level side by side must not be the same picture.
   countryside, not as wallpaper.
 - Order of work: wheat, grazing, timber and vineyard first (the most common), then the rest. Until a family has its
   second layout it says `VARIANTS = 1` and the map uses the mirror alone.
+- **A third layout** (`VARIANTS = 3`, `variant=2`; round 4: vineyard, grazing, castles) follows the same rules
+  against **both** other layouts: same landmarks, counts, coverage and signature; its yard at least 14 px from the
+  yards of layouts 0 and 1 and from their mirror images; told from all four at 50%. A third layout should differ
+  in **kind of plan**, not only in place (curved rows where the others are straight, round pens where the others
+  are square): that is what it is for. With three layouts `kit.pick` gives each of the grid's three classes its
+  own layout, plain or mirrored by the hex, so no two neighbours show the same layout. The variants sheet gets two
+  more columns by itself. `GATES` becomes a list of three dicts if the third layout ends elsewhere.
+- **A keyword choice is not a layout.** `animal=`, `ore=`, `landmark=`, `flag=` and `addon=` come from the map data
+  and keep the layout tables; the default of each keyword is today's picture, pixel for pixel. Where a choice
+  needs tables of its own (gold) they are separate tables with the same number of layouts.
 
 ## 7. Seasons
 
@@ -441,6 +513,22 @@ Seasons: spring light green rows; summer dark green rows; autumn **red rows**, 2
 the newest block, smoke; winter bare brown stakes on snow soil. The rows are the signature: never fewer than 5 per
 block.
 
+**The third layout: contour rows round the chateau** (`variant=2`; model: `wine4`, `wine5`). The six blocks are
+six **sectors of one set of concentric rows**: 6 curved rows (`p.arc`), 4-5 px apart, round one centre near the
+middle of the hex, the rings flattened to about 0.78 (a low knoll seen at the tilt), open at the back over about
+100 degrees. No hill is drawn and nothing is shaded as a slope: the curve of the rows is the whole picture; a
+faint trodden knoll (`p.blob`, alpha 0.25-0.3) may mark the middle.
+
+| Level | What is drawn | Landmark |
+|---|---|---|
+| 1 | 2 sectors of young (dashed) rows at the front left, the thatched hut in the front gap between sectors | The hut |
+| 2 | 4 sectors of full rows, the hut becomes a tiled house | The press house with its 2 vats, at one end of the opening at the back |
+| 3 | 6 sectors; the two outermost bands of the back sectors stand on terrace walls (`p.terrace(face=2)` along the arc); a track from the middle to the gate through the front gap | The chateau **in the middle of the rings**: the estate house with its tower and 2 cypresses |
+
+Same counts as the other layouts (6 blocks, at least 5 rows each, 2 terraced). Each sector's soil is a patch
+between two `kit.ring_points` lines, with a 2 px gap of ground between sectors. The seasons are the vineyard's.
+The hut stands at least 14 px from (-14, 8), (12, -18) and their mirror images.
+
 ### Olives. Ground: `grass` (warm coast hills)
 
 | Level | What is drawn | Landmark |
@@ -466,6 +554,20 @@ One layout, three animals: `draw(level, season, animal="sheep")`, one sheet per 
 Seasons: spring 2-3 smaller young animals beside the grown ones; summer all animals out, haymaking (extra
 haystack); autumn all out, haystacks; winter **only 3 animals**, close to the byre, smoke, snow-capped haystacks.
 Animals always stand inside the fences from level 2.
+
+**The third layout: upland pens** (`variant=2`; models: `wool2`-`wool4`, `horses2`-`horses5`). The same table, the
+same counts (5 / 8 / 13 animals, 0 / 1 / 2 haystacks, hut, byre, hall), the meadows enclosed in another way, by
+the animal:
+
+| Animal | The meadows of levels 2 and 3 | The round thing |
+|---|---|---|
+| Sheep | **Odd-shaped pastures inside dry-stone walls** (`p.drystone`): 4 or 5 corners each, no two alike, sharing walls where they touch; the meadow colour inside | A **round stone fold** (`p.ring(kind="stone")`, radius 6) by the byre, from level 2, with 2 of the 8 sheep in it |
+| Cattle | The same walled pastures as the sheep | The same ring as a cattle pound, empty in winter |
+| Horses | **Round paddocks** (`p.ring`, post and rail): one of radius 16 at level 2 with a trodden middle (`p.blob`, alpha 0.3); two more of radius 11 at level 3. Three rings, no square meadow | The paddocks themselves |
+
+No stripes, tents or bunting at the stud (the old tile's tents are dropped), horses stand, the walls and rings stay
+10 px inside the border. The hut stands at least 14 px from (-32, -17), (34, -12) and their mirror images.
+Winter: walls and rings carry a snow line; the three animals left out stand in the fold or the paddock by the byre.
 
 ### Salt pans. Ground: `sand`, at the map's shore (`p.coast()`, section 10)
 
@@ -494,6 +596,24 @@ covered with a snow cap, nobody out.
 Seasons change little here, on purpose (spring and summer are the same picture): ground palette, snow caps on
 roofs and heaps, the race frozen. The
 smelter chimney smokes **in every season** (the one exception to the smoke rule). No people.
+
+**The four ores**: `mines.draw(level, season, variant=0, mirror=False, ore=None)`. `ore=None` is the table above
+and today's picture, pixel for pixel. An ore keeps the layout, the outcrop, the adit, the headframe, the race and
+the houses, and changes three things: the colour of the spoil heaps and the ore pile (`kit.ORES[ore]`), one
+detail, and the **level 3 landmark, which stands on the smelter's foot**. One sheet per ore
+(`mines_iron.png` ...).
+
+| `ore=` | Spoil and ore | Detail | Level 3 landmark (in the smelter's place) | Smoke |
+|---|---|---|---|---|
+| `None` | `SPOIL`, the module's `ORE` | - | The smelter with its chimney | The chimney, always |
+| `"iron"` | Brown-grey spoil, rust-red ore | From level 2 a second, small rust ore pile by the headframe | **The blast furnace**: a tapered grey stone stack, 15 px tall and 7 wide at the foot, a charging bridge (a timber ramp) on its right, the mouth at its foot glowing (`GLOW`, 2 x 2 px) | The stack, always |
+| `"silver"` | Pale blue-grey spoil, near-white ore | No sparkles, no glints, no snow peaks | **The mint**: a white house (`PLASTER[3]`), 10 wide, on a grey stone base, **slate** roof, a barred dark door; beside it a stamp frame (2 timber posts and a beam, 6 px) | None; the usual house smoke in autumn and winter |
+| `"copper"` | Grey-green spoil, orange ore | The outcrop's lit faces carry 3-4 `VERDIGRIS` stains (flat patches, no gradient) from level 1 | **The roasting yard**: three low dark heaps in a row (7 x 4 px, an orange line at the foot) on a trodden yard | The three heaps, always (three smokes: the activity limit) |
+| `"gold"` | Pale ochre gravel heaps, a small ochre ore pile | **Its own layout tables** (two, for the two layouts): tents in place of the huts at levels 1 and 2 (pale cones 5 wide, 6 tall, on the huts' feet; houses at level 3) | Level 2's landmark is **the sluice** in place of the headframe: a timber trough on trestles, 26-30 px long, 4 tall, lying along the piece's own race (the race and its two ponds are longer; no stream to the border). Level 3: **the strongroom**: one small grey stone house, slate roof, a barred door. No fort, no ring, no tower | None |
+
+Gold keeps the outcrop and the adit at level 1 (the family's signature); the river of the old tile is the map's
+and is not drawn. Seasons as the family's; the race and the sluice's water are frozen where water freezes. No
+people. No ore has a mountain, a peak or a tramway to the border.
 
 ### Timber and logging. Ground: `wood`
 
@@ -537,6 +657,121 @@ quay, moles, lighthouse, the hull on the slip, ships and boats. No huts, no ware
 widening, no trees. The add-on has the same three levels and the same layout as the full piece, so a fishing
 village that grows into a port town keeps its harbour.
 
+### Quarry. Ground: `rock`. Seed 11. Models: `stone1`, `stone3`, `stone5`
+
+The pit is **not** drawn from above. It is a stepped rock face rising to the back, like a wide stair seen from
+the front: each ledge is a flat top (`PIT`) over a cut face (`PIT`, with the right quarter `PIT_D`), 4-5 px tall.
+It is the family's own raised ground, as the mine's outcrop is, and is built with `p.stand` (give `x=`).
+
+| Level | What is drawn | Landmark |
+|---|---|---|
+| 1 | One ledge at the back, 24 px wide; 2 cut blocks (`MARBLE` boxes, 3 x 2 px) on a trodden yard; a thatched hut; a track | The cut face |
+| 2 | 3 ledges, 40 px wide, stepping back and up; 5 blocks in one neat stack; a second hut; a ramp (a pale track up the first ledge) | The treadwheel crane: a timber A-frame with a wheel at its foot, 12 px tall, on the lowest ledge's edge |
+| 3 | 4 ledges, 56 px wide (18 px tall in all); 8 blocks in two stacks; a long thatched masons' lodge | The column yard in front: 3 standing `MARBLE` columns, 9 px tall, and one lying |
+
+Seasons change little, as in mines (spring and summer are one picture): the ground palette; snow on ledge tops,
+block tops and roofs, **the cut faces bare**; 2 masons in summer, nobody in winter. No smoke in any season, no
+water, no heap. Coverage: the usual bands; the trodden yard is what clears the ground.
+
+### Dye works. Ground: `grass`. Seed 12. Models: `dyes1`, `dyes3`, `dyes5`
+
+| Level | What is drawn | Landmark |
+|---|---|---|
+| 1 | 3 round vats (flat ellipses 6 x 4 px with a `STONE_D` rim: blue, red, yellow) on a trodden yard; a thatched hut; a rinsing channel of plain water between two small ponds, inside the hex | The cloth line: 2 posts and a line with 3 hanging cloths (2.5 x 4 px each, in the vats' colours) |
+| 2 | 6 vats in two rows of three (purple added); 2 cloth lines; the hut becomes a tiled house | The drying loft: a tall open timber frame, 10 wide and 11 tall, hung with long cloths in the four colours |
+| 3 | 9 vats in a 3 x 3 grid; 3 cloth lines; a second house | The dye house: a wide stone building (`STONE` walls, tile roof, 13 px) with a chimney |
+
+The vats lie on the ground; cloth lines and the loft stand. The old tile's coloured stream is dropped: the channel
+is plain water. Seasons: the vats **keep their colours in every season, also under snow** (they are heated: no ice
+and no snow on the liquor, snow only on the rims), which makes this family's winter its strongest picture; the
+cloth lines are hung from spring to autumn and bare in winter, the loft is hung in every season; 2 dyers in
+summer; the channel freezes where water freezes; the dye house chimney smokes **in every season** (a listed
+chimney). Never more than nine vats, never square, never in pale colours (salt's pans).
+
+### Hemp and the ropewalk. Ground: `farm`. Seed 13. Models: `hemp1`, `hemp3`, `hemp5`
+
+| Level | What is drawn | Landmark |
+|---|---|---|
+| 1 | 2 blocks (14 x 12 px, 2 strips, `kit.crop("hemp", season)`), 1 retting pond (`RET`, about 9 x 6 px) touching a block, a thatched hut, a track | The hut |
+| 2 | 5 blocks, 2 ponds, a row of 4 stooks (thin tripods of three lines, 2.4 wide, 4.5 tall) | The scutching barn: a thatched barn, 11 px |
+| 3 | 8 blocks, 3 ponds, 6 stooks, a second house | The ropewalk: an open thatched shed **28 px long**, wall 4, roof 3, on posts, with a rope (one thin line) running 10 px out of its end to a post |
+
+Blocks are near-square and lie at two or three slightly different angles, in loose groups with a pond between;
+never in a row of long strips (the crowding table, section 4). Seasons: **spring** bare earth blocks with dashed
+young rows (`hemp_row`) and full ponds; **summer** the darkest green, with a 1 px darker band along each block's
+front edge (the crop stands tall), 1-2 workers; **autumn** cut: pale stubble, the stooks on the newest blocks, two
+pale lines on each pond (bundles steeping), smoke; **winter** blocks in two snow tones with their edges, ponds
+frozen where water freezes, no stooks. In a mild winter: bare dark earth, open ponds. Stooks stand in summer
+(few) and autumn (all) only.
+
+### Cotton. Ground: `farm`. Seed 16. Models: `cotton1`, `cotton3`, `cotton5`
+
+| Level | What is drawn | Landmark |
+|---|---|---|
+| 1 | 1 patch of red earth (22 x 16 px, `cotton_soil`) with 5 plant rows along its long side, a thatched hut | The hut |
+| 2 | 3 patches, 2 bales (`BOLL` boxes 3 x 2.5 px with two dark bands) by the shed | The drying shed: a thatched roof on posts, 12 px wide, open sides, white under it |
+| 3 | 5 patches, 4 bales, a track | The gin house: a two-storey plastered house (`PLASTER[1]`), 9 wide and 8 tall, tile roof, a hoist beam on its right |
+
+The red earth is a patch under the work only; the hex's ground is the map's. Seasons: spring young green dashed
+rows on red earth; summer green rows, bolls (1 px `BOLL` dots) on every second row; **autumn is the harvest and
+the signature at its strongest**: every row white with dots, 2 pickers, the bales out; winter no white at all:
+bare brown stalk rows. Cotton grows where the winter is mild, and there its winter is bare stalks on dark red
+earth; in a frost or snow winter the patch is snow soil with one row in four showing earth. Bales stand in
+autumn and winter only.
+
+### Silk. Ground: `grass`. Seed 14. Models: `silk1`, `silk3`, `silk5`
+
+| Level | What is drawn | Landmark |
+|---|---|---|
+| 1 | 2 rows of 6 mulberries (`p.tree(..., "mulberry")`, 5 px apart) on pale strips (`mulberry_soil`, 3 px wide), a thatched hut | The hut |
+| 2 | 4 rows of 7 | The silkworm shed: a long low thatched shed, 16 px, wall 3.5, with 4 dark window slots |
+| 3 | 6 rows, a second shed | The caravanserai: a square court wall (`STONE`, 14 wide, 5 tall, an arched gate) with a small turquoise dome (`DOME_TILE`, 6 px wide) over the gate; 13 px tall in all |
+
+The rows are straight, parallel and at least 9 px apart, with the sheds lying between them; the old tile's hedge
+bands are not used (hedges are wheat's). Seasons: spring light green; **summer the leaves are picked**: every
+second tree of the two newest rows stands stripped, 2 pickers with baskets; autumn gold and late green; winter
+bare pollards with a snow dab; smoke from the sheds in autumn and winter. The dome keeps its colour in every
+season; snow lies only on its upper left. Silk is mostly a warm-land good: check the mild winter first.
+
+### Furs. Ground: `wood`. Seed 15. Models: `furs1`, `furs3`, `furs5`
+
+The wood is the map's and stays. Coverage bands of its own: **10-20 / 20-35 / 35-50%**.
+
+| Level | What is drawn | Landmark |
+|---|---|---|
+| 1 | A small clearing at the front (2 overlapping `p.blob`, alpha 0.5), 2 pelt frames (a pale timber square 4 x 4.5 px with a `PELT` diamond in it), a fire ring | The trapper's tent: a pale hide cone, 6 wide and 7 tall, its poles crossing at the top |
+| 2 | The clearing wider; 5 frames in a row at the front | The log cabin: `TIMBER` walls with two log lines, a dark plank roof (`TIMBER_D`), 8 px |
+| 3 | 8 frames in two rows, a second cabin, a stack of fur bales (`PELT` boxes) | The trading post: a long log house (13 px) inside a **square stockade open to the front** (three straight palisade sides, corner posts, about 30 px wide; the kit's ring wall is not used) |
+
+No stumps, no log piles, no mound, no water (timber's), no stone, no banner (the castle's); the crowding table,
+section 4. The pelt frames always stand in front of the buildings, nothing in front of them. Seasons: **winter is
+the high season**: every frame carries a pelt and every cabin smokes (three smokes at most); in spring and summer
+every second frame is empty and 1 trapper stands by the tent; autumn smoke from the tent's fire. The snow and the
+pines are the season's and the map's.
+
+### Sites. Ground: `grass`. Seed 17. One level. Models: the six `L-...` pictures of catalogue page 4
+
+A site is a thing to find in land without an improvement. It is decoration: it marks no rule of the game.
+`sites.draw(level, season, variant=0, mirror=False)` with `LEVELS = (0, 1)`; **the variant is the site**
+(`VARIANTS = 6`, `SITES = ("monastery", "roman_ruins", "aqueduct", "standing_stones", "ruined_castle",
+"pilgrimage_chapel")`). The map data says which hex has which site, so the map gives `variant=` itself and takes
+only the mirror from `kit.pick`. Footprint **8-20%** of the margin hex, so the wild land comes close; at most
+20 px tall; inside the safe area.
+
+| Variant | Site | What is drawn |
+|---|---|---|
+| 0 | Monastery | A church (the kit's `church`, 13 px) with three low wings round a court (`p.claim`), all slate-roofed, inside a low stone wall; one garden plot, 2 fruit trees |
+| 1 | Roman ruins | 4 broken columns of different heights (5-10 px, `MARBLE_D`), a lintel across two of them, 2 fallen drums, a pale paved patch (an overlay) |
+| 2 | Aqueduct | A run of 5 arches (`STONE`, 9 px tall, 34 long), the last pier broken, both ends inside the hex |
+| 3 | Standing stones | A ring of 7 grey stones (`STONE_GREY`, 3-6 px tall) on an ellipse of radius 12, one taller, one fallen; a faint trodden circle (alpha 0.25) |
+| 4 | Ruined castle | A square tower stump (12 px) with a jagged top, a length of wall with a gap; `STONE_GREY`; 2 patches of ivy (`hedge`); no roof, banner, ring or mound |
+| 5 | Pilgrimage chapel | The kit's `chapel` alone on a pale trodden knoll, a stone cross, 2 cypresses, a track to the south gate |
+
+Seasons: the palette, snow caps on tops and roofs, the ivy rust in autumn. Smoke only from the monastery (autumn
+and winter). People: 1-2 pilgrims at the chapel in summer, nobody else. No fields beyond the monastery's plot, no
+animals, no heaps. Later sites (burial mound, wayside cross, hospice) get further variant numbers; the windmill
+and the lighthouse are never sites (they are landmarks of wheat and harbour).
+
 ### Settlements (reference: `settlements.png`). Ground: `grass`. Levels 1-5
 
 | Level | Name | What is drawn | Landmark |
@@ -556,6 +791,37 @@ harbour add-on there. Seasons: garden plots follow the season, blossom on fruit 
 the green in spring and summer, smoke from 1 house in 3 in autumn and winter, snow roofs and a grey trodden ground
 inside the ring in winter.
 
+**Landmark cities**: `settlements.draw(level, season, variant=0, mirror=False, landmark=None)`. A famous city
+shows its own monument **in place of the church (level 4) and the cathedral (level 5)**, on the same spot, with
+the same green in front. Below level 4 the keyword does nothing: a famous city that is still a town looks like a
+town. `landmark=None` is today's picture, pixel for pixel. The monuments live in one module, `landmarks.py`
+(`NAMES`, `draw(p, name, level, x, y)` with `p.stand`, `x=` on every part); `settlements.py` only calls it, leaves
+out the houses whose feet lie under the monument (`landmarks.CLEAR[name]`, a box per level) and takes the ring
+wall's colour from `landmarks.WALL` where a city has one. A monument is at most **20 px tall and 24 px wide**, has
+the kit's two tones and thin ink, and keeps the clear gap in front. Model pictures: `<city>2` for level 4 and
+`<city>3` for level 5.
+
+| `landmark=` | Level 4 | Level 5 adds | Notes |
+|---|---|---|---|
+| `"venice"` | The campanile: a `BRICK` shaft 4 px wide, 17 tall, a pale belfry, a pointed `VERDIGRIS` cap | St Mark's beside it: a low wide front (`MARBLE`) with 3 small `LEAD` domes, and the palace front (a pale block with an arcade line) | **The water is the map's** (below) |
+| `"constantinople"` | The great dome: a wide low `LEAD` dome (12 px) on a pale stone body with two half-domes | 4 thin minarets (1.2 px wide, 16 tall, pointed caps) at its corners | The sea walls of the old tile are the settlement's own wall |
+| `"paris"` | The twin-towered front: two square `CHURCH` towers, 15 tall, flat tops, a slate nave between them | The towers at 18 px, a thin spire behind them, a dark rose-window dot | No island, no river: they are the map's |
+| `"moscow"` | The ring wall in `BRICK` (`WALL`), its towers with pointed slate caps; a white church with one `GILT` onion dome | A cluster of 4 onion domes in the `ONION` colours at different heights | Snow comes from the season, not from the piece |
+| `"london"` | The White Tower: a square white keep (`PLASTER[3]`) with 4 corner turrets | The tall thin spire of the old cathedral | The bridge is the road layer's |
+| `"rome"` | The round castle: a low wide drum (`STONE`) with a small block on top | The great dome (`LEAD`, on a drum with a lantern) | |
+| `"seville"` | The Giralda: a tall pale tower, 20 px, with 3 dark bands and a belfry | A long low cathedral body at its foot; 2 planted palms are **not** drawn (poplars instead) | |
+| `"lisbon"` | The shore tower: a white tower with corner turrets and a balcony line | A long monastery front beside it | Stands on the church's spot for now; at the shore with the harbour add-on is a later step |
+| `"cairo"` | 2 minarets of different heights and a small ribbed dome, in banded `STONE` | A third and fourth minaret | No great dome: that is Constantinople's |
+| `"granada"` | The red palace wall: a long low `BRICK` wall with 3 square towers | A taller square tower behind it | No hill, no snow peaks |
+
+- **Venice and the water.** A town on islands needs the map: the hex would be lagoon, the town an island, there
+  would be no wall and no south road. That is a design of its own (open, section 12). **Until then Venice is
+  drawn as any city at a lagoon shore**: the settlement piece with `landmark="venice"`, clipped at the shore like
+  every town, with the harbour add-on. The monument is drawn now; the island comes later and will not change it.
+- A landmark city keeps the settlement's signature (red roofs round the monument, the wall). No monument may be a
+  second castle: no banner, no bastion.
+- The first four are Venice, Constantinople, Paris and Moscow; the other six follow in a second task.
+
 ### Castles. Ground: `grass`. Levels 1-3. `draw(level, season, flag=kit.FLAG)`
 
 All three stand on the same low mound (a darker-edged ellipse about 40 x 20 px) at the centre.
@@ -569,6 +835,20 @@ All three stand on the same low mound (a darker-edged ellipse about 40 x 20 px) 
 Use `STONE_GREY` for castles so they never read as a town. No houses, no red roofs. Seasons: the mound follows the
 ground, snow on battlements and roofs, the moat frozen in winter, smoke from the keep in winter only. The banner
 colour never changes with the season.
+
+**The third layout: motte and bailey** (`variant=2`; model: `K1`). The mound and the ring are **two places side
+by side** instead of one inside the other: a small steep motte at the back left (about (-12, -16); a mound 22 x 12
+px with a visibly darker front edge) and a bailey in front of it to the right (a ring of radius about 19 round
+(9, 6)), joined by a short lane. The family's signature stays: grey stone, slate, the banner.
+
+| Level | What is drawn | Landmark |
+|---|---|---|
+| 1 | The motte; the bailey as a palisade ring with a gate; a track to the gate point | The tower on the motte: grey stone, 14 px, slate cone, the banner (not the old tile's timber keep) |
+| 2 | The bailey's ring in grey stone with 2 towers and a gatehouse; a small palisade round the motte's top | The keep on the motte: the tower grown in place to a square keep, 18 px with the motte's rise, battlements, the banner |
+| 3 | The angular outer wall with bastions and the moat round **both**, 2 banners | The bastions |
+
+The tallest point stays within 20 px above the keep's foot. The keep stands at least 14 px from (0, -3),
+(15, -4) and (-15, -4). The bailey holds no houses (castles have none): a well or a timber shed at most.
 
 ## 9. Readability
 
@@ -597,7 +877,14 @@ colour never changes with the season.
 | Mines | Hills and mountains with ore | `rock` | Scree and boulders are the map's; the outcrop is the piece's |
 | Timber | Woods | `wood` | |
 | Harbour | Sheltered coast | `grass` + `coast()` | The sea side comes from the map; also an add-on to a town |
-| Settlements, castles | Any land but high peaks | `grass` | |
+| Settlements, castles | Any land but high peaks | `grass` | A landmark city is a settlement |
+| Quarry | Hills and mountains with good stone | `rock` | The stepped face is the piece's own raised ground |
+| Dye works | Lowland by water, near towns | `grass` | Its channel is its own water, inside the hex |
+| Hemp | Wet lowland, river plains | `farm` | |
+| Cotton | Warm dry plains (mostly the mild winter) | `farm` | Red earth only as a patch |
+| Silk | Warm hills and plains (mostly the mild winter) | `grass` | |
+| Furs | Northern woods | `wood` | Small footprint: the wood stays |
+| Sites | Any land without an improvement | `grass` | Placed by the map data; one level |
 
 - The base ground is the **terrain**, never the improvement: it does not change with the level.
 - Pieces are flat-land pictures. Hills, ridges and slope shading belong to the landscape layer and are not drawn in
@@ -680,9 +967,12 @@ a port to the seaside"). Sheet: `ports.png`; in the map: Genoa carved, the other
     middle 70% (50 px) and rises in a rounded shoulder to each horn (`kit.bay_profile`): a basin, not a notch.
   - The back lies `kit.BAY_BACK` = 13 px out from the hex centre (the harbour's own `COAST["y0"]`); in front of a
     walled town 16 px and of a city 18 px, so the wall stays dry.
-  - **Limits.** The shore moves at most `kit.BAY_REACH` = 19 px (5 km) inland; the bay never leaves the port's
-    hex; its horns stay inside the hex as headlands. (The style frame's small coves move a shore at most 3.5 km;
-    a basin for a level 3 harbour needs more: Genoa's is 13 px, 4.2 km. The limit is an open question, section 12.)
+  - **Limits (the owner's answer, round 4).** A carved bay may move the shore **up to 5 km** inland:
+    `kit.BAY_REACH` = 19 px. This holds **for carved ports only**. Every other change the map makes to a coast
+    (the style frame's coves, a lagoon's shore) keeps the old limit of **3.5 km** (`kit.COVE_REACH` = 13.3 px).
+    The bay never leaves the port's hex; its horns stay inside the hex as headlands. Genoa's bay is 13 px (4.2 km).
+  - **Fixed by the map data.** A port is carved from the first day of a game or never: the mode is read from the
+    place data when the map is built, and the coast does not change in play (the owner's answer, round 4).
   - A bay belongs to the hex, not to the harbour's level: it is there from the first day, and a fishing jetty sits
     in it as well as a mole harbour.
 - **The piece in a bay.** The map hands the piece the carved shore line and `bay=(u0, width, depth)`
@@ -744,6 +1034,20 @@ Tick every line for every family. One "no" sends the sheet back.
 - [ ] At 50% layout 1 is told from layout 0 and from layout 0 mirrored.
 - [ ] The block of 5 x 4 hexes shows no two equal neighbours and reads as countryside, not wallpaper.
 
+- [ ] **Three layouts** (vineyard, grazing, castles): layout 2 keeps the counts and landmarks, its yard is 14 px
+      from both other yards and their mirror images, and at 50% it is told from all four other pictures.
+
+**Keyword choices (ores, landmark cities) and sites**
+- [ ] The default (`ore=None`, `landmark=None`) is pixel-equal to the picture before the task, for every level,
+      season, layout and mirror (send the comparison).
+- [ ] Each ore is told from the other three and from the default at 50% by its spoil and its level 3 landmark;
+      the landmark stands on the smelter's foot; gold has no ring wall; only iron glows.
+- [ ] Each landmark city is told from a plain city and from the other landmark cities at 50%; the monument is
+      at most 20 px tall and 24 wide and stands on the church's spot; no house pokes through it.
+- [ ] Each site is told from the other five at 50%, cannot be taken for a castle, a hamlet or a village, and its
+      footprint is 8-20% of the margin hex.
+- [ ] Every pair of the crowding table (section 4) that the family is in was put side by side at 50%.
+
 **Coast families (salt, harbour)**
 - [ ] The piece draws no sea of its own: one `p.coast()` call, everything at the water's edge placed with
       `shore.pt(u, v)`, the tables in shore coordinates.
@@ -782,13 +1086,32 @@ Tick every line for every family. One "no" sends the sheet back.
 | 4 | Ports: the harbour did not fit the port's own strip of water | **"Some to carve a port to the tile, and some will need just to add a port to the seaside."** | Two port modes: carved (the map cuts a bay into the port's hex; great ports) and seaside (the add-on at the shore as it is). Section 10 |
 | 5 | Winter snow everywhere? | **"Not all of the map gets snowed. For example south Italy doesn't get that much snow. Might need some in between tiles?"** | Three winters by climate: snow, frost (the in-between) and mild. A rule from latitude, height and distance to the sea. Section 7 |
 
-**Still open** (none blocks the fix tasks):
+**Decided in round 4** (the same day):
 
-1. **How far may a carved bay move the coast?** As drawn: at most 19 px (5 km); Genoa's bay is 13 px (4.2 km),
-   and with the style frame's own cove the coast there lies 6.8 km from the frame's first line. The frame's cove
-   rule is 3.5 km. Options: (a) 5 km for carved ports only (recommended: it is what puts a level 3 harbour inside
-   its hex; there are few of them); (b) keep 3.5 km: the moles and outer berths then reach about 6 px into the sea
-   hex next door.
+| | Question | The owner's answer | What it means here |
+|---|---|---|---|
+| 6 | Which Python art comes over? (`../python_art/catalogue.md`) | **"Top 10 (Recommended)."** | The four ores in Mines (`ore=`); new families Quarry, Dye works, Hemp, Silk, Furs, Cotton; landmark cities in Settlements levels 4-5 (`landmark=`; Venice, Constantinople, Paris, Moscow first, then the other six); a one-level Sites family; third layouts for vineyard, grazing and castles. Tables: section 8; signatures and crowding: section 4. The overseas batch is not picked |
+| 7 | How far may a carved bay move the coast? | **Up to 5 km, carved ports only; the normal cove limit stays 3.5 km.** | `kit.BAY_REACH` = 19 px, `kit.COVE_REACH` = 13.3 px. Section 10 |
+| 8 | When is a port's mode decided? | **By the map data: carved from the start; the coast never changes in play.** | Section 10 |
+
+**The art director's calls in round 4** (recorded so they are not asked twice; the owner may overrule any):
+
+- **The iron furnace glows.** One `GLOW` spot of 2 x 2 px in the furnace mouth, iron level 3, in every season. With
+  the lighthouse lamp it is one of the map's two lights; no further ones (section 4).
+- **Gold has no fort** (it would read as a castle); **the fur post's stockade is square and open** (section 4).
+- **The mint has a slate roof**, not tile, so mines stay free of red roofs.
+- **Cotton's strongest season is autumn**, not summer: the harvest is the white field.
+- **The winter of warm-land families** (the catalogue's side question) is answered by the three winters: cotton,
+  silk and dye works are drawn for all three and checked in the mild one first.
+- **Cattle take the sheep's walled pastures** in the third grazing layout; only horses get round paddocks.
+- **Cocoa's pods** (fruit on trees) need no answer: the overseas batch was not picked.
+
+**Still open** (none blocks the tasks):
+
+1. **Venice on the water.** Drawn for now as a city at a lagoon shore with its monument. A town on islands needs
+   a rule for the map: (a) a **lagoon hex**: the map floods the hex with shallow water round the town's footprint
+   and the piece drops its wall and south road for a quay edge (recommended, as a design task of its own after the
+   first four monuments are seen); (b) leave Venice at the shore for good.
 2. **The winter rule on the whole map.** The three steps and the rule are in (section 7); the numbers are tuned
    on this region only. Before the full map is built: check a list of known places (the rule puts London on the
    edge of snow and Venice in the mild winter) and decide whether the map's ground follows the cold index point

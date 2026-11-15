@@ -3,6 +3,22 @@
 Art director, 2026-11-15. **Status: a test for the owner and the planning session. Nothing in the game, the style
 frame or the pieces is changed.**
 
+## Round 5: the carved harbour is in (2026-11-15)
+
+`harbour.py` has its carved layout and `salt.py` and `harbour.py` their second layouts (review task 9), so the
+stand-in is gone: `compose.py` cuts Genoa's bay at the guide's width (`kit.BAY_WIDTH`, 72 px; it was 84).
+All five pictures are rendered again.
+
+- **Genoa:** the bay is 72 px wide with its horns inside the hex; the shore moved 13 px (4.2 km) to 18 px from
+  the hex centre, 91 km2 of land turned to sea. The harbour is a closed basin: the quay on the back of the bay,
+  two short moles across the mouth, the lighthouse on the west horn, ships and boats inside. No standing thing
+  has its foot outside Genoa's hex. The owner's answer of this round allows a carved bay up to 5 km.
+- **On the other shores** the run prints four `PIECE PROBLEM` lines (harbour level 1 and level 2, the level 2
+  add-on, salt level 3): standing things outside the hex margin on curved, slanted shores. South of Pisa a wild
+  tree stands between the two blocks of salt pans, and at Pisa's outport the long mole of harbour layout 1
+  starts on land. Review task 24.
+- The pictures differ from round 4's everywhere a family got its second layout since.
+
 ## Round 4: two port modes, winter by climate (2026-11-15)
 
 The owner's two answers of round 3 of the pieces (`../pieces/REVIEW.md`, "Round 3"; guide sections 7 and 10).

@@ -78,12 +78,19 @@ def pick(col, row, variants=2):
     rows shoved right, as the map has them). The same hex always gives the same answer. With two layouts no two
     neighbours ever show the same picture: the grid is split in three classes that never touch; one class shows
     layout 0 mirrored, one the last layout, and the third takes plain layout 0 or the last layout mirrored by a
-    hash of the hex. With one layout only the mirror differs, so some neighbours repeat."""
+    hash of the hex. With one layout only the mirror differs, so some neighbours repeat.
+    With three layouts or more each of the three classes shows its own layout (0, 1, 2; a fourth and further layout
+    takes turns with layout 0 by the hash), plain or mirrored by the hash: no two neighbours show the same layout."""
     q = col - ((row - (row & 1)) >> 1)
     cls = (q - row) % 3
     h = ((col * 73856093) ^ (row * 19349663)) & 0xffffffff
     h = ((h ^ (h >> 13)) * 0x5bd1e995) & 0xffffffff
     bit = (h >> 15) & 1
+    if variants >= 3:
+        v = cls
+        if cls == 0 and variants > 3:
+            v = (0, *range(3, variants))[(h >> 17) % (variants - 2)]
+        return (v, bool(bit))
     last = max(1, variants) - 1
     if cls == 1:
         return (last, False)
@@ -160,6 +167,38 @@ SALT = (248, 246, 240)
 SPOIL = (150, 140, 132)         # mine waste heaps
 SPOIL_D = (112, 104, 100)
 
+# Signature tokens of the families brought over from the Python tiles (guide sections 4 and 8). They live here, in
+# one place, so no two families can pick the same colour; each has ONE owner (named at the right).
+MARBLE = (240, 236, 226)        # quarry: cut blocks and columns. Landmarks: Venice's fronts
+MARBLE_D = (200, 196, 188)
+PIT = (212, 202, 180)           # quarry: the ledges of the pit, lit top
+PIT_D = (164, 152, 132)         # quarry: the cut faces
+DYE = {"blue": (58, 98, 172), "red": (192, 54, 60), "yellow": (234, 192, 62), "purple": (128, 72, 152)}   # dye works: vats and cloth
+RET = (98, 132, 118)            # hemp: the retting pond (dull green water), with RET_D as its edge
+RET_D = (64, 92, 86)
+BOLL = (250, 248, 240)          # cotton: the open bolls
+DOME_TILE = (64, 150, 168)      # silk: the caravanserai's small turquoise dome
+DOME_TILE_D = (44, 112, 132)
+PELT = (146, 94, 58)            # furs: pelts on stretching frames
+PELT_D = (106, 68, 46)
+GLOW = (250, 150, 50)           # mines, iron: the furnace mouth (with harbour's lamp the only light on the map)
+VERDIGRIS = (96, 160, 140)      # mines, copper: the stained rock. Landmarks: Venice's campanile cap
+VERDIGRIS_D = (66, 122, 110)
+# Mines by ore: spoil heaps (lit, shaded) and the ore pile (lit, shaded). mines.draw(..., ore=None) keeps SPOIL and
+# the module's own ORE: today's picture.
+ORES = {
+    "iron": dict(spoil=(150, 134, 126), spoil_d=(112, 98, 94), ore=(164, 86, 54), ore_d=(122, 62, 44)),
+    "silver": dict(spoil=(176, 184, 196), spoil_d=(132, 140, 156), ore=(208, 214, 222), ore_d=(160, 168, 182)),
+    "copper": dict(spoil=(140, 142, 132), spoil_d=(104, 108, 100), ore=(214, 132, 62), ore_d=(170, 98, 48)),
+    "gold": dict(spoil=(214, 194, 140), spoil_d=(172, 150, 104), ore=(222, 184, 84), ore_d=(178, 140, 60)),
+}
+BRICK = (178, 74, 60)           # landmarks: Moscow's and Granada's red walls
+BRICK_D = (136, 56, 48)
+LEAD = (118, 140, 168)          # landmarks: the grey-blue domes of Constantinople and Venice
+LEAD_D = (88, 108, 136)
+GILT = (228, 188, 84)           # landmarks: a gilded dome or finial, 2 px at most
+ONION = [(228, 188, 84), (72, 132, 92), (62, 104, 170), (190, 60, 56)]       # landmarks: Moscow's onion domes
+
 # Season tokens. PAL[season][token].
 PAL = {
     "spring": dict(
@@ -220,6 +259,19 @@ CROPS = {
         spring=[(120, 170, 76)], summer=[(72, 128, 62)], autumn=[(170, 70, 60)], winter=[(96, 76, 60)]),
     "olive_soil": dict(
         spring=[(206, 196, 140)], summer=[(212, 198, 142)], autumn=[(204, 188, 136)], winter=[(226, 226, 222)]),
+    "hemp": dict(                                                                         # dark blue-green blocks: never gold
+        spring=[(150, 116, 82), (140, 108, 76)],                                          # sown late: bare earth (the rows are drawn over it)
+        summer=[(52, 112, 76), (62, 124, 84)],                                            # the signature: the darkest crop on the map
+        autumn=[(176, 160, 104), (164, 148, 96)],                                         # cut: pale stubble, the stooks stand on it
+        winter=[(236, 239, 244), (212, 222, 234)]),
+    "hemp_row": dict(                                                                     # the young rows of spring
+        spring=[(84, 148, 86)], summer=[(40, 92, 64)], autumn=[(140, 124, 80)], winter=[(190, 170, 148)]),
+    "cotton_soil": dict(                                                                  # the red earth, as a patch only
+        spring=[(178, 116, 86)], summer=[(184, 112, 82)], autumn=[(168, 106, 80)], winter=[(228, 226, 228)]),
+    "cotton": dict(                                                                       # the plant rows; summer and autumn carry BOLL dots
+        spring=[(120, 168, 84)], summer=[(96, 140, 76)], autumn=[(132, 112, 72)], winter=[(120, 90, 66)]),
+    "mulberry_soil": dict(                                                                # the pale strip under a mulberry row
+        spring=[(190, 196, 120)], summer=[(196, 194, 118)], autumn=[(196, 180, 112)], winter=[(230, 233, 236)]),
 }
 CROP_EDGE = dict(spring=(104, 130, 62), summer=(128, 124, 60), autumn=(100, 78, 54), winter=(140, 152, 176))
 
@@ -251,11 +303,15 @@ WINTER_CROPS = {
     "frost": dict(                                         # a thin snow: the pattern and more of the ground show
         wheat=[(228, 233, 232), (198, 208, 184), (234, 238, 240), (176, 156, 134)],
         garden=[(222, 228, 226), (200, 208, 188), (190, 174, 154)],
-        meadow=[(214, 222, 204)], vine_soil=[(210, 204, 194)], vine=[(96, 76, 60)], olive_soil=[(218, 212, 190)]),
+        meadow=[(214, 222, 204)], vine_soil=[(210, 204, 194)], vine=[(96, 76, 60)], olive_soil=[(218, 212, 190)],
+        hemp=[(224, 228, 222), (196, 200, 180)], hemp_row=[(176, 156, 134)],
+        cotton_soil=[(212, 196, 190)], cotton=[(120, 90, 66)], mulberry_soil=[(212, 216, 196)]),
     "mild": dict(                                          # no snow: young winter corn and dark wet earth
         wheat=[(128, 160, 84), (138, 108, 78), (120, 150, 80), (150, 118, 84)],
         garden=[(136, 106, 76), (122, 150, 82), (146, 114, 80)],
-        meadow=[(158, 176, 104)], vine_soil=[(160, 128, 94)], vine=[(96, 76, 60)], olive_soil=[(196, 180, 130)]),
+        meadow=[(158, 176, 104)], vine_soil=[(160, 128, 94)], vine=[(96, 76, 60)], olive_soil=[(196, 180, 130)],
+        hemp=[(134, 104, 76), (124, 96, 70)], hemp_row=[(112, 88, 64)],
+        cotton_soil=[(156, 100, 76)], cotton=[(112, 84, 62)], mulberry_soil=[(168, 168, 108)]),
 }
 WINTER_EDGE = {"snow": CROP_EDGE["winter"], "frost": (136, 144, 150), "mild": (96, 96, 60)}
 # In a mild winter nothing is white. A module asks p.winter before it draws snow (False in a mild winter), but a
@@ -471,7 +527,9 @@ class Shore:
 
 
 # ------------------------------------------------------------------ the carved bay (ports, guide section 10)
-BAY_REACH = 19.0            # px: a carved bay moves the shore at most this far inland (5 km at this zoom)
+BAY_REACH = 19.0            # px: a carved bay moves the shore at most this far inland (5 km at this zoom): the owner's
+                            # answer of 2026-11-15, for carved ports only
+COVE_REACH = 13.3           # px: every other change the map makes to a coast (a cove) stays within 3.5 km
 BAY_WIDTH = 72.0            # px: a bay's width, horn to horn: the same for every carved port
 BAY_BACK = 13.0             # px: the back of a bay comes no nearer to the hex centre than this
 
@@ -761,6 +819,53 @@ class Piece:
             return
         self.gp.lines([(p[0], p[1] + 0.8) for p in pts], shade(self.pal[self.ground_kind], 0.72), 1.0)
         self.gp.lines(pts, (222, 212, 190) if not self.winter else SNOW, 1.0)
+
+    def drystone(self, pts, closed=False):
+        """A dry-stone field wall along a line on the ground (upland pastures): a grey line 1 px wide with a dark
+        foot and a light top, greyer and darker than a terrace wall; snow on its top where snow lies. A thin line:
+        it does not count for the footprint (put a meadow patch inside it, or claim() the pasture)."""
+        pts = list(pts) + ([pts[0]] if closed else [])
+        self.gp.lines([(p[0], p[1] + 0.9) for p in pts], shade(STONE_GREY_D, 0.78), 1.0)
+        self.gp.lines(pts, STONE_GREY, 1.2)
+        self.gp.lines([(p[0], p[1] - 0.5) for p in pts], SNOW if self.winter else shade(STONE_GREY, 1.12), 0.5)
+
+    def ring(self, cx, cy, rx, ry=None, kind="fence", gate=None, claim=True, col=None):
+        """A round pen lying on the ground: a paddock ring (kind="fence": post and rail, as fence()) or a round
+        sheepfold (kind="stone": a dry-stone ring, as drystone()). ry defaults to rx x TILT (a true circle on the
+        ground). gate: the middle of a 4 px opening as an angle in degrees (90 = the front, 0 = the east side),
+        or None. claim=True: the inside counts for the footprint (no wild tree in the pen). Returns the ring's
+        points. For a meadow inside, draw it BEFORE the ring:
+        p.patch(kit.ring_points(cx, cy, rx, rx * kit.TILT, 0, 2 * math.pi), colour)."""
+        ry = rx * TILT if ry is None else ry
+        n = max(16, int(rx * 2.2))
+        if gate is None:
+            a0, a1 = 0.0, 2 * math.pi
+        else:
+            half = 2.0 / max(1.0, rx)
+            a0, a1 = math.radians(gate) + half, math.radians(gate) + 2 * math.pi - half
+        pts = ring_points(cx, cy, rx, ry, a0, a1, n)
+        if claim:
+            self.claim(ring_points(cx, cy, rx + 1, ry + 1, 0, 2 * math.pi, n))
+        if kind == "stone":
+            self.drystone(pts)
+        else:
+            self.fence(pts, col or TIMBER_D)
+        return pts
+
+    def arc(self, cx, cy, rx, ry, a0, a1, col=None, lw=1.2, dashed=False):
+        """A curved plant row on the ground (contour rows round a house): the part of the ellipse round (cx, cy)
+        from angle a0 to a1 in degrees (0 = east, 90 = the front). col defaults to the season's vine colour;
+        dashed=True breaks it into plants 3 px apart (young vines), as rows() does. For the soil under a band of
+        arcs draw a patch between two kit.ring_points() lines first."""
+        col = col or crop("vine", self.season)[0]
+        ln = abs(math.radians(a1 - a0)) * (rx + ry) / 2.0
+        if not dashed:
+            self.gp.lines(ring_points(cx, cy, rx, ry, math.radians(a0), math.radians(a1), max(4, int(ln / 2))), col, lw)
+            return
+        m = max(2, int(ln // 3))
+        for q in range(m):
+            a = math.radians(a0 + (a1 - a0) * (q + 0.5) / m)
+            self.gp.dot(cx + math.cos(a) * rx, cy + math.sin(a) * ry, col, lw)
 
     def scree(self, n=18, avoid=()):
         """Scree streaks and small stones for rock ground, which must never be flat grey."""
@@ -1067,7 +1172,8 @@ class Piece:
 
     def tree(self, x, y, sc=1.0, kind="round", i=0):
         """A tree with its foot at (x, y). kind: 'round' (broadleaf), 'conifer', 'poplar' (tall, thin), 'bush',
-        'olive' (silver green, evergreen), 'fruit' (small, blossom in spring). i: the tree's index (autumn colour mix)."""
+        'olive' (silver green, evergreen), 'fruit' (small, blossom in spring), 'mulberry' (a low pollarded crown on
+        a pale stem, no blossom: silk's planted rows). i: the tree's index (autumn colour mix)."""
         season, pal, winter, bare = self.season, self.pal, self.winter, self.cold
         self.cast(x, y, {"conifer": 4.5, "poplar": 3.5, "bush": 4.0}.get(kind, 5.5) * sc)
 
@@ -1103,8 +1209,21 @@ class Piece:
                 p.ellipse(x, cy, r * 2, r * 1.5, (122, 142, 104))
                 p.ellipse(x - r * 0.3, cy - r * 0.22, r * 1.2, r * 0.8, (168, 182, 142) if not winter else SNOW)
                 return
-            r = {"round": 4.4, "bush": 2.6, "fruit": 3.2}[kind] * sc
-            th = {"round": 3.0, "bush": 0.6, "fruit": 2.4}[kind] * sc
+            r = {"round": 4.4, "bush": 2.6, "fruit": 3.2, "mulberry": 2.8}[kind] * sc
+            th = {"round": 3.0, "bush": 0.6, "fruit": 2.4, "mulberry": 2.8}[kind] * sc
+            if kind == "mulberry":              # pollarded: a pale stem and a flat low crown; autumn gold and late green by turns
+                p.line((x, y), (x, y - th), (176, 160, 132), 1.2 * sc)
+                if bare:
+                    for dx in (-0.8, -0.3, 0.3, 0.8):
+                        p.line((x, y - th), (x + dx * r, y - th - r * 0.9), pal["leaf"][0], 0.6)
+                    if winter:
+                        p.line((x - r * 0.6, y - th - 0.4), (x + r * 0.3, y - th - 0.4), SNOW, 0.5)
+                    return
+                oc, dk, mid, lt = pal["leaf"] if season != "autumn" else LEAF_AUTUMN[1 + i % 2]
+                p.ellipse(x, y - th - r * 0.45, r * 2 + 1, r * 1.3 + 1, oc)
+                p.ellipse(x, y - th - r * 0.45, r * 2, r * 1.3, mid)
+                p.ellipse(x - r * 0.25, y - th - r * 0.6, r * 1.2, r * 0.7, lt)
+                return
             cy = y - th - r * 0.75
             if kind != "bush":
                 p.line((x, y), (x, y - th - (r * 0.4 if not bare else 0)), TRUNK, 1.4 * sc)

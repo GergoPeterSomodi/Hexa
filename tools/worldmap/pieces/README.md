@@ -13,6 +13,8 @@ they are the pattern to copy.
 | `contract.py` | The kit's map contract on one page (`kit_contract.png`): wild land, coast sides, footprint, mirror, `pick`. Its `fishing()` is the pattern for a coast piece |
 | `overview.py` | Every family on one page (`overview.png`) |
 | `winters.py` | The three winters (`winters.png`) and the two port modes (`ports.png`) |
+| `additions.py` | The kit's additions of round 4 on one page (`kit_additions.png`): `drystone`, `ring`, `arc`, the mulberry, the new crops and tokens, `pick` with three layouts |
+| To come (review tasks 10 to 23) | `quarry`, `dyes`, `hemp`, `silk`, `furs`, `cotton`, `sites`, `landmarks` (the monuments of the landmark cities, called by `settlements`) |
 
 ## The module contract
 
@@ -43,7 +45,10 @@ def draw(level, season, variant=0, mirror=False):     # season: "spring" | "summ
 - **Winter**: the module is called `draw(level, "winter")` in every climate; the kit knows the hex's winter. Ask
   `p.winter` before drawing snow (False in a mild winter), `p.frozen` before drawing ice, and `season == "winter"`
   for what the season does. Colours only from `p.pal` and `kit.crop`.
-- Extra keyword arguments with defaults are allowed (`animal="sheep"`, `flag=kit.FLAG`, `addon=False`).
+- Extra keyword arguments with defaults are allowed (`animal="sheep"`, `flag=kit.FLAG`, `addon=False`, `ore=None`,
+  `landmark=None`). The default must be the picture the module drew before the keyword existed.
+- `VARIANTS = 3` where a family has a third layout (vineyard, grazing, castles). In `sites.py` the variant is the
+  site (`VARIANTS = 6`); the map gives it from its data and takes only the mirror from `kit.pick`.
 - Positions are fixed tables at the top of the module. No position may depend on the season. Random numbers only
   from a fixed seed, never from the season or the level.
 - Running the module writes both sheets: `kit.sheet(draw, LEVELS, title, path, NAMES, ground="...", wild=True)` and
@@ -82,6 +87,9 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 | `p.field(cx, cy, w, h, angle, cols, strips, furrows=)` | A block of strips; returns its corners |
 | `p.rows(cx, cy, w, h, angle, n, dashed=)` | Plant rows on a soil block |
 | `p.hedge(pts)`, `p.fence(pts)`, `p.terrace(pts, face=)` | Lines on the ground; `face=2` gives a terrace wall a visible front |
+| `p.drystone(pts, closed=)` | A grey dry-stone field wall (upland pastures); a thin line: put a meadow patch inside |
+| `p.ring(cx, cy, rx, ry=, kind=, gate=, claim=)` | A round pen: `kind="fence"` a paddock, `kind="stone"` a sheepfold; `gate` an angle in degrees (90 = the front); claims its inside |
+| `p.arc(cx, cy, rx, ry, a0, a1, col=, lw=, dashed=)` | A curved plant row (contour rows), angles in degrees |
 | `p.road(pts, w, track=)`, `p.water(pts, w)`, `p.pond(pts, col=, edge=)` | Roads, streams and canals (frozen in winter), ponds. Tracks are overlays |
 | `p.coast(y0)` | The shore the map gave (`Piece(sea=, shore=)`; in front on the sheets). Returns a `Shore`: `pt(u, v)`, `at(u, v, du, dv)`, `rect(u, v, w, h)`, `land(x, y)`, `depth`, `front`, and for tall things `fits(u, v, tall, wide)`, `fit(...)` (slides towards the shore, or `None`), `first(spots, tall, wide)`. Draws a sea on the sheets only |
 | `p.claim(pts)` | Ground the piece holds without drawing on it (a court, a square): it counts for the footprint. `p.wall` claims the inside of its ring |
@@ -93,7 +101,7 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 
 | Call | Draws |
 |---|---|
-| `p.tree(x, y, sc, kind, i)` | `round`, `conifer`, `poplar`, `bush`, `olive`, `fruit` |
+| `p.tree(x, y, sc, kind, i)` | `round`, `conifer`, `poplar`, `bush`, `olive`, `fruit`, `mulberry` |
 | `p.house(x, y, w, h, roof_h, wall, kind, roof, door, smoke)` | `kind`: `ridge` or `gable`; `roof`: `tile`, `thatch`, `slate` |
 | `p.church(x, y, size, sc)` | `chapel`, `church`, `cathedral` |
 | `p.tower(x, y, w, h, col, top, flag)` | `top`: `battlement`, `cone`, `flat` |
@@ -111,8 +119,8 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 |---|---|
 | `kit.take_apart(draw, level, season, hex=(col, row), sea=, shore=, bay=, climate=)` | The piece without its ground base, as layers: `ground` (the detail, 2x), `shadow`, `standing` (`(foot_y, order_y, fn)` back to front), `footprint` (a mask: the map draws no wild tree or bush with its foot in it), `shore`, `mirror`, `variant`. **Level 0 gives `None`.** Layout and mirror come from the hex. Works with every module as it is |
 | `kit.winter_of(lat, height_m, sea_km)` | The hex's winter: `"snow"`, `"frost"` or `"mild"` (give it as `climate=`); `kit.cold_index(...)` is the number behind it |
-| `kit.carve(sea, shore, (u0, width, depth))` | A carved port: the shore with the bay cut in, as a `Shore`; the map turns to sea what is not `.land(x, y)`, then hands the piece the new shore line and the same `bay=`. `kit.BAY_WIDTH`, `BAY_BACK`, `BAY_REACH` are the bay's size and limits |
-| `kit.pick(col, row, variants)` | `(variant, mirror)` for a hex: always the same; with two layouts no two neighbours equal |
+| `kit.carve(sea, shore, (u0, width, depth))` | A carved port: the shore with the bay cut in, as a `Shore`; the map turns to sea what is not `.land(x, y)`, then hands the piece the new shore line and the same `bay=`. `kit.BAY_WIDTH`, `BAY_BACK`, `BAY_REACH` are the bay's size and limits (5 km, carved ports only; `kit.COVE_REACH` is the 3.5 km of every other coast change) |
+| `kit.pick(col, row, variants)` | `(variant, mirror)` for a hex: always the same; with two layouts no two neighbours equal; with three each of the grid's three classes shows its own layout |
 | `kit.in_footprint(mask, x, y)` | True if the piece-px point is in the footprint |
 | `kit.mirror_gates(GATES, mirror, variant)` | The gate points as they lie in a mirrored piece; `GATES` is one dict, or a list with one dict per layout |
 
@@ -124,8 +132,9 @@ shows every piece in the terrain's wild land thinned by its footprint; `kit.vari
 their mirrors and a block of hexes chosen by `pick`; `kit.with_wild(draw, level, season, variant=, mirror=)` gives
 one such picture.
 
-**Colours**: fixed tokens `kit.INK`, `kit.ROOF`, `kit.STONE` ...; season tokens `p.pal["grass"]` ...; crops
-`kit.crop("wheat", season)`; helpers `kit.mix(c1, c2, t)`, `kit.shade(c, f)`; flags `p.season`, `p.winter` (snow
+**Colours**: fixed tokens `kit.INK`, `kit.ROOF`, `kit.STONE` ...; the signature tokens of the round 4 families
+(`kit.MARBLE`, `kit.DYE`, `kit.ORES` ...: guide section 4); season tokens `p.pal["grass"]` ...; crops
+`kit.crop("wheat", season)` (also `hemp`, `hemp_row`, `cotton_soil`, `cotton`, `mulberry_soil`); helpers `kit.mix(c1, c2, t)`, `kit.shade(c, f)`; flags `p.season`, `p.winter` (snow
 lies), `p.frozen`, `p.climate`.
 
 For a landmark of your own, copy the shape of `windmill()` in `wheat.py`: call `p.cast`, define `fn(pen)`, draw the

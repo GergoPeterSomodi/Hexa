@@ -104,9 +104,8 @@ PORTS = {"Genoa": 3, "Pisa": 3, "Savona": 2, "Nice": 2, "Chiavari": 1}
 # The two port modes (GUIDE section 10). CARVED: the map cuts a bay into the port's hex and the harbour sits in it,
 # inside its own hex. SEASIDE: the harbour is added along the shore as it is. The mode comes from the map data and
 # never changes in play: a place that is a city (rank 3) and a sea port in the data is a great port and is carved.
-BAY_WIDTH = 84.0            # px, horn to horn. FOR NOW the hex's whole front: harbour.py still has only its open-shore
-                            # layout, 64 px from mole to mole. With the carved layout of review task 9 this becomes
-                            # kit.BAY_WIDTH (72 px) and the two horns stand inside the hex as headlands.
+BAY_WIDTH = kit.BAY_WIDTH   # px, horn to horn (72): harbour.py has its carved layout (review task 9), so the bay is the
+                            # guide's and its two horns stand inside the hex as headlands.
 BAY_U0 = 2.0                # the harbour's works are centred 2 px off the shore's middle
 BAY_BACK = {5: 18.0, 4: 16.0}      # px from the hex centre to the back of the bay: clear of a city's wall (others: kit.BAY_BACK)
 BAYS = {}                   # town -> (u0, width, depth) once carve_ports() has cut it

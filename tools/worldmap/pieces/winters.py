@@ -116,7 +116,7 @@ def ports(path):
     f_t, f_h, f_s = kit._font(30, True), kit._font(21), kit._font(17)
     out.blit(f_t.render("Ports: seaside and carved", True, kit.SHEET_TEXT), (16, 10))
     out.blit(f_s.render("Left: summer on three sea sides. Right: the same, winter. Red: the bay's horns and mouth line "
-                        "(shore.bay). The modules do not use the bay yet (review task 9).", True, kit.SHEET_DIM), (16, 42))
+                        "(shore.bay). The harbour has its carved layout; salt lies on a lagoon as on any shore.", True, kit.SHEET_DIM), (16, 42))
     for r, (title, sub, mod, ground, lv, bay, kw) in enumerate(rows):
         y = top + r * (cw + 6)
         out.blit(f_h.render(title, True, kit.SHEET_TEXT), (12, y + 40))
