@@ -1,6 +1,6 @@
-"""Mines, levels 0-3 (see docs/design/map/pieces/GUIDE.md, section 8). Ground: rock, with scree and stones.
+"""Mines, levels 0-3 (see docs/design/map/pieces/GUIDE.md, section 8). Ground: rock.
 
-0 bare rock: scree, boulders, a low outcrop at the back, two conifers - 1 the adit (a timbered mouth in the outcrop), a
+0 the map's wild rock (scree, boulders and conifers are the map's) - 1 the low outcrop at the back with the adit (a timbered mouth in the outcrop), a
 hut, a spoil heap, a track - 2 the headframe with its wheel over a shaft, a second hut and heap, a stream with a water
 wheel - 3 the smelter with its tall chimney (smoking in every season), an ore pile, a third heap, and the two huts
 upgraded in place to a row of three miners' houses.
@@ -14,10 +14,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(0, 4)
-NAMES = {0: "bare rock", 1: "adit", 2: "headframe", 3: "smelter, row"}
+VARIANTS = 1
+NAMES = {0: "wild land (the map's)", 1: "adit", 2: "headframe", 3: "smelter, row"}
 
 # Named tokens that are new to this family (rock and ore are not in the kit's list):
-OUTCROP = (128, 116, 104)        # the rock outcrop and boulders, lit
+OUTCROP = (128, 116, 104)        # the rock outcrop, lit
 OUTCROP_D = (92, 84, 78)         # shaded side
 ORE = (136, 104, 88)             # the ore pile, lit (rust-brown)
 ORE_D = (104, 78, 68)
@@ -41,41 +42,19 @@ SMELTER = (-24, 6)                          # foot of the smelter, from level 3
 ORE_PILE = (-9, 9)                          # from level 3
 # huts become houses in place; the row's third house is new at level 3: x, y, from level
 HOUSES = [(-33, 22, 1), (-21, 22, 2), (-9, 23, 3)]
-BOULDERS = [(-37, 8, 6.0, 4.6, 9), (25, -12, 7.5, 5.4, 9), (7, 27, 6.5, 4.8, 9), (31, 25, 6.8, 5.0, 9)]   # x, y, w, h, gone from level
-CONIFERS = [(36, -15, 0.95, 9), (-40, -8, 0.9, 9)]                                      # x, y, size, gone from level
-WORK_PATCHES = [(-33, 22, 14, 7), (-18, -10, 17, 8), (11, 2, 16, 8), (-24, 6, 20, 9)]    # level 0: darker rock where the work will come
 # the worked yard grows with the level: trodden earth laid over the rock (x, y, w, h, from level)
 YARDS = [(-12, -8, 46, 20, 1), (-31, 20, 18, 8, 1),               # under the adit and the first heap; the hut
          (12, 4, 40, 22, 2), (-19, 20, 18, 8, 2),                  # under the headframe and its heap; the second hut
          (-22, 9, 34, 22, 3), (-12, 21, 42, 10, 3)]               # under the smelter; along the row of houses
 YARD_ALPHA = 0.35
-MOSS = [(-28, 12, 14, 6), (18, 24, 16, 7), (22, -24, 12, 5), (-2, 36, 18, 6), (-40, 0, 9, 5)]
-
-
-def boulder(p, x, y, w, h):
-    """A boulder standing on the ground: lit left, shaded right, a snow cap in winter."""
-    p.cast(x, y, w * 0.9)
-    winter = p.winter
-
-    def fn(pen):
-        hw = w / 2
-        body = [(x - hw, y), (x - hw * 0.95, y - h * 0.4), (x - hw * 0.6, y - h * 0.8), (x - hw * 0.2, y - h), (x + hw * 0.3, y - h * 0.92),
-                (x + hw * 0.8, y - h * 0.6), (x + hw, y - h * 0.2), (x + hw * 0.9, y)]
-        pen.poly(body, OUTCROP, None)
-        pen.poly([(x + hw * 0.1, y), (x + hw * 0.05, y - h * 0.85), (x + hw * 0.3, y - h * 0.92), (x + hw * 0.8, y - h * 0.6), (x + hw, y - h * 0.2), (x + hw * 0.9, y)], OUTCROP_D, None)
-        pen.line((x - hw * 0.5, y - h * 0.45), (x + hw * 0.05, y - h * 0.15), OUTCROP_D, 0.5)               # a facet line: boulders are lumpy, heaps are smooth
-        if winter:
-            pen.poly([(x - hw * 0.8, y - h * 0.62), (x - hw * 0.2, y - h), (x + hw * 0.3, y - h * 0.92), (x + hw * 0.7, y - h * 0.6),
-                      (x, y - h * 0.68)], kit.SNOW, None)
-        pen.poly(body, None, kit.INK, 0.5)
-    p.stand(y, fn)
 
 
 def outcrop(p):
     """The low rock outcrop at the back: three blocks of rock. It stays at every level; the adit is cut into it at level 1."""
     winter = p.winter
     y0 = OUTCROP_BASE
-    p.shadow(4, y0 + 1.8, 42, 4.5)
+    p.shadow(-13 + p.m * 17, y0 + 1.8, 42, 4.5)         # the outcrop's own shadow, lower right of its middle (x = -13)
+    handles = []
     for dy, prof, ridge in OUTCROP_BLOCKS:
         base = y0 + dy
         top = [(x, base - h) for x, h in prof]
@@ -91,10 +70,11 @@ def outcrop(p):
             pen.poly(body, None, kit.INK, 0.5)
             for k in range(1, len(top) - 1, 2):              # cracks
                 pen.line((top[k][0] + 0.6, top[k][1] + 2.4), (top[k][0] + 1.4, base - 0.8), OUTCROP_D, 0.5)
-        p.stand(base, fn)
+        handles.append(p.stand(base, fn))
+    return handles
 
 
-def adit(p):
+def adit(p, rock):
     """Level 1 landmark: a dark arched mouth in the outcrop, framed with timber."""
     x, y = ADIT
 
@@ -108,7 +88,7 @@ def adit(p):
             pen.rect(x - 4.8, y - 7.7, 9.6, 1.0, kit.SNOW, None)
         pen.line((x - 1.6, y), (x - 2.6, y + 3.4), kit.TIMBER_D, 0.5)              # two rails run out
         pen.line((x + 1.6, y), (x + 2.2, y + 3.4), kit.TIMBER_D, 0.5)
-    p.stand(y + 0.3, fn)
+    return p.stand(y + 0.3, fn, on=rock)
 
 
 def headframe(p, x, y):
@@ -121,8 +101,8 @@ def headframe(p, x, y):
         # the shaft head: a low stone collar and a small shaft house
         pen.ellipse(x, y - 0.6, 11, 4.4, kit.STONE_GREY_D, kit.INK, 0.5)
         pen.ellipse(x, y - 0.9, 9, 3.2, kit.DOOR, None)
-        # back stay from the wheel to the shaft house, drawn behind the legs
-        pen.line((top[0], top[1] + 1), (x + 8.5, y - 4.5), kit.INK, 0.5)
+        # back stay from the wheel to the shaft house (it lies on the house's side in a mirrored piece), behind the legs
+        pen.line((top[0], top[1] + 1), (x + p.m * 8.5, y - 4.5), kit.INK, 0.5)
         # two legs: the left lit, the right shaded
         pen.poly([(x - 5.2, y), (x - 3.9, y), (x + 0.3, top[1] + 1.4), (x - 0.9, top[1] + 1.4)], kit.TIMBER, kit.INK, 0.5)
         pen.poly([(x + 5.2, y), (x + 3.9, y), (x + 0.3, top[1] + 1.4), (x + 0.9, top[1] + 1.4)], kit.TIMBER_D, kit.INK, 0.5)
@@ -139,7 +119,7 @@ def headframe(p, x, y):
             pen.line((x - 1.8, top[1] - 3.2), (x + 1.8, top[1] - 3.2), kit.SNOW, 1.0)
         # the cable down to the shaft
         pen.line((x - 2.9, top[1] + 0.6), (x - 2.9, y - 1.0), kit.INK, 0.5)
-    p.stand(y, fn)
+    p.stand(y, fn, x=x)
     # the shaft house beside it (a thatched shed, the engine house)
     p.house(x + 8.5, y + 0.8, 6.8, 4.0, 3.0, wall=kit.shade(kit.TIMBER, 1.25), kind="ridge", roof="thatch", door=True)
 
@@ -159,7 +139,7 @@ def water_wheel(p, x, y):
         if winter:
             pen.line((x - 2.4, cy - 3.2), (x + 0.6, cy - 3.9), kit.SNOW, 0.9)
         pen.line((x - 4.6, y + 0.4), (x + 4.6, y + 0.4), kit.TIMBER_D, 1.0)                    # the trough it sits in
-    p.stand(y, fn)
+    p.stand(y, fn, x=x)
 
 
 def smelter(p, x, y):
@@ -177,52 +157,28 @@ def smelter(p, x, y):
         pen.poly([(cxm - 2.0, chy), (cxm + 2.0, chy), (cxm + 1.5, chy - h), (cxm - 1.5, chy - h)], None, kit.INK, 0.5)
         if winter:
             pen.line((cxm - 2.0, chy - h - 1.4), (cxm + 2.0, chy - h - 1.4), kit.SNOW, 0.9)
-    p.stand(y - 0.5, chimney)
-    p.smoke(cxm, chy - 19.5 - 1.6, always=True, foot=y - 0.5)       # smokes in every season
-    p.house(x, y, 12.5, 6.2, 3.8, wall=kit.STONE_GREY, kind="ridge", roof="slate", door=False)
+    stack = p.stand(y - 0.5, chimney, x=cxm)
+    p.smoke(cxm, chy - 19.5 - 1.6, always=True, foot=y - 0.5, on=stack)       # smokes in every season, on its chimney
+    house = p.house(x, y, 12.5, 6.2, 3.8, wall=kit.STONE_GREY, kind="ridge", roof="slate", door=False)
     # the furnace mouth: a dark arch with a red glow, the one warm spot
-    p.stand(y + 0.1, lambda pen: (pen.rect(x - 2.0, y - 3.4, 4.0, 3.4, kit.DOOR, None), pen.rect(x - 1.0, y - 1.6, 2.0, 1.4, kit.ROOF, None)))
+    p.stand(y + 0.1, lambda pen: (pen.rect(x - 2.0, y - 3.4, 4.0, 3.4, kit.DOOR, None), pen.rect(x - 1.0, y - 1.6, 2.0, 1.4, kit.ROOF, None)), x=x, on=house)
 
 
-def draw(level, season):
-    p = kit.Piece(season, ground="rock", seed=4)
-    winter = p.winter
+def draw(level, season, variant=0, mirror=False):
+    if level == 0:                                    # no piece: the sheets show the map's wild rock
+        return kit.wild(season, "rock", seed=4)
+    p = kit.Piece(season, ground="rock", seed=4, mirror=mirror)
     # ---- ground plane
-    if level == 0:                                    # wild rock: darker patches where the work will come
-        for x, y, w, h in WORK_PATCHES:
-            p.scrub(x, y, w, h, dark=0.10)
     for x, y, w, h, lo in YARDS:                      # worked ground under each landmark, growing with the level
         if level >= lo:
             p.blob(x, y, w, h, p.pal["soil"], alpha=YARD_ALPHA)
-    moss = {"spring": (0.62, 0.0), "summer": (0.22, 0.0), "autumn": (0.30, 1.0)}.get(season)
-    if moss:                                          # a little green on the rock: fresh in spring, dry and olive in autumn
-        col = kit.mix(p.pal["grass"], (150, 130, 70), moss[1] * 0.6)
-        for x, y, w, h in MOSS:
-            p.blob(x, y, w, h, col, alpha=moss[0])
-    elif winter:
-        for x, y, w, h in MOSS:
-            p.snow_patch(x, y, w * 0.8, h * 0.8)
-    p.scree(24 if level == 0 else 18)
     if level >= 2:
         p.water(STREAM, 3.0)
-    if level >= 1:
-        p.road(TRACK, 1.5, track=True)
-    p.tufts(10, avoid=[(-9, -18, 14), (11, 2, 14), (-24, 6, 16)])
-    if level < 2:
-        p.stones([(10, 8, 1.8), (-30, -4, 1.6), (36, 6, 1.5)])
-    else:
-        p.stones([(-30, -4, 1.6), (36, 6, 1.5)])
+    p.road(TRACK, 1.5, track=True)
 
     # ---- standing things
-    outcrop(p)
-    for x, y, w, h, gone in BOULDERS:
-        if level < gone:
-            boulder(p, x, y, w, h)
-    for i, (x, y, sc, gone) in enumerate(CONIFERS):
-        if level < gone:
-            p.tree(x, y, sc, "conifer", i)
-    if level >= 1:
-        adit(p)
+    rock = outcrop(p)
+    adit(p, rock[2])                                  # cut into the middle block: it moves with it
     for x, y, w, h, lo in HEAPS:
         if level >= lo:
             p.heap(x, y, w, h, kit.SPOIL, kit.SPOIL_D)
@@ -244,5 +200,8 @@ def draw(level, season):
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "docs", "design", "map", "pieces", "mines.png")
-    kit.sheet(draw, LEVELS, "Mines: levels 0-3 by season", out, NAMES, ground="rock")
+    kit.sheet(draw, LEVELS, "Mines: levels 0-3 by season", out, NAMES, ground="rock", wild=True)
     print("wrote", os.path.normpath(out))
+    vout = os.path.join(os.path.dirname(out), "mines_variants.png")
+    kit.variant_sheet(draw, LEVELS, "Mines: layout and mirror", vout, NAMES, ground="rock")
+    print("wrote", os.path.normpath(vout))

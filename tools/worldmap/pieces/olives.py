@@ -1,6 +1,6 @@
 """Olives, levels 0-3 (see docs/design/map/pieces/GUIDE.md, section 8).
 
-0 scrub and pine - 1 a thatched hut and seven olive trees in two loose groups - 2 a stone farmhouse, 15 trees on
+0 the map's wild land - 1 a thatched hut and seven olive trees in two loose groups - 2 a stone farmhouse, 15 trees on
 three terrace walls - 3 an oil mill with a millstone, 24 trees on five terrace walls, a track.
 The olive tree is evergreen: its colours never change with the season, only the ground does.
 
@@ -14,7 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(0, 4)
-NAMES = {0: "scrub and pine", 1: "hut, 7 trees", 2: "farmhouse", 3: "oil mill"}
+VARIANTS = 1
+NAMES = {0: "wild land (the map's)", 1: "hut, 7 trees", 2: "farmhouse", 3: "oil mill"}
 
 # The layout is fixed: a level adds to the level below and never moves anything.
 FARM = (30, 9)                                        # the hut, later the stone farmhouse: same foot at every level
@@ -29,18 +30,8 @@ TREES = [                                             # x, y, from level; foot y
     (-33, -19.5, 3), (-24, -19.5, 3), (-15, -19.5, 3), (-6, -19.5, 3), (3, -19.5, 3),                 # wall -16
     (-22, -30.5, 3), (-14, -30.5, 3), (-6, -30.5, 3), (2, -30.5, 3),                                  # wall -27
 ]
-WILD = [                                                      # x, y, kind, gone from level (9 = never)
-    (-35, -14, "conifer", 2), (-6, -28, "conifer", 3), (25, -20, "conifer", 9), (38, -4, "conifer", 9),
-    (14, 30, "bush", 2), (-40, 26, "bush", 2), (24, -16, "bush", 2), (-20, 32, "bush", 3), (40, 22, "bush", 9),
-    (18, -30, "bush", 9),
-]
-STONES = [(22, 18, 1.8, 3), (-38, -2, 1.6, 2), (35, -18, 1.6, 9), (8, 34, 1.6, 9)]
 TRACK = [(28, 12), (24, 20), (16, 29), (8, 36)]
 GATES = {"south": (8, 36)}                            # the track ends here; the map's road layer carries it on
-# level 0: where the shelves will come, a few rough patches of darker scrub (x, y, w, h)
-SCRUB = [(-29, -20, 22, 8), (-24, -22.5, 12, 5), (-13, -4, 30, 9), (-33, 11, 20, 8), (-22, 14, 16, 7), (-13, 25, 26, 8),
-         (-27, 26, 12, 6)]
-
 
 def wall_pts(y, x0, x1):
     n = 8
@@ -95,11 +86,13 @@ def oil_mill(p, x, y):
         pen.rect(x - 3.4, y - 4.0, 3.2, 4.0, kit.DOOR, None)                 # the wide press door
         pen.rect(x + 1.4, y - 3.8, 1.2, 1.4, kit.DOOR, None)
         pen.rect(x0, top, w, h, None, kit.INK, 0.5)
-    p.stand(y, fn)
+    return p.stand(y, fn, x=x)
 
 
-def draw(level, season):
-    p = kit.Piece(season, ground="grass", seed=3)
+def draw(level, season, variant=0, mirror=False):
+    if level == 0:                                    # no piece: the sheets show the map's wild land
+        return kit.wild(season, "grass", seed=3)
+    p = kit.Piece(season, ground="grass", seed=3, mirror=mirror)
     sp, su, au, wi = season == "spring", season == "summer", season == "autumn", season == "winter"
     soil = kit.crop("olive_soil", season)[0]
     if wi:                                            # the shelves take snow; the walls stay stone
@@ -108,9 +101,6 @@ def draw(level, season):
     walls = [w for w in WALLS if w[3] <= level]
 
     # ---- ground plane
-    if level == 0:                                    # wild land, with darker patches where the groves will come
-        for x, y, w, h in SCRUB:
-            p.scrub(x, y, w, h, dark=0.09)
     for x, y, frm in trees:                           # pale ochre soil under every tree
         p.patch(clip(ellipse_pts(x + 0.5, y + 1.5, 5.5, 3.25)), soil)
     for y, x0, x1, _ in walls:                        # the terrace strip north of each wall
@@ -121,9 +111,6 @@ def draw(level, season):
         p.road(TRACK, 1.6, track=True)
         p.blob(STONE_AT[0], STONE_AT[1], 11.2, 7.2, kit.STONE, edge=kit.STONE_D)                 # the millstone, flat on the ground
         p.blob(STONE_AT[0], STONE_AT[1], 3.0, 2.0, kit.DOOR)
-    avoid = [(MILL[0], MILL[1], 16), (FARM[0], FARM[1], 8)] + [(x, y, 6) for x, y, _ in trees]
-    p.tufts(14 if level == 0 else 8 if level == 1 else 4, avoid=avoid if level else ())
-    p.stones([(x, y, r) for x, y, r, g in STONES if level < g or g == 9])
     if sp:                                            # blossom dots on the ground under one tree in three
         for i, (x, y, frm) in enumerate(trees):
             if i % 3 == 0:
@@ -135,9 +122,6 @@ def draw(level, season):
             p.patch(clip([(x - 4.5, y + 0.5), (x + 4.5, y + 0.5), (x + 5.5, y + 3.8), (x - 5.5, y + 3.8)]), kit.SAIL_D, kit.STONE_D, 0.5)
 
     # ---- standing things
-    for i, (x, y, kind, gone) in enumerate(WILD):
-        if level < gone:
-            p.tree(x, y, 1.0 if kind == "conifer" else 1.0, kind, i)
     for i, (x, y, frm) in enumerate(TREES):
         if frm <= level:
             p.tree(x, y, 1.0, "olive", i)
@@ -164,5 +148,8 @@ def ellipse_pts(cx, cy, rx, ry, n=16):
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "docs", "design", "map", "pieces", "olives.png")
-    kit.sheet(draw, LEVELS, "Olives: levels 0-3 by season", out, NAMES, ground="grass")
+    kit.sheet(draw, LEVELS, "Olives: levels 0-3 by season", out, NAMES, ground="grass", wild=True)
     print("wrote", os.path.normpath(out))
+    vout = os.path.join(os.path.dirname(out), "olives_variants.png")
+    kit.variant_sheet(draw, LEVELS, "Olives: layout and mirror", vout, NAMES, ground="grass")
+    print("wrote", os.path.normpath(vout))

@@ -1,9 +1,13 @@
-"""Salt pans, levels 0-3 (see docs/design/map/pieces/GUIDE.md, section 8).
+"""Salt pans, levels 1-3, at the map's shore (see docs/design/map/pieces/GUIDE.md, sections 8 and 10).
 
-0 bare shore - 1 three pans, a heap and a hut - 2 eight pans, a feeder channel, a sluice, three heaps -
-3 fourteen pans, five heaps, a jetty with a boat and the salt store.
+1 four pans in a row along the shore, a heap, a hut and a trodden path - 2 eight pans in two rows, a feeder channel
+from the pans to the shore, a sluice, three heaps - 3 fourteen pans in three rows, five heaps, a short jetty with a
+boat and the salt store.   Level 0 is no piece: the sheets show kit.wild().
 
-python salt.py             writes docs/design/map/pieces/salt.png
+Everything is laid out in SHORE COORDINATES: u px along the shore from the middle, v px out to sea (v < 0 is
+inland); shore.pt(u, v) turns that into piece px for whichever side the sea is on. The piece draws no sea of its own.
+
+python salt.py             writes docs/design/map/pieces/salt.png, salt_variants.png and salt_sides.png
 """
 import os
 import sys
@@ -12,30 +16,33 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(0, 4)
-NAMES = {0: "bare shore", 1: "3 pans, hut", 2: "8 pans, sluice", 3: "14 pans, store"}
+NAMES = {0: "wild land (the map's)", 1: "4 pans, hut, path", 2: "8 pans, sluice", 3: "14 pans, store"}
+VARIANTS = 1
+SEED = 2
+COAST = dict(y0=15.0, amp=2.0, sand=4.0, seed=3)      # the keywords of p.coast(); level 0 uses the same
+# the land depth behind the shore each level uses (px): a hex with less land takes a lower level
+NEED = {1: 26, 2: 34, 3: 46}
 
-SHORE_Y = 15.0                                        # the sea starts here, the same at every level
-PAN_W, PAN_H = 10.4, 7.3                              # the pan, inside its dyke
-PX, PY = 12.0, 9.0                                    # grid pitch
-ROW_Y = (-22.0, -13.0, -4.0)
-# x of each column; rows 1..3 are ROW_Y[0..2]
-PANS = [                                              # cx, cy, from level
-    (6, ROW_Y[2], 1), (18, ROW_Y[2], 1), (30, ROW_Y[2], 1),
-    (-18, ROW_Y[1], 2), (-6, ROW_Y[1], 2), (6, ROW_Y[1], 2), (18, ROW_Y[1], 2), (30, ROW_Y[1], 2),
-    (-6, ROW_Y[0], 3), (6, ROW_Y[0], 3), (18, ROW_Y[0], 3), (30, ROW_Y[0], 3), (-6, ROW_Y[2], 3), (-18, ROW_Y[2], 3),
+PAN_W, PAN_H = 10.4, 7.3                              # the pan, inside its dyke (dykes of neighbours share a rim)
+COLS = (-22.4, -11.2, 0.0, 11.2, 22.4)                # u of the five pan columns
+ROWS = (-18.0, -26.6, -35.2)                          # v of the three pan rows: A (by the shore), B, C
+HUT = (COLS[0], ROWS[0] - 1.0)                        # u, v: the hut stands at the left end of row A
+PANS = [                                              # u, v, from level
+    (COLS[1], ROWS[0], 1), (COLS[2], ROWS[0], 1), (COLS[3], ROWS[0], 1), (COLS[4], ROWS[0], 1),
+    (COLS[1], ROWS[1], 2), (COLS[2], ROWS[1], 2), (COLS[3], ROWS[1], 2), (COLS[4], ROWS[1], 2),
+    (COLS[0], ROWS[1], 3),
+    (COLS[0], ROWS[2], 3), (COLS[1], ROWS[2], 3), (COLS[2], ROWS[2], 3), (COLS[3], ROWS[2], 3), (COLS[4], ROWS[2], 3),
 ]
-HEAPS = [(8, 1), (-4, 2), (20, 2), (-16, 3), (32, 3)]  # x, from level; all stand on y = HEAP_Y
-HEAP_Y = 6.5
-HUT = (-37, -8)
-CHANNEL = [(-29, 17), (-29, 8), (-29, -2), (-28, -11), (-26, -21)]
-SLUICE = (-29, -2)
-STORE = (0, -29)
-JETTY = ((25, 12), (31, 28))
-BOAT = (38, 27)
-SCRUB = [(14, -4, 40, 12), (-4, -13, 44, 12), (0, -22, 40, 11)]       # level 0: darker ground where the pans will come
-POOLS = [[(11, -7), (17, -8.5), (23, -7), (21, -3), (14, -2.5)], [(-14, -15), (-8, -16.5), (-3, -14), (-6, -10.5), (-12, -10.5)]]
-STONES = [(-8, 3, 1.8, 1), (30, 9, 1.6, 9), (-42, 4, 1.8, 9), (4, -33, 1.5, 9), (40, -8, 1.6, 2)]   # x, y, r, gone from level
-DRIFTS = [(-30, -30, 13, 5), (30, -31, 12, 5), (-12, 10, 8, 3)]       # winter only
+HEAPS = [(3, 1), (-9, 2), (15, 2), (-21, 3), (27, 3)]  # u, from level; all stand at v = HEAP_V
+HEAP_V = -8.0
+PATH = [(-21.0, -14.0), (-14.0, -13.0), (-4.0, -12.5), (6.0, -12.5), (16.0, -12.5)]   # trodden: hut to the pans, along their front
+CHANNEL = [(-33.0, 0.0), (-33.0, -9.0), (-32.0, -20.0), (-33.0, -31.0)]   # u, v: from the pans down to the shore
+SLUICE = (-33.0, -17.0)
+STORE = (0.0, -43.0)
+JETTY_U = 18.0                                        # the jetty runs straight out from pt(u, -1) to pt(u, 14)
+BOAT = (10.0, 9.0)                                    # moored beside the jetty
+DRIFT = (-26.0, -4.0, 8, 3)                           # winter only: one low drift on the beach
+RAKERS = [(9.0, -13.0), (21.0, -13.0, (70, 96, 150))]   # summer: one from level 1, the second from level 2
 
 
 def pan_col(p, i):
@@ -49,16 +56,30 @@ def pan_col(p, i):
     return kit.ICE
 
 
-def pan(p, cx, cy, i):
+def at(s, u, v, du=0.0, dv=0.0):
+    """The piece-px point du along and dv across the shore from the shore point (u, v). One shore point per shape
+    keeps a pan a true rectangle where the shore is wavy or slanted."""
+    x, y = s.pt(u, v)
+    return (x + s.along[0] * du + s.out[0] * dv, y + s.along[1] * du + s.out[1] * dv)
+
+
+def quad(s, u, v, w2, h2):
+    """A rectangle lying on the shore: centre (u, v), w2 along the shore and h2 across it, as piece px."""
+    return [at(s, u, v, du, dv) for du, dv in ((-w2, -h2), (w2, -h2), (w2, h2), (-w2, h2))]
+
+
+def pan(p, s, u, v, i):
     w2, h2 = PAN_W / 2, PAN_H / 2
     dyke = kit.SNOW if p.winter else kit.mix(p.pal["sand"], kit.STONE_D, 0.55)
-    p.patch([(cx - w2 - 0.8, cy - h2 - 0.65), (cx + w2 + 0.8, cy - h2 - 0.65), (cx + w2 + 0.8, cy + h2 + 0.65), (cx - w2 - 0.8, cy + h2 + 0.65)], dyke)
+    p.patch(quad(s, u, v, w2 + 0.8, h2 + 0.65), dyke)
     edge = kit.ICE_D if p.winter else kit.STONE_D
-    p.patch([(cx - w2, cy - h2), (cx + w2, cy - h2), (cx + w2, cy + h2), (cx - w2, cy + h2)], pan_col(p, i), edge, 0.5)
+    p.patch(quad(s, u, v, w2, h2), pan_col(p, i), edge, 0.5)
     inner = kit.mix(pan_col(p, i), kit.SNOW if p.winter else (kit.SALT if p.season != "autumn" else kit.STONE_GREY_D), 0.35)
-    p.gp.line((cx - w2 + 1.6, cy - 0.6), (cx + w2 - 2.2, cy - 0.6), inner, 0.5)         # a glint, a crust or a crack
+    a, b = at(s, u, v, -w2 + 1.6, -0.6), at(s, u, v, w2 - 2.2, -0.6)
+    p.over(lambda pen: pen.line(a, b, inner, 0.5), 0.85)                       # a glint, a crust or a crack
     if p.season == "summer" and i % 3 != 1:
-        p.gp.line((cx - w2 + 2.4, cy + 1.6), (cx + w2 - 3.0, cy + 1.6), kit.shade(kit.SALT, 0.93), 0.5)
+        a, b = at(s, u, v, -w2 + 2.4, 1.6), at(s, u, v, w2 - 3.0, 1.6)
+        p.over(lambda pen: pen.line(a, b, kit.shade(kit.SALT, 0.93), 0.5), 0.85)
 
 
 def sluice(p, x, y):
@@ -75,65 +96,84 @@ def sluice(p, x, y):
         pen.line((x - 2.7, y - 5.6), (x - 2.7, y), kit.INK, 0.5)
         pen.line((x + 2.7, y - 5.6), (x + 2.7, y), kit.INK, 0.5)
         pen.rect(x - 2.6, y - 2.6, 5.2, 2.6, None, kit.INK, 0.5)
-    p.stand(y, fn)
+    return p.stand(y, fn)
 
 
-def draw(level, season):
-    p = kit.Piece(season, ground="sand", seed=2)
+def draw(level, season, variant=0, mirror=False, sea=None, shore=None):
+    if level == 0:                                    # no piece on the map: the sheets show the wild shore
+        return kit.wild(season, "sand", seed=SEED, coast=COAST, sea=sea, shore=shore, mirror=mirror)
+    p = kit.Piece(season, ground="sand", seed=SEED, sea=sea, shore=shore, mirror=mirror)
+    s = p.coast(**COAST)
     su, au, wi = season == "summer", season == "autumn", season == "winter"
-    pans = [q for q in PANS if q[2] <= level]
-    heaps = [h for h in HEAPS if h[1] <= level]
-    work = [(q[0], q[1], 9) for q in pans] + [(h[0], HEAP_Y, 6) for h in heaps]
-    if level >= 1:
-        work.append((HUT[0], HUT[1], 8))
-    if level >= 2:
-        work.append((SLUICE[0], SLUICE[1], 6))
 
-    # ---- ground plane (the same order every time, so the scatter never moves)
-    if level == 0:                                    # wild: darker wet ground where the pans will come, two pools
-        for x, y, w, h in SCRUB:
-            p.blob(x, y, w, h, kit.mix(p.pal["sand"], p.pal["soil"], 0.25))
-    p.tufts(14 if level == 0 else 8 if level == 1 else 5 if level == 2 else 3, area=(-46, -44, 46, 6), avoid=work)
-    p.stones([(x, y, r) for x, y, r, gone in STONES if level < gone])
-    p.coast(SHORE_Y, amp=2.0, sand=4.0, seed=3)
-    if level == 0:
-        for pts in POOLS:
-            p.patch(pts, kit.ICE if wi else kit.mix(p.pal["shallow"], p.pal["sand"], 0.3),
-                    kit.ICE_D if wi else kit.mix(p.pal["shallow"], p.pal["sand"], 0.7), 0.5)       # shallow pools
-    if level >= 2:
-        p.water(CHANNEL, 2.2)
-    for i, (cx, cy, _) in enumerate(PANS):
-        if level >= PANS[i][2]:
-            pan(p, cx, cy, i)
+    # ---- ground plane (the same order every time)
+    soil = p.pal["soil"]
+    if level >= 1:                                    # the trodden path from the hut to the pans, and ground round the hut
+        p.blob(*s.pt(HUT[0], HUT[1] + 1.5), 15, 7, soil, alpha=0.35)
+        p.over(lambda pen: pen.lines([s.pt(*q) for q in PATH], soil, 2.6), 0.5)
+    if level >= 2:                                    # the feeder channel: quiet, quieter than the sea
+        col = kit.ICE if wi else kit.mix(p.pal["river"], p.pal["shallow"], 0.5)
+        edge = kit.ICE_D if wi else p.pal["river_edge"]
+        line = [s.pt(*q) for q in CHANNEL]
+        p.over(lambda pen: (pen.lines(line, edge, 3.2), pen.lines(line, col, 2.2)), 0.8)
+    for i, (u, v, frm) in enumerate(PANS):
+        if level >= frm:
+            pan(p, s, u, v, i)
     if level >= 3:
-        p.jetty(JETTY[0], JETTY[1], 2.2)
-    for d in DRIFTS:
-        p.snow_patch(*d)
+        p.jetty(s.pt(JETTY_U, -1), s.pt(JETTY_U, 14), 2.2, snow=True)
+    if wi:
+        p.snow_patch(*s.pt(DRIFT[0], DRIFT[1]), DRIFT[2], DRIFT[3])
 
     # ---- standing things
     if level >= 1:
-        p.house(HUT[0], HUT[1], 5.5, 3.5, 3.0, roof="thatch", smoke=True)
+        p.house(*s.pt(*HUT), 5.5, 3.5, 3.0, roof="thatch", smoke=True)
     if level >= 2:
-        sluice(p, SLUICE[0], SLUICE[1])
+        sluice(p, *s.pt(*SLUICE))
     covered = au or wi
-    for hx, frm in HEAPS:
+    for hu, frm in HEAPS:
         if level >= frm:
+            x, y = s.pt(hu, HEAP_V)
             if covered:
-                p.heap(hx, HEAP_Y, 8, 5.5, kit.THATCH, kit.THATCH_D)
+                p.heap(x, y, 8, 5.5, kit.THATCH, kit.THATCH_D)
             else:
-                p.heap(hx, HEAP_Y, 8, 5.5, kit.SALT, kit.shade(kit.SALT, 0.86))
+                p.heap(x, y, 8, 5.5, kit.SALT, kit.shade(kit.SALT, 0.86))
     if level >= 3:
-        p.house(STORE[0], STORE[1], 16, 5.4, 4.6, wall=3, kind="ridge", roof="tile", door=False)
-        p.boat(BOAT[0], BOAT[1], 0.55, sail=not wi)
+        p.house(*s.pt(*STORE), 16, 5.4, 4.6, wall=3, kind="ridge", roof="tile", door=False)
+        p.boat(*s.pt(*BOAT), 0.7, sail=not wi)
     # ---- season activity: two rakers in summer
-    if su and level >= 1:
-        p.person(24, 1.8)
-        if level >= 2:
-            p.person(38, 1.8, (70, 96, 150))
+    if su:
+        for k, r in enumerate(RAKERS):
+            if level >= k + 1:
+                p.person(*s.pt(r[0], r[1]), *r[2:])
     return p.finish(label="salt L%d" % level)
 
 
+def sides_sheet(path, season="summer"):
+    """The coast check: levels 1-3, in summer and winter, with the sea on S, E and NW and the same mirrored."""
+    pg = kit.pygame
+    cases = [(side, m) for m in (False, True) for side in ("S", "E", "NW")]
+    cw = kit.SIZE + 8
+    W, H = 90 + len(cases) * cw, 40 + 6 * cw + 30
+    out = pg.Surface((W, H))
+    out.fill(kit.SHEET_BG)
+    f = kit._font(17)
+    for j, (side, m) in enumerate(cases):
+        out.blit(f.render("sea %s%s" % (side, " mirrored" if m else ""), True, kit.SHEET_TEXT), (90 + j * cw + 4, 8))
+    for r, (se, lv) in enumerate([(se, lv) for se in ("summer", "winter") for lv in (1, 2, 3)]):
+        out.blit(f.render("%s L%d" % (se, lv), True, kit.SHEET_TEXT), (6, 40 + r * cw + 50))
+        for j, (side, m) in enumerate(cases):
+            img = kit.with_wild(draw, lv, se, mirror=m, sea=side)
+            out.blit(kit._cell(img, se, 1.0, 4, "sand"), (90 + j * cw, 34 + r * cw))
+    pg.image.save(out, path)
+
+
 if __name__ == "__main__":
-    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "docs", "design", "map", "pieces", "salt.png")
-    kit.sheet(draw, LEVELS, "Salt pans: levels 0-3 by season", out, NAMES, ground="sand")
+    here = os.path.dirname(os.path.abspath(__file__))
+    folder = os.path.join(here, "..", "..", "..", "docs", "design", "map", "pieces")
+    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(folder, "salt.png")
+    base = os.path.splitext(out)[0]
+    kit.sheet(draw, LEVELS, "Salt pans: levels 0-3 by season", out, NAMES, ground="sand", wild=True)
     print("wrote", os.path.normpath(out))
+    kit.variant_sheet(draw, LEVELS, "Salt pans: layouts and mirror", base + "_variants.png", NAMES, ground="sand")
+    sides_sheet(base + "_sides.png")
+    print("wrote", os.path.normpath(base + "_variants.png"), os.path.normpath(base + "_sides.png"))

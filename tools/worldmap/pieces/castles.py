@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(1, 4)
+VARIANTS = 1
 NAMES = {1: "watchtower", 2: "castle, keep", 3: "bastion fortress"}
 
 # ---- the fixed layout: nothing here depends on the level except where a "from level" is given
@@ -30,14 +31,7 @@ FORT_A, FORT_B = 26.0, 16.5                          # level 3: half sizes of th
 FORT_H = 4.6                                         # fortress wall height
 FORT_T = 3.4                                         # fortress wall thickness (plan)
 MOAT_W = 3.0                                         # visible width of the moat
-TREES = [                                            # x, y, kind, size, gone from level
-    (-36, -12, "round", 1.0, 3), (35, -14, "round", 0.95, 3), (29, -20, "round", 0.9, 2),
-    (-38, 12, "round", 1.0, 2), (40, 10, "round", 0.9, 3), (-13, -29, "round", 0.85, 9), (12, -29, "round", 0.85, 9),
-    (-24, 27, "bush", 1.0, 2), (26, 29, "bush", 1.0, 2), (-31, -6, "bush", 1.0, 2), (5, 32, "bush", 1.0, 3),
-    (36, 24, "conifer", 0.9, 2),
-]
 GATES = {"south": (-5, 36)}                          # where the map's road layer joins the lane (10+ px inside the border)
-STONES = [(-16, 20, 1.8, 2), (20, 18, 1.6, 2), (-32, 6, 1.6, 3)]     # x, y, r, gone from level
 
 
 # ------------------------------------------------------------------ small drawing helpers
@@ -86,7 +80,7 @@ def _tower(pen, winter, x, y, w, h, top="battlement", flag=None, door=True, roof
 
 def add_tower(p, x, y, w, h, top="battlement", flag=None, door=True, roof_h=None, slit=False):
     p.cast(x, y, w + 1)
-    p.stand(y, lambda pen: _tower(pen, p.winter, x, y, w, h, top, flag, door, roof_h, slit))
+    return p.stand(y, lambda pen: _tower(pen, p.winter, x, y, w, h, top, flag, door, roof_h, slit), x=x)
 
 
 def mound(p):
@@ -111,7 +105,7 @@ def ring_wall(p, cx, cy, rx, ry, height=RING_H):
     back = kit.ring_points(cx, cy, rx, ry, math.pi, 2 * math.pi)
     front = kit.ring_points(cx, cy, rx, ry, 0, math.pi)
     hw = height
-    p.shadow(cx + rx * 0.2, cy + ry * 0.35, rx * 2.3, ry * 2.0)
+    p.shadow(cx + p.m * rx * 0.2, cy + ry * 0.35, rx * 2.3, ry * 2.0)
 
     def fb(pen):
         top = [(a[0], a[1] - hw) for a in back]
@@ -137,11 +131,12 @@ def ring_wall(p, cx, cy, rx, ry, height=RING_H):
         g = front[len(front) // 2]                             # the gatehouse
         _tower(pen, winter, g[0], g[1] + 0.8, 7.0, 8.2, "battlement", None, False)
         pen.rect(g[0] - 1.5, g[1] + 0.8 - 3.4, 3.0, 3.4, kit.DOOR, None)
-    p.stand(cy - ry - 0.5, fb)
-    p.stand(cy + ry + 0.5, ff)
+    p.stand(cy - ry - 0.5, fb, x=cx)                          # the ring is symmetric about x = cx: it stays where it is
+    handle = p.stand(cy + ry + 0.5, ff, x=cx)
     for t in (0.02, 0.98):
         q = front[int((len(front) - 1) * t)]
         p.cast(q[0], q[1], 4.8)
+    return handle
 
 
 # ------------------------------------------------------------------ level 3: the bastion fortress
@@ -223,7 +218,7 @@ def fort_wall(p, outer, inner, h):
                     b = (a[0] + (Pi[0] - P[0]) * 0.28, a[1] + (Pi[1] - P[1]) * 0.28)
                     pen.line(a, b, kit.STONE_GREY_D if not winter else kit.SNOW_D, 0.5)
             pen.line(up(P), up(Q), kit.INK, 1.0)
-        p.stand(depth, fn)
+        p.stand(depth, fn, x=CX)                           # the plan is symmetric about x = CX: edges stay joined
 
 
 def moat(p, outer):
@@ -247,15 +242,14 @@ def moat(p, outer):
     p.over(fn, 1.0)
 
 
-def draw(level, season, flag=kit.FLAG):
-    p = kit.Piece(season, ground="grass", seed=3)
+def draw(level, season, variant=0, mirror=False, flag=kit.FLAG):
+    p = kit.Piece(season, ground="grass", seed=3, mirror=mirror)
     winter, spring, summer = p.winter, season == "spring", season == "summer"
     plan = fort_plan(FORT_A, FORT_B)
     outer = tilt(plan)
     inner = tilt(offset_poly(plan, FORT_T))
 
     # ---- ground plane
-    p.tufts(10 if level == 1 else 6 if level == 2 else 4, avoid=[(CX, CY, 20)])     # first: later levels cover some of them
     if level >= 3:
         moat(p, outer)
         yard = kit.ROAD if not winter else (172, 160, 140)      # the trodden yard: an overlay on whatever ground there is
@@ -273,13 +267,8 @@ def draw(level, season, flag=kit.FLAG):
         for k in range(5):
             y = gy + 0.5 + k * 1.7
             p.over(lambda pen, y=y: pen.line((CX - 2.6, y), (CX + 2.6, y), kit.TIMBER_D, 0.5), 1.0)
-    p.stones([(x, y, r) for x, y, r, gone in STONES if level < gone])
 
     # ---- standing things
-    for i, (x, y, kind, sc, gone) in enumerate(TREES):
-        if level < gone:
-            p.tree(x, y, sc, kind, i)
-
     if level == 1:
         p.wall(CX, CY, RING1[0], RING1[1], "palisade", towers=(), gate=0.5, height=3.4)
         add_tower(p, KEEP[0], KEEP[1], 6.4, 8.8, "cone", flag, door=False, roof_h=5.6)
@@ -287,14 +276,14 @@ def draw(level, season, flag=kit.FLAG):
         ring_wall(p, CX, CY, RING2[0], RING2[1])
         keep_h = 14.5
         p.cast(KEEP[0], KEEP[1], 11)
-        p.stand(KEEP[1], lambda pen: _tower(pen, winter, KEEP[0], KEEP[1], 10.0, keep_h, "battlement", flag, True, slit=True, banner_h=3.2))
+        keep = p.stand(KEEP[1], lambda pen: _tower(pen, winter, KEEP[0], KEEP[1], 10.0, keep_h, "battlement", flag, True, slit=True, banner_h=3.2), x=KEEP[0])
         if winter:                                         # the keep smokes in winter only (the kit's smoke is grey on snow)
-            p.smoke(KEEP[0] + 3.6, KEEP[1] - keep_h - 3.4, always=False, foot=KEEP[1])
+            p.smoke(KEEP[0] + 3.6, KEEP[1] - keep_h - 3.4, always=False, foot=KEEP[1], on=keep)
     if level >= 3:
         fort_wall(p, outer, inner, FORT_H)
         gy = CY + FORT_B * kit.TILT
         p.cast(CX, gy, 8)
-        p.stand(gy + 0.9, lambda pen: _tower(pen, winter, CX, gy + 0.9, 8.4, 8.0, "battlement", flag, True))
+        p.stand(gy + 0.9, lambda pen: _tower(pen, winter, CX, gy + 0.9, 8.4, 8.0, "battlement", flag, True), x=CX)
     # ---- season activity (never changes the layout)
     if (spring or summer) and level >= 2:
         p.person(CX + 5, CY + RING2[1] + 7, (70, 96, 150))
@@ -303,5 +292,8 @@ def draw(level, season, flag=kit.FLAG):
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "docs", "design", "map", "pieces", "castles.png")
-    kit.sheet(draw, LEVELS, "Castles: levels 1-3 by season", out, NAMES)
+    kit.sheet(draw, LEVELS, "Castles: levels 1-3 by season", out, NAMES, wild=True)
     print("wrote", os.path.normpath(out))
+    vout = os.path.join(os.path.dirname(out), "castles_variants.png")
+    kit.variant_sheet(draw, LEVELS, "Castles: layout and mirror", vout, NAMES)
+    print("wrote", os.path.normpath(vout))

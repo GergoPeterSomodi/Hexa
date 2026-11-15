@@ -1,10 +1,11 @@
 """Grazing, levels 0-3, for sheep, cattle or horses (see docs/design/map/pieces/GUIDE.md, section 8).
 
-0 rough grazing - 1 loose animals, a shepherd, a hut - 2 a fenced meadow, the byre - 3 three meadows, the market hall.
-One layout for all three animals: draw(level, season, animal="sheep"|"cattle"|"horses").
-Only the animal, the byre's openings and the market hall's goods differ.
+0 the map's wild land (no piece) - 1 loose animals on a trodden patch, a shepherd, a hut - 2 a fenced meadow, the byre -
+3 three meadows, the market hall. Two layouts (LAYOUT) and the mirror. One layout table for all three animals:
+draw(level, season, variant=0, mirror=False, animal="sheep"|"cattle"|"horses"). Only the animal, the byre's openings
+and the market hall's goods differ. The piece draws no wild land: the map's trees and scrub stand round the work.
 
-python grazing.py          writes grazing_sheep.png, grazing_cattle.png, grazing_horses.png in docs/design/map/pieces
+python grazing.py          writes grazing_sheep.png, grazing_cattle.png, grazing_horses.png and grazing_sheep_variants.png
 python grazing.py DIR      the same, into DIR
 """
 import os
@@ -14,42 +15,54 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(0, 4)
-NAMES = {0: "rough grazing", 1: "loose herd, hut", 2: "meadow, byre", 3: "3 meadows, hall"}
+NAMES = {0: "wild land (the map's)", 1: "loose herd, hut", 2: "meadow, byre", 3: "3 meadows, hall"}
+VARIANTS = 2
 ANIMALS = ("sheep", "cattle", "horses")
 KIND = {"sheep": "sheep", "cattle": "cow", "horses": "horse"}
 HALL_NAME = {"sheep": "wool hall", "cattle": "dairy", "horses": "stud house"}
+# Where the map's road layer joins the track (unmirrored, 10+ px inside the border). Both layouts end there.
+GATES = {"south": (-8, 34)}
 
-# Young animals (spring). Named tokens, not in the kit.
-LAMB = (244, 240, 230)
-CALF = (176, 118, 80)
-FOAL = (120, 86, 64)
+# The meadow: the season's grass mixed half way to this tint, so it is clearly paler than the ground in every season
+# (named token, not in the kit). The colours are fixed per season, so they do not depend on the map's ground.
+MEADOW_TINT = (232, 228, 150)
+MEADOW = {s: kit.mix(kit.PAL[s]["grass"], MEADOW_TINT, 0.5) for s in ("spring", "summer", "autumn")}
 
-HUT = (-31, -4)
-BYRE = (-4, 0, 13.0)                                  # x, foot y, width
-HALL = (16, -12, 16.0)
-MEADOWS = [                                           # cx, cy, w, h (before the tilt), from level
-    (6, 17, 30, 18, 2),
-    (-29, 24, 22, 15, 3),
-    (35, 3, 16, 22, 3),
+# The layouts are fixed tables: a level adds to the level below and never moves anything.
+#   hut, byre (x, foot y, width), hall (x, foot y, width): the buildings;
+#   meadows: cx, cy, w, h (before the tilt), from level; the first is the level 2 meadow, the trodden patch lies in it;
+#   patch: the level 1 trodden patch (36 x 16, an overlay) where the herd gathers;
+#   herd: x, y, from level, stays out in winter; young: spring only, beside a grown animal: x, y, from level;
+#   hay: haystacks (x, y, size, from level; not in spring); haymaking: the extra summer stack; shepherd: the person;
+#   track: level 3, ends at the gate.
+LAYOUT = [
+    dict(  # layout 0: the hut far left at the back, the byre at the middle, the hall at the back right, meadows in front and to the sides
+        hut=(-32, -17), byre=(-2, -2, 13.0), hall=(8, -18, 16.0),
+        meadows=[(8, 17, 40, 24, 2), (-26.5, -6, 30, 20, 3), (30.5, -7, 22, 26, 3)],
+        patch=(8, 17),
+        herd=[
+            (-3, 15, 1, True), (5, 21, 1, False), (13, 14, 1, True), (19, 21, 1, False), (24, 15, 1, False),
+            (-7, 22, 2, False), (10, 10, 2, True), (18, 25, 2, False),
+            (-35, -5, 3, False), (-27, 0, 3, False), (-20, -9, 3, False), (27, -11, 3, False), (36, 0, 3, False),
+        ],
+        young=[(-0.8, 15.8, 1), (15.2, 14.8, 1), (12.2, 10.8, 2)],
+        hay=[(-18, -18, 1.0, 2), (37, -23, 0.9, 3)], haymaking=(-13, -12), shepherd=(-15, 9),
+        track=[(-3, 3), (-13, 5), (-17, 12), (-16, 22), (-13, 29), GATES["south"]],
+    ),
+    dict(  # layout 1: the byre and hut at the back right, the big meadow across the middle, two meadows on the west, the hall front left
+        hut=(34, -12), byre=(18, -16, 13.0), hall=(-22, 31, 16.0),
+        meadows=[(15, 8, 40, 24, 2), (-21, -15, 30, 20, 3), (-22, 9, 22, 26, 3)],
+        patch=(15, 8),
+        herd=[
+            (4, 8, 1, False), (11, 12, 1, False), (18, 5, 1, True), (25, 10, 1, True), (31, 7, 1, False),
+            (7, 15, 2, False), (21, 15, 2, False), (28, 1, 2, True),
+            (-29, -17, 3, False), (-21, -11, 3, False), (-13, -18, 3, False), (-26, 2, 3, False), (-18, 13, 3, False),
+        ],
+        young=[(5.8, 8.8, 1), (19.8, 5.8, 1), (8.8, 15.8, 2)],
+        hay=[(4, -19, 1.0, 2), (-35, 22, 0.9, 3)], haymaking=(38, -6), shepherd=(-6, 4),
+        track=[(16, -11), (6, -8), (-3, -6), (-6, -3.5), (-8, 0), (-8, 12), (-9, 24), GATES["south"]],
+    ),
 ]
-YARD = [(-11.5, 2.5), (3.5, 2.5), (3.5, 6.5), (-11.5, 6.5)]            # the stable's small fenced yard (horses), level 2
-# x, y, from level, stays out in winter
-HERD = [
-    (-4, 15, 1, True), (3, 20, 1, False), (9, 14, 1, True), (14, 21, 1, False), (18, 16, 1, False),
-    (-5, 22, 2, False), (5, 15, 2, True), (10, 22, 2, False),
-    (-33, 23, 3, False), (-27, 27, 3, False), (-22, 22, 3, False), (32, 0, 3, False), (38, 8, 3, False),
-]
-YOUNG = [(-1.8, 15.8, 1), (11.6, 21.6, 1), (7.6, 15.8, 2)]             # spring only: beside a grown animal; x, y, from level
-SCRUB = [(6, 17, 34, 16), (-28, 24, 24, 12), (35, 3, 20, 20), (-4, -2, 24, 10), (-30, -5, 16, 8), (16, -12, 22, 8)]   # level 0 darker patches
-WILD = [                                              # x, y, kind, size, gone from level
-    (-32, -18, "round", 1.0, 9), (30, -23, "round", 0.9, 9),
-    (-3, 14, "bush", 1.0, 1), (-28, 25, "bush", 1.0, 3), (34, 5, "bush", 1.0, 3),
-    (-24, -20, "bush", 1.0, 9), (44, 26, "bush", 1.0, 9), (6, -28, "bush", 1.0, 9),
-]
-STONES = [(-12, 24, 1.8, 1), (28, 30, 2.0, 9), (-40, 6, 1.6, 9), (40, -14, 1.7, 9), (-16, 12, 1.4, 3)]   # x, y, r, gone from level
-HAY = [(-17, -6, 2), (32, -15, 3)]                    # haystacks (not in spring)
-HAY_EXTRA = (-22, -9)                                 # the haymaking stack, summer only, level 2 and up
-TRACK = [(-27, -1), (-18, 4), (-13, 12), (-13, 30), (-15, 48)]
 
 
 def longhouse(p, x, y, w, kind):
@@ -57,7 +70,6 @@ def longhouse(p, x, y, w, kind):
     h, roof_h = 4.2, 3.8
     r1, r2 = (kit.THATCH, kit.THATCH_D) if not p.winter else (kit.SNOW, kit.SNOW_D)
     p.cast(x, y, w)
-    smoky = p.winter
 
     def fn(pen):
         x0, top = x - w / 2, y - h
@@ -80,9 +92,9 @@ def longhouse(p, x, y, w, kind):
             pen.line(rf[0], rf[1], kit.THATCH_D, 0.5)
         pen.poly(rf, None, kit.INK, 0.5)
         pen.rect(x0, top, w, h, None, kit.INK, 0.5)
-        if smoky:
-            kit._smoke(pen, x + w * 0.3, top - roof_h - 0.5)
-    p.stand(y, fn)
+    handle = p.stand(y, fn)
+    p.smoke(x + w * 0.3, y - h - roof_h - 0.5, foot=y, on=handle)          # the chimney is off the middle: smoke is tied to it
+    return handle
 
 
 def market_hall(p, x, y, w, animal):
@@ -122,81 +134,77 @@ def market_hall(p, x, y, w, animal):
             pen.rect(cx - 1.5, top - roof_h - 2.2, 3.0, 2.2, kit.PLASTER[0], kit.INK, 0.5)
             pen.poly([(cx - 2.0, top - roof_h - 2.2), (cx, top - roof_h - 4.0), (cx + 2.0, top - roof_h - 2.2)], r1, kit.INK, 0.5)
         pen.poly(rf, None, kit.INK, 0.5)
-    p.stand(y, fn)
+    return p.stand(y, fn)
 
 
-def young_animal(p, x, y, kind):
-    def fn(pen):
-        if kind == "sheep":
-            pen.ellipse(x, y - 0.8, 2.0, 1.5, LAMB, (120, 110, 100), 0.5)
-        elif kind == "cow":
-            pen.ellipse(x, y - 1.1, 2.8, 1.8, CALF, kit.INK, 0.5)
-        else:
-            pen.line((x - 0.7, y), (x - 0.7, y - 1.3), FOAL, 0.5)
-            pen.line((x + 0.7, y), (x + 0.7, y - 1.3), FOAL, 0.5)
-            pen.ellipse(x, y - 1.8, 2.6, 1.4, FOAL, kit.INK, 0.5)
-            pen.line((x + 1.2, y - 2.0), (x + 1.7, y - 3.0), FOAL, 0.8)
-    p.stand(y, fn)
+def meadow(p, cx, cy, w, h, season):
+    """A fenced meadow of one pale colour. In winter it is snow with two hoof-trodden patches, so the fence never
+    encloses plain background."""
+    if p.winter:
+        pts = p.field(cx, cy, w, h, 0, [kit.SNOW], 1, edge=kit.SNOW_D)
+        p.blob(cx - w * 0.18, cy + h * 0.12, w * 0.34, h * 0.30, kit.SNOW_D, alpha=0.85)
+        p.blob(cx + w * 0.20, cy - h * 0.14, w * 0.26, h * 0.26, kit.SNOW_D, alpha=0.85)
+    else:
+        col = MEADOW[season]
+        pts = p.field(cx, cy, w, h, 0, [col], 1, edge=kit.shade(col, 0.78))
+    p.fence(pts + [pts[0]])
 
 
-def draw(level, season, animal="sheep"):
+def draw(level, season, variant=0, mirror=False, animal="sheep"):
     assert animal in ANIMALS, animal
+    if level == 0:                                    # no piece on the map: the sheet shows the wild land
+        return kit.wild(season, "grass", seed=2)
     kind = KIND[animal]
-    p = kit.Piece(season, ground="grass", seed=2)
+    p = kit.Piece(season, ground="grass", seed=2, mirror=mirror)
+    L = LAYOUT[variant]
     sp, su, wi = season == "spring", season == "summer", season == "winter"
+    hut, byre, hall = L["hut"], L["byre"], L["hall"]
 
-    # ---- ground plane
-    if level == 0:                                    # wild grazing: darker scrub patches where the work will come
-        for x, y, w, h in SCRUB:
-            p.blob(x, y, w, h, kit.mix(p.pal["grass"], p.pal["wood"], 0.5))
-    if level == 1:                                    # worn ground where the herd gathers and round the hut
-        p.blob(6, 17, 32, 14, kit.mix(p.pal["grass"], p.pal["soil"], 0.22))
-        p.blob(HUT[0] + 1, HUT[1] + 3, 14, 7, kit.mix(p.pal["grass"], p.pal["soil"], 0.22))
+    # ---- ground plane: trodden ground is an overlay on whatever ground the map has
+    p.blob(L["patch"][0], L["patch"][1], 36, 16, p.pal["soil"], alpha=0.3)          # where the herd gathers (the level 1 footprint)
+    p.blob(hut[0] + 1, hut[1] + 3.5, 14, 7, p.pal["soil"], alpha=0.3)               # the hut's yard
+    if level >= 2:
+        p.blob(byre[0], byre[1] + 3, byre[2] + 6, 7, p.pal["soil"], alpha=0.3)      # the byre's yard
     if level >= 3:
-        p.road(TRACK, 1.6, track=True)
-    for cx, cy, w, h, frm in MEADOWS:
+        p.road(L["track"], 1.6, track=True)
+    for cx, cy, w, h, frm in L["meadows"]:
         if level >= frm:
-            pts = p.field(cx, cy, w, h, 0, kit.crop("meadow", season), 1, edge=kit.mix(p.pal["grass"], kit.TIMBER_D, 0.5))
-            p.fence(pts + [pts[0]])
-    if level >= 2 and kind == "horse":
-        p.fence(YARD + [YARD[0]])
-    avoid = [(HUT[0], HUT[1], 8), (BYRE[0], BYRE[1], 11), (HALL[0], HALL[1], 12)] + [(m[0], m[1], max(m[2], m[3]) * 0.62) for m in MEADOWS if level >= m[4]]
-    p.tufts(24 if level == 0 else 14 if level == 1 else 9 if level == 2 else 5, avoid=avoid if level else ())
-    p.stones([(x, y, r) for x, y, r, gone in STONES if level < gone])
+            meadow(p, cx, cy, w, h, season)
+    if level >= 2 and kind == "horse":                # the stable's small fenced yard
+        bx, by = byre[0], byre[1]
+        yard = [(bx - 7.5, by + 2.5), (bx + 7.5, by + 2.5), (bx + 7.5, by + 6.5), (bx - 7.5, by + 6.5)]
+        p.fence(yard + [yard[0]])
 
     # ---- standing things
-    for i, (x, y, k, sc, gone) in enumerate(WILD):
-        if level < gone:
-            p.tree(x, y, sc, k, i)
-    if level >= 1:
-        p.house(HUT[0], HUT[1], 5.5, 3.5, 3.0, wall=4, kind="ridge", roof="thatch", smoke=True)
+    p.house(hut[0], hut[1], 5.5, 3.5, 3.0, wall=4, kind="ridge", roof="thatch", smoke=True)
     if level >= 2:
-        longhouse(p, BYRE[0], BYRE[1], BYRE[2], kind)
-        if not sp:
-            p.haystack(HAY[0][0], HAY[0][1])
+        longhouse(p, byre[0], byre[1], byre[2], kind)
+    for x, y, sc, frm in L["hay"]:
+        if level >= frm and not sp:
+            p.haystack(x, y, sc)
     if level >= 3:
-        market_hall(p, HALL[0], HALL[1], HALL[2], animal)
-        if not sp:
-            p.haystack(HAY[1][0], HAY[1][1], 0.9)
+        market_hall(p, hall[0], hall[1], hall[2], animal)
 
     # ---- the herd: fixed table; winter keeps only the three nearest the byre; young ones in spring
-    for x, y, frm, stays in HERD:
+    for x, y, frm, stays in L["herd"]:
         if level >= frm and (not wi or stays):
-            p.animal(x, y, kind, flip=x > 8)
+            p.animal(x, y, kind, flip=x > 4)
     if sp:
-        for x, y, frm in YOUNG:
+        for x, y, frm in L["young"]:
             if level >= frm:
-                young_animal(p, x, y, kind)
+                p.animal(x, y, kind, flip=x > 4, sc=0.7)
     # ---- season activity
-    if not wi and level >= 1:
-        p.person(-12, 9, (110, 80, 60))                                   # the shepherd
+    if not wi:
+        p.person(L["shepherd"][0], L["shepherd"][1], (110, 80, 60))                 # the shepherd
     if su and level >= 2:
-        p.haystack(HAY_EXTRA[0], HAY_EXTRA[1])                            # haymaking
-    return p.finish(label="grazing %s L%d" % (animal, level))
+        p.haystack(L["haymaking"][0], L["haymaking"][1])                            # haymaking
+    return p.finish(label="grazing %s L%d v%d%s" % (animal, level, variant, "m" if mirror else ""))
 
 
 def _draw_for(animal):
-    return lambda level, season: draw(level, season, animal=animal)
+    def draw_animal(level, season, variant=0, mirror=False):
+        return draw(level, season, variant=variant, mirror=mirror, animal=animal)
+    return draw_animal
 
 
 if __name__ == "__main__":
@@ -206,5 +214,8 @@ if __name__ == "__main__":
         out = os.path.join(outdir, "grazing_%s.png" % a)
         names = dict(NAMES)
         names[3] = HALL_NAME[a]
-        kit.sheet(_draw_for(a), LEVELS, "Grazing (%s): levels 0-3 by season" % a, out, names, ground="grass")
+        kit.sheet(_draw_for(a), LEVELS, "Grazing (%s): levels 0-3 by season" % a, out, names, ground="grass", wild=True)
         print("wrote", os.path.normpath(out))
+    out = os.path.join(outdir, "grazing_sheep_variants.png")
+    kit.variant_sheet(_draw_for("sheep"), LEVELS, "Grazing (sheep): layouts and mirror", out, NAMES, ground="grass")
+    print("wrote", os.path.normpath(out))

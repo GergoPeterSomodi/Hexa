@@ -1,9 +1,10 @@
 """Vineyard and winery, levels 0-3 (see docs/design/map/pieces/GUIDE.md, section 8).
 
-0 scrub on sunny hills - 1 two young blocks and a thatched hut - 2 four blocks of full rows, a tiled house, the press
-house with two vats - 3 six blocks, the upper two terraced, a track, the wine estate with a tower and cypresses.
+0 the map's wild land - 1 two young blocks and a thatched hut - 2 four blocks of full rows, a tiled house, the press
+house with two vats - 3 six blocks, two of them terraced, a track, the wine estate with a tower and cypresses.
+Two layouts (LAYOUT[0], LAYOUT[1]) with the same landmarks, counts and coverage; the map also mirrors either one.
 
-python vineyard.py         writes docs/design/map/pieces/vineyard.png
+python vineyard.py         writes docs/design/map/pieces/vineyard.png and vineyard_variants.png
 """
 import math
 import os
@@ -13,31 +14,50 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(0, 4)
-NAMES = {0: "scrub", 1: "young vines", 2: "press house", 3: "estate"}
+VARIANTS = 2
+NAMES = {0: "wild land (the map's)", 1: "young vines", 2: "press house", 3: "estate"}
 
-# The layout is fixed: a level adds to the level below and never moves anything.
-HUT = (-14, 8)                                        # the hut, later the tiled house: same foot at every level
-PRESS = (3, -2)                                       # the press house (level 2)
-VATS = [(13.5, -0.5), (18.5, 1.8)]
-ESTATE = (-4, -22)                                    # the estate: one broad two-storey ochre house (level 3)
-TOWER = (3.6, -21.4)                                  # its tower stands on the right-hand end, not above the ridge
-CYPRESS = [(9.5, -21), (13.5, -23.5)]
-BLOCKS = [                                            # cx, cy, w, h, angle, rows, from level, shelves (terraces)
-    (26, 14, 24, 17, -8, 6, 1, 1),
-    (-21, 21, 18, 12, 6, 5, 1, 1),
-    (27, -7, 22, 15, 18, 6, 2, 1),
-    (-27, -8, 21, 15, -14, 5, 2, 1),
-    (-22, -22, 14, 10, 0, 5, 3, 2),
-    (22, -22, 14, 10, 0, 5, 3, 2),
+# The layouts are fixed tables: a level adds to the level below and never moves anything. Blocks: cx, cy, w, h,
+# angle, rows, from level, shelves (terraces). Layout 0: hut left of the middle, press house in the middle, estate at
+# the back; layout 1: hut at the back right, press house on the east side, estate on the west flank, the terraced
+# blocks at the front.
+LAYOUT = [
+    dict(
+        hut=(-14, 8),                                 # the hut, later the tiled house: same foot at every level
+        press=(3, -2),                                # the press house (level 2)
+        vats=[(13.5, -0.5), (18.5, 1.8)],
+        estate=(-4, -22),                             # one broad two-storey ochre house (level 3)
+        tower=(3.6, -21.4),                           # its tower stands on the right-hand end, not above the ridge
+        cypress=[(9.5, -21), (13.5, -23.5)],
+        blocks=[
+            (26, 14, 24, 17, -8, 6, 1, 1),
+            (-21, 21, 18, 12, 6, 5, 1, 1),
+            (27, -7, 22, 15, 18, 6, 2, 1),
+            (-27, -8, 21, 15, -14, 5, 2, 1),
+            (-22, -22, 14, 10, 0, 5, 3, 2),
+            (22, -22, 14, 10, 0, 5, 3, 2),
+        ],
+        track=[(-12, 11), (-10, 20), (-6, 32), (-5, 41)],
+    ),
+    dict(
+        hut=(12, -18),
+        press=(14, -2),
+        vats=[(24.5, -0.5), (29.5, 1.8)],
+        estate=(-30, -9),
+        tower=(-22.4, -8.4),
+        cypress=[(-17, -8), (-13, -10.5)],
+        blocks=[
+            (-27, 14, 24, 17, 12, 6, 1, 1),
+            (31, 17, 18, 12, -12, 5, 1, 1),
+            (-3, -27, 22, 15, -6, 6, 2, 1),
+            (26, -18, 21, 15, 10, 5, 2, 1),
+            (-12, 26, 14, 10, 0, 5, 3, 2),
+            (13, 26, 14, 10, 0, 5, 3, 2),
+        ],
+        track=[(11, 2), (8, 12), (3, 22), (-2, 32), (-5, 41)],
+    ),
 ]
-TRACK = [(-12, 11), (-10, 20), (-6, 32), (-5, 41)]
-GATES = {"south": (-5, 41)}                           # the track ends here; the map's road layer carries it on
-WILD = [                                              # x, y, kind, size, gone from level (9 = never)
-    (-26, -26, "bush", 1.0, 3), (28, -27, "bush", 1.0, 3), (-30, -6, "bush", 1.0, 2), (30, 18, "bush", 1.0, 1),
-    (-30, 24, "bush", 1.0, 1), (3, -40, "bush", 1.0, 9), (-42, 4, "bush", 1.0, 9), (42, 2, "bush", 1.0, 9),
-    (30, -8, "round", 0.9, 2), (-14, -25, "round", 1.0, 3),
-]
-STONES = [(-4, 22, 1.8, 9), (10, 16, 1.6, 3), (34, -30, 1.5, 3), (-38, -18, 1.6, 2), (36, 30, 1.5, 9)]
+GATES = {"south": (-5, 41)}                           # the track ends here in both layouts; the map's road layer carries it on
 
 
 def corners(b):
@@ -68,7 +88,7 @@ def press_house(p, x, y):
         pen.rect(x - 2.6, y - 3.8, 4.4, 3.8, None, kit.INK, 0.5)
         pen.rect(x0 + 1.0, y - 3.4, 1.2, 1.2, kit.DOOR, None)
         pen.rect(x0, top, w, h, None, kit.INK, 0.5)
-    p.stand(y, fn)
+    return p.stand(y, fn, x=x)
 
 
 def vat(p, x, y):
@@ -83,15 +103,18 @@ def vat(p, x, y):
         pen.line((x - 2.5, y - 2.9), (x + 2.5, y - 2.9), kit.TIMBER_D, 0.5)
         pen.rect(x - 2.5, y - 4.0, 5.0, 4.0, None, kit.INK, 0.5)
         pen.ellipse(x, y - 4.0, 5.0, 2.0, kit.SNOW if winter else (120, 50, 62), kit.INK, 0.5)
-    p.stand(y, fn)
+    return p.stand(y, fn, x=x)
 
 
 def basket(p, x, y):
-    p.stand(y, lambda pen: (pen.rect(x - 1.1, y - 1.5, 2.2, 1.5, kit.TIMBER, kit.INK, 0.5), pen.rect(x - 1.1, y - 1.5, 2.2, 0.5, (150, 60, 66), None)))
+    return p.stand(y, lambda pen: (pen.rect(x - 1.1, y - 1.5, 2.2, 1.5, kit.TIMBER, kit.INK, 0.5), pen.rect(x - 1.1, y - 1.5, 2.2, 0.5, (150, 60, 66), None)), x=x)
 
 
-def draw(level, season):
-    p = kit.Piece(season, ground="grass", seed=2)
+def draw(level, season, variant=0, mirror=False):
+    if level == 0:                                    # no piece: the sheets show the map's wild land
+        return kit.wild(season, "grass", seed=2)
+    p = kit.Piece(season, ground="grass", seed=2, mirror=mirror)
+    L = LAYOUT[variant]
     sp, su, au, wi = season == "spring", season == "summer", season == "autumn", season == "winter"
     soil = kit.crop("vine_soil", season)[0]
     vine = kit.crop("vine", season)[0]
@@ -99,14 +122,11 @@ def draw(level, season):
         strips = [kit.SNOW, kit.mix(kit.SNOW, kit.SNOW_D, 0.7), kit.SNOW, p.pal["soil"]]     # one strip in four shows earth
     else:
         strips = [soil]
-    blocks = [b for b in BLOCKS if b[6] <= level]
+    blocks = [b for b in L["blocks"] if b[6] <= level]
 
     # ---- ground plane
-    if level == 0:                                    # wild land, with darker patches where the vines will come
-        for b in BLOCKS:
-            p.scrub(b[0], b[1], b[2] * 1.1, b[3] * 0.9, dark=0.08)
     if level >= 3:
-        p.road(TRACK, 1.6, track=True)
+        p.road(L["track"], 1.6, track=True)
     for b in blocks:
         cx, cy, w, h, ang, n, frm, shelves = b
         young = level == 1 and frm == 1
@@ -121,29 +141,22 @@ def draw(level, season):
             p.rows(cx, sy, w, sh, ang, n, col=vine, soil=False, lw=1.5)
             ya = sy + sh / 2 * kit.TILT
             p.terrace([(cx - w / 2 - 0.5, ya + 0.4), (cx + w / 2 + 0.5, ya + 0.4)], face=2)
-    avoid = [(b[0], b[1], max(b[2], b[3]) * 0.62) for b in blocks] + [(HUT[0], HUT[1], 8)]
-    if level >= 2:
-        avoid += [(PRESS[0] + 6, PRESS[1], 14)]
-    p.tufts(14 if level == 0 else 8 if level == 1 else 4, avoid=avoid if level else ())
-    p.stones([(x, y, r) for x, y, r, g in STONES if level < g or g == 9])
 
     # ---- standing things
-    for i, (x, y, kind, sc, gone) in enumerate(WILD):
-        if level < gone:
-            p.tree(x, y, sc, kind, i)
+    hut = L["hut"]
     if level >= 1:
         if level == 1:
-            p.house(HUT[0], HUT[1], 5.5, 3.5, 3.0, wall=0, roof="thatch", smoke=True)
+            p.house(hut[0], hut[1], 5.5, 3.5, 3.0, wall=0, roof="thatch", smoke=True)
         else:                                         # the hut grows into a house but keeps its thatch: the tile roofs are the press and the estate
-            p.house(HUT[0], HUT[1], 7.5, 4.8, 3.6, wall=0, roof="thatch", smoke=True)
+            p.house(hut[0], hut[1], 7.5, 4.8, 3.6, wall=0, roof="thatch", smoke=True)
     if level >= 2:
-        press_house(p, PRESS[0], PRESS[1])
-        for x, y in VATS:
+        press_house(p, *L["press"])
+        for x, y in L["vats"]:
             vat(p, x, y)
     if level >= 3:
-        p.house(ESTATE[0], ESTATE[1], 12.0, 6.5, 3.4, wall=kit.PLASTER[1], roof="tile")
-        p.tower(TOWER[0], TOWER[1], 3.6, 8.6, col=kit.PLASTER[1], top="cone", roof=kit.ROOF)
-        for i, (x, y) in enumerate(CYPRESS):
+        p.house(L["estate"][0], L["estate"][1], 12.0, 6.5, 3.4, wall=kit.PLASTER[1], roof="tile")
+        p.tower(L["tower"][0], L["tower"][1], 3.6, 8.6, col=kit.PLASTER[1], top="cone", roof=kit.ROOF)
+        for i, (x, y) in enumerate(L["cypress"]):
             p.tree(x, y, 1.0, "poplar", i)
 
     # ---- season activity (never changes the layout)
@@ -164,5 +177,8 @@ def draw(level, season):
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "docs", "design", "map", "pieces", "vineyard.png")
-    kit.sheet(draw, LEVELS, "Vineyard and winery: levels 0-3 by season", out, NAMES, ground="grass")
+    kit.sheet(draw, LEVELS, "Vineyard and winery: levels 0-3 by season", out, NAMES, ground="grass", wild=True)
     print("wrote", os.path.normpath(out))
+    vout = os.path.join(os.path.dirname(out), "vineyard_variants.png")
+    kit.variant_sheet(draw, LEVELS, "Vineyard: layouts and mirror", vout, NAMES, ground="grass")
+    print("wrote", os.path.normpath(vout))
