@@ -7,6 +7,9 @@ import paint as A
 import slopes as SLP
 
 TONES = None                   # the slope tones of this zoom (set by the close-up when the slope rule is on)
+# The growing map (growth.py) turns these: how much of the farm and wood ground colour shows, and the coast tint.
+FARM_GAIN, WOOD_GAIN = 1.0, 1.0
+SUN_COL = (176, 198, 100)
 
 C_FARM = (178, 198, 98)
 C_GRASS = (146, 186, 86)
@@ -30,6 +33,8 @@ class Canvas:
         self.keep = PGrid(64)      # where trees and fields must not stand
         self.coast = []            # shore points in px, with their seaward normals
         self.land_mask = None
+        self.sites = PGrid(64)     # growing map: ground reserved for a later stage (fields keep off, trees may stand)
+        self.hills = []            # growing map: (x, y, h) of every standing hill and range sample
 
     def add(self, key, fn):
         self.objs.append((key, len(self.objs), fn))
@@ -137,10 +142,14 @@ def land_colour(x, y):
     if v < 0.36:
         return C_GRASS
     farm, woods, rock = F.at(F.farm, x, y), F.at(F.woods, x, y), F.at(F.rock, x, y)
+    if FARM_GAIN != 1.0 or WOOD_GAIN != 1.0:
+        farm = min(1.0, farm * FARM_GAIN)
+        woods = min(1.0 - farm, woods * WOOD_GAIN + max(0.0, WOOD_GAIN - 1.0) * 0.5 * (1.0 - farm - rock))
+        rock = min(rock, max(0.0, 1.0 - farm - woods))
     grass = max(0.0, 1.0 - farm - woods - rock)
     c = [farm * C_FARM[i] + grass * C_GRASS[i] + woods * C_WOOD[i] + rock * C_ROCK[i] for i in range(3)]
     sun = smoothstep(0.72, 0.52, v) * 0.45            # the sunny coastal strip
-    c = [c[i] + ((176, 198, 100)[i] - c[i]) * sun for i in range(3)]
+    c = [c[i] + (SUN_COL[i] - c[i]) * sun for i in range(3)]
     dh = F.at(F.height, x - 1.5, y - 1.5) - F.at(F.height, x + 1.5, y + 1.5)
     roll = vnoise(x - 0.7, y - 0.7, 4.5, 71) - vnoise(x + 0.7, y + 0.7, 4.5, 71)
     roll2 = vnoise(x - 0.35, y - 0.35, 1.7, 73) - vnoise(x + 0.35, y + 0.35, 1.7, 73)
@@ -335,9 +344,17 @@ def sil_y(top, x):
     return None
 
 
-def hill(cv, x, y, h, seed, terraces=False, wood=0.5, key=None):
-    """A rounded hill standing on (x, y): lit left, shaded right, hachures, a few trees, terraces if farmed."""
+TERRACE_FR = [0.14, 0.27, 0.4, 0.53, 0.66, 0.78, 0.88]
+
+
+def hill(cv, x, y, h, seed, terraces=False, wood=0.5, key=None, st=None):
+    """A rounded hill standing on (x, y): lit left, shaded right, hachures, a few trees, terraces if farmed.
+    st (growing map): dict(lines=number of terrace lines from the foot up, crop="olive"|"vine"|"mixed", scrub=bool);
+    the woods then come from their own random stream, so the same trees stand in every stage unless cleared."""
     r = random.Random(seed)
+    if st is not None:
+        terraces = st.get("lines", 0) > 0
+    cv.hills.append((x, y, h))
     w = h * r.uniform(2.2, 3.3)
     skew = r.uniform(0.85, 1.2)
     n = 28
@@ -370,7 +387,8 @@ def hill(cv, x, y, h, seed, terraces=False, wood=0.5, key=None):
             hi = left[2:] + [(p[0] + w * 0.03, p[1] + h * 0.2 * math.sin(math.pi * q / (m - 3.0)) + 2) for q, p in list(enumerate(left[2:]))[::-1]]
             pygame.draw.polygon(s, HILL_HI, hi)
         if terraces:        # farmed slopes: dry-stone terraces following the round of the hill
-            fr = [0.14, 0.27, 0.4, 0.53, 0.66]
+            fr = [0.14, 0.27, 0.4, 0.53, 0.66] if st is None else TERRACE_FR[:max(2, st["lines"])]
+            crop = "olive" if st is None else st.get("crop", "olive")
             lines = []
             for f in fr:
                 lines.append([(p[0], y - (y - p[1]) * f + w * 0.02 * math.sin(math.pi * q / n)) for q, p in enumerate(top) if 0.05 * n < q < 0.95 * n])
@@ -378,7 +396,10 @@ def hill(cv, x, y, h, seed, terraces=False, wood=0.5, key=None):
                 if q % 2 == 0:
                     band = [p for p in lines[q] if p[0] < ax + w * 0.08] + [p for p in lines[q + 1] if p[0] < ax + w * 0.08][::-1]
                     if len(band) > 3:
-                        pygame.draw.polygon(s, (178, 192, 100) if q % 4 == 0 else (160, 182, 88), band)
+                        if crop == "olive":
+                            pygame.draw.polygon(s, (178, 192, 100) if q % 4 == 0 else (160, 182, 88), band)
+                        else:
+                            pygame.draw.polygon(s, (204, 192, 122) if q % 4 == 0 else (188, 190, 108), band)
             for ln in lines:
                 lit = [p for p in ln if p[0] < ax + w * 0.1]
                 shd = [p for p in ln if p[0] >= ax + w * 0.1]
@@ -388,6 +409,15 @@ def hill(cv, x, y, h, seed, terraces=False, wood=0.5, key=None):
                 if len(shd) > 1:
                     pygame.draw.lines(s, (150, 158, 118), False, shd, 2)
             for q, ln in enumerate(lines[:-1]):   # olives and vines on the terraces
+                if crop == "vine" or (crop == "mixed" and q % 2 == 0):
+                    for p0, p1 in zip(ln, ln[1:]):      # a vine row: small dark heads close together
+                        for t in (0.0, 0.5):
+                            vx, vy = p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t - 5
+                            lit = vx < ax + w * 0.1
+                            pygame.draw.circle(s, (74, 118, 58) if lit else (62, 98, 56), (vx, vy), 3)
+                            if lit:
+                                pygame.draw.circle(s, (124, 166, 80), (vx - 1, vy - 1), 1.4)
+                    continue
                 for p in ln[1::2]:
                     if r.random() < 0.55:
                         lit = p[0] < ax + w * 0.1
@@ -407,21 +437,43 @@ def hill(cv, x, y, h, seed, terraces=False, wood=0.5, key=None):
         # woods on the hill
         cnt = int(w * h / 900 * wood)
         blobs = []
+        rw = r if st is None else random.Random(seed * 7919 + 13)
+        t_top = 0.0 if st is None or not terraces else TERRACE_FR[max(2, st["lines"]) - 1] + 0.04
         for _ in range(cnt * 3):
-            px = x + r.uniform(-0.46, 0.46) * w
+            px = x + rw.uniform(-0.46, 0.46) * w
             py0 = sil_y(top, px)
             if py0 is None:
                 continue
-            py = py0 + (y - py0) * r.uniform(0.25, 1.0)
+            py = py0 + (y - py0) * rw.uniform(0.25, 1.0)
             if py - py0 < 9:
                 continue
-            if vnoise(px, py, 46.0, int(seed * 1000) % 97 + 100) < (0.42 if not terraces else 0.6):
-                continue
+            if st is None:
+                if vnoise(px, py, 46.0, int(seed * 1000) % 97 + 100) < (0.42 if not terraces else 0.6):
+                    continue
+            else:           # the wood is cleared from the foot up, as far as the terraces reach
+                if vnoise(px, py, 46.0, int(seed * 1000) % 97 + 100) < 0.42:
+                    continue
+                if (y - py) / max(1.0, y - py0) < t_top and int(px * 3 + py * 7) % 7:
+                    continue
             blobs.append((py, px))
             if len(blobs) >= cnt:
                 break
         for py, px in sorted(blobs):
-            canopy(s, px, py, r.uniform(7, 10.5), px < ax + w * 0.11, r)
+            rb = rw if st is None else random.Random(int(px * 31 + py * 17))
+            canopy(s, px, py, rb.uniform(7, 10.5), px < ax + w * 0.11, rb)
+        if st is not None and st.get("scrub"):      # rough ground: low scrub in dull tones
+            for q in range(int(w * h / 620)):
+                px = x + rw.uniform(-0.44, 0.44) * w
+                py0 = sil_y(top, px)
+                if py0 is None:
+                    continue
+                py = py0 + (y - py0) * rw.uniform(0.3, 1.0)
+                lit = px < ax + w * 0.11
+                pygame.draw.circle(s, (96, 132, 70) if lit else (80, 112, 64), (px, py), rw.uniform(3.5, 5.5))
+                if lit:
+                    pygame.draw.circle(s, (128, 158, 84), (px - 1.5, py - 1.5), 2)
+        if st is not None:
+            r.seed(seed * 104729 + 7)
         for q in range(int(w / 26)):          # tufts and bushes round the foot
             px = x + r.uniform(-0.47, 0.47) * w
             canopy(s, px, y + r.uniform(-3, 6), r.uniform(6, 9.5), px < ax + w * 0.11, r)
@@ -434,10 +486,14 @@ def hill(cv, x, y, h, seed, terraces=False, wood=0.5, key=None):
     return top
 
 
-def ridge(cv, g, seed, main=True, wood=0.62, key=None, rocky_from=1700, pre=False, terraces=None):
+def ridge(cv, g, seed, main=True, wood=0.62, key=None, rocky_from=1700, pre=False, terraces=None, st=None):
     """A range standing on the feet of its samples g (dicts x, y, h, apex, m): one silhouette with shaded faces,
-    fall lines, minor spurs and woods on the slopes."""
+    fall lines, minor spurs and woods on the slopes.
+    st (growing map): dict(wood=density, clear=share of the slope cleared from the foot up, terr=share of the slope
+    under terraces, crop="olive"|"vine"|"mixed", where=fn(x, y) limiting the terraces). The silhouette never changes."""
     r = random.Random(seed)
+    for p in g:
+        cv.hills.append((p["x"], p["y"], p["h"]))
     g = sorted(g, key=lambda p: p["x"])
     n = len(g)
     ctrl = [(g[0]["x"] - g[0]["h"] * 1.35, g[0]["y"])]
@@ -579,6 +635,9 @@ def ridge(cv, g, seed, main=True, wood=0.62, key=None, rocky_from=1700, pre=Fals
         y_top = min(p[1] for p in top)
         y_bot = max(p[1] for p in foot)
         yy = y_top + 10
+        if st is not None:
+            staged_slopes(s, st, top, base_y, x0, x1, y_top, y_bot, sd, shps, rock_polys)
+            yy = y_bot
         while yy < y_bot:
             xx = x0 + r.uniform(0, 14)
             while xx < x1:
@@ -599,6 +658,8 @@ def ridge(cv, g, seed, main=True, wood=0.62, key=None, rocky_from=1700, pre=Fals
                 canopy(s, px, py, r.uniform(7.5, 11.5), lit, r)
             yy += 10.0
         xx = x0 + 6
+        if st is not None:
+            r.seed(sd * 31 + 5)
         while xx < x1 - 6:                      # bushes along the foot, so the range grows out of the ground
             fy = base_y(xx) + 5 + r.uniform(-4, 3)
             if r.random() < 0.8:
@@ -618,8 +679,79 @@ def ridge(cv, g, seed, main=True, wood=0.62, key=None, rocky_from=1700, pre=Fals
     return top
 
 
-def data_relief(cv, skip=None, drop=0.0):
-    """The frame's ranges and hills at this zoom: same places, same heights, new painting."""
+def staged_slopes(s, st, top, base_y, x0, x1, y_top, y_bot, sd, shps, rock_polys):
+    """Growing map: the slopes of a range at one stage. Terraces climb from the foot, the wood is cleared from the
+    foot up and never from the crest; every canopy has its own fixed place, so stages only add or remove."""
+    wood, clear, terr = st.get("wood", 0.62), st.get("clear", 0.0), st.get("terr", 0.0)
+    crop, where = st.get("crop", "mixed"), st.get("where")
+    gone = max(clear, terr + 0.05 if terr else 0.0)
+    if terr:
+        fqs = [f for f in (0.1, 0.19, 0.28, 0.37, 0.46, 0.55, 0.64, 0.73, 0.82) if f <= terr + 0.001]
+        for k, fq in enumerate(fqs):
+            run = []
+            for pt in top[2:-2] + [None]:
+                q_ = None
+                if pt is not None:
+                    by_ = base_y(pt[0])
+                    ty_ = by_ - (by_ - pt[1]) * fq
+                    if by_ - pt[1] > 34 and (where is None or where(pt[0], ty_)):
+                        q_ = (pt[0], ty_)
+                if q_:
+                    run.append(q_)
+                else:
+                    if len(run) > 2:
+                        mid = run[len(run) // 2]
+                        lit_ = not any(in_poly(mid[0], mid[1], sp) for sp in shps)
+                        pygame.draw.lines(s, (96, 130, 64) if lit_ else (78, 110, 60), False, [(a_, b_ + 3) for a_, b_ in run], 2)
+                        pygame.draw.lines(s, (222, 212, 176) if lit_ else (160, 166, 124), False, run, 2)
+                        vines = crop == "vine" or (crop == "mixed" and k % 2 == 0)
+                        for (a0, b0), (a1, b1) in zip(run, run[1:]):
+                            lt = not any(in_poly(a0, b0, sp) for sp in shps)
+                            if vines:
+                                for t in (0.0, 0.5):
+                                    vx, vy = a0 + (a1 - a0) * t, b0 + (b1 - b0) * t - 5
+                                    pygame.draw.circle(s, (74, 118, 58) if lt else (60, 96, 56), (vx, vy), 3)
+                                    if lt:
+                                        pygame.draw.circle(s, (124, 166, 80), (vx - 1, vy - 1), 1.4)
+                            elif int(a0) % 3 == 0:
+                                pygame.draw.circle(s, (104, 132, 96) if lt else (84, 110, 84), (a0, b0 - 6), 4.5)
+                                if lt:
+                                    pygame.draw.circle(s, (150, 172, 132), (a0 - 1.5, b0 - 7.5), 2)
+                    run = []
+    iy = 0
+    yy = y_top + 10
+    while yy < y_bot:
+        ix = 0
+        xx = x0 + (iy * 5) % 14
+        while xx < x1:
+            rp = random.Random((ix * 73856093) ^ (iy * 19349663) ^ (sd * 83492791))
+            px, py = xx + rp.uniform(-4, 4), yy + rp.uniform(-4, 4)
+            xx += 12.0
+            ix += 1
+            ty = sil_y(top, px)
+            if ty is None or py < ty + 9 or py > base_y(px) + 3:
+                continue
+            nz = vnoise(px, py, 64.0, sd + 1) * 0.65 + vnoise(px, py, 22.0, sd + 2) * 0.35
+            thin = (py - ty) / max(30.0, base_y(px) - ty)          # 0 at the crest, 1 at the foot
+            if nz < 1 - wood - 0.12 * thin + 0.1:
+                if rp.random() < 0.05:
+                    pygame.draw.line(s, (116, 152, 78), (px, py), (px - 2, py + 11), 2)
+                continue
+            if gone and 1.0 - thin < gone + (vnoise(px, py, 90.0, sd + 3) - 0.5) * 0.3:
+                if not terr and rp.random() < 0.12:
+                    A.stump(s, px, py)
+                continue
+            if any(in_poly(px, py, rp_) for rp_ in rock_polys):
+                continue
+            lit = not any(in_poly(px, py, sp) for sp in shps)
+            canopy(s, px, py, rp.uniform(7.5, 11.5), lit, rp)
+        yy += 10.0
+        iy += 1
+
+
+def data_relief(cv, skip=None, drop=0.0, st=None):
+    """The frame's ranges and hills at this zoom: same places, same heights, new painting.
+    st (growing map): dict(ridge=fn(group) -> ridge stage, hill=fn(x, y, h, coastal, sd) -> hill stage)."""
     k = RPX / 60.0 * SS
     rnd = random.Random(5)
     for rg in RELIEF:
@@ -656,7 +788,7 @@ def data_relief(cv, skip=None, drop=0.0):
                 continue
             if len(g) == 1 and not cv.routes.clear(xs, foot - 20, 70, reach=5):
                 continue
-            ridge(cv, g, sd, main=g[0]["kind"] == "crest")
+            ridge(cv, g, sd, main=g[0]["kind"] == "crest", st=st["ridge"](g) if st else None)
     for hl in HILLS:
         sd = rnd.random()
         bx, by = P(hl["x"], hl["y"])
@@ -669,10 +801,12 @@ def data_relief(cv, skip=None, drop=0.0):
             continue      # the shaded ground carries the shape there
         coastal = F.at(F.land, hl["x"], hl["y"] + 9) < 0.75 or F.at(F.farm, hl["x"], hl["y"]) > 0.3
         wd = 0.3 + 0.5 * F.at(F.woods, hl["x"], hl["y"])
+        hs = st["hill"](bx, by, h, coastal, sd) if st else None
         if 0.42 < sd < 0.72:      # a lower shoulder behind, so the hills are not all single humps
             side = 1 if sd < 0.57 else -1
-            hill(cv, bx + side * h * 1.25, by - 7, h * 0.64, sd + 0.11, wood=wd, key=by - 1)
-        hill(cv, bx, by, h, sd, terraces=coastal and sd < 0.75, wood=wd)
+            hill(cv, bx + side * h * 1.25, by - 7, h * 0.64, sd + 0.11, wood=wd, key=by - 1,
+                 st=dict(lines=0, scrub=hs.get("scrub")) if hs else None)
+        hill(cv, bx, by, h, sd, terraces=coastal and sd < 0.75, wood=wd, st=hs)
         cv.keep.add(bx, by - h * 0.3, h * 0.9)
 
 
@@ -696,6 +830,50 @@ def grow_trees(cv, coast_y, veto=None):
             m = F.at(F.height, kx, ky)
             sc = r.uniform(1.2, 2.05)
             roll = r.random()
+            tf = SLP.canopy_tone(TONES.soft(TONES.shade, kx, ky), TONES.soft(TONES.valley, kx, ky)) if TONES else 1.0
+            if cd < 200 and roll < 0.14:
+                fn, w = (lambda a, b, c, d=random.Random(roll): A.stone_pine(cv.s, a, b, c * 1.05, d)), 26
+            elif cd < 260 and roll < 0.25:
+                fn, w = (lambda a, b, c, d=random.Random(roll): A.cypress(cv.s, a, b, c * 1.1, d)), 8
+            elif m > 700 and roll > 0.62 - (m - 700) / 1400.0:
+                fn, w = (lambda a, b, c, d=random.Random(roll), f=tf: A.conifer(cv.s, a, b, c * 1.1, d, f)), 16
+            else:
+                tone = int(vnoise(kx, ky, 2.0, 83) * 3.2) % 3
+                fn, w = (lambda a, b, c, d=random.Random(roll), t=tone, f=tf: A.broadleaf(cv.s, a, b, c, d, t, f=f)), 22
+            cv.add(y, (lambda f=fn, a=x, b=y, c=sc: f(a, b, c)))
+            cv.sh_ell(x + w * sc * 0.45, y + 2, w * sc * 1.25, w * sc * 0.42)
+
+
+def grow_trees_staged(cv, coast_y, veto=None, bias=None, scrub=None, marks=None):
+    """Growing map: the trees of one stage. Every grid cell has its own fixed dice, so a tree that stands in two stages
+    stands in the same place and looks the same; bias(x, y, coast distance) raises or lowers the wood, scrub(...) is the
+    chance of a bush on open ground, marks(x, y, dice) may return a painter for a cleared cell (a stump, a charcoal pile)."""
+    for gy in range(-10, H + 70, 27):
+        for gx in range(-20, W + 40, 31):
+            r = random.Random((gx * 73856093) ^ (gy * 19349663) ^ 11)
+            x, y = gx + r.uniform(-13, 13), gy + r.uniform(-11, 11)
+            dice, sc, roll, d2 = r.random(), r.uniform(1.2, 2.05), r.random(), r.random()
+            kx, ky = K(x, y)
+            if land_value(kx, ky) < 0.56:
+                continue
+            woods = F.at(F.woods, kx, ky)
+            clump = vnoise(kx, ky, 3.4, 81) * 0.65 + vnoise(kx, ky, 1.2, 82) * 0.35
+            p0 = woods * 0.8 + (clump - 0.5) * 2.0 - 0.3
+            cd = coast_y(x) - y
+            if cd < 170:
+                p0 -= 0.2
+            p = p0 + (bias(x, y, cd) if bias else 0.0)
+            if not cv.keep.clear(x, y, 12) or (veto and veto(x, y)):
+                continue
+            if dice > p:
+                if scrub and d2 < scrub(x, y, cd):
+                    cv.add(y, (lambda a=x, b=y, c=0.9 + roll * 0.7, d=random.Random(roll), t=int(roll * 3): A.bush(cv.s, a, b, c, d, t)))
+                elif marks and dice <= p0 + 0.35:
+                    fn = marks(x, y, d2)
+                    if fn:
+                        cv.add(y, (lambda a=x, b=y, f=fn: f(cv.s, a, b)))
+                continue
+            m = F.at(F.height, kx, ky)
             tf = SLP.canopy_tone(TONES.soft(TONES.shade, kx, ky), TONES.soft(TONES.valley, kx, ky)) if TONES else 1.0
             if cd < 200 and roll < 0.14:
                 fn, w = (lambda a, b, c, d=random.Random(roll): A.stone_pine(cv.s, a, b, c * 1.05, d)), 26

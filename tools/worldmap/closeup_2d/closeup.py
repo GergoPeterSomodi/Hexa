@@ -6,6 +6,10 @@ Writes 2d_genoa_close.png and, when the frame's plain 4x crop is given, 2d_genoa
 With the slope rule on (the default; see tools/worldmap/style_frame/slopes.py) the picture is written as
 2d_genoa_close_slopes.png instead; STYLE_FRAME_SLOPES=0 gives the first picture again.
 Set CLOSEUP_KEEP_2X=1 to also save the 2x drawing (for checking details).
+
+The growing map (the same view at several moments in time, see growth.py and stages.py):
+    python tools/worldmap/closeup_2d/closeup.py OUT_DIR --stage 1|2|3|4a|4b|all
+Without --stage the picture is drawn exactly as before.
 Authored positions are in drawing px (2x of the 1280x720 picture).
 """
 import math, os, random, sys, time
@@ -105,9 +109,17 @@ def paint_stream(cv, pts, w0, w1, seed):
     return pts
 
 
-def paint_road(cv, pts, w, wig=5, clear=0):
+def paint_road(cv, pts, w, wig=5, clear=0, style=None, keep_w=None):
+    """style (growing map): "track" (a mule track), "cart" (a cart road), None (a road) or "highway" (paved).
+    keep_w is the width that trees and fields keep clear, so that it can stay the same while the road grows."""
     s = cv.s
     pts = wiggle(smooth(pts, 2 if clear else 3, 4.0), wig, 46.0, int(pts[0][0]) % 50 + 7)
+    if style is not None:
+        paint_road_style(s, pts, w, style)
+        kw = keep_w or w
+        cv.keep.add_line(pts, kw + 10 + clear)
+        cv.routes.add_line(pts, 12 + clear)
+        return pts
     stroke(s, pts, w + 5, C_ROAD_EDGE)
     stroke(s, pts, w, C_ROAD)
     r = random.Random(int(pts[0][1]))
@@ -122,11 +134,50 @@ def paint_road(cv, pts, w, wig=5, clear=0):
     return pts
 
 
+def paint_road_style(s, pts, w, style):
+    r = random.Random(int(pts[0][1]))
+    if style == "track":            # a mule track: a thin worn line, broken where the grass has taken it back
+        for i, p in enumerate(pts):
+            if (i // 7) % 5 != 4:
+                pygame.draw.circle(s, (150, 132, 92), p, w / 2.0 + 1.5)
+        for i, p in enumerate(pts):
+            if (i // 7) % 5 != 4:
+                pygame.draw.circle(s, (208, 190, 144), p, w / 2.0)
+        return
+    if style == "cart":             # a cart road: two ruts in the earth
+        stroke(s, pts, w + 4, (140, 114, 76))
+        stroke(s, pts, w, (216, 196, 148))
+        for i in range(2, len(pts) - 3, 2):
+            a, b = pts[i], pts[i + 1]
+            pygame.draw.line(s, (188, 166, 120), (a[0] - 2, a[1] + 1), (b[0] - 2, b[1] + 1), 2)
+            if r.random() < 0.5:
+                pygame.draw.line(s, (188, 166, 120), (a[0] + 3, a[1] - 1), (b[0] + 3, b[1] - 1), 1)
+        return
+    # a highway: wide, paved pale, kerb stones on both sides
+    stroke(s, pts, w + 6, (112, 92, 70))
+    stroke(s, pts, w, (238, 226, 190))
+    for i in range(2, len(pts) - 2, 3):
+        a, b = pts[i - 1], pts[i + 1]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        n = math.hypot(dx, dy) or 1.0
+        nx, ny = -dy / n, dx / n
+        for sd in (-1, 1):
+            cx, cy = pts[i][0] + nx * sd * (w / 2.0 - 1), pts[i][1] + ny * sd * (w / 2.0 - 1)
+            pygame.draw.circle(s, (250, 244, 224) if i % 2 else (206, 192, 160), (cx, cy), 2)
+        if i % 2:
+            pygame.draw.line(s, (214, 198, 160), (pts[i][0] - 2, pts[i][1]), (pts[i][0] + 2, pts[i][1]), 2)
+
+
 FIELD_COLS = [(222, 198, 104), (196, 208, 102), (210, 180, 96), (186, 196, 120), (232, 212, 128), (168, 196, 92), (204, 190, 132)]
 
 
-def field_block(cv, cx, cy, ang, cols, rows, cw, ch, seed):
-    """A block of strip fields on the ground: wheat, green crops, fallow, vines and olive groves, hedged."""
+FIELD_MIX = ("wheat", "wheat", "green", "fallow", "vine", "olive", "green")
+
+
+def field_block(cv, cx, cy, ang, cols, rows, cw, ch, seed, mix=None, hedge=True):
+    """A block of strip fields on the ground: wheat, green crops, fallow, vines and olive groves, hedged.
+    mix (growing map): the crops to draw from; the parcels then keep their shape whatever grows on them.
+    hedge: True (hedged), False (open strips with a thin balk) or "trees" (hedges with trees at the corners)."""
     r = random.Random(seed)
     s = cv.s
     ca, sa = math.cos(math.radians(ang)), math.sin(math.radians(ang))
@@ -135,6 +186,7 @@ def field_block(cv, cx, cy, ang, cols, rows, cw, ch, seed):
         return (cx + u * ca - v * sa, cy + (u * sa + v * ca) * TILT)
 
     v0 = -rows * ch / 2.0
+    rgeo = r
     for j in range(rows):
         u0 = -cols * cw / 2.0 + r.uniform(-8, 8)
         hh = ch * r.uniform(0.85, 1.15)
@@ -146,7 +198,11 @@ def field_block(cv, cx, cy, ang, cols, rows, cw, ch, seed):
             u0 += ww
             if r.random() < 0.1 or not all(is_land(*K(*q), 0.03) for q in quad) or not cv.keep.clear(mx, my, min(ww, hh) * 0.55):
                 continue
-            kind = r.choice(("wheat", "wheat", "green", "fallow", "vine", "olive", "green"))
+            if mix is not None:
+                if not cv.sites.clear(mx, my, min(ww, hh) * 0.55):
+                    continue
+                r = random.Random(seed * 131 + j * 17 + i)      # the dice of this parcel
+            kind = r.choice(FIELD_MIX if mix is None else mix)
             col = {"wheat": FIELD_COLS[r.choice((0, 4))], "green": FIELD_COLS[r.choice((1, 5, 3))], "fallow": FIELD_COLS[r.choice((2, 6))],
                    "vine": (206, 190, 128), "olive": (188, 200, 118)}[kind]
             pygame.draw.polygon(s, col, quad)
@@ -181,12 +237,22 @@ def field_block(cv, cx, cy, ang, cols, rows, cw, ch, seed):
                         px, py = G(ua + ww * (e + 0.5) / m, v0 + hh * (q + 0.6) / k)
                         cv.add(py, (lambda a=px, b=py, d=random.Random(q * 7 + e): A.olive(cv.s, a, b, 1.25, d)))
                         cv.sh_ell(px + 5, py + 1, 16, 6)
-            pygame.draw.polygon(s, (98, 138, 68), quad, 3)
-            if r.random() < 0.6:
+            if hedge:
+                pygame.draw.polygon(s, (98, 138, 68), quad, 3)
+            else:
+                pygame.draw.polygon(s, A.sh(col, 0.8), quad, 1)
+            if r.random() < 0.6 and hedge:
                 bx, by = quad[r.randrange(4)]
                 cv.add(by, (lambda a=bx, b=by, d=random.Random(i * 3 + j), t=r.randrange(3): A.bush(cv.s, a, b, 1.3, d, t)))
+            if hedge == "trees":
+                for qi in (0, 2):
+                    if r.random() < 0.55:
+                        bx, by = quad[qi]
+                        cv.add(by, (lambda a=bx, b=by, d=random.Random(i * 5 + j + qi), t=r.randrange(3): A.broadleaf(cv.s, a, b, 1.05, d, t)))
             cv.keep.add(mx, my, max(ww, hh) * 0.62)
             cv.routes.add(mx, my, max(ww, hh) * 0.3)
+            if mix is not None:
+                r = rgeo
         v0 += hh
 
 
@@ -200,14 +266,21 @@ def farmstead(cv, x, y, seed):
     cv.routes.add(x + 10, y - 10, 30)
 
 
-def town(cv, cx, cy, rx, ry, n, seed, sc=1.3, walled=False, church=None, front_open=True, big=0):
-    """A town or hamlet: houses packed in an ellipse, a church, paving, and a wall round the land side."""
+def town(cv, cx, cy, rx, ry, n, seed, sc=1.3, walled=False, church=None, front_open=True, big=0,
+         church_built=True, wall_frac=1.0, scaffold=False, flags=False, paved=True, pave_k=1.0):
+    """A town or hamlet: houses packed in an ellipse, a church, paving, and a wall round the land side.
+    Growing map: church_built=False keeps the church plot empty, wall_frac is the share of the wall that stands
+    (built from the west), scaffold marks the stretch in work, flags puts garrison flags on the wall towers."""
     r = random.Random(seed)
     s = cv.s
-    e = pygame.Rect(0, 0, rx * 2.1, ry * 2.1)
+    e = pygame.Rect(0, 0, rx * 2.1 * pave_k, ry * 2.1 * pave_k)
     e.center = (cx, cy)
-    pygame.draw.ellipse(s, (212, 200, 160), e)
-    pygame.draw.ellipse(s, (224, 212, 172), e.inflate(-rx * 0.5, -ry * 0.5))
+    if paved:
+        pygame.draw.ellipse(s, (212, 200, 160), e)
+        pygame.draw.ellipse(s, (224, 212, 172), e.inflate(-rx * 0.5, -ry * 0.5))
+    else:           # trodden earth round a few houses
+        pygame.draw.ellipse(s, (190, 196, 124), e.inflate(-rx * 0.3, -ry * 0.3))
+        pygame.draw.ellipse(s, (204, 200, 138), e.inflate(-rx * 0.9, -ry * 0.9))
     houses, tries = [], 0
     while len(houses) < n and tries < 900:
         tries += 1
@@ -228,21 +301,33 @@ def town(cv, cx, cy, rx, ry, n, seed, sc=1.3, walled=False, church=None, front_o
         else:
             cv.add(hy, (lambda a=hx, b=hy, d=rr: A.house(cv.s, a, b, d, sc=sc)))
             cv.sh_box(hx, hy, 30 * sc, 44 * sc)
-    if church:
+    if church and church_built:
         kw = dict(church[2])
         cv.add(church[1], (lambda: A.church(cv.s, church[0], church[1], random.Random(seed + 5), **kw)))
         cv.sh_box(church[0] + 20, church[1], 60 * kw.get("sc", 1), 80 * kw.get("sc", 1))
     if walled:
         m = 26
         pts = [(cx + math.cos(a) * (rx + 16), cy + math.sin(a) * (ry + 12)) for a in [math.pi * 0.96 + math.pi * 1.08 * q / m for q in range(m + 1)]]
+        built = int(round(m * wall_frac))
         for q in range(m):
             a, b = pts[q], pts[q + 1]
+            if q >= built:
+                if scaffold and q < built + 5 and is_land(*K(a[0], a[1] + 4), 0.02) and is_land(*K(b[0], b[1] + 4), 0.02):
+                    lo = 17 - (q - built + 1) * 3               # the wall going up: lower course by course
+                    cv.add(max(a[1], b[1]) - 6, (lambda a=a, b=b, lo=lo: A.wall_run(cv.s, [a, b], lo, teeth=False)))
+                    cv.add(max(a[1], b[1]) - 5, (lambda a=a, b=b: A.scaffold(cv.s, a, b, 32)))
+                    if q == built + 4:
+                        cv.add(b[1] + 6, (lambda b=b: A.stone_heap(cv.s, b[0] + 16, b[1] + 8)))
+                continue
             if is_land(*K(a[0], a[1] + 4), 0.02) and is_land(*K(b[0], b[1] + 4), 0.02):
                 cv.add(max(a[1], b[1]) - 6, (lambda a=a, b=b: A.wall_run(cv.s, [a, b], 18)))
                 if q % 6 == 3:
                     cv.add(a[1] - 5, (lambda a=a: A.tower(cv.s, a[0], a[1] + 2, 18, 40)))
+                    if flags:
+                        cv.add(a[1] - 4.5, (lambda a=a: A.flag(cv.s, a[0], a[1] - 50, 20)))
         g = pts[m // 2]
-        cv.add(g[1] - 4, lambda: A.gate(cv.s, g[0], g[1] + 3, 0.9))
+        if built > m // 2:
+            cv.add(g[1] - 4, lambda: A.gate(cv.s, g[0], g[1] + 3, 0.9))
     cv.sh_ell(cx + rx * 0.2, cy + 6, rx * 1.7, ry * 1.2)
     for a in range(0, 360, 30):
         cv.keep.add(cx + math.cos(math.radians(a)) * rx * 0.7, cy + math.sin(math.radians(a)) * ry * 0.7, rx * 0.55)
@@ -271,33 +356,66 @@ def jetty(cv, x, y, length=70, w=15, along=0.0):
 
 
 # ---------------------------------------------------------------- Genoa
-def genoa_ground(cv):
+# What Genoa has today (about 1600). The growing map passes other values (stages.py); the layout never changes.
+GENOA_NOW = dict(
+    rows=232,                        # how far up the hill the house rows reach (offset from the quay)
+    churches=4,
+    quay=(184, 357),                 # the stone quay round the basin, in degrees of the harbour ellipse
+    piers=((226, 52), (258, 62), (288, 60), (318, 50)),
+    moles=(([(1420, 1058), (1372, 1074), (1310, 1080), (1262, 1076)], 22), ([(1052, 1070), (1090, 1084), (1136, 1086)], 20)),
+    lights=((1262, 1080, 14, 34, 1082), (1136, 1090, 12, 26, 1092)),
+    slips=((1052, 968), (1084, 954)),
+    hulls=((1052, 962, 975), (1086, 948, 962)),
+    crane=True,
+    goods=(214, 236, 262, 284, 300, 326),
+    lanterna=True,
+    castle=True,
+    suburbs=((930, 905), (902, 960), (1600, 935), (1596, 880), (940, 968)),
+)
+
+
+def genoa_ground(cv, g=None):
     """What lies flat: the paving, the quay round the basin, the piers and the two moles."""
     s = cv.s
-    pave = [arc(a, 196) for a in range(190, 351, 4)] + [arc(a, -3) for a in range(350, 189, -4)]
-    pygame.draw.polygon(s, (214, 200, 164), pave)
-    pygame.draw.polygon(s, (226, 212, 176), [arc(a, 120) for a in range(196, 345, 4)] + [arc(a, 0) for a in range(344, 195, -4)])
+    g = g or GENOA_NOW
+    q0, q1 = g["quay"]
+
+    def edge(a, off):         # where there is no quay yet the paving stops short of the strand
+        return arc(a, off if q0 <= a <= q1 else 17)
+
+    pave = [arc(a, 196) for a in range(190, 351, 4)] + [edge(a, -3) for a in range(350, 189, -4)]
+    if g.get("pave_in_wall"):      # a smaller town: no paved suburbs yet, the paving ends at the wall
+        lay = pygame.Surface((W, H), pygame.SRCALPHA)
+        pygame.draw.polygon(lay, (214, 200, 164, 255), pave)
+        pygame.draw.polygon(lay, (226, 212, 176, 255), [arc(a, 120) for a in range(196, 345, 4)] + [edge(a, 0) for a in range(344, 195, -4)])
+        m = pygame.Surface((W, H), pygame.SRCALPHA)
+        pygame.draw.polygon(m, (255, 255, 255, 255), [(p[0], p[1]) for p in WALL] + [(1570, 1110), (975, 1110)])
+        lay.blit(m, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        s.blit(lay, (0, 0))
+    else:
+        pygame.draw.polygon(s, (214, 200, 164), pave)
+        pygame.draw.polygon(s, (226, 212, 176), [arc(a, 120) for a in range(196, 345, 4)] + [edge(a, 0) for a in range(344, 195, -4)])
     e = pygame.Rect(0, 0, POINT[2] * 1.75, POINT[3] * 1.7)
     e.center = (POINT[0] - 6, POINT[1] - 6)
     pygame.draw.ellipse(s, (220, 206, 170), e)
     # streets: a few darker lanes running up from the quay
     for a in (212, 232, 252, 276, 298, 318, 336):
-        pygame.draw.line(s, (196, 180, 146), arc(a, 10), arc(a + 3, 186), 5)
+        pygame.draw.line(s, (196, 180, 146), arc(a, 10 if q0 <= a <= q1 else 22), arc(a + 3, 186), 5)
     for off in (48, 88, 126, 163):
         pts = [arc(a, off) for a in range(198, 344, 4)]
         pygame.draw.lines(s, (198, 182, 148), False, pts, 4)
     # the quay
-    outer = [arc(a, 15) for a in range(184, 357, 3)]
-    inner = [arc(a, -5) for a in range(184, 357, 3)]
+    outer = [arc(a, 15) for a in range(q0, q1, 3)]
+    inner = [arc(a, -5) for a in range(q0, q1, 3)]
     pygame.draw.polygon(s, QUAY, outer + inner[::-1])
-    pygame.draw.lines(s, (246, 238, 214), False, [arc(a, 9) for a in range(186, 355, 3)], 3)
+    pygame.draw.lines(s, (246, 238, 214), False, [arc(a, 9) for a in range(q0 + 2, q1 - 2, 3)], 3)
     pygame.draw.lines(s, INK, False, inner, 3)
-    pygame.draw.lines(s, (40, 86, 130), False, [arc(a, -9) for a in range(186, 355, 3)], 3)
-    for a in range(190, 352, 7):
+    pygame.draw.lines(s, (40, 86, 130), False, [arc(a, -9) for a in range(q0 + 2, q1 - 2, 3)], 3)
+    for a in range(q0 + 6, q1 - 5, 7):
         x, y = arc(a, 2)
         pygame.draw.rect(s, (88, 66, 54), (x - 2, y - 5, 4, 6))
     # piers into the basin
-    for a, ln in ((226, 52), (258, 62), (288, 60), (318, 50)):
+    for a, ln in g["piers"]:
         x0, y0 = arc(a, -2)
         dx, dy = BAY[0] - x0, (BAY[1] + 40) - y0
         d = math.hypot(dx, dy)
@@ -308,7 +426,7 @@ def genoa_ground(cv):
         for t in (0.35, 0.7, 1.0):
             pygame.draw.rect(s, (88, 66, 54), (x0 + (x1 - x0) * t - 2, y0 + (y1 - y0) * t - 4, 4, 6))
     # the old mole from the town point, the new mole from the lighthouse cape
-    for pts, w in (([(1420, 1058), (1372, 1074), (1310, 1080), (1262, 1076)], 22), ([(1052, 1070), (1090, 1084), (1136, 1086)], 20)):
+    for pts, w in g["moles"]:
         pts = smooth(pts, 2, 4.0)
         stroke(s, pts, w + 5, INK)
         stroke(s, pts, w, QUAY)
@@ -317,15 +435,15 @@ def genoa_ground(cv):
             pygame.draw.rect(s, (188, 174, 150), (p[0] - 4, p[1] + w * 0.22, 9, 5))
             pygame.draw.rect(s, INK, (p[0] - 4, p[1] + w * 0.22, 9, 5), 1)
     # a shipyard on the west strand: slips with two hulls in frame, and stacked timber
-    for x, y in ((1052, 968), (1084, 954)):
+    for x, y in g["slips"]:
         pygame.draw.polygon(s, (196, 178, 140), [(x - 30, y + 8), (x + 26, y - 6), (x + 32, y + 4), (x - 24, y + 18)])
 
 
-def genoa_gardens(cv, wallpoly):
+def genoa_gardens(cv, wallpoly, offs=(212, 236, 262, 290, 320)):
     """Terraced gardens and olive yards between the upper houses and the wall."""
     s = cv.s
     r = random.Random(77)
-    for off in (212, 236, 262, 290, 320):
+    for off in offs:
         pts = [arc(a, off) for a in range(186, 356, 2)]
         run = []
         for p in pts + [None]:
@@ -343,8 +461,9 @@ def genoa_gardens(cv, wallpoly):
                 run = []
 
 
-def genoa(cv):
+def genoa(cv, g=None):
     s = cv.s
+    g = g or GENOA_NOW
     r = random.Random(1492)
     wallpoly = WALL + [(1480, 1100), (1000, 1100)]
     sc = 1.42
@@ -384,6 +503,8 @@ def genoa(cv):
             if k == "-":
                 continue
             rr = random.Random(int(x * 7 + y))
+            if off > g["rows"]:        # not built yet: the plot stays garden
+                continue
             if k == "p":
                 cv.add(y, (lambda x=x, y=y, w=w, rr=rr: A.palazzo(cv.s, x, y, rr, sc=1.2, w=w, floors=rr.choice((3, 3, 4)), arcade=False)))
             else:
@@ -403,9 +524,12 @@ def genoa(cv):
             x += w * 1.3
     # the cathedral of San Lorenzo: striped front, dome and bell tower
     cv.add(848, lambda: A.church(cv.s, 1318, 848, random.Random(1), sc=1.72, stripes=True, dome=True, cap="dome"))
-    cv.add(877, lambda: A.church(cv.s, 1118, 877, random.Random(2), sc=1.2, side="left"))
-    cv.add(903, lambda: A.church(cv.s, 1440, 903, random.Random(3), sc=1.2, stripes=True))
-    cv.add(809, lambda: A.church(cv.s, 1212, 809, random.Random(4), sc=1.05, cap="dome", side="left"))
+    if g["churches"] > 1:
+        cv.add(877, lambda: A.church(cv.s, 1118, 877, random.Random(2), sc=1.2, side="left"))
+    if g["churches"] > 2:
+        cv.add(903, lambda: A.church(cv.s, 1440, 903, random.Random(3), sc=1.2, stripes=True))
+    if g["churches"] > 3:
+        cv.add(809, lambda: A.church(cv.s, 1212, 809, random.Random(4), sc=1.05, cap="dome", side="left"))
     # tower houses of the old families
     for x, y, h in ((1262, 846, 118), (1392, 872, 100), (1172, 842, 92), (1466, 962, 84)):
         cv.add(y, (lambda x=x, y=y, h=h: A.tower(cv.s, x, y, 19, h, col=(218, 182, 144))))
@@ -439,8 +563,9 @@ def genoa(cv):
         pygame.draw.line(s, INK, (x, y - 103), (x, y - 138), 2)
         A.pennant(s, x, y - 138, d=1, n=30)
 
-    cv.add(CASTLE[1] + 8, castle)
-    cv.sh_box(CASTLE[0], CASTLE[1] + 8, 100, 90)
+    if g["castle"]:
+        cv.add(CASTLE[1] + 8, castle)
+        cv.sh_box(CASTLE[0], CASTLE[1] + 8, 100, 90)
     # the shipyard: two hulls in frame on the slips, timber, and a treadwheel crane on the quay
     def hull_frame(x, y):
         hull = [(x - 34, y - 12), (x + 34, y - 16), (x + 24, y + 1), (x - 22, y + 4)]
@@ -452,8 +577,8 @@ def genoa(cv):
             pygame.draw.line(s, (128, 90, 58), (px, y - 12 - 4 * t / 8.0), (px + 2, y + 3 - 3 * t / 8.0), 2)
         pygame.draw.line(s, (236, 204, 150), hull[0], hull[1], 2)
         pygame.draw.polygon(s, INK, hull, 2)
-    cv.add(975, lambda: hull_frame(1052, 962))
-    cv.add(962, lambda: hull_frame(1086, 948))
+    for hx_, hy_, hk_ in g["hulls"]:
+        cv.add(hk_, (lambda a=hx_, b=hy_: hull_frame(a, b)))
 
     def crane():
         x, y = arc(246, 8)
@@ -464,9 +589,10 @@ def genoa(cv):
         pygame.draw.line(s, INK, (x + 30, y - 52), (x + 30, y - 22), 1)
         pygame.draw.rect(s, (196, 160, 110), (x + 26, y - 22, 9, 8))
         pygame.draw.rect(s, INK, (x + 26, y - 22, 9, 8), 1)
-    cv.add(arc(246, 8)[1] + 30, crane)
+    if g["crane"]:
+        cv.add(arc(246, 8)[1] + 30, crane)
     # goods on the quay: bales and barrels
-    for a in (214, 236, 262, 284, 300, 326):
+    for a in g["goods"]:
         x, y = arc(a, 6)
         def goods(x=x, y=y, k=int(a)):
             for i in range(3):
@@ -489,13 +615,14 @@ def genoa(cv):
         top = A.lanterna(s, lx, ly, 1.42)
         for dx, dy in ((-34, -6), (-30, 8), (34, -6), (30, 8)):      # the beam of the light
             pygame.draw.line(s, (255, 238, 170), (lx + dx * 0.45, top + 14 + dy * 0.45), (lx + dx, top + 14 + dy), 2)
-    cv.add(ly + 20, lantern)
-    cv.sh_box(lx, ly + 6, 36, 190)
+    if g["lanterna"]:
+        cv.add(ly + 20, lantern)
+        cv.sh_box(lx, ly + 6, 36, 190)
     # small harbour lights at the ends of the moles
-    cv.add(1082, lambda: A.tower(s, 1262, 1080, 14, 34, cap="spire"))
-    cv.add(1092, lambda: A.tower(s, 1136, 1090, 12, 26, cap="spire"))
+    for tx_, ty_, tw_, th_, tk_ in g["lights"]:
+        cv.add(tk_, (lambda a=tx_, b=ty_, c=tw_, d=th_: A.tower(s, a, b, c, d, cap="spire")))
     # suburbs outside the gates
-    for x, y in ((930, 905), (902, 960), (1600, 935), (1596, 880), (940, 968)):
+    for x, y in g["suburbs"]:
         if cv.keep.clear(x, y, 0) or True:
             rr = random.Random(int(x + y))
             cv.add(y, (lambda x=x, y=y, rr=rr: A.house(cv.s, x, y, rr, sc=1.25)))
@@ -523,9 +650,9 @@ def gulls(s):
             pygame.draw.line(s, (90, 96, 110), (x - 1, y + 1), (x + 1, y + 1), 1)
 
 
-def ships(cv):
+def ships(cv, fleet=None):
     s = cv.s
-    fleet = [
+    fleet = fleet or [
         (A.carrack, 1168, 1012, dict(sc=1.0, d=1, furled=True)),
         (A.galley, 1322, 1030, dict(sc=0.86, d=-1, sail=False)),
         (A.boat, 1126, 966, dict(sc=1.0, d=1, sail=False)),
@@ -756,4 +883,8 @@ def compare(new, old, path):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
+    if "--stage" in sys.argv:
+        import growth
+        growth.run(sys.argv[1], sys.argv[sys.argv.index("--stage") + 1])
+    else:
+        main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)

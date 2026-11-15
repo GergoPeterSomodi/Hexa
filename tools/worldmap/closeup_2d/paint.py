@@ -636,3 +636,255 @@ def mule_train(s, x, y, d=1, n=3):
     pygame.draw.line(s, (60, 70, 110), (px, y), (px, y - 9), 3)
     pygame.draw.circle(s, (232, 196, 160), (px, y - 12), 3)
     pygame.draw.line(s, INK, (px + d * 3, y), (px + d * 5, y - 15), 1)
+
+
+# ---------------------------------------------------------------- pieces of the growing map (see growth.py)
+WOOD_L, WOOD_D = (196, 160, 110), (128, 92, 60)
+
+
+def flag(s, x, y, h=22, d=1, col=RED, n=18):
+    """A garrison flag on a pole standing on (x, y)."""
+    pygame.draw.line(s, INK, (x, y), (x, y - h), 2)
+    pennant(s, x, y - h, d=d, n=n, col=col)
+
+
+def castle(s, x, y, sc=1.0, banner=True, col=STONE):
+    """A castle on its foot (x, y): a curtain between two towers and a tall keep in front."""
+    tower(s, x - 38 * sc, y - 2, 24 * sc, 58 * sc, col)
+    tower(s, x + 38 * sc, y - 2, 24 * sc, 58 * sc, col)
+    rect(s, col, x - 36 * sc, y - 40 * sc, 72 * sc, 42 * sc, INK, 2)
+    pygame.draw.rect(s, sh(col, 0.82), (round(x + 10 * sc), round(y - 40 * sc), round(26 * sc), round(42 * sc)))
+    pygame.draw.rect(s, INK, (round(x - 36 * sc), round(y - 40 * sc), round(72 * sc), round(42 * sc)), 2)
+    for i in range(7):
+        rect(s, col, x - 36 * sc + i * 11.2 * sc, y - 40 * sc - 7, 6, 8, INK, 1)
+    tower(s, x, y + 2, 34 * sc, 92 * sc, col)
+    d = pygame.Rect(0, 0, 13 * sc, 20 * sc)
+    d.midbottom = (x, y + 2)
+    pygame.draw.rect(s, (62, 48, 48), d, border_top_left_radius=int(6 * sc), border_top_right_radius=int(6 * sc))
+    if banner:
+        pygame.draw.line(s, INK, (x, y - 92 * sc - 11), (x, y - 92 * sc - 46), 2)
+        pennant(s, x, y - 92 * sc - 46, d=1, n=30)
+
+
+def bastion_fort(s, x, y, rx, ry, h=20, n=5, rot=-90.0):
+    """A bastion fortress round (x, y): a low star of stone walls on an earth bank, seen from the 3/4 camera."""
+    def star(k_out, k_in, dy=0.0):
+        pts = []
+        w = math.radians(13.0)
+        for i in range(n):
+            a = math.radians(rot + 360.0 * i / n)
+            b = math.radians(rot + 360.0 * (i + 0.5) / n)
+            pts.append((x + math.cos(a - w) * rx * k_out * 0.86, y + math.sin(a - w) * ry * k_out * 0.86 + dy))
+            pts.append((x + math.cos(a) * rx * k_out * 1.12, y + math.sin(a) * ry * k_out * 1.12 + dy))
+            pts.append((x + math.cos(a + w) * rx * k_out * 0.86, y + math.sin(a + w) * ry * k_out * 0.86 + dy))
+            pts.append((x + math.cos(b) * rx * k_in, y + math.sin(b) * ry * k_in + dy))
+        return pts
+
+    lit_c, sh_c, top_c = (232, 204, 164), (174, 142, 112), (244, 228, 196)      # warm scarp walls, apart from the old grey town wall
+    glacis = star(1.22, 0.9, 6)
+    pygame.draw.polygon(s, (160, 172, 100), glacis)
+    pygame.draw.polygon(s, (104, 128, 72), glacis, 2)
+    pygame.draw.polygon(s, (92, 112, 70), star(1.06, 0.72, 4))      # the dry ditch
+    base, top = star(1.0, 0.66), star(0.94, 0.62, -h)
+    pygame.draw.polygon(s, sh_c, base)
+    m = len(base)
+    quads = []
+    for i in range(m):
+        quads.append((max(base[i][1], base[(i + 1) % m][1]), [base[i], base[(i + 1) % m], top[(i + 1) % m], top[i]]))
+    for _, q in sorted(quads, key=lambda t: t[0]):
+        lit = (q[0][0] + q[1][0]) / 2 < x - rx * 0.1 or abs(q[1][0] - q[0][0]) > abs(q[1][1] - q[0][1]) * 2.2
+        pygame.draw.polygon(s, lit_c if lit else sh_c, q)
+        mid0 = ((q[0][0] + q[3][0]) / 2, (q[0][1] + q[3][1]) / 2)
+        mid1 = ((q[1][0] + q[2][0]) / 2, (q[1][1] + q[2][1]) / 2)
+        pygame.draw.line(s, sh(lit_c if lit else sh_c, 0.86), mid0, mid1, 1)
+        pygame.draw.polygon(s, INK, q, 2)
+    pygame.draw.polygon(s, top_c, top)
+    pygame.draw.polygon(s, INK, top, 2)
+    yard = star(0.76, 0.48, -h + 3)
+    pygame.draw.polygon(s, (196, 184, 140), yard)
+    pygame.draw.polygon(s, sh(sh_c, 0.8), yard, 2)
+    return top
+
+
+def scaffold(s, a, b, h=30):
+    """Scaffolding in front of a wall from a to b (ground points): poles, two decks and ladders."""
+    if a[0] > b[0]:
+        a, b = b, a
+    n = max(2, int(math.dist(a, b) / 15))
+    for lv in (0.5, 1.0):
+        pygame.draw.line(s, INK, (a[0] - 1, a[1] + 4 - h * lv), (b[0] + 1, b[1] + 4 - h * lv), 6)
+        pygame.draw.line(s, WOOD_L, (a[0], a[1] + 4 - h * lv), (b[0], b[1] + 4 - h * lv), 3)
+    for i in range(n + 1):
+        px, py = a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n + 4
+        pygame.draw.line(s, WOOD_D, (px, py), (px, py - h - 6), 2)
+    pygame.draw.line(s, WOOD_D, (a[0] + 4, a[1] + 4), (a[0] + 13, a[1] + 4 - h), 2)
+    pygame.draw.line(s, WOOD_D, (b[0] - 3, b[1] + 4), (b[0] - 14, b[1] + 4 - h * 0.5), 2)
+
+
+def stone_heap(s, x, y, sc=1.0):
+    """Cut stone and fresh earth by a work in progress."""
+    pygame.draw.ellipse(s, (176, 150, 108), (x - 15 * sc, y - 5 * sc, 30 * sc, 11 * sc))
+    for dx, dy in ((-8, -3), (0, -4), (8, -3), (-4, -9), (4, -9)):
+        rect(s, STONE, x + dx * sc - 4 * sc, y + dy * sc - 3 * sc, 8 * sc, 6 * sc, INK, 1)
+
+
+def timber_bridge(s, a, b, w=8):
+    """A timber bridge from a to b (ground points): a plank deck on trestles, with a rail."""
+    n = max(2, int(abs(b[0] - a[0]) / 18))
+    for i in range(n + 1):
+        px, py = a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n
+        pygame.draw.line(s, (84, 60, 44), (px - 3, py + w * 0.5), (px - 5, py + w * 0.5 + 15), 3)
+        pygame.draw.line(s, (84, 60, 44), (px + 3, py + w * 0.5), (px + 5, py + w * 0.5 + 15), 3)
+    deck = [(a[0], a[1] - w), (b[0], b[1] - w), (b[0], b[1] + w * 0.5), (a[0], a[1] + w * 0.5)]
+    pygame.draw.polygon(s, (182, 142, 96), deck)
+    for i in range(1, n * 3):
+        px = a[0] + (b[0] - a[0]) * i / (n * 3.0)
+        py = a[1] + (b[1] - a[1]) * i / (n * 3.0)
+        pygame.draw.line(s, (140, 104, 70), (px, py - w + 2), (px, py + w * 0.5 - 1), 1)
+    pygame.draw.polygon(s, INK, deck, 2)
+    pygame.draw.line(s, (96, 70, 50), (a[0], a[1] - w - 7), (b[0], b[1] - w - 7), 2)
+    for i in range(n + 1):
+        px, py = a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n
+        pygame.draw.line(s, (96, 70, 50), (px, py - w), (px, py - w - 8), 2)
+
+
+def ford(s, x, y, w=30):
+    """A ford: pale shallows and stepping stones where a track crosses a stream."""
+    pygame.draw.ellipse(s, (150, 204, 228), (x - w, y - 10, w * 2, 20))
+    pygame.draw.ellipse(s, (190, 226, 238), (x - w * 0.7, y - 6, w * 1.4, 12))
+    for i in range(5):
+        px = x - w * 0.8 + w * 1.6 * i / 4.0
+        pygame.draw.ellipse(s, (206, 198, 178), (px - 5, y - 3 + (i % 2) * 2, 10, 6))
+        pygame.draw.ellipse(s, INK, (px - 5, y - 3 + (i % 2) * 2, 10, 6), 1)
+
+
+def mill(s, x, y, r, sc=1.0, d=1):
+    """A water mill: a stone house with its wheel on the stream side (d: +1 wheel to the right, -1 to the left)."""
+    house(s, x, y, r, sc=sc * 1.25, kind="gable", floors=2, wall=(226, 214, 190), roof=(176, 96, 66), w=30)
+    wx, wy, R = x + d * 27 * sc, y - 11 * sc, 15 * sc
+    pygame.draw.circle(s, (150, 112, 76), (wx, wy), R)
+    pygame.draw.circle(s, (120, 176, 214), (wx, wy), R - 4 * sc)
+    for k in range(8):
+        a = math.pi * k / 4.0 + 0.2
+        pygame.draw.line(s, (104, 76, 56), (wx, wy), (wx + math.cos(a) * R, wy + math.sin(a) * R), 2)
+    pygame.draw.circle(s, INK, (wx, wy), R, 2)
+    pygame.draw.circle(s, (84, 60, 44), (wx, wy), 3 * sc)
+    for k in range(3):       # the tail race
+        pygame.draw.line(s, (232, 246, 250), (wx - 6 + k * 5, wy + R + 1), (wx - 4 + k * 5, wy + R + 6), 2)
+
+
+def press_house(s, x, y, r, sc=1.0):
+    """A press house of a wine or oil estate: a long stone building with a wide arched door and barrels outside."""
+    w, hw, rh = 46 * sc, 24 * sc, 12 * sc
+    x0, top = x - w / 2, y - hw
+    wall = (236, 226, 204)
+    roof = (150, 110, 84)
+    rect(s, wall, x0, top, w, hw, None)
+    pygame.draw.rect(s, sh(wall, 0.82), (round(x0 + w * 0.82), round(top), round(w * 0.18) + 1, round(hw)))
+    a = pygame.Rect(0, 0, 15 * sc, 17 * sc)
+    a.midbottom = (x - w * 0.14, y)
+    pygame.draw.rect(s, (74, 52, 50), a, border_top_left_radius=int(7 * sc), border_top_right_radius=int(7 * sc))
+    for q in (0.2, 0.42):
+        pygame.draw.rect(s, WINDOW, (round(x + w * q - 6), round(top + 7 * sc), round(4 * sc), round(6 * sc)))
+    pygame.draw.rect(s, INK, (round(x0), round(top), round(w), round(hw)), 2)
+    q = [(x0 - 3 * sc, top + 1), (x0 + w + 3 * sc, top + 1), (x0 + w - 3 * sc, top - rh), (x0 + 3 * sc, top - rh)]
+    pygame.draw.polygon(s, roof, q)
+    tile_rows(s, q, roof, 2, r)
+    pygame.draw.polygon(s, sh(roof, 0.78), [q[1], q[2], (x0 + w * 0.78, top - rh), (x0 + w * 0.82, top + 1)])
+    pygame.draw.polygon(s, INK, q, 2)
+    for i in range(3):       # barrels in a row, one on top
+        bx = x + w * 0.5 + 6 * sc + i * 9 * sc
+        pygame.draw.ellipse(s, (150, 104, 66), (bx - 4 * sc, y - 10 * sc, 8 * sc, 10 * sc))
+        pygame.draw.line(s, (96, 66, 46), (bx - 4 * sc, y - 5 * sc), (bx + 4 * sc, y - 5 * sc), 1)
+        pygame.draw.ellipse(s, INK, (bx - 4 * sc, y - 10 * sc, 8 * sc, 10 * sc), 1)
+    bx = x + w * 0.5 + 6.5 * sc
+    pygame.draw.ellipse(s, (166, 116, 74), (bx, y - 18 * sc, 8 * sc, 9 * sc))
+    pygame.draw.ellipse(s, INK, (bx, y - 18 * sc, 8 * sc, 9 * sc), 1)
+
+
+def warehouse(s, x, y, r, w=58, sc=1.0, roof=None):
+    """A harbour warehouse: long and low, with wide doors and small windows under the eaves."""
+    w, hw, rh = w * sc, 22 * sc, 13 * sc
+    x0, top = x - w / 2, y - hw
+    wall = r.choice(((226, 206, 170), (236, 222, 196), (218, 190, 150)))
+    roof = roof or r.choice((SLATE, (176, 96, 66), (150, 110, 84)))
+    rect(s, wall, x0, top, w, hw, None)
+    pygame.draw.rect(s, sh(wall, 0.82), (round(x0 + w * 0.84), round(top), round(w * 0.16) + 1, round(hw)))
+    n = max(2, int(w / (20 * sc)))
+    for i in range(n):
+        dx = x0 + w * (i + 0.5) / n * 0.86
+        pygame.draw.rect(s, (92, 66, 52), (round(dx - 5 * sc), round(y - 13 * sc), round(10 * sc), round(13 * sc)))
+        pygame.draw.rect(s, WINDOW, (round(dx - 2 * sc), round(top + 3 * sc), round(4 * sc), round(4 * sc)))
+    pygame.draw.rect(s, INK, (round(x0), round(top), round(w), round(hw)), 2)
+    q = [(x0 - 3 * sc, top + 1), (x0 + w + 3 * sc, top + 1), (x0 + w - 4 * sc, top - rh), (x0 + 4 * sc, top - rh)]
+    pygame.draw.polygon(s, roof, q)
+    tile_rows(s, q, roof, 2, r)
+    pygame.draw.polygon(s, sh(roof, 0.78), [q[1], q[2], (x0 + w * 0.8, top - rh), (x0 + w * 0.84, top + 1)])
+    pygame.draw.polygon(s, INK, q, 2)
+
+
+def beacon(s, x, y, sc=1.0):
+    """The old light tower on the cape: a plain square tower with a fire basket."""
+    h = 62 * sc
+    tower(s, x, y, 20 * sc, h, col=(226, 216, 196))
+    pygame.draw.line(s, INK, (x, y - h - 12), (x, y - h - 24), 2)
+    pygame.draw.polygon(s, (70, 60, 60), [(x - 6, y - h - 24), (x + 6, y - h - 24), (x + 4, y - h - 17), (x - 4, y - h - 17)])
+    pygame.draw.polygon(s, (252, 200, 90), [(x - 5, y - h - 24), (x, y - h - 36), (x + 5, y - h - 24)])
+    pygame.draw.polygon(s, (240, 120, 60), [(x - 2, y - h - 24), (x, y - h - 30), (x + 3, y - h - 24)])
+
+
+def cart(s, x, y, d=1):
+    """An ox cart with a load, going towards d."""
+    pygame.draw.rect(s, (232, 222, 196), (x - 9, y - 16, 18, 8))
+    pygame.draw.rect(s, (150, 112, 76), (x - 10, y - 9, 20, 5))
+    pygame.draw.rect(s, INK, (x - 10, y - 16, 20, 12), 1)
+    for wx in (x - 6, x + 6):
+        pygame.draw.circle(s, (96, 70, 50), (wx, y - 3), 4)
+        pygame.draw.circle(s, INK, (wx, y - 3), 4, 1)
+    ox = x + d * 19
+    pygame.draw.ellipse(s, (206, 196, 180), (ox - 8, y - 12, 16, 8))
+    pygame.draw.circle(s, (206, 196, 180), (ox + d * 9, y - 11), 3)
+    pygame.draw.line(s, (72, 54, 46), (ox - 5, y - 5), (ox - 5, y), 2)
+    pygame.draw.line(s, (72, 54, 46), (ox + 5, y - 5), (ox + 5, y), 2)
+    pygame.draw.line(s, (96, 70, 50), (x + d * 10, y - 8), (ox - d * 7, y - 9), 1)
+
+
+def milestone(s, x, y):
+    rect(s, (236, 230, 214), x - 3, y - 10, 6, 10, INK, 1)
+
+
+def haystack(s, x, y, sc=1.0):
+    pts = [(x - 9 * sc, y), (x - 7 * sc, y - 9 * sc), (x, y - 16 * sc), (x + 7 * sc, y - 9 * sc), (x + 9 * sc, y)]
+    pygame.draw.polygon(s, (228, 196, 104), pts)
+    pygame.draw.polygon(s, (190, 156, 80), [(x, y - 16 * sc), (x + 7 * sc, y - 9 * sc), (x + 9 * sc, y), (x + 2 * sc, y)])
+    pygame.draw.polygon(s, (120, 94, 56), pts, 2)
+
+
+def barn(s, x, y, r, sc=1.0):
+    """A grain barn: a wide gable with a tall door, a brown roof, hay beside it."""
+    house(s, x, y, r, sc=sc * 1.3, kind="gable", floors=1, wall=(214, 194, 150), roof=(158, 112, 76), w=36)
+    pygame.draw.rect(s, (86, 62, 50), (round(x - 6 * sc), round(y - 17 * sc), round(11 * sc), round(17 * sc)))
+    haystack(s, x - 36 * sc, y + 3, sc * 1.1)
+    haystack(s, x - 52 * sc, y - 3, sc * 0.9)
+
+
+def timber_stack(s, x, y, sc=1.0):
+    for dx, dy in ((-9, 0), (0, 0), (9, 0), (-4, -6), (5, -6), (0, -12)):
+        pygame.draw.circle(s, (206, 164, 108), (x + dx * sc, y - 4 * sc + dy * sc), 4.5 * sc)
+        pygame.draw.circle(s, (150, 108, 70), (x + dx * sc, y - 4 * sc + dy * sc), 1.6 * sc)
+        pygame.draw.circle(s, INK, (x + dx * sc, y - 4 * sc + dy * sc), 4.5 * sc, 1)
+
+
+def stump(s, x, y):
+    pygame.draw.ellipse(s, (150, 116, 80), (x - 4, y - 5, 8, 6))
+    pygame.draw.ellipse(s, (212, 186, 140), (x - 3, y - 6, 6, 3))
+    pygame.draw.ellipse(s, (80, 60, 46), (x - 4, y - 6, 8, 7), 1)
+
+
+def charcoal_pile(s, x, y):
+    """A charcoal burner's mound with a thread of smoke: the mark of a clearing in the woods."""
+    pts = [(x - 11, y), (x - 6, y - 10), (x + 6, y - 10), (x + 11, y)]
+    pygame.draw.polygon(s, (92, 84, 80), pts)
+    pygame.draw.polygon(s, INK, pts, 1)
+    for i in range(4):
+        pygame.draw.circle(s, (232, 234, 232), (x + 2 + i * 2 + (i % 2) * 2, y - 15 - i * 7), 3 + i * 0.8)
