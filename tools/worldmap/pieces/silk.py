@@ -8,7 +8,7 @@ the rows by about 20 degrees and puts the caravanserai at the front.
 
 Every tree stands in a row, at least 9 px from the next row. The sheds stand at the rows' open end, in line with a lane:
 they are front-view buildings and a row in front of them would hide them. In summer the leaves are picked: every second
-tree of the two newest rows stands stripped (a local copy of the kit's bare pollard, see `stripped()`), and two pickers
+tree of the two newest rows stands stripped (the kit's bare pollard, `p.tree(..., "mulberry", bare=True)`), and two pickers
 with baskets work there. Autumn is gold and late green by turns (the kit's own mulberry); winter is bare pollards with a
 dab of snow where snow lies. The sheds smoke in autumn and winter. The dome keeps its colour in every season: snow lies
 only on its upper left.
@@ -29,7 +29,6 @@ LEVELS = range(0, 4)
 NAMES = {0: "wild land (the map's)", 1: "2 rows, hut", 2: "4 rows, silkworm shed", 3: "6 rows, caravanserai"}
 VARIANTS = 2
 
-STEM = (176, 160, 132)             # the pale mulberry stem: the colour of the kit's own pollard (it keeps it in the tree call)
 STEP = 5.0                         # trees stand 5 px apart along a row
 RUN = {1: 6, 2: 7}                 # trees per row from level 1 and 2; the rest of a row from level 3
 
@@ -79,19 +78,6 @@ def row_trees(row):
     return out
 
 
-def stripped(p, x, y):
-    """A pollard with its leaves picked: the pale stem and the bare twigs, as the kit draws a bare mulberry. A local copy,
-    because the kit's tree is bare only in winter (kit gap: a `bare=True` keyword)."""
-    p.cast(x, y, 5.5)
-    twig = p.pal["leaf"][0]
-
-    def fn(pen):
-        pen.line((x, y), (x, y - 2.8), STEM, 1.2)
-        for dx in (-0.8, -0.3, 0.3, 0.8):
-            pen.line((x, y - 2.8), (x + dx * 2.8, y - 2.8 - 2.5), twig, 0.6)
-    return p.stand(y, fn, x=x)
-
-
 def basket(p, x, y):
     """A picker's basket on the ground: 2 x 1.4 px of thatch with a dark rim."""
     def fn(pen):
@@ -139,15 +125,11 @@ def caravanserai(p, x, y):
         pen.rect(gl, gt, 6.0, 8.0, None, kit.INK, 0.5)
         pen.rect(x - 1.3, y - 3.2, 2.6, 3.2, kit.DOOR, None)                          # the arched gate
         pen.ellipse(x, y - 3.2, 2.6, 2.4, kit.DOOR, None)
-        # the dome: a half ellipse 6 wide and 3.4 tall on the block, a finial on top
+        # the dome: the kit's, 6 wide and 3.4 tall on the block (snow on the upper left only), a finial on top
         dy = gt
-        pen.ellipse(x, dy, 6.0, 6.8, kit.DOME_TILE, None)
-        pen.rect(gl - 0.2, dy, 6.4, 1.2, kit.STONE, None)                             # the drum hides the lower half
-        pen.poly([(x + 0.4, dy - 3.3), (x + 3.0, dy), (x + 0.6, dy)], kit.DOME_TILE_D, None)
-        if snow:
-            pen.ellipse(x - 1.4, dy - 1.8, 2.6, 1.8, kit.SNOW, None)
+        pen.dome(x, dy, 6.0, 3.4, kit.DOME_TILE, kit.DOME_TILE_D, snow=snow)
         pen.line((x, dy - 3.4), (x, dy - 5.0), kit.INK, 0.5)
-        pen.rect(gl - 0.2, dy, 6.4, 1.2, None, kit.INK, 0.4)
+        pen.rect(gl - 0.2, dy, 6.4, 1.2, kit.STONE, kit.INK, 0.4)                     # the drum under the dome
     h = p.stand(y, fn, x=x)
     p.claim([(x - 11, y - 12), (x + 11, y - 12), (x + 11, y + 5), (x - 11, y + 5)])
     return h
@@ -182,7 +164,7 @@ def draw(level, season, variant=0, mirror=False):
             if frm > level:
                 continue
             if su and ri in newest and k % 2 == 1:
-                stripped(p, x, y)
+                p.tree(x, y, 1.0, "mulberry", k + ri, bare=True)       # stripped: the kit's bare pollard
             else:
                 p.tree(x, y, 1.0, "mulberry", k + ri)
     p.house(*L["hut"], 5.5, 3.5, 3.0, wall=0, kind="ridge", roof="thatch", smoke=level < 2)
