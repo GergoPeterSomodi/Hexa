@@ -7,6 +7,7 @@ os.environ["SDL_VIDEODRIVER"] = "dummy"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pygame
 from geo import *
+import sites
 
 pygame.init()
 
@@ -223,12 +224,18 @@ def build_world():
     towns = []
     for name, rank, lon, lat, port in TOWNS:
         x, y = km_of(lon, lat)
-        towns.append(dict(name=name, rank=rank, x=x, y=y, port=port, hex=hex_of_km(x, y)))
+        towns.append(dict(name=name, rank=rank, x=x, y=y, real=(x, y), port=port))
+    # one town, one hex: the hex comes from the map data; the site inside it is set by sites.place_sites
+    sites.resolve_hexes(towns)
+    for t in towns:                   # a port stands between its hex centre and its quay, so it is drawn a little smaller
+        t["scale"] = {"Genoa": 0.82, "Savona": 0.8, "Nice": 0.8}.get(t["name"], 1.0)
     w["towns"] = {t["name"]: t for t in towns}
     passes = []
     for name, lon, lat, m in PASSES:
         x, y = km_of(lon, lat)
-        passes.append(dict(name=name, x=x, y=y, m=m))
+        if name == "Giovi":
+            x, y = sites.GIOVI_AT     # where the close-up's road crosses the saddle
+        passes.append(dict(name=name, x=x, y=y, m=m, real=km_of(lon, lat)))
     w["passes"] = {p["name"]: p for p in passes}
     build_roads(w)
     return w
@@ -241,22 +248,28 @@ def build_roads(w):
     def C(c, r):
         return centre(c, r)
 
+    def at(name):
+        return (T_[name]["x"], T_[name]["y"])
+
+    # Every road ends at a town's site inside its hex. Round Genoa the lines are the close-up's (sites.ROAD_*): the
+    # roads meet at the centre of Genoa's hex, behind the town, and a short gate road leads down into it.
     roads = [
-        dict(cls=3, pts=[(T_["Genoa"]["x"], T_["Genoa"]["y"]), (263, 312), (P_["Giovi"]["x"], P_["Giovi"]["y"]),
-                         (T_["Serravalle"]["x"], T_["Serravalle"]["y"]), C(9, 10), (276, 247), (T_["Pavia"]["x"], T_["Pavia"]["y"])]),
-        dict(cls=3, pts=[(T_["Turin"]["x"], T_["Turin"]["y"]), (182, 260), (T_["Asti"]["x"], T_["Asti"]["y"]),
-                         (T_["Alessandria"]["x"], T_["Alessandria"]["y"]), C(9, 10), (292, 256), (T_["Piacenza"]["x"], T_["Piacenza"]["y"]),
-                         (348, 263), (T_["Parma"]["x"], T_["Parma"]["y"]), (400, 288), (430, 296)]),
-        dict(cls=2, pts=[(T_["Savona"]["x"], T_["Savona"]["y"]), (243, 324), (T_["Genoa"]["x"], T_["Genoa"]["y"]),
-                         (276, 325), (T_["Chiavari"]["x"], T_["Chiavari"]["y"])]),
-        dict(cls=2, pts=[(T_["Turin"]["x"], T_["Turin"]["y"]), (140, 243), (T_["Susa"]["x"], T_["Susa"]["y"]),
-                         (108, 234), (P_["Mont Cenis"]["x"], P_["Mont Cenis"]["y"]), (90, 221), (60, 216)]),
-        dict(cls=2, pts=[(T_["Cuneo"]["x"], T_["Cuneo"]["y"]), (152, 338), (P_["Col di Tenda"]["x"], P_["Col di Tenda"]["y"]),
-                         (148, 368), (140, 384), (T_["Nice"]["x"], T_["Nice"]["y"])]),
-        dict(cls=2, pts=[(T_["Pisa"]["x"], T_["Pisa"]["y"]), (398, 396), (430, 394)]),
+        dict(cls=3, pts=sites.ROAD_GIOVI + [at("Serravalle"), (258, 272), C(9, 10), (275, 248), at("Pavia")]),
+        dict(cls=3, pts=[at("Turin"), (190, 244), at("Asti"), at("Alessandria"), C(9, 10), (294, 256), at("Piacenza"),
+                         (344, 266), at("Parma"), (400, 288), (430, 296)]),
+        dict(cls=2, pts=sites.ROAD_WEST),                     # from Savona's east side
+        dict(cls=2, pts=sites.ROAD_EAST, cut=sites.EAST_END),
+        dict(cls=2, pts=sites.ROAD_SPUR),                     # down to Chiavari
+        dict(cls=2, pts=sites.ROAD_GATE),                     # to Genoa's north gate
+        dict(cls=2, pts=[at("Turin"), (152, 240.5), (134, 242.6), (122, 241), at("Susa"), (P_["Mont Cenis"]["x"], P_["Mont Cenis"]["y"]), (90, 221), (60, 216)]),
+        dict(cls=2, pts=[at("Cuneo"), (157, 341), (P_["Col di Tenda"]["x"], P_["Col di Tenda"]["y"]),
+                         (148, 368), (140, 384), at("Nice")]),
+        dict(cls=2, pts=[at("Pisa"), (398, 396), (430, 394)]),
     ]
     for rd in roads:
         pts = chaikin(rd["pts"], 3)
+        if "cut" in rd:               # the line goes on in the close-up; the map's road stops here
+            pts = pts[:min(range(len(pts)), key=lambda i: math.dist(pts[i], rd["cut"])) + 1]
         rd["pts"] = resample(pts, 0.8)
     w["roads"] = roads
     rdg = Grid(3.0)
@@ -328,6 +341,7 @@ FW_KM, FH_KM = 345 + 4, int(720 / (60 / R_KM * TILT)) + 4
 class Fields:
     def __init__(self, world):
         self.w, self.h = FW_KM, FH_KM
+        self.x0, self.y0 = X0 - 2, Y0 - 2
         n = self.w * self.h
         self.land = [0.0] * n
         self.height = [0.0] * n
@@ -389,7 +403,9 @@ class Fields:
                 mland = acc["m"] / ml
                 stretch = vnoise(x, y, 6.5, 21)
                 self.cliff[k] = smoothstep(300, 750, mland) * smoothstep(0.47, 0.6, stretch)
-        # a port stands on the shore: move it to the nearest coast (the hex coast can lie a little off the real one)
+        # The first coast line. Each port's real position, carried to the nearest coast, gets a low bulge of land.
+        # (The towns themselves are sited later, inside their hexes: sites.place_sites; t is a copy here.)
+        ports = [dict(x=t["real"][0], y=t["real"][1], town=t) for t in ports]
         for t in ports:
             best = None
             for a in range(0, 360, 6):
@@ -405,6 +421,7 @@ class Fields:
                 d, ca, sa = best
                 t["x"] += ca * (d - 1.6)
                 t["y"] += sa * (d - 1.6)
+            t["town"]["coast_point"] = (t["x"], t["y"])     # where the frame drew the port before the one-hex rule
         for j in range(self.h):
             for i in range(self.w):
                 x, y = X0 + i - 2, Y0 + j - 2
@@ -421,6 +438,18 @@ class Fields:
                     if dd < 9:
                         k = j * self.w + i
                         self.cliff[k] *= smoothstep(4, 9, dd)
+        self.land0 = list(self.land)      # the coast before the harbour coves (sites.apply_coves)
+
+    def low_shore(self, towns):
+        """Harbours and port towns stand on a low shore: no cliff near a port's site."""
+        for t in towns:
+            if not t["port"]:
+                continue
+            for j in range(self.h):
+                for i in range(self.w):
+                    dd = math.hypot(t["x"] - (X0 + i - 2), t["y"] - (Y0 + j - 2))
+                    if dd < 9:
+                        self.cliff[j * self.w + i] *= smoothstep(4, 9, dd)
 
     def at(self, arr, x, y):
         fx, fy = x - X0 + 2, y - Y0 + 2

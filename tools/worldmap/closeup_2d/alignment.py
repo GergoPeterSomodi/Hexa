@@ -4,7 +4,9 @@
 
 TOOLS_DIR is tools/worldmap, DOCS_MAP_DIR is docs/design/map. PANEL is the growth panel shown (default 3). Every hex
 of the close-up is labelled with its district: name, main use and stage in that panel (stages.DISTRICTS). The thin
-lines on the close-up are the normal map's own coast (white), roads (red) and torrent (light blue), for comparison.
+lines on the close-up are the normal map's own coast (white), roads (red) and torrent (light blue), and the red rings
+are the normal map's town sites and pass, for comparison. Since the normal map follows "one town, one hex, drawn
+inside it" (style_frame/sites.py) they coincide with the close-up's own coast, roads and towns.
 """
 import sys, os
 sys.path.insert(0, sys.argv[1] + "/closeup_2d"); sys.path.insert(0, sys.argv[1] + "/style_frame")
@@ -32,6 +34,9 @@ for ln in scene.FRAME_ROADS:
     pygame.draw.lines(over, (230, 60, 60, 230), False, [(x / scene.SS, y / scene.SS) for x, y in ln], 1)
 for ln in scene.FRAME_STREAMS:
     pygame.draw.lines(over, (170, 230, 255, 240), False, [(x / scene.SS, y / scene.SS) for x, y in ln], 1)
+for name, (x, y) in scene.FRAME_SITES.items():
+    pygame.draw.circle(over, (255, 255, 255, 255), (x / scene.SS, y / scene.SS), 9, 4)
+    pygame.draw.circle(over, (230, 60, 60, 255), (x / scene.SS, y / scene.SS), 8, 2)
 seen = []
 labels = []
 for (c, r), h in HEX.items():
@@ -65,7 +70,7 @@ W = 1280 * 2 + 30; sheet = pygame.Surface((W, 720 + 96)); sheet.fill((24, 26, 36
 sheet.blit(f.render("The normal game map (wide/close zoom of the style frame): red box = the close-up's area", True, (240, 240, 240)), (10, 12))
 sheet.blit(f.render("The closest zoom (%s, %s) with the same 28 km hexes: one district, one seat, one stage per hex" % (st["title"], st["year"]), True, (240, 240, 240)), (1310, 12))
 sheet.blit(frame, (0, 60)); sheet.blit(close, (1310, 60))
-note = "Thin lines on the close-up: the normal map's own coast (white), roads (red) and torrent (light blue). Its Genoa and Chiavari stand on hex borders; the close-up moves them inside their hexes."
+note = "Thin lines on the close-up: the normal map's own coast (white), roads (red) and torrent (light blue); red rings: its town sites and pass. Both zooms now draw every town inside its own hex."
 sheet.blit(ft.render(note, True, (200, 204, 216)), (1310, 60 + 720 + 8))
 pygame.image.save(sheet, out)
 print(sorted(seen))

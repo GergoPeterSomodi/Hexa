@@ -4,8 +4,12 @@ from frame import *
 from relief import *
 from relief2 import *
 import slopes
+import sites
 
 FIELDS = Fields(WORLD)
+COAST_SHIFT_KM = sites.apply_coves(FIELDS)                   # a port hex gets a shore of its own
+sites.place_sites(WORLD, FIELDS, TILT)                       # one town, one hex, drawn inside it
+FIELDS.low_shore(WORLD["towns"].values())
 build_roads(WORLD)
 RELIEF, HILLS, RGRID = build_relief(WORLD, FIELDS)
 TREES = build_trees(WORLD, FIELDS, RGRID)
@@ -624,10 +628,15 @@ class Frame:
             rnd = random.Random(t["name"])
             k = self.k * (1.6 if self.mid else 1.0)
             rank = t["rank"]
-            n = {3: 19, 2: 9, 1: 3}[rank] + (14 if t["port"] and rank == 3 else 0)
+            n = {3: 19, 2: 9, 1: 3}[rank] + (11 if t["port"] and rank == 3 else 0)
             if self.mid:
                 n = {3: 6, 2: 3, 1: 0}[rank]
-            rx = {3: 26, 2: 15.5, 1: 8}[rank] * k
+            rx = {3: 26, 2: 15.5, 1: 8}[rank] * k * t.get("scale", 1.0)
+            pieces = t["_pieces"] = []          # everything drawn for this town, for the one-hex check
+
+            def put(y, x, fn, pieces=pieces):
+                pieces.append(fn)
+                self.add(y, x, fn)
             if self.mid:
                 rx *= 0.5
             ry = rx * TILT * 0.62
@@ -649,23 +658,33 @@ class Frame:
                 houses.append((hx, hy, rnd.random()))
             walled = rank >= 2 and not self.mid
             front_wall = walled and not t["port"]
-            self.add(by - ry - 0.5, bx, (lambda a, b, c, d, e: lambda: self.draw_wall(a, b, c, d, e, back=True))(bx, by, rx + 3 * k, ry + 2.5 * k, walled))
+            put(by - ry - 0.5, bx, (lambda a, b, c, d, e: lambda: self.draw_wall(a, b, c, d, e, back=True))(bx, by, rx + 3 * k, ry + 2.5 * k, walled))
             for hx, hy, sd in houses:
-                self.add(hy, hx, (lambda a, b, c, d: lambda: self.draw_house(a, b, c, d))(hx, hy, sd, k))
+                put(hy, hx, (lambda a, b, c, d: lambda: self.draw_house(a, b, c, d))(hx, hy, sd, k))
             # the landmark of the place
             lm = {"Genoa": "dome", "Turin": "dome", "Pavia": "towers", "Pisa": "leaning", "Asti": "towers"}.get(t["name"],
                                                                                                            "church" if rank >= 2 else "chapel")
             if self.mid:
                 lm = "dome" if rank == 3 else "church"
-            self.add(by + 0.5, bx + 2, (lambda a, b, c, d: lambda: self.draw_landmark(a, b, c, d))(bx + rnd.uniform(-3, 3) * k, by - 1 * k, lm, k))
+            put(by + 0.5, bx + 2, (lambda a, b, c, d: lambda: self.draw_landmark(a, b, c, d))(bx + rnd.uniform(-3, 3) * k, by - 1 * k, lm, k))
             if front_wall:
-                self.add(by + ry + 2.5 * k, bx, (lambda a, b, c, d, e: lambda: self.draw_wall(a, b, c, d, e, back=False))(bx, by, rx + 3 * k, ry + 2.5 * k, walled))
+                put(by + ry + 2.5 * k, bx, (lambda a, b, c, d, e: lambda: self.draw_wall(a, b, c, d, e, back=False))(bx, by, rx + 3 * k, ry + 2.5 * k, walled))
             self.shadows.append(("ell", bx + rx * 0.25, by + 2, rx * 2.3, ry * 1.6))
             t["_label"] = (bx, by + ry + (6 if front_wall else 4) * k)
-            if t["port"] and rank == 3:
-                t["_label_above"] = (bx + rx * 0.2, by - ry * 1.7 - 16 * k)
             if t["port"]:
-                self.harbour(t, bx, by, rx, ry, k)
+                # a port's plate goes on the land side, inside its hex, so that it does not cover the harbour
+                wide = (1.45 * rx if rank == 3 else rx) + 4 * k
+                top = min([hy for hx, hy, sd in houses] + [by - ry]) - {3: 13, 2: 12, 1: 10}[rank] * k
+                side = t.get("plate_side", "above")
+                if side == "above":
+                    t["_label_at"] = ("midbottom", (bx, top - 3 * k))
+                elif side == "below":
+                    t["_label_at"] = ("midtop", (bx, by + ry + 6 * k))
+                elif side == "left":
+                    t["_label_at"] = ("midright", (bx - wide - 3 * k, (top + by + ry) / 2))
+                else:
+                    t["_label_at"] = ("midleft", (bx + wide + 3 * k, (top + by + ry) / 2))
+                self.harbour(t, bx, by, rx, ry, k, put)
 
     def draw_house(self, x, y, sd, k):
         s = self.surf
@@ -781,18 +800,10 @@ class Frame:
             p = pts[n // 2]
             pygame.draw.rect(s, (70, 56, 50), (p[0] - 1.4 * k, p[1] - 2.6 * k, 2.8 * k, 2.6 * k))
 
-    def harbour(self, t, bx, by, rx, ry, k):
-        s = self.surf
-        # find the sea side: the direction from the town to the nearest sea
-        best = None
-        for a in range(0, 360, 10):
-            for d in (1, 2, 3, 4, 5, 7, 9):
-                x = t["x"] + math.cos(math.radians(a)) * d
-                y = t["y"] + math.sin(math.radians(a)) * d
-                if not FIELDS.is_land(x, y, -0.05):
-                    if best is None or d < best[0]:
-                        best = (d, a)
-                    break
+    def harbour(self, t, bx, by, rx, ry, k, put):
+        """The quay, moles and lighthouse are part of the town and stay in its hex; the ships at anchor are not."""
+        # the sea side: the nearest shore of the town's own hex
+        best = sites.shore_room(FIELDS, t["x"], t["y"], t["hex"])
         if best is None:
             return
         d, a = best
@@ -801,25 +812,53 @@ class Frame:
         if t["name"] == "Genoa":
             # the old mole and the new: two arms round a basin; the Lanterna on its rock to the west; ships at anchor
             sx, sy = t["x"] + ca * (d - 0.6), t["y"] + sa * (d - 0.6)
-            west = [(sx + px_ * 4.2, sy + py_ * 4.2), (sx + px_ * 4.0 + ca * 2.4, sy + py_ * 4.0 + sa * 2.4),
-                    (sx + px_ * 2.2 + ca * 3.6, sy + py_ * 2.2 + sa * 3.6)]
-            east = [(sx - px_ * 3.0, sy - py_ * 3.0), (sx - px_ * 2.6 + ca * 2.0, sy - py_ * 2.6 + sa * 2.0),
-                    (sx - px_ * 1.2 + ca * 2.6, sy - py_ * 1.2 + sa * 2.6)]
-            for mole in (west, east):
-                pts = [self.P(*q) for q in mole]
-                pygame.draw.lines(s, INK, False, pts, max(3, int(5.2 * k)))
-                pygame.draw.lines(s, (214, 202, 176), False, pts, max(2, int(3.2 * k)))
+            west = [(sx + px_ * 4.2, sy + py_ * 4.2), (sx + px_ * 4.0 + ca * 2.0, sy + py_ * 4.0 + sa * 2.0),
+                    (sx + px_ * 2.2 + ca * 2.9, sy + py_ * 2.2 + sa * 2.9)]
+            east = [(sx - px_ * 3.0, sy - py_ * 3.0), (sx - px_ * 2.6 + ca * 1.7, sy - py_ * 2.6 + sa * 1.7),
+                    (sx - px_ * 1.2 + ca * 2.2, sy - py_ * 1.2 + sa * 2.2)]
+
+            def moles(west=west, east=east):
+                for mole in (west, east):
+                    pts = [self.P(*q) for q in mole]
+                    pygame.draw.lines(self.surf, INK, False, pts, 3 if self.mid else max(3, int(5.2 * k)))
+                    pygame.draw.lines(self.surf, (214, 202, 176), False, pts, 1 if self.mid else max(2, int(3.2 * k)))
             lx, ly = self.P(sx + px_ * 5.4 + ca * 0.4, sy + py_ * 5.4 + sa * 0.4)
-            pygame.draw.ellipse(s, (128, 118, 106), (lx - 4 * k, ly - 2 * k, 8 * k, 4 * k))
-            self.add(ly, lx, lambda: self.draw_lighthouse(lx, ly, k))
-            for u, v in ((0.6, 1.6), (-1.2, 1.2), (1.8, 6.0)):
+
+            def rock():
+                pygame.draw.ellipse(self.surf, (128, 118, 106), (lx - 4 * k, ly - 2 * k, 8 * k, 4 * k))
+            moles()
+            rock()
+            t["_pieces"] += [moles, rock]
+            put(ly, lx, lambda: self.draw_lighthouse(lx, ly, k))
+            # ships at anchor (not part of the town's footprint); at the middle zoom one small ship, clear of the houses
+            for u, v in (((1.2, 2.6),) if self.mid else ((0.6, 1.6), (-1.2, 1.2), (1.8, 6.0))):
                 qx, qy = self.P(sx + px_ * u + ca * v, sy + py_ * u + sa * v)
-                self.add(qy, qx, (lambda a_, b_: lambda: self.draw_ship(a_, b_, k))(qx, qy))
+                self.add(qy, qx, (lambda a_, b_: lambda: self.draw_ship(a_, b_, k * (0.7 if self.mid else 1.0)))(qx, qy))
         else:
+            # a jetty, as long as the hex's own water allows; where there is no room, a quay along the shore
             mx, my = t["x"] + ca * (d - 0.4), t["y"] + sa * (d - 0.4)
-            pts = [self.P(mx, my), self.P(mx + ca * 1.8 + px_ * 0.8, my + sa * 1.8 + py_ * 0.8)]
-            pygame.draw.line(s, INK, pts[0], pts[1], max(3, int(4 * k)))
-            pygame.draw.line(s, (210, 198, 172), pts[0], pts[1], max(1, int(2.2 * k)))
+            keep = sites.MARGIN_KM + (1.4 if self.mid else 0.8)          # the line is drawn 3-4 px wide at either zoom
+            room = 1.8
+            while room > 0.5 and sites.hex_margin_km(mx + ca * room + px_ * 0.8 * room / 1.8, my + sa * room + py_ * 0.8 * room / 1.8,
+                                                     t["hex"]) < keep:
+                room -= 0.1
+            if room > 0.9:
+                ends = [(mx, my), (mx + ca * room + px_ * 0.8 * room / 1.8, my + sa * room + py_ * 0.8 * room / 1.8)]
+            else:
+                # no water of its own to build into: a short quay on the beach, pulled back until it lies in the hex
+                back, half = 0.0, 1.1
+                while back < 2.0 and min(sites.hex_margin_km(mx - ca * back + px_ * u, my - sa * back + py_ * u, t["hex"])
+                                         for u in (-half, half)) < keep:
+                    back += 0.1
+                    half = max(0.7, half - 0.03)
+                ends = [(mx - ca * back - px_ * half, my - sa * back - py_ * half), (mx - ca * back + px_ * half, my - sa * back + py_ * half)]
+            pts = [self.P(*q) for q in ends]
+
+            def jetty(pts=pts):
+                pygame.draw.line(self.surf, INK, pts[0], pts[1], max(3, int(4 * k)))
+                pygame.draw.line(self.surf, (210, 198, 172), pts[0], pts[1], max(1, int(2.2 * k)))
+            jetty()
+            t["_pieces"].append(jetty)
             if not self.mid:
                 qx, qy = self.P(mx + ca * 1.7 - px_ * 1.0, my + sa * 1.7 - py_ * 1.0)
                 self.add(qy, qx, (lambda a_, b_: lambda: self.draw_ship(a_, b_, k * 0.85))(qx, qy))
@@ -945,14 +984,20 @@ class Frame:
             if self.mid and t["rank"] < 2:
                 continue
             x, y = t["_label"]
-            size = {3: 16, 2: 13.5, 1: 11.5}[t["rank"]] * (k if not self.mid else 0.72)
-            f = bold(max(9, size))
+            pw, ph, f = sites.plate_size(t, k, self.mid)
             txt = f.render(t["name"], True, (250, 246, 234))
-            pad_x, pad_y = (7 if t["rank"] == 3 else 5) * max(k, 0.6), 1.5 * max(k, 0.6)
-            r = pygame.Rect(0, 0, txt.get_width() + pad_x * 2, txt.get_height() + pad_y * 2 - 2)
+            r = pygame.Rect(0, 0, pw, ph)
             r.midtop = (x, y)
-            if "_label_above" in t:
-                r.midbottom = t["_label_above"]
+            if "_label_at" in t:
+                setattr(r, *t["_label_at"])
+            # the plate belongs to the town's hex: slide it sideways, as little as needed, until it lies inside
+
+            def inside(rr):
+                return min(sites.hex_margin_km(*self.km(px, py), t["hex"]) for px in (rr.left, rr.right) for py in (rr.top, rr.bottom))
+            if inside(r) < sites.MARGIN_KM:
+                best = max((r.move(dx, 0) for dx in sorted(range(-int(18 * max(k, 0.6)), int(18 * max(k, 0.6)) + 1), key=abs)),
+                           key=lambda rr: (min(inside(rr), sites.MARGIN_KM), -abs(rr.x - r.x)))
+                r = best
             r.clamp_ip(self.surf.get_rect().inflate(-4, -4))
             plate = pygame.Surface(r.size, pygame.SRCALPHA)
             col = (30, 36, 56, 232) if t["rank"] >= 2 else (52, 58, 74, 214)
@@ -961,6 +1006,7 @@ class Frame:
                 pygame.draw.rect(plate, (214, 186, 110, 255), plate.get_rect(), 1, border_radius=int(r.height / 2.4))
             self.surf.blit(plate, r)
             self.surf.blit(txt, (r.centerx - txt.get_width() / 2, r.centery - txt.get_height() / 2))
+            t["_plate"] = r
             placed.append(r)
         for p in WORLD["passes"].values():
             if "_label" not in p:
@@ -990,7 +1036,7 @@ class Frame:
     def render(self, path):
         t0 = time.time()
         for d in list(WORLD["towns"].values()) + list(WORLD["passes"].values()):
-            for key in ("_label", "_label_above"):
+            for key in ("_label", "_label_at", "_pieces", "_plate", "_worst_at"):
                 d.pop(key, None)
         self.ground()
         t1 = time.time()
@@ -1012,9 +1058,95 @@ class Frame:
         pygame.draw.rect(self.surf, (40, 36, 40), self.surf.get_rect(), 1)
         pygame.image.save(self.surf, path)
         print(path, "ground %.1fs total %.1fs, %d objects" % (t1 - t0, time.time() - t0, len(self.objs)))
+        return self.check_sites()
+
+    # ------------------------------------------------------------ the check: one town, one hex, drawn inside it
+    def km(self, px, py):
+        return (X0 + px / self.S, Y0 + py / (self.S * TILT))
+
+    def check_sites(self, quiet=False):
+        """Draws every town's picture again on an empty sheet and measures how far its pixels and its plate keep from
+        the border of its hex. Returns the problems (and prints them): a list of lines, empty when all is well.
+
+        Checked: the houses, walls, landmark, quay, moles and lighthouse (every pixel), and the name plate. Not
+        checked: ships at anchor, the soft ground shadow and the fields round a town.
+        """
+        zoom = "middle" if self.mid else "close"
+        need = sites.MARGIN_KM
+        rows, bad, notes = [], [], []
+        real = self.surf
+        for t in WORLD["towns"].values():
+            if "_pieces" not in t:
+                continue
+            sheet = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
+            self.surf = sheet
+            try:
+                for fn in t["_pieces"]:
+                    fn()
+            finally:
+                self.surf = real
+            mask = pygame.mask.from_surface(sheet, 0)
+            rects = mask.get_bounding_rects()
+            if not rects:
+                continue
+            box = rects[0].unionall(rects[1:])
+            pic, worst_at = 1e9, None
+            for y in range(box.top, box.bottom):          # the outermost pixels of every row are enough: the hex is convex
+                x0 = next((x for x in range(box.left, box.right) if mask.get_at((x, y))), None)
+                if x0 is None:
+                    continue
+                x1 = next(x for x in range(box.right - 1, box.left - 1, -1) if mask.get_at((x, y)))
+                for x in (x0, x1 + 1):
+                    for yy in (y, y + 1):
+                        m = sites.hex_margin_km(*self.km(x, yy), t["hex"])
+                        if m < pic:
+                            pic, worst_at = m, (x, yy)
+            t["_worst_at"] = worst_at
+            plate = None
+            r = t.get("_plate")
+            if r is not None:
+                plate = min(sites.hex_margin_km(*self.km(x, y), t["hex"]) for x in (r.left, r.right) for y in (r.top, r.bottom))
+            site_hex = hex_of_km(t["x"], t["y"])
+            rows.append((t["name"], t["hex"], pic, plate))
+            if site_hex != t["hex"]:
+                bad.append("%s (%s zoom): its site lies in hex %s, not in its hex %s" % (t["name"], zoom, site_hex, t["hex"]))
+            if pic < need:
+                bad.append("%s (%s zoom): the picture comes within %.2f km of the border of hex %s (wanted %.1f)%s"
+                           % (t["name"], zoom, pic, t["hex"], need, " and crosses it" if pic < 0 else ""))
+            if plate is not None and plate < need:
+                line = ("%s (%s zoom): the plate comes within %.2f km of the border of hex %s (wanted %.1f)%s"
+                        % (t["name"], zoom, plate, t["hex"], need, " and crosses it" if plate < 0 else ""))
+                # at the middle zoom a readable plate can be wider than a hex: it must stay centred in its own hex
+                if self.mid and hex_of_km(*self.km(*r.center)) == t["hex"]:
+                    notes.append(line)
+                else:
+                    bad.append(line)
+            if t["port"]:
+                sh = sites.shore_room(FIELDS, t["x"], t["y"], t["hex"])
+                if sh is None:
+                    bad.append("%s (%s zoom): a port without a shore inside its own hex %s" % (t["name"], zoom, t["hex"]))
+        for p in WORLD["passes"].values():
+            if "_label" in p and hex_of_km(p["x"], p["y"]) != p.get("hex"):
+                bad.append("pass %s (%s zoom): drawn outside its hex %s" % (p["name"], zoom, p.get("hex")))
+        if COAST_SHIFT_KM > sites.COAST_REACH_KM:
+            bad.append("the harbour coves move the coast %.1f km (limit %.1f)" % (COAST_SHIFT_KM, sites.COAST_REACH_KM))
+        if not quiet:
+            print("one town, one hex (%s zoom): %d towns drawn; km from the hex border (picture / plate):" % (zoom, len(rows)))
+            print("   " + "; ".join("%s %s %.1f / %s" % (n, "%d,%d" % h, a, "-" if b is None else "%.1f" % b) for n, h, a, b in rows))
+            for line in notes:
+                print("   note:", line)
+            for line in bad:
+                print("SITE PROBLEM:", line)
+            if not bad:
+                print("   no problems")
+        self.site_rows, self.site_notes = rows, notes
+        return bad
 
 
 if __name__ == "__main__":
+    for note in sites.DATA_NOTES:
+        print("DATA:", note)
+    print("coast: the harbour coves move it at most %.1f km from the first line (limit %.1f)" % (COAST_SHIFT_KM, sites.COAST_REACH_KM))
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.abspath(__file__))
     which = sys.argv[2] if len(sys.argv) > 2 else "both"
     if which in ("both", "close"):

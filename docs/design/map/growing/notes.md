@@ -55,11 +55,11 @@ growing city fills more of its own hex and never spills over the border. All pan
 map's own coast, roads and torrent. `alignment_before.png` is the same sheet before the change (Genoa across the
 border of 8,13 and 9,13).
 
-**Where the two zooms still differ, and why.** The normal map (the style frame) draws Genoa and Chiavari at their
-real longitude and latitude, which puts Genoa 1.4 km from the border of its hex and Chiavari on a strip of shore that
-belongs to a sea hex. The close-up moves both inside their hexes (about 12 km west each), so the last stretch of the
-Giovi road and of the road to Chiavari leaves the map's line. The fix belongs to the normal map: draw every town at
-its hex's site, not at its coordinates.
+**The two zooms agree (2026-11-15).** The normal map (the style frame) now follows the same rule: every town is
+drawn inside its own hex, with the close-up's town sites, harbour coves and road lines (see "One town, one hex" in
+`../style-frame/README.md`). On `alignment.png` the red rings are the normal map's town sites and pass. The panels
+were drawn again because the map's hills and ranges moved with its towns and roads; the layout is the same.
+`alignment_before.png` is older: it shows the close-up before its own change.
 
 ## What changes per stage
 

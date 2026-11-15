@@ -3,8 +3,10 @@
 The land, coast, roads, the torrent and the ridges come from the style-frame generator (read only), so the view is
 the same patch as the frame's 4x crop. The rule of this zoom is "one city, one hex, drawn inside it": every settlement
 stands inside its own 28 km hex (see stages.DISTRICTS), and the helpers below say which hex a point lies in and how
-far it is from the border. The coast is the frame's line; the only local changes are three small harbour coves
-(COAST_MODS), each within COAST_REACH_KM of the frame's line.
+far it is from the border. The coast is the frame's first line (FIELDS.land0); the only local changes are three small
+harbour coves (COAST_MODS), each within COAST_REACH_KM of that line. The frame now follows the same rule and cuts the
+same coves (style_frame/sites.py), so its own coast, roads and town sites (frame_land, FRAME_ROADS, FRAME_SITES)
+coincide with the close-up's; agreement() measures how well.
 """
 import math, os, sys, random
 
@@ -84,6 +86,9 @@ def frame_line(pts):
 FRAME_ROADS = [frame_line(rd["pts"]) for rd in WORLD["roads"]]
 FRAME_ROADS = [ln for ln in FRAME_ROADS if len(ln) > 1]
 FRAME_STREAMS = [ln for ln in (frame_line(st) for st in WORLD["streams"]) if len(ln) > 1]
+# the normal map's town sites and pass in view: name -> drawing px
+FRAME_SITES = {t["name"]: P(t["x"], t["y"]) for t in list(WORLD["towns"].values()) + list(WORLD["passes"].values())
+               if -100 < P(t["x"], t["y"])[0] < W + 100 and -100 < P(t["x"], t["y"])[1] < H + 100}
 
 # ---------------------------------------------------------------- the coast
 COAST_REACH_KM = 3.5            # no local change moves the shore further than this from the frame's line
@@ -92,12 +97,17 @@ MODS = []
 
 
 def frame_land(x, y):
-    """The normal map's own land value (the frame's coast is its 0.5 line)."""
+    """The normal map's own land value (the frame's coast, with its harbour coves, is its 0.5 line)."""
     return FIELDS.at(FIELDS.land, x, y)
 
 
+def first_land(x, y):
+    """The normal map's land value before any harbour cove: the line the coves are measured from."""
+    return FIELDS.at(FIELDS.land0, x, y)
+
+
 def land_value(x, y):
-    v = FIELDS.at(FIELDS.land, x, y)
+    v = FIELDS.at(FIELDS.land0, x, y)
     # small coves and points that only show at this zoom (they move the shore by a few hundred metres at most)
     edge = max(0.0, 1 - abs(v - 0.5) * 5.0)
     v += ((vnoise(x, y, 1.3, 31) - 0.5) * 0.10 + (vnoise(x, y, 0.55, 32) - 0.5) * 0.05) * edge
@@ -160,8 +170,10 @@ def build_coast(mods):
     return [chaikin(lp, 2, closed=True) for lp in loops]
 
 
-def coast_drift(loops, step=4):
-    """The largest distance (km) from the close-up's shore to the normal map's shore, and where (km)."""
+def coast_drift(loops, step=4, frame_land=None):
+    """The largest distance (km) from the close-up's shore to the normal map's first shore, and where (km).
+    With frame_land given, the distance to that land field instead (the frame's coast with its coves)."""
+    frame_land = frame_land or first_land
     worst, at = 0.0, None
     for lp in loops:
         for x, y in lp[::step]:
@@ -179,6 +191,43 @@ def coast_drift(loops, step=4):
             if d > worst:
                 worst, at = d, (x, y)
     return worst, at
+
+
+def line_gap(a, b, step=1.0):
+    """The largest distance from a point of polyline a to polyline b (both in km)."""
+    def seg_d(p, q0, q1):
+        dx, dy = q1[0] - q0[0], q1[1] - q0[1]
+        n = dx * dx + dy * dy
+        t = 0.0 if n == 0 else max(0.0, min(1.0, ((p[0] - q0[0]) * dx + (p[1] - q0[1]) * dy) / n))
+        return math.hypot(p[0] - q0[0] - dx * t, p[1] - q0[1] - dy * t)
+    worst = 0.0
+    for p in resample(a, step):
+        worst = max(worst, min(seg_d(p, b[i], b[i + 1]) for i in range(len(b) - 1)))
+    return worst
+
+
+def agreement(loops, close_roads, close_sites):
+    """How far the normal map (the style frame) lies from the close-up, in km, inside the close-up's view.
+    close_roads: the close-up's road lines in km; close_sites: name -> (x, y) in km of its towns and pass.
+    Returns lines of text."""
+    out = []
+    drift, at = coast_drift(loops, frame_land=frame_land)
+    out.append("coast: the two shores lie at most %.1f km apart (the map draws its coast on a 1 km grid)" % drift)
+    def in_view(p):
+        return VX < p[0] < VX + VW_KM and VY < p[1] < VY + VH_KM
+    allc = [resample(chaikin(ln, 3), 0.3) for ln in close_roads]
+    worst = 0.0
+    for rd in WORLD["roads"]:
+        pts = [p for p in rd["pts"] if in_view(p)]
+        for p in pts:
+            worst = max(worst, min(math.dist(p, q) for ln in allc for q in ln))
+    out.append("roads: every road of the map in view lies within %.2f km of a road of the close-up" % worst)
+    for name, (x, y) in sorted(close_sites.items()):
+        t = WORLD["towns"].get(name) or WORLD["passes"].get(name)
+        out.append("%s: map site %.1f km from the close-up's, hex %s on both" % (name, math.hypot(t["x"] - x, t["y"] - y), hex_of_km(x, y))
+                   if hex_of_km(x, y) == hex_of_km(t["x"], t["y"]) else
+                   "%s: DIFFERENT HEX, map %s, close-up %s" % (name, hex_of_km(t["x"], t["y"]), hex_of_km(x, y)))
+    return out
 
 
 def poly_area(pts):

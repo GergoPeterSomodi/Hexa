@@ -46,8 +46,12 @@ def setup():
             T.TONES = SF.SLOPES.level(1.0)
         loops = build_coast([ell_km(kind, e) for kind, e in C.COAST_MODS])
         drift, at = coast_drift(loops)
-        print("coast: at most %.1f km from the normal map's line (limit %.1f)" % (drift, COAST_REACH_KM))
+        print("coast: at most %.1f km from the normal map's first line (limit %.1f)" % (drift, COAST_REACH_KM))
         assert drift <= COAST_REACH_KM, at
+        for line in agreement(loops, [[K(*q) for q in ln] for ln in (C.ROAD_WEST, C.ROAD_EAST, C.ROAD_GIOVI, C.ROAD_SPUR, C.ROAD_GATE)],
+                              {"Genoa": K(898, 930), "Savona": K(*ST.SAVONA_AT[:2]), "Chiavari": K(*ST.CHIAVARI_AT[:2]),
+                               "Giovi": K(*ST.PASS_AT)}):
+            print("map and close-up:", line)
         _ready.append([[P(*p) for p in lp] for lp in loops])
         bad = check_layout()
         for line in bad:
