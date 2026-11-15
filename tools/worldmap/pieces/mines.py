@@ -7,6 +7,7 @@ upgraded in place to a row of three miners' houses.
 
 python mines.py            writes docs/design/map/pieces/mines.png
 """
+import math
 import os
 import sys
 
@@ -36,7 +37,8 @@ TRACK = [(-9, -18), (-7, -8), (-3, 2), (-1, 14), (-3, 30), (-4, 38)]       # end
 GATES = {"south": (-4, 38)}                 # where the map's road layer joins the track
 HEAPS = [(-18, -10, 14.0, 7.5, 1), (24, 10, 10.0, 5.6, 2), (16, 19, 9.0, 5.0, 3)]       # x, y, w, h, from level
 HEADFRAME = (11, 2)                         # foot of the headframe, from level 2
-STREAM = [(52, -14), (44, -11), (36, -6), (33, 0), (36, 7), (43, 12), (52, 18)]
+# the wheel's race: the piece's own water (streams are the map's), ending in a small pond at each end, inside the hex
+STREAM = [(37, -13), (35, -7), (33, 0), (35, 7), (37, 13)]
 WHEEL = (34.5, -2.5)                        # foot of the water wheel, on the stream
 SMELTER = (-24, 6)                          # foot of the smelter, from level 3
 ORE_PILE = (-9, 9)                          # from level 3
@@ -173,7 +175,9 @@ def draw(level, season, variant=0, mirror=False):
         if level >= lo:
             p.blob(x, y, w, h, p.pal["soil"], alpha=YARD_ALPHA)
     if level >= 2:
-        p.water(STREAM, 3.0)
+        p.water(STREAM, 2.0)
+        for x, y in (STREAM[0], STREAM[-1]):
+            p.pond([(x + math.cos(i * math.pi / 6) * 4.0, y + math.sin(i * math.pi / 6) * 2.5) for i in range(12)])
     p.road(TRACK, 1.5, track=True)
 
     # ---- standing things

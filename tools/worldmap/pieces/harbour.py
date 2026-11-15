@@ -39,7 +39,12 @@ QUAY = (-30, 12, -1.5)                                # level 2: from u to u at 
 MOLES = [[(-30, -1), (-30, 14), (-18, 18)], [(34, -1), (34, 14), (22, 18)]]   # level 3: two bent moles, a 40 px mouth
 WAREHOUSES = [(-22, -6), (-8, -6), (6, -6)]           # u, v; level 2 has the first two, level 3 the third
 SLIP = (21, -5)                                       # the shipyard slip and its hull, level 3
-LIGHT = MOLES[0][1]                                   # the lighthouse stands on the first mole's bend
+# The lighthouse stands on the first mole's bend. Where the hex is too short above that spot (the sea behind the
+# land, or the mole at the upper end of an east or west shore) it takes the next spot that has room: the other
+# mole's bend, then the moles' roots, then the land by the second mole. The rest of the layout stays where it is.
+LIGHTS = [MOLES[0][1], MOLES[1][1], MOLES[0][0], MOLES[1][0], (34, -7)]     # the last: on the head of land (sea in the north)
+LIGHT_SIZE = (21.5, 7.0)                              # tall, wide (px), with its cap
+SHIP_SIZE = (13.5, 12.5)                              # a ship at size 1.0; a boat is BOAT_SC of it
 # boats: home berth, out berth, from level
 BOATS = [((-1.5, 6), (-12, 21.5), 1), ((-3.5, 14), (4, 22.5), 1), ((-22.5, 7), (12, 20.5), 2)]
 SHIPS = [((-14, 11), 2), ((20, 11), 3)]
@@ -94,17 +99,12 @@ def net_rack(p, x0, y0, x1, y1):
     return p.stand(max(y0, y1), fn)
 
 
-LIGHT_TOP = -8.0                                      # the lighthouse is 20 px tall: its foot must not stand higher than this
-
-
-class Along:
-    """The shore with u turned round when g = -1 (the whole layout then runs the other way along the shore)."""
-
-    def __init__(self, shore, g):
-        self.shore, self.g = shore, g
-
-    def pt(self, u, v=0.0):
-        return self.shore.pt(u * self.g, v)
+def afloat(p, s, u, v, sc, sail):
+    """A ship or boat at (u, v) out on the water. Sails stand upright on every sea side, so where the hex is too
+    short above the berth the boat lies closer in (shore.fit), and where it fits nowhere it is left out."""
+    at = s.fit(u, v, SHIP_SIZE[0] * sc, SHIP_SIZE[1] * sc, v_min=min(v, 4.0))
+    if at is not None:
+        p.boat(*at, sc, sail=sail)
 
 
 def line_at(s, u0, u1, v, step=12):
@@ -117,9 +117,7 @@ def draw(level, season, variant=0, mirror=False, sea=None, shore=None, addon=Fal
     if level == 0:                                    # no piece on the map: the sheets show the wild shore
         return kit.wild(season, "grass", seed=SEED, coast=COAST, sea=sea, shore=shore, mirror=mirror)
     p = kit.Piece(season, ground="grass", seed=SEED, sea=sea, shore=shore, mirror=mirror)
-    shore = p.coast(**COAST)
-    g = -1 if shore.pt(*LIGHT)[1] < LIGHT_TOP else 1  # the lighthouse stands on the lower end of the hex: the layout runs the other way along the shore
-    s = Along(shore, g)
+    s = p.coast(**COAST)
     su, au, wi, sp = season == "summer", season == "autumn", season == "winter", season == "spring"
     land = not addon                                  # the add-on keeps to the water's edge: no huts, warehouses, rack, people
 
@@ -154,18 +152,20 @@ def draw(level, season, variant=0, mirror=False, sea=None, shore=None, addon=Fal
     if level >= 2:
         for (u, v), frm in SHIPS:
             if level >= frm:
-                p.boat(*s.pt(u, v), 1.0, sail=not wi)
+                afloat(p, s, u, v, 1.0, not wi)
     if level >= 3:
         if land:
             u, v = WAREHOUSES[2]
             p.house(*s.pt(u, v), 11.5, 5.2, 4.4, wall=4, kind="ridge", roof="tile", door=False)
         hull_on_slip(p, *s.pt(*SLIP))
-        lighthouse(p, *s.pt(*LIGHT))
+        light = s.first(LIGHTS, *LIGHT_SIZE)
+        if light is not None:
+            lighthouse(p, *s.pt(*light))
     for i, (home, out, frm) in enumerate(BOATS):
         if level < frm:
             continue
         at_sea = sp or su or (au and i % 2 == 1)
-        p.boat(*s.pt(*(out if at_sea else home)), BOAT_SC, sail=not wi)
+        afloat(p, s, *(out if at_sea else home), BOAT_SC, not wi)
     # ---- season activity
     if land and (sp or su) and level >= 1:
         p.person(*s.pt(-35, -12.5))                      # a fisherman at the net rack

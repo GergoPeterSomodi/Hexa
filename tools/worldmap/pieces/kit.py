@@ -92,8 +92,11 @@ def pick(col, row, variants=2):
     return (last, True) if bit else (0, False)
 
 
-def mirror_gates(gates, mirror=True):
-    """A module's GATES table as it lies in the mirrored piece: x turned round, east and west swapped."""
+def mirror_gates(gates, mirror=True, variant=0):
+    """A module's GATES table as it lies in the mirrored piece: x turned round, east and west swapped.
+    GATES is one dict for the module, or a list with one dict per layout (then give variant=)."""
+    if isinstance(gates, (list, tuple)):
+        gates = gates[min(variant, len(gates) - 1)]
     if not mirror:
         return dict(gates)
     swap = {"east": "west", "west": "east"}
@@ -302,6 +305,11 @@ class Shore:
         shore.land(x, y) True if the piece-px point lies on land
         shore.out        the unit vector towards the sea;  shore.along  the unit vector along the shore (u grows)
         shore.depth      px of land behind the shore at its middle (down to the hex border)
+        shore.at(u, v, du, dv)   the point du along and dv out from pt(u, v), on straight axes
+        shore.rect(u, v, w, h)   a true rectangle lying at the shore (a pan, a yard, a slip): four piece-px corners
+        shore.fits(u, v, tall, wide)   True if a standing thing that size, its foot at pt(u, v), stays inside the hex
+        shore.fit(u, v, tall, wide)    pt(u, v) slid back towards the shore until the thing fits, or None
+        shore.first(spots, tall, wide) the first of several (u, v) spots where the thing fits, or None
         shore.front      True if the sea lies in front (the south half): boats and jetties are then in front of the land
     With the sea in front (the sheets' default), pt(u, v) is (u, shore(u) + v): shore(x) still gives the y of the
     water's edge, as the first kit did."""
@@ -323,6 +331,43 @@ class Shore:
     def land(self, x, y, margin=0.0):
         u = x * self.along[0] + y * self.along[1]
         return x * self.out[0] + y * self.out[1] < self.h(u) - margin
+
+    def at(self, u, v, du=0.0, dv=0.0):
+        """The point du px along and dv px out from the shore point (u, v), on straight axes: one shore point per
+        shape keeps the shape true where the shore is wavy or slanted."""
+        x, y = self.pt(u, v)
+        return (x + self.along[0] * du + self.out[0] * dv, y + self.along[1] * du + self.out[1] * dv)
+
+    def rect(self, u, v, w, h):
+        """A rectangle lying at the shore: centre (u, v), w px along the shore and h px across it. Returns its four
+        corners in piece px (for p.patch, p.pond)."""
+        return [self.at(u, v, du, dv) for du, dv in ((-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2))]
+
+    def fits(self, u, v, tall, wide=0.0, margin=MARGIN + 0.5):
+        """True if a standing thing `tall` px high and `wide` px wide with the middle of its foot at pt(u, v) stays
+        inside the hex. Standing things are upright on every sea side, so with the sea behind the land (north) a
+        tall thing far out to sea leaves the hex at the top: ask before you place a lighthouse or a ship."""
+        x, y = self.pt(u, v)
+        return all(in_hex(x + dx, y + dy, margin) for dx in (-wide / 2, wide / 2) for dy in (-tall, 1.0))
+
+    def fit(self, u, v, tall, wide=0.0, v_min=None):
+        """pt(u, v), slid back towards the shore (v growing smaller, down to v_min; default: half way) until the
+        thing fits (see fits()). Returns the piece-px point, or None if it fits nowhere: then leave the thing out."""
+        v_min = v * 0.5 if v_min is None else v_min
+        q = v
+        while q >= v_min - 1e-6:
+            if self.fits(u, q, tall, wide):
+                return self.pt(u, q)
+            q -= 1.0
+        return None
+
+    def first(self, spots, tall, wide=0.0):
+        """The first of the (u, v) spots where a thing that size fits, as (u, v), or None. For a landmark that has
+        one place on most coasts and a fall-back where the hex is too short above it."""
+        for u, v in spots:
+            if self.fits(u, v, tall, wide):
+                return (u, v)
+        return None
 
     def __call__(self, x):
         assert abs(self.out[0]) < 1e-6 and self.out[1] > 0, "shore(x) only works with the sea in front: use shore.pt(u, v)"
@@ -376,6 +421,7 @@ class Piece:
         self.dx = {}                    # mirrored pieces: how far each standing thing was moved
         self.box = {}                   # the bounding box of each standing thing (filled by footprint())
         self.lifted = set()
+        self.claims = []                # ground the piece holds without a surface of its own (see claim())
         self.wild_done = False
         self.seed = seed
         self.season = season
@@ -658,6 +704,12 @@ class Piece:
         if self.winter:
             self.gp.ellipse(x, y, w, h, SNOW)
 
+    def claim(self, pts):
+        """Ground this piece holds although nothing is drawn on it: the polygon counts for the footprint, so the
+        map keeps its wild trees out. The kit claims the inside of every ring wall; use it for a court, a square
+        or a gap between two works that must stay open. Draws nothing."""
+        self.claims.append([(x * self.m, y) for x, y in pts])
+
     # -------------------------------------------------------------- shadows
     def shadow(self, x, y, w, h):
         """A soft ground shadow: an ellipse centred on (x, y). Standing primitives add their own."""
@@ -723,11 +775,16 @@ class Piece:
         It is: the ground detail that is a real surface (fields, plots, pans, yards, trodden ground; thin lines such
         as tracks, fences and tufts and faint scrub overlays do not count), grown by `grow` px; and the foot of
         every standing thing, 2 px to each side and up to `front` px in front of it (so nothing wild stands in
-        front of a building). Smoke does not count. Only for a piece drawn without its base (take_apart())."""
+        front of a building); and what the piece claims (claim(): the inside of a ring wall). Smoke does not count. Only for a piece drawn without its base (take_apart())."""
         assert not self.has_base, "footprint() needs the piece without its ground base: use kit.take_apart()"
         small = pygame.transform.smoothscale(self.g, (SIZE, SIZE))
         work = pygame.mask.from_surface(small, 60)
         work = _grow(_shrink(work, 1), 1 + grow)
+        if self.claims:
+            lay = pygame.Surface((SIZE, SIZE), pygame.SRCALPHA)
+            for pts in self.claims:
+                pygame.draw.polygon(lay, (255, 255, 255, 255), [(x + C, y + C) for x, y in pts])
+            work.draw(pygame.mask.from_surface(lay, 127), (0, 0))
         for y, n, fn in self.queue:
             if n in self.lifted:
                 continue
@@ -1008,6 +1065,7 @@ class Piece:
         front = ring_points(cx, cy, rx, ry, 0, math.pi)
         hw = height
         self.shadow(cx + self.m * rx * 0.2, cy + ry * 0.35, rx * 2.3, ry * 2.0)
+        self.claim(ring_points(cx, cy, rx + 2, ry + 2, 0, 2 * math.pi))       # no wild tree inside or on the wall
 
         def stakes(p, pts, c):
             for q in range(0, len(pts), 1):
@@ -1053,8 +1111,8 @@ class Piece:
         return self.stand(cy + ry + 0.5, ff, x=cx)
 
     def boat(self, x, y, sc=1.0, sail=True):
-        """A ship or fishing boat with its keel at (x, y). sc 1.0 = a trading ship (12 px long); 0.55 = a fishing
-        boat. sail=False: a bare mast (boats laid up in winter)."""
+        """A ship or boat with its keel at (x, y). sc 1.0 = a trading ship (12 px long, 13 tall); 0.7 = a fishing
+        boat; 0.55 = a small boat drawn up on the beach. sail=False: a bare mast (boats laid up in winter)."""
         def fn(p):
             k = sc
             hull = [(x - 6 * k, y - 3 * k), (x + 6 * k, y - 3 * k), (x + 4 * k, y), (x - 4 * k, y)]
@@ -1083,22 +1141,24 @@ class Piece:
         d = -1 if flip else 1
         if sc != 1.0 or col is not None:
             def fy(p):
-                body = col or {"sheep": (244, 240, 230), "cow": (150, 92, 60), "horse": (96, 66, 50)}[kind]
+                body = col or {"sheep": (250, 248, 240), "cow": (150, 92, 60), "horse": (96, 66, 50)}[kind]
                 if kind == "horse":
                     p.line((x - 1.2 * sc, y), (x - 1.2 * sc, y - 1.6 * sc), INK, 0.5)
                     p.line((x + 1.2 * sc, y), (x + 1.2 * sc, y - 1.6 * sc), INK, 0.5)
                     p.ellipse(x, y - 2.4 * sc, 4.4 * sc, 2.2 * sc, body, INK, 0.5)
                     p.line((x + 1.8 * d * sc, y - 2.8 * sc), (x + 2.6 * d * sc, y - 4.4 * sc), body, 1.0)
                 else:
-                    w, h = ((3.2, 2.2) if kind == "sheep" else (4.4, 2.6))
-                    p.ellipse(x, y - h * sc * 0.58, w * sc, h * sc, body, (120, 110, 100) if kind == "sheep" else INK, 0.5)
-                    p.dot(x + w * 0.48 * d * sc, y - h * sc * 0.75, INK if kind == "sheep" else shade(body, 0.72), 1.0)
+                    if kind == "sheep":
+                        _sheep(p, x, y, d, sc, body)
+                        return
+                    w, h = 4.4, 2.6
+                    p.ellipse(x, y - h * sc * 0.58, w * sc, h * sc, body, INK, 0.5)
+                    p.dot(x + w * 0.48 * d * sc, y - h * sc * 0.75, shade(body, 0.72), 1.0)
             return self.stand(y, fy, x=x)
 
         def fn(p):
             if kind == "sheep":
-                p.ellipse(x, y - 1.2, 3.2, 2.2, (244, 240, 230) if not self.winter else (226, 218, 200), (120, 110, 100), 0.5)
-                p.dot(x + 1.5 * d, y - 1.5, INK, 1.0)
+                _sheep(p, x, y, d, 1.0, (250, 248, 240) if not self.winter else (226, 218, 200))
             elif kind == "cow":
                 p.ellipse(x, y - 1.6, 4.4, 2.6, (150, 92, 60), INK, 0.5)
                 p.dot(x - 0.6 * d, y - 1.8, (240, 232, 220), 1.2)
@@ -1174,6 +1234,15 @@ class Piece:
             if bad:
                 print("PIECE PROBLEM %s %s: %d px of standing art outside the hex margin" % (label, self.season, bad))
         return out
+
+
+def _sheep(p, x, y, d, sc, body):
+    """A sheep: a clean pale body with no outline (an outline greys so small a shape), a dark line under the belly
+    so it stands off a pale meadow or snow, and a dark head."""
+    w, h = 3.4 * sc, 2.4 * sc
+    p.ellipse(x, y - h * 0.42, w, h, (104, 92, 80))              # the belly line and legs, showing 0.5 px below
+    p.ellipse(x, y - h * 0.62, w, h, body)
+    p.dot(x + w * 0.5 * d, y - h * 0.72, INK, 1.0 * max(0.8, sc))
 
 
 def _smoke(p, x, y, winter=False):

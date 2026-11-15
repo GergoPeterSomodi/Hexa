@@ -106,6 +106,7 @@ def ring_wall(p, cx, cy, rx, ry, height=RING_H):
     front = kit.ring_points(cx, cy, rx, ry, 0, math.pi)
     hw = height
     p.shadow(cx + p.m * rx * 0.2, cy + ry * 0.35, rx * 2.3, ry * 2.0)
+    p.claim(kit.ring_points(cx, cy, rx + 2, ry + 2, 0, 2 * math.pi))        # the court: no wild tree inside the ring
 
     def fb(pen):
         top = [(a[0], a[1] - hw) for a in back]

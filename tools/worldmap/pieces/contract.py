@@ -128,8 +128,8 @@ def main(path):
             out.blit(img, (24 + i * (cw + 8), y + 24))
             out.blit(f_s.render(name, True, kit.SHEET_DIM), (24 + i * (cw + 8) + 2, y + 26 + cw))
         y += cw + 56
-    out.blit(f_h.render("5  kit.pick(col, row) on 7 x 3 hexes of wheat level 3 (one layout so far: plain or mirrored; "
-                        "with the second layout no two neighbours repeat)", True, kit.SHEET_TEXT), (24, y))
+    out.blit(f_h.render("5  kit.pick(col, row) on 7 x 3 hexes of wheat level 3 (0 = layout 0, 1 = layout 1, m = mirrored: "
+                        "no two neighbours show the same picture)", True, kit.SHEET_TEXT), (24, y))
     out.blit(field, (24, y + 26))
     for c in range(7):
         for q in range(3):

@@ -3,6 +3,39 @@
 Art director, 2026-11-15. **Status: a test for the owner and the planning session. Nothing in the game, the style
 frame or the pieces is changed.**
 
+## Round 3: every family in the map (2026-11-15)
+
+`summer.png`, `winter.png`, `plain_crop.png` and the new `hills_coast_crop.png` (the Alps to Genoa, 2x) now carry
+all ten families, each on its own kind of land, with layout and mirror from the hex.
+
+| Where | What |
+|---|---|
+| Po plain | Wheat, 8 hexes, levels 1 to 3, both layouts |
+| Monferrato and Langhe hills | Vineyards, 4 hexes, levels 1 to 3 |
+| Riviera di Ponente | Olives, levels 3 and 2 |
+| Alpine and Apennine foothills | Grazing: sheep 3 and 1, cattle 2, horses 2 |
+| Apennine woods | Timber, 4 hexes, levels 1 to 3: clearings cut into the map's own wood |
+| Maritime Alps | Mines, levels 3 and 2 |
+| Giovi, Col di Tenda, Susa valley | Castles 2, 1 and 3 |
+| South of Pisa | Salt pans 3 |
+| Two cliff coasts | Fishing villages (harbour 1 and 2, the full piece) |
+| Genoa, Pisa, Savona, Nice, Chiavari | Town piece plus the harbour add-on (levels 3, 3, 2, 2, 1); the frame's own harbour stand-in is gone |
+
+What the compositor learned to do, and what it means for the real map:
+
+- **Coast families are left whole at the shore**: their jetties, moles and boats lie on the water. A hex with less
+  land than the module's `NEED` takes a lower level; a hex without a shore takes no coast piece.
+- **The harbour add-on is anchored at the shore, not at the hex centre.** The port hexes have 10 to 20 px of water;
+  the canvas is moved 18 to 36 px towards the sea so the basin reaches into the sea hex next door. Add-on things
+  inside the town's footprint are left out (1 to 2 per port).
+- **Relief rule K, applied**: range samples in or up to 30 px in front of a footprint are dropped and the range is
+  cut there (39 samples). Without it both mines and the Tenda tower are hidden behind peaks.
+- With the map's own shore line a few standing things of the full coast pieces land outside their hex (2 to 3 per
+  piece); they are left out. The kit's eight straight sides do not show this; wavy shores do.
+
+Seen and left for the map's side: the pass name "Giovi" sits on the castle; the castle mound is grass green on
+rock; the salt pans south of Pisa lie a little back from the water because the shore crosses only the hex's edge.
+
 ## Round 2: after the owner's answers (2026-11-15)
 
 `summer.png`, `winter.png` and `plain_crop.png` were rendered again to the owner's three answers

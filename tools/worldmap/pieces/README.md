@@ -77,7 +77,8 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 | `p.rows(cx, cy, w, h, angle, n, dashed=)` | Plant rows on a soil block |
 | `p.hedge(pts)`, `p.fence(pts)`, `p.terrace(pts, face=)` | Lines on the ground; `face=2` gives a terrace wall a visible front |
 | `p.road(pts, w, track=)`, `p.water(pts, w)`, `p.pond(pts, col=, edge=)` | Roads, streams and canals (frozen in winter), ponds. Tracks are overlays |
-| `p.coast(y0)` | The shore the map gave (`Piece(sea=, shore=)`; in front on the sheets). Returns a `Shore`: `pt(u, v)`, `land(x, y)`, `depth`, `front`. Draws a sea on the sheets only |
+| `p.coast(y0)` | The shore the map gave (`Piece(sea=, shore=)`; in front on the sheets). Returns a `Shore`: `pt(u, v)`, `at(u, v, du, dv)`, `rect(u, v, w, h)`, `land(x, y)`, `depth`, `front`, and for tall things `fits(u, v, tall, wide)`, `fit(...)` (slides towards the shore, or `None`), `first(spots, tall, wide)`. Draws a sea on the sheets only |
+| `p.claim(pts)` | Ground the piece holds without drawing on it (a court, a square): it counts for the footprint. `p.wall` claims the inside of its ring |
 | `p.jetty(a, b, stone=, snow=)` or `p.jetty([pts], ...)` | A jetty, quay or mole; a list of points makes a bent mole; `snow=True` caps it in winter |
 | `p.tufts(n, avoid=)`, `p.stones(spots)`, `p.scree(n)` | Ground scatter |
 | `p.snow_patch(x, y, w, h)` | A drift (winter only) |
@@ -91,7 +92,7 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 | `p.church(x, y, size, sc)` | `chapel`, `church`, `cathedral` |
 | `p.tower(x, y, w, h, col, top, flag)` | `top`: `battlement`, `cone`, `flat` |
 | `p.wall(cx, cy, rx, ry, kind, towers, gate, back_towers, col=)` | A ring wall: `palisade` or `stone`; `col=kit.STONE_GREY` for castles |
-| `p.boat(x, y, sc, sail)` | A ship (1.0) or fishing boat (0.55) |
+| `p.boat(x, y, sc, sail)` | A ship (1.0), a fishing boat (0.7) or a small boat on the beach (0.55) |
 | `p.person(x, y, col)`, `p.animal(x, y, kind, flip, sc=, col=)` | `sheep`, `cow`, `horse`; `sc=0.7` for young, `col` for another coat |
 | `p.haystack(x, y)`, `p.heap(x, y, w, h, col)`, `p.logs(x, y, n)` | Stacks, cone heaps, log piles |
 | `p.smoke(x, y, always=, foot=)` | Smoke (autumn and winter only; `always=True` for the listed chimneys). Never call `kit._smoke` |
@@ -105,7 +106,7 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 | `kit.take_apart(draw, level, season, hex=(col, row), sea=, shore=)` | The piece without its ground base, as layers: `ground` (the detail, 2x), `shadow`, `standing` (`(foot_y, order_y, fn)` back to front), `footprint` (a mask: the map draws no wild tree or bush with its foot in it), `shore`, `mirror`, `variant`. **Level 0 gives `None`.** Layout and mirror come from the hex. Works with every module as it is |
 | `kit.pick(col, row, variants)` | `(variant, mirror)` for a hex: always the same; with two layouts no two neighbours equal |
 | `kit.in_footprint(mask, x, y)` | True if the piece-px point is in the footprint |
-| `kit.mirror_gates(GATES, mirror)` | The gate points as they lie in a mirrored piece |
+| `kit.mirror_gates(GATES, mirror, variant)` | The gate points as they lie in a mirrored piece; `GATES` is one dict, or a list with one dict per layout |
 
 **For the sheets.** `kit.wild(season, ground, seed, coast=)` is the level 0 picture; `kit.sheet(..., wild=True)`
 shows every piece in the terrain's wild land thinned by its footprint; `kit.variant_sheet(...)` shows the layouts,

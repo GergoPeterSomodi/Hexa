@@ -57,15 +57,13 @@ def pan_col(p, i):
 
 
 def at(s, u, v, du=0.0, dv=0.0):
-    """The piece-px point du along and dv across the shore from the shore point (u, v). One shore point per shape
-    keeps a pan a true rectangle where the shore is wavy or slanted."""
-    x, y = s.pt(u, v)
-    return (x + s.along[0] * du + s.out[0] * dv, y + s.along[1] * du + s.out[1] * dv)
+    """The piece-px point du along and dv across the shore from the shore point (u, v): the kit's shore.at."""
+    return s.at(u, v, du, dv)
 
 
 def quad(s, u, v, w2, h2):
-    """A rectangle lying on the shore: centre (u, v), w2 along the shore and h2 across it, as piece px."""
-    return [at(s, u, v, du, dv) for du, dv in ((-w2, -h2), (w2, -h2), (w2, h2), (-w2, h2))]
+    """A rectangle lying on the shore: centre (u, v), half sizes w2 along and h2 across: the kit's shore.rect."""
+    return s.rect(u, v, w2 * 2, h2 * 2)
 
 
 def pan(p, s, u, v, i):

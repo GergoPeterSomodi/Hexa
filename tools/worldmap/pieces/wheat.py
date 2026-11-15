@@ -27,10 +27,10 @@ LAYOUT = [
     dict(  # layout 0: the yard just left of the middle, the windmill behind it, the canal across the upper half
         yard=(-5, 3, 28, 16),
         blocks=[
-            (26, 15, 36, 26, -10, 6, 1),
-            (-23, 23, 32, 21, 8, 5, 2),
-            (21, -22, 35, 20, -6, 5, 2),
-            (-25, -21, 30, 19, 6, 5, 3),
+            (23, 13, 34, 24, -10, 6, 1),               # every corner 10 px inside the border (the map's rivers run there)
+            (-20, 19, 30, 15, 8, 5, 2),
+            (17, -18, 29, 16, -6, 5, 2),
+            (-22, -17, 28, 13, 6, 4, 3),
             (4, 30, 18, 7, 0, 3, 3),
         ],
         canal=[(-36, -7), (-24, -8), (-10, -9), (2, -10), (14, -8), (30, -7), (36, -5)],

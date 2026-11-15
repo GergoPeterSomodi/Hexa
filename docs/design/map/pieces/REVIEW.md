@@ -1,8 +1,8 @@
 # Normal-map pieces: the review
 
-Art director, 2026-11-15. **Status: the owner answered the three questions on 2026-11-15 (section 6). The kit, the
-guide and the in-map test follow the answers; fix tasks 1 and 2 are done; tasks 3 to 6 are written to the answers
-and wait for workers (section 4). Nothing in the game is changed.**
+Art director, 2026-11-15. **Status: the owner answered the three questions on 2026-11-15 (section 6). All six fix
+tasks are done and reviewed a second time: all ten families pass ("Round 2" below). Nothing in the game is
+changed.**
 
 All ten families are drawn. This is the review of the eight new ones against `GUIDE.md` (the two reference
 families were checked again too), with the findings of the in-map test (`../pieces_in_map/notes.md`) folded in.
@@ -11,7 +11,90 @@ families were checked again too), with the findings of the in-map test (`../piec
 below). The per-family sheets (`<family>.png`) show all four seasons and the 50% test. `kit_contract.png` shows what
 the owner's answers mean in the kit: wild land, the coast on any side, the footprint, the mirror.
 
-## Verdict in one paragraph
+## Round 2: the second review (2026-11-15)
+
+Fix tasks 3 to 6 are back. Every sheet (family, variants, sides) was looked at whole and in enlarged crops, each
+family was measured (footprint, the 10 px margin, all eight sea sides) and checked against the guide's checklist.
+**All ten families pass.** No module prints a `PIECE PROBLEM`, plain or mirrored, on any sea side. The owner's three
+answers are now true in every module: no wild land in a piece, the shore from the map, a mirror for all and a second
+layout for wheat, grazing, timber and vineyard.
+
+**Show the owner:** `overview.png` (summer, eight families in winter, and a bottom block with layouts, sea sides and
+the port add-on), then `../pieces_in_map/summer.png`, `hills_coast_crop.png`, `plain_crop.png` and `winter.png`.
+
+### Verdict per family
+
+| Family | Verdict | Coverage (share of the margin hex, levels up) | Notes |
+|---|---|---|---|
+| Settlements | **Pass** | 27 / 41 / 66 / 75 / 84% | Roads end at gates, no plate strip. The village green stays. The inside of the ring is now footprint by the kit, so no map tree stands on the wall |
+| Wheat | **Pass, after one fix** | 29 / 57 / 82% (layout 1: 31 / 56 / 85%) | Layout 0's four corner blocks poked up to 9 px into the margin (the Po problem of round 1), not 2-5 px: pulled in. The fullest family, on purpose. Sails over a field edge in layout 1 are fine (a mill stands among its fields) |
+| Castles | **Pass** | 20 / 31 / 70% | The keep's smoke keeps its side in the mirror: right. The court of the ring is claimed for the footprint |
+| Vineyard | **Pass, after one fix** | 21 / 47 / 62% (66%) | The gate point lay 7 px from the border: moved to 10. Presses of the two layouts 11 px apart: accepted, the 14 px rule is for the yard (the hut), which is 37 px away |
+| Olives | **Pass** | 22 / 51 / 70% | The clearest signature. One layout so far |
+| Grazing | **Pass, after the kit fix** | 17 / 34 / 61% (66%) | Sheep read as grey smudges: the kit's sheep is redrawn (below). Level 2 is at the low edge of its band; accepted, the pale meadow carries |
+| Salt | **Pass** | 20 / 38 / 62% | Works on all eight sides. On slanted shores one back-row corner comes 3 px into the margin: accepted |
+| Mines | **Pass, after one fix** | 27 / 53 / 68% | The stream ran border to border (missed in round 1 and by the task): now a short wheel race with a pond at each end. Spring = summer by the guide. The one `p.m` aims the headframe's stay at the shaft house: allowed (guide) |
+| Timber | **Pass** | 26 / 45 / 71% | Level 3 a little over the table's 65%: inside the band. The irregular clearing reads as a clearing, not a disc |
+| Harbour | **Pass, after one fix** | 17 / 31 / 44% of the land side | The worker turned the whole layout round where the lighthouse did not fit; that cancelled the mirror on five sides and failed with the sea in the north. Replaced by the kit's fit calls (below): now all eight sides work, mirrored differs from plain, the lighthouse is there on every side |
+
+### The workers' open points, decided
+
+| Point | Decision |
+|---|---|
+| Footprint target: whole hex or margin hex? | **The margin hex** (the hex pulled in 10 px). Bands 15-30 / 35-60 / 60-85%. Guide section 6 |
+| Wheat layout 0 blocks past the margin | Fixed in the table (blocks pulled in and slightly smaller); the look holds |
+| Wheat farmyard blob, settlements' village green and wider ring blob | Pass. The ring blob is no longer needed for clearing: the kit claims the ring |
+| Ring wall footprint was only a foot band | Kit: `p.claim(points)`; `p.wall` claims its inside; castles' own ring calls it |
+| Vineyard gate outside the margin | Fixed: (-5, 38) |
+| `GATES` per module, not per layout | Kept as the rule (all four two-layout families end at one gate). `kit.mirror_gates(GATES, mirror, variant)` also takes a list with one dict per layout |
+| Mirror needs `x=` for structures of several parts | Into the guide (section 6) with the `on=` rule beside it |
+| Sheep read grey | Kit: no outline, a clean pale body with a dark belly line and head, 3.4 x 2.4 |
+| Harbour: sea N fails at level 3; the flip cancels the mirror | Kit: `shore.fits`, `shore.fit`, `shore.first`. Ships slide towards the shore until their sails fit; the lighthouse takes the first spot with room (mole bend, other mole bend, mole roots, land). The flip is gone |
+| Boat size 0.7 against the guide's 0.55 | 0.7 is right for a fishing boat; 0.55 is the small boat on the beach. Guide and kit text changed |
+| Salt coverage low | In the band on the margin hex (20 / 38 / 62%) |
+| Salt's own `at` and `quad` | Now in the kit as `shore.at` and `shore.rect` |
+| Mines: moss and snow patches gone | Pass |
+
+### Kit, guide and tool changes in this round
+
+- `kit.py`: the sheep; `Shore.at`, `rect`, `fits`, `fit`, `first`; `Piece.claim` and the ring wall's claim;
+  `mirror_gates(..., variant)`. Sheets that changed for it: grazing (sheep), settlements and castles in the kit
+  contract's footprint row. Everything else is pixel-equal apart from the module fixes named above.
+- `GUIDE.md`: coverage on the margin hex with bands; the margin for corners and on the water; `x=`, `on=` and `p.m`
+  in the mirror; boat and sheep sizes; tall things on a coast (the fit calls); all eight sea sides in the checklist;
+  the add-on anchored at the shore; the mine's wheel race.
+- `overview.py` shows every piece in its wild land, eight winter rows and a bottom block (layouts and mirror for
+  wheat and grazing; harbour and salt on four sea sides; the add-on). `contract.py` re-run.
+- `compose.py` (the in-map test) now places **every family**: see `../pieces_in_map/notes.md`, round 3.
+
+### What the in-map test showed this time
+
+Vineyards and olives on the hills, grazing and timber in the foothills, two mines in the Alps, castles at Giovi, at
+the Col di Tenda and in the Susa valley, salt south of Pisa, two fishing villages, and Genoa, Pisa, Savona, Nice and
+Chiavari as town plus harbour add-on. It reads as one countryside; no family looks pasted on. Four things for the
+map's side:
+
+1. **A port's hex has too little water** (10-20 px; the basin needs about 25). The add-on is therefore anchored at
+   the shore, not at the hex centre, and reaches into the sea hex next door. Recommended as the rule.
+2. **Mountains hide pieces.** Relief rule K had to be applied for real: range samples in or up to 30 px in front of
+   a footprint are dropped (39 of them), or both mines and the Tenda tower vanish behind peaks.
+3. **Pass names sit on the castle** (Giovi). Names and pieces need one placing rule when names are designed.
+4. **The castle mound is grass green** also on rock. A mound should take the map's ground colour (a kit change for
+   the next round: the mound as an overlay).
+
+### Remaining work, for a later round
+
+- Second layouts for olives, salt, mines, harbour, settlements and castles (on the 5 x 4 blocks of the variants
+  sheets these six still show mirror-only repeats; salt and harbour most of all).
+- Castle mound and settlement green as ground overlays (point 4 above).
+- Grazing level 2: one more small paddock would lift it from 34% into the middle of its band.
+- A water depth per level for coast modules (`REACH`, beside `NEED`), so the map can tell a full harbour from a
+  jetty before it draws.
+- Stronger spring ground tone (still open from round 1), tried on the map.
+- Vineyard layout 1 and timber: a few px of ground overlay inside the margin at one corner (15 and 27 px of area):
+  trim when the modules are next opened.
+
+## Verdict in one paragraph (round 1, kept as the record)
 
 The families are one hand: the same ink, light, house and tree sizes, and each has its own colour and pattern. No
 piece leaves the hex (the kit's check prints nothing for all 192 pieces). **Five families pass with small fixes, five
@@ -95,7 +178,8 @@ For the planning session, not made (the map's side, for when the real map is bui
 
 ## 4. Fix tasks
 
-Six tasks. **Tasks 1 and 2 are done.** Tasks 3 to 6 are open, share no file and can run in parallel:
+Six tasks. **All six are done** (tasks 3 to 6 came back and were reviewed in round 2, above). The briefs are kept
+as the record:
 
 | Task | Files | What |
 |---|---|---|

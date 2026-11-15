@@ -37,7 +37,7 @@ LAYOUT = [
             (-22, -22, 14, 10, 0, 5, 3, 2),
             (22, -22, 14, 10, 0, 5, 3, 2),
         ],
-        track=[(-12, 11), (-10, 20), (-6, 32), (-5, 41)],
+        track=[(-12, 11), (-10, 20), (-6, 32), (-5, 38)],
     ),
     dict(
         hut=(12, -18),
@@ -54,10 +54,10 @@ LAYOUT = [
             (-12, 26, 14, 10, 0, 5, 3, 2),
             (13, 26, 14, 10, 0, 5, 3, 2),
         ],
-        track=[(11, 2), (8, 12), (3, 22), (-2, 32), (-5, 41)],
+        track=[(11, 2), (8, 12), (3, 22), (-2, 32), (-5, 38)],
     ),
 ]
-GATES = {"south": (-5, 41)}                           # the track ends here in both layouts; the map's road layer carries it on
+GATES = {"south": (-5, 38)}                           # the track ends here in both layouts; the map's road layer carries it on
 
 
 def corners(b):
