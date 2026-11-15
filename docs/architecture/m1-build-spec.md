@@ -479,3 +479,26 @@ Against `docs/design/map/style-frame/` and the side-by-side, tile kind by tile k
   trial; the goldens of T16 guard it.
 - **One hex of knowledge:** a coast tile cannot know hexes two steps away. Bands wider than 25 px, or a wobble over
   10 px, would break the joins. The Python test of section 10 guards it.
+
+## 14. Owner's decision (2026-11-15): build M1 on the trial look; polish the look later
+
+The owner saw the round-1 side-by-side and decided not to spend more time on the look now: M1 is built on the trial
+look as it is (good enough to play on), and the look gets its own **map look milestone** later (after a few game
+systems, before the first public release): the real shoreline drawn as chunk meshes (Genoa's bay and the capes back),
+ranges along crest chains, a ground shader blending covers by a splat texture with slope shading, trees one by one,
+bridges and today's road style. **T0 is replaced by this decision** (no art-director sign-off gate in M1).
+
+So that the later look work is a drawing job only, `MapData` (T1, T6) **also stores** the data it will need:
+
+```gdscript
+@export var shoreline: Array[PackedVector2Array]   # the real coast lines in km (the style frame's coast, carved
+                                                   # ports included), closed or ending at the map edge
+@export var height_grid: PackedInt32Array          # metres on a fine raster: HEIGHT_GRID_STEP samples per hex width
+@export var height_grid_size: Vector2i             # raster width x height in samples
+@export var height_grid_origin_km: Vector2         # km of sample (0, 0); sample spacing = hex_w_km / HEIGHT_GRID_STEP
+const HEIGHT_GRID_STEP := 4
+```
+
+Crest chains are the `crest` edges (already stored); rivers keep their drawn course in `rivers`. `validate()` checks
+the shoreline is consistent with `land` (a land hex's centre is inside the land side) and the raster covers the map;
+`digest()` includes the new fields.
