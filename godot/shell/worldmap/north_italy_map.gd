@@ -10,7 +10,8 @@
 ## standing thing, wild or built, back to front by the y of its foot. A wild tree whose foot lies in a piece's
 ## footprint is left out, and so are a rounded hill in a hex that takes a piece and a peak in front of a footprint.
 ##
-## Keys: 1 to 4 the season, R a new seed, V the unnamed villages on or off, F the whole map, H the panel; drag or WASD to move, the wheel to zoom.
+## Keys: 1 to 4 the season, R a new seed, V the unnamed villages on or off, G the hex grid, F the whole map, H the panel;
+## drag or WASD to move, the wheel to zoom.
 ## Shell only: what stands where is the core's answer; this file looks pictures up and puts them down.
 class_name NorthItalyMap
 extends Node2D
@@ -52,6 +53,7 @@ var _exact: Dictionary[String, Dictionary] = {}  # "c,r,family" -> the placement
 var _textures: Dictionary[String, Texture2D] = {}
 var _images: Dictionary[String, Image] = {}
 var _land: Image = null
+var _grid: HexGridLayer = null
 var _dragging := false
 var _wfc_ms := 0.0
 var _fps_shown := 0.0
@@ -77,9 +79,29 @@ func _ready() -> void:
 		_title.text = "North Italy map: the baked art is missing"
 		_stats_label.text = _error + "\nBake it with tools/worldmap/godot_bake/bake.py, then import the project."
 		return
+	_add_grid()
 	_run_wfc()
 	_rebuild()
 	frame_all()
+
+
+## The hex grid layer, just above the rivers and roads (the Overlay) and under the shadows and standing things.
+func _add_grid() -> void:
+	_grid = HexGridLayer.new()
+	_grid.name = "HexGrid"
+	add_child(_grid)
+	move_child(_grid, _overlay.get_index() + 1)
+	var centres: Array[Vector2] = []
+	for row: Variant in _hex_rows:
+		var at := _vec(_dict(row).get("centre_px", null), Vector2(-1.0, -1.0))
+		if at.x >= 0.0:
+			centres.append(at)
+	_grid.set_hexes(centres, TILT)
+
+
+func set_grid_visible(value: bool) -> void:
+	if _grid != null:
+		_grid.visible = value
 
 
 # ----- what the tools and the keys call -----------------------------------------------------------------------------
@@ -172,6 +194,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				frame_all()
 			KEY_H:
 				set_hud_visible(not _hud.visible)
+			KEY_G:
+				set_grid_visible(_grid != null and not _grid.visible)
 
 
 func _process(delta: float) -> void:
@@ -621,5 +645,5 @@ func _write_hud() -> void:
 	lines.append("%d wild things, %d cleared for pieces" % [int(stats["wild_shown"]), int(stats["wild_dropped"])])
 	if int(stats.get("missing_pictures", 0)) > 0:
 		lines.append("%d pieces have no picture in the bake" % int(stats["missing_pictures"]))
-	lines.append("1-4 season   R new seed   V villages   F whole map   H hide")
+	lines.append("1-4 season   R new seed   V villages   G grid   F whole map   H hide")
 	_stats_label.text = "\n".join(lines)
