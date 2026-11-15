@@ -1,336 +1,435 @@
-# Hexa in Godot: the architecture of the whole game (draft for the owner, 2026-11-15)
+# Hexa in Godot: the architecture (decided, 2026-11-15)
 
-Technical director. **Status: a plan for the owner to decide. Nothing in the code changes with this document.**
+Technical director. **Status: the standard.** This page replaces the options draft of the same name and the technical
+appendix of `docs/roadmap/godot-port-plan.md` (Parts B2 and B3). Where an older page disagrees, this one wins.
+Nothing in the code changes with this document; the changes arrive milestone by milestone (section 9).
 
-Since the restart in Godot we have designed the map and its art in depth, but never laid out how the whole game is
-put together. This page does that. It replaces the technical appendix of `docs/roadmap/godot-port-plan.md` wherever the
-two disagree (that plan was written for a port; we are restarting). It keeps the lessons of the Python review
-(`review-2026-11-12.md`) and the layout rules in `godot/README.md`.
+The engineering questions are answered here, not asked. Each section says **what we do**, **why it is the Godot
+way**, and **what it means in practice**. Only three questions are left for the owner, all about the game (section 10).
 
-How to read it: section 1 is where we stand, section 2 is the target, section 3 is the eight big decisions with a
-recommendation each, section 4 is the road to a first playable slice, section 5 is the five questions for you.
+**What the owner decided (2026-11-15):**
 
----
-
-## 1. Where we are, honestly
-
-### 1.1 What exists
-
-| Thing | Where | State | Verdict |
-|---|---|---|---|
-| The Python game, v0.2.2 | `hexa/` | Frozen. Complete game, about 800 tests | **Reference only.** A source of rules, numbers and lessons |
-| Game designs | `docs/design/` (battle, tech tree, sieges, war goals, castle areas, crown projects, prices, city states...) | Written for the Python game's map (57 km provinces, one sprite per level) | **Keep the ideas, re-fit each one** to the district map when its turn comes |
-| Map design | `docs/design/map/` 00 to 06 | Decided: 28 km hexes, real heights, rivers on edges, one city one hex, 2D, the growing map | **The base of everything below** |
-| Godot project skeleton | `godot/` on `master`: layers, lint (`tools/lint_godot.py`), GUT tests, CI (`.github/workflows/godot.yml`), seeded luck (`core/rng.gd`) | Working, enforced in CI | **Keep.** This is the best part of the 0.3.0 work |
-| The 0.3.0 map builder | `godot/core/mapgen/`, `core/state/`, `core/views/`, `shell/map/`, `data/maps/europe_1480.json` | Builds all of Europe on the **old** map model: 203 x 150 hexes of 57 km, rivers through hexes, Kenney tiles | **Superseded** by the map decisions. See decision (c) |
-| The new map core | branch `map-proto`, `godot/core/worldmap/` (grid, heights, relief, water, cover, places, roads, improvements), about 4,900 lines with about 2,500 lines of tests | Works for one region (north Italy, about 150 hexes on screen). Follows the core rules (no engine calls, seeded luck, check/action pairs) | **Keepable**, after a tidy-up |
-| The playable map scene | `map-proto`, `godot/shell/worldmap/north_italy_map.gd` (956 lines) | Seasons, select, build, upgrade, clear. One file that loads data, runs the generator, draws, handles input and builds the panel | **Prototype.** It proved the idea; it is not the game's map view |
-| The art | `map-proto`, `tools/worldmap/` in Python: `style_frame/`, `pieces/` (`kit.py` and 16 families), `godot_bake/`; about 12,700 lines | Owner-approved look. Baked to PNG atlases and JSON, 23 MB for the one region | **The look is keepable; the pipeline is not, as it stands.** See decision (a) |
-
-### 1.2 The two Godot code lines
-
-`master` holds the 0.3.0 port code. `map-proto` was branched from it and adds the new map beside the old one, so
-today there are **two maps in one project**: two hex grids (`core/hexgrid.gd` and `core/worldmap/world_grid.gd`), two
-generators, two views, two sets of baked art (`assets/baked/` with Kenney tiles and `assets/worldmap/`). Only one of
-them matches your decisions. Nothing of the game itself exists in either: no countries that act, no economy, no
-armies, no turns, no saves.
-
-### 1.3 Technical debt and risks
-
-1. **The baked map does not scale to Europe.** The bake stores the ground of the region as whole pictures
-   (`base_<season>.png`, `ground_<season>.png`) and every wild tree and hill as a line in a list (`wild.json`: 3,268
-   objects for 148 hexes). Europe at 28 km is about 122,000 hexes. At the same detail the ground alone would be a
-   picture of about 42,000 x 23,000 pixels **per season** (several gigabytes in memory), and the object list would
-   pass half a gigabyte. This cannot ship, least of all on web or mobile. The **pieces** (farms, towns, castles) are
-   different: they are reusable, and all six season sets fit in six small atlases (about 4 MB). They scale fine.
-2. **The game state is fed by the art.** `WorldImprove.build()` reads its hex table from the bake's `meta.json`. So
-   the rules depend on a picture file made by Python. It must be the other way round: the map data comes first and
-   both the rules and the art read it.
-3. **Python is still needed to make art.** Two languages, and any art change needs a 40 second bake and a commit of
-   binary files. The one-language goal is not met yet.
-4. **Rule tables live in code.** Which family may stand where, the pair rules and the weights are constants in
-   `world_improve.gd`. The Python review's lesson was: numbers in data files.
-5. **Two files are over our own size limit** (1,200 lines): `world_water.gd` (1,370) and `world_improve.gd` (1,272,
-   which mixes the puzzle solver, the rules and the player's build actions). And the prototype scene repeats the
-   Python game's biggest fault, "the app does everything".
-6. **Unmeasured at Europe size:** drawing 122,000 hexes at every zoom, and one AI season of path searches. The hex
-   size is only confirmed for Europe after both are measured (your decision of 2026-11-14).
-7. **The game designs assume the old map.** Castle areas, sieges, prices and the tech tree speak of provinces,
-   works and buildings. The district model (one main use, levels) changes their inputs. This is design work, not
-   code, but it sits on the critical path.
+- **Windows only.** Web and phones are not requirements. We only avoid things that would block them later.
+- **The 0.3.0 Godot map is retired** (the 57 km Europe, the Kenney tiles, its builder). The new map from the
+  `map-proto` branch (28 km districts, the pieces) is the map.
+- **The Python game v0.2.2 (`hexa/`) is the gameplay reference.** It was the last working game. We rebuild what it
+  did in Godot, system by system. It is a guide to what each system must do, not code to copy line by line.
+- **Step by step.** No big first slice. A row of small milestones, each adding one system, each playable and tested
+  before the next starts.
 
 ---
 
-## 2. The target architecture
+## 1. Where we are
 
-### 2.1 The picture
+| Thing | Where | Verdict |
+|---|---|---|
+| Python game v0.2.2 | `hexa/` | Frozen. **The reference** for rules, numbers and lessons |
+| Game designs | `docs/design/` | Ideas kept. Each is re-fitted to districts when its milestone comes |
+| Map design | `docs/design/map/` 00 to 06 | **The base:** 28 km hexes, real heights, rivers on edges, one city one hex, 2D, the growing map |
+| Project skeleton | `godot/` on `master`: layers, lint, GUT, CI, seeded luck | **Kept.** The best part of the 0.3.0 work |
+| 0.3.0 map and builder | `core/mapgen`, `core/state`, `core/views`, `shell/map`, `data/maps/europe_1480.json`, `assets/baked` | **Retired** (section 8) |
+| New map core | `map-proto`: `core/worldmap/` (about 4,900 lines, 2,500 of tests) | **Kept**, tidied and moved into the layers below |
+| Prototype scene | `map-proto`: `shell/worldmap/north_italy_map.gd` (956 lines, does everything) | **Replaced** in M1 by the map view of section 3 |
+| The art | `map-proto`: `tools/worldmap/` in Python (kit, 16 families, style frame, bake) | **Look kept. Bake changed** from whole-map pictures to a tileset (section 3.4) |
+
+The game itself does not exist in Godot yet: no countries that act, no economy, no armies, no turns, no saves.
+
+**The three faults this standard removes:**
+
+1. **The bake cannot reach Europe.** It stores the ground as one picture per season and every wild tree as a line
+   in a list (3,268 objects for 148 hexes). Europe is about 122,000 hexes: a picture of about 42,000 x 23,000 pixels
+   per season. Reusable tiles fix this.
+2. **The rules are fed by the art.** The build rules read their hex table from a file the art bake wrote. It must
+   be the other way round: map data first; rules and art both read it.
+3. **The scene does everything.** One script loads, generates, draws, handles input and builds the panel. That is
+   the Python game's old fault. Layers fix this.
+
+---
+
+## 2. The shape of the game
 
 ```
-        tools (offline, headless)                     the game (runtime)
-  geography facts + elevation data            +-----------------------------------+
-            |                                 |  shell/   Godot nodes             |
-            v                                 |   app  screens  hud  panels  ui   |
-   map builder (core/mapgen) ---> map file -->|   mapview  input                  |
-                                 (committed)  +-----------------^-----------------+
-  art source ---> piece atlases (committed) ->|     reads state | sends actions,  |
-                                              |     hears events| never writes    |
-                                              +-----------------|-----------------+
-                                              |  core/   plain GDScript, no nodes |
-                                              |   views   what to draw (lists)    |
-                                              |   ai      picks actions           |
-                                              |   game    Game, season, events,   |
-                                              |           saves                   |
-                                              |   systems rules: one per topic    |
-                                              |   state   the map and the world   |
-                                              |   data    numbers from JSON       |
-                                              +-----------------------------------+
+   shell/   Godot nodes: what you see and click
+            map view, HUD, panels, screens, input, the two autoloads
+              | reads state, sends actions, hears events       (never writes state)
+   ---------------------------------------------------------------------------
+   core/    plain GDScript, no nodes, runs without a window
+            views    "what to draw" as plain lists
+            ai       picks actions for a country
+            game     Game, the action table, the season table, events, saves
+            systems  the rules, one file per topic
+            state    the facts of one game
+            defs     the definitions (Resource classes)
 ```
 
-**The one-way rule:** a file may use files of its own layer or a lower one, never a higher one. Order, bottom to
-top: `data`, `state`, `systems`, `game`, `ai`, `views`, then `shell`. `mapgen` sits beside `systems` and is used by
-tools and by "new random world" only. The lint already checks this on every pull request.
+**The one-way rule:** a file may use its own layer or a lower one, never a higher one. Bottom to top: `defs`,
+`state`, `systems`, `game`, `ai`, `views`, `shell`. `mapgen` sits beside `systems` and runs only in tools. The lint
+checks this on every pull request.
 
-### 2.2 What each layer owns
+**Node, RefCounted or Resource?** One rule for every new class:
 
-| Layer | Owns | Must never |
-|---|---|---|
-| **data** (`core/data/`, `godot/data/*.json`) | Every number and table: goods, improvement families and levels, costs, build times, terrain rules, units, countries, AI temperaments. Loaded once, checked against a schema, read-only afterwards | Hold a number in code that a designer may want to change |
-| **state** (`core/state/`) | The facts of one game, as plain objects with `to_dict` / `from_dict`. No rules | Compute, draw, or read files |
-| **systems** (`core/systems/`) | The rules, one file per topic: `improve`, `economy`, `growth`, `movement`, `battle`, `siege`, `diplomacy`, `research`... Each is a set of functions that take the game as a parameter | Use another system's private parts, the shell, or luck outside `rng.gd` |
-| **game** (`core/game/`) | `Game` (the one object that holds the state), the **season phase table**, the event bus, saves, the digest | Contain rules of its own |
-| **ai** (`core/ai/`) | Choosing actions for a country, inside a time budget | Change state except through actions |
-| **views** (`core/views/`) | "What should be drawn": for a chunk of map or a panel, a plain list of sprites, lines and texts. Testable without a window | Touch nodes or textures |
-| **mapgen** (`core/mapgen/`) | Building a map from facts: heights, water, cover (WFC), places, roads, the 1480 improvements (WFC), checks | Run during play |
-| **shell** (`godot/shell/`) | Everything with nodes: the window, the map view, the UI kit and theme, panels, screens, input, sound, file reads and writes | Change state directly, or hold game rules |
+| It is... | Use | Examples | Lives in |
+|---|---|---|---|
+| Designed ahead, the same in every game | **Resource** (`.tres`), read-only in play | A family and its levels, a good, a unit type, a country's start, the fixed map, the TileSets, the Theme | `core/defs/` (classes), `data/` (files) |
+| Changing during a game | **RefCounted** (plain object) or a packed array | `Game`, the living map, `Country`, `Army`, `War` | `core/state/`, `core/game/` |
+| Seen or clicked | **Node** (a scene) | Map layers, army tokens, panels, buttons | `shell/` |
 
-### 2.3 The map is the heart of the game state
-
-The growing map makes each hex a district, so the map is not scenery: it **is** the save game. Two parts:
-
-- **The fixed map (`MapBase`).** Never changes in play; comes from the map file. Per hex: land or sea, height,
-  ground cover at the start, climate, fertility, ore, shelter. Per **edge** (stored once, both hexes read it): river,
-  coast type, crest, pass. Per place: name, the river-city facts.
-- **The living map (`MapState`).** Changes in play; goes into the save. Per hex: owner, controller, `main_use`
-  (family), `level`, settlement level, castle level, harbour level, the one-step cover change (woods thinned, marsh
-  drained), damage, people. Per edge: road level and crossing (ford, bridge). Plus the works in progress.
-
-Around it: `Country` (treasury, research, relations), `Army`, `War`, `Market`, the calendar (year, season) and the rng
-state. **Storage:** packed arrays indexed by hex number, not dictionaries of objects. At 122,000 hexes this is the
-difference between a few megabytes and hundreds, and between fast and slow saves.
-
-**One owner per attribute** (kept from the Python rules): each system file lists the state fields it writes in
-`OWNS`; a test fails if two systems write the same field or a field has no owner.
-
-### 2.4 How a change happens
-
-1. **Check/action pairs.** Every thing a player can do is two functions in its system: `build_check(game, ...)`
-   returns yes or a reason; `build(game, ...)` does it. The UI shows the reason on a greyed button. The AI and the
-   tests call the very same pair. (`WorldImprove` already works this way.)
-2. **Events, not polling.** A system that changes something the player should notice emits an event
-   (`hex_changed`, `work_finished`, `war_declared`, `battle_fought`). The map view redraws only the hexes named (a hex
-   and its ring of six; a city and its second ring). The log, the floating texts and the sounds listen to the same
-   events. Event handlers never change the state, and events are never saved.
-3. **The season pipeline.** "End season" runs one table, in one place (`core/game/season.gd`, `PHASES`): for example
-   AI orders, movement and battles, sieges, works progress, people's growth, production and trade, prices, income
-   and upkeep, research, weather and the new season, autosave. The order is data you can read in one screen, and
-   nothing else may run the season (the Python game had three copies).
-4. **Determinism.** All luck comes from one seeded `Rng`, with separate streams for the world, the AI and pure
-   decoration, so a cosmetic change never alters a battle. Same seed and same actions give the same game, on every
-   PC. A short **digest** (a fingerprint of the whole state) proves it in tests.
-
-### 2.5 Map generation: offline and at runtime
-
-- **Offline, committed:** the Europe 1480 map is built by a headless tool from the geography facts and the
-  elevation data, checked (every river reaches the sea, every road a town), and written to one map file. CI rebuilds
-  it and fails if it differs. Players never wait for it and never get a different Europe.
-- **At runtime:** only "new random world" runs the generator, with a progress bar. In play nothing is re-solved:
-  the neighbour rules are used as a checklist for build actions (as `06-growing-map.md` says).
-
-### 2.6 View, UI and input
-
-- **Map view:** the map is cut into **chunks** (blocks of about 16 x 16 hexes). `core/views` says what is in a
-  chunk; the shell draws it once and keeps it until an event marks it changed. Three detail levels by zoom (far,
-  normal, close) from the same data.
-- **UI:** one kit (`shell/ui/`: button, panel, row, tooltip, modal) and one Theme. Panels are scenes laid out with
-  containers, never hand-placed pixels, so they fit a phone later. A panel reads the game, shows it, and calls actions.
-- **Input:** one controller turns mouse, keys and later touch into intents ("select hex", "order build"). Panels
-  and the map never read the mouse for game meaning themselves.
-- **Size limits** (kept): a file over 800 lines needs a reason, over 1,200 it is split; a function over 60 lines
-  needs a reason, over 100 it is split. Checked by a test.
+The test for a Node: **delete every node, rebuild the screen from `Game`, and nothing is lost.** Nodes hold no
+facts. This is what makes the game testable without a window and saves simple.
 
 ---
 
-## 3. The big decisions
+## 3. The map, the Godot way
 
-### (a) The art pipeline
+### 3.1 The backbone: TileMapLayer
 
-| Option | What | For | Against | Cost |
-|---|---|---|---|---|
-| A. Keep as is | Python draws everything; whole-map pictures and object lists are baked | Nothing to build; the look is exact | **Cannot reach Europe** (1.3 point 1); every change needs Python and a bake | None now, a dead end later |
-| B. Port everything to Godot now | Rewrite the kit, 16 families and the style frame (12,700 lines) in GDScript; draw at runtime or bake in Godot | One language; small download | Months of re-drawing art you already approved; every piece must be re-approved; drawing all pieces at start is slow on web and phones | Very high |
-| **C. Hybrid (recommended)** | **Pieces stay baked** from Python into atlases (they are reusable and small). **The ground is composed in Godot** from the map data: ground textures by cover, relief shading from the heights, rivers, coasts and roads as drawn lines, wild trees and hills placed by a fixed rule per hex instead of a list. The far zoom is one small prepared picture per season | Reaches Europe; small download (tens of MB, not gigabytes); local redraw when a hex grows; art you approved is kept as it is | The ground look must be rebuilt in Godot and matched to the style frame (art director signs off side by side); Python stays for pieces for now | Medium: one focused piece of work |
+**Decision:** the map is a stack of `TileMapLayer` nodes that share one hex grid. The TileSet has tile shape
+*hexagon*, layout *stacked*, offset axis *horizontal*: pointy-top hexes with odd rows shifted half a hex right. That
+is our own odd-r grid, so a hex `(col, row)` in the rules is cell `(col, row)` on screen with no conversion. A test
+pins that Godot's `map_to_local` / `local_to_map` and `core`'s grid agree for every hex.
 
-**Recommendation: C.** Python becomes a pure piece factory with a frozen contract (`pieces/index.json`); it never
-again sees a map. Porting the piece kit to Godot (to reach one language) is a later, separate decision, taken when
-the piece list has settled.
+**Why:** this is the engine's own tool for grids. It draws tiles in batches ("rendering quadrants" of 16 x 16
+cells), draws only what the camera sees, sorts tall things by depth, and finds the hex under the mouse. We write
+none of that. A cell costs a few bytes, so **the map's size costs almost nothing; memory is the atlas**, and the
+atlas is the same size for north Italy and for Europe.
 
-### (b) The world map at Europe scale
+**In practice:** the cell size is fixed in whole pixels (about 104 x 102 at the play zoom, the present art's size
+with its 0.85 tilt). The TileSet is the truth for sizes; the art bake follows it.
 
-Europe at 28 km is a grid of about 406 x 300, **about 122,000 hexes**, perhaps 40,000 to 50,000 of them land (to be
-counted by the builder).
+### 3.2 The stack, bottom to top
 
-- **Committed, built offline:** heights per hex (derived from the elevation data; the raw data stays outside the
-  repo), the map file (hexes, edges, places, roads, the 1480 improvements, owners). Estimated 1 to 2 MB packed.
-- **Computed at start (under a second):** neighbour tables, the movement graph, distance-to-town fields.
-- **Computed when first seen, then cached:** the chunk pictures. About 6 to 12 chunks are on screen at the play
-  zoom; a bounded cache keeps a few dozen and drops the oldest.
-- **Levels of detail:** *far* = one prepared picture per season plus country colours and names; *normal* = chunks
-  with ground, lines and pieces; *close* = the same chunks with the extra detail pieces, only for what is on screen.
-
-**Options:** build for Europe from day one (slow start, nothing to play for months); build only for one region and
-scale later (fast, but the Python game showed that scaling late hurts); **recommended: play on one region, but
-measure on a full-size fake Europe early** (a generated 122,000-hex map, phase 2). Budgets to prove: a frame under
-16 ms at every zoom; textures under about 300 MB (the web limit decides); an AI season within its budget. If a
-budget fails we know before the game is built on it, and the fallback (about 40 km hexes) changes numbers, not code.
-
-### (c) The 0.3.0 port code and the map-proto core
-
-| Option | What | For | Against |
+| # | Layer | Node | Filled from |
 |---|---|---|---|
-| Keep both | Leave the two maps side by side | No work now | Two grids, two generators; every worker must ask "which one?" |
-| Adapt the 0.3.0 builder | Teach `core/mapgen` the new model | Keeps the all-Europe data flow | It is built round 57 km provinces and rivers through hexes; more work than replacing it |
-| **Replace (recommended)** | Merge `map-proto` into `master`. `core/worldmap` becomes the map generator and model. Retire the 0.3.0 builder, its Europe file, `shell/map` and the Kenney bake, each in a small step with the tests green | One map, one grid, one truth | The all-Europe 28 km map must be built anew (it is needed anyway) |
+| 1 | Sea and coast | `TileMapLayer` | Sea tiles; on a land hex beside sea, a coast tile picked by which of its six sides are sea (63 shapes) |
+| 2 | Ground cover | `TileMapLayer` | One tile per hex by cover (farmland, grass, woods, marsh, rock, snow, tundra, sand), a few variants each |
+| 3 | Relief shading | `TileMapLayer`, multiply blend | One shade tile per hex by slope direction and steepness, from the heights |
+| 4 | Piece ground | `TileMapLayer` | The flat part of a built piece: fields, yards, town ground |
+| 5 | Rivers, roads, borders | One drawn node per chunk (32 x 32 hexes) | Lines from edge data (3.3) |
+| 6 | Standing things | A **y-sorted group**: `TileMapLayer`s for wild decor (trees, hills, peaks) and for pieces (a back and a front band), plus the army tokens | Decor tile by cover and density; piece tile by family, level, variant |
+| 7 | Country colour, fog | `TileMapLayer`s with one white hex tile, tinted per country | Owner per hex; what the player has seen |
+| 8 | Highlights and selection | `TileMapLayer` and one cursor sprite | Move range, build targets, the selected hex |
+| 9 | Names | Labels, only for what is on screen | Places, countries |
 
-**Kept from the 0.3.0 work:** the project skeleton and rules, the lint, CI, GUT, `rng.gd`, the geography data
-(coasts, rivers, cities, countries), the projection, the game data exports (goods, units, countries as starting
-values), the "map file that rebuilds byte for byte" idea, the speed and start-up probes, the contact sheet tool.
+Notes on the Godot features used:
 
-### (d) Save format and versioning
+- **Ground blending (layer 2).** Ground tiles are drawn a little larger than the cell with a soft edge, and each
+  cover has a rank (the tile's z-index), so woods spill softly onto grass, grass onto sand. We do **not** use
+  TileSet terrain sets for cover: on hexes they need a tile for every mix of neighbours, and eight covers make
+  thousands. Terrain-style matching is used only where the count is small: the coast (63 shapes).
+- **Depth (layer 6).** The group and its layers have `y_sort_enabled`. Each tall tile carries its own
+  `texture_origin` (where the picture sits on the hex) and `y_sort_origin` (where its foot is), so a tower overlaps
+  the hex behind it and is hidden by the trees in front. Army tokens are small scenes in the same group, so they
+  sort with the trees.
+- **Seasons.** Every layer has four TileSets with the **same atlas layout**; a season change swaps the TileSet. No
+  cell is touched. Winter differs by climate (snow, frost, mild): that is three atlas sources, and a hex's climate
+  picks the source. Only the current season's textures are in memory.
+- **A change in play** (a farm built, a town grown) is a few `set_cell` calls on the hex and its ring. Godot
+  redraws only the quadrants touched.
+- **Far zoom.** Past a set zoom the tile layers are hidden and one small picture is shown instead, made at runtime
+  from the map data (a few pixels per hex: cover, relief, country colour). All of Europe is one draw.
 
-- **Recommended: a snapshot.** Line 1 is a small header (country, year, format number, the map's id and hash) that
-  the load screen reads. The body is compressed data from each state class's `to_dict`: the living map as packed
-  arrays, countries, armies, wars, the rng state. The fixed map is not saved; it is named by id and hash.
-- **Versioning:** one format number; each bump adds one small upgrade function; a missing field gets its default.
-  A test saves, loads and saves again (equal files), and plays on from a load (equal digest).
-- **Promise:** saves may break until the first public Godot release; from then on old saves keep loading, with a
-  check in CI against saves kept from each release.
-- **Alternative:** a replay (start, seed and the list of actions). Tiny and perfect for bug reports, but any rule
-  change breaks every save. Recommended only as an **optional action log** beside the snapshot, for debugging.
+### 3.3 Things on edges: rivers, roads, borders
 
-### (e) The AI's place
+Rivers run along hex edges, roads cross them, borders follow them. An edge is not a cell, so tiles do not fit.
 
-- **The AI is a player.** It reads the state through the same queries as the panels and acts only through the
-  same check/action pairs, at the same costs. No cheats in code; any handicap is a number in data.
-- **Its own thinking budget.** AI work is cut into small slices run over several frames with a "thinking" marker,
-  not on a second thread (threads are limited on the web). A budget per season is part of the performance tests.
-- **Its own luck stream**, so changing how the AI thinks never changes battle dice.
-- **Temperaments in data** (trading republic, border duchy), as the growing-map design asks.
-- **AI-only games without a window are our main test rig**: hundreds of seasons in CI find crashes and runaway
-  snowballing long before a player does.
+**Decision:** `core/views` turns the edge data of a chunk into plain lists of lines (points, width, kind). One
+`Node2D` per chunk draws them in `_draw()`. Godot keeps the drawn result until we ask for a redraw; a new road
+redraws one chunk. We do not use one `Line2D` node per river: Europe would need tens of thousands of nodes.
+Bridges, fords and pass marks are small tiles in the standing group.
 
-### (f) Testing and CI
+### 3.4 What changes in the Python bake
 
-| Check | What it proves | When |
+The Python art code stays (kit, families, the approved look). **What it writes changes.**
+
+| Today | The standard |
+|---|---|
+| Whole-map ground pictures per season | **Ground tiles:** per cover, per season, a few variants, hex-sized with a soft edge |
+| Relief shading painted into the picture | **Shade tiles:** direction x steepness, about 20 tiles |
+| Coast drawn along the real shoreline | **Coast tiles:** 63 shapes x season, with a hand-drawn wobble |
+| A list of 3,268 placed trees and hills | **Decor tiles:** per cover x density (full, thinned, none) x variant x season; hill and peak tiles by relief level |
+| Pieces in atlases with a JSON index | **Piece tiles:** per family x level x season/climate x variant x mirror, as ground + back band + front band. Almost the same as today |
+| Rivers and roads painted into the picture | Not baked. Drawn at runtime from the data (3.3) |
+| Bake reads the region and its layout | Bake never sees a map. Its output is a TileSet: reusable anywhere |
+
+The bake writes the atlases and one index; a Godot tool builds the `.tres` TileSets from the index (origins, sort
+points, custom data), so nobody sets a thousand tile properties by hand. A new region, or all of Europe, needs **no
+new bake**. The tileset is expected to stay in the tens of megabytes; M1 measures it.
+
+### 3.5 What TileMapLayer cannot do, and what we do instead
+
+| Limit | Workaround | Cost |
 |---|---|---|
-| Lint, import with warnings as errors, script load | Layers, no engine calls in core, typed code | Every pull request (exists) |
-| GUT unit tests | Each rule does what its design says | Every pull request (exists) |
-| Rule properties | Things that must always hold: every check/action pair agrees, no negative treasury without debt, every river reaches the sea, one owner per attribute | Every pull request |
-| Determinism digest | Same seed, same actions, same game; refactors change no behaviour | Every pull request |
-| Map rebuild | The committed map file is what the builder makes | Pull requests touching the map (exists) |
-| Save round trip and old saves | Saves work and keep working | Every pull request, once saves exist |
-| Golden screenshots | The look did not change by accident (compared with a small tolerance, on one fixed CI machine) | Pull requests touching art or views |
-| Performance budget | Frame time per zoom, AI season time, start-up, memory, on the full-size test map | Nightly, and before each release |
-| Soak and bands | Long AI-only games: no crash, and wars, wealth and growth stay inside expected ranges | Nightly |
+| One tile per cell per layer | Pieces are cut into ground, back band and front band on three layers | Depth inside one hex is in two steps, not per tree. Fine at this size |
+| No "hide the trees under this building" | **Thinning is a data step.** The decor tile of a hex is chosen from what stands there: wild hex = full, built hex = thinned or none (set per family). When you build, the rules' event changes the decor cell | Trees no longer vanish one by one under a footprint; they thin per hex |
+| Tiles follow hexes, the old shoreline did not | Coast tiles follow the hex edges with a drawn wobble. A special harbour (Genoa's bay) is a piece variant | **A look change.** The art director signs it side by side with the style frame before M1 closes |
+| No tile on an edge | Drawn chunk lines (3.3) | None |
+| A mountain range crossing many hexes | Peak and ridge tiles per hex, oversized so neighbours join | The range is built from parts; needs art care |
+| Shadows of overlapping tiles add up | Shadows go in their own layer drawn as one group with a fixed strength | None visible |
+| No smooth per-cell animation | Things that move (armies, floating texts) are scenes, not tiles | None |
 
-A refactor never rides with a behaviour change: refactor pull requests must keep the digest and the goldens identical.
+### 3.6 The map editor is the Godot editor
 
-### (g) Folders and names
+A `@tool` scene shows a map file on the same layers. The owner paints **data layers** (cover, owner, main use and
+level, places) with Godot's normal tile tools and inspects any hex; a button writes the result back to the map
+file and runs the checks. Heights, rivers and roads come from the map builder at first; an edge tool comes when
+needed. The picture layers are never painted by hand: they always follow the data.
+
+---
+
+## 4. Data, the Godot way
+
+### 4.1 Definitions: Resources you edit in the inspector
+
+**Decision:** every table a designer may want to change is a custom `Resource` class in `core/defs/` with typed
+`@export` fields, saved as `.tres` in `data/`: `FamilyDef` (levels, costs, build time, where it may stand, its
+tiles), `GoodDef`, `UnitDef`, `CountryDef`, `TerrainDef`, `TechDef`, `AiTemperDef`. One `GameDefs.tres` lists them
+all; it is loaded once and is read-only afterwards.
+
+**Why:** the Godot inspector becomes the data editor for free: typed fields, drop-downs, pickers, undo. `.tres` is
+text, so changes show in a review.
+
+**In practice:** each class has `validate()`; a test loads every file and fails with the file and field on a bad
+value. No number that a designer may change lives in code. The JSON exported from Python (goods, units, buildings,
+countries) is turned into `.tres` when its milestone comes. Bulk geography (coast polygons, place names) stays JSON:
+it is input for the map builder, not something to edit in an inspector.
+
+### 4.2 The map file
+
+The fixed map is one Resource, `MapData`: packed arrays indexed by hex number (land or sea, height, starting
+cover, climate, fertility, ore), packed arrays per edge (river, coast, crest, pass), and the places. It is built by
+a headless tool from the geography and the heights, checked (every river reaches the sea, every road a town) and
+committed. CI rebuilds it and compares a digest.
+
+### 4.3 The living game: plain objects
+
+One `Game` object (RefCounted) owns everything that changes:
+
+- `MapState`: packed arrays per hex (owner, controller, main use, level, settlement, castle and harbour level,
+  cover change, damage, people) and per edge (road level, crossing), plus works in progress.
+- `Country`, `Army`, `War`, `Market` objects, the calendar, the luck state.
+
+Packed arrays, not a dictionary of hex objects: at 122,000 hexes it is the difference between a few megabytes and
+hundreds, and between fast and slow saves.
+
+**One owner per attribute** (kept from Python): each system file lists the state fields it writes in `OWNS`. A
+test fails if two systems write one field or a field has no owner.
+
+### 4.4 Two autoloads, both in the shell
+
+| Autoload | Job |
+|---|---|
+| `Session` | Holds the current `Game`. New game, load, save, `act(...)`, `end_season()`. The only door from the shell to the rules |
+| `Events` | The bus: one typed Godot signal per event kind (`hex_changed`, `work_finished`, `war_declared`, `battle_fought`...) |
+
+`core/` never reads an autoload. Rules append events to a plain queue on `Game`; `Session` empties it after each
+action and each season phase and emits the signals. So a handler never runs in the middle of a rule, and a game
+without a window simply never drains to nodes.
+
+### 4.5 UI
+
+Panels and screens are scenes laid out with containers and one Theme, built from one kit (`shell/ui/`: button,
+panel, row, tooltip, modal). A panel reads the game, shows it, and calls `Session.act`. One input controller turns
+mouse and keys into intents ("select hex", "order build"); panels and the map never read the mouse for game meaning.
+
+---
+
+## 5. How the game runs
+
+### 5.1 Actions: check and do
+
+Everything a player can do is a pair in its system: `build_check(game, ...)` returns yes or a reason;
+`build(game, ...)` checks again and does it. The UI shows the reason on a greyed button.
+
+**Decision:** every pair is registered by name in one table (`core/game/actions.gd`), and everything goes through
+`Game.act(name, args)`: the UI, the AI and the tests. One door means one place to log. The action log beside the
+seed replays a whole game, which is how bugs are reported and how determinism is tested.
+
+### 5.2 Events, not polling
+
+A rule that changes something the player should notice adds an event. The map view changes only the cells named;
+the log, floating texts and sounds hear the same events. Handlers never change the game. Events are never saved.
+
+### 5.3 The season: one table
+
+"End season" runs one ordered table in one file (`core/game/season.gd`, `PHASES`), and nothing else may run the
+season. The table grows by one row or two per milestone. The full order, taken from v0.2.2 and adjusted:
+
+| # | Phase | Arrives in |
+|---|---|---|
+| 1 | AI orders | M8 |
+| 2 | Movement, then battles | M6, M7 |
+| 3 | Supply and attrition | M6 |
+| 4 | Sieges and occupation | M7 |
+| 5 | War timeouts, peace offers | M9 |
+| 6 | Works progress (building, upgrades) | M3 |
+| 7 | Production, trade, prices | M4, M10 |
+| 8 | Income and upkeep, debt | M4, M12 |
+| 9 | People and growth | M5 |
+| 10 | Research | M11 |
+| 11 | Countries that are gone, scores | M12 |
+| 12 | Calendar: next season, weather | M3 |
+| 13 | Ready units, vision | M6 |
+| 14 | Autosave | M3 |
+
+A test pins the names in order. To change the order, change the table and the test in one pull request.
+
+### 5.4 Luck and determinism
+
+All luck comes from `core/rng.gd`, with three separate streams: the world, the AI, decoration. A cosmetic change
+never alters a battle. The streams' states are saved. Stored amounts (money, people, goods) are whole numbers.
+Lists are walked in a fixed order (by id), never by memory address. **Same seed and same actions give the same
+game**, and a short digest (a fingerprint of the whole state) proves it in tests.
+
+### 5.5 Saves
+
+**Decision: our own snapshot, not Godot Resource saves.** A Resource file can carry a script that runs on load, so
+a save passed between players could run code; and it ties the file to class names, which makes old saves fragile.
+
+- Line 1: a small JSON header (country, year, format number, the map's id and digest) for the load screen.
+- Body: one dictionary of plain values and packed arrays (each state class's `to_dict`), written with Godot's
+  binary variant format with objects switched off, compressed.
+- The fixed map is not saved; it is named by id and digest. A debug option writes the body as JSON for reading.
+- One format number. Each bump adds one small upgrade function; a missing field gets its default.
+- Tests: save, load, save again gives equal files; playing on from a load gives the same digest.
+- Saves may break between builds until the first public Godot release. From then on old saves keep loading, and CI
+  checks it against saves kept from each release.
+
+### 5.6 The AI is a player
+
+The AI reads the state through the same queries as the panels and acts only through `Game.act`, at the same costs.
+No cheats in code; any handicap is a number in a `.tres`. Temperaments are data. Its thinking is cut into slices
+over several frames on the main thread (no threads in `core/`, which also keeps the web possible later), with a
+time budget per season that the performance test checks. **AI-only games without a window are the main test rig.**
+
+---
+
+## 6. Testing: how a change is proven safe
+
+| Check | Proves | When |
+|---|---|---|
+| Lint, import with warnings as errors, script load | Layers, no engine calls in `core/`, typed code | Every pull request (exists) |
+| GUT unit tests | Each rule does what its build spec says | Every pull request (exists) |
+| Definition checks | Every `.tres` loads and passes `validate()` | Every pull request |
+| Rule properties | Check and action always agree; one owner per attribute; every river reaches the sea | Every pull request |
+| Determinism digest | Same seed and actions, same game; a refactor changed nothing | Every pull request |
+| Map rebuild | The committed map is what the builder makes | Pull requests touching the map |
+| Save round trip, old saves | Saves work and keep working | Every pull request, from M3 |
+| Golden screenshots | The look did not change by accident (fixed machine, software renderer, small tolerance) | Pull requests touching art, tiles or views |
+| Performance | Frame time per zoom, season time, start-up, memory, on a full-size test map | Nightly and before each release |
+| Soak | Long AI-only games: no crash; wealth, wars and growth stay in expected ranges | Nightly, from M8 |
+
+**Budgets (Windows):** a frame under 16 ms at every zoom on the 122,000-hex test map; an AI season within its
+budget. **A refactor never rides with a behaviour change:** a refactor pull request keeps the digest and the
+goldens identical.
+
+**Size limits (kept):** a file over 800 lines needs a reason, over 1,200 it is split; a function over 60 lines
+needs a reason, over 100 it is split. A test checks it.
+
+---
+
+## 7. Folders and names
 
 ```
 godot/
   core/     rng.gd  hexgrid.gd
-            data/  state/  systems/  game/  ai/  views/  mapgen/
-  shell/    app/  screens/  mapview/  hud/  panels/  ui/  input/
-  data/     rules/ (families, costs, goods, units, ai)   geography/   maps/
-  assets/   pieces/ (baked atlases)   ground/ (small textures)   ui/   fonts/
+            defs/  state/  systems/  game/  ai/  views/  mapgen/
+  shell/    app/  autoload/ (session.gd, events.gd)  map/  hud/  panels/  screens/  ui/  input/  editor/
+  data/     defs/ (*.tres)   geography/ (*.json)   maps/ (MapData)
+  assets/   tiles/ (atlases and TileSets per season)   ui/   fonts/
   tests/    core/  shell/  fixtures/  goldens/
-  tools/    build_map.gd  perf probes  contact sheets
-tools/      Python: the piece factory only (worldmap/pieces, the bake), lint
+  tools/    build_map.gd  build_tileset.gd  perf probes
+tools/      Python: the tile bake (the art kit and families), the lint
 docs/       architecture/  design/  roadmap/  testing/
 ```
 
-Names: files `snake_case.gd`, one class per file with the same name in `PascalCase`; a system file is named for its
-topic (`economy.gd`); actions are `verb_check` / `verb`; events are past tense (`work_finished`); data keys are the
-same words the design docs use (`main_use`, `level`). The region name never appears in a class name
-(`NorthItalyMap` becomes the map view plus a map file).
+Files are `snake_case.gd`, one class per file with the same name in `PascalCase`. A system is named for its topic
+(`economy.gd`). Actions are `verb_check` / `verb`. Events are past tense (`work_finished`). Data keys are the words
+the design docs use (`main_use`, `level`). No region name in a class name: north Italy is a map file, not a class.
 
-### (h) Keeping design docs, data and code in step
-
-1. **A number lives in exactly one place: a data file.** Design docs give starting values and name the file and key.
-2. **Tables in docs are printed from the data** by a tool (the player's rules page included), so they cannot drift.
-3. **Every data file has a schema test**: a typo or a missing key fails CI, with the file and line.
-4. **Every feature has a build spec** written from its design: the state fields and their owner, the actions, the
-   events, the data keys, the tests, and "done when". Workers build from the spec, reviewers check against it.
-5. **A design change after approval** edits the design doc first, then the data or the spec, then the code, in one
-   pull request where possible. The structure rules live in `CLAUDE.md` and `godot/README.md` and change only with a
-   technical director review.
+**Docs, data and code in step:** a number lives in one place, a `.tres`. Tables in docs (and the player's rules
+page) are printed from the data by a tool. Every feature has a **build spec** written from its design: the state
+fields and their owner, the actions, the events, the definitions, the tests, and "done when". Workers build from the
+spec; reviewers check against it.
 
 ---
 
-## 4. The road to a first playable slice
+## 8. Retiring the 0.3.0 code and merging map-proto
 
-**The slice:** north Italy, two or three countries (for example Milan, Venice and Genoa), seasons, build and
-upgrade districts, basic money, armies that move, one war with a simple end. Small, but every layer of section 2
-exists in it, so everything after is "more of the same", not new structure.
+Small steps, CI green after each, nothing lost (the planning session tags `master` before step 1).
 
-| Phase | What | Done when |
+| Step | What | Done when |
 |---|---|---|
-| **0. One code line** | Merge `map-proto`; retire the 0.3.0 builder, its map file, `shell/map` and the Kenney bake; one hex grid; lint and size test cover everything | `master` has one map; lint, GUT and CI green; the prototype scene still shows the same picture (golden) |
-| **1. The map model and file** | `MapBase` and `MapState`; a headless builder writes the region's map file from geography and heights (not from the art bake); `world_improve.gd` split into solver (mapgen), rule tables (data) and actions (systems); `Game`, digest | The game state builds with no art files present; rebuild is byte-identical; digest test in CI |
-| **2. The map view at scale** | Chunked map view; ground composed in Godot; pieces from atlases; seasons; local redraw on events; the full-size fake Europe for measuring | Art director signs the side-by-side with the style frame; frame under 16 ms at every zoom and textures under budget on the 122,000-hex test map. **This is the measurement that confirms 28 km for Europe** |
-| **3. The turn** | Calendar, season phase table, event bus, countries and ownership, treasury, works that cost money and take seasons, income and upkeep from districts, save and load | 40 seasons played by hand; save, quit, load gives the same digest |
-| **4. The UI kit and HUD** | Theme, kit, top bar, district panel with build options and reasons, end-season button, log fed by events | Every action reachable by mouse; no panel reads the mouse or writes state itself (lint) |
-| **5. Armies and one war** | Armies, movement costs (river edges, passes, winter), a simple battle and siege, occupation, declare war and make peace | A war can be started, fought and ended by hand; rule tests and properties green |
-| **6. The AI plays** | AI countries build, move and fight through the same actions, inside the thinking budget | 100 AI-only games of 80 seasons with no crash; AI season time inside budget |
-| **7. The slice release** | Windows build, your playtest, fixes | You play 40 seasons against the AI with no blocker |
+| R1 | Merge `map-proto` into `master` as it is. Two maps side by side for a moment | Lint, GUT, CI green |
+| R2 | The main scene opens the new map. Delete `shell/map/`, the old `core/views/` files, `assets/baked/` (the Kenney bake) and their tests | The game starts on the new map; a golden of it is stored |
+| R3 | Delete the 0.3.0 builder: `core/mapgen/*`, `core/state/` stubs, `data/maps/europe_1480.json`, `data/map_reference.json`, the builder rules file, the map count, report and probe tools | Nothing refers to them; CI green |
+| R4 | One grid: `core/worldmap/world_grid.gd` becomes `core/hexgrid.gd`; the old one goes. Delete `prototypes/closeup3d/` (the map is 2D) | One hex grid in the project |
+| R5 | Move `core/worldmap/` into the layers: generators to `core/mapgen/`, the model to `core/state/`. Split the two files over the limit (`world_water.gd`; `world_improve.gd` into solver, rule definitions and build actions) | Size test passes with no exceptions; digest unchanged |
+| R6 | Update the lint to the layers of section 2, and `CLAUDE.md` and `godot/README.md` to this page (two autoloads, Resources). Mark the port plan's appendix as replaced | Docs and lint agree with this page |
 
-**What runs in parallel.** Phases 1 and 2 run side by side once the view's input (the "what to draw" lists) is
-agreed. Phases 3 and 4 run side by side. Design runs ahead of code the whole time: the district economy (how
-levels become goods and money), the slice's army and war rules, and the UI mockups must be approved before phases
-3, 4 and 5 start. The all-Europe 28 km map build can start after phase 2, beside the game work.
-
-**Who does what.** Fable and Opus design: this architecture, each feature's design and its build spec, the
-interfaces between layers, and the reviews. Sonnet and Haiku workers build: one task per brief, with the files they
-may touch, the tests to add and the "done when" line. The lint, the size limits, the digest and the goldens are
-what make this safe: a worker cannot quietly cross a layer or change behaviour. Good worker tasks: one system file
-with its tests, one panel from a mockup, one data table with its schema, one family's rules. Kept with the senior
-models: `Game`, the season table, the save format, the chunk view's design, and anything that changes an interface.
+**Kept from 0.3.0:** the skeleton, lint, CI, GUT, `rng.gd`, the projection (`geo.gd`), the geography JSON, the
+exported goods, units, buildings and countries (starting values for M4, M6 and M2), the speed probe, the contact
+sheet tool, and the rule "the committed map is what the builder makes". **`hexa/` stays in the repository, frozen,**
+with its CI guard: it is the reference.
 
 ---
 
-## 5. Questions for the owner
+## 9. The roadmap: one system at a time
 
-1. **How do we make the art reach all of Europe?** *Recommended: the hybrid* (pieces stay drawn in Python and baked;
-   the ground is composed in Godot from the map data). Or keep everything baked (cannot reach Europe), or port all
-   drawing to Godot now (months, and every piece re-approved).
-2. **May we retire the 0.3.0 map (the 57 km Europe and its builder) and make the map-proto core the one map?**
-   *Recommended: yes*, keeping the project skeleton, the checks and the geography data. Or keep both for now.
-3. **Is the first playable slice right?** *Recommended: north Italy, two or three countries, seasons, build and
-   upgrade, basic money, armies, one war, an AI that plays*, with Europe measured on a fake full-size map in phase 2
-   and built afterwards. Or all of Europe first (nothing to play for much longer).
-4. **Do we design for the web and phones from the start?** *Recommended: yes for the budgets* (memory under about
-   300 MB of textures, no threads in the rules, panels that reflow), *Windows only for the builds* until the slice
-   is fun. Or Windows only in everything (cheaper now, a costly retrofit later).
-5. **May saves break between builds until the first public Godot release?** *Recommended: yes.* The state will
-   grow with every phase; from the first public release old saves keep loading and CI checks it.
+Every milestone ends with a Windows build the owner can play, its tests in CI, and a short owner playtest. The
+next one does not start before that. Play area: north Italy until the Europe track switches it (below).
 
-## 6. Risks and what is not settled
+**Who does what, every milestone:** *Fable* writes the build spec and the interfaces (state fields, actions,
+events, definitions) and reviews. *Opus* (game and systems designers) re-fits the design to districts and sets the
+numbers. *Sonnet* workers build systems and anything touching `Game`, saves or the season table. *Haiku* workers
+build panels from mockups, `.tres` data, and tests from a list. The "Build" column names the split per milestone.
 
-- **The ground look in Godot** (decision a) is the riskiest single item: the approved style frame must be matched
-  by a new compositor. Guard: phase 2 starts with one chunk, side by side, before anything else is built on it.
-- **Europe at 28 km is still unmeasured.** Phase 2 measures it; the fallback is a larger hex, which changes data.
-- **The older game designs need re-fitting** to districts (economy first). This is the likeliest thing to hold up
-  phase 3, so it should start now.
-- **Numbers in this page** (chunk size, memory budget, land hex count, file sizes) are estimates until measured.
-- Not covered here: sound, localisation, Steam integration, random worlds beyond the generator's place. Each gets
-  a short note when it nears.
+| M | Adds | Reference in v0.2.2: keep / improve | Done when | Design / Build |
+|---|---|---|---|---|
+| **M0** | One code line (section 8, R1 to R6) | none | One map, one grid; all checks green; same picture as before | Fable plan / Sonnet |
+| **M1** | **The map on the standard.** Tileset bake, the layer stack, far zoom, seasons as a look, select, build, upgrade, clear (today's prototype, rebuilt) | `mapview.py`: keep redraw-only-what-changed. Improve: the engine does the caching | Art director signs side by side with the style frame; under 16 ms at every zoom on a fake 122,000-hex map; build rules read `MapData`, not the bake | Fable + art director / Sonnet (view, bake), Haiku (family `.tres`, tests) |
+| **M2** | **Countries.** Owners, borders, colours, names, pick your country, country panel, the editor's data layers | `worldgen.build_countries`, `state.Country`: keep tags and starts. Improve: owner per hex, not per province | Three or more countries on the map; borders follow ownership; you can only build at home | Opus (who owns what in 1480) / Sonnet, Haiku (panel, data) |
+| **M3** | **Time.** Calendar, end season, the phase table, events and log, works take seasons, save and load, autosave | `game.py` `end_season`, `systems/season.py` `PHASES`, `saves.py`, `events.py`: keep one table, one bus. Improve: snapshot instead of pickle | 40 seasons by hand; save, quit, load gives the same digest | Fable / Sonnet |
+| **M4** | **Economy.** Goods from districts, treasury, taxes, upkeep, build costs, top bar and ledger | `systems/economy.py`, `building.py`: keep the income preview and "one job a season". Improve: district levels replace building slots; numbers in `.tres` | Building choices change your income; the ledger explains every ducat; no money from nowhere (property test) | Opus (district economy) / Sonnet (system), Haiku (ledger, data) |
+| **M5** | **People.** Population per district, food, growth and decline, towns that grow a level | `economy.grow`, `split_food`: keep food drives growth. Improve: growth shows on the map as pieces level up | A fed region grows over 40 seasons and a starved one shrinks, inside set ranges | Opus / Sonnet, Haiku |
+| **M6** | **Armies.** Recruit, upkeep, movement (river edges, passes, winter), supply, the army panel, move animation | `military.py`, `movement.py`, `supply.py`, `terrain.py`, `replay.py`: keep the path search, stack limit, supply. Improve: rivers are edges, so crossings are clear rules | Raise an army, march it across the Po and a pass; it starves out of supply; season time in budget | Opus (re-fit) / Sonnet (movement, supply), Haiku (panel) |
+| **M7** | **War.** Declare war, battles, sieges, occupation, a simple peace | `war.py`, `battle.py`, `combat.py`, `battleview.py`: keep lanes and days (battle slice 1) and the read-only battle view. Improve: castles are districts with levels | A war can be started, fought and ended by hand against a passive enemy | Opus (re-fit battle and siege docs) / Sonnet, Haiku (battle panel) |
+| **M8** | **AI.** Countries build, grow, raise armies and fight, through the same actions | `campaign/ai.py`: keep "the AI is a player". Improve: time slices, temperaments in data, soak from day one | 100 AI-only games of 80 seasons with no crash; the owner loses a war at least once | Fable (AI frame) + Opus (temperaments) / Sonnet |
+| **M9** | **Diplomacy and peace.** War goals, war score, peace terms, relations, anti-steamrolling | `war.py` `war_score`, `peace`; `war-goals-and-peace.md`, `stop-steamrolling.md`: keep the approved designs | Wars end by terms, not exhaustion; soak shows no runaway winner | Opus / Sonnet, Haiku (peace screen) |
+| **M10** | **Trade.** Markets, routes, merchants, reactive prices | `systems/trade.py`, `reactive-prices.md`: keep markets and routes. Improve: per the owner's trade decisions of 2026-11-13 | Prices move with supply; a trade route changes a town's income | Opus / Sonnet, Haiku |
+| **M11** | **Research.** The four-branch, three-era tree, era gates, idea cards | `systems/research.py`, `tech-tree.md`: keep the approved tree | Techs change rules through definitions only; an era passes in play | Opus / Sonnet (system), Haiku (tech screen) |
+| **M12** | **A whole game.** Debt and bankruptcy, countries that fall, score and end, menus, options, sound | `debt.py`, `season.py` scores, `screens/`: keep | Start to 1650 with no blocker: **the first public Godot release on Windows** | Fable + Opus / Sonnet, Haiku |
+
+**The Europe track, beside the milestones.** E1 (inside M1): measure on a fake full-size map. E2 (after M3): build
+the real 28 km Europe map file from the geography and heights. E3 (after M8): measure an AI season on it, then
+switch the play area. If a budget fails, the fallback is a larger hex, which changes data, not code.
+
+**After M12, in an order the owner picks:** ships and sea war, exploration and fog of discovery, colonies, random
+worlds, city states, crown projects, achievements.
+
+---
+
+## 10. Questions for the owner
+
+Only game and scope. The recommendation is first.
+
+1. **When a v0.2.2 rule and the new district map disagree, which wins?** Example: v0.2.2 has provinces with
+   building slots; the new map has one district per hex with one main use and levels.
+   *Recommended: the district map wins.* v0.2.2 gives the list of systems and the feel; each design is re-fitted.
+   Or: keep v0.2.2's rules exactly and group hexes into provinces (less design work, but the growing map loses its point).
+2. **How long do we play on north Italy before Europe?** *Recommended: through M8,* with the Europe map built
+   beside (track E) and switched in once the AI's speed is measured on it. Or: Europe from M2 (everything is slower
+   to build and test, but you see the whole map early).
+3. **What is in the first public Godot release (M12)?** *Recommended: land game only:* no ships, no exploration,
+   no colonies; they follow as their own milestones. Or: add ships and sea trade before release (v0.2.2 had them;
+   about two more milestones).
+
+## 11. Risks and what is not settled
+
+- **The tile look must match the approved style frame** (ground blending, tile coast, thinned trees, ranges from
+  parts). Riskiest item. Guard: M1 starts with one screen, side by side, signed by the art director before the rest.
+- **Europe at 28 km is still unmeasured.** E1 measures drawing in M1; E3 measures the AI.
+- **The district economy is design work on the critical path** for M4. It should start during M1.
+- **Numbers here are estimates until measured:** tileset size, cell size, tile counts, chunk size.
+- **Godot details to confirm in M1 with a test, not by reading:** that *stacked* layout shifts odd rows right as
+  our grid does, and that y-sorting across several layers in one group orders tall tiles as needed.
+- Not covered: sound, localisation, Steam integration. Each gets a short note when it nears.
