@@ -1,0 +1,73 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://shell/worldmap/north_italy_map.gd" id="1_map"]
+[ext_resource type="Script" path="res://shell/worldmap/world_sprite_layer.gd" id="2_layer"]
+[ext_resource type="Shader" path="res://shell/worldmap/land_clip.gdshader" id="3_clip"]
+[ext_resource type="Shader" path="res://shell/worldmap/shadow_cover.gdshader" id="4_shadow"]
+
+[sub_resource type="ShaderMaterial" id="mat_clip"]
+shader = ExtResource("3_clip")
+
+[sub_resource type="ShaderMaterial" id="mat_shadow"]
+shader = ExtResource("4_shadow")
+
+[sub_resource type="LabelSettings" id="label_title"]
+font_size = 18
+
+[node name="NorthItalyMap" type="Node2D"]
+script = ExtResource("1_map")
+
+[node name="Ground" type="Sprite2D" parent="."]
+centered = false
+
+[node name="PieceGround" type="Node2D" parent="."]
+material = SubResource("mat_clip")
+script = ExtResource("2_layer")
+
+[node name="CoastGround" type="Node2D" parent="."]
+script = ExtResource("2_layer")
+
+[node name="Overlay" type="Sprite2D" parent="."]
+centered = false
+
+[node name="ShadowGroup" type="CanvasGroup" parent="."]
+self_modulate = Color(1, 1, 1, 0.18)
+
+[node name="Shadows" type="Node2D" parent="ShadowGroup"]
+material = SubResource("mat_shadow")
+script = ExtResource("2_layer")
+
+[node name="Standing" type="Node2D" parent="."]
+script = ExtResource("2_layer")
+
+[node name="Camera" type="Camera2D" parent="."]
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="Margin" type="MarginContainer" parent="Hud"]
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+
+[node name="Panel" type="PanelContainer" parent="Hud/Margin"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Box" type="VBoxContainer" parent="Hud/Margin/Panel"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Hud/Margin/Panel/Box"]
+layout_mode = 2
+text = "North Italy"
+label_settings = SubResource("label_title")
+
+[node name="Stats" type="Label" parent="Hud/Margin/Panel/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+
+[node name="Fps" type="Label" parent="Hud/Margin/Panel/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
