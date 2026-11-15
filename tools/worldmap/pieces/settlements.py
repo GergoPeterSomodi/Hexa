@@ -17,6 +17,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
+import landmarks
 
 LEVELS = range(1, 6)
 NAMES = {1: "hamlet", 2: "village", 3: "town", 4: "walled town", 5: "city"}
@@ -137,14 +138,14 @@ def ring_arcs(cx, cy, a, b, rot, n=96):
     return pts[:n // 2 + 1], pts[n // 2:] + [pts[0]]
 
 
-def rot_wall(p, cx, cy, a, b, rot, kind, towers=(), back_towers=(), height=4.0):
+def rot_wall(p, cx, cy, a, b, rot, kind, towers=(), back_towers=(), height=4.0, col=None):
     """kit.wall for a ring turned in the plan. The kit's own wall is an upright ellipse; this one is drawn from
     outline points. The geometry is worked out unmirrored and every point is turned round when the piece is
     mirrored (the kit moves a standing thing, it cannot turn a lopsided ring), so the whole ring is queued with
     x=0 (no move of its own). Returns (front handle, the gate point, the right-most point)."""
     front, back = ring_arcs(cx, cy, a, b, rot)
     m = p.m
-    col = kit.STONE if kind == "stone" else kit.TIMBER
+    col = col or (kit.STONE if kind == "stone" else kit.TIMBER)
     hw = height
     gi = max(range(len(front)), key=lambda q: front[q][1])              # the gate: the lowest point of the front
     gate = front[gi]
@@ -198,7 +199,7 @@ def rot_wall(p, cx, cy, a, b, rot, kind, towers=(), back_towers=(), height=4.0):
     return h, gate, max(front, key=lambda q: q[0])
 
 
-def draw(level, season, variant=0, mirror=False):
+def draw(level, season, variant=0, mirror=False, landmark=None):
     p = kit.Piece(season, ground="grass", seed=2, mirror=mirror)
     L = LAYOUT[variant]
     gates = GATES[variant]
@@ -210,6 +211,11 @@ def draw(level, season, variant=0, mirror=False):
     else:
         n, rx, ry, wall = SPEC1[level]
     grey = (204, 198, 188)
+    lmk = landmark if (landmark and level >= 4) else None   # a famous city: its monument stands in place of the church
+    wcol = landmarks.WALL.get(lmk)                            # ... and may colour the ring wall (None: the usual)
+    capcol = lmk in landmarks.CAPS
+    mx, my = lx - 1, ly + 6                                   # the church's spot (the monument is drawn round it)
+    box = None if lmk is None else landmarks.CLEAR[lmk][level]
     # ---- ground plane
     if level <= 2:                                    # the village green in front of the well or chapel: kept clear of the map's trees
         p.blob(lx, ly + 7, 26, 14, kit.ROAD if not p.winter else grey, alpha=0.3)
@@ -255,14 +261,29 @@ def draw(level, season, variant=0, mirror=False):
         back = {3: (), 4: (), 5: (0.3, 0.7)}[level]
         hh = 3.4 if wall == "palisade" else 4.0
         if variant == 0:
-            p.wall(cx, cy + 1, rx, ry, wall, towers=towers, gate=0.5, back_towers=back, height=hh)
+            p.wall(cx, cy + 1, rx, ry, wall, towers=towers, gate=0.5, back_towers=back, height=hh, col=wcol)
             gx, gy = cx, cy + 1 + ry
         else:
-            _, (gx, gy), _ = rot_wall(p, cx, cy, rx, ry, ROT1, wall, towers, back, hh)
+            _, (gx, gy), _ = rot_wall(p, cx, cy, rx, ry, ROT1, wall, towers, back, hh, col=wcol)
+        if capcol:                                    # pointed caps on the towers of a landmark city's wall (Moscow)
+            if variant == 0:
+                fr = kit.ring_points(cx, cy + 1, rx, ry, 0, math.pi)
+                bk = kit.ring_points(cx, cy + 1, rx, ry, math.pi, 2 * math.pi)
+                fl = (lambda a: 1 - a) if p.m < 0 else (lambda a: a)
+                fspots = [fr[int((len(fr) - 1) * fl(a))] for a in towers]
+                bspots = [bk[int(len(bk) * fl(a))] for a in back]
+            else:
+                fa, ba = ring_arcs(cx, cy, rx, ry, ROT1)
+                fspots = [(p.m * fa[int((len(fa) - 1) * a)][0], fa[int((len(fa) - 1) * a)][1]) for a in towers]
+                bspots = [(p.m * ba[int(len(ba) * a)][0], ba[int(len(ba) * a)][1]) for a in back]
+            landmarks.caps(p, lmk, [(q[0], q[1], hh + 3.0) for q in bspots], 4.0, 2.4)
+            landmarks.caps(p, lmk, [(q[0], q[1], hh + 3.5) for q in fspots], 4.8)
         if level >= 4:                                # the gate tower: taller at the city (banners belong to castles)
-            gt = p.tower(gx, gy + 0.7, 5.0, 8.5 if level == 4 else 10.0, kit.STONE, "battlement")
+            gt = p.tower(gx, gy + 0.7, 5.0, 8.5 if level == 4 else 10.0, wcol or kit.STONE, "cone" if capcol else "battlement")
             p.stand(gy + 0.8, lambda pen: pen.rect(gx - 1.5, gy - 2.6, 3.0, 3.0, kit.DOOR, None), on=gt)
     for i, (x, y) in enumerate(sites[:n]):
+        if box and mx + box[0] <= x <= mx + box[2] and my + box[1] <= y <= my + box[3]:
+            continue                                  # no house under or beside the monument
         thatch = level == 1 or (level == 2 and i % 2 == 1)
         tall = level >= 4 and i % 4 == 0              # a few taller houses in the walled places
         big = level == 5 and i % 3 == 1
@@ -270,9 +291,13 @@ def draw(level, season, variant=0, mirror=False):
                 kind="ridge" if (i * 29 % 7) < 4 else "gable", roof="thatch" if thatch else "tile", smoke=(i % 3 == 0))
     if level == 5:
         for i, (x, y) in enumerate(suburb):
+            if box and mx + box[0] <= x <= mx + box[2] and my + box[1] <= y <= my + box[3]:
+                continue
             p.house(x, y, 6.6, 4.2, 3.2, wall=i + 2, kind="ridge" if i % 2 else "gable", smoke=(i == 1))
     # the landmark of the level, always at the same place
-    if level == 1:
+    if lmk:
+        landmarks.draw(p, lmk, level, mx, my)
+    elif level == 1:
         well(p, lx + 1, ly + 5)
     elif level == 2:
         p.church(lx - 1, ly + 5, "chapel")
