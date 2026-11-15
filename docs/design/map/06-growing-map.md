@@ -3,6 +3,12 @@
 Game designer. **Status: a plan and ideas for the owner to decide. Nothing is built.** All numbers are starting
 values for the systems designer and belong in data files, not in code. Read `README.md` in this folder first.
 
+> **Owner's decision (2026-11-15): one city, one hex, drawn inside it.** Every settlement belongs to exactly one hex and
+> is drawn entirely inside that hex at every zoom (Genoa at most about half its hex, harbour included). A growing city
+> fills more of its own hex and never spills over the border. Each hex is one district with one main use and a stage;
+> its fields, woods and landmarks stay inside it. The close zoom is built hex by hex from the same data as the normal
+> map (coast, rivers, roads), so what you own, upgrade or capture is exactly what you see.
+
 The owner's idea: *"start from a plain map and the map is to be changed over time as the fields are upgraded OR
 villages, towns and cities are raised instead. The terrains should remain somewhat similar but improved with whatever
 the player wants to put there."*
