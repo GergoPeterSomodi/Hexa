@@ -11,7 +11,8 @@
 ## footprint is left out, and so are a rounded hill in a hex that takes a piece and a peak in front of a footprint.
 ##
 ## Keys: 1 to 4 the season, R a new seed, V the unnamed villages on or off, G the hex grid, F the whole map, H the panel;
-## drag or WASD to move, the wheel to zoom.
+## drag or WASD to move, the wheel to zoom. A left click selects a hex (outline and a panel of what is on it); a right
+## click or Esc clears it.
 ## Shell only: what stands where is the core's answer; this file looks pictures up and puts them down.
 class_name NorthItalyMap
 extends Node2D
@@ -30,6 +31,16 @@ const TILT := 0.85
 ## A peak is left out when a footprint lies under its foot or this many px behind it (compose.py, relief rule K).
 const RANGE_FRONT: Array[float] = [0.0, 10.0, 20.0, 30.0]
 const SEA_COLOUR := Color("#3f7fae")
+const NO_HEX := Vector2i(-9999, -9999)
+## A press that moves less than this many screen px before it is let go is a click (it selects), not a drag.
+const CLICK_SLOP := 6.0
+## The words for a level, per family (docs/design/map/pieces/GUIDE.md section 8); goods not listed use STAGE_WORDS.
+const LEVEL_WORDS := {
+	"settlements": ["", "hamlet", "village", "town", "walled town", "city"],
+	"castles": ["", "watchtower", "castle", "fortress"],
+	"harbour": ["", "fishing jetty", "quay", "port"],
+}
+const STAGE_WORDS: Array[String] = ["wild", "first stage", "second stage", "third stage"]
 
 ## The folder of the bake (with the last slash). A tool may point it at another bake before the scene enters the tree.
 var art_dir: String = DEFAULT_DIR
@@ -54,6 +65,13 @@ var _textures: Dictionary[String, Texture2D] = {}
 var _images: Dictionary[String, Image] = {}
 var _land: Image = null
 var _grid: HexGridLayer = null
+var _select: HexSelectLayer = null
+var _info_panel: PanelContainer = null
+var _info_title: Label = null
+var _info_text: Label = null
+## The selected hex, or NO_HEX.
+var selected: Vector2i = NO_HEX
+var _press_at := Vector2.ZERO
 var _dragging := false
 var _wfc_ms := 0.0
 var _fps_shown := 0.0
@@ -80,6 +98,7 @@ func _ready() -> void:
 		_stats_label.text = _error + "\nBake it with tools/worldmap/godot_bake/bake.py, then import the project."
 		return
 	_add_grid()
+	_add_selection()
 	_run_wfc()
 	_rebuild()
 	frame_all()
@@ -97,6 +116,123 @@ func _add_grid() -> void:
 		if at.x >= 0.0:
 			centres.append(at)
 	_grid.set_hexes(centres, TILT)
+
+
+## The selection outline (over everything on the map) and the hex panel on the right of the screen.
+func _add_selection() -> void:
+	_select = HexSelectLayer.new()
+	_select.name = "Selection"
+	add_child(_select)
+	move_child(_select, _standing.get_index() + 1)
+	_select.clear()
+	var margin := MarginContainer.new()
+	margin.name = "InfoMargin"
+	margin.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	margin.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hud.add_child(margin)
+	_info_panel = PanelContainer.new()
+	_info_panel.custom_minimum_size = Vector2(280.0, 0.0)
+	_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(_info_panel)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info_panel.add_child(box)
+	_info_title = Label.new()
+	_info_title.add_theme_font_size_override("font_size", 18)
+	box.add_child(_info_title)
+	_info_text = Label.new()
+	_info_text.add_theme_font_size_override("font_size", 13)
+	box.add_child(_info_text)
+	_info_panel.visible = false
+
+
+## The hex under a map pixel, or NO_HEX: the hex whose squashed outline holds the point (the nearest centre wins).
+func hex_at(map_px: Vector2) -> Vector2i:
+	var best := NO_HEX
+	var best_d := INF
+	for row: Variant in _hex_rows:
+		var r := _dict(row)
+		var centre := _vec(r.get("centre_px", null), Vector2(-1e9, -1e9))
+		var d := map_px - centre
+		d.y /= TILT
+		var dist := d.length()
+		if dist < best_d:
+			best_d = dist
+			best = Vector2i(int(r.get("c", 0)), int(r.get("r", 0)))
+	return best if best_d <= 60.0 else NO_HEX
+
+
+## Select a hex (NO_HEX clears the selection) and show what is on it.
+func select_hex(hex: Vector2i) -> void:
+	if hex == NO_HEX or not _row_of.has(hex):
+		selected = NO_HEX
+		_select.clear()
+		_info_panel.visible = false
+		return
+	selected = hex
+	_select.select(centre_of(hex), TILT)
+	_write_info()
+
+
+func _write_info() -> void:
+	if selected == NO_HEX:
+		return
+	var row := _row_of[selected]
+	var place := _dict(row.get("place", null))
+	var piece: Dictionary = improve.piece_at(selected) if improve != null else {}
+	var title := str(place.get("name", "")) if not place.is_empty() and str(place.get("name", "")) != "" else ""
+	if title == "":
+		title = "Sea" if not bool(row.get("land", false)) else str(row.get("cover", "land")).capitalize()
+	_info_title.text = title
+	var lines: Array[String] = []
+	lines.append("Hex %d, %d" % [selected.x, selected.y])
+	if piece.is_empty():
+		lines.append("Wild land: nothing built" if bool(row.get("land", false)) else "Open sea")
+	else:
+		lines.append("%s: %s" % [_family_word(str(piece["family"]), str(piece["extra"])),
+			_level_word(str(piece["family"]), int(piece["level"]))])
+		if int(piece["addon"]) > 0:
+			lines.append("Harbour: %s (%s)" % [_level_word("harbour", int(piece["addon"])), str(piece["addon_mode"])])
+		lines.append("Layout %d%s" % [int(piece["variant"]) + 1, ", mirrored" if bool(piece["mirror"]) else ""])
+	if bool(row.get("land", false)):
+		lines.append("")
+		lines.append("Ground: %s" % str(row.get("cover", "-")))
+		lines.append("Height: %d m" % int(float(row.get("height_m", 0.0))))
+		lines.append("Winter: %s" % str(row.get("climate", "-")))
+		var extras: Array[String] = []
+		if bool(row.get("coast", false)):
+			extras.append("coast")
+		var rivers: Variant = row.get("river_edges", null)
+		if typeof(rivers) == TYPE_ARRAY and not (rivers as Array).is_empty():
+			extras.append("river")
+		if bool(row.get("road", false)):
+			extras.append("road")
+		if row.get("pass", null) != null and str(row.get("pass", "")) != "":
+			extras.append("pass: " + str(row.get("pass", "")))
+		if not extras.is_empty():
+			lines.append(", ".join(extras).capitalize())
+	_info_text.text = "\n".join(lines)
+	_info_panel.visible = true
+
+
+static func _family_word(family: String, extra: String) -> String:
+	var word := family.replace("_", " ").capitalize()
+	if extra != "-" and extra != "":
+		word += " (" + extra + ")"
+	return word
+
+
+static func _level_word(family: String, level: int) -> String:
+	if LEVEL_WORDS.has(family):
+		var words: Array = LEVEL_WORDS[family]
+		if level >= 0 and level < words.size():
+			return "level %d, %s" % [level, str(words[level])]
+	if level >= 0 and level < STAGE_WORDS.size():
+		return "level %d, %s" % [level, STAGE_WORDS[level]]
+	return "level %d" % level
 
 
 func set_grid_visible(value: bool) -> void:
@@ -176,6 +312,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			_zoom_about(button.position, 1.0 / 1.15)
 		elif button.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT]:
 			_dragging = button.pressed
+			if button.pressed:
+				_press_at = button.position
+			elif button.position.distance_to(_press_at) < CLICK_SLOP:
+				if button.button_index == MOUSE_BUTTON_LEFT:
+					select_hex(hex_at(get_global_mouse_position()))
+				elif button.button_index == MOUSE_BUTTON_RIGHT:
+					select_hex(NO_HEX)
 	elif event is InputEventMouseMotion and _dragging:
 		var motion := event as InputEventMouseMotion
 		_camera.position -= motion.relative / _camera.zoom.x
@@ -196,6 +339,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				set_hud_visible(not _hud.visible)
 			KEY_G:
 				set_grid_visible(_grid != null and not _grid.visible)
+			KEY_ESCAPE:
+				select_hex(NO_HEX)
 
 
 func _process(delta: float) -> void:
@@ -590,6 +735,7 @@ func _rebuild() -> void:
 	stats["wfc_ms"] = _wfc_ms
 	stats["rebuild_ms"] = float(Time.get_ticks_usec() - rebuild_start) / 1000.0
 	_write_hud()
+	_write_info()  # a new seed or season may change what stands on the selected hex
 
 
 ## Whether a wild thing gives way to a piece (the compositor's rules): a tree whose foot lies in a footprint; a rounded
@@ -645,5 +791,5 @@ func _write_hud() -> void:
 	lines.append("%d wild things, %d cleared for pieces" % [int(stats["wild_shown"]), int(stats["wild_dropped"])])
 	if int(stats.get("missing_pictures", 0)) > 0:
 		lines.append("%d pieces have no picture in the bake" % int(stats["missing_pictures"]))
-	lines.append("1-4 season   R new seed   V villages   G grid   F whole map   H hide")
+	lines.append("1-4 season   R new seed   V villages   G grid   click a hex   F whole map   H hide")
 	_stats_label.text = "\n".join(lines)
