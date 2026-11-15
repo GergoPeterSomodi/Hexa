@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(0, 4)
-VARIANTS = 1
+VARIANTS = 2
 NAMES = {0: "wild land (the map's)", 1: "adit", 2: "headframe", 3: "smelter, row"}
 
 # Named tokens that are new to this family (rock and ore are not in the kit's list):
@@ -24,41 +24,68 @@ OUTCROP_D = (92, 84, 78)         # shaded side
 ORE = (136, 104, 88)             # the ore pile, lit (rust-brown)
 ORE_D = (104, 78, 68)
 
-# ---- the fixed layout: positions never depend on level or season
-OUTCROP_BASE = -21               # y of the outcrop's foot
-# the outcrop is three rock blocks, drawn back to front: (foot y offset, top profile as (x, height above the foot), ridge x)
-OUTCROP_BLOCKS = [
-    (0.0, [(-33, 0), (-32, 5), (-27, 8), (-21, 8.5), (-17, 6), (-16, 0)], -23),
-    (0.4, [(-2, 0), (-1, 5), (2, 6.5), (5, 4.5), (7, 0)], 1),
-    (1.0, [(-20, 0), (-19, 6), (-14, 9.5), (-8, 10.5), (-2, 8.5), (0, 4), (0.8, 0)], -11),
+# ---- the fixed layouts: positions never depend on level or season
+# The outcrop is three rock blocks, drawn back to front: (foot y, top profile as (x, height above the foot), ridge x).
+# The adit is cut into block 2. Layout 0: the outcrop spans the back, the headframe east of the middle with the wheel
+# race on the east side, the smelter west, the row of houses along the front. Layout 1: the outcrop stands on the west
+# flank, the headframe at the back of the middle, the wheel race at the back right, the smelter at the front, and the
+# row of houses is a column on the east side.
+LAYOUT = [
+    dict(
+        blocks=[
+            (-21.0, [(-33, 0), (-32, 5), (-27, 8), (-21, 8.5), (-17, 6), (-16, 0)], -23),
+            (-20.6, [(-2, 0), (-1, 5), (2, 6.5), (5, 4.5), (7, 0)], 1),
+            (-20.0, [(-20, 0), (-19, 6), (-14, 9.5), (-8, 10.5), (-2, 8.5), (0, 4), (0.8, 0)], -11),
+        ],
+        shadows=[(-13, -19.2, 42, 4.5, 17)],        # x, y, w, h, shift to the lower right (times p.m)
+        adit=(-9, -19.4),                           # foot of the adit's mouth, in the middle block
+        track=[(-9, -18), (-7, -8), (-3, 2), (-1, 14), (-3, 30), (-4, 38)],       # ends at the gate point
+        heaps=[(-18, -10, 14.0, 7.5, 1), (24, 10, 10.0, 5.6, 2), (16, 19, 9.0, 5.0, 3)],       # x, y, w, h, from level
+        headframe=(11, 2),                          # foot of the headframe, from level 2
+        # the wheel's race: the piece's own water (streams are the map's), ending in a small pond at each end, inside the hex
+        stream=[(37, -13), (35, -7), (33, 0), (35, 7), (37, 13)],
+        wheel=(34.5, -2.5),                         # foot of the water wheel, on the stream
+        smelter=(-24, 6),                           # foot of the smelter, from level 3
+        ore=(-9, 9),                                # the ore pile, from level 3
+        # huts become houses in place; the row's third house is new at level 3: x, y, from level
+        houses=[(-33, 22, 1), (-21, 22, 2), (-9, 23, 3)],
+        # the worked yard grows with the level: trodden earth laid over the rock (x, y, w, h, from level)
+        yards=[(-12, -8, 46, 20, 1), (-31, 20, 18, 8, 1),               # under the adit and the first heap; the hut
+               (12, 4, 40, 22, 2), (-19, 20, 18, 8, 2),                  # under the headframe and its heap; the second hut
+               (-22, 9, 34, 22, 3), (-12, 21, 42, 10, 3)],              # under the smelter; along the row of houses
+    ),
+    dict(
+        blocks=[
+            (-22.0, [(-28, 0), (-27, 5), (-22, 8), (-16, 8.5), (-12, 6), (-11, 0)], -19),
+            (6.0, [(-42, 0), (-41, 4.5), (-37, 6.5), (-33, 4.5), (-32, 0)], -37),
+            (-7.0, [(-42, 0), (-41, 6), (-36, 9.5), (-30, 10.5), (-24, 8.5), (-22, 4), (-21.2, 0)], -32),
+        ],
+        shadows=[(-19, -20.2, 22, 4.0, 10), (-31.5, -5.2, 22, 4.0, 10), (-37, 7.8, 14, 3.5, 8)],
+        adit=(-31, -5.4),
+        track=[(-31, -2), (-29, 6), (-26, 16), (-21, 26), (-16, 33)],
+        heaps=[(-19, 5, 14.0, 7.5, 1), (-6, 10, 10.0, 5.6, 2), (14, 12, 9.0, 5.0, 3)],
+        headframe=(3, -6),
+        stream=[(13, -26), (19, -25), (25, -22), (30, -18)],
+        wheel=(22, -23.5),
+        smelter=(-4, 26),
+        ore=(12, 28),
+        houses=[(25, -6, 1), (26, 5, 2), (27, 16, 3)],
+        yards=[(-26, -2, 40, 22, 1), (27, -8, 18, 8, 1),
+               (4, -4, 40, 22, 2), (28, 3, 18, 8, 2),
+               (-2, 24, 34, 22, 3), (27, 6, 14, 30, 3)],
+    ),
 ]
-ADIT = (-9, OUTCROP_BASE + 1.6)             # foot of the adit's mouth, in the middle block
-TRACK = [(-9, -18), (-7, -8), (-3, 2), (-1, 14), (-3, 30), (-4, 38)]       # ends at the gate point, 13 px inside the border
-GATES = {"south": (-4, 38)}                 # where the map's road layer joins the track
-HEAPS = [(-18, -10, 14.0, 7.5, 1), (24, 10, 10.0, 5.6, 2), (16, 19, 9.0, 5.0, 3)]       # x, y, w, h, from level
-HEADFRAME = (11, 2)                         # foot of the headframe, from level 2
-# the wheel's race: the piece's own water (streams are the map's), ending in a small pond at each end, inside the hex
-STREAM = [(37, -13), (35, -7), (33, 0), (35, 7), (37, 13)]
-WHEEL = (34.5, -2.5)                        # foot of the water wheel, on the stream
-SMELTER = (-24, 6)                          # foot of the smelter, from level 3
-ORE_PILE = (-9, 9)                          # from level 3
-# huts become houses in place; the row's third house is new at level 3: x, y, from level
-HOUSES = [(-33, 22, 1), (-21, 22, 2), (-9, 23, 3)]
-# the worked yard grows with the level: trodden earth laid over the rock (x, y, w, h, from level)
-YARDS = [(-12, -8, 46, 20, 1), (-31, 20, 18, 8, 1),               # under the adit and the first heap; the hut
-         (12, 4, 40, 22, 2), (-19, 20, 18, 8, 2),                  # under the headframe and its heap; the second hut
-         (-22, 9, 34, 22, 3), (-12, 21, 42, 10, 3)]               # under the smelter; along the row of houses
+GATES = [{"south": (-4, 38)}, {"south": (-16, 33)}]       # where the map's road layer joins the track
 YARD_ALPHA = 0.35
 
 
-def outcrop(p):
-    """The low rock outcrop at the back: three blocks of rock. It stays at every level; the adit is cut into it at level 1."""
+def outcrop(p, L):
+    """The low rock outcrop: three blocks of rock. It stays at every level; the adit is cut into it at level 1."""
     winter = p.winter
-    y0 = OUTCROP_BASE
-    p.shadow(-13 + p.m * 17, y0 + 1.8, 42, 4.5)         # the outcrop's own shadow, lower right of its middle (x = -13)
+    for sx, sy, sw, sh, dx in L["shadows"]:
+        p.shadow(sx + p.m * dx, sy, sw, sh)             # the outcrop's own shadow, lower right of its middle
     handles = []
-    for dy, prof, ridge in OUTCROP_BLOCKS:
-        base = y0 + dy
+    for base, prof, ridge in L["blocks"]:
         top = [(x, base - h) for x, h in prof]
 
         def fn(pen, top=top, base=base, ridge=ridge):
@@ -76,9 +103,9 @@ def outcrop(p):
     return handles
 
 
-def adit(p, rock):
+def adit(p, rock, at):
     """Level 1 landmark: a dark arched mouth in the outcrop, framed with timber."""
-    x, y = ADIT
+    x, y = at
 
     def fn(pen):
         pen.poly([(x - 3.2, y), (x - 3.2, y - 4.2), (x - 1.8, y - 5.6), (x + 1.8, y - 5.6), (x + 3.2, y - 4.2), (x + 3.2, y)], kit.DOOR, None)
@@ -170,36 +197,37 @@ def draw(level, season, variant=0, mirror=False):
     if level == 0:                                    # no piece: the sheets show the map's wild rock
         return kit.wild(season, "rock", seed=4)
     p = kit.Piece(season, ground="rock", seed=4, mirror=mirror)
+    L = LAYOUT[variant]
     # ---- ground plane
-    for x, y, w, h, lo in YARDS:                      # worked ground under each landmark, growing with the level
+    for x, y, w, h, lo in L["yards"]:                      # worked ground under each landmark, growing with the level
         if level >= lo:
             p.blob(x, y, w, h, p.pal["soil"], alpha=YARD_ALPHA)
     if level >= 2:
-        p.water(STREAM, 2.0)
-        for x, y in (STREAM[0], STREAM[-1]):
+        p.water(L["stream"], 2.0)
+        for x, y in (L["stream"][0], L["stream"][-1]):
             p.pond([(x + math.cos(i * math.pi / 6) * 4.0, y + math.sin(i * math.pi / 6) * 2.5) for i in range(12)])
-    p.road(TRACK, 1.5, track=True)
+    p.road(L["track"], 1.5, track=True)
 
     # ---- standing things
-    rock = outcrop(p)
-    adit(p, rock[2])                                  # cut into the middle block: it moves with it
-    for x, y, w, h, lo in HEAPS:
+    rock = outcrop(p, L)
+    adit(p, rock[2], L["adit"])                                  # cut into the middle block: it moves with it
+    for x, y, w, h, lo in L["heaps"]:
         if level >= lo:
             p.heap(x, y, w, h, kit.SPOIL, kit.SPOIL_D)
     if level >= 2:
-        water_wheel(p, *WHEEL)
-        headframe(p, *HEADFRAME)
+        water_wheel(p, *L["wheel"])
+        headframe(p, *L["headframe"])
     if level >= 3:
-        smelter(p, *SMELTER)
-        p.heap(ORE_PILE[0], ORE_PILE[1], 8.0, 4.6, ORE, ORE_D)
-    for i, (x, y, lo) in enumerate(HOUSES):
+        smelter(p, *L["smelter"])
+        p.heap(L["ore"][0], L["ore"][1], 8.0, 4.6, ORE, ORE_D)
+    for i, (x, y, lo) in enumerate(L["houses"]):
         if level < lo:
             continue
         if level >= 3:                                # upgraded in place: the same foot, a bigger house
             p.house(x, y, 7.6, 4.6, 3.6, wall=i + 1, kind="ridge" if i % 2 else "gable", roof="thatch", smoke=(i == 2))
         else:
             p.house(x, y, 5.5, 3.5, 3.0, wall=i, kind="ridge", roof="thatch", smoke=(i == 0))
-    return p.finish(label="mines L%d" % level)
+    return p.finish(label="mines L%d v%d%s" % (level, variant, "m" if mirror else ""))
 
 
 if __name__ == "__main__":

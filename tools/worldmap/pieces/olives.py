@@ -14,28 +14,51 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 
 LEVELS = range(0, 4)
-VARIANTS = 1
+VARIANTS = 2
 NAMES = {0: "wild land (the map's)", 1: "hut, 7 trees", 2: "farmhouse", 3: "oil mill"}
 
-# The layout is fixed: a level adds to the level below and never moves anything.
-FARM = (30, 9)                                        # the hut, later the stone farmhouse: same foot at every level
-MILL = (13, -2)                                       # the oil mill (level 3)
-STONE_AT = (13, 6.5)                                  # its millstone lies on the ground in front
-#         wall y, x from, x to, from level      (the strip of ground and trees lies north of its wall)
-WALLS = [(-27, -30, 6, 3), (-16, -42, 6, 3), (-6, -42, 3, 2), (8, -46, 1, 2), (22, -40, 11, 2)]
-TREES = [                                             # x, y, from level; foot y = wall y - 3.5
-    (-37, -9.5, 2), (-28, -9.5, 1), (-19, -9.5, 1), (-10, -9.5, 2), (-1, -9.5, 2),                    # wall -6
-    (-39, 4.5, 2), (-30, 4.5, 1), (-21, 4.5, 1), (-12, 4.5, 2), (-3, 4.5, 2),                         # wall 8
-    (-33, 18.5, 2), (-24, 18.5, 1), (-15, 18.5, 1), (-6, 18.5, 1), (3, 18.5, 2),                      # wall 22
-    (-33, -19.5, 3), (-24, -19.5, 3), (-15, -19.5, 3), (-6, -19.5, 3), (3, -19.5, 3),                 # wall -16
-    (-22, -30.5, 3), (-14, -30.5, 3), (-6, -30.5, 3), (2, -30.5, 3),                                  # wall -27
+# The layouts are fixed tables: a level adds to the level below and never moves anything.
+# walls: (wall y at x0, x0, x1, from level[, wall y at x1]); the strip of ground and trees lies north of its wall.
+# trees: (x, y, from level); foot y = wall y - 3.5. Layout 0: the farm east of the middle, the mill in the middle, the
+# terraces in horizontal rows in the west. Layout 1: the farm in the south-west, the mill in the north-east, the
+# terraces in sloping rows that meet in a valley (the west rows run down to the east, the east rows up to the east).
+LAYOUT = [
+    dict(
+        farm=(30, 9),                                 # the hut, later the stone farmhouse: same foot at every level
+        mill=(13, -2),                                # the oil mill (level 3)
+        stone=(13, 6.5),                              # its millstone lies on the ground in front
+        walls=[(-27, -30, 6, 3), (-16, -42, 6, 3), (-6, -42, 3, 2), (8, -46, 1, 2), (22, -40, 11, 2)],
+        trees=[
+            (-37, -9.5, 2), (-28, -9.5, 1), (-19, -9.5, 1), (-10, -9.5, 2), (-1, -9.5, 2),                    # wall -6
+            (-39, 4.5, 2), (-30, 4.5, 1), (-21, 4.5, 1), (-12, 4.5, 2), (-3, 4.5, 2),                         # wall 8
+            (-33, 18.5, 2), (-24, 18.5, 1), (-15, 18.5, 1), (-6, 18.5, 1), (3, 18.5, 2),                      # wall 22
+            (-33, -19.5, 3), (-24, -19.5, 3), (-15, -19.5, 3), (-6, -19.5, 3), (3, -19.5, 3),                 # wall -16
+            (-22, -30.5, 3), (-14, -30.5, 3), (-6, -30.5, 3), (2, -30.5, 3),                                  # wall -27
+        ],
+        track=[(28, 12), (24, 20), (16, 29), (8, 36)],
+    ),
+    dict(
+        farm=(-18, 28),
+        mill=(28, -14),
+        stone=(28, -5.5),
+        walls=[(-9, -42, 0, 2, -0.6), (16, 4, 44, 2, 8), (30, -4, 44, 2, 20.4),     # the three of level 2
+               (-23, -32, 0, 3, -17.4), (5, -42, -2, 3, 13)],                      # level 3: back west, front west
+        trees=[
+            (-37, -11.5, 1), (-29, -10.0, 1), (-21, -8.5, 2), (-13, -6.5, 2), (-5, -5.0, 2),                   # west, middle
+            (8, 11.5, 1), (16, 10.0, 1), (24, 8.5, 2), (32, 7.0, 2), (40, 5.5, 2),                            # east, back
+            (4, 25.0, 1), (12, 23.5, 1), (20, 21.5, 1), (28, 20.0, 2), (36, 18.5, 2),                         # east, front
+            (-27, -25.5, 3), (-19, -24.0, 3), (-11, -23.0, 3), (-3, -21.5, 3),                                # west, back
+            (-37, 2.5, 3), (-29, 4.0, 3), (-21, 5.5, 3), (-13, 7.5, 3), (-5, 9.0, 3),                         # west, front
+        ],
+        track=[(-12, 31), (-6, 34), (0, 36)],
+    ),
 ]
-TRACK = [(28, 12), (24, 20), (16, 29), (8, 36)]
-GATES = {"south": (8, 36)}                            # the track ends here; the map's road layer carries it on
+GATES = [{"south": (8, 36)}, {"south": (0, 36)}]       # the track ends here; the map's road layer carries it on
 
-def wall_pts(y, x0, x1):
+def wall_pts(y, x0, x1, y1=None):
     n = 8
-    return [(x0 + (x1 - x0) * i / n, y + 1.4 * ((i / n - 0.5) ** 2) * -4 + 1.0) for i in range(n + 1)]
+    y1 = y if y1 is None else y1
+    return [(x0 + (x1 - x0) * i / n, y + (y1 - y) * i / n + 1.4 * ((i / n - 0.5) ** 2) * -4 + 1.0) for i in range(n + 1)]
 
 
 def clip(pts, shrink=10.0):
@@ -97,18 +120,21 @@ def draw(level, season, variant=0, mirror=False):
     soil = kit.crop("olive_soil", season)[0]
     if wi:                                            # the shelves take snow; the walls stay stone
         soil = kit.mix(soil, kit.SNOW, 0.6)
-    trees = [t for t in TREES if t[2] <= level]
-    walls = [w for w in WALLS if w[3] <= level]
+    L = LAYOUT[variant]
+    FARM, MILL, STONE_AT = L["farm"], L["mill"], L["stone"]
+    trees = [t for t in L["trees"] if t[2] <= level]
+    walls = [w for w in L["walls"] if w[3] <= level]
 
     # ---- ground plane
     for x, y, frm in trees:                           # pale ochre soil under every tree
         p.patch(clip(ellipse_pts(x + 0.5, y + 1.5, 5.5, 3.25)), soil)
-    for y, x0, x1, _ in walls:                        # the terrace strip north of each wall
-        p.patch(clip([(x0, y - 11), (x1, y - 11), (x1, y), (x0, y)]), soil)
-    for y, x0, x1, _ in walls:                        # the wall: a stone face under a pale top line, never under snow
-        p.terrace([q for q in wall_pts(y, x0, x1) if kit.in_hex(q[0], q[1] + 3, 10)], face=3)
+    for y, x0, x1, _, *rest in walls:                 # the terrace strip north of each wall
+        y1 = rest[0] if rest else y
+        p.patch(clip([(x0, y - 11), (x1, y1 - 11), (x1, y1), (x0, y)]), soil)
+    for y, x0, x1, _, *rest in walls:                 # the wall: a stone face under a pale top line, never under snow
+        p.terrace([q for q in wall_pts(y, x0, x1, rest[0] if rest else None) if kit.in_hex(q[0], q[1] + 3, 10)], face=3)
     if level >= 3:
-        p.road(TRACK, 1.6, track=True)
+        p.road(L["track"], 1.6, track=True)
         p.blob(STONE_AT[0], STONE_AT[1], 11.2, 7.2, kit.STONE, edge=kit.STONE_D)                 # the millstone, flat on the ground
         p.blob(STONE_AT[0], STONE_AT[1], 3.0, 2.0, kit.DOOR)
     if sp:                                            # blossom dots on the ground under one tree in three
@@ -122,7 +148,7 @@ def draw(level, season, variant=0, mirror=False):
             p.patch(clip([(x - 4.5, y + 0.5), (x + 4.5, y + 0.5), (x + 5.5, y + 3.8), (x - 5.5, y + 3.8)]), kit.SAIL_D, kit.STONE_D, 0.5)
 
     # ---- standing things
-    for i, (x, y, frm) in enumerate(TREES):
+    for i, (x, y, frm) in enumerate(L["trees"]):
         if frm <= level:
             p.tree(x, y, 1.0, "olive", i)
     if level >= 1:
@@ -139,7 +165,7 @@ def draw(level, season, variant=0, mirror=False):
         p.person(new[2][0] - 5, new[2][1] + 3.5, (196, 72, 60))
     elif su and level >= 2:
         p.person(FARM[0] - 8, FARM[1] + 3, (70, 96, 150))
-    return p.finish(label="olives L%d" % level)
+    return p.finish(label="olives L%d v%d%s" % (level, variant, "m" if mirror else ""))
 
 
 def ellipse_pts(cx, cy, rx, ry, n=16):
