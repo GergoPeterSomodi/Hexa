@@ -1,6 +1,6 @@
 """Two contract sheets of round 3: the three winters, and the two port modes.
 
-winters.png   Winter by climate (guide section 7). Every family's wild land and top level in the snow winter, the
+winters.png   Winter by climate (guide section 7). Every family's (all sixteen) wild land and top level in the snow winter, the
               frost winter and the mild winter, at 100% and at 50%. The modules are called as always,
               draw(level, "winter"); the kit is told the hex's winter (kit.with_wild(..., climate=)).
 ports.png     The two port modes (guide section 10): the harbour on an open shore (seaside) and in a bay the map
@@ -19,19 +19,11 @@ import kit
 
 pygame = kit.pygame
 
-# title, module, ground, the level shown, draw keywords
-FAMILIES = [
-    ("Settlements", "settlements", "grass", 4, {}),
-    ("Wheat", "wheat", "farm", 3, {}),
-    ("Vineyard", "vineyard", "grass", 3, {}),
-    ("Olives", "olives", "grass", 3, {}),
-    ("Grazing", "grazing", "grass", 3, {}),
-    ("Timber", "timber", "wood", 3, {}),
-    ("Mines", "mines", "rock", 3, {}),
-    ("Salt pans", "salt", "sand", 3, {}),
-    ("Harbour", "harbour", "grass", 3, {}),
-]
-WILD_GROUND = {"Settlements": ("grass", 3)}        # a family without a level 0: kit.wild(ground, seed)
+import families as F
+
+# title, module, ground, the level shown, draw keywords: every family's top level (settlements: the walled town)
+FAMILIES = [(t, n, g, 4 if n == "settlements" else lv[2], kw) for t, n, g, lv, kw in F.FAMILIES]
+WILD_GROUND = F.WILD_GROUND                         # a family without a level 0: kit.wild(ground, seed)
 NOTE = {"snow": "snow (hard)", "frost": "frost (light)", "mild": "mild (Mediterranean)"}
 
 
@@ -42,39 +34,43 @@ def winters(path):
     left, top = 110, 104
     x_top = left + 3 * (cw + 4) + 18
     x50 = x_top + 3 * (cw + 4) + 22
-    W = x50 + 3 * (hw + 3) + 16
-    H = top + len(FAMILIES) * (cw + 6) + 16
+    BW = x50 + 3 * (hw + 3) + 26                      # one block: nine cells at 100% and three at 50%
+    rows = (len(FAMILIES) + 1) // 2                  # two blocks side by side
+    W = BW * 2
+    H = top + rows * (cw + 6) + 16
     out = pygame.Surface((W, H))
     out.fill(kit.SHEET_BG)
     f_t, f_h, f_s = kit._font(30, True), kit._font(22), kit._font(17)
     out.blit(f_t.render("Winter by climate: the three winters", True, kit.SHEET_TEXT), (16, 10))
-    out.blit(f_s.render("The same call, draw(level, \"winter\"); the kit is told the hex's winter. Left: the wild land. "
+    out.blit(f_s.render("The same call, draw(level, \"winter\"); the kit is told the hex's winter. In each block, left: the wild land. "
                         "Middle: the top level. Right: the top level at 50%.", True, kit.SHEET_DIM), (16, 42))
-    out.blit(f_s.render("the wild land (level 0)", True, kit.SHEET_DIM), (left + 2, top - 38))
-    out.blit(f_s.render("the top level", True, kit.SHEET_DIM), (x_top + 2, top - 38))
-    out.blit(f_s.render("50% test", True, kit.SHEET_DIM), (x50 + 2, top - 38))
-    for j, c in enumerate(kit.CLIMATES):
-        for x0 in (left, x_top):
-            out.blit(f_s.render(NOTE[c], True, kit.SHEET_TEXT), (x0 + j * (cw + 4) + 2, top - 20))
-        out.blit(f_s.render(c, True, kit.SHEET_DIM), (x50 + j * (hw + 3) + 2, top - 20))
+    for b in range(2):
+        bx = b * BW
+        out.blit(f_s.render("the wild land (level 0)", True, kit.SHEET_DIM), (bx + left + 2, top - 38))
+        out.blit(f_s.render("the top level", True, kit.SHEET_DIM), (bx + x_top + 2, top - 38))
+        out.blit(f_s.render("50% test", True, kit.SHEET_DIM), (bx + x50 + 2, top - 38))
+        for j, c in enumerate(kit.CLIMATES):
+            for x0 in (left, x_top):
+                out.blit(f_s.render(NOTE[c], True, kit.SHEET_TEXT), (bx + x0 + j * (cw + 4) + 2, top - 20))
+            out.blit(f_s.render(c, True, kit.SHEET_DIM), (bx + x50 + j * (hw + 3) + 2, top - 20))
     for i, (title, name, ground, lv, kw) in enumerate(FAMILIES):
-        y = top + i * (cw + 6)
-        out.blit(f_h.render(title, True, kit.SHEET_TEXT), (12, y + 44))
+        bx, y = (i // rows) * BW, top + (i % rows) * (cw + 6)
+        out.blit(f_h.render(title, True, kit.SHEET_TEXT), (bx + 12, y + 44))
         try:
             mod = importlib.import_module(name)
         except Exception as e:                            # a module that is being edited: leave its row empty
-            out.blit(f_s.render("(module not ready: %s)" % type(e).__name__, True, kit.SHEET_DIM), (left, y + 50))
+            out.blit(f_s.render("(module not ready: %s)" % type(e).__name__, True, kit.SHEET_DIM), (bx + left, y + 50))
             continue
-        out.blit(f_s.render("level %d" % lv, True, kit.SHEET_DIM), (12, y + 64))
+        out.blit(f_s.render("level %d" % lv, True, kit.SHEET_DIM), (bx + 12, y + 64))
         for j, c in enumerate(kit.CLIMATES):
             if 0 in mod.LEVELS:
                 w0 = kit.with_wild(mod.draw, 0, "winter", climate=c, **kw)
             else:
                 w0 = kit.wild("winter", *WILD_GROUND[title], climate=c)
             img = kit.with_wild(mod.draw, lv, "winter", climate=c, **kw)
-            out.blit(kit._cell(w0, "winter", 1.0, pad, ground, c), (left + j * (cw + 4), y))
-            out.blit(kit._cell(img, "winter", 1.0, pad, ground, c), (x_top + j * (cw + 4), y))
-            out.blit(kit._cell(img, "winter", 0.5, pad, ground, c), (x50 + j * (hw + 3), y + 30))
+            out.blit(kit._cell(w0, "winter", 1.0, pad, ground, c), (bx + left + j * (cw + 4), y))
+            out.blit(kit._cell(img, "winter", 1.0, pad, ground, c), (bx + x_top + j * (cw + 4), y))
+            out.blit(kit._cell(img, "winter", 0.5, pad, ground, c), (bx + x50 + j * (hw + 3), y + 30))
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     pygame.image.save(out, path)
     print("wrote", os.path.normpath(path), out.get_size())

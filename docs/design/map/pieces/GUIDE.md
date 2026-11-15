@@ -6,7 +6,10 @@ sizes, coast pieces on every sea side). Round 3 (the same day) adds the owner's 
 modes** (section 10) and **winter by climate** (section 7). Round 4 (the same day) records the owner's pick from
 the Python-art catalogue (`../python_art/catalogue.md`, the top 10) and his two port answers, and writes the tables
 for it in one pass: six new goods families, the four ores, the landmark cities, the Sites family and the third
-layouts (sections 4, 6, 8, 10, 12). Nothing in the game is changed.**
+layouts (sections 4, 6, 8, 10, 12). Round 5 (the same day), after the review of those families: one more crowding
+pair (cotton / hemp), the smoke rule and the winter-fleece rule (section 7), the landmark `CLEAR` rule (section 8),
+and the kit calls the workers had to draw by hand (section 6, "Kit calls for low rows and straight walls").
+Nothing in the game is changed.**
 
 A **piece** is the picture of one hex's improvement at one level in one season, at the normal map zoom (the style
 frame's close zoom: hex radius 60 px, one hex = one district). This guide and the drawing kit
@@ -219,6 +222,7 @@ church's place and adds no signature of its own to the list.
 | Silk's dome / the cathedral dome / Constantinople | The caravanserai's dome is 6 px wide, turquoise, on a courtyard wall. The cathedral's is `DOME` grey-green on a church. Constantinople's is `LEAD` grey-blue, 12 px wide, with minarets |
 | Ruined castle (site) / castle 1 | The ruin has a broken, jagged top, a gap in its wall, no roof, no banner, no ring and no mound |
 | Monastery (site) / village | The monastery is one joined block round a court, slate roofs, inside a low wall: no single houses, no red roofs |
+| Cotton / hemp (round 5) | Close in **spring and the mild winter** only, when both are bare blocks on farm land. Hemp: small near-square blocks, plain brown earth, always a pond, the long ropewalk. Cotton: at most 5 big patches of **red** earth with its rows of dry stalks showing along the long side, the two-storey gin house, never water |
 | Spices / dyes | Not needed now (spices are batch 2). If they come: spices are pointed heaps in a row, dyes stay round vats |
 
 ## 5. Sizes and scale
@@ -325,6 +329,26 @@ What follows for the drawing:
   towards the north with the level; the back of the hex stays wild to the last level.
 - The map's duty, not the piece's: the wild land never stands in a footprint, and it is the same in every season
   and at every level, so a level-up only removes wild things, it never moves them.
+
+### Kit calls for low rows and straight walls (round 5)
+
+Reported as missing by more than one worker and now in the kit (`kit_additions.png`, the two bottom rows; the
+tools README has the signatures). Use them instead of a local drawing:
+
+- **`p.hold(points)`**: the claim round a row or group of low things (bales, frames, vats, low trees, stones).
+  A low thing has a small foot, so the footprint alone lets a wild tree stand right behind it and hang its crown
+  over it. Call it in every season, also when the things are not drawn, so the wild land never changes.
+- **`p.stockade(points, kind=)`**: a standing wall with straight sides (`"palisade"`, `"stone"`, `"low"`): a
+  square stockade, a bailey, a precinct wall. The round ring stays `p.wall`. Points are unmirrored; the kit turns
+  the plan round and lights every side anew, so no `x=` and never `if mirror:`.
+- **`p.dots`**, **`p.bale`**, **`p.tent`**: bolls and blossom on the ground; the one bale and the one tent of
+  the map (colour by the goods).
+- **`p.tree(..., "cypress")`**: the evergreen beside an estate, a chapel or a villa. A poplar goes bare in
+  winter; a cypress never does. **`p.tree(..., bare=True)`**: a leafless tree in any season.
+- **`p.church(roof="slate")`**: a church without red (a monastery). **`p.wall(tower_top="cone", tower_col=)`**:
+  capped towers on the ring.
+- **`pen.dome`, `pen.onion`, `pen.minaret`** for monuments: snow lies on the upper left only, so the colour
+  shows; a minaret is never thinner than 1 px, has a dark cap and no ink round its shaft.
 
 ### Mirror and second layout
 
@@ -477,6 +501,13 @@ known places before it is fixed (the Atlantic west and the head of the Adriatic 
 **Activity details: at most three per piece**, small, and placed on the newest work of the level. Each family's
 table lists them. Use them to say what the season *does* here: sheaves at harvest, a plough team, smoke, frozen pans,
 boats laid up.
+
+**Smoke, sparingly (round 5).** The kit's smoke is three pale puffs on a slant. Two or three of them one above
+the other read as punctuation, not as smoke: **at most one smoke in any column of buildings** (buildings within
+8 px of each other in x), and in a goods piece of more than one smoking building the newest landmark smokes and
+the others do not. **Pale animals on snow:** where snow lies (`p.winter`) a sheep is drawn in a darker winter
+fleece (`grazing.WINTER_FLEECE`), or it vanishes at 50%; anything else that is near-white and stands on snow
+needs a dark foot line or a darker winter colour.
 
 **What not to add.** No falling snow or rain, no weather, no night, no puddles, no flowers on open ground, no
 flying birds, no festivals, flags or bunting (banners are for castles), no text or icons, no fruit drawn on trees,
@@ -821,6 +852,10 @@ the kit's two tones and thin ink, and keeps the clear gap in front. Model pictur
 - A landmark city keeps the settlement's signature (red roofs round the monument, the wall). No monument may be a
   second castle: no banner, no bastion.
 - The first four are Venice, Constantinople, Paris and Moscow; the other six follow in a second task.
+
+**The `CLEAR` box (round 5).** A monument clears only its own ground: its width plus 2 px to each side, from its
+foot line to 3 px in front. Houses behind it stay (their roofs may show behind the monument), so a landmark city is
+as full as a plain one. A monument should reach at least 16 px, or the roofs round it hide it (review task 26).
 
 ### Castles. Ground: `grass`. Levels 1-3. `draw(level, season, flag=kit.FLAG)`
 

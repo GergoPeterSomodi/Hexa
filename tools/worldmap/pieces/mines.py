@@ -24,6 +24,9 @@ LEVELS = range(0, 4)
 VARIANTS = 2
 ORES = (None, "iron", "silver", "copper", "gold")
 NAMES = {0: "wild land (the map's)", 1: "adit", 2: "headframe", 3: "smelter, row"}
+# the level names by ore, for the ore sheets (levels 1 and 2 are the plain mine's, except gold)
+ORE_NAMES = {"iron": {3: "blast furnace, row"}, "silver": {3: "mint, row"}, "copper": {3: "roasting yard, row"},
+             "gold": {1: "adit, tent", 2: "sluice, tents", 3: "strongroom, row"}}
 
 # Named tokens that are new to this family (rock and ore are not in the kit's list):
 OUTCROP = (128, 116, 104)        # the rock outcrop, lit
@@ -463,5 +466,5 @@ if __name__ == "__main__":
         def draw_o(level, season, variant=0, mirror=False, o=o, **kw):
             return draw(level, season, variant, mirror, ore=o)
         oout = os.path.join(os.path.dirname(out), "mines_%s.png" % o)
-        kit.sheet(draw_o, LEVELS, "Mines, %s: levels 0-3 by season" % o, oout, NAMES, ground="rock", wild=True)
+        kit.sheet(draw_o, LEVELS, "Mines, %s: levels 0-3 by season" % o, oout, {**NAMES, **ORE_NAMES[o]}, ground="rock", wild=True)
         print("wrote", os.path.normpath(oout))

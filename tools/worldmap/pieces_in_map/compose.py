@@ -44,9 +44,15 @@ What the compositor does (the frame and the pieces are used read only; no file o
   - Winter: the frame has no winter of its own, so a stand-in is made here (the ground from the pieces' three
     winter palettes, bare broadleaves, snow on conifers and hills where snow lies). It is a stand-in, not a design.
 
+Round 6 (review task 25, the Python art; notes.md round 6): the new families where they fit north Italy: a quarry in the Apuan Alps,
+hemp and silk on the Po plain, a dye works by Parma, three sites (a monastery in the Apennines, Roman ruins at Luni,
+a ruined castle on a pass), iron and copper for the two mines, castles in all three layouts, the vineyard's contour
+layout and the walled pastures. Furs and cotton have no place here; no landmark city lies in the frame.
+
 Run (the frame's environment: STYLE_FRAME_LAYERS must name the exported layers file):
     python tools/worldmap/pieces_in_map/compose.py [OUT_DIR] [summer|winter|both]
-Writes summer.png, winter.png, plain_crop.png, hills_coast_crop.png, winter_crop.png and prints the measurements. (base_kept_crop.png in the docs folder is
+Writes summer.png, winter.png, plain_crop.png, hills_coast_crop.png, east_crop.png, west_plain_crop.png,
+carrara_crop.png, winter_crop.png and prints the measurements. (base_kept_crop.png in the docs folder is
 from round 1 and is no longer written.)
 """
 import contextlib
@@ -64,15 +70,25 @@ sys.path.insert(0, os.path.join(HERE, "..", "pieces"))
 import render as R          # the style frame (builds the world at import)
 import kit                  # the pieces kit
 import castles
+import dyes
 import grazing
 import harbour
+import hemp
 import mines
 import olives
+import quarry
 import salt
 import settlements
+import silk
 import timber
 import vineyard
 import wheat
+
+import importlib.util as _ilu       # the pieces' sites.py: the style frame has a module of the same name (R.sites)
+_spec = _ilu.spec_from_file_location("piece_sites", os.path.join(HERE, "..", "pieces", "sites.py"))
+sites = _ilu.module_from_spec(_spec)
+sys.modules["piece_sites"] = sites  # kit.variants_of() looks the module up by name
+_spec.loader.exec_module(sites)
 
 pygame = R.pygame
 WORLD, FIELDS = R.WORLD, R.FIELDS
@@ -86,17 +102,30 @@ TOWN_LEVEL = {
 WHEAT = {(7, 9): 2, (8, 9): 3, (10, 9): 3, (11, 9): 1, (12, 9): 2, (6, 10): 2, (13, 10): 3, (12, 12): 2}
 # Round 3: the other families, each on its own kind of land: (column, row) -> (module, level, draw keywords).
 GOODS = {
-    (7, 12): (vineyard, 3, {}), (7, 11): (vineyard, 2, {}), (6, 11): (vineyard, 1, {}),      # the Monferrato and Langhe hills
-    (6, 12): (vineyard, 2, {}),
+    (7, 12): (vineyard, 3, {}), (7, 11): (vineyard, 2, {}), (6, 11): (vineyard, 3, {}),      # the Monferrato and Langhe hills
+    (6, 12): (vineyard, 1, {}),                                                              # ((6, 11) shows the contour layout)
     (7, 14): (olives, 3, {}), (6, 13): (olives, 2, {}),                                      # the Riviera di Ponente
-    (5, 12): (grazing, 3, {"animal": "sheep"}), (4, 10): (grazing, 2, {"animal": "cattle"}),  # Alpine foothills
-    (11, 11): (grazing, 2, {"animal": "horses"}), (13, 12): (grazing, 1, {"animal": "sheep"}),   # Apennine foothills
+    (5, 12): (grazing, 3, {"animal": "sheep"}), (4, 10): (grazing, 2, {"animal": "cattle"}),  # Alpine foothills ((5, 12): walled pastures)
+    (11, 11): (grazing, 2, {"animal": "horses"}), (11, 12): (grazing, 2, {"animal": "sheep"}),   # Apennine foothills
     (8, 12): (timber, 3, {}), (10, 11): (timber, 2, {}), (11, 13): (timber, 1, {}), (10, 10): (timber, 2, {}),
-    (4, 13): (mines, 3, {}), (3, 15): (mines, 2, {}),                                        # the Maritime Alps
-    (9, 12): (castles, 2, {}), (5, 14): (castles, 1, {}), (4, 9): (castles, 3, {}),          # Giovi, Col di Tenda, the Susa valley
+    (4, 13): (mines, 3, {"ore": "iron"}), (3, 15): (mines, 2, {"ore": "copper"}),            # the Maritime Alps: iron, copper
+    # castles in all three layouts: Giovi (a watchtower), the Col di Tenda (motte and bailey), the Susa valley (the
+    # bastion fortress) and the Apennine foothills above Parma (layout 1)
+    (9, 12): (castles, 1, {}), (5, 14): (castles, 2, {}), (4, 9): (castles, 3, {}), (13, 12): (castles, 2, {}),
     (13, 17): (salt, 3, {}),                                                                 # the flat shore south of Pisa
     (5, 15): (harbour, 1, {}), (10, 13): (harbour, 2, {}),                                   # fishing villages
+    # Round 4 (review task 25): the families brought over from the Python art, where they fit this region.
+    (13, 15): (quarry, 3, {}),                                                               # the Apuan Alps: Carrara's marble
+    (5, 11): (hemp, 2, {}), (13, 9): (hemp, 3, {}),                                          # Carmagnola; the lower Po plain
+    (6, 9): (silk, 3, {}), (14, 10): (silk, 2, {}),                                          # Piedmont and Emilia
+    (13, 11): (dyes, 3, {}),                                                                 # a dye works by Parma
+    # sites: the variant is the site (sites.SITES), given by the map's data, not picked by the hex
+    (9, 11): (sites, 1, {"variant": 0}),                                                     # a monastery in the Apennines (Bobbio)
+    (12, 15): (sites, 1, {"variant": 1}),                                                    # Roman ruins: Luni
+    (10, 12): (sites, 1, {"variant": 4}),                                                    # a ruined castle on an Apennine pass
 }
+# Not placed, on purpose: FURS (a northern forest good) and COTTON (a hot-land good) have no place in north Italy;
+# LANDMARK CITIES: none of the ten lies in this frame (Genoa is a plain city: settlements.draw(landmark=None)).
 COAST_FAMILIES = (salt, harbour)                     # they build at the map's shore: on the water too
 # A port is a town piece plus the harbour add-on at the hex's own shore: town -> the add-on's level.
 PORTS = {"Genoa": 3, "Pisa": 3, "Savona": 2, "Nice": 2, "Chiavari": 1}
@@ -849,6 +878,9 @@ def probe():
 CROP = (460, 0, 640, 360)      # the Po plain: Asti to Piacenza
 CROP2 = (130, 230, 640, 360)   # the Alps to Genoa: mines, the castle at the pass, grazing, vineyards, olives, two ports
 CROP3 = (300, 60, 640, 420)    # winter: the Po plain (frost), the Apennines (snow) and the Ligurian coast (mild)
+CROP4 = (640, 0, 640, 360)     # round 6: hemp, silk and the dye works on the plain; the monastery, the ruin and a castle in the hills
+CROP5 = (240, 0, 640, 360)     # round 6: silk by Turin, hemp, the contour vineyard, the bastion fortress
+CROP6 = (960, 420, 320, 180)   # round 6: the quarry in the Apuan Alps and the Roman ruins of Luni (x 4)
 
 
 def main():
@@ -867,6 +899,9 @@ def main():
         pygame.image.save(pygame.transform.scale(crop, (CROP[2] * 2, CROP[3] * 2)), os.path.join(out, "plain_crop.png"))
         crop = f.surf.subsurface(pygame.Rect(CROP2)).copy()
         pygame.image.save(pygame.transform.scale(crop, (CROP2[2] * 2, CROP2[3] * 2)), os.path.join(out, "hills_coast_crop.png"))
+        for box, k, name in ((CROP4, 2, "east_crop.png"), (CROP5, 2, "west_plain_crop.png"), (CROP6, 4, "carrara_crop.png")):
+            crop = f.surf.subsurface(pygame.Rect(box)).copy()
+            pygame.image.save(pygame.transform.scale(crop, (box[2] * k, box[3] * k)), os.path.join(out, name))
     if which in ("both", "winter"):
         f = PieceFrame("winter")
         f.render(os.path.join(out, "winter.png"))

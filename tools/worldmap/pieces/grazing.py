@@ -31,6 +31,9 @@ GATES = {"south": (-8, 34)}
 MEADOW_TINT = (232, 228, 150)
 MEADOW = {s: kit.mix(kit.PAL[s]["grass"], MEADOW_TINT, 0.5) for s in ("spring", "summer", "autumn")}
 MEADOW["winter"] = kit.mix(kit.WINTER["mild"]["grass"], MEADOW_TINT, 0.4)     # a mild winter: no snow lies (p.winter is False)
+# A sheep where snow lies: the unwashed winter fleece, so that the animal shows on a white meadow (named token, not in
+# the kit; round 4 review: the kit's pale winter sheep vanished on snow at 50%).
+WINTER_FLEECE = (176, 158, 128)
 
 # The layouts are fixed tables: a level adds to the level below and never moves anything.
 #   hut, byre (x, foot y, width), hall (x, foot y, width): the buildings;
@@ -271,7 +274,7 @@ def draw_upland(level, season, animal, mirror):
 
     for x, y, frm, stays in F["herd"]:
         if level >= frm and (not wi or animal in stays):
-            p.animal(x, y, kind, flip=x > 4)
+            p.animal(x, y, kind, flip=x > 4, col=WINTER_FLEECE if (kind == "sheep" and p.winter) else None)
     if sp:
         for x, y, frm in F["young"]:
             if level >= frm:
@@ -323,7 +326,7 @@ def draw(level, season, variant=0, mirror=False, animal="sheep"):
     # ---- the herd: fixed table; winter keeps only the three nearest the byre; young ones in spring
     for x, y, frm, stays in L["herd"]:
         if level >= frm and (not wi or stays):
-            p.animal(x, y, kind, flip=x > 4)
+            p.animal(x, y, kind, flip=x > 4, col=WINTER_FLEECE if (kind == "sheep" and p.winter) else None)
     if sp:
         for x, y, frm in L["young"]:
             if level >= frm:

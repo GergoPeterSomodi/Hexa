@@ -100,11 +100,12 @@ def basket(p, x, y):
     return p.stand(y, fn, x=x)
 
 
-def shed(p, x, y):
+def shed(p, x, y, smoke=True):
     """The silkworm shed: a long low thatched shed, 16 px wide, wall 3.5, with four dark window slots. It smokes in autumn
-    and winter (a heated rearing room)."""
+    and winter (a heated rearing room); only the oldest shed does (smoke=): three smokes in a column beside the pale
+    rows read as a row of exclamation marks (round 4 review)."""
     w, h, rh = 16.0, 3.5, 3.0
-    hs = p.house(x, y, w, h, rh, wall=3, kind="ridge", roof="thatch", door=False, smoke=True)
+    hs = p.house(x, y, w, h, rh, wall=3, kind="ridge", roof="thatch", door=False, smoke=smoke)
 
     def fn(pen):
         for q in range(4):
@@ -184,10 +185,11 @@ def draw(level, season, variant=0, mirror=False):
                 stripped(p, x, y)
             else:
                 p.tree(x, y, 1.0, "mulberry", k + ri)
-    p.house(*L["hut"], 5.5, 3.5, 3.0, wall=0, kind="ridge", roof="thatch", smoke=True)
+    p.house(*L["hut"], 5.5, 3.5, 3.0, wall=0, kind="ridge", roof="thatch", smoke=level < 2)
+    oldest = min(frm for _, _, frm in L["sheds"])
     for x, y, frm in L["sheds"]:
         if level >= frm:
-            shed(p, x, y)
+            shed(p, x, y, smoke=(frm == oldest))
     if level >= 3:
         caravanserai(p, *L["caravan"])
 

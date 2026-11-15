@@ -149,6 +149,7 @@ SLATE = (112, 116, 132)         # castle and tower roofs
 SLATE_D = (82, 86, 102)
 TIMBER = (150, 110, 72)         # palisades, jetties, fences, frames
 TIMBER_D = (112, 80, 54)
+ROOFS = {"tile": (ROOF, ROOF_D), "slate": (SLATE, SLATE_D), "thatch": (THATCH, THATCH_D)}     # p.church(roof=)
 TRUNK = (92, 70, 50)
 DOOR = (70, 56, 50)
 DOME = (150, 160, 150)
@@ -442,6 +443,42 @@ class Pen:
 
     def dot(self, x, y, col, size=1.0):
         self.rect(x - size / 2, y - size / 2, size, size, col, None)
+
+    def dome(self, x, y, w, h, col, col_d=None, ink=INK, snow=False, lw=0.5):
+        """A dome standing on (x, y) = the middle of its base line: half an ellipse, w wide and h tall, lit from the
+        upper left with a shaded right flank. snow: snow on the upper left only, so the colour still shows on the
+        right and along the base (give p.winter)."""
+        col_d = col_d or shade(col, 0.76)
+        arc = [(x + math.cos(math.pi * k / 16) * w / 2, y - math.sin(math.pi * k / 16) * h) for k in range(17)]
+        self.poly(arc, col, None)
+        self.poly(arc[:6] + [(x + w * 0.14, y - h * 0.5), (x + w * 0.2, y)], col_d, None)
+        if snow:
+            self.poly(arc[6:14] + [(x - w * 0.24, y - h * 0.5), (x, y - h * 0.72)], SNOW, None)
+        if ink is not None:
+            self.lines(arc, ink, lw, closed=True)
+
+    def onion(self, x, y, w, h, col, col_d=None, ink=INK, snow=False, lw=0.5):
+        """An onion dome standing on (x, y) = the middle of its neck: a bulb w wide (wider than the neck) drawn in to
+        a point h above. Two flat tones; snow on the upper left only (give p.winter)."""
+        col_d = col_d or shade(col, 0.74)
+        left = [(x - w * 0.28, y), (x - w * 0.5, y - h * 0.3), (x - w * 0.34, y - h * 0.62), (x, y - h)]
+        right = [(x + w * 0.34, y - h * 0.62), (x + w * 0.5, y - h * 0.3), (x + w * 0.28, y)]
+        self.poly(left + right, col, None)
+        self.poly([(x + w * 0.06, y), (x + w * 0.1, y - h * 0.5), (x, y - h)] + right, col_d, None)
+        if snow:
+            self.poly([(x - w * 0.5, y - h * 0.3), (x - w * 0.34, y - h * 0.62), (x, y - h), (x - w * 0.12, y - h * 0.45)], SNOW, None)
+        if ink is not None:
+            self.lines(left + right, ink, lw, closed=True)
+
+    def minaret(self, x, y, h, w=1.4, col=CHURCH, cap=SLATE_D, cap_h=2.6, ink=INK):
+        """A thin tower standing on (x, y): a minaret, a needle, a pinnacle. A shaft never thinner than 1 px, a shaded
+        right half, a dark pointed cap and a gallery line, so that it survives the 50% test. No ink round the shaft
+        (ink would grey so thin a thing): the dark cap and the shaded half carry it."""
+        w = max(1.0, w)
+        self.rect(x - w / 2, y - h, w, h, col, None)
+        self.rect(x, y - h, w / 2, h, shade(col, 0.74), None)
+        self.line((x - w / 2 - 0.5, y - h * 0.7), (x + w / 2 + 0.5, y - h * 0.7), ink, 0.5)
+        self.poly([(x - w / 2 - 0.4, y - h), (x + w / 2 + 0.4, y - h), (x, y - h - cap_h)], cap, None)
 
 
 def ring_points(cx, cy, rx, ry, a0, a1, n=40):
@@ -929,14 +966,14 @@ class Piece:
 
     def water(self, pts, w=3.0, frozen=None):
         """A stream or canal along a line. Freezes in winter unless frozen=False."""
-        frozen = self.winter if frozen is None else frozen
+        frozen = self.frozen if frozen is None else frozen
         self.gp.lines(pts, self.pal["river_edge"] if not frozen else ICE_D, w + 1)
         self.gp.lines(pts, self.pal["river"] if not frozen else ICE, w)
 
     def pond(self, pts, frozen=None, ink=True, col=None, edge=None):
         """Still water as a shape (a pond, a salt pan uses patch() instead). Freezes in winter.
         col, edge: the open-water colours (default the river's); the frozen colours are always ICE."""
-        frozen = self.winter if frozen is None else frozen
+        frozen = self.frozen if frozen is None else frozen
         col, edge = col or self.pal["river"], edge or self.pal["river_edge"]
         self.gp.poly(pts, col if not frozen else ICE, (edge if not frozen else ICE_D) if ink else None, 0.5)
         if frozen:
@@ -1000,6 +1037,22 @@ class Piece:
         map keeps its wild trees out. The kit claims the inside of every ring wall; use it for a court, a square
         or a gap between two works that must stay open. Draws nothing."""
         self.claims.append([(x * self.m, y) for x, y in pts])
+
+    def hold(self, points, side=3.5, back=4.0, front=8.0):
+        """Claim the ground round a row or group of LOW things (bales, frames, vats, low trees, stones): the box round
+        their feet, `side` px wider, `back` px behind and `front` px in front. A low thing has a small foot, so a
+        wild tree may stand right behind it and hang its crown over it, or right in front and hide it; this keeps
+        both away, in every season (call it whether or not the things are drawn this season, so the wild land
+        never changes). points: the feet, (x, y) each."""
+        xs, ys = [q[0] for q in points], [q[1] for q in points]
+        self.claim([(min(xs) - side, min(ys) - back), (max(xs) + side, min(ys) - back),
+                    (max(xs) + side, max(ys) + front), (min(xs) - side, max(ys) + front)])
+
+    def dots(self, points, col, size=1.0):
+        """Small dots lying on the ground: bolls on their rows, blossom, flowers, crumbs of salt or ore. Flat, no
+        ink, no shadow; they do not count for the footprint. points: (x, y) each."""
+        for x, y in points:
+            self.gp.dot(x, y, col, size)
 
     # -------------------------------------------------------------- shadows
     def shadow(self, x, y, w, h):
@@ -1170,14 +1223,30 @@ class Piece:
             if free(x, y):
                 self.tree(x * m, y, 1.0, "bush", i)
 
-    def tree(self, x, y, sc=1.0, kind="round", i=0):
+    def tree(self, x, y, sc=1.0, kind="round", i=0, bare=None):
         """A tree with its foot at (x, y). kind: 'round' (broadleaf), 'conifer', 'poplar' (tall, thin), 'bush',
         'olive' (silver green, evergreen), 'fruit' (small, blossom in spring), 'mulberry' (a low pollarded crown on
-        a pale stem, no blossom: silk's planted rows). i: the tree's index (autumn colour mix)."""
-        season, pal, winter, bare = self.season, self.pal, self.winter, self.cold
-        self.cast(x, y, {"conifer": 4.5, "poplar": 3.5, "bush": 4.0}.get(kind, 5.5) * sc)
+        a pale stem, no blossom: silk's planted rows), 'cypress' (a dark narrow spindle, evergreen: it stays green
+        in every winter, the mild one too; planted by an estate, a chapel, a villa). i: the tree's index (autumn
+        colour mix). bare: True draws a broadleaf, poplar or mulberry leafless in any season (a stripped mulberry,
+        a dead tree); default: bare in winter."""
+        season, pal, winter = self.season, self.pal, self.winter
+        bare = self.cold if bare is None else bare
+        self.cast(x, y, {"conifer": 4.5, "poplar": 3.5, "bush": 4.0, "cypress": 3.2}.get(kind, 5.5) * sc)
 
         def fn(p):
+            if kind == "cypress":
+                oc, lit, dk = pal["conifer"]
+                h, w = 13.5 * sc, 3.6 * sc
+                p.line((x, y), (x, y - 2.2 * sc), TRUNK, 1.0 * sc)
+                cyp = [(x, y - h), (x + w * 0.42, y - h * 0.62), (x + w / 2, y - h * 0.34), (x + w * 0.3, y - 1.6 * sc),
+                       (x - w * 0.3, y - 1.6 * sc), (x - w / 2, y - h * 0.34), (x - w * 0.42, y - h * 0.62)]
+                p.poly(cyp, dk, None)
+                p.poly([cyp[0], (x + w * 0.04, y - h * 0.5), (x - w * 0.02, y - 1.6 * sc)] + cyp[4:], lit, None)
+                if winter:      # snow lies on the lit (left) shoulder only
+                    p.poly([cyp[0], (x - w * 0.42, y - h * 0.62), (x - w * 0.1, y - h * 0.7)], SNOW, None)
+                p.poly(cyp, None, oc, 0.5)
+                return
             if kind == "conifer":
                 oc, lit, dk = pal["conifer"]
                 h, w = 12.5 * sc, 7.2 * sc
@@ -1299,13 +1368,15 @@ class Piece:
             fy = y if foot is None else foot
             return self.stand(fy, lambda p: _smoke(p, x, y, self.winter), lift=y + 30 - fy, x=x, on=on)
 
-    def church(self, x, y, size="church", sc=1.0):
+    def church(self, x, y, size="church", sc=1.0, roof="tile"):
         """size: 'chapel' (village), 'church' (town), 'cathedral' (city: a dome and a tall bell tower).
-        (x, y) is the middle of the nave's foot; the tower stands to the right. sc scales the whole building."""
+        (x, y) is the middle of the nave's foot; the tower stands to the right. sc scales the whole building.
+        roof: 'tile' (the settlements' red), 'slate' (a monastery, an abbey: no red) or 'thatch'."""
         big = size != "chapel"
         w, hw = ((9, 6) if big else (6, 4.5))
         w, hw = w * sc, hw * sc
         th = {"chapel": 8, "church": 13, "cathedral": 17}[size] * sc
+        ROOF, ROOF_D = ROOFS[roof]                      # (shadows the tokens inside this call only)
         r1, r2 = (ROOF, ROOF_D) if not self.winter else (SNOW, SNOW_D)
         self.cast(x + 2 if not self.mirror else x + 3.5 * sc - 2, y, w + 5 * sc)     # the tower stays on the right
 
@@ -1363,11 +1434,24 @@ class Piece:
                 p.poly([(x, ty - 4.5), (x + 3.2, ty - 3.6), (x, ty - 2.6)], flag, None)
         return self.stand(y, fn, x=x)
 
-    def wall(self, cx, cy, rx, ry, kind="stone", towers=(0.25, 0.5, 0.75), gate=0.5, back_towers=(), height=4.0, col=None):
+    def wall(self, cx, cy, rx, ry, kind="stone", towers=(0.25, 0.5, 0.75), gate=0.5, back_towers=(), height=4.0, col=None,
+             tower_col=None, tower_top="flat", tower_roof=SLATE):
         """A ring wall round (cx, cy). kind: 'palisade' (timber stakes, no towers unless asked) or 'stone'
         (battlements). towers and gate are positions along the front half, 0 = right end, 1 = left end
-        (0.5 = the middle of the front). The back half is queued behind everything inside, the front half before it."""
+        (0.5 = the middle of the front). The back half is queued behind everything inside, the front half before it.
+        tower_col: another colour for the towers (default the wall's). tower_top: 'flat' (as always) or 'cone': a
+        pointed cap in tower_roof on every tower (a brick ring with dark spires; snow on its left where snow lies)."""
         col = col or (STONE if kind == "stone" else TIMBER)       # col=STONE_GREY for castles
+        tcol = tower_col or col
+
+        def cap(p, qx, qy, tw, th):
+            if tower_top == "cone":
+                tip = (qx, qy - th - tw * 0.8)
+                p.poly([(qx - tw / 2 - 0.5, qy - th), (qx + tw / 2 + 0.5, qy - th), tip], tower_roof, INK, 0.5)
+                if self.winter:
+                    p.poly([(qx - tw / 2 - 0.5, qy - th), (qx, qy - th), tip], SNOW, None)
+            elif self.winter and th > height + 3.2:
+                p.rect(qx - tw / 2, qy - th - 0.6, tw, 1.0, SNOW, None)
         if self.mirror:                                           # the ring is moved; its towers and gate change ends
             towers, back_towers = [1 - a for a in towers], [1 - a for a in back_towers]
             gate = None if gate is None else 1 - gate
@@ -1390,7 +1474,9 @@ class Piece:
             p.lines(top, INK if kind == "stone" else TIMBER_D, 0.5)
             for a in back_towers:
                 q = back[int(len(back) * a)]
-                p.box(q[0], q[1], 3.6, hw + 3, shade(col, 0.9), INK)
+                p.box(q[0], q[1], 3.6, hw + 3, shade(tcol, 0.9), INK)
+                if tower_top == "cone":
+                    cap(p, q[0], q[1], 3.6, hw + 3)
 
         def ff(p):
             top = [(a[0], a[1] - hw) for a in front]
@@ -1409,9 +1495,8 @@ class Piece:
             for a in towers:
                 q = front[int((len(front) - 1) * a)]
                 tw, th = 4.2, hw + 3.5
-                p.box(q[0], q[1], tw, th, col, INK)
-                if self.winter:
-                    p.rect(q[0] - tw / 2, q[1] - th - 0.6, tw, 1.0, SNOW, None)
+                p.box(q[0], q[1], tw, th, tcol, INK)
+                cap(p, q[0], q[1], tw, th)
             if gate is not None:
                 q = front[int((len(front) - 1) * gate)]
                 p.rect(q[0] - 1.6, q[1] - 3.0, 3.2, 3.0, DOOR, None)
@@ -1478,6 +1563,102 @@ class Piece:
                 p.line((x + 1.2, y), (x + 1.2, y - 1.6), INK, 0.5)
                 p.ellipse(x, y - 2.4, 4.4, 2.2, (96, 66, 50), INK, 0.5)
                 p.line((x + 1.8 * d, y - 2.8), (x + 2.6 * d, y - 4.4), (96, 66, 50), 1.0)
+        return self.stand(y, fn, x=x)
+
+    def stockade(self, pts, kind="palisade", height=4.8, col=None, closed=False, posts=True, claim=None):
+        """A straight-sided standing wall along the points (unmirrored piece px), for what the ring wall cannot do:
+        a square stockade, a bailey, a precinct or garden wall, a long palace wall. kind: 'palisade' (pointed timber
+        stakes), 'stone' (a wall with battlements) or 'low' (a plain low stone wall: give height=2 to 3).
+        Each side is queued at its own depth, so what stands inside is in front of the back side and behind the
+        front side. In a mirrored piece the plan is turned round and every side is drawn anew, lit from the left
+        (never write `if mirror:`). posts: a taller corner post or pier at every point. closed: join the last point
+        to the first. claim: hold the inside (default: when closed); for an open stockade claim the yard yourself
+        (p.claim). For a gate or an open front leave that side out (an open line, or two calls). A side running
+        away from the viewer is shaded. Returns the handles of the sides."""
+        col = col or (TIMBER if kind == "palisade" else STONE_GREY)
+        q = [(x * self.m, y) for x, y in pts]                 # the plan as it lies in this piece
+        if (claim is None and closed) or claim:
+            self.claim(pts)
+        sides = list(zip(q, q[1:])) + ([(q[-1], q[0])] if closed and len(q) > 2 else [])
+        snow = self.winter
+        out = []
+        for a, b in sides:
+            steep = abs(b[1] - a[1]) > abs(b[0] - a[0])
+            face = shade(col, 0.82) if steep else col
+            mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+            ln = math.hypot(b[0] - a[0], b[1] - a[1])
+            self.shadow((mid[0] + (1.0 if steep else ln * 0.1)) * self.m, mid[1] + 0.8, max(3.0, abs(b[0] - a[0]) + 2.5), max(2.0, abs(b[1] - a[1]) * 0.8 + 2.0))
+
+            def fn(p, a=a, b=b, steep=steep, face=face, ln=ln):
+                if kind == "palisade":
+                    n = max(1, int(round(ln / (1.4 if steep else 1.9))))
+                    feet = [(a[0] + (b[0] - a[0]) * (k + 0.5) / n, a[1] + (b[1] - a[1]) * (k + 0.5) / n) for k in range(n)]
+                    sw = 2.2 if steep else abs(b[0] - a[0]) / n
+                    for k, (sx, sy) in enumerate(sorted(feet, key=lambda f: f[1])):
+                        _stake(p, sx - sw / 2 + ((0.4 if k % 2 else -0.4) if steep else 0.0), sy, sw, height, col, snow)
+                    return
+                top = [(a[0], a[1] - height), (b[0], b[1] - height)]
+                p.poly([a, b, top[1], top[0]], face, None)
+                if kind == "stone":
+                    n = max(1, int(ln / 3.0))
+                    for k in range(n + 1):
+                        mx, my = a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n - height
+                        p.rect(mx - 0.8, my - 1.4, 1.6, 1.5, face if not snow else SNOW, None)
+                elif snow:
+                    p.line((top[0][0], top[0][1] - 0.3), (top[1][0], top[1][1] - 0.3), SNOW, 0.7)
+                p.line(top[0], top[1], INK, 0.5)
+                p.line(a, b, INK, 0.5)
+            out.append(self.stand(mid[1] if steep else max(a[1], b[1]), fn, x=0.0))
+        if posts:
+            ph = height + (1.2 if kind == "palisade" else 2.2 if kind == "stone" else 0.8)
+            pw = 2.2 if kind != "stone" else 3.0
+            for px, py in q:
+                def fp(p, px=px, py=py):
+                    p.rect(px - pw / 2, py - ph, pw, ph, col, None)
+                    p.rect(px + pw * 0.08, py - ph, pw * 0.42, ph, shade(col, 0.74), None)
+                    if kind == "palisade":
+                        p.poly([(px - pw / 2, py - ph), (px, py - ph - 1.2), (px + pw / 2, py - ph)], shade(col, 0.74) if not snow else SNOW, None)
+                    elif snow:
+                        p.rect(px - pw / 2, py - ph - 0.5, pw, 0.8, SNOW, None)
+                    p.rect(px - pw / 2, py - ph, pw, ph, None, INK, 0.5)
+                self.stand(py + 0.1, fp, x=0.0)
+        return out
+
+    def bale(self, x, y, w=3.4, h=2.8, col=BOLL, band=TIMBER_D, lift=0.0):
+        """A bale or bundle: a small box with two dark bands (cotton, wool, furs, hemp, cloth). lift raises it onto
+        the bale below; its foot (and so its place in the order) stays at y. col: the goods' colour (BOLL is
+        cotton's white; pass PELT for furs, a THATCH tone for hemp or wool)."""
+        if not lift:
+            self.cast(x, y, w * 0.9, 1.4)
+
+        def fn(p):
+            b = y - lift
+            p.rect(x - w / 2, b - h, w, h, col, None)
+            p.rect(x + w / 2 - w * 0.22, b - h, w * 0.22, h, shade(col, 0.86), None)
+            for dx in (-w * 0.22, w * 0.22):
+                p.line((x + dx, b - h), (x + dx, b), band, 0.3)
+            if self.winter and not lift:
+                p.rect(x - w / 2, b - h - 0.4, w, 0.6, SNOW, None)
+            p.rect(x - w / 2, b - h, w, h, None, INK, 0.35)
+        return self.stand(y + 0.1 + lift * 0.01, fn, x=x)
+
+    def tent(self, x, y, w=5.0, h=6.0, col=None, poles=False):
+        """A tent: a pale cone with a dark flap, lit left and shaded right (a prospector's, a trapper's, a camp).
+        col: default PLASTER[3] (canvas); a hide tent passes its own. poles: the crossed pole ends above the top."""
+        col = col or PLASTER[3]
+        self.cast(x, y, w)
+
+        def fn(p):
+            tri = [(x - w / 2, y), (x, y - h), (x + w / 2, y)]
+            p.poly(tri, col, None)
+            p.poly([(x + w * 0.04, y), (x, y - h), (x + w / 2, y)], shade(col, 0.85), None)
+            p.poly([(x - w * 0.16, y), (x, y - h * 0.46), (x + w * 0.16, y)], DOOR, None)
+            if self.winter:
+                p.poly([(x - w * 0.2, y - h * 0.74), (x, y - h), (x + w * 0.2, y - h * 0.74)], SNOW, None)
+            p.poly(tri, None, INK, 0.5)
+            if poles:
+                p.line((x - w * 0.22, y - h - 1.6), (x + w * 0.08, y - h + 0.8), TIMBER_D, 0.8)
+                p.line((x + w * 0.22, y - h - 1.6), (x - w * 0.08, y - h + 0.8), TIMBER_D, 0.8)
         return self.stand(y, fn, x=x)
 
     def haystack(self, x, y, sc=1.0):
@@ -1553,6 +1734,16 @@ def _sheep(p, x, y, d, sc, body):
     p.ellipse(x, y - h * 0.42, w, h, (104, 92, 80))              # the belly line and legs, showing 0.5 px below
     p.ellipse(x, y - h * 0.62, w, h, body)
     p.dot(x + w * 0.5 * d, y - h * 0.72, INK, 1.0 * max(0.8, sc))
+
+
+def _stake(p, sx, y, w, h, col, snow):
+    """One stake of a palisade: pointed, lit on the left, shaded on the right. (sx, y) is its lower left corner."""
+    dk = shade(col, 0.74)
+    p.poly([(sx, y), (sx, y - h + 1.6), (sx + w / 2, y - h), (sx + w, y - h + 1.6), (sx + w, y)], col, None)
+    p.poly([(sx + w / 2, y - h), (sx + w, y - h + 1.6), (sx + w, y), (sx + w * 0.55, y)], dk, None)
+    p.line((sx, y - h + 1.6), (sx, y), TRUNK, 0.4)
+    if snow:
+        p.poly([(sx + w * 0.2, y - h + 1.0), (sx + w / 2, y - h), (sx + w * 0.8, y - h + 1.0)], SNOW, None)
 
 
 def _smoke(p, x, y, winter=False):

@@ -3,6 +3,39 @@
 Art director, 2026-11-15. **Status: a test for the owner and the planning session. Nothing in the game, the style
 frame or the pieces is changed.**
 
+## Round 6: the families of the Python art (2026-11-15)
+
+Review task 25 (`../pieces/REVIEW.md`, "Round 5"). Tasks 10 to 24 are back, so the test carries what fits north
+Italy. All pictures are rendered again; three crops are new: `east_crop.png` (the lower Po plain and the
+Apennines), `west_plain_crop.png` (Turin to Asti) and `carrara_crop.png` (the Apuan coast, four times enlarged).
+
+| What | Where (column, row) | Level |
+|---|---|---|
+| Quarry | The Apuan Alps above Carrara (13, 15) | 3 |
+| Hemp | South of Turin (5, 11); the lower Po (13, 9) | 2, 3 |
+| Silk | By Turin (6, 9); Emilia (14, 10) | 3, 2 |
+| Dye works | By Parma (13, 11) | 3 |
+| Sites | A monastery in the Apennines (9, 11); Roman ruins at Luni (12, 15); a ruined castle on a pass (10, 12) | - |
+| Ores | Iron (4, 13) and copper (3, 15) in the Maritime Alps | 3, 2 |
+| Castles, three layouts | Giovi (9, 12): a watchtower, layout 0. The Col di Tenda (5, 14): motte and bailey, layout 2. Above Parma (13, 12): layout 1. The Susa valley (4, 9): the bastion fortress | 1, 2, 2, 3 |
+| Third layouts | The contour vineyard (6, 11); the walled pastures (5, 12) and (11, 12) | 3, 3, 2 |
+
+**Not placed, on purpose.** Furs (a northern forest good) and cotton (a hot-land good) have no place in north
+Italy. None of the ten landmark cities lies in the frame; Genoa is a plain city.
+
+- **No `PIECE PROBLEM`**, summer or winter. Rule K drops 57 range samples at footprints; nothing is hidden.
+- **It still reads as one countryside**, and it is richer: the plain is no longer wheat only. Hemp's dark squares,
+  the silk lines, the vats and the pale quarry are each told at a glance at 100%.
+- **The sites sit best of all.** A monastery and a ruin in the frame's own dense wood look found, not placed.
+- **Sites: the variant is the site.** The map gives `variant=` from its data and takes only the mirror from
+  `kit.pick`. (The compositor loads the pieces' `sites.py` under another name: the style frame has a module of
+  the same name.)
+- **For the map's side:** the frame's road runs through the dye works' vat yard: roads are led to a town's
+  middle but not yet to a goods piece's gate point (rule H wants a road layer that does). The motte at the Col
+  di Tenda is a green mound on rock and both pass castles sit under their pass names (both known since round 3).
+- **Winter:** the plain's hemp is outlined blocks in the frost (review task 29); the sheep in the snow pasture
+  are seen now (the winter fleece).
+
 ## Round 5: the carved harbour is in (2026-11-15)
 
 `harbour.py` has its carved layout and `salt.py` and `harbour.py` their second layouts (review task 9), so the

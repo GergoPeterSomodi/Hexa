@@ -5,14 +5,136 @@ tasks are done and reviewed a second time: all ten families pass ("Round 2" belo
 the owner's two further answers, two port modes and winter by climate, to the kit, the guide and the in-map test,
 and writes task 9. Round 4 (the same day): task 9 is back, the owner picked the Python art to bring over (the
 catalogue's top 10) and answered the two port questions; the guide has the tables, the kit the tools, and section 4
-the worker tasks 10 to 25. Nothing in the game is changed.**
+the worker tasks 10 to 25. Round 5 (the same day): tasks 10 to 24 are back and reviewed on one page at 50%
+("Round 5" below): all sixteen families pass, the landmark monuments need one more task, the kit has the calls the
+workers missed, the in-map test carries the new families, and section 4 has tasks 26 to 33. Nothing in the game is
+changed.**
 
 All ten families are drawn. This is the review of the eight new ones against `GUIDE.md` (the two reference
 families were checked again too), with the findings of the in-map test (`../pieces_in_map/notes.md`) folded in.
 
-**Look at `overview.png` first**: every family and every level on one page (summer on top, six families in winter
-below). The per-family sheets (`<family>.png`) show all four seasons and the 50% test. `kit_contract.png` shows what
+**Look at `overview.png` first**: every family and every level on one page in summer, with the ores, the sites and
+the landmark cities (`overview_2.png`: the same in winter, the layouts, the coasts). The per-family sheets (`<family>.png`) show all four seasons and the 50% test. `kit_contract.png` shows what
 the owner's answers mean in the kit: wild land, the coast on any side, the footprint, the mirror.
+
+## Round 5: the review of the Python art (task 25, 2026-11-15)
+
+Tasks 10 to 24 are back. Everything was put on two pages at 50% (`crowding.png`: every family, ore, site and
+landmark city in summer and the three winters; `crowding_pairs.png`: the pairs of guide section 4 side by side at
+50% and 100%), every new sheet was looked at whole and in enlarged crops, and the new families were placed in the
+in-map test. **All sixteen families, the ores and the sites pass the look-alike test; three small fixes were made
+at once; the landmark cities pass as cities but their monuments need one more task; eight follow-up tasks (26 to
+33) are written, each on one file.** No module prints a `PIECE PROBLEM`, on the sheets or in the map.
+
+**Show the owner, in this order:** `overview.png` (summer: sixteen families, the ores, the sites, the landmark
+cities), `overview_2.png` (the snow winter; the layouts; the coasts), `crowding.png`, then
+`../pieces_in_map/summer.png` with `east_crop.png`, `west_plain_crop.png` and `carrara_crop.png`, then
+`../pieces_in_map/winter.png`. `crowding_pairs.png`, `winters.png` (now all sixteen) and `landmarks.png` are the
+backing.
+
+### Verdict per family (look-alikes at 50%, summer and the three winters)
+
+| Family | Verdict | Coverage, levels up (layout 0 / 1) | Notes |
+|---|---|---|---|
+| Settlements, Castles, Wheat, Vineyard, Olives, Salt, Timber, Harbour | **Pass** | as in round 2 | Unchanged and still told apart from every newcomer. The third layouts read at once: the contour vineyard (28 / 53 / 70%) is the best single picture of the round; the motte and bailey (25 / 36 / 71%) is told from the two ring castles |
+| Grazing | **Pass, after one fix** | 17 / 34 / 61% (upland pens the same; horses 17 / 35 / 64%) | **Fixed:** sheep vanished on snow; where snow lies they now wear a darker winter fleece (`WINTER_FLEECE`, a module token). Level 2 at 34% against a floor of 35%: accepted as in round 2, the pale meadow carries. The walled pastures and the round paddocks are told from the fenced meadows at 50% |
+| Mines and the four ores | **Pass, after one fix** | 28 / 53 / 68%; gold 28 / 46 / 62% | Level 3 is five different pictures at 50% (smelter, furnace with its glow, mint, three roasting heaps, sluice and strongroom). Levels 1 and 2 of iron, silver and copper differ by colour only, as agreed. **Fixed:** the ore sheets carried the plain mine's level names (`ORE_NAMES`). Gold's tents are 5 px cones of nearly the gravel heaps' size and tone: task 31 |
+| Quarry | **Pass; level 1 to strengthen** | 26 / 50 / 69% (both) | Never taken for a mine: pale, stepped, no opening, no smoke. In the map (the Apuan Alps) it is the clearest of the new families. Level 1 is one thin pale bar and nearly gone on snow: task 27 |
+| Dye works | **Pass** | 28 / 45 / 66% / 30 / 50 / 73% | The only many-coloured piece; the vats keep their colour in every winter. Nothing like salt |
+| Hemp | **Pass; winter to strengthen** | 22 / 50 / 77% / 23 / 48 / 79% | Summer's dark green squares are unmistakable; against spring wheat the rule holds (brown squares with dashed rows against green strips). In the snow winter the blocks are empty outlines: task 29 |
+| Cotton | **Pass; one pair to watch** | 19 / 48 / 76% / 16 / 42 / 66% | Told from the vineyard in every season (big red patches, rows along). **New pair: cotton / hemp** in spring and in the mild winter (brown blocks on farm land both); they differ by size, redness, the ponds and the ropewalk, which is enough at 100% and thin at 50%: task 28 |
+| Silk | **Pass, after one fix** | 22 / 46 / 81% / 22 / 49 / 77% | Lines, not a grid: never olives. Autumn does not read as haystacks (the rows are too regular and too long). **Fixed:** the hut and both sheds smoked in a column beside the pale rows and read as exclamation marks; now one smoke per level (the hut at level 1, the oldest shed after). The 6 px dome is told from both cathedral domes by its colour |
+| Furs | **Pass** | 17 / 27 / 48% / 16 / 21 / 42% | Told from timber (no clearing to speak of, the wood left standing, the frames in front) and from castle 1 (square, open, timber). Level 1 is close to the wild wood, as its band (10-20%) wants |
+| Sites | **Pass** | 19 / 17 / 18 / 17 / 15 / 19% | Six different silhouettes; none is taken for a village or a castle. The monastery and the ruined castle are very good in the map's woods. On snow the pale ruins and the stones are faint but found |
+| Landmark cities | **Pass as cities; monuments: task 26** | as the plain city | Moscow (the red ring) and Granada (the red block) read at 50%; the other eight read at 100% and are faint at 50%. In layout 0 the `CLEAR` box empties the middle of the city, so the monument stands in a bare court and the city looks thinner than a plain one; most monuments are lower than the roofs round them. In layout 1 the monument stands at the west edge of the ring and reads better |
+
+### The workers' open points, decided
+
+| Point | Decision |
+|---|---|
+| Grazing level 2 at 34% | Accepted (above) |
+| Winter sheep nearly invisible | Fixed in `grazing.py` (above). The kit's own winter sheep stays as it is for other users |
+| Gold: tents and heaps alike at 50%; wrong level names | Names fixed. Tents: task 31 (the kit's `p.tent`, 6 x 7, and flatter gravel heaps) |
+| Silk's smoke as exclamation marks | Fixed in `silk.py`: one smoke per level. New rule in the guide (section 7): at most one smoke in any column of buildings, and never more than two in a goods piece of the new families |
+| Landmark `CLEAR` boxes empty the city | Task 26: the box is the monument's own width plus 2 px and 3 px in front; houses behind it stay |
+| Constantinople's minarets faint at 50% | Task 26, with the kit's `pen.minaret` (never thinner than 1 px, a dark cap, no ink round the shaft) |
+| The mirrored landmark spot | Checked on all ten: the monument moves with the church's spot and is drawn unflipped; correct |
+| Kit gaps | Added where more than one module needs them (below) |
+
+### Kit additions (all optional; nothing a module draws today changes)
+
+Checked on **4,184 pictures** (seventeen modules: every level, season, layout, mirror and the three winters; the
+three animals, the five ores, the ten landmark cities at levels 4 and 5, the coast modules on three sea sides and in
+two bays) and `kit.pick`: **hash for hash equal before and after the kit change.** After the three module fixes 68
+pictures differ, all intended: sheep in the snow and frost winters (36) and silk in autumn and the three winters
+(32). `kit_additions.png` has two new rows that show every new call in four seasons, three winters and mirrored.
+
+| New in the kit | For | Modules that should adopt it (the tasks below) |
+|---|---|---|
+| `p.stockade(pts, kind="palisade" / "stone" / "low", height=, closed=, posts=, claim=)` | A straight-sided standing wall along any points; each side at its own depth; the plan is turned round in a mirrored piece and every side is lit anew | `furs.py` (the stockade), `castles.py` (the bailey), `sites.py` (the monastery's precinct), `landmarks.py` (Granada) |
+| `p.hold(points, side=, back=, front=)` | The claim round a row of low things, so no wild tree hangs its crown over them or stands in front (the "crown-aware claim") | `cotton.py`, `furs.py`, `dyes.py`, `silk.py`, `sites.py` |
+| `p.dots(points, col, size=)` | Dots on the ground: bolls, blossom, crumbs | `cotton.py`, `olives.py` |
+| `p.bale(x, y, w=, h=, col=, band=, lift=)` | The standard bale | `cotton.py`, `furs.py`, `grazing.py` (wool), `hemp.py` |
+| `p.tent(x, y, w=, h=, col=, poles=)` | A tent | `mines.py` (gold), `furs.py` |
+| `p.tree(..., "cypress")` | An evergreen cypress: green in every winter, the mild one too | `vineyard.py`, `sites.py` (they use the poplar, which goes bare) |
+| `p.tree(..., bare=True)` | A leafless tree in any season | `silk.py` (the stripped mulberries; it keeps a local copy today) |
+| `p.church(..., roof="tile" / "slate" / "thatch")` | A church without red | `sites.py` (the monastery) |
+| `p.wall(..., tower_col=, tower_top="cone", tower_roof=)` | Capped towers of another colour on the ring wall | `landmarks.py` / `settlements.py` (Moscow), `castles.py` |
+| `pen.dome`, `pen.onion`, `pen.minaret` | Domes with snow on the upper left only; a thin tower that survives 50% | `landmarks.py`, `silk.py` (the caravanserai) |
+| `p.pond` and `p.water` freeze by `p.frozen` | The default was `p.winter` (the same value today; now the right name) | - |
+
+Not added: a round "cylinder" (`pen.box` is that shape already); a mound as a ground overlay (one family; it stays
+on the list below).
+
+### Tools
+
+- `families.py` (new): the list of the sixteen families in one place, for the pages that show them all.
+- `crowding.py` (new) writes `crowding.png` and `crowding_pairs.png`.
+- `overview.py` writes two pages: `overview.png` (summer) and `overview_2.png` (the snow winter, the layouts, the
+  coasts). Both carry the ores, the sites and the landmark cities.
+- `winters.py`: all sixteen families, in two blocks. `contract.py`, `additions.py`: run again.
+- `compose.py` (the in-map test): below.
+
+### The in-map test with the new families (`../pieces_in_map/notes.md`, round 6)
+
+Placed where they belong in north Italy: **a quarry** in the Apuan Alps (Carrara), **hemp** south of Turin and on
+the lower Po, **silk** by Turin and in Emilia, **a dye works** by Parma, **three sites** (a monastery in the
+Apennines, Roman ruins at Luni, a ruined castle on a pass), **iron and copper** for the two Alpine mines,
+**castles in all three layouts** (a watchtower at Giovi, a motte and bailey at the Col di Tenda, the bastion
+fortress in the Susa valley, a ring castle above Parma), the **contour vineyard** in the Langhe and the **walled
+pastures** in the foothills. **Furs and cotton are not placed: they have no place in north Italy. No landmark city
+lies in the frame** (Genoa is a plain city).
+
+- It still reads as one countryside. The new families are told at a glance at 100%: the dark hemp squares, the
+  silk lines, the coloured vats, the pale stepped quarry. No `PIECE PROBLEM`, no piece hidden by relief (rule K
+  drops 57 range samples).
+- **Sites are the surprise.** A monastery and a ruin standing in the map's own dense wood look found, not placed;
+  the small footprint (15-19%) is right.
+- Seen, for the map's side: the map's road runs through the dye works' vat yard (roads are led to a town's
+  middle, not yet to a goods piece's gate: the gate rule H needs its road layer); the watchtower at Giovi and the
+  motte at Tenda sit under the pass names (known, round 2 point 3); the motte is a green mound on rock (known,
+  point 4).
+- Winter: the frost plain shows hemp as outlined blocks (task 29) and the sheep in the snow pasture are seen.
+
+### Remaining work
+
+- **Tasks 26 to 33** (section 4): the monuments, quarry level 1, cotton against hemp, hemp's winter, the
+  adoptions of the new kit calls. All eight are one file each and run side by side.
+- A test of **furs, cotton and a landmark city in a map** needs another region (an owner question below).
+- Still open from earlier rounds: the castle mound and the village green as ground overlays; the stronger spring
+  ground tone; a water depth per level for coast modules; Venice on the water (guide section 12, point 1).
+- The kit's smoke (three puffs on a slant) is the same everywhere; where two or three stand close it reads as
+  punctuation. The rule above avoids it; a rounder smoke would change every sheet and is not proposed now.
+
+### Owner questions (two)
+
+1. **How tall may a landmark city's monument be?** Today 20 x 24 px, like every tall thing; eight of ten are faint
+   at 50%. (a) Keep the limit; task 26 fills the city round them and sharpens the silhouettes (recommended first:
+   it costs nothing and may be enough). (b) Let landmark cities alone go to 28 px, so the monument stands above
+   the roofs (the next step if (a) is not enough). (c) Leave them as they are.
+2. **Furs, cotton and the landmark cities are judged on sheets only: north Italy has none of them.** (a) A second
+   small test frame later (for instance the eastern Mediterranean: cotton, silk, Constantinople or Cairo),
+   when the map plan reaches it (recommended). (b) Sheets are enough until the real map is built.
 
 ## Round 4: the Python art, the port answers (2026-11-15)
 
@@ -323,7 +445,8 @@ as the record:
 | 5 | `wheat.py`, `settlements.py` | The rule fixes, the wild-land rules, **wheat's second layout**; settlements: roads to gates, no plate strip |
 | 6 | `vineyard.py`, `castles.py`, `mines.py`, `olives.py` | **Vineyard's second layout**; the wild-land rules and the mirror check for all four |
 | 9 (done, round 3) | `salt.py`, `harbour.py` | **Second layouts for both, the carved port in `harbour.py`**, salt on a lagoon, the three winters. Follow-ups from the map: task 24 |
-| 10 to 25 (open, round 4) | one module each | **The Python art**: six new families, the ores, the third layouts, the landmark cities, the sites. The briefs are at the end of this section |
+| 10 to 25 (done, round 4; reviewed in round 5) | one module each | **The Python art**: six new families, the ores, the third layouts, the landmark cities, the sites. The briefs are at the end of this section |
+| 26 to 33 (open, round 5) | one module each | The monuments, quarry level 1, cotton against hemp, hemp's winter, gold's tents, and the adoption of the new kit calls. The briefs are at the very end of this section |
 
 Each worker: read `GUIDE.md` (sections 1, 6, 8, 10, 11) and look at `kit_contract.png` first. Change only the
 named modules. Run them to rewrite the sheets, check that no `PIECE PROBLEM` line is printed, and look at every
@@ -910,6 +1033,65 @@ sheets again.
   `winters.py`: the new families. `compose.py`: place a quarry, a dye works and a site in the test region and
   give Genoa no landmark (it has none); render and review. Then the look-alike review of all sixteen families on
   one page, at 50%.
+
+### Round 5: tasks 26 to 33 (after the review of the Python art)
+
+Eight tasks, **one file each, all parallel**. N1 to N10 above hold. New for all: the kit calls of round 5
+(`kit_additions.png`, the two bottom rows; `tools/worldmap/pieces/README.md`). Where a task says **adopt**, replace
+the module's local drawing by the kit call and send a before/after strip: the picture may change by a pixel or two,
+never in kind. Hash every picture of the module before you start and list what changed (N9).
+
+**Task 26: `landmarks.py`, the monuments.**
+- `CLEAR[name][level]` becomes the monument's own width plus 2 px to each side, from its foot line to 3 px in
+  front; nothing behind the monument is cleared (roofs may show behind it). The city must look as full as a plain
+  one in both layouts.
+- Use the allowance: every monument reaches at least 16 px and may reach 20 x 24. Today most are lower than the
+  roofs round them. One silhouette idea each, as before.
+- Adopt `pen.dome`, `pen.onion`, `pen.minaret` (Constantinople, Cairo, Venice's domes, Moscow, Rome) and
+  `p.stockade(kind="stone", col=kit.BRICK)` for Granada's long wall if it gives the same picture or a better one.
+  Minarets: `pen.minaret`, at least 13 px, dark caps.
+- Check: all ten beside a plain city at 50%, summer and the snow winter; each must be told from the plain city
+  and from the other nine. Say plainly which still are not.
+
+**Task 27: `quarry.py`, level 1.**
+- Level 1 is one thin pale bar and a block: at 50% it is hardly told from wild rock, and it is gone on snow.
+  Make the first cut a face of two short ledges (about 20 px wide, 5 px tall in all) and four blocks in two
+  stacks; coverage stays in 15-30%. Faces stay bare in every winter (snow on the tops only): check that the face
+  shows on snow at 50%. Levels 2 and 3 keep their pictures.
+
+**Task 28: `cotton.py`, against hemp.**
+- Seen on `crowding_pairs.png`: in spring and in the mild winter cotton and hemp are both brown blocks on farm
+  land. Give cotton's bare patches the rows of dry stalks in winter (pale dashed rows along the long side, in
+  every climate) and keep the red earth clearly redder than `soil` in spring. Do not touch the summer and autumn
+  pictures.
+- Adopt `p.bale` (the bales), `p.dots` (the bolls) and `p.hold` (the claims round the bales).
+
+**Task 29: `hemp.py`, the winter.**
+- In the snow and frost winters the blocks are empty outlines. Draw stubble: three or four short dark dashes per
+  block (`p.rows(..., dashed=True)` in `kit.crop("hemp_row", "winter")`), so the near-square blocks still read at
+  50%. The mild winter keeps its dark earth.
+- Adopt `p.hold` round the stooks.
+
+**Task 30: `furs.py`, adoptions.**
+- Adopt `p.stockade` (the square stockade: three sides, `closed=False`, then `p.claim` the yard), `p.tent`
+  (`poles=True`, the hide colour), `p.bale(col=kit.PELT)` and `p.hold` (the frame rows). The pictures stay in
+  kind; the mirror must now be exact for the stockade without `x=` care.
+
+**Task 31: `mines.py`, gold's tents.**
+- The tents are 5 px cones beside gravel heaps of the same size and nearly the same tone. Adopt `p.tent(x, y,
+  6.0, 7.0)` (canvas white, a dark flap) and make the gravel heaps flatter (height at most 45% of the width).
+  Only `ore="gold"` may change; every other picture of the module stays hash-equal.
+
+**Task 32: `silk.py`, adoptions.**
+- Adopt `p.tree(..., "mulberry", bare=True)` for the stripped trees (drop the local copy), `pen.dome` for the
+  caravanserai's dome (snow on the upper left only) and `p.hold` where rows are claimed by hand.
+
+**Task 33: `sites.py` and the cypress** (one file; `vineyard.py` follows as task 34 if the owner likes the tree).
+- The monastery: `p.church(..., roof="slate")` and `p.stockade(kind="low", height=2.2, closed=True)` for the
+  precinct wall, if the local drawings can go. The chapel's two trees become `"cypress"` (they must stay green in
+  every winter). `p.hold` for the standing stones and the ruins.
+- Roman ruins on a rock hex (seen in the map at Luni): the pale floor patch reads; the map's grey stones round
+  it compete with the broken drums. Make the fallen drums `MARBLE`, clearly paler than the map's stones.
 
 ## 5. Kit changes made in this review
 
