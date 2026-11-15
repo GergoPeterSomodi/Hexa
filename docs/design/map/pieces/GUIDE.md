@@ -1,19 +1,34 @@
 # Normal-map pieces: the rule book
 
-Art director, 2026-11-15. **Status: for the owner to approve. Nothing in the game is changed.**
+Art director, 2026-11-15. **Status: the owner answered the three open questions on 2026-11-15 (section 12); this
+guide is rewritten to those answers. Nothing in the game is changed.**
 
 A **piece** is the picture of one hex's improvement at one level in one season, at the normal map zoom (the style
 frame's close zoom: hex radius 60 px, one hex = one district). This guide and the drawing kit
-(`tools/worldmap/pieces/kit.py`) are everything an artist needs to draw a family of pieces. Two families are already
-drawn to these rules and set the bar: `wheat.png` and `settlements.png` in this folder (code: `wheat.py`,
-`settlements.py` next to the kit). **When this guide and a reference sheet seem to disagree, copy the reference sheet
-and report the gap.**
+(`tools/worldmap/pieces/kit.py`) are everything an artist needs to draw a family of pieces. Two families are the
+reference: `wheat.png` and `settlements.png` in this folder (code: `wheat.py`, `settlements.py` next to the kit).
+`kit_contract.png` shows the kit's side of the map contract (wild land, coast, footprint, mirror) on one page.
+**When this guide and a reference sheet seem to disagree, follow this guide and report the gap**: the reference
+sheets were drawn before the owner's answers and are brought up to date in review task 5.
 
 The look itself (camera, light, palette, ink) is the style frame's: `../style-frame/README.md`. The stages follow the
 growing-map plan (`../06-growing-map.md`, sections 2 and 5).
 
-Contents: 1 canvas, 2 camera, 3 light and ink, 4 palette, 5 sizes, 6 how a level reads, 7 seasons, 8 the family
-tables, 9 readability, 10 terrain fit, 11 the reviewer's checklist, 12 for the owner to decide.
+**Who draws what** (the owner's answers in one table):
+
+| Thing | Drawn by | The piece's part |
+|---|---|---|
+| Ground colour | The map | None. The piece's ground base is for the sheets only |
+| Wild land: woods, single trees, bushes, scrub, tufts, stones | **The map** | None. The piece reports its **footprint** and the map thins the wild land there (section 6) |
+| Level 0 | **Nobody: it is no piece** | On the sheets the level 0 column is `kit.wild()`: the wild land as the map draws it |
+| The coast: sea, sand, foam, the shore line | **The map** | The piece is told where the sea is and builds at that shore (section 10) |
+| Rivers, streams, roads between hexes | The map | Gate points for roads (section 10); no water or road to the hex border |
+| Town name plates | **Nobody, for now** | None. No plate, no plate strip |
+| Repetition | The map picks by the hex | Every family has a mirrored version and a second layout (section 6) |
+
+Contents: 1 canvas, 2 camera, 3 light and ink, 4 palette, 5 sizes, 6 how a level reads (level 0, footprint,
+mirror and second layout), 7 seasons, 8 the family tables, 9 readability, 10 terrain fit and the coast, 11 the
+reviewer's checklist, 12 the owner's decisions and what is still open.
 
 ---
 
@@ -26,16 +41,21 @@ tables, 9 readability, 10 terrain fit, 11 the reviewer's checklist, 12 for the o
 | Drawing | At 2x, then smooth-scaled to 1x. The kit does this; you always work in 100% pixels |
 | Coordinates | Origin at the hex centre, x to the right, y down. The hex spans x -52 to +52 and y -51 to +51 |
 | Ground base | The season colour of the terrain, with soft mottling, fading to transparent over the last **5 px** at the hex border so it blends with the neighbours. **The base is for the sheets only: on the map it is not drawn.** The map paints the ground and takes the piece apart into ground detail, shadows and standing things (`kit.take_apart`) |
-| Ground work | Fields, plots, pans, yards, canals, ponds and activity details stay **10 px clear of the hex border** (the map's rivers and roads run along the borders). Soft scrub patches and tufts may come closer |
+| Wild land | **Not drawn by the piece.** No wild trees, bushes, scrub patches, tufts or stones of the terrain: the map has them. A piece draws only what people made (planted trees, hedges, orchards and a family's own rock or mound count as made) |
+| Ground work | Fields, plots, pans, yards, canals, ponds and activity details stay **10 px clear of the hex border** (the map's rivers and roads run along the borders) |
+| Footprint | The area the piece works. The kit measures it from what you draw (section 6); you never draw it |
 | Standing things | Must lie wholly inside the hex, **3 px clear of the border**. The kit checks this and prints `PIECE PROBLEM` if not |
 | Safe area | Put the main picture inside x -42 to +42, y -38 to +38. Remember the corners are cut: at y = +/-38 only x -18 to +18 is inside |
 
-- Start every picture with `kit.Piece(season, ground=..., seed=N)`. Use **one seed per family**, the same for every
-  level and season, so the ground mottling never changes.
+- The contract is `draw(level, season, variant=0, mirror=False)`. Start every picture with
+  `kit.Piece(season, ground=..., seed=N, mirror=mirror)`. Use **one seed per family**, the same for every level,
+  season and layout, so the ground mottling and the sheet's wild land never change.
+- `draw(0, season)` returns `kit.wild(season, ground, seed=N)` and nothing else (section 6).
 - Ground-plane shapes near the border are faded by the kit; do not try to stop them exactly at the border.
-- **A change of the ground itself is an overlay, not a colour.** Scrub, rough or trodden ground, cleared ground and
-  tracks are laid half-transparent over whatever ground the map has: use `p.scrub(...)`, `p.blob(..., alpha=)` and
-  `p.road(..., track=True)`. Never mix a colour with the base ground colour yourself; the map's ground may differ.
+- **A change of the ground itself is an overlay, not a colour.** Trodden ground, cleared ground and tracks are
+  laid half-transparent over whatever ground the map has: use `p.blob(..., alpha=)` and `p.road(..., track=True)`.
+  Never mix a colour with the base ground colour yourself; the map's ground may differ. Trodden and cleared ground
+  of alpha 0.25 or more counts for the footprint; that is how a clearing in a wood is made.
 - Never draw outside the kit (no drawing on the returned surface, no own scaling).
 
 ## 2. Camera
@@ -43,8 +63,9 @@ tables, 9 readability, 10 terrain fit, 11 the reviewer's checklist, 12 for the o
 One slight 3/4 view, the same for every piece.
 
 - **Lying on the ground** (drawn flat, north-south at 85%): fields, plots, pans, yards, roads, tracks, canals, ponds,
-  the coast, jetties, quays, moles, fences, hedges, terrace walls, the footprint of a ring wall. Use the kit's
-  ground calls (`field`, `rows`, `patch`, `road`, `water`, `pond`, `coast`, `jetty`, `fence`, `hedge`, `terrace`).
+  jetties, quays, moles, fences, hedges, terrace walls, the foot of a ring wall. Use the kit's ground calls
+  (`field`, `rows`, `patch`, `road`, `water`, `pond`, `jetty`, `fence`, `hedge`, `terrace`). The coast itself is
+  the map's; `p.coast()` tells you where it is (section 10).
 - **Standing upright, unsquashed**: houses, churches, towers, walls, trees, mills, heaps, haystacks, boats, people,
   animals. They are seen from the front: you see the front wall and the roof slope, never the top. Use the kit's
   standing calls, or `p.stand(y, fn)` for your own landmark.
@@ -62,6 +83,10 @@ One slight 3/4 view, the same for every piece.
 - **Ground shadow.** One soft dark ellipse to the lower right of the foot, colour (30, 50, 30) at 18% opacity. The
   kit's standing primitives add it; for your own landmark call `p.cast(x, y, foot_width)`. Never draw a hard or
   black shadow, never a shadow to the left.
+- **A mirrored piece keeps the light.** Mirroring (section 6) turns the *positions* round, never the drawing: a
+  mirrored house stands on the other side of the hex and is still lit on its left and shaded on its right, and its
+  shadow still falls to the lower right. The kit does this; a module never tests `mirror` itself and never flips a
+  picture.
 - **Ink** is the token `INK` (52, 44, 46), never pure black.
   - **0.5 px** (the kit's default): houses, roofs, towers, heaps, boats, field edges.
   - **1 px**: only the outer line of a big mass more than 20 px wide (a mole, a fortress wall).
@@ -168,8 +193,8 @@ front to back, or roofs merge into one red mass.
 
 A level is the **character of the whole district**, not one building. Four things grow together:
 
-1. **Coverage.** The share of the hex that is worked: level 0 = 0%, level 1 = about 20%, level 2 = about 45%,
-   level 3 = about 70% (settlements and castles: the footprint width grows about 12 px per level).
+1. **Coverage.** The share of the hex that is worked: level 1 = about 20%, level 2 = about 45%, level 3 = about
+   70% (settlements and castles: the footprint width grows about 12 px per level).
 2. **Silhouette.** The tallest thing gets taller: level 1 up to 9 px, level 2 up to 13 px, level 3 up to 20 px.
 3. **Density.** More of the same unit: blocks, rows, pans, heaps, houses, animals.
 4. **One landmark per level.** Each level adds exactly one new landmark that no lower level has. It stands at or
@@ -177,18 +202,87 @@ A level is the **character of the whole district**, not one building. Four thing
 
 **The additive rule (what must stay the same).** Level N is level N-1 plus more. So:
 
-- The **layout is a fixed table** in the module: every block, building and tree has one position, and a `from level`
-  (and for wild things a `gone from level`). Nothing moves, turns or changes size between levels.
+- The **layout is a fixed table** in the module: every block and building has one position and a `from level`.
+  Nothing moves, turns or changes size between levels.
 - The **yard** (the home building and its place in the hex) is the same at every level.
-- The **terrain is the same at every level**: the same `ground`, the same seed, the same coast or stream line.
-- **Wild things thin out**: level 0 has the terrain's own scatter (trees, bushes, tufts, stones); each level removes
-  the ones where the new work lies, and keeps the rest where they were. Woods thin from the front (south) first;
-  the back (north) row of trees stays to the last level.
+- The **terrain is the same at every level**: the same `ground`, the same seed.
 - A building may be **upgraded in place** (thatch to tile, hut to house on the same foot), never moved.
-- **Level 0 is not empty.** It is the wild version of the terrain, with darker patches where the work will come.
 
 **The season never changes the layout.** Positions never depend on the season; only colours and the listed season
 details do. Do not seed any random number with the season.
+
+### Level 0 is no piece
+
+The owner's answer: **the map draws the wild land**. A hex without an improvement is simply the map's own hex, so
+on the map there is no level 0 picture.
+
+- `draw(0, season)` returns `kit.wild(season, ground, seed=N)` with the family's own ground and seed (a coast family
+  adds `coast={...}`, the keywords of its `p.coast()` call). It is the generic wild scatter of that terrain and it
+  is **for the sheets only**: the level 0 column shows the land the work will be set into.
+- `kit.take_apart(draw, 0, ...)` returns `None`: the map asks for no piece.
+- Levels 1 and up draw **no wild scatter**: no `WILD_TREES`, no scrub patches where work will come, no terrain tufts
+  or stones. Delete those tables. Planted things stay: fruit trees by a house, poplars on a canal, cypresses, olive
+  trees, hedges.
+- Sheets of a module without wild scatter are made with `kit.sheet(..., wild=True)`: the kit then shows every piece
+  standing in the terrain's wild land, thinned by the piece's footprint, as the map will. Check the piece there, not
+  on bare ground.
+
+### The footprint: how the wild land is thinned
+
+The piece no longer clears the hex. The map keeps its own trees and scrub in the hex and leaves out only those that
+stand **in the piece's footprint** (`kit.take_apart(...)["footprint"]`, a mask of the piece canvas; red in
+`kit_contract.png`). You do not draw the footprint; the kit measures it from the piece:
+
+| Counts for the footprint | Does not count |
+|---|---|
+| Ground detail that is a real surface: fields, plots, pans, yards, ponds, roads, trodden or cleared ground of alpha 0.25 or more. Grown by 3 px | Thin lines: tracks, fences, hedges, terrace lines, canals under 2 px |
+| The foot of every standing thing: 2 px to each side and up to 10 px in front of it (so no wild tree stands in front of a building) | Smoke; faint overlays under alpha 0.25 |
+
+What follows for the drawing:
+
+- **In a wood the piece makes its own clearing.** A hamlet in a wooded hex keeps the wood round it; only the houses'
+  feet and the yard are cleared. If a family needs open ground round its work (timber's felling, a mine's work
+  yard, the trodden ground of a herd), draw it: `p.blob(x, y, w, h, p.pal["soil"], alpha=0.3...0.6)`. No blob, no
+  clearing.
+- **Coverage is now measured**: the footprint's share of the hex should be near the coverage targets above.
+- **Woods thin from the front.** Where a family grows into a wood (timber), the footprint grows from the south
+  towards the north with the level; the back of the hex stays wild to the last level.
+- The map's duty, not the piece's: the wild land never stands in a footprint, and it is the same in every season
+  and at every level, so a level-up only removes wild things, it never moves them.
+
+### Mirror and second layout
+
+The owner's answer: **every family gets a mirror and one second layout, chosen by the hex.** Two hexes of the same
+level side by side must not be the same picture.
+
+- **The contract.** `draw(level, season, variant=0, mirror=False)`; the module says `VARIANTS = 2`. The map calls
+  `kit.pick(col, row, VARIANTS)` and gets `(variant, mirror)` for the hex: always the same answer for the same hex,
+  and with two layouts no two neighbours get the same picture.
+- **The mirror comes from the kit.** Pass `mirror=mirror` to `kit.Piece` and draw as always, in unmirrored
+  coordinates. The kit turns the ground detail round and moves every standing thing to its mirrored place without
+  flipping it (section 3). Rules for your own landmarks:
+  - Draw them with `p.stand(y, fn)` and shadow them with `p.cast(x, y, w)`; then they mirror by themselves. If you
+    must place a shadow by hand, shift it with `p.m` (`p.shadow(x + p.m * 3, ...)`; `p.m` is -1 in a mirrored piece).
+  - A part that belongs to another thing (smoke on an off-centre chimney, a wheel on a mill's side, a door on a
+    tower) gets `on=`: `h = p.stand(...)` returns a handle, `p.smoke(x, y, always=True, foot=y0, on=h)` and
+    `p.stand(y, fn2, on=h)` move with it.
+  - Never write `if mirror:` and never use private kit calls; both break the mirror.
+  - The `GATES` table stays unmirrored; the map mirrors it with `kit.mirror_gates`.
+- **The second layout** (`variant=1`) is the same district arranged differently. Same landmarks, same counts, same
+  coverage, same signature, same additive rule and seasons inside the layout. Different:
+  - the **yard stands somewhere else**: at least 14 px from layout 0's yard and from its mirror image;
+  - the blocks, rows or pans lie at other places and angles, and the landmark of the top level stands in another
+    part of the hex;
+  - at 50% it must be told from layout 0 **and from layout 0 mirrored** at a glance. If it looks like either, it is
+    not a second layout.
+  Keep both layouts as tables side by side at the top of the module (`LAYOUT = [dict(...), dict(...)]`), never as
+  offsets of each other.
+- **The second sheet.** `kit.variant_sheet(draw, LEVELS, title, path, NAMES, ground=...)` writes
+  `<family>_variants.png`: each level as layout 0, layout 0 mirrored, layout 1, layout 1 mirrored, and a block of
+  5 x 4 touching hexes of the top level as `kit.pick` chooses them. Look at the block first: it must read as a
+  countryside, not as wallpaper.
+- Order of work: wheat, grazing, timber and vineyard first (the most common), then the rest. Until a family has its
+  second layout it says `VARIANTS = 1` and the map uses the mirror alone.
 
 ## 7. Seasons
 
@@ -226,13 +320,14 @@ no fallen-leaf carpets, no animals in the fields of crop families beyond the one
 
 ## 8. The family tables
 
-"Landmark" is the one new thing of that level. "Count" numbers are targets, not ranges to explore.
+"Landmark" is the one new thing of that level. "Count" numbers are targets, not ranges to explore. **Level 0 is the
+same line in every table and is left out: no piece; on the sheet `kit.wild(season, ground, seed)`.** The tables
+describe layout 0; layout 1 has the same content in another arrangement (section 6).
 
 ### Wheat fields (reference: `wheat.png`). Ground: `farm`
 
 | Level | What is drawn | Landmark |
 |---|---|---|
-| 0 | Rough grass: 6 darker scrub patches, 6 round trees, 5 bushes, stones, tufts | None |
 | 1 | A thatched farmhouse with a fruit tree, 1 block of 6 strips, a track | The farmhouse |
 | 2 | 3 blocks with hedges on two sides, the house re-roofed in tile, a second fruit tree, a haystack | The thatched barn |
 | 3 | 5 blocks, a canal with 3 poplars that **ends in a small pond at each end, inside the hex** (it never runs to the border), a second house, a second haystack | The windmill |
@@ -245,7 +340,6 @@ snow strips with furrows. Haystacks stand from summer to winter, not in spring.
 
 | Level | What is drawn | Landmark |
 |---|---|---|
-| 0 | Scrub: 8 bushes, 2 round trees, stones, tufts | None |
 | 1 | 2 small blocks of young vines (dashed rows), a thatched hut | The hut |
 | 2 | 4 blocks of full rows at two different angles, the hut becomes a tiled house | The press house: a wide tiled building with a big dark door and 2 round vats beside it |
 | 3 | 6 blocks, the upper two with 2-3 terrace walls; a track | The wine estate: a tall house with a small cone-roofed tower and 2 cypresses (`poplar`) |
@@ -258,7 +352,6 @@ block.
 
 | Level | What is drawn | Landmark |
 |---|---|---|
-| 0 | Scrub and pine: 4 conifers, 6 bushes, stones | None |
 | 1 | 7 olive trees in two loose groups, a hut | The hut |
 | 2 | 15 olive trees in straight lines on 3 terrace walls, pale ochre soil patches under them | A stone farmhouse (`STONE` walls, tile roof) |
 | 3 | 24 olive trees on 5 terrace walls reaching the back of the hex, a track | The oil mill: a long stone building with a round millstone (a pale disc with a dark centre) in front |
@@ -273,8 +366,7 @@ One layout, three animals: `draw(level, season, animal="sheep")`, one sheet per 
 
 | Level | What is drawn | Landmark |
 |---|---|---|
-| 0 | Rough grazing: 6 bushes, 2 round trees, stones, many tufts | None |
-| 1 | 5 animals loose in one group, a shepherd, a thatched hut | The hut |
+| 1 | 5 animals loose in one group on a trodden patch (an overlay: it is the footprint), a shepherd, a thatched hut | The hut |
 | 2 | 1 fenced meadow (a `meadow` field of one colour inside a `fence`) with 8 animals, a haystack | The byre: a long low thatched barn (horses: a stable with a fenced yard) |
 | 3 | 3 fenced meadows, 13 animals, 2 haystacks, a track | The market hall: a wide tiled building on timber posts (sheep: wool hall; cattle: dairy; horses: stud house) |
 
@@ -282,26 +374,25 @@ Seasons: spring 2-3 smaller young animals beside the grown ones; summer all anim
 haystack); autumn all out, haystacks; winter **only 3 animals**, close to the byre, smoke, snow-capped haystacks.
 Animals always stand inside the fences from level 2.
 
-### Salt pans. Ground: `sand`, with `p.coast()` in front
+### Salt pans. Ground: `sand`, at the map's shore (`p.coast()`, section 10)
 
 | Level | What is drawn | Landmark |
 |---|---|---|
-| 0 | A bare shore: sand, 2 shallow pools, reeds (tufts), stones | None |
-| 1 | 3 square pans with low dykes, 1 salt heap, a thatched hut | The hut |
-| 2 | 8 pans in 2 rows, a feeder channel from the sea, 3 heaps in a row | A sluice gate on the channel (a small timber frame) |
+| 1 | 4 square pans with low dykes in a row along the shore, 1 salt heap, a thatched hut, a trodden path | The hut |
+| 2 | 8 pans in 2 rows, a feeder channel from the shore, 3 heaps in a row | A sluice gate on the channel (a small timber frame) |
 | 3 | 14 pans in 3 rows, 5 heaps in a row, a short jetty with 1 boat | The salt store: a long warehouse |
 
-Pans are `p.patch` squares of 9-11 px with a `STONE_D` edge, laid as a strict grid. Seasons: spring pans filled,
+Everything is laid out in shore coordinates (`shore.pt(u, v)`): the rows of pans run along the shore, the channel
+and the jetty run out to it. Pans are `p.patch` squares of 9-11 px with a `STONE_D` edge, laid as a strict grid. Seasons: spring pans filled,
 blue-grey (mix of `shallow` and `sand`); summer pans white and pale pink as they dry (`SALT`), the heaps at full
 size, 2 rakers; autumn grey pans, heaps covered (thatch colour); winter pans frozen (`ICE`) with snow edges, heaps
 covered with a snow cap, nobody out.
 
-### Mines. Ground: `rock` (add `p.scree()` and stones: rock is never flat)
+### Mines. Ground: `rock` (scree and boulders are the map's wild land: the piece draws none)
 
 | Level | What is drawn | Landmark |
 |---|---|---|
-| 0 | Bare rock: scree, 4 boulders, one low rock outcrop at the back (it stays at every level), 2 conifers | None |
-| 1 | A hut, 1 small spoil heap, a track | The adit: a dark arched mouth in the outcrop with a timber frame |
+| 1 | A low rock outcrop at the back (the family's own raised ground, from level 1 on), a hut, 1 spoil heap, a trodden work yard, a track | The adit: a dark arched mouth in the outcrop with a timber frame |
 | 2 | 2 huts, 2 spoil heaps, a short stream | The headframe over a shaft with a water wheel |
 | 3 | A row of 3 miners' houses, 3 spoil heaps, an ore pile | The smelter: a stone building with a tall chimney |
 
@@ -310,41 +401,57 @@ smelter chimney smokes **in every season** (the one exception to the smoke rule)
 
 ### Timber and logging. Ground: `wood`
 
-| Level | What is drawn | Landmark |
-|---|---|---|
-| 0 | Wild wood: about 24 trees (2 conifers to 1 round), a stream across the front | None |
-| 1 | About 19 trees; a clearing at the front centre with 5 stumps, a hut | The charcoal mound: a dark heap with smoke |
-| 2 | About 15 trees; the clearing wider, 2 log piles, a track | The sawmill on the stream: a timber house with a water wheel |
-| 3 | About 11 trees, all in the back half; 4 log piles, a long shed | The log raft on the stream |
-
-Trees are removed from the front; the back row never changes. Seasons: broadleaves follow the season table; winter
-is felling time: one more log pile, the stream frozen and **no raft**; the charcoal mound smokes in every season.
-
-### Fishing and harbours. Ground: `grass`, with `p.coast()` in front
+The wood is the map's. The piece draws **the clearing and the work in it**; the map's trees stand everywhere else.
 
 | Level | What is drawn | Landmark |
 |---|---|---|
-| 0 | A beach: sand, 1 small boat drawn up on the sand, tufts, 2 bushes | None |
-| 1 | 2 thatched huts, 2 fishing boats, a net rack (2 posts and a line) | The timber jetty |
+| 1 | A clearing at the front centre (cleared ground, an overlay, about 20% of the hex) with 5 stumps, a hut | The charcoal mound: a dark heap with smoke |
+| 2 | The clearing wider (about 45%), 2 log piles, a track, a short mill race ending in a pond at each end, inside the hex | The sawmill on the race: a timber house with a water wheel |
+| 3 | The clearing reaches the middle of the hex (about 65%; the back third stays wood), 4 log piles, a long shed | The log raft on the mill pond |
+
+The clearing grows from the front (south) to the back; its outline is irregular (three or four overlapping
+`p.blob(..., p.pal["soil"], alpha=0.6)`), never an ellipse. No trees are drawn: on the sheet the kit's wild wood shows
+what the map will do (`kit.sheet(..., ground="wood", wild=True)`). The piece draws no stream: streams are the
+map's. The mill race is the piece's own water, like the wheat canal: 1.4 px, ending in a small pond at each end,
+10 px clear of the border. Seasons: winter is felling time: one more log pile, the race and pond frozen and **no
+raft**; the charcoal mound smokes in every season.
+
+### Fishing and harbours. Ground: `grass`, at the map's shore (`p.coast()`, section 10)
+
+| Level | What is drawn | Landmark |
+|---|---|---|
+| 1 | 2 thatched huts, 2 fishing boats, 1 small boat drawn up on the beach, a net rack (2 posts and a line) | The timber jetty |
 | 2 | A stone quay along the shore, 3 fishing boats, 1 ship | The warehouses: 2 long tiled buildings on the quay |
-| 3 | Two stone moles round a basin, 3 warehouses, 2 ships, 3 boats, a hull on a slip (the shipyard) | The lighthouse on the west mole |
+| 3 | Two stone moles round a basin with a mouth about 40 px wide, 3 warehouses, 2 ships, 3 boats, a hull on a slip (the shipyard) | The lighthouse on the bend of the first mole |
 
-Seasons: spring and summer the boats are out at sea with sails; autumn half of them are at the jetty; winter all
-boats are laid up at the jetty or quay with bare masts (`sail=False`), snow on roofs and moles, the sea darker.
-The lighthouse lamp is yellow in every season. The sea is always on the south side of the hex.
+Everything is laid out in shore coordinates (`shore.pt(u, v)`): quay and warehouses along the shore, jetty and moles
+out from it, huts inland. The sea is wherever the map has it; the sheets show it in front. Seasons: spring and
+summer the boats are out at sea with sails; autumn half of them are at the jetty; winter all boats are laid up at
+the jetty or quay with bare masts (`sail=False`), snow on roofs and moles, the sea darker. The lighthouse lamp is
+yellow in every season.
+
+**The harbour as an add-on.** A port town is a settlement piece plus the harbour's works at the hex's own shore
+(the owner's answer 2). `draw(level, season, ..., addon=True)` draws only what stands at the water's edge: jetty,
+quay, moles, lighthouse, the hull on the slip, ships and boats. No huts, no warehouses, no net rack, no beach
+widening, no trees. The add-on has the same three levels and the same layout as the full piece, so a fishing
+village that grows into a port town keeps its harbour.
 
 ### Settlements (reference: `settlements.png`). Ground: `grass`. Levels 1-5
 
 | Level | Name | What is drawn | Landmark |
 |---|---|---|---|
-| 1 | Hamlet | 3 thatched houses, 2 garden plots, a track, the trees around | The well |
+| 1 | Hamlet | 3 thatched houses, 2 garden plots, a track, 2 fruit trees | The well |
 | 2 | Village | 7 houses (half thatch), 4 garden plots, 2 tracks | The chapel |
 | 3 | Town | 11 tiled houses, 4 plots outside, 2 roads | The palisade ring with a gate, and the church |
 | 4 | Walled town | 16 houses (a few taller), 3 roads | The stone wall with 2 towers and a gate tower |
 | 5 | City | 24 houses, 4 suburb houses outside the wall | The cathedral dome; 4 wall towers and 2 at the back |
 
-The church and the green in front of it are at the same spot in every level. The strip from y = +26 down is kept
-free for the name plate. Seasons: garden plots follow the season, blossom on fruit trees in spring, 1-2 people on
+The church and the green in front of it are at the same spot in every level, and the place keeps its middle 7 px
+above the hex centre. **There is no name plate and no plate strip** (the owner's answer 1): the ground in front of
+the place is ordinary open ground, the south road ends at its gate point, and plots and suburb houses may use it
+within the usual margins. The round trees round the place are wild land and are not drawn; the fruit trees by the
+houses are planted and stay. A town on the coast is not a coast piece: the map clips it at its shore and adds the
+harbour add-on there. Seasons: garden plots follow the season, blossom on fruit trees in spring, 1-2 people on
 the green in spring and summer, smoke from 1 house in 3 in autumn and winter, snow roofs and a grey trodden ground
 inside the ring in winter.
 
@@ -366,15 +473,18 @@ colour never changes with the season.
 
 - **At 100%**: each level must be told from its neighbours at a glance, without counting. Cover the labels on your
   sheet and name the levels; if you hesitate, raise the difference in coverage or silhouette, not the detail.
-- **At 50%** (the right-hand grid of the sheet): the family must still be recognised by its signature, and level 0,
-  the middle levels and the top level must still differ. Details may vanish; the landmark of the top level may not.
+- **At 50%** (the right-hand grid of the sheet): the family must still be recognised by its signature, and the wild
+  land, the middle levels and the top level must still differ. Level 1 must be told from the wild land at 50%: it
+  is the first thing a player builds. Details may vanish; the landmark of the top level may not.
 - **Winter** is the hardest column. Check that the worked pattern and every landmark still read on snow.
 - **Clutter limits**: no more than 3 houses in a goods piece; no more than 3 activity details; no two standing things
   with feet closer than 4 px unless they are meant as one cluster; keep 25% of a level-3 hex as plain ground.
+- **Repetition**: on the variants sheet the block of 5 x 4 hexes must not show a pattern of identical pictures;
+  layout 1 must not look like layout 0 or its mirror.
 - **Look-alikes**: put your sheet next to the two reference sheets and to any finished family. If a piece could be
   taken for another family or another level at 50%, change it and say so in your report.
 
-## 10. Terrain fit
+## 10. Terrain fit and the coast
 
 | Family | Sits on | `ground=` | Notes |
 |---|---|---|---|
@@ -382,10 +492,10 @@ colour never changes with the season.
 | Vineyard | Sunny hills | `grass` | |
 | Olives | Warm coast hills | `grass` | Pale `olive_soil` patches under the trees |
 | Grazing | Highland, poor hills | `grass` | |
-| Salt | Low sandy coast | `sand` + `coast()` | Sea to the south |
-| Mines | Hills and mountains with ore | `rock` | Scree and stones on every level |
+| Salt | Low sandy coast | `sand` + `coast()` | The sea side comes from the map |
+| Mines | Hills and mountains with ore | `rock` | Scree and boulders are the map's; the outcrop is the piece's |
 | Timber | Woods | `wood` | |
-| Harbour | Sheltered coast | `grass` + `coast()` | Sea to the south |
+| Harbour | Sheltered coast | `grass` + `coast()` | The sea side comes from the map; also an add-on to a town |
 | Settlements, castles | Any land but high peaks | `grass` | |
 
 - The base ground is the **terrain**, never the improvement: it does not change with the level.
@@ -395,14 +505,47 @@ colour never changes with the season.
   inside its yard or ring, ending at a **gate point**: a named spot at least 10 px inside the border on the south,
   east or west side (a `GATES = {"south": (x, y), ...}` table in the module). The map's road layer joins the gate
   points to its roads.
-- Pass the family's ground to `kit.sheet(..., ground=...)` so the sheet shows the piece on its own terrain.
+- Pass the family's ground to `kit.sheet(..., ground=..., wild=True)` so the sheet shows the piece on its own
+  terrain, in its wild land.
+
+**The coast: the map draws the shore** (the owner's answer 2).
+
+- The map owns the coastline. A piece **never draws sea, sand strip or foam on the map**, and it never decides
+  where the sea is. The map tells it: `kit.take_apart(draw, level, season, hex=..., sea=..., shore=...)`.
+  - `sea`: the side the sea is on: `"E"`, `"SE"`, `"SW"`, `"W"`, `"NW"`, `"NE"` (the six neighbours of a pointy-top
+    hex), `"S"` or `"N"` (both lower or both upper neighbours), several sides as a tuple (`("E", "SE")`), or an
+    angle in degrees on screen.
+  - `shore`: the map's shore line through the hex, as points in piece px. Without it the kit takes a straight,
+    slightly wavy shore on the given side.
+- A coast family calls `shore = p.coast(y0, ...)` once and lays out everything at the water's edge in **shore
+  coordinates**: `shore.pt(u, v)` is the point `u` px along the shore from its middle and `v` px out to sea (`v < 0`
+  is inland). Give that point to any kit call: `p.jetty(shore.pt(12, -1), shore.pt(12, 15))`,
+  `p.house(*shore.pt(-6, -5), ...)`, `p.boat(*shore.pt(20, 9))`. The layout tables hold `(u, v)`, not `(x, y)`.
+  `fishing()` in `tools/worldmap/pieces/contract.py` is the pattern to copy; `kit_contract.png` row 2 shows it on
+  six sea sides.
+- Standing things stay upright and lit from the upper left on every side; only their places turn with the shore.
+  Pans, quays and other flat shapes are drawn as polygons from `shore.pt` corners, so they turn with it.
+- With the sea in front (the sheets' default: no `sea` given) `shore.pt(u, v)` is `(u, shore(u) + v)`, so a layout
+  written for the south side moves over by subtracting the old shore y.
+- `shore.land(x, y)` says if a point is on land; `shore.depth` is the land behind the shore at its middle in px. Each
+  coast module lists the land depth its levels use (`NEED = {1: px, 2: px, 3: px}`, at most 46 px); the map gives a
+  hex with less land a lower level or no coast piece. `shore.front`
+  is True when the sea lies in the south half: only then do boats stand in front of the buildings.
+- On the sheets the kit draws a stand-in sea so the piece can be judged. Show the default (sea in front) on the
+  family sheet, and check two other sides (`"E"` and `"NW"`) in your scratch folder before you report.
+- A piece that is not a coast family (a town, a wheat hex on the coast) does nothing: the map clips its ground
+  detail at the shore and leaves out any standing thing whose foot would be in the water.
+- **Ports.** A town with a harbour is the settlement piece in the middle of the hex, as always, plus the harbour
+  family's add-on at the hex's own shore (section 8). They are two calls; the map leaves out add-on things that
+  would stand inside the town's footprint.
 
 ## 11. The reviewer's checklist
 
 Tick every line for every family. One "no" sends the sheet back.
 
 **Kit and canvas**
-- [ ] One module, `draw(level, season)` returns a 112x112 surface, drawn only with the kit.
+- [ ] One module, `draw(level, season, variant=0, mirror=False)` returns a 112x112 surface, drawn only with the kit
+      (no private calls, no `if mirror:`).
 - [ ] The run prints no `PIECE PROBLEM` line.
 - [ ] One seed and one `ground` for the whole family.
 - [ ] No colour outside the kit's tokens, or each new one is a named token and listed in the report.
@@ -413,8 +556,13 @@ Tick every line for every family. One "no" sends the sheet back.
 - [ ] Ink is thin and dark brown, never black, never thicker than 1 px.
 - [ ] Nothing tall stands in front of a landmark.
 
-**Levels**
-- [ ] Level 0 is wild, not empty.
+**Levels, wild land and footprint**
+- [ ] `draw(0, season)` is `kit.wild(...)` with the family's ground and seed, and nothing else.
+- [ ] Levels 1 and up draw no wild scatter (no wild trees, bushes, scrub patches, terrain tufts or stones); the sheet
+      is made with `wild=True`.
+- [ ] On the sheet no wild tree stands on the work or in front of a building, and the work does not sit in a bald
+      hex: the wild land comes up to the footprint. In a wood the piece has made the clearing it needs.
+- [ ] Level 1 is told from the wild land at a glance, also at 50%.
 - [ ] Each level keeps everything of the level below in the same place (flip between two levels to check).
 - [ ] Coverage, height and density all grow with the level.
 - [ ] Exactly one new landmark per level, as in the family table.
@@ -428,6 +576,21 @@ Tick every line for every family. One "no" sends the sheet back.
 - [ ] Smoke only in autumn and winter (except the listed chimneys). At most three activity details.
 - [ ] Nothing from the "what not to add" list.
 
+**Mirror and second layout**
+- [ ] `<family>_variants.png` exists (`kit.variant_sheet`). In the mirrored columns every building is lit on the
+      left and shaded on the right, shadows fall to the lower right, smoke sits on its chimney, nothing collides.
+- [ ] Layout 1 has the same landmarks, counts, coverage and signature as layout 0, with the yard at least 14 px
+      from layout 0's yard and from its mirror image.
+- [ ] At 50% layout 1 is told from layout 0 and from layout 0 mirrored.
+- [ ] The block of 5 x 4 hexes shows no two equal neighbours and reads as countryside, not wallpaper.
+
+**Coast families (salt, harbour)**
+- [ ] The piece draws no sea of its own: one `p.coast()` call, everything at the water's edge placed with
+      `shore.pt(u, v)`, the tables in shore coordinates.
+- [ ] Checked with the sea in front, on `"E"` and on `"NW"`: nothing stands in the water that should not, nothing
+      leaves the hex, the works still meet the shore.
+- [ ] Harbour: `addon=True` draws only the works at the water's edge.
+
 **Readability and fit**
 - [ ] At 50% the family is recognised by its signature and the top level by its landmark.
 - [ ] The piece cannot be mistaken for another family (compare the sheets side by side).
@@ -435,9 +598,19 @@ Tick every line for every family. One "no" sends the sheet back.
 - [ ] No worked ground or activity detail within 10 px of the hex border; no road or track runs to the border.
 - [ ] Scrub, trodden ground and tracks are overlays (`scrub`, `blob(alpha=)`, `road(track=True)`), not mixed colours.
 - [ ] Goods pieces have at most 3 houses and no banner.
-- [ ] Settlements keep the plate strip (y from +26) free.
+- [ ] No name plate and no space kept for one.
 
-## 12. For the owner to decide
+## 12. The owner's decisions, and what is still open
+
+**Decided on 2026-11-15** (the three questions of `REVIEW.md`):
+
+| | Question | The owner's answer | What it means here |
+|---|---|---|---|
+| 1 | Where does a town's name plate go? | **"No plates for now."** | The normal map shows no town name plates. Pieces keep no plate strip; the town stays where it is (sections 8, 11) |
+| 2 | Coasts and ports | **"Map draws shore."** | The map owns the coastline; coast pieces are told the sea side and build at that shore; in a town's hex the harbour is an add-on at its own shore (sections 8, 10) |
+| 3 | Wild land and variety | **"Map + 2nd layout."** | The map draws woods and scrub and thins them under the piece's footprint; level 0 is no piece; every family gets a mirror and a second layout chosen by the hex, wheat, grazing, timber and vineyard first (section 6) |
+
+**Still open** (none blocks the fix tasks):
 
 1. **Winter snow.** As drawn: full snow on every hex in winter (recommended for a clear season signal). Option:
    full snow only in the north and on high ground, and a "frost" winter (grey-green ground, bare trees, no snow) for
@@ -445,6 +618,13 @@ Tick every line for every family. One "no" sends the sheet back.
 2. **Wheat landmarks.** As drawn: barn at level 2, windmill at level 3 (the windmill is the strongest silhouette, so
    it marks the top). The growing-map plan has "a mill" at stage 2; option: a watermill at level 2 and the windmill
    kept for level 3.
-3. **A hex with a settlement and a good.** These pieces assume one piece per hex. Options: (a) one piece per hex,
-   the settlement wins (recommended for now); (b) half-size goods pieces round a settlement, to be designed later.
+3. **A hex with a settlement and a good.** Answered for ports (answer 2: the harbour is an add-on). For the other
+   goods the pieces still assume one piece per hex. Options: (a) one piece per hex, the settlement wins
+   (recommended for now); (b) half-size goods pieces round a settlement, to be designed later.
 4. **Banner colour.** Castles take the owner's colour as a parameter; the sheet shows red.
+5. **Where do town names show, if not on plates?** "No plates for now" leaves the normal map without town names.
+   Options: (a) nothing at this zoom, names on hover and in the panel (recommended for now: it is what was
+   decided); (b) small plain text under the town, no plate, to be tried when the UI round comes.
+6. **The timber piece's water.** Streams are the map's, so the sawmill gets a short mill race with a pond at each
+   end, inside the hex (as wheat's canal). Option: no water, a horse-driven saw and the raft dropped. Recommended:
+   the mill race (it keeps the water wheel and the raft, the family's landmarks).

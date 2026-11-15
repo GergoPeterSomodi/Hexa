@@ -1,7 +1,18 @@
 """The shared drawing kit for Hexa's normal-map pieces. Rule book: docs/design/map/pieces/GUIDE.md.
 
 A piece is the picture of one hex's improvement at one level in one season, at hex radius 60.
-Every family module imports this kit and exposes  draw(level, season) -> pygame.Surface  (see README.md).
+Every family module imports this kit and exposes
+    draw(level, season, variant=0, mirror=False) -> pygame.Surface        (see README.md).
+
+Who draws what (the owner's answers of 2026-11-15, guide sections 1, 6, 10 and 12):
+  - The MAP draws the ground, the coast and the wild land (woods, scrub). A piece draws only the work.
+  - Level 0 is "no piece" on the map. On the sheets the level 0 column is kit.wild(): the wild land as the map
+    draws it for that terrain.
+  - The map thins its wild land under the piece's FOOTPRINT (take_apart()["footprint"], Piece.footprint()).
+  - A coast piece is told where the sea is (sea=, shore=) and builds at that shore: p.coast() returns a Shore.
+  - Every family has a mirrored version and a second layout; pick(col, row) chooses them from the hex.
+    Mirroring moves positions only: every standing thing is still drawn lit from the upper left.
+  - No name plates on the normal map for now.
 
 Coordinates: everything a family module passes to the kit is in PIECE PIXELS at 100% size, with the origin at
 the hex centre, x to the right and y down. The kit draws at 2x and scales down, so never multiply by 2 yourself.
@@ -38,6 +49,55 @@ SHADOW_ALPHA = 46
 
 NO_BASE = False               # set by take_apart(): pieces are then drawn without their ground base (for the map)
 LAST = None                   # the Piece most recently finished (take_apart() reads it)
+SITE = {}                     # set by take_apart(): the hex's mirror, sea and shore, for modules that do not pass them on
+WILD = None                   # set by with_wild(): a footprint mask; the piece then stands in thinned wild land (sheets)
+CHECK = True                  # False while a piece is drawn only to measure it
+
+# The sea side of a hex, as the direction from the hex centre to the sea on screen (x right, y down). A pointy-top
+# hex has the six neighbours E, SE, SW, W, NW, NE; S and N stand for "both lower" and "both upper" neighbours.
+_D = (HEX_W / 2, 0.75 * HEX_H)
+_L = math.hypot(*_D)
+SIDES = {"E": (1.0, 0.0), "W": (-1.0, 0.0), "S": (0.0, 1.0), "N": (0.0, -1.0),
+         "SE": (_D[0] / _L, _D[1] / _L), "SW": (-_D[0] / _L, _D[1] / _L),
+         "NE": (_D[0] / _L, -_D[1] / _L), "NW": (-_D[0] / _L, -_D[1] / _L)}
+
+
+def sea_vector(sea):
+    """The unit vector towards the sea. sea: a side name ("S", "SE", ...), several of them (("E", "SE"): the sea
+    lies on both; the middle is taken), or an angle in degrees on screen (0 = east, 90 = south)."""
+    if isinstance(sea, (int, float)):
+        return (math.cos(math.radians(sea)), math.sin(math.radians(sea)))
+    names = [sea] if isinstance(sea, str) else list(sea)
+    x, y = sum(SIDES[q][0] for q in names), sum(SIDES[q][1] for q in names)
+    d = math.hypot(x, y)
+    return (x / d, y / d) if d > 1e-6 else SIDES[names[0]]
+
+
+def pick(col, row, variants=2):
+    """Which picture a hex shows: (variant, mirror), from the hex's coordinates alone (offset coordinates with odd
+    rows shoved right, as the map has them). The same hex always gives the same answer. With two layouts no two
+    neighbours ever show the same picture: the grid is split in three classes that never touch; one class shows
+    layout 0 mirrored, one the last layout, and the third takes plain layout 0 or the last layout mirrored by a
+    hash of the hex. With one layout only the mirror differs, so some neighbours repeat."""
+    q = col - ((row - (row & 1)) >> 1)
+    cls = (q - row) % 3
+    h = ((col * 73856093) ^ (row * 19349663)) & 0xffffffff
+    h = ((h ^ (h >> 13)) * 0x5bd1e995) & 0xffffffff
+    bit = (h >> 15) & 1
+    last = max(1, variants) - 1
+    if cls == 1:
+        return (last, False)
+    if cls == 2:
+        return (0, True)
+    return (last, True) if bit else (0, False)
+
+
+def mirror_gates(gates, mirror=True):
+    """A module's GATES table as it lies in the mirrored piece: x turned round, east and west swapped."""
+    if not mirror:
+        return dict(gates)
+    swap = {"east": "west", "west": "east"}
+    return {swap.get(k, k): (-p[0], p[1]) for k, p in gates.items()}
 
 
 def hex_points(shrink=0.0):
@@ -169,19 +229,24 @@ def crop(name, season):
 class Pen:
     """Draws on a 2x surface in piece px. Every family uses this for its own landmarks, so ink and scale agree."""
 
-    def __init__(self, surf):
+    def __init__(self, surf, m=1, dx=0.0):
         self.s = surf
+        self.m = m              # -1: x is turned round (the kit's ground pen of a mirrored piece)
+        self.dx = dx            # a shift in px (a standing thing of a mirrored piece: moved, not turned)
 
     @staticmethod
     def T(p):
         return ((p[0] + C) * SS, (p[1] + C) * SS)
+
+    def t(self, p):
+        return ((p[0] * self.m + self.dx + C) * SS, (p[1] + C) * SS)
 
     @staticmethod
     def W(w):
         return max(1, int(round(w * SS)))
 
     def poly(self, pts, fill=None, ink=INK, w=1):
-        q = [self.T(p) for p in pts]
+        q = [self.t(p) for p in pts]
         if fill is not None:
             pygame.draw.polygon(self.s, fill, q)
         if ink is not None:
@@ -200,22 +265,22 @@ class Pen:
             self.rect(x0, y - h, w, h, None, ink)
 
     def line(self, a, b, col=INK, w=1):
-        pygame.draw.line(self.s, col, self.T(a), self.T(b), self.W(w))
+        pygame.draw.line(self.s, col, self.t(a), self.t(b), self.W(w))
 
     def lines(self, pts, col=INK, w=1, closed=False):
         if len(pts) > 1:
-            pygame.draw.lines(self.s, col, closed, [self.T(p) for p in pts], self.W(w))
+            pygame.draw.lines(self.s, col, closed, [self.t(p) for p in pts], self.W(w))
 
     def circle(self, x, y, r, fill=None, ink=None, w=1):
         if fill is not None:
-            pygame.draw.circle(self.s, fill, self.T((x, y)), r * SS)
+            pygame.draw.circle(self.s, fill, self.t((x, y)), r * SS)
         if ink is not None:
-            pygame.draw.circle(self.s, ink, self.T((x, y)), r * SS, self.W(w))
+            pygame.draw.circle(self.s, ink, self.t((x, y)), r * SS, self.W(w))
 
     def ellipse(self, x, y, w, h, fill=None, ink=None, lw=1):
         """x, y is the centre."""
         r = pygame.Rect(0, 0, max(1, int(w * SS)), max(1, int(h * SS)))
-        r.center = self.T((x, y))
+        r.center = self.t((x, y))
         if fill is not None:
             pygame.draw.ellipse(self.s, fill, r)
         if ink is not None:
@@ -229,13 +294,90 @@ def ring_points(cx, cy, rx, ry, a0, a1, n=40):
     return [(cx + math.cos(a0 + (a1 - a0) * q / n) * rx, cy + math.sin(a0 + (a1 - a0) * q / n) * ry) for q in range(n + 1)]
 
 
+# ------------------------------------------------------------------ the shore
+class Shore:
+    """Where the sea meets the land in this hex, as p.coast() returns it. A coast family lays out its shore things
+    in SHORE COORDINATES: u px along the shore from its middle, v px out to sea (v < 0 is inland).
+        shore.pt(u, v)   the piece-px point (give it to any kit call)
+        shore.land(x, y) True if the piece-px point lies on land
+        shore.out        the unit vector towards the sea;  shore.along  the unit vector along the shore (u grows)
+        shore.depth      px of land behind the shore at its middle (down to the hex border)
+        shore.front      True if the sea lies in front (the south half): boats and jetties are then in front of the land
+    With the sea in front (the sheets' default), pt(u, v) is (u, shore(u) + v): shore(x) still gives the y of the
+    water's edge, as the first kit did."""
+
+    def __init__(self, out, h):
+        self.out = out
+        self.along = (out[1], -out[0])
+        self.h = h
+        self.front = out[1] > 0.3
+        d = 0.0
+        while d < 2 * R and in_hex(*self.pt(0, -d - 1)):
+            d += 1
+        self.depth = d
+
+    def pt(self, u, v=0.0):
+        d = self.h(u) + v
+        return (self.along[0] * u + self.out[0] * d, self.along[1] * u + self.out[1] * d)
+
+    def land(self, x, y, margin=0.0):
+        u = x * self.along[0] + y * self.along[1]
+        return x * self.out[0] + y * self.out[1] < self.h(u) - margin
+
+    def __call__(self, x):
+        assert abs(self.out[0]) < 1e-6 and self.out[1] > 0, "shore(x) only works with the sea in front: use shore.pt(u, v)"
+        return self.h(x)
+
+
+def _shore_h(line, out):
+    """h(u) for a shore line the map gives as piece-px points: the line's distance out from the centre at u."""
+    along = (out[1], -out[0])
+    q = sorted((x * along[0] + y * along[1], x * out[0] + y * out[1]) for x, y in line)
+
+    def h(u):
+        if u <= q[0][0]:
+            return q[0][1]
+        for a, b in zip(q, q[1:]):
+            if u <= b[0]:
+                return a[1] + (b[1] - a[1]) * (u - a[0]) / max(1e-6, b[0] - a[0])
+        return q[-1][1]
+    return h
+
+
+# ------------------------------------------------------------------ the wild land (what the map draws)
+# The generic scatter of each terrain: trees, bushes, tufts, stones, scrub patches, scree. Used on the sheets only.
+WILD_MIX = {
+    "farm": dict(round=4, conifer=0, bush=4, tufts=14, stones=2, scrub=3, scree=0),
+    "grass": dict(round=4, conifer=1, bush=6, tufts=16, stones=3, scrub=3, scree=0),
+    "wood": dict(round=8, conifer=16, bush=2, tufts=8, stones=0, scrub=0, scree=0),
+    "rock": dict(round=0, conifer=2, bush=1, tufts=0, stones=4, scrub=0, scree=18),
+    "sand": dict(round=0, conifer=0, bush=2, tufts=12, stones=3, scrub=0, scree=0),
+}
+
+
 # ------------------------------------------------------------------ the piece
 class Piece:
     """One hex picture. Ground-plane calls draw at once, in call order. Standing calls are queued and drawn back to
     front (by the y of their foot) in finish()."""
 
-    def __init__(self, season, ground="grass", seed=0, texture=True, base=None):
+    def __init__(self, season, ground="grass", seed=0, texture=True, base=None, mirror=None, sea=None, shore=None):
+        """mirror: draw the layout turned round (x to -x); every standing thing keeps its light from the upper left.
+        sea, shore: where the map has the sea in this hex (see coast()). All three default to what take_apart()
+        was told, so a module that does not pass them on still follows the map."""
         assert season in SEASONS, season
+        self.mirror = bool(SITE.get("mirror")) if mirror is None else bool(mirror)
+        self.m = -1 if self.mirror else 1
+        sea = SITE.get("sea") if sea is None else sea
+        line = SITE.get("shore") if shore is None else shore
+        # the sea in the module's own (unmirrored) coordinates: the kit turns it round with everything else
+        self.sea = None if sea is None else (lambda v: (v[0] * self.m, v[1]))(sea_vector(sea))
+        self.shore_line = None if line is None else [(x * self.m, y) for x, y in line]
+        self.shore = None               # the Shore, once coast() is called
+        self.dx = {}                    # mirrored pieces: how far each standing thing was moved
+        self.box = {}                   # the bounding box of each standing thing (filled by footprint())
+        self.lifted = set()
+        self.wild_done = False
+        self.seed = seed
         self.season = season
         self.pal = PAL[season]
         self.winter = season == "winter"
@@ -245,7 +387,8 @@ class Piece:
         self.sh.fill((255, 255, 255))
         self.sh.set_colorkey((255, 255, 255))
         self.o = pygame.Surface(big, pygame.SRCALPHA)      # standing things
-        self.gp = Pen(self.g)
+        self.gp = Pen(self.g, self.m)   # ground detail is flat: a mirrored piece simply draws it turned round
+        self.raw = Pen(self.g)          # ... except what has a lit side (stones) and the sheet's base
         self.op = Pen(self.o)
         self.queue = []                 # (order y, n, fn); the true foot y of entry n is self.foot[n]
         self.foot = {}
@@ -275,7 +418,7 @@ class Piece:
                 c2 = mix(shade(col, f), SNOW_D, 0.0 if i % 2 else 0.25)
             else:
                 c2 = shade(col, f)
-            self.gp.ellipse(x, y, w, h, c2)
+            self.raw.ellipse(x, y, w, h, c2)
 
     def tufts(self, n=14, area=None, avoid=()):
         """Grass tufts (in winter: dry stalks through the snow). `avoid` is a list of (x, y, r) to keep clear."""
@@ -297,9 +440,10 @@ class Piece:
     def stones(self, spots):
         """Small boulders lying on the ground. spots: [(x, y, r)]."""
         for x, y, r in spots:
+            x = x * self.m                          # mirrored: the stone moves, its shaded side stays on the right
             pts = [(x + math.cos(a) * r, y + math.sin(a) * r * 0.7) for a in [q * math.pi / 3 for q in range(6)]]
-            self.gp.poly(pts, (196, 186, 166) if not self.winter else SNOW, (84, 74, 68), 0.5)
-            self.gp.poly([pts[0], pts[1], pts[2], (x, y)], (140, 130, 118), None)
+            self.raw.poly(pts, (196, 186, 166) if not self.winter else SNOW, (84, 74, 68), 0.5)
+            self.raw.poly([pts[0], pts[1], pts[2], (x, y)], (140, 130, 118), None)
 
     def patch(self, pts, col, ink=None, w=0.5):
         """A flat shape on the ground (a yard, a pan, a clearing)."""
@@ -312,7 +456,7 @@ class Piece:
             fn(self.gp)
             return
         lay = pygame.Surface(self.g.get_size(), pygame.SRCALPHA)
-        fn(Pen(lay))
+        fn(Pen(lay, self.gp.m))
         a = pygame.Surface(self.g.get_size(), pygame.SRCALPHA)
         a.fill((255, 255, 255, int(round(255 * alpha))))
         lay.blit(a, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
@@ -431,9 +575,9 @@ class Piece:
     def hedge(self, pts, w=1.6):
         """A hedge along a line on the ground: a dark base line with a lighter top line."""
         self.gp.lines(pts, self.pal["hedge_d"], w)
-        self.gp.lines([(p[0] - 0.3, p[1] - 0.6) for p in pts], self.pal["hedge"], w * 0.55)
+        self.gp.lines([(p[0] - 0.3 * self.m, p[1] - 0.6) for p in pts], self.pal["hedge"], w * 0.55)
         if self.winter:
-            self.gp.lines([(p[0] - 0.3, p[1] - 0.9) for p in pts], SNOW, 0.5)
+            self.gp.lines([(p[0] - 0.3 * self.m, p[1] - 0.9) for p in pts], SNOW, 0.5)
 
     def fence(self, pts, col=TIMBER_D):
         """A post-and-rail fence along a line: a thin rail with a post every 4 px."""
@@ -471,25 +615,42 @@ class Piece:
             self.gp.line(((a[0] * 2 + b[0]) / 3, (a[1] * 2 + b[1]) / 3), ((a[0] + b[0] * 2) / 3, (a[1] + b[1] * 2) / 3), SNOW, 0.5)
 
     def coast(self, y0=10.0, amp=3.0, sand=4.0, seed=3):
-        """The sea on the south side of the hex (the side facing the viewer), below a wavy shore line at about y0.
-        Draws a sand strip, the sea, a light shallow band and a foam line. Returns shore(x) -> y of the water's edge.
-        The sea never freezes."""
+        """The shore of this hex. Returns a Shore (see the class): lay out everything that belongs to the water's
+        edge with shore.pt(u, v).
+
+        THE MAP OWNS THE COAST. Where the sea lies comes from the map: Piece(sea=..., shore=...) or take_apart(...,
+        sea=, shore=). sea is the side (or sides, or an angle) the sea is on; shore is the map's shore line through
+        the hex as piece-px points. On the map nothing is drawn here: the map has its own sea, sand and foam.
+
+        On the sheets (no map) the kit draws a sea so the piece can be judged: a sand strip, the shallows, the sea,
+        a foam line. Without sea= it lies in front (south), below a wavy line at about y0, as before; with a side
+        and no shore line it lies y0 px out from the centre on that side. The sea never freezes."""
         rnd = random.Random(seed)
         ph = [rnd.uniform(0, 6.28) for _ in range(3)]
+        out = self.sea or SIDES["S"]
+        if self.shore_line:
+            h = _shore_h(self.shore_line, out)
+        else:
+            def h(u):
+                return y0 + amp * (math.sin(u * 0.07 + ph[0]) * 0.6 + math.sin(u * 0.17 + ph[1]) * 0.3 + math.sin(u * 0.4 + ph[2]) * 0.1)
+        shore = self.shore = Shore(out, h)
+        if not self.has_base:
+            return shore
+        line = [shore.pt(u) for u in range(-90, 92, 2)]
+        far = (out[0] * 170, out[1] * 170)
 
-        def shore(x):
-            return y0 + amp * (math.sin(x * 0.07 + ph[0]) * 0.6 + math.sin(x * 0.17 + ph[1]) * 0.3 + math.sin(x * 0.4 + ph[2]) * 0.1)
-        xs = [x for x in range(-58, 60, 2)]
-        line = [(x, shore(x)) for x in xs]
+        def body(v):
+            pts = [(x + out[0] * v, y + out[1] * v) for x, y in line]
+            return pts + [(pts[-1][0] + far[0], pts[-1][1] + far[1]), (pts[0][0] + far[0], pts[0][1] + far[1])]
         if sand:
-            self.gp.poly([(x, y - sand) for x, y in line] + [(58, 60), (-58, 60)], self.pal["sand"], None)
-        self.gp.poly(line + [(58, 60), (-58, 60)], self.pal["shallow"], None)
-        self.gp.poly([(x, y + 5) for x, y in line] + [(58, 60), (-58, 60)], self.pal["sea"], None)
+            self.gp.poly(body(-sand), self.pal["sand"], None)
+        self.gp.poly(body(0), self.pal["shallow"], None)
+        self.gp.poly(body(5), self.pal["sea"], None)
         self.gp.lines(line, self.pal["foam"], 1)
         for wx, wy in ((-30, 12), (8, 20), (30, 9), (-8, 30)):       # little wave marks, as in the style frame
-            y = shore(wx) + 8 + wy
-            if in_hex(wx, y, 8):
-                self.gp.lines([(wx - 3, y), (wx - 1.5, y - 0.8), (wx, y), (wx + 1.5, y - 0.8), (wx + 3, y)], mix(self.pal["sea"], self.pal["foam"], 0.45), 0.5)
+            x, y = shore.pt(wx, 8 + wy)
+            if in_hex(x, y, 8):
+                self.gp.lines([(x - 3, y), (x - 1.5, y - 0.8), (x, y), (x + 1.5, y - 0.8), (x + 3, y)], mix(self.pal["sea"], self.pal["foam"], 0.45), 0.5)
         return shore
 
     def snow_patch(self, x, y, w, h):
@@ -501,29 +662,165 @@ class Piece:
     def shadow(self, x, y, w, h):
         """A soft ground shadow: an ellipse centred on (x, y). Standing primitives add their own."""
         r = pygame.Rect(0, 0, max(1, int(w * SS)), max(1, int(h * SS)))
-        r.center = Pen.T((x, y))
+        r.center = Pen.T((x * self.m, y))
         pygame.draw.ellipse(self.sh, SHADOW, r)
 
     def cast(self, x, y, w, h=None):
-        """The usual shadow of a standing thing whose foot is w wide: lower right of the foot."""
-        self.shadow(x + w * 0.35, y + 0.6, w * 1.5, h or max(2.0, w * 0.5))
+        """The usual shadow of a standing thing whose foot is w wide: lower right of the foot (also when the piece
+        is mirrored: the foot moves, the shadow still falls to the lower right)."""
+        self.shadow(x + self.m * w * 0.35, y + 0.6, w * 1.5, h or max(2.0, w * 0.5))
 
     # -------------------------------------------------------------- standing things
-    def stand(self, y, fn, lift=0.0):
+    def stand(self, y, fn, lift=0.0, x=None, on=None):
         """Queue fn(pen) to be drawn at depth y (the y of the thing's foot). Use for a family's own landmarks.
-        lift: draw it that many px later in the order than its foot says (smoke: it must lie over its chimney)."""
-        self.queue.append((y + lift, self.n, fn))
-        self.foot[self.n] = y
+        lift: draw it that many px later in the order than its foot says (smoke: it must lie over its chimney).
+        Returns a handle for on=.
+
+        In a mirrored piece the thing is MOVED to its mirrored place and drawn as it is, so it stays lit from the
+        upper left. The kit finds the place itself (the middle of the thing's picture goes from x to -x). Give x=
+        if the thing should turn round another axis (the x of its foot), or on=<handle of another thing> if it
+        belongs to that thing and must move with it (smoke on an off-centre chimney, a wheel on a mill)."""
+        n = self.n
+        if self.mirror:
+            if on is not None:
+                dx = self.dx.get(on, 0.0)
+            else:
+                dx = -2.0 * (x if x is not None else self._middle(fn))
+            dx = round(dx * SS) / SS                    # whole 2x pixels: the thing is drawn exactly as unmirrored
+            self.dx[n] = dx
+            if dx:
+                fn = (lambda f, d: lambda pen: f(Pen(pen.s, 1, d + pen.dx)))(fn, dx)
+        self.queue.append((y + lift, n, fn))
+        self.foot[n] = y
+        if lift:
+            self.lifted.add(n)
         self.n += 1
+        return n
+
+    _scratch = None
+
+    def _bounds(self, fn):
+        """The bounding box of what fn draws, in piece px: (left, top, right, bottom), or None."""
+        if Piece._scratch is None:
+            Piece._scratch = pygame.Surface((SIZE * SS, SIZE * SS), pygame.SRCALPHA)
+        sc = Piece._scratch
+        sc.fill((0, 0, 0, 0))
+        fn(Pen(sc))
+        r = sc.get_bounding_rect()
+        if not r.width:
+            return None
+        return (r.left / SS - C, r.top / SS - C, r.right / SS - C, r.bottom / SS - C)
+
+    def _middle(self, fn):
+        b = self._bounds(fn)
+        return 0.0 if b is None else (b[0] + b[2]) / 2.0
+
+    def footprint(self, grow=3, front=10):
+        """The area this piece works, as a pygame.mask.Mask of the piece canvas at 100% (SIZE x SIZE; the piece-px
+        point (x, y) is mask pixel (x + C, y + C); test it with kit.in_footprint). The map draws no wild tree,
+        bush or scrub whose foot lies in it.
+
+        It is: the ground detail that is a real surface (fields, plots, pans, yards, trodden ground; thin lines such
+        as tracks, fences and tufts and faint scrub overlays do not count), grown by `grow` px; and the foot of
+        every standing thing, 2 px to each side and up to `front` px in front of it (so nothing wild stands in
+        front of a building). Smoke does not count. Only for a piece drawn without its base (take_apart())."""
+        assert not self.has_base, "footprint() needs the piece without its ground base: use kit.take_apart()"
+        small = pygame.transform.smoothscale(self.g, (SIZE, SIZE))
+        work = pygame.mask.from_surface(small, 60)
+        work = _grow(_shrink(work, 1), 1 + grow)
+        for y, n, fn in self.queue:
+            if n in self.lifted:
+                continue
+            if n not in self.box:
+                self.box[n] = self._bounds(fn)
+            b = self.box[n]
+            if b is None:
+                continue
+            fy = min(self.foot[n], b[3])
+            ahead = min(front, 2 + 0.8 * (b[3] - b[1]))
+            r = pygame.Rect(0, 0, int(round(b[2] - b[0] + 4)), int(round(3 + ahead)))
+            r.midtop = (int(round((b[0] + b[2]) / 2 + C)), int(round(fy - 3 + C)))
+            r = r.clip(pygame.Rect(0, 0, SIZE, SIZE))
+            if r.width and r.height:
+                work.draw(pygame.mask.Mask(r.size, fill=True), r.topleft)
+        return work
 
     def layers(self):
         """The piece taken apart for the map (see take_apart()):
-        'ground'   the ground-plane layer at 2x (with base=False: only the detail, transparent elsewhere), not yet
-                   feathered at the hex border;
-        'shadow'   the 2x shadow layer (white = none; blend it with SHADOW_ALPHA);
-        'standing' the standing things, back to front: (foot_y, order_y, fn), fn(pen) draws one of them."""
+        'ground'    the ground-plane layer at 2x (with base=False: only the detail, transparent elsewhere), not yet
+                    feathered at the hex border;
+        'shadow'    the 2x shadow layer (white = none; blend it with SHADOW_ALPHA);
+        'standing'  the standing things, back to front: (foot_y, order_y, fn), fn(pen) draws one of them;
+        'footprint' the area the piece works (see footprint()): the map thins its wild land there;
+        'shore'     the Shore the piece built at, or None;
+        'mirror'    True if the piece is drawn mirrored (mirror the module's GATES with kit.mirror_gates)."""
         st = [(self.foot[q[1]], q[0], q[2]) for q in sorted(self.queue, key=lambda q: (q[0], q[1]))]
-        return {"ground": self.g, "shadow": self.sh, "standing": st}
+        return {"ground": self.g, "shadow": self.sh, "standing": st, "footprint": None if self.has_base else self.footprint(),
+                "shore": self.shore, "mirror": self.mirror}
+
+    def wild(self, thin=None, mix=None):
+        """The wild land of this piece's terrain, as the map draws it: a generic scatter of trees, bushes, tufts,
+        stones and scrub (WILD_MIX). FOR THE SHEETS ONLY: on the map the map draws it. thin: a footprint mask;
+        nothing wild is drawn where it is set. The scatter depends on the terrain and the seed only, so the same
+        wild things stand at every level and the work thins them. It is never mirrored: it belongs to the map."""
+        self.wild_done = True
+        k = dict(WILD_MIX[self.ground_kind])
+        k.update(mix or {})
+        rnd = random.Random("wild %s %d" % (self.ground_kind, self.seed))
+        m = self.m
+
+        def free(x, y):
+            if thin is not None and 0 <= int(x + C) < SIZE and 0 <= int(y + C) < SIZE and thin.get_at((int(x + C), int(y + C))):
+                return False
+            return self.shore is None or self.shore.land(x * m, y, 3)
+
+        def spots(n, room_x, room_y, half, tall, taken, margin=MARGIN + 1.5):
+            got = []
+            for _ in range(n * 40):
+                if len(got) >= n:
+                    break
+                x, y = rnd.uniform(-48, 48), rnd.uniform(-44, 46)
+                if not (in_hex(x - half, y + 1, margin) and in_hex(x + half, y + 1, margin) and in_hex(x - half * 0.7, y - tall, margin)
+                        and in_hex(x + half * 0.7, y - tall, margin)):
+                    continue
+                if any(abs(x - q[0]) < room_x and abs(y - q[1]) < room_y for q in taken + got):
+                    continue
+                got.append((x, y))
+            return got
+        for x, y in spots(k["scrub"], 26, 12, 13, 5, []):            # rough ground, as an overlay
+            w, h = rnd.uniform(22, 30), rnd.uniform(9, 13)
+            if free(x, y):
+                keep, self.gp = self.gp, self.raw
+                try:
+                    self.scrub(x, y, w, h, 0.07)
+                finally:
+                    self.gp = keep
+        col = self.pal["tuft"]
+        for x, y in spots(k["tufts"], 5, 3, 2, 3, [], 6):
+            if free(x, y):
+                for q in (-1, 0, 1):
+                    self.raw.line((x + q, y), (x + q * 1.6, y - 2.2), col, 0.5)
+        for i, (x, y) in enumerate(spots(k["scree"], 5, 3, 2, 1, [], 6)):
+            if free(x, y):
+                c = (198, 188, 168) if i % 2 else (128, 118, 104)
+                if self.winter:
+                    c = SNOW if i % 2 else (150, 144, 138)
+                ln = rnd.uniform(2.5, 4.5)
+                self.raw.line((x, y), (x + ln * 0.35, y + ln * 0.8), c, 0.5)
+                self.raw.line((x + 2, y), (x + 2 + ln * 0.3, y + ln * 0.65), c, 0.5)
+        stones = [(x, y, rnd.uniform(1.5, 2.2)) for x, y in spots(k["stones"], 10, 6, 3, 2, [])]
+        self.stones([(x * m, y, r) for x, y, r in stones if free(x, y)])
+        n_all = k["round"] + k["conifer"]
+        dense = n_all > 12
+        trees = spots(n_all, 9 if dense else 13, 6 if dense else 9, 4.5, 12.5, [])
+        for i, (x, y) in enumerate(trees):
+            kind = "conifer" if (i * 7 + 3) % max(1, n_all) < k["conifer"] else "round"
+            sc = 0.85 + 0.15 * ((i * 5) % 4) / 3.0
+            if free(x, y):
+                self.tree(x * m, y, sc, kind, i)
+        for i, (x, y) in enumerate(spots(k["bush"], 9, 6, 3, 4, trees)):
+            if free(x, y):
+                self.tree(x * m, y, 1.0, "bush", i)
 
     def tree(self, x, y, sc=1.0, kind="round", i=0):
         """A tree with its foot at (x, y). kind: 'round' (broadleaf), 'conifer', 'poplar' (tall, thin), 'bush',
@@ -585,7 +882,7 @@ class Piece:
             if kind == "fruit" and pal["blossom"]:
                 for dx, dy in ((-0.5, -0.3), (0.3, -0.5), (0.1, 0.3), (-0.2, 0.5), (0.55, 0.15)):
                     p.dot(x + dx * r, cy + dy * r, pal["blossom"], 1.0)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x)
 
     def house(self, x, y, w=7.0, h=4.6, roof_h=3.6, wall=0, kind="ridge", roof="tile", door=True, smoke=False):
         """A house with the middle of its foot at (x, y). kind: 'ridge' (roof slope faces the viewer) or 'gable'
@@ -624,14 +921,16 @@ class Piece:
             p.rect(x0, top, w, h, None, INK, 0.5)
             if smoky:
                 _smoke(p, x + w * 0.2, top - roof_h - 0.5, self.winter)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x)
 
-    def smoke(self, x, y, always=False, foot=None):
+    def smoke(self, x, y, always=False, foot=None, on=None):
         """Chimney smoke rising from (x, y). Autumn and winter only, unless always=True (the listed chimneys: the
-        smelter, the charcoal mound). Grey in winter so it shows on snow. foot: the foot y of the thing that smokes."""
+        smelter, the charcoal mound). Grey in winter so it shows on snow. foot: the foot y of the thing that smokes.
+        on: the handle of the thing that smokes (what p.stand or a kit call returned); give it when the chimney is
+        not in the middle of that thing, so the smoke stays on the chimney in the mirrored piece."""
         if always or self.season in ("autumn", "winter"):
             fy = y if foot is None else foot
-            self.stand(fy, lambda p: _smoke(p, x, y, self.winter), lift=y + 30 - fy)
+            return self.stand(fy, lambda p: _smoke(p, x, y, self.winter), lift=y + 30 - fy, x=x, on=on)
 
     def church(self, x, y, size="church", sc=1.0):
         """size: 'chapel' (village), 'church' (town), 'cathedral' (city: a dome and a tall bell tower).
@@ -641,7 +940,7 @@ class Piece:
         w, hw = w * sc, hw * sc
         th = {"chapel": 8, "church": 13, "cathedral": 17}[size] * sc
         r1, r2 = (ROOF, ROOF_D) if not self.winter else (SNOW, SNOW_D)
-        self.cast(x + 2, y, w + 5 * sc)
+        self.cast(x + 2 if not self.mirror else x + 3.5 * sc - 2, y, w + 5 * sc)     # the tower stays on the right
 
         def fn(p):
             rh = 3.5 * sc
@@ -670,7 +969,7 @@ class Piece:
             p.poly(cap, ROOF_D if not self.winter else SNOW_D, INK, 0.5)
             p.rect(tx - tw / 2, y - th, tw, th, None, INK, 0.5)
             p.rect(tx - 0.5 * sc, y - th + 1.5 * sc, 1 * sc, 1.8 * sc, DOOR, None)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x + 1.75 * sc)
 
     def tower(self, x, y, w=4.2, h=9.0, col=STONE, top="battlement", flag=None, roof=SLATE):
         """A tower with the middle of its foot at (x, y). top: 'battlement', 'cone' (a pointed roof) or 'flat'.
@@ -695,17 +994,20 @@ class Piece:
                 ty = y - h - (2.4 if top == "battlement" else w * 0.95 if top == "cone" else 0)
                 p.line((x, ty), (x, ty - 4.5), INK, 0.5)
                 p.poly([(x, ty - 4.5), (x + 3.2, ty - 3.6), (x, ty - 2.6)], flag, None)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x)
 
     def wall(self, cx, cy, rx, ry, kind="stone", towers=(0.25, 0.5, 0.75), gate=0.5, back_towers=(), height=4.0, col=None):
         """A ring wall round (cx, cy). kind: 'palisade' (timber stakes, no towers unless asked) or 'stone'
         (battlements). towers and gate are positions along the front half, 0 = right end, 1 = left end
         (0.5 = the middle of the front). The back half is queued behind everything inside, the front half before it."""
         col = col or (STONE if kind == "stone" else TIMBER)       # col=STONE_GREY for castles
+        if self.mirror:                                           # the ring is moved; its towers and gate change ends
+            towers, back_towers = [1 - a for a in towers], [1 - a for a in back_towers]
+            gate = None if gate is None else 1 - gate
         back = ring_points(cx, cy, rx, ry, math.pi, 2 * math.pi)
         front = ring_points(cx, cy, rx, ry, 0, math.pi)
         hw = height
-        self.shadow(cx + rx * 0.2, cy + ry * 0.35, rx * 2.3, ry * 2.0)
+        self.shadow(cx + self.m * rx * 0.2, cy + ry * 0.35, rx * 2.3, ry * 2.0)
 
         def stakes(p, pts, c):
             for q in range(0, len(pts), 1):
@@ -747,8 +1049,8 @@ class Piece:
                 p.rect(q[0] - 1.6, q[1] - 3.0, 3.2, 3.0, DOOR, None)
                 if kind == "palisade":
                     p.rect(q[0] - 2.4, q[1] - hw - 1.6, 4.8, 1.2, TIMBER_D, None)
-        self.stand(cy - ry - 0.5, fb)
-        self.stand(cy + ry + 0.5, ff)
+        self.stand(cy - ry - 0.5, fb, x=cx)
+        return self.stand(cy + ry + 0.5, ff, x=cx)
 
     def boat(self, x, y, sc=1.0, sail=True):
         """A ship or fishing boat with its keel at (x, y). sc 1.0 = a trading ship (12 px long); 0.55 = a fishing
@@ -764,18 +1066,20 @@ class Piece:
                 p.poly([(x + 0.5 * k, y - 11.5 * k), sl[1], sl[2], (x + 0.5 * k, y - 5 * k)], SAIL_D, None)
                 p.poly(sl, None, INK, 0.5)
             p.line((x - 7 * k, y + 0.5), (x - 3 * k, y + 0.5), (240, 244, 248), 0.5)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x)
 
     def person(self, x, y, col=(196, 72, 60)):
         """A person as a dot: 1 px wide, 3 px tall (a dark head on a coloured body)."""
         def fn(p):
             p.rect(x - 0.6, y - 2.4, 1.2, 2.4, col, None)
             p.rect(x - 0.6, y - 3.4, 1.2, 1.1, INK, None)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x)
 
     def animal(self, x, y, kind="sheep", flip=False, sc=1.0, col=None):
         """An animal as a blob: 'sheep' (white, 3x2), 'cow' (brown and white, 4x2.5), 'horse' (dark, 4x3 on legs).
         sc: 0.7 for a young one. col: another coat colour."""
+        if self.mirror:                 # the animal moves and looks the other way (that is not lighting)
+            flip = not flip
         d = -1 if flip else 1
         if sc != 1.0 or col is not None:
             def fy(p):
@@ -789,8 +1093,7 @@ class Piece:
                     w, h = ((3.2, 2.2) if kind == "sheep" else (4.4, 2.6))
                     p.ellipse(x, y - h * sc * 0.58, w * sc, h * sc, body, (120, 110, 100) if kind == "sheep" else INK, 0.5)
                     p.dot(x + w * 0.48 * d * sc, y - h * sc * 0.75, INK if kind == "sheep" else shade(body, 0.72), 1.0)
-            self.stand(y, fy)
-            return
+            return self.stand(y, fy, x=x)
 
         def fn(p):
             if kind == "sheep":
@@ -805,7 +1108,7 @@ class Piece:
                 p.line((x + 1.2, y), (x + 1.2, y - 1.6), INK, 0.5)
                 p.ellipse(x, y - 2.4, 4.4, 2.2, (96, 66, 50), INK, 0.5)
                 p.line((x + 1.8 * d, y - 2.8), (x + 2.6 * d, y - 4.4), (96, 66, 50), 1.0)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x)
 
     def haystack(self, x, y, sc=1.0):
         """A round haystack (a snow-capped mound in winter)."""
@@ -819,7 +1122,7 @@ class Piece:
             if self.winter:
                 p.poly([(x - w / 2, y - h * 0.45), (x, y - h), (x + w / 2, y - h * 0.45), (x, y - h * 0.62)], SNOW, None)
             p.poly(pts, None, (110, 84, 50), 0.5)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x)
 
     def heap(self, x, y, w, h, col, col_d=None, ink=INK):
         """A cone-shaped heap (salt, spoil, grain, charcoal): two-tone, lit from the left. Snow-capped in winter."""
@@ -833,7 +1136,7 @@ class Piece:
             if self.winter:
                 p.poly([(x - w * 0.3, y - h * 0.55), (x - w * 0.12, y - h), (x + w * 0.12, y - h), (x + w * 0.28, y - h * 0.6), (x, y - h * 0.72)], SNOW, None)
             p.poly(pts, None, ink, 0.5)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x)
 
     def logs(self, x, y, n=3, w=7.0):
         """A pile of n logs lying across, seen from the side with their cut ends to the right."""
@@ -845,7 +1148,7 @@ class Piece:
                 ww = w - i * 1.2
                 p.rect(x - ww / 2, yy - 1.6, ww, 1.6, TIMBER if not (self.winter and i == n - 1) else SNOW, INK, 0.5)
                 p.dot(x + ww / 2 - 0.6, yy - 0.8, (226, 196, 140), 1.0)
-        self.stand(y, fn)
+        return self.stand(y, fn, x=x)
 
     # -------------------------------------------------------------- output
     def finish(self, check=True, label=""):
@@ -853,6 +1156,8 @@ class Piece:
         Returns a SIZE x SIZE surface with alpha. With check=True, prints a line if a standing thing leaves the hex."""
         global LAST
         LAST = self
+        if WILD is not None and self.has_base and not self.wild_done:
+            self.wild(thin=WILD)                    # sheets: the piece stands in the map's wild land, thinned
         for q in sorted(self.queue, key=lambda q: (q[0], q[1])):
             q[2](self.op)
         mask = _hex_mask()
@@ -864,7 +1169,7 @@ class Piece:
         ground.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
         ground.blit(self.o, (0, 0))
         out = pygame.transform.smoothscale(ground, (SIZE, SIZE))
-        if check:
+        if check and CHECK:
             bad = overhang(self.o)
             if bad:
                 print("PIECE PROBLEM %s %s: %d px of standing art outside the hex margin" % (label, self.season, bad))
@@ -876,17 +1181,109 @@ def _smoke(p, x, y, winter=False):
         p.circle(x + dx, y + dy, r, SMOKE_SNOW if winter else SMOKE)
 
 
-def take_apart(draw, level, season, **kw):
+def _grow(mask, r):
+    out = pygame.mask.Mask(mask.get_size())
+    for dx in range(-r, r + 1):
+        for dy in range(-r, r + 1):
+            if dx * dx + dy * dy <= r * r + 1:
+                out.draw(mask, (dx, dy))
+    return out
+
+
+def _shrink(mask, r):
+    inv = mask.copy()
+    inv.invert()
+    inv = _grow(inv, r)
+    inv.invert()
+    return inv
+
+
+def in_footprint(mask, x, y):
+    """True if the piece-px point (origin at the hex centre) lies in the footprint mask."""
+    i, j = int(math.floor(x + C)), int(math.floor(y + C))
+    return 0 <= i < SIZE and 0 <= j < SIZE and bool(mask.get_at((i, j)))
+
+
+def _accepts(draw):
+    import inspect
+    try:
+        return set(inspect.signature(draw).parameters)
+    except (TypeError, ValueError):
+        return set()
+
+
+def variants_of(draw):
+    """How many layouts the module of this draw function has (its VARIANTS; 1 if it has none yet)."""
+    import sys as _sys
+    return int(getattr(_sys.modules.get(getattr(draw, "__module__", "")), "VARIANTS", 1))
+
+
+def take_apart(draw, level, season, hex=None, variant=None, mirror=None, sea=None, shore=None, **kw):
     """Draw one piece for the map: without its ground base, and returned as layers (see Piece.layers()), so the map
-    can lay the ground detail on its own ground and sort every standing thing into its own back-to-front list.
-    Works with every family module as it is: take_apart(wheat.draw, 2, "summer")."""
-    global NO_BASE
-    NO_BASE = True
+    can lay the ground detail on its own ground, sort every standing thing into its own back-to-front list and thin
+    its wild land under the piece's footprint.
+
+    Level 0 is no piece: returns None (the map draws the wild land itself).
+    hex=(col, row): the layout and the mirror are chosen from the hex by pick(); or give variant= and mirror=.
+    sea=, shore=: where the map has the sea in this hex (see Piece.coast()); None for an inland hex.
+    Works with every family module as it is: what a module's draw() does not take yet (variant, mirror, sea) is
+    handed to the kit instead, so the mirror and the sea side still apply."""
+    global NO_BASE, SITE
+    if level == 0:
+        return None
+    if hex is not None:
+        v, m = pick(hex[0], hex[1], variants_of(draw))
+        variant = v if variant is None else variant
+        mirror = m if mirror is None else mirror
+    variant, mirror = variant or 0, bool(mirror)
+    names = _accepts(draw)
+    for k, v in (("variant", variant), ("mirror", mirror), ("sea", sea), ("shore", shore)):
+        if k in names:
+            kw[k] = v
+    NO_BASE, old = True, SITE
+    SITE = {"mirror": mirror, "sea": sea, "shore": shore}
     try:
         draw(level, season, **kw)
     finally:
-        NO_BASE = False
-    return LAST.layers()
+        NO_BASE, SITE = False, old
+    lay = LAST.layers()
+    lay["variant"] = variant if "variant" in names else 0
+    return lay
+
+
+def with_wild(draw, level, season, variant=0, mirror=False, sea=None, shore=None, **kw):
+    """A piece as the sheets show it once the map draws the wild land: the flat picture standing in the terrain's
+    wild scatter (Piece.wild()), thinned by the piece's own footprint. Level 0: draw() itself (kit.wild)."""
+    global WILD, CHECK, SITE
+    names = _accepts(draw)
+    site = {"variant": variant, "mirror": mirror, "sea": sea, "shore": shore}
+    if level == 0:
+        return draw(level, season, **dict(kw, **{k: v for k, v in site.items() if k in names and k != "variant"}))
+    CHECK = False
+    try:
+        lay = take_apart(draw, level, season, **dict(kw, **site))
+    finally:
+        CHECK = True
+    kw = dict(kw, **{k: v for k, v in site.items() if k in names})
+    WILD, old = lay["footprint"], SITE
+    SITE = {"mirror": mirror, "sea": sea, "shore": shore}
+    try:
+        return draw(level, season, **kw)
+    finally:
+        WILD, SITE = None, old
+
+
+def wild(season, ground="grass", seed=0, coast=None, thin=None, mix=None, label="wild", **site):
+    """The level 0 picture of a family: the wild land of its terrain, as the map draws it. FOR THE SHEETS ONLY.
+    Use the family's own ground and seed. coast: the keywords of the family's p.coast() call, for a coast family
+    (coast={} for the defaults). A module's draw() returns this for level 0:
+        if level == 0:
+            return kit.wild(season, "farm", seed=1)"""
+    p = Piece(season, ground, seed, **site)
+    if coast is not None:
+        p.coast(**coast)
+    p.wild(thin, mix)
+    return p.finish(label=label)
 
 
 _MASK = None
@@ -948,8 +1345,12 @@ def _cell(piece, season, scale=1.0, pad=6, ground="grass"):
     return s
 
 
-def sheet(draw, levels, title, path, level_names=None, ground="grass", row_season="summer"):
+def sheet(draw, levels, title, path, level_names=None, ground="grass", row_season="summer", wild=False):
     """Lay a family out as a labelled grid and save it as a PNG.
+
+    wild=True (for a module that no longer draws its own wild scatter): every piece is shown standing in the
+    terrain's wild land, thinned by its footprint, as on the map (with_wild()); level 0 is draw(0, season), which
+    returns kit.wild(...).
 
     draw(level, season) -> Surface (SIZE x SIZE);  levels: e.g. range(0, 4);  level_names: {level: "name"}.
     Left: rows = levels, columns = seasons, at 100%. Right: the same grid at 50% (the small-size test).
@@ -957,7 +1358,10 @@ def sheet(draw, levels, title, path, level_names=None, ground="grass", row_seaso
     Returns the dict {(level, season): Surface}."""
     levels = list(levels)
     level_names = level_names or {}
-    pieces = {(lv, se): draw(lv, se) for lv in levels for se in SEASONS}
+    if wild:
+        pieces = {(lv, se): with_wild(draw, lv, se) for lv in levels for se in SEASONS}
+    else:
+        pieces = {(lv, se): draw(lv, se) for lv in levels for se in SEASONS}
     for k, s in pieces.items():
         assert s.get_size() == (SIZE, SIZE), "draw%r must return a %dx%d surface" % (k, SIZE, SIZE)
     pad, gap, left, top = 6, 6, 118, 64
@@ -993,6 +1397,80 @@ def sheet(draw, levels, title, path, level_names=None, ground="grass", row_seaso
     for i, lv in enumerate(levels):
         strip.blit(pieces[(lv, row_season)], (int(20 + i * HEX_W - (SIZE - HEX_W) / 2), 6))
     out.blit(strip, (left, ry + 14))
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    pygame.image.save(out, path)
+    return pieces
+
+
+def hex_field(get, cols, rows, season="summer", ground="grass", pad=8):
+    """A block of touching hexes, as on the map (odd rows shoved right). get(col, row) -> a piece Surface or None.
+    Returns the picture: the repetition test."""
+    w = int(cols * HEX_W + HEX_W / 2 + pad * 2)
+    h = int((rows - 1) * 0.75 * HEX_H + HEX_H + pad * 2)
+    out = backdrop(season, w, h, ground)
+    for r in range(rows):
+        for c in range(cols):
+            img = get(c, r)
+            if img is not None:
+                cx = pad + HEX_W / 2 + c * HEX_W + (r & 1) * HEX_W / 2
+                cy = pad + HEX_H / 2 + r * 0.75 * HEX_H
+                out.blit(img, (int(round(cx - C)), int(round(cy - C))))
+    return out
+
+
+def variant_sheet(draw, levels, title, path, level_names=None, ground="grass", variants=None, season="summer", wild=True, **kw):
+    """The second sheet of a family: its layouts and their mirrors, and how they repeat. Saves a PNG.
+
+    Left: rows = levels (level 0 is left out: it is no piece), columns = layout 0, layout 0 mirrored, layout 1,
+    layout 1 mirrored, at 100% in `season`; a small 50% copy beside it. Check: the light still comes from the upper
+    left in the mirrored columns, nothing collides, layout 1 is not taken for a mirror of layout 0.
+    Right: a block of 5 x 4 touching hexes of the top level, each hex's picture chosen by pick(col, row): no two
+    neighbours may be the same picture. wild=True shows the pieces in the thinned wild land, as on the map."""
+    levels = [lv for lv in levels if lv != 0]
+    level_names = level_names or {}
+    n = variants or variants_of(draw)
+    combos = [(v, m) for v in range(n) for m in (False, True)]
+
+    def one(lv, v, m):
+        if wild:
+            return with_wild(draw, lv, season, variant=v, mirror=m, **kw)
+        names = _accepts(draw)
+        k2 = dict(kw, **{k: val for k, val in (("variant", v), ("mirror", m)) if k in names})
+        global SITE
+        old, SITE = SITE, {"mirror": m}
+        try:
+            return draw(lv, season, **k2)
+        finally:
+            SITE = old
+    pieces = {(lv, c): one(lv, *c) for lv in levels for c in combos}
+    pad, gap, left, top = 6, 6, 118, 64
+    cw = SIZE + pad * 2
+    hw = cw // 2
+    gw = len(combos) * (cw + gap)
+    gh = len(levels) * (cw + gap)
+    x50 = left + gw + 24
+    fx = x50 + len(combos) * (hw + 4) + 24
+    field = hex_field(lambda c, r: pieces[(levels[-1], pick(c, r, n))], 5, 4, season, ground)
+    W = fx + field.get_width() + 20
+    H = max(top + gh + 40, top + field.get_height() + 60)
+    out = pygame.Surface((W, H))
+    out.fill(SHEET_BG)
+    f_t, f_h, f_s = _font(30, True), _font(22), _font(18)
+    out.blit(f_t.render(title, True, SHEET_TEXT), (16, 12))
+    out.blit(f_s.render("100%%, %s (light: upper left in every column)" % season, True, SHEET_DIM), (left, 44))
+    out.blit(f_s.render("50% test", True, SHEET_DIM), (x50, 44))
+    out.blit(f_s.render("Level %d on 5 x 4 hexes, chosen by kit.pick(col, row)" % levels[-1], True, SHEET_DIM), (fx, 44))
+    for j, (v, m) in enumerate(combos):
+        out.blit(f_h.render("layout %d%s" % (v, ", mirrored" if m else ""), True, SHEET_TEXT), (left + j * (cw + gap) + 4, top - 2 + gh))
+    for i, lv in enumerate(levels):
+        y = top + i * (cw + gap)
+        out.blit(f_h.render("Level %d" % lv, True, SHEET_TEXT), (14, y + 40))
+        if lv in level_names:
+            out.blit(f_s.render(level_names[lv], True, SHEET_DIM), (14, y + 62))
+        for j, c in enumerate(combos):
+            out.blit(_cell(pieces[(lv, c)], season, 1.0, pad, ground), (left + j * (cw + gap), y))
+            out.blit(_cell(pieces[(lv, c)], season, 0.5, pad, ground), (x50 + j * (hw + 4), top + i * (hw + 4)))
+    out.blit(field, (fx, top))
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     pygame.image.save(out, path)
     return pieces

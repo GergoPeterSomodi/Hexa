@@ -3,24 +3,32 @@
 A test, not game code. It answers one question: do the pieces of tools/worldmap/pieces (one hex, one level, one
 season) sit in the real map, or do they look like stickers?
 
+Round 2 (after the owner's answers of 2026-11-15; see docs/design/map/pieces/GUIDE.md):
+  - NO NAME PLATES. The normal map shows no town name plates for now. Towns stay where the guide puts them.
+  - THE MAP DRAWS THE WILD LAND. The frame's own trees stay in a piece hex and are thinned only under the piece's
+    footprint (kit.take_apart(...)["footprint"]), instead of the whole hex being cleared.
+  - THE MAP OWNS THE SHORE. Every piece is told where the map has the sea in its hex (sea=, shore=); a piece
+    never draws a sea, and nothing of a piece stands in the water. A port keeps the frame's own quay, moles,
+    lighthouse and ships at its own shore: the stand-in for the harbour add-on until harbour.py can draw it.
+  - MIRROR AND LAYOUT come from the hex: kit.pick(col, row).
+
 What the compositor does (the frame and the pieces are used read only; no file of either is changed):
-  - A hex that takes a piece loses the frame's own town, field parcels, trees and rounded hills, so nothing doubles.
-    Ranges, rivers, roads, coasts and names stay: they are other layers.
-  - The piece's ground base is dropped: the frame paints the ground. Only the piece's ground detail (fields, plots,
-    yards, tracks, tufts) is kept, feathered at the hex border, clipped to the land, and laid on the frame's ground
-    before the rivers and roads.
+  - A hex that takes a piece loses the frame's own town, field parcels and rounded hills, and the trees that stand
+    in the piece's footprint. Ranges, rivers, roads, coasts and the other trees stay.
+  - The piece comes from kit.take_apart(): no ground base (the frame paints the ground), the ground detail (fields,
+    plots, yards) feathered at the hex border, clipped to the land, and laid on the frame's ground before the
+    rivers and roads.
   - The piece's soft shadows go into the frame's one shadow pass.
-  - Every standing thing of a piece is taken out of the piece's queue one by one and put into the frame's own
-    back-to-front list by the y of its foot, so a piece's houses and a neighbour's trees and hills cover each other
-    correctly.
-  - A town's site moves to the middle of its piece, the roads are led there, and the name plate goes on the strip
-    the settlement pieces keep free (26 px below the hex centre).
+  - Every standing thing of a piece is put into the frame's own back-to-front list by the y of its foot, so a
+    piece's houses and the map's trees and hills cover each other correctly.
+  - A town's site moves to the middle of its piece and the roads are led there.
   - Winter: the frame has no winter of its own, so a stand-in is made here (snow ground from the pieces' palette,
     bare broadleaves, snow on conifers and hills). It is a stand-in, not a design.
 
 Run (the frame's environment: STYLE_FRAME_LAYERS must name the exported layers file):
-    python tools/worldmap/pieces_in_map/compose.py [OUT_DIR] [summer|winter|both] [--ab]
-Writes summer.png, winter.png, plain_crop.png (and base_ab.png with --ab) and prints the measurements.
+    python tools/worldmap/pieces_in_map/compose.py [OUT_DIR] [summer|winter|both]
+Writes summer.png, winter.png, plain_crop.png and prints the measurements. (base_kept_crop.png in the docs folder is
+from round 1 and is no longer written.)
 """
 import contextlib
 import os
@@ -50,31 +58,10 @@ TOWN_LEVEL = {
 # Wheat on the Po plain: (column, row) -> level. Chosen from the farmland hexes in view (see --probe).
 WHEAT = {(7, 9): 2, (8, 9): 3, (10, 9): 3, (11, 9): 1, (12, 9): 2, (6, 10): 2, (6, 11): 1, (7, 11): 1, (12, 12): 2}
 SITE_DY = -6.0              # the middle of a settlement piece lies 6 px above the hex centre (CY + 1 in settlements.py)
-PLATE_DY = 26.0             # the settlement pieces keep the strip from here down free for the name plate
 SS, SIZE, C = kit.SS, kit.SIZE, kit.C
 
 
 # ---------------------------------------------------------------- taking a piece apart
-BasePiece = kit.Piece
-
-
-class LayeredPiece(BasePiece):
-    """kit.Piece that keeps its layers: no ground base (the map paints the ground), and the queue of standing things
-    is kept so each one can join the map's back-to-front order."""
-    last = None
-    keep_base = False
-
-    def base(self, kind, texture=True):
-        if LayeredPiece.keep_base:
-            return BasePiece.base(self, kind, texture)
-        if texture:
-            self.rnd.random()       # the kit draws one number here: keep the sequence, so tufts stand where they did
-
-    def finish(self, check=True, label=""):
-        LayeredPiece.last = self
-        return None
-
-
 _MASK = None
 
 
@@ -91,28 +78,24 @@ def feather_mask():
     return _MASK
 
 
-def take_apart(draw, level, season, keep_base=False):
-    """Returns (ground, shadow, things): the ground detail (112x112, premultiplied alpha), the shadow layer (2x, white
-    = none) and the standing things as (foot_y, order, image, rect) with premultiplied images cut to their boxes."""
-    kit.Piece = LayeredPiece
-    LayeredPiece.keep_base = keep_base
-    try:
-        draw(level, season)
-    finally:
-        kit.Piece = BasePiece
-    p = LayeredPiece.last
-    g = p.g.copy()                                   # drawn pixels are opaque, the rest is (0, 0, 0, 0): premultiplied
+def take_apart(draw, level, season, hx, sea=None, shore=None):
+    """The piece of one hex from the kit, ready for the frame. Returns a dict:
+    ground (112x112, premultiplied alpha), shadow (2x, white = none), things [(foot_y, order, image, rect)] with
+    premultiplied images cut to their boxes, footprint (the kit's mask), mirror, variant."""
+    lay = kit.take_apart(draw, level, season, hex=hx, sea=sea, shore=shore)
+    g = lay["ground"].premul_alpha()                 # overlays are half-transparent: premultiply before scaling
     g.blit(feather_mask(), (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
     ground = pygame.transform.smoothscale(g, (SIZE, SIZE))
     things = []
-    for y, n, fn in sorted(p.queue, key=lambda q: (q[0], q[1])):
-        lay = pygame.Surface((SIZE * SS, SIZE * SS), pygame.SRCALPHA)
-        fn(kit.Pen(lay))
-        small = pygame.transform.smoothscale(lay, (SIZE, SIZE))
+    for n, (foot, order, fn) in enumerate(lay["standing"]):
+        one = pygame.Surface((SIZE * SS, SIZE * SS), pygame.SRCALPHA)
+        fn(kit.Pen(one))
+        small = pygame.transform.smoothscale(one, (SIZE, SIZE))
         box = small.get_bounding_rect()
         if box.width:
-            things.append((y, n, small.subsurface(box).copy(), box))
-    return ground, p.sh, things
+            things.append((order, n, small.subsurface(box).copy(), box))
+    return {"ground": ground, "shadow": lay["shadow"], "things": things, "footprint": lay["footprint"],
+            "mirror": lay["mirror"], "variant": lay["variant"]}
 
 
 # ---------------------------------------------------------------- winter stand-in for the frame
@@ -159,11 +142,10 @@ def season_cols(season):
 
 # ---------------------------------------------------------------- the frame with pieces
 class PieceFrame(R.Frame):
-    def __init__(self, season="summer", towns=TOWN_LEVEL, fields=WHEAT, keep_base=False, with_pieces=True):
+    def __init__(self, season="summer", towns=TOWN_LEVEL, fields=WHEAT, with_pieces=True):
         R.Frame.__init__(self, 60)
         self.season = season
         self.winter = season == "winter"
-        self.keep_base = keep_base
         self.assign = {}                                     # hex -> (family module, level, town or None)
         if with_pieces:
             for name, lv in towns.items():
@@ -181,6 +163,41 @@ class PieceFrame(R.Frame):
 
     def in_piece(self, x_km, y_km):
         return R.hex_of_km(x_km, y_km) in self.assign
+
+    def in_footprint(self, x_km, y_km):
+        """True if the map point lies in the footprint of a piece (the area the piece works)."""
+        x, y = self.P(x_km, y_km)
+        for hx, pc in self.pieces.items():
+            cx, cy = self.hex_px(hx)
+            if abs(x - cx) < C and abs(y - cy) < C and kit.in_footprint(pc["footprint"], x - cx, y - cy):
+                return True
+        return False
+
+    def sea_of(self, hx):
+        """Where the map has the sea in this hex, for the kit: (sea, shore) = the direction to the sea as an angle
+        on screen and the shore line as piece-px points; (None, None) for a hex without sea."""
+        cx, cy = self.hex_px(hx)
+        wet = []
+        for j in range(-50, 51, 4):
+            for i in range(-52, 53, 4):
+                if kit.in_hex(i, j) and not FIELDS.is_land(*self.km(cx + i, cy + j)):
+                    wet.append((i, j))
+        if len(wet) < 3:
+            return None, None
+        sx, sy = sum(p[0] for p in wet) / len(wet), sum(p[1] for p in wet) / len(wet)
+        if math.hypot(sx, sy) < 1e-6:
+            return None, None
+        ang = math.degrees(math.atan2(sy, sx))
+        out = (math.cos(math.radians(ang)), math.sin(math.radians(ang)))
+        along = (out[1], -out[0])
+        line = []
+        for u in range(-54, 55, 6):
+            for v in range(-60, 61):
+                x, y = along[0] * u + out[0] * v, along[1] * u + out[1] * v
+                if not FIELDS.is_land(*self.km(cx + x, cy + y)):
+                    line.append((x, y))
+                    break
+        return (ang, line) if len(line) >= 2 else (None, None)
 
     # ---- the frame's own drawing, without what the pieces replace
     def parcels(self):
@@ -224,9 +241,12 @@ class PieceFrame(R.Frame):
             R.HILLS = hills
 
     def trees(self):
+        # the map's wild land stays; it is thinned only where a piece works (the piece's footprint)
         trees = R.TREES
-        R.TREES = [t for t in trees if not self.in_piece(t["x"], t["y"])]
-        self.stats["trees dropped"] = len(trees) - len(R.TREES)
+        inside = [t for t in trees if self.in_piece(t["x"], t["y"])]
+        R.TREES = [t for t in trees if not self.in_footprint(t["x"], t["y"])]
+        self.stats["trees of the map in piece hexes"] = len(inside)
+        self.stats["trees thinned by the footprints"] = len(trees) - len(R.TREES)
         try:
             R.Frame.trees(self)
         finally:
@@ -240,12 +260,14 @@ class PieceFrame(R.Frame):
             R.Frame.towns(self)
         finally:
             WORLD["towns"] = towns
+        for t in towns.values():        # no name plates on the normal map for now
+            t.pop("_label", None)
+            t.pop("_label_at", None)
         for hx, (mod, lv, t) in self.assign.items():
             if not t:
                 continue
-            cx, cy = self.hex_px(hx)
-            t["_label"] = (cx, cy + PLATE_DY)
-            if t["port"]:               # the quay, moles and ships are the frame's coast layer: kept, at the old site
+            if t["port"]:               # the harbour add-on at the town's own shore: the frame's quay, moles and ships
+                                        # stand in for it until harbour.py can draw an add-on (review task 4)
                 x, y = t["x"], t["y"]
                 t["x"], t["y"] = t["site0"]
                 try:
@@ -316,14 +338,21 @@ class PieceFrame(R.Frame):
     # ---- the pieces
     def build_pieces(self):
         self.pieces = {}
+        self.stats["sea side"] = {}
+        self.stats["picture (layout, mirrored)"] = {}
         for hx, (mod, lv, t) in sorted(self.assign.items()):
-            self.pieces[hx] = take_apart(mod.draw, lv, self.season, self.keep_base)
+            sea, shore = self.sea_of(hx)
+            self.pieces[hx] = pc = take_apart(mod.draw, lv, self.season, hx, sea, shore)
+            if sea is not None:
+                self.stats["sea side"][hx] = "%d deg" % round(sea)
+            self.stats["picture (layout, mirrored)"][hx] = (pc["variant"], pc["mirror"])
 
     def piece_ground(self):
         """The ground detail of every piece, on the frame's ground, clipped to the land."""
         self.build_pieces()
         lost = {}
-        for hx, (ground, sh, things) in self.pieces.items():
+        for hx, pc in self.pieces.items():
+            ground = pc["ground"]
             cx, cy = self.hex_px(hx)
             land = pygame.Surface((SIZE, SIZE), pygame.SRCALPHA)
             n = 0
@@ -341,22 +370,22 @@ class PieceFrame(R.Frame):
         self.stats["ground px clipped at the sea"] = lost
 
     def place_pieces(self):
-        """Every standing thing of every piece joins the frame's back-to-front list by the y of its foot."""
+        """Every standing thing of every piece joins the frame's back-to-front list by the y of its foot. The map
+        owns the shore: a thing whose foot would stand in the water is left out."""
         wet = {}
         count = 0
-        for hx, (ground, sh, things) in self.pieces.items():
+        for hx, pc in self.pieces.items():
             cx, cy = self.hex_px(hx)
-            for y, n, img, box in things:
+            for y, n, img, box in pc["things"]:
                 pos = (cx - C + box.x, cy - C + box.y)
+                foot_y = min(cy + y, pos[1] + box.height)               # smoke is queued 30 px low: use the picture's foot
+                if y < 60 and any(not FIELDS.is_land(*self.km(fx, foot_y)) for fx in (pos[0] + 1, pos[0] + box.width // 2, pos[0] + box.width - 1)):
+                    wet[hx] = wet.get(hx, 0) + 1
+                    continue
                 self.add(cy + y + n * 1e-5, cx, (lambda im, p: lambda: self.surf.blit(im, p, special_flags=pygame.BLEND_PREMULTIPLIED))(img, pos))
                 count += 1
-                foot_y = min(cy + y, pos[1] + box.height)               # smoke is queued 30 px low: use the picture's foot
-                for fx in (pos[0] + 1, pos[0] + box.width // 2, pos[0] + box.width - 1):
-                    if y < 60 and not FIELDS.is_land(*self.km(fx, foot_y)):
-                        wet[hx] = wet.get(hx, 0) + 1
-                        break
         self.stats["standing things placed"] = count
-        self.stats["standing things with a foot in the sea"] = wet
+        self.stats["standing things left out at the sea"] = wet
 
     def draw_shadows(self):
         lay = pygame.Surface((self.W, self.H))
@@ -366,9 +395,9 @@ class PieceFrame(R.Frame):
             r = pygame.Rect(0, 0, w, h)
             r.center = (x, y)
             pygame.draw.ellipse(lay, (30, 50, 30), r)
-        for hx, (ground, sh, things) in self.pieces.items():
+        for hx, pc in self.pieces.items():
             cx, cy = self.hex_px(hx)
-            small = pygame.transform.smoothscale(sh.convert(24), (SIZE, SIZE))
+            small = pygame.transform.smoothscale(pc["shadow"].convert(24), (SIZE, SIZE))
             small.set_colorkey((255, 255, 255))
             lay.blit(small, (cx - C, cy - C))
         lay.set_alpha(46)
@@ -387,16 +416,6 @@ class PieceFrame(R.Frame):
         out = []
         for k in sorted(self.stats):
             out.append("%s: %s" % (k, self.stats[k]))
-        rows = []
-        for hx, (mod, lv, t) in sorted(self.assign.items()):
-            if not t or "_plate" not in t:
-                continue
-            r = t["_plate"]
-            m = min(R.sites.hex_margin_km(*self.km(x, y), hx) for x in (r.left, r.right) for y in (r.top, r.bottom))
-            cx, cy = self.hex_px(hx)
-            rows.append("%s L%d plate %dx%d, top %+d px from the hex centre: %s%.1f px %s the hex border" % (
-                t["name"], lv, r.width, r.height, r.top - cy, "" if m >= 0 else "", abs(m) * self.S, "inside" if m >= 0 else "OUTSIDE"))
-        out += rows
         # what of the frame is left inside the piece hexes
         left = {}
         for rv in WORLD["rivers"]:
@@ -479,12 +498,6 @@ def main():
         pygame.image.save(pygame.transform.scale(crop, (CROP[2] * 2, CROP[3] * 2)), os.path.join(out, "plain_crop.png"))
     if which in ("both", "winter"):
         PieceFrame("winter").render(os.path.join(out, "winter.png"))
-    if "--ab" in sys.argv:              # the same crop with the kit's own ground base kept: what dropping it buys
-        f = PieceFrame("summer", keep_base=True)
-        f.render(os.path.join(out, "_base_kept.png"))
-        crop = f.surf.subsurface(pygame.Rect(CROP)).copy()
-        pygame.image.save(pygame.transform.scale(crop, (CROP[2] * 2, CROP[3] * 2)), os.path.join(out, "base_kept_crop.png"))
-        os.remove(os.path.join(out, "_base_kept.png"))
 
 
 if __name__ == "__main__":

@@ -10,23 +10,38 @@ they are the pattern to copy.
 | `kit.py` | The shared kit: canvas, hex mask, palette, season colours, primitives, the sheet helper. **Do not edit it** in a family task; report what is missing |
 | `wheat.py`, `settlements.py` | The two reference families |
 | `<family>.py` | One module per family: `castles`, `vineyard`, `olives`, `grazing`, `salt`, `mines`, `timber`, `harbour` |
+| `contract.py` | The kit's map contract on one page (`kit_contract.png`): wild land, coast sides, footprint, mirror, `pick`. Its `fishing()` is the pattern for a coast piece |
+| `overview.py` | Every family on one page (`overview.png`) |
 
 ## The module contract
 
 ```python
 LEVELS = range(0, 4)                 # settlements range(1, 6), castles range(1, 4)
-NAMES = {0: "...", 1: "...", ...}    # a short name per level, for the sheet
+NAMES = {0: "wild land (the map's)", 1: "...", ...}    # a short name per level, for the sheet
+VARIANTS = 2                         # layouts in this module (1 until the second layout is drawn)
+GATES = {"south": (x, y), ...}       # where the piece's lane ends, 10 px inside the border (unmirrored)
 
-def draw(level, season):             # season: "spring" | "summer" | "autumn" | "winter"
-    p = kit.Piece(season, ground="grass", seed=N)   # one seed and one ground per family
+def draw(level, season, variant=0, mirror=False):     # season: "spring" | "summer" | "autumn" | "winter"
+    if level == 0:                   # no piece on the map; on the sheet: the wild land as the map draws it
+        return kit.wild(season, "grass", seed=N)
+    p = kit.Piece(season, ground="grass", seed=N, mirror=mirror)   # one seed and one ground per family
+    L = LAYOUT[variant]              # the layout tables: one dict per layout
     ...                               # ground-plane calls first, then standing things, then season details
     return p.finish(label="family L%d" % level)     # a 112x112 pygame.Surface with alpha
 ```
 
-- Extra keyword arguments with defaults are allowed (`animal="sheep"`, `flag=kit.FLAG`).
-- Positions are fixed tables at the top of the module (see `BLOCKS`, `WILD_TREES` in `wheat.py`). No position may
-  depend on the season. Random numbers only from a fixed seed, never from the season or the level.
-- Running the module writes the sheet: `kit.sheet(draw, LEVELS, title, path, NAMES, ground="...")`.
+- **The piece draws only the work.** No wild trees, bushes, scrub, tufts or stones: the map draws the wild land and
+  thins it under the piece's footprint (the kit measures the footprint from what you draw).
+- **Mirror**: pass `mirror=mirror` on and draw in unmirrored coordinates. The kit turns the ground round and moves
+  each standing thing to its mirrored place without flipping it, so the light stays upper left. Never write
+  `if mirror:`. Landmark functions `return p.stand(y, fn)`; a part of another thing gets `on=<that handle>`.
+- **Coast families** also take `sea=None, shore=None`, pass them to `kit.Piece`, call `shore = p.coast(...)` once
+  and place everything at the water's edge with `shore.pt(u, v)` (u along the shore, v out to sea).
+- Extra keyword arguments with defaults are allowed (`animal="sheep"`, `flag=kit.FLAG`, `addon=False`).
+- Positions are fixed tables at the top of the module. No position may depend on the season. Random numbers only
+  from a fixed seed, never from the season or the level.
+- Running the module writes both sheets: `kit.sheet(draw, LEVELS, title, path, NAMES, ground="...", wild=True)` and
+  `kit.variant_sheet(draw, LEVELS, title, "<family>_variants.png", NAMES, ground="...")`.
 
 ## Running
 
@@ -42,7 +57,7 @@ A line `PIECE PROBLEM <label> <season>: N px ...` means a standing thing leaves 
 ## Output naming
 
 - Sheets: `docs/design/map/pieces/<family>.png` (grazing: `grazing_sheep.png`, `grazing_cattle.png`,
-  `grazing_horses.png`).
+  `grazing_horses.png`) and `<family>_variants.png`.
 - Single pieces, when the game needs them later: `<family>_L<level>_<season>.png`, 112x112, hex centred.
 - Trial pictures and crops go in your own scratch folder, not in the repository.
 
@@ -62,7 +77,7 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 | `p.rows(cx, cy, w, h, angle, n, dashed=)` | Plant rows on a soil block |
 | `p.hedge(pts)`, `p.fence(pts)`, `p.terrace(pts, face=)` | Lines on the ground; `face=2` gives a terrace wall a visible front |
 | `p.road(pts, w, track=)`, `p.water(pts, w)`, `p.pond(pts, col=, edge=)` | Roads, streams and canals (frozen in winter), ponds. Tracks are overlays |
-| `p.coast(y0)` | The sea on the south side; returns `shore(x)` |
+| `p.coast(y0)` | The shore the map gave (`Piece(sea=, shore=)`; in front on the sheets). Returns a `Shore`: `pt(u, v)`, `land(x, y)`, `depth`, `front`. Draws a sea on the sheets only |
 | `p.jetty(a, b, stone=, snow=)` or `p.jetty([pts], ...)` | A jetty, quay or mole; a list of points makes a bent mole; `snow=True` caps it in winter |
 | `p.tufts(n, avoid=)`, `p.stones(spots)`, `p.scree(n)` | Ground scatter |
 | `p.snow_patch(x, y, w, h)` | A drift (winter only) |
@@ -80,13 +95,22 @@ Coordinates are 100% pixels from the hex centre (x right, y down; the hex is 104
 | `p.person(x, y, col)`, `p.animal(x, y, kind, flip, sc=, col=)` | `sheep`, `cow`, `horse`; `sc=0.7` for young, `col` for another coat |
 | `p.haystack(x, y)`, `p.heap(x, y, w, h, col)`, `p.logs(x, y, n)` | Stacks, cone heaps, log piles |
 | `p.smoke(x, y, always=, foot=)` | Smoke (autumn and winter only; `always=True` for the listed chimneys). Never call `kit._smoke` |
-| `p.stand(y, fn, lift=)` | Your own landmark: `fn(pen)` draws with `pen.poly`, `pen.rect`, `pen.box`, `pen.line`, `pen.lines`, `pen.circle`, `pen.ellipse`, `pen.dot` |
+| `p.stand(y, fn, lift=, x=, on=)` | Returns a handle. Your own landmark: `fn(pen)` draws with `pen.poly`, `pen.rect`, `pen.box`, `pen.line`, `pen.lines`, `pen.circle`, `pen.ellipse`, `pen.dot` |
 | `p.cast(x, y, w)` | The ground shadow for your own landmark |
 
-**For the map: layers.** `kit.take_apart(draw, level, season)` draws a piece without its ground base and returns
-`{"ground", "shadow", "standing"}`: the ground detail (2x, transparent where nothing is drawn), the shadow layer,
-and the standing things as `(foot_y, order_y, fn)` back to front, so the map can sort each one into its own list.
-It works with every module as it is. `draw()` still returns the flat 112x112 picture for the sheets.
+**For the map.**
+
+| Call | Gives |
+|---|---|
+| `kit.take_apart(draw, level, season, hex=(col, row), sea=, shore=)` | The piece without its ground base, as layers: `ground` (the detail, 2x), `shadow`, `standing` (`(foot_y, order_y, fn)` back to front), `footprint` (a mask: the map draws no wild tree or bush with its foot in it), `shore`, `mirror`, `variant`. **Level 0 gives `None`.** Layout and mirror come from the hex. Works with every module as it is |
+| `kit.pick(col, row, variants)` | `(variant, mirror)` for a hex: always the same; with two layouts no two neighbours equal |
+| `kit.in_footprint(mask, x, y)` | True if the piece-px point is in the footprint |
+| `kit.mirror_gates(GATES, mirror)` | The gate points as they lie in a mirrored piece |
+
+**For the sheets.** `kit.wild(season, ground, seed, coast=)` is the level 0 picture; `kit.sheet(..., wild=True)`
+shows every piece in the terrain's wild land thinned by its footprint; `kit.variant_sheet(...)` shows the layouts,
+their mirrors and a block of hexes chosen by `pick`; `kit.with_wild(draw, level, season, variant=, mirror=)` gives
+one such picture.
 
 **Colours**: fixed tokens `kit.INK`, `kit.ROOF`, `kit.STONE` ...; season tokens `p.pal["grass"]` ...; crops
 `kit.crop("wheat", season)`; helpers `kit.mix(c1, c2, t)`, `kit.shade(c, f)`; flags `p.winter`, `p.season`.

@@ -3,6 +3,28 @@
 Art director, 2026-11-15. **Status: a test for the owner and the planning session. Nothing in the game, the style
 frame or the pieces is changed.**
 
+## Round 2: after the owner's answers (2026-11-15)
+
+`summer.png`, `winter.png` and `plain_crop.png` were rendered again to the owner's three answers
+(`../pieces/REVIEW.md`, section 6). The rest of this file is round 1 and is kept as the record; where it speaks of
+plates, cleared hexes and repeats it describes the pictures before this round.
+
+| Answer | What the compositor does now | Seen in the pictures |
+|---|---|---|
+| "No plates for now" | Draws no town name plate. Towns stand where they stood (the middle 6 px above the hex centre) | The 14 plates are gone; nothing covers rivers, harbours or the hexes below. River, pass and sea names stay |
+| "Map draws shore" | Tells every piece where the map has the sea in its hex (`sea=` as an angle, `shore=` as a line: Nice 77, Savona 63, Genoa 90, Chiavari 90, Pisa 163 degrees). No piece draws sea; ground detail is clipped at the shore (4 hexes); a standing thing whose foot would be in the water is left out (1, at Nice). Ports keep the frame's own quay, moles, lighthouse and ships at their shore | Genoa, Savona, Chiavari, Nice and Pisa as before at the shore. The frame's harbour works are the stand-in for the harbour add-on, which `harbour.py` cannot draw yet (review task 4) |
+| "Map + 2nd layout" | The frame's trees stay in a piece hex; only those with their foot in the piece's footprint are left out: 142 of the 355 trees in the 23 piece hexes (round 1 dropped all 355). Layout and mirror come from the hex (`kit.pick`): 13 of the 23 pieces are mirrored | Serravalle's hamlet stands in the wood with a small clearing instead of in a bald hex; the woods run up to Genoa's and Chiavari's houses. The two level 3 wheat hexes beside Pavia are no longer the same picture (one is mirrored) |
+
+Still to come, and visible in the pictures: the wheat and settlement modules still draw their own wild trees (so
+piece hexes on the plain carry a few trees too many) and their road stubs to the hex border (review task 5); there
+is only one layout per family yet, so equal pictures still meet where the mirror does not differ (the level 2
+wheat hexes); the hills inside a piece hex are still dropped whole (the map's relief rule, recommendation K).
+
+The compositor now takes its pieces from `kit.take_apart` (it had a private route in round 1) and no longer writes
+`base_kept_crop.png`.
+
+## Round 1
+
 The question: each piece is exactly one hex at the normal map's zoom, so can the map use them? The test puts the two
 reference families (settlements, wheat) into the style frame's close zoom (hex radius 60, the Gulf of Genoa).
 
