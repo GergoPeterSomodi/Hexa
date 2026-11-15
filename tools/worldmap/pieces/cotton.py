@@ -8,8 +8,9 @@ and the patches in an L round the gin house.
 
 The red earth is a patch under the work only. Spring: young green dashed rows; summer: green rows, bolls (1 px BOLL dots) on
 every second row; autumn is the harvest, the signature at its strongest: every row white with bolls, two pickers, the bales
-out; winter: no white at all, bare brown stalk rows (in a snow or frost winter the patch is snow soil with one row in four
-showing earth; in a mild winter bare stalks on dark red earth). The bales (and the white under the shed) stand in autumn and
+out; winter: no white at all, the rows of dry stalks: pale dashed rows along the long side in every climate (tan on the snow
+soil of a snow or frost winter, pale straw on the dark red earth of a mild one), so cotton is not a plain brown block like
+hemp. Spring's red earth is redder than the map's soil (SPRING_RED). The bales (and the white under the shed) stand in autumn and
 winter only.
 
 python cotton.py            writes docs/design/map/pieces/cotton.png and cotton_variants.png
@@ -62,44 +63,55 @@ def _pt(cx, cy, ang, u, v):
     return (cx + ca * u - sa * v, cy + (sa * u + ca * v) * kit.TILT)
 
 
-def _square(p, x, y, col, s=1.0):
-    """A 1 px dot on the ground (a boll)."""
-    p.patch([(x - s / 2, y - s / 2), (x + s / 2, y - s / 2), (x + s / 2, y + s / 2), (x - s / 2, y + s / 2)], col)
+SPRING_RED = (192, 106, 78)        # spring's earth: clearly redder than soil (152,114,78), so cotton is not hemp's brown
+STALK = {"snow": (176, 146, 106), "frost": (176, 146, 106), "mild": (220, 200, 156)}     # dry stalks, by winter
+DASH, GAP = 2.4, 1.6               # a dry-stalk dash and the gap after it, along the row
+
+
+def _dots(p, cx, cy, ang, u, n, step, shift, col, size):
+    """n dots `step` apart along the row at across-offset u (shifted along by `shift`), laid by the kit's p.dots."""
+    pts = []
+    for k in range(n):
+        v = -(n - 1) * step / 2 + k * step + shift
+        pts.append(_pt(cx, cy, ang, u, v))
+    p.dots(pts, col, size)
+
+
+def _stalks(p, cx, cy, ang, col):
+    """Winter: the dry stalks, five pale dashed rows along the long side (2.4 px dashes, 1.6 px gaps)."""
+    for i in range(ROWS):
+        u = -SPACE / 2 + SPACE * (i + 0.5) / ROWS
+        v = -RUN / 2 + 1.2 + (i % 2) * 1.8
+        while v + DASH < RUN / 2 - 0.8:
+            p.gp.line(_pt(cx, cy, ang, u, v), _pt(cx, cy, ang, u, v + DASH), col, 1.0)
+            v += DASH + GAP
 
 
 def _young_rows(p, cx, cy, ang, col):
     """Spring: the soil and five rows of young plants, 1.2 px dots 3.4 px apart, every other row shifted by half a step
     (so the dots do not form a grid)."""
-    p.field(cx, cy, SPACE, RUN, ang, [kit.crop("cotton_soil", "spring")[0]], 1)
+    p.field(cx, cy, SPACE, RUN, ang, [SPRING_RED], 1)
     for i in range(ROWS):
         u = -SPACE / 2 + SPACE * (i + 0.5) / ROWS
         n = int((RUN - 3.0) // 3.4)
-        for k in range(n):
-            v = -(n - 1) * 3.4 / 2 + k * 3.4 + (i % 2) * 1.7 - 0.85
-            _square(p, *_pt(cx, cy, ang, u, v), col, 1.3)
+        _dots(p, cx, cy, ang, u, n, 3.4, (i % 2) * 1.7 - 0.85, col, 1.3)
 
 
 def patch(p, cx, cy, ang, season):
     """One patch of red earth with five rows along its long side. Bolls: every second row in summer, every row in autumn."""
     cot = kit.crop("cotton", season)[0]
-    if season == "winter" and not p.winter:               # bare stalks on dark red earth: a darker line so the rows still read
-        cot = kit.shade(cot, 0.72)
     if season == "spring":
         _young_rows(p, cx, cy, ang, cot)
+    elif season == "winter":                              # the red earth under dry, pale stalks (dashed rows along the long side)
+        p.field(cx, cy, SPACE, RUN, ang, [kit.crop("cotton_soil", "winter")[0]], 1)
+        _stalks(p, cx, cy, ang, STALK[kit.CLIMATE])
     else:
         p.rows(cx, cy, SPACE, RUN, ang, ROWS, col=cot, soil=kit.crop("cotton_soil", season)[0])
-    if season == "winter" and p.winter:                   # a thin snow: one row in four shows earth
-        u = -SPACE / 2 + SPACE * 1.0 / ROWS
-        p.patch([_pt(cx, cy, ang, u - 0.6, -RUN / 2 + 0.8), _pt(cx, cy, ang, u + 0.6, -RUN / 2 + 0.8),
-                 _pt(cx, cy, ang, u + 0.6, RUN / 2 - 0.8), _pt(cx, cy, ang, u - 0.6, RUN / 2 - 0.8)], p.pal["soil"])
     if season in ("summer", "autumn"):
         step, rows = (2.0, range(ROWS)) if season == "autumn" else (2.8, (1, 3))
         for i in rows:
             u = -SPACE / 2 + SPACE * (i + 0.5) / ROWS
-            n = int((RUN - 3.0) // step) + 1
-            for k in range(n):
-                v = -(n - 1) * step / 2 + k * step
-                _square(p, *_pt(cx, cy, ang, u, v), kit.BOLL)
+            _dots(p, cx, cy, ang, u, int((RUN - 3.0) // step) + 1, step, 0.0, kit.BOLL, 1.0)
 
 
 def _bale_box(pen, x, b, w, h):
@@ -109,16 +121,6 @@ def _bale_box(pen, x, b, w, h):
     pen.rect(x - w / 2, b - h, w, h, None, kit.INK, 0.35)
     for dx in (-w * 0.22, w * 0.22):
         pen.line((x + dx, b - h), (x + dx, b), kit.TIMBER_D, 0.3)
-
-
-def bale(p, x, y, lift=0.0):
-    """A bale: a 3.4 x 2.8 px BOLL box with two dark bands. lift raises it onto the bale below (the foot stays at y)."""
-    p.cast(x, y, 3.0, 1.4)
-
-    def fn(pen):
-        b = y - lift
-        _bale_box(pen, x, b, 3.4, 2.8)
-    return p.stand(y + 0.1, fn, x=x)
 
 
 def drying_shed(p, x, y):
@@ -194,11 +196,12 @@ def draw(level, season, variant=0, mirror=False):
         drying_shed(p, *L["shed"])
     if level >= 3:
         gin_house(p, *L["gin"])
+    feet = [(x, y) for x, y, lift, frm in L["bales"] if level >= frm]
+    if feet:
+        p.hold(feet)                                  # the bales' ground, held in every season so the wild land never changes
     for x, y, lift, frm in L["bales"]:
-        if level >= frm:
-            p.claim([(x - 3.5, y - 4), (x + 3.5, y - 4), (x + 3.5, y + 8), (x - 3.5, y + 8)])    # held in every season, so the wild land never changes
-            if season in ("autumn", "winter"):
-                bale(p, x, y, lift)
+        if level >= frm and season in ("autumn", "winter"):
+            p.bale(x, y, lift=lift)
     # ---- season activity: two pickers on the first patches in autumn
     for x, y in L["pickers"]:
         p.claim([(x - 2.5, y - 3), (x + 2.5, y - 3), (x + 2.5, y + 10), (x - 2.5, y + 10)])     # held in every season

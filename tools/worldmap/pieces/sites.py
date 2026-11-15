@@ -101,36 +101,6 @@ def _arch(cx, yb, r, n=10, flip=1):
 
 
 # ------------------------------------------------------------------ 0 monastery
-def _slate_church(p, x, y):
-    """The kit's church (nave 9 wide, tower 13 tall) with slate roofs: no red roof on a monastery (guide section 4)."""
-    w, hw, th, rh, tw = 9.0, 6.0, 13.0, 3.5, 4.0
-    r1, r2 = (kit.SLATE, kit.SLATE_D) if not p.winter else (kit.SNOW, kit.SNOW_D)
-    p.cast(x + 2 if not p.mirror else x + 3.5 - 2, y, w + 5)
-
-    def fn(pen):
-        pen.rect(x - w / 2, y - hw, w, hw, kit.CHURCH, None)
-        pen.rect(x + w * 0.28, y - hw, w * 0.22, hw, kit.shade(kit.CHURCH, 0.86), None)
-        rf = [(x - w / 2 - 0.5, y - hw), (x + w / 2 + 0.5, y - hw), (x + w / 2 - 0.5, y - hw - rh), (x - w / 2 + 0.5, y - hw - rh)]
-        pen.poly(rf, r1, None)
-        pen.poly([rf[1], rf[2], (x + w * 0.22, y - hw - rh), (x + w * 0.26, y - hw)], r2, None)
-        if p.winter:
-            pen.poly([rf[0], rf[1], (rf[1][0] - 0.3, rf[1][1] - 1.1), (rf[0][0] + 0.3, rf[0][1] - 1.1)], kit.SLATE, None)
-        pen.poly(rf, None, kit.INK, 0.5)
-        pen.rect(x - w / 2, y - hw, w, hw, None, kit.INK, 0.5)
-        pen.rect(x - 0.8, y - 2.6, 1.6, 2.6, kit.DOOR, None)
-        tx = x + w / 2 + 1.5
-        pen.rect(tx - tw / 2, y - th, tw, th, kit.CHURCH, None)
-        pen.rect(tx + tw * 0.15, y - th, tw * 0.35, th, kit.shade(kit.CHURCH, 0.85), None)
-        cap = [(tx - tw / 2 - 0.6, y - th), (tx + tw / 2 + 0.6, y - th), (tx, y - th - 4.0)]
-        pen.poly(cap, kit.SLATE_D if not p.winter else kit.SNOW_D, None)
-        if p.winter:
-            pen.poly([cap[0], (tx, y - th), (tx, y - th - 4.0)], kit.SNOW, None)
-        pen.poly(cap, None, kit.INK, 0.5)
-        pen.rect(tx - tw / 2, y - th, tw, th, None, kit.INK, 0.5)
-        pen.rect(tx - 0.5, y - th + 1.5, 1.0, 1.8, kit.DOOR, None)
-    return p.stand(y, fn, x=x + 1.75)
-
-
 def monastery(p, season):
     L = LAYOUT[0]
     # ground: the court (claimed, nothing wild grows in it), the plot, the track, the low wall
@@ -140,9 +110,9 @@ def monastery(p, season):
     cx, cy, w, h = L["plot"]
     p.field(cx, cy, w, h, 0, kit.crop("garden", season), 3, furrows=season in ("autumn", "winter", "spring"))
     p.road(L["track"], 1.6, track=True)
-    p.drystone(L["wall"])
+    p.stockade(L["wall"], kind="low", height=2.2, col=kit.STONE_GREY, claim=True)           # the low precinct wall, the gate gap in front
     # the church and the three wings, slate roofs, one joined block round the court
-    _slate_church(p, *L["church"])
+    p.church(*L["church"], "church", roof="slate")
     wx, wy, ww = L["wing_w"]
     p.house(wx, wy, ww, 4.4, 3.4, wall=0, kind="ridge", roof="slate", door=False)
     ex, ey, ew = L["wing_e"]
@@ -151,6 +121,7 @@ def monastery(p, season):
     p.house(sx, sy, sw, 3.8, 2.8, wall=3, kind="ridge", roof="slate", door=True)
     for i, (x, y) in enumerate(L["fruit"]):
         p.tree(x, y, 0.9, "fruit", i + 1)
+    p.hold(L["fruit"], side=2.5, back=3, front=4)                                 # the low fruit trees keep their ground
 
 
 # ------------------------------------------------------------------ 1 Roman ruins
@@ -195,9 +166,10 @@ def _drum(p, x, y, w=5.8):
 
     def fn(pen):
         x0 = x - w / 2
-        pen.rect(x0, y - 2.7, w, 1.5, kit.MARBLE, None)
-        pen.rect(x0, y - 1.2, w, 1.2, kit.MARBLE_D, None)
-        pen.ellipse(x - w / 2, y - 1.35, 1.8, 2.7, kit.MARBLE, None)
+        pale = kit.mix(kit.MARBLE, (255, 255, 255), 0.5)                          # paler than the map's grey stones
+        pen.rect(x0, y - 2.7, w, 1.5, pale, None)
+        pen.rect(x0, y - 1.2, w, 1.2, kit.mix(kit.MARBLE, kit.MARBLE_D, 0.45), None)
+        pen.ellipse(x - w / 2, y - 1.35, 1.8, 2.7, pale, None)
         pen.rect(x0, y - 2.7, w, 2.7, None, kit.INK, 0.5)
         pen.line((x0 + w * 0.55, y - 2.7), (x0 + w * 0.55, y), kit.MARBLE_D, 0.4)
         if p.winter:
@@ -221,6 +193,7 @@ def roman_ruins(p, season):
     _lintel(p, a, b, ya + 0.5, min(c[1] - c[2] for c in cols if c[0] in (a, b)) - 2.4)
     for x, y in L["drums"]:
         _drum(p, x, y)
+    p.hold(L["drums"], side=3, back=3, front=4)                                  # the fallen drums keep their ground
 
 
 # ------------------------------------------------------------------ 2 aqueduct
@@ -302,6 +275,8 @@ def standing_stones(p, season):
     p.blob(cx, cy, 2 * rx + 9, 2 * ry + 8, p.pal["soil"], alpha=0.25)              # the trodden circle
     n = 7
     k = 0
+    p.hold([(cx + math.cos(math.radians(L["first"] + i * 360.0 / n)) * rx, cy + math.sin(math.radians(L["first"] + i * 360.0 / n)) * ry)
+            for i in range(n)], side=2.5, back=3, front=4)                       # the ring's low stones keep their ground
     for i in range(n):
         a = math.radians(L["first"] + i * 360.0 / n)
         x, y = cx + math.cos(a) * rx, cy + math.sin(a) * ry
@@ -396,7 +371,7 @@ def pilgrimage_chapel(p, season):
     p.church(*L["chapel"], "chapel")
     _cross(p, *L["cross"])
     for i, (x, y) in enumerate(L["cypress"]):
-        p.tree(x, y, 0.82, "poplar", i)
+        p.tree(x, y, 0.82, "cypress", i)
     if season == "summer":                                                      # one or two pilgrims
         p.person(*L["pilgrims"][0], (96, 84, 120))
         p.person(*L["pilgrims"][1], (150, 100, 64))
