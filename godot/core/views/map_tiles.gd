@@ -24,6 +24,10 @@ const EDGE_NORMALS: Array[Vector2] = [
 	Vector2(-1.0, 0.0), Vector2(-0.562, 0.827), Vector2(0.562, 0.827),
 ]
 const SIDES: Array[String] = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"]
+## The covers by number, as MapData.cover stores them (the order of the tile names; WorldCover's ids). 255 is sea.
+const COVERS: Array[String] = ["farmland", "grassland", "woods", "marsh", "rock", "snow", "tundra", "sand"]
+## The sea depths by number, as MapData.depth stores them.
+const DEPTHS: Array[String] = ["shelf", "sea", "deep"]
 
 
 ## The middle of a cell in map px (what TileMapLayer.map_to_local gives; a test pins the two together).
@@ -58,6 +62,26 @@ static func ground(cover: String, height_m: float, hex: Vector2i) -> String:
 		if height_m > 1700.0 and cover != "woods":
 			band = 4
 	return "ground/%s/%d/%d" % [cover, band, pick(hex, GROUND_VARIANTS, 1)]
+
+
+## The cover's name for a MapData cover number, "" for the sea (255) or a number that is no cover.
+static func cover_name(cover_id: int) -> String:
+	return COVERS[cover_id] if cover_id >= 0 and cover_id < COVERS.size() else ""
+
+
+## The depth's name for a MapData depth number (0 shelf, 1 sea, 2 deep); anything else is shelf.
+static func depth_name(depth_id: int) -> String:
+	return DEPTHS[depth_id] if depth_id >= 0 and depth_id < DEPTHS.size() else "shelf"
+
+
+## ground() with the cover given by its MapData number.
+static func ground_of(cover_id: int, height_m: float, hex: Vector2i) -> String:
+	return ground(cover_name(cover_id), height_m, hex)
+
+
+## sea() with the depth given by its MapData number.
+static func sea_of(depth_id: int, beside_land: bool, hex: Vector2i) -> String:
+	return sea(depth_name(depth_id), beside_land, hex)
 
 
 ## sea/<depth>/<variant>. A sea hex beside land is always shelf: only the shelf tile has a hard edge, so no deeper

@@ -11,6 +11,10 @@ const HEIGHT_GRID_STEP := 4
 const OWNED_EDGES := 3
 const MAX_RELIEF := 6
 const COVER_SEA := 255
+## The two neighbour directions a hex corner lies between (corner 0 is at the top, then anticlockwise).
+const CORNER_SIDES: Array[Vector2i] = [
+	Vector2i(1, 2), Vector2i(0, 1), Vector2i(5, 0), Vector2i(4, 5), Vector2i(3, 4), Vector2i(2, 3),
+]
 
 @export var id: String = ""
 @export var cols: int = 0
@@ -267,29 +271,63 @@ static func _hex_in(entry: Dictionary) -> Vector2i:
 
 
 ## The key of corner `k` of `hex`, rounded to 10 m so two hexes name a shared corner alike.
+## A hex corner as exact integers on the corner lattice (x in half hex widths, y in half radii from the first row's
+## centre line), so two hexes name a shared corner the same way on any map size (float km rounding did not).
+const CORNER_STEP: Array[Vector2i] = [Vector2i(0, -2), Vector2i(1, -1), Vector2i(1, 1), Vector2i(0, 2), Vector2i(-1, 1), Vector2i(-1, -1)]
+
+
 func _corner_key(hex: Vector2i, k: int) -> Vector2i:
-	var p := grid().corners_km(hex)[k]
-	return Vector2i(roundi(p.x * 100.0), roundi(p.y * 100.0))
+	return Vector2i(2 * hex.x + 1 + (hex.y & 1), 3 * hex.y) + CORNER_STEP[k]
 
 
-## Every connected river (edges that share a corner) must touch the sea or leave the map.
+## The corner-lattice key of a point in km (the nearest lattice point; see _corner_key).
+func _km_key(p: Vector2) -> Vector2i:
+	var g := grid()
+	return Vector2i(roundi(p.x / (g.hex_w_km / 2.0)), roundi((p.y - g.hex_r_km) / (g.hex_r_km / 2.0)))
+
+
+## Corners where a river ends without touching the sea along its edges, as keys: a river entry of `rivers` may list them in
+## "open_ends" (km points): where it meets a lake, leaves the map's window, or passes a river city's hex.
+func _open_end_keys() -> Dictionary:
+	var keys: Dictionary = {}
+	for r: Dictionary in rivers:
+		var pts: Variant = r.get("open_ends", null)
+		if pts is PackedVector2Array:
+			for p: Vector2 in (pts as PackedVector2Array):
+				keys[_km_key(p)] = true
+	return keys
+
+
+## A river may end at a corner that touches the sea or the map's border (a hex there is sea or off the map), or at a listed open end.
+## Corner k of a hex lies between the neighbours CORNER_SIDES[k].
+func _corner_ends_river(hex: Vector2i, k: int, open_ends: Dictionary) -> bool:
+	if not is_land(hex):
+		return true
+	for d: int in CORNER_SIDES[k]:
+		if not is_land(grid().neighbour(hex, d)):
+			return true
+	return open_ends.has(_corner_key(hex, k))
+
+
+## Every connected river (edges that share a corner) must touch the sea, an open end or the map border (streams are not checked).
 func _check_rivers(errors: Array[String]) -> void:
 	var parent: Dictionary = {}
 	var ends: Dictionary = {}  # corner key -> true when the corner touches the sea or the map edge
 	var edges: Array[Vector2i] = []  # (hex index, owned direction)
+	var open_ends := _open_end_keys()
 	for i: int in hex_count():
 		var hex := hex_of(i)
 		for k: int in OWNED_EDGES:
-			if river[OWNED_EDGES * i + k] == 0:
+			if river[OWNED_EDGES * i + k] == 0 or river[OWNED_EDGES * i + k] > 3:  # streams (4) may end anywhere
 				continue
 			var pair: Vector2i = HexGrid.EDGE_CORNERS[k]
 			var a := _corner_key(hex, pair.x)
 			var b := _corner_key(hex, pair.y)
 			_union(parent, a, b)
 			edges.append(Vector2i(i, k))
-			var nb := grid().neighbour(hex, k)
-			if not has(nb) or not is_land(nb) or not is_land(hex):
+			if _corner_ends_river(hex, pair.x, open_ends):
 				ends[a] = true
+			if _corner_ends_river(hex, pair.y, open_ends):
 				ends[b] = true
 	var ok_roots: Dictionary = {}
 	for c: Vector2i in ends:

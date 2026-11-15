@@ -1,0 +1,1127 @@
+[gd_resource type="Resource" script_class="MapData" format=4]
+
+[ext_resource type="Script" path="res://core/defs/map_data.gd" id="1_xkl6h"]
+
+[resource]
+script = ExtResource("1_xkl6h")
+id = "north_italy"
+cols = 21
+rows = 19
+lon_west = 5.6
+lat_north = 47.3
+ref_lat = 45.25
+land = PackedByteArray("AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQAAAQEBAQEBAQEBAQEBAQEBAQEBAQAAAQEBAQEBAQEBAQEBAQEBAQEBAQAAAQEBAQEBAQEBAQEBAQEBAQEBAQAAAQEBAQEBAQEBAQEBAQEBAQEBAAAAAQEBAQEBAQEBAQEBAQEBAQEBAQAAAQEBAQEBAQEBAQEBAQEBAQEBAAAAAQEBAQEBAQEAAAAAAQEBAQEBAQAAAQEBAQEBAAAAAAAAAQEBAQEBAQEBAQEBAQEAAAAAAAAAAAEBAQEBAQEBAQEBAAAAAAAAAAAAAAEBAQEBAQEBAAABAAAAAAAAAAAAAAABAQEBAQEB")
+height_m = PackedInt32Array(394, 623, 1019, 1297, 1465, 880, 901, 822, 1408, 1875, 482, 2613, 2585, 2684, 2742, 3080, 2605, 2785, 3264, 3242, 2950, 846, 1203, 1397, 713, 890, 1176, 1802, 2607, 2835, 2792, 483, 2575, 2998, 2990, 3375, 3021, 3167, 2971, 2789, 2900, 2900, 794, 1340, 1354, 887, 1768, 1953, 2454, 3049, 2962, 824, 640, 2712, 2901, 890, 3379, 272, 595, 2396, 2611, 2425, 2416, 1351, 1572, 889, 1998, 2432, 3284, 3608, 2863, 2812, 3001, 2831, 3175, 2880, 3521, 2963, 220, 2826, 2648, 689, 2130, 2130, 1331, 1331, 368, 368, 2774, 2786, 2911, 2833, 2270, 200, 198, 286, 3056, 1120, 2932, 1936, 2390, 2694, 362, 2008, 1642, 368, 1679, 2320, 461, 3478, 4087, 3504, 199, 193, 1906, 2140, 286, 2489, 3137, 2451, 220, 2183, 232, 359, 283, 283, 1342, 1704, 2265, 4169, 3381, 3348, 4210, 339, 193, 1384, 198, 1975, 1780, 283, 1833, 178, 1732, 93, 336, 25, 40, 1596, 336, 2589, 3197, 572, 256, 339, 644, 347, 328, 413, 790, 1143, 1168, 164, 1198, 94, 69, 20, 0, 0, 1742, 2396, 622, 3254, 3169, 2536, 216, 224, 167, 154, 125, 115, 124, 202, 194, 19, 370, 23, 6, 0, 0, 2529, 622, 956, 3320, 332, 392, 381, 234, 112, 92, 116, 65, 53, 49, 33, 20, 186, 4, 2, 0, 0, 2063, 3176, 3234, 2984, 419, 235, 350, 304, 209, 464, 710, 261, 74, 33, 26, 19, 11, 4, 2, 0, 0, 2317, 3008, 2697, 2953, 249, 384, 118, 395, 498, 1488, 1255, 865, 352, 109, 37, 22, 11, 1, 0, 0, 0, 1796, 1665, 2595, 2954, 2398, 804, 214, 665, 1056, 1096, 1607, 1242, 199, 801, 647, 305, 69, 12, 5, 0, 0, 1446, 2171, 2670, 2773, 2177, 2062, 363, 759, 368, 524, 1096, 1284, 1698, 1424, 955, 859, 440, 39, 0, 0, 0, 1532, 1402, 2223, 2396, 2778, 2700, 2117, 1116, 0, 0, 0, 0, 1476, 1594, 1748, 1115, 1042, 688, 371, 0, 0, 686, 1649, 1701, 1540, 1744, 1407, 0, 0, 0, 0, 0, 0, 900, 953, 690, 839, 1479, 1293, 1325, 349, 349, 557, 1016, 1210, 1409, 579, 0, 0, 0, 0, 0, 0, 0, 0, 375, 179, 425, 126, 1257, 1231, 770, 486, 601, 392, 406, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 574, 544, 703, 571, 940, 767, 1450, 1450, 0, 0, 579, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 696, 635, 386, 341, 766, 761, 1326)
+relief = PackedByteArray("AgMEBAQDBAMEBQMFBQUFBgUFBgYGAwQEAwMEBQUGBQMFBgYGBgYGBQYGAwQEAwUFBQYGAwMFBgMGAgMFBQUFBAQDBQUGBgYGBgYGBgYGAgYFAwUFBAQCAgUFBgYFAgICBgQGBQUFAgUEAgQFAwYGBgICBQUCBQYFAgUCAgICBAUFBgYGBgICBAIFBQIFAgUBAgEBBAIFBgMCAgMCAgMDBAQCBAEBAQAABQUDBgYFAgICAgICAgICAQIBAQAABQMEBgICAgICAQIBAQEBAQIBAQAABQYGBgMCAgICAwMCAQEBAQEBAQAABQYFBgICAgIDBAQDAgIBAQEBAAAABQQFBgUDAgMEBAQEAgMDAgEBAQAABAUFBQUFAgMCAwQEBAQEAwMBAAAABAQFBQUFBQQAAAAABAQFBAQDAgAAAwQFBAUEAAAAAAAABAQDAwQEBAICAwQEBAMAAAAAAAAAAAICAwIEBAMDAwIDAAAAAAAAAAAAAAMDAwMEAwQEAAADAAAAAAAAAAAAAAADAwICAwME")
+cover = PackedByteArray("AgACAgICAgIEBAIBBAQEBQQEBQUFAgIBAQICBAQFBAIEBQUFBQUFBAUFAgICAQQEBAUFAQEEBQEFAQEBBAQEAgIBAQQFBQUFBQUFBQUFAQUEAgQEAQABAAQEBQUBAQEBBQQFBAQEAAQCAAQBAQUFBQEABAQBAQUEAAQAAAAAAQQEBQUFBQEDAgAEBAEBAQQAAAMHAQIEBQEBAQEDAAIAAAEDAgAAA///BAQBBQUBAAADAAIAAAAAAwAAA///BAEBBQEAAAAAAAAAAAABAAADA///BAUFBQEBAAAAAgIAAwAAAAADA///BAUEBQEAAAACAgICAAEAAAAD////BAQEBQQCAAACAgICAAICAAABA///BAQEBAQEAAACAgICAgQCAgIA////AgQEBAQEBAD/////AgQCAgICAf//AQQEBAQE////////BAICAgEBAQAAAQEBAQT//////////wACAgIBAgEAAQEC/////////////wACAgICAQEB//8B//////////////8CAgIBAgEE")
+depth = PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAABAQICAQEBAAAAAAAAAAAAAAAAAQECAgICAQEBAAAAAAAAAAAAAQEAAQICAgICAQEBAAAAAAAAAAAA")
+climate = PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAQAAAAABAQAAAAAAAQEBAAAAAAAAAQAAAQAAAQAAAAEBAAABAAAAAQABAQEBAAAAAAAAAAEBAAEAAAEAAQABAQICAAEAAAEBAQEBAQEBAAABAAEBAgICAAABAAAAAQEBAQEBAQEBAQEBAgICAAEAAAEBAQEBAQEBAQEBAQECAgICAAAAAAEBAQEBAQEBAQEBAQECAgICAAAAAAEBAQEBAAABAQEBAQECAgICAAAAAAABAQEBAQAAAQEBAQECAgICAAAAAAAAAQICAgIBAAABAQECAgICAAAAAAAAAQICAgICAQAAAAEBAgICAQAAAAECAgICAgICAgEBAQABAgICAQEBAQICAgICAgICAgICAQEAAAEBAgICAgICAgICAgICAgIBAQEBAQAAAgICAgICAgICAgICAgICAQEBAQEA")
+fertility = PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+ore = PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+pass_id = PackedInt32Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 23, 20, -1, -1, 21, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 10, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 12, 11, 13, 14, 15, 17, 18, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 9, -1, -1, -1, -1, 16, 22, 19, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 4, -1, -1, -1, -1, -1, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, -1, -1, -1, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+place_id = PackedInt32Array(-1, 66, -1, -1, -1, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 70, -1, -1, -1, 43, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 80, -1, 44, -1, -1, 67, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 50, -1, 74, 81, 79, 82, 77, -1, 45, -1, -1, -1, -1, -1, -1, 41, 42, 39, -1, 38, 76, -1, 36, 34, 49, 48, -1, 47, -1, -1, -1, -1, 60, -1, -1, -1, -1, -1, 40, -1, -1, -1, 35, 6, -1, 14, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 73, -1, -1, 37, -1, -1, 8, -1, -1, 11, -1, 46, -1, -1, -1, -1, -1, -1, -1, -1, 78, -1, 30, 51, -1, -1, 7, -1, -1, -1, -1, -1, -1, 54, 55, 52, -1, -1, -1, -1, 71, -1, -1, -1, 28, 26, -1, -1, -1, 10, -1, -1, -1, 12, -1, 53, -1, -1, -1, -1, -1, -1, 75, 31, 1, 27, 25, 72, 0, 9, 15, 16, -1, -1, -1, -1, -1, 56, -1, -1, -1, -1, -1, -1, -1, 29, -1, -1, 24, -1, -1, 19, -1, -1, 17, -1, 58, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 61, -1, -1, -1, -1, -1, -1, 18, 20, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 59, -1, -1, -1, 4, 57, -1, -1, -1, -1, -1, -1, -1, -1, 23, 32, -1, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 63, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 21, -1, -1, 3, -1, -1, -1, 64, -1, 68, -1, -1, -1, 33, -1, -1, -1, -1, -1, -1, -1, -1, 13, -1, -1, 22, -1, -1, -1, -1, -1, 62, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 65, -1, 69, -1)
+river = PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAgAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAgAAAAICAgICAgAAAAACAAAEAAAAAAAAAgIAAAAABAAAAAQEAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAICBAICAAACAAAAAgAAAAACAAAAAAAAAgAAAAAAAAIAAgICAAAEAAAAAAAAAgIAAAAAAAAAAAAAAAAAAgAAAAACAAAAAAAAAAAAAAAAAgIAAAAABAAAAAAAAgIAAAAAAAAAAgIAAAAEAAAAAgAAAAACAAAAAAAAAAIABAQCAAQEAAAAAAAAAAAAAgQAAAACAgQAAAICAAICAAACAAAAAgAAAAACAAAAAgAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIAAAAAAgIAAgAAAAACAAAAAgAAAAACAgAAAAACAgIAAgAABAACAAAAAAAAAAAAAAAEAAAAAAIAAgICAAAAAgIAAgAAAAACAgIAAAAAAgAAAAACAAAAAgIAAAAAAgIAAAIAAAICAAAAAAAAAAAABAQAAAQEAAAAAAAAAgIAAAAAAgIAAgIAAQAAAgIBAgAAAAACAQAAAAAAAAAAAAAAAgIAAAQAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAwIAAwMDAAACAgIAAQEAAgIAAgIAAAAEAQEAAAAAAgIAAAAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAAIAAAICAwICAAADAgMABAMDAAMDAAMDAAMDBAMDAwMDAQEAAAAAAAIAAAICAAICAAAAAAAAAAAAAAAAAAAAAAAAAwQAAgADBAICAAACAAAAAAAAAAAAAAAAAQAEAAMBBAMDBAMDBAMDAAMDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDAAADAgIEAAAAAAAAAAAAAAAAAQAABAEBAAABAAAAAAAEBAAEAAAEAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAgAAAAACAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAICAAACAAIAAAACAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+crest = PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEBAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEBAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEBAQEBAQEBAQAAAQEBAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEBAAABAAAAAAEBAAEBAQABAAEBAAABAAEAAAABAAEAAAEBAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAEBAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEBAAEBAAABAAAAAAAAAAAAAAEAAAEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAAAAAAAAAAAAAQAAAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAEBAAABAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+pass_edge = PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEBAQAAAQEBAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAAEAAAABAAEAAAABAAEAAAEBAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAQAAAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+road = PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAQABAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAQABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgEBAgAAAgAAAAAAAAAAAAEAAQABAQAAAQABAAAAAQEAAAABAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAIAAgIAAgAAAAAAAQABAAAAAAABAgEAAAIAAAEAAAEBAAABAAAAAAAAAAACAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAACAAACAAAAAAAAAAICAgIAAAAAAgAAAgACAAIAAAABAAAAAAIAAAAAAAEAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAEBAAAAAAAAAAIAAAAAAAIAAAAAAAAAAAAAAAECAAAAAAIAAAAAAAEAAAAAAAAAAAAAAAAAAgACAQAAAgAAAwAAAwAAAAIAAAAAAAAAAAICAAAAAAAAAAMAAAAAAAAAAAACAwAAAwABAAAAAAAAAAAAAAAAAAAAAAABAAECAAAAAAAAAgAAAwADAwAAAAIAAAAAAAAAAAMAAAACAAAAAwIAAwMAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAABAgAAAgAAAgAAAAACAAAAAwADAwEAAwMAAwAAAwACAwMAAAAAAAAAAgACAAAAAAAAAAAAAAAAAAAAAAAAAQAAAgABAAIAAAAAAAAAAAAAAAMAAAAAAwADAAAAAAAAAAACAAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEAAAMCAAABAAAAAAAAAwADAwAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQMAAAEAAAAAAAAAAAAAAAAAAAAAAwADAQIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAQAAAgAAAgAAAgAAAgADAgAAAgAAAAEAAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAMAAAADAAAAAAAAAgACAAAAAAAAAAAAAAAAAAAAAgAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwACAAMAAAAAAAABAAAAAAAAAAAAAAAAAQABAgAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAQAAAAAAAAAA")
+crossing = PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAgAAAAAAAAAAAAUABQAFBQAABQAFAAAABQAAAAAFAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAFAAAAAAAFAAUAAAAAAAUAAAUFAAAFAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAACAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACBQAAAAAAAgAAAAAAAAIAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAUAAAAAAAAAAAAAAgAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAAAAgAAAgAAAAACAAAAAgAAAwIAAwMAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAAAAAFAAIAAAAAAAAAAAAAAAIAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAgACAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAAAAUAAAAAAAAAAAAAAAAAAAAAAAACAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAAAAgAAAAAAAAAAAgAAAAAAAAAAAAUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+places = Array[Dictionary]([{
+"capital": true,
+"castle": 3,
+"hex": Vector2i(9, 9),
+"lake_port": false,
+"landmark": "",
+"level": 5,
+"name": "Milan",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 2,
+"hex": Vector2i(5, 9),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Turin",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 2,
+"hex": Vector2i(8, 13),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Genoa",
+"port": true,
+"port_mode": "carved",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(15, 15),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Florence",
+"port": false,
+"port_mode": "",
+"river_city": true
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(16, 12),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Bologna",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(5, 0),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "Bern",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(8, 5),
+"lake_port": true,
+"landmark": "",
+"level": 3,
+"name": "Como",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(9, 7),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Monza",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(10, 6),
+"lake_port": true,
+"landmark": "",
+"level": 3,
+"name": "Varese",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 2,
+"hex": Vector2i(10, 9),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Pavia",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(11, 8),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "Bergamo",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(13, 6),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Brescia",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(15, 8),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Verona",
+"port": false,
+"port_mode": "",
+"river_city": true
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(13, 16),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Pisa",
+"port": true,
+"port_mode": "carved",
+"river_city": true
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(10, 5),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Lecco",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(11, 9),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "Lodi",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(12, 9),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Cremona",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(14, 10),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Mantua",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(13, 11),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Parma",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(11, 10),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "Piacenza",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(14, 11),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Modena",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(12, 15),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "Lucca",
+"port": true,
+"port_mode": "seaside",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(16, 16),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "Siena",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(5, 13),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Cuneo",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(8, 10),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Asti",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(7, 9),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Alessandria",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(7, 8),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Novara",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(6, 9),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Vercelli",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(6, 8),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Ivrea",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(5, 10),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Chivasso",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(5, 7),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Aosta",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(4, 9),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Susa",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(6, 13),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Savona",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(4, 16),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Nice",
+"port": true,
+"port_mode": "seaside",
+"river_city": false
+}, {
+"capital": false,
+"castle": 3,
+"hex": Vector2i(9, 4),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Bellinzona",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(7, 5),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Locarno",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(8, 4),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Lugano",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(7, 6),
+"lake_port": true,
+"landmark": "",
+"level": 3,
+"name": "Domodossola",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(5, 4),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Brig",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(3, 4),
+"lake_port": true,
+"landmark": "",
+"level": 3,
+"name": "Sion",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(3, 5),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Martigny",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(1, 4),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Geneva",
+"port": false,
+"port_mode": "",
+"river_city": true
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(2, 4),
+"lake_port": true,
+"landmark": "",
+"level": 2,
+"name": "Lausanne",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(7, 1),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Lucerne",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(10, 2),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Chur",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(15, 3),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Bolzano",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(15, 6),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Trento",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(13, 4),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Bormio",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(11, 4),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Sondrio",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(10, 4),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Chiavenna",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(7, 3),
+"lake_port": false,
+"landmark": "hospice",
+"level": 3,
+"name": "Airolo",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 1,
+"hex": Vector2i(6, 7),
+"lake_port": false,
+"landmark": "",
+"level": 0,
+"name": "Bard fort",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(18, 7),
+"lake_port": false,
+"landmark": "",
+"level": 5,
+"name": "Venice",
+"port": true,
+"port_mode": "carved",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(17, 8),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Padua",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(16, 7),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "Vicenza",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(17, 7),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "Treviso",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(18, 9),
+"lake_port": false,
+"landmark": "",
+"level": 3,
+"name": "Chioggia",
+"port": true,
+"port_mode": "seaside",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(17, 12),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "Ravenna",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(16, 10),
+"lake_port": false,
+"landmark": "",
+"level": 4,
+"name": "Ferrara",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(12, 12),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(18, 4),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(6, 11),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(1, 17),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": true,
+"port_mode": "seaside",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(18, 14),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": true,
+"port_mode": "seaside",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(19, 15),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": true,
+"port_mode": "seaside",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(17, 18),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(1, 0),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(13, 2),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(0, 16),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(19, 18),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(3, 1),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(2, 8),
+"lake_port": false,
+"landmark": "",
+"level": 2,
+"name": "",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(8, 9),
+"lake_port": false,
+"landmark": "monastery",
+"level": 0,
+"name": "Certosa di Pavia",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(4, 6),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice Great St Bernard",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(9, 3),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice San Bernardino",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(3, 9),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice Mont Cenis",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(6, 4),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice Simplon",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(13, 3),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice Stelvio",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(3, 7),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice Little St Bernard",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(11, 3),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice Julier",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(8, 2),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice Gotthard",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(10, 3),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice Splugen",
+"port": false,
+"port_mode": "",
+"river_city": false
+}, {
+"capital": false,
+"castle": 0,
+"hex": Vector2i(12, 3),
+"lake_port": false,
+"landmark": "hospice",
+"level": 0,
+"name": "Hospice Bernina",
+"port": false,
+"port_mode": "",
+"river_city": false
+}])
+passes = Array[Dictionary]([{
+"hex": Vector2i(4, 6),
+"metres": 2469,
+"name": "Great St Bernard"
+}, {
+"hex": Vector2i(3, 7),
+"metres": 2188,
+"name": "Little St Bernard"
+}, {
+"hex": Vector2i(3, 9),
+"metres": 2083,
+"name": "Mont Cenis"
+}, {
+"hex": Vector2i(3, 10),
+"metres": 1854,
+"name": "Mont Genevre"
+}, {
+"hex": Vector2i(3, 12),
+"metres": 1991,
+"name": "Col de Larche"
+}, {
+"hex": Vector2i(5, 14),
+"metres": 1871,
+"name": "Col di Tenda"
+}, {
+"hex": Vector2i(7, 13),
+"metres": 435,
+"name": "Cadibona"
+}, {
+"hex": Vector2i(9, 12),
+"metres": 472,
+"name": "Giovi"
+}, {
+"hex": Vector2i(11, 13),
+"metres": 1041,
+"name": "Cisa"
+}, {
+"hex": Vector2i(6, 4),
+"metres": 2005,
+"name": "Simplon"
+}, {
+"hex": Vector2i(8, 2),
+"metres": 2106,
+"name": "Gotthard"
+}, {
+"hex": Vector2i(8, 3),
+"metres": 1917,
+"name": "Lukmanier"
+}, {
+"hex": Vector2i(7, 3),
+"metres": 2431,
+"name": "Furka"
+}, {
+"hex": Vector2i(9, 3),
+"metres": 2065,
+"name": "San Bernardino"
+}, {
+"hex": Vector2i(10, 3),
+"metres": 2113,
+"name": "Splugen"
+}, {
+"hex": Vector2i(11, 3),
+"metres": 2284,
+"name": "Julier"
+}, {
+"hex": Vector2i(11, 4),
+"metres": 1815,
+"name": "Maloja"
+}, {
+"hex": Vector2i(12, 3),
+"metres": 2328,
+"name": "Bernina"
+}, {
+"hex": Vector2i(13, 3),
+"metres": 2757,
+"name": "Stelvio"
+}, {
+"hex": Vector2i(13, 4),
+"metres": 1883,
+"name": "Tonale"
+}, {
+"hex": Vector2i(13, 1),
+"metres": 1507,
+"name": "Resia"
+}, {
+"hex": Vector2i(16, 1),
+"metres": 1374,
+"name": "Brenner"
+}, {
+"hex": Vector2i(12, 4),
+"metres": 1181,
+"name": "Aprica"
+}, {
+"hex": Vector2i(12, 1),
+"metres": 1793,
+"name": "Arlberg"
+}])
+rivers = Array[Dictionary]([{
+"class": 3,
+"corners": PackedVector2Array(112, 299.06744, 114.953125, 297.36246, 116.59375, 296.54153, 117.90625, 296.03638, 119.21875, 295.65747, 120.53125, 295.4049, 121.953125, 295.21545, 123.484375, 295.08914, 125.125, 295.026, 126.875, 295.026, 128.625, 295.026, 130.375, 295.026, 132.125, 295.026, 133.875, 295.026, 135.625, 295.026, 137.375, 295.026, 139.125, 295.026, 140.875, 295.026, 142.51563, 294.83655, 144.04688, 294.45767, 145.46875, 293.88934, 146.78125, 293.13156, 147.98438, 292.18436, 149.07813, 291.0477, 150.0625, 289.7216, 150.9375, 288.20605, 151.8125, 286.6905, 152.6875, 285.17496, 153.5625, 283.65942, 154.4375, 282.14386, 155.3125, 280.62833, 156.1875, 279.1128, 157.0625, 277.59723, 157.9375, 276.0817, 158.8125, 274.56616, 159.6875, 273.0506, 160.5625, 271.53506, 161.4375, 270.0195, 162.3125, 268.50397, 163.1875, 266.9884, 164.0625, 265.47287, 164.9375, 263.95734, 165.70313, 262.50494, 166.35938, 261.1157, 166.90625, 259.7896, 167.34375, 258.5266, 167.67188, 257.20053, 167.89063, 255.81128, 168, 253.98, 168, 250.57002, 170.95313, 248.86502, 172.48438, 247.85466, 173.57813, 246.9706, 174.5625, 246.02338, 175.4375, 245.01303, 176.3125, 243.87637, 177.1875, 242.6134, 178.0625, 241.22415, 178.9375, 239.70862, 179.70313, 238.25623, 180.35938, 236.86697, 180.90625, 235.54086, 181.34375, 234.27792, 181.67188, 232.95181, 181.89063, 231.56256, 182, 229.73128, 182, 226.32129, 184.95313, 224.6163, 186.59375, 223.79538, 187.90625, 223.2902, 189.21875, 222.91132, 190.53125, 222.65872, 191.95313, 222.46928, 193.48438, 222.34299, 195.125, 222.27985, 196.875, 222.27985, 198.51563, 222.34299, 200.04688, 222.46928, 201.46875, 222.65872, 202.78125, 222.91132, 204.09375, 223.2902, 205.40625, 223.79538, 207.04688, 224.6163, 210, 226.32129, 210, 229.73128, 210.10938, 231.56256, 210.32813, 232.95181, 210.65625, 234.27792, 211.09375, 235.54086, 211.64063, 236.86697, 212.29688, 238.25623, 213.0625, 239.70862, 213.9375, 241.22415, 214.8125, 242.6134, 215.6875, 243.87637, 216.5625, 245.01303, 217.4375, 246.02338, 218.42188, 246.9706, 219.51563, 247.85466, 221.04688, 248.86502, 224, 250.57002, 226.95313, 248.86502, 228.59375, 248.0441, 229.90625, 247.53893, 231.21875, 247.16003, 232.53125, 246.90746, 233.95313, 246.71802, 235.48438, 246.5917, 237.125, 246.52856, 238.875, 246.52856, 240.625, 246.52856, 242.375, 246.52856, 244.125, 246.52856, 245.875, 246.52856, 247.625, 246.52856, 249.375, 246.52856, 251.125, 246.52856, 252.875, 246.52856, 254.51563, 246.46542, 256.04688, 246.33911, 257.46875, 246.14967, 258.78125, 245.8971, 260.09375, 245.5182, 261.40625, 245.01303, 263.04688, 244.19211, 266, 242.4871, 268.95313, 244.19211, 270.59375, 245.01303, 271.90625, 245.5182, 273.21875, 245.8971, 274.53125, 246.14967, 275.95313, 246.33911, 277.48438, 246.46542, 279.125, 246.52856, 280.875, 246.52856, 282.51563, 246.46542, 284.04688, 246.33911, 285.46875, 246.14967, 286.78125, 245.8971, 288.09375, 245.5182, 289.40625, 245.01303, 291.04688, 244.19211, 294, 242.4871, 296.95313, 244.19211, 298.59375, 245.01303, 299.90625, 245.5182, 301.21875, 245.8971, 302.53125, 246.14967, 303.95313, 246.33911, 305.48438, 246.46542, 307.125, 246.52856, 308.875, 246.52856, 310.51563, 246.46542, 312.04688, 246.33911, 313.46875, 246.14967, 314.78125, 245.8971, 316.09375, 245.5182, 317.40625, 245.01303, 319.04688, 244.19211, 322, 242.4871, 324.95313, 244.19211, 326.59375, 245.01303, 327.90625, 245.5182, 329.21875, 245.8971, 330.53125, 246.14967, 331.95313, 246.33911, 333.48438, 246.46542, 335.125, 246.52856, 336.875, 246.52856, 338.51563, 246.46542, 340.04688, 246.33911, 341.46875, 246.14967, 342.78125, 245.8971, 344.09375, 245.5182, 345.40625, 245.01303, 347.04688, 244.19211, 350, 242.4871, 352.95313, 244.19211, 354.59375, 245.01303, 355.90625, 245.5182, 357.21875, 245.8971, 358.53125, 246.14967, 359.95313, 246.33911, 361.48438, 246.46542, 363.125, 246.52856, 364.875, 246.52856, 366.625, 246.52856, 368.375, 246.52856, 370.125, 246.52856, 371.875, 246.52856, 373.625, 246.52856, 375.375, 246.52856, 377.125, 246.52856, 378.875, 246.52856, 380.51563, 246.71802, 382.04688, 247.0969, 383.46875, 247.66522, 384.78125, 248.423, 385.98438, 249.37021, 387.07813, 250.50687, 388.0625, 251.83298, 388.9375, 253.34851, 389.70313, 254.8009, 390.35938, 256.19016, 390.90625, 257.51624, 391.34375, 258.77924, 391.67188, 260.10535, 391.89063, 261.49457, 392, 263.32587, 392, 266.73584, 394.95313, 268.44083, 396.59375, 269.26175, 397.90625, 269.7669, 399.21875, 270.14578, 400.53125, 270.3984, 401.95313, 270.58783, 403.48438, 270.71414, 405.125, 270.77728, 406.875, 270.77728, 408.51563, 270.71414, 410.04688, 270.58783, 411.46875, 270.3984, 412.78125, 270.14578, 414.09375, 269.7669, 415.40625, 269.26175, 417.04688, 268.44083, 420, 266.73584, 422.95313, 268.44083, 424.59375, 269.26175, 425.90625, 269.7669, 427.21875, 270.14578, 428.53125, 270.3984, 429.95313, 270.58783, 431.48438, 270.71414, 433.125, 270.77728, 434.875, 270.77728, 436.625, 270.77728, 438.375, 270.77728, 440.125, 270.77728, 441.875, 270.77728, 443.625, 270.77728, 445.375, 270.77728, 447.125, 270.77728, 448.875, 270.77728, 450.625, 270.77728, 452.375, 270.77728, 454.125, 270.77728, 455.875, 270.77728, 457.625, 270.77728, 459.375, 270.77728, 461.125, 270.77728, 462.875, 270.77728, 464.625, 270.77728, 466.375, 270.77728, 468.125, 270.77728, 469.875, 270.77728, 471.625, 270.77728, 473.375, 270.77728, 475.125, 270.77728, 476.875, 270.77728, 478.625, 270.77728, 480.375, 270.77728, 482.125, 270.77728, 483.875, 270.77728, 485.625, 270.77728, 487.375, 270.77728, 489.125, 270.77728, 490.875, 270.77728, 492.625, 270.77728, 494.375, 270.77728, 496.125, 270.77728, 497.875, 270.77728, 499.625, 270.77728, 501.375, 270.77728, 503.125, 270.77728, 504.875, 270.77728, 506.51563, 270.84042, 508.04688, 270.96674, 509.46875, 271.15616, 510.78125, 271.40878, 512.09375, 271.78766, 513.40625, 272.29282, 515.0469, 273.11374, 518, 274.81873),
+"name": "Po",
+"open_ends": PackedVector2Array()
+}, {
+"class": 2,
+"corners": PackedVector2Array(238, 80.82903, 238, 84.23901, 238.10938, 86.0703, 238.32813, 87.45955, 238.65625, 88.78565, 239.09375, 90.04861, 239.64063, 91.37471, 240.29688, 92.763954, 241.0625, 94.216354, 241.9375, 95.73189, 242.8125, 97.24744, 243.6875, 98.762985, 244.5625, 100.27852, 245.4375, 101.79407, 246.3125, 103.309616, 247.1875, 104.82515, 248.0625, 106.3407, 248.9375, 107.85625, 249.59375, 109.37179, 250.03125, 110.88733, 250.25, 112.40288, 250.25, 113.91842, 250.03125, 115.43396, 249.59375, 116.94951, 248.9375, 118.46506, 248.0625, 119.9806, 247.1875, 121.49615, 246.3125, 123.01169, 245.4375, 124.52724, 244.5625, 126.042786, 243.6875, 127.55833, 242.8125, 129.07387, 241.9375, 130.58942, 241.0625, 132.10495, 240.40625, 133.6205, 239.96875, 135.13605, 239.75, 136.6516, 239.75, 138.16713, 239.96875, 139.68268, 240.40625, 141.19823, 241.0625, 142.71378, 241.9375, 144.22931, 242.8125, 145.74486, 243.6875, 147.2604, 244.5625, 148.77594, 245.4375, 150.2915, 246.3125, 151.80704, 247.1875, 153.32259, 248.0625, 154.83813, 248.9375, 156.35367, 249.59375, 157.86922, 250.03125, 159.38477, 250.25, 160.90031, 250.25, 162.41585, 250.03125, 163.9314, 249.59375, 165.44695, 248.9375, 166.9625, 248.0625, 168.47803, 247.1875, 169.99358, 246.3125, 171.50912, 245.4375, 173.02466, 244.5625, 174.5402, 243.6875, 176.05576, 242.8125, 177.57129, 241.9375, 179.08684, 241.0625, 180.60239, 240.40625, 182.11792, 239.96875, 183.63347, 239.75, 185.14902, 239.75, 186.66455, 239.96875, 188.1801, 240.40625, 189.69565, 241.0625, 191.21118, 241.9375, 192.72675, 242.8125, 194.2423, 243.6875, 195.75783, 244.5625, 197.27338, 245.4375, 198.78893, 246.3125, 200.30446, 247.1875, 201.82, 248.0625, 203.33556, 248.9375, 204.85109, 249.8125, 206.36664, 250.6875, 207.88219, 251.5625, 209.39772, 252.4375, 210.91327, 253.3125, 212.42882, 254.1875, 213.94435, 255.0625, 215.4599, 255.9375, 216.97545, 256.8125, 218.491, 257.6875, 220.00655, 258.5625, 221.5221, 259.4375, 223.03763, 260.3125, 224.55318, 261.1875, 226.06873, 262.0625, 227.58426, 262.9375, 229.09981, 263.70313, 230.55222, 264.35938, 231.94144, 264.90625, 233.26755, 265.34375, 234.53052, 265.67188, 235.85661, 265.89063, 237.24586, 266, 239.07715, 266, 242.4871),
+"name": "Ticino",
+"open_ends": PackedVector2Array()
+}, {
+"class": 2,
+"corners": PackedVector2Array(350, 80.82903, 350, 84.23901, 350.10938, 86.0703, 350.32813, 87.45955, 350.65625, 88.78565, 351.09375, 90.04861, 351.64063, 91.37471, 352.29688, 92.763954, 353.0625, 94.216354, 353.9375, 95.73189, 354.8125, 97.24744, 355.6875, 98.762985, 356.5625, 100.27852, 357.4375, 101.79407, 358.3125, 103.309616, 359.1875, 104.82515, 360.0625, 106.3407, 360.9375, 107.85625, 361.59375, 109.37179, 362.03125, 110.88733, 362.25, 112.40288, 362.25, 113.91842, 362.03125, 115.43396, 361.59375, 116.94951, 360.9375, 118.46506, 360.0625, 119.9806, 359.07813, 121.3067, 357.98438, 122.44336, 356.78125, 123.39057, 355.46875, 124.148346, 354.04688, 124.716675, 352.51563, 125.09556, 350.875, 125.285, 349.125, 125.285, 347.375, 125.285, 345.625, 125.285, 343.875, 125.285, 342.125, 125.285, 340.375, 125.285, 338.625, 125.285, 336.875, 125.285, 335.125, 125.285, 333.375, 125.285, 331.625, 125.285, 329.875, 125.285, 328.125, 125.285, 326.375, 125.285, 324.625, 125.285, 322.875, 125.285, 321.125, 125.285, 319.375, 125.285, 317.625, 125.285, 315.875, 125.285, 314.125, 125.285, 312.375, 125.285, 310.625, 125.285, 308.875, 125.285, 307.125, 125.285, 305.48438, 125.47445, 303.95313, 125.85333, 302.53125, 126.42166, 301.21875, 127.17944, 300.01563, 128.12665, 298.92188, 129.2633, 297.9375, 130.58942, 297.0625, 132.10495, 296.1875, 133.6205, 295.3125, 135.13605, 294.4375, 136.6516, 293.5625, 138.16713, 292.6875, 139.68268, 291.8125, 141.19823, 290.9375, 142.71378, 290.0625, 144.22931, 289.1875, 145.61856, 288.3125, 146.8815, 287.4375, 148.01816, 286.5625, 149.02853, 285.57813, 149.97575, 284.48438, 150.85983, 282.95313, 151.8702, 280, 153.57518, 280, 156.98515, 280.10938, 158.81644, 280.32813, 160.20569, 280.65625, 161.53178, 281.09375, 162.79475, 281.64063, 164.12085, 282.29688, 165.51009, 283.0625, 166.9625, 283.9375, 168.47803, 284.8125, 169.99358, 285.6875, 171.50912, 286.5625, 173.02466, 287.4375, 174.5402, 288.3125, 176.05576, 289.1875, 177.57129, 290.0625, 179.08684, 290.9375, 180.60239, 291.8125, 182.11792, 292.6875, 183.63347, 293.5625, 185.14902, 294.4375, 186.66455, 295.3125, 188.1801, 296.1875, 189.69565, 297.0625, 191.21118, 297.9375, 192.72675, 298.8125, 194.2423, 299.6875, 195.75783, 300.5625, 197.27338, 301.4375, 198.78893, 302.3125, 200.30446, 303.1875, 201.82, 304.0625, 203.33556, 304.9375, 204.85109, 305.8125, 206.36664, 306.6875, 207.88219, 307.5625, 209.39772, 308.4375, 210.91327, 309.3125, 212.42882, 310.1875, 213.94435, 311.0625, 215.4599, 311.9375, 216.97545, 312.8125, 218.491, 313.6875, 220.00655, 314.5625, 221.5221, 315.4375, 223.03763, 316.3125, 224.55318, 317.1875, 226.06873, 318.0625, 227.58426, 318.9375, 229.09981, 319.70313, 230.55222, 320.35938, 231.94144, 320.90625, 233.26755, 321.34375, 234.53052, 321.67188, 235.85661, 321.89063, 237.24586, 322, 239.07715, 322, 242.4871),
+"name": "Adda",
+"open_ends": PackedVector2Array()
+}, {
+"class": 2,
+"corners": PackedVector2Array(112, 169.74098, 114.953125, 171.44595, 116.59375, 172.26688, 117.90625, 172.77206, 119.21875, 173.15096, 120.53125, 173.40355, 121.953125, 173.59299, 123.484375, 173.71928, 125.125, 173.78244, 126.875, 173.78244, 128.625, 173.78244, 130.375, 173.78244, 132.125, 173.78244, 133.875, 173.78244, 135.625, 173.78244, 137.375, 173.78244, 139.125, 173.78244, 140.875, 173.78244, 142.51563, 173.97188, 144.04688, 174.35077, 145.46875, 174.9191, 146.78125, 175.67686, 147.98438, 176.62408, 149.07813, 177.76074, 150.0625, 179.08684, 150.9375, 180.60239, 151.8125, 182.11792, 152.6875, 183.63347, 153.5625, 185.14902, 154.4375, 186.66455, 155.3125, 188.1801, 156.1875, 189.69565, 157.0625, 191.21118, 157.9375, 192.72675, 158.8125, 194.2423, 159.6875, 195.75783, 160.5625, 197.27338, 161.4375, 198.78893, 162.3125, 200.30446, 163.1875, 201.82, 164.0625, 203.33556, 164.9375, 204.85109, 165.8125, 206.36664, 166.6875, 207.88219, 167.5625, 209.39772, 168.4375, 210.91327, 169.3125, 212.42882, 170.1875, 213.94435, 171.0625, 215.4599, 171.9375, 216.97545, 172.8125, 218.36469, 173.6875, 219.62764, 174.5625, 220.7643, 175.4375, 221.77466, 176.42188, 222.72188, 177.51563, 223.60594, 179.04688, 224.6163, 182, 226.32129),
+"name": "Dora Baltea",
+"open_ends": PackedVector2Array()
+}, {
+"class": 2,
+"corners": PackedVector2Array(98, 242.4871, 100.953125, 244.19211, 102.59375, 245.01303, 103.90625, 245.5182, 105.21875, 245.8971, 106.53125, 246.14967, 107.953125, 246.33911, 109.484375, 246.46542, 111.125, 246.52856, 112.875, 246.52856, 114.625, 246.52856, 116.375, 246.52856, 118.125, 246.52856, 119.875, 246.52856, 121.625, 246.52856, 123.375, 246.52856, 125.125, 246.52856, 126.875, 246.52856, 128.625, 246.52856, 130.375, 246.52856, 132.125, 246.52856, 133.875, 246.52856, 135.625, 246.52856, 137.375, 246.52856, 139.125, 246.52856, 140.875, 246.52856, 142.625, 246.52856, 144.375, 246.52856, 146.125, 246.52856, 147.875, 246.52856, 149.625, 246.52856, 151.375, 246.52856, 153.125, 246.52856, 154.875, 246.52856, 156.51563, 246.5917, 158.04688, 246.71802, 159.46875, 246.90746, 160.78125, 247.16003, 162.09375, 247.53893, 163.40625, 248.0441, 165.04688, 248.86502, 168, 250.57002),
+"name": "Dora Riparia",
+"open_ends": PackedVector2Array()
+}, {
+"class": 2,
+"corners": PackedVector2Array(196, 347.56485, 193.04688, 345.85986, 191.51563, 344.84952, 190.42188, 343.96542, 189.4375, 343.01822, 188.5625, 342.00787, 187.6875, 340.87122, 186.8125, 339.60825, 185.9375, 338.219, 185.0625, 336.70346, 184.40625, 335.1879, 183.96875, 333.67236, 183.75, 332.15683, 183.75, 330.64127, 183.96875, 329.12573, 184.40625, 327.6102, 185.0625, 326.09464, 185.9375, 324.5791, 186.8125, 323.06354, 187.6875, 321.548, 188.5625, 320.03247, 189.4375, 318.5169, 190.3125, 317.00137, 191.1875, 315.48584, 192.0625, 313.97028, 192.9375, 312.45474, 193.59375, 310.9392, 194.03125, 309.42365, 194.25, 307.9081, 194.25, 306.39258, 194.03125, 304.877, 193.59375, 303.36148, 192.9375, 301.84595, 192.0625, 300.33038, 191.1875, 298.81485, 190.3125, 297.29932, 189.4375, 295.78375, 188.5625, 294.26822, 187.6875, 292.7527, 186.8125, 291.23712, 185.9375, 289.7216, 185.0625, 288.20605, 184.40625, 286.6905, 183.96875, 285.17496, 183.75, 283.65942, 183.75, 282.14386, 183.96875, 280.62833, 184.40625, 279.1128, 185.0625, 277.59723, 185.9375, 276.0817, 186.92188, 274.75558, 188.01563, 273.61893, 189.21875, 272.67172, 190.53125, 271.91394, 191.95313, 271.34564, 193.48438, 270.96674, 195.125, 270.77728, 196.875, 270.77728, 198.625, 270.77728, 200.375, 270.77728, 202.125, 270.77728, 203.875, 270.77728, 205.625, 270.77728, 207.375, 270.77728, 209.125, 270.77728, 210.875, 270.77728, 212.51563, 270.58783, 214.04688, 270.20892, 215.46875, 269.64063, 216.78125, 268.88284, 217.98438, 267.93564, 219.07813, 266.79898, 220.0625, 265.47287, 220.9375, 263.95734, 221.70313, 262.50494, 222.35938, 261.1157, 222.90625, 259.7896, 223.34375, 258.5266, 223.67188, 257.20053, 223.89063, 255.81128, 224, 253.98, 224, 250.57002),
+"name": "Tanaro",
+"open_ends": PackedVector2Array()
+}, {
+"class": 2,
+"corners": PackedVector2Array(182, 145.49226, 184.95313, 147.19725, 186.48438, 148.20761, 187.57813, 149.09169, 188.5625, 150.03891, 189.4375, 151.04929, 190.3125, 152.18594, 191.1875, 153.44888, 192.0625, 154.83813, 192.9375, 156.35367, 193.8125, 157.86922, 194.6875, 159.38477, 195.5625, 160.90031, 196.4375, 162.41585, 197.3125, 163.9314, 198.1875, 165.44695, 199.0625, 166.9625, 199.9375, 168.47803, 200.8125, 169.99358, 201.6875, 171.50912, 202.5625, 173.02466, 203.4375, 174.5402, 204.3125, 176.05576, 205.1875, 177.57129, 206.0625, 179.08684, 206.9375, 180.60239, 207.8125, 182.11792, 208.6875, 183.63347, 209.5625, 185.14902, 210.4375, 186.66455, 211.3125, 188.1801, 212.1875, 189.69565, 213.0625, 191.21118, 213.9375, 192.72675, 214.8125, 194.2423, 215.6875, 195.75783, 216.5625, 197.27338, 217.4375, 198.78893, 218.3125, 200.30446, 219.1875, 201.82, 220.0625, 203.33556, 220.9375, 204.85109, 221.59375, 206.36664, 222.03125, 207.88219, 222.25, 209.39772, 222.25, 210.91327, 222.03125, 212.42882, 221.59375, 213.94435, 220.9375, 215.4599, 220.0625, 216.97545, 219.1875, 218.36469, 218.3125, 219.62764, 217.4375, 220.7643, 216.5625, 221.77466, 215.57813, 222.72188, 214.48438, 223.60594, 212.95313, 224.6163, 210, 226.32129),
+"name": "Sesia",
+"open_ends": PackedVector2Array()
+}, {
+"class": 2,
+"corners": PackedVector2Array(378, 145.49226, 375.04688, 147.19725, 373.51563, 148.20761, 372.42188, 149.09169, 371.4375, 150.03891, 370.5625, 151.04929, 369.6875, 152.18594, 368.8125, 153.44888, 367.9375, 154.83813, 367.0625, 156.35367, 366.1875, 157.86922, 365.3125, 159.38477, 364.4375, 160.90031, 363.5625, 162.41585, 362.6875, 163.9314, 361.8125, 165.44695, 360.9375, 166.9625, 360.0625, 168.47803, 359.1875, 169.99358, 358.3125, 171.50912, 357.4375, 173.02466, 356.5625, 174.5402, 355.6875, 176.05576, 354.8125, 177.57129, 353.9375, 179.08684, 353.0625, 180.60239, 352.1875, 182.11792, 351.3125, 183.63347, 350.4375, 185.14902, 349.5625, 186.66455, 348.6875, 188.1801, 347.8125, 189.69565, 346.9375, 191.21118, 346.0625, 192.72675, 345.1875, 194.2423, 344.3125, 195.75783, 343.4375, 197.27338, 342.5625, 198.78893, 341.6875, 200.30446, 340.8125, 201.82, 339.9375, 203.33556, 339.0625, 204.85109, 338.40625, 206.36664, 337.96875, 207.88219, 337.75, 209.39772, 337.75, 210.91327, 337.96875, 212.42882, 338.40625, 213.94435, 339.0625, 215.4599, 339.9375, 216.97545, 340.8125, 218.491, 341.6875, 220.00655, 342.5625, 221.5221, 343.4375, 223.03763, 344.3125, 224.55318, 345.1875, 226.06873, 346.0625, 227.58426, 346.9375, 229.09981, 347.70313, 230.55222, 348.35938, 231.94144, 348.90625, 233.26755, 349.34375, 234.53052, 349.67188, 235.85661, 349.89063, 237.24586, 350, 239.07715, 350, 242.4871),
+"name": "Oglio",
+"open_ends": PackedVector2Array()
+}, {
+"class": 2,
+"corners": PackedVector2Array(378, 48.497425, 380.95313, 50.20241, 382.48438, 51.212776, 383.57813, 52.09684, 384.5625, 53.044056, 385.4375, 54.05442, 386.3125, 55.19108, 387.1875, 56.45403, 388.0625, 57.843277, 388.9375, 59.358826, 389.8125, 60.87437, 390.6875, 62.38991, 391.5625, 63.905457, 392.4375, 65.421, 393.3125, 66.93655, 394.1875, 68.45209, 395.0625, 69.967636, 395.9375, 71.48318, 396.92188, 72.80928, 398.01563, 73.94594, 399.21875, 74.89315, 400.53125, 75.650925, 401.95313, 76.21925, 403.48438, 76.59814, 405.125, 76.78758, 406.875, 76.78758, 408.625, 76.78758, 410.375, 76.78758, 412.125, 76.78758, 413.875, 76.78758, 415.625, 76.78758, 417.375, 76.78758, 419.125, 76.78758, 420.875, 76.78758, 422.51563, 76.97703, 424.04688, 77.35591, 425.46875, 77.92424, 426.78125, 78.682014, 427.98438, 79.62923, 429.07813, 80.765884, 430.0625, 82.091995, 430.9375, 83.60754, 431.8125, 85.123085, 432.6875, 86.638626, 433.5625, 88.154175, 434.4375, 89.66972, 435.3125, 91.18526, 436.1875, 92.700806, 437.0625, 94.216354, 437.9375, 95.73189, 438.8125, 97.24744, 439.6875, 98.762985, 440.5625, 100.27852, 441.4375, 101.79407, 442.3125, 103.309616, 443.1875, 104.82515, 444.0625, 106.3407, 444.9375, 107.85625, 445.59375, 109.37179, 446.03125, 110.88733, 446.25, 112.40288, 446.25, 113.91842, 446.03125, 115.43396, 445.59375, 116.94951, 444.9375, 118.46506, 444.0625, 119.9806, 443.1875, 121.49615, 442.3125, 123.01169, 441.4375, 124.52724, 440.5625, 126.042786, 439.6875, 127.55833, 438.8125, 129.07387, 437.9375, 130.58942, 437.0625, 132.10495, 436.1875, 133.6205, 435.3125, 135.13605, 434.4375, 136.6516, 433.5625, 138.16713, 432.6875, 139.68268, 431.8125, 141.19823, 430.9375, 142.71378, 430.0625, 144.22931, 429.1875, 145.74486, 428.3125, 147.2604, 427.4375, 148.77594, 426.5625, 150.2915, 425.6875, 151.80704, 424.8125, 153.32259, 423.9375, 154.83813, 423.0625, 156.35367, 422.40625, 157.86922, 421.96875, 159.38477, 421.75, 160.90031, 421.75, 162.41585, 421.96875, 163.9314, 422.40625, 165.44695, 423.0625, 166.9625, 423.9375, 168.47803, 424.8125, 169.99358, 425.6875, 171.50912, 426.5625, 173.02466, 427.4375, 174.5402, 428.3125, 176.05576, 429.1875, 177.57129, 430.0625, 179.08684, 430.9375, 180.60239, 431.70313, 182.30737, 432.35938, 184.2018, 432.90625, 186.28568, 433.34375, 188.55899, 433.67188, 191.40063, 433.89063, 194.81061, 434, 199.92557, 434, 210.1555, 442.85938, 215.27046, 447.23438, 217.92267, 450.07813, 219.81711, 452.375, 221.5221, 454.125, 223.03763, 455.65625, 224.55318, 456.96875, 226.06873, 458.0625, 227.58426, 458.9375, 229.09981, 459.8125, 230.61536, 460.6875, 232.13089, 461.5625, 233.64644, 462.4375, 235.16199, 463.3125, 236.67752, 464.1875, 238.19307, 465.0625, 239.70862, 465.9375, 241.22415, 466.92188, 242.55026, 468.01563, 243.68692, 469.21875, 244.63412, 470.53125, 245.3919, 471.95313, 245.96024, 473.48438, 246.33911, 475.125, 246.52856, 476.875, 246.52856, 478.625, 246.52856, 480.375, 246.52856, 482.125, 246.52856, 483.875, 246.52856, 485.625, 246.52856, 487.375, 246.52856, 489.125, 246.52856, 490.875, 246.52856, 492.625, 246.52856, 494.375, 246.52856, 496.125, 246.52856, 497.875, 246.52856, 499.625, 246.52856, 501.375, 246.52856, 503.125, 246.52856, 504.875, 246.52856, 506.625, 246.52856, 508.375, 246.52856, 510.125, 246.52856, 511.875, 246.52856, 513.625, 246.52856, 515.375, 246.52856, 517.125, 246.52856, 518.875, 246.52856, 520.5156, 246.5917, 522.0469, 246.71802, 523.46875, 246.90746, 524.78125, 247.16003, 526.09375, 247.53893, 527.40625, 248.0441, 529.0469, 248.86502, 532, 250.57002),
+"name": "Adige",
+"open_ends": PackedVector2Array(434, 193.98969, 448, 218.2384)
+}, {
+"class": 2,
+"corners": PackedVector2Array(490, 387.9794, 487.04688, 389.68436, 485.40625, 390.50528, 484.09375, 391.01047, 482.78125, 391.38934, 481.46875, 391.64194, 480.04688, 391.8314, 478.51563, 391.9577, 476.875, 392.02084, 475.125, 392.02084, 473.26563, 391.8314, 471.29688, 391.4525, 469.21875, 390.8842, 467.03125, 390.1264, 464.40625, 388.98975, 461.34375, 387.4742, 456.85938, 385.01144, 448, 379.89648, 439.14063, 385.01144, 434.65625, 387.4742, 431.59375, 388.98975, 428.96875, 390.1264, 426.78125, 390.8842, 424.70313, 391.4525, 422.73438, 391.8314, 420.875, 392.02084, 419.125, 392.02084, 417.375, 392.02084, 415.625, 392.02084, 413.875, 392.02084, 412.125, 392.02084, 410.375, 392.02084, 408.625, 392.02084, 406.875, 392.02084, 405.125, 392.02084, 403.26563, 392.21027, 401.29688, 392.5892, 399.21875, 393.15753, 397.03125, 393.91528, 394.40625, 395.05194, 391.34375, 396.5675, 386.85938, 399.03027, 378, 404.1452, 369.14063, 399.03027, 364.76563, 396.50433, 361.92188, 394.8625, 359.625, 393.53638, 357.875, 392.526, 356.23438, 391.5788, 354.70313, 390.6947, 352.95313, 389.68436, 350, 387.9794),
+"name": "Arno",
+"open_ends": PackedVector2Array(462, 387.9794, 434, 387.9794, 392, 396.0623, 364, 396.0623)
+}, {
+"class": 2,
+"corners": PackedVector2Array(224, 72.74613, 224, 69.33615, 223.89063, 67.50487, 223.67188, 66.11562, 223.34375, 64.78952, 222.90625, 63.526573, 222.35938, 62.20047, 221.70313, 60.811222, 220.9375, 59.358826, 220.0625, 57.843277, 219.07813, 56.517178, 217.98438, 55.38052, 216.78125, 54.433304, 215.46875, 53.675533, 214.04688, 53.107204, 212.51563, 52.728317, 210.875, 52.538876, 209.125, 52.538876, 207.375, 52.538876, 205.625, 52.538876, 203.875, 52.538876, 202.125, 52.538876, 200.375, 52.538876, 198.625, 52.538876, 196.875, 52.538876, 195.125, 52.538876, 193.375, 52.538876, 191.625, 52.538876, 189.875, 52.538876, 188.125, 52.538876, 186.375, 52.538876, 184.625, 52.538876, 182.875, 52.538876, 181.125, 52.538876, 179.48438, 52.728317, 177.95313, 53.107204, 176.53125, 53.675533, 175.21875, 54.433304, 174.01563, 55.38052, 172.92188, 56.517178, 171.9375, 57.843277, 171.0625, 59.358826, 170.1875, 60.87437, 169.3125, 62.38991, 168.4375, 63.905457, 167.5625, 65.421, 166.6875, 66.93655, 165.8125, 68.45209, 164.9375, 69.967636, 164.0625, 71.48318, 163.07813, 72.80928, 161.98438, 73.94594, 160.78125, 74.89315, 159.46875, 75.650925, 158.04688, 76.21925, 156.51563, 76.59814, 154.875, 76.78758, 153.125, 76.78758, 151.375, 76.78758, 149.625, 76.78758, 147.875, 76.78758, 146.125, 76.78758, 144.375, 76.78758, 142.625, 76.78758, 140.875, 76.78758, 139.125, 76.78758, 137.375, 76.78758, 135.625, 76.78758, 133.875, 76.78758, 132.125, 76.78758, 130.375, 76.78758, 128.625, 76.78758, 126.875, 76.78758, 125.125, 76.78758, 123.375, 76.78758, 121.625, 76.78758, 119.875, 76.78758, 118.125, 76.78758, 116.375, 76.78758, 114.625, 76.78758, 112.875, 76.78758, 111.125, 76.78758, 109.484375, 76.97703, 107.953125, 77.35591, 106.53125, 77.92424, 105.21875, 78.682014, 104.015625, 79.62923, 102.921875, 80.765884, 101.9375, 82.091995, 101.0625, 83.60754, 100.1875, 85.123085, 99.3125, 86.638626, 98.4375, 88.154175, 97.5625, 89.66972, 96.6875, 91.18526, 95.8125, 92.700806, 94.9375, 94.216354, 94.0625, 95.73189, 93.1875, 97.24744, 92.3125, 98.762985, 91.4375, 100.27852, 90.5625, 101.79407, 89.6875, 103.309616, 88.8125, 104.82515, 87.9375, 106.3407, 87.0625, 107.85625, 86.1875, 109.37179, 85.3125, 110.88733, 84.4375, 112.40288, 83.5625, 113.91842, 82.6875, 115.43396, 81.8125, 116.94951, 80.9375, 118.46506, 80.0625, 119.9806, 79.078125, 121.3067, 77.984375, 122.44336, 76.78125, 123.39057, 75.46875, 124.148346, 74.046875, 124.716675, 72.515625, 125.09556, 70.875, 125.285, 69.125, 125.285, 67.265625, 125.09556, 65.296875, 124.716675, 63.21875, 124.148346, 61.03125, 123.39057, 58.40625, 122.253914, 55.34375, 120.73837, 50.859375, 118.27561, 42, 113.16065, 28, 105.07775),
+"name": "Rhone",
+"open_ends": PackedVector2Array(56, 121.24355, 28, 105.07775)
+}, {
+"class": 2,
+"corners": PackedVector2Array(238, 80.82903, 240.95313, 79.12405, 242.48438, 78.11368, 243.57813, 77.229614, 244.5625, 76.2824, 245.4375, 75.27203, 246.3125, 74.135376, 247.1875, 72.87243, 248.0625, 71.48318, 248.9375, 69.967636, 249.8125, 68.45209, 250.6875, 66.93655, 251.5625, 65.421, 252.4375, 63.905457, 253.3125, 62.38991, 254.1875, 60.87437, 255.0625, 59.358826, 255.9375, 57.843277, 256.8125, 56.327732, 257.6875, 54.81219, 258.5625, 53.296646, 259.4375, 51.7811, 260.3125, 50.265556, 261.1875, 48.75001, 262.0625, 47.234467, 262.9375, 45.718925, 263.70313, 44.266525, 264.35938, 42.87728, 264.90625, 41.551178, 265.34375, 40.288223, 265.67188, 38.96212, 265.89063, 37.572876, 266, 35.741592, 266, 32.331615),
+"name": "Rhine (Alpine)",
+"open_ends": PackedVector2Array(266, 32.331615)
+}, {
+"class": 2,
+"corners": PackedVector2Array(462, 145.49226, 464.95313, 147.19725, 466.48438, 148.20761, 467.57813, 149.09169, 468.5625, 150.03891, 469.4375, 151.04929, 470.3125, 152.18594, 471.1875, 153.44888, 472.0625, 154.83813, 472.9375, 156.35367, 473.8125, 157.86922, 474.6875, 159.38477, 475.5625, 160.90031, 476.4375, 162.41585, 477.3125, 163.9314, 478.1875, 165.44695, 479.0625, 166.9625, 479.9375, 168.47803, 480.8125, 169.99358, 481.6875, 171.50912, 482.5625, 173.02466, 483.4375, 174.5402, 484.3125, 176.05576, 485.1875, 177.57129, 486.0625, 179.08684, 486.9375, 180.60239, 487.8125, 182.11792, 488.6875, 183.63347, 489.5625, 185.14902, 490.4375, 186.66455, 491.3125, 188.1801, 492.1875, 189.69565, 493.0625, 191.21118, 493.9375, 192.72675, 494.8125, 194.2423, 495.6875, 195.75783, 496.5625, 197.27338, 497.4375, 198.78893, 498.3125, 200.30446, 499.1875, 201.82, 500.0625, 203.33556, 500.9375, 204.85109, 501.8125, 206.36664, 502.6875, 207.88219, 503.5625, 209.39772, 504.4375, 210.91327, 505.3125, 212.42882, 506.1875, 213.94435, 507.0625, 215.4599, 507.9375, 216.97545, 508.92188, 218.30154, 510.01563, 219.4382, 511.21875, 220.38542, 512.53125, 221.14319, 513.9531, 221.71152, 515.4844, 222.09041, 517.125, 222.27985, 518.875, 222.27985, 520.5156, 222.2167, 522.0469, 222.09041, 523.46875, 221.90097, 524.78125, 221.64838, 526.09375, 221.26949, 527.40625, 220.76431, 529.0469, 219.94339, 532, 218.2384),
+"name": "Brenta",
+"open_ends": PackedVector2Array()
+}, {
+"class": 2,
+"corners": PackedVector2Array(532, 72.74613, 534.9531, 74.45112, 536.4844, 75.46149, 537.5781, 76.34555, 538.5625, 77.29276, 539.4375, 78.30313, 540.3125, 79.43979, 541.1875, 80.70274, 542.0625, 82.091995, 542.9375, 83.60754, 543.59375, 85.123085, 544.03125, 86.638626, 544.25, 88.154175, 544.25, 89.66972, 544.03125, 91.18526, 543.59375, 92.700806, 542.9375, 94.216354, 542.0625, 95.73189, 541.1875, 97.24744, 540.3125, 98.762985, 539.4375, 100.27852, 538.5625, 101.79407, 537.6875, 103.309616, 536.8125, 104.82515, 535.9375, 106.3407, 535.0625, 107.85625, 534.1875, 109.37179, 533.3125, 110.88733, 532.4375, 112.40288, 531.5625, 113.91842, 530.6875, 115.43396, 529.8125, 116.94951, 528.9375, 118.46506, 528.0625, 119.9806, 527.1875, 121.49615, 526.3125, 123.01169, 525.4375, 124.52724, 524.5625, 126.042786, 523.6875, 127.55833, 522.8125, 129.07387, 521.9375, 130.58942, 521.0625, 132.10495, 520.1875, 133.6205, 519.3125, 135.13605, 518.4375, 136.6516, 517.5625, 138.16713, 516.6875, 139.68268, 515.8125, 141.19823, 514.9375, 142.71378, 514.0625, 144.22931, 513.1875, 145.74486, 512.3125, 147.2604, 511.4375, 148.77594, 510.5625, 150.2915, 509.6875, 151.80704, 508.8125, 153.32259, 507.9375, 154.83813, 507.0625, 156.35367, 506.40625, 157.86922, 505.96875, 159.38477, 505.75, 160.90031, 505.75, 162.41585, 505.96875, 163.9314, 506.40625, 165.44695, 507.0625, 166.9625, 507.9375, 168.47803, 508.92188, 169.80414, 510.01563, 170.9408, 511.21875, 171.888, 512.53125, 172.64578, 513.9531, 173.21411, 515.4844, 173.59299, 517.125, 173.78244, 518.875, 173.78244, 520.625, 173.78244, 522.375, 173.78244, 524.125, 173.78244, 525.875, 173.78244, 527.625, 173.78244, 529.375, 173.78244, 531.125, 173.78244, 532.875, 173.78244, 534.5156, 173.84558, 536.0469, 173.97186, 537.46875, 174.16132, 538.78125, 174.41393, 540.09375, 174.79282, 541.40625, 175.29799, 543.0469, 176.11891, 546, 177.8239),
+"name": "Piave",
+"open_ends": PackedVector2Array()
+}, {
+"class": 1,
+"corners": PackedVector2Array(336, 315.23325, 336, 311.82327, 336.10938, 309.99197, 336.32813, 308.60275, 336.65625, 307.27664, 337.09375, 306.01367, 337.64063, 304.68756, 338.29688, 303.29834, 339.0625, 301.84595, 339.9375, 300.33038, 340.92188, 299.0043, 342.01563, 297.86765, 343.21875, 296.9204, 344.53125, 296.16266, 345.95313, 295.5943, 347.48438, 295.21545, 349.125, 295.026, 350.875, 295.026, 352.625, 295.026, 354.375, 295.026, 356.125, 295.026, 357.875, 295.026, 359.625, 295.026, 361.375, 295.026, 363.125, 295.026, 364.875, 295.026, 366.51563, 294.83655, 368.04688, 294.45767, 369.46875, 293.88934, 370.78125, 293.13156, 371.98438, 292.18436, 373.07813, 291.0477, 374.0625, 289.7216, 374.9375, 288.20605, 375.8125, 286.6905, 376.6875, 285.17496, 377.5625, 283.65942, 378.4375, 282.14386, 379.3125, 280.62833, 380.1875, 279.1128, 381.0625, 277.59723, 381.9375, 276.0817, 382.8125, 274.69244, 383.6875, 273.4295, 384.5625, 272.29285, 385.4375, 271.28247, 386.42188, 270.33527, 387.51563, 269.45117, 389.04688, 268.44083, 392, 266.73584),
+"name": "Taro",
+"open_ends": PackedVector2Array()
+}, {
+"class": 1,
+"corners": PackedVector2Array(280, 153.57518, 280, 156.98515, 280.10938, 158.81644, 280.32813, 160.20569, 280.65625, 161.53178, 281.09375, 162.79475, 281.64063, 164.12085, 282.29688, 165.51009, 283.0625, 166.9625, 283.9375, 168.47803, 284.8125, 169.99358, 285.6875, 171.50912, 286.5625, 173.02466, 287.4375, 174.5402, 288.3125, 176.05576, 289.1875, 177.57129, 290.0625, 179.08684, 290.9375, 180.60239, 291.59375, 182.11792, 292.03125, 183.63347, 292.25, 185.14902, 292.25, 186.66455, 292.03125, 188.1801, 291.59375, 189.69565, 290.9375, 191.21118, 290.0625, 192.72675, 289.1875, 194.2423, 288.3125, 195.75783, 287.4375, 197.27338, 286.5625, 198.78893, 285.6875, 200.30446, 284.8125, 201.82, 283.9375, 203.33556, 283.0625, 204.85109, 282.40625, 206.36664, 281.96875, 207.88219, 281.75, 209.39772, 281.75, 210.91327, 281.96875, 212.42882, 282.40625, 213.94435, 283.0625, 215.4599, 283.9375, 216.97545, 284.8125, 218.491, 285.6875, 220.00655, 286.5625, 221.5221, 287.4375, 223.03763, 288.3125, 224.55318, 289.1875, 226.06873, 290.0625, 227.58426, 290.9375, 229.09981, 291.70313, 230.55222, 292.35938, 231.94144, 292.90625, 233.26755, 293.34375, 234.53052, 293.67188, 235.85661, 293.89063, 237.24586, 294, 239.07715, 294, 242.4871),
+"name": "Lambro",
+"open_ends": PackedVector2Array()
+}, {
+"class": 1,
+"corners": PackedVector2Array(392, 202.07259, 392, 205.48256, 392.10938, 207.31384, 392.32813, 208.7031, 392.65625, 210.0292, 393.09375, 211.29214, 393.64063, 212.61826, 394.29688, 214.0075, 395.0625, 215.4599, 395.9375, 216.97545, 396.8125, 218.491, 397.6875, 220.00655, 398.5625, 221.5221, 399.4375, 223.03763, 400.3125, 224.55318, 401.1875, 226.06873, 402.0625, 227.58426, 402.9375, 229.09981, 403.8125, 230.61536, 404.6875, 232.13089, 405.5625, 233.64644, 406.4375, 235.16199, 407.3125, 236.67752, 408.1875, 238.19307, 409.0625, 239.70862, 409.9375, 241.22415, 410.8125, 242.73972, 411.6875, 244.25525, 412.5625, 245.77078, 413.4375, 247.28635, 414.3125, 248.80188, 415.1875, 250.31741, 416.0625, 251.83298, 416.9375, 253.34851, 417.70313, 254.8009, 418.35938, 256.19016, 418.90625, 257.51624, 419.34375, 258.77924, 419.67188, 260.10535, 419.89063, 261.49457, 420, 263.32587, 420, 266.73584),
+"name": "Mincio",
+"open_ends": PackedVector2Array()
+}])
+shoreline = Array[PackedVector2Array]([PackedVector2Array(95.97, 468.81, 95.67, 468, 94.99, 467, 94, 466.04, 92, 464.97, 90, 463.53, 89, 463.1, 87, 460.17, 86, 459.4, 84.81, 459, 84, 458.22, 83.16, 456, 83.14, 455, 83.68, 453, 83.9, 451, 84.37, 450, 84.67, 448, 85.69, 446, 85.89, 445, 85.41, 444, 84.6, 443, 85, 442.22, 86, 442.21, 87, 441.89, 90, 439.95, 94, 438.78, 97, 438.33, 98, 437.9, 98.84, 437, 100.59, 434, 100.62, 433, 99.77, 430, 99.28, 427, 99.41, 425, 100, 423.64, 104.22, 421, 109, 417.31, 110, 416.75, 112.13, 416, 113.09, 414, 114, 413.15, 117, 412.15, 118, 412.29, 119, 413.58, 119.65, 415, 120, 415.4, 121.07, 416, 121.8, 417, 122.01, 418, 123, 418.74, 124, 418.34, 125, 417.55, 126, 417.3, 127, 417.68, 129.87, 420, 131, 420.55, 133, 420.51, 134.53, 420, 136, 418.61, 137.13, 418, 137.82, 417, 137.82, 414, 136.92, 412, 137.6, 411, 138.9, 410, 137.73, 409, 137.33, 408, 137.37, 407, 137.87, 406, 139, 405.15, 140, 404.91, 141.03, 405, 141.9, 404, 141.9, 403, 141.4, 401, 141.36, 400, 141.89, 399, 144.1, 398, 146.59, 396, 148.49, 395, 149.83, 393, 151, 392.32, 152, 391.36, 153, 389.94, 154, 389.33, 155, 389.69, 159.25, 392, 160.99, 394, 163, 394.94, 165, 394.79, 167, 394.94, 170.17, 394, 173, 393.91, 176, 392.54, 176.51, 392, 176.71, 391, 176.43, 390, 176.59, 389, 177.95, 387, 178.33, 386, 178.44, 384, 179.39, 381, 178.66, 378, 178.93, 377, 179.97, 375, 180.12, 373, 181.62, 370, 182, 369.59, 185, 368.76, 187, 367.23, 188, 366.8, 191, 366.09, 193, 366.28, 197, 365.7, 199, 364.7, 201, 364.11, 202, 364.32, 203, 365.36, 205, 366.49, 207.33, 367, 207.84, 368, 207, 368.21, 206.43, 369, 207, 370.05, 208, 369.67, 208.32, 369, 208.19, 368, 210, 367.76, 213, 368.14, 214, 368.55, 215, 369.9, 216, 369.89, 217.32, 369, 218, 367.65, 219, 367.1, 220, 367.28, 221, 367.19, 222, 366.57, 225, 364.09, 226.56, 361, 226.22, 359, 225.98, 353, 226.16, 352, 227.11, 350, 227.16, 348, 227.59, 347, 227.48, 346, 227.62, 345, 228.12, 344, 229, 343.21, 230, 342.87, 231, 342.94, 232, 343.48, 233, 344.58, 237, 342.11, 238, 341.74, 240, 341.24, 242, 341.31, 242.12, 341, 243.38, 340, 243.5, 339, 245, 337.2, 260, 337.49, 260.47, 338, 260.84, 339, 261.54, 340, 261.61, 341, 262, 342.28, 263, 342.55, 264, 342.56, 266, 341.89, 267, 342.07, 269, 343.89, 271.03, 344, 272, 344.69, 273, 346.24, 274, 346.84, 275, 346.88, 278, 344.64, 279, 344.31, 280, 344.2, 282, 344.67, 282.42, 345, 283, 346.09, 285, 346.68, 287, 346.4, 290, 345.28, 294, 345.18, 297, 343.83, 300, 343.4, 300.52, 344, 301, 345.1, 302, 346, 305, 346.94, 306.05, 346, 309, 345.01, 311, 342.9, 313, 342.24, 315, 341.14, 319, 340.34, 320.54, 341, 321.8, 342, 322.46, 343, 323, 343.36, 326, 344.06, 329, 345.07, 330, 345.58, 331, 346.51, 333.26, 350, 333.44, 351, 333.36, 353, 332.45, 356, 332.37, 357, 333.13, 361, 335, 364.25, 336, 365.6, 337, 366.21, 340, 366.87, 343, 366.93, 344, 367.5, 344.29, 369, 345.33, 371, 346, 371.8, 349, 373.92, 350, 375.11, 351.14, 376, 351.44, 380, 351.27, 381, 350.43, 383, 350.23, 384, 350.99, 386, 351.46, 389, 351.93, 390, 353, 391.42, 355, 392.1, 355.83, 393, 356.37, 394, 357.37, 395, 359, 396.08, 361, 398.29, 362, 398.86, 364, 399.38, 364.67, 400, 365.14, 401, 365.35, 402, 366.25, 403, 365.98, 408, 366.16, 409, 367, 410.21, 368.81, 412, 368.75, 414, 369.21, 415, 370.48, 416, 371.78, 418, 373.15, 419, 374.13, 420, 374.28, 421, 374.22, 423, 375.23, 425, 375.38, 426, 374.4, 433, 374.38, 434, 375, 435.69, 376, 436.51, 378, 436.84, 379.31, 438, 381, 438.89, 383, 439.41, 386, 439.77, 386.63, 440, 388.26, 441, 389.29, 442, 389.96, 443, 390.54, 446, 391, 446.66, 392.5, 448, 393.16, 450, 394, 451.33, 394.15, 455, 393.26, 460, 393.53, 461, 396.22, 465, 397.24, 467, 398.66, 468, 400.31, 468.81), PackedVector2Array(602, 173.83, 600, 174.36, 599, 174.16, 597, 172.69, 594, 171.73, 593, 171.68, 591, 172.49, 590, 172.58, 585, 172.15, 583, 171.48, 582, 171.55, 580, 172.29, 577, 174.13, 572, 175.01, 569, 175.27, 567.63, 175, 567, 174.61, 566, 173.47, 565, 172.87, 563, 172.59, 561, 171.75, 557, 170.94, 556, 171.05, 552, 172.18, 548.93, 174, 548, 175.28, 547, 177.35, 545.72, 179, 545.99, 182, 544.67, 184, 544.29, 185, 542.72, 192, 541.88, 193, 539, 194.15, 537.67, 195, 536.84, 196, 535, 200.08, 534.67, 201, 534.46, 203, 534.6, 212, 533.74, 215, 533.71, 216, 534, 217, 536, 218.8, 538, 220.97, 539, 221.72, 542, 223.37, 543, 224.17, 544, 225.49, 544.75, 227, 544.97, 228, 545.79, 233, 545.95, 235, 547.69, 237, 548.16, 238, 547.79, 239, 545, 241.66, 544, 242.31, 541.84, 243, 540.23, 244, 539.16, 246, 538, 246.61, 537, 247.64, 535, 251.98, 533.24, 255, 531.71, 257, 531.18, 260, 531.21, 261, 531.85, 263, 529.97, 269, 529.49, 270, 528.15, 271, 526, 271.89, 525, 272.69, 523, 273.32, 521, 273.49, 519.87, 274, 519.27, 275, 518.24, 278, 517.63, 281, 517.83, 282, 519.4, 286, 518.75, 288, 518.86, 289, 519.86, 291, 520.11, 293, 520.49, 294, 522, 295.58, 524.46, 297, 526, 298.5, 527, 299.08, 529, 298.94, 529.94, 300, 529.66, 301, 529.02, 302, 529.48, 303, 530.28, 304, 530.52, 306, 531.5, 308, 527.94, 313, 526, 314.81, 524, 316.25, 522.5, 318, 520.81, 319, 520.62, 320, 521.17, 321, 521.42, 322, 521, 323.19, 520.3, 324, 519.91, 327, 519.98, 328, 520.82, 330, 520.45, 332, 519.52, 334, 519.31, 335, 519.28, 337, 519.62, 339, 520, 340.1, 520.59, 341, 522.94, 343, 523.56, 344, 524, 344.34, 526, 344.4, 528.34, 348, 529.12, 352, 529.46, 355, 529, 358, 529.28, 360, 529.59, 361, 531, 362.27, 532, 363.9, 534, 364.76, 536.31, 368, 538.15, 370, 539, 370.64, 541, 371.29, 544, 371.72, 545, 372.42, 546, 372.81, 547, 372.64, 549, 371.57, 552, 370.57, 552.83, 370, 553.32, 369, 553, 368.06, 552.2, 367, 554, 366.07, 555, 365.88, 557, 366.41, 560, 366.01, 562, 366.2, 563, 366.5, 566, 368.93, 567.11, 371, 568, 371.58, 569, 371.86, 571, 372.29, 572, 372.23, 575, 371.5, 576.49, 371, 577.03, 370, 577.96, 369, 580, 367.84, 580.65, 367, 581.12, 365, 582, 363.99, 583, 363.97, 585, 365.83, 586, 366.12, 588, 366.26, 591, 366.09, 592.59, 367, 594.16, 369, 595, 369.71, 596, 370.2, 598, 370.56, 599, 370.53, 601, 369.41, 602, 369.24), PackedVector2Array(0, 444.18, 3, 443.46, 3.64, 443, 5, 441.13, 8, 438.28, 9, 437.81, 11, 437.65, 12, 437.16, 13, 436.04, 14, 435.66, 15, 435.87, 17, 436.86, 20, 437.78, 24.59, 440, 25.1, 441, 25.32, 442, 26, 442.43, 28, 442.7, 30, 443.37, 31, 443.31, 31.48, 443, 32.19, 442, 32.73, 440, 34, 439.2, 36, 439.3, 39, 438.9, 42, 439.2, 45, 438.19, 47, 438.87, 48, 439.01, 50, 438.82, 51, 439.13, 53, 440.34, 54, 441.75, 54.46, 443, 54.37, 445, 53.4, 447, 53.33, 448, 54.68, 451, 54.64, 454, 55.52, 459, 57.15, 463, 58, 464.54, 59, 465.35, 60, 465.27, 61, 464.77, 62, 464.84, 63.02, 466, 65, 467.12, 66.01, 468.81)])
+height_grid = PackedInt32Array(228, 242, 246, 227, 264, 350, 338, 384, 420, 498, 553, 594, 664, 595, 700, 768, 804, 867, 791, 826, 745, 850, 901, 718, 565, 456, 461, 527, 563, 548, 564, 434, 581, 522, 602, 499, 567, 833, 984, 800, 912, 1065, 1168, 1093, 688, 472, 1077, 1512, 1616, 1385, 1587, 1677, 1816, 1899, 1668, 1547, 1826, 1920, 1390, 1315, 952, 937, 967, 1279, 1617, 1311, 916, 815, 955, 1658, 992, 1725, 1886, 1961, 1833, 1672, 1258, 1328, 1333, 1253, 1056, 1052, 1201, 1126, 1103, 1210, 1359, 229, 253, 255, 256, 284, 354, 430, 454, 536, 600, 696, 727, 674, 789, 849, 878, 1016, 1020, 932, 952, 981, 776, 577, 474, 461, 490, 536, 568, 654, 621, 650, 471, 478, 611, 525, 454, 442, 501, 585, 1024, 986, 1283, 1622, 986, 483, 582, 903, 1265, 1309, 1643, 1870, 1795, 1742, 1773, 1783, 2095, 2092, 1411, 1100, 1008, 1833, 2182, 1865, 1093, 989, 861, 1466, 1667, 1910, 2079, 1274, 1562, 1678, 1704, 1370, 1411, 1664, 1671, 1552, 1848, 1620, 1397, 1641, 1559, 1313, 1424, 1672, 257, 249, 253, 256, 331, 419, 512, 569, 605, 698, 720, 754, 885, 896, 873, 1070, 1023, 997, 868, 679, 461, 489, 465, 481, 535, 596, 643, 540, 546, 703, 564, 488, 426, 630, 803, 778, 749, 586, 481, 1153, 1335, 1403, 1406, 721, 859, 1269, 869, 844, 1433, 1988, 1993, 2110, 2128, 2058, 2129, 2076, 1298, 1565, 1621, 1751, 2220, 2424, 1973, 1904, 1723, 1131, 2012, 2197, 2143, 1796, 1048, 1809, 2058, 2368, 2144, 2180, 2254, 2137, 1957, 2215, 2405, 1805, 1575, 1809, 1344, 1654, 1749, 233, 245, 270, 307, 382, 451, 468, 565, 690, 767, 801, 889, 956, 987, 1028, 1065, 1123, 946, 606, 453, 503, 531, 486, 567, 695, 691, 688, 607, 632, 586, 510, 497, 466, 841, 929, 1034, 1078, 1057, 1208, 730, 903, 902, 1199, 1306, 897, 1686, 1622, 1378, 1060, 1305, 1676, 2022, 1910, 2093, 1834, 1524, 1457, 1619, 1961, 2204, 1829, 2649, 2395, 2044, 1553, 1715, 1578, 2028, 2123, 1936, 1687, 2101, 2182, 2481, 2372, 2696, 2745, 2227, 2461, 2673, 2450, 2197, 2089, 1840, 1473, 1829, 1979, 238, 245, 263, 343, 412, 508, 591, 609, 743, 907, 910, 904, 981, 1083, 1103, 864, 665, 478, 452, 504, 558, 552, 554, 657, 763, 895, 880, 815, 702, 658, 515, 496, 821, 811, 854, 1325, 1238, 1443, 1386, 1206, 1875, 1776, 1192, 739, 1140, 1864, 2047, 1948, 1497, 1570, 2064, 2241, 2433, 1950, 1969, 2317, 1621, 1637, 2173, 2257, 1887, 2516, 2794, 2065, 2037, 1761, 1564, 2029, 2541, 2081, 2366, 2390, 2199, 2207, 2677, 2411, 2530, 2052, 2354, 2458, 2356, 1948, 2457, 2261, 2065, 2181, 2464, 223, 238, 275, 431, 543, 668, 761, 753, 807, 919, 1005, 1066, 1093, 1037, 709, 490, 438, 448, 471, 601, 589, 581, 739, 735, 737, 999, 1072, 896, 976, 1248, 893, 558, 571, 732, 880, 1164, 1400, 1910, 1774, 1196, 1547, 1912, 1793, 1564, 782, 1126, 1274, 1755, 2006, 1679, 1800, 2209, 2044, 2405, 2236, 1845, 1764, 2448, 2526, 2365, 2241, 2508, 2696, 2544, 2071, 1868, 1868, 2070, 2401, 2665, 2341, 1656, 2134, 2480, 2542, 2348, 2057, 1666, 1649, 2017, 2615, 2007, 1912, 2123, 1978, 1763, 2384, 237, 263, 364, 539, 646, 731, 816, 834, 837, 1025, 1099, 996, 1073, 876, 445, 452, 461, 500, 528, 600, 632, 622, 651, 831, 801, 906, 990, 1164, 1452, 1261, 699, 1028, 1568, 1193, 1069, 1799, 1782, 1942, 1375, 1969, 1673, 2308, 2199, 1722, 1039, 1543, 1304, 1456, 2071, 2329, 2233, 2323, 2535, 2460, 2280, 1839, 2212, 2649, 2627, 2836, 2463, 2346, 2463, 2292, 1800, 1418, 1702, 2374, 2114, 2141, 1831, 1498, 2245, 2499, 2279, 2054, 2014, 1936, 1479, 1932, 2306, 2107, 1706, 1759, 1336, 1363, 1589, 249, 319, 554, 626, 668, 811, 845, 872, 937, 1060, 1126, 1198, 856, 472, 452, 456, 525, 597, 608, 672, 757, 765, 646, 873, 969, 1010, 1172, 1348, 1366, 658, 1179, 1294, 2054, 1952, 823, 1472, 1961, 2269, 2074, 2345, 2376, 1880, 1842, 1375, 928, 1797, 2018, 2092, 1614, 2090, 2654, 2708, 2613, 2077, 1650, 1980, 2527, 2752, 2950, 2667, 2653, 2491, 1945, 2088, 1709, 1515, 1322, 1907, 1913, 1771, 1965, 1522, 2143, 1852, 2154, 2260, 2466, 2290, 2249, 1422, 1337, 1363, 1265, 1630, 2114, 1801, 1347, 317, 485, 559, 615, 706, 819, 879, 957, 958, 1143, 1083, 580, 462, 516, 569, 525, 641, 626, 699, 825, 854, 828, 580, 822, 993, 1217, 1394, 1516, 1475, 1232, 1763, 1776, 1928, 2263, 1249, 1889, 2352, 2582, 2329, 1630, 1465, 1082, 981, 1139, 1584, 1795, 1835, 2081, 2095, 2438, 2506, 2177, 1865, 1723, 2201, 1964, 2409, 2801, 2925, 2880, 2946, 2577, 1965, 1250, 1937, 1948, 1921, 1437, 1115, 1338, 1077, 1062, 1456, 1805, 1759, 2146, 1942, 2019, 1738, 1484, 1264, 1088, 1560, 1991, 2007, 1753, 1563, 341, 513, 551, 591, 662, 875, 1036, 1001, 1113, 979, 676, 481, 582, 702, 611, 706, 718, 748, 920, 1042, 1330, 1297, 718, 696, 1188, 1454, 1190, 1002, 1216, 1124, 1602, 2024, 2391, 1995, 1537, 2092, 2309, 1641, 1498, 1588, 1338, 1775, 1631, 959, 1788, 2382, 2119, 2001, 2333, 2534, 2014, 2347, 2274, 2360, 2539, 1887, 2239, 2564, 2503, 2279, 2484, 2383, 1776, 1412, 1811, 1913, 2157, 1628, 908, 1600, 1579, 1653, 1615, 1402, 1505, 1554, 1687, 1501, 1648, 1788, 1802, 1885, 1221, 1072, 1019, 930, 962, 433, 528, 530, 707, 755, 962, 1117, 1221, 1130, 972, 584, 552, 664, 725, 717, 799, 905, 924, 1332, 1467, 1505, 1251, 1155, 946, 770, 860, 1263, 1952, 2165, 1842, 1855, 2742, 2538, 1933, 2197, 2047, 1712, 2159, 2173, 1888, 1646, 2035, 1952, 1388, 1465, 1538, 1640, 2291, 2608, 2437, 2068, 2080, 2362, 2391, 2241, 1460, 1498, 2251, 2188, 2192, 1405, 1046, 589, 1384, 1655, 1774, 1732, 1036, 1221, 1993, 1685, 1650, 2087, 2092, 1991, 2134, 1847, 2018, 1958, 1861, 1702, 1430, 1257, 1019, 1094, 1193, 1052, 537, 490, 584, 775, 877, 1049, 1210, 1148, 1318, 705, 550, 578, 774, 767, 761, 897, 854, 945, 1283, 1466, 1274, 1586, 1548, 1184, 1449, 1926, 1486, 1582, 2732, 2694, 2230, 2692, 2504, 2010, 2304, 2407, 2213, 2515, 2438, 2305, 1933, 2331, 2244, 1646, 2046, 1937, 2372, 2265, 2599, 2028, 2497, 2357, 2276, 2141, 1809, 1981, 1313, 1313, 1112, 1054, 1585, 1610, 642, 1107, 1527, 1470, 1365, 1156, 1764, 2168, 1935, 2132, 2148, 1827, 1933, 2032, 2091, 1527, 1658, 1697, 1605, 1779, 1649, 1646, 1494, 1181, 878, 541, 497, 646, 911, 964, 1059, 1219, 1302, 1006, 644, 484, 501, 754, 768, 738, 1088, 1191, 1371, 1631, 1582, 1363, 1725, 1740, 1384, 1794, 2209, 1998, 3159, 3173, 2753, 2349, 2082, 2481, 2180, 2002, 2262, 2218, 1694, 2212, 2434, 2260, 2139, 1991, 1995, 2346, 1916, 2662, 2490, 2088, 2446, 2508, 2154, 2353, 2458, 2550, 2185, 2568, 2642, 2069, 2373, 1846, 1500, 1198, 636, 1092, 1166, 981, 1534, 1699, 2056, 2050, 1987, 2316, 1585, 1927, 1661, 1356, 1317, 1379, 1609, 1389, 1115, 1412, 1093, 1201, 1537, 1420, 503, 526, 799, 867, 936, 1091, 1304, 973, 653, 449, 379, 370, 395, 519, 649, 1216, 1226, 1386, 1381, 1416, 1540, 1786, 1743, 1798, 2444, 2752, 2931, 3028, 2806, 2482, 1883, 2362, 2267, 2163, 1925, 1734, 1557, 1420, 2085, 2551, 2147, 2457, 2205, 2207, 2429, 2193, 2538, 2325, 2188, 2617, 2497, 2497, 2167, 1715, 2206, 2862, 2854, 2604, 2677, 1992, 1965, 1594, 1352, 850, 414, 862, 1057, 1944, 2156, 2004, 2131, 1761, 2003, 1801, 1790, 1950, 1419, 1203, 1781, 1555, 1455, 964, 1252, 872, 1052, 1188, 998, 550, 572, 754, 761, 1130, 1300, 948, 502, 381, 368, 372, 404, 477, 484, 374, 878, 1547, 1536, 1748, 1495, 1880, 1844, 2499, 2453, 2306, 2377, 2841, 2466, 1873, 1862, 2619, 2390, 2391, 1904, 1594, 2170, 1579, 1357, 1250, 2106, 1973, 1997, 1797, 2389, 2460, 2353, 2220, 2410, 2688, 2559, 2376, 2564, 2504, 1893, 2417, 2513, 3015, 2515, 2072, 2020, 1480, 917, 1041, 871, 513, 1295, 1327, 1848, 1706, 2188, 2326, 1668, 1570, 1832, 1439, 1262, 1129, 1725, 1340, 1397, 1050, 643, 673, 550, 923, 741, 904, 531, 577, 620, 890, 1199, 981, 520, 388, 399, 409, 551, 794, 1115, 1630, 1073, 692, 1385, 1599, 1933, 2237, 2447, 2183, 1894, 1779, 1828, 2124, 2123, 1369, 1922, 2044, 2278, 2093, 2035, 1610, 1339, 1944, 1729, 1304, 1223, 1831, 1727, 1788, 1445, 1654, 1782, 1861, 2520, 2607, 2909, 2683, 1828, 2356, 1997, 1590, 2422, 2711, 2474, 1814, 2075, 1321, 1255, 661, 1228, 786, 746, 1566, 1813, 1865, 1764, 2087, 1660, 1366, 1959, 1456, 1373, 1302, 1610, 1576, 1562, 1406, 1012, 1107, 1026, 580, 448, 1000, 953, 506, 666, 915, 1186, 1225, 566, 430, 387, 506, 563, 984, 1062, 1250, 1369, 1403, 454, 980, 1738, 2089, 1865, 1469, 1054, 879, 1113, 1277, 1075, 1173, 1569, 2339, 2405, 1721, 1637, 1896, 1441, 1032, 1518, 1423, 1805, 968, 1666, 1197, 1873, 789, 1404, 2115, 2513, 2665, 2095, 1824, 2436, 1545, 2290, 1389, 2106, 2315, 2100, 2302, 1668, 1576, 1649, 1517, 545, 1151, 569, 1280, 1176, 1212, 1416, 1707, 1924, 2287, 1511, 985, 1695, 1377, 1111, 1330, 1053, 1342, 1209, 674, 801, 738, 630, 323, 961, 835, 587, 851, 934, 1054, 784, 441, 401, 434, 694, 920, 1150, 1314, 1316, 1572, 1589, 983, 1019, 2033, 1668, 824, 765, 1367, 1697, 2493, 2403, 1793, 1944, 2249, 2465, 1577, 1268, 1617, 1984, 1661, 1350, 845, 1259, 1663, 900, 897, 1248, 1773, 1342, 678, 1986, 1618, 2173, 2029, 1664, 2171, 2047, 1158, 1318, 1635, 1655, 1924, 2357, 2539, 2022, 2048, 1748, 598, 701, 839, 1141, 1486, 1909, 1830, 1769, 1825, 1887, 1510, 1215, 1229, 1402, 837, 1389, 948, 1142, 991, 522, 687, 485, 345, 183, 355, 480, 693, 840, 730, 934, 436, 424, 463, 550, 605, 836, 980, 1535, 1314, 1657, 1663, 2074, 1228, 1484, 813, 1534, 1672, 2026, 2265, 2531, 2758, 2190, 2259, 2705, 1817, 1805, 986, 1247, 1495, 1306, 926, 569, 409, 510, 604, 1408, 1596, 929, 519, 431, 1145, 744, 734, 787, 719, 796, 853, 1222, 1530, 1120, 2387, 2829, 2354, 1916, 1376, 2310, 1541, 952, 498, 876, 1501, 1920, 1864, 2011, 1562, 1267, 1178, 1580, 1125, 716, 680, 599, 832, 1313, 932, 515, 263, 211, 179, 194, 178, 189, 199, 878, 1117, 734, 557, 547, 617, 909, 794, 510, 719, 750, 840, 1092, 1479, 2007, 2142, 1078, 922, 1518, 2467, 2474, 2133, 2603, 2699, 2825, 3007, 2387, 2807, 2016, 1411, 577, 1343, 1428, 1047, 1192, 382, 1025, 968, 1065, 1420, 1427, 673, 769, 1392, 1204, 1355, 1769, 1719, 1764, 2002, 2096, 1963, 1864, 995, 1805, 2343, 2460, 1524, 1309, 1738, 1154, 640, 516, 830, 1439, 1698, 1241, 1428, 1490, 1183, 1468, 919, 469, 347, 526, 818, 953, 1314, 615, 221, 180, 138, 116, 137, 155, 136, 121, 920, 1042, 624, 463, 570, 581, 803, 827, 839, 1018, 1155, 885, 1462, 1278, 2175, 1800, 1927, 1490, 1799, 2096, 2817, 2535, 2876, 3174, 2439, 2971, 2988, 2566, 1640, 1065, 711, 1469, 1361, 1303, 883, 360, 916, 646, 746, 822, 671, 387, 956, 1380, 1799, 1778, 1823, 1950, 2141, 1648, 2103, 1943, 1712, 905, 1891, 2193, 2103, 1256, 920, 700, 643, 1218, 498, 762, 1273, 743, 655, 832, 969, 715, 705, 327, 390, 548, 887, 821, 1169, 599, 122, 127, 108, 85, 83, 91, 91, 95, 92, 905, 774, 813, 450, 532, 611, 635, 866, 1375, 1296, 1634, 1410, 1638, 2027, 2158, 1944, 2918, 1776, 2137, 2823, 2922, 2990, 3172, 2830, 2522, 3033, 2659, 2001, 1404, 1272, 985, 688, 664, 730, 450, 288, 510, 398, 622, 819, 770, 352, 1144, 1093, 1524, 1050, 1219, 1766, 1566, 1562, 1419, 1535, 1268, 842, 2054, 1836, 1649, 1222, 1342, 870, 658, 1088, 858, 899, 987, 1428, 1839, 1325, 870, 624, 638, 607, 932, 683, 469, 205, 315, 106, 51, 52, 42, 50, 54, 55, 54, 60, 61, 879, 557, 921, 500, 457, 503, 516, 945, 1208, 1225, 1679, 1407, 815, 1185, 1610, 2498, 2860, 2258, 2376, 2942, 2750, 2639, 2653, 2495, 3154, 3562, 2554, 1999, 1787, 1575, 1377, 975, 487, 232, 389, 534, 574, 499, 784, 854, 657, 715, 912, 1022, 1269, 1105, 1050, 1555, 1175, 1053, 1241, 955, 703, 1378, 1884, 1904, 1023, 1206, 1142, 322, 1094, 436, 1037, 1291, 1069, 1469, 1392, 1385, 981, 968, 956, 461, 620, 213, 179, 91, 48, 24, 19, 18, 21, 29, 30, 24, 24, 27, 30, 725, 333, 438, 537, 415, 590, 657, 867, 1182, 1493, 1464, 1381, 1546, 1696, 3260, 2760, 2375, 2423, 2133, 2004, 2021, 2512, 2156, 2314, 2219, 2472, 1915, 1686, 1267, 948, 970, 615, 819, 415, 235, 453, 531, 415, 431, 567, 818, 643, 474, 805, 894, 831, 804, 1106, 815, 884, 933, 531, 1470, 1737, 1498, 1224, 1004, 1299, 829, 485, 542, 652, 1335, 1351, 951, 957, 1096, 1123, 705, 1058, 504, 224, 149, 145, 115, 50, 29, 15, 11, 11, 12, 13, 13, 10, 9, 9, 8, 630, 299, 324, 450, 449, 756, 1088, 684, 949, 1173, 1213, 1613, 1840, 2385, 2652, 1885, 1886, 2276, 2175, 1327, 1882, 1655, 1390, 1663, 2084, 2160, 2125, 1403, 1110, 1164, 702, 555, 500, 289, 267, 272, 332, 381, 366, 341, 409, 283, 414, 409, 719, 567, 695, 670, 619, 726, 386, 1190, 985, 1175, 1227, 772, 1169, 978, 309, 1187, 790, 922, 1279, 1039, 848, 598, 785, 642, 447, 169, 122, 124, 142, 148, 61, 43, 24, 12, 7, 5, 5, 3, 4, 4, 1, -3, -1, 423, 288, 356, 432, 495, 944, 995, 1256, 1048, 711, 1153, 1310, 2101, 2241, 2532, 1968, 1856, 1525, 1343, 876, 1034, 990, 1223, 947, 1481, 2006, 2039, 1744, 1338, 995, 500, 561, 357, 284, 246, 287, 332, 317, 322, 310, 318, 300, 366, 299, 337, 300, 358, 464, 553, 840, 305, 950, 792, 774, 603, 889, 790, 638, 512, 1352, 696, 1124, 1471, 635, 433, 216, 174, 156, 90, 92, 70, 68, 68, 61, 37, 26, 16, 8, 4, 2, -1, -1, 0, 2, -10, -24, -13, 288, 394, 506, 447, 863, 1163, 1025, 1474, 808, 651, 1715, 1694, 2205, 1930, 2163, 2394, 2562, 1830, 1427, 1995, 2733, 2235, 2260, 1069, 1351, 1682, 1819, 1288, 1007, 583, 432, 368, 311, 307, 247, 252, 259, 256, 251, 249, 237, 251, 251, 248, 220, 217, 231, 238, 327, 331, 363, 597, 750, 609, 500, 683, 529, 100, 989, 644, 1089, 1396, 1262, 784, 460, 153, 88, 71, 60, 58, 47, 39, 34, 30, 18, 11, 8, 5, 1, -1, -1, -2, -1, -1, -2, -10, -10, 246, 447, 627, 459, 660, 1050, 1057, 905, 716, 1244, 1455, 2076, 1748, 1225, 1600, 2288, 2440, 2382, 2385, 2509, 2271, 2655, 2352, 1679, 1061, 1156, 1608, 766, 521, 353, 294, 262, 265, 232, 209, 192, 212, 211, 199, 195, 183, 178, 181, 190, 173, 169, 173, 170, 181, 221, 211, 302, 447, 654, 448, 226, 69, 175, 383, 535, 692, 887, 841, 588, 392, 191, 63, 42, 40, 33, 31, 26, 21, 17, 11, 5, 3, 0, 0, -1, -2, -2, -6, -10, -13, -14, -14, 392, 299, 527, 668, 414, 736, 383, 637, 915, 1717, 962, 1344, 1490, 1863, 2490, 2339, 2873, 2598, 2529, 2987, 2803, 2142, 1855, 1949, 1536, 727, 787, 397, 304, 242, 221, 209, 200, 188, 179, 155, 171, 172, 162, 151, 144, 137, 138, 132, 129, 128, 126, 131, 141, 143, 136, 126, 233, 261, 197, 162, 66, 68, 167, 264, 362, 468, 485, 417, 245, 102, 54, 32, 28, 25, 22, 18, 14, 10, 6, 2, -5, -15, -10, -2, -6, -14, -18, -19, -19, -19, -21, 574, 500, 708, 1097, 713, 327, 564, 1125, 1107, 1764, 1145, 1345, 1920, 2346, 2562, 2189, 2751, 2635, 2691, 2340, 2161, 2089, 1350, 1648, 855, 363, 307, 393, 251, 211, 180, 174, 167, 160, 154, 145, 132, 142, 137, 128, 125, 114, 111, 107, 102, 105, 101, 106, 106, 108, 104, 104, 115, 135, 144, 123, 67, 70, 138, 101, 147, 161, 207, 202, 159, 59, 145, 92, 23, 19, 16, 12, 8, 5, 3, -4, -14, -3, -4, -13, -19, -22, -22, -22, -24, -24, -24, 602, 587, 709, 1124, 815, 571, 1152, 1549, 1270, 2073, 1540, 1585, 1582, 2374, 2691, 2583, 2686, 2753, 2334, 2066, 1582, 1176, 969, 709, 479, 282, 231, 278, 267, 190, 161, 147, 144, 141, 140, 132, 114, 120, 119, 112, 107, 101, 96, 90, 87, 88, 87, 89, 84, 86, 83, 80, 87, 97, 105, 125, 96, 92, 117, 87, 63, 51, 53, 59, 32, 79, 190, 48, 19, 16, 13, 10, 6, 2, -1, -2, -3, -11, -18, -20, -22, -23, -26, -27, -25, -25, -25, 371, 942, 1131, 1341, 423, 963, 1662, 1847, 916, 2152, 1869, 2238, 2297, 2741, 2540, 2826, 2419, 2875, 2132, 1586, 1399, 1437, 881, 371, 305, 322, 228, 266, 209, 174, 153, 135, 125, 127, 124, 120, 110, 94, 106, 101, 96, 92, 85, 80, 72, 76, 73, 74, 66, 69, 67, 63, 63, 68, 69, 83, 107, 92, 77, 49, 42, 34, 25, 21, 25, 35, 37, 16, 116, 25, 9, 7, 4, 0, -6, -4, -12, -18, -19, -21, -22, -27, -29, -30, -30, -30, -29, 395, 902, 1207, 673, 612, 1478, 2232, 1635, 1190, 1484, 2216, 2666, 2643, 2563, 1935, 2283, 2588, 2761, 2210, 1784, 1013, 678, 453, 311, 254, 248, 245, 216, 179, 161, 144, 130, 119, 115, 114, 112, 107, 88, 91, 93, 88, 83, 78, 76, 70, 61, 60, 63, 64, 56, 52, 52, 50, 49, 49, 49, 47, 47, 45, 35, 31, 27, 24, 20, 19, 17, 14, 18, 122, 32, 5, 3, 2, -2, -12, -7, -18, -21, -24, -25, -27, -30, -31, -31, -32, -32, -31, 1103, 363, 438, 497, 1357, 1979, 2204, 1914, 1459, 1590, 1454, 1900, 1778, 1769, 2238, 2223, 2387, 2574, 1889, 1547, 1045, 814, 357, 302, 242, 203, 196, 176, 159, 147, 141, 126, 115, 106, 106, 103, 100, 93, 72, 77, 82, 77, 74, 73, 67, 65, 54, 51, 55, 53, 49, 44, 40, 39, 38, 38, 35, 27, 30, 28, 24, 21, 18, 16, 14, 13, 11, 9, 21, 6, 3, 1, 0, -1, -4, -5, -20, -24, -26, -27, -27, -29, -31, -32, -34, -34, -33, 1240, 384, 400, 948, 2223, 1562, 2593, 2260, 2158, 2023, 2167, 2482, 2307, 2655, 2726, 2192, 1093, 1183, 1198, 1382, 1021, 600, 302, 258, 223, 225, 265, 203, 207, 183, 187, 131, 110, 101, 101, 97, 95, 89, 84, 68, 61, 69, 68, 70, 61, 59, 57, 47, 43, 46, 45, 42, 39, 31, 29, 30, 28, 23, 21, 22, 19, 16, 13, 12, 12, 10, 7, 6, 5, 3, 1, 1, -1, -3, -3, -1, -18, -24, -26, -27, -29, -30, -31, -33, -34, -35, -34, 1189, 327, 460, 1213, 1538, 1388, 2211, 2240, 2551, 2309, 2438, 2547, 2088, 2208, 2365, 1582, 1531, 1340, 1021, 759, 440, 428, 301, 247, 260, 335, 343, 336, 280, 263, 206, 207, 134, 100, 94, 92, 86, 79, 69, 63, 61, 66, 65, 57, 53, 49, 47, 43, 39, 37, 36, 35, 32, 31, 28, 24, 23, 21, 20, 16, 15, 12, 11, 9, 8, 9, 8, 6, 5, 3, 1, -1, -1, -2, -2, -2, -14, -25, -28, -30, -31, -32, -33, -34, -35, -35, -35, 1202, 570, 918, 1426, 1807, 1358, 1655, 2258, 2272, 2367, 2371, 2215, 1926, 1766, 1564, 2045, 1837, 1838, 1753, 883, 502, 368, 277, 254, 410, 325, 291, 253, 218, 208, 230, 203, 156, 126, 103, 85, 76, 73, 74, 78, 117, 180, 160, 99, 75, 69, 59, 50, 45, 39, 33, 31, 29, 26, 23, 21, 20, 20, 18, 17, 15, 13, 12, 10, 8, 7, 7, 5, 4, 2, 1, 0, -1, -2, -2, -3, -3, -16, -29, -30, -31, -33, -33, -35, -35, -36, -37, 933, 798, 1032, 1571, 1751, 2122, 1937, 2543, 2778, 2734, 2056, 2098, 2034, 2084, 1949, 2246, 2063, 1312, 1067, 937, 368, 287, 247, 226, 238, 251, 258, 214, 214, 181, 194, 179, 158, 133, 150, 95, 86, 91, 115, 198, 260, 331, 341, 214, 146, 106, 100, 74, 62, 47, 38, 34, 31, 27, 25, 21, 19, 21, 17, 16, 15, 13, 10, 8, 8, 8, 6, 5, 3, 2, 1, 0, -1, -1, -2, -3, -3, -2, -15, -30, -32, -32, -34, -35, -37, -38, -39, 1149, 896, 1006, 1047, 1357, 2003, 2591, 2393, 2722, 2653, 2375, 1876, 1788, 2182, 2155, 2402, 2002, 1661, 1036, 584, 311, 264, 242, 232, 232, 246, 261, 206, 176, 145, 145, 139, 108, 95, 91, 98, 109, 133, 202, 363, 413, 459, 424, 411, 338, 199, 154, 116, 97, 67, 53, 43, 35, 31, 25, 24, 22, 19, 18, 18, 18, 14, 11, 8, 7, 8, 6, 6, 4, 2, 0, -2, -4, -3, -2, -3, -3, -3, -16, -29, -33, -33, -34, -36, -36, -39, -40, 969, 728, 855, 971, 1424, 1779, 1981, 2365, 2612, 2355, 1662, 1700, 2062, 2274, 2568, 2511, 2321, 1903, 1025, 470, 307, 265, 246, 237, 243, 272, 300, 244, 177, 158, 170, 145, 126, 106, 102, 121, 138, 212, 307, 394, 552, 707, 682, 567, 374, 376, 320, 242, 196, 136, 85, 60, 46, 38, 30, 27, 21, 20, 22, 19, 21, 19, 15, 11, 11, 9, 9, 7, 4, 3, 1, -3, -3, -3, -1, -3, -2, -7, -23, -29, -32, -34, -35, -37, -38, -38, -41, 1247, 799, 1073, 1466, 1156, 1427, 1953, 2128, 2372, 2499, 1994, 1675, 2338, 2054, 2028, 2082, 2024, 1306, 1013, 463, 290, 259, 249, 251, 256, 315, 318, 231, 174, 224, 190, 168, 188, 133, 129, 156, 180, 303, 420, 506, 685, 842, 691, 629, 638, 553, 583, 459, 404, 297, 196, 101, 79, 61, 47, 34, 28, 28, 28, 25, 23, 19, 17, 15, 12, 13, 9, 7, 3, 2, 1, 0, -3, -2, -2, -3, -5, -17, -26, -30, -33, -35, -36, -38, -39, -42, -41, 1292, 1356, 1393, 1622, 1560, 1136, 1789, 1985, 2120, 2382, 2267, 1460, 2019, 1878, 2200, 2554, 2507, 2109, 1546, 664, 295, 267, 271, 277, 277, 297, 258, 200, 266, 307, 257, 306, 273, 178, 199, 200, 265, 305, 495, 755, 1219, 968, 635, 983, 827, 864, 815, 673, 521, 382, 250, 165, 157, 117, 91, 62, 46, 39, 37, 31, 26, 22, 18, 15, 14, 12, 9, 8, 4, 1, 0, -2, -3, -2, -2, -9, -16, -24, -28, -31, -34, -35, -38, -40, -40, -42, -42, 1146, 1219, 1589, 1739, 1759, 1419, 1208, 1486, 2030, 2337, 2007, 1370, 1532, 2181, 2450, 2683, 2351, 2428, 1593, 842, 407, 337, 323, 310, 313, 263, 291, 294, 487, 419, 335, 263, 255, 261, 235, 277, 377, 485, 611, 769, 1114, 972, 789, 915, 829, 821, 824, 620, 601, 388, 332, 361, 315, 214, 157, 142, 97, 64, 51, 40, 32, 27, 21, 19, 20, 15, 9, 7, 6, 4, -1, -3, -4, -3, -1, -10, -17, -24, -29, -32, -35, -36, -40, -40, -40, -41, -44, 1216, 1125, 1335, 1279, 1428, 1275, 1085, 1450, 1828, 1893, 1331, 1804, 2114, 2585, 2422, 2666, 1953, 1703, 1441, 1137, 756, 525, 373, 343, 328, 326, 313, 452, 572, 418, 513, 308, 396, 419, 374, 519, 623, 536, 593, 908, 1193, 869, 1039, 1116, 1223, 841, 672, 829, 615, 462, 686, 696, 476, 352, 319, 308, 283, 144, 82, 62, 43, 39, 33, 25, 24, 21, 14, 11, 8, 5, 2, 0, -2, -2, -2, -7, -15, -23, -29, -32, -35, -38, -41, -40, -40, -43, -45, 1080, 972, 934, 1075, 1252, 851, 946, 1067, 990, 1025, 1087, 1817, 2307, 2083, 2563, 2476, 2179, 1749, 1498, 1268, 872, 543, 416, 376, 357, 365, 326, 558, 568, 516, 438, 387, 424, 568, 549, 591, 726, 396, 544, 755, 963, 868, 1031, 1010, 1159, 846, 750, 769, 589, 696, 1034, 660, 593, 416, 488, 502, 357, 260, 167, 130, 88, 65, 55, 41, 35, 35, 28, 15, 8, 7, 4, 2, 2, 1, 0, -6, -15, -23, -29, -32, -36, -40, -41, -41, -41, -45, -46, 1213, 920, 835, 1208, 1089, 751, 916, 972, 981, 1520, 2030, 2262, 2416, 1885, 2281, 2117, 1693, 1582, 1369, 957, 673, 517, 455, 409, 397, 376, 421, 619, 589, 590, 395, 458, 477, 784, 852, 436, 451, 215, 361, 593, 646, 857, 860, 1133, 1040, 749, 578, 741, 985, 1019, 842, 1041, 689, 557, 601, 611, 474, 348, 416, 349, 203, 173, 184, 150, 148, 82, 45, 31, 21, 11, 8, 6, 4, 1, 0, -5, -14, -21, -28, -32, -37, -40, -41, -40, -42, -47, -48, 966, 918, 820, 972, 722, 1013, 1207, 1143, 1246, 1777, 1518, 1569, 1552, 1752, 2285, 2204, 2261, 2246, 1754, 1153, 814, 565, 508, 466, 447, 436, 434, 485, 622, 525, 432, 618, 479, 527, 240, 11, -42, 7, 151, 395, 318, 372, 408, 757, 711, 827, 1113, 944, 486, 1079, 1257, 925, 947, 806, 613, 569, 490, 564, 683, 449, 433, 363, 364, 253, 222, 197, 177, 85, 46, 22, 16, 13, 7, 2, 1, -2, -11, -18, -25, -31, -37, -40, -41, -43, -47, -49, -51, 952, 912, 661, 644, 708, 890, 1163, 1354, 1421, 1657, 1992, 1963, 1897, 2371, 2365, 2295, 1756, 1889, 1634, 1347, 919, 699, 583, 551, 599, 581, 651, 627, 725, 609, 470, 359, 209, 19, -94, -158, -379, -246, -96, -66, 138, 136, 188, 424, 678, 582, 890, 761, 320, 493, 1152, 1311, 1095, 834, 983, 727, 720, 812, 679, 615, 565, 617, 502, 273, 348, 340, 284, 178, 98, 46, 26, 17, 10, 6, 0, 0, -9, -15, -22, -29, -36, -41, -42, -46, -49, -51, -53, 1048, 898, 816, 583, 645, 960, 1366, 1577, 1398, 1495, 2170, 2095, 2225, 2352, 2111, 2124, 2165, 1686, 1573, 1366, 1077, 947, 1113, 987, 993, 991, 1007, 779, 778, 828, 656, 329, 2, -204, -393, -465, -842, -725, -448, -285, -153, -77, 8, 201, 496, 418, 442, 746, 497, 245, 564, 797, 1337, 1399, 1448, 983, 1015, 940, 662, 500, 697, 575, 380, 430, 503, 415, 326, 206, 156, 111, 48, 25, 16, 12, 5, 1, -7, -13, -19, -25, -33, -40, -44, -48, -50, -52, -55, 960, 1034, 1144, 644, 671, 953, 1267, 1263, 1253, 1268, 1682, 1972, 1994, 2032, 2178, 1653, 1940, 2162, 2319, 1952, 1453, 1568, 1369, 1577, 1862, 1541, 1440, 857, 874, 891, 398, 244, -241, -707, -773, -895, -1068, -1092, -765, -891, -759, -552, -229, -62, 145, 408, 249, 299, 348, 147, 246, 495, 861, 1054, 1358, 1269, 1091, 1294, 900, 681, 685, 452, 527, 632, 717, 653, 432, 411, 320, 195, 139, 81, 30, 22, 17, 5, -2, -10, -15, -20, -27, -36, -44, -50, -52, -54, -58, 1122, 1056, 998, 799, 593, 800, 930, 952, 876, 1303, 1717, 1641, 2103, 1527, 1692, 2010, 1768, 1663, 2239, 2309, 2140, 2153, 1696, 1968, 1802, 1593, 1156, 957, 675, 531, 51, -210, -702, -1097, -1162, -1337, -1385, -1526, -1306, -1156, -986, -825, -710, -462, -145, 74, 375, 236, 67, 277, 445, 809, 901, 601, 616, 1178, 1419, 1357, 1318, 965, 624, 588, 760, 778, 860, 578, 626, 551, 436, 368, 336, 171, 102, 88, 44, 21, 7, -4, -11, -15, -20, -27, -38, -48, -52, -55, -59, 1029, 965, 1152, 991, 584, 686, 702, 777, 1084, 1377, 1377, 1505, 2003, 1858, 1179, 1624, 1569, 1227, 1731, 1710, 2276, 2122, 1352, 1356, 1617, 979, 837, 506, 274, 153, -141, -724, -1119, -1336, -1422, -1547, -1733, -1256, -1078, -1011, -868, -687, -579, -551, -474, -197, -27, 136, 39, 69, 253, 628, 1038, 811, 395, 625, 1072, 1037, 952, 1155, 849, 851, 757, 721, 711, 666, 774, 581, 507, 494, 373, 324, 195, 229, 154, 101, 40, 18, -4, -11, -15, -19, -27, -39, -49, -54, -58, 799, 714, 679, 613, 490, 628, 640, 810, 1083, 1106, 1359, 1343, 1397, 1296, 1099, 1458, 1349, 883, 1486, 1127, 1668, 1637, 1108, 1501, 1133, 1120, 570, 424, 208, 97, -290, -870, -1180, -1398, -1618, -1732, -1848, -1312, -891, -892, -784, -664, -604, -504, -418, -323, -90, -34, -18, 2, 5, 229, 687, 917, 646, 322, 457, 662, 817, 698, 955, 795, 444, 417, 407, 582, 804, 780, 808, 560, 435, 362, 320, 227, 205, 237, 115, 65, 23, -5, -12, -14, -18, -26, -38, -49, -55, 640, 666, 577, 457, 522, 687, 715, 855, 1050, 987, 1086, 1297, 1013, 837, 829, 929, 833, 756, 985, 818, 1344, 1204, 954, 1052, 934, 819, 560, 418, 219, -67, -461, -863, -1056, -1271, -1736, -1958, -1903, -1247, -895, -856, -734, -676, -564, -472, -439, -386, -186, -67, -28, -18, -13, 2, 244, 668, 566, 367, 683, 564, 673, 295, 357, 523, 436, 373, 256, 248, 448, 784, 821, 764, 593, 508, 516, 412, 309, 282, 206, 188, 78, 39, 13, 16, -13, -17, -24, -37, -49, 546, 570, 475, 408, 495, 576, 664, 1065, 1313, 1036, 1224, 1233, 1263, 1123, 918, 764, 798, 781, 627, 848, 929, 692, 636, 440, 804, 553, 370, 133, -20, -207, -548, -717, -1020, -1704, -2034, -2206, -1678, -911, -892, -995, -876, -841, -664, -478, -424, -402, -304, -111, -53, -26, -19, -15, 18, 191, 226, 127, 279, 216, 186, 145, 46, 75, 289, 406, 466, 478, 361, 585, 976, 885, 606, 627, 597, 425, 486, 387, 443, 392, 225, 128, 89, 52, 21, -13, -17, -23, -35, 522, 513, 431, 384, 553, 599, 660, 771, 1268, 1165, 1014, 1176, 1225, 1181, 1111, 1109, 949, 615, 372, 566, 676, 745, 324, 291, 417, 88, 23, -149, -284, -505, -693, -1159, -1879, -2242, -2241, -1936, -1558, -1153, -1031, -1142, -1168, -1106, -778, -483, -397, -411, -345, -202, -96, -45, -25, -17, -4, 28, 103, 25, 21, 32, 17, 108, 183, 48, 43, 218, 370, 366, 333, 719, 846, 1013, 926, 757, 937, 725, 538, 769, 657, 379, 284, 191, 133, 136, 96, 11, -10, -16, -22, 407, 428, 309, 401, 458, 554, 599, 626, 1059, 877, 917, 1016, 1141, 1264, 1209, 963, 954, 779, 265, 375, 530, 190, 8, -98, -97, -246, -495, -691, -880, -908, -1339, -2113, -2391, -2318, -2417, -1458, -1184, -1320, -1241, -1414, -1411, -1094, -746, -535, -429, -419, -377, -260, -125, -73, -33, -20, -7, 3, 83, 359, 85, 25, 34, 47, 191, 103, 48, 61, 140, 223, 399, 924, 726, 629, 885, 890, 939, 942, 673, 936, 541, 341, 251, 206, 274, 281, 88, 73, 42, -11, -16, 387, 343, 301, 392, 487, 490, 576, 771, 970, 926, 909, 1004, 1120, 978, 1000, 961, 537, 280, 134, 122, 49, -254, -379, -695, -765, -810, -1256, -1404, -1819, -2131, -2349, -2426, -2518, -2541, -2507, -1948, -1412, -1455, -1707, -1669, -1608, -1395, -1015, -681, -523, -462, -424, -312, -151, -98, -49, -23, -9, 3, 3, 185, 91, 39, 25, 37, 54, 119, 176, 154, 207, 317, 361, 1077, 745, 432, 547, 886, 748, 879, 748, 688, 449, 392, 365, 333, 368, 153, 133, 125, 79, 30, -9, 275, 395, 369, 404, 496, 518, 535, 688, 873, 834, 802, 833, 586, 428, 442, 286, 211, 23, -180, -668, -671, -962, -1214, -1302, -1722, -1784, -2009, -2260, -2367, -2469, -2496, -2544, -2562, -2563, -2569, -2453, -2242, -2107, -1934, -1814, -1645, -1394, -1094, -760, -635, -519, -497, -383, -190, -118, -68, -27, -9, 3, 1, 5, 14, 45, 81, 94, 85, 160, 205, 229, 317, 392, 209, 787, 1110, 653, 484, 868, 540, 799, 856, 633, 512, 446, 329, 357, 407, 281, 212, 139, 99, 88, 46, 487, 453, 451, 465, 378, 427, 430, 393, 537, 509, 488, 332, 273, 223, 242, 112, 125, -31, -748, -1196, -1162, -1637, -1951, -1886, -2117, -2289, -2335, -2395, -2447, -2490, -2522, -2558, -2567, -2577, -2569, -2537, -2304, -2138, -2022, -1766, -1410, -1100, -1091, -614, -522, -574, -511, -415, -246, -124, -63, -19, -8, 8, 33, 35, 51, 57, 122, 151, 103, 126, 275, 311, 388, 434, 168, 281, 610, 602, 407, 709, 434, 445, 731, 768, 617, 637, 525, 334, 458, 372, 240, 153, 120, 139, 58, 453, 381, 422, 417, 295, 322, 292, 229, 282, 241, 218, 157, 194, 176, 238, 3, -223, -447, -750, -1404, -1659, -2024, -2206, -2252, -2243, -2342, -2437, -2456, -2438, -2491, -2516, -2566, -2573, -2586, -2581, -2539, -2366, -2155, -1966, -1629, -1353, -881, -852, -752, -494, -517, -477, -371, -268, -154, -66, -37, -26, 61, 199, 84, 212, 97, 106, 270, 288, 125, 183, 360, 443, 575, 316, 188, 231, 275, 267, 511, 410, 315, 362, 586, 660, 715, 658, 588, 473, 407, 366, 251, 190, 117, 107, 261, 264, 476, 336, 335, 315, 204, 215, 167, 154, 98, 69, 22, 52, 106, -132, -842, -1073, -1327, -1571, -1908, -2083, -2205, -2296, -2359, -2408, -2431, -2482, -2473, -2506, -2547, -2570, -2577, -2595, -2590, -2521, -2322, -2113, -1942, -1654, -1418, -899, -666, -679, -435, -500, -478, -324, -143, -142, -95, -86, -68, 9, 145, 85, 388, 193, 124, 198, 420, 208, 146, 303, 497, 442, 555, 329, 337, 330, 262, 526, 516, 438, 388, 465, 603, 675, 666, 826, 765, 409, 461, 350, 285, 197, 178, 337, 397, 465, 390, 325, 319, 301, 255, 202, 84, 130, 236, 88, -82, -207, -603, -999, -1548, -1874, -2082, -1905, -2002, -2169, -2244, -2301, -2347, -2413, -2469, -2504, -2523, -2560, -2577, -2592, -2596, -2558, -2404, -2199, -2159, -2011, -1781, -1506, -1176, -824, -611, -477, -422, -517, -328, -146, -142, -128, -113, -87, -59, 38, 97, 369, 352, 175, 275, 352, 255, 211, 251, 358, 350, 443, 351, 410, 298, 349, 549, 744, 495, 347, 434, 510, 571, 708, 691, 731, 443, 437, 544, 390, 353, 176, 295, 601, 652, 659, 511, 373, 363, 264, 182, 178, 268, 140, 28, -427, -884, -1265, -868, -1664, -2079, -2270, -2140, -2101, -2098, -2225, -2310, -2403, -2456, -2498, -2531, -2539, -2563, -2583, -2591, -2598, -2516, -2421, -2317, -2176, -2005, -1782, -1470, -1171, -700, -488, -458, -428, -488, -494, -250, -157, -138, -124, -103, -34, -12, 29, 116, 96, 119, 173, 273, 270, 327, 377, 294, 242, 280, 345, 432, 276, 253, 393, 635, 493, 371, 308, 446, 548, 501, 536, 707, 487, 370, 649, 654, 529, 271, 246, 365, 426, 541, 424, 369, 145, 230, 395, 377, 121, 37, -18, -191, -776, -1602, -1674, -2127, -2242, -2353, -2375, -2299, -2329, -2351, -2429, -2471, -2507, -2529, -2540, -2557, -2570, -2584, -2594, -2599, -2579, -2411, -2189, -2095, -1975, -1821, -1487, -1176, -713, -183, -297, -357, -340, -405, -276, -199, -143, -131, -100, -54, -28, -1, 104, 206, 330, 321, 295, 389, 410, 277, 222, 193, 235, 275, 355, 279, 255, 281, 497, 536, 415, 436, 343, 584, 508, 434, 572, 846, 581, 442, 684, 353, 223, 147, 173, 166, 428, 526, 163, 115, 192, 344, 239, 140, 95, -4, -304, -927, -1651, -2179, -2279, -2292, -2392, -2506, -2434, -2447, -2476, -2504, -2531, -2548, -2560, -2565, -2562, -2579, -2586, -2598, -2605, -2594, -2454, -2202, -2101, -2033, -1849, -1460, -950, -502, -179, -192, -396, -399, -342, -186, -207, -155, -132, -119, -93, -52, -11, 67, 279, 341, 543, 482, 378, 351, 285, 275, 195, 204, 280, 405, 275, 268, 279, 325, 405, 471, 464, 379, 384, 471, 493, 554, 883, 773, 438, 513, 419, 286, -54, -20, 101, 182, 202, 97, 71, 71, 115, 102, -24, -243, -478, -837, -1430, -1869, -2225, -2401, -2375, -2452, -2560, -2519, -2522, -2545, -2560, -2578, -2584, -2591, -2581, -2573, -2587, -2591, -2606, -2612, -2591, -2491, -2302, -2172, -2057, -1871, -1511, -940, -456, -137, -149, -406, -464, -264, -135, -173, -160, -132, -122, -105, -72, -11, 179, 222, 220, 491, 658, 480, 321, 341, 294, 226, 192, 305, 419, 343, 260, 294, 260, 255, 300, 362, 389, 265, 402, 603, 560, 759, 817, 571, 587, 504, 358, -128, -93, -35, 37, -31, 7, 10, -18, -14, -135, -467, -790, -1035, -1471, -1875, -2290, -2372, -2465, -2513, -2524, -2597, -2582, -2581, -2585, -2597, -2607, -2615, -2619, -2600, -2595, -2604, -2610, -2619, -2624, -2610, -2558, -2465, -2330, -2119, -1718, -1048, -769, -406, -96, -92, -328, -437, -115, -108, -133, -164, -133, -122, -109, -83, -14, 223, 97, 199, 328, 512, 498, 419, 394, 222, 272, 248, 310, 375, 480, 310, 280, 281, 280, 294, 267, 277, 211, 274, 650, 591, 823, 997, 714, 543, 814, 512)
+height_grid_size = Vector2i(87, 68)

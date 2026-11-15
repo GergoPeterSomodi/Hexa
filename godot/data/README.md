@@ -42,6 +42,8 @@ the builder relies on (`geo.COUNTRIES` order, `geo.CITIES` order, the row-by-row
 | `geography/placenames.json` | 302,333 | 6,940 real places with the GeoNames credit | export_geography |
 | `worldmap/region_alps_po.json` | | the north Italy map's skeleton: the window, the grid, rivers, lakes, places and gorges (by hand) | by hand |
 | `worldmap/heights_alps_po.json` | | the per-hex heights of the same window | `tools/worldmap/extract_heights.py` |
+| `worldmap/shoreline_alps_po.json` | | the real coast lines of the window in km (the style frame's coast, carved ports included) | `tools/worldmap/export_shoreline.py` |
+| `worldmap/height_grid_alps_po.json` | | a fine height raster of the window (4 samples per hex width, ETOPO 2022, NOAA) | `tools/worldmap/export_height_grid.py` |
 
 Total about 0.7 MB. No file is gzipped (none is large enough to need it).
 

@@ -171,19 +171,24 @@ static func roads(steps: Array[Array], centres: Callable) -> Array[Dictionary]:
 					chain.append(other)
 				else:
 					chain.insert(0, other)
-		var pts := PackedVector2Array()
-		for hex: Vector2i in chain:
-			var at: Vector2 = centres.call(hex)
-			pts.append(at)
-		var line := resample(smooth(pts, 3), 3.0)
-		var phase := float(posmod(chain[0].x * 7 + chain[0].y * 13, 17))
-		for i: int in range(1, line.size() - 1):
-			var along := (line[i + 1] - line[i - 1]).normalized()
-			var ease := minf(1.0, float(mini(i, line.size() - 1 - i)) / 8.0)  # the two ends stay on their hexes
-			line[i] += Vector2(-along.y, along.x) * sin(float(i) * 0.19 + phase) * ROAD_SWING * ease
-		out.append({"kind": "road" if quality >= 2 else "track", "points": line,
-			"width": ROAD_WIDTH[clampi(quality, 1, 3)], "rank": quality})
+		out.append(road_line(chain, quality, centres))
 	return out
+
+
+## One road run: the hexes it passes in order, drawn through their middles and smoothed (see `roads`).
+static func road_line(chain: Array[Vector2i], quality: int, centres: Callable) -> Dictionary:
+	var pts := PackedVector2Array()
+	for hex: Vector2i in chain:
+		var at: Vector2 = centres.call(hex)
+		pts.append(at)
+	var line := resample(smooth(pts, 3), 3.0)
+	var phase := float(posmod(chain[0].x * 7 + chain[0].y * 13, 17))
+	for i: int in range(1, line.size() - 1):
+		var along := (line[i + 1] - line[i - 1]).normalized()
+		var ease := minf(1.0, float(mini(i, line.size() - 1 - i)) / 8.0)  # the two ends stay on their hexes
+		line[i] += Vector2(-along.y, along.x) * sin(float(i) * 0.19 + phase) * ROAD_SWING * ease
+	return {"kind": "road" if quality >= 2 else "track", "points": line,
+		"width": ROAD_WIDTH[clampi(quality, 1, 3)], "rank": quality}
 
 
 ## The one unused step of the same quality that goes on from a hex, or -1 at a junction, an end or a change of
@@ -197,4 +202,179 @@ static func _only_way_on(_hex: Vector2i, here: Array, steps: Array[Array], used:
 		var q: int = step[2]
 		if used[n] == 0 and q == quality:
 			return n
+	return -1
+
+
+# ---- The lines of a chunk, read from MapData (docs/architecture/m1-build-spec.md section 6) ----
+
+
+## The lines of one chunk (32 x 32 cells): the pieces `cut` gives that chunk when the whole map's lines are cut, built
+## without building the whole map. A river is the drawn course in MapData.rivers (phase from its index), a stream is
+## one edge, a road is a run of road edges of one quality between junctions, built from the edge facts of the map as
+## `roads` would build it from the list of all steps (every edge once, in edge-index order). Only the runs that come
+## within a hex of the chunk are built, whole, then cut. `_state` is for the living roads of M3; M1 draws the
+## starting network of the map. A road change can reach other chunks than the changed hex's: rebuild the chunks
+## `chunks_of_run` names.
+static func for_chunk(map: MapData, _state: MapState, chunk: Vector2i) -> Array[Dictionary]:
+	var low := chunk * CHUNK - Vector2i.ONE
+	var high := (chunk + Vector2i.ONE) * CHUNK
+	var lines: Array[Dictionary] = []
+	lines.append_array(_rivers_near(map, chunk))
+	lines.append_array(_streams_between(map, low, high))
+	for run: Dictionary in _road_runs_between(map, low, high):
+		var chain: Array[Vector2i] = []
+		chain.assign(run["chain"])
+		lines.append(road_line(chain, int(run["quality"]), MapTiles.cell_centre))
+	var pieces: Array[Dictionary] = []
+	pieces.assign(cut(lines).get(chunk, []))
+	return pieces
+
+
+## The chunks to rebuild when a road is laid or taken up on an edge of `hex`: every chunk the road run through the hex
+## has a hex in, each with its eight neighbours (a piece of a line can lie in a chunk its hexes are not in).
+static func chunks_of_run(map: MapData, hex: Vector2i) -> Array[Vector2i]:
+	var seen: Dictionary[Vector2i, bool] = {chunk_of(hex): true}
+	for d: int in 6:
+		var edge := map.edge_index(hex, d)
+		if edge >= 0 and map.road[edge] > 0:
+			var chain: Array[Vector2i] = []
+			chain.assign(_road_run(map, edge)["chain"])
+			for h: Vector2i in chain:
+				seen[chunk_of(h)] = true
+	var out: Array[Vector2i] = []
+	for c: Vector2i in seen:
+		for dy: int in range(-1, 2):
+			for dx: int in range(-1, 2):
+				var near := c + Vector2i(dx, dy)
+				if not out.has(near):
+					out.append(near)
+	return out
+
+
+## Rivers whose course comes near the chunk, as `river` lines (phase = the river's index, class from the list).
+static func _rivers_near(map: MapData, chunk: Vector2i) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var scale := Vector2(float(MapTiles.CELL.x) / map.hex_w_km, MapTiles.ROW / map.grid().hex_h_km)
+	var low := MapTiles.cell_centre(chunk * CHUNK) - Vector2(MapTiles.CELL) * 2.0
+	var high := MapTiles.cell_centre((chunk + Vector2i.ONE) * CHUNK) + Vector2(MapTiles.CELL) * 2.0
+	for n: int in map.rivers.size():
+		var corners: PackedVector2Array = map.rivers[n]["corners"]
+		var pts := PackedVector2Array()
+		var near := false
+		for p: Vector2 in corners:
+			var q := p * scale
+			pts.append(q)
+			near = near or (q.x >= low.x and q.x <= high.x and q.y >= low.y and q.y <= high.y)
+		if near:
+			out.append(river(pts, int(map.rivers[n]["class"]), float(n) * 1.7))
+	return out
+
+
+## Streams (river class 4) on the edges that the hexes low..high (inclusive) own, in edge-index order.
+static func _streams_between(map: MapData, low: Vector2i, high: Vector2i) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for e: int in _owned_edges_between(map, low, high):
+		if map.river[e] != 4:
+			continue
+		var ends := _ends_of(map, e)
+		var mid := (MapTiles.cell_centre(ends[0]) + MapTiles.cell_centre(ends[1])) / 2.0
+		var across := MapTiles.cell_centre(ends[1]) - MapTiles.cell_centre(ends[0])
+		# The edge runs square to the line between the two middles on the untilted ground: 30 px either way.
+		var along := Vector2(-across.y / 0.85, across.x).normalized() * 30.0
+		along.y *= 0.85
+		out.append(stream(mid - along, mid + along))
+	return out
+
+
+## The edges (indices) owned by the hexes low..high (inclusive, clipped to the map), in edge-index order.
+static func _owned_edges_between(map: MapData, low: Vector2i, high: Vector2i) -> Array[int]:
+	var out: Array[int] = []
+	for row: int in range(maxi(low.y, 0), mini(high.y, map.rows - 1) + 1):
+		for col: int in range(maxi(low.x, 0), mini(high.x, map.cols - 1) + 1):
+			var base := MapData.OWNED_EDGES * map.index_of(Vector2i(col, row))
+			for k: int in MapData.OWNED_EDGES:
+				out.append(base + k)
+	return out
+
+
+## The road runs that have an edge owned by a hex low..high, each once, in the order of their first edge seen.
+## Each is {chain: hexes in drawing order, quality, edges}.
+static func _road_runs_between(map: MapData, low: Vector2i, high: Vector2i) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var seen: Dictionary[int, bool] = {}
+	for e: int in _owned_edges_between(map, low, high):
+		if map.road[e] == 0 or seen.has(e):
+			continue
+		var run := _road_run(map, e)
+		var members: Array = run["edges"]
+		for member: Variant in members:
+			seen[int(member)] = true
+		out.append(run)
+	return out
+
+
+## The two hexes of an edge (the owner first).
+static func _ends_of(map: MapData, edge: int) -> Array[Vector2i]:
+	var a := map.hex_of(floori(float(edge) / float(MapData.OWNED_EDGES)))
+	return [a, map.neighbour(a, edge % MapData.OWNED_EDGES)]
+
+
+## The road edges that touch a hex (edge indices).
+static func _road_edges_at(map: MapData, hex: Vector2i) -> Array[int]:
+	var out: Array[int] = []
+	for d: int in 6:
+		var e := map.edge_index(hex, d)
+		if e >= 0 and map.road[e] > 0:
+			out.append(e)
+	return out
+
+
+## The run of road edges `edge` belongs to, as `roads` builds it: a run goes on through a hex that has exactly two
+## road edges when the other has the same quality, and starts from its lowest edge index (the first step of the
+## list of all steps). {chain, quality, edges}.
+static func _road_run(map: MapData, edge: int) -> Dictionary:
+	var quality := int(map.road[edge])
+	var members: Dictionary[int, bool] = {edge: true}
+	var first_ends := _ends_of(map, edge)
+	for end: int in 2:
+		var tip := first_ends[end]
+		while true:
+			var next := _run_on(map, tip, members, quality)
+			if next < 0:
+				break
+			members[next] = true
+			var pair := _ends_of(map, next)
+			tip = pair[1] if pair[0] == tip else pair[0]
+	var first := edge
+	for member: int in members:
+		first = mini(first, member)
+	var used: Dictionary[int, bool] = {first: true}
+	var ends := _ends_of(map, first)
+	var chain: Array[Vector2i] = [ends[0], ends[1]]
+	for side: int in 2:
+		while true:
+			var tip := chain[chain.size() - 1] if side == 0 else chain[0]
+			var next := _run_on(map, tip, used, quality)
+			if next < 0:
+				break
+			used[next] = true
+			var pair := _ends_of(map, next)
+			var other := pair[1] if pair[0] == tip else pair[0]
+			if side == 0:
+				chain.append(other)
+			else:
+				chain.insert(0, other)
+	var edges: Array[int] = []
+	edges.assign(members.keys())
+	return {"chain": chain, "quality": quality, "edges": edges}
+
+
+## The one edge not in `used` that goes on from a hex, or -1 at a junction, an end or a change of quality.
+static func _run_on(map: MapData, hex: Vector2i, used: Dictionary[int, bool], quality: int) -> int:
+	var here := _road_edges_at(map, hex)
+	if here.size() != 2:
+		return -1
+	for e: int in here:
+		if not used.has(e) and map.road[e] == quality:
+			return e
 	return -1
