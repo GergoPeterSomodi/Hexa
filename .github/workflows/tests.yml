@@ -15,7 +15,7 @@ jobs:
   unit:
     name: unit (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25  # the frozen game's suite takes ~15 min on Python 3.10
     strategy:
       fail-fast: false
       matrix:
