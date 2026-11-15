@@ -10,7 +10,7 @@ The red earth is a patch under the work only. Spring: young green dashed rows; s
 every second row; autumn is the harvest, the signature at its strongest: every row white with bolls, two pickers, the bales
 out; winter: no white at all, the rows of dry stalks: pale dashed rows along the long side in every climate (tan on the snow
 soil of a snow or frost winter, pale straw on the dark red earth of a mild one), so cotton is not a plain brown block like
-hemp. Spring's red earth is redder than the map's soil (SPRING_RED). The bales (and the white under the shed) stand in autumn and
+hemp. Spring's red earth is redder than the map's soil (the kit's cotton_soil). The bales (and the white under the shed) stand in autumn and
 winter only.
 
 python cotton.py            writes docs/design/map/pieces/cotton.png and cotton_variants.png
@@ -63,7 +63,6 @@ def _pt(cx, cy, ang, u, v):
     return (cx + ca * u - sa * v, cy + (sa * u + ca * v) * kit.TILT)
 
 
-SPRING_RED = (192, 106, 78)        # spring's earth: clearly redder than soil (152,114,78), so cotton is not hemp's brown
 STALK = {"snow": (176, 146, 106), "frost": (176, 146, 106), "mild": (220, 200, 156)}     # dry stalks, by winter
 DASH, GAP = 2.4, 1.6               # a dry-stalk dash and the gap after it, along the row
 
@@ -79,18 +78,20 @@ def _dots(p, cx, cy, ang, u, n, step, shift, col, size):
 
 def _stalks(p, cx, cy, ang, col):
     """Winter: the dry stalks, five pale dashed rows along the long side (2.4 px dashes, 1.6 px gaps)."""
+    dashes = []
     for i in range(ROWS):
         u = -SPACE / 2 + SPACE * (i + 0.5) / ROWS
         v = -RUN / 2 + 1.2 + (i % 2) * 1.8
         while v + DASH < RUN / 2 - 0.8:
-            p.gp.line(_pt(cx, cy, ang, u, v), _pt(cx, cy, ang, u, v + DASH), col, 1.0)
+            dashes.append((_pt(cx, cy, ang, u, v), _pt(cx, cy, ang, u, v + DASH)))
             v += DASH + GAP
+    p.over(lambda pen: [pen.line(a, b, col, 1.0) for a, b in dashes], 1.0)
 
 
 def _young_rows(p, cx, cy, ang, col):
     """Spring: the soil and five rows of young plants, 1.2 px dots 3.4 px apart, every other row shifted by half a step
     (so the dots do not form a grid)."""
-    p.field(cx, cy, SPACE, RUN, ang, [SPRING_RED], 1)
+    p.field(cx, cy, SPACE, RUN, ang, [kit.crop("cotton_soil", "spring")[0]], 1)
     for i in range(ROWS):
         u = -SPACE / 2 + SPACE * (i + 0.5) / ROWS
         n = int((RUN - 3.0) // 3.4)

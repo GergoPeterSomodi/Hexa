@@ -268,7 +268,7 @@ CROPS = {
     "hemp_row": dict(                                                                     # the young rows of spring
         spring=[(84, 148, 86)], summer=[(40, 92, 64)], autumn=[(140, 124, 80)], winter=[(190, 170, 148)]),
     "cotton_soil": dict(                                                                  # the red earth, as a patch only
-        spring=[(178, 116, 86)], summer=[(184, 112, 82)], autumn=[(168, 106, 80)], winter=[(228, 226, 228)]),
+        spring=[(192, 106, 78)], summer=[(184, 112, 82)], autumn=[(168, 106, 80)], winter=[(228, 226, 228)]),   # spring: clearly redder than soil, so cotton is not hemp's brown
     "cotton": dict(                                                                       # the plant rows; summer and autumn carry BOLL dots
         spring=[(120, 168, 84)], summer=[(96, 140, 76)], autumn=[(132, 112, 72)], winter=[(120, 90, 66)]),
     "mulberry_soil": dict(                                                                # the pale strip under a mulberry row

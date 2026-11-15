@@ -90,10 +90,9 @@ def stubble(p, cx, cy, angle):
     def P(u, v):
         return (cx + ca * u - sa * v, cy + (sa * u + ca * v) * kit.TILT)
     col = STUBBLE[p.climate]
-    for i in range(4):
-        u = -BW / 2 + BW * (i + 0.5) / 4
-        for v0 in (-3.9, 1.5):
-            p.gp.line(P(u, v0), P(u, v0 + 2.4), col, 1.1)
+    dashes = [(P(-BW / 2 + BW * (i + 0.5) / 4, v0), P(-BW / 2 + BW * (i + 0.5) / 4, v0 + 2.4))
+              for i in range(4) for v0 in (-3.9, 1.5)]
+    p.over(lambda pen: [pen.line(a, b, col, 1.1) for a, b in dashes], 1.0)
 
 
 def hemp_block(p, cx, cy, angle, i):

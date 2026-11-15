@@ -696,13 +696,15 @@ It is the family's own raised ground, as the mine's outcrop is, and is built wit
 
 | Level | What is drawn | Landmark |
 |---|---|---|
-| 1 | One ledge at the back, 24 px wide; 2 cut blocks (`MARBLE` boxes, 3 x 2 px) on a trodden yard; a thatched hut; a track | The cut face |
-| 2 | 3 ledges, 40 px wide, stepping back and up; 5 blocks in one neat stack; a second hut; a ramp (a pale track up the first ledge) | The treadwheel crane: a timber A-frame with a wheel at its foot, 12 px tall, on the lowest ledge's edge |
+| 1 | The first cut: the two top ledges of the stair (24 and 32 px wide, 9 px tall in all); 4 cut blocks (`MARBLE` boxes, 3 x 2 px: a row of three, one on top) on a trodden yard; a thatched hut; a track | The cut face |
+| 2 | A third ledge, 40 px wide, in front of the two; the fifth block (one neat stack of 5); a second hut; a ramp (a pale track up the first ledge) | The treadwheel crane: a timber A-frame with a wheel at its foot, 12 px tall, on the lowest ledge's edge |
 | 3 | 4 ledges, 56 px wide (18 px tall in all); 8 blocks in two stacks; a long thatched masons' lodge | The column yard in front: 3 standing `MARBLE` columns, 9 px tall, and one lying |
 
 Seasons change little, as in mines (spring and summer are one picture): the ground palette; snow on ledge tops,
 block tops and roofs, **the cut faces bare**; 2 masons in summer, nobody in winter. No smoke in any season, no
-water, no heap. Coverage: the usual bands; the trodden yard is what clears the ground.
+water, no heap. Coverage: the usual bands; the trodden yard is what clears the ground. Level 1 is exactly the top
+of the level 2 stair (the same ledges and blocks, nothing moved or resized); it measures 30 / 31%, at the top of
+its band, because both ledge tops count as worked ground.
 
 ### Dye works. Ground: `grass`. Seed 12. Models: `dyes1`, `dyes3`, `dyes5`
 
@@ -787,7 +789,8 @@ A site is a thing to find in land without an improvement. It is decoration: it m
 (`VARIANTS = 6`, `SITES = ("monastery", "roman_ruins", "aqueduct", "standing_stones", "ruined_castle",
 "pilgrimage_chapel")`). The map data says which hex has which site, so the map gives `variant=` itself and takes
 only the mirror from `kit.pick`. Footprint **8-20%** of the margin hex, so the wild land comes close; at most
-20 px tall; inside the safe area.
+20 px tall; inside the safe area. The monastery alone measures 27%: its precinct wall claims the whole close, so
+no wild tree stands inside the wall (accepted).
 
 | Variant | Site | What is drawn |
 |---|---|---|

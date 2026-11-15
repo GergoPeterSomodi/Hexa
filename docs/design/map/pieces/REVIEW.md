@@ -7,8 +7,8 @@ and writes task 9. Round 4 (the same day): task 9 is back, the owner picked the 
 catalogue's top 10) and answered the two port questions; the guide has the tables, the kit the tools, and section 4
 the worker tasks 10 to 25. Round 5 (the same day): tasks 10 to 24 are back and reviewed on one page at 50%
 ("Round 5" below): all sixteen families pass, the landmark monuments need one more task, the kit has the calls the
-workers missed, the in-map test carries the new families, and section 4 has tasks 26 to 33. Nothing in the game is
-changed.**
+workers missed, the in-map test carries the new families, and section 4 has tasks 26 to 33. Round 5 is done
+("Round 5 done" below): tasks 27 to 33 are back and pass, task 26 is dropped. Nothing in the game is changed.**
 
 All ten families are drawn. This is the review of the eight new ones against `GUIDE.md` (the two reference
 families were checked again too), with the findings of the in-map test (`../pieces_in_map/notes.md`) folded in.
@@ -16,6 +16,46 @@ families were checked again too), with the findings of the in-map test (`../piec
 **Look at `overview.png` first**: every family and every level on one page in summer, with the ores, the sites and
 the landmark cities (`overview_2.png`: the same in winter, the layouts, the coasts). The per-family sheets (`<family>.png`) show all four seasons and the 50% test. `kit_contract.png` shows what
 the owner's answers mean in the kit: wild land, the coast on any side, the footprint, the mirror.
+
+## Round 5 done: the final check (2026-11-15)
+
+Tasks 27 to 33 are back and checked (task 26 is dropped: the owner keeps the landmark monuments; no second test
+frame: sheets are enough). **Verdict: round 5 is closed. All sixteen families, the ores, the sites and the landmark
+cities pass; nothing is waiting on a worker.** Every page was made again and looked at whole and enlarged
+(`overview.png`, `overview_2.png`, `crowding.png`, `crowding_pairs.png`, `winters.png`, `kit_contract.png`,
+`kit_additions.png`, the in-map test in summer and winter with its crops). No `PIECE PROBLEM` anywhere.
+
+**Show the owner, in this order:** `overview.png`, `overview_2.png`, `crowding.png`, `crowding_pairs.png` (the
+cotton / hemp and quarry / mines rows), `quarry.png`, `../pieces_in_map/summer.png` with `east_crop.png` and
+`carrara_crop.png`, then `../pieces_in_map/winter.png`. `winters.png` and `sites.png` are the backing.
+
+| Task | Verdict | What the final check did |
+|---|---|---|
+| 27 quarry level 1 | **Pass, after a fix** | The worker's level 1 drew two short ledges and two big stacks that level 2 replaced by the stair: against the additive rule. Now level 1 **is** the top of the stair: its two back ledges and four of the five blocks (a row of three, one on top), exactly as levels 2 and 3 draw them. Level 2 adds the third ledge, the fifth block, the crane, the ramp and the hut. Levels 2 and 3 are pixel-equal to before. The face reads on rock and on snow at 50%. Coverage 30 / 50 / 69% (layout 1: 31 / 52 / 69%); level 1 is one point over its band in layout 1, accepted (both ledge tops count as worked ground) |
+| 28 cotton against hemp | **Pass** | Spring's red earth and the dry-stalk rows keep the pair apart at 50% in every season and winter. The spring red moved from a module token into the kit's crop table (`cotton_soil`, spring); the private pen call for the stalks became `p.over`. Cotton's pictures are pixel-equal |
+| 29 hemp's winter | **Pass** | The stubble dashes make the blocks read on snow and frost at 50%. The private pen call became `p.over` (pixel-equal). The stubble colour stays a named module token (`STUBBLE`): the kit's winter `hemp_row` is too pale on snow |
+| 30 furs | **Pass** | Kit stockade, tent, bale and hold. On the guide's measure 17 / 27 / 48% (layout 1: 16 / 21 / 42%): inside the furs bands (10-20 / 20-35 / 35-50%) |
+| 31 gold | **Pass** | The white tent is told from the flat gravel heaps at 50% |
+| 32 silk | **Pass** | Bare mulberry and dome from the kit. `p.hold` is not used: every row stands on its own soil strip, which is footprint, and the caravanserai's court has its claim. Accepted |
+| 33 sites | **Pass** | Slate monastery inside the low precinct wall, evergreen cypresses, marble drums that stand out from the map's stones (seen at Luni). Two things accepted and recorded: the monastery measures 27% (the wall claims the whole close; the guide says so), and the corner piers of the low wall are a little heavy when enlarged; they are right at 100% and 50%. The chapel's mirrored footprint is 0.7% larger (rounding) |
+
+**The check in numbers.** 4,934 pictures and footprints (every module, level, season, layout, mirror and the three
+winters; the animals, the ores, the landmark cities; each also standing in its wild land) were hashed before and
+after the final fixes: only quarry level 1 changed (44). One kit change: the spring colour of `cotton_soil`
+(192, 106, 78), seen only in cotton (unchanged: it drew that colour already) and on `kit_additions.png`.
+
+### Backlog after round 5 (nothing blocks the owner's look)
+
+- **`vineyard.py`: the cypress** (task 34) if the owner likes the evergreen beside the estate.
+- **A thinner pier for `p.stockade(kind="low")`** (an optional `post_w=`), then the monastery's corners.
+- **Adoptions left over:** `p.stockade` in `castles.py` (the bailey), `p.bale` in `grazing.py` (wool), `p.dots`
+  in `olives.py`, `p.hold` in `dyes.py`. Pictures must not change in kind.
+- **Sheet labels** on the overview pages are cut where a level name is long (the pages only, not the art).
+- **From earlier rounds, still open:** the castle mound and the village green as ground overlays; a stronger
+  spring ground tone; a water depth per level for coast modules; Venice on the water; a rounder smoke; the map's
+  road led to a goods piece's gate (rule H needs the road layer).
+- **Judged on sheets only** (the owner's answer): furs, cotton and the landmark cities, until the real map is
+  built.
 
 ## Round 5: the review of the Python art (task 25, 2026-11-15)
 

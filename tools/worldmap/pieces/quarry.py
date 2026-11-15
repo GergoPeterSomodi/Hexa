@@ -1,9 +1,9 @@
 """Quarry, levels 0-3 (see docs/design/map/pieces/GUIDE.md, sections 4 and 8). Ground: rock. Seed 11.
 
-0 the map's wild rock (no piece) - 1 one pale ledge at the back (the cut face), 2 cut blocks, a hut, a track -
-2 three ledges stepping back and up, a neat stack of 5 blocks, a second hut, a ramp and the treadwheel crane on the
-lowest ledge - 3 four ledges, 8 blocks in two stacks, a long masons' lodge and the column yard (3 standing columns
-and one lying). Two layouts (LAYOUT) and the mirror.
+0 the map's wild rock (no piece) - 1 the first cut: the two top ledges of the stair (the cut face), 4 cut blocks
+(a row of three, one on top), a hut, a track - 2 a third ledge, the fifth block (a neat stack of 5), a second hut,
+a ramp and the treadwheel crane on the lowest ledge - 3 four ledges, 8 blocks in two stacks, a long masons' lodge
+and the column yard (3 standing columns and one lying). Two layouts (LAYOUT) and the mirror.
 
 The pit is not drawn from above: it is a stepped rock face seen from the front, the family's own raised ground
 (as the mine's outcrop is). Each ledge is a flat top (ground, lit PIT, snow where snow lies) behind a cut face
@@ -25,12 +25,11 @@ LEVELS = range(0, 4)
 NAMES = {0: "wild land (the map's)", 1: "cut face, blocks", 2: "treadwheel crane", 3: "column yard"}
 VARIANTS = 2
 
-CUT_FACE, CUT_STEP = 2.3, 2.8   # level 1's two short ledges: a face and a step (two of them are 5.6 px)
 FACE = 2.9           # the cut face of a ledge (px); with its visible top it is one step of the stair
 
 # The layouts are fixed tables; a level adds to the level below and never moves anything.
-#   ledges: x0, x1, foot y (the foot of the cut face), from the back (the level 1 ledge) to the front, one more
-#       ledge per level from level 2 (ledge 1 at level 1, 1-3 at level 2, 1-4 at level 3);
+#   ledges: x0, x1, foot y (the foot of the cut face), from the back to the front: ledges 1-2 at level 1 (the
+#       first cut), 1-3 at level 2, 1-4 at level 3;
 #   step: the stair's y step (a ledge's face plus the visible depth of its top);
 #   crane: x, foot y: on the top of the lowest ledge of level 2 (ledge 3);
 #   ramp: the pale track up beside the stair (level 2 and up);
@@ -48,7 +47,7 @@ LAYOUT = [
                (-6, 9, 66, 20, 2), (33, 11, 20, 10, 2),
                (4, 15, 80, 28, 3), (-14, 19, 28, 11, 3)],
         blocks=[(10.0, 7, 1, False), (13.2, 7, 1, False),
-                (16.4, 7, 2, False), (11.6, 5, 2, True), (14.8, 5, 2, True),
+                (16.4, 7, 1, False), (11.6, 5, 1, True), (14.8, 5, 2, True),
                 (23.0, 10, 3, False), (26.2, 10, 3, False), (24.6, 8, 3, True)],
         huts=[(-32, 5, 1), (35, 12, 2)],
         lodge=(-13, 19),
@@ -56,8 +55,6 @@ LAYOUT = [
         lying=(31, 26),
         masons=[(2, 11, 1), (20, 14, 2)],
         track=[(2, 6), (1, 16), (-1, 26), (-3, 34)],
-        cut1=[(-24, -6, -27.0), (-26, -4, -24.3)],
-        stacks1=[(9.6, 7.6), (15.4, 7.6)],
     ),
     dict(  # layout 1: the stair runs back to front down the west flank, the yard, the crane and the works to its east
         step=9.0,
@@ -68,7 +65,7 @@ LAYOUT = [
                (6, 9, 62, 22, 2), (32, 3, 18, 10, 2),
                (4, 14, 78, 28, 3), (27, 19, 26, 11, 3)],
         blocks=[(5.0, 8, 1, False), (8.2, 8, 1, False),
-                (11.4, 8, 2, False), (6.6, 6, 2, True), (9.8, 6, 2, True),
+                (11.4, 8, 1, False), (6.6, 6, 1, True), (9.8, 6, 2, True),
                 (15.0, 15, 3, False), (18.2, 15, 3, False), (16.6, 13, 3, True)],
         huts=[(20, -13, 1), (34, 4, 2)],
         lodge=(28, 21),
@@ -76,16 +73,13 @@ LAYOUT = [
         lying=(-4, 28),
         masons=[(2, 14, 1), (-6, 8, 2)],
         track=[(0, 8), (3, 17), (5, 26), (6, 34)],
-        cut1=[(-28, -10, -18.0), (-30, -8, -15.3)],
-        stacks1=[(4.4, 8.6), (10.2, 8.6)],
     ),
 ]
 GATES = [{"south": (-3, 34)}, {"south": (6, 34)}]       # where the map's road layer joins the track
 
 
-def ledge(p, i, x0, x1, y, step, face=FACE, strong=False):
+def ledge(p, i, x0, x1, y, step):
     """One ledge: its top (ground, lit PIT or snow) behind its cut face (standing; bare in winter too)."""
-    FACE = face
     w = x1 - x0
     cx = (x0 + x1) / 2
     snow = p.winter
@@ -94,18 +88,15 @@ def ledge(p, i, x0, x1, y, step, face=FACE, strong=False):
     if snow:                                            # a lit left part of the snow, a shaded right quarter
         p.patch([(x1 - w * 0.25, y - FACE), (x1 - 0.8, y - FACE), (x1 - 2.6, y - step), (x1 - w * 0.25 - 1.0, y - step)],
                 kit.SNOW_D, None)
-    p.shadow(cx + p.m * 3, y + 1.3, w * 0.9, 3.4 if strong else 2.4)       # the ledge's soft shadow on the ledge below, lower right
+    p.shadow(cx + p.m * 3, y + 1.3, w * 0.9, 2.4)       # the ledge's soft shadow on the ledge below, lower right
 
     def fn(pen):
         body = [(x0 + 0.8, y - FACE), (x1 - 0.8, y - FACE), (x1, y), (x0, y)]
         pen.poly(body, kit.PIT, None)
         xd = x1 - w * 0.25
         pen.poly([(xd, y - FACE), (x1 - 0.8, y - FACE), (x1, y), (xd - 0.4, y)], kit.PIT_D, None)
-        gap = 6 if strong else 10                        # level 1's short faces: a dark foot and closer joints
-        if strong:
-            pen.poly([(x0 + 0.2, y - 0.9), (x1 - 0.2, y - 0.9), (x1, y), (x0, y)], kit.PIT_D, None)
-        for k in range(1, int(w // gap) + 1):            # cut seams: a few vertical joints of the saw cuts
-            sx = x0 + k * w / (int(w // gap) + 1) + (i % 2) * 1.3
+        for k in range(1, int(w // 10) + 1):             # cut seams: a few vertical joints of the saw cuts
+            sx = x0 + k * w / (int(w // 10) + 1) + (i % 2) * 1.3
             if sx < xd - 1:
                 pen.line((sx, y - FACE + 0.4), (sx - 0.3, y - 0.3), kit.PIT_D, 0.5)
         pen.poly(body, None, kit.INK, 0.5)
@@ -173,8 +164,8 @@ def lying_column(p, x, y):
 
 
 def block(p, x, y, exposed, w=3.0, h=2.0):
-    """A cut block: a 3 x 2 px MARBLE box (level 1 3.8 x 2.6). The ones with a free top carry snow where
-    snow lies."""
+    """A cut block: a 3 x 2 px MARBLE box. The ones with a free top carry snow where snow lies (a block that
+    gets another on top at a higher level is listed as not exposed, so its picture never changes)."""
     p.cast(x, y, w, 1.4)
     snow = p.winter and exposed
 
@@ -191,7 +182,7 @@ def draw(level, season, variant=0, mirror=False):
     p = kit.Piece(season, ground=GROUND, seed=SEED, mirror=mirror)
     L = LAYOUT[variant]
     step = L["step"]
-    nledge = {1: 1, 2: 3, 3: 4}[level]
+    nledge = {1: 2, 2: 3, 3: 4}[level]
 
     # ---- ground plane: the trodden yard (an overlay, the only thing that clears the ground), the ramp, the track
     yards = [yd for yd in L["yards"] if yd[4] <= level]
@@ -201,10 +192,7 @@ def draw(level, season, variant=0, mirror=False):
         p.road(L["ramp"], 2.0, track=True)                # the pale ramp up beside the stair
 
     # ---- the stair: ledges back to front (tops are ground, faces stand)
-    if level == 1:                                    # the first cut: two short ledges, one stair of 5 px
-        for i, (x0, x1, y) in enumerate(L["cut1"]):
-            ledge(p, i, x0, x1, y, CUT_STEP, CUT_FACE, strong=True)
-    for i in range(nledge if level > 1 else 0):
+    for i in range(nledge):
         x0, x1, y = L["ledges"][i]
         ledge(p, i, x0, x1, y, step)
 
@@ -212,12 +200,8 @@ def draw(level, season, variant=0, mirror=False):
     for x, y, lo in L["huts"]:
         if level >= lo:
             p.house(x, y, 5.5, 3.5, 3.0, wall=4 if lo == 1 else 0, kind="ridge", roof="thatch")
-    if level == 1:                                    # two stacks of two cut blocks
-        for x, y in L["stacks1"]:
-            block(p, x, y, False, 3.8, 2.6)
-            block(p, x + 0.3, y - 2.6, True, 3.8, 2.6)
     for x, y, lo, exposed in L["blocks"]:
-        if level >= max(lo, 2):
+        if level >= lo:
             block(p, x, y, exposed)
     if level >= 2:
         crane(p, *L["crane"])
