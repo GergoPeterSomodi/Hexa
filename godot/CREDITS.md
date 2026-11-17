@@ -25,3 +25,14 @@ Arc-Second Global Relief Model, doi:10.25921/fd45-gt74.
 ## Place names
 
 Place names from GeoNames (CC BY 4.0) arrive with the map data in 0.3.0 and are credited here then.
+
+## Fonts
+
+The UI uses the following fonts, each licensed under the SIL Open Font License, Version 1.1 (`OFL.txt` sits alongside each family):
+
+- **Cinzel** (`Cinzel-Bold.ttf`) — Copyright 2020 The Cinzel Project Authors (`https://github.com/NDISCOVER/Cinzel`), SIL Open Font License 1.1.
+- **Cinzel Decorative** (`CinzelDecorative-Black.ttf`, UI wordmark bake input) — Copyright (c) 2012 Natanael Gama (`info@ndiscovered.com`), with Reserved Font Name 'Cinzel', SIL Open Font License 1.1.
+- **Alegreya** (`Alegreya-MediumItalic.ttf`) — Copyright 2011 The Alegreya Project Authors (`https://github.com/huertatipografica/Alegreya`), SIL Open Font License 1.1.
+- **Alegreya SC** (`AlegreyaSC-Bold.ttf`) — Copyright 2011 The Alegreya Project Authors (`https://github.com/huertatipografica/Alegreya`), SIL Open Font License 1.1.
+- **Alegreya Sans** (`AlegreyaSans-Regular.ttf`, `AlegreyaSans-Medium.ttf`, `AlegreyaSans-Bold.ttf`) — Copyright 2013 The Alegreya Sans Project Authors (`https://github.com/huertatipografica/Alegreya-Sans`), SIL Open Font License 1.1.
+- **Noto Sans** (`NotoSans-Regular.ttf`, fallback face) — Copyright 2022 The Noto Project Authors (`https://github.com/notofonts/latin-greek-cyrillic`), SIL Open Font License 1.1.
