@@ -98,6 +98,8 @@ func test_sort_points_back_to_front_inside_a_hex() -> void:
 	assert_gt(front, 0)
 	assert_gt(shadows, 0)
 	assert_gt(addon_south, 0)
+	# Crossings sit on their edge (y_sort = round(edge_middle.y) + 1): owned directions 0..2 are +1 or -37 (within
+	# half a row, 38.25 px, so rows never swap); directions 4..5 (+39) are baked for completeness and never placed.
 	for tile_name: String in Crossings.all_names():
 		var d := int(tile_name.split("/")[2])
 		var limit := 38 if d < Crossings.OWNED else 39
