@@ -1,0 +1,2233 @@
+{
+  "schema": "hexa-godot/ui-kit/1",
+  "tokens_sha": "cb3439b787ead284519c04db4bf587a349e52b6b0a232ca53efc8d8866a3b8c7",
+  "bytes_rgba": {
+    "kit_1x": 3017024,
+    "kit_2x": 12068096,
+    "menu": 8812800
+  },
+  "pieces": {
+    "panel_frame": {
+      "size": [
+        160,
+        160
+      ],
+      "margin": [
+        32,
+        32,
+        32,
+        32
+      ],
+      "content": [
+        20,
+        20,
+        20,
+        20
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        10
+      ],
+      "axis": "tile",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "41312dff94141ebed02706bcbaf34c16c2b5eeba8d49ee87cd7f9f2c5bf50e2d",
+        "2x": "a21f18a116932dc1c44a2f551fe08cbbc1c648aedc9cf4cd57ffbf81109fdeb4"
+      },
+      "check": "exact"
+    },
+    "panel_modal": {
+      "size": [
+        192,
+        192
+      ],
+      "margin": [
+        48,
+        48,
+        48,
+        48
+      ],
+      "content": [
+        28,
+        28,
+        28,
+        28
+      ],
+      "expand": [
+        24,
+        24,
+        24,
+        24
+      ],
+      "axis": "tile",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "9cb162fbfb881560d782b33bf278a9fade7736d3c63d81a9d57ba07a801da952",
+        "2x": "748304c128c50e8ccf972cf149edd25e6c7fdbea757df0e992ec46a85097a0b2"
+      },
+      "check": "exact"
+    },
+    "panel_vellum": {
+      "size": [
+        160,
+        160
+      ],
+      "margin": [
+        32,
+        32,
+        32,
+        32
+      ],
+      "content": [
+        24,
+        24,
+        24,
+        24
+      ],
+      "expand": [
+        24,
+        24,
+        24,
+        24
+      ],
+      "axis": "tile",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "5d81a6af0d7dee1a1c941235adf84f7a11a64764f650aa02dca277ad47833e4a",
+        "2x": "2f6cbadb388a83e2367587e57fc4c60376b133c14f28572ea5322477543df731"
+      },
+      "check": "exact"
+    },
+    "panel_card": {
+      "size": [
+        48,
+        48
+      ],
+      "margin": [
+        12,
+        12,
+        12,
+        12
+      ],
+      "content": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "fd6a06d3c733f853f1ac0773061753bd66cd101395af7eb5900975df018a60b9",
+        "2x": "da3d1a64600044764c5c4e376ea662edd7125fb861da9b9e6ddc7c9a9887a0b2"
+      },
+      "check": "exact"
+    },
+    "panel_bar": {
+      "size": [
+        128,
+        48
+      ],
+      "margin": [
+        8,
+        4,
+        8,
+        10
+      ],
+      "content": [
+        8,
+        4,
+        8,
+        8
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        8
+      ],
+      "axis": "tile_x",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "bdf830c60387bad3b901f8b6b552d5b32fc4abbedb612dcf572ef3672a41a77f",
+        "2x": "7869e2a6513d0095047091f0324025f5ca83fbc6a6f24a98e5ae2a0f8385119d"
+      },
+      "check": "exact"
+    },
+    "ribbon": {
+      "size": [
+        128,
+        40
+      ],
+      "margin": [
+        36,
+        12,
+        36,
+        12
+      ],
+      "content": [
+        36,
+        8,
+        36,
+        8
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 230,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "42be264e2af43c56a48c894c15772f52f6911a98e6644c3e3d43a0cfb80d4286",
+        "2x": "49e43f3af5956b4ac4debedeaf01699c1c07cfd31a0ee2b17da5f217fedf6c02"
+      },
+      "check": "exact"
+    },
+    "toast": {
+      "size": [
+        128,
+        40
+      ],
+      "margin": [
+        36,
+        20,
+        36,
+        20
+      ],
+      "content": [
+        36,
+        8,
+        36,
+        8
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "5208597d2daf31440a14c30a6bc2e155a7f15835a99c8ec2f374631e133d4596",
+        "2x": "95549bf046a4cd38163ff0cece639c53b8b9ca71942edef9d823f5226737f332"
+      },
+      "check": "exact"
+    },
+    "cartouche": {
+      "size": [
+        96,
+        36
+      ],
+      "margin": [
+        24,
+        18,
+        24,
+        18
+      ],
+      "content": [
+        24,
+        6,
+        24,
+        6
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "04754e28850dad134dcac27047bd55adb00094ede56287e041065b23677aa6bd",
+        "2x": "73b39d83d89a101c3108acc3c123a896bacd1ed93833ccd3e016df242cd1c951"
+      },
+      "check": "exact"
+    },
+    "button_secondary_normal": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "21fc062c28b44503cba4fe97897812da4e6649f6faf600aa3d3131e30d082ae2",
+        "2x": "c2191e1e55745aa4f5fc844b20b664da5fed8b7f23c6ebcbbf7b0b481e155072"
+      },
+      "check": "exact"
+    },
+    "button_secondary_hot": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "373f964b7eae9be6332a1dda55c96a36ffa02f3e6bd48bb2f623e6a9a15fc3f5",
+        "2x": "3e524a8998ddba19d227aa28aac12d80c38409675d2de7978c5e6f576eadaabb"
+      },
+      "check": "exact"
+    },
+    "button_secondary_pressed": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "ef2b1117841dac3ead915b15f38ebada1925de0cec2f8385707270f2e33f1b36",
+        "2x": "b7a7c1d0407a90dc1375d7ef2f5a190e37a96e394cc942c03b35ec8acb05c703"
+      },
+      "check": "exact"
+    },
+    "button_secondary_off": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "e2d0f09307e613228c7718d153e03cfd92698c8ff167fa790f88590e40d2cf4d",
+        "2x": "ff2ef42128ad1f301c84775b4fc843f09ce1723c2053f8097bc330893ff91334"
+      },
+      "check": "exact"
+    },
+    "button_primary_normal": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "64324cca13e7fd3ab678c149f0bfdf239919da6cfdba490e622a4cafe8a569ed",
+        "2x": "1201a2dbc403979c88d771eade15300a729c5644ff7669b3971e7e86a82187d3"
+      },
+      "check": "exact"
+    },
+    "button_primary_hot": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "f595ede0a781578e1193a54963759aaf9b5ae3ac4d647608f801f1fa5c9fe865",
+        "2x": "68812e5e51158b114806bd106973206d222fd4cdd821b919909252a5e288c222"
+      },
+      "check": "exact"
+    },
+    "button_primary_pressed": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "1cbbfe92f87e26985da625a4eb18011156665fb160eecbb90984a8eaf8812be2",
+        "2x": "c567606d40062776a3bc32ea9cc78fc144d352cc64fcb62dac955e99d2c70d60"
+      },
+      "check": "exact"
+    },
+    "button_primary_off": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "e2d0f09307e613228c7718d153e03cfd92698c8ff167fa790f88590e40d2cf4d",
+        "2x": "ff2ef42128ad1f301c84775b4fc843f09ce1723c2053f8097bc330893ff91334"
+      },
+      "check": "exact"
+    },
+    "button_danger_normal": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "c16cfb346f5f310fe6bed444f354d346a334933a8deb43d961404a3c691edf27",
+        "2x": "eed056715996ac6f5417cc8cfd9f1767fa1a6d0d5732b0f2ae57b20b2f7cb074"
+      },
+      "check": "exact"
+    },
+    "button_danger_hot": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "37436fe381a11eb0c7b48bd866a73f2c3f0666f29ea90045b4c057d74acefe13",
+        "2x": "3f8c17d0e1d40b58289a5d49d8eb14db7489a06f4f7f162000b0ca930703ced4"
+      },
+      "check": "exact"
+    },
+    "button_danger_pressed": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "e4bff0923ed20c0b8e4443c1ff2bfd99150e48df41626aa564ca6f29f2e16950",
+        "2x": "678bfb0a212a40c309ff6ded7e86cd5404443de5b1707e0d6827bdd3802e25cd"
+      },
+      "check": "exact"
+    },
+    "button_danger_off": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "e2d0f09307e613228c7718d153e03cfd92698c8ff167fa790f88590e40d2cf4d",
+        "2x": "ff2ef42128ad1f301c84775b4fc843f09ce1723c2053f8097bc330893ff91334"
+      },
+      "check": "exact"
+    },
+    "button_toggle_normal": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "29def8e1bd7bb2af62a77bab7ce183d0b9856c96bd14785c8694351b28f414b8",
+        "2x": "69c1ee9a1c4881975d393b18a97fbd575427d8f5c0ebb5513d87ff3627d335fb"
+      },
+      "check": "exact"
+    },
+    "button_toggle_hot": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "68096371b36bc38cec934d97d2cf55c959f3d7fdaf5fe7ea745378a310c859e5",
+        "2x": "b56dbe5cf5573e383752f2eb9e1f50625738b132c398301c8c6f08f4e6bbcac3"
+      },
+      "check": "exact"
+    },
+    "button_toggle_pressed": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "b39a01d9d1a77ba681e21bb1d45b8c8ce8c2734a9f4bd96a6ac98d33287eeb1e",
+        "2x": "14c76313f4d19ef7aeced3d8ef4d80b763e588281edb1f8066b94e60f5ebc557"
+      },
+      "check": "exact"
+    },
+    "button_toggle_off": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "e2d0f09307e613228c7718d153e03cfd92698c8ff167fa790f88590e40d2cf4d",
+        "2x": "ff2ef42128ad1f301c84775b4fc843f09ce1723c2053f8097bc330893ff91334"
+      },
+      "check": "exact"
+    },
+    "toggle_on": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "6fcbedaf1bb6027df5f3ff59ff7721ecd52df67e9d0de8e37d7d6970f35f2ac4",
+        "2x": "014387bf7817ca75e92d85384b7af5ff11747dda21ae6afe6b817715de6911a1"
+      },
+      "check": "exact"
+    },
+    "focus": {
+      "size": [
+        64,
+        40
+      ],
+      "margin": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "content": [
+        14,
+        4,
+        14,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "3e65dd58efd8f11ac28265cbdd6a8c9ae6b87abd882cb7f7355e3e215eba9eaf",
+        "2x": "7a5ce46fe8133606243bf31b252078b691466eb5bdbe3b8e2e397016d1a7ef7b"
+      },
+      "check": "exact"
+    },
+    "button_menu_secondary_normal": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "e4c0a485564b5e359549561bd12d83a1806a29b80c2494af40b9c654e70cd721",
+        "2x": "2e6522a2a5b067cdbfb09a22e11323ca278c5d18000feaf7596c2a29037118a3"
+      },
+      "check": "exact"
+    },
+    "button_menu_secondary_hot": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "fa6490258aba65eed0155e1120090cf042a5a4a360a792ba614ecacb775768a4",
+        "2x": "922e3852e3766acbcdedb94fff2703857d395542b2ae606a58dec568f8057863"
+      },
+      "check": "exact"
+    },
+    "button_menu_secondary_pressed": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "8a26db17a7ef16e8d6da9ce7f51b46c5ed9e1ee6daa9696d72a8b3b93ba04ea7",
+        "2x": "68599092226ee7763fae9340f263afb61a2701f007f51b174477aece481ade70"
+      },
+      "check": "exact"
+    },
+    "button_menu_secondary_off": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "05b8d1c1512c5e0a5c7eefee3f0ab06f345d8a6724b8c778d5756ca6e1b170a2",
+        "2x": "7716359bebf3cc6532908c4557ed0d78389e8cbc90a5763a2c0e0d643693a752"
+      },
+      "check": "exact"
+    },
+    "button_menu_primary_normal": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "473e3ff75357f84199422116bbec90d9a1e83e4cbbb3789c3e3948c179ecea3f",
+        "2x": "bffb0e02e76afbbf5065c9fbc503d0c299f4cf44eddb0f82366608a144247199"
+      },
+      "check": "exact"
+    },
+    "button_menu_primary_hot": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "495d96871328cbe7fd1d8be419f7b05bef811cf20453942b76e3810d3c87b018",
+        "2x": "f24035628bf22e8f96509f5db65e1f70d39ca16e313b80f75b39bebf772c1420"
+      },
+      "check": "exact"
+    },
+    "button_menu_primary_pressed": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "c12d9c5aaf064040539943abaa2df0c69e978d3548ac73a041d6eebe421260fc",
+        "2x": "135b9d0cef50f204325719e9b2e25576f88e49215da655a4be20aedbfb19739a"
+      },
+      "check": "exact"
+    },
+    "button_menu_primary_off": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "05b8d1c1512c5e0a5c7eefee3f0ab06f345d8a6724b8c778d5756ca6e1b170a2",
+        "2x": "7716359bebf3cc6532908c4557ed0d78389e8cbc90a5763a2c0e0d643693a752"
+      },
+      "check": "exact"
+    },
+    "button_menu_danger_normal": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "eae0e4537a2907337ad8ba64ccf5743c2a33e09e4f51d6c8cdfa692e4a4242b1",
+        "2x": "89ddcb80017546a78b7d4c1eb77ab8a256728e54e8974b2c5d8d3541a4abb7c9"
+      },
+      "check": "exact"
+    },
+    "button_menu_danger_hot": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "4c19696f313709141e4bf2983d7545fb005ea146fc4be06930314fcc0d845af9",
+        "2x": "9cc731ca3939362f0a5090de1ec69e21950558e450264565bfa5aecf33559caf"
+      },
+      "check": "exact"
+    },
+    "button_menu_danger_pressed": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "67245926c34a6db7958fae8215b29b1990fb768fb34b8c52319712bbc21c3e01",
+        "2x": "d59894e103e1d41b9b51543a6793566cd43edf519d5a2d2255c93ce16c42db35"
+      },
+      "check": "exact"
+    },
+    "button_menu_danger_off": {
+      "size": [
+        96,
+        42
+      ],
+      "margin": [
+        28,
+        21,
+        28,
+        21
+      ],
+      "content": [
+        34,
+        0,
+        34,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "05b8d1c1512c5e0a5c7eefee3f0ab06f345d8a6724b8c778d5756ca6e1b170a2",
+        "2x": "7716359bebf3cc6532908c4557ed0d78389e8cbc90a5763a2c0e0d643693a752"
+      },
+      "check": "exact"
+    },
+    "slot": {
+      "size": [
+        32,
+        24
+      ],
+      "margin": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "content": [
+        10,
+        2,
+        10,
+        2
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "62ceb5644fb16e8b92210f5c383911ce293634d1a7af47b1525cce9c2cadef25",
+        "2x": "1334216704487d66e4cec38ccd7d423b5f1958630911b8f56995cd06f2c2a89e"
+      },
+      "check": "exact"
+    },
+    "plate": {
+      "size": [
+        32,
+        24
+      ],
+      "margin": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "content": [
+        10,
+        2,
+        10,
+        2
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "bc93f9cad033043d1fd73f9f55a933d2aebc6c4136b569b26c575250413ddd88",
+        "2x": "f7560ab5a0ea0049e3dab646c24781c2edb3f79502edc7bfd84cc6a715ba3e19"
+      },
+      "check": "exact"
+    },
+    "nav_selected": {
+      "size": [
+        32,
+        24
+      ],
+      "margin": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "content": [
+        10,
+        2,
+        10,
+        2
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "f4c03709a9d923e882b25bd74808ca3d0fa817fad0036b687003e2f7a8fd7a16",
+        "2x": "e2401aa9ac74f18478c64679a7c2ea8bd1d7c2c9e829b8e94b5c3f284dac944b"
+      },
+      "check": "exact"
+    },
+    "nav_selected_ink": {
+      "size": [
+        32,
+        24
+      ],
+      "margin": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "content": [
+        10,
+        2,
+        10,
+        2
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "1242496124cfe017dcfabb1b0f3a074544950de04fb641c36967c275b0d88ad8",
+        "2x": "b103b7ef6ccc546060e38502c6a8d8e4357cb2d290eb9d2a11fad100a1953dd7"
+      },
+      "check": "exact"
+    },
+    "switch_off": {
+      "size": [
+        48,
+        24
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "701b4dee6e26f131ba51fa1307e82488cf25aa2eeeae4232acba48f77822a066",
+        "2x": "cf01cd397dab48e74cdc7015480c2ee98cac403630f7a97fbb52d22cd4f263a5"
+      },
+      "check": "exact"
+    },
+    "switch_on": {
+      "size": [
+        48,
+        24
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "449c920f023b053905d98c2d1735935f972dcde9149d444a0e8c07d68f72c8d2",
+        "2x": "b692737c8f6c9f46ea17b2359ea89a89dcea68b1bedb6c0dc7a059254779520f"
+      },
+      "check": "exact"
+    },
+    "grabber": {
+      "size": [
+        24,
+        24
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "a9f6d2be7f70972c990c0d92e00ca26fa76912d315f65dcab3a052c7dce3069c",
+        "2x": "cd4166936d426cb0b28263297e24417a5a74defae1c77a01ec12643fdb458e31"
+      },
+      "check": "exact"
+    },
+    "grabber_hot": {
+      "size": [
+        24,
+        24
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "76028aa2ad7beeb0c9f96d666215fa080d9ab410169997e813fc2c639a285fff",
+        "2x": "0f7dd89f530a88bd82b24cb4c6eed19ea13b7663f25cf474fe06fe5a1319bab4"
+      },
+      "check": "exact"
+    },
+    "keycap": {
+      "size": [
+        32,
+        28
+      ],
+      "margin": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "content": [
+        8,
+        4,
+        8,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "33c1196e0d3c71485a48b2c0c68f2482a8877515d8ba728fda425bf82f1a0d8e",
+        "2x": "0f53eca098c257a9bd4b071be7bc3bb69ed3e30799ecb82ad5833a036f93d405"
+      },
+      "check": "exact"
+    },
+    "keycap_wait": {
+      "size": [
+        32,
+        28
+      ],
+      "margin": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "content": [
+        8,
+        4,
+        8,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "921d22c52bcdd45e2c2da96dd402d649b058a998ad3fb6b191ab402083e4c68e",
+        "2x": "ca61e620154aed3ce39f16666ab103489882783dd4008564650c58f80fc3cb07"
+      },
+      "check": "exact"
+    },
+    "progress_fill": {
+      "size": [
+        32,
+        12
+      ],
+      "margin": [
+        6,
+        4,
+        6,
+        4
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "4b1309f6dd80475113fdeba2277b0916fe73112c63094d08ba4973e8f479cc35",
+        "2x": "0b075418f1c531b2630bd3a24f32615a71f02611403b754a3c57d95d0a419763"
+      },
+      "check": "exact"
+    },
+    "seal": {
+      "size": [
+        72,
+        72
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "f7a694365ac6447352f853e62e46baff8d716f653568df8d8c8bdfd49854b8fd",
+        "2x": "0e1078b25fd8a21ac07b4cb62b97b88400faddd4e978493e05be969bdc67b822"
+      },
+      "check": "exact"
+    },
+    "stud": {
+      "size": [
+        12,
+        12
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "a80c19fb96369de6a3b8ffbe7a95567a6d8338b8363b9fad66f8ac89a694e520",
+        "2x": "97a6a53d747525510440ddc7e801fe17d7c0a0c13f8044f6b44e6379afbac081"
+      },
+      "check": "exact"
+    },
+    "glow_soft": {
+      "size": [
+        64,
+        64
+      ],
+      "margin": [
+        24,
+        24,
+        24,
+        24
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "8c828b1042445b161f5b2ffd67640d612c30e7156640eac1884826f0044756d8",
+        "2x": "96e38e7853d598bff3410722f54c31763cb11bcef2fc52d296091a3b77ffceee"
+      },
+      "check": "exact"
+    },
+    "rule_diamond": {
+      "size": [
+        256,
+        12
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "ae665823ea6999842d7d6195784f3585344d2efadd214ad9131d58feef5a7e24",
+        "2x": "fc57a77f575192589f8c6e3168f8a09340bff36b84ffd9701f32d3daff67a2db"
+      },
+      "check": "exact"
+    },
+    "icons_base": {
+      "size": [
+        128,
+        32
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "c69d50043bda73235489e2ecff981c300f51142a73ec9e94a8fcbcbf25328679",
+        "2x": "04fde8739cfeda2358db84a685101b44651b04d2c2e40350a4c643562efc4c28"
+      },
+      "check": "exact",
+      "cell": [
+        16,
+        16
+      ],
+      "icons": [
+        "arrow_up",
+        "arrow_down",
+        "arrow_left",
+        "arrow_right",
+        "tick",
+        "cross",
+        "lock",
+        "dash",
+        "close",
+        "menu",
+        "help",
+        "zoom_in",
+        "zoom_out",
+        "zoom_fit",
+        "study",
+        "info"
+      ]
+    },
+    "wordmark": {
+      "size": [
+        1024,
+        256
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "6f7039cef9879785047d1b784a15d876e0c8e34df3be1dbc2e858bc367fb72ee",
+        "2x": "34b6a37e7655f45b1585ff3c7c133f3fe7064e5224d8c75c13ad522ff5ad2e43"
+      },
+      "check": "tolerant"
+    },
+    "rose": {
+      "size": [
+        512,
+        512
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "848ccef8ba15157f32a9088f7f087ba6e89b2bf2293c928a473af842112d9084",
+        "2x": "04e4e5111b6d4214cf17ba33aee7ce4cea28e5b4740d34c450d2b63a6d8d6333"
+      },
+      "check": "tolerant"
+    },
+    "menu_shade": {
+      "size": [
+        480,
+        270
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1
+      ],
+      "subdir": "menu",
+      "sha": {
+        "1x": "2cad721c80f5793c3c8b53f2948532345c02743b21b032464c297846d8b84f01"
+      },
+      "check": "exact"
+    },
+    "menu_bg": {
+      "size": [
+        1920,
+        1080
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 1,
+      "scales": [
+        1
+      ],
+      "subdir": "menu",
+      "sha": {
+        "1x": "193c59b144cbd0d8d90de9e75f3cb2aa203c61e3376acf6d71bee36c93d73613"
+      },
+      "check": "exact"
+    }
+  }
+}
