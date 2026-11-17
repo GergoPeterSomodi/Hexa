@@ -123,7 +123,7 @@ It needs the M3 core from M3's own build spec: `Game.turn`, `PHASES` in `core/ga
 | R10 (Haiku, M) | E | **The report screen** | `shell/screens/season_report.tscn/.gd`, `tests/shell/test_season_report.gd`; edit `shell/screens/screen_ids.gd` | Spec 6.8 against `report_m4.jpg` cut to M3's sections; links glide; the quiet state |
 | R11 (Haiku, S) | F | **Monkey, pictures, perf** | edit `tests/shell/test_ui_monkey.gd`, `godot/tools/ui/shot_ui.gd`, `godot/tests/perf_ui_budget.json`, `tests/fixtures/ui_sample.gd` | The invariants and budgets of spec 11 for the report |
 
-Bake slice 2 (minimap frame, shield, pennant) ships with M2's own UI tasks, in `tools/ui_bake/pieces_m2.py`.
+Bake slice 2 (minimap frame, shield rims, pennant pole and cloth) ships with M2's own UI tasks, in `tools/ui_bake/pieces_m2.py` (task C5 of `m2-build-plan.md`).
 
 ### S3: the works preview and the Economy page (M4)
 

@@ -200,7 +200,7 @@ signed-distance bevel for edges). It writes `godot/assets/baked/ui/*.png` and a 
 | `menu_bg` (graded far map; freed after the menu) | 1920 x 1080 | none | S | 1 |
 | `cartouche` | 96 x 36 | L/R 24, T/B 18 | S | 2 |
 | `minimap_frame` | 256 x 144 | L/R 56, T/B 16 | M | 2 |
-| `shield_rim`, shield mask, `pennant` | 48 x 56 | none | M | 2 |
+| `shield_rim` and `shield_rim_sm`; `pennant_pole`, `pennant_cloth` (the arms are drawn in code under the rim: `m2-build-spec.md` 7.2) | 48 x 56, 20 x 24; 24 x 56, 28 x 20 | none | M | 2 |
 | `medallion_64`, `medallion_30`, `endseason_plate_*`, `dial_hand` | as named | none | M | 3 |
 | `seal` (3 tones), `seal_cracked` | 72 x 72 | none | M | 3 |
 | Medallion icon set | 24 px | none | L | 4 |

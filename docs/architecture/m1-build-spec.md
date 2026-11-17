@@ -223,7 +223,8 @@ the next layer.
 | 50 | lines | one mesh node per chunk of 32 x 32 cells | | section 6 |
 | 60 | shadow group (`CanvasGroup`, alpha 0.18): `piece_shadow`, `addon_shadow` | plain, drawn solid | `.../shadow` | so overlapping shadows are no darker than one |
 | 70 | standing group (`y_sort_enabled`): `relief`, `trees0` ... `trees5`, `piece_back`, `piece_front`, `addon` (each `y_sort_enabled`); later the army tokens | y-sorted | | depth = cell y + tile `y_sort` |
-| 80 | `tint` (M2), `fog` (later) | plain, modulated | `mark/white` | owner |
+| 80 | the mode overlay (M2: `ModeOverlay`, one shader quad, not a `TileMapLayer`; `m2-build-spec.md` 6.2), fog later in the same node | shader | | owner, height |
+| 85 | borders (M2): one mesh node per chunk of 32 x 32 cells (`m2-build-spec.md` 6.3) | | | owner |
 | 90 | `marks` | plain | `mark/select`, `mark/target` | selection, build targets |
 | 100 | names | `Label`s for what is on screen | | places |
 

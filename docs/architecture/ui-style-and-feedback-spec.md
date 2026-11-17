@@ -53,7 +53,7 @@ The open questions of `game-feedback-screens.md` D.7, taken as recommended.
 | 6.5 | High contrast is built flat; also the low-memory theme (4.9) |
 | 6.7 | 860 x 580; Back in the header; footer Defaults and **Apply** (commits staged window rows, then the 10 s question). Rows follow `Settings.SCHEMA`, not the mockup's samples |
 | 7 | The "What changed" card becomes the season report; `season_ended(turn: int)`; `cancel_work` in M3; walnut plank, medallion chips, year medallion, swallow-tail toasts, hexagon minimap frame, key hints (`shell/hud/key_hints.gd`) |
-| 8 | "`StyleBoxFlat` and fonts only" becomes baked 9-slices, the flat list and fonts; **no shaders in the UI** |
+| 8 | "`StyleBoxFlat` and fonts only" becomes baked 9-slices, the flat list and fonts; **no shaders in the UI** (Controls, the Theme, the HUD and screens). Map layers may use a canvas shader that reads only its own textures, never the screen: the M1 shadow group and the M2 map-mode overlay (`m2-build-spec.md` 6.2), which the minimap also draws over its copy of the map |
 | plan 4 M3, M4 | `shell/screens/season_report.*` (was `shell/hud/`); the ledger is the study's Economy page (was `shell/panels/ledger.*`) |
 
 ## 3. What is there today (master `d28e5e8`)
@@ -176,7 +176,7 @@ All also baked at 2x except the menu art. Import: lossless, no mipmaps; never VR
 | `progress_fill`; `seal`; `stud`; `glow_soft`; `rule_diamond` | 32 x 12; 72 x 72; 12 x 12; 64 x 64; 256 x 12 | glow M 24 | 1 |
 | `icons_base` (arrows, tick, cross, lock, dash, close, menu, help, zoom) | 128 x 32 | 16 px cells | 1 |
 | `wordmark`; `rose`; `menu_shade`; `menu_bg` | 1024 x 256; 512 x 512; 480 x 270; 1920 x 1080 | | 1 |
-| `minimap_frame`; `shield_rim`, `shield_mask`, `pennant` | 256 x 144; 48 x 56 | frame M 56, 16 | 2 (M2) |
+| `minimap_frame`; `shield_rim`, `shield_rim_sm`; `pennant_pole`, `pennant_cloth` (white, tinted at run time) | 256 x 144; 48 x 56, 20 x 24; 24 x 56, 28 x 20 | frame M 56, 16 | 2 (M2; the arms are polygons drawn in code under the rim, so no mask: `m2-build-spec.md` 7.2) |
 | `medallion_64`, `medallion_30`, `dial_quarters`, `dial_hand`, `hourglass` | 64, 30, 64, 64, 24 square | | 3 (M3) |
 | `endseason_plate_{normal,hot,pressed,off}`; `seal_good`, `seal_plain`, `seal_cracked` | 160 x 44; 72 x 72 | plate M 28, 22, 44, 22 | 3 (M3) |
 | `vellum_inset`; `strip_cell`, `strip_cell_now` | 96 x 96; 48 x 48 | M 16, C 10, tile; M 12, C 6 | 4 (M4) |

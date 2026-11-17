@@ -338,7 +338,7 @@ navigation. Modifier chords use `command_or_control_autoremap`, so "Ctrl" is Cmd
 | `game_end_season` | Space, Enter | | Game | 3 |
 | `game_quicksave` / `game_quickload` | F5, Ctrl+S / F9, Ctrl+L | Cmd+S / Cmd+L | Game | 3 |
 | `cam_bookmark_go_1..9` / `cam_bookmark_set_1..9` | Ctrl+1..9 / Ctrl+Shift+1..9 | Cmd | Camera | 3 |
-| `view_mode_1..4` | 1-4 (political, terrain, relief, then supply or trade) | | View | 2 |
+| `view_mode_1..4` | 1 Terrain, 2 Owner, 3 Relief (M2); 4 Supply (M6) | | View | 2 |
 | `ui_find_place` | Ctrl+F | Cmd+F | View | 2 |
 | `game_country` | C | | Game | 2 |
 | `game_ledger` | L | | Game | 4 |
@@ -626,7 +626,7 @@ add a third.
 | Tooltip delay | **1.5**: Short 0.2 s, Normal 0.5 s, Long 1.0 s (Normal) | `ProjectSettings gui/timers/tooltip_delay_sec` set at start and on change (that the engine reads it live is confirmed in the probe; else it applies after a restart and the row says so); the map's hover card uses the same value | `accessibility/tooltip_delay` |
 | UI scale | **1.5** (also on Display) | section 6.2 | `display/ui_scale` |
 | Keyboard-only play | **1.5** for every screen and map toggle; the hex cursor and unit cycling in M6; the panel's build list by key in M12 | focus, InputMap | |
-| Colour-blind safe country colours | **M2** (with the owner colours): a second palette chosen for the common colour-vision types, plus a pattern on occupied land | the tint layer's per-country modulate; the minimap and the mode overlay read the same palette | `accessibility/country_colours` |
+| Colour-blind safe country colours | **M2** (with the owner colours): a second palette chosen for the common colour-vision types (`m2-build-spec.md` 4.6); the pattern on occupied land comes with occupation (M7) | the mode overlay's palette texture and the border meshes; the minimap and the mode overlay read the same palette | `accessibility/country_colours` |
 | Text size | **M12**: 100 % to 150 %. The Theme's sizes are tokens, so the App scales a duplicate of the Theme's font sizes; the containers reflow. Until then UI scale covers it | a runtime copy of the Theme | `accessibility/text_size` |
 | High contrast | **M12**: a second token set (`build_theme.gd` writes `theme_high_contrast.tres`): brighter lines, no translucent panels, thicker selection ring and grid | `gui/theme/custom` swapped at start | `accessibility/high_contrast` |
 
@@ -668,7 +668,7 @@ first slice), a milestone, or **skip**.
 | Hover card on the map | next to the pointer, kept inside `MapArea` | after the tooltip delay with the pointer still on one hex, not over the UI, not dragging: `HexCard.of(game, hex)` from `core/views` (hex column and row, place, cover, height in metres, relief level, winter climate, rivers, roads, pass, what stands and its level; the owner from M2, people M5, army M6). Listens to `MapInput.hover_changed` and `Events.hex_changed` | **1.5** |
 | Layers popover | a top-bar button opening a `PopupPanel` | grid, place names, relief shading, season preview (Spring, Summer, Autumn, Winter); borders and owner tint in M2. Writes `Settings` (or `season_preview_requested`); the map scene applies | **1.5** |
 | Villages switch | | dropped by the M1 spec (all villages show) | **skip** (unless the owner wants it back) |
-| Map-mode switcher | top bar, a `Segmented` group, keys 1-4 | Terrain (the tiles), Owner, Relief (a height tint); later Supply (M6) and Trade (M10). A mode is drawn by **one overlay node**: a full-map quad with a shader that finds the hex under each pixel (odd-r) and reads a data texture of one pixel a hex (`core/views/map_modes.gd` gives the colours). One draw for any mode; `hex_changed` rewrites one pixel | M2 |
+| Map-mode switcher | top bar, a `Segmented` group, keys 1-4 | Terrain (the tiles), Owner, Relief (a height tint); later Supply (M6) and Trade (M10). A mode is drawn by **one overlay node**: a full-map quad with a shader that finds the hex under each pixel (odd-r) and reads two one-byte-a-hex textures (owner id, height band) and a palette (`core/views/map_modes.gd` builds them; `m2-build-spec.md` 6.2). One draw for any mode; a mode switch is a uniform; an owner change rewrites one texel | M2 |
 | Minimap | bottom right, above the zoom control | draws the far picture's `ImageTexture` (shared with `FarMap`; no extra memory), the camera's rectangle from `view_changed`; a click or drag sends `look_at_requested`. On north Italy the whole map fits the screen, so it matters from Europe on; with owner colours from M2 it is useful earlier | M2 |
 | Place search ("go to") | a `LineEdit` popup, Ctrl/Cmd+F | matches `MapData.places` by name (prefix first, then substring, then accent-free); Enter glides there and selects the hex | M2 |
 | Camera bookmarks | Ctrl/Cmd+1..9 jump, Ctrl/Cmd+Shift+1..9 set | stored with the game (the save's UI block), so they follow the map and the country; a toast "Bookmark 3 set" | M3 |
@@ -706,7 +706,8 @@ first slice), a milestone, or **skip**.
   (`tools/perf_map.gd`) runs without the HUD; the UI probe measures the frame with the HUD up.
 - **Compatibility renderer.** No 3D, no shaders in the UI: baked 9-slice textures (`StyleBoxTexture`), `StyleBoxFlat`
   for the flat pieces, and fonts (`ui-style-and-feedback-spec.md` section 4). The mode overlay
-  shader is plain GLSL ES 3.0 that the Compatibility renderer runs.
+  shader is plain GLSL ES 3.0 that the Compatibility renderer runs; it is a map layer, reads only its own textures and
+  never the screen, and the minimap uses the same material on its copy of the map (`m2-build-spec.md` 1.2).
 - **Stretch and HiDPI** as in 6.2. The art is baked at 1x, so on a Retina screen at UI scale 2 the map is upsampled x2 at
   zoom 1; a 2x bake is a question for the map-look milestone (section 11).
 - **Power.** `OS.low_processor_usage_mode` on by default: a still map draws nothing (section 6.2). The background
