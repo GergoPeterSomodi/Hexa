@@ -16,14 +16,18 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   `.github/workflows/godot.yml`) fails a pull request that changes a file under `hexa/`. The Python `tools/` folder may gain
   the exporters (`export_data.py`, `export_geography.py`, ...) and the map art tools (`tools/worldmap/`, `bake_art.py`); they
   import `hexa` through its public API.
-- **New work goes to `godot/`.** The map is the north Italy district map (`shell/worldmap/north_italy_map.tscn`, the main
-  scene); the 0.3.0 Europe map, its builder and the Kenney bake are retired. The layers, bottom to top: `defs`, `state`,
-  `systems`, `game`, `ai`, `views`, `shell` (`mapgen` sits beside `systems` and runs only in tools). A file uses its own
-  layer or a lower one. `core/` has no engine calls and extends `RefCounted`; luck only through `core/rng.gd`; Godot 4 only,
-  typed GDScript, scenes as text. A script over 800 lines needs a reason in `tools/lint_godot.py`, over 1,200 it is split; a
-  function over 100 lines is split.
-- **Autoloads:** two, both in the shell, each arriving with its milestone: `Session` (holds the game, the one door to the
-  rules) and `Events` (the bus). `core/` never reads an autoload; any other autoload needs a reason in `godot/README.md`.
+- **New work goes to `godot/`.** The map is the north Italy district map (`shell/map/map_scene.tscn`, the main scene,
+  built on `MapData` in `core/defs/map_data.gd`, `MapState` in `core/state/map_state.gd`, `Improve` in
+  `core/systems/improve.gd`, `Game` and `Actions` in `core/game/`, the pure view helpers in `core/views/`, `TileMapView`
+  and `MapLabels` in `shell/mapview/`, `HexPanel` in `shell/panels/hex_panel.tscn`, and `MapInput` in
+  `shell/input/map_input.gd`); the 0.3.0 Europe map, its builder, the Kenney bake and the whole-map prototype scene are
+  retired. The layers, bottom to top: `defs`, `state`, `systems`, `game`, `ai`, `views`, `shell` (`mapgen` sits beside
+  `systems` and runs only in tools). A file uses its own layer or a lower one. `core/` has no engine calls and extends
+  `RefCounted` (`Resource` in `core/defs/`); luck only through `core/rng.gd`; Godot 4 only, typed GDScript, scenes as
+  text. A script over 800 lines needs a reason in `tools/lint_godot.py`, over 1,200 it is split; a function over 100
+  lines is split.
+- **Autoloads:** two, both in the shell (`shell/autoload/`): `Session` (holds the game, the one door to the rules) and
+  `Events` (the bus). `core/` never reads an autoload; any other autoload needs a reason in `godot/README.md`.
 - **A refactor never rides with a behaviour change.** One system per milestone (section 9 of the standard), each playable
   and tested before the next starts.
 - **Engine:** Godot 4.7.2-stable, pinned in `godot/project.godot`, in CI and in the README. Upgrade only between releases,
@@ -34,6 +38,8 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   python tools/lint_godot.py godot                                 # layers, size limits, core/ rules, luck, Godot 3 spellings
   "$GODOT" --headless --path godot --script res://tools/check_scripts.gd   # parse every script
   "$GODOT" --headless --path godot --quit                          # open the main scene (the north Italy map) and quit
+  "$GODOT" --headless --path godot -s res://tools/build_tileset.gd -- --check   # check committed TileSets
+  "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --check       # check committed MapData
   "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit   # GUT
   "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe   # Windows build
   ```

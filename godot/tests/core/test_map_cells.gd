@@ -1,56 +1,30 @@
-## MapCells and the chunk lines of EdgeLines (docs/architecture/m1-build-spec.md sections 5 and 6): the tile of every
-## layer of a hex from MapData and MapState, and the lines of a chunk cut as the whole map's lines are cut.
-## The fixture tests/fixtures/trial_cells.json is written by tools/mapview/dump_trial_cells.gd: the trial scene's north
-## Italy facts as map arrays, one seed's improvement as state arrays, and the names the trial scene puts on its layers.
+## MapCells and the chunk lines of EdgeLines (docs/architecture/m1-build-spec.md sections 5, 6 and 10): the tile of every
+## layer of a hex from MapData and MapState, every tile existing in assets/tiles/summer/index.json on north Italy and on a
+## 60 x 40 fake map (wild and after 500 random builds), crossings on crossing0..2, and the lines of a chunk cut as the
+## whole map's lines are cut.
 extends GutTest
 
-const FIXTURE := "res://tests/fixtures/trial_cells.json"
-const TRIAL_INDEX := "res://assets/tiles/trial/index.json"
-const TRIAL_GRID_TILE := "grid/line"
+const NORTH_ITALY := "res://data/maps/north_italy.tres"
+const SUMMER_INDEX := "res://assets/tiles/summer/index.json"
 
-var _fixture: Dictionary = {}
+var _north_italy: MapData = null
+var _north_italy_state: MapState = null
+var _summer: Dictionary = {}
 var _seed := 12345
 
 
 func before_all() -> void:
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(FIXTURE))
-	_fixture = parsed if typeof(parsed) == TYPE_DICTIONARY else {}
+	_north_italy = load(NORTH_ITALY) as MapData
+	_north_italy_state = Game.new_game(_north_italy, 1480).state
+	_summer = _summer_names()
 
 
-## The trial's facts as a MapData.
 func _map() -> MapData:
-	var m := MapData.new()
-	m.id = "trial"
-	m.hex_w_km = 28.0
-	m.ref_lat = 45.0
-	m.allocate(int(_fixture["cols"]), int(_fixture["rows"]))
-	for i: int in m.hex_count():
-		m.land[i] = int(_fixture["land"][i])
-		m.height_m[i] = int(_fixture["height"][i])
-		m.relief[i] = int(_fixture["relief"][i])
-		m.cover[i] = int(_fixture["cover"][i])
-		m.depth[i] = int(_fixture["depth"][i])
-		m.place_id[i] = int(_fixture["place_id"][i])
-	for p: Dictionary in _fixture["places"]:
-		var at: Array = p["hex"]
-		var place := p.duplicate()
-		place["hex"] = Vector2i(int(at[0]), int(at[1]))
-		m.places.append(place)
-	for e: Array in _fixture["river"]:
-		m.river[m.edge_index(Vector2i(int(e[0]), int(e[1])), int(e[2]))] = int(e[3])
-	for e: Array in _fixture["crest"]:
-		m.crest[m.edge_index(Vector2i(int(e[0]), int(e[1])), int(e[2]))] = 1
-	for e: Array in _fixture["road"]:
-		m.road[m.edge_index(Vector2i(int(e[0]), int(e[1])), int(e[2]))] = int(e[3])
-	return m
+	return _north_italy
 
 
-func _state(m: MapData) -> MapState:
-	var s := MapState.create(m)
-	for i: int in m.hex_count():
-		s.main_use[i] = int(_fixture["main_use"][i])
-		s.level[i] = int(_fixture["level"][i])
-	return s
+func _state(_m: MapData) -> MapState:
+	return _north_italy_state.duplicate_state()
 
 
 func _next(n: int) -> int:
@@ -58,42 +32,9 @@ func _next(n: int) -> int:
 	return (_seed >> 8) % n
 
 
-func test_of_hex_gives_the_names_the_trial_scene_gives() -> void:
-	var m := _map()
-	var s := _state(m)
-	var have := _trial_names()
-	var window: Array = _fixture["window"]
-	var expected: Dictionary = _fixture["expected"]
-	var wrong := 0
-	var built := 0
-	var named := 0
-	for entry: Variant in window:
-		var at: Array = entry
-		var hex := Vector2i(int(at[0]), int(at[1]))
-		var want: Dictionary = expected["%d,%d" % [hex.x, hex.y]]
-		var got := MapCells.of_hex(m, s, hex)
-		if got["grid"] == MapCells.GRID_TILE:
-			got["grid"] = TRIAL_GRID_TILE  # the trial tileset's name for the grid line
-		for layer_name: String in MapCells.LAYERS:  # the trial view clears a cell whose tile the trial bake lacks
-			if not have.has(str(got[layer_name])):
-				got[layer_name] = ""
-		built += 1 if got["piece_ground"] != "" else 0
-		for layer_name: String in MapCells.LAYERS:
-			var w := str(want.get(layer_name, ""))
-			named += 1 if w != "" else 0
-			if str(got[layer_name]) != w:
-				wrong += 1
-				if wrong <= 10:
-					gut.p("hex %s layer %s: want '%s', got '%s'" % [hex, layer_name, w, got[layer_name]])
-	assert_eq(window.size(), 148)
-	assert_gt(built, 10, "the fixture has built hexes")
-	assert_gt(named, 800)
-	assert_eq(wrong, 0, "layers that differ from the trial scene")
-
-
-## The tile names of the trial tileset (assets/tiles/trial/index.json) as a set, with "" in it.
-func _trial_names() -> Dictionary:
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(TRIAL_INDEX))
+## The tile names of the summer tileset (assets/tiles/summer/index.json) as a set, with "" in it.
+func _summer_names() -> Dictionary:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SUMMER_INDEX))
 	var index: Dictionary = parsed
 	var have: Dictionary = {"": true}
 	for source: Dictionary in index["sources"]:
@@ -102,20 +43,81 @@ func _trial_names() -> Dictionary:
 	return have
 
 
-func test_only_pieces_are_missing_from_the_trial_tileset() -> void:
-	var have := _trial_names()
-	var m := _map()
-	var s := _state(m)
+## A piece's back or shadow part is omitted from the bake when nothing stands in that band (the view clears the cell).
+func _in_tileset(tile_name: String) -> bool:
+	if _summer.has(tile_name):
+		return true
+	return tile_name.begins_with("piece/") and (tile_name.ends_with("/back") or tile_name.ends_with("/shadow"))
+
+
+func _missing_on_map(m: MapData, s: MapState) -> Array[String]:
 	var missing: Dictionary = {}
-	for entry: Variant in _fixture["window"]:
-		var at: Array = entry
-		var cells := MapCells.of_hex(m, s, Vector2i(int(at[0]), int(at[1])))
+	for i: int in m.hex_count():
+		var cells := MapCells.of_hex(m, s, m.hex_of(i))
 		for layer_name: String in cells:
-			var n := str(cells[layer_name])
-			if not have.has(n) and not n.begins_with("piece/") and n != MapCells.GRID_TILE:
-				missing[n] = true
-	# (The trial bake drew only the pieces of its own improvement, so some piece tiles are not in it.)
-	assert_eq(missing.size(), 0, "tiles that are not pieces and not in the trial tileset: %s" % [missing.keys()])
+			var tile_name := str(cells[layer_name])
+			if not _in_tileset(tile_name):
+				missing[tile_name] = true
+	var out: Array[String] = []
+	out.assign(missing.keys())
+	out.sort()
+	return out
+
+
+func test_north_italy_wild_and_built_names_are_in_the_summer_tileset() -> void:
+	var m := _map()
+	var wild := MapState.create(m)
+	var built := _state(m)
+	assert_eq(_missing_on_map(m, wild), [] as Array[String], "wild north Italy has no missing tile")
+	assert_eq(_missing_on_map(m, built), [] as Array[String], "built north Italy has no missing tile")
+	var built_hexes := 0
+	var crossings := 0
+	for i: int in m.hex_count():
+		var hex := m.hex_of(i)
+		var got := MapCells.of_hex(m, built, hex)
+		built_hexes += 1 if got["piece_ground"] != "" else 0
+		var want_crossings := Crossings.of_hex(m, hex)
+		for layer_name: String in Crossings.LAYERS:
+			assert_eq(got[layer_name], want_crossings[layer_name], "hex %s %s" % [hex, layer_name])
+			if str(got[layer_name]) != "":
+				assert_true(_summer.has(str(got[layer_name])), str(got[layer_name]))
+				crossings += 1
+	assert_gt(built_hexes, 50, "north Italy has built hexes")
+	assert_eq(crossings, Crossings.all_of(m).size(), "every crossing of north Italy is on crossing0..2")
+
+
+func test_fake_map_wild_and_after_500_random_builds_has_no_missing_tile() -> void:
+	var m := FakeMap.build(60, 40, 1480)
+	var s := MapState.create(m)
+	assert_eq(_missing_on_map(m, s), [] as Array[String], "wild 60x40 fake map has no missing tile")
+	var game := Game.with_state(m, s)
+	var land_hexes: Array[Vector2i] = []
+	for i: int in m.hex_count():
+		if m.land[i] == 1:
+			land_hexes.append(m.hex_of(i))
+	var builds := 0
+	var attempts := 0
+	while builds < 500 and attempts < 4000:
+		attempts += 1
+		var hex := land_hexes[_next(land_hexes.size())]
+		var idx := m.index_of(hex)
+		if game.state.main_use[idx] == ImproveRules.NONE:
+			var options := Improve.build_options(game, hex)
+			var allowed: Array[int] = []
+			for opt: Dictionary in options:
+				if bool(opt["ok"]):
+					allowed.append(int(opt["family_id"]))
+			if not allowed.is_empty():
+				var fam := allowed[_next(allowed.size())]
+				game.state.main_use[idx] = fam
+				game.state.level[idx] = 1 + _next(ImproveRules.TOP_LEVEL[fam])
+				builds += 1
+		else:
+			game.state.main_use[idx] = ImproveRules.NONE
+			game.state.level[idx] = 0
+			builds += 1
+	assert_eq(builds, 500, "500 random builds completed")
+	assert_eq(_missing_on_map(m, game.state), [] as Array[String], "60x40 fake map after 500 random builds has no missing tile")
 
 
 func test_layers_are_the_views_layers() -> void:
@@ -236,7 +238,7 @@ func _lined_map() -> MapData:
 	return m
 
 
-## The lines of the whole map as the trial scene builds them, for the reference.
+## The lines of the whole map built in one pass, for the reference.
 func _all_lines(m: MapData) -> Array[Dictionary]:
 	var lines: Array[Dictionary] = []
 	var scale := Vector2(float(MapTiles.CELL.x) / m.hex_w_km, MapTiles.ROW / m.grid().hex_h_km)

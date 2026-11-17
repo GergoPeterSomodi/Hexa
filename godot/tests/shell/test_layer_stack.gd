@@ -54,7 +54,7 @@ func test_lines_shadows_and_the_standing_group() -> void:
 	for layer_name: String in ["piece_shadow", "addon_shadow"]:
 		assert_eq(_view.layer(layer_name).get_parent(), shadows, layer_name)
 	var stand: Array[String] = ["relief", "trees0", "trees1", "trees2", "trees3", "trees4", "trees5", "piece_back",
-		"piece_front", "addon"]
+		"piece_front", "addon", "crossing0", "crossing1", "crossing2"]
 	for layer_name: String in stand:
 		assert_eq(_view.layer(layer_name).get_parent(), standing, layer_name)
 		assert_true(_view.layer(layer_name).y_sort_enabled, "%s is y-sorted" % layer_name)
@@ -62,7 +62,7 @@ func test_lines_shadows_and_the_standing_group() -> void:
 	for layer_name: String in ["ground", "shade", "sea", "coast"]:
 		assert_false(_view.layer(layer_name).y_sort_enabled, layer_name)
 	# Every layer of the table is there, and the view's list is the table.
-	assert_eq(TileMapView.LAYERS.size(), 20)
+	assert_eq(TileMapView.LAYERS.size(), 23)
 
 
 func test_sort_points_back_to_front_inside_a_hex() -> void:
@@ -98,6 +98,14 @@ func test_sort_points_back_to_front_inside_a_hex() -> void:
 	assert_gt(front, 0)
 	assert_gt(shadows, 0)
 	assert_gt(addon_south, 0)
+	# Crossings sit on their edge (y_sort = round(edge_middle.y) + 1): owned directions 0..2 are +1 or -37 (within
+	# half a row, 38.25 px, so rows never swap); directions 4..5 (+39) are baked for completeness and never placed.
+	for tile_name: String in Crossings.all_names():
+		var d := int(tile_name.split("/")[2])
+		var limit := 38 if d < Crossings.OWNED else 39
+		assert_lte(absi(_data(tile_name).y_sort_origin), limit, tile_name)
+	assert_lt(_data("mark/bridge_stone/1").y_sort_origin, 0)
+	assert_gt(_data("mark/bridge_stone/4").y_sort_origin, 0)
 
 
 func test_ranks_of_the_ground_covers() -> void:

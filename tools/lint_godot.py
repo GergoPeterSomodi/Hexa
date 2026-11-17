@@ -47,7 +47,6 @@ FUNC_LIMIT = 100
 SIZE_REASONS = {
     "core/mapgen/world_water.gd": "one routing model: corners, courses, the flood and the router share their state; "
                                   "split again when the Europe map arrives",
-    "shell/worldmap/north_italy_map.gd": "the prototype scene; M1 replaces it with the layered map view",
 }
 
 CORE_FORBIDDEN = [

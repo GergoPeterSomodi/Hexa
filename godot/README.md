@@ -3,9 +3,10 @@
 The Godot version of Age of Discovery. The standard is `docs/architecture/godot-architecture.md` (decided 2026-11-15);
 this page is its short form for the folder. Windows builds only. The Python game in `hexa/` is frozen at v0.2.2 and is
 the gameplay reference, not something to edit. The game itself arrives milestone by milestone (section 9 of the
-standard). Today the project opens on the **north Italy map** (`shell/worldmap/north_italy_map.tscn`, the main scene):
-the 28 km district map with its pieces, the four seasons, select, build, upgrade and clear. The 0.3.0 Europe map, its
-builder and the Kenney bake are retired.
+standard). Today the project opens on the **north Italy map** (`shell/map/map_scene.tscn`, the main scene):
+the 28 km district map on stacked hex `TileMapLayer`s with its pieces, crossings, place names, far picture, the four
+seasons, and select, build, upgrade and clear through `Session.act`. The 0.3.0 Europe map, its builder, the Kenney bake
+and the whole-map prototype scene are retired.
 
 ## Engine
 
@@ -18,25 +19,35 @@ builder and the Kenney bake are retired.
 ## Layout
 
 ```
-project.godot           engine pin, warning levels, main scene, GUT plugin
-core/                   plain GDScript, extends RefCounted, no Node, no scene tree, runs headless
+project.godot           engine pin, warning levels, main scene, autoloads (Session, Events), GUT plugin
+core/                   plain GDScript, extends RefCounted (or Resource in defs/), no Node, no scene tree, runs headless
   rng.gd  hexgrid.gd  geo.gd   luck (the only source), the one hex grid (HexGrid), the Mercator projection
-  defs/                 definitions (Resource classes)                 empty until M1
-  state/                the facts: WorldRegion, WorldHeights, ReliefLevels (the fixed map data)
-  systems/              the rules: WorldImprove (the improvement of each hex) with ImproveRules (tables and cell and
-                        pair rules) and ImproveSolver (the wave function collapse search)
-  game/ ai/ views/      Game, the action table, the season table, AI, "what to draw" lists   empty until their milestones
+  defs/                 definitions (Resource classes): map_data.gd (MapData)
+  state/                changing state: map_state.gd (MapState), plus WorldRegion, WorldHeights, ReliefLevels
+  systems/              the rules: improve.gd (Improve: build/upgrade/clear actions and checks) with WorldImprove,
+                        ImproveRules and ImproveSolver (the wave function collapse search)
+  game/                 game.gd (Game), actions.gd (the action table)
+  ai/                   empty until its milestone
+  views/                pure "what to draw" helpers: map_tiles.gd, map_cells.gd, edge_lines.gd, crossings.gd,
+                        far_picture.gd
   mapgen/               generators, run in tools and tests only: WorldRelief, WorldWater (with WaterCurves and
-                        WaterSearch), WorldCover, WorldPlaces, WorldRoads
+                        WaterSearch), WorldCover, WorldPlaces, WorldRoads, climate.gd, fake_map.gd
 shell/                  everything with Nodes
-  worldmap/             the north Italy map scene and its layers (replaced by shell/map in M1)
-  app/ map/ hud/ panels/ screens/ ui/ input/ editor/ autoload/   empty until their milestones
-tests/core/ tests/shell/ tests/fixtures/     GUT tests (test_*.gd)
-tools/                  headless GDScript tools (check_scripts.gd; worldmap/ for the map: improve_report.gd,
-                        shot_north_italy.gd, render_region.gd, compose_side_by_side.gd)
-data/                   data: geography/ (JSON from Python), worldmap/ (the north Italy region and heights), the
-                        exported goods, units, buildings, countries and terrain. See data/README.md
-assets/worldmap/        the baked map art (see assets/worldmap/README.md)
+  autoload/             session.gd (Session) and events.gd (Events)
+  map/                  map_scene.tscn + map_scene.gd (the map scene), hex_panel_contract.gd
+  mapview/              tile_map_view.gd, tileset_builder.gd, edge_line_layer.gd, far_map.gd, map_labels.gd,
+                        shadow_cover.gdshader
+  panels/               hex_panel.tscn + hex_panel.gd
+  ui/                   theme.tres, panel_kit.gd
+  input/                map_input.gd
+  app/ hud/ screens/ editor/   empty until their milestones
+tests/core/ tests/shell/     GUT tests (test_*.gd) and perf_budget.json
+tools/                  GDScript tools: check_scripts.gd, build_map.gd, build_tileset.gd, perf_map.gd,
+                        mapview/probe_ysort.gd, worldmap/improve_report.gd
+data/                   data: maps/north_italy.tres, geography/ (JSON from Python), worldmap/ (the north Italy region
+                        and heights), the exported goods, units, buildings, countries and terrain. See data/README.md
+assets/tiles/           the six baked tile sets (spring, summer, autumn, winter_snow, winter_frost, winter_mild) and the
+                        committed TileSets tiles_spring.tres ... tiles_winter.tres
 addons/gut/             GUT 9.7.1, copied unchanged from its release (MIT, see addons/gut/LICENSE.md)
 ```
 
@@ -52,12 +63,11 @@ addons/gut/             GUT 9.7.1, copied unchanged from its release (MIT, see a
   in `core/` outside `rng.gd`.
 - **Node, RefCounted or Resource:** designed ahead and read-only in play is a Resource (`core/defs/`, files in `data/`);
   changing during a game is a RefCounted or a packed array; seen or clicked is a Node (`shell/`). Nodes hold no facts.
-- **Actions are pairs:** `x_check(...)` and `x(...)`; later they are registered in `core/game/actions.gd` and go through
-  `Game.act`. The shell changes state only through actions.
-- **Autoloads:** exactly two, both in the shell, both arriving with the milestone that needs them: `Session` (holds the
-  current `Game`; the only door from the shell to the rules) and `Events` (the bus, one signal per event kind). None
-  exists yet. `core/` never reads an autoload. Any other autoload needs a line here and a reason reviewed by the
-  technical director.
+- **Actions are pairs:** `x_check(...)` and `x(...)`, registered in `core/game/actions.gd` and called through
+  `Session.act` / `Game.act`. The shell changes state only through actions.
+- **Autoloads:** exactly two, both in the shell: `Session` (holds the current `Game`; the only door from the shell to the
+  rules) and `Events` (the bus, one signal per event kind). `core/` never reads an autoload. Any other autoload needs a
+  line here and a reason reviewed by the technical director.
 - **Size limits:** a script over 800 lines needs a reason (an entry in `SIZE_REASONS` of `tools/lint_godot.py`), over
   1,200 it is split; a function over 100 lines is split. The lint checks both.
 - **Godot 4 only:** no `yield`, `export var`, `onready var`, `setget`, string `connect(...)`, `.instance()`, `tool`
@@ -84,6 +94,10 @@ python tools/lint_godot.py godot
 # Open the main scene (the north Italy map) and quit at once
 "$GODOT" --headless --path godot --quit
 
+# Check or rebuild the committed TileSets (assets/tiles/tiles_<season>.tres) and map (data/maps/north_italy.tres)
+"$GODOT" --headless --path godot -s res://tools/build_tileset.gd -- --check
+"$GODOT" --headless --path godot -s res://tools/build_map.gd -- --check
+
 # GUT tests, headless, with a JUnit report
 "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit -gjunit_xml_file=gut-junit.xml
 
@@ -93,23 +107,24 @@ python tools/lint_godot.py godot
 # The improvement step in numbers per seed: search time, backtracks, pieces by family and level, rule breaks
 "$GODOT" --headless --path godot -s res://tools/worldmap/improve_report.gd -- --seeds=1480,1481
 
-# Pictures of the north Italy scene and its frame rate (windowed: nothing is drawn headless)
-"$GODOT" --path godot -s res://tools/worldmap/shot_north_italy.gd -- --out=<absolute folder>
+# Speed measurement on the 494 x 247 fake Europe map against tests/perf_budget.json (windowed)
+"$GODOT" --path godot -s res://tools/perf_map.gd
 ```
 
 The editor: open `godot/project.godot` with the same engine. GUT shows in the editor's plugin list.
 
 ## The map scene
 
-Keys: 1 to 4 the season, R a new seed, V the unnamed villages on or off, G the hex grid, F the whole map, H the panel;
-drag or WASD to move, the wheel to zoom. A left click selects a hex; the panel builds, upgrades (U) and clears it; a
-right click or Esc clears the selection. The art is baked by `tools/worldmap/bake_map_art.py` and
-`tools/worldmap/godot_bake/` (Python); the rules are `core/systems/world_improve.gd`.
+Keys: 1 to 4 the season, R a new seed, G the hex grid, N the place names, F the whole map, H the panel; drag or WASD
+to move, the wheel to zoom. A left click selects a hex; the panel builds, upgrades (U) and clears it through
+`Session.act`; a right click or Esc clears the selection. The tiles are baked by `tools/worldmap/tileset_bake/bake.py`
+(Python) and assembled into `assets/tiles/tiles_<season>.tres` by `tools/build_tileset.gd`; the map resource
+`data/maps/north_italy.tres` is built by `tools/build_map.gd`; the rules are `core/systems/improve.gd`.
 
 ## Checks in CI
 
 `.github/workflows/godot.yml`: on pull requests (and pushes) that touch `godot/` or `tools/`, the lint, the import, the
-script load, the main-scene start and the GUT tests. On a tag `v0.3.*` (or by hand), the Windows zip and a smoke start
-on a Windows runner. A guard job fails any pull request that changes a file under `hexa/` (frozen since v0.2.2). Still to
-come with their milestones: the map rebuild check (the committed map file is what the builder makes), the goldens, the
-performance and soak jobs.
+script load, the main-scene start, the `build_tileset --check` and `build_map --check` guards, and the GUT tests.
+Nightly (and by hand), `tools/perf_map.gd` on the fake Europe map. On a tag `v0.3.*` (or by hand), the Windows zip and a
+smoke start on a Windows runner. A guard job fails any pull request that changes a file under `hexa/` (frozen since
+v0.2.2).

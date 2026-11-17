@@ -66,10 +66,36 @@ func test_it_opens_on_tiles_of_the_whole_map() -> void:
 	var map := Session.game.map
 	assert_false(_scene.view().is_filling())
 	assert_gt(_scene.view().cell_count(), map.cols * map.rows, "every hex has at least a tile")
+	var crossings := 0
+	for layer_name: String in Crossings.LAYERS:
+		crossings += _scene.view().layer(layer_name).get_used_cells().size()
+	assert_eq(crossings, Crossings.all_of(map).size(), "every crossing of the map is on a crossing layer")
 	assert_eq(_unexplained_missing(), [] as Array[String], "every tile asked for is in the tileset or a blank piece part")
 	assert_eq(_scene.view().season(), "summer")
 	_scene.frame_at(_scene.map_size() / 2.0, 0.5)  # (a test window is 64 px square, so fit() would zoom far out)
 	assert_true(_scene.view().visible and not _scene.far().visible, "the tiles show at the start zoom")
+
+
+func test_place_names_are_off_by_default_and_toggle_shows_them() -> void:
+	assert_not_null(_scene.labels())
+	assert_eq((_scene.labels().get_parent() as CanvasLayer).layer, 5)
+	assert_false(_scene.labels().visible, "place names are off by default")
+	var map := Session.game.map
+	var place_hex: Vector2i = map.places[0]["hex"]
+	_scene.frame_at(_scene.view().centre_of(place_hex), 0.5)
+	_scene.toggle_names()
+	assert_true(_scene.labels().visible)
+	_scene.labels()._process(0.0)
+	var layout := MapLabels.layout(map, Transform2D(Vector2(1.0, 0.0), Vector2(0.0, 1.0), Vector2(640.0, 360.0) - _scene.view().centre_of(place_hex)),
+		Rect2(0.0, 0.0, 1280.0, 720.0), ThemeDB.fallback_font, [])
+	assert_gt(layout.size(), 0, "places near the camera are laid out on screen")
+	var press := InputEventKey.new()
+	press.keycode = KEY_N
+	press.pressed = true
+	_scene.labels()._unhandled_key_input(press)
+	assert_false(_scene.labels().visible, "key N toggles the place names off")
+	_scene.labels()._unhandled_key_input(press)
+	assert_true(_scene.labels().visible, "key N toggles the place names on")
 
 
 func test_a_click_selects_the_hex_under_it() -> void:
