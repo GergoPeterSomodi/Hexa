@@ -188,7 +188,8 @@ func digest() -> String                      # sha256 of every field in a fixed 
 ```
 
 `coast` (does the hex touch the sea) and the sea side are **derived** (`coast_mask`, `MapTiles.sea_side`), never
-stored. Read-only in play. `road` and `crossing` are the starting network; from M3 the living ones are in `MapState`.
+stored. Read-only in play. `road` and `crossing` are the starting network; the living ones join `MapState` with road
+works in M4 (`m3-build-spec.md` 1.2).
 
 ### `MapState` (`core/state/map_state.gd`, RefCounted): what changes
 

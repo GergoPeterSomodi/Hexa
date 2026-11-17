@@ -272,6 +272,13 @@ wrap Godot's controls.
 
 ## 6. The season report
 
+> **M3's build spec refines this section** (`m3-build-spec.md` 1.2, where it wins): the chronicle is its own
+> `Chronicle` on `Game`, written only by `Game.emit` (not `stats.chronicle`; `StatsSystem.chronicle` is dropped);
+> `SERIES` keeps 35 names with the **14** families of `ImproveRules` plus `works_running` and `works_finished`; M3's
+> notices are "a free work slot" and "winter stops works in the snow"; `Knowledge.witnessed` takes the game (a public
+> event is seen by countries that know its actor); `Events.chronicled(entry)` joins the typed signals; `view_cache`
+> arrives in M3. The M3 season table is works, stats, calendar; the autosave runs in the shell after the report.
+
 ### 6.1 How it is fed
 
 No polling. Actions go to `game.action_log`; money moves through `Treasury.move` into the ledger (M4); rules call

@@ -299,8 +299,8 @@ Studiolo adds kit pieces (`VellumSheet`, `Ribbon`, `Cartouche`, `NavList`, medal
 - **Act** with `Session.act(name, args)` and pre-check with `Session.check` (a `KitButton` shows the verdict).
 - **Listen** to `Events` signals: connect in `_enter_tree` or `on_enter`, disconnect in `_exit_tree` or `on_exit`
   (as `map_scene.gd` does today). Handlers redraw; they never act.
-- **Game lifecycle** through `Session`: `new_game(map_id, seed)`, `end_game()` (M1.5), `save(slot)`, `load(slot)`,
-  `list_saves()` (M3). `Session.unsaved_actions` counts the successful actions since the game started or was saved;
+- **Game lifecycle** through `Session`: `new_game(map_id, seed)`, `end_game()` (M1.5), `save_game(slot)`, `load_game(slot)`,
+  `list_saves()` (M3; named so in `m3-build-spec.md` 5.5). `Session.unsaved_actions` counts the successful actions since the game started or was saved;
   the App asks before losing them.
 - **App things** (settings, toasts, quit, main menu, screenshot) through the `ShellContext`.
 
@@ -338,6 +338,8 @@ navigation. Modifier chords use `command_or_control_autoremap`, so "Ctrl" is Cmd
 | `game_end_season` | Space, Enter | | Game | 3 |
 | `game_quicksave` / `game_quickload` | F5, Ctrl+S / F9, Ctrl+L | Cmd+S / Cmd+L | Game | 3 |
 | `cam_bookmark_go_1..9` / `cam_bookmark_set_1..9` | Ctrl+1..9 / Ctrl+Shift+1..9 | Cmd | Camera | 3 |
+| `game_undo_work` | Ctrl+Z (cancels the newest work begun this season; `m3-build-spec.md` 6.1) | Cmd+Z | Game | 3 |
+| `dev_console` | F2 (focuses the console at the foot of F3) | | Developer | 3 |
 | `view_mode_1..4` | 1 Terrain, 2 Owner, 3 Relief (M2); 4 Supply (M6) | | View | 2 |
 | `ui_find_place` | Ctrl+F | Cmd+F | View | 2 |
 | `game_country` | C | | Game | 2 |
@@ -677,7 +679,7 @@ first slice), a milestone, or **skip**.
 | Notifications | top right under the bar, a short stack | from `Events` (war declared, a battle, a work finished); click goes to the place | M3, M7 |
 | Action log | bottom left, collapsed one line | `Events` to lines (`shell/hud/log_feed.gd`), filters All, War, Money, Mine; links glide the camera | M3 |
 | "What changed" after a season | a card centred low, dismissed by Space, Esc or a click | built from the season's events (`Events.season_ended(summary)`): income, works finished, growth, battles; the task flag beside it | M3 |
-| Undo the last build this season | a button in the hex panel and the toast ("Undo") | **not Godot's `UndoRedo`**: game state changes only through actions. A rules action pair `cancel_work_check` / `cancel_work` (a work started this season is cancelled with a full refund) | M4 (when building costs money; until then Clear undoes) |
+| Undo the last build this season | "Cancel the work" in the hex panel; Ctrl/Cmd+Z, shown as a key cap in the toast (toasts take no clicks) | **not Godot's `UndoRedo`**: game state changes only through actions. A rules action pair `cancel_work_check` / `cancel_work` (a work started this season is cancelled with a full refund) | M3 (the action, with works that take seasons; `m3-build-spec.md` 4.3); the refund M4 |
 | Pause dim | the stack's shade | section 3.2 | **1.5** |
 | Confirm modals | centred | section 5.3 | **1.5** |
 | Loading overlay | new game: the `Loading` screen ("Building the map", then "Drawing the map 63 %" from `MapScene.fill_progress()`); a season swap that takes over 200 ms: a small pill at the top, "Changing season 40 %" | reads the map scene's progress | **1.5** |
@@ -686,7 +688,7 @@ first slice), a milestone, or **skip**.
 | Screenshot | F12 | `get_viewport().get_texture().get_image().save_png(...)` to `user://screenshots/`; a toast with the file name | **1.5** |
 | Photo mode | H | hides the HUD (exists); names stay as set | **1.5** (kept) |
 | F3 debug panel | top left under the bar (developer tools on) | four times a second: frames a second and the worst frame of the last second; `Performance` `TIME_PROCESS`, `RENDER_TOTAL_DRAW_CALLS_IN_FRAME`, `RENDER_TOTAL_OBJECTS_IN_FRAME`, `MEMORY_STATIC`, `RENDER_VIDEO_MEM_USED`, `RENDER_TEXTURE_MEM_USED`; from the view: chunks, layers, cells, line chunks, hexes on screen, fill and swap progress; zoom, season, seed, map digest (short), renderer. Controls: season preview, New seed, layer switches (grid, shade, light, trees, lines, far picture locked), far-zoom switch point, slice budget | **1.5** |
-| Developer console | a `LineEdit` over the F3 panel | commands are `Session.act` names with arguments (`build 12 7 farm`), plus `seed`, `season`, `goto c r`; a history | M3 (with the action log and its replay), developer tools only |
+| Developer console | a `LineEdit` at the foot of the F3 panel, F2 | commands are `Session.act` names with arguments (`build 12 7 wheat`), plus `end n`, `goto c r`, `look`, `give`, `digest`, `seed`; a history (`m3-build-spec.md` 6.13) | M3 (with the action log and its replay), developer tools only |
 
 ---
 

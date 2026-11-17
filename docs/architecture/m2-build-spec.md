@@ -502,7 +502,8 @@ home rule first, 7.6).
 
 ```gdscript
 # core/game/game.gd  (edit)
-var defs: GameDefs = null                   # null in a map-only game
+var defs: GameDefs = null                   # null in a map-only game in M2; set in every game from M3 (the sandbox needs
+	# the work times; m3-build-spec.md 1.2), so has_countries() is `scenario != null`
 var scenario: ScenarioDef = null            # null in a map-only game; fixed data, named by id in saves
 var countries: Array[Country] = []          # countries[id - 1]
 var player: StringName = &""                # the human's tag; &"" before the pick, in AI-only games, in a map-only game
@@ -527,7 +528,9 @@ const NAMES: Array[String] = ["build", "upgrade", "clear", "choose_country"]
 
 ### 5.5 Events
 
-Rules append to `game.events`; `Session` drains them into `Events` signals (standard 4.4).
+Rules append to `game.events`; `Session` drains them into `Events` signals (standard 4.4). From M3 they call
+`game.emit(event)`, which also stamps the turn and keeps the notable kinds in the chronicle, and `owners_changed` carries
+`tag` (the new owner) and `others` (the old owners) (`m3-build-spec.md` 4.4).
 
 | Event (queued dict) | Signal | Queued by | Heard by |
 |---|---|---|---|

@@ -271,11 +271,13 @@ season. The table grows by one row or two per milestone. The full order, taken f
 | 9 | People and growth | M5 |
 | 10 | Research | M11 |
 | 11 | Countries that are gone, scores | M12 |
-| 12 | Calendar: next season, weather | M3 |
-| 13 | Ready units, vision | M6 |
-| 14 | Autosave | M3 |
+| 12 | Stats: the season's rows (the ledger closes here from M4) | M3 |
+| 13 | Calendar: next season (weather from M4) | M3 |
+| 14 | Ready units, vision | M6 |
 
-A test pins the names in order. To change the order, change the table and the test in one pull request.
+A test pins the names in order. To change the order, change the table and the test in one pull request. The autosave
+is not a phase: the shell saves after the season's report closes (it needs a thumbnail and the wall clock, and changes
+nothing in the game; `m3-build-spec.md` 4.2 and 6.3).
 
 ### 5.4 Luck and determinism
 
@@ -442,7 +444,7 @@ at the level of the table; the system work of M2 and later is not yet specified.
 | M1 | `m1-build-spec.md` | its section 11 (T0 to T16) | done (T1 to T16 complete; the look decision is its section 14) |
 | M1.5 | `ui-and-controls-spec.md` and `ui-style-and-feedback-spec.md` (sections 4, 5, 9) | `ui-style-and-feedback-plan.md` S0, S1 (with `ui-and-controls-plan.md`) | **specified and planned, waiting for the owner's go** |
 | M2 | `m2-build-spec.md` (who owns what in 1480, the home rule, modes, borders, the UI rows of `ui-and-controls-plan.md` section 4) | `m2-build-plan.md` (C1 to C20) | **specified and planned, waiting for the owner's go**; starts after M1 (T16) and M1.5 close |
-| M3 | none yet for the system; the report is in `ui-style-and-feedback-spec.md` section 6 | the plan's S2 (R1 to R11) for the report; system tasks to write | UI **specified and planned**; system to write |
+| M3 | `m3-build-spec.md` (calendar, the season table, works that take seasons, events and the chronicle, `Stats`, `Knowledge`, saves, the report and every M3 screen; it is task R1 of the style plan) | `m3-build-plan.md` (Y1 to Y18 with S2's R2 to R11 folded in) | **specified and planned, waits for the owner's go**; starts after M2 closes |
 | M4 | none yet for the system; the works preview and study are in the spec, sections 7 and 8 | the plan's S3; W0 (seasonal district economy design) gates it | UI **specified and planned**; the economy design W0 and the system to write |
 | M4.5 | the spec, sections 8 and 10 | the plan's S4 (I1 to I8) | **specified and planned**, after M4 |
 | M5 to M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |

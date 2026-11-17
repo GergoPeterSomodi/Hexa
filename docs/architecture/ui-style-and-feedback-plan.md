@@ -125,6 +125,12 @@ It needs the M3 core from M3's own build spec: `Game.turn`, `PHASES` in `core/ga
 
 Bake slice 2 (minimap frame, shield rims, pennant pole and cloth) ships with M2's own UI tasks, in `tools/ui_bake/pieces_m2.py` (task C5 of `m2-build-plan.md`).
 
+**`m3-build-plan.md` folds these tasks into M3** with their IDs (its opening table): R1 is done by `m3-build-spec.md`;
+R6 is merged with the Session season work; R8's edits of `app.gd`, `settings.gd` and `bindings.gd` belong to its tasks
+Y18 and Y3; R11 is merged with the M3 monkey and pictures; R5 fills `stats_system.gd` while Y1 writes the season table.
+The "M3 core" of the dependency line above is Y1, Y5 and Y6 there. `core/game/view_cache.gd` is created in M3 (Y1), so
+W5 below edits it.
+
 ### S3: the works preview and the Economy page (M4)
 
 | # | Group | Task | Files | Done when |
