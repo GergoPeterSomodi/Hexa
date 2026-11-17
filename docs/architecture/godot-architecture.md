@@ -439,7 +439,7 @@ at the level of the table; the system work of M2 and later is not yet specified.
 | M | Build spec | Plan and tasks | Status |
 |---|---|---|---|
 | M0 | this page, section 8 | R1 to R6 | done |
-| M1 | `m1-build-spec.md` | its section 11 (T0 to T16) | T1 to T15 committed; **T16 (retire the prototype `shell/worldmap/`) is open**, so M1 is not closed; the look decision is its section 14 |
+| M1 | `m1-build-spec.md` | its section 11 (T0 to T16) | done (T1 to T16 complete; the look decision is its section 14) |
 | M1.5 | `ui-and-controls-spec.md` and `ui-style-and-feedback-spec.md` (sections 4, 5, 9) | `ui-style-and-feedback-plan.md` S0, S1 (with `ui-and-controls-plan.md`) | **specified and planned, waiting for the owner's go** |
 | M2 | none yet; its UI rows: `ui-and-controls-plan.md` section 4 | none yet | to write (Opus first: who owns what in 1480) |
 | M3 | none yet for the system; the report is in `ui-style-and-feedback-spec.md` section 6 | the plan's S2 (R1 to R11) for the report; system tasks to write | UI **specified and planned**; system to write |

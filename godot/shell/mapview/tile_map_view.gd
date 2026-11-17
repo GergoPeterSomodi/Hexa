@@ -5,7 +5,8 @@
 ## Bottom to top (LAYERS): ground cover (tiles ranked by their z, so one cover spills onto the next); relief shade
 ## (multiplied) and light (added); the sea; the coast; the pieces' flat ground and a harbour's; the hex grid; rivers
 ## and roads (EdgeLineLayer, one mesh a chunk); the shadows as one group; then the standing things, sorted by depth as
-## one group: the relief, the six tree wedges, a piece's back and front band, a harbour; then the marks (OVERLAYS).
+## one group: the relief, the six tree wedges, a piece's back and front band, a harbour, the three crossing layers;
+## then the marks (OVERLAYS).
 ##
 ## Seasons: every layer but two shares the season's TileSet (TilesetBuilder), which has three climate slots a source; a
 ## cell is set with the slot of its hex's climate (set_climates), so a season swap writes no cell. Godot rebuilds a
@@ -30,6 +31,7 @@ const LAYERS: Dictionary[String, Array] = {
 	"relief": [0, "stand"], "trees0": [0, "stand"], "trees1": [0, "stand"], "trees2": [0, "stand"],
 	"trees3": [0, "stand"], "trees4": [0, "stand"], "trees5": [0, "stand"],
 	"piece_back": [0, "stand"], "piece_front": [0, "stand"], "addon": [0, "stand"],
+	"crossing0": [0, "stand"], "crossing1": [0, "stand"], "crossing2": [0, "stand"],
 }
 ## Layers that MapCells does not fill: the selection and build marks (the tint and the fog arrive later).
 const OVERLAYS: Dictionary[String, Array] = {"marks": [90, ""]}

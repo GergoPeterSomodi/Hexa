@@ -3,9 +3,9 @@
 ## tile of every hex is MapCells.of_hex of the game's map and state; a change comes in as Events.hex_changed and redraws
 ## the hex and its six neighbours only (MapCells.touched_by); the player changes the game only through Session.act.
 ##
-## Keys (MapInput): 1 to 4 the season, R a new seed, G the grid, F the whole map, H the panel, U upgrade the selected hex,
-## Esc or a right click clears the selection; drag or WASD to move, the wheel to zoom. Below zoom 0.25 the far picture
-## fades in over the tiles and below 0.20 it replaces them.
+## Keys (MapInput / MapLabels): 1 to 4 the season, R a new seed, G the grid, N the place names, F the whole map, H the
+## panel, U upgrade the selected hex, Esc or a right click clears the selection; drag or WASD to move, the wheel to zoom.
+## Below zoom 0.25 the far picture fades in over the tiles and below 0.20 it replaces them.
 class_name MapScene
 extends Node2D
 
@@ -19,7 +19,7 @@ const SELECT_TILE := "mark/select"
 const SYNC_LOAD_HEXES := 4000
 ## Milliseconds a frame the loading and a season swap may use (a layer or a chunk is never split, so one can pass it).
 const SLICE_MS := 5.0
-const HELP := "1-4 season   R new seed   G grid   F whole map   H hide   U upgrade   Esc clear\nclick a hex   drag or WASD move   wheel zoom"
+const HELP := "1-4 season   R new seed   G grid   N names   F whole map   H hide   U upgrade   Esc clear\nclick a hex   drag or WASD move   wheel zoom"
 
 ## The map the scene shows (a Session.new_game id); a tool may set it before the scene enters the tree.
 var map_id := MAP_ID
@@ -41,6 +41,7 @@ var _loading_state: MapState = null
 @onready var _view: TileMapView = $View
 @onready var _far: FarMap = $Far
 @onready var _input: MapInput = $Input
+@onready var _labels: MapLabels = $Names/Labels
 @onready var _hud: CanvasLayer = $Hud
 @onready var _panel: HexPanelContract = $Hud/Margin/Row/Panel
 @onready var _title: Label = $Hud/Margin/Row/Info/Box/Title
@@ -91,6 +92,7 @@ func _on_game_started() -> void:
 	var map := Session.game.map
 	var state := Session.game.state
 	select_hex(NO_HEX)
+	_labels.setup(map)
 	_view.set_climates(map.cols, map.climate)
 	_view.begin_fill(map.cols, map.rows, func(hex: Vector2i, names: PackedStringArray) -> void: MapCells.fill_hex(map, state, hex, names),
 		_hex_under_camera(), MapCells.LAYERS)
@@ -243,6 +245,10 @@ func toggle_grid() -> void:
 	_view.set_layer_visible("grid", not _view.layer("grid").visible)
 
 
+func toggle_names() -> void:
+	_labels.set_visible(not _labels.visible)
+
+
 func set_hud_visible(value: bool) -> void:
 	_hud.visible = value
 
@@ -284,6 +290,10 @@ func far() -> FarMap:
 
 func panel() -> HexPanelContract:
 	return _panel
+
+
+func labels() -> MapLabels:
+	return _labels
 
 
 func camera() -> Camera2D:

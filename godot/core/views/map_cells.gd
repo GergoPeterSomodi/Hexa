@@ -1,7 +1,7 @@
 ## Which tile every layer of the map view shows on a hex, from the facts of the map (docs/architecture/m1-build-spec.md
 ## sections 3.3 and 5). The one place that decides a tile: it reads MapData (what is fixed) and MapState (what the
-## player built), asks the rules of MapTiles for each name, and returns them by layer. No nodes, no files, no luck.
-## Before M1 this logic lived in the trial scene (shell/mapview/trial/tile_trial.gd).
+## player built), asks the rules of MapTiles and Crossings for each name, and returns them by layer. No nodes, no files,
+## no luck.
 class_name MapCells
 extends RefCounted
 
@@ -10,6 +10,7 @@ const LAYERS: Array[String] = [
 	"grid", "ground", "shade", "light", "sea", "coast", "relief",
 	"trees0", "trees1", "trees2", "trees3", "trees4", "trees5",
 	"piece_ground", "piece_shadow", "piece_back", "piece_front", "addon_ground", "addon_shadow", "addon",
+	"crossing0", "crossing1", "crossing2",
 ]
 ## The grid line tile (in the marks source of every set).
 const GRID_TILE := "mark/grid"
@@ -30,6 +31,7 @@ const AT_PIECE := 13  # four layers: ground, shadow, back, front (PIECE_PARTS)
 const AT_ADDON_GROUND := 17
 const AT_ADDON_SHADOW := 18
 const AT_ADDON := 19  # a harbour's standing things are one tile (its "front")
+const AT_CROSSING := 20  # three layers, one per owned edge (directions 0 E, 1 NE, 2 NW)
 
 
 ## {layer name: tile name} for every layer of LAYERS; "" means no tile on that layer (so a changed hex can be
@@ -117,6 +119,11 @@ static func fill_hex(map: MapData, state: MapState, hex: Vector2i, out: PackedSt
 		for d: int in 6:
 			out[AT_TREES + d] = MapTiles.trees(d, cover, height, covers[d], (river_mask >> d) & 1 == 1,
 				(road_mask >> d) & 1 == 1, built, relief != "", hex)
+	for d: int in Crossings.OWNED:
+		var e := 3 * i + d
+		var kind := int(map.crossing[e]) if e < map.crossing.size() else 0
+		if kind > 0:
+			out[AT_CROSSING + d] = Crossings.tile_name(kind, d)
 	if not built:
 		return
 	var family := str(piece["family"])
