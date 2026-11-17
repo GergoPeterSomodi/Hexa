@@ -231,6 +231,10 @@ Panels and screens are scenes laid out with containers and one Theme, built from
 panel, row, tooltip, modal). A panel reads the game, shows it, and calls `Session.act`. One input controller turns
 mouse and keys into intents ("select hex", "order build"); panels and the map never read the mouse for game meaning.
 
+The look is the **Studiolo** style (`docs/design/ui/design.md`): the Theme is generated from tokens and baked 9-slice
+textures, with no screen-space shaders. The kit and the frame are milestone M1.5; the content of each screen is built
+by the milestone of its system (9.1). The specs are `ui-and-controls-spec.md` and `ui-style-and-feedback-spec.md`.
+
 ---
 
 ## 5. How the game runs
@@ -387,9 +391,11 @@ build panels from mockups, `.tres` data, and tests from a list. The "Build" colu
 |---|---|---|---|---|
 | **M0** | One code line (section 8, R1 to R6) | none | One map, one grid; all checks green; same picture as before | Fable plan / Sonnet |
 | **M1** | **The map on the standard.** Tileset bake, the layer stack, far zoom, seasons as a look, select, build, upgrade, clear (today's prototype, rebuilt) | `mapview.py`: keep redraw-only-what-changed. Improve: the engine does the caching | Art director signs side by side with the style frame; under 16 ms at every zoom on a fake 122,000-hex map; build rules read `MapData`, not the bake | Fable + art director / Sonnet (view, bake), Haiku (family `.tres`, tests) |
-| **M2** | **Countries.** Owners, borders, colours, names, pick your country, country panel, the editor's data layers | `worldgen.build_countries`, `state.Country`: keep tags and starts. Improve: owner per hex, not per province | Three or more countries on the map; borders follow ownership; you can only build at home | Opus (who owns what in 1480) / Sonnet, Haiku (panel, data) |
-| **M3** | **Time.** Calendar, end season, the phase table, events and log, works take seasons, save and load, autosave | `game.py` `end_season`, `systems/season.py` `PHASES`, `saves.py`, `events.py`: keep one table, one bus. Improve: snapshot instead of pickle | 40 seasons by hand; save, quit, load gives the same digest | Fable / Sonnet |
-| **M4** | **Economy.** Goods from districts, treasury, taxes, upkeep, build costs, top bar and ledger | `systems/economy.py`, `building.py`: keep the income preview and "one job a season". Improve: district levels replace building slots; numbers in `.tres` | Building choices change your income; the ledger explains every ducat; no money from nowhere (property test) | Opus (district economy) / Sonnet (system), Haiku (ledger, data) |
+| **M1.5** | **The UI foundation, in the Studiolo style** (added 2026-11-17). Tokens, the UI bake, the generated Theme (1x, 2x, flat), fonts, the component kit, the input map and zoom, the HUD frame, main and pause menus, options. Components only: the content of each screen arrives with its system (9.1) | none: the Python menus and options are the reference for behaviour only | The mockup's M1.5 scenes match side by side at 1x and 2x; both `--check`s (tokens and Theme) in CI; the owner plays it on the Mac and on Windows | Fable + art director / Sonnet (bake, Theme, input, App), Haiku (kit pieces, menus) |
+| **M2** | **Countries.** Owners, borders, colours, names, pick your country, country panel, the editor's data layers; map modes, minimap, place search, New game | `worldgen.build_countries`, `state.Country`: keep tags and starts. Improve: owner per hex, not per province | Three or more countries on the map; borders follow ownership; you can only build at home | Opus (who owns what in 1480) / Sonnet, Haiku (panel, data) |
+| **M3** | **Time.** Calendar, end season, the phase table, events and log, works take seasons (and `cancel_work`), save and load, autosave; `Stats` and the `stats` phase, `Knowledge`; the **season report** (a dialog at the end of every season: what happened, resources, actions) | `game.py` `end_season`, `systems/season.py` `PHASES`, `saves.py`, `events.py`: keep one table, one bus. Improve: snapshot instead of pickle | 40 seasons by hand; save, quit, load gives the same digest; Space, Space plays one season; save, load, J shows the same report | Fable / Sonnet, Haiku (report, Save and Load screens) |
+| **M4** | **Economy.** Goods from districts, treasury (`Treasury.move`, the ledger), taxes, upkeep, build costs, top bar chips; the **works preview** (what an upgrade brings, gain per field, per season); the Statesman's Study with **Economy, This season** (the ledger, L) | `systems/economy.py`, `building.py`: keep the income preview and "one job a season". Improve: district levels replace building slots, and output varies by season (the preview needs it); numbers in `.tres` | Building choices change your income; every ducat of the report sums to the change; the preview equals the season for four calm seasons; no money from nowhere (property test) | Opus (district economy, seasonal output) / Sonnet (system), Haiku (chips, works card, study page, data) |
+| **M4.5** | **Insights I** (added 2026-11-17). The chart and table kit complete; Economy's other tabs (Districts, Goods, History); the Rankings and History pages; the Yields map mode | `economy.py` incomes, `world.score`, `ranking`, the action log: keep the figures. Improve: the owner reads them as pages, not tooltips | The owner answers five questions from the study in under a minute each; a page opens in under 16 ms; others' numbers only for known countries | Opus (what to show) / Sonnet (views), Haiku (pages) |
 | **M5** | **People.** Population per district, food, growth and decline, towns that grow a level | `economy.grow`, `split_food`: keep food drives growth. Improve: growth shows on the map as pieces level up | A fed region grows over 40 seasons and a starved one shrinks, inside set ranges | Opus / Sonnet, Haiku |
 | **M6** | **Armies.** Recruit, upkeep, movement (river edges, passes, winter), supply, the army panel, move animation | `military.py`, `movement.py`, `supply.py`, `terrain.py`, `replay.py`: keep the path search, stack limit, supply. Improve: rivers are edges, so crossings are clear rules | Raise an army, march it across the Po and a pass; it starves out of supply; season time in budget | Opus (re-fit) / Sonnet (movement, supply), Haiku (panel) |
 | **M7** | **War.** Declare war, battles, sieges, occupation, a simple peace | `war.py`, `battle.py`, `combat.py`, `battleview.py`: keep lanes and days (battle slice 1) and the read-only battle view. Improve: castles are districts with levels | A war can be started, fought and ended by hand against a passive enemy | Opus (re-fit battle and siege docs) / Sonnet, Haiku (battle panel) |
@@ -397,7 +403,49 @@ build panels from mockups, `.tres` data, and tests from a list. The "Build" colu
 | **M9** | **Diplomacy and peace.** War goals, war score, peace terms, relations, anti-steamrolling | `war.py` `war_score`, `peace`; `war-goals-and-peace.md`, `stop-steamrolling.md`: keep the approved designs | Wars end by terms, not exhaustion; soak shows no runaway winner | Opus / Sonnet, Haiku (peace screen) |
 | **M10** | **Trade.** Markets, routes, merchants, reactive prices | `systems/trade.py`, `reactive-prices.md`: keep markets and routes. Improve: per the owner's trade decisions of 2026-11-13 | Prices move with supply; a trade route changes a town's income | Opus / Sonnet, Haiku |
 | **M11** | **Research.** The four-branch, three-era tree, era gates, idea cards | `systems/research.py`, `tech-tree.md`: keep the approved tree | Techs change rules through definitions only; an era passes in play | Opus / Sonnet (system), Haiku (tech screen) |
-| **M12** | **A whole game.** Debt and bankruptcy, countries that fall, score and end, menus, options, sound | `debt.py`, `season.py` scores, `screens/`: keep | Start to 1650 with no blocker: **the first public Godot release on Windows** | Fable + Opus / Sonnet, Haiku |
+| **M12** | **A whole game.** Debt and bankruptcy, countries that fall, score and end, the Audio and Keys option pages, text size and high contrast, event pop-ups, tutorial hints, final credits, sound (the main and pause menus and the other options pages came with M1.5) | `debt.py`, `season.py` scores, `screens/`: keep | Start to 1650 with no blocker: **the first public Godot release on Windows** | Fable + Opus / Sonnet, Haiku |
+
+### 9.1 The UI: components in M1.5, content with each system
+
+M1.5 delivers the **frame and the components**: look (tokens, bake, Theme), kit (button, panel, row, tooltip, modal,
+tabs, chips, `DeltaChip`, `SeasonStrip`, the chart and table pieces as they are needed), input, HUD frame, menus and
+options. It builds no screen whose content belongs to a system. Each later milestone builds its own screens **out of
+those components, as tasks in its own build spec**; a milestone is not done until its screens are in the game's final
+UI, with no stand-in panel left. Sources: `docs/design/ui/design.md` (the look), `docs/design/ui/game-feedback-screens.md`
+(report, works preview, study), `ui-and-controls-plan.md` section 4 and `ui-style-and-feedback-plan.md` (S2 to S5).
+
+| M | The UI content this milestone builds | Study page / report section |
+|---|---|---|
+| M1.5 | Frame and kit only (above) | none |
+| M2 | Country arms and name in the top bar; map modes (Owner, Terrain, Relief); country panel and country pick; New game; minimap; place search; colour-blind palette | none |
+| M3 | Date and End season; the **season report**; action log, notifications, toasts, floating ribbons; Save and Load with thumbnails; Continue; autosave recovery; bookmarks; Game options page | the report's frame, "What befell", Your orders |
+| M4 | Resource chips; the **works card** (upgrade preview); the **study** with Economy, This season (L); the icon set; costs on the hex panel; task flag rules | the report's money sections |
+| M4.5 | Study: Economy tabs, Rankings, History; Yields mode; the chart and table kit complete | Economy, Rankings, History |
+| M5 | People and food chips; growth ribbons; Food mode | People page; people section |
+| M6 | Army tokens, orders and path preview; move card; army panel and raise tab; movement replay; Supply mode | Military page; real witnesses in the report |
+| M7 | Battle and siege badges; odds card; battle dock; the war alert | losses and wars; battle lines |
+| M8 | AI turn pill; the AI's moves replayed | none (the AI reads `Knowledge`) |
+| M9 | Peace screen; war goals and relations in the country panel; Relations mode | Diplomacy page; relation matrix |
+| M10 | Market panel; merchant orders; Trade mode | Trade page; price ring |
+| M11 | Tech screen; idea pick | Research page |
+| M12 | Event pop-ups; game-over and score; Audio and Keys pages; text size, high contrast; tutorial hints; credits | score in Rankings; the Debt tab |
+
+### 9.2 Build specs and plans: where each milestone stands (2026-11-17)
+
+A milestone's **build spec** (interfaces, tasks, tests, risks) is written by Fable before that milestone starts, from
+this table, the design pages and the UI rows above. The UI work is already specified and planned for every milestone
+at the level of the table; the system work of M2 and later is not yet specified.
+
+| M | Build spec | Plan and tasks | Status |
+|---|---|---|---|
+| M0 | this page, section 8 | R1 to R6 | done |
+| M1 | `m1-build-spec.md` | its section 11 (T0 to T16) | T1 to T15 committed; **T16 (retire the prototype `shell/worldmap/`) is open**, so M1 is not closed; the look decision is its section 14 |
+| M1.5 | `ui-and-controls-spec.md` and `ui-style-and-feedback-spec.md` (sections 4, 5, 9) | `ui-style-and-feedback-plan.md` S0, S1 (with `ui-and-controls-plan.md`) | **specified and planned, waiting for the owner's go** |
+| M2 | none yet; its UI rows: `ui-and-controls-plan.md` section 4 | none yet | to write (Opus first: who owns what in 1480) |
+| M3 | none yet for the system; the report is in `ui-style-and-feedback-spec.md` section 6 | the plan's S2 (R1 to R11) for the report; system tasks to write | UI **specified and planned**; system to write |
+| M4 | none yet for the system; the works preview and study are in the spec, sections 7 and 8 | the plan's S3; W0 (seasonal district economy design) gates it | UI **specified and planned**; the economy design W0 and the system to write |
+| M4.5 | the spec, sections 8 and 10 | the plan's S4 (I1 to I8) | **specified and planned**, after M4 |
+| M5 to M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |
 
 **The Europe track, beside the milestones.** E1 (inside M1): measure on a fake full-size map. E2 (after M3): build
 the real 28 km Europe map file from the geography and heights. E3 (after M8): measure an AI season on it, then
