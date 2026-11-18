@@ -1,0 +1,67 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://shell/ui/panel_frame.gd" id="1_frame"]
+[ext_resource type="Script" path="res://shell/ui/cartouche.gd" id="2_cart"]
+[ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
+
+[node name="PanelFrame" type="PanelContainer"]
+mouse_filter = 0
+script = ExtResource("1_frame")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="TitleBox" type="VBoxContainer" parent="VBox/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Cartouche" type="PanelContainer" parent="VBox/Head/TitleBox"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("2_cart")
+
+[node name="Title" type="Label" parent="VBox/Head/TitleBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"TitlePanel"
+autowrap_mode = 3
+
+[node name="Subtitle" type="Label" parent="VBox/Head/TitleBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[node name="CloseButton" type="Button" parent="VBox/Head"]
+layout_mode = 2
+size_flags_vertical = 0
+tooltip_text = "Close"
+accessibility_name = "Close"
+script = ExtResource("3_btn")
+kind = 6
+icon_name = &"close"
+
+[node name="BodyScroll" type="ScrollContainer" parent="VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Body" type="VBoxContainer" parent="VBox/BodyScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Foot" type="HBoxContainer" parent="VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+alignment = 2

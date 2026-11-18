@@ -1,0 +1,94 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://shell/ui/modal_frame.gd" id="1_modal"]
+[ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="2_btn"]
+[ext_resource type="Script" path="res://shell/ui/ribbon.gd" id="3_rib"]
+
+[node name="ModalFrame" type="Control"]
+mouse_filter = 2
+script = ExtResource("1_modal")
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+theme_type_variation = &"PanelModal"
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="HBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="TitleBox" type="VBoxContainer" parent="Panel/VBox/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Panel/VBox/Head/TitleBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"TitleModal"
+autowrap_mode = 3
+
+[node name="Subtitle" type="Label" parent="Panel/VBox/Head/TitleBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[node name="CloseButton" type="Button" parent="Panel/VBox/Head"]
+layout_mode = 2
+size_flags_vertical = 0
+tooltip_text = "Close"
+accessibility_name = "Close"
+script = ExtResource("2_btn")
+kind = 6
+icon_name = &"close"
+
+[node name="BodyScroll" type="ScrollContainer" parent="Panel/VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Body" type="VBoxContainer" parent="Panel/VBox/BodyScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Foot" type="HBoxContainer" parent="Panel/VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+alignment = 2
+
+[node name="Overhang" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Ribbon" type="PanelContainer" parent="Overhang"]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -115.0
+offset_top = -22.0
+offset_right = 115.0
+offset_bottom = 18.0
+grow_horizontal = 2
+mouse_filter = 2
+script = ExtResource("3_rib")

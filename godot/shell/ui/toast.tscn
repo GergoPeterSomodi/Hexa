@@ -1,0 +1,31 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/ui/key_cap.gd" id="1_cap"]
+
+[node name="Toast" type="PanelContainer"]
+size_flags_horizontal = 4
+mouse_filter = 2
+theme_type_variation = &"PanelToast"
+
+[node name="HBox" type="HBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ToneIcon" type="TextureRect" parent="HBox"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="Text" type="Label" parent="HBox"]
+layout_mode = 2
+theme_type_variation = &"Body"
+vertical_alignment = 1
+
+[node name="KeyCap" type="PanelContainer" parent="HBox"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("1_cap")

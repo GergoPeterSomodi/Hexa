@@ -1,0 +1,119 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://shell/ui/vellum_sheet.gd" id="1_vellum"]
+[ext_resource type="Script" path="res://shell/ui/nav_list.gd" id="2_nav"]
+[ext_resource type="Script" path="res://shell/ui/ribbon.gd" id="3_rib"]
+
+[node name="VellumSheet" type="PanelContainer"]
+mouse_filter = 0
+theme_type_variation = &"PanelVellum"
+script = ExtResource("1_vellum")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="SealGap" type="Control" parent="VBox/Head"]
+custom_minimum_size = Vector2(96, 22)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Lede" type="Label" parent="VBox/Head"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"LabelFlavour"
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="HeadRule" type="HSeparator" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Main" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Nav" type="VBoxContainer" parent="VBox/Main"]
+custom_minimum_size = Vector2(178, 0)
+layout_mode = 2
+size_flags_vertical = 3
+script = ExtResource("2_nav")
+ink = true
+
+[node name="NavRule" type="VSeparator" parent="VBox/Main"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BodyScroll" type="ScrollContainer" parent="VBox/Main"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Body" type="VBoxContainer" parent="VBox/Main/BodyScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Foot" type="HBoxContainer" parent="VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+alignment = 2
+
+[node name="Overhang" type="Control" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Ribbon" type="PanelContainer" parent="Overhang"]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -115.0
+offset_top = -46.0
+offset_right = 115.0
+offset_bottom = -6.0
+grow_horizontal = 2
+mouse_filter = 2
+script = ExtResource("3_rib")
+
+[node name="Seal" type="Control" parent="Overhang"]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 0
+offset_left = 6.0
+offset_top = -54.0
+offset_right = 78.0
+offset_bottom = 18.0
+mouse_filter = 2
+
+[node name="SealIcon" type="TextureRect" parent="Overhang/Seal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch_mode = 5
+
+[node name="SealLetter" type="Label" parent="Overhang/Seal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"TitleRibbon"
+horizontal_alignment = 1
+vertical_alignment = 1
