@@ -1,0 +1,11 @@
+{
+  "comment": "UI performance and memory budgets (docs/architecture/ui-style-and-feedback-spec.md sections 4.10, 11; ui-and-controls-spec.md section 9). Read by tools/ui/perf_ui.gd. Never read by a GUT test.",
+  "screens": ["main_menu", "sandbox", "credits", "pause_menu", "options", "about", "help", "confirm", "loading"],
+  "limits": {
+    "screen_push_cpu_worst_ms": {"limit": 150.0, "class": "cpu", "what": "worst cold instantiate + ScreenStack.push time across M1.5 screens"},
+    "screen_push_worst_ms": {"limit": 16.0, "class": "gpu", "what": "worst first-frame push + render time across M1.5 screens"},
+    "hud_frame_worst_ms": {"limit": 16.0, "class": "gpu", "what": "worst frame with HUD + HexPanel open at 1920x1080"},
+    "kit_1x_mb": {"limit": 4.0, "class": "mem", "what": "1x Studiolo UI kit RGBA8 memory in play (budget < 4 MB)"},
+    "kit_2x_mb": {"limit": 16.0, "class": "mem", "what": "2x Studiolo UI kit RGBA8 memory in play (budget < 16 MB)"}
+  }
+}

@@ -10,7 +10,10 @@ A text scan with no third-party packages (it runs in CI as it is). It checks:
 - core/ takes its luck only through core/rng.gd;
 - no Godot 3 spellings in godot/ (yield, export var, onready var, setget, string connect, instance(), tool);
 - the size limits (section 6): a script over 1,200 lines or a function over 100 lines fails; a script over 800 lines
-  needs an entry with its reason in SIZE_REASONS below.
+  needs an entry with its reason in SIZE_REASONS below;
+- UI style rules (ui-style-and-feedback-spec.md section 2, ui-and-controls-spec.md section 3.4):
+  no theme_override_ in shell/**/*.tscn; no raw Color(, StyleBoxFlat.new, StyleBoxTexture.new, or assets/ui/kit
+  paths in shell/{ui,hud,screens,panels,app}/ outside tokens.gd and kit_theme.gd.
 
 Limits: class_name references are not followed, only res:// paths. A new file under core/ must be listed in
 CORE_RANK. Comments are removed before the scan; string contents are not.
@@ -70,6 +73,17 @@ GODOT3_FORBIDDEN = [
     (r"\.instance\s*\(", "instance() is Godot 3 (use instantiate())"),
     (r"\.connect\s*\(\s*[\"']", "string connect() is Godot 3 (use signal.connect(callable))"),
     (r"\bTileMap\b", "the TileMap node is Godot 3 style (use TileMapLayer)"),
+]
+
+# UI style rules (Studiolo): ui-style-and-feedback-spec.md section 2, ui-and-controls-spec.md section 3.4.
+THEME_OVERRIDE_ALLOWLIST: set[str] = set()
+UI_STYLE_DIRS = ("shell/ui/", "shell/hud/", "shell/screens/", "shell/panels/", "shell/app/")
+UI_STYLE_ALLOWLIST = {"shell/ui/tokens.gd", "shell/ui/kit_theme.gd"}
+UI_STYLE_FORBIDDEN = [
+    (r"\bColor\s*\(", "raw Color( literal in UI script (read Tokens instead)"),
+    (r"\bStyleBoxFlat\.new\b", "StyleBoxFlat.new outside shell/ui/kit_theme.gd (use the generated Theme)"),
+    (r"\bStyleBoxTexture\.new\b", "StyleBoxTexture.new outside shell/ui/kit_theme.gd (use the generated Theme)"),
+    (r"assets/ui/kit\b", "direct assets/ui/kit path outside shell/ui/kit_theme.gd (use get_theme_icon / Theme)"),
 ]
 
 RES_REF = re.compile(r"res://[^\"'\s)]+")
@@ -149,6 +163,8 @@ def lint_file(root: Path, path: Path, findings: list) -> None:
                 report(start, f"function {name} is {length} lines: over {FUNC_LIMIT}, split it (architecture section 6)")
 
     in_core = rel.startswith("core/")
+    in_shell_tscn = rel.startswith("shell/") and path.suffix == ".tscn"
+    in_ui_style = rel.startswith(UI_STYLE_DIRS) and rel not in UI_STYLE_ALLOWLIST
     rank = rank_of(rel)
     if in_core and rank is None:
         report(1, "not listed in CORE_RANK (tools/lint_godot.py): say which layer this file is")
@@ -159,6 +175,15 @@ def lint_file(root: Path, path: Path, findings: list) -> None:
                 report(lineno, message)
         if line.strip() == "tool" and is_gd:
             report(lineno, "tool is Godot 3 (use @tool)")
+        if in_shell_tscn and not line.lstrip().startswith(";"):
+            if rel not in THEME_OVERRIDE_ALLOWLIST and re.search(r"\btheme_override_", line):
+                report(lineno, "theme_override_ in shell/ .tscn (use the generated Theme variations)")
+            if re.search(r"assets/ui/kit\b", line):
+                report(lineno, "direct assets/ui/kit path in shell/ .tscn (use Theme)")
+        if is_gd and in_ui_style:
+            for pattern, message in UI_STYLE_FORBIDDEN:
+                if re.search(pattern, line):
+                    report(lineno, message)
         if is_gd and in_core:
             for pattern, message in CORE_FORBIDDEN:
                 if re.search(pattern, line):

@@ -3,8 +3,10 @@ name: godot
 # The Godot game (docs/architecture/godot-architecture.md, section 6). Jobs:
 # - changes: decides whether the Godot checks and the frozen-Python guard apply;
 # - frozen-python: a pull request that changes a file under hexa/ fails (hexa/ is frozen at v0.2.2, the reference);
-# - checks: the lint (layers, size limits), the import, the script parse, the main scene start (the north Italy map)
-#   and the GUT tests (on pull requests and pushes that touch godot/, tools/ or this workflow);
+# - checks: the lint (layers, size limits, UI style rules), Python UI bake check, import, script parse, generated
+#   theme/tileset/map checks, main scene start (app.tscn), and the GUT tests (on pull requests and pushes that touch
+#   godot/, tools/ or this workflow);
+# - ui-shots: on pull requests touching shell UI/input or by hand, renders UI pictures (1x & 2x) and checks UI budgets under xvfb;
 # - perf: nightly and by hand, tools/perf_map.gd on the made-up Europe map with the full tileset (m1-build-spec section 9);
 # - export-windows and smoke-windows: on a tag v0.3.*, or by hand, the Windows zip and a smoke start on a Windows runner.
 # The 0.3.0 map job (rebuild of europe_1480.json) is gone with that map (M0, step R3). A check of the committed map
@@ -35,6 +37,7 @@ jobs:
     outputs:
       godot: ${{ steps.changes.outputs.godot }}
       hexa: ${{ steps.changes.outputs.hexa }}
+      ui_shots: ${{ steps.changes.outputs.ui_shots }}
     steps:
       # The whole history, so that the merge base with the target branch can be found.
       - uses: actions/checkout@v4
@@ -58,6 +61,7 @@ jobs:
           # Without a known base the Godot checks run; the frozen-Python guard only needs pull requests, which always have one.
           godot=true
           hexa=false
+          ui_shots=true
           if [ -n "$base" ]; then
             changed=$(git diff --name-only "$base" HEAD)
             if grep -q '^hexa/' <<< "$changed"; then hexa=true; fi
@@ -66,11 +70,20 @@ jobs:
             else
               godot=false
             fi
+            if grep -qE '^(godot/shell/(app|ui|hud|screens|input)/|godot/tools/ui/|godot/tests/perf_ui_budget\.json|\.github/workflows/godot\.yml)' <<< "$changed"; then
+              ui_shots=true
+            else
+              ui_shots=false
+            fi
           fi
-          if [ "$IS_TAG" = "true" ]; then godot=true; fi
+          if [ "$IS_TAG" = "true" ]; then
+            godot=true
+            ui_shots=true
+          fi
           echo "godot=$godot" >> "$GITHUB_OUTPUT"
           echo "hexa=$hexa" >> "$GITHUB_OUTPUT"
-          echo "base=${base:-none} godot=$godot hexa=$hexa"
+          echo "ui_shots=$ui_shots" >> "$GITHUB_OUTPUT"
+          echo "base=${base:-none} godot=$godot hexa=$hexa ui_shots=$ui_shots"
 
   frozen-python:
     name: hexa/ stays frozen
@@ -97,6 +110,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Python 3.12 (UI bake checks)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: tools/requirements-bake.txt
+      - name: Install UI bake dependencies
+        run: python -m pip install -r tools/requirements-bake.txt
       - name: Set up Godot
         uses: ./.github/actions/setup-godot
       # Every step that prints to the log is also checked for the engine's error and warning lines: the
@@ -110,8 +131,12 @@ jobs:
             echo "::error::The import reported errors or warnings (see the log)."
             exit 1
           fi
-      - name: Lint (layers, size limits, core/ rules, luck, Godot 3 spellings)
-        run: python3 tools/lint_godot.py godot
+      - name: Lint (layers, size limits, core/ rules, luck, Godot 3 spellings, Studiolo UI style)
+        run: python tools/lint_godot.py godot
+      - name: UI bake check and unit tests (bake_ui --check)
+        run: |
+          python tools/bake_ui.py --check
+          python -m unittest tests/test_bake_ui.py
       - name: Load every script (parse errors and warnings)
         run: |
           set -uo pipefail
@@ -121,7 +146,7 @@ jobs:
             echo "::error::A script does not parse (see the log)."
             exit 1
           fi
-      - name: Open the main scene headless (the north Italy map)
+      - name: Open the main scene headless (app.tscn)
         run: |
           set -uo pipefail
           "$GODOT" --headless --path godot --quit 2>&1 | tee main.log
@@ -130,7 +155,16 @@ jobs:
             echo "::error::The main scene did not open cleanly (see the log)."
             exit 1
           fi
-      # The generated files must be current: the four TileSets (assets/tiles/tiles_<season>.tres) and the north Italy map.
+      # The generated files must be current: the Themes, the four TileSets (assets/tiles/tiles_<season>.tres) and the north Italy map.
+      - name: Generated Themes are current (build_theme --check)
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot -s res://tools/build_theme.gd -- --check 2>&1 | tee theme.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error|ERROR' theme.log; then
+            echo "::error::Committed Theme files or font checks failed tools/build_theme.gd --check: run tools/build_theme.gd and commit the files."
+            exit 1
+          fi
       - name: Generated TileSets are current (build_tileset --check)
         run: |
           set -uo pipefail
@@ -214,6 +248,59 @@ jobs:
         with:
           name: perf-map
           path: ${{ runner.temp }}/perf.json
+          if-no-files-found: ignore
+
+  ui-shots:
+    name: UI pictures and perf (xvfb)
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && needs.changes.outputs.ui_shots == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Godot
+        uses: ./.github/actions/setup-godot
+      - name: Software OpenGL and a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0 libegl1 mesa-utils
+      - name: Import the project
+        run: |
+          "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
+      - name: Render UI screen pictures (1x and 2x)
+        run: |
+          set -uo pipefail
+          mkdir -p "$RUNNER_TEMP/ui-shots"
+          xvfb-run -a -s "-screen 0 2560x1440x24" "$GODOT" --path godot --rendering-driver opengl3 \
+            -s res://tools/ui/shot_ui.gd -- --out="$RUNNER_TEMP/ui-shots" 2>&1 | tee shot_ui.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error' shot_ui.log; then
+            echo "::error::tools/ui/shot_ui.gd failed (see the log)."
+            exit 1
+          fi
+      - name: Measure UI frame & memory budgets (perf_ui)
+        run: |
+          set -uo pipefail
+          xvfb-run -a -s "-screen 0 1920x1080x24" "$GODOT" --path godot --rendering-driver opengl3 \
+            -s res://tools/ui/perf_ui.gd -- --cpu-scale=2.0 --out="$RUNNER_TEMP/perf_ui.json" --summary="$GITHUB_STEP_SUMMARY" 2>&1 | tee perf_ui.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error' perf_ui.log; then
+            echo "::error::tools/ui/perf_ui.gd exceeded a CPU or memory limit (see the job summary)."
+            exit 1
+          fi
+      - name: Keep UI pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-shots
+          path: ${{ runner.temp }}/ui-shots
+          if-no-files-found: ignore
+      - name: Keep UI perf report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-ui
+          path: ${{ runner.temp }}/perf_ui.json
           if-no-files-found: ignore
 
   export-windows:
