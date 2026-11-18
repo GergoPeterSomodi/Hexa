@@ -1,0 +1,138 @@
+## Map mode colours, height ramp, palette packing, and pixel-to-hex lookup
+## (docs/architecture/m2-build-spec.md sections 4.6 and 5.7).
+## Pure core/views/ code: no nodes, no engine calls; mirrors mode_overlay.gdshader.
+class_name MapModes
+extends RefCounted
+
+enum Mode { TERRAIN, OWNER, RELIEF }  # keys 1, 2, 3
+
+const TINT_ALPHA := 0.14
+const OWNER_ALPHA := 0.55
+const RELIEF_ALPHA := 0.65
+const HOT_ALPHA := 0.20
+const HOT_LIGHTEN := 0.15
+const PALETTE_SIZE := 256
+const HEIGHT_STEP_M := 16
+const RELIEF_STOPS: Array[Array] = [
+	[0, Color("#4f8a4a")],
+	[150, Color("#79a557")],
+	[400, Color("#b7b56a")],
+	[800, Color("#c49a5c")],
+	[1300, Color("#a2744c")],
+	[1900, Color("#8e7f74")],
+	[2500, Color("#c9c7c4")],
+	[3200, Color("#f4f5f8")],
+]
+
+static var _cached_ramp := PackedColorArray()
+
+
+## The cell under a map pixel, matching TileMapLayer.local_to_map and mode_overlay.gdshader.
+static func hex_at_px(px: Vector2) -> Vector2i:
+	var half_w := float(MapTiles.CELL.x) * 0.5
+	var half_h := float(MapTiles.CELL.y) * 0.5
+	var ux := px.x - half_w
+	var uy := px.y - half_h
+	var r := uy / MapTiles.ROW
+	var q := ux / float(MapTiles.CELL.x) - 0.5 * r
+	var s := -q - r
+	var rq := floorf(q + 0.5)
+	var rr := floorf(r + 0.5)
+	var rs := floorf(s + 0.5)
+	var dq := absf(rq - q)
+	var dr := absf(rr - r)
+	var ds := absf(rs - s)
+	if dq > dr and dq > ds:
+		rq = -rr - rs
+	elif dr > ds:
+		rr = -rq - rs
+	var row := int(rr)
+	var col := int(rq) + ((row - (row & 1)) >> 1)
+	return Vector2i(col, row)
+
+
+## Encodes each hex's elevation as 1 byte (0 = sea, 1..255 = 1 + clampi(height_m / 16, 0, 254)).
+static func height_bytes(map: MapData) -> PackedByteArray:
+	if map == null:
+		return PackedByteArray()
+	var n := map.hex_count()
+	var out := PackedByteArray()
+	out.resize(n)
+	for i: int in n:
+		if map.land[i] == 0:
+			out[i] = 0
+		else:
+			out[i] = 1 + clampi(floori(float(map.height_m[i]) / float(HEIGHT_STEP_M)), 0, 254)
+	return out
+
+
+## 256-entry colour ramp indexed by height byte (0 = transparent sea, 1..255 = elevation stops).
+static func relief_ramp() -> PackedColorArray:
+	return _ramp().duplicate()
+
+
+## Packs a 256-entry palette: index 0 is unowned, index id (1..255) is colours[id - 1].
+static func palette_from(colours: PackedColorArray, unowned: Color) -> PackedColorArray:
+	var out := PackedColorArray()
+	out.resize(PALETTE_SIZE)
+	out.fill(Color(0.0, 0.0, 0.0, 0.0))
+	out[0] = unowned
+	var count := mini(colours.size(), PALETTE_SIZE - 1)
+	for i: int in count:
+		out[i + 1] = colours[i]
+	return out
+
+
+## Fragment colour for one (owner_id, height_byte) pair; matches mode_overlay.gdshader.
+static func colour_of(mode: int, owner_id: int, height_byte: int, palette: PackedColorArray,
+		tint_on: bool, hot_id: int) -> Color:
+	if height_byte <= 0:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var base := Color(0.0, 0.0, 0.0, 0.0)
+	var alpha := 0.0
+	match mode:
+		Mode.TERRAIN:
+			if not tint_on or owner_id <= 0 or owner_id >= palette.size():
+				return Color(0.0, 0.0, 0.0, 0.0)
+			base = palette[owner_id]
+			alpha = TINT_ALPHA
+		Mode.OWNER:
+			if owner_id < 0 or owner_id >= palette.size():
+				return Color(0.0, 0.0, 0.0, 0.0)
+			base = palette[owner_id]
+			alpha = OWNER_ALPHA
+		Mode.RELIEF:
+			var ramp := _ramp()
+			base = ramp[clampi(height_byte, 0, PALETTE_SIZE - 1)]
+			alpha = RELIEF_ALPHA
+		_:
+			return Color(0.0, 0.0, 0.0, 0.0)
+	if hot_id > 0 and owner_id == hot_id:
+		base = base.lerp(Color.WHITE, HOT_LIGHTEN)
+		alpha += HOT_ALPHA
+	return Color(base.r, base.g, base.b, alpha)
+
+
+static func _ramp() -> PackedColorArray:
+	if _cached_ramp.size() == PALETTE_SIZE:
+		return _cached_ramp
+	_cached_ramp.resize(PALETTE_SIZE)
+	_cached_ramp[0] = Color(0.0, 0.0, 0.0, 0.0)
+	for b: int in range(1, PALETTE_SIZE):
+		_cached_ramp[b] = _colour_at_metres((b - 1) * HEIGHT_STEP_M)
+	return _cached_ramp
+
+
+static func _colour_at_metres(metres: int) -> Color:
+	var last_idx := RELIEF_STOPS.size() - 1
+	if metres <= int(RELIEF_STOPS[0][0]):
+		return RELIEF_STOPS[0][1] as Color
+	for i: int in range(1, RELIEF_STOPS.size()):
+		var hi_m := int(RELIEF_STOPS[i][0])
+		if metres <= hi_m:
+			var lo_m := int(RELIEF_STOPS[i - 1][0])
+			var lo_c := RELIEF_STOPS[i - 1][1] as Color
+			var hi_c := RELIEF_STOPS[i][1] as Color
+			var t := float(metres - lo_m) / float(hi_m - lo_m)
+			return lo_c.lerp(hi_c, t)
+	return RELIEF_STOPS[last_idx][1] as Color

@@ -97,6 +97,11 @@ func pixel_of(hex: Vector2i) -> Color:
 	return _image.get_pixel(rect.position.x + 1, rect.position.y + 2) if _image != null else Color.BLACK
 
 
+## The built far-map texture, or null before the picture is finished.
+func texture() -> ImageTexture:
+	return _texture
+
+
 ## Sets the far-zoom switch thresholds (driven by dev/far_zoom in Settings).
 func set_zoom_switch(off_zoom: float, on_zoom: float = -1.0) -> void:
 	zoom_off = clampf(off_zoom, 0.01, 2.0)
