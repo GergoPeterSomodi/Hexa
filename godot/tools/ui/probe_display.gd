@@ -83,16 +83,17 @@ func _check_content_scale(headless: bool) -> void:
 		var scr := clampi(root.current_screen, 0, DisplayServer.get_screen_count() - 1)
 		scale = Display.auto_scale(OS.get_name(), DisplayServer.screen_get_scale(scr), DisplayServer.screen_get_dpi(scr))
 	root.content_scale_factor = scale
-	root.content_scale_size = Display.logical_size(root.size, scale)
+	root.content_scale_size = root.size
 	await process_frame
 	var vis := root.get_visible_rect().size
 	if headless:
-		_record_skip("content_scale", "headless window size is %s (logical %s at %.2fx)" % [str(root.size), str(root.content_scale_size), scale])
+		_record_skip("content_scale", "headless window size is %s (scale=%.2fx)" % [str(root.size), scale])
 		return
-	if is_equal_approx(root.content_scale_factor, scale) and vis.x > 0.0 and vis.y > 0.0:
+	var expected_vis := Vector2(Display.logical_size(root.size, scale))
+	if is_equal_approx(root.content_scale_factor, scale) and vis.x > 0.0 and vis.y > 0.0 and vis.distance_to(expected_vis) <= 2.0:
 		_record_pass("content_scale", "factor=%.2f content_scale_size=%s visible_rect=%s" % [scale, str(root.content_scale_size), str(vis)])
 	else:
-		_record_fail("content_scale", "unexpected visible_rect=%s for scale=%.2f" % [str(vis), scale])
+		_record_fail("content_scale", "expected visible_rect~=%s, got %s for scale=%.2f" % [str(expected_vis), str(vis), scale])
 
 
 func _check_min_size(headless: bool) -> void:

@@ -70,6 +70,10 @@ func test_window_rect_keeps_valid_saved_position_and_centres_off_screen() -> voi
 	var too_large := Display.window_rect(Vector2i(50, 50), Vector2i(4000, 3000), screens, 0)
 	assert_eq(too_large.size, Vector2i(1920, 1080), "clamped down to screen size")
 
+	var retina_screens: Array[Rect2i] = [Rect2i(Vector2i(0, 0), Vector2i(3024, 1898))]
+	var retina_min := Display.window_rect(Vector2i(-1, -1), Vector2i(1280, 720), retina_screens, 0, Vector2i(2048, 1200))
+	assert_eq(retina_min.size, Vector2i(2048, 1200), "clamps up to scaled Retina min_size_px")
+
 
 func test_logical_size_and_tooltip_delay() -> void:
 	assert_eq(Display.logical_size(Vector2i(2560, 1440), 2.0), Vector2i(1280, 720))
@@ -102,7 +106,7 @@ func test_headless_safe_apply() -> void:
 	assert_almost_eq(float(ProjectSettings.get_setting("gui/timers/tooltip_delay_sec")), 0.2, 0.001)
 	assert_eq(win.min_size, Display.MIN_SIZE)
 	assert_almost_eq(win.content_scale_factor, 1.25, 0.001)
-	assert_eq(win.content_scale_size, Vector2i(1280, 800))
+	assert_eq(win.content_scale_size, Vector2i(1600, 1000))
 
 	Engine.max_fps = old_fps
 	OS.low_processor_usage_mode = old_low_proc

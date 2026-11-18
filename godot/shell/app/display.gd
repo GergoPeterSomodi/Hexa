@@ -54,12 +54,14 @@ static func window_rect(
 	saved_pos: Vector2i,
 	saved_size: Vector2i,
 	screen_rects: Array[Rect2i],
-	primary_screen: int = 0
+	primary_screen: int = 0,
+	min_size_px: Vector2i = MIN_SIZE
 ) -> Rect2i:
+	var min_sz := Vector2i(maxi(MIN_SIZE.x, min_size_px.x), maxi(MIN_SIZE.y, min_size_px.y))
 	if screen_rects.is_empty():
 		var fallback_size := Vector2i(
-			maxi(saved_size.x, MIN_SIZE.x),
-			maxi(saved_size.y, MIN_SIZE.y)
+			maxi(saved_size.x, min_sz.x),
+			maxi(saved_size.y, min_sz.y)
 		)
 		var fallback_pos := saved_pos if saved_pos != Vector2i(-1, -1) else Vector2i.ZERO
 		return Rect2i(fallback_pos, fallback_size)
@@ -75,11 +77,13 @@ static func window_rect(
 				keep_pos = true
 				break
 
-	var max_w: int = maxi(MIN_SIZE.x, target_screen.size.x)
-	var max_h: int = maxi(MIN_SIZE.y, target_screen.size.y)
+	var effective_min_x: int = mini(min_sz.x, target_screen.size.x)
+	var effective_min_y: int = mini(min_sz.y, target_screen.size.y)
+	var max_w: int = maxi(effective_min_x, target_screen.size.x)
+	var max_h: int = maxi(effective_min_y, target_screen.size.y)
 	var clamped_size := Vector2i(
-		clampi(saved_size.x, MIN_SIZE.x, max_w),
-		clampi(saved_size.y, MIN_SIZE.y, max_h)
+		clampi(saved_size.x, effective_min_x, max_w),
+		clampi(saved_size.y, effective_min_y, max_h)
 	)
 
 	if keep_pos:
@@ -127,9 +131,14 @@ static func apply(window: Window, settings: Settings) -> void:
 
 	if not is_headless:
 		_apply_window_and_screen(window, settings)
-		var scr: int = window.current_screen
-		screen_scale = DisplayServer.screen_get_scale(scr)
-		screen_dpi = DisplayServer.screen_get_dpi(scr)
+		var scr: int = clampi(window.current_screen, 0, maxi(0, DisplayServer.get_screen_count() - 1))
+		if DisplayServer.get_screen_count() > 0:
+			screen_scale = DisplayServer.screen_get_scale(scr)
+			screen_dpi = DisplayServer.screen_get_dpi(scr)
+			var pt_scale: float = maxf(1.0, screen_scale)
+			var usable: Vector2i = DisplayServer.screen_get_usable_rect(scr).size
+			var scaled_min := Vector2i(roundi(float(MIN_SIZE.x) * pt_scale), roundi(float(MIN_SIZE.y) * pt_scale))
+			window.min_size = Vector2i(mini(scaled_min.x, usable.x), mini(scaled_min.y, usable.y)) if usable.x > 0 and usable.y > 0 else scaled_min
 
 	var scale := resolve_ui_scale(
 		str(settings.get_value("display/ui_scale")),
@@ -138,7 +147,7 @@ static func apply(window: Window, settings: Settings) -> void:
 		screen_dpi
 	)
 	window.content_scale_factor = scale
-	window.content_scale_size = logical_size(window.size, scale)
+	window.content_scale_size = window.size
 
 
 static func _apply_window_and_screen(window: Window, settings: Settings) -> void:
@@ -168,13 +177,6 @@ static func _apply_window_and_screen(window: Window, settings: Settings) -> void
 		return
 
 	window.mode = Window.MODE_WINDOWED
-	var desired_size: Vector2i = settings.get_value("display/window_size") as Vector2i
-	var preset_str := str(settings.get_value("display/window_preset"))
-	if preset_str != "custom":
-		var parsed := parse_preset(preset_str)
-		if parsed != Vector2i.ZERO:
-			desired_size = parsed
-
 	var screen_rects: Array[Rect2i] = []
 	for i: int in range(screen_count):
 		screen_rects.append(DisplayServer.screen_get_usable_rect(i))
@@ -182,6 +184,25 @@ static func _apply_window_and_screen(window: Window, settings: Settings) -> void
 	if screen_choice > 0 and screen_choice <= screen_count:
 		primary = screen_choice - 1
 	var saved_pos: Vector2i = settings.get_value("display/window_position") as Vector2i
-	var rect := window_rect(saved_pos, desired_size, screen_rects, primary)
+
+	var target_idx := clampi(primary, 0, maxi(0, screen_count - 1))
+	if saved_pos != Vector2i(-1, -1):
+		for i: int in range(screen_rects.size()):
+			if screen_rects[i].has_point(saved_pos):
+				target_idx = i
+				break
+	var pt_scale: float = maxf(1.0, DisplayServer.screen_get_scale(target_idx)) if screen_count > 0 else 1.0
+
+	var desired_size: Vector2i = settings.get_value("display/window_size") as Vector2i
+	var preset_str := str(settings.get_value("display/window_preset"))
+	if preset_str != "custom":
+		var parsed := parse_preset(preset_str)
+		if parsed != Vector2i.ZERO:
+			desired_size = Vector2i(roundi(float(parsed.x) * pt_scale), roundi(float(parsed.y) * pt_scale))
+	elif saved_pos == Vector2i(-1, -1) and desired_size == DEFAULT_SIZE:
+		desired_size = Vector2i(roundi(float(DEFAULT_SIZE.x) * pt_scale), roundi(float(DEFAULT_SIZE.y) * pt_scale))
+
+	var min_px := Vector2i(roundi(float(MIN_SIZE.x) * pt_scale), roundi(float(MIN_SIZE.y) * pt_scale))
+	var rect := window_rect(saved_pos, desired_size, screen_rects, primary, min_px)
 	window.size = rect.size
 	window.position = rect.position

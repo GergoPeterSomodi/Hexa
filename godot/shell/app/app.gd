@@ -656,9 +656,15 @@ func _on_window_size_changed() -> void:
 	var win := get_window()
 	if win == null:
 		return
+	var old_scale := _last_ui_scale
 	var scale := _resolved_ui_scale(win)
 	win.content_scale_factor = scale
-	win.content_scale_size = Display.logical_size(win.size, scale)
+	win.content_scale_size = win.size
+	if not is_equal_approx(old_scale, scale):
+		_apply_theme()
+		if _map_scene != null and _map_scene.camera_rig() != null:
+			_map_scene.camera_rig().apply_ui_scale_change(old_scale, _last_ui_scale)
+		_sync_camera_free_rect()
 	if DisplayServer.get_name() != "headless":
 		_capture_window_geometry()
 

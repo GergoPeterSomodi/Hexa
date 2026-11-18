@@ -469,7 +469,9 @@ func _choices_override_for(key: String, settings: Settings) -> Array:
 		var usable := DisplayServer.screen_get_usable_rect(scr).size
 		if usable.x <= 0 or usable.y <= 0:
 			return []
-		var presets := Display.presets_for(usable)
+		var scr_scale := maxf(1.0, DisplayServer.screen_get_scale(scr))
+		var usable_points := Display.logical_size(usable, scr_scale)
+		var presets := Display.presets_for(usable_points)
 		var cur_str := str(settings.get_value(key))
 		if not presets.has(cur_str):
 			presets.append(cur_str)
