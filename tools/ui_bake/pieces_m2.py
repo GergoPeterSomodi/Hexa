@@ -153,18 +153,19 @@ def _render_shield_rim(s: int, tokens: TokenTable, small: bool) -> np.ndarray:
     out = blend_rgb_mask(out, brass, rim_cov)
 
     # Bright specular ridge along the centre of the brass band.
-    ridge_center = -0.65 if small else -1.55
-    ridge_hw = 0.40 if small else 0.65
+    ridge_center = -1.0 if small else -1.55
+    ridge_hw = 0.50 if small else 0.65
     hi_mask = rim_cov * stroke_coverage(sd_outer, ridge_center, ridge_hw, s)
     hi_strength = np.clip(1.0 - light_t * 0.7, 0.30, 0.85)
     out = blend_rgb_mask(out, np.asarray(tokens.rgb("BRASS_HI"), dtype=np.float64), hi_mask * hi_strength)
 
-    # Crisp INK hairlines aligned to pixel centres (2 bands on 20x24, 3 bands on 48x56).
+    # Crisp INK hairlines on both outer and inner edges (3 bands: ink / brass / ink).
     ink = np.asarray(tokens.rgb("INK"), dtype=np.float64)
     if small:
-        # 2.0 px rim: outer ~1.25 px gleaming brass + inner ~0.75 px INK border.
-        ink_in = rim_cov * coverage(sd_outer + 1.25, s)
-        out = blend_rgb_mask(out, ink, ink_in)
+        # 2.0 px rim: ~0.5 px outer INK + ~1.0 px brass ridge + ~0.5 px inner INK.
+        ink_out = rim_cov * coverage(-sd_outer - 0.5, s)
+        ink_in = rim_cov * coverage(sd_outer + 1.5, s)
+        out = blend_rgb_mask(out, ink, np.maximum(ink_out, ink_in))
     else:
         ink_out = rim_cov * coverage(-sd_outer - 0.75, s)
         ink_in = rim_cov * coverage(sd_outer + 2.25, s)
