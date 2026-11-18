@@ -124,7 +124,7 @@ static func build_options(game: Game, hex: Vector2i) -> Array[Dictionary]:
 	return game.improvement.build_options(hex)
 
 
-# ----- the actions: args build {hex, family}, upgrade {hex}, clear {hex} --------------------------------------------
+# ----- the actions: args build {hex, family, tag}, upgrade {hex, tag}, clear {hex, tag} ---------------------------
 
 
 static func _refusal(reason: String) -> Dictionary:
@@ -137,14 +137,30 @@ static func _hex_arg(args: Dictionary) -> Variant:
 	return hex if typeof(hex) == TYPE_VECTOR2I else null
 
 
-static func build_check(game: Game, args: Dictionary) -> Dictionary:
+static func _tag_arg(args: Dictionary) -> StringName:
+	var raw: Variant = args.get("tag", &"")
+	if raw is StringName:
+		return raw
+	if raw is String:
+		return StringName(raw as String)
+	return &""
+
+
+static func _hex_and_home(game: Game, args: Dictionary) -> Dictionary:
 	var hex: Variant = _hex_arg(args)
-	var family: Variant = args.get("family", null)
 	if hex == null:
 		return _refusal("no hex given")
+	return Territory.at_home_check(game, _tag_arg(args), hex as Vector2i)
+
+
+static func build_check(game: Game, args: Dictionary) -> Dictionary:
+	var home := _hex_and_home(game, args)
+	if not bool(home["ok"]):
+		return home
+	var family: Variant = args.get("family", null)
 	if typeof(family) != TYPE_INT:
 		return _refusal("no piece given")
-	return game.improvement.build_check(hex, int(family))
+	return game.improvement.build_check(args["hex"] as Vector2i, int(family))
 
 
 ## Builds level 1 of a family on a wild hex (after checking again), and queues hex_changed.
@@ -158,10 +174,10 @@ static func build(game: Game, args: Dictionary) -> Dictionary:
 
 
 static func upgrade_check(game: Game, args: Dictionary) -> Dictionary:
-	var hex: Variant = _hex_arg(args)
-	if hex == null:
-		return _refusal("no hex given")
-	return game.improvement.upgrade_check(hex)
+	var home := _hex_and_home(game, args)
+	if not bool(home["ok"]):
+		return home
+	return game.improvement.upgrade_check(args["hex"] as Vector2i)
 
 
 static func upgrade(game: Game, args: Dictionary) -> Dictionary:
@@ -174,10 +190,10 @@ static func upgrade(game: Game, args: Dictionary) -> Dictionary:
 
 
 static func clear_check(game: Game, args: Dictionary) -> Dictionary:
-	var hex: Variant = _hex_arg(args)
-	if hex == null:
-		return _refusal("no hex given")
-	return game.improvement.clear_check(hex)
+	var home := _hex_and_home(game, args)
+	if not bool(home["ok"]):
+		return home
+	return game.improvement.clear_check(args["hex"] as Vector2i)
 
 
 static func clear(game: Game, args: Dictionary) -> Dictionary:
