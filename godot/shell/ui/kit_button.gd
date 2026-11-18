@@ -185,7 +185,7 @@ func _apply_kind() -> void:
 		_internal_text_set = true
 		text = text.to_upper()
 		_internal_text_set = false
-	if not _supports_glow() and _glow != null:
+	if _glow != null or (_supports_glow() and (_hovered or has_focus())):
 		_update_glow()
 
 

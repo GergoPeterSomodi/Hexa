@@ -114,6 +114,16 @@ func test_kit_button_verdict_icon_cost_and_hotkey_tooltip() -> void:
 	btn.set_verdict({})
 	assert_false(btn.disabled, "missing ok defaults to true")
 
+	# Custom icon (without icon_name) is saved and restored across verdict toggle
+	var custom_tex := btn.get_theme_icon(&"tick", &"Kit")
+	var custom_btn := KitButton.new()
+	custom_btn.icon = custom_tex
+	_root.add_child(custom_btn)
+	custom_btn.set_verdict({"ok": false, "reason": "Locked"})
+	assert_eq(custom_btn.icon, lock_icon)
+	custom_btn.set_verdict({"ok": true})
+	assert_eq(custom_btn.icon, custom_tex, "custom icon restored on ok verdict")
+
 
 func test_kit_button_lazy_glow_creation_and_motion() -> void:
 	var sec := KitButton.new()
@@ -349,3 +359,23 @@ func test_option_row_binds_bool_choices_range_and_disabled_reason() -> void:
 	assert_false(opt.disabled)
 	assert_false(reason_lbl.visible)
 	assert_eq(choice_row.tooltip_text, "")
+
+	# choices_override turns a ranged key (e.g. display/screen) into an OptionButton
+	var screen_row := OPTION_ROW_SCENE.instantiate() as OptionRow
+	_root.add_child(screen_row)
+	screen_row.bind(settings, "display/screen", "macOS", [0, 1])
+	var screen_opt := screen_row.control() as OptionButton
+	assert_not_null(screen_opt)
+	assert_eq(screen_opt.item_count, 2)
+	screen_opt.select(1)
+	screen_opt.item_selected.emit(1)
+	assert_eq(settings.get_value("display/screen"), 1)
+
+	# _exit_tree disconnects Settings.changed; re-entering reconnects and resyncs
+	assert_true(settings.changed.is_connected(screen_row._on_settings_changed))
+	_root.remove_child(screen_row)
+	assert_false(settings.changed.is_connected(screen_row._on_settings_changed))
+	settings.set_value("display/screen", 0)
+	_root.add_child(screen_row)
+	assert_true(settings.changed.is_connected(screen_row._on_settings_changed))
+	assert_eq(screen_opt.selected, 0)

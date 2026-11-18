@@ -85,6 +85,8 @@ func _clear_options() -> void:
 	_selected_id = null
 	_entries.clear()
 	for child: Node in _hbox.get_children():
+		if child is BaseButton:
+			(child as BaseButton).button_group = null
 		_hbox.remove_child(child)
 		child.queue_free()
 

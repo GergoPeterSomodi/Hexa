@@ -52,7 +52,7 @@ func bind(
 		label_node.text = row_label
 
 	var current: Variant = _settings.get_value(key)
-	if entry.has("choices"):
+	if entry.has("choices") or not choices_override.is_empty():
 		_build_choice_control(key, row_label, current, choices_override)
 	elif int(entry.get("type", TYPE_NIL)) == TYPE_BOOL:
 		_build_switch_control(row_label, bool(current))
