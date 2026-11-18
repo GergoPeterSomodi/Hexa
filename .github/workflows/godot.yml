@@ -155,7 +155,7 @@ jobs:
             echo "::error::The main scene did not open cleanly (see the log)."
             exit 1
           fi
-      # The generated files must be current: the Themes, the four TileSets (assets/tiles/tiles_<season>.tres) and the north Italy map.
+      # The generated files must be current: the Themes, the four TileSets (assets/tiles/tiles_<season>.tres), the north Italy map, and the scenarios.
       - name: Generated Themes are current (build_theme --check)
         run: |
           set -uo pipefail
@@ -181,6 +181,15 @@ jobs:
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error' map.log; then
             echo "::error::The committed map file differs from what tools/build_map.gd builds: run it and commit the file."
+            exit 1
+          fi
+      - name: Generated scenarios are current (build_scenario --check)
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot -s res://tools/build_scenario.gd -- --check 2>&1 | tee scenario.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error' scenario.log; then
+            echo "::error::Committed scenario files differ from what tools/build_scenario.gd builds or fail validation: run it and commit the files."
             exit 1
           fi
       - name: GUT tests (headless, JUnit report)
