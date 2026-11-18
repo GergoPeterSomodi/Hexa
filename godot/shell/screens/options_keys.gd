@@ -208,11 +208,20 @@ func _commit_rebind(action: StringName, key_ev: InputEventKey) -> void:
 		normalized.meta_pressed = key_ev.meta_pressed
 
 	var serialized := Bindings.serialize_event(normalized)
-	var res := Bindings.apply_overrides({String(action): serialized})
+	var prev_overrides: Dictionary = _settings.get_key_overrides() if _settings != null else {}
+	var candidate_overrides: Dictionary = {}
+	for existing_action: Variant in prev_overrides.keys():
+		var action_key := str(existing_action)
+		if action_key != String(action):
+			candidate_overrides[action_key] = prev_overrides[existing_action]
+	candidate_overrides[String(action)] = serialized
+
+	var res := Bindings.apply_overrides(candidate_overrides)
 	_capturing_action = &""
-	_rebuild_action_caps(action)
 
 	if not bool(res.get("ok", false)):
+		Bindings.apply_overrides(prev_overrides)
+		_rebuild_action_caps(action)
 		var conflicts: Dictionary = res.get("conflicts", {})
 		var clash_id := StringName(str(conflicts.get(action, &"")))
 		var clash_label := _label_for_action(clash_id) if clash_id != &"" else "another action"
@@ -223,6 +232,7 @@ func _commit_rebind(action: StringName, key_ev: InputEventKey) -> void:
 
 	if _settings != null:
 		_settings.set_key_override(String(action), serialized)
+	refresh_all()
 	if _hint != null:
 		_hint.theme_type_variation = &"NumberGood"
 		_hint.text = "Bound %s to %s." % [_label_for_action(action), Bindings.event_text(normalized)]

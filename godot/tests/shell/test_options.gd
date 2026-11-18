@@ -221,10 +221,30 @@ func test_key_rebinding_conflict_esc_cancel_and_reset() -> void:
 	assert_eq(options.key_caps_for_action(&"view_grid")[0].label().text, "K")
 	assert_eq(_harness.settings.get_key_overrides().get("view_grid"), "K")
 
-	# Reset keys restores default G and clears overrides
+	# Rebinding another action in the same group to K clashes with view_grid's custom binding
+	options.rebind_button_for(&"view_names").pressed.emit()
+	_harness.send_key(KEY_K)
+	await _harness.wait_frames(self, 1)
+	assert_true(options.keys_hint_label().text.contains("conflicts"))
+	assert_eq(options.key_caps_for_action(&"view_names")[0].label().text, "N")
+	assert_eq(options.key_caps_for_action(&"view_grid")[0].label().text, "K", "previous rebind preserved after clash")
+
+	# Rebinding a second action to B preserves both custom overrides in InputMap and Settings
+	options.rebind_button_for(&"view_names").pressed.emit()
+	_harness.send_key(KEY_B)
+	await _harness.wait_frames(self, 1)
+	assert_eq(options.key_caps_for_action(&"view_names")[0].label().text, "B")
+	assert_eq(options.key_caps_for_action(&"view_grid")[0].label().text, "K", "first rebind still active after second rebind")
+	assert_eq(_harness.settings.get_key_overrides().get("view_grid"), "K")
+	assert_eq(_harness.settings.get_key_overrides().get("view_names"), "B")
+	assert_eq(Bindings.key_caps_for(&"view_grid", _harness.settings.platform)[0], "K")
+	assert_eq(Bindings.key_caps_for(&"view_names", _harness.settings.platform)[0], "B")
+
+	# Reset keys restores default G / N and clears overrides
 	options.reset_keys_button().pressed.emit()
 	await _harness.wait_frames(self, 1)
 	assert_eq(options.key_caps_for_action(&"view_grid")[0].label().text, "G")
+	assert_eq(options.key_caps_for_action(&"view_names")[0].label().text, "N")
 	assert_true(_harness.settings.get_key_overrides().is_empty())
 
 

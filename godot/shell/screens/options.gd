@@ -57,6 +57,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	_keys_panel.cancel_rebind()
 	_disconnect_settings()
 
 
