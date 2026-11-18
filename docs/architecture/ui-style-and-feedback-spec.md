@@ -402,6 +402,13 @@ medallion or the log's newest season header reopen the last report.
 
 ## 7. The works preview
 
+> **M4's build spec refines this section** (`m4-build-spec.md` 1.2 and 4.23, where it wins): the season profile is a field
+> of each `FamilyDef` (`season_percent`), not a `season_profiles.tres`; `district_output` takes the tax level as one more
+> argument and returns `walls`, `staffing`, `lift`, `good` and `wild` too; goods move through a second door,
+> `Stores.move`, beside `Treasury.move`; `expensive` is a quarter of the treasury or **eight** seasons or more (every
+> first stage takes four); the card is `shell/screens/works_preview.*`; the tint of the hex and its ring is drawn by
+> `PreviewMarks`, not the mode overlay. The six requirements of 7.3 are answered there (no "no" on 1 or 2).
+
 ### 7.1 `ImprovePreview` (`core/views/improve_preview.gd`, pure)
 
 `ImprovePreview.of(game, tag: StringName, hex: Vector2i, option: Dictionary) -> Dictionary`; `option` is

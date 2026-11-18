@@ -133,6 +133,11 @@ W5 below edits it.
 
 ### S3: the works preview and the Economy page (M4)
 
+**`m4-build-plan.md` folds these tasks into M4** with their IDs (its opening table): W0 is done by `m4-build-spec.md`; W2
+also builds `Stores` and every M4 field of `Country`; W8 and W11 are split in two (kit pieces first, screens after the
+previews); W9 no longer edits `settings.gd` or `bindings.gd` (their M4 rows exist); `resource_chip.tscn` is its task N8;
+the system tasks are N1 to N12.
+
 | # | Group | Task | Files | Done when |
 |---|---|---|---|---|
 | W0 (Opus, M; **starts now**) | 0 | **The district economy carries spec 7.3**; Fable signs `district_output`, `market_prices`, `Treasury.move` | the M4 design page and `docs/architecture/m4-build-spec.md` | The six requirements are answered yes or no in writing; a no on 1 or 2 flips assumed decision 2 |

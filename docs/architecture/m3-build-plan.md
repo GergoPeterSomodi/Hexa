@@ -228,13 +228,15 @@ On the day M2 closes:
 ## 7. What M3 hands to M4
 
 - **Money hooks:** `Work.paid` (set in `Works.build`, `upgrade`, `clear`), `Works.refund` and the one `Treasury.move`
-  line in `cancel_work` (spec 4.3); `Treasury.close_ledger` in the `stats` phase; the `production`, `trade` and
-  `income` rows between `works` and `stats` (spec 4.2).
+  line in `cancel_work` (spec 4.3; `m4-build-spec.md` 4.11 adds `paid_goods`, a `Stores.move` per good and check rows
+  8 and 9); `Treasury.close_ledger` in the `stats` phase; the `production`, `trade` and `income` rows (spec 4.2; M4 puts
+  them before `works`, `m4-build-spec.md` 4.13).
 - **The report:** `SeasonSummary`'s `treasury`, `goods` and `standing` sections, already drawn by the screen from
   `tests/fixtures/report_sample.gd`; `swing_permille`; "Open the study"; the money and food reminders; toasts of
   `goods_short` dropped while a season runs (`COVERED`).
 - **Data:** `FamilyDef` gains costs, upkeep and output beside `work_seasons`; `GameDefs.goods` sets `Stats.goods`.
 - **Luck:** weather from `game.luck.world` in the `calendar` phase.
-- **Road works** (spec 1.2): `MapState` schema 4 with road and crossing per edge.
+- **Road works** (spec 1.2): `MapState` schema 4 with road and crossing per edge; **moved to M10** by `m4-build-spec.md` 1.2
+  (a road's worth is market reach, which only M10's markets give).
 - **Caches:** `game.view_cache` for `ImprovePreview` (W5).
 - **Saves:** `SaveFile.FORMAT` 1; a new body field with a default needs no bump (spec 4.10).

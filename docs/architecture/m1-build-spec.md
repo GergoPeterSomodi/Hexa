@@ -158,8 +158,8 @@ class_name MapData extends Resource
 @export var cover: PackedByteArray           # 0 farmland ... 7 sand (the order of the tile names); 255 at sea
 @export var depth: PackedByteArray           # sea: 0 shelf, 1 sea, 2 deep; land: 0
 @export var climate: PackedByteArray         # 0 snow, 1 frost, 2 mild (the kit's winter_of)
-@export var fertility: PackedByteArray       # 0 until M4
-@export var ore: PackedByteArray             # 0 until M4
+@export var fertility: PackedByteArray       # 0; unread in M4 (m4-build-spec.md D27): E2 decides whether soil data fills it
+@export var ore: PackedByteArray             # 0; unread in M4: a mine's ore is its piece's extra (Improve.piece_of)
 @export var pass_id: PackedInt32Array        # index into passes, -1 none
 @export var place_id: PackedInt32Array       # index into places, -1 none
 # per edge, index = 3 * hex index + k, k = 0 E, 1 NE, 2 NW (each hex owns three of its six edges)
@@ -189,7 +189,7 @@ func digest() -> String                      # sha256 of every field in a fixed 
 
 `coast` (does the hex touch the sea) and the sea side are **derived** (`coast_mask`, `MapTiles.sea_side`), never
 stored. Read-only in play. `road` and `crossing` are the starting network; the living ones join `MapState` with road
-works in M4 (`m3-build-spec.md` 1.2).
+works in M10 (`m3-build-spec.md` 1.2, moved from M4 by `m4-build-spec.md` 1.2).
 
 ### `MapState` (`core/state/map_state.gd`, RefCounted): what changes
 

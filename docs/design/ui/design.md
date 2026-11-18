@@ -161,7 +161,9 @@ wireframes and sample strings: `game-feedback-screens.md`. In the Studiolo kit:
 New kit pieces: `VellumSheet`, `DeltaChip`, `SeasonStrip`, `PreviewCard`, `InkChart`, `StudyTable`, `RelationMatrix`, `NavList`;
 tokens `GOOD_INK`, `BAD_INK`, `WARN_INK` and five chart inks (iron-gall, lapis, madder, verdigris, ochre), each 4.5:1 or more on vellum.
 The numbers in the mockup are examples; the M4 district-economy design sets the real ones. In the map data Genoa is already
-level 4, so the Genoa example is 4 to 5; Savona (3 to 4) is the refused case, because Cuneo is a town beside it.
+level 4, so the Genoa example is 4 to 5; Savona (3 to 4) is the refused case, because Cuneo is a town beside it. The real
+numbers are in `docs/architecture/m4-build-spec.md` 4.15; its 4.16 lists which of the mockup's figures they reproduce
+(the vineyard card's) and which they replace (Genoa's city, the report's treasury, the study's money).
 
 ## 7. Motion and sound
 

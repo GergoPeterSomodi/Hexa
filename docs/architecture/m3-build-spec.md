@@ -87,7 +87,7 @@ the M1.5 frame as M2 left it.
 | Style spec 7.2: `core/game/view_cache.gd` arrives with M4 (W5) | It arrives in M3 (the report and the task flag cache by `game.version`); W5 uses it | The style spec already puts `view_cache` on `Game` in M3 |
 | UI spec 7: "Undo the last build this season ... M4 (until then Clear undoes)"; style spec 7.4: Undo in the toast | `cancel_work` arrives in M3 (style spec section 1, refinement 6); the undo is **Ctrl/Cmd+Z** (`game_undo_work`) and the hex panel's "Cancel the work"; toasts are mouse-ignored, so the toast shows the key | A click cannot reach a toast (style spec 5) |
 | UI spec 7: the developer console is "a `LineEdit` over the F3 panel" | It sits at the foot of the F3 panel; **F2** focuses it | The backtick is `dev_debug`, and Shift+backtick would also match it (Godot matches an action whose modifiers are a subset of the event's) |
-| M1 spec 4: "from M3 the living [roads and crossings] are in `MapState`" | Road works arrive with **M4** (a road changes market reach, the works preview's "road to the market"); M3 keeps the starting roads | M3's scope is district works; the M1 line is edited (section 11) |
+| M1 spec 4: "from M3 the living [roads and crossings] are in `MapState`" | Road works arrive with **M10** (a road changes market reach, the works preview's "road to the market"; `m4-build-spec.md` 1.2 moved them from M4); M3 keeps the starting roads | M3's scope is district works; the M1 line is edited (section 11) |
 | M2 spec 5.4: `Game.defs` is null in a map-only game | `defs` is set in **every** game from M3 (the sandbox needs the work times); `has_countries()` is `scenario != null` | One code path for works in the sandbox and in a scenario |
 | UI spec 5.4: one "Autosave" slot | Three, `auto1` to `auto3`, the oldest written over; the Load tab lists them newest first | One bad season (a crash, a mistake) cannot cost the last good autosave |
 | UI spec 7: the log's filters All, War, Money, Mine | **All, Works, Mine** in M3; Money arrives with M4 and War with M7 (hidden before, the UI spec's rule) | Works are M3's only kind; the History page (style spec 8) has the same five filters |
@@ -192,7 +192,9 @@ nothing else. "The season that ended" is always `game.turn − 1` after a season
 ### 4.2 The season table
 
 `core/game/season.gd`. **M3's `PHASES`: `works`, `stats`, `calendar`.** The planned order of every milestone (standard
-5.3 with the edits of section 11); a milestone adds its rows where they stand here and edits `test_season.gd`:
+5.3 with the edits of section 11); a milestone adds its rows where they stand here and edits `test_season.gd`. (M4 moves
+`works` after `income` and `debt`, so a work stands and produces from the season after it finishes: `m4-build-spec.md`
+1.2 and 4.13 hold the order from M4 on.)
 
 | # | Name | Arrives | Reads | Writes (through the owner) |
 |---|---|---|---|---|
@@ -307,7 +309,9 @@ and stands from season T + n. `WorksView.ready_turn` walks the seasons from `gam
 (`work.paid` when `work.started_turn == game.turn`, else 0; always 0 in M3), and emits `work_cancelled` with
 `why: &"order"` and `refund`. **The M4 hook:** M4 adds, in `cancel_work` after `refund`, one line
 `Treasury.move(game, work.tag, refund, &"refund", work.hex)` and sets `paid` in `build`, `upgrade` and `clear`; nothing
-else in M3's code changes for money.
+else in M3's code changes for money. (`m4-build-spec.md` 4.11 refines it: works also cost goods, so `Work` gains
+`paid_goods`, the refund has a second call, `Stores.move` per good, and the check table gains rows 8 and 9, money and
+goods.)
 
 ### 4.4 Events and the chronicle
 
@@ -1312,7 +1316,7 @@ Made in this change:
 | Page | Edit |
 |---|---|
 | `docs/architecture/godot-architecture.md` | 5.3: the `stats` row before the calendar; the calendar row's weather moves to M4; row 14 (autosave) leaves the table: the shell saves after the report. 9.2, row M3: points at this spec and its plan; status "specified and planned, waits for the owner's go; starts after M2 closes" |
-| `docs/architecture/m1-build-spec.md` | Section 4: the living roads and crossings join `MapState` with road works in M4, not M3 |
+| `docs/architecture/m1-build-spec.md` | Section 4: the living roads and crossings join `MapState` with road works in M4, not M3 (since moved to M10 by `m4-build-spec.md` 1.2) |
 | `docs/architecture/m2-build-spec.md` | 5.4: `defs` is set in every game from M3 and `has_countries()` is `scenario != null`; 5.5: from M3 the rules call `game.emit`, and `owners_changed` carries `tag` and `others` |
 | `docs/architecture/ui-style-and-feedback-spec.md` | Section 6: a note of M3's refinements (the chronicle on `Game`, 35 series with 14 families, the M3 notices, `witnessed` with the game, `Events.chronicled`, `view_cache` from M3) |
 | `docs/architecture/ui-style-and-feedback-plan.md` | S2: a note that `m3-build-plan.md` folds R1 to R11 (R1 done by this spec; R6 with the Session work; R8's App and key edits in Y18 and Y3; R11 with the M3 monkey) and that W5 edits `view_cache.gd` |
@@ -1331,7 +1335,7 @@ changes: no new autoload, no new layer.
 
 | M | Takes from M3 | M3 leaves for it |
 |---|---|---|
-| M4 | `Work.paid`, `Works.refund` and the one `Treasury.move` line in `cancel_work`; the `production`, `trade`, `income` rows between `works` and `stats`; `Treasury.close_ledger` in the `stats` phase; weather from `luck.world` in the calendar phase; `SeasonSummary`'s `treasury`, `goods`, `standing` sections (the screen draws them already), `swing_permille`, money reminders; `FamilyDef` for costs and output; `view_cache` for previews; road works (schema 4 of `MapState`); "Open the study" | Money |
+| M4 | `Work.paid`, `Works.refund` and the one `Treasury.move` line in `cancel_work`; the `production`, `trade`, `income` rows between `works` and `stats`; `Treasury.close_ledger` in the `stats` phase; weather from `luck.world` in the calendar phase; `SeasonSummary`'s `treasury`, `goods`, `standing` sections (the screen draws them already), `swing_permille`, money reminders; `FamilyDef` for costs and output; `view_cache` for previews; "Open the study" (road works, schema 4 of `MapState`, moved to M10 by `m4-build-spec.md` 1.2) | Money |
 | M4.5 | the chronicle for History; `Stats` rings and years for charts and Rankings; `Knowledge.band` and `known`; older log headers open History | Insights |
 | M5 | `people`, `food_made`, `food_eaten` series; `town_grew`, `district_declined` into `Chronicle.NOTABLE`; the People section | People |
 | M6 | `witnesses` on events from vision; `knows` by explored hexes; the flow's `REPLAY` state; `ready_units`, `vision` rows; the winter rule's passes | Armies |

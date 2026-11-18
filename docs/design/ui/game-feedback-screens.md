@@ -200,6 +200,10 @@ forbid (pair rules, a town's demand). Luck (harvests, late frost) is never count
 The seasons add up: −2, −3, +28, −1 = +22 a year. Payback from Spring 1481: −2, −5, +23, +22, +20, +17, +45 (Autumn
 1482, past the 40 spent).
 
+> **M4's numbers** (`docs/architecture/m4-build-spec.md` 4.15 c and 4.16): this card's district, season and payback
+> figures are reproduced exactly by M4's tables; the country's own figures (658 → 680, the chart) and the neighbour's
+> price line are not (the country is 511 → 533 on seed 1480; prices react only in M10).
+
 ### B.5 Example: Genoa, and a refusal (*example* numbers)
 
 **Genoa is already level 4 in `north_italy.tres`**, so its card is 4 → 5; the 3 → 4 case is Savona's, which the rules refuse.
@@ -213,6 +217,10 @@ The seasons add up: −2, −3, +28, −1 = +22 a year. Payback from Spring 1481
 - Savona, "town to walled town (level 3 → 4)", refused. Today's string (`_pair_against`): "a town needs its own
   countryside: no two towns side by side (settlements 3 at 5, 13)". The card: **"Cuneo (5, 13) is a town beside
   Savona: two towns may not stand side by side."**
+
+> **M4's numbers replace this example** (`docs/architecture/m4-build-spec.md` 4.15 d): Genoa's city costs 1,000 ducats,
+> 20 timber and 40 stone, brings people 30,000 → 60,000 and about +45 a season, and pays back in about 32 seasons: an
+> investment, not a prestige work. The Savona refusal stands as written.
 
 ### B.6 Compare
 
@@ -288,6 +296,10 @@ flows, Relations, Supply, Food.
 |   hover: "High: ▲ +38, people ▼ −0.3% a season"                                     |
 +--------------------------------------------------------------------------------------+
 ```
+
+> **M4's numbers replace this example** (`docs/architecture/m4-build-spec.md` 4.15 and 4.16): on seed 1480 Genoa's
+> Spring 1480 reads money in +102 (+65, +7, +30), out −16 (−12, −4), left over +86, and the chart starts with the first
+> season played.
 
 ### C.4 Charts and tables in Godot
 
