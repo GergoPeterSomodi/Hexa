@@ -1,0 +1,27 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/ui/option_row.gd" id="1_row"]
+
+[node name="OptionRow" type="VBoxContainer"]
+size_flags_horizontal = 3
+script = ExtResource("1_row")
+
+[node name="MainRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MainRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Body"
+vertical_alignment = 1
+
+[node name="Slot" type="HBoxContainer" parent="MainRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 2
+
+[node name="Reason" type="Label" parent="."]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Reason"
+autowrap_mode = 3
