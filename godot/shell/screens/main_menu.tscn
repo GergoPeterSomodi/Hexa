@@ -1,0 +1,161 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://shell/screens/main_menu.gd" id="1_menu"]
+[ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="2_btn"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("1_menu")
+kind = 1
+screen_id = &"main_menu"
+
+[node name="Backdrop" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"PanelShade"
+
+[node name="MenuBg" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="MenuShade" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Rose" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -340.0
+offset_top = -274.0
+offset_right = -120.0
+offset_bottom = -54.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="MenuColumn" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 120.0
+offset_top = -210.0
+offset_right = 420.0
+offset_bottom = 210.0
+grow_vertical = 2
+mouse_filter = 2
+alignment = 1
+
+[node name="Wordmark" type="TextureRect" parent="MenuColumn"]
+custom_minimum_size = Vector2(300, 76)
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Subtitle" type="Label" parent="MenuColumn"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+text = "Anno Domini MCDLXXX"
+horizontal_alignment = 1
+
+[node name="Rule" type="TextureRect" parent="MenuColumn"]
+custom_minimum_size = Vector2(200, 14)
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Sheet" type="PanelContainer" parent="MenuColumn"]
+layout_mode = 2
+mouse_filter = 0
+theme_type_variation = &"PanelModal"
+
+[node name="Buttons" type="VBoxContainer" parent="MenuColumn/Sheet"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="SandboxButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
+layout_mode = 2
+text = "Map sandbox"
+script = ExtResource("2_btn")
+kind = 8
+
+[node name="OptionsButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
+layout_mode = 2
+text = "Options"
+script = ExtResource("2_btn")
+kind = 7
+
+[node name="CreditsButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
+layout_mode = 2
+text = "Credits"
+script = ExtResource("2_btn")
+kind = 7
+
+[node name="QuitButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
+layout_mode = 2
+text = "Quit"
+script = ExtResource("2_btn")
+kind = 7
+
+[node name="DevNote" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -30.0
+offset_right = 420.0
+offset_bottom = -10.0
+grow_vertical = 0
+theme_type_variation = &"Hint"
+text = "Map sandbox shows while developer tools are on."
+
+[node name="VersionLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -30.0
+offset_right = -16.0
+offset_bottom = -10.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_type_variation = &"Hint"
+horizontal_alignment = 2

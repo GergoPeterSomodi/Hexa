@@ -1,0 +1,79 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://shell/screens/loading.gd" id="1_loading"]
+[ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="2_btn"]
+
+[node name="Loading" type="Control"]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("1_loading")
+kind = 1
+screen_id = &"loading"
+
+[node name="Backdrop" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+theme_type_variation = &"PanelShade"
+
+[node name="Center" type="CenterContainer" parent="Backdrop"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Card" type="PanelContainer" parent="Backdrop/Center"]
+custom_minimum_size = Vector2(440, 0)
+layout_mode = 2
+mouse_filter = 0
+theme_type_variation = &"PanelModal"
+
+[node name="VBox" type="VBoxContainer" parent="Backdrop/Center/Card"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Backdrop/Center/Card/VBox"]
+layout_mode = 2
+theme_type_variation = &"TitleModal"
+text = "Building the map"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="ProgressBar" type="ProgressBar" parent="Backdrop/Center/Card/VBox"]
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+max_value = 100.0
+show_percentage = false
+
+[node name="Status" type="Label" parent="Backdrop/Center/Card/VBox"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+text = "Preparing..."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Hint" type="Label" parent="Backdrop/Center/Card/VBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Hint"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Actions" type="HBoxContainer" parent="Backdrop/Center/Card/VBox"]
+visible = false
+layout_mode = 2
+alignment = 1
+
+[node name="CancelButton" type="Button" parent="Backdrop/Center/Card/VBox/Actions"]
+layout_mode = 2
+text = "Cancel"
+script = ExtResource("2_btn")
+kind = 0
