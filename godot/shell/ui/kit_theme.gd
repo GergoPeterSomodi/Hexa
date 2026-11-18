@@ -96,7 +96,6 @@ static func _build(hc: bool) -> Theme:
 	theme.default_font_size = 14
 
 	_apply_typography(theme, font_cache, hc)
-	_apply_hex_aliases(theme)
 	_apply_base_controls(theme, font_cache, pieces, tex_cache, hc)
 	_apply_panels(theme, pieces, tex_cache, hc)
 	_apply_buttons(theme, font_cache, pieces, tex_cache, hc)
@@ -174,16 +173,6 @@ static func _apply_typography(theme: Theme, font_cache: Dictionary, hc: bool) ->
 		theme.set_color(&"font_color", tname, _tok(str(spec["color_token"]), spec["color"] as Color, hc))
 		if tname == &"Label":
 			theme.set_constant(&"line_spacing", tname, 2)
-
-
-static func _apply_hex_aliases(theme: Theme) -> void:
-	for alias_name: String in Tokens.HEX_ALIASES:
-		var target := StringName(Tokens.HEX_ALIASES[alias_name])
-		var aname := StringName(alias_name)
-		theme.set_type_variation(aname, &"Label")
-		theme.set_font(&"font", aname, theme.get_font(&"font", target))
-		theme.set_font_size(&"font_size", aname, theme.get_font_size(&"font_size", target))
-		theme.set_color(&"font_color", aname, theme.get_color(&"font_color", target))
 
 
 static func _apply_base_controls(theme: Theme, fc: Dictionary, pieces: Dictionary, tc: Dictionary[String, Texture2D], hc: bool) -> void:

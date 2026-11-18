@@ -1,0 +1,196 @@
+## Studiolo map layers and season-preview popup card toggled from TopBar
+## (docs/architecture/ui-and-controls-spec.md sections 3.3, 7; ui-style-and-feedback-plan.md U14).
+class_name LayersPopover
+extends PanelContainer
+
+signal layer_toggled(layer_name: StringName, on: bool)
+signal season_preview_requested(index: int)
+signal closed
+
+const LAYER_GRID := &"map/grid"
+const LAYER_NAMES := &"map/place_names"
+const LAYER_RELIEF := &"graphics/relief_shading"
+
+const SEASON_LABELS: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
+
+var anchor_button: BaseButton = null
+
+@onready var _grid_cap: KeyCap = $VBox/GridRow/KeyCap
+@onready var _grid_switch: KitSwitch = $VBox/GridRow/GridSwitch
+@onready var _names_cap: KeyCap = $VBox/NamesRow/KeyCap
+@onready var _names_switch: KitSwitch = $VBox/NamesRow/NamesSwitch
+@onready var _relief_switch: KitSwitch = $VBox/ReliefRow/ReliefSwitch
+@onready var _season_seg: Segmented = $VBox/SeasonSeg
+
+var _settings: Settings = null
+var _syncing: bool = false
+var _season_index: int = 1
+
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	visible = false
+
+	_grid_cap.action = &"view_grid"
+	_names_cap.action = &"view_names"
+
+	_grid_switch.focus_mode = Control.FOCUS_NONE
+	_names_switch.focus_mode = Control.FOCUS_NONE
+	_relief_switch.focus_mode = Control.FOCUS_NONE
+
+	_grid_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_GRID, on))
+	_names_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_NAMES, on))
+	_relief_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_RELIEF, on))
+
+	_season_seg.hud_mode = true
+	var items: Array[Dictionary] = []
+	for i: int in SEASON_LABELS.size():
+		items.append({"id": i, "label": SEASON_LABELS[i]})
+	_season_seg.set_options(items)
+	_season_seg.select(_season_index, false)
+	_season_seg.changed.connect(_on_season_changed)
+
+	if _settings != null:
+		_sync_from_settings()
+
+
+func _exit_tree() -> void:
+	_disconnect_settings()
+
+
+func _input(event: InputEvent) -> void:
+	if not visible or not is_inside_tree():
+		return
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		if key.pressed and not key.echo:
+			var is_back := (InputMap.has_action(&"app_back") and key.is_action(&"app_back")) or key.is_action(&"ui_cancel")
+			if is_back:
+				close()
+				var vp := get_viewport()
+				if vp != null:
+					vp.set_input_as_handled()
+		return
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if not mb.pressed:
+			return
+		if mb.button_index not in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
+			return
+		if get_global_rect().has_point(mb.position):
+			return
+		if anchor_button != null and is_instance_valid(anchor_button) and anchor_button.get_global_rect().has_point(mb.position):
+			return
+		close()
+
+
+func open() -> void:
+	set_open(true)
+
+
+func close() -> void:
+	set_open(false)
+
+
+func set_open(on: bool) -> void:
+	if visible == on:
+		return
+	visible = on
+	if not on:
+		closed.emit()
+
+
+func configure(settings: Settings) -> void:
+	if settings == _settings:
+		if settings != null and is_node_ready():
+			_sync_from_settings()
+		return
+	_disconnect_settings()
+	_settings = settings
+	if _settings == null:
+		return
+	_settings.changed.connect(_on_setting_changed)
+	if is_node_ready():
+		_sync_from_settings()
+
+
+func set_layer_state(layer_name: StringName, on: bool) -> void:
+	if not is_node_ready():
+		return
+	_syncing = true
+	match layer_name:
+		LAYER_GRID, &"grid":
+			_grid_switch.set_pressed_no_signal(on)
+		LAYER_NAMES, &"place_names":
+			_names_switch.set_pressed_no_signal(on)
+		LAYER_RELIEF, &"relief_shading":
+			_relief_switch.set_pressed_no_signal(on)
+	_syncing = false
+
+
+func set_season(index: int) -> void:
+	_season_index = clampi(index, 0, SEASON_LABELS.size() - 1)
+	if is_node_ready():
+		_season_seg.select(_season_index, false)
+
+
+func refresh_hotkeys() -> void:
+	if not is_node_ready():
+		return
+	_grid_cap.refresh_from_input_map()
+	_names_cap.refresh_from_input_map()
+
+
+func grid_switch() -> KitSwitch:
+	return _grid_switch
+
+
+func names_switch() -> KitSwitch:
+	return _names_switch
+
+
+func relief_switch() -> KitSwitch:
+	return _relief_switch
+
+
+func season_segmented() -> Segmented:
+	return _season_seg
+
+
+func _on_switch_toggled(layer_key: StringName, on: bool) -> void:
+	if _syncing:
+		return
+	if _settings != null:
+		_syncing = true
+		_settings.set_value(String(layer_key), on)
+		_syncing = false
+	layer_toggled.emit(layer_key, on)
+
+
+func _on_season_changed(id: Variant) -> void:
+	var idx := clampi(int(id), 0, SEASON_LABELS.size() - 1)
+	_season_index = idx
+	season_preview_requested.emit(idx)
+
+
+func _sync_from_settings() -> void:
+	if _settings == null or not is_node_ready():
+		return
+	_syncing = true
+	_grid_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_GRID))))
+	_names_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_NAMES))))
+	_relief_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_RELIEF))))
+	_syncing = false
+
+
+func _on_setting_changed(key: String, value: Variant) -> void:
+	if _syncing:
+		return
+	if key == String(LAYER_GRID) or key == String(LAYER_NAMES) or key == String(LAYER_RELIEF):
+		set_layer_state(StringName(key), bool(value))
+
+
+func _disconnect_settings() -> void:
+	if _settings != null and _settings.changed.is_connected(_on_setting_changed):
+		_settings.changed.disconnect(_on_setting_changed)
+	_settings = null

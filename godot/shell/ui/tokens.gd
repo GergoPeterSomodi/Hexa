@@ -445,15 +445,6 @@ const TYPE_VARIATIONS: Dictionary[String, Dictionary] = {
 	},
 }
 
-## Legacy Hex* label aliases kept until task H1 migrates the hex panel (spec 4.3).
-const HEX_ALIASES: Dictionary[String, String] = {
-	"HexTitle": "TitlePanel",
-	"HexSection": "SectionHead",
-	"HexKey": "Hint",
-	"HexValue": "TableRow",
-	"HexReason": "Reason",
-}
-
 ## Panel, button and composite Theme variations for `build_theme.gd` (spec 4.7, ui-and-controls-spec.md 3.4).
 const STYLE_VARIATIONS: Dictionary[String, Dictionary] = {
 	"PanelContainer": {"base_type": "PanelContainer", "kind": "texture", "texture": "panel_frame"},

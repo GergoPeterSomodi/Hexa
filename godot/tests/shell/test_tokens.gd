@@ -143,9 +143,7 @@ func test_type_and_style_variation_tables_are_complete() -> void:
 			assert_true(bool(entry["tabular"]), "number variation uses tabular digits: " + var_name)
 
 	for alias_name: String in ["HexTitle", "HexSection", "HexKey", "HexValue", "HexReason"]:
-		assert_true(Tokens.HEX_ALIASES.has(alias_name), "HEX_ALIASES has " + alias_name)
-		var target: String = Tokens.HEX_ALIASES[alias_name]
-		assert_true(Tokens.TYPE_VARIATIONS.has(target), "HEX_ALIASES[%s] targets %s" % [alias_name, target])
+		assert_false(Tokens.TYPE_VARIATIONS.has(alias_name), "Hex* alias removed: " + alias_name)
 
 	var expected_styles: Array[String] = [
 		"PanelContainer", "PanelModal", "PanelVellum", "PanelVellumInset", "PanelCard", "PanelBar",

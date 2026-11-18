@@ -1,27 +1,27 @@
 [gd_scene load_steps=3 format=3]
 
-[ext_resource type="Theme" path="res://shell/ui/theme.tres" id="1_theme"]
-[ext_resource type="Script" path="res://shell/panels/hex_panel.gd" id="2_panel"]
+[ext_resource type="Script" path="res://shell/panels/hex_panel.gd" id="1_panel"]
+[ext_resource type="Script" path="res://shell/ui/cartouche.gd" id="2_cart"]
 
 [node name="HexPanel" type="PanelContainer"]
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(296, 0)
 size_flags_vertical = 0
 mouse_filter = 0
-theme = ExtResource("1_theme")
-script = ExtResource("2_panel")
+script = ExtResource("1_panel")
 
 [node name="Body" type="VBoxContainer" parent="."]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Title" type="Label" parent="Body"]
+[node name="Cartouche" type="PanelContainer" parent="Body"]
 layout_mode = 2
-theme_type_variation = &"HexTitle"
-autowrap_mode = 3
+size_flags_horizontal = 3
+script = ExtResource("2_cart")
 
 [node name="Subtitle" type="Label" parent="Body"]
 layout_mode = 2
-theme_type_variation = &"HexReason"
+theme_type_variation = &"Hint"
+autowrap_mode = 3
 
 [node name="PieceBox" type="VBoxContainer" parent="Body"]
 layout_mode = 2
@@ -29,7 +29,7 @@ mouse_filter = 2
 
 [node name="Heading" type="Label" parent="Body/PieceBox"]
 layout_mode = 2
-theme_type_variation = &"HexSection"
+theme_type_variation = &"SectionHead"
 text = "Built"
 
 [node name="Rows" type="GridContainer" parent="Body/PieceBox"]
@@ -43,7 +43,7 @@ mouse_filter = 2
 
 [node name="Heading" type="Label" parent="Body/GroundBox"]
 layout_mode = 2
-theme_type_variation = &"HexSection"
+theme_type_variation = &"SectionHead"
 text = "Ground"
 
 [node name="Rows" type="GridContainer" parent="Body/GroundBox"]
@@ -51,8 +51,9 @@ layout_mode = 2
 mouse_filter = 2
 columns = 2
 
-[node name="HSeparator" type="HSeparator" parent="Body"]
+[node name="Rule" type="HSeparator" parent="Body"]
 layout_mode = 2
+mouse_filter = 2
 
 [node name="ActionsBox" type="VBoxContainer" parent="Body"]
 layout_mode = 2
@@ -60,7 +61,7 @@ mouse_filter = 2
 
 [node name="Heading" type="Label" parent="Body/ActionsBox"]
 layout_mode = 2
-theme_type_variation = &"HexSection"
+theme_type_variation = &"SectionHead"
 text = "Actions"
 
 [node name="Actions" type="VBoxContainer" parent="Body/ActionsBox"]

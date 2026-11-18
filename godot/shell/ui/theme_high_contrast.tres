@@ -5,9 +5,9 @@
 [ext_resource type="FontFile" path="res://assets/fonts/alegreya_sans/AlegreyaSans-Bold.ttf" id="3"]
 [ext_resource type="FontFile" path="res://assets/fonts/cinzel/Cinzel-Bold.ttf" id="4"]
 [ext_resource type="FontFile" path="res://assets/fonts/alegreya_sans/AlegreyaSans-Regular.ttf" id="5"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sc/AlegreyaSC-Bold.ttf" id="6"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_base.png" id="7"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya/Alegreya-MediumItalic.ttf" id="8"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_base.png" id="6"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya/Alegreya-MediumItalic.ttf" id="7"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sc/AlegreyaSC-Bold.ttf" id="8"]
 
 [sub_resource type="FontVariation" id="FontVariation_1"]
 fallbacks = Array[Font]([ExtResource("2")])
@@ -796,14 +796,6 @@ opentype_features = {
 1953396077: 1
 }
 
-[sub_resource type="FontVariation" id="FontVariation_5"]
-fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("6")
-opentype_features = {
-1819178349: 1,
-1953396077: 1
-}
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_63"]
 content_margin_left = 6.0
 content_margin_top = 3.0
@@ -829,72 +821,80 @@ border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_1"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(16, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_2"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(32, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_3"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(48, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_4"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(0, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_5"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(0, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_6"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(80, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_7"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(112, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_8"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(80, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_9"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(32, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_10"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(112, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_11"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(96, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_12"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(16, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_13"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(96, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_14"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(64, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_15"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(48, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_16"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(64, 16, 16, 16)
+
+[sub_resource type="FontVariation" id="FontVariation_5"]
+fallbacks = Array[Font]([ExtResource("2")])
+base_font = ExtResource("7")
 
 [sub_resource type="FontVariation" id="FontVariation_6"]
 fallbacks = Array[Font]([ExtResource("2")])
 base_font = ExtResource("8")
+opentype_features = {
+1819178349: 1,
+1953396077: 1
+}
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_65"]
 content_margin_left = 8.0
@@ -933,7 +933,7 @@ border_width_bottom = 2
 border_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_17"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(16, 0, 16, 16)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_68"]
@@ -1113,7 +1113,7 @@ border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_18"]
-atlas = ExtResource("7")
+atlas = ExtResource("6")
 region = Rect2(64, 0, 16, 16)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_83"]
@@ -1700,26 +1700,6 @@ HSeparator/styles/separator = SubResource("StyleBoxFlat_60")
 HSlider/styles/grabber_area = SubResource("StyleBoxFlat_61")
 HSlider/styles/grabber_area_highlight = SubResource("StyleBoxFlat_61")
 HSlider/styles/slider = SubResource("StyleBoxFlat_62")
-HexKey/base_type = &"Label"
-HexKey/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
-HexKey/font_sizes/font_size = 13
-HexKey/fonts/font = SubResource("FontVariation_4")
-HexReason/base_type = &"Label"
-HexReason/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
-HexReason/font_sizes/font_size = 13
-HexReason/fonts/font = SubResource("FontVariation_4")
-HexSection/base_type = &"Label"
-HexSection/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
-HexSection/font_sizes/font_size = 16
-HexSection/fonts/font = SubResource("FontVariation_5")
-HexTitle/base_type = &"Label"
-HexTitle/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
-HexTitle/font_sizes/font_size = 16
-HexTitle/fonts/font = SubResource("FontVariation_3")
-HexValue/base_type = &"Label"
-HexValue/colors/font_color = Color(1, 1, 1, 1)
-HexValue/font_sizes/font_size = 14
-HexValue/fonts/font = SubResource("FontVariation_1")
 Hint/base_type = &"Label"
 Hint/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 Hint/font_sizes/font_size = 13
@@ -1796,7 +1776,7 @@ Label/fonts/font = SubResource("FontVariation_2")
 LabelFlavour/base_type = &"Label"
 LabelFlavour/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 LabelFlavour/font_sizes/font_size = 17
-LabelFlavour/fonts/font = SubResource("FontVariation_6")
+LabelFlavour/fonts/font = SubResource("FontVariation_5")
 LabelInk/base_type = &"Label"
 LabelInk/colors/font_color = Color(1, 1, 1, 1)
 LabelInk/font_sizes/font_size = 16
@@ -1804,7 +1784,7 @@ LabelInk/fonts/font = SubResource("FontVariation_1")
 LabelInkHead/base_type = &"Label"
 LabelInkHead/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
 LabelInkHead/font_sizes/font_size = 16
-LabelInkHead/fonts/font = SubResource("FontVariation_5")
+LabelInkHead/fonts/font = SubResource("FontVariation_6")
 LabelInkMuted/base_type = &"Label"
 LabelInkMuted/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 LabelInkMuted/font_sizes/font_size = 15
@@ -1907,8 +1887,8 @@ RichTextLabel/font_sizes/bold_italics_font_size = 15
 RichTextLabel/font_sizes/italics_font_size = 15
 RichTextLabel/font_sizes/normal_font_size = 15
 RichTextLabel/fonts/bold_font = SubResource("FontVariation_2")
-RichTextLabel/fonts/bold_italics_font = SubResource("FontVariation_6")
-RichTextLabel/fonts/italics_font = SubResource("FontVariation_6")
+RichTextLabel/fonts/bold_italics_font = SubResource("FontVariation_5")
+RichTextLabel/fonts/italics_font = SubResource("FontVariation_5")
 RichTextLabel/fonts/normal_font = SubResource("FontVariation_1")
 RichTextLabel/styles/focus = SubResource("StyleBoxFlat_86")
 RichTextLabel/styles/normal = SubResource("StyleBoxEmpty_7")
@@ -1916,7 +1896,7 @@ ScrollContainer/styles/panel = SubResource("StyleBoxEmpty_8")
 SectionHead/base_type = &"Label"
 SectionHead/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
 SectionHead/font_sizes/font_size = 16
-SectionHead/fonts/font = SubResource("FontVariation_5")
+SectionHead/fonts/font = SubResource("FontVariation_6")
 StudyTree/base_type = &"Tree"
 StudyTree/colors/font_color = Color(1, 1, 1, 1)
 StudyTree/colors/font_selected_color = Color(1, 0.8392157, 0.27450982, 1)
@@ -1929,7 +1909,7 @@ StudyTree/constants/v_separation = 4
 StudyTree/font_sizes/font_size = 14
 StudyTree/font_sizes/title_button_font_size = 13
 StudyTree/fonts/font = SubResource("FontVariation_1")
-StudyTree/fonts/title_button_font = SubResource("FontVariation_5")
+StudyTree/fonts/title_button_font = SubResource("FontVariation_6")
 StudyTree/styles/panel = SubResource("StyleBoxEmpty_9")
 StudyTree/styles/selected = SubResource("StyleBoxFlat_87")
 StudyTree/styles/selected_focus = SubResource("StyleBoxFlat_88")
@@ -1939,7 +1919,7 @@ StudyTree/styles/title_button_pressed = SubResource("StyleBoxFlat_90")
 TableHeader/base_type = &"Label"
 TableHeader/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
 TableHeader/font_sizes/font_size = 13
-TableHeader/fonts/font = SubResource("FontVariation_5")
+TableHeader/fonts/font = SubResource("FontVariation_6")
 TableRow/base_type = &"Label"
 TableRow/colors/font_color = Color(1, 1, 1, 1)
 TableRow/font_sizes/font_size = 14
@@ -1976,7 +1956,7 @@ Tree/constants/v_separation = 4
 Tree/font_sizes/font_size = 14
 Tree/font_sizes/title_button_font_size = 13
 Tree/fonts/font = SubResource("FontVariation_1")
-Tree/fonts/title_button_font = SubResource("FontVariation_5")
+Tree/fonts/title_button_font = SubResource("FontVariation_6")
 Tree/styles/panel = SubResource("StyleBoxEmpty_11")
 Tree/styles/selected = SubResource("StyleBoxFlat_91")
 Tree/styles/selected_focus = SubResource("StyleBoxFlat_92")

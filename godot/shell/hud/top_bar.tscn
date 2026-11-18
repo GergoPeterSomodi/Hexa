@@ -1,0 +1,71 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://shell/hud/top_bar.gd" id="1_bar"]
+[ext_resource type="Script" path="res://shell/ui/segmented.gd" id="2_seg"]
+[ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
+
+[node name="TopBar" type="PanelContainer"]
+custom_minimum_size = Vector2(0, 40)
+size_flags_horizontal = 3
+mouse_filter = 0
+theme_type_variation = &"PanelBar"
+script = ExtResource("1_bar")
+
+[node name="HBox" type="HBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Brand" type="Label" parent="HBox"]
+layout_mode = 2
+theme_type_variation = &"TitleBrand"
+text = "HEXA"
+
+[node name="Sep" type="VSeparator" parent="HBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="MapInfo" type="Label" parent="HBox"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+text = "North Italy · Sandbox, seed 1480"
+
+[node name="Spacer" type="Control" parent="HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="SeasonSeg" type="PanelContainer" parent="HBox"]
+layout_mode = 2
+size_flags_vertical = 4
+script = ExtResource("2_seg")
+hud_mode = true
+
+[node name="LayersButton" type="Button" parent="HBox"]
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+tooltip_text = "Map layers and season preview"
+accessibility_name = "Layers"
+text = "Layers"
+script = ExtResource("3_btn")
+kind = 5
+
+[node name="HelpButton" type="Button" parent="HBox"]
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+tooltip_text = "Help and keys"
+accessibility_name = "Help and keys"
+script = ExtResource("3_btn")
+kind = 6
+icon_name = &"help"
+
+[node name="MenuButton" type="Button" parent="HBox"]
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+tooltip_text = "Pause menu"
+accessibility_name = "Pause menu"
+script = ExtResource("3_btn")
+kind = 6
+icon_name = &"menu"

@@ -64,11 +64,10 @@ func test_both_themes_load_and_contain_all_variations() -> void:
 			assert_true(theme.has_font_size(&"font_size", tname), "%s has font_size for %s" % [label, var_name])
 			assert_true(theme.has_color(&"font_color", tname), "%s has font_color for %s" % [label, var_name])
 
-		for alias_name: String in Tokens.HEX_ALIASES:
+		for alias_name: String in ["HexTitle", "HexSection", "HexKey", "HexValue", "HexReason"]:
 			var aname := StringName(alias_name)
-			assert_eq(theme.get_type_variation_base(aname), &"Label", "%s Hex alias %s extends Label" % [label, alias_name])
-			assert_true(theme.has_font(&"font", aname), "%s has font for %s" % [label, alias_name])
-			assert_true(theme.has_color(&"font_color", aname), "%s has font_color for %s" % [label, alias_name])
+			assert_eq(theme.get_type_variation_base(aname), &"", "%s removed Hex alias %s" % [label, alias_name])
+			assert_false(Array(theme.get_type_list()).has(alias_name), "%s has no Hex alias type %s" % [label, alias_name])
 
 		for style_name: String in Tokens.STYLE_VARIATIONS:
 			var spec: Dictionary = Tokens.STYLE_VARIATIONS[style_name]

@@ -1,0 +1,51 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://shell/hud/zoom_control.gd" id="1_zoom"]
+[ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="2_btn"]
+
+[node name="ZoomControl" type="PanelContainer"]
+mouse_filter = 0
+theme_type_variation = &"PanelCard"
+script = ExtResource("1_zoom")
+
+[node name="HBox" type="HBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ZoomOutButton" type="Button" parent="HBox"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Zoom out"
+accessibility_name = "Zoom out"
+script = ExtResource("2_btn")
+kind = 6
+icon_name = &"zoom_out"
+
+[node name="ReadoutButton" type="Button" parent="HBox"]
+custom_minimum_size = Vector2(56, 0)
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Reset zoom to 100%"
+accessibility_name = "Zoom level"
+text = "100%"
+script = ExtResource("2_btn")
+kind = 1
+
+[node name="ZoomInButton" type="Button" parent="HBox"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Zoom in"
+accessibility_name = "Zoom in"
+script = ExtResource("2_btn")
+kind = 6
+icon_name = &"zoom_in"
+
+[node name="FitButton" type="Button" parent="HBox"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Fit whole map"
+accessibility_name = "Fit whole map"
+text = "Fit"
+script = ExtResource("2_btn")
+kind = 1
+icon_name = &"fit"

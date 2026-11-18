@@ -66,12 +66,6 @@ func _verify_theme(label: String, theme: Theme) -> int:
 			printerr("build_theme: [%s] missing type variation %s" % [label, var_name])
 			failed += 1
 
-	for alias_name: String in Tokens.HEX_ALIASES:
-		var aname := StringName(alias_name)
-		if not theme.has_font(&"font", aname) or not theme.has_font_size(&"font_size", aname) or not theme.has_color(&"font_color", aname):
-			printerr("build_theme: [%s] missing Hex alias %s" % [label, alias_name])
-			failed += 1
-
 	for style_name: String in Tokens.STYLE_VARIATIONS:
 		if not _has_style_variation(theme, style_name):
 			printerr("build_theme: [%s] missing style variation %s" % [label, style_name])

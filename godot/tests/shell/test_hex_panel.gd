@@ -1,7 +1,5 @@
-## The hex panel (docs/architecture/m1-build-spec.md section 11, T14): it shows a hex's place or ground, what stands on it and
-## its level; a wild hex lists its builds, a built one has Upgrade and Clear; a refused button is disabled with the reason as
-## its tooltip and a grey line. Build, upgrade and clear go through Session.act, and the panel refreshes on every
-## Events.hex_changed as the map scene does it.
+## Studiolo inspected-hex side panel tests (docs/architecture/m1-build-spec.md section 11, T14;
+## docs/architecture/ui-style-and-feedback-plan.md H1).
 extends GutTest
 
 const PANEL := "res://shell/panels/hex_panel.tscn"
@@ -11,8 +9,10 @@ var _panel: HexPanel = null
 
 
 func before_each() -> void:
+	Bindings.ensure()
 	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
 	_panel = (load(PANEL) as PackedScene).instantiate() as HexPanel
+	_panel.theme = KitTheme.load_for(1.0)
 	add_child_autofree(_panel)
 	Events.hex_changed.connect(_on_hex_changed)
 
@@ -20,15 +20,13 @@ func before_each() -> void:
 func after_each() -> void:
 	if Events.hex_changed.is_connected(_on_hex_changed):
 		Events.hex_changed.disconnect(_on_hex_changed)
-	await get_tree().process_frame  # the panel frees the rows and buttons it replaced at the end of a frame
+	await get_tree().process_frame
 
 
-## The map scene refreshes the panel on every change; the test does the same.
 func _on_hex_changed(_hex: Vector2i) -> void:
 	_panel.refresh()
 
 
-## Wild land hexes that have at least one build option the rules list (ok or refused), in map order.
 func _wild_land_with_options(limit: int) -> Array[Vector2i]:
 	var game := Session.game
 	var out: Array[Vector2i] = []
@@ -41,7 +39,6 @@ func _wild_land_with_options(limit: int) -> Array[Vector2i]:
 	return out
 
 
-## The first enabled button whose text starts with the prefix; fails the test when there is none.
 func _press(prefix: String) -> void:
 	for button: Button in _panel.action_buttons():
 		if not button.disabled and button.text.begins_with(prefix):
@@ -57,7 +54,6 @@ func _button(prefix: String) -> Button:
 	return null
 
 
-## The value written beside a key in a grid of key and value labels ("" when the key is not there).
 func _row_value(grid_path: String, key: String) -> String:
 	var kids := (_panel.get_node(grid_path) as GridContainer).get_children()
 	for at: int in range(0, kids.size() - 1, 2):
@@ -66,7 +62,6 @@ func _row_value(grid_path: String, key: String) -> String:
 	return ""
 
 
-## The grey reason lines under the actions.
 func _reason_lines() -> Array[String]:
 	var out: Array[String] = []
 	for node: Node in (_panel.get_node("Body/ActionsBox/Actions") as VBoxContainer).get_children():
@@ -75,15 +70,23 @@ func _reason_lines() -> Array[String]:
 	return out
 
 
-func test_it_is_hidden_until_a_hex_is_shown_and_it_stops_the_mouse() -> void:
+func test_it_is_hidden_until_a_hex_is_shown_and_stops_the_mouse_with_studiolo_frame() -> void:
 	assert_false(_panel.visible, "hidden at the start")
 	assert_eq(_panel.shown_hex(), HexPanelContract.NO_HEX)
 	assert_eq(_panel.mouse_filter, Control.MOUSE_FILTER_STOP, "a click on the panel never reaches the map")
+	assert_eq(_panel.custom_minimum_size.x, float(Tokens.PANEL_W), "width matches Tokens.PANEL_W")
+	assert_eq((_panel.get_node("Body/PieceBox/Heading") as Label).theme_type_variation, &"SectionHead")
+	assert_eq((_panel.get_node("Body/GroundBox/Heading") as Label).theme_type_variation, &"SectionHead")
+	assert_eq((_panel.get_node("Body/ActionsBox/Heading") as Label).theme_type_variation, &"SectionHead")
+
 	var hex := _wild_land_with_options(1)[0]
 	_panel.show_hex(hex)
 	assert_true(_panel.visible)
 	assert_eq(_panel.shown_hex(), hex)
+	assert_eq(_panel.cartouche().theme_type_variation, &"PanelCartouche")
+	assert_eq(_panel.cartouche().label().theme_type_variation, &"TitlePanel")
 	for button: Button in _panel.action_buttons():
+		assert_true(button is KitButton, "actions use Studiolo KitButton")
 		assert_eq(button.focus_mode, Control.FOCUS_NONE, "buttons take no keyboard focus")
 	_panel.clear()
 	assert_false(_panel.visible, "clear hides it")
@@ -93,10 +96,13 @@ func test_it_is_hidden_until_a_hex_is_shown_and_it_stops_the_mouse() -> void:
 func test_a_wild_hex_shows_its_ground_and_lists_its_builds() -> void:
 	var hex := _wild_land_with_options(1)[0]
 	_panel.show_hex(hex)
-	assert_eq((_panel.get_node("Body/Subtitle") as Label).text, "Hex %d, %d" % [hex.x, hex.y])
+	assert_eq(_panel.subtitle_label().text, "Hex %d, %d" % [hex.x, hex.y])
 	assert_eq(_row_value("Body/PieceBox/Rows", "Stands on it"), "nothing (wild land)")
 	assert_ne(_row_value("Body/GroundBox/Rows", "Ground"), "", "the ground is written")
 	assert_ne(_row_value("Body/GroundBox/Rows", "Height"), "", "the height is written")
+	var piece_rows := (_panel.get_node("Body/PieceBox/Rows") as GridContainer).get_children()
+	assert_eq((piece_rows[0] as Label).theme_type_variation, &"Hint", "ledger keys use Hint")
+	assert_eq((piece_rows[1] as Label).theme_type_variation, &"TableRow", "ledger values use TableRow")
 	assert_true((_panel.get_node("Body/GroundBox") as VBoxContainer).visible)
 	assert_eq((_panel.get_node("Body/ActionsBox/Heading") as Label).text, "Build here")
 	var enabled := 0
@@ -117,7 +123,8 @@ func test_a_sea_hex_shows_no_actions() -> void:
 	assert_ne(sea, Vector2i(-1, -1), "the map has a sea hex")
 	_panel.show_hex(sea)
 	assert_true(_panel.visible)
-	assert_eq((_panel.get_node("Body/Title") as Label).text, "Sea")
+	assert_eq(_panel.cartouche().text, "Sea")
+	assert_eq(_panel.cartouche().label().text, "SEA")
 	assert_false((_panel.get_node("Body/ActionsBox") as VBoxContainer).visible)
 	assert_true(_panel.action_buttons().is_empty())
 
@@ -133,12 +140,15 @@ func test_a_refused_button_is_disabled_and_shows_its_reason() -> void:
 			break
 	assert_ne(place_hex, Vector2i(-1, -1), "a place of the map stands on a settlement")
 	_panel.show_hex(place_hex)
-	var clear_button := _button("Clear")
+	var clear_button := _button("Clear") as KitButton
 	assert_not_null(clear_button, "a built hex has Clear")
+	assert_eq(clear_button.kind, KitButton.Kind.DANGER)
 	assert_true(clear_button.disabled, "a place is never pulled down, so Clear is refused")
 	var reason := str(Session.check("clear", {"hex": place_hex})["reason"])
 	assert_ne(reason, "", "the rules give a reason")
 	assert_eq(clear_button.tooltip_text, reason, "the reason is the tooltip")
+	assert_eq(clear_button.reason_text(), reason, "KitButton tracks verdict reason")
+	assert_eq(clear_button.icon, clear_button.get_theme_icon(&"lock", &"Kit"), "refused KitButton shows lock icon")
 	assert_true(_reason_lines().has(reason), "the reason is a line under the actions")
 
 
@@ -175,7 +185,6 @@ func _has_enabled(prefix: String) -> bool:
 	return false
 
 
-## The level word the panel writes for the family the hex now holds.
 func _level_word_for(hex: Vector2i) -> String:
 	var piece := Improve.piece_at(Session.game, hex)
 	var family := str(piece["family"])
