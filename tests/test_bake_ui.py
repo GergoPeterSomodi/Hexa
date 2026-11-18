@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
 import unittest
@@ -30,6 +31,22 @@ from tools.ui_bake.tokens import load_tokens
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 KIT_JSON = REPO_ROOT / "godot" / "assets" / "ui" / "kit" / "ui_kit.json"
+COUNTRY_ARMS_GD = REPO_ROOT / "godot" / "shell" / "ui" / "country_arms.gd"
+
+_SHIELD_DECL_RE = re.compile(r"const\s+SHIELD\s*:[^=\n]*=\s*\[(.*?)\]", re.DOTALL)
+_VEC2_RE = re.compile(r"Vector2\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)")
+
+
+def load_country_arms_shield(gd_path: Path = COUNTRY_ARMS_GD) -> tuple[tuple[float, float], ...]:
+    """Parse CountryArms.SHIELD directly from godot/shell/ui/country_arms.gd."""
+    text = gd_path.read_text(encoding="utf-8")
+    m = _SHIELD_DECL_RE.search(text)
+    if not m:
+        raise AssertionError(f"Could not find const SHIELD declaration in {gd_path}")
+    pts = tuple((float(vx), float(vy)) for vx, vy in _VEC2_RE.findall(m.group(1)))
+    if len(pts) < 3:
+        raise AssertionError(f"Parsed too few vertices ({len(pts)}) for SHIELD in {gd_path}")
+    return pts
 
 
 class TestBakeUI(unittest.TestCase):
@@ -153,11 +170,13 @@ class TestBakeUI(unittest.TestCase):
             self.assertEqual(int(mf[72 * s, 4 * s, 3]), 255, f"minimap_frame@{s}x left tip opaque")
             self.assertEqual(int(mf[72 * s, 252 * s, 3]), 255, f"minimap_frame@{s}x right tip opaque")
 
-        # Shield rims: transparent interior & exterior aligned to SHIELD_OUTLINE; 1 px shift fails.
+        # Shield rims: transparent interior & exterior aligned to CountryArms.SHIELD (parsed from country_arms.gd); 1 px shift fails.
+        gd_shield = load_country_arms_shield()
+        self.assertEqual(gd_shield, SHIELD_OUTLINE, "CountryArms.SHIELD must match pieces_m2.SHIELD_OUTLINE")
         for name, (w, h), rim_w in (("shield_rim", (48, 56), 3.0), ("shield_rim_sm", (20, 24), 2.0)):
             sx = float(w) / 48.0
             sy = float(h) / 56.0
-            pts = [(x * sx, y * sy) for x, y in SHIELD_OUTLINE]
+            pts = [(x * sx, y * sy) for x, y in gd_shield]
             shifted_pts = [(x + 1.0, y) for x, y in pts]
             for s in (1, 2):
                 arr = load_png_rgba(kit_dir / f"{s}x" / f"{name}.png")
