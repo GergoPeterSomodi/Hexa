@@ -61,6 +61,7 @@ var _refs_bound: bool = false
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_ensure_refs()
+	resized.connect(_sync_ribbon_layout)
 	_sync_header()
 	_sync_seal()
 	_sync_nav_visibility()
@@ -70,6 +71,7 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_THEME_CHANGED and _refs_bound:
 		_sync_seal()
+		_sync_ribbon_layout()
 
 
 ## Adds a titled section to the vellum body and registers it in the ink NavList.
@@ -230,6 +232,22 @@ func _sync_header() -> void:
 	_seal_gap.visible = show_seal
 	_head.visible = _lede_label.visible or show_seal
 	_head_rule.visible = _head.visible
+	_sync_ribbon_layout()
+
+
+func _sync_ribbon_layout() -> void:
+	if not _refs_bound or _ribbon == null or not _ribbon.visible:
+		return
+	var host_w := maxf(size.x, custom_minimum_size.x)
+	var min_left := 88.0 if show_seal else 24.0
+	var max_w := maxf(Ribbon.MIN_WIDTH, host_w - min_left - 24.0) if host_w > 0.0 else 560.0
+	_ribbon.fit_overhang(max_w, -46.0, 0.0)
+	if show_seal and host_w > 0.0:
+		var left_x := host_w * 0.5 + _ribbon.offset_left
+		if left_x < min_left:
+			var shift := min_left - left_x
+			_ribbon.offset_left += shift
+			_ribbon.offset_right += shift
 
 
 func _sync_seal() -> void:

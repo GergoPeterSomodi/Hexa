@@ -117,7 +117,6 @@ func _rebuild() -> void:
 		_caps.append(cap)
 
 		var lbl := Label.new()
-		lbl.theme_type_variation = &"Hint"
 		lbl.text = desc
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		item.add_child(lbl)

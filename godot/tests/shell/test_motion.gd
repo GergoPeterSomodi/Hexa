@@ -147,3 +147,15 @@ func test_looping_helpers_spin_ring_drift_map_and_spin_rose() -> void:
 	rose_tween.custom_step(60.0)
 	assert_almost_eq(rose.rotation, PI, 0.05, "spin_rose turns half a circle in 60 s")
 	rose_tween.kill()
+
+	var compass := _make_control(Vector2(220.0, 220.0))
+	compass.rotation = 0.4
+	assert_null(Motion.wiggle_rose(compass, true), "wiggle_rose reduce_motion returns null")
+	assert_almost_eq(compass.rotation, 0.0, 0.001, "wiggle_rose resets rotation to North")
+
+	var compass_tween := Motion.wiggle_rose(compass, false)
+	assert_not_null(compass_tween, "wiggle_rose returns a Tween")
+	compass_tween.pause()
+	compass_tween.custom_step(2.4)
+	assert_almost_eq(compass.rotation, deg_to_rad(3.5), 0.005, "wiggle_rose tilts slightly near North")
+	compass_tween.kill()

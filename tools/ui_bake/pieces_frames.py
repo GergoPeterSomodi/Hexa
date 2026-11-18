@@ -61,13 +61,14 @@ def _walnut_band_frame(
 
     out = np.zeros((h * s, w * s, 4), dtype=np.float64)
 
-    # Soft drop shadow below/around the frame box
-    sd_sh = sd_box(lx, ly, cx, cy + 4.0, hw, hh)
-    sh_alpha = np.clip(1.0 - np.maximum(sd_sh, 0.0) / 8.0, 0.0, 1.0) * 0.55
-    out = blend_rgb_mask(out, np.array([0.0, 0.0, 0.0]), sh_alpha)
-
     sd_outer = sd_box(lx, ly, cx, cy, hw, hh)
     sd_inner = sd_box(lx, ly, cx, cy, hw - band_w, hh - band_w)
+
+    # Outer drop shadow strictly outside the frame box (never darkening the panel interior)
+    outer_cov = coverage(sd_outer, s)
+    sd_sh = sd_box(lx, ly, cx, cy + 4.0, hw, hh)
+    sh_alpha = np.clip(1.0 - np.maximum(sd_sh, 0.0) / 8.0, 0.0, 1.0) * 0.55 * (1.0 - outer_cov)
+    out = blend_rgb_mask(out, np.array([0.0, 0.0, 0.0]), sh_alpha)
 
     # Wood grain: horizontal on top/bottom bands, turned 90 deg on left/right vertical bands
     wood_h = walnut_rgb(lx, ly, tokens, vertical=False, period_x=96, period_y=96, seed=11)
@@ -78,25 +79,36 @@ def _walnut_band_frame(
     is_vert = dx_edge < dy_edge
     wood = np.where(is_vert[..., None], wood_v, wood_h)
 
-    # Diagonal walnut shading from #7a5230 -> WOOD -> WOOD_DARK across the box
-    diag_t = np.clip(((lx - x0) + (ly - y0)) / ((x1 - x0) + (y1 - y0)), 0.0, 1.0)
-    wood_tint = sample_ramp(
-        diag_t,
-        [(0.0, parse_hex_color("#7a5230")[:3]), (0.5, tokens.rgb("WOOD")), (1.0, tokens.rgb("WOOD_DARK"))],
-    )
+    # Tile-seamless walnut tone: constant along border strips (varying only by edge normal, never X/Y gradient)
+    # so 9-slice corners and middle strips meet with zero visible step or brightness seam.
+    edge_dist = np.minimum(dx_edge, dy_edge)
+    top_edge_t = np.clip(1.0 - (ly - y0) / max(1.0, band_w), 0.0, 1.0)
+    is_top_band = (ly - y0) <= dx_edge
+    bevel_t = np.where(is_top_band, top_edge_t * 0.35, 0.0)
+    # Slight warm highlight near outer rim of top border, dark edge rim along inner groove
+    wood_hi = np.asarray(parse_hex_color("#7a5230")[:3], dtype=np.float64)
+    wood_base = np.asarray(tokens.rgb("WOOD"), dtype=np.float64)
+    wood_dk = np.asarray(tokens.rgb("WOOD_DARK"), dtype=np.float64)
+    groove_t = np.clip((band_w - edge_dist) / band_w, 0.0, 1.0) * 0.25
+    wood_tint = wood_base * (1.0 - bevel_t[..., None]) + wood_hi * bevel_t[..., None]
+    wood_tint = wood_tint * (1.0 - groove_t[..., None]) + wood_dk * groove_t[..., None]
     wood = np.clip(0.55 * wood + 0.45 * wood_tint, 0.0, 1.0)
 
     # Band mask (outer minus inner)
-    outer_cov = coverage(sd_outer, s)
     inner_cov = coverage(sd_inner, s)
     band_cov = np.clip(outer_cov - inner_cov, 0.0, 1.0)
     out = blend_rgb_mask(out, wood, band_cov)
 
-    # Gilt fillets along outer (2.7px inside) and inner (10.0px inside) border
-    gilt_grad = sample_ramp(diag_t, [(0.0, tokens.rgb("BRASS_HI")), (0.5, tokens.rgb("BRASS")), (1.0, tokens.rgb("BRASS_LO"))])
+    # Seamless gilt fillets along outer (2.7px inside) and inner (10.0px inside) border
+    gilt_outer = (
+        0.35 * np.asarray(tokens.rgb("BRASS_HI"), dtype=np.float64)
+        + 0.65 * np.asarray(tokens.rgb("BRASS"), dtype=np.float64)
+    )
+    gilt_inner = np.asarray(tokens.rgb("BRASS"), dtype=np.float64)
     fillet_out = stroke_coverage(sd_outer, -2.7, 0.7, s)
     fillet_in = stroke_coverage(sd_outer, -10.0, 0.5, s)
-    out = blend_rgb_mask(out, gilt_grad, np.maximum(fillet_out, fillet_in))
+    out = blend_rgb_mask(out, gilt_outer, fillet_out)
+    out = blend_rgb_mask(out, gilt_inner, fillet_in)
 
     # 1px INK hairline on outer edge and inner edge of walnut band
     ink = np.asarray(tokens.rgb("INK"), dtype=np.float64)
@@ -162,8 +174,8 @@ def _render_panel_modal(s: int, tokens: TokenTable) -> np.ndarray:
     out[..., :3] = frame[..., :3] * sa + out[..., :3] * (1.0 - sa)
     out[..., 3:4] = np.clip(sa + out[..., 3:4] * (1.0 - sa), 0.0, 1.0)
 
-    # Quatrefoil bosses overhanging the 4 corners of the frame (24..168)
-    for bx, by in ((24.0, 24.0), (168.0, 24.0), (24.0, 168.0), (168.0, 168.0)):
+    # Quatrefoil bosses centered on the 13px walnut corner miters (24+6.5 .. 168-6.5), overhanging cleanly inside E=24
+    for bx, by in ((30.5, 30.5), (161.5, 30.5), (30.5, 161.5), (161.5, 161.5)):
         out = draw_quatrefoil_boss(out, lx, ly, bx, by, s, tokens)
     return (np.floor(np.clip(out, 0.0, 1.0) * 255.0 + 0.5)).astype(np.uint8)
 

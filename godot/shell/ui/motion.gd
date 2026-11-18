@@ -127,6 +127,21 @@ static func drift_map(bg_node: Control, reduce_motion: bool = false) -> Tween:
 	return tween
 
 
+## Gently oscillates the main-menu compass rose +/-3.5 deg around true North.
+static func wiggle_rose(rose_node: Control, reduce_motion: bool = false) -> Tween:
+	rose_node.pivot_offset = rose_node.size * 0.5
+	rose_node.rotation = 0.0
+	if reduce_motion:
+		return null
+	var amp := deg_to_rad(3.5)
+	var tween := _make_tween(rose_node)
+	tween.set_loops()
+	tween.tween_property(rose_node, "rotation", amp, 2.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(rose_node, "rotation", -amp * 0.7, 2.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(rose_node, "rotation", 0.0, 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	return tween
+
+
 ## Slowly rotates the main-menu wind rose once every 120 s.
 static func spin_rose(rose_node: Control, reduce_motion: bool = false) -> Tween:
 	rose_node.pivot_offset = rose_node.size * 0.5

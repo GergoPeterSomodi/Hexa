@@ -7,7 +7,7 @@ extends Screen
 
 const MENU_BG_PATH := "res://assets/ui/menu/menu_bg.png"
 const MENU_SHADE_PATH := "res://assets/ui/menu/menu_shade.png"
-const COLUMN_HALF_W := 150.0
+const COLUMN_HALF_W := 168.0
 
 @onready var _bg_rect: TextureRect = $MenuBg
 @onready var _shade_rect: TextureRect = $MenuShade
@@ -127,8 +127,9 @@ func _start_motion() -> void:
 	for btn: KitButton in [_sandbox_btn, _options_btn, _credits_btn, _quit_btn]:
 		btn.reduce_motion = reduce
 	_sync_pivots()
-	_drift_tween = Motion.drift_map(_bg_rect, reduce)
-	_rose_tween = Motion.spin_rose(_rose_rect, reduce)
+	if _bg_rect != null:
+		_bg_rect.scale = Vector2.ONE
+	_rose_tween = Motion.wiggle_rose(_rose_rect, reduce)
 
 
 func _stop_motion() -> void:

@@ -25,6 +25,6 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="Sheet" parent="Center" instance=ExtResource("2_vellum")]
-custom_minimum_size = Vector2(480, 220)
+custom_minimum_size = Vector2(560, 230)
 layout_mode = 2
 show_nav = false

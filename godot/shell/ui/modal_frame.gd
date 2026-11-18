@@ -26,6 +26,8 @@ signal closed
 		show_close = value
 		_sync_header()
 
+const MAX_AUTO_BODY_H: float = 520.0
+
 @onready var _panel: PanelContainer = $Panel
 @onready var _head: HBoxContainer = $Panel/VBox/Head
 @onready var _title_box: VBoxContainer = $Panel/VBox/Head/TitleBox
@@ -41,11 +43,19 @@ signal closed
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel.minimum_size_changed.connect(update_minimum_size)
+	_body.minimum_size_changed.connect(_sync_auto_body_height)
+	resized.connect(_sync_ribbon_layout)
 	_close_button.pressed.connect(_on_close_pressed)
 	_foot.child_order_changed.connect(_sync_footer_visibility)
 	_sync_header()
 	_sync_footer_visibility()
+	_sync_auto_body_height()
 	update_minimum_size()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED and is_node_ready():
+		_sync_ribbon_layout()
 
 
 func _get_minimum_size() -> Vector2:
@@ -102,6 +112,26 @@ func _sync_header() -> void:
 	_close_button.visible = show_close
 	_head.visible = has_title_content or _close_button.visible
 	_title_box.visible = _head.visible
+	_sync_ribbon_layout()
+
+
+func _sync_ribbon_layout() -> void:
+	if not is_node_ready() or _ribbon == null or not _ribbon.visible:
+		return
+	var host_w := maxf(size.x, custom_minimum_size.x)
+	var max_w := maxf(Ribbon.MIN_WIDTH, host_w - 48.0) if host_w > 0.0 else 520.0
+	_ribbon.fit_overhang(max_w, -22.0, 0.0)
+
+
+func _sync_auto_body_height() -> void:
+	if not is_node_ready() or _body == null or _body_scroll == null:
+		return
+	if custom_minimum_size.y > 0.0:
+		return
+	var body_h := clampf(_body.get_combined_minimum_size().y, 0.0, MAX_AUTO_BODY_H)
+	if not is_equal_approx(_body_scroll.custom_minimum_size.y, body_h):
+		_body_scroll.custom_minimum_size.y = body_h
+		update_minimum_size()
 
 
 func _sync_footer_visibility() -> void:
