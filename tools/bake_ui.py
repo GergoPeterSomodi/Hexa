@@ -28,6 +28,7 @@ from tools.ui_bake.checks import BakeCheckError, run_all_checks
 from tools.ui_bake.pieces_art import art_pieces
 from tools.ui_bake.pieces_controls import control_pieces
 from tools.ui_bake.pieces_frames import PieceSpec, frame_pieces
+from tools.ui_bake.pieces_m2 import m2_pieces
 from tools.ui_bake.png import load_png_rgba, rgba_sha256, save_png
 from tools.ui_bake.tokens import TokenTable, load_tokens
 
@@ -38,7 +39,7 @@ TOLERANT_MAX_MAD = 2.5
 
 
 def all_specs() -> list[PieceSpec]:
-    return frame_pieces() + control_pieces() + art_pieces()
+    return frame_pieces() + control_pieces() + art_pieces() + m2_pieces()
 
 
 def _spec_map() -> dict[str, PieceSpec]:

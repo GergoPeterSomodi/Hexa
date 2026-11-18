@@ -84,8 +84,15 @@ func test_both_themes_load_and_contain_all_variations() -> void:
 				assert_true(theme.has_stylebox(&"selected", sname), "%s %s has selected stylebox" % [label, style_name])
 				assert_true(theme.has_color(&"guide_color", sname), "%s %s has guide_color" % [label, style_name])
 
-		for extra_panel: StringName in [&"PanelPlate", &"PanelDebug", &"PanelShade", &"KeyCapPanel", &"KeyCapPanelWait"]:
+		for extra_panel: StringName in [&"PanelPlate", &"PanelDebug", &"PanelShade", &"KeyCapPanel", &"KeyCapPanelWait", &"PanelMinimap"]:
 			assert_true(theme.has_stylebox(&"panel", extra_panel), "%s has %s" % [label, str(extra_panel)])
+		if label == "studiolo":
+			var minimap_sb := theme.get_stylebox(&"panel", &"PanelMinimap") as StyleBoxTexture
+			assert_not_null(minimap_sb, "studiolo PanelMinimap is StyleBoxTexture")
+			if minimap_sb != null:
+				assert_true(minimap_sb.texture.resource_path.ends_with("minimap_frame.png"), "PanelMinimap uses minimap_frame.png")
+		else:
+			assert_true(theme.get_stylebox(&"panel", &"PanelMinimap") is StyleBoxFlat, "HC PanelMinimap is StyleBoxFlat")
 		assert_eq(theme.get_type_variation_base(&"KitSwitch"), &"CheckButton", "%s has KitSwitch" % label)
 
 		var chart_colors: Dictionary = (Tokens.STYLE_VARIATIONS["InkChart"] as Dictionary)["colors"]
@@ -195,10 +202,31 @@ func test_kit_icons_exist_in_theme_and_high_contrast() -> void:
 	var hc := load(KitTheme.HIGH_CONTRAST_PATH) as Theme
 	var pieces := _load_pieces()
 
-	for icon_name: String in ["seal", "stud", "glow_soft", "rule_diamond", "rose", "wordmark", "switch_off", "switch_on", "grabber", "grabber_hot"]:
+	for icon_name: String in ["seal", "stud", "glow_soft", "rule_diamond", "rose", "wordmark", "switch_off", "switch_on", "grabber", "grabber_hot", "shield_rim", "shield_rim_sm", "pennant_pole", "pennant_cloth"]:
 		assert_true(studiolo.has_icon(StringName(icon_name), &"Kit"), "studiolo Kit has " + icon_name)
 		var tex := studiolo.get_icon(StringName(icon_name), &"Kit")
 		assert_not_null(tex, "Kit icon %s is non-null" % icon_name)
+
+	var m2_sizes: Dictionary[String, Vector2] = {
+		"shield_rim": Vector2(48.0, 56.0),
+		"shield_rim_sm": Vector2(20.0, 24.0),
+		"pennant_pole": Vector2(24.0, 56.0),
+		"pennant_cloth": Vector2(28.0, 20.0),
+	}
+	var theme_2x := KitTheme.load_for(2.0, &"2x", false)
+	for m2_name: String in m2_sizes:
+		var expected_sz: Vector2 = m2_sizes[m2_name]
+		var tex_1x := studiolo.get_icon(StringName(m2_name), &"Kit")
+		assert_eq(tex_1x.get_size(), expected_sz, "1x Kit icon %s size" % m2_name)
+		var tex_2x := theme_2x.get_icon(StringName(m2_name), &"Kit")
+		assert_not_null(tex_2x, "2x Kit icon %s non-null" % m2_name)
+		assert_eq(tex_2x.get_size(), expected_sz, "2x Kit icon %s logical size override" % m2_name)
+		assert_eq(tex_2x.get_image().get_size(), Vector2i(int(expected_sz.x) * 2, int(expected_sz.y) * 2), "2x Kit icon %s backing pixels" % m2_name)
+
+	var minimap_sb_2x := theme_2x.get_stylebox(&"panel", &"PanelMinimap") as StyleBoxTexture
+	assert_not_null(minimap_sb_2x, "2x PanelMinimap is StyleBoxTexture")
+	assert_eq(minimap_sb_2x.texture.get_size(), Vector2(256.0, 144.0), "2x minimap_frame logical size")
+	assert_eq(minimap_sb_2x.texture.get_image().get_size(), Vector2i(512, 288), "2x minimap_frame backing pixels")
 
 	var base_icons: Array = (pieces["icons_base"] as Dictionary).get("icons", [])
 	for name_var: Variant in base_icons:

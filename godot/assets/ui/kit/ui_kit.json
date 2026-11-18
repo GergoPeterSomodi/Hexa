@@ -2,8 +2,8 @@
   "schema": "hexa-godot/ui-kit/1",
   "tokens_sha": "cb3439b787ead284519c04db4bf587a349e52b6b0a232ca53efc8d8866a3b8c7",
   "bytes_rgba": {
-    "kit_1x": 3017024,
-    "kit_2x": 12068096,
+    "kit_1x": 3184768,
+    "kit_2x": 12739072,
     "menu": 8812800
   },
   "pieces": {
@@ -2226,6 +2226,196 @@
       "subdir": "menu",
       "sha": {
         "1x": "193c59b144cbd0d8d90de9e75f3cb2aa203c61e3376acf6d71bee36c93d73613"
+      },
+      "check": "exact"
+    },
+    "minimap_frame": {
+      "size": [
+        256,
+        144
+      ],
+      "margin": [
+        56,
+        16,
+        56,
+        16
+      ],
+      "content": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 2,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "9fc772b7434aac4a5a12ca1a83cc71c557938869241a290835e33f24b82730ac",
+        "2x": "21dae678daaa12231e64085fe59529ce1a5c9a236bc3aab2c6387e841e57155c"
+      },
+      "check": "exact"
+    },
+    "shield_rim": {
+      "size": [
+        48,
+        56
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 2,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "6d43054d89981322bedf58b57c19f6002c577543d2f06992764ee229b3571198",
+        "2x": "1245f789654dc144d46df4fce7f456a5c3e24d9444728164d87c21afaedf83f8"
+      },
+      "check": "exact"
+    },
+    "shield_rim_sm": {
+      "size": [
+        20,
+        24
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 2,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "d956802ee5fc420cbfb77d670badeca2119ff90b0e61adc71cf86b3aa328f514",
+        "2x": "7ba2ef8d0aefcc8f624d702690b6becf2f69e95641f26fa93a5b5d8ade4fd3b0"
+      },
+      "check": "exact"
+    },
+    "pennant_pole": {
+      "size": [
+        24,
+        56
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 2,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "c053d1abc5ae4b9def3e6362b1d1f0e2dabeef7692de09bd475d7052e191c345",
+        "2x": "1f02142da7df84ec94878d62dca5c7b26f7419bfcc52b5bc6b47df797215ce74"
+      },
+      "check": "exact"
+    },
+    "pennant_cloth": {
+      "size": [
+        28,
+        20
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 2,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "bb5da963c0591a65711553970c831e378ed2263fcb4e48c4130094a23d876402",
+        "2x": "6756694a9f78424694f952cd6e09834dc819fd1de5ea5e16ba735494c700ba22"
       },
       "check": "exact"
     }

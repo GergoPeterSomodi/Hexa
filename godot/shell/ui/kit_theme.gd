@@ -25,6 +25,10 @@ const KIT_DIRECT_ICONS: Array[String] = [
 	"grabber",
 	"grabber_hot",
 	"icons_base",
+	"shield_rim",
+	"shield_rim_sm",
+	"pennant_pole",
+	"pennant_cloth",
 ]
 
 const ICON_ALIASES: Dictionary[String, String] = {
@@ -40,6 +44,7 @@ const PANEL_VARIATION_PIECES: Dictionary[String, String] = {
 	"PanelRibbon": "ribbon",
 	"PanelToast": "toast",
 	"PanelCartouche": "cartouche",
+	"PanelMinimap": "minimap_frame",
 	"PanelSlot": "slot",
 	"PanelPlate": "plate",
 	"PanelStripCell": "strip_cell",

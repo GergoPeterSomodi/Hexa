@@ -71,6 +71,12 @@ func _verify_theme(label: String, theme: Theme) -> int:
 			printerr("build_theme: [%s] missing style variation %s" % [label, style_name])
 			failed += 1
 
+	if label == "studiolo":
+		for icon_name: String in KitTheme.KIT_DIRECT_ICONS:
+			if not theme.has_icon(StringName(icon_name), &"Kit") or theme.get_icon(StringName(icon_name), &"Kit") == null:
+				printerr("build_theme: [%s] missing Kit icon %s" % [label, icon_name])
+				failed += 1
+
 	failed += _verify_fonts(label, theme)
 	failed += _verify_tabular_digits(label, theme)
 	return failed

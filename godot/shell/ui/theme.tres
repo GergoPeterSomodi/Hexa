@@ -46,22 +46,27 @@
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/keycap_wait.png" id="44"]
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_base.png" id="45"]
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/glow_soft.png" id="46"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/rose.png" id="47"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/rule_diamond.png" id="48"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/seal.png" id="49"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/stud.png" id="50"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/wordmark.png" id="51"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya/Alegreya-MediumItalic.ttf" id="52"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sc/AlegreyaSC-Bold.ttf" id="53"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_bar.png" id="54"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_card.png" id="55"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/cartouche.png" id="56"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_frame.png" id="57"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_modal.png" id="58"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/plate.png" id="59"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/ribbon.png" id="60"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/toast.png" id="61"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_vellum.png" id="62"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/pennant_cloth.png" id="47"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/pennant_pole.png" id="48"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/rose.png" id="49"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/rule_diamond.png" id="50"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/seal.png" id="51"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/shield_rim.png" id="52"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/shield_rim_sm.png" id="53"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/stud.png" id="54"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/wordmark.png" id="55"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya/Alegreya-MediumItalic.ttf" id="56"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sc/AlegreyaSC-Bold.ttf" id="57"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_bar.png" id="58"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_card.png" id="59"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/cartouche.png" id="60"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_frame.png" id="61"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/minimap_frame.png" id="62"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_modal.png" id="63"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/plate.png" id="64"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/ribbon.png" id="65"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/toast.png" id="66"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_vellum.png" id="67"]
 
 [sub_resource type="FontVariation" id="FontVariation_1"]
 fallbacks = Array[Font]([ExtResource("2")])
@@ -906,11 +911,11 @@ region = Rect2(64, 16, 16, 16)
 
 [sub_resource type="FontVariation" id="FontVariation_5"]
 fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("52")
+base_font = ExtResource("56")
 
 [sub_resource type="FontVariation" id="FontVariation_6"]
 fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("53")
+base_font = ExtResource("57")
 opentype_features = {
 1819178349: 1,
 1953396077: 1
@@ -973,7 +978,7 @@ content_margin_left = 8.0
 content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 8.0
-texture = ExtResource("54")
+texture = ExtResource("58")
 texture_margin_left = 8.0
 texture_margin_top = 4.0
 texture_margin_right = 8.0
@@ -986,7 +991,7 @@ content_margin_left = 10.0
 content_margin_top = 10.0
 content_margin_right = 10.0
 content_margin_bottom = 10.0
-texture = ExtResource("55")
+texture = ExtResource("59")
 texture_margin_left = 12.0
 texture_margin_top = 12.0
 texture_margin_right = 12.0
@@ -997,7 +1002,7 @@ content_margin_left = 24.0
 content_margin_top = 6.0
 content_margin_right = 24.0
 content_margin_bottom = 6.0
-texture = ExtResource("56")
+texture = ExtResource("60")
 texture_margin_left = 24.0
 texture_margin_top = 18.0
 texture_margin_right = 24.0
@@ -1008,7 +1013,7 @@ content_margin_left = 20.0
 content_margin_top = 20.0
 content_margin_right = 20.0
 content_margin_bottom = 20.0
-texture = ExtResource("57")
+texture = ExtResource("61")
 texture_margin_left = 32.0
 texture_margin_top = 32.0
 texture_margin_right = 32.0
@@ -1034,11 +1039,22 @@ corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_61"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+texture = ExtResource("62")
+texture_margin_left = 56.0
+texture_margin_top = 16.0
+texture_margin_right = 56.0
+texture_margin_bottom = 16.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_62"]
 content_margin_left = 28.0
 content_margin_top = 28.0
 content_margin_right = 28.0
 content_margin_bottom = 28.0
-texture = ExtResource("58")
+texture = ExtResource("63")
 texture_margin_left = 48.0
 texture_margin_top = 48.0
 texture_margin_right = 48.0
@@ -1050,23 +1066,23 @@ expand_margin_bottom = 24.0
 axis_stretch_horizontal = 1
 axis_stretch_vertical = 1
 
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_62"]
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_63"]
 content_margin_left = 10.0
 content_margin_top = 2.0
 content_margin_right = 10.0
 content_margin_bottom = 2.0
-texture = ExtResource("59")
+texture = ExtResource("64")
 texture_margin_left = 10.0
 texture_margin_top = 10.0
 texture_margin_right = 10.0
 texture_margin_bottom = 10.0
 
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_63"]
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_64"]
 content_margin_left = 36.0
 content_margin_top = 8.0
 content_margin_right = 36.0
 content_margin_bottom = 8.0
-texture = ExtResource("60")
+texture = ExtResource("65")
 texture_margin_left = 36.0
 texture_margin_top = 12.0
 texture_margin_right = 36.0
@@ -1080,7 +1096,7 @@ content_margin_bottom = 0.0
 bg_color = Color(0.02745098, 0.019607844, 0.015686275, 0.72156864)
 border_color = Color(0, 0, 0, 0)
 
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_64"]
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_65"]
 content_margin_left = 10.0
 content_margin_top = 2.0
 content_margin_right = 10.0
@@ -1123,23 +1139,23 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_65"]
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_66"]
 content_margin_left = 36.0
 content_margin_top = 8.0
 content_margin_right = 36.0
 content_margin_bottom = 8.0
-texture = ExtResource("61")
+texture = ExtResource("66")
 texture_margin_left = 36.0
 texture_margin_top = 20.0
 texture_margin_right = 36.0
 texture_margin_bottom = 20.0
 
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_66"]
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_67"]
 content_margin_left = 24.0
 content_margin_top = 24.0
 content_margin_right = 24.0
 content_margin_bottom = 24.0
-texture = ExtResource("62")
+texture = ExtResource("67")
 texture_margin_left = 32.0
 texture_margin_top = 32.0
 texture_margin_right = 32.0
@@ -1183,12 +1199,12 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_67"]
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_68"]
 content_margin_left = 10.0
 content_margin_top = 10.0
 content_margin_right = 10.0
 content_margin_bottom = 10.0
-texture = ExtResource("55")
+texture = ExtResource("59")
 texture_margin_left = 12.0
 texture_margin_top = 12.0
 texture_margin_right = 12.0
@@ -1826,15 +1842,19 @@ Kit/icons/icons_base = ExtResource("45")
 Kit/icons/info = SubResource("AtlasTexture_10")
 Kit/icons/lock = SubResource("AtlasTexture_11")
 Kit/icons/menu = SubResource("AtlasTexture_12")
-Kit/icons/rose = ExtResource("47")
-Kit/icons/rule_diamond = ExtResource("48")
-Kit/icons/seal = ExtResource("49")
-Kit/icons/stud = ExtResource("50")
+Kit/icons/pennant_cloth = ExtResource("47")
+Kit/icons/pennant_pole = ExtResource("48")
+Kit/icons/rose = ExtResource("49")
+Kit/icons/rule_diamond = ExtResource("50")
+Kit/icons/seal = ExtResource("51")
+Kit/icons/shield_rim = ExtResource("52")
+Kit/icons/shield_rim_sm = ExtResource("53")
+Kit/icons/stud = ExtResource("54")
 Kit/icons/study = SubResource("AtlasTexture_13")
 Kit/icons/switch_off = ExtResource("37")
 Kit/icons/switch_on = ExtResource("36")
 Kit/icons/tick = SubResource("AtlasTexture_14")
-Kit/icons/wordmark = ExtResource("51")
+Kit/icons/wordmark = ExtResource("55")
 Kit/icons/zoom_fit = SubResource("AtlasTexture_8")
 Kit/icons/zoom_in = SubResource("AtlasTexture_15")
 Kit/icons/zoom_out = SubResource("AtlasTexture_16")
@@ -1933,24 +1953,26 @@ PanelCartouche/styles/panel = SubResource("StyleBoxTexture_59")
 PanelContainer/styles/panel = SubResource("StyleBoxTexture_60")
 PanelDebug/base_type = &"PanelContainer"
 PanelDebug/styles/panel = SubResource("StyleBoxFlat_12")
+PanelMinimap/base_type = &"PanelContainer"
+PanelMinimap/styles/panel = SubResource("StyleBoxTexture_61")
 PanelModal/base_type = &"PanelContainer"
-PanelModal/styles/panel = SubResource("StyleBoxTexture_61")
+PanelModal/styles/panel = SubResource("StyleBoxTexture_62")
 PanelPlate/base_type = &"PanelContainer"
-PanelPlate/styles/panel = SubResource("StyleBoxTexture_62")
+PanelPlate/styles/panel = SubResource("StyleBoxTexture_63")
 PanelRibbon/base_type = &"PanelContainer"
-PanelRibbon/styles/panel = SubResource("StyleBoxTexture_63")
+PanelRibbon/styles/panel = SubResource("StyleBoxTexture_64")
 PanelShade/base_type = &"PanelContainer"
 PanelShade/styles/panel = SubResource("StyleBoxFlat_13")
 PanelSlot/base_type = &"PanelContainer"
-PanelSlot/styles/panel = SubResource("StyleBoxTexture_64")
+PanelSlot/styles/panel = SubResource("StyleBoxTexture_65")
 PanelStripCell/base_type = &"PanelContainer"
 PanelStripCell/styles/panel = SubResource("StyleBoxFlat_14")
 PanelStripCellNow/base_type = &"PanelContainer"
 PanelStripCellNow/styles/panel = SubResource("StyleBoxFlat_15")
 PanelToast/base_type = &"PanelContainer"
-PanelToast/styles/panel = SubResource("StyleBoxTexture_65")
+PanelToast/styles/panel = SubResource("StyleBoxTexture_66")
 PanelVellum/base_type = &"PanelContainer"
-PanelVellum/styles/panel = SubResource("StyleBoxTexture_66")
+PanelVellum/styles/panel = SubResource("StyleBoxTexture_67")
 PanelVellumInset/base_type = &"PanelContainer"
 PanelVellumInset/styles/panel = SubResource("StyleBoxFlat_16")
 PopupMenu/colors/font_color = Color(0.9490196, 0.9098039, 0.8156863, 1)
@@ -1961,9 +1983,9 @@ PopupMenu/fonts/font = SubResource("FontVariation_1")
 PopupMenu/icons/checked = SubResource("AtlasTexture_18")
 PopupMenu/icons/radio_checked = SubResource("AtlasTexture_18")
 PopupMenu/styles/hover = SubResource("StyleBoxFlat_17")
-PopupMenu/styles/panel = SubResource("StyleBoxTexture_67")
+PopupMenu/styles/panel = SubResource("StyleBoxTexture_68")
 PopupMenu/styles/separator = SubResource("StyleBoxFlat_18")
-PopupPanel/styles/panel = SubResource("StyleBoxTexture_67")
+PopupPanel/styles/panel = SubResource("StyleBoxTexture_68")
 ProgressBar/colors/font_color = Color(0.9490196, 0.9098039, 0.8156863, 1)
 ProgressBar/font_sizes/font_size = 12
 ProgressBar/fonts/font = SubResource("FontVariation_2")
@@ -2036,7 +2058,7 @@ TooltipLabel/colors/font_color = Color(0.9490196, 0.9098039, 0.8156863, 1)
 TooltipLabel/font_sizes/font_size = 13
 TooltipLabel/fonts/font = SubResource("FontVariation_4")
 TooltipPanel/base_type = &"PanelContainer"
-TooltipPanel/styles/panel = SubResource("StyleBoxTexture_67")
+TooltipPanel/styles/panel = SubResource("StyleBoxTexture_68")
 Tree/colors/font_color = Color(0.9490196, 0.9098039, 0.8156863, 1)
 Tree/colors/font_selected_color = Color(0.9647059, 0.8901961, 0.6313726, 1)
 Tree/colors/guide_color = Color(0.41960785, 0.3372549, 0.21568628, 0.5019608)

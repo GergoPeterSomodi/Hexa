@@ -23,7 +23,9 @@ from tools.ui_bake.checks import (
     check_token_contrasts,
     check_vellum_surface,
 )
+from tools.ui_bake.pieces_m2 import SHIELD_OUTLINE, sd_polygon
 from tools.ui_bake.png import load_png_rgba, rgba_sha256, save_png
+from tools.ui_bake.shapes import logical_grid
 from tools.ui_bake.tokens import load_tokens
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -102,14 +104,94 @@ class TestBakeUI(unittest.TestCase):
                     [96, 42], [28, 21, 28, 21], [34, 0, 34, 0], [0, 0, 0, 0], "stretch"
                 )
 
-        self.assertEqual(set(pieces.keys()), set(expected_slice1.keys()))
-        for name, (sz, mar, con, exp, axis) in expected_slice1.items():
+        expected_slice2 = {
+            "minimap_frame": ([256, 144], [56, 16, 56, 16], [8, 8, 8, 8], [0, 0, 0, 0], "stretch"),
+            "shield_rim": ([48, 56], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "shield_rim_sm": ([20, 24], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "pennant_pole": ([24, 56], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "pennant_cloth": ([28, 20], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+        }
+
+        expected_all = {**expected_slice1, **expected_slice2}
+        self.assertEqual(set(pieces.keys()), set(expected_all.keys()))
+        for name, (sz, mar, con, exp, axis) in expected_all.items():
             entry = pieces[name]
             self.assertEqual(entry["size"], sz, name)
             self.assertEqual(entry["margin"], mar, name)
             self.assertEqual(entry["content"], con, name)
             self.assertEqual(entry["expand"], exp, name)
             self.assertEqual(entry["axis"], axis, name)
+            self.assertEqual(entry["slice"], 2 if name in expected_slice2 else 1, name)
+
+    def test_slice2_pieces_geometry_and_apertures(self) -> None:
+        kit_dir = REPO_ROOT / "godot" / "assets" / "ui" / "kit"
+        expected_dims = {
+            "minimap_frame": (256, 144),
+            "shield_rim": (48, 56),
+            "shield_rim_sm": (20, 24),
+            "pennant_pole": (24, 56),
+            "pennant_cloth": (28, 20),
+        }
+
+        for name, (w, h) in expected_dims.items():
+            for s in (1, 2):
+                png_path = kit_dir / f"{s}x" / f"{name}.png"
+                self.assertTrue(png_path.is_file(), f"missing {png_path}")
+                arr = load_png_rgba(png_path)
+                self.assertEqual(arr.shape, (h * s, w * s, 4), f"{name}@{s}x shape")
+                self.assertTrue(np.any(arr[..., 3] == 255), f"{name}@{s}x has opaque pixels")
+                self.assertTrue(np.any(arr[..., 3] == 0), f"{name}@{s}x has transparent pixels")
+
+        # Minimap frame: transparent interior aperture, transparent outer corners, opaque rim edges.
+        for s in (1, 2):
+            mf = load_png_rgba(kit_dir / f"{s}x" / "minimap_frame.png")
+            self.assertTrue(np.all(mf[40 * s : 104 * s, 60 * s : 196 * s, 3] == 0), f"minimap_frame@{s}x aperture")
+            self.assertEqual(int(mf[0, 0, 3]), 0, f"minimap_frame@{s}x top-left outside hex")
+            self.assertEqual(int(mf[0, 256 * s - 1, 3]), 0, f"minimap_frame@{s}x top-right outside hex")
+            self.assertEqual(int(mf[4 * s, 128 * s, 3]), 255, f"minimap_frame@{s}x top bar opaque")
+            self.assertEqual(int(mf[140 * s, 128 * s, 3]), 255, f"minimap_frame@{s}x bottom bar opaque")
+            self.assertEqual(int(mf[72 * s, 4 * s, 3]), 255, f"minimap_frame@{s}x left tip opaque")
+            self.assertEqual(int(mf[72 * s, 252 * s, 3]), 255, f"minimap_frame@{s}x right tip opaque")
+
+        # Shield rims: transparent interior & exterior aligned to SHIELD_OUTLINE; 1 px shift fails.
+        for name, (w, h), rim_w in (("shield_rim", (48, 56), 3.0), ("shield_rim_sm", (20, 24), 2.0)):
+            sx = float(w) / 48.0
+            sy = float(h) / 56.0
+            pts = [(x * sx, y * sy) for x, y in SHIELD_OUTLINE]
+            shifted_pts = [(x + 1.0, y) for x, y in pts]
+            for s in (1, 2):
+                arr = load_png_rgba(kit_dir / f"{s}x" / f"{name}.png")
+                lx, ly = logical_grid(w, h, s)
+                sd = sd_polygon(lx, ly, pts)
+                alpha = arr[..., 3]
+                self.assertTrue(np.all(alpha[sd > 0.75] == 0), f"{name}@{s}x exterior transparent")
+                self.assertTrue(np.all(alpha[sd < -(rim_w + 0.75)] == 0), f"{name}@{s}x interior transparent")
+                ridge = np.abs(sd + rim_w * 0.5) < 0.25
+                self.assertTrue(np.all(alpha[ridge] >= 240), f"{name}@{s}x continuous opaque rim")
+
+                # Planted alignment fault: 1 px shifted shield must violate transparency bounds.
+                sd_bad = sd_polygon(lx, ly, shifted_pts)
+                self.assertFalse(
+                    bool(np.all(alpha[sd_bad > 0.75] == 0) and np.all(alpha[sd_bad < -(rim_w + 0.75)] == 0)),
+                    f"{name}@{s}x 1px shift must fail alignment",
+                )
+
+        # Pennant cloth: neutral white/greyscale for runtime tinting, transparent swallow-tail V-notch.
+        for s in (1, 2):
+            pc = load_png_rgba(kit_dir / f"{s}x" / "pennant_cloth.png")
+            opaque = pc[..., 3] > 200
+            rgb = pc[opaque, :3].astype(np.int16)
+            max_chroma = int(np.max(np.max(rgb, axis=1) - np.min(rgb, axis=1)))
+            self.assertLessEqual(max_chroma, 2, f"pennant_cloth@{s}x must be neutral grayscale")
+            self.assertGreaterEqual(int(pc[10 * s, 10 * s, 0]), 210, f"pennant_cloth@{s}x bright white interior")
+            self.assertEqual(int(pc[10 * s, 25 * s, 3]), 0, f"pennant_cloth@{s}x swallow-tail notch transparent")
+
+        # Pennant pole: centered finial & shaft opaque, outer side corners transparent.
+        for s in (1, 2):
+            pp = load_png_rgba(kit_dir / f"{s}x" / "pennant_pole.png")
+            self.assertEqual(int(pp[7 * s, 12 * s, 3]), 255, f"pennant_pole@{s}x finial opaque")
+            self.assertEqual(int(pp[30 * s, 12 * s, 3]), 255, f"pennant_pole@{s}x shaft opaque")
+            self.assertEqual(int(pp[0, 0, 3]), 0, f"pennant_pole@{s}x outer corner transparent")
 
     def test_faults_fire_every_check_assert(self) -> None:
         tokens = load_tokens(bake_ui.TOKENS_PATH)

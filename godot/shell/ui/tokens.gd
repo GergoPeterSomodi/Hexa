@@ -456,6 +456,7 @@ const STYLE_VARIATIONS: Dictionary[String, Dictionary] = {
 	"PanelRibbon": {"base_type": "PanelContainer", "kind": "texture", "texture": "ribbon", "min_width": 230},
 	"PanelToast": {"base_type": "PanelContainer", "kind": "texture", "texture": "toast"},
 	"PanelCartouche": {"base_type": "PanelContainer", "kind": "texture", "texture": "cartouche"},
+	"PanelMinimap": {"base_type": "PanelContainer", "kind": "texture", "texture": "minimap_frame"},
 	"PanelSlot": {"base_type": "PanelContainer", "kind": "texture", "texture": "slot"},
 	"PanelStripCell": {"base_type": "PanelContainer", "kind": "texture", "texture": "strip_cell"},
 	"PanelStripCellNow": {"base_type": "PanelContainer", "kind": "texture", "texture": "strip_cell_now"},
