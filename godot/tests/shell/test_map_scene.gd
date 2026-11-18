@@ -12,6 +12,9 @@ func before_each() -> void:
 	var packed := load("res://shell/map/map_scene.tscn") as PackedScene
 	_scene = packed.instantiate() as MapScene
 	_scene.preload_next_season = false
+	var injected_panel := (load("res://shell/panels/hex_panel.tscn") as PackedScene).instantiate() as HexPanelContract
+	_scene.add_child(injected_panel)
+	_scene.set_panel(injected_panel)
 	add_child_autofree(_scene)
 	_finish_fill()
 	_hexes_changed.clear()
@@ -56,8 +59,8 @@ func _buildable() -> Dictionary:
 	return {}
 
 
-func test_main_scene_is_the_map_scene() -> void:
-	assert_eq(str(ProjectSettings.get_setting("application/run/main_scene")), "res://shell/map/map_scene.tscn")
+func test_main_scene_is_the_app_scene_and_autoloads_exist() -> void:
+	assert_eq(str(ProjectSettings.get_setting("application/run/main_scene")), "res://shell/app/app.tscn")
 	assert_true(ProjectSettings.has_setting("autoload/Session"), "Session is an autoload")
 	assert_true(ProjectSettings.has_setting("autoload/Events"), "Events is an autoload")
 

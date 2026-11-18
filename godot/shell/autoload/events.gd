@@ -7,3 +7,5 @@ extends Node
 signal hex_changed(hex: Vector2i)
 ## A new game began (or a game was put in place): everything that shows the game starts again from Session.game.
 signal game_started
+## The current game ended and Session.game is now null.
+signal game_ended

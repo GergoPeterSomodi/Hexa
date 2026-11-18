@@ -1,0 +1,35 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://shell/app/app.gd" id="1_app"]
+[ext_resource type="Script" path="res://shell/input/app_input.gd" id="2_app_input"]
+[ext_resource type="PackedScene" path="res://shell/hud/hud.tscn" id="3_hud"]
+[ext_resource type="Script" path="res://shell/ui/screen_stack.gd" id="4_stack"]
+
+[node name="App" type="Node"]
+process_mode = 3
+script = ExtResource("1_app")
+
+[node name="AppInput" type="Node" parent="."]
+process_mode = 3
+script = ExtResource("2_app_input")
+
+[node name="World" type="Node2D" parent="."]
+process_mode = 1
+
+[node name="Hud" parent="." instance=ExtResource("3_hud")]
+process_mode = 1
+
+[node name="Screens" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 20
+
+[node name="Stack" type="Control" parent="Screens"]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_stack")

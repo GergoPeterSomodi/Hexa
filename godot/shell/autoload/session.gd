@@ -5,6 +5,8 @@ extends Node
 
 ## The current game, or null before the first new_game.
 var game: Game = null
+## Number of successful player actions since the game started (or was saved).
+var unsaved_actions: int = 0
 
 var _maps: Dictionary[String, MapData] = {}
 
@@ -21,7 +23,15 @@ func new_game(map_id: String, seed_value: int) -> void:
 ## Puts a game that exists already in place (a loaded save, a test's game over a made-up map).
 func start_game(new_game_value: Game) -> void:
 	game = new_game_value
+	unsaved_actions = 0
 	Events.game_started.emit()
+
+
+## Ends the current game cleanly, resets unsaved_actions, and emits Events.game_ended.
+func end_game() -> void:
+	game = null
+	unsaved_actions = 0
+	Events.game_ended.emit()
 
 
 ## The fixed map of an id, read once.
@@ -50,6 +60,8 @@ func act(action: String, args: Dictionary) -> Dictionary:
 	if game == null:
 		return {"ok": false, "reason": "no game"}
 	var verdict := game.act(action, args)
+	if bool(verdict.get("ok", false)):
+		unsaved_actions += 1
 	_drain()
 	return verdict
 

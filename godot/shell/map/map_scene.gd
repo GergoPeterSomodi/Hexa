@@ -1,9 +1,13 @@
 ## The map scene (docs/architecture/m1-build-spec.md sections 5, 7 and 8; ui-and-controls-spec.md sections 3.1, 3.3, 4.2 to 4.4):
-## the camera, CameraRig, the tile view, the far picture, MapInput, MapLabels and the hex panel around Session.game.
+## the camera, CameraRig, the tile view, the far picture, MapInput and MapLabels around Session.game.
+## Any HexPanelContract is injected externally by App/Hud (or tests) and is null-safe when running standalone.
 class_name MapScene
 extends Node2D
 
 signal refused(reason: String)
+signal selection_changed(hex: Vector2i)
+signal season_changed(season_name: String)
+signal hud_toggle_requested
 
 const MAP_ID := "north_italy"
 const START_SEED := 1480
@@ -15,7 +19,6 @@ const SELECT_TILE := "mark/select"
 const SYNC_LOAD_HEXES := 4000
 ## Milliseconds a frame the loading and a season swap may use (a layer or a chunk is never split, so one can pass it).
 const SLICE_MS := 5.0
-const HELP := "1-4 season   Ctrl+R new seed   G grid   N names   F whole map   H hide   U upgrade   Esc clear\nclick a hex   drag or WASD move   wheel zoom"
 
 ## The map the scene shows (a Session.new_game id); a tool may set it before the scene enters the tree.
 var map_id := MAP_ID
@@ -29,14 +32,15 @@ var preload_next_season := true
 var slice_ms := SLICE_MS
 
 var _tiles: TilesetBuilder = null
-var _fps_clock := 0.0
 var _line_queue: Array[Vector2i] = []
 var _loading_map: MapData = null
 var _pending_season := ""  # a season asked for before its pictures were loaded: swapped when they are
 var _loading_state: MapState = null
 var _settings: Settings = null
-var _grid_visible := true
+var _grid_visible := false
 var _grid_opacity := 1.0
+var _far_locked := false
+var _panel: HexPanelContract = null
 
 @onready var _camera: Camera2D = $Camera
 @onready var _rig: CameraRig = $CameraRig
@@ -44,18 +48,12 @@ var _grid_opacity := 1.0
 @onready var _far: FarMap = $Far
 @onready var _input: MapInput = $Input
 @onready var _labels: MapLabels = $Names/Labels
-@onready var _hud: CanvasLayer = $Hud
-@onready var _panel: HexPanelContract = $Hud/Margin/Row/Panel
-@onready var _title: Label = $Hud/Margin/Row/Info/Box/Title
-@onready var _stats: Label = $Hud/Margin/Row/Info/Box/Stats
-@onready var _help: Label = $Hud/Margin/Row/Info/Box/Help
 
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(SEA_COLOUR)
 	if not InputMap.has_action(&"map_select"):
 		Bindings.ensure()
-	_help.text = HELP
 	_rig.setup(_camera, Vector2.ZERO)
 	_rig.view_changed.connect(_on_view_changed)
 	_input.camera = _camera
@@ -66,13 +64,14 @@ func _ready() -> void:
 	_input.new_seed_requested.connect(new_seed)
 	_input.grid_toggled.connect(toggle_grid)
 	_input.names_toggled.connect(toggle_names)
-	_input.hud_toggled.connect(func() -> void: set_hud_visible(not _hud.visible))
+	_input.hud_toggled.connect(func() -> void: hud_toggle_requested.emit())
 	_input.upgrade_requested.connect(upgrade_selected)
 	_tiles = TilesetBuilder.load_season(season)
 	if _tiles.tile_set == null:
 		push_warning("map scene: %s (bake the tiles and run tools/build_tileset.gd)" % _tiles.error)
 		_tiles.tile_set = TileSet.new()
 	_view.setup(_tiles)
+	_set_grid_visible(_grid_visible)
 	_far.visible = false
 	Events.hex_changed.connect(_on_hex_changed)
 	Events.game_started.connect(_on_game_started)
@@ -208,6 +207,46 @@ func _line_step(budget_ms: float) -> void:
 			break
 
 
+## Injects an external HexPanelContract (e.g. from Hud) or null for standalone/headless runs.
+func set_panel(value: HexPanelContract) -> void:
+	_panel = value
+	if _panel == null:
+		return
+	if selected != NO_HEX and Session.game != null and Session.game.map != null and Session.game.map.has(selected):
+		_panel.show_hex(selected)
+	else:
+		_panel.clear()
+
+
+## Enables or disables map pointer/camera input (used while modal/opaque screens are up).
+func set_input_enabled(on: bool) -> void:
+	if _input != null:
+		_input.enabled = on
+	if _rig != null:
+		_rig.enabled = on
+
+
+## Applies developer debug layer switches from DebugOverlay.
+func apply_debug_layer(layer_name: StringName, on: bool) -> void:
+	if _view == null:
+		return
+	match layer_name:
+		&"grid":
+			_set_grid_visible(on)
+		&"shade", &"light":
+			_view.set_layer_visible(String(layer_name), on)
+		&"trees":
+			for i: int in range(6):
+				_view.set_layer_visible("trees%d" % i, on)
+		&"lines":
+			var lines_node := _view.get_node_or_null("Lines") as CanvasItem
+			if lines_node != null:
+				lines_node.visible = on
+		&"far_locked":
+			_far_locked = on
+			_apply_zoom()
+
+
 ## A hex changed: it and its neighbours are named again and only what differs is written.
 func _on_hex_changed(hex: Vector2i) -> void:
 	var map := Session.game.map
@@ -215,7 +254,7 @@ func _on_hex_changed(hex: Vector2i) -> void:
 	for touched: Vector2i in MapCells.touched_by(map, hex):
 		_view.set_hex(touched, MapCells.of_hex(map, state, touched))
 	_far.update_hex(hex)
-	if _panel.shown_hex() != NO_HEX:
+	if _panel != null and _panel.shown_hex() != NO_HEX:
 		_panel.refresh()
 
 
@@ -254,12 +293,18 @@ func select_hex(hex: Vector2i) -> void:
 	if selected != NO_HEX:
 		_view.set_tile("marks", selected, "")
 	if hex == NO_HEX or Session.game == null or not Session.game.map.has(hex):
+		var was_selected := selected != NO_HEX
 		selected = NO_HEX
-		_panel.clear()
+		if _panel != null:
+			_panel.clear()
+		if was_selected:
+			selection_changed.emit(NO_HEX)
 		return
 	selected = hex
 	_view.set_tile("marks", hex, SELECT_TILE)
-	_panel.show_hex(hex)
+	if _panel != null:
+		_panel.show_hex(hex)
+	selection_changed.emit(hex)
 
 
 # ----- seasons, grid, camera ----------------------------------------------------------------------------------------
@@ -289,6 +334,7 @@ func set_season(value: String) -> void:
 	_view.begin_season_swap(tiles, _hexes_on_screen())
 	_view.swap_step(slice_ms)
 	_request_next_season()
+	season_changed.emit(season)
 
 
 func is_swapping() -> bool:
@@ -334,8 +380,9 @@ func toggle_names() -> void:
 		_settings.set_value("map/place_names", _labels.visible)
 
 
-func set_hud_visible(value: bool) -> void:
-	_hud.visible = value
+func set_hud_visible(_value: bool) -> void:
+	# Kept as a safe no-op for standalone tools (HUD lives in App/Hud).
+	pass
 
 
 ## The map's size in px.
@@ -401,14 +448,14 @@ func _on_view_changed(_zoom_val: float, _visible_rect: Rect2) -> void:
 
 
 func _apply_zoom() -> void:
-	var z := _camera.zoom.x
+	var z := 0.0 if _far_locked else _camera.zoom.x
 	_view.visible = _far.apply_zoom(z)
 	var grid_layer := _view.layer("grid")
 	if grid_layer != null:
-		grid_layer.modulate.a = ZoomModel.grid_alpha(z, _grid_opacity)
+		grid_layer.modulate.a = ZoomModel.grid_alpha(_camera.zoom.x, _grid_opacity)
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	_apply_zoom()
 	if _pending_season != "" and TilesetBuilder.is_loaded(_pending_season):
 		set_season(_pending_season)
@@ -416,11 +463,3 @@ func _process(delta: float) -> void:
 		_view.swap_step(slice_ms)
 	elif is_loading():
 		_load_step(slice_ms)
-	_fps_clock += delta
-	if _fps_clock >= 0.5:
-		_fps_clock = 0.0
-		_title.text = "North Italy" if map_id == MAP_ID else map_id.capitalize()
-		var game := Session.game
-		_stats.text = "%s, seed %d, zoom %.2f\n%d frames a second%s" % [season, game.seed_value if game != null else 0,
-			_camera.zoom.x, int(Engine.get_frames_per_second()),
-			"\nfilling %d%%" % int(_view.fill_progress() * 100.0) if _view.is_filling() else ""]

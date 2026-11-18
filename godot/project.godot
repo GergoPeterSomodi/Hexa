@@ -9,14 +9,26 @@ config_version=5
 config/name="Hexa"
 config/description="Hexa: Age of Discovery, Godot port"
 config/version="0.3.0"
-run/main_scene="res://shell/map/map_scene.tscn"
+run/main_scene="res://shell/app/app.tscn"
 config/features=PackedStringArray("4.7", "Compatibility")
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Hexa"
+config/auto_accept_quit=false
+run/low_processor_mode=true
 
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/size/resizable=true
+window/dpi/allow_hidpi=true
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[gui]
+
+theme/custom="res://shell/ui/theme.tres"
+timers/tooltip_delay_sec=0.5
 
 [autoload]
 
