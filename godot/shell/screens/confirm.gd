@@ -42,6 +42,24 @@ static func make(params: Dictionary) -> Confirm:
 	return screen
 
 
+## Spec-style constructor: Confirm.ask(title, lines, choices, extra_params).
+static func ask(
+	title_text: String,
+	lines_or_body: Variant = "",
+	choices: Array = [],
+	extra: Dictionary = {}
+) -> Confirm:
+	var params := extra.duplicate()
+	params["title"] = title_text
+	if lines_or_body is Array:
+		params["lines"] = lines_or_body
+	else:
+		params["body"] = str(lines_or_body)
+	if not choices.is_empty():
+		params["choices"] = choices
+	return make(params)
+
+
 func _ready() -> void:
 	set_process(false)
 	_ensure_ui()
@@ -83,7 +101,6 @@ func configure(params: Dictionary) -> void:
 	_seal_tone = StringName(str(params.get("seal_tone", "vermilion")))
 	_timeout_s = maxf(0.0, float(params.get("timeout_s", 0.0)))
 	_timeout_choice = StringName(str(params.get("timeout_choice", params.get("timeout_id", "cancel"))))
-	_safe_choice = StringName(str(params.get("safe_choice", "cancel")))
 	var cb: Variant = params.get("on_result", Callable())
 	_on_result = cb if cb is Callable else Callable()
 
@@ -93,6 +110,11 @@ func configure(params: Dictionary) -> void:
 		for item: Variant in (raw_choices as Array):
 			if item is Dictionary:
 				_choices.append(item as Dictionary)
+
+	if params.has("safe_choice"):
+		_safe_choice = StringName(str(params["safe_choice"]))
+	else:
+		_safe_choice = _derive_safe_choice(_choices)
 
 	_resolved = false
 	_last_displayed_sec = -1
@@ -285,3 +307,15 @@ func _reduce_motion() -> bool:
 	if ctx != null and ctx.settings != null:
 		return bool(ctx.settings.get_value("accessibility/reduce_motion"))
 	return false
+
+
+func _derive_safe_choice(choices: Array[Dictionary]) -> StringName:
+	for spec: Dictionary in choices:
+		if bool(spec.get("safe", false)):
+			return StringName(str(spec.get("id", "cancel")))
+	for spec: Dictionary in choices:
+		if StringName(str(spec.get("id", ""))) == &"cancel":
+			return &"cancel"
+	if not choices.is_empty():
+		return StringName(str(choices[choices.size() - 1].get("id", "cancel")))
+	return &"cancel"

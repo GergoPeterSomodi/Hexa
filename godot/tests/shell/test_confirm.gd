@@ -132,3 +132,46 @@ func test_confirm_countdown_can_timeout_to_confirm_and_supports_custom_choices()
 	assert_eq(_harness.stack.count(), 0)
 	assert_eq(chosen, [&"confirm"])
 	assert_eq(results, [true])
+
+
+func test_confirm_ask_derives_safe_choice_for_esc_and_stops_timer_on_pop() -> void:
+	var chosen: Array[StringName] = []
+	var confirm := Confirm.ask(
+		"Keep display settings?",
+		["Resolution changed."],
+		[
+			{"id": &"keep", "label": "Keep", "kind": "primary", "safe": false},
+			{"id": &"revert", "label": "Revert", "kind": "secondary", "safe": true},
+		],
+		{"timeout_s": 10.0, "timeout_id": &"revert"}
+	)
+	confirm.chose.connect(func(cid: StringName) -> void: chosen.append(cid))
+
+	_harness.stack.push(confirm)
+	await _harness.wait_frames(self, 1)
+	assert_eq(_harness.viewport.gui_get_focus_owner(), confirm.button_for(&"revert"))
+	assert_true(_harness.stack.back(), "Esc picks safe choice 'revert'")
+	await _harness.wait_frames(self, 1)
+	assert_eq(_harness.stack.count(), 0)
+	assert_eq(chosen, [&"revert"])
+
+	# Popping a running countdown Confirm stops processing cleanly without firing timeout
+	var chosen2: Array[StringName] = []
+	var confirm2 := Confirm.ask(
+		"Keep?",
+		["Timer test"],
+		[
+			{"id": &"keep", "label": "Keep", "kind": "primary"},
+			{"id": &"revert", "label": "Revert", "kind": "secondary", "safe": true},
+		],
+		{"timeout_s": 2.0, "timeout_id": &"revert"}
+	)
+	confirm2.chose.connect(func(cid: StringName) -> void: chosen2.append(cid))
+	_harness.stack.push(confirm2)
+	await _harness.wait_frames(self, 1)
+	var popped := _harness.stack.pop()
+	assert_eq(popped, confirm2)
+	assert_false(confirm2.is_processing())
+	confirm2._process(5.0)
+	assert_eq(chosen2.size(), 0, "popped Confirm timer must not fire")
+	confirm2.queue_free()

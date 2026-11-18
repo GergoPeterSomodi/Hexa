@@ -95,3 +95,4 @@ func test_help_overlay_state_help_seen_opens_once_and_closes_cleanly() -> void:
 	assert_true(_harness.stack.back(), "Esc closes HelpOverlay")
 	await _harness.wait_frames(self, 1)
 	assert_eq(_harness.stack.count(), 0)
+	assert_eq(_harness.settings.changed.get_connections().size(), 0, "no leaked settings.changed connections on exit")
