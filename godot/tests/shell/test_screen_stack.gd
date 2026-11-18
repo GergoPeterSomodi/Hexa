@@ -338,7 +338,13 @@ func test_screen_ids_registry_and_missing_scene_fails_loudly() -> void:
 	assert_null(missing_id, "unknown screen id returns null")
 	assert_push_error("unknown screen id")
 
-	var missing_scene := ScreenIds.make(&"options")
+	var missing_scene_id := &""
+	for id: StringName in ALL_SPEC_SCREEN_IDS:
+		if not ResourceLoader.exists(ScreenIds.path_of(id)):
+			missing_scene_id = id
+			break
+	assert_ne(missing_scene_id, &"", "at least one future-milestone screen .tscn is absent")
+	var missing_scene := ScreenIds.make(missing_scene_id)
 	assert_null(missing_scene, "missing .tscn file returns null")
 	assert_push_error("missing scene")
 
