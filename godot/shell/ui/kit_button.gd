@@ -55,7 +55,10 @@ const _KIND_MIN_HEIGHTS: Dictionary[int, int] = {
 
 @export var icon_name: StringName = &"":
 	set(value):
+		var had_named := icon_name != &""
 		icon_name = value
+		if icon_name == &"" and had_named and _verdict_ok:
+			icon = null
 		_refresh_icon()
 
 @export var cost_text: String = "":
@@ -192,9 +195,12 @@ func _apply_kind() -> void:
 func _refresh_icon() -> void:
 	if not _verdict_ok:
 		if has_theme_icon(&"lock", &"Kit"):
+			if icon_name == &"" and not _showing_lock_icon and icon != null:
+				_saved_custom_icon = icon
 			icon = get_theme_icon(&"lock", &"Kit")
 			_showing_lock_icon = true
 		return
+	var was_lock := _showing_lock_icon
 	_showing_lock_icon = false
 	if icon_name != &"":
 		icon = get_theme_icon(icon_name, &"Kit") if has_theme_icon(icon_name, &"Kit") else null
@@ -202,7 +208,7 @@ func _refresh_icon() -> void:
 	elif _saved_custom_icon != null:
 		icon = _saved_custom_icon
 		_saved_custom_icon = null
-	else:
+	elif was_lock:
 		icon = null
 
 

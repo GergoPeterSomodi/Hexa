@@ -124,6 +124,9 @@ func test_kit_button_verdict_icon_cost_and_hotkey_tooltip() -> void:
 	custom_btn.set_verdict({"ok": true})
 	assert_eq(custom_btn.icon, custom_tex, "custom icon restored on ok verdict")
 
+	btn.icon_name = &""
+	assert_null(btn.icon, "clearing icon_name clears theme icon")
+
 
 func test_kit_button_lazy_glow_creation_and_motion() -> void:
 	var sec := KitButton.new()
