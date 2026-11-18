@@ -403,15 +403,20 @@ func _on_pan_gesture(gesture: InputEventPanGesture) -> void:
 
 
 func _on_key(key: InputEventKey) -> void:
+	var has_non_shift_mod := key.ctrl_pressed or key.alt_pressed or key.meta_pressed
 	for pan_action: StringName in [&"cam_pan_left", &"cam_pan_right", &"cam_pan_up", &"cam_pan_down", &"cam_pan_fast"]:
 		if InputMap.has_action(pan_action) and key.is_action(pan_action):
 			if key.pressed:
+				if _is_text_input_focused():
+					continue
+				if pan_action != &"cam_pan_fast" and has_non_shift_mod:
+					continue
 				_held_actions[pan_action] = true
 				_saw_hardware_actions[pan_action] = Input.is_action_pressed(pan_action)
 			else:
 				_held_actions.erase(pan_action)
 				_saw_hardware_actions.erase(pan_action)
-	if not key.pressed:
+	if not key.pressed or _is_text_input_focused() or has_non_shift_mod:
 		return
 	if InputMap.has_action(&"cam_zoom_in") and key.is_action_pressed(&"cam_zoom_in", true):
 		zoom_by(KEY_ZOOM_NOTCHES)
@@ -624,9 +629,13 @@ func _free_centre_screen() -> Vector2:
 
 
 func _is_action_active(action: StringName) -> bool:
-	if InputMap.has_action(action) and Input.is_action_pressed(action):
+	if bool(_held_actions.get(action, false)):
 		return true
-	return bool(_held_actions.get(action, false))
+	if InputMap.has_action(action) and Input.is_action_pressed(action):
+		if action != &"cam_pan_fast" and (Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_ALT) or Input.is_key_pressed(KEY_META)):
+			return false
+		return true
+	return false
 
 
 func _is_text_input_focused() -> bool:

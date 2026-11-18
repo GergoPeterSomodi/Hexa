@@ -316,3 +316,40 @@ func test_ctrl_or_cmd_r_gives_new_seed_and_plain_r_does_nothing() -> void:
 	_scene.map_input()._unhandled_input(chord_r)
 	assert_eq(Session.game.seed_value, seed_before + 1, "Ctrl/Cmd+R starts a new seed")
 	_finish_fill()
+
+
+func test_viewport_click_does_not_stick_camera_drag() -> void:
+	var vp := SubViewport.new()
+	vp.size = Vector2i(1280, 720)
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	vp.gui_disable_input = false
+	add_child_autofree(vp)
+
+	var packed := load("res://shell/map/map_scene.tscn") as PackedScene
+	var scene := packed.instantiate() as MapScene
+	scene.preload_next_season = false
+	vp.add_child(scene)
+	scene.finish_loading()
+	var hex := _buildable()["hex"] as Vector2i
+	scene.frame_at(scene.view().centre_of(hex), 1.0)
+	var cam_before := scene.camera().position
+
+	var centre := Vector2(640.0, 360.0)
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.position = centre
+	press.global_position = centre
+	press.pressed = true
+	vp.push_input(press)
+
+	var release := press.duplicate() as InputEventMouseButton
+	release.pressed = false
+	vp.push_input(release)
+	assert_eq(scene.selected, hex, "viewport click selects the hex")
+
+	var motion := InputEventMouseMotion.new()
+	motion.position = centre + Vector2(80.0, 0.0)
+	motion.global_position = motion.position
+	motion.relative = Vector2(80.0, 0.0)
+	vp.push_input(motion)
+	assert_eq(scene.camera().position, cam_before, "CameraRig saw button release before MapInput consumed click")

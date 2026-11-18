@@ -102,6 +102,9 @@ func configure(settings: Settings) -> void:
 	_disconnect_settings()
 	_settings = settings
 	if _settings == null:
+		if is_node_ready():
+			_rig.configure(null)
+			_input.configure(null)
 		return
 	_settings.changed.connect(_on_setting_changed)
 	if is_node_ready():

@@ -300,6 +300,21 @@ func test_disabled_and_text_focus_gate_camera_input() -> void:
 	_rig._process(0.1)
 	assert_eq(_camera.position, pos0, "focused LineEdit gates key pan")
 
+	var zoom_in := InputEventKey.new()
+	zoom_in.keycode = KEY_EQUAL
+	zoom_in.pressed = true
+	_rig._unhandled_input(zoom_in)
+	assert_eq(_rig.target_zoom(), 1.0, "focused LineEdit gates cam_zoom_in")
+
+	edit.release_focus()
+	var ctrl_s := InputEventKey.new()
+	ctrl_s.physical_keycode = KEY_S
+	ctrl_s.ctrl_pressed = true
+	ctrl_s.pressed = true
+	_rig._unhandled_input(ctrl_s)
+	_rig._process(0.1)
+	assert_eq(_camera.position, pos0, "Ctrl+S does not trigger cam_pan_down")
+
 
 func test_edge_pan_and_small_axis_centring() -> void:
 	# Small map at fit zoom centres on map_size * 0.5 even after pan_by.

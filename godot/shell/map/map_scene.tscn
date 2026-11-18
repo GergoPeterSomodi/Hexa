@@ -16,9 +16,6 @@ script = ExtResource("1_scene")
 
 [node name="Camera" type="Camera2D" parent="."]
 
-[node name="CameraRig" type="Node" parent="."]
-script = ExtResource("7_rig")
-
 [node name="View" type="Node2D" parent="."]
 script = ExtResource("2_view")
 
@@ -28,6 +25,9 @@ script = ExtResource("3_far")
 
 [node name="Input" type="Node" parent="."]
 script = ExtResource("4_input")
+
+[node name="CameraRig" type="Node" parent="."]
+script = ExtResource("7_rig")
 
 [node name="Names" type="CanvasLayer" parent="."]
 layer = 5

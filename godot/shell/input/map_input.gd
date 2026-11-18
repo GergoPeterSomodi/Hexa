@@ -133,7 +133,7 @@ func _on_mouse_motion(motion: InputEventMouseMotion) -> void:
 
 
 func _on_key(key: InputEventKey) -> void:
-	if not key.pressed or key.echo:
+	if not key.pressed or key.echo or _is_text_input_focused():
 		return
 	if allow_dev_actions and _is_action_pressed_exact(key, &"dev_new_seed"):
 		new_seed_requested.emit()
@@ -215,6 +215,16 @@ func _is_gui_hovered() -> bool:
 		return false
 	var vp := get_viewport()
 	return vp != null and vp.gui_get_hovered_control() != null
+
+
+func _is_text_input_focused() -> bool:
+	if not is_inside_tree():
+		return false
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	var owner := vp.gui_get_focus_owner()
+	return owner is LineEdit or owner is TextEdit
 
 
 func _reset_press() -> void:

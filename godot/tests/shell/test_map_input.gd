@@ -155,6 +155,18 @@ func test_action_keys_and_rebinding_and_dev_gating() -> void:
 	_input._unhandled_input(seed_chord)
 	assert_true(log.is_empty(), "dev_new_seed gated when dev/developer_tools is false")
 
+	# Focused LineEdit gates map key shortcuts including chords.
+	var edit := LineEdit.new()
+	_vp.add_child(edit)
+	edit.grab_focus()
+	var settings_dev := Settings.new("macOS", false)
+	settings_dev.set_value("dev/developer_tools", true)
+	_input.configure(settings_dev)
+	_input._unhandled_input(seed_chord)
+	_input._unhandled_input(_key(KEY_G))
+	assert_true(log.is_empty(), "focused LineEdit gates MapInput shortcuts")
+	edit.release_focus()
+
 	# Disabling MapInput clears hover and blocks intents.
 	_input._unhandled_input(_motion(Vector2(250.0, 350.0)))
 	assert_eq(_input.current_hover(), Vector2i(2, 3))
