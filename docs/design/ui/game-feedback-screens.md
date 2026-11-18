@@ -343,6 +343,10 @@ v0.2.2's tracker it is **saved**: charts that empty on load would break the stud
 | M5; M6-M7; M9; M10; M11 | People; Military; Diplomacy; Trade; Research, each built and tested with its system |
 | M12 | score in Rankings, the debt tab, text size and high contrast in charts |
 
+> **M4.5's build spec** (`docs/architecture/m4-5-build-spec.md`) sets the five questions as a playtest script on seed 1480
+> as Genoa (its 4.11; the winter asked about is Winter 1481, when Genoa's city is begun) and builds the pages above with no
+> new game rule.
+
 **Recommendation: M4.5, then pages with their systems.** The chart kit is paid once; a page built with its system is
 checked against real data by its designers, where a late Insights milestone would find missing fields after the systems
 froze; and M4 stays on the district economy, the critical path.

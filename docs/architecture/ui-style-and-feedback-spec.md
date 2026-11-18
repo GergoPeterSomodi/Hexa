@@ -482,6 +482,14 @@ helps Milan's district at (9, 11)") outside the totals.
 
 ## 8. The Statesman's Study
 
+> **M4.5's build spec refines this section** (`m4-5-build-spec.md` 1.2, where it wins): Rankings is one page with two
+> ranked lists side by side and a line of your value under each; Economy's History adds the treasury at each year's end
+> from the year rows on its own chart; Districts and Goods have the columns of its 4.3 and 4.4; `InkChart` gains a legend,
+> a cursor and fill cues, with the drawing helpers in `InkMarks`; `StudyTable` gains the `delta`, `bar`, `spark` and
+> `button` kinds, 100 rows at a time and sorting by keyboard; the timeline is a new kit piece, `TimelineStrip`;
+> `StudyWarm` fills the views' caches after a season; the Yields mode colours your land by worth a year (key 4). The five
+> questions of M4.5 are its 4.11.
+
 `shell/screens/study.tscn`, `OPAQUE`; one instance for the App's life, so page, tab and scroll are kept. Tree: a
 `PanelModal` frame (the window less 30 px) > VBox: `Head` (date, Close with key cap I), `Body` (HBox: `Nav` NavList,
 `PageHost`, a plain Control with the pages stacked for the cross-fade), `Hints`; the `Ribbon` over the top band. A

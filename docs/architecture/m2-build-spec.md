@@ -766,7 +766,7 @@ fonts come from the Theme; HUD controls take no focus, screens do.
 | Action (`Bindings.DEFAULTS`) | Key (Mac) | Does | Who hears it |
 |---|---|---|---|
 | `view_mode_1`, `_2`, `_3` | 1, 2, 3 | Terrain, Owner, Relief; refused with a toast "no countries on this map" for Owner in a map-only game | `MapInput` -> `mode_requested(mode)` |
-| `view_mode_4` | 4 | registered in M6 (Supply) | |
+| `view_mode_4` | 4 | does nothing in M2; **Yields from M4.5** (`m4-5-build-spec.md` D15); later modes take the next keys as they arrive (M5's mode 5, M6's Supply 6), each milestone adding its `view_mode_<n>` | `MapInput` (M4.5) |
 | `ui_find_place` | Ctrl+F (Cmd+F) | opens and closes the place search | `MapInput` -> `find_place_requested` |
 | `game_country` | C | your country's panel; while picking, focus to the list; a map-only game toasts "no countries on this map" | `MapInput` -> `country_requested` |
 | removed | 1 to 4 | `view_season_1..4` leave the keys (the Layers popover and F3 keep the preview until M3) | |
@@ -780,7 +780,7 @@ fonts come from the Theme; HUD controls take no focus, screens do.
 | `map/owner_tint` | bool (true) | Map: "Country tint in Terrain"; also Layers | `ModeOverlay.set_tint` |
 | `map/minimap` | bool (true) | Map: "Minimap"; also Layers | `Hud` |
 | `accessibility/country_colours` | `standard`, `colour_blind` (`standard`) | Accessibility: "Colour-blind safe country colours" (a switch) | overlay palette, borders, minimap, editor |
-| `state/map_mode` | `terrain`, `owner`, `relief` (`terrain`) | no row (remembered) | `MapScene` |
+| `state/map_mode` | `terrain`, `owner`, `relief` (`terrain`); M4.5 adds `yields` | no row (remembered) | `MapScene` |
 
 Each row carries `since: 2`; the Options screen shows them under M1.5's rule (later rows hidden).
 
@@ -1119,7 +1119,8 @@ Made by the tasks (listed in the plan): `godot/README.md` (layout, keys, the edi
 |---|---|---|
 | M3 | The fields of 5.9 to save; `owners_changed` and `country_chosen` for the action log ("You rule the Republic of Genoa"); `CountryDef.adjective` and the seal's initial for the report; `Territory.neighbours` for `Knowledge.knows` (a shared border); the long name for the pause menu and save rows | Save and load, the header's scenario digest, the date in the top bar |
 | M4 | `Country` for the treasury; the home rule for works and `cancel_work`; `Territory.districts` for the economy's sums; the country panel's treasury section | Money, taxes, the chips |
-| M6 | Owner for supply and movement; the overlay for the Supply mode (a third texture) and fog (a fourth); `view_mode_4` | Armies |
+| M4.5 | The overlay for the Yields mode (a yields texture and its ramp), `view_mode_4`, the top bar's switch, `state/map_mode` (`m4-5-build-spec.md` 6.7) | Yields |
+| M6 | Owner for supply and movement; the overlay for the Supply mode (one more texture) and fog (another); `view_mode_6` (key 4 is Yields from M4.5, key 5 M5's mode) | Armies |
 | M7 | `Territory.transfer` for capture; a `controller` byte beside `owner`; the CB **pattern on occupied land** in the overlay; Declare war in the country panel | Occupation and its pattern |
 | M8 | Actions with `tag`; `Countries.playable` and outside powers as AI countries | The AI |
 | M9 | `transfer` for peace terms; relations and war goals in the country panel; a Relations mode | Diplomacy |

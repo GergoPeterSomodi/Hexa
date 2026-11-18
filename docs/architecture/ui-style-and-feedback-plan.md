@@ -156,6 +156,13 @@ the system tasks are N1 to N12.
 
 ### S4: Insights I (M4.5)
 
+**`m4-5-build-plan.md` folds these tasks into M4.5** with their IDs (its opening table): I3 is split into I3a (Economy's
+views, with `EconomyPreview.worth_seasons`, the `Stats` accessors and the test fixture) and I3b (Rankings and History);
+I4 into I4a (the read model and the hover card's Worth line) and I4b (the map); I2 grows to M and follows I1 (it draws
+with `InkMarks`); I5 grows to L (three tab scenes); I7's action-log edit moves to Q3; I8 adds the five-questions test and
+the read-only proof. New: Q1 `TimelineStrip`, Q2 the study frame's tabs and the mockup renders, Q3 the App, Q4 the Yields
+legend, Q5 the perf games, core rows and core proof. M4.5 adds no game rule (`m4-5-build-spec.md` D1).
+
 | # | Group | Task | Files | Done when |
 |---|---|---|---|---|
 | I1 (M) | A | **`InkChart` complete** | edit `shell/ui/ink_chart.gd`, its test | `LINE`, `STACKED_BAR`, `SPARK`, marks, the cursor, `summary()` |
