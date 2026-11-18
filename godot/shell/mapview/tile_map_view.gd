@@ -40,6 +40,7 @@ const WHOLE: Array[String] = ["grid", "marks"]
 const LINES_Z := 50
 const SHADOW_Z := 60
 const STAND_Z := 70
+const BORDERS_Z := 85
 const SHADOW_ALPHA := 0.18
 const SHADOW_SHADER := "res://shell/mapview/shadow_cover.gdshader"
 const FILL_BLOCK := 16  # cells a side of one block of the sliced fill
@@ -71,6 +72,8 @@ var _hidden: Dictionary[String, bool] = {}
 var _marks_set: TileSet = null  # the TileSet of the WHOLE layers when a season's TileSet has climate slots
 var _lines: Node2D = null
 var _line_chunks: Dictionary[Vector2i, EdgeLineLayer] = {}
+var _borders: Node2D = null
+var _border_chunks: Dictionary[Vector2i, EdgeLineLayer] = {}
 var _missing: Dictionary[String, bool] = {}
 var _fill_provider := Callable()
 var _fill_order := PackedInt32Array()  # the view layer of each name a packed provider writes (empty: it gives a Dictionary)
@@ -136,9 +139,13 @@ func setup(tiles: TilesetBuilder) -> void:
 	_lines = Node2D.new()
 	_lines.name = "Lines"
 	_lines.z_index = LINES_Z
+	_borders = Node2D.new()
+	_borders.name = "Borders"
+	_borders.z_index = BORDERS_Z
 	add_child(_lines)
 	add_child(shadows)
 	add_child(standing)
+	add_child(_borders)
 	for k: int in _layer_names.size():
 		if WHOLE.has(_layer_names[k]):
 			_whole[k] = _new_layer(k, Vector2i.ZERO)
@@ -384,9 +391,8 @@ func clear() -> void:
 				layer.queue_free()
 		if chunk != Vector2i.ZERO:
 			_chunks.erase(chunk)
-	for chunk: Vector2i in _line_chunks:
-		_line_chunks[chunk].queue_free()
-	_line_chunks.clear()
+	_clear_edge_chunks(_lines, _line_chunks)
+	_clear_edge_chunks(_borders, _border_chunks)
 
 
 # ----- the sliced fill ----------------------------------------------------------------------------------------------
@@ -521,35 +527,95 @@ func _process(_delta: float) -> void:
 ## Rivers, streams and roads of one chunk (EdgeLines.for_chunk): one mesh node for the chunk, replaced when the
 ## chunk's lines change; no lines frees it.
 func set_chunk_lines(chunk: Vector2i, lines: Array[Dictionary]) -> void:
-	if _line_chunks.has(chunk):
-		_line_chunks[chunk].queue_free()
-		_line_chunks.erase(chunk)
-	if lines.is_empty():
-		return
-	var node := EdgeLineLayer.new()
-	node.name = "Lines_%d_%d" % [chunk.x, chunk.y]
-	_lines.add_child(node)
-	node.set_lines(lines)
-	_line_chunks[chunk] = node
+	_set_chunk_edge_layer(_lines, _line_chunks, "Lines", chunk, lines)
 
 
 ## The chunks that have a line node.
 func line_chunks() -> Array[Vector2i]:
-	var out: Array[Vector2i] = []
-	out.assign(_line_chunks.keys())
-	return out
+	return _edge_chunk_keys(_line_chunks)
 
 
 ## All the lines of the map at once (the trial's way): cut at the chunk borders, one node a chunk.
 func set_lines(lines: Array[Dictionary]) -> void:
-	for chunk: Vector2i in _line_chunks:
-		_line_chunks[chunk].queue_free()
-	_line_chunks.clear()
+	_clear_edge_chunks(_lines, _line_chunks)
 	var cut := EdgeLines.cut(lines)
 	for chunk: Vector2i in cut:
 		var list: Array[Dictionary] = []
 		list.assign(cut[chunk])
 		set_chunk_lines(chunk, list)
+
+
+# ----- borders ------------------------------------------------------------------------------------------------------
+
+
+## Country borders and inner tinted bands of one chunk (BorderLines.for_chunk): one mesh node for the chunk,
+## replaced when the chunk's borders change; [] frees it.
+func set_chunk_borders(chunk: Vector2i, lines: Array[Dictionary]) -> void:
+	_set_chunk_edge_layer(_borders, _border_chunks, "Borders", chunk, lines)
+
+
+## The chunks that have a border node.
+func border_chunks() -> Array[Vector2i]:
+	return _edge_chunk_keys(_border_chunks)
+
+
+## Builds every border chunk of `map` from `owner` and `palette`.
+func set_borders(map: MapData, owner: PackedByteArray, palette: PackedColorArray) -> void:
+	_clear_edge_chunks(_borders, _border_chunks)
+	if map == null:
+		return
+	var chunks_x := ceili(float(map.cols) / float(EdgeLines.CHUNK))
+	var chunks_y := ceili(float(map.rows) / float(EdgeLines.CHUNK))
+	for cy: int in chunks_y:
+		for cx: int in chunks_x:
+			var chunk := Vector2i(cx, cy)
+			set_chunk_borders(chunk, BorderLines.for_chunk(map, owner, chunk, palette))
+
+
+## Rebuilds only the border chunks touched by ownership changes on `hexes`.
+func rebuild_borders(map: MapData, owner: PackedByteArray, palette: PackedColorArray, hexes: Array[Vector2i]) -> void:
+	if map == null:
+		return
+	for chunk: Vector2i in BorderLines.chunks_touched(map, hexes):
+		set_chunk_borders(chunk, BorderLines.for_chunk(map, owner, chunk, palette))
+
+
+## Shows or hides the Borders node without rebuilding its chunk meshes.
+func set_borders_visible(value: bool) -> void:
+	if _borders != null:
+		_borders.visible = value
+
+
+func _set_chunk_edge_layer(parent: Node2D, store: Dictionary[Vector2i, EdgeLineLayer], prefix: String,
+		chunk: Vector2i, lines: Array[Dictionary]) -> void:
+	if store.has(chunk):
+		var old := store[chunk]
+		if parent != null and old.get_parent() == parent:
+			parent.remove_child(old)
+		old.queue_free()
+		store.erase(chunk)
+	if lines.is_empty():
+		return
+	var node := EdgeLineLayer.new()
+	node.name = "%s_%d_%d" % [prefix, chunk.x, chunk.y]
+	parent.add_child(node)
+	node.set_lines(lines)
+	store[chunk] = node
+
+
+func _clear_edge_chunks(parent: Node2D, store: Dictionary[Vector2i, EdgeLineLayer]) -> void:
+	for chunk: Vector2i in store:
+		var old := store[chunk]
+		if parent != null and old.get_parent() == parent:
+			parent.remove_child(old)
+		old.queue_free()
+	store.clear()
+
+
+func _edge_chunk_keys(store: Dictionary[Vector2i, EdgeLineLayer]) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	out.assign(store.keys())
+	return out
 
 
 # ----- asking -------------------------------------------------------------------------------------------------------

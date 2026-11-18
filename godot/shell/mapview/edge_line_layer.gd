@@ -84,14 +84,24 @@ func _build() -> void:
 		_pass(kind, EDGE, ROAD_EDGE if kind == "road" else RIVER_EDGE)
 		_pass(kind, 0.0, ROAD if kind == "road" else RIVER)
 	for line: Dictionary in _lines:  # the light on a river's lit bank: short dashes
+		if str(line.get("kind", "")) != "river":
+			continue
 		var width := float(line["width"])
-		if str(line["kind"]) != "river" or width <= 3.0:
+		if width <= 3.0:
 			continue
 		var points: PackedVector2Array = line["points"]
 		var shift := Vector2(-width * 0.18, -width * 0.12)
 		for i: int in range(0, points.size() - 1, 3):
 			_stroke(PackedVector2Array([points[i] + shift, points[i].lerp(points[i + 1], 0.45) + shift]),
 				maxf(1.0, width * 0.3), RIVER_LIGHT)
+	for line: Dictionary in _lines:
+		if str(line.get("kind", "")) == "border_band":
+			_polygon(line["polygon"] as PackedVector2Array, line["colours"] as PackedColorArray)
+	for line: Dictionary in _lines:
+		if str(line.get("kind", "")) == "border":
+			var width := float(line.get("width", BorderLines.INK_WIDTH))
+			var colour: Color = line["colour"] if line.has("colour") else BorderLines.INK
+			_stroke(line["points"] as PackedVector2Array, width, colour, line.get("before"), line.get("after"))
 	_mesh = null
 	if _indices.is_empty():
 		return
@@ -107,8 +117,30 @@ func _build() -> void:
 
 func _pass(kind: String, wider: float, colour: Color) -> void:
 	for line: Dictionary in _lines:
-		if str(line["kind"]) == kind:
+		if str(line.get("kind", "")) == kind:
 			_stroke(line["points"], float(line["width"]) + wider, colour, line.get("before"), line.get("after"))
+
+
+## One filled convex polygon with per-vertex colours (border_band), sampling the solid middle of _rim_texture().
+func _polygon(polygon: PackedVector2Array, colours: PackedColorArray) -> void:
+	var count := polygon.size()
+	if count < 3 or colours.size() != count:
+		return
+	var first := _vertices.size()
+	_vertices.resize(first + count)
+	_colours.resize(first + count)
+	_uvs.resize(first + count)
+	for i: int in count:
+		_vertices[first + i] = polygon[i]
+		_colours[first + i] = colours[i]
+		_uvs[first + i] = Vector2(0.5, 0.5)
+	var written := _indices.size()
+	_indices.resize(written + 3 * (count - 2))
+	for i: int in range(1, count - 1):
+		_indices[written] = first
+		_indices[written + 1] = first + i
+		_indices[written + 2] = first + i + 1
+		written += 3
 
 
 ## One thick line as a ribbon of triangles: two vertices a point, set square to the line's run there.
