@@ -434,9 +434,9 @@ UI, with no stand-in panel left. Sources: `docs/design/ui/design.md` (the look),
 
 ### 9.2 Build specs and plans: where each milestone stands (2026-11-17)
 
-A milestone's **build spec** (interfaces, tasks, tests, risks) is written by Fable before that milestone starts, from
-this table, the design pages and the UI rows above. The UI work is already specified and planned for every milestone
-at the level of the table; the system work of M2 and later is not yet specified.
+A milestone's **build spec** (interfaces, tasks, tests, risks) is written before that milestone starts, from this
+table, the design pages and the UI rows above. M2 to M5 (with M4.5) have their build spec and plan; M6 to M12 have
+their UI rows and no system spec yet. The UI work is specified and planned for every milestone at the level of the table.
 
 | M | Build spec | Plan and tasks | Status |
 |---|---|---|---|
