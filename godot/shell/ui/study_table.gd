@@ -56,6 +56,9 @@ func set_columns(cols: Array) -> void:
 			"align": align,
 		})
 
+	if _sort_id != &"" and _find_column(_sort_id).is_empty():
+		_sort_id = &""
+		_sort_desc = false
 	_tree.columns = maxi(1, _columns.size())
 	_apply_column_headers()
 	_rebuild_tree()
@@ -159,8 +162,8 @@ func _compare_values(a: Variant, b: Variant, force_num: bool) -> int:
 	var num_a := typeof(a) in [TYPE_INT, TYPE_FLOAT]
 	var num_b := typeof(b) in [TYPE_INT, TYPE_FLOAT]
 	if force_num or (num_a and num_b):
-		var fa := float(a)
-		var fb := float(b)
+		var fa := 0.0 if a == null else float(a)
+		var fb := 0.0 if b == null else float(b)
 		if fa < fb:
 			return -1
 		if fa > fb:

@@ -225,6 +225,10 @@ func test_preview_card_accepted_refused_compare_and_signals() -> void:
 	assert_eq(pins, [true])
 	assert_true(card.pin_button().button_pressed, "PinBtn stays synced with PinCheck")
 	assert_eq(treas, [true])
+	assert_true(card.treasury_only, "treasury_only property reflects switch state")
+	card.treasury_only = false
+	assert_false(card.treasury_only_switch().button_pressed, "setting treasury_only syncs switch")
+	assert_eq(treas.size(), 1, "setting treasury_only programmatically does not emit toggled")
 
 	var ring_link := card.lands_container().get_child(2).get_child(0) as KitButton
 	_harness.send_click(ring_link.get_global_rect().get_center())

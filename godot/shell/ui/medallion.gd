@@ -209,6 +209,7 @@ func _stop_spin_tween() -> void:
 	if _spin_tween != null and _spin_tween.is_valid():
 		_spin_tween.kill()
 	_spin_tween = null
+	_spinning = false
 
 
 func _on_dial_draw() -> void:

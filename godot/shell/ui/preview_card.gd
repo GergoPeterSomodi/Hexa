@@ -11,6 +11,12 @@ signal closed
 signal look_at_requested(hex: Vector2i)
 signal treasury_only_toggled(on: bool)
 
+@export var treasury_only: bool = false:
+	set(value):
+		treasury_only = value
+		if _refs_bound and _treasury_only != null:
+			_treasury_only.set_pressed_no_signal(treasury_only)
+
 var _pin_check: KitSwitch = null
 var _treasury_only: KitSwitch = null
 var _close_btn: KitButton = null
@@ -44,13 +50,14 @@ var _syncing_pin: bool = false
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_ensure_refs()
+	_treasury_only.set_pressed_no_signal(treasury_only)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_visible_in_tree():
 		return
 	var key_ev := event as InputEventKey
-	if key_ev != null and key_ev.pressed and key_ev.keycode == KEY_ESCAPE:
+	if key_ev != null and key_ev.pressed and not key_ev.is_echo() and key_ev.keycode == KEY_ESCAPE:
 		closed.emit()
 		var vp := get_viewport()
 		if vp != null:
@@ -599,6 +606,7 @@ func _on_pin_btn_toggled(on: bool) -> void:
 
 
 func _on_treasury_only_toggled(on: bool) -> void:
+	treasury_only = on
 	treasury_only_toggled.emit(on)
 
 
