@@ -5,12 +5,16 @@
 class_name FarMap
 extends Node2D
 
-const ZOOM_OFF := 0.20  # at and below this zoom the tiles are hidden and the picture is solid
-const ZOOM_ON := 0.25  # at and above this zoom the picture is gone
+const ZOOM_OFF := 0.20  # default zoom at and below which tiles are hidden and the picture is solid
+const ZOOM_ON := 0.25  # default zoom at and above which the picture is gone
+const ZOOM_BAND := 0.05  # cross-fade width above zoom_off
 ## Map px a picture px covers (a cell is 104 x 76.5 px, a hex is 4 x 3 picture px).
 const SCALE := Vector2(26.0, 25.5)
 ## The cell's middle is 51 px under its top, the picture hex's is 76.5 / 6 = 12.75 px under where the scale puts it.
 const OFFSET := Vector2(0.0, 12.75)
+
+var zoom_off := ZOOM_OFF
+var zoom_on := ZOOM_ON
 
 var _map: MapData = null
 var _state: MapState = null
@@ -93,19 +97,25 @@ func pixel_of(hex: Vector2i) -> Color:
 	return _image.get_pixel(rect.position.x + 1, rect.position.y + 2) if _image != null else Color.BLACK
 
 
-## How solid the picture is at a zoom: 1 at and below ZOOM_OFF, 0 at and above ZOOM_ON, linear between.
-static func alpha_at(zoom: float) -> float:
-	return clampf((ZOOM_ON - zoom) / (ZOOM_ON - ZOOM_OFF), 0.0, 1.0)
+## Sets the far-zoom switch thresholds (driven by dev/far_zoom in Settings).
+func set_zoom_switch(off_zoom: float, on_zoom: float = -1.0) -> void:
+	zoom_off = clampf(off_zoom, 0.01, 2.0)
+	zoom_on = maxf(off_zoom + ZOOM_BAND if on_zoom < 0.0 else on_zoom, zoom_off + 0.01)
+
+
+## How solid the picture is at a zoom: 1 at and below off, 0 at and above on, linear between.
+static func alpha_at(zoom: float, off: float = ZOOM_OFF, on: float = ZOOM_ON) -> float:
+	return clampf((on - zoom) / maxf(on - off, 1.0e-5), 0.0, 1.0)
 
 
 ## Whether the tile layers show at a zoom.
-static func tiles_show_at(zoom: float) -> bool:
-	return zoom > ZOOM_OFF
+static func tiles_show_at(zoom: float, off: float = ZOOM_OFF) -> bool:
+	return zoom > off
 
 
 ## Shows the picture as the zoom says; returns whether the tiles should show.
 func apply_zoom(zoom: float) -> bool:
-	var alpha := alpha_at(zoom)
+	var alpha := alpha_at(zoom, zoom_off, zoom_on)
 	visible = alpha > 0.0 and _texture != null
 	modulate.a = alpha
-	return tiles_show_at(zoom)
+	return tiles_show_at(zoom, zoom_off)

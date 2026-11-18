@@ -1,13 +1,9 @@
-## The map scene (docs/architecture/m1-build-spec.md sections 5, 7 and 8): the camera, the tile view, the far picture, the
-## input and the hex panel, around a Game that Session holds. North Italy opens on tiles. The scene holds no facts: the
-## tile of every hex is MapCells.of_hex of the game's map and state; a change comes in as Events.hex_changed and redraws
-## the hex and its six neighbours only (MapCells.touched_by); the player changes the game only through Session.act.
-##
-## Keys (MapInput / MapLabels): 1 to 4 the season, R a new seed, G the grid, N the place names, F the whole map, H the
-## panel, U upgrade the selected hex, Esc or a right click clears the selection; drag or WASD to move, the wheel to zoom.
-## Below zoom 0.25 the far picture fades in over the tiles and below 0.20 it replaces them.
+## The map scene (docs/architecture/m1-build-spec.md sections 5, 7 and 8; ui-and-controls-spec.md sections 3.1, 3.3, 4.2 to 4.4):
+## the camera, CameraRig, the tile view, the far picture, MapInput, MapLabels and the hex panel around Session.game.
 class_name MapScene
 extends Node2D
+
+signal refused(reason: String)
 
 const MAP_ID := "north_italy"
 const START_SEED := 1480
@@ -19,7 +15,7 @@ const SELECT_TILE := "mark/select"
 const SYNC_LOAD_HEXES := 4000
 ## Milliseconds a frame the loading and a season swap may use (a layer or a chunk is never split, so one can pass it).
 const SLICE_MS := 5.0
-const HELP := "1-4 season   R new seed   G grid   N names   F whole map   H hide   U upgrade   Esc clear\nclick a hex   drag or WASD move   wheel zoom"
+const HELP := "1-4 season   Ctrl+R new seed   G grid   N names   F whole map   H hide   U upgrade   Esc clear\nclick a hex   drag or WASD move   wheel zoom"
 
 ## The map the scene shows (a Session.new_game id); a tool may set it before the scene enters the tree.
 var map_id := MAP_ID
@@ -29,6 +25,8 @@ var season := START_SEASON
 var selected := NO_HEX
 ## Ask for the next season's pictures a moment ahead (a swap then does not wait for the disk).
 var preload_next_season := true
+## Frame loading/swap slice budget in milliseconds (configurable via Settings "dev/slice_ms").
+var slice_ms := SLICE_MS
 
 var _tiles: TilesetBuilder = null
 var _fps_clock := 0.0
@@ -36,8 +34,12 @@ var _line_queue: Array[Vector2i] = []
 var _loading_map: MapData = null
 var _pending_season := ""  # a season asked for before its pictures were loaded: swapped when they are
 var _loading_state: MapState = null
+var _settings: Settings = null
+var _grid_visible := true
+var _grid_opacity := 1.0
 
 @onready var _camera: Camera2D = $Camera
+@onready var _rig: CameraRig = $CameraRig
 @onready var _view: TileMapView = $View
 @onready var _far: FarMap = $Far
 @onready var _input: MapInput = $Input
@@ -51,16 +53,20 @@ var _loading_state: MapState = null
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(SEA_COLOUR)
+	if not InputMap.has_action(&"map_select"):
+		Bindings.ensure()
 	_help.text = HELP
+	_rig.setup(_camera, Vector2.ZERO)
+	_rig.view_changed.connect(_on_view_changed)
 	_input.camera = _camera
 	_input.map_node = _view
 	_input.select_requested.connect(_on_select_requested)
-	_input.clear_selection_requested.connect(select_hex.bind(NO_HEX))
+	_input.command_requested.connect(_on_command_requested)
 	_input.season_requested.connect(_on_season_requested)
 	_input.new_seed_requested.connect(new_seed)
 	_input.grid_toggled.connect(toggle_grid)
-	_input.fit_requested.connect(fit)
-	_input.hud_toggled.connect(func() -> void: _hud.visible = not _hud.visible)
+	_input.names_toggled.connect(toggle_names)
+	_input.hud_toggled.connect(func() -> void: set_hud_visible(not _hud.visible))
 	_input.upgrade_requested.connect(upgrade_selected)
 	_tiles = TilesetBuilder.load_season(season)
 	if _tiles.tile_set == null:
@@ -70,6 +76,8 @@ func _ready() -> void:
 	_far.visible = false
 	Events.hex_changed.connect(_on_hex_changed)
 	Events.game_started.connect(_on_game_started)
+	if _settings != null:
+		_apply_settings(_settings)
 	if Session.game == null:
 		Session.new_game(map_id, start_seed)
 	else:
@@ -82,6 +90,57 @@ func _exit_tree() -> void:
 		Events.hex_changed.disconnect(_on_hex_changed)
 	if Events.game_started.is_connected(_on_game_started):
 		Events.game_started.disconnect(_on_game_started)
+	_disconnect_settings()
+
+
+## Applies display, map, graphics, controls and developer settings and listens for live changes.
+func configure(settings: Settings) -> void:
+	if settings == _settings:
+		if settings != null and is_node_ready():
+			_apply_settings(settings)
+		return
+	_disconnect_settings()
+	_settings = settings
+	if _settings == null:
+		if is_node_ready():
+			_rig.configure(null)
+			_input.configure(null)
+		return
+	_settings.changed.connect(_on_setting_changed)
+	if is_node_ready():
+		_apply_settings(_settings)
+
+
+func _apply_settings(settings: Settings) -> void:
+	_set_grid_visible(bool(settings.get_value("map/grid")))
+	_grid_opacity = clampf(float(settings.get_value("map/grid_opacity")) / 100.0, 0.0, 1.0)
+	_labels.set_visible(bool(settings.get_value("map/place_names")))
+	var shading := bool(settings.get_value("graphics/relief_shading"))
+	_view.set_layer_visible("shade", shading)
+	_view.set_layer_visible("light", shading)
+	preload_next_season = bool(settings.get_value("graphics/preload_next_season"))
+	_far.set_zoom_switch(float(settings.get_value("dev/far_zoom")))
+	slice_ms = clampf(float(settings.get_value("dev/slice_ms")), 2.0, 16.0)
+	_rig.configure(settings)
+	_input.configure(settings)
+	_apply_zoom()
+
+
+func _on_setting_changed(key: String, _value: Variant) -> void:
+	if _settings == null or not is_node_ready():
+		return
+	if key in [
+		"map/grid", "map/grid_opacity", "map/place_names",
+		"graphics/relief_shading", "graphics/preload_next_season",
+		"dev/far_zoom", "dev/slice_ms"
+	]:
+		_apply_settings(_settings)
+
+
+func _disconnect_settings() -> void:
+	if _settings != null and _settings.changed.is_connected(_on_setting_changed):
+		_settings.changed.disconnect(_on_setting_changed)
+	_settings = null
 
 
 # ----- the game's side ----------------------------------------------------------------------------------------------
@@ -104,6 +163,7 @@ func _on_game_started() -> void:
 		for chunk_x: int in ceili(float(map.cols) / EdgeLines.CHUNK):
 			_line_queue.append(Vector2i(chunk_x, chunk_y))
 	_far.begin(map, state)
+	_rig.set_map_size(map_size())
 	fit()
 	if map.hex_count() <= SYNC_LOAD_HEXES:
 		finish_loading()
@@ -112,6 +172,10 @@ func _on_game_started() -> void:
 ## Whether the map is still being put on the view (tiles, lines, the far picture).
 func is_loading() -> bool:
 	return _view.is_filling() or not _line_queue.is_empty() or _far.is_building()
+
+
+func fill_progress() -> float:
+	return _view.fill_progress()
 
 
 ## Does all the loading now (a small map, a test, a tool).
@@ -162,9 +226,16 @@ func new_seed() -> void:
 
 
 func upgrade_selected() -> Dictionary:
+	var verdict: Dictionary
 	if selected == NO_HEX:
-		return {"ok": false, "reason": "no hex is selected"}
-	return Session.act("upgrade", {"hex": selected})
+		verdict = {"ok": false, "reason": "no hex is selected"}
+	else:
+		verdict = Session.act("upgrade", {"hex": selected})
+	if not bool(verdict.get("ok", false)):
+		var reason := str(verdict.get("reason", ""))
+		if reason != "":
+			refused.emit(reason)
+	return verdict
 
 
 # ----- selection ----------------------------------------------------------------------------------------------------
@@ -172,6 +243,10 @@ func upgrade_selected() -> Dictionary:
 
 func _on_select_requested(map_px: Vector2) -> void:
 	select_hex(_view.hex_at(map_px))
+
+
+func _on_command_requested(_map_px: Vector2) -> void:
+	select_hex(NO_HEX)
 
 
 ## Selects a hex of the map (NO_HEX, or a hex off the map, clears the selection): the ring on the marks layer and the panel.
@@ -195,7 +270,7 @@ func _on_season_requested(index: int) -> void:
 
 
 ## Swaps the season: the TileSet of every layer is replaced and no cell is written. Godot rebuilds a layer when its TileSet
-## changes (about 1 ms a thousand cells), so the view swaps a chunk of a layer at a time (SLICE_MS a frame), the chunks on the
+## changes (about 1 ms a thousand cells), so the view swaps a chunk of a layer at a time (slice_ms a frame), the chunks on the
 ## screen first; a small map is done in the first step.
 func set_season(value: String) -> void:
 	_pending_season = ""
@@ -212,7 +287,7 @@ func set_season(value: String) -> void:
 	season = value
 	_tiles = tiles
 	_view.begin_season_swap(tiles, _hexes_on_screen())
-	_view.swap_step(SLICE_MS)
+	_view.swap_step(slice_ms)
 	_request_next_season()
 
 
@@ -242,11 +317,21 @@ func _request_next_season() -> void:
 
 
 func toggle_grid() -> void:
-	_view.set_layer_visible("grid", not _view.layer("grid").visible)
+	_set_grid_visible(not _grid_visible)
+	if _settings != null:
+		_settings.set_value("map/grid", _grid_visible)
+
+
+func _set_grid_visible(value: bool) -> void:
+	_grid_visible = value
+	if _view != null:
+		_view.set_layer_visible("grid", _grid_visible)
 
 
 func toggle_names() -> void:
 	_labels.set_visible(not _labels.visible)
+	if _settings != null:
+		_settings.set_value("map/place_names", _labels.visible)
 
 
 func set_hud_visible(value: bool) -> void:
@@ -261,18 +346,15 @@ func map_size() -> Vector2:
 
 ## The whole map in the window.
 func fit() -> void:
-	var view := get_viewport_rect().size
-	var size := map_size()
-	var zoom := minf(view.x / size.x, view.y / size.y) * 0.96
-	frame_at(size / 2.0, zoom)
+	_rig.set_map_size(map_size())
+	_rig.fit()
+	_apply_zoom()
 
 
 ## A view centred on a map pixel at a zoom (1 = the art's size).
-func frame_at(centre: Vector2, zoom: float) -> void:
-	var z := clampf(zoom, MapInput.ZOOM_MIN, MapInput.ZOOM_MAX)
-	_camera.zoom = Vector2(z, z)
-	_camera.position = centre
-	_camera.force_update_scroll()
+func frame_at(centre: Vector2, zoom_val: float) -> void:
+	_rig.set_map_size(map_size())
+	_rig.frame_at(centre, zoom_val)
 	_apply_zoom()
 
 
@@ -300,14 +382,30 @@ func camera() -> Camera2D:
 	return _camera
 
 
+func camera_rig() -> CameraRig:
+	return _rig
+
+
+func map_input() -> MapInput:
+	return _input
+
+
 func _hex_under_camera() -> Vector2i:
 	if _camera == null or not is_inside_tree():
 		return Vector2i.ZERO
 	return _view.hex_at(_camera.position)
 
 
+func _on_view_changed(_zoom_val: float, _visible_rect: Rect2) -> void:
+	_apply_zoom()
+
+
 func _apply_zoom() -> void:
-	_view.visible = _far.apply_zoom(_camera.zoom.x)
+	var z := _camera.zoom.x
+	_view.visible = _far.apply_zoom(z)
+	var grid_layer := _view.layer("grid")
+	if grid_layer != null:
+		grid_layer.modulate.a = ZoomModel.grid_alpha(z, _grid_opacity)
 
 
 func _process(delta: float) -> void:
@@ -315,9 +413,9 @@ func _process(delta: float) -> void:
 	if _pending_season != "" and TilesetBuilder.is_loaded(_pending_season):
 		set_season(_pending_season)
 	if _view.is_swapping():
-		_view.swap_step(SLICE_MS)
+		_view.swap_step(slice_ms)
 	elif is_loading():
-		_load_step(SLICE_MS)
+		_load_step(slice_ms)
 	_fps_clock += delta
 	if _fps_clock >= 0.5:
 		_fps_clock = 0.0
