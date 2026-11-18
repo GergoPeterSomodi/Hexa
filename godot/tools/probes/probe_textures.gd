@@ -1,5 +1,6 @@
 ## Probe G1: measures per-season TileSet texture memory (RENDER_TEXTURE_MEM_USED / RENDER_VIDEO_MEM_USED)
-## plus steady-state next-season preload pairs and Studiolo menu/kit texture footprint
+## plus steady-state next-season preload pairs for both Full and Half resolution atlases,
+## and Studiolo menu/kit texture footprint
 ## (docs/architecture/ui-and-controls-spec.md section 6.3; ui-and-controls-plan.md G1;
 ## ui-style-and-feedback-plan.md G1).
 ##
@@ -33,7 +34,21 @@ func _run() -> void:
 	var base_tex := _tex_mb()
 	var base_vid := _vid_mb()
 	print("Baseline: RENDER_TEXTURE_MEM_USED=%.2f MB, RENDER_VIDEO_MEM_USED=%.2f MB" % [base_tex, base_vid])
+
+	await _measure_variant(false)
+	await _measure_variant(true)
+	await _measure_menu_art()
+
+	if headless:
+		print("probe_textures: note — dummy headless renderer reports 0.00 MB for GPU texture monitors; run windowed for live VRAM numbers.")
+	print("probe_textures: done")
+	quit(0)
+
+
+func _measure_variant(is_half: bool) -> void:
+	var label := "Half (0.5x)" if is_half else "Full (1.0x)"
 	print("")
+	print("### %s" % label)
 	print("| Season | Delta Tex Mem (MB) | Delta Video Mem (MB) | Unique Atlases | Total Atlas RGBA8 Est (MB) |")
 	print("|---|---|---|---|---|")
 
@@ -41,7 +56,7 @@ func _run() -> void:
 	for season_name: String in SEASONS:
 		var t_before := _tex_mb()
 		var v_before := _vid_mb()
-		var builder := TilesetBuilder.load_season(season_name)
+		var builder := TilesetBuilder.load_season(season_name, is_half)
 		loaded_builders[season_name] = builder
 		await process_frame
 		await process_frame
@@ -55,17 +70,16 @@ func _run() -> void:
 		builder = null
 		await process_frame
 
-	# Steady-state pairs (active season + preloaded next season)
 	print("")
-	print("| Steady-state Pair | Delta Tex Mem (MB) | Delta Video Mem (MB) | Combined Atlas RGBA8 Est (MB) |")
+	print("| Steady-state Pair (%s) | Delta Tex Mem (MB) | Delta Video Mem (MB) | Combined Atlas RGBA8 Est (MB) |" % label)
 	print("|---|---|---|---|")
 	for pair: Array in [["summer", "autumn"], ["winter", "spring"]]:
 		var s1 := str(pair[0])
 		var s2 := str(pair[1])
 		var t_before := _tex_mb()
 		var v_before := _vid_mb()
-		var b1 := TilesetBuilder.load_season(s1)
-		var b2 := TilesetBuilder.load_season(s2)
+		var b1 := TilesetBuilder.load_season(s1, is_half)
+		var b2 := TilesetBuilder.load_season(s2, is_half)
 		await process_frame
 		await process_frame
 		var t_delta := _tex_mb() - t_before
@@ -76,7 +90,8 @@ func _run() -> void:
 		b2 = null
 		await process_frame
 
-	# Menu art footprint (lazy-loaded on MainMenu and released on game start)
+
+func _measure_menu_art() -> void:
 	var menu_est_mb := 0.0
 	var menu_t_before := _tex_mb()
 	var menu_refs: Array[Texture2D] = []
@@ -94,10 +109,6 @@ func _run() -> void:
 	print("Menu art (menu_bg + menu_shade): delta RENDER_TEXTURE_MEM_USED=%.2f MB, RGBA8 est=%.2f MB" % [
 		menu_t_delta, menu_est_mb
 	])
-	if headless:
-		print("probe_textures: note — dummy headless renderer reports 0.00 MB for GPU texture monitors; run windowed for live VRAM numbers.")
-	print("probe_textures: done")
-	quit(0)
 
 
 func _tex_mb() -> float:

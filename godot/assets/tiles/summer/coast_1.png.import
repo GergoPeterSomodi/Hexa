@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://mga0brvp7tx6"
 path.bptc="res://.godot/imported/coast_1.png-b50d520bb4ca0be54a2a9cdd28b631e5.bptc.ctex"
+path.astc="res://.godot/imported/coast_1.png-b50d520bb4ca0be54a2a9cdd28b631e5.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/summer/coast_1.png"
-dest_files=["res://.godot/imported/coast_1.png-b50d520bb4ca0be54a2a9cdd28b631e5.bptc.ctex"]
+dest_files=["res://.godot/imported/coast_1.png-b50d520bb4ca0be54a2a9cdd28b631e5.bptc.ctex", "res://.godot/imported/coast_1.png-b50d520bb4ca0be54a2a9cdd28b631e5.astc.ctex"]
 
 [params]
 

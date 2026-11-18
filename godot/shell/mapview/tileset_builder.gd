@@ -11,6 +11,7 @@ class_name TilesetBuilder
 extends RefCounted
 
 const ROOT := "res://assets/tiles/"
+const HALF_ROOT := "res://assets/tiles/half/"
 const SEASONS: Array[String] = ["spring", "summer", "autumn", "winter"]
 const CLIMATES := 3
 ## The bake set behind each climate slot (snow, frost, mild) of a season.
@@ -37,6 +38,7 @@ var names: Dictionary[String, Vector3i] = {}
 ## 3 for a season's TileSet (the view adds the hex's climate: source id = slots * source + climate), 1 for a single set.
 var slots := 1
 var season := ""
+var half := false
 var error := ""
 
 
@@ -61,10 +63,12 @@ static func build(folder: String) -> TilesetBuilder:
 
 ## A season's TileSet with its three climate slots, built from the indexes and the imported pictures (what
 ## tools/build_tileset.gd saves). A picture that is the same file in several sets is loaded once.
-static func assemble(season_name: String) -> TilesetBuilder:
+## When `is_half` is true, loads 0.5x atlases from HALF_ROOT with halved cell/region/origin dimensions.
+static func assemble(season_name: String, is_half: bool = false) -> TilesetBuilder:
 	var out := TilesetBuilder.new()
 	out.slots = CLIMATES
 	out.season = season_name
+	out.half = is_half
 	if not SETS.has(season_name):
 		out.error = "%s is not a season" % season_name
 		return out
@@ -75,32 +79,34 @@ static func assemble(season_name: String) -> TilesetBuilder:
 		if index.is_empty():
 			return out
 		indexes.append(index)
-	var tiles := _new_tile_set(indexes[0])
+	var tiles := _new_tile_set(indexes[0], is_half)
 	var count := (indexes[0]["sources"] as Array).size()
+	var tex_root := HALF_ROOT if is_half else ROOT
 	var textures: Dictionary[String, Texture2D] = {}  # md5 of the file -> its texture
 	for s: int in count:
 		for slot: int in CLIMATES:
 			var sources: Array = indexes[slot]["sources"]
 			var source: Dictionary = sources[s]
-			var path := ROOT + str(set_names[slot]) + "/" + str(source["file"])
+			var path := tex_root + str(set_names[slot]) + "/" + str(source["file"])
 			var key := FileAccess.get_md5(path)
 			if not textures.has(key):
 				textures[key] = _texture(path)
 			if textures[key] == null:
 				out.error = "%s does not load" % path
 				return out
-			_add_atlas(tiles, source, textures[key], CLIMATES * s + slot, s, out.names if slot == 0 else {})
+			_add_atlas(tiles, source, textures[key], CLIMATES * s + slot, s, out.names if slot == 0 else {}, is_half)
 	out.tile_set = tiles
 	return out
 
 
 ## A season's TileSet from its committed file. Loading it loads that season's pictures (and no other season's):
 ## drop the builder (and the view's reference) to unload them.
-static func load_season(season_name: String) -> TilesetBuilder:
+static func load_season(season_name: String, is_half: bool = false) -> TilesetBuilder:
 	var out := TilesetBuilder.new()
 	out.slots = CLIMATES
 	out.season = season_name
-	var path := tres_path(season_name)
+	out.half = is_half
+	var path := tres_path(season_name, is_half)
 	if not ResourceLoader.exists(path):
 		out.error = "%s is not there (tools/build_tileset.gd writes it)" % path
 		return out
@@ -166,19 +172,19 @@ static func marks_source() -> int:
 
 ## Starts loading a season's TileSet and pictures on another thread (the swap then does not wait for the disk:
 ## load_season finds the resource ready). Ask a moment before the swap, e.g. when the season is about to change.
-static func request_season(season_name: String) -> void:
-	var path := tres_path(season_name)
+static func request_season(season_name: String, is_half: bool = false) -> void:
+	var path := tres_path(season_name, is_half)
 	if ResourceLoader.exists(path):
 		ResourceLoader.load_threaded_request(path)
 
 
 ## Whether a season's TileSet has been loaded (by request_season) and waits to be taken by load_season.
-static func is_loaded(season_name: String) -> bool:
-	return ResourceLoader.load_threaded_get_status(tres_path(season_name)) == ResourceLoader.THREAD_LOAD_LOADED
+static func is_loaded(season_name: String, is_half: bool = false) -> bool:
+	return ResourceLoader.load_threaded_get_status(tres_path(season_name, is_half)) == ResourceLoader.THREAD_LOAD_LOADED
 
 
-static func tres_path(season_name: String) -> String:
-	return ROOT + "tiles_%s.tres" % season_name
+static func tres_path(season_name: String, is_half: bool = false) -> String:
+	return ROOT + ("tiles_%s_half.tres" % season_name if is_half else "tiles_%s.tres" % season_name)
 
 
 ## The index of a folder, or {} (and out.error says why).
@@ -195,25 +201,31 @@ static func _read_index(folder: String, out: TilesetBuilder) -> Dictionary:
 	return index
 
 
-static func _new_tile_set(index: Dictionary) -> TileSet:
+static func _new_tile_set(index: Dictionary, is_half: bool = false) -> TileSet:
 	var cell: Array = index["cell"]
 	var tiles := TileSet.new()
 	tiles.tile_shape = TileSet.TILE_SHAPE_HEXAGON
 	tiles.tile_layout = TileSet.TILE_LAYOUT_STACKED
 	tiles.tile_offset_axis = TileSet.TILE_OFFSET_AXIS_HORIZONTAL
-	tiles.tile_size = Vector2i(int(cell[0]), int(cell[1]))
+	var cell_size := Vector2i(int(cell[0]), int(cell[1]))
+	if is_half:
+		cell_size = Vector2i(roundi(float(cell_size.x) * 0.5), roundi(float(cell_size.y) * 0.5))
+	tiles.tile_size = cell_size
 	return tiles
 
 
 ## One atlas source of the index: every tile with its origin, sort point and rank. `table` (when not empty-literal
 ## {}) gets name -> (source in the index, column, row).
 static func _add_atlas(tiles: TileSet, source: Dictionary, texture: Texture2D, id: int, source_in_index: int,
-		table: Dictionary) -> void:
+		table: Dictionary, is_half: bool = false) -> void:
 	var region: Array = source["region"]
-	var size := Vector2i(int(region[0]), int(region[1]))
+	var full_size := Vector2i(int(region[0]), int(region[1]))
+	var size := Vector2i(roundi(float(full_size.x) * 0.5), roundi(float(full_size.y) * 0.5)) if is_half else full_size
+	var full_sep := int(source["separation"])
+	var sep := roundi(float(full_sep) * 0.5) if is_half else full_sep
 	var atlas := TileSetAtlasSource.new()
 	atlas.texture = texture
-	atlas.separation = Vector2i(int(source["separation"]), int(source["separation"]))
+	atlas.separation = Vector2i(sep, sep)
 	atlas.texture_region_size = size
 	# The engine would make an uncompressed padded copy of every atlas (3 x 290 MB a season); the bake leaves 2 px between tiles.
 	atlas.use_texture_padding = false
@@ -228,8 +240,10 @@ static func _add_atlas(tiles: TileSet, source: Dictionary, texture: Texture2D, i
 		var data := atlas.get_tile_data(coords, 0)
 		# The picture is drawn with its middle on the cell's middle, moved back by texture_origin: this puts the
 		# picture's anchor pixel on the middle of the cell.
-		data.texture_origin = Vector2i(int(anchor[0]) - int(size.x / 2.0), int(anchor[1]) - int(size.y / 2.0))
-		data.y_sort_origin = int(tile["y_sort"])
+		var full_origin := Vector2i(int(anchor[0]) - int(full_size.x / 2.0), int(anchor[1]) - int(full_size.y / 2.0))
+		data.texture_origin = Vector2i(roundi(float(full_origin.x) * 0.5), roundi(float(full_origin.y) * 0.5)) if is_half else full_origin
+		var full_ysort := int(tile["y_sort"])
+		data.y_sort_origin = roundi(float(full_ysort) * 0.5) if is_half else full_ysort
 		data.z_index = int(tile["z"])
 		table[str(tile["name"])] = Vector3i(source_in_index, coords.x, coords.y)
 

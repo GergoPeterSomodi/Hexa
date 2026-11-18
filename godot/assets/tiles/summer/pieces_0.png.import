@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://tygw3doe7cqu"
 path.bptc="res://.godot/imported/pieces_0.png-1287232d2021f2a74f49cd308a46ff51.bptc.ctex"
+path.astc="res://.godot/imported/pieces_0.png-1287232d2021f2a74f49cd308a46ff51.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/summer/pieces_0.png"
-dest_files=["res://.godot/imported/pieces_0.png-1287232d2021f2a74f49cd308a46ff51.bptc.ctex"]
+dest_files=["res://.godot/imported/pieces_0.png-1287232d2021f2a74f49cd308a46ff51.bptc.ctex", "res://.godot/imported/pieces_0.png-1287232d2021f2a74f49cd308a46ff51.astc.ctex"]
 
 [params]
 

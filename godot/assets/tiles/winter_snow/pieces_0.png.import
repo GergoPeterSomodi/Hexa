@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://67pc21xqd7og"
 path.bptc="res://.godot/imported/pieces_0.png-f72fc7ab60cf056b9bb1ef71744aee81.bptc.ctex"
+path.astc="res://.godot/imported/pieces_0.png-f72fc7ab60cf056b9bb1ef71744aee81.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/winter_snow/pieces_0.png"
-dest_files=["res://.godot/imported/pieces_0.png-f72fc7ab60cf056b9bb1ef71744aee81.bptc.ctex"]
+dest_files=["res://.godot/imported/pieces_0.png-f72fc7ab60cf056b9bb1ef71744aee81.bptc.ctex", "res://.godot/imported/pieces_0.png-f72fc7ab60cf056b9bb1ef71744aee81.astc.ctex"]
 
 [params]
 

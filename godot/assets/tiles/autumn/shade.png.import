@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://v2vb4q88w66a"
 path.bptc="res://.godot/imported/shade.png-262acc2a584ec4596c27f13fb2b78769.bptc.ctex"
+path.astc="res://.godot/imported/shade.png-262acc2a584ec4596c27f13fb2b78769.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/autumn/shade.png"
-dest_files=["res://.godot/imported/shade.png-262acc2a584ec4596c27f13fb2b78769.bptc.ctex"]
+dest_files=["res://.godot/imported/shade.png-262acc2a584ec4596c27f13fb2b78769.bptc.ctex", "res://.godot/imported/shade.png-262acc2a584ec4596c27f13fb2b78769.astc.ctex"]
 
 [params]
 

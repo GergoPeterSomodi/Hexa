@@ -106,6 +106,24 @@ const SCHEMA: Dictionary = {
 		"label": "UI scale",
 		"applies": "confirm",
 	},
+	"graphics/preset": {
+		"type": TYPE_STRING,
+		"default": "medium",
+		"choices": ["low", "medium", "high", "custom"],
+		"page": "graphics",
+		"since": "1.5",
+		"label": "Graphics preset",
+		"applies": "immediate",
+	},
+	"graphics/texture_quality": {
+		"type": TYPE_STRING,
+		"default": "full",
+		"choices": ["full", "half"],
+		"page": "graphics",
+		"since": "1.5",
+		"label": "Texture quality",
+		"applies": "immediate",
+	},
 	"graphics/relief_shading": {
 		"type": TYPE_BOOL,
 		"default": true,
@@ -120,24 +138,6 @@ const SCHEMA: Dictionary = {
 		"page": "advanced",
 		"since": "1.5",
 		"label": "Preload next season",
-		"applies": "immediate",
-	},
-	"graphics/texture_quality": {
-		"type": TYPE_STRING,
-		"default": "full",
-		"choices": ["full", "half"],
-		"page": "graphics",
-		"since": "2",
-		"label": "Texture quality",
-		"applies": "next_season",
-	},
-	"graphics/preset": {
-		"type": TYPE_STRING,
-		"default": "medium",
-		"choices": ["low", "medium", "high", "custom"],
-		"page": "graphics",
-		"since": "2",
-		"label": "Graphics preset",
 		"applies": "immediate",
 	},
 	"graphics/season_change": {
@@ -503,10 +503,39 @@ const DEVICE_PRESETS: Dictionary = {
 	"trackpad": {"wheel": "pan", "gesture": "pan"},
 }
 
+const GRAPHICS_PRESETS: Dictionary = {
+	"low": {
+		"graphics/texture_quality": "half",
+		"graphics/relief_shading": false,
+		"graphics/preload_next_season": false,
+		"display/fps_cap": 60,
+	},
+	"medium": {
+		"graphics/texture_quality": "full",
+		"graphics/relief_shading": true,
+		"graphics/preload_next_season": true,
+		"display/fps_cap": 0,
+	},
+	"high": {
+		"graphics/texture_quality": "full",
+		"graphics/relief_shading": true,
+		"graphics/preload_next_season": true,
+		"display/fps_cap": 0,
+	},
+}
+
+const GRAPHICS_PRESET_KEYS: Array[String] = [
+	"graphics/texture_quality",
+	"graphics/relief_shading",
+	"graphics/preload_next_season",
+	"display/fps_cap",
+]
+
 var platform: String = OS.get_name()
 var should_reduce_motion: bool = false
 var _values: Dictionary = {}
 var _key_overrides: Dictionary = {}
+var _applying_graphics_preset: bool = false
 
 
 func _init(
@@ -540,54 +569,11 @@ static func load_from(
 		return s
 	var raw_text := file.get_as_text()
 	file.close()
-	var cfg := _parse_safe_config(raw_text)
+	var cfg := SettingsIo.parse_safe_config(raw_text)
 	if cfg == null:
 		return s
 	_apply_loaded_config(s, cfg)
 	return s
-
-
-static func _parse_safe_config(raw_text: String) -> ConfigFile:
-	var clean_lines := PackedStringArray()
-	var obj_regex := RegEx.create_from_string("\\bObject\\s*\\(")
-	for raw_line: String in raw_text.split("\n"):
-		var stripped := raw_line.strip_edges()
-		if stripped.is_empty() or stripped.begins_with(";") or stripped.begins_with("#"):
-			clean_lines.append(raw_line)
-			continue
-		if stripped.begins_with("["):
-			if not stripped.ends_with("]") or stripped.length() < 3:
-				return null
-			clean_lines.append(raw_line)
-			continue
-		var eq_idx := stripped.find("=")
-		if eq_idx <= 0:
-			return null
-		var rhs := stripped.substr(eq_idx + 1).strip_edges()
-		if rhs.is_empty():
-			return null
-		if obj_regex.search(rhs) != null:
-			continue
-		if not _looks_like_variant_literal(rhs):
-			return null
-		clean_lines.append(raw_line)
-	var cfg := ConfigFile.new()
-	if cfg.parse("\n".join(clean_lines)) != OK:
-		return null
-	return cfg
-
-
-static func _looks_like_variant_literal(rhs: String) -> bool:
-	var first := rhs[0]
-	if first == "\"" or first == "'" or first == "[" or first == "{":
-		return true
-	if first == "-" or first == "+" or (first >= "0" and first <= "9"):
-		return true
-	if rhs.begins_with("true") or rhs.begins_with("false") or rhs.begins_with("null"):
-		return true
-	if rhs.begins_with("Vector2i(") or rhs.begins_with("Vector2(") or rhs.begins_with("&\""):
-		return true
-	return false
 
 
 static func _apply_loaded_config(s: Settings, cfg: ConfigFile) -> void:
@@ -616,6 +602,10 @@ func get_default(key: String) -> Variant:
 		return null
 	if key == "accessibility/reduce_motion":
 		return should_reduce_motion
+	if key == "graphics/texture_quality" and platform == "macOS":
+		return "half"
+	if key == "graphics/preset" and platform == "macOS":
+		return "custom"
 	var entry: Dictionary = SCHEMA[key]
 	return entry["default"]
 
@@ -698,6 +688,36 @@ func set_value(key: String, value: Variant) -> bool:
 			var preset: Dictionary = DEVICE_PRESETS[preset_name]
 			set_value("controls/wheel_action", preset["wheel"])
 			set_value("controls/gesture_action", preset["gesture"])
+	elif key == "graphics/preset":
+		var gp_name := str(value)
+		if GRAPHICS_PRESETS.has(gp_name):
+			_applying_graphics_preset = true
+			var gp: Dictionary = GRAPHICS_PRESETS[gp_name]
+			for k: String in gp.keys():
+				set_value(k, gp[k])
+			_applying_graphics_preset = false
+	elif not _applying_graphics_preset and key in GRAPHICS_PRESET_KEYS:
+		_sync_graphics_preset()
+	return true
+
+
+func _sync_graphics_preset() -> void:
+	var matched := "custom"
+	if _matches_graphics_preset("low"):
+		matched = "low"
+	elif _matches_graphics_preset("medium"):
+		var cur := str(get_value("graphics/preset"))
+		matched = "high" if cur == "high" else "medium"
+	if str(get_value("graphics/preset")) != matched:
+		_values["graphics/preset"] = matched
+		changed.emit("graphics/preset", matched)
+
+
+func _matches_graphics_preset(preset_name: String) -> bool:
+	var gp: Dictionary = GRAPHICS_PRESETS[preset_name]
+	for k: String in gp.keys():
+		if get_value(k) != gp[k]:
+			return false
 	return true
 
 
@@ -707,11 +727,13 @@ func reset_page(page: String) -> void:
 	for key: String in SCHEMA.keys():
 		var entry: Dictionary = SCHEMA[key]
 		if str(entry.get("page", "")) == page:
-			if key == "controls/device":
+			if key == "controls/device" or key == "graphics/preset":
 				continue
 			set_value(key, get_default(key))
 	if page == "controls" and SCHEMA.has("controls/device"):
 		set_value("controls/device", get_default("controls/device"))
+	elif page == "graphics" and SCHEMA.has("graphics/preset"):
+		_sync_graphics_preset()
 
 
 func get_key_overrides() -> Dictionary:
@@ -735,22 +757,6 @@ func clear_key_overrides() -> void:
 func save_to(path: String = PATH) -> bool:
 	if path.is_empty():
 		return false
-	var tmp_path := path + ".tmp"
-	var global_tmp := ProjectSettings.globalize_path(tmp_path)
-	var global_target := ProjectSettings.globalize_path(path)
-	var base_dir := global_target.get_base_dir()
-	if not base_dir.is_empty() and not DirAccess.dir_exists_absolute(base_dir):
-		if path.begins_with("user://"):
-			if DirAccess.make_dir_recursive_absolute(base_dir) != OK:
-				return false
-		else:
-			return false
-	if DirAccess.dir_exists_absolute(global_tmp) or DirAccess.dir_exists_absolute(global_target):
-		return false
-	var probe := FileAccess.open(tmp_path, FileAccess.WRITE)
-	if probe == null:
-		return false
-	probe.close()
 	var cfg := ConfigFile.new()
 	for full_key: String in SCHEMA.keys():
 		var parts := full_key.split("/", true, 1)
@@ -759,12 +765,4 @@ func save_to(path: String = PATH) -> bool:
 		cfg.set_value(parts[0], parts[1], get_value(full_key))
 	for action: String in _key_overrides.keys():
 		cfg.set_value("keys", action, str(_key_overrides[action]))
-	if cfg.save(tmp_path) != OK:
-		if FileAccess.file_exists(global_tmp):
-			DirAccess.remove_absolute(global_tmp)
-		return false
-	if DirAccess.rename_absolute(global_tmp, global_target) != OK:
-		if FileAccess.file_exists(global_tmp):
-			DirAccess.remove_absolute(global_tmp)
-		return false
-	return true
+	return SettingsIo.save_atomic(cfg, path)

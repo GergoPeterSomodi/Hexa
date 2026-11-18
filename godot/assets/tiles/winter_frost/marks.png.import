@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://b64fww1k6a3ta"
 path.bptc="res://.godot/imported/marks.png-7b092a1ed26b1a67e0d7987fb933397f.bptc.ctex"
+path.astc="res://.godot/imported/marks.png-7b092a1ed26b1a67e0d7987fb933397f.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/winter_frost/marks.png"
-dest_files=["res://.godot/imported/marks.png-7b092a1ed26b1a67e0d7987fb933397f.bptc.ctex"]
+dest_files=["res://.godot/imported/marks.png-7b092a1ed26b1a67e0d7987fb933397f.bptc.ctex", "res://.godot/imported/marks.png-7b092a1ed26b1a67e0d7987fb933397f.astc.ctex"]
 
 [params]
 

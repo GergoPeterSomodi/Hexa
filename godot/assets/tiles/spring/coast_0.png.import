@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://b4lrtxqu4h1d6"
 path.bptc="res://.godot/imported/coast_0.png-7d7fdf6ca0d32fde3623f80221479ac7.bptc.ctex"
+path.astc="res://.godot/imported/coast_0.png-7d7fdf6ca0d32fde3623f80221479ac7.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/spring/coast_0.png"
-dest_files=["res://.godot/imported/coast_0.png-7d7fdf6ca0d32fde3623f80221479ac7.bptc.ctex"]
+dest_files=["res://.godot/imported/coast_0.png-7d7fdf6ca0d32fde3623f80221479ac7.bptc.ctex", "res://.godot/imported/coast_0.png-7d7fdf6ca0d32fde3623f80221479ac7.astc.ctex"]
 
 [params]
 

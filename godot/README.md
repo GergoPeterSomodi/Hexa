@@ -39,7 +39,7 @@ core/                   plain GDScript, extends RefCounted (or Resource in defs/
 shell/                  everything with Nodes (Studiolo UI architecture)
   autoload/             session.gd (Session) and events.gd (Events)
   app/                  app.tscn + app.gd (main scene root), settings.gd (user://settings.cfg),
-                        display.gd, shell_context.gd
+                        settings_io.gd, display.gd, shell_context.gd
   input/                bindings.gd (InputMap & gestures), zoom_model.gd, esc_ladder.gd,
                         app_input.gd, camera_rig.gd, map_input.gd
   ui/                   tokens.gd, theme.tres, theme_high_contrast.tres, kit_theme.gd (1x/2x/plain),
@@ -65,8 +65,9 @@ data/                   data: maps/north_italy.tres, geography/ (JSON from Pytho
                         and heights), the exported goods, units, buildings, countries and terrain. See data/README.md
 assets/fonts/           static OFL fonts (Cinzel, Alegreya, Alegreya SC, Alegreya Sans, Noto Sans fallback)
 assets/ui/              baked Studiolo kit textures (kit/ui_kit.json, kit/1x/, kit/2x/) and menu/ art
-assets/tiles/           the six baked tile sets (spring, summer, autumn, winter_snow, winter_frost, winter_mild) and the
-                        committed TileSets tiles_spring.tres ... tiles_winter.tres
+assets/tiles/           the six baked tile sets (spring, summer, autumn, winter_snow, winter_frost, winter_mild),
+                        half/ (0.5x atlases for Mac/Low quality), and the committed TileSets
+                        tiles_<season>.tres and tiles_<season>_half.tres
 addons/gut/             GUT 9.7.1, copied unchanged from its release (MIT, see addons/gut/LICENSE.md)
 ```
 
@@ -126,8 +127,9 @@ python -m unittest tests/test_bake_ui.py
 "$GODOT" --headless --path godot -s res://tools/build_theme.gd -- --check
 "$GODOT" --headless --path godot -s res://tools/build_theme.gd
 
-# Check or rebuild the committed TileSets (assets/tiles/tiles_<season>.tres) and map (data/maps/north_italy.tres)
+# Check or rebuild the committed TileSets (full and half) and map (data/maps/north_italy.tres)
 "$GODOT" --headless --path godot -s res://tools/build_tileset.gd -- --check
+"$GODOT" --headless --path godot -s res://tools/build_tileset.gd -- --half
 "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --check
 
 # GUT tests, headless, with a JUnit report (includes tests/shell/test_ui_monkey.gd)
@@ -164,7 +166,7 @@ The editor: open `godot/project.godot` with the same engine. GUT shows in the ed
 - **Pointer & trackpad gestures** (`shell/input/camera_rig.gd`):
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).
   - Mac trackpad two-finger scroll (`InputEventPanGesture`) pans at `GESTURE_PAN_PX` (20 px per delta unit); trackpad pinch (`InputEventMagnifyGesture`) zooms directly about the fingers; left/middle/right drag past `CLICK_SLOP` (6 px) pans 1:1.
-- **Tiles & Map:** tiles are baked by `tools/worldmap/tileset_bake/bake.py` and assembled into `assets/tiles/tiles_<season>.tres` by `tools/build_tileset.gd`; `data/maps/north_italy.tres` is built by `tools/build_map.gd`; the rules are `core/systems/improve.gd`.
+- **Tiles & Map:** tiles are baked by `tools/worldmap/tileset_bake/bake.py` and assembled into `assets/tiles/tiles_<season>.tres` (full) and `assets/tiles/tiles_<season>_half.tres` (0.5× atlases in `assets/tiles/half/`, default on macOS `gl_compatibility` and in the Low preset to avoid `BPTC_RGBA -> RGBA8` 4× VRAM expansion; `import_etc2_astc` is also enabled in `project.godot`) by `tools/build_tileset.gd`; `data/maps/north_italy.tres` is built by `tools/build_map.gd`; the rules are `core/systems/improve.gd`.
 
 ## Checks in CI
 

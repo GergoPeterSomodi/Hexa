@@ -43,6 +43,7 @@ func test_round_trip_save_and_load() -> void:
 	assert_true(s.set_value("display/background_fps", 5))
 	assert_true(s.set_value("display/power_saving", false))
 	assert_true(s.set_value("display/ui_scale", "150"))
+	assert_true(s.set_value("graphics/texture_quality", "full"))
 	assert_true(s.set_value("graphics/relief_shading", false))
 	assert_true(s.set_value("graphics/preload_next_season", false))
 	assert_true(s.set_value("controls/pan_speed", 140))
@@ -288,3 +289,36 @@ func test_shell_context_signals_and_convenience_methods() -> void:
 	assert_eq(toasts[1], {"text": "Cannot build", "tone": &"bad"})
 	assert_eq(requests.size(), 1)
 	assert_eq(requests[0], {"what": &"new_sandbox", "args": {"seed": 42}})
+
+
+func test_graphics_texture_quality_platform_defaults_and_presets() -> void:
+	var mac := Settings.new("macOS", false)
+	var win := Settings.new("Windows", false)
+	assert_eq(mac.get_value("graphics/texture_quality"), "half", "macOS defaults to half textures")
+	assert_eq(mac.get_value("graphics/preset"), "custom", "macOS starts custom (half + relief + preload)")
+	assert_eq(win.get_value("graphics/texture_quality"), "full", "Windows defaults to full textures")
+	assert_eq(win.get_value("graphics/preset"), "medium", "Windows defaults to medium preset")
+
+	assert_true(win.set_value("graphics/preset", "low"))
+	assert_eq(win.get_value("graphics/texture_quality"), "half")
+	assert_eq(win.get_value("graphics/relief_shading"), false)
+	assert_eq(win.get_value("graphics/preload_next_season"), false)
+	assert_eq(win.get_value("display/fps_cap"), 60)
+
+	assert_true(win.set_value("graphics/relief_shading", true))
+	assert_eq(win.get_value("graphics/preset"), "custom", "changing a knob switches preset to custom")
+
+	assert_true(win.set_value("graphics/preset", "high"))
+	assert_eq(win.get_value("graphics/texture_quality"), "full")
+	assert_eq(win.get_value("graphics/relief_shading"), true)
+	assert_eq(win.get_value("graphics/preload_next_season"), true)
+	assert_eq(win.get_value("display/fps_cap"), 0)
+	assert_eq(win.get_value("graphics/preset"), "high")
+
+	assert_true(mac.set_value("graphics/preset", "low"))
+	mac.reset_page("graphics")
+	assert_eq(mac.get_value("graphics/texture_quality"), "half")
+	assert_eq(mac.get_value("graphics/relief_shading"), true)
+	assert_eq(mac.get_value("graphics/preload_next_season"), false, "reset_page(graphics) does not touch advanced")
+	assert_eq(mac.get_value("display/fps_cap"), 60, "reset_page(graphics) does not touch display")
+	assert_eq(mac.get_value("graphics/preset"), "custom")

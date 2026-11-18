@@ -367,6 +367,7 @@ func _mount_map_scene(map_id_val: String, seed_val: int) -> void:
 	scene.start_seed = seed_val
 	if _settings != null:
 		scene.preload_next_season = bool(_settings.get_value("graphics/preload_next_season"))
+		scene.texture_quality = str(_settings.get_value("graphics/texture_quality"))
 	_world.add_child(scene)
 	_map_scene = scene
 	scene.configure(_settings)

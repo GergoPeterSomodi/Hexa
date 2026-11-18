@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://l0nutjw6a36t"
 path.bptc="res://.godot/imported/marks.png-5ee9d5b592aa2e3f9c4d26a63f9e5955.bptc.ctex"
+path.astc="res://.godot/imported/marks.png-5ee9d5b592aa2e3f9c4d26a63f9e5955.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/autumn/marks.png"
-dest_files=["res://.godot/imported/marks.png-5ee9d5b592aa2e3f9c4d26a63f9e5955.bptc.ctex"]
+dest_files=["res://.godot/imported/marks.png-5ee9d5b592aa2e3f9c4d26a63f9e5955.bptc.ctex", "res://.godot/imported/marks.png-5ee9d5b592aa2e3f9c4d26a63f9e5955.astc.ctex"]
 
 [params]
 

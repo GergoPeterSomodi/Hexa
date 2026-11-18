@@ -267,6 +267,7 @@ func test_configure_applies_settings_and_live_updates() -> void:
 	assert_true(settings.set_value("dev/slice_ms", 12))
 
 	_scene.configure(settings)
+	_scene.finish_swap()
 	_scene.frame_at(_scene.map_size() / 2.0, 1.0)
 	assert_true(_scene.view().layer("grid").visible)
 	assert_almost_eq(_scene.view().layer("grid").modulate.a, 0.5, 0.01)
@@ -274,6 +275,8 @@ func test_configure_applies_settings_and_live_updates() -> void:
 	assert_false(_scene.view().layer("shade").visible)
 	assert_false(_scene.view().layer("light").visible)
 	assert_false(_scene.preload_next_season)
+	assert_eq(_scene.texture_quality, "half")
+	assert_true(_scene.view().is_half())
 	assert_almost_eq(_scene.far().zoom_off, 0.55, 0.001)
 	assert_almost_eq(_scene.slice_ms, 12.0, 0.001)
 
@@ -356,3 +359,35 @@ func test_viewport_click_does_not_stick_camera_drag() -> void:
 	motion.relative = Vector2(80.0, 0.0)
 	vp.push_input(motion)
 	assert_eq(scene.camera().position, cam_before, "CameraRig saw button release before MapInput consumed click")
+
+
+func test_half_texture_quality_preserves_cell_alignment_and_live_swaps() -> void:
+	var settings := Settings.new("Windows", false)
+	assert_true(settings.set_value("graphics/preload_next_season", false))
+	assert_true(settings.set_value("graphics/texture_quality", "half"))
+	var writes := _scene.view().cell_writes
+	var before := _snapshot()
+
+	_scene.configure(settings)
+	_scene.finish_swap()
+	assert_true(_scene.view().is_half())
+	assert_eq(_scene.view().cell_writes, writes, "quality swap writes no cell")
+	assert_eq(_snapshot(), before, "cell coordinates and tile ids preserved")
+	assert_eq(_scene.view().layer("ground").scale, Vector2(2.0, 2.0))
+	assert_eq(_scene.view().layer("piece_front").scale, Vector2(2.0, 2.0))
+	assert_eq(_scene.view().layer("grid").scale, Vector2.ONE)
+	assert_eq(_scene.view().layer("marks").scale, Vector2.ONE)
+	assert_eq(_scene.view().layer("ground").tile_set.tile_size, Vector2i(52, 51))
+
+	var map := Session.game.map
+	for i: int in map.hex_count():
+		var hex := map.hex_of(i)
+		var c := _scene.view().centre_of(hex)
+		assert_lt(c.distance_to(MapTiles.cell_centre(hex)), 0.01)
+		assert_eq(_scene.view().hex_at(c), hex)
+
+	assert_true(settings.set_value("graphics/texture_quality", "full"))
+	_scene.finish_swap()
+	assert_false(_scene.view().is_half())
+	assert_eq(_scene.view().layer("ground").scale, Vector2.ONE)
+	assert_eq(_scene.view().layer("ground").tile_set.tile_size, Vector2i(104, 102))

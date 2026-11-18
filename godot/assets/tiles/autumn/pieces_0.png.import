@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dmxatfhaaifdl"
 path.bptc="res://.godot/imported/pieces_0.png-749cce2a8d441def22bedf9659c4da94.bptc.ctex"
+path.astc="res://.godot/imported/pieces_0.png-749cce2a8d441def22bedf9659c4da94.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/autumn/pieces_0.png"
-dest_files=["res://.godot/imported/pieces_0.png-749cce2a8d441def22bedf9659c4da94.bptc.ctex"]
+dest_files=["res://.godot/imported/pieces_0.png-749cce2a8d441def22bedf9659c4da94.bptc.ctex", "res://.godot/imported/pieces_0.png-749cce2a8d441def22bedf9659c4da94.astc.ctex"]
 
 [params]
 

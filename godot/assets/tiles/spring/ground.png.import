@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://ckkbm7x7oh76k"
 path.bptc="res://.godot/imported/ground.png-a7441e51c4d381c3e879bbfb5f2879f9.bptc.ctex"
+path.astc="res://.godot/imported/ground.png-a7441e51c4d381c3e879bbfb5f2879f9.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/spring/ground.png"
-dest_files=["res://.godot/imported/ground.png-a7441e51c4d381c3e879bbfb5f2879f9.bptc.ctex"]
+dest_files=["res://.godot/imported/ground.png-a7441e51c4d381c3e879bbfb5f2879f9.bptc.ctex", "res://.godot/imported/ground.png-a7441e51c4d381c3e879bbfb5f2879f9.astc.ctex"]
 
 [params]
 

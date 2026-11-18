@@ -73,9 +73,10 @@ func test_coast_is_two_sources_and_every_source_fits_the_picture() -> void:
 
 
 ## One season's committed TileSet against the indexes of its three sets.
-func _check_season(season: String) -> void:
-	var built := TilesetBuilder.load_season(season)
+func _check_season(season: String, is_half: bool = false) -> void:
+	var built := TilesetBuilder.load_season(season, is_half)
 	assert_eq(built.error, "", season)
+	assert_eq(built.half, is_half, season)
 	assert_not_null(built.tile_set, season)
 	if built.tile_set == null:
 		return
@@ -84,7 +85,7 @@ func _check_season(season: String) -> void:
 	assert_eq(tiles.tile_shape, TileSet.TILE_SHAPE_HEXAGON)
 	assert_eq(tiles.tile_layout, TileSet.TILE_LAYOUT_STACKED)
 	assert_eq(tiles.tile_offset_axis, TileSet.TILE_OFFSET_AXIS_HORIZONTAL)
-	assert_eq(tiles.tile_size, Vector2i(104, 102))
+	assert_eq(tiles.tile_size, Vector2i(52, 51) if is_half else Vector2i(104, 102))
 	var set_names: Array = TilesetBuilder.SETS[season]
 	var first := _index(str(set_names[0]))
 	var count := (first["sources"] as Array).size()
@@ -101,7 +102,8 @@ func _check_season(season: String) -> void:
 				continue
 			assert_false(atlas.use_texture_padding, "a padded copy would be uncompressed")
 			var region: Array = source["region"]
-			var size := Vector2i(int(region[0]), int(region[1]))
+			var full_size := Vector2i(int(region[0]), int(region[1]))
+			var size := Vector2i(roundi(float(full_size.x) * 0.5), roundi(float(full_size.y) * 0.5)) if is_half else full_size
 			assert_eq(atlas.texture_region_size, size)
 			assert_eq(atlas.get_tiles_count(), (source["tiles"] as Array).size(), "%s %s" % [season, source["name"]])
 			var rows: Array = source["tiles"]
@@ -114,8 +116,10 @@ func _check_season(season: String) -> void:
 					bad += 1
 					continue
 				var data := atlas.get_tile_data(coords, 0)
-				var origin := Vector2i(int(anchor[0]) - int(size.x / 2.0), int(anchor[1]) - int(size.y / 2.0))
-				if data.texture_origin != origin or data.y_sort_origin != int(tile["y_sort"]) or data.z_index != int(tile["z"]):
+				var full_origin := Vector2i(int(anchor[0]) - int(full_size.x / 2.0), int(anchor[1]) - int(full_size.y / 2.0))
+				var origin := Vector2i(roundi(float(full_origin.x) * 0.5), roundi(float(full_origin.y) * 0.5)) if is_half else full_origin
+				var want_ysort := roundi(float(int(tile["y_sort"])) * 0.5) if is_half else int(tile["y_sort"])
+				if data.texture_origin != origin or data.y_sort_origin != want_ysort or data.z_index != int(tile["z"]):
 					bad += 1
 	assert_eq(bad, 0, "%s: tiles whose origin, sort point or rank differ from the index" % season)
 	# The name table: name -> (source in the index, column, row).
@@ -182,3 +186,49 @@ func test_a_requested_season_loads_the_same() -> void:
 	assert_eq(built.error, "")
 	assert_not_null(built.tile_set)
 	assert_eq(built.tile_set.get_source_count(), 30)
+
+
+func test_half_tilesets_match_indexes() -> void:
+	for season: String in TilesetBuilder.SEASONS:
+		_check_season(season, true)
+
+
+func test_half_slots_share_pictures_outside_winter_and_differ_in_winter() -> void:
+	var summer := TilesetBuilder.load_season("summer", true).tile_set
+	var ground_a := (summer.get_source(0) as TileSetAtlasSource).texture
+	var ground_b := (summer.get_source(2) as TileSetAtlasSource).texture
+	assert_same(ground_a, ground_b, "summer half: one picture behind the three slots")
+	assert_true(ground_a.resource_path.begins_with(TilesetBuilder.HALF_ROOT))
+	var winter := TilesetBuilder.load_season("winter", true).tile_set
+	var snow := (winter.get_source(0) as TileSetAtlasSource).texture
+	var frost := (winter.get_source(1) as TileSetAtlasSource).texture
+	var mild := (winter.get_source(2) as TileSetAtlasSource).texture
+	assert_ne(snow.resource_path, frost.resource_path)
+	assert_ne(frost.resource_path, mild.resource_path)
+	assert_same((winter.get_source(3) as TileSetAtlasSource).texture, (winter.get_source(4) as TileSetAtlasSource).texture)
+
+
+func test_half_requested_season_loads_the_same() -> void:
+	TilesetBuilder.request_season("autumn", true)
+	var built := TilesetBuilder.load_season("autumn", true)
+	assert_eq(built.error, "")
+	assert_true(built.half)
+	assert_not_null(built.tile_set)
+	assert_eq(built.tile_set.get_source_count(), 30)
+
+
+func test_half_atlases_exist_at_half_dimensions_with_lossless_import() -> void:
+	for set_name: String in TilesetBuilder.ALL_SETS:
+		var index := _index(set_name)
+		for src_var: Variant in (index["sources"] as Array):
+			var source: Dictionary = src_var
+			var file_name := str(source["file"])
+			var sz: Array = source["size"]
+			var half_path := "%s%s/%s" % [TilesetBuilder.HALF_ROOT, set_name, file_name]
+			var tex := load(half_path) as Texture2D
+			assert_not_null(tex, half_path)
+			if tex != null:
+				assert_eq(Vector2i(roundi(tex.get_size().x), roundi(tex.get_size().y)),
+					Vector2i(roundi(float(sz[0]) * 0.5), roundi(float(sz[1]) * 0.5)), half_path)
+			var imp := FileAccess.get_file_as_string(half_path + ".import")
+			assert_true(imp.contains("compress/mode=0"), "%s uses lossless import (no BPTC fallback)" % half_path)

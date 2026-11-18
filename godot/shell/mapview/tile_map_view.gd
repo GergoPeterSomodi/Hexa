@@ -56,6 +56,7 @@ var cell_writes := 0
 var _tiles: TilesetBuilder = null
 var _names: Dictionary[String, Vector3i] = {}
 var _slots := 1
+var _half := false
 var _cols := 0
 var _chunk := CHUNK
 var _climate := PackedByteArray()
@@ -83,6 +84,7 @@ var _fill_at := 0
 var _fill_total := 0
 var _fill_done := 0
 var _swap_to: TileSet = null
+var _swap_scale := Vector2.ONE
 var _swap_chunks: Array[Vector2i] = []
 var _swap_focus := Rect2i()
 var _swap_at := 0
@@ -95,6 +97,7 @@ func setup(tiles: TilesetBuilder) -> void:
 	_tiles = tiles
 	_names = tiles.names
 	_slots = tiles.slots
+	_half = tiles.half
 	set_process(false)
 	var shadows := CanvasGroup.new()
 	shadows.name = "Shadows"
@@ -202,7 +205,9 @@ func begin_season_swap(tiles: TilesetBuilder, focus: Rect2i = Rect2i()) -> void:
 	_tiles = tiles
 	_names = tiles.names
 	_slots = tiles.slots
+	_half = tiles.half
 	_swap_to = tiles.tile_set
+	_swap_scale = Vector2(2.0, 2.0) if _half else Vector2.ONE
 	_swap_focus = focus
 	_swap_chunks.clear()
 	_swap_chunks.assign(_chunks.keys())
@@ -220,6 +225,7 @@ func begin_season_swap(tiles: TilesetBuilder, focus: Rect2i = Rect2i()) -> void:
 	for k: int in _layer_names.size():
 		if _whole[k] != null and _marks_set == null:  # (a single TileSet, the trial's: the grid goes with the rest)
 			_whole[k].tile_set = _swap_to
+			_whole[k].scale = _swap_scale
 			_whole[k].update_internals()
 
 
@@ -235,8 +241,9 @@ func swap_step(budget_ms: float) -> bool:
 		while _swap_layer < layers.size():
 			var layer := layers[_swap_layer] as TileMapLayer
 			_swap_layer += 1
-			if layer != null and layer.tile_set != _swap_to:
+			if layer != null and (layer.tile_set != _swap_to or layer.scale != _swap_scale):
 				layer.tile_set = _swap_to
+				layer.scale = _swap_scale
 				layer.update_internals()  # the rebuild happens here, inside the slice, not at the end of the frame
 				if Time.get_ticks_usec() >= until:
 					return _finish_swap_step()
@@ -335,7 +342,9 @@ func _new_layer(k: int, chunk: Vector2i) -> TileMapLayer:
 	var layer_name := _layer_names[k]
 	var spec := _specs[k]
 	layer.name = layer_name.to_pascal_case() if chunk == Vector2i.ZERO else "%s_%d_%d" % [layer_name.to_pascal_case(), chunk.x, chunk.y]
-	layer.tile_set = _marks_set if _marks_set != null and WHOLE.has(layer_name) else _tiles.tile_set
+	var uses_marks := _marks_set != null and WHOLE.has(layer_name)
+	layer.tile_set = _marks_set if uses_marks else _tiles.tile_set
+	layer.scale = Vector2(2.0, 2.0) if (_half and not uses_marks) else Vector2.ONE
 	layer.z_index = int(spec[0])
 	layer.material = _materials[k]
 	layer.y_sort_enabled = str(spec[1]) == "stand"
@@ -576,11 +585,17 @@ func layers_of(layer_name: String) -> Array[TileMapLayer]:
 
 ## The hex under a point of the map (the view's own coordinates).
 func hex_at(map_px: Vector2) -> Vector2i:
-	return layer("ground").local_to_map(map_px)
+	var ground := layer("ground")
+	return ground.local_to_map(map_px / ground.scale)
 
 
 func centre_of(hex: Vector2i) -> Vector2:
-	return layer("ground").map_to_local(hex)
+	var ground := layer("ground")
+	return ground.map_to_local(hex) * ground.scale
+
+
+func is_half() -> bool:
+	return _half
 
 
 ## The tile names that were asked for and are not in the tileset (a bake that is behind the rules).

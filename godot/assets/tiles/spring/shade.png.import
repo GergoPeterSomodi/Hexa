@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dg2ifvw4tswmq"
 path.bptc="res://.godot/imported/shade.png-68c9adb101854196d510930feb94b1b5.bptc.ctex"
+path.astc="res://.godot/imported/shade.png-68c9adb101854196d510930feb94b1b5.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/spring/shade.png"
-dest_files=["res://.godot/imported/shade.png-68c9adb101854196d510930feb94b1b5.bptc.ctex"]
+dest_files=["res://.godot/imported/shade.png-68c9adb101854196d510930feb94b1b5.bptc.ctex", "res://.godot/imported/shade.png-68c9adb101854196d510930feb94b1b5.astc.ctex"]
 
 [params]
 

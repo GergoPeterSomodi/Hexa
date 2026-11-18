@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://mhwwh4b3rub8"
 path.bptc="res://.godot/imported/pieces_0.png-7bb9e6446a719727b030d6a68c2ec60d.bptc.ctex"
+path.astc="res://.godot/imported/pieces_0.png-7bb9e6446a719727b030d6a68c2ec60d.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/winter_frost/pieces_0.png"
-dest_files=["res://.godot/imported/pieces_0.png-7bb9e6446a719727b030d6a68c2ec60d.bptc.ctex"]
+dest_files=["res://.godot/imported/pieces_0.png-7bb9e6446a719727b030d6a68c2ec60d.bptc.ctex", "res://.godot/imported/pieces_0.png-7bb9e6446a719727b030d6a68c2ec60d.astc.ctex"]
 
 [params]
 

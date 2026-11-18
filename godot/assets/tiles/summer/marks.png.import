@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bvpbsqeyyhtbm"
 path.bptc="res://.godot/imported/marks.png-91cebd7e2732424c624718dcf3e34c20.bptc.ctex"
+path.astc="res://.godot/imported/marks.png-91cebd7e2732424c624718dcf3e34c20.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/summer/marks.png"
-dest_files=["res://.godot/imported/marks.png-91cebd7e2732424c624718dcf3e34c20.bptc.ctex"]
+dest_files=["res://.godot/imported/marks.png-91cebd7e2732424c624718dcf3e34c20.bptc.ctex", "res://.godot/imported/marks.png-91cebd7e2732424c624718dcf3e34c20.astc.ctex"]
 
 [params]
 

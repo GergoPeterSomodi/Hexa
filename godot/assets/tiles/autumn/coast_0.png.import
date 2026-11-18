@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cwcekuieuqcx2"
 path.bptc="res://.godot/imported/coast_0.png-f67840f66f3adefc8ef3ebc79f23c9e5.bptc.ctex"
+path.astc="res://.godot/imported/coast_0.png-f67840f66f3adefc8ef3ebc79f23c9e5.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/autumn/coast_0.png"
-dest_files=["res://.godot/imported/coast_0.png-f67840f66f3adefc8ef3ebc79f23c9e5.bptc.ctex"]
+dest_files=["res://.godot/imported/coast_0.png-f67840f66f3adefc8ef3ebc79f23c9e5.bptc.ctex", "res://.godot/imported/coast_0.png-f67840f66f3adefc8ef3ebc79f23c9e5.astc.ctex"]
 
 [params]
 

@@ -28,6 +28,8 @@ var season := START_SEASON
 var selected := NO_HEX
 ## Ask for the next season's pictures a moment ahead (a swap then does not wait for the disk).
 var preload_next_season := true
+## Texture quality ("full" or "half"): half loads 0.5x atlases scaled x2 in TileMapView.
+var texture_quality := "full"
 ## Frame loading/swap slice budget in milliseconds (configurable via Settings "dev/slice_ms").
 var slice_ms := SLICE_MS
 
@@ -66,7 +68,7 @@ func _ready() -> void:
 	_input.names_toggled.connect(toggle_names)
 	_input.hud_toggled.connect(func() -> void: hud_toggle_requested.emit())
 	_input.upgrade_requested.connect(upgrade_selected)
-	_tiles = TilesetBuilder.load_season(season)
+	_tiles = TilesetBuilder.load_season(season, is_half_textures())
 	if _tiles.tile_set == null:
 		push_warning("map scene: %s (bake the tiles and run tools/build_tileset.gd)" % _tiles.error)
 		_tiles.tile_set = TileSet.new()
@@ -118,6 +120,10 @@ func _apply_settings(settings: Settings) -> void:
 	_view.set_layer_visible("shade", shading)
 	_view.set_layer_visible("light", shading)
 	preload_next_season = bool(settings.get_value("graphics/preload_next_season"))
+	var next_quality := str(settings.get_value("graphics/texture_quality"))
+	if next_quality != texture_quality:
+		texture_quality = next_quality
+		_reload_season_quality()
 	_far.set_zoom_switch(float(settings.get_value("dev/far_zoom")))
 	slice_ms = clampf(float(settings.get_value("dev/slice_ms")), 2.0, 16.0)
 	_rig.configure(settings)
@@ -130,7 +136,7 @@ func _on_setting_changed(key: String, _value: Variant) -> void:
 		return
 	if key in [
 		"map/grid", "map/grid_opacity", "map/place_names",
-		"graphics/relief_shading", "graphics/preload_next_season",
+		"graphics/relief_shading", "graphics/preload_next_season", "graphics/texture_quality",
 		"dev/far_zoom", "dev/slice_ms"
 	]:
 		_apply_settings(_settings)
@@ -314,18 +320,39 @@ func _on_season_requested(index: int) -> void:
 	set_season(TilesetBuilder.SEASONS[clampi(index, 0, TilesetBuilder.SEASONS.size() - 1)])
 
 
+func is_half_textures() -> bool:
+	return texture_quality == "half"
+
+
+func _reload_season_quality() -> void:
+	if _view == null:
+		return
+	var half := is_half_textures()
+	if _tiles != null and _tiles.half == half:
+		return
+	var tiles := TilesetBuilder.load_season(season, half)
+	if tiles.tile_set == null:
+		push_warning("map scene: %s" % tiles.error)
+		return
+	_tiles = tiles
+	_view.begin_season_swap(tiles, _hexes_on_screen())
+	_view.swap_step(slice_ms)
+	_request_next_season()
+
+
 ## Swaps the season: the TileSet of every layer is replaced and no cell is written. Godot rebuilds a layer when its TileSet
 ## changes (about 1 ms a thousand cells), so the view swaps a chunk of a layer at a time (slice_ms a frame), the chunks on the
 ## screen first; a small map is done in the first step.
 func set_season(value: String) -> void:
 	_pending_season = ""
-	if value == season or not TilesetBuilder.SEASONS.has(value):
+	var half := is_half_textures()
+	if (value == season and (_tiles == null or _tiles.half == half)) or not TilesetBuilder.SEASONS.has(value):
 		return
-	if preload_next_season and DisplayServer.get_name() != "headless" and not TilesetBuilder.is_loaded(value):
-		TilesetBuilder.request_season(value)  # not loaded yet (a key jumped over the next season): the frames go on meanwhile
+	if preload_next_season and DisplayServer.get_name() != "headless" and not TilesetBuilder.is_loaded(value, half):
+		TilesetBuilder.request_season(value, half)  # not loaded yet (a key jumped over the next season): the frames go on meanwhile
 		_pending_season = value
 		return
-	var tiles := TilesetBuilder.load_season(value)
+	var tiles := TilesetBuilder.load_season(value, half)
 	if tiles.tile_set == null:
 		push_warning("map scene: %s" % tiles.error)
 		return
@@ -359,7 +386,7 @@ func _request_next_season() -> void:
 	if not preload_next_season or DisplayServer.get_name() == "headless":
 		return
 	var seasons := TilesetBuilder.SEASONS
-	TilesetBuilder.request_season(seasons[(seasons.find(season) + 1) % seasons.size()])
+	TilesetBuilder.request_season(seasons[(seasons.find(season) + 1) % seasons.size()], is_half_textures())
 
 
 func toggle_grid() -> void:
@@ -457,7 +484,7 @@ func _apply_zoom() -> void:
 
 func _process(_delta: float) -> void:
 	_apply_zoom()
-	if _pending_season != "" and TilesetBuilder.is_loaded(_pending_season):
+	if _pending_season != "" and TilesetBuilder.is_loaded(_pending_season, is_half_textures()):
 		set_season(_pending_season)
 	if _view.is_swapping():
 		_view.swap_step(slice_ms)

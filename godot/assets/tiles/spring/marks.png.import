@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://c3352sc5p0e8u"
 path.bptc="res://.godot/imported/marks.png-c6b52456e3e8c45d64f359b4a407e67b.bptc.ctex"
+path.astc="res://.godot/imported/marks.png-c6b52456e3e8c45d64f359b4a407e67b.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/spring/marks.png"
-dest_files=["res://.godot/imported/marks.png-c6b52456e3e8c45d64f359b4a407e67b.bptc.ctex"]
+dest_files=["res://.godot/imported/marks.png-c6b52456e3e8c45d64f359b4a407e67b.bptc.ctex", "res://.godot/imported/marks.png-c6b52456e3e8c45d64f359b4a407e67b.astc.ctex"]
 
 [params]
 

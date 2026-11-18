@@ -259,7 +259,7 @@ func reset_current_page_defaults() -> void:
 			continue
 		if str(entry.get("applies", "immediate")) == "confirm":
 			_staged_settings.set_value(key, _staged_settings.get_default(key))
-		elif key != "controls/device":
+		elif key != "controls/device" and key != "graphics/preset":
 			_live_settings.set_value(key, _live_settings.get_default(key))
 	if page_name == "controls" and Settings.SCHEMA.has("controls/device"):
 		_live_settings.set_value("controls/device", _live_settings.get_default("controls/device"))

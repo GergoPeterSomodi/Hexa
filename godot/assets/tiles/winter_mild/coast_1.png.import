@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cwmxg321saibs"
 path.bptc="res://.godot/imported/coast_1.png-b934502934a5bfb893efa6c82dbfeef1.bptc.ctex"
+path.astc="res://.godot/imported/coast_1.png-b934502934a5bfb893efa6c82dbfeef1.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/tiles/winter_mild/coast_1.png"
-dest_files=["res://.godot/imported/coast_1.png-b934502934a5bfb893efa6c82dbfeef1.bptc.ctex"]
+dest_files=["res://.godot/imported/coast_1.png-b934502934a5bfb893efa6c82dbfeef1.bptc.ctex", "res://.godot/imported/coast_1.png-b934502934a5bfb893efa6c82dbfeef1.astc.ctex"]
 
 [params]
 

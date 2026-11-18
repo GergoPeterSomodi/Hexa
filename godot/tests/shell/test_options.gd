@@ -264,3 +264,49 @@ func test_back_button_discards_unapplied_staging_and_closes() -> void:
 	await _harness.wait_frames(self, 1)
 	assert_eq(_harness.stack.count(), 0)
 	assert_eq(_harness.settings.get_value("display/window_mode"), "windowed")
+
+
+func test_graphics_page_texture_quality_presets_and_page_defaults() -> void:
+	var options := ScreenIds.make(&"options") as Options
+	_harness.stack.push(options)
+	await _harness.wait_frames(self, 2)
+
+	options.select_page(&"graphics")
+	await _harness.wait_frames(self, 1)
+	var preset_row := options.option_row("graphics/preset")
+	var quality_row := options.option_row("graphics/texture_quality")
+	var relief_row := options.option_row("graphics/relief_shading")
+	assert_not_null(preset_row)
+	assert_not_null(quality_row)
+	assert_not_null(relief_row)
+
+	var preset_opt := preset_row.control() as OptionButton
+	var quality_opt := quality_row.control() as OptionButton
+	var relief_sw := relief_row.control() as KitSwitch
+	assert_not_null(preset_opt)
+	assert_not_null(quality_opt)
+	assert_not_null(relief_sw)
+
+	# Select "low" (index 0) -> half textures, relief off, preload off, fps_cap 60
+	preset_opt.select(0)
+	preset_opt.item_selected.emit(0)
+	assert_eq(_harness.settings.get_value("graphics/preset"), "low")
+	assert_eq(_harness.settings.get_value("graphics/texture_quality"), "half")
+	assert_eq(_harness.settings.get_value("graphics/relief_shading"), false)
+	assert_eq(_harness.settings.get_value("graphics/preload_next_season"), false)
+	assert_eq(_harness.settings.get_value("display/fps_cap"), 60)
+	assert_eq(quality_opt.selected, 1, "Texture quality row synced to Half")
+	assert_false(relief_sw.button_pressed, "Relief shading switch synced off")
+
+	# Flip relief shading back on -> preset row updates to Custom (index 3)
+	relief_sw.button_pressed = true
+	assert_eq(_harness.settings.get_value("graphics/preset"), "custom")
+	assert_eq(preset_opt.selected, 3)
+
+	# Defaults for this page resets graphics rows without clobbering Display/Advanced
+	options.defaults_button().pressed.emit()
+	await _harness.wait_frames(self, 1)
+	assert_eq(_harness.settings.get_value("graphics/texture_quality"), _harness.settings.get_default("graphics/texture_quality"))
+	assert_eq(_harness.settings.get_value("graphics/relief_shading"), true)
+	assert_eq(_harness.settings.get_value("display/fps_cap"), 60, "Display fps_cap preserved")
+	assert_eq(_harness.settings.get_value("graphics/preload_next_season"), false, "Advanced preload preserved")
