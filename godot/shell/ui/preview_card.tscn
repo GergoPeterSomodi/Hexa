@@ -1,0 +1,183 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://shell/ui/preview_card.gd" id="1_card"]
+[ext_resource type="Script" path="res://shell/ui/kit_switch.gd" id="2_switch"]
+[ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
+[ext_resource type="PackedScene" path="res://shell/ui/season_strip.tscn" id="4_strip"]
+[ext_resource type="Script" path="res://shell/ui/ink_chart.gd" id="5_chart"]
+
+[node name="PreviewCard" type="PanelContainer"]
+custom_minimum_size = Vector2(556, 0)
+mouse_filter = 0
+theme_type_variation = &"PanelCard"
+script = ExtResource("1_card")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Top" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PinCheck" type="CheckButton" parent="VBox/Top"]
+layout_mode = 2
+text = "Pin to compare"
+script = ExtResource("2_switch")
+
+[node name="TreasuryOnly" type="CheckButton" parent="VBox/Top"]
+layout_mode = 2
+text = "Treasury only"
+script = ExtResource("2_switch")
+
+[node name="Spacer" type="Control" parent="VBox/Top"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="CloseBtn" type="Button" parent="VBox/Top"]
+layout_mode = 2
+size_flags_vertical = 0
+tooltip_text = "Close"
+accessibility_name = "Close"
+script = ExtResource("3_btn")
+kind = 6
+icon_name = &"close"
+
+[node name="Title" type="Label" parent="VBox"]
+layout_mode = 2
+theme_type_variation = &"TitlePanel"
+autowrap_mode = 3
+
+[node name="Sub" type="Label" parent="VBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[node name="Body" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BringsHead" type="Label" parent="VBox/Body"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+text = "BRINGS"
+
+[node name="Brings" type="VBoxContainer" parent="VBox/Body"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="SeasonStrip" parent="VBox/Body" instance=ExtResource("4_strip")]
+layout_mode = 2
+
+[node name="Cols" type="HBoxContainer" parent="VBox/Body"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="LandsBox" type="VBoxContainer" parent="VBox/Body/Cols"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="LandsHead" type="Label" parent="VBox/Body/Cols/LandsBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+text = "WHERE IT LANDS"
+
+[node name="Lands" type="VBoxContainer" parent="VBox/Body/Cols/LandsBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ChartBox" type="VBoxContainer" parent="VBox/Body/Cols"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="ChartHead" type="Label" parent="VBox/Body/Cols/ChartBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+text = "GAIN A SEASON"
+
+[node name="InkChart" type="Control" parent="VBox/Body/Cols/ChartBox"]
+custom_minimum_size = Vector2(220, 96)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("5_chart")
+kind = 2
+ground = 1
+
+[node name="Cost" type="Label" parent="VBox/Body"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Body"
+autowrap_mode = 3
+
+[node name="Requirements" type="VBoxContainer" parent="VBox/Body"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Payback" type="Label" parent="VBox/Body"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Body"
+autowrap_mode = 3
+
+[node name="Next" type="Label" parent="VBox/Body"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[node name="CompareBox" type="HBoxContainer" parent="VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ColA" type="VBoxContainer" parent="VBox/CompareBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="CompareRule" type="VSeparator" parent="VBox/CompareBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ColB" type="VBoxContainer" parent="VBox/CompareBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Refusal" type="PanelContainer" parent="VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"PanelSlot"
+
+[node name="RefusalLabel" type="Label" parent="VBox/Refusal"]
+layout_mode = 2
+theme_type_variation = &"NumberBad"
+autowrap_mode = 3
+
+[node name="Foot" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Note" type="Label" parent="VBox/Foot"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"LabelFlavour"
+text = "Weather not counted"
+
+[node name="PinBtn" type="Button" parent="VBox/Foot"]
+layout_mode = 2
+text = "Pin to compare"
+script = ExtResource("3_btn")
+kind = 5
+
+[node name="BeginBtn" type="Button" parent="VBox/Foot"]
+layout_mode = 2
+text = "Begin the work"
+script = ExtResource("3_btn")
+kind = 2

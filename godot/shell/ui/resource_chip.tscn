@@ -1,0 +1,39 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://shell/ui/resource_chip.gd" id="1_chip"]
+[ext_resource type="Script" path="res://shell/ui/medallion.gd" id="2_medal"]
+[ext_resource type="Script" path="res://shell/ui/delta_chip.gd" id="3_delta"]
+
+[node name="ResourceChip" type="PanelContainer"]
+mouse_filter = 0
+theme_type_variation = &"PanelSlot"
+script = ExtResource("1_chip")
+
+[node name="HBox" type="HBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Medallion" type="Button" parent="HBox"]
+layout_mode = 2
+size_flags_vertical = 4
+script = ExtResource("2_medal")
+small = true
+
+[node name="NameLabel" type="Label" parent="HBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Hint"
+vertical_alignment = 1
+
+[node name="ValueLabel" type="Label" parent="HBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Number"
+vertical_alignment = 1
+
+[node name="DeltaChip" type="PanelContainer" parent="HBox"]
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("3_delta")

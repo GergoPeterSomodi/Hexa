@@ -1,0 +1,113 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://shell/ui/season_strip.gd" id="1_strip"]
+[ext_resource type="Script" path="res://shell/ui/delta_chip.gd" id="2_delta"]
+
+[node name="SeasonStrip" type="HBoxContainer"]
+size_flags_horizontal = 3
+mouse_filter = 2
+script = ExtResource("1_strip")
+
+[node name="Cell0" type="PanelContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_type_variation = &"PanelStripCell"
+
+[node name="VBox" type="VBoxContainer" parent="Cell0"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="Label" parent="Cell0/VBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+horizontal_alignment = 1
+
+[node name="Lines" type="VBoxContainer" parent="Cell0/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Gain" type="PanelContainer" parent="Cell0/VBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+script = ExtResource("2_delta")
+
+[node name="Cell1" type="PanelContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_type_variation = &"PanelStripCell"
+
+[node name="VBox" type="VBoxContainer" parent="Cell1"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="Label" parent="Cell1/VBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+horizontal_alignment = 1
+
+[node name="Lines" type="VBoxContainer" parent="Cell1/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Gain" type="PanelContainer" parent="Cell1/VBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+script = ExtResource("2_delta")
+
+[node name="Cell2" type="PanelContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_type_variation = &"PanelStripCell"
+
+[node name="VBox" type="VBoxContainer" parent="Cell2"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="Label" parent="Cell2/VBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+horizontal_alignment = 1
+
+[node name="Lines" type="VBoxContainer" parent="Cell2/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Gain" type="PanelContainer" parent="Cell2/VBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+script = ExtResource("2_delta")
+
+[node name="Cell3" type="PanelContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_type_variation = &"PanelStripCell"
+
+[node name="VBox" type="VBoxContainer" parent="Cell3"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="Label" parent="Cell3/VBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+horizontal_alignment = 1
+
+[node name="Lines" type="VBoxContainer" parent="Cell3/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Gain" type="PanelContainer" parent="Cell3/VBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+script = ExtResource("2_delta")
