@@ -1,7 +1,6 @@
-## Player settings stored in user://settings.cfg (docs/architecture/ui-and-controls-spec.md section 6,
-## docs/architecture/ui-style-and-feedback-spec.md section 9). Every key is validated against SCHEMA
-## (type, choices or range); unknown keys, wrong types, out-of-range values, Objects and corrupt files
-## fall back to defaults. Saves atomically via a .tmp file and rename.
+## Player settings in user://settings.cfg (ui-and-controls-spec.md section 6, ui-style-and-feedback-spec.md section 9).
+## Every key is validated against SCHEMA (type, choices or range); unknown keys, wrong types, out-of-range values,
+## Objects and corrupt files fall back to defaults. Saves atomically via a .tmp file and rename.
 class_name Settings
 extends RefCounted
 
@@ -270,6 +269,30 @@ const SCHEMA: Dictionary = {
 		"label": "Place names",
 		"applies": "immediate",
 	},
+	"map/borders": {
+		"type": TYPE_BOOL,
+		"default": true,
+		"page": "map",
+		"since": "2",
+		"label": "Borders",
+		"applies": "immediate",
+	},
+	"map/owner_tint": {
+		"type": TYPE_BOOL,
+		"default": true,
+		"page": "map",
+		"since": "2",
+		"label": "Country tint in Terrain",
+		"applies": "immediate",
+	},
+	"map/minimap": {
+		"type": TYPE_BOOL,
+		"default": true,
+		"page": "map",
+		"since": "2",
+		"label": "Minimap",
+		"applies": "immediate",
+	},
 	"accessibility/reduce_motion": {
 		"type": TYPE_BOOL,
 		"default": false,
@@ -289,11 +312,11 @@ const SCHEMA: Dictionary = {
 	},
 	"accessibility/country_colours": {
 		"type": TYPE_STRING,
-		"default": "default",
-		"choices": ["default", "colourblind"],
+		"default": "standard",
+		"choices": ["standard", "colour_blind"],
 		"page": "accessibility",
 		"since": "2",
-		"label": "Country colours",
+		"label": "Colour-blind safe country colours",
 		"applies": "immediate",
 	},
 	"accessibility/text_size": {
@@ -475,6 +498,15 @@ const SCHEMA: Dictionary = {
 		"page": "",
 		"since": "1.5",
 		"label": "Help seen",
+		"applies": "immediate",
+	},
+	"state/map_mode": {
+		"type": TYPE_STRING,
+		"default": "terrain",
+		"choices": ["terrain", "owner", "relief"],
+		"page": "",
+		"since": "2",
+		"label": "Map mode",
 		"applies": "immediate",
 	},
 	"state/study_page": {

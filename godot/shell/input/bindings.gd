@@ -28,15 +28,7 @@ const DEFAULTS: Array[Dictionary] = [
 		"events": ["MouseLeft"] as Array[String]},
 	{"action": &"map_command", "label": "Clear or command", "group": "Map", "since": "1",
 		"events": ["MouseRight"] as Array[String]},
-	# View (M1..M1.5)
-	{"action": &"view_season_1", "label": "Spring preview", "group": "View", "since": "1", "until": "1.5",
-		"events": ["1"] as Array[String]},
-	{"action": &"view_season_2", "label": "Summer preview", "group": "View", "since": "1", "until": "1.5",
-		"events": ["2"] as Array[String]},
-	{"action": &"view_season_3", "label": "Autumn preview", "group": "View", "since": "1", "until": "1.5",
-		"events": ["3"] as Array[String]},
-	{"action": &"view_season_4", "label": "Winter preview", "group": "View", "since": "1", "until": "1.5",
-		"events": ["4"] as Array[String]},
+	# View
 	{"action": &"view_grid", "label": "Hex grid", "group": "View", "since": "1",
 		"events": ["G"] as Array[String]},
 	{"action": &"view_names", "label": "Place names", "group": "View", "since": "1.5",

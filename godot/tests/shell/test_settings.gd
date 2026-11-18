@@ -322,3 +322,45 @@ func test_graphics_texture_quality_platform_defaults_and_presets() -> void:
 	assert_eq(mac.get_value("graphics/preload_next_season"), false, "reset_page(graphics) does not touch advanced")
 	assert_eq(mac.get_value("display/fps_cap"), 60, "reset_page(graphics) does not touch display")
 	assert_eq(mac.get_value("graphics/preset"), "custom")
+
+
+func test_m2_keys_have_the_spec_defaults_and_choices() -> void:
+	var s := Settings.new("macOS", false)
+	for key: String in ["map/borders", "map/owner_tint", "map/minimap"]:
+		assert_true(Settings.SCHEMA.has(key), key)
+		assert_true(bool(s.get_value(key)), "%s defaults on" % key)
+		assert_eq(str(Settings.SCHEMA[key]["since"]), "2")
+		assert_eq(str(Settings.SCHEMA[key]["page"]), "map")
+	assert_eq(s.get_value("accessibility/country_colours"), "standard")
+	assert_eq(s.choices_for("accessibility/country_colours"), ["standard", "colour_blind"])
+	assert_eq(s.get_value("state/map_mode"), "terrain")
+	assert_eq(s.choices_for("state/map_mode"), ["terrain", "owner", "relief"])
+	assert_eq(str(Settings.SCHEMA["state/map_mode"]["page"]), "", "remembered, no row")
+
+
+func test_m2_keys_reject_wrong_values_and_load_back() -> void:
+	var s := Settings.new("macOS", false)
+	assert_false(s.set_value("map/borders", "yes"), "a string is not a bool")
+	assert_false(s.set_value("accessibility/country_colours", "default"), "the old choice is gone")
+	assert_false(s.set_value("state/map_mode", "yields"), "yields arrives with M4.5")
+	assert_eq(s.get_value("state/map_mode"), "terrain")
+	assert_true(s.set_value("map/minimap", false))
+	assert_true(s.set_value("accessibility/country_colours", "colour_blind"))
+	assert_true(s.set_value("state/map_mode", "owner"))
+	var path := _tmp_file("m2_keys")
+	assert_true(s.save_to(path))
+	var loaded := Settings.load_from(path, "macOS", false)
+	assert_false(bool(loaded.get_value("map/minimap")))
+	assert_eq(loaded.get_value("accessibility/country_colours"), "colour_blind")
+	assert_eq(loaded.get_value("state/map_mode"), "owner")
+
+
+func test_m2_keys_with_wrong_values_in_a_file_fall_back() -> void:
+	var path := _tmp_file("m2_bad")
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string("[map]\nborders = 3\nminimap = \"no\"\n[accessibility]\ncountry_colours = \"pink\"\n"
+		+ "[state]\nmap_mode = \"yields\"\n")
+	f.close()
+	var loaded := Settings.load_from(path, "macOS", false)
+	for key: String in ["map/borders", "map/minimap", "accessibility/country_colours", "state/map_mode"]:
+		assert_eq(loaded.get_value(key), loaded.get_default(key), "default kept for " + key)

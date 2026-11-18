@@ -159,3 +159,42 @@ func test_gestures_include_platform_lines_and_works_card_hold() -> void:
 		assert_gt(lines.size(), 0)
 		assert_true(lines.has("Shift: hold the works card"),
 			"%s gestures include Shift: hold the works card" % platform)
+
+
+func test_m2_actions_exist_and_season_keys_are_gone() -> void:
+	Bindings.ensure()
+	var wanted: Dictionary = {
+		&"view_mode_1": "1", &"view_mode_2": "2", &"view_mode_3": "3", &"view_mode_4": "4",
+		&"ui_find_place": "Ctrl+F", &"game_country": "C",
+	}
+	for action: StringName in wanted:
+		assert_true(InputMap.has_action(action), "InputMap has %s" % action)
+		var entry := _entry_of(action)
+		assert_eq(str(entry["since"]), "2", "%s arrives in M2" % action)
+		var ev := Bindings.parse_event(str(wanted[action]))
+		assert_eq(Bindings.serialize_event(Bindings.parse_event(str((entry["events"] as Array)[0]))),
+			Bindings.serialize_event(ev), "%s default key" % action)
+	for i: int in range(1, 5):
+		var season := StringName("view_season_%d" % i)
+		assert_false(InputMap.has_action(season), "%s is gone from InputMap" % season)
+		assert_true(_entry_of(season).is_empty(), "%s is gone from the table" % season)
+	assert_false(InputMap.has_action(&"view_season_1"))
+
+
+func test_digit_keys_have_one_owner_at_every_milestone() -> void:
+	for m_str: String in ["1", "1.5", "2", "3", "12"]:
+		var owners: Array[StringName] = []
+		for entry: Dictionary in Bindings.DEFAULTS:
+			var m := float(m_str)
+			if m < float(str(entry["since"])) or m > float(str(entry.get("until", "999"))):
+				continue
+			if str(entry["group"]) == "View" and (entry["events"] as Array).has("1"):
+				owners.append(entry["action"])
+		assert_lte(owners.size(), 1, "key 1 has at most one View action at M%s: %s" % [m_str, owners])
+
+
+func _entry_of(action: StringName) -> Dictionary:
+	for entry: Dictionary in Bindings.DEFAULTS:
+		if entry["action"] == action:
+			return entry
+	return {}

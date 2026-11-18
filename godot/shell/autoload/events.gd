@@ -9,3 +9,7 @@ signal hex_changed(hex: Vector2i)
 signal game_started
 ## The current game ended and Session.game is now null.
 signal game_ended
+## Land changed owner (Territory.transfer): the map redraws those hexes' overlay, borders and labels, the dock refreshes.
+signal owners_changed(hexes: Array[Vector2i])
+## The human player chose a country (choose_country): the pick ends, the top bar and the map show it.
+signal country_chosen(tag: StringName)

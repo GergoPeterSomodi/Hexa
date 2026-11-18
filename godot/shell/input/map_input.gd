@@ -139,8 +139,9 @@ func _on_key(key: InputEventKey) -> void:
 		new_seed_requested.emit()
 		_mark_handled()
 		return
+	# Until C13 swaps season_requested for mode_requested, the mode keys drive the season preview.
 	var season_actions: Array[StringName] = [
-		&"view_season_1", &"view_season_2", &"view_season_3", &"view_season_4"
+		&"view_mode_1", &"view_mode_2", &"view_mode_3", &"view_mode_4"
 	]
 	for i: int in season_actions.size():
 		if _is_action_pressed_exact(key, season_actions[i]):
