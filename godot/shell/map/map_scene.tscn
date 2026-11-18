@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://shell/map/map_scene.gd" id="1_scene"]
 [ext_resource type="Script" path="res://shell/mapview/tile_map_view.gd" id="2_view"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://shell/input/map_input.gd" id="4_input"]
 [ext_resource type="PackedScene" path="res://shell/panels/hex_panel.tscn" id="5_panel"]
 [ext_resource type="Script" path="res://shell/mapview/map_labels.gd" id="6_labels"]
+[ext_resource type="Script" path="res://shell/input/camera_rig.gd" id="7_rig"]
 
 [sub_resource type="LabelSettings" id="label_title"]
 font_size = 18
@@ -14,6 +15,9 @@ font_size = 18
 script = ExtResource("1_scene")
 
 [node name="Camera" type="Camera2D" parent="."]
+
+[node name="CameraRig" type="Node" parent="."]
+script = ExtResource("7_rig")
 
 [node name="View" type="Node2D" parent="."]
 script = ExtResource("2_view")

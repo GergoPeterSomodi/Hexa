@@ -89,13 +89,14 @@ func test_place_names_are_off_by_default_and_toggle_shows_them() -> void:
 	var layout := MapLabels.layout(map, Transform2D(Vector2(1.0, 0.0), Vector2(0.0, 1.0), Vector2(640.0, 360.0) - _scene.view().centre_of(place_hex)),
 		Rect2(0.0, 0.0, 1280.0, 720.0), ThemeDB.fallback_font, [])
 	assert_gt(layout.size(), 0, "places near the camera are laid out on screen")
+	Bindings.ensure()
 	var press := InputEventKey.new()
 	press.keycode = KEY_N
 	press.pressed = true
-	_scene.labels()._unhandled_key_input(press)
-	assert_false(_scene.labels().visible, "key N toggles the place names off")
-	_scene.labels()._unhandled_key_input(press)
-	assert_true(_scene.labels().visible, "key N toggles the place names on")
+	_scene.map_input()._unhandled_input(press)
+	assert_false(_scene.labels().visible, "key N via MapInput toggles the place names off")
+	_scene.map_input()._unhandled_input(press)
+	assert_true(_scene.labels().visible, "key N via MapInput toggles the place names on")
 
 
 func test_a_click_selects_the_hex_under_it() -> void:
@@ -250,3 +251,68 @@ func test_a_big_map_loads_a_slice_a_frame() -> void:
 	_scene.frame_at(_scene.map_size() / 2.0, 0.1)
 	assert_true(_scene.far().visible)
 	assert_ne(_scene.far().pixel_of(Vector2i(5, 5)), Color.BLACK)
+
+
+func test_configure_applies_settings_and_live_updates() -> void:
+	var settings := Settings.new("macOS", false)
+	assert_true(settings.set_value("map/grid", true))
+	assert_true(settings.set_value("map/grid_opacity", 50))
+	assert_true(settings.set_value("map/place_names", true))
+	assert_true(settings.set_value("graphics/relief_shading", false))
+	assert_true(settings.set_value("graphics/preload_next_season", false))
+	assert_true(settings.set_value("dev/far_zoom", 0.55))
+	assert_true(settings.set_value("dev/slice_ms", 12))
+
+	_scene.configure(settings)
+	_scene.frame_at(_scene.map_size() / 2.0, 1.0)
+	assert_true(_scene.view().layer("grid").visible)
+	assert_almost_eq(_scene.view().layer("grid").modulate.a, 0.5, 0.01)
+	assert_true(_scene.labels().visible)
+	assert_false(_scene.view().layer("shade").visible)
+	assert_false(_scene.view().layer("light").visible)
+	assert_false(_scene.preload_next_season)
+	assert_almost_eq(_scene.far().zoom_off, 0.55, 0.001)
+	assert_almost_eq(_scene.slice_ms, 12.0, 0.001)
+
+	assert_true(settings.set_value("map/grid", false))
+	assert_true(settings.set_value("graphics/relief_shading", true))
+	assert_false(_scene.view().layer("grid").visible)
+	assert_true(_scene.view().layer("shade").visible)
+	assert_true(_scene.view().layer("light").visible)
+
+
+func test_refused_signal_emits_on_refused_upgrade_and_key_u() -> void:
+	Bindings.ensure()
+	var reasons: Array[String] = []
+	_scene.refused.connect(func(reason: String) -> void: reasons.append(reason))
+
+	_scene.select_hex(MapScene.NO_HEX)
+	var v1 := _scene.upgrade_selected()
+	assert_false(bool(v1["ok"]))
+	assert_eq(reasons.size(), 1)
+	assert_eq(reasons[0], str(v1["reason"]))
+
+	var wild := _buildable()["hex"] as Vector2i
+	_scene.select_hex(wild)
+	var press_u := InputEventKey.new()
+	press_u.keycode = KEY_U
+	press_u.pressed = true
+	_scene.map_input()._unhandled_input(press_u)
+	assert_eq(reasons.size(), 2, "refused U key action emits MapScene.refused")
+	assert_ne(reasons[1], "")
+
+
+func test_ctrl_or_cmd_r_gives_new_seed_and_plain_r_does_nothing() -> void:
+	Bindings.ensure()
+	var seed_before := Session.game.seed_value
+	var plain_r := InputEventKey.new()
+	plain_r.keycode = KEY_R
+	plain_r.pressed = true
+	_scene.map_input()._unhandled_input(plain_r)
+	assert_eq(Session.game.seed_value, seed_before, "plain R does nothing")
+
+	var chord_r := Bindings.events_for(&"dev_new_seed")[0].duplicate() as InputEventKey
+	chord_r.pressed = true
+	_scene.map_input()._unhandled_input(chord_r)
+	assert_eq(Session.game.seed_value, seed_before + 1, "Ctrl/Cmd+R starts a new seed")
+	_finish_fill()

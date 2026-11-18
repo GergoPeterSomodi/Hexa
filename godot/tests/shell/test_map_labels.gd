@@ -44,24 +44,17 @@ func test_off_by_default_and_set_visible() -> void:
 	assert_false(labels.visible)
 
 
-func test_key_n_toggles() -> void:
+func test_set_visible_emits_toggled_and_has_no_own_key_handler() -> void:
 	var labels := MapLabels.new()
 	add_child_autofree(labels)
+	assert_false(labels.has_method("_unhandled_key_input"), "key N handling moved to MapInput")
 	var heard: Array[bool] = []
 	labels.toggled.connect(func(on: bool) -> void: heard.append(on))
-	var press := InputEventKey.new()
-	press.keycode = KEY_N
-	press.pressed = true
-	labels._unhandled_key_input(press)
+	labels.set_visible(true)
 	assert_true(labels.visible)
-	labels._unhandled_key_input(press)
+	labels.set_visible(false)
 	assert_false(labels.visible)
 	assert_eq(heard, [true, false])
-	var other := InputEventKey.new()
-	other.keycode = KEY_M
-	other.pressed = true
-	labels._unhandled_key_input(other)
-	assert_false(labels.visible, "another key does nothing")
 
 
 func test_names_for_the_places_on_screen_without_overlaps() -> void:

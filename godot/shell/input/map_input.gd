@@ -1,116 +1,231 @@
-## The mouse and keyboard of the map as intents (docs/architecture/m1-build-spec.md section 8). It moves and zooms the
-## camera itself (that is all it changes) and tells the scene what the player means with signals; it knows no rules and
-## no tiles. The scene hands it the camera and the node whose local mouse position is a map position.
-##
-## Left click (a press that moves less than CLICK_SLOP px) selects; right click or Esc clears; a drag with any button, or
-## WASD and the arrows, moves; the wheel zooms about the pointer. Keys: 1 to 4 the season, R a new seed, G the grid,
-## F the whole map, H the panel and help, U upgrade the selected hex.
+## Action-based map input controller (docs/architecture/ui-and-controls-spec.md sections 3.3, 4.1, 4.2, 4.5).
+## Turns pointer clicks, hover and InputMap actions into intent signals; knows no game rules or tiles.
+## Camera movement and zoom belong exclusively to CameraRig.
 class_name MapInput
 extends Node
 
 signal select_requested(map_px: Vector2)
-signal clear_selection_requested
+signal command_requested(map_px: Vector2)
+signal hover_changed(hex: Vector2i)
 signal season_requested(index: int)
-signal new_seed_requested
 signal grid_toggled
-signal fit_requested
+signal names_toggled
 signal hud_toggled
 signal upgrade_requested
+signal new_seed_requested
 
-const ZOOM_MIN := 0.03
-const ZOOM_MAX := 4.0
-const ZOOM_STEP := 1.15
-const PAN_SPEED := 700.0  # map px a second at zoom 1, with the keys
-## A press that moves less than this many screen px before it is let go is a click, not a drag.
 const CLICK_SLOP := 6.0
+const NO_HEX := Vector2i(-9999, -9999)
 
 var camera: Camera2D = null
-## Any node of the map (at the map's origin): the window's points are turned into its coordinates.
+## Any node at the map's origin (usually TileMapView); viewport points are transformed to its local space.
 var map_node: Node2D = null
-## Off while a screen or a text field wants the keys.
-var enabled := true
+## Optional override Callable(map_px: Vector2) -> Vector2i for tests; defaults to TileMapView.hex_at.
+var hex_at_func := Callable()
+## Optional override Callable(hex: Vector2i) -> bool; defaults to Session.game.map.has(hex).
+var hex_valid_func := Callable()
+## Gates developer-only actions such as dev_new_seed (configured via Settings "dev/developer_tools").
+var allow_dev_actions := true
+## Off while a screen or text field blocks map interaction.
+var enabled := true:
+	set(value):
+		enabled = value
+		if not enabled:
+			_reset_press()
+			_set_hover(NO_HEX)
 
+var _settings: Settings = null
+var _press_action := &""
+var _press_button: MouseButton = MOUSE_BUTTON_NONE
 var _press_at := Vector2.ZERO
-var _dragging := false
+var _slop_broken := false
+var _saw_hardware_button := false
+var _last_hover := NO_HEX
+
+
+func _ready() -> void:
+	if not InputMap.has_action(&"map_select"):
+		Bindings.ensure()
+
+
+func _exit_tree() -> void:
+	_disconnect_settings()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_MOUSE_EXIT:
+		_set_hover(NO_HEX)
+
+
+## Applies relevant settings (developer tools gating) and listens for live updates.
+func configure(settings: Settings) -> void:
+	if settings == _settings and settings != null:
+		allow_dev_actions = bool(settings.get_value("dev/developer_tools"))
+		return
+	_disconnect_settings()
+	_settings = settings
+	if _settings == null:
+		return
+	_settings.changed.connect(_on_setting_changed)
+	allow_dev_actions = bool(_settings.get_value("dev/developer_tools"))
+
+
+func _on_setting_changed(key: String, value: Variant) -> void:
+	if key == "dev/developer_tools":
+		allow_dev_actions = bool(value)
+
+
+func _disconnect_settings() -> void:
+	if _settings != null and _settings.changed.is_connected(_on_setting_changed):
+		_settings.changed.disconnect(_on_setting_changed)
+	_settings = null
+
+
+func current_hover() -> Vector2i:
+	return _last_hover
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not enabled or camera == null:
+	if not enabled:
 		return
 	if event is InputEventMouseButton:
-		_on_button(event as InputEventMouseButton)
-	elif event is InputEventMouseMotion and _dragging:
-		camera.position -= (event as InputEventMouseMotion).relative / camera.zoom.x
+		_on_mouse_button(event as InputEventMouseButton)
+	elif event is InputEventMouseMotion:
+		_on_mouse_motion(event as InputEventMouseMotion)
 	elif event is InputEventKey:
 		_on_key(event as InputEventKey)
 
 
-func _on_button(button: InputEventMouseButton) -> void:
-	if button.button_index == MOUSE_BUTTON_WHEEL_UP and button.pressed:
-		zoom_about(button.position, ZOOM_STEP)
-	elif button.button_index == MOUSE_BUTTON_WHEEL_DOWN and button.pressed:
-		zoom_about(button.position, 1.0 / ZOOM_STEP)
-	elif button.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT]:
-		_dragging = button.pressed
-		if button.pressed:
-			_press_at = button.position
-		elif button.position.distance_to(_press_at) < CLICK_SLOP:
-			if button.button_index == MOUSE_BUTTON_LEFT:
-				select_requested.emit(map_px_of(button.position))
-			elif button.button_index == MOUSE_BUTTON_RIGHT:
-				clear_selection_requested.emit()
+func _on_mouse_button(mb: InputEventMouseButton) -> void:
+	var action := _pointer_action_of(mb)
+	if action == &"":
+		return
+	if mb.pressed:
+		_press_action = action
+		_press_button = mb.button_index
+		_press_at = mb.position
+		_slop_broken = false
+		_saw_hardware_button = Input.is_mouse_button_pressed(mb.button_index)
+		return
+	if mb.button_index != _press_button:
+		return
+	var within_slop := not _slop_broken and mb.position.distance_to(_press_at) < CLICK_SLOP
+	var released_action := _press_action
+	_reset_press()
+	if not within_slop or _is_gui_hovered():
+		return
+	var map_px := map_px_of(mb.position)
+	if released_action == &"map_select":
+		select_requested.emit(map_px)
+		_mark_handled()
+	elif released_action == &"map_command":
+		command_requested.emit(map_px)
+		_mark_handled()
+
+
+func _on_mouse_motion(motion: InputEventMouseMotion) -> void:
+	if _press_button != MOUSE_BUTTON_NONE and motion.position.distance_to(_press_at) >= CLICK_SLOP:
+		_slop_broken = true
+	if _slop_broken or _is_gui_hovered():
+		_set_hover(NO_HEX)
+		return
+	_set_hover(_hex_at(map_px_of(motion.position)))
 
 
 func _on_key(key: InputEventKey) -> void:
 	if not key.pressed or key.echo:
 		return
-	match key.keycode:
-		KEY_1, KEY_2, KEY_3, KEY_4:
-			season_requested.emit(int(key.keycode) - int(KEY_1))
-		KEY_R:
-			new_seed_requested.emit()
-		KEY_U:
-			upgrade_requested.emit()
-		KEY_F:
-			fit_requested.emit()
-		KEY_H:
-			hud_toggled.emit()
-		KEY_G:
-			grid_toggled.emit()
-		KEY_ESCAPE:
-			clear_selection_requested.emit()
-
-
-func _process(delta: float) -> void:
-	if camera == null:
+	if allow_dev_actions and _is_action_pressed_exact(key, &"dev_new_seed"):
+		new_seed_requested.emit()
+		_mark_handled()
 		return
-	if _dragging and not (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)
-			or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)):
-		_dragging = false  # the release went to the panel, not here
-	if not enabled:
-		return
-	var step := Vector2.ZERO
-	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
-		step.x -= 1.0
-	if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
-		step.x += 1.0
-	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
-		step.y -= 1.0
-	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
-		step.y += 1.0
-	if step != Vector2.ZERO:
-		camera.position += step * PAN_SPEED * delta / camera.zoom.x
+	var season_actions: Array[StringName] = [
+		&"view_season_1", &"view_season_2", &"view_season_3", &"view_season_4"
+	]
+	for i: int in season_actions.size():
+		if _is_action_pressed_exact(key, season_actions[i]):
+			season_requested.emit(i)
+			_mark_handled()
+			return
+	if _is_action_pressed_exact(key, &"view_grid"):
+		grid_toggled.emit()
+		_mark_handled()
+	elif _is_action_pressed_exact(key, &"view_names"):
+		names_toggled.emit()
+		_mark_handled()
+	elif _is_action_pressed_exact(key, &"view_hud"):
+		hud_toggled.emit()
+		_mark_handled()
+	elif _is_action_pressed_exact(key, &"game_upgrade"):
+		upgrade_requested.emit()
+		_mark_handled()
 
 
-## The map position under a point of the window.
+func _process(_delta: float) -> void:
+	if _press_button != MOUSE_BUTTON_NONE and _saw_hardware_button:
+		if not Input.is_mouse_button_pressed(_press_button):
+			_reset_press()
+	if not enabled or _is_gui_hovered():
+		_set_hover(NO_HEX)
+
+
+## Converts a viewport pixel to map space (local coordinates of `map_node`).
 func map_px_of(screen: Vector2) -> Vector2:
+	if map_node == null:
+		return screen
 	return map_node.get_global_transform_with_canvas().affine_inverse() * screen
 
 
-## Zooms so that the map point under a screen position stays under it.
-func zoom_about(screen: Vector2, factor: float) -> void:
-	var view := camera.get_viewport_rect().size
-	var before := camera.position + (screen - view / 2.0) / camera.zoom.x
-	var z := clampf(camera.zoom.x * factor, ZOOM_MIN, ZOOM_MAX)
-	camera.zoom = Vector2(z, z)
-	camera.position = before - (screen - view / 2.0) / z
+func _hex_at(map_px: Vector2) -> Vector2i:
+	var hex := NO_HEX
+	if hex_at_func.is_valid():
+		hex = hex_at_func.call(map_px) as Vector2i
+	elif map_node is TileMapView:
+		hex = (map_node as TileMapView).hex_at(map_px)
+	else:
+		return NO_HEX
+	if hex_valid_func.is_valid():
+		return hex if bool(hex_valid_func.call(hex)) else NO_HEX
+	if Session.game != null and Session.game.map != null:
+		return hex if Session.game.map.has(hex) else NO_HEX
+	return hex
+
+
+func _set_hover(hex: Vector2i) -> void:
+	if hex == _last_hover:
+		return
+	_last_hover = hex
+	hover_changed.emit(hex)
+
+
+func _pointer_action_of(mb: InputEventMouseButton) -> StringName:
+	if InputMap.has_action(&"map_select") and mb.is_action(&"map_select"):
+		return &"map_select"
+	if InputMap.has_action(&"map_command") and mb.is_action(&"map_command"):
+		return &"map_command"
+	return &""
+
+
+func _is_action_pressed_exact(event: InputEvent, action: StringName) -> bool:
+	return InputMap.has_action(action) and event.is_action_pressed(action, false, true)
+
+
+func _is_gui_hovered() -> bool:
+	if not is_inside_tree():
+		return false
+	var vp := get_viewport()
+	return vp != null and vp.gui_get_hovered_control() != null
+
+
+func _reset_press() -> void:
+	_press_action = &""
+	_press_button = MOUSE_BUTTON_NONE
+	_slop_broken = false
+	_saw_hardware_button = false
+
+
+func _mark_handled() -> void:
+	if is_inside_tree():
+		var vp := get_viewport()
+		if vp != null:
+			vp.set_input_as_handled()

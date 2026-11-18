@@ -5,15 +5,14 @@
 ## are read from MapData, the hexes' pixels from MapTiles, and the screen position from the viewport's canvas transform,
 ## so it follows the camera by itself.
 ##
-## OFF by default (owner, 2026-11-15: no plates on the normal map for now). Key N toggles it, set_visible(bool) turns it on
-## and off from code, and `toggled(on)` tells whoever listens. Put it in a CanvasLayer above the map (screen space).
+## OFF by default (owner, 2026-11-15: no plates on the normal map for now). Key N (via MapInput -> MapScene) or
+## set_visible(bool) turns it on and off, and `toggled(on)` tells whoever listens. Put it in a CanvasLayer above the map
+## (screen space).
 class_name MapLabels
 extends Control
 
 signal toggled(on: bool)
 
-## The key that toggles the names.
-const TOGGLE_KEY := KEY_N
 ## Plate padding (px) round the text, and the gap between a hex's middle and its plate.
 const PAD_X := 7.0
 const PAD_Y := 2.0
@@ -73,18 +72,11 @@ func placed() -> Array[Dictionary]:
 	return _placed
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
-	var key := event as InputEventKey
-	if key != null and key.pressed and not key.echo and key.keycode == TOGGLE_KEY:
-		set_visible(not visible)
-		toggled.emit(visible)
-		get_viewport().set_input_as_handled()
-
-
 func _on_visibility_changed() -> void:
 	_dirty = true
 	set_process(visible)
 	queue_redraw()
+	toggled.emit(visible)
 
 
 func _process(_delta: float) -> void:
