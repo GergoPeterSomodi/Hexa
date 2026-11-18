@@ -40,6 +40,8 @@ func test_options_opens_with_studiolo_geometry_focus_and_bidirectional_schema_pa
 	assert_eq(options.kind, Screen.Kind.MODAL)
 	assert_eq(options.screen_id, &"options")
 	assert_eq(options.frame().custom_minimum_size, Vector2(860.0, 580.0))
+	assert_not_null(options.back_button().embedded_key_cap(), "Esc KeyCap is embedded inside BackButton")
+	assert_eq(options.back_button().embedded_key_cap().label().text, "Esc")
 	assert_eq(_harness.viewport.gui_get_focus_owner(), options.nav_list().button_for(&"display"))
 	assert_true(options.apply_button().disabled, "Apply starts disabled with no staged changes")
 

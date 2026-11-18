@@ -145,37 +145,19 @@ def draw_diamond_stud(dst: np.ndarray, lx: np.ndarray, ly: np.ndarray, cx: float
     return blend_rgb_mask(out, hi, dot)
 
 
-def draw_quatrefoil_boss(dst: np.ndarray, lx: np.ndarray, ly: np.ndarray, cx: float, cy: float, s: int, tokens: TokenTable) -> np.ndarray:
-    """Draw a 34px quatrefoil brass corner boss with lapis centre jewel (kit.css --boss)."""
-    scale = 34.0 / 36.0
-    lobe_off = 10.0 * scale
-    lobe_r = 6.0 * scale
-    diam_r = 11.0 * scale
-    jewel_r = 3.2 * scale
-
-    sd_lobes = np.minimum(
-        np.minimum(sd_circle(lx, ly, cx, cy - lobe_off, lobe_r), sd_circle(lx, ly, cx, cy + lobe_off, lobe_r)),
-        np.minimum(sd_circle(lx, ly, cx - lobe_off, cy, lobe_r), sd_circle(lx, ly, cx + lobe_off, cy, lobe_r)),
-    )
-    sd_body = np.minimum(sd_lobes, sd_diamond(lx, ly, cx, cy, diam_r, diam_r))
-
-    # Drop shadow
-    sd_shadow = np.minimum(
-        np.minimum(sd_circle(lx, ly, cx, cy + 2.0 - lobe_off, lobe_r), sd_circle(lx, ly, cx, cy + 2.0 + lobe_off, lobe_r)),
-        np.minimum(sd_circle(lx, ly, cx - lobe_off, cy + 2.0, lobe_r), sd_circle(lx, ly, cx + lobe_off, cy + 2.0, lobe_r)),
-    )
-    sd_shadow = np.minimum(sd_shadow, sd_diamond(lx, ly, cx, cy + 2.0, diam_r, diam_r))
-
-    out = blend_rgb_mask(dst, np.array([0.0, 0.0, 0.0]), coverage(sd_shadow - 1.0, s), alpha=0.45)
-
-    ink = np.asarray(tokens.rgb("INK"), dtype=np.float64)
-    out = blend_rgb_mask(out, ink, coverage(sd_body - 0.9, s))
-
-    # Radial-like brass shading biased to top-left highlight (0.35, 0.30)
-    dx = (lx - (cx - 4.5)) / 18.0
-    dy = (ly - (cy - 5.5)) / 18.0
-    rt = np.clip(np.sqrt(dx * dx + dy * dy), 0.0, 1.0)
-    boss_brass = sample_ramp(
+def _radial_boss_brass(
+    lx: np.ndarray,
+    ly: np.ndarray,
+    ocx: float,
+    ocy: float,
+    box_size: float,
+    tokens: TokenTable,
+) -> np.ndarray:
+    """SVG objectBoundingBox radialGradient cx=0.35 cy=0.30 r=0.50."""
+    hx = (lx - (ocx - 0.15 * box_size)) / (0.50 * box_size)
+    hy = (ly - (ocy - 0.20 * box_size)) / (0.50 * box_size)
+    rt = np.clip(np.sqrt(hx * hx + hy * hy), 0.0, 1.0)
+    return sample_ramp(
         rt,
         [
             (0.0, parse_hex_color("#fff3c4")[:3]),
@@ -183,9 +165,53 @@ def draw_quatrefoil_boss(dst: np.ndarray, lx: np.ndarray, ly: np.ndarray, cx: fl
             (1.0, parse_hex_color("#6b4c14")[:3]),
         ],
     )
-    out = blend_rgb_mask(out, boss_brass, coverage(sd_body, s))
 
-    # Lapis jewel in centre
+
+def draw_quatrefoil_boss(dst: np.ndarray, lx: np.ndarray, ly: np.ndarray, cx: float, cy: float, s: int, tokens: TokenTable) -> np.ndarray:
+    """Draw a 34px quatrefoil brass corner boss with layered diamond square and lapis centre jewel (kit.css --boss)."""
+    scale = 34.0 / 36.0
+    lobe_off = 10.0 * scale
+    lobe_r = 6.0 * scale
+    diam_r = 11.0 * scale
+    jewel_r = 3.2 * scale
+
+    lobes: list[tuple[float, float]] = [
+        (cx, cy - lobe_off),
+        (cx, cy + lobe_off),
+        (cx - lobe_off, cy),
+        (cx + lobe_off, cy),
+    ]
+    sd_diam = sd_diamond(lx, ly, cx, cy, diam_r, diam_r)
+    sd_lobes = np.minimum(
+        np.minimum(sd_circle(lx, ly, lobes[0][0], lobes[0][1], lobe_r), sd_circle(lx, ly, lobes[1][0], lobes[1][1], lobe_r)),
+        np.minimum(sd_circle(lx, ly, lobes[2][0], lobes[2][1], lobe_r), sd_circle(lx, ly, lobes[3][0], lobes[3][1], lobe_r)),
+    )
+    sd_body = np.minimum(sd_lobes, sd_diam)
+
+    # Drop shadow beneath whole ornament
+    sd_shadow = np.minimum(
+        np.minimum(sd_circle(lx, ly, lobes[0][0], lobes[0][1] + 2.0, lobe_r), sd_circle(lx, ly, lobes[1][0], lobes[1][1] + 2.0, lobe_r)),
+        np.minimum(sd_circle(lx, ly, lobes[2][0], lobes[2][1] + 2.0, lobe_r), sd_circle(lx, ly, lobes[3][0], lobes[3][1] + 2.0, lobe_r)),
+    )
+    sd_shadow = np.minimum(sd_shadow, sd_diamond(lx, ly, cx, cy + 2.0, diam_r, diam_r))
+    out = blend_rgb_mask(dst, np.array([0.0, 0.0, 0.0]), coverage(sd_shadow - 1.0, s), alpha=0.45)
+
+    ink = np.asarray(tokens.rgb("INK"), dtype=np.float64)
+    _ = sd_body
+
+    # 1) Four circular lobes stroked with #0b0806 and shaded individually like SVG objectBoundingBox
+    for lx_c, ly_c in lobes:
+        sd_c = sd_circle(lx, ly, lx_c, ly_c, lobe_r)
+        out = blend_rgb_mask(out, ink, coverage(sd_c - 0.95, s))
+        c_brass = _radial_boss_brass(lx, ly, lx_c, ly_c, 2.0 * lobe_r, tokens)
+        out = blend_rgb_mask(out, c_brass, coverage(sd_c, s))
+
+    # 2) Internal rotated square (diamond) layered on top with its own #0b0806 stroke & brass radial fill
+    out = blend_rgb_mask(out, ink, coverage(sd_diam - 0.95, s))
+    d_brass = _radial_boss_brass(lx, ly, cx, cy, 2.0 * diam_r, tokens)
+    out = blend_rgb_mask(out, d_brass, coverage(sd_diam, s))
+
+    # 3) Lapis jewel in centre
     sd_jewel = sd_circle(lx, ly, cx, cy, jewel_r)
     out = blend_rgb_mask(out, ink, coverage(sd_jewel - 0.9, s))
     lapis = np.asarray(tokens.rgb("LAPIS"), dtype=np.float64)

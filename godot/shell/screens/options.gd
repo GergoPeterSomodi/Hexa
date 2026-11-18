@@ -342,25 +342,15 @@ func _build_header_back() -> void:
 	var head := _frame.panel().get_node_or_null("VBox/Head") as HBoxContainer
 	if head == null:
 		return
-	var back_box := HBoxContainer.new()
-	back_box.name = &"BackBox"
-	back_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	back_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	head.add_child(back_box)
-
 	_back_btn = KitButton.new()
 	_back_btn.name = &"BackButton"
 	_back_btn.kind = KitButton.Kind.SMALL
 	_back_btn.text = "Back"
 	_back_btn.hotkey_action = &"app_back"
+	_back_btn.show_key_cap = true
+	_back_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_back_btn.pressed.connect(_on_back_pressed)
-	back_box.add_child(_back_btn)
-
-	var esc_cap := KeyCap.new()
-	esc_cap.name = &"BackKeyCap"
-	esc_cap.action = &"app_back"
-	esc_cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	back_box.add_child(esc_cap)
+	head.add_child(_back_btn)
 
 
 func _build_body_split() -> void:

@@ -70,12 +70,19 @@ const _KIND_MIN_HEIGHTS: Dictionary[int, int] = {
 	set(value):
 		hotkey_action = value
 		_refresh_tooltip()
+		_refresh_key_cap()
+
+@export var show_key_cap: bool = false:
+	set(value):
+		show_key_cap = value
+		_refresh_key_cap()
 
 @export var reduce_motion: bool = false
 
 var _glow: NinePatchRect = null
 var _glow_tween: Tween = null
 var _cost_label: Label = null
+var _key_cap: KeyCap = null
 var _hovered: bool = false
 var _verdict_ok: bool = true
 var _verdict_reason: String = ""
@@ -83,6 +90,9 @@ var _base_tooltip: String = ""
 var _saved_custom_icon: Texture2D = null
 var _showing_lock_icon: bool = false
 var _auto_min_height: float = 0.0
+var _auto_min_width: float = 0.0
+var _saved_alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER
+var _alignment_overridden: bool = false
 var _auto_accessibility_desc: String = ""
 var _internal_text_set: bool = false
 var _internal_tooltip_set: bool = false
@@ -101,11 +111,13 @@ func _ready() -> void:
 	_refresh_icon()
 	_refresh_cost_label()
 	_refresh_tooltip()
+	_refresh_key_cap()
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_THEME_CHANGED:
 		_refresh_icon()
+		_refresh_key_cap()
 		if _glow != null and has_theme_icon(&"glow_soft", &"Kit"):
 			_glow.texture = get_theme_icon(&"glow_soft", &"Kit")
 	elif what == NOTIFICATION_MOUSE_ENTER or what == NOTIFICATION_FOCUS_ENTER:
@@ -120,6 +132,7 @@ func _set(property: StringName, value: Variant) -> bool:
 		_internal_text_set = true
 		text = next_text
 		_internal_text_set = false
+		_refresh_key_cap()
 		_sync_accessibility_desc()
 		return true
 	if property == &"tooltip_text" and not _internal_tooltip_set:
@@ -159,6 +172,12 @@ func reason_text() -> String:
 ## Rebuilds the hotkey-annotated tooltip from the current `Bindings` InputMap.
 func refresh_hotkey() -> void:
 	_refresh_tooltip()
+	_refresh_key_cap()
+
+
+## Returns the embedded KeyCap when `show_key_cap` is enabled, else `null`.
+func embedded_key_cap() -> KeyCap:
+	return _key_cap
 
 
 func _is_menu_kind() -> bool:
@@ -259,6 +278,56 @@ func _sync_accessibility_desc() -> void:
 	if accessibility_description.is_empty() or accessibility_description == _auto_accessibility_desc:
 		_auto_accessibility_desc = desired
 		accessibility_description = desired
+
+
+func _refresh_key_cap() -> void:
+	var want_cap := show_key_cap and hotkey_action != &""
+	if not want_cap:
+		if _key_cap != null:
+			_key_cap.visible = false
+		if _alignment_overridden:
+			alignment = _saved_alignment
+			_alignment_overridden = false
+		if _auto_min_width > 0.0 and is_equal_approx(custom_minimum_size.x, _auto_min_width):
+			custom_minimum_size.x = 0.0
+		_auto_min_width = 0.0
+		return
+
+	if _key_cap == null:
+		_key_cap = KeyCap.new()
+		_key_cap.name = &"HotkeyCap"
+		_key_cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_key_cap)
+	_key_cap.action = hotkey_action
+	_key_cap.visible = true
+
+	var cap_sz := _key_cap.get_combined_minimum_size()
+	var sb := get_theme_stylebox(&"normal")
+	var pad_l := sb.content_margin_left if sb != null else 10.0
+	var pad_r := sb.content_margin_right if sb != null else 10.0
+	var cap_right := maxf(float(Tokens.S2), pad_r * 0.6)
+	_key_cap.anchor_left = 1.0
+	_key_cap.anchor_right = 1.0
+	_key_cap.anchor_top = 0.5
+	_key_cap.anchor_bottom = 0.5
+	_key_cap.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_key_cap.offset_right = -cap_right
+	_key_cap.offset_left = -(cap_right + cap_sz.x)
+	_key_cap.offset_top = -cap_sz.y * 0.5
+	_key_cap.offset_bottom = cap_sz.y * 0.5
+
+	if not _alignment_overridden:
+		_saved_alignment = alignment
+		_alignment_overridden = true
+	alignment = HORIZONTAL_ALIGNMENT_LEFT
+
+	var font := get_theme_font(&"font")
+	var font_sz := get_theme_font_size(&"font_size")
+	var text_w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_sz).x if (font != null and font_sz > 0) else float(text.length() * 8)
+	var needed_w := ceilf(pad_l + text_w + float(Tokens.S2) + cap_sz.x + cap_right)
+	if is_equal_approx(custom_minimum_size.x, _auto_min_width) or custom_minimum_size.x < needed_w:
+		custom_minimum_size.x = needed_w
+		_auto_min_width = needed_w
 
 
 func _ensure_glow() -> NinePatchRect:
