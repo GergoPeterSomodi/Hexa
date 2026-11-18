@@ -189,6 +189,7 @@ func test_modal_frame_ribbon_body_footer_and_close_signal() -> void:
 	modal.closed.connect(func() -> void: closed_count[0] += 1)
 
 	await _harness.wait_frames(self, 2)
+	assert_gt(modal.close_button().position.x, modal.size.x * 0.5, "close button stays right-aligned when ribbon replaces title")
 	_harness.send_click(modal.close_button().get_global_rect().get_center())
 	await _harness.wait_frames(self, 2)
 	assert_eq(closed_count[0], 1, "modal close button emits closed")

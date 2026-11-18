@@ -84,9 +84,10 @@ func _sync_header() -> void:
 	_subtitle_label.text = subtitle
 	_subtitle_label.visible = not subtitle.is_empty()
 
-	_title_box.visible = has_cartouche or has_plain_title or _subtitle_label.visible
+	var has_title_content := has_cartouche or has_plain_title or _subtitle_label.visible
 	_close_button.visible = show_close
-	_head.visible = _title_box.visible or _close_button.visible
+	_head.visible = has_title_content or _close_button.visible
+	_title_box.visible = _head.visible
 
 
 func _sync_footer_visibility() -> void:
