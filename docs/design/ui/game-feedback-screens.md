@@ -96,6 +96,10 @@ Below the fold, exactly:
 The sums close (151 − 25 − 40 = +86; food 127 − 104 = 23 = grain +14 and fish +9). **Every ducat is explained**: a
 property test fails if the lines do not add up to the change (M4's "no money from nowhere").
 
+> **M5's numbers replace the People line** (`docs/architecture/m5-build-spec.md` 4.11 b): on seed 1480 Genoa's Spring 1480
+> reads "Genoa (8, 13) 30,300 ▲ +300 · Savona (6, 13) 10,100 ▲ +100 · the countryside 42,805 ▲ +105" (82,700 → 83,205) and
+> "Food: 8 made for 4 eaten. Fed, 4 to spare."
+
 ### A.4 Lines later milestones add (*example* strings)
 
 | M | Example |
@@ -221,6 +225,9 @@ The seasons add up: −2, −3, +28, −1 = +22 a year. Payback from Spring 1481
 > **M4's numbers replace this example** (`docs/architecture/m4-build-spec.md` 4.15 d): Genoa's city costs 1,000 ducats,
 > 20 timber and 40 stone, brings people 30,000 → 60,000 and about +45 a season, and pays back in about 32 seasons: an
 > investment, not a prestige work. The Savona refusal stands as written.
+>
+> **M5 replaces M4's card** (`docs/architecture/m5-build-spec.md` 4.11 c): an upgrade brings room, not people: "Room 45,000 →
+> 100,000", +15, +16, +15, +10 a season (+56 a year), payback in Winter 1500.
 
 ### B.6 Compare
 
@@ -299,7 +306,8 @@ flows, Relations, Supply, Food.
 
 > **M4's numbers replace this example** (`docs/architecture/m4-build-spec.md` 4.15 and 4.16): on seed 1480 Genoa's
 > Spring 1480 reads money in +102 (+65, +7, +30), out −16 (−12, −4), left over +86, and the chart starts with the first
-> season played.
+> season played. The tax hover's people part is M5's (`docs/architecture/m5-build-spec.md` 6.7): "High: ... people grow
+> 0.5 % a season, not 1 %."
 
 ### C.4 Charts and tables in Godot
 

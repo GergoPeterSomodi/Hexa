@@ -411,6 +411,10 @@ upgrade, clear, cancel_work, choose_country, set_tax`; `SaveFile.FORMAT` and `OL
 its 35; `Chronicle.NOTABLE` keeps M4's seven kinds; `Events` gains no signal; `Game.digest()` and the save body are
 unchanged. The save's `ui` block (M3, not in the digest) may now hold `map_mode = "yields"`.
 
+> **From M5** (`m5-build-spec.md` 1.2, 4.13): these pins move to M5's values in M5's pull request (`PHASES` gains `people`,
+> `SaveFile.FORMAT` 3, `Stats.SERIES` 40, `Chronicle.NOTABLE` nine kinds), and `InsightsFixture` runs on still people
+> (`PeopleFixture.still`), so every number of 4.10 and 4.11 holds.
+
 ---
 
 ## 5. Interfaces
@@ -944,7 +948,7 @@ new autoload, no new layer; `tools/lint_godot.py` needs no entry (new files sit 
 
 | M | Takes from M4.5 | M4.5 leaves for it |
 |---|---|---|
-| M5 | `StudyRankings.MEASURES` gains people; the People page on `StudyTable` and `InkChart`; its map mode on key 5 with a `MapModes.legend`; worth follows `Economy.people_at` with no view change | People |
+| M5 | `StudyRankings.MEASURES` gains people; the People page on `StudyTable` and `InkChart`; its map mode on key 5 with a `MapModes.legend` (the Food mode); worth follows `Economy.people_at` with no view change; all taken up in `m5-build-spec.md` | People |
 | M6 | Rankings' army measure (banded "about 40,000 men"); Supply on key 6; witnesses from vision shrink what History shows of others; `knows` by explored hexes changes Rankings' lists; "Upkeep, walls and army" on the money chart (D35) | Armies |
 | M7 | the War filter (`LogLines.FILTERS` `since` 7) and a `war` mark kind before `land`; losses on the Military page | War |
 | M8 | the AI's acts fill the chronicle (the 120-row pages and the index matter); `StudyWarm` after the AI's season; the AI reads `Knowledge` as the pages do | The AI |

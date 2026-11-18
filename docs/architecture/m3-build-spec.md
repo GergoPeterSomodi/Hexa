@@ -358,7 +358,8 @@ The `stats` phase writes, for every country in id order (the pseudo-country `""`
 season that is ending (`game.turn`, before the calendar moves it) at ring slot `turn mod 40`, and in Winter appends the
 same row to `years`. M3's values: `land` (`Territory.count`; all land hexes for `""`), `districts_<f>` (the country's
 hexes whose `main_use` is `f`), `works_running` (its works after the works phase), `works_finished` (its
-`work_finished` entries of `turn` in the chronicle). Every other series is 0 until its milestone. `goods_ring` has
+`work_finished` entries of `turn` in the chronicle). Every other series is 0 until its milestone (M5 appends `people_towns`,
+`people_grew`, `people_starved`, `people_left`, `food_need`: `m5-build-spec.md` 4.16). `goods_ring` has
 `G = 0` goods until M4 (an empty array). Sizes on Europe with 60 countries: ring 0.34 MB, years 1.4 MB by 1650.
 
 ### 4.7 Knowledge
@@ -1337,7 +1338,7 @@ changes: no new autoload, no new layer.
 |---|---|---|
 | M4 | `Work.paid`, `Works.refund` and the one `Treasury.move` line in `cancel_work`; the `production`, `trade`, `income` rows between `works` and `stats`; `Treasury.close_ledger` in the `stats` phase; weather from `luck.world` in the calendar phase; `SeasonSummary`'s `treasury`, `goods`, `standing` sections (the screen draws them already), `swing_permille`, money reminders; `FamilyDef` for costs and output; `view_cache` for previews; "Open the study" (road works, schema 4 of `MapState`, moved to M10 by `m4-build-spec.md` 1.2) | Money |
 | M4.5 | the chronicle for History; `Stats` rings and years for charts and Rankings; `Knowledge.band` and `known`; older log headers open History | Insights |
-| M5 | `people`, `food_made`, `food_eaten` series; `town_grew`, `district_declined` into `Chronicle.NOTABLE`; the People section | People |
+| M5 | `people`, `food_made`, `food_eaten` series; `town_grew`, `district_declined` into `Chronicle.NOTABLE`; the People section; all taken up in `m5-build-spec.md` (which appends five series) | People |
 | M6 | `witnesses` on events from vision; `knows` by explored hexes; the flow's `REPLAY` state; `ready_units`, `vision` rows; the winter rule's passes | Armies |
 | M7 | the flow's `DECISIONS` state; war kinds into the chronicle, the log's War filter, notifications for battles; `owners_changed` by capture cancels works `lost` | War |
 | M8 | AI actions through `Game.act` (logged); `ai_orders` row; `Luck.ai`; the action log's size (D22); `Knowledge` as the AI's only door | The AI |

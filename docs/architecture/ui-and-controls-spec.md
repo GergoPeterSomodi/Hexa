@@ -89,7 +89,7 @@ replaced by something the engine does), **defer**, **drop**. "M" is the mileston
 | Side panels: province, unit, country, market, raise, ledger | `campaign/panels/` | Province is today's hex panel (M1). Unit and raise M6, country M2, ledger M4, market M10 | keep | per M |
 | War alert ("War on you!") | `app.py` via `pause.ask` | `Confirm` screen with "Show <country>" | keep | 7 |
 | Minimap: 1 px a hex, click to jump | `app.py` `draw_minimap` | `Minimap` drawing the far picture's texture (no extra memory), viewport frame, click and drag to jump | keep | 2 |
-| Map modes on 1-4 (political, terrain, goods, markets) | `app.py`, `mapview.MODES` | `view_mode_1..4` actions and a segmented toggle; modes drawn by a data-texture overlay (section 8) | keep | 2 (owner, relief), 4.5 (yields), 10 (trade) |
+| Map modes on 1-4 (political, terrain, goods, markets) | `app.py`, `mapview.MODES` | `view_mode_1..4` actions and a segmented toggle; modes drawn by a data-texture overlay (section 8) | keep | 2 (owner, relief), 4.5 (yields), 5 (food), 10 (trade) |
 | Six fixed zooms (hex radius 3 to 34), wheel and `+`/`-`, anchored at the mouse | `mapview.ZOOMS`, `app.zoom` | Continuous zoom with smoothing, limits from the map's size, gestures (section 4.3) | improve | 1.5 |
 | Pan: WASD, arrows, right or middle drag; clamp 200 px past the edge; scroll speed option | `app.scroll`, `app.clamp` | Same inputs plus left drag and trackpad; bounds keep the camera's centre on the map (section 4.4) | improve | 1.5 |
 | G grid, the pass-names option | `gamemenu.toggle_grid` | G grid, N place names, a grid opacity slider | keep | 1.5 |
@@ -340,7 +340,7 @@ navigation. Modifier chords use `command_or_control_autoremap`, so "Ctrl" is Cmd
 | `cam_bookmark_go_1..9` / `cam_bookmark_set_1..9` | Ctrl+1..9 / Ctrl+Shift+1..9 | Cmd | Camera | 3 |
 | `game_undo_work` | Ctrl+Z (cancels the newest work begun this season; `m3-build-spec.md` 6.1) | Cmd+Z | Game | 3 |
 | `dev_console` | F2 (focuses the console at the foot of F3) | | Developer | 3 |
-| `view_mode_1..4` | 1 Terrain, 2 Owner, 3 Relief (M2); 4 Yields (M4.5); later modes take 5 and up as they arrive (Supply 6 in M6; `m4-5-build-spec.md` D15) | | View | 2 |
+| `view_mode_1..4` | 1 Terrain, 2 Owner, 3 Relief (M2); 4 Yields (M4.5); later modes take 5 and up as they arrive (5 Food in M5, `view_mode_5`, `m5-build-spec.md` 6.1; Supply 6 in M6; `m4-5-build-spec.md` D15) | | View | 2 |
 | `ui_find_place` | Ctrl+F | Cmd+F | View | 2 |
 | `game_country` | C | | Game | 2 |
 | `game_ledger` | L | | Game | 4 |
@@ -664,13 +664,13 @@ first slice), a milestone, or **skip**.
 
 | Overlay | Placement | Contract | When |
 |---|---|---|---|
-| Top bar | full width, 40 px, under nothing | 1.5: map name and "Sandbox, seed N"; right: Layers, `?`, menu. M2: country arms and name, map-mode toggles. M3: date, season, End season (primary, Space). M4: resource chips. Reads `Session.game`, `Events`; sends intents and `ctx.app_requested` | **1.5** frame |
+| Top bar | full width, 40 px, under nothing | 1.5: map name and "Sandbox, seed N"; right: Layers, `?`, menu. M2: country arms and name, map-mode toggles. M3: date, season, End season (primary, Space). M4: resource chips (Ducats, Stores). M5: the People and Food chips. Reads `Session.game`, `Events`; sends intents and `ctx.app_requested` | **1.5** frame |
 | Zoom control | bottom right of `MapArea` | `+`, a vertical slider (log scale between the limits), `-`, fit. Sends `zoom_step_requested`, `zoom_set_requested`, `fit_requested`; listens to `CameraRig.view_changed` | **1.5** |
 | Scale bar | bottom right, left of the zoom control | km per logical px = `map.hex_w_km / (104 x zoom)` (a hex is 28 km across its 104 px cell); the bar takes the longest of 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000 km that fits in 120 px. Pure `ScaleBar.pick(km_per_px, max_px)` | **1.5** |
 | Hover card on the map | next to the pointer, kept inside `MapArea` | after the tooltip delay with the pointer still on one hex, not over the UI, not dragging: `HexCard.of(game, hex)` from `core/views` (hex column and row, place, cover, height in metres, relief level, winter climate, rivers, roads, pass, what stands and its level; the owner from M2, people M5, army M6). Listens to `MapInput.hover_changed` and `Events.hex_changed` | **1.5** |
 | Layers popover | a top-bar button opening a `PopupPanel` | grid, place names, relief shading, season preview (Spring, Summer, Autumn, Winter); borders and owner tint in M2. Writes `Settings` (or `season_preview_requested`); the map scene applies | **1.5** |
 | Villages switch | | dropped by the M1 spec (all villages show) | **skip** (unless the owner wants it back) |
-| Map-mode switcher | top bar, a `Segmented` group, keys 1-4 (more as modes arrive) | Terrain (the tiles), Owner, Relief (a height tint); later Yields (M4.5, key 4: your land by worth a year, `m4-5-build-spec.md` 4.8), Supply (M6) and Trade (M10). A mode is drawn by **one overlay node**: a full-map quad with a shader that finds the hex under each pixel (odd-r) and reads two one-byte-a-hex textures (owner id, height band) and a palette (`core/views/map_modes.gd` builds them; `m2-build-spec.md` 6.2). One draw for any mode; a mode switch is a uniform; an owner change rewrites one texel | M2 |
+| Map-mode switcher | top bar, a `Segmented` group, keys 1-4 (more as modes arrive) | Terrain (the tiles), Owner, Relief (a height tint); later Yields (M4.5, key 4: your land by worth a year, `m4-5-build-spec.md` 4.8), Food (M5, key 5: your land by food made less eaten, a year, `m5-build-spec.md` 6.5), Supply (M6) and Trade (M10). A mode is drawn by **one overlay node**: a full-map quad with a shader that finds the hex under each pixel (odd-r) and reads two one-byte-a-hex textures (owner id, height band) and a palette (`core/views/map_modes.gd` builds them; `m2-build-spec.md` 6.2). One draw for any mode; a mode switch is a uniform; an owner change rewrites one texel | M2 |
 | Minimap | bottom right, above the zoom control | draws the far picture's `ImageTexture` (shared with `FarMap`; no extra memory), the camera's rectangle from `view_changed`; a click or drag sends `look_at_requested`. On north Italy the whole map fits the screen, so it matters from Europe on; with owner colours from M2 it is useful earlier | M2 |
 | Place search ("go to") | a `LineEdit` popup, Ctrl/Cmd+F | matches `MapData.places` by name (prefix first, then substring, then accent-free); Enter glides there and selects the hex | M2 |
 | Camera bookmarks | Ctrl/Cmd+1..9 jump, Ctrl/Cmd+Shift+1..9 set | stored with the game (the save's UI block), so they follow the map and the country; a toast "Bookmark 3 set" | M3 |

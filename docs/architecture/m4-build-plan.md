@@ -237,7 +237,7 @@ On the day M3 closes:
 - **M4.5:** `Stats`' money and goods series and the goods ring; the closed ledgers; `EconomyPreview.worth_by_hex` (the
   Districts tab); `InkChart`'s two kinds to complete; `StudyPages.LIST` and the study frame; `MapModes.delta_colour` for
   the Yields mode.
-- **M5:** `Economy.people_at` (reads `MapState.people`; the table becomes room); towns' needs and contentment (hunger,
+- **M5** (taken up in `m5-build-spec.md` and `m5-build-plan.md`)**:** `Economy.people_at` (reads `MapState.people`; the table becomes room); towns' needs and contentment (hunger,
   decline); food's `goods_short`; the tax level's growth effect; the settlement payoffs to re-tune (spec D42); the People
   and Food chips (icon `food` baked).
 - **M6:** `Treasury.WHY` `army`; armies' food from the stores; horses and iron reserves; the Army chip (icon baked).

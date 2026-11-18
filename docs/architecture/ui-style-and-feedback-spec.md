@@ -517,6 +517,10 @@ helps Milan's district at (9, 11)") outside the totals.
 
 "Show on map" modes: Yields (M4.5), Food (M5), Supply (M6), Relations (M9), Trade flows (M10).
 
+> **M5's build spec** (`m5-build-spec.md` 6.2 to 6.8) specifies the People page (one page, no tabs, between Economy and
+> Rankings), the people measure in Rankings and Standing, the report's People section, the People and Food chips and the
+> Food mode on key 5 (your land by food made less eaten, a year).
+
 ## 9. Input actions and options
 
 Added to `Bindings.DEFAULTS` (action, default, since): `game_report` J (M3); `game_study` I (M4); `game_ledger` L

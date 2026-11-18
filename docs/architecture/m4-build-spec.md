@@ -146,6 +146,12 @@ Each is decided. "Reverse" is the cost to change it later (S half a day, M a day
 | D41 | Not built in M4 | Districts, Goods, History and Debt tabs; the Yields mode; Rankings, History pages (M4.5, M12); reactive prices, markets, roads works (M10); people growth (M5) | Their milestones | none |
 | D42 | Settlement payoffs | M4's towns are full (D6), so a town upgrade brings all its people at once; M5 makes people grow into room and re-tunes these costs | M4 must be playable alone; the numbers move once, with M5 | M5's data |
 
+> **M5 settles D6, D7, D10 and D42** (`m5-build-spec.md` 1.2 and 4.7): `MapState.people` grows from this page's table (the
+> start) into a room (settlements by level, other land by cover plus its district's jobs); hands and jobs count only the
+> hexes of the district's own country; a food shortage also costs the towns people and may lower a level; an upgrade brings
+> room, not people, and the village and town costs fall to 60 + 10 timber and 200 + 20 timber + 10 stone. Every number of
+> this page at turn 1 holds; the tests that pin later numbers run with still people (`PeopleFixture.still`).
+
 ---
 
 ## 3. The v0.2.2 reference
@@ -231,7 +237,8 @@ any other land hex holds the countryside people of its cover (`GameDefs.country_
 
 **Town people** of a country are the people of its settlement hexes; **countryside people** the rest of its land.
 **Hands** of a hex: `(people of the hex + people of its six land neighbours) × hands_permille (300) / 1000`. People and
-hands count whoever owns the hexes (people cross borders to work).
+hands count whoever owns the hexes (people cross borders to work). (From M5 this table is the start and `MapState.people`
+grows from it; hands and `jobs_near` count only the hexes held by the hex's owner: `m5-build-spec.md` 4.2 and 4.7.)
 
 ### 4.4 District output
 
@@ -580,6 +587,9 @@ shows everything with its refusal bar.
 | Payback | realm: Spring 1488, 32 seasons from now; treasury only: Summer 1489, 37 seasons |
 | Next | "None: Genoa is at its top level." |
 | Expensive | yes |
+
+> **M5 replaces (d)** (`m5-build-spec.md` 4.11 c): an upgrade brings room, not people, so Genoa's city brings room 45,000 →
+> 100,000, +15, +16, +15, +10 a season (+56 a year) and pays back in Winter 1500.
 
 **(e) Savona, town to walled town**: refused by a rule (`blocked_by` rule): only the refusal. `Works.upgrade_check` row 5
 gives M1's words, "a town needs its own countryside: no two towns side by side (settlements 3 at 5, 13)"; the card shows
@@ -1464,7 +1474,7 @@ Made by the tasks (listed in the plan): `godot/README.md` (the M4 game; N12), `g
 | M | Takes from M4 | M4 leaves for it |
 |---|---|---|
 | M4.5 | `Stats` money and goods series, the ledgers, `EconomyPreview.worth_by_hex` (Districts tab), the goods ring (Goods tab), `InkChart`'s two kinds (to complete), the study frame and `StudyPages.LIST`, `MapModes.delta_colour` (the Yields mode) | Insights |
-| M5 | `Economy.people_at` (the one seam: it reads `MapState.people` from M5, the table becoming room), towns' needs and contentment (hunger, decline), `goods_short` of food, the tax level's growth effect, the People chip (icon `food` baked), settlement payoffs to re-tune (D42) | People |
+| M5 | `Economy.people_at` (the one seam: it reads `MapState.people` from M5, the table becoming room), towns' needs and contentment (hunger, decline), `goods_short` of food, the tax level's growth effect, the People chip (icon `food` baked), settlement payoffs to re-tune (D42); all taken up in `m5-build-spec.md` | People |
 | M6 | `Treasury.WHY` gains `army`; armies eat from the stores (a need); horses and iron reserves; the Army chip (icon baked) | Armies |
 | M7 | captured land produces for its new owner from the next production; walls upkeep of castles; occupation may cut output (a term of `district_output`) | War |
 | M8 | the AI acts through `build`, `set_tax`, `cancel_work` with the same checks; `ImprovePreview` and `EconomyPreview` are its views; the soak checks the money property | The AI |
