@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CountryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/country_def.gd" id="1_g4c61"]
+
+[resource]
+script = ExtResource("1_g4c61")
+tag = &"PAP"
+name = "Papal States"
+long_name = "Papal States"
+adjective = "Papal"
+colour = Color(0.9411765, 0.9019608, 0.627451, 1)
+capital_name = "Rome"
+arms_division = &"saltire"
+arms_field = &"gules"
+arms_charge = &"or"

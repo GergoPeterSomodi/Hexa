@@ -141,3 +141,60 @@ func test_resource_round_trip_preserves_fields() -> void:
 	assert_eq(loaded.arms_charge, src.arms_charge)
 	assert_eq(loaded.tip, src.tip)
 	assert_eq(loaded.validate(TINCTURES), [] as Array[String])
+
+
+func test_committed_data_defs_and_scenario_load_and_validate() -> void:
+	var tres_paths: Array[String] = []
+	_collect_tres("res://data/defs", tres_paths)
+	assert_eq(tres_paths.size(), 14, "expected game_defs.tres + 13 country .tres files")
+	assert_true(tres_paths.has("res://data/defs/game_defs.tres"))
+
+	var defs := ResourceLoader.load(
+		"res://data/defs/game_defs.tres", "", ResourceLoader.CACHE_MODE_IGNORE
+	) as GameDefs
+	assert_not_null(defs)
+	assert_eq(defs.validate(), [] as Array[String])
+	assert_eq(defs.countries.size(), 13)
+
+	var country_count := 0
+	for path: String in tres_paths:
+		var res := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
+		assert_not_null(res, "failed to load %s" % path)
+		if path == "res://data/defs/game_defs.tres":
+			assert_true(res is GameDefs, "%s should be GameDefs" % path)
+			assert_eq((res as GameDefs).validate(), [] as Array[String], path)
+		else:
+			assert_true(res is CountryDef, "%s should be CountryDef" % path)
+			var cdef := res as CountryDef
+			assert_eq(cdef.validate(defs.tinctures), [] as Array[String], path)
+			assert_not_null(defs.country(cdef.tag), "%s missing from GameDefs" % path)
+			country_count += 1
+	assert_eq(country_count, 13)
+
+	var map := ResourceLoader.load(
+		"res://data/maps/north_italy.tres", "", ResourceLoader.CACHE_MODE_IGNORE
+	) as MapData
+	var scen := ResourceLoader.load(
+		"res://data/scenarios/north_italy_1480.tres", "", ResourceLoader.CACHE_MODE_IGNORE
+	) as ScenarioDef
+	assert_not_null(map)
+	assert_not_null(scen)
+	assert_eq(scen.validate(map, defs, true), [] as Array[String])
+
+
+static func _collect_tres(dir_path: String, out: Array[String]) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while entry != "":
+		if not entry.begins_with("."):
+			var full := dir_path.path_join(entry)
+			if dir.current_is_dir():
+				_collect_tres(full, out)
+			elif entry.ends_with(".tres"):
+				out.append(full)
+		entry = dir.get_next()
+	dir.list_dir_end()
+	out.sort()

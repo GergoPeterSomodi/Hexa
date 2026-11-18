@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CountryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/country_def.gd" id="1_34t37"]
+
+[resource]
+script = ExtResource("1_34t37")
+tag = &"GEN"
+name = "Genoa"
+long_name = "Republic of Genoa"
+adjective = "Genoese"
+colour = Color(0.74509805, 0.23529412, 0.43137255, 1)
+arms_division = &"cross"
+arms_field = &"argent"
+arms_charge = &"gules"
+tip = "A narrow coast of harbours under the mountains; little land, much sea."

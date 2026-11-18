@@ -1,0 +1,516 @@
+[gd_resource type="Resource" script_class="ScenarioDef" format=4]
+
+[ext_resource type="Script" path="res://core/defs/scenario_def.gd" id="1_6m2y6"]
+
+[resource]
+script = ExtResource("1_6m2y6")
+id = "north_italy_1480"
+name = "Italy, 1480"
+blurb = "The north of Italy under the Peace of Lodi: five powers, their small neighbours, and the kings beyond the Alps."
+map_id = "north_italy"
+map_digest = "6666d92774b436d9e4624db2deecc71ca2e4c695f1c036e3bbf951bec65caf41"
+countries = Array[StringName]([&"FRA", &"AUS", &"SWI", &"SAV", &"MLO", &"VEN", &"GEN", &"TUS", &"PAP", &"MAN", &"FER", &"SIE", &"LUC"])
+capitals = Array[Vector2i]([Vector2i(-1, -1), Vector2i(-1, -1), Vector2i(5, 0), Vector2i(5, 9), Vector2i(9, 9), Vector2i(18, 7), Vector2i(8, 13), Vector2i(15, 15), Vector2i(-1, -1), Vector2i(14, 10), Vector2i(16, 10), Vector2i(16, 16), Vector2i(12, 15)])
+cb_colours = PackedByteArray("AwQBBQMFAQMBAQQFBQ==")
+seeds = Array[Dictionary]([{
+"hex": Vector2i(9, 9),
+"kind": &"town",
+"note": "Milan",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(5, 9),
+"kind": &"town",
+"note": "Turin",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(8, 13),
+"kind": &"town",
+"note": "Genoa",
+"tag": &"GEN"
+}, {
+"hex": Vector2i(15, 15),
+"kind": &"town",
+"note": "Florence",
+"tag": &"TUS"
+}, {
+"hex": Vector2i(16, 12),
+"kind": &"town",
+"note": "Bologna",
+"tag": &"PAP"
+}, {
+"hex": Vector2i(5, 0),
+"kind": &"town",
+"note": "Bern",
+"tag": &"SWI"
+}, {
+"hex": Vector2i(8, 5),
+"kind": &"town",
+"note": "Como",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(9, 7),
+"kind": &"town",
+"note": "Monza",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(10, 6),
+"kind": &"town",
+"note": "Varese",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(10, 9),
+"kind": &"town",
+"note": "Pavia",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(11, 8),
+"kind": &"town",
+"note": "Bergamo",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(13, 6),
+"kind": &"town",
+"note": "Brescia",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(15, 8),
+"kind": &"town",
+"note": "Verona",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(13, 16),
+"kind": &"town",
+"note": "Pisa",
+"tag": &"TUS"
+}, {
+"hex": Vector2i(10, 5),
+"kind": &"town",
+"note": "Lecco",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(11, 9),
+"kind": &"town",
+"note": "Lodi",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(12, 9),
+"kind": &"town",
+"note": "Cremona",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(14, 10),
+"kind": &"town",
+"note": "Mantua",
+"tag": &"MAN"
+}, {
+"hex": Vector2i(13, 11),
+"kind": &"town",
+"note": "Parma",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(11, 10),
+"kind": &"town",
+"note": "Piacenza",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(14, 11),
+"kind": &"town",
+"note": "Modena",
+"tag": &"FER"
+}, {
+"hex": Vector2i(12, 15),
+"kind": &"town",
+"note": "Lucca",
+"tag": &"LUC"
+}, {
+"hex": Vector2i(16, 16),
+"kind": &"town",
+"note": "Siena",
+"tag": &"SIE"
+}, {
+"hex": Vector2i(5, 13),
+"kind": &"town",
+"note": "Cuneo",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(8, 10),
+"kind": &"town",
+"note": "Asti",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(7, 9),
+"kind": &"town",
+"note": "Alessandria",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(7, 8),
+"kind": &"town",
+"note": "Novara",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(6, 9),
+"kind": &"town",
+"note": "Vercelli",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(6, 8),
+"kind": &"town",
+"note": "Ivrea",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(5, 10),
+"kind": &"town",
+"note": "Chivasso",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(5, 7),
+"kind": &"town",
+"note": "Aosta",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(4, 9),
+"kind": &"town",
+"note": "Susa",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(6, 13),
+"kind": &"town",
+"note": "Savona",
+"tag": &"GEN"
+}, {
+"hex": Vector2i(4, 16),
+"kind": &"town",
+"note": "Nice",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(9, 4),
+"kind": &"town",
+"note": "Bellinzona",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(7, 5),
+"kind": &"town",
+"note": "Locarno",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(8, 4),
+"kind": &"town",
+"note": "Lugano",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(7, 6),
+"kind": &"town",
+"note": "Domodossola",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(5, 4),
+"kind": &"town",
+"note": "Brig",
+"tag": &"SWI"
+}, {
+"hex": Vector2i(3, 4),
+"kind": &"town",
+"note": "Sion",
+"tag": &"SWI"
+}, {
+"hex": Vector2i(3, 5),
+"kind": &"town",
+"note": "Martigny",
+"tag": &"SWI"
+}, {
+"hex": Vector2i(1, 4),
+"kind": &"town",
+"note": "Geneva",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(2, 4),
+"kind": &"town",
+"note": "Lausanne",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(7, 1),
+"kind": &"town",
+"note": "Lucerne",
+"tag": &"SWI"
+}, {
+"hex": Vector2i(10, 2),
+"kind": &"town",
+"note": "Chur",
+"tag": &"SWI"
+}, {
+"hex": Vector2i(15, 3),
+"kind": &"town",
+"note": "Bolzano",
+"tag": &"AUS"
+}, {
+"hex": Vector2i(15, 6),
+"kind": &"town",
+"note": "Trento",
+"tag": &"AUS"
+}, {
+"hex": Vector2i(13, 4),
+"kind": &"town",
+"note": "Bormio",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(11, 4),
+"kind": &"town",
+"note": "Sondrio",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(10, 4),
+"kind": &"town",
+"note": "Chiavenna",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(7, 3),
+"kind": &"town",
+"note": "Airolo",
+"tag": &"SWI"
+}, {
+"hex": Vector2i(6, 7),
+"kind": &"town",
+"note": "Bard fort",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(18, 7),
+"kind": &"town",
+"note": "Venice",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(17, 8),
+"kind": &"town",
+"note": "Padua",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(16, 7),
+"kind": &"town",
+"note": "Vicenza",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(17, 7),
+"kind": &"town",
+"note": "Treviso",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(18, 9),
+"kind": &"town",
+"note": "Chioggia",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(17, 12),
+"kind": &"town",
+"note": "Ravenna",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(16, 10),
+"kind": &"town",
+"note": "Ferrara",
+"tag": &"FER"
+}, {
+"hex": Vector2i(12, 12),
+"kind": &"town",
+"note": "Pontremoli",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(18, 4),
+"kind": &"town",
+"note": "Belluno",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(6, 11),
+"kind": &"town",
+"note": "Alba",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(1, 17),
+"kind": &"town",
+"note": "Fréjus",
+"tag": &"FRA"
+}, {
+"hex": Vector2i(18, 14),
+"kind": &"town",
+"note": "Cesena",
+"tag": &"PAP"
+}, {
+"hex": Vector2i(19, 15),
+"kind": &"town",
+"note": "Pesaro",
+"tag": &"PAP"
+}, {
+"hex": Vector2i(17, 18),
+"kind": &"town",
+"note": "Cortona",
+"tag": &"TUS"
+}, {
+"hex": Vector2i(1, 0),
+"kind": &"town",
+"note": "Besançon",
+"tag": &"FRA"
+}, {
+"hex": Vector2i(13, 2),
+"kind": &"town",
+"note": "Glurns",
+"tag": &"AUS"
+}, {
+"hex": Vector2i(0, 16),
+"kind": &"town",
+"note": "Brignoles",
+"tag": &"FRA"
+}, {
+"hex": Vector2i(19, 18),
+"kind": &"town",
+"note": "Gubbio",
+"tag": &"PAP"
+}, {
+"hex": Vector2i(3, 1),
+"kind": &"town",
+"note": "Murten",
+"tag": &"SWI"
+}, {
+"hex": Vector2i(2, 8),
+"kind": &"town",
+"note": "Moûtiers",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(0, 7),
+"kind": &"anchor",
+"note": "Chambéry, the seat of the Savoy court",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(2, 6),
+"kind": &"anchor",
+"note": "Faucigny and Chamonix",
+"tag": &"SAV"
+}, {
+"hex": Vector2i(1, 10),
+"kind": &"anchor",
+"note": "Dauphiné: the Oisans and Briançon",
+"tag": &"FRA"
+}, {
+"hex": Vector2i(1, 12),
+"kind": &"anchor",
+"note": "Dauphiné: Gap and Embrun",
+"tag": &"FRA"
+}, {
+"hex": Vector2i(1, 15),
+"kind": &"anchor",
+"note": "Provence: Digne and Draguignan",
+"tag": &"FRA"
+}, {
+"hex": Vector2i(19, 1),
+"kind": &"anchor",
+"note": "Pustertal and Lienz (Tyrol, Gorizia)",
+"tag": &"AUS"
+}, {
+"hex": Vector2i(19, 3),
+"kind": &"anchor",
+"note": "Carnia (Friuli, Venetian since 1420)",
+"tag": &"VEN"
+}, {
+"hex": Vector2i(14, 4),
+"kind": &"anchor",
+"note": "Val di Sole (bishopric of Trento, under Tyrol)",
+"tag": &"AUS"
+}, {
+"hex": Vector2i(11, 3),
+"kind": &"anchor",
+"note": "Upper Engadin (League of God's House)",
+"tag": &"SWI"
+}, {
+"hex": Vector2i(5, 15),
+"kind": &"anchor",
+"note": "Riviera di Ponente: Ventimiglia, Sanremo",
+"tag": &"GEN"
+}, {
+"hex": Vector2i(6, 14),
+"kind": &"anchor",
+"note": "Riviera di Ponente: Albenga, Finale",
+"tag": &"GEN"
+}, {
+"hex": Vector2i(8, 11),
+"kind": &"anchor",
+"note": "the Oltregiogo: Novi, Ovada",
+"tag": &"GEN"
+}, {
+"hex": Vector2i(6, 6),
+"kind": &"anchor",
+"note": "the Valsesia (contado of Novara)",
+"tag": &"MLO"
+}, {
+"hex": Vector2i(13, 10),
+"kind": &"anchor",
+"note": "Gonzaga lands: Viadana, Sabbioneta",
+"tag": &"MAN"
+}, {
+"hex": Vector2i(16, 11),
+"kind": &"anchor",
+"note": "Argenta (Este)",
+"tag": &"FER"
+}, {
+"hex": Vector2i(17, 11),
+"kind": &"anchor",
+"note": "Comacchio (Este)",
+"tag": &"FER"
+}, {
+"hex": Vector2i(13, 12),
+"kind": &"anchor",
+"note": "the Reggio hills (Este)",
+"tag": &"FER"
+}, {
+"hex": Vector2i(14, 12),
+"kind": &"anchor",
+"note": "the Frignano (Este)",
+"tag": &"FER"
+}, {
+"hex": Vector2i(13, 14),
+"kind": &"anchor",
+"note": "the Garfagnana (Este)",
+"tag": &"FER"
+}, {
+"hex": Vector2i(17, 13),
+"kind": &"anchor",
+"note": "Forlì and Faenza (papal vicars)",
+"tag": &"PAP"
+}, {
+"hex": Vector2i(18, 16),
+"kind": &"anchor",
+"note": "Città di Castello",
+"tag": &"PAP"
+}, {
+"hex": Vector2i(18, 18),
+"kind": &"anchor",
+"note": "Perugia",
+"tag": &"PAP"
+}, {
+"hex": Vector2i(17, 15),
+"kind": &"anchor",
+"note": "Sansepolcro (Florentine since 1441)",
+"tag": &"TUS"
+}, {
+"hex": Vector2i(17, 16),
+"kind": &"anchor",
+"note": "Arezzo (Florentine since 1384)",
+"tag": &"TUS"
+}, {
+"hex": Vector2i(12, 14),
+"kind": &"anchor",
+"note": "the Versilia hills: Camaiore",
+"tag": &"LUC"
+}, {
+"hex": Vector2i(14, 18),
+"kind": &"anchor",
+"note": "Massa Marittima (Siena)",
+"tag": &"SIE"
+}, {
+"hex": Vector2i(16, 18),
+"kind": &"anchor",
+"note": "Montalcino (Siena)",
+"tag": &"SIE"
+}, {
+"hex": Vector2i(14, 9),
+"kind": &"anchor",
+"note": "Gonzaga lands: Goito",
+"tag": &"MAN"
+}])
+owner = PackedByteArray("AQEBAwMDAwMDAwMDAgICAgICAgICAQEDAwMDAwMDAwMDAgICAgICAgICAQEEAwMDAwMDAwMDAgICAgICBgICBAQEAwMDAwMFBQMDBQUCAgIGBgYGBAQEAwMDAwUFBQUFBQUCAgIGBgYGBAQDAwMDBQUFBQUFBQYCAgIGBgYGBAQEAwMEBQUFBQUFBgYGAgIGBgYGBAQEBAQEBAUFBQUGBgYGBgYGBgAABAQEBAQEBAUFBQUGBQUGBgYGBgAAAQQEBAQEBAUFBQUFBQUKBgYGBgAAAQEBBAQEBAQEBAUFBQoKCwsLBgAAAQEBBAQEBAQHBwUFBQULCQsLAAAAAQEBAQQEBAcHBwcFBQsLCQkGBgAAAQEBBAQEBwcHBwcFBQsLCQkJAAAAAQEBBAQEBwcAAAAADQsLCAgJCQAAAQEBBAQHAAAAAAAADQgICAgICQkJAQEBBAQAAAAAAAAAAAgICAwICQkJAQEBAAAAAAAAAAAAAAgMDAwICQkJAAABAAAAAAAAAAAAAAAMDAwICQkJ")

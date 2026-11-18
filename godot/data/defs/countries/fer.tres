@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CountryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/country_def.gd" id="1_1yu00"]
+
+[resource]
+script = ExtResource("1_1yu00")
+tag = &"FER"
+name = "Ferrara"
+long_name = "Duchy of Ferrara"
+adjective = "Ferrarese"
+colour = Color(0.47058824, 0.6666667, 0.8627451, 1)
+arms_division = &"per_bend"
+arms_field = &"azure"
+arms_charge = &"argent"
+tip = "The Este duchy on the lower Po, between Venice and the Pope."

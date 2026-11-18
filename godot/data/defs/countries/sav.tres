@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CountryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/country_def.gd" id="1_cqubj"]
+
+[resource]
+script = ExtResource("1_cqubj")
+tag = &"SAV"
+name = "Savoy"
+long_name = "Duchy of Savoy"
+adjective = "Savoyard"
+colour = Color(0.50980395, 0.5882353, 0.47058824, 1)
+arms_division = &"cross"
+arms_field = &"gules"
+arms_charge = &"argent"
+tip = "Passes over the Alps and the Piedmont plain: many roads, few rich towns."

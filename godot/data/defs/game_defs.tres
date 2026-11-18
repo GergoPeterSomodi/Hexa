@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="GameDefs" format=3]
+
+[ext_resource type="Script" path="res://core/defs/country_def.gd" id="1_js5y5"]
+[ext_resource type="Resource" path="res://data/defs/countries/fra.tres" id="2_0fi1l"]
+[ext_resource type="Resource" path="res://data/defs/countries/aus.tres" id="3_6x4ee"]
+[ext_resource type="Resource" path="res://data/defs/countries/swi.tres" id="4_4kvco"]
+[ext_resource type="Resource" path="res://data/defs/countries/sav.tres" id="5_byo8m"]
+[ext_resource type="Resource" path="res://data/defs/countries/mlo.tres" id="6_i07uy"]
+[ext_resource type="Resource" path="res://data/defs/countries/ven.tres" id="7_xvx8g"]
+[ext_resource type="Resource" path="res://data/defs/countries/gen.tres" id="8_d5e2e"]
+[ext_resource type="Resource" path="res://data/defs/countries/tus.tres" id="9_xhcqx"]
+[ext_resource type="Resource" path="res://data/defs/countries/pap.tres" id="10_65v6a"]
+[ext_resource type="Resource" path="res://data/defs/countries/man.tres" id="11_t58ib"]
+[ext_resource type="Resource" path="res://data/defs/countries/fer.tres" id="12_cpw3g"]
+[ext_resource type="Resource" path="res://data/defs/countries/sie.tres" id="13_l4ihp"]
+[ext_resource type="Resource" path="res://data/defs/countries/luc.tres" id="14_icwc0"]
+[ext_resource type="Script" path="res://core/defs/scenario_def.gd" id="15_uvokg"]
+[ext_resource type="Resource" path="res://data/scenarios/north_italy_1480.tres" id="16_6d0wf"]
+[ext_resource type="Script" path="res://core/defs/game_defs.gd" id="17_eiw27"]
+
+[resource]
+script = ExtResource("17_eiw27")
+countries = Array[ExtResource("1_js5y5")]([ExtResource("2_0fi1l"), ExtResource("3_6x4ee"), ExtResource("4_4kvco"), ExtResource("5_byo8m"), ExtResource("6_i07uy"), ExtResource("7_xvx8g"), ExtResource("8_d5e2e"), ExtResource("9_xhcqx"), ExtResource("10_65v6a"), ExtResource("11_t58ib"), ExtResource("12_cpw3g"), ExtResource("13_l4ihp"), ExtResource("14_icwc0")])
+scenarios = Array[ExtResource("15_uvokg")]([ExtResource("16_6d0wf")])
+tinctures = Dictionary[StringName, Color]({
+&"argent": Color(0.9372549, 0.91764706, 0.8745098, 1),
+&"azure": Color(0.16862746, 0.3529412, 0.65882355, 1),
+&"gules": Color(0.7019608, 0.14901961, 0.11764706, 1),
+&"or": Color(0.83137256, 0.65882355, 0.17254902, 1),
+&"purpure": Color(0.41960785, 0.22745098, 0.47843137, 1),
+&"sable": Color(0.14117648, 0.12156863, 0.10980392, 1),
+&"vert": Color(0.18039216, 0.49019608, 0.23529412, 1)
+})
+cb_palette = PackedColorArray(0.9019608, 0.62352943, 0, 1, 0.3372549, 0.7058824, 0.9137255, 1, 0, 0.61960787, 0.4509804, 1, 0.9411765, 0.89411765, 0.25882354, 1, 0, 0.44705883, 0.69803923, 1, 0.8352941, 0.36862746, 0, 1, 0.8, 0.4745098, 0.654902, 1, 0.92156863, 0.92156863, 0.92156863, 1)

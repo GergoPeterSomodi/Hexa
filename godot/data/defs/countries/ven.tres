@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CountryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/country_def.gd" id="1_i1uir"]
+
+[resource]
+script = ExtResource("1_i1uir")
+tag = &"VEN"
+name = "Venice"
+long_name = "Republic of Venice"
+adjective = "Venetian"
+colour = Color(0.11764706, 0.627451, 0.54901963, 1)
+arms_division = &"bordure"
+arms_field = &"gules"
+arms_charge = &"or"
+tip = "A lagoon city with a mainland empire: trade first, land second."

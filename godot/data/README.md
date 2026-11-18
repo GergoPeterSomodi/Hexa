@@ -140,3 +140,20 @@ the Windows zip.** The credit text is copied from the Python module.
 7. **The tech tree and the special goods' art** are not in this release (0.3.1 and later).
 8. **Place names.** `naming.name_europe` takes the three biggest places per hex from `placenames.json`, then the
     region names. The 1480 names of exonyms are in `naming.json`.
+
+## Definitions and Scenarios (`defs/`, `scenarios/`)
+
+Godot text `.tres` resources read by `core/defs/` and validated in CI:
+
+| Path | Resource | Contents |
+|---|---|---|
+| `defs/game_defs.tres` | `GameDefs` | Master catalog: references the 13 countries and `north_italy_1480`, plus heraldic `tinctures`, the 8-colour Okabe-Ito `cb_palette`, `unowned_colour`, and neighbour contrast thresholds (`min_contrast = 30.0`, `min_contrast_cb = 20.0`). |
+| `defs/countries/<tag>.tres` | `CountryDef` | One file per country, lowercase 3-letter tag (`fra`, `aus`, `swi`, `sav`, `mlo`, `ven`, `gen`, `tus`, `pap`, `man`, `fer`, `sie`, `luc`): names, sRGB colour, off-map `capital_name`, heraldic arms (`arms_division`, `arms_field`, `arms_charge`), and pick `tip`. |
+| `scenarios/north_italy_1480.tres` | `ScenarioDef` | The 1480 scenario (`Italy, 1480`) on `maps/north_italy.tres`: country order, capitals, colour-blind palette indices, town/anchor `seeds`, `pins`, growth parameters, and the grown `owner` array + `map_digest`. |
+
+Whenever `maps/north_italy.tres` or the scenario seeds, pins, or growth constants change, regrow `owner` and `map_digest` and verify everything passes deep validation:
+
+    godot --headless --path godot -s tools/build_scenario.gd
+    godot --headless --path godot -s tools/build_scenario.gd -- --check
+
+`build_scenario.gd --check` runs in CI and exits non-zero if `owner`, `map_digest`, or any validation or contrast rule is out of date.

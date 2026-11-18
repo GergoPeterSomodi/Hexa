@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CountryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/country_def.gd" id="1_oytaw"]
+
+[resource]
+script = ExtResource("1_oytaw")
+tag = &"MAN"
+name = "Mantua"
+long_name = "Marquisate of Mantua"
+adjective = "Mantuan"
+colour = Color(0.8039216, 0.5882353, 0.19607843, 1)
+arms_division = &"fess"
+arms_field = &"or"
+arms_charge = &"sable"
+tip = "A small marquisate in the marshes of the Mincio, between Milan and Venice."

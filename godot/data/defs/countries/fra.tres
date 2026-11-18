@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CountryDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/country_def.gd" id="1_lk6i1"]
+
+[resource]
+script = ExtResource("1_lk6i1")
+tag = &"FRA"
+name = "France"
+long_name = "Kingdom of France"
+adjective = "French"
+colour = Color(0.15686275, 0.27450982, 0.6666667, 1)
+capital_name = "Paris"
+arms_division = &"pale"
+arms_field = &"azure"
+arms_charge = &"or"
