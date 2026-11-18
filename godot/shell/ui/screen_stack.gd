@@ -35,19 +35,7 @@ func push(screen: Screen) -> void:
 	var prev_focus := _current_focus_owner()
 	_screens.append(screen)
 	_focus_owners.append(prev_focus)
-	_connect_finished(screen)
-	screen.setup(ctx)
-	add_child(screen)
-	_sync_shade()
-	screen.on_enter()
-	if not is_instance_valid(screen) or not _screens.has(screen):
-		return
-	if screen.kind != Screen.Kind.OPAQUE:
-		var target := screen.motion_target()
-		if target != null:
-			Motion.enter(target, _reduce_motion())
-	_grab_default_focus(screen)
-	changed.emit()
+	_mount_screen(screen)
 
 
 ## Pops the topmost Screen, calls on_exit(), restores saved focus, and returns it.
@@ -86,28 +74,17 @@ func replace(screen: Screen) -> void:
 	var old_screen := _screens[top_idx]
 	var inherited_focus := _focus_owners[top_idx]
 	_disconnect_finished(old_screen)
-	old_screen.on_exit()
 	_screens.remove_at(top_idx)
 	_focus_owners.remove_at(top_idx)
-	if old_screen.get_parent() == self:
-		remove_child(old_screen)
-	old_screen.queue_free()
+	if is_instance_valid(old_screen):
+		old_screen.on_exit()
+		if old_screen.get_parent() == self:
+			remove_child(old_screen)
+		old_screen.queue_free()
 
 	_screens.append(screen)
 	_focus_owners.append(inherited_focus)
-	_connect_finished(screen)
-	screen.setup(ctx)
-	add_child(screen)
-	_sync_shade()
-	screen.on_enter()
-	if not is_instance_valid(screen) or not _screens.has(screen):
-		return
-	if screen.kind != Screen.Kind.OPAQUE:
-		var target := screen.motion_target()
-		if target != null:
-			Motion.enter(target, _reduce_motion())
-	_grab_default_focus(screen)
-	changed.emit()
+	_mount_screen(screen)
 
 
 ## Pops and frees every Screen on the stack, hides the shade, restores bottom focus, and emits changed.
@@ -146,7 +123,7 @@ func count() -> int:
 ## Returns true if any screen on the stack has `screen_id == id`.
 func has_screen(id: StringName) -> bool:
 	for s: Screen in _screens:
-		if s.screen_id == id:
+		if is_instance_valid(s) and s.screen_id == id:
 			return true
 	return false
 
@@ -154,7 +131,7 @@ func has_screen(id: StringName) -> bool:
 ## Returns true when any MODAL or OPAQUE screen is on the stack (pauses the world tree).
 func wants_pause() -> bool:
 	for s: Screen in _screens:
-		if s.kind == Screen.Kind.MODAL or s.kind == Screen.Kind.OPAQUE:
+		if is_instance_valid(s) and (s.kind == Screen.Kind.MODAL or s.kind == Screen.Kind.OPAQUE):
 			return true
 	return false
 
@@ -162,7 +139,7 @@ func wants_pause() -> bool:
 ## Returns true when any OPAQUE screen is on the stack (hides the world and HUD).
 func hides_world() -> bool:
 	for s: Screen in _screens:
-		if s.kind == Screen.Kind.OPAQUE:
+		if is_instance_valid(s) and s.kind == Screen.Kind.OPAQUE:
 			return true
 	return false
 
@@ -193,12 +170,29 @@ func _ensure_shade() -> ColorRect:
 	return _shade
 
 
+func _mount_screen(screen: Screen) -> void:
+	_connect_finished(screen)
+	screen.setup(ctx)
+	add_child(screen)
+	_sync_shade()
+	screen.on_enter()
+	if not is_instance_valid(screen) or not _screens.has(screen):
+		return
+	if screen.kind != Screen.Kind.OPAQUE:
+		var target := screen.motion_target()
+		if target != null:
+			Motion.enter(target, _reduce_motion())
+	_grab_default_focus(screen)
+	changed.emit()
+
+
 func _sync_shade() -> void:
 	var shade := _ensure_shade()
 	var top_modal: Screen = null
 	for i: int in range(_screens.size() - 1, -1, -1):
-		if _screens[i].kind == Screen.Kind.MODAL:
-			top_modal = _screens[i]
+		var candidate := _screens[i]
+		if is_instance_valid(candidate) and candidate.kind == Screen.Kind.MODAL:
+			top_modal = candidate
 			break
 	if top_modal == null:
 		shade.visible = false
@@ -221,13 +215,19 @@ func _detach_at(idx: int, restore_focus: bool) -> void:
 	_disconnect_finished(screen)
 	if not restore_focus and idx + 1 < _focus_owners.size():
 		var next_focus := _focus_owners[idx + 1]
-		if next_focus == null or not is_instance_valid(next_focus) or screen.is_ancestor_of(next_focus):
+		if (
+			next_focus == null
+			or not is_instance_valid(next_focus)
+			or next_focus == screen
+			or (is_instance_valid(screen) and screen.is_ancestor_of(next_focus))
+		):
 			_focus_owners[idx + 1] = saved_focus
-	screen.on_exit()
 	_screens.remove_at(idx)
 	_focus_owners.remove_at(idx)
-	if screen.get_parent() == self:
-		remove_child(screen)
+	if is_instance_valid(screen):
+		screen.on_exit()
+		if screen.get_parent() == self:
+			remove_child(screen)
 	_sync_shade()
 	if restore_focus:
 		_restore_focus(saved_focus)

@@ -363,3 +363,94 @@ func test_ui_harness_input_and_headless_shot() -> void:
 
 	assert_eq(h.shot("user://test_ui_harness_shot.png"), ERR_UNAVAILABLE, "headless shot returns ERR_UNAVAILABLE safely")
 	h.stack.clear()
+
+
+func test_intermediate_remove_transfers_saved_focus_to_next_screen() -> void:
+	var h := UIHarness.new()
+	var vp := h.mount(self)
+
+	var outside_btn := Button.new()
+	outside_btn.text = "Outside"
+	vp.add_child(outside_btn)
+	vp.move_child(outside_btn, 0)
+	outside_btn.grab_focus()
+
+	var screen_a := SpyScreen.new(&"a", Screen.Kind.MODAL)
+	var screen_b := SpyScreen.new(&"b", Screen.Kind.MODAL)
+	h.stack.push(screen_a)
+	h.stack.push(screen_b)
+
+	h.stack.remove(screen_a)
+	screen_a.queue_free()
+	assert_eq(vp.gui_get_focus_owner(), screen_b.primary_button, "top screen keeps focus after intermediate remove")
+
+	var popped_b := h.stack.pop()
+	popped_b.queue_free()
+	assert_eq(vp.gui_get_focus_owner(), outside_btn, "popping B restores pre-A focus after A was removed")
+
+	# Also verify when the intermediate screen root itself held focus
+	var root_focus_screen := SpyScreen.new(&"root_focus", Screen.Kind.MODAL, false)
+	root_focus_screen.focus_mode = Control.FOCUS_ALL
+	root_focus_screen.default_focus = NodePath(".")
+	var top_screen := SpyScreen.new(&"top", Screen.Kind.MODAL)
+	h.stack.push(root_focus_screen)
+	assert_eq(vp.gui_get_focus_owner(), root_focus_screen)
+	h.stack.push(top_screen)
+
+	h.stack.remove(root_focus_screen)
+	root_focus_screen.queue_free()
+	var popped_top := h.stack.pop()
+	popped_top.queue_free()
+	assert_eq(vp.gui_get_focus_owner(), outside_btn, "intermediate root-focused screen transfers pre-A focus")
+
+
+func test_modal_shade_blocks_mouse_while_overlay_allows_pass_through() -> void:
+	var h := UIHarness.new()
+	var vp := h.mount(self)
+
+	var behind_btn := Button.new()
+	behind_btn.text = "Behind"
+	behind_btn.position = Vector2(500.0, 300.0)
+	behind_btn.size = Vector2(140.0, 40.0)
+	vp.add_child(behind_btn)
+	vp.move_child(behind_btn, 0)
+	var hits: Array[int] = [0]
+	behind_btn.pressed.connect(func() -> void: hits[0] += 1)
+
+	await h.wait_frames(self, 1)
+	h.send_click(Vector2(540.0, 320.0))
+	assert_eq(hits[0], 1, "empty stack passes clicks through to underlying controls")
+
+	var overlay := SpyScreen.new(&"overlay", Screen.Kind.OVERLAY)
+	h.stack.push(overlay)
+	await h.wait_frames(self, 1)
+	h.send_click(Vector2(540.0, 320.0))
+	assert_eq(hits[0], 2, "OVERLAY passes clicks outside its panels to underlying controls")
+
+	var modal := SpyScreen.new(&"modal", Screen.Kind.MODAL)
+	h.stack.push(modal)
+	await h.wait_frames(self, 1)
+	h.send_click(Vector2(540.0, 320.0))
+	assert_eq(hits[0], 2, "MODAL shade blocks clicks outside modal panel from reaching underlying controls")
+	h.stack.clear()
+
+
+func test_centered_modal_child_does_not_lose_vertical_centering_on_enter() -> void:
+	var h := UIHarness.new()
+	h.mount(self)
+	h.settings.set_value("accessibility/reduce_motion", true)
+
+	var s := SpyScreen.new(&"centered", Screen.Kind.MODAL, false)
+	var centered := Control.new()
+	centered.set_anchors_preset(Control.PRESET_CENTER)
+	centered.offset_left = -100.0
+	centered.offset_top = -50.0
+	centered.offset_right = 100.0
+	centered.offset_bottom = 50.0
+	s.add_child(centered)
+	h.stack.push(s)
+	await h.wait_frames(self, 1)
+
+	assert_eq(s.motion_target(), s, "centered child falls back to screen root so Motion.enter preserves centering")
+	assert_gt(centered.position.y, 100.0, "centered modal child stays vertically centered")
+	h.stack.clear()

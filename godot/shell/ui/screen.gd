@@ -35,12 +35,18 @@ func back() -> bool:
 
 
 ## Returns the Control to animate with Motion.enter(). Defaults to the first non-full-rect child
-## Control for MODAL screens, or self otherwise.
+## Control anchored at y = 0 for MODAL screens (since Motion.enter animates position.y to 0),
+## or self otherwise.
 func motion_target() -> Control:
 	if kind == Kind.MODAL:
 		for child: Node in get_children():
 			var ctrl := child as Control
-			if ctrl != null and not _is_full_rect(ctrl):
+			if (
+				ctrl != null
+				and not _is_full_rect(ctrl)
+				and is_zero_approx(ctrl.anchor_top)
+				and is_zero_approx(ctrl.position.y)
+			):
 				return ctrl
 	return self
 

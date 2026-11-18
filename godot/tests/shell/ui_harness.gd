@@ -120,3 +120,5 @@ func dispose() -> void:
 		viewport.queue_free()
 	viewport = null
 	stack = null
+	ctx = null
+	settings = null
