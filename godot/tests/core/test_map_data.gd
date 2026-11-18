@@ -178,10 +178,16 @@ func test_map_state_round_trip() -> void:
 	var s := MapState.create(m)
 	assert_eq(s.main_use.size(), 35)
 	assert_eq(s.level.size(), 35)
+	assert_eq(s.owner.size(), 35)
+	for i: int in 35:
+		assert_eq(s.owner[i], 0, "default owner is 0")
 	s.main_use[8] = 3
 	s.level[8] = 2
 	s.main_use[30] = 255
+	s.owner[m.index_of(Vector2i(3, 2))] = 7
+	s.owner[m.index_of(Vector2i(5, 2))] = 254
 	var d := s.to_dict()
+	assert_eq(d["schema"], MapState.SCHEMA)
 	# JSON-safe: survives text.
 	var parsed: Variant = JSON.parse_string(JSON.stringify(d))
 	assert_true(parsed is Dictionary)
@@ -189,11 +195,39 @@ func test_map_state_round_trip() -> void:
 	assert_not_null(back)
 	assert_eq(back.main_use, s.main_use)
 	assert_eq(back.level, s.level)
+	assert_eq(back.owner, s.owner)
 	assert_eq(back.digest(), s.digest())
 	var copy := s.duplicate_state()
 	copy.level[0] = 1
 	assert_ne(copy.digest(), s.digest())
 	assert_eq(s.level[0], 0, "a copy is independent")
+	var owner_copy := s.duplicate_state()
+	owner_copy.owner[m.index_of(Vector2i(4, 2))] = 5
+	assert_ne(owner_copy.digest(), s.digest(), "digest moves with one owner byte")
+	assert_eq(s.owner[m.index_of(Vector2i(4, 2))], 0, "owner copy is independent")
+
+
+func test_map_state_schema_1_loads_with_zero_owners() -> void:
+	var m := _map()
+	var s := MapState.create(m)
+	s.main_use[8] = 3
+	s.level[8] = 2
+	var v1 := {
+		"schema": MapState.SCHEMA_V1,
+		"size": 35,
+		"main_use": Marshalls.raw_to_base64(s.main_use),
+		"level": Marshalls.raw_to_base64(s.level),
+	}
+	var parsed: Variant = JSON.parse_string(JSON.stringify(v1))
+	assert_true(parsed is Dictionary)
+	var back := MapState.from_dict(parsed as Dictionary, m)
+	assert_not_null(back)
+	assert_eq(back.main_use, s.main_use)
+	assert_eq(back.level, s.level)
+	assert_eq(back.owner.size(), 35)
+	for i: int in 35:
+		assert_eq(back.owner[i], 0, "schema 1 loads with owner 0")
+	assert_eq(back.digest(), s.digest())
 
 
 func test_map_state_refuses_a_wrong_map_or_schema() -> void:
@@ -205,4 +239,10 @@ func test_map_state_refuses_a_wrong_map_or_schema() -> void:
 	var d := s.to_dict()
 	d["schema"] = "nope"
 	assert_null(MapState.from_dict(d, m), "schema mismatch")
+	var missing_owner := s.to_dict()
+	missing_owner.erase("owner")
+	assert_null(MapState.from_dict(missing_owner, m), "schema 2 missing owner")
+	var bad_owner := s.to_dict()
+	bad_owner["owner"] = Marshalls.raw_to_base64(PackedByteArray([1, 2, 3]))
+	assert_null(MapState.from_dict(bad_owner, m), "schema 2 owner size mismatch")
 	assert_null(MapState.from_dict({}, m), "empty")

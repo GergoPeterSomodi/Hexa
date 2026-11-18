@@ -92,16 +92,19 @@ func test_the_same_seed_and_the_same_actions_give_the_same_digest() -> void:
 func test_the_improvement_writes_only_what_it_owns() -> void:
 	assert_eq(Improve.OWNS, ["main_use", "level"])
 	var state := MapState.create(_map)
+	var known_fields: Array[String] = ["main_use", "level", "owner"]
 	for property: Dictionary in state.get_property_list():
 		if int(property["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE != 0:
-			assert_true(Improve.OWNS.has(str(property["name"])), "%s is owned by the improvement" % property["name"])
+			assert_true(known_fields.has(str(property["name"])), "%s is a known MapState field" % property["name"])
 	var game := _game()
+	var owner_before := game.state.owner.duplicate()
 	var map_before := _map.digest()
 	_luck.seed_with(11)
 	for n: int in 500:
 		var pick := _random_action(game)
 		game.act(pick[0], pick[1])
 	assert_eq(_map.digest(), map_before, "the fixed map is never written")
+	assert_eq(game.state.owner, owner_before, "the improvement never writes owner")
 	for i: int in _map.hex_count():
 		if _map.land[i] == 0:
 			assert_eq(game.state.main_use[i], 0, "no sea hex has a use")
