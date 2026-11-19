@@ -169,12 +169,12 @@ numbers are in `docs/architecture/m4-build-spec.md` 4.15; its 4.16 lists which o
 
 - Panels fade and slide 6 px in 120 ms; the seal scales 1.15 to 1 in 180 ms; buttons glow on hover; the main-menu map drifts; the wind rose may turn once in 120 s. **All off under Reduce motion** and `prefers-reduced-motion`.
 - Godot: tweens on `modulate`, scale and rotation only. No shader needed.
-- Sound (M12): paper slide, quill tick, seal thud, page turn on a season, coin.
+- Sound (M12): paper slide, quill tick, seal thud, page turn on a season, coin. Specified in `docs/architecture/m12-build-spec.md` 6.9.
 
 ## 8. Accessibility
 
 - Text 13 px or more (12 px in key caps only); targets 24 px or more.
-- High-contrast theme (M12): flat boxes, black fields, white text (21:1), 2 px `#ffd646` borders, a 3 px INFO focus ring. It doubles as the low-memory theme.
+- High-contrast theme (M12): flat boxes, black fields, white text (21:1), 2 px `#ffd646` borders, a 3 px INFO focus ring. It doubles as the low-memory theme. The player's row and the chart inks: `docs/architecture/m12-build-spec.md` D55.
 - Contrast ratios as in section 3; colour never carries a meaning alone.
 - Seasons do not change the UI. Contrast is tuned once; only the season dial changes.
 

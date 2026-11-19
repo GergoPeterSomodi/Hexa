@@ -502,7 +502,9 @@ The owner saw the round-1 side-by-side and decided not to spend more time on the
 look as it is (good enough to play on), and the look gets its own **map look milestone** later (after a few game
 systems, before the first public release): the real shoreline drawn as chunk meshes (Genoa's bay and the capes back),
 ranges along crest chains, a ground shader blending covers by a splat texture with slope shading, trees one by one,
-bridges and today's road style. **T0 is replaced by this decision** (no art-director sign-off gate in M1).
+bridges and today's road style. **T0 is replaced by this decision** (no art-director sign-off gate in M1). (2026-11-17:
+`m12-build-spec.md` 8.15 splits the look: the ranges along crest chains, decor density and the finished palettes ship in M12; the
+shoreline meshes, the ground shader, trees one by one, the bridge and road restyle and the rest go to M14 Map look II.)
 
 So that the later look work is a drawing job only, `MapData` (T1, T6) **also stores** the data it will need:
 

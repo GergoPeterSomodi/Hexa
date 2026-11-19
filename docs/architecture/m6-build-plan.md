@@ -252,5 +252,6 @@ On the day M5 closes:
 - **M10:** road works change `StepCosts` (it moves onto `Game`); markets may feed armies (taken up in `m10-build-spec.md`).
 - **M11:** later kinds and refit; techs change move points, supply reach and costs through definitions only (taken up in
   `m11-build-spec.md` 4.10 and 4.14).
-- **M12:** desertion through `Armies.lose_men` (`deserted`); bankruptcy disbands; score with men under arms.
+- **M12:** desertion through `Armies.lose_men` (`deserted`); bankruptcy disbands; score with men under arms (taken up in
+  `m12-build-spec.md`).
 - **Saves:** `SaveFile.FORMAT` 4; a new body field with a default needs no bump (M3 4.10).

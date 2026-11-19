@@ -244,7 +244,8 @@ On the day M6 closes:
   `m10-build-spec.md`: a besieged market shuts).
 - **M11:** generals (stack +2, a term each in the values and the morale loss), techs changing `WarDef` through definitions only,
   later kinds' attack and defence (taken up in `m11-build-spec.md` 4.10, 4.11 and 4.14).
-- **M12:** countries that fall, desertion, score with battles (war weariness and the brakes moved to M9).
+- **M12:** countries that fall, desertion, score with battles (war weariness and the brakes moved to M9; taken up in
+  `m12-build-spec.md`).
 - **After M12:** the battle board (the mini game between days, width 3 to 7, back slots, rotation, cards) on `Combat.fight` and
   the records; field forts.
 - **Saves:** `SaveFile.FORMAT` 5; a new body field with a default needs no bump (M3 4.10).

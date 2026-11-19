@@ -955,5 +955,5 @@ new autoload, no new layer; `tools/lint_godot.py` needs no entry (new files sit 
 | M9 | Relations on key 7; the Diplomacy page with `RelationMatrix`: taken up in `m9-build-spec.md` 6.3, 6.9 | Diplomacy |
 | M10 | "Dues and trade" on the money chart; the Trade page with sparks in `StudyTable`; Trade on key 8 | Trade |
 | M11 | an `era` mark kind; the Research page; **taken up in `m11-build-spec.md`** 4.21 and 6.6 (the `era` and `tech` marks; the page between People and Rankings) | Research |
-| M12 | score in Rankings; the Debt tab (`PageEconomy.TABS`); text size and high contrast in charts (`InkChart` reads the Theme, whose high-contrast set has the chart inks) | A whole game |
+| M12 | score in Rankings; the Debt tab (`PageEconomy.TABS`); text size and high contrast in charts (`InkChart` reads the Theme, whose high-contrast set has the chart inks) (taken up in `m12-build-spec.md` section 12; `since` compared as numbers, D49) | A whole game |
 | **E2, E3** | **Nothing blocking: every view reads the map through `Territory` and `EconomyPreview`, and the Europe budgets are already measured on the made-up Europe.** | |

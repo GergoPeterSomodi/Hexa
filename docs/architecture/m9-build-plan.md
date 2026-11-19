@@ -251,7 +251,8 @@ On the day M8 closes:
 - **M11:** techs changing `DiplomacyDef` through definitions only (goal size, the outside price, infamy's fade, `reach_free`); an
   idea card against weariness (taken up in `m11-build-spec.md` 4.3 to 4.6).
 - **M12:** countries that fall (`keep_last_district` off, `Countries.fall`, wars ended with terms `fallen`); the debt row in
-  `declare_war_check`; infamy and weariness for the score; a difficulty that may scale `enforce_net`.
+  `declare_war_check`; infamy and weariness for the score; a difficulty that may scale `enforce_net` (taken up in
+  `m12-build-spec.md`: infamy counts, weariness and a difficulty do not).
 - **After M12:** alliances and calls to arms; rebels and free states on the defiant band, `gained`, `former` and the regions;
   historical claims on the Europe map.
 - **E2, E3:** regions for Europe in E2's map build; the reach and league numbers re-tuned there; section 8's rows on the real map.

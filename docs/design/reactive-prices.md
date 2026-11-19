@@ -1,7 +1,7 @@
 # Reactive prices: harvests, war closing ports, trade fairs (design proposal)
 
 Status: DRAFT for the owner (2026-11-13). Nothing here is approved or built. **The Godot build is `docs/architecture/m10-build-spec.md`**
-(its 1.3 and D24, D32): harvests are M4's weather, war closes the roads between enemies but for grain, fairs come after M12,
+(its 1.3 and D24, D32): harvests are M4's weather, war closes the roads between enemies but for grain, fairs are M12's `trade_fair` incident (`m12-build-spec.md` 4.8),
 `PRICE_CAP` stays 3.5. This is proposal T3 of `docs/reports/trade-fun-test.md`. The owner asked for the design note first, then a decision.
 T1 (merchants after the background trade) and T2 (flagged orders, AI re-pick, "Re-pick best") are being built on a branch. This note assumes both.
 

@@ -245,5 +245,5 @@ On the day M3 closes:
   views; the money property in the soak. Taken up in `m8-build-spec.md` 4.6, 4.7 and 4.17.
 - **M10:** the body of `market_prices`; `market_of`; sales to markets; road works (`MapState` schema 4); price lines on the
   card; `Treasury.WHY` `trade` (taken up in `m10-build-spec.md`; tasks in `m10-build-plan.md`).
-- **M12:** `debt_limit`, interest, bankruptcy; the Debt tab; the Prestige chip.
+- **M12:** `debt_limit`, interest, bankruptcy; the Debt tab; the Prestige chip (taken up in `m12-build-spec.md`).
 - **Saves:** `SaveFile.FORMAT` 2; a new body field with a default needs no bump (M3 4.10).

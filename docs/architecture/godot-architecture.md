@@ -269,14 +269,15 @@ season. The table grows by one row or two per milestone. The full order, taken f
 | 5 | War (`war`): the 40-season safety peace (`m7-build-spec.md` 4.9); offers lapse, truces end, the score's bookkeeping (`m9-build-spec.md` 4.15) | M7, M9 |
 | 6 | Relations (`relations`): memories fade, infamy, war weariness, leagues, unrest bands (`m9-build-spec.md` 4.15) | M9 |
 | 7 | Production (`production`), then trade and prices (`trade`: markets, routes, merchants, next season's prices; `m10-build-spec.md` 4.6, 4.12) | M4, M10 |
-| 8 | Income and upkeep (`income`), debt | M4, M12 |
+| 8 | Income and upkeep (`income`), then debt (`debt`: interest, desertion, bankruptcy; `m12-build-spec.md` 4.2) | M4, M12 |
 | 9 | Works progress (building, upgrades): after the money, so a work stands and produces from the season after it finishes (`m4-build-spec.md` 1.2) | M3 (moved here in M4) |
 | 10 | People and growth | M5 |
 | 11 | Research (`research`): points, techs learned, the era gate and idea offers (`m11-build-spec.md` 4.9) | M11 |
-| 12 | Countries that are gone, scores | M12 |
-| 13 | Stats: the season's rows (the ledger closes here from M4) | M3 |
-| 14 | Calendar: next season; from M4 the weather of the season that begins, from the world's luck | M3, M4 |
-| 15 | Ready units, vision | M6 |
+| 12 | Incidents (`incidents`): small events with choices, from the world's luck (`m12-build-spec.md` 4.8) | M12 |
+| 13 | Countries that are gone (`extinction`), then scores and the end (`scores`) (`m12-build-spec.md` 4.5 to 4.7) | M12 |
+| 14 | Stats: the season's rows (the ledger closes here from M4) | M3 |
+| 15 | Calendar: next season; from M4 the weather of the season that begins, from the world's luck | M3, M4 |
+| 16 | Ready units, vision | M6 |
 
 A test pins the names in order. To change the order, change the table and the test in one pull request. The autosave
 is not a phase: the shell saves after the season's report closes (it needs a thumbnail and the wall clock, and changes
@@ -441,8 +442,8 @@ UI, with no stand-in panel left. Sources: `docs/design/ui/design.md` (the look),
 ### 9.2 Build specs and plans: where each milestone stands (2026-11-17)
 
 A milestone's **build spec** (interfaces, tasks, tests, risks) is written before that milestone starts, from this
-table, the design pages and the UI rows above. M2 to M11 (with M4.5) have their build spec and plan; M12 has its UI rows and no
-system spec yet. The UI work is specified and planned for every milestone at the level of the table.
+table, the design pages and the UI rows above. M2 to M12 (with M4.5) have their build spec and plan. The UI work is specified
+and planned for every milestone at the level of the table.
 
 **Tracking (from M3, decided 2026-11-19).** Each milestone from M3 on is a GitHub milestone titled `Godot M<N>: <Name>`;
 each task row of its plan is one issue (`M<N> <ID>: <task>`, labels `godot`, `size:*`, `who:*`, `group:*`); each milestone
@@ -468,15 +469,17 @@ to 17). M2 stays in its plan file.
 | M9 | `m9-build-spec.md` (war goals and reasons, the war score by worth and battles, peace by terms with deals, white peace and surrender, offers to the player as decisions with imposing at 50, truces of 12 and 8, relations of memories and standing, gifts, infamy and soft leagues, war weariness, overextension by reach and the national part, unrest by region part on the map's new regions; the peace screen, the declare-war overlay with the goal on the map, the country panel's relations and war goals, the Relations mode on key 7, the Diplomacy page with the relation matrix, the report's Diplomacy section, the decisions; the AI's reasons, peace rules, leagues and gifts; the soak's runaway invariant and conqueror suite) | `m9-build-plan.md` (V1 to V33) | **specified and planned, waits for the owner's go**; starts after M8 closes |
 | M10 | `m10-build-spec.md` (markets at the walled towns, cities and capitals, catchments by move cost, routes over land with their ways, costs, capacities and winter, prices from supply and appetite smoothed and bounded, the trade phase with free traders then merchants (T1), offers above the reserve and the reserve bought, tolls Low to High, trade agreements and embargoes on M9's relations, war, blockade and siege closing roads, road works on edges with fords and bridges and `StepCosts` on `Game`, the open-markets peace term; the Trade mode on key 8, the route lines, the market panel (E), the order card, the road card, the Trade page with the price ring, the report's Trade section, the Merchants chip; the AI's merchants, tolls, pacts and roads; the soak's trade invariants and ranges) | `m10-build-plan.md` (X1 to X31) | **specified and planned, waits for the owner's go**; starts after M9 closes |
 | M11 | `m11-build-spec.md` (research points from towns and settlements, the 37-tech tree in four branches and three eras, the queue, funding, diffusion over M10's markets, the era gate of 1520 and 1575, idea cards, national techs, every effect a modifier row on a definition read through `Game.defs_of`, the 55-key registry and its probes, eight later kinds and refits, generals as traits on armies; the tech screen (T), the idea pick in `DECISIONS`, the Research chip, the Research page, the report's Research section; the AI's research, generals and refits; the `research` soak suite) | `m11-build-plan.md` (Z1 to Z25) | **specified and planned, waits for the owner's go**; starts after M10 closes |
-| M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of the milestone) | to write before it starts |
+| M12 | `m12-build-spec.md` (debt with credit, stages and three settlements; countries that fall; prestige and the end after Winter 1650, by conquest or ruin; eleven incidents; the event pop-up, the game-over screen, the Debt tab, the debt and Prestige chips, Audio and Keys pages, text size, high contrast, hints, sound, credits, developer tools off; the map look before the release; release engineering for Hexa 0.3.0 on Windows; the `whole` soak of 100 games to 1650; the hand-off ledger of everything deferred to M12; the after-M12 roadmap M13 to M27) | `m12-build-plan.md` (J1 to J38, with S5's M12 row folded in) | **specified and planned, waits for the owner's go**; starts after M11 closes |
 
 **The Europe track, beside the milestones.** E1 (inside M1): measure on a fake full-size map. E2 (after M3): build
 the real 28 km Europe map file from the geography and heights. E3 (after M8): measure an AI season on it, then
-switch the play area. If a budget fails, the fallback is a larger hex, which changes data, not code.
+switch the play area. If a budget fails, the fallback is a larger hex, which changes data, not code. The first public release
+(0.3.0, M12) ships on north Italy; E2, E3 and the switch are milestone M13 Europe, with the criteria of `m12-build-spec.md` 8.14.
 
 **After M12, in an order the owner picks:** alliances and calls to arms, rebels and free states (`stop-steamrolling.md` Part C),
 historical claims (`war-goals-and-peace.md` 3.9), ships and sea war, exploration and fog of discovery, colonies, random
-worlds, city states, crown projects, achievements.
+worlds, city states, crown projects, achievements. `m12-build-spec.md` section 13 names them M13 to M27 (with Europe, the map
+look II, the battle board, characters, Steam and localisation), with what each needs, its size and its Python reference.
 
 ---
 
@@ -504,7 +507,8 @@ Only game and scope. The recommendation is first.
 - **Numbers here are estimates until measured:** tileset size, cell size, tile counts, chunk size.
 - **Godot details to confirm in M1 with a test, not by reading:** that *stacked* layout shifts odd rows right as
   our grid does, and that y-sorting across several layers in one group orders tall tiles as needed.
-- Not covered: sound, localisation, Steam integration. Each gets a short note when it nears.
+- Sound and localisation are specified in `m12-build-spec.md` 6.9 and 6.13 (English only in 0.3.0); Steam integration comes
+  with 0.9 (`m12-build-spec.md` section 13, M26).
 
 ## Owner's answers (2026-11-15)
 
