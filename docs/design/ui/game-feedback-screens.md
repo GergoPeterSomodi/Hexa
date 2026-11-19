@@ -26,7 +26,8 @@ look. Numbers marked *example* are placeholders: the M4 district-economy design 
 
 ### A.1 When it opens, and how it closes
 
-After **End season**: the busy pill while the phases run; the movement replay (M6, Space skips it); any **decision
+After **End season**: the busy pill while the phases run (from M8 "Countries are moving 3 / 12" while the other countries
+think, `m8-build-spec.md` 6.1); the movement replay (M6, Space skips it); any **decision
 screens** the season queued (war declared on you M7, peace offer M9, idea pick M11), one at a time; then **the report**,
 a `MODAL` screen (map dimmed and paused). Closing it starts the new season. Toasts for what the report holds are dropped.
 

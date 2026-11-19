@@ -236,7 +236,8 @@ On the day M6 closes:
 - **M8:** the actions `declare_war`, `make_peace`, `march` (attack and besiege), `storm`, `set_standing` with their checks;
   `OddsView`, `SiegeView`, `Sieges.forecast`, `Occupation.area_state`, `BattleView`, `Wars.score`, `Wars.truce_until`,
   `Knowledge` and the reminders `besieged`, `occupied` as its views; `fight_ms`, `battles_ms`, `sieges_ms` as its budget rows; AI
-  declarations on the player through `DECISIONS`.
+  declarations on the player through `DECISIONS`. Taken up in `m8-build-spec.md` 4.9 to 4.11 and 4.14 (`Sieges.forecast_for`,
+  the peace alert).
 - **M9:** `Wars.score`'s body, `make_peace`'s terms (the peace screen), the truce of 12 after terms, war goals and casus belli on
   `War`, peace offers in the `war` phase, the `battle_ended` contract, the Wars table moving to the Diplomacy page.
 - **M10:** road works change `StepCosts` (retreats and areas follow); markets may feed besieged towns.

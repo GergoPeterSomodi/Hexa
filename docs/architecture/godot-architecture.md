@@ -54,8 +54,8 @@ The game itself does not exist in Godot yet: no countries that act, no economy, 
               | reads state, sends actions, hears events       (never writes state)
    ---------------------------------------------------------------------------
    core/    plain GDScript, no nodes, runs without a window
-            views    "what to draw" as plain lists
-            ai       picks actions for a country
+            ai       picks actions for a country (reads views, acts through Game.act)
+            views    "what to draw" and "what a country may know" as plain lists
             game     Game, the action table, the season table, events, saves
             systems  the rules, one file per topic
             state    the facts of one game
@@ -63,8 +63,10 @@ The game itself does not exist in Godot yet: no countries that act, no economy, 
 ```
 
 **The one-way rule:** a file may use its own layer or a lower one, never a higher one. Bottom to top: `defs`,
-`state`, `systems`, `game`, `ai`, `views`, `shell`. `mapgen` sits beside `systems` and runs only in tools. The lint
-checks this on every pull request.
+`state`, `systems`, `game`, `views`, `ai`, `shell` (from M8: the AI reads the views the panels read, and no view needs the
+AI; `m8-build-spec.md` D2. Before M8 the order named `ai` below `views`, while `core/ai/` was empty). `mapgen` sits beside
+`systems` and runs only in tools. The lint checks this on every pull request. The season (game) runs the AI (ai) through
+an orders hook that the AI subclasses, so no game file names an AI one (`m8-build-spec.md` 4.2).
 
 **Node, RefCounted or Resource?** One rule for every new class:
 
@@ -260,7 +262,7 @@ season. The table grows by one row or two per milestone. The full order, taken f
 
 | # | Phase | Arrives in |
 |---|---|---|
-| 1 | AI orders | M8 |
+| 1 | AI orders (`ai_orders`): run through `Game.orders`, the hook the AI attaches; the shell runs it in slices (`m8-build-spec.md` 4.2) | M8 |
 | 2 | Movement, then battles | M6, M7 |
 | 3 | Supply and attrition | M6 |
 | 4 | Sieges and occupation | M7 |
@@ -306,6 +308,9 @@ The AI reads the state through the same queries as the panels and acts only thro
 No cheats in code; any handicap is a number in a `.tres`. Temperaments are data. Its thinking is cut into slices
 over several frames on the main thread (no threads in `core/`, which also keeps the web possible later), with a
 time budget per season that the performance test checks. **AI-only games without a window are the main test rig.**
+From M8 (`m8-build-spec.md`): the slices are a step queue (each step at most one route or one works card), the AI keeps no
+memory of its own, every read and act goes through one door (`AiKnow`) that sees only what `Knowledge` lets its country
+know, and the AI's acts are logged like the player's.
 
 ---
 
@@ -322,7 +327,7 @@ time budget per season that the performance test checks. **AI-only games without
 | Save round trip, old saves | Saves work and keep working | Every pull request, from M3 |
 | Golden screenshots | The look did not change by accident (fixed machine, software renderer, small tolerance) | Pull requests touching art, tiles or views |
 | Performance | Frame time per zoom, season time, start-up, memory, on a full-size test map | Nightly and before each release |
-| Soak | Long AI-only games: no crash; wealth, wars and growth stay in expected ranges | Nightly, from M8 |
+| Soak | Long AI-only games: no crash; wealth, wars and growth stay in expected ranges (`godot/tools/soak.gd`, `m8-build-spec.md` 4.17) | Nightly, from M8 |
 
 **Budgets (Windows):** a frame under 16 ms at every zoom on the 122,000-hex test map; an AI season within its
 budget. **A refactor never rides with a behaviour change:** a refactor pull request keeps the digest and the
@@ -435,7 +440,7 @@ UI, with no stand-in panel left. Sources: `docs/design/ui/design.md` (the look),
 ### 9.2 Build specs and plans: where each milestone stands (2026-11-17)
 
 A milestone's **build spec** (interfaces, tasks, tests, risks) is written before that milestone starts, from this
-table, the design pages and the UI rows above. M2 to M7 (with M4.5) have their build spec and plan; M8 to M12 have
+table, the design pages and the UI rows above. M2 to M8 (with M4.5) have their build spec and plan; M9 to M12 have
 their UI rows and no system spec yet. The UI work is specified and planned for every milestone at the level of the table.
 
 **Tracking (from M3, decided 2026-11-19).** Each milestone from M3 on is a GitHub milestone titled `Godot M<N>: <Name>`;
@@ -458,7 +463,8 @@ to 17). M2 stays in its plan file.
 | M5 | `m5-build-spec.md` (people per district: start, room, growth, hunger, crowding; towns that grow and fall a level; people in M4's economy; the People and Food chips, the Food mode on key 5, the People page, the report's People section, people in Rankings; the M6 seam for recruits) | `m5-build-plan.md` (P1 to P18, with S5's M5 row folded in) | **specified and planned, waits for the owner's go**; starts after M4.5 closes |
 | M6 | `m6-build-spec.md` (companies and armies raised from the people, orders walked in the movement phase, river crossings, passes and winter, supply and hunger, sight and witnesses; tokens, orders, the route, the move card, the army panel, the Raise tab, the replay, the hex menu, the Supply mode on key 6, the Army chip, the Military page, the report's Armies section; the seams for M7 and M8) | `m6-build-plan.md` (L1 to L25, with S5's M6 row folded in) | **specified and planned, waits for the owner's go**; starts after M5 closes |
 | M7 | `m7-build-spec.md` (war declared between neighbours, battles of lanes and days settled in their phase with records the battle dock plays back, fortresses as districts with garrisons and castle areas, sieges, occupation and its economy and people, a simple peace by hand with a truce and the 40-season timer; Declare war, the war alert in `DECISIONS`, the odds card, battle and siege badges, the castle areas, the dock, the report's War section, the Military page's wars and battles; the seams for M8 and M9) | `m7-build-plan.md` (B1 to B29, with S5's M7 row folded in) | **specified and planned, waits for the owner's go**; starts after M6 closes |
-| M8 to M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |
+| M8 | `m8-build-spec.md` (every other country played through the same actions and checks, seeing only what `Knowledge` gives it; the `ai_orders` row run through an orders hook and in slices by the shell; five temperaments in data, set per scenario; taxes, works, raising, posts, declaring, the army's aims, standing orders, storms and peace written out; no AI memory; AI-only games; the soak with its invariants and ranges, nightly; the AI's perf rows and the E3 criteria; the AI-turn pill, the camera-only map, the replay timed in view, what others did in the report and the log, the peace alert, `peace_risk`; the layer order views below ai) | `m8-build-plan.md` (K10 to K29) | **specified and planned, waits for the owner's go**; starts after M7 closes |
+| M9 to M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |
 
 **The Europe track, beside the milestones.** E1 (inside M1): measure on a fake full-size map. E2 (after M3): build
 the real 28 km Europe map file from the geography and heights. E3 (after M8): measure an AI season on it, then

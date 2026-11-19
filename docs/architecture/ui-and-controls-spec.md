@@ -685,6 +685,7 @@ first slice), a milestone, or **skip**.
 | Undo the last build this season | "Cancel the work" in the hex panel; Ctrl/Cmd+Z, shown as a key cap in the toast (toasts take no clicks) | **not Godot's `UndoRedo`**: game state changes only through actions. A rules action pair `cancel_work_check` / `cancel_work` (a work started this season is cancelled with a full refund) | M3 (the action, with works that take seasons; `m3-build-spec.md` 4.3); the refund M4 |
 | Pause dim | the stack's shade | section 3.2 | **1.5** |
 | Confirm modals | centred | section 5.3 | **1.5** |
+| AI-turn pill | top centre under the bar (the mockup's pill) | `BusyPill`: "Countries are moving 3 / 12" while the other countries think in slices, "The season ends", then "The moves of Summer 1480 · Space skips them" in the replay; meanwhile the map takes only camera moves (`MapInput.block_orders`) | M8 (`m8-build-spec.md` 6.1, 6.2) |
 | Loading overlay | new game: the `Loading` screen ("Building the map", then "Drawing the map 63 %" from `MapScene.fill_progress()`); a season swap that takes over 200 ms: a small pill at the top, "Changing season 40 %" | reads the map scene's progress | **1.5** |
 | Help overlay | centred card | section 4.6 | **1.5** |
 | Tutorial hints | bubbles anchored to Controls by node path, from a hint table (`.tres`) | the hints option | M12 |

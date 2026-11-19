@@ -200,7 +200,8 @@ On the day M4 closes:
 - **M6:** an army measure (banded); Supply on key 6; witnesses from vision; `knows` by explored hexes; "Upkeep, walls and
   army" on the money chart (spec D35).
 - **M7:** the War filter and a `war` mark kind first in `StudyHistory.MARK_KINDS`.
-- **M8:** the AI fills the chronicle: the 120-row pages, the witnessed index and `StudyWarm` carry it.
+- **M8:** the AI fills the chronicle: the 120-row pages, the witnessed index and `StudyWarm` carry it. Taken up in
+  `m8-build-spec.md` (the soak measures the chronicle's coverage, D51).
 - **M9, M10, M11:** Relations (key 7), Trade (key 8, "Dues and trade"), the eras' marks; their pages on the kit.
 - **M12:** score in Rankings; the Debt tab (`PageEconomy.TABS`); text size and high contrast in charts.
 - **Saves:** unchanged (`SaveFile.FORMAT` 2); the `ui` block may hold `map_mode = "yields"`.

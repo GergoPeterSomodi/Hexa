@@ -242,7 +242,7 @@ On the day M3 closes:
   and Food chips (icon `food` baked).
 - **M6:** `Treasury.WHY` `army`; armies' food from the stores; horses and iron reserves; the Army chip (icon baked).
 - **M8:** `set_tax`, works with costs and `cancel_work` as the AI's actions; `ImprovePreview` and `EconomyPreview` as its
-  views; the money property in the soak.
+  views; the money property in the soak. Taken up in `m8-build-spec.md` 4.6, 4.7 and 4.17.
 - **M10:** the body of `market_prices`; `market_of`; sales to markets; road works (`MapState` schema 4); price lines on the
   card; `Treasury.WHY` `trade`.
 - **M12:** `debt_limit`, interest, bankruptcy; the Debt tab; the Prestige chip.

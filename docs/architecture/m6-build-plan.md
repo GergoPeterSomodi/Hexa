@@ -245,7 +245,8 @@ On the day M5 closes:
 - **M8:** the seven army actions with their checks; `Knowledge.armies_seen`, `Knowledge.sees`, `ArmyView`, `MovePreview`,
   `Movement.plan`, `PathSearch.cost_field`, `Supply.field`, `SupplyView`, `Military.raise_options` and the reminders
   `army_idle`, `army_hungry`, `army_stores` as its views; `route_ms` and `cost_field_ms` as its budget rows; the scenario's
-  starting armies; the chronicle's size with army events.
+  starting armies; the chronicle's size with army events. Taken up in `m8-build-spec.md` (`cost_field` not used, D48; 1480's
+  start armies empty, D30).
 - **M9:** land that changes hands under an army re-plans or halts its march (D2); military access opens `open_to`.
 - **M10:** road works change `StepCosts` (it moves onto `Game`); markets may feed armies.
 - **M11:** later kinds and refit; techs change move points, supply reach and costs through definitions only.

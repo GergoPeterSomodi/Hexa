@@ -183,7 +183,7 @@ Each row is a task group inside that milestone's own build spec; the kit and the
 | M5 People | People page; people in Rankings | People section; `town_grew`, `district_declined` | Food map mode (folded into `m5-build-plan.md`: P6, P8 to P11, P14) |
 | M6 Armies | Military page (armies table) | "What befell" with real `witnesses`; raised and marched in Your orders | `REPLAY` before the report; Supply mode (folded into `m6-build-plan.md`: L5, L11, L12, L15, L16, L17, L21, L22) |
 | M7 War | losses chart, wars | battle and siege lines | the war alert as a `DECISIONS` screen (folded into `m7-build-plan.md`: B19, B20, B27, B28) |
-| M8 AI | | | the AI reads `Knowledge`; the soak checks the `stats` budget |
+| M8 AI | | "What befell" one line a country, "Your orders" by tag (folded into `m8-build-plan.md`: K25) | the AI reads `Knowledge` (K14's door); the soak checks the `stats` budget (K22) |
 | M9 Diplomacy | Diplomacy page; `RelationMatrix` joins the kit | `truce_ended` | peace offer as a decision; Relations mode |
 | M10 Trade | Trade page; sparklines in tables; the price ring | `price_moved` | Trade flows mode |
 | M11 Research | Research page | research line | idea pick as a decision |
