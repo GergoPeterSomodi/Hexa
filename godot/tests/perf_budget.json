@@ -12,6 +12,18 @@
     "season_swap_frame_worst_ms": {"limit": 100.0, "class": "cpu", "what": "worst frame of a whole swap (the rest of the map goes 5 ms a frame)"},
     "chunk_rebuild_ms": {"limit": 80.0, "class": "cpu", "what": "EdgeLines.for_chunk and set_chunk_lines for one chunk, worst"},
     "cells_static_mb": {"limit": 400.0, "class": "mem", "what": "static memory of the filled cells"},
-    "video_mb_per_season": {"limit": 512.0, "class": "mem", "what": "video memory of one season's TileSet (the standard's budget for the map)"}
+    "video_mb_per_season": {"limit": 512.0, "class": "mem", "what": "video memory of one season's TileSet (the standard's budget for the map)"},
+    "owner_frame_worst_ms": {"limit": 16.0, "class": "gpu", "what": "M2: worst frame panning at zooms 2, 1, 0.5, 0.25, 0.12 in Owner mode with borders and names on"},
+    "owner_frame_mean_ms": {"limit": 8.0, "class": "gpu", "what": "M2: mean of the same"},
+    "height_bytes_ms": {"limit": 60.0, "class": "cpu", "what": "M2: MapModes.height_bytes once per map"},
+    "overlay_setup_ms": {"limit": 20.0, "class": "cpu", "what": "M2: ModeOverlay.setup (four textures)"},
+    "mode_switch_ms": {"limit": 2.0, "class": "cpu", "what": "M2: set_mode to the next frame, worst of four switches"},
+    "borders_all_ms": {"limit": 2000.0, "class": "cpu", "what": "M2: every border chunk built, total CPU of the 5 ms slices"},
+    "border_chunk_ms": {"limit": 10.0, "class": "cpu", "what": "M2: one chunk's BorderLines.for_chunk and mesh, worst"},
+    "owner_change_frame_ms": {"limit": 16.0, "class": "cpu", "what": "M2: Territory.transfer of 1 hex: drained, texel written, touched chunks rebuilt, the two countries' names, to the next frame; worst of 24"},
+    "owner_change_200_ms": {"limit": 50.0, "class": "cpu", "what": "M2: a transfer of 200 hexes (a peace treaty): all the work, total CPU; the chunks are sliced"},
+    "country_names_ms": {"limit": 15.0, "class": "cpu", "what": "M2: CountryNames.places_of for the largest country"},
+    "scenario_grow_ms": {"limit": 5000.0, "class": "cpu", "what": "M2: ScenarioGrowth.grow on the whole map (the tool and the editor, not play)"},
+    "owner_mem_mb": {"limit": 8.0, "class": "mem", "what": "M2: overlay textures and border meshes"}
   }
 }
