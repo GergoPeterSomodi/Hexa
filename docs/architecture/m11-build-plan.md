@@ -240,7 +240,8 @@ On the day M10 closes:
 
 - **M12:** the score's research part (`Research.known_points`, `Stats` `techs` and `era`, `era_turns`, the chronicle's tech and era
   entries); the end at 1650 with no era after the third; the debt row in `fund_research_check` and generals dismissed at bankruptcy;
-  the `research` soak suite run to 681 seasons as the whole-game rig.
+  the `research` soak suite run to 681 seasons as the whole-game rig (taken up in `m12-build-spec.md`: the `whole` suite of 684
+  seasons).
 - **After M12:** ships and the sea (Navigation's ship rows, carracks and galleons as kinds, sea routes, the Atlantic), colonies, battle
   cards, drill, named generals with lives (characters), the price-swing part of Bourse; each new effect a registry key with its probe.
 - **E2, E3:** research rates re-tuned on the real Europe by `research_report.gd`; each country's own national tech.

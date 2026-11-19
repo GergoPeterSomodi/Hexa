@@ -185,7 +185,7 @@ Each row is a task group inside that milestone's own build spec; the kit and the
 | M9 Diplomacy | Diplomacy page; `RelationMatrix` joins the kit | `truce_ended` | peace offer as a decision; Relations mode (folded into `m9-build-plan.md`: V17, V18, V19, V21, V26, V28, V30) |
 | M10 Trade | Trade page; sparklines in tables; the price ring | `price_moved` | Trade flows mode (folded into `m10-build-plan.md`: X14, X17, X18, X19, X25, X26) |
 | M11 Research | Research page | research line | idea pick as a decision (folded into `m11-build-plan.md`: Z13, Z14, Z19, Z20) |
-| M12 | score in Rankings; the Debt tab | debt and score lines | the high-contrast row, text size in charts, `seal_cracked`, sounds |
+| M12 | score in Rankings; the Debt tab | debt and score lines | the high-contrast row, text size in charts, `seal_cracked`, sounds (folded into `m12-build-plan.md`: J18, J22, J26, J28, J30) |
 
 ---
 

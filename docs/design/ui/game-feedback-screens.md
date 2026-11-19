@@ -353,7 +353,7 @@ v0.2.2's tracker it is **saved**: charts that empty on load would break the stud
 | M4 | money and goods in the report; the works card with seasons and payback; the study frame with **Economy, This season** as the ledger (L) |
 | **M4.5, new: "Insights I"** | chart and table kit, Economy's other tabs, History, Rankings (land, income), the Yields map mode. Done when the owner answers five questions from the study in under a minute each ("which district earns most?", "why did the treasury fall in Winter 1480?") |
 | M5; M6-M7; M9; M10; M11 | People; Military; Diplomacy; Trade; Research, each built and tested with its system |
-| M12 | score in Rankings, the debt tab, text size and high contrast in charts |
+| M12 | score in Rankings, the debt tab, text size and high contrast in charts (specified in `m12-build-spec.md` 4.12, 6.4, 6.6; the score is called Prestige) |
 
 > **M4.5's build spec** (`docs/architecture/m4-5-build-spec.md`) sets the five questions as a playtest script on seed 1480
 > as Genoa (its 4.11; the winter asked about is Winter 1481, when Genoa's city is begun) and builds the pages above with no

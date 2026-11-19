@@ -216,6 +216,6 @@ On the day M7 closes:
 - **M11:** research and idea picks by temperament branch weights; generals and refits in `AiForces` (taken up in
   `m11-build-spec.md` 4.17).
 - **M12:** debt and bankruptcy in the AI's money; seats that fall; a difficulty scale in `AiDef` on the New game page; the
-  soak to 1650 and the old-saves check.
+  soak to 1650 and the old-saves check (taken up in `m12-build-spec.md`: no difficulty, by the owner's decision).
 - **E3:** `perf_core.gd --ai-map --ai-scenario` and spec 8.3's criteria; the soak's `europe` suite on the real map.
 - **Saves:** `SaveFile.FORMAT` 6; a new body field with a default needs no bump (M3 4.10).

@@ -1,7 +1,8 @@
 # Stop steamrolling, diplomacy and rebels: design proposal
 
 (2026-11-19) The Godot build of Part A (the brakes) and of the parts of Part B that war goals need is
-`docs/architecture/m9-build-spec.md` (milestone M9); Part C (rebels) and alliances come after M12.
+`docs/architecture/m9-build-spec.md` (milestone M9); Part C (rebels) and alliances come after M12 (M16 and M15 of
+`docs/architecture/m12-build-spec.md` section 13).
 
 Status: DRAFT for the owner (2026-11-12). Nothing here is approved or built. Each part lists its mockups; the owner sees mockups before any build.
 

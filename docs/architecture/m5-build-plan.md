@@ -217,5 +217,6 @@ On the day M4.5 closes:
 - **M10:** buying food from markets; the food need in market demand; grain and fish prices by supply (taken up in
   `m10-build-spec.md`).
 - **M11:** techs change the growth, hunger, room and jobs numbers through definitions only (taken up in `m11-build-spec.md` 4.14).
-- **M12:** score with people; plague and famine pop-ups; countries that fall with their people.
+- **M12:** score with people; plague and famine pop-ups; countries that fall with their people (taken up in
+  `m12-build-spec.md`).
 - **Saves:** `SaveFile.FORMAT` 3; a new body field with a default needs no bump (M3 4.10).

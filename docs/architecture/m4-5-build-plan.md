@@ -204,5 +204,6 @@ On the day M4 closes:
   `m8-build-spec.md` (the soak measures the chronicle's coverage, D51).
 - **M9, M10, M11:** Relations (key 7), Trade (key 8, "Dues and trade"), the eras' marks; their pages on the kit (M11's taken up in
   `m11-build-spec.md` 4.21 and 6.6).
-- **M12:** score in Rankings; the Debt tab (`PageEconomy.TABS`); text size and high contrast in charts.
+- **M12:** score in Rankings; the Debt tab (`PageEconomy.TABS`); text size and high contrast in charts (taken up in
+  `m12-build-spec.md`).
 - **Saves:** unchanged (`SaveFile.FORMAT` 2); the `ui` block may hold `map_mode = "yields"`.

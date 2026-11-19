@@ -1,6 +1,8 @@
 # Debt and bankruptcy roadmap
 
 Status: idea stage (2026-11-12). Nothing here is designed or approved yet. The design comes with mockups and is approved by the owner before any build.
+**The Godot build is `docs/architecture/m12-build-spec.md`** (2026-11-17): one number with stages and credit (option A), bankruptcy at
+the limit with three settlements (default, pledge land, pay with the army); loans (option B) come with M18.
 
 ## The idea (owner, 2026-11-12)
 

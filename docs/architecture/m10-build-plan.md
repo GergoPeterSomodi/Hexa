@@ -249,7 +249,7 @@ On the day M9 closes:
   tolls, the remote share); an idea card that brings idle orders home sooner (taken up in `m11-build-spec.md` 4.2 and 4.3).
 - **M12:** debt and bankruptcy reading purchases and merchants' losses; no buying over the debt limit; orders home at bankruptcy;
   a fallen country's orders and pacts ended; `income_trade` and the markets held for the score; trade fairs as an event kind
-  through `Trade.appetite`, if the events design wants them.
+  through `Trade.appetite`, if the events design wants them (taken up in `m12-build-spec.md`: fairs are an incident).
 - **After M12:** ships and sea trade (sea routes, port capacity, naval blockade), river boats, overseas and colonial markets, the
   price revolution, trade companies, alliances' trade clauses, pact offers to the player, roads in reach fields.
 - **E2, E3:** markets on Europe by the same rule; `market_reach` and the appetites re-tuned there; section 8's rows on the real map.
