@@ -184,3 +184,54 @@ func test_action_keys_and_rebinding_and_dev_gating() -> void:
 	assert_eq(_input.current_hover(), MapInput.NO_HEX)
 	_input._unhandled_input(_key(KEY_N))
 	assert_true(log.is_empty())
+
+
+func _chord(action: StringName) -> InputEventKey:
+	var ev := Bindings.events_for(action)[0].duplicate() as InputEventKey
+	ev.pressed = true
+	return ev
+
+
+func test_m3_keys_emit_their_intents() -> void:
+	var log: Array[String] = []
+	_input.end_season_requested.connect(func(echo: bool) -> void: log.append("end:%s" % echo))
+	_input.report_requested.connect(func() -> void: log.append("report"))
+	_input.bookmark_requested.connect(func(i: int, set: bool) -> void: log.append("bm:%d:%s" % [i, set]))
+	_input.undo_work_requested.connect(func() -> void: log.append("undo"))
+
+	_input._unhandled_input(_key(KEY_SPACE))
+	var held := _key(KEY_SPACE)
+	held.echo = true
+	_input._unhandled_input(held)
+	_input._unhandled_input(_key(KEY_ENTER))
+	_input._unhandled_input(_key(KEY_J))
+	_input._unhandled_input(_chord(&"game_undo_work"))
+	_input._unhandled_input(_chord(&"cam_bookmark_go_3"))
+	_input._unhandled_input(_chord(&"cam_bookmark_set_7"))
+	assert_eq(log, ["end:false", "end:true", "end:false", "report", "undo", "bm:3:false", "bm:7:true"])
+
+	log.clear()
+	_input._unhandled_input(_key(KEY_Z))  # plain Z does nothing
+	_input._unhandled_input(_key(KEY_3, true))  # Ctrl+3 is a bookmark, not map mode 3
+	assert_eq(log, ["bm:3:false"])
+
+
+func test_m3_keys_are_silent_under_a_line_edit_and_when_disabled() -> void:
+	var log: Array[String] = []
+	_input.end_season_requested.connect(func(echo: bool) -> void: log.append("end:%s" % echo))
+	_input.report_requested.connect(func() -> void: log.append("report"))
+	_input.bookmark_requested.connect(func(i: int, _set: bool) -> void: log.append("bm:%d" % i))
+	_input.undo_work_requested.connect(func() -> void: log.append("undo"))
+	var edit := LineEdit.new()
+	_vp.add_child(edit)
+	edit.grab_focus()
+	_input._unhandled_input(_key(KEY_SPACE))
+	_input._unhandled_input(_key(KEY_J))
+	_input._unhandled_input(_chord(&"game_undo_work"))
+	_input._unhandled_input(_chord(&"cam_bookmark_go_1"))
+	assert_true(log.is_empty(), "a focused LineEdit wins")
+	edit.release_focus()
+	_input.enabled = false
+	_input._unhandled_input(_key(KEY_SPACE))
+	_input._unhandled_input(_key(KEY_J))
+	assert_true(log.is_empty(), "nothing while disabled")

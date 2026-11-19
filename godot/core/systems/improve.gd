@@ -206,4 +206,4 @@ static func clear(game: Game, args: Dictionary) -> Dictionary:
 
 
 static func _changed(game: Game, hex: Vector2i) -> void:
-	game.events.append({"kind": "hex_changed", "hex": hex})
+	game.emit({"kind": "hex_changed", "hex": hex})

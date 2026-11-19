@@ -8,6 +8,7 @@ tag = &"SAV"
 name = "Savoy"
 long_name = "Duchy of Savoy"
 adjective = "Savoyard"
+ruler = "the Duke of Savoy"
 colour = Color(0.50980395, 0.5882353, 0.47058824, 1)
 arms_division = &"cross"
 arms_field = &"gules"

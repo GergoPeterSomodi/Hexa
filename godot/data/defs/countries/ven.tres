@@ -8,6 +8,7 @@ tag = &"VEN"
 name = "Venice"
 long_name = "Republic of Venice"
 adjective = "Venetian"
+ruler = "the Doge of Venice"
 colour = Color(0.11764706, 0.627451, 0.54901963, 1)
 arms_division = &"bordure"
 arms_field = &"gules"

@@ -252,3 +252,42 @@ func test_committed_themes_match_live_builder_properties() -> void:
 	for style_name: String in Tokens.STYLE_VARIATIONS:
 		var sname := StringName(style_name)
 		assert_eq(committed.get_type_variation_base(sname), rebuilt.get_type_variation_base(sname), style_name)
+
+func test_slice3_kit_icons_and_end_season_plate() -> void:
+	# Spec 4.5 slice 3: medallions, dial, hourglass and seal tones are Kit icons at their size, 1x and 2x.
+	var studiolo := load(KitTheme.THEME_PATH) as Theme
+	var pieces := _load_pieces()
+	var sizes: Dictionary[String, Vector2] = {
+		"medallion_64": Vector2(64.0, 64.0),
+		"medallion_30": Vector2(30.0, 30.0),
+		"dial_quarters": Vector2(64.0, 64.0),
+		"dial_hand": Vector2(64.0, 64.0),
+		"hourglass": Vector2(24.0, 24.0),
+		"seal_good": Vector2(72.0, 72.0),
+		"seal_plain": Vector2(72.0, 72.0),
+		"seal_cracked": Vector2(72.0, 72.0),
+	}
+	var theme_2x := KitTheme.load_for(2.0, &"2x", false)
+	for icon_name: String in sizes:
+		var expected: Vector2 = sizes[icon_name]
+		assert_true(studiolo.has_icon(StringName(icon_name), &"Kit"), "studiolo Kit has " + icon_name)
+		var tex_1x := studiolo.get_icon(StringName(icon_name), &"Kit")
+		assert_not_null(tex_1x, "1x Kit icon %s non-null" % icon_name)
+		assert_eq(tex_1x.get_size(), expected, "1x %s size" % icon_name)
+		var tex_2x := theme_2x.get_icon(StringName(icon_name), &"Kit")
+		assert_not_null(tex_2x, "2x Kit icon %s non-null" % icon_name)
+		assert_eq(tex_2x.get_size(), expected, "2x %s logical size" % icon_name)
+		assert_eq(tex_2x.get_image().get_size(), Vector2i(int(expected.x) * 2, int(expected.y) * 2), "2x %s backing pixels" % icon_name)
+
+	# End season plate: four states, the plate's own margins, a StyleBoxTexture on ButtonEndSeason.
+	for state: String in ["normal", "hot", "pressed", "off"]:
+		assert_true(pieces.has("endseason_plate_" + state), "ui_kit.json has endseason_plate_" + state)
+	var end_piece: Dictionary = pieces["endseason_plate_normal"]
+	assert_eq(end_piece["size"], [160.0, 44.0], "plate size")
+	assert_eq(end_piece["margin"], [28.0, 22.0, 44.0, 22.0], "plate margins (spec 4.5)")
+	assert_eq(end_piece["expand"], [0.0, 0.0, 0.0, 0.0], "plate expand")
+	assert_eq(end_piece["slice"], 3, "plate is slice 3")
+	var plate := studiolo.get_stylebox(&"normal", &"ButtonEndSeason") as StyleBoxTexture
+	assert_not_null(plate, "ButtonEndSeason normal is a StyleBoxTexture")
+	if plate != null:
+		assert_eq(plate.texture.resource_path.get_file(), "endseason_plate_normal.png", "ButtonEndSeason uses the plate")

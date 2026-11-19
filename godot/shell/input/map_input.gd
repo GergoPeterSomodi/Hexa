@@ -15,6 +15,12 @@ signal names_toggled
 signal hud_toggled
 signal upgrade_requested
 signal new_seed_requested
+## `echo` is true for a held key's repeat; the receiver (SeasonFlow) refuses echoes.
+signal end_season_requested(echo: bool)
+signal report_requested
+## `set` true stores the view in slot `index` (1 to 9); false goes to it.
+signal bookmark_requested(index: int, set: bool)
+signal undo_work_requested
 
 const CLICK_SLOP := 6.0
 const NO_HEX := Vector2i(-9999, -9999)
@@ -135,7 +141,15 @@ func _on_mouse_motion(motion: InputEventMouseMotion) -> void:
 
 
 func _on_key(key: InputEventKey) -> void:
-	if not key.pressed or key.echo or _is_text_input_focused():
+	if not key.pressed or _is_text_input_focused():
+		return
+	if event_is_exact_action(key, &"game_end_season", true):
+		end_season_requested.emit(key.echo)
+		_mark_handled()
+		return
+	if key.echo:
+		return
+	if _on_game_key(key):
 		return
 	if allow_dev_actions and _is_action_pressed_exact(key, &"dev_new_seed"):
 		new_seed_requested.emit()
@@ -165,6 +179,34 @@ func _on_key(key: InputEventKey) -> void:
 	elif _is_action_pressed_exact(key, &"game_upgrade"):
 		upgrade_requested.emit()
 		_mark_handled()
+
+
+## The M3 keys: report, bookmarks, cancel work. Returns true when one fired.
+func _on_game_key(key: InputEventKey) -> bool:
+	var fired := true
+	if _is_action_pressed_exact(key, &"game_report"):
+		report_requested.emit()
+	elif _is_action_pressed_exact(key, &"game_undo_work"):
+		undo_work_requested.emit()
+	else:
+		var slot := _bookmark_slot(key)
+		if slot.x == 0:
+			fired = false
+		else:
+			bookmark_requested.emit(slot.x, slot.y == 1)
+	if fired:
+		_mark_handled()
+	return fired
+
+
+## (index, 1 if set else 0) of the bookmark action the key presses, or (0, 0).
+func _bookmark_slot(key: InputEventKey) -> Vector2i:
+	for i: int in range(1, 10):
+		if _is_action_pressed_exact(key, StringName("cam_bookmark_set_%d" % i)):
+			return Vector2i(i, 1)
+		if _is_action_pressed_exact(key, StringName("cam_bookmark_go_%d" % i)):
+			return Vector2i(i, 0)
+	return Vector2i.ZERO
 
 
 func _process(_delta: float) -> void:
@@ -213,7 +255,12 @@ func _pointer_action_of(mb: InputEventMouseButton) -> StringName:
 
 
 func _is_action_pressed_exact(event: InputEvent, action: StringName) -> bool:
-	return InputMap.has_action(action) and event.is_action_pressed(action, false, true)
+	return event_is_exact_action(event, action, false)
+
+
+## Exact-modifier match; `echo_ok` lets a held key's repeats through.
+func event_is_exact_action(event: InputEvent, action: StringName, echo_ok: bool) -> bool:
+	return InputMap.has_action(action) and event.is_action_pressed(action, echo_ok, true)
 
 
 func _is_gui_hovered() -> bool:

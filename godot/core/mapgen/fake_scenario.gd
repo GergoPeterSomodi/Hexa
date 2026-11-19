@@ -19,11 +19,28 @@ const VALUE := 0.8
 const MAX_COUNTRIES := 254
 
 
+## The 14 families with the table's shape (M3 spec 4.3): work seasons grow with the level; no file read.
+static func _families() -> Array[FamilyDef]:
+	var out: Array[FamilyDef] = []
+	for id: int in range(1, FamilyIds.COUNT):
+		var f := FamilyDef.new()
+		f.id = id
+		f.key = StringName(FamilyIds.NAMES[id])
+		var seasons := PackedInt32Array()
+		for level: int in FamilyIds.TOP_LEVEL[id] + 1:
+			seasons.append(4 * level)
+		seasons[0] = 0
+		f.work_seasons = seasons
+		out.append(f)
+	return out
+
+
 ## `{defs: GameDefs, scenario: ScenarioDef}` with `count` countries (fewer when the map has fewer places).
 static func build(map: MapData, count: int, _seed_value: int) -> Dictionary:
 	var defs := GameDefs.new()
 	defs.tinctures = GameDefs.default_tinctures()
 	defs.cb_palette = GameDefs.default_cb_palette()
+	defs.families = _families()
 	var scenario := ScenarioDef.new()
 	scenario.id = "fake"
 	scenario.name = "Fake %d" % count
@@ -82,6 +99,7 @@ static func _make_defs(defs: GameDefs, capitals: PackedInt32Array, map: MapData)
 		c.name = "Land %02d" % (i + 1)
 		c.long_name = "Realm of Land %02d" % (i + 1)
 		c.adjective = "Landish"
+		c.ruler = "the Ruler of Land %02d" % (i + 1)
 		c.colour = Color.from_hsv(fposmod(float(i) * GOLDEN, 1.0), SATURATION, VALUE)
 		c.capital_name = str(map.places[capitals[i]].get("name", ""))
 		c.arms_division = CountryDef.DIVISIONS[i % CountryDef.DIVISIONS.size()]

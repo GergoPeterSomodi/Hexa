@@ -364,3 +364,33 @@ func test_m2_keys_with_wrong_values_in_a_file_fall_back() -> void:
 	var loaded := Settings.load_from(path, "macOS", false)
 	for key: String in ["map/borders", "map/minimap", "accessibility/country_colours", "state/map_mode"]:
 		assert_eq(loaded.get_value(key), loaded.get_default(key), "default kept for " + key)
+
+
+func test_m3_keys_have_the_spec_defaults_and_fall_back() -> void:
+	var s := Settings.new("macOS", false)
+	for key: String in ["dev/save_json", "state/log_open", "state/log_filter"]:
+		assert_true(Settings.SCHEMA.has(key), key)
+		assert_eq(str(Settings.SCHEMA[key]["since"]), "3")
+	assert_eq(str(Settings.SCHEMA["dev/save_json"]["page"]), "advanced")
+	assert_eq(str(Settings.SCHEMA["state/log_open"]["page"]), "", "remembered, no row")
+	assert_eq(str(Settings.SCHEMA["state/log_filter"]["page"]), "", "remembered, no row")
+	assert_false(bool(s.get_value("dev/save_json")))
+	assert_false(bool(s.get_value("state/log_open")))
+	assert_eq(s.get_value("state/log_filter"), "all")
+	assert_eq(s.choices_for("state/log_filter"), ["all", "works", "mine"])
+	assert_false(s.set_value("state/log_filter", "everything"), "a wrong value is refused")
+	assert_false(s.set_value("dev/save_json", "yes"))
+	assert_true(s.set_value("state/log_filter", "works"))
+	assert_true(s.set_value("state/log_open", true))
+	var path := _tmp_file("m3_keys")
+	assert_true(s.save_to(path))
+	var loaded := Settings.load_from(path, "macOS", false)
+	assert_eq(loaded.get_value("state/log_filter"), "works")
+	assert_true(bool(loaded.get_value("state/log_open")))
+	var bad := _tmp_file("m3_bad")
+	var f := FileAccess.open(bad, FileAccess.WRITE)
+	f.store_string("[dev]\nsave_json = 3\n[state]\nlog_filter = \"pink\"\nlog_open = \"no\"\n")
+	f.close()
+	var fallen := Settings.load_from(bad, "macOS", false)
+	for key: String in ["dev/save_json", "state/log_open", "state/log_filter"]:
+		assert_eq(fallen.get_value(key), fallen.get_default(key), "default kept for " + key)

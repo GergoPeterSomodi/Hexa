@@ -10,6 +10,9 @@ signal help_toggled
 signal debug_toggled
 signal fullscreen_toggled
 signal screenshot_requested
+signal quicksave_requested
+signal quickload_requested
+signal console_requested
 
 var allow_dev_actions: bool = true
 var enabled: bool = true
@@ -73,6 +76,15 @@ func handle_key_event(key: InputEventKey) -> bool:
 		return true
 	if _is_action_pressed_exact(key, &"app_screenshot"):
 		screenshot_requested.emit()
+		return true
+	if _is_action_pressed_exact(key, &"game_quicksave"):
+		quicksave_requested.emit()
+		return true
+	if _is_action_pressed_exact(key, &"game_quickload"):
+		quickload_requested.emit()
+		return true
+	if allow_dev_actions and _is_action_pressed_exact(key, &"dev_console"):
+		console_requested.emit()
 		return true
 	return false
 

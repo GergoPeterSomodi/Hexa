@@ -93,6 +93,9 @@ func test_choose_check_every_table_row_and_choose_action() -> void:
 	assert_eq(g.events.size(), 1)
 	assert_eq(str(g.events[0]["kind"]), "country_chosen")
 	assert_eq(g.events[0]["tag"], &"AAA")
+	assert_eq(int(g.events[0]["turn"]), 1)
+	assert_eq(g.chronicle.entries.size(), 1, "country_chosen is notable")
+	assert_eq(g.chronicle.entries[0]["tag"], "AAA")
 	assert_ne(g.digest(), before)
 
 	# 2. Second choose is refused and changes nothing.
@@ -144,6 +147,10 @@ func test_game_digest_covers_new_fields_and_round_trip_pieces() -> void:
 	restored.defs = a.defs
 	restored.scenario = a.scenario
 	restored.player = StringName(saved_player)
+	restored.start_year = a.start_year
+	restored.turn = a.turn
+	restored.chronicle = Chronicle.from_dict(a.chronicle.to_dict())
+	restored.luck = Luck.from_dict(a.luck.to_dict(), a.seed_value)
 	for cd: Dictionary in saved_countries:
 		restored.countries.append(Country.from_dict(cd))
 	assert_eq(restored.digest(), a.digest(), "5.9 piece round-trip preserves Game.digest()")

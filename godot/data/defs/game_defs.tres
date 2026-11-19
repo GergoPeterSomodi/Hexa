@@ -14,13 +14,32 @@
 [ext_resource type="Resource" path="res://data/defs/countries/fer.tres" id="12_cpw3g"]
 [ext_resource type="Resource" path="res://data/defs/countries/sie.tres" id="13_l4ihp"]
 [ext_resource type="Resource" path="res://data/defs/countries/luc.tres" id="14_icwc0"]
+[ext_resource type="Script" path="res://core/defs/family_def.gd" id="f0_script"]
 [ext_resource type="Script" path="res://core/defs/scenario_def.gd" id="15_uvokg"]
 [ext_resource type="Resource" path="res://data/scenarios/north_italy_1480.tres" id="16_6d0wf"]
 [ext_resource type="Script" path="res://core/defs/game_defs.gd" id="17_eiw27"]
+[ext_resource type="Resource" path="res://data/defs/families/settlements.tres" id="f1_settlements"]
+[ext_resource type="Resource" path="res://data/defs/families/castles.tres" id="f2_castles"]
+[ext_resource type="Resource" path="res://data/defs/families/wheat.tres" id="f3_wheat"]
+[ext_resource type="Resource" path="res://data/defs/families/hemp.tres" id="f4_hemp"]
+[ext_resource type="Resource" path="res://data/defs/families/silk.tres" id="f5_silk"]
+[ext_resource type="Resource" path="res://data/defs/families/dyes.tres" id="f6_dyes"]
+[ext_resource type="Resource" path="res://data/defs/families/vineyard.tres" id="f7_vineyard"]
+[ext_resource type="Resource" path="res://data/defs/families/olives.tres" id="f8_olives"]
+[ext_resource type="Resource" path="res://data/defs/families/grazing.tres" id="f9_grazing"]
+[ext_resource type="Resource" path="res://data/defs/families/timber.tres" id="f10_timber"]
+[ext_resource type="Resource" path="res://data/defs/families/mines.tres" id="f11_mines"]
+[ext_resource type="Resource" path="res://data/defs/families/quarry.tres" id="f12_quarry"]
+[ext_resource type="Resource" path="res://data/defs/families/salt.tres" id="f13_salt"]
+[ext_resource type="Resource" path="res://data/defs/families/harbour.tres" id="f14_harbour"]
 
 [resource]
 script = ExtResource("17_eiw27")
 countries = Array[ExtResource("1_js5y5")]([ExtResource("2_0fi1l"), ExtResource("3_6x4ee"), ExtResource("4_4kvco"), ExtResource("5_byo8m"), ExtResource("6_i07uy"), ExtResource("7_xvx8g"), ExtResource("8_d5e2e"), ExtResource("9_xhcqx"), ExtResource("10_65v6a"), ExtResource("11_t58ib"), ExtResource("12_cpw3g"), ExtResource("13_l4ihp"), ExtResource("14_icwc0")])
+families = Array[ExtResource("f0_script")]([ExtResource("f1_settlements"), ExtResource("f2_castles"), ExtResource("f3_wheat"), ExtResource("f4_hemp"), ExtResource("f5_silk"), ExtResource("f6_dyes"), ExtResource("f7_vineyard"), ExtResource("f8_olives"), ExtResource("f9_grazing"), ExtResource("f10_timber"), ExtResource("f11_mines"), ExtResource("f12_quarry"), ExtResource("f13_salt"), ExtResource("f14_harbour")])
+work_slots_base = 1
+work_slots_city_level = 4
+works_halt_in_snow_winter = true
 scenarios = Array[ExtResource("15_uvokg")]([ExtResource("16_6d0wf")])
 tinctures = Dictionary[StringName, Color]({
 &"argent": Color(0.9372549, 0.91764706, 0.8745098, 1),

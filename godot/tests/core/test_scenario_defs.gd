@@ -13,6 +13,7 @@ func _make_country(p_tag: StringName, p_name: String, p_long: String, p_adj: Str
 	c.adjective = p_adj
 	c.colour = p_colour
 	c.capital_name = p_cap_name
+	c.ruler = "the Ruler of %s" % p_name
 	c.arms_division = &"cross"
 	c.arms_field = &"gules"
 	c.arms_charge = &"argent"
@@ -47,6 +48,7 @@ func _make_defs() -> GameDefs:
 	var defs := GameDefs.new()
 	defs.tinctures = GameDefs.default_tinctures()
 	defs.cb_palette = GameDefs.default_cb_palette()
+	defs.families = ScenarioFixture.families()
 	defs.countries = [
 		_make_country(&"AAA", "Alpha", "Republic of Alpha", "Alphan", Color("#b3261e")),
 		_make_country(&"BBB", "Beta", "Duchy of Beta", "Betan", Color("#2b5aa8")),

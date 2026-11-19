@@ -10,12 +10,26 @@ extends SceneTree
 const SYMBOLS_ALL := "−·×%"
 const SYMBOLS_ARROWS := "→↑↓"
 
+## Slice 3 Kit icons (spec 4.5, 4.7): registered here, not in KitTheme, so the medallion and seal textures
+## reach the studiolo theme only. Each name is also its file in assets/ui/kit/1x/.
+const SLICE3_ICONS: Array[String] = [
+	"medallion_64",
+	"medallion_30",
+	"dial_quarters",
+	"dial_hand",
+	"hourglass",
+	"seal_good",
+	"seal_plain",
+	"seal_cracked",
+]
+
 
 func _initialize() -> void:
 	var check := OS.get_cmdline_user_args().has("--check")
 	var failed := 0
 
 	var studiolo := KitTheme.build_studiolo()
+	_add_slice3_icons(studiolo)
 	var hc := KitTheme.build_high_contrast()
 
 	failed += _process_theme("studiolo", studiolo, KitTheme.THEME_PATH, check)
@@ -26,6 +40,15 @@ func _initialize() -> void:
 		failed += _verify_theme("high_contrast", hc)
 
 	quit(1 if failed > 0 else 0)
+
+
+func _add_slice3_icons(theme: Theme) -> void:
+	for icon_name: String in SLICE3_ICONS:
+		var tex := load("res://assets/ui/kit/1x/%s.png" % icon_name) as Texture2D
+		if tex == null:
+			printerr("build_theme: missing slice 3 texture %s" % icon_name)
+			continue
+		theme.set_icon(StringName(icon_name), &"Kit", tex)
 
 
 func _process_theme(label: String, theme: Theme, out_path: String, check: bool) -> int:
@@ -72,7 +95,7 @@ func _verify_theme(label: String, theme: Theme) -> int:
 			failed += 1
 
 	if label == "studiolo":
-		for icon_name: String in KitTheme.KIT_DIRECT_ICONS:
+		for icon_name: String in KitTheme.KIT_DIRECT_ICONS + SLICE3_ICONS:
 			if not theme.has_icon(StringName(icon_name), &"Kit") or theme.get_icon(StringName(icon_name), &"Kit") == null:
 				printerr("build_theme: [%s] missing Kit icon %s" % [label, icon_name])
 				failed += 1

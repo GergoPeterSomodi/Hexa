@@ -136,7 +136,20 @@ class TestBakeUI(unittest.TestCase):
             "pennant_cloth": ([28, 20], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
         }
 
-        expected_all = {**expected_slice1, **expected_slice2}
+        expected_slice3 = {
+            "medallion_64": ([64, 64], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "medallion_30": ([30, 30], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "dial_quarters": ([64, 64], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "dial_hand": ([64, 64], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "hourglass": ([24, 24], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "seal_good": ([72, 72], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "seal_plain": ([72, 72], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "seal_cracked": ([72, 72], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+        }
+        for state in ("normal", "hot", "pressed", "off"):
+            expected_slice3[f"endseason_plate_{state}"] = ([160, 44], [28, 22, 44, 22], [28, 4, 44, 4], [0, 0, 0, 0], "stretch")
+
+        expected_all = {**expected_slice1, **expected_slice2, **expected_slice3}
         self.assertEqual(set(pieces.keys()), set(expected_all.keys()))
         for name, (sz, mar, con, exp, axis) in expected_all.items():
             entry = pieces[name]
@@ -145,7 +158,8 @@ class TestBakeUI(unittest.TestCase):
             self.assertEqual(entry["content"], con, name)
             self.assertEqual(entry["expand"], exp, name)
             self.assertEqual(entry["axis"], axis, name)
-            self.assertEqual(entry["slice"], 2 if name in expected_slice2 else 1, name)
+            expected_slice = 2 if name in expected_slice2 else (3 if name in expected_slice3 else 1)
+            self.assertEqual(entry["slice"], expected_slice, name)
 
     def test_slice2_pieces_geometry_and_apertures(self) -> None:
         kit_dir = REPO_ROOT / "godot" / "assets" / "ui" / "kit"
@@ -218,6 +232,50 @@ class TestBakeUI(unittest.TestCase):
             self.assertEqual(int(pp[7 * s, 12 * s, 3]), 255, f"pennant_pole@{s}x finial opaque")
             self.assertEqual(int(pp[30 * s, 12 * s, 3]), 255, f"pennant_pole@{s}x shaft opaque")
             self.assertEqual(int(pp[0, 0, 3]), 0, f"pennant_pole@{s}x outer corner transparent")
+
+    def test_slice3_textures_shapes_and_alpha(self) -> None:
+        kit_dir = REPO_ROOT / "godot" / "assets" / "ui" / "kit"
+        for s in (1, 2):
+            # Medallion rims: transparent face (the Dial draws it), opaque gilt band, transparent corner.
+            for name, d, band_r in (("medallion_64", 64, 28), ("medallion_30", 30, 12)):
+                arr = load_png_rgba(kit_dir / f"{s}x" / f"{name}.png")
+                self.assertEqual(arr.shape, (d * s, d * s, 4), f"{name}@{s}x shape")
+                c = d // 2
+                self.assertEqual(int(arr[c * s, c * s, 3]), 0, f"{name}@{s}x face transparent")
+                self.assertEqual(int(arr[c * s, (c + band_r) * s, 3]), 255, f"{name}@{s}x gilt band opaque")
+                self.assertEqual(int(arr[0, 0, 3]), 0, f"{name}@{s}x corner transparent")
+
+            # Dial face: opaque lapis with a hub at the centre; the hand points up from the centre.
+            face = load_png_rgba(kit_dir / f"{s}x" / "dial_quarters.png")
+            self.assertEqual(int(face[32 * s, 32 * s, 3]), 255, f"dial_quarters@{s}x hub opaque")
+            self.assertEqual(int(face[12 * s, 32 * s, 3]), 255, f"dial_quarters@{s}x face opaque")
+            self.assertEqual(int(face[0, 0, 3]), 0, f"dial_quarters@{s}x corner transparent")
+            hand = load_png_rgba(kit_dir / f"{s}x" / "dial_hand.png")
+            self.assertEqual(int(hand[20 * s, 32 * s, 3]), 255, f"dial_hand@{s}x needle opaque")
+            self.assertEqual(int(hand[56 * s, 32 * s, 3]), 0, f"dial_hand@{s}x below the hub transparent")
+
+            hg = load_png_rgba(kit_dir / f"{s}x" / "hourglass.png")
+            self.assertEqual(hg.shape, (24 * s, 24 * s, 4), f"hourglass@{s}x shape")
+            self.assertTrue(np.any(hg[..., 3] == 255), f"hourglass@{s}x has opaque pixels")
+            self.assertEqual(int(hg[0, 0, 3]), 0, f"hourglass@{s}x corner transparent")
+
+            # End season plate: the swallow-tail notch is cut at the centre line, the body is opaque.
+            for state in ("normal", "hot", "pressed", "off"):
+                pl = load_png_rgba(kit_dir / f"{s}x" / f"endseason_plate_{state}.png")
+                self.assertEqual(pl.shape, (44 * s, 160 * s, 4), f"plate {state}@{s}x shape")
+                self.assertEqual(int(pl[22 * s, 2 * s, 3]), 0, f"plate {state}@{s}x notch transparent")
+                self.assertEqual(int(pl[22 * s, 80 * s, 3]), 255, f"plate {state}@{s}x body opaque")
+
+            # Seals: good and plain are solid inside the wax; cracked has a gap cut across it.
+            lx, ly = logical_grid(72, 72, s)
+            disc = (lx - 36.0) ** 2 + (ly - 36.0) ** 2 < 25.0 ** 2
+            for tone in ("good", "plain"):
+                sl = load_png_rgba(kit_dir / f"{s}x" / f"seal_{tone}.png")
+                self.assertEqual(sl.shape, (72 * s, 72 * s, 4), f"seal_{tone}@{s}x shape")
+                self.assertTrue(np.all(sl[..., 3][disc] == 255), f"seal_{tone}@{s}x solid inside the wax")
+            cr = load_png_rgba(kit_dir / f"{s}x" / "seal_cracked.png")
+            # The gap shows the drop shadow beneath it (alpha about 0.45), so it is well below the solid wax.
+            self.assertTrue(np.any(cr[..., 3][disc] < 200), f"seal_cracked@{s}x has a gap cut across the wax")
 
     def test_faults_fire_every_check_assert(self) -> None:
         tokens = load_tokens(bake_ui.TOKENS_PATH)

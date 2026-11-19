@@ -8,6 +8,7 @@ tag = &"SWI"
 name = "Switzerland"
 long_name = "Swiss Confederation"
 adjective = "Swiss"
+ruler = "the Diet of the Confederation"
 colour = Color(0.74509805, 0.19607843, 0.19607843, 1)
 arms_division = &"bend"
 arms_field = &"gules"

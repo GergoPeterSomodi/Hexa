@@ -65,23 +65,35 @@ static func at_home_check(game: Game, tag: StringName, hex: Vector2i) -> Diction
 
 
 ## Transfers `hexes` to `to_id` (0 frees land), skipping sea, off-map, and already-owned hexes.
-## Queues one `{kind: "owners_changed", hexes}` event when any hex changes; returns the count changed.
+## Emits one `{kind: "owners_changed", hexes, tag, others}` event when any hex changes; returns the count changed.
 static func transfer(game: Game, hexes: Array[Vector2i], to_id: int) -> int:
 	if game == null or game.map == null or game.state == null:
 		return 0
 	if to_id < 0 or to_id > game.countries.size():
 		return 0
 	var changed: Array[Vector2i] = []
+	var old_ids: Array[int] = []
 	for hex: Vector2i in hexes:
 		var idx := game.map.index_of(hex)
 		if idx < 0 or game.map.land[idx] == 0 or idx >= game.state.owner.size():
 			continue
 		if int(game.state.owner[idx]) == to_id:
 			continue
+		var old_id := int(game.state.owner[idx])
+		if old_id > 0 and not old_ids.has(old_id):
+			old_ids.append(old_id)
 		game.state.owner[idx] = to_id
 		changed.append(hex)
 	if not changed.is_empty():
-		game.events.append({"kind": "owners_changed", "hexes": changed})
+		old_ids.sort()
+		var others: Array[StringName] = []
+		for old_id: int in old_ids:
+			var old_country := Countries.by_id(game, old_id)
+			if old_country != null:
+				others.append(old_country.tag)
+		var new_country := Countries.by_id(game, to_id)
+		var new_tag: StringName = new_country.tag if new_country != null else &""
+		game.emit({"kind": "owners_changed", "hexes": changed, "tag": new_tag, "others": others})
 	return changed.size()
 
 

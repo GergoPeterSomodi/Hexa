@@ -21,6 +21,7 @@ func _valid_genoa() -> CountryDef:
 	c.adjective = "Genoese"
 	c.colour = Color("#be3c6e")
 	c.capital_name = ""
+	c.ruler = "the Doge of Genoa"
 	c.arms_division = &"cross"
 	c.arms_field = &"argent"
 	c.arms_charge = &"gules"
@@ -59,6 +60,7 @@ func test_valid_country_passes_validate() -> void:
 	pap.adjective = "Papal"
 	pap.colour = Color("#f0e6a0")
 	pap.capital_name = "Rome"
+	pap.ruler = "the Pope"
 	pap.arms_division = &"saltire"
 	pap.arms_field = &"gules"
 	pap.arms_charge = &"or"
@@ -119,7 +121,7 @@ func test_planted_fault_unknown_division_and_tinctures() -> void:
 	assert_true(errors[0].contains("arms_charge") and errors[0].contains("tincture"))
 
 	var blank := CountryDef.new()
-	assert_eq(blank.validate(TINCTURES).size(), 7, "all seven required fields reported on blank def")
+	assert_eq(blank.validate(TINCTURES).size(), 8, "all eight required fields reported on blank def")
 
 
 func test_resource_round_trip_preserves_fields() -> void:
@@ -145,7 +147,8 @@ func test_resource_round_trip_preserves_fields() -> void:
 
 func test_committed_data_defs_and_scenario_load_and_validate() -> void:
 	var tres_paths: Array[String] = []
-	_collect_tres("res://data/defs", tres_paths)
+	_collect_tres("res://data/defs/countries", tres_paths)
+	tres_paths.append("res://data/defs/game_defs.tres")
 	assert_eq(tres_paths.size(), 14, "expected game_defs.tres + 13 country .tres files")
 	assert_true(tres_paths.has("res://data/defs/game_defs.tres"))
 
@@ -180,6 +183,31 @@ func test_committed_data_defs_and_scenario_load_and_validate() -> void:
 	assert_not_null(map)
 	assert_not_null(scen)
 	assert_eq(scen.validate(map, defs, true), [] as Array[String])
+
+
+func test_every_country_has_its_spec_ruler() -> void:
+	var rulers := {
+		&"SAV": "the Duke of Savoy", &"MLO": "the Duke of Milan", &"VEN": "the Doge of Venice",
+		&"GEN": "the Doge of Genoa", &"TUS": "the Signoria of Florence",
+		&"SWI": "the Diet of the Confederation", &"MAN": "the Marquis of Mantua",
+		&"FER": "the Duke of Ferrara", &"SIE": "the Signoria of Siena", &"LUC": "the Elders of Lucca",
+		&"FRA": "the King of France", &"AUS": "the Archduke of Austria", &"PAP": "the Pope",
+	}
+	var defs := ResourceLoader.load(
+		"res://data/defs/game_defs.tres", "", ResourceLoader.CACHE_MODE_IGNORE
+	) as GameDefs
+	assert_eq(defs.countries.size(), 13)
+	for c: CountryDef in defs.countries:
+		assert_true(rulers.has(c.tag), "%s has a spec ruler" % [c.tag])
+		assert_eq(c.ruler, rulers.get(c.tag, ""), "%s ruler" % [c.tag])
+
+
+func test_planted_fault_empty_ruler() -> void:
+	var c := _valid_genoa()
+	c.ruler = ""
+	var errors := c.validate(TINCTURES)
+	assert_eq(errors.size(), 1)
+	assert_true(errors[0].contains("ruler"))
 
 
 static func _collect_tres(dir_path: String, out: Array[String]) -> void:

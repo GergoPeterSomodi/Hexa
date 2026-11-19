@@ -8,6 +8,7 @@ tag = &"PAP"
 name = "Papal States"
 long_name = "Papal States"
 adjective = "Papal"
+ruler = "the Pope"
 colour = Color(0.9411765, 0.9019608, 0.627451, 1)
 capital_name = "Rome"
 arms_division = &"saltire"

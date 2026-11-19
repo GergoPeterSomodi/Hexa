@@ -16,14 +16,15 @@ const DIVISIONS: Array[StringName] = [
 @export var adjective: String = ""
 @export var colour: Color = Color()
 @export var capital_name: String = ""
+@export var ruler: String = ""
 @export var arms_division: StringName = &""
 @export var arms_field: StringName = &""
 @export var arms_charge: StringName = &""
 @export_multiline var tip: String = ""
 
 
-## Problems found, empty when valid: tag form (3 capital ASCII letters), non-empty names, known division, and
-## both arms tinctures present in `tinctures`.
+## Problems found, empty when valid: tag form (3 capital ASCII letters), non-empty names and ruler, known division,
+## and both arms tinctures present in `tinctures`.
 func validate(tinctures: Dictionary) -> Array[String]:
 	var errors: Array[String] = []
 	var label := _label()
@@ -35,6 +36,8 @@ func validate(tinctures: Dictionary) -> Array[String]:
 		errors.append("%s: long_name is empty" % [label])
 	if adjective.strip_edges().is_empty():
 		errors.append("%s: adjective is empty" % [label])
+	if ruler.strip_edges().is_empty():
+		errors.append("%s: ruler is empty" % [label])
 	if not DIVISIONS.has(arms_division):
 		errors.append("%s: unknown arms_division '%s'" % [label, String(arms_division)])
 	if not _has_tincture(tinctures, arms_field):

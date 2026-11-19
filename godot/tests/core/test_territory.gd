@@ -104,6 +104,12 @@ func test_transfer_skips_queues_one_event_and_frees() -> void:
 	assert_eq(str(g.events[0]["kind"]), "owners_changed")
 	var ev_hexes: Array[Vector2i] = g.events[0]["hexes"]
 	assert_eq(ev_hexes, [beta_hex, unowned_hex] as Array[Vector2i])
+	assert_eq(g.events[0]["tag"], &"AAA", "the new owner")
+	assert_eq(g.events[0]["others"], [&"BBB"] as Array[StringName], "the old owners, unowned land left out")
+	assert_eq(int(g.events[0]["turn"]), 1, "emit stamps the turn")
+	assert_eq(g.chronicle.entries.size(), 1, "owners_changed is notable")
+	assert_eq(str(g.chronicle.entries[0]["kind"]), "owners_changed")
+	assert_eq(g.chronicle.entries[0]["others"], PackedStringArray(["BBB"]))
 
 	# No-op transfer queues nothing.
 	g.events.clear()

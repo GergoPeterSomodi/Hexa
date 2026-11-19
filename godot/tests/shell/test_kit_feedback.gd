@@ -70,6 +70,44 @@ func test_delta_chip_signs_icons_invert_ink_boxed_and_a11y() -> void:
 	assert_eq(chip.theme_type_variation, &"PanelSlot")
 
 
+func test_delta_chip_every_state_has_icon_and_sign_on_leather_and_vellum() -> void:
+	var theme := _root.theme
+	var chip := DeltaChip.new()
+	_root.add_child(chip)
+
+	# Style spec 5: every state shows its Kit icon and its sign, on leather (plain) and on vellum (ink).
+	var cases: Array[Dictionary] = [
+		{"amount": 9, "icon": &"arrow_up", "sign": "+", "leather": &"NumberGood", "vellum": &"NumberInkGood"},
+		{"amount": -9, "icon": &"arrow_down", "sign": "−", "leather": &"NumberBad", "vellum": &"NumberInkBad"},
+		{"amount": 0, "icon": &"dash", "sign": "0", "leather": &"Hint", "vellum": &"LabelInkMuted"},
+	]
+	for c: Dictionary in cases:
+		for ink_on: bool in [false, true]:
+			for boxed_on: bool in [false, true]:
+				for inverted: bool in [false, true]:
+					chip.ink = ink_on
+					chip.boxed = boxed_on
+					chip.invert = inverted
+					chip.set_delta(c["amount"], "ducats")
+					var tag := "amount %d ink %s boxed %s invert %s" % [c["amount"], ink_on, boxed_on, inverted]
+					assert_eq(chip.icon_name(), c["icon"], tag)
+					assert_not_null(chip.icon_node().texture, "icon present: " + tag)
+					assert_eq(chip.icon_node().texture, theme.get_icon(c["icon"], &"Kit"), "Kit icon: " + tag)
+					assert_true(chip.text().begins_with(c["sign"]), "sign: " + tag)
+					var variation: StringName = c["vellum"] if ink_on else c["leather"]
+					if inverted and c["amount"] != 0:
+						variation = (&"NumberInkBad" if ink_on else &"NumberBad") if c["amount"] > 0 else (&"NumberInkGood" if ink_on else &"NumberGood")
+					assert_eq(chip.label_node().theme_type_variation, variation, "tone: " + tag)
+					assert_true(theme.has_color(&"font_color", variation), "variation has a colour: " + tag)
+					assert_eq(chip.icon_node().self_modulate, theme.get_color(&"font_color", variation), "icon takes the tone: " + tag)
+					assert_almost_eq(chip.self_modulate.a, 1.0 if boxed_on else 0.0, 0.001, "plate: " + tag)
+
+	# The three icons differ, so no state is drawn with the wrong one.
+	assert_ne(theme.get_icon(&"arrow_up", &"Kit"), theme.get_icon(&"arrow_down", &"Kit"))
+	assert_ne(theme.get_icon(&"arrow_up", &"Kit"), theme.get_icon(&"dash", &"Kit"))
+	assert_ne(theme.get_icon(&"arrow_down", &"Kit"), theme.get_icon(&"dash", &"Kit"))
+
+
 func test_medallion_sizes_dial_and_busy_motion() -> void:
 	var medal := Medallion.new()
 	_root.add_child(medal)

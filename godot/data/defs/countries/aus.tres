@@ -8,6 +8,7 @@ tag = &"AUS"
 name = "Austria"
 long_name = "Archduchy of Austria"
 adjective = "Austrian"
+ruler = "the Archduke of Austria"
 colour = Color(0.9019608, 0.9019608, 0.9019608, 1)
 capital_name = "Vienna"
 arms_division = &"fess"

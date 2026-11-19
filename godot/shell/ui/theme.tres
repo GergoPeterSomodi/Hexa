@@ -12,10 +12,10 @@
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_danger_hot.png" id="10"]
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_danger_pressed.png" id="11"]
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_danger_normal.png" id="12"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_primary_off.png" id="13"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_primary_hot.png" id="14"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_primary_pressed.png" id="15"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_primary_normal.png" id="16"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/endseason_plate_off.png" id="13"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/endseason_plate_hot.png" id="14"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/endseason_plate_pressed.png" id="15"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/endseason_plate_normal.png" id="16"]
 [ext_resource type="FontFile" path="res://assets/fonts/cinzel/Cinzel-Bold.ttf" id="17"]
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_menu_secondary_off.png" id="18"]
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_menu_secondary_hot.png" id="19"]
@@ -31,42 +31,54 @@
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_menu_primary_normal.png" id="29"]
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/nav_selected.png" id="30"]
 [ext_resource type="Texture2D" path="res://assets/ui/kit/1x/nav_selected_ink.png" id="31"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_toggle_off.png" id="32"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_toggle_hot.png" id="33"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/toggle_on.png" id="34"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_toggle_normal.png" id="35"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/switch_on.png" id="36"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/switch_off.png" id="37"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/grabber.png" id="38"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/grabber_hot.png" id="39"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/progress_fill.png" id="40"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/slot.png" id="41"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sans/AlegreyaSans-Regular.ttf" id="42"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/keycap.png" id="43"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/keycap_wait.png" id="44"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_base.png" id="45"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/glow_soft.png" id="46"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/pennant_cloth.png" id="47"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/pennant_pole.png" id="48"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/rose.png" id="49"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/rule_diamond.png" id="50"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/seal.png" id="51"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/shield_rim.png" id="52"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/shield_rim_sm.png" id="53"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/stud.png" id="54"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/wordmark.png" id="55"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya/Alegreya-MediumItalic.ttf" id="56"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sc/AlegreyaSC-Bold.ttf" id="57"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_bar.png" id="58"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_card.png" id="59"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/cartouche.png" id="60"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_frame.png" id="61"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/minimap_frame.png" id="62"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_modal.png" id="63"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/plate.png" id="64"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/ribbon.png" id="65"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/toast.png" id="66"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_vellum.png" id="67"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_primary_off.png" id="32"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_primary_hot.png" id="33"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_primary_pressed.png" id="34"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_primary_normal.png" id="35"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_toggle_off.png" id="36"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_toggle_hot.png" id="37"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/toggle_on.png" id="38"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/button_toggle_normal.png" id="39"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/switch_on.png" id="40"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/switch_off.png" id="41"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/grabber.png" id="42"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/grabber_hot.png" id="43"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/progress_fill.png" id="44"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/slot.png" id="45"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sans/AlegreyaSans-Regular.ttf" id="46"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/keycap.png" id="47"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/keycap_wait.png" id="48"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_base.png" id="49"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/dial_hand.png" id="50"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/dial_quarters.png" id="51"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/glow_soft.png" id="52"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/hourglass.png" id="53"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/medallion_30.png" id="54"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/medallion_64.png" id="55"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/pennant_cloth.png" id="56"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/pennant_pole.png" id="57"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/rose.png" id="58"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/rule_diamond.png" id="59"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/seal.png" id="60"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/seal_cracked.png" id="61"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/seal_good.png" id="62"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/seal_plain.png" id="63"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/shield_rim.png" id="64"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/shield_rim_sm.png" id="65"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/stud.png" id="66"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/wordmark.png" id="67"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya/Alegreya-MediumItalic.ttf" id="68"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sc/AlegreyaSC-Bold.ttf" id="69"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_bar.png" id="70"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_card.png" id="71"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/cartouche.png" id="72"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_frame.png" id="73"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/minimap_frame.png" id="74"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_modal.png" id="75"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/plate.png" id="76"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/ribbon.png" id="77"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/toast.png" id="78"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/panel_vellum.png" id="79"]
 
 [sub_resource type="FontVariation" id="FontVariation_1"]
 fallbacks = Array[Font]([ExtResource("2")])
@@ -189,10 +201,10 @@ content_margin_top = 10.0
 content_margin_right = 18.0
 content_margin_bottom = 10.0
 texture = ExtResource("13")
-texture_margin_left = 14.0
-texture_margin_top = 14.0
-texture_margin_right = 14.0
-texture_margin_bottom = 14.0
+texture_margin_left = 28.0
+texture_margin_top = 22.0
+texture_margin_right = 44.0
+texture_margin_bottom = 22.0
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_11"]
 content_margin_left = 18.0
@@ -200,10 +212,10 @@ content_margin_top = 10.0
 content_margin_right = 18.0
 content_margin_bottom = 10.0
 texture = ExtResource("14")
-texture_margin_left = 14.0
-texture_margin_top = 14.0
-texture_margin_right = 14.0
-texture_margin_bottom = 14.0
+texture_margin_left = 28.0
+texture_margin_top = 22.0
+texture_margin_right = 44.0
+texture_margin_bottom = 22.0
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_12"]
 content_margin_left = 18.0
@@ -211,10 +223,10 @@ content_margin_top = 10.0
 content_margin_right = 18.0
 content_margin_bottom = 10.0
 texture = ExtResource("15")
-texture_margin_left = 14.0
-texture_margin_top = 14.0
-texture_margin_right = 14.0
-texture_margin_bottom = 14.0
+texture_margin_left = 28.0
+texture_margin_top = 22.0
+texture_margin_right = 44.0
+texture_margin_bottom = 22.0
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_13"]
 content_margin_left = 18.0
@@ -222,10 +234,10 @@ content_margin_top = 10.0
 content_margin_right = 18.0
 content_margin_bottom = 10.0
 texture = ExtResource("16")
-texture_margin_left = 14.0
-texture_margin_top = 14.0
-texture_margin_right = 14.0
-texture_margin_bottom = 14.0
+texture_margin_left = 28.0
+texture_margin_top = 22.0
+texture_margin_right = 44.0
+texture_margin_bottom = 22.0
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_14"]
 content_margin_left = 6.0
@@ -489,7 +501,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("13")
+texture = ExtResource("32")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -500,7 +512,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("14")
+texture = ExtResource("33")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -511,7 +523,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("15")
+texture = ExtResource("34")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -522,7 +534,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("16")
+texture = ExtResource("35")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -533,7 +545,7 @@ content_margin_left = 16.0
 content_margin_top = 6.0
 content_margin_right = 16.0
 content_margin_bottom = 6.0
-texture = ExtResource("13")
+texture = ExtResource("32")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -544,7 +556,7 @@ content_margin_left = 16.0
 content_margin_top = 6.0
 content_margin_right = 16.0
 content_margin_bottom = 6.0
-texture = ExtResource("14")
+texture = ExtResource("33")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -555,7 +567,7 @@ content_margin_left = 16.0
 content_margin_top = 6.0
 content_margin_right = 16.0
 content_margin_bottom = 6.0
-texture = ExtResource("15")
+texture = ExtResource("34")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -566,7 +578,7 @@ content_margin_left = 16.0
 content_margin_top = 6.0
 content_margin_right = 16.0
 content_margin_bottom = 6.0
-texture = ExtResource("16")
+texture = ExtResource("35")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -621,7 +633,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("32")
+texture = ExtResource("36")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -632,7 +644,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("33")
+texture = ExtResource("37")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -643,7 +655,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("34")
+texture = ExtResource("38")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -654,7 +666,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("35")
+texture = ExtResource("39")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -665,7 +677,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("32")
+texture = ExtResource("36")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -676,7 +688,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("33")
+texture = ExtResource("37")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -687,7 +699,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("34")
+texture = ExtResource("38")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -698,7 +710,7 @@ content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
 content_margin_bottom = 4.0
-texture = ExtResource("35")
+texture = ExtResource("39")
 texture_margin_left = 14.0
 texture_margin_top = 14.0
 texture_margin_right = 14.0
@@ -798,7 +810,7 @@ content_margin_left = 0.0
 content_margin_top = 0.0
 content_margin_right = 0.0
 content_margin_bottom = 0.0
-texture = ExtResource("40")
+texture = ExtResource("44")
 texture_margin_left = 6.0
 texture_margin_top = 4.0
 texture_margin_right = 6.0
@@ -809,7 +821,7 @@ content_margin_left = 10.0
 content_margin_top = 2.0
 content_margin_right = 10.0
 content_margin_bottom = 2.0
-texture = ExtResource("41")
+texture = ExtResource("45")
 texture_margin_left = 10.0
 texture_margin_top = 10.0
 texture_margin_right = 10.0
@@ -817,7 +829,7 @@ texture_margin_bottom = 10.0
 
 [sub_resource type="FontVariation" id="FontVariation_4"]
 fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("42")
+base_font = ExtResource("46")
 opentype_features = {
 1819178349: 1,
 1953396077: 1
@@ -828,7 +840,7 @@ content_margin_left = 8.0
 content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 4.0
-texture = ExtResource("43")
+texture = ExtResource("47")
 texture_margin_left = 10.0
 texture_margin_top = 10.0
 texture_margin_right = 10.0
@@ -839,83 +851,83 @@ content_margin_left = 8.0
 content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 4.0
-texture = ExtResource("44")
+texture = ExtResource("48")
 texture_margin_left = 10.0
 texture_margin_top = 10.0
 texture_margin_right = 10.0
 texture_margin_bottom = 10.0
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_1"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(16, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_2"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(32, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_3"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(48, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_4"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(0, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_5"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(0, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_6"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(80, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_7"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(112, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_8"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(80, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_9"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(32, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_10"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(112, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_11"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(96, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_12"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(16, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_13"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(96, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_14"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(64, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_15"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(48, 16, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_16"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(64, 16, 16, 16)
 
 [sub_resource type="FontVariation" id="FontVariation_5"]
 fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("56")
+base_font = ExtResource("68")
 
 [sub_resource type="FontVariation" id="FontVariation_6"]
 fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("57")
+base_font = ExtResource("69")
 opentype_features = {
 1819178349: 1,
 1953396077: 1
@@ -970,7 +982,7 @@ corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_17"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(16, 0, 16, 16)
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_57"]
@@ -978,7 +990,7 @@ content_margin_left = 8.0
 content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 8.0
-texture = ExtResource("58")
+texture = ExtResource("70")
 texture_margin_left = 8.0
 texture_margin_top = 4.0
 texture_margin_right = 8.0
@@ -991,7 +1003,7 @@ content_margin_left = 10.0
 content_margin_top = 10.0
 content_margin_right = 10.0
 content_margin_bottom = 10.0
-texture = ExtResource("59")
+texture = ExtResource("71")
 texture_margin_left = 12.0
 texture_margin_top = 12.0
 texture_margin_right = 12.0
@@ -1002,7 +1014,7 @@ content_margin_left = 24.0
 content_margin_top = 6.0
 content_margin_right = 24.0
 content_margin_bottom = 6.0
-texture = ExtResource("60")
+texture = ExtResource("72")
 texture_margin_left = 24.0
 texture_margin_top = 18.0
 texture_margin_right = 24.0
@@ -1013,7 +1025,7 @@ content_margin_left = 20.0
 content_margin_top = 20.0
 content_margin_right = 20.0
 content_margin_bottom = 20.0
-texture = ExtResource("61")
+texture = ExtResource("73")
 texture_margin_left = 32.0
 texture_margin_top = 32.0
 texture_margin_right = 32.0
@@ -1043,7 +1055,7 @@ content_margin_left = 8.0
 content_margin_top = 8.0
 content_margin_right = 8.0
 content_margin_bottom = 8.0
-texture = ExtResource("62")
+texture = ExtResource("74")
 texture_margin_left = 56.0
 texture_margin_top = 16.0
 texture_margin_right = 56.0
@@ -1054,7 +1066,7 @@ content_margin_left = 28.0
 content_margin_top = 28.0
 content_margin_right = 28.0
 content_margin_bottom = 28.0
-texture = ExtResource("63")
+texture = ExtResource("75")
 texture_margin_left = 48.0
 texture_margin_top = 48.0
 texture_margin_right = 48.0
@@ -1071,7 +1083,7 @@ content_margin_left = 10.0
 content_margin_top = 2.0
 content_margin_right = 10.0
 content_margin_bottom = 2.0
-texture = ExtResource("64")
+texture = ExtResource("76")
 texture_margin_left = 10.0
 texture_margin_top = 10.0
 texture_margin_right = 10.0
@@ -1082,7 +1094,7 @@ content_margin_left = 36.0
 content_margin_top = 8.0
 content_margin_right = 36.0
 content_margin_bottom = 8.0
-texture = ExtResource("65")
+texture = ExtResource("77")
 texture_margin_left = 36.0
 texture_margin_top = 12.0
 texture_margin_right = 36.0
@@ -1101,7 +1113,7 @@ content_margin_left = 10.0
 content_margin_top = 2.0
 content_margin_right = 10.0
 content_margin_bottom = 2.0
-texture = ExtResource("41")
+texture = ExtResource("45")
 texture_margin_left = 10.0
 texture_margin_top = 10.0
 texture_margin_right = 10.0
@@ -1144,7 +1156,7 @@ content_margin_left = 36.0
 content_margin_top = 8.0
 content_margin_right = 36.0
 content_margin_bottom = 8.0
-texture = ExtResource("66")
+texture = ExtResource("78")
 texture_margin_left = 36.0
 texture_margin_top = 20.0
 texture_margin_right = 36.0
@@ -1155,7 +1167,7 @@ content_margin_left = 24.0
 content_margin_top = 24.0
 content_margin_right = 24.0
 content_margin_bottom = 24.0
-texture = ExtResource("67")
+texture = ExtResource("79")
 texture_margin_left = 32.0
 texture_margin_top = 32.0
 texture_margin_right = 32.0
@@ -1184,7 +1196,7 @@ corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_18"]
-atlas = ExtResource("45")
+atlas = ExtResource("49")
 region = Rect2(64, 0, 16, 16)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_17"]
@@ -1204,7 +1216,7 @@ content_margin_left = 10.0
 content_margin_top = 10.0
 content_margin_right = 10.0
 content_margin_bottom = 10.0
-texture = ExtResource("59")
+texture = ExtResource("71")
 texture_margin_left = 12.0
 texture_margin_top = 12.0
 texture_margin_right = 12.0
@@ -1759,14 +1771,14 @@ CheckButton/colors/font_pressed_color = Color(0.9490196, 0.9098039, 0.8156863, 1
 CheckButton/constants/h_separation = 8
 CheckButton/font_sizes/font_size = 14
 CheckButton/fonts/font = SubResource("FontVariation_1")
-CheckButton/icons/checked = ExtResource("36")
-CheckButton/icons/checked_disabled = ExtResource("36")
-CheckButton/icons/checked_disabled_mirrored = ExtResource("36")
-CheckButton/icons/checked_mirrored = ExtResource("36")
-CheckButton/icons/unchecked = ExtResource("37")
-CheckButton/icons/unchecked_disabled = ExtResource("37")
-CheckButton/icons/unchecked_disabled_mirrored = ExtResource("37")
-CheckButton/icons/unchecked_mirrored = ExtResource("37")
+CheckButton/icons/checked = ExtResource("40")
+CheckButton/icons/checked_disabled = ExtResource("40")
+CheckButton/icons/checked_disabled_mirrored = ExtResource("40")
+CheckButton/icons/checked_mirrored = ExtResource("40")
+CheckButton/icons/unchecked = ExtResource("41")
+CheckButton/icons/unchecked_disabled = ExtResource("41")
+CheckButton/icons/unchecked_disabled_mirrored = ExtResource("41")
+CheckButton/icons/unchecked_mirrored = ExtResource("41")
 CheckButton/styles/disabled = SubResource("StyleBoxEmpty_6")
 CheckButton/styles/focus = SubResource("StyleBoxTexture_52")
 CheckButton/styles/hover = SubResource("StyleBoxEmpty_6")
@@ -1783,9 +1795,9 @@ HScrollBar/styles/scroll = SubResource("StyleBoxFlat_6")
 HScrollBar/styles/scroll_focus = SubResource("StyleBoxFlat_7")
 HSeparator/constants/separation = 8
 HSeparator/styles/separator = SubResource("StyleBoxFlat_8")
-HSlider/icons/grabber = ExtResource("38")
-HSlider/icons/grabber_disabled = ExtResource("38")
-HSlider/icons/grabber_highlight = ExtResource("39")
+HSlider/icons/grabber = ExtResource("42")
+HSlider/icons/grabber_disabled = ExtResource("42")
+HSlider/icons/grabber_highlight = ExtResource("43")
 HSlider/styles/grabber_area = SubResource("StyleBoxTexture_53")
 HSlider/styles/grabber_area_highlight = SubResource("StyleBoxTexture_53")
 HSlider/styles/slider = SubResource("StyleBoxTexture_54")
@@ -1833,28 +1845,36 @@ Kit/icons/arrow_up = SubResource("AtlasTexture_4")
 Kit/icons/close = SubResource("AtlasTexture_5")
 Kit/icons/cross = SubResource("AtlasTexture_6")
 Kit/icons/dash = SubResource("AtlasTexture_7")
+Kit/icons/dial_hand = ExtResource("50")
+Kit/icons/dial_quarters = ExtResource("51")
 Kit/icons/fit = SubResource("AtlasTexture_8")
-Kit/icons/glow_soft = ExtResource("46")
-Kit/icons/grabber = ExtResource("38")
-Kit/icons/grabber_hot = ExtResource("39")
+Kit/icons/glow_soft = ExtResource("52")
+Kit/icons/grabber = ExtResource("42")
+Kit/icons/grabber_hot = ExtResource("43")
 Kit/icons/help = SubResource("AtlasTexture_9")
-Kit/icons/icons_base = ExtResource("45")
+Kit/icons/hourglass = ExtResource("53")
+Kit/icons/icons_base = ExtResource("49")
 Kit/icons/info = SubResource("AtlasTexture_10")
 Kit/icons/lock = SubResource("AtlasTexture_11")
+Kit/icons/medallion_30 = ExtResource("54")
+Kit/icons/medallion_64 = ExtResource("55")
 Kit/icons/menu = SubResource("AtlasTexture_12")
-Kit/icons/pennant_cloth = ExtResource("47")
-Kit/icons/pennant_pole = ExtResource("48")
-Kit/icons/rose = ExtResource("49")
-Kit/icons/rule_diamond = ExtResource("50")
-Kit/icons/seal = ExtResource("51")
-Kit/icons/shield_rim = ExtResource("52")
-Kit/icons/shield_rim_sm = ExtResource("53")
-Kit/icons/stud = ExtResource("54")
+Kit/icons/pennant_cloth = ExtResource("56")
+Kit/icons/pennant_pole = ExtResource("57")
+Kit/icons/rose = ExtResource("58")
+Kit/icons/rule_diamond = ExtResource("59")
+Kit/icons/seal = ExtResource("60")
+Kit/icons/seal_cracked = ExtResource("61")
+Kit/icons/seal_good = ExtResource("62")
+Kit/icons/seal_plain = ExtResource("63")
+Kit/icons/shield_rim = ExtResource("64")
+Kit/icons/shield_rim_sm = ExtResource("65")
+Kit/icons/stud = ExtResource("66")
 Kit/icons/study = SubResource("AtlasTexture_13")
-Kit/icons/switch_off = ExtResource("37")
-Kit/icons/switch_on = ExtResource("36")
+Kit/icons/switch_off = ExtResource("41")
+Kit/icons/switch_on = ExtResource("40")
 Kit/icons/tick = SubResource("AtlasTexture_14")
-Kit/icons/wordmark = ExtResource("55")
+Kit/icons/wordmark = ExtResource("67")
 Kit/icons/zoom_fit = SubResource("AtlasTexture_8")
 Kit/icons/zoom_in = SubResource("AtlasTexture_15")
 Kit/icons/zoom_out = SubResource("AtlasTexture_16")
@@ -1867,14 +1887,14 @@ KitSwitch/colors/font_pressed_color = Color(0.9490196, 0.9098039, 0.8156863, 1)
 KitSwitch/constants/h_separation = 8
 KitSwitch/font_sizes/font_size = 14
 KitSwitch/fonts/font = SubResource("FontVariation_1")
-KitSwitch/icons/checked = ExtResource("36")
-KitSwitch/icons/checked_disabled = ExtResource("36")
-KitSwitch/icons/checked_disabled_mirrored = ExtResource("36")
-KitSwitch/icons/checked_mirrored = ExtResource("36")
-KitSwitch/icons/unchecked = ExtResource("37")
-KitSwitch/icons/unchecked_disabled = ExtResource("37")
-KitSwitch/icons/unchecked_disabled_mirrored = ExtResource("37")
-KitSwitch/icons/unchecked_mirrored = ExtResource("37")
+KitSwitch/icons/checked = ExtResource("40")
+KitSwitch/icons/checked_disabled = ExtResource("40")
+KitSwitch/icons/checked_disabled_mirrored = ExtResource("40")
+KitSwitch/icons/checked_mirrored = ExtResource("40")
+KitSwitch/icons/unchecked = ExtResource("41")
+KitSwitch/icons/unchecked_disabled = ExtResource("41")
+KitSwitch/icons/unchecked_disabled_mirrored = ExtResource("41")
+KitSwitch/icons/unchecked_mirrored = ExtResource("41")
 KitSwitch/styles/disabled = SubResource("StyleBoxEmpty_6")
 KitSwitch/styles/focus = SubResource("StyleBoxTexture_52")
 KitSwitch/styles/hover = SubResource("StyleBoxEmpty_6")

@@ -148,6 +148,7 @@ Godot text `.tres` resources read by `core/defs/` and validated in CI:
 | Path | Resource | Contents |
 |---|---|---|
 | `defs/game_defs.tres` | `GameDefs` | Master catalog: references the 13 countries and `north_italy_1480`, plus heraldic `tinctures`, the 8-colour Okabe-Ito `cb_palette`, `unowned_colour`, and neighbour contrast thresholds (`min_contrast = 30.0`, `min_contrast_cb = 20.0`). |
+| `defs/families/<key>.tres` | `FamilyDef` | The 14 works families (M3 spec 4.3, 5.1): id, key, `work_seasons` by level, `clear_seasons`. |
 | `defs/countries/<tag>.tres` | `CountryDef` | One file per country, lowercase 3-letter tag (`fra`, `aus`, `swi`, `sav`, `mlo`, `ven`, `gen`, `tus`, `pap`, `man`, `fer`, `sie`, `luc`): names, sRGB colour, off-map `capital_name`, heraldic arms (`arms_division`, `arms_field`, `arms_charge`), and pick `tip`. |
 | `scenarios/north_italy_1480.tres` | `ScenarioDef` | The 1480 scenario (`Italy, 1480`) on `maps/north_italy.tres`: country order, capitals, colour-blind palette indices, town/anchor `seeds`, `pins`, growth parameters, and the grown `owner` array + `map_digest`. |
 

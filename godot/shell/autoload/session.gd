@@ -22,7 +22,7 @@ func new_game(map_id: String, seed_value: int) -> void:
 	if map == null:
 		push_error("Session: no map '%s' in res://data/maps/" % map_id)
 		return
-	start_game(Game.new_game(map, seed_value))
+	start_game(Game.new_game(map, seed_value, defs()))
 	_origin = {"map_id": map_id, "scenario_id": "", "player": &""}
 
 

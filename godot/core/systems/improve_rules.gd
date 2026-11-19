@@ -23,13 +23,10 @@ const MINES := 11
 const QUARRY := 12
 const SALT := 13
 const HARBOUR := 14
-const FAMILIES := 15
-## The names are the piece modules' names: the first part of a key of the baked piece index.
-const NAMES: Array[String] = [
-	"none", "settlements", "castles", "wheat", "hemp", "silk", "dyes", "vineyard", "olives", "grazing", "timber",
-	"mines", "quarry", "salt", "harbour",
-]
-const TOP_LEVEL: Array[int] = [0, 5, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+## The family tables live in the defs layer (FamilyIds); these are the same values under the names the systems use.
+const FAMILIES := FamilyIds.COUNT
+const NAMES: Array[String] = FamilyIds.NAMES
+const TOP_LEVEL: Array[int] = FamilyIds.TOP_LEVEL
 ## Layouts each family has (the modules' VARIANTS).
 const VARIANTS: Array[int] = [1, 2, 3, 2, 2, 2, 2, 3, 2, 3, 2, 2, 2, 2, 2]
 ## In a pair rule: any goods family (wheat and after).

@@ -78,7 +78,7 @@ static func choose(game: Game, args: Dictionary) -> Dictionary:
 	if bool(verdict["ok"]):
 		var tag := _tag_arg(args)
 		game.player = tag
-		game.events.append({"kind": "country_chosen", "tag": tag})
+		game.emit({"kind": "country_chosen", "tag": tag})
 	return verdict
 
 

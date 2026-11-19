@@ -2,8 +2,8 @@
   "schema": "hexa-godot/ui-kit/1",
   "tokens_sha": "cb3439b787ead284519c04db4bf587a349e52b6b0a232ca53efc8d8866a3b8c7",
   "bytes_rgba": {
-    "kit_1x": 3184768,
-    "kit_2x": 12739072,
+    "kit_1x": 3414672,
+    "kit_2x": 13658688,
     "menu": 8812800
   },
   "pieces": {
@@ -2416,6 +2416,462 @@
       "sha": {
         "1x": "bb5da963c0591a65711553970c831e378ed2263fcb4e48c4130094a23d876402",
         "2x": "6756694a9f78424694f952cd6e09834dc819fd1de5ea5e16ba735494c700ba22"
+      },
+      "check": "exact"
+    },
+    "medallion_64": {
+      "size": [
+        64,
+        64
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "14bb135dc43fddae34a419dfcdfbfb0574aadbcffe4647957cd20389b3074cc5",
+        "2x": "c702dec2f850f2785424575fefda64d3ad2762c1f638c3b0dc06a77908e1248d"
+      },
+      "check": "exact"
+    },
+    "medallion_30": {
+      "size": [
+        30,
+        30
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "5b1f77ecd31391f4b5eac05ad9a4c0b53713ebd17b02be9741a7914d81d54522",
+        "2x": "b000c54165e1a9a3ca268c4223aee3f79353e68144b2697af32b23623fc2d782"
+      },
+      "check": "exact"
+    },
+    "dial_quarters": {
+      "size": [
+        64,
+        64
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "c8e3f40b28f6631239f446f7e7fd3c8c12bef64b8e633ea609b2931a81375005",
+        "2x": "6445da9af212038914865bbee91cac535b964e85000ac334736b9cd3ddbdd7e4"
+      },
+      "check": "exact"
+    },
+    "dial_hand": {
+      "size": [
+        64,
+        64
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "6878d486520ea1d88079825fe29b02cd549496dfd29077e1f7493be69f6289cf",
+        "2x": "15208e3789a60a67da10394fc3e9f4cb307a543f0bd9ddfb2c62e2d58e835876"
+      },
+      "check": "exact"
+    },
+    "hourglass": {
+      "size": [
+        24,
+        24
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "a967599cf336ce43d0416adffc595aad6de99d117e218e786a036c1b3d7c03d6",
+        "2x": "57188514d0fbb46aa1c374e74110c9a722644c2d02a16a1cedfe525e1cb67769"
+      },
+      "check": "exact"
+    },
+    "endseason_plate_normal": {
+      "size": [
+        160,
+        44
+      ],
+      "margin": [
+        28,
+        22,
+        44,
+        22
+      ],
+      "content": [
+        28,
+        4,
+        44,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "446e15dcfb0a6bffbabb7106f9062eb9c07d12831a45a859ee22fdc3c3e5700a",
+        "2x": "b22724851861e2dcd288eceb2f35e6fc14a96bfbf6bd4c1c13a8e7fb42163ee5"
+      },
+      "check": "exact"
+    },
+    "endseason_plate_hot": {
+      "size": [
+        160,
+        44
+      ],
+      "margin": [
+        28,
+        22,
+        44,
+        22
+      ],
+      "content": [
+        28,
+        4,
+        44,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "feb207f86b41ab164b12d15dc3cfb6e739bfc82fce745a8531dd4aa01b8f5972",
+        "2x": "d6603232d70c748f5ee1d014f37cce55635b899d8e94583a85332d836ea4c011"
+      },
+      "check": "exact"
+    },
+    "endseason_plate_pressed": {
+      "size": [
+        160,
+        44
+      ],
+      "margin": [
+        28,
+        22,
+        44,
+        22
+      ],
+      "content": [
+        28,
+        4,
+        44,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "1b43026a70a431f97ea9cba76c5a1b84174bfabb5dd1bf6636b69ea7f83ffd11",
+        "2x": "8d7b1f8ab035675f2586dae039f73e54b1cdfe77edd2994d463bbcf67547e279"
+      },
+      "check": "exact"
+    },
+    "endseason_plate_off": {
+      "size": [
+        160,
+        44
+      ],
+      "margin": [
+        28,
+        22,
+        44,
+        22
+      ],
+      "content": [
+        28,
+        4,
+        44,
+        4
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": true,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "d3aa92f00fd0d09403cbb0398a3ab614d0caa94fba0c955d3754e133fda5a347",
+        "2x": "37845bc46db8cab38f14a7486d3472f86ac8337010d986f4e1586f27c01167ba"
+      },
+      "check": "exact"
+    },
+    "seal_good": {
+      "size": [
+        72,
+        72
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "4fd18d1e3b280a2e303d5e92a2cd89d252c9804fc801964bcc771e6e0fa88b1f",
+        "2x": "e14d3eb39bc1b57fb294bf68e4b6d449b85c4f029f4fba817aaf558ec34303e8"
+      },
+      "check": "exact"
+    },
+    "seal_plain": {
+      "size": [
+        72,
+        72
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "9c1233a998f623ab6bc6114d275234d41669db4535d1d9ca0c5e16f25c2d958c",
+        "2x": "4dafd9b7aa30991b91c2b694172d62a78b5b2aa86efb2e75e56e2d334f280a4c"
+      },
+      "check": "exact"
+    },
+    "seal_cracked": {
+      "size": [
+        72,
+        72
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 3,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "02f23475545ad6550b510c1f7014474bb83c6931ed2e8e8cb9c1684b79d84f3a",
+        "2x": "657c6f8282a571126e494a88955de58e71f92d4faadc7ad256140b3965c00978"
       },
       "check": "exact"
     }

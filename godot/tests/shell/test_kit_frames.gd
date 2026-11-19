@@ -281,12 +281,13 @@ func test_vellum_sheet_seal_tones_press_and_countdown() -> void:
 	assert_not_null(seal_icon.texture)
 	assert_eq(seal_icon.self_modulate, Color.WHITE, "vermilion uses unmodulated seal")
 
-	sheet.seal_tone = &"good"
-	assert_eq(seal_icon.self_modulate, sheet.get_theme_color(&"font_color", &"NumberGood"))
-	sheet.seal_tone = &"plain"
-	assert_eq(seal_icon.self_modulate, sheet.get_theme_color(&"font_color", &"Hint"))
-	sheet.seal_tone = &"cracked"
-	assert_eq(seal_icon.self_modulate, sheet.get_theme_color(&"font_color", &"NumberWarn"))
+	# Slice 3 bakes a seal for each tone: it is shown as it is, unmodulated.
+	for tone: StringName in [&"good", &"plain", &"cracked"]:
+		sheet.seal_tone = tone
+		var baked := StringName("seal_" + String(tone))
+		assert_true(sheet.has_theme_icon(baked, &"Kit"), "the Kit has %s" % baked)
+		assert_eq(seal_icon.texture, sheet.get_theme_icon(baked, &"Kit"), "%s uses its baked seal" % tone)
+		assert_eq(seal_icon.self_modulate, Color.WHITE, "%s is not tinted" % tone)
 
 	assert_null(sheet.press_seal(true), "press_seal reduce_motion=true returns null")
 	assert_eq(sheet.seal_node().scale, Vector2.ONE)

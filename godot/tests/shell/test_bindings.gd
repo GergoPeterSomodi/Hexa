@@ -198,3 +198,14 @@ func _entry_of(action: StringName) -> Dictionary:
 		if entry["action"] == action:
 			return entry
 	return {}
+
+
+func test_m3_actions_exist_with_the_spec_keys() -> void:
+	var wanted := {&"game_undo_work": "Ctrl+Z", &"dev_console": "F2"}
+	for action: StringName in wanted:
+		assert_true(InputMap.has_action(action), "InputMap has %s" % action)
+		var entry := _entry_of(action)
+		assert_eq(str(entry["since"]), "3", "%s arrives in M3" % action)
+		assert_eq(Bindings.serialize_event(Bindings.parse_event(str((entry["events"] as Array)[0]))),
+			Bindings.serialize_event(Bindings.parse_event(str(wanted[action]))), "%s default key" % action)
+	assert_eq(str(_entry_of(&"dev_console")["group"]), "Developer")

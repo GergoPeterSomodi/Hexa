@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="FamilyDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/family_def.gd" id="1_family"]
+
+[resource]
+script = ExtResource("1_family")
+id = 11
+key = &"mines"
+work_seasons = PackedInt32Array(0, 4, 8, 16)
+clear_seasons = 1
