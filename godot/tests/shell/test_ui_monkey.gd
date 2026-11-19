@@ -33,6 +33,10 @@ const SAFE_KEYS: Array[Key] = [
 	KEY_S,
 	KEY_D,
 	KEY_TAB,
+	KEY_C,
+	KEY_ENTER,
+	KEY_UP,
+	KEY_DOWN,
 ]
 
 var _prev_game: Game = null
@@ -40,6 +44,11 @@ var _prev_unsaved: int = 0
 var _old_max_fps: int = 0
 var _old_low_proc: bool = false
 var _old_tooltip_delay: float = 0.5
+## Hexes whose state an action changed during the current step (Events.hex_changed).
+var _changed_hexes: Array[Vector2i] = []
+## The player seen after the pick, and the game it belongs to.
+var _player_seen: StringName = &""
+var _player_game: Game = null
 
 
 func before_each() -> void:
@@ -73,9 +82,29 @@ func test_ui_monkey_seed_1482() -> void:
 	await _run_monkey_seed(SEEDS[2])
 
 
-func _run_monkey_seed(seed_value: int) -> void:
+## M2: the same monkey on a New game (the country pick first, then Play as and the country game).
+func test_ui_monkey_m2_seed_1480() -> void:
+	await _run_monkey_seed(SEEDS[0], true)
+
+
+func test_ui_monkey_m2_seed_1481() -> void:
+	await _run_monkey_seed(SEEDS[1], true)
+
+
+func test_ui_monkey_m2_seed_1482() -> void:
+	await _run_monkey_seed(SEEDS[2], true)
+
+
+func _on_hex_changed(hex: Vector2i) -> void:
+	_changed_hexes.append(hex)
+
+
+func _run_monkey_seed(seed_value: int, new_game: bool = false) -> void:
 	await _wait_frames(2)
 	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	_player_seen = &""
+	_player_game = null
+	Events.hex_changed.connect(_on_hex_changed)
 
 	var vp := SubViewport.new()
 	vp.size = Vector2i(1280, 720)
@@ -88,13 +117,21 @@ func _run_monkey_seed(seed_value: int) -> void:
 	app.allow_tree_quit = false
 	app.pause_tree_when_modal = false
 	app.skip_loading_frames = true
-	app.cli_args_override = PackedStringArray(["--sandbox", "--seed=%d" % seed_value])
+	if new_game:
+		app.cli_args_override = PackedStringArray(["--new-game", "--seed=%d" % seed_value])
+	else:
+		app.cli_args_override = PackedStringArray(["--sandbox", "--seed=%d" % seed_value])
 	var s := Settings.new("macOS", true)
 	s.set_value("state/help_seen", true)
 	s.set_value("graphics/preload_next_season", false)
 	app.set_settings_override(s)
 	vp.add_child(app)
 	await _wait_frames(2)
+
+	var waited := 0
+	while app.is_starting() and waited < 240:
+		await _wait_frames(1)
+		waited += 1
 
 	var rng := Rng.new()
 	rng.seed_with(seed_value)
@@ -104,12 +141,15 @@ func _run_monkey_seed(seed_value: int) -> void:
 		var prev_game := Session.game
 		var prev_digest := prev_game.digest() if (prev_game != null and prev_game.map != null and prev_game.state != null) else ""
 		var prev_unsaved := Session.unsaved_actions
+		var prev_player := Session.player_tag()
+		_changed_hexes.clear()
 
 		_perform_monkey_step(rng, vp, app, land_hexes, step)
 		await _wait_frames(1)
 
-		_assert_invariants(vp, app, prev_game, prev_digest, prev_unsaved, seed_value, step)
+		_assert_invariants(vp, app, prev_game, prev_digest, prev_unsaved, prev_player, seed_value, step)
 
+	Events.hex_changed.disconnect(_on_hex_changed)
 	Session.end_game()
 	remove_child(vp)
 	vp.queue_free()
@@ -145,22 +185,29 @@ func _perform_monkey_step(
 
 func _send_random_key(rng: Rng, vp: SubViewport) -> void:
 	var key := SAFE_KEYS[rng.randi_range(0, SAFE_KEYS.size() - 1)]
+	# Ctrl+F (place search) is F with Ctrl; plain F is Fit whole map.
+	var ctrl := key == KEY_F and rng.randi_range(0, 2) == 0
 	var press := InputEventKey.new()
 	press.keycode = key
 	press.physical_keycode = key
 	press.pressed = true
+	press.ctrl_pressed = ctrl
 	vp.push_input(press)
 
 	var release := InputEventKey.new()
 	release.keycode = key
 	release.physical_keycode = key
 	release.pressed = false
+	release.ctrl_pressed = ctrl
 	vp.push_input(release)
 
 
 func _click_visible_control(rng: Rng, vp: SubViewport, app: App) -> void:
 	var stack := app.stack()
 	var root_ctrl: Node = stack.top() if stack.count() > 0 else app.hud().root()
+	# With a screen up (the pick), the HUD's dock still gets clicks: Play as, the country panel.
+	if stack.count() > 0 and app.hud() != null and rng.randi_range(0, 2) == 0:
+		root_ctrl = app.hud().root()
 	if root_ctrl == null:
 		return
 	var buttons := _collect_clickable_buttons(root_ctrl)
@@ -280,6 +327,19 @@ func _exercise_screen_or_hud_flow(
 ) -> void:
 	var top := app.stack().top()
 	if top != null:
+		if top.screen_id == &"country_pick":
+			# The pick: a row opens its country; Play as (or Enter on it) chooses it.
+			var pick := top as CountryPick
+			var tags := pick.row_tags()
+			if not tags.is_empty():
+				var tag := tags[rng.randi_range(0, tags.size() - 1)]
+				if rng.randi_range(0, 2) == 0:
+					pick.play(tag)
+				else:
+					var row := pick.row_button(tag)
+					if row != null:
+						row.pressed.emit()
+			return
 		if top.screen_id == &"options":
 			var opt := top as Options
 			var page_idx := rng.randi_range(0, Options.PAGES.size() - 1)
@@ -326,6 +386,7 @@ func _assert_invariants(
 	prev_game: Game,
 	prev_digest: String,
 	prev_unsaved: int,
+	prev_player: StringName,
 	seed_value: int,
 	step: int
 ) -> void:
@@ -386,7 +447,22 @@ func _assert_invariants(
 	if Session.game != null and Session.game == prev_game and not prev_digest.is_empty():
 		var cur_digest := Session.game.digest()
 		if cur_digest != prev_digest:
-			assert_gt(Session.unsaved_actions, prev_unsaved, "%s: game digest changed without incrementing unsaved_actions" % tag)
+			# The pick is an accepted action too; choosing a country resets unsaved_actions to 0 (AppRoutes).
+			var picked := prev_player == &"" and Session.player_tag() != &""
+			if not picked:
+				assert_gt(Session.unsaved_actions, prev_unsaved, "%s: game digest changed without an accepted action" % tag)
+
+	# 5. M2: the player is fixed by the pick; an accepted works action (build, upgrade, clear) is on the player's land
+	var game := Session.game
+	if game != null and game.has_countries():
+		if game.player != &"":
+			if _player_game != game:
+				_player_game = game
+				_player_seen = game.player
+			assert_eq(game.player, _player_seen, "%s: the player never changes after the pick" % tag)
+		for hex: Vector2i in _changed_hexes:
+			assert_eq(Territory.owner_tag(game, hex), game.player,
+				"%s: an accepted works action on %s is on the player's land" % [tag, str(hex)])
 
 
 func _send_click(vp: SubViewport, pos: Vector2, button: MouseButton) -> void:

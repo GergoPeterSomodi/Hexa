@@ -1,5 +1,7 @@
 ## Measures M1.5 UI screen instantiation/first-frame push budgets, HUD frame time, and 1x/2x kit memory
 ## against tests/perf_ui_budget.json (docs/architecture/ui-style-and-feedback-spec.md sections 4.10, 11).
+## M2 (m2-build-spec.md section 10): the worst frame with the minimap in a country game and with the country pick open,
+## each inside the same 16 ms as the HUD frame.
 ##
 ## Windowed (GPU or xvfb + Mesa in CI):
 ##   godot --path godot -s res://tools/ui/perf_ui.gd -- [--gpu-limits] [--cpu-scale=2.0] [--out=perf_ui.json] [--summary=summary.md]
@@ -113,6 +115,12 @@ func _measure() -> int:
 	vp.queue_free()
 	await _wait_frames(3)
 
+	# M2: each in its own app, after the sandbox above has gone (one Session game at a time).
+	_r["minimap_frame_worst_ms"] = await _measure_cli_frames(
+		packed, PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"]), true)
+	_r["pick_frame_worst_ms"] = await _measure_cli_frames(
+		packed, PackedStringArray(["--new-game", "--seed=1480"]), false)
+
 	return _finish(budget, headless)
 
 
@@ -157,11 +165,11 @@ func _measure_screen(app: Node, screen_ids: GDScript, sid: StringName) -> Dictio
 	}
 
 
-func _measure_hud_frames(app: Node) -> float:
+func _measure_hud_frames(app: Node, select: bool = true) -> float:
 	var ms := app.call("map_scene") as Node
 	var session := root.get_node_or_null("Session")
 	var g: Game = session.get("game") as Game if session != null else null
-	if ms != null and g != null and g.map != null:
+	if select and ms != null and g != null and g.map != null:
 		for i: int in g.map.hex_count():
 			if g.map.land[i] == 1:
 				ms.call("select_hex", g.map.hex_of(i))
@@ -174,6 +182,39 @@ func _measure_hud_frames(app: Node) -> float:
 		var now := Time.get_ticks_usec()
 		worst = maxf(worst, float(now - last) / 1000.0)
 		last = now
+	return worst
+
+
+## One app started by `cli` (a New game), its HUD frames measured with `select` (a hex picked); returns the worst frame.
+func _measure_cli_frames(packed: PackedScene, cli: PackedStringArray, select: bool) -> float:
+	var vp := SubViewport.new()
+	vp.size = FRAME
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(vp)
+
+	var app := packed.instantiate()
+	app.set("settings_path", "")
+	app.set("allow_tree_quit", false)
+	app.set("pause_tree_when_modal", false)
+	app.set("skip_loading_frames", true)
+	app.set("cli_args_override", cli)
+	var s := Settings.new("macOS", true)
+	s.set_value("state/help_seen", true)
+	s.set_value("graphics/preload_next_season", false)
+	s.set_value("accessibility/reduce_motion", true)
+	s.set_value("map/minimap", true)
+	app.call("set_settings_override", s)
+	vp.add_child(app)
+	await _wait_frames(3)
+
+	var worst := await _measure_hud_frames(app, select)
+
+	var session := root.get_node_or_null("Session")
+	if session != null:
+		session.call("end_game")
+	root.remove_child(vp)
+	vp.queue_free()
+	await _wait_frames(3)
 	return worst
 
 

@@ -1,5 +1,8 @@
-## Renders key M1.5 Studiolo UI screens at 1x (1280x720) and 2x (2560x1440) into PNG files
+## Renders key Studiolo UI screens at 1x (1280x720) and 2x (2560x1440) into PNG files
 ## (docs/architecture/ui-and-controls-spec.md section 9; ui-style-and-feedback-spec.md section 11).
+## M2 pictures (m2-build-spec.md section 10, names m2_*): the pick with Genoa's panel, the country panel, New game,
+## the place search with results, the minimap, Terrain / Owner / Relief at fit and zoom 1 on Genoa, and Owner in the
+## colour-blind palette. The arms sheet of all 13 is made by its own tool (C7), not here.
 ##
 ## Windowed (GPU or xvfb + Mesa in CI):
 ##   godot --path godot -s res://tools/ui/shot_ui.gd -- [--out=/tmp/hexa_ui_shots] [--dir=/tmp/hexa_ui_shots] [--scale=1,2]
@@ -20,6 +23,20 @@ const SCENES: Array[String] = [
 	"about",
 	"help",
 	"confirm",
+]
+const M2_SCENES: Array[String] = [
+	"m2_pick",
+	"m2_country_panel",
+	"m2_new_game",
+	"m2_find_place",
+	"m2_minimap",
+	"m2_terrain_fit",
+	"m2_terrain_zoom1",
+	"m2_owner_fit",
+	"m2_owner_zoom1",
+	"m2_relief_fit",
+	"m2_relief_zoom1",
+	"m2_owner_fit_colour_blind",
 ]
 
 var _out_dir := DEFAULT_OUT_DIR
@@ -64,7 +81,8 @@ func _capture_all() -> int:
 		printerr("shot_ui: cannot load %s" % APP_SCENE_PATH)
 		return 1
 
-	var target_scenes: Array[String] = SCENES if _only.is_empty() else _only
+	var known := _all_scenes()
+	var target_scenes: Array[String] = known if _only.is_empty() else _only
 	var rendered := 0
 	var saved := 0
 
@@ -72,7 +90,7 @@ func _capture_all() -> int:
 		var scale_dir := global_out.path_join("%dx" % scale_mult)
 		DirAccess.make_dir_recursive_absolute(scale_dir)
 		for scene_name: String in target_scenes:
-			if not SCENES.has(scene_name):
+			if not known.has(scene_name):
 				printerr("shot_ui: unknown scene '%s'" % scene_name)
 				return 1
 			var ok := await _capture_one(packed, scene_name, scale_mult, scale_dir, headless)
@@ -106,19 +124,22 @@ func _capture_one(
 	vp.gui_disable_input = false
 	root.add_child(vp)
 
-	var start_in_sandbox := scene_name in ["hud", "pause_menu", "options", "about", "help", "confirm"]
 	var app := packed.instantiate()
 	app.set("settings_path", "")
 	app.set("allow_tree_quit", false)
 	app.set("pause_tree_when_modal", false)
 	app.set("skip_loading_frames", true)
-	if start_in_sandbox:
-		app.set("cli_args_override", PackedStringArray(["--sandbox", "--seed=1480"]))
+	var cli := _cli_for(scene_name)
+	if cli.size() > 0:
+		app.set("cli_args_override", cli)
 	var s := Settings.new("macOS", true)
 	s.set_value("state/help_seen", true)
 	s.set_value("graphics/preload_next_season", false)
 	s.set_value("accessibility/reduce_motion", true)
 	s.set_value("display/ui_scale", "100" if scale_mult == 1 else "200")
+	var extra := _settings_for(scene_name)
+	for key: String in extra.keys():
+		s.set_value(key, extra[key])
 	app.call("set_settings_override", s)
 	vp.add_child(app)
 
@@ -154,6 +175,8 @@ func _prepare_scene(app: Node, scene_name: String) -> bool:
 	var ctx := app.call("context") as ShellContext
 	if stack == null or ctx == null:
 		return false
+	if scene_name.begins_with("m2_"):
+		return _prepare_m2(app, stack, ctx, scene_name)
 	match scene_name:
 		"main_menu":
 			var top_m := stack.call("top") as Node
@@ -198,6 +221,87 @@ func _prepare_scene(app: Node, scene_name: String) -> bool:
 			stack.call("push", confirm)
 			return stack.call("top") == confirm
 	return false
+
+
+func _all_scenes() -> Array[String]:
+	var out: Array[String] = []
+	out.append_array(SCENES)
+	out.append_array(M2_SCENES)
+	return out
+
+
+## The command line of a scene: the M2 pictures start a New game (the pick, or Genoa from --country=GEN).
+func _cli_for(scene_name: String) -> PackedStringArray:
+	if scene_name == "m2_new_game":
+		return PackedStringArray()
+	if scene_name == "m2_pick":
+		return PackedStringArray(["--new-game", "--seed=1480"])
+	if scene_name.begins_with("m2_"):
+		return PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"])
+	if scene_name in ["hud", "pause_menu", "options", "about", "help", "confirm"]:
+		return PackedStringArray(["--sandbox", "--seed=1480"])
+	return PackedStringArray()
+
+
+## Settings of a scene: the map mode and the palette of the M2 map pictures.
+func _settings_for(scene_name: String) -> Dictionary:
+	var out := {}
+	if not scene_name.begins_with("m2_"):
+		return out
+	if scene_name.contains("terrain"):
+		out["state/map_mode"] = "terrain"
+	elif scene_name.contains("owner"):
+		out["state/map_mode"] = "owner"
+	elif scene_name.contains("relief"):
+		out["state/map_mode"] = "relief"
+	if scene_name.ends_with("colour_blind"):
+		out["accessibility/country_colours"] = "colour_blind"
+	return out
+
+
+func _prepare_m2(app: Node, stack: Control, ctx: ShellContext, scene_name: String) -> bool:
+	if scene_name == "m2_new_game":
+		ctx.request(&"open_screen", {"id": &"new_game"})
+		var top_n := stack.call("top") as Node
+		return top_n != null and top_n.get("screen_id") == &"new_game"
+	if scene_name == "m2_pick":
+		var top_p := stack.call("top") as Node
+		if top_p == null or top_p.get("screen_id") != &"country_pick":
+			return false
+		top_p.call("show_country", &"GEN")
+		return true
+	var session := root.get_node_or_null("Session")
+	var g: Game = session.get("game") as Game if session != null else null
+	var ms := app.call("map_scene") as Node
+	var hud_node := app.call("hud") as Node
+	if g == null or ms == null or hud_node == null or not g.has_countries() or g.player == &"":
+		return false
+	if scene_name == "m2_country_panel":
+		hud_node.call("show_country", g.player, false)
+		return true
+	if scene_name == "m2_find_place":
+		var screen_ids := ResourceLoader.load(SCREEN_IDS_PATH) as GDScript
+		if screen_ids == null:
+			return false
+		var find := screen_ids.call("make", &"find_place") as Node
+		if find == null:
+			return false
+		stack.call("push", find)
+		find.call("set_query", "Gen")
+		return stack.call("top") == find
+	if scene_name == "m2_minimap":
+		return hud_node.call("minimap") != null
+	# The map pictures: Genoa at fit, or at zoom 1 (the art size) centred on her focus hex.
+	if scene_name.contains("zoom1"):
+		var card := CountryCard.of(g, g.player)
+		var focus := card["focus"] as Vector2i
+		var view_node := ms.call("view") as Node
+		if view_node == null:
+			return false
+		ms.call("frame_at", view_node.call("centre_of", focus), 1.0)
+	else:
+		ms.call("fit")
+	return true
 
 
 func _sample_land_hex(g: Game) -> Vector2i:
