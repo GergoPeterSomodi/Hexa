@@ -449,8 +449,8 @@ and planned for every milestone at the level of the table.
 each task row of its plan is one issue (`M<N> <ID>: <task>`, labels `godot`, `size:*`, `who:*`, `group:*`); each milestone
 also has an `M<N>: owner's playtest` issue. A group's issues are blocked by the group before it, and a milestone's first
 group by the previous milestone's playtest issue. The spec and plan stay the source of truth for design; the issues
-track status. A milestone's plan is migrated to GitHub when its spec is committed. M3 to M5 are migrated (milestones 14
-to 17). M2 stays in its plan file.
+track status. A milestone's plan is migrated to GitHub when its spec is committed. M3 to M12 are migrated (GitHub
+milestones 14 to 24, 299 issues). M2 stays in its plan file (`m2-build-plan.md`, C1 to C20).
 
 | M | Build spec | Plan and tasks | Status |
 |---|---|---|---|
