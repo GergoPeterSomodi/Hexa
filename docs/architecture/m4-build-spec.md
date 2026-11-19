@@ -1475,7 +1475,7 @@ Made by the tasks (listed in the plan): `godot/README.md` (the M4 game; N12), `g
 |---|---|---|
 | M4.5 | `Stats` money and goods series, the ledgers, `EconomyPreview.worth_by_hex` (Districts tab), the goods ring (Goods tab), `InkChart`'s two kinds (to complete), the study frame and `StudyPages.LIST`, `MapModes.delta_colour` (the Yields mode) | Insights |
 | M5 | `Economy.people_at` (the one seam: it reads `MapState.people` from M5, the table becoming room), towns' needs and contentment (hunger, decline), `goods_short` of food, the tax level's growth effect, the People chip (icon `food` baked), settlement payoffs to re-tune (D42); all taken up in `m5-build-spec.md` | People |
-| M6 | `Treasury.WHY` gains `army`; armies eat from the stores (a need); horses and iron reserves; the Army chip (icon baked) | Armies |
+| M6 | `Treasury.WHY` gains `army`; armies eat from the stores (a need); horses and iron reserves; the Army chip (icon baked); taken up in `m6-build-spec.md` (WHY `upkeep_army` and `raise`, Stores flows `army` and `raise`, horses 10 and copper 5 kept, `needs_of.army_food`) | Armies |
 | M7 | captured land produces for its new owner from the next production; walls upkeep of castles; occupation may cut output (a term of `district_output`) | War |
 | M8 | the AI acts through `build`, `set_tax`, `cancel_work` with the same checks; `ImprovePreview` and `EconomyPreview` are its views; the soak checks the money property | The AI |
 | M10 | `market_prices` gets its body (supply); `market_of` returns real markets; sales go to markets instead of the flat price; road works (`MapState` schema 4); the ring's price lines on the card; `Treasury.WHY` `trade` | Trade |

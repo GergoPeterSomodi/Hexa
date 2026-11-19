@@ -118,8 +118,8 @@ Notes on the Godot features used:
   thousands. Terrain-style matching is used only where the count is small: the coast (63 shapes).
 - **Depth (layer 6).** The group and its layers have `y_sort_enabled`. Each tall tile carries its own
   `texture_origin` (where the picture sits on the hex) and `y_sort_origin` (where its foot is), so a tower overlaps
-  the hex behind it and is hidden by the trees in front. Army tokens are small scenes in the same group, so they
-  sort with the trees.
+  the hex behind it and is hidden by the trees in front. Army tokens are small scenes in their own y-sorted node at z 88,
+  above the mode overlay, so a tint never dims an army and a tree never hides one (`m6-build-spec.md` 1.2).
 - **Seasons.** Every layer has four TileSets with the **same atlas layout**; a season change swaps the TileSet. No
   cell is touched. Winter differs by climate (snow, frost, mild): that is three atlas sources, and a hex's climate
   picks the source. Only the current season's textures are in memory.
@@ -435,8 +435,15 @@ UI, with no stand-in panel left. Sources: `docs/design/ui/design.md` (the look),
 ### 9.2 Build specs and plans: where each milestone stands (2026-11-17)
 
 A milestone's **build spec** (interfaces, tasks, tests, risks) is written before that milestone starts, from this
-table, the design pages and the UI rows above. M2 to M5 (with M4.5) have their build spec and plan; M6 to M12 have
+table, the design pages and the UI rows above. M2 to M6 (with M4.5) have their build spec and plan; M7 to M12 have
 their UI rows and no system spec yet. The UI work is specified and planned for every milestone at the level of the table.
+
+**Tracking (from M3, decided 2026-11-19).** Each milestone from M3 on is a GitHub milestone titled `Godot M<N>: <Name>`;
+each task row of its plan is one issue (`M<N> <ID>: <task>`, labels `godot`, `size:*`, `who:*`, `group:*`); each milestone
+also has an `M<N>: owner's playtest` issue. A group's issues are blocked by the group before it, and a milestone's first
+group by the previous milestone's playtest issue. The spec and plan stay the source of truth for design; the issues
+track status. A milestone's plan is migrated to GitHub when its spec is committed. M3 to M5 are migrated (milestones 14
+to 17). M2 stays in its plan file.
 
 | M | Build spec | Plan and tasks | Status |
 |---|---|---|---|
@@ -449,7 +456,8 @@ their UI rows and no system spec yet. The UI work is specified and planned for e
 | M4 | `m4-build-spec.md` (the district economy: goods by family, level and season, stores, `Treasury.move` and `Stores.move`, taxes, upkeep, costs, weather, the previews, the study's Economy page, the chips; it is task W0 of the style plan) | `m4-build-plan.md` (N1 to N12 with S3's W1 to W12 folded in) | **specified and planned, waits for the owner's go**; starts after M3 closes |
 | M4.5 | `m4-5-build-spec.md` (Economy's Districts, Goods and History tabs, Rankings, History, the Yields mode, the chart and table kit complete, the five questions as the playtest script; no new game rules) | `m4-5-build-plan.md` (I1 to I8 of S4 with Q1 to Q5) | **specified and planned, waits for the owner's go**; starts after M4 closes |
 | M5 | `m5-build-spec.md` (people per district: start, room, growth, hunger, crowding; towns that grow and fall a level; people in M4's economy; the People and Food chips, the Food mode on key 5, the People page, the report's People section, people in Rankings; the M6 seam for recruits) | `m5-build-plan.md` (P1 to P18, with S5's M5 row folded in) | **specified and planned, waits for the owner's go**; starts after M4.5 closes |
-| M6 to M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |
+| M6 | `m6-build-spec.md` (companies and armies raised from the people, orders walked in the movement phase, river crossings, passes and winter, supply and hunger, sight and witnesses; tokens, orders, the route, the move card, the army panel, the Raise tab, the replay, the hex menu, the Supply mode on key 6, the Army chip, the Military page, the report's Armies section; the seams for M7 and M8) | `m6-build-plan.md` (L1 to L25, with S5's M6 row folded in) | **specified and planned, waits for the owner's go**; starts after M5 closes |
+| M7 to M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |
 
 **The Europe track, beside the milestones.** E1 (inside M1): measure on a fake full-size map. E2 (after M3): build
 the real 28 km Europe map file from the geography and heights. E3 (after M8): measure an AI season on it, then

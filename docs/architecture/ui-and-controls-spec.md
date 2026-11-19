@@ -340,12 +340,13 @@ navigation. Modifier chords use `command_or_control_autoremap`, so "Ctrl" is Cmd
 | `cam_bookmark_go_1..9` / `cam_bookmark_set_1..9` | Ctrl+1..9 / Ctrl+Shift+1..9 | Cmd | Camera | 3 |
 | `game_undo_work` | Ctrl+Z (cancels the newest work begun this season; `m3-build-spec.md` 6.1) | Cmd+Z | Game | 3 |
 | `dev_console` | F2 (focuses the console at the foot of F3) | | Developer | 3 |
-| `view_mode_1..4` | 1 Terrain, 2 Owner, 3 Relief (M2); 4 Yields (M4.5); later modes take 5 and up as they arrive (5 Food in M5, `view_mode_5`, `m5-build-spec.md` 6.1; Supply 6 in M6; `m4-5-build-spec.md` D15) | | View | 2 |
+| `view_mode_1..4` | 1 Terrain, 2 Owner, 3 Relief (M2); 4 Yields (M4.5); later modes take 5 and up as they arrive (5 Food in M5, `view_mode_5`, `m5-build-spec.md` 6.1; 6 Supply in M6, `view_mode_6`, `m6-build-spec.md` 6.1; `m4-5-build-spec.md` D15) | | View | 2 |
 | `ui_find_place` | Ctrl+F | Cmd+F | View | 2 |
 | `game_country` | C | | Game | 2 |
 | `game_ledger` | L | | Game | 4 |
 | `game_next_unit` / `game_continue_march` | Tab / R | | Game | 6 |
-| `map_cursor_*` (move the selected hex) | Alt+arrows | Option+arrows | Map | 6 |
+| `map_cursor_*` (move the selected hex; with an army selected, the order cursor) | Alt+arrows | Option+arrows | Map | 6 |
+| `map_command_key` (a right click at the cursor: the order, or the hex menu; `m6-build-spec.md` 6.1) | O, Shift+F10 | | Map | 6 |
 | `game_tech` | T | | Game | 11 |
 
 Mac notes: Cmd+Q and the red button arrive as a close request (section 5.3); Ctrl+arrows are taken by macOS (Spaces),
@@ -670,11 +671,11 @@ first slice), a milestone, or **skip**.
 | Hover card on the map | next to the pointer, kept inside `MapArea` | after the tooltip delay with the pointer still on one hex, not over the UI, not dragging: `HexCard.of(game, hex)` from `core/views` (hex column and row, place, cover, height in metres, relief level, winter climate, rivers, roads, pass, what stands and its level; the owner from M2, people M5, army M6). Listens to `MapInput.hover_changed` and `Events.hex_changed` | **1.5** |
 | Layers popover | a top-bar button opening a `PopupPanel` | grid, place names, relief shading, season preview (Spring, Summer, Autumn, Winter); borders and owner tint in M2. Writes `Settings` (or `season_preview_requested`); the map scene applies | **1.5** |
 | Villages switch | | dropped by the M1 spec (all villages show) | **skip** (unless the owner wants it back) |
-| Map-mode switcher | top bar, a `Segmented` group, keys 1-4 (more as modes arrive) | Terrain (the tiles), Owner, Relief (a height tint); later Yields (M4.5, key 4: your land by worth a year, `m4-5-build-spec.md` 4.8), Food (M5, key 5: your land by food made less eaten, a year, `m5-build-spec.md` 6.5), Supply (M6) and Trade (M10). A mode is drawn by **one overlay node**: a full-map quad with a shader that finds the hex under each pixel (odd-r) and reads two one-byte-a-hex textures (owner id, height band) and a palette (`core/views/map_modes.gd` builds them; `m2-build-spec.md` 6.2). One draw for any mode; a mode switch is a uniform; an owner change rewrites one texel | M2 |
+| Map-mode switcher | top bar, a `Segmented` group, keys 1-4 (more as modes arrive) | Terrain (the tiles), Owner, Relief (a height tint); later Yields (M4.5, key 4: your land by worth a year, `m4-5-build-spec.md` 4.8), Food (M5, key 5: your land by food made less eaten, a year, `m5-build-spec.md` 6.5), Supply (M6, key 6: your land by where your armies are fed, `m6-build-spec.md` 6.6) and Trade (M10). A mode is drawn by **one overlay node**: a full-map quad with a shader that finds the hex under each pixel (odd-r) and reads two one-byte-a-hex textures (owner id, height band) and a palette (`core/views/map_modes.gd` builds them; `m2-build-spec.md` 6.2). One draw for any mode; a mode switch is a uniform; an owner change rewrites one texel | M2 |
 | Minimap | bottom right, above the zoom control | draws the far picture's `ImageTexture` (shared with `FarMap`; no extra memory), the camera's rectangle from `view_changed`; a click or drag sends `look_at_requested`. On north Italy the whole map fits the screen, so it matters from Europe on; with owner colours from M2 it is useful earlier | M2 |
 | Place search ("go to") | a `LineEdit` popup, Ctrl/Cmd+F | matches `MapData.places` by name (prefix first, then substring, then accent-free); Enter glides there and selects the hex | M2 |
 | Camera bookmarks | Ctrl/Cmd+1..9 jump, Ctrl/Cmd+Shift+1..9 set | stored with the game (the save's UI block), so they follow the map and the country; a toast "Bookmark 3 set" | M3 |
-| Hex menu on right click | a `PopupMenu` (not a radial: Godot's menu is keyboard-ready and themed) | the selected hex's actions from `Session.check` (build, upgrade, clear), each acting through `Session.act`. Only when no army of yours is selected (then a right click is an order) | M6, when right click's meaning is settled; **skip** the radial |
+| Hex menu on right click | a `PopupMenu` (not a radial: Godot's menu is keyboard-ready and themed) | the selected hex's actions from `Session.check` (build, upgrade, clear), each acting through `Session.act`. Only when no army of yours is selected (then a right click is an order); M6 adds "Raise companies here", the armies on the hex and "Show supply" (`m6-build-spec.md` 6.8) | M6; **skip** the radial |
 | Toasts | bottom centre, above the log | `ctx.toast_requested(text, tone)`: refused key actions now, events from M3 | **1.5** |
 | Notifications | top right under the bar, a short stack | from `Events` (war declared, a battle, a work finished); click goes to the place | M3, M7 |
 | Action log | bottom left, collapsed one line | `Events` to lines (`shell/hud/log_feed.gd`), filters All, War, Money, Mine; links glide the camera | M3 |

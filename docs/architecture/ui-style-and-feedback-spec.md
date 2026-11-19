@@ -343,8 +343,8 @@ line = {text: String, detail: String, amount: int, unit: StringName, tone: Strin
         value: int, from: int, to: int, hex: Vector2i, rank: int, top: bool, sub: bool, action: Array, action_label: String}
 ```
 
-- Section ids, fixed order: `glance`, `before`, `treasury`, `goods`, `works`, `people`, `orders`, `befell`, `standing`;
-  one whose system does not exist is absent.
+- Section ids, fixed order: `glance`, `before`, `treasury`, `goods`, `works`, `people`, `armies` (M6,
+  `m6-build-spec.md` 4.14), `orders`, `befell`, `standing`; one whose system does not exist is absent.
 - `rank`: size in ducats at the season's prices (men for armies). Lines sort by it; six show, `more` counts the rest;
   the report's three largest have `top`.
 - `before`: up to five notices of `Reminders.unfinished(game, tag)` (`core/views/reminders.gd`; in M3 two rules: a
@@ -520,6 +520,9 @@ helps Milan's district at (9, 11)") outside the totals.
 > **M5's build spec** (`m5-build-spec.md` 6.2 to 6.8) specifies the People page (one page, no tabs, between Economy and
 > Rankings), the people measure in Rankings and Standing, the report's People section, the People and Food chips and the
 > Food mode on key 5 (your land by food made less eaten, a year).
+>
+> **M6's build spec** (`m6-build-spec.md` 6.9, 6.6, 4.14) specifies the Military page (one page, no tabs, between Economy
+> and People), men under arms in Rankings and Standing, the report's Armies section and the Supply mode on key 6.
 
 ## 9. Input actions and options
 

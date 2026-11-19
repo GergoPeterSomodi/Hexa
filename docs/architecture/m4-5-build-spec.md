@@ -949,7 +949,7 @@ new autoload, no new layer; `tools/lint_godot.py` needs no entry (new files sit 
 | M | Takes from M4.5 | M4.5 leaves for it |
 |---|---|---|
 | M5 | `StudyRankings.MEASURES` gains people; the People page on `StudyTable` and `InkChart`; its map mode on key 5 with a `MapModes.legend` (the Food mode); worth follows `Economy.people_at` with no view change; all taken up in `m5-build-spec.md` | People |
-| M6 | Rankings' army measure (banded "about 40,000 men"); Supply on key 6; witnesses from vision shrink what History shows of others; `knows` by explored hexes changes Rankings' lists; "Upkeep, walls and army" on the money chart (D35) | Armies |
+| M6 | Rankings' army measure (banded "about 40,000 men"); Supply on key 6; witnesses from vision shrink what History shows of others; `knows` by explored hexes changes Rankings' lists; "Upkeep, walls and army" on the money chart (D35); taken up in `m6-build-spec.md` | Armies |
 | M7 | the War filter (`LogLines.FILTERS` `since` 7) and a `war` mark kind before `land`; losses on the Military page | War |
 | M8 | the AI's acts fill the chronicle (the 120-row pages and the index matter); `StudyWarm` after the AI's season; the AI reads `Knowledge` as the pages do | The AI |
 | M9 | Relations on key 7; the Diplomacy page with `RelationMatrix` | Diplomacy |

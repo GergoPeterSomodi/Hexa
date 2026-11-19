@@ -285,7 +285,8 @@ map mode; I returns to the same page and scroll. Later pages are hidden, not gre
 | **Rankings** | ranked bars on land, income, army, people, score; your line through time | known, banded | M4.5, more per M |
 | **History** | timeline (a tick a season, marks for wars, battles, works, eras), chronicle with filters All, War, Money, Works, Mine | what you witnessed | M4.5 |
 
-Tables sort on a header click (stable, ties by id) and remember it per page. "Show on map" picks a mode: Yields, Trade
+Tables sort on a header click (stable, ties by id) and remember it per page. (The Military page is specified in
+`docs/architecture/m6-build-spec.md` 6.9: your armies, the upkeep and losses charts, the foreign armies in sight.) "Show on map" picks a mode: Yields, Trade
 flows, Relations, Supply, Food.
 
 ### C.3 The Economy page (*example* numbers)

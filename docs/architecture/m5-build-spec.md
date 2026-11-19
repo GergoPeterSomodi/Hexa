@@ -1208,7 +1208,7 @@ files sit in listed folders, each under 800 lines); `CLAUDE.md` gains no command
 
 | M | Takes from M5 | M5 leaves for it |
 |---|---|---|
-| M6 | **`People.available`, `levy_check`, `levy`, `give_back`** and the flows `raised`, `returned` (4.20); people for supply (v0.2.2's `SUPPLY_PER_PEOPLE`: a hex's people feed armies passing); foraging as a flow appended to `People.FLOWS`; the army's food as a need beside the towns' in `EconomySeason.needs_of` (`People.fed_of` stays the towns' share); Supply on key 6 | Recruits, foraging, armies' food |
+| M6 | **`People.available`, `levy_check`, `levy`, `give_back`** and the flows `raised`, `returned` (4.20); people for supply (v0.2.2's `SUPPLY_PER_PEOPLE`: a hex's people feed armies passing); foraging as a flow appended to `People.FLOWS`; the army's food as a need beside the towns' in `EconomySeason.needs_of` (`People.fed_of` stays the towns' share); Supply on key 6; all taken up in `m6-build-spec.md` | Recruits, foraging, armies' food |
 | M7 | `district_declined` with `why` `sacked`; captured hexes keep their people (D12); refugees (a flow) if M7 wants them; a besieged town eats its stores | War's toll on people |
 | M8 | The AI reads `PeopleView`, `StudyPeople`, `MapModes.food_bytes` and the `hunger` and `town_full` reminders; it builds food when hungry and walls when full; the soak checks the conservation property and the `Stats` budget | The AI |
 | M9 | Peace terms move land with its people (`Territory.transfer`, D12) | Diplomacy |
