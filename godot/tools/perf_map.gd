@@ -415,14 +415,15 @@ func _countries_pass() -> void:
 	await _owner_frames()
 
 
-## `set_mode` to the next frame, worst of four switches (it ends in Owner mode).
+## CPU time of `set_mode`, worst of four switches (it ends in Owner mode). The frame wait sits outside the timing:
+## windowed, it would add a whole vsync frame to a CPU row.
 func _mode_switches() -> void:
 	var worst := 0.0
 	for mode: MapModes.Mode in [MapModes.Mode.OWNER, MapModes.Mode.RELIEF, MapModes.Mode.TERRAIN, MapModes.Mode.OWNER]:
 		var t := Time.get_ticks_usec()
 		_overlay.set_mode(mode)
-		await process_frame
 		worst = maxf(worst, _ms_since(t))
+		await process_frame
 	_r["mode_switch_ms"] = worst
 
 
