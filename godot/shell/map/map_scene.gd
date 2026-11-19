@@ -1,5 +1,6 @@
-## The map scene (docs/architecture/m1-build-spec.md sections 5, 7 and 8; ui-and-controls-spec.md sections 3.1, 3.3, 4.2 to 4.4):
-## the camera, CameraRig, the tile view, the far picture, MapInput and MapLabels around Session.game.
+## The map scene (docs/architecture/m1-build-spec.md sections 5, 7 and 8; m2-build-spec.md sections 6.1 to 6.5;
+## ui-and-controls-spec.md sections 3.1, 3.3, 4.2 to 4.4): the camera, CameraRig, TileMapView, FarMap, ModeOverlay,
+## CapitalMarks, MapInput, CountryLabels and MapLabels around Session.game.
 ## Any HexPanelContract is injected externally by App/Hud (or tests) and is null-safe when running standalone.
 class_name MapScene
 extends Node2D
@@ -8,6 +9,11 @@ signal refused(reason: String)
 signal selection_changed(hex: Vector2i)
 signal season_changed(season_name: String)
 signal hud_toggle_requested
+signal country_clicked(tag: StringName)
+signal country_hovered(tag: StringName)
+signal mode_changed(mode: int)
+signal country_requested
+signal find_place_requested
 
 const MAP_ID := "north_italy"
 const START_SEED := 1480
@@ -19,6 +25,11 @@ const SELECT_TILE := "mark/select"
 const SYNC_LOAD_HEXES := 4000
 ## Milliseconds a frame the loading and a season swap may use (a layer or a chunk is never split, so one can pass it).
 const SLICE_MS := 5.0
+const MODE_NAMES: Dictionary[String, MapModes.Mode] = {
+	"terrain": MapModes.Mode.TERRAIN,
+	"owner": MapModes.Mode.OWNER,
+	"relief": MapModes.Mode.RELIEF,
+}
 
 ## The map the scene shows (a Session.new_game id); a tool may set it before the scene enters the tree.
 var map_id := MAP_ID
@@ -32,9 +43,14 @@ var preload_next_season := true
 var texture_quality := "full"
 ## Frame loading/swap slice budget in milliseconds (configurable via Settings "dev/slice_ms").
 var slice_ms := SLICE_MS
+## Number of border chunk mesh rebuilds performed since ready (for tests).
+var border_chunk_rebuilds := 0
+## Chunks rebuilt in the most recent border update batch (for tests).
+var last_rebuilt_border_chunks: Array[Vector2i] = []
 
 var _tiles: TilesetBuilder = null
 var _line_queue: Array[Vector2i] = []
+var _border_queue: Array[Vector2i] = []
 var _loading_map: MapData = null
 var _pending_season := ""  # a season asked for before its pictures were loaded: swapped when they are
 var _loading_state: MapState = null
@@ -44,11 +60,22 @@ var _grid_opacity := 1.0
 var _far_locked := false
 var _panel: HexPanelContract = null
 
+var _mode: MapModes.Mode = MapModes.Mode.TERRAIN
+var _persisted_mode: MapModes.Mode = MapModes.Mode.TERRAIN
+var _tint_on := true
+var _borders_visible := true
+var _colour_blind := false
+var _active_palette := PackedColorArray()
+var _last_hovered_country := &""
+
 @onready var _camera: Camera2D = $Camera
 @onready var _rig: CameraRig = $CameraRig
 @onready var _view: TileMapView = $View
 @onready var _far: FarMap = $Far
+@onready var _overlay: ModeOverlay = $Overlay
+@onready var _capitals: CapitalMarks = $Capitals
 @onready var _input: MapInput = $Input
+@onready var _country_labels: CountryLabels = $Names/CountryLabels
 @onready var _labels: MapLabels = $Names/Labels
 
 
@@ -62,7 +89,10 @@ func _ready() -> void:
 	_input.map_node = _view
 	_input.select_requested.connect(_on_select_requested)
 	_input.command_requested.connect(_on_command_requested)
-	_input.season_requested.connect(_on_season_requested)
+	_input.hover_changed.connect(_on_hover_changed)
+	_input.mode_requested.connect(_on_mode_requested)
+	_input.country_requested.connect(_on_country_requested)
+	_input.find_place_requested.connect(_on_find_place_requested)
 	_input.new_seed_requested.connect(new_seed)
 	_input.grid_toggled.connect(toggle_grid)
 	_input.names_toggled.connect(toggle_names)
@@ -77,6 +107,8 @@ func _ready() -> void:
 	_far.visible = false
 	Events.hex_changed.connect(_on_hex_changed)
 	Events.game_started.connect(_on_game_started)
+	Events.owners_changed.connect(_on_owners_changed)
+	Events.country_chosen.connect(_on_country_chosen)
 	if _settings != null:
 		_apply_settings(_settings)
 	if Session.game == null:
@@ -91,6 +123,10 @@ func _exit_tree() -> void:
 		Events.hex_changed.disconnect(_on_hex_changed)
 	if Events.game_started.is_connected(_on_game_started):
 		Events.game_started.disconnect(_on_game_started)
+	if Events.owners_changed.is_connected(_on_owners_changed):
+		Events.owners_changed.disconnect(_on_owners_changed)
+	if Events.country_chosen.is_connected(_on_country_chosen):
+		Events.country_chosen.disconnect(_on_country_chosen)
 	_disconnect_settings()
 
 
@@ -116,6 +152,12 @@ func _apply_settings(settings: Settings) -> void:
 	_set_grid_visible(bool(settings.get_value("map/grid")))
 	_grid_opacity = clampf(float(settings.get_value("map/grid_opacity")) / 100.0, 0.0, 1.0)
 	_labels.set_visible(bool(settings.get_value("map/place_names")))
+	set_borders(bool(settings.get_value("map/borders")))
+	set_tint(bool(settings.get_value("map/owner_tint")))
+	set_colour_blind(str(settings.get_value("accessibility/country_colours")) == "colour_blind")
+	_persisted_mode = _mode_from_string(str(settings.get_value("state/map_mode")))
+	if not picking() and Session.game != null:
+		_apply_mode(_clamp_mode_for_game(_persisted_mode), false)
 	var shading := bool(settings.get_value("graphics/relief_shading"))
 	_view.set_layer_visible("shade", shading)
 	_view.set_layer_visible("light", shading)
@@ -131,9 +173,24 @@ func _apply_settings(settings: Settings) -> void:
 	_apply_zoom()
 
 
-func _on_setting_changed(key: String, _value: Variant) -> void:
+func _on_setting_changed(key: String, value: Variant) -> void:
 	if _settings == null or not is_node_ready():
 		return
+	match key:
+		"map/borders":
+			set_borders(bool(value))
+			return
+		"map/owner_tint":
+			set_tint(bool(value))
+			return
+		"accessibility/country_colours":
+			set_colour_blind(str(value) == "colour_blind")
+			return
+		"state/map_mode":
+			_persisted_mode = _mode_from_string(str(value))
+			if not picking() and Session.game != null:
+				_apply_mode(_clamp_mode_for_game(_persisted_mode), false)
+			return
 	if key in [
 		"map/grid", "map/grid_opacity", "map/place_names",
 		"graphics/relief_shading", "graphics/preload_next_season", "graphics/texture_quality",
@@ -153,10 +210,12 @@ func _disconnect_settings() -> void:
 
 ## A game began: every layer is filled again from the game's map and state, the far picture rebuilt, the selection gone.
 func _on_game_started() -> void:
-	var map := Session.game.map
-	var state := Session.game.state
+	var game := Session.game
+	var map := game.map
+	var state := game.state
 	select_hex(NO_HEX)
-	_labels.setup(map)
+	_last_hovered_country = &""
+	_labels.setup(map, MapLabels.capitals_from(game))
 	_view.set_climates(map.cols, map.climate)
 	_view.begin_fill(map.cols, map.rows, func(hex: Vector2i, names: PackedStringArray) -> void: MapCells.fill_hex(map, state, hex, names),
 		_hex_under_camera(), MapCells.LAYERS)
@@ -164,9 +223,11 @@ func _on_game_started() -> void:
 	_loading_map = map
 	_loading_state = state
 	_line_queue.clear()
-	for chunk_y: int in ceili(float(map.rows) / EdgeLines.CHUNK):
-		for chunk_x: int in ceili(float(map.cols) / EdgeLines.CHUNK):
-			_line_queue.append(Vector2i(chunk_x, chunk_y))
+	_border_queue.clear()
+	_enqueue_all_chunks(_line_queue, map)
+	if game.has_countries():
+		_enqueue_all_chunks(_border_queue, map)
+	_setup_country_layers(game)
 	_far.begin(map, state)
 	_rig.set_map_size(map_size())
 	fit()
@@ -174,9 +235,28 @@ func _on_game_started() -> void:
 		finish_loading()
 
 
-## Whether the map is still being put on the view (tiles, lines, the far picture).
+func _setup_country_layers(game: Game) -> void:
+	_overlay.setup(game, _colour_blind)
+	_overlay.set_tint(_tint_on)
+	_overlay.set_hot(0)
+	if game.has_countries():
+		_active_palette = MapModes.palette(game, _colour_blind)
+		_country_labels.setup(game)
+		_capitals.setup(game, _colour_blind)
+		_view.set_borders_visible(_borders_visible)
+		var start_mode := MapModes.Mode.OWNER if picking() else _saved_mode_from_settings()
+		_apply_mode(_clamp_mode_for_game(start_mode), false)
+	else:
+		_active_palette = PackedColorArray()
+		_country_labels.setup(null)
+		_capitals.setup(null, _colour_blind)
+		_view.set_borders_visible(false)
+		_apply_mode(_clamp_mode_for_game(_saved_mode_from_settings()), false)
+
+
+## Whether the map is still being put on the view (tiles, lines, borders, the far picture).
 func is_loading() -> bool:
-	return _view.is_filling() or not _line_queue.is_empty() or _far.is_building()
+	return _view.is_filling() or not _line_queue.is_empty() or not _border_queue.is_empty() or _far.is_building()
 
 
 func fill_progress() -> float:
@@ -189,18 +269,20 @@ func finish_loading() -> void:
 	while _view.fill_step(100000):
 		pass
 	_line_step(1.0e9)
+	_border_step(1.0e9)
 
 
-## Up to `budget_ms` of loading: the far picture first (it is what a zoomed-out start shows), then the tiles nearest the
-## camera first, then the lines. A row, a block or a chunk is never split, so a step can pass its budget by one of them.
+## Up to `budget_ms` of loading: the far picture first, then tiles nearest camera, then lines, then borders.
 func _load_step(budget_ms: float) -> void:
 	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
 	if _far.is_building():
 		_far.step(budget_ms)
 	if _view.is_filling():
 		_view.fill_for(float(until - Time.get_ticks_usec()) / 1000.0)
-	if Time.get_ticks_usec() < until:
+	if Time.get_ticks_usec() < until and not _line_queue.is_empty():
 		_line_step(float(until - Time.get_ticks_usec()) / 1000.0)
+	if Time.get_ticks_usec() < until and not _border_queue.is_empty():
+		_border_step(float(until - Time.get_ticks_usec()) / 1000.0)
 
 
 ## Builds the lines of the queued chunks, one at least, until the time is up.
@@ -209,6 +291,21 @@ func _line_step(budget_ms: float) -> void:
 	while not _line_queue.is_empty():
 		var chunk: Vector2i = _line_queue.pop_front()
 		_view.set_chunk_lines(chunk, EdgeLines.for_chunk(_loading_map, _loading_state, chunk))
+		if Time.get_ticks_usec() >= until:
+			break
+
+
+## Builds the borders of the queued chunks, one at least, until the time is up.
+func _border_step(budget_ms: float) -> void:
+	if _loading_map == null or _loading_state == null:
+		_border_queue.clear()
+		return
+	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
+	while not _border_queue.is_empty():
+		var chunk: Vector2i = _border_queue.pop_front()
+		_view.set_chunk_borders(chunk, BorderLines.for_chunk(_loading_map, _loading_state.owner, chunk, _active_palette))
+		border_chunk_rebuilds += 1
+		last_rebuilt_border_chunks.append(chunk)
 		if Time.get_ticks_usec() >= until:
 			break
 
@@ -248,6 +345,8 @@ func apply_debug_layer(layer_name: StringName, on: bool) -> void:
 			var lines_node := _view.get_node_or_null("Lines") as CanvasItem
 			if lines_node != null:
 				lines_node.visible = on
+		&"borders":
+			set_borders(on)
 		&"far_locked":
 			_far_locked = on
 			_apply_zoom()
@@ -264,9 +363,48 @@ func _on_hex_changed(hex: Vector2i) -> void:
 		_panel.refresh()
 
 
-## A new seed: the same map, the next seed's improvement.
+## Land changed owner: updates touched overlay texels, touched border chunks, country labels, and pennants.
+func _on_owners_changed(hexes: Array[Vector2i]) -> void:
+	if Session.game == null or Session.game.map == null or Session.game.state == null:
+		return
+	var map := Session.game.map
+	if Session.game.has_countries():
+		_overlay.update_hexes(hexes)
+		var touched := BorderLines.chunks_touched(map, hexes)
+		last_rebuilt_border_chunks.clear()
+		for chunk: Vector2i in touched:
+			if not _border_queue.has(chunk):
+				_border_queue.append(chunk)
+		_loading_map = map
+		_loading_state = Session.game.state
+		var budget := 1.0e9 if map.hex_count() <= SYNC_LOAD_HEXES else slice_ms
+		_border_step(budget)
+		_country_labels.on_owners_changed(hexes)
+		_labels.set_obstacles(_country_labels.obstacles())
+		_capitals.refresh()
+	if _panel != null and _panel.shown_hex() != NO_HEX:
+		_panel.refresh()
+
+
+## The player picked a country: ends picking highlight/pennants and restores the remembered map mode.
+func _on_country_chosen(_tag: StringName) -> void:
+	_last_hovered_country = &""
+	_overlay.set_hot(0)
+	_capitals.set_picking(false)
+	_country_labels.set_picking(false)
+	var restored := _clamp_mode_for_game(_saved_mode_from_settings())
+	_apply_mode(restored, false)
+	if _panel != null and _panel.shown_hex() != NO_HEX:
+		_panel.refresh()
+
+
+## A new seed: the same map or scenario, the next seed.
 func new_seed() -> void:
-	if Session.game != null:
+	if Session.game == null:
+		return
+	if Session.game.has_countries():
+		Session.reseed()
+	else:
 		Session.new_game(map_id, Session.game.seed_value + 1)
 
 
@@ -283,15 +421,185 @@ func upgrade_selected() -> Dictionary:
 	return verdict
 
 
-# ----- selection ----------------------------------------------------------------------------------------------------
+# ----- modes, borders, tint, picking --------------------------------------------------------------------------------
+
+
+## True when a scenario game with countries is active and the player has not yet chosen a country.
+func picking() -> bool:
+	return Session.game != null and Session.game.has_countries() and Session.game.player == &""
+
+
+## Returns the active MapModes.Mode integer value.
+func mode() -> int:
+	return int(_mode)
+
+
+## Switches map mode (Terrain, Owner, Relief). Writes `state/map_mode` unless picking.
+func set_mode(value: int) -> void:
+	if value < int(MapModes.Mode.TERRAIN) or value > int(MapModes.Mode.RELIEF):
+		return
+	var target := value as MapModes.Mode
+	if target == MapModes.Mode.OWNER and (Session.game == null or not Session.game.has_countries()):
+		return
+	_apply_mode(target, not picking())
+
+
+## Shows or hides Terrain-mode owner tinting.
+func set_tint(on: bool) -> void:
+	_tint_on = on
+	if _overlay != null:
+		_overlay.set_tint(_tint_on)
+
+
+## Shows or hides country border meshes.
+func set_borders(on: bool) -> void:
+	_borders_visible = on
+	if _view != null:
+		var has_c := Session.game != null and Session.game.has_countries()
+		_view.set_borders_visible(_borders_visible and has_c)
+
+
+## Switches overlay, pennants, and borders between standard and colour-blind safe palettes.
+func set_colour_blind(on: bool) -> void:
+	if on == _colour_blind:
+		return
+	_colour_blind = on
+	if Session.game == null or not Session.game.has_countries():
+		return
+	_active_palette = MapModes.palette(Session.game, _colour_blind)
+	_overlay.set_palette(_colour_blind)
+	_capitals.set_colour_blind(_colour_blind)
+	_queue_all_borders(Session.game.map)
+
+
+## Glides the camera smoothly to `map_px`, optionally changing zoom.
+func glide_to(map_px: Vector2, new_zoom: float = -1.0, instant: bool = false) -> void:
+	if _rig != null:
+		_rig.look_at(map_px, new_zoom, instant)
+
+
+## Glides the camera smoothly to the middle of `hex`.
+func glide_to_hex(hex: Vector2i, new_zoom: float = -1.0, instant: bool = false) -> void:
+	if _rig != null and _view != null:
+		_rig.look_at(_view.centre_of(hex), new_zoom, instant)
+
+
+func _on_mode_requested(requested_mode: int) -> void:
+	if requested_mode == int(MapModes.Mode.OWNER) and (Session.game == null or not Session.game.has_countries()):
+		refused.emit("no countries on this map")
+		return
+	set_mode(requested_mode)
+
+
+func _on_country_requested() -> void:
+	if Session.game == null or not Session.game.has_countries():
+		refused.emit("no countries on this map")
+		return
+	country_requested.emit()
+
+
+func _on_find_place_requested() -> void:
+	find_place_requested.emit()
+
+
+func _apply_mode(target: MapModes.Mode, persist: bool) -> void:
+	var changed := _mode != target
+	_mode = target
+	if _overlay != null:
+		_overlay.set_mode(_mode)
+	var is_picking := picking()
+	if _capitals != null:
+		_capitals.set_picking(is_picking)
+		_capitals.set_mode(_mode)
+	if _country_labels != null:
+		_country_labels.set_picking(is_picking)
+		_country_labels.set_mode(_mode)
+	_sync_country_labels()
+	if persist:
+		_persisted_mode = _mode
+		if _settings != null:
+			var mode_str := _mode_to_string(_mode)
+			if str(_settings.get_value("state/map_mode")) != mode_str:
+				_settings.set_value("state/map_mode", mode_str)
+	if changed:
+		mode_changed.emit(int(_mode))
+
+
+func _queue_all_borders(map: MapData) -> void:
+	if map == null:
+		return
+	_border_queue.clear()
+	last_rebuilt_border_chunks.clear()
+	_enqueue_all_chunks(_border_queue, map)
+	_loading_map = map
+	_loading_state = Session.game.state if Session.game != null else null
+	if map.hex_count() <= SYNC_LOAD_HEXES:
+		_border_step(1.0e9)
+
+
+static func _enqueue_all_chunks(queue: Array[Vector2i], map: MapData) -> void:
+	var chunks_y := ceili(float(map.rows) / EdgeLines.CHUNK)
+	var chunks_x := ceili(float(map.cols) / EdgeLines.CHUNK)
+	for chunk_y: int in chunks_y:
+		for chunk_x: int in chunks_x:
+			queue.append(Vector2i(chunk_x, chunk_y))
+
+
+func _saved_mode_from_settings() -> MapModes.Mode:
+	if _settings != null:
+		return _mode_from_string(str(_settings.get_value("state/map_mode")))
+	return _persisted_mode
+
+
+func _clamp_mode_for_game(candidate: MapModes.Mode) -> MapModes.Mode:
+	if candidate == MapModes.Mode.OWNER and (Session.game == null or not Session.game.has_countries()):
+		return MapModes.Mode.TERRAIN
+	return candidate
+
+
+static func _mode_from_string(name: String) -> MapModes.Mode:
+	return MODE_NAMES.get(name, MapModes.Mode.TERRAIN)
+
+
+static func _mode_to_string(m: MapModes.Mode) -> String:
+	for key: String in MODE_NAMES:
+		if MODE_NAMES[key] == m:
+			return key
+	return "terrain"
+
+
+# ----- selection & picking ------------------------------------------------------------------------------------------
 
 
 func _on_select_requested(map_px: Vector2) -> void:
-	select_hex(_view.hex_at(map_px))
+	var hex := _view.hex_at(map_px)
+	if picking():
+		var tag := Territory.owner_tag(Session.game, hex)
+		if tag != &"":
+			country_clicked.emit(tag)
+		return
+	select_hex(hex)
 
 
 func _on_command_requested(_map_px: Vector2) -> void:
+	if picking():
+		return
 	select_hex(NO_HEX)
+
+
+func _on_hover_changed(hex: Vector2i) -> void:
+	if not picking():
+		if _last_hovered_country != &"":
+			_last_hovered_country = &""
+			_overlay.set_hot(0)
+			country_hovered.emit(&"")
+		return
+	var oid := Territory.owner_id(Session.game, hex)
+	var tag := Territory.owner_tag(Session.game, hex)
+	_overlay.set_hot(oid)
+	if tag != _last_hovered_country:
+		_last_hovered_country = tag
+		country_hovered.emit(tag)
 
 
 ## Selects a hex of the map (NO_HEX, or a hex off the map, clears the selection): the ring on the marks layer and the panel.
@@ -314,10 +622,6 @@ func select_hex(hex: Vector2i) -> void:
 
 
 # ----- seasons, grid, camera ----------------------------------------------------------------------------------------
-
-
-func _on_season_requested(index: int) -> void:
-	set_season(TilesetBuilder.SEASONS[clampi(index, 0, TilesetBuilder.SEASONS.size() - 1)])
 
 
 func is_half_textures() -> bool:
@@ -423,6 +727,7 @@ func fit() -> void:
 	_rig.set_map_size(map_size())
 	_rig.fit()
 	_apply_zoom()
+	_sync_country_labels()
 
 
 ## A view centred on a map pixel at a zoom (1 = the art's size).
@@ -430,38 +735,20 @@ func frame_at(centre: Vector2, zoom_val: float) -> void:
 	_rig.set_map_size(map_size())
 	_rig.frame_at(centre, zoom_val)
 	_apply_zoom()
+	_sync_country_labels()
 
 
-func zoom() -> float:
-	return _camera.zoom.x
-
-
-func view() -> TileMapView:
-	return _view
-
-
-func far() -> FarMap:
-	return _far
-
-
-func panel() -> HexPanelContract:
-	return _panel
-
-
-func labels() -> MapLabels:
-	return _labels
-
-
-func camera() -> Camera2D:
-	return _camera
-
-
-func camera_rig() -> CameraRig:
-	return _rig
-
-
-func map_input() -> MapInput:
-	return _input
+func zoom() -> float: return _camera.zoom.x
+func view() -> TileMapView: return _view
+func far() -> FarMap: return _far
+func overlay() -> ModeOverlay: return _overlay
+func capital_marks() -> CapitalMarks: return _capitals
+func country_labels() -> CountryLabels: return _country_labels
+func panel() -> HexPanelContract: return _panel
+func labels() -> MapLabels: return _labels
+func camera() -> Camera2D: return _camera
+func camera_rig() -> CameraRig: return _rig
+func map_input() -> MapInput: return _input
 
 
 func _hex_under_camera() -> Vector2i:
@@ -472,6 +759,20 @@ func _hex_under_camera() -> Vector2i:
 
 func _on_view_changed(_zoom_val: float, _visible_rect: Rect2) -> void:
 	_apply_zoom()
+	_sync_country_labels()
+
+
+func _sync_country_labels() -> void:
+	if _country_labels == null or _camera == null:
+		return
+	var z := _camera.zoom.x
+	var vp_size := get_viewport_rect().size if is_inside_tree() else Vector2(1280.0, 720.0)
+	if vp_size.x <= 0.0 or vp_size.y <= 0.0:
+		vp_size = Vector2(1280.0, 720.0)
+	var xform := Transform2D(Vector2(z, 0.0), Vector2(0.0, z), vp_size * 0.5 - _camera.position * z)
+	_country_labels.set_view(xform, z, vp_size)
+	if _labels != null:
+		_labels.set_obstacles(_country_labels.obstacles())
 
 
 func _apply_zoom() -> void:

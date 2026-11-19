@@ -255,3 +255,26 @@ func test_the_hex_under_a_point_is_the_rules_hex() -> void:
 	for hex: Vector2i in [Vector2i(0, 0), Vector2i(5, 3), Vector2i(7, 8)]:
 		assert_eq(_view.hex_at(_view.centre_of(hex)), hex)
 		assert_eq(_view.centre_of(hex), MapTiles.cell_centre(hex))
+
+
+func test_m2_layer_stack_z_and_name_order() -> void:
+	var prev_game := Session.game
+	Session.new_scenario("north_italy_1480", 1480)
+	var packed := load("res://shell/map/map_scene.tscn") as PackedScene
+	var scene := packed.instantiate() as MapScene
+	scene.preload_next_season = false
+	add_child_autofree(scene)
+	scene.finish_loading()
+
+	assert_eq(scene.overlay().z_index, 80, "ModeOverlay sits at z 80")
+	assert_eq((scene.view().get_node("Borders") as Node2D).z_index, 85, "Borders sit at z 85")
+	assert_eq(scene.capital_marks().z_index, 86, "CapitalMarks sits at z 86")
+	assert_eq(scene.view().layer("marks").z_index, 90, "marks sit at z 90")
+	assert_lt(scene.far().z_index, scene.overlay().z_index, "FarMap sits below ModeOverlay so overlay draws over it")
+
+	var names_layer := scene.get_node("Names") as CanvasLayer
+	assert_not_null(names_layer)
+	assert_lt(scene.country_labels().get_index(), scene.labels().get_index(), "CountryLabels precedes MapLabels in Names")
+	assert_lt(scene.country_labels().z_index, scene.labels().z_index, "CountryLabels draws under MapLabels")
+
+	Session.game = prev_game

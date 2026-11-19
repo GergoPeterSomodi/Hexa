@@ -118,7 +118,9 @@ func test_hover_changes_only_on_new_hex_and_clears_off_map_or_over_ui() -> void:
 
 func test_action_keys_and_rebinding_and_dev_gating() -> void:
 	var log: Array[String] = []
-	_input.season_requested.connect(func(i: int) -> void: log.append("season:%d" % i))
+	_input.mode_requested.connect(func(m: int) -> void: log.append("mode:%d" % m))
+	_input.country_requested.connect(func() -> void: log.append("country"))
+	_input.find_place_requested.connect(func() -> void: log.append("find_place"))
 	_input.grid_toggled.connect(func() -> void: log.append("grid"))
 	_input.names_toggled.connect(func() -> void: log.append("names"))
 	_input.hud_toggled.connect(func() -> void: log.append("hud"))
@@ -126,8 +128,14 @@ func test_action_keys_and_rebinding_and_dev_gating() -> void:
 	_input.new_seed_requested.connect(func() -> void: log.append("seed"))
 
 	_input._unhandled_input(_key(KEY_1))
-	_input._unhandled_input(_key(KEY_4))
-	_input._unhandled_input(_key(KEY_2, true, true))  # modified chord must not trigger season 2
+	_input._unhandled_input(_key(KEY_2))
+	_input._unhandled_input(_key(KEY_3))
+	_input._unhandled_input(_key(KEY_4))  # unbound / no-op in M2
+	_input._unhandled_input(_key(KEY_2, true, true))  # modified chord must not trigger mode 2
+	_input._unhandled_input(_key(KEY_C))
+	var find_chord := Bindings.events_for(&"ui_find_place")[0].duplicate() as InputEventKey
+	find_chord.pressed = true
+	_input._unhandled_input(find_chord)
 	_input._unhandled_input(_key(KEY_G))
 	_input._unhandled_input(_key(KEY_N))
 	_input._unhandled_input(_key(KEY_H))
@@ -138,7 +146,7 @@ func test_action_keys_and_rebinding_and_dev_gating() -> void:
 	seed_chord.pressed = true
 	_input._unhandled_input(seed_chord)
 
-	assert_eq(log, ["season:0", "season:3", "grid", "names", "hud", "upgrade", "seed"])
+	assert_eq(log, ["mode:0", "mode:1", "mode:2", "country", "find_place", "grid", "names", "hud", "upgrade", "seed"])
 
 	# Rebind view_grid to K: G stops working, K works.
 	log.clear()
@@ -163,6 +171,8 @@ func test_action_keys_and_rebinding_and_dev_gating() -> void:
 	settings_dev.set_value("dev/developer_tools", true)
 	_input.configure(settings_dev)
 	_input._unhandled_input(seed_chord)
+	_input._unhandled_input(find_chord)
+	_input._unhandled_input(_key(KEY_C))
 	_input._unhandled_input(_key(KEY_G))
 	assert_true(log.is_empty(), "focused LineEdit gates MapInput shortcuts")
 	edit.release_focus()

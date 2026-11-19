@@ -1,11 +1,14 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://shell/map/map_scene.gd" id="1_scene"]
 [ext_resource type="Script" path="res://shell/mapview/tile_map_view.gd" id="2_view"]
 [ext_resource type="Script" path="res://shell/mapview/far_map.gd" id="3_far"]
 [ext_resource type="Script" path="res://shell/input/map_input.gd" id="4_input"]
+[ext_resource type="Script" path="res://shell/map/mode_overlay.gd" id="5_overlay"]
 [ext_resource type="Script" path="res://shell/mapview/map_labels.gd" id="6_labels"]
 [ext_resource type="Script" path="res://shell/input/camera_rig.gd" id="7_rig"]
+[ext_resource type="Script" path="res://shell/map/capital_marks.gd" id="8_capitals"]
+[ext_resource type="Script" path="res://shell/mapview/country_labels.gd" id="9_country_labels"]
 
 [node name="MapScene" type="Node2D"]
 script = ExtResource("1_scene")
@@ -16,8 +19,16 @@ script = ExtResource("1_scene")
 script = ExtResource("2_view")
 
 [node name="Far" type="Node2D" parent="."]
-z_index = 95
+z_index = 75
 script = ExtResource("3_far")
+
+[node name="Overlay" type="Node2D" parent="."]
+z_index = 80
+script = ExtResource("5_overlay")
+
+[node name="Capitals" type="Node2D" parent="."]
+z_index = 86
+script = ExtResource("8_capitals")
 
 [node name="Input" type="Node" parent="."]
 script = ExtResource("4_input")
@@ -27,6 +38,10 @@ script = ExtResource("7_rig")
 
 [node name="Names" type="CanvasLayer" parent="."]
 layer = 5
+
+[node name="CountryLabels" type="Node2D" parent="Names"]
+z_index = 95
+script = ExtResource("9_country_labels")
 
 [node name="Labels" type="Control" parent="Names"]
 layout_mode = 3

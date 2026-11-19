@@ -16,6 +16,8 @@ var texture_updates := 0
 var _mode: MapModes.Mode = MapModes.Mode.TERRAIN
 var _tint_on := true
 var _hot_id := 0
+var _colour_blind := false
+var _game: Game = null
 var _map: MapData = null
 var _map_size := Vector2.ZERO
 var _grid_size := Vector2i.ZERO
@@ -38,6 +40,7 @@ func _init() -> void:
 
 ## Builds all four GPU textures from plain inputs and applies shader uniforms.
 func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray) -> void:
+	_game = null
 	if map == null or map.cols <= 0 or map.rows <= 0:
 		return
 	_map = map
@@ -88,12 +91,30 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	queue_redraw()
 
 
+## Configures the overlay directly from `game` using standard or colour-blind safe colours.
+func setup(game: Game, colour_blind: bool = false) -> void:
+	_colour_blind = colour_blind
+	if game == null or game.map == null or game.state == null:
+		_game = null
+		return
+	setup_from(game.map, game.state.owner, MapModes.palette(game, colour_blind))
+	_game = game
+
+
 ## Replaces the 256 x 1 palette texture from plain colours (used by the editor and tests).
 func set_palette_colours(palette: PackedColorArray) -> void:
 	if _palette_tex == null:
 		return
 	_palette_image = _image_from_colours(palette)
 	_palette_tex.update(_palette_image)
+
+
+## Rewrites only the 256 x 1 palette texture for `colour_blind` when bound to a Game.
+func set_palette(colour_blind: bool) -> void:
+	_colour_blind = colour_blind
+	if _game == null:
+		return
+	set_palette_colours(MapModes.palette(_game, colour_blind))
 
 
 ## Switches map mode via a shader uniform; hides the node in Terrain when tint is off.
@@ -131,18 +152,24 @@ func hot_id() -> int:
 	return _hot_id
 
 
-## Rewrites the owner texels for `hexes` (reading from `owner` when provided, else internal bytes)
+## Rewrites the owner texels for `hexes` (reading from `owner`, bound `game.state.owner`, or internal bytes)
 ## and uploads the updated owner texture once for the batch.
 func update_hexes(hexes: Array[Vector2i], owner: PackedByteArray = PackedByteArray()) -> void:
 	if _map == null or _owner_image == null or _owner_tex == null or hexes.is_empty():
 		return
-	var has_src := owner.size() == _map.hex_count()
+	var count := _map.hex_count()
+	var src := PackedByteArray()
+	if owner.size() == count:
+		src = owner
+	elif _game != null and _game.state != null and _game.state.owner.size() == count:
+		src = _game.state.owner
+	var has_src := src.size() == count
 	var wrote := 0
 	for hex: Vector2i in hexes:
 		var idx := _map.index_of(hex)
 		if idx < 0:
 			continue
-		var owner_id := int(owner[idx]) if has_src else int(_owner_bytes[idx])
+		var owner_id := int(src[idx]) if has_src else int(_owner_bytes[idx])
 		_owner_bytes[idx] = owner_id
 		_owner_image.set_pixel(hex.x, hex.y, Color(float(owner_id) / 255.0, 0.0, 0.0, 1.0))
 		wrote += 1

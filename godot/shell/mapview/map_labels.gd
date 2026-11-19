@@ -32,6 +32,8 @@ const SPOTS: Array[int] = [Spot.BELOW, Spot.ABOVE, Spot.RIGHT, Spot.LEFT, Spot.B
 var obstacles: Array[Rect2] = []
 
 var _map: MapData = null
+var _capitals: Array[Vector2i] = []
+var _use_game_capitals := false
 var _placed: Array[Dictionary] = []
 var _last_transform := Transform2D()
 var _last_size := Vector2.ZERO
@@ -55,11 +57,52 @@ func _ready() -> void:
 	visibility_changed.connect(_on_visibility_changed)
 
 
-## The map whose places are named. Call once (and again for another map).
-func setup(map: MapData) -> void:
+## The map whose places are named. When `capitals` is provided, capital styling comes from that list
+## (use MapLabels.capitals_from(game) in M2); otherwise falls back to MapData.places[].capital.
+func setup(map: MapData, capitals_list: Variant = null) -> void:
 	_map = map
+	_capitals.clear()
+	if capitals_list is Array:
+		_use_game_capitals = true
+		for h: Variant in (capitals_list as Array):
+			if h is Vector2i:
+				_capitals.append(h as Vector2i)
+	else:
+		_use_game_capitals = false
 	_dirty = true
 	queue_redraw()
+
+
+## Sets explicit capital hexes from the active Game and forces a relayout.
+func set_capitals(capitals_list: Array[Vector2i]) -> void:
+	_capitals = capitals_list.duplicate()
+	_use_game_capitals = true
+	_dirty = true
+	queue_redraw()
+
+
+## Returns the active explicit capital hexes (empty when using MapData.places[].capital or map-only).
+func capitals() -> Array[Vector2i]:
+	return _capitals.duplicate()
+
+
+## Updates screen-space obstacle boxes (e.g. CountryLabels) and refreshes when changed.
+func set_obstacles(boxes: Array[Rect2]) -> void:
+	if obstacles == boxes:
+		return
+	obstacles = boxes.duplicate()
+	refresh()
+
+
+## Extracts on-map capital hexes from the alive countries of `game`.
+static func capitals_from(game: Game) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if game == null or not game.has_countries():
+		return out
+	for country: Country in game.countries:
+		if country != null and country.alive and country.capital != Country.NO_HEX:
+			out.append(country.capital)
+	return out
 
 
 ## Forces a new layout at the next frame (a place was added, a panel moved).
@@ -88,7 +131,8 @@ func _process(_delta: float) -> void:
 		_last_transform = xform
 		_last_size = screen
 		_dirty = false
-		_placed = layout(_map, xform, Rect2(Vector2.ZERO, screen), ThemeDB.fallback_font, obstacles)
+		var cap_override: Variant = _capitals if _use_game_capitals else null
+		_placed = layout(_map, xform, Rect2(Vector2.ZERO, screen), ThemeDB.fallback_font, obstacles, cap_override)
 		queue_redraw()
 
 
@@ -130,11 +174,19 @@ static func font_size(level: int) -> int:
 
 
 ## The places of `map` that are on screen, with their plates placed. `to_screen` carries map px (MapTiles.cell_centre) to
-## screen px, `screen` is the area the plates must stay in, `blocked` the boxes they keep off. Returns
-## [{name, level, capital, hex, box}] in placing order (rank: level, capital first, then by name).
-static func layout(map: MapData, to_screen: Transform2D, screen: Rect2, font: Font, blocked: Array[Rect2]) -> Array[Dictionary]:
+## screen px, `screen` is the area the plates must stay in, `blocked` the boxes they keep off. When `capitals_override`
+## is provided (an Array of capital Vector2i hexes), capital status comes from that set instead of MapData.places[].capital.
+## Returns [{name, level, capital, hex, box}] in placing order (rank: level, capital first, then by name).
+static func layout(map: MapData, to_screen: Transform2D, screen: Rect2, font: Font,
+		blocked: Array[Rect2], capitals_override: Variant = null) -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
 	var taken: Array[Rect2] = blocked.duplicate()
+	var cap_set: Dictionary[Vector2i, bool] = {}
+	var has_cap_override := capitals_override is Array
+	if has_cap_override:
+		for c: Variant in (capitals_override as Array):
+			if c is Vector2i:
+				cap_set[c as Vector2i] = true
 	var reach := screen.grow(40.0)
 	for place: Dictionary in map.places:
 		var hex: Vector2i = place["hex"]
@@ -148,7 +200,8 @@ static func layout(map: MapData, to_screen: Transform2D, screen: Rect2, font: Fo
 		var level := int(place.get("level", 0))
 		var fs := font_size(level)
 		var text := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
-		items.append({"name": label, "level": level, "capital": bool(place.get("capital", false)), "hex": hex, "at": at,
+		var is_cap := cap_set.has(hex) if has_cap_override else bool(place.get("capital", false))
+		items.append({"name": label, "level": level, "capital": is_cap, "hex": hex, "at": at,
 			"size": Vector2(text.x + 2.0 * PAD_X, text.y + 2.0 * PAD_Y)})
 	return _place(items, taken, screen)
 

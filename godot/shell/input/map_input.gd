@@ -7,7 +7,9 @@ extends Node
 signal select_requested(map_px: Vector2)
 signal command_requested(map_px: Vector2)
 signal hover_changed(hex: Vector2i)
-signal season_requested(index: int)
+signal mode_requested(mode: int)
+signal country_requested
+signal find_place_requested
 signal grid_toggled
 signal names_toggled
 signal hud_toggled
@@ -139,16 +141,19 @@ func _on_key(key: InputEventKey) -> void:
 		new_seed_requested.emit()
 		_mark_handled()
 		return
-	# Until C13 swaps season_requested for mode_requested, the mode keys drive the season preview.
-	var season_actions: Array[StringName] = [
-		&"view_mode_1", &"view_mode_2", &"view_mode_3", &"view_mode_4"
-	]
-	for i: int in season_actions.size():
-		if _is_action_pressed_exact(key, season_actions[i]):
-			season_requested.emit(i)
+	var mode_actions: Array[StringName] = [&"view_mode_1", &"view_mode_2", &"view_mode_3"]
+	for i: int in mode_actions.size():
+		if _is_action_pressed_exact(key, mode_actions[i]):
+			mode_requested.emit(i)
 			_mark_handled()
 			return
-	if _is_action_pressed_exact(key, &"view_grid"):
+	if _is_action_pressed_exact(key, &"ui_find_place"):
+		find_place_requested.emit()
+		_mark_handled()
+	elif _is_action_pressed_exact(key, &"game_country"):
+		country_requested.emit()
+		_mark_handled()
+	elif _is_action_pressed_exact(key, &"view_grid"):
 		grid_toggled.emit()
 		_mark_handled()
 	elif _is_action_pressed_exact(key, &"view_names"):

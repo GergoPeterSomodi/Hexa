@@ -316,8 +316,14 @@ func test_app_shortcuts_and_map_hud_wiring() -> void:
 	await _wait_frames(1)
 	assert_true(app.hud().is_hud_visible(), "H restores HUD")
 
-	# 1 previews Spring and syncs TopBar segmented switcher
+	# 3 and 1 switch map modes (Relief / Terrain); TopBar switcher previews Spring
+	_send_key(vp, KEY_3)
+	await _wait_frames(1)
+	assert_eq(app.map_scene().mode(), int(MapModes.Mode.RELIEF))
 	_send_key(vp, KEY_1)
+	await _wait_frames(1)
+	assert_eq(app.map_scene().mode(), int(MapModes.Mode.TERRAIN))
+	app.hud().top_bar().season_segmented().select(0, true)
 	await _wait_frames(1)
 	assert_eq(app.map_scene().season, "spring")
 	assert_eq(app.hud().top_bar().season_segmented().selected_id(), 0)

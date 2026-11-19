@@ -391,3 +391,230 @@ func test_half_texture_quality_preserves_cell_alignment_and_live_swaps() -> void
 	assert_false(_scene.view().is_half())
 	assert_eq(_scene.view().layer("ground").scale, Vector2.ONE)
 	assert_eq(_scene.view().layer("ground").tile_set.tile_size, Vector2i(104, 102))
+
+
+func _key_event(keycode: Key) -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.keycode = keycode
+	ev.pressed = true
+	return ev
+
+
+func _click_world_hex(hex: Vector2i) -> void:
+	_scene.frame_at(_scene.view().centre_of(hex), 1.0)
+	_scene.camera().force_update_scroll()
+	var input := _scene.map_input()
+	var pos := _scene.get_viewport_rect().size / 2.0
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.position = pos
+	press.pressed = true
+	input._unhandled_input(press)
+	var release := press.duplicate() as InputEventMouseButton
+	release.pressed = false
+	input._unhandled_input(release)
+
+
+func _multi_chunk_scenario_game() -> Game:
+	var map := FakeMap.build(40, 40, 1480)
+	var defs := GameDefs.new()
+	defs.tinctures = GameDefs.default_tinctures()
+	defs.cb_palette = GameDefs.default_cb_palette()
+	defs.countries = [
+		ScenarioFixture.make_country(&"AAA", "Alpha", "Republic of Alpha", "Alphan", Color("#b3261e")),
+		ScenarioFixture.make_country(&"BBB", "Beta", "Duchy of Beta", "Betan", Color("#2b5aa8")),
+	]
+	var scen := ScenarioDef.new()
+	scen.id = "multi_chunk_fixture"
+	scen.name = "Multi Chunk"
+	scen.map_id = map.id
+	scen.map_digest = map.digest()
+	scen.countries = [&"AAA", &"BBB"]
+	scen.capitals = [Vector2i(4, 4), Vector2i(36, 36)]
+	scen.cb_colours = PackedByteArray([0, 4])
+	scen.owner.resize(map.hex_count())
+	for r: int in map.rows:
+		for c: int in map.cols:
+			var idx := r * map.cols + c
+			if map.land[idx] == 0:
+				scen.owner[idx] = 0
+			elif c < 20:
+				scen.owner[idx] = 1
+			else:
+				scen.owner[idx] = 2
+	defs.scenarios = [scen]
+	return Game.new_scenario(map, defs, scen, 1480)
+
+
+func test_map_only_game_has_no_borders_pennants_or_owner_mode() -> void:
+	Bindings.ensure()
+	assert_false(_scene.picking())
+	assert_eq(_scene.mode(), int(MapModes.Mode.TERRAIN))
+	assert_true(_scene.view().border_chunks().is_empty(), "map-only game has no border chunks")
+	assert_eq(_scene.capital_marks().pennant_count(), 0)
+	assert_false(_scene.capital_marks().visible)
+	assert_true(_scene.country_labels().entries().is_empty())
+
+	var reasons: Array[String] = []
+	_scene.refused.connect(func(r: String) -> void: reasons.append(r))
+	_scene.map_input()._unhandled_input(_key_event(KEY_2))
+	_scene.map_input()._unhandled_input(_key_event(KEY_C))
+	assert_eq(reasons, ["no countries on this map", "no countries on this map"])
+	assert_eq(_scene.mode(), int(MapModes.Mode.TERRAIN), "Owner mode refused in map-only game")
+
+	_scene.map_input()._unhandled_input(_key_event(KEY_3))
+	assert_eq(_scene.mode(), int(MapModes.Mode.RELIEF), "Relief mode works in map-only game")
+
+
+func test_scenario_game_borders_modes_labels_pennants_and_settings() -> void:
+	Bindings.ensure()
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	_finish_fill()
+
+	assert_true(_scene.picking(), "scenario without player opens in picking state")
+	assert_eq(_scene.mode(), int(MapModes.Mode.OWNER), "picking opens in Owner mode")
+	assert_gt(_scene.view().border_chunks().size(), 0, "scenario game builds border chunks")
+	assert_eq(_scene.capital_marks().pennant_count(), 10, "10 playable capital pennants")
+	assert_true(_scene.capital_marks().visible, "pennants visible while picking")
+	assert_gt(_scene.country_labels().placed().size(), 0, "country names shown while picking")
+
+	# Keys 1, 2, 3 switch Terrain, Owner, Relief.
+	_scene.map_input()._unhandled_input(_key_event(KEY_1))
+	assert_eq(_scene.mode(), int(MapModes.Mode.TERRAIN))
+	_scene.map_input()._unhandled_input(_key_event(KEY_3))
+	assert_eq(_scene.mode(), int(MapModes.Mode.RELIEF))
+	_scene.map_input()._unhandled_input(_key_event(KEY_2))
+	assert_eq(_scene.mode(), int(MapModes.Mode.OWNER))
+
+	# Colour-blind setting updates overlay palette, pennant tint, and rebuilds borders.
+	var gen_std := _scene.capital_marks().cloth_colour_of(&"GEN")
+	var rebuilds_before := _scene.border_chunk_rebuilds
+	var settings := Settings.new("macOS", false)
+	_scene.configure(settings)
+	assert_true(settings.set_value("accessibility/country_colours", "colour_blind"))
+	assert_gt(_scene.border_chunk_rebuilds, rebuilds_before, "palette switch rebuilds borders")
+	var gen_cb := _scene.capital_marks().cloth_colour_of(&"GEN")
+	assert_ne(gen_cb, gen_std, "pennant cloth reflects colour-blind palette")
+	assert_eq(_scene.overlay().palette_image().get_pixel(7, 0).to_html(), gen_cb.to_html())
+
+	# Borders and tint settings toggle visibility without rebuilding chunks.
+	var borders_node := _scene.view().get_node("Borders") as Node2D
+	assert_true(borders_node.visible)
+	assert_true(settings.set_value("map/borders", false))
+	assert_false(borders_node.visible)
+	assert_true(settings.set_value("map/borders", true))
+	assert_true(borders_node.visible)
+
+	_scene.set_mode(MapModes.Mode.TERRAIN)
+	assert_true(_scene.overlay().visible)
+	assert_true(settings.set_value("map/owner_tint", false))
+	assert_false(_scene.overlay().visible)
+	assert_true(settings.set_value("map/owner_tint", true))
+	assert_true(_scene.overlay().visible)
+
+	# Below far zoom, TileMapView hides while ModeOverlay and CapitalMarks remain visible.
+	_scene.set_mode(MapModes.Mode.OWNER)
+	_scene.frame_at(_scene.map_size() / 2.0, 0.1)
+	assert_false(_scene.view().visible)
+	assert_true(_scene.far().visible)
+	assert_true(_scene.overlay().visible, "ModeOverlay stays visible over FarMap")
+	assert_true(_scene.capital_marks().visible, "CapitalMarks stay visible over FarMap")
+
+
+func test_transfer_through_session_rebuilds_only_touched_chunks_and_texels() -> void:
+	var game := _multi_chunk_scenario_game()
+	Session.start_game(game)
+	_finish_fill()
+	assert_eq(_scene.view().border_chunks().size(), 2, "chunks (0, 0) and (0, 1) hold the col 19/20 border")
+
+	var transfer_hex := Vector2i(5, 5)  # deep inside chunk (0, 0)
+	if game.map.land[game.map.index_of(transfer_hex)] == 0:
+		for r: int in 10:
+			for c: int in 10:
+				var cand := Vector2i(c, r)
+				if game.map.is_land(cand):
+					transfer_hex = cand
+					break
+			if game.map.is_land(transfer_hex):
+				break
+	var expected_chunks := BorderLines.chunks_touched(game.map, [transfer_hex])
+	assert_eq(expected_chunks, [Vector2i(0, 0)] as Array[Vector2i], "only chunk (0, 0) is touched")
+
+	var rebuilds_before := _scene.border_chunk_rebuilds
+	var writes_before := _scene.overlay().texel_writes
+	var updates_before := _scene.overlay().texture_updates
+	var untouched_node := _scene.view().get_node("Borders/Borders_0_1")
+
+	assert_eq(Territory.transfer(game, [transfer_hex], 2), 1)
+	Session.drain()
+
+	assert_eq(_scene.border_chunk_rebuilds - rebuilds_before, expected_chunks.size(),
+		"rebuilds exactly chunks_touched count")
+	assert_eq(_scene.last_rebuilt_border_chunks, expected_chunks)
+	assert_same(_scene.view().get_node("Borders/Borders_0_1"), untouched_node,
+		"untouched border chunk node is preserved")
+	assert_eq(_scene.overlay().texel_writes - writes_before, 1, "writes exactly 1 overlay texel")
+	assert_eq(_scene.overlay().texture_updates - updates_before, 1, "performs 1 GPU texture update")
+	assert_eq(_scene.overlay().owner_image().get_pixelv(transfer_hex).r8, 2)
+
+
+func test_picking_signals_hover_and_country_chosen() -> void:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	_finish_fill()
+
+	var settings := Settings.new("macOS", false)
+	_scene.configure(settings)
+	assert_eq(_scene.mode(), int(MapModes.Mode.OWNER))
+	assert_eq(str(settings.get_value("state/map_mode")), "terrain", "picking does not overwrite state/map_mode")
+
+	var clicked: Array[StringName] = []
+	var hovered: Array[StringName] = []
+	_scene.country_clicked.connect(func(tag: StringName) -> void: clicked.append(tag))
+	_scene.country_hovered.connect(func(tag: StringName) -> void: hovered.append(tag))
+
+	# Clicking Milan while picking emits country_clicked(&"MLO") and does not select hex.
+	_click_world_hex(Vector2i(9, 9))
+	assert_eq(clicked, [&"MLO"] as Array[StringName])
+	assert_eq(_scene.selected, MapScene.NO_HEX)
+
+	# Clicking sea while picking emits nothing and does not select hex.
+	_click_world_hex(Vector2i(19, 10))
+	assert_eq(clicked, [&"MLO"] as Array[StringName])
+	assert_eq(_scene.selected, MapScene.NO_HEX)
+
+	# Hovering Genoa sets hot_id and emits country_hovered(&"GEN"); hovering sea clears both.
+	_scene.map_input().hover_changed.emit(Vector2i(8, 13))
+	assert_eq(_scene.overlay().hot_id(), Session.game.scenario.id_of(&"GEN"))
+	_scene.map_input().hover_changed.emit(Vector2i(19, 10))
+	assert_eq(_scene.overlay().hot_id(), 0)
+	assert_eq(hovered, [&"GEN", &""] as Array[StringName])
+
+	# Choosing a country ends picking, hides pennants, and restores state/map_mode (Terrain).
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	assert_false(_scene.picking())
+	assert_eq(_scene.mode(), int(MapModes.Mode.TERRAIN))
+	assert_false(_scene.capital_marks().visible)
+	assert_eq(_scene.overlay().hot_id(), 0)
+
+	# After choosing, clicking a hex selects it normally.
+	_click_world_hex(Vector2i(8, 13))
+	assert_eq(_scene.selected, Vector2i(8, 13))
+
+
+func test_mode_overlay_setup_from_game_and_single_arg_update_hexes() -> void:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	var overlay := ModeOverlay.new()
+	add_child_autofree(overlay)
+	overlay.setup(Session.game, false)
+	var gen_hex := Vector2i(8, 13)
+	var mlo_id := Session.game.scenario.id_of(&"MLO")
+	assert_eq(overlay.owner_image().get_pixelv(gen_hex).r8, Session.game.scenario.id_of(&"GEN"))
+
+	overlay.set_palette(true)
+	var cb_pal := MapModes.palette(Session.game, true)
+	assert_true(overlay.palette_image().get_pixel(mlo_id, 0).is_equal_approx(cb_pal[mlo_id]))
+
+	Territory.transfer(Session.game, [gen_hex], mlo_id)
+	Session.game.events.clear()
+	overlay.update_hexes([gen_hex])
+	assert_eq(overlay.owner_image().get_pixelv(gen_hex).r8, mlo_id)

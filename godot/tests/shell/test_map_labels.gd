@@ -102,3 +102,28 @@ func test_a_blocked_box_is_kept_clear_and_moving_the_camera_moves_the_plates() -
 func test_bigger_places_have_bigger_type() -> void:
 	assert_gt(MapLabels.font_size(5), MapLabels.font_size(3))
 	assert_gt(MapLabels.font_size(3), MapLabels.font_size(1))
+
+
+func test_capitals_come_from_game_countries_and_avoid_obstacles() -> void:
+	var f := ScenarioFixture.build()
+	var map := f["map"] as MapData
+	var game := Game.new_scenario(map, f["defs"] as GameDefs, f["scenario"] as ScenarioDef, 1480)
+	# Fixture places have capital=false in MapData; game countries mark ALPHA_CAPITAL and BETA_CAPITAL.
+	var caps := MapLabels.capitals_from(game)
+	assert_eq(caps, [ScenarioFixture.ALPHA_CAPITAL, ScenarioFixture.BETA_CAPITAL] as Array[Vector2i])
+
+	var xform := _shift(Vector2(200.0, 200.0))
+	var placed := MapLabels.layout(map, xform, SCREEN, ThemeDB.fallback_font, [], caps)
+	assert_eq(placed.size(), 2)
+	for item: Dictionary in placed:
+		assert_true(bool(item["capital"]), "%s styled as a game capital" % str(item["name"]))
+
+	# An obstacle covering Alpha's preferred box forces Alpha onto an unblocked spot (or hides it if none free).
+	var blocked: Array[Rect2] = [placed[0]["box"] as Rect2]
+	var labels := MapLabels.new()
+	add_child_autofree(labels)
+	labels.setup(map, caps)
+	labels.set_obstacles(blocked)
+	var after := MapLabels.layout(map, xform, SCREEN, ThemeDB.fallback_font, labels.obstacles, labels.capitals())
+	for item: Dictionary in after:
+		assert_false((item["box"] as Rect2).intersects(blocked[0]), "plate avoids CountryLabels obstacle")
