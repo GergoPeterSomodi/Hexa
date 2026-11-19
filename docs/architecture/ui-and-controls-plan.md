@@ -1,7 +1,6 @@
 # UI, menus and controls: the plan
 
-UI and game-systems designer, 2026-11-17. Builds `docs/architecture/ui-and-controls-spec.md` (the spec). **Status: a
-proposal. No task starts before the owner approves the spec and answers (or accepts the defaults of) its section 11.**
+UI and game-systems designer, 2026-11-17. Builds `docs/architecture/ui-and-controls-spec.md` (the spec). **Status: M1.5 (`U1`–`U17`, `G1`, M1.5b) is implemented and merged on `master`; later-milestone UI rows (section 4) ship with M2–M12 (M2 Groups A–D + `C13` merged, `C14`–`C20` remaining).**
 
 > **Note (2026-11-17, later the same day):** the owner approved the Studiolo look and three feedback screens. `docs/architecture/ui-style-and-feedback-plan.md` re-bases the tasks below (its slice S1 says, task by task, what changes: U4 is replaced, U7 is split, H1 and M1 are added) and adds slices S0 and S2 to S5; the spec is `docs/architecture/ui-style-and-feedback-spec.md`.
 

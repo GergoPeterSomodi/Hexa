@@ -1,8 +1,6 @@
 # UI style (Studiolo) and feedback screens: the plan
 
-Technical director, 2026-11-17. Builds `docs/architecture/ui-style-and-feedback-spec.md` ("the spec"). **Status: a
-proposal; no task starts before the owner's go.** It re-bases the M1.5 tasks of `ui-and-controls-plan.md` ("the UI
-plan") on Studiolo, then adds the feedback screens to M3, M4 and a new M4.5.
+Technical director, 2026-11-17. Builds `docs/architecture/ui-style-and-feedback-spec.md` ("the spec"). **Status: `S0` and `S1` (M1.5 Studiolo) are implemented and merged on `master`, plus M2 slice 2 (`C5`, `C7`); `S2` to `S5` wait for M3+.** It re-bases the M1.5 tasks of `ui-and-controls-plan.md` ("the UI plan") on Studiolo, then adds the feedback screens to M3, M4 and a new M4.5.
 
 ---
 

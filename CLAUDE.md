@@ -16,10 +16,10 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   `.github/workflows/godot.yml`) fails a pull request that changes a file under `hexa/`. The Python `tools/` folder may gain
   the exporters (`export_data.py`, `export_geography.py`, ...) and the map art tools (`tools/worldmap/`, `bake_art.py`); they
   import `hexa` through its public API.
-- **New work goes to `godot/`.** The map is the north Italy district map (`shell/map/map_scene.tscn`, the main scene,
-  built on `MapData` in `core/defs/map_data.gd`, `MapState` in `core/state/map_state.gd`, `Improve` in
-  `core/systems/improve.gd`, `Game` and `Actions` in `core/game/`, the pure view helpers in `core/views/`, `TileMapView`
-  and `MapLabels` in `shell/mapview/`, `HexPanel` in `shell/panels/hex_panel.tscn`, and `MapInput` in
+- **New work goes to `godot/`.** The app opens on the Studiolo main scene (`shell/app/app.tscn`, currently M1.5 / M1.5b with M2 Countries `C1`–`C13` merged and `C14`–`C20` remaining), and the map is the north Italy district map (`shell/map/map_scene.tscn`,
+  built on `MapData` and scenario/country defs in `core/defs/`, `MapState` schema 2 + `Country` in `core/state/`, `Improve`, `Territory` and `Countries` in
+  `core/systems/`, `Game` and `Actions` in `core/game/`, the pure view helpers in `core/views/`, `TileMapView`
+  and `MapLabels`/`CountryLabels` in `shell/mapview/`, `ModeOverlay`/`CapitalMarks` in `shell/map/`, `HexPanel` in `shell/panels/hex_panel.tscn`, `@tool ScenarioEditor` in `shell/editor/scenario_editor.tscn`, and `MapInput` in
   `shell/input/map_input.gd`); the 0.3.0 Europe map, its builder, the Kenney bake and the whole-map prototype scene are
   retired. The layers, bottom to top: `defs`, `state`, `systems`, `game`, `ai`, `views`, `shell` (`mapgen` sits beside
   `systems` and runs only in tools). A file uses its own layer or a lower one. `core/` has no engine calls and extends
@@ -37,9 +37,12 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   "$GODOT" --headless --path godot --import                       # import; fails on any error or warning
   python tools/lint_godot.py godot                                 # layers, size limits, core/ rules, luck, Godot 3 spellings
   "$GODOT" --headless --path godot --script res://tools/check_scripts.gd   # parse every script
-  "$GODOT" --headless --path godot --quit                          # open the main scene (the north Italy map) and quit
+  "$GODOT" --headless --path godot --quit                          # open the main scene (shell/app/app.tscn) and quit
   "$GODOT" --headless --path godot -s res://tools/build_tileset.gd -- --check   # check committed TileSets
   "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --check       # check committed MapData
+  "$GODOT" --headless --path godot -s res://tools/build_scenario.gd -- --check  # check committed scenarios
+  "$GODOT" --headless --path godot -s res://tools/build_theme.gd -- --check     # check committed Studiolo themes
+  /Users/kioba/develop/Hexa/.venv/bin/python tools/bake_ui.py --check           # check Studiolo baked UI kit
   "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit   # GUT
   "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe   # Windows build
   ```

@@ -5,12 +5,13 @@ this page is its short form for the folder. Windows builds only. The Python game
 the gameplay reference, not something to edit. The game itself arrives milestone by milestone (section 9 of the
 standard).
 
-At M1.5 (UI foundation, Studiolo style), the project opens on the `App` root (`shell/app/app.tscn`, the main scene),
+At M1.5 / M1.5b (Studiolo UI foundation + Mac half-res atlases) with **M2 Countries in progress (`C1`–`C13` merged; `C14`–`C20` UI/App wiring remaining)**, the project opens on the `App` root (`shell/app/app.tscn`, the main scene),
 booting to the Studiolo main menu with `Map sandbox` launching the **north Italy map** (`shell/map/map_scene.tscn`):
-the 28 km district map on stacked hex `TileMapLayer`s with its pieces, crossings, place names, far picture, the four
-seasons, and select, build, upgrade and clear through `Session.act`. Pass `-- --sandbox [--seed=N]` to boot straight
-into the map, or `-- --plain-ui` to run with the flat high-contrast/low-memory theme. The 0.3.0 Europe map, its
-builder, the Kenney bake and the whole-map prototype scene are retired.
+the 28 km district map on stacked hex `TileMapLayer`s with its pieces, crossings, place names, far picture, borders,
+map-mode overlay (`Terrain`, `Owner`, `Relief`), country labels, capital pennants, and select, build, upgrade and clear
+through `Session.act`. Pass `-- --sandbox [--seed=N]` to boot straight into the map, or `-- --plain-ui` to run with
+the flat high-contrast/low-memory theme. The 0.3.0 Europe map, its builder, the Kenney bake and the whole-map
+prototype scene are retired.
 
 ## Engine
 
@@ -26,14 +27,19 @@ builder, the Kenney bake and the whole-map prototype scene are retired.
 project.godot           engine pin, warning levels, main scene, autoloads (Session, Events), GUT plugin
 core/                   plain GDScript, extends RefCounted (or Resource in defs/), no Node, no scene tree, runs headless
   rng.gd  hexgrid.gd  geo.gd   luck (the only source), the one hex grid (HexGrid), the Mercator projection
-  defs/                 definitions (Resource classes): map_data.gd (MapData)
-  state/                changing state: map_state.gd (MapState), plus WorldRegion, WorldHeights, ReliefLevels
-  systems/              the rules: improve.gd (Improve: build/upgrade/clear actions and checks) with WorldImprove,
-                        ImproveRules and ImproveSolver (the wave function collapse search)
+  defs/                 definitions (Resource classes): map_data.gd (MapData), country_def.gd (CountryDef),
+                        colour_contrast.gd (ColourContrast), scenario_def.gd (ScenarioDef),
+                        game_defs.gd (GameDefs), scenario_growth.gd (ScenarioGrowth)
+  state/                changing state: map_state.gd (MapState schema 2), country.gd (Country),
+                        plus WorldRegion, WorldHeights, ReliefLevels
+  systems/              the rules: improve.gd (Improve: build/upgrade/clear actions, home rule,
+                        WorldImprove, ImproveRules, ImproveSolver), territory.gd (Territory),
+                        countries.gd (Countries)
   game/                 game.gd (Game), actions.gd (the action table)
   ai/                   empty until its milestone
   views/                pure "what to draw" helpers: map_tiles.gd, map_cells.gd, edge_lines.gd, crossings.gd,
-                        far_picture.gd, hex_card.gd
+                        far_picture.gd, hex_card.gd, border_lines.gd, map_modes.gd, country_names.gd,
+                        country_card.gd, place_search.gd
   mapgen/               generators, run in tools and tests only: WorldRelief, WorldWater (with WaterCurves and
                         WaterSearch), WorldCover, WorldPlaces, WorldRoads, climate.gd, fake_map.gd
 shell/                  everything with Nodes (Studiolo UI architecture)
@@ -43,25 +49,29 @@ shell/                  everything with Nodes (Studiolo UI architecture)
   input/                bindings.gd (InputMap & gestures), zoom_model.gd, esc_ladder.gd,
                         app_input.gd, camera_rig.gd, map_input.gd
   ui/                   tokens.gd, theme.tres, theme_high_contrast.tres, kit_theme.gd (1x/2x/plain),
-                        motion.gd, screen.gd, screen_stack.gd, kit controls & frames (KitButton,
-                        PanelFrame, ModalFrame, VellumSheet, HoverCard, ToastHost, OptionRow, KeyCap,
-                        Segmented, NavList, Cartouche, Ribbon, PanelKit, Medallion, DeltaChip,
-                        SeasonStrip, PreviewCard, InkChart, StudyTable, RelationMatrix, ResourceChip)
+                        motion.gd, screen.gd, screen_stack.gd, country_arms.gd (CountryArms),
+                        kit controls & frames (KitButton, PanelFrame, ModalFrame, VellumSheet, HoverCard,
+                        ToastHost, OptionRow, KeyCap, Segmented, NavList, Cartouche, Ribbon, PanelKit,
+                        Medallion, DeltaChip, SeasonStrip, PreviewCard, InkChart, StudyTable,
+                        RelationMatrix, ResourceChip)
   hud/                  hud.tscn + hud.gd, top_bar, layers_popover, zoom_control, scale_bar,
                         map_hover, key_hints, debug_overlay (F3)
   screens/              screen_ids.gd, main_menu, sandbox, pause_menu, options (+ options_keys),
                         about, credits, confirm, loading, help_overlay
-  map/                  map_scene.tscn + map_scene.gd (the map scene), hex_panel_contract.gd
+  map/                  map_scene.tscn + map_scene.gd (the map scene), mode_overlay.gd (.gdshader),
+                        capital_marks.gd, hex_panel_contract.gd
   mapview/              tile_map_view.gd, tileset_builder.gd, edge_line_layer.gd, far_map.gd, map_labels.gd,
-                        shadow_cover.gdshader
+                        country_labels.gd, shadow_cover.gdshader
   panels/               hex_panel.tscn + hex_panel.gd
-  editor/               empty until its milestone
-tests/core/ tests/shell/     GUT tests (test_*.gd, ui_harness.gd, test_ui_monkey.gd), perf_budget.json, perf_ui_budget.json
-tools/                  GDScript tools: check_scripts.gd, build_map.gd, build_tileset.gd, build_theme.gd,
-                        perf_map.gd, mapview/probe_ysort.gd, worldmap/improve_report.gd,
-                        ui/{shot_ui.gd,perf_ui.gd,shot_menu_map.gd,probe_display.gd,probe_input.gd},
-                        probes/{probe_ui_fonts.gd,probe_textures.gd}
-data/                   data: maps/north_italy.tres, geography/ (JSON from Python), worldmap/ (the north Italy region
+  editor/               scenario_editor.tscn + scenario_editor.gd (@tool scenario editor, helpers & UI)
+tests/core/ tests/shell/     GUT tests (test_*.gd, scenario_fixture.gd, ui_harness.gd, test_ui_monkey.gd),
+                             perf_budget.json, perf_ui_budget.json
+tools/                  GDScript tools: check_scripts.gd, build_map.gd, build_scenario.gd, build_tileset.gd,
+                        build_theme.gd, perf_map.gd, map/probe_mode_overlay.gd, mapview/probe_ysort.gd,
+                        worldmap/improve_report.gd, ui/{shot_ui.gd,perf_ui.gd,shot_menu_map.gd,
+                        probe_display.gd,probe_input.gd}, probes/{probe_ui_fonts.gd,probe_textures.gd}
+data/                   data: maps/north_italy.tres, defs/{game_defs.tres,countries/*.tres},
+                        scenarios/north_italy_1480.tres, geography/ (JSON from Python), worldmap/ (the north Italy region
                         and heights), the exported goods, units, buildings, countries and terrain. See data/README.md
 assets/fonts/           static OFL fonts (Cinzel, Alegreya, Alegreya SC, Alegreya Sans, Noto Sans fallback)
 assets/ui/              baked Studiolo kit textures (kit/ui_kit.json, kit/1x/, kit/2x/) and menu/ art
@@ -127,10 +137,11 @@ python -m unittest tests/test_bake_ui.py
 "$GODOT" --headless --path godot -s res://tools/build_theme.gd -- --check
 "$GODOT" --headless --path godot -s res://tools/build_theme.gd
 
-# Check or rebuild the committed TileSets (full and half) and map (data/maps/north_italy.tres)
+# Check or rebuild the committed TileSets (full and half), map (data/maps/north_italy.tres), and scenarios
 "$GODOT" --headless --path godot -s res://tools/build_tileset.gd -- --check
 "$GODOT" --headless --path godot -s res://tools/build_tileset.gd -- --half
 "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --check
+"$GODOT" --headless --path godot -s res://tools/build_scenario.gd -- --check
 
 # GUT tests, headless, with a JUnit report (includes tests/shell/test_ui_monkey.gd)
 "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit -gjunit_xml_file=gut-junit.xml
@@ -161,7 +172,7 @@ The editor: open `godot/project.godot` with the same engine. GUT shows in the ed
   `user://settings.cfg` (`Settings`), with a 10 s `Confirm` revert for display/window/UI-scale changes.
 - **Default bindings** (`shell/input/bindings.gd`, `Bindings.DEFAULTS`):
   - **Camera:** `WASD` / arrows (pan; hold `Shift` for fast pan), `=` / `+` / `Kp+` (zoom in), `-` / `Kp-` (zoom out), `F` / `Home` (fit whole map).
-  - **Map & View:** left click (select hex), right click (clear selection), `1`–`4` (season preview), `G` (hex grid), `N` (place names), `H` (hide HUD / photo mode), `U` (upgrade selected hex).
+  - **Map & View:** left click (select hex), right click (clear selection), `1`–`3` (map modes Terrain / Owner / Relief), `G` (hex grid), `N` (place names), `C` (country action binding), `Ctrl+F` / `Cmd+F` (find place action binding), `H` (hide HUD / photo mode), `U` (upgrade selected hex).
   - **App & Dev:** `Esc` (Esc ladder: popover → top screen → selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
 - **Pointer & trackpad gestures** (`shell/input/camera_rig.gd`):
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).
@@ -171,7 +182,7 @@ The editor: open `godot/project.godot` with the same engine. GUT shows in the ed
 ## Checks in CI
 
 `.github/workflows/godot.yml`:
-- `checks`: on pull requests (and pushes) touching `godot/` or `tools/`, runs Python 3.12 UI bake verification (`tools/bake_ui.py --check`, `tests/test_bake_ui.py`), Godot `--import`, `tools/lint_godot.py`, `tools/check_scripts.gd`, main-scene headless start (`--quit`), `build_theme.gd --check`, `build_tileset.gd --check`, `build_map.gd --check`, and the full GUT suite.
+- `checks`: on pull requests (and pushes) touching `godot/` or `tools/`, runs Python 3.12 UI bake verification (`tools/bake_ui.py --check`, `tests/test_bake_ui.py`), Godot `--import`, `tools/lint_godot.py`, `tools/check_scripts.gd`, main-scene headless start (`--quit`), `build_theme.gd --check`, `build_tileset.gd --check`, `build_map.gd --check`, `build_scenario.gd --check`, and the full GUT suite.
 - `ui-shots`: on pull requests touching `shell/{app,ui,hud,screens,input}/` (or manual dispatch), renders 1x/2x UI screenshots (`shot_ui.gd`) and checks UI budgets (`perf_ui.gd`) under `xvfb-run` + Mesa.
 - `perf`: nightly (and manual dispatch), `tools/perf_map.gd` on the fake Europe map.
 - `export-windows` / `smoke-windows`: on a tag `v0.3.*` (or manual dispatch), builds the Windows zip and runs a smoke start on a Windows runner.
