@@ -13,6 +13,7 @@ signal slice_ms_changed(ms: int)
 const REFRESH_INTERVAL_SEC: float = 0.25
 const SEASON_NAMES: Array[String] = ["spring", "summer", "autumn", "winter"]
 const SEASON_LABELS: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
+const MODE_WORDS: Array[String] = ["Terrain", "Owner", "Relief"]
 const LAYER_SPECS: Array[Array] = [
 	[&"grid", "Grid"],
 	[&"shade", "Shade"],
@@ -218,6 +219,9 @@ func refresh_metrics() -> void:
 			"yes" if bool(data["swapping"]) else "no", int(data["slice_ms"])
 		],
 		"Digest: %s  Renderer: %s" % [str(data["digest"]), str(data["renderer"])],
+		"countries %d · mode %s · border chunks %d · overlay %.1f KB" % [
+			int(data["countries"]), str(data["mode"]), int(data["border_chunks"]), float(data["overlay_kb"])
+		],
 	]
 	_metrics_label.text = "\n".join(lines)
 
@@ -245,10 +249,19 @@ func _collect_metrics() -> Dictionary:
 	var fill_prog := float(_snapshot.get("fill_progress", 1.0))
 	var swapping := bool(_snapshot.get("swapping", false))
 	var digest_str := str(_snapshot.get("digest", _game_digest()))
+	var countries := Session.game.countries.size() if (Session.game != null and Session.game.has_countries()) else 0
+	var mode_name := "Terrain"
+	var border_chunks := 0
+	var overlay_kb := 0.0
 
 	if _map_scene != null and is_instance_valid(_map_scene):
 		var scene := _map_scene as MapScene
 		if scene != null:
+			mode_name = MODE_WORDS[clampi(scene.mode(), 0, MODE_WORDS.size() - 1)]
+			if scene.view() != null:
+				border_chunks = scene.view().border_chunks().size()
+			if scene.overlay() != null:
+				overlay_kb = scene.overlay().texture_bytes() / 1024.0
 			zoom_val = scene.zoom()
 			if scene.camera() != null:
 				cam_pos = scene.camera().position
@@ -302,6 +315,10 @@ func _collect_metrics() -> Dictionary:
 		"slice_ms": slice_val,
 		"digest": digest_str,
 		"renderer": renderer,
+		"countries": countries,
+		"mode": mode_name,
+		"border_chunks": border_chunks,
+		"overlay_kb": overlay_kb,
 	}
 
 

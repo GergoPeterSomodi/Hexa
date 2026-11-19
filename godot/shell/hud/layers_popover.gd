@@ -10,6 +10,12 @@ signal closed
 const LAYER_GRID := &"map/grid"
 const LAYER_NAMES := &"map/place_names"
 const LAYER_RELIEF := &"graphics/relief_shading"
+const LAYER_BORDERS := &"map/borders"
+const LAYER_TINT := &"map/owner_tint"
+const LAYER_MINIMAP := &"map/minimap"
+const LAYER_KEYS: Array[String] = [
+	"map/grid", "map/place_names", "graphics/relief_shading", "map/borders", "map/owner_tint", "map/minimap",
+]
 
 const SEASON_LABELS: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
 
@@ -20,6 +26,9 @@ var anchor_button: BaseButton = null
 @onready var _names_cap: KeyCap = $VBox/NamesRow/KeyCap
 @onready var _names_switch: KitSwitch = $VBox/NamesRow/NamesSwitch
 @onready var _relief_switch: KitSwitch = $VBox/ReliefRow/ReliefSwitch
+@onready var _borders_switch: KitSwitch = $VBox/BordersRow/BordersSwitch
+@onready var _tint_switch: KitSwitch = $VBox/TintRow/TintSwitch
+@onready var _minimap_switch: KitSwitch = $VBox/MinimapRow/MinimapSwitch
 @onready var _season_seg: Segmented = $VBox/SeasonSeg
 
 var _settings: Settings = null
@@ -37,10 +46,16 @@ func _ready() -> void:
 	_grid_switch.focus_mode = Control.FOCUS_NONE
 	_names_switch.focus_mode = Control.FOCUS_NONE
 	_relief_switch.focus_mode = Control.FOCUS_NONE
+	_borders_switch.focus_mode = Control.FOCUS_NONE
+	_tint_switch.focus_mode = Control.FOCUS_NONE
+	_minimap_switch.focus_mode = Control.FOCUS_NONE
 
 	_grid_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_GRID, on))
 	_names_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_NAMES, on))
 	_relief_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_RELIEF, on))
+	_borders_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_BORDERS, on))
+	_tint_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_TINT, on))
+	_minimap_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_MINIMAP, on))
 
 	_season_seg.hud_mode = true
 	var items: Array[Dictionary] = []
@@ -125,6 +140,12 @@ func set_layer_state(layer_name: StringName, on: bool) -> void:
 			_names_switch.set_pressed_no_signal(on)
 		LAYER_RELIEF, &"relief_shading":
 			_relief_switch.set_pressed_no_signal(on)
+		LAYER_BORDERS, &"borders":
+			_borders_switch.set_pressed_no_signal(on)
+		LAYER_TINT, &"owner_tint":
+			_tint_switch.set_pressed_no_signal(on)
+		LAYER_MINIMAP, &"minimap":
+			_minimap_switch.set_pressed_no_signal(on)
 	_syncing = false
 
 
@@ -151,6 +172,18 @@ func names_switch() -> KitSwitch:
 
 func relief_switch() -> KitSwitch:
 	return _relief_switch
+
+
+func borders_switch() -> KitSwitch:
+	return _borders_switch
+
+
+func tint_switch() -> KitSwitch:
+	return _tint_switch
+
+
+func minimap_switch() -> KitSwitch:
+	return _minimap_switch
 
 
 func season_segmented() -> Segmented:
@@ -180,13 +213,16 @@ func _sync_from_settings() -> void:
 	_grid_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_GRID))))
 	_names_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_NAMES))))
 	_relief_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_RELIEF))))
+	_borders_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_BORDERS))))
+	_tint_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_TINT))))
+	_minimap_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_MINIMAP))))
 	_syncing = false
 
 
 func _on_setting_changed(key: String, value: Variant) -> void:
 	if _syncing:
 		return
-	if key == String(LAYER_GRID) or key == String(LAYER_NAMES) or key == String(LAYER_RELIEF):
+	if key in LAYER_KEYS:
 		set_layer_state(StringName(key), bool(value))
 
 

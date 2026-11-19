@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/hud.gd" id="1_hud"]
 [ext_resource type="PackedScene" path="res://shell/hud/top_bar.tscn" id="2_topbar"]
@@ -10,6 +10,8 @@
 [ext_resource type="PackedScene" path="res://shell/ui/toast_host.tscn" id="8_toasts"]
 [ext_resource type="Script" path="res://shell/hud/map_hover.gd" id="9_hover"]
 [ext_resource type="PackedScene" path="res://shell/panels/hex_panel.tscn" id="10_hex"]
+[ext_resource type="PackedScene" path="res://shell/hud/minimap.tscn" id="11_minimap"]
+[ext_resource type="PackedScene" path="res://shell/panels/country_panel.tscn" id="12_country"]
 
 [node name="Hud" type="CanvasLayer"]
 process_mode = 1
@@ -63,7 +65,7 @@ anchor_right = 1.0
 offset_left = -280.0
 offset_top = 6.0
 offset_right = -12.0
-offset_bottom = 220.0
+offset_bottom = 400.0
 grow_horizontal = 0
 
 [node name="KeyHints" type="HBoxContainer" parent="Root/Column/Main/MapArea"]
@@ -86,8 +88,8 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -360.0
-offset_top = -54.0
+offset_left = -392.0
+offset_top = -372.0
 offset_right = -14.0
 offset_bottom = -14.0
 grow_horizontal = 0
@@ -102,8 +104,19 @@ size_flags_vertical = 8
 mouse_filter = 2
 script = ExtResource("6_scale")
 
-[node name="ZoomControl" parent="Root/Column/Main/MapArea/BottomRight" instance=ExtResource("7_zoom")]
+[node name="RightColumn" type="VBoxContainer" parent="Root/Column/Main/MapArea/BottomRight"]
 layout_mode = 2
+size_flags_vertical = 8
+mouse_filter = 2
+alignment = 2
+
+[node name="Minimap" parent="Root/Column/Main/MapArea/BottomRight/RightColumn" instance=ExtResource("11_minimap")]
+layout_mode = 2
+size_flags_horizontal = 8
+
+[node name="ZoomControl" parent="Root/Column/Main/MapArea/BottomRight/RightColumn" instance=ExtResource("7_zoom")]
+layout_mode = 2
+size_flags_horizontal = 8
 size_flags_vertical = 8
 
 [node name="Toasts" parent="Root/Column/Main/MapArea" instance=ExtResource("8_toasts")]
@@ -139,3 +152,8 @@ mouse_filter = 2
 [node name="HexPanel" parent="Root/Column/Main/Dock" instance=ExtResource("10_hex")]
 layout_mode = 2
 size_flags_vertical = 0
+
+[node name="CountryPanel" parent="Root/Column/Main/Dock" instance=ExtResource("12_country")]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3

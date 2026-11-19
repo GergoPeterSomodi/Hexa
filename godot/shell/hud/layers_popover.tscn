@@ -85,6 +85,54 @@ focus_mode = 0
 accessibility_name = "Relief shading"
 script = ExtResource("3_sw")
 
+[node name="BordersRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="VBox/BordersRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TableRow"
+text = "Borders"
+
+[node name="BordersSwitch" type="CheckButton" parent="VBox/BordersRow"]
+layout_mode = 2
+focus_mode = 0
+accessibility_name = "Borders"
+script = ExtResource("3_sw")
+
+[node name="TintRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="VBox/TintRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TableRow"
+text = "Country tint"
+
+[node name="TintSwitch" type="CheckButton" parent="VBox/TintRow"]
+layout_mode = 2
+focus_mode = 0
+accessibility_name = "Country tint"
+script = ExtResource("3_sw")
+
+[node name="MinimapRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="VBox/MinimapRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TableRow"
+text = "Minimap"
+
+[node name="MinimapSwitch" type="CheckButton" parent="VBox/MinimapRow"]
+layout_mode = 2
+focus_mode = 0
+accessibility_name = "Minimap"
+script = ExtResource("3_sw")
+
 [node name="Rule2" type="HSeparator" parent="VBox"]
 layout_mode = 2
 mouse_filter = 2

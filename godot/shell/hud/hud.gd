@@ -16,6 +16,15 @@ signal debug_layer_toggled(layer_name: StringName, on: bool)
 signal far_zoom_changed(value: float)
 signal slice_ms_changed(ms: int)
 signal hud_visibility_changed(shown: bool)
+## The top bar's mode switch (0 Terrain, 1 Owner, 2 Relief).
+signal mode_requested(mode: int)
+## A country's name was asked for: the top bar's name, a neighbour link or the hex panel's owner link.
+signal country_requested(tag: StringName)
+signal country_play_requested(tag: StringName)
+signal country_look_at_requested(hex: Vector2i)
+## The minimap: a click glides the view to map_px, a drag jumps to it (map px).
+signal look_at_requested(map_px: Vector2)
+signal jump_requested(map_px: Vector2)
 
 @onready var _root: Control = $Root
 @onready var _top_bar: TopBar = $Root/Column/TopBar
@@ -24,11 +33,13 @@ signal hud_visibility_changed(shown: bool)
 @onready var _layers_popover: LayersPopover = $Root/Column/Main/MapArea/LayersPopover
 @onready var _key_hints: KeyHints = $Root/Column/Main/MapArea/KeyHints
 @onready var _scale_bar: ScaleBar = $Root/Column/Main/MapArea/BottomRight/ScaleBar
-@onready var _zoom_control: ZoomControl = $Root/Column/Main/MapArea/BottomRight/ZoomControl
+@onready var _minimap: Minimap = $Root/Column/Main/MapArea/BottomRight/RightColumn/Minimap
+@onready var _zoom_control: ZoomControl = $Root/Column/Main/MapArea/BottomRight/RightColumn/ZoomControl
 @onready var _toasts: ToastHost = $Root/Column/Main/MapArea/Toasts
 @onready var _map_hover: MapHover = $Root/Column/Main/MapArea/MapHover
 @onready var _dock: VBoxContainer = $Root/Column/Main/Dock
 @onready var _hex_panel: HexPanel = $Root/Column/Main/Dock/HexPanel
+@onready var _country_panel: CountryPanel = $Root/Column/Main/Dock/CountryPanel
 
 var _ctx: ShellContext = null
 var _settings: Settings = null
@@ -44,6 +55,17 @@ func _ready() -> void:
 	_top_bar.layers_toggled.connect(_on_top_bar_layers_toggled)
 	_top_bar.help_requested.connect(func() -> void: help_requested.emit())
 	_top_bar.menu_requested.connect(func() -> void: menu_requested.emit())
+	_top_bar.mode_requested.connect(func(mode: int) -> void: mode_requested.emit(mode))
+	_top_bar.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
+
+	_minimap.look_at_requested.connect(func(map_px: Vector2) -> void: look_at_requested.emit(map_px))
+	_minimap.jump_requested.connect(func(map_px: Vector2) -> void: jump_requested.emit(map_px))
+
+	_country_panel.play_requested.connect(func(tag: StringName) -> void: country_play_requested.emit(tag))
+	_country_panel.look_at_requested.connect(func(hex: Vector2i) -> void: country_look_at_requested.emit(hex))
+	_country_panel.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
+	_hex_panel.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
+	_hex_panel.visibility_changed.connect(_on_hex_panel_visibility_changed)
 
 	_layers_popover.layer_toggled.connect(func(lname: StringName, on: bool) -> void: layer_toggled.emit(lname, on))
 	_layers_popover.season_preview_requested.connect(_on_season_preview_selected)
@@ -63,6 +85,8 @@ func _ready() -> void:
 	for child: Node in _dock.get_children():
 		_watch_dock_child(child)
 	_sync_dock_visibility()
+	if _settings != null:
+		_minimap.configure(_settings)
 
 
 func _exit_tree() -> void:
@@ -93,6 +117,7 @@ func configure(settings: Settings) -> void:
 		_debug_overlay.configure(_settings)
 		_map_hover.configure(_settings)
 		_key_hints.configure(_settings)
+		_minimap.configure(_settings)
 	if _settings == null:
 		return
 	_settings.changed.connect(_on_setting_changed)
@@ -113,6 +138,8 @@ func bind_map_scene(scene: Node) -> void:
 	_debug_overlay.bind_map_scene(scene)
 	var map_scene := scene as MapScene
 	if map_scene == null:
+		_minimap.unbind()
+		_top_bar.refresh_game()
 		return
 	set_season(map_scene.season)
 	if Session.game != null:
@@ -124,6 +151,27 @@ func bind_map_scene(scene: Node) -> void:
 	_bound_map_input = map_scene.map_input()
 	if _bound_map_input != null:
 		_bound_map_input.hover_changed.connect(_on_map_hover_changed)
+	_minimap.bind_map_scene(map_scene)
+	_top_bar.refresh_game()
+	_top_bar.set_mode(map_scene.mode())
+	if not map_scene.mode_changed.is_connected(_top_bar.set_mode):
+		map_scene.mode_changed.connect(_top_bar.set_mode)
+
+
+## Shows the country `tag` in the dock (its panel replaces the hex panel). `picking` adds the tip and "Play as".
+func show_country(tag: StringName, picking: bool) -> void:
+	_hex_panel.clear()
+	_country_panel.show_country(tag, picking)
+
+
+## Closes whichever panel the dock shows.
+func close_dock() -> void:
+	_hex_panel.clear()
+	_country_panel.clear()
+
+
+func set_mode(mode: int) -> void:
+	_top_bar.set_mode(mode)
 
 
 func set_hud_visible(shown: bool) -> void:
@@ -259,12 +307,26 @@ func dock() -> VBoxContainer:
 	return _dock
 
 
+func country_panel() -> CountryPanel:
+	return _country_panel
+
+
+func minimap() -> Minimap:
+	return _minimap
+
+
 func map_area() -> Control:
 	return _map_area
 
 
 func root() -> Control:
 	return _root
+
+
+## A hex panel shown (a hex selected) replaces the country panel in the dock.
+func _on_hex_panel_visibility_changed() -> void:
+	if _hex_panel.visible and _country_panel.visible:
+		_country_panel.clear()
 
 
 func _on_season_preview_selected(index: int) -> void:

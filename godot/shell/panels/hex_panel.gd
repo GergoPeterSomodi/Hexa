@@ -5,13 +5,19 @@
 class_name HexPanel
 extends HexPanelContract
 
+## The Owner row's link was pressed: the owner's tag (the dock shows that country).
+signal country_requested(tag: StringName)
+
 @onready var _cartouche: Cartouche = $Body/Cartouche
 @onready var _subtitle: Label = $Body/Subtitle
 @onready var _piece_box: VBoxContainer = $Body/PieceBox
 @onready var _piece_rows: GridContainer = $Body/PieceBox/Rows
 @onready var _ground_box: VBoxContainer = $Body/GroundBox
 @onready var _ground_rows: GridContainer = $Body/GroundBox/Rows
+@onready var _owner_row: HBoxContainer = $Body/OwnerRow
+@onready var _owner_value: HBoxContainer = $Body/OwnerRow/Value
 @onready var _rule: HSeparator = $Body/Rule
+@onready var _home_box: VBoxContainer = $Body/HomeReason
 @onready var _actions_box: VBoxContainer = $Body/ActionsBox
 @onready var _actions_heading: Label = $Body/ActionsBox/Heading
 @onready var _actions: VBoxContainer = $Body/ActionsBox/Actions
@@ -24,9 +30,15 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	custom_minimum_size.x = float(Tokens.PANEL_W)
 	visible = false
+	Events.owners_changed.connect(_on_owners_changed)
+	Events.country_chosen.connect(_on_country_chosen)
 
 
 func _exit_tree() -> void:
+	if Events.owners_changed.is_connected(_on_owners_changed):
+		Events.owners_changed.disconnect(_on_owners_changed)
+	if Events.country_chosen.is_connected(_on_country_chosen):
+		Events.country_chosen.disconnect(_on_country_chosen)
 	PanelKit.free_retired(_retired)
 
 
@@ -77,7 +89,9 @@ func refresh() -> void:
 		_subtitle.text = "Hex %d, %d, open sea" % [_hex.x, _hex.y]
 		_piece_box.visible = false
 		_ground_box.visible = false
+		_owner_row.visible = false
 		_rule.visible = false
+		_home_box.visible = false
 		_actions_box.visible = false
 		PanelKit.clear_children(_actions, _retired)
 		visible = true
@@ -90,9 +104,54 @@ func refresh() -> void:
 	_subtitle.text = "Hex %d, %d" % [_hex.x, _hex.y]
 	_refresh_piece(piece)
 	_refresh_ground(map)
+	_refresh_owner(game)
 	_rule.visible = true
-	_write_actions(piece)
+	var home := Territory.at_home_check(game, Session.player_tag(), _hex)
+	_refresh_home(home)
+	if bool(home["ok"]):
+		_write_actions(piece)
+	else:
+		PanelKit.clear_children(_actions, _retired)
+		_actions_box.visible = false
 	visible = true
+
+
+## The Owner row: the owner's long name as a link to its country, "no one" for unowned land; hidden where
+## HexCard.owner_of gives nothing (a map-only game).
+func _refresh_owner(game: Game) -> void:
+	var owner_text := HexCard.owner_of(game, _hex)
+	PanelKit.clear_children(_owner_value, _retired)
+	_owner_row.visible = owner_text != ""
+	if owner_text == "":
+		return
+	var otag := Territory.owner_tag(game, _hex)
+	if otag == &"":
+		_owner_value.add_child(PanelKit.label(owner_text, &"TableRow"))
+		return
+	var link := KitButton.new()
+	link.kind = KitButton.Kind.SMALL
+	link.text = owner_text
+	link.tooltip_text = "Show this country"
+	link.focus_mode = Control.FOCUS_NONE
+	link.pressed.connect(func() -> void: country_requested.emit(otag))
+	_owner_value.add_child(link)
+
+
+## The home rule: the works section is shown only on the player's land; elsewhere one reason line says why.
+func _refresh_home(home: Dictionary) -> void:
+	PanelKit.clear_children(_home_box, _retired)
+	var blocked := not bool(home["ok"])
+	_home_box.visible = blocked
+	if blocked:
+		_home_box.add_child(PanelKit.reason(str(home["reason"])))
+
+
+func _on_owners_changed(_hexes: Array[Vector2i]) -> void:
+	refresh()
+
+
+func _on_country_chosen(_tag: StringName) -> void:
+	refresh()
 
 
 func _refresh_piece(piece: Dictionary) -> void:

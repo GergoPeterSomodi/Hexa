@@ -51,7 +51,27 @@ layout_mode = 2
 mouse_filter = 2
 columns = 2
 
+[node name="OwnerRow" type="HBoxContainer" parent="Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Key" type="Label" parent="Body/OwnerRow"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+text = "Owner"
+
+[node name="Value" type="HBoxContainer" parent="Body/OwnerRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
 [node name="Rule" type="HSeparator" parent="Body"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="HomeReason" type="VBoxContainer" parent="Body"]
+visible = false
 layout_mode = 2
 mouse_filter = 2
 

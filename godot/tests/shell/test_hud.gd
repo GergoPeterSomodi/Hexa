@@ -265,3 +265,132 @@ func test_map_hover_delay_clamping_and_hiding() -> void:
 
 	_hud.on_hover_changed(MapInput.NO_HEX)
 	assert_false(hover.is_card_visible(), "hides on NO_HEX")
+
+
+func _find_hex_owned_by(tag: StringName) -> Vector2i:
+	var game := Session.game
+	for i: int in game.map.hex_count():
+		if game.map.land[i] == 1 and Territory.owner_tag(game, game.map.hex_of(i)) == tag:
+			return game.map.hex_of(i)
+	return Vector2i(-1, -1)
+
+
+func test_dock_shows_one_panel_at_a_time_and_closes() -> void:
+	await _harness.wait_frames(self, 2)
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "", "the scenario starts")
+	var asked: Array[StringName] = []
+	_hud.country_requested.connect(func(tag: StringName) -> void: asked.append(tag))
+
+	_hud.show_country(&"GEN", false)
+	await _harness.wait_frames(self, 2)
+	assert_true(_hud.country_panel().visible, "the country panel shows")
+	assert_eq(_hud.country_panel().shown_tag(), &"GEN")
+	assert_false(_hud.hex_panel().visible, "the hex panel is closed")
+	assert_true(_hud.dock().visible, "the dock opens")
+
+	_hud.hex_panel().show_hex(_find_land_hex())
+	await _harness.wait_frames(self, 1)
+	assert_false(_hud.country_panel().visible, "a hex replaces the country panel")
+	assert_true(_hud.hex_panel().visible)
+
+	_hud.show_country(&"SAV", false)
+	assert_false(_hud.hex_panel().visible, "a country replaces the hex panel")
+	assert_true(_hud.country_panel().visible)
+
+	_hud.country_panel().country_requested.emit(&"MLO")
+	assert_eq(asked, [&"MLO"], "a neighbour link reaches the Hud")
+
+	_hud.close_dock()
+	await _harness.wait_frames(self, 2)
+	assert_false(_hud.dock().visible, "close_dock closes the dock")
+	assert_false(_hud.country_panel().visible)
+	assert_false(_hud.hex_panel().visible)
+
+
+func test_top_bar_names_the_country_and_switches_modes() -> void:
+	await _harness.wait_frames(self, 2)
+	var top := _hud.top_bar()
+	assert_false(top.country_button().visible, "a map-only game has no country name")
+	assert_true(top.map_info_label().visible, "a map-only game keeps its map info")
+	assert_null(top.mode_segmented().button_for(1), "no Owner mode in a map-only game")
+
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	top.refresh_game()
+	assert_false(top.map_info_label().visible)
+	assert_not_null(top.mode_segmented().button_for(1), "Owner is offered with countries")
+	assert_true(top.country_button().visible, "the pick's title shows")
+	assert_true(top.country_button().text.contains("choose your country"))
+	assert_false(top.arms().visible, "no arms before a country is chosen")
+
+	var chosen: Array[int] = []
+	_hud.mode_requested.connect(func(mode: int) -> void: chosen.append(mode))
+	top.mode_segmented().select(2, true)
+	assert_eq(chosen, [2], "the mode switch reaches the Hud")
+
+	assert_true(bool(Session.act("choose_country", {"tag": "GEN"})["ok"]))
+	await _harness.wait_frames(self, 1)
+	var card := CountryCard.of(Session.game, &"GEN")
+	assert_eq(top.country_button().text, str(card["long_name"]), "the long name after the choice")
+	assert_true(top.arms().visible, "the arms show for the player's country")
+
+
+func test_narrow_top_bar_hides_the_name_before_the_switch() -> void:
+	await _harness.wait_frames(self, 2)
+	Session.new_scenario("north_italy_1480", 1480, &"GEN")
+	var top := _hud.top_bar()
+	top.refresh_game()
+	await _harness.wait_frames(self, 1)
+	top.fit_width(4000.0)
+	assert_true(top.name_shown(), "the name shows when there is room")
+	top.fit_width(300.0)
+	assert_false(top.name_shown(), "the name hides first when narrow")
+	assert_true(top.arms().visible, "the arms stay")
+	assert_true(top.mode_segmented().visible, "the mode switch stays")
+	assert_true(top.menu_button().visible, "the menu stays")
+	top.fit_width(4000.0)
+	assert_true(top.name_shown(), "the name returns when there is room")
+
+
+func test_layers_popover_has_the_three_m2_switches_and_fits() -> void:
+	await _harness.wait_frames(self, 2)
+	var pop := _hud.layers_popover()
+	pop.set_open(true)
+	await _harness.wait_frames(self, 2)
+	pop.borders_switch().button_pressed = false
+	assert_false(bool(_harness.settings.get_value("map/borders")), "Borders writes its setting")
+	pop.tint_switch().button_pressed = false
+	assert_false(bool(_harness.settings.get_value("map/owner_tint")), "Country tint writes its setting")
+	pop.minimap_switch().button_pressed = false
+	assert_false(bool(_harness.settings.get_value("map/minimap")), "Minimap writes its setting")
+	_harness.settings.set_value("map/borders", true)
+	assert_true(pop.borders_switch().button_pressed, "the switch follows Settings")
+	assert_true(pop.get_combined_minimum_size().y <= pop.size.y, "the popover is tall enough for its rows")
+	pop.set_open(false)
+
+
+func test_minimap_sits_above_the_zoom_control_and_forwards_its_signals() -> void:
+	await _harness.wait_frames(self, 2)
+	var mini := _hud.minimap()
+	var zoom := _hud.zoom_control()
+	assert_eq(mini.get_parent(), zoom.get_parent(), "the minimap shares the zoom column")
+	assert_lt(mini.get_index(), zoom.get_index(), "the minimap sits above the zoom control")
+	assert_false(mini.is_bound(), "no game scene: the minimap is unbound and hidden")
+	assert_false(mini.visible)
+
+	var looks: Array[Vector2] = []
+	var jumps: Array[Vector2] = []
+	_hud.look_at_requested.connect(func(p: Vector2) -> void: looks.append(p))
+	_hud.jump_requested.connect(func(p: Vector2) -> void: jumps.append(p))
+	mini.look_at_requested.emit(Vector2(10.0, 20.0))
+	mini.jump_requested.emit(Vector2(30.0, 40.0))
+	assert_eq(looks, [Vector2(10.0, 20.0)])
+	assert_eq(jumps, [Vector2(30.0, 40.0)])
+
+
+func test_f3_m2_line_counts_countries_and_mode() -> void:
+	await _harness.wait_frames(self, 1)
+	_hud.debug_overlay().refresh_metrics()
+	assert_true(_hud.debug_overlay().metrics_text().contains("countries 0 · mode Terrain"), "a map-only game has no countries")
+	Session.new_scenario("north_italy_1480", 1480)
+	_hud.debug_overlay().refresh_metrics()
+	assert_true(_hud.debug_overlay().metrics_text().contains("countries 13 · mode Terrain · border chunks 0"))

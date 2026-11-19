@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/top_bar.gd" id="1_bar"]
 [ext_resource type="Script" path="res://shell/ui/segmented.gd" id="2_seg"]
 [ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
+[ext_resource type="Script" path="res://shell/ui/country_arms.gd" id="4_arms"]
 
 [node name="TopBar" type="PanelContainer"]
 custom_minimum_size = Vector2(0, 40)
@@ -28,6 +29,33 @@ mouse_filter = 2
 layout_mode = 2
 theme_type_variation = &"Hint"
 text = "North Italy · Sandbox, seed 1480"
+
+[node name="CountryBox" type="HBoxContainer" parent="HBox"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="Arms" type="Control" parent="HBox/CountryBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("4_arms")
+small = true
+
+[node name="CountryButton" type="Button" parent="HBox/CountryBox"]
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+tooltip_text = "Your country (C)"
+script = ExtResource("3_btn")
+kind = 1
+
+[node name="ModeSeg" type="PanelContainer" parent="HBox"]
+layout_mode = 2
+size_flags_vertical = 4
+script = ExtResource("2_seg")
+hud_mode = true
 
 [node name="Spacer" type="Control" parent="HBox"]
 layout_mode = 2

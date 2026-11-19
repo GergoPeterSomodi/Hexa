@@ -178,6 +178,66 @@ func test_build_then_upgrade_then_clear_go_through_session() -> void:
 	assert_true(done, "a wild hex could be built, upgraded and cleared")
 
 
+func _reason_text_of(box: VBoxContainer) -> String:
+	for child: Node in box.get_children():
+		if child is Label:
+			return (child as Label).text
+	return ""
+
+
+func _find_hex_owned(tag: StringName, same: bool) -> Vector2i:
+	var game := Session.game
+	for i: int in game.map.hex_count():
+		var hex := game.map.hex_of(i)
+		var holder := Territory.owner_tag(game, hex)
+		if game.map.land[i] == 1 and holder != &"" and (holder == tag) == same:
+			return hex
+	return Vector2i(-1, -1)
+
+
+func test_owner_row_is_hidden_and_the_home_rule_is_silent_in_a_map_only_game() -> void:
+	var hex := _wild_land_with_options(1)[0]
+	_panel.show_hex(hex)
+	assert_false((_panel.get_node("Body/OwnerRow") as HBoxContainer).visible, "no owner without countries")
+	assert_false((_panel.get_node("Body/HomeReason") as VBoxContainer).visible, "a map-only game has no home rule")
+	assert_true((_panel.get_node("Body/ActionsBox") as VBoxContainer).visible, "the works show")
+
+
+func test_owner_link_opens_the_country_and_the_home_reason_explains_refusals() -> void:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "", "the scenario starts")
+	var own_hex := _find_hex_owned(&"GEN", true)
+	var other_hex := _find_hex_owned(&"GEN", false)
+	assert_ne(own_hex, Vector2i(-1, -1), "Genoa holds land")
+	assert_ne(other_hex, Vector2i(-1, -1), "someone else holds land")
+	var asked: Array[StringName] = []
+	_panel.country_requested.connect(func(tag: StringName) -> void: asked.append(tag))
+
+	_panel.show_hex(own_hex)
+	var owner_row := _panel.get_node("Body/OwnerRow") as HBoxContainer
+	assert_true(owner_row.visible, "the Owner row shows on owned land")
+	var link := (_panel.get_node("Body/OwnerRow/Value") as HBoxContainer).get_child(0) as KitButton
+	assert_not_null(link, "the owner is a link")
+	assert_eq(link.text, HexCard.owner_of(Session.game, own_hex), "the link names the owner")
+	link.pressed.emit()
+	assert_eq(asked, [&"GEN"], "the link asks for the owner's country")
+
+	var reason := _panel.get_node("Body/HomeReason") as VBoxContainer
+	var actions := _panel.get_node("Body/ActionsBox") as VBoxContainer
+	assert_true(reason.visible, "no player: one reason line")
+	assert_true(_reason_text_of(reason).contains("choose your country"), "the reason says to choose a country")
+	assert_false(actions.visible, "no works before a country is chosen")
+
+	assert_true(bool(Session.act("choose_country", {"tag": "GEN"})["ok"]))
+	_panel.show_hex(own_hex)
+	assert_false(reason.visible, "own land: no reason line")
+	assert_true(actions.visible, "own land: the works show")
+
+	_panel.show_hex(other_hex)
+	assert_true(reason.visible, "another's land: the reason shows")
+	assert_true(_reason_text_of(reason).begins_with("not your land"), "the refusal names the holder")
+	assert_false(actions.visible, "another's land: no works")
+
+
 func _has_enabled(prefix: String) -> bool:
 	for button: Button in _panel.action_buttons():
 		if not button.disabled and button.text.begins_with(prefix):
