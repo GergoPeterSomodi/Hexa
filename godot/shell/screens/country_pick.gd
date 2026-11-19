@@ -35,8 +35,7 @@ func _exit_tree() -> void:
 
 func on_enter() -> void:
 	_ensure_ui()
-	if ctx != null:  # the key hints move right of the list
-		ctx.request(&"left_inset", {"px": float(Tokens.S4 + Tokens.PANEL_W)})
+	_send_cover.call_deferred()  # the list and the banner settle a frame late
 	_shown_tag = &""
 	_dock_open = false
 	_hover_tag = &""
@@ -47,7 +46,7 @@ func on_enter() -> void:
 func on_exit() -> void:
 	_disconnect_chosen()
 	if ctx != null:
-		ctx.request(&"left_inset", {"px": 0.0})
+		ctx.request(&"screen_cover", {"rects": []})
 
 
 ## Esc (ScreenStack and the App): closes the dock's panel when one is open, otherwise asks for the pause menu.
@@ -163,6 +162,12 @@ func outside_lines() -> Array[String]:
 	return out
 
 
+## Tells the HUD what the list and the banner cover: country names keep clear, the key hints start right of the list.
+func _send_cover() -> void:
+	if ctx != null and is_inside_tree() and visible:
+		ctx.request(&"screen_cover", {"rects": [Hud.screen_rect(_left), Hud.screen_rect(_top)]})
+
+
 func _ensure_ui() -> void:
 	if _ui_built or _left == null:
 		return
@@ -175,6 +180,8 @@ func _ensure_ui() -> void:
 	_left.offset_right = float(Tokens.S4 + Tokens.PANEL_W)
 	_left.offset_top = float(Tokens.BAR_H + Tokens.S2)
 	_left.offset_bottom = -float(Tokens.S4)
+	_left.resized.connect(_send_cover)
+	_top.resized.connect(_send_cover)
 	_left.cartouche_title = "Countries"
 	_left.show_close = false
 	var body := _left.body()

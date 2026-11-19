@@ -38,6 +38,7 @@ var _caps: Array[KeyCap] = []
 var _actions: Array[StringName] = []
 var _retired: Array[Node] = []
 var _settings: Settings = null
+var _fit_w: float = INF
 
 
 func _init() -> void:
@@ -89,6 +90,20 @@ func refresh_bindings(platform: String = OS.get_name()) -> void:
 			cap.refresh_from_input_map(_platform)
 
 
+## Hides the trailing hints that would run past `max_w` px (the scale bar's edge); the rest stay in order.
+func fit_width(max_w: float) -> void:
+	_fit_w = max_w
+	var used := 0.0
+	var gap := float(get_theme_constant(&"separation"))
+	for child: Node in get_children():
+		var item := child as Control
+		if item == null or item.is_queued_for_deletion():
+			continue
+		used += item.get_combined_minimum_size().x
+		item.visible = used <= max_w
+		used += gap
+
+
 func hint_actions() -> Array[StringName]:
 	return _actions.duplicate()
 
@@ -122,6 +137,8 @@ func _rebuild() -> void:
 		item.add_child(lbl)
 
 		add_child(item)
+	if _fit_w < INF:
+		fit_width(_fit_w)
 
 
 func _apply_settings(settings: Settings) -> void:

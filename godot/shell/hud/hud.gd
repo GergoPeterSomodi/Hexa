@@ -52,7 +52,7 @@ var _settings: Settings = null
 var _bound_rig: CameraRig = null
 var _bound_map_input: MapInput = null
 var _reduce_motion: bool = false
-var _left_inset: float = 0.0
+var _screen_cover: Array[Rect2] = []
 var _cover_queued: bool = false
 
 
@@ -182,26 +182,37 @@ func close_dock() -> void:
 	_country_panel.clear()
 
 
-## Room a screen panel takes on the map's left (px): the key hints start right of it. 0 puts them back.
-func set_left_inset(px: float) -> void:
+## What a screen over the map covers (viewport px, e.g. CountryPick's list and banner); [] when it leaves. The key
+## hints start right of any of them that reaches the bottom edge.
+func set_screen_cover(rects: Array[Rect2]) -> void:
+	_screen_cover = rects.duplicate()
+	var bottom := get_viewport().get_visible_rect().size.y - 2.0 * KEY_HINTS_LEFT
+	var inset := 0.0
+	for r: Rect2 in _screen_cover:
+		if r.end.y >= bottom:
+			inset = maxf(inset, r.end.x)
 	var width := _key_hints.offset_right - _key_hints.offset_left
-	_left_inset = maxf(px, 0.0)
-	_key_hints.offset_left = KEY_HINTS_LEFT + _left_inset
+	_key_hints.offset_left = KEY_HINTS_LEFT + inset
 	_key_hints.offset_right = _key_hints.offset_left + width
 	_queue_cover()
 
 
-## The screen rects (viewport px) the HUD covers over the map: the top bar, the open dock, the minimap corner and a
-## screen's left list (set_left_inset). Empty while the HUD is hidden.
+## The screen rect (viewport px) of a Control, whatever CanvasLayer holds it.
+static func screen_rect(c: Control) -> Rect2:
+	var xf := c.get_global_transform_with_canvas()
+	return Rect2(xf.origin, c.size * xf.get_scale())
+
+
+## The screen rects (viewport px) covering the map: the top bar, the open dock, the minimap corner and what a screen
+## over the map covers (set_screen_cover). Empty while the HUD is hidden.
 func cover_rects() -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	if not _root.visible:
 		return out
-	for c: Control in [_top_bar, _bottom_right, _dock]:
+	for c: Control in [_top_bar, _minimap, _zoom_control, _scale_bar, _dock]:  # not BottomRight: mostly empty
 		if c.is_visible_in_tree():
-			out.append(_screen_rect(c))
-	if _left_inset > 0.0:
-		out.append(Rect2(0.0, 0.0, _left_inset + Tokens.S2, get_viewport().get_visible_rect().size.y))
+			out.append(screen_rect(c))
+	out.append_array(_screen_cover)
 	return out
 
 
@@ -415,11 +426,6 @@ func _sync_dock_visibility() -> void:
 	_key_hints.set_context(open)
 
 
-static func _screen_rect(c: Control) -> Rect2:
-	var xf := c.get_global_transform_with_canvas()
-	return Rect2(xf.origin, c.size * xf.get_scale())
-
-
 ## Containers settle a frame late: cover_changed goes out once, deferred.
 func _queue_cover() -> void:
 	if _cover_queued:
@@ -430,6 +436,8 @@ func _queue_cover() -> void:
 
 func _emit_cover() -> void:
 	_cover_queued = false
+	var room := screen_rect(_scale_bar).position.x - screen_rect(_key_hints).position.x - float(Tokens.S2)
+	_key_hints.fit_width(room)
 	cover_changed.emit()
 
 

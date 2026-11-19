@@ -439,9 +439,12 @@ func _on_app_requested(what: StringName, args: Dictionary) -> void:
 		&"close_dock":
 			if _hud != null:
 				_hud.close_dock()
-		&"left_inset":
+		&"screen_cover":
 			if _hud != null:
-				_hud.set_left_inset(float(args.get("px", 0.0)))
+				var rects: Array[Rect2] = []
+				for r: Variant in args.get("rects", []):
+					rects.append(r as Rect2)
+				_hud.set_screen_cover(rects)
 		&"pause":
 			_open_pause_menu()
 		&"main_menu", &"end_game":
