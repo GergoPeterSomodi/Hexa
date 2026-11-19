@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/hud/minimap.gd" id="1_minimap"]
+
+[node name="Minimap" type="PanelContainer"]
+custom_minimum_size = Vector2(220, 124)
+mouse_filter = 0
+theme_type_variation = &"PanelMinimap"
+script = ExtResource("1_minimap")
+
+[node name="Picture" type="Control" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Overlay" type="Control" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Frame" type="Control" parent="."]
+layout_mode = 2
+mouse_filter = 2

@@ -1,0 +1,139 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://shell/panels/country_panel.gd" id="1_panel"]
+[ext_resource type="Script" path="res://shell/ui/cartouche.gd" id="2_cart"]
+[ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
+[ext_resource type="Script" path="res://shell/ui/country_arms.gd" id="4_arms"]
+
+[node name="CountryPanel" type="PanelContainer"]
+size_flags_vertical = 3
+mouse_filter = 0
+script = ExtResource("1_panel")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="TitleBox" type="VBoxContainer" parent="VBox/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Cartouche" type="PanelContainer" parent="VBox/Head/TitleBox"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("2_cart")
+
+[node name="Title" type="Label" parent="VBox/Head/TitleBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"TitlePanel"
+autowrap_mode = 3
+
+[node name="Subtitle" type="Label" parent="VBox/Head/TitleBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[node name="CloseButton" type="Button" parent="VBox/Head"]
+layout_mode = 2
+size_flags_vertical = 0
+tooltip_text = "Close"
+accessibility_name = "Close"
+script = ExtResource("3_btn")
+kind = 6
+icon_name = &"close"
+
+[node name="BodyScroll" type="ScrollContainer" parent="VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Body" type="VBoxContainer" parent="VBox/BodyScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Summary" type="HBoxContainer" parent="VBox/BodyScroll/Body"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Arms" type="Control" parent="VBox/BodyScroll/Body/Summary"]
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("4_arms")
+
+[node name="Names" type="VBoxContainer" parent="VBox/BodyScroll/Body/Summary"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="LongName" type="Label" parent="VBox/BodyScroll/Body/Summary/Names"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="Relation" type="Label" parent="VBox/BodyScroll/Body/Summary/Names"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[node name="Tip" type="Label" parent="VBox/BodyScroll/Body"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"LabelFlavour"
+autowrap_mode = 3
+
+[node name="PlayAs" type="Button" parent="VBox/BodyScroll/Body"]
+visible = false
+layout_mode = 2
+focus_mode = 0
+script = ExtResource("3_btn")
+kind = 2
+
+[node name="PlayReason" type="Label" parent="VBox/BodyScroll/Body"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Reason"
+autowrap_mode = 3
+
+[node name="Rule" type="HSeparator" parent="VBox/BodyScroll/Body"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Ledger" type="GridContainer" parent="VBox/BodyScroll/Body"]
+layout_mode = 2
+mouse_filter = 2
+columns = 2
+
+[node name="NeighboursBox" type="VBoxContainer" parent="VBox/BodyScroll/Body"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Heading" type="Label" parent="VBox/BodyScroll/Body/NeighboursBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+text = "Neighbours"
+
+[node name="Links" type="HFlowContainer" parent="VBox/BodyScroll/Body/NeighboursBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Foot" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+alignment = 2
+
+[node name="ShowOnMap" type="Button" parent="VBox/Foot"]
+layout_mode = 2
+focus_mode = 0
+script = ExtResource("3_btn")
+text = "Show on the map"

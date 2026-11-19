@@ -14,6 +14,8 @@ const PATHS: Dictionary[StringName, String] = {
 	&"credits": "res://shell/screens/credits.tscn",
 	&"about": "res://shell/screens/about.tscn",
 	&"new_game": "res://shell/screens/new_game.tscn",
+	&"country_pick": "res://shell/screens/country_pick.tscn",
+	&"find_place": "res://shell/screens/find_place.tscn",
 	&"save_load": "res://shell/screens/save_load.tscn",
 	&"season_report": "res://shell/screens/season_report.tscn",
 	&"works_preview": "res://shell/screens/works_preview.tscn",

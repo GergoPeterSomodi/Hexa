@@ -1,0 +1,42 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://shell/screens/country_pick.gd" id="1_pick"]
+[ext_resource type="PackedScene" path="res://shell/ui/panel_frame.tscn" id="2_panel"]
+[ext_resource type="Script" path="res://shell/ui/ribbon.gd" id="3_ribbon"]
+
+[node name="CountryPick" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_pick")
+kind = 2
+screen_id = &"country_pick"
+
+[node name="Top" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+grow_horizontal = 2
+alignment = 1
+mouse_filter = 2
+
+[node name="Ribbon" type="PanelContainer" parent="Top"]
+layout_mode = 2
+script = ExtResource("3_ribbon")
+
+[node name="Hint" type="Label" parent="Top"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+horizontal_alignment = 1
+text = "Click a country's land, or pick it from the list"
+
+[node name="Left" parent="." instance=ExtResource("2_panel")]
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+grow_vertical = 2

@@ -21,7 +21,7 @@ func after_each() -> void:
 
 
 func _tmp_file(suffix: String) -> String:
-	var p := "/tmp/test_settings_%s_%d.cfg" % [suffix, Time.get_ticks_usec()]
+	var p := OS.get_temp_dir().path_join("test_settings_%s_%d.cfg" % [suffix, Time.get_ticks_usec()])  # any OS, not only /tmp
 	_temp_paths.append(p)
 	return p
 
