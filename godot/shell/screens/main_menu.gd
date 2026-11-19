@@ -15,6 +15,7 @@ const COLUMN_HALF_W := 168.0
 @onready var _menu_column: VBoxContainer = $MenuColumn
 @onready var _wordmark_rect: TextureRect = $MenuColumn/Wordmark
 @onready var _rule_rect: TextureRect = $MenuColumn/Rule
+@onready var _new_game_btn: KitButton = $MenuColumn/Sheet/Buttons/NewGameButton
 @onready var _sandbox_btn: KitButton = $MenuColumn/Sheet/Buttons/SandboxButton
 @onready var _options_btn: KitButton = $MenuColumn/Sheet/Buttons/OptionsButton
 @onready var _credits_btn: KitButton = $MenuColumn/Sheet/Buttons/CreditsButton
@@ -32,6 +33,7 @@ func _ready() -> void:
 	_ui_ready = true
 	_menu_column.offset_left = float(Tokens.MENU_COLUMN_X) - COLUMN_HALF_W
 	_menu_column.offset_right = float(Tokens.MENU_COLUMN_X) + COLUMN_HALF_W
+	_new_game_btn.pressed.connect(_on_new_game_pressed)
 	_sandbox_btn.pressed.connect(_on_sandbox_pressed)
 	_options_btn.pressed.connect(_on_options_pressed)
 	_credits_btn.pressed.connect(_on_credits_pressed)
@@ -69,6 +71,10 @@ func on_exit() -> void:
 ## Esc does nothing on the main menu (no accidental quit).
 func back() -> bool:
 	return true
+
+
+func new_game_button() -> KitButton:
+	return _new_game_btn
 
 
 func sandbox_button() -> KitButton:
@@ -124,7 +130,7 @@ func _refresh_kit_art() -> void:
 func _start_motion() -> void:
 	_stop_motion()
 	var reduce := _reduce_motion()
-	for btn: KitButton in [_sandbox_btn, _options_btn, _credits_btn, _quit_btn]:
+	for btn: KitButton in [_new_game_btn, _sandbox_btn, _options_btn, _credits_btn, _quit_btn]:
 		btn.reduce_motion = reduce
 	_sync_pivots()
 	if _bg_rect != null:
@@ -177,10 +183,9 @@ func _sync_dev_visibility() -> void:
 		dev_on = bool(ctx.settings.get_value("dev/developer_tools"))
 	_sandbox_btn.visible = dev_on
 	_dev_note.visible = dev_on
-	var focus_btn: KitButton = _sandbox_btn if dev_on else _options_btn
-	default_focus = get_path_to(focus_btn)
+	default_focus = get_path_to(_new_game_btn)
 	if is_inside_tree() and not dev_on and _sandbox_btn.has_focus():
-		_options_btn.grab_focus()
+		_new_game_btn.grab_focus()
 
 
 func _push_screen(id: StringName) -> void:
@@ -189,6 +194,10 @@ func _push_screen(id: StringName) -> void:
 	var next := ScreenIds.make(id)
 	if next != null:
 		ctx.stack.call(&"push", next)
+
+
+func _on_new_game_pressed() -> void:
+	_push_screen(&"new_game")
 
 
 func _on_sandbox_pressed() -> void:

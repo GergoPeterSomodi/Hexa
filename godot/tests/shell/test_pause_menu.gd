@@ -157,3 +157,30 @@ func test_main_menu_and_quit_require_confirm_when_unsaved_actions_exist() -> voi
 	confirm.button_for(&"confirm").pressed.emit()
 	await _harness.wait_frames(self, 1)
 	assert_eq(requests, [&"main_menu", &"quit"])
+
+
+func test_subtitle_is_the_long_name_of_your_country_in_a_scenario_game() -> void:
+	_apply_theme()
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	var pause := ScreenIds.make(&"pause_menu") as PauseMenu
+	_harness.stack.push(pause)
+	await _harness.wait_frames(self, 1)
+	assert_eq(pause.subtitle_label().text, "Italy, 1480", "no country yet: the scenario's name")
+	_harness.stack.pop()
+	pause.queue_free()
+
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"}).get("ok", false)))
+	var pause2 := ScreenIds.make(&"pause_menu") as PauseMenu
+	_harness.stack.push(pause2)
+	await _harness.wait_frames(self, 1)
+	assert_eq(pause2.subtitle_label().text, "Republic of Genoa")
+
+
+func test_subtitle_in_a_sandbox_game_keeps_the_seed() -> void:
+	_apply_theme()
+	var map := load("res://data/maps/north_italy.tres") as MapData
+	Session.game = Game.new_game(map, 77)
+	var pause := ScreenIds.make(&"pause_menu") as PauseMenu
+	_harness.stack.push(pause)
+	await _harness.wait_frames(self, 1)
+	assert_eq(pause.subtitle_label().text, "Map sandbox · seed 77")

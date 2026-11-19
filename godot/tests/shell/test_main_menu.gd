@@ -34,7 +34,9 @@ func test_main_menu_loads_and_drops_menu_art_and_ignores_esc() -> void:
 	assert_true(_harness.stack.hides_world())
 	assert_not_null(menu.background_rect().texture, "menu_bg loaded lazily on enter")
 	assert_not_null(menu.shade_rect().texture, "menu_shade loaded lazily on enter")
-	assert_eq(_harness.viewport.gui_get_focus_owner(), menu.sandbox_button(), "Map sandbox focused when dev tools on")
+	assert_eq(_harness.viewport.gui_get_focus_owner(), menu.new_game_button(), "New game is focused first")
+	assert_eq(menu.new_game_button().kind, KitButton.Kind.MENU_PRIMARY, "New game is the primary button")
+	assert_eq(menu.sandbox_button().kind, KitButton.Kind.MENU, "Map sandbox is a secondary button")
 
 	assert_true(_harness.stack.back(), "Esc does nothing on MainMenu")
 	assert_eq(_harness.stack.count(), 1)
@@ -53,7 +55,8 @@ func test_main_menu_hides_sandbox_when_developer_tools_off_and_quits_directly() 
 	await _harness.wait_frames(self, 2)
 
 	assert_false(menu.sandbox_button().visible, "Sandbox button hidden when dev/developer_tools is false")
-	assert_eq(_harness.viewport.gui_get_focus_owner(), menu.options_button(), "Options takes focus when Sandbox hidden")
+	assert_eq(_harness.viewport.gui_get_focus_owner(), menu.new_game_button(), "New game keeps focus when Sandbox hidden")
+	assert_true(menu.new_game_button().visible, "New game is always shown")
 
 	_harness.settings.set_value("dev/developer_tools", true)
 	assert_true(menu.sandbox_button().visible, "Sandbox button reappears when dev/developer_tools enabled")
@@ -64,6 +67,23 @@ func test_main_menu_hides_sandbox_when_developer_tools_off_and_quits_directly() 
 	await _harness.wait_frames(self, 1)
 	assert_eq(_harness.stack.count(), 1, "MainMenu Quit does not push Confirm")
 	assert_eq(requests, [&"quit"])
+
+
+func test_new_game_is_first_and_opens_the_new_game_screen() -> void:
+	var menu := ScreenIds.make(&"main_menu") as MainMenu
+	_harness.stack.push(menu)
+	await _harness.wait_frames(self, 1)
+
+	var buttons := menu.new_game_button().get_parent().get_children()
+	assert_eq(buttons[0], menu.new_game_button(), "New game is first in the column")
+	assert_eq(menu.new_game_button().text.to_lower(), "new game")
+	menu.new_game_button().pressed.emit()
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 2)
+	assert_true(_harness.stack.top() is NewGame)
+	assert_true(_harness.stack.back(), "Esc closes New game")
+	await _harness.wait_frames(self, 1)
+	assert_eq(_harness.stack.top(), menu)
 
 
 func test_sandbox_starts_with_typed_and_random_seed_and_validates_input() -> void:

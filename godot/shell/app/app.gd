@@ -36,6 +36,7 @@ var _syncing_window: bool = false
 var _window_focused: bool = true
 var _did_pause_tree: bool = false
 var _starting_game: bool = false
+var _routes: AppRoutes = null
 var _booted: bool = false
 var _lifecycle_gen: int = 0
 var _quit_count: int = 0
@@ -98,6 +99,7 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	_stack.setup(_ctx)
 	_hud.setup(_ctx)
 	_app_input.configure(_settings)
+	_routes = AppRoutes.new(self)
 	_connect_signals()
 
 	var cli := _parse_cli_args(p_cli_args)
@@ -110,10 +112,21 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	_apply_theme()
 	RenderingServer.set_default_clear_color(Tokens.BG)
 
-	if bool(cli["sandbox"]):
+	if bool(cli["new_game"]):
+		_start_session(MapScene.MAP_ID, int(cli["seed"]), str(cli["scenario"]), StringName(str(cli["country"])))
+	elif bool(cli["sandbox"]):
 		_start_sandbox(MapScene.MAP_ID, int(cli["seed"]))
 	else:
 		_open_main_menu()
+
+
+func is_starting() -> bool:
+	return _starting_game
+
+
+## Re-reads the screen stack's pause and hidden-world state (after the pick is pushed).
+func refresh_stack_state() -> void:
+	_on_stack_changed()
 
 
 func context() -> ShellContext:
@@ -211,31 +224,7 @@ func _parse_cli_args(explicit_args: PackedStringArray) -> Dictionary:
 	var args := explicit_args
 	if args.is_empty():
 		args = cli_args_override if not cli_args_override.is_empty() else OS.get_cmdline_user_args()
-	var sandbox := false
-	var plain_ui := false
-	var seed_val := -1
-	var i := 0
-	while i < args.size():
-		var arg := args[i]
-		if arg == "--sandbox":
-			sandbox = true
-		elif arg == "--plain-ui":
-			plain_ui = true
-		elif arg.begins_with("--seed="):
-			var raw := arg.substr(7)
-			if raw.is_valid_int():
-				seed_val = raw.to_int()
-		elif arg == "--seed" and i + 1 < args.size():
-			var next_raw := args[i + 1]
-			if next_raw.is_valid_int():
-				seed_val = next_raw.to_int()
-				i += 1
-		i += 1
-	if seed_val < 0:
-		var rng := RandomNumberGenerator.new()
-		rng.randomize()
-		seed_val = rng.randi_range(Sandbox.RANDOM_SEED_MIN, Sandbox.RANDOM_SEED_MAX)
-	return {"sandbox": sandbox, "plain_ui": plain_ui, "seed": seed_val}
+	return AppCli.parse(args)
 
 
 func _link(emitter: Object, sig: StringName, handler: Callable) -> void:
@@ -258,19 +247,28 @@ func _connect_signals() -> void:
 	_link(_app_input, &"fullscreen_toggled", _on_fullscreen_toggled)
 	_link(_app_input, &"screenshot_requested", _on_screenshot_requested)
 
-	_link(_hud, &"zoom_step_requested", _on_hud_zoom_step)
-	_link(_hud, &"zoom_set_requested", _on_hud_zoom_set)
-	_link(_hud, &"fit_requested", _on_hud_fit)
-	_link(_hud, &"season_preview_requested", _on_hud_season_preview)
+	_link(_hud, &"zoom_step_requested", _routes.on_hud_zoom_step)
+	_link(_hud, &"zoom_set_requested", _routes.on_hud_zoom_set)
+	_link(_hud, &"fit_requested", _routes.on_hud_fit)
+	_link(_hud, &"season_preview_requested", _routes.on_hud_season_preview)
 	_link(_hud, &"help_requested", _on_help_toggled)
 	_link(_hud, &"menu_requested", _on_menu_requested)
-	_link(_hud, &"new_seed_requested", _on_hud_new_seed)
-	_link(_hud, &"debug_layer_toggled", _on_hud_debug_layer)
-	_link(_hud, &"far_zoom_changed", _on_hud_far_zoom)
-	_link(_hud, &"slice_ms_changed", _on_hud_slice_ms)
+	_link(_hud, &"new_seed_requested", _routes.on_hud_new_seed)
+	_link(_hud, &"debug_layer_toggled", _routes.on_hud_debug_layer)
+	_link(_hud, &"far_zoom_changed", _routes.on_hud_far_zoom)
+	_link(_hud, &"slice_ms_changed", _routes.on_hud_slice_ms)
 	_link(_hud, &"hud_visibility_changed", _sync_camera_free_rect.unbind(1))
+	_link(_hud, &"mode_requested", _routes.on_hud_mode_requested)
+	_link(_hud, &"country_requested", _routes.show_country)
+	_link(_hud, &"country_play_requested", _routes.on_hud_country_play)
+	_link(_hud, &"country_look_at_requested", _routes.on_hud_country_look_at)
+	_link(_hud, &"look_at_requested", _routes.on_hud_look_at)
+	_link(_hud, &"jump_requested", _routes.on_hud_jump)
+	if _hud.country_panel() != null:
+		_link(_hud.country_panel(), &"closed", _routes.on_country_panel_closed)
 
 	_link(Events, &"game_started", _on_events_game_started)
+	_link(Events, &"country_chosen", _routes.on_country_chosen)
 	_link(get_viewport(), &"size_changed", _sync_camera_free_rect)
 	if _is_root_window():
 		_link(get_window(), &"size_changed", _on_window_size_changed)
@@ -303,6 +301,12 @@ func _open_main_menu() -> void:
 
 
 func _start_sandbox(map_id_val: String, seed_val: int) -> void:
+	_start_session(map_id_val, seed_val)
+
+
+## Starts a game: the map sandbox when `scenario_id` is empty, otherwise that scenario (with the country `player` when
+## given, so no pick). A scenario the rules refuse toasts its first problem and goes back to the main menu.
+func _start_session(map_id_val: String, seed_val: int, scenario_id: String = "", player: StringName = &"") -> void:
 	if _starting_game:
 		return
 	_starting_game = true
@@ -310,7 +314,10 @@ func _start_sandbox(map_id_val: String, seed_val: int) -> void:
 
 	var loading := ScreenIds.make(&"loading") as Loading
 	if loading != null:
-		loading.set_status("Building the map", "Preparing %s (seed %d)..." % [_map_title(map_id_val), seed_val])
+		if scenario_id.is_empty():
+			loading.set_status("Building the map", "Preparing %s (seed %d)..." % [_map_title(map_id_val), seed_val])
+		else:
+			loading.set_status("Drawing the map", "Preparing %s (seed %d)..." % [_routes.scenario_title(scenario_id), seed_val])
 		loading.set_progress(0.1)
 		_stack.push(loading)
 
@@ -325,7 +332,16 @@ func _start_sandbox(map_id_val: String, seed_val: int) -> void:
 			return
 
 	_teardown_world()
-	Session.new_game(map_id_val, seed_val)
+	if scenario_id.is_empty():
+		Session.new_game(map_id_val, seed_val)
+	else:
+		var problem := Session.new_scenario(scenario_id, seed_val, player)
+		if problem != "":
+			_starting_game = false
+			_open_main_menu()
+			_ctx.toast(problem, &"bad")
+			return
+		map_id_val = Session.defs().scenario(scenario_id).map_id
 	_mount_map_scene(map_id_val, seed_val)
 
 	if loading != null and is_instance_valid(loading) and _map_scene != null and _map_scene.is_loading():
@@ -350,7 +366,12 @@ func _start_sandbox(map_id_val: String, seed_val: int) -> void:
 	if _map_scene != null:
 		_map_scene.fit()
 	_on_stack_changed()
-	HelpOverlay.open_if_unseen(_ctx)
+	if _map_scene != null and _map_scene.picking():
+		_routes.begin_pick()
+	else:
+		if _map_scene != null and Session.player_tag() != &"":
+			_routes.announce_rule(true)
+		HelpOverlay.open_if_unseen(_ctx)
 	game_started.emit()
 
 
@@ -377,22 +398,12 @@ func _mount_map_scene(map_id_val: String, seed_val: int) -> void:
 
 
 func _connect_map_scene(scene: MapScene) -> void:
-	if not scene.refused.is_connected(_on_map_refused):
-		scene.refused.connect(_on_map_refused)
-	if not scene.season_changed.is_connected(_on_map_season_changed):
-		scene.season_changed.connect(_on_map_season_changed)
-	if not scene.hud_toggle_requested.is_connected(_on_map_hud_toggle):
-		scene.hud_toggle_requested.connect(_on_map_hud_toggle)
+	_routes.bind_scene(scene)
 
 
 func _disconnect_map_scene() -> void:
-	if _map_scene != null and is_instance_valid(_map_scene):
-		if _map_scene.refused.is_connected(_on_map_refused):
-			_map_scene.refused.disconnect(_on_map_refused)
-		if _map_scene.season_changed.is_connected(_on_map_season_changed):
-			_map_scene.season_changed.disconnect(_on_map_season_changed)
-		if _map_scene.hud_toggle_requested.is_connected(_on_map_hud_toggle):
-			_map_scene.hud_toggle_requested.disconnect(_on_map_hud_toggle)
+	if _routes != null:
+		_routes.unbind_scene(_map_scene)
 
 
 func _teardown_world() -> void:
@@ -409,10 +420,25 @@ func _teardown_world() -> void:
 
 func _on_app_requested(what: StringName, args: Dictionary) -> void:
 	match what:
-		&"start_sandbox", &"new_game":
+		&"new_game":
+			if args.has("scenario"):
+				_start_session(
+					MapScene.MAP_ID, int(args.get("seed", Sandbox.DEFAULT_SEED)), str(args["scenario"]),
+					StringName(str(args.get("country", &"")))
+				)
+			else:
+				_start_sandbox(str(args.get("map_id", MapScene.MAP_ID)), int(args.get("seed", Sandbox.DEFAULT_SEED)))
+		&"start_sandbox":
 			var map_id_val := str(args.get("map_id", MapScene.MAP_ID))
 			var seed_val := int(args.get("seed", Sandbox.DEFAULT_SEED))
 			_start_sandbox(map_id_val, seed_val)
+		&"country":
+			_routes.show_country(StringName(str(args.get("tag", &""))))
+		&"close_dock":
+			if _hud != null:
+				_hud.close_dock()
+		&"pause":
+			_open_pause_menu()
 		&"main_menu", &"end_game":
 			Session.end_game()
 			_open_main_menu()
@@ -445,7 +471,7 @@ func _handle_look_at(args: Dictionary) -> void:
 		_map_scene.camera_rig().look_at(args["map_px"] as Vector2)
 	elif args.has("hex") and args["hex"] is Vector2i and _map_scene.view() != null:
 		var hex := args["hex"] as Vector2i
-		_map_scene.camera_rig().look_at(_map_scene.view().centre_of(hex))
+		_map_scene.glide_to_hex(hex, _routes.glide_zoom())
 		if bool(args.get("select", false)):
 			_map_scene.select_hex(hex)
 
@@ -517,15 +543,14 @@ func _on_back_requested() -> void:
 			if _hud != null:
 				_hud.close_popovers()
 		EscLadder.CLEAR_SELECTION:
-			if _map_scene != null:
+			if _hud != null and _hud.country_panel() != null and _hud.country_panel().visible:
+				_hud.close_dock()
+			elif _map_scene != null:
 				_map_scene.select_hex(MapScene.NO_HEX)
 			elif _hud != null:
 				_hud.hex_panel().clear()
 		EscLadder.OPEN_PAUSE_MENU:
-			if _map_scene != null:
-				var pause := ScreenIds.make(&"pause_menu")
-				if pause != null:
-					_stack.push(pause)
+			_open_pause_menu()
 
 
 func _on_menu_requested() -> void:
@@ -536,10 +561,7 @@ func _on_menu_requested() -> void:
 		if top.screen_id == &"pause_menu":
 			_stack.back()
 		return
-	if _map_scene != null:
-		var pause := ScreenIds.make(&"pause_menu")
-		if pause != null:
-			_stack.push(pause)
+	_open_pause_menu()
 
 
 func _on_help_toggled() -> void:
@@ -597,58 +619,21 @@ func _on_screenshot_requested() -> void:
 		_ctx.toast("Could not save screenshot", &"bad")
 
 
-func _on_map_refused(reason: String) -> void:
-	if _ctx != null and not reason.is_empty():
-		_ctx.toast(reason, &"warn")
-
-
-func _on_map_season_changed(season_name: String) -> void:
-	if _hud != null:
-		_hud.set_season(season_name)
-
-
-func _on_map_hud_toggle() -> void:
-	if _hud != null:
-		_hud.toggle_hud()
-
-
 func _on_events_game_started() -> void:
-	if _hud != null and _map_scene != null and Session.game != null:
+	if _hud != null and _map_scene != null and Session.game != null and not Session.game.has_countries():
 		_hud.set_map_info(_map_title(_map_scene.map_id), Session.game.seed_value)
 		_hud.set_season(_map_scene.season)
 
 
-func _on_hud_zoom_step(notches: float) -> void:
-	if _map_scene != null and _map_scene.camera_rig() != null:
-		_map_scene.camera_rig().zoom_by(notches)
-
-func _on_hud_zoom_set(z: float) -> void:
-	if _map_scene != null and _map_scene.camera_rig() != null:
-		_map_scene.camera_rig().zoom_to(z)
-
-func _on_hud_fit() -> void:
-	if _map_scene != null:
-		_map_scene.fit()
-
-func _on_hud_season_preview(index: int) -> void:
-	if _map_scene != null:
-		_map_scene.set_season(TilesetBuilder.SEASONS[clampi(index, 0, TilesetBuilder.SEASONS.size() - 1)])
-
-func _on_hud_new_seed() -> void:
-	if _map_scene != null:
-		_map_scene.new_seed()
-
-func _on_hud_debug_layer(layer_name: StringName, on: bool) -> void:
-	if _map_scene != null:
-		_map_scene.apply_debug_layer(layer_name, on)
-
-func _on_hud_far_zoom(value: float) -> void:
-	if _map_scene != null and _map_scene.far() != null:
-		_map_scene.far().set_zoom_switch(value)
-
-func _on_hud_slice_ms(ms: int) -> void:
-	if _map_scene != null:
-		_map_scene.slice_ms = float(ms)
+func _open_pause_menu() -> void:
+	if _map_scene == null:
+		return
+	var top := _stack.top()
+	if top != null and top.screen_id == &"pause_menu":
+		return
+	var pause := ScreenIds.make(&"pause_menu")
+	if pause != null:
+		_stack.push(pause)
 
 
 func _on_window_size_changed() -> void:

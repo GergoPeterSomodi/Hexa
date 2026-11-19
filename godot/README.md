@@ -5,12 +5,14 @@ this page is its short form for the folder. Windows builds only. The Python game
 the gameplay reference, not something to edit. The game itself arrives milestone by milestone (section 9 of the
 standard).
 
-At M1.5 / M1.5b (Studiolo UI foundation + Mac half-res atlases) with **M2 Countries in progress (`C1`–`C13` merged; `C14`–`C20` UI/App wiring remaining)**, the project opens on the `App` root (`shell/app/app.tscn`, the main scene),
-booting to the Studiolo main menu with `Map sandbox` launching the **north Italy map** (`shell/map/map_scene.tscn`):
+At M1.5 / M1.5b (Studiolo UI foundation + Mac half-res atlases) with **M2 Countries in progress (`C1`–`C19` merged; `C20` remaining)**, the project opens on the `App` root (`shell/app/app.tscn`, the main scene),
+booting to the Studiolo main menu: **New game** starts the scenario "Italy, 1480" (you choose your country on the map: the
+pick, then Play as), and `Map sandbox` launches the plain **north Italy map** with no countries (`shell/map/map_scene.tscn`):
 the 28 km district map on stacked hex `TileMapLayer`s with its pieces, crossings, place names, far picture, borders,
 map-mode overlay (`Terrain`, `Owner`, `Relief`), country labels, capital pennants, and select, build, upgrade and clear
-through `Session.act`. Pass `-- --sandbox [--seed=N]` to boot straight into the map, or `-- --plain-ui` to run with
-the flat high-contrast/low-memory theme. The 0.3.0 Europe map, its builder, the Kenney bake and the whole-map
+through `Session.act`. Pass `-- --new-game [--scenario=north_italy_1480] [--country=GEN] [--seed=N]` to start the scenario
+at once (with `--country` there is no pick), `-- --sandbox [--seed=N]` to boot straight into the map, or `-- --plain-ui` to
+run with the flat high-contrast/low-memory theme. The 0.3.0 Europe map, its builder, the Kenney bake and the whole-map
 prototype scene are retired.
 
 ## Engine
@@ -54,15 +56,16 @@ shell/                  everything with Nodes (Studiolo UI architecture)
                         ToastHost, OptionRow, KeyCap, Segmented, NavList, Cartouche, Ribbon, PanelKit,
                         Medallion, DeltaChip, SeasonStrip, PreviewCard, InkChart, StudyTable,
                         RelationMatrix, ResourceChip)
-  hud/                  hud.tscn + hud.gd, top_bar, layers_popover, zoom_control, scale_bar,
-                        map_hover, key_hints, debug_overlay (F3)
-  screens/              screen_ids.gd, main_menu, sandbox, pause_menu, options (+ options_keys),
-                        about, credits, confirm, loading, help_overlay
+  hud/                  hud.tscn + hud.gd, top_bar (arms, country name, mode switch), layers_popover,
+                        zoom_control, scale_bar, minimap, map_hover, key_hints, debug_overlay (F3)
+  screens/              screen_ids.gd, main_menu, new_game, country_pick, find_place, sandbox, pause_menu,
+                        options (+ options_keys), about, credits, confirm, loading, help_overlay
   map/                  map_scene.tscn + map_scene.gd (the map scene), mode_overlay.gd (.gdshader),
                         capital_marks.gd, hex_panel_contract.gd
   mapview/              tile_map_view.gd, tileset_builder.gd, edge_line_layer.gd, far_map.gd, map_labels.gd,
                         country_labels.gd, shadow_cover.gdshader
-  panels/               hex_panel.tscn + hex_panel.gd
+  panels/               hex_panel.tscn + hex_panel.gd, country_panel.tscn + country_panel.gd (the dock shows
+                        one panel at a time)
   editor/               scenario_editor.tscn + scenario_editor.gd (@tool scenario editor, helpers & UI)
 tests/core/ tests/shell/     GUT tests (test_*.gd, scenario_fixture.gd, ui_harness.gd, test_ui_monkey.gd),
                              perf_budget.json, perf_ui_budget.json
@@ -126,7 +129,8 @@ python tools/lint_godot.py godot
 # Open the main scene (shell/app/app.tscn) and quit at once
 "$GODOT" --headless --path godot --quit
 
-# Launch directly into the North Italy sandbox (optionally pinned to a seed) or flat high-contrast UI
+# Start the scenario at once as Genoa (leave out --country to see the pick), the North Italy sandbox, or flat high-contrast UI
+"$GODOT" --path godot -- --new-game --country=GEN --seed=1480
 "$GODOT" --path godot -- --sandbox --seed=1480
 "$GODOT" --path godot -- --plain-ui
 
@@ -142,6 +146,8 @@ python -m unittest tests/test_bake_ui.py
 "$GODOT" --headless --path godot -s res://tools/build_tileset.gd -- --half
 "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --check
 "$GODOT" --headless --path godot -s res://tools/build_scenario.gd -- --check
+# Rebuild the committed scenario files (pins, owner bytes, map digest); --scenario=<id> picks one
+"$GODOT" --headless --path godot -s res://tools/build_scenario.gd
 
 # GUT tests, headless, with a JUnit report (includes tests/shell/test_ui_monkey.gd)
 "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit -gjunit_xml_file=gut-junit.xml
@@ -165,6 +171,13 @@ python -m unittest tests/test_bake_ui.py
 
 The editor: open `godot/project.godot` with the same engine. GUT shows in the editor's plugin list.
 
+**The scenario editor** (`shell/editor/scenario_editor.tscn`, `@tool`): open the scene in the Godot editor. It shows the
+scenario on the game's own layers (tiles, Owner overlay, borders, seeds). Select the `Pins` layer and paint pins with
+Godot's TileMap tools (a painted cell is a pin, an erased cell no pin); territory regrows as you paint. The inspector
+buttons are **Regrow**, **Write the scenario** (pins, owner and map digest go into `data/scenarios/<id>.tres`, then a
+check) and **Check** (the deep validation; its lines go to `facts` and the Output panel). Run
+`build_scenario.gd --check` afterwards to see that the committed file is current.
+
 ## App, Controls & Map Scene
 
 - **Main scene:** `shell/app/app.tscn` (`App`) owns `AppInput`, `World` (`MapScene`, created on game start and freed on
@@ -172,8 +185,9 @@ The editor: open `godot/project.godot` with the same engine. GUT shows in the ed
   `user://settings.cfg` (`Settings`), with a 10 s `Confirm` revert for display/window/UI-scale changes.
 - **Default bindings** (`shell/input/bindings.gd`, `Bindings.DEFAULTS`):
   - **Camera:** `WASD` / arrows (pan; hold `Shift` for fast pan), `=` / `+` / `Kp+` (zoom in), `-` / `Kp-` (zoom out), `F` / `Home` (fit whole map).
-  - **Map & View:** left click (select hex), right click (clear selection), `1`–`3` (map modes Terrain / Owner / Relief), `G` (hex grid), `N` (place names), `C` (country action binding), `Ctrl+F` / `Cmd+F` (find place action binding), `H` (hide HUD / photo mode), `U` (upgrade selected hex).
-  - **App & Dev:** `Esc` (Esc ladder: popover → top screen → selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
+  - **Map & View:** left click (select hex), right click (clear selection), `1`–`3` (map modes Terrain / Owner / Relief; Owner is refused with a toast in a map-only game), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (upgrade selected hex).
+  - **The pick:** click a country's land or choose it in the list (`Up` / `Down`, `Enter` shows it, `Enter` again plays it), or `Play as` in its panel; `Esc` closes the panel, then asks for the pause menu (the pick cannot be skipped).
+  - **App & Dev:** `Esc` (Esc ladder: popover → top screen → country panel or selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
 - **Pointer & trackpad gestures** (`shell/input/camera_rig.gd`):
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).
   - Mac trackpad two-finger scroll (`InputEventPanGesture`) pans at `GESTURE_PAN_PX` (20 px per delta unit); trackpad pinch (`InputEventMagnifyGesture`) zooms directly about the fingers; left/middle/right drag past `CLICK_SLOP` (6 px) pans 1:1.

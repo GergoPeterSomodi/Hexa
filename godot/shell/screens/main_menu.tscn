@@ -107,11 +107,17 @@ theme_type_variation = &"PanelModal"
 layout_mode = 2
 mouse_filter = 2
 
+[node name="NewGameButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
+layout_mode = 2
+text = "New game"
+script = ExtResource("2_btn")
+kind = 8
+
 [node name="SandboxButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
 layout_mode = 2
 text = "Map sandbox"
 script = ExtResource("2_btn")
-kind = 8
+kind = 7
 
 [node name="OptionsButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
 layout_mode = 2

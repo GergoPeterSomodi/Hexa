@@ -16,7 +16,7 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   `.github/workflows/godot.yml`) fails a pull request that changes a file under `hexa/`. The Python `tools/` folder may gain
   the exporters (`export_data.py`, `export_geography.py`, ...) and the map art tools (`tools/worldmap/`, `bake_art.py`); they
   import `hexa` through its public API.
-- **New work goes to `godot/`.** The app opens on the Studiolo main scene (`shell/app/app.tscn`, currently M1.5 / M1.5b with M2 Countries `C1`–`C13` merged and `C14`–`C20` remaining), and the map is the north Italy district map (`shell/map/map_scene.tscn`,
+- **New work goes to `godot/`.** The app opens on the Studiolo main scene (`shell/app/app.tscn`, currently M1.5 / M1.5b with M2 Countries `C1`–`C19` done and `C20` remaining), and the map is the north Italy district map (`shell/map/map_scene.tscn`,
   built on `MapData` and scenario/country defs in `core/defs/`, `MapState` schema 2 + `Country` in `core/state/`, `Improve`, `Territory` and `Countries` in
   `core/systems/`, `Game` and `Actions` in `core/game/`, the pure view helpers in `core/views/`, `TileMapView`
   and `MapLabels`/`CountryLabels` in `shell/mapview/`, `ModeOverlay`/`CapitalMarks` in `shell/map/`, `HexPanel` in `shell/panels/hex_panel.tscn`, `@tool ScenarioEditor` in `shell/editor/scenario_editor.tscn`, and `MapInput` in
@@ -42,7 +42,7 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --check       # check committed MapData
   "$GODOT" --headless --path godot -s res://tools/build_scenario.gd -- --check  # check committed scenarios
   "$GODOT" --headless --path godot -s res://tools/build_theme.gd -- --check     # check committed Studiolo themes
-  /Users/kioba/develop/Hexa/.venv/bin/python tools/bake_ui.py --check           # check Studiolo baked UI kit
+  python tools/bake_ui.py --check                                  # check Studiolo baked UI kit
   "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit   # GUT
   "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe   # Windows build
   ```

@@ -157,16 +157,28 @@ func _build_hint_row() -> HBoxContainer:
 	return row
 
 
+## The long name of your country in a scenario game ("Republic of Genoa"), the scenario while none is chosen,
+## else the sandbox line. M3 adds the date.
+func _subtitle_text() -> String:
+	var game := Session.game
+	if game == null:
+		return "Map sandbox"
+	if game.has_countries():
+		if game.player != &"":
+			var card := CountryCard.of(game, game.player)
+			if not card.is_empty():
+				return str(card["long_name"])
+		return game.scenario.name if game.scenario != null and not game.scenario.name.is_empty() else "Choosing a country"
+	return "Map sandbox · seed %d" % game.seed_value
+
+
 func _refresh_state() -> void:
 	var reduce := _reduce_motion()
 	for btn: KitButton in [_resume_btn, _save_btn, _load_btn, _options_btn, _help_btn, _main_menu_btn, _quit_btn]:
 		if btn != null:
 			btn.reduce_motion = reduce
 
-	if Session.game != null:
-		_subtitle_label.text = "Map sandbox · seed %d" % Session.game.seed_value
-	else:
-		_subtitle_label.text = "Map sandbox"
+	_subtitle_label.text = _subtitle_text()
 
 	var has_saves := Session.has_method(&"save_game")
 	_save_btn.visible = has_saves
