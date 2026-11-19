@@ -762,6 +762,13 @@ func _on_view_changed(_zoom_val: float, _visible_rect: Rect2) -> void:
 	_sync_country_labels()
 
 
+## The HUD's covering rects (Hud.cover_rects): country names keep clear of them.
+func set_screen_cover(rects: Array[Rect2]) -> void:
+	if _country_labels != null and _labels != null:
+		_country_labels.set_cover(rects)
+		_labels.set_obstacles(_country_labels.obstacles())
+
+
 func _sync_country_labels() -> void:
 	if _country_labels == null or _camera == null:
 		return

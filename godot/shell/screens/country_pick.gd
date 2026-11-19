@@ -35,6 +35,8 @@ func _exit_tree() -> void:
 
 func on_enter() -> void:
 	_ensure_ui()
+	if ctx != null:  # the key hints move right of the list
+		ctx.request(&"left_inset", {"px": float(Tokens.S4 + Tokens.PANEL_W)})
 	_shown_tag = &""
 	_dock_open = false
 	_hover_tag = &""
@@ -44,6 +46,8 @@ func on_enter() -> void:
 
 func on_exit() -> void:
 	_disconnect_chosen()
+	if ctx != null:
+		ctx.request(&"left_inset", {"px": 0.0})
 
 
 ## Esc (ScreenStack and the App): closes the dock's panel when one is open, otherwise asks for the pause menu.
@@ -164,6 +168,7 @@ func _ensure_ui() -> void:
 		return
 	_ui_built = true
 	_ribbon.text = TITLE
+	_ribbon.custom_minimum_size.x = _ribbon.single_line_width()  # one line: the default width wraps the title
 	_top.offset_top = float(Tokens.BAR_H + Tokens.S2)
 	_left.custom_minimum_size.x = float(Tokens.PANEL_W)
 	_left.offset_left = float(Tokens.S4)

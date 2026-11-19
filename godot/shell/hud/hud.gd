@@ -25,6 +25,11 @@ signal country_look_at_requested(hex: Vector2i)
 ## The minimap: a click glides the view to map_px, a drag jumps to it (map px).
 signal look_at_requested(map_px: Vector2)
 signal jump_requested(map_px: Vector2)
+## What the HUD covers on screen changed (the dock, the left inset, a resize, the HUD shown or hidden): cover_rects().
+signal cover_changed
+
+## The key hints' left offset in hud.tscn.
+const KEY_HINTS_LEFT := 12.0
 
 @onready var _root: Control = $Root
 @onready var _top_bar: TopBar = $Root/Column/TopBar
@@ -37,6 +42,7 @@ signal jump_requested(map_px: Vector2)
 @onready var _zoom_control: ZoomControl = $Root/Column/Main/MapArea/BottomRight/RightColumn/ZoomControl
 @onready var _toasts: ToastHost = $Root/Column/Main/MapArea/Toasts
 @onready var _map_hover: MapHover = $Root/Column/Main/MapArea/MapHover
+@onready var _bottom_right: Control = $Root/Column/Main/MapArea/BottomRight
 @onready var _dock: VBoxContainer = $Root/Column/Main/Dock
 @onready var _hex_panel: HexPanel = $Root/Column/Main/Dock/HexPanel
 @onready var _country_panel: CountryPanel = $Root/Column/Main/Dock/CountryPanel
@@ -46,9 +52,15 @@ var _settings: Settings = null
 var _bound_rig: CameraRig = null
 var _bound_map_input: MapInput = null
 var _reduce_motion: bool = false
+var _left_inset: float = 0.0
+var _cover_queued: bool = false
 
 
 func _ready() -> void:
+	for watched: Control in [_top_bar, _bottom_right, _dock]:
+		watched.resized.connect(_queue_cover)
+		watched.visibility_changed.connect(_queue_cover)
+	get_viewport().size_changed.connect(_queue_cover)
 	_layers_popover.anchor_button = _top_bar.layers_button()
 
 	_top_bar.season_preview_requested.connect(_on_season_preview_selected)
@@ -170,6 +182,29 @@ func close_dock() -> void:
 	_country_panel.clear()
 
 
+## Room a screen panel takes on the map's left (px): the key hints start right of it. 0 puts them back.
+func set_left_inset(px: float) -> void:
+	var width := _key_hints.offset_right - _key_hints.offset_left
+	_left_inset = maxf(px, 0.0)
+	_key_hints.offset_left = KEY_HINTS_LEFT + _left_inset
+	_key_hints.offset_right = _key_hints.offset_left + width
+	_queue_cover()
+
+
+## The screen rects (viewport px) the HUD covers over the map: the top bar, the open dock, the minimap corner and a
+## screen's left list (set_left_inset). Empty while the HUD is hidden.
+func cover_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	if not _root.visible:
+		return out
+	for c: Control in [_top_bar, _bottom_right, _dock]:
+		if c.is_visible_in_tree():
+			out.append(_screen_rect(c))
+	if _left_inset > 0.0:
+		out.append(Rect2(0.0, 0.0, _left_inset + Tokens.S2, get_viewport().get_visible_rect().size.y))
+	return out
+
+
 func set_mode(mode: int) -> void:
 	_top_bar.set_mode(mode)
 
@@ -181,6 +216,7 @@ func set_hud_visible(shown: bool) -> void:
 	if shown and not _reduce_motion:
 		_root.modulate.a = 1.0
 	hud_visibility_changed.emit(shown)
+	_queue_cover()
 
 
 func is_hud_visible() -> bool:
@@ -377,6 +413,24 @@ func _sync_dock_visibility() -> void:
 	var open := is_dock_open()
 	_dock.visible = open
 	_key_hints.set_context(open)
+
+
+static func _screen_rect(c: Control) -> Rect2:
+	var xf := c.get_global_transform_with_canvas()
+	return Rect2(xf.origin, c.size * xf.get_scale())
+
+
+## Containers settle a frame late: cover_changed goes out once, deferred.
+func _queue_cover() -> void:
+	if _cover_queued:
+		return
+	_cover_queued = true
+	_emit_cover.call_deferred()
+
+
+func _emit_cover() -> void:
+	_cover_queued = false
+	cover_changed.emit()
 
 
 func _apply_settings(settings: Settings) -> void:

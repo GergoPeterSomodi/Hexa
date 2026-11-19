@@ -11,6 +11,8 @@ const MAX_FONT_PX := 40
 const OUTLINE_PX := 4
 const TEXT_ALPHA := 0.9
 const TERRAIN_MAX_ZOOM := 0.9
+## Gap (px) kept between a name and the window's edge or a covering HUD element.
+const EDGE_GAP := 6.0
 
 ## Last country ids passed to CountryNames.places_of on owners_changed (for tests).
 var last_recomputed_ids := PackedInt32Array()
@@ -28,6 +30,8 @@ var _xform := Transform2D.IDENTITY
 var _zoom := 1.0
 var _vp_size := Vector2(1280.0, 720.0)
 var _dirty := true
+## Screen rects the HUD covers (top bar, dock, minimap, a screen's side list): names slide out of them or hide.
+var _cover: Array[Rect2] = []
 var _fallback_theme: Theme = null
 
 
@@ -136,6 +140,18 @@ func set_view(to_screen: Transform2D, zoom_val: float, vp_size: Vector2 = Vector
 	_relayout()
 
 
+## The HUD's covering rects in screen px (Hud.cover_rects). An empty list frees the whole window.
+func set_cover(rects: Array[Rect2]) -> void:
+	if rects == _cover and not _dirty:
+		return
+	_cover = rects.duplicate()
+	_relayout()
+
+
+func cover() -> Array[Rect2]:
+	return _cover
+
+
 ## Whether country names should be displayed at the given mode, zoom, and picking state.
 func should_show_at(mode: int, zoom_val: float, is_picking: bool) -> bool:
 	if _game == null or not _game.has_countries():
@@ -169,6 +185,8 @@ func _relayout() -> void:
 		queue_redraw()
 		return
 	var font := _resolve_font()
+	var screen := Rect2(Vector2.ZERO, _vp_size)
+	var free := screen.grow(-EDGE_GAP)
 	for entry: Dictionary in _entries:
 		var text := str(entry["text"])
 		var upper := text.to_upper()
@@ -182,8 +200,15 @@ func _relayout() -> void:
 		var box_h := maxf(text_size.y, ascent + descent)
 		var top_left := screen_at - Vector2(text_size.x * 0.5, box_h * 0.5)
 		var box := Rect2(top_left, Vector2(text_size.x, box_h))
+		if box.intersects(screen):  # off-screen names stay put (they are culled when drawn)
+			var max_shift := maxf(0.5 * float(entry["span_px"]) * _zoom, box_h)
+			box = fit_free(box, free, _cover, max_shift)
+			if not box.has_area():
+				continue
 		var shift := _resolve_overlap(box, _boxes)
 		box.position += shift
+		if shift != Vector2.ZERO and box.intersects(screen) and not _is_clear(box, free, _cover):
+			continue
 		_placed.append({
 			"id": entry["id"],
 			"tag": entry["tag"],
@@ -195,6 +220,52 @@ func _relayout() -> void:
 		_boxes.append(box)
 	visible = not _placed.is_empty()
 	queue_redraw()
+
+
+## Moves `box` the least distance that puts it inside `free` and clear of every `cover` rect (with EDGE_GAP), at most
+## `max_shift` px from where it was. Returns an empty Rect2 when no such place exists (the name hides).
+static func fit_free(box: Rect2, free: Rect2, cover: Array[Rect2], max_shift: float) -> Rect2:
+	if box.size.x > free.size.x or box.size.y > free.size.y:
+		return Rect2()
+	var clamped := _clamp_into(box, free)
+	var candidates: Array[Rect2] = [clamped]
+	for c: Rect2 in cover:
+		var pad := c.grow(EDGE_GAP)
+		if not pad.intersects(clamped):
+			continue
+		var p := clamped.position
+		var s := clamped.size
+		candidates.append(_clamp_into(Rect2(Vector2(pad.position.x - s.x, p.y), s), free))
+		candidates.append(_clamp_into(Rect2(Vector2(pad.end.x, p.y), s), free))
+		candidates.append(_clamp_into(Rect2(Vector2(p.x, pad.position.y - s.y), s), free))
+		candidates.append(_clamp_into(Rect2(Vector2(p.x, pad.end.y), s), free))
+	var best := Rect2()
+	var best_d := INF
+	for cand: Rect2 in candidates:
+		if not _is_clear(cand, free, cover):
+			continue
+		var d := cand.position.distance_to(box.position)
+		if d < best_d:
+			best_d = d
+			best = cand
+	if best_d > max_shift:
+		return Rect2()
+	return best
+
+
+static func _clamp_into(box: Rect2, free: Rect2) -> Rect2:
+	var x := clampf(box.position.x, free.position.x, free.end.x - box.size.x)
+	var y := clampf(box.position.y, free.position.y, free.end.y - box.size.y)
+	return Rect2(Vector2(x, y), box.size)
+
+
+static func _is_clear(box: Rect2, free: Rect2, cover: Array[Rect2]) -> bool:
+	if not free.encloses(box):
+		return false
+	for c: Rect2 in cover:
+		if c.grow(EDGE_GAP).intersects(box):
+			return false
+	return true
 
 
 static func _resolve_overlap(box: Rect2, taken: Array[Rect2]) -> Vector2:

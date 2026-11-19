@@ -29,9 +29,15 @@ mouse_filter = 2
 layout_mode = 2
 script = ExtResource("3_ribbon")
 
-[node name="Hint" type="Label" parent="Top"]
+[node name="HintBack" type="PanelContainer" parent="Top"]
 layout_mode = 2
-theme_type_variation = &"Hint"
+size_flags_horizontal = 4
+theme_type_variation = &"PanelToast"
+mouse_filter = 2
+
+[node name="Hint" type="Label" parent="Top/HintBack"]
+layout_mode = 2
+theme_type_variation = &"Body"
 horizontal_alignment = 1
 text = "Click a country's land, or pick it from the list"
 

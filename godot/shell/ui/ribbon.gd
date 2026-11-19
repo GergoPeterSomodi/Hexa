@@ -37,20 +37,27 @@ func label() -> Label:
 	return _label
 
 
+## The width that shows the title on one line, padding included (MIN_WIDTH at least; needs the theme, so call it
+## once the ribbon is in the tree).
+func single_line_width() -> float:
+	if _label == null or _label.text.is_empty():
+		return MIN_WIDTH
+	var font := _label.get_theme_font(&"font")
+	var font_size := _label.get_theme_font_size(&"font_size")
+	if font == null or font_size <= 0:
+		return MIN_WIDTH
+	var sb := get_theme_stylebox(&"panel")
+	var pad_x := 80.0
+	if sb != null:
+		pad_x = maxf(72.0, sb.content_margin_left + sb.content_margin_right + 12.0)
+	var text_w := font.get_string_size(_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	return maxf(MIN_WIDTH, text_w + pad_x)
+
+
 ## Computes and applies centered overhanging offsets so the ribbon expands to fit 1 line when possible.
 func fit_overhang(max_w: float = 520.0, top_y: float = -22.0, center_x_offset: float = 0.0) -> void:
 	var upper_bound := maxf(MIN_WIDTH, max_w)
-	var single_w := MIN_WIDTH
-	if _label != null and not _label.text.is_empty():
-		var font := _label.get_theme_font(&"font")
-		var font_size := _label.get_theme_font_size(&"font_size")
-		if font != null and font_size > 0:
-			var sb := get_theme_stylebox(&"panel")
-			var pad_x := 80.0
-			if sb != null:
-				pad_x = maxf(72.0, sb.content_margin_left + sb.content_margin_right + 12.0)
-			var text_w := font.get_string_size(_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-			single_w = text_w + pad_x
+	var single_w := single_line_width()
 	var target_w := clampf(single_w, MIN_WIDTH, upper_bound)
 	var needs_two_lines := single_w > target_w + 1.0
 	var target_h := 56.0 if needs_two_lines else 40.0

@@ -113,3 +113,45 @@ func _find_placed(items: Array[Dictionary], place_name: String) -> Dictionary:
 		if str(item["name"]) == place_name:
 			return item
 	return {}
+
+
+func test_fit_free_slides_a_name_out_of_the_hud_or_hides_it() -> void:
+	var free := Rect2(6.0, 6.0, 1268.0, 708.0)
+	var top_bar := Rect2(0.0, 0.0, 1280.0, 44.0)
+	var minimap := Rect2(1040.0, 520.0, 240.0, 200.0)
+	var cover: Array[Rect2] = [top_bar, minimap]
+	# Under the top bar: pushed straight down below it.
+	var under_bar := CountryLabels.fit_free(Rect2(500.0, 20.0, 120.0, 30.0), free, cover, 100.0)
+	assert_true(under_bar.has_area())
+	assert_eq(under_bar.position.x, 500.0)
+	assert_eq(under_bar.position.y, 44.0 + CountryLabels.EDGE_GAP)
+	# Into the minimap: moved up over it (76 px, shorter than 116 px to its left).
+	var by_map := CountryLabels.fit_free(Rect2(1010.0, 560.0, 140.0, 30.0), free, cover, 200.0)
+	assert_true(by_map.has_area())
+	assert_false(minimap.grow(CountryLabels.EDGE_GAP).intersects(by_map))
+	assert_eq(by_map.position, Vector2(1010.0, 520.0 - CountryLabels.EDGE_GAP - 30.0))
+	# Past the window's right edge: clamped inside.
+	var at_edge := CountryLabels.fit_free(Rect2(1200.0, 300.0, 140.0, 30.0), free, cover, 100.0)
+	assert_eq(at_edge.end.x, free.end.x)
+	# Too far from its country: hidden.
+	assert_false(CountryLabels.fit_free(Rect2(1010.0, 560.0, 140.0, 30.0), free, cover, 10.0).has_area())
+	# Already clear: unchanged.
+	var clear := Rect2(400.0, 300.0, 120.0, 30.0)
+	assert_eq(CountryLabels.fit_free(clear, free, cover, 50.0), clear)
+
+
+func test_names_keep_clear_of_the_cover() -> void:
+	var labels := CountryLabels.new()
+	add_child_autofree(labels)
+	labels.setup(_scenario_game())
+	labels.set_mode(MapModes.Mode.OWNER)
+	labels.set_view(Transform2D.IDENTITY, 0.45, Vector2(1280.0, 720.0))
+	var cover: Array[Rect2] = [Rect2(0.0, 0.0, 1280.0, 44.0), Rect2(0.0, 0.0, 320.0, 720.0)]
+	labels.set_cover(cover)
+	var screen := Rect2(0.0, 0.0, 1280.0, 720.0)
+	for item: Dictionary in labels.placed():
+		var box := item["box"] as Rect2
+		if not box.intersects(screen):
+			continue
+		for c: Rect2 in cover:
+			assert_false(c.intersects(box), "%s clear of %s" % [item["text"], c])

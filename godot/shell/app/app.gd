@@ -258,6 +258,7 @@ func _connect_signals() -> void:
 	_link(_hud, &"far_zoom_changed", _routes.on_hud_far_zoom)
 	_link(_hud, &"slice_ms_changed", _routes.on_hud_slice_ms)
 	_link(_hud, &"hud_visibility_changed", _sync_camera_free_rect.unbind(1))
+	_link(_hud, &"cover_changed", _sync_screen_cover)
 	_link(_hud, &"mode_requested", _routes.on_hud_mode_requested)
 	_link(_hud, &"country_requested", _routes.show_country)
 	_link(_hud, &"country_play_requested", _routes.on_hud_country_play)
@@ -363,6 +364,7 @@ func _start_session(map_id_val: String, seed_val: int, scenario_id: String = "",
 		_hud.set_hud_visible(true)
 		_hud.bind_map_scene(_map_scene)
 	_sync_camera_free_rect()
+	_sync_screen_cover()
 	if _map_scene != null:
 		_map_scene.fit()
 	_on_stack_changed()
@@ -437,6 +439,9 @@ func _on_app_requested(what: StringName, args: Dictionary) -> void:
 		&"close_dock":
 			if _hud != null:
 				_hud.close_dock()
+		&"left_inset":
+			if _hud != null:
+				_hud.set_left_inset(float(args.get("px", 0.0)))
 		&"pause":
 			_open_pause_menu()
 		&"main_menu", &"end_game":
@@ -731,6 +736,12 @@ func _sync_camera_free_rect() -> void:
 		return
 	var top_h := float(Tokens.BAR_H) if (_hud != null and _hud.is_hud_visible()) else 0.0
 	rig.set_free_rect(Rect2(0.0, top_h, vp_size.x, maxf(1.0, vp_size.y - top_h)))
+
+
+## Country names keep clear of what the HUD covers.
+func _sync_screen_cover() -> void:
+	if _map_scene != null and is_instance_valid(_map_scene) and _hud != null:
+		_map_scene.set_screen_cover(_hud.cover_rects())
 
 
 func _on_focus_out() -> void:
