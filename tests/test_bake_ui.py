@@ -9,7 +9,14 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-import numpy as np
+import os
+
+try:
+    import numpy as np
+except ImportError:                     # the frozen game's unit suite runs without the bake tools: skip the module
+    if os.environ.get("HEXA_REQUIRE_BAKE") == "1":   # the Godot workflow installs tools/requirements-bake.txt and sets it
+        raise
+    raise unittest.SkipTest("numpy is not installed (pip install -r tools/requirements-bake.txt; HEXA_REQUIRE_BAKE=1 makes this an error)") from None
 
 from tools import bake_ui
 from tools.ui_bake.checks import (

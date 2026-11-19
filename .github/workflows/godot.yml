@@ -136,7 +136,7 @@ jobs:
       - name: UI bake check and unit tests (bake_ui --check)
         run: |
           python tools/bake_ui.py --check
-          python -m unittest tests/test_bake_ui.py
+          HEXA_REQUIRE_BAKE=1 python -m unittest tests/test_bake_ui.py
       - name: Load every script (parse errors and warnings)
         run: |
           set -uo pipefail
