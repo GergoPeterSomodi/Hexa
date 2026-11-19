@@ -347,6 +347,8 @@ navigation. Modifier chords use `command_or_control_autoremap`, so "Ctrl" is Cmd
 | `game_next_unit` / `game_continue_march` | Tab / R | | Game | 6 |
 | `map_cursor_*` (move the selected hex; with an army selected, the order cursor) | Alt+arrows | Option+arrows | Map | 6 |
 | `map_command_key` (a right click at the cursor: the order, or the hex menu; `m6-build-spec.md` 6.1) | O, Shift+F10 | | Map | 6 |
+| `map_command_storm` (storm with the selected army at the cursor; Shift+right click storms at the pointer, read by `MapInput` from the click; `m7-build-spec.md` 6.1) | Shift+O | | Map | 7 |
+| `game_battle` (the battle dock on your newest battle) | B | | Game | 7 |
 | `game_tech` | T | | Game | 11 |
 
 Mac notes: Cmd+Q and the red button arrive as a close request (section 5.3); Ctrl+arrows are taken by macOS (Spaces),

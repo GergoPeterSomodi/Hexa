@@ -224,8 +224,10 @@ the next layer.
 | 50 | lines | one mesh node per chunk of 32 x 32 cells | | section 6 |
 | 60 | shadow group (`CanvasGroup`, alpha 0.18): `piece_shadow`, `addon_shadow` | plain, drawn solid | `.../shadow` | so overlapping shadows are no darker than one |
 | 70 | standing group (`y_sort_enabled`): `relief`, `trees0` ... `trees5`, `piece_back`, `piece_front`, `addon` (each `y_sort_enabled`); the army tokens sit above the overlay at z 88 (`m6-build-spec.md` 6.3) | y-sorted | | depth = cell y + tile `y_sort` |
-| 80 | the mode overlay (M2: `ModeOverlay`, one shader quad, not a `TileMapLayer`; `m2-build-spec.md` 6.2), fog later in the same node | shader | | owner, height |
+| 80 | the mode overlay (M2: `ModeOverlay`, one shader quad, not a `TileMapLayer`; `m2-build-spec.md` 6.2), fog later in the same node; M7's occupied stripes and castle-area tint in the same node | shader | | owner, height |
+| 82 | castle-area lines (M7): one dashed mesh node per chunk, shown with a war army selected (`m7-build-spec.md` 6.3) | | | areas |
 | 85 | borders (M2): one mesh node per chunk of 32 x 32 cells (`m2-build-spec.md` 6.3) | | | owner |
+| 89 | battle sites and siege dials (M7: `WarMarks`, `m7-build-spec.md` 6.3) | | | battle records, sieges |
 | 90 | `marks` | plain | `mark/select`, `mark/target` | selection, build targets |
 | 100 | names | `Label`s for what is on screen | | places |
 

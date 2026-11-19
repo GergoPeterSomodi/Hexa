@@ -240,7 +240,8 @@ On the day M5 closes:
   phase's step into a hostile army (an attack; the `battles` phase after `movement`), `Military.stack_limit` (generals; per
   side on a battle hex), the battle hex rule (`Army.battle`, `army/2`), `Unit` morale and experience (`unit/2`), `UnitDef`'s
   combat numbers, castles as depots and garrisons, supply over controlled land, `unit_lost.why` `battle`, battle losses in
-  `Stats.losses` and the Military page, the War filter for the army kinds.
+  `Stats.losses` and the Military page, the War filter for the army kinds. Taken up in `m7-build-spec.md` and
+  `m7-build-plan.md` (battles never outlive their phase: `army/2` is the standing order; generals move to M11).
 - **M8:** the seven army actions with their checks; `Knowledge.armies_seen`, `Knowledge.sees`, `ArmyView`, `MovePreview`,
   `Movement.plan`, `PathSearch.cost_field`, `Supply.field`, `SupplyView`, `Military.raise_options` and the reminders
   `army_idle`, `army_hungry`, `army_stores` as its views; `route_ms` and `cost_field_ms` as its budget rows; the scenario's

@@ -87,6 +87,8 @@ The battle system (v0.2.0) leaves war score out of the battle code on purpose. T
 
 If this design were built before the battle system, the stand-in is today's `battle` event: 1 point per enemy unit lost. Do not ship that; build after v0.2.0.
 
+(2026-11-17) The Godot `battle_ended` keeps these fields: `docs/architecture/m7-build-spec.md` 4.14 and 5.5 (M9 reads it unchanged).
+
 ### 3.5 Battles and the capital
 
 - Holding the enemy capital gives its worth (a capital hex 40 plus its own level).

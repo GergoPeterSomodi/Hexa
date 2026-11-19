@@ -829,7 +829,8 @@ static func free_slot(game: Game, tag: StringName) -> Dictionary
 # core/views/season_summary.gd  (new): style spec 6.4 with M3's content (4.9)
 class_name SeasonSummary extends RefCounted
 const SECTIONS: Array[StringName] = [&"glance", &"before", &"treasury", &"goods", &"works", &"people", &"orders",
-	&"befell", &"standing"]   # M6 inserts &"armies" after &"people" (m6-build-spec.md 4.14)
+	&"befell", &"standing"]   # M6 inserts &"armies" after &"people" (m6-build-spec.md 4.14); M7 &"war" after &"armies"
+	# (m7-build-spec.md 4.17)
 const COVERED: Array[String] = ["work_finished", "work_cancelled", "owners_changed"]   # toasts dropped while a season runs
 const SHOWN := 6
 static func of(game: Game, tag: StringName, turn: int) -> Dictionary
@@ -1340,7 +1341,7 @@ changes: no new autoload, no new layer.
 | M4.5 | the chronicle for History; `Stats` rings and years for charts and Rankings; `Knowledge.band` and `known`; older log headers open History | Insights |
 | M5 | `people`, `food_made`, `food_eaten` series; `town_grew`, `district_declined` into `Chronicle.NOTABLE`; the People section; all taken up in `m5-build-spec.md` (which appends five series) | People |
 | M6 | `witnesses` on events from vision; `knows` by explored hexes; the flow's `REPLAY` state; `ready_units`, `vision` rows; the winter rule's passes; all taken up in `m6-build-spec.md` (which adds the `armies` section and the `movement`, `supply` rows) | Armies |
-| M7 | the flow's `DECISIONS` state; war kinds into the chronicle, the log's War filter, notifications for battles; `owners_changed` by capture cancels works `lost` | War |
+| M7 | the flow's `DECISIONS` state; war kinds into the chronicle, the log's War filter, notifications for battles; `owners_changed` by capture cancels works `lost`; taken up in `m7-build-spec.md` (a capture changes the occupier, not the owner: a work on occupied or besieged land waits, and is cancelled `lost` only when a peace moves the owner) | War |
 | M8 | AI actions through `Game.act` (logged); `ai_orders` row; `Luck.ai`; the action log's size (D22); `Knowledge` as the AI's only door | The AI |
 | M12 | "the game is over" in `Season.end_check`; `OLDEST_FORMAT` frozen and CI loads saves kept from each release; `seal_cracked`; score rows | The whole game |
 | **E2** | **Nothing blocking: the save names the map by id and digest and stores none of it, and the season, works, stats and saves scale with countries and works, not hexes, so the Europe map file is built without touching M3's code.** | |

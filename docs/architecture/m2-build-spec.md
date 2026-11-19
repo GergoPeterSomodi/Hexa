@@ -1121,7 +1121,7 @@ Made by the tasks (listed in the plan): `godot/README.md` (layout, keys, the edi
 | M4 | `Country` for the treasury; the home rule for works and `cancel_work`; `Territory.districts` for the economy's sums; the country panel's treasury section | Money, taxes, the chips |
 | M4.5 | The overlay for the Yields mode (a yields texture and its ramp), `view_mode_4`, the top bar's switch, `state/map_mode` (`m4-5-build-spec.md` 6.7) | Yields |
 | M6 | Owner for supply and movement; the overlay for the Supply mode (one more texture) and fog (another); `view_mode_6` (key 4 is Yields from M4.5, key 5 M5's mode) | Armies |
-| M7 | `Territory.transfer` for capture; a `controller` byte beside `owner`; the CB **pattern on occupied land** in the overlay; Declare war in the country panel | Occupation and its pattern |
+| M7 | `Territory.transfer` for capture; a `controller` byte beside `owner`; the CB **pattern on occupied land** in the overlay; Declare war in the country panel; taken up in `m7-build-spec.md` (an `occupier` byte, 0 when the owner holds the land; a capture changes the occupier and `transfer` runs only at a peace; occupied land striped in both palettes) | Occupation and its pattern |
 | M8 | Actions with `tag`; `Countries.playable` and outside powers as AI countries | The AI |
 | M9 | `transfer` for peace terms; relations and war goals in the country panel; a Relations mode | Diplomacy |
 | M12 | `Country.alive` and "is no more"; CB colours for countries that appear in play (the least-used colour among its neighbours) | Countries that fall or rise |

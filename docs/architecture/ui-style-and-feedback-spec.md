@@ -344,7 +344,8 @@ line = {text: String, detail: String, amount: int, unit: StringName, tone: Strin
 ```
 
 - Section ids, fixed order: `glance`, `before`, `treasury`, `goods`, `works`, `people`, `armies` (M6,
-  `m6-build-spec.md` 4.14), `orders`, `befell`, `standing`; one whose system does not exist is absent.
+  `m6-build-spec.md` 4.14), `war` (M7, `m7-build-spec.md` 4.17), `orders`, `befell`, `standing`; one whose system does not
+  exist is absent.
 - `rank`: size in ducats at the season's prices (men for armies). Lines sort by it; six show, `more` counts the rest;
   the report's three largest have `top`.
 - `before`: up to five notices of `Reminders.unfinished(game, tag)` (`core/views/reminders.gd`; in M3 two rules: a
@@ -523,6 +524,10 @@ helps Milan's district at (9, 11)") outside the totals.
 >
 > **M6's build spec** (`m6-build-spec.md` 6.9, 6.6, 4.14) specifies the Military page (one page, no tabs, between Economy
 > and People), men under arms in Rankings and Standing, the report's Armies section and the Supply mode on key 6.
+>
+> **M7's build spec** (`m7-build-spec.md` 6.9, 4.17, 6.6) adds to the Military page its Wars and Battles tables and the
+> Battle losses (the Diplomacy page of M9 takes the Wars table over), the report's War section and the war alert in
+> `DECISIONS`.
 
 ## 9. Input actions and options
 
