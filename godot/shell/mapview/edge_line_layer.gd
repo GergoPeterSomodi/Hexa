@@ -21,7 +21,7 @@ const SOFT := 0.5  # px added either side for the soft rim of the stroke texture
 
 static var _rim: Texture2D = null
 
-var _lines: Array[Dictionary] = []
+var _line_count := 0  # the lines themselves are not kept: the mesh is what is drawn (a border chunk is hundreds of them)
 var _mesh: ArrayMesh = null
 var _vertices := PackedVector2Array()
 var _colours := PackedColorArray()
@@ -30,13 +30,13 @@ var _indices := PackedInt32Array()
 
 
 func set_lines(lines: Array[Dictionary]) -> void:
-	_lines = lines
-	_build()
+	_line_count = lines.size()
+	_build(lines)
 	queue_redraw()
 
 
 func line_count() -> int:
-	return _lines.size()
+	return _line_count
 
 
 ## The mesh is one surface (or none when there is nothing to draw).
@@ -73,20 +73,25 @@ static func _rim_texture() -> Texture2D:
 	return _rim
 
 
-func _build() -> void:
+func _build(lines: Array[Dictionary]) -> void:
 	_vertices.clear()
 	_colours.clear()
 	_uvs.clear()
 	_indices.clear()
 	# Tracks, then water, then roads (a road crosses a river on its bridge or ford). Within a kind all dark edges
 	# come before all fills, so two lines that meet run into each other. Triangles are drawn in this order.
-	_pass("track", 0.0, TRACK)
+	var by_kind: Dictionary[String, Array] = {}  # kind -> its lines, in order (one look at each line)
+	for line: Dictionary in lines:
+		var kind := str(line.get("kind", ""))
+		if by_kind.has(kind):
+			by_kind[kind].append(line)
+		else:
+			by_kind[kind] = [line]
+	_pass(by_kind.get("track", []), 0.0, TRACK)
 	for kind: String in ["stream", "river", "road"]:
-		_pass(kind, EDGE, ROAD_EDGE if kind == "road" else RIVER_EDGE)
-		_pass(kind, 0.0, ROAD if kind == "road" else RIVER)
-	for line: Dictionary in _lines:  # the light on a river's lit bank: short dashes
-		if str(line.get("kind", "")) != "river":
-			continue
+		_pass(by_kind.get(kind, []), EDGE, ROAD_EDGE if kind == "road" else RIVER_EDGE)
+		_pass(by_kind.get(kind, []), 0.0, ROAD if kind == "road" else RIVER)
+	for line: Dictionary in by_kind.get("river", []):  # the light on a river's lit bank: short dashes
 		var width := float(line["width"])
 		if width <= 3.0:
 			continue
@@ -95,14 +100,12 @@ func _build() -> void:
 		for i: int in range(0, points.size() - 1, 3):
 			_stroke(PackedVector2Array([points[i] + shift, points[i].lerp(points[i + 1], 0.45) + shift]),
 				maxf(1.0, width * 0.3), RIVER_LIGHT)
-	for line: Dictionary in _lines:
-		if str(line.get("kind", "")) == "border_band":
-			_polygon(line["polygon"] as PackedVector2Array, line["colours"] as PackedColorArray)
-	for line: Dictionary in _lines:
-		if str(line.get("kind", "")) == "border":
-			var width := float(line.get("width", BorderLines.INK_WIDTH))
-			var colour: Color = line["colour"] if line.has("colour") else BorderLines.INK
-			_stroke(line["points"] as PackedVector2Array, width, colour, line.get("before"), line.get("after"))
+	for line: Dictionary in by_kind.get("border_band", []):
+		_polygon(line["polygon"] as PackedVector2Array, line["colours"] as PackedColorArray)
+	for line: Dictionary in by_kind.get("border", []):
+		var width := float(line.get("width", BorderLines.INK_WIDTH))
+		var colour: Color = line["colour"] if line.has("colour") else BorderLines.INK
+		_stroke(line["points"] as PackedVector2Array, width, colour, line.get("before"), line.get("after"))
 	_mesh = null
 	if _indices.is_empty():
 		return
@@ -114,12 +117,12 @@ func _build() -> void:
 	arrays[Mesh.ARRAY_INDEX] = _indices
 	_mesh = ArrayMesh.new()
 	_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_uvs = PackedVector2Array()  # only the mesh needs them
 
 
-func _pass(kind: String, wider: float, colour: Color) -> void:
-	for line: Dictionary in _lines:
-		if str(line.get("kind", "")) == kind:
-			_stroke(line["points"], float(line["width"]) + wider, colour, line.get("before"), line.get("after"))
+func _pass(lines: Array, wider: float, colour: Color) -> void:
+	for line: Dictionary in lines:
+		_stroke(line["points"], float(line["width"]) + wider, colour, line.get("before"), line.get("after"))
 
 
 ## One filled convex polygon with per-vertex colours (border_band), sampling the solid middle of _rim_texture().

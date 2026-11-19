@@ -13,6 +13,7 @@ const HOT_ALPHA := 0.20
 const HOT_LIGHTEN := 0.15
 const PALETTE_SIZE := 256
 const HEIGHT_STEP_M := 16
+const HEIGHT_STEP_SHIFT := 4  # HEIGHT_STEP_M is 1 << 4
 const RELIEF_STOPS: Array[Array] = [
 	[0, Color("#4f8a4a")],
 	[150, Color("#79a557")],
@@ -59,9 +60,12 @@ static func height_bytes(map: MapData) -> PackedByteArray:
 		return PackedByteArray()
 	var n := map.hex_count()
 	var out := PackedByteArray()
-	out.resize(n)
-	for i: int in n:
-		out[i] = _height_byte_at(map, i)
+	out.resize(n)  # zero: sea
+	var land := map.land
+	var heights := map.height_m
+	for i: int in n:  # (a shift floors a negative height as floori does)
+		if land[i] != 0:
+			out[i] = 1 + clampi(heights[i] >> HEIGHT_STEP_SHIFT, 0, 254)
 	return out
 
 

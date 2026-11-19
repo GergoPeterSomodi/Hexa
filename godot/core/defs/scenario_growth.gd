@@ -127,33 +127,53 @@ static func regions(map: MapData, owner: PackedByteArray, id: int) -> Array[Pack
 	var n := map.hex_count()
 	var cols := map.cols
 	var rows := map.rows
-	var grid := map.grid()
+	var land := map.land
 	var visited := PackedByteArray()
 	visited.resize(n)
-	for start: int in n:
-		if visited[start] != 0 or map.land[start] == 0 or int(owner[start]) != id:
+	# The six neighbours as index steps, for the hexes with all six on the map (HexGrid's even and odd rows), and
+	# as column and row steps for the hexes on the rim.
+	var step_even := PackedInt32Array([1, -cols, -cols - 1, -1, cols - 1, cols])
+	var step_odd := PackedInt32Array([1, 1 - cols, -cols, -1, cols, cols + 1])
+	var dx_even := [1, 0, -1, -1, -1, 0]
+	var dx_odd := [1, 1, 0, -1, 0, 1]
+	var dy := [0, -1, -1, 0, 1, 1]
+	var start := owner.find(id, 0)  # the engine's own search: the hexes of other countries are never looked at
+	while start >= 0:
+		if visited[start] != 0 or land[start] == 0:
+			start = owner.find(id, start + 1)
 			continue
-		var comp := PackedInt32Array()
-		var queue: Array[int] = [start]
+		var comp := PackedInt32Array()  # also the queue: a hex is appended when seen, read at `head`
+		comp.append(start)
 		visited[start] = 1
 		var head := 0
-		while head < queue.size():
-			var cur := queue[head]
+		while head < comp.size():
+			var cur := comp[head]
 			head += 1
-			comp.append(cur)
-			var row := floori(float(cur) / float(cols))
-			var hex := Vector2i(cur - row * cols, row)
+			@warning_ignore("integer_division")
+			var row := cur / cols
+			var col := cur - row * cols
+			if col > 0 and col < cols - 1 and row > 0 and row < rows - 1:
+				for step: int in (step_odd if (row & 1) == 1 else step_even):
+					var nb_idx := cur + step
+					if owner[nb_idx] != id or visited[nb_idx] != 0 or land[nb_idx] == 0:
+						continue
+					visited[nb_idx] = 1
+					comp.append(nb_idx)
+				continue
+			var dx: Array = dx_odd if (row & 1) == 1 else dx_even
 			for d: int in 6:
-				var nb := grid.neighbour(hex, d)
-				if nb.x < 0 or nb.y < 0 or nb.x >= cols or nb.y >= rows:
+				var nx: int = col + dx[d]
+				var ny: int = row + dy[d]
+				if nx < 0 or ny < 0 or nx >= cols or ny >= rows:
 					continue
-				var nb_idx := nb.y * cols + nb.x
-				if visited[nb_idx] != 0 or map.land[nb_idx] == 0 or int(owner[nb_idx]) != id:
+				var nb_idx := ny * cols + nx
+				if visited[nb_idx] != 0 or land[nb_idx] == 0 or owner[nb_idx] != id:
 					continue
 				visited[nb_idx] = 1
-				queue.append(nb_idx)
+				comp.append(nb_idx)
 		comp.sort()
 		out.append(comp)
+		start = owner.find(id, start + 1)
 	return out
 
 

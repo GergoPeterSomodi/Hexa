@@ -88,6 +88,10 @@ func _initialize() -> void:
 		DisplayServer.window_set_size(FRAME)
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		Engine.max_fps = 0
+	# The game sleeps up to 7 ms a frame when nothing changes (run/low_processor_mode): that wait is not work, and the
+	# rows that run "to the next frame" would measure it.
+	OS.low_processor_usage_mode = false
+	OS.low_processor_usage_mode_sleep_usec = 0
 	_run()
 
 

@@ -43,22 +43,46 @@ static func for_chunk(map: MapData, owner: PackedByteArray, chunk: Vector2i, pal
 	if x0 >= x1 or y0 >= y1:
 		return []
 	var out: Array[Dictionary] = []
+	var cols := map.cols
+	var rows := map.rows
+	var land := map.land
+	var cell_w := float(MapTiles.CELL.x)
+	var half_h := float(MapTiles.CELL.y) / 2.0
 	for row: int in range(y0, y1):
+		var odd := (row & 1) == 1
+		# The three owned edges (E, NE, NW) as column and row steps, the same as HexGrid's odd and even rows.
+		var ne_dx := 1 if odd else 0
+		var nw_dx := 0 if odd else -1
+		var cy_a := half_h + MapTiles.ROW * float(row)
+		var shift := 0.5 + (0.5 if odd else 0.0)  # MapTiles.cell_centre, inlined
+		var base := row * cols
 		for col: int in range(x0, x1):
-			var hex := Vector2i(col, row)
-			var idx := row * map.cols + col
-			if map.land[idx] == 0:
+			var idx := base + col
+			if land[idx] == 0:
 				continue
 			var own_a := int(owner[idx])
-			var centre_a := MapTiles.cell_centre(hex)
+			var centre_a := Vector2.ZERO
+			var have_a := false
 			for d: int in MapData.OWNED_EDGES:
-				var other := map.neighbour(hex, d)
-				var other_idx := map.index_of(other)
-				if other_idx < 0 or map.land[other_idx] == 0:
+				var ox := col + 1
+				var oy := row
+				if d == 1:
+					ox = col + ne_dx
+					oy = row - 1
+				elif d == 2:
+					ox = col + nw_dx
+					oy = row - 1
+				if ox < 0 or oy < 0 or ox >= cols or oy >= rows:
+					continue
+				var other_idx := oy * cols + ox
+				if land[other_idx] == 0:
 					continue
 				var own_b := int(owner[other_idx])
 				if own_a == own_b:
 					continue
+				if not have_a:
+					centre_a = Vector2(cell_w * (float(col) + shift), cy_a)
+					have_a = true
 				var pair := HexGrid.EDGE_CORNERS[d]
 				var p0 := centre_a + HEX_CORNERS[pair.x]
 				var p1 := centre_a + HEX_CORNERS[pair.y]
@@ -71,7 +95,8 @@ static func for_chunk(map: MapData, owner: PackedByteArray, chunk: Vector2i, pal
 				if own_a > 0 and own_a < palette.size():
 					out.append(_band(p0, p1, centre_a, palette[own_a]))
 				if own_b > 0 and own_b < palette.size():
-					out.append(_band(p1, p0, MapTiles.cell_centre(other), palette[own_b]))
+					var centre_b := Vector2(cell_w * (float(ox) + 0.5 + 0.5 * float(oy & 1)), half_h + MapTiles.ROW * float(oy))
+					out.append(_band(p1, p0, centre_b, palette[own_b]))
 	return out
 
 

@@ -1024,6 +1024,15 @@ Never asserted in GUT. The nightly perf job fails past a CPU or memory limit; th
 `--gpu-limits` on real hardware, which the owner runs once on Windows and once on the Mac before M2 closes. The UI probe
 (`tools/ui/perf_ui.gd`, M1.5) adds the minimap and the pick screen to its HUD frame row.
 
+How the limits are met (first dry run on the made-up Europe, then after the speed pass): `overlay_setup_ms` 32 to 6 (the
+height bytes are one loop on the arrays, with a shift); `owner_change_frame_ms` 42 to 8 and `owner_change_200_ms` 130 to 27
+(a border chunk is built from index steps, not `HexGrid` calls, and `EdgeLineLayer` sorts its lines by kind once); 
+`country_names_ms` 109 to 11 (`ScenarioGrowth.regions` finds the hexes of the country with the engine's own search and steps
+by index; `region_label_hex` works on a grid of the region's box); `owner_mem_mb` 20 to 5 (`EdgeLineLayer` keeps the mesh
+arrays, not the line dictionaries it was built from). `mode_switch_ms` was never the switch (0.05 ms): the harness waited
+out the engine's low-processor sleep of up to 7 ms between frames, and `perf_map.gd` now turns that sleep off. No limit was
+changed.
+
 North Italy for scale: 399 hexes, one border chunk, a few hundred border segments; nothing there is measurable.
 
 ---

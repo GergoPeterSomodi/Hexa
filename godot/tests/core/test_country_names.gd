@@ -113,3 +113,73 @@ func test_committed_1480_regions_and_places_of_subset() -> void:
 		if eid == fra_id or eid == mlo_id:
 			expected.append(entry)
 	assert_eq(subset, expected, "places_of equals the matching part of places in id then region order")
+
+
+## The plain way, one hex at a time through HexGrid: what the fast regions and label search must give.
+func _reference_regions(map: MapData, owner: PackedByteArray, id: int) -> Array[PackedInt32Array]:
+	var grid := map.grid()
+	var seen: Dictionary[int, bool] = {}
+	var out: Array[PackedInt32Array] = []
+	for start: int in map.hex_count():
+		if seen.has(start) or map.land[start] == 0 or int(owner[start]) != id:
+			continue
+		var comp := PackedInt32Array()
+		var queue: Array[int] = [start]
+		seen[start] = true
+		while not queue.is_empty():
+			var cur: int = queue.pop_front()
+			comp.append(cur)
+			for d: int in 6:
+				var nb := map.index_of(grid.neighbour(map.hex_of(cur), d))
+				if nb >= 0 and not seen.has(nb) and map.land[nb] != 0 and int(owner[nb]) == id:
+					seen[nb] = true
+					queue.append(nb)
+		comp.sort()
+		out.append(comp)
+	return out
+
+
+func _reference_label_hex(map: MapData, region: PackedInt32Array) -> Vector2i:
+	var grid := map.grid()
+	var dist: Dictionary[int, int] = {}
+	for idx: int in region:
+		dist[idx] = -1
+	var queue: Array[int] = []
+	for idx: int in region:
+		for d: int in 6:
+			if not dist.has(map.index_of(grid.neighbour(map.hex_of(idx), d))):
+				dist[idx] = 0
+				queue.append(idx)
+				break
+	while not queue.is_empty():
+		var cur: int = queue.pop_front()
+		for d: int in 6:
+			var nb := map.index_of(grid.neighbour(map.hex_of(cur), d))
+			if nb >= 0 and dist.get(nb, 0) == -1:
+				dist[nb] = dist[cur] + 1
+				queue.append(nb)
+	var best := region[0]
+	for idx: int in region:
+		if dist[idx] > dist[best]:
+			best = idx
+	return map.hex_of(best)
+
+
+func test_regions_and_label_hex_match_the_plain_search_on_a_scrambled_map() -> void:
+	var map := MapData.new()
+	map.allocate(13, 12)
+	var owner := PackedByteArray()
+	owner.resize(map.hex_count())
+	for i: int in map.hex_count():
+		var h := (i * 73856093) ^ (i * i * 19349663)
+		h = (h ^ (h >> 11)) & 0x7fffffff
+		map.land[i] = 0 if h % 9 == 0 else 1  # a little sea
+		owner[i] = 1 if h % 7 < 5 else (2 if h % 7 == 5 else 0)  # country 1 is most of it, so its regions touch the rim
+	for id: int in [1, 2]:
+		var fast := ScenarioGrowth.regions(map, owner, id)
+		var plain := _reference_regions(map, owner, id)
+		assert_eq(fast.size(), plain.size(), "country %d: the same number of regions" % id)
+		for r: int in mini(fast.size(), plain.size()):
+			assert_eq(fast[r], plain[r], "country %d region %d: the same hexes" % [id, r])
+			assert_eq(CountryNames.region_label_hex(map, fast[r]), _reference_label_hex(map, plain[r]),
+				"country %d region %d: the same label hex" % [id, r])

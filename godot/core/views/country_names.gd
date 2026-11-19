@@ -42,34 +42,61 @@ static func places_of(game: Game, ids: PackedInt32Array) -> Array[Dictionary]:
 static func region_label_hex(map: MapData, region: PackedInt32Array) -> Vector2i:
 	if map == null or region.is_empty():
 		return ScenarioDef.NO_HEX
-	var dist: Dictionary[int, int] = {}
+	var cols := map.cols
+	# The region's box, with a rim of one slot all round so that no neighbour is ever outside it, as a grid of
+	# distances (not a dictionary): -2 outside the region, -1 not reached yet.
+	var min_col := cols
+	var max_col := -1
+	var min_row := map.rows
+	var max_row := -1
 	for idx: int in region:
-		dist[idx] = -1
-	var grid := map.grid()
-	var queue: Array[int] = []
+		@warning_ignore("integer_division")
+		var row := idx / cols
+		min_col = mini(min_col, idx - row * cols)
+		max_col = maxi(max_col, idx - row * cols)
+		min_row = mini(min_row, row)
+		max_row = maxi(max_row, row)
+	var w := max_col - min_col + 3
+	var home := w + 1 - min_row * w - min_col  # box slot = home + row * w + col
+	var dist := PackedInt32Array()
+	dist.resize(w * (max_row - min_row + 3))
+	dist.fill(-2)
 	for idx: int in region:
-		var hex := map.hex_of(idx)
-		for d: int in 6:
-			var nb_idx := map.index_of(grid.neighbour(hex, d))
-			if nb_idx < 0 or not dist.has(nb_idx):
-				dist[idx] = 0
-				queue.append(idx)
+		@warning_ignore("integer_division")
+		var row := idx / cols
+		dist[home + row * w + idx - row * cols] = -1
+	# The six neighbours as slot steps, for an even and an odd row of the map (HexGrid's).
+	var step_even := PackedInt32Array([1, -w, -w - 1, -1, w - 1, w])
+	var step_odd := PackedInt32Array([1, 1 - w, -w, -1, w, w + 1])
+	var queue := PackedInt32Array()  # slots
+	for idx: int in region:
+		@warning_ignore("integer_division")
+		var row := idx / cols
+		var slot := home + row * w + idx - row * cols
+		for step: int in (step_odd if (row & 1) == 1 else step_even):
+			if dist[slot + step] == -2:  # next to something that is not the region: on its boundary
+				dist[slot] = 0
+				queue.append(slot)
 				break
 	var head := 0
 	while head < queue.size():
 		var cur := queue[head]
 		head += 1
-		var cur_d := dist[cur]
-		var cur_hex := map.hex_of(cur)
-		for d: int in 6:
-			var nb_idx := map.index_of(grid.neighbour(cur_hex, d))
-			if nb_idx >= 0 and dist.get(nb_idx, 0) == -1:
-				dist[nb_idx] = cur_d + 1
-				queue.append(nb_idx)
+		var next_d := dist[cur] + 1
+		@warning_ignore("integer_division")
+		var box_row := cur / w
+		var odd := ((box_row + min_row - 1) & 1) == 1
+		for step: int in (step_odd if odd else step_even):
+			var nb := cur + step
+			if dist[nb] == -1:
+				dist[nb] = next_d
+				queue.append(nb)
 	var best_idx := region[0]
-	var best_dist := dist[best_idx]
+	var best_dist := -2
 	for idx: int in region:
-		var d_val := dist[idx]
+		@warning_ignore("integer_division")
+		var row := idx / cols
+		var d_val := dist[home + row * w + idx - row * cols]
 		if d_val > best_dist or (d_val == best_dist and idx < best_idx):
 			best_dist = d_val
 			best_idx = idx
@@ -81,7 +108,7 @@ static func _region_entry(map: MapData, cid: int, tag: StringName, text: String,
 	var min_col := map.cols
 	var max_col := -1
 	for idx: int in region:
-		var col := map.hex_of(idx).x
+		var col := idx % map.cols
 		min_col = mini(min_col, col)
 		max_col = maxi(max_col, col)
 	var label_hex := region_label_hex(map, region)
