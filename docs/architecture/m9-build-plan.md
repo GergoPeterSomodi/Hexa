@@ -246,7 +246,8 @@ On the day M8 closes:
 ## 7. What M9 hands on
 
 - **M10:** trade agreements and embargoes as relations (a memory reason and a standing term each, a matrix state), a deal row for
-  trade rights, `Treasury.WHY` `trade`, road works dropping reach fields.
+  trade rights, `Treasury.WHY` `trade`, road works dropping reach fields (taken up in `m10-build-spec.md`; roads do not change
+  reach fields, its D46).
 - **M11:** techs changing `DiplomacyDef` through definitions only (goal size, the outside price, infamy's fade, `reach_free`); an
   idea card against weariness.
 - **M12:** countries that fall (`keep_last_district` off, `Countries.fall`, wars ended with terms `fallen`); the debt row in

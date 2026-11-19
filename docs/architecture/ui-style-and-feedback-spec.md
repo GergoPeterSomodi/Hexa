@@ -518,6 +518,10 @@ helps Milan's district at (9, 11)") outside the totals.
 
 "Show on map" modes: Yields (M4.5), Food (M5), Supply (M6), Relations (M9), Trade flows (M10).
 
+> **M10's build spec** (`m10-build-spec.md` 6.7, 4.20, 4.18, 6.3) specifies the Trade page (between Economy and Diplomacy: prices
+> with sparklines, the price ring chart, your merchants, tolls and trade, best and worst goods, pacts), the 40-season price ring
+> in `Stats`, the report's Trade section with its `price_moved` lines and the Trade mode on key 8.
+>
 > **M9's build spec** (`m9-build-spec.md` 6.9, 4.18, 6.3) specifies the Diplomacy page (between Economy and Military, with the
 > relation matrix and the Wars table taken from Military), the report's Diplomacy section and the Relations mode on key 7.
 

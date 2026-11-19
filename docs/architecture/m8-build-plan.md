@@ -211,7 +211,8 @@ On the day M7 closes:
   as M9's actions in the `war` phase, reaching the player through `DECISIONS`; war goals and a casus belli chosen by
   `AiWar.war`; relation numbers on `AiTemperDef`; `Relations` through `AiKnow`; the soak's land-share range turned into "no
   runaway winner".
-- **M10:** merchants and the market's prices in `AiEconomy`; road works as candidates; the soak's trade ranges.
+- **M10:** merchants and the market's prices in `AiEconomy`; road works as candidates; the soak's trade ranges (taken up in
+  `m10-build-spec.md` 4.16 and 4.17).
 - **M11:** research and idea picks by temperament branch weights; generals and refits in `AiForces`.
 - **M12:** debt and bankruptcy in the AI's money; seats that fall; a difficulty scale in `AiDef` on the New game page; the
   soak to 1650 and the old-saves check.

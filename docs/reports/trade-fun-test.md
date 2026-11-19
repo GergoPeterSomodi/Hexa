@@ -174,6 +174,7 @@ and does so once a season, so a recalled order can be re-sent. This needs a look
 - **T3:** write the design note, then decide.
 - **T4 not now:** revisit after T1 and T2.
 - **T5 yes:** the starter nudge. Merchant capacity stays 12 unless T1 proves too weak.
+- (Built in Godot by `docs/architecture/m10-build-spec.md`, its 1.3; with E5 of `economy-fun-test.md`.)
 
 ## Proposals, ranked by value
 

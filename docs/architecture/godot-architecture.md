@@ -268,7 +268,7 @@ season. The table grows by one row or two per milestone. The full order, taken f
 | 4 | Sieges and occupation | M7 |
 | 5 | War (`war`): the 40-season safety peace (`m7-build-spec.md` 4.9); offers lapse, truces end, the score's bookkeeping (`m9-build-spec.md` 4.15) | M7, M9 |
 | 6 | Relations (`relations`): memories fade, infamy, war weariness, leagues, unrest bands (`m9-build-spec.md` 4.15) | M9 |
-| 7 | Production (`production`), trade, prices | M4, M10 |
+| 7 | Production (`production`), then trade and prices (`trade`: markets, routes, merchants, next season's prices; `m10-build-spec.md` 4.6, 4.12) | M4, M10 |
 | 8 | Income and upkeep (`income`), debt | M4, M12 |
 | 9 | Works progress (building, upgrades): after the money, so a work stands and produces from the season after it finishes (`m4-build-spec.md` 1.2) | M3 (moved here in M4) |
 | 10 | People and growth | M5 |
@@ -441,7 +441,7 @@ UI, with no stand-in panel left. Sources: `docs/design/ui/design.md` (the look),
 ### 9.2 Build specs and plans: where each milestone stands (2026-11-17)
 
 A milestone's **build spec** (interfaces, tasks, tests, risks) is written before that milestone starts, from this
-table, the design pages and the UI rows above. M2 to M9 (with M4.5) have their build spec and plan; M10 to M12 have
+table, the design pages and the UI rows above. M2 to M10 (with M4.5) have their build spec and plan; M11 and M12 have
 their UI rows and no system spec yet. The UI work is specified and planned for every milestone at the level of the table.
 
 **Tracking (from M3, decided 2026-11-19).** Each milestone from M3 on is a GitHub milestone titled `Godot M<N>: <Name>`;
@@ -466,7 +466,8 @@ to 17). M2 stays in its plan file.
 | M7 | `m7-build-spec.md` (war declared between neighbours, battles of lanes and days settled in their phase with records the battle dock plays back, fortresses as districts with garrisons and castle areas, sieges, occupation and its economy and people, a simple peace by hand with a truce and the 40-season timer; Declare war, the war alert in `DECISIONS`, the odds card, battle and siege badges, the castle areas, the dock, the report's War section, the Military page's wars and battles; the seams for M8 and M9) | `m7-build-plan.md` (B1 to B29, with S5's M7 row folded in) | **specified and planned, waits for the owner's go**; starts after M6 closes |
 | M8 | `m8-build-spec.md` (every other country played through the same actions and checks, seeing only what `Knowledge` gives it; the `ai_orders` row run through an orders hook and in slices by the shell; five temperaments in data, set per scenario; taxes, works, raising, posts, declaring, the army's aims, standing orders, storms and peace written out; no AI memory; AI-only games; the soak with its invariants and ranges, nightly; the AI's perf rows and the E3 criteria; the AI-turn pill, the camera-only map, the replay timed in view, what others did in the report and the log, the peace alert, `peace_risk`; the layer order views below ai) | `m8-build-plan.md` (K10 to K29) | **specified and planned, waits for the owner's go**; starts after M7 closes |
 | M9 | `m9-build-spec.md` (war goals and reasons, the war score by worth and battles, peace by terms with deals, white peace and surrender, offers to the player as decisions with imposing at 50, truces of 12 and 8, relations of memories and standing, gifts, infamy and soft leagues, war weariness, overextension by reach and the national part, unrest by region part on the map's new regions; the peace screen, the declare-war overlay with the goal on the map, the country panel's relations and war goals, the Relations mode on key 7, the Diplomacy page with the relation matrix, the report's Diplomacy section, the decisions; the AI's reasons, peace rules, leagues and gifts; the soak's runaway invariant and conqueror suite) | `m9-build-plan.md` (V1 to V33) | **specified and planned, waits for the owner's go**; starts after M8 closes |
-| M10 to M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |
+| M10 | `m10-build-spec.md` (markets at the walled towns, cities and capitals, catchments by move cost, routes over land with their ways, costs, capacities and winter, prices from supply and appetite smoothed and bounded, the trade phase with free traders then merchants (T1), offers above the reserve and the reserve bought, tolls Low to High, trade agreements and embargoes on M9's relations, war, blockade and siege closing roads, road works on edges with fords and bridges and `StepCosts` on `Game`, the open-markets peace term; the Trade mode on key 8, the route lines, the market panel (E), the order card, the road card, the Trade page with the price ring, the report's Trade section, the Merchants chip; the AI's merchants, tolls, pacts and roads; the soak's trade invariants and ranges) | `m10-build-plan.md` (X1 to X31) | **specified and planned, waits for the owner's go**; starts after M9 closes |
+| M11 and M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |
 
 **The Europe track, beside the milestones.** E1 (inside M1): measure on a fake full-size map. E2 (after M3): build
 the real 28 km Europe map file from the geography and heights. E3 (after M8): measure an AI season on it, then

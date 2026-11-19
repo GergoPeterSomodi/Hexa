@@ -351,6 +351,8 @@ navigation. Modifier chords use `command_or_control_autoremap`, so "Ctrl" is Cmd
 | `game_battle` (the battle dock on your newest battle) | B | | Game | 7 |
 | `view_mode_7` (the Relations mode; `m9-build-spec.md` 6.1) | 7 | | View | 9 |
 | `game_peace` (the peace screen: the war with the country shown, else your newest; `m9-build-spec.md` 6.1) | P | | Game | 9 |
+| `view_mode_8` (the Trade mode: catchments, prices and the route lines; `m10-build-spec.md` 6.1) | 8 | | View | 10 |
+| `game_market` (the market panel: the selected hex's market, else your home market; `m10-build-spec.md` 6.1) | E | | Game | 10 |
 | `game_tech` | T | | Game | 11 |
 
 Mac notes: Cmd+Q and the red button arrive as a close request (section 5.3); Ctrl+arrows are taken by macOS (Spaces),

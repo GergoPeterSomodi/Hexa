@@ -183,7 +183,7 @@ Each row is a task group inside that milestone's own build spec; the kit and the
 | M7 War | losses chart, wars | battle and siege lines | the war alert as a `DECISIONS` screen (folded into `m7-build-plan.md`: B19, B20, B27, B28) |
 | M8 AI | | "What befell" one line a country, "Your orders" by tag (folded into `m8-build-plan.md`: K25) | the AI reads `Knowledge` (K14's door); the soak checks the `stats` budget (K22) |
 | M9 Diplomacy | Diplomacy page; `RelationMatrix` joins the kit | `truce_ended` | peace offer as a decision; Relations mode (folded into `m9-build-plan.md`: V17, V18, V19, V21, V26, V28, V30) |
-| M10 Trade | Trade page; sparklines in tables; the price ring | `price_moved` | Trade flows mode |
+| M10 Trade | Trade page; sparklines in tables; the price ring | `price_moved` | Trade flows mode (folded into `m10-build-plan.md`: X14, X17, X18, X19, X25, X26) |
 | M11 Research | Research page | research line | idea pick as a decision |
 | M12 | score in Rankings; the Debt tab | debt and score lines | the high-contrast row, text size in charts, `seal_cracked`, sounds |
 

@@ -278,7 +278,7 @@ map mode; I returns to the same page and scroll. Later pages are hidden, not gre
 | Page | Widgets | Others' data | Ships |
 |---|---|---|---|
 | **Economy** | money in/out stacked bars and lines, treasury line with change bars (12 or 40 seasons), Earns most / Costs most, district table (gain, goods, upkeep), tax hover preview (design 13) | none | M4 (This season), M4.5 |
-| **Trade** | price table with sparklines and ▲▼, flows overlay, best and worst goods, merchants and profit (design 12) | public prices of known markets | M10 |
+| **Trade** | price table with sparklines and ▲▼, flows overlay, best and worst goods, merchants and profit (design 12); specified in `docs/architecture/m10-build-spec.md` 6.7 | public prices of known markets | M10 |
 | **Diplomacy** | relations matrix (war, truce and seasons left, alliance, opinion word), war score bars, coalition risk | public facts | M9 (wars M7) |
 | **Military** | armies table (men, upkeep, supply, place), losses chart, upkeep share | seen armies, banded strength | M6, M7 |
 | **People** | population by place, food balance chart, growth and decline, hungry places | none | M5 |

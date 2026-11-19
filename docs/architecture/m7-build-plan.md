@@ -240,7 +240,8 @@ On the day M6 closes:
   the peace alert).
 - **M9** (taken up in `m9-build-spec.md`)**:** `Wars.score`'s body, `make_peace`'s terms (the peace screen), the truce of 12 after terms, war goals and casus belli on
   `War`, peace offers in the `war` phase, the `battle_ended` contract, the Wars table moving to the Diplomacy page.
-- **M10:** road works change `StepCosts` (retreats and areas follow); markets may feed besieged towns.
+- **M10:** road works change `StepCosts` (retreats and areas follow); markets may feed besieged towns (taken up in
+  `m10-build-spec.md`: a besieged market shuts).
 - **M11:** generals (stack +2, a term each in the values and the morale loss), techs changing `WarDef` through definitions only,
   later kinds' attack and defence.
 - **M12:** countries that fall, desertion, score with battles (war weariness and the brakes moved to M9).

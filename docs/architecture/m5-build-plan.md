@@ -214,7 +214,8 @@ On the day M4.5 closes:
 - **M7:** `district_declined` with `why` `sacked`; captured land keeps its people; refugees as a flow if wanted.
 - **M8:** `PeopleView`, `StudyPeople`, `MapModes.food_bytes` and the `hunger` and `town_full` reminders as the AI's views; the
   soak checks the conservation property and the `Stats` budget. Taken up in `m8-build-spec.md` 4.7 and 4.17.
-- **M10:** buying food from markets; the food need in market demand; grain and fish prices by supply.
+- **M10:** buying food from markets; the food need in market demand; grain and fish prices by supply (taken up in
+  `m10-build-spec.md`).
 - **M11:** techs change the growth, hunger, room and jobs numbers through definitions only.
 - **M12:** score with people; plague and famine pop-ups; countries that fall with their people.
 - **Saves:** `SaveFile.FORMAT` 3; a new body field with a default needs no bump (M3 4.10).
