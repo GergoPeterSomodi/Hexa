@@ -954,6 +954,6 @@ new autoload, no new layer; `tools/lint_godot.py` needs no entry (new files sit 
 | M8 | the AI's acts fill the chronicle (the 120-row pages and the index matter); `StudyWarm` after the AI's season; the AI reads `Knowledge` as the pages do; taken up in `m8-build-spec.md` (the chronicle's coverage measured by the soak, D51) | The AI |
 | M9 | Relations on key 7; the Diplomacy page with `RelationMatrix`: taken up in `m9-build-spec.md` 6.3, 6.9 | Diplomacy |
 | M10 | "Dues and trade" on the money chart; the Trade page with sparks in `StudyTable`; Trade on key 8 | Trade |
-| M11 | an `era` mark kind; the Research page | Research |
+| M11 | an `era` mark kind; the Research page; **taken up in `m11-build-spec.md`** 4.21 and 6.6 (the `era` and `tech` marks; the page between People and Rankings) | Research |
 | M12 | score in Rankings; the Debt tab (`PageEconomy.TABS`); text size and high contrast in charts (`InkChart` reads the Theme, whose high-contrast set has the chart inks) | A whole game |
 | **E2, E3** | **Nothing blocking: every view reads the map through `Territory` and `EconomyPreview`, and the Europe budgets are already measured on the made-up Europe.** | |

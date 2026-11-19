@@ -518,6 +518,10 @@ helps Milan's district at (9, 11)") outside the totals.
 
 "Show on map" modes: Yields (M4.5), Food (M5), Supply (M6), Relations (M9), Trade flows (M10).
 
+> **M11's build spec** (`m11-build-spec.md` 6.6, 4.20, 6.3, 6.4) specifies the Research page (between People and Rankings: points
+> a season with marks, the sources, techs by branch, the age's gate, your ideas, the known countries' ages), the report's Research
+> section, the tech screen and the idea pick as a decision.
+>
 > **M10's build spec** (`m10-build-spec.md` 6.7, 4.20, 4.18, 6.3) specifies the Trade page (between Economy and Diplomacy: prices
 > with sparklines, the price ring chart, your merchants, tolls and trade, best and worst goods, pacts), the 40-season price ring
 > in `Stats`, the report's Trade section with its `price_moved` lines and the Trade mode on key 8.

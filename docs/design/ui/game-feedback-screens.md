@@ -282,7 +282,7 @@ map mode; I returns to the same page and scroll. Later pages are hidden, not gre
 | **Diplomacy** | relations matrix (war, truce and seasons left, alliance, opinion word), war score bars, coalition risk | public facts | M9 (wars M7) |
 | **Military** | armies table (men, upkeep, supply, place), losses chart, upkeep share | seen armies, banded strength | M6, M7 |
 | **People** | population by place, food balance chart, growth and decline, hungry places | none | M5 |
-| **Research** | points chart, techs by branch, era progress | eras of known countries | M11 |
+| **Research** | points chart, techs by branch, era progress; specified in `docs/architecture/m11-build-spec.md` 6.6 | eras of known countries | M11 |
 | **Rankings** | ranked bars on land, income, army, people, score; your line through time | known, banded | M4.5, more per M |
 | **History** | timeline (a tick a season, marks for wars, battles, works, eras), chronicle with filters All, War, Money, Works, Mine | what you witnessed | M4.5 |
 

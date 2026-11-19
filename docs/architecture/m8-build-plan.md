@@ -213,7 +213,8 @@ On the day M7 closes:
   runaway winner".
 - **M10:** merchants and the market's prices in `AiEconomy`; road works as candidates; the soak's trade ranges (taken up in
   `m10-build-spec.md` 4.16 and 4.17).
-- **M11:** research and idea picks by temperament branch weights; generals and refits in `AiForces`.
+- **M11:** research and idea picks by temperament branch weights; generals and refits in `AiForces` (taken up in
+  `m11-build-spec.md` 4.17).
 - **M12:** debt and bankruptcy in the AI's money; seats that fall; a difficulty scale in `AiDef` on the New game page; the
   soak to 1650 and the old-saves check.
 - **E3:** `perf_core.gd --ai-map --ai-scenario` and spec 8.3's criteria; the soak's `europe` suite on the real map.

@@ -249,7 +249,7 @@ On the day M8 closes:
   trade rights, `Treasury.WHY` `trade`, road works dropping reach fields (taken up in `m10-build-spec.md`; roads do not change
   reach fields, its D46).
 - **M11:** techs changing `DiplomacyDef` through definitions only (goal size, the outside price, infamy's fade, `reach_free`); an
-  idea card against weariness.
+  idea card against weariness (taken up in `m11-build-spec.md` 4.3 to 4.6).
 - **M12:** countries that fall (`keep_last_district` off, `Countries.fall`, wars ended with terms `fallen`); the debt row in
   `declare_war_check`; infamy and weariness for the score; a difficulty that may scale `enforce_net`.
 - **After M12:** alliances and calls to arms; rebels and free states on the defiant band, `gained`, `former` and the regions;

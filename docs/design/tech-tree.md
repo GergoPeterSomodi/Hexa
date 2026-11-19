@@ -1,5 +1,8 @@
 # Age of Discovery: tech tree design (approved 2026-11-11, not built yet)
 
+> The Godot build is `docs/architecture/m11-build-spec.md`: the tree re-fitted to districts (every effect a modifier on a definition,
+> Navigation on the coast, the merchants' ways and the maps, no tile-level gates, generals as traits on armies).
+
 The user approved this design. Mockups:
 - [14_tech_tree_c.png](../design/images/14_tech_tree_c.png): the tech screen, as approved
 - [14_tech_tree_d_new_age.png](../design/images/14_tech_tree_d_new_age.png): the idea-card pick when a new era opens

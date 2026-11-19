@@ -246,7 +246,7 @@ On the day M9 closes:
 ## 7. What M10 hands on
 
 - **M11:** techs changing `TradeDef` through definitions only (merchant capacity, merchants, the route cost a point, market reach, the
-  tolls, the remote share); an idea card that brings idle orders home sooner.
+  tolls, the remote share); an idea card that brings idle orders home sooner (taken up in `m11-build-spec.md` 4.2 and 4.3).
 - **M12:** debt and bankruptcy reading purchases and merchants' losses; no buying over the debt limit; orders home at bankruptcy;
   a fallen country's orders and pacts ended; `income_trade` and the markets held for the score; trade fairs as an event kind
   through `Trade.appetite`, if the events design wants them.
