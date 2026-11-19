@@ -148,6 +148,10 @@ func test_the_panel_build_button_changes_the_state_and_only_the_touched_cells() 
 	var use_before := Session.game.state.main_use[Session.game.map.index_of(hex)]
 	Events.hex_changed.connect(_remember)
 	button.pressed.emit()
+	assert_eq(Session.game.state.work_at(hex).family, family, "Build begins a work")
+	assert_eq(Session.game.state.main_use[Session.game.map.index_of(hex)], use_before, "nothing stands yet")
+	assert_eq(_hexes_changed, [] as Array[Vector2i], "no hex changed yet")
+	_stand(hex)
 	Events.hex_changed.disconnect(_remember)
 	assert_ne(Session.game.state.main_use[Session.game.map.index_of(hex)], use_before, "the state has a piece now")
 	assert_eq(_hexes_changed, [hex] as Array[Vector2i], "exactly one hex_changed")
@@ -171,6 +175,15 @@ func test_the_panel_build_button_changes_the_state_and_only_the_touched_cells() 
 	assert_true(family > 0)
 
 
+## Ends seasons until the work on the hex has finished (a build, an upgrade or a clearing takes seasons since M3).
+func _stand(hex: Vector2i) -> void:
+	var n := 0
+	while Session.game.state.work_at(hex) != null and n < 40:
+		assert_true(bool(Session.end_season()["ok"]))
+		n += 1
+	assert_null(Session.game.state.work_at(hex), "the work has finished")
+
+
 func _remember(hex: Vector2i) -> void:
 	_hexes_changed.append(hex)
 
@@ -179,12 +192,15 @@ func test_upgrade_and_clear_go_through_session() -> void:
 	var found := _buildable()
 	var hex := found["hex"] as Vector2i
 	assert_true(Session.act("build", {"hex": hex, "family": int(found["family"])})["ok"])
+	_stand(hex)
 	var level := Session.game.state.level[Session.game.map.index_of(hex)]
 	_scene.selected = hex
 	var verdict := _scene.upgrade_selected()
 	if bool(verdict["ok"]):
+		_stand(hex)
 		assert_eq(Session.game.state.level[Session.game.map.index_of(hex)], level + 1)
 	assert_true(Session.act("clear", {"hex": hex})["ok"])
+	_stand(hex)
 	assert_eq(Improve.piece_at(Session.game, hex), {})
 	assert_eq(_scene.view().layer("piece_ground").get_cell_source_id(hex), -1, "the piece's tile is gone")
 
@@ -225,6 +241,7 @@ func test_the_far_picture_follows_a_build() -> void:
 	var hex := found["hex"] as Vector2i
 	var before := _scene.far().pixel_of(hex)
 	Session.act("build", {"hex": hex, "family": int(found["family"])})
+	_stand(hex)
 	assert_ne(_scene.far().pixel_of(hex), before, "a built hex is warmer on the far picture")
 
 

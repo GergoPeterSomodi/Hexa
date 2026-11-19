@@ -39,6 +39,14 @@ func _wild_land_with_options(limit: int) -> Array[Vector2i]:
 	return out
 
 
+## Ends seasons until the work on the hex has finished (a build, an upgrade or a clearing takes seasons since M3).
+func _stand(hex: Vector2i) -> void:
+	var n := 0
+	while Session.game.state.work_at(hex) != null and n < 40:
+		Session.end_season()
+		n += 1
+
+
 func _press(prefix: String) -> void:
 	for button: Button in _panel.action_buttons():
 		if not button.disabled and button.text.begins_with(prefix):
@@ -160,17 +168,23 @@ func test_build_then_upgrade_then_clear_go_through_session() -> void:
 		if not is_wild or not _has_enabled("Build"):
 			continue
 		_press("Build")
-		assert_false(Improve.piece_at(Session.game, hex).is_empty(), "Build put a piece on the hex")
+		assert_true(Improve.piece_at(Session.game, hex).is_empty(), "Build only begins a work")
+		assert_not_null(Session.game.state.work_at(hex), "the work is under way")
+		_stand(hex)
+		assert_false(Improve.piece_at(Session.game, hex).is_empty(), "the work put a piece on the hex")
 		assert_eq(_row_value("Body/PieceBox/Rows", "Level"), "level 1, " + _level_word_for(hex), "the panel shows level 1")
 		if not _has_enabled("Upgrade"):
 			_press("Clear")
+			_stand(hex)
 			assert_true(Improve.piece_at(Session.game, hex).is_empty(), "Clear took it away again")
 			continue
 		var level_before := Session.game.state.level[Session.game.map.index_of(hex)]
 		_press("Upgrade")
+		_stand(hex)
 		assert_eq(Session.game.state.level[Session.game.map.index_of(hex)], level_before + 1, "Upgrade raised the level by one")
 		assert_eq(_panel.shown_hex(), hex, "the panel still shows the hex")
 		_press("Clear")
+		_stand(hex)
 		assert_true(Improve.piece_at(Session.game, hex).is_empty(), "Clear took the piece away")
 		assert_false((_panel.get_node("Body/ActionsBox/Actions") as VBoxContainer).get_children().is_empty(), "the build list is back")
 		done = true

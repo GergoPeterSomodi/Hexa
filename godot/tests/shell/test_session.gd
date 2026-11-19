@@ -51,9 +51,17 @@ func test_unsaved_actions_counts_successful_acts_and_resets_on_new_or_start_game
 	assert_true(bool(built.get("ok", false)))
 	assert_eq(Session.unsaved_actions, 1, "successful build increments unsaved_actions")
 
+	# A build is a work now: the clear is refused until it stands (each season end is unsaved play too).
+	assert_false(bool(Session.act("clear", {"hex": hex}).get("ok", true)), "a hex under work cannot be cleared")
+	var guard := 0
+	while Session.game.state.work_at(hex) != null and guard < 40:
+		Session.end_season()
+		guard += 1
+	assert_null(Session.game.state.work_at(hex), "the build stands")
+	var before_clear := Session.unsaved_actions
 	var cleared := Session.act("clear", {"hex": hex})
 	assert_true(bool(cleared.get("ok", false)))
-	assert_eq(Session.unsaved_actions, 2, "successful clear increments unsaved_actions")
+	assert_eq(Session.unsaved_actions, before_clear + 1, "successful clear increments unsaved_actions")
 
 	# new_game resets unsaved_actions
 	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED + 1)
@@ -228,3 +236,122 @@ func test_two_autoloads_only() -> void:
 		if str(prop["name"]).begins_with("autoload/"):
 			autoloads.append(str(prop["name"]))
 	assert_eq(autoloads.size(), 2, "Session and Events only: %s" % [autoloads])
+
+
+func _record(sig: Signal, log: Array, label: String) -> Callable:
+	var handler := func(a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null) -> void:
+		log.append([label, a])
+	sig.connect(handler)
+	return handler
+
+
+func test_end_season_refused_before_the_pick_changes_nothing() -> void:
+	Session.new_scenario(SCENARIO, 5)
+	var turn := Session.game.turn
+	var log: Array = []
+	var handler := _record(Events.season_ended, log, "ended")
+	assert_false(bool(Session.end_season_check()["ok"]))
+	var verdict := Session.end_season()
+	Events.season_ended.disconnect(handler)
+	assert_false(bool(verdict["ok"]))
+	assert_string_contains(str(verdict["reason"]), "choose your country")
+	assert_eq(Session.game.turn, turn)
+	assert_true(Session.game.action_log.is_empty())
+	assert_eq(Session.unsaved_actions, 0)
+	assert_true(log.is_empty())
+	Session.game = null
+	assert_eq(str(Session.end_season()["reason"]), "no game")
+	assert_eq(str(Session.end_season_check()["reason"]), "no game")
+
+
+func test_end_season_runs_phases_drains_and_emits_season_ended_once_last() -> void:
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	var game := Session.game
+	var ended_turn := game.turn
+	var version := game.version
+	var unsaved := Session.unsaved_actions
+	var log: Array = []
+	var h1 := _record(Events.hex_changed, log, "hex")
+	var h2 := _record(Events.season_ended, log, "ended")
+	game.emit({"kind": "hex_changed", "hex": Vector2i(1, 1)})
+	var verdict := Session.end_season()
+	Events.hex_changed.disconnect(h1)
+	Events.season_ended.disconnect(h2)
+	assert_true(bool(verdict["ok"]))
+	assert_eq(log, [["hex", Vector2i(1, 1)], ["ended", ended_turn]], "the queue drains, season_ended once and last")
+	assert_true(game.events.is_empty())
+	assert_eq(game.turn, ended_turn + 1, "the calendar phase ran")
+	assert_eq(game.version, version + 1)
+	assert_eq(game.action_log.back()["action"], "end_season")
+	assert_eq(Session.unsaved_actions, unsaved + 1)
+	assert_eq(Session.last_phase_ms.keys(), ["works", "stats", "calendar"])
+	for phase: String in Session.last_phase_ms:
+		assert_true(float(Session.last_phase_ms[phase]) >= 0.0)
+
+
+func test_drain_sends_the_work_signals_and_chronicles_notable_events() -> void:
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	var game := Session.game
+	var log: Array = []
+	var handlers: Array[Callable] = [
+		_record(Events.work_started, log, "started"),
+		_record(Events.work_finished, log, "finished"),
+		_record(Events.work_cancelled, log, "cancelled"),
+		_record(Events.chronicled, log, "chron"),
+	]
+	var work := {"id": 1}
+	game.emit({"kind": "work_started", "tag": &"GEN", "hex": Vector2i(2, 3), "work": work})
+	game.emit({"kind": "work_finished", "tag": &"GEN", "hex": Vector2i(2, 3), "work": work})
+	game.emit({"kind": "work_cancelled", "tag": &"GEN", "hex": Vector2i(2, 3), "work": work, "why": &"order"})
+	game.emit({"kind": "hex_changed", "hex": Vector2i(2, 3)})
+	Session.drain()
+	Events.work_started.disconnect(handlers[0])
+	Events.work_finished.disconnect(handlers[1])
+	Events.work_cancelled.disconnect(handlers[2])
+	Events.chronicled.disconnect(handlers[3])
+	var labels: Array = []
+	for item: Array in log:
+		labels.append(item[0])
+	assert_eq(labels, ["started", "chron", "finished", "chron", "cancelled", "chron"], "hex_changed is not chronicled")
+	assert_eq(log[0][1], &"GEN")
+	var entry := log[1][1] as Dictionary
+	assert_eq(entry["kind"], "work_started")
+	assert_true(entry["tag"] is String, "the entry is plain")
+	assert_true(game.events.is_empty())
+
+
+func test_dev_transfer_logs_drains_and_refuses_an_unknown_tag() -> void:
+	Session.new_scenario(SCENARIO, 5)
+	var game := Session.game
+	var target: Array[Vector2i] = []
+	for i: int in game.map.hex_count():
+		if game.map.land[i] != 0 and int(game.state.owner[i]) != game.scenario.id_of(&"VEN"):
+			target.append(game.map.hex_of(i))
+			break
+	var log: Array = []
+	var handler := _record(Events.owners_changed, log, "owners")
+	assert_eq(Session.dev_transfer(target, &"NOPE"), 0)
+	assert_eq(Session.dev_transfer(target, &"VEN"), 1)
+	Events.owners_changed.disconnect(handler)
+	assert_eq(log.size(), 1)
+	assert_true(game.events.is_empty())
+	assert_eq(game.action_log.back()["action"], "dev_transfer")
+	assert_eq(Session.dev_transfer(target, &""), 1, "an empty tag frees the land")
+	Session.game = null
+	assert_eq(Session.dev_transfer(target, &"VEN"), 0)
+
+
+func test_play_seconds_counts_while_a_game_runs_and_resets_on_a_new_game() -> void:
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	Session.play_seconds = 0.0
+	Session._process(0.5)
+	assert_almost_eq(Session.play_seconds, 0.5, 0.0001)
+	Session.current_slot = "3"
+	Session.last_phase_ms = {"works": 1.0}
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	assert_eq(Session.play_seconds, 0.0)
+	assert_eq(Session.current_slot, "")
+	assert_true(Session.last_phase_ms.is_empty())
+	Session.game = null
+	Session._process(1.0)
+	assert_eq(Session.play_seconds, 0.0, "no game, no count")

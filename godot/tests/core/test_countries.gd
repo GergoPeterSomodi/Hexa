@@ -151,6 +151,7 @@ func test_game_digest_covers_new_fields_and_round_trip_pieces() -> void:
 	restored.turn = a.turn
 	restored.chronicle = Chronicle.from_dict(a.chronicle.to_dict())
 	restored.luck = Luck.from_dict(a.luck.to_dict(), a.seed_value)
+	restored.stats = Stats.from_dict(a.stats.to_dict())
 	for cd: Dictionary in saved_countries:
 		restored.countries.append(Country.from_dict(cd))
 	assert_eq(restored.digest(), a.digest(), "5.9 piece round-trip preserves Game.digest()")
@@ -159,9 +160,9 @@ func test_game_digest_covers_new_fields_and_round_trip_pieces() -> void:
 func test_map_only_backward_compatibility() -> void:
 	var f := ScenarioFixture.build()
 	var m := f["map"] as MapData
-	var g := Game.new_game(m, 99)
+	# A map-only game has no countries; building needs the work data (the defs), as every work takes seasons.
+	var g := Game.new_game(m, 99, load("res://data/defs/game_defs.tres") as GameDefs)
 	assert_false(g.has_countries())
-	assert_null(g.defs)
 	assert_null(g.scenario)
 	assert_true(g.countries.is_empty())
 	assert_eq(g.player, &"")

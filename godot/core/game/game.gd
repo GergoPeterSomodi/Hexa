@@ -36,6 +36,8 @@ var luck: Luck = null
 var version: int = 0
 ## Derived views; not saved.
 var view_cache: ViewCache = ViewCache.new()
+## The ring and year rows of numbers; written only by StatsSystem.
+var stats: Stats = null
 
 
 ## A new map-only game: the improvement search chooses what stands on the map for this seed.
@@ -47,6 +49,8 @@ static func new_game(p_map: MapData, p_seed: int, p_defs: GameDefs = null) -> Ga
 	out.luck = Luck.seeded(p_seed)
 	out.improvement = WorldImprove.build(p_map, p_seed)
 	out.state = out.improvement.state
+	# Called by reference: a typed call would make Game and StatsSystem need each other to parse.
+	StatsSystem.setup.call(out)
 	return out
 
 
@@ -61,6 +65,7 @@ static func new_scenario(p_map: MapData, p_defs: GameDefs, p_scenario: ScenarioD
 	out.start_year = p_scenario.year
 	Countries.setup(out, p_scenario)
 	Territory.setup(out, p_scenario)
+	StatsSystem.setup.call(out)  # again, now that the countries are known
 	return out
 
 
@@ -136,7 +141,7 @@ func digest() -> String:
 		state_digest]
 	for c: Country in countries:
 		parts.append(c.digest_text() if c != null else "")
-	parts.append("")  # R5: stats.digest()
+	parts.append(stats.digest() if stats != null else "")
 	parts.append(chronicle.digest())
 	parts.append(luck.digest_text() if luck != null else "")
 	return "|".join(parts).sha256_text()

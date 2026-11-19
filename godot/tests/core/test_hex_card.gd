@@ -135,7 +135,7 @@ func test_place_pass_and_edge_hexes() -> void:
 
 
 func test_build_upgrade_and_clear_update_card_and_lines() -> void:
-	var game := Game.new_game(_map, START_SEED)
+	var game := Game.new_game(_map, START_SEED, load("res://data/defs/game_defs.tres") as GameDefs)
 	var target_hex := Vector2i(-1, -1)
 	var target_family := -1
 	for i: int in _map.hex_count():
@@ -157,6 +157,7 @@ func test_build_upgrade_and_clear_update_card_and_lines() -> void:
 
 	var built := game.act("build", {"hex": target_hex, "family": target_family})
 	assert_true(bool(built["ok"]))
+	_until_stands(game, target_hex)
 	var after_build := HexCard.of(game, target_hex)
 	assert_false((after_build["piece"] as Dictionary).is_empty())
 	assert_eq(int((after_build["piece"] as Dictionary)["level"]), 1)
@@ -166,14 +167,25 @@ func test_build_upgrade_and_clear_update_card_and_lines() -> void:
 	if bool(up_check["ok"]):
 		var upgraded := game.act("upgrade", {"hex": target_hex})
 		assert_true(bool(upgraded["ok"]))
+		_until_stands(game, target_hex)
 		var after_upgrade := HexCard.of(game, target_hex)
 		assert_eq(int((after_upgrade["piece"] as Dictionary)["level"]), 2)
 
 	var cleared := game.act("clear", {"hex": target_hex})
 	assert_true(bool(cleared["ok"]))
+	_until_stands(game, target_hex)
 	var after_clear := HexCard.of(game, target_hex)
 	assert_eq(after_clear["piece"], {})
 	assert_false(_has_rule_line(after_clear["lines"] as Array))
+
+
+## Plays seasons until the work on `hex` is done (a work takes up to 16 seasons, winters excepted).
+func _until_stands(game: Game, hex: Vector2i) -> void:
+	var guard := 0
+	while game.state.work_at(hex) != null and guard < 40:
+		Season.run(game)
+		guard += 1
+	assert_null(game.state.work_at(hex), "the work on %s stands" % hex)
 
 
 func test_edge_and_crossing_summaries_on_fixture_map() -> void:

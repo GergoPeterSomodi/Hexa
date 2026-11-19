@@ -188,6 +188,7 @@ func test_map_state_round_trip() -> void:
 	s.owner[m.index_of(Vector2i(5, 2))] = 254
 	var d := s.to_dict()
 	assert_eq(d["schema"], MapState.SCHEMA)
+	assert_eq(MapState.SCHEMA, "hexa-godot/map-state/3")
 	# JSON-safe: survives text.
 	var parsed: Variant = JSON.parse_string(JSON.stringify(d))
 	assert_true(parsed is Dictionary)
@@ -205,6 +206,97 @@ func test_map_state_round_trip() -> void:
 	owner_copy.owner[m.index_of(Vector2i(4, 2))] = 5
 	assert_ne(owner_copy.digest(), s.digest(), "digest moves with one owner byte")
 	assert_eq(s.owner[m.index_of(Vector2i(4, 2))], 0, "owner copy is independent")
+
+
+func _state_with_works(m: MapData) -> MapState:
+	var s := MapState.create(m)
+	for spec: Array in [[1, Vector2i(3, 2), &"build", 3, 1, 4, 3], [3, Vector2i(5, 2), &"upgrade", 1, 4, 8, 8]]:
+		var w := Work.new()
+		w.id = int(spec[0])
+		w.tag = &"GEN"
+		w.hex = spec[1]
+		w.action = spec[2]
+		w.family = int(spec[3])
+		w.level_to = int(spec[4])
+		w.started_turn = 2
+		w.seasons = int(spec[5])
+		w.seasons_left = int(spec[6])
+		s.works.append(w)
+	s.next_work_id = 4
+	return s
+
+
+func test_map_state_schema_3_round_trip_with_works() -> void:
+	var m := _map()
+	var s := _state_with_works(m)
+	var d := s.to_dict()
+	assert_eq(d["schema"], "hexa-godot/map-state/3")
+	var back := MapState.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary, m)
+	assert_not_null(back)
+	assert_eq(back.works.size(), 2)
+	assert_eq(back.next_work_id, 4)
+	assert_eq(back.works[1].digest_text(), s.works[1].digest_text())
+	assert_eq(back.digest(), s.digest())
+	assert_eq(back.work_at(Vector2i(5, 2)).id, 3)
+	assert_null(back.work_at(Vector2i(0, 0)))
+	var again := MapState.from_dict(back.to_dict(), m)
+	assert_eq(again.digest(), s.digest(), "save, load, save")
+
+
+func test_map_state_digest_moves_with_a_work_and_copies_are_independent() -> void:
+	var m := _map()
+	var s := _state_with_works(m)
+	var copy := s.duplicate_state()
+	assert_eq(copy.digest(), s.digest())
+	copy.works[0].seasons_left -= 1
+	assert_ne(copy.digest(), s.digest(), "the digest moves with one seasons_left")
+	assert_eq(s.works[0].seasons_left, 3, "duplicate_state copies the works")
+	var next := s.duplicate_state()
+	next.next_work_id = 9
+	assert_ne(next.digest(), s.digest(), "and with next_work_id")
+
+
+func test_map_state_schemas_1_and_2_load_with_no_works() -> void:
+	var m := _map()
+	var s := MapState.create(m)
+	s.main_use[8] = 3
+	var v2 := {
+		"schema": MapState.SCHEMA_V2,
+		"size": 35,
+		"main_use": Marshalls.raw_to_base64(s.main_use),
+		"level": Marshalls.raw_to_base64(s.level),
+		"owner": Marshalls.raw_to_base64(s.owner),
+	}
+	var back := MapState.from_dict(v2, m)
+	assert_not_null(back)
+	assert_true(back.works.is_empty())
+	assert_eq(back.next_work_id, 1)
+	assert_eq(back.digest(), s.digest())
+	v2["schema"] = MapState.SCHEMA_V1
+	assert_not_null(MapState.from_dict(v2, m))
+
+
+func test_map_state_refuses_damaged_works() -> void:
+	var m := _map()
+	var d := _state_with_works(m).to_dict()
+	var bad := d.duplicate(true)
+	((bad["works"] as Array)[0] as Dictionary)["seasons_left"] = "3"
+	assert_null(MapState.from_dict(bad, m), "P: a string for seasons_left")
+	bad = d.duplicate(true)
+	bad.erase("works")
+	assert_null(MapState.from_dict(bad, m), "schema 3 needs works")
+	bad = d.duplicate(true)
+	bad.erase("next_work_id")
+	assert_null(MapState.from_dict(bad, m), "schema 3 needs next_work_id")
+	bad = d.duplicate(true)
+	bad["next_work_id"] = 2
+	assert_null(MapState.from_dict(bad, m), "next_work_id must pass every id")
+	bad = d.duplicate(true)
+	((bad["works"] as Array)[1] as Dictionary)["hex"] = [3, 2]
+	assert_null(MapState.from_dict(bad, m), "two works on one hex")
+	bad = d.duplicate(true)
+	((bad["works"] as Array)[0] as Dictionary)["hex"] = [99, 99]
+	assert_null(MapState.from_dict(bad, m), "a work off the map")
 
 
 func test_map_state_schema_1_loads_with_zero_owners() -> void:
