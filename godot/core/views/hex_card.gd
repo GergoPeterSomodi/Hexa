@@ -171,6 +171,26 @@ static func piece_rows(piece: Dictionary) -> Array[Array]:
 	return rows
 
 
+## Owner label for a land hex in a scenario game: the owner's long name (with ", yours" when the player holds it),
+## "no one" for unowned land, or "" at sea, off-map, or in a map-only game.
+static func owner_of(game: Game, hex: Vector2i) -> String:
+	if game == null or not game.has_countries() or game.map == null or not game.map.is_land(hex):
+		return ""
+	var otag := Territory.owner_tag(game, hex)
+	if otag == &"":
+		return "no one"
+	var cdef := Countries.def_of(game, otag)
+	var label := String(otag)
+	if cdef != null:
+		if not cdef.long_name.is_empty():
+			label = cdef.long_name
+		elif not cdef.name.is_empty():
+			label = cdef.name
+	if game.player != &"" and otag == game.player:
+		label += ", yours"
+	return label
+
+
 ## Hover-card model for `hex` in `game` (spec sections 3.5 and 7); `{}` when `game` or `game.map` is null or `hex` is off the map.
 static func of(game: Game, hex: Vector2i) -> Dictionary:
 	if game == null or game.map == null or not game.map.has(hex):
@@ -185,6 +205,7 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 	var place := Improve.place_of(map, hex) if is_land else {}
 	var place_name := str(place.get("name", ""))
 	var pass_name := pass_of(map, hex) if is_land else ""
+	var owner_text := owner_of(game, hex) if is_land else ""
 	var rivers := edge_summary(map, hex, "river")
 	var roads := edge_summary(map, hex, "road")
 	var crossings := crossing_summary(map, hex)
@@ -193,6 +214,8 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 		["Hex", &"muted", "(%d, %d)" % [hex.x, hex.y]],
 	]
 	if is_land:
+		if owner_text != "":
+			lines.append(["Owner", &"plain", owner_text])
 		if place_name != "":
 			lines.append(["Place", &"plain", place_name])
 		lines.append(["Cover", &"plain", cover])
@@ -228,6 +251,7 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 		"climate": climate,
 		"place": place_name,
 		"pass_name": pass_name,
+		"owner": owner_text,
 		"rivers": rivers,
 		"roads": roads,
 		"crossings": crossings,
@@ -241,14 +265,19 @@ static func top_level(family_name: String) -> int:
 	return ImproveRules.TOP_LEVEL[id] if id >= 0 else 0
 
 
-static func level_name(family_name: String, level: int) -> String:
-	var label := ""
+## Plain level word for `family_name` and `level` (e.g. "town", "city", "watchtower"), or "".
+static func level_label(family_name: String, level: int) -> String:
 	if LEVEL_WORDS.has(family_name):
 		var words: Array = LEVEL_WORDS[family_name]
 		if level >= 0 and level < words.size():
-			label = str(words[level])
+			return str(words[level])
 	elif level >= 0 and level < STAGE_WORDS.size():
-		label = STAGE_WORDS[level]
+		return STAGE_WORDS[level]
+	return ""
+
+
+static func level_name(family_name: String, level: int) -> String:
+	var label := level_label(family_name, level)
 	return "%s (level %d)" % [label, level] if label != "" else "level %d" % level
 
 
@@ -260,10 +289,5 @@ static func family_word(family: String, extra: String) -> String:
 
 
 static func level_word(family: String, level: int) -> String:
-	if LEVEL_WORDS.has(family):
-		var words: Array = LEVEL_WORDS[family]
-		if level >= 0 and level < words.size():
-			return "level %d, %s" % [level, str(words[level])]
-	if level >= 0 and level < STAGE_WORDS.size():
-		return "level %d, %s" % [level, STAGE_WORDS[level]]
-	return "level %d" % level
+	var label := level_label(family, level)
+	return "level %d, %s" % [level, label] if label != "" else "level %d" % level

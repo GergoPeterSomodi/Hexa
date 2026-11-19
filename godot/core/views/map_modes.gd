@@ -24,6 +24,8 @@ const RELIEF_STOPS: Array[Array] = [
 	[3200, Color("#f4f5f8")],
 ]
 
+const DEFAULT_UNOWNED := Color("#d8ccb0")
+
 static var _cached_ramp := PackedColorArray()
 
 
@@ -59,10 +61,7 @@ static func height_bytes(map: MapData) -> PackedByteArray:
 	var out := PackedByteArray()
 	out.resize(n)
 	for i: int in n:
-		if map.land[i] == 0:
-			out[i] = 0
-		else:
-			out[i] = 1 + clampi(floori(float(map.height_m[i]) / float(HEIGHT_STEP_M)), 0, 254)
+		out[i] = _height_byte_at(map, i)
 	return out
 
 
@@ -111,6 +110,39 @@ static func colour_of(mode: int, owner_id: int, height_byte: int, palette: Packe
 		base = base.lerp(Color.WHITE, HOT_LIGHTEN)
 		alpha += HOT_ALPHA
 	return Color(base.r, base.g, base.b, alpha)
+
+
+## Available map modes for `game`: `[TERRAIN, OWNER, RELIEF]`, omitting `OWNER` in a map-only game.
+static func modes(game: Game) -> Array[int]:
+	if game != null and game.has_countries():
+		return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF]
+	return [Mode.TERRAIN, Mode.RELIEF]
+
+
+## 256-entry palette for `game` using standard country colours or colour-blind safe colours.
+static func palette(game: Game, colour_blind: bool) -> PackedColorArray:
+	if game == null or game.defs == null:
+		return palette_from(PackedColorArray(), DEFAULT_UNOWNED)
+	if not game.has_countries() or game.scenario == null:
+		return palette_from(PackedColorArray(), game.defs.unowned_colour)
+	return palette_from(game.scenario.colours(game.defs, colour_blind), game.defs.unowned_colour)
+
+
+## Overlay colour for `hex` in `game`, matching `colour_of` and `mode_overlay.gdshader`.
+static func colour_at(game: Game, mode: int, hex: Vector2i, pal: PackedColorArray,
+		tint_on: bool, hot_id: int) -> Color:
+	if game == null or game.map == null or not game.map.has(hex):
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var idx := game.map.index_of(hex)
+	var height_byte := _height_byte_at(game.map, idx)
+	var oid := Territory.owner_id(game, hex)
+	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id)
+
+
+static func _height_byte_at(map: MapData, idx: int) -> int:
+	if map.land[idx] == 0:
+		return 0
+	return 1 + clampi(floori(float(map.height_m[idx]) / float(HEIGHT_STEP_M)), 0, 254)
 
 
 static func _ramp() -> PackedColorArray:

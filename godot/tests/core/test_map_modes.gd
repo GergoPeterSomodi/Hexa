@@ -115,3 +115,57 @@ func test_colour_of_modes_tint_off_and_hot() -> void:
 	var hot_relief := MapModes.colour_of(MapModes.Mode.RELIEF, 1, 26, pal, true, 1)
 	var exp_r := ramp[26].lerp(Color.WHITE, MapModes.HOT_LIGHTEN)
 	assert_true(hot_relief.is_equal_approx(Color(exp_r.r, exp_r.g, exp_r.b, MapModes.RELIEF_ALPHA + MapModes.HOT_ALPHA)))
+
+
+func test_modes_and_palette_from_game() -> void:
+	assert_eq(MapModes.modes(null), [MapModes.Mode.TERRAIN, MapModes.Mode.RELIEF] as Array[int])
+	var map := _make_map(4, 3)
+	var sandbox := Game.new_game(map, 1480)
+	assert_eq(MapModes.modes(sandbox), [MapModes.Mode.TERRAIN, MapModes.Mode.RELIEF] as Array[int],
+		"map-only game omits OWNER mode")
+	var sandbox_pal := MapModes.palette(sandbox, false)
+	assert_eq(sandbox_pal.size(), MapModes.PALETTE_SIZE)
+	assert_eq(sandbox_pal[0], MapModes.DEFAULT_UNOWNED)
+
+	var scen_game := ScenarioFixture.game()
+	assert_eq(MapModes.modes(scen_game), [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF] as Array[int])
+
+	var std_pal := MapModes.palette(scen_game, false)
+	assert_eq(std_pal.size(), MapModes.PALETTE_SIZE)
+	assert_eq(std_pal[0], scen_game.defs.unowned_colour)
+	assert_eq(std_pal[1], scen_game.defs.country(&"AAA").colour)
+	assert_eq(std_pal[2], scen_game.defs.country(&"BBB").colour)
+	assert_eq(std_pal[3], scen_game.defs.country(&"OUT").colour)
+
+	var cb_pal := MapModes.palette(scen_game, true)
+	assert_eq(cb_pal.size(), MapModes.PALETTE_SIZE)
+	assert_eq(cb_pal[0], scen_game.defs.unowned_colour)
+	assert_eq(cb_pal[1], scen_game.defs.cb_palette[int(scen_game.scenario.cb_colours[0])])
+	assert_eq(cb_pal[2], scen_game.defs.cb_palette[int(scen_game.scenario.cb_colours[1])])
+	assert_eq(cb_pal[3], scen_game.defs.cb_palette[int(scen_game.scenario.cb_colours[2])])
+
+
+func test_colour_at_matches_colour_of_for_owned_unowned_and_sea() -> void:
+	var game := ScenarioFixture.game()
+	var pal := MapModes.palette(game, false)
+	var alpha_hex := ScenarioFixture.ALPHA_CAPITAL
+	var unowned_hex := ScenarioFixture.UNOWNED_HEXES[0]
+	var sea_hex := ScenarioFixture.SEA_HEX
+	var hb := MapModes.height_bytes(game.map)
+
+	assert_eq(MapModes.colour_at(game, MapModes.Mode.OWNER, sea_hex, pal, true, 1), Color(0.0, 0.0, 0.0, 0.0))
+	assert_eq(MapModes.colour_at(game, MapModes.Mode.OWNER, Vector2i(-1, 0), pal, true, 1), Color(0.0, 0.0, 0.0, 0.0))
+
+	var alpha_oid := Territory.owner_id(game, alpha_hex)
+	assert_eq(alpha_oid, 1)
+	var alpha_hb := int(hb[game.map.index_of(alpha_hex)])
+	for mode: int in [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF]:
+		assert_true(MapModes.colour_at(game, mode, alpha_hex, pal, true, 0).is_equal_approx(
+			MapModes.colour_of(mode, alpha_oid, alpha_hb, pal, true, 0)))
+		assert_true(MapModes.colour_at(game, mode, alpha_hex, pal, true, 1).is_equal_approx(
+			MapModes.colour_of(mode, alpha_oid, alpha_hb, pal, true, 1)))
+
+	assert_eq(Territory.owner_id(game, unowned_hex), 0)
+	var unowned_col := MapModes.colour_at(game, MapModes.Mode.OWNER, unowned_hex, pal, true, 0)
+	assert_true(unowned_col.is_equal_approx(Color(pal[0].r, pal[0].g, pal[0].b, MapModes.OWNER_ALPHA)))
+	assert_eq(MapModes.colour_at(game, MapModes.Mode.TERRAIN, unowned_hex, pal, true, 0), Color(0.0, 0.0, 0.0, 0.0))

@@ -194,6 +194,41 @@ func test_edge_and_crossing_summaries_on_fixture_map() -> void:
 	assert_eq(HexCard.piece_rows({}).size(), 1)
 
 
+func test_owner_line_in_scenario_and_map_only_games() -> void:
+	# Map-only game has no Owner line.
+	var sandbox_card := HexCard.of(_game, Vector2i(9, 9))
+	assert_eq(str(sandbox_card["owner"]), "")
+	assert_null(_find_line(sandbox_card["lines"] as Array, "Owner"), "map-only game omits Owner line")
+
+	var game := ScenarioFixture.game()
+	# Before player choice: owned land shows long name without ', yours'; unowned shows 'no one'; sea omits it.
+	var alpha_before := HexCard.of(game, ScenarioFixture.ALPHA_CAPITAL)
+	assert_eq(_find_line(alpha_before["lines"] as Array, "Owner"), ["Owner", &"plain", "Republic of Alpha"])
+	var unowned_card := HexCard.of(game, ScenarioFixture.UNOWNED_HEXES[0])
+	assert_eq(_find_line(unowned_card["lines"] as Array, "Owner"), ["Owner", &"plain", "no one"])
+	var sea_card := HexCard.of(game, ScenarioFixture.SEA_HEX)
+	assert_null(_find_line(sea_card["lines"] as Array, "Owner"), "sea hex omits Owner line")
+
+	# After choosing AAA: AAA land gets ', yours'; BBB land does not.
+	assert_true(bool(game.act("choose_country", {"tag": &"AAA"})["ok"]))
+	var alpha_yours := HexCard.of(game, ScenarioFixture.ALPHA_CAPITAL)
+	assert_eq(_find_line(alpha_yours["lines"] as Array, "Owner"), ["Owner", &"plain", "Republic of Alpha, yours"])
+	var beta_card := HexCard.of(game, ScenarioFixture.BETA_CAPITAL)
+	assert_eq(_find_line(beta_card["lines"] as Array, "Owner"), ["Owner", &"plain", "Duchy of Beta"])
+	var unowned_after := HexCard.of(game, ScenarioFixture.UNOWNED_HEXES[0])
+	assert_eq(_find_line(unowned_after["lines"] as Array, "Owner"), ["Owner", &"plain", "no one"])
+	var sea_after := HexCard.of(game, ScenarioFixture.SEA_HEX)
+	assert_null(_find_line(sea_after["lines"] as Array, "Owner"))
+
+
+func _find_line(lines: Array, label: String) -> Variant:
+	for row: Variant in lines:
+		var arr: Array = row
+		if arr.size() >= 1 and str(arr[0]) == label:
+			return arr
+	return null
+
+
 func _has_rule_line(lines: Array) -> bool:
 	for row: Variant in lines:
 		var arr: Array = row
