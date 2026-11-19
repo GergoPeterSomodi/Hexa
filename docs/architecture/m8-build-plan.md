@@ -207,7 +207,7 @@ On the day M7 closes:
 
 ## 7. What M8 hands on
 
-- **M9:** `AiPeace.answer` for peace offers by temperament (replacing M7's fixed acceptance for AI countries); the AI's offers
+- **M9** (taken up in `m9-build-spec.md` 4.14, which drops `AiPeace.answer`: every country accepts by the score rule)**:** `AiPeace.answer` for peace offers by temperament (replacing M7's fixed acceptance for AI countries); the AI's offers
   as M9's actions in the `war` phase, reaching the player through `DECISIONS`; war goals and a casus belli chosen by
   `AiWar.war`; relation numbers on `AiTemperDef`; `Relations` through `AiKnow`; the soak's land-share range turned into "no
   runaway winner".

@@ -1,5 +1,8 @@
 # War goals and peace: design proposal
 
+(2026-11-19) The Godot build of this design, with its questions answered by the recommended options, is
+`docs/architecture/m9-build-spec.md` (milestone M9).
+
 Status: DRAFT for the owner (2026-11-13). Nothing here is approved or built. It is one of three separate designs that came out of `stop-steamrolling.md` (brakes, war goals and peace, rebels). This one stands on its own: it works with no brakes and no rebels, and leaves hooks for both. It is built after the battle system v0.2.0 (see the roadmap, "Next up").
 
 ## Questions for the owner

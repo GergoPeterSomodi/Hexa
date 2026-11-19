@@ -289,7 +289,7 @@ map mode; I returns to the same page and scroll. Later pages are hidden, not gre
 Tables sort on a header click (stable, ties by id) and remember it per page. (The Military page is specified in
 `docs/architecture/m6-build-spec.md` 6.9: your armies, the upkeep and losses charts, the foreign armies in sight; M7 adds the
 Wars and Battles tables and the Battle losses, `docs/architecture/m7-build-spec.md` 6.9, and M9's Diplomacy page takes the
-Wars table over.) "Show on map" picks a mode: Yields, Trade
+Wars table over; the Diplomacy page is specified in `docs/architecture/m9-build-spec.md` 6.9.) "Show on map" picks a mode: Yields, Trade
 flows, Relations, Supply, Food.
 
 ### C.3 The Economy page (*example* numbers)

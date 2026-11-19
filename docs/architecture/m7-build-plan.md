@@ -238,12 +238,12 @@ On the day M6 closes:
   `Knowledge` and the reminders `besieged`, `occupied` as its views; `fight_ms`, `battles_ms`, `sieges_ms` as its budget rows; AI
   declarations on the player through `DECISIONS`. Taken up in `m8-build-spec.md` 4.9 to 4.11 and 4.14 (`Sieges.forecast_for`,
   the peace alert).
-- **M9:** `Wars.score`'s body, `make_peace`'s terms (the peace screen), the truce of 12 after terms, war goals and casus belli on
+- **M9** (taken up in `m9-build-spec.md`)**:** `Wars.score`'s body, `make_peace`'s terms (the peace screen), the truce of 12 after terms, war goals and casus belli on
   `War`, peace offers in the `war` phase, the `battle_ended` contract, the Wars table moving to the Diplomacy page.
 - **M10:** road works change `StepCosts` (retreats and areas follow); markets may feed besieged towns.
 - **M11:** generals (stack +2, a term each in the values and the morale loss), techs changing `WarDef` through definitions only,
   later kinds' attack and defence.
-- **M12:** countries that fall, war weariness and the brakes, desertion, score with battles.
+- **M12:** countries that fall, desertion, score with battles (war weariness and the brakes moved to M9).
 - **After M12:** the battle board (the mini game between days, width 3 to 7, back slots, rotation, cards) on `Combat.fight` and
   the records; field forts.
 - **Saves:** `SaveFile.FORMAT` 5; a new body field with a default needs no bump (M3 4.10).

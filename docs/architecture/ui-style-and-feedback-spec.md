@@ -260,7 +260,7 @@ All in `shell/ui/`. Every piece: containers only; colours and fonts through the 
 | **`PreviewCard`** (`preview_card.tscn`, 556 px): VBox: `Top` (pinned options, close), `Title`, `Sub`, `Brings`, `SeasonStrip`, `Cols` (`Lands`, `InkChart`), `Cost`, `Requirements`, `Payback`, `Next`, `Refusal`, `Foot` (note, Pin, Begin) | `show_preview(p)`, `show_compare(a, b)`, `treasury_only`; signals `begin_pressed`, `pin_toggled(on)`, `closed`, `look_at_requested(hex)` | `PanelCard`. Refused: title, `Refusal` (a `BAD` bar, the reason in words), close. Compare: two columns, one scale. Opened by key: Begin focused; Esc closes |
 | **`InkChart`** (`ink_chart.gd`, Control, `_draw`) | `kind` (`LINE`, `LINE_BARS`, `PAIRED_BARS`, `STACKED_BAR`, `SPARK`), `ground` (`VELLUM`, `SLOT`), `x_labels`, `y_ticks`, `caption`; `set_series([{name, values: PackedInt32Array, ink, role}])`, `set_marks([{index, text, tone}])`, `summary()`; signals `point_hovered(i)`, `point_activated(i)` | `draw_polyline`, `draw_rect`, `draw_dashed_line`, `draw_string`. Redraws only from setters, resize, theme change. Each series: ink **and** dash and marker. 0 points: "No data yet". Left, Right move a cursor; the value is a `HoverCard` (`_make_custom_tooltip`); description `summary()` |
 | **`StudyTable`** (`study_table.gd`, extends Tree) | `set_columns([{id, title, kind, align}])`, `set_rows(rows)` (each `id`, optional `hex`), `sort_by(id, descending)`; signals `row_activated(row)`, `sort_changed(id, descending)` | `StudyTree`. `column_title_clicked` sorts: stable, ties by `id`; the title gains `↓` or `↑`. Numbers right, tabular. Enter looks there |
-| **`RelationMatrix`** (`relation_matrix.gd`, Control, `_draw`; M9) | `set_matrix(tags, names, cells)`; cell `{state, seasons_left, opinion}`; signal `cell_activated(a, b)` | 64 x 34 cells: an icon and a word, never colour alone; arrows move a cursor |
+| **`RelationMatrix`** (`relation_matrix.gd`, Control, `_draw`; M9) | `set_matrix(tags, names, cells)`; cell `{state, seasons_left, opinion}`, from M9 also `word` and `value` (`m9-build-spec.md` 6.12); signal `cell_activated(a, b)` | 64 x 40 cells from M9 (34 before): line 1 an icon and the state (war, truce, league, peace, self), line 2 the opinion word or "?"; never colour alone; arrows move a cursor |
 | **`NavList`** (`nav_list.gd`, VBox): toggle Buttons in a `ButtonGroup`, each with a `Count` | `ink`; `set_items([{id, text, count}])`, `select(id)`; signal `selected(id)` | `ButtonNav`, `ButtonNavInk`. Selected: brass bar left, gold or bold text. Up, Down, Home, End |
 | **Medallions** (`medallion.gd`, Button: `Ring`, `Face`, `Dial`, `Hand`, lazy `Glow`; `resource_chip.tscn`: `PanelSlot` > `medallion_30`, name, value, DeltaChip) | `text`, `icon_name`, `dial` (-1 or the lit quarter), `busy`; chip `set_value(n, change)` | `ButtonMedallion`. The date medallion shows the year and lights the season's quarter; busy turns the ring. Chips are buttons named by resource |
 | **`Ribbon`**, **`Cartouche`** (PanelContainer > Label) | `text` | `PanelRibbon`: wraps to two lines. `PanelCartouche`: one line, ellipsis, the full name in the tooltip |
@@ -344,7 +344,7 @@ line = {text: String, detail: String, amount: int, unit: StringName, tone: Strin
 ```
 
 - Section ids, fixed order: `glance`, `before`, `treasury`, `goods`, `works`, `people`, `armies` (M6,
-  `m6-build-spec.md` 4.14), `war` (M7, `m7-build-spec.md` 4.17), `orders`, `befell`, `standing`; one whose system does not
+  `m6-build-spec.md` 4.14), `war` (M7, `m7-build-spec.md` 4.17), `diplomacy` (M9, `m9-build-spec.md` 4.18), `orders`, `befell`, `standing`; one whose system does not
   exist is absent.
 - `rank`: size in ducats at the season's prices (men for armies). Lines sort by it; six show, `more` counts the rest;
   the report's three largest have `top`.
@@ -517,6 +517,9 @@ helps Milan's district at (9, 11)") outside the totals.
 | People, Military, Diplomacy, Trade, Research | as `game-feedback-screens.md` C.2 | as C.5 | M5; M6 and M7; M9; M10; M11 |
 
 "Show on map" modes: Yields (M4.5), Food (M5), Supply (M6), Relations (M9), Trade flows (M10).
+
+> **M9's build spec** (`m9-build-spec.md` 6.9, 4.18, 6.3) specifies the Diplomacy page (between Economy and Military, with the
+> relation matrix and the Wars table taken from Military), the report's Diplomacy section and the Relations mode on key 7.
 
 > **M5's build spec** (`m5-build-spec.md` 6.2 to 6.8) specifies the People page (one page, no tabs, between Economy and
 > Rankings), the people measure in Rankings and Standing, the report's People section, the People and Food chips and the

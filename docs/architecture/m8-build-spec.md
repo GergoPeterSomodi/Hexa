@@ -730,7 +730,7 @@ values that the tuning task measures and keeps, or changes with Opus's word in i
 | wars declared a game | ai | median 2 to 12 |
 | ended wars ended by an AI's peace (not the timer) | ai | ≥ 50 % |
 | battles a game | ai | median ≥ 2 |
-| the largest country's share of the land | ai | median ≤ 30 %, every game ≤ 60 % (M9 tightens it into "no runaway winner") |
+| the largest country's share of the land | ai | median ≤ 30 %, every game ≤ 60 % (M9 replaces it: `m9-build-spec.md` 4.23, the invariant `runaway` and 24 % / 33 %) |
 | countries with a treasury under 0 | ai | ≤ 20 % of country-games |
 | the largest treasury | ai | ≤ 30,000 in every game |
 | all people | ai | 90 % to 200 % of the start (1,564,100) |
@@ -1349,7 +1349,7 @@ K10; the AI, the soak, the console, K28), `tools/lint_godot.py` (the ranks, K10)
 
 | M | Takes from M8 | M8 leaves for it |
 |---|---|---|
-| M9 | `AiPeace` grows an answer to peace offers (`AiPeace.answer(game, brief, offer) -> bool`) by temperament, replacing M7's fixed acceptance for AI countries; the AI sends its offers as M9's actions in the `war` phase's offers, which reach the player as `DECISIONS` (the peace alert's slot); `AiWar.war` picks a war goal and a casus belli for `declare_war`; `AiTemperDef` gains the relation numbers (trust, grudge); `AiKnow` gains `Relations`; the soak's runaway range becomes "no runaway winner" (its done-when) | Diplomacy and peace |
+| M9 | `AiPeace` grows an answer to peace offers (`AiPeace.answer(game, brief, offer) -> bool`) by temperament, replacing M7's fixed acceptance for AI countries; the AI sends its offers as M9's actions in the `war` phase's offers, which reach the player as `DECISIONS` (the peace alert's slot); `AiWar.war` picks a war goal and a casus belli for `declare_war`; `AiTemperDef` gains the relation numbers (trust, grudge); `AiKnow` gains `Relations`; the soak's runaway range becomes "no runaway winner" (its done-when); **taken up in `m9-build-spec.md` 4.14**: no `AiPeace.answer` (every country accepts by the score rule; only the player receives offers, through `offer_peace`, made in `ai_orders` and lapsing in the `war` phase), `AiPeace` rewritten, the `diplomacy` step, `AiTemperDef`'s peace fields replaced, the door's new tokens | Diplomacy and peace |
 | M10 | `AiEconomy` gains merchants (`send_merchant`, `recall_merchant`) and the market's prices in its prior (`Economy.market_prices`); road works as candidates; the soak's trade ranges | Trade |
 | M11 | `AiEconomy` gains research and ideas (`set_research`, `pick_idea`) by temperament branch weights (`AiTemperDef.branch_weights`); `AiForces` raises generals and refits later kinds | Research |
 | M12 | Debt and bankruptcy in the AI's money (loans, desertion as M12's rules); seats that fall (a dead country is no seat); a difficulty as an `AiDef` scale on the New game page; the full-length soak to 1650 (680 seasons) and the old-saves check | A whole game |

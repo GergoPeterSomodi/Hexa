@@ -247,7 +247,8 @@ On the day M5 closes:
   `army_idle`, `army_hungry`, `army_stores` as its views; `route_ms` and `cost_field_ms` as its budget rows; the scenario's
   starting armies; the chronicle's size with army events. Taken up in `m8-build-spec.md` (`cost_field` not used, D48; 1480's
   start armies empty, D30).
-- **M9:** land that changes hands under an army re-plans or halts its march (D2); military access opens `open_to`.
+- **M9:** land that changes hands under an army re-plans or halts its march (D2); taken up in `m9-build-spec.md`, which adds no
+  military access (`open_to` unchanged).
 - **M10:** road works change `StepCosts` (it moves onto `Game`); markets may feed armies.
 - **M11:** later kinds and refit; techs change move points, supply reach and costs through definitions only.
 - **M12:** desertion through `Armies.lose_men` (`deserted`); bankruptcy disbands; score with men under arms.

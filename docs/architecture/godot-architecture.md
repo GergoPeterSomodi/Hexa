@@ -266,16 +266,17 @@ season. The table grows by one row or two per milestone. The full order, taken f
 | 2 | Movement, then battles | M6, M7 |
 | 3 | Supply and attrition | M6 |
 | 4 | Sieges and occupation | M7 |
-| 5 | War (`war`): the 40-season safety peace (`m7-build-spec.md` 4.9); peace offers | M7, M9 |
-| 6 | Production (`production`), trade, prices | M4, M10 |
-| 7 | Income and upkeep (`income`), debt | M4, M12 |
-| 8 | Works progress (building, upgrades): after the money, so a work stands and produces from the season after it finishes (`m4-build-spec.md` 1.2) | M3 (moved here in M4) |
-| 9 | People and growth | M5 |
-| 10 | Research | M11 |
-| 11 | Countries that are gone, scores | M12 |
-| 12 | Stats: the season's rows (the ledger closes here from M4) | M3 |
-| 13 | Calendar: next season; from M4 the weather of the season that begins, from the world's luck | M3, M4 |
-| 14 | Ready units, vision | M6 |
+| 5 | War (`war`): the 40-season safety peace (`m7-build-spec.md` 4.9); offers lapse, truces end, the score's bookkeeping (`m9-build-spec.md` 4.15) | M7, M9 |
+| 6 | Relations (`relations`): memories fade, infamy, war weariness, leagues, unrest bands (`m9-build-spec.md` 4.15) | M9 |
+| 7 | Production (`production`), trade, prices | M4, M10 |
+| 8 | Income and upkeep (`income`), debt | M4, M12 |
+| 9 | Works progress (building, upgrades): after the money, so a work stands and produces from the season after it finishes (`m4-build-spec.md` 1.2) | M3 (moved here in M4) |
+| 10 | People and growth | M5 |
+| 11 | Research | M11 |
+| 12 | Countries that are gone, scores | M12 |
+| 13 | Stats: the season's rows (the ledger closes here from M4) | M3 |
+| 14 | Calendar: next season; from M4 the weather of the season that begins, from the world's luck | M3, M4 |
+| 15 | Ready units, vision | M6 |
 
 A test pins the names in order. To change the order, change the table and the test in one pull request. The autosave
 is not a phase: the shell saves after the season's report closes (it needs a thumbnail and the wall clock, and changes
@@ -440,7 +441,7 @@ UI, with no stand-in panel left. Sources: `docs/design/ui/design.md` (the look),
 ### 9.2 Build specs and plans: where each milestone stands (2026-11-17)
 
 A milestone's **build spec** (interfaces, tasks, tests, risks) is written before that milestone starts, from this
-table, the design pages and the UI rows above. M2 to M8 (with M4.5) have their build spec and plan; M9 to M12 have
+table, the design pages and the UI rows above. M2 to M9 (with M4.5) have their build spec and plan; M10 to M12 have
 their UI rows and no system spec yet. The UI work is specified and planned for every milestone at the level of the table.
 
 **Tracking (from M3, decided 2026-11-19).** Each milestone from M3 on is a GitHub milestone titled `Godot M<N>: <Name>`;
@@ -464,13 +465,15 @@ to 17). M2 stays in its plan file.
 | M6 | `m6-build-spec.md` (companies and armies raised from the people, orders walked in the movement phase, river crossings, passes and winter, supply and hunger, sight and witnesses; tokens, orders, the route, the move card, the army panel, the Raise tab, the replay, the hex menu, the Supply mode on key 6, the Army chip, the Military page, the report's Armies section; the seams for M7 and M8) | `m6-build-plan.md` (L1 to L25, with S5's M6 row folded in) | **specified and planned, waits for the owner's go**; starts after M5 closes |
 | M7 | `m7-build-spec.md` (war declared between neighbours, battles of lanes and days settled in their phase with records the battle dock plays back, fortresses as districts with garrisons and castle areas, sieges, occupation and its economy and people, a simple peace by hand with a truce and the 40-season timer; Declare war, the war alert in `DECISIONS`, the odds card, battle and siege badges, the castle areas, the dock, the report's War section, the Military page's wars and battles; the seams for M8 and M9) | `m7-build-plan.md` (B1 to B29, with S5's M7 row folded in) | **specified and planned, waits for the owner's go**; starts after M6 closes |
 | M8 | `m8-build-spec.md` (every other country played through the same actions and checks, seeing only what `Knowledge` gives it; the `ai_orders` row run through an orders hook and in slices by the shell; five temperaments in data, set per scenario; taxes, works, raising, posts, declaring, the army's aims, standing orders, storms and peace written out; no AI memory; AI-only games; the soak with its invariants and ranges, nightly; the AI's perf rows and the E3 criteria; the AI-turn pill, the camera-only map, the replay timed in view, what others did in the report and the log, the peace alert, `peace_risk`; the layer order views below ai) | `m8-build-plan.md` (K10 to K29) | **specified and planned, waits for the owner's go**; starts after M7 closes |
-| M9 to M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |
+| M9 | `m9-build-spec.md` (war goals and reasons, the war score by worth and battles, peace by terms with deals, white peace and surrender, offers to the player as decisions with imposing at 50, truces of 12 and 8, relations of memories and standing, gifts, infamy and soft leagues, war weariness, overextension by reach and the national part, unrest by region part on the map's new regions; the peace screen, the declare-war overlay with the goal on the map, the country panel's relations and war goals, the Relations mode on key 7, the Diplomacy page with the relation matrix, the report's Diplomacy section, the decisions; the AI's reasons, peace rules, leagues and gifts; the soak's runaway invariant and conqueror suite) | `m9-build-plan.md` (V1 to V33) | **specified and planned, waits for the owner's go**; starts after M8 closes |
+| M10 to M12 | none yet; UI rows above and the spec's section 8 | the plan's S5 (as tasks of each milestone) | to write, one at a time, before each starts |
 
 **The Europe track, beside the milestones.** E1 (inside M1): measure on a fake full-size map. E2 (after M3): build
 the real 28 km Europe map file from the geography and heights. E3 (after M8): measure an AI season on it, then
 switch the play area. If a budget fails, the fallback is a larger hex, which changes data, not code.
 
-**After M12, in an order the owner picks:** ships and sea war, exploration and fog of discovery, colonies, random
+**After M12, in an order the owner picks:** alliances and calls to arms, rebels and free states (`stop-steamrolling.md` Part C),
+historical claims (`war-goals-and-peace.md` 3.9), ships and sea war, exploration and fog of discovery, colonies, random
 worlds, city states, crown projects, achievements.
 
 ---

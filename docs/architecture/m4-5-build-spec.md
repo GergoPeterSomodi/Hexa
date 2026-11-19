@@ -952,7 +952,7 @@ new autoload, no new layer; `tools/lint_godot.py` needs no entry (new files sit 
 | M6 | Rankings' army measure (banded "about 40,000 men"); Supply on key 6; witnesses from vision shrink what History shows of others; `knows` by explored hexes changes Rankings' lists; "Upkeep, walls and army" on the money chart (D35); taken up in `m6-build-spec.md` | Armies |
 | M7 | the War filter (`LogLines.FILTERS` `since` 7) and a `war` mark kind before `land`; losses on the Military page; taken up in `m7-build-spec.md` (4.14, 5.6, 6.9) | War |
 | M8 | the AI's acts fill the chronicle (the 120-row pages and the index matter); `StudyWarm` after the AI's season; the AI reads `Knowledge` as the pages do; taken up in `m8-build-spec.md` (the chronicle's coverage measured by the soak, D51) | The AI |
-| M9 | Relations on key 7; the Diplomacy page with `RelationMatrix` | Diplomacy |
+| M9 | Relations on key 7; the Diplomacy page with `RelationMatrix`: taken up in `m9-build-spec.md` 6.3, 6.9 | Diplomacy |
 | M10 | "Dues and trade" on the money chart; the Trade page with sparks in `StudyTable`; Trade on key 8 | Trade |
 | M11 | an `era` mark kind; the Research page | Research |
 | M12 | score in Rankings; the Debt tab (`PageEconomy.TABS`); text size and high contrast in charts (`InkChart` reads the Theme, whose high-contrast set has the chart inks) | A whole game |
