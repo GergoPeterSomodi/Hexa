@@ -2,6 +2,7 @@
 ## One file per map in data/maps/<id>.tres, built by tools/build_map.gd. Per-hex arrays are indexed row * cols + col;
 ## per-edge arrays by 3 * hex index + k, where k = 0 E, 1 NE, 2 NW (each hex owns three of its six edges, so an edge
 ## has one slot whichever side asks). What changes in play lives in MapState, never here.
+@tool
 class_name MapData
 extends Resource
 

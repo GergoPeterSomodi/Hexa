@@ -6,6 +6,7 @@
 ## every six rows: one node drawing every line with draw_polyline: 18 ms a frame; chunks with draw_polyline: 4 to 19
 ## ms; chunks with antialiased draw_multiline: 7 to 43 ms; a mesh per chunk: under 2 ms. Canvas draw commands are
 ## re-sent every frame; a mesh stays on the graphics card.
+@tool
 class_name EdgeLineLayer
 extends Node2D
 

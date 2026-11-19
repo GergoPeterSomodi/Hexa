@@ -16,6 +16,7 @@
 ## lands in it. A swap (begin_season_swap, swap_step) then goes a chunk and a layer at a time, the chunks that are on
 ## the screen first, and takes only the time it is given a frame. `layer(name)` is the layer of the first chunk (the
 ## whole layer of a map of one chunk); `layers_of(name)` gives them all.
+@tool
 class_name TileMapView
 extends Node2D
 

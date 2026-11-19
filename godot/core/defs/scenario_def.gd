@@ -1,5 +1,6 @@
 ## A playable scenario's fixed countries, capitals, territory seeds/pins, growth parameters, and grown owner grid
 ## (docs/architecture/m2-build-spec.md sections 4.1 to 4.6, 5.1, and 8.2).
+@tool
 class_name ScenarioDef
 extends Resource
 

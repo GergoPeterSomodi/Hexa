@@ -1,6 +1,7 @@
 ## Per-hex map mode overlay (docs/architecture/m2-build-spec.md sections 6.1 and 6.2):
 ## draws one map-sized quad at z_index 80 with mode_overlay.gdshader over four data textures
 ## (owner_ids R8, heights R8, palette RGBA8 256x1, ramp RGBA8 256x1).
+@tool
 class_name ModeOverlay
 extends Node2D
 

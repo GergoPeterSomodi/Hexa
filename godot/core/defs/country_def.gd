@@ -1,5 +1,6 @@
 ## A country's fixed identity and arms (docs/architecture/m2-build-spec.md section 4.7 and 5.1).
 ## Stored one file per country in data/defs/countries/<tag>.tres and listed by GameDefs.
+@tool
 class_name CountryDef
 extends Resource
 

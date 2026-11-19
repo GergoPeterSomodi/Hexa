@@ -1,5 +1,6 @@
 ## Central catalog of fixed game definitions (docs/architecture/m2-build-spec.md section 4.6, 4.7, 5.1, and 8.2).
 ## Loaded once from res://data/defs/game_defs.tres and read-only in play.
+@tool
 class_name GameDefs
 extends Resource
 
