@@ -5,6 +5,8 @@
 ## pops the study first). While it is on the stack the study listens for tax_set, work_started, work_finished, work_cancelled
 ## and season_ended and refreshes the page in view; a page's [&"set_tax", level] is done here through Session.act (the App's
 ## tax_set handler makes the toast). The Economy page reads the shell's game/gain_treasury_only switch before each refresh.
+## Ctrl+[ ] and Ctrl+] (study_tab_prev, study_tab_next) step the tabs of the page in view; [ ] still steps the pages.
+## open_page(page, focus) gives the focus to the page, and last_open_ms times the open (the F3 line).
 class_name Study
 extends Screen
 
@@ -17,10 +19,18 @@ const NEXT_ACTION := &"study_page_next"
 const TAX_ACTION := &"set_tax"
 const TREASURY_KEY := "game/gain_treasury_only"
 const PAGE_KEY := "state/study_page"
-const HINT_BASE := "I: close · Enter: look there"
+const HINT_CLOSE := "I: close"
+const HINT_LOOK := "Enter: look there"
 const PAGE_KEYS_HINT := "[ ]: page"
+const TAB_KEYS_HINT := "Ctrl+[ ]: tab"
 const HINT_JOIN := " · "
 const PAGE_KEYS_FROM := 2
+const TAB_KEYS_FROM := 2
+const TAB_PREV_ACTION := &"study_tab_prev"
+const TAB_NEXT_ACTION := &"study_tab_next"
+const COUNTRY_ACTION := &"country"
+const MAP_MODE_ACTION := &"map_mode"
+const REDUCE_KEY := "accessibility/reduce_motion"
 
 @onready var _ribbon: Ribbon = $Frame/VBox/Ribbon
 @onready var _date: Label = $Frame/VBox/Head/Date
@@ -33,6 +43,10 @@ var _pages: Array[Dictionary] = []
 var _configured: bool = false
 var _current: StringName = &""
 var _scrolls: Dictionary[StringName, ScrollContainer] = {}
+## The milestone the pages are built at: their tabs are shown from it (the App's SHELL_MILESTONE unless configure says).
+var milestone: String = Bindings.SHELL_MILESTONE
+## The synchronous part of the last open_page, in milliseconds (the F3 line).
+var last_open_ms: float = 0.0
 
 
 func _init() -> void:
@@ -58,7 +72,9 @@ func _ready() -> void:
 
 ## The pages the Study shows, in order; each entry is {id, title, scene, since}. The App passes StudyPages.shown(milestone).
 ## A Study never configured shows StudyPages.shown(DEFAULT_MILESTONE).
-func configure(entries: Array[Dictionary]) -> void:
+func configure(entries: Array[Dictionary], at_milestone: String = "") -> void:
+	if at_milestone != "":
+		milestone = at_milestone
 	_set_pages(entries)
 	_configured = true
 	if is_node_ready():
@@ -66,7 +82,9 @@ func configure(entries: Array[Dictionary]) -> void:
 
 
 ## Shows `page`; &"" the last page shown (or the first when none was). An id that is not shown changes nothing.
-func open_page(page: StringName) -> void:
+## `focus` goes to the page's focus() (a tab: {tab}). The synchronous part is timed into last_open_ms.
+func open_page(page: StringName, focus: Dictionary = {}) -> void:
+	var started := Time.get_ticks_usec()
 	if _pages.is_empty():
 		return
 	var id := page
@@ -85,7 +103,12 @@ func open_page(page: StringName) -> void:
 	_nav.select(id)
 	_remember_page(id)
 	_refresh_shown(&"open")
+	var shown_page := current_page()
+	if shown_page != null:
+		shown_page.focus(focus)
 	_refresh_date()
+	_refresh_hint()
+	last_open_ms = float(Time.get_ticks_usec() - started) / 1000.0
 
 
 func on_enter() -> void:
@@ -121,6 +144,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _pressed(event, NEXT_ACTION):
 		accept_event()
 		_step_page(1)
+	elif _pressed(event, TAB_PREV_ACTION):
+		accept_event()
+		_step_tab(-1)
+	elif _pressed(event, TAB_NEXT_ACTION):
+		accept_event()
+		_step_tab(1)
 
 
 # ----- accessors (tests and the App read these; nothing here changes the study) -------------------------------------
@@ -150,11 +179,16 @@ func date_label() -> Label:
 	return _date
 
 
-## The hint line: "[ ]: page" is in it only from two pages.
+## The hint line: "[ ]: page" from two pages, "Ctrl+[ ]: tab" from two shown tabs of the page in view, then the look key.
 func hint_text() -> String:
+	var parts := PackedStringArray([HINT_CLOSE])
 	if _pages.size() >= PAGE_KEYS_FROM:
-		return HINT_BASE + HINT_JOIN + PAGE_KEYS_HINT
-	return HINT_BASE
+		parts.append(PAGE_KEYS_HINT)
+	var page := current_page()
+	if page != null and page.shown_tabs().size() >= TAB_KEYS_FROM:
+		parts.append(TAB_KEYS_HINT)
+	parts.append(HINT_LOOK)
+	return HINT_JOIN.join(parts)
 
 
 ## "Spring 1480" for the game's turn; "" with no game.
@@ -203,8 +237,7 @@ func _rebuild_nav() -> void:
 		_current = &""
 	if _current != &"":
 		_nav.select(_current)
-	_hints.text = hint_text()
-	_hints.accessibility_name = _hints.text
+	_refresh_hint()
 
 
 func _index_of(id: StringName) -> int:
@@ -236,7 +269,10 @@ func _scroll_for(id: StringName, entry: Dictionary) -> ScrollContainer:
 		push_error("Study: no study page scene for '%s' at %s" % [String(id), path])
 		return null
 	page_node.page_id = id
+	page_node.milestone = milestone
+	page_node.reduce_motion = _reduce_motion()
 	page_node.action_requested.connect(_on_page_action)
+	page_node.tab_changed.connect(_on_tab_changed)
 	page_node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var scroll := ScrollContainer.new()
 	scroll.name = String(id)
@@ -258,12 +294,26 @@ func _step_page(step: int) -> void:
 	open_page(StringName(str(_pages[idx].get("id", ""))))
 
 
+func _step_tab(step: int) -> void:
+	var page := current_page()
+	if page != null:
+		page.step_tab(step)
+
+
 func _on_page_action(action: Array) -> void:
 	if action.size() < 2 or ctx == null:
 		return
 	match StringName(str(action[0])):
 		LOOK_ACTION:
 			ctx.request(LOOK_ACTION, {"hex": action[1], "select": true})
+		COUNTRY_ACTION:
+			ctx.request(COUNTRY_ACTION, {"tag": action[1]})
+		MAP_MODE_ACTION:
+			var args := {"mode": action[1]}
+			if action.size() >= 3:
+				args["hex"] = action[2]
+				args["select"] = false
+			ctx.request(LOOK_ACTION, args)
 		TAX_ACTION:
 			var verdict := Session.act(String(TAX_ACTION), {"level": int(action[1])})
 			if not bool(verdict.get("ok", false)):
@@ -277,10 +327,16 @@ func _refresh_shown(why: StringName) -> void:
 	var shown_page := current_page()
 	if shown_page == null:
 		return
+	shown_page.reduce_motion = _reduce_motion()
 	var economy := shown_page as PageEconomy
 	if economy != null:
 		economy.treasury_only = ctx != null and ctx.settings != null and bool(ctx.settings.get_value(TREASURY_KEY))
 	shown_page.refresh(Session.game, why)
+
+
+## The shell's reduce-motion setting: a tab switch is instant then.
+func _reduce_motion() -> bool:
+	return ctx != null and ctx.settings != null and bool(ctx.settings.get_value(REDUCE_KEY))
 
 
 ## Keeps the last page in the setting state/study_page so a later run can open on it.
@@ -319,6 +375,17 @@ func _on_work_event(_tag: StringName, _hex: Vector2i, _work: Dictionary) -> void
 
 func _on_work_cancelled(_tag: StringName, _hex: Vector2i, _work: Dictionary, _why: StringName) -> void:
 	_refresh_shown(&"work")
+
+
+func _on_tab_changed(_tab: StringName) -> void:
+	_refresh_hint()
+
+
+func _refresh_hint() -> void:
+	if not is_node_ready():
+		return
+	_hints.text = hint_text()
+	_hints.accessibility_name = _hints.text
 
 
 func _refresh_date() -> void:

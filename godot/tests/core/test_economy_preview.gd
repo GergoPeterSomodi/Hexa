@@ -202,3 +202,141 @@ func test_a_short_and_a_long_ask_share_the_baseline_and_agree() -> void:
 	fresh.act("build", {"hex": EconomyFixture.VINEYARD_HEX, "family": VINEYARD, "tag": &"GEN"})
 	assert_eq(EconomyPreview.with(fresh, &"GEN", {}, 8)["seasons"], long["seasons"], "the long ask first gives the same")
 	assert_true(is_same(EconomyPreview.baseline(g, &"GEN", 1, 1), EconomyPreview.baseline(g, &"GEN", 8, 1)), "one array for every horizon")
+
+
+
+# --- worth_seasons (docs/architecture/m4-5-build-spec.md 4.10, 5.6) -------------------------------------------------
+
+
+func _hex_row(ws: Dictionary, g: Game, hex: Vector2i) -> int:
+	return (ws["hexes"] as PackedInt32Array).find(g.map.index_of(hex))
+
+
+func _worths(ws: Dictionary, h: int) -> Array:
+	var n := int(ws["seasons"])
+	return Array((ws["worth"] as PackedInt32Array).slice(h * n, h * n + n))
+
+
+func test_worth_seasons_at_turn_1_equals_the_districts_of_4_10() -> void:
+	var g := EconomyFixture.game(&"GEN")
+	var ws := EconomyPreview.worth_seasons(g, &"GEN", 4)
+	assert_eq(int(ws["turn"]), 1)
+	assert_eq(int(ws["seasons"]), 4)
+	assert_eq((ws["hexes"] as PackedInt32Array).size(), 14)
+	var want := {Vector2i(8, 13): [60, 63, 60, 49], Vector2i(7, 14): [0, 0, 35, 70], Vector2i(7, 12): [2, 2, 62, 2],
+		Vector2i(6, 13): [9, 11, 10, 8], Vector2i(9, 13): [5, 5, 5, 18]}
+	for hex: Vector2i in want:
+		assert_eq(_worths(ws, _hex_row(ws, g, hex)), want[hex], str(hex))
+	var genoa := _hex_row(ws, g, Vector2i(8, 13))
+	var dues := (ws["dues"] as PackedInt32Array).slice(genoa * 4, genoa * 4 + 4)
+	assert_eq(dues, PackedInt32Array([30, 33, 30, 21]))
+	var upkeep := (ws["upkeep"] as PackedInt32Array).slice(genoa * 4, genoa * 4 + 4)
+	assert_eq(upkeep, PackedInt32Array([6, 6, 6, 6]))
+	var fish := 0
+	for k: int in 4:
+		fish += (ws["goods"] as PackedInt32Array)[(genoa * 4 + k) * g.defs.goods.size() + Economy.FISH]
+	assert_eq(fish, 22)
+	var total := 0
+	for v: int in ws["worth"] as PackedInt32Array:
+		total += v
+	assert_eq(total, 533, "all the land, each place rounded down")
+
+
+func test_worth_by_hex_is_the_first_season_hex_by_hex() -> void:
+	var g := EconomyFixture.game(&"GEN")
+	var ws := EconomyPreview.worth_seasons(g, &"GEN", 4)
+	var one := EconomyPreview.worth_seasons(g, &"GEN", 1)
+	var listed := 0
+	for row: Dictionary in EconomyPreview.worth_by_hex(g, &"GEN"):
+		var h := _hex_row(ws, g, row["hex"])
+		assert_gte(h, 0)
+		assert_eq((ws["worth"] as PackedInt32Array)[h * 4], int(row["worth"]), str(row["hex"]))
+		assert_eq((ws["upkeep"] as PackedInt32Array)[h * 4], int(row["upkeep"]), str(row["hex"]))
+		assert_eq((one["worth"] as PackedInt32Array)[h], int(row["worth"]), "one season asked")
+		listed += 1
+	assert_gt(listed, 5)
+	for h: int in (ws["hexes"] as PackedInt32Array).size():  # a hex worth_by_hex leaves out gives and costs nothing
+		var hex := g.map.hex_of((ws["hexes"] as PackedInt32Array)[h])
+		if EconomyPreview.worth_of(g, &"GEN", hex).is_empty():
+			assert_eq((ws["worth"] as PackedInt32Array)[h * 4], 0)
+			assert_eq((ws["upkeep"] as PackedInt32Array)[h * 4], 0)
+
+
+func test_a_work_under_way_stands_from_its_ready_turn_in_the_window() -> void:
+	var g := InsightsFixture.genoa_1483()
+	var genoa := Vector2i(8, 13)
+	var work := g.state.work_at(genoa)
+	assert_not_null(work, "the city is still being built at Spring 1483")
+	var ready := Works.ready_turn(g, work)
+	assert_gt(ready, g.turn)
+	assert_lt(ready, g.turn + 4, "it lands inside the window")
+	var ws := EconomyPreview.worth_seasons(g, &"GEN", 4)
+	var h := _hex_row(ws, g, genoa)
+	var seasons := _worths(ws, h)
+	var landed := ready - g.turn
+	var upkeep := (ws["upkeep"] as PackedInt32Array)
+	assert_eq(upkeep[h * 4 + landed - 1], upkeep[h * 4], "the walled town until then")
+	assert_gt(upkeep[h * 4 + landed], upkeep[h * 4 + landed - 1], "the city costs more from the ready turn")
+	assert_ne(seasons[landed], seasons[0])
+	var plain := EconomyPreview.with(g, &"GEN", {}, 4)
+	assert_eq(int(plain["seasons"][landed]["turn"]), ready)
+
+
+func test_worth_seasons_is_cached_by_version_and_changes_nothing() -> void:
+	var g := EconomyFixture.game(&"GEN")
+	var digest := g.digest()
+	var version := g.version
+	var a := EconomyPreview.worth_seasons_shared(g, &"GEN", 4)
+	assert_true(is_same(EconomyPreview.worth_seasons_shared(g, &"GEN", 4), EconomyPreview.worth_seasons_shared(g, &"GEN", 4)), "cached")
+	assert_false(is_same(a, EconomyPreview.worth_seasons_shared(g, &"GEN", 2)), "the seasons are in the key")
+	assert_eq(g.digest(), digest)
+	assert_eq(g.version, version)
+	g.dev_money(&"GEN", 100)
+	var after := EconomyPreview.worth_seasons_shared(g, &"GEN", 4)
+	assert_false(is_same(after, a), "a cached result is not served after an action")
+	assert_true((EconomyPreview.worth_seasons(g, &"NOPE", 4)["hexes"] as PackedInt32Array).is_empty())
+	var map_only := Game.new_game(EconomyFixture.map(), 5, EconomyFixture.defs())
+	assert_true((EconomyPreview.worth_seasons(map_only, &"GEN", 4)["hexes"] as PackedInt32Array).is_empty())
+
+
+func test_worth_seasons_top_and_total_name_the_makers() -> void:
+	var g := EconomyFixture.game(&"GEN")
+	var ws := EconomyPreview.worth_seasons(g, &"GEN", 4)
+	var wine := 3
+	assert_eq((ws["total"] as PackedInt32Array)[wine], 24)
+	assert_eq(g.map.hex_of((ws["top"] as PackedInt32Array)[wine]), Vector2i(7, 12))
+	assert_eq((ws["total"] as PackedInt32Array)[4], 0, "no salt")
+	assert_eq((ws["top"] as PackedInt32Array)[4], -1)
+
+
+func test_worth_seasons_equals_the_worth_worked_out_by_hand_under_works() -> void:
+	# every hex of every season: the one pass equals the worth of each season worked out from a base per view
+	var g := EconomyFixture.game(&"GEN", true)
+	g.dev_money(&"GEN", 5000)
+	for hex: Vector2i in [Vector2i(8, 13), Vector2i(7, 14), EconomyFixture.VINEYARD_HEX]:
+		for row: Dictionary in ImprovePreview.options_of(g, &"GEN", hex):
+			if bool(row["verdict"]["ok"]):
+				g.act(String(row["action"]), {"hex": hex, "family": row["family"], "tag": &"GEN"})
+				break
+	assert_gt(g.state.works.size(), 0)
+	var ws := EconomyPreview.worth_seasons(g, &"GEN", 8)
+	var records := EconomyPreview.baseline(g, &"GEN", 8, 1)
+	var run: Array = EconomyPreview.with(g, &"GEN", {}, 8)["seasons"]
+	var c := Countries.by_tag(g, &"GEN")
+	var prices := Economy.market_prices(g, null, 0, c.stock)
+	for h: int in (ws["hexes"] as PackedInt32Array).size():
+		var i: int = (ws["hexes"] as PackedInt32Array)[h]
+		for k: int in 8:
+			var rec: Dictionary = records[k]
+			var base := Economy.district_base(g, rec["view"] as StateView, g.map.hex_of(i))
+			var goods := PackedInt32Array()
+			goods.resize(g.defs.goods.size())
+			var out := Economy.add_output(base, Economy.slot_for(int(g.map.climate[i]), int(rec["season"])), Economy.CALM, c.tax, g.defs, goods)
+			var milli := 0
+			for n: int in goods.size():
+				milli += goods[n] * prices[n]
+			var factor := EconomySeason.factor_of(g, int(run[k]["content"]))
+			var rate: int = g.defs.town_tax_milli * factor / 1000 if int(base["family"]) == Economy.SETTLEMENTS else g.defs.country_tax_milli
+			var taxes: int = int(base["room"]) * rate * g.defs.tax_permille[c.tax] / 1000000000
+			var want: int = milli / 1000 + int(out["ducats"]) + taxes - int(out["upkeep"]) - int(out["walls"])
+			assert_eq((ws["worth"] as PackedInt32Array)[h * 8 + k], want, "hex %s season %d" % [str(g.map.hex_of(i)), k])

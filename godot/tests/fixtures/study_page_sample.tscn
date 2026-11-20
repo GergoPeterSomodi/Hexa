@@ -5,13 +5,27 @@
 [node name="SamplePage" type="VBoxContainer"]
 script = ExtResource("1_page")
 page_id = &"sample"
+tabs = Array[Dictionary]([{"id": &"alpha", "since": "4", "title": "Alpha"}, {"id": &"beta", "since": "4.5", "title": "Beta"}])
 
 [node name="Heading" type="Label" parent="."]
 layout_mode = 2
 theme_type_variation = &"SectionHead"
 text = "Sample page"
 
-[node name="Spacer" type="Control" parent="."]
+[node name="alpha" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Spacer" type="Control" parent="alpha"]
+custom_minimum_size = Vector2(0, 1200)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="beta" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Spacer" type="Control" parent="beta"]
 custom_minimum_size = Vector2(0, 1200)
 layout_mode = 2
 mouse_filter = 2

@@ -18,6 +18,10 @@ const SERIES: Array[String] = [
 ]
 ## The first of the districts_<family> columns; the column of family f (1 to 14) is DISTRICTS_FIRST + f - 1.
 const DISTRICTS_FIRST := 21
+## The parts of a goods ring row (goods_value and goods_series): [(c * RING + turn % RING) * G + g) * 3 + part].
+const MADE := 0
+const USED := 1
+const STOCK := 2
 
 ## Country tags in id order; [""] in a map-only game.
 var tags: PackedStringArray = PackedStringArray()
@@ -113,6 +117,28 @@ func series(tag: StringName, p_name: String, span: int) -> PackedInt32Array:
 	var s := SERIES.size()
 	for t: int in range(last_turn - n + 1, last_turn + 1):
 		out.append(ring[(c * RING + posmod(t, RING)) * s + col])
+	return out
+
+
+## One part (MADE, USED or STOCK) of one good of a country's goods ring row at `turn`; 0 when the row is not written or
+## out of the ring, or the tag, the good or the part is unknown. Read-only.
+func goods_value(tag: StringName, turn: int, good: int, part: int) -> int:
+	var c := index_of(tag)
+	if c < 0 or good < 0 or good >= goods or part < MADE or part > STOCK or not has_row(turn):
+		return 0
+	return goods_ring[(((c * RING + posmod(turn, RING)) * goods) + good) * 3 + part]
+
+
+## The last `span` (at most RING) values of one part of one good, newest last; fewer when fewer rows are written, empty
+## for an unknown tag, good or part. Read-only.
+func goods_series(tag: StringName, good: int, part: int, span: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var c := index_of(tag)
+	if c < 0 or good < 0 or good >= goods or part < MADE or part > STOCK or count == 0:
+		return out
+	var n := mini(mini(span, RING), count)
+	for t: int in range(last_turn - n + 1, last_turn + 1):
+		out.append(goods_ring[(((c * RING + posmod(t, RING)) * goods) + good) * 3 + part])
 	return out
 
 

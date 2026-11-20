@@ -233,3 +233,58 @@ func test_the_stats_phase_closes_the_ledgers_and_the_flows() -> void:
 	assert_eq(c.flows_open.count(0), c.flows_open.size(), "the flows start again from zero")
 	assert_eq(c.stock_from, c.stock)
 	assert_eq(int(c.goods_closed["turn"]), 1)
+
+
+func _goods_stats(seasons: int) -> Stats:
+	var st := Stats.create(PackedStringArray(["AAA", "BBB"]), 3)
+	for t: int in range(1, seasons + 1):
+		for c: int in 2:
+			var base := (c * Stats.RING + posmod(t, Stats.RING)) * 3 * 3
+			for g: int in 3:
+				st.goods_ring[base + g * 3 + Stats.MADE] = t * 100 + c * 10 + g
+				st.goods_ring[base + g * 3 + Stats.USED] = t * 100 + c * 10 + g + 1000
+				st.goods_ring[base + g * 3 + Stats.STOCK] = t * 100 + c * 10 + g + 2000
+		_write(st, t, t)
+	return st
+
+
+func test_goods_value_reads_the_ring() -> void:
+	var st := _goods_stats(5)
+	assert_eq(st.goods_value(&"AAA", 3, 2, Stats.MADE), 302)
+	assert_eq(st.goods_value(&"BBB", 3, 1, Stats.USED), 1311)
+	assert_eq(st.goods_value(&"BBB", 5, 0, Stats.STOCK), 2510)
+	assert_eq(st.goods_value(&"AAA", 6, 0, Stats.MADE), 0, "not written yet")
+	assert_eq(st.goods_value(&"AAA", 0, 0, Stats.MADE), 0)
+
+
+func test_goods_value_and_series_give_nothing_for_the_unknown() -> void:
+	var st := _goods_stats(5)
+	assert_eq(st.goods_value(&"ZZZ", 3, 0, Stats.MADE), 0, "unknown tag")
+	assert_eq(st.goods_value(&"AAA", 3, 3, Stats.MADE), 0, "unknown good")
+	assert_eq(st.goods_value(&"AAA", 3, -1, Stats.MADE), 0)
+	assert_eq(st.goods_value(&"AAA", 3, 0, 3), 0, "unknown part")
+	assert_true(st.goods_series(&"ZZZ", 0, Stats.MADE, 5).is_empty())
+	assert_true(st.goods_series(&"AAA", 9, Stats.MADE, 5).is_empty())
+	assert_true(st.goods_series(&"AAA", 0, 7, 5).is_empty())
+	assert_true(Stats.create(PackedStringArray(["AAA"]), 3).goods_series(&"AAA", 0, Stats.MADE, 5).is_empty(), "no season written")
+
+
+func test_goods_series_spans_and_wraps() -> void:
+	var st := _goods_stats(5)
+	assert_eq(st.goods_series(&"AAA", 1, Stats.MADE, 3), PackedInt32Array([301, 401, 501]))
+	assert_eq(st.goods_series(&"AAA", 1, Stats.MADE, 40), PackedInt32Array([101, 201, 301, 401, 501]), "a span longer than the seasons written")
+	var long := _goods_stats(43)
+	var s := long.goods_series(&"BBB", 2, Stats.STOCK, 40)
+	assert_eq(s.size(), 40)
+	assert_eq(s[0], 4 * 100 + 10 + 2 + 2000, "the oldest in the ring is turn 4")
+	assert_eq(s[39], 43 * 100 + 10 + 2 + 2000)
+	assert_eq(long.goods_value(&"AAA", 3, 0, Stats.MADE), 0, "out of the ring")
+	assert_eq(long.goods_series(&"AAA", 0, Stats.MADE, 100).size(), 40, "never more than the ring")
+
+
+func test_the_goods_accessors_change_nothing() -> void:
+	var st := _goods_stats(5)
+	var before := st.digest()
+	st.goods_value(&"AAA", 3, 1, Stats.USED)
+	st.goods_series(&"AAA", 1, Stats.USED, 40)
+	assert_eq(st.digest(), before)

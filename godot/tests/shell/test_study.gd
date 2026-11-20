@@ -6,6 +6,7 @@ const SCENE := "res://shell/screens/study.tscn"
 const SAMPLE := "res://tests/fixtures/study_page_sample.tscn"
 const GENOA_HEX := Vector2i(7, 12)
 const FRAME_INSET := Vector2(30.0, 30.0)
+const COUNTING := "res://tests/fixtures/study_page_counting.tscn"
 
 var _harness: UIHarness = null
 var _requests: Array[Array] = []
@@ -40,6 +41,20 @@ func _open(entries: Array[Dictionary]) -> Study:
 	study.configure(entries)
 	_harness.stack.push(study)
 	return study
+
+
+func _open_at(entries: Array[Dictionary], at: String) -> Study:
+	var study := (load(SCENE) as PackedScene).instantiate() as Study
+	study.configure(entries, at)
+	_harness.stack.push(study)
+	return study
+
+
+func _ids(tabs: Array[Dictionary]) -> Array:
+	var out: Array = []
+	for tab: Dictionary in tabs:
+		out.append(StringName(str(tab["id"])))
+	return out
 
 
 func test_study_is_an_opaque_screen_with_its_id() -> void:
@@ -124,7 +139,7 @@ func test_close_button_closes_the_study() -> void:
 
 func test_page_keys_hint_hidden_with_one_page_shown_with_two() -> void:
 	var one := _open(_sample_entries(1))
-	assert_false(one.hint().text.contains("[ ]"))
+	assert_false(one.hint().text.contains("[ ]: page"))
 	assert_true(one.hint().text.contains("I: close"))
 	assert_true(one.hint().text.contains("Enter: look there"))
 	_harness.stack.clear()
@@ -142,10 +157,17 @@ func test_page_look_request_is_forwarded_as_look_at() -> void:
 	assert_eq((_requests[0][1] as Dictionary)["select"], true)
 
 
-func test_other_page_actions_are_not_forwarded() -> void:
+func test_country_and_map_mode_actions_are_forwarded() -> void:
 	var study := _open(_sample_entries(1))
-	study.current_page().request([&"map_mode", &"trade"])
-	assert_eq(_requests.size(), 0)
+	study.current_page().request([&"country", &"GEN"])
+	assert_eq(_requests[0][0], &"country")
+	assert_eq((_requests[0][1] as Dictionary)["tag"], &"GEN")
+	study.current_page().request([&"map_mode", &"trade", GENOA_HEX])
+	assert_eq(_requests[1][0], &"look_at")
+	assert_eq(_requests[1][1], {"hex": GENOA_HEX, "select": false, "mode": &"trade"})
+	study.current_page().request([&"map_mode", &"yields"])
+	assert_eq(_requests[2][0], &"look_at")
+	assert_eq(_requests[2][1], {"mode": &"yields"})
 
 
 func test_frame_fits_1280_by_720_and_2560_by_1440() -> void:
@@ -171,3 +193,98 @@ func test_accessibility_names() -> void:
 func test_study_pages_shown_is_empty_before_economy() -> void:
 	assert_true(StudyPages.shown("3").is_empty())
 	assert_true(StudyPages.shown("not a number").is_empty())
+
+
+func test_shown_tabs_follow_the_milestone() -> void:
+	var at_four := _open_at(_sample_entries(1), "4")
+	assert_eq(_ids(at_four.current_page().shown_tabs()), [&"alpha"])
+	_harness.stack.clear()
+	var at_45 := _open_at(_sample_entries(1), "4.5")
+	assert_eq(_ids(at_45.current_page().shown_tabs()), [&"alpha", &"beta"])
+
+
+func test_tab_strip_shows_only_from_two_shown_tabs() -> void:
+	var at_four := _open_at(_sample_entries(1), "4")
+	var strip := at_four.current_page().get_node("TabStrip") as Control
+	assert_false(strip.visible)
+	_assert_beta_not_selected(at_four)
+	_harness.stack.clear()
+	var at_45 := _open_at(_sample_entries(1), "4.5")
+	assert_true((at_45.current_page().get_node("TabStrip") as Control).visible)
+
+
+func _assert_beta_not_selected(study: Study) -> void:
+	var page := study.current_page()
+	page.select_tab(&"beta")
+	assert_eq(page.current_tab(), &"alpha", "a tab that is not shown yet is not selected")
+
+
+func test_open_page_focus_selects_the_tab_and_times_the_open() -> void:
+	var study := _open_at(_sample_entries(2), "4.5")
+	study.open_page(&"sample")
+	var seen: Array[StringName] = []
+	study.current_page().tab_changed.connect(func(tab: StringName) -> void: seen.append(tab))
+	study.open_page(&"sample", {"tab": "beta"})
+	assert_eq(seen, [&"beta"])
+	assert_eq(study.current_page().current_tab(), &"beta")
+	assert_true(study.last_open_ms >= 0.0)
+	assert_true(study.hint().text.contains("Ctrl+[ ]: tab"))
+
+
+func test_focus_with_an_unknown_tab_changes_nothing() -> void:
+	var study := _open_at(_sample_entries(1), "4.5")
+	study.open_page(&"sample", {"tab": "nope"})
+	assert_eq(study.current_page().current_tab(), &"alpha")
+
+
+func test_step_tab_stops_at_the_first_and_last_tab() -> void:
+	var study := _open_at(_sample_entries(1), "4.5")
+	var page := study.current_page()
+	assert_eq(page.current_tab(), &"alpha")
+	page.step_tab(-1)
+	assert_eq(page.current_tab(), &"alpha")
+	page.step_tab(1)
+	assert_eq(page.current_tab(), &"beta")
+	page.step_tab(1)
+	assert_eq(page.current_tab(), &"beta")
+
+
+func test_the_tab_in_view_is_kept_for_the_life_of_the_page() -> void:
+	var study := _open_at(_sample_entries(2), "4.5")
+	study.open_page(&"sample")
+	study.current_page().select_tab(&"beta")
+	study.open_page(&"sample2")
+	study.open_page(&"sample")
+	assert_eq(study.current_page().current_tab(), &"beta")
+
+
+func test_selected_tab_shows_its_body_and_hides_the_other() -> void:
+	var study := _open_at(_sample_entries(1), "4.5")
+	var page := study.current_page()
+	page.select_tab(&"beta")
+	await _harness.wait_frames(self, 40)
+	assert_true((page.get_node("beta") as Control).visible)
+	assert_false((page.get_node("alpha") as Control).visible)
+
+
+func test_ctrl_brackets_step_the_tabs_and_plain_brackets_step_the_pages() -> void:
+	var study := _open_at(_sample_entries(2), "4.5")
+	study.open_page(&"sample")
+	_harness.send_key(KEY_BRACKETRIGHT, true, true)
+	assert_eq(study.current_page().current_tab(), &"beta")
+	_harness.send_key(KEY_BRACKETLEFT, true, true)
+	assert_eq(study.current_page().current_tab(), &"alpha")
+	assert_eq(study.current_page_id(), &"sample")
+	_harness.send_key(KEY_BRACKETRIGHT)
+	assert_eq(study.current_page_id(), &"sample2")
+
+
+func test_hint_shows_tab_keys_only_on_a_page_with_two_shown_tabs() -> void:
+	var plain: Array[Dictionary] = [{"id": &"plain", "title": "Plain", "scene": COUNTING, "since": "4"}]
+	var study := _open_at(plain, "4.5")
+	assert_false(study.hint().text.contains("Ctrl+[ ]"))
+	_harness.stack.clear()
+	var tabbed := _open_at(_sample_entries(1), "4.5")
+	assert_true(tabbed.hint().text.contains("Ctrl+[ ]: tab"))
+	assert_true(tabbed.hint().text.contains("I: close"))
+	assert_true(tabbed.hint().text.contains("Enter: look there"))
