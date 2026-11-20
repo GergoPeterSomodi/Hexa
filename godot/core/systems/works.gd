@@ -10,12 +10,6 @@ const UPGRADE := &"upgrade"
 const CLEAR := &"clear"
 ## The longest a ready date is searched for (seasons); a work never takes anywhere near it.
 const HORIZON := 1024
-const _LEVEL_WORDS := {
-	"settlements": ["", "hamlet", "village", "town", "walled town", "city"],
-	"castles": ["", "watchtower", "castle", "fortress"],
-	"harbour": ["", "fishing jetty", "quay", "port"],
-}
-const _STAGE_WORDS: Array[String] = ["wild", "first", "second", "third"]
 
 
 # ----- the checks ------------------------------------------------------------------------------------------------
@@ -286,17 +280,21 @@ static func _label(work: Work) -> String:
 	var piece := FamilyIds.NAMES[clampi(work.family, 0, FamilyIds.COUNT - 1)]
 	if work.action == CLEAR:
 		return "clearing the %s" % piece
-	var words: Variant = _LEVEL_WORDS.get(piece, null)
+	var words: Variant = FamilyIds.LEVEL_WORDS.get(piece, null)
 	if words == null:
 		if work.action == BUILD:
 			return "%s, first stage" % piece
-		return "%s, %s to %s stage" % [piece, _STAGE_WORDS[clampi(work.level_to - 1, 0, 3)],
-			_STAGE_WORDS[clampi(work.level_to, 0, 3)]]
+		return "%s, %s to %s stage" % [piece, _stage(work.level_to - 1), _stage(work.level_to)]
 	var list: Array = words
 	if work.action == BUILD:
 		return str(list[clampi(work.level_to, 0, list.size() - 1)])
 	return "%s to %s" % [list[clampi(work.level_to - 1, 0, list.size() - 1)],
 		list[clampi(work.level_to, 0, list.size() - 1)]]
+
+
+## "first" for a stage level (the shared tables say "first stage").
+static func _stage(level: int) -> String:
+	return FamilyIds.STAGE_WORDS[clampi(level, 0, 3)].trim_suffix(" stage")
 
 
 static func _long_name(game: Game, tag: StringName) -> String:

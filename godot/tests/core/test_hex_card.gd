@@ -233,6 +233,35 @@ func test_owner_line_in_scenario_and_map_only_games() -> void:
 	assert_null(_find_line(sea_after["lines"] as Array, "Owner"))
 
 
+func test_work_line_and_its_halted_form() -> void:
+	var defs := load("res://data/defs/game_defs.tres") as GameDefs
+	var game := Game.new_game(_map, START_SEED, defs)
+	var hex := Vector2i(7, 12)
+	var plain := HexCard.of(game, hex)
+	assert_null(_find_line(plain["lines"] as Array, "Work"), "none without a work")
+	game.state.works.append(_work(1, hex, ImproveRules.VINEYARD, 1, 4))
+	var line: Variant = _find_line(HexCard.of(game, hex)["lines"] as Array, "Work")
+	assert_eq(line, ["Work", &"warn", "vineyard, first stage: 1 of 4 seasons, ready Spring 1481"])
+	var snow := Vector2i(9, 11)
+	game.turn = 4
+	game.state.works.append(_work(2, snow, ImproveRules.TIMBER, 1, 3))
+	var halted: Variant = _find_line(HexCard.of(game, snow)["lines"] as Array, "Work")
+	assert_eq(halted, ["Work", &"warn", "timber, first stage: stopped for the winter, ready Winter 1481"])
+
+
+func _work(id: int, hex: Vector2i, family: int, level_to: int, left: int) -> Work:
+	var w := Work.new()
+	w.id = id
+	w.hex = hex
+	w.action = Works.BUILD
+	w.family = family
+	w.level_to = level_to
+	w.started_turn = 1
+	w.seasons = 4
+	w.seasons_left = left
+	return w
+
+
 func _find_line(lines: Array, label: String) -> Variant:
 	for row: Variant in lines:
 		var arr: Array = row

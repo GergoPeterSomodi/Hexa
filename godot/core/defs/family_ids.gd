@@ -12,3 +12,12 @@ const NAMES: Array[String] = [
 ]
 ## The highest level of each family (settlements 5, the rest 3).
 const TOP_LEVEL: Array[int] = [0, 5, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+
+## The words for a level, per family (docs/design/map/pieces/GUIDE.md section 8); other families use STAGE_WORDS.
+## One source for the hex card, the works view and the works' own refusal texts.
+const LEVEL_WORDS := {
+	"settlements": ["", "hamlet", "village", "town", "walled town", "city"],
+	"castles": ["", "watchtower", "castle", "fortress"],
+	"harbour": ["", "fishing jetty", "quay", "port"],
+}
+const STAGE_WORDS: Array[String] = ["wild", "first stage", "second stage", "third stage"]

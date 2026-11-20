@@ -4,12 +4,8 @@ class_name HexCard
 extends RefCounted
 
 ## The words for a level, per family (docs/design/map/pieces/GUIDE.md section 8); other families use STAGE_WORDS.
-const LEVEL_WORDS := {
-	"settlements": ["", "hamlet", "village", "town", "walled town", "city"],
-	"castles": ["", "watchtower", "castle", "fortress"],
-	"harbour": ["", "fishing jetty", "quay", "port"],
-}
-const STAGE_WORDS: Array[String] = ["wild", "first stage", "second stage", "third stage"]
+const LEVEL_WORDS := FamilyIds.LEVEL_WORDS
+const STAGE_WORDS: Array[String] = FamilyIds.STAGE_WORDS
 const COVER_WORDS: Array[String] = ["farmland", "grassland", "woods", "marsh", "rock", "snow", "tundra", "sand"]
 const RELIEF_WORDS: Array[String] = ["sea", "lowland", "plain", "hills", "highland", "mountains", "high peaks"]
 const CLIMATE_WORDS: Array[String] = ["snow", "frost", "mild"]
@@ -236,6 +232,9 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 			lines.append(["", &"rule", ""])
 			for row: Array in piece_rows(piece):
 				lines.append([str(row[0]), &"plain", str(row[1])])
+		var work_line := work_text(game, hex)
+		if work_line != "":
+			lines.append(["Work", &"warn", work_line])
 	else:
 		lines.append(["Depth", &"plain", cover])
 		lines.append(["Relief", &"plain", relief])
@@ -258,6 +257,16 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 		"piece": piece,
 		"lines": lines,
 	}
+
+
+## The hover card's Work line: "vineyard, first stage: 1 of 4 seasons, ready Spring 1481" (": stopped for the winter,
+## ready Autumn 1481" when halted this season); "" when no work stands on `hex`.
+static func work_text(game: Game, hex: Vector2i) -> String:
+	var work := WorksView.at(game, hex)
+	if work.is_empty():
+		return ""
+	var middle := "stopped for the winter" if bool(work["halted"]) else str(work["progress"])
+	return "%s: %s, ready %s" % [work["label"], middle, work["ready"]]
 
 
 static func top_level(family_name: String) -> int:
