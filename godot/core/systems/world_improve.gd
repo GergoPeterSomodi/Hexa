@@ -159,44 +159,58 @@ static func _verdict(ok: bool, reason: String = "") -> Dictionary:
 ## The first pair rule that the option (family, level) on a hex breaks against the pieces within two hexes, as a
 ## reason with the neighbour's place; "" when none.
 func _pair_conflict(hex: Vector2i, family_id: int, level_value: int) -> String:
+	var found := conflict(hex, family_id, level_value)
+	if found.is_empty():
+		return ""
+	var other: Vector2i = found["hex"]
+	return "%s (%s %d at %d, %d)" % [ImproveRules.PAIR_RULES[int(found["rule"])][5],
+		ImproveRules.NAMES[int(found["family"])], int(found["level"]), other.x, other.y]
+
+
+## {} or {rule: int (index in ImproveRules.PAIR_RULES), hex: Vector2i, family: int, level: int}: the first pair rule the
+## option (family, level) on a hex breaks, in the order _pair_conflict walks (the neighbours, then the ring of two),
+## and the piece it breaks it against.
+func conflict(hex: Vector2i, family_id: int, level_value: int) -> Dictionary:
+	if not _index.has(hex):
+		return {}
 	if _lazy:
 		return _pair_conflict_lazy(hex, family_id, level_value)
 	var i := int(_index[hex])
 	for d: int in 6:
 		var k := _neighbour_cell(i, d)
 		if k >= 0:
-			var why := _pair_against(k, family_id, level_value, 1)
-			if why != "":
-				return why
+			var found := _pair_against(k, family_id, level_value, 1)
+			if not found.is_empty():
+				return found
 	for k: int in _ring2_of(i):
-		var why := _pair_against(k, family_id, level_value, 2)
-		if why != "":
-			return why
-	return ""
+		var found := _pair_against(k, family_id, level_value, 2)
+		if not found.is_empty():
+			return found
+	return {}
 
 
 ## The same answer as the tables above for a game over a state (loaded, or just checked): the neighbours in edge order,
 ## then the twelve hexes two away in row order, skipping the wild ones by a look at the state before any cell lookup
 ## (nearly every hex around is wild, and a sea hex holds no piece).
-func _pair_conflict_lazy(hex: Vector2i, family_id: int, level_value: int) -> String:
+func _pair_conflict_lazy(hex: Vector2i, family_id: int, level_value: int) -> Dictionary:
 	var use := state.main_use
 	for d: int in 6:
 		var beside := ImproveRules.neighbour(hex, d)
 		var at := map.index_of(beside)
 		if at < 0 or use[at] == 0 or map.land[at] == 0:
 			continue
-		var why := _pair_against(int(_index[beside]), family_id, level_value, 1)
-		if why != "":
-			return why
+		var found := _pair_against(int(_index[beside]), family_id, level_value, 1)
+		if not found.is_empty():
+			return found
 	for delta: Vector2i in _ring_deltas((hex.y & 1) == 1):
 		var far := hex + delta
 		var at := map.index_of(far)
 		if at < 0 or use[at] == 0 or map.land[at] == 0:
 			continue
-		var why := _pair_against(int(_index[far]), family_id, level_value, 2)
-		if why != "":
-			return why
-	return ""
+		var found := _pair_against(int(_index[far]), family_id, level_value, 2)
+		if not found.is_empty():
+			return found
+	return {}
 
 
 ## The land cell next to cell `i` in direction `d`, or -1.
@@ -213,15 +227,15 @@ func _ring2_of(i: int) -> PackedInt32Array:
 	return _ring_of(_cells[i])
 
 
-func _pair_against(cell: int, family_id: int, level_value: int, radius: int) -> String:
+func _pair_against(cell: int, family_id: int, level_value: int, radius: int) -> Dictionary:
 	var other := _cells[cell]
 	var f := family_at(other)
 	if f == ImproveRules.NONE:
-		return ""
-	var why := ImproveRules.pair_reason(family_id, level_value, f, level_at(other), radius)
-	if why == "":
-		return ""
-	return "%s (%s %d at %d, %d)" % [why, ImproveRules.NAMES[f], level_at(other), other.x, other.y]
+		return {}
+	var rule := ImproveRules.pair_rule(family_id, level_value, f, level_at(other), radius)
+	if rule < 0:
+		return {}
+	return {"rule": rule, "hex": other, "family": f, "level": level_at(other)}
 
 
 ## The pieces a wild hex may take, each {family_id, family, level (1), ok, reason}: every family its ground allows at

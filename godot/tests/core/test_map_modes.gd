@@ -169,3 +169,13 @@ func test_colour_at_matches_colour_of_for_owned_unowned_and_sea() -> void:
 	var unowned_col := MapModes.colour_at(game, MapModes.Mode.OWNER, unowned_hex, pal, true, 0)
 	assert_true(unowned_col.is_equal_approx(Color(pal[0].r, pal[0].g, pal[0].b, MapModes.OWNER_ALPHA)))
 	assert_eq(MapModes.colour_at(game, MapModes.Mode.TERRAIN, unowned_hex, pal, true, 0), Color(0.0, 0.0, 0.0, 0.0))
+
+
+func test_delta_colour_is_good_for_a_gain_and_bad_for_a_loss() -> void:
+	var gain := MapModes.delta_colour(12)
+	var loss := MapModes.delta_colour(-3)
+	assert_eq(Color(gain.r, gain.g, gain.b), Color("#7fc98a"))
+	assert_eq(Color(loss.r, loss.g, loss.b), Color("#f0806a"))
+	assert_almost_eq(gain.a, 0.35, 0.0001)
+	assert_almost_eq(loss.a, 0.35, 0.0001)
+	assert_eq(MapModes.delta_colour(0).a, 0.0, "no change, no tint")

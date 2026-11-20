@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GoodDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/good_def.gd" id="1_good"]
+
+[resource]
+script = ExtResource("1_good")
+id = 10
+key = &"horses"
+name = "Horses"
+kind = &"ware"
+price_milli = 3000
+need_milli = 0
+need_weight = 0
+food_order = -1
+reserve_fixed = 0
+harvest_word = ""
+icon = &"good_horses"

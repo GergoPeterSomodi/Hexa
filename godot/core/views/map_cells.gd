@@ -140,6 +140,30 @@ static func fill_hex(map: MapData, state: MapState, hex: Vector2i, out: PackedSt
 				bool(piece["mirror"]), side, ADDON_PARTS[k])
 
 
+## The piece layers' tile names for a piece dictionary (Improve.piece_for or piece_of) on a hex, as of_hex would give
+## them: {layer name: tile name} for the four piece layers and the three add-on layers only ({} for no piece).
+static func piece_cells(map: MapData, piece: Dictionary, hex: Vector2i) -> Dictionary:
+	var out: Dictionary = {}
+	var i := map.index_of(hex)
+	if piece.is_empty() or i < 0 or map.land[i] == 0:
+		return out
+	var mask := map.coast_mask(hex)
+	var family := str(piece["family"])
+	var extra := str(piece["extra"])
+	if family == "harbour" or family == "salt":
+		extra = MapTiles.sea_side(mask)
+	for k: int in PIECE_PARTS.size():
+		out[LAYERS[AT_PIECE + k]] = MapTiles.piece(family, int(piece["level"]), int(piece["variant"]),
+			bool(piece["mirror"]), extra, PIECE_PARTS[k])
+	if int(piece["addon"]) > 0 and mask != 0:
+		var carved := str(piece["addon_mode"]) == "carved" and MapTiles.bay_fits(mask)
+		var side := "carved" if carved else MapTiles.sea_side(mask)
+		for k: int in ADDON_PARTS.size():
+			out[LAYERS[AT_ADDON_GROUND + k]] = MapTiles.piece("harbour_addon", int(piece["addon"]),
+				int(piece["variant"]), bool(piece["mirror"]), side, ADDON_PARTS[k])
+	return out
+
+
 ## The hexes whose tiles can change when `hex` changes: the hex and its six neighbours (the ones on the map).
 static func touched_by(map: MapData, hex: Vector2i) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []

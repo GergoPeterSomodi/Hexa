@@ -1,6 +1,6 @@
 ## FamilyDef and the family part of GameDefs (core/defs/family_def.gd, core/defs/game_defs.gd;
-## docs/architecture/m3-build-spec.md sections 4.3, 5.1 and 7): the 14 committed files against table 4.3, the slot
-## numbers, and planted faults (P) for each rule.
+## docs/architecture/m3-build-spec.md sections 4.3, 5.1 and 7; m4-build-spec.md sections 4.4, 5.1 and 9): the 14 committed
+## files against table 4.3 and the M4 numbers of 4.4, the slot numbers, and planted faults (P) for each rule.
 extends GutTest
 
 ## Table 4.3: key, id, work seasons to level 0..top, clear seasons.
@@ -22,8 +22,9 @@ const TABLE: Array = [
 ]
 
 
+## A family from the committed file of the same key (so the M4 numbers are whole), with the M3 fields replaced.
 func _family(p_id: int, p_key: StringName, p_seasons: PackedInt32Array, p_clear: int = 1) -> FamilyDef:
-	var f := FamilyDef.new()
+	var f := _load_family(String(p_key))
 	f.id = p_id
 	f.key = p_key
 	f.work_seasons = p_seasons
@@ -213,6 +214,149 @@ func test_planted_fault_null_family_entry() -> void:
 	fams[0] = null
 	defs.families = fams
 	assert_true(_has(defs.validate(), "families[0]: entry is null"), "null entry reported")
+
+
+## M4 spec 4.4, the goods families: key, good, base, season percents, weather, keep wild, jobs, upkeep, cost, cost_goods,
+## ground line. The wheat-style costs are shared by the families that spec 4.4 marks "same".
+func _m4_rows() -> Array:
+	var wheat_cost := [0, 40, 100, 250]
+	var wheat_goods := [{}, {}, {"timber": 10}, {"timber": 20, "stone": 20}]
+	var mines_cost := [0, 60, 150, 350]
+	var mines_goods := [{}, {"timber": 10}, {"timber": 20}, {"timber": 30, "stone": 20}]
+	var jobs := [0, 1000, 2000, 4000]
+	var upkeep := [0, 1, 2, 4]
+	var harbour_upkeep := [0, 2, 3, 5]
+	var zero := [0, 0, 0, 0]
+	var keep := [0, 50, 25, 0]
+	var none := {}
+	return [
+		["wheat", "grain", none, [0, 10, 20, 32], [20, 100, 40, 0, 0, 10], true, zero, jobs, upkeep, wheat_cost, wheat_goods, "low farmland, up to 600 m"],
+		["hemp", "hemp", none, [0, 10, 20, 32], [0, 50, 100, 0, 0, 0], true, keep, jobs, upkeep, wheat_cost, wheat_goods, "farmland at a river or stream, up to 400 m"],
+		["silk", "silk", none, [0, 3, 6, 10], [100, 50, 0, 0, 0, 0], true, keep, jobs, upkeep, wheat_cost, wheat_goods, "farmland or meadow within two hexes of a town, up to 600 m, no snow winter"],
+		["dyes", "dyes", none, [0, 2, 4, 7], [50, 100, 50, 0, 0, 0], true, keep, jobs, upkeep, wheat_cost, wheat_goods, "farmland or meadow beside a town, up to 500 m"],
+		["vineyard", "wine", none, [0, 12, 24, 40], [0, 0, 100, 0, 0, 0], true, keep, jobs, upkeep, wheat_cost, wheat_goods, "farmland or meadow, 100–900 m, no snow winter"],
+		["olives", "oil", none, [0, 8, 16, 28], [0, 0, 50, 0, 0, 100], true, keep, jobs, upkeep, wheat_cost, wheat_goods, "the mild winter, on the coast or up to 900 m"],
+		["grazing", "", {"sheep": &"wool", "cattle": &"cattle", "horses": &"horses"}, [0, 8, 16, 26], [100, 120, 60, 0, 30, 30], true, zero, jobs, upkeep, wheat_cost, wheat_goods, "meadow, or woods from 700 m"],
+		["timber", "timber", none, [0, 6, 12, 20], [50, 50, 50, 0, 150, 150], false, zero, jobs, upkeep, wheat_cost, wheat_goods, "woods up to 1,800 m"],
+		["mines", "", {"iron": &"iron", "copper": &"copper", "silver": &"silver"}, [0, 4, 8, 14], [100, 100, 100, 0, 70, 100], false, zero, jobs, harbour_upkeep, mines_cost, mines_goods, "rock, or high ground from 1,000 m"],
+		["quarry", "stone", none, [0, 6, 12, 20], [100, 100, 100, 0, 70, 100], false, zero, jobs, upkeep, wheat_cost, wheat_goods, "rock, or upland from 700 m"],
+		["salt", "salt", none, [0, 4, 8, 14], [50, 150, 100, 0, 0, 20], true, zero, jobs, upkeep, wheat_cost, wheat_goods, "a low shore"],
+		["harbour", "fish", none, [0, 4, 8, 14], [100, 100, 100, 30, 50, 70], false, zero, [0, 500, 1000, 2000], harbour_upkeep, mines_cost, mines_goods, "a coast with no port beside it"],
+	]
+
+
+func _goods_array(items: Array[Dictionary]) -> Array:
+	var out: Array = []
+	for item: Dictionary in items:
+		out.append(item.duplicate())
+	return out
+
+
+func test_m4_goods_families_equal_table_4_4() -> void:
+	var extra_permille := {"grazing": {"sheep": 1000, "cattle": 750, "horses": 375}, "mines": {"iron": 1000, "copper": 750, "silver": 250}}
+	for row: Array in _m4_rows():
+		var key: String = row[0]
+		var f := _load_family(key)
+		assert_not_null(f, "%s loads" % key)
+		if f == null:
+			continue
+		assert_eq(String(f.good), row[1], "%s good" % key)
+		assert_eq(f.by_extra, row[2], "%s by_extra" % key)
+		assert_eq(Array(f.base), row[3], "%s base" % key)
+		assert_eq(Array(f.season_percent), row[4], "%s season_percent" % key)
+		assert_eq(f.weather_bound, row[5], "%s weather_bound" % key)
+		assert_eq(Array(f.keep_wild), row[6], "%s keep_wild" % key)
+		assert_eq(Array(f.jobs), row[7], "%s jobs" % key)
+		assert_eq(Array(f.upkeep), row[8], "%s upkeep" % key)
+		assert_eq(Array(f.walls), [0, 0, 0, 0], "%s walls" % key)
+		assert_eq(Array(f.cost), row[9], "%s cost" % key)
+		assert_eq(_goods_array(f.cost_goods), row[10], "%s cost_goods" % key)
+		assert_eq(f.ground_text, row[11], "%s ground" % key)
+		if extra_permille.has(key):
+			assert_eq(f.extra_permille, extra_permille[key], "%s extra_permille" % key)
+		assert_eq(f.validate(), [] as Array[String], "%s validates" % key)
+
+
+func test_m4_settlement_and_castle_numbers_equal_table_4_4() -> void:
+	var s := _load_family("settlements")
+	assert_eq(Array(s.people), [0, 1000, 3000, 10000, 30000, 60000])
+	assert_eq(Array(s.keep_wild), [0, 100, 100, 100, 75, 50])
+	assert_eq(Array(s.jobs), [0, 0, 0, 0, 0, 0])
+	assert_eq(Array(s.upkeep), [0, 0, 1, 2, 2, 5])
+	assert_eq(Array(s.walls), [0, 0, 0, 0, 4, 6])
+	assert_eq(Array(s.ring_lift), [0, 0, 0, 0, 100, 200])
+	assert_eq(Array(s.port_fish), [0, 1, 2, 4, 6, 10])
+	assert_eq(Array(s.port_dues), [0, 2, 5, 12, 30, 45])
+	assert_eq(Array(s.cost), [0, 0, 100, 300, 700, 1000])
+	assert_eq(_goods_array(s.cost_goods), [{}, {}, {"timber": 10}, {"timber": 20, "stone": 10}, {"timber": 20, "stone": 60}, {"timber": 20, "stone": 40}])
+	assert_eq(s.base.size(), 0, "settlements make no goods")
+	assert_eq(s.ground_text, "")
+	var c := _load_family("castles")
+	assert_eq(Array(c.keep_wild), [0, 100, 100, 100])
+	assert_eq(Array(c.walls), [0, 2, 4, 8])
+	assert_eq(Array(c.cost), [0, 60, 200, 500])
+	assert_eq(_goods_array(c.cost_goods), [{}, {"timber": 10, "stone": 10}, {"stone": 40}, {"stone": 80, "iron": 10}])
+	assert_eq(c.good, &"")
+	assert_eq(c.validate(), [] as Array[String])
+	assert_eq(s.validate(), [] as Array[String])
+
+
+func test_m4_extras_are_the_improve_rules_lists() -> void:
+	assert_eq(FamilyDef.ANIMAL_EXTRAS, ImproveRules.ANIMALS)
+	assert_eq(FamilyDef.ORE_EXTRAS, ImproveRules.ORES)
+
+
+func test_planted_fault_m4_wrong_array_size() -> void:
+	var f := _load_family("wheat")
+	f.season_percent = PackedInt32Array([20, 100, 40, 0, 0])
+	assert_true(_has(f.validate(), "season_percent has 5 entries"), "five season percents refused")
+	f = _load_family("wheat")
+	f.base = PackedInt32Array([0, 10, 20])
+	assert_true(_has(f.validate(), "base has 3 entries"), "three bases refused")
+	f = _load_family("wheat")
+	f.keep_wild = PackedInt32Array([0, 0, 0, 0, 0])
+	assert_true(_has(f.validate(), "keep_wild has 5 entries"), "five keep_wild refused")
+
+
+func test_planted_fault_m4_unknown_good_in_cost_goods() -> void:
+	var f := _load_family("wheat")
+	f.cost_goods[2]["gold"] = 3
+	assert_true(_has(f.validate(), "unknown good 'gold'"), "unknown good in cost_goods refused")
+
+
+func test_planted_fault_m4_keep_wild_101() -> void:
+	var f := _load_family("wheat")
+	f.keep_wild[2] = 101
+	assert_true(_has(f.validate(), "keep_wild[2] is 101"), "keep_wild 101 refused")
+
+
+func test_planted_fault_m4_settlement_arrays_on_a_goods_family() -> void:
+	var f := _load_family("wheat")
+	f.people = PackedInt32Array([0, 1000, 3000, 10000])
+	assert_true(_has(f.validate(), "people is for settlements only"), "people on wheat refused")
+	f = _load_family("wheat")
+	f.port_fish = PackedInt32Array([0, 1, 2, 4])
+	assert_true(_has(f.validate(), "port_fish is for settlements only"), "port_fish on wheat refused")
+
+
+func test_planted_fault_m4_extra_not_in_animals_or_ores() -> void:
+	var f := _load_family("grazing")
+	f.by_extra["goats"] = &"wool"
+	f.extra_permille["goats"] = 500
+	assert_true(_has(f.validate(), "extra 'goats' is not an animal or an ore"), "goats refused")
+
+
+func test_planted_fault_m4_goods_family_rules() -> void:
+	var f := _load_family("wheat")
+	f.good = &"gold"
+	assert_true(_has(f.validate(), "good 'gold' is not a known good"), "unknown good refused")
+	f = _load_family("wheat")
+	f.ground_text = ""
+	assert_true(_has(f.validate(), "ground_text is empty"), "goods family without ground line refused")
+	f = _load_family("wheat")
+	f.good = &""
+	f.by_extra = {"sheep": &"wool"}
+	assert_true(_has(f.validate(), "extra 'sheep' has no extra_permille"), "by_extra without extra_permille refused")
 
 
 func test_resource_round_trip() -> void:

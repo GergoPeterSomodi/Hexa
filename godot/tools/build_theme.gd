@@ -23,6 +23,11 @@ const SLICE3_ICONS: Array[String] = [
 	"seal_cracked",
 ]
 
+## Slice 4 icons (spec 6.2): the `icons` atlas is 10 columns of 24 px cells in the order of ui_kit.json's `icons` list.
+## `study` and `info` already name 16 px icons of `icons_base`, so the 24 px ones are registered as `study_24` and `info_24`.
+const SLICE4_ATLAS := "icons"
+const SLICE4_RENAMES: Dictionary[String, String] = {"study": "study_24", "info": "info_24"}
+
 
 func _initialize() -> void:
 	var check := OS.get_cmdline_user_args().has("--check")
@@ -30,7 +35,9 @@ func _initialize() -> void:
 
 	var studiolo := KitTheme.build_studiolo()
 	_add_slice3_icons(studiolo)
+	_add_slice4_icons(studiolo)
 	var hc := KitTheme.build_high_contrast()
+	_add_slice4_icons(hc)
 
 	failed += _process_theme("studiolo", studiolo, KitTheme.THEME_PATH, check)
 	failed += _process_theme("high_contrast", hc, KitTheme.HIGH_CONTRAST_PATH, check)
@@ -49,6 +56,31 @@ func _add_slice3_icons(theme: Theme) -> void:
 			printerr("build_theme: missing slice 3 texture %s" % icon_name)
 			continue
 		theme.set_icon(StringName(icon_name), &"Kit", tex)
+
+
+func _slice4_names() -> Array[String]:
+	var names: Array[String] = []
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(KitTheme.KIT_JSON))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return names
+	var piece: Variant = ((parsed as Dictionary).get("pieces", {}) as Dictionary).get(SLICE4_ATLAS, {})
+	for n: Variant in (piece as Dictionary).get("icons", []):
+		names.append(SLICE4_RENAMES.get(str(n), str(n)))
+	return names
+
+
+## Each icon is an AtlasTexture of the 1x atlas; KitTheme swaps it for its 2x region (size override) at scale 2.
+func _add_slice4_icons(theme: Theme) -> void:
+	var atlas := load("res://assets/ui/kit/1x/%s.png" % SLICE4_ATLAS) as Texture2D
+	if atlas == null:
+		printerr("build_theme: missing slice 4 atlas %s" % SLICE4_ATLAS)
+		return
+	var names := _slice4_names()
+	for idx: int in names.size():
+		var sub := AtlasTexture.new()
+		sub.atlas = atlas
+		sub.region = Rect2((idx % 10) * 24, floori(idx / 10.0) * 24, 24, 24)
+		theme.set_icon(StringName(names[idx]), &"Kit", sub)
 
 
 func _process_theme(label: String, theme: Theme, out_path: String, check: bool) -> int:
@@ -92,6 +124,11 @@ func _verify_theme(label: String, theme: Theme) -> int:
 	for style_name: String in Tokens.STYLE_VARIATIONS:
 		if not _has_style_variation(theme, style_name):
 			printerr("build_theme: [%s] missing style variation %s" % [label, style_name])
+			failed += 1
+
+	for icon_name: String in _slice4_names():
+		if not theme.has_icon(StringName(icon_name), &"Kit"):
+			printerr("build_theme: [%s] missing slice 4 Kit icon %s" % [label, icon_name])
 			failed += 1
 
 	if label == "studiolo":

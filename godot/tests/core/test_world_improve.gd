@@ -732,3 +732,69 @@ func test_the_same_changes_give_the_same_map() -> void:
 		assert_eq(a.family_at(hex), b.family_at(hex))
 		assert_eq(a.level_at(hex), b.level_at(hex))
 		assert_eq(a.piece_at(hex), b.piece_at(hex))
+
+
+func test_conflict_names_the_rule_and_the_hex_for_every_pair_rule() -> void:
+	assert_eq(ImproveRules.PAIR_WORDS.size(), ImproveRules.PAIR_RULES.size(), "a sentence a rule")
+	assert_eq(ImproveRules.PAIR_NEEDS.size(), ImproveRules.PAIR_RULES.size(), "a need a rule")
+	for w: String in ImproveRules.PAIR_WORDS:
+		assert_eq(w.count("%s"), 2, "two places in " + w)
+	for at: int in ImproveRules.PAIR_RULES.size():
+		var rule: Array = ImproveRules.PAIR_RULES[at]
+		var imp := _bare(WorldCover.GRASSLAND, 100.0)
+		var here := Vector2i(1, 2)
+		var there := Vector2i(2, 2) if int(rule[4]) == 1 else Vector2i(3, 2)
+		var fa := int(rule[0]) if int(rule[0]) != ImproveRules.ANY_GOODS else ImproveRules.WHEAT
+		var fb := int(rule[2]) if int(rule[2]) != ImproveRules.ANY_GOODS else ImproveRules.WHEAT
+		imp._put(here, fa, int(rule[1]))
+		var found := imp.conflict(there, fb, int(rule[3]))
+		assert_false(found.is_empty(), "rule %d breaks" % at)
+		assert_eq(int(found["rule"]), ImproveRules.pair_rule(fa, int(rule[1]), fb, int(rule[3]), int(rule[4])),
+			"rule %d: the index the rules give" % at)
+		assert_true(int(found["rule"]) <= at, "rule %d: the first broken" % at)
+		assert_true(_words_fit(at), "PAIR_WORDS and PAIR_NEEDS %d fit the rule" % at)
+		assert_eq(found["hex"], here, "rule %d names the hex" % at)
+		assert_eq(int(found["family"]), fa)
+		assert_eq(int(found["level"]), int(rule[1]))
+		var text := imp._pair_conflict(there, fb, int(rule[3]))
+		var expected := "%s (%s %d at %d, %d)" % [ImproveRules.PAIR_RULES[int(found["rule"])][5],
+			ImproveRules.NAMES[fa], int(rule[1]), here.x, here.y]
+		assert_eq(text, expected, "rule %d keeps its M1 words" % at)
+	var clear := _bare(WorldCover.GRASSLAND, 100.0)
+	assert_true(clear.conflict(Vector2i(2, 2), ImproveRules.WHEAT, 1).is_empty(), "nothing near")
+	assert_true(clear.conflict(Vector2i(-9, 9), ImproveRules.WHEAT, 1).is_empty(), "off the map")
+
+
+## Whether the sentence and requirement of rule `at` name its families.
+func _words_fit(at: int) -> bool:
+	var rule: Array = ImproveRules.PAIR_RULES[at]
+	var words := ImproveRules.PAIR_WORDS[at] + " " + ImproveRules.PAIR_NEEDS[at]
+	var keys := {ImproveRules.SETTLEMENT: ["town"], ImproveRules.CASTLE: ["castle"], ImproveRules.MINES: ["mine"],
+		ImproveRules.QUARRY: ["quarry"], ImproveRules.SALT: ["salt"], ImproveRules.HARBOUR: ["harbour"],
+		ImproveRules.DYES: ["dye"], ImproveRules.SILK: ["silk"], ImproveRules.OLIVES: ["olives"],
+		ImproveRules.ANY_GOODS: ["third stage"]}
+	for side: int in [0, 2]:
+		var found := false
+		for key: String in keys.get(int(rule[side]), []):
+			found = found or words.contains(key)
+		if not found:
+			return false
+	return true
+
+
+func test_the_lazy_search_gives_the_eager_conflicts_on_north_italy() -> void:
+	if not _ready_or_fail():
+		return
+	var eager := _runs[1]  # seed 7
+	var lazy := WorldImprove.over(_map, eager.state)
+	var bad := 0
+	var seen := 0
+	for hex: Vector2i in eager.hexes:
+		for f: int in range(1, ImproveRules.FAMILIES):
+			for lv: int in range(1, ImproveRules.TOP_LEVEL[f] + 1):
+				var a := eager.conflict(hex, f, lv)
+				if a != lazy.conflict(hex, f, lv) or eager._pair_conflict(hex, f, lv) != lazy._pair_conflict(hex, f, lv):
+					bad += 1
+				seen += 1 if not a.is_empty() else 0
+	assert_eq(bad, 0, "the lazy path agrees with the eager one")
+	assert_gt(seen, 100, "conflicts to compare")

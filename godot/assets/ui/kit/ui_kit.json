@@ -2,8 +2,8 @@
   "schema": "hexa-godot/ui-kit/1",
   "tokens_sha": "cb3439b787ead284519c04db4bf587a349e52b6b0a232ca53efc8d8866a3b8c7",
   "bytes_rgba": {
-    "kit_1x": 3414672,
-    "kit_2x": 13658688,
+    "kit_1x": 3601040,
+    "kit_2x": 14404160,
     "menu": 8812800
   },
   "pieces": {
@@ -2874,6 +2874,212 @@
         "2x": "657c6f8282a571126e494a88955de58e71f92d4faadc7ad256140b3965c00978"
       },
       "check": "exact"
+    },
+    "vellum_inset": {
+      "size": [
+        96,
+        96
+      ],
+      "margin": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "content": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "tile",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 4,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "658a13305c49e43d25af630c23d9dc716e5fcd04672846ee49cec136ac946a70",
+        "2x": "bfa0161511cf3e24851b22fef4862dea108dd4f29e3ad5d7d073c8371715bd5e"
+      },
+      "check": "exact"
+    },
+    "strip_cell": {
+      "size": [
+        48,
+        48
+      ],
+      "margin": [
+        12,
+        12,
+        12,
+        12
+      ],
+      "content": [
+        6,
+        6,
+        6,
+        6
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 4,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "b772e93e46cc711a4a4e0d2bc00e9361208b18d0158f16848dc79c563c055593",
+        "2x": "1c7ad00ea2872ccd338856d15a7173c9b6e39f2f55f9952abda3f5464c86ab8d"
+      },
+      "check": "exact"
+    },
+    "strip_cell_now": {
+      "size": [
+        48,
+        48
+      ],
+      "margin": [
+        12,
+        12,
+        12,
+        12
+      ],
+      "content": [
+        6,
+        6,
+        6,
+        6
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 4,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "32be3046b4d58b8bb5e1fec074890d300bf86cf7c1e9143521a3341571a141c1",
+        "2x": "73628b8dd0c69087de821bc38d60f1937fc4a13c6403316883904af451de3337"
+      },
+      "check": "exact"
+    },
+    "icons": {
+      "size": [
+        256,
+        128
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 4,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "d023c82774423c24e1a8e8c501eae13031d0d111ce284042b297df1c57a0133d",
+        "2x": "04f1499904dfda6e5edacd6699e82a65a231ba4883a5fb95aeaebe4f6728477d"
+      },
+      "check": "exact",
+      "cell": [
+        24,
+        24
+      ],
+      "icons": [
+        "good_grain",
+        "good_fish",
+        "good_oil",
+        "good_wine",
+        "good_salt",
+        "good_hemp",
+        "good_silk",
+        "good_dyes",
+        "good_wool",
+        "good_cattle",
+        "good_horses",
+        "good_timber",
+        "good_stone",
+        "good_iron",
+        "good_copper",
+        "good_silver",
+        "ducats",
+        "stores",
+        "tax",
+        "upkeep",
+        "walls",
+        "port_dues",
+        "spending",
+        "refund",
+        "payback",
+        "people",
+        "jobs",
+        "district",
+        "settlement",
+        "castle",
+        "season_spring",
+        "season_summer",
+        "season_autumn",
+        "season_winter",
+        "weather_good",
+        "weather_poor",
+        "study",
+        "pin",
+        "info",
+        "go",
+        "warning",
+        "ring",
+        "chart",
+        "sold",
+        "food",
+        "army",
+        "research",
+        "prestige"
+      ]
     }
   }
 }

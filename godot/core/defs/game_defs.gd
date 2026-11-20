@@ -16,11 +16,47 @@ extends Resource
 @export var unowned_colour: Color = Color("#d8ccb0")
 @export var min_contrast: float = 30.0
 @export var min_contrast_cb: float = 20.0
+## The economy (M4 spec 5.1): the 16 goods in id order (external files under data/defs/goods/), then the numbers of
+## spec 4.2 to 4.12. Covers run farmland, grassland, woods, marsh, rock, snow, tundra, sand (MapData's cover order).
+@export var goods: Array[GoodDef] = []
+## Per cover (8): the good its wild land yields, &"" for none (4.4).
+@export var wild_good: Array[StringName] = []
+## 8 covers x 6 slots (spring, summer, autumn, winter snow, frost, mild): wild yield in loads a season (4.4).
+@export var wild_yield: PackedInt32Array = PackedInt32Array()
+## Per cover (8): countryside people (4.3).
+@export var country_people: PackedInt32Array = PackedInt32Array()
+@export var hands_permille := 300
+@export var food_need_milli := 100
+@export var food_weight := 700
+@export var content_floor := 750
+@export var reserve_seasons := 4
+@export var town_tax_milli := 1000
+@export var country_tax_milli := 600
+## Low/Normal/High tax levels (0 Low, 1 Normal, 2 High): 700, 1000, 1400.
+@export var tax_permille: PackedInt32Array = PackedInt32Array()
+## 500, 700, 900.
+@export var goods_share_permille: PackedInt32Array = PackedInt32Array()
+## 1050, 1000, 900.
+@export var output_permille: PackedInt32Array = PackedInt32Array()
+## 6 slots: 100, 110, 100, 70, 70, 70.
+@export var port_dues_percent: PackedInt32Array = PackedInt32Array()
+## 6 slots: 100, 100, 100, 30, 50, 70.
+@export var fishing_percent: PackedInt32Array = PackedInt32Array()
+@export var start_treasury_base := 200
+@export var start_treasury_per_1000 := 5
+## Calm, good, poor in percent: 60, 20, 20.
+@export var weather_odds: PackedInt32Array = PackedInt32Array()
+## Calm, good, poor: 1000, 1200, 750.
+@export var weather_permille: PackedInt32Array = PackedInt32Array()
+@export var expensive_permille := 250
+@export var expensive_seasons := 8
 
 var _country_cache: Dictionary[StringName, CountryDef] = {}
 var _country_cache_size: int = -1
 var _scenario_cache: Dictionary[String, ScenarioDef] = {}
 var _scenario_cache_size: int = -1
+var _good_cache: Dictionary[StringName, int] = {}
+var _good_cache_size: int = -1
 
 
 ## Default heraldic tinctures from m2-build-spec section 4.7.
@@ -63,6 +99,25 @@ func family(id: int) -> FamilyDef:
 		if f != null and f.id == id:
 			return f
 	return null
+
+
+## Looks up a good by id (0 to 15), or null when out of range.
+func good(id: int) -> GoodDef:
+	if id < 0 or id >= goods.size():
+		return null
+	return goods[id]
+
+
+## Looks up a good's id by key, or -1 when unknown (cache built on first use).
+func good_id(key: StringName) -> int:
+	if _good_cache_size != goods.size():
+		_good_cache.clear()
+		for i: int in goods.size():
+			var g := goods[i]
+			if g != null and g.key != &"" and not _good_cache.has(g.key):
+				_good_cache[g.key] = i
+		_good_cache_size = goods.size()
+	return _good_cache.get(key, -1)
 
 
 ## Looks up a scenario definition by id, or null when unknown (cache built on first use).
@@ -122,6 +177,7 @@ func validate() -> Array[String]:
 			errors.append("scenarios[%d]: duplicate scenario id '%s'" % [i, s.id])
 		else:
 			seen_ids[s.id] = true
+	_check_economy(errors)
 	return errors
 
 
@@ -157,6 +213,61 @@ func digest() -> String:
 	_feed_int(ctx, work_slots_city_level)
 	_feed_int(ctx, 1 if works_halt_in_snow_winter else 0)
 	return ctx.finish().hex_encode()
+
+
+## The economy's checks (spec 5.1): 16 goods with ids 0 to 15 in order and valid, the four weights (food_weight and the
+## staples' need weights) adding to 1,000, the array sizes (8 covers, 48 wild yields, 3 tax levels, 6 slots), weather
+## odds adding to 100, and every good named by a cover, a family or a cost known.
+func _check_economy(errors: Array[String]) -> void:
+	if goods.size() != GoodDef.COUNT:
+		errors.append("goods has %d entries, expected %d" % [goods.size(), GoodDef.COUNT])
+	var weights := food_weight
+	for i: int in goods.size():
+		var g := goods[i]
+		if g == null:
+			errors.append("goods[%d]: entry is null" % i)
+			continue
+		if g.id != i:
+			errors.append("goods[%d]: id %d should be %d (ids run 0 to %d in order)" % [i, g.id, i, GoodDef.COUNT - 1])
+		for err: String in g.validate():
+			errors.append(err)
+		weights += g.need_weight
+	if weights != 1000:
+		errors.append("the four weights add to %d, expected 1000" % weights)
+	_check_size(errors, "wild_good", wild_good.size(), 8)
+	_check_size(errors, "wild_yield", wild_yield.size(), 48)
+	_check_size(errors, "country_people", country_people.size(), 8)
+	_check_size(errors, "tax_permille", tax_permille.size(), 3)
+	_check_size(errors, "goods_share_permille", goods_share_permille.size(), 3)
+	_check_size(errors, "output_permille", output_permille.size(), 3)
+	_check_size(errors, "weather_odds", weather_odds.size(), 3)
+	_check_size(errors, "weather_permille", weather_permille.size(), 3)
+	_check_size(errors, "port_dues_percent", port_dues_percent.size(), 6)
+	_check_size(errors, "fishing_percent", fishing_percent.size(), 6)
+	if weather_odds.size() == 3 and weather_odds[0] + weather_odds[1] + weather_odds[2] != 100:
+		errors.append("weather_odds add to %d, expected 100" % (weather_odds[0] + weather_odds[1] + weather_odds[2]))
+	for cover: int in wild_good.size():
+		if wild_good[cover] != &"" and good_id(wild_good[cover]) < 0:
+			errors.append("wild_good[%d] names unknown good '%s'" % [cover, String(wild_good[cover])])
+	for f: FamilyDef in families:
+		if f == null:
+			continue
+		if f.good != &"" and good_id(f.good) < 0:
+			errors.append("family %s names unknown good '%s'" % [String(f.key), String(f.good)])
+		for extra_key: Variant in f.by_extra:
+			if good_id(f.by_extra[extra_key]) < 0:
+				errors.append("family %s extra '%s' names unknown good '%s'"
+					% [String(f.key), String(extra_key), String(f.by_extra[extra_key])])
+		for level: int in f.cost_goods.size():
+			for good_key: Variant in f.cost_goods[level]:
+				if good_id(StringName(String(good_key))) < 0:
+					errors.append("family %s cost_goods[%d] names unknown good '%s'"
+						% [String(f.key), level, String(good_key)])
+
+
+func _check_size(errors: Array[String], field: String, size: int, expected: int) -> void:
+	if size != expected:
+		errors.append("%s has %d entries, expected %d" % [field, size, expected])
 
 
 func _rebuild_country_cache() -> void:

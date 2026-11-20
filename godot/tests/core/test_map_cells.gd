@@ -317,3 +317,29 @@ func test_chunks_of_run_names_the_chunks_along_the_road() -> void:
 	var none := EdgeLines.chunks_of_run(m, Vector2i(5, 35))
 	assert_true(none.has(EdgeLines.chunk_of(Vector2i(5, 35))))
 	assert_lt(none.size(), along.size())
+
+
+func test_piece_cells_equal_the_piece_layers_of_of_hex_for_every_piece_of_north_italy() -> void:
+	var map := _map()
+	var state := _state(map)
+	var improved := WorldImprove.build(map, 7)
+	for hex: Vector2i in improved.hexes:
+		var f := improved.family_at(hex)
+		if f != ImproveRules.NONE:
+			state.main_use[map.index_of(hex)] = f
+			state.level[map.index_of(hex)] = improved.level_at(hex)
+	var pieces := 0
+	for hex: Vector2i in improved.hexes:
+		var piece := Improve.piece_of(map, state, hex)
+		if piece.is_empty():
+			assert_true(MapCells.piece_cells(map, piece, hex).is_empty())
+			continue
+		pieces += 1
+		var again := Improve.piece_for(map, hex, int(piece["family_id"]), int(piece["level"]))
+		assert_eq(again, piece, "piece_for is piece_of's answer at %s" % hex)
+		var cells := MapCells.piece_cells(map, again, hex)
+		var all := MapCells.of_hex(map, state, hex)
+		for layer: String in MapCells.LAYERS.slice(MapCells.AT_PIECE, MapCells.AT_ADDON + 1):
+			assert_eq(str(cells.get(layer, "")), str(all[layer]), "%s on %s" % [layer, hex])
+	assert_gt(pieces, 100, "north Italy has pieces")
+	assert_true(Improve.piece_for(map, Vector2i(2, 2), ImproveRules.NONE, 0).is_empty())

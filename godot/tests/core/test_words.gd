@@ -95,3 +95,23 @@ func test_country_the() -> void:
 	assert_eq(Words.country_the(_game, tag), "the " + def.long_name)
 	assert_eq(Words.country_the(_game, &""), "")
 	assert_eq(Words.country_the(_game, &"ZZZ"), "the ZZZ")
+
+
+func test_money_words() -> void:
+	assert_eq(Words.ducats(40), "40 ducats")
+	assert_eq(Words.ducats(1), "1 ducat")
+	assert_eq(Words.ducats(1240), "1,240 ducats")
+	assert_eq(Words.loads(12, "Wine"), "12 wine")
+	assert_eq(Words.loads(1, "salt"), "1 salt")
+	assert_eq(Words.signed_ducats(48), "+48 ducats")
+	assert_eq(Words.signed_ducats(-40), Words.MINUS + "40 ducats")
+	assert_eq(Words.signed_ducats(1), "+1 ducat")
+	assert_eq(Words.signed_ducats(0), "0 ducats")
+	assert_eq(Words.ducats(-1), Words.MINUS + "1 ducat")
+	assert_eq(Words.ducats(-40), Words.MINUS + "40 ducats")
+	for n: int in range(-3, 4):
+		assert_eq(Words.signed_ducats(n).split(" ")[1], Words.ducats(n).split(" ")[1], "the same unit word at %d" % n)
+	assert_eq(Words.tax_name(0), "Low")
+	assert_eq(Words.tax_name(1), "Normal")
+	assert_eq(Words.tax_name(2), "High")
+	assert_eq(Words.tax_name(3), "")

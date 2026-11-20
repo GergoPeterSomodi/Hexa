@@ -86,6 +86,7 @@ static func build() -> Dictionary:
 	defs.tinctures = GameDefs.default_tinctures()
 	defs.cb_palette = GameDefs.default_cb_palette()
 	defs.families = families()
+	FakeScenario.economy_into(defs)
 	defs.countries = [
 		make_country(&"AAA", "Alpha", "Republic of Alpha", "Alphan", Color("#b3261e")),
 		make_country(&"BBB", "Beta", "Duchy of Beta", "Betan", Color("#2b5aa8")),

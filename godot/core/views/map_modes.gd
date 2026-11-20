@@ -26,8 +26,21 @@ const RELIEF_STOPS: Array[Array] = [
 ]
 
 const DEFAULT_UNOWNED := Color("#d8ccb0")
+## The works card's tint (Tokens.GOOD and Tokens.BAD, whose values these are: a view does not read the shell).
+const DELTA_GOOD := Color("#7fc98a")
+const DELTA_BAD := Color("#f0806a")
+const DELTA_ALPHA := 0.35
 
 static var _cached_ramp := PackedColorArray()
+
+
+## The card's tint of a change in ducats a year: DELTA_GOOD at a gain, DELTA_BAD at a loss, alpha 0.35; no tint (clear)
+## for no change.
+static func delta_colour(delta: int) -> Color:
+	if delta == 0:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var base := DELTA_GOOD if delta > 0 else DELTA_BAD
+	return Color(base.r, base.g, base.b, DELTA_ALPHA)
 
 
 ## The cell under a map pixel, matching TileMapLayer.local_to_map and mode_overlay.gdshader.

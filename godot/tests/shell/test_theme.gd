@@ -291,3 +291,37 @@ func test_slice3_kit_icons_and_end_season_plate() -> void:
 	assert_not_null(plate, "ButtonEndSeason normal is a StyleBoxTexture")
 	if plate != null:
 		assert_eq(plate.texture.resource_path.get_file(), "endseason_plate_normal.png", "ButtonEndSeason uses the plate")
+
+
+func test_slice4_icons_and_feedback_frames() -> void:
+	# Spec 6.2: 48 icons of the `icons` atlas are 24 px Kit icons at 1x and 2x (study and info are `_24`, the 16 px names stay).
+	var studiolo := load(KitTheme.THEME_PATH) as Theme
+	var hc := load(KitTheme.HIGH_CONTRAST_PATH) as Theme
+	var pieces := _load_pieces()
+	var names: Array = (pieces["icons"] as Dictionary)["icons"]
+	assert_eq(names.size(), 48, "48 icons")
+	var theme_2x := KitTheme.load_for(2.0, &"2x", false)
+	for n: Variant in names:
+		var iname := StringName(str(n) + "_24" if str(n) in ["study", "info"] else str(n))
+		for pair: Array in [["studiolo", studiolo], ["hc", hc], ["2x", theme_2x]]:
+			var th: Theme = pair[1]
+			assert_true(th.has_icon(iname, &"Kit"), "%s has icon %s" % [pair[0], iname])
+		assert_eq(studiolo.get_icon(iname, &"Kit").get_size(), Vector2(24.0, 24.0), "%s is 24 px" % iname)
+		assert_eq(theme_2x.get_icon(iname, &"Kit").get_size(), Vector2(24.0, 24.0), "%s 2x logical size" % iname)
+		assert_eq(theme_2x.get_icon(iname, &"Kit").get_image().get_size(), Vector2i(48, 48), "%s 2x pixels" % iname)
+	assert_eq((studiolo.get_icon(&"study", &"Kit") as Texture2D).get_size(), Vector2(16.0, 16.0), "icons_base study stays 16 px")
+	for frame: String in ["PanelVellumInset", "PanelStripCell", "PanelStripCellNow"]:
+		var sb := studiolo.get_stylebox(&"panel", StringName(frame)) as StyleBoxTexture
+		assert_not_null(sb, "%s is a baked StyleBoxTexture" % frame)
+	var inset := studiolo.get_stylebox(&"panel", &"PanelVellumInset") as StyleBoxTexture
+	assert_eq(inset.texture.resource_path.get_file(), "vellum_inset.png", "inset texture")
+	assert_eq(inset.texture_margin_left, 16.0, "inset margin")
+	var cell := studiolo.get_stylebox(&"panel", &"PanelStripCellNow") as StyleBoxTexture
+	assert_eq(cell.texture_margin_left, 12.0, "strip cell margin")
+	for colour: String in ["ink_0", "ink_4", "axis", "grid", "good", "bad", "ink_2_slot"]:
+		assert_true(studiolo.has_color(StringName(colour), &"InkChart"), "InkChart has " + colour)
+
+
+func test_the_map_views_delta_tints_are_the_token_colours() -> void:
+	assert_eq(MapModes.DELTA_GOOD, Tokens.GOOD)
+	assert_eq(MapModes.DELTA_BAD, Tokens.BAD)

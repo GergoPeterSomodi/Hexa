@@ -32,6 +32,23 @@
 [ext_resource type="Resource" path="res://data/defs/families/quarry.tres" id="f12_quarry"]
 [ext_resource type="Resource" path="res://data/defs/families/salt.tres" id="f13_salt"]
 [ext_resource type="Resource" path="res://data/defs/families/harbour.tres" id="f14_harbour"]
+[ext_resource type="Script" path="res://core/defs/good_def.gd" id="g0_script"]
+[ext_resource type="Resource" path="res://data/defs/goods/grain.tres" id="g_grain"]
+[ext_resource type="Resource" path="res://data/defs/goods/fish.tres" id="g_fish"]
+[ext_resource type="Resource" path="res://data/defs/goods/oil.tres" id="g_oil"]
+[ext_resource type="Resource" path="res://data/defs/goods/wine.tres" id="g_wine"]
+[ext_resource type="Resource" path="res://data/defs/goods/salt.tres" id="g_salt"]
+[ext_resource type="Resource" path="res://data/defs/goods/hemp.tres" id="g_hemp"]
+[ext_resource type="Resource" path="res://data/defs/goods/silk.tres" id="g_silk"]
+[ext_resource type="Resource" path="res://data/defs/goods/dyes.tres" id="g_dyes"]
+[ext_resource type="Resource" path="res://data/defs/goods/wool.tres" id="g_wool"]
+[ext_resource type="Resource" path="res://data/defs/goods/cattle.tres" id="g_cattle"]
+[ext_resource type="Resource" path="res://data/defs/goods/horses.tres" id="g_horses"]
+[ext_resource type="Resource" path="res://data/defs/goods/timber.tres" id="g_timber"]
+[ext_resource type="Resource" path="res://data/defs/goods/stone.tres" id="g_stone"]
+[ext_resource type="Resource" path="res://data/defs/goods/iron.tres" id="g_iron"]
+[ext_resource type="Resource" path="res://data/defs/goods/copper.tres" id="g_copper"]
+[ext_resource type="Resource" path="res://data/defs/goods/silver.tres" id="g_silver"]
 
 [resource]
 script = ExtResource("17_eiw27")
@@ -51,3 +68,25 @@ tinctures = Dictionary[StringName, Color]({
 &"vert": Color(0.18039216, 0.49019608, 0.23529412, 1)
 })
 cb_palette = PackedColorArray(0.9019608, 0.62352943, 0, 1, 0.3372549, 0.7058824, 0.9137255, 1, 0, 0.61960787, 0.4509804, 1, 0.9411765, 0.89411765, 0.25882354, 1, 0, 0.44705883, 0.69803923, 1, 0.8352941, 0.36862746, 0, 1, 0.8, 0.4745098, 0.654902, 1, 0.92156863, 0.92156863, 0.92156863, 1)
+goods = Array[ExtResource("g0_script")]([ExtResource("g_grain"), ExtResource("g_fish"), ExtResource("g_oil"), ExtResource("g_wine"), ExtResource("g_salt"), ExtResource("g_hemp"), ExtResource("g_silk"), ExtResource("g_dyes"), ExtResource("g_wool"), ExtResource("g_cattle"), ExtResource("g_horses"), ExtResource("g_timber"), ExtResource("g_stone"), ExtResource("g_iron"), ExtResource("g_copper"), ExtResource("g_silver")])
+wild_good = Array[StringName]([&"grain", &"grain", &"timber", &"", &"", &"", &"", &""])
+wild_yield = PackedInt32Array(1, 3, 2, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+country_people = PackedInt32Array(8000, 5000, 2500, 1500, 600, 0, 0, 1500)
+hands_permille = 300
+food_need_milli = 100
+food_weight = 700
+content_floor = 750
+reserve_seasons = 4
+town_tax_milli = 1000
+country_tax_milli = 600
+tax_permille = PackedInt32Array(700, 1000, 1400)
+goods_share_permille = PackedInt32Array(500, 700, 900)
+output_permille = PackedInt32Array(1050, 1000, 900)
+port_dues_percent = PackedInt32Array(100, 110, 100, 70, 70, 70)
+fishing_percent = PackedInt32Array(100, 100, 100, 30, 50, 70)
+start_treasury_base = 200
+start_treasury_per_1000 = 5
+weather_odds = PackedInt32Array(60, 20, 20)
+weather_permille = PackedInt32Array(1000, 1200, 750)
+expensive_permille = 250
+expensive_seasons = 8

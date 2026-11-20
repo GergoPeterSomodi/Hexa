@@ -51,6 +51,32 @@ const PAIR_RULES: Array[Array] = [
 	[CASTLE, 1, SETTLEMENT, 4, 1, "a walled town is its own fortress: no castle against its wall"],
 ]
 
+## One line per PAIR_RULES entry, for a refusal that names both places. Two %s: the other hex (Words.place) and this one
+## (its place's name when it is a named place, else "this district").
+const PAIR_WORDS: Array[String] = [
+	"%s is a town beside %s: two towns may not stand side by side.",
+	"%s holds the area round %s: no castle within two hexes of another.",
+	"%s is a third stage beside %s: two third stages never touch.",
+	"%s is a mine beside %s: one mining district a valley.",
+	"%s is a quarry beside %s: one quarry a hill.",
+	"%s is a mine or quarry beside %s: the two are kept apart.",
+	"%s has salt pans beside %s: salt pans are a special shore.",
+	"%s has a fishing harbour beside %s: harbours are spaced along the shore.",
+	"%s has a dye works within two hexes of %s: one dye works a town.",
+	"%s is a dye works or salt pans beside %s: the two are kept apart.",
+	"%s is silk or olives beside %s: the two groves are kept apart.",
+	"%s is grown silk beside %s: silk is a town's luxury.",
+	"%s is a walled town or castle beside %s: no castle against a town's wall.",
+]
+## One short requirement per PAIR_RULES entry, for the works card's ticks.
+const PAIR_NEEDS: Array[String] = [
+	"no other town beside it", "no other castle within two hexes", "no other third stage beside it",
+	"no other mine beside it", "no other quarry beside it", "no mine or quarry beside it",
+	"no other salt pans beside it", "no other fishing harbour beside it", "no other dye works within two hexes",
+	"no dye works or salt pans beside it", "no silk or olives beside it", "no other grown silk beside it",
+	"no castle against a town's wall",
+]
+
 ## Restarts of the search before the fallback, and backtracks allowed in one run.
 const RETRIES := 8
 const BACKTRACK_LIMIT := 20000
@@ -189,34 +215,46 @@ static func pair_allowed(family_a: int, level_a: int, family_b: int, level_b: in
 
 ## The reason of the first pair rule two options break at a distance, or "" when they may stand there.
 static func pair_reason(family_a: int, level_a: int, family_b: int, level_b: int, radius: int) -> String:
+	var rule := pair_rule(family_a, level_a, family_b, level_b, radius)
+	return str(PAIR_RULES[rule][5]) if rule >= 0 else ""
+
+
+## The index in PAIR_RULES of the first rule two options break at a distance, or -1 when they may stand there.
+static func pair_rule(family_a: int, level_a: int, family_b: int, level_b: int, radius: int) -> int:
 	# The memo key packs families below 16, levels below 8 and radius below 4: a bigger value would collide.
-	assert(family_a < 16 and family_b < 16 and level_a < 8 and level_b < 8 and radius < 4, "pair_reason memo key range")
+	assert(family_a < 16 and family_b < 16 and level_a < 8 and level_b < 8 and radius < 4, "pair_rule memo key range")
 	var key := (((family_a * 8 + level_a) * 16 + family_b) * 8 + level_b) * 4 + radius
 	var held: Variant = _pair_memo.get(key)
 	if held != null:
-		return held as String
-	var why := _pair_reason_of(family_a, level_a, family_b, level_b, radius)
-	_pair_memo[key] = why
-	return why
+		return held as int
+	var rule := _pair_rule_of(family_a, level_a, family_b, level_b, radius)
+	_pair_memo[key] = rule
+	return rule
 
 
-## pair_reason is a pure function of constants: each answer is worked out once.
+## pair_rule is a pure function of constants: each answer (the rule's index, -1 for none) is worked out once.
 static var _pair_memo: Dictionary = {}
 
 
 static func _pair_reason_of(family_a: int, level_a: int, family_b: int, level_b: int, radius: int) -> String:
-	for rule: Array in PAIR_RULES:
+	var rule := _pair_rule_of(family_a, level_a, family_b, level_b, radius)
+	return str(PAIR_RULES[rule][5]) if rule >= 0 else ""
+
+
+static func _pair_rule_of(family_a: int, level_a: int, family_b: int, level_b: int, radius: int) -> int:
+	for at: int in PAIR_RULES.size():
+		var rule: Array = PAIR_RULES[at]
 		if radius > int(rule[4]):
 			continue
 		var a := _rule_side(int(rule[0]), int(rule[1]), family_a, level_a)
 		var b := _rule_side(int(rule[2]), int(rule[3]), family_b, level_b)
 		if a and b:
-			return str(rule[5])
+			return at
 		a = _rule_side(int(rule[0]), int(rule[1]), family_b, level_b)
 		b = _rule_side(int(rule[2]), int(rule[3]), family_a, level_a)
 		if a and b:
-			return str(rule[5])
-	return ""
+			return at
+	return -1
 
 
 ## What a family needs of the ground, for a refusal (index: family).

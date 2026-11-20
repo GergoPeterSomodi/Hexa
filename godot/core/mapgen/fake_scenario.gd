@@ -19,20 +19,50 @@ const VALUE := 0.8
 const MAX_COUNTRIES := 254
 
 
-## The 14 families with the table's shape (M3 spec 4.3): work seasons grow with the level; no file read.
+## The 14 committed families (data/defs/families, M3 spec 4.3, M4 spec 4.4), so a fake world validates without
+## inventing numbers.
 static func _families() -> Array[FamilyDef]:
 	var out: Array[FamilyDef] = []
 	for id: int in range(1, FamilyIds.COUNT):
-		var f := FamilyDef.new()
-		f.id = id
-		f.key = StringName(FamilyIds.NAMES[id])
-		var seasons := PackedInt32Array()
-		for level: int in FamilyIds.TOP_LEVEL[id] + 1:
-			seasons.append(4 * level)
-		seasons[0] = 0
-		f.work_seasons = seasons
-		out.append(f)
+		out.append(ResourceLoader.load(
+			"res://data/defs/families/%s.tres" % FamilyIds.NAMES[id], "", ResourceLoader.CACHE_MODE_IGNORE
+		) as FamilyDef)
 	return out
+
+
+## Copies the committed goods (data/defs/goods) and the economy numbers of data/defs/game_defs.tres (M4 spec 4.2 to
+## 4.12, 5.1) into `defs`, so a fake or fixture defs validates under the M4 rules. Numbers are never invented here.
+static func economy_into(defs: GameDefs) -> void:
+	var committed := ResourceLoader.load(
+		"res://data/defs/game_defs.tres", "", ResourceLoader.CACHE_MODE_IGNORE
+	) as GameDefs
+	var goods: Array[GoodDef] = []
+	for g: GoodDef in committed.goods:
+		goods.append(ResourceLoader.load(
+			"res://data/defs/goods/%s.tres" % String(g.key), "", ResourceLoader.CACHE_MODE_IGNORE
+		) as GoodDef)
+	defs.goods = goods
+	defs.wild_good = committed.wild_good.duplicate()
+	defs.wild_yield = committed.wild_yield
+	defs.country_people = committed.country_people
+	defs.hands_permille = committed.hands_permille
+	defs.food_need_milli = committed.food_need_milli
+	defs.food_weight = committed.food_weight
+	defs.content_floor = committed.content_floor
+	defs.reserve_seasons = committed.reserve_seasons
+	defs.town_tax_milli = committed.town_tax_milli
+	defs.country_tax_milli = committed.country_tax_milli
+	defs.tax_permille = committed.tax_permille
+	defs.goods_share_permille = committed.goods_share_permille
+	defs.output_permille = committed.output_permille
+	defs.port_dues_percent = committed.port_dues_percent
+	defs.fishing_percent = committed.fishing_percent
+	defs.start_treasury_base = committed.start_treasury_base
+	defs.start_treasury_per_1000 = committed.start_treasury_per_1000
+	defs.weather_odds = committed.weather_odds
+	defs.weather_permille = committed.weather_permille
+	defs.expensive_permille = committed.expensive_permille
+	defs.expensive_seasons = committed.expensive_seasons
 
 
 ## `{defs: GameDefs, scenario: ScenarioDef}` with `count` countries (fewer when the map has fewer places).
@@ -41,6 +71,7 @@ static func build(map: MapData, count: int, _seed_value: int) -> Dictionary:
 	defs.tinctures = GameDefs.default_tinctures()
 	defs.cb_palette = GameDefs.default_cb_palette()
 	defs.families = _families()
+	economy_into(defs)
 	var scenario := ScenarioDef.new()
 	scenario.id = "fake"
 	scenario.name = "Fake %d" % count

@@ -31,6 +31,7 @@ from tools.ui_bake.checks import (
     check_token_contrasts,
     check_vellum_surface,
 )
+from tools.ui_bake.pieces_feedback import check_feedback_pieces
 from tools.ui_bake.pieces_m2 import SHIELD_OUTLINE, sd_polygon
 from tools.ui_bake.png import load_png_rgba, rgba_sha256, save_png
 from tools.ui_bake.shapes import logical_grid
@@ -149,7 +150,13 @@ class TestBakeUI(unittest.TestCase):
         for state in ("normal", "hot", "pressed", "off"):
             expected_slice3[f"endseason_plate_{state}"] = ([160, 44], [28, 22, 44, 22], [28, 4, 44, 4], [0, 0, 0, 0], "stretch")
 
-        expected_all = {**expected_slice1, **expected_slice2, **expected_slice3}
+        expected_slice4 = {
+            "vellum_inset": ([96, 96], [16, 16, 16, 16], [10, 10, 10, 10], [0, 0, 0, 0], "tile"),
+            "strip_cell": ([48, 48], [12, 12, 12, 12], [6, 6, 6, 6], [0, 0, 0, 0], "stretch"),
+            "strip_cell_now": ([48, 48], [12, 12, 12, 12], [6, 6, 6, 6], [0, 0, 0, 0], "stretch"),
+            "icons": ([256, 128], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+        }
+        expected_all = {**expected_slice1, **expected_slice2, **expected_slice3, **expected_slice4}
         self.assertEqual(set(pieces.keys()), set(expected_all.keys()))
         for name, (sz, mar, con, exp, axis) in expected_all.items():
             entry = pieces[name]
@@ -158,7 +165,7 @@ class TestBakeUI(unittest.TestCase):
             self.assertEqual(entry["content"], con, name)
             self.assertEqual(entry["expand"], exp, name)
             self.assertEqual(entry["axis"], axis, name)
-            expected_slice = 2 if name in expected_slice2 else (3 if name in expected_slice3 else 1)
+            expected_slice = 2 if name in expected_slice2 else (3 if name in expected_slice3 else (4 if name in expected_slice4 else 1))
             self.assertEqual(entry["slice"], expected_slice, name)
 
     def test_slice2_pieces_geometry_and_apertures(self) -> None:
@@ -276,6 +283,56 @@ class TestBakeUI(unittest.TestCase):
             cr = load_png_rgba(kit_dir / f"{s}x" / "seal_cracked.png")
             # The gap shows the drop shadow beneath it (alpha about 0.45), so it is well below the solid wax.
             self.assertTrue(np.any(cr[..., 3][disc] < 200), f"seal_cracked@{s}x has a gap cut across the wax")
+
+    def test_slice4_icons_and_feedback_frames(self) -> None:
+        kit_dir = REPO_ROOT / "godot" / "assets" / "ui" / "kit"
+        doc = json.loads(KIT_JSON.read_text(encoding="utf-8"))
+        names = doc["pieces"]["icons"]["icons"]
+        self.assertEqual(len(names), 48)
+        self.assertEqual(len(set(names)), 48)
+        self.assertEqual(names[:16], [f"good_{g}" for g in (
+            "grain", "fish", "oil", "wine", "salt", "hemp", "silk", "dyes", "wool", "cattle", "horses", "timber",
+            "stone", "iron", "copper", "silver")])
+        self.assertEqual(doc["pieces"]["icons"]["cell"], [24, 24])
+        sheets = {s: load_png_rgba(kit_dir / f"{s}x" / "icons.png") for s in (1, 2)}
+        self.assertEqual(sheets[1].shape, (128, 256, 4))
+        self.assertEqual(sheets[2].shape, (256, 512, 4))
+        for i, name in enumerate(names):
+            x, y = (i % 10) * 24, (i // 10) * 24
+            for s in (1, 2):
+                cell = sheets[s][y * s : (y + 24) * s, x * s : (x + 24) * s]
+                alpha = cell[..., 3]
+                self.assertGreater(int((alpha == 255).sum()), 24 * 24 * s * s // 6, f"{name}@{s}x has body")
+            c1 = sheets[1][y : y + 24, x : x + 24, 3].astype(np.int16)
+            c2 = sheets[2][y * 2 : (y + 24) * 2, x * 2 : (x + 24) * 2, 3].astype(np.int16)
+            down = c2.reshape(24, 2, 24, 2).mean(axis=(1, 3))
+            self.assertLess(float(np.abs(down - c1).mean()), 14.0, f"{name} 2x is the same drawing as 1x")
+        # The two spare cells stay empty.
+        self.assertTrue(np.all(sheets[1][96:120, 192:240, 3] == 0))
+        self.assertTrue(np.all(sheets[1][:, 240:, 3] == 0))
+
+        # Frames: vellum luminance and amplitude hold in the content rect; the field repeats every 64 px.
+        tokens = load_tokens(bake_ui.TOKENS_PATH)
+        specs = {sp.name: sp for sp in bake_ui.all_specs()}
+        for name in ("vellum_inset", "strip_cell", "strip_cell_now"):
+            for s in (1, 2):
+                check_vellum_surface(load_png_rgba(kit_dir / f"{s}x" / f"{name}.png"), specs[name], s)
+        inset = load_png_rgba(kit_dir / "1x" / "vellum_inset.png")
+        self.assertTrue(np.array_equal(inset[10:86, 10:22, :3], inset[10:86, 74:86, :3]))
+        self.assertEqual(int(inset[0, 0, 3]), 0, "rounded corner transparent")
+        # Planted faults: a dark patch fails the vellum rule; a broken period fails the feedback check.
+        bad = inset.copy()
+        bad[40:60, 40:60, :3] = 150
+        with self.assertRaises(BakeCheckError):
+            check_vellum_surface(bad, specs["vellum_inset"], 1)
+        rendered = {("vellum_inset", 1): bad}
+        with self.assertRaises(BakeCheckError):
+            check_feedback_pieces([specs["vellum_inset"]], rendered)
+        shifted = inset.copy()
+        shifted[20:40, 74:86, :3] = 235
+        with self.assertRaises(BakeCheckError):
+            check_feedback_pieces([specs["vellum_inset"]], {("vellum_inset", 1): shifted})
+        self.assertIsNotNone(tokens)
 
     def test_faults_fire_every_check_assert(self) -> None:
         tokens = load_tokens(bake_ui.TOKENS_PATH)

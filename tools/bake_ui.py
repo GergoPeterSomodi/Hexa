@@ -25,8 +25,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tools.ui_bake.checks import BakeCheckError, run_all_checks
+from tools.ui_bake.icons import ICON_NAMES, icon_pieces
 from tools.ui_bake.pieces_art import art_pieces
 from tools.ui_bake.pieces_controls import control_pieces
+from tools.ui_bake.pieces_feedback import check_feedback_pieces, feedback_pieces
 from tools.ui_bake.pieces_frames import PieceSpec, frame_pieces
 from tools.ui_bake.pieces_hud import hud_pieces
 from tools.ui_bake.pieces_m2 import m2_pieces
@@ -40,7 +42,7 @@ TOLERANT_MAX_MAD = 2.5
 
 
 def all_specs() -> list[PieceSpec]:
-    return frame_pieces() + control_pieces() + art_pieces() + m2_pieces() + hud_pieces()
+    return frame_pieces() + control_pieces() + art_pieces() + m2_pieces() + hud_pieces() + feedback_pieces() + icon_pieces()
 
 
 def _spec_map() -> dict[str, PieceSpec]:
@@ -145,6 +147,9 @@ def build_kit_index(
                 "study",
                 "info",
             ]
+        if sp.name == "icons":
+            entry["cell"] = [24, 24]
+            entry["icons"] = list(ICON_NAMES)
         pieces_doc[sp.name] = entry
 
     return {
@@ -288,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         run_all_checks(REPO_ROOT, tokens, specs, rendered)
+        check_feedback_pieces(specs, rendered)
         if args.check:
             verify_committed(args.out, tokens, specs, rendered)
     except BakeCheckError as exc:

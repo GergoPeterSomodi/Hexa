@@ -28,6 +28,26 @@ static func signed(n: int) -> String:
 	return number(n)
 
 
+## "40 ducats", "1 ducat".
+static func ducats(n: int) -> String:
+	return "%s %s" % [number(n), "ducat" if absi(n) == 1 else "ducats"]
+
+
+## "12 wine", "1 salt": a count and the good's name (in lower case).
+static func loads(n: int, name: String) -> String:
+	return "%s %s" % [number(n), name.to_lower()]
+
+
+## "+48 ducats", "−40 ducats", "0 ducats".
+static func signed_ducats(n: int) -> String:
+	return "%s %s" % [signed(n), "ducat" if absi(n) == 1 else "ducats"]
+
+
+## "Low", "Normal", "High" for tax level 0, 1, 2 ("" for any other).
+static func tax_name(level: int) -> String:
+	return ["Low", "Normal", "High"][level] if level >= 0 and level <= 2 else ""
+
+
 ## "1 work", "2 works": the count and the matching word.
 static func plural(n: int, one: String, many: String) -> String:
 	return "%s %s" % [number(n), one if n == 1 else many]

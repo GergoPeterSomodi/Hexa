@@ -76,7 +76,19 @@ static func piece_of(map: MapData, state: MapState, hex: Vector2i) -> Dictionary
 	var f := int(state.main_use[i])
 	if f <= ImproveRules.NONE or f >= ImproveRules.FAMILIES:
 		return {}
-	var lv := int(state.level[i])
+	return piece_for(map, hex, f, int(state.level[i]))
+
+
+## What piece_of would give for this family and level on this hex (the works card's ghost); {} for family 0, a family
+## out of range, or a hex that is not land. piece_of is this function over what the state holds.
+static func piece_for(map: MapData, hex: Vector2i, family_id: int, level_value: int) -> Dictionary:
+	var i := map.index_of(hex)
+	if i < 0 or map.land[i] == 0:
+		return {}
+	var f := family_id
+	if f <= ImproveRules.NONE or f >= ImproveRules.FAMILIES:
+		return {}
+	var lv := level_value
 	var chosen := ImproveRules.pick(hex, ImproveRules.VARIANTS[f])
 	var place := place_of(map, hex)
 	var port := bool(place.get("port", false)) and int(place.get("level", 0)) >= 1

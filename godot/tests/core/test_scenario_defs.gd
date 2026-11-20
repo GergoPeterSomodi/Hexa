@@ -49,6 +49,7 @@ func _make_defs() -> GameDefs:
 	defs.tinctures = GameDefs.default_tinctures()
 	defs.cb_palette = GameDefs.default_cb_palette()
 	defs.families = ScenarioFixture.families()
+	FakeScenario.economy_into(defs)
 	defs.countries = [
 		_make_country(&"AAA", "Alpha", "Republic of Alpha", "Alphan", Color("#b3261e")),
 		_make_country(&"BBB", "Beta", "Duchy of Beta", "Betan", Color("#2b5aa8")),
