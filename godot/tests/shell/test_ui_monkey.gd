@@ -2,13 +2,17 @@
 ## exercises bound keys, viewport/HUD/screen clicks, mouse wheel with factors, trackpad
 ## pan/magnify gestures, drags, screen stack push/pop, Esc ladder, layers/seasons, and
 ## checks stack/shade/focus/zoom/bounds/digest invariants and zero leaked orphan nodes
+## M4 (m4-build-spec.md section 9): the economy monkey adds I, L, [ and ], U, clicks on the chips, hex panel rows (hover and
+## click), the works card (Begin, pin, Esc) and the study's tax buttons.
 ## (docs/architecture/ui-and-controls-spec.md section 9; ui-style-and-feedback-spec.md section 11).
-extends GutTest
+extends MonkeyM4
 
 const APP_SCENE := preload("res://shell/app/app.tscn")
 const SEEDS: Array[int] = [1480, 1481, 1482]
 ## M3 (m3-build-spec.md section 9): country games with the season, save, load, bookmark and log keys.
 const M3_SEEDS: Array[int] = [1483, 1484, 1485]
+## M4: country games with the study, the chips, the rows and the works card.
+const M4_SEEDS: Array[int] = [1486, 1487, 1488]
 ## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
 const FORCE_SEASON_STEP := 30
 const FORCE_SAVE_STEP := 120
@@ -16,6 +20,9 @@ const COUNTER_KEYS: Array[String] = [
 	"picks", "works_begun", "works_cancelled", "seasons", "saves", "loads", "new_games", "games",
 	"reports", "report_links", "log_opens", "log_lines", "save_screens", "slot_keys", "bookmarks_set", "bookmarks_go",
 	"undos", "spaces", "double_spaces", "refused_spaces", "console_opens", "m3_keys", "view_checks", "roundtrips",
+	"studies", "study_i", "study_l", "study_page_keys", "study_clicks", "tax_clicks", "tax_changes", "u_keys", "u_cards",
+	"chip_clicks", "chip_cards", "row_hovers", "row_refused_hovers", "row_clicks", "card_begins", "card_pins", "card_escs",
+	"orphan_cycles", "m4_checks",
 ]
 const EVENTS_PER_SEED := 600
 
@@ -35,6 +42,10 @@ const SAFE_KEYS: Array[Key] = [
 	KEY_N,
 	KEY_H,
 	KEY_U,
+	KEY_I,
+	KEY_L,
+	KEY_BRACKETLEFT,
+	KEY_BRACKETRIGHT,
 	KEY_F,
 	KEY_EQUAL,
 	KEY_MINUS,
@@ -63,7 +74,6 @@ var _player_seen: StringName = &""
 var _player_game: Game = null
 ## M3: the monkey's counters (every action it does and every effect it sees), the app under test and the clock reading
 ## of the last season (-1 after a new or loaded game: the flow and its guard were reset).
-var _n: Dictionary = {}
 var _m3_app: App = null
 var _last_season_msec: int = -1
 
@@ -146,15 +156,68 @@ func test_ui_monkey_m3_seed_1485() -> void:
 	await _run_monkey_seed(M3_SEEDS[2], true, true)
 
 
+## M4: the same monkey with the economy's keys, chips, rows and works card (every M3 action stays).
+func test_ui_monkey_m4_seed_1486() -> void:
+	await _run_monkey_seed(M4_SEEDS[0], true, true, true)
+
+
+func test_ui_monkey_m4_seed_1487() -> void:
+	await _run_monkey_seed(M4_SEEDS[1], true, true, true)
+
+
+func test_ui_monkey_m4_seed_1488() -> void:
+	await _run_monkey_seed(M4_SEEDS[2], true, true, true)
+
+
+## A real bug the M4 monkey found, kept as a minimal failing test (it fails until the card is fixed): with Confirm works on Always
+## a mouse click on a hex panel row opens the card, the card takes the focus for Begin, the row's focus_exited reads as the
+## pointer leaving, and the card closes at once (WorksPreview.leave); then WorksFlow.show_card draws the ghost and the marks for
+## a card that is gone, and they stay on the map.
+func test_a_mouse_click_on_a_row_keeps_its_card_and_leaves_no_marks_without_it() -> void:
+	var vp := SubViewport.new()
+	vp.size = Vector2i(1280, 720)
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	vp.gui_disable_input = false
+	add_child_autofree(vp)
+	var app := APP_SCENE.instantiate() as App
+	app.settings_path = ""
+	app.allow_tree_quit = false
+	app.pause_tree_when_modal = false
+	app.skip_loading_frames = true
+	app.cli_args_override = PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"])
+	var s := Settings.new("macOS", true)
+	s.set_value("state/help_seen", true)
+	s.set_value("graphics/preload_next_season", false)
+	s.set_value("game/autosave", "off")
+	s.set_value("game/confirm_works", "always")
+	app.set_settings_override(s)
+	vp.add_child(app)
+	await _m3_wait_until(func() -> bool: return app.map_scene() != null and app.stack().count() == 0 and not app.is_starting(), 900)
+	await _wait_frames(3)
+	app.map_scene().select_hex(Vector2i(10, 13))  # wild woods by the sea east of Genoa
+	await _wait_frames(3)
+	var row := AppFlowHelpers.row_button(app, "Build olive")
+	assert_not_null(row, "the woods offer an olive grove")
+	if row != null:
+		_send_click(vp, row.get_global_rect().get_center(), MOUSE_BUTTON_LEFT)
+		await _wait_frames(3)
+		assert_true(app.stack().top() is WorksPreview, "the card stays up after the click")
+		assert_eq(app.map_scene().preview_marks().shown(), app.stack().has_screen(&"works_preview"),
+			"the ghost and marks are on the map exactly while the card is up")
+	Session.end_game()
+	await _wait_frames(2)
+
+
 func _on_hex_changed(hex: Vector2i) -> void:
 	_changed_hexes.append(hex)
 
 
-func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false) -> void:
+func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false) -> void:
 	await _wait_frames(2)
 	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	_player_seen = &""
 	_player_game = null
+	_m4 = m4
 	Events.hex_changed.connect(_on_hex_changed)
 
 	var vp := SubViewport.new()
@@ -201,8 +264,9 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false)
 		var prev_unsaved := Session.unsaved_actions
 		var prev_player := Session.player_tag()
 		_changed_hexes.clear()
+		_tag = "seed %d step %d" % [seed_value, step]
 
-		if m3 and rng.randi_range(0, 99) < 45:
+		if m3 and rng.randi_range(0, 99) < (70 if m4 else 45):
 			await _m3_step(rng, vp, app)
 		else:
 			_perform_monkey_step(rng, vp, app, land_hexes, step)
@@ -211,9 +275,12 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false)
 		_assert_invariants(vp, app, prev_game, prev_digest, prev_unsaved, prev_player, seed_value, step)
 		if m3:
 			_m3_assert_invariants(app, "seed %d step %d" % [seed_value, step])
+		if m4:
+			_m4_assert_invariants(app, "seed %d step %d" % [seed_value, step])
 
 	if m3:
 		_m3_end(seed_value)
+	_m4 = false
 	Events.hex_changed.disconnect(_on_hex_changed)
 	Session.end_game()
 	remove_child(vp)
@@ -286,24 +353,6 @@ func _click_visible_control(rng: Rng, vp: SubViewport, app: App) -> void:
 		btn.pressed.emit()
 
 
-func _collect_clickable_buttons(root_node: Node) -> Array[BaseButton]:
-	var out: Array[BaseButton] = []
-	var queue: Array[Node] = [root_node]
-	while not queue.is_empty():
-		var cur := queue.pop_front() as Node
-		if cur is CanvasItem and not (cur as CanvasItem).visible:
-			continue
-		if cur is BaseButton:
-			var btn := cur as BaseButton
-			if btn.is_visible_in_tree() and not btn.disabled:
-				var bname := String(btn.name)
-				if bname != "QuitButton" and not bname.contains("Quit") and not bname.contains("OpenDataFolder"):
-					out.append(btn)
-		for child: Node in cur.get_children():
-			queue.append(child)
-	return out
-
-
 func _send_random_viewport_click(rng: Rng, vp: SubViewport) -> void:
 	var pos := Vector2(
 		float(rng.randi_range(12, vp.size.x - 12)),
@@ -334,6 +383,11 @@ func _send_random_wheel(rng: Rng, vp: SubViewport) -> void:
 	ev.ctrl_pressed = rng.randi_range(0, 5) == 0
 	ev.shift_pressed = rng.randi_range(0, 5) == 0
 	vp.push_input(ev)
+	# A wheel tick is a press and a release (as the window sends it): left pressed, it would hold the viewport's mouse grab and
+	# every later click would go to the control under the wheel.
+	var release := ev.duplicate() as InputEventMouseButton
+	release.pressed = false
+	vp.push_input(release)
 
 
 func _send_random_gesture(rng: Rng, vp: SubViewport) -> void:
@@ -532,27 +586,6 @@ func _assert_invariants(
 				"%s: an accepted works action on %s is on the player's land" % [tag, str(hex)])
 
 
-func _send_click(vp: SubViewport, pos: Vector2, button: MouseButton) -> void:
-	var motion := InputEventMouseMotion.new()
-	motion.position = pos
-	motion.global_position = pos
-	vp.push_input(motion)
-
-	var press := InputEventMouseButton.new()
-	press.button_index = button
-	press.position = pos
-	press.global_position = pos
-	press.pressed = true
-	vp.push_input(press)
-
-	var release := InputEventMouseButton.new()
-	release.button_index = button
-	release.position = pos
-	release.global_position = pos
-	release.pressed = false
-	vp.push_input(release)
-
-
 func _collect_land_hexes() -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	if Session.game == null or Session.game.map == null:
@@ -562,22 +595,6 @@ func _collect_land_hexes() -> Array[Vector2i]:
 		if m.land[i] == 1:
 			out.append(m.hex_of(i))
 	return out
-
-
-func _wait_frames(frames: int = 1) -> void:
-	for _i: int in range(frames):
-		await get_tree().process_frame
-
-
-func _send_chord(vp: SubViewport, key: Key, ctrl: bool = false, shift: bool = false) -> void:
-	for pressed: bool in [true, false]:
-		var ev := InputEventKey.new()
-		ev.keycode = key
-		ev.physical_keycode = key
-		ev.ctrl_pressed = ctrl
-		ev.shift_pressed = shift
-		ev.pressed = pressed
-		vp.push_input(ev)
 
 
 # ----- M3: the season, report, log, Save and Load, bookmarks and quick keys -------------------------------------------------
@@ -615,6 +632,9 @@ func _m3_end(seed_value: int) -> void:
 	assert_gt(int(_n["seasons"]), 0, "seed %d: the monkey played a season" % seed_value)
 	assert_gt(int(_n["saves"]), 0, "seed %d: the monkey saved" % seed_value)
 	assert_gt(int(_n["roundtrips"]), 0, "seed %d: a save then load kept the digest at least once" % seed_value)
+	if _m4:
+		for key: String in M4_REQUIRED:
+			assert_gt(int(_n[key]), 0, "seed %d: the monkey did %s" % [seed_value, key])
 
 
 func _on_season_counted(_turn: int) -> void:
@@ -650,15 +670,6 @@ func _on_saved_counted(_slot: String, problem: String) -> void:
 		_n["saves"] = int(_n["saves"]) + 1
 
 
-func _bump(key: String) -> void:
-	_n[key] = int(_n[key]) + 1
-
-
-func _m3_calm(app: App) -> bool:
-	return Session.game != null and Session.player_tag() != &"" and app.stack().count() == 0 \
-		and not app.is_starting() and app.requests().flow.state() == SeasonFlow.State.IDLE
-
-
 ## Before every step: waits out a load, starts a game when none is left, chooses a country at the pick, and forces the
 ## actions a seed must do (a season, a save then load) when its counters are still 0 late enough.
 func _m3_before_step(rng: Rng, app: App, step: int) -> void:
@@ -688,6 +699,8 @@ func _m3_before_step(rng: Rng, app: App, step: int) -> void:
 	if step >= FORCE_SAVE_STEP and int(_n["roundtrips"]) == 0:
 		await _m3_clear_screens(app)
 		await _m3_save_then_load(vp, app)
+	if _m4 and step >= FORCE_M4_STEP:
+		await _m4_force(rng, vp, app)
 
 
 func _m3_clear_screens(app: App) -> void:
@@ -882,6 +895,9 @@ func _m3_buildable() -> Dictionary:
 
 
 func _m3_step(rng: Rng, vp: SubViewport, app: App) -> void:
+	if _m4 and rng.randi_range(0, 99) < 60:
+		await _m4_step(rng, vp, app)
+		return
 	var calm := _m3_calm(app)
 	match rng.randi_range(0, 13):
 		0, 1:

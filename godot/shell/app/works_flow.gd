@@ -168,10 +168,14 @@ func show_card(hex: Vector2i, option: Dictionary, focus: bool) -> void:
 		card.finished.connect(_on_card_finished.bind(card))
 		_card = card
 		_app.stack().push(card)
+	if not focus and card.opened_explicitly() and not (card.shown_hex() == hex and card.shown_option() == option):
+		return  # a hover does not replace a card the player opened by click
 	var panel := _app.hud().hex_panel()
 	if panel.is_visible_in_tree():
 		card.set_beside(Hud.screen_rect(panel))
 	card.show_option(hex, option, focus)
+	if _live_card() == null or _scene == null or not is_instance_valid(_scene):
+		return  # the card closed while it opened: no marks for a card that is gone
 	_scene.show_preview(card.preview())
 
 

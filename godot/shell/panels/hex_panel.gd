@@ -24,27 +24,27 @@ signal row_unhovered
 
 const MAX_CHIPS := 3
 
-@onready var _cartouche: Cartouche = $Body/Cartouche
-@onready var _subtitle: Label = $Body/Subtitle
-@onready var _piece_box: VBoxContainer = $Body/PieceBox
-@onready var _piece_rows: GridContainer = $Body/PieceBox/Rows
-@onready var _ground_box: VBoxContainer = $Body/GroundBox
-@onready var _ground_rows: GridContainer = $Body/GroundBox/Rows
-@onready var _owner_row: HBoxContainer = $Body/OwnerRow
-@onready var _owner_value: HBoxContainer = $Body/OwnerRow/Value
-@onready var _gives_row: HBoxContainer = $Body/GivesRow
-@onready var _gives_value: Label = $Body/GivesRow/Value
-@onready var _worth_row: HBoxContainer = $Body/WorthRow
-@onready var _worth_value: HBoxContainer = $Body/WorthRow/Value
-@onready var _rule: HSeparator = $Body/Rule
-@onready var _home_box: VBoxContainer = $Body/HomeReason
-@onready var _work_box: VBoxContainer = $Body/WorkBox
-@onready var _work_text: Label = $Body/WorkBox/Text
-@onready var _work_progress: Label = $Body/WorkBox/Progress
-@onready var _work_actions: VBoxContainer = $Body/WorkBox/Actions
-@onready var _actions_box: VBoxContainer = $Body/ActionsBox
-@onready var _actions_heading: Label = $Body/ActionsBox/Heading
-@onready var _actions: VBoxContainer = $Body/ActionsBox/Actions
+@onready var _cartouche: Cartouche = $Scroll/Body/Cartouche
+@onready var _subtitle: Label = $Scroll/Body/Subtitle
+@onready var _piece_box: VBoxContainer = $Scroll/Body/PieceBox
+@onready var _piece_rows: GridContainer = $Scroll/Body/PieceBox/Rows
+@onready var _ground_box: VBoxContainer = $Scroll/Body/GroundBox
+@onready var _ground_rows: GridContainer = $Scroll/Body/GroundBox/Rows
+@onready var _owner_row: HBoxContainer = $Scroll/Body/OwnerRow
+@onready var _owner_value: HBoxContainer = $Scroll/Body/OwnerRow/Value
+@onready var _gives_row: HBoxContainer = $Scroll/Body/GivesRow
+@onready var _gives_value: Label = $Scroll/Body/GivesRow/Value
+@onready var _worth_row: HBoxContainer = $Scroll/Body/WorthRow
+@onready var _worth_value: HBoxContainer = $Scroll/Body/WorthRow/Value
+@onready var _rule: HSeparator = $Scroll/Body/Rule
+@onready var _home_box: VBoxContainer = $Scroll/Body/HomeReason
+@onready var _work_box: VBoxContainer = $Scroll/Body/WorkBox
+@onready var _work_text: Label = $Scroll/Body/WorkBox/Text
+@onready var _work_progress: Label = $Scroll/Body/WorkBox/Progress
+@onready var _work_actions: VBoxContainer = $Scroll/Body/WorkBox/Actions
+@onready var _actions_box: VBoxContainer = $Scroll/Body/ActionsBox
+@onready var _actions_heading: Label = $Scroll/Body/ActionsBox/Heading
+@onready var _actions: VBoxContainer = $Scroll/Body/ActionsBox/Actions
 
 ## The App's settings (game/confirm_works is read from them on each refresh); null reads the shipped default.
 var settings: Settings = null
@@ -52,16 +52,43 @@ var settings: Settings = null
 var _hex := NO_HEX
 var _retired: Array[Node] = []
 var _refresh_queued := false
+var _fit_queued := false
+
+@onready var _scroll: ScrollContainer = $Scroll
+@onready var _body: VBoxContainer = $Scroll/Body
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	custom_minimum_size.x = float(Tokens.PANEL_W)
 	visible = false
+	_body.minimum_size_changed.connect(_fit_later)
+	visibility_changed.connect(_fit_later)
+	get_viewport().size_changed.connect(_fit_later)
 	for pair: Array in _wiring():
 		var sig: Signal = pair[0]
 		var handler: Callable = pair[1]
 		sig.connect(handler)
+
+
+## The body scrolls inside the panel: the panel is as tall as its content but never taller than the window below its top
+## edge, so a long list of rows can never push the HUD column past the window.
+func _fit_later() -> void:
+	if not _fit_queued:
+		_fit_queued = true
+		_fit.call_deferred()
+
+
+func _fit() -> void:
+	_fit_queued = false
+	if not is_inside_tree():
+		return
+	var top := global_position.y if visible else float(Tokens.BAR_H)
+	var room := maxf(0.0, get_viewport_rect().size.y - top - float(Tokens.S2))
+	var chrome := get_combined_minimum_size().y - _scroll.get_combined_minimum_size().y
+	var want := minf(_body.get_combined_minimum_size().y, maxf(0.0, room - chrome))
+	if not is_equal_approx(_scroll.custom_minimum_size.y, want):
+		_scroll.custom_minimum_size.y = want
 
 
 func _exit_tree() -> void:
@@ -347,6 +374,10 @@ func _add_row(game: Game, row: Dictionary) -> void:
 		button.hotkey_action = &"game_upgrade"
 	line.add_child(button)
 	button.cost_text = str(row["cost_text"])
+	# The cost sits on its own line under the button, never over its label (the button keeps it for its description).
+	var overlay := button.get_node_or_null("CostLabel") as Label
+	if overlay != null:
+		overlay.visible = false
 	button.set_verdict({"ok": ok, "reason": words})
 	if ok:
 		button.pressed.connect(_on_row_pressed.bind(option, bool(row["expensive"])))
@@ -355,6 +386,12 @@ func _add_row(game: Game, row: Dictionary) -> void:
 	button.mouse_exited.connect(_on_row_left)
 	button.focus_exited.connect(_on_row_left)
 	line.add_child(_info_button(str(row["label"]), option))
+	if not button.cost_text.is_empty():
+		var cost := PanelKit.label(button.cost_text, &"Hint")
+		cost.name = &"RowCost"
+		cost.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(cost)
 	_add_chips(box, row["chips"])
 	if not ok and words != "":
 		box.add_child(PanelKit.reason(words))

@@ -45,15 +45,17 @@ func set_seasons(cells: Array, now: int) -> void:
 		var gain := int(data.get("gain", 0))
 
 		_heads[i].text = season_name
+		_heads[i].theme_type_variation = &"LabelInkHead"
 		var lines_box := _lines[i]
 		PanelKit.clear_children(lines_box)
 
 		if not note.is_empty():
 			var note_lbl := Label.new()
 			note_lbl.text = note
-			note_lbl.theme_type_variation = &"Reason"
+			note_lbl.theme_type_variation = &"LabelInkMuted"
 			note_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			note_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			note_lbl.custom_minimum_size.x = 40.0
 			note_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			lines_box.add_child(note_lbl)
 
@@ -69,8 +71,10 @@ func set_seasons(cells: Array, now: int) -> void:
 
 			var row_lbl := Label.new()
 			row_lbl.text = "%s %d > %d" % [g_name, before, after]
-			row_lbl.theme_type_variation = &"Hint" if (before == 0 and after == 0) else &"TableRow"
+			row_lbl.theme_type_variation = &"LabelInkMuted" if (before == 0 and after == 0) else &"LabelInk"
 			row_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			row_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			row_lbl.custom_minimum_size.x = 40.0
 			row_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			lines_box.add_child(row_lbl)
 

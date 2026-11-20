@@ -309,3 +309,93 @@ func test_shift_held_before_the_card_opens_keeps_it_when_the_pointer_leaves() ->
 	screen.hold(false)
 	assert_eq(_harness.stack.count(), 0, "released after the pointer left: closes")
 
+
+func test_a_card_opened_explicitly_survives_leave_and_closes_on_esc() -> void:
+	var screen := WORKS_PREVIEW_SCENE.instantiate() as WorksPreview
+	_harness.stack.push(screen)
+	screen.show_option(VINEYARD_HEX, _vineyard(), true)
+	await _harness.wait_frames(self, 2)
+	assert_true(screen.opened_explicitly())
+	screen.leave()
+	screen.hold(false)
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 1, "leaving does not close a card the player opened")
+	_harness.send_key(KEY_ESCAPE)
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 0, "Esc closes it")
+
+
+
+func _fit_check(h: UIHarness, vp: Vector2, hex: Vector2i, option: Dictionary) -> void:
+	var screen := WORKS_PREVIEW_SCENE.instantiate() as WorksPreview
+	h.stack.push(screen)
+	screen.show_option(hex, option)
+	await h.wait_frames(self, 3)
+	var panel := Rect2(vp.x - Tokens.PANEL_W, Tokens.BAR_H + Tokens.S2, Tokens.PANEL_W, 400.0)
+	screen.set_beside(panel)
+	await h.wait_frames(self, 3)
+	var card := screen.card()
+	var rect := card.get_global_rect()
+	var window := Rect2(Vector2.ZERO, vp)
+	assert_true(window.encloses(rect), "the card lies inside the %s window: %s" % [str(vp), str(rect)])
+	if not card.foot_visible():
+		# A rule refusal shows only the refusal (no foot): it still fits.
+		h.stack.clear()
+		return
+	var foot := card.foot().get_global_rect()
+	assert_true(window.encloses(foot), "the foot is inside the window: %s" % str(foot))
+	assert_true(rect.encloses(foot), "the foot is inside the card")
+	assert_gte(foot.position.y, card.body_scroll().get_global_rect().end.y - 0.5, "the foot sits below the scrolling body")
+	for btn: Button in [card.begin_button(), card.pin_button()]:
+		assert_true(window.encloses(btn.get_global_rect()), "%s is in view" % btn.text)
+	h.stack.clear()
+
+
+func test_card_and_its_foot_fit_the_window_at_1280_x_720() -> void:
+	await _fit_check(_harness, Vector2(1280, 720), VINEYARD_HEX, {"action": Works.UPGRADE, "family": 0})
+	await _fit_check(_harness, Vector2(1280, 720), VINEYARD_HEX, _vineyard())
+
+
+func test_card_and_its_foot_fit_the_window_at_2560_x_1440() -> void:
+	var big := UIHarness.new(Vector2i(2560, 1440))
+	big.mount(self)
+	big.stack.theme = KitTheme.load_for(1.0)
+	await _fit_check(big, Vector2(2560, 1440), VINEYARD_HEX, _vineyard())
+	big.dispose()
+
+
+func test_a_short_window_scrolls_the_body_and_keeps_the_foot() -> void:
+	var small := UIHarness.new(Vector2i(1280, 560))
+	small.mount(self)
+	small.stack.theme = KitTheme.load_for(1.0)
+	await _fit_check(small, Vector2(1280, 560), VINEYARD_HEX, _vineyard())
+	small.dispose()
+
+
+func _clear_of_panel(h: UIHarness, vp: Vector2) -> void:
+	var panel := Rect2(vp.x - Tokens.PANEL_W, Tokens.BAR_H + Tokens.S2, Tokens.PANEL_W, 600.0)
+	var screen := WORKS_PREVIEW_SCENE.instantiate() as WorksPreview
+	h.stack.push(screen)
+	screen.set_beside(panel)
+	screen.show_option(GENOA_HEX, {"action": Works.UPGRADE, "family": 0})
+	await h.wait_frames(self, 3)
+	assert_lte(screen.card_rect().end.x, panel.position.x - 8.0, "the Genoa upgrade card stays left of the panel at %s" % str(vp))
+	assert_lte(screen.card().get_global_rect().end.x, panel.position.x - 8.0)
+	screen.pin(true)
+	screen.show_option(VINEYARD_HEX, _vineyard())
+	await h.wait_frames(self, 3)
+	assert_true(screen.card().compare_container().visible, "the compare card is open")
+	assert_lte(screen.card_rect().end.x, panel.position.x - 8.0, "the compare card stays left of the panel at %s" % str(vp))
+	h.stack.clear()
+
+
+func test_genoa_and_compare_cards_stay_left_of_the_panel_at_1280_x_720() -> void:
+	await _clear_of_panel(_harness, Vector2(1280, 720))
+
+
+func test_genoa_and_compare_cards_stay_left_of_the_panel_at_2560_x_1440() -> void:
+	var big := UIHarness.new(Vector2i(2560, 1440))
+	big.mount(self)
+	big.stack.theme = KitTheme.load_for(1.0)
+	await _clear_of_panel(big, Vector2(2560, 1440))
+	big.dispose()

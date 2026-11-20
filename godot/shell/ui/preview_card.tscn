@@ -45,51 +45,63 @@ layout_mode = 2
 theme_type_variation = &"Hint"
 autowrap_mode = 3
 
-[node name="Body" type="VBoxContainer" parent="VBox"]
+[node name="BodyScroll" type="ScrollContainer" parent="VBox"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 0
+horizontal_scroll_mode = 0
+
+[node name="Content" type="VBoxContainer" parent="VBox/BodyScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Body" type="VBoxContainer" parent="VBox/BodyScroll/Content"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="BringsHead" type="Label" parent="VBox/Body"]
+[node name="BringsHead" type="Label" parent="VBox/BodyScroll/Content/Body"]
 layout_mode = 2
 theme_type_variation = &"SectionHead"
 text = "BRINGS"
 
-[node name="Brings" type="VBoxContainer" parent="VBox/Body"]
+[node name="Brings" type="VBoxContainer" parent="VBox/BodyScroll/Content/Body"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="SeasonStrip" parent="VBox/Body" instance=ExtResource("4_strip")]
+[node name="SeasonStrip" parent="VBox/BodyScroll/Content/Body" instance=ExtResource("4_strip")]
 layout_mode = 2
 
-[node name="Cols" type="HBoxContainer" parent="VBox/Body"]
+[node name="Cols" type="HBoxContainer" parent="VBox/BodyScroll/Content/Body"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="LandsBox" type="VBoxContainer" parent="VBox/Body/Cols"]
+[node name="LandsBox" type="VBoxContainer" parent="VBox/BodyScroll/Content/Body/Cols"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="LandsHead" type="Label" parent="VBox/Body/Cols/LandsBox"]
+[node name="LandsHead" type="Label" parent="VBox/BodyScroll/Content/Body/Cols/LandsBox"]
 layout_mode = 2
 theme_type_variation = &"SectionHead"
 text = "WHERE IT LANDS"
 
-[node name="Lands" type="VBoxContainer" parent="VBox/Body/Cols/LandsBox"]
+[node name="Lands" type="VBoxContainer" parent="VBox/BodyScroll/Content/Body/Cols/LandsBox"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="ChartBox" type="VBoxContainer" parent="VBox/Body/Cols"]
+[node name="ChartBox" type="VBoxContainer" parent="VBox/BodyScroll/Content/Body/Cols"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="ChartHead" type="Label" parent="VBox/Body/Cols/ChartBox"]
+[node name="ChartHead" type="Label" parent="VBox/BodyScroll/Content/Body/Cols/ChartBox"]
 layout_mode = 2
 theme_type_variation = &"SectionHead"
 text = "GAIN A SEASON"
 
-[node name="InkChart" type="Control" parent="VBox/Body/Cols/ChartBox"]
+[node name="InkChart" type="Control" parent="VBox/BodyScroll/Content/Body/Cols/ChartBox"]
 custom_minimum_size = Vector2(220, 96)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -98,54 +110,54 @@ script = ExtResource("5_chart")
 kind = 2
 ground = 1
 
-[node name="Cost" type="Label" parent="VBox/Body"]
+[node name="Cost" type="Label" parent="VBox/BodyScroll/Content/Body"]
 visible = false
 layout_mode = 2
 theme_type_variation = &"Body"
 autowrap_mode = 3
 
-[node name="Requirements" type="VBoxContainer" parent="VBox/Body"]
+[node name="Requirements" type="VBoxContainer" parent="VBox/BodyScroll/Content/Body"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Payback" type="Label" parent="VBox/Body"]
+[node name="Payback" type="Label" parent="VBox/BodyScroll/Content/Body"]
 visible = false
 layout_mode = 2
 theme_type_variation = &"Body"
 autowrap_mode = 3
 
-[node name="Next" type="Label" parent="VBox/Body"]
+[node name="Next" type="Label" parent="VBox/BodyScroll/Content/Body"]
 visible = false
 layout_mode = 2
 theme_type_variation = &"Hint"
 autowrap_mode = 3
 
-[node name="CompareBox" type="HBoxContainer" parent="VBox"]
+[node name="CompareBox" type="HBoxContainer" parent="VBox/BodyScroll/Content"]
 visible = false
 layout_mode = 2
 mouse_filter = 2
 
-[node name="ColA" type="VBoxContainer" parent="VBox/CompareBox"]
+[node name="ColA" type="VBoxContainer" parent="VBox/BodyScroll/Content/CompareBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="CompareRule" type="VSeparator" parent="VBox/CompareBox"]
+[node name="CompareRule" type="VSeparator" parent="VBox/BodyScroll/Content/CompareBox"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="ColB" type="VBoxContainer" parent="VBox/CompareBox"]
+[node name="ColB" type="VBoxContainer" parent="VBox/BodyScroll/Content/CompareBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="Refusal" type="PanelContainer" parent="VBox"]
+[node name="Refusal" type="PanelContainer" parent="VBox/BodyScroll/Content"]
 visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_type_variation = &"PanelSlot"
 
-[node name="RefusalLabel" type="Label" parent="VBox/Refusal"]
+[node name="RefusalLabel" type="Label" parent="VBox/BodyScroll/Content/Refusal"]
 layout_mode = 2
 theme_type_variation = &"NumberBad"
 autowrap_mode = 3

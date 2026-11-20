@@ -179,13 +179,13 @@ func test_season_strip_marks_now_styles_zero_and_hides_when_equal() -> void:
 
 	var spring_lines := strip.cell(0).get_node("VBox/Lines") as VBoxContainer
 	assert_eq(spring_lines.get_child_count(), 1)
-	assert_eq((spring_lines.get_child(0) as Label).theme_type_variation, &"Hint", "zero good row uses Hint")
+	assert_eq((spring_lines.get_child(0) as Label).theme_type_variation, &"LabelInkMuted", "zero good row uses the muted ink")
 
 	var autumn_lines := strip.cell(2).get_node("VBox/Lines") as VBoxContainer
-	assert_eq((autumn_lines.get_child(0) as Label).theme_type_variation, &"TableRow")
+	assert_eq((autumn_lines.get_child(0) as Label).theme_type_variation, &"LabelInk")
 
 	var winter_lines := strip.cell(3).get_node("VBox/Lines") as VBoxContainer
-	assert_eq((winter_lines.get_child(0) as Label).theme_type_variation, &"Reason")
+	assert_eq((winter_lines.get_child(0) as Label).theme_type_variation, &"LabelInkMuted")
 
 	# Four equal cells hide the strip
 	var equal_cell := {"season": "Season", "note": "", "goods": [{"name": "grain", "before": 4, "after": 6}], "gain": 10}
@@ -254,6 +254,9 @@ func test_preview_card_accepted_refused_compare_and_signals() -> void:
 	card.treasury_only_toggled.connect(func(on: bool) -> void: treas.append(on))
 	card.look_at_requested.connect(func(h: Vector2i) -> void: looks.append(h))
 
+	await _harness.wait_frames(self, 2)
+	# A card in a plain container is as tall as its parts need, so its scrolling body shows all of it.
+	card.custom_minimum_size.y = card.natural_height()
 	await _harness.wait_frames(self, 2)
 	_harness.send_click(card.begin_button().get_global_rect().get_center())
 	_harness.send_click(card.pin_button().get_global_rect().get_center())

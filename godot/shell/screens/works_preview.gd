@@ -8,8 +8,6 @@ class_name WorksPreview
 extends Screen
 
 const CARD_W: int = 556
-## Room for the scroll bar beside the card.
-const SCROLL_ROOM: int = Tokens.S3
 const CARD_GAP: int = Tokens.S3
 const BOTTOM_MARGIN: int = Tokens.S4
 const BEGIN_REQUEST := &"begin_work"
@@ -17,8 +15,7 @@ const LOOK_REQUEST := &"look_at"
 const BEGIN_ACTION := &"game_upgrade"
 const TREASURY_KEY := "game/gain_treasury_only"
 
-@onready var _scroll: ScrollContainer = $Scroll
-@onready var _card: PreviewCard = $Scroll/Card
+@onready var _card: PreviewCard = $Card
 
 var _hex: Vector2i = Vector2i.ZERO
 var _option: Dictionary = {}
@@ -30,6 +27,9 @@ var _treasury: bool = false
 var _beside: Rect2 = Rect2()
 var _has_beside: bool = false
 var _done: bool = false
+var _layout_queued: bool = false
+## Opened by the player (a click, the (i) button, U): leave() and a hover do not close or replace it.
+var _explicit: bool = false
 
 
 func _init() -> void:
@@ -45,6 +45,7 @@ func _ready() -> void:
 	_card.treasury_only_toggled.connect(_on_treasury_toggled)
 	_card.look_at_requested.connect(_on_look_at)
 	resized.connect(_layout)
+	_card.content_changed.connect(_layout_later)
 	_layout()
 
 
@@ -66,6 +67,7 @@ func back() -> bool:
 ## `focus` (the info button, the keyboard, U) puts the focus on Begin. A hover (`focus` false) never takes the focus, so the
 ## hex panel's row keeps it under the card.
 func show_option(hex: Vector2i, option: Dictionary, focus: bool = false) -> void:
+	_explicit = focus or (_explicit and hex == _hex and option == _option)
 	_hex = hex
 	_option = option.duplicate()
 	_pointer_left = false
@@ -76,6 +78,7 @@ func show_option(hex: Vector2i, option: Dictionary, focus: bool = false) -> void
 		return
 	_preview = ImprovePreview.of(Session.game, Session.player_tag(), hex, _option)
 	_render(focus)
+	_layout()
 
 
 ## Keeps the shown card (on) or lets it go (off). The next option shown while a card is pinned opens beside it on one scale.
@@ -90,14 +93,14 @@ func pin(on: bool) -> void:
 ## Shift held (true) keeps the card while the pointer is away. Released (false) after the pointer left, the card closes.
 func hold(on: bool) -> void:
 	_held = on
-	if not on and _pointer_left and _pinned.is_empty():
+	if not on and _pointer_left and _pinned.is_empty() and not _explicit:
 		_close()
 
 
 ## The pointer left the row that opened the card: the card closes unless Shift holds it or it is pinned.
 func leave() -> void:
 	_pointer_left = true
-	if not _shift_down() and _pinned.is_empty():
+	if not _shift_down() and _pinned.is_empty() and not _explicit:
 		_close()
 
 
@@ -118,13 +121,14 @@ func card() -> PreviewCard:
 	return _card
 
 
+## The card's scrolling body (the foot below it never scrolls).
 func scroll() -> ScrollContainer:
-	return _scroll
+	return _card.body_scroll()
 
 
 ## The card's rect in this screen's coordinates (what the window shows of it).
 func card_rect() -> Rect2:
-	return Rect2(_scroll.position, _scroll.size)
+	return Rect2(_card.position, _card.size)
 
 
 func preview() -> Dictionary:
@@ -137,6 +141,11 @@ func shown_hex() -> Vector2i:
 
 func shown_option() -> Dictionary:
 	return _option
+
+
+## Whether the player opened this card (a click, the (i) button, U) rather than a hover.
+func opened_explicitly() -> bool:
+	return _explicit
 
 
 func pinned() -> bool:
@@ -162,6 +171,7 @@ func _render(focus: bool = false) -> void:
 		_card.set_pinned(true)
 		_card.show_compare(_pinned, _preview)
 	_card.visible = true
+	_layout_later()
 	if focus and is_inside_tree():
 		_card.focus_begin()
 
@@ -219,10 +229,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		_begin()
 
 
-## The card opens left of the hex panel, its top at the panel's top (never under the top bar), and its height fits the
-## window less a margin; the scroll container takes the rest.
+func _layout_later() -> void:
+	if not _layout_queued:
+		_layout_queued = true
+		_layout.call_deferred()
+
+
+## The card opens left of the hex panel, its top at the panel's top (never under the top bar). Its height is its content's,
+## at most the window less the top and a margin: a taller card scrolls its body and keeps the foot in view.
 func _layout() -> void:
-	if not is_node_ready():
+	_layout_queued = false
+	if not is_node_ready() or not is_inside_tree():
 		return
 	var vp := get_viewport_rect().size
 	var top := maxf(ctx.top_inset() if ctx != null else float(Tokens.BAR_H + Tokens.S2), 0.0)
@@ -230,7 +247,16 @@ func _layout() -> void:
 	if _has_beside:
 		top = maxf(top, _beside.position.y)
 		right = _beside.position.x - float(CARD_GAP)
-	var width := float(CARD_W + SCROLL_ROOM)
+	# Never wider than the room left of the panel (a margin each side); the content wraps to fit.
+	var width := minf(float(CARD_W), maxf(right - float(Tokens.S2), 0.0))
+	if _card.custom_minimum_size.x != width:
+		_card.custom_minimum_size.x = width
 	var left := maxf(right - width, float(Tokens.S2))
-	_scroll.position = Vector2(left, top)
-	_scroll.size = Vector2(width, maxf(0.0, vp.y - top - float(BOTTOM_MARGIN)))
+	var room := maxf(0.0, vp.y - top - float(BOTTOM_MARGIN))
+	var height := minf(_card.natural_height(), room)
+	var pos := Vector2(left, top)
+	if _card.position != pos:
+		_card.position = pos
+	var want := Vector2(width, height)
+	if _card.size != want:
+		_card.size = want

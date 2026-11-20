@@ -9,136 +9,142 @@ size_flags_vertical = 0
 mouse_filter = 0
 script = ExtResource("1_panel")
 
-[node name="Body" type="VBoxContainer" parent="."]
+[node name="Scroll" type="ScrollContainer" parent="."]
 layout_mode = 2
+mouse_filter = 1
+horizontal_scroll_mode = 0
+
+[node name="Body" type="VBoxContainer" parent="Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="Cartouche" type="PanelContainer" parent="Body"]
+[node name="Cartouche" type="PanelContainer" parent="Scroll/Body"]
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("2_cart")
 
-[node name="Subtitle" type="Label" parent="Body"]
+[node name="Subtitle" type="Label" parent="Scroll/Body"]
 layout_mode = 2
 theme_type_variation = &"Hint"
 autowrap_mode = 3
 
-[node name="PieceBox" type="VBoxContainer" parent="Body"]
+[node name="PieceBox" type="VBoxContainer" parent="Scroll/Body"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Heading" type="Label" parent="Body/PieceBox"]
+[node name="Heading" type="Label" parent="Scroll/Body/PieceBox"]
 layout_mode = 2
 theme_type_variation = &"SectionHead"
 text = "Built"
 
-[node name="Rows" type="GridContainer" parent="Body/PieceBox"]
+[node name="Rows" type="GridContainer" parent="Scroll/Body/PieceBox"]
 layout_mode = 2
 mouse_filter = 2
 columns = 2
 
-[node name="GroundBox" type="VBoxContainer" parent="Body"]
+[node name="GroundBox" type="VBoxContainer" parent="Scroll/Body"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Heading" type="Label" parent="Body/GroundBox"]
+[node name="Heading" type="Label" parent="Scroll/Body/GroundBox"]
 layout_mode = 2
 theme_type_variation = &"SectionHead"
 text = "Ground"
 
-[node name="Rows" type="GridContainer" parent="Body/GroundBox"]
+[node name="Rows" type="GridContainer" parent="Scroll/Body/GroundBox"]
 layout_mode = 2
 mouse_filter = 2
 columns = 2
 
-[node name="OwnerRow" type="HBoxContainer" parent="Body"]
+[node name="OwnerRow" type="HBoxContainer" parent="Scroll/Body"]
 visible = false
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Key" type="Label" parent="Body/OwnerRow"]
+[node name="Key" type="Label" parent="Scroll/Body/OwnerRow"]
 layout_mode = 2
 theme_type_variation = &"Hint"
 text = "Owner"
 
-[node name="Value" type="HBoxContainer" parent="Body/OwnerRow"]
+[node name="Value" type="HBoxContainer" parent="Scroll/Body/OwnerRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="GivesRow" type="HBoxContainer" parent="Body"]
+[node name="GivesRow" type="HBoxContainer" parent="Scroll/Body"]
 visible = false
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Key" type="Label" parent="Body/GivesRow"]
+[node name="Key" type="Label" parent="Scroll/Body/GivesRow"]
 layout_mode = 2
 theme_type_variation = &"Hint"
 text = "Gives"
 
-[node name="Value" type="Label" parent="Body/GivesRow"]
+[node name="Value" type="Label" parent="Scroll/Body/GivesRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"TableRow"
 autowrap_mode = 3
 
-[node name="WorthRow" type="HBoxContainer" parent="Body"]
+[node name="WorthRow" type="HBoxContainer" parent="Scroll/Body"]
 visible = false
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Key" type="Label" parent="Body/WorthRow"]
+[node name="Key" type="Label" parent="Scroll/Body/WorthRow"]
 layout_mode = 2
 theme_type_variation = &"Hint"
 text = "Worth, this season"
 
-[node name="Value" type="HBoxContainer" parent="Body/WorthRow"]
+[node name="Value" type="HBoxContainer" parent="Scroll/Body/WorthRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="Rule" type="HSeparator" parent="Body"]
+[node name="Rule" type="HSeparator" parent="Scroll/Body"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="HomeReason" type="VBoxContainer" parent="Body"]
+[node name="HomeReason" type="VBoxContainer" parent="Scroll/Body"]
 visible = false
 layout_mode = 2
 mouse_filter = 2
 
-[node name="WorkBox" type="VBoxContainer" parent="Body"]
+[node name="WorkBox" type="VBoxContainer" parent="Scroll/Body"]
 visible = false
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Heading" type="Label" parent="Body/WorkBox"]
+[node name="Heading" type="Label" parent="Scroll/Body/WorkBox"]
 layout_mode = 2
 theme_type_variation = &"SectionHead"
 text = "Work under way"
 
-[node name="Text" type="Label" parent="Body/WorkBox"]
+[node name="Text" type="Label" parent="Scroll/Body/WorkBox"]
 layout_mode = 2
 theme_type_variation = &"TableRow"
 autowrap_mode = 3
 
-[node name="Progress" type="Label" parent="Body/WorkBox"]
+[node name="Progress" type="Label" parent="Scroll/Body/WorkBox"]
 layout_mode = 2
 theme_type_variation = &"Hint"
 autowrap_mode = 3
 
-[node name="Actions" type="VBoxContainer" parent="Body/WorkBox"]
+[node name="Actions" type="VBoxContainer" parent="Scroll/Body/WorkBox"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="ActionsBox" type="VBoxContainer" parent="Body"]
+[node name="ActionsBox" type="VBoxContainer" parent="Scroll/Body"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Heading" type="Label" parent="Body/ActionsBox"]
+[node name="Heading" type="Label" parent="Scroll/Body/ActionsBox"]
 layout_mode = 2
 theme_type_variation = &"SectionHead"
 text = "Actions"
 
-[node name="Actions" type="VBoxContainer" parent="Body/ActionsBox"]
+[node name="Actions" type="VBoxContainer" parent="Scroll/Body/ActionsBox"]
 layout_mode = 2
 mouse_filter = 2

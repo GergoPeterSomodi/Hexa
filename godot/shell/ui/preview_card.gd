@@ -10,6 +10,8 @@ signal pin_toggled(on: bool)
 signal closed
 signal look_at_requested(hex: Vector2i)
 signal treasury_only_toggled(on: bool)
+## The content got taller or shorter: the screen refits the card to the window.
+signal content_changed
 
 @export var treasury_only: bool = false:
 	set(value):
@@ -22,6 +24,8 @@ var _close_btn: KitButton = null
 var _title_label: Label = null
 var _sub_label: Label = null
 var _body: VBoxContainer = null
+var _body_scroll: ScrollContainer = null
+var _content: VBoxContainer = null
 var _brings_head: Label = null
 var _brings: VBoxContainer = null
 var _season_strip: SeasonStrip = null
@@ -238,6 +242,23 @@ func treasury_only_switch() -> KitSwitch:
 	return _treasury_only
 
 
+## The scrolling part of the card (the foot stays below it).
+func body_scroll() -> ScrollContainer:
+	_ensure_refs()
+	return _body_scroll
+
+
+func foot() -> HBoxContainer:
+	_ensure_refs()
+	return _foot
+
+
+## The card's height with nothing scrolled: its own chrome, title, the whole content and the foot.
+func natural_height() -> float:
+	_ensure_refs()
+	return get_combined_minimum_size().y - _body_scroll.get_combined_minimum_size().y + _content.get_combined_minimum_size().y
+
+
 func body_visible() -> bool:
 	_ensure_refs()
 	return _body.visible
@@ -260,24 +281,26 @@ func _ensure_refs() -> void:
 	_close_btn = get_node("VBox/Top/CloseBtn") as KitButton
 	_title_label = get_node("VBox/Title") as Label
 	_sub_label = get_node("VBox/Sub") as Label
-	_body = get_node("VBox/Body") as VBoxContainer
-	_brings_head = get_node("VBox/Body/BringsHead") as Label
-	_brings = get_node("VBox/Body/Brings") as VBoxContainer
-	_season_strip = get_node("VBox/Body/SeasonStrip") as SeasonStrip
-	_cols = get_node("VBox/Body/Cols") as HBoxContainer
-	_lands_box = get_node("VBox/Body/Cols/LandsBox") as VBoxContainer
-	_lands = get_node("VBox/Body/Cols/LandsBox/Lands") as VBoxContainer
-	_chart_box = get_node("VBox/Body/Cols/ChartBox") as VBoxContainer
-	_chart = get_node("VBox/Body/Cols/ChartBox/InkChart") as InkChart
-	_cost_label = get_node("VBox/Body/Cost") as Label
-	_requirements = get_node("VBox/Body/Requirements") as VBoxContainer
-	_payback_label = get_node("VBox/Body/Payback") as Label
-	_next_label = get_node("VBox/Body/Next") as Label
-	_compare_box = get_node("VBox/CompareBox") as HBoxContainer
-	_col_a = get_node("VBox/CompareBox/ColA") as VBoxContainer
-	_col_b = get_node("VBox/CompareBox/ColB") as VBoxContainer
-	_refusal = get_node("VBox/Refusal") as PanelContainer
-	_refusal_label = get_node("VBox/Refusal/RefusalLabel") as Label
+	_body_scroll = get_node("VBox/BodyScroll") as ScrollContainer
+	_content = get_node("VBox/BodyScroll/Content") as VBoxContainer
+	_body = get_node("VBox/BodyScroll/Content/Body") as VBoxContainer
+	_brings_head = get_node("VBox/BodyScroll/Content/Body/BringsHead") as Label
+	_brings = get_node("VBox/BodyScroll/Content/Body/Brings") as VBoxContainer
+	_season_strip = get_node("VBox/BodyScroll/Content/Body/SeasonStrip") as SeasonStrip
+	_cols = get_node("VBox/BodyScroll/Content/Body/Cols") as HBoxContainer
+	_lands_box = get_node("VBox/BodyScroll/Content/Body/Cols/LandsBox") as VBoxContainer
+	_lands = get_node("VBox/BodyScroll/Content/Body/Cols/LandsBox/Lands") as VBoxContainer
+	_chart_box = get_node("VBox/BodyScroll/Content/Body/Cols/ChartBox") as VBoxContainer
+	_chart = get_node("VBox/BodyScroll/Content/Body/Cols/ChartBox/InkChart") as InkChart
+	_cost_label = get_node("VBox/BodyScroll/Content/Body/Cost") as Label
+	_requirements = get_node("VBox/BodyScroll/Content/Body/Requirements") as VBoxContainer
+	_payback_label = get_node("VBox/BodyScroll/Content/Body/Payback") as Label
+	_next_label = get_node("VBox/BodyScroll/Content/Body/Next") as Label
+	_compare_box = get_node("VBox/BodyScroll/Content/CompareBox") as HBoxContainer
+	_col_a = get_node("VBox/BodyScroll/Content/CompareBox/ColA") as VBoxContainer
+	_col_b = get_node("VBox/BodyScroll/Content/CompareBox/ColB") as VBoxContainer
+	_refusal = get_node("VBox/BodyScroll/Content/Refusal") as PanelContainer
+	_refusal_label = get_node("VBox/BodyScroll/Content/Refusal/RefusalLabel") as Label
 	_foot = get_node("VBox/Foot") as HBoxContainer
 	_pin_btn = get_node("VBox/Foot/PinBtn") as KitButton
 	_begin_btn = get_node("VBox/Foot/BeginBtn") as KitButton
@@ -291,6 +314,7 @@ func _ensure_refs() -> void:
 	_begin_btn.pressed.connect(_on_begin_pressed)
 	_pin_btn.toggled.connect(_on_pin_btn_toggled)
 	_treasury_only.toggled.connect(_on_treasury_only_toggled)
+	_content.minimum_size_changed.connect(content_changed.emit)
 	_refs_bound = true
 
 
@@ -411,6 +435,8 @@ func _populate_lands(raw_lands: Variant) -> void:
 		var txt_lbl := Label.new()
 		txt_lbl.theme_type_variation = &"Hint"
 		txt_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		txt_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		txt_lbl.custom_minimum_size.x = 60.0
 		txt_lbl.text = str(r.get("text", ""))
 		r_row.add_child(txt_lbl)
 		_lands.add_child(r_row)
@@ -512,6 +538,8 @@ func _populate_compare_col(col: VBoxContainer, p: Dictionary, is_better: bool, s
 	var head := Label.new()
 	head.theme_type_variation = &"SectionHead" if is_better else &"TitlePanel"
 	head.text = str(p.get("title", ""))
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	head.custom_minimum_size.x = 60.0
 	col.add_child(head)
 
 	var sub_txt := str(p.get("subtitle", ""))
@@ -519,6 +547,8 @@ func _populate_compare_col(col: VBoxContainer, p: Dictionary, is_better: bool, s
 		var sub := Label.new()
 		sub.theme_type_variation = &"Hint"
 		sub.text = sub_txt
+		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		sub.custom_minimum_size.x = 60.0
 		col.add_child(sub)
 
 	var verdict: Dictionary = p.get("verdict", {}) if p.get("verdict", {}) is Dictionary else {}
@@ -542,7 +572,7 @@ func _populate_compare_col(col: VBoxContainer, p: Dictionary, is_better: bool, s
 		var c := InkChart.new()
 		c.kind = InkChart.Kind.PAIRED_BARS
 		c.ground = InkChart.Ground.SLOT
-		c.custom_minimum_size = Vector2(180.0, 72.0)
+		c.custom_minimum_size = Vector2(120.0, 72.0)
 		c.y_ticks = shared_ticks
 		var xl := PackedStringArray()
 		var bv := PackedInt32Array()

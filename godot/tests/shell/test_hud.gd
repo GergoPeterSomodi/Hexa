@@ -614,3 +614,18 @@ func test_the_hex_panel_gets_the_settings_and_refresh_economy_reads_the_chips_ag
 	assert_eq(bar.chips().ducats_chip().value_label().text, "610", "dev_money sends no event")
 	_hud.refresh_economy()
 	assert_eq(bar.chips().ducats_chip().value_label().text, "700")
+
+
+## The hex panel's rows scroll inside the panel: the HUD column never grows past the window (top bar at y 0, root = viewport).
+func test_a_tall_hex_panel_never_pushes_the_hud_past_the_window() -> void:
+	Session.start_game(EconomyFixture.game(&"GEN", true))
+	for view: Vector2i in [Vector2i(1280, 720), Vector2i(2560, 1440)]:
+		_harness.viewport.size = view
+		for hex: Vector2i in [Vector2i(10, 13), Vector2i(7, 12)]:
+			_hud.hex_panel().show_hex(hex)
+			await _harness.wait_frames(self, 3)
+			assert_true(_hud.hex_panel().visible)
+			assert_eq(_hud.root().get_global_rect(), Rect2(Vector2.ZERO, Vector2(view)), "HUD root is the viewport at %s, %s" % [str(view), str(hex)])
+			assert_eq(_hud.top_bar().get_global_position().y, 0.0, "top bar at y 0 at %s, %s" % [str(view), str(hex)])
+			assert_lte(_hud.hex_panel().get_global_rect().end.y, float(view.y) + 0.5, "the panel ends inside the window")
+	Session.end_game()

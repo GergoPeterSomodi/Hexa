@@ -7,6 +7,9 @@
 ## opening, each inside 16 ms; 16 live ribbons under 1 ms a frame; the season fade's capture frame under 50 ms (gpu class,
 ## enforced with --gpu-limits). The M3 rows run in a country game on a temporary save folder and lock.
 ##
+## M4 (m4-build-spec.md section 8): the works card's push and the study's push inside 16 ms each, the chips' refresh inside 1 ms,
+## the map marks' show inside 2 ms (see _measure_m4).
+##
 ## Windowed (GPU or xvfb + Mesa in CI):
 ##   godot --path godot -s res://tools/ui/perf_ui.gd -- [--gpu-limits] [--cpu-scale=2.0] [--out=perf_ui.json] [--summary=summary.md]
 ## Headless: exercises every M1.5 screen push and checks memory budgets; GPU frame times are reported only.
@@ -22,6 +25,9 @@ const M3_SAVE_DIR := "user://perf_ui_saves"
 const M3_LOCK := "user://perf_ui_running.lock"
 const RIBBONS := 16
 const RIBBON_FRAMES := 30
+const M4_VINEYARD := Vector2i(7, 12)
+const M4_PUSH_RUNS := 3
+const M4_REFRESH_RUNS := 30
 
 var _gpu_limits := false
 var _cpu_scale := 1.0
@@ -138,6 +144,7 @@ func _measure() -> int:
 		packed, PackedStringArray(["--new-game", "--seed=1480"]), false)
 
 	await _measure_m3(packed, headless)
+	await _measure_m4(packed)
 
 	return _finish(budget, headless)
 
@@ -298,6 +305,130 @@ func _measure_m3(packed: PackedScene, headless: bool) -> void:
 	_clean_m3_disk()
 	session.set("save_dir", old_dir)
 	RunLock.path = old_lock
+
+
+## M4 (m4-build-spec.md section 8): the works card's push and the study's push, each inside 16 ms (the call, then one forced draw:
+## never a vsync frame, never frame_post_draw: the project runs in low-processor mode); the chips' refresh inside 1 ms and the
+## map marks' show inside 2 ms (the call alone). One country game (Genoa) on a temporary save folder; fills
+## `works_card_push_ms`, `study_push_ms`, `chips_refresh_ms` and `marks_show_ms`. Headless the same calls run (the draw is the
+## dummy renderer's) and the gpu rows are reported only.
+func _measure_m4(packed: PackedScene) -> void:
+	var session := root.get_node("Session")
+	var old_dir := str(session.get("save_dir"))
+	var old_lock := RunLock.path
+	session.set("save_dir", M3_SAVE_DIR)
+	RunLock.path = M3_LOCK
+	_clean_m3_disk()
+
+	var vp := SubViewport.new()
+	vp.size = FRAME
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(vp)
+	var app := packed.instantiate()
+	app.set("settings_path", "")
+	app.set("allow_tree_quit", false)
+	app.set("pause_tree_when_modal", false)
+	app.set("skip_loading_frames", true)
+	app.set("cli_args_override", PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"]))
+	var s := Settings.new("macOS", true)
+	s.set_value("state/help_seen", true)
+	s.set_value("graphics/preload_next_season", false)
+	s.set_value("accessibility/reduce_motion", true)
+	s.set_value("game/autosave", "off")
+	app.call("set_settings_override", s)
+	vp.add_child(app)
+	await _wait_frames(5)
+
+	var g: Game = session.get("game") as Game
+	var ms := app.call("map_scene") as Node
+	var hud_node := app.call("hud") as Node
+	var requests := app.call("requests") as Object
+	var works: Object = requests.get("works") if requests != null else null
+	var row := _m4_upgrade_row(g, M4_VINEYARD) if g != null and g.has_countries() and g.player != &"" else {}
+	if g == null or ms == null or hud_node == null or works == null or row.is_empty():
+		printerr("perf_ui: the M4 country game did not start")
+		_r["works_card_push_ms"] = INF
+		_r["study_push_ms"] = INF
+		_r["chips_refresh_ms"] = INF
+		_r["marks_show_ms"] = INF
+	else:
+		var option := {"action": row["action"], "family": row["family"]}
+		var view_node := ms.call("view") as Node
+		ms.call("frame_at", view_node.call("centre_of", M4_VINEYARD), 1.0)
+		ms.call("select_hex", M4_VINEYARD)
+		await _wait_frames(4)
+		var open_card := func() -> void: works.call("show_card", M4_VINEYARD, option, true)
+		var close_card := func() -> void: works.call("close_card")
+		var open_study := func() -> void: works.call("open_study", &"economy")
+		var close_study := func() -> void: works.call("close_study")
+		_r["works_card_push_cold_ms"] = await _m4_push_ms(open_card, close_card)
+		var warm := 0.0
+		for _i: int in M4_PUSH_RUNS:
+			warm = maxf(warm, await _m4_push_ms(open_card, close_card))
+		_r["works_card_push_ms"] = warm
+		_r["study_push_cold_ms"] = await _m4_push_ms(open_study, close_study)
+		warm = 0.0
+		for _i: int in M4_PUSH_RUNS:
+			warm = maxf(warm, await _m4_push_ms(open_study, close_study))
+		_r["study_push_ms"] = warm
+
+		var chips := hud_node.call("chips") as Node
+		chips.call("refresh")
+		var total := 0.0
+		for _i: int in M4_REFRESH_RUNS:
+			var t0 := Time.get_ticks_usec()
+			chips.call("refresh")
+			total += float(Time.get_ticks_usec() - t0) / 1000.0
+		_r["chips_refresh_ms"] = total / float(M4_REFRESH_RUNS)
+
+		works.call("show_card", M4_VINEYARD, option, true)
+		await _wait_frames(3)
+		var card := (app.call("stack") as Control).call("top") as Node
+		if card == null or not card.has_method("preview"):
+			_r["marks_show_ms"] = INF
+		else:
+			var preview := card.call("preview") as Dictionary
+			ms.call("show_preview", preview)
+			total = 0.0
+			for _i: int in M4_REFRESH_RUNS:
+				var t1 := Time.get_ticks_usec()
+				ms.call("show_preview", preview)
+				total += float(Time.get_ticks_usec() - t1) / 1000.0
+			_r["marks_show_ms"] = total / float(M4_REFRESH_RUNS)
+			_r["marks_shown"] = bool((ms.call("preview_marks") as Object).call("shown"))
+		works.call("close_card")
+
+	session.call("end_game")
+	root.remove_child(vp)
+	vp.queue_free()
+	await _wait_frames(3)
+	_clean_m3_disk()
+	session.set("save_dir", old_dir)
+	RunLock.path = old_lock
+
+
+## One push, in ms: `open` runs, then one forced draw (RenderingServer.force_draw: the project is in low-processor mode, so no
+## frame is waited for); `close` runs after and two frames pass.
+func _m4_push_ms(open: Callable, close: Callable) -> float:
+	var t0 := Time.get_ticks_usec()
+	open.call()
+	RenderingServer.force_draw(false)
+	var ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	close.call()
+	await _wait_frames(2)
+	return ms
+
+
+## The row U acts on (WorksFlow.upgrade_row, which this script cannot name: it compiles before the autoloads).
+func _m4_upgrade_row(g: Game, hex: Vector2i) -> Dictionary:
+	var rows := ImprovePreview.options_of(g, g.player, hex)
+	for row: Dictionary in rows:
+		if StringName(str(row["action"])) == Works.UPGRADE:
+			return row
+	for row: Dictionary in rows:
+		if StringName(str(row["action"])) == Works.BUILD and bool((row["verdict"] as Dictionary)["ok"]):
+			return row
+	return {}
 
 
 func _clean_m3_disk() -> void:
@@ -504,6 +635,11 @@ func _markdown(limit_rows: String, headless: bool) -> String:
 		float(_r.get("report_push_ms", 0.0)), float(_r.get("report_push_cold_ms", 0.0)), int(_r.get("save_load_rows", 0)),
 		float(_r.get("save_load_push_ms", 0.0)), float(_r.get("save_load_push_cold_ms", 0.0)),
 		float(_r.get("log_open_ms", 0.0)), float(_r.get("ribbons_16_frame_ms", 0.0)),
+	]
+	s += "M4 (warm; cold in brackets): works card push %.2f ms [%.2f], study push %.2f ms [%.2f], chips refresh %.3f ms, marks show %.3f ms.\n" % [
+		float(_r.get("works_card_push_ms", 0.0)), float(_r.get("works_card_push_cold_ms", 0.0)),
+		float(_r.get("study_push_ms", 0.0)), float(_r.get("study_push_cold_ms", 0.0)),
+		float(_r.get("chips_refresh_ms", 0.0)), float(_r.get("marks_show_ms", 0.0)),
 	]
 	s += "Season fade: capture warm %.2f ms (cold %.2f), whole show_season with the next season preloaded %.2f ms.\n\n" % [
 		float(_r.get("season_fade_capture_ms", 0.0)), float(_r.get("season_fade_capture_cold_ms", 0.0)), float(_r.get("season_fade_total_ms", 0.0)),

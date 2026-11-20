@@ -294,9 +294,22 @@ func _draw_axes_and_grid(plot: Rect2, y_min: float, y_max: float, count: int, fo
 	if font != null and not x_labels.is_empty():
 		var max_labels := maxi(1, int(plot.size.x / 48.0))
 		var step := maxi(1, ceili(float(count) / float(max_labels)))
-		for i: int in range(0, mini(count, x_labels.size()), step):
+		var labels := _fitted_x_labels(font, font_size, 40.0)
+		for i: int in range(0, mini(count, labels.size()), step):
 			var lx := _x_for_index(plot, i, count)
-			draw_string(font, Vector2(lx - 20.0, plot.end.y + float(font_size) + 2.0), x_labels[i], HORIZONTAL_ALIGNMENT_CENTER, 40.0, font_size, axis_col)
+			draw_string(font, Vector2(lx - 20.0, plot.end.y + float(font_size) + 2.0), labels[i], HORIZONTAL_ALIGNMENT_CENTER, 40.0, font_size, axis_col)
+
+
+## The x labels as drawn: all of them whole when each fits `width`, else all cut to three letters (Spr, Sum, Aut, Win),
+## so the axis never mixes long and short names or clips one ("Summe").
+func _fitted_x_labels(font: Font, font_size: int, width: float) -> PackedStringArray:
+	for lab: String in x_labels:
+		if font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width:
+			var short := PackedStringArray()
+			for l2: String in x_labels:
+				short.append(l2.substr(0, 3))
+			return short
+	return x_labels
 
 
 func _draw_line_kind(plot: Rect2, y_min: float, y_max: float, count: int, compact: bool) -> void:
@@ -442,9 +455,9 @@ func _draw_marks(plot: Rect2, count: int, font: Font, font_size: int, axis_col: 
 		var tone := StringName(str(m.get("tone", &"")))
 		var col := _chart_color(tone) if (tone == &"good" or tone == &"bad") else axis_col
 		draw_dashed_line(Vector2(mx, plot.position.y), Vector2(mx, plot.end.y), col, 1.0, 3.0)
-		var txt := str(m.get("text", ""))
+		var txt := str(m.get("short", m.get("text", "")))
 		if font != null and not txt.is_empty():
-			draw_string(font, Vector2(mx + 3.0, plot.position.y + float(font_size)), txt, HORIZONTAL_ALIGNMENT_LEFT, 80.0, font_size, col)
+			draw_string(font, Vector2(mx + 3.0, plot.position.y + float(font_size)), txt, HORIZONTAL_ALIGNMENT_LEFT, maxf(24.0, minf(80.0, plot.end.x - mx - 3.0)), font_size, col)
 
 
 func _draw_styled_polyline(pts: PackedVector2Array, col: Color, dash_kind: String, width: float) -> void:

@@ -41,6 +41,8 @@ func _init() -> void:
 
 func _ready() -> void:
 	_close.text = "Close"
+	# The date sits on the leather: the dim vellum flavour colour is unreadable there.
+	_date.add_theme_color_override(&"font_color", Tokens.MUTED)
 	_close.hotkey_action = CLOSE_ACTION
 	_close.show_key_cap = true
 	_close.accessibility_name = "Close"

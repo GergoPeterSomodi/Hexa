@@ -619,7 +619,7 @@ func _m4_chips_and_gives(app: App) -> void:
 	assert_true(app.hud().top_bar().study_button().visible, "the study button shows")
 	app.map_scene().select_hex(VINEYARD)
 	await _wait_frames(3)
-	var gives := app.hud().hex_panel().get_node("Body/GivesRow/Value") as Label
+	var gives := app.hud().hex_panel().get_node("Scroll/Body/GivesRow/Value") as Label
 	assert_eq(gives.text, "wine 24 in autumn · upkeep 2 a season")
 	assert_eq(HexCard.of(Session.game, VINEYARD)["gives"], gives.text, "the hover card says the same")
 

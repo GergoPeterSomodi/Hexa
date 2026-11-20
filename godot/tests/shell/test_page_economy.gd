@@ -217,3 +217,22 @@ func test_fits_at_1280_by_720_and_2560_by_1440() -> void:
 		await harness.wait_frames(self, 2)
 		assert_lte(page.get_combined_minimum_size().x, float(size.x) - 60.0, "no horizontal overflow at %s" % str(size))
 		harness.dispose()
+
+
+func test_the_whole_page_with_its_tax_control_fits_1280_by_720() -> void:
+	var harness := UIHarness.new(Vector2i(1280, 720))
+	harness.mount(self)
+	var root := Control.new()
+	root.theme = KitTheme.load_for(1.0)
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	harness.viewport.add_child(root)
+	var game := EconomyFixture.game(GEN)
+	assert_true(bool(Season.run(game)["ok"]))
+	var page := (load(SCENE) as PackedScene).instantiate() as PageEconomy
+	root.add_child(page)
+	page.refresh(game, &"open")
+	await harness.wait_frames(self, 3)
+	# The Study frame leaves about 520 px under its ribbon for a page.
+	assert_lte(page.get_combined_minimum_size().y, 520.0, "the ledger and the Tax control need no scrolling")
+	assert_not_null(page.find_child("TaxLevels", true, false))
+	harness.dispose()

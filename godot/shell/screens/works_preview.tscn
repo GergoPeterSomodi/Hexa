@@ -13,12 +13,5 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_works")
 
-[node name="Scroll" type="ScrollContainer" parent="."]
+[node name="Card" parent="." instance=ExtResource("2_card")]
 layout_mode = 0
-offset_right = 568.0
-offset_bottom = 400.0
-mouse_filter = 0
-horizontal_scroll_mode = 0
-
-[node name="Card" parent="Scroll" instance=ExtResource("2_card")]
-layout_mode = 2

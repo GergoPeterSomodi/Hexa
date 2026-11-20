@@ -81,7 +81,7 @@ func _row_value(grid_path: String, key: String) -> String:
 ## The reason lines under the rows (Reason-type labels inside the actions box, at any depth).
 func _reason_lines() -> Array[String]:
 	var out: Array[String] = []
-	_collect_reasons(_panel.get_node("Body/ActionsBox/Actions"), out)
+	_collect_reasons(_panel.get_node("Scroll/Body/ActionsBox/Actions"), out)
 	return out
 
 
@@ -94,7 +94,7 @@ func _collect_reasons(node: Node, out: Array[String]) -> void:
 
 func _delta_chips(node: Node = null) -> Array[DeltaChip]:
 	var out: Array[DeltaChip] = []
-	var start: Node = _panel.get_node("Body/ActionsBox/Actions") if node == null else node
+	var start: Node = _panel.get_node("Scroll/Body/ActionsBox/Actions") if node == null else node
 	for child: Node in start.get_children():
 		if child is DeltaChip:
 			out.append(child as DeltaChip)
@@ -143,9 +143,9 @@ func test_it_is_hidden_until_a_hex_is_shown_and_stops_the_mouse_with_studiolo_fr
 	assert_eq(_panel.shown_hex(), HexPanelContract.NO_HEX)
 	assert_eq(_panel.mouse_filter, Control.MOUSE_FILTER_STOP, "a click on the panel never reaches the map")
 	assert_eq(_panel.custom_minimum_size.x, float(Tokens.PANEL_W), "width matches Tokens.PANEL_W")
-	assert_eq((_panel.get_node("Body/PieceBox/Heading") as Label).theme_type_variation, &"SectionHead")
-	assert_eq((_panel.get_node("Body/GroundBox/Heading") as Label).theme_type_variation, &"SectionHead")
-	assert_eq((_panel.get_node("Body/ActionsBox/Heading") as Label).theme_type_variation, &"SectionHead")
+	assert_eq((_panel.get_node("Scroll/Body/PieceBox/Heading") as Label).theme_type_variation, &"SectionHead")
+	assert_eq((_panel.get_node("Scroll/Body/GroundBox/Heading") as Label).theme_type_variation, &"SectionHead")
+	assert_eq((_panel.get_node("Scroll/Body/ActionsBox/Heading") as Label).theme_type_variation, &"SectionHead")
 
 	var hex := _wild_land_with_options(1)[0]
 	_panel.show_hex(hex)
@@ -165,14 +165,14 @@ func test_a_wild_hex_shows_its_ground_and_lists_its_builds() -> void:
 	var hex := _wild_land_with_options(1)[0]
 	_panel.show_hex(hex)
 	assert_eq(_panel.subtitle_label().text, "Hex %d, %d" % [hex.x, hex.y])
-	assert_eq(_row_value("Body/PieceBox/Rows", "Stands on it"), "nothing (wild land)")
-	assert_ne(_row_value("Body/GroundBox/Rows", "Ground"), "", "the ground is written")
-	assert_ne(_row_value("Body/GroundBox/Rows", "Height"), "", "the height is written")
-	var piece_rows := (_panel.get_node("Body/PieceBox/Rows") as GridContainer).get_children()
+	assert_eq(_row_value("Scroll/Body/PieceBox/Rows", "Stands on it"), "nothing (wild land)")
+	assert_ne(_row_value("Scroll/Body/GroundBox/Rows", "Ground"), "", "the ground is written")
+	assert_ne(_row_value("Scroll/Body/GroundBox/Rows", "Height"), "", "the height is written")
+	var piece_rows := (_panel.get_node("Scroll/Body/PieceBox/Rows") as GridContainer).get_children()
 	assert_eq((piece_rows[0] as Label).theme_type_variation, &"Hint", "ledger keys use Hint")
 	assert_eq((piece_rows[1] as Label).theme_type_variation, &"TableRow", "ledger values use TableRow")
-	assert_true((_panel.get_node("Body/GroundBox") as VBoxContainer).visible)
-	assert_eq((_panel.get_node("Body/ActionsBox/Heading") as Label).text, "Build here")
+	assert_true((_panel.get_node("Scroll/Body/GroundBox") as VBoxContainer).visible)
+	assert_eq((_panel.get_node("Scroll/Body/ActionsBox/Heading") as Label).text, "Build here")
 	var enabled := 0
 	for button: Button in _panel.action_buttons():
 		assert_true(button.text.begins_with("Build "), "every button is a build: " + button.text)
@@ -193,9 +193,9 @@ func test_a_sea_hex_shows_no_actions() -> void:
 	assert_true(_panel.visible)
 	assert_eq(_panel.cartouche().text, "Sea")
 	assert_eq(_panel.cartouche().label().text, "SEA")
-	assert_false((_panel.get_node("Body/ActionsBox") as VBoxContainer).visible)
+	assert_false((_panel.get_node("Scroll/Body/ActionsBox") as VBoxContainer).visible)
 	assert_true(_panel.action_buttons().is_empty())
-	assert_false((_panel.get_node("Body/GivesRow") as HBoxContainer).visible, "a sea hex gives nothing")
+	assert_false((_panel.get_node("Scroll/Body/GivesRow") as HBoxContainer).visible, "a sea hex gives nothing")
 
 
 func test_a_refused_button_is_disabled_and_shows_its_reason() -> void:
@@ -235,7 +235,7 @@ func test_build_then_upgrade_then_clear_go_through_session() -> void:
 		assert_not_null(Session.game.state.work_at(hex), "the work is under way")
 		await _stand(hex)
 		assert_false(Improve.piece_at(Session.game, hex).is_empty(), "the work put a piece on the hex")
-		assert_eq(_row_value("Body/PieceBox/Rows", "Level"), "level 1, " + _level_word_for(hex), "the panel shows level 1")
+		assert_eq(_row_value("Scroll/Body/PieceBox/Rows", "Level"), "level 1, " + _level_word_for(hex), "the panel shows level 1")
 		if not _has_enabled("Upgrade"):
 			await _press("Clear")
 			await _stand(hex)
@@ -249,7 +249,7 @@ func test_build_then_upgrade_then_clear_go_through_session() -> void:
 		await _press("Clear")
 		await _stand(hex)
 		assert_true(Improve.piece_at(Session.game, hex).is_empty(), "Clear took the piece away")
-		assert_false((_panel.get_node("Body/ActionsBox/Actions") as VBoxContainer).get_children().is_empty(), "the build list is back")
+		assert_false((_panel.get_node("Scroll/Body/ActionsBox/Actions") as VBoxContainer).get_children().is_empty(), "the build list is back")
 		done = true
 		break
 	assert_true(done, "a wild hex could be built, upgraded and cleared")
@@ -275,10 +275,10 @@ func _find_hex_owned(tag: StringName, same: bool) -> Vector2i:
 func test_owner_row_is_hidden_and_the_home_rule_is_silent_in_a_map_only_game() -> void:
 	var hex := _wild_land_with_options(1)[0]
 	_panel.show_hex(hex)
-	assert_false((_panel.get_node("Body/OwnerRow") as HBoxContainer).visible, "no owner without countries")
-	assert_false((_panel.get_node("Body/HomeReason") as VBoxContainer).visible, "a map-only game has no home rule")
-	assert_true((_panel.get_node("Body/ActionsBox") as VBoxContainer).visible, "the works show")
-	assert_false((_panel.get_node("Body/WorthRow") as HBoxContainer).visible, "no worth without countries")
+	assert_false((_panel.get_node("Scroll/Body/OwnerRow") as HBoxContainer).visible, "no owner without countries")
+	assert_false((_panel.get_node("Scroll/Body/HomeReason") as VBoxContainer).visible, "a map-only game has no home rule")
+	assert_true((_panel.get_node("Scroll/Body/ActionsBox") as VBoxContainer).visible, "the works show")
+	assert_false((_panel.get_node("Scroll/Body/WorthRow") as HBoxContainer).visible, "no worth without countries")
 
 
 func test_owner_link_opens_the_country_and_the_home_reason_explains_refusals() -> void:
@@ -291,16 +291,16 @@ func test_owner_link_opens_the_country_and_the_home_reason_explains_refusals() -
 	_panel.country_requested.connect(func(tag: StringName) -> void: asked.append(tag))
 
 	_panel.show_hex(own_hex)
-	var owner_row := _panel.get_node("Body/OwnerRow") as HBoxContainer
+	var owner_row := _panel.get_node("Scroll/Body/OwnerRow") as HBoxContainer
 	assert_true(owner_row.visible, "the Owner row shows on owned land")
-	var link := (_panel.get_node("Body/OwnerRow/Value") as HBoxContainer).get_child(0) as KitButton
+	var link := (_panel.get_node("Scroll/Body/OwnerRow/Value") as HBoxContainer).get_child(0) as KitButton
 	assert_not_null(link, "the owner is a link")
 	assert_eq(link.text, HexCard.owner_of(Session.game, own_hex), "the link names the owner")
 	link.pressed.emit()
 	assert_eq(asked, [&"GEN"], "the link asks for the owner's country")
 
-	var reason := _panel.get_node("Body/HomeReason") as VBoxContainer
-	var actions := _panel.get_node("Body/ActionsBox") as VBoxContainer
+	var reason := _panel.get_node("Scroll/Body/HomeReason") as VBoxContainer
+	var actions := _panel.get_node("Scroll/Body/ActionsBox") as VBoxContainer
 	assert_true(reason.visible, "no player: one reason line")
 	assert_true(_reason_text_of(reason).contains("choose your country"), "the reason says to choose a country")
 	assert_false(actions.visible, "no works before a country is chosen")
@@ -314,7 +314,7 @@ func test_owner_link_opens_the_country_and_the_home_reason_explains_refusals() -
 	assert_true(reason.visible, "another's land: the reason shows")
 	assert_true(_reason_text_of(reason).begins_with("not your land"), "the refusal names the holder")
 	assert_false(actions.visible, "another's land: no works")
-	assert_false((_panel.get_node("Body/WorthRow") as HBoxContainer).visible, "another's land: no worth row")
+	assert_false((_panel.get_node("Scroll/Body/WorthRow") as HBoxContainer).visible, "another's land: no worth row")
 
 
 ## The first wild land hex (not in `skip`) where a build is allowed now, as the build's args {hex, family} (with the
@@ -341,15 +341,15 @@ func test_a_work_under_way_shows_its_section_and_its_cancel_button() -> void:
 	assert_false(args.is_empty(), "a map-only game can start a build")
 	var hex: Vector2i = args["hex"]
 	_panel.show_hex(hex)
-	var work_box := _panel.get_node("Body/WorkBox") as VBoxContainer
+	var work_box := _panel.get_node("Scroll/Body/WorkBox") as VBoxContainer
 	assert_false(work_box.visible, "no work section before a build")
 	await _press("Build")
 	assert_true(work_box.visible, "the build's work shows at once (work_started refreshes the panel)")
 	var at := WorksView.at(Session.game, hex)
-	assert_eq((_panel.get_node("Body/WorkBox/Heading") as Label).text, "Work under way")
-	assert_eq((_panel.get_node("Body/WorkBox/Text") as Label).text, str(at["label"]))
-	assert_eq((_panel.get_node("Body/WorkBox/Progress") as Label).text, "%s, ready %s" % [at["progress"], at["ready"]])
-	assert_false((_panel.get_node("Body/ActionsBox") as VBoxContainer).visible, "the rows are hidden while the work runs")
+	assert_eq((_panel.get_node("Scroll/Body/WorkBox/Heading") as Label).text, "Work under way")
+	assert_eq((_panel.get_node("Scroll/Body/WorkBox/Text") as Label).text, str(at["label"]))
+	assert_eq((_panel.get_node("Scroll/Body/WorkBox/Progress") as Label).text, "%s, ready %s" % [at["progress"], at["ready"]])
+	assert_false((_panel.get_node("Scroll/Body/ActionsBox") as VBoxContainer).visible, "the rows are hidden while the work runs")
 	var cancel := _button("Cancel the work") as KitButton
 	assert_not_null(cancel, "the player's own work has Cancel the work")
 	assert_false(cancel.disabled, "cancel is allowed")
@@ -366,7 +366,7 @@ func test_another_countrys_work_shows_with_no_cancel_button() -> void:
 	assert_false(args.is_empty(), "Lucca can start a work")
 	assert_true(bool(Session.act("build", args)["ok"]), "Lucca's build is accepted")
 	_panel.show_hex(args["hex"])
-	assert_true((_panel.get_node("Body/WorkBox") as VBoxContainer).visible, "the work shows")
+	assert_true((_panel.get_node("Scroll/Body/WorkBox") as VBoxContainer).visible, "the work shows")
 	assert_null(_button("Cancel the work"), "no Cancel on another country's work")
 
 
@@ -396,7 +396,7 @@ func test_a_work_halted_in_a_snow_winter_says_stopped_for_the_winter() -> void:
 		n += 1
 	await _settle()
 	assert_true(bool(WorksView.at(Session.game, hex).get("halted", false)), "the snow work halts in winter")
-	assert_true((_panel.get_node("Body/WorkBox/Progress") as Label).text.begins_with("stopped for the winter, ready "),
+	assert_true((_panel.get_node("Scroll/Body/WorkBox/Progress") as Label).text.begins_with("stopped for the winter, ready "),
 		"the panel says it stopped for the winter (season_ended refreshes it)")
 
 
@@ -619,18 +619,18 @@ func test_gives_and_worth_rows_show_the_hex_card_and_the_worth() -> void:
 	var row: Dictionary = worth_rows[0]
 	var worth_hex: Vector2i = row["hex"]
 	_panel.show_hex(worth_hex)
-	var gives_row := _panel.get_node("Body/GivesRow") as HBoxContainer
+	var gives_row := _panel.get_node("Scroll/Body/GivesRow") as HBoxContainer
 	var gives := str(HexCard.of(Session.game, worth_hex).get("gives", ""))
 	assert_eq(gives_row.visible, gives != "", "the Gives row shows when the hex card has a Gives line")
-	assert_eq((_panel.get_node("Body/GivesRow/Value") as Label).text, gives, "the Gives text is the hex card's")
-	var worth_row := _panel.get_node("Body/WorthRow") as HBoxContainer
+	assert_eq((_panel.get_node("Scroll/Body/GivesRow/Value") as Label).text, gives, "the Gives text is the hex card's")
+	var worth_row := _panel.get_node("Scroll/Body/WorthRow") as HBoxContainer
 	assert_true(worth_row.visible, "the Worth row shows for a held hex")
-	var chips := (_panel.get_node("Body/WorthRow/Value") as HBoxContainer).get_children()
+	var chips := (_panel.get_node("Scroll/Body/WorthRow/Value") as HBoxContainer).get_children()
 	assert_eq(chips.size(), 1, "one DeltaChip")
 	var chip := chips[0] as DeltaChip
 	assert_not_null(chip, "the worth is a DeltaChip")
 	assert_true(chip.text().contains(str(absi(int(row["worth"])))), "the chip shows the worth: " + chip.text())
-	assert_eq((_panel.get_node("Body/WorthRow/Key") as Label).text, "Worth, this season")
+	assert_eq((_panel.get_node("Scroll/Body/WorthRow/Key") as Label).text, "Worth, this season")
 
 
 func test_a_row_click_with_no_listener_begins_the_work_itself() -> void:
@@ -688,3 +688,21 @@ func test_confirm_expensive_opens_the_card_for_a_row_a_poor_treasury_makes_expen
 	(cheap[1] as Button).pressed.emit()
 	await _settle()
 	assert_eq(log[-1][0], &"begin_work", "and a click on it begins the work")
+
+
+func test_a_rows_cost_never_overlaps_its_label() -> void:
+	var hex := _gen_buildable()
+	assert_ne(hex, Vector2i(-1, -1), "Genoa can build somewhere")
+	_panel.show_hex(hex)
+	await _settle()
+	var buttons := _panel.action_buttons()
+	assert_gt(buttons.size(), 0)
+	for button: Button in buttons:
+		var kit := button as KitButton
+		var box := button.get_parent().get_parent()
+		var cost := box.get_node_or_null("RowCost") as Label
+		assert_not_null(cost, "the cost has its own line under '%s'" % button.text)
+		assert_eq(cost.text, kit.cost_text)
+		assert_false(cost.get_global_rect().intersects(button.get_global_rect()), "'%s': the cost line is clear of the label" % button.text)
+		var overlay := button.get_node_or_null("CostLabel") as Label
+		assert_true(overlay == null or not overlay.visible, "no cost text drawn over the label")

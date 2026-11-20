@@ -22,6 +22,8 @@ const TAX_LABEL := "Tax"
 const CHART_TITLE := "The last 12 seasons"
 const CHART_CAPTION := "bars: change a season · line: treasury"
 const CHART_MIN := Vector2(360.0, 200.0)
+const MARK_SHORT := "Works"
+const ROW_GAP := 1
 const EARNS := "Earns most"
 const COSTS := "Costs most"
 const SIGN_GAIN := 1
@@ -84,6 +86,7 @@ func _ensure_built() -> void:
 	_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(_columns)
 	_left = _column(&"Left")
+	_left.add_theme_constant_override(&"separation", ROW_GAP)
 	_right = _column(&"Right")
 	_build_chart_inset()
 	_extras = VBoxContainer.new()
@@ -235,7 +238,13 @@ func _update_chart(chart: Dictionary) -> void:
 		{"name": "Treasury", "values": chart["treasury"], "ink": 0},
 		{"name": "Change", "values": chart["change"], "role": "bar"},
 	])
-	_chart.set_marks(chart["marks"] as Array)
+	# The mark's label is short ("Works"); the full text ("Spring 1480: works") stays in the tooltip.
+	var marks: Array[Dictionary] = []
+	for m: Dictionary in (chart["marks"] as Array):
+		var short := m.duplicate()
+		short["short"] = MARK_SHORT
+		marks.append(short)
+	_chart.set_marks(marks)
 
 
 func _fill_extras(s: Dictionary, has: bool) -> void:
@@ -318,6 +327,11 @@ func _link(text: String, hex: Vector2i) -> Button:
 func _chip(amount: int) -> DeltaChip:
 	var chip := DeltaChip.new()
 	chip.set_delta(amount)
+	# No slot plate on the page's rows, so a row is as tall as its text and the whole ledger fits the window.
+	var flat := StyleBoxEmpty.new()
+	flat.content_margin_left = float(Tokens.S1)
+	flat.content_margin_right = float(Tokens.S1)
+	chip.add_theme_stylebox_override(&"panel", flat)
 	return chip
 
 

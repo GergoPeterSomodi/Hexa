@@ -10,6 +10,12 @@
 ## fixture's nine sections), the top bar with the date and End season, the log open, notifications, the task flag, Save and
 ## Load with thumbnails (a temporary save folder with three saves), the pause and main menus with Save, Load and Continue,
 ## and work marks with ribbons. They never touch the real saves or the running lock.
+## M4 pictures (m4-build-spec.md section 9, names m4_*): the works card for the vineyard, for Genoa (refused for the ducats) and
+## for Savona (refused by a rule), two options pinned, a refused row's hover, the study's This season after a season, the top
+## bar with its chips and a chip's hover card, the season report with the Treasury and Goods sections, the card's marks on the
+## map, the hex panel's rows and the country panel's treasury. They are made in a Genoa game on a temporary save folder like
+## the M3 ones and are compared with the mockups of docs/design/ui/studiolo (works_vineyard, works_genoa, study_econ,
+## play_m4, report_m4).
 ## Headless (dummy renderer): exercises all screens at 1x and 2x without writing empty PNGs and exits 0.
 extends SceneTree
 
@@ -55,6 +61,19 @@ const M3_SCENES: Array[String] = [
 	"m3_pause_menu",
 	"m3_main_menu",
 	"m3_work_marks",
+]
+const M4_SCENES: Array[String] = [
+	"m4_card_vineyard",
+	"m4_card_genoa",
+	"m4_card_savona",
+	"m4_card_pinned",
+	"m4_row_refused_hover",
+	"m4_study_economy",
+	"m4_top_bar_chips",
+	"m4_report_money",
+	"m4_map_marks",
+	"m4_hex_panel_rows",
+	"m4_country_panel",
 ]
 const M3_SAVE_DIR := "user://shot_ui_saves"
 const M3_LOCK := "user://shot_ui_running.lock"
@@ -139,7 +158,7 @@ func _capture_one(
 	scale_dir: String,
 	headless: bool
 ) -> bool:
-	var m3 := scene_name.begins_with("m3_")
+	var m3 := scene_name.begins_with("m3_") or scene_name.begins_with("m4_")
 	if m3:
 		_m3_disk_begin()
 	var vp := SubViewport.new()
@@ -209,6 +228,8 @@ func _prepare_scene(app: Node, scene_name: String) -> bool:
 		return _prepare_m2(app, stack, ctx, scene_name)
 	if scene_name.begins_with("m3_"):
 		return await _prepare_m3(app, stack, ctx, scene_name)
+	if scene_name.begins_with("m4_"):
+		return await _prepare_m4(app, scene_name)
 	match scene_name:
 		"main_menu":
 			var top_m := stack.call("top") as Node
@@ -260,6 +281,7 @@ func _all_scenes() -> Array[String]:
 	out.append_array(SCENES)
 	out.append_array(M2_SCENES)
 	out.append_array(M3_SCENES)
+	out.append_array(M4_SCENES)
 	return out
 
 
@@ -269,7 +291,7 @@ func _cli_for(scene_name: String) -> PackedStringArray:
 		return PackedStringArray()
 	if scene_name == "m2_pick":
 		return PackedStringArray(["--new-game", "--seed=1480"])
-	if scene_name.begins_with("m2_") or scene_name.begins_with("m3_"):
+	if scene_name.begins_with("m2_") or scene_name.begins_with("m3_") or scene_name.begins_with("m4_"):
 		return PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"])
 	if scene_name in ["hud", "pause_menu", "options", "about", "help", "confirm"]:
 		return PackedStringArray(["--sandbox", "--seed=1480"])
@@ -279,7 +301,7 @@ func _cli_for(scene_name: String) -> PackedStringArray:
 ## Settings of a scene: the map mode and the palette of the M2 map pictures.
 func _settings_for(scene_name: String) -> Dictionary:
 	var out := {}
-	if scene_name.begins_with("m3_"):
+	if scene_name.begins_with("m3_") or scene_name.begins_with("m4_"):
 		out["game/season_report"] = "full"
 		out["game/autosave"] = "off"
 		out["graphics/season_change"] = "instant"
@@ -502,6 +524,163 @@ func _prepare_m3(app: Node, stack: Control, ctx: ShellContext, scene_name: Strin
 			if floaters != null:
 				floaters.call("advance", 0.35)  # ribbons mid-rise
 			return not hexes.is_empty()
+	return false
+
+
+# ----- M4 pictures ----------------------------------------------------------------------------------------------------------
+# Everything of the shell is reached through call() and get(), as in the M3 pictures: this script compiles before the autoloads.
+
+
+## Hexes of the Genoa scenario on seed 1480 (m4-build-spec.md 1.1): Genoa the walled town, Savona the town, the vineyard
+## above Savona, and the wild woods by the sea east of Genoa.
+const M4_GENOA := Vector2i(8, 13)
+const M4_SAVONA := Vector2i(6, 13)
+const M4_VINEYARD := Vector2i(7, 12)
+const M4_WOODS := Vector2i(10, 13)
+const M4_CARD_KEY := "card"
+
+
+## The row U acts on (WorksFlow.upgrade_row): the upgrade of a piece, even refused, else the first build wild land allows.
+func _m4_upgrade_row(g: Game, hex: Vector2i) -> Dictionary:
+	var rows := ImprovePreview.options_of(g, g.player, hex)
+	for row: Dictionary in rows:
+		if StringName(str(row["action"])) == Works.UPGRADE:
+			return row
+	for row: Dictionary in rows:
+		if StringName(str(row["action"])) == Works.BUILD and bool((row["verdict"] as Dictionary)["ok"]):
+			return row
+	return {}
+
+
+func _m4_top_id(app: Node) -> StringName:
+	var top := (app.call("stack") as Control).call("top") as Node
+	return StringName(str(top.get("screen_id"))) if top != null else &""
+
+
+## Selects `hex`, then opens the works card of its upgrade beside the hex panel as U does; the card's ghost and marks go on
+## the map. False when the hex has no such row or the card did not open.
+func _m4_card_for(app: Node, g: Game, hex: Vector2i) -> bool:
+	var row := _m4_upgrade_row(g, hex)
+	if row.is_empty():
+		return false
+	(app.call("map_scene") as Node).call("select_hex", hex)
+	await _wait_frames(2)
+	var works: Object = (app.call("requests") as Object).get("works")
+	works.call("show_card", hex, {"action": row["action"], "family": row["family"]}, true)
+	await _wait_frames(3)
+	return _m4_top_id(app) == &"works_preview"
+
+
+## The hex panel's action buttons (Cancel the work, then the rows), as an untyped list of Buttons.
+func _m4_rows(app: Node) -> Array[Button]:
+	var out: Array[Button] = []
+	var panel := (app.call("hud") as Node).call("hex_panel") as Node
+	for raw: Variant in panel.call("action_buttons"):
+		out.append(raw as Button)
+	return out
+
+
+func _m4_row(app: Node, prefix: String) -> Button:
+	for button: Button in _m4_rows(app):
+		if button.text.begins_with(prefix):
+			return button
+	return null
+
+
+func _prepare_m4(app: Node, scene_name: String) -> bool:
+	var session := root.get_node_or_null("Session")
+	var g: Game = session.get("game") as Game if session != null else null
+	var scene := app.call("map_scene") as Node
+	var hud_node := app.call("hud") as Node
+	if g == null or scene == null or hud_node == null or not g.has_countries() or g.player == &"":
+		return false
+	var focus := CountryCard.of(g, g.player)["focus"] as Vector2i
+	var view_node := scene.call("view") as Node
+	var works: Object = (app.call("requests") as Object).get("works")
+	match scene_name:
+		"m4_card_vineyard":
+			return await _m4_card_for(app, g, M4_VINEYARD)
+		"m4_card_genoa":
+			return await _m4_card_for(app, g, M4_GENOA)
+		"m4_card_savona":
+			return await _m4_card_for(app, g, M4_SAVONA)
+		"m4_card_pinned":
+			scene.call("select_hex", M4_WOODS)
+			await _wait_frames(3)
+			var rows := _m4_rows(app)
+			var first := _m4_row(app, "Build woodland")
+			var second := _m4_row(app, "Build harbour")
+			if first == null and not rows.is_empty():
+				first = rows[0]
+			if second == null and rows.size() > 1:
+				second = rows[rows.size() - 1]
+			if first == null or second == null or first == second:
+				return false
+			first.mouse_entered.emit()
+			await _wait_frames(2)
+			var card := (app.call("stack") as Control).call("top") as Node
+			if card == null or _m4_top_id(app) != &"works_preview":
+				return false
+			card.call("pin", true)
+			first.mouse_exited.emit()
+			await _wait_frames(2)
+			second.mouse_entered.emit()  # the next option opens beside the pinned one, on one scale
+			await _wait_frames(3)
+			return (app.call("stack") as Control).call("top") == card and bool(card.call("pinned"))
+		"m4_row_refused_hover":
+			# A row the treasury or a rule refuses: Genoa's city (ducats), else Savona's walls (the town rule).
+			for hex: Vector2i in [M4_GENOA, M4_SAVONA]:
+				scene.call("select_hex", hex)
+				await _wait_frames(3)
+				for button: Button in _m4_rows(app):
+					if button.disabled:
+						button.mouse_entered.emit()
+						await _wait_frames(3)
+						return _m4_top_id(app) == &"works_preview"
+			return false
+		"m4_study_economy":
+			_m3_season(g, focus)
+			await _wait_frames(2)
+			works.call("open_study", &"economy")
+			await _wait_frames(4)
+			return _m4_top_id(app) == &"study"
+		"m4_top_bar_chips":
+			_m3_season(g, focus)
+			await _wait_frames(3)
+			var chips := hud_node.call("chips") as Control
+			var chip := chips.call("ducats_chip") as Control
+			var hover := chip.call("_make_custom_tooltip", M4_CARD_KEY) as Control
+			if hover == null:
+				return false
+			hud_node.add_child(hover)  # the card a pointer on the chip shows, drawn under it
+			var at := chip.get_global_rect()
+			hover.position = Vector2(at.position.x, at.end.y + 6.0)
+			await _wait_frames(3)
+			return chips.is_visible_in_tree()
+		"m4_report_money":
+			_m3_begin_works(g, 2, focus)
+			session.call("end_season")
+			var screen_ids := ResourceLoader.load(SCREEN_IDS_PATH) as GDScript
+			return _m3_push_report(app.call("stack") as Control, screen_ids, SeasonSummary.of(g, g.player, g.turn - 1))
+		"m4_map_marks":
+			if view_node == null:
+				return false
+			scene.call("frame_at", view_node.call("centre_of", M4_VINEYARD), 1.0)
+			await _wait_frames(3)
+			var opened := await _m4_card_for(app, g, M4_VINEYARD)
+			return opened and bool((scene.call("preview_marks") as Object).call("shown"))
+		"m4_hex_panel_rows":
+			scene.call("select_hex", M4_WOODS)
+			if view_node != null:
+				scene.call("frame_at", view_node.call("centre_of", M4_WOODS), 1.0)
+			await _wait_frames(3)
+			var panel := hud_node.call("hex_panel") as Control
+			return panel.is_visible_in_tree() and not _m4_rows(app).is_empty()
+		"m4_country_panel":
+			hud_node.call("show_country", g.player, false)
+			await _wait_frames(3)
+			var country_panel := hud_node.call("country_panel") as Control
+			return country_panel.is_visible_in_tree() and bool(country_panel.call("treasury_visible"))
 	return false
 
 

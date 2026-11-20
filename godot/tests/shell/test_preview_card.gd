@@ -30,7 +30,7 @@ func _card() -> PreviewCard:
 
 
 func _caption(card: PreviewCard) -> HBoxContainer:
-	return card.get_node("VBox/Body/Cols/ChartBox/Caption") as HBoxContainer
+	return card.get_node("VBox/BodyScroll/Content/Body/Cols/ChartBox/Caption") as HBoxContainer
 
 
 func _strip_gain(card: PreviewCard, index: int) -> DeltaChip:
