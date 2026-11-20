@@ -25,6 +25,17 @@ const PATHS: Dictionary[StringName, String] = {
 	&"peace": "res://shell/screens/peace.tscn",
 }
 
+## The screens a player opens from the menus: warm() loads them on a thread while the main menu is up.
+const WARM_IDS: Array[StringName] = [
+	&"options", &"pause_menu", &"help", &"credits", &"about", &"new_game", &"country_pick", &"save_load",
+	&"season_report", &"confirm", &"sandbox", &"find_place",
+]
+
+## Scenes already loaded, kept so a second open does not read the file again (a PackedScene is small).
+static var _scenes: Dictionary[StringName, PackedScene] = {}
+## Ids with a threaded load asked for and not yet taken.
+static var _warming: Dictionary[StringName, bool] = {}
+
 
 ## Returns true if `id` is registered in PATHS.
 static func has(id: StringName) -> bool:
@@ -34,6 +45,32 @@ static func has(id: StringName) -> bool:
 ## Returns the scene resource path for `id`, or "" if unknown.
 static func path_of(id: StringName) -> String:
 	return str(PATHS.get(id, ""))
+
+
+## Starts loading the scenes of WARM_IDS on a thread (nothing blocks; make() takes the result). Safe to call again.
+static func warm() -> void:
+	for id: StringName in WARM_IDS:
+		if _scenes.has(id) or _warming.has(id) or not PATHS.has(id):
+			continue
+		var path: String = PATHS[id]
+		if ResourceLoader.exists(path) and ResourceLoader.load_threaded_request(path) == OK:
+			_warming[id] = true
+
+
+## The PackedScene of `id` (a finished threaded load, the cache, or a load now); null when it cannot be had.
+static func scene_of(id: StringName) -> PackedScene:
+	if _scenes.has(id):
+		return _scenes[id]
+	var path: String = PATHS[id]
+	var packed: PackedScene = null
+	if _warming.has(id):
+		_warming.erase(id)
+		packed = ResourceLoader.load_threaded_get(path) as PackedScene
+	if packed == null:
+		packed = ResourceLoader.load(path) as PackedScene
+	if packed != null:
+		_scenes[id] = packed
+	return packed
 
 
 ## Instantiates the Screen scene for `id`. Fails loudly via push_error and returns null
@@ -46,7 +83,7 @@ static func make(id: StringName) -> Screen:
 	if not ResourceLoader.exists(path):
 		push_error("ScreenIds.make: missing scene for screen '%s' at %s" % [String(id), path])
 		return null
-	var packed := ResourceLoader.load(path) as PackedScene
+	var packed := scene_of(id)
 	if packed == null:
 		push_error("ScreenIds.make: failed to load PackedScene for '%s' at %s" % [String(id), path])
 		return null

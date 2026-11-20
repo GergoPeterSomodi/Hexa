@@ -55,6 +55,11 @@ func test_main_menu_loads_and_drops_menu_art_and_ignores_esc() -> void:
 
 	_harness.stack.push(menu)
 	await _harness.wait_frames(self, 2)
+	# The pictures load on a thread and are laid on the menu a few frames after it opens.
+	var waited := 0
+	while (menu.background_rect().texture == null or menu.shade_rect().texture == null) and waited < 600:
+		await _harness.wait_frames(self, 1)
+		waited += 1
 
 	assert_eq(menu.kind, Screen.Kind.OPAQUE)
 	assert_true(_harness.stack.hides_world())

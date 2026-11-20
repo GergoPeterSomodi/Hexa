@@ -239,6 +239,47 @@ func test_a_burst_of_events_causes_one_rebuild() -> void:
 	assert_eq(_widget.line_count(), _line_total(&"all"), "and its rows are the log's lines")
 
 
+func test_the_open_card_is_at_most_340_wide_and_the_bar_stays_400() -> void:
+	# The UIHarness viewport is 1280 x 720, the size the picture check uses.
+	assert_eq(_harness.viewport.size, Vector2i(1280, 720), "the test viewport is 1280 x 720")
+	_log()
+	_widget.open()
+	await _harness.wait_frames(self, 3)
+	assert_eq(_widget._card.custom_minimum_size.x, 340.0, "the card asks for 340 px")
+	assert_lte(_widget._card.size.x, 340.5, "the open card is at most 340 px wide")
+	assert_gt(_widget._card.size.x, 300.0, "and it fills that width, not a sliver")
+	var sentence := _first_sentence()
+	assert_not_null(sentence, "a line is on the card")
+	assert_eq(sentence.autowrap_mode, TextServer.AUTOWRAP_WORD_SMART, "the line text wraps inside the card")
+	_widget.close()
+	await _harness.wait_frames(self, 3)
+	assert_eq(_widget._bar.custom_minimum_size.x, 400.0, "the closed bar keeps its 400 px")
+	assert_gte(_widget._bar.size.x, 400.0 - 0.5, "and is never drawn narrower than 400 px")
+
+
+func test_the_open_card_ends_above_the_key_hints_at_1280_720() -> void:
+	# The card starts at y 368 at 1280 x 720; its bottom must stay above the hints row (720 - 44).
+	_widget.open()
+	var top := 368.0
+	assert_lte(top + float(ActionLog.CARD_H), 720.0 - float(ActionLog.HINTS_CLEARANCE), "the default card clears the hints")
+	_widget.fit_height(100.0)
+	assert_eq(_widget._card.custom_minimum_size.y, 100.0, "fit_height caps the card")
+	await _harness.wait_frames(self, 3)
+	assert_lte(_widget._card.size.y, 100.5, "the card is no taller than the space given")
+	_widget.fit_height(9999.0)
+	assert_eq(_widget._card.custom_minimum_size.y, float(ActionLog.CARD_H), "never taller than 268")
+	_widget.fit_height(-5.0)
+	assert_eq(_widget._card.custom_minimum_size.y, 0.0, "a negative space gives no height")
+
+
+func _first_sentence() -> Label:
+	for child: Node in _widget._seasons.get_children():
+		var row := child as HBoxContainer
+		if row != null and row.get_child_count() == 2:
+			return row.get_child(1) as Label
+	return null
+
+
 func _press() -> InputEventMouseButton:
 	var ev := InputEventMouseButton.new()
 	ev.button_index = MOUSE_BUTTON_LEFT

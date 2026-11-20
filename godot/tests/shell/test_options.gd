@@ -328,3 +328,30 @@ func test_game_page_shows_the_three_milestone_three_rows() -> void:
 	assert_not_null(options.option_row("graphics/season_change"), "Season change on Graphics")
 	assert_not_null(options.option_row("dev/save_json"), "Write saves as JSON too on Advanced")
 	assert_null(options.option_row("game/confirm_works"), "milestone 4 rows stay hidden")
+
+
+## Pages are built when first needed: only Display at the start, the rest on a page switch or an accessor, and the rows are
+## the same as when everything was built at once.
+func test_pages_build_lazily_and_every_accessor_still_reaches_its_rows() -> void:
+	var options := ScreenIds.make(&"options") as Options
+	_harness.stack.push(options)
+	await _harness.wait_frames(self, 2)
+	var rows_of_display := options.page_rows(&"display").size()
+	assert_gt(rows_of_display, 0, "Display is built at once")
+	assert_eq(options.get_node("Center/Frame").find_child("AccessibilityPage", true, false).find_child("Rows", true, false).get_child_count(), 0, "Accessibility waits")
+	assert_eq(options.get_node("Center/Frame").find_child("ControlsPage", true, false).find_child("Rows", true, false).get_child_count(), 0, "Controls waits")
+
+	# An accessor builds the page it needs.
+	assert_not_null(options.option_row("accessibility/reduce_motion"))
+	assert_not_null(options.rebind_button_for(&"app_back"))
+	assert_not_null(options.about_copy_button())
+	# A page switch builds its page too.
+	options.select_page(&"map")
+	assert_gt(options.page_rows(&"map").size(), 0)
+	# Every schema row with a page at or under the milestone has exactly one row once all are asked for.
+	var expected := 0
+	for key: String in Settings.SCHEMA.keys():
+		var entry: Dictionary = Settings.SCHEMA[key]
+		if not str(entry.get("page", "")).is_empty() and float(str(entry.get("since", "1.5"))) <= Options.TARGET_MILESTONE:
+			expected += 1
+	assert_eq(options.option_rows().size(), expected, "lazy pages give the same rows as the old build")

@@ -48,8 +48,9 @@ text = "Log"
 
 [node name="Card" type="PanelContainer" parent="."]
 visible = false
-custom_minimum_size = Vector2(470, 268)
+custom_minimum_size = Vector2(340, 268)
 layout_mode = 2
+size_flags_horizontal = 0
 theme_type_variation = &"PanelCard"
 mouse_filter = 2
 

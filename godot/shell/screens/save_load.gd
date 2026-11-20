@@ -124,8 +124,14 @@ func default_name() -> String:
 	var game := Session.game
 	if game == null:
 		return ""
-	var header := SaveFile.header_of(game, "", {})
-	return SaveRows.default_name(str(header.get("country", "")), str(header.get("date", "")))
+	# The same words SaveFile.header_of puts in a save's header, without its digests (they cost about 2 ms and the name needs none).
+	var country := ""
+	if game.scenario == null:
+		country = "Sandbox"
+	elif game.player != &"":
+		var def := Countries.def_of(game, game.player)
+		country = def.long_name if def != null else String(game.player)
+	return SaveRows.default_name(country, game.date_text())
 
 
 ## The SaveRows of the rows on screen, in order.

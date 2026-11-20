@@ -22,6 +22,7 @@ var _gestures_box: VBoxContainer = null
 var _close_btn: KitButton = null
 var _connected_settings: Settings = null
 var _ui_built: bool = false
+var _just_refreshed: bool = false
 
 
 ## Returns true when first-run help has not yet been shown (`state/help_seen == false`).
@@ -47,6 +48,7 @@ static func open_if_unseen(context: ShellContext) -> HelpOverlay:
 func _ready() -> void:
 	_ensure_ui()
 	refresh_bindings()
+	_just_refreshed = true
 
 
 func _exit_tree() -> void:
@@ -56,7 +58,10 @@ func _exit_tree() -> void:
 func on_enter() -> void:
 	_ensure_ui()
 	_close_btn.reduce_motion = _reduce_motion()
-	refresh_bindings()
+	# _ready has just drawn every key cap; a second pass on the same frame would only repeat it.
+	if not _just_refreshed:
+		refresh_bindings()
+	_just_refreshed = false
 	_connect_settings()
 	if ctx != null and ctx.settings != null:
 		ctx.settings.set_value("state/help_seen", true)

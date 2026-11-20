@@ -30,6 +30,7 @@ var _drift_tween: Tween = null
 var _rose_tween: Tween = null
 var _connected_settings: Settings = null
 var _ui_ready: bool = false
+var _art_pending: Array[String] = []
 
 
 func _ready() -> void:
@@ -124,14 +125,45 @@ func shade_rect() -> TextureRect:
 	return _shade_rect
 
 
+## The backdrop pictures load on a thread (the bigger one costs about 25 ms to decode) and are laid on the menu when they are
+## ready, a frame or a few after it opens; the other screens are warmed meanwhile.
 func _load_menu_art() -> void:
-	if _bg_rect.texture == null and ResourceLoader.exists(MENU_BG_PATH):
-		_bg_rect.texture = ResourceLoader.load(MENU_BG_PATH) as Texture2D
-	if _shade_rect.texture == null and ResourceLoader.exists(MENU_SHADE_PATH):
-		_shade_rect.texture = ResourceLoader.load(MENU_SHADE_PATH) as Texture2D
+	ScreenIds.warm()
+	if _bg_rect.texture != null and _shade_rect.texture != null:
+		return
+	_art_pending.clear()
+	for path: String in [MENU_BG_PATH, MENU_SHADE_PATH]:
+		if ResourceLoader.exists(path) and ResourceLoader.load_threaded_request(path) == OK:
+			_art_pending.append(path)
+	set_process(not _art_pending.is_empty())
+
+
+func _process(_delta: float) -> void:
+	for path: String in _art_pending.duplicate():
+		var status := ResourceLoader.load_threaded_get_status(path)
+		if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			continue
+		_art_pending.erase(path)
+		if status != ResourceLoader.THREAD_LOAD_LOADED:
+			continue
+		var tex := ResourceLoader.load_threaded_get(path) as Texture2D
+		if path == MENU_BG_PATH:
+			_bg_rect.texture = tex
+			_bg_rect.modulate.a = 0.0 if not _reduce_motion() else 1.0
+			if not _reduce_motion():
+				create_tween().tween_property(_bg_rect, "modulate:a", 1.0, 0.2)
+		else:
+			_shade_rect.texture = tex
+	if _art_pending.is_empty():
+		set_process(false)
 
 
 func _release_menu_art() -> void:
+	for path: String in _art_pending:
+		if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_LOADED:
+			ResourceLoader.load_threaded_get(path)
+	_art_pending.clear()
+	set_process(false)
 	_stop_motion()
 	if _bg_rect != null:
 		_bg_rect.texture = null

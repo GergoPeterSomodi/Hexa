@@ -13,6 +13,13 @@ const NO_HEX := Vector2i(-1, -1)
 const CHIP_LIMIT: int = 5
 const LOOK_ACTIONS: Array[StringName] = [&"look_at", &"select"]
 const CLOSE_KEYS: Array[Key] = [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]
+const SHEET_MAX_W: float = 900.0
+const SHEET_MAX_H: float = 800.0
+const SIDE_MARGIN: float = 24.0
+const FALLBACK_VIEW: Vector2 = Vector2(1280.0, 720.0)
+## The ribbon overhangs the sheet's top edge by 46 px and the seal by 54 px: the sheet starts this far below the inset.
+const TOP_CLEAR: float = 60.0
+const BOTTOM_MARGIN: float = 16.0
 const SETTING_KEY: String = "game/season_report"
 const SETTING_CHOICES: Array[Dictionary] = [
 	{"id": "full", "label": "Full"},
@@ -42,6 +49,29 @@ func _ensure_ui() -> void:
 	_ui_built = true
 	_sheet.show_nav = true
 	_build_footer()
+	resized.connect(_apply_layout)
+	_apply_layout()
+
+
+## Places the sheet under the top bar's real bottom edge (ShellContext.top_inset) with room for the overhang, and fills
+## the height left above the bottom margin, so the footer stays on screen at 1280 x 720.
+func _apply_layout() -> void:
+	var center := get_node_or_null("Center") as CenterContainer
+	if center == null or _sheet == null:
+		return
+	var inset := ctx.top_inset() if ctx != null else float(Tokens.BAR_H + Tokens.S2)
+	center.offset_top = inset + TOP_CLEAR
+	center.offset_bottom = -BOTTOM_MARGIN
+	center.offset_left = SIDE_MARGIN
+	center.offset_right = -SIDE_MARGIN
+	# Before the screen is in the tree there is no viewport: on_enter lays out again once it is.
+	var view := get_viewport_rect().size if is_inside_tree() else FALLBACK_VIEW
+	var avail_w := view.x - 2.0 * SIDE_MARGIN
+	var avail_h := view.y - inset - TOP_CLEAR - BOTTOM_MARGIN
+	_sheet.custom_minimum_size = Vector2(
+		clampf(avail_w, 0.0, SHEET_MAX_W),
+		clampf(avail_h, 0.0, SHEET_MAX_H)
+	)
 
 
 func _ready() -> void:
@@ -56,6 +86,7 @@ func show_summary(summary: Dictionary, reopened: bool = false) -> void:
 		return
 	_summary = summary.duplicate(true)
 	_reopened = reopened
+	_apply_layout()
 	_sheet.title = str(_summary.get("title", ""))
 	_sheet.lede = str(_summary.get("lede", ""))
 	_sheet.seal_letter = str(_summary.get("seal_letter", ""))
@@ -70,6 +101,9 @@ func show_summary(summary: Dictionary, reopened: bool = false) -> void:
 
 func on_enter() -> void:
 	_ensure_ui()
+	_apply_layout()
+	if ctx != null and not ctx.top_inset_changed.is_connected(_apply_layout):
+		ctx.top_inset_changed.connect(_apply_layout)
 	var reduce := _reduce_motion()
 	_begin_btn.reduce_motion = reduce
 	_seg.select(_current_setting(), false)
@@ -79,6 +113,8 @@ func on_enter() -> void:
 
 
 func on_exit() -> void:
+	if ctx != null and ctx.top_inset_changed.is_connected(_apply_layout):
+		ctx.top_inset_changed.disconnect(_apply_layout)
 	if not _closed:
 		_closed = true
 		closed.emit(&"back")
@@ -219,8 +255,11 @@ func _chip(line: Dictionary) -> PanelContainer:
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.add_child(box)
-	box.add_child(PanelKit.label(str(line.get("text", "")), &"Hint"))
+	var label := PanelKit.label(str(line.get("text", "")), &"Hint")
+	label.add_theme_color_override(&"font_color", Tokens.TEXT)
+	box.add_child(label)
 	var value := PanelKit.label(str(line.get("detail", "")), &"LabelInk")
+	value.add_theme_color_override(&"font_color", Tokens.TEXT)
 	box.add_child(value)
 	var amount := int(line.get("amount", 0))
 	if amount != 0:

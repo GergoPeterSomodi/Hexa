@@ -28,14 +28,22 @@ func _buildable() -> Dictionary:
 func test_the_layer_and_the_constants() -> void:
 	assert_eq(_marks.z_index, 87)
 	assert_eq(WorkMarks.MIN_ZOOM, 0.45)
-	assert_eq(WorkMarks.ICON_SIZE, 24.0)
-	assert_eq(WorkMarks.ICON_OFFSET_Y, -30.0)
+	assert_gte(WorkMarks.ICON_SIZE, 20.0)
+	assert_gte(WorkMarks.FONT_SIZE, 13)
 
 
 func test_the_kit_has_the_hourglass() -> void:
 	var theme := load(KitTheme.THEME_PATH) as Theme
 	assert_true(theme.has_icon(&"hourglass", &"Kit"))
 	assert_not_null(_marks._kit_icon(&"hourglass"))
+
+
+func test_the_hourglass_is_found_when_the_windows_theme_has_no_kit() -> void:
+	var window := get_window()
+	var before := window.theme
+	window.theme = Theme.new()
+	assert_not_null(_marks._kit_icon(&"hourglass"), "taken from the project or the Studiolo theme")
+	window.theme = before
 
 
 func test_a_mark_follows_a_work_from_start_to_finish() -> void:

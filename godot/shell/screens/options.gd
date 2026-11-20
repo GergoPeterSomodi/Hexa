@@ -45,6 +45,8 @@ var _staged_settings: Settings = null
 var _pages: Dictionary[StringName, ScrollContainer] = {}
 var _page_vboxes: Dictionary[StringName, VBoxContainer] = {}
 var _page_rows: Dictionary[StringName, Array] = {}
+## Pages whose rows are made: a page is built when it is first shown or asked for (the Display page at once).
+var _page_built: Dictionary[StringName, bool] = {}
 var _rows: Dictionary[String, OptionRow] = {}
 var _current_page: StringName = &"display"
 
@@ -139,6 +141,7 @@ func select_page(page_id: StringName) -> void:
 		return
 	if _keys_panel.capturing_action() != &"" and page_id != &"controls":
 		_keys_panel.cancel_rebind()
+	_build_page(page_id)
 	var prev_id := _current_page
 	_current_page = page_id
 	_nav.select(page_id, false)
@@ -160,6 +163,7 @@ func select_page(page_id: StringName) -> void:
 ## Returns every OptionRow across all Options pages.
 func option_rows() -> Array[OptionRow]:
 	_ensure_ui()
+	_build_all_pages()
 	var out: Array[OptionRow] = []
 	for key: String in _rows:
 		var row := _rows[key]
@@ -171,12 +175,15 @@ func option_rows() -> Array[OptionRow]:
 ## Returns the OptionRow bound to `key`, or null if absent.
 func option_row(key: String) -> OptionRow:
 	_ensure_ui()
+	if Settings.SCHEMA.has(key):
+		_build_page(StringName(str((Settings.SCHEMA[key] as Dictionary).get("page", ""))))
 	return _rows.get(key, null) as OptionRow
 
 
 ## Returns the OptionRows belonging to `page_id`.
 func page_rows(page_id: StringName) -> Array[OptionRow]:
 	_ensure_ui()
+	_build_page(page_id)
 	var out: Array[OptionRow] = []
 	var list: Array = _page_rows.get(page_id, [])
 	for item: Variant in list:
@@ -272,21 +279,25 @@ func reset_current_page_defaults() -> void:
 
 func key_caps_for_action(action: StringName) -> Array[KeyCap]:
 	_ensure_ui()
+	_build_page(&"controls")
 	return _keys_panel.key_caps_for(action)
 
 
 func rebind_button_for(action: StringName) -> KitButton:
 	_ensure_ui()
+	_build_page(&"controls")
 	return _keys_panel.rebind_button_for(action)
 
 
 func reset_keys_button() -> KitButton:
 	_ensure_ui()
+	_build_page(&"controls")
 	return _keys_panel.reset_button()
 
 
 func keys_hint_label() -> Label:
 	_ensure_ui()
+	_build_page(&"controls")
 	return _keys_panel.hint_label()
 
 
@@ -296,6 +307,7 @@ func capturing_action() -> StringName:
 
 func begin_rebind(action: StringName) -> void:
 	_ensure_ui()
+	_build_page(&"controls")
 	_keys_panel.begin_rebind(action)
 
 
@@ -305,11 +317,13 @@ func cancel_rebind() -> void:
 
 func reset_all_keys() -> void:
 	_ensure_ui()
+	_build_page(&"controls")
 	_keys_panel.reset_all()
 
 
 func about_copy_button() -> KitButton:
 	_ensure_ui()
+	_build_page(&"about")
 	return _about_handles.get("copy_btn", null) as KitButton
 
 
@@ -406,18 +420,36 @@ func _build_pages() -> void:
 		_page_vboxes[page_id] = vbox
 		_page_rows[page_id] = []
 
-	_populate_schema_rows()
-	_populate_accessibility_note()
-	var controls_vbox := _page_vboxes.get(&"controls", null) as VBoxContainer
-	if controls_vbox != null:
-		_keys_panel.build(controls_vbox, _live_settings)
-	var about_vbox := _page_vboxes.get(&"about", null) as VBoxContainer
-	if about_vbox != null:
-		_about_handles = About.build_about_content(about_vbox, _live_settings, ctx, get_window())
+	_build_page(_current_page)
 	_nav.select(_current_page, false)
 
 
-func _populate_schema_rows() -> void:
+## Makes the rows of one page the first time it is needed (the screen opens on Display: the other seven pages cost nothing
+## until they are shown or asked for by option_row, page_rows or the keys and About accessors).
+func _build_page(page_id: StringName) -> void:
+	if not _pages.has(page_id) or _page_built.get(page_id, false):
+		return
+	_page_built[page_id] = true
+	_populate_schema_rows(page_id)
+	match page_id:
+		&"accessibility":
+			_populate_accessibility_note()
+		&"controls":
+			_keys_panel.build(_page_vboxes[page_id], _live_settings)
+			_keys_panel.set_reduce_motion(_reduce_motion())
+		&"about":
+			_about_handles = About.build_about_content(_page_vboxes[page_id], _live_settings, ctx, get_window())
+			_about_handles["context"] = ctx
+			About.refresh_about_handles(_about_handles, _live_settings, get_window())
+	_sync_display_row_states()
+
+
+func _build_all_pages() -> void:
+	for page_spec: Dictionary in PAGES:
+		_build_page(page_spec["id"] as StringName)
+
+
+func _populate_schema_rows(only_page: StringName) -> void:
 	var row_scene := ResourceLoader.load(OPTION_ROW_PATH) as PackedScene
 	if row_scene == null:
 		return
@@ -428,7 +460,7 @@ func _populate_schema_rows() -> void:
 		if page_str.is_empty() or since_val > TARGET_MILESTONE:
 			continue
 		var page_id := StringName(page_str)
-		if not _page_vboxes.has(page_id):
+		if page_id != only_page or not _page_vboxes.has(page_id):
 			continue
 		var row := row_scene.instantiate() as OptionRow
 		row.name = key.replace("/", "_")

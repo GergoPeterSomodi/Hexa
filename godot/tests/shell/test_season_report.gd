@@ -205,3 +205,43 @@ func test_glance_chips_hold_no_buttons() -> void:
 	await _harness.wait_frames(self, 2)
 	var glance := report.sheet().section_box(&"glance")
 	assert_eq(glance.find_children("*", "Button", true, false).size(), 0, "chips are labels, not links")
+
+
+func test_glance_chip_value_and_label_use_the_light_ink() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	var chip := report.sheet().section_box(&"glance").find_child("Chips", true, false).get_child(0) as PanelContainer
+	assert_not_null(chip)
+	var texts := chip.find_children("*", "Label", true, false)
+	assert_true(texts.size() >= 2, "a label and a value")
+	for i: int in 2:  # the label, then the value, in tree order (a DeltaChip's own text comes after)
+		var lbl := texts[i] as Label
+		assert_eq(lbl.get_theme_color(&"font_color"), Tokens.TEXT, "%s is light on the dark chip" % lbl.text)
+
+
+func test_sheet_clears_the_top_bar_and_keeps_the_footer_at_1280_x_720() -> void:
+	await _assert_layout(Vector2i(1280, 720))
+
+
+func test_sheet_clears_the_top_bar_and_keeps_the_footer_at_1600_x_900() -> void:
+	await _assert_layout(Vector2i(1600, 900))
+
+
+## The sheet starts under the bar's real bottom edge (76 px), its ribbon and seal overhang stay on screen below it, and
+## the footer (the setting, Begin) is inside the window.
+func _assert_layout(view: Vector2i) -> void:
+	_harness.viewport.size = view
+	_harness.ctx.top_bar_bottom_func = func() -> float: return 76.0
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 3)
+	var sheet_rect := report.sheet().get_global_rect()
+	assert_true(sheet_rect.position.y >= 76.0 + 60.0 - 0.5, "the sheet starts below the bar and its overhang")
+	assert_true(report.sheet().ribbon().get_global_rect().position.y >= 76.0, "the ribbon clears the bar")
+	assert_true(report.sheet().seal_node().get_global_rect().position.y >= 76.0, "the seal clears the bar")
+	var window := Rect2(Vector2.ZERO, Vector2(view))
+	assert_true(window.encloses(sheet_rect), "the sheet fits the window")
+	assert_true(report.sheet().footer().visible, "the footer shows")
+	assert_true(window.encloses(report.begin_button().get_global_rect()), "Begin is on screen")
+	assert_true(window.encloses(report.segmented().get_global_rect()), "the setting is on screen")
+	_harness.ctx.top_bar_bottom_func = Callable()
+	_harness.viewport.size = Vector2i(1280, 720)

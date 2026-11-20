@@ -14,6 +14,9 @@ enum Method { PRIMARY, FALLBACK }
 const METHOD := Method.PRIMARY
 const LAYER_INDEX := 9
 const DURATION := 0.4
+## A capture (the forced draw, the read of the picture, the texture) that takes longer than this many ms freezes the game at
+## every season end: the fade then uses the FALLBACK from the next season on (tools/ui/perf_ui.gd measures the capture).
+const SLOW_CAPTURE_MS := 60.0
 
 ## The method this fade uses (a test may change it).
 var method: Method = METHOD
@@ -23,6 +26,9 @@ var reduce_motion := false
 var run_headless := false
 ## The node the fallback modulates (the map scene).
 var world: CanvasItem = null
+
+## The cost of the last capture in ms (0 before the first, or when none was taken).
+var last_capture_ms := 0.0
 
 var _rect: TextureRect = null
 var _tween: Tween = null
@@ -56,6 +62,7 @@ func capture() -> void:
 			_tween.tween_property(world, "modulate", Tokens.BG, DURATION / 2.0)
 			await _tween.finished
 		return
+	var started := Time.get_ticks_usec()
 	RenderingServer.force_draw(false)  # not `await frame_post_draw`: low-processor mode draws no idle frames
 	var image := get_viewport().get_texture().get_image()
 	if image == null or image.is_empty():
@@ -63,6 +70,14 @@ func capture() -> void:
 	_rect.texture = ImageTexture.create_from_image(image)
 	_rect.modulate.a = 1.0
 	_rect.visible = true
+	note_capture_cost(float(Time.get_ticks_usec() - started) / 1000.0)
+
+
+## Records a capture's cost; a capture over SLOW_CAPTURE_MS makes the fade use the FALLBACK from then on.
+func note_capture_cost(ms: float) -> void:
+	last_capture_ms = ms
+	if ms > SLOW_CAPTURE_MS and method == Method.PRIMARY:
+		method = Method.FALLBACK
 
 
 ## Call after the swap has begun: the picture fades away (or the world comes back) and `finished` is emitted.

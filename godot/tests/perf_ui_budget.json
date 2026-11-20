@@ -3,7 +3,8 @@
   "screens": ["main_menu", "sandbox", "credits", "pause_menu", "options", "about", "help", "confirm", "loading"],
   "limits": {
     "screen_push_cpu_worst_ms": {"limit": 150.0, "class": "cpu", "what": "worst cold instantiate + ScreenStack.push time across M1.5 screens"},
-    "screen_push_worst_ms": {"limit": 16.0, "class": "gpu", "what": "worst first-frame push + render time across M1.5 screens"},
+    "screen_push_worst_ms": {"limit": 16.0, "class": "gpu", "what": "worst first-frame push + render time across M1.5 screens, second (warm) push"},
+    "screen_push_cold_worst_ms": {"limit": 100.0, "class": "gpu", "what": "worst first-ever push + render across M1.5 screens: a hitch over this is a bug (target 50)"},
     "hud_frame_worst_ms": {"limit": 16.0, "class": "gpu", "what": "worst frame with HUD + HexPanel open at 1920x1080"},
     "minimap_frame_worst_ms": {"limit": 16.0, "class": "gpu", "what": "worst frame with the HUD and the minimap in a country game (Genoa) at 1920x1080 (M2)"},
     "pick_frame_worst_ms": {"limit": 16.0, "class": "gpu", "what": "worst frame with the country pick open at 1920x1080 (M2)"},

@@ -14,6 +14,13 @@ signal report_requested
 
 ## The filters up to this milestone (LogLines.FILTERS carries the milestone each one arrives in).
 const MILESTONE := 3
+## The open card's size: at most 340 px wide (x 12 to 352 at 1280 wide, clear of the centred toast stack) and 268 px
+## tall; the lines wrap inside it and the card scrolls. The closed bar is BAR_W wide.
+const CARD_W := 340
+const CARD_H := 268
+const BAR_W := 400
+## The key hints row keeps this much of the window's bottom clear of the card (fit_height).
+const HINTS_CLEARANCE := 44
 const KEYWORD_W := 96
 const NEW_FORMAT := "+%d new"
 const EMPTY_TEXT := "No actions yet."
@@ -92,6 +99,13 @@ func bind_settings(settings: Settings) -> void:
 		_read_settings()
 		_apply_visibility()
 		refresh()
+
+
+## Caps the open card's height at `available` px (the space above the key hints row, which the HUD measures); the
+## card is never taller than CARD_H, and its lines scroll when they do not fit.
+func fit_height(available: float) -> void:
+	if is_node_ready():
+		_card.custom_minimum_size.y = minf(float(CARD_H), maxf(0.0, available))
 
 
 ## Opens the card and marks every line read.
