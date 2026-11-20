@@ -238,6 +238,9 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 				lines.append([str(row[0]), &"plain", str(row[1])])
 		if gives != "":
 			lines.append(["Gives", &"plain", gives])
+		var worth_line := worth_row(game, hex)
+		if not worth_line.is_empty():
+			lines.append(worth_line)
 		var work_line := work_text(game, hex)
 		if work_line != "":
 			lines.append(["Work", &"warn", work_line])
@@ -265,6 +268,34 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 		"weather": weather_now,
 		"lines": lines,
 	}
+
+
+## The hover card's Worth line on a land hex of the player's, in a game with countries: ["Worth", tone, "+232 a year (+60 this
+## season)"], the four seasons from now and the first of them (EconomyPreview.worth_seasons); tone good above 0, bad below,
+## plain at 0. [] on any other hex (another country's, unowned, sea) and without a player or countries.
+static func worth_row(game: Game, hex: Vector2i) -> Array:
+	if game == null or game.map == null or game.state == null or not game.has_countries() or game.player == &"" \
+			or not game.map.has(hex):
+		return []
+	var i := game.map.index_of(hex)
+	if game.map.land[i] == 0:
+		return []
+	var c := Countries.by_tag(game, game.player)
+	if c == null or int(game.state.owner[i]) != c.id:
+		return []
+	var worth := EconomyPreview.worth_seasons_shared(game, game.player, 4)
+	var hexes: PackedInt32Array = worth["hexes"]
+	var h := hexes.bsearch(i)
+	if h >= hexes.size() or hexes[h] != i:
+		return []
+	var seasons := int(worth["seasons"])
+	var values: PackedInt32Array = worth["worth"]
+	var year := 0
+	for k: int in seasons:
+		year += values[h * seasons + k]
+	var now := values[h * seasons]
+	var tone := &"good" if year > 0 else (&"bad" if year < 0 else &"plain")
+	return ["Worth", tone, "%s a year (%s this season)" % [Words.signed(year), Words.signed(now)]]
 
 
 ## The hover card's Work line: "vineyard, first stage: 1 of 4 seasons, ready Spring 1481" (": stopped for the winter,

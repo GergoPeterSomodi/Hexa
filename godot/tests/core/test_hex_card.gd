@@ -323,3 +323,47 @@ func test_no_gives_or_weather_without_countries_or_at_sea() -> void:
 	assert_ne(sea, Vector2i(-1, -1))
 	assert_eq(str(HexCard.of(game, sea)["gives"]), "")
 	assert_eq(str(HexCard.of(game, sea)["weather"]), "")
+
+
+func test_worth_line_of_genoa_and_others() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var card := HexCard.of(game, InsightsFixture.GENOA_HEX)
+	assert_eq(_find_line(card["lines"] as Array, "Worth"), ["Worth", &"good", "+232 a year (+60 this season)"])
+	var vineyard := HexCard.of(game, EconomyFixture.VINEYARD_HEX)
+	assert_eq(_find_line(vineyard["lines"] as Array, "Worth"), ["Worth", &"good", "+68 a year (+2 this season)"])
+
+
+func test_worth_line_none_on_milan_sea_and_map_only() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var milan := Countries.by_tag(game, &"MLO")
+	var checked := 0
+	for i: int in game.map.hex_count():
+		if game.map.land[i] != 0 and int(game.state.owner[i]) == milan.id:
+			assert_null(_find_line(HexCard.of(game, game.map.hex_of(i))["lines"] as Array, "Worth"), "Milan hex %d" % i)
+			checked += 1
+			if checked >= 5:
+				break
+	assert_gt(checked, 0)
+	for i: int in game.map.hex_count():
+		if game.map.land[i] == 0:
+			assert_null(_find_line(HexCard.of(game, game.map.hex_of(i))["lines"] as Array, "Worth"), "sea has no Worth")
+			break
+	assert_null(_find_line(HexCard.of(_game, Vector2i(9, 9))["lines"] as Array, "Worth"), "map-only game")
+	var no_player := EconomyFixture.game()
+	assert_null(_find_line(HexCard.of(no_player, InsightsFixture.GENOA_HEX)["lines"] as Array, "Worth"), "no chosen player")
+
+
+func test_worth_line_wild_land_and_a_loss() -> void:
+	var wild := EconomyFixture.game(&"GEN", true)
+	var line: Variant = _find_line(HexCard.of(wild, EconomyFixture.VINEYARD_HEX)["lines"] as Array, "Worth")
+	assert_not_null(line, "wild land of yours has a Worth line")
+	assert_true(str((line as Array)[2]).contains(" a year ("), str(line))
+	var row := HexCard.worth_row(wild, EconomyFixture.VINEYARD_HEX)
+	var worth := EconomyPreview.worth_seasons(wild, &"GEN", 4)
+	var values: PackedInt32Array = worth["worth"]
+	var h := (worth["hexes"] as PackedInt32Array).find(wild.map.index_of(EconomyFixture.VINEYARD_HEX))
+	var year := 0
+	for k: int in 4:
+		year += values[h * 4 + k]
+	assert_eq(row[1], &"good" if year > 0 else (&"bad" if year < 0 else &"plain"))
+	assert_eq(row[2], "%s a year (%s this season)" % [Words.signed(year), Words.signed(values[h * 4])])

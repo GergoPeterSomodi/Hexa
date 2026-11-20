@@ -179,3 +179,153 @@ func test_delta_colour_is_good_for_a_gain_and_bad_for_a_loss() -> void:
 	assert_almost_eq(gain.a, 0.35, 0.0001)
 	assert_almost_eq(loss.a, 0.35, 0.0001)
 	assert_eq(MapModes.delta_colour(0).a, 0.0, "no change, no tint")
+
+
+
+# --- Yields (docs/architecture/m4-5-build-spec.md 4.8) ---------------------------------------------------------------
+
+
+func test_yield_band_edges() -> void:
+	var edges: Dictionary = {-1: 1, 0: 2, 1: 3, 9: 3, 10: 4, 24: 4, 25: 5, 49: 5, 50: 6, 99: 6, 100: 7, 199: 7, 200: 8,
+		399: 8, 400: 9, 5000: 9}
+	for year: int in edges:
+		assert_eq(MapModes.yield_band(year), int(edges[year]), "band of %d" % year)
+
+
+func test_mode_keys_and_mode_of() -> void:
+	assert_eq(MapModes.MODE_KEYS, [&"terrain", &"owner", &"relief", &"yields"] as Array[StringName])
+	assert_eq(MapModes.mode_of(&"terrain"), MapModes.Mode.TERRAIN)
+	assert_eq(MapModes.mode_of(&"yields"), MapModes.Mode.YIELDS)
+	assert_eq(MapModes.mode_of(&"supply"), -1)
+	assert_eq(MapModes.mode_of(&""), -1)
+
+
+func test_yield_ramp_entries() -> void:
+	var ramp := MapModes.yield_ramp()
+	assert_eq(ramp.size(), 256)
+	assert_eq(ramp[0], Color(0.0, 0.0, 0.0, 0.0))
+	for b: int in range(1, 10):
+		assert_eq(ramp[b], MapModes.YIELD_COLOURS[b - 1], "byte %d" % b)
+	assert_eq(ramp[10], Color(0.0, 0.0, 0.0, 0.0))
+	assert_eq(ramp[255], Color(0.0, 0.0, 0.0, 0.0))
+
+
+func test_yield_colour_distances() -> void:
+	var cols := MapModes.YIELD_COLOURS
+	for b: int in range(2, 9):  # bytes 2 to 9 are cols[1] to cols[8]
+		assert_gte(ColourContrast.worst_delta_e(cols[b - 1], cols[b]), 6.0, "bytes %d and %d" % [b, b + 1])
+	for b: int in range(2, 10):
+		assert_gte(ColourContrast.worst_delta_e(MapModes.VEIL, cols[b - 1]), 15.0, "veil against byte %d" % b)
+		assert_gte(ColourContrast.worst_delta_e(cols[0], cols[b - 1]), 15.0, "madder against byte %d" % b)
+
+
+func test_colour_of_yields() -> void:
+	var pal := MapModes.palette_from(PackedColorArray(), MapModes.DEFAULT_UNOWNED)
+	var clear := Color(0.0, 0.0, 0.0, 0.0)
+	for yb: int in range(0, 10):
+		assert_eq(MapModes.colour_of(MapModes.Mode.YIELDS, 1, 0, pal, true, 0, yb), clear, "sea is clear at byte %d" % yb)
+	var veil := MapModes.colour_of(MapModes.Mode.YIELDS, 1, 5, pal, true, 0, 0)
+	assert_eq(Color(veil.r, veil.g, veil.b), MapModes.VEIL)
+	assert_almost_eq(veil.a, 0.45, 0.0001)
+	assert_eq(MapModes.colour_of(MapModes.Mode.YIELDS, 1, 5, pal, true, 0), veil, "no byte given is the veil")
+	var loss := MapModes.colour_of(MapModes.Mode.YIELDS, 1, 5, pal, true, 0, 1)
+	assert_eq(Color(loss.r, loss.g, loss.b), Color("#a8321a"))
+	for yb: int in range(1, 10):
+		var c := MapModes.colour_of(MapModes.Mode.YIELDS, 1, 5, pal, true, 0, yb)
+		assert_eq(Color(c.r, c.g, c.b), MapModes.YIELD_COLOURS[yb - 1], "byte %d" % yb)
+		assert_almost_eq(c.a, 0.70, 0.0001)
+	# The hover highlight does not touch Yields.
+	assert_eq(MapModes.colour_of(MapModes.Mode.YIELDS, 1, 5, pal, true, 1, 6),
+		MapModes.colour_of(MapModes.Mode.YIELDS, 1, 5, pal, true, 0, 6))
+
+
+func test_legend() -> void:
+	for mode: int in [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF]:
+		assert_eq(MapModes.legend(mode).size(), 0)
+	var rows := MapModes.legend(MapModes.Mode.YIELDS)
+	var texts: Array[String] = []
+	for row: Dictionary in rows:
+		texts.append(str(row["text"]))
+	assert_eq(texts, ["400 and more", "200 to 399", "100 to 199", "50 to 99", "25 to 49", "10 to 24", "1 to 9", "Nothing",
+		"A loss", "Not your land"] as Array[String])
+	assert_eq(rows[0]["colour"], Color("#0b3f3c"))
+	assert_eq(rows[7]["colour"], Color("#efe3c4"))
+	assert_true(bool(rows[8]["stripes"]))
+	assert_eq(rows[8]["colour"], Color("#a8321a"))
+	assert_eq(rows[9]["colour"], MapModes.VEIL)
+	for r: int in range(0, 8):
+		assert_false(bool(rows[r]["stripes"]))
+	assert_false(bool(rows[9]["stripes"]))
+
+
+func test_yield_bytes_of_genoa_at_turn_one() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var map := game.map
+	var bytes := MapModes.yield_bytes(game, &"GEN")
+	assert_eq(bytes.size(), map.hex_count())
+	var named: Dictionary = {Vector2i(8, 13): 8, Vector2i(7, 14): 7, Vector2i(7, 12): 6, Vector2i(6, 13): 5,
+		Vector2i(9, 13): 5, Vector2i(7, 13): 4}
+	for hex: Vector2i in named:
+		assert_eq(int(bytes[map.index_of(hex)]), int(named[hex]), "byte of %s" % hex)
+	var counts: Dictionary = {}
+	var genoa := Countries.by_tag(game, &"GEN")
+	for i: int in map.hex_count():
+		if map.land[i] == 0 or int(game.state.owner[i]) != genoa.id:
+			assert_eq(int(bytes[i]), 0, "not Genoa's land: hex %d is 0" % i)
+		else:
+			counts[int(bytes[i])] = int(counts.get(int(bytes[i]), 0)) + 1
+	assert_eq(int(counts.get(3, 0)), 6, "the six woods")
+	assert_eq(int(counts.get(2, 0)), 2, "the two rocks")
+	assert_eq(int(counts.get(1, 0)), 0, "no loss")
+
+
+func test_yield_bytes_planted_milan_hex_is_zero_and_wild_land_is_its_own_band() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var milan := Countries.by_tag(game, &"MLO")
+	var found := 0
+	for i: int in game.map.hex_count():
+		if game.map.land[i] != 0 and int(game.state.owner[i]) == milan.id:
+			found += 1
+			assert_eq(int(MapModes.yield_bytes(game, &"GEN")[i]), 0, "a Milan hex is 0 (veiled)")
+			var pal := MapModes.palette(game, false)
+			var col := MapModes.colour_at(game, MapModes.Mode.YIELDS, game.map.hex_of(i), pal, true, 0)
+			assert_eq(Color(col.r, col.g, col.b), MapModes.VEIL)
+			assert_almost_eq(col.a, MapModes.VEIL_ALPHA, 0.0001)
+			if found >= 5:
+				break
+	assert_gt(found, 0, "Milan holds land")
+	# Genoa's vineyard made wild: still Genoa's land, so a band of its own, not the veil.
+	var wild := EconomyFixture.game(&"GEN", true)
+	var b := int(MapModes.yield_bytes(wild, &"GEN")[wild.map.index_of(EconomyFixture.VINEYARD_HEX)])
+	assert_between(b, 2, 9, "wild land of yours has a band")
+	assert_ne(b, 6, "and not the vineyard's")
+	# A map-only game and no viewer give all zeros.
+	var sandbox := Game.new_game(_make_map(4, 3), 1480)
+	assert_eq(MapModes.yield_bytes(sandbox, &"GEN").size(), 12)
+	assert_eq(MapModes.yield_bytes(sandbox, &"GEN").count(0), 12)
+	assert_eq(MapModes.yield_bytes(game, &"").count(0), game.map.hex_count())
+
+
+func test_colour_at_yields_reads_the_players_bytes() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var pal := MapModes.palette(game, false)
+	var genoa := MapModes.colour_at(game, MapModes.Mode.YIELDS, Vector2i(8, 13), pal, true, 0)
+	assert_eq(Color(genoa.r, genoa.g, genoa.b), MapModes.YIELD_COLOURS[7], "Genoa is byte 8")
+	assert_almost_eq(genoa.a, 0.70, 0.0001)
+	var sea := Vector2i(-1, -1)
+	for i: int in game.map.hex_count():
+		if game.map.land[i] == 0:
+			sea = game.map.hex_of(i)
+			break
+	assert_eq(MapModes.colour_at(game, MapModes.Mode.YIELDS, sea, pal, true, 0), Color(0.0, 0.0, 0.0, 0.0))
+
+
+func test_modes_with_yields() -> void:
+	var all: Array[int] = [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF, MapModes.Mode.YIELDS]
+	assert_eq(MapModes.modes(EconomyFixture.game(&"GEN")), all)
+	assert_eq(MapModes.modes(EconomyFixture.game()),
+		[MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF] as Array[int],
+		"countries but no chosen player: no Yields")
+	assert_eq(MapModes.modes(Game.new_game(_make_map(4, 3), 1480)),
+		[MapModes.Mode.TERRAIN, MapModes.Mode.RELIEF] as Array[int])
+	assert_eq(MapModes.modes(null), [MapModes.Mode.TERRAIN, MapModes.Mode.RELIEF] as Array[int])

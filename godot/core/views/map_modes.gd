@@ -4,7 +4,9 @@
 class_name MapModes
 extends RefCounted
 
-enum Mode { TERRAIN, OWNER, RELIEF }  # keys 1, 2, 3
+enum Mode { TERRAIN, OWNER, RELIEF, YIELDS }  # keys 1 to 4
+## The values of the setting state/map_mode, by Mode.
+const MODE_KEYS: Array[StringName] = [&"terrain", &"owner", &"relief", &"yields"]
 
 const TINT_ALPHA := 0.14
 const OWNER_ALPHA := 0.55
@@ -25,6 +27,20 @@ const RELIEF_STOPS: Array[Array] = [
 	[3200, Color("#f4f5f8")],
 ]
 
+## The Yields mode (docs/architecture/m4-5-build-spec.md 4.8): your land in nine bands of its worth a year.
+const YIELD_ALPHA := 0.70
+const VEIL := Color("#1c140d")
+const VEIL_ALPHA := 0.45
+const STRIPE_PX := 6.0
+## The worth a year that starts bytes 3 to 9.
+const YIELD_FLOORS: PackedInt32Array = [1, 10, 25, 50, 100, 200, 400]
+## Bytes 1 (a loss, madder) to 9.
+const YIELD_COLOURS: Array[Color] = [Color("#a8321a"), Color("#efe3c4"), Color("#d9d3a0"), Color("#b5c98a"),
+	Color("#86b37a"), Color("#4f9a6e"), Color("#2a7d63"), Color("#12605a"), Color("#0b3f3c")]
+## The legend's words for bytes 2 to 9.
+const YIELD_WORDS: Array[String] = ["Nothing", "1 to 9", "10 to 24", "25 to 49", "50 to 99", "100 to 199", "200 to 399",
+	"400 and more"]
+
 const DEFAULT_UNOWNED := Color("#d8ccb0")
 ## The works card's tint (Tokens.GOOD and Tokens.BAD, whose values these are: a view does not read the shell).
 const DELTA_GOOD := Color("#7fc98a")
@@ -32,6 +48,73 @@ const DELTA_BAD := Color("#f0806a")
 const DELTA_ALPHA := 0.35
 
 static var _cached_ramp := PackedColorArray()
+static var _cached_yield_ramp := PackedColorArray()
+
+
+## The Mode of a state/map_mode value; -1 when unknown.
+static func mode_of(key: StringName) -> int:
+	return MODE_KEYS.find(key)
+
+
+## The band (byte 1 to 9) of a worth a year: 1 under 0, 2 for 0, 3 to 9 from YIELD_FLOORS.
+static func yield_band(year: int) -> int:
+	if year < 0:
+		return 1
+	var band := 2
+	for floor_value: int in YIELD_FLOORS:
+		if year >= floor_value:
+			band += 1
+	return band
+
+
+## One byte a hex (index = row * cols + col): the band of your land hex's worth over the next four seasons; 0 on every
+## other hex (sea, unowned, another country's: their worth is theirs to know). All 0 for no viewer or an unknown one.
+## Cached in the game's view cache by [&"yields", version, viewer].
+static func yield_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	if game == null or game.map == null:
+		return PackedByteArray()
+	var key: Array = [&"yields", game.version, viewer]
+	return game.view_cache.get_or_make(key, func() -> PackedByteArray: return _make_yield_bytes(game, viewer)) as PackedByteArray
+
+
+static func _make_yield_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(game.map.hex_count())  # zero
+	if viewer == &"" or not game.has_countries():
+		return out
+	var worth := EconomyPreview.worth_seasons_shared(game, viewer, 4)
+	var hexes: PackedInt32Array = worth["hexes"]
+	var values: PackedInt32Array = worth["worth"]
+	var seasons := int(worth["seasons"])
+	for h: int in hexes.size():
+		var year := 0
+		for k: int in seasons:
+			year += values[h * seasons + k]
+		out[hexes[h]] = yield_band(year)
+	return out
+
+
+## 256-entry colours by Yields byte: [0] clear, [1..9] YIELD_COLOURS, the rest clear.
+static func yield_ramp() -> PackedColorArray:
+	if _cached_yield_ramp.size() != PALETTE_SIZE:
+		_cached_yield_ramp.resize(PALETTE_SIZE)
+		_cached_yield_ramp.fill(Color(0.0, 0.0, 0.0, 0.0))
+		for b: int in YIELD_COLOURS.size():
+			_cached_yield_ramp[b + 1] = YIELD_COLOURS[b]
+	return _cached_yield_ramp.duplicate()
+
+
+## The legend rows of a mode: for YIELDS [{colour, text, stripes}], the top byte first, then "A loss" and "Not your land";
+## [] for the other modes.
+static func legend(mode: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if mode != Mode.YIELDS:
+		return out
+	for b: int in range(9, 1, -1):
+		out.append({"colour": YIELD_COLOURS[b - 1], "text": YIELD_WORDS[b - 2], "stripes": false})
+	out.append({"colour": YIELD_COLOURS[0], "text": "A loss", "stripes": true})
+	out.append({"colour": VEIL, "text": "Not your land", "stripes": false})
+	return out
 
 
 ## The card's tint of a change in ducats a year: DELTA_GOOD at a gain, DELTA_BAD at a loss, alpha 0.35; no tint (clear)
@@ -101,9 +184,14 @@ static func palette_from(colours: PackedColorArray, unowned: Color) -> PackedCol
 
 ## Fragment colour for one (owner_id, height_byte) pair; matches mode_overlay.gdshader.
 static func colour_of(mode: int, owner_id: int, height_byte: int, palette: PackedColorArray,
-		tint_on: bool, hot_id: int) -> Color:
+		tint_on: bool, hot_id: int, yield_byte: int = 0) -> Color:
 	if height_byte <= 0:
 		return Color(0.0, 0.0, 0.0, 0.0)
+	if mode == Mode.YIELDS:  # no hover highlight: the colour says the worth
+		if yield_byte <= 0 or yield_byte > YIELD_COLOURS.size():
+			return Color(VEIL.r, VEIL.g, VEIL.b, VEIL_ALPHA)
+		var c := YIELD_COLOURS[yield_byte - 1]
+		return Color(c.r, c.g, c.b, YIELD_ALPHA)
 	var base := Color(0.0, 0.0, 0.0, 0.0)
 	var alpha := 0.0
 	match mode:
@@ -129,9 +217,12 @@ static func colour_of(mode: int, owner_id: int, height_byte: int, palette: Packe
 	return Color(base.r, base.g, base.b, alpha)
 
 
-## Available map modes for `game`: `[TERRAIN, OWNER, RELIEF]`, omitting `OWNER` in a map-only game.
+## Available map modes for `game`: `[TERRAIN, OWNER, RELIEF]`, omitting `OWNER` in a map-only game, and adding `YIELDS`
+## when the game has countries and a chosen player.
 static func modes(game: Game) -> Array[int]:
 	if game != null and game.has_countries():
+		if game.player != &"":
+			return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF, Mode.YIELDS]
 		return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF]
 	return [Mode.TERRAIN, Mode.RELIEF]
 
@@ -153,7 +244,11 @@ static func colour_at(game: Game, mode: int, hex: Vector2i, pal: PackedColorArra
 	var idx := game.map.index_of(hex)
 	var height_byte := _height_byte_at(game.map, idx)
 	var oid := Territory.owner_id(game, hex)
-	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id)
+	var yield_byte := 0
+	if mode == Mode.YIELDS and height_byte > 0:
+		var bytes := yield_bytes(game, game.player)
+		yield_byte = int(bytes[idx]) if idx < bytes.size() else 0
+	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id, yield_byte)
 
 
 static func _height_byte_at(map: MapData, idx: int) -> int:

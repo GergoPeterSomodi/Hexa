@@ -6,6 +6,8 @@ extends RefCounted
 
 const FILTERS: Array[Dictionary] = [{id = &"all", since = "3"}, {id = &"works", since = "3"}, {id = &"mine", since = "3"},
 	{id = &"money", since = "4"}, {id = &"war", since = "7"}]
+## The memo slot of the set of tags the viewer knows.
+const _KNOWN := &"*known"
 const SEASONS_SHOWN := 8
 const PER_SEASON := 60
 
@@ -38,7 +40,7 @@ static func line_of(game: Game, entry: Dictionary, viewer: StringName, memo: Dic
 		return {}
 	line["mine"] = mine
 	line["turn"] = int(entry.get("turn", 0))
-	line["filters"] = _filters_of(entry, mine)
+	line["filters"] = filters_of(game, entry, viewer, memo)
 	return line
 
 
@@ -106,6 +108,73 @@ static func _may_pass(entry: Dictionary, viewer: StringName, filter: StringName)
 	return true
 
 
+## The filters `line_of` gives the entry, without building its sentence: [] when `viewer` is not told of it (Knowledge.
+## witnessed) or it cannot be described (the cases in which `line_of` gives {}). `line_of` calls this. `memo` is
+## `line_of`'s: a caller that reads many entries shares the answers of "does the viewer know this actor".
+static func filters_of(game: Game, entry: Dictionary, viewer: StringName, memo: Dictionary = {}) -> Array[StringName]:
+	var none: Array[StringName] = []
+	if game == null or not _seen(game, entry, viewer, memo) or not _describable(entry, viewer):
+		return none
+	var kind := str(entry.get("kind", ""))
+	var mine := StringName(str(entry.get("tag", ""))) == viewer
+	if kind == "owners_changed":
+		mine = mine or _tags(entry.get("others", [])).has(viewer)
+	return _filters_of(entry, mine)
+
+
+## False for an entry `line_of` gives no line: an unknown kind, a work that does not read back, land with no hexes or that
+## nobody gave and nobody got, a rule choice with no country, a shortage of another country, a tax level out of range.
+static func _describable(entry: Dictionary, viewer: StringName) -> bool:
+	var tag := StringName(str(entry.get("tag", "")))
+	match str(entry.get("kind", "")):
+		"work_started", "work_finished", "work_cancelled":
+			var work_value: Variant = entry.get("work", null)
+			return work_value is Dictionary and _reads_as_work(work_value as Dictionary)
+		"owners_changed":
+			return not _hexes(entry.get("hexes", [])).is_empty() and not (tag == &"" and _tags(entry.get("others", [])).is_empty())
+		"country_chosen":
+			return tag != &""
+		"goods_short":
+			return tag == viewer  # only the owner is told
+		"tax_set":
+			return not Words.tax_name(int(entry.get("level", -1))).is_empty()
+	return false
+
+
+const _WORK_INTS: Array[String] = ["id", "family", "level_to", "started_turn", "seasons", "seasons_left", "paid"]
+
+
+## Whether Work.from_dict reads `d` (a test pins the two equal): the same checks without building the Work, which an index of
+## three thousand entries cannot afford.
+static func _reads_as_work(d: Dictionary) -> bool:
+	var schema := str(d.get("schema", ""))
+	if schema != Work.SCHEMA and schema != Work.SCHEMA_V1:
+		return false
+	for key: String in _WORK_INTS:
+		if Work.whole(d.get(key, null)) == null:
+			return false
+	var tag_value: Variant = d.get("tag", null)
+	var action_value: Variant = d.get("action", null)
+	if not (tag_value is String or tag_value is StringName) or not (action_value is String or action_value is StringName):
+		return false
+	if schema == Work.SCHEMA:
+		var goods: Variant = d.get("paid_goods", null)
+		if not (goods is Dictionary):
+			return false
+		for key: Variant in goods as Dictionary:
+			var loads: Variant = Work.whole((goods as Dictionary)[key])
+			if not (key is String or key is StringName) or loads == null or int(loads) < 0:
+				return false
+	if not Work.ACTIONS.has(String(action_value)):
+		return false
+	var hex_value: Variant = d.get("hex", null)
+	if hex_value is Vector2i:
+		return true
+	if hex_value is Array and (hex_value as Array).size() == 2:
+		return Work.whole((hex_value as Array)[0]) != null and Work.whole((hex_value as Array)[1]) != null
+	return false
+
+
 static func _filters_of(entry: Dictionary, mine: bool) -> Array[StringName]:
 	var kind := str(entry.get("kind", ""))
 	var out: Array[StringName] = [&"all"]
@@ -126,13 +195,45 @@ static func _money_kind(kind: String) -> bool:
 # ----- who is told -----------------------------------------------------------------------------------------------
 
 
-## Knowledge.witnessed, remembered per set of parties: the answer depends on the actor, the others and the witnesses
-## only, and "knows" costs a pass over the map.
+## Knowledge.witnessed (a test pins the two equal): the actor and each of `others` are told; a witness list tells exactly
+## the tags it holds; else whoever knows the actor. "Knows" costs a pass over the map: `memo` keeps the tags the viewer
+## knows (Knowledge.known, which `knows` agrees with) and asks it once.
 static func _seen(game: Game, entry: Dictionary, viewer: StringName, memo: Dictionary) -> bool:
-	var key := "%s|%s|%s" % [str(entry.get("tag", "")), str(entry.get("others", "")), str(entry.get("witnesses", ""))]
-	if not memo.has(key):
-		memo[key] = Knowledge.witnessed(game, entry, viewer)
-	return bool(memo[key])
+	if viewer == &"":
+		return true
+	var tag := StringName(str(entry.get("tag", "")))
+	if tag == viewer or _lists(entry.get("others", []), viewer):
+		return true
+	var witnesses: Variant = entry.get("witnesses", [])
+	if not _no_tags(witnesses):
+		return _lists(witnesses, viewer)
+	if tag == &"":
+		return true  # Knowledge.knows: a public party
+	if not memo.has(_KNOWN):
+		var told := {}
+		for other: StringName in Knowledge.known(game, viewer):  # one pass over the map, not one a tag
+			told[other] = true
+		memo[_KNOWN] = told
+	return (memo[_KNOWN] as Dictionary).has(tag)
+
+
+## True when `value` (an Array or the PackedStringArray the chronicle stores) holds `tag`; false for anything else.
+static func _lists(value: Variant, tag: StringName) -> bool:
+	if typeof(value) != TYPE_ARRAY and typeof(value) != TYPE_PACKED_STRING_ARRAY:
+		return false
+	for item: Variant in value:
+		if str(item) == String(tag):
+			return true
+	return false
+
+
+## True when `value` holds no tags: an empty Array or PackedStringArray, or anything that is no list (Knowledge reads it so).
+static func _no_tags(value: Variant) -> bool:
+	if value is Array:
+		return (value as Array).is_empty()
+	if value is PackedStringArray:
+		return (value as PackedStringArray).is_empty()
+	return true
 
 
 static func _tags(value: Variant) -> Array[StringName]:

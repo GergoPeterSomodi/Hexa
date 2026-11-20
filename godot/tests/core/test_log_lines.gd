@@ -368,3 +368,113 @@ func test_money_lines_are_equal_after_a_save_and_load() -> void:
 	var back := _round_trip(_g)
 	assert_not_null(back)
 	assert_eq(LogLines.entries(back, &"GEN", &"money"), before)
+
+
+func test_filters_of_equals_the_lines_filters_for_every_kind_and_viewer() -> void:
+	var known := _known()
+	var stranger := _stranger()
+	var paid := _work(Works.BUILD, ImproveRules.VINEYARD, 1, SAVONA, 4)
+	paid.paid = 40
+	var entries: Array[Dictionary] = []
+	for tag: StringName in [&"GEN", known, stranger]:
+		var by := _work(Works.BUILD, ImproveRules.VINEYARD, 1, SAVONA, 4, tag)
+		entries.append_array([_emit("work_started", by), _emit("work_finished", by),
+			_emit("work_cancelled", by, {"why": &"order", "reason": "", "refund": 0}),
+			_emit("work_cancelled", by, {"why": &"lost", "reason": "", "refund": 0}),
+			_emit("work_cancelled", by, {"why": &"order", "reason": "", "refund": 12})])
+		_g.emit({"kind": "goods_short", "tag": tag, "good": "Salt", "need": 1, "taken": 0, "witnesses": [tag]})
+		_g.emit({"kind": "tax_set", "tag": tag, "level": 2})
+		_g.emit({"kind": "tax_set", "tag": tag, "level": 9})
+		_g.emit({"kind": "country_chosen", "tag": tag})
+		_g.emit({"kind": "owners_changed", "hexes": [Vector2i(11, 8)], "tag": tag, "others": [&"GEN"]})
+		_g.emit({"kind": "owners_changed", "hexes": [Vector2i(11, 8)], "tag": &"GEN", "others": [tag]})
+		_g.emit({"kind": "owners_changed", "hexes": [], "tag": tag, "others": [&"GEN"]})
+	entries.append(_emit("work_started", paid))
+	_g.emit({"kind": "owners_changed", "hexes": [Vector2i(11, 8)], "tag": &"", "others": []})
+	_g.emit({"kind": "work_started", "tag": &"GEN", "hex": SAVONA, "work": {"schema": "bad"}})
+	_g.emit({"kind": "country_chosen", "tag": &""})
+	_g.emit({"kind": "nonsense", "tag": &"GEN"})
+	var count := 0
+	var empty := 0
+	for entry: Dictionary in _g.chronicle.entries:
+		for viewer: StringName in [&"GEN", known, stranger, &""]:
+			var line := LogLines.line_of(_g, entry, viewer)
+			var filters := LogLines.filters_of(_g, entry, viewer)
+			if line.is_empty():
+				assert_eq(filters, [] as Array[StringName], "no line, no filters: %s for %s" % [entry["kind"], viewer])
+				empty += 1
+			else:
+				assert_eq(filters, line["filters"], "%s for %s" % [entry["kind"], viewer])
+				assert_false(filters.is_empty())
+			count += 1
+	assert_gt(count, 100)
+	assert_gt(empty, 10, "the cases with no line were reached")
+
+
+func test_filters_of_gives_nothing_for_an_unwitnessed_entry() -> void:
+	var entry := _emit("work_started", _work(Works.BUILD, ImproveRules.VINEYARD, 1, SAVONA, 4, _stranger()))
+	assert_eq(LogLines.filters_of(_g, entry, &"GEN"), [] as Array[StringName])
+	assert_ne(LogLines.filters_of(_g, entry, &""), [] as Array[StringName], "the sandbox is told everything")
+	var short := {"kind": "goods_short", "tag": _known(), "good": "Salt", "need": 1, "taken": 0, "witnesses": [&"GEN"]}
+	_g.emit(short)
+	assert_eq(LogLines.filters_of(_g, _g.chronicle.entries[_g.chronicle.entries.size() - 1], &"GEN"), [] as Array[StringName],
+		"another country's shortage is nobody else's line")
+
+
+func test_seen_equals_knowledge_witnessed() -> void:
+	var known := _known()
+	var stranger := _stranger()
+	var parties: Array[StringName] = [&"GEN", known, stranger, &""]
+	var entries: Array[Dictionary] = []
+	for tag: StringName in parties:
+		entries.append({"kind": "tax_set", "tag": tag, "level": 1})
+		entries.append({"kind": "tax_set", "tag": tag, "level": 1, "others": [&"GEN"]})
+		entries.append({"kind": "tax_set", "tag": tag, "level": 1, "others": PackedStringArray([String(known)])})
+		entries.append({"kind": "tax_set", "tag": tag, "level": 1, "witnesses": [&"GEN"]})
+		entries.append({"kind": "tax_set", "tag": tag, "level": 1, "witnesses": PackedStringArray([String(stranger)])})
+		entries.append({"kind": "tax_set", "tag": tag, "level": 1, "others": "GEN", "witnesses": 3})
+	var checked := 0
+	for viewer: StringName in parties:
+		var memo := {}
+		for e: Dictionary in entries:
+			assert_eq(LogLines._seen(_g, e, viewer, memo), Knowledge.witnessed(_g, e, viewer), "%s sees %s" % [viewer, e])
+			checked += 1
+	assert_gt(checked, 80)
+
+
+func test_the_work_checks_agree_with_work_from_dict() -> void:
+	var good := _work(Works.BUILD, ImproveRules.VINEYARD, 1, SAVONA, 4).to_dict()
+	var variants: Array[Dictionary] = [good]
+	for key: String in good.keys():
+		var gone := good.duplicate(true)
+		gone.erase(key)
+		variants.append(gone)
+		var wrong := good.duplicate(true)
+		wrong[key] = "x"
+		variants.append(wrong)
+		var floaty := good.duplicate(true)
+		floaty[key] = 2.5
+		variants.append(floaty)
+	var old := good.duplicate(true)
+	old["schema"] = Work.SCHEMA_V1
+	old.erase("paid_goods")
+	variants.append(old)
+	var odd := good.duplicate(true)
+	odd["schema"] = "other"
+	variants.append(odd)
+	var act := good.duplicate(true)
+	act["action"] = "teleport"
+	variants.append(act)
+	var vec := good.duplicate(true)
+	vec["hex"] = SAVONA
+	variants.append(vec)
+	var long := good.duplicate(true)
+	long["hex"] = [1, 2, 3]
+	variants.append(long)
+	var neg := good.duplicate(true)
+	neg["paid_goods"] = {"Salt": -1}
+	variants.append(neg)
+	for v: Dictionary in variants:
+		var entry := {"kind": "work_started", "tag": &"GEN", "work": v}
+		assert_eq(LogLines._describable(entry, &"GEN"), Work.from_dict(v) != null, str(v))
+		assert_eq(LogLines.line_of(_g, entry, &"GEN").is_empty(), Work.from_dict(v) == null, str(v))
