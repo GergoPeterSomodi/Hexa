@@ -8,6 +8,7 @@ signal zoom_step_requested(notches: float)
 signal zoom_set_requested(zoom: float)
 signal fit_requested
 signal layer_toggled(layer_name: StringName, on: bool)
+## F3's Look: 0 to 3 a season, -1 the calendar's (the console's `look` and the Look control).
 signal season_preview_requested(index: int)
 signal help_requested
 signal menu_requested
@@ -27,6 +28,11 @@ signal look_at_requested(map_px: Vector2)
 signal jump_requested(map_px: Vector2)
 ## What the HUD covers on screen changed (the dock, the left inset, a resize, the HUD shown or hidden): cover_rects().
 signal cover_changed
+## End season was pressed (the date and End season in the top bar) and the date's medallion: the last report.
+signal end_season_requested
+signal report_requested
+## A row of the action log, a notification's Go or a task flag row asked to look at a hex and select it.
+signal hex_look_requested(hex: Vector2i)
 
 ## The key hints' left offset in hud.tscn.
 const KEY_HINTS_LEFT := 12.0
@@ -40,6 +46,9 @@ const KEY_HINTS_LEFT := 12.0
 @onready var _scale_bar: ScaleBar = $Root/Column/Main/MapArea/BottomRight/ScaleBar
 @onready var _minimap: Minimap = $Root/Column/Main/MapArea/BottomRight/RightColumn/Minimap
 @onready var _zoom_control: ZoomControl = $Root/Column/Main/MapArea/BottomRight/RightColumn/ZoomControl
+@onready var _action_log: ActionLog = $Root/Column/Main/MapArea/ActionLog
+@onready var _task_flag: TaskFlag = $Root/Column/Main/MapArea/TopRight/TaskFlag
+@onready var _notifications: Notifications = $Root/Column/Main/MapArea/TopRight/Notifications
 @onready var _toasts: ToastHost = $Root/Column/Main/MapArea/Toasts
 @onready var _map_hover: MapHover = $Root/Column/Main/MapArea/MapHover
 @onready var _bottom_right: Control = $Root/Column/Main/MapArea/BottomRight
@@ -63,12 +72,19 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_queue_cover)
 	_layers_popover.anchor_button = _top_bar.layers_button()
 
-	_top_bar.season_preview_requested.connect(_on_season_preview_selected)
 	_top_bar.layers_toggled.connect(_on_top_bar_layers_toggled)
 	_top_bar.help_requested.connect(func() -> void: help_requested.emit())
 	_top_bar.menu_requested.connect(func() -> void: menu_requested.emit())
 	_top_bar.mode_requested.connect(func(mode: int) -> void: mode_requested.emit(mode))
 	_top_bar.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
+	_top_bar.date_end().end_season_requested.connect(func() -> void: end_season_requested.emit())
+	_top_bar.date_end().report_requested.connect(func() -> void: report_requested.emit())
+	_action_log.report_requested.connect(func() -> void: report_requested.emit())
+	_action_log.line_activated.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
+	_task_flag.go_requested.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
+	_notifications.go_requested.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
+	Events.game_started.connect(_on_game_started)
+	Events.season_ended.connect(_on_season_ended)
 
 	_minimap.look_at_requested.connect(func(map_px: Vector2) -> void: look_at_requested.emit(map_px))
 	_minimap.jump_requested.connect(func(map_px: Vector2) -> void: jump_requested.emit(map_px))
@@ -80,7 +96,6 @@ func _ready() -> void:
 	_hex_panel.visibility_changed.connect(_on_hex_panel_visibility_changed)
 
 	_layers_popover.layer_toggled.connect(func(lname: StringName, on: bool) -> void: layer_toggled.emit(lname, on))
-	_layers_popover.season_preview_requested.connect(_on_season_preview_selected)
 	_layers_popover.closed.connect(_on_layers_popover_closed)
 
 	_zoom_control.zoom_step_requested.connect(func(notches: float) -> void: zoom_step_requested.emit(notches))
@@ -102,6 +117,9 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	for pair: Array in [[Events.game_started, _on_game_started], [Events.season_ended, _on_season_ended]]:
+		if (pair[0] as Signal).is_connected(pair[1] as Callable):
+			(pair[0] as Signal).disconnect(pair[1] as Callable)
 	_disconnect_ctx()
 	_disconnect_settings()
 	_unbind_rig()
@@ -113,6 +131,7 @@ func setup(context: ShellContext) -> void:
 	_ctx = context
 	if _ctx != null:
 		_ctx.toast_requested.connect(_on_ctx_toast_requested)
+		_debug_overlay.setup_console(_ctx)
 		if _ctx.settings != null:
 			configure(_ctx.settings)
 
@@ -130,6 +149,8 @@ func configure(settings: Settings) -> void:
 		_map_hover.configure(_settings)
 		_key_hints.configure(_settings)
 		_minimap.configure(_settings)
+		_action_log.bind_settings(_settings)
+		_task_flag.settings = _settings
 	if _settings == null:
 		return
 	_settings.changed.connect(_on_setting_changed)
@@ -153,7 +174,6 @@ func bind_map_scene(scene: Node) -> void:
 		_minimap.unbind()
 		_top_bar.refresh_game()
 		return
-	set_season(map_scene.season)
 	if Session.game != null:
 		var map_label := "North Italy" if map_scene.map_id == MapScene.MAP_ID else map_scene.map_id.capitalize()
 		set_map_info(map_label, Session.game.seed_value)
@@ -263,6 +283,35 @@ func has_open_popover() -> bool:
 	return _layers_popover.visible
 
 
+## An action log or task flag list is open (the Esc ladder's CLOSE_HUD_LIST step).
+func has_open_list() -> bool:
+	return _action_log.is_open() or _task_flag.is_list_open()
+
+
+## Esc on an open list: closes the action log or the task flag list. True when one was open.
+func close_lists() -> bool:
+	var closed := _action_log.escape()
+	if _task_flag.is_list_open():
+		_task_flag.close_list()
+		closed = true
+	return closed
+
+
+## A screen is up: `hides_world` hides the notifications (and the HUD with them), any screen hides the task flag.
+func set_covered(hides_world: bool, any_screen: bool) -> void:
+	_notifications.set_covered(hides_world)
+	_task_flag.set_covered(any_screen)
+
+
+## Esc while the console's field has the cursor: lets go of the field. True when it had it.
+func release_console_focus() -> bool:
+	var console := _debug_overlay.console()
+	if console != null and console.has_line_focus():
+		console.release_focus_line()
+		return true
+	return false
+
+
 func close_popovers() -> bool:
 	if _layers_popover.visible:
 		_layers_popover.close()
@@ -282,16 +331,9 @@ func set_zoom(zoom: float, min_zoom: float = 0.0, max_zoom: float = ZoomModel.ZO
 	_scale_bar.set_zoom(zoom, hex_w_km)
 
 
-func set_season_index(index: int) -> void:
-	_top_bar.set_season(index)
-	_layers_popover.set_season(index)
+## Shows `index` on F3's Look control (-1 the calendar's season, 0 to 3 a season) without a signal.
+func set_look(index: int) -> void:
 	_debug_overlay.set_season(index)
-
-
-func set_season(season_name: String) -> void:
-	var idx := TopBar.SEASONS.find(season_name.to_lower())
-	if idx >= 0:
-		set_season_index(idx)
 
 
 func set_map_info(map_title: String, seed_value: int, mode_label: String = "Sandbox") -> void:
@@ -316,6 +358,22 @@ func refresh_bindings(platform: String = OS.get_name()) -> void:
 
 func top_bar() -> TopBar:
 	return _top_bar
+
+
+func date_end() -> DateEnd:
+	return _top_bar.date_end()
+
+
+func action_log() -> ActionLog:
+	return _action_log
+
+
+func task_flag() -> TaskFlag:
+	return _task_flag
+
+
+func notifications() -> Notifications:
+	return _notifications
 
 
 func layers_popover() -> LayersPopover:
@@ -377,8 +435,16 @@ func _on_hex_panel_visibility_changed() -> void:
 
 
 func _on_season_preview_selected(index: int) -> void:
-	set_season_index(index)
 	season_preview_requested.emit(index)
+
+
+## A new game or a season that ended: F3's Look is back on the calendar (the preview ends with the season).
+func _on_game_started() -> void:
+	set_look(-1)
+
+
+func _on_season_ended(_turn: int) -> void:
+	set_look(-1)
 
 
 func _on_top_bar_layers_toggled(open: bool) -> void:
@@ -443,6 +509,7 @@ func _emit_cover() -> void:
 
 func _apply_settings(settings: Settings) -> void:
 	_reduce_motion = bool(settings.get_value("accessibility/reduce_motion"))
+	_top_bar.date_end().date_button().reduce_motion = _reduce_motion
 	if not bool(settings.get_value("dev/developer_tools")):
 		_debug_overlay.set_open(false)
 

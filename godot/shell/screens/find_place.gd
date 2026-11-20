@@ -26,6 +26,9 @@ func _ready() -> void:
 
 func on_enter() -> void:
 	_ensure_ui()
+	_apply_top_inset()
+	if ctx != null and not ctx.top_inset_changed.is_connected(_apply_top_inset):
+		ctx.top_inset_changed.connect(_apply_top_inset)
 	_query.text = ""
 	_refresh()
 	default_focus = get_path_to(_query)
@@ -104,12 +107,22 @@ func choose(index: int) -> bool:
 	return true
 
 
+## The card starts under the top bar's real bottom edge.
+func _apply_top_inset() -> void:
+	if _card != null:
+		_card.offset_top = ctx.top_inset() if ctx != null else float(Tokens.BAR_H + Tokens.S2)
+
+
+func on_exit() -> void:
+	if ctx != null and ctx.top_inset_changed.is_connected(_apply_top_inset):
+		ctx.top_inset_changed.disconnect(_apply_top_inset)
+
+
 func _ensure_ui() -> void:
 	if _ui_built or _card == null:
 		return
 	_ui_built = true
 	_card.custom_minimum_size.x = float(CARD_W)
-	_card.offset_top = float(Tokens.BAR_H + Tokens.S2)
 	_query.text_changed.connect(_on_text_changed)
 	_query.text_submitted.connect(_on_text_submitted)
 	_query.gui_input.connect(_on_query_gui_input)

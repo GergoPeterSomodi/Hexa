@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/top_bar.gd" id="1_bar"]
 [ext_resource type="Script" path="res://shell/ui/segmented.gd" id="2_seg"]
 [ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
 [ext_resource type="Script" path="res://shell/ui/country_arms.gd" id="4_arms"]
+[ext_resource type="PackedScene" path="res://shell/hud/date_end.tscn" id="5_dateend"]
 
 [node name="TopBar" type="PanelContainer"]
 custom_minimum_size = Vector2(0, 40)
@@ -57,22 +58,20 @@ size_flags_vertical = 4
 script = ExtResource("2_seg")
 hud_mode = true
 
+[node name="DateEnd" parent="HBox" instance=ExtResource("5_dateend")]
+layout_mode = 2
+size_flags_vertical = 4
+
 [node name="Spacer" type="Control" parent="HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="SeasonSeg" type="PanelContainer" parent="HBox"]
-layout_mode = 2
-size_flags_vertical = 4
-script = ExtResource("2_seg")
-hud_mode = true
-
 [node name="LayersButton" type="Button" parent="HBox"]
 layout_mode = 2
 size_flags_vertical = 4
 focus_mode = 0
-tooltip_text = "Map layers and season preview"
+tooltip_text = "Map layers"
 accessibility_name = "Layers"
 text = "Layers"
 script = ExtResource("3_btn")

@@ -1,9 +1,8 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/layers_popover.gd" id="1_pop"]
 [ext_resource type="Script" path="res://shell/ui/key_cap.gd" id="2_cap"]
 [ext_resource type="Script" path="res://shell/ui/kit_switch.gd" id="3_sw"]
-[ext_resource type="Script" path="res://shell/ui/segmented.gd" id="4_seg"]
 
 [node name="LayersPopover" type="PanelContainer"]
 visible = false
@@ -132,17 +131,3 @@ layout_mode = 2
 focus_mode = 0
 accessibility_name = "Minimap"
 script = ExtResource("3_sw")
-
-[node name="Rule2" type="HSeparator" parent="VBox"]
-layout_mode = 2
-mouse_filter = 2
-
-[node name="SeasonHead" type="Label" parent="VBox"]
-layout_mode = 2
-theme_type_variation = &"SectionHead"
-text = "Season preview"
-
-[node name="SeasonSeg" type="PanelContainer" parent="VBox"]
-layout_mode = 2
-script = ExtResource("4_seg")
-hud_mode = true

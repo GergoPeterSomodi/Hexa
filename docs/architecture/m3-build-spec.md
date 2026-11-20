@@ -1165,7 +1165,7 @@ stays under the 800-line limit; the App connects the signals below to it.
 | `MapInput.bookmark_requested(i, set)` | 6.12 and its toasts |
 | `AppInput.quicksave_requested`, `quickload_requested`, `console_requested` | 6.10; focus the console |
 | `app_requested(&"save", {slot, name})` | `Thumbnail.take` then `Session.save_game`; toast; `ctx.saved.emit` |
-| `app_requested(&"load", {slot})`, `(&"continue")` | pops the screens, pushes Loading, `Session.load_game`; a problem pops Loading, toasts it and shows the main menu; then the camera and bookmarks from `loaded_ui()` |
+| `app_requested(&"load", {slot})`, `(&"continue")` | pops the screens, pushes Loading, `Session.load_game`; a problem pops Loading and toasts it; from the main menu it stays on the main menu, from a running game the running game is kept (the load is made in Session first and the world is torn down only after it succeeds); then the camera and bookmarks from `loaded_ui()` |
 | `app_requested(&"report_closed")`, `(&"end_seasons", {count})`, `(&"dev_look", {season})` | the flow; `MapScene.preview_season` |
 | `Events.work_started` (the player's) | the toast with the undo key |
 | `flow.state_changed` | `DateEnd.set_busy`, the pause menu's Save verdict |

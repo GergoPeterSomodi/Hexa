@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://shell/map/map_scene.gd" id="1_scene"]
 [ext_resource type="Script" path="res://shell/mapview/tile_map_view.gd" id="2_view"]
@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://shell/mapview/country_labels.gd" id="9_country_labels"]
 [ext_resource type="Script" path="res://shell/map/season_fade.gd" id="10_fade"]
 [ext_resource type="Script" path="res://shell/map/work_marks.gd" id="11_marks"]
+[ext_resource type="Script" path="res://shell/map/floaters.gd" id="12_floaters"]
 
 [node name="MapScene" type="Node2D"]
 script = ExtResource("1_scene")
@@ -62,3 +63,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("6_labels")
+
+[node name="Floaters" type="Node2D" parent="Names"]
+z_index = 96
+script = ExtResource("12_floaters")

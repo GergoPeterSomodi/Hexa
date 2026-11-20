@@ -18,6 +18,8 @@ const SAVE_DEBOUNCE_SEC := 1.0
 @export var pause_tree_when_modal: bool = true
 @export var allow_tree_quit: bool = true
 @export var skip_loading_frames: bool = false
+## The running lock is used when this is on and the run is real (a settings file) or RunLock points at another path.
+@export var use_run_lock: bool = true
 
 @onready var _app_input: AppInput = $AppInput
 @onready var _world: Node2D = $World
@@ -37,6 +39,7 @@ var _window_focused: bool = true
 var _did_pause_tree: bool = false
 var _starting_game: bool = false
 var _routes: AppRoutes = null
+var _requests: GameRequests = null
 var _booted: bool = false
 var _lifecycle_gen: int = 0
 var _quit_count: int = 0
@@ -91,15 +94,19 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	_booted = true
 	if p_settings != null:
 		_settings_override = p_settings
-	Bindings.ensure()
+	Bindings.ensure(Bindings.SHELL_MILESTONE)
 	_init_settings()
 	_apply_key_overrides()
 
 	_ctx = ShellContext.new(_settings, _stack)
+	_ctx.top_bar_bottom_func = func() -> float: return Hud.screen_rect(_hud.top_bar()).end.y if _hud.is_hud_visible() else 0.0
 	_stack.setup(_ctx)
 	_hud.setup(_ctx)
 	_app_input.configure(_settings)
 	_routes = AppRoutes.new(self)
+	_requests = GameRequests.new(self)
+	_requests.lock_enabled = use_run_lock and (not settings_path.is_empty() or RunLock.path != RunLock.PATH)
+	_requests.setup()
 	_connect_signals()
 
 	var cli := _parse_cli_args(p_cli_args)
@@ -117,7 +124,13 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	elif bool(cli["sandbox"]):
 		_start_sandbox(MapScene.MAP_ID, int(cli["seed"]))
 	else:
+		var recover := _requests.recovery_candidate()
 		_open_main_menu()
+		_requests.offer_recovery(recover)
+
+
+func requests() -> GameRequests:
+	return _requests
 
 
 func is_starting() -> bool:
@@ -265,6 +278,7 @@ func _connect_signals() -> void:
 	_link(_hud, &"country_look_at_requested", _routes.on_hud_country_look_at)
 	_link(_hud, &"look_at_requested", _routes.on_hud_look_at)
 	_link(_hud, &"jump_requested", _routes.on_hud_jump)
+	_requests.connect_signals(_link)
 	if _hud.country_panel() != null:
 		_link(_hud.country_panel(), &"closed", _routes.on_country_panel_closed)
 
@@ -288,6 +302,7 @@ func _disconnect_all() -> void:
 
 func _open_main_menu() -> void:
 	_stack.clear()
+	_requests.clear_lock()
 	_teardown_world()
 	if _hud != null:
 		_hud.close_popovers()
@@ -308,42 +323,52 @@ func _start_sandbox(map_id_val: String, seed_val: int) -> void:
 ## Starts a game: the map sandbox when `scenario_id` is empty, otherwise that scenario (with the country `player` when
 ## given, so no pick). A scenario the rules refuse toasts its first problem and goes back to the main menu.
 func _start_session(map_id_val: String, seed_val: int, scenario_id: String = "", player: StringName = &"") -> void:
+	var make := func() -> String:
+		if scenario_id.is_empty():
+			Session.new_game(map_id_val, seed_val)
+			return ""
+		return Session.new_scenario(scenario_id, seed_val, player)
+	var title := "Building the map" if scenario_id.is_empty() else "Drawing the map"
+	var what := _map_title(map_id_val) if scenario_id.is_empty() else _routes.scenario_title(scenario_id)
+	await launch(title, "Preparing %s (seed %d)..." % [what, seed_val], make, false)
+
+
+## Puts a game on the screen: Loading shows with `title`, `make` (() -> problem String) starts the game in Session, the map
+## is mounted and filled, the screens go. A problem toasts and shows the main menu. `loaded` is a game read from a save: the
+## camera and a toast come from the save, no pick, no help.
+func launch(title: String, message: String, make: Callable, loaded: bool) -> void:
 	if _starting_game:
 		return
 	_starting_game = true
 	var gen := _lifecycle_gen
-
 	var loading := ScreenIds.make(&"loading") as Loading
 	if loading != null:
-		if scenario_id.is_empty():
-			loading.set_status("Building the map", "Preparing %s (seed %d)..." % [_map_title(map_id_val), seed_val])
-		else:
-			loading.set_status("Drawing the map", "Preparing %s (seed %d)..." % [_routes.scenario_title(scenario_id), seed_val])
+		loading.set_status(title, message)
 		loading.set_progress(0.1)
 		_stack.push(loading)
-
-	if not skip_loading_frames and is_inside_tree() and get_tree() != null:
-		await get_tree().process_frame
-		if not is_inside_tree() or _lifecycle_gen != gen:
-			_starting_game = false
+	for _i: int in 2:
+		if not skip_loading_frames and is_inside_tree() and get_tree() != null:
+			await get_tree().process_frame
+			if not is_inside_tree() or _lifecycle_gen != gen:
+				_starting_game = false
+				return
+	var keep := loaded and _map_scene != null  # a running game stays until the load has worked
+	if not keep:
+		_teardown_world()
+	var problem := str(make.call())
+	if problem != "":
+		_starting_game = false
+		_ctx.toast(problem, &"bad")
+		if keep:
+			if loading != null and is_instance_valid(loading):
+				_stack.remove(loading)
+				loading.queue_free()
 			return
-		await get_tree().process_frame
-		if not is_inside_tree() or _lifecycle_gen != gen:
-			_starting_game = false
-			return
-
-	_teardown_world()
-	if scenario_id.is_empty():
-		Session.new_game(map_id_val, seed_val)
-	else:
-		var problem := Session.new_scenario(scenario_id, seed_val, player)
-		if problem != "":
-			_starting_game = false
-			_open_main_menu()
-			_ctx.toast(problem, &"bad")
-			return
-		map_id_val = Session.defs().scenario(scenario_id).map_id
-	_mount_map_scene(map_id_val, seed_val)
+		_open_main_menu()
+		return
+	if keep:
+		_teardown_world()
+	_mount_map_scene(Session.game.map.id, Session.game.seed_value)
 
 	if loading != null and is_instance_valid(loading) and _map_scene != null and _map_scene.is_loading():
 		loading.set_progress_source(_map_scene.fill_progress)
@@ -368,7 +393,9 @@ func _start_session(map_id_val: String, seed_val: int, scenario_id: String = "",
 	if _map_scene != null:
 		_map_scene.fit()
 	_on_stack_changed()
-	if _map_scene != null and _map_scene.picking():
+	if loaded:
+		_requests.after_load()
+	elif _map_scene != null and _map_scene.picking():
 		_routes.begin_pick()
 	else:
 		if _map_scene != null and Session.player_tag() != &"":
@@ -396,16 +423,14 @@ func _mount_map_scene(map_id_val: String, seed_val: int) -> void:
 	scene.configure(_settings)
 	scene.set_panel(_hud.hex_panel())
 	_hud.bind_map_scene(scene)
-	_connect_map_scene(scene)
-
-
-func _connect_map_scene(scene: MapScene) -> void:
 	_routes.bind_scene(scene)
+	_requests.bind_scene(scene)
 
 
 func _disconnect_map_scene() -> void:
 	if _routes != null:
 		_routes.unbind_scene(_map_scene)
+		_requests.unbind_scene(_map_scene)
 
 
 func _teardown_world() -> void:
@@ -469,19 +494,9 @@ func _on_app_requested(what: StringName, args: Dictionary) -> void:
 		&"reload_theme":
 			_apply_theme()
 		&"look_at":
-			_handle_look_at(args)
-
-
-func _handle_look_at(args: Dictionary) -> void:
-	if _map_scene == null or _map_scene.camera_rig() == null:
-		return
-	if args.has("map_px") and args["map_px"] is Vector2:
-		_map_scene.camera_rig().look_at(args["map_px"] as Vector2)
-	elif args.has("hex") and args["hex"] is Vector2i and _map_scene.view() != null:
-		var hex := args["hex"] as Vector2i
-		_map_scene.glide_to_hex(hex, _routes.glide_zoom())
-		if bool(args.get("select", false)):
-			_map_scene.select_hex(hex)
+			_routes.look_at(args)
+		_:
+			_requests.handle(what, args)
 
 
 func _handle_display_applied() -> void:
@@ -498,6 +513,7 @@ func _on_setting_changed(key: String, _value: Variant) -> void:
 		return
 	if not settings_path.is_empty():
 		_save_countdown = SAVE_DEBOUNCE_SEC
+	_requests.on_setting(key)
 	if key in ["display/ui_scale", "accessibility/high_contrast", "dev/ui_kit"]:
 		_handle_display_applied()
 	elif key in ["display/fps_cap", "display/power_saving", "accessibility/tooltip_delay", "display/vsync"]:
@@ -527,9 +543,13 @@ func _on_stack_changed() -> void:
 			_hud.close_popovers()
 	if _map_scene != null and is_instance_valid(_map_scene):
 		_map_scene.set_input_enabled(not paused)
+	if _requests != null:
+		_requests.on_stack_changed()
 
 
 func _on_back_requested() -> void:
+	if _hud != null and _hud.release_console_focus():
+		return
 	if _hud != null and _hud.has_open_popover():
 		_hud.close_popovers()
 		return
@@ -538,7 +558,7 @@ func _on_back_requested() -> void:
 	var state := {
 		"top_screen_id": top_id,
 		"has_screen": top != null,
-		"hud_list_open": false,
+		"hud_list_open": _hud != null and _hud.has_open_list(),
 		"has_selection": _map_scene != null and _map_scene.selected != MapScene.NO_HEX,
 		"dock_open": _hud != null and _hud.is_dock_open(),
 	}
@@ -549,7 +569,7 @@ func _on_back_requested() -> void:
 			_stack.back()
 		EscLadder.CLOSE_HUD_LIST:
 			if _hud != null:
-				_hud.close_popovers()
+				_hud.close_lists()
 		EscLadder.CLEAR_SELECTION:
 			if _hud != null and _hud.country_panel() != null and _hud.country_panel().visible:
 				_hud.close_dock()
@@ -604,33 +624,14 @@ func _on_fullscreen_toggled() -> void:
 
 
 func _on_screenshot_requested() -> void:
-	var vp := get_viewport()
-	if vp == null or DisplayServer.get_name() == "headless":
-		return
-	var tex := vp.get_texture()
-	if tex == null:
-		return
-	var img := tex.get_image()
-	if img == null or img.is_empty():
-		return
-	var global_dir := ProjectSettings.globalize_path(screenshot_dir)
-	if DirAccess.make_dir_recursive_absolute(global_dir) != OK:
-		_ctx.toast("Could not create screenshot folder", &"bad")
-		return
-	var stamp := Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
-	var filename := "hexa_%s.png" % stamp
-	var full_path := screenshot_dir.path_join(filename)
-	if img.save_png(full_path) == OK:
-		_last_screenshot = full_path
-		_ctx.toast("Saved screenshot: %s" % filename, &"good")
-	else:
-		_ctx.toast("Could not save screenshot", &"bad")
+	var path := _routes.take_screenshot(screenshot_dir)
+	if not path.is_empty():
+		_last_screenshot = path
 
 
 func _on_events_game_started() -> void:
 	if _hud != null and _map_scene != null and Session.game != null and not Session.game.has_countries():
 		_hud.set_map_info(_map_title(_map_scene.map_id), Session.game.seed_value)
-		_hud.set_season(_map_scene.season)
 
 
 func _open_pause_menu() -> void:
@@ -737,7 +738,9 @@ func _sync_camera_free_rect() -> void:
 	var vp_size := vp.get_visible_rect().size
 	if vp_size.x <= 0.0 or vp_size.y <= 0.0:
 		return
-	var top_h := float(Tokens.BAR_H) if (_hud != null and _hud.is_hud_visible()) else 0.0
+	var top_h := 0.0
+	if _hud != null and _hud.is_hud_visible():
+		top_h = maxf(float(Tokens.BAR_H), Hud.screen_rect(_hud.top_bar()).size.y)
 	rig.set_free_rect(Rect2(0.0, top_h, vp_size.x, maxf(1.0, vp_size.y - top_h)))
 
 
@@ -745,6 +748,8 @@ func _sync_camera_free_rect() -> void:
 func _sync_screen_cover() -> void:
 	if _map_scene != null and is_instance_valid(_map_scene) and _hud != null:
 		_map_scene.set_screen_cover(_hud.cover_rects())
+		_sync_camera_free_rect()
+		_requests.on_cover_changed()
 
 
 func _on_focus_out() -> void:
@@ -774,6 +779,7 @@ func _save_settings() -> void:
 func _perform_quit() -> void:
 	_save_countdown = -1.0
 	_save_settings()
+	_requests.clear_lock()
 	_quit_count += 1
 	quit_performed.emit()
 	if allow_tree_quit and _is_root_window() and is_inside_tree() and get_tree() != null:

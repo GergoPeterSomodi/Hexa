@@ -35,6 +35,9 @@ func _exit_tree() -> void:
 
 func on_enter() -> void:
 	_ensure_ui()
+	_apply_top_inset()
+	if ctx != null and not ctx.top_inset_changed.is_connected(_apply_top_inset):
+		ctx.top_inset_changed.connect(_apply_top_inset)
 	_send_cover.call_deferred()  # the list and the banner settle a frame late
 	_shown_tag = &""
 	_dock_open = false
@@ -45,6 +48,8 @@ func on_enter() -> void:
 
 func on_exit() -> void:
 	_disconnect_chosen()
+	if ctx != null and ctx.top_inset_changed.is_connected(_apply_top_inset):
+		ctx.top_inset_changed.disconnect(_apply_top_inset)
 	if ctx != null:
 		ctx.request(&"screen_cover", {"rects": []})
 
@@ -168,17 +173,24 @@ func _send_cover() -> void:
 		ctx.request(&"screen_cover", {"rects": [Hud.screen_rect(_left), Hud.screen_rect(_top)]})
 
 
+## The banner and the list start under the top bar's real bottom edge.
+func _apply_top_inset() -> void:
+	if _top == null or _left == null:
+		return
+	var inset := ctx.top_inset() if ctx != null else float(Tokens.BAR_H + Tokens.S2)
+	_top.offset_top = inset
+	_left.offset_top = inset
+
+
 func _ensure_ui() -> void:
 	if _ui_built or _left == null:
 		return
 	_ui_built = true
 	_ribbon.text = TITLE
 	_ribbon.custom_minimum_size.x = _ribbon.single_line_width()  # one line: the default width wraps the title
-	_top.offset_top = float(Tokens.BAR_H + Tokens.S2)
 	_left.custom_minimum_size.x = float(Tokens.PANEL_W)
 	_left.offset_left = float(Tokens.S4)
 	_left.offset_right = float(Tokens.S4 + Tokens.PANEL_W)
-	_left.offset_top = float(Tokens.BAR_H + Tokens.S2)
 	_left.offset_bottom = -float(Tokens.S4)
 	_left.resized.connect(_send_cover)
 	_top.resized.connect(_send_cover)

@@ -182,7 +182,6 @@ func unbind_scene(scene: MapScene) -> void:
 func _scene_links(scene: MapScene) -> Array[Array]:
 	return [
 		[scene.refused, on_map_refused],
-		[scene.season_changed, on_map_season_changed],
 		[scene.hud_toggle_requested, on_map_hud_toggle],
 		[scene.country_clicked, on_map_country_clicked],
 		[scene.country_hovered, on_map_country_hovered],
@@ -194,11 +193,6 @@ func _scene_links(scene: MapScene) -> Array[Array]:
 func on_map_refused(reason: String) -> void:
 	if _app.context() != null and not reason.is_empty():
 		_app.context().toast(reason, &"warn")
-
-
-func on_map_season_changed(season_name: String) -> void:
-	if _app.hud() != null:
-		_app.hud().set_season(season_name)
 
 
 func on_map_hud_toggle() -> void:
@@ -221,9 +215,10 @@ func on_hud_fit() -> void:
 		_app.map_scene().fit()
 
 
+## F3's Look: 0 to 3 a season, -1 the calendar's (MapScene.preview_season; the index is passed on as it is).
 func on_hud_season_preview(index: int) -> void:
 	if _app.map_scene() != null:
-		_app.map_scene().set_season(TilesetBuilder.SEASONS[clampi(index, 0, TilesetBuilder.SEASONS.size() - 1)])
+		_app.map_scene().preview_season(index)
 
 
 func on_hud_new_seed() -> void:
@@ -244,3 +239,41 @@ func on_hud_far_zoom(value: float) -> void:
 func on_hud_slice_ms(ms: int) -> void:
 	if _app.map_scene() != null:
 		_app.map_scene().slice_ms = float(ms)
+
+
+## Saves the viewport as a PNG in `dir` and toasts; returns the file's path, or "" (headless, or it failed).
+func take_screenshot(dir: String) -> String:
+	var vp := _app.get_viewport()
+	if vp == null or DisplayServer.get_name() == "headless":
+		return ""
+	var tex := vp.get_texture()
+	if tex == null:
+		return ""
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		return ""
+	if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir)) != OK:
+		_app.context().toast("Could not create screenshot folder", &"bad")
+		return ""
+	var stamp := Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
+	var filename := "hexa_%s.png" % stamp
+	var full_path := dir.path_join(filename)
+	if img.save_png(full_path) == OK:
+		_app.context().toast("Saved screenshot: %s" % filename, &"good")
+		return full_path
+	_app.context().toast("Could not save screenshot", &"bad")
+	return ""
+
+
+## The `look_at` request: a map pixel, or a hex (glide there; `select` also selects it).
+func look_at(args: Dictionary) -> void:
+	var scene := _app.map_scene()
+	if scene == null or scene.camera_rig() == null:
+		return
+	if args.has("map_px") and args["map_px"] is Vector2:
+		scene.camera_rig().look_at(args["map_px"] as Vector2)
+	elif args.has("hex") and args["hex"] is Vector2i and scene.view() != null:
+		var hex := args["hex"] as Vector2i
+		scene.glide_to_hex(hex, glide_zoom())
+		if bool(args.get("select", false)):
+			scene.select_hex(hex)

@@ -1,10 +1,9 @@
-## Studiolo map layers and season-preview popup card toggled from TopBar
+## Studiolo map layers popup card toggled from TopBar
 ## (docs/architecture/ui-and-controls-spec.md sections 3.3, 7; ui-style-and-feedback-plan.md U14).
 class_name LayersPopover
 extends PanelContainer
 
 signal layer_toggled(layer_name: StringName, on: bool)
-signal season_preview_requested(index: int)
 signal closed
 
 const LAYER_GRID := &"map/grid"
@@ -17,8 +16,6 @@ const LAYER_KEYS: Array[String] = [
 	"map/grid", "map/place_names", "graphics/relief_shading", "map/borders", "map/owner_tint", "map/minimap",
 ]
 
-const SEASON_LABELS: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
-
 var anchor_button: BaseButton = null
 
 @onready var _grid_cap: KeyCap = $VBox/GridRow/KeyCap
@@ -29,11 +26,9 @@ var anchor_button: BaseButton = null
 @onready var _borders_switch: KitSwitch = $VBox/BordersRow/BordersSwitch
 @onready var _tint_switch: KitSwitch = $VBox/TintRow/TintSwitch
 @onready var _minimap_switch: KitSwitch = $VBox/MinimapRow/MinimapSwitch
-@onready var _season_seg: Segmented = $VBox/SeasonSeg
 
 var _settings: Settings = null
 var _syncing: bool = false
-var _season_index: int = 1
 
 
 func _ready() -> void:
@@ -56,14 +51,6 @@ func _ready() -> void:
 	_borders_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_BORDERS, on))
 	_tint_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_TINT, on))
 	_minimap_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_MINIMAP, on))
-
-	_season_seg.hud_mode = true
-	var items: Array[Dictionary] = []
-	for i: int in SEASON_LABELS.size():
-		items.append({"id": i, "label": SEASON_LABELS[i]})
-	_season_seg.set_options(items)
-	_season_seg.select(_season_index, false)
-	_season_seg.changed.connect(_on_season_changed)
 
 	if _settings != null:
 		_sync_from_settings()
@@ -149,12 +136,6 @@ func set_layer_state(layer_name: StringName, on: bool) -> void:
 	_syncing = false
 
 
-func set_season(index: int) -> void:
-	_season_index = clampi(index, 0, SEASON_LABELS.size() - 1)
-	if is_node_ready():
-		_season_seg.select(_season_index, false)
-
-
 func refresh_hotkeys() -> void:
 	if not is_node_ready():
 		return
@@ -186,10 +167,6 @@ func minimap_switch() -> KitSwitch:
 	return _minimap_switch
 
 
-func season_segmented() -> Segmented:
-	return _season_seg
-
-
 func _on_switch_toggled(layer_key: StringName, on: bool) -> void:
 	if _syncing:
 		return
@@ -198,12 +175,6 @@ func _on_switch_toggled(layer_key: StringName, on: bool) -> void:
 		_settings.set_value(String(layer_key), on)
 		_syncing = false
 	layer_toggled.emit(layer_key, on)
-
-
-func _on_season_changed(id: Variant) -> void:
-	var idx := clampi(int(id), 0, SEASON_LABELS.size() - 1)
-	_season_index = idx
-	season_preview_requested.emit(idx)
 
 
 func _sync_from_settings() -> void:

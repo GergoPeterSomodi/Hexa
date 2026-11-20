@@ -316,17 +316,19 @@ func test_app_shortcuts_and_map_hud_wiring() -> void:
 	await _wait_frames(1)
 	assert_true(app.hud().is_hud_visible(), "H restores HUD")
 
-	# 3 and 1 switch map modes (Relief / Terrain); TopBar switcher previews Spring
+	# 3 and 1 switch map modes (Relief / Terrain); F3 Look previews a season
 	_send_key(vp, KEY_3)
 	await _wait_frames(1)
 	assert_eq(app.map_scene().mode(), int(MapModes.Mode.RELIEF))
 	_send_key(vp, KEY_1)
 	await _wait_frames(1)
 	assert_eq(app.map_scene().mode(), int(MapModes.Mode.TERRAIN))
-	app.hud().top_bar().season_segmented().select(0, true)
+	app.hud().debug_overlay().season_segmented().select(2, true)
 	await _wait_frames(1)
-	assert_eq(app.map_scene().season, "spring")
-	assert_eq(app.hud().top_bar().season_segmented().selected_id(), 0)
+	assert_eq(app.map_scene().season, "autumn", "F3's Look previews a season")
+	app.hud().debug_overlay().season_segmented().select(-1, true)
+	await _wait_frames(1)
+	assert_eq(app.map_scene().season, "spring", "Look: Calendar goes back to the calendar's season")
 
 	# U with no hex selected toasts refusal reason
 	_send_key(vp, KEY_U)

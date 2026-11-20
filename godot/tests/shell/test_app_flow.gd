@@ -11,6 +11,8 @@ var _prev_unsaved: int = 0
 var _old_max_fps: int = 0
 var _old_low_proc: bool = false
 var _old_tooltip_delay: float = 0.5
+var _old_save_dir: String = ""
+var _old_lock_path: String = ""
 
 
 func before_each() -> void:
@@ -20,9 +22,25 @@ func before_each() -> void:
 	_old_max_fps = Engine.max_fps
 	_old_low_proc = OS.low_processor_usage_mode
 	_old_tooltip_delay = float(ProjectSettings.get_setting("gui/timers/tooltip_delay_sec", 0.5))
+	# Never the real user://saves or running.lock.
+	_old_save_dir = Session.save_dir
+	_old_lock_path = RunLock.path
+	Session.save_dir = "user://test_flow_saves"
+	RunLock.path = "user://test_flow_running.lock"
+	_clean_disk()
+
+
+func _clean_disk() -> void:
+	for slot: String in SaveFile.SLOTS + SaveFile.AUTO_SLOTS:
+		SaveFile.remove(slot, Session.save_dir)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Session.save_dir))
+	RunLock.clear()
 
 
 func after_each() -> void:
+	_clean_disk()
+	Session.save_dir = _old_save_dir
+	RunLock.path = _old_lock_path
 	Session.game = _prev_game
 	Session.unsaved_actions = _prev_unsaved
 	Bindings.reset_defaults()
@@ -340,3 +358,214 @@ func test_a_scenario_the_rules_refuse_toasts_and_returns_to_the_main_menu() -> v
 	assert_eq((toasts[0] as Array)[1], &"bad")
 	assert_null(app.map_scene())
 	assert_true(app.hides_world())
+
+
+# ----- M3: the whole flow (docs/architecture/m3-build-spec.md section 9) -------------------------------------------------
+
+
+func _send_chord(vp: SubViewport, keycode: Key, ctrl: bool, shift: bool) -> void:
+	for pressed: bool in [true, false]:
+		var ev := InputEventKey.new()
+		ev.keycode = keycode
+		ev.physical_keycode = keycode
+		ev.ctrl_pressed = ctrl
+		ev.shift_pressed = shift
+		ev.pressed = pressed
+		vp.push_input(ev)
+
+
+func _buildable() -> Dictionary:
+	var game := Session.game
+	for i: int in game.map.hex_count():
+		var hex := game.map.hex_of(i)
+		if game.map.land[i] == 0 or not Improve.piece_at(game, hex).is_empty():
+			continue
+		for option: Dictionary in Improve.build_options(game, hex):
+			if bool(option["ok"]) and bool(Session.check("build", {"hex": hex, "family": int(option["family_id"])})["ok"]):
+				return {"hex": hex, "family": int(option["family_id"])}
+	return {}
+
+
+func _report_up(app: App) -> bool:
+	return app.stack().top() is SeasonReport
+
+
+func _guard_over(app: App) -> bool:
+	return Time.get_ticks_msec() > app.requests().flow.guard_until
+
+
+## One season by the keys: Space, the report, Space.
+func _play_season(vp: SubViewport, app: App) -> void:
+	await _wait_until(func() -> bool: return _guard_over(app), 600)
+	_send_key(vp, KEY_SPACE)
+	assert_true(await _wait_until(func() -> bool: return _report_up(app)), "the report opens")
+	_send_key(vp, KEY_SPACE)
+	assert_true(await _wait_until(func() -> bool: return app.stack().count() == 0), "the report closes")
+
+
+## New game, pick Genoa, build, Space (the report), Space (closes), a second Space inside the guard is refused, J (the same
+## report), F5, a season more, F9 (asks), the same digest and the same report, bookmarks, the main menu and Continue.
+func test_m3_flow_pick_build_space_report_j_quicksave_quickload_continue() -> void:
+	var env := await _scenario_app(PackedStringArray(["--new-game", "--seed=1480"]))
+	var vp := env["vp"] as SubViewport
+	var app := env["app"] as App
+	var s := app.settings()
+	s.set_value("game/autosave", "off")
+	s.set_value("graphics/season_change", "instant")
+	s.set_value("game/season_report", "full")
+	assert_true(await _wait_until(func() -> bool: return app.stack().top() is CountryPick), "the pick opens")
+
+	# During the pick End season is refused with its reason, and Space plays nothing.
+	var date_end := app.hud().date_end()
+	assert_true(date_end.end_button().disabled, "End season is off during the pick")
+	assert_ne(date_end.verdict_text(), "")
+	_send_key(vp, KEY_SPACE)
+	await _wait_frames(3)
+	assert_eq(Session.game.turn, 1, "Space during the pick plays nothing")
+	assert_true(app.stack().top() is CountryPick)
+
+	(app.stack().top() as CountryPick).play(&"GEN")
+	await _wait_frames(3)
+	assert_eq(app.stack().count(), 0)
+	assert_eq(date_end.date_button().text, "1480")
+	assert_eq(date_end.date_button().dial, 0, "Spring is lit")
+	assert_false(date_end.end_button().disabled)
+
+	var found := _buildable()
+	assert_true(bool(Session.act("build", {"hex": found["hex"], "family": found["family"]})["ok"]), "a work begins")
+	assert_eq(Session.game.state.works.size(), 1)
+
+	# Space: the season runs and the report opens.
+	_send_key(vp, KEY_SPACE)
+	assert_true(await _wait_until(func() -> bool: return _report_up(app)), "the first Space opens the report")
+	assert_eq(Session.game.turn, 2)
+	assert_eq(app.requests().flow.state(), SeasonFlow.State.REPORT)
+	assert_eq(date_end.date_button().dial, 1, "the medallion follows the calendar: Summer")
+	var report_summary := SeasonSummary.of(Session.game, Session.player_tag(), 1)
+
+	# Space closes it; the map shows the calendar's season; a second Space inside the guard is refused.
+	_send_key(vp, KEY_SPACE)
+	assert_true(await _wait_until(func() -> bool: return app.stack().count() == 0), "the second Space closes the report")
+	assert_eq(app.requests().flow.state(), SeasonFlow.State.IDLE)
+	assert_eq(app.map_scene().season, "summer", "the map changes season with the calendar")
+	_send_key(vp, KEY_SPACE)
+	await _wait_frames(3)
+	assert_eq(Session.game.turn, 2, "a Space inside the 400 ms guard plays nothing")
+	assert_eq(app.stack().count(), 0)
+
+	# J: the same report again.
+	await _wait_until(func() -> bool: return _guard_over(app), 600)
+	_send_key(vp, KEY_J)
+	assert_true(await _wait_until(func() -> bool: return _report_up(app)), "J reopens the last report")
+	assert_eq(Session.game.turn, 2, "J plays nothing")
+	var shown := app.stack().top() as SeasonReport
+	assert_eq(shown.sheet().title, str(report_summary["title"]), "the same letter")
+	_send_key(vp, KEY_ESCAPE)
+	assert_true(await _wait_until(func() -> bool: return app.stack().count() == 0))
+
+	await _verify_save_load_bookmarks_and_continue(vp, app)
+
+
+## F5 with a bookmark, a season more, F9, the same digest and J's report, Ctrl+1, the main menu and Continue.
+func _verify_save_load_bookmarks_and_continue(vp: SubViewport, app: App) -> void:
+	# Ctrl+Shift+1 sets a bookmark; F5 saves with it.
+	_send_chord(vp, KEY_1, true, true)
+	await _wait_frames(2)
+	assert_gt(app.requests().bookmarks.get_at(1).size(), 0, "Ctrl+Shift+1 sets bookmark 1")
+	_send_key(vp, KEY_F5)
+	assert_true(await _wait_until(func() -> bool: return FileAccess.file_exists(Session.save_dir.path_join("quick.sav"))))
+	await _wait_frames(2)
+	assert_eq(Session.unsaved_actions, 0, "a save leaves nothing unsaved")
+	var digest_saved := Session.game.digest()
+	var summary_saved := SeasonSummary.of(Session.game, Session.player_tag(), Session.game.turn - 1)
+
+	# Another season, then F9 asks before losing it.
+	await _play_season(vp, app)
+	assert_eq(Session.game.turn, 3)
+	assert_gt(Session.unsaved_actions, 0)
+	_send_key(vp, KEY_F9)
+	await _wait_frames(2)
+	var ask := app.stack().top() as Confirm
+	assert_not_null(ask, "F9 asks before losing unsaved actions")
+	ask.button_for(&"confirm").pressed.emit()
+	assert_true(await _wait_until(func() -> bool: return Session.game.turn == 2 and app.stack().count() == 0 and not app.is_starting(), 900))
+	assert_eq(Session.game.digest(), digest_saved, "the quickload gives the saved digest")
+	assert_eq(app.map_scene().season, "summer", "the loaded map shows the calendar's season")
+	assert_eq(SeasonSummary.of(Session.game, Session.player_tag(), Session.game.turn - 1), summary_saved, "J's report is the same after a load")
+	assert_gt(app.requests().bookmarks.get_at(1).size(), 0, "the bookmarks come back from the save")
+
+	# Ctrl+1 goes back to the bookmark (reduce motion: a jump).
+	var cam := app.map_scene().camera()
+	var at := app.requests().bookmarks.get_at(1)["centre"] as Vector2
+	cam.position = at + Vector2(300.0, 200.0)
+	_send_chord(vp, KEY_1, true, false)
+	await _wait_frames(3)
+	assert_lt(cam.position.distance_to(at), 60.0, "Ctrl+1 goes to bookmark 1")
+
+	# Quit to the main menu (nothing unsaved: no question), then Continue gives the same digest.
+	_send_key(vp, KEY_ESCAPE)
+	await _wait_frames(2)
+	var pause := app.stack().top() as PauseMenu
+	assert_not_null(pause)
+	pause.main_menu_button().pressed.emit()
+	assert_true(await _wait_until(func() -> bool: return app.stack().top() is MainMenu), "no question: it was saved")
+	var menu := app.stack().top() as MainMenu
+	assert_true(menu.continue_button().visible)
+	menu.continue_button().pressed.emit()
+	assert_true(await _wait_until(func() -> bool: return Session.game != null and app.map_scene() != null and app.stack().count() == 0 and not app.is_starting(), 900))
+	assert_eq(Session.game.digest(), digest_saved, "Continue gives the same digest")
+
+
+func test_autosave_runs_after_the_report_closes_when_due() -> void:
+	var env := await _scenario_app(PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"]))
+	var vp := env["vp"] as SubViewport
+	var app := env["app"] as App
+	assert_true(await _wait_until(func() -> bool: return app.map_scene() != null and app.stack().count() == 0))
+	app.settings().set_value("game/autosave", "yearly")
+	app.settings().set_value("graphics/season_change", "instant")
+	for _i: int in 4:
+		await _play_season(vp, app)
+	assert_eq(Session.game.turn, 5, "Spring 1481")
+	await _wait_frames(2)
+	assert_eq(SaveFile.read_header("auto1", Session.save_dir)["state"], &"ok", "Spring 1481 is autosaved")
+
+
+func test_recovery_asks_when_the_lock_was_left_and_the_autosave_is_newest() -> void:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480, &"GEN"), "")
+	assert_eq(Session.autosave_game(null, {}), "")
+	var turn := Session.game.turn
+	RunLock.write("north_italy", int(Time.get_unix_time_from_system()))
+	Session.end_game()
+	var env := await _scenario_app()
+	var app := env["app"] as App
+	await _wait_frames(3)
+	var ask := app.stack().top() as Confirm
+	assert_not_null(ask, "the question is pushed over the main menu")
+	assert_false(FileAccess.file_exists(RunLock.path), "the lock is deleted either way")
+	ask.button_for(&"confirm").pressed.emit()
+	assert_true(await _wait_until(func() -> bool: return Session.game != null and app.map_scene() != null and app.stack().count() == 0, 900))
+	assert_eq(Session.game.turn, turn)
+
+
+func test_recovery_not_now_keeps_the_main_menu() -> void:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480, &"GEN"), "")
+	assert_eq(Session.autosave_game(null, {}), "")
+	RunLock.write("north_italy", int(Time.get_unix_time_from_system()))
+	Session.end_game()
+	var env := await _scenario_app()
+	var app := env["app"] as App
+	await _wait_frames(3)
+	var ask := app.stack().top() as Confirm
+	assert_not_null(ask)
+	ask.button_for(&"cancel").pressed.emit()
+	await _wait_frames(3)
+	assert_true(app.stack().top() is MainMenu)
+	assert_null(Session.game)
+	assert_false(FileAccess.file_exists(RunLock.path))
+
+
+func test_no_recovery_question_without_a_lock() -> void:
+	var env := await _scenario_app()
+	var app := env["app"] as App
+	await _wait_frames(3)
+	assert_true(app.stack().top() is MainMenu)

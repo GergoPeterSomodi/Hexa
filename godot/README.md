@@ -47,7 +47,10 @@ core/                   plain GDScript, extends RefCounted (or Resource in defs/
 shell/                  everything with Nodes (Studiolo UI architecture)
   autoload/             session.gd (Session) and events.gd (Events)
   app/                  app.tscn + app.gd (main scene root), settings.gd (user://settings.cfg),
-                        settings_io.gd, display.gd, shell_context.gd
+                        settings_io.gd, display.gd, shell_context.gd, app_routes.gd (map and HUD requests),
+                        game_requests.gd (the M3 handlers: the season flow and report, F5/F9, Save and Load,
+                        Continue, bookmarks, undo, the running lock and recovery), season_flow.gd (SeasonFlow),
+                        bookmarks.gd, thumbnail.gd, run_lock.gd
   input/                bindings.gd (InputMap & gestures), zoom_model.gd, esc_ladder.gd,
                         app_input.gd, camera_rig.gd, map_input.gd
   ui/                   tokens.gd, theme.tres, theme_high_contrast.tres, kit_theme.gd (1x/2x/plain),
@@ -56,7 +59,9 @@ shell/                  everything with Nodes (Studiolo UI architecture)
                         ToastHost, OptionRow, KeyCap, Segmented, NavList, Cartouche, Ribbon, PanelKit,
                         Medallion, DeltaChip, SeasonStrip, PreviewCard, InkChart, StudyTable,
                         RelationMatrix, ResourceChip)
-  hud/                  hud.tscn + hud.gd, top_bar (arms, country name, mode switch), layers_popover,
+  hud/                  hud.tscn + hud.gd, top_bar (arms, country name, mode switch, date and End season),
+                        date_end, action_log (bottom left), the TopRight column (task_flag, notifications),
+                        layers_popover (no season buttons: F3's Look previews seasons),
                         zoom_control, scale_bar, minimap, map_hover, key_hints, debug_overlay (F3)
   screens/              screen_ids.gd, main_menu, new_game, country_pick, find_place, sandbox, pause_menu,
                         options (+ options_keys), about, credits, confirm, loading, help_overlay
@@ -187,7 +192,9 @@ check) and **Check** (the deep validation; its lines go to `facts` and the Outpu
   - **Camera:** `WASD` / arrows (pan; hold `Shift` for fast pan), `=` / `+` / `Kp+` (zoom in), `-` / `Kp-` (zoom out), `F` / `Home` (fit whole map).
   - **Map & View:** left click (select hex), right click (clear selection), `1`–`3` (map modes Terrain / Owner / Relief; Owner is refused with a toast in a map-only game), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (upgrade selected hex).
   - **The pick:** click a country's land or choose it in the list (`Up` / `Down`, `Enter` shows it, `Enter` again plays it), or `Play as` in its panel; `Esc` closes the panel, then asks for the pause menu (the pick cannot be skipped).
-  - **App & Dev:** `Esc` (Esc ladder: popover → top screen → country panel or selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
+  - **Time & saves (M3):** `Space` / `Enter` (end the season; a second one inside 400 ms of the report closing is refused), `J` (the last season report), `F5` / `Ctrl+S` / `Cmd+S` (quicksave), `F9` / `Ctrl+L` / `Cmd+L` (quickload; asks first when actions are unsaved), `Ctrl+Z` / `Cmd+Z` (cancel the work begun last this season), `Ctrl+Shift+1..9` (set camera bookmark), `Ctrl+1..9` (go to it), `F2` (the developer console at the foot of F3, developer tools on).
+  - **Saves:** `user://saves/` holds `quick`, `1` to `8` and `auto1` to `auto3` (`.sav`, `.png`); the program writes `user://running.lock` while a game runs and asks to load the newest autosave when it finds one left behind. Continue on the main menu loads the newest save and falls back to older ones when its body is damaged. The shell's key milestone is `Bindings.SHELL_MILESTONE` (`"3"`).
+  - **App & Dev:** `Esc` (Esc ladder: console field → popover → top screen → country panel or selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
 - **Pointer & trackpad gestures** (`shell/input/camera_rig.gd`):
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).
   - Mac trackpad two-finger scroll (`InputEventPanGesture`) pans at `GESTURE_PAN_PX` (20 px per delta unit); trackpad pinch (`InputEventMagnifyGesture`) zooms directly about the fingers; left/middle/right drag past `CLICK_SLOP` (6 px) pans 1:1.

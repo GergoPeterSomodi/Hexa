@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/hud.gd" id="1_hud"]
 [ext_resource type="PackedScene" path="res://shell/hud/top_bar.tscn" id="2_topbar"]
@@ -12,6 +12,9 @@
 [ext_resource type="PackedScene" path="res://shell/panels/hex_panel.tscn" id="10_hex"]
 [ext_resource type="PackedScene" path="res://shell/hud/minimap.tscn" id="11_minimap"]
 [ext_resource type="PackedScene" path="res://shell/panels/country_panel.tscn" id="12_country"]
+[ext_resource type="PackedScene" path="res://shell/hud/action_log.tscn" id="13_log"]
+[ext_resource type="PackedScene" path="res://shell/hud/task_flag.tscn" id="14_flag"]
+[ext_resource type="PackedScene" path="res://shell/hud/notifications.tscn" id="15_notif"]
 
 [node name="Hud" type="CanvasLayer"]
 process_mode = 1
@@ -56,6 +59,36 @@ offset_left = 12.0
 offset_top = 8.0
 offset_right = 372.0
 offset_bottom = 260.0
+
+[node name="TopRight" type="VBoxContainer" parent="Root/Column/Main/MapArea"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -312.0
+offset_top = 8.0
+offset_right = -12.0
+offset_bottom = 8.0
+grow_horizontal = 0
+mouse_filter = 2
+
+[node name="TaskFlag" parent="Root/Column/Main/MapArea/TopRight" instance=ExtResource("14_flag")]
+layout_mode = 2
+size_flags_horizontal = 8
+
+[node name="Notifications" parent="Root/Column/Main/MapArea/TopRight" instance=ExtResource("15_notif")]
+layout_mode = 2
+
+[node name="ActionLog" parent="Root/Column/Main/MapArea" instance=ExtResource("13_log")]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = -352.0
+offset_right = 482.0
+offset_bottom = -46.0
+grow_vertical = 0
 
 [node name="LayersPopover" parent="Root/Column/Main/MapArea" instance=ExtResource("4_layers")]
 layout_mode = 1

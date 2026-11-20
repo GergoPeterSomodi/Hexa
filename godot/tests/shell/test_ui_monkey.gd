@@ -44,6 +44,8 @@ var _prev_unsaved: int = 0
 var _old_max_fps: int = 0
 var _old_low_proc: bool = false
 var _old_tooltip_delay: float = 0.5
+var _old_save_dir: String = ""
+var _old_lock_path: String = ""
 ## Hexes whose state an action changed during the current step (Events.hex_changed).
 var _changed_hexes: Array[Vector2i] = []
 ## The player seen after the pick, and the game it belongs to.
@@ -58,9 +60,20 @@ func before_each() -> void:
 	_old_max_fps = Engine.max_fps
 	_old_low_proc = OS.low_processor_usage_mode
 	_old_tooltip_delay = float(ProjectSettings.get_setting("gui/timers/tooltip_delay_sec", 0.5))
+	# Enter now ends seasons and autosaves: never the real user://saves (R11 rewrites the monkey for M3).
+	_old_save_dir = Session.save_dir
+	_old_lock_path = RunLock.path
+	Session.save_dir = "user://test_monkey_saves"
+	RunLock.path = "user://test_monkey_running.lock"
 
 
 func after_each() -> void:
+	for slot: String in SaveFile.SLOTS + SaveFile.AUTO_SLOTS:
+		SaveFile.remove(slot, Session.save_dir)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Session.save_dir))
+	RunLock.clear()
+	Session.save_dir = _old_save_dir
+	RunLock.path = _old_lock_path
 	Session.game = _prev_game
 	Session.unsaved_actions = _prev_unsaved
 	Bindings.reset_defaults()
@@ -449,7 +462,9 @@ func _assert_invariants(
 		if cur_digest != prev_digest:
 			# The pick is an accepted action too; choosing a country resets unsaved_actions to 0 (AppRoutes).
 			var picked := prev_player == &"" and Session.player_tag() != &""
-			if not picked:
+			# A season (Enter) is an accepted action too; an autosave after it then leaves nothing unsaved.
+			var autosaved := Session.unsaved_actions == 0 and Session.current_slot.begins_with("auto")
+			if not picked and not autosaved:
 				assert_gt(Session.unsaved_actions, prev_unsaved, "%s: game digest changed without an accepted action" % tag)
 
 	# 5. M2: the player is fixed by the pick; an accepted works action (build, upgrade, clear) is on the player's land

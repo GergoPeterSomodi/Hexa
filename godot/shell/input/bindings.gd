@@ -237,6 +237,10 @@ static func gestures_for(platform: String = OS.get_name()) -> Array[String]:
 	return out
 
 
+## The milestone the shell registers its keys up to (the App passes it to ensure and the Options screen).
+const SHELL_MILESTONE := "3"
+
+
 ## Registers actions from DEFAULTS up to `up_to_milestone` into Godot's InputMap.
 static func ensure(up_to_milestone: String = "12") -> void:
 	var max_m := float(up_to_milestone)

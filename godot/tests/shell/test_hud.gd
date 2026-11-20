@@ -159,9 +159,11 @@ func test_top_bar_and_layers_popover() -> void:
 	assert_eq(_hud.top_bar().help_button().focus_mode, Control.FOCUS_NONE)
 	assert_eq(_hud.top_bar().menu_button().focus_mode, Control.FOCUS_NONE)
 
-	_hud.top_bar().season_segmented().select(2, true)
-	assert_eq(seasons, [2])
-	assert_eq(_hud.layers_popover().season_segmented().selected_id(), 2, "LayersPopover season stays synced")
+	# The season preview lives only in F3's Look control; the Layers popover has none (M3).
+	assert_null(_hud.layers_popover().get_node_or_null("VBox/SeasonSeg"))
+	_hud.debug_overlay().season_segmented().select(2, true)
+	_hud.debug_overlay().season_segmented().select(-1, true)
+	assert_eq(seasons, [2, -1], "F3's Look sends 0 to 3 and -1 for the calendar")
 
 	_hud.top_bar().help_button().pressed.emit()
 	_hud.top_bar().menu_button().pressed.emit()
@@ -394,3 +396,73 @@ func test_f3_m2_line_counts_countries_and_mode() -> void:
 	Session.new_scenario("north_italy_1480", 1480)
 	_hud.debug_overlay().refresh_metrics()
 	assert_true(_hud.debug_overlay().metrics_text().contains("countries 13 · mode Terrain · border chunks 0"))
+
+
+func test_m3_slots_the_date_and_end_season_the_log_and_the_top_right_column() -> void:
+	await _harness.wait_frames(self, 2)
+	assert_not_null(_hud.date_end(), "DateEnd sits in the top bar")
+	assert_true(_hud.top_bar().is_ancestor_of(_hud.date_end()))
+	assert_true(_hud.map_area().is_ancestor_of(_hud.action_log()), "the action log is in MapArea")
+	var top_right := _hud.map_area().get_node("TopRight")
+	assert_eq(_hud.task_flag().get_parent(), top_right, "TaskFlag is in the TopRight column")
+	assert_eq(_hud.notifications().get_parent(), top_right, "Notifications is in the TopRight column")
+	assert_null(_hud.layers_popover().get_node_or_null("VBox/SeasonSeg"), "no season buttons in Layers")
+	assert_null(_hud.top_bar().get_node_or_null("HBox/SeasonSeg"), "no season preview in the top bar")
+
+
+func test_m3_hud_signals_for_end_report_and_looking() -> void:
+	await _harness.wait_frames(self, 2)
+	var seen := {"end": 0, "report": 0, "hex": []}
+	_hud.end_season_requested.connect(func() -> void: seen["end"] += 1)
+	_hud.report_requested.connect(func() -> void: seen["report"] += 1)
+	_hud.hex_look_requested.connect(func(hex: Vector2i) -> void: (seen["hex"] as Array).append(hex))
+	_hud.date_end().end_season_requested.emit()
+	_hud.date_end().report_requested.emit()
+	_hud.action_log().report_requested.emit()
+	_hud.task_flag().go_requested.emit(Vector2i(3, 4))
+	_hud.notifications().go_requested.emit(Vector2i(5, 6))
+	_hud.action_log().line_activated.emit(Vector2i(7, 8))
+	assert_eq(seen["end"], 1)
+	assert_eq(seen["report"], 2)
+	assert_eq(seen["hex"], [Vector2i(3, 4), Vector2i(5, 6), Vector2i(7, 8)])
+
+
+func test_m3_covering_and_the_look_control_returns_to_the_calendar() -> void:
+	await _harness.wait_frames(self, 2)
+	_hud.set_covered(true, true)
+	assert_true(_hud.notifications().is_covered())
+	assert_true(_hud.task_flag().is_covered())
+	_hud.set_covered(false, false)
+	assert_false(_hud.notifications().is_covered())
+	_hud.debug_overlay().season_segmented().select(2, false)
+	Events.season_ended.emit(1)
+	assert_eq(_hud.debug_overlay().season_segmented().selected_id(), -1, "Look is back on Calendar when a season ends")
+	assert_false(_hud.has_open_list(), "no log or flag list is open")
+	_hud.action_log().open()
+	assert_true(_hud.has_open_list())
+	assert_true(_hud.close_lists(), "Esc closes the open log")
+	assert_false(_hud.action_log().is_open())
+
+
+
+func test_the_top_bar_fits_700_px_in_a_sandbox_the_pick_and_a_game() -> void:
+	await _harness.wait_frames(self, 2)
+	var bar := _hud.top_bar()
+	bar.fit_width(700.0)
+	assert_lte(bar.get_combined_minimum_size().x, 700.0, "a sandbox bar fits 700 px")
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	bar.refresh_game()
+	_hud.date_end().refresh()
+	await _harness.wait_frames(self, 2)
+	bar.fit_width(700.0)
+	assert_lte(bar.get_combined_minimum_size().x, 700.0, "the pick bar (with its refusal line) fits 700 px")
+	assert_false(bar.name_shown(), "the name hides first")
+	assert_true(bar.date_end().end_button().visible, "End season never hides")
+	assert_true(bar.date_end().date_button().visible)
+	Session.act("choose_country", {"tag": &"GEN"})
+	await _harness.wait_frames(self, 2)
+	bar.fit_width(700.0)
+	assert_lte(bar.get_combined_minimum_size().x, 700.0, "a game bar fits 700 px")
+	bar.fit_width(1600.0)
+	assert_true(bar.name_shown(), "the name comes back when there is room")
+	assert_true(bar.brand_label().visible)
