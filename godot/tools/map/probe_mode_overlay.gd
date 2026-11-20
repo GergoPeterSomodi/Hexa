@@ -1,10 +1,12 @@
 ## Compatibility GL / shader probe for ModeOverlay (docs/architecture/m2-build-spec.md sections 10 and 11).
-## Renders North Italy with a hand-made owner array in Terrain, Owner, and Relief modes, reads back the
-## framebuffer, and compares every hex middle against MapModes.colour_of (tolerance <= 3 per channel).
+## Renders North Italy with a hand-made owner array in Terrain, Owner, and Relief modes, and with hand-made Yields
+## bytes (0 to 9 over the land) in Yields mode, reads back the framebuffer, and compares every hex middle against
+## MapModes.colour_of (tolerance <= 3 per channel). A loss (byte 1) is striped: its middle may read madder or the veil.
+## Headless (dummy renderer) it prints SKIP and exits 0.
 ##
 ## Run windowed (live GPU / Compatibility GL):
 ##   /opt/homebrew/bin/godot --path godot -s res://tools/map/probe_mode_overlay.gd
-## Planted fault (swaps two palette entries, must print FAIL and exit 1):
+## Planted fault (swaps two palette entries and shifts every Yields byte; must print FAIL and exit 1):
 ##   /opt/homebrew/bin/godot --path godot -s res://tools/map/probe_mode_overlay.gd -- --plant
 ## Save PNGs per mode:
 ##   /opt/homebrew/bin/godot --path godot -s res://tools/map/probe_mode_overlay.gd -- --out-dir=/tmp/m2_c4_shots
@@ -54,6 +56,7 @@ func _run() -> void:
 	var owner := _hand_made_owners(map)
 	var palette := _hand_made_palette()
 	var h_bytes := MapModes.height_bytes(map)
+	var yield_bytes := _hand_made_yields(map)
 
 	var world := Node2D.new()
 	world.name = "ProbeWorld"
@@ -75,6 +78,7 @@ func _run() -> void:
 	var overlay := ModeOverlay.new()
 	world.add_child(overlay)
 	overlay.setup_from(map, owner, palette)
+	overlay.update_yields(yield_bytes)
 	view.set_borders(map, owner, borders_palette)
 
 	if headless:
@@ -91,17 +95,14 @@ func _run() -> void:
 		return
 
 	if _plant:
-		var planted := palette.duplicate()
-		var tmp := planted[1]
-		planted[1] = planted[2]
-		planted[2] = tmp
-		overlay.set_palette_colours(planted)
+		_plant_faults(overlay, palette, yield_bytes)
 
 	overlay.visible = true
 	var modes_to_check: Array[Array] = [
 		[MapModes.Mode.TERRAIN, "Terrain"],
 		[MapModes.Mode.OWNER, "Owner"],
 		[MapModes.Mode.RELIEF, "Relief"],
+		[MapModes.Mode.YIELDS, "Yields"],
 	]
 	var total_failed_modes := 0
 	for entry: Array in modes_to_check:
@@ -117,7 +118,7 @@ func _run() -> void:
 			continue
 		if _out_dir != "":
 			_save_shot(img, label.to_lower())
-		var stats := _verify_frame(map, owner, h_bytes, palette, mode, world, vp_size, base_img, img)
+		var stats := _verify_frame(map, owner, h_bytes, palette, mode, world, vp_size, base_img, img, yield_bytes)
 		var bad := int(stats["bad"])
 		var worst := float(stats["worst"])
 		var status := "PASS" if bad == 0 else "FAIL"
@@ -129,6 +130,19 @@ func _run() -> void:
 			total_failed_modes += 1
 
 	quit(0 if total_failed_modes == 0 else 1)
+
+
+## The planted fault: two palette entries swapped and every Yields byte shifted by one.
+func _plant_faults(overlay: ModeOverlay, palette: PackedColorArray, yield_bytes: PackedByteArray) -> void:
+	var planted := palette.duplicate()
+	var tmp := planted[1]
+	planted[1] = planted[2]
+	planted[2] = tmp
+	overlay.set_palette_colours(planted)
+	var shifted := yield_bytes.duplicate()
+	for i: int in shifted.size():
+		shifted[i] = (int(shifted[i]) + 1) % 10
+	overlay.update_yields(shifted)
 
 
 func _wait_frames(count: int) -> void:
@@ -159,7 +173,8 @@ func _build_tile_view(map: MapData) -> TileMapView:
 
 
 func _verify_frame(map: MapData, owner: PackedByteArray, h_bytes: PackedByteArray, palette: PackedColorArray,
-		mode: MapModes.Mode, world: Node2D, vp_size: Vector2, base_img: Image, img: Image) -> Dictionary:
+		mode: MapModes.Mode, world: Node2D, vp_size: Vector2, base_img: Image, img: Image,
+		yield_bytes: PackedByteArray) -> Dictionary:
 	var img_size := Vector2(img.get_size())
 	var xform := world.get_global_transform_with_canvas()
 	var bad := 0
@@ -176,11 +191,18 @@ func _verify_frame(map: MapData, owner: PackedByteArray, h_bytes: PackedByteArra
 			)
 			var bg := base_img.get_pixelv(px)
 			var got := img.get_pixelv(px)
-			var want := MapModes.colour_of(mode, int(owner[idx]), int(h_bytes[idx]), palette, true, 0)
+			var want := MapModes.colour_of(mode, int(owner[idx]), int(h_bytes[idx]), palette, true, 0, int(yield_bytes[idx]))
 			var exp_r := bg.r * (1.0 - want.a) + want.r * want.a
 			var exp_g := bg.g * (1.0 - want.a) + want.g * want.a
 			var exp_b := bg.b * (1.0 - want.a) + want.b * want.a
 			var diff := maxf(absf(got.r - exp_r), maxf(absf(got.g - exp_g), absf(got.b - exp_b))) * 255.0
+			if mode == MapModes.Mode.YIELDS and int(yield_bytes[idx]) == 1 and int(h_bytes[idx]) > 0:
+				# the stripe under the middle may be madder or the veil between
+				var a := MapModes.VEIL_ALPHA
+				var alt_r := bg.r * (1.0 - a) + MapModes.VEIL.r * a
+				var alt_g := bg.g * (1.0 - a) + MapModes.VEIL.g * a
+				var alt_b := bg.b * (1.0 - a) + MapModes.VEIL.b * a
+				diff = minf(diff, maxf(absf(got.r - alt_r), maxf(absf(got.g - alt_g), absf(got.b - alt_b))) * 255.0)
 			worst = maxf(worst, diff)
 			if diff > TOLERANCE:
 				if bad == 0:
@@ -221,6 +243,16 @@ static func _hand_made_owners(map: MapData) -> PackedByteArray:
 			else:
 				owner[idx] = 2  # Milan
 	return owner
+
+
+## Hand-made Yields bytes: 0 to 9 in turn over the land hexes (a 0 is a hex of another country), sea 0.
+static func _hand_made_yields(map: MapData) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(map.hex_count())
+	for idx: int in map.hex_count():
+		if map.land[idx] != 0:
+			out[idx] = idx % 10
+	return out
 
 
 static func _hand_made_palette() -> PackedColorArray:

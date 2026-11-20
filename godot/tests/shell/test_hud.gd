@@ -629,3 +629,44 @@ func test_a_tall_hex_panel_never_pushes_the_hud_past_the_window() -> void:
 			assert_eq(_hud.top_bar().get_global_position().y, 0.0, "top bar at y 0 at %s, %s" % [str(view), str(hex)])
 			assert_lte(_hud.hex_panel().get_global_rect().end.y, float(view.y) + 0.5, "the panel ends inside the window")
 	Session.end_game()
+
+
+func test_the_mode_switch_offers_yields_only_to_a_player_and_fits_1024_px() -> void:
+	await _harness.wait_frames(self, 2)
+	var top := _hud.top_bar()
+	var seg := top.mode_segmented()
+	assert_null(seg.button_for(int(MapModes.Mode.YIELDS)), "no Yields in a sandbox")
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	top.refresh_game()
+	assert_null(seg.button_for(int(MapModes.Mode.YIELDS)), "no Yields while picking")
+	assert_true(bool(Session.act("choose_country", {"tag": "GEN"})["ok"]))
+	await _harness.wait_frames(self, 1)
+	var yields := seg.button_for(int(MapModes.Mode.YIELDS))
+	assert_not_null(yields, "Yields is the fourth segment once you play")
+	assert_eq(yields.text, "Yields")
+	assert_true(yields.tooltip_text.contains("[4]"))
+	var chosen: Array[int] = []
+	_hud.mode_requested.connect(func(mode: int) -> void: chosen.append(mode))
+	seg.select(int(MapModes.Mode.YIELDS), true)
+	assert_eq(chosen, [3], "the fourth segment reaches the Hud as mode 3")
+	for width: int in [1024, 1280]:
+		top.fit_width(float(width))
+		assert_lte(top.get_combined_minimum_size().x, float(width), "the bar fits %d px" % width)
+	top.fit_width(4000.0)
+	top.set_mode(int(MapModes.Mode.YIELDS))
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	top.refresh_game()
+	assert_null(seg.button_for(int(MapModes.Mode.YIELDS)), "a new sandbox takes it away again")
+
+
+func test_the_mode_buttons_stay_normal_at_1280_and_nothing_clips_down_to_800() -> void:
+	await _harness.wait_frames(self, 2)
+	var bar := _genoa_bar()
+	await _harness.wait_frames(self, 3)
+	var normal := bar.mode_segmented().button_for(0)
+	for width: int in [1280, 1024, 900, 800]:
+		bar.fit_width(float(width))
+		assert_lte(bar.get_combined_minimum_size().x, float(width), "%d px: nothing clips" % width)
+		assert_true(bar.chips().visible and bar.study_button().visible, "%d px: the chips and the study button" % width)
+		if width == 1280:
+			assert_false(normal.has_theme_font_size_override(&"font_size"), "1280 px: the mode buttons are normal")

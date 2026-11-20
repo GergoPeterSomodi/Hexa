@@ -67,6 +67,7 @@ const MARK_SIZE: float = 6.0
 signal point_hovered(index: int)
 ## A click or Enter on point `index`.
 signal point_activated(index: int)
+signal cursor_keyed(index: int)  ## A key (Left, Right, Home, End) moved the cursor to `index`.
 
 var _series: Array[Dictionary] = []
 var _marks: Array[Dictionary] = []
@@ -762,6 +763,7 @@ func _key_cursor(next: int) -> void:
 	if next == _cursor:
 		return
 	_cursor = next
+	cursor_keyed.emit(_cursor)
 	point_hovered.emit(_cursor)
 	queue_redraw()
 

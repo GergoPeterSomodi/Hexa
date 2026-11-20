@@ -220,3 +220,107 @@ func test_far_map_texture_returns_null_before_build_and_image_texture_after() ->
 	var tex := far.texture()
 	assert_not_null(tex)
 	assert_eq(tex.get_size(), Vector2(FarPicture.size_of(map)))
+
+
+# ----- Yields (M4.5 I4b, docs/architecture/m4-5-build-spec.md 6.7) ------------------------------------------------------
+
+
+func _yield_fixture(overlay: ModeOverlay, cols: int = 12, rows: int = 10) -> MapData:
+	var map := _make_map(cols, rows)
+	add_child_autofree(overlay)
+	overlay.setup_from(map, _make_owner(map), _make_palette())
+	return map
+
+
+func test_yield_textures_exist_with_the_ramp_and_uniforms() -> void:
+	var overlay := ModeOverlay.new()
+	var map := _yield_fixture(overlay, 30, 20)
+	assert_eq(overlay.yields_texture().get_size(), Vector2(30, 20))
+	assert_eq(overlay.yield_ramp_texture().get_size(), Vector2(256, 1))
+	assert_eq(overlay.yields_texture().get_image().get_format(), Image.FORMAT_R8)
+	assert_eq(overlay.yield_ramp_texture().get_image().get_format(), Image.FORMAT_RGBA8)
+	assert_eq(overlay.yields_texture_bytes(), 30 * 20 + 256 * 4)
+	assert_eq(overlay.yields_bytes().size(), map.hex_count())
+	assert_eq(overlay.yields_bytes().count(0), map.hex_count(), "zeros before any update")
+	var ramp := overlay.yield_ramp_texture().get_image()
+	for b: int in range(1, 10):
+		assert_true(ramp.get_pixel(b, 0).is_equal_approx(MapModes.YIELD_COLOURS[b - 1]), "ramp byte %d" % b)
+	assert_eq(ramp.get_pixel(0, 0).a8, 0, "byte 0 is clear")
+	var mat := overlay.material as ShaderMaterial
+	assert_same(mat.get_shader_parameter(&"yields"), overlay.yields_texture())
+	assert_same(mat.get_shader_parameter(&"yield_ramp"), overlay.yield_ramp_texture())
+	assert_almost_eq(float(mat.get_shader_parameter(&"yield_alpha")), MapModes.YIELD_ALPHA, 0.0001)
+	assert_almost_eq(float(mat.get_shader_parameter(&"veil_alpha")), MapModes.VEIL_ALPHA, 0.0001)
+	assert_almost_eq(float(mat.get_shader_parameter(&"stripe_px")), MapModes.STRIPE_PX, 0.0001)
+	overlay.set_mode(MapModes.Mode.YIELDS)
+	assert_eq(int(mat.get_shader_parameter(&"mode")), 3)
+	assert_true(overlay.visible)
+	overlay.set_tint(false)
+	assert_true(overlay.visible, "Yields stays visible with the Terrain tint off")
+
+
+func test_update_yields_writes_only_the_changed_texels() -> void:
+	var overlay := ModeOverlay.new()
+	var map := _yield_fixture(overlay)
+	var bytes := PackedByteArray()
+	bytes.resize(map.hex_count())
+	var writes := overlay.texel_writes
+	var updates := overlay.texture_updates
+	assert_eq(overlay.update_yields(bytes), 0, "all zeros: nothing differs")
+	assert_eq(overlay.texel_writes, writes)
+	assert_eq(overlay.texture_updates, updates, "and no upload")
+
+	bytes[map.index_of(Vector2i(3, 2))] = 7
+	assert_eq(overlay.update_yields(bytes), 1, "one changed byte, one texel")
+	assert_eq(overlay.texel_writes - writes, 1)
+	assert_eq(overlay.texture_updates - updates, 1, "one upload")
+	assert_eq(overlay.yields_image().get_pixelv(Vector2i(3, 2)).r8, 7)
+	assert_eq(overlay.yields_bytes()[map.index_of(Vector2i(3, 2))], 7)
+
+	assert_eq(overlay.update_yields(bytes), 0, "the same bytes again write nothing")
+	assert_eq(overlay.texel_writes - writes, 1)
+	assert_eq(overlay.texture_updates - updates, 1)
+
+	bytes[map.index_of(Vector2i(3, 2))] = 0
+	bytes[map.index_of(Vector2i(0, 0))] = 1
+	bytes[map.index_of(Vector2i(11, 9))] = 9
+	assert_eq(overlay.update_yields(bytes), 3)
+	assert_eq(overlay.texture_updates - updates, 2, "one upload a batch")
+	assert_eq(overlay.yields_image().get_pixelv(Vector2i(3, 2)).r8, 0)
+	assert_eq(overlay.yields_image().get_pixelv(Vector2i(11, 9)).r8, 9)
+
+	assert_eq(overlay.update_yields(PackedByteArray([1, 2, 3])), 0, "bytes of the wrong size are ignored")
+	assert_eq(overlay.texture_updates - updates, 2)
+	assert_eq(overlay.update_yields(bytes), 0)
+
+
+func test_the_minimap_material_shares_the_yield_textures() -> void:
+	var overlay := ModeOverlay.new()
+	_yield_fixture(overlay, 8, 6)
+	overlay.set_mode(MapModes.Mode.YIELDS)
+	var mm := overlay.material_for_minimap()
+	assert_same(mm.get_shader_parameter(&"yields"), overlay.yields_texture())
+	assert_same(mm.get_shader_parameter(&"yield_ramp"), overlay.yield_ramp_texture())
+	assert_eq(int(mm.get_shader_parameter(&"mode")), 3, "the minimap shows Yields too")
+
+
+func test_sync_yields_only_computes_in_yields_and_when_the_version_moved() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var overlay := ModeOverlay.new()
+	add_child_autofree(overlay)
+	overlay.setup(game)
+	assert_eq(overlay.sync_yields(game, true), 0, "not in Yields: nothing is computed")
+	assert_eq(overlay.yields_bytes().count(0), game.map.hex_count())
+	overlay.set_mode(MapModes.Mode.YIELDS)
+	var wrote := overlay.sync_yields(game, true)
+	assert_gt(wrote, 0, "Genoa's land is coloured")
+	assert_eq(overlay.yields_bytes(), MapModes.yield_bytes(game, &"GEN"))
+	assert_eq(int(overlay.yields_bytes()[game.map.index_of(Vector2i(8, 13))]), 8)
+	assert_eq(overlay.sync_yields(game), 0, "the same version: nothing")
+	game.version += 1
+	assert_eq(overlay.sync_yields(game), 0, "a new version with the same worth writes no texel")
+	overlay.set_mode(MapModes.Mode.OWNER)
+	var cached := overlay.yields_bytes()
+	game.version += 1
+	assert_eq(overlay.sync_yields(game), 0)
+	assert_eq(overlay.yields_bytes(), cached, "leaving Yields keeps the texture and computes nothing")

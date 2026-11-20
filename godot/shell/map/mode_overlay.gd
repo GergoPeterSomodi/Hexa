@@ -1,6 +1,7 @@
 ## Per-hex map mode overlay (docs/architecture/m2-build-spec.md sections 6.1 and 6.2):
 ## draws one map-sized quad at z_index 80 with mode_overlay.gdshader over four data textures
-## (owner_ids R8, heights R8, palette RGBA8 256x1, ramp RGBA8 256x1).
+## (owner_ids R8, heights R8, palette RGBA8 256x1, ramp RGBA8 256x1), and for the Yields mode (docs/architecture/m4-5-build-spec.md
+## 6.7) two more: yields R8 (one band byte a hex) and yield_ramp RGBA8 256x1.
 @tool
 class_name ModeOverlay
 extends Node2D
@@ -31,6 +32,12 @@ var _palette_image: Image = null
 var _palette_tex: ImageTexture = null
 var _ramp_image: Image = null
 var _ramp_tex: ImageTexture = null
+var _yield_bytes := PackedByteArray()
+var _yields_version := -1  # the game.version the Yields texture shows (-1: none)
+var _yields_image: Image = null
+var _yields_tex: ImageTexture = null
+var _yield_ramp_image: Image = null
+var _yield_ramp_tex: ImageTexture = null
 var _material: ShaderMaterial = null
 
 
@@ -70,6 +77,14 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	_ramp_image = _image_from_colours(MapModes.relief_ramp())
 	_ramp_tex = ImageTexture.create_from_image(_ramp_image)
 
+	_yields_version = -1
+	_yield_bytes = PackedByteArray()
+	_yield_bytes.resize(count)  # zero: no worth known
+	_yields_image = Image.create_from_data(map.cols, map.rows, false, Image.FORMAT_R8, _yield_bytes)
+	_yields_tex = ImageTexture.create_from_image(_yields_image)
+	_yield_ramp_image = _image_from_colours(MapModes.yield_ramp())
+	_yield_ramp_tex = ImageTexture.create_from_image(_yield_ramp_image)
+
 	if _material == null:
 		_material = ShaderMaterial.new()
 		_material.shader = load(SHADER_PATH) as Shader
@@ -77,6 +92,12 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	_material.set_shader_parameter(&"heights", _heights_tex)
 	_material.set_shader_parameter(&"palette", _palette_tex)
 	_material.set_shader_parameter(&"ramp", _ramp_tex)
+	_material.set_shader_parameter(&"yields", _yields_tex)
+	_material.set_shader_parameter(&"yield_ramp", _yield_ramp_tex)
+	_material.set_shader_parameter(&"yield_alpha", MapModes.YIELD_ALPHA)
+	_material.set_shader_parameter(&"veil_alpha", MapModes.VEIL_ALPHA)
+	_material.set_shader_parameter(&"stripe_px", MapModes.STRIPE_PX)
+	_material.set_shader_parameter(&"veil_colour", MapModes.VEIL)
 	_material.set_shader_parameter(&"map_size", _map_size)
 	_material.set_shader_parameter(&"grid_size", _grid_size)
 	_material.set_shader_parameter(&"from_uv", false)
@@ -179,6 +200,45 @@ func update_hexes(hexes: Array[Vector2i], owner: PackedByteArray = PackedByteArr
 		texture_updates += 1
 
 
+## Writes the Yields texels that differ from `bytes` (one byte a hex, MapModes.yield_bytes) and uploads the texture once;
+## returns how many texels it wrote (0, and no upload, when nothing differs or `bytes` is not one a hex).
+func update_yields(bytes: PackedByteArray) -> int:
+	if _map == null or _yields_image == null or _yields_tex == null or bytes.size() != _yield_bytes.size():
+		return 0
+	var wrote := 0
+	var cols := _map.cols
+	var idx := 0
+	for row: int in _map.rows:
+		for col: int in cols:
+			var b := bytes[idx]
+			if b != _yield_bytes[idx]:
+				_yield_bytes[idx] = b
+				_yields_image.set_pixel(col, row, Color(float(b) / 255.0, 0.0, 0.0, 1.0))
+				wrote += 1
+			idx += 1
+	if wrote > 0:
+		texel_writes += wrote
+		_yields_tex.update(_yields_image)
+		texture_updates += 1
+	return wrote
+
+
+## Brings the Yields texture to `game`'s worth for its player: only while the mode is Yields, and (unless `force`) only
+## when `game.version` changed since the last time. Returns the texels written.
+func sync_yields(game: Game, force: bool = false) -> int:
+	if _mode != MapModes.Mode.YIELDS or game == null or game.map == null:
+		return 0
+	if not force and game.version == _yields_version:
+		return 0
+	_yields_version = game.version
+	return update_yields(MapModes.yield_bytes(game, game.player))
+
+
+## The Yields bytes the texture holds now (a copy; tests).
+func yields_bytes() -> PackedByteArray:
+	return _yield_bytes.duplicate()
+
+
 ## Returns a ShaderMaterial copy sharing the four textures, configured for minimap UV coordinates.
 func material_for_minimap() -> ShaderMaterial:
 	if _material == null:
@@ -195,6 +255,27 @@ func texture_bytes() -> int:
 		if img != null:
 			total += img.get_data().size()
 	return total
+
+
+## Bytes of the two Yields textures (kept out of texture_bytes, the four of M2).
+func yields_texture_bytes() -> int:
+	var total := 0
+	for img: Image in [_yields_image, _yield_ramp_image]:
+		if img != null:
+			total += img.get_data().size()
+	return total
+
+
+func yields_image() -> Image:
+	return _yields_image
+
+
+func yields_texture() -> ImageTexture:
+	return _yields_tex
+
+
+func yield_ramp_texture() -> ImageTexture:
+	return _yield_ramp_tex
 
 
 func owner_texture() -> ImageTexture:

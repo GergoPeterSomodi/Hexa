@@ -3,6 +3,10 @@
 ## Left over, Your spending, Treasury this season), the season in play (Expected), the tax levels and the 12-season chart
 ## with Earns most and Costs most. It changes nothing: a tax level is asked for as action_requested([&"set_tax", level])
 ## and a row as action_requested([&"look_at", hex]); the App routes both.
+## The tabs (docs/architecture/m4-5-build-spec.md 6.4): This season (this page's own body, the child `this_season`),
+## Districts, Goods and History (the three tab scenes, built with the page for the milestone's shown tabs, each asked to
+## refresh when it is in view and stale). A tab's action_requested is passed up as the page's; the span of Goods and History
+## is the setting state/study_span (read from the Study this page sits in, written when a span Segmented changes).
 ## `treasury_only` is the shell's game/gain_treasury_only switch, set by the study before refresh (docs/architecture/
 ## m4-build-spec.md 5.0 R2): true shows the treasury's measure, false the realm's.
 class_name PageEconomy
@@ -30,11 +34,25 @@ const SIGN_GAIN := 1
 const SIGN_COST := -1
 const ACTION_TAX := &"set_tax"
 const ACTION_LOOK := &"look_at"
+const SPAN_KEY := "state/study_span"
+const THIS_SEASON := &"this_season"
+const TABS: Array[Dictionary] = [
+	{id = &"this_season", title = "This season", since = "4"},
+	{id = &"districts", title = "Districts", since = "4.5", scene = "res://shell/screens/study/economy_districts_tab.tscn"},
+	{id = &"goods", title = "Goods", since = "4.5", scene = "res://shell/screens/study/economy_goods_tab.tscn"},
+	{id = &"history", title = "History", since = "4.5", scene = "res://shell/screens/study/economy_history_tab.tscn"},
+	{id = &"debt", title = "Debt", since = "12"},
+]
 
 ## The gains in the treasury's measure (true) or the realm's (false).
 var treasury_only: bool = false
 
 var _built: bool = false
+var _game: Game = null
+var _has_game: bool = false
+var _span: int = 12
+var _stale: Dictionary = {}
+var _body: VBoxContainer = null
 var _message: Label = null
 var _columns: HBoxContainer = null
 var _left: VBoxContainer = null
@@ -46,13 +64,35 @@ var _tax_hint: Label = null
 var _tax_notes: Dictionary = {}
 
 
+func _init() -> void:
+	tabs = TABS
+
+
 func _ready() -> void:
 	_ensure_built()
+	_ensure_tabs()
+
+
+## The tab bodies exist before StudyPage builds its strip.
+func _ensure_tabs() -> void:
+	_ensure_built()
+	super()
 
 
 ## Fills the page from `game`; `tag` says why (open, season_ended, ...) and is not used: the page shows the player's country.
 func refresh(game: Game, _tag: StringName) -> void:
 	_ensure_built()
+	_game = game
+	_has_game = true
+	_refresh_season(game)
+	_adopt_span()
+	for id: StringName in _extra_ids():
+		_stale[id] = true
+	_refresh_if_stale(current_tab())
+
+
+## The page's own body, "This season".
+func _refresh_season(game: Game) -> void:
 	if game == null:
 		_show_message("", false)
 		return
@@ -78,13 +118,19 @@ func _ensure_built() -> void:
 	_built = true
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_message = PanelKit.label("", &"Hint")
+	_body = get_node_or_null(NodePath(String(THIS_SEASON))) as VBoxContainer
+	if _body == null:
+		_body = VBoxContainer.new()
+		_body.name = THIS_SEASON
+		add_child(_body)
+	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_message.name = &"Message"
 	_message.visible = false
-	add_child(_message)
+	_body.add_child(_message)
 	_columns = HBoxContainer.new()
 	_columns.name = &"Columns"
 	_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(_columns)
+	_body.add_child(_columns)
 	_left = _column(&"Left")
 	_left.add_theme_constant_override(&"separation", ROW_GAP)
 	_right = _column(&"Right")
@@ -93,6 +139,8 @@ func _ensure_built() -> void:
 	_extras.name = &"Extras"
 	_extras.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_right.add_child(_extras)
+	_build_tabs()
+	tab_changed.connect(_on_tab_changed)
 
 
 func _column(column_name: StringName) -> VBoxContainer:
@@ -352,3 +400,108 @@ func _expected_tip(lines: Array) -> String:
 	for entry: Dictionary in lines:
 		parts.append("%s %s" % [str(entry.get("label", "")), Words.signed(int(entry.get("amount", 0)))])
 	return "\n".join(parts)
+
+
+# ----- the tabs ------------------------------------------------------------------------------------------------------
+
+
+## Instances the scene of each shown tab under its id; StudyPage hides them and shows the one in view.
+func _build_tabs() -> void:
+	for entry: Dictionary in shown_tabs():
+		var path := str(entry.get("scene", ""))
+		var id := StringName(str(entry.get("id", "")))
+		if path == "" or not ResourceLoader.exists(path) or get_node_or_null(NodePath(String(id))) != null:
+			continue
+		var node := (load(path) as PackedScene).instantiate() as Control
+		node.name = String(id)
+		node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		add_child(node)
+		node.connect(&"action_requested", request)
+		if node.has_signal(&"span_changed"):
+			node.connect(&"span_changed", _on_span_changed)
+
+
+## The ids of the shown tabs that are separate scenes.
+func _extra_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for entry: Dictionary in shown_tabs():
+		var id := StringName(str(entry.get("id", "")))
+		if get_node_or_null(NodePath(String(id))) != null and id != THIS_SEASON:
+			out.append(id)
+	return out
+
+
+func _tab_node(id: StringName) -> Control:
+	if id == THIS_SEASON or id == &"":
+		return null
+	return get_node_or_null(NodePath(String(id))) as Control
+
+
+## Fills tab `id` when it is a scene and stale; This season is filled by every refresh.
+func _refresh_if_stale(id: StringName) -> void:
+	var node := _tab_node(id)
+	if node == null or not _has_game or not bool(_stale.get(id, true)):
+		return
+	_stale[id] = false
+	var tag: StringName = _game.player if _game != null else &""
+	node.call(&"refresh", _game, tag)
+
+
+func _on_tab_changed(tab: StringName) -> void:
+	_refresh_if_stale(tab)
+
+
+func _settings() -> Settings:
+	var node: Node = get_parent()
+	while node != null:
+		var screen := node as Screen
+		if screen != null:
+			return screen.ctx.settings if screen.ctx != null else null
+		node = node.get_parent()
+	return null
+
+
+## The span from the setting (when the page sits in a Study), given to the tabs that chart seasons.
+func _adopt_span() -> void:
+	var settings := _settings()
+	if settings != null:
+		_span = int(settings.get_value(SPAN_KEY))
+	_apply_span()
+
+
+func _apply_span() -> void:
+	for id: StringName in _extra_ids():
+		var node := _tab_node(id)
+		if node != null and node.has_method(&"set_span") and int(node.get("span")) != _span:
+			node.call(&"set_span", _span)
+
+
+## A span Segmented was pressed: the setting, the other tab's control and the tab in view follow.
+func _on_span_changed(value: int) -> void:
+	_span = value
+	var settings := _settings()
+	if settings != null:
+		settings.set_value(SPAN_KEY, value)
+	_apply_span()
+	for id: StringName in _extra_ids():
+		_stale[id] = true
+	_refresh_if_stale(current_tab())
+
+
+## {tab}, plus {hex} (Districts), {good} (Goods) or {turn} (History): the tab is shown, filled, and told the rest.
+func focus(args: Dictionary) -> void:
+	var tab := StringName(str(args.get("tab", "")))
+	if tab == &"":
+		if args.has("hex"):
+			tab = &"districts"
+		elif args.has("good"):
+			tab = &"goods"
+		elif args.has("turn"):
+			tab = &"history"
+	if tab != &"":
+		select_tab(tab)
+	var node := _tab_node(current_tab())
+	if node == null:
+		return
+	_refresh_if_stale(current_tab())
+	node.call(&"focus", args)

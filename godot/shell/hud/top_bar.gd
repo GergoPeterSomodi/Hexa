@@ -1,5 +1,5 @@
 ## Studiolo walnut top bar (PanelBar): brand, the player's country (arms and long name, or the pick's title in a
-## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief), the date and End turn (DateEnd, right of the middle),
+## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief, Yields: the modes MapModes.modes offers), the date and End turn (DateEnd, right of the middle),
 ## Layers, Help and Pause menu (docs/architecture/m2-build-spec.md section 7.3; ui-and-controls-spec.md section 7).
 ## M4 (spec 6.3): the resource chips (Ducats, Stores) sit right after the mode switch with the study button; both show only for
 ## the player of a game with countries. When the bar is tight the gap goes first, then the Stores chip shrinks to its medal and value,
@@ -18,10 +18,14 @@ signal country_requested(tag: StringName)
 ## A chip or the study button was pressed: the study opens at `page` (&"economy" for a chip, &"" its last page).
 signal study_requested(page: StringName)
 
-const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief"]
-const MODE_KEYS: Array[String] = ["1", "2", "3"]
+const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief", "Yields"]
+const MODE_KEYS: Array[String] = ["1", "2", "3", "4"]
 const PICK_TAIL := ": choose your country"
 const MAX_FITS_PER_FRAME := 3
+## The mode buttons' side padding and font size when the bar is tight (four modes need the room the three had).
+const COMPACT_PAD := 6.0
+const COMPACT_FONT := 12
+const BUTTON_STATES: Array[StringName] = [&"normal", &"pressed", &"hover", &"hover_pressed", &"disabled", &"focus"]
 
 @onready var _brand_label: Label = $HBox/Brand
 @onready var _sep: VSeparator = $HBox/Sep
@@ -39,6 +43,7 @@ const MAX_FITS_PER_FRAME := 3
 @onready var _menu_btn: KitButton = $HBox/MenuButton
 
 var _mode_index: int = 0
+var _modes_compact := false
 var _name_wanted: bool = false
 var _country_tag: StringName = &""
 var _scenario_title: String = ""
@@ -120,7 +125,7 @@ func refresh_game() -> void:
 	_study_btn.visible = _economy_wanted
 	_chips.refresh()
 	_refresh_name()
-	_set_mode_options(has_countries)
+	_set_mode_options()
 	fit_width(available_width())
 
 
@@ -161,6 +166,7 @@ func _fit(width: float) -> void:
 	_brand_label.visible = true
 	_sep.visible = true
 	_gap.visible = true
+	_set_modes_compact(false)
 	_chips.visible = _economy_wanted
 	_study_btn.visible = _economy_wanted
 	var stores := _chips.stores_chip()
@@ -180,6 +186,8 @@ func _fit(width: float) -> void:
 		stores.set_name_shown(false)  # the Stores chip shrinks to its medal and value; it stays
 		stores.set_change_shown(false)
 		_resize_chip(stores)
+	if get_combined_minimum_size().x > width:
+		_set_modes_compact(true)  # then the mode buttons tighten
 	if get_combined_minimum_size().x > width:
 		_country_btn.visible = false
 		_map_info_label.visible = false
@@ -272,16 +280,40 @@ func _refresh_name() -> void:
 	_country_btn.tooltip_text = "Your country (C)"
 
 
-func _set_mode_options(has_owner: bool) -> void:
-	if not has_owner and _mode_index == int(MapModes.Mode.OWNER):
+func _set_mode_options() -> void:
+	var offered := MapModes.modes(Session.game)
+	if not offered.has(_mode_index):
 		_mode_index = int(MapModes.Mode.TERRAIN)
 	var items: Array[Dictionary] = []
 	for i: int in MODE_LABELS.size():
-		if i == int(MapModes.Mode.OWNER) and not has_owner:
+		if not offered.has(i):
 			continue
 		items.append({"id": i, "label": MODE_LABELS[i], "tooltip": "%s [%s]" % [MODE_LABELS[i], MODE_KEYS[i]]})
 	_mode_seg.set_options(items)
+	_modes_compact = false  # the new buttons have their own padding
 	_mode_seg.select(_mode_index, false)
+
+
+## Tightens (or restores) the padding and font of the mode buttons.
+func _set_modes_compact(on: bool) -> void:
+	if on == _modes_compact:
+		return
+	_modes_compact = on
+	for mode: int in MODE_LABELS.size():
+		var btn := _mode_seg.button_for(mode)
+		if btn == null:
+			continue
+		for state: StringName in BUTTON_STATES:
+			btn.remove_theme_stylebox_override(state)
+			if on:
+				var box := btn.get_theme_stylebox(state).duplicate() as StyleBox
+				box.set_content_margin(SIDE_LEFT, COMPACT_PAD)
+				box.set_content_margin(SIDE_RIGHT, COMPACT_PAD)
+				btn.add_theme_stylebox_override(state, box)
+		if on:
+			btn.add_theme_font_size_override(&"font_size", COMPACT_FONT)
+		else:
+			btn.remove_theme_font_size_override(&"font_size")
 
 
 func _on_mode_changed(id: Variant) -> void:

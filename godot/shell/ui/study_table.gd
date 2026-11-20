@@ -166,7 +166,7 @@ func column_header(index: int) -> String:
 
 ## Selects the row with `id` (quietly: no row_selected). Clears the selection when no row has that id.
 func select_id(id: int) -> void:
-	_has_selection = _index_of_id.has(id)
+	_has_selection = true
 	_selected_id = id
 	_rebuild()
 
@@ -181,9 +181,10 @@ func selected_row() -> Dictionary:
 ## Shows the next PAGE rows.
 func show_more() -> void:
 	var total := _order.size()
-	if _shown >= total:
+	var have := shown_count()
+	if have >= total:
 		return
-	_shown = mini(_shown + PAGE, total)
+	_shown = mini(have + PAGE, total)
 	_rebuild()
 
 
@@ -355,13 +356,15 @@ func _rebuild() -> void:
 	_grid.clear()
 	var root := _grid.create_item()
 	var total := _order.size()
-	_shown = clampi(_shown, PAGE, maxi(PAGE, total))
+	# The requested page count is kept (a shorter refresh draws fewer rows, a longer one the same page again); only a
+	# selected row beyond it grows the page, so it stays in view.
+	var shown := maxi(_shown, PAGE)
 	if _has_selection:
 		var pos := _position_of(_selected_id)
-		_has_selection = pos >= 0
-		if pos >= _shown:
-			_shown = (floori(float(pos) / PAGE) + 1) * PAGE
-	var n := mini(_shown, total)
+		if pos >= shown:
+			shown = (floori(float(pos) / PAGE) + 1) * PAGE
+			_shown = shown
+	var n := mini(shown, total)
 	var sel_item: TreeItem = null
 	for k: int in n:
 		var ri := _order[k]
@@ -458,7 +461,10 @@ func _fill_spark(item: TreeItem, c: int, col: Dictionary, cell: Variant) -> void
 	item.set_custom_draw_callback(c, _draw_spark.bind(values, colour))
 
 
+## A row whose button cell is null or an empty string has no button (it opts out).
 func _fill_button(item: TreeItem, c: int, cell: Variant) -> void:
+	if cell == null or (typeof(cell) == TYPE_STRING and str(cell) == ""):
+		return
 	var tip := _cell_text_or(cell, "Go")
 	item.add_button(c, _icon(&"go"), 0, false, tip)
 
@@ -597,7 +603,7 @@ func _on_item_activated() -> void:
 		return
 	var meta := int(item.get_metadata(0))
 	if meta == _MORE:
-		var first_new := _shown
+		var first_new := shown_count()
 		show_more()
 		_select_position(first_new)
 		return

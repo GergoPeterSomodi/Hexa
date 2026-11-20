@@ -32,6 +32,8 @@ var _tab: StringName = &""
 var _strip: Segmented = null
 var _hosts: Dictionary = {}
 var _tabs_built: bool = false
+## The fade of the last switch: a new switch kills it first, so a quick A-B-A never leaves a body hidden.
+var _fade: Tween = null
 
 
 func _ready() -> void:
@@ -74,8 +76,16 @@ func select_tab(tab: StringName) -> void:
 		return
 	var from := _hosts.get(_tab) as Control
 	var to := _host_for(tab, entry)
+	if _fade != null and _fade.is_valid():
+		_fade.kill()
+	_fade = null
+	for host: Variant in _hosts.values():  # a body another switch left half faded is shown whole again or hidden
+		var node := host as Control
+		if node != from and node != to:
+			node.visible = false
+			node.modulate.a = 1.0
 	_tab = tab
-	Motion.cross_fade(from, to, reduce_motion)
+	_fade = Motion.cross_fade(from, to, reduce_motion, _is_current_host)
 	_sync_strip()
 	tab_changed.emit(tab)
 
@@ -159,6 +169,11 @@ func _host_for(id: StringName, entry: Dictionary) -> Control:
 	host.visible = false
 	_hosts[id] = host
 	return host
+
+
+## True for the body in view now (the fade keeps it visible when it ends).
+func _is_current_host(node: Variant) -> bool:
+	return _hosts.get(_tab) == node
 
 
 func _sync_strip() -> void:

@@ -288,3 +288,107 @@ func test_hint_shows_tab_keys_only_on_a_page_with_two_shown_tabs() -> void:
 	assert_true(tabbed.hint().text.contains("Ctrl+[ ]: tab"))
 	assert_true(tabbed.hint().text.contains("I: close"))
 	assert_true(tabbed.hint().text.contains("Enter: look there"))
+
+
+func _three_tab_page() -> StudyPage:
+	var page := StudyPage.new()
+	var entries: Array[Dictionary] = [
+		{"id": &"a", "title": "A", "since": "4"},
+		{"id": &"b", "title": "B", "since": "4"},
+		{"id": &"c", "title": "C", "since": "4"},
+	]
+	page.tabs = entries
+	add_child_autofree(page)
+	return page
+
+
+## The tab in view is shown whole, and the others are not shown.
+func _settled(page: StudyPage, tab: StringName) -> void:
+	assert_eq(page.current_tab(), tab)
+	var body := page.get_node(String(tab)) as Control
+	assert_true(body.visible, "%s in view is visible" % String(tab))
+	assert_eq(body.modulate.a, 1.0, "%s in view is opaque" % String(tab))
+	for other: Node in page.get_children():
+		if other.name != String(tab) and other is Control and other.name != "TabStrip" and other.name != "Heading":
+			assert_false((other as Control).visible, "%s is not in view" % other.name)
+
+
+func test_rapid_a_b_a_in_one_frame_leaves_a_visible() -> void:
+	var study := _open_at(_sample_entries(1), "4.5")
+	var page := study.current_page()
+	page.select_tab(&"beta")
+	page.select_tab(&"alpha")
+	await _harness.wait_frames(self, 40)
+	_settled(page, &"alpha")
+
+
+func test_rapid_a_b_a_across_a_tenth_of_a_second_leaves_a_visible() -> void:
+	var study := _open_at(_sample_entries(1), "4.5")
+	var page := study.current_page()
+	page.select_tab(&"beta")
+	await get_tree().create_timer(0.1).timeout
+	page.select_tab(&"alpha")
+	await _harness.wait_frames(self, 40)
+	_settled(page, &"alpha")
+
+
+func test_a_b_c_a_in_one_frame_leaves_a_visible() -> void:
+	var page := _three_tab_page()
+	page.select_tab(&"b")
+	page.select_tab(&"c")
+	page.select_tab(&"a")
+	await _harness.wait_frames(self, 40)
+	_settled(page, &"a")
+
+
+func test_a_b_c_a_across_a_tenth_of_a_second_leaves_a_visible() -> void:
+	var page := _three_tab_page()
+	page.select_tab(&"b")
+	await get_tree().create_timer(0.1).timeout
+	page.select_tab(&"c")
+	await get_tree().create_timer(0.1).timeout
+	page.select_tab(&"a")
+	await _harness.wait_frames(self, 40)
+	_settled(page, &"a")
+
+
+func test_step_tab_back_and_forth_in_one_frame_leaves_the_tab_visible() -> void:
+	var study := _open_at(_sample_entries(1), "4.5")
+	var page := study.current_page()
+	page.step_tab(1)
+	page.step_tab(-1)
+	page.step_tab(1)
+	await _harness.wait_frames(self, 40)
+	_settled(page, &"beta")
+
+
+func test_reduce_motion_rapid_switches_end_on_the_tab_in_view() -> void:
+	var study := _open_at(_sample_entries(1), "4.5")
+	var page := study.current_page()
+	page.reduce_motion = true
+	page.select_tab(&"beta")
+	page.select_tab(&"alpha")
+	page.select_tab(&"beta")
+	_settled(page, &"beta")
+	await _harness.wait_frames(self, 10)
+	_settled(page, &"beta")
+
+
+func test_study_closed_mid_fade_reopens_on_a_settled_tab() -> void:
+	var study := _open_at(_sample_entries(1), "4.5")
+	var page := study.current_page()
+	page.select_tab(&"beta")
+	_harness.stack.remove(study)
+	_harness.stack.push(study)
+	await _harness.wait_frames(self, 40)
+	_settled(study.current_page(), &"beta")
+
+
+func test_study_closed_mid_fade_and_a_new_switch_leaves_a_visible() -> void:
+	var study := _open_at(_sample_entries(1), "4.5")
+	study.current_page().select_tab(&"beta")
+	_harness.stack.remove(study)
+	_harness.stack.push(study)
+	study.current_page().select_tab(&"alpha")
+	await _harness.wait_frames(self, 40)
+	_settled(study.current_page(), &"alpha")

@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/screens/study/economy_goods_tab.gd" id="1_tab"]
+
+[node name="EconomyGoodsTab" type="VBoxContainer"]
+size_flags_horizontal = 3
+script = ExtResource("1_tab")

@@ -52,7 +52,7 @@ func _districts(n: int) -> Array:
 				"change": (i % 7) - 3,
 				"share": (i * 13) % 1001,
 				"seasons": PackedInt32Array([i % 5, 2, 4, i % 3]),
-				"go": null,
+				"go": {"text": "Go"},
 			},
 			"hex": Vector2i(i, 13),
 		})
@@ -334,3 +334,64 @@ func test_fits_1280_by_720_and_2560_by_1440() -> void:
 		assert_eq(table.size, Vector2(size), "the table fills %s and does not grow past it" % str(size))
 		assert_eq(table.shown_count(), 100)
 		harness.dispose()
+
+
+func _named_rows(ids: Array) -> Array:
+	var rows: Array = []
+	for id: int in ids:
+		rows.append({"id": id, "cells": {"name": "Row %d" % id, "gain": id * 10}})
+	return rows
+
+
+func _named_columns() -> Array:
+	return [{"id": &"name", "title": "District"}, {"id": &"gain", "title": "Gain", "kind": &"number"}]
+
+
+func test_button_only_on_rows_that_have_the_cell() -> void:
+	var table := _table(
+		[{"id": &"name", "title": "District"}, {"id": &"go", "title": "", "kind": &"button"}],
+		[
+			{"id": 1, "cells": {"name": "With", "go": {"text": "Go"}}},
+			{"id": 2, "cells": {"name": "Without"}},
+			{"id": 3, "cells": {"name": "Empty", "go": ""}},
+			{"id": 4, "cells": {"name": "Null", "go": null}},
+		])
+	await _harness.wait_frames(self, 1)
+	var tree := table.tree()
+	var root_item := tree.get_root()
+	assert_eq(root_item.get_child(0).get_button_count(1), 1, "a row with the cell has its Go button")
+	assert_eq(root_item.get_child(1).get_button_count(1), 0, "a missing cell: no button")
+	assert_eq(root_item.get_child(2).get_button_count(1), 0, "an empty cell: no button")
+	assert_eq(root_item.get_child(3).get_button_count(1), 0, "a null cell: no button")
+
+	var activated: Array[int] = []
+	table.row_activated.connect(func(row: Dictionary) -> void: activated.append(int(row["id"])))
+	tree.button_clicked.emit(root_item.get_child(0), 1, 0, MOUSE_BUTTON_LEFT)
+	assert_eq(activated, [1], "the Go button activates its row")
+	table.select_id(2)
+	tree.item_activated.emit()
+	assert_eq(activated, [1, 2], "Enter or a double click still activates a row without a button")
+
+
+func test_set_rows_keeps_the_requested_page() -> void:
+	var table := _table(_districts_columns(), _districts(250), Vector2(900.0, 500.0))
+	table.show_more()
+	table.show_more()
+	assert_eq(table.shown_count(), 250)
+	table.set_rows(_districts(150))
+	assert_eq(table.shown_count(), 150, "a shorter refresh draws every row it has")
+	table.set_rows(_districts(500))
+	assert_eq(table.shown_count(), 250, "the requested page comes back with a longer refresh")
+
+
+func test_selection_comes_back_when_its_id_returns() -> void:
+	var table := _table(_named_columns(), _named_rows([1, 2, 3, 4, 5]))
+	await _harness.wait_frames(self, 1)
+	table.select_id(3)
+	table.set_rows(_named_rows([1, 2]))
+	assert_eq(table.selected_row(), {}, "while row 3 is gone nothing is selected")
+	assert_null(table.tree().get_selected(), "and the tree shows no selection")
+	table.set_rows(_named_rows([1, 2, 3, 4, 5]))
+	assert_eq(table.selected_row()["id"], 3, "the selection returns with its id")
+	assert_eq(table.tree().get_selected().get_text(0), "Row 3")
+

@@ -33,7 +33,7 @@ func _initialize() -> void:
 				"change": (i % 7) - 3,
 				"share": (i * 13) % 1001,
 				"seasons": PackedInt32Array([i % 5, 2, 4, i % 3]),
-				"go": null,
+				"go": {"text": "Go"},
 			},
 		})
 	var build_ms: Array[float] = []

@@ -68,8 +68,9 @@ static func enter(frame_node: Control, reduce_motion: bool = false) -> Tween:
 	return tween
 
 
-## Cross-fades two pages sharing a plain parent `Control` over 120 ms, then hides `out_node`.
-static func cross_fade(out_node: CanvasItem, in_node: CanvasItem, reduce_motion: bool = false) -> Tween:
+## Cross-fades two pages sharing a plain parent `Control` over 120 ms, then hides `out_node`. `keep_visible` (optional, a
+## Callable taking a node) names a node the end of the fade must not hide: a later switch may have brought it back into view.
+static func cross_fade(out_node: CanvasItem, in_node: CanvasItem, reduce_motion: bool = false, keep_visible: Callable = Callable()) -> Tween:
 	if reduce_motion:
 		if out_node != null and out_node != in_node:
 			out_node.modulate.a = 0.0
@@ -94,7 +95,7 @@ static func cross_fade(out_node: CanvasItem, in_node: CanvasItem, reduce_motion:
 	if in_node != null:
 		tween.tween_property(in_node, "modulate:a", 1.0, CROSS_FADE_DURATION)
 	if out_node != null and out_node != in_node:
-		tween.chain().tween_callback(out_node.hide)
+		tween.chain().tween_callback(_hide_unless.bind(out_node, keep_visible))
 	return tween
 
 
@@ -152,6 +153,15 @@ static func spin_rose(rose_node: Control, reduce_motion: bool = false) -> Tween:
 	tween.set_loops()
 	tween.tween_property(rose_node, "rotation", TAU, ROSE_TURN_DURATION).from(0.0)
 	return tween
+
+
+## The end of a fade: hides `node` unless `keep` says it is the one in view now.
+static func _hide_unless(node: CanvasItem, keep: Callable) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	if keep.is_valid() and bool(keep.call(node)):
+		return
+	node.hide()
 
 
 static func _make_tween(node: Node) -> Tween:

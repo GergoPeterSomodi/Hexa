@@ -12,6 +12,7 @@ signal hud_toggle_requested
 signal country_clicked(tag: StringName)
 signal country_hovered(tag: StringName)
 signal mode_changed(mode: int)
+signal map_mode_refused(mode: int)
 signal country_requested
 signal find_place_requested
 ## U with a selection: the App opens the works card for the hex's upgrade (or its first build), or begins the work at once
@@ -28,11 +29,6 @@ const SELECT_TILE := "mark/select"
 const SYNC_LOAD_HEXES := 4000
 ## Milliseconds a frame the loading and a season swap may use (a layer or a chunk is never split, so one can pass it).
 const SLICE_MS := 5.0
-const MODE_NAMES: Dictionary[String, MapModes.Mode] = {
-	"terrain": MapModes.Mode.TERRAIN,
-	"owner": MapModes.Mode.OWNER,
-	"relief": MapModes.Mode.RELIEF,
-}
 
 ## The map the scene shows (a Session.new_game id); a tool may set it before the scene enters the tree.
 var map_id := MAP_ID
@@ -113,6 +109,8 @@ func _ready() -> void:
 	Events.owners_changed.connect(_on_owners_changed)
 	Events.country_chosen.connect(_on_country_chosen)
 	Events.season_ended.connect(_on_season_ended)
+	for sig: Signal in [Events.work_started, Events.work_finished, Events.work_cancelled, Events.tax_set]:
+		sig.connect(_on_yields_event)
 	if _settings != null:
 		_apply_settings(_settings)
 	if Session.game == null:
@@ -128,6 +126,9 @@ func _exit_tree() -> void:
 			[Events.season_ended, _on_season_ended]]:
 		if (pair[0] as Signal).is_connected(pair[1] as Callable):
 			(pair[0] as Signal).disconnect(pair[1] as Callable)
+	for sig: Signal in [Events.work_started, Events.work_finished, Events.work_cancelled, Events.tax_set]:
+		if sig.is_connected(_on_yields_event):
+			sig.disconnect(_on_yields_event)
 	_disconnect_settings()
 
 
@@ -375,6 +376,7 @@ func _on_owners_changed(hexes: Array[Vector2i]) -> void:
 	var map := Session.game.map
 	if Session.game.has_countries():
 		_overlay.update_hexes(hexes)
+		_overlay.sync_yields(Session.game)
 		var touched := BorderLines.chunks_touched(map, hexes)
 		last_rebuilt_border_chunks.clear()
 		for chunk: Vector2i in touched:
@@ -393,6 +395,12 @@ func _on_owners_changed(hexes: Array[Vector2i]) -> void:
 
 func _on_season_ended(_turn: int) -> void:
 	_seasons.season_ended()
+	_overlay.sync_yields(Session.game)
+
+
+## Works and taxes change a hex's worth: the Yields texture follows (only while the mode is Yields).
+func _on_yields_event(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null) -> void:
+	_overlay.sync_yields(Session.game)
 
 
 ## The player picked a country: ends picking highlight/pennants and restores the remembered map mode.
@@ -453,14 +461,11 @@ func mode() -> int:
 	return int(_mode)
 
 
-## Switches map mode (Terrain, Owner, Relief). Writes `state/map_mode` unless picking.
+## Switches map mode. A mode not in `MapModes.modes(game)` is ignored. Writes `state/map_mode` unless picking.
 func set_mode(value: int) -> void:
-	if value < int(MapModes.Mode.TERRAIN) or value > int(MapModes.Mode.RELIEF):
+	if not MapModes.modes(Session.game).has(value):
 		return
-	var target := value as MapModes.Mode
-	if target == MapModes.Mode.OWNER and (Session.game == null or not Session.game.has_countries()):
-		return
-	_apply_mode(target, not picking())
+	_apply_mode(value as MapModes.Mode, not picking())
 
 
 ## Shows or hides Terrain-mode owner tinting.
@@ -504,8 +509,10 @@ func glide_to_hex(hex: Vector2i, new_zoom: float = -1.0, instant: bool = false) 
 
 
 func _on_mode_requested(requested_mode: int) -> void:
-	if requested_mode == int(MapModes.Mode.OWNER) and (Session.game == null or not Session.game.has_countries()):
-		refused.emit("no countries on this map")
+	if not MapModes.modes(Session.game).has(requested_mode):
+		map_mode_refused.emit(requested_mode)
+		if Session.game == null or not Session.game.has_countries():
+			refused.emit("no countries on this map" if requested_mode == int(MapModes.Mode.OWNER) else "No countries on this map")
 		return
 	set_mode(requested_mode)
 
@@ -526,6 +533,7 @@ func _apply_mode(target: MapModes.Mode, persist: bool) -> void:
 	_mode = target
 	if _overlay != null:
 		_overlay.set_mode(_mode)
+		_overlay.sync_yields(Session.game, true)
 	var is_picking := picking()
 	if _capitals != null:
 		_capitals.set_picking(is_picking)
@@ -571,20 +579,15 @@ func _saved_mode_from_settings() -> MapModes.Mode:
 
 
 func _clamp_mode_for_game(candidate: MapModes.Mode) -> MapModes.Mode:
-	if candidate == MapModes.Mode.OWNER and (Session.game == null or not Session.game.has_countries()):
-		return MapModes.Mode.TERRAIN
-	return candidate
+	return candidate if MapModes.modes(Session.game).has(int(candidate)) else MapModes.Mode.TERRAIN
 
 
 static func _mode_from_string(name: String) -> MapModes.Mode:
-	return MODE_NAMES.get(name, MapModes.Mode.TERRAIN)
+	return maxi(MapModes.mode_of(StringName(name)), 0) as MapModes.Mode
 
 
 static func _mode_to_string(m: MapModes.Mode) -> String:
-	for key: String in MODE_NAMES:
-		if MODE_NAMES[key] == m:
-			return key
-	return "terrain"
+	return String(MapModes.MODE_KEYS[int(m)])
 
 
 # ----- selection & picking ------------------------------------------------------------------------------------------

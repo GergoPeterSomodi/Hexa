@@ -740,3 +740,61 @@ func test_mode_overlay_setup_from_game_and_single_arg_update_hexes() -> void:
 	Session.game.events.clear()
 	overlay.update_hexes([gen_hex])
 	assert_eq(overlay.owner_image().get_pixelv(gen_hex).r8, mlo_id)
+
+
+func _choose_genoa() -> void:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	_finish_fill()
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+
+
+func test_key_4_is_refused_in_a_sandbox_and_while_picking_and_the_mode_ignored() -> void:
+	Bindings.ensure()
+	var reasons: Array[String] = []
+	var refused_modes: Array[int] = []
+	_scene.refused.connect(func(r: String) -> void: reasons.append(r))
+	_scene.map_mode_refused.connect(func(m: int) -> void: refused_modes.append(m))
+	_scene.map_input()._unhandled_input(_key_event(KEY_4))
+	assert_eq(reasons, ["No countries on this map"])
+	_scene.set_mode(MapModes.Mode.YIELDS)
+	assert_eq(_scene.mode(), int(MapModes.Mode.TERRAIN), "a mode the game does not offer is ignored")
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	_finish_fill()
+	_scene.map_input()._unhandled_input(_key_event(KEY_4))
+	assert_eq(refused_modes, [3, 3], "refused while picking too")
+	assert_eq(_scene.mode(), int(MapModes.Mode.OWNER), "picking keeps Owner")
+
+
+func test_yields_follows_the_game_only_while_in_yields() -> void:
+	Bindings.ensure()
+	_choose_genoa()
+	var overlay := _scene.overlay()
+	var writes := overlay.texel_writes
+	Events.tax_set.emit(&"GEN", 2)
+	Events.season_ended.emit(1)
+	assert_eq(overlay.texel_writes, writes, "nothing is computed or written in Terrain")
+	var settings := Settings.new("macOS", false)
+	_scene.configure(settings)
+	_scene.map_input()._unhandled_input(_key_event(KEY_4))
+	assert_eq(_scene.mode(), int(MapModes.Mode.YIELDS))
+	assert_eq(str(settings.get_value("state/map_mode")), "yields", "the switch writes state/map_mode")
+	var want := MapModes.yield_bytes(Session.game, &"GEN")
+	assert_eq(overlay.yields_bytes(), want)
+	var hex := Vector2i(7, 13)  # land changes hands: its texel is veiled
+	Session.game.version += 1
+	Session.game.state.owner[Session.game.map.index_of(hex)] = 0
+	Events.owners_changed.emit([hex] as Array[Vector2i])
+	assert_eq(overlay.yields_bytes(), MapModes.yield_bytes(Session.game, &"GEN"))
+
+
+func test_a_saved_yields_mode_comes_back_and_falls_back_to_terrain() -> void:
+	var settings := Settings.new("macOS", false)
+	settings.set_value("state/map_mode", "yields")
+	_scene.configure(settings)
+	assert_eq(_scene.mode(), int(MapModes.Mode.TERRAIN), "a sandbox does not offer Yields")
+	assert_eq(str(settings.get_value("state/map_mode")), "yields", "and the saved value is kept")
+	_choose_genoa()
+	_scene.configure(settings)
+	assert_eq(_scene.mode(), int(MapModes.Mode.YIELDS), "restored once the game offers it")
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	assert_eq(_scene.mode(), int(MapModes.Mode.TERRAIN), "a new sandbox falls back")

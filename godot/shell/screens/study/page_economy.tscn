@@ -6,3 +6,7 @@
 size_flags_horizontal = 3
 script = ExtResource("1_econ")
 page_id = &"economy"
+
+[node name="this_season" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
