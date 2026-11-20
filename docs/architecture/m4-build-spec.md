@@ -360,7 +360,7 @@ content = (700 × food + 100 × wine + 100 × salt + 100 × oil) / 1000         
 factor  = content_floor (750) + content × (1000 − 750) / 1000                 # 750 to 1,000
 ```
 
-`factor` scales the towns' taxes (4.9). When a need is not fully met this season and was met last season, `production`
+`factor` scales the towns' taxes (4.9). When a need is not fully met this season and its bit in Country.short_mask was clear (set after each production), `production`
 emits `goods_short {tag, good: food|wine|salt|oil, need, taken, witnesses: [tag]}`.
 
 ### 4.8 Stores: the reserve, sales and flows
@@ -631,7 +631,7 @@ goods at price + its dues + its people's taxes (`people × rate × factor` for a
 at the country's level) − its upkeep and walls, floored per hex.
 
 **`ImprovePreview.of(game, tag, hex, option)`** (`option = {action, family}`; cached in `view_cache` by
-`[&"preview", game.version, tag, hex, action, family, treasury_only]`) gives the style spec's 7.1 dictionary with:
+`[&"preview", game.version, tag, hex, action, family]` (the view returns both measures; see 5.0 R2)) gives the style spec's 7.1 dictionary with:
 
 | Field | M4 content |
 |---|---|
@@ -744,6 +744,20 @@ Layers as the standard: `defs`, `state`, `systems`, `game`, `views`, `shell`. `c
 is the weather draw through `Rng`. New files are marked **new**; "(M2)", "(M3)" and "(M1.5)" name pieces those milestones
 build. Every amount is an `int`.
 
+### 5.0 Sign-off amendments (technical director, 2026-11-20; engineering inside D24 to D30)
+
+These bind M4's tasks and are part of the spec:
+
+- **R1** `flows_open` is flow-major (`flow * goods + good`) and saved with `flows_shape`; an older shape is re-laid with missing cells 0.
+- **R2** `ImprovePreview` and `EconomyPreview` return **both** measures (`gain_realm`, `gain_treasury`) in every gain, chip and payback field; the shell picks one by `game/gain_treasury_only`. Core never reads Settings.
+- **R3** `Country.short_mask` (bit per `NEEDS` entry not fully met in the last production) is owned by `EconomySeason`, saved and in the digest; `goods_short` fires for a need that is short now with its bit clear.
+- **R4** Every division in the economy has non-negative operands; signs are applied after dividing. A signed quotient, where a later milestone needs one, uses `Economy.floor_div(a, b)`.
+- **A1** Prices are passed as an argument (`goods_step`, `money_lines` above).
+- **A2** 4.11 rows 8 and 9 go through `Treasury.can_pay(game, tag, ducats)` and `Stores.short_of(game, tag, goods)`.
+- **A5** `Game.new_scenario`, `Snapshot.restore` and every `MapState` replacement call `districts.clear()`; `test_money_property` ends each season with `DistrictCache` equal to `Economy.district_base` for every land hex.
+- **A6** A work whose last season is turn T finishes in T's works phase and first produces in T + 1 = `WorksView.ready_turn_of`; the preview's season t counts it when t >= ready_turn.
+- **A7** `district_output` and `made_of` share one accumulate step, `Economy.add_output(base, slot, weather, tax, defs, into: PackedInt32Array) -> {ducats, upkeep, walls}`; `made_of` allocates no per-hex array.
+- **A8** The text test "no writer of `treasury` or `stock`" allows `country.gd`'s `from_dict` and its defaults.
 ### 5.1 Definitions (`core/defs/`)
 
 ```gdscript
@@ -830,17 +844,20 @@ func changed() -> PackedInt32Array                  # the overlay's hex indices,
 
 # core/state/country.gd  (M2, edit): schema "hexa-godot/country/2" (country/1 is refused: D38)
 var treasury: int = 0                    # Treasury
-var ledger_open: Array[Dictionary] = []  # Treasury: {why: StringName, hex: Vector2i, amount: int, count: int, spending: bool}
+var ledger_open: Array[Dictionary] = []  # Treasury: {why: StringName, hex: Vector2i, amount: int, count: int}; whether a line is spending is derived from Treasury.SPENDING (never stored); from_dict turns why back into StringName
 var ledger_from: int = 0                 # Treasury: the treasury when ledger_open was opened
 var ledger_closed: Dictionary = {}       # Treasury: {turn, opening, closing, lines}
 var tax: int = 1                         # EconomySeason: 0 Low, 1 Normal, 2 High
 var stock: PackedInt32Array              # Stores: per good id
-var flows_open: PackedInt32Array         # Stores: [good * Stores.FLOWS.size() + flow], signed
+var flows_open: PackedInt32Array         # Stores: [flow * goods + good], flow-major, signed; to_dict also writes "flows_shape": [goods, flows], and from_dict re-lays an older shape into the current one (missing cells 0)
+var short_mask: int = 0                # EconomySeason: bit per NEEDS entry not fully met in the last production
 var stock_from: PackedInt32Array         # Stores: the stock when flows_open was opened
 var goods_closed: Dictionary = {}        # Stores: {turn, opening: PackedInt32Array, closing, flows}
 # to_dict / from_dict carry every field (StringName as String; packed arrays as they are); digest_text() appends
-# "|treasury|tax|ledger_from|" + each open line "why:c,r:amount:count" + "|" + the closed ledger + "|" + stock, flows_open,
-# stock_from as comma lists + "|" + goods_closed
+# "|treasury|tax|short_mask|ledger_from|" + each open line "why:c,r:amount:count" + "|" + the closed ledger as
+# "turn:opening:closing;" + each closed line in the open-line form + "|" + stock, flows_open, stock_from as comma lists + "|" +
+# goods_closed as turn, opening, closing and flows as comma lists. stock and stock_from shorter than GameDefs.goods are padded
+# with 0; goods_closed.flows is re-laid as flows_open.
 
 # core/state/work.gd  (M3, edit): schema "hexa-godot/work/2"
 var paid_goods: Dictionary = {}          # good key (String) -> loads paid when begun; work/1 loads with {}
@@ -882,7 +899,7 @@ static func market_prices(game: Game, view: StateView, market: int, supply: Pack
 
 # core/systems/economy_season.gd  (new): a country's season, the two phases and the tax pair
 class_name EconomySeason extends RefCounted
-const OWNS: Array[String] = ["tax"]
+const OWNS: Array[String] = ["tax", "short_mask"]
 const NEEDS: Array[StringName] = [&"food", &"wine", &"salt", &"oil"]
 static func town_people(game: Game, view: StateView, tag: StringName) -> int
 static func country_people(game: Game, view: StateView, tag: StringName) -> int
@@ -891,11 +908,11 @@ static func reserve_of(game: Game, view: StateView, tag: StringName) -> PackedIn
 static func made_of(game: Game, view: StateView, tag: StringName, season: int, weather: PackedByteArray, tax: int) -> Dictionary
 	# {made: PackedInt32Array, dues: Array[Dictionary] {hex, amount}, upkeep: int, upkeep_count: int,
 	#  walls: Array[Dictionary] {hex, amount}}; from DistrictCache when view is the game's own, else district_output
-static func goods_step(game: Game, needs: Dictionary, reserve: PackedInt32Array, stock: PackedInt32Array, made: PackedInt32Array) -> Dictionary
+static func goods_step(game: Game, needs: Dictionary, reserve: PackedInt32Array, stock: PackedInt32Array, made: PackedInt32Array, prices: PackedInt32Array) -> Dictionary
 	# pure (4.7, 4.8): {used: PackedInt32Array, sold: PackedInt32Array, stock: PackedInt32Array, taken: Dictionary,
-	#  satisfaction: Dictionary, content: int}
+	#  satisfaction: Dictionary, content: int, sales_milli: int (sum of sold x prices)}; the phase reads market_prices once per country
 static func content_of(game: Game, needs: Dictionary, used: PackedInt32Array) -> int  # the same content from used goods
-static func money_lines(game: Game, view: StateView, tag: StringName, tax: int, content: int, sold: PackedInt32Array, made_info: Dictionary) -> Array[Dictionary]
+static func money_lines(game: Game, view: StateView, tag: StringName, tax: int, content: int, sales_milli: int, made_info: Dictionary) -> Array[Dictionary]
 	# pure (4.9): [{why, hex, amount, count}] in the order of 4.9; zero lines left out
 static func production(game: Game) -> void    # the phase: per country, made_of, goods_step, Stores.move made/used/sold; goods_short
 static func income(game: Game) -> void        # the phase: per country, content_of(flows_open), money_lines, Treasury.move each line
@@ -927,7 +944,7 @@ const FLOWS: Array[StringName] = [&"made", &"used", &"sold", &"work", &"refund",
 static func setup(game: Game) -> void      # 4.12: stock = EconomySeason.reserve_of(...); flows zero; stock_from = stock
 static func move(game: Game, tag: StringName, good: int, amount: int, why: StringName) -> bool
 	# THE ONLY WRITER OF A STOCK. false (nothing changes) for an unknown tag or good, a why not in FLOWS, or a stock that would
-	# fall below 0; else stock[good] += amount and flows_open[good * F + flow] += amount
+	# fall below 0; else stock[good] += amount and flows_open[flow * G + good] += amount
 static func close(game: Game) -> void      # every country: goods_closed = {turn, opening: stock_from, closing: stock, flows:
 	# flows_open}; flows_open zero; stock_from = stock
 static func short_of(game: Game, tag: StringName, goods: Dictionary) -> String

@@ -1,0 +1,254 @@
+## A country's season (docs/architecture/m4-build-spec.md 4.7 to 4.10 and 5.3): its people, needs and reserve, what its land
+## makes, what the towns use and the stores sell, and the money lines of the income phase. The functions here are pure;
+## the phases `production` and `income` and the tax pair `set_tax_check` / `set_tax` are stubs until task N4.
+class_name EconomySeason
+extends RefCounted
+
+@warning_ignore_start("integer_division")
+
+const OWNS: Array[String] = ["tax", "short_mask"]
+## The needs of the towns, in the order of Country.short_mask's bits.
+const NEEDS: Array[StringName] = [&"food", &"wine", &"salt", &"oil"]
+
+
+## The people of a country's settlement hexes.
+static func town_people(game: Game, view: StateView, tag: StringName) -> int:
+	return _people(game, view, tag, true)
+
+
+## The people of the rest of a country's land.
+static func country_people(game: Game, view: StateView, tag: StringName) -> int:
+	return _people(game, view, tag, false)
+
+
+## The loads a season the towns need: {food, wine, salt, oil} (String keys); ceil(town people x need_milli / 1,000,000).
+static func needs_of(game: Game, view: StateView, tag: StringName) -> Dictionary:
+	var town := town_people(game, view, tag)
+	var defs := game.defs
+	var out: Dictionary = {"food": need_loads(town, defs.food_need_milli)}
+	for g: GoodDef in defs.goods:
+		if g.kind == &"staple":
+			out[String(g.key)] = need_loads(town, g.need_milli)
+	for need: StringName in NEEDS:
+		if not out.has(String(need)):
+			out[String(need)] = 0
+	return out
+
+
+## ceil(town people x need_milli / 1,000,000); 0 town people need nothing.
+static func need_loads(town: int, need_milli: int) -> int:
+	return (town * need_milli + 999999) / 1000000
+
+
+## The stock a country keeps per good id (4.2): grain four seasons of food, a needed good four seasons of its need, a
+## material its fixed reserve, the rest 0.
+static func reserve_of(game: Game, view: StateView, tag: StringName) -> PackedInt32Array:
+	var defs := game.defs
+	var needs := needs_of(game, view, tag)
+	var out := PackedInt32Array()
+	out.resize(defs.goods.size())
+	for i: int in out.size():
+		var g := defs.goods[i]
+		if g.kind == &"food":
+			out[i] = defs.reserve_seasons * int(needs["food"]) if g.key == &"grain" else 0
+		elif g.kind == &"staple":
+			out[i] = defs.reserve_seasons * int(needs[String(g.key)])
+		else:
+			out[i] = g.reserve_fixed
+	return out
+
+
+## What a country's land makes in a season (district_output's step over every hex it owns): {made: PackedInt32Array by
+## good id, dues: [{hex, amount}], upkeep (ducats, positive), upkeep_count (districts with upkeep), walls: [{hex, amount}]}.
+## `weather` is Game.weather (per climate); the hex's own climate picks its entry. The game's own view reads the
+## DistrictCache (when the game has one, or `with_cache` is given: Game.districts is read until the field exists); any
+## other view computes each hex.
+static func made_of(game: Game, view: StateView, tag: StringName, season: int, weather: PackedByteArray, tax: int, with_cache: DistrictCache = null) -> Dictionary:
+	var map := game.map
+	var defs := game.defs
+	var made := PackedInt32Array()
+	made.resize(defs.goods.size())
+	var dues_list: Array[Dictionary] = []
+	var walls: Array[Dictionary] = []
+	var upkeep := 0
+	var count := 0
+	var c := Countries.by_tag(game, tag)
+	var out := {"made": made, "dues": dues_list, "upkeep": 0, "upkeep_count": 0, "walls": walls}
+	if c == null:
+		return out
+	var cache: Variant = with_cache
+	if cache == null and view.state == game.state and view.changed().is_empty():
+		cache = game.get("districts")
+	var fams: Array[FamilyDef] = []
+	for id: int in FamilyIds.COUNT:
+		fams.append(defs.family(id))
+	var settle := fams[Economy.SETTLEMENTS]
+	for i: int in Territory.districts(game, c.id):
+		var climate := int(map.climate[i])
+		var w := int(weather[climate]) if climate < weather.size() else Economy.CALM
+		var slot := Economy.slot_for(climate, season)
+		var dues := 0
+		var up := 0
+		var wall := 0
+		if cache is DistrictCache:
+			var ints := (cache as DistrictCache).ints_of(game, i)
+			var o := i * DistrictCache.FIELDS
+			dues = Economy.accumulate(fams[ints[o + Economy.F_FAMILY]], settle, ints[o + Economy.F_GOOD], ints[o + Economy.F_A0],
+				ints[o + Economy.F_BOUND] != 0, ints[o + Economy.F_WILD_GOOD], ints[o + Economy.F_COVER],
+				ints[o + Economy.F_KEEP], ints[o + Economy.F_PORT], slot, w, tax, defs, made)
+			up = ints[o + Economy.F_UPKEEP]
+			wall = ints[o + Economy.F_WALLS]
+		else:
+			var base := Economy.district_base(game, view, map.hex_of(i))
+			var rest := Economy.add_output(base, slot, w, tax, defs, made)
+			dues = int(rest["ducats"])
+			up = int(rest["upkeep"])
+			wall = int(rest["walls"])
+		if dues > 0:
+			dues_list.append({"hex": map.hex_of(i), "amount": dues})
+		if up > 0:
+			upkeep += up
+			count += 1
+		if wall > 0:
+			walls.append({"hex": map.hex_of(i), "amount": wall})
+	out["upkeep"] = upkeep
+	out["upkeep_count"] = count
+	return out
+
+
+## The towns' needs and the stores' sales of one season (4.7, 4.8), all pure. The goods made join the stock; the towns take
+## food (fish first, then grain), then wine, salt and oil; the stock above `reserve` is sold at `prices`.
+## {used: PackedInt32Array (positive loads by good id), sold, stock (after), taken: {food, wine, salt, oil}, satisfaction
+## (permille, the same keys), content (permille), sales_milli (the sum of sold x prices)}.
+static func goods_step(game: Game, needs: Dictionary, reserve: PackedInt32Array, stock: PackedInt32Array, made: PackedInt32Array, prices: PackedInt32Array) -> Dictionary:
+	var defs := game.defs
+	var count := defs.goods.size()
+	var held := PackedInt32Array()
+	var used := PackedInt32Array()
+	var sold := PackedInt32Array()
+	held.resize(count)
+	used.resize(count)
+	sold.resize(count)
+	for g: int in count:
+		held[g] = (stock[g] if g < stock.size() else 0) + (made[g] if g < made.size() else 0)
+	var taken: Dictionary = {}
+	# Food: fish, then grain (food_order).
+	var remaining := int(needs["food"])
+	for order: int in count:
+		for g: int in count:
+			if defs.goods[g].kind == &"food" and defs.goods[g].food_order == order:
+				var take := mini(held[g], remaining)
+				held[g] -= take
+				used[g] += take
+				remaining -= take
+	taken["food"] = int(needs["food"]) - remaining
+	for g: int in count:
+		if defs.goods[g].kind == &"staple":
+			var key := String(defs.goods[g].key)
+			var take := mini(held[g], int(needs.get(key, 0)))
+			held[g] -= take
+			used[g] = take
+			taken[key] = take
+	var sales := 0
+	for g: int in count:
+		var keep := reserve[g] if g < reserve.size() else 0
+		if held[g] > keep:
+			sold[g] = held[g] - keep
+			held[g] = keep
+			sales += sold[g] * (prices[g] if g < prices.size() else 0)
+	var satisfaction: Dictionary = {}
+	for need: StringName in NEEDS:
+		satisfaction[String(need)] = _satisfaction(int(taken.get(String(need), 0)), int(needs.get(String(need), 0)))
+	return {
+		"used": used, "sold": sold, "stock": held, "taken": taken, "satisfaction": satisfaction,
+		"content": content_of(game, needs, used), "sales_milli": sales,
+	}
+
+
+## Contentment (permille, 4.7) from the loads the towns used (positive, by good id): food counts fish and grain together.
+static func content_of(game: Game, needs: Dictionary, used: PackedInt32Array) -> int:
+	var defs := game.defs
+	var food_taken := 0
+	var total := 0
+	for g: int in defs.goods.size():
+		var def := defs.goods[g]
+		var loads := used[g] if g < used.size() else 0
+		if def.kind == &"food":
+			food_taken += loads
+		elif def.kind == &"staple":
+			total += def.need_weight * _satisfaction(loads, int(needs.get(String(def.key), 0)))
+	total += defs.food_weight * _satisfaction(food_taken, int(needs.get("food", 0)))
+	return total / 1000
+
+
+## The factor (permille, 750 to 1,000) that contentment puts on the towns' taxes.
+static func factor_of(game: Game, content: int) -> int:
+	return game.defs.content_floor + content * (1000 - game.defs.content_floor) / 1000
+
+
+## The income phase's lines (4.9), in order: tax_people, tax_goods, port_dues (each port), upkeep_districts, upkeep_walls
+## (each walled hex); [{why, hex, amount, count}], a zero line left out. `made_info` is made_of's result.
+static func money_lines(game: Game, view: StateView, tag: StringName, tax: int, content: int, sales_milli: int, made_info: Dictionary) -> Array[Dictionary]:
+	var defs := game.defs
+	var t := clampi(tax, 0, 2)
+	var lines: Array[Dictionary] = []
+	var town := town_people(game, view, tag)
+	var rest := country_people(game, view, tag)
+	var people := (town * defs.town_tax_milli * factor_of(game, content) / 1000 + rest * defs.country_tax_milli) \
+			* defs.tax_permille[t] / 1000000000
+	_add_line(lines, &"tax_people", Treasury.NO_HEX, people, 1)
+	_add_line(lines, &"tax_goods", Treasury.NO_HEX, sales_milli * defs.goods_share_permille[t] / 1000000, 1)
+	for due: Dictionary in made_info.get("dues", []):
+		_add_line(lines, &"port_dues", due["hex"], int(due["amount"]), 1)
+	_add_line(lines, &"upkeep_districts", Treasury.NO_HEX, -int(made_info.get("upkeep", 0)), int(made_info.get("upkeep_count", 0)))
+	for wall: Dictionary in made_info.get("walls", []):
+		_add_line(lines, &"upkeep_walls", wall["hex"], -int(wall["amount"]), 1)
+	return lines
+
+
+## The production phase (task N4).
+static func production(_game: Game) -> void:
+	pass
+
+
+## The income phase (task N4).
+static func income(_game: Game) -> void:
+	pass
+
+
+## The tax change's check (task N4).
+static func set_tax_check(_game: Game, _args: Dictionary) -> Dictionary:
+	return {"ok": false, "reason": "not built yet"}
+
+
+## The tax change (task N4).
+static func set_tax(_game: Game, _args: Dictionary) -> Dictionary:
+	return {"ok": false, "reason": "not built yet"}
+
+
+## How far into debt a country may go: 0 in M4 (M12 changes it).
+static func debt_limit(_game: Game, _tag: StringName) -> int:
+	return 0
+
+
+# --- internals -----------------------------------------------------------------------------------------------------
+
+static func _add_line(lines: Array[Dictionary], why: StringName, hex: Vector2i, amount: int, count: int) -> void:
+	if amount != 0:
+		lines.append({"why": why, "hex": hex, "amount": amount, "count": count})
+
+
+static func _satisfaction(taken: int, need: int) -> int:
+	return 1000 if need <= 0 else mini(1000, taken * 1000 / need)
+
+
+static func _people(game: Game, view: StateView, tag: StringName, towns: bool) -> int:
+	var c := Countries.by_tag(game, tag)
+	if c == null:
+		return 0
+	var settle := game.defs.family(Economy.SETTLEMENTS)
+	var total := 0
+	for i: int in Territory.districts(game, c.id):
+		if (view.main_use_at(i) == Economy.SETTLEMENTS) == towns:
+			total += Economy.people_i(game.map, game.defs, view, i, settle)
+	return total
