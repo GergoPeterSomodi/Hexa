@@ -169,3 +169,22 @@ func test_focus_console_opens_the_panel_and_hosts_the_console() -> void:
 	assert_true(_overlay.visible)
 	_harness.settings.set_value("dev/developer_tools", false)
 	assert_false(_overlay.focus_console(), "no console with developer tools off")
+
+
+func test_the_m4_line_shows_the_phase_times_the_cached_districts_and_the_weather() -> void:
+	Session.new_scenario("north_italy_1480", 5, &"GEN")
+	_overlay.set_open(true)
+	assert_eq(_overlay.m4_text(), "production none yet · income none yet · districts cached %d · weather calm, calm, calm" % Session.game.districts.size())
+	Session.last_phase_ms = {"production": 3.14, "income": 0.42, "works": 0.1}
+	Session.game.weather = PackedByteArray([0, 1, 2])
+	_overlay.refresh_metrics()
+	assert_true(_overlay.m4_text().begins_with("production 3.1 ms · income 0.4 ms · districts cached "), _overlay.m4_text())
+	assert_true(_overlay.m4_text().ends_with(" · weather calm, good, poor"), _overlay.m4_text())
+	Session.end_season()
+	_overlay.refresh_metrics()
+	assert_false(_overlay.m4_text().contains("none yet"), "a played season has timed both phases: " + _overlay.m4_text())
+	assert_gt(Session.game.districts.size(), 0, "the cache is filled by the production phase")
+	assert_true(_overlay.m4_text().contains("districts cached %d" % Session.game.districts.size()))
+	Session.game = null
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.m4_text(), "no game")

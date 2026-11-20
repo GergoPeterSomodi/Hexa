@@ -94,7 +94,7 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	_booted = true
 	if p_settings != null:
 		_settings_override = p_settings
-	Bindings.ensure(Bindings.SHELL_MILESTONE)
+	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "4": the study, ledger and works keys and the M4 options
 	_init_settings()
 	_apply_key_overrides()
 
@@ -431,6 +431,7 @@ func _disconnect_map_scene() -> void:
 	if _routes != null:
 		_routes.unbind_scene(_map_scene)
 		_requests.unbind_scene(_map_scene)
+		_requests.works.drop()  # the study and the card belong to the game going away
 
 
 func _teardown_world() -> void:
@@ -494,6 +495,7 @@ func _on_app_requested(what: StringName, args: Dictionary) -> void:
 		&"reload_theme":
 			_apply_theme()
 		&"look_at":
+			_requests.works.close_study()
 			_routes.look_at(args)
 		_:
 			_requests.handle(what, args)

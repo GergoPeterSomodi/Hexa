@@ -1,8 +1,9 @@
 ## The App's M3 handlers (docs/architecture/m3-build-spec.md 6.15), kept out of app.gd so that stays under its size limit:
 ## the season flow and the report screen, quicksave and quickload, Save and Load, Continue, the camera bookmarks, undo,
-## the toasts of works, the floating ribbons' view, the running lock and the recovery question. The App makes one with
-## itself and connects the signals below to it; this class reads the App only through its public accessors and changes the
-## game only through Session.
+## the toasts of works (M4: with their ducats, "-40 ducats" and "+40 ducats back"), the floating ribbons' view, the running
+## lock and the recovery question. The M4 requests (the works card, begin and cancel, the study, the tax toast) are WorksFlow's:
+## this class owns one (`works`) and passes them on. The App makes one with itself and connects the signals below to it; this
+## class reads the App only through its public accessors and changes the game only through Session.
 class_name GameRequests
 extends RefCounted
 
@@ -18,6 +19,8 @@ const END_SEASONS_MAX := 40
 var lock_enabled: bool = false
 var flow: SeasonFlow = null
 var bookmarks: Bookmarks = Bookmarks.new()
+## The works card, Begin and Cancel, the study and the tax toast (spec 6.12).
+var works: WorksFlow = null
 
 var _app: App = null
 var _scene: MapScene = null
@@ -31,6 +34,7 @@ var _due_seen: bool = false
 
 func _init(app: Node) -> void:
 	_app = app as App
+	works = WorksFlow.new(app)
 
 
 ## Makes the flow (a child of the App) with its callables, and lets the pause menu ask whether the season runs.
@@ -64,6 +68,7 @@ func connect_signals(link: Callable) -> void:
 	link.call(Events, &"season_ended", _on_season_ended)
 	link.call(Events, &"work_started", _on_work_started)
 	link.call(Events, &"work_cancelled", _on_work_cancelled)
+	works.connect_signals(link)
 
 
 ## The map scene came: its keys, its camera and its ribbons are bound.
@@ -80,12 +85,14 @@ func bind_scene(scene: MapScene) -> void:
 	_floaters = scene.get_node_or_null("Names/Floaters") as Floaters
 	if _floaters != null:
 		_floaters.setup(Session.game)
+	works.bind_scene(scene)
 	on_setting("accessibility/reduce_motion")
 	on_stack_changed()
 	sync_floaters()
 
 
 func unbind_scene(scene: MapScene) -> void:
+	works.unbind_scene(scene)
 	if scene != null and is_instance_valid(scene):
 		var input := scene.map_input()
 		if input != null:
@@ -123,7 +130,7 @@ func handle(what: StringName, args: Dictionary) -> bool:
 				_scene.preview_season(season)
 			_app.hud().set_look(season)
 		_:
-			return false
+			return works.handle(what, args)
 	return true
 
 
@@ -141,9 +148,12 @@ func on_setting(key: String) -> void:
 		_floaters.set_reduce_motion(bool(settings.get_value("accessibility/reduce_motion")))
 
 
-## The screen stack changed: the notifications and the task flag hide under a screen, the ribbons wait under a modal.
+## The screen stack changed: the notifications and the task flag hide under a screen, the ribbons wait under a modal. The
+## works card is no cover: it opens on a hover, beside the panel, over a live map.
 func on_stack_changed() -> void:
-	_app.hud().set_covered(_app.hides_world(), _app.stack().count() > 0)
+	works.on_stack_changed()
+	var screens := _app.stack().count() - (1 if _app.stack().has_screen(&"works_preview") else 0)
+	_app.hud().set_covered(_app.hides_world(), screens > 0)
 	if _floaters != null:
 		if _app.wants_pause() or _app.hides_world():
 			_floaters.wait()
@@ -318,7 +328,11 @@ func _on_work_started(tag: StringName, _hex: Vector2i, work: Dictionary) -> void
 	if game == null or w == null or tag != game.player:
 		return
 	var ready := Calendar.date_text(WorksView.ready_turn(game, w), game.start_year)
-	_toast("Work begun: %s. Ready %s." % [WorksView.line(game, w), ready], &"plain", &"game_undo_work")
+	var paid := _paid_words(game, w)
+	var text := "Work begun: %s." % WorksView.line(game, w)
+	if paid != "":
+		text += " %s." % paid
+	_toast("%s Ready %s." % [text, ready], &"plain", &"game_undo_work")
 
 
 func _on_work_cancelled(tag: StringName, _hex: Vector2i, work: Dictionary, why: StringName) -> void:
@@ -326,7 +340,42 @@ func _on_work_cancelled(tag: StringName, _hex: Vector2i, work: Dictionary, why: 
 	var w := Work.from_dict(work)
 	if game == null or w == null or tag != game.player or why != &"order":
 		return
-	_toast("Work cancelled: %s." % WorksView.line(game, w))
+	var text := "Work cancelled: %s." % WorksView.line(game, w)
+	var back := _refund_words(game, w)
+	if back != "":
+		text += " %s back." % back
+	_toast(text)
+
+
+## What a begun work took: "−40 ducats", "−60 ducats, −10 timber" ("" for a free work). The work's own record of it.
+func _paid_words(game: Game, w: Work) -> String:
+	var parts: PackedStringArray = []
+	if w.paid > 0:
+		parts.append(Words.signed_ducats(-w.paid))
+	parts.append_array(_goods_words(game, w.paid_goods, -1))
+	return ", ".join(parts)
+
+
+## What a cancelled work gives back at once (Works.refund and refund_goods: all of it in the season it began, else nothing):
+## "+40 ducats", "+60 ducats, +10 timber".
+func _refund_words(game: Game, w: Work) -> String:
+	var parts: PackedStringArray = []
+	var ducats := Works.refund(game, w)
+	if ducats > 0:
+		parts.append(Words.signed_ducats(ducats))
+	parts.append_array(_goods_words(game, Works.refund_goods(game, w), 1))
+	return ", ".join(parts)
+
+
+## "−10 timber" (sign -1) or "+10 timber" (sign 1) for each good of `loads` (key -> n), in the goods' id order.
+func _goods_words(game: Game, loads: Dictionary, sign: int) -> PackedStringArray:
+	var out: PackedStringArray = []
+	for g: int in game.defs.goods.size():
+		var good := game.defs.good(g)
+		var n := int(loads.get(String(good.key), 0))
+		if n > 0:
+			out.append("%s %s" % [Words.signed(sign * n), good.name.to_lower()])
+	return out
 
 
 # ----- save, load -------------------------------------------------------------------------------------------------------

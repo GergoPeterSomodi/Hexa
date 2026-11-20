@@ -1,6 +1,7 @@
 ## Chancellor's report: the season that ended, drawn on a Studiolo VellumSheet (docs/architecture/m3-build-spec.md 6.4;
 ## ui-style-and-feedback-spec.md 6.8). Input is one SeasonSummary.of dictionary (or tests/fixtures/report_sample.gd).
-## A link or an action button closes the report and asks the App to glide to the hex; Space, Enter, Esc and the primary
+## A link or an action button closes the report and asks the App to glide to the hex; "Open the study" (a KeyCap of I, and a
+## line's action [&"study", page]) closes it and asks the App for the study (spec 6.8); Space, Enter, Esc and the primary
 ## button close it. The Full, Brief, Off setting is written to `game/season_report`.
 ## show_summary() fills the sheet once per instance: the sheet keeps its sections, so a report is a fresh screen each time.
 class_name SeasonReport
@@ -12,6 +13,9 @@ signal closed(reason: StringName)
 const NO_HEX := Vector2i(-1, -1)
 const CHIP_LIMIT: int = 5
 const LOOK_ACTIONS: Array[StringName] = [&"look_at", &"select"]
+const STUDY_ACTION := &"study"
+const STUDY_PAGE := &"economy"
+const STUDY_LABEL := "Open the study"
 const CLOSE_KEYS: Array[Key] = [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]
 const SHEET_MAX_W: float = 900.0
 const SHEET_MAX_H: float = 800.0
@@ -30,6 +34,7 @@ const SETTING_CHOICES: Array[Dictionary] = [
 var _sheet: VellumSheet = null
 var _seg: Segmented = null
 var _begin_btn: KitButton = null
+var _study_btn: KitButton = null
 var _summary: Dictionary = {}
 var _reopened: bool = false
 var _body_filled: bool = false
@@ -172,6 +177,16 @@ func _build_footer() -> void:
 	_seg.set_options(SETTING_CHOICES)
 	_seg.changed.connect(_on_setting_changed)
 	foot.add_child(_seg)
+
+	_study_btn = KitButton.new()
+	_study_btn.name = &"StudyButton"
+	_study_btn.kind = KitButton.Kind.SECONDARY
+	_study_btn.text = STUDY_LABEL
+	_study_btn.hotkey_action = &"game_study"
+	_study_btn.show_key_cap = true
+	_study_btn.visible = Session.game == null or Session.game.has_countries()
+	_study_btn.pressed.connect(_open_study.bind(STUDY_PAGE))
+	foot.add_child(_study_btn)
 
 	_begin_btn = KitButton.new()
 	_begin_btn.name = &"BeginButton"
@@ -398,11 +413,23 @@ func _ink_for(tone: String) -> Color:
 			return Tokens.VELLUM_INK
 
 
-## A link or action: the report closes, then the App glides to the hex and selects it.
+## The study asked for at `page`: the report closes first, then the App pushes the study.
+func _open_study(page: StringName) -> void:
+	if _closed:
+		return
+	_close(&"study")
+	if ctx != null:
+		ctx.request(STUDY_ACTION, {"page": page})
+
+
+## A link or action: the report closes, then the App glides to the hex and selects it; a [&"study", page] action opens the study.
 func _pick(hex: Vector2i, action: Array) -> void:
 	if _closed:
 		return
 	link_chosen.emit(hex, action)
+	if action.size() >= 2 and StringName(str(action[0])) == STUDY_ACTION:
+		_open_study(StringName(str(action[1])))
+		return
 	if hex != NO_HEX and ctx != null:
 		ctx.request(&"look_at", {"hex": hex, "select": true})
 	_close(&"look")
@@ -420,6 +447,10 @@ func _close(reason: StringName) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if _closed or key == null or not key.pressed or key.echo:
+		return
+	if InputMap.has_action(&"game_study") and event.is_action_pressed(&"game_study", false, true) and _study_btn != null and _study_btn.visible:
+		accept_event()
+		_open_study(STUDY_PAGE)
 		return
 	if CLOSE_KEYS.has(key.keycode):
 		accept_event()

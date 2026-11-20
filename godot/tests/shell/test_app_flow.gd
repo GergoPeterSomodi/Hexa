@@ -570,3 +570,221 @@ func test_no_recovery_question_without_a_lock() -> void:
 	var app := env["app"] as App
 	await _wait_frames(3)
 	assert_true(app.stack().top() is MainMenu)
+
+
+# ----- M4 (docs/architecture/m4-build-spec.md 9; the owner's playtest checklist 1 to 8 and 15 of m4-build-plan.md section 4) --
+# The other M4 App tests (U in the three Confirm works modes, the options, the sandbox, the console) are in test_app_flow_m4.gd.
+
+const GENOA := Vector2i(8, 13)
+const SAVONA := Vector2i(6, 13)
+const VINEYARD := Vector2i(7, 12)
+const WOODS := Vector2i(10, 13)
+
+
+## A Genoa game on seed 1480, no pick, the report on, the map ready and the top bar fitted.
+func _genoa_app() -> Dictionary:
+	var env := await _scenario_app(PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"]))
+	var app := env["app"] as App
+	app.settings().set_value("game/autosave", "off")
+	app.settings().set_value("graphics/season_change", "instant")
+	app.settings().set_value("game/season_report", "full")
+	assert_true(await _wait_until(func() -> bool: return app.map_scene() != null and app.stack().count() == 0 and not app.is_starting()), "the game is up")
+	await _wait_frames(3)  # the HUD lays out: the top bar is fitted to the window
+	return env
+
+
+## New game as Genoa; the chips, the rows, the hover card, U, begin, undo, Space, the study, tax and F5 with Continue.
+func test_m4_flow_chips_rows_card_begin_undo_report_study_tax_save_load() -> void:
+	var env := await _genoa_app()
+	var vp := env["vp"] as SubViewport
+	var app := env["app"] as App
+	await _m4_chips_and_gives(app)
+	await _m4_hover_card(vp, app)
+	await _m4_u_refusals(vp, app)
+	await _m4_begin_and_undo(vp, app)
+	var study := await _m4_report_and_study(vp, app)
+	await _m4_tax_and_look(vp, app, study)
+	await _m4_save_and_continue(vp, app)
+
+
+## Checklist 1 and 2: the chips (610 ducats, the cards) and the vineyard's Gives row.
+func _m4_chips_and_gives(app: App) -> void:
+	var chips := app.hud().chips()
+	assert_true(chips.visible, "the chips show for the player")
+	assert_eq(AppFlowHelpers.ducats_shown(app), "610")
+	var ducats_text := " | ".join(AppFlowHelpers.card_lines(chips.ducats_card()))
+	assert_true(ducats_text.contains("No season has ended yet."), ducats_text)
+	assert_true(ducats_text.contains("Expected this season"), ducats_text)
+	assert_gt(AppFlowHelpers.card_lines(chips.stores_card()).size(), 4, "the stores card lists the goods in store")
+	assert_true(app.hud().top_bar().study_button().visible, "the study button shows")
+	app.map_scene().select_hex(VINEYARD)
+	await _wait_frames(3)
+	var gives := app.hud().hex_panel().get_node("Body/GivesRow/Value") as Label
+	assert_eq(gives.text, "wine 24 in autumn · upkeep 2 a season")
+	assert_eq(HexCard.of(Session.game, VINEYARD)["gives"], gives.text, "the hover card says the same")
+
+
+## Checklist 3: a row's hover opens the card beside the panel and the marks on the map; Shift and pin keep it; Esc closes it.
+func _m4_hover_card(vp: SubViewport, app: App) -> void:
+	app.map_scene().select_hex(WOODS)
+	await _wait_frames(3)
+	var woods := AppFlowHelpers.row_button(app, "Build woodland")
+	assert_not_null(woods, "a woodland row")
+	assert_not_null(AppFlowHelpers.row_button(app, "Build harbour"), "a harbour row")
+	woods.mouse_entered.emit()
+	await _wait_frames(2)
+	var card := app.stack().top() as WorksPreview
+	assert_not_null(card, "the hover opens the card")
+	assert_lt(card.card_rect().end.x, Hud.screen_rect(app.hud().hex_panel()).position.x + 1.0, "left of the panel")
+	var marks := app.map_scene().preview_marks()
+	assert_true(marks.shown(), "the ghost and the marks are on the map")
+	assert_true(marks.labels().any(func(l: Dictionary) -> bool: return str(l["text"]) == "+16 timber"), str(marks.labels()))
+	card.hold(true)  # Shift
+	woods.mouse_exited.emit()
+	await _wait_frames(2)
+	assert_eq(app.stack().top(), card, "Shift keeps the card while the pointer is away")
+	card.hold(false)
+	await _wait_frames(2)
+	assert_eq(app.stack().count(), 0, "released, it goes")
+	assert_false(marks.shown(), "and its marks with it")
+	woods.mouse_entered.emit()
+	await _wait_frames(2)
+	card = app.stack().top() as WorksPreview
+	card.pin(true)
+	woods.mouse_exited.emit()
+	await _wait_frames(2)
+	assert_eq(app.stack().top(), card, "a pinned card stays")
+	AppFlowHelpers.row_button(app, "Build harbour").mouse_entered.emit()
+	await _wait_frames(2)
+	assert_eq(app.stack().count(), 1, "the next option opens in the same card, beside the pinned one")
+	_send_key(vp, KEY_ESCAPE)
+	await _wait_frames(2)
+	assert_eq(app.stack().count(), 0, "Esc closes the card")
+	assert_false(marks.shown())
+
+
+## Checklist 4 and 5: U on Genoa (refused for the ducats, everything shown) and on Savona (only the town rule).
+func _m4_u_refusals(vp: SubViewport, app: App) -> void:
+	app.map_scene().select_hex(GENOA)
+	await _wait_frames(2)
+	_send_key(vp, KEY_U)
+	await _wait_frames(3)
+	var card := app.stack().top() as WorksPreview
+	assert_not_null(card, "U opens the card in the default Confirm works mode (the upgrade is expensive)")
+	assert_eq(card.shown_hex(), GENOA)
+	assert_eq(str(card.shown_option()["action"]), "upgrade")
+	assert_eq(str(card.preview()["reason_words"]), "Not enough ducats: 1,000 needed, 610 in the treasury.")
+	assert_gt((card.preview()["brings"] as Array).size(), 0, "everything is shown")
+	assert_eq(Session.game.state.works.size(), 0, "nothing was begun")
+	_send_key(vp, KEY_ESCAPE)
+	await _wait_frames(2)
+	assert_eq(app.stack().count(), 0)
+	app.map_scene().select_hex(SAVONA)
+	await _wait_frames(2)
+	_send_key(vp, KEY_U)
+	await _wait_frames(3)
+	card = app.stack().top() as WorksPreview
+	assert_not_null(card)
+	assert_eq(str(card.preview()["reason_words"]), "Cuneo (5, 13) is a town beside Savona: two towns may not stand side by side.")
+	_send_key(vp, KEY_ESCAPE)
+	await _wait_frames(2)
+
+
+## Checklist 6: begin woodland: the toast, 570, the stores unchanged; undo gives 610 back; begin it again.
+func _m4_begin_and_undo(vp: SubViewport, app: App) -> void:
+	app.map_scene().select_hex(WOODS)
+	await _wait_frames(3)
+	var stores_before := app.hud().chips().stores_card().duplicate(true)
+	AppFlowHelpers.row_button(app, "Build woodland").pressed.emit()
+	await _wait_frames(3)
+	assert_true(AppFlowHelpers.has_toast(app, "−40 ducats"), str(AppFlowHelpers.toasts(app)))
+	assert_eq(AppFlowHelpers.ducats_shown(app), "570")
+	assert_eq(app.hud().chips().stores_card(), stores_before, "no goods for a first stage")
+	assert_eq(app.stack().count(), 0)
+	AppFlowHelpers.undo_key(vp)
+	await _wait_frames(3)
+	assert_true(AppFlowHelpers.has_toast(app, "+40 ducats back"), str(AppFlowHelpers.toasts(app)))
+	assert_eq(AppFlowHelpers.ducats_shown(app), "610")
+	AppFlowHelpers.row_button(app, "Build woodland").pressed.emit()
+	await _wait_frames(3)
+	assert_eq(AppFlowHelpers.ducats_shown(app), "570")
+
+
+## Checklist 7: Space: the report, 610 to 656; Open the study opens the Economy page and the report is gone.
+func _m4_report_and_study(vp: SubViewport, app: App) -> Study:
+	await _wait_until(func() -> bool: return _guard_over(app), 600)
+	_send_key(vp, KEY_SPACE)
+	assert_true(await _wait_until(func() -> bool: return _report_up(app)), "the report opens")
+	var report := app.stack().top() as SeasonReport
+	var treasury_total := ""
+	for section: Dictionary in SeasonSummary.of(Session.game, &"GEN", 1)["sections"]:
+		if section["id"] == &"treasury":
+			treasury_total = str((section["total"] as Dictionary)["text"])
+	assert_eq(treasury_total, "610 → 656")
+	assert_true(AppFlowHelpers.labels_under(report).any(func(t: String) -> bool: return t.contains("656")), "the report shows it")
+	var open_study := report.find_child("StudyButton", true, false) as Button
+	assert_not_null(open_study, "Open the study")
+	open_study.pressed.emit()
+	await _wait_frames(3)
+	var study := app.stack().top() as Study
+	assert_not_null(study, "the study opens, the report is gone")
+	assert_eq(study.current_page_id(), &"economy")
+	assert_false(app.stack().has_screen(&"season_report"))
+	var page_text := " | ".join(AppFlowHelpers.labels_under(study))
+	for part: String in ["Money in", "Money out", "Left over, a season", "Expected this season", "Your spending"]:
+		assert_true(page_text.contains(part), part + " in " + page_text)
+	return study
+
+
+## Checklist 8: tax High (the toast, Expected rises) and back to Normal; a place closes the study; I reopens the same one.
+func _m4_tax_and_look(vp: SubViewport, app: App, study: Study) -> void:
+	var tax := study.find_child("TaxLevels", true, false) as Segmented
+	assert_not_null(tax)
+	var expected_before := int((StudyEconomy.this_season(Session.game, &"GEN")["expected"] as Dictionary)["realm"])
+	tax.button_for(2).button_pressed = true
+	await _wait_frames(2)
+	assert_true(AppFlowHelpers.has_toast(app, "Taxes set to High"), str(AppFlowHelpers.toasts(app)))
+	assert_gt(int((StudyEconomy.this_season(Session.game, &"GEN")["expected"] as Dictionary)["realm"]), expected_before, "Expected rises")
+	tax = study.find_child("TaxLevels", true, false) as Segmented
+	tax.button_for(1).button_pressed = true
+	await _wait_frames(2)
+	assert_eq(Countries.by_tag(Session.game, &"GEN").tax, 1, "back to Normal")
+	var link: Button = null
+	for node: Node in study.find_children("*", "Button", true, false):
+		if (node as Button).accessibility_name.begins_with("Look at"):
+			link = node as Button
+			break
+	assert_not_null(link, "a row of Earns most or the ledger")
+	link.pressed.emit()
+	await _wait_frames(3)
+	assert_eq(app.stack().count(), 0, "the study closes and the map glides there")
+	_send_key(vp, KEY_I)
+	await _wait_frames(3)
+	assert_eq(app.stack().top(), study, "I reopens the same study")
+	assert_eq(study.current_page_id(), &"economy")
+	_send_key(vp, KEY_I)
+	await _wait_frames(2)
+	assert_eq(app.stack().count(), 0, "I closes it")
+
+
+## Checklist 15: F5, the main menu, Continue: the ducats and the stores as before, and the study opens.
+func _m4_save_and_continue(vp: SubViewport, app: App) -> void:
+	var treasury_saved := Countries.by_tag(Session.game, &"GEN").treasury
+	var stock_saved := Countries.by_tag(Session.game, &"GEN").stock.duplicate()
+	var digest_saved := Session.game.digest()
+	_send_key(vp, KEY_F5)
+	assert_true(await _wait_until(func() -> bool: return FileAccess.file_exists(Session.save_dir.path_join("quick.sav"))))
+	await _wait_frames(2)
+	app.context().request(&"main_menu")
+	assert_true(await _wait_until(func() -> bool: return app.stack().top() is MainMenu), "the main menu")
+	app.context().request(&"continue")
+	assert_true(await _wait_until(func() -> bool: return Session.game != null and app.map_scene() != null and app.stack().count() == 0 and not app.is_starting(), 900))
+	assert_eq(Session.game.digest(), digest_saved)
+	assert_eq(Countries.by_tag(Session.game, &"GEN").treasury, treasury_saved)
+	assert_eq(Countries.by_tag(Session.game, &"GEN").stock, stock_saved)
+	assert_eq(AppFlowHelpers.ducats_shown(app), Words.number(treasury_saved), "the chip shows the saved ducats")
+	_send_key(vp, KEY_I)
+	await _wait_frames(3)
+	var study := app.stack().top() as Study
+	assert_not_null(study, "the study opens after a load")
+	assert_eq(study.current_page_id(), &"economy")

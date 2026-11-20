@@ -28,7 +28,7 @@ const PATHS: Dictionary[StringName, String] = {
 ## The screens a player opens from the menus: warm() loads them on a thread while the main menu is up.
 const WARM_IDS: Array[StringName] = [
 	&"options", &"pause_menu", &"help", &"credits", &"about", &"new_game", &"country_pick", &"save_load",
-	&"season_report", &"confirm", &"sandbox", &"find_place",
+	&"season_report", &"confirm", &"sandbox", &"find_place", &"works_preview", &"study",
 ]
 
 ## Scenes already loaded, kept so a second open does not read the file again (a PackedScene is small).

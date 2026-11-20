@@ -21,6 +21,8 @@ signal report_requested
 ## `set` true stores the view in slot `index` (1 to 9); false goes to it.
 signal bookmark_requested(index: int, set: bool)
 signal undo_work_requested
+## I opens the Statesman's Study on its last page (page &""), L on the Economy page (&"economy"): the App pushes it.
+signal study_requested(page: StringName)
 
 const CLICK_SLOP := 6.0
 const NO_HEX := Vector2i(-9999, -9999)
@@ -181,13 +183,17 @@ func _on_key(key: InputEventKey) -> void:
 		_mark_handled()
 
 
-## The M3 keys: report, bookmarks, cancel work. Returns true when one fired.
+## The M3 and M4 keys: report, bookmarks, cancel work, the study. Returns true when one fired.
 func _on_game_key(key: InputEventKey) -> bool:
 	var fired := true
 	if _is_action_pressed_exact(key, &"game_report"):
 		report_requested.emit()
 	elif _is_action_pressed_exact(key, &"game_undo_work"):
 		undo_work_requested.emit()
+	elif _is_action_pressed_exact(key, &"game_study"):
+		study_requested.emit(&"")
+	elif _is_action_pressed_exact(key, &"game_ledger"):
+		study_requested.emit(&"economy")
 	else:
 		var slot := _bookmark_slot(key)
 		if slot.x == 0:

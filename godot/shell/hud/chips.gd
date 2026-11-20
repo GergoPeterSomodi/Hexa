@@ -7,6 +7,8 @@ class_name Chips
 extends HBoxContainer
 
 signal study_requested
+## Emitted after every refresh (it sets the chips' visibility itself, so the top bar fits again).
+signal refreshed
 
 const DUCATS_ID := &"ducats"
 const STORES_ID := &"stores"
@@ -72,6 +74,7 @@ func refresh() -> void:
 	if not visible:
 		_ducats_card = {}
 		_stores_card = {}
+		refreshed.emit()
 		return
 	_ducats.set_value(int(ducats["value"]), int(ducats["change"]))
 	_ducats_card = _card_of(ducats)
@@ -83,6 +86,7 @@ func refresh() -> void:
 		_stores.set_card(_stores_card)
 	else:
 		_stores_card = {}
+	refreshed.emit()
 
 
 ## Narrowing (the top bar's order, spec 6.3): the Stores name and both changes hide; the values and medals stay.

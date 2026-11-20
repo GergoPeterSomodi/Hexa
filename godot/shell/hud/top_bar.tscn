@@ -1,10 +1,11 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/top_bar.gd" id="1_bar"]
 [ext_resource type="Script" path="res://shell/ui/segmented.gd" id="2_seg"]
 [ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
 [ext_resource type="Script" path="res://shell/ui/country_arms.gd" id="4_arms"]
 [ext_resource type="PackedScene" path="res://shell/hud/date_end.tscn" id="5_dateend"]
+[ext_resource type="PackedScene" path="res://shell/hud/chips.tscn" id="6_chips"]
 
 [node name="TopBar" type="PanelContainer"]
 custom_minimum_size = Vector2(0, 40)
@@ -57,6 +58,22 @@ layout_mode = 2
 size_flags_vertical = 4
 script = ExtResource("2_seg")
 hud_mode = true
+
+[node name="Chips" parent="HBox" instance=ExtResource("6_chips")]
+visible = false
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="StudyButton" type="Button" parent="HBox"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+tooltip_text = "The Statesman's Study"
+accessibility_name = "The Statesman's Study"
+script = ExtResource("3_btn")
+kind = 6
+icon_name = &"study"
 
 [node name="DateEnd" parent="HBox" instance=ExtResource("5_dateend")]
 layout_mode = 2

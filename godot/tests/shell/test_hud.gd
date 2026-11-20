@@ -466,3 +466,151 @@ func test_the_top_bar_fits_700_px_in_a_sandbox_the_pick_and_a_game() -> void:
 	bar.fit_width(1600.0)
 	assert_true(bar.name_shown(), "the name comes back when there is room")
 	assert_true(bar.brand_label().visible)
+
+
+# ----- M4: the chips and the study button in the top bar (docs/architecture/m4-build-spec.md 6.3, 6.12) -----------------------
+
+
+func _genoa_bar() -> TopBar:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480, &"GEN"), "")
+	var bar := _hud.top_bar()
+	bar.refresh_game()
+	return bar
+
+
+func test_the_chips_sit_after_the_mode_switch_and_before_the_date() -> void:
+	await _harness.wait_frames(self, 2)
+	var bar := _genoa_bar()
+	await _harness.wait_frames(self, 3)
+	var box := bar.get_node("HBox") as HBoxContainer
+	var chips_at := bar.chips().get_index()
+	assert_eq(chips_at, bar.mode_segmented().get_index() + 1, "right after the mode switch")
+	assert_lt(chips_at, bar.date_end().get_index(), "before the date and End turn")
+	assert_eq(box.get_child(bar.study_button().get_index()), bar.study_button())
+	assert_true(bar.chips().visible, "a player: chips")
+	assert_true(bar.study_button().visible)
+	assert_eq(bar.chips().ducats_chip().value_label().text, "610")
+	assert_eq(bar.study_button().tooltip_text, "The Statesman's Study [I]")
+	assert_eq(_hud.chips(), bar.chips())
+
+
+func test_no_chips_and_no_study_button_in_the_sandbox_and_the_pick() -> void:
+	await _harness.wait_frames(self, 2)
+	var bar := _hud.top_bar()
+	assert_false(bar.chips().visible, "the sandbox has no treasury")
+	assert_false(bar.study_button().visible)
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
+	bar.refresh_game()
+	await _harness.wait_frames(self, 2)
+	assert_false(bar.chips().visible, "the pick: no player yet")
+	assert_false(bar.study_button().visible)
+	Session.act("choose_country", {"tag": &"GEN"})
+	await _harness.wait_frames(self, 2)
+	assert_true(bar.chips().visible, "chosen: the chips come")
+	assert_true(bar.study_button().visible)
+	Session.end_game()
+	bar.refresh_game()
+	await _harness.wait_frames(self, 2)
+	assert_false(bar.chips().visible, "no game: no chips")
+
+
+func test_a_chip_and_the_study_button_reach_the_hud_as_study_requests() -> void:
+	await _harness.wait_frames(self, 2)
+	var bar := _genoa_bar()
+	await _harness.wait_frames(self, 3)
+	var asked: Array[StringName] = []
+	_hud.study_requested.connect(func(page: StringName) -> void: asked.append(page))
+	bar.chips().ducats_chip().pressed.emit()
+	bar.chips().stores_chip().pressed.emit()
+	bar.study_button().pressed.emit()
+	_hud.country_panel().study_requested.emit()
+	_hud.task_flag().study_requested.emit(&"economy")
+	assert_eq(asked, [&"economy", &"economy", &"", &"economy", &"economy"], "the chips and the panel ask Economy, the button its last page")
+
+
+func test_the_chips_narrow_in_the_order_of_the_spec_and_fit_the_window() -> void:
+	await _harness.wait_frames(self, 2)
+	var bar := _genoa_bar()
+	await _harness.wait_frames(self, 3)
+	var ducats := bar.chips().ducats_chip()
+	var stores := bar.chips().stores_chip()
+	bar.fit_width(1600.0)
+	assert_true(stores.visible and bar.name_shown(), "wide: the Stores chip and the country name are there")
+	assert_true(ducats.delta_chip().visible, "wide: the change shows")
+	bar.fit_width(1280.0)
+	assert_lte(bar.get_combined_minimum_size().x, 1280.0, "1280 px fits")
+	assert_true(bar.chips().visible and ducats.value_label().visible and ducats.medallion().visible, "1280: the medal and value")
+	# Tight: the gap first, then the Stores chip, then the country name, then the Ducats change, the brand last.
+	var seen: Array[String] = []
+	for width: float in [1100.0, 1000.0, 900.0, 800.0, 790.0]:
+		bar.fit_width(width)
+		seen.append("%d: stores %s name %s change %s brand %s chips %s" % [int(width), stores.visible, bar.name_shown(), ducats.delta_chip().visible, bar.brand_label().visible, bar.chips().visible])
+		assert_lte(bar.get_combined_minimum_size().x, width, "fits %d px: %s" % [int(width), seen[-1]])
+	bar.fit_width(1024.0)
+	assert_lte(bar.get_combined_minimum_size().x, 1024.0, "the smallest window fits")
+	assert_true(bar.chips().visible and bar.study_button().visible, "the chips and the study button stay at 1024 px")
+	assert_true(ducats.value_label().visible, "the Ducats value never hides in a real window")
+	# The order: whenever the name is still there the Stores chip may be gone, but never the other way round.
+	for width: float in [1400.0, 1300.0, 1200.0, 1100.0, 1000.0, 950.0, 900.0, 850.0, 800.0]:
+		bar.fit_width(width)
+		if bar.name_shown():
+			assert_true(ducats.delta_chip().visible, "%d: the Ducats change goes after the name" % int(width))
+		if not stores.visible:
+			assert_true(bar.chips().visible, "%d: the Stores chip goes before the Ducats chip" % int(width))
+		if not ducats.delta_chip().visible:
+			assert_false(bar.name_shown(), "%d: the name is gone before the Ducats change" % int(width))
+	bar.fit_width(4000.0)
+	assert_true(stores.visible and bar.name_shown() and ducats.delta_chip().visible and bar.brand_label().visible, "everything comes back")
+
+
+func test_both_chips_and_the_study_button_show_at_1280_and_1024_px() -> void:
+	await _harness.wait_frames(self, 2)
+	var bar := _genoa_bar()
+	await _harness.wait_frames(self, 3)
+	var ducats := bar.chips().ducats_chip()
+	var stores := bar.chips().stores_chip()
+	for width: int in [1280, 1024]:
+		_harness.viewport.size = Vector2i(width, 720)  # the real resize path
+		await _harness.wait_frames(self, 4)
+		var tag := "%d px" % width
+		assert_true(bar.chips().visible and bar.study_button().visible, "%s: the chips and the study button" % tag)
+		assert_true(ducats.visible and stores.visible, "%s: both chips show" % tag)
+		assert_true(ducats.value_label().visible and stores.value_label().visible, "%s: the values show" % tag)
+		assert_true(bar.date_end().date_button().visible and bar.date_end().end_button().visible, "%s: date and End turn" % tag)
+		assert_true(bar.layers_button().visible and bar.help_button().visible and bar.menu_button().visible, "%s: the buttons" % tag)
+		assert_lte(bar.get_combined_minimum_size().x, float(width), "%s: the bar fits" % tag)
+		assert_lte(bar.size.x, float(width), "%s: the bar is no wider than the window" % tag)
+		assert_lte(bar.menu_button().get_global_rect().end.x, float(width), "%s: Menu is not clipped" % tag)
+		if width == 1280:
+			assert_true(bar.brand_label().visible and bar.name_shown(), "1280 px: the brand and the country name")
+			assert_true(ducats.name_label().visible and ducats.delta_chip().visible, "1280 px: Ducats with name and change")
+	for width: int in [900, 800, 700, 1280]:
+		_harness.viewport.size = Vector2i(width, 720)
+		await _harness.wait_frames(self, 4)
+		assert_lte(bar.size.x, float(width), "%d px: the bar is no wider than the window" % width)
+		assert_lte(bar.menu_button().get_global_rect().end.x, float(width), "%d px: Menu is not clipped" % width)
+	assert_true(stores.visible and bar.brand_label().visible, "back at 1280 everything returns")
+	_harness.viewport.size = Vector2i(1280, 720)
+
+
+func test_below_any_real_window_the_chips_and_the_button_give_way_to_the_rest() -> void:
+	await _harness.wait_frames(self, 2)
+	var bar := _genoa_bar()
+	await _harness.wait_frames(self, 3)
+	bar.fit_width(700.0)
+	assert_lte(bar.get_combined_minimum_size().x, 700.0, "a game bar fits 700 px")
+	assert_false(bar.chips().visible, "the last thing to go")
+	assert_true(bar.date_end().end_button().visible, "End turn never hides")
+	bar.fit_width(1280.0)
+	assert_true(bar.chips().visible and bar.study_button().visible, "and they come back")
+
+
+func test_the_hex_panel_gets_the_settings_and_refresh_economy_reads_the_chips_again() -> void:
+	await _harness.wait_frames(self, 2)
+	assert_eq(_hud.hex_panel().settings, _harness.settings, "the panel reads game/confirm_works from the App's settings")
+	var bar := _genoa_bar()
+	await _harness.wait_frames(self, 3)
+	assert_true(Session.dev_money(&"GEN", 90))
+	assert_eq(bar.chips().ducats_chip().value_label().text, "610", "dev_money sends no event")
+	_hud.refresh_economy()
+	assert_eq(bar.chips().ducats_chip().value_label().text, "700")

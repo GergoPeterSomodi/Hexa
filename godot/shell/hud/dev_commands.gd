@@ -1,5 +1,7 @@
-## The developer console's command table (docs/architecture/m3-build-spec.md section 6.13): `parse` reads a line into a
-## plain description or a problem, `run` does it and returns the words to print. No node here: the console shows the text.
+## The developer console's command table (docs/architecture/m3-build-spec.md section 6.13; m4-build-spec.md 6.11 adds money,
+## goods and tax): `parse` reads a line into a plain description or a problem, `run` does it and returns the words to print.
+## No node here: the console shows the text. After money and goods, which send no event, `run` asks the App to refresh the
+## chips (request &"refresh_hud").
 class_name DevCommands
 extends RefCounted
 
@@ -17,11 +19,14 @@ const HELP_LINES: Array[String] = [
 	"build c r family   upgrade c r   clear c r   cancel c r",
 	"choose TAG   end [n]   goto c r   look spring|summer|autumn|winter|calendar",
 	"give c r [c r ...] TAG|none   digest   seed   help",
+	"money N [TAG]   goods KEY N [TAG]   tax low|normal|high",
 ]
+## The tax words of `tax`, by level.
+const TAX_WORDS: Array[String] = ["low", "normal", "high"]
 
 
-## Reads a line: {kind, action, args, problem}. `kind` is &"act", &"end", &"goto", &"look", &"give", &"digest", &"seed",
-## &"help" or &"" (a problem, whose words are in `problem`).
+## Reads a line: {kind, action, args, problem}. `kind` is &"act", &"end", &"goto", &"look", &"give", &"money", &"goods",
+## &"digest", &"seed", &"help" or &"" (a problem, whose words are in `problem`).
 static func parse(text: String, game: Game) -> Dictionary:
 	var words := text.strip_edges().split(" ", false)
 	if words.is_empty():
@@ -43,6 +48,12 @@ static func parse(text: String, game: Game) -> Dictionary:
 			return _parse_look(rest, game)
 		"give":
 			return _parse_give(rest, game)
+		"money":
+			return _parse_money(rest, game)
+		"goods":
+			return _parse_goods(rest, game)
+		"tax":
+			return _parse_tax(rest, game)
 		"digest", "seed", "help":
 			if not rest.is_empty():
 				return _problem("%s takes no arguments." % head)
@@ -84,6 +95,23 @@ static func run(text: String, ctx: ShellContext) -> String:
 			var changed := Session.dev_transfer(hexes, tag)
 			var to_words := "no one" if tag == &"" else String(tag)
 			return "%d hex%s given to %s." % [changed, "" if changed == 1 else "es", to_words]
+		&"money":
+			var tag_m: StringName = args["tag"]
+			var amount := int(args["amount"])
+			var done := Session.dev_money(tag_m, amount)
+			ctx.request(&"refresh_hud")
+			if not done:
+				return "Refused: %s has no treasury to change." % String(tag_m)
+			return "Done: %s to %s." % [Words.signed_ducats(amount), String(tag_m)]
+		&"goods":
+			var tag_g: StringName = args["tag"]
+			var loads := int(args["amount"])
+			var good := int(args["good"])
+			var made := Session.dev_goods(tag_g, good, loads)
+			ctx.request(&"refresh_hud")
+			if not made:
+				return "Refused: %s has no stores to change." % String(tag_g)
+			return "Done: %s %s to %s." % [Words.signed(loads), Session.game.defs.good(good).name.to_lower(), String(tag_g)]
 		&"digest":
 			return Session.game.digest().substr(0, DIGEST_CHARS)
 		&"seed":
@@ -191,6 +219,66 @@ static func _parse_give(rest: PackedStringArray, game: Game) -> Dictionary:
 			return _bad_hex(rest[i], rest[i + 1], game)
 		hexes.append(hex as Vector2i)
 	return _made(&"give", "", {"hexes": hexes, "tag": tag})
+
+
+## `money N [TAG]`: ducats (a negative number takes them) for the player, or the country TAG.
+static func _parse_money(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.is_empty() or rest.size() > 2:
+		return _problem("Use: money N [TAG]")
+	var shut := _economy_problem(game)
+	if shut != "":
+		return _problem(shut)
+	if not is_small_int(rest[0]):
+		return _problem("'%s' is not a number." % rest[0] if not rest[0].is_valid_int() else "'%s' is too large." % rest[0])
+	var tag := _tag_word(rest[1] if rest.size() == 2 else "", game)
+	if tag == &"":
+		return _problem("No country %s." % rest[1] if rest.size() == 2 else "Choose your country first.")
+	return _made(&"money", "", {"tag": tag, "amount": rest[0].to_int()})
+
+
+## `goods KEY N [TAG]`: loads of a good (by its key: grain, salt, timber, ...) for the player, or the country TAG.
+static func _parse_goods(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() < 2 or rest.size() > 3:
+		return _problem("Use: goods KEY N [TAG]")
+	var shut := _economy_problem(game)
+	if shut != "":
+		return _problem(shut)
+	var good := game.defs.good_id(StringName(rest[0].to_lower()))
+	if good < 0:
+		return _problem("No good '%s'." % rest[0])
+	if not is_small_int(rest[1]):
+		return _problem("'%s' is not a number." % rest[1] if not rest[1].is_valid_int() else "'%s' is too large." % rest[1])
+	var tag := _tag_word(rest[2] if rest.size() == 3 else "", game)
+	if tag == &"":
+		return _problem("No country %s." % rest[2] if rest.size() == 3 else "Choose your country first.")
+	return _made(&"goods", "", {"tag": tag, "good": good, "amount": rest[1].to_int()})
+
+
+## `tax low|normal|high`: the player's tax level, through the set_tax action.
+static func _parse_tax(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() != 1 or not TAX_WORDS.has(rest[0].to_lower()):
+		return _problem("Use: tax low|normal|high")
+	var shut := _economy_problem(game)
+	if shut != "":
+		return _problem(shut)
+	return _made(&"act", "set_tax", {"level": TAX_WORDS.find(rest[0].to_lower())})
+
+
+## Why the money commands cannot run (no game, or a map without countries), else "".
+static func _economy_problem(game: Game) -> String:
+	if game == null:
+		return "There is no game."
+	if not game.has_countries():
+		return "This map has no countries."
+	return ""
+
+
+## The country of an optional TAG word (upper-cased), the player when the word is "", &"" when there is none such.
+static func _tag_word(word: String, game: Game) -> StringName:
+	if word == "":
+		return game.player
+	var tag := StringName(word.to_upper())
+	return tag if game.scenario.id_of(tag) != 0 else &""
 
 
 ## Whether the word is an integer of at most MAX_DIGITS digits (a sign does not count).

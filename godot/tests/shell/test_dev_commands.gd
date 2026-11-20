@@ -242,3 +242,99 @@ func test_run_give_several_hexes_at_once() -> void:
 			break
 	var text := DevCommands.run("give %d %d %d %d VEN" % [first.x, first.y, second.x, second.y], _ctx)
 	assert_eq(text, "2 hexes given to VEN.")
+
+
+# ----- M4's money, goods and tax (docs/architecture/m4-build-spec.md 6.11) ----------------------------------------------
+
+
+func _treasury(tag: StringName) -> int:
+	return Countries.by_tag(_game(), tag).treasury
+
+
+func _stock(tag: StringName, key: StringName) -> int:
+	return Countries.by_tag(_game(), tag).stock[_game().defs.good_id(key)]
+
+
+func test_the_three_commands_parse_to_their_kinds_and_arguments() -> void:
+	var money := DevCommands.parse("money 500", _game())
+	assert_eq([money["kind"], money["problem"]], [&"money", ""])
+	assert_eq(money["args"], {"tag": &"GEN", "amount": 500}, "the player is the default")
+	assert_eq(DevCommands.parse("money -40 mlo", _game())["args"], {"tag": &"MLO", "amount": -40}, "a tag, in any case")
+	var goods := DevCommands.parse("goods stone 40", _game())
+	assert_eq(goods["kind"], &"goods")
+	assert_eq(goods["args"], {"tag": &"GEN", "good": _game().defs.good_id(&"stone"), "amount": 40})
+	assert_eq(DevCommands.parse("goods SALT 3 MLO", _game())["args"]["tag"], &"MLO")
+	var tax := DevCommands.parse("tax HIGH", _game())
+	assert_eq([tax["kind"], tax["action"], tax["args"]], [&"act", "set_tax", {"level": 2}])
+	assert_eq(DevCommands.parse("tax low", _game())["args"], {"level": 0})
+	assert_eq(DevCommands.parse("tax normal", _game())["args"], {"level": 1})
+
+
+func test_planted_bad_money_goods_and_tax_lines_give_a_problem() -> void:
+	assert_eq(_problem("money"), "Use: money N [TAG]")
+	assert_eq(_problem("money x"), "'x' is not a number.")
+	assert_eq(_problem("money 1 2 3"), "Use: money N [TAG]")
+	assert_eq(_problem("money 5 ZZZ"), "No country ZZZ.", "an unknown tag")
+	assert_eq(_problem("money 99999999999"), "'99999999999' is too large.")
+	assert_eq(_problem("goods"), "Use: goods KEY N [TAG]")
+	assert_eq(_problem("goods wheat 5"), "No good 'wheat'.", "an unknown good")
+	assert_eq(_problem("goods stone y"), "'y' is not a number.")
+	assert_eq(_problem("goods stone 5 ZZZ"), "No country ZZZ.")
+	assert_eq(_problem("tax"), "Use: tax low|normal|high")
+	assert_eq(_problem("tax extreme"), "Use: tax low|normal|high")
+	assert_eq(_problem("tax low high"), "Use: tax low|normal|high")
+
+
+func test_the_money_commands_need_a_game_with_countries_and_a_player() -> void:
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	for line: String in ["money 5", "goods stone 5", "tax low"]:
+		assert_eq(_problem(line), "This map has no countries.", line)
+	Session.game = null
+	for line: String in ["money 5", "goods stone 5", "tax low"]:
+		assert_eq(DevCommands.parse(line, null)["problem"], "There is no game.", line)
+	assert_eq(Session.new_scenario(SCENARIO, 5), "")
+	assert_eq(_problem("money 5"), "Choose your country first.", "before the pick")
+	assert_eq(DevCommands.parse("money 5 GEN", _game())["problem"], "", "a tag needs no pick")
+
+
+func test_run_money_changes_the_treasury_and_asks_for_the_chips_to_refresh() -> void:
+	var before := _treasury(&"GEN")
+	assert_eq(DevCommands.run("money 500", _ctx), "Done: +500 ducats to GEN.")
+	assert_eq(_treasury(&"GEN"), before + 500)
+	assert_eq(_sent, [[&"refresh_hud", {}]], "dev_money sends no event: the chips are asked")
+	assert_eq(DevCommands.run("money -100 GEN", _ctx), "Done: −100 ducats to GEN.")
+	assert_eq(_treasury(&"GEN"), before + 400)
+	assert_eq(_sent.size(), 2)
+	assert_eq(_game().action_log.back()["action"], "dev_money", "logged for the replay")
+	# A sum past the treasury's limit is refused by the treasury and says so.
+	assert_eq(DevCommands.run("money 999999999 GEN", _ctx), "Done: +999,999,999 ducats to GEN.", "up to a billion")
+	var rich := DevCommands.run("money 999999999 GEN", _ctx)  # two billion and a little: past the limit
+	assert_true(rich.begins_with("Refused:"), rich)
+	assert_eq(_treasury(&"GEN"), before + 400 + 999999999, "a refused line changes nothing")
+	assert_true(DevCommands.run("money -999999999 GEN", _ctx).begins_with("Done"))
+	assert_eq(_treasury(&"GEN"), before + 400, "back to where it was")
+
+
+func test_run_goods_changes_the_stores_and_asks_for_the_chips_to_refresh() -> void:
+	var before := _stock(&"GEN", &"stone")
+	assert_eq(DevCommands.run("goods stone 40", _ctx), "Done: +40 stone to GEN.")
+	assert_eq(_stock(&"GEN", &"stone"), before + 40)
+	assert_eq(_sent, [[&"refresh_hud", {}]])
+	assert_eq(DevCommands.run("goods stone -10", _ctx), "Done: −10 stone to GEN.")
+	assert_eq(_stock(&"GEN", &"stone"), before + 30)
+	assert_eq(_game().action_log.back()["action"], "dev_goods")
+
+
+func test_run_tax_sets_the_level_through_session_act() -> void:
+	assert_eq(DevCommands.run("tax high", _ctx), "Done: tax high.")
+	assert_eq(Countries.by_tag(_game(), &"GEN").tax, 2)
+	assert_eq(DevCommands.run("tax low", _ctx), "Done: tax low.")
+	assert_eq(Countries.by_tag(_game(), &"GEN").tax, 0)
+	assert_eq(DevCommands.run("tax low", _ctx), "Refused: taxes are already Low", "the rule's own words")
+	assert_true(_sent.is_empty(), "tax sends an event, not a request")
+
+
+func test_help_names_the_money_commands() -> void:
+	var help := DevCommands.run("help", _ctx)
+	for word: String in ["money", "goods", "tax low|normal|high"]:
+		assert_true(help.contains(word), "help names " + word)

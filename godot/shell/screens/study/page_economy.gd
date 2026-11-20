@@ -166,6 +166,10 @@ func _add_expected(expected: Dictionary) -> void:
 
 func _add_tax(tax: Dictionary) -> void:
 	var level := int(tax["level"])
+	if (tax["options"] as Array).is_empty():
+		_tax_seg = null  # no player to tax: no row
+		_tax_hint = null
+		return
 	var row := HBoxContainer.new()
 	row.name = &"TaxRow"
 	row.add_child(PanelKit.label(TAX_LABEL, &"Hint"))

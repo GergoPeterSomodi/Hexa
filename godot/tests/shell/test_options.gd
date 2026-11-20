@@ -45,11 +45,11 @@ func test_options_opens_with_studiolo_geometry_focus_and_bidirectional_schema_pa
 	assert_eq(_harness.viewport.gui_get_focus_owner(), options.nav_list().button_for(&"display"))
 	assert_true(options.apply_button().disabled, "Apply starts disabled with no staged changes")
 
-	# Schema -> Row: every key up to milestone 3 with a non-empty page has a matching OptionRow
+	# Schema -> Row: every key up to the shell's milestone (4) with a non-empty page has a matching OptionRow
 	var expected_1_5_keys: Dictionary[String, bool] = {}
 	for key: String in Settings.SCHEMA.keys():
 		var entry: Dictionary = Settings.SCHEMA[key]
-		if float(str(entry.get("since", "1.5"))) <= 3.0 and not str(entry.get("page", "")).is_empty():
+		if float(str(entry.get("since", "1.5"))) <= Options.TARGET_MILESTONE and not str(entry.get("page", "")).is_empty():
 			expected_1_5_keys[key] = true
 			var row := options.option_row(key)
 			assert_not_null(row, "Options has OptionRow for M1.5 key %s" % key)
@@ -312,7 +312,7 @@ func test_graphics_page_texture_quality_presets_and_page_defaults() -> void:
 	assert_eq(_harness.settings.get_value("graphics/preload_next_season"), false, "Advanced preload preserved")
 
 
-func test_game_page_shows_the_three_milestone_three_rows() -> void:
+func test_game_page_shows_the_milestone_three_rows_and_the_two_works_rows_of_milestone_four() -> void:
 	var options := ScreenIds.make(&"options") as Options
 	_harness.stack.push(options)
 	await _harness.wait_frames(self, 2)
@@ -324,10 +324,13 @@ func test_game_page_shows_the_three_milestone_three_rows() -> void:
 	for row: OptionRow in options.page_rows(&"game"):
 		keys.append(row.key())
 	keys.sort()
-	assert_eq(keys, ["game/autosave", "game/season_report", "game/task_flag"])
+	assert_eq(keys, ["game/autosave", "game/confirm_works", "game/preview_on_map", "game/season_report", "game/task_flag"])
 	assert_not_null(options.option_row("graphics/season_change"), "Season change on Graphics")
 	assert_not_null(options.option_row("dev/save_json"), "Write saves as JSON too on Advanced")
-	assert_null(options.option_row("game/confirm_works"), "milestone 4 rows stay hidden")
+	assert_not_null(options.option_row("game/confirm_works"), "Confirm works shows from milestone 4")
+	assert_not_null(options.option_row("game/preview_on_map"), "Preview on the map shows from milestone 4")
+	assert_null(options.option_row("game/gain_treasury_only"), "the card's switch has no row")
+	assert_null(options.option_row("game/movement"), "milestone 6 rows stay hidden")
 
 
 ## Pages are built when first needed: only Display at the start, the rest on a page switch or an accessor, and the rows are

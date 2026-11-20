@@ -534,27 +534,16 @@ func test_confirm_always_opens_the_card_for_every_row() -> void:
 	assert_null(Session.game.state.work_at(hex), "no work begun")
 
 
-func test_confirm_expensive_opens_the_card_only_for_expensive_rows() -> void:
+func test_confirm_expensive_begins_a_cheap_row_at_once() -> void:
 	var hex := _gen_buildable()
 	_set_mode("expensive")
 	_panel.show_hex(hex)
 	var log := _record_requests()
 	var cheap := _row_and_button(hex, false)
-	if cheap.is_empty():
-		pending("no enabled row that is not expensive at this hex")
-	else:
-		(cheap[1] as Button).pressed.emit()
-		await _settle()
-		assert_eq(log[-1][0], &"begin_work", "a cheap row begins the work")
-	var dear := _row_and_button(hex, true)
-	if dear.is_empty():
-		pending("no enabled expensive row at this hex")
-	else:
-		var before := log.size()
-		(dear[1] as Button).pressed.emit()
-		await _settle()
-		assert_eq(log.size(), before + 1, "one request for the expensive row")
-		assert_eq(log[-1][0], &"works_card", "an expensive row opens the card first")
+	assert_false(cheap.is_empty(), "an enabled row that is not expensive")
+	(cheap[1] as Button).pressed.emit()
+	await _settle()
+	assert_eq(log[-1][0], &"begin_work", "a cheap row begins the work (the expensive row has its own test below)")
 
 
 func test_the_default_confirm_mode_is_expensive() -> void:
@@ -670,3 +659,32 @@ func _level_word_for(hex: Vector2i) -> String:
 	if family == "castles":
 		return "watchtower"
 	return "first stage"
+
+
+## The positive case of the test above: a poor treasury makes an affordable row expensive (over a quarter of 70 ducats), so a
+## click on it asks for the card and begins nothing, while a cheap row (here none) would have begun the work.
+func test_confirm_expensive_opens_the_card_for_a_row_a_poor_treasury_makes_expensive() -> void:
+	var hex := _gen_buildable()
+	assert_true(Session.dev_money(&"GEN", -540), "70 ducats are left")
+	_set_mode("expensive")
+	_panel.show_hex(hex)
+	var log := _record_requests()
+	var dear := _row_and_button(hex, true)
+	assert_false(dear.is_empty(), "an enabled expensive row at this hex")
+	var row: Dictionary = dear[0]
+	assert_true(bool(row["expensive"]) and bool((row["verdict"] as Dictionary)["ok"]))
+	(dear[1] as Button).pressed.emit()
+	await _settle()
+	assert_eq(log.size(), 1, "one request for the expensive row")
+	assert_eq(log[-1][0], &"works_card", "an expensive row opens the card first")
+	assert_eq(str((log[-1][1] as Dictionary)["option"]["action"]), str(row["action"]), "the card of the row's own option")
+	assert_null(Session.game.state.work_at(hex), "nothing begun by the click")
+	# The same row with a full treasury is cheap again and begins at once.
+	assert_true(Session.dev_money(&"GEN", 540))
+	_panel.refresh()
+	await _settle()
+	var cheap := _row_and_button(hex, false)
+	assert_false(cheap.is_empty(), "with 610 ducats the row is not expensive")
+	(cheap[1] as Button).pressed.emit()
+	await _settle()
+	assert_eq(log[-1][0], &"begin_work", "and a click on it begins the work")

@@ -192,3 +192,49 @@ func test_a_season_end_refreshes_the_count() -> void:
 	assert_true(_build(WOODS, ImproveRules.TIMBER))
 	Events.season_ended.emit(_g.turn)
 	assert_false(_flag.visible, "the signal refreshed the flag")
+
+
+# ----- M4: a line whose action is [&"study", page] (docs/architecture/m4-build-spec.md 6.9) ------------------------------
+
+
+func _study_line() -> Dictionary:
+	return {
+		"kind": &"treasury_falling", "severity": 1, "hint": "", "hex": WorksView.NO_HEX, "text": "The treasury will fall by 12 ducats this season.",
+		"action": Reminders.STUDY_ACTION.duplicate(), "action_label": "Open the study",
+	}
+
+
+func test_a_study_row_asks_for_the_page_and_closes_the_list() -> void:
+	var asked: Array[StringName] = []
+	var watched: Array[Vector2i] = []
+	_flag.study_requested.connect(func(page: StringName) -> void: asked.append(page))
+	_flag.go_requested.connect(func(hex: Vector2i) -> void: watched.append(hex))
+	_flag.open_list()
+	_flag._lines = [_study_line()]
+	_flag._rebuild_rows()
+	assert_true(_flag.choose_row(0), "a study line is a row that does something")
+	assert_eq(asked, [&"economy"])
+	assert_eq(watched, [] as Array[Vector2i], "no glide")
+	assert_false(_flag.is_list_open(), "the list closes")
+
+
+func test_a_study_row_is_enabled_and_a_row_with_neither_is_not() -> void:
+	_flag._lines = [_study_line(), {"kind": &"x", "severity": 0, "hint": "", "hex": WorksView.NO_HEX, "text": "Nothing to go to.", "action": [], "action_label": ""}]
+	_flag._rebuild_rows()
+	assert_false((_flag._rows.get_child(0) as Button).disabled, "the study row can be pressed")
+	assert_true((_flag._rows.get_child(1) as Button).disabled, "a row with no hex and no study action is off")
+	assert_false(_flag.choose_row(1), "and does nothing")
+
+
+func test_the_real_money_lines_carry_the_study_action() -> void:
+	# The treasury lines of Reminders open the study: a line built by the rules, not by hand.
+	var line := Reminders.treasury_empty(_g, &"GEN")
+	assert_true(line.is_empty(), "a rich treasury has no such line")
+	assert_true(_g.dev_money(&"GEN", -(Countries.by_tag(_g, &"GEN").treasury + 5)), "the console's way into debt")
+	line = Reminders.treasury_empty(_g, &"GEN")
+	assert_eq(line["action"], [&"study", &"economy"])
+	_flag._lines = [line]
+	var asked: Array[StringName] = []
+	_flag.study_requested.connect(func(page: StringName) -> void: asked.append(page))
+	assert_true(_flag.choose_row(0))
+	assert_eq(asked, [&"economy"])

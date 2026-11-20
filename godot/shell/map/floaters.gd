@@ -184,7 +184,7 @@ func _on_chronicled(entry: Dictionary) -> void:
 		return
 	var line := LogLines.line_of(_game, entry, _game.player)
 	var word := str(line.get("floating", ""))
-	if word.is_empty() or word == QUIET_WORD:
+	if word.is_empty() or word.begins_with(QUIET_WORD):
 		return
 	var tone := StringName(str(line.get("tone", "plain")))
 	for hex: Vector2i in _hexes_for(entry, line, word):

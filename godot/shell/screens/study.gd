@@ -1,7 +1,10 @@
 ## The Statesman's Study (docs/architecture/m4-build-spec.md 6.7): a PanelModal frame the window's size less 30 px, with the
 ## Ribbon, the date, Close (a KeyCap of I), a NavList of the shown pages, the PageHost and the key hints. One instance
 ## lives for the App's life. Esc, I and Close take it off the stack without freeing it, so the page, its scroll and
-## its state are kept when the App pushes it again. A page's "look there" becomes ctx.request(&"look_at", {hex, select}).
+## its state are kept when the App pushes it again. A page's "look there" becomes ctx.request(&"look_at", {hex, select}) (the App
+## pops the study first). While it is on the stack the study listens for tax_set, work_started, work_finished, work_cancelled
+## and season_ended and refreshes the page in view; a page's [&"set_tax", level] is done here through Session.act (the App's
+## tax_set handler makes the toast). The Economy page reads the shell's game/gain_treasury_only switch before each refresh.
 class_name Study
 extends Screen
 
@@ -11,6 +14,9 @@ const LOOK_ACTION := &"look_at"
 const CLOSE_ACTION := &"game_study"
 const PREV_ACTION := &"study_page_prev"
 const NEXT_ACTION := &"study_page_next"
+const TAX_ACTION := &"set_tax"
+const TREASURY_KEY := "game/gain_treasury_only"
+const PAGE_KEY := "state/study_page"
 const HINT_BASE := "I: close · Enter: look there"
 const PAGE_KEYS_HINT := "[ ]: page"
 const HINT_JOIN := " · "
@@ -75,17 +81,15 @@ func open_page(page: StringName) -> void:
 		_scrolls[key_id].visible = key_id == id
 	_current = id
 	_nav.select(id)
-	var shown_page := current_page()
-	if shown_page != null:
-		shown_page.refresh(Session.game, &"open")
+	_remember_page(id)
+	_refresh_shown(&"open")
 	_refresh_date()
 
 
 func on_enter() -> void:
 	_fit_ribbon()
 	_refresh_date()
-	if not Events.season_ended.is_connected(_on_season_ended):
-		Events.season_ended.connect(_on_season_ended)
+	_listen(true)
 	open_page(_current)
 	if is_inside_tree():
 		var target: Control = _close
@@ -96,8 +100,7 @@ func on_enter() -> void:
 
 
 func on_exit() -> void:
-	if Events.season_ended.is_connected(_on_season_ended):
-		Events.season_ended.disconnect(_on_season_ended)
+	_listen(false)
 
 
 ## Esc closes the Study (it stays alive for the next open).
@@ -256,16 +259,64 @@ func _step_page(step: int) -> void:
 func _on_page_action(action: Array) -> void:
 	if action.size() < 2 or ctx == null:
 		return
-	if StringName(str(action[0])) != LOOK_ACTION:
+	match StringName(str(action[0])):
+		LOOK_ACTION:
+			ctx.request(LOOK_ACTION, {"hex": action[1], "select": true})
+		TAX_ACTION:
+			var verdict := Session.act(String(TAX_ACTION), {"level": int(action[1])})
+			if not bool(verdict.get("ok", false)):
+				var reason := str(verdict.get("reason", ""))
+				ctx.toast(reason.substr(0, 1).to_upper() + reason.substr(1) + ".", &"bad")
+			_refresh_shown(&"tax_set")
+
+
+## The page in view is filled again from the game, with the shell's measure switch set first.
+func _refresh_shown(why: StringName) -> void:
+	var shown_page := current_page()
+	if shown_page == null:
 		return
-	ctx.request(LOOK_ACTION, {"hex": action[1], "select": true})
+	var economy := shown_page as PageEconomy
+	if economy != null:
+		economy.treasury_only = ctx != null and ctx.settings != null and bool(ctx.settings.get_value(TREASURY_KEY))
+	shown_page.refresh(Session.game, why)
+
+
+## Keeps the last page in the setting state/study_page so a later run can open on it.
+func _remember_page(id: StringName) -> void:
+	if ctx != null and ctx.settings != null and str(ctx.settings.get_value(PAGE_KEY)) != String(id):
+		ctx.settings.set_value(PAGE_KEY, String(id))
+
+
+## The bus signals that change what the page shows: linked while the study is on the stack.
+func _listen(on: bool) -> void:
+	var pairs: Array = [
+		[Events.season_ended, _on_season_ended], [Events.tax_set, _on_tax_set], [Events.work_started, _on_work_event],
+		[Events.work_finished, _on_work_event], [Events.work_cancelled, _on_work_cancelled],
+	]
+	for pair: Array in pairs:
+		var sig: Signal = pair[0]
+		var handler: Callable = pair[1]
+		if on and not sig.is_connected(handler):
+			sig.connect(handler)
+		elif not on and sig.is_connected(handler):
+			sig.disconnect(handler)
 
 
 func _on_season_ended(_turn: int) -> void:
 	_refresh_date()
-	var shown_page := current_page()
-	if shown_page != null:
-		shown_page.refresh(Session.game, &"season_ended")
+	_refresh_shown(&"season_ended")
+
+
+func _on_tax_set(_tag: StringName, _level: int) -> void:
+	_refresh_shown(&"tax_set")
+
+
+func _on_work_event(_tag: StringName, _hex: Vector2i, _work: Dictionary) -> void:
+	_refresh_shown(&"work")
+
+
+func _on_work_cancelled(_tag: StringName, _hex: Vector2i, _work: Dictionary, _why: StringName) -> void:
+	_refresh_shown(&"work")
 
 
 func _refresh_date() -> void:

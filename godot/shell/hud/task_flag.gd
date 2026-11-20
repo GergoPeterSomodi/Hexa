@@ -9,6 +9,8 @@ extends PanelContainer
 
 ## A row was chosen: the App looks at the hex and selects it. The list is already closed.
 signal go_requested(hex: Vector2i)
+## A row whose action is [&"study", page] was chosen: the App opens the study at `page` (spec 6.9). The list is already closed.
+signal study_requested(page: StringName)
 signal list_toggled(open: bool)
 
 const LIST_WIDTH: int = 540
@@ -157,16 +159,29 @@ func close_list() -> void:
 	list_toggled.emit(false)
 
 
-## Chooses row `index`: closes the list and emits go_requested with that line's hex (a row without a hex does nothing).
+## Chooses row `index`: closes the list and emits go_requested with that line's hex, or study_requested for a study action
+## (a row with neither does nothing).
 func choose_row(index: int) -> bool:
 	if index < 0 or index >= _lines.size():
 		return false
 	var hex: Vector2i = _lines[index].get("hex", WorksView.NO_HEX)
+	var page := _study_page(_lines[index])
 	close_list()
 	if hex == WorksView.NO_HEX:
-		return false
+		if page == &"":
+			return false
+		study_requested.emit(page)
+		return true
 	go_requested.emit(hex)
 	return true
+
+
+## The page of a line whose action is [&"study", page], else &"".
+static func _study_page(line: Dictionary) -> StringName:
+	var action: Array = line.get("action", [])
+	if action.size() >= 2 and StringName(str(action[0])) == &"study":
+		return StringName(str(action[1]))
+	return &""
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -241,7 +256,7 @@ func _build_row(index: int, line: Dictionary) -> Button:
 	row.custom_minimum_size = Vector2(0, ROW_HEIGHT)
 	row.focus_mode = Control.FOCUS_NONE
 	row.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	row.disabled = (line.get("hex", WorksView.NO_HEX) as Vector2i) == WorksView.NO_HEX
+	row.disabled = (line.get("hex", WorksView.NO_HEX) as Vector2i) == WorksView.NO_HEX and _study_page(line) == &""
 	row.tooltip_text = str(line.get("action_label", ""))
 	row.accessibility_name = str(line.get("text", ""))
 	row.pressed.connect(func() -> void: choose_row(index))

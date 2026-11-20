@@ -235,3 +235,31 @@ func test_m3_keys_are_silent_under_a_line_edit_and_when_disabled() -> void:
 	_input._unhandled_input(_key(KEY_SPACE))
 	_input._unhandled_input(_key(KEY_J))
 	assert_true(log.is_empty(), "nothing while disabled")
+
+
+func test_i_and_l_ask_for_the_study_on_its_last_page_and_on_economy() -> void:
+	var log: Array[String] = []
+	_input.study_requested.connect(func(page: StringName) -> void: log.append("study:%s" % page))
+	_input._unhandled_input(_key(KEY_I))
+	_input._unhandled_input(_key(KEY_L))
+	_input._unhandled_input(_key(KEY_I, true))  # Ctrl+I is not the key
+	assert_eq(log, ["study:", "study:economy"])
+	var held := _key(KEY_I)
+	held.echo = true
+	_input._unhandled_input(held)
+	assert_eq(log.size(), 2, "a held key does not repeat")
+
+
+func test_the_study_keys_are_silent_under_a_line_edit_and_when_disabled() -> void:
+	var log: Array[String] = []
+	_input.study_requested.connect(func(page: StringName) -> void: log.append(String(page)))
+	var edit := LineEdit.new()
+	_vp.add_child(edit)
+	edit.grab_focus()
+	_input._unhandled_input(_key(KEY_I))
+	_input._unhandled_input(_key(KEY_L))
+	assert_true(log.is_empty(), "typing an I or an L in the console is not a key")
+	edit.release_focus()
+	_input.enabled = false
+	_input._unhandled_input(_key(KEY_I))
+	assert_true(log.is_empty(), "nothing while disabled")

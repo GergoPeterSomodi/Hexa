@@ -15,6 +15,8 @@ const SEASON_NAMES: Array[String] = ["spring", "summer", "autumn", "winter"]
 const SEASON_LABELS: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
 ## The Look control: the calendar (-1) and the four seasons.
 const LOOK_CALENDAR := -1
+## The word for each weather kind (0 calm, 1 good, 2 poor) in the economy line.
+const WEATHER_WORDS: Array[String] = ["calm", "good", "poor"]
 const MODE_WORDS: Array[String] = ["Terrain", "Owner", "Relief"]
 const LAYER_SPECS: Array[Array] = [
 	[&"grid", "Grid"],
@@ -27,6 +29,7 @@ const LAYER_SPECS: Array[Array] = [
 
 @onready var _metrics_label: Label = $VBox/Metrics
 @onready var _m3_label: Label = $VBox/M3Line
+@onready var _m4_label: Label = $VBox/M4Line
 @onready var _console: DevConsole = $VBox/DevConsole
 @onready var _season_seg: Segmented = $VBox/SeasonSeg
 @onready var _new_seed_btn: KitButton = $VBox/ControlsTop/NewSeedButton
@@ -208,6 +211,10 @@ func m3_text() -> String:
 	return _m3_label.text if is_node_ready() else ""
 
 
+func m4_text() -> String:
+	return _m4_label.text if is_node_ready() else ""
+
+
 func season_segmented() -> Segmented:
 	return _season_seg
 
@@ -260,6 +267,7 @@ func refresh_metrics() -> void:
 	]
 	_metrics_label.text = "\n".join(lines)
 	_m3_label.text = m3_line()
+	_m4_label.text = m4_line()
 
 
 ## "turn 9 · Spring 1482 · works 3 · phases works 0.4, stats 0.2, calendar 0.0 ms · save 32 ms".
@@ -275,6 +283,22 @@ func m3_line() -> String:
 	var save_text := "none yet" if _save_ms < 0.0 else "%d ms" % roundi(_save_ms)
 	return "turn %d · %s · works %d · phases %s · save %s" % [
 		game.turn, game.date_text(), works, phase_text, save_text]
+
+
+## The economy's line (spec 6.11): "production 3.1 ms · income 0.4 ms · districts cached 340 · weather calm, good, calm".
+## The phase times are of the last season played ("none yet" before one); the weather is a word for each climate (snow,
+## frost, mild).
+func m4_line() -> String:
+	var game := Session.game
+	if game == null:
+		return "no game"
+	var times: PackedStringArray = []
+	for phase: String in ["production", "income"]:
+		times.append("%s %s" % [phase, "%.1f ms" % float(Session.last_phase_ms[phase]) if Session.last_phase_ms.has(phase) else "none yet"])
+	var weather: PackedStringArray = []
+	for climate: int in 3:
+		weather.append(WEATHER_WORDS[clampi(int(game.weather[climate]), 0, WEATHER_WORDS.size() - 1)])
+	return "%s · districts cached %d · weather %s" % [" · ".join(times), game.districts.size(), ", ".join(weather)]
 
 
 func _collect_metrics() -> Dictionary:

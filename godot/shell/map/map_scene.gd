@@ -14,6 +14,9 @@ signal country_hovered(tag: StringName)
 signal mode_changed(mode: int)
 signal country_requested
 signal find_place_requested
+## U with a selection: the App opens the works card for the hex's upgrade (or its first build), or begins the work at once
+## by game/confirm_works (docs/architecture/m4-build-spec.md 6.1, 6.12). With no listener the scene begins the upgrade itself.
+signal upgrade_requested
 
 const MAP_ID := "north_italy"
 const START_SEED := 1480
@@ -99,7 +102,7 @@ func _ready() -> void:
 	_input.grid_toggled.connect(toggle_grid)
 	_input.names_toggled.connect(toggle_names)
 	_input.hud_toggled.connect(func() -> void: hud_toggle_requested.emit())
-	_input.upgrade_requested.connect(upgrade_selected)
+	_input.upgrade_requested.connect(_on_upgrade_key)
 	_fade.world = self
 	_view.setup(_seasons.open())
 	_preview.setup(_view)
@@ -414,6 +417,16 @@ func new_seed() -> void:
 		Session.new_game(map_id, Session.game.seed_value + 1)
 
 
+## The U key: the App's route (a card or a confirmed work); a scene on its own (no App) begins the upgrade directly.
+func _on_upgrade_key() -> void:
+	if upgrade_requested.get_connections().is_empty():
+		upgrade_selected()
+	else:
+		upgrade_requested.emit()
+
+
+## Begins the selected hex's upgrade through Session at once, with no card: the standalone path (the App answers
+## upgrade_requested instead, so game/confirm_works holds; see WorksFlow).
 func upgrade_selected() -> Dictionary:
 	var verdict: Dictionary
 	if selected == NO_HEX:

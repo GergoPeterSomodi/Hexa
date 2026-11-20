@@ -245,3 +245,69 @@ func _assert_layout(view: Vector2i) -> void:
 	assert_true(window.encloses(report.segmented().get_global_rect()), "the setting is on screen")
 	_harness.ctx.top_bar_bottom_func = Callable()
 	_harness.viewport.size = Vector2i(1280, 720)
+
+
+func _requested(what: StringName) -> Array:
+	return _requests.filter(func(r: Array) -> bool: return r[0] == what)
+
+
+func test_open_the_study_closes_the_report_and_asks_for_the_economy_page() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	var btn := report.find_child("StudyButton", true, false) as KitButton
+	assert_not_null(btn, "the footer has Open the study")
+	assert_eq(btn.text, "Open the study")
+	assert_eq(btn.embedded_key_cap().key_text, "I", "with a key cap of I")
+	btn.pressed.emit()
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 0, "the report closes")
+	assert_eq(_requested(&"study").size(), 1)
+	assert_eq(_requested(&"study")[0][1], {"page": &"economy"})
+	assert_eq(_requested(&"look_at").size(), 0, "no glide")
+	assert_eq(_requested(&"report_closed").size(), 1, "the App is told the report is closed")
+
+
+func test_the_i_key_opens_the_study_from_the_report() -> void:
+	var prev := Session.game
+	Session.new_scenario("north_italy_1480", 1480, &"GEN")  # a game with a treasury: the button (and its key) show
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	assert_not_null(report)
+	_harness.send_key(KEY_I)
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 0)
+	assert_eq(_requested(&"study").size(), 1)
+	Session.game = prev
+
+
+func test_a_line_with_the_study_action_opens_the_study() -> void:
+	var summary := ReportSample.genoa_spring()
+	for section: Dictionary in summary["sections"]:
+		if section["id"] == &"before":
+			(section["lines"] as Array).append({
+				"text": "The treasury will fall by 12 ducats this season.", "tone": "warn", "action": [&"study", &"economy"],
+				"action_label": "Open the study", "severity": 1,
+			})
+	var report := _open(summary)
+	await _harness.wait_frames(self, 2)
+	var action: KitButton = null
+	for btn: Button in report.link_buttons():
+		if btn.name.begins_with("Action") and btn.text == "Open the study":
+			action = btn as KitButton
+	assert_not_null(action, "the line has its action button")
+	action.pressed.emit()
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 0)
+	assert_eq(_requested(&"study").size(), 1, "the study, not a glide")
+	assert_eq(_requested(&"study")[0][1], {"page": &"economy"})
+	assert_eq(_requested(&"look_at").size(), 0)
+
+
+func test_open_the_study_hides_in_a_game_without_countries() -> void:
+	var prev := Session.game
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	assert_false((report.find_child("StudyButton", true, false) as Button).visible, "the sandbox has no treasury")
+	_harness.stack.clear()
+	Session.game = prev

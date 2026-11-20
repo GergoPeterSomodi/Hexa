@@ -33,6 +33,9 @@ signal end_season_requested
 signal report_requested
 ## A row of the action log, a notification's Go or a task flag row asked to look at a hex and select it.
 signal hex_look_requested(hex: Vector2i)
+## The study was asked for (a chip, the study button, the country panel's button, a task flag line): `page` is &"economy"
+## or &"" for the last page shown.
+signal study_requested(page: StringName)
 
 ## The key hints' left offset in hud.tscn.
 const KEY_HINTS_LEFT := 12.0
@@ -82,6 +85,8 @@ func _ready() -> void:
 	_action_log.report_requested.connect(func() -> void: report_requested.emit())
 	_action_log.line_activated.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
 	_task_flag.go_requested.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
+	_task_flag.study_requested.connect(func(page: StringName) -> void: study_requested.emit(page))
+	_top_bar.study_requested.connect(func(page: StringName) -> void: study_requested.emit(page))
 	_notifications.go_requested.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
 	Events.game_started.connect(_on_game_started)
 	Events.season_ended.connect(_on_season_ended)
@@ -92,6 +97,7 @@ func _ready() -> void:
 	_country_panel.play_requested.connect(func(tag: StringName) -> void: country_play_requested.emit(tag))
 	_country_panel.look_at_requested.connect(func(hex: Vector2i) -> void: country_look_at_requested.emit(hex))
 	_country_panel.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
+	_country_panel.study_requested.connect(func() -> void: study_requested.emit(&"economy"))
 	_hex_panel.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
 	_hex_panel.visibility_changed.connect(_on_hex_panel_visibility_changed)
 
@@ -114,6 +120,7 @@ func _ready() -> void:
 	_sync_dock_visibility()
 	if _settings != null:
 		_minimap.configure(_settings)
+		_hex_panel.set_settings(_settings)
 
 
 func _exit_tree() -> void:
@@ -144,6 +151,7 @@ func configure(settings: Settings) -> void:
 	_disconnect_settings()
 	_settings = settings
 	if is_node_ready():
+		_hex_panel.set_settings(_settings)
 		_layers_popover.configure(_settings)
 		_debug_overlay.configure(_settings)
 		_map_hover.configure(_settings)
@@ -200,6 +208,21 @@ func show_country(tag: StringName, picking: bool) -> void:
 func close_dock() -> void:
 	_hex_panel.clear()
 	_country_panel.clear()
+
+
+## The resource chips of the top bar (null-safe use is the caller's: the bar always has them).
+func chips() -> Chips:
+	return _top_bar.chips()
+
+
+## Reads the money and the stores again after a change that sends no event (the console's money and goods): the chips, the
+## hex panel and the country panel in view.
+func refresh_economy() -> void:
+	_top_bar.chips().refresh()
+	if _hex_panel.visible:
+		_hex_panel.refresh()
+	if _country_panel.visible:
+		_country_panel.refresh()
 
 
 ## What a screen over the map covers (viewport px, e.g. CountryPick's list and banner); [] when it leaves. The key
