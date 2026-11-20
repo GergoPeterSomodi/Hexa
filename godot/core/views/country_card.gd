@@ -48,6 +48,7 @@ static func of(game: Game, tag: StringName) -> Dictionary:
 		"playable": Countries.playable(game, country.tag),
 		"play_reason": _play_reason(country, short_name, cdef),
 		"tip": cdef.tip if cdef != null else "",
+		"treasury": _treasury(game, country),
 	}
 
 
@@ -163,3 +164,29 @@ static func _play_reason(country: Country, short_name: String, cdef: CountryDef)
 	if not country.alive:
 		return "%s is no more" % short_name
 	return ""
+
+
+## The treasury fields of the country panel (spec 6.10). The viewer's own country: its exact treasury, last season's change
+## (closing less opening in the closed ledger), the tax name, and `expected` null until EconomyPreview gives this season's
+## net. A known foreign country (Knowledge.knows; every country for the viewer "") is banded to two figures in `value`,
+## with no change and no tax. An unknown country is not `shown`.
+static func _treasury(game: Game, country: Country) -> Dictionary:
+	var out := {"shown": false, "value": 0, "banded": false, "change": 0, "expected": null, "tax": ""}
+	if not Knowledge.knows(game, game.player, country.tag):
+		return out
+	out["shown"] = true
+	if game.player != &"" and country.tag == game.player:
+		out["value"] = country.treasury
+		out["change"] = _last_change(country)
+		out["tax"] = Words.tax_name(country.tax)
+	else:
+		out["banded"] = true
+		out["value"] = Knowledge.band(country.treasury)
+	return out
+
+
+## The last closed season's change of a country's treasury; 0 before the first season.
+static func _last_change(country: Country) -> int:
+	if country.ledger_closed.is_empty():
+		return 0
+	return int(country.ledger_closed["closing"]) - int(country.ledger_closed["opening"])

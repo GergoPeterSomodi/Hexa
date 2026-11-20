@@ -49,6 +49,22 @@ static func ready_turn(game: Game, work: Work) -> int:
 	return Works.ready_turn(game, work)
 
 
+## The season from which a work of `seasons` seasons begun now on `hex` would stand: the works phase counts the season
+## it is begun in, and a snow winter halts it (as Works.ready_turn for a work under way).
+static func ready_turn_of(game: Game, hex: Vector2i, seasons: int) -> int:
+	var probe := Work.new()
+	probe.hex = hex
+	var left := maxi(seasons, 1)
+	var t := game.turn
+	for n: int in Works.HORIZON:
+		if not Works.halted(game, probe, t):
+			left -= 1
+			if left <= 0:
+				return t + 1
+		t += 1
+	return t
+
+
 ## Seasons a build (the family), an upgrade or a clear of `hex` would take, for a button's cost text.
 static func seasons_of(game: Game, action: StringName, hex: Vector2i, family: int = -1) -> int:
 	if action == Works.BUILD:

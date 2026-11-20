@@ -28,18 +28,22 @@ static func line_of(game: Game, entry: Dictionary, viewer: StringName, memo: Dic
 			line = _land_line(game, entry, viewer, tag, others)
 		"country_chosen":
 			line = _rule_line(game, entry, mine)
+		"goods_short":
+			line = _short_line(game, entry, mine)
+		"tax_set":
+			line = _tax_line(game, entry, mine)
 		_:
 			return {}
 	if line.is_empty():
 		return {}
 	line["mine"] = mine
 	line["turn"] = int(entry.get("turn", 0))
-	line["filters"] = _filters_of(str(entry.get("kind", "")), mine)
+	line["filters"] = _filters_of(entry, mine)
 	return line
 
 
 ## The lines of the newest SEASONS_SHOWN seasons that have any, as [{turn, title ("Spring 1480"), lines}], newest season
-## first, each season's lines newest first, at most PER_SEASON a season. Unknown filters (money, war: later milestones)
+## first, each season's lines newest first, at most PER_SEASON a season. Unknown filters (war: a later milestone)
 ## give no seasons. Cached in game.view_cache by [&"log", version, turn, viewer, filter].
 static func entries(game: Game, viewer: StringName, filter: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -95,18 +99,28 @@ static func _may_pass(entry: Dictionary, viewer: StringName, filter: StringName)
 	match filter:
 		&"works":
 			return str(entry.get("kind", "")).begins_with("work_")
+		&"money":
+			return _money_kind(str(entry.get("kind", "")))
 		&"mine":
 			return StringName(str(entry.get("tag", ""))) == viewer or _tags(entry.get("others", [])).has(viewer)
 	return true
 
 
-static func _filters_of(kind: String, mine: bool) -> Array[StringName]:
+static func _filters_of(entry: Dictionary, mine: bool) -> Array[StringName]:
+	var kind := str(entry.get("kind", ""))
 	var out: Array[StringName] = [&"all"]
 	if kind.begins_with("work_"):
 		out.append(&"works")
 	if mine:
 		out.append(&"mine")
+	if kind == "goods_short" or kind == "tax_set" or (mine and not _paid_text(entry).is_empty()):
+		out.append(&"money")
 	return out
+
+
+## The kinds that can carry the Money filter (a work does when its ducats moved: checked on the built line).
+static func _money_kind(kind: String) -> bool:
+	return kind == "goods_short" or kind == "tax_set" or kind.begins_with("work_")
 
 
 # ----- who is told -----------------------------------------------------------------------------------------------
@@ -148,15 +162,16 @@ static func _work_line(game: Game, entry: Dictionary, mine: bool) -> Dictionary:
 		var place := WorksView.line(game, work)
 		match kind:
 			"work_started":
-				line.merge({"keyword": "Begun", "tone": "plain", "floating": "Begun",
-					"text": "Begun: %s. Ready %s." % [place, ready_text(game, work, turn)]}, true)
+				line.merge({"keyword": "Begun", "tone": "plain",
+					"floating": ("Begun %s" % Words.signed(-work.paid)) if work.paid > 0 else "Begun",
+					"text": "Begun: %s. Ready %s.%s" % [place, ready_text(game, work, turn), _paid_text(entry)]}, true)
 			"work_finished":
 				line.merge({"keyword": "Finished", "tone": "good", "floating": "Finished", "notify": true,
 					"text": "Finished: %s." % place}, true)
 			_:
 				line.merge({"keyword": "Cancelled", "tone": "bad", "floating": "Cancelled",
 					"notify": why == "lost" or why == "blocked",
-					"text": cancelled_text(place, why, str(entry.get("reason", "")))}, true)
+					"text": cancelled_text(place, why, str(entry.get("reason", ""))) + _paid_text(entry)}, true)
 		return line
 	var who := short_name(game, StringName(str(entry.get("tag", ""))))
 	var at := "(%d, %d)" % [work.hex.x, work.hex.y]
@@ -173,6 +188,22 @@ static func _work_line(game: Game, entry: Dictionary, mine: bool) -> Dictionary:
 			line.merge({"keyword": "Cancelled", "tone": "muted",
 				"text": "%s cancelled work on %s at %s." % [who, noun_of(work), at]}, true)
 	return line
+
+
+## The money a work line adds when the viewer's own ducats moved: " (−40 ducats)" for a begun work that was paid,
+## " (+40 ducats back)" for a cancelled one with a refund; "" otherwise.
+static func _paid_text(entry: Dictionary) -> String:
+	match str(entry.get("kind", "")):
+		"work_started":
+			var work_value: Variant = entry.get("work", null)
+			var paid := int((work_value as Dictionary).get("paid", 0)) if work_value is Dictionary else 0
+			if paid > 0:
+				return " (%s)" % Words.signed_ducats(-paid)
+		"work_cancelled":
+			var refund := int(entry.get("refund", 0))
+			if refund > 0:
+				return " (+%s back)" % Words.ducats(refund)
+	return ""
 
 
 ## "Cancelled: <place>." (by order), "Cancelled: <place>, the land was lost." or "Cancelled: <place>: <reason>."
@@ -217,6 +248,37 @@ static func short_name(game: Game, tag: StringName) -> String:
 ## The text with its first letter in capitals.
 static func capital(text: String) -> String:
 	return text.left(1).to_upper() + text.substr(1)
+
+
+# ----- money: shortages and taxes ---------------------------------------------------------------------------------
+
+
+## "Your towns ran short of salt: 0 of 1." Only the owner is told: the event's witnesses are its actor alone, and any
+## other viewer gets no line even from a hand-made entry.
+static func _short_line(game: Game, entry: Dictionary, mine: bool) -> Dictionary:
+	if not mine:
+		return {}
+	var tag := StringName(str(entry.get("tag", "")))
+	var c := Countries.by_tag(game, tag)
+	var hex: Vector2i = c.capital if c != null else WorksView.NO_HEX
+	var text := "Your towns ran short of %s: %s of %s." % [str(entry.get("good", "")).to_lower(),
+		Words.number(int(entry.get("taken", 0))), Words.number(int(entry.get("need", 0)))]
+	return {"keyword": "Short", "tone": "bad", "hex": hex, "notify": true, "floating": "", "text": text}
+
+
+## "You set taxes to High." or, for a known other, "Milan set taxes to High." (muted).
+static func _tax_line(game: Game, entry: Dictionary, mine: bool) -> Dictionary:
+	var tag := StringName(str(entry.get("tag", "")))
+	var level := Words.tax_name(int(entry.get("level", -1)))
+	if level.is_empty():
+		return {}
+	var c := Countries.by_tag(game, tag)
+	var hex: Vector2i = c.capital if c != null else WorksView.NO_HEX
+	if mine:
+		return {"keyword": "Taxes", "tone": "plain", "hex": hex, "notify": false, "floating": "",
+			"text": "You set taxes to %s." % level}
+	return {"keyword": "Taxes", "tone": "muted", "hex": hex, "notify": false, "floating": "",
+		"text": "%s set taxes to %s." % [short_name(game, tag), level]}
 
 
 # ----- land and rule ---------------------------------------------------------------------------------------------

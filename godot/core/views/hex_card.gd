@@ -206,6 +206,8 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 	var roads := edge_summary(map, hex, "road")
 	var crossings := crossing_summary(map, hex)
 	var piece := Improve.piece_at(game, hex) if is_land else {}
+	var gives := gives_text(game, hex) if is_land else ""
+	var weather_now := weather_text(game, hex) if is_land else ""
 	var lines: Array = [
 		["Hex", &"muted", "(%d, %d)" % [hex.x, hex.y]],
 	]
@@ -218,6 +220,8 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 		lines.append(["Height", &"plain", "%d m" % height_m])
 		lines.append(["Relief", &"plain", relief])
 		lines.append(["Winter", &"plain", climate])
+		if weather_now != "":
+			lines.append(["Weather", &"plain", weather_now])
 		if pass_name != "":
 			lines.append(["Pass", &"plain", pass_name])
 		if rivers != "none":
@@ -232,6 +236,8 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 			lines.append(["", &"rule", ""])
 			for row: Array in piece_rows(piece):
 				lines.append([str(row[0]), &"plain", str(row[1])])
+		if gives != "":
+			lines.append(["Gives", &"plain", gives])
 		var work_line := work_text(game, hex)
 		if work_line != "":
 			lines.append(["Work", &"warn", work_line])
@@ -255,6 +261,8 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 		"roads": roads,
 		"crossings": crossings,
 		"piece": piece,
+		"gives": gives,
+		"weather": weather_now,
 		"lines": lines,
 	}
 
@@ -267,6 +275,89 @@ static func work_text(game: Game, hex: Vector2i) -> String:
 		return ""
 	var middle := "stopped for the winter" if bool(work["halted"]) else str(work["progress"])
 	return "%s: %s, ready %s" % [work["label"], middle, work["ready"]]
+
+
+## The hover card's Gives line for an owned land hex (spec 6.10): the district's good with the season it peaks in
+## ("wine 24 in autumn"), a port's fish and dues ("fish 6, dues 30 a season"), a wild hex's grain over the year
+## ("grain 6 a year (wild)") and the upkeep ("upkeep 2 a season"), joined with " · "; "" when it gives nothing, or the
+## hex is sea, unowned or off the map. Calm weather and the owner's tax, over the four seasons (Economy.district_output).
+static func gives_text(game: Game, hex: Vector2i) -> String:
+	if game == null or game.state == null or game.defs == null or game.map == null or not game.map.has(hex):
+		return ""
+	var map := game.map
+	var i := map.index_of(hex)
+	if map.land[i] == 0 or int(game.state.owner[i]) == 0:
+		return ""
+	var base := Economy.district_base(game, StateView.of(game.state), hex)
+	var years := _year_of(game, hex)
+	var pieces := PackedStringArray()
+	var good := int(base["good"])
+	var wild_good := int(base["wild_good"])
+	if good >= 0 and good != Economy.FISH:
+		var peak := _peak(years, good)
+		if int(peak["loads"]) > 0:
+			pieces.append("%s %s in %s" % [_good_name(game, good), Words.number(int(peak["loads"])),
+				Calendar.SEASON_NAMES[int(peak["season"])].to_lower()])
+	elif good < 0 and wild_good >= 0:
+		var wild_total := 0
+		for year: Dictionary in years:
+			wild_total += _loads(year, wild_good)
+		if wild_total > 0:
+			pieces.append("%s %s a year (wild)" % [_good_name(game, wild_good), Words.number(wild_total)])
+	if int(base["port_level"]) > 0:
+		var dues := 0
+		for year: Dictionary in years:
+			dues = maxi(dues, int(year["ducats"]))
+		var fish := int(_peak(years, Economy.FISH)["loads"])
+		pieces.append("fish %s, dues %s a season" % [Words.number(fish), Words.number(dues)])
+	var upkeep := int(base["upkeep"])
+	if upkeep > 0:
+		pieces.append("upkeep %s a season" % Words.number(upkeep))
+	return " · ".join(pieces)
+
+
+## The weather line of a land hex whose climate is not calm this season (4.6): "good this season: crops +20 %" or
+## "poor this season: crops −25 %"; "" when calm, at sea or off the map.
+static func weather_text(game: Game, hex: Vector2i) -> String:
+	if game == null or game.map == null or game.defs == null or not game.map.has(hex) or not game.map.is_land(hex):
+		return ""
+	if game.defs.weather_permille.size() != 3:
+		return ""
+	var climate := clampi(int(game.map.climate[game.map.index_of(hex)]), 0, 2)
+	var kind := int(game.weather[climate]) if climate < game.weather.size() else Economy.CALM
+	if kind == Economy.CALM:
+		return ""
+	var percent := int(float(game.defs.weather_permille[kind] - 1000) / 10.0)
+	return "%s this season: crops %s%d %%" % ["good" if kind == Economy.GOOD else "poor",
+		"+" if percent >= 0 else "−", absi(percent)]
+
+
+## The district's output in each season of the year (spring to winter, the winter slot of its climate): calm, the owner's tax.
+static func _year_of(game: Game, hex: Vector2i) -> Array[Dictionary]:
+	var view := StateView.of(game.state)
+	var out: Array[Dictionary] = []
+	for season: int in Calendar.SEASON_NAMES.size():
+		out.append(Economy.district_output(game, view, hex, season, Economy.CALM, -1))
+	return out
+
+
+## The season of `years` with the most loads of `good`: {loads, season}, the earliest season on a tie.
+static func _peak(years: Array[Dictionary], good: int) -> Dictionary:
+	var best := {"loads": 0, "season": 0}
+	for season: int in years.size():
+		var loads := _loads(years[season], good)
+		if loads > int(best["loads"]):
+			best = {"loads": loads, "season": season}
+	return best
+
+
+static func _loads(output: Dictionary, good: int) -> int:
+	var goods: PackedInt32Array = output["goods"]
+	return int(goods[good]) if good >= 0 and good < goods.size() else 0
+
+
+static func _good_name(game: Game, good: int) -> String:
+	return game.defs.goods[good].name.to_lower() if good >= 0 and good < game.defs.goods.size() else ""
 
 
 static func top_level(family_name: String) -> int:

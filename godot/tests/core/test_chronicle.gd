@@ -45,3 +45,18 @@ func test_wrong_schema_gives_null() -> void:
 	var d := Chronicle.new().to_dict()
 	d["schema"] = "nope"
 	assert_null(Chronicle.from_dict(d))
+
+
+func test_notable_holds_the_money_kinds() -> void:
+	assert_true(Chronicle.NOTABLE.has("goods_short"))
+	assert_true(Chronicle.NOTABLE.has("tax_set"))
+
+
+func test_money_events_are_stored_plain() -> void:
+	var c := Chronicle.new()
+	c.add({"kind": &"goods_short", "turn": 2, "tag": &"GEN", "good": &"salt", "need": 1, "taken": 0, "witnesses": [&"GEN"]})
+	c.add({"kind": &"tax_set", "turn": 2, "tag": &"GEN", "level": 2, "from": 1})
+	var short := c.of_turn(2)[0]
+	assert_true(short["good"] is String)
+	assert_eq(short["witnesses"], PackedStringArray(["GEN"]))
+	assert_eq(c.of_turn(2)[1]["level"], 2)

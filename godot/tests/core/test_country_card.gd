@@ -113,3 +113,27 @@ func test_france_outside_power_with_reason_and_region_focus() -> void:
 		sum += int((row as Dictionary)["count"])
 	assert_eq(sum, 34)
 	assert_eq(int(fra["districts"]), 34)
+
+
+func test_treasury_yours_known_and_unknown() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var gen := CountryCard.of(game, &"GEN")["treasury"] as Dictionary
+	assert_eq(gen, {"shown": true, "value": 610, "banded": false, "change": 0, "expected": null, "tax": "Normal"})
+	var mlo := CountryCard.of(game, &"MLO")["treasury"] as Dictionary
+	assert_true(bool(mlo["shown"]))
+	assert_true(bool(mlo["banded"]))
+	assert_eq(int(mlo["value"]), Knowledge.band(Countries.by_tag(game, &"MLO").treasury))
+	assert_eq(Knowledge.band_text(int(mlo["value"]), ""), "about 1,900")
+	assert_eq(mlo["tax"], "", "a foreign country shows no tax")
+	var fra := CountryCard.of(game, &"FRA")["treasury"] as Dictionary
+	assert_false(bool(fra["shown"]), "France is unknown to Genoa: no treasury")
+	assert_eq(int(fra["value"]), 0)
+
+
+func test_own_treasury_change_after_a_season() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	assert_true(bool(Season.run(game)["ok"]))
+	var gen := CountryCard.of(game, &"GEN")["treasury"] as Dictionary
+	assert_eq(int(gen["value"]), 696)
+	assert_eq(int(gen["change"]), 86)
+	assert_eq(gen["tax"], "Normal")

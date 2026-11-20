@@ -110,9 +110,9 @@ func test_an_m3_season_of_genoa() -> void:
 	var works := _texts(s, &"works")
 	assert_eq(works, [
 		"Under way: walled town to city, Genoa (8, 13): 2 of 8 seasons. Ready Spring 1482.",
-		"Begun: vineyard, first stage, near Savona (7, 12). Ready Spring 1481.",
-		"Begun: timber, first stage, %s. Ready Summer 1481." % place,
-		"Cancelled: timber, first stage, %s." % place,
+		"Begun: vineyard, first stage, near Savona (7, 12). Ready Spring 1481. (−40 ducats)",
+		"Begun: timber, first stage, %s. Ready Summer 1481. (−40 ducats)" % place,
+		"Cancelled: timber, first stage, %s. (+40 ducats back)" % place,
 		"Finished: timber, first stage, %s." % place,
 	] as Array[String])
 	assert_eq(_texts(s, &"orders"), [

@@ -11,7 +11,7 @@ var unsaved_actions: int = 0
 var play_seconds: float = 0.0
 ## The slot last saved or loaded ("" for none).
 var current_slot: String = ""
-## Phase name -> milliseconds the last season spent in it (F3, perf).
+## Phase name -> milliseconds the last season spent in it (F3, perf); M4 adds production and income.
 var last_phase_ms: Dictionary = {}
 
 ## The folder of the saves; tests point it at a temporary folder.
@@ -210,6 +210,26 @@ func dev_transfer(hexes: Array[Vector2i], tag: StringName) -> int:
 	return changed
 
 
+## Developer console only: gives (or takes, with a negative amount) ducats, logged for the replay, then drains. False
+## with no game, in a map-only game, for an unknown tag or when the treasury would pass its limit.
+func dev_money(tag: StringName, amount: int) -> bool:
+	if game == null:
+		return false
+	var done := game.dev_money(tag, amount)
+	drain()
+	return done
+
+
+## Developer console only: gives (or takes) loads of a good by its id, logged for the replay, then drains. False with no
+## game, in a map-only game or for an unknown tag or good.
+func dev_goods(tag: StringName, good: int, amount: int) -> bool:
+	if game == null:
+		return false
+	var done := game.dev_goods(tag, good, amount)
+	drain()
+	return done
+
+
 ## Saves the game to a slot ("quick", "1" to "8", "auto1" to "auto3"): the file with the wall clock, play_seconds and the
 ## build, then the thumbnail PNG (a null thumbnail removes an old picture). On success unsaved_actions is 0 and
 ## current_slot the slot. Returns "" or the problem; nothing changes on a problem.
@@ -373,6 +393,10 @@ func drain() -> void:
 				Events.work_finished.emit(StringName(event["tag"]), event["hex"], event["work"])
 			"work_cancelled":
 				Events.work_cancelled.emit(StringName(event["tag"]), event["hex"], event["work"], StringName(event["why"]))
+			"goods_short":
+				Events.goods_short.emit(StringName(event["tag"]), StringName(event["good"]))
+			"tax_set":
+				Events.tax_set.emit(StringName(event["tag"]), int(event["level"]))
 		if Chronicle.NOTABLE.has(str(event.get("kind", ""))):
 			Events.chronicled.emit(Chronicle.plain(event))
 

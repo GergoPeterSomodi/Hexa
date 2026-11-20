@@ -276,3 +276,50 @@ func _has_rule_line(lines: Array) -> bool:
 		if arr.size() >= 2 and StringName(arr[1]) == &"rule":
 			return true
 	return false
+
+
+func test_gives_line_of_the_genoa_vineyard() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var hex := EconomyFixture.VINEYARD_HEX
+	var card := HexCard.of(game, hex)
+	assert_eq(str(card["gives"]), "wine 24 in autumn · upkeep 2 a season")
+	assert_eq(_find_line(card["lines"] as Array, "Gives"), ["Gives", &"plain", "wine 24 in autumn · upkeep 2 a season"])
+	assert_eq(str(card["weather"]), "", "calm weather gives no Weather line")
+	assert_null(_find_line(card["lines"] as Array, "Weather"))
+
+
+func test_weather_line_follows_the_hexes_climate() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var hex := EconomyFixture.VINEYARD_HEX
+	var climate := clampi(int(game.map.climate[game.map.index_of(hex)]), 0, 2)
+	game.weather[climate] = 2
+	assert_eq(str(HexCard.of(game, hex)["weather"]), "poor this season: crops −25 %")
+	assert_eq(_find_line(HexCard.of(game, hex)["lines"] as Array, "Weather"),
+		["Weather", &"plain", "poor this season: crops −25 %"])
+	game.weather[climate] = 1
+	assert_eq(str(HexCard.of(game, hex)["weather"]), "good this season: crops +20 %")
+	# Another climate's weather does not reach this hex.
+	game.weather[climate] = 0
+	game.weather[(climate + 1) % 3] = 2
+	assert_eq(str(HexCard.of(game, hex)["weather"]), "")
+
+
+func test_wild_hex_gives_its_grain_over_the_year() -> void:
+	var game := EconomyFixture.game(&"GEN", true)
+	var gives := str(HexCard.of(game, EconomyFixture.VINEYARD_HEX)["gives"])
+	assert_true(gives.begins_with("grain "), "wild land gives grain: " + gives)
+	assert_true(gives.ends_with(" a year (wild)"), gives)
+
+
+func test_no_gives_or_weather_without_countries_or_at_sea() -> void:
+	assert_eq(str(HexCard.of(_game, Vector2i(9, 9))["gives"]), "")
+	assert_eq(str(HexCard.of(_game, Vector2i(9, 9))["weather"]), "")
+	var game := EconomyFixture.game(&"GEN")
+	var sea := Vector2i(-1, -1)
+	for i: int in EconomyFixture.map().hex_count():
+		if EconomyFixture.map().land[i] == 0:
+			sea = EconomyFixture.map().hex_of(i)
+			break
+	assert_ne(sea, Vector2i(-1, -1))
+	assert_eq(str(HexCard.of(game, sea)["gives"]), "")
+	assert_eq(str(HexCard.of(game, sea)["weather"]), "")

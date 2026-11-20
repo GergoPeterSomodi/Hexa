@@ -145,3 +145,25 @@ func test_seasons_of() -> void:
 	assert_eq(WorksView.seasons_of(g, Works.CLEAR, ALPHA), 1)
 	g.improvement.upgrade(ALPHA)
 	assert_eq(WorksView.seasons_of(g, Works.UPGRADE, ALPHA), 16, "to level 3")
+
+
+func test_ready_turn_of_counts_the_season_begun_and_skips_snow_winters() -> void:
+	var g := _italy()
+	assert_eq(g.turn, 1)
+	var frost := Vector2i(7, 12)
+	assert_eq(g.map.climate[g.map.index_of(frost)], 1, "frost winter: no halt")
+	assert_eq(WorksView.ready_turn_of(g, frost, 4), 5, "four seasons from Spring 1480: ready Spring 1481")
+	assert_eq(WorksView.ready_turn_of(g, frost, 1), 2)
+	assert_eq(WorksView.ready_turn_of(g, frost, 0), 2, "at least one season")
+	var snow := Vector2i(-1, -1)
+	for i: int in g.map.hex_count():
+		if g.map.land[i] == 1 and g.map.climate[i] == 0:
+			snow = g.map.hex_of(i)
+			break
+	assert_ne(snow, Vector2i(-1, -1), "the map has a snow hex")
+	assert_eq(WorksView.ready_turn_of(g, snow, 4), 6, "Winter 1480 halts the work: one more season")
+	# the same answer as a work really begun: Works.ready_turn.
+	var w := _work(g, Works.BUILD, ImproveRules.VINEYARD, 1, snow, 4)
+	assert_eq(WorksView.ready_turn(g, w), WorksView.ready_turn_of(g, snow, 4))
+	g.turn = 4
+	assert_eq(WorksView.ready_turn_of(g, snow, 1), 6, "begun in a snow winter it waits for spring")

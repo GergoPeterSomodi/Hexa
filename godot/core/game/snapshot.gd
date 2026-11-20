@@ -30,6 +30,7 @@ static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 		"game": {
 			"map_id": game.map.id, "scenario_id": scenario_id, "scenario_digest": scenario_digest,
 			"seed": game.seed_value, "start_year": game.start_year, "turn": game.turn, "player": String(game.player),
+			"weather": game.weather.duplicate(),
 		},
 		"map_state": game.state.to_dict(),
 		"countries": countries,
@@ -97,7 +98,32 @@ static func _meta_ok(meta: Variant) -> bool:
 	for key: String in ["seed", "start_year", "turn"]:
 		if not (d.get(key) is int):
 			return false
+	if d.has("weather") and _weather_of(d["weather"]) == null:
+		return false
 	return int(d["turn"]) >= Calendar.FIRST_TURN and int(d["turn"]) <= MAX_TURN
+
+
+## The weather (snow, frost, mild: 0 calm, 1 good, 2 poor) as three bytes, or null when it is not three whole numbers
+## 0 to 2; a save without the key is calm (the caller's default).
+static func _weather_of(raw: Variant) -> Variant:
+	var out := PackedByteArray([0, 0, 0])
+	if raw is PackedByteArray and (raw as PackedByteArray).size() == 3:
+		out = (raw as PackedByteArray).duplicate()
+	elif raw is Array and (raw as Array).size() == 3:
+		for i: int in 3:
+			var v: Variant = (raw as Array)[i]
+			if not (v is int) and not (v is float and is_equal_approx(float(v), roundf(float(v)))):
+				return null
+			if int(v) < 0 or int(v) > 2:
+				return null
+			out[i] = int(v)
+		return out
+	else:
+		return null
+	for b: int in out:
+		if b > 2:
+			return null
+	return out
 
 
 ## {scenario, problem}: the scenario named by the body, from the definitions; its digest must be the one saved.
@@ -145,6 +171,8 @@ static func _build(body: Dictionary, meta: Dictionary, map: MapData, defs: GameD
 	game.player = player
 	game.start_year = int(meta["start_year"])
 	game.turn = int(meta["turn"])
+	if (meta as Dictionary).has("weather"):
+		game.weather = _weather_of(meta["weather"]) as PackedByteArray
 	game.chronicle = chronicle
 	game.luck = luck as Luck
 	game.stats = stats
@@ -227,7 +255,9 @@ static func _countries_of(raw: Array, scenario: ScenarioDef) -> Variant:
 	return out
 
 
-## The types Country.from_dict reads without checking: id int, tag text, capital two ints, alive bool.
+## The types Country.from_dict reads without checking: id int, tag text, capital two ints, alive bool. The M4 fields
+## (treasury, tax, ledgers, stock, flows ...) are checked by Country.from_dict itself, which refuses a bad one and
+## country/1 (its schema) with null.
 static func _country_typed(d: Dictionary) -> bool:
 	if not (d.get("id") is int) or not (d.get("tag") is String) or not (d.get("alive") is bool):
 		return false

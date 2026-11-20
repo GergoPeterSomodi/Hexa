@@ -576,3 +576,46 @@ func test_delete_save_removes_every_file_and_save_json_writes_the_dev_copy() -> 
 	assert_eq(DirAccess.get_files_at(_dir).size(), 0)
 	assert_eq(Session.current_slot, "", "the deleted slot is no longer current")
 	assert_false(Session.delete_save("../x"))
+
+
+func test_dev_money_and_dev_goods_move_the_stores_log_and_refuse_bad_asks() -> void:
+	Session.game = null  # an earlier test file may have left a game in the autoload
+	assert_false(Session.dev_money(&"GEN", 5), "no game")
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	var game := Session.game
+	var c := Countries.by_tag(game, &"GEN")
+	var purse := c.treasury
+	assert_true(Session.dev_money(&"GEN", 100))
+	assert_eq(c.treasury, purse + 100)
+	assert_eq(game.action_log.back()["action"], "dev_money")
+	assert_false(Session.dev_money(&"NOPE", 100), "an unknown tag")
+	var salt := game.defs.good_id(&"salt")
+	var held := c.stock[salt]
+	assert_true(Session.dev_goods(&"GEN", salt, 3))
+	assert_eq(c.stock[salt], held + 3)
+	assert_eq(game.action_log.back()["action"], "dev_goods")
+	assert_false(Session.dev_goods(&"GEN", 999, 3), "an unknown good")
+	assert_true(game.events.is_empty())
+	Session.end_game()
+	assert_false(Session.dev_goods(&"GEN", salt, 1), "no game")
+
+
+func test_drain_sends_goods_short_and_tax_set_and_chronicles_them() -> void:
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	var game := Session.game
+	var log: Array = []
+	var on_short := func(tag: StringName, good: StringName) -> void: log.append(["short", tag, good])
+	var on_tax := func(tag: StringName, level: int) -> void: log.append(["tax", tag, level])
+	var on_chron := func(entry: Dictionary) -> void: log.append(["chron", entry["kind"]])
+	Events.goods_short.connect(on_short)
+	Events.tax_set.connect(on_tax)
+	Events.chronicled.connect(on_chron)
+	game.emit({"kind": "goods_short", "tag": &"GEN", "good": &"salt", "need": 1, "taken": 0, "witnesses": [&"GEN"]})
+	var verdict := Session.act("set_tax", {"level": 2})
+	Events.goods_short.disconnect(on_short)
+	Events.tax_set.disconnect(on_tax)
+	Events.chronicled.disconnect(on_chron)
+	assert_true(bool(verdict["ok"]))
+	assert_eq(log, [["short", &"GEN", &"salt"], ["chron", "goods_short"], ["tax", &"GEN", 2], ["chron", "tax_set"]])
+	assert_true(game.events.is_empty())
+	assert_eq(game.chronicle.entries.back()["kind"], "tax_set")

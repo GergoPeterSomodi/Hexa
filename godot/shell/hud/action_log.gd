@@ -13,7 +13,7 @@ signal line_activated(hex: Vector2i)
 signal report_requested
 
 ## The filters up to this milestone (LogLines.FILTERS carries the milestone each one arrives in).
-const MILESTONE := 3
+const MILESTONE := 4
 ## The open card's size: at most 340 px wide (x 12 to 352 at 1280 wide, clear of the centred toast stack) and 268 px
 ## tall; the lines wrap inside it and the card scrolls. The closed bar is BAR_W wide.
 const CARD_W := 340
@@ -57,6 +57,7 @@ func _ready() -> void:
 	_segments = Segmented.new()
 	_segments.hud_mode = true
 	_segments.set_options(_filter_options())
+	(_segments.get_node("Buttons") as HBoxContainer).add_theme_constant_override("separation", 0)  # four tabs fit the 340 px card
 	_head.add_child(_segments)
 	_head.move_child(_segments, 0)
 	_segments.changed.connect(_on_filter_picked)

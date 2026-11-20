@@ -225,7 +225,7 @@ func test_the_filters() -> void:
 	assert_eq(_count(LogLines.entries(_g, &"GEN", &"all")), 3, "the choice, the begun work, the other's finish")
 	assert_eq(_count(LogLines.entries(_g, &"GEN", &"works")), 2)
 	assert_eq(_count(LogLines.entries(_g, &"GEN", &"mine")), 2)
-	assert_eq(_count(LogLines.entries(_g, &"GEN", &"money")), 0, "money arrives with M4")
+	assert_eq(_count(LogLines.entries(_g, &"GEN", &"money")), 0, "no money lines yet")
 	assert_eq(_count(LogLines.entries(_g, &"GEN", &"war")), 0, "war arrives with M7")
 	assert_eq(_count(LogLines.entries(_g, &"GEN", &"nonsense")), 0)
 	var since: Array[String] = []
@@ -277,3 +277,94 @@ func _round_trip(game: Game) -> Game:
 		DirAccess.remove_absolute(dir + f)
 	DirAccess.remove_absolute(dir)
 	return restored["game"] as Game
+
+
+func _short(tag: StringName, good: StringName, need: int, taken: int) -> Dictionary:
+	_g.emit({"kind": "goods_short", "tag": tag, "good": good, "need": need, "taken": taken, "witnesses": [tag]})
+	return _g.chronicle.entries[_g.chronicle.entries.size() - 1]
+
+
+func _tax(tag: StringName, level: int) -> Dictionary:
+	_g.emit({"kind": "tax_set", "tag": tag, "level": level, "from": 1})
+	return _g.chronicle.entries[_g.chronicle.entries.size() - 1]
+
+
+func test_goods_short_is_the_owners_line() -> void:
+	var line := LogLines.line_of(_g, _short(&"GEN", &"salt", 1, 0), &"GEN")
+	assert_eq(line["text"], "Your towns ran short of salt: 0 of 1.")
+	assert_eq([line["keyword"], line["tone"], line["notify"], line["mine"]], ["Short", "bad", true, true])
+	assert_eq(line["filters"], [&"all", &"mine", &"money"] as Array[StringName])
+	assert_eq(line["hex"], Countries.by_tag(_g, &"GEN").capital)
+
+
+func test_goods_short_is_never_witnessed_by_others() -> void:
+	var entry := _short(&"GEN", &"wine", 4, 1)
+	assert_eq(LogLines.line_of(_g, entry, _known()), {}, "a known country hears nothing")
+	var stranger := _stranger()
+	if stranger != &"":
+		assert_eq(LogLines.line_of(_g, entry, stranger), {})
+	var others := _short(_known(), &"oil", 2, 0)
+	assert_eq(LogLines.line_of(_g, others, &"GEN"), {}, "nor does the player hear of a known country's shortage")
+
+
+func test_tax_set_lines() -> void:
+	var mine := LogLines.line_of(_g, _tax(&"GEN", 2), &"GEN")
+	assert_eq(mine["text"], "You set taxes to High.")
+	assert_eq([mine["keyword"], mine["tone"], mine["notify"]], ["Taxes", "plain", false])
+	assert_eq(mine["filters"], [&"all", &"mine", &"money"] as Array[StringName])
+	var other := _known()
+	var theirs := LogLines.line_of(_g, _tax(other, 2), &"GEN")
+	assert_eq(theirs["text"], "%s set taxes to High." % LogLines.short_name(_g, other))
+	assert_eq(theirs["tone"], "muted")
+	assert_eq(theirs["filters"], [&"all", &"money"] as Array[StringName], "not in Mine")
+	var stranger := _stranger()
+	if stranger != &"":
+		assert_eq(LogLines.line_of(_g, _tax(stranger, 0), &"GEN"), {}, "an unknown country's change is not told")
+
+
+func test_the_money_filter_shows_money_lines_only() -> void:
+	_emit("work_started", _work(Works.BUILD, ImproveRules.VINEYARD, 1, SAVONA, 4))
+	_short(&"GEN", &"salt", 1, 0)
+	_tax(&"GEN", 0)
+	_tax(_known(), 2)
+	_g.turn = 2
+	_g.version += 1
+	assert_eq(_count(LogLines.entries(_g, &"GEN", &"money")), 3, "a free work is not a money line")
+	assert_eq(_count(LogLines.entries(_g, &"GEN", &"mine")), 4)
+	var lines := LogLines.entries(_g, &"GEN", &"money")[0]["lines"] as Array
+	assert_eq((lines[0] as Dictionary)["text"], "%s set taxes to High." % LogLines.short_name(_g, _known()), "newest first")
+	var other_view := LogLines.entries(_g, _known(), &"money")
+	for season: Dictionary in other_view:
+		for l: Dictionary in season["lines"]:
+			assert_false(str(l["text"]).begins_with("Your towns ran short"), "never the shortage")
+
+
+func test_work_lines_carry_their_ducats() -> void:
+	var paid := _work(Works.BUILD, ImproveRules.VINEYARD, 1, SAVONA, 4)
+	paid.paid = 40
+	var started := LogLines.line_of(_g, _emit("work_started", paid), &"GEN")
+	assert_eq(started["text"], "Begun: vineyard, first stage, near Savona (7, 12). Ready Spring 1481. (\u221240 ducats)")
+	assert_eq(started["floating"], "Begun \u221240")
+	assert_true((started["filters"] as Array).has(&"money"))
+	var cancelled := LogLines.line_of(_g, _emit("work_cancelled", paid, {"why": &"order", "reason": "", "refund": 40}), &"GEN")
+	assert_eq(cancelled["text"], "Cancelled: vineyard, first stage, near Savona (7, 12). (+40 ducats back)")
+	assert_true((cancelled["filters"] as Array).has(&"money"))
+	var lost := LogLines.line_of(_g, _emit("work_cancelled", paid, {"why": &"lost", "reason": "", "refund": 0}), &"GEN")
+	assert_false((lost["filters"] as Array).has(&"money"), "nothing came back")
+	var other := _work(Works.BUILD, ImproveRules.VINEYARD, 1, WOODS, 4, _known())
+	other.paid = 40
+	var theirs := LogLines.line_of(_g, _emit("work_started", other), &"GEN")
+	assert_false(str(theirs["text"]).contains("ducats"), "another country's price is not told")
+	assert_false((theirs["filters"] as Array).has(&"money"))
+
+
+func test_money_lines_are_equal_after_a_save_and_load() -> void:
+	_short(&"GEN", &"salt", 1, 0)
+	_tax(&"GEN", 2)
+	_g.turn = 3
+	_g.version += 1
+	var before := LogLines.entries(_g, &"GEN", &"money")
+	assert_eq(_count(before), 2)
+	var back := _round_trip(_g)
+	assert_not_null(back)
+	assert_eq(LogLines.entries(back, &"GEN", &"money"), before)

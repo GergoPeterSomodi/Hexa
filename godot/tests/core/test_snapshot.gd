@@ -273,3 +273,95 @@ func test_p_crafted_ranges() -> void:
 	_set_hex(top, "main_use", land, ImproveRules.WHEAT)
 	_set_hex(top, "level", land, 4)
 	_refused(top, "Cannot be read", "wheat has three levels")
+
+
+# ----- M4: the weather and the economy fields (m4-build-spec.md 4.22) -------------------------------------------
+
+
+## A scenario game whose weather is never calm, with the player chosen and a few seasons played.
+func _stormy_game() -> Game:
+	var d := (_fx["defs"] as GameDefs).duplicate() as GameDefs
+	d.weather_odds = PackedInt32Array([0, 50, 50])
+	var g := Game.new_scenario(_fx["map"] as MapData, d, _fx["scenario"] as ScenarioDef, 1480)
+	g.act("choose_country", {"tag": &"AAA"})
+	for n: int in 5:
+		Season.run(g)
+	return g
+
+
+func test_the_weather_is_saved_and_a_loaded_game_plays_on_alike() -> void:
+	var g := _stormy_game()
+	assert_ne(g.weather, PackedByteArray([0, 0, 0]), "the weather is not calm")
+	var body := _through_bytes(Snapshot.of(g))
+	assert_eq((body["game"] as Dictionary)["weather"], g.weather)
+	var r := Snapshot.restore(body, _fx["map"] as MapData, g.defs)
+	assert_eq(r["problem"], "")
+	var back := r["game"] as Game
+	assert_eq(back.weather, g.weather)
+	assert_eq(back.digest(), g.digest())
+	Season.run(g)
+	Season.run(back)
+	assert_eq(back.weather, g.weather, "the next weather")
+	assert_eq(back.digest(), g.digest(), "the first production after the load")
+	assert_eq(back.countries[0].treasury, g.countries[0].treasury)
+
+
+func test_a_save_without_weather_is_calm() -> void:
+	var body := _body()
+	(body["game"] as Dictionary).erase("weather")
+	var r := _restore(body)
+	assert_eq(r["problem"], "")
+	assert_eq((r["game"] as Game).weather, PackedByteArray([0, 0, 0]))
+
+
+func test_p_mistyped_weather() -> void:
+	var bad: Array = [PackedByteArray([0, 0]), PackedByteArray([0, 3, 0]), PackedByteArray([0, 0, 0, 0]), "012", 5,
+			[0, 1], [0, 1, 3], [0, 1, "2"], [0, -1, 0], {"a": 1}, PackedInt32Array([0, 1, 2])]
+	for value: Variant in bad:
+		var body := _body()
+		(body["game"] as Dictionary)["weather"] = value
+		_refused(body, "Cannot be read", "weather " + str(value))
+
+
+func test_the_economy_fields_survive_the_body() -> void:
+	var g := _played_game()
+	var c := g.countries[0]
+	assert_ne(c.ledger_closed, {}, "a closed ledger to keep")
+	var back := _restore(_through_bytes(Snapshot.of(g)))["game"] as Game
+	var d := back.countries[0]
+	assert_eq(d.treasury, c.treasury)
+	assert_eq(d.tax, c.tax)
+	assert_eq(d.short_mask, c.short_mask)
+	assert_eq(d.stock, c.stock)
+	assert_eq(d.flows_open, c.flows_open)
+	assert_eq(d.stock_from, c.stock_from)
+	assert_eq(d.ledger_open, c.ledger_open)
+	assert_eq(d.ledger_closed, c.ledger_closed)
+	assert_eq(d.goods_closed, c.goods_closed)
+	assert_eq(back.state.digest(), g.state.digest(), "works with paid_goods")
+	assert_eq(back.stats.digest(), g.stats.digest())
+
+
+func test_p_old_and_damaged_economy_fields() -> void:
+	var old := _body()
+	old["format"] = 1
+	_refused(old, "Made by an older test build", "format 1")
+	var one := _body()
+	((one["countries"] as Array)[0] as Dictionary)["schema"] = "hexa-godot/country/1"
+	_refused(one, "Cannot be read", "country/1")
+	var cases: Array[Array] = [
+		["treasury", "40"], ["treasury", [1]], ["treasury", 1.5], ["treasury", true], ["tax", 3], ["tax", "x"],
+		["short_mask", -1], ["short_mask", {}], ["stock", "x"], ["stock", [1, "a"]], ["stock", PackedInt32Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36])],
+		["stock_from", ["a"]], ["flows_open", [1, 2, 3]], ["flows_shape", "x"],
+		["ledger_from", "x"], ["ledger_open", "x"], ["ledger_open", ["x"]],
+		["ledger_open", [{"why": "tax", "hex": [1, 2], "amount": "ten", "count": 1}]],
+		["ledger_open", [{"why": 5, "hex": [1, 2], "amount": 1, "count": 1}]],
+		["ledger_open", [{"why": "tax", "hex": [1], "amount": 1, "count": 1}]],
+		["ledger_closed", "x"], ["ledger_closed", {"turn": 1}], ["goods_closed", "x"], ["goods_closed", {"turn": "a"}],
+	]
+	for item: Array in cases:
+		var body := _body()
+		((body["countries"] as Array)[0] as Dictionary)[item[0]] = item[1]
+		var r := _restore(body)
+		assert_null(r["game"], str(item))
+		assert_eq(r["problem"], "Cannot be read", str(item))

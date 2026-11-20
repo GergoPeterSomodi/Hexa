@@ -19,6 +19,10 @@ signal work_started(tag: StringName, hex: Vector2i, work: Dictionary)
 signal work_finished(tag: StringName, hex: Vector2i, work: Dictionary)
 ## A work ended without finishing; `why` is `order`, `lost` or `blocked`.
 signal work_cancelled(tag: StringName, hex: Vector2i, work: Dictionary, why: StringName)
+## A country's towns ran short of a need (food, wine, salt or oil) that was met last season: chips, task flag.
+signal goods_short(tag: StringName, good: StringName)
+## A country set its tax level (0 low, 1 normal, 2 high): chips, study page, country panel, toast.
+signal tax_set(tag: StringName, level: int)
 ## Every notable event, as the chronicle stores it (plain values): the log, notifications and ribbons.
 signal chronicled(entry: Dictionary)
 ## A season ended; `turn` is the season that ended. Emitted once, after the last phase's drain.

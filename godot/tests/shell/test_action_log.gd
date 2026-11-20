@@ -129,8 +129,11 @@ func test_the_filters_show_only_their_lines() -> void:
 	assert_eq(_widget.line_count(), _line_total(&"works"), "the works rows")
 	_widget.set_filter(&"mine")
 	assert_eq(_widget.line_count(), _line_total(&"mine"), "the mine rows")
+	_widget.set_filter(&"money")
+	assert_eq(_widget.filter(), &"money", "the money filter shows from M4")
+	assert_eq(_widget.line_count(), _line_total(&"money"), "the money rows")
 	_widget.set_filter(&"war")
-	assert_eq(_widget.filter(), &"mine", "a filter after the milestone is ignored")
+	assert_eq(_widget.filter(), &"money", "a filter after the milestone is ignored")
 
 
 func test_the_newest_header_asks_for_the_report() -> void:

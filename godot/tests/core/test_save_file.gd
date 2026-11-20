@@ -285,7 +285,7 @@ func test_p_two_hundred_random_files_read_as_broken() -> void:
 		for i: int in bytes.size():
 			bytes[i] = rng.randi_range(0, 255)
 		if n % 4 == 0 and bytes.size() > 20:
-			bytes = ("{\"hexa\":\"save\",\"format\":1}\n").to_utf8_buffer() + bytes
+			bytes = ("{\"hexa\":\"save\",\"format\":2}\n").to_utf8_buffer() + bytes
 		_put(SaveFile.path_of("1", dir), bytes)
 		assert_eq(SaveFile.read_header("1", dir)["state"], &"broken", "file %d" % n)
 		assert_eq(SaveFile.read("1", dir)["problem"], "Cannot be read", "file %d" % n)
@@ -327,10 +327,10 @@ func _with_line(dir: String, slot: String, change: Callable) -> void:
 
 func test_p_hostile_header_numbers_read_as_broken() -> void:
 	var cases: Array[Array] = [
-		["\"format\":1,", "\"format\":1e999,"], ["\"format\":1,", "\"format\":-1e999,"],
-		["\"format\":1,", "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
+		["\"format\":2,", "\"format\":1e999,"], ["\"format\":2,", "\"format\":-1e999,"],
+		["\"format\":2,", "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
 		["\"saved_unix\":1700000000,", "\"saved_unix\":1e19,"], ["\"play_seconds\":61,", "\"play_seconds\":9007199254740994,"],
-		["\"format\":1,", "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
+		["\"format\":2,", "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
 	]
 	for item: Array in cases:
 		var dir := _saved("1")
@@ -414,3 +414,42 @@ func test_a_write_after_a_crash_between_the_two_renames_leaves_no_bak() -> void:
 	assert_eq(files.size(), 1, str(files))
 	assert_eq(files[0], "3.sav")
 	assert_eq(SaveFile.read("3", dir)["problem"], "")
+
+
+# ----- M4: format 2, the economy and the weather (m4-build-spec.md 4.22) ----------------------------------------
+
+
+func test_the_format_is_2_and_an_m3_save_is_older() -> void:
+	assert_eq(SaveFile.FORMAT, 2)
+	assert_eq(SaveFile.OLDEST_FORMAT, 2)
+	var dir := _saved("1")
+	_with_header(dir, "1", func(h: Dictionary) -> void: h["format"] = 1)
+	assert_eq(SaveFile.read_header("1", dir)["state"], &"older")
+	assert_eq(SaveFile.read("1", dir)["problem"], "Made by an older test build")
+
+
+func test_save_load_save_is_byte_equal_with_the_economy_and_a_stormy_weather() -> void:
+	var d := (_fx["defs"] as GameDefs).duplicate() as GameDefs
+	d.weather_odds = PackedInt32Array([0, 50, 50])
+	var g := Game.new_scenario(_fx["map"] as MapData, d, _fx["scenario"] as ScenarioDef, 1480)
+	g.improvement.clear(Vector2i(0, 2))
+	g.act("choose_country", {"tag": &"AAA"})
+	g.act("build", {"hex": Vector2i(0, 2), "family": ImproveRules.WHEAT, "tag": &"AAA"})
+	for n: int in 5:
+		Season.run(g)
+	assert_ne(g.weather, PackedByteArray([0, 0, 0]), "not calm")
+	var c := g.countries[0]
+	assert_ne(c.ledger_closed, {}, "a closed ledger")
+	assert_false(c.stock.is_empty(), "a stock")
+	assert_false(c.flows_open.is_empty(), "flows")
+	var dir_a := _dir()
+	assert_eq(SaveFile.write(g, "2", INFO, {}, dir_a), "")
+	var read := SaveFile.read("2", dir_a)
+	assert_eq(read["problem"], "")
+	var r := Snapshot.restore(read["body"] as Dictionary, _fx["map"] as MapData, d)
+	assert_eq(r["problem"], "", "a save in non-calm weather loads")
+	var back := r["game"] as Game
+	assert_eq(back.digest(), g.digest())
+	var dir_b := _dir()
+	assert_eq(SaveFile.write(back, "2", INFO, {}, dir_b), "")
+	assert_eq(_bytes(SaveFile.path_of("2", dir_a)), _bytes(SaveFile.path_of("2", dir_b)), "byte-equal files")

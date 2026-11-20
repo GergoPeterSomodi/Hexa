@@ -5,8 +5,8 @@
 class_name SaveFile
 extends RefCounted
 
-const FORMAT := 1
-const OLDEST_FORMAT := 1
+const FORMAT := 2
+const OLDEST_FORMAT := 2
 const DIR := "user://saves"
 const SLOTS: Array[String] = ["quick", "1", "2", "3", "4", "5", "6", "7", "8"]
 const AUTO_SLOTS: Array[String] = ["auto1", "auto2", "auto3"]
