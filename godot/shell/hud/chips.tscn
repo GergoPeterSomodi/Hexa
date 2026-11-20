@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://shell/hud/chips.gd" id="1_chips"]
+[ext_resource type="PackedScene" path="res://shell/ui/resource_chip.tscn" id="2_chip"]
+
+[node name="Chips" type="HBoxContainer"]
+script = ExtResource("1_chips")
+
+[node name="Ducats" parent="." instance=ExtResource("2_chip")]
+layout_mode = 2
+
+[node name="Stores" parent="." instance=ExtResource("2_chip")]
+layout_mode = 2
