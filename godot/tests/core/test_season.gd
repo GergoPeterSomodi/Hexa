@@ -1,9 +1,9 @@
-## The season table (docs/architecture/m3-build-spec.md 4.2, 9).
+## The season table (docs/architecture/m3-build-spec.md 4.2, 9; m4-build-spec.md 4.13).
 extends GutTest
 
 
 func test_phases_are_pinned() -> void:
-	assert_eq(Season.PHASES, [&"works", &"stats", &"calendar"] as Array[StringName])
+	assert_eq(Season.PHASES, [&"production", &"income", &"works", &"stats", &"calendar"] as Array[StringName])
 
 
 func test_end_check_rows() -> void:
@@ -39,6 +39,8 @@ func test_run_phase_unknown_does_nothing() -> void:
 	assert_eq(g.digest(), before)
 	Season.run_phase(g, &"calendar")
 	assert_eq(g.turn, 2)
+	Season.run_phase(g, &"production")
+	Season.run_phase(g, &"income")
 	Season.run_phase(g, &"works")
 	Season.run_phase(g, &"stats")
 	assert_eq(g.turn, 2)

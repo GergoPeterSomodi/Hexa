@@ -43,8 +43,12 @@ var _refusal_label: Label = null
 var _foot: HBoxContainer = null
 var _pin_btn: KitButton = null
 var _begin_btn: KitButton = null
+var _chart_caption: HBoxContainer = null
 var _refs_bound: bool = false
 var _syncing_pin: bool = false
+
+## Refusals that keep the whole card (money, goods, a slot); any other refusal shows only the refusal (spec 4.17).
+const FULL_CARD_BLOCKS: Array[String] = ["slot", "ducats", "goods"]
 
 
 func _ready() -> void:
@@ -77,27 +81,31 @@ func show_preview(p: Dictionary) -> void:
 	var verdict_raw: Variant = p.get("verdict", {})
 	var verdict: Dictionary = verdict_raw if verdict_raw is Dictionary else {}
 	var ok := bool(verdict.get("ok", true))
-	if not ok:
-		var reason := str(p.get("reason_words", ""))
-		if reason.is_empty():
-			reason = str(verdict.get("reason", ""))
+	var reason := str(p.get("reason_words", ""))
+	if reason.is_empty():
+		reason = str(verdict.get("reason", ""))
+	var full_card := str(p.get("blocked_by", "")) in FULL_CARD_BLOCKS
+	_compare_box.visible = false
+	if not ok and not full_card:
+		# A rule refusal shows only the refusal (spec 4.17 blocked_by, 6.5).
 		_body.visible = false
-		_compare_box.visible = false
+		_foot.visible = false
 		_refusal.visible = true
 		_refusal_label.text = reason
 		_begin_btn.set_verdict({"ok": false, "reason": reason})
-		_foot.visible = false
 		visible = true
 		return
 
-	_refusal.visible = false
-	_compare_box.visible = false
+	# Accepted, or refused for ducats, goods or a slot: the whole card, with the refusal bar when refused.
+	_refusal.visible = not ok
+	_refusal_label.text = reason
 	_body.visible = true
 	_foot.visible = true
-	_begin_btn.set_verdict({"ok": true})
+	_begin_btn.set_verdict({"ok": ok, "reason": reason})
 
 	_populate_brings(p.get("brings", []))
 	_populate_seasons_and_chart(p.get("by_season", []))
+	_populate_caption(p.get("year", {}))
 	_populate_lands(p.get("lands", {}))
 	_populate_cost(p.get("cost", {}))
 	_populate_requirements(p.get("requirements", []))
@@ -240,6 +248,16 @@ func treasury_only_switch() -> KitSwitch:
 	return _treasury_only
 
 
+func body_visible() -> bool:
+	_ensure_refs()
+	return _body.visible
+
+
+func foot_visible() -> bool:
+	_ensure_refs()
+	return _foot.visible
+
+
 func compare_container() -> HBoxContainer:
 	_ensure_refs()
 	return _compare_box
@@ -274,6 +292,11 @@ func _ensure_refs() -> void:
 	_foot = get_node("VBox/Foot") as HBoxContainer
 	_pin_btn = get_node("VBox/Foot/PinBtn") as KitButton
 	_begin_btn = get_node("VBox/Foot/BeginBtn") as KitButton
+	_chart_caption = HBoxContainer.new()
+	_chart_caption.name = &"Caption"
+	_chart_caption.visible = false
+	_chart_caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_chart_box.add_child(_chart_caption)
 
 	_close_btn.pressed.connect(_on_close_pressed)
 	_begin_btn.pressed.connect(_on_begin_pressed)
@@ -332,7 +355,7 @@ func _populate_seasons_and_chart(raw_seasons: Variant) -> void:
 		before_vals.append(int(s.get("before", 0)))
 		after_vals.append(int(s.get("after", int(s.get("before", 0)) + int(s.get("gain", 0)))))
 
-	_season_strip.set_seasons(seasons, now_idx)
+	_season_strip.set_seasons(_view_seasons(seasons), now_idx)
 	if seasons.is_empty():
 		_chart_box.visible = false
 		_chart.set_series([])
@@ -341,7 +364,7 @@ func _populate_seasons_and_chart(raw_seasons: Variant) -> void:
 		_chart.x_labels = x_labs
 		_chart.set_series([
 			{"name": "Before", "values": before_vals, "ink": 0},
-			{"name": "After", "values": after_vals, "ink": 4},
+			{"name": "After", "values": after_vals, "ink": 3},
 		])
 
 
@@ -459,7 +482,9 @@ func _populate_payback(raw_payback: Variant) -> void:
 	if raw_payback is String:
 		text = str(raw_payback)
 	elif raw_payback is Dictionary:
-		text = str((raw_payback as Dictionary).get("text", ""))
+		var pb := raw_payback as Dictionary
+		var key := "text_treasury" if (treasury_only and pb.has("text_treasury")) else "text"
+		text = str(pb.get(key, ""))
 	_payback_label.text = text
 	_payback_label.visible = not text.is_empty()
 
@@ -530,7 +555,7 @@ func _populate_compare_col(col: VBoxContainer, p: Dictionary, is_better: bool, s
 		c.x_labels = xl
 		c.set_series([
 			{"name": "Before", "values": bv, "ink": 0},
-			{"name": "After", "values": av, "ink": 4},
+			{"name": "After", "values": av, "ink": 3},
 		])
 		col.add_child(c)
 
@@ -550,15 +575,56 @@ func _populate_compare_col(col: VBoxContainer, p: Dictionary, is_better: bool, s
 
 func _year_gain(p: Dictionary) -> int:
 	var yr: Variant = p.get("year", {})
-	if yr is Dictionary and (yr as Dictionary).has("gain"):
-		return int((yr as Dictionary)["gain"])
+	if yr is Dictionary and _has_gain(yr as Dictionary):
+		return _pick_gain(yr as Dictionary)
 	var total := 0
 	var seasons: Variant = p.get("by_season", [])
 	if seasons is Array:
 		for s_var: Variant in (seasons as Array):
 			if s_var is Dictionary:
-				total += int((s_var as Dictionary).get("gain", 0))
+				total += _pick_gain(s_var as Dictionary)
 	return total
+
+
+## The gain the card shows: the treasury measure when `treasury_only` and the preview has it, else the realm
+## measure (spec 5.0 R2: the preview returns both; the shell picks one).
+func _pick_gain(d: Dictionary) -> int:
+	if treasury_only and d.has("gain_treasury"):
+		return int(d["gain_treasury"])
+	if d.has("gain_realm"):
+		return int(d["gain_realm"])
+	return int(d.get("gain", 0))
+
+
+func _has_gain(d: Dictionary) -> bool:
+	return d.has("gain_realm") or d.has("gain_treasury") or d.has("gain")
+
+
+## The four season cells with `gain` replaced by the measure the card shows.
+func _view_seasons(raw_seasons: Array) -> Array:
+	var out: Array = []
+	for s_var: Variant in raw_seasons:
+		if typeof(s_var) != TYPE_DICTIONARY:
+			continue
+		var s := (s_var as Dictionary).duplicate()
+		s["gain"] = _pick_gain(s_var as Dictionary)
+		out.append(s)
+	return out
+
+
+## The chart's caption: "A year 511 → 533" and the year's gain chip (spec 6.5).
+func _populate_caption(raw_year: Variant) -> void:
+	PanelKit.clear_children(_chart_caption)
+	var yr: Dictionary = raw_year if raw_year is Dictionary else {}
+	_chart_caption.visible = not yr.is_empty()
+	if yr.is_empty():
+		return
+	var before := int(yr.get("before", 0))
+	var after := int(yr.get("after", before))
+	_chart_caption.add_child(PanelKit.label("A year %d → %d" % [before, after], &"Hint"))
+	var chip := DeltaChip.new()
+	chip.set_delta(_pick_gain(yr))
+	_chart_caption.add_child(chip)
 
 
 func _shared_chart_ticks(a: Dictionary, b: Dictionary) -> PackedInt32Array:

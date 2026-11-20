@@ -1,14 +1,16 @@
 ## The stats phase (docs/architecture/m3-build-spec.md 4.6, 5.3): the row of the season that is ending, for every
-## country in id order (the pseudo-country "" in a map-only game), into the ring, and in Winter into the year rows.
+## country in id order (the pseudo-country "" in a map-only game), into the ring, and in Winter into the year rows. From
+## M4 (m4-build-spec.md 4.20) it also writes the money and goods series, then closes the season's ledgers and flows.
 class_name StatsSystem
 extends RefCounted
 
 const OWNS: Array[String] = ["stats"]
 
 
-## Stats.create(the countries' tags, or [""] in a map-only game, 0 goods); at game start.
+## Stats.create(the countries' tags, or [""] in a map-only game; the goods of the defs, none in a map-only game); at game
+## start.
 static func setup(game: Game) -> void:
-	game.stats = Stats.create(_tags_of(game), 0)
+	game.stats = Stats.create(_tags_of(game), _goods_of(game))
 
 
 ## The stats phase (4.6): writes the row of `game.turn` for every country; in Winter also the year block.
@@ -19,9 +21,12 @@ static func season(game: Game) -> void:
 	var rows := _rows(game, stats)
 	for c: int in rows.size():
 		stats.set_row(c, game.turn, rows[c])
+	_write_goods(game, stats)
 	stats.commit(game.turn)
 	if Calendar.is_winter(game.turn):
 		stats.append_year()
+	Treasury.close_ledger(game)
+	Stores.close(game)
 
 
 ## The values as the phase would write them for one country now; empty for an unknown tag.
@@ -31,6 +36,23 @@ static func row_now(game: Game, tag: StringName) -> PackedInt32Array:
 	if c < 0:
 		return PackedInt32Array()
 	return _rows(game, Stats.create(tags, 0))[c]
+
+
+## The goods ring of the season that is ending: made, used and the closing stock of every good, per country.
+static func _write_goods(game: Game, stats: Stats) -> void:
+	if stats.goods == 0 or not _by_owner(game):
+		return
+	for c: int in game.countries.size():
+		var country := game.countries[c]
+		var base := (c * Stats.RING + posmod(game.turn, Stats.RING)) * stats.goods * 3
+		for g: int in stats.goods:
+			stats.goods_ring[base + g * 3] = maxi(Stores.flow(country, g, &"made"), 0)
+			stats.goods_ring[base + g * 3 + 1] = -Stores.flow(country, g, &"used")
+			stats.goods_ring[base + g * 3 + 2] = country.stock[g] if g < country.stock.size() else 0
+
+
+static func _goods_of(game: Game) -> int:
+	return game.defs.goods.size() if _by_owner(game) and game.defs != null else 0
 
 
 static func _by_owner(game: Game) -> bool:
@@ -87,4 +109,40 @@ static func _rows(game: Game, stats: Stats) -> Array[PackedInt32Array]:
 			var c := stats.tags.find(str(entry.get("tag", "")))
 			if c >= 0:
 				rows[c][finished_col] += 1
+	if by_owner:
+		var held := SeasonProfile.table(game) if game.defs != null and game.state != null else {}
+		for c: int in mini(game.countries.size(), rows.size()):
+			_money_into(game, game.countries[c], rows[c])
+			if game.defs != null and game.state != null:
+				var profile := SeasonProfile.of(game, held, game.countries[c].id)
+				rows[c][Stats.column("people")] = int(profile["town"]) + int(profile["rest"])
 	return rows
+
+
+## The M4 series of one country from its open ledger (what close_ledger is about to close) and its open flows.
+static func _money_into(game: Game, country: Country, row: PackedInt32Array) -> void:
+	row[Stats.column("treasury")] = country.treasury
+	var spent := 0
+	for line: Dictionary in country.ledger_open:
+		var amount := int(line["amount"])
+		match line["why"]:
+			&"tax_people":
+				row[Stats.column("income_people")] += amount
+			&"tax_goods":
+				row[Stats.column("income_goods")] += amount
+			&"port_dues":
+				row[Stats.column("income_dues")] += amount
+			&"upkeep_districts":
+				row[Stats.column("upkeep_districts")] -= amount
+			&"upkeep_walls":
+				row[Stats.column("upkeep_walls")] -= amount
+			&"work", &"refund":
+				spent -= amount
+	row[Stats.column("spending")] = spent
+	if game.defs == null:
+		return
+	for key: StringName in [&"grain", &"fish"]:
+		var g := game.defs.good_id(key)
+		if g >= 0:
+			row[Stats.column("food_made")] += maxi(Stores.flow(country, g, &"made"), 0)
+			row[Stats.column("food_eaten")] += -Stores.flow(country, g, &"used")

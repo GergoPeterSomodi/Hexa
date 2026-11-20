@@ -1,9 +1,10 @@
 ## The season table (docs/architecture/m3-build-spec.md 4.2, 5.4): what happens, in order, when a season ends.
-## M3's phases: works, stats, calendar. A milestone adds its rows where the spec's table puts them.
+## M4's phases: production, income, works, stats, calendar (m4-build-spec.md 4.13). A milestone adds its rows where the
+## spec's table puts them.
 class_name Season
 extends RefCounted
 
-const PHASES: Array[StringName] = [&"works", &"stats", &"calendar"]
+const PHASES: Array[StringName] = [&"production", &"income", &"works", &"stats", &"calendar"]
 
 
 ## {ok, reason}: may the season end now?
@@ -20,6 +21,10 @@ static func begin(game: Game) -> void:
 
 static func run_phase(game: Game, phase: StringName) -> void:
 	match phase:
+		&"production":
+			EconomySeason.production(game)
+		&"income":
+			EconomySeason.income(game)
 		&"works":
 			Works.season(game)
 		&"stats":

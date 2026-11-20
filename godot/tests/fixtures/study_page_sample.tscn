@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/screens/study_page.gd" id="1_page"]
+
+[node name="SamplePage" type="VBoxContainer"]
+script = ExtResource("1_page")
+page_id = &"sample"
+
+[node name="Heading" type="Label" parent="."]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+text = "Sample page"
+
+[node name="Spacer" type="Control" parent="."]
+custom_minimum_size = Vector2(0, 1200)
+layout_mode = 2
+mouse_filter = 2

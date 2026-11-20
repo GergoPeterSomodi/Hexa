@@ -155,3 +155,47 @@ func test_made_of_through_the_cache_equals_made_of_without_it_for_every_country(
 				var warm := EconomySeason.made_of(game, view, c.tag, season, weather, tax, cache)
 				assert_eq(warm, cold, "%s season %d tax %d" % [c.tag, season, tax])
 	assert_gt(cache.size(), 0)
+
+
+# ----- through Game.emit (task N4; 5.0 A5) ---------------------------------------------------------------------------
+
+
+func test_two_thousand_random_actions_keep_the_games_own_cache_equal() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var cache := game.districts
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2000
+	var hexes: Array[Vector2i] = []
+	for i: int in game.map.hex_count():
+		if game.map.land[i] == 1 and int(game.state.owner[i]) == Countries.by_tag(game, &"GEN").id:
+			hexes.append(game.map.hex_of(i))
+	var changed := 0
+	for n: int in 2000:
+		var hex := hexes[rng.randi_range(0, hexes.size() - 1)]
+		var pick := rng.randi_range(0, 9)
+		if n % 5 == 0:
+			game.dev_money(&"GEN", 1000)
+			game.dev_goods(&"GEN", 11, 30)
+			game.dev_goods(&"GEN", 12, 60)
+		if pick < 3:
+			var options: Array[Dictionary] = []
+			for o: Dictionary in game.improvement.build_options(hex):
+				if bool(o["ok"]):
+					options.append(o)
+			if not options.is_empty():
+				game.act("build", {"hex": hex, "family": int(options[rng.randi_range(0, options.size() - 1)]["family_id"]), "tag": &"GEN"})
+		elif pick < 5:
+			game.act("upgrade", {"hex": hex, "tag": &"GEN"})
+		elif pick < 6:
+			game.act("clear", {"hex": hex, "tag": &"GEN"})
+		elif pick < 7:
+			game.act("cancel_work", {"hex": hex, "tag": &"GEN"})
+		else:
+			var before := Array(game.state.main_use)
+			Season.run(game)
+			changed += 0 if Array(game.state.main_use) == before else 1
+		if n % 40 == 39:
+			assert_eq(_stale(game, cache), [] as Array[int], "after %d actions" % (n + 1))
+	assert_eq(_stale(game, cache), [] as Array[int], "after 2,000 actions")
+	assert_gt(changed, 5, "works finished and changed the map through the door")
+	assert_gt(cache.size(), 0)

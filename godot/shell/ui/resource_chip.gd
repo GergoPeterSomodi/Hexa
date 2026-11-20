@@ -1,20 +1,19 @@
-## Studiolo top-bar resource chip: PanelSlot holding a 30 px Medallion, optional resource name,
-## tabular value, and inline DeltaChip (docs/architecture/ui-style-and-feedback-spec.md section 5).
+## Studiolo top-bar resource chip (docs/architecture/m4-build-spec.md 6.3; ui-style-and-feedback-spec.md sections 5 and
+## 4.11): a flat Button whose PanelSlot plate holds a 30 px Medallion with the resource's icon, the name (optional), the
+## value through Words, and a DeltaChip. The hover card is built from a dictionary (HoverCard, no Game access).
 class_name ResourceChip
-extends PanelContainer
+extends Button
 
-signal pressed
+const HOVER_CARD_SCENE := preload("res://shell/ui/hover_card.tscn")
+## The tooltip key that asks for the hover card (any non-empty text would do; the card is not text).
+const CARD_KEY := "card"
 
+## The medal's Kit icon (set by set_resource; settable on its own).
 @export var icon_name: StringName = &"":
 	set(value):
 		icon_name = value
 		if _refs_bound:
-			_medallion.icon_name = icon_name
-
-@export var resource_name: String = "":
-	set(value):
-		resource_name = value
-		_sync_name()
+			_medal.icon_name = icon_name
 
 @export var invert: bool = false:
 	set(value):
@@ -22,12 +21,16 @@ signal pressed
 		if _refs_bound:
 			_delta.invert = invert
 
-@export var hud_mode: bool = false:
-	set(value):
-		hud_mode = value
-		_sync_focus_mode()
+var resource_id: StringName = &""
 
-var _medallion: Medallion = null
+var _resource_label: String = ""
+var _value_text: String = ""
+var _name_shown: bool = true
+var _change_shown: bool = true
+var _card: Dictionary = {}
+
+var _plate: PanelContainer = null
+var _medal: Medallion = null
 var _name_label: Label = null
 var _value_label: Label = null
 var _delta: DeltaChip = null
@@ -35,91 +38,137 @@ var _refs_bound: bool = false
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	focus_mode = Control.FOCUS_NONE
 	_ensure_refs()
-	_medallion.icon_name = icon_name
-	_delta.invert = invert
 	_sync_name()
-	_sync_focus_mode()
+	_sync_change()
+	_sync_min_size()
+	_sync_accessibility()
 
 
-func _gui_input(event: InputEvent) -> void:
-	var mb := event as InputEventMouseButton
-	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-		pressed.emit()
-		accept_event()
-
-
-## Updates the displayed resource amount, change delta, optional unit, and optional resource name.
-func set_value(amount: int, change: int, unit: String = "", p_resource_name: String = "") -> void:
+## Names the chip: its id (for the bar's refresh), its icon from the Kit, and its label ("Ducats").
+func set_resource(id: StringName, icon: StringName, label: String) -> void:
 	_ensure_refs()
-	if not p_resource_name.is_empty():
-		resource_name = p_resource_name
-	_value_label.text = str(amount)
+	resource_id = id
+	icon_name = icon
+	_resource_label = label
+	_sync_name()
+	_sync_accessibility()
+
+
+## Shows the amount (through Words) and the change since the last closed season (a DeltaChip). `unit` names the change
+## on the chip ("ducats" gives "+86 ducats"); `label` also renames the chip when not empty.
+func set_value(value: int, change: int, unit: String = "", label: String = "") -> void:
+	_ensure_refs()
+	if not label.is_empty():
+		_resource_label = label
+		_sync_name()
+	_value_text = Words.number(value)
+	_value_label.text = _value_text
 	_delta.set_delta(change, unit)
-	_sync_accessibility(amount)
+	_sync_accessibility()
 
 
-## Returns the child Medallion button.
+## Sets the hover card from a dictionary (`{title, subtitle, lines}` as HoverCard.show_card takes it). An empty
+## dictionary removes the card.
+func set_card(card: Dictionary) -> void:
+	_card = card.duplicate(true)
+
+
+## Shows or hides the name (the top bar narrows by the name first). The medal and the value always show.
+func set_name_shown(on: bool) -> void:
+	_ensure_refs()
+	_name_shown = on
+	_sync_name()
+
+
+## Shows or hides the change (the top bar narrows by the change after the name).
+func set_change_shown(on: bool) -> void:
+	_ensure_refs()
+	_change_shown = on
+	_sync_change()
+
+
+## Returns the child Medal (a Medallion, not clickable: the chip takes the click).
 func medallion() -> Medallion:
 	_ensure_refs()
-	return _medallion
+	return _medal
 
 
-## Returns the child NameLabel.
+## Returns the child Name label.
 func name_label() -> Label:
 	_ensure_refs()
 	return _name_label
 
 
-## Returns the child ValueLabel.
+## Returns the child Value label.
 func value_label() -> Label:
 	_ensure_refs()
 	return _value_label
 
 
-## Returns the child DeltaChip.
+## Returns the child Change DeltaChip.
 func delta_chip() -> DeltaChip:
 	_ensure_refs()
 	return _delta
 
 
+## Returns the chip's hover card key when a card is set (Godot asks for it on hover).
+func _get_tooltip(_at_position: Vector2) -> String:
+	return CARD_KEY if not _card.is_empty() else ""
+
+
+## Builds the HoverCard for the card dictionary; null when there is no card.
+func _make_custom_tooltip(for_text: String) -> Object:
+	if for_text != CARD_KEY or _card.is_empty():
+		return null
+	var card := HOVER_CARD_SCENE.instantiate() as HoverCard
+	card.show_card(_card)
+	return card
+
+
 func _ensure_refs() -> void:
 	if _refs_bound:
 		return
-	_medallion = get_node("HBox/Medallion") as Medallion
-	_name_label = get_node("HBox/NameLabel") as Label
-	_value_label = get_node("HBox/ValueLabel") as Label
-	_delta = get_node("HBox/DeltaChip") as DeltaChip
-	_medallion.pressed.connect(_on_medallion_pressed)
+	_plate = get_node("Plate") as PanelContainer
+	_medal = get_node("Plate/HBox/Medal") as Medallion
+	_name_label = get_node("Plate/HBox/Name") as Label
+	_value_label = get_node("Plate/HBox/Value") as Label
+	_delta = get_node("Plate/HBox/Change") as DeltaChip
+	_medal.focus_mode = Control.FOCUS_NONE
+	_medal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_delta.invert = invert
+	_medal.icon_name = icon_name
+	_plate.minimum_size_changed.connect(_sync_min_size)
 	_refs_bound = true
 
 
 func _sync_name() -> void:
 	if not _refs_bound:
 		return
-	_name_label.text = resource_name
-	_name_label.visible = not resource_name.is_empty()
-	_medallion.accessibility_name = resource_name
-	if not resource_name.is_empty() and accessibility_name.is_empty():
-		accessibility_name = resource_name
+	_name_label.text = _resource_label
+	_name_label.visible = _name_shown and not _resource_label.is_empty()
 
 
-func _sync_focus_mode() -> void:
+func _sync_change() -> void:
 	if not _refs_bound:
 		return
-	_medallion.focus_mode = Control.FOCUS_NONE if hud_mode else Control.FOCUS_ALL
+	_delta.visible = _change_shown
 
 
-func _sync_accessibility(amount: int) -> void:
-	var parts: PackedStringArray = []
-	if not resource_name.is_empty():
-		parts.append(resource_name)
-	parts.append(str(amount))
-	if not _delta.accessibility_name.is_empty():
-		parts.append(_delta.accessibility_name)
-	accessibility_name = ", ".join(parts)
+## The Button takes the plate's size, so the top bar lays the chip out at its real size.
+func _sync_min_size() -> void:
+	if not _refs_bound:
+		return
+	custom_minimum_size = _plate.get_combined_minimum_size()
 
 
-func _on_medallion_pressed() -> void:
-	pressed.emit()
+## "Ducats: 658, up 48"; the name is left out when empty.
+func _sync_accessibility() -> void:
+	if not _refs_bound:
+		return
+	var head := _value_text
+	if not _resource_label.is_empty():
+		head = "%s: %s" % [_resource_label, _value_text]
+	var change := _delta.accessibility_name
+	accessibility_name = head if change.is_empty() else "%s, %s" % [head, change]

@@ -87,6 +87,7 @@ static func build() -> Dictionary:
 	defs.cb_palette = GameDefs.default_cb_palette()
 	defs.families = families()
 	FakeScenario.economy_into(defs)
+	defs.weather_odds = PackedInt32Array([100, 0, 0])  # calm: the weather is Calendar's and Snapshot's, not these tests'
 	defs.countries = [
 		make_country(&"AAA", "Alpha", "Republic of Alpha", "Alphan", Color("#b3261e")),
 		make_country(&"BBB", "Beta", "Duchy of Beta", "Betan", Color("#2b5aa8")),

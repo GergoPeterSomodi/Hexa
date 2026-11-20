@@ -145,7 +145,7 @@ func test_resource_chip_sets_values_and_emits_pressed() -> void:
 	chip.set_value(1240, 86, "ducats", "Treasury")
 	assert_eq(chip.name_label().text, "Treasury")
 	assert_true(chip.name_label().visible)
-	assert_eq(chip.value_label().text, "1240")
+	assert_eq(chip.value_label().text, "1,240", "value is formatted through Words")
 	assert_eq(chip.delta_chip().text(), "+86 ducats")
 	assert_true(chip.medallion().small)
 

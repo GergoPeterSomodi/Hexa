@@ -4,35 +4,48 @@
 [ext_resource type="Script" path="res://shell/ui/medallion.gd" id="2_medal"]
 [ext_resource type="Script" path="res://shell/ui/delta_chip.gd" id="3_delta"]
 
-[node name="ResourceChip" type="PanelContainer"]
+[node name="ResourceChip" type="Button"]
+focus_mode = 0
 mouse_filter = 0
-theme_type_variation = &"PanelSlot"
+flat = true
 script = ExtResource("1_chip")
 
-[node name="HBox" type="HBoxContainer" parent="."]
+[node name="Plate" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"PanelSlot"
+
+[node name="HBox" type="HBoxContainer" parent="Plate"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Medallion" type="Button" parent="HBox"]
+[node name="Medal" type="Button" parent="Plate/HBox"]
 layout_mode = 2
+focus_mode = 0
+mouse_filter = 2
 size_flags_vertical = 4
 script = ExtResource("2_medal")
 small = true
 
-[node name="NameLabel" type="Label" parent="HBox"]
+[node name="Name" type="Label" parent="Plate/HBox"]
 visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_type_variation = &"Hint"
 vertical_alignment = 1
 
-[node name="ValueLabel" type="Label" parent="HBox"]
+[node name="Value" type="Label" parent="Plate/HBox"]
 layout_mode = 2
 mouse_filter = 2
 theme_type_variation = &"Number"
 vertical_alignment = 1
 
-[node name="DeltaChip" type="PanelContainer" parent="HBox"]
+[node name="Change" type="PanelContainer" parent="Plate/HBox"]
 layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2

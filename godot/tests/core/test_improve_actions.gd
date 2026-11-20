@@ -360,8 +360,13 @@ func test_two_thousand_random_actions_with_actors_respect_home_rule() -> void:
 
 static func _snapshot_owned_fields(game: Game) -> Dictionary:
 	var country_digests: Array[String] = []
+	var purse: Array = []
+	var stores: Array = []
 	for c: Country in game.countries:
-		country_digests.append(c.digest_text() if c != null else "")
+		# the countries' own fields; the money and the goods are the doors' (Treasury's and Stores')
+		country_digests.append("%d|%s|%s|%s|%d|%d" % [c.id, c.tag, c.capital, c.alive, c.tax, c.short_mask] if c != null else "")
+		purse.append(var_to_bytes([c.treasury, c.ledger_open, c.ledger_from, c.ledger_closed]))
+		stores.append(var_to_bytes([c.stock, c.flows_open, c.stock_from, c.goods_closed]))
 	var work_texts: Array[String] = []
 	for w: Work in game.state.works:
 		work_texts.append(w.digest_text())
@@ -372,13 +377,15 @@ static func _snapshot_owned_fields(game: Game) -> Dictionary:
 		"works": work_texts,
 		"next_work_id": game.state.next_work_id,
 		"countries": country_digests,
+		"purse": purse,
+		"stores": stores,
 		"player": game.player,
 	}
 
 
 static func _owns_violations(before: Dictionary, after: Dictionary, allowed: Array[String]) -> Array[String]:
 	var violations: Array[String] = []
-	for field: String in ["main_use", "level", "owner", "works", "next_work_id", "countries", "player"]:
+	for field: String in ["main_use", "level", "owner", "works", "next_work_id", "countries", "purse", "stores", "player"]:
 		if not allowed.has(field) and before[field] != after[field]:
 			violations.append(field)
 	return violations
@@ -396,8 +403,9 @@ func test_owns_boundaries_and_planted_fault() -> void:
 		var pick := _random_action(game, 0, ScenarioFixture.ALL_ACTORS)
 		var snap := _snapshot_owned_fields(game)
 		game.act(pick[0] as String, pick[1] as Dictionary)
-		assert_eq(_owns_violations(snap, _snapshot_owned_fields(game), Works.OWNS), [] as Array[String],
-			"an action writes only works and next_work_id")
+		var allowed_by_action: Array[String] = ["works", "next_work_id", "purse", "stores"]  # a work is paid through the doors
+		assert_eq(_owns_violations(snap, _snapshot_owned_fields(game), allowed_by_action), [] as Array[String],
+			"an action writes only works, next_work_id and, through the doors, the purse and the stores")
 
 	var before_transfer := _snapshot_owned_fields(game)
 	Territory.transfer(game, [ScenarioFixture.BETA_CAPITAL], 1)

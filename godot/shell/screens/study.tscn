@@ -1,0 +1,77 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://shell/screens/study.gd" id="1_study"]
+[ext_resource type="Script" path="res://shell/ui/ribbon.gd" id="2_rib"]
+[ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
+[ext_resource type="Script" path="res://shell/ui/nav_list.gd" id="4_nav"]
+
+[node name="Study" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("1_study")
+screen_id = &"study"
+
+[node name="Frame" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 15.0
+offset_top = 15.0
+offset_right = -15.0
+offset_bottom = -15.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+theme_type_variation = &"PanelModal"
+
+[node name="VBox" type="VBoxContainer" parent="Frame"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Ribbon" type="PanelContainer" parent="Frame/VBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+script = ExtResource("2_rib")
+
+[node name="Head" type="HBoxContainer" parent="Frame/VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Date" type="Label" parent="Frame/VBox/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"LabelFlavour"
+
+[node name="Close" type="Button" parent="Frame/VBox/Head"]
+layout_mode = 2
+size_flags_vertical = 0
+script = ExtResource("3_btn")
+
+[node name="Body" type="HBoxContainer" parent="Frame/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="NavList" type="VBoxContainer" parent="Frame/VBox/Body"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_vertical = 0
+script = ExtResource("4_nav")
+
+[node name="PageHost" type="Control" parent="Frame/VBox/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+clip_contents = true
+mouse_filter = 2
+
+[node name="Hints" type="Label" parent="Frame/VBox"]
+layout_mode = 2
+theme_type_variation = &"Hint"

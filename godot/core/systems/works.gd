@@ -38,7 +38,7 @@ static func clear_check(game: Game, args: Dictionary) -> Dictionary:
 	return _begin_check(game, CLEAR, hex as Vector2i, _tag_of(args), 0, args)
 
 
-## Rows 2 to 8 of the check table (4.3); `args` is passed on to Improve's own check (row 5).
+## Rows 2 to 9 of the check table (4.3, m4-build-spec.md 4.11); `args` is passed on to Improve's own check (row 5).
 static func _begin_check(game: Game, action: StringName, hex: Vector2i, tag: StringName, family: int,
 		args: Dictionary) -> Dictionary:
 	if game.defs == null:
@@ -76,6 +76,22 @@ static func _begin_check(game: Game, action: StringName, hex: Vector2i, tag: Str
 		var total := slots(game, tag)
 		if total >= 0 and in_use(game, tag) >= total:
 			return _refusal("no free work slot: %d of %d in use" % [in_use(game, tag), total])
+	return _payment_check(game, action, tag, target_family, target_level)
+
+
+## Rows 8 and 9 (4.11): the treasury holds the work's ducats (a free work needs no check, so a treasury below zero can
+## still clear), and the stores hold its goods (the first short good in id order).
+static func _payment_check(game: Game, action: StringName, tag: StringName, family: int, level_to: int) -> Dictionary:
+	if not game.has_countries():
+		return {"ok": true, "reason": ""}
+	var cost := cost_of(game, action, family, level_to)
+	var ducats := int(cost["ducats"])
+	if ducats > 0 and not Treasury.can_pay(game, tag, ducats):
+		var c := Countries.by_tag(game, tag)
+		return _refusal("not enough ducats: %d needed, %d in the treasury" % [ducats, c.treasury if c != null else 0])
+	var short := Stores.short_of(game, tag, cost["goods"] as Dictionary)
+	if not short.is_empty():
+		return _refusal(short)
 	return {"ok": true, "reason": ""}
 
 
@@ -133,6 +149,7 @@ static func _begin(game: Game, action: StringName, hex: Vector2i, tag: StringNam
 	work.seasons_left = work.seasons
 	work.paid = 0
 	game.state.works.append(work)
+	_pay(game, work, cost_of(game, action, family, level_to))
 	game.emit({"kind": "work_started", "tag": tag, "hex": hex, "work": work.to_dict()})
 
 
@@ -142,8 +159,15 @@ static func cancel_work(game: Game, args: Dictionary) -> Dictionary:
 	if bool(verdict["ok"]):
 		var work := game.state.work_at(args["hex"] as Vector2i)
 		game.state.works.erase(work)
-		# M4: Treasury.move(game, work.tag, refund(game, work), &"refund", work.hex) goes here.
-		_cancelled(game, work, &"order", "")
+		var back := refund(game, work)
+		if back > 0:
+			Treasury.move(game, work.tag, back, &"refund", work.hex)
+		var goods := refund_goods(game, work)
+		for g: int in _good_count(game):
+			var n := int(goods.get(String(game.defs.good(g).key), 0))
+			if n > 0:
+				Stores.move(game, work.tag, g, n, &"refund")
+		_cancelled(game, work, &"order", "", back)
 	return verdict
 
 
@@ -159,7 +183,7 @@ static func season(game: Game) -> void:
 			var home := Territory.at_home_check(game, work.tag, work.hex)
 			if not bool(home["ok"]):
 				gone[work] = true
-				_cancelled(game, work, &"lost", str(home["reason"]))
+				_cancelled(game, work, &"lost", str(home["reason"]), 0)
 				continue
 		if halted(game, work, game.turn):
 			continue
@@ -171,7 +195,7 @@ static func season(game: Game) -> void:
 		if bool(put["ok"]):
 			game.emit({"kind": "work_finished", "tag": work.tag, "hex": work.hex, "work": work.to_dict()})
 		else:
-			_cancelled(game, work, &"blocked", str(put["reason"]))
+			_cancelled(game, work, &"blocked", str(put["reason"]), 0)
 	if not gone.is_empty():
 		var kept: Array[Work] = []
 		for work: Work in game.state.works:
@@ -191,9 +215,24 @@ static func _put_piece(game: Game, work: Work) -> Dictionary:
 	return Improve.clear_here(game, work.hex)
 
 
-static func _cancelled(game: Game, work: Work, why: StringName, reason: String) -> void:
+## work_cancelled with the ducats given back (0 for a work lost or blocked: M3 D13).
+static func _cancelled(game: Game, work: Work, why: StringName, reason: String, back: int) -> void:
 	game.emit({"kind": "work_cancelled", "tag": work.tag, "hex": work.hex, "work": work.to_dict(), "why": why,
-		"reason": reason, "refund": refund(game, work)})
+		"reason": reason, "refund": back})
+
+
+## Takes the cost: the ducats through Treasury.move (&"work", at the hex) and each good in id order through Stores.move
+## (&"work"); sets work.paid and work.paid_goods. Nothing for a free work.
+static func _pay(game: Game, work: Work, cost: Dictionary) -> void:
+	var ducats := int(cost["ducats"])
+	if ducats > 0 and Treasury.move(game, work.tag, -ducats, &"work", work.hex):
+		work.paid = ducats
+	var goods: Dictionary = cost["goods"]
+	for g: int in _good_count(game):
+		var key := String(game.defs.good(g).key)
+		var n := int(goods.get(key, 0))
+		if n > 0 and Stores.move(game, work.tag, g, -n, &"work"):
+			work.paid_goods[key] = n
 
 
 # ----- facts -----------------------------------------------------------------------------------------------------
@@ -275,9 +314,37 @@ static func pending_conflict(game: Game, hex: Vector2i, family: int, level_value
 	return ""
 
 
-## What a cancelled work gives back: its payment when cancelled in the season it began, else 0 (always 0 until M4).
+## What a cancelled work gives back: its payment when cancelled in the season it began, else 0.
 static func refund(game: Game, work: Work) -> int:
 	return work.paid if work.started_turn == game.turn else 0
+
+
+## The goods a cancelled work gives back: its paid_goods in the season it began, else {}.
+static func refund_goods(game: Game, work: Work) -> Dictionary:
+	return work.paid_goods.duplicate() if work.started_turn == game.turn else {}
+
+
+## The price of a work (4.11): {ducats, goods: {good key: loads}} from FamilyDef.cost[level_to] and cost_goods[level_to]. A
+## clearing is free, and so is any work in a game without countries or definitions.
+static func cost_of(game: Game, action: StringName, family: int, level_to: int) -> Dictionary:
+	var out := {"ducats": 0, "goods": {}}
+	if action == CLEAR or game == null or game.defs == null or not game.has_countries():
+		return out
+	var def := game.defs.family(family)
+	if def == null or level_to < 1:
+		return out
+	if level_to < def.cost.size():
+		out["ducats"] = maxi(def.cost[level_to], 0)
+	if level_to < def.cost_goods.size():
+		var goods: Dictionary = out["goods"]
+		for key: Variant in def.cost_goods[level_to]:
+			if int(def.cost_goods[level_to][key]) > 0:
+				goods[String(key)] = int(def.cost_goods[level_to][key])
+	return out
+
+
+static func _good_count(game: Game) -> int:
+	return game.defs.goods.size() if game.defs != null else 0
 
 
 ## The season from which the work stands: walks the seasons from game.turn, skipping the halted ones.

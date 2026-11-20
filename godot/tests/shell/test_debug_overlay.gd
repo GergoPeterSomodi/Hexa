@@ -134,13 +134,13 @@ func test_the_m3_line_shows_turn_date_works_phases_and_save() -> void:
 	Session.new_scenario("north_italy_1480", 5, &"GEN")
 	_overlay.set_open(true)
 	assert_true(_overlay.m3_text().begins_with("turn 1 · Spring 1480 · works 0 · phases none yet · save none yet"), _overlay.m3_text())
-	Session.last_phase_ms = {"works": 0.4, "stats": 0.2, "calendar": 0.0}
+	Session.last_phase_ms = {"works": 0.4, "stats": 0.2, "calendar": 0.0}  # any names: the line prints what it is given
 	_overlay.record_save_ms(32.4)
 	assert_eq(_overlay.m3_text(), "turn 1 · Spring 1480 · works 0 · phases works 0.4, stats 0.2, calendar 0.0 ms · save 32 ms")
 	Session.end_season()
 	_overlay.refresh_metrics()
 	assert_true(_overlay.m3_text().begins_with("turn 2 · Summer 1480"), _overlay.m3_text())
-	assert_true(_overlay.m3_text().contains("phases works "), "the last season's phase times")
+	assert_true(_overlay.m3_text().contains("phases production "), "the last season's phase times")
 	Session.game = null
 	_overlay.refresh_metrics()
 	assert_eq(_overlay.m3_text(), "no game")

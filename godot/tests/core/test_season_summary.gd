@@ -14,7 +14,7 @@ var _next_id := 90
 
 
 func before_each() -> void:
-	var defs := load(DEFS_PATH) as GameDefs
+	var defs := EconomyFixture.defs()  # calm weather: a save does not carry the weather until Snapshot does (N5)
 	_g = Game.new_scenario(load(MAP_PATH) as MapData, defs, defs.scenarios[defs.scenarios.size() - 1], 1480)
 	assert_true(bool(_g.act("choose_country", {"tag": &"GEN"})["ok"]))
 	_g.improvement.clear(SAVONA)
@@ -271,6 +271,7 @@ func test_orders_with_nothing_else_say_so() -> void:
 
 
 func test_an_upgrade_order_has_a_comma_before_the_place() -> void:
+	_g.dev_money(&"GEN", 1000)  # the city costs 1,000 ducats
 	assert_true(_act("upgrade", GENOA), "Genoa may be raised")
 	Season.run(_g)
 	var work := _g.state.work_at(GENOA)

@@ -186,14 +186,17 @@ func test_cancel_work_check_rows() -> void:
 
 func test_cancel_in_its_first_season_and_later() -> void:
 	var g := _game()
+	var treasury := Countries.by_tag(g, &"AAA").treasury
 	_build(g)
+	assert_eq(Countries.by_tag(g, &"AAA").treasury, treasury - 40)
 	g.events.clear()
 	assert_true(bool(g.act("cancel_work", {"hex": ALPHA, "tag": &"AAA"})["ok"]))
 	assert_true(g.state.works.is_empty())
 	assert_eq(_kinds(g), ["work_cancelled"])
 	var event := g.events[0]
 	assert_eq(event["why"], &"order")
-	assert_eq(event["refund"], 0, "always 0 in M3")
+	assert_eq(event["refund"], 40, "the wheat's 40 ducats, cancelled in its first season")
+	assert_eq(Countries.by_tag(g, &"AAA").treasury, treasury, "and back in the treasury")
 	assert_eq(event["tag"], &"AAA")
 	assert_eq(event["hex"], ALPHA)
 	assert_eq(int((event["work"] as Dictionary)["id"]), 1)
@@ -202,7 +205,7 @@ func test_cancel_in_its_first_season_and_later() -> void:
 	Season.run(g)
 	g.events.clear()
 	assert_true(bool(g.act("cancel_work", {"hex": ALPHA, "tag": &"AAA"})["ok"]))
-	assert_eq(g.events[0]["refund"], 0)
+	assert_eq(g.events[0]["refund"], 0, "nothing back after the first season")
 	assert_eq(g.chronicle.entries.size() > 0, true, "the cancelling is chronicled")
 	assert_eq(str(g.chronicle.entries[g.chronicle.entries.size() - 1]["kind"]), "work_cancelled")
 
@@ -220,7 +223,8 @@ func test_begin_adds_a_work_and_changes_nothing_else() -> void:
 	assert_eq(_kinds(g), ["work_started"])
 	var w := g.state.works[0]
 	assert_eq([w.id, w.tag, w.hex, w.action, w.family, w.level_to], [1, &"AAA", ALPHA, &"build", ImproveRules.WHEAT, 1])
-	assert_eq([w.started_turn, w.seasons, w.seasons_left, w.paid], [1, 4, 4, 0])
+	assert_eq([w.started_turn, w.seasons, w.seasons_left, w.paid], [1, 4, 4, 40])
+	assert_eq(w.paid_goods, {})
 	assert_eq(g.state.next_work_id, 2)
 	assert_eq(g.events[0]["work"], w.to_dict())
 	assert_eq(str(g.chronicle.entries[g.chronicle.entries.size() - 1]["kind"]), "work_started")
@@ -456,7 +460,31 @@ func test_work_round_trip_and_planted_faults() -> void:
 	var back := Work.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary)
 	assert_not_null(back)
 	assert_eq(back.digest_text(), w.digest_text())
-	assert_eq(w.digest_text(), "7|GEN|8,13|upgrade|1|4|3|8|5|0")
+	assert_eq(w.digest_text(), "7|GEN|8,13|upgrade|1|4|3|8|5|0|")
+	w.paid = 1000
+	w.paid_goods = {"timber": 20, "stone": 40}
+	assert_eq(w.digest_text(), "7|GEN|8,13|upgrade|1|4|3|8|5|1000|stone:40,timber:20")
+	d = w.to_dict()
+	assert_eq(d["schema"], "hexa-godot/work/2")
+	back = Work.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary)
+	assert_eq(back.paid_goods, {"timber": 20, "stone": 40})
+	assert_eq(back.digest_text(), w.digest_text(), "the same after the file")
+	assert_eq(w.duplicate_work().paid_goods, w.paid_goods)
+	var old := d.duplicate()
+	old["schema"] = "hexa-godot/work/1"
+	old.erase("paid_goods")
+	assert_eq(Work.from_dict(old).paid_goods, {}, "work/1 loads with no goods paid")
+	var bad_goods := d.duplicate()
+	bad_goods["paid_goods"] = {"stone": "x"}
+	assert_null(Work.from_dict(bad_goods), "P: a mistyped paid_goods")
+	bad_goods["paid_goods"] = 5
+	assert_null(Work.from_dict(bad_goods), "P: paid_goods that is no dictionary")
+	bad_goods = d.duplicate()
+	bad_goods.erase("paid_goods")
+	assert_null(Work.from_dict(bad_goods), "P: work/2 without paid_goods")
+	w.paid = 0
+	w.paid_goods = {}
+	d = w.to_dict()
 	var bad := d.duplicate()
 	bad["seasons_left"] = "5"
 	assert_null(Work.from_dict(bad), "P: a string for seasons_left")
@@ -475,3 +503,107 @@ func test_work_round_trip_and_planted_faults() -> void:
 	bad = d.duplicate()
 	bad["tag"] = 5
 	assert_null(Work.from_dict(bad), "P: a tag that is no text")
+
+
+# ----- paying: costs, rows 8 and 9, refunds (m4-build-spec.md 4.11) ----------------------------------------------------
+
+
+func _genoa() -> Game:
+	return EconomyFixture.game(&"GEN")
+
+
+func test_cost_of_reads_the_family_tables() -> void:
+	var g := _genoa()
+	assert_eq(Works.cost_of(g, &"build", ImproveRules.VINEYARD, 1), {"ducats": 40, "goods": {}})
+	var city := g.defs.family(ImproveRules.SETTLEMENT)
+	assert_eq(Works.cost_of(g, &"upgrade", ImproveRules.SETTLEMENT, 5)["ducats"], 1000)
+	assert_eq(city.cost[5], 1000)
+	assert_eq(Works.cost_of(g, &"upgrade", ImproveRules.SETTLEMENT, 5)["goods"], {"timber": 20, "stone": 40})
+	assert_eq(Works.cost_of(g, &"clear", ImproveRules.VINEYARD, 0), {"ducats": 0, "goods": {}}, "a clearing is free")
+	var sandbox := Game.new_game(EconomyFixture.map(), 1, EconomyFixture.committed())
+	assert_eq(Works.cost_of(sandbox, &"build", ImproveRules.VINEYARD, 1), {"ducats": 0, "goods": {}}, "a map-only game pays nothing")
+
+
+func test_row_8_money_and_row_9_goods() -> void:
+	var g := _genoa()
+	var genoa := Vector2i(8, 13)
+	var verdict := g.check("upgrade", {"hex": genoa, "tag": &"GEN"})
+	assert_eq(verdict["reason"], "not enough ducats: 1000 needed, 610 in the treasury")
+	assert_true(g.dev_money(&"GEN", 390))
+	assert_true(bool(g.check("upgrade", {"hex": genoa, "tag": &"GEN"})["ok"]), "1,000 of 1,000 is enough")
+	assert_true(g.dev_goods(&"GEN", 12, -35))
+	assert_eq(g.check("upgrade", {"hex": genoa, "tag": &"GEN"})["reason"], "not enough stone: 40 needed, 5 in store")
+	assert_true(g.dev_goods(&"GEN", 11, -30))
+	assert_eq(g.check("upgrade", {"hex": genoa, "tag": &"GEN"})["reason"], "not enough timber: 20 needed, 10 in store",
+		"the first short good in id order")
+	assert_true(g.dev_money(&"GEN", -1))
+	assert_eq(g.check("upgrade", {"hex": genoa, "tag": &"GEN"})["reason"], "not enough ducats: 1000 needed, 999 in the treasury",
+		"the ducats row comes first")
+	var treasury := Countries.by_tag(g, &"GEN").treasury
+	var stock := Countries.by_tag(g, &"GEN").stock.duplicate()
+	assert_false(bool(g.act("upgrade", {"hex": genoa, "tag": &"GEN"})["ok"]))
+	assert_eq(Countries.by_tag(g, &"GEN").treasury, treasury, "a refusal pays nothing")
+	assert_eq(Countries.by_tag(g, &"GEN").stock, stock)
+
+
+func test_a_work_pays_ducats_and_goods_and_a_cancel_gives_them_back_once() -> void:
+	var g := _genoa()
+	var c := Countries.by_tag(g, &"GEN")
+	var genoa := Vector2i(8, 13)
+	g.dev_money(&"GEN", 1000)
+	var before_ducats := c.treasury
+	var before_stock := c.stock.duplicate()
+	assert_true(bool(g.act("upgrade", {"hex": genoa, "tag": &"GEN"})["ok"]))
+	var work := g.state.work_at(genoa)
+	assert_eq(work.paid, 1000)
+	assert_eq(work.paid_goods, {"timber": 20, "stone": 40})
+	assert_eq(c.treasury, before_ducats - 1000)
+	assert_eq(c.stock[11], before_stock[11] - 20)
+	assert_eq(c.stock[12], before_stock[12] - 40)
+	assert_eq(Stores.flow(c, 12, &"work"), -40)
+	var line := c.ledger_open[c.ledger_open.size() - 1]
+	assert_eq([line["why"], line["hex"], line["amount"]], [&"work", genoa, -1000])
+	assert_eq(Works.refund(g, work), 1000)
+	assert_eq(Works.refund_goods(g, work), {"timber": 20, "stone": 40})
+	g.events.clear()
+	assert_true(bool(g.act("cancel_work", {"hex": genoa, "tag": &"GEN"})["ok"]))
+	assert_eq(c.treasury, before_ducats)
+	assert_eq(c.stock, before_stock)
+	assert_eq(g.events[0]["refund"], 1000)
+	assert_eq(Stores.flow(c, 12, &"refund"), 40)
+	# Cancelled in a later season: nothing comes back, and a lost or blocked work gives nothing.
+	assert_true(bool(g.act("upgrade", {"hex": genoa, "tag": &"GEN"})["ok"]))
+	var paid_ducats := c.treasury
+	Season.run(g)
+	var later := g.state.work_at(genoa)
+	assert_eq(Works.refund(g, later), 0)
+	assert_eq(Works.refund_goods(g, later), {})
+	var after_season := c.treasury
+	g.act("cancel_work", {"hex": genoa, "tag": &"GEN"})
+	assert_eq(c.treasury, after_season, "nothing back in a later season")
+	assert_lt(paid_ducats, before_ducats)
+
+
+func test_a_lost_work_gives_nothing_back() -> void:
+	var g := _genoa()
+	var c := Countries.by_tag(g, &"GEN")
+	var hex := Vector2i(10, 13)
+	assert_true(bool(g.act("build", {"hex": hex, "family": ImproveRules.TIMBER, "tag": &"GEN"})["ok"]), "timber camp")
+	var after := c.treasury
+	g.dev_transfer([hex], 0)
+	g.events.clear()
+	Works.season(g)
+	assert_eq(g.events[0]["why"], &"lost")
+	assert_eq(g.events[0]["refund"], 0)
+	assert_eq(c.treasury, after, "M3 D13: nothing back")
+
+
+func test_a_free_clearing_needs_no_money_at_a_negative_treasury() -> void:
+	var g := _genoa()
+	var c := Countries.by_tag(g, &"GEN")
+	assert_true(g.dev_money(&"GEN", -2000))
+	assert_lt(c.treasury, 0)
+	var olives := Vector2i(7, 14)
+	assert_true(bool(g.check("clear", {"hex": olives, "tag": &"GEN"})["ok"]), "0 ducats: no can_pay check")
+	assert_true(bool(g.act("clear", {"hex": olives, "tag": &"GEN"})["ok"]))
+	assert_false(bool(g.check("build", {"hex": Vector2i(10, 13), "family": ImproveRules.TIMBER, "tag": &"GEN"})["ok"]))

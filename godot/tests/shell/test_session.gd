@@ -295,7 +295,7 @@ func test_end_season_runs_phases_drains_and_emits_season_ended_once_last() -> vo
 	assert_eq(game.version, version + 1)
 	assert_eq(game.action_log.back()["action"], "end_season")
 	assert_eq(Session.unsaved_actions, unsaved + 1)
-	assert_eq(Session.last_phase_ms.keys(), ["works", "stats", "calendar"])
+	assert_eq(Session.last_phase_ms.keys(), ["production", "income", "works", "stats", "calendar"])
 	for phase: String in Session.last_phase_ms:
 		assert_true(float(Session.last_phase_ms[phase]) >= 0.0)
 
@@ -417,6 +417,7 @@ func _rewrite_header(slot: String, key: String, value: Variant) -> void:
 
 func test_save_then_load_keeps_the_digest_clock_slot_and_ui() -> void:
 	Session.new_scenario(SCENARIO, 5, &"GEN")
+	Session.game.defs = EconomyFixture.defs()  # calm weather: a save carries the weather only from N5 on
 	Session.end_season()
 	var digest := Session.game.digest()
 	Session.play_seconds = 125.0

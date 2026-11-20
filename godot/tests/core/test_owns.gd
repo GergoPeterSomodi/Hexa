@@ -1,24 +1,28 @@
-## Who writes what (docs/architecture/m3-build-spec.md 5.7, 9): the snapshot before and after every action and every
-## phase differs only in the owners' fields and the door's (chronicle and action_log; events, version and view_cache are
-## not saved). Planted fault: a phase that writes `turn` from Works is reported.
+## Who writes what (docs/architecture/m3-build-spec.md 5.7, 9; m4-build-spec.md 5.3): the snapshot before and after every
+## action and every phase differs only in the owners' fields and the door's (chronicle and action_log; events, version,
+## view_cache and districts are not saved). The money is the purse (Treasury), the goods the stores (Stores), the tax and the
+## shortage bits EconomySeason's. Planted fault: a phase that writes `turn` from Works is reported.
 extends GutTest
 
 const DOOR: Array[String] = ["chronicle", "action_log"]
 const ACTION_OWNERS := {
-	"build": ["works", "next_work_id"],
-	"upgrade": ["works", "next_work_id"],
-	"clear": ["works", "next_work_id"],
-	"cancel_work": ["works", "next_work_id"],
+	"build": ["works", "next_work_id", "purse", "stores"],
+	"upgrade": ["works", "next_work_id", "purse", "stores"],
+	"clear": ["works", "next_work_id", "purse", "stores"],
+	"cancel_work": ["works", "next_work_id", "purse", "stores"],
 	"choose_country": ["countries", "player"],
+	"set_tax": ["countries"],
 }
 const PHASE_OWNERS := {
+	&"production": ["stores", "countries"],
+	&"income": ["purse"],
 	&"works": ["main_use", "level", "works", "next_work_id"],
-	&"stats": ["stats"],
-	&"calendar": ["turn"],
+	&"stats": ["stats", "purse", "stores"],
+	&"calendar": ["turn", "weather", "luck"],
 }
 const HOME := Vector2i(0, 2)
-const FIELDS: Array[String] = ["turn", "player", "main_use", "level", "owner", "works", "next_work_id", "countries",
-	"stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id"]
+const FIELDS: Array[String] = ["turn", "weather", "player", "main_use", "level", "owner", "works", "next_work_id",
+	"countries", "purse", "stores", "stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id"]
 
 var _fx: Dictionary = {}
 
@@ -32,10 +36,22 @@ func _fields(game: Game) -> Dictionary:
 	var body := Snapshot.of(game)
 	var meta := body["game"] as Dictionary
 	var state := body["map_state"] as Dictionary
+	var countries: Array = []
+	var purse: Array = []
+	var stores: Array = []
+	for c: Dictionary in body["countries"] as Array:
+		var own := c.duplicate()
+		purse.append(var_to_bytes([own.get("treasury"), own.get("ledger_open"), own.get("ledger_from"), own.get("ledger_closed")]))  # bytes: a packed array in a dictionary is shared, not copied
+		stores.append(var_to_bytes([own.get("stock"), own.get("flows_open"), own.get("stock_from"), own.get("goods_closed")]))
+		for key: String in ["treasury", "ledger_open", "ledger_from", "ledger_closed", "stock", "flows_open", "stock_from",
+				"goods_closed", "flows_shape"]:
+			own.erase(key)
+		countries.append(own)
 	return {
+		"weather": game.weather, "purse": purse, "stores": stores,
 		"turn": meta["turn"], "player": meta["player"], "main_use": state["main_use"], "level": state["level"],
 		"owner": state["owner"], "works": state["works"], "next_work_id": state["next_work_id"],
-		"countries": body["countries"], "stats": body["stats"], "chronicle": body["chronicle"], "luck": body["luck"],
+		"countries": countries, "stats": body["stats"], "chronicle": body["chronicle"], "luck": body["luck"],
 		"action_log": body["action_log"], "seed": meta["seed"], "start_year": meta["start_year"],
 		"scenario_id": meta["scenario_id"], "map_id": meta["map_id"],
 	}
@@ -92,8 +108,9 @@ func test_every_action_changes_only_its_owners_and_the_door() -> void:
 	changed = _act(g, "build", args)
 	assert_true(changed.has("works") and changed.has("next_work_id") and changed.has("action_log"), str(changed))
 	assert_false(changed.has("main_use"), "an action writes no piece")
+	assert_true(changed.has("purse"), "the work is paid through Treasury")
 	changed = _act(g, "cancel_work", {"hex": HOME, "tag": &"AAA"})
-	assert_true(changed.has("works"))
+	assert_true(changed.has("works") and changed.has("purse"), "and given back through it")
 	_act(g, "build", args)
 	_run_out(g)
 	assert_eq(int(g.state.level[g.map.index_of(HOME)]), 1, "the wheat stands")
@@ -102,7 +119,7 @@ func test_every_action_changes_only_its_owners_and_the_door() -> void:
 	_run_out(g)
 	changed = _act(g, "clear", {"hex": HOME, "tag": &"AAA"})
 	assert_true(changed.has("works"), str(changed))
-	assert_false(changed.has("luck"), "no action draws luck in M3")
+	assert_false(changed.has("luck"), "no action draws luck")
 
 
 func test_refused_actions_change_nothing() -> void:
@@ -126,11 +143,11 @@ func test_every_phase_changes_only_its_owners() -> void:
 			for key: String in changed:
 				seen[key] = true
 		Season.finish(g)
-	for key: String in ["main_use", "level", "works", "stats", "turn", "chronicle"]:
+	for key: String in ["main_use", "level", "works", "stats", "turn", "chronicle", "countries"]:
 		assert_true(seen.has(key), "a phase wrote " + key)
-	assert_false(seen.has("luck"), "no phase draws luck in M3")
+	assert_true(seen.has("purse") and seen.has("stores"), "the doors were used")
+	assert_true(seen.has("luck"), "the calendar draws the weather")
 	assert_false(seen.has("owner"))
-	assert_false(seen.has("countries"))
 	assert_false(seen.has("player"))
 
 
@@ -175,3 +192,33 @@ func test_p_no_phase_or_action_may_write_the_fixed_game_fields() -> void:
 	var before_map := _fields(g)
 	g.map.id = "other_map"
 	assert_eq(_violations(_changed(before_map, _fields(g)), ["works"]), ["map_id"] as Array[String])
+
+
+func test_set_tax_writes_only_the_tax_and_the_door() -> void:
+	var g := _game()
+	g.act("choose_country", {"tag": &"AAA"})
+	var before := _fields(g)
+	assert_true(bool(g.act("set_tax", {"level": 2, "tag": &"AAA"})["ok"]))
+	var changed := _changed(before, _fields(g))
+	assert_eq(_violations(changed, ["countries"]), [] as Array[String])
+	assert_true(changed.has("countries") and changed.has("action_log"))
+	assert_false(changed.has("purse") or changed.has("stores"))
+	before = _fields(g)
+	assert_false(bool(g.act("set_tax", {"level": 2, "tag": &"AAA"})["ok"]), "already High")
+	assert_eq(_changed(before, _fields(g)), [] as Array[String], "a refusal changes nothing")
+
+
+func test_the_developer_transfers_write_through_the_doors() -> void:
+	var g := _game()
+	var before := _fields(g)
+	assert_true(g.dev_money(&"AAA", 500))
+	var changed := _changed(before, _fields(g))
+	assert_eq(_violations(changed, ["purse"]), [] as Array[String], "dev_money: the purse and the log")
+	assert_true(changed.has("purse"))
+	before = _fields(g)
+	assert_true(g.dev_goods(&"AAA", 12, 40))
+	changed = _changed(before, _fields(g))
+	assert_eq(_violations(changed, ["stores"]), [] as Array[String], "dev_goods: the stores and the log")
+	assert_true(changed.has("stores"))
+	assert_eq(g.action_log[g.action_log.size() - 2]["action"], "dev_money")
+	assert_eq(g.action_log[g.action_log.size() - 1]["action"], "dev_goods")

@@ -21,6 +21,10 @@ static func run(map: MapData, defs: GameDefs, scenario_id: String, seed_value: i
 		match action:
 			"end_season":
 				Season.run(game)
+			"dev_money":
+				game.dev_money(StringName(str(args.get("tag", ""))), int(args.get("amount", 0)))
+			"dev_goods":
+				game.dev_goods(StringName(str(args.get("tag", ""))), int(args.get("good", -1)), int(args.get("amount", 0)))
 			"dev_transfer":
 				game.dev_transfer(_hexes(args.get("hexes")), int(args.get("to_id", 0)))
 			_:

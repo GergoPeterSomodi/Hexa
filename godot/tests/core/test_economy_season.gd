@@ -237,9 +237,149 @@ func test_made_of_weather_follows_the_hexs_climate() -> void:
 	assert_eq(poor_snow[GRAIN], 6)
 
 
-func test_debt_limit_and_the_stubs_of_n3() -> void:
+func test_debt_limit_and_the_constants() -> void:
 	assert_eq(EconomySeason.debt_limit(_game, &"GEN"), 0)
 	assert_eq(EconomySeason.OWNS, ["tax", "short_mask"])
 	assert_eq(Economy.OWNS, [])
-	assert_false(bool(EconomySeason.set_tax_check(_game, {"level": 1, "tag": &"GEN"})["ok"]))
 	assert_eq(EconomySeason.NEEDS, [&"food", &"wine", &"salt", &"oil"] as Array[StringName])
+
+
+# ----- the phases and the tax pair (task N4; m4-build-spec.md 4.7 to 4.10) ------------------------------------------------
+
+
+func _fresh() -> Game:
+	return EconomyFixture.game(&"GEN")
+
+
+func test_set_tax_check_rows_in_order() -> void:
+	var g := _fresh()
+	var sandbox := Game.new_game(EconomyFixture.map(), 1, EconomyFixture.committed())
+	assert_eq(EconomySeason.set_tax_check(sandbox, {"level": 2, "tag": &"GEN"})["reason"], "this map has no countries")
+	assert_eq(EconomySeason.set_tax_check(g, {"level": 2})["reason"], "choose your country first")
+	assert_eq(EconomySeason.set_tax_check(g, {"level": 2, "tag": &"ZZZ"})["reason"], "no country ZZZ")
+	Countries.by_tag(g, &"FRA").alive = false
+	assert_string_contains(str(EconomySeason.set_tax_check(g, {"level": 2, "tag": &"FRA"})["reason"]), "is no more")
+	for bad: Variant in [3, -1, "high", null, 1.0]:
+		assert_eq(EconomySeason.set_tax_check(g, {"level": bad, "tag": &"GEN"})["reason"], "no such tax level", str(bad))
+	assert_eq(EconomySeason.set_tax_check(g, {"level": 1, "tag": &"GEN"})["reason"], "taxes are already Normal")
+	assert_eq(EconomySeason.set_tax_check(g, {"level": 2, "tag": "GEN"}), {"ok": true, "reason": ""}, "a String tag too")
+
+
+func test_set_tax_writes_the_level_emits_and_changes_back_for_nothing() -> void:
+	var g := _fresh()
+	var c := Countries.by_tag(g, &"GEN")
+	g.events.clear()
+	var treasury := c.treasury
+	assert_true(bool(g.act("set_tax", {"level": 2, "tag": &"GEN"})["ok"]))
+	assert_eq(c.tax, 2)
+	assert_eq(g.events.size(), 1)
+	assert_eq([g.events[0]["kind"], g.events[0]["tag"], g.events[0]["level"], g.events[0]["from"]], ["tax_set", &"GEN", 2, 1])
+	assert_false(bool(g.act("set_tax", {"level": 2, "tag": &"GEN"})["ok"]), "taxes are already High")
+	assert_true(bool(g.act("set_tax", {"level": 1, "tag": &"GEN"})["ok"]))
+	assert_eq(c.treasury, treasury, "a change and a change back cost nothing")
+	assert_eq(g.action_log.size(), 3, "choose_country and the two changes are logged, the refusal is not")
+
+
+func test_the_tax_level_moves_taxes_and_not_port_dues() -> void:
+	var results := {}
+	for level: int in 3:
+		var g := _fresh()
+		if level != 1:
+			g.act("set_tax", {"level": level, "tag": &"GEN"})
+		Season.run(g)
+		var c := Countries.by_tag(g, &"GEN")
+		results[level] = EconomyFixture.totals(c.ledger_closed["lines"] as Array)
+	assert_eq(int(results[1]["tax_people"]), 65)
+	assert_eq(int(results[0]["tax_people"]), 45, "(40,000 x 1,000 + 42,700 x 600) x 700 / 10^9 = 45.9")
+	assert_eq(int(results[2]["tax_people"]), 91, "x 1,400: 91.8")
+	assert_eq(int(results[0]["port_dues"]), 30, "port dues are customs: the tax level does not change them")
+	assert_eq(int(results[2]["port_dues"]), 30)
+
+
+func test_production_moves_every_good_through_stores_with_the_three_flows() -> void:
+	var g := _fresh()
+	var c := Countries.by_tag(g, &"GEN")
+	Season.begin(g)
+	Season.run_phase(g, &"production")
+	assert_eq(Stores.flow(c, 0, &"made"), 2)
+	assert_eq(Stores.flow(c, 1, &"made"), 6)
+	assert_eq(Stores.flow(c, 1, &"used"), -4)
+	assert_eq(Stores.flow(c, 1, &"sold"), -2)
+	assert_eq(Stores.flow(c, 11, &"sold"), -6, "timber made 6 and sold down to the reserve of 40")
+	assert_eq(c.stock[11], 40)
+	assert_eq(c.treasury, 610, "production touches no money")
+	assert_true(c.ledger_open.is_empty())
+	Season.run_phase(g, &"income")
+	assert_eq(c.treasury, 696)
+	assert_eq(c.stock[11], 40, "income touches no goods")
+
+
+func test_a_country_that_is_no_more_has_no_season() -> void:
+	var dead := _fresh()
+	var france := Countries.by_tag(dead, &"FRA")
+	france.alive = false
+	var before := france.treasury
+	Season.begin(dead)
+	Season.run_phase(dead, &"production")
+	Season.run_phase(dead, &"income")
+	assert_eq(france.treasury, before)
+	assert_true(france.ledger_open.is_empty())
+
+
+func test_every_country_runs_both_phases() -> void:
+	var g := _fresh()
+	var before: Array[int] = []
+	for c: Country in g.countries:
+		before.append(c.treasury)
+	Season.run(g)
+	for n: int in g.countries.size():
+		assert_ne(g.countries[n].treasury, before[n], "%s earned something" % g.countries[n].tag)
+		assert_eq(int(g.countries[n].ledger_closed["turn"]), 1)
+
+
+func _shorts(g: Game) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for e: Dictionary in g.events:
+		if str(e["kind"]) == "goods_short" and e["tag"] == &"GEN":
+			out.append(e)
+	return out
+
+
+func _finish_season(g: Game) -> void:
+	for phase: StringName in [&"income", &"works", &"stats", &"calendar"]:
+		Season.run_phase(g, phase)
+
+
+func test_goods_short_fires_once_a_run_of_shortage_and_again_after_a_meal() -> void:
+	var g := _fresh()
+	var c := Countries.by_tag(g, &"GEN")
+	assert_true(g.dev_goods(&"GEN", 4, -4), "the salt is taken from the stores")
+	g.events.clear()
+	Season.begin(g)
+	Season.run_phase(g, &"production")
+	var shorts := _shorts(g)
+	assert_eq(shorts.size(), 1)
+	assert_eq([shorts[0]["good"], shorts[0]["need"], shorts[0]["taken"]], [&"salt", 1, 0])
+	assert_eq(c.short_mask, 1 << 2)
+	_finish_season(g)
+	g.events.clear()
+	Season.run_phase(g, &"production")
+	assert_eq(_shorts(g).size(), 0, "still short: said once")
+	_finish_season(g)
+	assert_true(g.dev_goods(&"GEN", 4, 2))
+	Season.run_phase(g, &"production")
+	assert_eq(c.short_mask, 0, "met again: the bit is clear")
+	_finish_season(g)
+	assert_true(g.dev_goods(&"GEN", 4, -c.stock[4]))
+	g.events.clear()
+	Season.run_phase(g, &"production")
+	assert_eq(_shorts(g).size(), 1, "short again: said again")
+
+
+func test_a_map_only_game_runs_the_phases_for_nothing() -> void:
+	var sandbox := Game.new_game(EconomyFixture.map(), 1, EconomyFixture.committed())
+	var before := sandbox.digest()
+	EconomySeason.production(sandbox)
+	EconomySeason.income(sandbox)
+	assert_eq(sandbox.digest(), before)
+	assert_true(sandbox.events.is_empty())

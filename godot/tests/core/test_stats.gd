@@ -129,8 +129,14 @@ func test_scenario_values() -> void:
 	g.emit({"kind": "work_finished", "tag": &"AAA", "hex": Vector2i(0, 0), "work": {}})
 	g.emit({"kind": "work_finished", "tag": &"BBB", "hex": Vector2i(1, 0), "work": {}})
 	g.emit({"kind": "work_finished", "tag": &"AAA", "hex": Vector2i(2, 0), "work": {}})
-	var now := StatsSystem.row_now(g, &"AAA")
-	Season.run(g)
+	Season.begin(g)
+	Season.run_phase(g, &"production")
+	Season.run_phase(g, &"income")
+	Season.run_phase(g, &"works")
+	var now := StatsSystem.row_now(g, &"AAA")  # what the stats phase is about to write
+	Season.run_phase(g, &"stats")
+	Season.run_phase(g, &"calendar")
+	Season.finish(g)
 	assert_eq(g.stats.row(&"AAA", 1), now)
 	var land_total := 0
 	for tag: StringName in [&"AAA", &"BBB", &"OUT"]:
@@ -150,7 +156,8 @@ func test_scenario_values() -> void:
 	assert_eq(g.stats.value(&"BBB", 1, "works_finished"), 1)
 	assert_eq(g.stats.value(&"OUT", 1, "works_finished"), 0)
 	assert_eq(g.stats.value(&"AAA", 1, "works_running"), 0)
-	assert_eq(g.stats.value(&"AAA", 1, "treasury"), 0)
+	var alpha := Countries.by_tag(g, &"AAA")
+	assert_eq(g.stats.value(&"AAA", 1, "treasury"), alpha.treasury, "the closing treasury")
 	assert_true(StatsSystem.row_now(g, &"ZZZ").is_empty())
 
 
@@ -180,3 +187,49 @@ func _id_of(g: Game, tag: StringName) -> int:
 		if c.tag == tag:
 			return c.id
 	return 0
+
+
+# ----- the M4 values (m4-build-spec.md 4.20) -------------------------------------------------------------------------
+
+
+func test_the_money_goods_and_people_series_of_genoas_first_season() -> void:
+	var g := EconomyFixture.game(&"GEN", true)
+	g.act("build", {"hex": EconomyFixture.VINEYARD_HEX, "family": ImproveRules.VINEYARD, "tag": &"GEN"})
+	Season.run(g)
+	var s := g.stats
+	assert_eq(s.goods, 16, "Stats.create takes the goods of the defs")
+	assert_eq(s.value(&"GEN", 1, "treasury"), 658)
+	assert_eq(s.value(&"GEN", 1, "income_people"), 65)
+	assert_eq(s.value(&"GEN", 1, "income_goods"), 7)
+	assert_eq(s.value(&"GEN", 1, "income_dues"), 30)
+	assert_eq(s.value(&"GEN", 1, "upkeep_districts"), 10)
+	assert_eq(s.value(&"GEN", 1, "upkeep_walls"), 4)
+	assert_eq(s.value(&"GEN", 1, "spending"), 40, "the work, less refunds, positive")
+	assert_eq(s.value(&"GEN", 1, "people"), 82700)
+	assert_eq(s.value(&"GEN", 1, "food_made"), 3 + 6, "grain 3 and fish 6")
+	assert_eq(s.value(&"GEN", 1, "food_eaten"), 4)
+	assert_eq(s.value(&"GEN", 1, "income_trade"), 0)
+	assert_eq(s.value(&"GEN", 1, "upkeep_army"), 0)
+	# The goods ring: made, used, closing stock of grain (0) and fish (1) and wine (3).
+	var base := ((s.index_of(&"GEN") * Stats.RING + 1) * s.goods) * 3
+	assert_eq([s.goods_ring[base], s.goods_ring[base + 1], s.goods_ring[base + 2]], [3, 0, 16], "grain")
+	assert_eq([s.goods_ring[base + 3], s.goods_ring[base + 4], s.goods_ring[base + 5]], [6, 4, 0], "fish")
+	assert_eq([s.goods_ring[base + 9], s.goods_ring[base + 10], s.goods_ring[base + 11]], [0, 1, 3], "wine")
+
+
+func test_the_stats_phase_closes_the_ledgers_and_the_flows() -> void:
+	var g := EconomyFixture.game(&"GEN")
+	var c := Countries.by_tag(g, &"GEN")
+	Season.begin(g)
+	Season.run_phase(g, &"production")
+	Season.run_phase(g, &"income")
+	assert_false(c.ledger_open.is_empty())
+	assert_true(c.ledger_closed.is_empty())
+	assert_ne(c.flows_open.count(0), c.flows_open.size())
+	Season.run_phase(g, &"stats")
+	assert_true(c.ledger_open.is_empty(), "the lines were closed")
+	assert_eq(c.ledger_from, c.treasury)
+	assert_eq(int(c.ledger_closed["closing"]), c.treasury)
+	assert_eq(c.flows_open.count(0), c.flows_open.size(), "the flows start again from zero")
+	assert_eq(c.stock_from, c.stock)
+	assert_eq(int(c.goods_closed["turn"]), 1)

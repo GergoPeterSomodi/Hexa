@@ -21,7 +21,9 @@ var countries: Array[Country] = []
 ## Human player's country tag, or &"" before picking, in AI-only games, or in a map-only game.
 var player: StringName = &""
 ## The fields only the door (emit, act, Season) writes (docs/architecture/m3-build-spec.md 5.7).
-const DOOR_FIELDS: Array[String] = ["events", "action_log", "chronicle", "version", "view_cache"]
+const DOOR_FIELDS: Array[String] = ["events", "action_log", "chronicle", "version", "view_cache", "districts"]
+## The largest developer transfer of ducats or loads at once (dev_money, dev_goods).
+const DEV_LIMIT := 1000000000
 ## The year of turn 1 (the scenario's year; 1480 in a sandbox).
 var start_year: int = Calendar.DEFAULT_YEAR
 ## The season count, from 1. Written by Calendar only.
@@ -38,6 +40,11 @@ var version: int = 0
 var view_cache: ViewCache = ViewCache.new()
 ## The ring and year rows of numbers; written only by StatsSystem.
 var stats: Stats = null
+## Per climate (snow, frost, mild): 0 calm, 1 good, 2 poor. Written only by Calendar; a new game starts calm.
+var weather: PackedByteArray = PackedByteArray([0, 0, 0])
+## The season-free part of every land hex's district output; derived, not saved, not in the digest. Forgets a hex and
+## its ring on a hex_changed (emit); cleared by a new game, a load and any replaced MapState.
+var districts: DistrictCache = DistrictCache.new()
 
 
 ## A new map-only game: the improvement search chooses what stands on the map for this seed.
@@ -65,6 +72,10 @@ static func new_scenario(p_map: MapData, p_defs: GameDefs, p_scenario: ScenarioD
 	out.start_year = p_scenario.year
 	Countries.setup(out, p_scenario)
 	Territory.setup(out, p_scenario)
+	out.districts.clear()
+	# Called by reference (the layer rule: a typed call from game into systems makes the files need each other to parse).
+	Treasury.setup.call(out)
+	Stores.setup.call(out)
 	StatsSystem.setup.call(out)  # again, now that the countries are known
 	return out
 
@@ -78,6 +89,7 @@ static func with_state(p_map: MapData, p_state: MapState, p_seed: int = 0, p_def
 	out.luck = Luck.seeded(p_seed)
 	out.state = p_state
 	out.improvement = WorldImprove.over(p_map, p_state)
+	out.districts.clear()
 	return out
 
 
@@ -92,6 +104,8 @@ func emit(event: Dictionary) -> void:
 	if not event.has("turn"):
 		event["turn"] = turn
 	events.append(event)
+	if event.get("kind", "") == "hex_changed" and event.get("hex") is Vector2i and map != null:
+		districts.touch.call(self, event["hex"] as Vector2i)  # by reference: a typed call makes Game and DistrictCache need each other to parse
 	if Chronicle.NOTABLE.has(str(event.get("kind", ""))):
 		chronicle.add(event)
 
@@ -109,6 +123,35 @@ func dev_transfer(hexes: Array[Vector2i], to_id: int) -> int:
 	if changed > 0:
 		version += 1  # owner-derived views are cached by version
 	return changed
+
+
+## Developer transfer of ducats (logged for the replay): Treasury.move with the reason `dev`; the amount is cut to
+## plus or minus DEV_LIMIT. False in a map-only game, for an unknown tag or when the treasury would pass its limit.
+func dev_money(tag: StringName, amount: int) -> bool:
+	if not has_countries():
+		return false
+	var cut := clampi(amount, -DEV_LIMIT, DEV_LIMIT)
+	var done: bool = Treasury.move.call(self, tag, cut, &"dev")
+	if done:
+		action_log.append({"turn": turn, "action": "dev_money", "args": {"tag": String(tag), "amount": cut}})
+		version += 1
+	return done
+
+
+## Developer transfer of goods (logged for the replay): Stores.move with the flow `dev`; the amount is cut to plus or
+## minus DEV_LIMIT and a take to what the stores hold. False in a map-only game, for an unknown tag or good.
+func dev_goods(tag: StringName, good: int, amount: int) -> bool:
+	if not has_countries():
+		return false
+	var cut := clampi(amount, -DEV_LIMIT, DEV_LIMIT)
+	var held: Country = Countries.by_tag.call(self, tag)
+	if held != null and good >= 0 and good < held.stock.size():
+		cut = maxi(cut, -held.stock[good])
+	var done: bool = Stores.move.call(self, tag, good, cut, &"dev")
+	if done:
+		action_log.append({"turn": turn, "action": "dev_goods", "args": {"tag": String(tag), "good": good, "amount": cut}})
+		version += 1
+	return done
 
 
 ## Whether the action may be done now: {ok, reason} ("" when ok). Changes nothing.
@@ -132,13 +175,13 @@ func act(action: String, args: Dictionary) -> Dictionary:
 
 
 ## SHA-256 (hex text) of the game: map id, seed, scenario id, player, start year, turn, state digest, each country's
-## digest_text, stats (R5), chronicle and luck.
+## digest_text, stats (R5), chronicle and luck; the weather (as "s,f,m") follows the turn.
 func digest() -> String:
 	var map_id := map.id if map != null else ""
 	var scen_id := scenario.id if scenario != null else ""
 	var state_digest := state.digest() if state != null else ""
 	var parts: PackedStringArray = [map_id, str(seed_value), scen_id, String(player), str(start_year), str(turn),
-		state_digest]
+		"%d,%d,%d" % [weather[0], weather[1], weather[2]], state_digest]
 	for c: Country in countries:
 		parts.append(c.digest_text() if c != null else "")
 	parts.append(stats.digest() if stats != null else "")

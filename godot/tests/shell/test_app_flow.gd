@@ -430,6 +430,7 @@ func test_m3_flow_pick_build_space_report_j_quicksave_quickload_continue() -> vo
 	assert_eq(date_end.date_button().text, "Spring 1480")
 	assert_eq(date_end.season(), 0, "Spring")
 	assert_false(date_end.end_button().disabled)
+	Session.game.defs = EconomyFixture.defs()  # calm weather: a save carries the weather only from N5 on
 
 	var found := _buildable()
 	assert_true(bool(Session.act("build", {"hex": found["hex"], "family": found["family"]})["ok"]), "a work begins")

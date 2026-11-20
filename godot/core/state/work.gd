@@ -3,7 +3,9 @@
 class_name Work
 extends RefCounted
 
-const SCHEMA := "hexa-godot/work/1"
+const SCHEMA := "hexa-godot/work/2"
+## work/1 (M3) has no paid_goods; it loads with {}.
+const SCHEMA_V1 := "hexa-godot/work/1"
 const ACTIONS: Array[String] = ["build", "upgrade", "clear"]
 
 var id: int = 0
@@ -19,8 +21,10 @@ var level_to: int = 0
 var started_turn: int = 0
 var seasons: int = 0
 var seasons_left: int = 0
-## Ducats paid; 0 until M4.
+## Ducats paid when begun.
 var paid: int = 0
+## Goods paid when begun: good key (String) -> loads. Written by Works as it takes them, in good id order.
+var paid_goods: Dictionary = {}
 
 
 ## Plain: tag and action as String, the hex as [col, row].
@@ -37,12 +41,14 @@ func to_dict() -> Dictionary:
 		"seasons": seasons,
 		"seasons_left": seasons_left,
 		"paid": paid,
+		"paid_goods": paid_goods.duplicate(),
 	}
 
 
-## The work saved by to_dict; null on a wrong schema, a missing or mistyped field.
+## The work saved by to_dict (work/2, or work/1 with no goods paid); null on a wrong schema, a missing or mistyped field.
 static func from_dict(d: Dictionary) -> Work:
-	if str(d.get("schema", "")) != SCHEMA:
+	var schema := str(d.get("schema", ""))
+	if schema != SCHEMA and schema != SCHEMA_V1:
 		return null
 	var w := Work.new()
 	for key: String in ["id", "family", "level_to", "started_turn", "seasons", "seasons_left", "paid"]:
@@ -54,6 +60,15 @@ static func from_dict(d: Dictionary) -> Work:
 	var action_value: Variant = d.get("action", null)
 	if not (tag_value is String or tag_value is StringName) or not (action_value is String or action_value is StringName):
 		return null
+	if schema == SCHEMA:
+		var goods: Variant = d.get("paid_goods", null)
+		if not (goods is Dictionary):
+			return null
+		for key: Variant in goods as Dictionary:
+			var loads: Variant = whole((goods as Dictionary)[key])
+			if not (key is String or key is StringName) or loads == null or int(loads) < 0:
+				return null
+			w.paid_goods[String(key)] = int(loads)
 	w.tag = StringName(String(tag_value))
 	w.action = StringName(String(action_value))
 	if not ACTIONS.has(String(w.action)):
@@ -94,10 +109,17 @@ func duplicate_work() -> Work:
 	w.seasons = seasons
 	w.seasons_left = seasons_left
 	w.paid = paid
+	w.paid_goods = paid_goods.duplicate()
 	return w
 
 
-## "id|tag|c,r|action|family|level_to|started_turn|seasons|seasons_left|paid".
+## "id|tag|c,r|action|family|level_to|started_turn|seasons|seasons_left|paid|good:n,good:n" (the goods by key, so the
+## text is the same however the dictionary was filled or saved).
 func digest_text() -> String:
-	return "%d|%s|%d,%d|%s|%d|%d|%d|%d|%d|%d" % [id, String(tag), hex.x, hex.y, String(action), family, level_to,
-		started_turn, seasons, seasons_left, paid]
+	var keys: Array = paid_goods.keys()
+	keys.sort()
+	var goods: PackedStringArray = []
+	for key: Variant in keys:
+		goods.append("%s:%d" % [String(key), int(paid_goods[key])])
+	return "%d|%s|%d,%d|%s|%d|%d|%d|%d|%d|%d|%s" % [id, String(tag), hex.x, hex.y, String(action), family, level_to,
+		started_turn, seasons, seasons_left, paid, ",".join(goods)]

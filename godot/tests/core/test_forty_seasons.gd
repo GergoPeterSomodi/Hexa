@@ -26,8 +26,9 @@ func after_each() -> void:
 		DirAccess.remove_absolute(_dir)
 
 
-func _new_game() -> Game:
-	var defs := load(DEFS_PATH) as GameDefs
+## `calm` forces calm weather (the save round trip: Snapshot carries the weather from N5 on); false plays the real odds.
+func _new_game(calm: bool = true) -> Game:
+	var defs := EconomyFixture.defs(calm)
 	var g := Game.new_scenario(load(MAP_PATH) as MapData, defs, defs.scenarios[defs.scenarios.size() - 1], SEED)
 	assert_true(bool(g.act("choose_country", {"tag": TAG})["ok"]))
 	return g
@@ -96,15 +97,18 @@ func _check_ready(g: Game, ended_turn: int, ready: Dictionary) -> void:
 
 
 ## Plays 40 seasons; with `save` a save and a load every SAVE_EVERY seasons. Returns {game, digests, finished}.
-func _play(save: bool) -> Dictionary:
-	var g := _new_game()
+func _play(save: bool, calm: bool = true) -> Dictionary:
+	var g := _new_game(calm)
 	var luck := Rng.new()
 	luck.seed_with(SEED)
 	var ready := {}
 	var digests: Array[String] = []
+	var ledgers := {}
 	var finished_total := 0
 	var begun_total := 0
 	for n: int in SEASONS:
+		_fund(g, n)
+		_cancel_one(g, luck)
 		var before := g.state.works.size()
 		_begin_works(g, luck, ready)
 		begun_total += g.state.works.size() - before
@@ -112,6 +116,7 @@ func _play(save: bool) -> Dictionary:
 		assert_true(bool(Season.run(g)["ok"]))
 		assert_eq(g.turn, ended + 1)
 		_check_state(g, n + 1)
+		_check_money_and_goods(g, ended, ledgers)
 		_check_ready(g, ended, ready)
 		for entry: Dictionary in g.chronicle.of_turn(ended):
 			if str(entry.get("kind", "")) == "work_finished":
@@ -137,8 +142,78 @@ func _through_a_file(g: Game) -> Game:
 	return back
 
 
+## Money for the works and now and then a tax change (the console's door, so the ledgers see a `dev` line too).
+func _fund(g: Game, n: int) -> void:
+	if n % 3 == 0:
+		assert_true(g.dev_money(TAG, 400))
+	if n % 8 == 0:
+		assert_true(g.dev_goods(TAG, 11, 20))
+		assert_true(g.dev_goods(TAG, 12, 40))
+	if n % 7 == 3:
+		g.act("set_tax", {"level": int(n / 7.0) % 3, "tag": TAG})
+
+
+## Cancels one work of TAG now and then: the refund is what it paid, in its first season only, and never more.
+func _cancel_one(g: Game, luck: Rng) -> void:
+	var mine: Array[Work] = []
+	for w: Work in g.state.works:
+		if w.tag == TAG:
+			mine.append(w)
+	if mine.is_empty() or luck.randi_range(0, 3) != 0:
+		return
+	var work := mine[luck.randi_range(0, mine.size() - 1)]
+	var country := Countries.by_tag(g, TAG)
+	var before := country.treasury
+	var paid := work.paid
+	var first_season := work.started_turn == g.turn
+	g.events.clear()
+	assert_true(bool(g.act("cancel_work", {"hex": work.hex, "tag": TAG})["ok"]))
+	var refund := int(g.events[0]["refund"])
+	assert_eq(country.treasury - before, refund, "the treasury got the refund")
+	assert_lte(refund, paid, "a refund never exceeds what the work paid")
+	if not first_season:
+		assert_eq(refund, 0, "and there is none after its first season")
+
+
+## Every season, for every country: the treasury changed by the closed ledger's lines (the console's and the works'
+## included), the stock of every good by the closed flows; every line's reason is known; refunds never beyond the works'
+## payments. `ledgers` carries the last closing of each country (the next opening continues from it).
+func _check_money_and_goods(g: Game, ended: int, ledgers: Dictionary) -> void:
+	for c: Country in g.countries:
+		var closed := c.ledger_closed
+		assert_eq(int(closed["turn"]), ended)
+		var sum := 0
+		var work := 0
+		var refunds := 0
+		for line: Dictionary in closed["lines"] as Array:
+			assert_true(Treasury.WHY.has(line["why"]), "a known reason: %s" % line["why"])
+			sum += int(line["amount"])
+			if line["why"] == &"work":
+				work -= int(line["amount"])
+			elif line["why"] == &"refund":
+				refunds += int(line["amount"])
+		assert_eq(int(closed["closing"]) - int(closed["opening"]), sum, "%s: treasury change == the lines' sum" % c.tag)
+		assert_eq(int(closed["closing"]), c.treasury)
+		assert_lte(refunds, work, "%s: refunds never exceed what the works paid" % c.tag)
+		if ledgers.has(c.tag):
+			assert_eq(int(closed["opening"]), int(ledgers[c.tag]), "%s: the ledger continues from the last closing" % c.tag)
+		ledgers[c.tag] = int(closed["closing"])
+		assert_true(c.ledger_open.is_empty(), "the lines start again")
+		var goods := c.goods_closed
+		var count := (goods["closing"] as PackedInt32Array).size()
+		var flows := goods["flows"] as PackedInt32Array
+		for good: int in count:
+			var net := 0
+			for flow: int in Stores.FLOWS.size():
+				net += flows[flow * count + good]
+			assert_eq((goods["closing"] as PackedInt32Array)[good] - (goods["opening"] as PackedInt32Array)[good], net,
+				"%s: stock change == the flows' sum, good %d" % [c.tag, good])
+			assert_gte((goods["closing"] as PackedInt32Array)[good], 0)
+		assert_eq(goods["closing"], c.stock)
+
+
 func test_forty_seasons_hold_the_invariants() -> void:
-	var run := _play(false)
+	var run := _play(false, false)
 	var g := run["game"] as Game
 	assert_eq(g.turn, SEASONS + 1)
 	assert_gt(int(run["begun"]), 10, "works were begun")

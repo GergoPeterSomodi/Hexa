@@ -103,3 +103,29 @@ func test_p_one_changed_argument_gives_another_digest() -> void:
 	var dropped := g.action_log.duplicate(true)
 	dropped.remove_at(dropped.size() - 1)
 	assert_ne(_replay(g, dropped).digest(), base, "a missing last season")
+
+
+func test_the_developer_transfers_replay_to_the_same_game() -> void:
+	var g := Game.new_scenario(_map(), _defs(), _fx["scenario"] as ScenarioDef, 3)
+	assert_true(bool(g.act("choose_country", {"tag": &"AAA"})["ok"]))
+	assert_true(g.dev_money(&"AAA", 700))
+	assert_true(g.dev_goods(&"AAA", 12, 25))
+	assert_true(bool(g.act("set_tax", {"level": 2, "tag": &"AAA"})["ok"]))
+	Season.run(g)
+	assert_true(g.dev_money(&"AAA", -40))
+	Season.run(g)
+	var kinds := {}
+	for r: Dictionary in g.action_log:
+		kinds[r["action"]] = true
+	assert_true(kinds.has("dev_money") and kinds.has("dev_goods") and kinds.has("set_tax"), str(kinds.keys()))
+	var again := _replay(g, g.action_log)
+	assert_eq(again.digest(), g.digest())
+	assert_eq(again.action_log, g.action_log, "the replay writes the same log")
+	assert_eq(Countries.by_tag(again, &"AAA").treasury, Countries.by_tag(g, &"AAA").treasury)
+	var changed: Array[Dictionary] = []
+	for r: Dictionary in g.action_log:
+		var copy := r.duplicate(true)
+		if copy["action"] == "dev_money" and int(copy["args"]["amount"]) == 700:
+			copy["args"]["amount"] = 701
+		changed.append(copy)
+	assert_ne(_replay(g, changed).digest(), g.digest(), "one changed logged amount gives another game")
