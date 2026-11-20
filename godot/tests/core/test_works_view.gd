@@ -53,6 +53,13 @@ func test_labels() -> void:
 	assert_eq(WorksView.label(g, stage), "vineyard, first to second stage")
 	var clear := _work(g, Works.CLEAR, ImproveRules.VINEYARD, 0, Vector2i(4, 4), 1)
 	assert_eq(WorksView.label(g, clear), "clearing the vineyard")
+	var castle_clear := _work(g, Works.CLEAR, ImproveRules.CASTLE, 0, Vector2i(6, 6), 1)
+	assert_eq(WorksView.label(g, castle_clear), "clearing the castle", "a singular noun, not the family name")
+	assert_eq(WorksView.piece_name(ImproveRules.SETTLEMENT), "settlement")
+	var pasture := _work(g, Works.CLEAR, ImproveRules.GRAZING, 0, Vector2i(6, 7), 1)
+	assert_eq(WorksView.label(g, pasture), "clearing the pasture")
+	var pans := _work(g, Works.CLEAR, ImproveRules.SALT, 0, Vector2i(6, 8), 1)
+	assert_eq(WorksView.label(g, pans), "clearing the salt pans")
 	var castle := _work(g, Works.UPGRADE, ImproveRules.CASTLE, 3, Vector2i(5, 5), 16)
 	assert_eq(WorksView.label(g, castle), "castle to fortress")
 

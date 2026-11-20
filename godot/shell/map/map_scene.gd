@@ -19,7 +19,7 @@ const MAP_ID := "north_italy"
 const START_SEED := 1480
 const NO_HEX := Vector2i(-9999, -9999)
 const SEA_COLOUR := Color("#3f7fae")
-const START_SEASON := "summer"
+const START_SEASON := MapSeasons.START_SEASON
 const SELECT_TILE := "mark/select"
 ## A map of at most this many hexes is loaded at once when the game starts; a larger one a slice a frame.
 const SYNC_LOAD_HEXES := 4000
@@ -48,11 +48,10 @@ var border_chunk_rebuilds := 0
 ## Chunks rebuilt in the most recent border update batch (for tests).
 var last_rebuilt_border_chunks: Array[Vector2i] = []
 
-var _tiles: TilesetBuilder = null
+var _seasons := MapSeasons.new(self)
 var _line_queue: Array[Vector2i] = []
 var _border_queue: Array[Vector2i] = []
 var _loading_map: MapData = null
-var _pending_season := ""  # a season asked for before its pictures were loaded: swapped when they are
 var _loading_state: MapState = null
 var _settings: Settings = null
 var _grid_visible := false
@@ -77,6 +76,8 @@ var _last_hovered_country := &""
 @onready var _input: MapInput = $Input
 @onready var _country_labels: CountryLabels = $Names/CountryLabels
 @onready var _labels: MapLabels = $Names/Labels
+@onready var _fade: SeasonFade = $SeasonFade
+@onready var _work_marks: WorkMarks = $WorkMarks
 
 
 func _ready() -> void:
@@ -98,35 +99,30 @@ func _ready() -> void:
 	_input.names_toggled.connect(toggle_names)
 	_input.hud_toggled.connect(func() -> void: hud_toggle_requested.emit())
 	_input.upgrade_requested.connect(upgrade_selected)
-	_tiles = TilesetBuilder.load_season(season, is_half_textures())
-	if _tiles.tile_set == null:
-		push_warning("map scene: %s (bake the tiles and run tools/build_tileset.gd)" % _tiles.error)
-		_tiles.tile_set = TileSet.new()
-	_view.setup(_tiles)
+	_fade.world = self
+	_view.setup(_seasons.open())
 	_set_grid_visible(_grid_visible)
 	_far.visible = false
 	Events.hex_changed.connect(_on_hex_changed)
 	Events.game_started.connect(_on_game_started)
 	Events.owners_changed.connect(_on_owners_changed)
 	Events.country_chosen.connect(_on_country_chosen)
+	Events.season_ended.connect(_on_season_ended)
 	if _settings != null:
 		_apply_settings(_settings)
 	if Session.game == null:
 		Session.new_game(map_id, start_seed)
 	else:
 		_on_game_started()
-	_request_next_season()
+	_seasons.request_next()
 
 
 func _exit_tree() -> void:
-	if Events.hex_changed.is_connected(_on_hex_changed):
-		Events.hex_changed.disconnect(_on_hex_changed)
-	if Events.game_started.is_connected(_on_game_started):
-		Events.game_started.disconnect(_on_game_started)
-	if Events.owners_changed.is_connected(_on_owners_changed):
-		Events.owners_changed.disconnect(_on_owners_changed)
-	if Events.country_chosen.is_connected(_on_country_chosen):
-		Events.country_chosen.disconnect(_on_country_chosen)
+	for pair: Array in [[Events.hex_changed, _on_hex_changed], [Events.game_started, _on_game_started],
+			[Events.owners_changed, _on_owners_changed], [Events.country_chosen, _on_country_chosen],
+			[Events.season_ended, _on_season_ended]]:
+		if (pair[0] as Signal).is_connected(pair[1] as Callable):
+			(pair[0] as Signal).disconnect(pair[1] as Callable)
 	_disconnect_settings()
 
 
@@ -215,6 +211,8 @@ func _on_game_started() -> void:
 	var state := game.state
 	select_hex(NO_HEX)
 	_last_hovered_country = &""
+	_seasons.game_started()
+	_work_marks.setup(game)
 	_labels.setup(map, MapLabels.capitals_from(game))
 	_view.set_climates(map.cols, map.climate)
 	_view.begin_fill(map.cols, map.rows, func(hex: Vector2i, names: PackedStringArray) -> void: MapCells.fill_hex(map, state, hex, names),
@@ -384,6 +382,10 @@ func _on_owners_changed(hexes: Array[Vector2i]) -> void:
 		_capitals.refresh()
 	if _panel != null and _panel.shown_hex() != NO_HEX:
 		_panel.refresh()
+
+
+func _on_season_ended(_turn: int) -> void:
+	_seasons.season_ended()
 
 
 ## The player picked a country: ends picking highlight/pennants and restores the remembered map mode.
@@ -629,43 +631,24 @@ func is_half_textures() -> bool:
 
 
 func _reload_season_quality() -> void:
-	if _view == null:
-		return
-	var half := is_half_textures()
-	if _tiles != null and _tiles.half == half:
-		return
-	var tiles := TilesetBuilder.load_season(season, half)
-	if tiles.tile_set == null:
-		push_warning("map scene: %s" % tiles.error)
-		return
-	_tiles = tiles
-	_view.begin_season_swap(tiles, _hexes_on_screen())
-	_view.swap_step(slice_ms)
-	_request_next_season()
+	if _view != null:
+		_seasons.reload_quality()
 
 
-## Swaps the season: the TileSet of every layer is replaced and no cell is written. Godot rebuilds a layer when its TileSet
-## changes (about 1 ms a thousand cells), so the view swaps a chunk of a layer at a time (slice_ms a frame), the chunks on the
-## screen first; a small map is done in the first step.
+## Swaps the TileSet to the named season, no cell written (MapSeasons has the slicing and the preload).
 func set_season(value: String) -> void:
-	_pending_season = ""
-	var half := is_half_textures()
-	if (value == season and (_tiles == null or _tiles.half == half)) or not TilesetBuilder.SEASONS.has(value):
-		return
-	if preload_next_season and DisplayServer.get_name() != "headless" and not TilesetBuilder.is_loaded(value, half):
-		TilesetBuilder.request_season(value, half)  # not loaded yet (a key jumped over the next season): the frames go on meanwhile
-		_pending_season = value
-		return
-	var tiles := TilesetBuilder.load_season(value, half)
-	if tiles.tile_set == null:
-		push_warning("map scene: %s" % tiles.error)
-		return
-	season = value
-	_tiles = tiles
-	_view.begin_season_swap(tiles, _hexes_on_screen())
-	_view.swap_step(slice_ms)
-	_request_next_season()
-	season_changed.emit(season)
+	_seasons.set_season(value)
+
+
+## The calendar's season (0 Spring to 3 Winter) with the fade when `fade`; ignored while a look preview is on.
+func show_season(index: int, fade: bool) -> void:
+	_fade.reduce_motion = _settings != null and bool(_settings.get_value("accessibility/reduce_motion"))
+	_seasons.show_season(index, fade)
+
+
+## F3's Look: 0 to 3 a season, -1 back to the calendar's; it ends at the next season_ended.
+func preview_season(index: int) -> void:
+	_seasons.preview(index)
 
 
 func is_swapping() -> bool:
@@ -675,22 +658,6 @@ func is_swapping() -> bool:
 ## Does the rest of a season swap now.
 func finish_swap() -> void:
 	_view.swap_step(1.0e9)
-
-
-## The hexes the camera sees (a Rect2i), for what is done nearest the screen first.
-func _hexes_on_screen() -> Rect2i:
-	var half := get_viewport_rect().size / (2.0 * _camera.zoom.x)
-	var low := _view.hex_at(_camera.position - half)
-	var high := _view.hex_at(_camera.position + half)
-	return Rect2i(low, high - low + Vector2i.ONE).abs()
-
-
-## The next season in the year's order is loaded on another thread, so the usual swap is quick.
-func _request_next_season() -> void:
-	if not preload_next_season or DisplayServer.get_name() == "headless":
-		return
-	var seasons := TilesetBuilder.SEASONS
-	TilesetBuilder.request_season(seasons[(seasons.find(season) + 1) % seasons.size()], is_half_textures())
 
 
 func toggle_grid() -> void:
@@ -746,6 +713,8 @@ func capital_marks() -> CapitalMarks: return _capitals
 func country_labels() -> CountryLabels: return _country_labels
 func panel() -> HexPanelContract: return _panel
 func labels() -> MapLabels: return _labels
+func work_marks() -> WorkMarks: return _work_marks
+func season_fade() -> SeasonFade: return _fade
 func camera() -> Camera2D: return _camera
 func camera_rig() -> CameraRig: return _rig
 func map_input() -> MapInput: return _input
@@ -785,6 +754,7 @@ func _sync_country_labels() -> void:
 func _apply_zoom() -> void:
 	var z := 0.0 if _far_locked else _camera.zoom.x
 	_view.visible = _far.apply_zoom(z)
+	_work_marks.set_zoom(_camera.zoom.x)
 	var grid_layer := _view.layer("grid")
 	if grid_layer != null:
 		grid_layer.modulate.a = ZoomModel.grid_alpha(_camera.zoom.x, _grid_opacity)
@@ -792,9 +762,7 @@ func _apply_zoom() -> void:
 
 func _process(_delta: float) -> void:
 	_apply_zoom()
-	if _pending_season != "" and TilesetBuilder.is_loaded(_pending_season, is_half_textures()):
-		set_season(_pending_season)
-	if _view.is_swapping():
-		_view.swap_step(slice_ms)
-	elif is_loading():
+	if _seasons.tick():
+		return
+	if is_loading():
 		_load_step(slice_ms)

@@ -302,7 +302,7 @@ and stands from season T + n. `WorksView.ready_turn` walks the seasons from `gam
 | Work | Begun | Seasons | Halts | Stands from |
 |---|---|---|---|---|
 | Vineyard, first stage, near Savona (7, 12), frost climate | Spring 1480 (1) | 4 | none | Spring 1481 (5) (the mockup's "ready Spring 1481") |
-| Timber, first stage, near Genoa (9, 11): Genoese woods at 1,488 m, snow climate | Summer 1480 (2) | 4 | Winter 1480 | Autumn 1481 (7), not Summer 1481 |
+| Timber, first stage, near Milan (9, 11): Genoese woods at 1,488 m, snow climate | Summer 1480 (2) | 4 | Winter 1480 | Autumn 1481 (7), not Summer 1481 |
 | Genoa (8, 13): walled town to city | Spring 1480 (1) | 8 | none (mild) | Spring 1482 (9) |
 
 **Cancelling.** `Works.cancel_work` checks again, removes the work, computes `refund = Works.refund(game, work)`
@@ -382,7 +382,7 @@ in M3 and first read by M4's Standing section, M4.5's Rankings and M8's AI.
 
 | Rule | When | Severity | Text | Action |
 |---|---|---|---|---|
-| `winter_halt` | the current season is Autumn and `tag` has works on snow-climate hexes | 2 (serious) | "Winter comes: 1 work in the snow stops until spring: timber, first stage, near Genoa (9, 11)." (two or more: "2 works in the snow stop until spring: ..." with `Words.list`) | `[&"look_at", first hex]`, "Go to (9, 11)" |
+| `winter_halt` | the current season is Autumn and `tag` has works on snow-climate hexes | 2 (serious) | "Winter comes: 1 work in the snow stops until spring: timber, first stage, near Milan (9, 11)." (two or more: "2 works in the snow stop until spring: ..." with `Words.list`) | `[&"look_at", first hex]`, "Go to (9, 11)" |
 | `free_slot` | a game with countries and `Works.in_use < Works.slots` for `tag` | 1 | "A work slot is free: 1 of 2 in use." | `[&"look_at", capital]`, "Show Genoa" |
 
 Severity 0 is information (none in M3). `serious` is true when a line has severity 2. M4 adds the money and food rules.
@@ -408,8 +408,8 @@ Severity 0 is information (none in M3). `serious` is true when a line has severi
 |---|---|---|
 | `glance` | At a glance | Up to five chips: **Works** ("1 finished, 1 under way"; good when one finished); **Work slots** ("2 of 2 in use"; countries only); **Land** ("14 districts", with ▲ +n / ▼ −n against the season before when it changed; countries only) |
 | `before` | Before Summer | the reminders (4.8), at most five, each with its button |
-| `works` | Works | **Finished:** "Finished: vineyard, first stage, near Savona (7, 12)." (good); **Begun:** "Begun: timber, first stage, near Genoa (9, 11). Ready Autumn 1481."; **Under way:** "Under way: walled town to city, Genoa (8, 13): 1 of 8 seasons. Ready Spring 1482." (warn and "stopped for the winter" when halted this season); **Cancelled:** "Cancelled: ..." with ", the land was lost." or ": <reason>." (bad) |
-| `orders` | Your orders | from the action log of `turn`, one line per kind: "Ordered to build: vineyard near Savona (7, 12) and timber near Genoa (9, 11).", "Ordered to upgrade: ...", "Ordered to clear: ...", "Cancelled: ...", "Took the rule of the Republic of Genoa." |
+| `works` | Works | **Finished:** "Finished: vineyard, first stage, near Savona (7, 12)." (good); **Begun:** "Begun: timber, first stage, near Milan (9, 11). Ready Autumn 1481."; **Under way:** "Under way: walled town to city, Genoa (8, 13): 1 of 8 seasons. Ready Spring 1482." (warn and "stopped for the winter" when halted this season); **Cancelled:** "Cancelled: ..." with ", the land was lost." or ": <reason>." (bad) |
+| `orders` | Your orders | from the action log of `turn`, one line per kind: "Ordered to build: vineyard near Savona (7, 12) and timber near Milan (9, 11).", "Ordered to upgrade: ...", "Ordered to clear: ...", "Cancelled: ...", "Took the rule of the Republic of Genoa." |
 | `befell` | What befell Genoa (sandbox: "What befell the map") | witnessed events of others: "Milan finished a vineyard at (9, 11).", "The Duchy of Milan took 3 districts from the Republic of Venice: Bergamo (11, 8) and 2 more." |
 
 `rank` in M3 is the work's `seasons` (orders and befell: 0); lines sort by rank, six show, `more` counts the rest; the

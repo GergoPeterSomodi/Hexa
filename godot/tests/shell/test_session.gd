@@ -6,6 +6,9 @@ var _prev_game: Game = null
 var _prev_unsaved: int = 0
 var _prev_defs: GameDefs = null
 var _prev_origin: Dictionary = {}
+var _prev_dir: String = ""
+var _prev_json: bool = false
+var _dir: String = "user://test_saves_session"
 
 
 func before_each() -> void:
@@ -13,6 +16,10 @@ func before_each() -> void:
 	_prev_unsaved = Session.unsaved_actions
 	_prev_defs = Session._defs
 	_prev_origin = Session._origin
+	_prev_dir = Session.save_dir
+	_prev_json = Session.save_json
+	Session.save_dir = _dir
+	_wipe()
 
 
 func after_each() -> void:
@@ -20,6 +27,10 @@ func after_each() -> void:
 	Session.unsaved_actions = _prev_unsaved
 	Session._defs = _prev_defs
 	Session._origin = _prev_origin
+	Session.save_dir = _prev_dir
+	Session.save_json = _prev_json
+	_wipe()
+	DirAccess.remove_absolute(_dir)
 
 
 func _first_buildable() -> Dictionary:
@@ -355,3 +366,212 @@ func test_play_seconds_counts_while_a_game_runs_and_resets_on_a_new_game() -> vo
 	Session.game = null
 	Session._process(1.0)
 	assert_eq(Session.play_seconds, 0.0, "no game, no count")
+
+
+func _wipe() -> void:
+	if not DirAccess.dir_exists_absolute(_dir):
+		return
+	for file: String in DirAccess.get_files_at(_dir):
+		DirAccess.remove_absolute(_dir.path_join(file))
+
+
+func _thumb() -> Image:
+	return Image.create_empty(192, 108, false, Image.FORMAT_RGBA8)
+
+
+func _read_bytes(slot: String) -> PackedByteArray:
+	var f := FileAccess.open(Session.save_dir.path_join(slot + ".sav"), FileAccess.READ)
+	var bytes := f.get_buffer(f.get_length())
+	f.close()
+	return bytes
+
+
+func _write_bytes(slot: String, bytes: PackedByteArray) -> void:
+	var f := FileAccess.open(Session.save_dir.path_join(slot + ".sav"), FileAccess.WRITE)
+	f.store_buffer(bytes)
+	f.close()
+
+
+func _damage(slot: String) -> void:
+	var bytes := _read_bytes(slot)
+	bytes[bytes.size() - 1] = bytes[bytes.size() - 1] ^ 0xFF
+	_write_bytes(slot, bytes)
+
+
+## Changes one value of a save's header line as text (JSON.stringify would write ints as floats, which a header refuses).
+func _rewrite_header(slot: String, key: String, value: Variant) -> void:
+	var bytes := _read_bytes(slot)
+	var end := bytes.find(10)
+	var line := bytes.slice(0, end).get_string_from_utf8()
+	var json := JSON.new()
+	json.parse(line)
+	var old: Variant = (json.data as Dictionary)[key]
+	var shown := str(int(old)) if old is float else JSON.stringify(old)
+	var from := "\"%s\":%s" % [key, shown]
+	assert_true(line.contains(from), "the header has " + from)
+	var out := (line.replace(from, "\"%s\":%s" % [key, JSON.stringify(value)]) + "
+").to_utf8_buffer()
+	out.append_array(bytes.slice(end + 1))
+	_write_bytes(slot, out)
+
+
+func test_save_then_load_keeps_the_digest_clock_slot_and_ui() -> void:
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	Session.end_season()
+	var digest := Session.game.digest()
+	Session.play_seconds = 125.0
+	assert_gt(Session.unsaved_actions, 0)
+	var ui := {"map_mode": "owner", "camera": {"zoom": 2.0}}
+	assert_eq(Session.save_game("3", _thumb(), ui, "My game"), "")
+	assert_eq(Session.unsaved_actions, 0, "saved")
+	assert_eq(Session.current_slot, "3")
+	assert_true(FileAccess.file_exists(_dir.path_join("3.png")), "thumbnail written")
+	Session.end_season()
+	assert_eq(Session.load_game("3"), "")
+	assert_eq(Session.game.digest(), digest)
+	assert_eq(Session.play_seconds, 125.0)
+	assert_eq(Session.current_slot, "3")
+	assert_eq(Session.unsaved_actions, 0)
+	assert_eq(Session.loaded_ui(), ui)
+	Session.new_game(MapScene.MAP_ID, 1)
+	assert_eq(Session.loaded_ui(), {}, "a new game clears loaded_ui")
+
+
+func test_save_refusals_and_no_thumbnail_removes_the_old_picture() -> void:
+	Session.game = null
+	assert_ne(Session.save_game("1"), "", "no game")
+	Session.new_game(MapScene.MAP_ID, 1)
+	assert_ne(Session.save_game("nope"), "", "an unknown slot")
+	assert_eq(Session.save_game("1", _thumb()), "")
+	assert_true(FileAccess.file_exists(_dir.path_join("1.png")))
+	assert_eq(Session.save_game("1"), "")
+	assert_false(FileAccess.file_exists(_dir.path_join("1.png")))
+
+
+func test_autosave_fills_empty_slots_then_replaces_the_oldest() -> void:
+	Session.new_game(MapScene.MAP_ID, 1)
+	for i: int in 3:
+		assert_eq(Session.autosave_game(null, {}), "")
+		assert_eq(Session.current_slot, "auto%d" % (i + 1))
+	assert_eq(Session.list_saves()[0]["state"], &"ok")
+
+
+func test_list_saves_order_states_and_newest_save() -> void:
+	Session.new_game(MapScene.MAP_ID, 1)
+	var rows := Session.list_saves()
+	assert_eq(rows.size(), 12)
+	assert_eq(rows[0]["slot"], "auto1")
+	assert_eq(rows[3]["slot"], "quick")
+	for row: Dictionary in rows:
+		assert_eq(row["state"], &"empty")
+	assert_true(Session.newest_save().is_empty())
+	Session.save_game("2", _thumb())
+	rows = Session.list_saves()
+	assert_eq(rows[5]["slot"], "2")
+	assert_eq(rows[5]["state"], &"ok")
+	assert_ne(rows[5]["thumbnail"], "")
+	assert_eq(Session.newest_save()["slot"], "2")
+	Session.save_game("quick")
+	assert_eq(Session.list_saves()[3]["thumbnail"], "")
+	assert_false(Session.newest_save().is_empty())
+
+
+func test_list_saves_maps_a_foreign_map_or_scenario_and_load_refuses_them() -> void:
+	Session.new_scenario(SCENARIO, 1)
+	assert_eq(Session.save_game("1"), "")
+	assert_eq(Session.save_game("2"), "")
+	assert_eq(Session.save_game("3"), "")
+	_rewrite_header("2", "map_digest", "0000")
+	_rewrite_header("3", "scenario_digest", "0000")
+	var rows := Session.list_saves()
+	assert_eq(rows[4]["state"], &"ok")
+	assert_eq(rows[5]["state"], &"other_map")
+	assert_eq(rows[6]["state"], &"other_build")
+	var game_before := Session.game
+	assert_eq(Session.load_game("2"), Snapshot.PROBLEM_OTHER_MAP)
+	assert_eq(Session.load_game("3"), Snapshot.PROBLEM_OTHER_BUILD)
+	assert_same(Session.game, game_before, "nothing started")
+	assert_eq(Session.newest_save()["slot"], "1", "only an ok save counts")
+
+
+func test_load_refuses_broken_and_damaged_saves_and_starts_nothing() -> void:
+	Session.new_game(MapScene.MAP_ID, 1)
+	var game_before := Session.game
+	assert_eq(Session.load_game("1"), "Empty slot")
+	Session.save_game("1")
+	_damage("1")
+	assert_eq(Session.load_game("1"), Snapshot.PROBLEM_UNREADABLE, "a flipped body byte")
+	Session.save_game("2")
+	_rewrite_header("2", "digest", "ffff")
+	assert_eq(Session.load_game("2"), "The save is damaged", "a header digest that differs")
+	assert_same(Session.game, game_before, "nothing started on any problem")
+	assert_eq(Session.list_saves()[4]["state"], &"ok", "list_saves reads headers only; the body is checked at load")
+
+
+func test_load_of_a_newer_format_returns_its_problem() -> void:
+	Session.new_game(MapScene.MAP_ID, 1)
+	Session.save_game("1")
+	_rewrite_header("1", "format", SaveFile.FORMAT + 1)
+	assert_eq(Session.load_game("1"), Snapshot.PROBLEM_NEWER)
+	assert_eq(Session.list_saves()[4]["state"], &"newer")
+
+
+func test_load_refuses_a_name_that_is_not_a_slot() -> void:
+	Session.new_game(MapScene.MAP_ID, 1)
+	Session.save_game("1")
+	var outside := "user://test_outside"
+	DirAccess.copy_absolute(_dir.path_join("1.sav"), outside + ".sav")
+	var game_before := Session.game
+	for bad: String in ["../test_outside", "x", "", "1/../1"]:
+		assert_ne(Session.load_game(bad), "", "refused: " + bad)
+	assert_eq(Session.load_game("../test_outside"), "no slot '../test_outside'")
+	assert_same(Session.game, game_before)
+	assert_eq(Session.current_slot, "1")
+	assert_eq(SaveFile.path_of("../x", _dir), "")
+	assert_eq(SaveFile.read("../x", _dir)["header"], {})
+	assert_eq(SaveFile.read_header("../x", _dir)["state"], &"empty")
+	assert_false(SaveFile.remove("../x", _dir))
+	assert_ne(SaveFile.write(game_before, "../x", {}, {}, _dir), "")
+	DirAccess.remove_absolute(outside + ".sav")
+
+
+func _on_started(seen: Array) -> void:
+	seen.append({"slot": Session.current_slot, "seconds": Session.play_seconds, "ui": Session.loaded_ui()})
+
+
+func test_game_started_listeners_see_the_loaded_slot_clock_and_ui() -> void:
+	Session.new_game(MapScene.MAP_ID, 1)
+	Session.play_seconds = 61.0
+	Session.save_game("2", null, {"camera": 3})
+	var seen: Array = []
+	var handler := _on_started.bind(seen)
+	Events.game_started.connect(handler)
+	var problem := Session.load_game("2")
+	Events.game_started.disconnect(handler)
+	assert_eq(problem, "")
+	assert_eq(seen, [{"slot": "2", "seconds": 61.0, "ui": {"camera": 3}}])
+
+
+func test_digest_caches_follow_the_instance_and_scenario() -> void:
+	Session.new_scenario(SCENARIO, 1)
+	var first := Session._map_digest(Session.game.map)
+	var copy := Session.game.map.duplicate() as MapData
+	assert_eq(Session._map_digest(copy), first, "a copy has the same digest")
+	assert_true(Session._map_digests.has(copy.get_instance_id()), "keyed by instance")
+	Session.save_game("1")
+	Session.list_saves()
+	assert_false(Session._scenario_digests.is_empty(), "scenario digests cached")
+	var again := Session._scenario_digests.duplicate()
+	Session.list_saves()
+	assert_eq(Session._scenario_digests, again)
+
+
+func test_delete_save_removes_every_file_and_save_json_writes_the_dev_copy() -> void:
+	Session.new_game(MapScene.MAP_ID, 1)
+	Session.save_json = true
+	Session.save_game("4", _thumb())
+	assert_true(FileAccess.file_exists(_dir.path_join("4.body.json")))
+	assert_true(Session.delete_save("4"))
+	assert_eq(DirAccess.get_files_at(_dir).size(), 0)
+	assert_eq(Session.current_slot, "", "the deleted slot is no longer current")
+	assert_false(Session.delete_save("../x"))

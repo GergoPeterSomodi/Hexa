@@ -7,6 +7,8 @@ extends RefCounted
 
 signal toast_requested(text: String, tone: StringName)
 signal app_requested(what: StringName, args: Dictionary)
+## The App has tried a save (request &"save"): the slot and the problem ("" when it worked). Save and Load refreshes.
+signal saved(slot: String, problem: String)
 
 var settings: Settings = null
 var stack: Control = null

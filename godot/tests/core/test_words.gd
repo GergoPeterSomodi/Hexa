@@ -59,6 +59,24 @@ func test_place_nearest_wins_and_ties_go_to_place_order() -> void:
 	assert_eq(Words.place(g, Vector2i(8, 2)), "near Gamma (8, 2)")
 
 
+func test_list_with_a_separator() -> void:
+	var three: Array[String] = ["a, x", "b, y", "c, z"]
+	assert_eq(Words.list(three, 3, "; "), "a, x; b, y and c, z")
+	assert_eq(Words.list(three, 2, "; "), "a, x; b, y and 1 more")
+	assert_eq(Words.list(three), "a, x, b, y and 1 more", "the default keeps every other caller")
+
+
+func test_piece_nouns_and_articles() -> void:
+	var expected := {"wheat": "wheat field", "hemp": "hemp field", "silk": "mulberry grove", "dyes": "dye field",
+		"vineyard": "vineyard", "olives": "olive grove", "grazing": "pasture", "timber": "woodland", "mines": "mine",
+		"quarry": "quarry", "salt": "salt pans", "settlements": "settlement", "castles": "castle", "harbour": "harbour"}
+	for family: String in expected:
+		assert_eq(Words.piece_noun(family), expected[family], family)
+	assert_eq(Words.piece_noun("unknown"), "unknown")
+	assert_eq([Words.with_article("vineyard"), Words.with_article("olive grove"), Words.with_article("salt pans")],
+		["a vineyard", "an olive grove", "salt pans"])
+
+
 func test_list() -> void:
 	var four: Array[String] = ["a", "b", "c", "d"]
 	assert_eq(Words.list(four), "a, b and 2 more")

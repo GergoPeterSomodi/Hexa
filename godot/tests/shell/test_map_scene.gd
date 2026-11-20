@@ -74,7 +74,7 @@ func test_it_opens_on_tiles_of_the_whole_map() -> void:
 		crossings += _scene.view().layer(layer_name).get_used_cells().size()
 	assert_eq(crossings, Crossings.all_of(map).size(), "every crossing of the map is on a crossing layer")
 	assert_eq(_unexplained_missing(), [] as Array[String], "every tile asked for is in the tileset or a blank piece part")
-	assert_eq(_scene.view().season(), "summer")
+	assert_eq(_scene.view().season(), "spring", "turn 1 is Spring: the map opens in the calendar season")
 	_scene.frame_at(_scene.map_size() / 2.0, 0.5)  # (a test window is 64 px square, so fit() would zoom far out)
 	assert_true(_scene.view().visible and not _scene.far().visible, "the tiles show at the start zoom")
 
@@ -219,6 +219,111 @@ func test_a_season_swap_writes_no_cell() -> void:
 	_scene.set_season("summer")
 	_scene.finish_swap()
 	assert_eq(_scene.view().cell_writes, writes)
+
+
+## A second scene on the running game (before_each's scene stays; both are freed with the test).
+func _another_scene() -> MapScene:
+	var packed := load("res://shell/map/map_scene.tscn") as PackedScene
+	var scene := packed.instantiate() as MapScene
+	scene.preload_next_season = false
+	add_child_autofree(scene)
+	scene.finish_loading()
+	return scene
+
+
+func test_the_map_opens_in_the_calendars_season() -> void:
+	for turn: int in [1, 2, 3, 4, 7]:
+		Session.game.turn = turn
+		var scene := _another_scene()
+		var want: String = TilesetBuilder.SEASONS[Calendar.season_of(turn)]
+		assert_eq(scene.season, want, "turn %d" % turn)
+		assert_eq(scene.view().season(), want)
+
+
+func test_game_started_shows_the_calendars_season() -> void:
+	assert_eq(_scene.season, "spring")
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	Session.game.turn = 4
+	Events.game_started.emit()
+	_scene.finish_swap()
+	assert_eq(_scene.season, "winter")
+
+
+func test_show_season_without_fade_swaps_at_once_and_the_fade_does_nothing_headless() -> void:
+	watch_signals(_scene)
+	_scene.show_season(2, false)
+	assert_eq(_scene.season, "autumn")
+	assert_signal_emitted_with_parameters(_scene, "season_changed", ["autumn"])
+	_scene.show_season(3, true)  # headless: the fade is skipped, the swap is not
+	assert_eq(_scene.season, "winter")
+	assert_false(_scene.season_fade().is_fading())
+	_scene.show_season(7, false)  # the index wraps
+	assert_eq(_scene.season, "winter")
+
+
+func test_the_fade_is_skipped_under_reduce_motion() -> void:
+	var fade := _scene.season_fade()
+	fade.run_headless = true
+	fade.reduce_motion = true
+	assert_true(fade.skipped())
+	fade.reduce_motion = false
+	assert_false(fade.skipped(), "a test switches the headless skip off")
+	assert_eq(fade.layer, 9)
+	assert_eq(SeasonFade.DURATION, 0.4)
+
+
+func test_the_fallback_fade_goes_through_the_background_colour_and_back() -> void:
+	var fade := _scene.season_fade()
+	fade.method = SeasonFade.Method.FALLBACK
+	fade.run_headless = true
+	_scene.show_season(1, true)
+	await wait_seconds(0.1)
+	assert_eq(_scene.season, "spring", "the swap waits for the world to be dark")
+	assert_ne(_scene.modulate, Color.WHITE, "the world is fading")
+	await wait_for_signal(fade.finished, 2.0)
+	assert_eq(_scene.season, "summer")
+	assert_eq(_scene.modulate, Color.WHITE, "the world is back")
+	assert_false(fade.is_fading())
+
+
+func test_a_preview_holds_until_the_season_ends() -> void:
+	_scene.preview_season(3)
+	assert_eq(_scene.season, "winter")
+	_scene.show_season(1, false)
+	assert_eq(_scene.season, "winter", "the calendar's change is ignored during a preview")
+	assert_true(bool(Session.end_season()["ok"]))  # season_ended: the preview is over
+	await wait_frames(2)
+	_scene.finish_swap()
+	assert_eq(_scene.season, "summer", "turn 2: the calendar's season is shown again")
+	_scene.preview_season(0)
+	assert_eq(_scene.season, "spring")
+	_scene.preview_season(-1)
+	assert_eq(_scene.season, "summer", "-1 goes back to the calendar")
+	_scene.show_season(2, false)
+	assert_eq(_scene.season, "autumn", "no preview is on any more")
+
+
+func test_freeing_the_scene_mid_fade_is_harmless() -> void:
+	var scene := _another_scene()
+	var fade := scene.season_fade()
+	fade.method = SeasonFade.Method.FALLBACK
+	fade.run_headless = true
+	scene.show_season(2, true)
+	await wait_seconds(0.05)
+	scene.free()
+	await wait_seconds(0.3)
+	assert_false(is_instance_valid(scene))
+
+
+func test_a_show_season_that_came_before_the_season_ended_is_not_lost() -> void:
+	_scene.preview_season(0)
+	Session.game.turn = 2
+	_scene.show_season(1, false)  # the App was first: ignored while the preview is on
+	assert_eq(_scene.season, "spring")
+	Events.season_ended.emit(1)
+	await wait_frames(2)
+	_scene.finish_swap()
+	assert_eq(_scene.season, "summer", "the scene shows the calendar's season by itself")
 
 
 func test_far_zoom_replaces_the_tiles() -> void:

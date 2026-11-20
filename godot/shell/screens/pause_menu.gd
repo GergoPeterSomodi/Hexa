@@ -180,7 +180,8 @@ func _refresh_state() -> void:
 
 	_subtitle_label.text = _subtitle_text()
 
-	var has_saves := Session.has_method(&"save_game")
+	# Until the Save and Load screen exists (M3 Y14) the buttons stay hidden; Y15 removes this check.
+	var has_saves := Session.has_method(&"save_game") and ResourceLoader.exists("res://shell/screens/save_load.tscn")
 	_save_btn.visible = has_saves
 	_load_btn.visible = has_saves
 	if has_saves and Session.has_method(&"is_season_running") and bool(Session.call(&"is_season_running")):

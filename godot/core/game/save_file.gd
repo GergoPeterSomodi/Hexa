@@ -18,7 +18,15 @@ const NAME_MAX := 120
 const MAX_EXACT := 9007199254740992.0
 
 
+## True for a slot name of SLOTS or AUTO_SLOTS: nothing else may become a file name.
+static func is_slot(slot: String) -> bool:
+	return SLOTS.has(slot) or AUTO_SLOTS.has(slot)
+
+
+## The `.sav` path of a slot, or "" for a name that is not a slot (no path out of the folder).
 static func path_of(slot: String, dir: String = DIR) -> String:
+	if not is_slot(slot):
+		return ""
 	return dir.path_join(slot + ".sav")
 
 
@@ -52,6 +60,8 @@ static func header_of(game: Game, slot: String, info: Dictionary) -> Dictionary:
 ## "" or the problem. The sequence of 4.10 (D33); `json_too` also writes `<slot>.body.json` for a developer.
 static func write(game: Game, slot: String, info: Dictionary, ui: Dictionary, dir: String = DIR,
 		json_too: bool = false) -> String:
+	if not is_slot(slot):
+		return "no slot '%s'" % slot
 	if DirAccess.make_dir_recursive_absolute(dir) != OK and not DirAccess.dir_exists_absolute(dir):
 		return "the save could not be written"
 	var body: Dictionary = Snapshot.of(game, ui)
@@ -127,6 +137,8 @@ static func _sha(bytes: PackedByteArray) -> String:
 ## {state: &"empty" | &"ok" | &"newer" | &"older" | &"broken", header: Dictionary}. `.bak` stands in when `.sav` is
 ## missing or broken. Only the first line and the file's length are read.
 static func read_header(slot: String, dir: String = DIR) -> Dictionary:
+	if not is_slot(slot):
+		return {"state": &"empty", "header": {}}
 	var sav := path_of(slot, dir)
 	var bak := sav + ".bak"
 	if not FileAccess.file_exists(sav) and not FileAccess.file_exists(bak):
@@ -251,6 +263,8 @@ static func _clean(raw: Dictionary) -> Dictionary:
 ## {problem: String, header: Dictionary, body: Dictionary}: the first of `.sav` and `.bak` that reads whole. A problem
 ## is the words of the table in 4.10 ("Empty slot", "Cannot be read", "Made by a newer Hexa" ...).
 static func read(slot: String, dir: String = DIR) -> Dictionary:
+	if not is_slot(slot):
+		return {"problem": "no slot '%s'" % slot, "header": {}, "body": {}}
 	var sav := path_of(slot, dir)
 	if not FileAccess.file_exists(sav) and not FileAccess.file_exists(sav + ".bak"):
 		return {"problem": "Empty slot", "header": {}, "body": {}}
@@ -300,6 +314,8 @@ static func _upgrade(body: Dictionary) -> Dictionary:
 
 ## Deletes every file of a slot; false when one could not be deleted.
 static func remove(slot: String, dir: String = DIR) -> bool:
+	if not is_slot(slot):
+		return false
 	var ok := true
 	for ext: String in [".sav", ".sav.bak", ".sav.tmp", ".png", ".body.json"]:
 		var path := dir.path_join(slot + ext)

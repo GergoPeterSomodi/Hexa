@@ -75,6 +75,30 @@ visible = false
 layout_mode = 2
 mouse_filter = 2
 
+[node name="WorkBox" type="VBoxContainer" parent="Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Heading" type="Label" parent="Body/WorkBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+text = "Work under way"
+
+[node name="Text" type="Label" parent="Body/WorkBox"]
+layout_mode = 2
+theme_type_variation = &"TableRow"
+autowrap_mode = 3
+
+[node name="Progress" type="Label" parent="Body/WorkBox"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[node name="Actions" type="VBoxContainer" parent="Body/WorkBox"]
+layout_mode = 2
+mouse_filter = 2
+
 [node name="ActionsBox" type="VBoxContainer" parent="Body"]
 layout_mode = 2
 mouse_filter = 2

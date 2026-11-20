@@ -14,7 +14,22 @@ var current_slot: String = ""
 ## Phase name -> milliseconds the last season spent in it (F3, perf).
 var last_phase_ms: Dictionary = {}
 
+## The folder of the saves; tests point it at a temporary folder.
+var save_dir: String = SaveFile.DIR
+## Also write `<slot>.body.json` with each save (the App sets it from the dev/save_json setting).
+var save_json: bool = false
+
 const DEFS := "res://data/defs/game_defs.tres"
+const DAMAGED := "The save is damaged"
+const NO_GAME := "no game"
+
+## The ui block of the last load ({} after a new game).
+var _loaded_ui: Dictionary = {}
+## MapData instance id -> MapData.digest(), cached.
+var _map_digests: Dictionary = {}
+## scenario id -> digest, valid for the defs instance in _scenario_digests_of.
+var _scenario_digests: Dictionary = {}
+var _scenario_digests_of: GameDefs = null
 
 var _maps: Dictionary[String, MapData] = {}
 var _defs: GameDefs = null
@@ -96,13 +111,14 @@ func _process(delta: float) -> void:
 
 
 ## Puts a game that exists already in place (a loaded save, a test's game over a made-up map).
-func start_game(new_game_value: Game) -> void:
+func start_game(new_game_value: Game, slot: String = "", seconds: float = 0.0, ui: Dictionary = {}) -> void:
 	game = new_game_value
 	_origin = {}
 	unsaved_actions = 0
-	play_seconds = 0.0
-	current_slot = ""
+	play_seconds = seconds
+	current_slot = slot
 	last_phase_ms = {}
+	_loaded_ui = ui
 	Events.game_started.emit()
 
 
@@ -114,6 +130,7 @@ func end_game() -> void:
 	play_seconds = 0.0
 	current_slot = ""
 	last_phase_ms = {}
+	_loaded_ui = {}
 	Events.game_ended.emit()
 
 
@@ -191,6 +208,147 @@ func dev_transfer(hexes: Array[Vector2i], tag: StringName) -> int:
 	var changed := game.dev_transfer(hexes, to_id)
 	drain()
 	return changed
+
+
+## Saves the game to a slot ("quick", "1" to "8", "auto1" to "auto3"): the file with the wall clock, play_seconds and the
+## build, then the thumbnail PNG (a null thumbnail removes an old picture). On success unsaved_actions is 0 and
+## current_slot the slot. Returns "" or the problem; nothing changes on a problem.
+func save_game(slot: String, thumbnail: Image = null, ui: Dictionary = {}, name: String = "") -> String:
+	if game == null:
+		return NO_GAME
+	if not (SaveFile.SLOTS.has(slot) or SaveFile.AUTO_SLOTS.has(slot)):
+		return "no slot '%s'" % slot
+	var info := {
+		"build": str(ProjectSettings.get_setting("application/config/version", "0.3.0")),
+		"name": name, "saved_unix": int(Time.get_unix_time_from_system()), "play_seconds": int(play_seconds),
+		"map_digest": _map_digest(game.map),
+	}
+	var problem := SaveFile.write(game, slot, info, ui, save_dir, save_json)
+	if not problem.is_empty():
+		return problem
+	var png := save_dir.path_join(slot + ".png")
+	if thumbnail != null and not thumbnail.is_empty():
+		thumbnail.save_png(png)
+	elif FileAccess.file_exists(png):
+		DirAccess.remove_absolute(png)
+	unsaved_actions = 0
+	current_slot = slot
+	return ""
+
+
+## Saves to the next autosave slot (the first empty, else the oldest).
+func autosave_game(thumbnail: Image, ui: Dictionary) -> String:
+	return save_game(SaveFile.auto_slot(save_dir), thumbnail, ui)
+
+
+## Loads a slot and starts its game. Returns "" or the problem ("Cannot be read", "Made for another map", "The save is
+## damaged" ...); nothing starts on a problem. The ui block is then in loaded_ui().
+func load_game(slot: String) -> String:
+	if not SaveFile.is_slot(slot):
+		return "no slot '%s'" % slot
+	var read := SaveFile.read(slot, save_dir)
+	if not str(read["problem"]).is_empty():
+		return str(read["problem"])
+	var header := read["header"] as Dictionary
+	var mismatch := _mismatch(header)
+	if not mismatch.is_empty():
+		return mismatch
+	var map := map_of(str(header["map_id"]))
+	var restored := Snapshot.restore(read["body"] as Dictionary, map, defs())
+	if not str(restored["problem"]).is_empty():
+		return str(restored["problem"])
+	var loaded := restored["game"] as Game
+	if loaded == null:
+		return Snapshot.PROBLEM_UNREADABLE
+	if loaded.digest() != str(header["digest"]):
+		return DAMAGED
+	start_game(loaded, slot, float(int(header["play_seconds"])), restored["ui"] as Dictionary)
+	return ""
+
+
+## The ui block of the last load ({} after a new game).
+func loaded_ui() -> Dictionary:
+	return _loaded_ui
+
+
+## One row per slot, the three autosaves first, then quick and 1 to 8: {slot, state, header, thumbnail}. Headers only.
+## `state` is empty, ok, newer, older, broken, other_map or other_build.
+func list_saves() -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	var slots: Array[String] = []
+	slots.append_array(SaveFile.AUTO_SLOTS)
+	slots.append_array(SaveFile.SLOTS)
+	for slot: String in slots:
+		var info := SaveFile.read_header(slot, save_dir)
+		var header := info["header"] as Dictionary
+		var state := info["state"] as StringName
+		if state == &"ok":
+			var mismatch := _mismatch(header)
+			if mismatch == Snapshot.PROBLEM_OTHER_MAP:
+				state = &"other_map"
+			elif mismatch == Snapshot.PROBLEM_OTHER_BUILD:
+				state = &"other_build"
+		var png := save_dir.path_join(slot + ".png")
+		rows.append({"slot": slot, "state": state, "header": header,
+				"thumbnail": png if FileAccess.file_exists(png) else ""})
+	return rows
+
+
+## The loadable save (state ok) with the newest saved_unix, or {} (the first of equals in list order).
+func newest_save() -> Dictionary:
+	var best := {}
+	var best_unix := -1
+	for row: Dictionary in list_saves():
+		if row["state"] != &"ok":
+			continue
+		var stamp := int((row["header"] as Dictionary)["saved_unix"])
+		if stamp > best_unix:
+			best = row
+			best_unix = stamp
+	return best
+
+
+## Deletes every file of a slot (.sav, .bak, .tmp, .png, .body.json).
+func delete_save(slot: String) -> bool:
+	if not (SaveFile.SLOTS.has(slot) or SaveFile.AUTO_SLOTS.has(slot)):
+		return false
+	var ok := SaveFile.remove(slot, save_dir)
+	if current_slot == slot:
+		current_slot = ""
+	return ok
+
+
+## "" when the header's map and scenario are here and unchanged, else PROBLEM_OTHER_MAP or PROBLEM_OTHER_BUILD.
+func _mismatch(header: Dictionary) -> String:
+	var map := map_of(str(header["map_id"]))
+	if map == null or _map_digest(map) != str(header["map_digest"]):
+		return Snapshot.PROBLEM_OTHER_MAP
+	var scenario_id := str(header["scenario_id"])
+	if not scenario_id.is_empty():
+		var game_defs := defs()
+		var scenario := game_defs.scenario(scenario_id) if game_defs != null else null
+		if scenario == null or _scenario_digest(game_defs, scenario) != str(header["scenario_digest"]):
+			return Snapshot.PROBLEM_OTHER_BUILD
+	return ""
+
+
+## Cached per map instance (a different MapData with the same id hashes again).
+func _map_digest(map: MapData) -> String:
+	var key := map.get_instance_id()
+	if not _map_digests.has(key):
+		_map_digests[key] = map.digest()
+	return _map_digests[key]
+
+
+## Cached per scenario id for one defs instance; a new GameDefs empties the cache.
+func _scenario_digest(game_defs: GameDefs, scenario: ScenarioDef) -> String:
+	if _scenario_digests_of != game_defs:
+		_scenario_digests = {}
+		_scenario_digests_of = game_defs
+	var key := "%s:%d" % [scenario.id, scenario.get_instance_id()]
+	if not _scenario_digests.has(key):
+		_scenario_digests[key] = scenario.digest()
+	return _scenario_digests[key]
 
 
 ## Empties game.events into Events signals. act() calls it; so do tools and tests that call a system directly.

@@ -11,7 +11,7 @@ const NO_HEX := Vector2i(-1, -1)
 static func label(_game: Game, work: Work) -> String:
 	var piece := FamilyIds.NAMES[clampi(work.family, 0, FamilyIds.COUNT - 1)]
 	if work.action == Works.CLEAR:
-		return "clearing the %s" % piece
+		return "clearing the %s" % piece_name(work.family)
 	if HexCard.LEVEL_WORDS.has(piece):
 		var words: Array = HexCard.LEVEL_WORDS[piece]
 		if work.action == Works.BUILD:
@@ -21,6 +21,11 @@ static func label(_game: Game, work: Work) -> String:
 	if work.action == Works.BUILD:
 		return "%s, %s" % [piece, HexCard.word(HexCard.STAGE_WORDS, 1)]
 	return "%s, %s to %s" % [piece, _stage(work.level_to - 1), HexCard.word(HexCard.STAGE_WORDS, work.level_to)]
+
+
+## The family as a singular noun (Words.PIECE_NOUNS): "vineyard", "pasture", "castle".
+static func piece_name(family: int) -> String:
+	return Words.piece_noun(FamilyIds.NAMES[clampi(family, 0, FamilyIds.COUNT - 1)])
 
 
 ## The label with its place: "vineyard, first stage, near Savona (7, 12)".

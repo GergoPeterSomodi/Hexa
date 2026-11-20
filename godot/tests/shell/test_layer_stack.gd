@@ -270,6 +270,10 @@ func test_m2_layer_stack_z_and_name_order() -> void:
 	assert_eq((scene.view().get_node("Borders") as Node2D).z_index, 85, "Borders sit at z 85")
 	assert_eq(scene.capital_marks().z_index, 86, "CapitalMarks sits at z 86")
 	assert_eq(scene.view().layer("marks").z_index, 90, "marks sit at z 90")
+	assert_eq(scene.work_marks().z_index, 87, "WorkMarks sit at z 87")
+	assert_gt(scene.work_marks().z_index, scene.capital_marks().z_index, "work marks over the pennants")
+	assert_lt(scene.work_marks().z_index, scene.view().layer("marks").z_index, "work marks under the selection")
+	assert_eq(scene.season_fade().layer, 9, "the season fade is a CanvasLayer under the HUD's 10")
 	assert_lt(scene.far().z_index, scene.overlay().z_index, "FarMap sits below ModeOverlay so overlay draws over it")
 
 	var names_layer := scene.get_node("Names") as CanvasLayer

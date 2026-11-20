@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://shell/map/map_scene.gd" id="1_scene"]
 [ext_resource type="Script" path="res://shell/mapview/tile_map_view.gd" id="2_view"]
@@ -9,6 +9,8 @@
 [ext_resource type="Script" path="res://shell/input/camera_rig.gd" id="7_rig"]
 [ext_resource type="Script" path="res://shell/map/capital_marks.gd" id="8_capitals"]
 [ext_resource type="Script" path="res://shell/mapview/country_labels.gd" id="9_country_labels"]
+[ext_resource type="Script" path="res://shell/map/season_fade.gd" id="10_fade"]
+[ext_resource type="Script" path="res://shell/map/work_marks.gd" id="11_marks"]
 
 [node name="MapScene" type="Node2D"]
 script = ExtResource("1_scene")
@@ -29,6 +31,14 @@ script = ExtResource("5_overlay")
 [node name="Capitals" type="Node2D" parent="."]
 z_index = 86
 script = ExtResource("8_capitals")
+
+[node name="WorkMarks" type="Node2D" parent="."]
+z_index = 87
+script = ExtResource("11_marks")
+
+[node name="SeasonFade" type="CanvasLayer" parent="."]
+layer = 9
+script = ExtResource("10_fade")
 
 [node name="Input" type="Node" parent="."]
 script = ExtResource("4_input")
