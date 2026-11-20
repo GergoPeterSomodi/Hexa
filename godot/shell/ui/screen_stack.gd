@@ -281,10 +281,13 @@ func _grab_default_focus(screen: Screen) -> void:
 		target.grab_focus()
 
 
-func _restore_focus(ctrl: Control) -> void:
-	if ctrl == null or not is_instance_valid(ctrl):
+## `target` is a Variant on purpose: the control saved when a screen opened may have been freed since (a list row
+## rebuilt while a Confirm was up), and a typed Control parameter errors before the validity check can run.
+func _restore_focus(target: Variant) -> void:
+	if target == null or not is_instance_valid(target):
 		return
-	if not ctrl.is_inside_tree() or not ctrl.is_visible_in_tree():
+	var ctrl := target as Control
+	if ctrl == null or not ctrl.is_inside_tree() or not ctrl.is_visible_in_tree():
 		return
 	if ctrl.focus_mode == Control.FOCUS_NONE:
 		return

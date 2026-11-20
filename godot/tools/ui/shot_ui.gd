@@ -6,6 +6,10 @@
 ##
 ## Windowed (GPU or xvfb + Mesa in CI):
 ##   godot --path godot -s res://tools/ui/shot_ui.gd -- [--out=/tmp/hexa_ui_shots] [--dir=/tmp/hexa_ui_shots] [--scale=1,2]
+## M3 pictures (m3-build-spec.md section 9, names m3_*): the season report (an M3 season of Genoa, the quiet one, the
+## fixture's nine sections), the top bar with the date and End season, the log open, notifications, the task flag, Save and
+## Load with thumbnails (a temporary save folder with three saves), the pause and main menus with Save, Load and Continue,
+## and work marks with ribbons. They never touch the real saves or the running lock.
 ## Headless (dummy renderer): exercises all screens at 1x and 2x without writing empty PNGs and exits 0.
 extends SceneTree
 
@@ -37,6 +41,27 @@ const M2_SCENES: Array[String] = [
 	"m2_relief_fit",
 	"m2_relief_zoom1",
 	"m2_owner_fit_colour_blind",
+]
+const M3_SCENES: Array[String] = [
+	"m3_report_genoa",
+	"m3_report_quiet",
+	"m3_report_nine",
+	"m3_top_bar",
+	"m3_log_open",
+	"m3_notifications",
+	"m3_task_flag",
+	"m3_save_screen",
+	"m3_load_screen",
+	"m3_pause_menu",
+	"m3_main_menu",
+	"m3_work_marks",
+]
+const M3_SAVE_DIR := "user://shot_ui_saves"
+const M3_LOCK := "user://shot_ui_running.lock"
+const M3_SAVES: Array[Dictionary] = [
+	{"slot": "quick", "name": ""},
+	{"slot": "1", "name": "Before the vintage"},
+	{"slot": "2", "name": "Walls for Genoa"},
 ]
 
 var _out_dir := DEFAULT_OUT_DIR
@@ -114,6 +139,9 @@ func _capture_one(
 	scale_dir: String,
 	headless: bool
 ) -> bool:
+	var m3 := scene_name.begins_with("m3_")
+	if m3:
+		_m3_disk_begin()
 	var vp := SubViewport.new()
 	var phys_size := LOGICAL_SIZE * scale_mult
 	vp.size = phys_size
@@ -145,7 +173,7 @@ func _capture_one(
 
 	await _wait_frames(3)
 
-	var ok := _prepare_scene(app, scene_name)
+	var ok: bool = await _prepare_scene(app, scene_name)
 	await _wait_frames(3)
 
 	if ok and not headless:
@@ -167,6 +195,8 @@ func _capture_one(
 	root.remove_child(vp)
 	vp.queue_free()
 	await _wait_frames(2)
+	if m3:
+		_m3_disk_end()
 	return ok
 
 
@@ -177,6 +207,8 @@ func _prepare_scene(app: Node, scene_name: String) -> bool:
 		return false
 	if scene_name.begins_with("m2_"):
 		return _prepare_m2(app, stack, ctx, scene_name)
+	if scene_name.begins_with("m3_"):
+		return await _prepare_m3(app, stack, ctx, scene_name)
 	match scene_name:
 		"main_menu":
 			var top_m := stack.call("top") as Node
@@ -227,6 +259,7 @@ func _all_scenes() -> Array[String]:
 	var out: Array[String] = []
 	out.append_array(SCENES)
 	out.append_array(M2_SCENES)
+	out.append_array(M3_SCENES)
 	return out
 
 
@@ -236,7 +269,7 @@ func _cli_for(scene_name: String) -> PackedStringArray:
 		return PackedStringArray()
 	if scene_name == "m2_pick":
 		return PackedStringArray(["--new-game", "--seed=1480"])
-	if scene_name.begins_with("m2_"):
+	if scene_name.begins_with("m2_") or scene_name.begins_with("m3_"):
 		return PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"])
 	if scene_name in ["hud", "pause_menu", "options", "about", "help", "confirm"]:
 		return PackedStringArray(["--sandbox", "--seed=1480"])
@@ -246,6 +279,11 @@ func _cli_for(scene_name: String) -> PackedStringArray:
 ## Settings of a scene: the map mode and the palette of the M2 map pictures.
 func _settings_for(scene_name: String) -> Dictionary:
 	var out := {}
+	if scene_name.begins_with("m3_"):
+		out["game/season_report"] = "full"
+		out["game/autosave"] = "off"
+		out["graphics/season_change"] = "instant"
+		return out
 	if not scene_name.begins_with("m2_"):
 		return out
 	if scene_name.contains("terrain"):
@@ -302,6 +340,185 @@ func _prepare_m2(app: Node, stack: Control, ctx: ShellContext, scene_name: Strin
 	else:
 		ms.call("fit")
 	return true
+
+
+# ----- M3 pictures ----------------------------------------------------------------------------------------------------------
+
+
+var _m3_old_dir := ""
+var _m3_old_lock := ""
+
+
+## Points the saves and the running lock at temporary places; nothing of the player's is read or written.
+func _m3_disk_begin() -> void:
+	var session := root.get_node_or_null("Session")
+	if session == null:
+		return
+	_m3_old_dir = str(session.get("save_dir"))
+	_m3_old_lock = RunLock.path
+	session.set("save_dir", M3_SAVE_DIR)
+	RunLock.path = M3_LOCK
+	_m3_clean()
+
+
+func _m3_disk_end() -> void:
+	var session := root.get_node_or_null("Session")
+	_m3_clean()
+	if session != null:
+		session.set("save_dir", _m3_old_dir)
+	RunLock.path = _m3_old_lock
+
+
+func _m3_clean() -> void:
+	var dir := DirAccess.open(M3_SAVE_DIR)
+	if dir != null:
+		for file: String in dir.get_files():
+			DirAccess.remove_absolute(M3_SAVE_DIR.path_join(file))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(M3_SAVE_DIR))
+	RunLock.clear()
+
+
+## Starts one work on each of `count` hexes the player owns, nearest to `near` first; returns the hexes.
+func _m3_begin_works(g: Game, count: int, near: Vector2i) -> Array[Vector2i]:
+	var session := root.get_node("Session")
+	var found: Array[Dictionary] = []
+	for i: int in g.map.hex_count():
+		var hex := g.map.hex_of(i)
+		if g.map.land[i] == 0 or Territory.owner_tag(g, hex) != g.player or not Improve.piece_at(g, hex).is_empty():
+			continue
+		for option: Dictionary in Improve.build_options(g, hex):
+			if bool(option["ok"]) and bool((session.call("check", "build", {"hex": hex, "family": int(option["family_id"])}) as Dictionary)["ok"]):
+				found.append({"hex": hex, "family": int(option["family_id"]), "d": (hex - near).length_squared()})
+				break
+	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["d"]) < int(b["d"]))
+	var out: Array[Vector2i] = []
+	for entry: Dictionary in found:
+		if out.size() >= count:
+			break
+		var verdict := session.call("act", "build", {"hex": entry["hex"], "family": entry["family"]}) as Dictionary
+		if bool(verdict.get("ok", false)):
+			out.append(entry["hex"] as Vector2i)
+	return out
+
+
+func _m3_season(g: Game, near: Vector2i) -> void:
+	_m3_begin_works(g, 2, near)
+	root.get_node("Session").call("end_season")
+
+
+## Saves the three pictures' games: the real map as the thumbnail (null headless), a season between each.
+func _m3_make_saves(app: Node, g: Game, near: Vector2i) -> void:
+	var session := root.get_node("Session")
+	var layers: Array[CanvasLayer] = []
+	var hud_layer := app.call("hud") as CanvasLayer
+	if hud_layer != null:
+		layers.append(hud_layer)
+	var screens := app.get_node_or_null("Screens") as CanvasLayer
+	if screens != null:
+		layers.append(screens)
+	for entry: Dictionary in M3_SAVES:
+		_m3_season(g, near)
+		await _wait_frames(2)
+		var thumb: Image = await Thumbnail.take(app.get_viewport(), layers)
+		session.call("save_game", str(entry["slot"]), thumb, {}, str(entry["name"]))
+
+
+func _prepare_m3(app: Node, stack: Control, ctx: ShellContext, scene_name: String) -> bool:
+	var session := root.get_node_or_null("Session")
+	var g: Game = session.get("game") as Game if session != null else null
+	var ms := app.call("map_scene") as Node
+	var hud_node := app.call("hud") as Node
+	if g == null or ms == null or hud_node == null or not g.has_countries() or g.player == &"":
+		return false
+	var focus := CountryCard.of(g, g.player)["focus"] as Vector2i
+	var view_node := ms.call("view") as Node
+	var screen_ids := ResourceLoader.load(SCREEN_IDS_PATH) as GDScript
+	match scene_name:
+		"m3_report_genoa":
+			_m3_begin_works(g, 3, focus)
+			session.call("end_season")
+			_m3_begin_works(g, 2, focus)
+			session.call("end_season")
+			var summary := SeasonSummary.of(g, g.player, g.turn - 1)
+			return _m3_push_report(stack, screen_ids, summary)
+		"m3_report_quiet":
+			return _m3_push_report(stack, screen_ids, ReportSample.quiet_season())
+		"m3_report_nine":
+			return _m3_push_report(stack, screen_ids, ReportSample.genoa_spring())
+		"m3_top_bar":
+			_m3_season(g, focus)
+			await _wait_frames(2)
+			return hud_node.call("date_end") != null
+		"m3_log_open":
+			_m3_season(g, focus)
+			_m3_season(g, focus)
+			await _wait_frames(2)
+			var log_card := hud_node.call("action_log") as Node
+			log_card.call("open")
+			return bool(log_card.call("is_open"))
+		"m3_notifications":
+			var notes := hud_node.call("notifications") as Node
+			var lines: Array[Dictionary] = [
+				{"text": "Finished: a vineyard near Genoa.", "tone": "good", "hex": focus, "turn": g.turn, "notify": true},
+				{"text": "Cancelled: the walls, the land was lost.", "tone": "bad", "hex": focus, "turn": g.turn, "notify": true},
+				{"text": "Finished: a granary at the harbour.", "tone": "good", "hex": focus, "turn": g.turn, "notify": true},
+			]
+			for line: Dictionary in lines:
+				notes.call("add_line", line)
+			await _wait_frames(2)
+			return int(notes.call("card_count")) > 0
+		"m3_task_flag":
+			var flag := hud_node.call("task_flag") as Node
+			flag.call("refresh")
+			flag.call("open_list")
+			await _wait_frames(2)
+			return bool(flag.call("is_list_open"))
+		"m3_save_screen", "m3_load_screen":
+			await _m3_make_saves(app, g, focus)
+			var save_load := screen_ids.call("make", &"save_load") as Node
+			if save_load == null:
+				return false
+			save_load.set("start_tab", &"save" if scene_name == "m3_save_screen" else &"load")
+			stack.call("push", save_load)
+			await _wait_frames(6)  # the thumbnails load two a frame
+			return _top_is(stack, &"save_load")
+		"m3_pause_menu":
+			await _m3_make_saves(app, g, focus)
+			ctx.request(&"pause")
+			return _top_is(stack, &"pause_menu")
+		"m3_main_menu":
+			await _m3_make_saves(app, g, focus)
+			ctx.request(&"main_menu")
+			await _wait_frames(2)
+			return _top_is(stack, &"main_menu")
+		"m3_work_marks":
+			if view_node == null:
+				return false
+			ms.call("frame_at", view_node.call("centre_of", focus), 1.0)
+			await _wait_frames(3)  # the floaters learn the view
+			var hexes := _m3_begin_works(g, 4, focus)
+			await _wait_frames(2)
+			var floaters := ms.get_node_or_null("Names/Floaters")
+			if floaters != null:
+				floaters.call("advance", 0.35)  # ribbons mid-rise
+			return not hexes.is_empty()
+	return false
+
+
+func _top_is(stack: Control, screen_id: StringName) -> bool:
+	var top := stack.call("top") as Node
+	return top != null and top.get("screen_id") == screen_id
+
+
+func _m3_push_report(stack: Control, screen_ids: GDScript, summary: Dictionary) -> bool:
+	if screen_ids == null:
+		return false
+	var report := screen_ids.call("make", &"season_report") as Node
+	if report == null:
+		return false
+	report.call("show_summary", summary, false)
+	stack.call("push", report)
+	return stack.call("top") == report
 
 
 func _sample_land_hex(g: Game) -> Vector2i:

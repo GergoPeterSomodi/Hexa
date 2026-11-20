@@ -3,6 +3,10 @@
 ## M2 (m2-build-spec.md section 10): the worst frame with the minimap in a country game and with the country pick open,
 ## each inside the same 16 ms as the HUD frame.
 ##
+## M3 (m3-build-spec.md section 8): the season report's push, the Save and Load screen's push with 12 rows and the log
+## opening, each inside 16 ms; 16 live ribbons under 1 ms a frame; the season fade's capture frame under 50 ms (gpu class,
+## enforced with --gpu-limits). The M3 rows run in a country game on a temporary save folder and lock.
+##
 ## Windowed (GPU or xvfb + Mesa in CI):
 ##   godot --path godot -s res://tools/ui/perf_ui.gd -- [--gpu-limits] [--cpu-scale=2.0] [--out=perf_ui.json] [--summary=summary.md]
 ## Headless: exercises every M1.5 screen push and checks memory budgets; GPU frame times are reported only.
@@ -14,6 +18,10 @@ const SCREEN_IDS_PATH := "res://shell/screens/screen_ids.gd"
 const FRAME := Vector2i(1920, 1080)
 const MB := 1048576.0
 const HUD_FRAMES := 30
+const M3_SAVE_DIR := "user://perf_ui_saves"
+const M3_LOCK := "user://perf_ui_running.lock"
+const RIBBONS := 16
+const RIBBON_FRAMES := 30
 
 var _gpu_limits := false
 var _cpu_scale := 1.0
@@ -121,6 +129,8 @@ func _measure() -> int:
 	_r["pick_frame_worst_ms"] = await _measure_cli_frames(
 		packed, PackedStringArray(["--new-game", "--seed=1480"]), false)
 
+	await _measure_m3(packed, headless)
+
 	return _finish(budget, headless)
 
 
@@ -218,6 +228,179 @@ func _measure_cli_frames(packed: PackedScene, cli: PackedStringArray, select: bo
 	return worst
 
 
+## M3: one country game (Genoa) on a temporary save folder; fills `report_push_ms`, `save_load_push_ms`, `log_open_ms`,
+## `ribbons_16_frame_ms` and `season_fade_capture_ms` (0 headless: there is no picture to capture).
+func _measure_m3(packed: PackedScene, headless: bool) -> void:
+	var session := root.get_node("Session")
+	var old_dir := str(session.get("save_dir"))
+	var old_lock := RunLock.path
+	session.set("save_dir", M3_SAVE_DIR)
+	RunLock.path = M3_LOCK
+	_clean_m3_disk()
+
+	var vp := SubViewport.new()
+	vp.size = FRAME
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(vp)
+	var app := packed.instantiate()
+	app.set("settings_path", "")
+	app.set("allow_tree_quit", false)
+	app.set("pause_tree_when_modal", false)
+	app.set("skip_loading_frames", true)
+	app.set("cli_args_override", PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"]))
+	var s := Settings.new("macOS", true)
+	s.set_value("state/help_seen", true)
+	s.set_value("graphics/preload_next_season", false)
+	s.set_value("accessibility/reduce_motion", true)
+	s.set_value("game/autosave", "off")
+	app.call("set_settings_override", s)
+	vp.add_child(app)
+	await _wait_frames(5)
+
+	var stack := app.call("stack") as Control
+	var hud_node := app.call("hud") as Node
+	var ms := app.call("map_scene") as Node
+	var g: Game = session.get("game") as Game
+	var screen_ids := ResourceLoader.load(SCREEN_IDS_PATH) as GDScript
+	if g == null or ms == null or hud_node == null or stack == null or screen_ids == null or g.player == &"":
+		printerr("perf_ui: the M3 country game did not start")
+		_r["report_push_ms"] = INF
+		_r["save_load_push_ms"] = INF
+		_r["log_open_ms"] = INF
+		_r["ribbons_16_frame_ms"] = INF
+		_r["season_fade_capture_ms"] = INF
+	else:
+		var focus := CountryCard.of(g, g.player)["focus"] as Vector2i
+		_r["report_push_ms"] = await _push_ms(stack, screen_ids, &"season_report", {"summary": ReportSample.genoa_spring()})
+		_r["save_load_push_ms"] = await _measure_save_load(session, g, stack, screen_ids)
+		_r["log_open_ms"] = await _measure_log_open(session, g, hud_node, focus)
+		_r["ribbons_16_frame_ms"] = await _measure_ribbons(ms, g, focus)
+		_r["season_fade_capture_ms"] = 0.0 if headless else await _measure_fade(ms, g, s)
+
+	session.call("end_game")
+	root.remove_child(vp)
+	vp.queue_free()
+	await _wait_frames(3)
+	_clean_m3_disk()
+	session.set("save_dir", old_dir)
+	RunLock.path = old_lock
+
+
+func _clean_m3_disk() -> void:
+	var dir := DirAccess.open(M3_SAVE_DIR)
+	if dir != null:
+		for file: String in dir.get_files():
+			DirAccess.remove_absolute(M3_SAVE_DIR.path_join(file))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(M3_SAVE_DIR))
+	RunLock.clear()
+
+
+## Cold make + push + the first drawn frame of a screen, in ms; the stack is cleared before and after.
+func _push_ms(stack: Control, screen_ids: GDScript, sid: StringName, extra: Dictionary = {}) -> float:
+	stack.call("clear")
+	await _wait_frames(1)
+	var t0 := Time.get_ticks_usec()
+	var screen := screen_ids.call("make", sid) as Node
+	if screen != null:
+		if extra.has("summary"):
+			screen.call("show_summary", extra["summary"], false)
+		if extra.has("tab"):
+			screen.set("start_tab", extra["tab"])
+		stack.call("push", screen)
+	await process_frame
+	var ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	stack.call("clear")
+	await _wait_frames(1)
+	return ms
+
+
+## Save and Load with 12 rows (the quick slot, the eight numbered ones and the three autosaves, every one a real save).
+func _measure_save_load(session: Node, g: Game, stack: Control, screen_ids: GDScript) -> float:
+	var slots: Array[String] = []
+	slots.append_array(SaveFile.SLOTS)
+	slots.append_array(SaveFile.AUTO_SLOTS)
+	for slot: String in slots:
+		session.call("save_game", slot, null, {}, "")
+	var worst := 0.0
+	for tab: StringName in [&"save", &"load"]:
+		worst = maxf(worst, await _push_ms(stack, screen_ids, &"save_load", {"tab": tab}))
+	_r["save_load_rows"] = slots.size()
+	return worst
+
+
+## Two seasons of works make log lines; the card opens and draws once.
+func _measure_log_open(session: Node, g: Game, hud_node: Node, focus: Vector2i) -> float:
+	for _i: int in 2:
+		_begin_works(session, g, 2, focus)
+		session.call("end_season")
+	await _wait_frames(2)
+	var log_card := hud_node.call("action_log") as Node
+	var t0 := Time.get_ticks_usec()
+	log_card.call("open")
+	await process_frame
+	var ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	log_card.call("close")
+	await _wait_frames(1)
+	return ms
+
+
+## The mean CPU time of Floaters.advance with 16 live ribbons, over RIBBON_FRAMES frames.
+func _measure_ribbons(ms: Node, g: Game, focus: Vector2i) -> float:
+	var view_node := ms.call("view") as Node
+	ms.call("frame_at", view_node.call("centre_of", focus), 1.0)
+	await _wait_frames(3)
+	var floaters := ms.get_node_or_null("Names/Floaters")
+	if floaters == null:
+		return INF
+	var hexes: Array[Vector2i] = []
+	for dy: int in range(-4, 5):
+		for dx: int in range(-4, 5):
+			var hex := focus + Vector2i(dx, dy)
+			if g.map.has(hex) and g.map.land[g.map.index_of(hex)] == 1:
+				hexes.append(hex)
+	var total := 0.0
+	for _i: int in RIBBON_FRAMES:
+		var at := 0
+		while int(floaters.call("live_count")) < RIBBONS and at < hexes.size() * 3:
+			floaters.call("spawn", "Begun", &"plain", hexes[at % hexes.size()])
+			at += 1
+		var t0 := Time.get_ticks_usec()
+		floaters.call("advance", 0.016)
+		total += float(Time.get_ticks_usec() - t0) / 1000.0
+		await process_frame
+	_r["ribbons_live"] = int(floaters.call("live_count"))
+	return total / float(RIBBON_FRAMES)
+
+
+## The season fade's capture frame: show_season with the fade on, then the frame that grabs the picture.
+func _measure_fade(ms: Node, g: Game, s: Settings) -> float:
+	s.set_value("accessibility/reduce_motion", false)
+	var next := (Calendar.season_of(g.turn) + 1) % 4
+	var t0 := Time.get_ticks_usec()
+	ms.call("show_season", next, true)
+	await process_frame
+	var cost := float(Time.get_ticks_usec() - t0) / 1000.0
+	ms.call("finish_swap")
+	return cost
+
+
+## Starts one work on each of `count` hexes the player owns, nearest to `near` first.
+func _begin_works(session: Node, g: Game, count: int, near: Vector2i) -> void:
+	var found: Array[Dictionary] = []
+	for i: int in g.map.hex_count():
+		var hex := g.map.hex_of(i)
+		if g.map.land[i] == 0 or Territory.owner_tag(g, hex) != g.player or not Improve.piece_at(g, hex).is_empty():
+			continue
+		for option: Dictionary in Improve.build_options(g, hex):
+			var args := {"hex": hex, "family": int(option["family_id"])}
+			if bool(option["ok"]) and bool((session.call("check", "build", args) as Dictionary)["ok"]):
+				found.append({"args": args, "d": (hex - near).length_squared()})
+				break
+	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["d"]) < int(b["d"]))
+	for k: int in mini(count, found.size()):
+		session.call("act", "build", found[k]["args"])
+
+
 func _finish(budget: Dictionary, headless: bool) -> int:
 	var limits: Dictionary = budget.get("limits", {})
 	var failed: Array[String] = []
@@ -273,8 +456,12 @@ func _markdown(limit_rows: String, headless: bool) -> String:
 	s += "| Screen | CPU ms | First-frame ms |\n|---|---|---|\n"
 	for row: Dictionary in _r["screens"]:
 		s += "| %s | %.2f | %.2f |\n" % [row["screen"], float(row["cpu_ms"]), float(row["first_frame_ms"])]
-	s += "\nKit memory: 1x %.2f MB, 2x %.2f MB. HUD worst frame: %.2f ms.\n\n" % [
+	s += "\nKit memory: 1x %.2f MB, 2x %.2f MB. HUD worst frame: %.2f ms.\n" % [
 		float(_r["kit_1x_mb"]), float(_r["kit_2x_mb"]), float(_r["hud_frame_worst_ms"])
+	]
+	s += "M3: report push %.2f ms, Save and Load (%d rows) %.2f ms, log opening %.2f ms, 16 ribbons %.3f ms a frame, season fade capture %.2f ms.\n\n" % [
+		float(_r.get("report_push_ms", 0.0)), int(_r.get("save_load_rows", 0)), float(_r.get("save_load_push_ms", 0.0)),
+		float(_r.get("log_open_ms", 0.0)), float(_r.get("ribbons_16_frame_ms", 0.0)), float(_r.get("season_fade_capture_ms", 0.0)),
 	]
 	s += "| Limit | measured | limit | class | verdict |\n|---|---|---|---|---|\n" + limit_rows
 	return s

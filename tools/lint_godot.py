@@ -50,6 +50,7 @@ FUNC_LIMIT = 100
 SIZE_REASONS = {
     "core/mapgen/world_water.gd": "one routing model: corners, courses, the flood and the router share their state; "
                                   "split again when the Europe map arrives",
+    "tests/shell/test_ui_monkey.gd": "one monkey: every seed shares one step table, its invariants and counters",
 }
 
 CORE_FORBIDDEN = [

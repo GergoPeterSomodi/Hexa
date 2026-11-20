@@ -7,6 +7,16 @@ extends GutTest
 
 const APP_SCENE := preload("res://shell/app/app.tscn")
 const SEEDS: Array[int] = [1480, 1481, 1482]
+## M3 (m3-build-spec.md section 9): country games with the season, save, load, bookmark and log keys.
+const M3_SEEDS: Array[int] = [1483, 1484, 1485]
+## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
+const FORCE_SEASON_STEP := 30
+const FORCE_SAVE_STEP := 120
+const COUNTER_KEYS: Array[String] = [
+	"picks", "works_begun", "works_cancelled", "seasons", "saves", "loads", "new_games", "games",
+	"reports", "report_links", "log_opens", "log_lines", "save_screens", "slot_keys", "bookmarks_set", "bookmarks_go",
+	"undos", "spaces", "double_spaces", "refused_spaces", "console_opens", "m3_keys", "view_checks", "roundtrips",
+]
 const EVENTS_PER_SEED := 600
 
 ## Documented non-fatal quirks (empty when clean; matches ui-and-controls-spec.md section 9).
@@ -51,6 +61,11 @@ var _changed_hexes: Array[Vector2i] = []
 ## The player seen after the pick, and the game it belongs to.
 var _player_seen: StringName = &""
 var _player_game: Game = null
+## M3: the monkey's counters (every action it does and every effect it sees), the app under test and the clock reading
+## of the last season (-1 after a new or loaded game: the flow and its guard were reset).
+var _n: Dictionary = {}
+var _m3_app: App = null
+var _last_season_msec: int = -1
 
 
 func before_each() -> void:
@@ -65,13 +80,23 @@ func before_each() -> void:
 	_old_lock_path = RunLock.path
 	Session.save_dir = "user://test_monkey_saves"
 	RunLock.path = "user://test_monkey_running.lock"
+	_clean_disk()
+
+
+## Removes every file of the temporary save folder and the temporary lock (never the real ones).
+func _clean_disk() -> void:
+	for slot: String in SaveFile.SLOTS + SaveFile.AUTO_SLOTS:
+		SaveFile.remove(slot, Session.save_dir)
+	var dir := DirAccess.open(Session.save_dir)
+	if dir != null:
+		for file: String in dir.get_files():
+			DirAccess.remove_absolute(Session.save_dir.path_join(file))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Session.save_dir))
+	RunLock.clear()
 
 
 func after_each() -> void:
-	for slot: String in SaveFile.SLOTS + SaveFile.AUTO_SLOTS:
-		SaveFile.remove(slot, Session.save_dir)
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(Session.save_dir))
-	RunLock.clear()
+	_clean_disk()
 	Session.save_dir = _old_save_dir
 	RunLock.path = _old_lock_path
 	Session.game = _prev_game
@@ -108,11 +133,24 @@ func test_ui_monkey_m2_seed_1482() -> void:
 	await _run_monkey_seed(SEEDS[2], true)
 
 
+## M3: the same monkey on a country game with the report, the log, Save and Load, bookmarks and the quick keys.
+func test_ui_monkey_m3_seed_1483() -> void:
+	await _run_monkey_seed(M3_SEEDS[0], true, true)
+
+
+func test_ui_monkey_m3_seed_1484() -> void:
+	await _run_monkey_seed(M3_SEEDS[1], true, true)
+
+
+func test_ui_monkey_m3_seed_1485() -> void:
+	await _run_monkey_seed(M3_SEEDS[2], true, true)
+
+
 func _on_hex_changed(hex: Vector2i) -> void:
 	_changed_hexes.append(hex)
 
 
-func _run_monkey_seed(seed_value: int, new_game: bool = false) -> void:
+func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false) -> void:
 	await _wait_frames(2)
 	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	_player_seen = &""
@@ -137,6 +175,9 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false) -> void:
 	var s := Settings.new("macOS", true)
 	s.set_value("state/help_seen", true)
 	s.set_value("graphics/preload_next_season", false)
+	if m3:
+		s.set_value("game/season_report", "full")
+		s.set_value("graphics/season_change", "instant")
 	app.set_settings_override(s)
 	vp.add_child(app)
 	await _wait_frames(2)
@@ -145,23 +186,34 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false) -> void:
 	while app.is_starting() and waited < 240:
 		await _wait_frames(1)
 		waited += 1
+	if m3:
+		_m3_begin(app)
 
 	var rng := Rng.new()
 	rng.seed_with(seed_value)
 	var land_hexes := _collect_land_hexes()
 
 	for step: int in range(EVENTS_PER_SEED):
+		if m3:
+			await _m3_before_step(rng, app, step)
 		var prev_game := Session.game
 		var prev_digest := prev_game.digest() if (prev_game != null and prev_game.map != null and prev_game.state != null) else ""
 		var prev_unsaved := Session.unsaved_actions
 		var prev_player := Session.player_tag()
 		_changed_hexes.clear()
 
-		_perform_monkey_step(rng, vp, app, land_hexes, step)
+		if m3 and rng.randi_range(0, 99) < 45:
+			await _m3_step(rng, vp, app)
+		else:
+			_perform_monkey_step(rng, vp, app, land_hexes, step)
 		await _wait_frames(1)
 
 		_assert_invariants(vp, app, prev_game, prev_digest, prev_unsaved, prev_player, seed_value, step)
+		if m3:
+			_m3_assert_invariants(app, "seed %d step %d" % [seed_value, step])
 
+	if m3:
+		_m3_end(seed_value)
 	Events.hex_changed.disconnect(_on_hex_changed)
 	Session.end_game()
 	remove_child(vp)
@@ -515,3 +567,368 @@ func _collect_land_hexes() -> Array[Vector2i]:
 func _wait_frames(frames: int = 1) -> void:
 	for _i: int in range(frames):
 		await get_tree().process_frame
+
+
+func _send_chord(vp: SubViewport, key: Key, ctrl: bool = false, shift: bool = false) -> void:
+	for pressed: bool in [true, false]:
+		var ev := InputEventKey.new()
+		ev.keycode = key
+		ev.physical_keycode = key
+		ev.ctrl_pressed = ctrl
+		ev.shift_pressed = shift
+		ev.pressed = pressed
+		vp.push_input(ev)
+
+
+# ----- M3: the season, report, log, Save and Load, bookmarks and quick keys -------------------------------------------------
+# Invariants (m3-build-spec.md section 9): at most one season per guard window; the world is paused exactly while the
+# report is up; the digest is unchanged by opening the report, the log or Save and Load; save then load keeps the digest;
+# every action is counted and a seed that does no picks, seasons or saves fails.
+
+
+func _m3_begin(app: App) -> void:
+	_m3_app = app
+	_n.clear()
+	for key: String in COUNTER_KEYS:
+		_n[key] = 0
+	_last_season_msec = -1
+	Events.season_ended.connect(_on_season_counted)
+	Events.work_started.connect(_on_work_started_counted)
+	Events.work_cancelled.connect(_on_work_cancelled_counted)
+	Events.country_chosen.connect(_on_country_counted)
+	Events.game_started.connect(_on_game_counted)
+	app.context().saved.connect(_on_saved_counted)
+
+
+func _m3_end(seed_value: int) -> void:
+	Events.season_ended.disconnect(_on_season_counted)
+	Events.work_started.disconnect(_on_work_started_counted)
+	Events.work_cancelled.disconnect(_on_work_cancelled_counted)
+	Events.country_chosen.disconnect(_on_country_counted)
+	Events.game_started.disconnect(_on_game_counted)
+	if _m3_app != null and is_instance_valid(_m3_app) and _m3_app.context().saved.is_connected(_on_saved_counted):
+		_m3_app.context().saved.disconnect(_on_saved_counted)
+	_n["loads"] = maxi(int(_n["games"]) - 1 - int(_n["new_games"]), 0)
+	_m3_app = null
+	gut.p("monkey m3 seed %d counters: %s" % [seed_value, JSON.stringify(_n)])
+	assert_gt(int(_n["picks"]), 0, "seed %d: the monkey picked a country" % seed_value)
+	assert_gt(int(_n["seasons"]), 0, "seed %d: the monkey played a season" % seed_value)
+	assert_gt(int(_n["saves"]), 0, "seed %d: the monkey saved" % seed_value)
+	assert_gt(int(_n["roundtrips"]), 0, "seed %d: a save then load kept the digest at least once" % seed_value)
+
+
+func _on_season_counted(_turn: int) -> void:
+	_n["seasons"] = int(_n["seasons"]) + 1
+	var now := Time.get_ticks_msec()
+	if _last_season_msec >= 0:
+		assert_gte(now - _last_season_msec, SeasonFlow.GUARD_MS,
+			"at most one season per %d ms guard window" % SeasonFlow.GUARD_MS)
+	_last_season_msec = now
+	if _m3_app != null and is_instance_valid(_m3_app):
+		assert_false(_m3_app.stack().has_screen(&"season_report"), "no season runs while the report is up")
+
+
+func _on_work_started_counted(_tag: StringName, _hex: Vector2i, _work: Dictionary) -> void:
+	_n["works_begun"] = int(_n["works_begun"]) + 1
+
+
+func _on_work_cancelled_counted(_tag: StringName, _hex: Vector2i, _work: Dictionary, _why: StringName) -> void:
+	_n["works_cancelled"] = int(_n["works_cancelled"]) + 1
+
+
+func _on_country_counted(_tag: StringName) -> void:
+	_n["picks"] = int(_n["picks"]) + 1
+
+
+func _on_game_counted() -> void:
+	_n["games"] = int(_n["games"]) + 1
+	_last_season_msec = -1  # a new or loaded game resets the flow and its guard
+
+
+func _on_saved_counted(_slot: String, problem: String) -> void:
+	if problem.is_empty():
+		_n["saves"] = int(_n["saves"]) + 1
+
+
+func _bump(key: String) -> void:
+	_n[key] = int(_n[key]) + 1
+
+
+func _m3_calm(app: App) -> bool:
+	return Session.game != null and Session.player_tag() != &"" and app.stack().count() == 0 \
+		and not app.is_starting() and app.requests().flow.state() == SeasonFlow.State.IDLE
+
+
+## Before every step: waits out a load, starts a game when none is left, chooses a country at the pick, and forces the
+## actions a seed must do (a season, a save then load) when its counters are still 0 late enough.
+func _m3_before_step(rng: Rng, app: App, step: int) -> void:
+	var vp := app.get_viewport() as SubViewport
+	await _m3_wait_until(func() -> bool: return not app.is_starting(), 900)
+	if Session.game == null:
+		var top := app.stack().top()
+		if top != null and top.screen_id == &"main_menu" and (top as MainMenu).continue_button().visible and rng.randi_range(0, 1) == 0:
+			(top as MainMenu).continue_button().pressed.emit()
+		else:
+			_bump("new_games")
+			app.context().request(&"new_game", {"scenario": "north_italy_1480", "seed": 1480 + step})
+		await _wait_frames(3)
+		await _m3_wait_until(func() -> bool: return not app.is_starting(), 900)
+	var pick := app.stack().top() as CountryPick
+	if pick != null and Session.player_tag() == &"":
+		var tags := pick.row_tags()
+		if not tags.is_empty() and (step >= 2 or rng.randi_range(0, 3) == 0):
+			pick.play(tags[rng.randi_range(0, tags.size() - 1)])
+			await _wait_frames(2)
+		return
+	if vp == null:
+		return
+	if step >= FORCE_SEASON_STEP and int(_n["seasons"]) == 0:
+		await _m3_clear_screens(app)
+		await _m3_season_and_close(vp, app)
+	if step >= FORCE_SAVE_STEP and int(_n["roundtrips"]) == 0:
+		await _m3_clear_screens(app)
+		await _m3_save_then_load(vp, app)
+
+
+func _m3_clear_screens(app: App) -> void:
+	var guard := 0
+	while app.stack().count() > 0 and guard < 8:
+		if not app.stack().back():
+			app.stack().pop()
+		guard += 1
+		await _wait_frames(1)
+
+
+func _m3_wait_until(done: Callable, limit: int) -> bool:
+	var frames := 0
+	while not bool(done.call()) and frames < limit:
+		await _wait_frames(1)
+		frames += 1
+	return bool(done.call())
+
+
+func _m3_wait_guard(app: App) -> void:
+	await _m3_wait_until(func() -> bool: return Time.get_ticks_msec() >= app.requests().flow.guard_until, 600)
+
+
+func _m3_report_up(app: App) -> bool:
+	return app.stack().top() is SeasonReport
+
+
+## One season by the keys: Space, the report, Space closes it.
+func _m3_season_and_close(vp: SubViewport, app: App) -> void:
+	if not _m3_calm(app):
+		return
+	await _m3_wait_guard(app)
+	_bump("spaces")
+	_send_chord(vp, KEY_SPACE)
+	await _m3_wait_until(func() -> bool: return _m3_report_up(app) or app.requests().flow.state() == SeasonFlow.State.IDLE, 240)
+	if _m3_report_up(app):
+		_bump("reports")
+		_send_chord(vp, KEY_SPACE)
+		await _m3_wait_until(func() -> bool: return app.stack().count() == 0, 60)
+
+
+## Double Space: the season and the report, the second Space closes the report, a third inside the guard plays nothing.
+func _m3_double_space(vp: SubViewport, app: App) -> void:
+	if not _m3_calm(app):
+		return
+	await _m3_season_and_close(vp, app)
+	if app.stack().count() != 0 or app.requests().flow.state() != SeasonFlow.State.IDLE or Session.game == null:
+		return
+	var before := int(_n["seasons"])
+	_send_chord(vp, KEY_SPACE)
+	var inside := Time.get_ticks_msec() < app.requests().flow.guard_until
+	await _wait_frames(2)
+	_bump("double_spaces")
+	if inside:
+		_bump("refused_spaces")
+		assert_eq(int(_n["seasons"]), before, "a Space inside the guard plays nothing")
+
+
+## F5, then F9: the saved digest comes back.
+func _m3_save_then_load(vp: SubViewport, app: App) -> void:
+	if not _m3_calm(app):
+		return
+	var saves_before := int(_n["saves"])
+	var games_before := int(_n["games"])
+	_send_chord(vp, KEY_F5)
+	await _m3_wait_until(func() -> bool: return int(_n["saves"]) > saves_before, 300)
+	if int(_n["saves"]) == saves_before or Session.game == null:
+		return
+	await _wait_frames(2)
+	if Session.unsaved_actions != 0:
+		return
+	var digest := Session.game.digest()
+	_send_chord(vp, KEY_F9)
+	await _m3_wait_until(func() -> bool: return int(_n["games"]) > games_before and not app.is_starting(), 900)
+	if int(_n["games"]) == games_before:
+		return
+	await _wait_frames(2)
+	assert_not_null(Session.game, "the quickload gives a game")
+	if Session.game != null:
+		assert_eq(Session.game.digest(), digest, "save then load keeps the digest")
+		_bump("roundtrips")
+
+
+## Opens the report (J), the log or Save and Load; the digest must not move; then closes it again.
+func _m3_open_view(rng: Rng, vp: SubViewport, app: App) -> void:
+	if not _m3_calm(app):
+		return
+	var digest := Session.game.digest()
+	var version := Session.game.version
+	var which := rng.randi_range(0, 3)
+	match which:
+		0:
+			_send_chord(vp, KEY_J)
+			_bump("reports")
+		1:
+			app.hud().action_log().toggle()
+			_bump("log_opens")
+		_:
+			var screen := SaveLoad.make(SaveLoad.TAB_SAVE if which == 2 else SaveLoad.TAB_LOAD)
+			if screen != null:
+				app.stack().push(screen)
+				_bump("save_screens")
+	await _wait_frames(2)
+	assert_eq(Session.game.digest(), digest, "opening the report, the log or Save and Load leaves the digest")
+	assert_eq(Session.game.version, version, "opening a view is not an action")
+	_bump("view_checks")
+	if which >= 2 and app.stack().top() is SaveLoad:
+		await _m3_slot_keys(rng, vp, app)
+	if which == 1 and app.hud().action_log().is_open() and rng.randi_range(0, 1) == 0:
+		await _m3_click_log_line(rng, vp, app)
+	if app.hud().action_log().is_open():
+		app.hud().action_log().close()
+	await _m3_clear_screens(app)
+
+
+## In Save and Load: Down, Del (asks to delete a save), Enter (saves, loads or asks); Esc backs out of a question.
+func _m3_slot_keys(rng: Rng, vp: SubViewport, app: App) -> void:
+	var keys: Array[Key] = [KEY_DOWN, KEY_DELETE, KEY_ENTER, KEY_UP]
+	for _i: int in range(rng.randi_range(1, 3)):
+		if not (app.stack().top() is SaveLoad):
+			break
+		_send_chord(vp, keys[rng.randi_range(0, keys.size() - 1)])
+		_bump("slot_keys")
+		await _wait_frames(2)
+		if app.stack().top() is Confirm and rng.randi_range(0, 2) != 0:
+			_send_chord(vp, KEY_ESCAPE)
+			await _wait_frames(1)
+
+
+## Clicks a line of the open log (it asks the App to look at the hex).
+func _m3_click_log_line(rng: Rng, vp: SubViewport, app: App) -> void:
+	var lines: Array[Label] = []
+	_collect_log_lines(app.hud().action_log(), lines)
+	if lines.is_empty():
+		return
+	var label := lines[rng.randi_range(0, lines.size() - 1)]
+	var rect := label.get_global_rect()
+	if rect.has_area() and Rect2(Vector2.ZERO, Vector2(vp.size)).has_point(rect.get_center()):
+		_send_click(vp, rect.get_center(), MOUSE_BUTTON_LEFT)
+		_bump("log_lines")
+		await _wait_frames(2)
+
+
+func _collect_log_lines(node: Node, out: Array[Label]) -> void:
+	for child: Node in node.get_children():
+		var label := child as Label
+		if label != null and label.is_visible_in_tree() and label.tooltip_text == ActionLog.ACTIVATE_TIP:
+			out.append(label)
+		_collect_log_lines(child, out)
+
+
+## Clicks a link or action of the report: it closes and the map looks at the hex.
+func _m3_click_report_link(rng: Rng, vp: SubViewport, app: App) -> void:
+	var report := app.stack().top() as SeasonReport
+	if report == null:
+		if not _m3_calm(app):
+			return
+		_send_chord(vp, KEY_J)
+		_bump("reports")
+		await _wait_frames(2)
+		report = app.stack().top() as SeasonReport
+		if report == null:
+			return
+	var links := report.link_buttons()
+	if not links.is_empty():
+		var btn := links[rng.randi_range(0, links.size() - 1)]
+		var rect := btn.get_global_rect()
+		if btn.is_visible_in_tree() and not btn.disabled and rect.has_area() and Rect2(Vector2.ZERO, Vector2(vp.size)).has_point(rect.get_center()):
+			_send_click(vp, rect.get_center(), MOUSE_BUTTON_LEFT)
+		else:
+			btn.pressed.emit()
+		_bump("report_links")
+		await _wait_frames(2)
+	if app.stack().top() is SeasonReport:
+		_send_chord(vp, KEY_ESCAPE)
+		await _wait_frames(2)
+
+
+## A work the player can begin now; {} when none.
+func _m3_buildable() -> Dictionary:
+	var game := Session.game
+	if game == null or Session.player_tag() == &"":
+		return {}
+	for i: int in range(0, game.map.hex_count(), 3):
+		var hex := game.map.hex_of(i)
+		if game.map.land[i] == 0 or Territory.owner_tag(game, hex) != game.player or not Improve.piece_at(game, hex).is_empty():
+			continue
+		for option: Dictionary in Improve.build_options(game, hex):
+			if bool(option["ok"]) and bool(Session.check("build", {"hex": hex, "family": int(option["family_id"])})["ok"]):
+				return {"hex": hex, "family": int(option["family_id"])}
+	return {}
+
+
+func _m3_step(rng: Rng, vp: SubViewport, app: App) -> void:
+	var calm := _m3_calm(app)
+	match rng.randi_range(0, 13):
+		0, 1:
+			await _m3_season_and_close(vp, app)
+		2:
+			await _m3_double_space(vp, app)
+		3:
+			_bump("m3_keys")
+			_send_chord(vp, KEY_J)
+		4:
+			_bump("m3_keys")
+			_send_chord(vp, KEY_F5)
+		5:
+			await _m3_save_then_load(vp, app)
+		6:
+			_bump("m3_keys")
+			_send_chord(vp, KEY_F9)
+		7:
+			var index := rng.randi_range(1, 9)
+			var set_it := rng.randi_range(0, 1) == 0
+			_bump("bookmarks_set" if set_it else "bookmarks_go")
+			_send_chord(vp, (KEY_1 + index - 1) as Key, true, set_it)
+		8:
+			if calm and not Session.game.state.works.is_empty():
+				_bump("undos")
+			_send_chord(vp, KEY_Z, true)
+		9:
+			_bump("console_opens")
+			_send_chord(vp, KEY_F2)
+			await _wait_frames(1)
+			_send_chord(vp, KEY_ESCAPE)
+		10, 11:
+			await _m3_open_view(rng, vp, app)
+		12:
+			await _m3_click_report_link(rng, vp, app)
+		_:
+			if calm:
+				var found := _m3_buildable()
+				if not found.is_empty():
+					Session.act("build", {"hex": found["hex"], "family": found["family"]})
+
+
+## After every step: the report is up exactly while the flow is in its REPORT state, and the world pauses with it.
+func _m3_assert_invariants(app: App, tag: String) -> void:
+	var report_up := app.stack().has_screen(&"season_report")
+	var reporting := app.requests().flow.state() == SeasonFlow.State.REPORT
+	if Session.game != null:
+		assert_eq(reporting, report_up, "%s: the flow is in REPORT exactly while the report is up" % tag)
+	if report_up:
+		assert_true(app.wants_pause(), "%s: the world is paused while the report is up" % tag)
