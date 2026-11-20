@@ -1,5 +1,5 @@
 ## Studiolo walnut top bar (PanelBar): brand, the player's country (arms and long name, or the pick's title in a
-## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief), the date and End season (DateEnd),
+## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief), the date and End turn (DateEnd, right of the middle),
 ## Layers, Help and Pause menu (docs/architecture/m2-build-spec.md section 7.3; ui-and-controls-spec.md section 7).
 ## It reads Session and Events and sends intents only. The name hides before the mode switch when the window narrows.
 class_name TopBar
@@ -23,6 +23,7 @@ const PICK_TAIL := ": choose your country"
 @onready var _country_btn: KitButton = $HBox/CountryBox/CountryButton
 @onready var _mode_seg: Segmented = $HBox/ModeSeg
 @onready var _date_end: DateEnd = $HBox/DateEnd
+@onready var _gap: Control = $HBox/Gap
 @onready var _layers_btn: KitButton = $HBox/LayersButton
 @onready var _help_btn: KitButton = $HBox/HelpButton
 @onready var _menu_btn: KitButton = $HBox/MenuButton
@@ -40,6 +41,7 @@ func _ready() -> void:
 	_brand_label.text = "HEXA"
 
 	_mode_seg.hud_mode = true
+	_mode_seg.add_theme_stylebox_override("panel", StyleBoxEmpty.new())  # no dark box round the three mode buttons
 	_mode_seg.changed.connect(_on_mode_changed)
 
 	_country_btn.focus_mode = Control.FOCUS_NONE
@@ -122,8 +124,11 @@ func fit_width(width: float) -> void:
 	_map_info_label.visible = _info_wanted
 	_brand_label.visible = true
 	_sep.visible = true
+	_gap.visible = true
 	if width <= 0.0:
 		return
+	if get_combined_minimum_size().x > width:
+		_gap.visible = false  # the space between End turn and Layers goes first
 	if get_combined_minimum_size().x > width:
 		_country_btn.visible = false
 		_map_info_label.visible = false

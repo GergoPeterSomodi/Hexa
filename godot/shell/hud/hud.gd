@@ -509,7 +509,6 @@ func _emit_cover() -> void:
 
 func _apply_settings(settings: Settings) -> void:
 	_reduce_motion = bool(settings.get_value("accessibility/reduce_motion"))
-	_top_bar.date_end().date_button().reduce_motion = _reduce_motion
 	if not bool(settings.get_value("dev/developer_tools")):
 		_debug_overlay.set_open(false)
 

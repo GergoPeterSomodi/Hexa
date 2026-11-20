@@ -44,19 +44,19 @@ func test_the_year_and_quarter_follow_the_turn() -> void:
 	Session.game.turn = 1
 	_widget.refresh()
 	var medal := _widget.date_button()
-	assert_eq(medal.text, "1480", "the first turn is the start year")
-	assert_eq(medal.dial, Calendar.SPRING, "the first turn is Spring")
+	assert_eq(medal.text, "Spring 1480", "the first turn is Spring of the start year")
+	assert_eq(_widget.season(), Calendar.SPRING, "the first turn is Spring")
 	assert_eq(medal.tooltip_text, "Spring 1480. J: the last report", "tooltip names the season and the report key")
 
 	Session.game.turn = 6
 	_widget.refresh()
-	assert_eq(medal.text, "1481", "turn 6 is in 1481")
-	assert_eq(medal.dial, Calendar.SUMMER, "turn 6 is Summer")
+	assert_eq(medal.text, "Summer 1481", "turn 6 is Summer 1481")
+	assert_eq(_widget.season(), Calendar.SUMMER, "turn 6 is Summer")
 	assert_true(medal.tooltip_text.begins_with("Summer 1481"), "tooltip follows the turn")
 
 	Session.game.turn = 8
 	_widget.set_date(Calendar.year_of(8, Session.game.start_year), Calendar.season_of(8))
-	assert_eq(_widget.date_button().dial, Calendar.WINTER, "turn 8 is Winter")
+	assert_eq(_widget.season(), Calendar.WINTER, "turn 8 is Winter")
 
 
 func test_the_pick_refuses_the_end_with_its_reason() -> void:
@@ -84,7 +84,7 @@ func test_no_game_shows_no_date_and_refuses_the_end() -> void:
 	Session.game = null
 	_widget.refresh()
 	assert_eq(_widget.date_button().text, "", "no year")
-	assert_eq(_widget.date_button().dial, -1, "no quarter")
+	assert_eq(_widget.season(), -1, "no quarter")
 	assert_eq(_widget.date_button().tooltip_text, "No game", "tooltip")
 	assert_true(_widget.end_button().disabled, "no game, no end")
 
@@ -107,30 +107,21 @@ func test_a_click_on_the_end_season_asks_to_end() -> void:
 
 func test_the_end_button_has_the_plate_and_the_space_key_cap() -> void:
 	var end := _widget.end_button()
-	assert_eq(end.theme_type_variation, &"ButtonEndSeason", "the End season plate variation")
+	assert_eq(end.theme_type_variation, &"ButtonEndSeason", "the End turn plate variation")
 	assert_eq(end.hotkey_action, &"game_end_season", "the end key")
 	assert_true(end.show_key_cap, "a key cap shows")
 	assert_eq(end.embedded_key_cap().action, &"game_end_season", "the cap reads the binding")
 
 
-func test_busy_turns_the_ring() -> void:
-	var medal := _widget.date_button()
+func test_busy_adds_an_ellipsis_to_the_date() -> void:
+	var date := _widget.date_button()
+	var plain := date.text
 	_widget.set_busy(true)
 	assert_true(_widget.is_busy(), "busy")
-	assert_true(medal.is_spinning(), "the ring turns")
+	assert_eq(date.text, plain + DateEnd.BUSY_TAIL, "the date shows an ellipsis")
 	_widget.set_busy(false)
 	assert_false(_widget.is_busy(), "idle")
-	assert_false(medal.is_spinning(), "the ring stops")
-
-
-func test_busy_under_reduce_motion_shows_the_hourglass() -> void:
-	var medal := _widget.date_button()
-	medal.reduce_motion = true
-	_widget.set_busy(true)
-	assert_false(medal.is_spinning(), "reduce motion: the ring stays still")
-	assert_true(medal.busy_icon_node().visible, "reduce motion: the hourglass shows")
-	_widget.set_busy(false)
-	assert_false(medal.busy_icon_node().visible, "idle: no hourglass")
+	assert_eq(date.text, plain, "the ellipsis goes")
 
 
 func test_a_reparented_widget_still_follows_the_bus() -> void:
@@ -139,8 +130,8 @@ func test_a_reparented_widget_still_follows_the_bus() -> void:
 	_root.add_child(_widget)
 	Session.game.turn = 6
 	Events.game_started.emit()
-	assert_eq(_widget.date_button().text, "1481", "game_started after a reparent updates the year")
-	assert_eq(_widget.date_button().dial, Calendar.SUMMER, "and the quarter")
+	assert_eq(_widget.date_button().text, "Summer 1481", "game_started after a reparent updates the date")
+	assert_eq(_widget.season(), Calendar.SUMMER, "and the quarter")
 
 	_choose_player()
 	Events.country_chosen.emit(&"GEN")
@@ -149,7 +140,7 @@ func test_a_reparented_widget_still_follows_the_bus() -> void:
 
 	Session.game.turn = 8
 	Events.season_ended.emit(7)
-	assert_eq(_widget.date_button().dial, Calendar.WINTER, "season_ended after a reparent updates the quarter")
+	assert_eq(_widget.season(), Calendar.WINTER, "season_ended after a reparent updates the quarter")
 
 
 func test_game_ended_shows_no_game_and_refuses_the_end() -> void:
@@ -158,7 +149,7 @@ func test_game_ended_shows_no_game_and_refuses_the_end() -> void:
 	assert_false(_widget.end_button().disabled, "precondition: End season is on")
 	Events.game_ended.emit()
 	assert_eq(_widget.date_button().text, "", "game_ended clears the year")
-	assert_eq(_widget.date_button().dial, -1, "and the quarter")
+	assert_eq(_widget.season(), -1, "and the quarter")
 	assert_true(_widget.end_button().disabled, "game_ended turns End season off")
 	assert_eq(_widget.end_button().tooltip_text, "no game", "with the no-game reason")
 	assert_false(_widget.verdict_label().visible, "no reason line for a game that has ended")

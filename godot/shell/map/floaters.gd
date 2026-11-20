@@ -38,6 +38,8 @@ const MAX_PER_HEX := 3
 const MAX_TOTAL := 16
 ## A land line (Gained, Lost) shows a ribbon on up to this many of its hexes.
 const LAND_HEXES := 3
+## A word that is only written in the log, never floated on the map (the owner does not want a flag for it).
+const QUIET_WORD := "Begun"
 
 var _game: Game = null
 var _xform := Transform2D.IDENTITY
@@ -182,7 +184,7 @@ func _on_chronicled(entry: Dictionary) -> void:
 		return
 	var line := LogLines.line_of(_game, entry, _game.player)
 	var word := str(line.get("floating", ""))
-	if word.is_empty():
+	if word.is_empty() or word == QUIET_WORD:
 		return
 	var tone := StringName(str(line.get("tone", "plain")))
 	for hex: Vector2i in _hexes_for(entry, line, word):

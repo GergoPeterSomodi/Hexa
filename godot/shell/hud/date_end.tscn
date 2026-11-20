@@ -1,29 +1,28 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/date_end.gd" id="1_dateend"]
-[ext_resource type="Script" path="res://shell/ui/medallion.gd" id="2_medal"]
 [ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_kitbtn"]
 
 [node name="DateEnd" type="HBoxContainer"]
+alignment = 2
 focus_mode = 0
 mouse_filter = 0
 script = ExtResource("1_dateend")
 
 [node name="Date" type="Button" parent="."]
-custom_minimum_size = Vector2(64, 64)
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 focus_mode = 0
 mouse_filter = 0
+flat = true
 tooltip_text = "No game"
-script = ExtResource("2_medal")
-kind = 10
 
 [node name="End" type="Button" parent="."]
 custom_minimum_size = Vector2(160, 44)
 layout_mode = 2
 focus_mode = 0
 mouse_filter = 0
-text = "End season"
+text = "End turn"
 script = ExtResource("3_kitbtn")
 kind = 2
 show_key_cap = true

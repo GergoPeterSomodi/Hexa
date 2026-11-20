@@ -192,14 +192,12 @@ func test_reduce_motion_fades_in_place() -> void:
 	assert_true(node.modulate.a < 0.5, "fading")
 
 
-func test_a_finished_work_of_the_player_starts_a_ribbon_from_the_chronicle() -> void:
+func test_a_begun_work_is_only_written_in_the_log_not_floated() -> void:
 	var found := _buildable()
 	var hex := found["hex"] as Vector2i
 	_floaters.setup(Session.game)
 	assert_true(bool(Session.act("build", {"hex": hex, "family": int(found["family"])})["ok"]))
-	assert_eq(_floaters.count_at(hex), 1, "the Begun line starts a ribbon")
-	var node := _floaters._ribbons[0]["node"] as PanelContainer
-	assert_eq((node.get_node("HBox/Word") as Label).text, "Begun")
+	assert_eq(_floaters.count_at(hex), 0, "the Begun line starts no ribbon (it is a log line only)")
 
 
 func test_no_game_no_ribbons_from_the_chronicle() -> void:

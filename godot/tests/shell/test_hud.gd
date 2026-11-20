@@ -457,7 +457,7 @@ func test_the_top_bar_fits_700_px_in_a_sandbox_the_pick_and_a_game() -> void:
 	bar.fit_width(700.0)
 	assert_lte(bar.get_combined_minimum_size().x, 700.0, "the pick bar (with its refusal line) fits 700 px")
 	assert_false(bar.name_shown(), "the name hides first")
-	assert_true(bar.date_end().end_button().visible, "End season never hides")
+	assert_true(bar.date_end().end_button().visible, "End turn never hides")
 	assert_true(bar.date_end().date_button().visible)
 	Session.act("choose_country", {"tag": &"GEN"})
 	await _harness.wait_frames(self, 2)

@@ -1,5 +1,5 @@
-## Studiolo top bar date and End season (docs/architecture/m3-build-spec.md section 6.2): a brass medallion with the
-## year and the season dial (a click asks for the season report), then the End season plate with its Space key cap.
+## Studiolo top bar date and End turn (docs/architecture/m3-build-spec.md section 6.2): the date typed out (Spring 1480,
+## a click asks for the season report), then the End turn plate with its Space key cap. (The owner dropped the medallion.)
 ## A refused end (the country pick is open) shows its reason as a line and as the button's tooltip. It reads Session
 ## and Events and sends intents only; the top bar places it (Y18).
 class_name DateEnd
@@ -11,15 +11,18 @@ signal report_requested
 const NO_GAME_TEXT := "No game"
 const REPORT_TIP := ". J: the last report"
 const END_VARIATION := &"ButtonEndSeason"
+const BUSY_TAIL := " …"
 
-var _date: Medallion = null
+var _date: Button = null
+var _busy := false
+var _season := -1
 var _end: KitButton = null
 var _verdict: Label = null
 
 
 func _ready() -> void:
 	focus_mode = Control.FOCUS_NONE
-	_date = $Date as Medallion
+	_date = $Date as Button
 	_end = $End as KitButton
 	_verdict = $Verdict as Label
 
@@ -74,28 +77,33 @@ func refresh() -> void:
 	_verdict.visible = not ok
 
 
-## Shows `year` on the medallion and the lit quarter `season` (0 Spring to 3 Winter); a year of 0 (no game) shows none.
+## Shows the date (`season` 0 Spring to 3 Winter, then `year`); a year of 0 (no game) shows none.
 func set_date(year: int, season: int) -> void:
 	if not is_node_ready():
 		return
+	_season = season
 	if year <= 0 or season < 0 or season > 3:
 		_date.text = ""
-		_date.dial = -1
 		_date.tooltip_text = NO_GAME_TEXT
 		return
-	_date.text = str(year)
-	_date.dial = season
+	_date.text = "%s %d%s" % [Calendar.SEASON_NAMES[season], year, BUSY_TAIL if _busy else ""]
 	_date.tooltip_text = "%s %d%s" % [Calendar.SEASON_NAMES[season], year, REPORT_TIP]
 
 
-## Turns the medallion's ring (or shows the still hourglass under reduce motion, the medallion's own setting).
+## The season is running: the date shows an ellipsis after it.
 func set_busy(on: bool) -> void:
-	if is_node_ready():
-		_date.set_busy(on, _date.reduce_motion)
+	_busy = on
+	if is_node_ready() and not _date.text.is_empty():
+		_date.text = _date.text.trim_suffix(BUSY_TAIL) + (BUSY_TAIL if on else "")
 
 
 func is_busy() -> bool:
-	return _date != null and _date.busy
+	return _busy
+
+
+## The quarter shown (0 Spring to 3 Winter, -1 none).
+func season() -> int:
+	return _season
 
 
 ## Re-reads the End season key cap after a rebinding.
@@ -109,7 +117,7 @@ func verdict_text() -> String:
 	return _verdict.text if _verdict != null and _verdict.visible else ""
 
 
-func date_button() -> Medallion:
+func date_button() -> Button:
 	return _date
 
 

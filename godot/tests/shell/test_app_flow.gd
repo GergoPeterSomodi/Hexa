@@ -427,8 +427,8 @@ func test_m3_flow_pick_build_space_report_j_quicksave_quickload_continue() -> vo
 	(app.stack().top() as CountryPick).play(&"GEN")
 	await _wait_frames(3)
 	assert_eq(app.stack().count(), 0)
-	assert_eq(date_end.date_button().text, "1480")
-	assert_eq(date_end.date_button().dial, 0, "Spring is lit")
+	assert_eq(date_end.date_button().text, "Spring 1480")
+	assert_eq(date_end.season(), 0, "Spring")
 	assert_false(date_end.end_button().disabled)
 
 	var found := _buildable()
@@ -440,7 +440,7 @@ func test_m3_flow_pick_build_space_report_j_quicksave_quickload_continue() -> vo
 	assert_true(await _wait_until(func() -> bool: return _report_up(app)), "the first Space opens the report")
 	assert_eq(Session.game.turn, 2)
 	assert_eq(app.requests().flow.state(), SeasonFlow.State.REPORT)
-	assert_eq(date_end.date_button().dial, 1, "the medallion follows the calendar: Summer")
+	assert_eq(date_end.season(), 1, "the date follows the calendar: Summer")
 	var report_summary := SeasonSummary.of(Session.game, Session.player_tag(), 1)
 
 	# Space closes it; the map shows the calendar's season; a second Space inside the guard is refused.

@@ -67,7 +67,7 @@ const DEFAULTS: Array[Dictionary] = [
 		"events": ["Ctrl+F"] as Array[String]},
 	{"action": &"game_country", "label": "Country panel", "group": "Game", "since": "2",
 		"events": ["C"] as Array[String]},
-	{"action": &"game_end_season", "label": "End season", "group": "Game", "since": "3",
+	{"action": &"game_end_season", "label": "End turn", "group": "Game", "since": "3",
 		"events": ["Space", "Enter"] as Array[String]},
 	{"action": &"game_report", "label": "Season report", "group": "Game", "since": "3",
 		"events": ["J"] as Array[String]},
