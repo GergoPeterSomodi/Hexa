@@ -149,18 +149,27 @@ static func count(game: Game, id: int) -> int:
 	return districts(game, id).size()
 
 
-## Country ids sharing a land-to-land edge with `id`, ascending, with 0 excluded.
+## Country ids sharing a land-to-land edge with `id`, ascending, with 0 excluded. Worked out once for the same owner bytes
+## (a pinned slot of the view cache, keyed like `districts`: any change of an owner makes it again) and then read.
 static func neighbours(game: Game, id: int) -> PackedInt32Array:
-	var out := PackedInt32Array()
 	if game == null or game.map == null or game.state == null or id <= 0:
-		return out
+		return PackedInt32Array()
+	var key: Array = [hash(game.state.owner), game.state.owner.size(), game.map.hex_count()]
+	var held := game.view_cache.pinned(&"neighbours", key, func() -> Dictionary: return {}) as Dictionary
+	if not held.has(id):
+		held[id] = _neighbours_of(game, id)
+	return held[id] as PackedInt32Array
+
+
+static func _neighbours_of(game: Game, id: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
 	var n := mini(game.map.hex_count(), game.state.owner.size())
 	var cols := game.map.cols
 	var rows := game.map.rows
 	var grid := game.map.grid()
 	var seen: Dictionary = {}
-	for i: int in n:
-		if game.map.land[i] == 0 or int(game.state.owner[i]) != id:
+	for i: int in districts(game, id):
+		if i >= n:
 			continue
 		var hex := game.map.hex_of(i)
 		for d: int in 6:

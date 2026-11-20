@@ -78,6 +78,7 @@ var _last_hovered_country := &""
 @onready var _labels: MapLabels = $Names/Labels
 @onready var _fade: SeasonFade = $SeasonFade
 @onready var _work_marks: WorkMarks = $WorkMarks
+@onready var _preview: PreviewMarks = $PreviewMarks
 
 
 func _ready() -> void:
@@ -101,6 +102,7 @@ func _ready() -> void:
 	_input.upgrade_requested.connect(upgrade_selected)
 	_fade.world = self
 	_view.setup(_seasons.open())
+	_preview.setup(_view)
 	_set_grid_visible(_grid_visible)
 	_far.visible = false
 	Events.hex_changed.connect(_on_hex_changed)
@@ -158,6 +160,7 @@ func _apply_settings(settings: Settings) -> void:
 	_view.set_layer_visible("shade", shading)
 	_view.set_layer_visible("light", shading)
 	preload_next_season = bool(settings.get_value("graphics/preload_next_season"))
+	_preview.set_enabled(bool(settings.get_value("game/preview_on_map")))
 	var next_quality := str(settings.get_value("graphics/texture_quality"))
 	if next_quality != texture_quality:
 		texture_quality = next_quality
@@ -190,7 +193,7 @@ func _on_setting_changed(key: String, value: Variant) -> void:
 	if key in [
 		"map/grid", "map/grid_opacity", "map/place_names",
 		"graphics/relief_shading", "graphics/preload_next_season", "graphics/texture_quality",
-		"dev/far_zoom", "dev/slice_ms"
+		"dev/far_zoom", "dev/slice_ms", "game/preview_on_map"
 	]:
 		_apply_settings(_settings)
 
@@ -213,6 +216,7 @@ func _on_game_started() -> void:
 	_last_hovered_country = &""
 	_seasons.game_started()
 	_work_marks.setup(game)
+	_preview.clear_marks()
 	_labels.setup(map, MapLabels.capitals_from(game))
 	_view.set_climates(map.cols, map.climate)
 	_view.begin_fill(map.cols, map.rows, func(hex: Vector2i, names: PackedStringArray) -> void: MapCells.fill_hex(map, state, hex, names),
@@ -640,6 +644,16 @@ func set_season(value: String) -> void:
 	_seasons.set_season(value)
 
 
+## A card's preview on the map (ImprovePreview's dictionary: ghost, map_marks); PreviewMarks draws it (nothing when the
+## setting game/preview_on_map is off).
+func show_preview(card: Dictionary) -> void:
+	_preview.show_preview(card)
+
+
+func clear_marks() -> void:
+	_preview.clear_marks()
+
+
 ## The calendar's season (0 Spring to 3 Winter) with the fade when `fade`; ignored while a look preview is on.
 func show_season(index: int, fade: bool) -> void:
 	_fade.reduce_motion = _settings != null and bool(_settings.get_value("accessibility/reduce_motion"))
@@ -714,6 +728,7 @@ func country_labels() -> CountryLabels: return _country_labels
 func panel() -> HexPanelContract: return _panel
 func labels() -> MapLabels: return _labels
 func work_marks() -> WorkMarks: return _work_marks
+func preview_marks() -> PreviewMarks: return _preview
 func season_fade() -> SeasonFade: return _fade
 func camera() -> Camera2D: return _camera
 func camera_rig() -> CameraRig: return _rig
@@ -755,6 +770,7 @@ func _apply_zoom() -> void:
 	var z := 0.0 if _far_locked else _camera.zoom.x
 	_view.visible = _far.apply_zoom(z)
 	_work_marks.set_zoom(_camera.zoom.x)
+	_preview.set_zoom(_camera.zoom.x)
 	var grid_layer := _view.layer("grid")
 	if grid_layer != null:
 		grid_layer.modulate.a = ZoomModel.grid_alpha(_camera.zoom.x, _grid_opacity)

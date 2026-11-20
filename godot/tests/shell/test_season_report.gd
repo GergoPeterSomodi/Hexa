@@ -77,9 +77,9 @@ func test_every_section_of_the_fixture_is_drawn_with_its_count() -> void:
 		var heading := report.sheet().section_box(id).get_parent().get_node("Heading") as Label
 		assert_eq(heading.text, section["title"])
 	var nav := report.sheet().nav()
-	assert_eq(_count_of(nav.button_for(&"before")), "2")
-	assert_eq(_count_of(nav.button_for(&"goods")), "5")
-	assert_eq(_count_of(nav.button_for(&"works")), "2")
+	assert_eq(_count_of(nav.button_for(&"before")), "3")
+	assert_eq(_count_of(nav.button_for(&"goods")), "6")
+	assert_eq(_count_of(nav.button_for(&"works")), "1")
 	assert_eq(_count_of(nav.button_for(&"orders")), "1")
 	assert_false((nav.button_for(&"glance").get_node("Count") as Label).visible, "glance has no count")
 
@@ -123,7 +123,7 @@ func test_link_closes_the_report_and_asks_for_a_glide_to_its_hex() -> void:
 	report.link_chosen.connect(func(hex: Vector2i, action: Array) -> void: picked.append([hex, action]))
 	await _harness.wait_frames(self, 2)
 
-	var link := _button_named(report, "Wine runs out in 6 seasons; the first vintage is Autumn 1481.")
+	var link := _button_named(report, "Wine runs out in 4 seasons; the first vintage is Autumn 1481.")
 	assert_not_null(link, "a line with a hex is a link button")
 	link.pressed.emit()
 	await _harness.wait_frames(self, 2)

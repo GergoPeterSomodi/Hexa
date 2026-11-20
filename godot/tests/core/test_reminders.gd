@@ -1,5 +1,8 @@
-## Reminders (docs/architecture/m3-build-spec.md 4.8, 5.6, 9): `free_slot` (0 of 2: a line; 2 of 2: none; map-only: none),
-## `winter_halt` only in Autumn with snow works, worst first, the cache, equal after a save and load.
+## Reminders (docs/architecture/m3-build-spec.md 4.8, 5.6, 9; docs/architecture/m4-build-spec.md 4.18, 9): `free_slot` (0 of
+## 2: a line; 2 of 2: none; map-only: none), `winter_halt` only in Autumn with snow works, worst first, the cache, equal
+## after a save and load. M4: `treasury_empty` (-1 gives it, 0 does not), `goods_running_out` (a stock that just covers the
+## eight seasons gives no line; food at k = 2 is serious, k = 3 is not), `treasury_falling`, and the order of all five.
+## The games of the M3 cases are rich (money and stores no season moves) so that the M4 rules stay quiet in them.
 extends GutTest
 
 const MAP_PATH := "res://data/maps/north_italy.tres"
@@ -12,7 +15,9 @@ var _g: Game
 
 
 func before_each() -> void:
-	var defs := load(DEFS_PATH) as GameDefs
+	var defs := EconomyFixture.defs()
+	defs.start_treasury_base = 1000000
+	defs.reserve_seasons = 10000
 	_g = Game.new_scenario(load(MAP_PATH) as MapData, defs, defs.scenarios[defs.scenarios.size() - 1], 1480)
 	assert_true(bool(_g.act("choose_country", {"tag": &"GEN"})["ok"]))
 	_g.improvement.clear(SAVONA)
@@ -97,7 +102,9 @@ func test_worst_first_and_the_cache() -> void:
 	assert_eq(lines.size(), 2)
 	assert_eq([lines[0]["kind"], lines[1]["kind"]], [&"winter_halt", &"free_slot"], "severity 2 before 1")
 	assert_eq(lines, Reminders.unfinished(_g, &"GEN"), "the cached answer is the same")
-	assert_eq(_g.view_cache.size(), 1)
+	var cached := _g.view_cache.size()
+	assert_eq(Reminders.unfinished(_g, &"GEN"), lines)
+	assert_eq(_g.view_cache.size(), cached, "the second ask is served from the cache")
 	assert_true(_build(SAVONA, ImproveRules.VINEYARD))
 	var after := Reminders.unfinished(_g, &"GEN")
 	assert_eq(after.size(), 1, "the slots are full: the version moved, the cache did not serve the old answer")
@@ -125,7 +132,7 @@ func test_a_free_slot_alone_is_not_serious() -> void:
 	var lines := Reminders.unfinished(_g, &"GEN")
 	assert_eq(lines.size(), 1)
 	assert_eq(lines[0]["severity"], 1)
-	assert_eq(Reminders.RULES, [&"winter_halt", &"free_slot"] as Array[StringName])
+	assert_eq(Reminders.RULES, [&"treasury_empty", &"goods_running_out", &"winter_halt", &"treasury_falling", &"free_slot"] as Array[StringName])
 
 
 func test_reminders_are_equal_after_a_save_and_load() -> void:
@@ -141,3 +148,90 @@ func test_reminders_are_equal_after_a_save_and_load() -> void:
 	DirAccess.remove_absolute(dir)
 	assert_not_null(back)
 	assert_eq(Reminders.unfinished(back, &"GEN"), before)
+
+
+# ----- M4 ---------------------------------------------------------------------------------------------------------
+
+
+func test_treasury_empty() -> void:
+	var c := Countries.by_tag(_g, &"GEN")
+	assert_true(_g.dev_money(&"GEN", -c.treasury - 120))
+	var line := Reminders.treasury_empty(_g, &"GEN")
+	assert_eq(line["text"], "The treasury is empty: 120 ducats owed. Upkeep is still paid; no work can begin.")
+	assert_eq([line["kind"], line["severity"], line["action"], line["action_label"]], [&"treasury_empty", 2, [&"study", &"economy"], "Open the study"])
+	_g.version += 1
+	assert_eq(Reminders.unfinished(_g, &"GEN")[0]["kind"], &"treasury_empty", "severity 2 and first")
+	assert_true(_g.dev_money(&"GEN", 119))
+	assert_eq(Reminders.treasury_empty(_g, &"GEN")["text"], "The treasury is empty: 1 ducat owed. Upkeep is still paid; no work can begin.", "P: -1 is empty")
+	assert_true(_g.dev_money(&"GEN", 1))
+	assert_eq(Reminders.treasury_empty(_g, &"GEN"), {}, "0 is not")
+	assert_eq(Reminders.treasury_empty(_g, &"ZZZ"), {})
+
+
+func test_goods_running_out_with_a_vineyard_coming() -> void:
+	var g := EconomyFixture.game(&"GEN", true)  # the stores of 1480: 4 seasons of each need
+	assert_true(bool(g.act("build", {"hex": SAVONA, "family": ImproveRules.VINEYARD, "tag": &"GEN"})["ok"]))
+	Season.run(g)
+	var lines := Reminders.goods_running_out(g, &"GEN")
+	assert_eq(lines.size(), 2, "wine and salt; the olives of (7, 14) keep the oil")
+	assert_eq(lines[0]["text"], "Wine runs out in 4 seasons; the first vintage is Autumn 1481.")
+	assert_eq([lines[0]["action"], lines[0]["action_label"], lines[0]["severity"]], [[&"look_at", SAVONA], "Go to (7, 12)", 1])
+	assert_eq(lines[1]["text"], "Salt runs out in 4 seasons; none of your land makes it.")
+	assert_eq([lines[1]["action_label"], lines[1]["hex"]], ["Show Genoa", Countries.by_tag(g, &"GEN").capital])
+
+
+func test_a_stock_that_covers_the_eight_seasons_gives_no_line() -> void:
+	var g := EconomyFixture.game(&"GEN", true)
+	g.defs.reserve_seasons = 8  # the stores keep 8 seasons of a need, so none of the stock is sold
+	assert_true(g.dev_goods(&"GEN", g.defs.good_id(&"wine"), 4))  # 4 + 4 = 8 loads at 1 a season
+	assert_true(g.dev_goods(&"GEN", g.defs.good_id(&"salt"), 4))  # 8: exactly the window
+	assert_eq(Reminders.goods_running_out(g, &"GEN"), [] as Array[Dictionary], "P: 8 seasons of salt is not running out")
+	assert_true(g.dev_goods(&"GEN", g.defs.good_id(&"salt"), -1))
+	g.version += 1
+	var lines := Reminders.goods_running_out(g, &"GEN")
+	assert_eq(lines.size(), 1)
+	assert_eq(lines[0]["text"], "Salt runs out in 8 seasons; none of your land makes it.")
+
+
+func _hungry(milli: int) -> Game:
+	var g := EconomyFixture.game(&"GEN", true)
+	g.defs.food_need_milli = milli
+	g.version += 1
+	return g
+
+
+func test_food_in_two_seasons_is_serious_and_in_three_is_not() -> void:
+	var two := Reminders.goods_running_out(_hungry(550), &"GEN")
+	assert_eq([two[0]["text"], two[0]["severity"]], ["Food runs out in 2 seasons.", 2])
+	var three := Reminders.goods_running_out(_hungry(500), &"GEN")
+	assert_eq([three[0]["text"], three[0]["severity"]], ["Food runs out in 3 seasons.", 1])
+	var one := Reminders.goods_running_out(_hungry(700), &"GEN")
+	assert_eq([one[0]["text"], one[0]["severity"]], ["Food runs out next season.", 2])
+	assert_eq(Reminders.unfinished(_hungry(550), &"GEN")[0]["kind"], &"goods_running_out", "serious first")
+
+
+func test_treasury_falling() -> void:
+	var g := EconomyFixture.game(&"", true)
+	g.defs.country_tax_milli = 0
+	g.defs.town_tax_milli = 0
+	g.version += 1
+	var net := int(EconomyPreview.expected(g, &"MLO")["net"])
+	assert_lt(net, 0, "Milan earns nothing from its people here and still pays its upkeep")
+	var line := Reminders.treasury_falling(g, &"MLO")
+	assert_eq(line["text"], "The treasury will fall by %s this season." % Words.ducats(-net))
+	assert_eq([line["kind"], line["severity"], line["action"], line["action_label"]], [&"treasury_falling", 1, [&"study", &"economy"], "Open the study"])
+	assert_eq(Reminders.treasury_falling(g, &"GEN"), {}, "Genoa still earns more than it pays")
+	assert_true(g.dev_money(&"MLO", -Countries.by_tag(g, &"MLO").treasury - 1))
+	assert_eq(Reminders.treasury_falling(g, &"MLO"), {}, "an empty treasury has its own rule")
+
+
+func test_the_rules_come_worst_first() -> void:
+	var g := _hungry(550)
+	assert_true(g.dev_money(&"GEN", -Countries.by_tag(g, &"GEN").treasury - 5))
+	g.version += 1
+	var kinds: Array[StringName] = []
+	for line: Dictionary in Reminders.unfinished(g, &"GEN"):
+		kinds.append(line["kind"] as StringName)
+	assert_eq(kinds.slice(0, 2), [&"treasury_empty", &"goods_running_out"] as Array[StringName], "severity 2 in the order of RULES")
+	assert_eq(kinds[kinds.size() - 1], &"free_slot", "severity 1 last, the slot after the others")
+	assert_true(kinds.has(&"goods_running_out"))

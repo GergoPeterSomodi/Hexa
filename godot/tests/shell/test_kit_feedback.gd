@@ -256,12 +256,12 @@ func test_preview_card_accepted_refused_compare_and_signals() -> void:
 
 	await _harness.wait_frames(self, 2)
 	_harness.send_click(card.begin_button().get_global_rect().get_center())
-	_harness.send_click(card.pin_check().get_global_rect().get_center())
+	_harness.send_click(card.pin_button().get_global_rect().get_center())
 	_harness.send_click(card.treasury_only_switch().get_global_rect().get_center())
 	await _harness.wait_frames(self, 2)
 	assert_eq(began[0], 1)
 	assert_eq(pins, [true])
-	assert_true(card.pin_button().button_pressed, "PinBtn stays synced with PinCheck")
+	assert_true(card.pin_button().button_pressed, "the Foot's Pin to compare is pressed")
 	assert_eq(treas, [true])
 	assert_true(card.treasury_only, "treasury_only property reflects switch state")
 	card.treasury_only = false

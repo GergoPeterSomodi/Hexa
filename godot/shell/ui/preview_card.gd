@@ -17,7 +17,6 @@ signal treasury_only_toggled(on: bool)
 		if _refs_bound and _treasury_only != null:
 			_treasury_only.set_pressed_no_signal(treasury_only)
 
-var _pin_check: KitSwitch = null
 var _treasury_only: KitSwitch = null
 var _close_btn: KitButton = null
 var _title_label: Label = null
@@ -45,7 +44,6 @@ var _pin_btn: KitButton = null
 var _begin_btn: KitButton = null
 var _chart_caption: HBoxContainer = null
 var _refs_bound: bool = false
-var _syncing_pin: bool = false
 
 ## Refusals that keep the whole card (money, goods, a slot); any other refusal shows only the refusal (spec 4.17).
 const FULL_CARD_BLOCKS: Array[String] = ["slot", "ducats", "goods"]
@@ -154,13 +152,10 @@ func focus_begin() -> void:
 		_begin_btn.grab_focus()
 
 
-## Sets pinned state on both PinCheck and PinBtn without emitting `pin_toggled`.
+## Sets the pinned state of the Foot's "Pin to compare" without emitting `pin_toggled`.
 func set_pinned(on: bool) -> void:
 	_ensure_refs()
-	_syncing_pin = true
-	_pin_check.set_pressed_no_signal(on)
 	_pin_btn.set_pressed_no_signal(on)
-	_syncing_pin = false
 
 
 func title_label() -> Label:
@@ -233,11 +228,6 @@ func close_button() -> KitButton:
 	return _close_btn
 
 
-func pin_check() -> KitSwitch:
-	_ensure_refs()
-	return _pin_check
-
-
 func pin_button() -> KitButton:
 	_ensure_refs()
 	return _pin_btn
@@ -266,8 +256,7 @@ func compare_container() -> HBoxContainer:
 func _ensure_refs() -> void:
 	if _refs_bound:
 		return
-	_pin_check = get_node("VBox/Top/PinCheck") as KitSwitch
-	_treasury_only = get_node("VBox/Top/TreasuryOnly") as KitSwitch
+	_treasury_only = get_node("VBox/Foot/TreasuryOnly") as KitSwitch
 	_close_btn = get_node("VBox/Top/CloseBtn") as KitButton
 	_title_label = get_node("VBox/Title") as Label
 	_sub_label = get_node("VBox/Sub") as Label
@@ -300,7 +289,6 @@ func _ensure_refs() -> void:
 
 	_close_btn.pressed.connect(_on_close_pressed)
 	_begin_btn.pressed.connect(_on_begin_pressed)
-	_pin_check.toggled.connect(_on_pin_check_toggled)
 	_pin_btn.toggled.connect(_on_pin_btn_toggled)
 	_treasury_only.toggled.connect(_on_treasury_only_toggled)
 	_refs_bound = true
@@ -315,16 +303,18 @@ func _populate_brings(raw_brings: Variant) -> void:
 		var b := item_var as Dictionary
 		var row := HBoxContainer.new()
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var lbl := Label.new()
-		lbl.theme_type_variation = &"TableRow"
-		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var before := int(b.get("before", 0))
 		var after := int(b.get("after", 0))
-		var per := str(b.get("per", ""))
-		var label_str := str(b.get("label", str(b.get("field", ""))))
-		lbl.text = "%s  %d → %d" % [label_str, before, after] if per.is_empty() else "%s  %d → %d / %s" % [label_str, before, after, per]
-		row.add_child(lbl)
-
+		var name_lbl := Label.new()
+		name_lbl.theme_type_variation = &"TableRow"
+		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		name_lbl.text = _brings_name(b)
+		row.add_child(name_lbl)
+		var value_lbl := Label.new()
+		value_lbl.theme_type_variation = &"TableRow"
+		value_lbl.text = "%d → %d" % [before, after]
+		row.add_child(value_lbl)
 		var chip := DeltaChip.new()
 		var field := StringName(str(b.get("field", "")))
 		var tone := StringName(str(b.get("tone", "")))
@@ -336,6 +326,17 @@ func _populate_brings(raw_brings: Variant) -> void:
 	var has_brings := _brings.get_child_count() > 0
 	_brings_head.visible = has_brings
 	_brings.visible = has_brings
+
+
+## "Wine, a year", "Port dues, in spring": the label with its period.
+static func _brings_name(b: Dictionary) -> String:
+	var label_str := str(b.get("label", str(b.get("field", ""))))
+	var per := str(b.get("per", ""))
+	if per.is_empty():
+		return label_str
+	if per == "spring":
+		return "%s, in spring" % label_str
+	return "%s, a %s" % [label_str, per]
 
 
 func _populate_seasons_and_chart(raw_seasons: Variant) -> void:
@@ -352,8 +353,8 @@ func _populate_seasons_and_chart(raw_seasons: Variant) -> void:
 		if bool(s.get("now", false)):
 			now_idx = i
 		x_labs.append(str(s.get("season", "")))
-		before_vals.append(int(s.get("before", 0)))
-		after_vals.append(int(s.get("after", int(s.get("before", 0)) + int(s.get("gain", 0)))))
+		before_vals.append(_measure(s, "before"))
+		after_vals.append(_measure(s, "after"))
 
 	_season_strip.set_seasons(_view_seasons(seasons), now_idx)
 	if seasons.is_empty():
@@ -416,7 +417,7 @@ func _populate_lands(raw_lands: Variant) -> void:
 
 	if lands.has("country") and lands["country"] is Dictionary:
 		var c := lands["country"] as Dictionary
-		_lands.add_child(_land_row("Country", int(c.get("before", 0)), int(c.get("after", 0))))
+		_lands.add_child(_land_row("Country", _measure(c, "before"), _measure(c, "after")))
 
 	_lands_box.visible = _lands.get_child_count() > 0
 
@@ -550,8 +551,8 @@ func _populate_compare_col(col: VBoxContainer, p: Dictionary, is_better: bool, s
 			if s_var is Dictionary:
 				var s := s_var as Dictionary
 				xl.append(str(s.get("season", "")))
-				bv.append(int(s.get("before", 0)))
-				av.append(int(s.get("after", int(s.get("before", 0)) + int(s.get("gain", 0)))))
+				bv.append(_measure(s, "before"))
+				av.append(_measure(s, "after"))
 		c.x_labels = xl
 		c.set_series([
 			{"name": "Before", "values": bv, "ink": 0},
@@ -600,6 +601,16 @@ func _has_gain(d: Dictionary) -> bool:
 	return d.has("gain_realm") or d.has("gain_treasury") or d.has("gain")
 
 
+## The field in the measure the card shows: `<field>_treasury` when `treasury_only` and the preview has it, else
+## `<field>_realm`, else the plain field (spec 5.0 R2: the preview returns both measures).
+func _measure(d: Dictionary, field: String) -> int:
+	if treasury_only and d.has(field + "_treasury"):
+		return int(d[field + "_treasury"])
+	if d.has(field + "_realm"):
+		return int(d[field + "_realm"])
+	return int(d.get(field, 0))
+
+
 ## The four season cells with `gain` replaced by the measure the card shows.
 func _view_seasons(raw_seasons: Array) -> Array:
 	var out: Array = []
@@ -619,8 +630,8 @@ func _populate_caption(raw_year: Variant) -> void:
 	_chart_caption.visible = not yr.is_empty()
 	if yr.is_empty():
 		return
-	var before := int(yr.get("before", 0))
-	var after := int(yr.get("after", before))
+	var before := _measure(yr, "before")
+	var after := _measure(yr, "after")
 	_chart_caption.add_child(PanelKit.label("A year %d → %d" % [before, after], &"Hint"))
 	var chip := DeltaChip.new()
 	chip.set_delta(_pick_gain(yr))
@@ -636,8 +647,8 @@ func _shared_chart_ticks(a: Dictionary, b: Dictionary) -> PackedInt32Array:
 			for s_var: Variant in (seasons as Array):
 				if s_var is Dictionary:
 					var s := s_var as Dictionary
-					var bv := int(s.get("before", 0))
-					var av := int(s.get("after", bv + int(s.get("gain", 0))))
+					var bv := _measure(s, "before")
+					var av := _measure(s, "after")
 					lo = mini(lo, mini(bv, av))
 					hi = maxi(hi, maxi(bv, av))
 	if lo == hi:
@@ -653,21 +664,7 @@ func _on_begin_pressed() -> void:
 	begin_pressed.emit()
 
 
-func _on_pin_check_toggled(on: bool) -> void:
-	if _syncing_pin:
-		return
-	_syncing_pin = true
-	_pin_btn.set_pressed_no_signal(on)
-	_syncing_pin = false
-	pin_toggled.emit(on)
-
-
 func _on_pin_btn_toggled(on: bool) -> void:
-	if _syncing_pin:
-		return
-	_syncing_pin = true
-	_pin_check.set_pressed_no_signal(on)
-	_syncing_pin = false
 	pin_toggled.emit(on)
 
 

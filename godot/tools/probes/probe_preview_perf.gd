@@ -56,4 +56,21 @@ func _initialize() -> void:
 	_avg("EconomyPreview.expected, cold", func() -> void:
 		game.version += 1
 		EconomyPreview.expected(game, tag))
+	game.version += 1
+	EconomyPreview.worth_of(game, tag, hex)
+	_avg("worth_of, warm (content cached)", func() -> void: EconomyPreview.worth_of(game, tag, hex))
+	var t := Time.get_ticks_usec()
+	game.version += 1
+	EconomyPreview.worth_by_hex(game, tag)
+	print("%-52s %.3f ms" % ["worth_by_hex, cold (once per version)", (Time.get_ticks_usec() - t) / 1000.0])
+	t = Time.get_ticks_usec()
+	game.view_cache.clear()
+	Territory.neighbours(game, best.id)
+	print("%-52s %.3f ms" % ["Territory.neighbours, cold (once per owner change)", (Time.get_ticks_usec() - t) / 1000.0])
+	_avg("Territory.neighbours / Knowledge.known, warm", func() -> void: Knowledge.known(game, tag))
+	game.version += 1
+	EconomyPreview.expected(game, tag)
+	t = Time.get_ticks_usec()
+	EconomyPreview.with(game, tag, {}, 8)
+	print("%-52s %.3f ms" % ["with(8) after expected (reminders), same version", (Time.get_ticks_usec() - t) / 1000.0])
 	quit()

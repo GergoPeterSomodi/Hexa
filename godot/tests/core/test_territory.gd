@@ -161,3 +161,17 @@ func test_districts_count_and_neighbours() -> void:
 	assert_eq(Territory.transfer(g, [border_hex], 1), 1)
 	assert_eq(Territory.neighbours(g, 1), PackedInt32Array([2, 3]))
 	assert_eq(Territory.neighbours(g, 3), PackedInt32Array([1, 2]))
+
+
+func test_neighbours_are_cached_and_follow_the_owner_bytes() -> void:
+	var g := EconomyFixture.game(&"GEN")
+	for c: Country in g.countries:
+		assert_eq(Territory.neighbours(g, c.id), Territory._neighbours_of(g, c.id), "cached equals worked out: %s" % c.tag)
+		assert_eq(Territory.neighbours(g, c.id), Territory._neighbours_of(g, c.id), "and again")
+	var genoa := Countries.by_tag(g, &"GEN")
+	var before := Territory.neighbours(g, genoa.id)
+	# a direct edit of an owner byte (no door): the next call sees it
+	for i: int in Territory.districts(g, genoa.id):
+		g.state.owner[i] = 0
+	assert_eq(Territory.neighbours(g, genoa.id), PackedInt32Array(), "a country with no land has no neighbour")
+	assert_gt(before.size(), 0)

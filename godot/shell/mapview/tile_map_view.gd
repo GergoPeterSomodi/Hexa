@@ -285,6 +285,21 @@ func season() -> String:
 	return "" if _tiles == null else _tiles.season
 
 
+## The season's TileSet (the one the layers have, or are being given): a layer of a ghost uses it (PreviewMarks).
+func tileset() -> TileSet:
+	return null if _tiles == null else _tiles.tile_set
+
+
+## Where a tile is for a cell of a layer that is not a WHOLE one, as (source id, atlas column, atlas row) with the climate
+## slot of the cell's hex, the way set_tile would write it; NO_TILE when the TileSet has no such tile. Writes nothing.
+func tile_source(tile_name: String, cell: Vector2i) -> Vector3i:
+	var at := _names.get(tile_name, NO_TILE) as Vector3i
+	if at == NO_TILE:
+		return NO_TILE
+	var source := at.x if _slots == 1 else _slots * at.x + _climate_at(cell)
+	return Vector3i(source, at.y, at.z)
+
+
 # ----- layers and chunks --------------------------------------------------------------------------------------------
 
 

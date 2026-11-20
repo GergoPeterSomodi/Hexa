@@ -369,6 +369,14 @@ func _draw_line_bars_kind(plot: Rect2, y_min: float, y_max: float, count: int) -
 			_draw_marker(p, str(cue["marker"]), col, 3.0)
 
 
+## Whether series `s_idx` is drawn hollow: in PAIRED_BARS the ink 0 series (the "before") is hollow, an outline with the
+## same ink; the rest are solid (style spec 6.5).
+func is_hollow(s_idx: int) -> bool:
+	if kind != Kind.PAIRED_BARS or s_idx < 0 or s_idx >= _series.size():
+		return false
+	return posmod(int(_series[s_idx]["ink"]), 5) == 0
+
+
 func _draw_paired_bars_kind(plot: Rect2, y_min: float, y_max: float, count: int) -> void:
 	var n_series := maxi(1, _series.size())
 	var zero_y := _y_for_value(plot, 0.0, y_min, y_max)
@@ -390,7 +398,11 @@ func _draw_paired_bars_kind(plot: Rect2, y_min: float, y_max: float, count: int)
 			var vy := _y_for_value(plot, float(vals[i]), y_min, y_max)
 			var top := minf(vy, zero_y)
 			var h := maxf(1.0, absf(vy - zero_y))
-			draw_rect(Rect2(bx, top, maxf(1.5, bar_w - 1.0), h), col)
+			var rect := Rect2(bx, top, maxf(1.5, bar_w - 1.0), h)
+			if is_hollow(s_idx):
+				draw_rect(rect, col, false, 1.5)
+			else:
+				draw_rect(rect, col)
 			if count <= 12:
 				_draw_marker(Vector2(bx + bar_w * 0.5, top - 4.0), marker_kind, col, 2.0)
 

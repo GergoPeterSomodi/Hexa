@@ -167,11 +167,11 @@ static func _play_reason(country: Country, short_name: String, cdef: CountryDef)
 
 
 ## The treasury fields of the country panel (spec 6.10). The viewer's own country: its exact treasury, last season's change
-## (closing less opening in the closed ledger), the tax name, and `expected` null until EconomyPreview gives this season's
-## net. A known foreign country (Knowledge.knows; every country for the viewer "") is banded to two figures in `value`,
+## (closing less opening in the closed ledger), the tax name, and `expected` (this season's net from EconomyPreview.expected,
+## the treasury's measure; `expected_realm` the realm's, 5.0 R2; both null for any other country). A known foreign country (Knowledge.knows; every country for the viewer "") is banded to two figures in `value`,
 ## with no change and no tax. An unknown country is not `shown`.
 static func _treasury(game: Game, country: Country) -> Dictionary:
-	var out := {"shown": false, "value": 0, "banded": false, "change": 0, "expected": null, "tax": ""}
+	var out := {"shown": false, "value": 0, "banded": false, "change": 0, "expected": null, "expected_realm": null, "tax": ""}
 	if not Knowledge.knows(game, game.player, country.tag):
 		return out
 	out["shown"] = true
@@ -179,6 +179,10 @@ static func _treasury(game: Game, country: Country) -> Dictionary:
 		out["value"] = country.treasury
 		out["change"] = _last_change(country)
 		out["tax"] = Words.tax_name(country.tax)
+		var now := EconomyPreview.expected(game, country.tag)
+		if not now.is_empty():
+			out["expected"] = int(now["net"])
+			out["expected_realm"] = int(now["realm"])
 	else:
 		out["banded"] = true
 		out["value"] = Knowledge.band(country.treasury)

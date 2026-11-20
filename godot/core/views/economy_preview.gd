@@ -80,11 +80,18 @@ static func expected(game: Game, tag: StringName) -> Dictionary:
 
 
 ## The country's land, season by season, with its works under way standing from their ready turns, at tax level `tax`:
-## one record for each of the next `seasons` seasons, {turn, season, made, dues, upkeep, upkeep_count, walls, town, rest,
-## view (the StateView with the works that stand by then)}, kept in the game's view cache for the version. Read-only.
+## one record for each of the next seasons, {turn, season, made, dues, dues_sum, upkeep, upkeep_count, walls, walls_sum, town,
+## rest, view (the StateView with the works that stand by then)}. Kept in the game's view cache by [&"made", version, tag,
+## tax] and extended in place, a season at a time, to the longest horizon asked (so a short ask and a long one share the
+## records; the array may be longer than `seasons`). Read-only.
 static func baseline(game: Game, tag: StringName, seasons: int, tax: int) -> Array:
-	var key: Array = [&"made", game.version, tag, game.turn, seasons, tax]
-	return game.view_cache.get_or_make(key, func() -> Array: return _make_baseline(game, tag, seasons, tax)) as Array
+	var key: Array = [&"made", game.version, tag, tax]
+	var holder := game.view_cache.get_or_make(key, func() -> Dictionary: return _new_holder(game, tag)) as Dictionary
+	var records: Array = holder["records"]
+	var want := mini(seasons, MAX_SEASONS)
+	if records.size() < want and holder["country"] != null:
+		_extend(game, holder, tax, want)
+	return records
 
 
 ## [{hex, worth, upkeep, label}] for the country's land in the season in play (D34): each hex's goods at price, its port
@@ -95,25 +102,55 @@ static func worth_by_hex(game: Game, tag: StringName) -> Array[Dictionary]:
 	return game.view_cache.get_or_make(key, func() -> Array[Dictionary]: return _make_worth(game, tag)) as Array[Dictionary]
 
 
+## The entry of worth_by_hex for one hex ({hex, worth, upkeep, label}), worked out on that hex alone; {} for a hex the
+## country does not hold or one that gives and costs nothing. Equal to the list's entry (the hex panel's Worth row).
+static func worth_of(game: Game, tag: StringName, hex: Vector2i) -> Dictionary:
+	var c := Countries.by_tag(game, tag)
+	var i := game.map.index_of(hex)
+	if c == null or i < 0 or game.defs == null or game.defs.goods.is_empty() or game.map.land[i] == 0 \
+			or int(game.state.owner[i]) != c.id:
+		return {}
+	var ctx := _worth_context(game, c)
+	return _worth_row(game, ctx, i)
+
+
 # --- the baseline ---------------------------------------------------------------------------------------------------
 
 
-static func _make_baseline(game: Game, tag: StringName, seasons: int, tax: int) -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
+static func _new_holder(game: Game, tag: StringName) -> Dictionary:
 	var c := Countries.by_tag(game, tag)
+	var holder: Dictionary = {"records": [] as Array[Dictionary], "country": c, "memo": {}, "views": {}, "standing": [] as Array[Dictionary],
+		"profile": {}, "own": StateView.of(game.state)}
 	if c == null or game.defs == null:
-		return out
-	var profile := SeasonProfile.of(game, SeasonProfile.table(game), c.id)
-	var own := StateView.of(game.state)
-	var standing := _standing(game, c, seasons)
-	var view := own
-	var landed := 0
-	var memo: Dictionary = {}
-	var changes: Dictionary = {}
-	var seeds: Array = []
-	for k: int in seasons:
+		holder["country"] = null
+		return holder
+	holder["profile"] = SeasonProfile.of(game, SeasonProfile.table(game), c.id)
+	holder["standing"] = _standing(game, c, MAX_SEASONS)
+	return holder
+
+
+## Adds the records up to `want` seasons to the holder.
+static func _extend(game: Game, holder: Dictionary, tax: int, want: int) -> void:
+	var c: Country = holder["country"]
+	var records: Array = holder["records"]
+	var profile: Dictionary = holder["profile"]
+	var own: StateView = holder["own"]
+	var standing: Array = holder["standing"]
+	var views: Dictionary = holder["views"]
+	for k: int in range(records.size(), want):
 		var turn := game.turn + k
 		var season := Calendar.season_of(turn)
+		var landed := 0
+		while landed < standing.size() and int((standing[landed] as Dictionary)["ready"]) <= turn:
+			landed += 1
+		var changes: Dictionary = {}
+		var seeds: Array = []
+		for n: int in landed:
+			changes[int((standing[n] as Dictionary)["i"])] = (standing[n] as Dictionary)["pair"]
+			seeds.append(int((standing[n] as Dictionary)["i"]))
+		if landed > 0 and not views.has(landed):
+			views[landed] = own.with(changes)
+		var view: StateView = views[landed] if landed > 0 else own
 		var info := SeasonProfile.made(game, profile, season, _calm(), tax)
 		var rec: Dictionary = {
 			"turn": turn, "season": season, "made": info["made"], "dues": info["dues"], "upkeep": int(info["upkeep"]),
@@ -121,17 +158,9 @@ static func _make_baseline(game: Game, tag: StringName, seasons: int, tax: int) 
 			"walls_sum": _sum_of(info["walls"] as Array), "town": int(profile["town"]),
 			"rest": int(profile["rest"]), "view": view,
 		}
-		while landed < standing.size() and int((standing[landed] as Dictionary)["ready"]) <= turn:
-			var work: Dictionary = standing[landed]
-			changes[int(work["i"])] = work["pair"]
-			seeds.append(int(work["i"]))
-			landed += 1
-			view = own.with(changes)
-			rec["view"] = view
-		if not seeds.is_empty():
-			_adjust(game, c, rec, own, view, _around(game, seeds), season, tax, [], true, true, memo)
-		out.append(rec)
-	return out
+		if landed > 0:
+			_adjust(game, c, rec, own, view, _around(game, seeds), season, tax, [], true, true, holder["memo"] as Dictionary)
+		records.append(rec)
 
 
 ## The works that touch the country's land (a hex it owns, or one beside), ready within the window, as {i, pair, ready}
@@ -351,32 +380,47 @@ static func _owner_tax(game: Game, owner_id: int) -> int:
 # --- worth ----------------------------------------------------------------------------------------------------------
 
 
+## What the worth of every hex of a country shares: the season, the prices, the tax level and the towns' factor (the
+## expected season's contentment, kept in the view cache).
+static func _worth_context(game: Game, c: Country) -> Dictionary:
+	var key: Array = [&"content", game.version, c.tag]
+	var content := int(game.view_cache.get_or_make(key, func() -> int: return int(expected(game, c.tag).get("content", 1000))))
+	return {
+		"defs": game.defs, "season": Calendar.season_of(game.turn), "factor": EconomySeason.factor_of(game, content),
+		"prices": Economy.market_prices(game, null, Economy.market_of(game, c.tag), c.stock), "level": clampi(c.tax, 0, 2),
+	}
+
+
+## The worth entry of hex index `i` of the country, from the district cache (no second base); {} when it gives and costs nothing.
+static func _worth_row(game: Game, ctx: Dictionary, i: int) -> Dictionary:
+	var defs: GameDefs = ctx["defs"]
+	var level: int = ctx["level"]
+	var prices: PackedInt32Array = ctx["prices"]
+	var base := game.districts.base_of(game, i)
+	var goods := PackedInt32Array()
+	goods.resize(defs.goods.size())
+	var out := Economy.add_output(base, Economy.slot_for(int(game.map.climate[i]), int(ctx["season"])), Economy.CALM, level, defs, goods)
+	var milli := 0
+	for g: int in goods.size():
+		milli += goods[g] * (prices[g] if g < prices.size() else 0)
+	var rate: int = defs.town_tax_milli * int(ctx["factor"]) / 1000 if int(base["family"]) == Economy.SETTLEMENTS else defs.country_tax_milli
+	var taxes := int(base["room"]) * rate * defs.tax_permille[level] / 1000000000 if level < defs.tax_permille.size() else 0
+	var upkeep := int(out["upkeep"]) + int(out["walls"])
+	var worth := milli / 1000 + int(out["ducats"]) + taxes - upkeep
+	if worth == 0 and upkeep == 0:
+		return {}
+	var hex := game.map.hex_of(i)
+	return {"hex": hex, "worth": worth, "upkeep": upkeep, "label": Words.place(game, hex)}
+
+
 static func _make_worth(game: Game, tag: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var c := Countries.by_tag(game, tag)
 	if c == null or game.defs == null or game.defs.goods.is_empty():
 		return out
-	var defs := game.defs
-	var season := Calendar.season_of(game.turn)
-	var view := StateView.of(game.state)
-	var now := expected(game, tag)
-	var content := int(now.get("content", 1000))
-	var factor := EconomySeason.factor_of(game, content)
-	var prices := Economy.market_prices(game, view, Economy.market_of(game, tag), c.stock)
-	var level := clampi(c.tax, 0, 2)
+	var ctx := _worth_context(game, c)
 	for i: int in Territory.districts(game, c.id):
-		var hex := game.map.hex_of(i)
-		var put := Economy.district_output(game, view, hex, season, Economy.CALM, level)
-		var goods: PackedInt32Array = put["goods"]
-		var milli := 0
-		for g: int in goods.size():
-			milli += goods[g] * (prices[g] if g < prices.size() else 0)
-		var base := Economy.district_base(game, view, hex)
-		var people := int(base["room"])
-		var rate := defs.town_tax_milli * factor / 1000 if int(base["family"]) == Economy.SETTLEMENTS else defs.country_tax_milli
-		var taxes := people * rate * defs.tax_permille[level] / 1000000000 if level < defs.tax_permille.size() else 0
-		var upkeep := int(put["upkeep"]) + int(put["walls"])
-		var worth := milli / 1000 + int(put["ducats"]) + taxes - upkeep
-		if worth != 0 or upkeep != 0:
-			out.append({"hex": hex, "worth": worth, "upkeep": upkeep, "label": Words.place(game, hex)})
+		var row := _worth_row(game, ctx, i)
+		if not row.is_empty():
+			out.append(row)
 	return out

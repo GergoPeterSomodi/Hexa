@@ -54,7 +54,7 @@ func test_accepted_vineyard_fills_every_part_of_spec_6_5() -> void:
 	assert_eq(card.requirements_container().get_child_count(), 3)
 	assert_eq(card.payback_label().text, "Pays back in Autumn 1482, 10 seasons from now (at today's prices).")
 	assert_eq(card.next_label().text,
-		"Stage 2 possible (Savona (6, 13) 1 hex away). stage 3 possible (a town within two hexes, under 1,200 m).")
+		"Stage 2 possible (Savona (6, 13) 1 hex away). Stage 3 possible (a town within two hexes, under 1,200 m).")
 
 	var caption := _caption(card)
 	assert_true(caption.visible)
@@ -98,12 +98,12 @@ func test_money_refusal_keeps_the_whole_card_with_its_bar() -> void:
 	var card := _card()
 	card.show_preview(PreviewSample.genoa_city_refused())
 	assert_true(card.refusal_panel().visible, "refusal bar shows")
-	assert_eq(card.refusal_label().text, "not enough ducats: 1,000 needed, 610 in the treasury")
+	assert_eq(card.refusal_label().text, "Not enough ducats: 1,000 needed, 610 in the treasury.")
 	assert_true(card.begin_button().disabled, "Begin is off")
 	assert_true(card.body_visible(), "the card still shows everything")
 	assert_eq(card.brings_container().get_child_count(), 6, "every brings line stays")
 	assert_true(card.season_strip().visible)
-	assert_eq(card.payback_label().text, "Pays back in Spring 1488, 32 seasons from now.")
+	assert_eq(card.payback_label().text, "Pays back in Spring 1488, 32 seasons from now (at today's prices).")
 
 
 func test_rule_refusal_shows_only_the_refusal() -> void:
@@ -133,8 +133,8 @@ func test_compare_uses_one_chart_scale_for_both_columns() -> void:
 	var b := PreviewSample.vineyard()
 	b["title"] = "Olive grove, third stage"
 	var autumn: Dictionary = (b["by_season"] as Array)[2]
-	autumn["after"] = 400
-	autumn["gain"] = 260
+	autumn["after_realm"] = 400
+	autumn["gain_realm"] = 260
 	card.show_compare(a, b)
 
 	assert_true(card.compare_container().visible)
@@ -169,9 +169,10 @@ func test_escape_closes_and_pin_syncs_with_both_controls() -> void:
 	card.closed.connect(func() -> void: closed_n[0] += 1)
 	card.pin_toggled.connect(func(on: bool) -> void: pins.append(on))
 
-	card.pin_check().set_pressed(true)
-	assert_eq(pins, [true], "toggling the switch emits pin_toggled once")
-	assert_true(card.pin_button().button_pressed, "the pin button follows the switch")
+	card.pin_button().set_pressed(true)
+	assert_eq(pins, [true], "toggling Pin to compare emits pin_toggled once")
+	assert_true(card.pin_button().button_pressed)
+	assert_null(card.get_node_or_null("VBox/Top/PinCheck"), "no second pin control")
 
 	await _harness.wait_frames(self, 2)
 	_harness.send_key(KEY_ESCAPE)
@@ -190,3 +191,48 @@ func test_begin_and_look_at_signals() -> void:
 	assert_eq(began[0], 1)
 	card.look_at_requested.emit(Vector2i(7, 12))
 	assert_eq(looks, [Vector2i(7, 12)])
+
+
+func test_brings_row_has_label_left_value_and_chip() -> void:
+	var card := _card()
+	card.show_preview(PreviewSample.vineyard())
+	var row := card.brings_container().get_child(0) as HBoxContainer
+	assert_eq(row.get_child_count(), 3, "label, value, chip")
+	assert_eq((row.get_child(0) as Label).text, "Wine, a year")
+	assert_eq((row.get_child(1) as Label).text, "0 → 12")
+	assert_eq((row.get_child(2) as DeltaChip).text(), "+12")
+	var upkeep := card.brings_container().get_child(3) as HBoxContainer
+	assert_true((upkeep.get_child(2) as DeltaChip).invert, "upkeep is a cost")
+
+
+func test_upkeep_is_the_years_change_shown_as_a_cost() -> void:
+	var card := _card()
+	card.show_preview(PreviewSample.vineyard())
+	var found := false
+	for row: Node in card.lands_container().get_children():
+		var lbl := row.get_child(0) as Label
+		if lbl != null and lbl.text == "Upkeep":
+			found = true
+			var chip := row.get_child(1) as DeltaChip
+			assert_eq(chip.text(), "+4", "an increase reads with a plus sign")
+			assert_true(chip.invert, "and is a cost (bad colour)")
+	assert_true(found, "an Upkeep row shows")
+
+
+func test_real_vineyard_preview_draws_in_the_card() -> void:
+	var g := EconomyFixture.game(&"GEN", true)
+	var real := ImprovePreview.of(g, &"GEN", Vector2i(7, 12), {"action": Works.BUILD, "family": ImproveRules.VINEYARD})
+	var card := _card()
+	card.show_preview(real)
+	assert_eq(card.title_label().text, real["title"])
+	assert_false(card.refusal_panel().visible, "accepted: no refusal bar")
+	assert_false(card.begin_button().disabled, "Begin is enabled")
+	assert_eq(card.brings_container().get_child_count(), (real["brings"] as Array).size())
+	assert_eq(card.requirements_container().get_child_count(), (real["requirements"] as Array).size())
+	assert_true(card.season_strip().visible, "the four seasons differ")
+	assert_eq(card.chart().kind, InkChart.Kind.PAIRED_BARS)
+	assert_eq(card.cost_label().text, real["cost"]["text"])
+	assert_eq(card.payback_label().text, real["payback"]["text"])
+	var year: Dictionary = real["year"]
+	assert_eq((_caption(card).get_child(0) as Label).text, "A year %d → %d" % [int(year["before_realm"]), int(year["after_realm"])])
+	assert_eq(_strip_gain(card, 2).text(), "+%d" % int((real["by_season"] as Array)[2]["gain_realm"]))

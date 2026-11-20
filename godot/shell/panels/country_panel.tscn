@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://shell/panels/country_panel.gd" id="1_panel"]
 [ext_resource type="Script" path="res://shell/ui/cartouche.gd" id="2_cart"]
 [ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
 [ext_resource type="Script" path="res://shell/ui/country_arms.gd" id="4_arms"]
+[ext_resource type="Script" path="res://shell/ui/delta_chip.gd" id="5_delta"]
 
 [node name="CountryPanel" type="PanelContainer"]
 size_flags_vertical = 3
@@ -113,6 +114,46 @@ mouse_filter = 2
 layout_mode = 2
 mouse_filter = 2
 columns = 2
+
+[node name="TreasuryBox" type="VBoxContainer" parent="VBox/BodyScroll/Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Heading" type="Label" parent="VBox/BodyScroll/Body/TreasuryBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+text = "Treasury"
+
+[node name="Value" type="Label" parent="VBox/BodyScroll/Body/TreasuryBox"]
+layout_mode = 2
+theme_type_variation = &"TableRow"
+autowrap_mode = 3
+
+[node name="Change" type="PanelContainer" parent="VBox/BodyScroll/Body/TreasuryBox"]
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("5_delta")
+
+[node name="Expected" type="PanelContainer" parent="VBox/BodyScroll/Body/TreasuryBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("5_delta")
+
+[node name="Tax" type="Label" parent="VBox/BodyScroll/Body/TreasuryBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"TableRow"
+autowrap_mode = 3
+
+[node name="OpenStudy" type="Button" parent="VBox/BodyScroll/Body/TreasuryBox"]
+layout_mode = 2
+size_flags_horizontal = 0
+script = ExtResource("3_btn")
+text = "Open the study"
+show_key_cap = true
+hotkey_action = &"game_study"
 
 [node name="NeighboursBox" type="VBoxContainer" parent="VBox/BodyScroll/Body"]
 layout_mode = 2

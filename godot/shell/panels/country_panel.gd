@@ -8,6 +8,7 @@ extends PanelFrame
 signal play_requested(tag: StringName)
 signal look_at_requested(hex: Vector2i)
 signal country_requested(tag: StringName)
+signal study_requested
 
 const NO_HEX := Country.NO_HEX
 const LAND_SHOWN := 3
@@ -23,6 +24,12 @@ const RELATION_WORDS: Dictionary = {"you": "your country", "neighbour": "neighbo
 @onready var _ledger: GridContainer = $VBox/BodyScroll/Body/Ledger
 @onready var _links: HFlowContainer = $VBox/BodyScroll/Body/NeighboursBox/Links
 @onready var _show: KitButton = $VBox/Foot/ShowOnMap
+@onready var _treasury_box: VBoxContainer = $VBox/BodyScroll/Body/TreasuryBox
+@onready var _treasury_value: Label = $VBox/BodyScroll/Body/TreasuryBox/Value
+@onready var _treasury_change: DeltaChip = $VBox/BodyScroll/Body/TreasuryBox/Change
+@onready var _treasury_expected: DeltaChip = $VBox/BodyScroll/Body/TreasuryBox/Expected
+@onready var _treasury_tax: Label = $VBox/BodyScroll/Body/TreasuryBox/Tax
+@onready var _study: KitButton = $VBox/BodyScroll/Body/TreasuryBox/OpenStudy
 
 var _tag: StringName = &""
 var _picking: bool = false
@@ -38,9 +45,12 @@ func _ready() -> void:
 	closed.connect(clear)
 	_play.pressed.connect(_on_play_pressed)
 	_show.pressed.connect(_on_show_pressed)
+	_study.pressed.connect(_on_study_pressed)
+	_wire_bus()
 
 
 func _exit_tree() -> void:
+	_unwire_bus()
 	PanelKit.free_retired(_retired)
 
 
@@ -77,6 +87,7 @@ func refresh() -> void:
 	_fill_picking(card)
 	_fill_ledger(card)
 	_fill_neighbours(card)
+	_fill_treasury(card)
 	_focus = card["focus"] as Vector2i
 	_show.disabled = _focus == NO_HEX
 	visible = true
@@ -250,3 +261,112 @@ func _on_play_pressed() -> void:
 
 func _on_show_pressed() -> void:
 	look_at_requested.emit(_focus)
+
+
+## Spec 6.10: the treasury section. Yours: the exact treasury, last season's change, the expected net (when the card
+## carries one) and the tax. A known foreign country: a banded figure only. Unknown: no section at all.
+func _fill_treasury(card: Dictionary) -> void:
+	var treasury := card["treasury"] as Dictionary
+	var shown := bool(treasury["shown"])
+	_treasury_box.visible = shown
+	if not shown:
+		_study.visible = false
+		return
+	var banded := bool(treasury["banded"])
+	var value := int(treasury["value"])
+	_treasury_value.text = "Treasury " + (Knowledge.band_text(value, "") if banded else Words.number(value))
+	_study.visible = not banded
+	_treasury_change.visible = not banded
+	_treasury_expected.visible = false
+	_treasury_tax.visible = false
+	if banded:
+		return
+	_treasury_change.set_delta(int(treasury["change"]), "", "Last season")
+	var expected: Variant = treasury["expected"]
+	if expected != null:
+		_treasury_expected.set_delta(int(expected), "", "Expected this season")
+		_treasury_expected.visible = true
+	_treasury_tax.text = "Taxes " + str(treasury["tax"])
+	_treasury_tax.visible = str(treasury["tax"]) != ""
+
+
+## The treasury section is shown (the viewer's own country or a known one).
+func treasury_visible() -> bool:
+	return _treasury_box.visible
+
+
+## "Treasury 658" or "Treasury about 1,900", or "" when hidden.
+func treasury_text() -> String:
+	return _treasury_value.text if _treasury_box.visible else ""
+
+
+## The last-season change readout, or "" when hidden (yours only).
+func change_text() -> String:
+	return _treasury_change.text() if _treasury_change.visible else ""
+
+
+## The expected net readout, or "" when the card carries none.
+func expected_text() -> String:
+	return _treasury_expected.text() if _treasury_expected.visible else ""
+
+
+## The tax line ("Taxes Normal"), or "" when hidden.
+func tax_text() -> String:
+	return _treasury_tax.text if _treasury_tax.visible else ""
+
+
+## The "Open the study" button (yours only).
+func study_button() -> KitButton:
+	return _study
+
+
+## The bus signals that change the treasury; each one refreshes the panel while it is shown.
+func _wiring() -> Array:
+	return [
+		[Events.season_ended, _on_season_ended],
+		[Events.tax_set, _on_tax_set],
+		[Events.work_started, _on_work_changed],
+		[Events.work_finished, _on_work_changed],
+		[Events.work_cancelled, _on_work_cancelled],
+	]
+
+
+func _wire_bus() -> void:
+	for pair: Array in _wiring():
+		var sig: Signal = pair[0]
+		var handler: Callable = pair[1]
+		if not sig.is_connected(handler):
+			sig.connect(handler)
+
+
+func _unwire_bus() -> void:
+	for pair: Array in _wiring():
+		var sig: Signal = pair[0]
+		var handler: Callable = pair[1]
+		if sig.is_connected(handler):
+			sig.disconnect(handler)
+
+
+func _refresh_if_shown() -> void:
+	if visible:
+		refresh()
+
+
+func _on_season_ended(_turn: int) -> void:
+	_refresh_if_shown()
+
+
+func _on_tax_set(_tag: StringName, _level: int) -> void:
+	_refresh_if_shown()
+
+
+func _on_work_changed(_tag: StringName, _hex: Vector2i, _work: Dictionary) -> void:
+	_refresh_if_shown()
+
+
+func _on_work_cancelled(_tag: StringName, _hex: Vector2i, _work: Dictionary, _why: StringName) -> void:
+	_refresh_if_shown()
+
+
+func _on_study_pressed() -> void:
+	study_requested.emit()

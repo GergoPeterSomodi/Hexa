@@ -14,7 +14,10 @@ var _flag: TaskFlag
 
 func before_each() -> void:
 	_prev_game = Session.game
-	var defs := load(DEFS_PATH) as GameDefs
+	var defs := load(DEFS_PATH).duplicate() as GameDefs  # rich: money and stores no season moves, so the M4 reminders stay quiet
+	defs.weather_odds = PackedInt32Array([100, 0, 0])
+	defs.start_treasury_base = 1000000
+	defs.reserve_seasons = 10000
 	_g = Game.new_scenario(load(MAP_PATH) as MapData, defs, defs.scenarios[defs.scenarios.size() - 1], 1480)
 	assert_true(bool(_g.act("choose_country", {"tag": &"GEN"})["ok"]))
 	_g.improvement.clear(SAVONA)

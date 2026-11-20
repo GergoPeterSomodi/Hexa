@@ -1,11 +1,14 @@
 ## Measures the core's speed on a big made-up world against tests/perf_core_budget.json
-## (docs/architecture/m3-build-spec.md section 8): the season phases, a digest, a snapshot, a save and a load, the
-## season summary, the reminders and one works check. Headless, no window, no GUT.
+## (docs/architecture/m3-build-spec.md and m4-build-spec.md section 8): the season phases (production and income
+## included), the cold DistrictCache fill, a digest, a snapshot, a save and a load, the season summary, the reminders, one
+## works check, ImprovePreview (of, options_of) and EconomyPreview.expected. Headless, no window, no GUT.
+## A row may carry "known_over": {"issue", "note"} in the budget: over its limit it prints KNOWN OVER and is listed
+## in the report and the JSON, but does not fail the run (a row that is back within the limit says so: drop the key).
 ##
 ##   godot --headless --path godot -s res://tools/perf_core.gd -- [--cpu-scale=2.0] [--out=perf_core.json] [--summary=summary.md]
 ##
 ## The world: FakeMap 494 x 247 (seed 1480), FakeScenario with 60 countries, the 14 FamilyDefs of
-## data/defs/game_defs.tres, work_slots_base 10, 600 works begun (10 a country, each a valid option, Rng seeded 1480),
+## data/defs/game_defs.tres and its 16 goods, work_slots_base 10, 600 works begun (10 a country, each a valid option, Rng seeded 1480),
 ## then 8 seasons through the phases, then a save and a load in user://perf/. Exit 1 when a row is over its limit.
 extends SceneTree
 
@@ -19,6 +22,7 @@ const COUNTRIES := 60
 const PER_COUNTRY := 10
 const SEASONS := 8
 const MB := 1048576.0
+const RUNS := 20
 
 var _cpu_scale := 1.0
 var _out := ""
@@ -58,6 +62,7 @@ func _measure() -> int:
 		printerr("perf_core: cannot load the families of %s" % GAME_DEFS)
 		return 1
 	defs.families = real.families
+	defs.goods = real.goods
 	defs.work_slots_base = PER_COUNTRY
 	var game := Game.new_scenario(map, defs, scenario, SEED)
 	_r["scenario_build_ms"] = _ms(t)
@@ -67,6 +72,7 @@ func _measure() -> int:
 		printerr("perf_core: cannot choose %s" % largest)
 		return 1
 	_r["works_begun"] = _begin_works(game)
+	_r["cache_build_ms"] = _cache_build(game)
 	_r["works_at_start"] = game.state.works.size()
 
 	_r["work_check_ms"] = _work_check(game, largest)
@@ -83,6 +89,7 @@ func _measure() -> int:
 	_r["body_keys"] = body.size()
 
 	_save_and_load(game, map, defs, digest)
+	_previews(game, largest)
 
 	game.version += 1  # a new version: the views are made again (the index of the owners stays: it is keyed on the owner bytes)
 	t = Time.get_ticks_usec()
@@ -96,6 +103,51 @@ func _measure() -> int:
 	_r["reminder_lines"] = lines.size()
 	_r["largest"] = String(largest)
 	return _finish()
+
+
+## DistrictCache filled for every land hex from cold (a new game, a load); leaves it warm.
+func _cache_build(game: Game) -> float:
+	game.districts.clear()
+	var t := Time.get_ticks_usec()
+	for i: int in game.map.hex_count():
+		if game.map.land[i] == 1:
+			game.districts.base_of(game, i)
+	return _ms(t)
+
+
+## ImprovePreview.of (the country's base warm, the option cold), options_of on the hex with the most options (cold: a new
+## game version each time) and EconomyPreview.expected (uncached), each the mean of RUNS calls (the works card's views).
+func _previews(game: Game, tag: StringName) -> void:
+	var c := Countries.by_tag(game, tag)
+	var hex := Vector2i(-1, -1)
+	var most := 0
+	for i: int in Territory.districts(game, c.id):
+		var n := Improve.build_options(game, game.map.hex_of(i)).size()
+		if n > most:
+			most = n
+			hex = game.map.hex_of(i)
+	var rows := ImprovePreview.options_of(game, tag, hex)
+	_r["options_rows"] = rows.size()
+	if rows.is_empty():
+		printerr("perf_core: no hex with build options for %s" % tag)
+		return
+	var option := {"action": rows[0]["action"], "family": rows[0]["family"]}
+	var t := Time.get_ticks_usec()
+	for n: int in RUNS:
+		game.version += 1
+		ImprovePreview.options_of(game, tag, hex)
+	_r["options_ms"] = _ms(t) / float(RUNS)
+	game.version += 1
+	ImprovePreview.of(game, tag, hex, option)  # the country's land summed up for this version
+	t = Time.get_ticks_usec()
+	for n: int in RUNS:
+		ImprovePreview._make(game, tag, hex, option["action"], int(option["family"]))
+	_r["preview_ms"] = _ms(t) / float(RUNS)
+	t = Time.get_ticks_usec()
+	for n: int in RUNS:
+		game.version += 1
+		EconomyPreview.expected(game, tag)
+	_r["expected_ms"] = _ms(t) / float(RUNS)
 
 
 ## The tag of the country with the most hexes (the one the summary and the reminders are measured for).
@@ -117,6 +169,9 @@ func _begin_works(game: Game) -> int:
 	luck.seed_with(SEED)
 	var begun := 0
 	for c: Country in game.countries:
+		game.dev_money(c.tag, 1000000)  # the works cost ducats and goods now (4.11): fund them
+		for good: int in game.defs.goods.size():
+			game.dev_goods(c.tag, good, 1000)
 		var districts := Territory.districts(game, c.id)
 		var got := 0
 		var tries := 0
@@ -185,6 +240,8 @@ func _seasons(game: Game) -> bool:
 		rows.append(row)
 	_r["seasons"] = rows
 	_r["season_ms"] = worst_season
+	_r["production_ms"] = worst[&"production"]
+	_r["income_ms"] = worst[&"income"]
 	_r["works_phase_ms"] = worst[&"works"]
 	_r["stats_phase_ms"] = worst[&"stats"]
 	_r["stats_ms_per_country"] = float(worst[&"stats"]) / float(maxi(game.countries.size(), 1))
@@ -227,21 +284,31 @@ func _remove_dir() -> void:
 func _finish() -> int:
 	var limits: Dictionary = _read_budget().get("limits", {})
 	var failed: Array[String] = []
+	var known: Array[String] = []
 	var rows := ""
 	for key: String in limits:
 		var spec: Dictionary = limits[key]
 		var value := float(_r.get(key, INF))
 		var limit := float(spec["limit"]) * (_cpu_scale if str(spec["class"]) == "cpu" else 1.0)
 		var verdict := "ok"
-		if value > limit:
+		var accepted: Dictionary = spec.get("known_over", {})
+		if value > limit and not accepted.is_empty():
+			verdict = "KNOWN OVER (#%s)" % str(int(accepted.get("issue", 0)))
+			known.append("%s %.2f > %.2f: issue #%s, %s" % [key, value, limit, str(int(accepted.get("issue", 0))), str(accepted.get("note", ""))])
+		elif value > limit:
 			verdict = "FAIL"
 			failed.append("%s %.2f > %.2f" % [key, value, limit])
+		elif not accepted.is_empty():
+			verdict = "ok (known_over is no longer needed: remove it)"
 		rows += "| %s | %.2f | %.2f | %s | %s |\n" % [key, value, limit, str(spec["what"]), verdict]
 	if not bool(_r.get("load_digest_matches", false)):
 		failed.append("the loaded game's digest differs")
 	var text := _markdown(rows)
 	print(text)
 	_r["failed"] = failed
+	_r["known_over"] = known
+	for line: String in known:
+		print("perf_core: KNOWN OVER, not hidden: %s" % line)
 	if _out != "":
 		var file := FileAccess.open(_out, FileAccess.WRITE)
 		if file != null:

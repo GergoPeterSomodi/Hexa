@@ -66,6 +66,37 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
+[node name="GivesRow" type="HBoxContainer" parent="Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Key" type="Label" parent="Body/GivesRow"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+text = "Gives"
+
+[node name="Value" type="Label" parent="Body/GivesRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TableRow"
+autowrap_mode = 3
+
+[node name="WorthRow" type="HBoxContainer" parent="Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Key" type="Label" parent="Body/WorthRow"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+text = "Worth, this season"
+
+[node name="Value" type="HBoxContainer" parent="Body/WorthRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
 [node name="Rule" type="HSeparator" parent="Body"]
 layout_mode = 2
 mouse_filter = 2

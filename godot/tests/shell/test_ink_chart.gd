@@ -170,3 +170,17 @@ func test_keyboard_cursor_activation_and_hover_card_tooltip() -> void:
 	assert_eq((card.get_node("VBox/Title") as Label).text, "Au 80")
 	assert_eq(card.rows_container().get_child_count(), 2, "tooltip includes series row and mark row")
 	card.free()
+
+
+func test_paired_bars_draw_the_before_series_hollow_and_the_after_solid() -> void:
+	var chart := InkChart.new()
+	chart.kind = InkChart.Kind.PAIRED_BARS
+	chart.set_series([
+		{"name": "Before", "values": PackedInt32Array([1, 2]), "ink": 0},
+		{"name": "After", "values": PackedInt32Array([2, 3]), "ink": 3},
+	])
+	assert_true(chart.is_hollow(0), "the before series (ink 0) is hollow")
+	assert_false(chart.is_hollow(1), "the after series (ink 3) is solid")
+	chart.kind = InkChart.Kind.LINE_BARS
+	assert_false(chart.is_hollow(0), "only paired bars are hollow")
+	chart.free()

@@ -134,3 +134,75 @@ func test_p_an_unknown_tag_or_no_game_hides_the_panel() -> void:
 	Session.end_game()
 	_panel.refresh()
 	assert_false(_panel.visible, "no game: hidden")
+
+func test_yours_shows_the_exact_treasury_change_and_tax() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	var gen := Countries.by_tag(Session.game, &"GEN")
+	_panel.show_country(&"GEN", false)
+	assert_true(_panel.treasury_visible())
+	assert_eq(_panel.treasury_text(), "Treasury " + Words.number(gen.treasury), "the exact treasury")
+	assert_true(_panel.change_text().begins_with("Last season"), "last season's change is shown")
+	assert_eq(_panel.tax_text(), "Taxes " + Words.tax_name(gen.tax), "the tax name")
+	assert_eq(_panel.expected_text(), "Expected this season +%d" % int(EconomyPreview.expected(Session.game, &"GEN")["net"]), "your card carries the expected net")
+	assert_true(_panel.study_button().visible, "the study button is yours")
+	assert_false(_panel.study_button().disabled)
+
+
+func test_a_known_foreign_country_is_banded_with_no_change_tax_or_study() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	var mlo := Countries.by_tag(Session.game, &"MLO")
+	_panel.show_country(&"MLO", false)
+	assert_true(_panel.treasury_visible(), "Milan borders Genoa: known")
+	assert_eq(_panel.treasury_text(), "Treasury " + Knowledge.band_text(mlo.treasury, ""), "the banded figure")
+	if Knowledge.band(mlo.treasury) != mlo.treasury:
+		assert_false(_panel.treasury_text().contains(Words.number(mlo.treasury)), "no exact figure anywhere")
+	assert_eq(_panel.change_text(), "", "no change for a foreign country")
+	assert_eq(_panel.tax_text(), "", "no tax for a foreign country")
+	assert_false(_panel.study_button().visible, "the study is yours only")
+
+
+func test_an_unknown_country_shows_no_treasury_section() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	_panel.show_country(&"FRA", false)
+	assert_false(_panel.treasury_visible(), "France does not border Genoa")
+	assert_eq(_panel.treasury_text(), "")
+	assert_false(_panel.study_button().visible)
+
+
+func test_with_no_player_every_country_is_banded() -> void:
+	_panel.show_country(&"GEN", false)
+	assert_true(_panel.treasury_visible())
+	assert_eq(_panel.change_text(), "", "no change without a player")
+	assert_false(_panel.study_button().visible)
+
+
+func test_the_expected_line_follows_the_card_and_a_banded_card_never_shows_change() -> void:
+	var yours := {"shown": true, "value": 658, "banded": false, "change": 48, "expected": 95, "tax": "Normal"}
+	_panel._fill_treasury({"treasury": yours})
+	assert_eq(_panel.change_text(), "Last season +48")
+	assert_eq(_panel.expected_text(), "Expected this season +95")
+	yours["expected"] = null
+	_panel._fill_treasury({"treasury": yours})
+	assert_eq(_panel.expected_text(), "", "a null expected hides the line")
+	# planted fault: a banded card that carries change, tax and expected must show none of them
+	var banded := {"shown": true, "value": 1900, "banded": true, "change": 50, "expected": 95, "tax": "Normal"}
+	_panel._fill_treasury({"treasury": banded})
+	assert_eq(_panel.treasury_text(), "Treasury about 1,900")
+	assert_eq(_panel.change_text(), "")
+	assert_eq(_panel.expected_text(), "")
+	assert_eq(_panel.tax_text(), "")
+
+
+func test_open_the_study_requests_the_study() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	_panel.show_country(&"GEN", false)
+	_panel.study_button().pressed.emit()
+	assert_signal_emitted(_panel, "study_requested")
+
+
+func test_the_treasury_refreshes_when_a_season_ends() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	_panel.show_country(&"GEN", false)
+	Countries.by_tag(Session.game, &"GEN").treasury = 999
+	Events.season_ended.emit(1)
+	assert_eq(_panel.treasury_text(), "Treasury 999")

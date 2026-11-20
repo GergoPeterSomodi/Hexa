@@ -170,3 +170,35 @@ func test_worth_by_hex_follows_4_17() -> void:
 	for row: Dictionary in rows:
 		total += int(row["worth"])
 	assert_gt(total, 0)
+
+
+func test_worth_of_equals_the_list_entry_for_every_district_of_genoa() -> void:
+	var g := EconomyFixture.game(&"GEN")
+	var rows := {}
+	for row: Dictionary in EconomyPreview.worth_by_hex(g, &"GEN"):
+		rows[row["hex"]] = row
+	var c := Countries.by_tag(g, &"GEN")
+	var checked := 0
+	for i: int in Territory.districts(g, c.id):
+		var hex := g.map.hex_of(i)
+		assert_eq(EconomyPreview.worth_of(g, &"GEN", hex), rows.get(hex, {}), "hex %s" % str(hex))
+		checked += 1
+	assert_gt(checked, 10)
+	assert_eq(EconomyPreview.worth_of(g, &"GEN", Vector2i(0, 0)), {}, "a hex of nobody's")
+	assert_eq(EconomyPreview.worth_of(g, &"NOPE", Vector2i(8, 13)), {})
+
+
+func test_a_short_and_a_long_ask_share_the_baseline_and_agree() -> void:
+	var g := EconomyFixture.game(&"GEN", true)
+	g.dev_money(&"GEN", 2000)
+	assert_true(bool(g.act("build", {"hex": EconomyFixture.VINEYARD_HEX, "family": VINEYARD, "tag": &"GEN"})["ok"]))
+	var short := EconomyPreview.with(g, &"GEN", {}, 1)
+	var long := EconomyPreview.with(g, &"GEN", {}, 8)
+	var again := EconomyPreview.with(g, &"GEN", {}, 1)
+	assert_eq(short["seasons"], again["seasons"])
+	assert_eq((long["seasons"] as Array)[0], (short["seasons"] as Array)[0])
+	var fresh := EconomyFixture.game(&"GEN", true)
+	fresh.dev_money(&"GEN", 2000)
+	fresh.act("build", {"hex": EconomyFixture.VINEYARD_HEX, "family": VINEYARD, "tag": &"GEN"})
+	assert_eq(EconomyPreview.with(fresh, &"GEN", {}, 8)["seasons"], long["seasons"], "the long ask first gives the same")
+	assert_true(is_same(EconomyPreview.baseline(g, &"GEN", 1, 1), EconomyPreview.baseline(g, &"GEN", 8, 1)), "one array for every horizon")

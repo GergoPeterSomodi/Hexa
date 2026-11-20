@@ -1,5 +1,5 @@
 ## Studiolo inspected-hex side panel tests (docs/architecture/m1-build-spec.md section 11, T14;
-## docs/architecture/ui-style-and-feedback-plan.md H1).
+## docs/architecture/ui-style-and-feedback-plan.md H1; m4-build-spec 6.4 for the rows, confirm and cancel).
 extends GutTest
 
 const PANEL := "res://shell/panels/hex_panel.tscn"
@@ -78,12 +78,64 @@ func _row_value(grid_path: String, key: String) -> String:
 	return ""
 
 
+## The reason lines under the rows (Reason-type labels inside the actions box, at any depth).
 func _reason_lines() -> Array[String]:
 	var out: Array[String] = []
-	for node: Node in (_panel.get_node("Body/ActionsBox/Actions") as VBoxContainer).get_children():
-		if node is Label:
-			out.append((node as Label).text)
+	_collect_reasons(_panel.get_node("Body/ActionsBox/Actions"), out)
 	return out
+
+
+func _collect_reasons(node: Node, out: Array[String]) -> void:
+	for child: Node in node.get_children():
+		if child is Label and (child as Label).theme_type_variation == &"Reason":
+			out.append((child as Label).text)
+		_collect_reasons(child, out)
+
+
+func _delta_chips(node: Node = null) -> Array[DeltaChip]:
+	var out: Array[DeltaChip] = []
+	var start: Node = _panel.get_node("Body/ActionsBox/Actions") if node == null else node
+	for child: Node in start.get_children():
+		if child is DeltaChip:
+			out.append(child as DeltaChip)
+		else:
+			out.append_array(_delta_chips(child))
+	return out
+
+
+## Records the panel's works_requested signal: each entry is [what, args].
+func _record_requests() -> Array:
+	var log: Array = []
+	_panel.works_requested.connect(func(what: StringName, args: Dictionary) -> void: log.append([what, args]))
+	return log
+
+
+func _set_mode(mode: String) -> void:
+	var s := Settings.new("macOS", false)
+	assert_true(s.set_value("game/confirm_works", mode), "the mode is a valid choice: " + mode)
+	_panel.set_settings(s)
+
+
+## A buildable hex of Genoa (the player's country in 1480), or Vector2i(-1, -1).
+func _gen_buildable() -> Vector2i:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480), "", "the scenario starts")
+	assert_true(bool(Session.act("choose_country", {"tag": "GEN"})["ok"]))
+	var args := _buildable_for(&"GEN", [])
+	if args.is_empty():
+		return Vector2i(-1, -1)
+	return args["hex"]
+
+
+## The first row of `hex` that is enabled and whose expensive flag is `want_expensive`, as [row, button]; [] when none.
+func _row_and_button(hex: Vector2i, want_expensive: bool) -> Array:
+	var rows := ImprovePreview.options_of(Session.game, &"GEN", hex)
+	var buttons := _panel.action_buttons()
+	assert_eq(buttons.size(), rows.size(), "one button per row")
+	for at: int in mini(rows.size(), buttons.size()):
+		var row: Dictionary = rows[at]
+		if bool((row["verdict"] as Dictionary)["ok"]) and bool(row["expensive"]) == want_expensive:
+			return [row, buttons[at]]
+	return []
 
 
 func test_it_is_hidden_until_a_hex_is_shown_and_stops_the_mouse_with_studiolo_frame() -> void:
@@ -103,7 +155,7 @@ func test_it_is_hidden_until_a_hex_is_shown_and_stops_the_mouse_with_studiolo_fr
 	assert_eq(_panel.cartouche().label().theme_type_variation, &"TitlePanel")
 	for button: Button in _panel.action_buttons():
 		assert_true(button is KitButton, "actions use Studiolo KitButton")
-		assert_eq(button.focus_mode, Control.FOCUS_NONE, "buttons take no keyboard focus")
+		assert_eq(button.focus_mode, Control.FOCUS_ALL, "the rows take keyboard focus")
 	_panel.clear()
 	assert_false(_panel.visible, "clear hides it")
 	assert_eq(_panel.shown_hex(), HexPanelContract.NO_HEX)
@@ -143,6 +195,7 @@ func test_a_sea_hex_shows_no_actions() -> void:
 	assert_eq(_panel.cartouche().label().text, "SEA")
 	assert_false((_panel.get_node("Body/ActionsBox") as VBoxContainer).visible)
 	assert_true(_panel.action_buttons().is_empty())
+	assert_false((_panel.get_node("Body/GivesRow") as HBoxContainer).visible, "a sea hex gives nothing")
 
 
 func test_a_refused_button_is_disabled_and_shows_its_reason() -> void:
@@ -160,12 +213,14 @@ func test_a_refused_button_is_disabled_and_shows_its_reason() -> void:
 	assert_not_null(clear_button, "a built hex has Clear")
 	assert_eq(clear_button.kind, KitButton.Kind.DANGER)
 	assert_true(clear_button.disabled, "a place is never pulled down, so Clear is refused")
-	var reason := str(Session.check("clear", {"hex": place_hex})["reason"])
-	assert_ne(reason, "", "the rules give a reason")
-	assert_eq(clear_button.tooltip_text, reason, "the reason is the tooltip")
-	assert_eq(clear_button.reason_text(), reason, "KitButton tracks verdict reason")
+	var verdict := Session.check("clear", {"hex": place_hex})
+	var piece_family := int(Improve.piece_at(game, place_hex)["family_id"])
+	var words := ImprovePreview.reason_words(game, place_hex, {"action": Works.CLEAR, "family": piece_family}, verdict)
+	assert_ne(words, "", "the rules give a reason")
+	assert_eq(clear_button.tooltip_text, words, "the reason is the tooltip")
+	assert_eq(clear_button.reason_text(), words, "KitButton tracks verdict reason")
 	assert_eq(clear_button.icon, clear_button.get_theme_icon(&"lock", &"Kit"), "refused KitButton shows lock icon")
-	assert_true(_reason_lines().has(reason), "the reason is a line under the actions")
+	assert_true(_reason_lines().has(words), "the reason is a line under the actions")
 
 
 func test_build_then_upgrade_then_clear_go_through_session() -> void:
@@ -223,6 +278,7 @@ func test_owner_row_is_hidden_and_the_home_rule_is_silent_in_a_map_only_game() -
 	assert_false((_panel.get_node("Body/OwnerRow") as HBoxContainer).visible, "no owner without countries")
 	assert_false((_panel.get_node("Body/HomeReason") as VBoxContainer).visible, "a map-only game has no home rule")
 	assert_true((_panel.get_node("Body/ActionsBox") as VBoxContainer).visible, "the works show")
+	assert_false((_panel.get_node("Body/WorthRow") as HBoxContainer).visible, "no worth without countries")
 
 
 func test_owner_link_opens_the_country_and_the_home_reason_explains_refusals() -> void:
@@ -258,6 +314,7 @@ func test_owner_link_opens_the_country_and_the_home_reason_explains_refusals() -
 	assert_true(reason.visible, "another's land: the reason shows")
 	assert_true(_reason_text_of(reason).begins_with("not your land"), "the refusal names the holder")
 	assert_false(actions.visible, "another's land: no works")
+	assert_false((_panel.get_node("Body/WorthRow") as HBoxContainer).visible, "another's land: no worth row")
 
 
 ## The first wild land hex (not in `skip`) where a build is allowed now, as the build's args {hex, family} (with the
@@ -292,6 +349,7 @@ func test_a_work_under_way_shows_its_section_and_its_cancel_button() -> void:
 	assert_eq((_panel.get_node("Body/WorkBox/Heading") as Label).text, "Work under way")
 	assert_eq((_panel.get_node("Body/WorkBox/Text") as Label).text, str(at["label"]))
 	assert_eq((_panel.get_node("Body/WorkBox/Progress") as Label).text, "%s, ready %s" % [at["progress"], at["ready"]])
+	assert_false((_panel.get_node("Body/ActionsBox") as VBoxContainer).visible, "the rows are hidden while the work runs")
 	var cancel := _button("Cancel the work") as KitButton
 	assert_not_null(cancel, "the player's own work has Cancel the work")
 	assert_false(cancel.disabled, "cancel is allowed")
@@ -353,11 +411,7 @@ func test_build_buttons_say_their_seasons() -> void:
 		var kit := buttons[at] as KitButton
 		var family := int(options[at]["family_id"])
 		var expected := Words.seasons(WorksView.seasons_of(Session.game, Works.BUILD, hex, family))
-		if kit.disabled:
-			assert_eq(kit.cost_text, "", "a refused build shows no seasons: %s" % options[at]["family"])
-		else:
-			assert_eq(kit.cost_text, expected, "build %s says its seasons" % options[at]["family"])
-			assert_true(kit.cost_text.ends_with("season") or kit.cost_text.ends_with("seasons"), "the cost is in seasons")
+		assert_eq(kit.cost_text, expected, "build %s says its seasons (refused or not)" % options[at]["family"])
 
 
 func test_upgrade_and_clear_buttons_say_their_seasons() -> void:
@@ -375,9 +429,8 @@ func test_upgrade_and_clear_buttons_say_their_seasons() -> void:
 	assert_not_null(down, "a piece has Clear")
 	var up_seasons := Words.seasons(WorksView.seasons_of(Session.game, Works.UPGRADE, hex, family))
 	var down_seasons := Words.seasons(WorksView.seasons_of(Session.game, Works.CLEAR, hex, family))
-	assert_eq(up.cost_text, "" if up.disabled else up_seasons, "Upgrade says its seasons when allowed, none when refused")
-	assert_eq(down.cost_text, "" if down.disabled else down_seasons, "Clear says its seasons when allowed, none when refused")
-	assert_false(down.disabled and down.cost_text != "", "a refused button never shows seasons")
+	assert_eq(up.cost_text, up_seasons, "Upgrade says its seasons")
+	assert_eq(down.cost_text, down_seasons, "Clear says its seasons")
 
 
 func test_a_full_slot_gives_its_reason_on_the_build_buttons() -> void:
@@ -407,7 +460,7 @@ func test_a_full_slot_gives_its_reason_on_the_build_buttons() -> void:
 			break
 	assert_ne(blocked, Vector2i(-1, -1), "a third build is refused by the slots")
 	_panel.show_hex(blocked)
-	var full := "no free work slot: 2 of 2 in use"
+	var full := "No free work slot: 2 of 2 in use."
 	var found := 0
 	for button: Button in _panel.action_buttons():
 		var kit := button as KitButton
@@ -416,6 +469,190 @@ func test_a_full_slot_gives_its_reason_on_the_build_buttons() -> void:
 			assert_eq(kit.tooltip_text, full, "the reason is the tooltip")
 	assert_gt(found, 0, "a build button shows the full slot's reason")
 	assert_true(_reason_lines().has(full), "the reason is a line under the buttons")
+
+
+func test_rows_show_their_label_cost_text_and_at_most_three_chips() -> void:
+	var hex := _gen_buildable()
+	assert_ne(hex, Vector2i(-1, -1), "Genoa can build somewhere")
+	_panel.show_hex(hex)
+	var rows := ImprovePreview.options_of(Session.game, &"GEN", hex)
+	var buttons := _panel.action_buttons()
+	assert_eq(buttons.size(), rows.size(), "one KitButton per row")
+	for at: int in rows.size():
+		var row: Dictionary = rows[at]
+		var kit := buttons[at] as KitButton
+		assert_eq(kit.text, str(row["label"]), "the row's label")
+		assert_eq(kit.cost_text, str(row["cost_text"]), "the row's cost text, e.g. '40 · 4 seasons'")
+		assert_true(kit.cost_text.ends_with("seasons") or kit.cost_text.ends_with("season"), "the cost ends in seasons")
+	var chips := _delta_chips()
+	var expected := 0
+	for row: Dictionary in rows:
+		expected += mini((row["chips"] as Array).size(), 3)
+	assert_eq(chips.size(), expected, "each row shows up to three DeltaChips from its chips")
+
+
+func test_a_refused_row_has_no_click_and_its_reason_is_words() -> void:
+	var hex := _gen_buildable()
+	_panel.show_hex(hex)
+	var rows := ImprovePreview.options_of(Session.game, &"GEN", hex)
+	var buttons := _panel.action_buttons()
+	for at: int in rows.size():
+		var verdict: Dictionary = rows[at]["verdict"]
+		if not bool(verdict["ok"]):
+			assert_true(buttons[at].disabled, "a refused row is disabled")
+			var words := ImprovePreview.reason_words(Session.game, hex, {"action": rows[at]["action"], "family": rows[at]["family"]}, verdict)
+			assert_true(_reason_lines().has(words), "the refused row's reason is a line: " + words)
+
+
+func test_confirm_off_asks_for_the_work_and_does_not_begin_it() -> void:
+	var hex := _gen_buildable()
+	_set_mode("off")
+	_panel.show_hex(hex)
+	var log := _record_requests()
+	var pair := _row_and_button(hex, false)
+	assert_false(pair.is_empty(), "an enabled row that is not expensive")
+	(pair[1] as Button).pressed.emit()
+	await _settle()
+	assert_eq(log.size(), 1, "one request")
+	assert_eq(log[0][0], &"begin_work", "off: the click asks for the work")
+	assert_eq(str((log[0][1] as Dictionary)["option"]["action"]), str((pair[0] as Dictionary)["action"]), "the request names the row")
+	assert_eq(log[0][1]["hex"], hex, "the request names the hex")
+	assert_null(Session.game.state.work_at(hex), "the panel did not begin it itself: the App does")
+
+
+func test_confirm_always_opens_the_card_for_every_row() -> void:
+	var hex := _gen_buildable()
+	_set_mode("always")
+	_panel.show_hex(hex)
+	var log := _record_requests()
+	var pair := _row_and_button(hex, false)
+	assert_false(pair.is_empty(), "an enabled row")
+	(pair[1] as Button).pressed.emit()
+	await _settle()
+	assert_eq(log.size(), 1, "one request")
+	assert_eq(log[0][0], &"works_card", "always: the click opens the card")
+	assert_null(Session.game.state.work_at(hex), "no work begun")
+
+
+func test_confirm_expensive_opens_the_card_only_for_expensive_rows() -> void:
+	var hex := _gen_buildable()
+	_set_mode("expensive")
+	_panel.show_hex(hex)
+	var log := _record_requests()
+	var cheap := _row_and_button(hex, false)
+	if cheap.is_empty():
+		pending("no enabled row that is not expensive at this hex")
+	else:
+		(cheap[1] as Button).pressed.emit()
+		await _settle()
+		assert_eq(log[-1][0], &"begin_work", "a cheap row begins the work")
+	var dear := _row_and_button(hex, true)
+	if dear.is_empty():
+		pending("no enabled expensive row at this hex")
+	else:
+		var before := log.size()
+		(dear[1] as Button).pressed.emit()
+		await _settle()
+		assert_eq(log.size(), before + 1, "one request for the expensive row")
+		assert_eq(log[-1][0], &"works_card", "an expensive row opens the card first")
+
+
+func test_the_default_confirm_mode_is_expensive() -> void:
+	var hex := _gen_buildable()
+	_panel.show_hex(hex)
+	var log := _record_requests()
+	var cheap := _row_and_button(hex, false)
+	assert_false(cheap.is_empty(), "an enabled row that is not expensive")
+	(cheap[1] as Button).pressed.emit()
+	await _settle()
+	assert_eq(log[-1][0], &"begin_work", "no settings: a cheap row begins the work")
+
+
+func test_row_hover_emits_row_hovered_and_leaving_emits_row_unhovered() -> void:
+	var hex := _gen_buildable()
+	_panel.show_hex(hex)
+	var hovered: Array = []
+	var left := [0]
+	_panel.row_hovered.connect(func(h: Vector2i, option: Dictionary) -> void: hovered.append([h, option]))
+	_panel.row_unhovered.connect(func() -> void: left[0] += 1)
+	var rows := ImprovePreview.options_of(Session.game, &"GEN", hex)
+	var buttons := _panel.action_buttons()
+	assert_gt(buttons.size(), 0, "the hex has rows")
+	buttons[0].mouse_entered.emit()
+	assert_eq(hovered.size(), 1, "hovering a row emits once")
+	assert_eq(hovered[0][0], hex, "the hex of the row")
+	assert_eq(str((hovered[0][1] as Dictionary)["action"]), str(rows[0]["action"]), "the row's action")
+	assert_eq(int((hovered[0][1] as Dictionary)["family"]), int(rows[0]["family"]), "the row's family")
+	buttons[0].mouse_exited.emit()
+	assert_eq(left[0], 1, "leaving emits row_unhovered")
+
+
+func test_the_info_button_opens_the_card_and_is_not_a_row() -> void:
+	var hex := _gen_buildable()
+	_panel.show_hex(hex)
+	var log := _record_requests()
+	var info: Button = null
+	for node: Node in _panel.find_children("*", "Button", true, false):
+		if node is Button and not (node is KitButton) and (node as Button).tooltip_text == "Show the card":
+			info = node as Button
+			break
+	assert_not_null(info, "each row has an (i) button")
+	info.pressed.emit()
+	assert_eq(log[-1][0], &"works_card", "(i) asks for the card")
+	assert_null(Session.game.state.work_at(hex), "(i) begins nothing")
+
+
+func test_cancel_asks_for_the_cancel_with_its_refund() -> void:
+	var hex := _gen_buildable()
+	var args := _buildable_for(&"GEN", [])
+	assert_false(args.is_empty(), "Genoa can start a build")
+	assert_true(bool(Session.act("build", args)["ok"]), "the build is accepted")
+	var work_hex: Vector2i = args["hex"]
+	assert_ne(hex, Vector2i(-1, -1), "Genoa can build somewhere")
+	var work := Session.game.state.work_at(work_hex)
+	assert_not_null(work, "the work is under way")
+	var expected := Works.refund(Session.game, work)
+	_panel.show_hex(work_hex)
+	var log := _record_requests()
+	await _press("Cancel the work")
+	assert_eq(log.size(), 1, "the cancel is one request")
+	assert_eq(log[0][0], &"cancel_work", "the request is cancel_work")
+	assert_eq(int(log[0][1]["refund"]), expected, "the request carries the refund")
+	assert_eq(log[0][1]["hex"], work_hex, "and its hex")
+	assert_not_null(Session.game.state.work_at(work_hex), "the App cancels it, not the panel")
+
+
+func test_gives_and_worth_rows_show_the_hex_card_and_the_worth() -> void:
+	var hex := _gen_buildable()
+	assert_ne(hex, Vector2i(-1, -1), "Genoa can build somewhere")
+	var worth_rows := EconomyPreview.worth_by_hex(Session.game, &"GEN")
+	assert_false(worth_rows.is_empty(), "Genoa's land has a worth this season")
+	var row: Dictionary = worth_rows[0]
+	var worth_hex: Vector2i = row["hex"]
+	_panel.show_hex(worth_hex)
+	var gives_row := _panel.get_node("Body/GivesRow") as HBoxContainer
+	var gives := str(HexCard.of(Session.game, worth_hex).get("gives", ""))
+	assert_eq(gives_row.visible, gives != "", "the Gives row shows when the hex card has a Gives line")
+	assert_eq((_panel.get_node("Body/GivesRow/Value") as Label).text, gives, "the Gives text is the hex card's")
+	var worth_row := _panel.get_node("Body/WorthRow") as HBoxContainer
+	assert_true(worth_row.visible, "the Worth row shows for a held hex")
+	var chips := (_panel.get_node("Body/WorthRow/Value") as HBoxContainer).get_children()
+	assert_eq(chips.size(), 1, "one DeltaChip")
+	var chip := chips[0] as DeltaChip
+	assert_not_null(chip, "the worth is a DeltaChip")
+	assert_true(chip.text().contains(str(absi(int(row["worth"])))), "the chip shows the worth: " + chip.text())
+	assert_eq((_panel.get_node("Body/WorthRow/Key") as Label).text, "Worth, this season")
+
+
+func test_a_row_click_with_no_listener_begins_the_work_itself() -> void:
+	var hex := _gen_buildable()
+	_set_mode("off")
+	_panel.show_hex(hex)
+	var pair := _row_and_button(hex, false)
+	assert_false(pair.is_empty(), "an enabled row")
+	(pair[1] as Button).pressed.emit()
+	await _settle()
+	assert_not_null(Session.game.state.work_at(hex), "without a listener the M3 path begins the work")
 
 
 func _has_enabled(prefix: String) -> bool:
