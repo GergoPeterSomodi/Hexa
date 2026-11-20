@@ -1,0 +1,79 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/hud/action_log.gd" id="1_log"]
+
+[node name="ActionLog" type="VBoxContainer"]
+mouse_filter = 2
+script = ExtResource("1_log")
+
+[node name="Bar" type="PanelContainer" parent="."]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+theme_type_variation = &"PanelBar"
+mouse_filter = 2
+
+[node name="Row" type="HBoxContainer" parent="Bar"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Keyword" type="Label" parent="Bar/Row"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+mouse_filter = 2
+
+[node name="Sentence" type="Label" parent="Bar/Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Body"
+clip_text = true
+text_overrun_behavior = 3
+mouse_filter = 2
+
+[node name="Badge" type="PanelContainer" parent="Bar/Row"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"PanelSlot"
+mouse_filter = 2
+
+[node name="BadgeText" type="Label" parent="Bar/Row/Badge"]
+layout_mode = 2
+theme_type_variation = &"NumberBad"
+mouse_filter = 2
+
+[node name="Toggle" type="Button" parent="Bar/Row"]
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"ButtonSmall"
+text = "Log"
+
+[node name="Card" type="PanelContainer" parent="."]
+visible = false
+custom_minimum_size = Vector2(470, 268)
+layout_mode = 2
+theme_type_variation = &"PanelCard"
+mouse_filter = 2
+
+[node name="VBox" type="VBoxContainer" parent="Card"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="HBoxContainer" parent="Card/VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Close" type="Button" parent="Card/VBox/Head"]
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"ButtonSmall"
+tooltip_text = "Esc"
+text = "Close"
+
+[node name="Scroll" type="ScrollContainer" parent="Card/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Seasons" type="VBoxContainer" parent="Card/VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2

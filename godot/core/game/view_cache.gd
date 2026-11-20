@@ -7,6 +7,7 @@ const SIZE := 64
 
 var _values: Dictionary = {}
 var _order: Array = []
+var _pins: Dictionary = {}
 
 
 func get_or_make(key: Array, make: Callable) -> Variant:
@@ -20,6 +21,18 @@ func get_or_make(key: Array, make: Callable) -> Variant:
 	return value
 
 
+## A value kept in its own named slot, outside the 64: `make` runs again only when `key` differs from the key the slot
+## was made with. For a big index that must outlive the ordinary entries (the owner index of Territory). Not counted by
+## `size()`; forgotten by `clear()`.
+func pinned(slot: StringName, key: Variant, make: Callable) -> Variant:
+	var held: Variant = _pins.get(slot)
+	if held != null and (held as Array)[0] == key:
+		return (held as Array)[1]
+	var value: Variant = make.call()
+	_pins[slot] = [key, value]
+	return value
+
+
 func size() -> int:
 	return _values.size()
 
@@ -27,3 +40,4 @@ func size() -> int:
 func clear() -> void:
 	_values.clear()
 	_order.clear()
+	_pins.clear()

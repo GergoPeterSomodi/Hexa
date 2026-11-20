@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/hud/notifications.gd" id="1_notif"]
+
+[node name="Notifications" type="VBoxContainer"]
+custom_minimum_size = Vector2(300, 0)
+mouse_filter = 2
+script = ExtResource("1_notif")

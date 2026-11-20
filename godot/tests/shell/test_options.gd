@@ -45,11 +45,11 @@ func test_options_opens_with_studiolo_geometry_focus_and_bidirectional_schema_pa
 	assert_eq(_harness.viewport.gui_get_focus_owner(), options.nav_list().button_for(&"display"))
 	assert_true(options.apply_button().disabled, "Apply starts disabled with no staged changes")
 
-	# Schema -> Row: every 1.5 key with a non-empty page has a matching OptionRow
+	# Schema -> Row: every key up to milestone 3 with a non-empty page has a matching OptionRow
 	var expected_1_5_keys: Dictionary[String, bool] = {}
 	for key: String in Settings.SCHEMA.keys():
 		var entry: Dictionary = Settings.SCHEMA[key]
-		if str(entry.get("since", "")) == "1.5" and not str(entry.get("page", "")).is_empty():
+		if float(str(entry.get("since", "1.5"))) <= 3.0 and not str(entry.get("page", "")).is_empty():
 			expected_1_5_keys[key] = true
 			var row := options.option_row(key)
 			assert_not_null(row, "Options has OptionRow for M1.5 key %s" % key)
@@ -310,3 +310,21 @@ func test_graphics_page_texture_quality_presets_and_page_defaults() -> void:
 	assert_eq(_harness.settings.get_value("graphics/relief_shading"), true)
 	assert_eq(_harness.settings.get_value("display/fps_cap"), 60, "Display fps_cap preserved")
 	assert_eq(_harness.settings.get_value("graphics/preload_next_season"), false, "Advanced preload preserved")
+
+
+func test_game_page_shows_the_three_milestone_three_rows() -> void:
+	var options := ScreenIds.make(&"options") as Options
+	_harness.stack.push(options)
+	await _harness.wait_frames(self, 2)
+
+	options.nav_list().select(&"game", true)
+	await _harness.wait_frames(self, 1)
+	assert_eq(options.current_page(), &"game")
+	var keys: Array[String] = []
+	for row: OptionRow in options.page_rows(&"game"):
+		keys.append(row.key())
+	keys.sort()
+	assert_eq(keys, ["game/autosave", "game/season_report", "game/task_flag"])
+	assert_not_null(options.option_row("graphics/season_change"), "Season change on Graphics")
+	assert_not_null(options.option_row("dev/save_json"), "Write saves as JSON too on Advanced")
+	assert_null(options.option_row("game/confirm_works"), "milestone 4 rows stay hidden")

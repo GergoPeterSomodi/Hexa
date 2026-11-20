@@ -13,6 +13,8 @@ signal slice_ms_changed(ms: int)
 const REFRESH_INTERVAL_SEC: float = 0.25
 const SEASON_NAMES: Array[String] = ["spring", "summer", "autumn", "winter"]
 const SEASON_LABELS: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
+## The Look control: the calendar (-1) and the four seasons.
+const LOOK_CALENDAR := -1
 const MODE_WORDS: Array[String] = ["Terrain", "Owner", "Relief"]
 const LAYER_SPECS: Array[Array] = [
 	[&"grid", "Grid"],
@@ -24,6 +26,8 @@ const LAYER_SPECS: Array[Array] = [
 ]
 
 @onready var _metrics_label: Label = $VBox/Metrics
+@onready var _m3_label: Label = $VBox/M3Line
+@onready var _console: DevConsole = $VBox/DevConsole
 @onready var _season_seg: Segmented = $VBox/SeasonSeg
 @onready var _new_seed_btn: KitButton = $VBox/ControlsTop/NewSeedButton
 @onready var _layers_grid: GridContainer = $VBox/LayersGrid
@@ -38,7 +42,8 @@ var _refresh_clock: float = 0.0
 var _worst_clock: float = 0.0
 var _worst_frame_ms: float = 0.0
 var _syncing: bool = false
-var _season_index: int = 1
+var _season_index: int = LOOK_CALENDAR
+var _save_ms: float = -1.0
 var _hovered_hex: Vector2i = MapInput.NO_HEX
 
 
@@ -47,7 +52,7 @@ func _ready() -> void:
 	visible = false
 
 	_season_seg.hud_mode = true
-	var season_items: Array[Dictionary] = []
+	var season_items: Array[Dictionary] = [{"id": LOOK_CALENDAR, "label": "Calendar"}]
 	for i: int in SEASON_LABELS.size():
 		season_items.append({"id": i, "label": SEASON_LABELS[i]})
 	_season_seg.set_options(season_items)
@@ -150,7 +155,7 @@ func set_hovered_hex(hex: Vector2i) -> void:
 
 
 func set_season(index: int) -> void:
-	_season_index = clampi(index, 0, SEASON_NAMES.size() - 1)
+	_season_index = clampi(index, LOOK_CALENDAR, SEASON_NAMES.size() - 1)
 	if is_node_ready():
 		_season_seg.select(_season_index, false)
 
@@ -169,8 +174,38 @@ func set_layer_switch(layer_name: StringName, on: bool) -> void:
 		_syncing = false
 
 
+## Gives the console its context (the App's) so `end`, `goto` and `look` reach the App.
+func setup_console(ctx: ShellContext) -> void:
+	_console.setup(ctx)
+
+
+func console() -> DevConsole:
+	return _console
+
+
+## F2: opens the panel (with developer tools on) and puts the cursor in the console. False when it cannot open.
+func focus_console() -> bool:
+	if not visible:
+		set_open(true)
+	if not visible:
+		return false
+	_console.focus_line()
+	return true
+
+
+## The time of the last save in ms (the App measures it around `Session.save_game`); shown in the M3 line.
+func record_save_ms(ms: float) -> void:
+	_save_ms = ms
+	if visible:
+		refresh_metrics()
+
+
 func metrics_text() -> String:
 	return _metrics_label.text if is_node_ready() else ""
+
+
+func m3_text() -> String:
+	return _m3_label.text if is_node_ready() else ""
 
 
 func season_segmented() -> Segmented:
@@ -224,6 +259,22 @@ func refresh_metrics() -> void:
 		],
 	]
 	_metrics_label.text = "\n".join(lines)
+	_m3_label.text = m3_line()
+
+
+## "turn 9 · Spring 1482 · works 3 · phases works 0.4, stats 0.2, calendar 0.0 ms · save 32 ms".
+func m3_line() -> String:
+	var game := Session.game
+	if game == null:
+		return "no game"
+	var works := game.state.works.size() if game.state != null else 0
+	var phases: PackedStringArray = []
+	for phase: String in Session.last_phase_ms:
+		phases.append("%s %.1f" % [phase, float(Session.last_phase_ms[phase])])
+	var phase_text := "none yet" if phases.is_empty() else ", ".join(phases) + " ms"
+	var save_text := "none yet" if _save_ms < 0.0 else "%d ms" % roundi(_save_ms)
+	return "turn %d · %s · works %d · phases %s · save %s" % [
+		game.turn, game.date_text(), works, phase_text, save_text]
 
 
 func _collect_metrics() -> Dictionary:
@@ -350,7 +401,7 @@ func _on_layer_switch(layer_id: StringName, on: bool) -> void:
 
 
 func _on_season_changed(id: Variant) -> void:
-	var idx := clampi(int(id), 0, SEASON_NAMES.size() - 1)
+	var idx := clampi(int(id), LOOK_CALENDAR, SEASON_NAMES.size() - 1)
 	_season_index = idx
 	season_preview_requested.emit(idx)
 	if visible:

@@ -15,7 +15,10 @@ const COLUMN_HALF_W := 168.0
 @onready var _menu_column: VBoxContainer = $MenuColumn
 @onready var _wordmark_rect: TextureRect = $MenuColumn/Wordmark
 @onready var _rule_rect: TextureRect = $MenuColumn/Rule
+@onready var _continue_btn: KitButton = $MenuColumn/Sheet/Buttons/ContinueButton
+@onready var _continue_hint: Label = $MenuColumn/Sheet/Buttons/ContinueHint
 @onready var _new_game_btn: KitButton = $MenuColumn/Sheet/Buttons/NewGameButton
+@onready var _load_btn: KitButton = $MenuColumn/Sheet/Buttons/LoadButton
 @onready var _sandbox_btn: KitButton = $MenuColumn/Sheet/Buttons/SandboxButton
 @onready var _options_btn: KitButton = $MenuColumn/Sheet/Buttons/OptionsButton
 @onready var _credits_btn: KitButton = $MenuColumn/Sheet/Buttons/CreditsButton
@@ -33,7 +36,9 @@ func _ready() -> void:
 	_ui_ready = true
 	_menu_column.offset_left = float(Tokens.MENU_COLUMN_X) - COLUMN_HALF_W
 	_menu_column.offset_right = float(Tokens.MENU_COLUMN_X) + COLUMN_HALF_W
+	_continue_btn.pressed.connect(_on_continue_pressed)
 	_new_game_btn.pressed.connect(_on_new_game_pressed)
+	_load_btn.pressed.connect(_on_load_pressed)
 	_sandbox_btn.pressed.connect(_on_sandbox_pressed)
 	_options_btn.pressed.connect(_on_options_pressed)
 	_credits_btn.pressed.connect(_on_credits_pressed)
@@ -43,6 +48,7 @@ func _ready() -> void:
 	_version_label.text = _format_version()
 	_refresh_kit_art()
 	_sync_dev_visibility()
+	_refresh_saves()
 
 
 func _exit_tree() -> void:
@@ -60,6 +66,7 @@ func on_enter() -> void:
 	_refresh_kit_art()
 	_connect_settings()
 	_sync_dev_visibility()
+	_refresh_saves()
 	_start_motion()
 
 
@@ -91,6 +98,18 @@ func credits_button() -> KitButton:
 
 func quit_button() -> KitButton:
 	return _quit_btn
+
+
+func continue_button() -> KitButton:
+	return _continue_btn
+
+
+func continue_hint() -> Label:
+	return _continue_hint
+
+
+func load_button() -> KitButton:
+	return _load_btn
 
 
 func background_rect() -> TextureRect:
@@ -183,17 +202,62 @@ func _sync_dev_visibility() -> void:
 		dev_on = bool(ctx.settings.get_value("dev/developer_tools"))
 	_sandbox_btn.visible = dev_on
 	_dev_note.visible = dev_on
-	default_focus = get_path_to(_new_game_btn)
+	_refresh_default_focus()
 	if is_inside_tree() and not dev_on and _sandbox_btn.has_focus():
 		_new_game_btn.grab_focus()
 
 
-func _push_screen(id: StringName) -> void:
+## Continue holds focus when a save exists, else New game.
+func _refresh_default_focus() -> void:
+	var primary: Control = _continue_btn if _continue_btn.visible else _new_game_btn
+	default_focus = get_path_to(primary)
+
+
+## Continue (with its line of the save) and Load game show only when a save exists; the newest save is Continue.
+func _refresh_saves() -> void:
+	var newest: Dictionary = Session.newest_save() if Session.has_method(&"newest_save") else {}
+	var has_save := not newest.is_empty()
+	_continue_btn.visible = has_save
+	_continue_hint.visible = has_save
+	_load_btn.visible = has_save
+	_continue_btn.kind = KitButton.Kind.MENU_PRIMARY
+	_new_game_btn.kind = KitButton.Kind.MENU if has_save else KitButton.Kind.MENU_PRIMARY
+	_continue_hint.text = _save_line(newest) if has_save else ""
+	_refresh_default_focus()
+
+
+## "Republic of Genoa · Spring 1482"; a sandbox save reads "Map sandbox · Spring 1482".
+func _save_line(newest: Dictionary) -> String:
+	var header := newest.get("header", {}) as Dictionary
+	var country := str(header.get("country", ""))
+	if country == "Sandbox" or (country.is_empty() and str(header.get("scenario_id", "")).is_empty()):
+		country = "Map sandbox"
+	var date := str(header.get("date", ""))
+	return date if country.is_empty() else "%s · %s" % [country, date]
+
+
+func _push_screen(id: StringName) -> Screen:
 	if ctx == null or ctx.stack == null or not ctx.stack.has_method(&"push"):
-		return
+		return null
 	var next := ScreenIds.make(id)
 	if next != null:
 		ctx.stack.call(&"push", next)
+	return next
+
+
+## Continue loads the newest save (the App starts it, with the Loading screen).
+func _on_continue_pressed() -> void:
+	var newest: Dictionary = Session.newest_save() if Session.has_method(&"newest_save") else {}
+	if newest.is_empty() or ctx == null:
+		return
+	ctx.request(&"load", {"slot": str(newest["slot"])})
+
+
+## Load game opens the Save and Load screen on its Load tab.
+func _on_load_pressed() -> void:
+	if ctx == null or ctx.stack == null or not ctx.stack.has_method(&"push"):
+		return
+	ctx.stack.call(&"push", SaveLoad.make(&"load"))
 
 
 func _on_new_game_pressed() -> void:

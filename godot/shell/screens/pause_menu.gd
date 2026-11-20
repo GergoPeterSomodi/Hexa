@@ -123,6 +123,7 @@ func _ensure_ui() -> void:
 	body.add_child(_quit_btn)
 
 	body.add_child(_build_hint_row())
+	body.add_child(_build_quick_row())
 	default_focus = get_path_to(_resume_btn)
 
 
@@ -137,15 +138,25 @@ func _make_menu_button(node_name: StringName, label_text: String, btn_kind: KitB
 
 
 func _build_hint_row() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.name = &"HintRow"
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pairs: Array[Array] = [
+	return _key_row(&"HintRow", [
 		[&"app_back", "back to the map"],
 		[&"app_help", "keys"],
 		[&"app_fullscreen", "window mode"],
-	]
+	])
+
+
+func _build_quick_row() -> HBoxContainer:
+	return _key_row(&"QuickRow", [
+		[&"game_quicksave", "quicksave"],
+		[&"game_quickload", "quickload"],
+	])
+
+
+func _key_row(node_name: StringName, pairs: Array[Array]) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = node_name
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for pair: Array in pairs:
 		var cap := KeyCap.new()
 		cap.action = pair[0] as StringName
@@ -157,19 +168,24 @@ func _build_hint_row() -> HBoxContainer:
 	return row
 
 
-## The long name of your country in a scenario game ("Republic of Genoa"), the scenario while none is chosen,
-## else the sandbox line. M3 adds the date.
+## "Republic of Genoa · Spring 1480" in a scenario game (the scenario's name while no country is chosen), and
+## "North Italy · Sandbox, seed 1480 · Spring 1480" in a sandbox game.
 func _subtitle_text() -> String:
 	var game := Session.game
 	if game == null:
 		return "Map sandbox"
+	var date := game.date_text()
 	if game.has_countries():
+		var head := ""
 		if game.player != &"":
 			var card := CountryCard.of(game, game.player)
 			if not card.is_empty():
-				return str(card["long_name"])
-		return game.scenario.name if game.scenario != null and not game.scenario.name.is_empty() else "Choosing a country"
-	return "Map sandbox · seed %d" % game.seed_value
+				head = str(card["long_name"])
+		if head.is_empty():
+			head = game.scenario.name if game.scenario != null and not game.scenario.name.is_empty() else "Choosing a country"
+		return "%s · %s" % [head, date]
+	var map_title := game.map.id.replace("_", " ").capitalize()
+	return "%s · Sandbox, seed %d · %s" % [map_title, game.seed_value, date]
 
 
 func _refresh_state() -> void:
@@ -180,14 +196,23 @@ func _refresh_state() -> void:
 
 	_subtitle_label.text = _subtitle_text()
 
-	# Until the Save and Load screen exists (M3 Y14) the buttons stay hidden; Y15 removes this check.
-	var has_saves := Session.has_method(&"save_game") and ResourceLoader.exists("res://shell/screens/save_load.tscn")
-	_save_btn.visible = has_saves
-	_load_btn.visible = has_saves
-	if has_saves and Session.has_method(&"is_season_running") and bool(Session.call(&"is_season_running")):
+	var can_save := Session.has_method(&"save_game")
+	_save_btn.visible = can_save
+	_load_btn.visible = can_save
+	if can_save and _season_running():
 		_save_btn.set_verdict({"ok": false, "reason": "Wait for the season to end"})
 	else:
 		_save_btn.set_verdict({"ok": true})
+
+
+## True while the season runs (SeasonFlow RUNNING, D48). The App or the context exposes it as `season_running`
+## or Session as `is_season_running`; neither is wired yet, so the verdict stays open until one is.
+func _season_running() -> bool:
+	if ctx != null and ctx.has_method(&"season_running"):
+		return bool(ctx.call(&"season_running"))
+	if Session.has_method(&"is_season_running"):
+		return bool(Session.call(&"is_season_running"))
+	return false
 
 
 func _has_unsaved_actions() -> bool:
@@ -245,11 +270,28 @@ func _on_resume_pressed() -> void:
 
 
 func _on_save_pressed() -> void:
-	_push_screen(&"save_load")
+	if _season_running():
+		return
+	_push_save_load(&"save")
 
 
 func _on_load_pressed() -> void:
-	_push_screen(&"save_load")
+	_push_save_load(&"load")
+
+
+## Opens the Save and Load screen on `tab` (SaveLoad.TAB_SAVE or TAB_LOAD).
+func _push_save_load(tab: StringName) -> void:
+	_push_made(SaveLoad.make(tab))
+
+
+## Pushes a screen built by the caller (its start tab already set).
+func _push_made(screen: Screen) -> void:
+	if screen == null:
+		return
+	if ctx == null or ctx.stack == null or not ctx.stack.has_method(&"push"):
+		screen.queue_free()
+		return
+	ctx.stack.call(&"push", screen)
 
 
 func _on_options_pressed() -> void:

@@ -168,7 +168,7 @@ static func build(game: Game, args: Dictionary) -> Dictionary:
 	var verdict := build_check(game, args)
 	if bool(verdict["ok"]):
 		var hex: Vector2i = args["hex"]
-		game.improvement.build_on(hex, int(args["family"]))
+		game.improvement.put_piece(hex, int(args["family"]), 1)
 		_changed(game, hex)
 	return verdict
 
@@ -184,7 +184,7 @@ static func upgrade(game: Game, args: Dictionary) -> Dictionary:
 	var verdict := upgrade_check(game, args)
 	if bool(verdict["ok"]):
 		var hex: Vector2i = args["hex"]
-		game.improvement.upgrade(hex)
+		game.improvement.put_piece(hex, game.improvement.family_at(hex), game.improvement.level_at(hex) + 1)
 		_changed(game, hex)
 	return verdict
 
@@ -200,7 +200,36 @@ static func clear(game: Game, args: Dictionary) -> Dictionary:
 	var verdict := clear_check(game, args)
 	if bool(verdict["ok"]):
 		var hex: Vector2i = args["hex"]
-		game.improvement.clear(hex)
+		game.improvement.put_piece(hex, ImproveRules.NONE, 0)
+		_changed(game, hex)
+	return verdict
+
+
+# ----- the same three actions for a caller that has checked the home rule itself (Works, at the end of a work) --------
+
+
+## Build, upgrade or clear on `hex` when the pieces' own rules allow it: Improve's actions without the home rule, which
+## the caller has just checked. {ok, reason} as the actions; hex_changed is queued on success.
+static func build_here(game: Game, hex: Vector2i, family: int) -> Dictionary:
+	var verdict := game.improvement.build_check(hex, family)
+	if bool(verdict["ok"]):
+		game.improvement.put_piece(hex, family, 1)
+		_changed(game, hex)
+	return verdict
+
+
+static func upgrade_here(game: Game, hex: Vector2i) -> Dictionary:
+	var verdict := game.improvement.upgrade_check(hex)
+	if bool(verdict["ok"]):
+		game.improvement.put_piece(hex, game.improvement.family_at(hex), game.improvement.level_at(hex) + 1)
+		_changed(game, hex)
+	return verdict
+
+
+static func clear_here(game: Game, hex: Vector2i) -> Dictionary:
+	var verdict := game.improvement.clear_check(hex)
+	if bool(verdict["ok"]):
+		game.improvement.put_piece(hex, ImproveRules.NONE, 0)
 		_changed(game, hex)
 	return verdict
 

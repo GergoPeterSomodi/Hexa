@@ -153,11 +153,12 @@ static func cancel_work(game: Game, args: Dictionary) -> Dictionary:
 ## The works phase (4.3): every work in id order is lost, halted or advanced; a finished one puts its piece.
 static func season(game: Game) -> void:
 	var under_way: Array[Work] = game.state.works.duplicate()
+	var gone: Dictionary = {}  # the works finished or cancelled: removed from the list once, in order, after the loop
 	for work: Work in under_way:
 		if game.has_countries():
 			var home := Territory.at_home_check(game, work.tag, work.hex)
 			if not bool(home["ok"]):
-				game.state.works.erase(work)
+				gone[work] = true
 				_cancelled(game, work, &"lost", str(home["reason"]))
 				continue
 		if halted(game, work, game.turn):
@@ -166,22 +167,28 @@ static func season(game: Game) -> void:
 		if work.seasons_left > 0:
 			continue
 		var put := _put_piece(game, work)
-		game.state.works.erase(work)
+		gone[work] = true
 		if bool(put["ok"]):
 			game.emit({"kind": "work_finished", "tag": work.tag, "hex": work.hex, "work": work.to_dict()})
 		else:
 			_cancelled(game, work, &"blocked", str(put["reason"]))
+	if not gone.is_empty():
+		var kept: Array[Work] = []
+		for work: Work in game.state.works:
+			if not gone.has(work):
+				kept.append(work)
+		game.state.works = kept
 
 
+## The piece of a finished work. The home rule was checked at the top of the phase for this work, so the `_here` forms
+## (the piece rules only) are used; the verdicts are those of Improve.build, upgrade and clear.
 static func _put_piece(game: Game, work: Work) -> Dictionary:
-	var args := {"hex": work.hex, "tag": work.tag}
 	match work.action:
 		BUILD:
-			args["family"] = work.family
-			return Improve.build(game, args)
+			return Improve.build_here(game, work.hex, work.family)
 		UPGRADE:
-			return Improve.upgrade(game, args)
-	return Improve.clear(game, args)
+			return Improve.upgrade_here(game, work.hex)
+	return Improve.clear_here(game, work.hex)
 
 
 static func _cancelled(game: Game, work: Work, why: StringName, reason: String) -> void:
@@ -213,11 +220,25 @@ static func slots(game: Game, tag: StringName) -> int:
 	var c := Countries.by_tag(game, tag)
 	if c == null:
 		return total
-	for i: int in Territory.districts(game, c.id):
+	return total + _city_count(game, c.id)
+
+
+## The settlements of country `id` at work_slots_city_level or more. Counted once for the same owners, uses and levels
+## (kept in a pinned slot of the view cache, keyed on the hashes of the three arrays and the threshold, so any change
+## counts again); a cached count always equals a fresh one.
+static func _city_count(game: Game, id: int) -> int:
+	var key: Array = [hash(game.state.owner), hash(game.state.main_use), hash(game.state.level),
+		game.defs.work_slots_city_level]
+	var counts := game.view_cache.pinned(&"city_counts", key, func() -> Dictionary: return {}) as Dictionary
+	if counts.has(id):
+		return int(counts[id])
+	var n := 0
+	for i: int in Territory.districts(game, id):
 		if int(game.state.main_use[i]) == ImproveRules.SETTLEMENT \
 				and int(game.state.level[i]) >= game.defs.work_slots_city_level:
-			total += 1
-	return total
+			n += 1
+	counts[id] = n
+	return n
 
 
 ## Works of `tag` under way.
@@ -243,7 +264,7 @@ static func pending_conflict(game: Game, hex: Vector2i, family: int, level_value
 	if family <= 0:
 		return ""
 	for w: Work in game.state.works:
-		if w.hex == hex or w.action == CLEAR:
+		if w.hex == hex or w.action == CLEAR or absi(w.hex.y - hex.y) > 2:  # a row apart is a hex apart, at least
 			continue
 		var distance := ImproveRules.hex_distance(hex, w.hex)
 		if distance < 1 or distance > 2:

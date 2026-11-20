@@ -8,6 +8,7 @@ class FakeUnsavedContext:
 	extends ShellContext
 
 	var unsaved: bool = false
+	var running: bool = false
 
 	func _init(p_settings: Settings, p_stack: Control, p_unsaved: bool) -> void:
 		super(p_settings, p_stack)
@@ -15,6 +16,9 @@ class FakeUnsavedContext:
 
 	func has_unsaved_actions() -> bool:
 		return unsaved
+
+	func season_running() -> bool:
+		return running
 
 
 var _harness: UIHarness = null
@@ -165,7 +169,7 @@ func test_subtitle_is_the_long_name_of_your_country_in_a_scenario_game() -> void
 	var pause := ScreenIds.make(&"pause_menu") as PauseMenu
 	_harness.stack.push(pause)
 	await _harness.wait_frames(self, 1)
-	assert_eq(pause.subtitle_label().text, "Italy, 1480", "no country yet: the scenario's name")
+	assert_eq(pause.subtitle_label().text, "Italy, 1480 · Spring 1480", "no country yet: the scenario's name")
 	_harness.stack.pop()
 	pause.queue_free()
 
@@ -173,7 +177,7 @@ func test_subtitle_is_the_long_name_of_your_country_in_a_scenario_game() -> void
 	var pause2 := ScreenIds.make(&"pause_menu") as PauseMenu
 	_harness.stack.push(pause2)
 	await _harness.wait_frames(self, 1)
-	assert_eq(pause2.subtitle_label().text, "Republic of Genoa")
+	assert_eq(pause2.subtitle_label().text, "Republic of Genoa · Spring 1480")
 
 
 func test_subtitle_in_a_sandbox_game_keeps_the_seed() -> void:
@@ -183,4 +187,56 @@ func test_subtitle_in_a_sandbox_game_keeps_the_seed() -> void:
 	var pause := ScreenIds.make(&"pause_menu") as PauseMenu
 	_harness.stack.push(pause)
 	await _harness.wait_frames(self, 1)
-	assert_eq(pause.subtitle_label().text, "Map sandbox · seed 77")
+	assert_eq(pause.subtitle_label().text, "North Italy · Sandbox, seed 77 · Spring 1480")
+
+
+func test_save_and_load_are_shown_and_quick_keys_are_hinted() -> void:
+	_apply_theme()
+	var map := load("res://data/maps/north_italy.tres") as MapData
+	Session.game = Game.new_game(map, 1480)
+	var pause := ScreenIds.make(&"pause_menu") as PauseMenu
+	_harness.stack.push(pause)
+	await _harness.wait_frames(self, 1)
+
+	assert_true(pause.save_button().visible, "Save game shown")
+	assert_true(pause.load_button().visible, "Load game shown")
+	assert_false(pause.save_button().disabled, "Save allowed between seasons")
+	var quick := pause.frame().body().get_node_or_null("QuickRow")
+	assert_not_null(quick, "F5 and F9 hint row")
+	assert_eq(quick.get_child_count(), 4, "two key caps, two labels")
+
+
+func test_save_is_refused_while_the_season_runs() -> void:
+	_apply_theme()
+	var fake_ctx := FakeUnsavedContext.new(_harness.settings, _harness.stack, false)
+	fake_ctx.running = true
+	_harness.stack.setup(fake_ctx)
+	var map := load("res://data/maps/north_italy.tres") as MapData
+	Session.game = Game.new_game(map, 1480)
+	var pause := ScreenIds.make(&"pause_menu") as PauseMenu
+	_harness.stack.push(pause)
+	await _harness.wait_frames(self, 1)
+
+	assert_true(pause.save_button().disabled, "Save greyed while the season runs")
+	assert_eq(pause.save_button().reason_text(), "Wait for the season to end")
+
+	fake_ctx.running = false
+	pause.on_enter()
+	assert_false(pause.save_button().disabled, "Save allowed once the season ends")
+
+
+func test_save_and_load_open_the_save_and_load_screen() -> void:
+	_apply_theme()
+	var map := load("res://data/maps/north_italy.tres") as MapData
+	Session.game = Game.new_game(map, 1480)
+	var pause := ScreenIds.make(&"pause_menu") as PauseMenu
+	_harness.stack.push(pause)
+	await _harness.wait_frames(self, 1)
+	pause.save_button().pressed.emit()
+	await _harness.wait_frames(self, 1)
+	assert_eq(_harness.stack.top().screen_id, &"save_load")
+	assert_eq((_harness.stack.top() as SaveLoad).tab(), SaveLoad.TAB_SAVE, "Save opens on the Save tab")
+	_harness.stack.pop()
+	pause.load_button().pressed.emit()
+	await _harness.wait_frames(self, 1)
+	assert_eq((_harness.stack.top() as SaveLoad).tab(), SaveLoad.TAB_LOAD, "Load opens on the Load tab")

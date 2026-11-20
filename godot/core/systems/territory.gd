@@ -99,13 +99,46 @@ static func transfer(game: Game, hexes: Array[Vector2i], to_id: int) -> int:
 
 ## Hex indices owned by `id`, in ascending index order.
 static func districts(game: Game, id: int) -> PackedInt32Array:
-	var out := PackedInt32Array()
 	if game == null or game.map == null or game.state == null or id <= 0:
-		return out
+		return PackedInt32Array()
+	var held: Variant = _by_owner(game).get(id)
+	return held as PackedInt32Array if held != null else PackedInt32Array()
+
+
+## Every country's hex indices (id -> ascending PackedInt32Array), made in one pass over the map and kept in the game's
+## view cache (a pinned slot) while the owner bytes are the same: the key is their hash, so any change of an owner,
+## by an action or a direct edit, makes the next call build it again.
+static func _by_owner(game: Game) -> Dictionary:
+	var key: Array = [hash(game.state.owner), game.state.owner.size(), game.map.hex_count()]
+	return game.view_cache.pinned(&"districts", key, func() -> Dictionary: return _index_of(game)) as Dictionary
+
+
+static func _index_of(game: Game) -> Dictionary:
 	var n := mini(game.map.hex_count(), game.state.owner.size())
+	var sizes := PackedInt32Array()
+	sizes.resize(256)
+	sizes.fill(0)
 	for i: int in n:
-		if game.map.land[i] != 0 and int(game.state.owner[i]) == id:
-			out.append(i)
+		var id := int(game.state.owner[i])
+		if id > 0 and game.map.land[i] != 0:
+			sizes[id] += 1
+	var lists: Array[PackedInt32Array] = []
+	var next := PackedInt32Array()
+	next.resize(256)
+	next.fill(0)
+	for id: int in 256:
+		var list := PackedInt32Array()
+		list.resize(sizes[id])
+		lists.append(list)
+	for i: int in n:
+		var id := int(game.state.owner[i])
+		if id > 0 and game.map.land[i] != 0:
+			lists[id][next[id]] = i
+			next[id] += 1
+	var out: Dictionary = {}
+	for id: int in range(1, 256):
+		if sizes[id] > 0:
+			out[id] = lists[id]
 	return out
 
 
@@ -113,12 +146,7 @@ static func districts(game: Game, id: int) -> PackedInt32Array:
 static func count(game: Game, id: int) -> int:
 	if game == null or game.map == null or game.state == null or id <= 0:
 		return 0
-	var total := 0
-	var n := mini(game.map.hex_count(), game.state.owner.size())
-	for i: int in n:
-		if game.map.land[i] != 0 and int(game.state.owner[i]) == id:
-			total += 1
-	return total
+	return districts(game, id).size()
 
 
 ## Country ids sharing a land-to-land edge with `id`, ascending, with 0 excluded.

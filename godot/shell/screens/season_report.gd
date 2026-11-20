@@ -1,0 +1,398 @@
+## Chancellor's report: the season that ended, drawn on a Studiolo VellumSheet (docs/architecture/m3-build-spec.md 6.4;
+## ui-style-and-feedback-spec.md 6.8). Input is one SeasonSummary.of dictionary (or tests/fixtures/report_sample.gd).
+## A link or an action button closes the report and asks the App to glide to the hex; Space, Enter, Esc and the primary
+## button close it. The Full, Brief, Off setting is written to `game/season_report`.
+## show_summary() fills the sheet once per instance: the sheet keeps its sections, so a report is a fresh screen each time.
+class_name SeasonReport
+extends Screen
+
+signal link_chosen(hex: Vector2i, action: Array)
+signal closed(reason: StringName)
+
+const NO_HEX := Vector2i(-1, -1)
+const CHIP_LIMIT: int = 5
+const LOOK_ACTIONS: Array[StringName] = [&"look_at", &"select"]
+const CLOSE_KEYS: Array[Key] = [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]
+const SETTING_KEY: String = "game/season_report"
+const SETTING_CHOICES: Array[Dictionary] = [
+	{"id": "full", "label": "Full"},
+	{"id": "brief", "label": "Brief"},
+	{"id": "off", "label": "Off"},
+]
+
+var _sheet: VellumSheet = null
+var _seg: Segmented = null
+var _begin_btn: KitButton = null
+var _summary: Dictionary = {}
+var _reopened: bool = false
+var _body_filled: bool = false
+var _closed: bool = false
+var _ui_built: bool = false
+var _serial: int = 0
+
+
+## Builds the frame and footer once; safe before the screen enters the tree.
+func _ensure_ui() -> void:
+	if _ui_built:
+		return
+	if _sheet == null:
+		_sheet = get_node_or_null("Center/Sheet") as VellumSheet
+	if _sheet == null:
+		return
+	_ui_built = true
+	_sheet.show_nav = true
+	_build_footer()
+
+
+func _ready() -> void:
+	_ensure_ui()
+
+
+## Fills the sheet from a SeasonSummary.of dictionary. `reopened` true when J or the log reopened an older report
+## (the primary button then says "Back to the map").
+func show_summary(summary: Dictionary, reopened: bool = false) -> void:
+	_ensure_ui()
+	if _sheet == null:
+		return
+	_summary = summary.duplicate(true)
+	_reopened = reopened
+	_sheet.title = str(_summary.get("title", ""))
+	_sheet.lede = str(_summary.get("lede", ""))
+	_sheet.seal_letter = str(_summary.get("seal_letter", ""))
+	_sheet.seal_tone = &"plain" if bool(_summary.get("quiet", false)) else &"vermilion"
+	_begin_btn.text = _begin_text()
+	if _body_filled:
+		push_error("SeasonReport.show_summary: the sheet is filled once per instance")
+		return
+	_body_filled = true
+	_fill_sections()
+
+
+func on_enter() -> void:
+	_ensure_ui()
+	var reduce := _reduce_motion()
+	_begin_btn.reduce_motion = reduce
+	_seg.select(_current_setting(), false)
+	_sheet.press_seal(reduce)
+	if is_inside_tree():
+		default_focus = get_path_to(_begin_btn)
+
+
+func on_exit() -> void:
+	if not _closed:
+		_closed = true
+		closed.emit(&"back")
+	if ctx != null:
+		ctx.request(&"report_closed")
+
+
+## Esc: the stack pops the report (on_exit closes it).
+func back() -> bool:
+	return false
+
+
+func sheet() -> VellumSheet:
+	_ensure_ui()
+	return _sheet
+
+
+func begin_button() -> KitButton:
+	_ensure_ui()
+	return _begin_btn
+
+
+func segmented() -> Segmented:
+	_ensure_ui()
+	return _seg
+
+
+## Every link and action button of the body (names "Link…" and "Action…"), in order.
+func link_buttons() -> Array[Button]:
+	var out: Array[Button] = []
+	if _sheet == null:
+		return out
+	_collect_buttons(_sheet.body(), out)
+	return out
+
+
+func _collect_buttons(node: Node, out: Array[Button]) -> void:
+	for child: Node in node.get_children():
+		var btn := child as Button
+		if btn != null and (btn.name.begins_with("Link") or btn.name.begins_with("Action")):
+			out.append(btn)
+		_collect_buttons(child, out)
+
+
+# ----- footer ----------------------------------------------------------------------------------------------------------
+
+
+func _build_footer() -> void:
+	var foot := _sheet.footer()
+	var label := PanelKit.label("Show", &"Hint")
+	foot.add_child(label)
+
+	_seg = Segmented.new()
+	_seg.name = &"ReportSetting"
+	_seg.set_options(SETTING_CHOICES)
+	_seg.changed.connect(_on_setting_changed)
+	foot.add_child(_seg)
+
+	_begin_btn = KitButton.new()
+	_begin_btn.name = &"BeginButton"
+	_begin_btn.kind = KitButton.Kind.MENU_PRIMARY
+	_begin_btn.hotkey_action = &"game_end_season"
+	_begin_btn.show_key_cap = true
+	_begin_btn.pressed.connect(_on_begin_pressed)
+	foot.add_child(_begin_btn)
+
+
+func _begin_text() -> String:
+	if _reopened:
+		return "Back to the map"
+	var next := str(_summary.get("next", ""))
+	var season := next.get_slice(" ", 0) if not next.is_empty() else ""
+	return "Begin %s" % season if not season.is_empty() else "Back to the map"
+
+
+func _current_setting() -> String:
+	if ctx != null and ctx.settings != null:
+		return str(ctx.settings.get_value(SETTING_KEY))
+	return "full"
+
+
+func _on_setting_changed(id: Variant) -> void:
+	if ctx != null and ctx.settings != null:
+		ctx.settings.set_value(SETTING_KEY, str(id))
+
+
+func _on_begin_pressed() -> void:
+	_close(&"begin")
+
+
+# ----- body ------------------------------------------------------------------------------------------------------------
+
+
+func _fill_sections() -> void:
+	var quiet := bool(_summary.get("quiet", false))
+	var sections: Array = _summary.get("sections", [])
+	for section: Dictionary in sections:
+		var id := StringName(str(section.get("id", "")))
+		var content := _sheet.add_section(id, str(section.get("title", "")))
+		var total: Dictionary = section.get("total", {})
+		if not total.is_empty():
+			content.add_child(_line_row(total))
+		var lines: Array = section.get("lines", [])
+		if id == &"glance" and not quiet:
+			_fill_chips(content, lines)
+		else:
+			for line: Dictionary in lines:
+				content.add_child(_line_row(line))
+		_add_notes(content, section)
+		_sheet.set_count(id, -1 if id == &"glance" else int(section.get("count", 0)))
+
+
+func _add_notes(content: VBoxContainer, section: Dictionary) -> void:
+	var more := int(section.get("more", 0))
+	if more > 0:
+		content.add_child(PanelKit.label("and %d more" % more, &"Hint"))
+	var unchanged := str(section.get("unchanged", ""))
+	if not unchanged.is_empty():
+		content.add_child(PanelKit.label(unchanged, &"Hint"))
+
+
+## The glance section of a season with work: up to five boxed chips, a label, the value and a DeltaChip in ink.
+func _fill_chips(content: VBoxContainer, lines: Array) -> void:
+	var flow := HFlowContainer.new()
+	flow.name = &"Chips"
+	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(flow)
+	for i: int in mini(lines.size(), CHIP_LIMIT):
+		flow.add_child(_chip(lines[i] as Dictionary))
+
+
+func _chip(line: Dictionary) -> PanelContainer:
+	var slot := PanelContainer.new()
+	slot.name = "Chip%d" % _next_serial()
+	slot.theme_type_variation = &"PanelSlot"
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(box)
+	box.add_child(PanelKit.label(str(line.get("text", "")), &"Hint"))
+	var value := PanelKit.label(str(line.get("detail", "")), &"LabelInk")
+	box.add_child(value)
+	var amount := int(line.get("amount", 0))
+	if amount != 0:
+		box.add_child(_delta(line))
+	return slot
+
+
+# ----- lines -----------------------------------------------------------------------------------------------------------
+
+
+func _line_row(line: Dictionary) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "Row%d" % _next_serial()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override(&"separation", Tokens.S2)
+	row.add_child(_gilt_bar(bool(line.get("top", false))))
+	if bool(line.get("sub", false)):
+		var indent := Control.new()
+		indent.custom_minimum_size = Vector2(float(Tokens.S4), 0.0)
+		indent.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(indent)
+	row.add_child(_text_column(line))
+	if int(line.get("amount", 0)) != 0:
+		row.add_child(_delta(line))
+	var action_btn := _action_button(line)
+	if action_btn != null:
+		row.add_child(action_btn)
+	return row
+
+
+func _gilt_bar(on: bool) -> ColorRect:
+	var bar := ColorRect.new()
+	bar.name = &"GiltBar"
+	bar.custom_minimum_size = Vector2(3.0, 0.0)
+	bar.color = Tokens.BRASS
+	bar.visible = on
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return bar
+
+
+func _text_column(line: Dictionary) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tone := str(line.get("tone", "plain"))
+	var target := _target_of(line)
+	if target.is_empty():
+		var label := PanelKit.label(str(line.get("text", "")), &"LabelInk")
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_tint(label, tone)
+		col.add_child(label)
+	else:
+		col.add_child(_link_button(line, tone, target))
+	var detail := str(line.get("detail", ""))
+	if not detail.is_empty():
+		var hint := PanelKit.label(detail, &"LabelInkMuted")
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		col.add_child(hint)
+	return col
+
+
+## A line's target: {hex, action} when it names a hex (its own or a look_at action's), else {}.
+func _target_of(line: Dictionary) -> Dictionary:
+	var hex := _hex_of(line.get("hex", NO_HEX))
+	var action: Array = line.get("action", [])
+	if action.size() >= 2 and LOOK_ACTIONS.has(StringName(str(action[0]))):
+		hex = _hex_of(action[1])
+	if hex == NO_HEX:
+		return {}
+	return {"hex": hex, "action": action if not action.is_empty() else [&"look_at", hex]}
+
+
+func _hex_of(value: Variant) -> Vector2i:
+	if typeof(value) == TYPE_VECTOR2I:
+		return value
+	return NO_HEX
+
+
+func _link_button(line: Dictionary, tone: String, target: Dictionary) -> Button:
+	var btn := Button.new()
+	btn.name = "Link%d" % _next_serial()
+	btn.flat = true
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.text = str(line.get("text", ""))
+	btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.tooltip_text = "Show on the map"
+	btn.accessibility_name = btn.text
+	var ink := _ink_for(tone)
+	btn.add_theme_color_override(&"font_color", ink)
+	btn.add_theme_color_override(&"font_hover_color", Tokens.GOLD_INK)
+	btn.add_theme_color_override(&"font_focus_color", Tokens.GOLD_INK)
+	btn.add_theme_color_override(&"font_pressed_color", Tokens.GOLD_INK)
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.pressed.connect(_pick.bind(target["hex"] as Vector2i, target["action"] as Array))
+	return btn
+
+
+func _action_button(line: Dictionary) -> KitButton:
+	var action: Array = line.get("action", [])
+	var label := str(line.get("action_label", ""))
+	if action.is_empty() or label.is_empty():
+		return null
+	var btn := KitButton.new()
+	btn.name = "Action%d" % _next_serial()
+	btn.kind = KitButton.Kind.SMALL
+	btn.text = label
+	btn.reduce_motion = _reduce_motion()
+	var hex := _hex_of(action[1]) if action.size() >= 2 else NO_HEX
+	btn.pressed.connect(_pick.bind(hex, action))
+	return btn
+
+
+func _delta(line: Dictionary) -> DeltaChip:
+	var chip := DeltaChip.new()
+	chip.name = &"Delta"
+	chip.ink = true
+	chip.set_delta(int(line.get("amount", 0)), str(line.get("unit", "")))
+	return chip
+
+
+func _tint(label: Label, tone: String) -> void:
+	if tone != "plain":
+		label.add_theme_color_override(&"font_color", _ink_for(tone))
+
+
+func _ink_for(tone: String) -> Color:
+	match tone:
+		"good":
+			return Tokens.GOOD_INK
+		"bad":
+			return Tokens.BAD_INK
+		"warn":
+			return Tokens.WARN_INK
+		_:
+			return Tokens.VELLUM_INK
+
+
+## A link or action: the report closes, then the App glides to the hex and selects it.
+func _pick(hex: Vector2i, action: Array) -> void:
+	if _closed:
+		return
+	link_chosen.emit(hex, action)
+	if hex != NO_HEX and ctx != null:
+		ctx.request(&"look_at", {"hex": hex, "select": true})
+	_close(&"look")
+
+
+## Ends the report once: the signal, then the stack pops it (on_exit sends report_closed).
+func _close(reason: StringName) -> void:
+	if _closed:
+		return
+	_closed = true
+	closed.emit(reason)
+	finished.emit(reason)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if _closed or key == null or not key.pressed or key.echo:
+		return
+	if CLOSE_KEYS.has(key.keycode):
+		accept_event()
+		_close(&"begin")
+
+
+func _next_serial() -> int:
+	_serial += 1
+	return _serial
+
+
+func _reduce_motion() -> bool:
+	if ctx != null and ctx.settings != null:
+		return bool(ctx.settings.get_value("accessibility/reduce_motion"))
+	return false

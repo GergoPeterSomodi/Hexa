@@ -159,6 +159,8 @@ static func _verdict(ok: bool, reason: String = "") -> Dictionary:
 ## The first pair rule that the option (family, level) on a hex breaks against the pieces within two hexes, as a
 ## reason with the neighbour's place; "" when none.
 func _pair_conflict(hex: Vector2i, family_id: int, level_value: int) -> String:
+	if _lazy:
+		return _pair_conflict_lazy(hex, family_id, level_value)
 	var i := int(_index[hex])
 	for d: int in 6:
 		var k := _neighbour_cell(i, d)
@@ -168,6 +170,30 @@ func _pair_conflict(hex: Vector2i, family_id: int, level_value: int) -> String:
 				return why
 	for k: int in _ring2_of(i):
 		var why := _pair_against(k, family_id, level_value, 2)
+		if why != "":
+			return why
+	return ""
+
+
+## The same answer as the tables above for a game over a state (loaded, or just checked): the neighbours in edge order,
+## then the twelve hexes two away in row order, skipping the wild ones by a look at the state before any cell lookup
+## (nearly every hex around is wild, and a sea hex holds no piece).
+func _pair_conflict_lazy(hex: Vector2i, family_id: int, level_value: int) -> String:
+	var use := state.main_use
+	for d: int in 6:
+		var beside := ImproveRules.neighbour(hex, d)
+		var at := map.index_of(beside)
+		if at < 0 or use[at] == 0 or map.land[at] == 0:
+			continue
+		var why := _pair_against(int(_index[beside]), family_id, level_value, 1)
+		if why != "":
+			return why
+	for delta: Vector2i in _ring_deltas((hex.y & 1) == 1):
+		var far := hex + delta
+		var at := map.index_of(far)
+		if at < 0 or use[at] == 0 or map.land[at] == 0:
+			continue
+		var why := _pair_against(int(_index[far]), family_id, level_value, 2)
 		if why != "":
 			return why
 	return ""
@@ -224,14 +250,22 @@ func build_check(hex: Vector2i, family_id: int) -> Dictionary:
 		return _verdict(false, "not a land hex")
 	if family_at(hex) != ImproveRules.NONE:
 		return _verdict(false, "something already stands here")
-	for option: Dictionary in build_options(hex):
-		if int(option["family_id"]) == family_id:
-			return _verdict(bool(option["ok"]), str(option["reason"]))
+	# Only the asked family is tried (build_options would try every candidate's pair rules for the same answer).
+	var facts := facts_at(hex)
+	var offered := family_id == ImproveRules.CASTLE if bool(facts.get("pass", false)) 			else (family_id >= ImproveRules.WHEAT and family_id < ImproveRules.FAMILIES and ImproveRules.cell_allowed(family_id, 1, facts))
+	if offered:
+		var why := _pair_conflict(hex, family_id, 1)
+		return _verdict(why == "", why)
 	if family_id <= ImproveRules.NONE or family_id >= ImproveRules.FAMILIES:
 		return _verdict(false, "no such piece")
 	if bool(facts_at(hex).get("pass", false)):
 		return _verdict(false, "only a watchtower can stand on a pass")
 	return _verdict(false, ImproveRules.cell_reason(family_id, 1, facts_at(hex)))
+
+
+## Sets the piece of a hex with no check: for a caller that has just checked (Improve), so the rules run once.
+func put_piece(hex: Vector2i, family_id: int, level_value: int) -> void:
+	_put(hex, family_id, level_value)
 
 
 ## Builds level 1 of a family on a wild hex (after checking again). Returns the verdict.
@@ -487,19 +521,36 @@ func _collect() -> void:
 				fixed_conflicts.append("%s (level %d) and %s (level %d)" % [ha, settled[a].z, hb, settled[b].z])
 
 
-## The land cells exactly two hexes from a hex, in cell order.
+## The land cells exactly two hexes from a hex, in cell order (ascending: the cells are in row-major order, and the
+## twelve offsets of a parity are listed row-major too).
 func _ring_of(hex: Vector2i) -> PackedInt32Array:
 	var ring := PackedInt32Array()
-	var seen: Dictionary[int, bool] = {}
-	for d: int in 6:
-		var first := ImproveRules.neighbour(hex, d)
-		for e: int in 6:
-			var second := ImproveRules.neighbour(first, e)
-			if _index.has(second) and ImproveRules.hex_distance(hex, second) == 2 and not seen.has(int(_index[second])):
-				seen[int(_index[second])] = true
-				ring.append(int(_index[second]))
-	ring.sort()
+	for delta: Vector2i in _ring_deltas((hex.y & 1) == 1):
+		var k := int(_index.get(hex + delta, -1))
+		if k >= 0:
+			ring.append(k)
 	return ring
+
+
+static var _deltas: Array = []
+
+
+## The twelve offsets of the hexes exactly two away from a hex on an even row (false) or an odd row (true), sorted by
+## row then column. Found once from the distance function itself.
+static func _ring_deltas(odd_row: bool) -> Array[Vector2i]:
+	if _deltas.is_empty():
+		for parity: int in 2:
+			var origin := Vector2i(10, 10 + parity)
+			var found: Array[Vector2i] = []
+			for dy: int in range(-2, 3):
+				for dx: int in range(-3, 4):
+					var delta := Vector2i(dx, dy)
+					if ImproveRules.hex_distance(origin, origin + delta) == 2:
+						found.append(delta)  # row-major already: dy ascending, then dx
+			_deltas.append(found)
+	var out: Array[Vector2i] = []
+	out.assign(_deltas[1 if odd_row else 0])
+	return out
 
 
 ## What `over` needs and no search: the land cells, which of them are places of the data, and the pairs of those

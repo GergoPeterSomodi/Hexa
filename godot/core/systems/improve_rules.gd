@@ -189,6 +189,22 @@ static func pair_allowed(family_a: int, level_a: int, family_b: int, level_b: in
 
 ## The reason of the first pair rule two options break at a distance, or "" when they may stand there.
 static func pair_reason(family_a: int, level_a: int, family_b: int, level_b: int, radius: int) -> String:
+	# The memo key packs families below 16, levels below 8 and radius below 4: a bigger value would collide.
+	assert(family_a < 16 and family_b < 16 and level_a < 8 and level_b < 8 and radius < 4, "pair_reason memo key range")
+	var key := (((family_a * 8 + level_a) * 16 + family_b) * 8 + level_b) * 4 + radius
+	var held: Variant = _pair_memo.get(key)
+	if held != null:
+		return held as String
+	var why := _pair_reason_of(family_a, level_a, family_b, level_b, radius)
+	_pair_memo[key] = why
+	return why
+
+
+## pair_reason is a pure function of constants: each answer is worked out once.
+static var _pair_memo: Dictionary = {}
+
+
+static func _pair_reason_of(family_a: int, level_a: int, family_b: int, level_b: int, radius: int) -> String:
 	for rule: Array in PAIR_RULES:
 		if radius > int(rule[4]):
 			continue

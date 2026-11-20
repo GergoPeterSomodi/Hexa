@@ -1,0 +1,207 @@
+## GUT tests for the Chancellor's report screen (docs/architecture/m3-build-spec.md 6.4 and 9;
+## ui-style-and-feedback-spec.md 6.8). The screen is instantiated from its scene, fed by tests/fixtures/report_sample.gd.
+extends GutTest
+
+const SCENE := "res://shell/screens/season_report.tscn"
+const GENOA_HEX := Vector2i(7, 12)
+
+var _harness: UIHarness = null
+var _requests: Array[Array] = []
+
+
+func before_each() -> void:
+	Bindings.reset_defaults()
+	_harness = UIHarness.new()
+	_harness.mount(self)
+	_harness.stack.theme = KitTheme.load_for(1.0)
+	_requests = []
+	_harness.ctx.app_requested.connect(func(what: StringName, args: Dictionary) -> void: _requests.append([what, args]))
+
+
+func after_each() -> void:
+	if _harness != null and _harness.stack != null:
+		_harness.stack.clear()
+	_harness = null
+	Bindings.reset_defaults()
+
+
+func _open(summary: Dictionary, reopened: bool = false) -> SeasonReport:
+	var report := (load(SCENE) as PackedScene).instantiate() as SeasonReport
+	report.show_summary(summary, reopened)
+	_harness.stack.push(report)
+	return report
+
+
+func _section_ids(summary: Dictionary) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for section: Dictionary in summary["sections"]:
+		out.append(StringName(str(section["id"])))
+	return out
+
+
+func _count_of(btn: Button) -> String:
+	return (btn.get_node("Count") as Label).text
+
+
+func _button_named(report: SeasonReport, text: String) -> Button:
+	for btn: Button in report.link_buttons():
+		if btn.text == text:
+			return btn
+	return null
+
+
+func test_fixture_has_the_nine_sections_of_a3_in_order() -> void:
+	var summary := ReportSample.genoa_spring()
+	assert_eq(_section_ids(summary), ReportSample.SECTION_IDS)
+	assert_eq(ReportSample.SECTION_IDS.size(), 9)
+	assert_false(bool(summary["quiet"]))
+	assert_eq(summary["title"], "Spring 1480")
+	assert_eq(summary["seal_letter"], "G")
+
+
+func test_quiet_fixture_has_only_glance_and_the_link() -> void:
+	var summary := ReportSample.quiet_season()
+	assert_true(bool(summary["quiet"]))
+	assert_eq(_section_ids(summary), [&"glance"])
+	assert_eq(summary["lede"], "A quiet season.")
+
+
+func test_every_section_of_the_fixture_is_drawn_with_its_count() -> void:
+	var summary := ReportSample.genoa_spring()
+	var report := _open(summary)
+	await _harness.wait_frames(self, 2)
+
+	for section: Dictionary in summary["sections"]:
+		var id := StringName(str(section["id"]))
+		assert_not_null(report.sheet().section_box(id), "section %s drawn" % id)
+		var heading := report.sheet().section_box(id).get_parent().get_node("Heading") as Label
+		assert_eq(heading.text, section["title"])
+	var nav := report.sheet().nav()
+	assert_eq(_count_of(nav.button_for(&"before")), "2")
+	assert_eq(_count_of(nav.button_for(&"goods")), "5")
+	assert_eq(_count_of(nav.button_for(&"works")), "2")
+	assert_eq(_count_of(nav.button_for(&"orders")), "1")
+	assert_false((nav.button_for(&"glance").get_node("Count") as Label).visible, "glance has no count")
+
+
+func test_glance_shows_up_to_five_boxed_chips() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	var chips := report.sheet().section_box(&"glance").find_child("Chips", true, false) as HFlowContainer
+	assert_not_null(chips)
+	assert_eq(chips.get_child_count(), 5)
+	var first := chips.get_child(0) as PanelContainer
+	assert_eq(first.theme_type_variation, &"PanelSlot")
+	assert_true(first.find_child("Delta", true, false) is DeltaChip, "a chip carries its DeltaChip")
+
+
+func test_title_lede_seal_and_seal_press() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	assert_eq(report.sheet().title, "Spring 1480")
+	assert_eq(report.sheet().ribbon().text, "Spring 1480")
+	assert_eq(report.sheet().lede, "The Chancellor's report to the Doge of Genoa. Summer 1480 begins.")
+	assert_eq(report.sheet().seal_text(), "G")
+	assert_eq(report.sheet().seal_tone, &"vermilion")
+
+
+func test_quiet_season_uses_the_plain_seal_and_one_glance_line() -> void:
+	var report := _open(ReportSample.quiet_season())
+	await _harness.wait_frames(self, 2)
+	assert_eq(report.sheet().seal_tone, &"plain")
+	assert_eq(report.sheet().lede, "A quiet season.")
+	assert_eq(report.sheet().nav().button_for(&"befell"), null, "a quiet report has no What befell")
+	var link := _button_named(report, "2 works under way; nothing else of note.")
+	assert_not_null(link, "the one glance line is a link to the capital")
+	assert_true(link.name.begins_with("Link"))
+	assert_eq(report.link_buttons().size(), 2, "the link and its Show Genoa action")
+
+
+func test_link_closes_the_report_and_asks_for_a_glide_to_its_hex() -> void:
+	var picked: Array[Array] = []
+	var report := _open(ReportSample.genoa_spring())
+	report.link_chosen.connect(func(hex: Vector2i, action: Array) -> void: picked.append([hex, action]))
+	await _harness.wait_frames(self, 2)
+
+	var link := _button_named(report, "Wine runs out in 6 seasons; the first vintage is Autumn 1481.")
+	assert_not_null(link, "a line with a hex is a link button")
+	link.pressed.emit()
+	await _harness.wait_frames(self, 2)
+
+	assert_eq(_harness.stack.count(), 0, "the link closes the report")
+	assert_eq(picked.size(), 1)
+	assert_eq(picked[0][0], Vector2i(7, 12))
+	var look := _requests.filter(func(r: Array) -> bool: return r[0] == &"look_at")
+	assert_eq(look.size(), 1)
+	assert_eq(look[0][1], {"hex": Vector2i(7, 12), "select": true})
+	assert_eq(_requests.filter(func(r: Array) -> bool: return r[0] == &"report_closed").size(), 1, "on_exit tells the App")
+
+
+func test_action_button_closes_and_glides_to_its_hex() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	var action: KitButton = null
+	for btn: Button in report.link_buttons():
+		if btn.name.begins_with("Action") and btn.text == "Show Genoa":
+			action = btn as KitButton
+	assert_not_null(action, "the before list has its action button")
+	action.pressed.emit()
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 0)
+	var look := _requests.filter(func(r: Array) -> bool: return r[0] == &"look_at")
+	assert_eq(look.size(), 1)
+	assert_eq(look[0][1]["hex"], Vector2i(8, 13))
+
+
+func test_space_enter_and_esc_close_the_report() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	_harness.send_key(KEY_SPACE)
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 0, "Space closes")
+
+	report = _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	_harness.send_key(KEY_ENTER)
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 0, "Enter closes")
+
+	report = _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	assert_true(_harness.stack.back(), "Esc handled by the stack")
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 0, "Esc closes")
+
+
+func test_begin_is_focused_and_says_the_season_that_begins() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	assert_eq(report.begin_button().text, "BEGIN SUMMER", "KitButton sets its own caps")
+	assert_eq(report.begin_button().kind, KitButton.Kind.MENU_PRIMARY)
+	assert_eq(_harness.viewport.gui_get_focus_owner(), report.begin_button(), "the primary button holds focus")
+	report.begin_button().pressed.emit()
+	await _harness.wait_frames(self, 1)
+	assert_eq(_harness.stack.count(), 0)
+
+
+func test_reopened_report_says_back_to_the_map() -> void:
+	var report := _open(ReportSample.genoa_spring(), true)
+	await _harness.wait_frames(self, 2)
+	assert_eq(report.begin_button().text, "BACK TO THE MAP")
+
+
+func test_segmented_writes_the_season_report_setting() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	assert_eq(report.segmented().selected_id(), "full")
+	report.segmented().button_for("brief").button_pressed = true
+	assert_eq(_harness.settings.get_value("game/season_report"), "brief")
+	report.segmented().button_for("off").button_pressed = true
+	assert_eq(_harness.settings.get_value("game/season_report"), "off")
+
+
+func test_glance_chips_hold_no_buttons() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	var glance := report.sheet().section_box(&"glance")
+	assert_eq(glance.find_children("*", "Button", true, false).size(), 0, "chips are labels, not links")

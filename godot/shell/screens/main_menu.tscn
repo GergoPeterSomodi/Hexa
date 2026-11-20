@@ -107,6 +107,19 @@ theme_type_variation = &"PanelModal"
 layout_mode = 2
 mouse_filter = 2
 
+[node name="ContinueButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
+visible = false
+layout_mode = 2
+text = "Continue"
+script = ExtResource("2_btn")
+kind = 7
+
+[node name="ContinueHint" type="Label" parent="MenuColumn/Sheet/Buttons"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"Hint"
+horizontal_alignment = 1
+
 [node name="NewGameButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
 layout_mode = 2
 text = "New game"
@@ -116,6 +129,13 @@ kind = 8
 [node name="SandboxButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
 layout_mode = 2
 text = "Map sandbox"
+script = ExtResource("2_btn")
+kind = 7
+
+[node name="LoadButton" type="Button" parent="MenuColumn/Sheet/Buttons"]
+visible = false
+layout_mode = 2
+text = "Load game"
 script = ExtResource("2_btn")
 kind = 7
 

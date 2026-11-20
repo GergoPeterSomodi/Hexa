@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/debug_overlay.gd" id="1_dbg"]
 [ext_resource type="Script" path="res://shell/ui/segmented.gd" id="2_seg"]
 [ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
 [ext_resource type="Script" path="res://shell/ui/kit_slider.gd" id="4_sld"]
+[ext_resource type="PackedScene" path="res://shell/hud/dev_console.tscn" id="5_con"]
 
 [node name="DebugOverlay" type="PanelContainer"]
 visible = false
@@ -26,6 +27,11 @@ layout_mode = 2
 theme_type_variation = &"TableRow"
 text = "FPS: 0"
 
+[node name="M3Line" type="Label" parent="VBox"]
+layout_mode = 2
+theme_type_variation = &"TableRow"
+text = "no game"
+
 [node name="Rule1" type="HSeparator" parent="VBox"]
 layout_mode = 2
 mouse_filter = 2
@@ -38,7 +44,7 @@ mouse_filter = 2
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"Hint"
-text = "Season preview"
+text = "Look"
 
 [node name="NewSeedButton" type="Button" parent="VBox/ControlsTop"]
 layout_mode = 2
@@ -86,3 +92,10 @@ text = "Slice ms"
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("4_sld")
+
+[node name="Rule2" type="HSeparator" parent="VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="DevConsole" parent="VBox" instance=ExtResource("5_con")]
+layout_mode = 2

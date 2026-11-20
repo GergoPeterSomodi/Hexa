@@ -1,0 +1,16 @@
+{
+  "comment": "Core speed budgets (docs/architecture/m3-build-spec.md section 8). Read by tools/perf_core.gd, nightly in CI. Never read by a GUT test. A row past its limit fails the job. Times are CPU milliseconds, headless; save_mb is the size of the .sav file.",
+  "limits": {
+    "season_ms": {"limit": 100.0, "class": "cpu", "what": "the three phases of Season.run, worst of 8 seasons"},
+    "works_phase_ms": {"limit": 20.0, "class": "cpu", "what": "the works phase with 600 works, worst"},
+    "stats_phase_ms": {"limit": 60.0, "class": "cpu", "what": "the stats phase (1 ms a country), worst"},
+    "digest_ms": {"limit": 100.0, "class": "cpu", "what": "Game.digest()"},
+    "snapshot_ms": {"limit": 150.0, "class": "cpu", "what": "Snapshot.of"},
+    "save_ms": {"limit": 1000.0, "class": "cpu", "what": "SaveFile.write (bytes, zstd, sha, the file sequence)"},
+    "load_ms": {"limit": 2000.0, "class": "cpu", "what": "SaveFile.read, Snapshot.restore with WorldImprove.over, the digest check"},
+    "save_mb": {"limit": 8.0, "class": "mem", "what": "the .sav file"},
+    "summary_ms": {"limit": 2.0, "class": "cpu", "what": "SeasonSummary.of for the largest country, uncached"},
+    "reminders_ms": {"limit": 2.0, "class": "cpu", "what": "Reminders.unfinished, uncached"},
+    "work_check_ms": {"limit": 1.0, "class": "cpu", "what": "one Works.build_check with 600 works under way (the pending scan)"}
+  }
+}

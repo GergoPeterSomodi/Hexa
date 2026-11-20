@@ -1,0 +1,30 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://shell/screens/season_report.gd" id="1_report"]
+[ext_resource type="PackedScene" path="res://shell/ui/vellum_sheet.tscn" id="2_vellum"]
+
+[node name="SeasonReport" type="Control"]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_report")
+screen_id = &"season_report"
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Sheet" parent="Center" instance=ExtResource("2_vellum")]
+custom_minimum_size = Vector2(900, 640)
+layout_mode = 2
+show_nav = true

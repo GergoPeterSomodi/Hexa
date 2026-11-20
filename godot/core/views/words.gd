@@ -44,22 +44,43 @@ static func place(game: Game, hex: Vector2i) -> String:
 	var coords := "(%d, %d)" % [hex.x, hex.y]
 	if game == null or game.map == null:
 		return coords
-	var best_name := ""
-	var best_distance := NEAR + 1
-	for entry: Dictionary in game.map.places:
-		var place_name := str(entry.get("name", ""))
-		var at: Variant = entry.get("hex", null)
-		if place_name == "" or typeof(at) != TYPE_VECTOR2I:
-			continue
-		var distance := ImproveRules.hex_distance(hex, at as Vector2i)
-		if distance == 0:
-			return "%s %s" % [place_name, coords]
-		if distance < best_distance:
-			best_distance = distance
-			best_name = place_name
-	if best_name == "":
-		return coords
-	return "near %s %s" % [best_name, coords]
+	var names := _place_names(game)
+	var seen: Dictionary = {hex: true}
+	var ring: Array[Vector2i] = [hex]
+	for distance: int in NEAR + 1:
+		var best_name := ""
+		var best_order := 1 << 30
+		for at: Vector2i in ring:
+			var held: Variant = names.get(at)
+			if held != null and int((held as Array)[1]) < best_order:
+				best_order = int((held as Array)[1])
+				best_name = str((held as Array)[0])
+		if best_name != "":
+			return "%s %s" % [best_name, coords] if distance == 0 else "near %s %s" % [best_name, coords]
+		var next: Array[Vector2i] = []
+		for at: Vector2i in ring:
+			for d: int in 6:
+				var beside := ImproveRules.neighbour(at, d)
+				if not seen.has(beside):
+					seen[beside] = true
+					next.append(beside)
+		ring = next
+	return coords
+
+
+## hex -> [name, place order] for the named places of the map (the first of two on one hex), made once for a game and
+## kept in its view cache: the scan of every place per call was the cost of a works line.
+static func _place_names(game: Game) -> Dictionary:
+	var key: Array = [game.map.id, game.map.places.size()]
+	return game.view_cache.pinned(&"place_names", key, func() -> Dictionary:
+		var out: Dictionary = {}
+		for order: int in game.map.places.size():
+			var entry: Dictionary = game.map.places[order]
+			var place_name := str(entry.get("name", ""))
+			var at: Variant = entry.get("hex", null)
+			if place_name != "" and typeof(at) == TYPE_VECTOR2I and not out.has(at):
+				out[at] = [place_name, order]
+		return out) as Dictionary
 
 
 ## "a, b and 2 more": the first `shown` items, then how many are left. Up to `shown` items are all named.

@@ -128,3 +128,44 @@ func test_debug_controls_emit_intents_and_take_no_focus() -> void:
 	_overlay.slice_ms_slider().set_slider_value(10.0, true)
 	assert_eq(slices, [10])
 	assert_eq(int(_harness.settings.get_value("dev/slice_ms")), 10)
+
+
+func test_the_m3_line_shows_turn_date_works_phases_and_save() -> void:
+	Session.new_scenario("north_italy_1480", 5, &"GEN")
+	_overlay.set_open(true)
+	assert_true(_overlay.m3_text().begins_with("turn 1 · Spring 1480 · works 0 · phases none yet · save none yet"), _overlay.m3_text())
+	Session.last_phase_ms = {"works": 0.4, "stats": 0.2, "calendar": 0.0}
+	_overlay.record_save_ms(32.4)
+	assert_eq(_overlay.m3_text(), "turn 1 · Spring 1480 · works 0 · phases works 0.4, stats 0.2, calendar 0.0 ms · save 32 ms")
+	Session.end_season()
+	_overlay.refresh_metrics()
+	assert_true(_overlay.m3_text().begins_with("turn 2 · Summer 1480"), _overlay.m3_text())
+	assert_true(_overlay.m3_text().contains("phases works "), "the last season's phase times")
+	Session.game = null
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.m3_text(), "no game")
+
+
+func test_look_control_offers_calendar_and_four_seasons_with_minus_one_for_calendar() -> void:
+	var seg := _overlay.season_segmented()
+	for id: int in [-1, 0, 1, 2, 3]:
+		assert_not_null(seg.button_for(id), "Look has option %d" % id)
+	assert_eq(seg.button_for(-1).text, "Calendar")
+	assert_eq(seg.selected_id(), -1, "starts on the calendar")
+	var seen: Array[int] = []
+	_overlay.season_preview_requested.connect(func(i: int) -> void: seen.append(i))
+	seg.select(2, true)
+	seg.select(-1, true)
+	assert_eq(seen, [2, -1])
+	_overlay.set_season(-1)
+	assert_eq(seg.selected_id(), -1)
+	_overlay.set_season(9)
+	assert_eq(seg.selected_id(), 3, "clamped to Winter")
+
+
+func test_focus_console_opens_the_panel_and_hosts_the_console() -> void:
+	assert_not_null(_overlay.console())
+	assert_true(_overlay.focus_console())
+	assert_true(_overlay.visible)
+	_harness.settings.set_value("dev/developer_tools", false)
+	assert_false(_overlay.focus_console(), "no console with developer tools off")

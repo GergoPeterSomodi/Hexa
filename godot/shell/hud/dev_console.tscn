@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/hud/dev_console.gd" id="1_con"]
+
+[node name="DevConsole" type="VBoxContainer"]
+mouse_filter = 2
+script = ExtResource("1_con")
+
+[node name="Output" type="Label" parent="."]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Hint"
+
+[node name="Line" type="LineEdit" parent="."]
+layout_mode = 2
+placeholder_text = "console (F2): help"

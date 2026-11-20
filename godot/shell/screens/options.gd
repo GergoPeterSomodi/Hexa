@@ -8,7 +8,8 @@ extends Screen
 const OPTION_ROW_PATH := "res://shell/ui/option_row.tscn"
 const DISPLAY_REVERT_TIMEOUT_S := 10.0
 const NAV_WIDTH_PX := 184.0
-const TARGET_MILESTONE := 1.5
+## The milestone the screen shows: rows with a later `since` stay hidden (M3 shows the Game page, Season change, JSON saves).
+const TARGET_MILESTONE := 3.0
 
 const PAGES: Array[Dictionary] = [
 	{"id": &"display", "text": "Display"},
@@ -16,6 +17,7 @@ const PAGES: Array[Dictionary] = [
 	{"id": &"controls", "text": "Controls"},
 	{"id": &"map", "text": "Map"},
 	{"id": &"accessibility", "text": "Accessibility"},
+	{"id": &"game", "text": "Game"},
 	{"id": &"advanced", "text": "Advanced"},
 	{"id": &"about", "text": "About"},
 ]

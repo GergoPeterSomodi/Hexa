@@ -1,0 +1,45 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/hud/task_flag.gd" id="1_flag"]
+
+[node name="TaskFlag" type="PanelContainer"]
+mouse_filter = 0
+theme_type_variation = &"PanelCard"
+script = ExtResource("1_flag")
+
+[node name="Pill" type="HBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Number" type="Label" parent="Pill"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+mouse_filter = 2
+text = "0"
+
+[node name="Noun" type="Label" parent="Pill"]
+layout_mode = 2
+theme_type_variation = &"Body"
+mouse_filter = 2
+text = " things to do"
+
+[node name="List" type="PanelContainer" parent="."]
+visible = false
+top_level = true
+layout_mode = 2
+mouse_filter = 0
+theme_type_variation = &"PanelCard"
+
+[node name="VBox" type="VBoxContainer" parent="List"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Head" type="Label" parent="List/VBox"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+mouse_filter = 2
+text = "Things to do"
+
+[node name="Rows" type="VBoxContainer" parent="List/VBox"]
+layout_mode = 2
+mouse_filter = 2

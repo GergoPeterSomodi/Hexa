@@ -294,7 +294,7 @@ func test_new_game_pick_play_as_genoa_panel_and_pause() -> void:
 	await _wait_frames(2)
 	var pause := app.stack().top() as PauseMenu
 	assert_not_null(pause, "the next Esc pauses")
-	assert_eq(pause.subtitle_label().text, "Republic of Genoa")
+	assert_eq(pause.subtitle_label().text, "Republic of Genoa · Spring 1480", "the subtitle names the country and the date")
 
 
 func test_show_on_the_map_switches_to_owner_mode() -> void:
