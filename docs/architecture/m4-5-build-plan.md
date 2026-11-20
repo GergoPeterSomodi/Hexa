@@ -161,7 +161,7 @@ five times down; each must be under a minute.
 12. F3: the study line shows the last page built in a few milliseconds; no page or tab opens with a visible pause.
 13. F5, quit to desktop, Continue: the study shows the same numbers; the map is in Yields if you left it there.
 14. Make the window 1280 x 720: Rankings shows both lists and both charts; nothing is cut.
-15. Map sandbox: 4 says "no countries on this map"; older log headers are plain; I says "The sandbox has no treasury."
+15. Map sandbox: 4 says "No countries on this map"; older log headers are plain; I says "The sandbox has no treasury."
 16. Back in the game, play on to **Spring 1490** (`end 28` in the console): the History tab at 40 seasons is full; the year
     chart shows 1480 to 1489; the timeline's labels thin out; no error.
 

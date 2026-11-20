@@ -28,6 +28,16 @@ money out, your spending, the expected change, the **tax level** (Low, Normal, H
 sandbox has no treasury: no chips, and `I` says so. The developer console takes `money N [TAG]`, `goods KEY N [TAG]` and
 `tax low|normal|high`.
 
+**M4.5 Insights (the App is wired; the owner's playtest is next).** The study grows three pages. **Economy** has four tabs:
+*This season*, *Districts* (your land ranked by what it earns a year, with Look there and Show on the map), *Goods* (what
+runs short, and when) and *History* (the treasury, season by season, with a ledger that adds up). **Rankings** sets you
+against the countries you know (land, income and more; others are shown as bands such as "about 58"). **History** is the
+chronicle of what you may know, on a timeline of seasons with filters. Key `4` is the **Yields** map mode: your land in
+greens, darker where it earns more, others' land under a veil, with a legend top left. In a map-only game `4` says "No
+countries on this map", and while you are still picking a country it asks you to choose one first. In a game with countries,
+the headers of older seasons in the action log open History at that season. The study warms its pages in the background
+after each season (`shell/app/study_warm.gd`), and F3 shows the page last built and the warm queue.
+
 ## Engine
 
 - Godot **4.7.2-stable**, standard build (not .NET), Compatibility renderer, GDScript. Pinned here, in CI and in
@@ -64,7 +74,7 @@ shell/                  everything with Nodes (Studiolo UI architecture)
                         game_requests.gd (the M3 handlers: the season flow and report, F5/F9, Save and Load,
                         Continue, bookmarks, undo, the running lock and recovery, the toasts of works with their
                         ducats), works_flow.gd (WorksFlow, M4: the works card and its map marks, Begin and Cancel,
-                        the study, the tax toast), season_flow.gd (SeasonFlow),
+                        the study, the tax toast), study_warm.gd (StudyWarm: warms the study's views), season_flow.gd (SeasonFlow),
                         bookmarks.gd, thumbnail.gd, run_lock.gd
   input/                bindings.gd (InputMap & gestures), zoom_model.gd, esc_ladder.gd,
                         app_input.gd, camera_rig.gd, map_input.gd
@@ -80,7 +90,7 @@ shell/                  everything with Nodes (Studiolo UI architecture)
                         zoom_control, scale_bar, minimap, map_hover, key_hints, debug_overlay (F3)
   screens/              screen_ids.gd, main_menu, new_game, country_pick, find_place, sandbox, pause_menu,
                         options (+ options_keys), about, credits, confirm, loading, help_overlay, season_report,
-                        works_preview (the works card), study (+ study/page_economy)
+                        works_preview (the works card), study (+ study/page_economy, page_rankings, page_history)
   map/                  map_scene.tscn + map_scene.gd (the map scene), mode_overlay.gd (.gdshader),
                         capital_marks.gd, preview_marks.gd (the card's ghost, tint and labels), hex_panel_contract.gd
   mapview/              tile_map_view.gd, tileset_builder.gd, edge_line_layer.gd, far_map.gd, map_labels.gd,
@@ -206,11 +216,11 @@ check) and **Check** (the deep validation; its lines go to `facts` and the Outpu
   `user://settings.cfg` (`Settings`), with a 10 s `Confirm` revert for display/window/UI-scale changes.
 - **Default bindings** (`shell/input/bindings.gd`, `Bindings.DEFAULTS`):
   - **Camera:** `WASD` / arrows (pan; hold `Shift` for fast pan), `=` / `+` / `Kp+` (zoom in), `-` / `Kp-` (zoom out), `F` / `Home` (fit whole map).
-  - **Map & View:** left click (select hex), right click (clear selection), `1`–`3` (map modes Terrain / Owner / Relief; Owner is refused with a toast in a map-only game), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (the works card for the selected hex's upgrade, or its first build on wild land; with Confirm works Off, or Expensive only for a cheap work, it begins the work at once).
+  - **Map & View:** left click (select hex), right click (clear selection), `1`–`4` (map modes Terrain / Owner / Relief / Yields; Owner and Yields are refused with a toast in a map-only game, and Yields while picking), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (the works card for the selected hex's upgrade, or its first build on wild land; with Confirm works Off, or Expensive only for a cheap work, it begins the work at once).
   - **The pick:** click a country's land or choose it in the list (`Up` / `Down`, `Enter` shows it, `Enter` again plays it), or `Play as` in its panel; `Esc` closes the panel, then asks for the pause menu (the pick cannot be skipped).
   - **Time & saves (M3):** `Space` / `Enter` (end the season; a second one inside 400 ms of the report closing is refused), `J` (the last season report), `F5` / `Ctrl+S` / `Cmd+S` (quicksave), `F9` / `Ctrl+L` / `Cmd+L` (quickload; asks first when actions are unsaved), `Ctrl+Z` / `Cmd+Z` (cancel the work begun last this season), `Ctrl+Shift+1..9` (set camera bookmark), `Ctrl+1..9` (go to it), `F2` (the developer console at the foot of F3, developer tools on).
-  - **Economy (M4):** `I` (the Statesman's Study on its last page), `L` (the study's Economy page), `[` `]` (study pages, once there are two), `Enter` or `U` on a works card (begin the work), `Esc` (close the card or the study), `Shift` (keep a hovered card while the pointer is away).
-  - **Saves:** `user://saves/` holds `quick`, `1` to `8` and `auto1` to `auto3` (`.sav`, `.png`); the program writes `user://running.lock` while a game runs and asks to load the newest autosave when it finds one left behind. Continue on the main menu loads the newest save and falls back to older ones when its body is damaged. The shell's key milestone is `Bindings.SHELL_MILESTONE` (`"4"`); the Options screen shows the rows up to `Options.TARGET_MILESTONE` (4).
+  - **Economy (M4):** `I` (the Statesman's Study on its last page), `L` (the study's Economy page), `[` `]` (study pages: Economy, Rankings, History), `Ctrl+[` `Ctrl+]` (`Cmd` on a Mac: the tabs of the page, as Economy's four), `Enter` or `U` on a works card (begin the work), `Esc` (close the card or the study), `Shift` (keep a hovered card while the pointer is away).
+  - **Saves:** `user://saves/` holds `quick`, `1` to `8` and `auto1` to `auto3` (`.sav`, `.png`); the program writes `user://running.lock` while a game runs and asks to load the newest autosave when it finds one left behind. Continue on the main menu loads the newest save and falls back to older ones when its body is damaged. The shell's key milestone is `Bindings.SHELL_MILESTONE` (`"4.5"`); the Options screen shows the rows up to `Options.TARGET_MILESTONE` (4.5).
   - **App & Dev:** `Esc` (Esc ladder: console field → popover → top screen → country panel or selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
 - **Pointer & trackpad gestures** (`shell/input/camera_rig.gd`):
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).

@@ -2,6 +2,8 @@
 ## exercises bound keys, viewport/HUD/screen clicks, mouse wheel with factors, trackpad
 ## pan/magnify gestures, drags, screen stack push/pop, Esc ladder, layers/seasons, and
 ## checks stack/shade/focus/zoom/bounds/digest invariants and zero leaked orphan nodes
+## M4.5 adds Ctrl+[ and Ctrl+] (the study's tabs), key 4 (it was in the key pool already) and clicks on the tab strip and every
+## button of the three pages; its invariant: the Yields legend shows exactly in Yields.
 ## M4 (m4-build-spec.md section 9): the economy monkey adds I, L, [ and ], U, clicks on the chips, hex panel rows (hover and
 ## click), the works card (Begin, pin, Esc) and the study's tax buttons.
 ## (docs/architecture/ui-and-controls-spec.md section 9; ui-style-and-feedback-spec.md section 11).
@@ -22,7 +24,7 @@ const COUNTER_KEYS: Array[String] = [
 	"undos", "spaces", "double_spaces", "refused_spaces", "console_opens", "m3_keys", "view_checks", "roundtrips",
 	"studies", "study_i", "study_l", "study_page_keys", "study_clicks", "tax_clicks", "tax_changes", "u_keys", "u_cards",
 	"chip_clicks", "chip_cards", "row_hovers", "row_refused_hovers", "row_clicks", "card_begins", "card_pins", "card_escs",
-	"orphan_cycles", "m4_checks",
+	"orphan_cycles", "m4_checks", "study_tab_keys", "legend_checks",
 ]
 const EVENTS_PER_SEED := 600
 
@@ -75,6 +77,10 @@ var _player_game: Game = null
 ## M3: the monkey's counters (every action it does and every effect it sees), the app under test and the clock reading
 ## of the last season (-1 after a new or loaded game: the flow and its guard were reset).
 var _m3_app: App = null
+## The turn, the season count and the slot at the start of the step (the digest check's diagnostic on failure).
+var _step_turn: int = -1
+var _step_seasons: int = 0
+var _step_slot: String = ""
 var _last_season_msec: int = -1
 
 
@@ -265,6 +271,9 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 		var prev_player := Session.player_tag()
 		_changed_hexes.clear()
 		_tag = "seed %d step %d" % [seed_value, step]
+		_step_turn = prev_game.turn if prev_game != null else -1
+		_step_seasons = int(_n.get("seasons", 0))
+		_step_slot = Session.current_slot
 
 		if m3 and rng.randi_range(0, 99) < (70 if m4 else 45):
 			await _m3_step(rng, vp, app)
@@ -570,7 +579,15 @@ func _assert_invariants(
 			var picked := prev_player == &"" and Session.player_tag() != &""
 			# A season (Enter) is an accepted action too; an autosave after it then leaves nothing unsaved.
 			var autosaved := Session.unsaved_actions == 0 and Session.current_slot.begins_with("auto")
-			if not picked and not autosaved:
+			# Seasons that ended during this step are accepted actions that finished by themselves (a run of several, or the
+			# frames of a slow machine): an autosave between two of them leaves unsaved at 1, not 0 (found under load: turn 12 -> 14,
+			# unsaved 4 -> 1, slot auto1). The season_ended events counted by the monkey say so; nothing else explains a change.
+			var seasons_ended := int(_n.get("seasons", 0)) > _step_seasons
+			if not picked and not autosaved and not seasons_ended:
+				if Session.unsaved_actions <= prev_unsaved:
+					gut.p("DIGEST DIAGNOSTIC %s: turn %d -> %d, seasons ended this step %d, unsaved %d -> %d, slot '%s' -> '%s', digest %s -> %s" % [
+						tag, _step_turn, Session.game.turn, int(_n.get("seasons", 0)) - _step_seasons, prev_unsaved, Session.unsaved_actions,
+						_step_slot, Session.current_slot, prev_digest.substr(0, 12), cur_digest.substr(0, 12)])
 				assert_gt(Session.unsaved_actions, prev_unsaved, "%s: game digest changed without an accepted action" % tag)
 
 	# 5. M2: the player is fixed by the pick; an accepted works action (build, upgrade, clear) is on the player's land

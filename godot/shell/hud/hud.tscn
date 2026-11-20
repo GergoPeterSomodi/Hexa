@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/hud.gd" id="1_hud"]
 [ext_resource type="PackedScene" path="res://shell/hud/top_bar.tscn" id="2_topbar"]
@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://shell/hud/action_log.tscn" id="13_log"]
 [ext_resource type="PackedScene" path="res://shell/hud/task_flag.tscn" id="14_flag"]
 [ext_resource type="PackedScene" path="res://shell/hud/notifications.tscn" id="15_notif"]
+[ext_resource type="PackedScene" path="res://shell/hud/mode_legend.tscn" id="16_legend"]
 
 [node name="Hud" type="CanvasLayer"]
 process_mode = 1
@@ -59,6 +60,13 @@ offset_left = 12.0
 offset_top = 8.0
 offset_right = 372.0
 offset_bottom = 260.0
+
+[node name="ModeLegend" parent="Root/Column/Main/MapArea" instance=ExtResource("16_legend")]
+layout_mode = 1
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 232.0
+offset_bottom = 12.0
 
 [node name="TopRight" type="VBoxContainer" parent="Root/Column/Main/MapArea"]
 layout_mode = 1

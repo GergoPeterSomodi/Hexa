@@ -581,7 +581,7 @@ func test_map_only_game_has_no_borders_pennants_or_owner_mode() -> void:
 	_scene.refused.connect(func(r: String) -> void: reasons.append(r))
 	_scene.map_input()._unhandled_input(_key_event(KEY_2))
 	_scene.map_input()._unhandled_input(_key_event(KEY_C))
-	assert_eq(reasons, ["no countries on this map", "no countries on this map"])
+	assert_eq(reasons, ["No countries on this map", "No countries on this map"])
 	assert_eq(_scene.mode(), int(MapModes.Mode.TERRAIN), "Owner mode refused in map-only game")
 
 	_scene.map_input()._unhandled_input(_key_event(KEY_3))

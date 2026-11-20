@@ -512,14 +512,14 @@ func _on_mode_requested(requested_mode: int) -> void:
 	if not MapModes.modes(Session.game).has(requested_mode):
 		map_mode_refused.emit(requested_mode)
 		if Session.game == null or not Session.game.has_countries():
-			refused.emit("no countries on this map" if requested_mode == int(MapModes.Mode.OWNER) else "No countries on this map")
+			refused.emit("No countries on this map")
 		return
 	set_mode(requested_mode)
 
 
 func _on_country_requested() -> void:
 	if Session.game == null or not Session.game.has_countries():
-		refused.emit("no countries on this map")
+		refused.emit("No countries on this map")
 		return
 	country_requested.emit()
 

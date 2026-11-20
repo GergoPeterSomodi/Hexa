@@ -392,3 +392,48 @@ func test_study_closed_mid_fade_and_a_new_switch_leaves_a_visible() -> void:
 	study.current_page().select_tab(&"alpha")
 	await _harness.wait_frames(self, 40)
 	_settled(study.current_page(), &"alpha")
+
+
+## M4.5 spec 6.3: LIST has the three pages, each from the milestone it came in.
+func test_the_list_holds_economy_rankings_and_history_from_their_milestones() -> void:
+	assert_eq(_ids(StudyPages.shown("4")), [&"economy"], "M4 had the Economy page only")
+	var at_45 := StudyPages.shown("4.5")
+	assert_eq(_ids(at_45), [&"economy", &"rankings", &"history"])
+	assert_eq(at_45.map(func(e: Dictionary) -> String: return str(e["title"])), ["Economy", "Rankings", "History"])
+	assert_eq(at_45.map(func(e: Dictionary) -> String: return str(e["since"])), ["4", "4.5", "4.5"])
+	for entry: Dictionary in at_45:
+		var page := (load(str(entry["scene"])) as PackedScene).instantiate()
+		assert_true(page is StudyPage, "%s is a study page" % str(entry["id"]))
+		page.free()
+
+
+func test_the_real_pages_step_with_brackets_and_rankings_shares_the_span_setting() -> void:
+	_harness.settings.set_value("state/study_span", 40)
+	var study := _open_at(StudyPages.shown("4.5"), "4.5")
+	study.open_page(&"economy")
+	assert_eq(study.nav().button_for(&"history").text, "History")
+	assert_eq(study.hint().text, "I: close · [ ]: page · Ctrl+[ ]: tab · Enter: look there")
+	_harness.send_key(KEY_BRACKETRIGHT)
+	assert_eq(study.current_page_id(), &"rankings")
+	var rankings := study.current_page() as PageRankings
+	assert_eq(rankings.settings, _harness.settings, "the Study hands its settings to Rankings")
+	assert_eq(rankings.span, 40, "the span is the shared setting")
+	assert_false(study.hint().text.contains("Ctrl+[ ]"), "Rankings has no tabs")
+	_harness.send_key(KEY_BRACKETRIGHT)
+	assert_eq(study.current_page_id(), &"history")
+	_harness.send_key(KEY_BRACKETRIGHT)
+	assert_eq(study.current_page_id(), &"economy", "the pages wrap")
+	_harness.send_key(KEY_BRACKETRIGHT, true, true)
+	assert_eq(study.current_page().current_tab(), &"districts", "Ctrl+] steps Economy's tabs")
+
+
+func test_queue_open_opens_the_page_and_focus_once_on_enter() -> void:
+	var study := (load(SCENE) as PackedScene).instantiate() as Study
+	study.configure(StudyPages.shown("4.5"), "4.5")
+	study.queue_open(&"economy", {"tab": &"goods"})
+	_harness.stack.push(study)
+	assert_eq(study.current_page_id(), &"economy")
+	assert_eq(study.current_page().current_tab(), &"goods", "the focus came with the first open")
+	_harness.stack.remove(study)
+	_harness.stack.push(study)
+	assert_eq(study.current_page().current_tab(), &"goods", "a later push keeps the tab and opens nothing queued")

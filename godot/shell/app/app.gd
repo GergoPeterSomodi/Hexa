@@ -94,7 +94,7 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	_booted = true
 	if p_settings != null:
 		_settings_override = p_settings
-	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "4": the study, ledger and works keys and the M4 options
+	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "4.5": the study and its tabs, Yields (key 4), the M4.5 options
 	_init_settings()
 	_apply_key_overrides()
 
@@ -395,9 +395,9 @@ func launch(title: String, message: String, make: Callable, loaded: bool) -> voi
 	_on_stack_changed()
 	if loaded:
 		_requests.after_load()
-	elif _map_scene != null and _map_scene.picking():
-		_routes.begin_pick()
-	else:
+	if _map_scene != null and _map_scene.picking():
+		_routes.begin_pick()  # also for a save made during the pick: it has no player yet
+	elif not loaded:
 		if _map_scene != null and Session.player_tag() != &"":
 			_routes.announce_rule(true)
 		HelpOverlay.open_if_unseen(_ctx)
@@ -457,10 +457,9 @@ func _on_app_requested(what: StringName, args: Dictionary) -> void:
 			else:
 				_start_sandbox(str(args.get("map_id", MapScene.MAP_ID)), int(args.get("seed", Sandbox.DEFAULT_SEED)))
 		&"start_sandbox":
-			var map_id_val := str(args.get("map_id", MapScene.MAP_ID))
-			var seed_val := int(args.get("seed", Sandbox.DEFAULT_SEED))
-			_start_sandbox(map_id_val, seed_val)
+			_start_sandbox(str(args.get("map_id", MapScene.MAP_ID)), int(args.get("seed", Sandbox.DEFAULT_SEED)))
 		&"country":
+			_requests.works.close_study()  # a country asked for from the study: the map is shown first
 			_routes.show_country(StringName(str(args.get("tag", &""))))
 		&"close_dock":
 			if _hud != null:

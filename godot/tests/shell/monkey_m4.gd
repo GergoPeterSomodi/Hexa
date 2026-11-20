@@ -11,7 +11,7 @@ const FORCE_M4_STEP := 150
 ## The M4 counters a seed must raise above 0 (so its invariants cannot pass empty).
 const M4_REQUIRED: Array[String] = [
 	"studies", "study_i", "study_l", "study_page_keys", "tax_clicks", "u_keys", "chip_clicks", "chip_cards", "row_hovers",
-	"row_clicks", "card_begins", "card_pins", "card_escs", "orphan_cycles", "m4_checks",
+	"row_clicks", "card_begins", "card_pins", "card_escs", "orphan_cycles", "m4_checks", "study_tab_keys", "legend_checks",
 ]
 
 ## The monkey's counters (every action it does and every effect it sees).
@@ -282,6 +282,12 @@ func _m4_study_open(rng: Rng, vp: SubViewport, app: App, key: Key, click: bool =
 		await _wait_frames(1)
 		assert_true(app.stack().top() is Study, "%s: the page keys keep the study" % _tag)
 	_m4_assert_untouched(before, "[ and ] in the study")
+	for _i: int in range(rng.randi_range(1, 2)):  # Ctrl+[ and Ctrl+]: the page's tabs (nothing on a page without tabs)
+		_send_chord(vp, KEY_BRACKETRIGHT if rng.randi_range(0, 1) == 0 else KEY_BRACKETLEFT, true)
+		_bump("study_tab_keys")
+		await _wait_frames(1)
+		assert_true(app.stack().top() is Study, "%s: the tab keys keep the study" % _tag)
+	_m4_assert_untouched(before, "Ctrl+[ and Ctrl+] in the study")
 	if click or rng.randi_range(0, 3) == 0:
 		await _m4_study_click(rng, vp, app)
 	await _m4_close_study(rng, vp, app)
@@ -617,3 +623,7 @@ func _m4_assert_invariants(app: App, tag: String) -> void:
 		assert_eq(app.hud().chips().ducats_chip().value_label().text, Words.number(player.treasury),
 			"%s: the Ducats chip shows the treasury" % tag)
 	_bump("m4_checks")
+	var legend := app.hud().mode_legend()
+	var expect := app.map_scene().mode() == int(MapModes.Mode.YIELDS) and not app.hides_world() and app.hud().is_hud_visible()
+	assert_eq(legend.visible, expect, "%s: the Yields legend shows exactly in Yields on the bare map" % tag)
+	_bump("legend_checks")

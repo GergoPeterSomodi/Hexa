@@ -17,7 +17,7 @@ signal debug_layer_toggled(layer_name: StringName, on: bool)
 signal far_zoom_changed(value: float)
 signal slice_ms_changed(ms: int)
 signal hud_visibility_changed(shown: bool)
-## The top bar's mode switch (0 Terrain, 1 Owner, 2 Relief).
+## The top bar's mode switch (0 Terrain, 1 Owner, 2 Relief, 3 Yields).
 signal mode_requested(mode: int)
 ## A country's name was asked for: the top bar's name, a neighbour link or the hex panel's owner link.
 signal country_requested(tag: StringName)
@@ -36,14 +36,20 @@ signal hex_look_requested(hex: Vector2i)
 ## The study was asked for (a chip, the study button, the country panel's button, a task flag line): `page` is &"economy"
 ## or &"" for the last page shown.
 signal study_requested(page: StringName)
+## A chip asked for the study at a tab of a page (the Stores chip: Economy's Goods).
+signal study_tab_requested(page: StringName, tab: StringName)
 
 ## The key hints' left offset in hud.tscn.
 const KEY_HINTS_LEFT := 12.0
+## The Yields legend's top edge in the map area: 12 px under the bar, and this far under the F3 panel when that is open.
+const LEGEND_TOP := 12.0
+const LEGEND_GAP := 8.0
 
 @onready var _root: Control = $Root
 @onready var _top_bar: TopBar = $Root/Column/TopBar
 @onready var _map_area: Control = $Root/Column/Main/MapArea
 @onready var _debug_overlay: DebugOverlay = $Root/Column/Main/MapArea/DebugOverlay
+@onready var _mode_legend: ModeLegend = $Root/Column/Main/MapArea/ModeLegend
 @onready var _layers_popover: LayersPopover = $Root/Column/Main/MapArea/LayersPopover
 @onready var _key_hints: KeyHints = $Root/Column/Main/MapArea/KeyHints
 @onready var _scale_bar: ScaleBar = $Root/Column/Main/MapArea/BottomRight/ScaleBar
@@ -66,6 +72,7 @@ var _bound_map_input: MapInput = null
 var _reduce_motion: bool = false
 var _screen_cover: Array[Rect2] = []
 var _cover_queued: bool = false
+var _mode_scene: MapScene = null
 
 
 func _ready() -> void:
@@ -74,6 +81,8 @@ func _ready() -> void:
 		watched.visibility_changed.connect(_queue_cover)
 	get_viewport().size_changed.connect(_queue_cover)
 	_layers_popover.anchor_button = _top_bar.layers_button()
+	_debug_overlay.visibility_changed.connect(_place_legend)
+	_debug_overlay.resized.connect(_place_legend)
 
 	_top_bar.layers_toggled.connect(_on_top_bar_layers_toggled)
 	_top_bar.help_requested.connect(func() -> void: help_requested.emit())
@@ -83,10 +92,12 @@ func _ready() -> void:
 	_top_bar.date_end().end_season_requested.connect(func() -> void: end_season_requested.emit())
 	_top_bar.date_end().report_requested.connect(func() -> void: report_requested.emit())
 	_action_log.report_requested.connect(func() -> void: report_requested.emit())
+	_action_log.history_requested.connect(_on_history_requested)
 	_action_log.line_activated.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
 	_task_flag.go_requested.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
 	_task_flag.study_requested.connect(func(page: StringName) -> void: study_requested.emit(page))
 	_top_bar.study_requested.connect(func(page: StringName) -> void: study_requested.emit(page))
+	_top_bar.study_tab_requested.connect(func(page: StringName, tab: StringName) -> void: study_tab_requested.emit(page, tab))
 	_notifications.go_requested.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
 	Events.game_started.connect(_on_game_started)
 	Events.season_ended.connect(_on_season_ended)
@@ -178,6 +189,8 @@ func bind_camera_rig(rig: CameraRig) -> void:
 func bind_map_scene(scene: Node) -> void:
 	_debug_overlay.bind_map_scene(scene)
 	var map_scene := scene as MapScene
+	_mode_scene = map_scene
+	_sync_legend()
 	if map_scene == null:
 		_minimap.unbind()
 		_top_bar.refresh_game()
@@ -196,6 +209,8 @@ func bind_map_scene(scene: Node) -> void:
 	_top_bar.set_mode(map_scene.mode())
 	if not map_scene.mode_changed.is_connected(_top_bar.set_mode):
 		map_scene.mode_changed.connect(_top_bar.set_mode)
+	if not map_scene.mode_changed.is_connected(_on_mode_changed):
+		map_scene.mode_changed.connect(_on_mode_changed)
 
 
 ## Shows the country `tag` in the dock (its panel replaces the hex panel). `picking` adds the tip and "Play as".
@@ -267,6 +282,7 @@ func set_hud_visible(shown: bool) -> void:
 	if not shown:
 		_layers_popover.close()
 	_root.visible = shown
+	_mode_legend.set_hidden_by_hud(not shown)
 	if shown and not _reduce_motion:
 		_root.modulate.a = 1.0
 	hud_visibility_changed.emit(shown)
@@ -323,6 +339,7 @@ func close_lists() -> bool:
 ## A screen is up: `hides_world` hides the notifications (and the HUD with them), any screen hides the task flag.
 func set_covered(hides_world: bool, any_screen: bool) -> void:
 	_notifications.set_covered(hides_world)
+	_mode_legend.set_covered(hides_world)
 	_task_flag.set_covered(any_screen)
 
 
@@ -419,6 +436,10 @@ func debug_overlay() -> DebugOverlay:
 	return _debug_overlay
 
 
+func mode_legend() -> ModeLegend:
+	return _mode_legend
+
+
 func key_hints() -> KeyHints:
 	return _key_hints
 
@@ -464,6 +485,34 @@ func _on_season_preview_selected(index: int) -> void:
 ## A new game or a season that ended: F3's Look is back on the calendar (the preview ends with the season).
 func _on_game_started() -> void:
 	set_look(-1)
+	_sync_legend()
+
+
+## The legend follows the map's mode: its rows for Yields, hidden for every other mode and with no map.
+func _sync_legend() -> void:
+	if _mode_scene != null and is_instance_valid(_mode_scene):
+		_mode_legend.show_mode(_mode_scene.mode())
+	else:
+		_mode_legend.hide_legend()
+
+
+## An older header of the action log: the study's History page at that turn.
+func _on_history_requested(turn: int) -> void:
+	if _ctx != null:
+		_ctx.request(&"study", {"page": &"history", "turn": turn})
+
+
+func _on_mode_changed(_mode: int) -> void:
+	_sync_legend()
+
+
+## The legend sits 12 px under the bar, or under the F3 panel while that is open.
+func _place_legend() -> void:
+	var top := LEGEND_TOP
+	if _debug_overlay.visible:
+		top = _debug_overlay.offset_top + _debug_overlay.size.y + LEGEND_GAP
+	_mode_legend.offset_top = top
+	_mode_legend.offset_bottom = top
 
 
 func _on_season_ended(_turn: int) -> void:

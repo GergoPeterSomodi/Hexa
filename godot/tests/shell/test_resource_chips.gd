@@ -145,12 +145,12 @@ func test_dev_money_and_goods_show_after_a_refresh() -> void:
 
 func test_a_click_on_either_chip_asks_for_the_study() -> void:
 	_genoa()
-	var asked := [0]
-	_chips.study_requested.connect(func() -> void: asked[0] += 1)
+	var asked: Array[StringName] = []
+	_chips.study_requested.connect(func(tab: StringName) -> void: asked.append(tab))
 	_chips.ducats_chip().pressed.emit()
-	assert_eq(asked[0], 1, "the Ducats chip asks for the study")
+	assert_eq(asked, [&"this_season"] as Array[StringName], "the Ducats chip asks for This season")
 	_chips.stores_chip().pressed.emit()
-	assert_eq(asked[0], 2, "the Stores chip asks for the study")
+	assert_eq(asked, [&"this_season", &"goods"] as Array[StringName], "the Stores chip asks for Goods")
 
 
 func test_narrowing_hides_the_stores_name_and_the_changes() -> void:

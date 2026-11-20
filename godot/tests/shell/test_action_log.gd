@@ -1,5 +1,5 @@
 ## ActionLog (docs/architecture/m3-build-spec.md 6.5 and section 9): collapsed and open; unread counts; filters; a line
-## asks for its hex; the newest header asks for the report; Esc closes; the open state and filter kept in Settings.
+## asks for its hex; the newest header asks for the report, an older one for History; Esc closes; the open state and filter kept in Settings.
 extends GutTest
 
 const ACTION_LOG_SCENE := "res://shell/hud/action_log.tscn"
@@ -146,17 +146,44 @@ func test_the_newest_header_asks_for_the_report() -> void:
 	assert_signal_emitted(_widget, "report_requested", "the header asks for the report")
 
 
-func test_an_older_header_is_text_not_a_button() -> void:
+## In a game with countries an older season's header is a button (M4.5 spec 6.8): it asks for History at that season's turn.
+func test_an_older_header_asks_for_history_at_its_turn() -> void:
 	_log()
 	_game().turn = Calendar.FIRST_TURN + 4
 	_log("work_finished")
 	_widget.open()
 	assert_eq(_widget.season_titles().size(), 2, "two seasons")
-	var buttons := 0
-	for child: Node in _widget._seasons.get_children():
-		if child is Button:
-			buttons += 1
-	assert_eq(buttons, 1, "only the newest header is a button")
+	var buttons := _widget.header_buttons()
+	assert_eq(buttons.size(), 2, "both headers are buttons")
+	assert_eq(buttons[0].tooltip_text, ActionLog.REPORT_TIP, "the newest still opens the report")
+	assert_eq(buttons[1].tooltip_text, "Open History at Spring 1480", buttons[1].tooltip_text)
+	watch_signals(_widget)
+	buttons[1].pressed.emit()
+	assert_signal_emitted_with_parameters(_widget, "history_requested", [Calendar.FIRST_TURN])
+	assert_signal_not_emitted(_widget, "report_requested", "an older header is no report")
+	buttons[0].pressed.emit()
+	assert_signal_emitted(_widget, "report_requested")
+
+
+## In a map-only game older headers stay plain text.
+func test_an_older_header_is_text_in_a_map_only_game() -> void:
+	Session.new_game(MapScene.MAP_ID, 1480)
+	assert_false(_game().has_countries(), "the sandbox has no countries")
+	_game().turn = Calendar.FIRST_TURN
+	_log_sandbox()
+	_game().turn = Calendar.FIRST_TURN + 4
+	_log_sandbox()
+	_widget.open()
+	assert_eq(_widget.season_titles().size(), 2, "two seasons")
+	var buttons := _widget.header_buttons()
+	assert_eq(buttons.size(), 1, "only the newest header is a button")
+
+
+func _log_sandbox() -> void:
+	var w := _work(Works.BUILD, ImproveRules.VINEYARD, 1, SAVONA)
+	w.tag = &""
+	_game().emit({"kind": "work_started", "tag": w.tag, "hex": w.hex, "work": w.to_dict()})
+	Events.chronicled.emit(_game().chronicle.entries[_game().chronicle.entries.size() - 1])
 
 
 func test_a_line_with_a_hex_asks_to_glide_there() -> void:

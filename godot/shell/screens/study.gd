@@ -6,7 +6,8 @@
 ## and season_ended and refreshes the page in view; a page's [&"set_tax", level] is done here through Session.act (the App's
 ## tax_set handler makes the toast). The Economy page reads the shell's game/gain_treasury_only switch before each refresh.
 ## Ctrl+[ ] and Ctrl+] (study_tab_prev, study_tab_next) step the tabs of the page in view; [ ] still steps the pages.
-## open_page(page, focus) gives the focus to the page, and last_open_ms times the open (the F3 line).
+## open_page(page, focus) gives the focus to the page, and last_open_ms times the open (the F3 line). Rankings is given the
+## shell's settings (its span is state/study_span, as Economy's); Economy finds them through this screen's ctx.
 class_name Study
 extends Screen
 
@@ -47,6 +48,10 @@ var _scrolls: Dictionary[StringName, ScrollContainer] = {}
 var milestone: String = Bindings.SHELL_MILESTONE
 ## The synchronous part of the last open_page, in milliseconds (the F3 line).
 var last_open_ms: float = 0.0
+## The page and focus the next on_enter opens (queue_open): the App sets them before it pushes the study, so the page is
+## built and timed once.
+var _next_page: StringName = &""
+var _next_focus: Dictionary = {}
 
 
 func _init() -> void:
@@ -111,11 +116,21 @@ func open_page(page: StringName, focus: Dictionary = {}) -> void:
 	last_open_ms = float(Time.get_ticks_usec() - started) / 1000.0
 
 
+## Names the page (&"" the last one) and its focus that the next push opens, in one open_page.
+func queue_open(page: StringName, focus: Dictionary = {}) -> void:
+	_next_page = page
+	_next_focus = focus
+
+
 func on_enter() -> void:
 	_fit_ribbon()
 	_refresh_date()
 	_listen(true)
-	open_page(_current)
+	var page := _next_page if _next_page != &"" and _index_of(_next_page) >= 0 else _current
+	var focus := _next_focus
+	_next_page = &""
+	_next_focus = {}
+	open_page(page, focus)
 	if is_inside_tree():
 		var target: Control = _close
 		var btn := _nav.button_for(_current)
@@ -271,6 +286,9 @@ func _scroll_for(id: StringName, entry: Dictionary) -> ScrollContainer:
 	page_node.page_id = id
 	page_node.milestone = milestone
 	page_node.reduce_motion = _reduce_motion()
+	var rankings := page_node as PageRankings
+	if rankings != null and ctx != null:
+		rankings.settings = ctx.settings  # the span (state/study_span) is shared with Economy and kept
 	page_node.action_requested.connect(_on_page_action)
 	page_node.tab_changed.connect(_on_tab_changed)
 	page_node.size_flags_horizontal = Control.SIZE_EXPAND_FILL

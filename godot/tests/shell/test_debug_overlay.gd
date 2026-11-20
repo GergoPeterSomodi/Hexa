@@ -188,3 +188,26 @@ func test_the_m4_line_shows_the_phase_times_the_cached_districts_and_the_weather
 	Session.game = null
 	_overlay.refresh_metrics()
 	assert_eq(_overlay.m4_text(), "no game")
+
+
+## M4.5 spec 6.9: the study line names the page and tab last built, its time and the warm queue; before a first open it says so.
+func test_the_study_line_shows_the_last_page_built_and_the_warm_queue() -> void:
+	_overlay.set_open(true)
+	assert_eq(_overlay.study_text(), "study not opened yet · warm queue 0", "no source: nothing opened yet")
+	var holder := {"info": {"page": &"economy", "tab": &"districts", "ms": 3.44, "warm": 2}}
+	_overlay.study_info_func = func() -> Dictionary: return holder["info"]
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.study_text(), "study economy/districts built in 3.4 ms · warm queue 2")
+	holder["info"] = {"page": &"rankings", "tab": &"", "ms": 0.0, "warm": 0}
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.study_text(), "study rankings built in 0.0 ms · warm queue 0", "a page without tabs shows its name only")
+	holder["info"] = {"warm": 5}
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.study_text(), "study not opened yet · warm queue 5")
+	Session.game = null
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.study_text(), "no game")
+
+
+func test_the_f3_mode_word_names_yields() -> void:
+	assert_eq(DebugOverlay.MODE_WORDS[int(MapModes.Mode.YIELDS)], "Yields")

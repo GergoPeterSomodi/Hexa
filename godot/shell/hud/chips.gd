@@ -1,12 +1,13 @@
 ## The top bar's resource chips (docs/architecture/m4-build-spec.md 6.3): Ducats and Stores for the player's country, the
 ## values and hover cards from EconomyCards. Shown only in a game with countries and a chosen player (hidden in the
-## sandbox and in the country pick). A click on either chip emits study_requested (N12 opens the study's Economy page).
+## sandbox and in the country pick). A click on a chip emits study_requested with the Economy tab it opens (spec 6.9 of M4.5:
+## Ducats This season, Stores Goods).
 ## It reads Session and Events and sends intents only; the top bar places it (N12). Session.dev_money and dev_goods emit
 ## no event: their caller calls refresh().
 class_name Chips
 extends HBoxContainer
 
-signal study_requested
+signal study_requested(tab: StringName)
 ## Emitted after every refresh (it sets the chips' visibility itself, so the top bar fits again).
 signal refreshed
 
@@ -29,8 +30,8 @@ func _ready() -> void:
 	_stores = $Stores as ResourceChip
 	_ducats.set_resource(DUCATS_ID, &"ducats", DUCATS_LABEL)
 	_stores.set_resource(STORES_ID, &"stores", STORES_LABEL)
-	_ducats.pressed.connect(_on_chip_pressed)
-	_stores.pressed.connect(_on_chip_pressed)
+	_ducats.pressed.connect(_on_chip_pressed.bind(&"this_season"))
+	_stores.pressed.connect(_on_chip_pressed.bind(&"goods"))
 	_apply_narrow()
 	refresh()
 
@@ -138,8 +139,8 @@ func _apply_narrow() -> void:
 	_stores.set_change_shown(not _narrow)
 
 
-func _on_chip_pressed() -> void:
-	study_requested.emit()
+func _on_chip_pressed(tab: StringName) -> void:
+	study_requested.emit(tab)
 
 
 func _link(sig: Signal, handler: Callable) -> void:

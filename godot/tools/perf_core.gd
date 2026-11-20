@@ -2,6 +2,8 @@
 ## (docs/architecture/m3-build-spec.md and m4-build-spec.md section 8): the season phases (production and income
 ## included), the cold DistrictCache fill, a digest, a snapshot, a save and a load, the season summary, the reminders, one
 ## works check, ImprovePreview (of, options_of) and EconomyPreview.expected. Headless, no window, no GUT.
+## The M4.5 rows (m4-5-build-spec.md 8) run on a second game, PerfFixture.europe_game(SEASONS_45): the study's views and the
+## Yields bytes of the largest country, each on a new game version (cold; the owner index of the territories, keyed on the owner bytes, stays), the worst of RUNS_45.
 ## A row may carry "known_over": {"issue", "note"} in the budget: over its limit it prints KNOWN OVER and is listed
 ## in the report and the JSON, but does not fail the run (a row that is back within the limit says so: drop the key).
 ##
@@ -23,6 +25,8 @@ const PER_COUNTRY := 10
 const SEASONS := 8
 const MB := 1048576.0
 const RUNS := 20
+const SEASONS_45 := 40
+const RUNS_45 := 5
 
 var _cpu_scale := 1.0
 var _out := ""
@@ -41,7 +45,10 @@ func _initialize() -> void:
 			_summary = arg.substr(10)
 		elif arg.begins_with("--budget="):
 			_budget_path = arg.substr(9)
-	quit(_measure())
+	var code := _measure()
+	if code == 0:
+		code = _europe_40()
+	quit(_finish() if code == 0 else code)
 
 
 func _ms(from_usec: int) -> float:
@@ -102,7 +109,49 @@ func _measure() -> int:
 	_r["reminders_ms"] = _ms(t)
 	_r["reminder_lines"] = lines.size()
 	_r["largest"] = String(largest)
-	return _finish()
+	return 0
+
+
+## The M4.5 rows on the made-up Europe after SEASONS_45 seasons (the ring full, the chronicle at its 3,000).
+func _europe_40() -> int:
+	var t := Time.get_ticks_usec()
+	var game := PerfFixture.europe_game(SEASONS_45)
+	if game == null:
+		return 1
+	_r["europe_40_build_ms"] = _ms(t)
+	var tag := PerfFixture.largest_tag(game)
+	_r["chronicle_entries"] = game.chronicle.entries.size()
+	_r["turn_45"] = game.turn
+	Knowledge.known(game, tag)  # the owner index of the territories is built once per owner change, not per view
+	_r["worth_seasons_ms"] = _worst(game, func() -> void: EconomyPreview.worth_seasons_shared(game, tag, 4))
+	_r["study_districts_ms"] = _worst(game, func() -> void: StudyEconomy.districts(game, tag))
+	_r["study_goods_ms"] = _worst(game, func() -> void: StudyEconomy.goods(game, tag, 40))
+	_r["study_history_ms"] = _worst(game, func() -> void: StudyEconomy.history(game, tag, 40))
+	_r["study_rankings_ms"] = _worst(game, func() -> void: StudyRankings.of(game, tag, 40))
+	_r["history_index_ms"] = _worst(game, func() -> void: StudyHistory.index(game, tag))
+	var last := game.turn - 1
+	var worst := 0.0
+	for n: int in RUNS_45:
+		game.version += 1
+		StudyHistory.index(game, tag)  # warm: the page is measured on top of it
+		var t2 := Time.get_ticks_usec()
+		StudyHistory.timeline(game, tag)
+		StudyHistory.chronicle(game, tag, &"all", last, StudyHistory.PAGE)
+		worst = maxf(worst, _ms(t2))
+	_r["history_page_ms"] = worst
+	_r["yield_bytes_ms"] = _worst(game, func() -> void: MapModes.yield_bytes(game, tag))
+	return 0
+
+
+## The worst of RUNS_45 calls of `call`, each on a new game version (cold: the views are made again, the owner index of the territories stays, as after an action).
+func _worst(game: Game, call: Callable) -> float:
+	var worst := 0.0
+	for n: int in RUNS_45:
+		game.version += 1
+		var t := Time.get_ticks_usec()
+		call.call()
+		worst = maxf(worst, _ms(t))
+	return worst
 
 
 ## DistrictCache filled for every land hex from cold (a new game, a load); leaves it warm.

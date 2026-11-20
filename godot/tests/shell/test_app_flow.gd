@@ -444,7 +444,10 @@ func test_m3_flow_pick_build_space_report_j_quicksave_quickload_continue() -> vo
 	assert_eq(date_end.season(), 1, "the date follows the calendar: Summer")
 	var report_summary := SeasonSummary.of(Session.game, Session.player_tag(), 1)
 
-	# Space closes it; the map shows the calendar's season; a second Space inside the guard is refused.
+	# Space closes it; the map shows the calendar's season; a second Space inside the guard is refused. The flow's clock stands
+	# still while the guard is tested (a slow machine must not let 400 ms go by), then the real clock is back.
+	var frozen := [Time.get_ticks_msec()]
+	app.requests().flow.clock = func() -> int: return frozen[0]
 	_send_key(vp, KEY_SPACE)
 	assert_true(await _wait_until(func() -> bool: return app.stack().count() == 0), "the second Space closes the report")
 	assert_eq(app.requests().flow.state(), SeasonFlow.State.IDLE)
@@ -453,6 +456,7 @@ func test_m3_flow_pick_build_space_report_j_quicksave_quickload_continue() -> vo
 	await _wait_frames(3)
 	assert_eq(Session.game.turn, 2, "a Space inside the 400 ms guard plays nothing")
 	assert_eq(app.stack().count(), 0)
+	app.requests().flow.clock = Callable(Time, "get_ticks_msec")
 
 	# J: the same report again.
 	await _wait_until(func() -> bool: return _guard_over(app), 600)

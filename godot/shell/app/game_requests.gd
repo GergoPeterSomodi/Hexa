@@ -21,6 +21,8 @@ var flow: SeasonFlow = null
 var bookmarks: Bookmarks = Bookmarks.new()
 ## The works card, Begin and Cancel, the study and the tax toast (spec 6.12).
 var works: WorksFlow = null
+## Warms the study's views after a season (M4.5 spec 6.8): a child of the App, made in setup.
+var warm: StudyWarm = null
 
 var _app: App = null
 var _scene: MapScene = null
@@ -48,6 +50,13 @@ func setup() -> void:
 	flow.toast = _flow_toast
 	flow.autosave = _autosave
 	_app.add_child(flow)
+	warm = StudyWarm.new()
+	warm.name = "StudyWarm"
+	warm.setup(_app.settings())
+	warm.yields_active = func() -> bool:
+		return _scene != null and is_instance_valid(_scene) and _scene.mode() == int(MapModes.Mode.YIELDS)
+	_app.add_child(warm)
+	_app.hud().debug_overlay().study_info_func = study_info
 	_app.context().season_running_func = func() -> bool: return flow.state() == SeasonFlow.State.RUNNING
 	on_setting("dev/save_json")
 	on_setting("accessibility/reduce_motion")
@@ -69,6 +78,14 @@ func connect_signals(link: Callable) -> void:
 	link.call(Events, &"work_started", _on_work_started)
 	link.call(Events, &"work_cancelled", _on_work_cancelled)
 	works.connect_signals(link)
+
+
+## What the F3 line says of the study: {page, tab, ms} of the last open (WorksFlow.study_info) and `warm`, the views the
+## warmer still has to run.
+func study_info() -> Dictionary:
+	var info := works.study_info()
+	info["warm"] = warm.pending() if warm != null and is_instance_valid(warm) else 0
+	return info
 
 
 ## The map scene came: its keys, its camera and its ribbons are bound.

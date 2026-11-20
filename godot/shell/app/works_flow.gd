@@ -31,6 +31,7 @@ func connect_signals(link: Callable) -> void:
 	link.call(hud.hex_panel(), &"row_hovered", on_row_hovered)
 	link.call(hud.hex_panel(), &"row_unhovered", on_row_unhovered)
 	link.call(hud, &"study_requested", open_study)
+	link.call(hud, &"study_tab_requested", on_study_tab)
 	link.call(Events, &"tax_set", _on_tax_set)
 	link.call(Events, &"game_started", _sync_tax)
 	link.call(Events, &"country_chosen", _on_country_chosen)
@@ -73,9 +74,11 @@ func handle(what: StringName, args: Dictionary) -> bool:
 		&"cancel_work":
 			cancel(args)
 		&"study":
-			open_study(StringName(str(args.get("page", &""))))
+			open_study(StringName(str(args.get("page", &""))), focus_of(args))
 		&"refresh_hud":
 			_app.hud().refresh_economy()
+			if _scene != null and is_instance_valid(_scene):
+				_scene.overlay().sync_yields(Session.game, true)  # the console's money and goods change the worth
 		_:
 			return false
 	return true
@@ -247,9 +250,24 @@ func cancel(args: Dictionary) -> void:
 # ----- the study ------------------------------------------------------------------------------------------------------
 
 
-## Pushes the study at `page` (&"" the last page shown); a game without countries toasts instead; a study already up shows
-## the page. Nothing while the pick or another screen is up (the card closes first).
-func open_study(page: StringName = &"") -> void:
+## A chip: the study at `tab` of `page`.
+func on_study_tab(page: StringName, tab: StringName) -> void:
+	open_study(page, {"tab": tab})
+
+
+## The focus a study request carries: {tab, turn, hex, good} of its args, whichever it has (a page's focus() reads them).
+static func focus_of(args: Dictionary) -> Dictionary:
+	var focus := {}
+	for key: String in ["tab", "turn", "hex", "good"]:
+		if args.has(key):
+			focus[key] = args[key]
+	return focus
+
+
+## Pushes the study at `page` (&"" the last page shown) with the page's `focus`; a game without countries toasts instead; a
+## study already up shows the page. L (Economy, no focus) opens This season and I (&"") the last page on its tab. Nothing
+## while the pick or another screen is up (the card closes first).
+func open_study(page: StringName = &"", focus: Dictionary = {}) -> void:
 	var game := Session.game
 	if game == null or _scene == null:
 		return
@@ -261,21 +279,30 @@ func open_study(page: StringName = &"") -> void:
 	var study := _study_screen()
 	if study == null:
 		return
+	if page == &"economy" and focus.is_empty():
+		focus = {"tab": PageEconomy.THIS_SEASON}
 	if _app.stack().has_screen(&"study"):
-		study.open_page(page)
+		study.open_page(page, focus)
 		return
 	close_card()
 	if _app.stack().count() > 0:
 		return
+	study.queue_open(page, focus)
 	_app.stack().push(study)
-	if page != &"":
-		study.open_page(page)
 
 
 ## Takes the study off the stack when it is up (a look_at from one of its rows: the map is shown first).
 func close_study() -> void:
 	if _study != null and is_instance_valid(_study) and _app.stack().has_screen(&"study"):
 		_study.back()
+
+
+## The Study's page, tab and the time its last open took (the F3 line); {} before the first open.
+func study_info() -> Dictionary:
+	if _study == null or not is_instance_valid(_study) or _study.current_page_id() == &"":
+		return {}
+	var page := _study.current_page()
+	return {"page": _study.current_page_id(), "tab": page.current_tab() if page != null else &"", "ms": _study.last_open_ms}
 
 
 ## The game is going: the study (which survives its own pops) is freed, the next game makes another.
@@ -291,7 +318,7 @@ func _study_screen() -> Study:
 	if _study == null or not is_instance_valid(_study):
 		_study = ScreenIds.make(&"study") as Study
 		if _study != null:
-			_study.configure(StudyPages.shown(Bindings.SHELL_MILESTONE))
+			_study.configure(StudyPages.shown(Bindings.SHELL_MILESTONE), Bindings.SHELL_MILESTONE)
 	return _study
 
 

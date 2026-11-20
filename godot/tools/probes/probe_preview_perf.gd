@@ -5,7 +5,6 @@
 ## one ImprovePreview card with the country's base warm and the option cold; EconomyPreview.expected, cold.
 extends SceneTree
 
-const GAME_DEFS := "res://data/defs/game_defs.tres"
 const RUNS := 20
 
 
@@ -17,21 +16,12 @@ func _avg(label: String, f: Callable) -> void:
 
 
 func _initialize() -> void:
-	var map := FakeMap.build(494, 247, 1480)
-	var built := FakeScenario.build(map, 60, 1480)
-	var defs := built["defs"] as GameDefs
-	var real := ResourceLoader.load(GAME_DEFS, "", ResourceLoader.CACHE_MODE_IGNORE) as GameDefs
-	defs.families = real.families
-	defs.work_slots_base = 10
-	var game := Game.new_scenario(map, defs, built["scenario"] as ScenarioDef, 1480)
-	var best := game.countries[0]
-	for c: Country in game.countries:
-		if Territory.count(game, c.id) > Territory.count(game, best.id):
-			best = c
-	var tag := best.tag
-	game.act("choose_country", {"tag": tag})
-	Season.run(game)
-	Season.run(game)
+	var game := PerfFixture.europe_game(2)  # the made-up Europe, two seasons played (works at random options)
+	if game == null:
+		quit(1)
+		return
+	var tag := PerfFixture.largest_tag(game)
+	var best := Countries.by_tag(game, tag)
 	var hex := Vector2i(-1, -1)
 	var most := 0
 	for i: int in Territory.districts(game, best.id):

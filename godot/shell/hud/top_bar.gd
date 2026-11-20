@@ -17,6 +17,8 @@ signal mode_requested(mode: int)
 signal country_requested(tag: StringName)
 ## A chip or the study button was pressed: the study opens at `page` (&"economy" for a chip, &"" its last page).
 signal study_requested(page: StringName)
+## A chip was pressed: the study opens at `page` on its `tab` (Ducats: This season, Stores: Goods).
+signal study_tab_requested(page: StringName, tab: StringName)
 
 const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief", "Yields"]
 const MODE_KEYS: Array[String] = ["1", "2", "3", "4"]
@@ -80,7 +82,7 @@ func _ready() -> void:
 	_study_btn.tooltip_text = "The Statesman's Study"  # set here: the scene's value comes before the script and the hotkey tag
 	(_study_btn as KitButton).hotkey_action = &"game_study"
 	_study_btn.pressed.connect(func() -> void: study_requested.emit(&""))
-	_chips.study_requested.connect(func() -> void: study_requested.emit(&"economy"))
+	_chips.study_requested.connect(func(tab: StringName) -> void: study_tab_requested.emit(&"economy", tab))
 	_chips.minimum_size_changed.connect(_queue_fit)
 	_chips.refreshed.connect(_queue_fit)  # a refresh shows the chips again; the bar's fit wins
 

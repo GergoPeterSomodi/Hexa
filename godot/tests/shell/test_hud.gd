@@ -519,13 +519,16 @@ func test_a_chip_and_the_study_button_reach_the_hud_as_study_requests() -> void:
 	var bar := _genoa_bar()
 	await _harness.wait_frames(self, 3)
 	var asked: Array[StringName] = []
+	var tabs: Array[String] = []
 	_hud.study_requested.connect(func(page: StringName) -> void: asked.append(page))
+	_hud.study_tab_requested.connect(func(page: StringName, tab: StringName) -> void: tabs.append("%s/%s" % [page, tab]))
 	bar.chips().ducats_chip().pressed.emit()
 	bar.chips().stores_chip().pressed.emit()
 	bar.study_button().pressed.emit()
 	_hud.country_panel().study_requested.emit()
 	_hud.task_flag().study_requested.emit(&"economy")
-	assert_eq(asked, [&"economy", &"economy", &"", &"economy", &"economy"], "the chips and the panel ask Economy, the button its last page")
+	assert_eq(tabs, ["economy/this_season", "economy/goods"] as Array[String], "the Ducats chip asks This season, the Stores chip Goods")
+	assert_eq(asked, [&"", &"economy", &"economy"], "the button asks its last page, the panel and the flag Economy")
 
 
 func test_the_chips_narrow_in_the_order_of_the_spec_and_fit_the_window() -> void:
@@ -670,3 +673,45 @@ func test_the_mode_buttons_stay_normal_at_1280_and_nothing_clips_down_to_800() -
 		assert_true(bar.chips().visible and bar.study_button().visible, "%d px: the chips and the study button" % width)
 		if width == 1280:
 			assert_false(normal.has_theme_font_size_override(&"font_size"), "1280 px: the mode buttons are normal")
+
+
+## M4.5 spec 6.7: the Yields legend has its slot top left of the map area, 12 px under the bar; a screen that hides the
+## world and photo mode hide it; the F3 panel pushes it down.
+func test_the_yields_legend_has_a_slot_follows_the_covers_and_sits_under_f3() -> void:
+	await _harness.wait_frames(self, 2)
+	var legend := _hud.mode_legend()
+	assert_not_null(legend, "the Hud has the legend")
+	assert_false(legend.visible, "no map and no Yields: nothing shows")
+	legend.show_mode(MapModes.Mode.YIELDS)
+	assert_true(legend.visible)
+	var map_area := _hud.get_node("Root/Column/Main/MapArea") as Control
+	assert_eq(legend.get_parent(), map_area, "a child of the map area")
+	assert_almost_eq(legend.offset_top, Hud.LEGEND_TOP, 0.01, "12 px under the bar")
+	_hud.set_covered(true, true)
+	assert_true(legend.is_covered(), "a screen that hides the world covers it")
+	assert_false(legend.visible)
+	_hud.set_covered(false, false)
+	assert_true(legend.visible)
+	_hud.set_hud_visible(false)
+	assert_true(legend.is_hidden_by_hud(), "photo mode hides it")
+	_hud.set_hud_visible(true)
+	assert_false(legend.is_hidden_by_hud())
+	assert_true(legend.visible)
+	_harness.settings.set_value("dev/developer_tools", true)
+	_hud.set_debug_open(true)
+	await _harness.wait_frames(self, 3)
+	var overlay := _hud.debug_overlay()
+	assert_true(overlay.visible, "F3 is open")
+	assert_gte(legend.offset_top, overlay.offset_top + overlay.size.y, "the legend sits under the F3 panel")
+	_hud.set_debug_open(false)
+	await _harness.wait_frames(self, 2)
+	assert_almost_eq(legend.offset_top, Hud.LEGEND_TOP, 0.01, "and back under the bar when F3 closes")
+
+
+## M4.5 spec 6.8: an older header of the action log asks for History at its turn through the shell context.
+func test_an_older_log_header_requests_history_at_its_turn() -> void:
+	await _harness.wait_frames(self, 1)
+	var sent: Array[Array] = []
+	_harness.ctx.app_requested.connect(func(what: StringName, args: Dictionary) -> void: sent.append([what, args]))
+	_hud.action_log().history_requested.emit(9)
+	assert_eq(sent, [[&"study", {"page": &"history", "turn": 9}]])

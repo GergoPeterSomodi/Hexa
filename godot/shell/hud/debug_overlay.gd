@@ -17,7 +17,7 @@ const SEASON_LABELS: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
 const LOOK_CALENDAR := -1
 ## The word for each weather kind (0 calm, 1 good, 2 poor) in the economy line.
 const WEATHER_WORDS: Array[String] = ["calm", "good", "poor"]
-const MODE_WORDS: Array[String] = ["Terrain", "Owner", "Relief"]
+const MODE_WORDS: Array[String] = ["Terrain", "Owner", "Relief", "Yields"]
 const LAYER_SPECS: Array[Array] = [
 	[&"grid", "Grid"],
 	[&"shade", "Shade"],
@@ -47,12 +47,22 @@ var _worst_frame_ms: float = 0.0
 var _syncing: bool = false
 var _season_index: int = LOOK_CALENDAR
 var _save_ms: float = -1.0
+## The App's answer to "what did the study last build": () -> {page, tab, ms, warm}; {} (or unset) before a first open.
+var study_info_func: Callable = Callable()
+var _study_label: Label = null
 var _hovered_hex: Vector2i = MapInput.NO_HEX
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
+
+	_study_label = Label.new()
+	_study_label.theme_type_variation = &"TableRow"
+	_study_label.text = "no game"
+	_study_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_m4_label.get_parent().add_child(_study_label)
+	_m4_label.get_parent().move_child(_study_label, _m4_label.get_index() + 1)
 
 	_season_seg.hud_mode = true
 	var season_items: Array[Dictionary] = [{"id": LOOK_CALENDAR, "label": "Calendar"}]
@@ -215,6 +225,10 @@ func m4_text() -> String:
 	return _m4_label.text if is_node_ready() else ""
 
 
+func study_text() -> String:
+	return _study_label.text if is_node_ready() and _study_label != null else ""
+
+
 func season_segmented() -> Segmented:
 	return _season_seg
 
@@ -268,6 +282,22 @@ func refresh_metrics() -> void:
 	_metrics_label.text = "\n".join(lines)
 	_m3_label.text = m3_line()
 	_m4_label.text = m4_line()
+	if _study_label != null:
+		_study_label.text = study_line()
+
+
+## The study's line (M4.5 spec 6.9): "study economy/districts built in 3.4 ms · warm queue 0". The page and the tab of the last
+## open (a page without tabs shows its name only), its synchronous time, and the views the warmer still has to run.
+func study_line() -> String:
+	if Session.game == null:
+		return "no game"
+	var info: Dictionary = study_info_func.call() if study_info_func.is_valid() else {}
+	var warm := int(info.get("warm", 0))
+	if not info.has("page"):
+		return "study not opened yet · warm queue %d" % warm
+	var tab := str(info.get("tab", ""))
+	var where := str(info["page"]) if tab.is_empty() else "%s/%s" % [str(info["page"]), tab]
+	return "study %s built in %.1f ms · warm queue %d" % [where, float(info.get("ms", 0.0)), warm]
 
 
 ## "turn 9 · Spring 1482 · works 3 · phases works 0.4, stats 0.2, calendar 0.0 ms · save 32 ms".

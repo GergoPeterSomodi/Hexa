@@ -7,6 +7,9 @@ extends RefCounted
 
 ## The zoom a glide to a country or a place reaches when the view is further out than this (1 = the art size).
 const GLIDE_ZOOM := 0.6
+## The toasts of a map mode the game does not offer (MapModes.modes): a map-only game, and the pick before a country is ruled.
+const NO_COUNTRIES := "No countries on this map"
+const CHOOSE_FIRST := "Choose your country first"
 
 var _app: App = null
 var _pick: CountryPick = null
@@ -126,13 +129,22 @@ func on_country_panel_closed() -> void:
 		pick.dock_closed()
 
 
+## The top bar's switch: a mode the game does not offer is toasted (spec 6.9), otherwise it is set.
 func on_hud_mode_requested(mode: int) -> void:
 	if _app.map_scene() == null:
 		return
-	if mode == int(MapModes.Mode.OWNER) and (Session.game == null or not Session.game.has_countries()):
-		_app.context().toast("no countries on this map", &"warn")
+	if not MapModes.modes(Session.game).has(mode):
+		var has_countries := Session.game != null and Session.game.has_countries()
+		_app.context().toast(CHOOSE_FIRST if has_countries else NO_COUNTRIES, &"warn")
 		return
 	_app.map_scene().set_mode(mode)
+
+
+## A key asked for a mode the game does not offer: while picking, the toast says to choose first. (In a map-only game the
+## scene itself has said "No countries on this map" through `refused`.)
+func on_map_mode_refused(_mode: int) -> void:
+	if Session.game != null and Session.game.has_countries():
+		_app.context().toast(CHOOSE_FIRST, &"warn")
 
 
 func on_hud_country_play(tag: StringName) -> void:
@@ -182,6 +194,7 @@ func unbind_scene(scene: MapScene) -> void:
 func _scene_links(scene: MapScene) -> Array[Array]:
 	return [
 		[scene.refused, on_map_refused],
+		[scene.map_mode_refused, on_map_mode_refused],
 		[scene.hud_toggle_requested, on_map_hud_toggle],
 		[scene.country_clicked, on_map_country_clicked],
 		[scene.country_hovered, on_map_country_hovered],
@@ -265,9 +278,12 @@ func take_screenshot(dir: String) -> String:
 	return ""
 
 
-## The `look_at` request: a map pixel, or a hex (glide there; `select` also selects it).
+## The `look_at` request: a map pixel, or a hex (glide there; `select` also selects it). `mode` (a MapModes key such as
+## &"yields") sets the map mode first (Show on the map).
 func look_at(args: Dictionary) -> void:
 	var scene := _app.map_scene()
+	if scene != null and args.has("mode"):
+		scene.set_mode(MapModes.mode_of(StringName(str(args["mode"]))))
 	if scene == null or scene.camera_rig() == null:
 		return
 	if args.has("map_px") and args["map_px"] is Vector2:

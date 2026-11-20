@@ -267,6 +267,7 @@ func test_the_tabs_are_this_season_districts_goods_history_from_four_point_five(
 	assert_eq(ids, [&"this_season", &"districts", &"goods", &"history"])
 	assert_eq(page.current_tab(), &"this_season")
 	var old := _page(EconomyFixture.game(GEN))
+	old.milestone = "4"  # the shell now defaults to 4.5
 	assert_eq(old.shown_tabs().size(), 1, "at milestone 4 only This season shows")
 
 

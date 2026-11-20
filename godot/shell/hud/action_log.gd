@@ -1,7 +1,8 @@
 ## The action log (docs/architecture/m3-build-spec.md section 6.5), bottom left of the map. Collapsed: one line, the newest
 ## line and a "+N new" badge. Open: a card with the filters (LogLines.FILTERS up to the milestone), the seasons newest first
 ## and their lines. A line with a hex asks to glide there (line_activated); the newest season's header asks for the last
-## report (report_requested). Esc closes it: the App's Esc ladder calls escape(). It reads Session and Events and sends
+## report (report_requested), an older one (in a game with countries) opens the study's History page at its turn
+## (history_requested). Esc closes it: the App's Esc ladder calls escape(). It reads Session and Events and sends
 ## intents only; the HUD places and wires it (Y18). Once bind_settings is called, its open state and filter are kept in
 ## Settings (state/log_open, state/log_filter).
 class_name ActionLog
@@ -11,6 +12,8 @@ extends VBoxContainer
 signal line_activated(hex: Vector2i)
 ## The player asked for the last season report (the newest season's header).
 signal report_requested
+## An older season's header asked for the History page at that season's turn.
+signal history_requested(turn: int)
 
 ## The filters up to this milestone (LogLines.FILTERS carries the milestone each one arrives in).
 const MILESTONE := 4
@@ -27,6 +30,7 @@ const EMPTY_TEXT := "No actions yet."
 const EMPTY_FILTER_TEXT := "Nothing under this filter yet."
 const ACTIVATE_TIP := "Show on the map"
 const REPORT_TIP := "Open the last report"
+const HISTORY_TIP := "Open History at %s"
 const TONE_VARIATION := {"good": &"NumberGood", "bad": &"NumberBad", "plain": &"SectionHead", "muted": &"Hint"}
 
 @onready var _bar: PanelContainer = $Bar
@@ -184,6 +188,16 @@ func report_button() -> Button:
 	return null
 
 
+## Every season header button of the card, newest first: the first asks for the last report, the others (in a game with
+## countries) for History at their turn. Season headers that are plain text are not in it.
+func header_buttons() -> Array[Button]:
+	var out: Array[Button] = []
+	for child: Node in _seasons.get_children():
+		if child is Button:
+			out.append(child as Button)
+	return out
+
+
 ## The text of the collapsed bar's newest line ("" when there is none).
 func bar_text() -> String:
 	return _sentence.text
@@ -272,21 +286,26 @@ func _rebuild_seasons() -> void:
 		return
 	for at: int in seasons.size():
 		var season := seasons[at]
-		_seasons.add_child(_season_header(str(season["title"]), at == 0))
+		_seasons.add_child(_season_header(str(season["title"]), at == 0, int(season["turn"])))
 		for line: Dictionary in season["lines"] as Array:
 			_seasons.add_child(_line_row(line))
 
 
-func _season_header(title: String, newest: bool) -> Control:
-	if not newest:
+func _season_header(title: String, newest: bool, turn: int) -> Control:
+	var older_link := not newest and Session.game != null and Session.game.has_countries()
+	if not newest and not older_link:
 		return PanelKit.label(title, &"SectionHead")
 	var head := Button.new()
 	head.text = title
 	head.flat = true
 	head.focus_mode = Control.FOCUS_NONE
 	head.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	head.tooltip_text = REPORT_TIP
-	head.pressed.connect(func() -> void: report_requested.emit())
+	if newest:
+		head.tooltip_text = REPORT_TIP
+		head.pressed.connect(func() -> void: report_requested.emit())
+	else:
+		head.tooltip_text = HISTORY_TIP % title
+		head.pressed.connect(func() -> void: history_requested.emit(turn))
 	return head
 
 
