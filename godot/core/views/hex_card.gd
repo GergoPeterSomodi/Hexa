@@ -236,6 +236,12 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 			lines.append(["", &"rule", ""])
 			for row: Array in piece_rows(piece):
 				lines.append([str(row[0]), &"plain", str(row[1])])
+		var people_view := PeopleView.at(game, game.player, hex)
+		if bool(people_view.get("shown", false)):
+			lines.append(["People", &"plain", str(people_view["text"])])
+		var food_text := food_text_of(game, hex)
+		if food_text != "":
+			lines.append(["Food", &"plain", food_text])
 		if gives != "":
 			lines.append(["Gives", &"plain", gives])
 		var worth_line := worth_row(game, hex)
@@ -296,6 +302,14 @@ static func worth_row(game: Game, hex: Vector2i) -> Array:
 	var now := values[h * seasons]
 	var tone := &"good" if year > 0 else (&"bad" if year < 0 else &"plain")
 	return ["Worth", tone, "%s a year (%s this season)" % [Words.signed(year), Words.signed(now)]]
+
+
+## The hover card's Food line on your land that makes or eats food: "made 22, eaten 12 a year" (MapModes.food_year); "" else.
+static func food_text_of(game: Game, hex: Vector2i) -> String:
+	var year := MapModes.food_year(game, game.player, hex)
+	if year.x == 0 and year.y == 0:
+		return ""
+	return "made %s, eaten %s a year" % [Words.number(year.x), Words.number(year.y)]
 
 
 ## The hover card's Work line: "vineyard, first stage: 1 of 4 seasons, ready Spring 1481" (": stopped for the winter,

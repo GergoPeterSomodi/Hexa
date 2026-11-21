@@ -456,7 +456,7 @@ people rise from 65 to 66: +89 against M4's +91. In Winter no grain is sold (its
 | place | Genoa (8, 13) 30,300 | ▲ +300 |
 | place | Savona (6, 13) 10,100 | ▲ +100 |
 | place | The countryside, 12 places, 42,805 | ▲ +105 |
-| sub | Food: 8 made for 4 eaten. Fed, 4 to spare. | |
+| sub | Food: 9 made for 4 eaten. Fed, 5 to spare. | |
 
 300 + 100 + 105 = 505 (on the fixture (7, 12) is wild and full, so only the olives and the timber camp grow). The glance
 gains the chip "People 83,205 ▲ +505"; Standing reads "Among the 3 countries you know, you are 3rd in land (14 districts),
@@ -566,7 +566,7 @@ The food line (`sub`), from the closed Stores flows of grain and fish and `Count
 
 | Case | Text |
 |---|---|
-| fed, made ≥ eaten | "Food: 8 made for 4 eaten. Fed, 4 to spare." |
+| fed, made ≥ eaten | "Food: 9 made for 4 eaten. Fed, 5 to spare." |
 | fed, made < eaten | "Food: 3 made for 5 eaten. Fed from the stores: 12 left." |
 | hungry | "Food: 8 made for 9 needed. 1 short: your towns lost 404 people to hunger." |
 
@@ -1045,7 +1045,7 @@ nav reads Economy, People, Rankings, History.
 | Economy     | 83,285 people: 40,400 in towns, 42,885 in the countryside;        |
 | PEOPLE   <  | room for 32,415 more. Expected this season ▲ +589        12 | 40 |
 | Rankings    | TOWNS                                  | FOOD                       |
-| History     | Place      What        People  Room  Last season  Outlook | Fed: 8 made for 4 eaten... |
+| History     | Place      What        People  Room  Last season  Outlook | Fed: 9 made for 4 eaten... |
 |             | Genoa (8,13) walled town 30,300 45,000 ▲ +300 Room for...  | [chart: made, eaten, need] |
 |             | Savona (6,13) town      10,100 20,000 ▲ +100 Room for...  | GROWTH AND LOSSES          |
 |             | The countryside: 12 places, 42,885 of 50,700, ▲ +185  | [chart: grew / starved, left]|

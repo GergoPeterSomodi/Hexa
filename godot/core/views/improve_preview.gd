@@ -11,7 +11,7 @@ extends RefCounted
 
 const SEASON_NAMES: Array[String] = Calendar.SEASON_NAMES
 ## Payback is "never" past this many seasons from now (D31).
-const PAYBACK_HORIZON := 400
+const PAYBACK_HORIZON := PeopleView.HORIZON
 const NO_HEX := Vector2i(-1, -1)
 
 
@@ -685,7 +685,7 @@ static func _people_note(game: Game, cells: Dictionary, target: Dictionary) -> S
 	var room_n := People.room_i(game, StateView.of(game.state), i)
 	var room := Words.number(room_n)
 	var full := people >= room_n
-	var left := 0 if full else seasons_to_room(game, i)
+	var left := 0 if full else PeopleView.seasons_to_full(game, StateView.of(game.state), game.map.hex_of(i))
 	var in_about := "" if left < 0 else (" (in about %s)" % Words.seasons(left) if left > 0 else "")
 	if int(target["old_level"]) < game.defs.people_top_level:
 		if full:
@@ -698,26 +698,6 @@ static func _people_note(game: Game, cells: Dictionary, target: Dictionary) -> S
 	if left < 0:
 		return "People %s: they do not grow, so the new room stays empty." % Words.number(people)
 	return "People %s: the new room counts once they pass %s, in about %s." % [Words.number(people), room, Words.seasons(left)]
-
-
-## Seasons until the people of hex index `i` reach its room, fed, at the owner's tax from this season (stepping the rule of 4.4);
-## 0 when full, -1 when they never do (past 400 seasons).
-static func seasons_to_room(game: Game, i: int) -> int:
-	var view := StateView.of(game.state)
-	var room := People.room_i(game, view, i)
-	var crowd := int(game.state.people[i])
-	var owner := Countries.by_id(game, int(game.state.owner[i])) if game.has_countries() else null
-	var tax := owner.tax if owner != null else 1
-	var settlement := game.state.main_use[i] == ImproveRules.SETTLEMENT
-	if game.defs.growth_bp[clampi(tax, 0, 2)] <= 0:
-		return 0 if crowd >= room else -1
-	for n: int in PAYBACK_HORIZON:
-		if crowd >= room:
-			return n
-		var rates := People.rates_of(game.defs, Economy.slot_for(int(game.map.climate[i]), Calendar.season_of(game.turn + n)), tax)
-		var step := People.rule_of(game.defs, crowd, room, settlement, rates, 1000)
-		crowd += step.x
-	return -1
 
 
 static func _line(entry: Dictionary, why: StringName) -> int:

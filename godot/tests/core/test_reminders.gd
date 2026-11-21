@@ -132,7 +132,7 @@ func test_a_free_slot_alone_is_not_serious() -> void:
 	var lines := Reminders.unfinished(_g, &"GEN")
 	assert_eq(lines.size(), 1)
 	assert_eq(lines[0]["severity"], 1)
-	assert_eq(Reminders.RULES, [&"treasury_empty", &"goods_running_out", &"winter_halt", &"treasury_falling", &"free_slot"] as Array[StringName])
+	assert_eq(Reminders.RULES, [&"treasury_empty", &"hunger", &"goods_running_out", &"winter_halt", &"treasury_falling", &"town_full", &"free_slot"] as Array[StringName])
 
 
 func test_reminders_are_equal_after_a_save_and_load() -> void:
@@ -235,3 +235,115 @@ func test_the_rules_come_worst_first() -> void:
 	assert_eq(kinds.slice(0, 2), [&"treasury_empty", &"goods_running_out"] as Array[StringName], "severity 2 in the order of RULES")
 	assert_eq(kinds[kinds.size() - 1], &"free_slot", "severity 1 last, the slot after the others")
 	assert_true(kinds.has(&"goods_running_out"))
+
+
+# ----- M5: 4.14, `hunger` and `town_full` ---------------------------------------------------------------------------
+
+
+const GENOA := Vector2i(8, 13)
+const SAVONA_TOWN := Vector2i(6, 13)
+
+
+func test_hunger_names_what_was_eaten_and_what_was_needed() -> void:
+	var c := Countries.by_tag(_g, &"GEN")
+	assert_eq(Reminders.hunger(_g, &"GEN"), {}, "fed at the start: no line")
+	c.food_need = 9
+	c.food_fed = 999
+	assert_eq(Reminders.hunger(_g, &"GEN")["text"], "Your towns went hungry: 8 of 9 food. They lose people each season until they are fed.")
+	var line := Reminders.hunger(_g, &"GEN")
+	assert_eq([line["kind"], line["severity"], line["action"], line["action_label"]], [&"hunger", 2, [&"study", &"people"], "Open People"])
+	c.food_fed = 1000
+	assert_eq(Reminders.hunger(_g, &"GEN"), {}, "P: fed (1,000) is not hungry")
+	assert_eq(Reminders.hunger(_g, &"ZZZ"), {})
+
+
+func test_hunger_reads_the_closed_flows_of_the_last_season() -> void:
+	var g := PeopleFixture.genoa(PeopleFixture.no_food(), true)
+	for key: StringName in [&"grain", &"fish"]:
+		assert_true(g.dev_goods(&"GEN", g.defs.good_id(key), -100000))
+	PeopleFixture.season(g)
+	var c := Countries.by_tag(g, &"GEN")
+	assert_lt(c.food_fed, 1000, "no food made: the towns are hungry")
+	var line := Reminders.hunger(g, &"GEN")
+	assert_false(line.is_empty())
+	@warning_ignore("integer_division")
+	var eaten := int(c.food_need) * c.food_fed / 1000
+	assert_lte(int(str(line["text"]).split(" ")[4]), eaten + 1, "the eaten number is the stores' flow, about food_fed of the need")
+	assert_string_contains(str(line["text"]), "of %d food." % c.food_need)
+	assert_eq(Reminders.unfinished(g, &"GEN")[0]["kind"], &"hunger", "severity 2 and first of RULES after the empty treasury")
+
+
+func _full(hex: Vector2i, people: int) -> void:
+	assert_true(_g.dev_people(hex, people))
+	_g.version += 1
+
+
+func test_town_full_names_the_work_that_would_give_room() -> void:
+	assert_eq(Reminders.town_full(_g, &"GEN"), {}, "nothing is full at the start")
+	_full(GENOA, 45000)
+	var line := Reminders.town_full(_g, &"GEN")
+	assert_eq(line["text"], "Genoa (8, 13) is full at 45,000 people: a city would give it room.")
+	assert_eq([line["kind"], line["severity"], line["action"], line["action_label"]], [&"town_full", 1, [&"look_at", GENOA], "Go to Genoa"])
+	_full(SAVONA_TOWN, 20000)
+	line = Reminders.town_full(_g, &"GEN")
+	assert_eq(line["text"], "2 towns are full: Savona (6, 13) and Genoa (8, 13).")
+	assert_eq(line["action"], [&"look_at", SAVONA_TOWN], "the first")
+	assert_eq(line["action_label"], "Go to Savona")
+	_full(GENOA, 44999)
+	assert_eq(Reminders.town_full(_g, &"GEN")["text"], "Savona (6, 13) is full at 20,000 people: walls would give it room.")
+
+
+func test_a_full_village_and_a_town_with_a_work_make_no_line() -> void:
+	var i := _g.map.index_of(SAVONA_TOWN)
+	_g.state.level[i] = 2  # a village: it grows into a town by itself, no work gives that
+	_full(SAVONA_TOWN, 4000)
+	assert_eq(Reminders.town_full(_g, &"GEN"), {}, "P: a full village makes no town_full line")
+	_g.state.level[i] = 3
+	_g.districts.clear()
+	_full(SAVONA_TOWN, 20000)
+	assert_eq(Reminders.town_full(_g, &"GEN")["text"], "Savona (6, 13) is full at 20,000 people: walls would give it room.")
+	var work := Work.new()  # walls under way on Savona
+	work.id = 90
+	work.tag = &"GEN"
+	work.hex = SAVONA_TOWN
+	work.action = Works.UPGRADE
+	work.family = ImproveRules.SETTLEMENT
+	work.level_to = 4
+	work.seasons = 4
+	work.seasons_left = 4
+	_g.state.works.append(work)
+	_g.state.next_work_id = 91
+	_g.version += 1
+	assert_eq(Reminders.town_full(_g, &"GEN"), {}, "walls are under way: the work is the answer")
+	assert_eq(Reminders.town_full(_g, &"MLO"), {}, "another country's town is not yours")
+
+
+func test_the_order_of_the_seven_rules() -> void:
+	assert_eq(Reminders.RULES, [&"treasury_empty", &"hunger", &"goods_running_out", &"winter_halt", &"treasury_falling",
+		&"town_full", &"free_slot"] as Array[StringName])
+	var c := Countries.by_tag(_g, &"GEN")
+	c.food_need = 9
+	c.food_fed = 800
+	_full(GENOA, 45000)
+	var kinds: Array[StringName] = []
+	for line: Dictionary in Reminders.unfinished(_g, &"GEN"):
+		kinds.append(line["kind"] as StringName)
+	assert_eq(kinds, [&"hunger", &"town_full", &"free_slot"] as Array[StringName], "severity 2, then 1 in the order of RULES")
+
+
+func test_three_full_towns_are_joined_with_semicolons() -> void:
+	_full(GENOA, 45000)
+	_full(SAVONA_TOWN, 20000)
+	var third := Vector2i(-1, -1)
+	for i: int in Territory.districts(_g, Countries.by_tag(_g, &"GEN").id):
+		var hex := _g.map.hex_of(i)
+		if third == Vector2i(-1, -1) and hex != GENOA and hex != SAVONA_TOWN and _g.state.main_use[i] != People.SETTLEMENTS:
+			third = hex
+	_g.state.main_use[_g.map.index_of(third)] = People.SETTLEMENTS
+	_g.state.level[_g.map.index_of(third)] = 3
+	_g.districts.clear()
+	_full(third, 20000)
+	var text := str(Reminders.town_full(_g, &"GEN")["text"])
+	assert_true(text.begins_with("3 towns are full: "), text)
+	assert_true(text.contains("; "), "P: names with commas are not joined with commas: " + text)
+	assert_true(text.contains(" and "), text)

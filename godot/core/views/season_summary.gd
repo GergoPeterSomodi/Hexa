@@ -73,8 +73,9 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 	var begun := int(counts["work_started"])
 	var stopped := int(counts["work_cancelled"])
 	var money := _money(game, tag, turn, started, cancelled)
+	var people := SummaryPeople.of(game, tag, turn)
 	var quiet := finished + begun + stopped == 0 and order_lines.is_empty() and befell.is_empty() \
-			and int(land["delta"]) == 0 and bool(money.get("quiet", true))
+			and int(land["delta"]) == 0 and bool(money.get("quiet", true)) and bool(people["quiet"])
 	# Reminders are of the season in play: only the report of the season that just closed carries them.
 	var reminders: Array[Dictionary] = []
 	if turn == game.turn - 1:
@@ -87,22 +88,25 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 			before.append(_reminder_line(r))
 	var under_way := _under_way(game, tag, turn)
 	var by_id := {
-		&"glance": _glance(game, tag, turn, quiet, finished, land, money),
+		&"glance": _glance(game, tag, turn, quiet, finished, land, money, people),
 		&"before": _section(&"before", "Before %s" % Calendar.season_name(turn + 1), before, false),
 		&"works": _section(&"works", "Works", mine_works + under_way, true),
 		&"orders": _section(&"orders", "Your orders", order_lines, false),
 		&"befell": _section(&"befell", _befell_title(game, tag), befell, false),
 	}
+	if not (people["section"] as Dictionary).is_empty():
+		by_id[&"people"] = people["section"]
 	if not money.is_empty():
 		by_id[&"treasury"] = money["treasury"]
 		by_id[&"goods"] = money["goods"]
 		by_id[&"standing"] = _standing(game, tag, turn, money)
 	if quiet:
-		for id: StringName in [&"works", &"treasury", &"goods", &"standing"]:
+		for id: StringName in [&"works", &"treasury", &"goods", &"people", &"standing"]:
 			by_id.erase(id)
 	var sections: Array[Dictionary] = []
 	for id: StringName in SECTIONS:
-		if by_id.has(id) and (id == &"glance" or not ((by_id[id] as Dictionary)["lines"] as Array).is_empty()):
+		if by_id.has(id) and (id == &"glance" or not ((by_id[id] as Dictionary)["lines"] as Array).is_empty()
+				or not ((by_id[id] as Dictionary)["total"] as Dictionary).is_empty()):
 			sections.append(by_id[id])
 	_mark_top(sections)
 	var title := Calendar.date_text(turn, game.start_year)
@@ -222,7 +226,7 @@ static func _mark_top(sections: Array[Dictionary]) -> void:
 
 
 static func _glance(game: Game, tag: StringName, turn: int, quiet: bool, finished: int, land: Dictionary,
-		money: Dictionary) -> Dictionary:
+		money: Dictionary, people: Dictionary) -> Dictionary:
 	var lines: Array[Dictionary] = []
 	var countries := game.has_countries()
 	if quiet:
@@ -245,6 +249,12 @@ static func _glance(game: Game, tag: StringName, turn: int, quiet: bool, finishe
 		chip["detail"] = Words.number(int(money["closing"]))
 		chip["amount"] = int(money["change"])
 		chip["value"] = int(money["closing"])
+		lines.append(chip)
+	if bool(people["known"]) and int(people["change"]) != 0:
+		var chip := _line("People", _tone_of(int(people["change"])))
+		chip["detail"] = Words.number(int(people["to"]))
+		chip["amount"] = int(people["change"])
+		chip["value"] = int(people["to"])
 		lines.append(chip)
 	var running := WorksView.of_country(game, tag).size()
 	var works := _line("Works", "good" if finished > 0 else "plain")
@@ -634,24 +644,28 @@ static func _standing(game: Game, tag: StringName, turn: int, money: Dictionary)
 		for other: StringName in Knowledge.known(game, tag):
 			var c := Countries.by_tag(game, other)
 			if c != null and c.alive and int(c.ledger_closed.get("turn", -1)) == turn:
-				others.append({"tag": other, "land": stats.value(other, turn, "land"),
+				others.append({"tag": other, "land": stats.value(other, turn, "land"), "people": stats.value(other, turn, "people"),
 					"income": Treasury.left_over(_lines_of(c.ledger_closed)), "n": others.size()})
 		if not others.is_empty():
 			var land := stats.value(tag, turn, "land")
 			var income := Treasury.left_over(money["lines"] as Array[Dictionary])
 			var land_rank := 1
 			var income_rank := 1
+			var people := stats.value(tag, turn, "people")
+			var people_rank := 1
 			for o: Dictionary in others:
 				land_rank += 1 if int(o["land"]) > land else 0
 				income_rank += 1 if int(o["income"]) > income else 0
-			lines.append(_line("Among the %d countries you know, you are %s in land (%s) and %s in income (%s a season)." % [
+				people_rank += 1 if int(o["people"]) > people else 0
+			lines.append(_line("Among the %d countries you know, you are %s in land (%s), %s in income (%s a season) and %s in people (%s)." % [
 				others.size() + 1, _ordinal(land_rank), Words.plural(land, "district", "districts"), _ordinal(income_rank),
-				Words.signed(income)], "plain"))
+				Words.signed(income), _ordinal(people_rank), Words.number(people)], "plain"))
 			others.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 				return int(a["land"]) > int(b["land"]) or (int(a["land"]) == int(b["land"]) and int(a["n"]) < int(b["n"])))
 			for o: Dictionary in others:
-				lines.append(_line("%s: about %s districts, about %s." % [LogLines.short_name(game, o["tag"] as StringName),
-					Words.number(Knowledge.band(int(o["land"]))), Words.signed(Knowledge.band(int(o["income"])))], "plain"))
+				lines.append(_line("%s: about %s districts, about %s, about %s people." % [LogLines.short_name(game, o["tag"] as StringName),
+					Words.number(Knowledge.band(int(o["land"]))), Words.signed(Knowledge.band(int(o["income"]))),
+					Words.number(Knowledge.band(int(o["people"])))], "plain"))
 	return _section(&"standing", "Standing", lines, false)
 
 

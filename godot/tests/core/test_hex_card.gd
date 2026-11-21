@@ -367,3 +367,52 @@ func test_worth_line_wild_land_and_a_loss() -> void:
 		year += values[h * 4 + k]
 	assert_eq(row[1], &"good" if year > 0 else (&"bad" if year < 0 else &"plain"))
 	assert_eq(row[2], "%s a year (%s this season)" % [Words.signed(year), Words.signed(values[h * 4])])
+
+
+func test_people_and_food_lines_of_genoa() -> void:
+	var game := PeopleFixture.genoa()
+	var genoa := HexCard.of(game, Vector2i(8, 13))
+	var people: Variant = _find_line(genoa["lines"] as Array, "People")
+	assert_not_null(people)
+	assert_eq((people as Array)[2], "30,000 · room 45,000")
+	var food: Variant = _find_line(genoa["lines"] as Array, "Food")
+	assert_not_null(food, "Genoa makes fish and eats")
+	var year := MapModes.food_year(game, &"GEN", Vector2i(8, 13))
+	assert_eq((food as Array)[2], "made %d, eaten %d a year" % [year.x, year.y])
+	assert_eq(year, Vector2i(22, 12))
+	for row: Variant in genoa["lines"] as Array:
+		assert_eq((row as Array).size(), 3)
+	Season.run(game)
+	assert_eq((_find_line(HexCard.of(game, Vector2i(8, 13))["lines"] as Array, "People") as Array)[2],
+		"30,300 · room 45,000 · ▲ +300")
+
+
+func test_people_line_for_known_unknown_and_no_food_on_foreign_land() -> void:
+	var game := PeopleFixture.genoa()
+	var milan := Countries.by_tag(game, &"MLO")
+	var france := Countries.by_tag(game, &"FRA")
+	var seen_milan := false
+	var seen_france := false
+	for i: int in game.map.hex_count():
+		if game.map.land[i] == 0:
+			continue
+		var lines := HexCard.of(game, game.map.hex_of(i))["lines"] as Array
+		if int(game.state.owner[i]) == milan.id and not seen_milan and game.state.people[i] > 0:
+			seen_milan = true
+			var row: Variant = _find_line(lines, "People")
+			if row != null:
+				assert_true(str((row as Array)[2]).begins_with("about "), "known: banded")
+			assert_null(_find_line(lines, "Food"), "no food line on foreign land")
+		if int(game.state.owner[i]) == france.id and not seen_france:
+			seen_france = true
+			assert_null(_find_line(lines, "People"), "an unknown country's people are not shown")
+	assert_true(seen_milan and seen_france)
+
+
+func test_no_people_line_at_sea_or_in_a_map_only_game() -> void:
+	var game := PeopleFixture.genoa()
+	for i: int in game.map.hex_count():
+		if game.map.land[i] == 0:
+			assert_null(_find_line(HexCard.of(game, game.map.hex_of(i))["lines"] as Array, "People"))
+			break
+	assert_null(_find_line(HexCard.of(_game, Vector2i(9, 9))["lines"] as Array, "People"))

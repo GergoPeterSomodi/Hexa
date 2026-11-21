@@ -7,8 +7,8 @@ class_name StudyHistory
 extends RefCounted
 
 const PAGE := 120
-const MARK_KINDS: Array[StringName] = [&"land", &"finished", &"stopped", &"short", &"begun", &"tax", &"chosen"]  # priority
-const MARK_ICONS: Dictionary = {land = &"settlement", finished = &"district", stopped = &"district", short = &"warning",
+const MARK_KINDS: Array[StringName] = [&"land", &"declined", &"grew", &"finished", &"stopped", &"short", &"begun", &"tax", &"chosen"]  # priority
+const MARK_ICONS: Dictionary = {land = &"settlement", declined = &"settlement", grew = &"settlement", finished = &"district", stopped = &"district", short = &"warning",
 	begun = &"spending", tax = &"tax", chosen = &"study"}
 const FILTER_ORDER: Array[StringName] = [&"all", &"war", &"money", &"works", &"mine"]  # shown when LogLines.FILTERS allows
 const KEPT_NONE_TEXT := "Numbers are kept for the last 40 seasons and each winter."
@@ -123,6 +123,10 @@ static func _mark_kind(entry: Dictionary, viewer: StringName) -> StringName:
 	match str(entry.get("kind", "")):
 		"owners_changed":
 			return &"land" if tag == viewer or others.has(viewer) else &""
+		"town_grew":
+			return &"grew" if tag == viewer else &""
+		"district_declined":
+			return &"declined" if tag == viewer else &""
 		"work_finished":
 			return &"finished" if tag == viewer else &""
 		"work_cancelled":
@@ -143,9 +147,9 @@ static func _tone(kind: StringName, entry: Dictionary, viewer: StringName) -> St
 	match kind:
 		&"land":
 			return &"good" if StringName(str(entry.get("tag", ""))) == viewer else &"bad"
-		&"finished":
+		&"finished", &"grew":
 			return &"good"
-		&"stopped", &"short":
+		&"stopped", &"short", &"declined":
 			return &"bad"
 	return &"plain"
 
@@ -154,7 +158,7 @@ static func _tone(kind: StringName, entry: Dictionary, viewer: StringName) -> St
 ## income}. The numbers are 0 when kept is &"none". The viewer `&""` and a map-only game have none.
 static func season(game: Game, viewer: StringName, turn: int) -> Dictionary:
 	var out := {"turn": turn, "title": Calendar.date_text(turn, game.start_year) if game != null else "", "kept": &"none",
-		"text": KEPT_NONE_TEXT, "opening": 0, "closing": 0, "change": 0, "land": 0, "income": 0}
+		"text": KEPT_NONE_TEXT, "opening": 0, "closing": 0, "change": 0, "land": 0, "income": 0, "people": 0}
 	if game == null or game.stats == null or viewer == &"" or game.stats.index_of(viewer) < 0 or turn < 1:
 		return out
 	var stats := game.stats
@@ -164,17 +168,19 @@ static func season(game: Game, viewer: StringName, turn: int) -> Dictionary:
 		var spent := stats.value(viewer, turn, "spending")
 		var opening := stats.value(viewer, turn - 1, "treasury") if stats.has_row(turn - 1) else closing - (income - spent)  # D7
 		var land := stats.value(viewer, turn, "land")
+		var people := stats.value(viewer, turn, "people")
 		out.merge({"kept": &"season", "opening": opening, "closing": closing, "change": closing - opening, "land": land,
-			"income": income, "text": "Treasury %s → %s %s · land %d · income %s" % [Words.number(opening), Words.number(closing),
-			_arrow(closing - opening), land, _arrow(income)]}, true)
+			"income": income, "people": people, "text": "Treasury %s → %s %s · land %d · income %s · people %s" % [
+			Words.number(opening), Words.number(closing), _arrow(closing - opening), land, _arrow(income), Words.number(people)]}, true)
 		return out
 	if Calendar.is_winter(turn):
 		var row := stats.year_row(viewer, Calendar.year_of(turn, game.start_year) - game.start_year)
 		if not row.is_empty():
 			var closing := row[Stats.column("treasury")]
 			var land := row[Stats.column("land")]
-			out.merge({"kept": &"year", "closing": closing, "land": land,
-				"text": "At the year's end: treasury %s · land %d" % [Words.number(closing), land]}, true)
+			out.merge({"kept": &"year", "closing": closing, "land": land, "people": row[Stats.column("people")],
+				"text": "At the year's end: treasury %s · land %d · people %s" % [Words.number(closing), land,
+					Words.number(row[Stats.column("people")])]}, true)
 	return out
 
 

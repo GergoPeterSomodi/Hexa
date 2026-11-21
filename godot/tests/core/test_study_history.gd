@@ -109,7 +109,7 @@ func test_a_season_with_two_events_shows_the_one_of_the_highest_priority() -> vo
 	# lost land is bad
 	g.chronicle.add({"kind": "owners_changed", "turn": 2, "tag": _stranger(g), "others": [GEN], "hexes": [hex]})
 	assert_eq(_mark_of(StudyHistory.timeline(g, GEN)["marks"], 2)["tone"], &"bad")
-	assert_eq(StudyHistory.MARK_KINDS, [&"land", &"finished", &"stopped", &"short", &"begun", &"tax", &"chosen"] as Array[StringName])
+	assert_eq(StudyHistory.MARK_KINDS, [&"land", &"declined", &"grew", &"finished", &"stopped", &"short", &"begun", &"tax", &"chosen"] as Array[StringName])
 
 
 func test_other_countries_lines_raise_the_tick_but_are_no_mark() -> void:
@@ -134,7 +134,9 @@ func test_the_season_line_for_a_ring_row() -> void:
 	assert_eq(s["change"], 134)
 	assert_eq(s["land"], 14)
 	assert_eq(s["income"], 134)
-	assert_eq(s["text"], "Treasury 934 → 1,068 ▲ +134 · land 14 · income ▲ +134")
+	assert_eq(s["people"], g.stats.value(GEN, 4, "people"))
+	assert_gt(int(s["people"]), 0)
+	assert_eq(s["text"], "Treasury 934 → 1,068 ▲ +134 · land 14 · income ▲ +134 · people %s" % Words.number(int(s["people"])))
 	var first := StudyHistory.season(g, GEN, 1)
 	assert_eq(first["opening"], 610, "the opening of the oldest row: the closing less its lines (D7)")
 	assert_eq(first["closing"], 696)
@@ -154,7 +156,8 @@ func test_the_kept_numbers_of_a_forty_eight_season_run() -> void:
 	var row := g.stats.year_row(GEN, 1)
 	assert_eq(winter["closing"], row[Stats.column("treasury")])
 	assert_eq(winter["land"], row[Stats.column("land")])
-	assert_eq(winter["text"], "At the year's end: treasury %s · land %d" % [Words.number(winter["closing"]), winter["land"]])
+	assert_eq(winter["text"], "At the year's end: treasury %s · land %d · people %s" % [
+		Words.number(winter["closing"]), winter["land"], Words.number(winter["people"])])
 	assert_eq(StudyHistory.season(g, GEN, 0)["kept"], &"none")
 	assert_eq(StudyHistory.season(g, GEN, 99)["kept"], &"none")
 	assert_eq(StudyHistory.season(g, &"", 20)["kept"], &"none")
@@ -289,3 +292,51 @@ func test_the_views_are_equal_after_a_save_and_load() -> void:
 	assert_eq(StudyHistory.timeline(back, GEN), StudyHistory.timeline(g, GEN))
 	assert_eq(StudyHistory.chronicle(back, GEN, &"all", 0), StudyHistory.chronicle(g, GEN, &"all", 0))
 	assert_eq(StudyHistory.season(back, GEN, 12), StudyHistory.season(g, GEN, 12))
+
+
+# ----- M5: the two marks and the season line --------------------------------------------------------------------------
+
+
+func _town_entry(kind: String, turn: int, tag: StringName, hex: Vector2i) -> Dictionary:
+	var entry := {"kind": kind, "turn": turn, "tag": tag, "hex": hex, "level": 3 if kind == "town_grew" else 2,
+		"from": 2 if kind == "town_grew" else 3, "people": 4000}
+	if kind == "district_declined":
+		entry["family"] = 1
+		entry["why"] = "hunger"
+	return entry
+
+
+func test_the_grew_and_declined_marks_and_their_priority() -> void:
+	var g := InsightsFixture.genoa_1483()
+	var savona := Vector2i(6, 13)
+	g.chronicle.add(_town_entry("town_grew", 3, GEN, savona))
+	var mark := _mark_of(StudyHistory.timeline(g, GEN)["marks"], 3)
+	assert_eq([mark["kind"], mark["tone"], mark["icon"], mark["hex"]], [&"grew", &"good", &"settlement", savona])
+	assert_eq(mark["text"], "Savona (6, 13) grew into a town.")
+	g.chronicle.add(_town_entry("district_declined", 6, GEN, savona))
+	mark = _mark_of(StudyHistory.timeline(g, GEN)["marks"], 6)
+	assert_eq([mark["kind"], mark["tone"], mark["icon"]], [&"declined", &"bad", &"settlement"])
+	assert_eq(mark["text"], "Savona (6, 13) fell to a village: hunger.")
+	# the priority: land, declined, grew, finished, ... (turn 4 has a finished timber from the fixture)
+	g.chronicle.add(_town_entry("town_grew", 4, GEN, savona))
+	assert_eq(_mark_of(StudyHistory.timeline(g, GEN)["marks"], 4)["kind"], &"grew", "grew outranks finished")
+	g.chronicle.add(_town_entry("district_declined", 4, GEN, savona))
+	assert_eq(_mark_of(StudyHistory.timeline(g, GEN)["marks"], 4)["kind"], &"declined", "declined outranks grew")
+	g.chronicle.add({"kind": "owners_changed", "turn": 4, "tag": GEN, "others": [], "hexes": [savona]})
+	assert_eq(_mark_of(StudyHistory.timeline(g, GEN)["marks"], 4)["kind"], &"land", "land outranks declined")
+
+
+func test_another_countrys_town_is_no_mark() -> void:
+	var g := InsightsFixture.genoa_1483()
+	var before := (StudyHistory.timeline(g, GEN)["marks"] as Array).size()
+	g.chronicle.add(_town_entry("town_grew", 9, Knowledge.known(g, GEN)[0], Vector2i(6, 11)))
+	assert_eq((StudyHistory.timeline(g, GEN)["marks"] as Array).size(), before, "P: a known other's town is a line, not a mark")
+
+
+func test_the_season_line_names_the_people_of_a_growing_country() -> void:
+	var g := EconomyFixture.game(GEN, true, true, EconomyFixture.SEED, false)
+	Season.run(g)
+	var s := StudyHistory.season(g, GEN, 1)
+	assert_eq(s["people"], g.stats.value(GEN, 1, "people"))
+	assert_true(String(s["text"]).ends_with(" · people " + Words.number(int(s["people"]))), String(s["text"]))
+	assert_eq(StudyHistory.season(g, &"", 1)["people"], 0)

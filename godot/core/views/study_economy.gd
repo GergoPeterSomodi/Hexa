@@ -142,9 +142,28 @@ static func _tax(game: Game, tag: StringName, level: int, net: int, realm: int) 
 				realm_change = int((list[0] as Dictionary)["realm"]) - realm
 		var note := "%s: as now" % Words.tax_name(l) if l == level \
 				else "%s: %s a season" % [Words.tax_name(l), Words.signed_ducats(change)]
+		note += _people_note(game, l, level)
 		options.append({"level": l, "label": Words.tax_name(l), "change": change, "realm_change": realm_change,
 			"note": note})
 	return {"level": level, "options": options}
+
+
+## "; people grow 0.5 % a season, not 1 %." (a level other than now), "; people grow 1 % a season." (the level now): the
+## people's growth at a tax level, from the definitions' growth_bp.
+static func _people_note(game: Game, l: int, level: int) -> String:
+	if game.defs == null or game.defs.growth_bp.size() < 3:
+		return ""
+	if l == level:
+		return "; people grow %s a season." % _percent(game.defs.growth_bp[l])
+	return "; people grow %s a season, not %s." % [_percent(game.defs.growth_bp[l]), _percent(game.defs.growth_bp[clampi(level, 0, 2)])]
+
+
+## Basis points as a percent: 50 -> "0.5 %", 100 -> "1 %", 125 -> "1.25 %".
+static func _percent(bp: int) -> String:
+	var text := str(floori(bp / 100.0))
+	if bp % 100 != 0:
+		text += "." + ("%02d" % (bp % 100)).rstrip("0")
+	return text + " %"
 
 
 ## Up to TOP hexes of `worth_by_hex` with the most `field` (> 0), ties by hex (row, then column).

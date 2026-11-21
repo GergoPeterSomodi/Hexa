@@ -477,10 +477,13 @@ func test_4_15_b_the_goods_works_orders_and_standing() -> void:
 	assert_eq(_section(s, &"goods")["unchanged"], "Unchanged: stone, iron")
 	assert_eq(_texts(s, &"works"), ["Begun: vineyard, first stage, near Savona (7, 12). Ready Spring 1481. (−40 ducats)"] as Array[String])
 	assert_eq(_texts(s, &"orders")[0], "Ordered to build: vineyard near Savona (7, 12).")
-	assert_eq(_texts(s, &"standing"), [
-		"Among the 3 countries you know, you are 3rd in land (14 districts) and 3rd in income (+88 a season).",
-		"Savoy: about 58 districts, about +240.", "Milan: about 52 districts, about +260.",
-	] as Array[String])
+	var standing := _texts(s, &"standing")
+	var people := _g.stats.value(&"GEN", 1, "people")
+	assert_true(standing[0].begins_with("Among the 3 countries you know, you are 3rd in land (14 districts), 3rd in income (+88 a season) and "), standing[0])
+	assert_true(standing[0].ends_with(" in people (%s)." % Words.number(people)), standing[0])
+	assert_eq(standing[1], "Savoy: about 58 districts, about +240, about %s people." % Words.number(Knowledge.band(_g.stats.value(&"SAV", 1, "people"))))
+	assert_eq(standing[2], "Milan: about 52 districts, about +260, about %s people." % Words.number(Knowledge.band(_g.stats.value(&"MLO", 1, "people"))))
+	assert_eq(_section(s, &"people"), {}, "M4's numbers on still people: no change, no People section, no chip")
 	assert_eq([s["toast"], s["swing_permille"]], ["Spring 1480 ended: ▲ +48 ducats. J: the report", 78])
 
 
@@ -640,8 +643,12 @@ func _check_sums(g: Game, c: Country, ended: int, seen: Dictionary) -> void:
 func test_the_report_fixture_is_the_summary_of_4_15_b() -> void:
 	var real := _fixture_report()
 	var sample := ReportSample.genoa_spring()
-	for id: StringName in [&"glance", &"before", &"treasury", &"standing", &"works"]:
-		assert_eq(_rows(sample, id), _rows(real, id), "section %s" % id)
+	for id: StringName in [&"glance", &"before", &"treasury", &"works"]:
+		var want := _rows(sample, id)
+		if id == &"glance":
+			want.remove_at(1)  # the People chip is of 4.11 (b)'s growing game: its own test
+			want.append("Salt ▼ −1 3")  # and the sample's five chips are then four: M4's fifth is the one it lost
+		assert_eq(want, _rows(real, id), "section %s" % id)
 	assert_eq(_section(sample, &"treasury")["total"]["text"], _section(real, &"treasury")["total"]["text"])
 	assert_eq(_section(sample, &"goods")["unchanged"], _section(real, &"goods")["unchanged"])
 	var a := _rows(sample, &"goods")

@@ -9,7 +9,7 @@ extends RefCounted
 
 ## The measures, in the page's order; later milestones append (M5 people, M6 army, M12 score).
 const MEASURES: Array[Dictionary] = [{id = &"land", title = "Land, districts", since = "4.5"},
-	{id = &"income", title = "Income, a season", since = "4.5"}]
+	{id = &"income", title = "Income, a season", since = "4.5"}, {id = &"people", title = "People", since = "5"}]
 const _DOWN := "fell to"
 const _UP := "rose to"
 
@@ -27,7 +27,7 @@ static func income_of(stats: Stats, tag: StringName, turn: int) -> int:
 		- row[Stats.column("upkeep_army")]
 
 
-## One measure (&"land" or &"income") of a country in a season; 0 for an unknown measure.
+## One measure (&"land", &"income" or &"people") of a country in a season; 0 for an unknown measure.
 static func value_of(stats: Stats, measure: StringName, tag: StringName, turn: int) -> int:
 	if stats == null:
 		return 0
@@ -36,6 +36,8 @@ static func value_of(stats: Stats, measure: StringName, tag: StringName, turn: i
 			return stats.value(tag, turn, "land")
 		&"income":
 			return income_of(stats, tag, turn)
+		&"people":
+			return stats.value(tag, turn, "people")
 	return 0
 
 
@@ -186,6 +188,6 @@ static func _line(game: Game, viewer: StringName, id: StringName, tags: Array[St
 				marks.append({"index": t - first, "turn": t, "text": "%s %s" % [_UP if rank < before else _DOWN, ordinal(rank)],
 					"tone": "good" if rank < before else "bad"})
 			before = rank
-	var what := "land" if id == &"land" else "income"
+	var what := "land" if id == &"land" else ("income" if id == &"income" else "people")
 	var caption := "Your %s, the last %s" % [what, "season" if n == 1 else "%d seasons" % n]
 	return {"caption": caption, "labels": labels, "you": you, "best": best, "marks": marks}

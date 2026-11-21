@@ -59,6 +59,7 @@ var _ring2: Array[PackedInt32Array] = []  # per cell: the land cells exactly two
 ## Set by `over`: the facts, the neighbour tables and the distances are not built for every cell (that was a search of
 ## every cell against every settlement) but for the hex that is asked about, and kept until a settlement changes.
 var _lazy := false
+var _dist: SettleDistances = null  # not lazy: the three distance tables, moved one settlement change at a time
 var _settled: Dictionary[Vector2i, int] = {}  # lazy: the hexes with a settlement, their level
 var _facts_lazy: Dictionary[int, Dictionary] = {}  # lazy: cell -> facts, for the cells asked about
 var _prior: PackedFloat32Array = PackedFloat32Array()  # one per cell and option; zero when not allowed
@@ -130,6 +131,12 @@ func facts_at(hex: Vector2i) -> Dictionary:
 ## What the map draws on a hex: {} for a wild hex, else the facts of Improve.piece_of.
 func piece_at(hex: Vector2i) -> Dictionary:
 	return Improve.piece_of(map, state, hex)
+
+
+## Hex distances the incremental distance tables have worked out since the context was made (0 for a lazy one); a count
+## for the tests, never a time.
+func distance_evals() -> int:
+	return _dist.evals if _dist != null else 0
 
 
 func count_of(family_id: int) -> int:
@@ -373,12 +380,13 @@ func _put(hex: Vector2i, family_id: int, level_value: int) -> void:
 			else:
 				_settled.erase(hex)
 			_facts_lazy.clear()
-		else:
-			_refresh_distances()
+		elif _dist != null:
+			_dist.change(hex, old_l if old_f == ImproveRules.SETTLEMENT else 0, level_value if family_id == ImproveRules.SETTLEMENT else 0)
 
 
 ## The distances to the nearest place, town and city from the settlements as they stand now (a village that grew into a
-## town opens the town-near levels round it).
+## town opens the town-near levels round it), worked out in full. `_put` moves them one change at a time instead
+## (SettleDistances); this is the reference.
 func _refresh_distances() -> void:
 	if _lazy:
 		_settled.clear()
@@ -391,23 +399,7 @@ func _refresh_distances() -> void:
 	for hex: Vector2i in hexes:
 		if family_at(hex) == ImproveRules.SETTLEMENT:
 			settled.append(Vector3i(hex.x, hex.y, level_at(hex)))
-	for i: int in _cells.size():
-		var near_place := 99
-		var near_town := 99
-		var near_city := 99
-		for s: Vector3i in settled:
-			var distance := ImproveRules.hex_distance(_cells[i], Vector2i(s.x, s.y))
-			if distance == 0:
-				continue
-			near_place = mini(near_place, distance)
-			if s.z >= 3:
-				near_town = mini(near_town, distance)
-			if s.z >= 4:
-				near_city = mini(near_city, distance)
-		var facts := _facts[i]
-		facts["place_distance"] = near_place
-		facts["town_distance"] = near_town
-		facts["city_distance"] = near_city
+	_dist.rebuild(settled)
 
 
 ## Every pair rule and cell rule the result breaks, as text (none expected; the tests and the tools print it).
@@ -521,29 +513,16 @@ func _collect() -> void:
 			var nb := ImproveRules.neighbour(hex, d)
 			if _index.has(nb):
 				_nbr[i * 6 + d] = int(_index[nb])
+	_dist = SettleDistances.new(map, _cells, _facts)
+	_dist.rebuild(settled)
 	for i: int in n:
 		var hex := _cells[i]
 		_ring2.append(_ring_of(hex))
 		var facts := _facts[i]
-		var near_place := 99
-		var near_town := 99
-		var near_city := 99
-		for s: Vector3i in settled:
-			var distance := ImproveRules.hex_distance(hex, Vector2i(s.x, s.y))
-			if distance == 0:
-				continue
-			near_place = mini(near_place, distance)
-			if s.z >= 3:
-				near_town = mini(near_town, distance)
-			if s.z >= 4:
-				near_city = mini(near_city, distance)
 		var port_near := bool(facts["port"])
 		for p: Vector2i in ports:
 			if ImproveRules.hex_distance(hex, p) <= 1:
 				port_near = true
-		facts["place_distance"] = near_place
-		facts["town_distance"] = near_town
-		facts["city_distance"] = near_city
 		facts["port_near"] = port_near
 	# Fixed places that break a pair rule are data: listed, and left as they are.
 	for a: int in settled.size():

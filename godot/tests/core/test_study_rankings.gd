@@ -186,7 +186,7 @@ func test_the_line_spans() -> void:
 		assert_eq((line["labels"] as Array).size(), 12)
 		assert_eq((line["best"] as PackedInt32Array).size(), 12)
 		assert_eq((line["you"] as PackedInt32Array)[11], StudyRankings.value_of(g.stats, m["id"], GEN, g.stats.last_turn))
-		assert_eq(line["caption"], "Your %s, the last 12 seasons" % ("land" if m["id"] == &"land" else "income"))
+		assert_eq(line["caption"], "Your %s, the last 12 seasons" % String(m["id"]))
 		for mark: Dictionary in line["marks"]:
 			assert_true(int(mark["index"]) >= 1 and int(mark["index"]) < 12)
 			assert_true(String(mark["text"]).begins_with("rose to ") or String(mark["text"]).begins_with("fell to "))
@@ -216,7 +216,7 @@ func test_the_view_is_cached_and_a_copy() -> void:
 	var g := InsightsFixture.genoa_first_year()
 	var a := _of(g)
 	(a["measures"] as Array).clear()
-	assert_eq((_of(g)["measures"] as Array).size(), 2)
+	assert_eq((_of(g)["measures"] as Array).size(), 3)
 	var before := g.view_cache.size()
 	_of(g)
 	assert_eq(g.view_cache.size(), before, "a second call makes no new entry")
@@ -249,10 +249,13 @@ func _compare_standing(g: Game, ended: int) -> void:
 	assert_eq(r["turn"], ended)
 	var land := _measure(r, &"land")
 	var income := _measure(r, &"income")
+	var people := _measure(r, &"people")
 	var lines: Array = section["lines"]
 	var mine_land := 0
 	var mine_income := 0
+	var mine_people := 0
 	var income_text := {}
+	var people_text := {}
 	for row: Dictionary in land["rows"]:
 		if bool(row["mine"]):
 			mine_land = int(row["value"])
@@ -260,14 +263,19 @@ func _compare_standing(g: Game, ended: int) -> void:
 		income_text[row["tag"]] = row["text"]
 		if bool(row["mine"]):
 			mine_income = int(row["value"])
-	var head := "Among the %d countries you know, you are %s in land (%s) and %s in income (%s a season)." % [
+	for row: Dictionary in people["rows"]:
+		people_text[row["tag"]] = row["text"]
+		if bool(row["mine"]):
+			mine_people = int(row["value"])
+	var head := "Among the %d countries you know, you are %s in land (%s), %s in income (%s a season) and %s in people (%s)." % [
 		int(r["known"]), StudyRankings.ordinal(int(land["rank"])), Words.plural(mine_land, "district", "districts"),
-		StudyRankings.ordinal(int(income["rank"])), Words.signed(mine_income)]
+		StudyRankings.ordinal(int(income["rank"])), Words.signed(mine_income), StudyRankings.ordinal(int(people["rank"])),
+		Words.number(mine_people)]
 	assert_eq(lines[0]["text"], head, "turn %d" % ended)
 	var want: Array[String] = [head]
 	for row: Dictionary in land["rows"]:
 		if not bool(row["mine"]):
-			want.append("%s: %s districts, %s." % [row["short"], row["text"], income_text[row["tag"]]])
+			want.append("%s: %s districts, %s, %s people." % [row["short"], row["text"], income_text[row["tag"]], people_text[row["tag"]]])
 	var got: Array[String] = []
 	for line: Dictionary in lines:
 		got.append(String(line["text"]))
@@ -279,3 +287,50 @@ func test_equal_to_the_reports_standing_every_season() -> void:
 	_standing_checked = 0
 	InsightsFixture.forty_seasons(_compare_standing)
 	assert_gt(_standing_checked, 10, "the Standing section was present and compared in %d seasons" % _standing_checked)
+
+
+# ----- M5: the people measure -----------------------------------------------------------------------------------------
+
+
+func test_people_is_the_third_measure_yours_exact_and_others_banded() -> void:
+	var g := EconomyFixture.game(GEN, false, true, EconomyFixture.SEED, false)  # people grow
+	Season.run(g)
+	var r := _of(g)
+	var ids: Array[StringName] = []
+	for m: Dictionary in r["measures"]:
+		ids.append(m["id"] as StringName)
+	assert_eq(ids, [&"land", &"income", &"people"] as Array[StringName])
+	var people := _measure(r, &"people")
+	assert_eq(people["title"], "People")
+	var t := int(r["turn"])
+	assert_eq(StudyRankings.value_of(g.stats, &"people", GEN, t), g.stats.value(GEN, t, "people"))
+	for row: Dictionary in people["rows"]:
+		var exact := g.stats.value(row["tag"], t, "people")
+		if bool(row["mine"]):
+			assert_eq(row["text"], Words.number(exact), "yours exact")
+		else:
+			assert_eq(row["text"], "about " + Words.number(Knowledge.band(exact)), "banded: %s" % row["tag"])
+	assert_eq((people["line"] as Dictionary)["caption"], "Your people, the last season")
+	var tags: Array[StringName] = []
+	for row: Dictionary in people["rows"]:
+		tags.append(row["tag"])
+	for c: Country in g.countries:
+		if c.tag != GEN and not Knowledge.known(g, GEN).has(c.tag):
+			assert_false(tags.has(c.tag), "P: an unknown country is absent from the people list: " + String(c.tag))
+
+
+func test_equal_to_the_reports_standing_with_people_every_season() -> void:
+	_standing_checked = 0
+	var g := EconomyFixture.game(GEN, false, true, EconomyFixture.SEED, false)  # people grow, every season differs
+	var luck := Rng.new()
+	luck.seed_with(InsightsFixture.SEED)
+	var first_people := g.stats.value(GEN, 1, "people")
+	for n: int in InsightsFixture.SEASONS:
+		InsightsFixture._fund(g, n)
+		InsightsFixture._cancel_one(g, luck)
+		InsightsFixture._begin_works(g, luck)
+		var ended := g.turn
+		Season.run(g)
+		_compare_standing(g, ended)
+	assert_gt(_standing_checked, 10, "Standing was present and compared in %d seasons" % _standing_checked)
+	assert_gt(g.stats.value(GEN, g.stats.last_turn, "people"), first_people, "the people grew over the run")

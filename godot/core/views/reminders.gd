@@ -1,17 +1,22 @@
 ## What is still to do this season, as lines for the task flag and the report's "Before" section
-## (docs/architecture/m3-build-spec.md 4.8, 5.6; docs/architecture/m4-build-spec.md 4.18). Five rules: an empty treasury and
-## a need that will run out (severity 2 or 1), winter stops works in the snow (2), a treasury that will fall (1) and a free
-## work slot (1). Pure core/views/ code: reads the game (and EconomyPreview, which writes only the view cache), writes nothing.
+## (docs/architecture/m3-build-spec.md 4.8, 5.6; docs/architecture/m4-build-spec.md 4.18). Seven rules: an empty treasury, hunger
+## and a need that will run out (severity 2 or 1), winter stops works in the snow (2), a treasury that will fall (1), a
+## full town (1) and a free work slot (1) (docs/architecture/m5-build-spec.md 4.14). Pure core/views/ code: reads the game (and EconomyPreview, which writes only the view cache), writes nothing.
 class_name Reminders
 extends RefCounted
 
-const RULES: Array[StringName] = [&"treasury_empty", &"goods_running_out", &"winter_halt", &"treasury_falling", &"free_slot"]
+const RULES: Array[StringName] = [&"treasury_empty", &"hunger", &"goods_running_out", &"winter_halt", &"treasury_falling",
+	&"town_full", &"free_slot"]
 ## The seasons `goods_running_out` looks ahead (spec 4.18).
 const WINDOW := 8
 ## Food that runs out within this many seasons is serious (severity 2).
 const FOOD_SERIOUS := 2
 ## The study's economy page: the action of the money rules.
 const STUDY_ACTION: Array = [&"study", &"economy"]
+## The study's people page: the action of `hunger`.
+const PEOPLE_ACTION: Array = [&"study", &"people"]
+## A hunger line is of a season whose towns ate under this many permille of their need.
+const FED_FULL := 1000
 
 
 ## Lines worst first (severity descending, then the order of RULES): {kind, severity, text, hint, action: Array,
@@ -32,12 +37,16 @@ static func _build(game: Game, tag: StringName) -> Array[Dictionary]:
 		match rule:
 			&"treasury_empty":
 				_add(lines, treasury_empty(game, tag))
+			&"hunger":
+				_add(lines, hunger(game, tag))
 			&"goods_running_out":
 				lines.append_array(goods_running_out(game, tag))
 			&"winter_halt":
 				_add(lines, winter_halt(game, tag))
 			&"treasury_falling":
 				_add(lines, treasury_falling(game, tag))
+			&"town_full":
+				_add(lines, town_full(game, tag))
 			&"free_slot":
 				_add(lines, free_slot(game, tag))
 	# A stable sort: equal severities keep the order of RULES.
@@ -63,6 +72,72 @@ static func treasury_empty(game: Game, tag: StringName) -> Dictionary:
 		"kind": &"treasury_empty", "severity": 2, "hint": "", "hex": WorksView.NO_HEX,
 		"text": "The treasury is empty: %s owed. Upkeep is still paid; no work can begin." % Words.ducats(-country.treasury),
 		"action": STUDY_ACTION.duplicate(), "action_label": "Open the study",
+	}
+
+
+## {} when it does not apply: the towns of `tag` ate under their need in the last season ended (severity 2): "Your towns
+## went hungry: 8 of 9 food. They lose people each season until they are fed."
+static func hunger(game: Game, tag: StringName) -> Dictionary:
+	var country := _country(game, tag)
+	if country == null or not country.alive or country.food_fed >= FED_FULL or country.food_need <= 0:
+		return {}
+	@warning_ignore("integer_division")
+	var eaten := country.food_need * country.food_fed / 1000
+	var closed := country.goods_closed
+	var flows := closed.get("flows", PackedInt32Array()) as PackedInt32Array
+	var closing := closed.get("closing", PackedInt32Array()) as PackedInt32Array
+	if int(closed.get("turn", -1)) == game.turn - 1 and not closing.is_empty():
+		eaten = 0  # the closed flows say exactly how much was eaten
+		for key: StringName in [&"grain", &"fish"]:
+			var g := game.defs.good_id(key)
+			var at := Stores.FLOWS.find(&"used") * closing.size() + g
+			if g >= 0 and g < closing.size() and at < flows.size():
+				eaten += absi(flows[at])
+	return {
+		"kind": &"hunger", "severity": 2, "hint": "", "hex": WorksView.NO_HEX,
+		"text": "Your towns went hungry: %d of %d food. They lose people each season until they are fed." % [
+			mini(eaten, country.food_need), country.food_need],
+		"action": PEOPLE_ACTION.duplicate(), "action_label": "Open People",
+	}
+
+
+## {} when it does not apply: a settlement of `tag` at its room whose next level only a work gives (a level from
+## people_top_level up, short of a city) and with no work under way there (severity 1); the action looks at the first.
+static func town_full(game: Game, tag: StringName) -> Dictionary:
+	var country := _country(game, tag)
+	if country == null or not country.alive or game.districts == null:
+		return {}
+	var top := game.defs.people_top_level
+	var open := game.districts.open_hexes(game)
+	var keys := open.keys()
+	keys.sort()
+	var names: Array[String] = []
+	var first := WorksView.NO_HEX
+	var first_text := ""
+	var city := FamilyIds.LEVEL_WORDS["settlements"].size() - 1  # no work gives more than the top level
+	for i: int in keys:
+		var level := int(game.state.level[i])
+		var mine := int(game.state.owner[i]) == country.id and int(game.state.main_use[i]) == People.SETTLEMENTS
+		if not mine or level < top or level >= city or int(game.state.people[i]) < int(open[i]):
+			continue
+		var hex := game.map.hex_of(i)
+		if game.state.work_at(hex) != null:
+			continue
+		var place := Words.settlement(game, hex, level)
+		names.append(place)
+		if first == WorksView.NO_HEX:
+			first = hex
+			first_text = "%s is full at %s people: %s would give it room." % [place, Words.number(int(game.state.people[i])),
+				"walls" if level + 1 == 4 else "a city"]
+	if names.is_empty():
+		return {}
+	var text := first_text
+	if names.size() > 1:  # the names hold commas ("Savona (6, 13)"): the list is joined with semicolons
+		text = "%d towns are full: %s." % [names.size(), Words.list(names, names.size(), "; ")]
+	var at := names[0].rfind(" (")
+	return {
+		"kind": &"town_full", "severity": 1, "hint": "", "text": text, "hex": first,
+		"action": [&"look_at", first], "action_label": "Go to %s" % (names[0].left(at) if at > 0 else names[0]),
 	}
 
 

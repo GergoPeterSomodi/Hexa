@@ -139,3 +139,25 @@ func test_own_treasury_change_after_a_season() -> void:
 	assert_eq(int(gen["value"]), 696)
 	assert_eq(int(gen["change"]), 86)
 	assert_eq(gen["tax"], "Normal")
+
+
+func test_people_yours_known_and_unknown() -> void:
+	var game := PeopleFixture.genoa()
+	var gen := CountryCard.of(game, &"GEN")["people"] as Dictionary
+	assert_eq(gen, {"shown": true, "value": 82700, "banded": false, "change": 0})
+	var mlo := CountryCard.of(game, &"MLO")["people"] as Dictionary
+	assert_true(bool(mlo["shown"]))
+	assert_true(bool(mlo["banded"]))
+	assert_eq(int(mlo["value"]), Knowledge.band(int(PeopleView.totals(game, &"MLO")["people"])))
+	assert_eq(int(mlo["change"]), 0, "a foreign change is not told")
+	var fra := CountryCard.of(game, &"FRA")["people"] as Dictionary
+	assert_false(bool(fra["shown"]), "France is unknown to Genoa: no people")
+	assert_eq(int(fra["value"]), 0)
+	Season.run(game)
+	var after := CountryCard.of(game, &"GEN")["people"] as Dictionary
+	assert_eq(int(after["value"]), 83285)
+	assert_eq(int(after["change"]), 585)
+	game.player = &""
+	var all := CountryCard.of(game, &"FRA")["people"] as Dictionary
+	assert_true(bool(all["shown"]))
+	assert_false(bool(all["banded"]), "the viewer empty sees everything exact")

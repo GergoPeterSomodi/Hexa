@@ -10,8 +10,8 @@ const SECTION_IDS: Array[StringName] = [&"glance", &"before", &"treasury", &"goo
 
 
 ## The report of Spring 1480 on the economy fixture (docs/architecture/m4-build-spec.md 4.15 b), the vineyard at (7, 12)
-## begun that season: nine sections, the top three lines marked, lines with links and actions. The People section and
-## What befell Genoa are fixtures of M3 (the People section stays one until M5; 4.15 b has no What befell).
+## begun that season: nine sections, the top three lines marked, lines with links and actions. The People section is the one of M5's 4.11 (b); 4.15 b of M4 has
+## no What befell, so that section is a fixture of M3.
 static func genoa_spring() -> Dictionary:
 	return {
 		"turn": 1,
@@ -26,10 +26,10 @@ static func genoa_spring() -> Dictionary:
 		"sections": [
 			_section(&"glance", "At a glance", [
 				_line("Treasury", "good", {"detail": "658", "amount": 48, "value": 658}),
+				_line("People", "good", {"detail": "83,205", "amount": 505, "value": 83205}),
 				_line("Works", "plain", {"detail": "1 under way"}),
 				_line("Wine", "bad", {"detail": "3", "amount": -1, "value": 3}),
 				_line("Olive oil", "bad", {"detail": "3", "amount": -1, "value": 3}),
-				_line("Salt", "bad", {"detail": "3", "amount": -1, "value": 3}),
 			], 5),
 			_section(&"before", "Before Summer", [
 				_line("Wine runs out in 4 seasons; the first vintage is Autumn 1481.", "warn", {
@@ -63,10 +63,11 @@ static func genoa_spring() -> Dictionary:
 					"plain", {"hex": Vector2i(7, 12), "rank": 4, "top": true}),
 			], 1),
 			_section(&"people", "People", [
-				_line("Genoa 62,000 ▲ +700 · Savona 14,000 ▲ +150 · the countryside 136,000 ▲ +450.",
-					"plain", {"rank": 0}),
-				_line("Food: 127 made for 104 eaten: fed, 23 to spare.", "good", {"rank": 0}),
-			], 2),
+				_line("Genoa (8, 13) 30,300", "good", {"amount": 300, "hex": Vector2i(8, 13)}),
+				_line("Savona (6, 13) 10,100", "good", {"amount": 100, "hex": Vector2i(6, 13)}),
+				_line("The countryside, 12 places, 42,805", "good", {"amount": 105}),
+				_line("Food: 9 made for 4 eaten. Fed, 5 to spare.", "good", {"sub": true}),
+			], 3, "", _line("82,700 → 83,205", "good", {"from": 82700, "to": 83205, "amount": 505})),
 			_section(&"orders", "Your orders", [
 				_line("Ordered to build: vineyard near Savona (7, 12).", "plain", {"hex": Vector2i(7, 12)}),
 			], 1),
@@ -76,10 +77,10 @@ static func genoa_spring() -> Dictionary:
 					"warn", {"hex": Vector2i(11, 8)}),
 			], 2),
 			_section(&"standing", "Standing", [
-				_line("Among the 3 countries you know, you are 3rd in land (14 districts) and 3rd in income (+88 a season).",
+				_line("Among the 3 countries you know, you are 3rd in land (14 districts), 3rd in income (+88 a season) and 3rd in people (83,205).",
 					"plain", {}),
-				_line("Savoy: about 58 districts, about +240.", "plain", {}),
-				_line("Milan: about 52 districts, about +260.", "plain", {}),
+				_line("Savoy: about 58 districts, about +240, about 260,000 people.", "plain", {}),
+				_line("Milan: about 52 districts, about +260, about 250,000 people.", "plain", {}),
 			], 3),
 		],
 	}

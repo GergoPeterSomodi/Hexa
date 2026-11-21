@@ -164,7 +164,7 @@ the ducats do by a few.
    your towns lost 404 people to hunger."; the Food chip's card says so; the task flag has "Your towns went hungry"; in the
    Food mode Genoa is striped madder. **F9** (nothing of steps 5 to 7 is left).
 8. **Space**: the report's **People** section: "Genoa (8, 13) 30,300 ▲ +300", "Savona (6, 13) 10,100 ▲ +100", "The
-   countryside, 12 places, 42,885 ▲ +185"; the total 82,700 → 83,285 ▲ +585 (add them); "Food: 8 made for 4 eaten. Fed, 4 to
+   countryside, 12 places, 42,885 ▲ +185"; the total 82,700 → 83,285 ▲ +585 (add them); "Food: 9 made for 4 eaten. Fed, 5 to
    spare." The glance has "People 83,285 ▲ +585". Close it: "People +300" rises over Genoa, "People +100" over Savona.
 9. Space, Space: Summer's report. Its Treasury shows Taxes on people **66** (it was 65): the people pay as they grow.
 10. Press **I**, then `]` to the **People** page: Genoa and Savona with their room and outlook, the countryside line, the

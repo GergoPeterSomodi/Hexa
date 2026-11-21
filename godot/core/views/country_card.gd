@@ -49,6 +49,7 @@ static func of(game: Game, tag: StringName) -> Dictionary:
 		"play_reason": _play_reason(country, short_name, cdef),
 		"tip": cdef.tip if cdef != null else "",
 		"treasury": _treasury(game, country),
+		"people": _people(game, country),
 	}
 
 
@@ -194,3 +195,23 @@ static func _last_change(country: Country) -> int:
 	if country.ledger_closed.is_empty():
 		return 0
 	return int(country.ledger_closed["closing"]) - int(country.ledger_closed["opening"])
+
+
+## The people fields of the country panel (spec 5.6, 4.19): {shown, value, banded, change}. The viewer's own country: exact, with
+## last season's change; the viewer "" sees every country exact; a known foreign country is banded to two figures with no
+## change; an unknown country is not `shown`.
+static func _people(game: Game, country: Country) -> Dictionary:
+	var out := {"shown": false, "value": 0, "banded": false, "change": 0}
+	if not Knowledge.knows(game, game.player, country.tag):
+		return out
+	var sums := PeopleView.totals(game, country.tag)
+	if sums.is_empty():
+		return out
+	out["shown"] = true
+	if game.player == &"" or country.tag == game.player:
+		out["value"] = int(sums["people"])
+		out["change"] = int(sums["change"])
+	else:
+		out["banded"] = true
+		out["value"] = Knowledge.band(int(sums["people"]))
+	return out

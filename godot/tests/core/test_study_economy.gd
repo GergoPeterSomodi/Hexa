@@ -75,7 +75,7 @@ func test_tax_levels() -> void:
 	assert_eq(int(s["tax"]["level"]), 1)
 	var options: Array = s["tax"]["options"]
 	assert_eq(options.size(), 3)
-	assert_eq((options[1] as Dictionary)["note"], "Normal: as now")
+	assert_eq((options[1] as Dictionary)["note"], "Normal: as now; people grow 0 % a season.", "the still people of M4's numbers")
 	assert_eq(int((options[1] as Dictionary)["change"]), 0)
 	for l: int in [0, 2]:
 		var want := int(EconomyPreview.with(g, GEN, {"tax": l}, 1)["seasons"][0]["net"]) - 86
@@ -473,3 +473,25 @@ func test_a_caller_cannot_change_what_worth_seasons_gives_next() -> void:
 	assert_eq((b["worth"] as PackedInt32Array)[0], before)
 	assert_eq((b["hexes"] as PackedInt32Array).size(), 14)
 	assert_eq(int(StudyEconomy.districts(g, GEN)["total_year"]), 533, "the views read the cache, not the caller's copy")
+
+
+# ----- M5: the tax notes name the people's growth (6.7) ---------------------------------------------------------------
+
+
+func test_the_tax_notes_name_the_peoples_growth_at_each_level() -> void:
+	var g := EconomyFixture.game(GEN, false, true, EconomyFixture.SEED, false)  # growth_bp 125, 100, 50
+	var s := StudyEconomy.this_season(g, GEN)
+	var options: Array = s["tax"]["options"]
+	assert_eq((options[1] as Dictionary)["note"], "Normal: as now; people grow 1 % a season.")
+	assert_true(str((options[2] as Dictionary)["note"]).ends_with("; people grow 0.5 % a season, not 1 %."), str((options[2] as Dictionary)["note"]))
+	assert_true(str((options[0] as Dictionary)["note"]).ends_with("; people grow 1.25 % a season, not 1 %."), str((options[0] as Dictionary)["note"]))
+	assert_true(str((options[2] as Dictionary)["note"]).begins_with("High: +"), "the money part is M4's")
+	# the player moves to High: the notes follow the level now
+	assert_true(bool(g.act("set_tax", {"level": 2, "tag": GEN})["ok"]))
+	options = StudyEconomy.this_season(g, GEN)["tax"]["options"]
+	assert_eq((options[2] as Dictionary)["note"], "High: as now; people grow 0.5 % a season.")
+	assert_true(str((options[0] as Dictionary)["note"]).ends_with("people grow 1.25 % a season, not 0.5 %."), str((options[0] as Dictionary)["note"]))
+	g.defs.growth_bp = PackedInt32Array([100, 75, 5])  # P: the numbers come from the definitions
+	g.version += 1
+	options = StudyEconomy.this_season(g, GEN)["tax"]["options"]
+	assert_string_contains(str((options[0] as Dictionary)["note"]), "people grow 1 % a season, not 0.05 %.")
