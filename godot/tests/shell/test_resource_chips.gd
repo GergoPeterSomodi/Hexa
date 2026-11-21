@@ -285,7 +285,67 @@ func test_the_order_of_the_chips_is_ducats_people_food_stores() -> void:
 	var names: Array[String] = []
 	for child: Node in _chips.get_children():
 		names.append(child.name)
-	assert_eq(names, ["Ducats", "People", "Food", "Stores"] as Array[String], "the chips' order")
+	assert_eq(names, ["Ducats", "People", "Food", "Army", "Stores"] as Array[String], "the chips' order (M6: Army between Food and Stores)")
+
+
+## M6 (L21): the Army chip shows the men under arms of the player's country, its change and its card (MilitaryCards.army).
+func test_the_army_chip_shows_the_men_and_its_card() -> void:
+	_genoa()
+	var army := _chips.army_chip()
+	assert_true(army.visible, "a player: the Army chip shows")
+	assert_eq(army.value_label().text, "0", "no army yet: no men")
+	assert_eq(_chips.army_card()["title"], "Men under arms")
+	var game := Session.game
+	ArmyFixture.army(game, GEN, ArmyFixture.find_town(game), 0, 2)
+	_chips.refresh()
+	assert_eq(army.value_label().text, Words.number(Armies.men_of_country(game, GEN)))
+	var lines := _chips.army_card()["lines"] as Array
+	assert_eq(str((lines[0] as Array)[0]), "1 army, 2 companies", "the first line counts the armies and companies")
+	assert_eq(str((lines[lines.size() - 1] as Array)[0]), "Click: the Military page", "the hint is the last row")
+
+
+## A raise through Session.act reaches the Army and Ducats chips on the bus (army_raised), with no refresh() by the test.
+func test_a_raise_through_the_door_updates_the_army_and_ducats_chips() -> void:
+	_genoa()
+	var army := _chips.army_chip()
+	var ducats := _chips.ducats_chip()
+	var game := Session.game
+	var hex := ArmyFixture.find_town(game)
+	ArmyFixture.town(game, hex)
+	ArmyFixture.rich(game)
+	_chips.refresh()
+	assert_eq(army.value_label().text, "0", "no men before the raise")
+	var kinds := Military.raise_options(game, GEN, hex)
+	assert_false(kinds.is_empty(), "a raise is on offer")
+	var verdict := Session.act("raise", {"hex": hex, "kind": int(kinds[0]["kind"]), "count": 1})
+	assert_true(bool(verdict.get("ok", false)), str(verdict))
+	var men := Armies.men_of_country(game, GEN)
+	assert_gt(men, 0)
+	assert_eq(army.value_label().text, Words.number(men), "the Army chip follows the raise on the bus")
+	assert_eq(ducats.value_label().text, Words.number(Countries.by_tag(game, GEN).treasury), "the Ducats chip follows the raise's cost")
+
+
+func test_a_click_on_the_army_chip_asks_for_the_military_page() -> void:
+	_genoa()
+	var pages: Array[StringName] = []
+	_chips.page_requested.connect(func(page: StringName) -> void: pages.append(page))
+	_chips.army_chip().pressed.emit()
+	assert_eq(pages, [&"military"] as Array[StringName], "the Army chip asks for the Military page")
+
+
+func test_the_army_chip_never_shows_a_name_and_narrows_its_change() -> void:
+	_genoa()
+	assert_false(_chips.army_chip().name_label().visible, "no Army name at any width")
+	assert_true(_chips.army_chip().delta_chip().visible, "the Army change shows")
+	_chips.set_narrow(true)
+	assert_false(_chips.army_chip().name_label().visible, "still no name when narrow")
+	assert_false(_chips.army_chip().delta_chip().visible, "the Army change hides when narrow")
+	assert_true(_chips.army_chip().value_label().visible, "the Army value stays")
+	_chips.set_narrow(false)
+	assert_true(_chips.army_chip().delta_chip().visible, "the Army change returns")
+	Session.new_game(MapScene.MAP_ID, 1480)
+	_chips.refresh()
+	assert_false(_chips.wanted(&"army"), "the sandbox has no Army chip")
 
 
 func test_narrowing_hides_food_then_the_people_name_and_keeps_the_values() -> void:

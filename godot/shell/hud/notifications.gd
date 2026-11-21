@@ -9,6 +9,8 @@ extends VBoxContainer
 
 ## The player asked to look at a card's hex (Go). The card is dismissed right after; the App looks and selects.
 signal go_requested(hex: Vector2i)
+## A card of one of the player's armies: its Go selects the army (and glides to it), not only the hex.
+signal army_requested(army: int, hex: Vector2i)
 ## The card list changed: a card came, went or was cleared.
 signal changed
 
@@ -80,6 +82,7 @@ func add_line(line: Dictionary) -> int:
 		"text": str(line.get("text", "")),
 		"tone": StringName(str(line.get("tone", "plain"))),
 		"hex": hex,
+		"army": int(line.get("army", -1)),
 		"turn": int(line.get("turn", 0)),
 		"seasons": 0,
 		"skip": 1,  # the season_ended of the season it came in is not counted: the count starts at the next one
@@ -103,7 +106,7 @@ func cards() -> Array[Dictionary]:
 	for card: Dictionary in _cards:
 		out.append({
 			"id": card["id"], "text": card["text"], "tone": card["tone"], "hex": card["hex"],
-			"turn": card["turn"], "seasons": card["seasons"],
+			"army": card["army"], "turn": card["turn"], "seasons": card["seasons"],
 		})
 	return out
 
@@ -128,7 +131,10 @@ func go(id: int) -> bool:
 	for card: Dictionary in _cards:
 		if int(card["id"]) == id:
 			var hex: Vector2i = card["hex"]
-			if hex != WorksView.NO_HEX:
+			var army := int(card["army"])
+			if army >= 0:
+				army_requested.emit(army, hex)
+			elif hex != WorksView.NO_HEX:
 				go_requested.emit(hex)
 			return dismiss(id)
 	return false
@@ -165,7 +171,10 @@ func _on_chronicled(entry: Dictionary) -> void:
 	var viewer := Session.player_tag()
 	if game == null or viewer == &"":
 		return
-	add_line(LogLines.line_of(game, entry, viewer))
+	var line := LogLines.line_of(game, entry, viewer)
+	if bool(line.get("mine", false)) and entry.has("army"):
+		line["army"] = int(entry["army"])  # the player's army lines: Go selects the army
+	add_line(line)
 
 
 ## Two seasons ended since a card came: it is dropped at the second season's end.
@@ -229,14 +238,14 @@ func _build_card(card: Dictionary) -> PanelContainer:
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(body)
-	var has_hex: bool = (card["hex"] as Vector2i) != WorksView.NO_HEX
+	var can_go: bool = (card["hex"] as Vector2i) != WorksView.NO_HEX or int(card["army"]) >= 0
 	var go_button := Button.new()
 	go_button.theme_type_variation = &"ButtonSmall"
 	go_button.text = "Go"
 	go_button.focus_mode = Control.FOCUS_NONE
 	go_button.custom_minimum_size.y = float(Tokens.BUTTON_SM_H)
-	go_button.disabled = not has_hex
-	go_button.tooltip_text = "Look at it on the map" if has_hex else ""
+	go_button.disabled = not can_go
+	go_button.tooltip_text = "Look at it on the map" if can_go else ""
 	go_button.pressed.connect(func() -> void: go(id))
 	row.add_child(go_button)
 	var close_button := Button.new()

@@ -184,6 +184,24 @@ func test_before_the_first_season_shows_no_season_yet() -> void:
 	assert_false((page.find_child("Lists", true, false) as Control).visible)
 
 
+## M6 (L21): the fourth measure, Men under arms, is a list of its own from milestone six, and is hidden before it.
+func test_the_fourth_measure_men_under_arms_shows_from_milestone_six() -> void:
+	var page := _page(_played_one_season(), "6")
+	var army := _column(page, "army")
+	assert_true(army.visible, "the army list shows at milestone 6")
+	assert_eq(_table(page, "army").section_title, "Men under arms")
+	var rows := _row_texts(_table(page, "army"))
+	assert_eq(rows.size(), 3, "the three countries you know")
+	var mine := rows.filter(func(r: Array) -> bool: return str(r[1]).ends_with("(you)"))
+	assert_eq(mine.size(), 1, "your row is in the army list")
+	var chart := army.find_child("Chart", true, false) as InkChart
+	assert_true(chart.caption.begins_with("Your army"), chart.caption)
+	assert_true(_column(page, "people").visible, "the earlier measures stay")
+	var before := _page(_played_one_season(), "5")
+	var hidden := _column(before, "army")
+	assert_true(hidden == null or not hidden.visible, "the army list is not shown before milestone 6")
+
+
 func test_lists_are_hidden_before_the_milestone_of_the_measures() -> void:
 	var page := _page(_played_one_season(), "4")
 	var land := _column(page, LAND)

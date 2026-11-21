@@ -33,6 +33,8 @@ signal end_season_requested
 signal report_requested
 ## A row of the action log, a notification's Go or a task flag row asked to look at a hex and select it.
 signal hex_look_requested(hex: Vector2i)
+## A task flag row or a notification's Go asked for one of the player's armies: selected and glided to.
+signal army_requested(army: int, hex: Vector2i)
 ## The study was asked for (a chip, the study button, the country panel's button, a task flag line): `page` is &"economy"
 ## or &"" for the last page shown.
 signal study_requested(page: StringName)
@@ -95,10 +97,12 @@ func _ready() -> void:
 	_action_log.history_requested.connect(_on_history_requested)
 	_action_log.line_activated.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
 	_task_flag.go_requested.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
+	_task_flag.army_requested.connect(func(army: int, hex: Vector2i) -> void: army_requested.emit(army, hex))
 	_task_flag.study_requested.connect(func(page: StringName) -> void: study_requested.emit(page))
 	_top_bar.study_requested.connect(func(page: StringName) -> void: study_requested.emit(page))
 	_top_bar.study_tab_requested.connect(func(page: StringName, tab: StringName) -> void: study_tab_requested.emit(page, tab))
 	_notifications.go_requested.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
+	_notifications.army_requested.connect(func(army: int, hex: Vector2i) -> void: army_requested.emit(army, hex))
 	Events.game_started.connect(_on_game_started)
 	Events.season_ended.connect(_on_season_ended)
 
@@ -110,6 +114,7 @@ func _ready() -> void:
 	_country_panel.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
 	_country_panel.study_requested.connect(func() -> void: study_requested.emit(&"economy"))
 	_hex_panel.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
+	_hex_panel.toast_requested.connect(func(text: String, tone: StringName) -> void: toast(text, tone))
 	_hex_panel.visibility_changed.connect(_on_hex_panel_visibility_changed)
 
 	_layers_popover.layer_toggled.connect(func(lname: StringName, on: bool) -> void: layer_toggled.emit(lname, on))

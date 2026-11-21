@@ -31,6 +31,11 @@ signal continue_march_requested
 signal cursor_moved(direction: int)
 ## O or Shift+F10: a right click at the cursor (or the selection).
 signal command_key_requested
+## A click (select or command) while `orders_blocked` says so: it selects and orders nothing (M6 6.4: the replay's skip).
+signal blocked_click(map_px: Vector2)
+
+## () -> bool, asked on a click's release: true while a movement replay runs, so the click is `blocked_click` instead.
+var orders_blocked: Callable = Callable()
 
 const CURSOR_LEFT := 0
 const CURSOR_RIGHT := 1
@@ -137,6 +142,11 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 	if not within_slop or _is_gui_hovered():
 		return
 	var map_px := map_px_of(mb.position)
+	var orders := released_action == &"map_select" or released_action == &"map_command"
+	if orders and orders_blocked.is_valid() and bool(orders_blocked.call()):
+		blocked_click.emit(map_px)
+		_mark_handled()
+		return
 	if released_action == &"map_select":
 		select_requested.emit(map_px)
 		_mark_handled()

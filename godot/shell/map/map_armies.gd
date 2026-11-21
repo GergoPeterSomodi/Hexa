@@ -8,6 +8,8 @@ extends Node
 
 signal army_selected(army_id: int)
 signal army_cleared
+## An order's toast (spec 6.10): the App shows it (GameRequests); a refusal is `refused` on the scene, as before.
+signal said(text: String, tone: StringName)
 
 const NO_HEX := Vector2i(-9999, -9999)
 const REACH_TILE := "mark/white"
@@ -16,14 +18,22 @@ const REACH_LAYER := "reach"
 const REACH_NEXT_LAYER := "reach_next"
 ## The order kind of a march (Army.ORDER_MARCH; the view's order.kind).
 const MARCH_KIND := &"march"
+## The tone of an order toast (spec 6.10); a refusal is a warning (`refused`).
+const TOAST_TONE := &"plain"
 ## Supply states that feed an army (SupplyView.at's state); any other state is out of supply.
 const INSIDE_STATES: Array[StringName] = [&"depot", &"in", &"winter_cut"]
 
+## The line an order gets while the movement replay runs (spec 6.4; the keys O and R and a halt are orders too).
+const REPLAY_BLOCKED := "The moves are still playing: Space skips them."
+
+## () -> bool, set by GameRequests: true while the movement replay runs, so no order is given (M6 6.4).
+var orders_blocked: Callable = Callable()
 var _scene: MapScene = null
 var _view: TileMapView = null
 var _tokens: ArmyTokens = null
 var _route: PathMarks = null
 var _stored: PathMarks = null
+var _menu: HexMenu = null
 var _army := -1
 var _cursor := NO_HEX
 var _hover := NO_HEX
@@ -50,6 +60,9 @@ func _ready() -> void:
 	_stored = PathMarks.new()
 	_stored.setup(_view)
 	add_child(_stored)
+	_menu = HexMenu.new()  # the hex menu (L19): no army of yours selected, a right click or O on an own hex
+	add_child(_menu)
+	_menu.setup(_scene, self)
 	_view.layer(REACH_LAYER).modulate = Tokens.MAP_REACH
 	_view.layer(REACH_NEXT_LAYER).modulate = Tokens.MAP_REACH_NEXT
 	_colour_blind = _scene.overlay().is_colour_blind()
@@ -232,21 +245,36 @@ func next_army() -> bool:
 	return true
 
 
+## An army chosen from a report line, a task flag row or a notification's Go: selected, and the view glides to it (6.10).
+## False, with nothing changed, for an army that is not yours.
+func show_army(army_id: int) -> bool:
+	if not select_army(army_id):
+		return false
+	_scene.glide_to_hex(_cursor)
+	return true
+
+
 ## R: continue the halted march of the selected army; a refusal is said.
 func continue_march() -> bool:
+	if _replay_blocks():
+		return false
 	if _army < 0:
 		return _refuse("Select an army first.")
 	var verdict := Session.act("continue_march", {"army": _army})
 	if not bool(verdict.get("ok", false)):
 		return _refuse(str(verdict.get("reason", "")))
 	sync()
+	_say(_continued_words(), TOAST_TONE)
 	return true
 
 
 ## A command at `hex` (a right click, or O at the cursor) with an army of yours selected: a march to it, or a halt when it is
 ## the army's own hex. False with no army selected (the scene then deselects, and the hex menu comes later).
 func command(hex: Vector2i) -> bool:
+	if _replay_blocks():
+		return true
 	if _army < 0:
+		_menu.open_for(hex, get_viewport().get_mouse_position())
 		return false
 	var game := Session.game
 	if not _mine(game, _army):
@@ -256,16 +284,59 @@ func command(hex: Vector2i) -> bool:
 		return true
 	var here := ArmyView.panel(game, Session.player_tag(), _army)["hex"] as Vector2i
 	var verdict: Dictionary
+	var words := ""
 	if hex == here:
+		words = _holds_words(game, hex)
 		verdict = Session.act("halt", {"army": _army})
 	else:
+		words = _marches_words(game, hex)
 		verdict = Session.act("march", {"army": _army, "goal": hex})
 	if bool(verdict.get("ok", false)):
 		_set_cursor(hex)
 		sync()
+		_say(words, TOAST_TONE)
 	else:
-		_refuse(str(verdict.get("reason", "")))
+		_refuse(_said_reason(hex, verdict))
 	return true
+
+
+## The order toasts (spec 6.10): "The Army of Turin marches to Vercelli (6, 9): there in Autumn 1480.", "The Army of Turin holds
+## at Vercelli (6, 9).", and for a march on (R) "The Army of Turin marches on to Susa (4, 9)." Made before the order is given
+## (the preview of a march the army already walks is not the same), except the march on, which reads the order it now has.
+func _marches_words(game: Game, hex: Vector2i) -> String:
+	var name := str(ArmyView.panel(game, Session.player_tag(), _army).get("name", "The army"))
+	var preview := MovePreview.to(game, Session.player_tag(), _army, hex)
+	var arrives := int(preview.get("arrives_turn", -1))
+	var when := ": there in %s" % Calendar.date_text(arrives, game.start_year) if arrives >= 0 else ""
+	return "The %s marches to %s%s." % [name, Words.place(game, hex), when]
+
+
+func _holds_words(game: Game, hex: Vector2i) -> String:
+	var name := str(ArmyView.panel(game, Session.player_tag(), _army).get("name", "The army"))
+	return "The %s holds at %s." % [name, Words.place(game, hex)]
+
+
+func _continued_words() -> String:
+	var game := Session.game
+	var panel := ArmyView.panel(game, Session.player_tag(), _army)
+	var name := str(panel.get("name", "The army"))
+	var goal := (panel.get("order", {}) as Dictionary).get("goal", MapInput.NO_HEX) as Vector2i
+	return "The %s marches on to %s." % [name, Words.place(game, goal)]
+
+
+## Says an order's words on the scene's `said` signal (the App's toast).
+func _say(text: String, tone: StringName) -> void:
+	said.emit(text, tone)
+
+
+## The words of a refused order: MovePreview's, the same as the move card's (spec 6.7), else the action's own reason.
+func _said_reason(hex: Vector2i, verdict: Dictionary) -> String:
+	var reason := str(verdict.get("reason", ""))
+	var game := Session.game
+	if hex == (ArmyView.panel(game, Session.player_tag(), _army)["hex"] as Vector2i):
+		return reason
+	var said := MovePreview.to(game, Session.player_tag(), _army, hex)["verdict"] as Dictionary
+	return reason if bool(said.get("ok", false)) else str(said.get("reason", reason))
 
 
 ## Alt+arrows: with no army selected the selected hex moves (from the camera's hex when none); with one, the order cursor
@@ -285,11 +356,22 @@ func move_cursor(direction: int) -> void:
 	_set_cursor(next)
 	_scene.glide_to_hex(next)
 	_show_route()
+	_announce_cursor(next)
+
+
+## True while the replay runs: the order is not given and the replay's line is said (orders_blocked, spec 6.4).
+func _replay_blocks() -> bool:
+	if not (orders_blocked.is_valid() and bool(orders_blocked.call())):
+		return false
+	_say(REPLAY_BLOCKED, TOAST_TONE)
+	return true
 
 
 func _on_command_key() -> void:
 	if _army >= 0:
 		command(_cursor)
+	elif _scene.selected != NO_HEX:
+		_menu.open_for(_scene.selected, _view.get_global_transform_with_canvas() * _view.centre_of(_scene.selected))
 
 
 func _on_hover(hex: Vector2i) -> void:
@@ -375,6 +457,12 @@ func _clear_reach() -> void:
 		for hex: Vector2i in cells:
 			_view.set_tile(layer, hex, "")
 		cells.clear()
+
+
+## The order cursor moved (Alt+arrows): the move card of the pointer's hover card (MapHover) follows it to the hex's centre.
+func _announce_cursor(hex: Vector2i) -> void:
+	var screen := _view.get_global_transform_with_canvas() * _view.centre_of(hex)
+	get_tree().call_group(MapHover.GROUP, "order_cursor_moved", hex, screen)
 
 
 ## Says a refusal on the scene's `refused` signal (the App's toast) and returns false.

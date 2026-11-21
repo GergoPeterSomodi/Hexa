@@ -1,5 +1,6 @@
 ## The top bar's resource chips (docs/architecture/m4-build-spec.md 6.3, m5-build-spec.md 6.2): Ducats, People, Food and
-## Stores for the player's country, the values and hover cards from EconomyCards and PeopleCards. Shown only in a game with
+## Stores for the player's country, the values and hover cards from EconomyCards, PeopleCards and MilitaryCards. M6 adds the
+## Army chip (men under arms, between Food and Stores; a click asks for the Military page, m6-build-spec.md 6.10). Shown only in a game with
 ## countries and a chosen player (hidden in the sandbox and in the country pick); People and Food also need the people and
 ## the goods of the game. A click on Ducats or Stores emits study_requested with the Economy tab it opens (spec 6.9 of M4.5:
 ## Ducats This season, Stores Goods); a click on People or Food emits page_requested for the People page (spec 6.2 of M5).
@@ -18,10 +19,13 @@ const DUCATS_ID := &"ducats"
 const PEOPLE_ID := &"people"
 const FOOD_ID := &"food"
 const STORES_ID := &"stores"
+const ARMY_ID := &"army"
 const DUCATS_LABEL := "Ducats"
 const PEOPLE_LABEL := "People"
 const FOOD_LABEL := "Food"
 const STORES_LABEL := "Stores"
+const ARMY_LABEL := "Army"
+const MILITARY_PAGE := &"military"
 const PEOPLE_PAGE := &"people"
 const RULE_TONE := &"rule"
 const HINT_TONE := &"muted"
@@ -33,10 +37,12 @@ var _ducats: ResourceChip = null
 var _people: ResourceChip = null
 var _food: ResourceChip = null
 var _stores: ResourceChip = null
+var _army: ResourceChip = null
 var _ducats_card: Dictionary = {}
 var _people_card: Dictionary = {}
 var _food_card: Dictionary = {}
 var _stores_card: Dictionary = {}
+var _army_card: Dictionary = {}
 ## Whether the data wants each chip (a game with the resource); the top bar's fit may still hide it.
 var _wanted: Dictionary = {}
 ## Whether a season has closed for People and Food: before it, their changes show no DeltaChip.
@@ -50,18 +56,22 @@ func _ready() -> void:
 	_people = $People as ResourceChip
 	_food = $Food as ResourceChip
 	_stores = $Stores as ResourceChip
+	_army = $Army as ResourceChip
 	_ducats.set_resource(DUCATS_ID, &"ducats", DUCATS_LABEL)
 	_people.set_resource(PEOPLE_ID, &"people", PEOPLE_LABEL)
 	_food.set_resource(FOOD_ID, &"food", FOOD_LABEL)
 	_stores.set_resource(STORES_ID, &"stores", STORES_LABEL)
+	# The Army chip never shows a name (medal, value and change only, M6 design fix): its label stays empty.
+	_army.set_resource(ARMY_ID, &"army", "")
 	# Tighter than the Studiolo default, so the four chips fit the bar beside the brand at 1280 px (spec 6.2 of M5).
 	add_theme_constant_override(&"separation", ROW_SEPARATION)
-	for chip: ResourceChip in [_ducats, _people, _food, _stores]:
+	for chip: ResourceChip in [_ducats, _people, _food, _army, _stores]:
 		(chip.get_node("Plate/HBox") as HBoxContainer).add_theme_constant_override(&"separation", CHIP_SEPARATION)
 	_ducats.pressed.connect(_on_chip_pressed.bind(&"this_season"))
 	_people.pressed.connect(_on_page_pressed)
 	_food.pressed.connect(_on_page_pressed)
 	_stores.pressed.connect(_on_chip_pressed.bind(&"goods"))
+	_army.pressed.connect(_on_page_pressed.bind(MILITARY_PAGE))
 	_apply_narrow()
 	refresh()
 
@@ -78,6 +88,11 @@ func _enter_tree() -> void:
 	_link(Events.work_cancelled, _on_work_cancelled)
 	_link(Events.owners_changed, _on_owners_changed)
 	_link(Events.town_grew, _on_town_grew)
+	_link(Events.army_raised, _on_army_raised)
+	_link(Events.army_disbanded, _on_army_disbanded)
+	_link(Events.army_changed, _on_army_changed)
+	_link(Events.army_starved, _on_army_starved)
+	_link(Events.unit_lost, _on_unit_lost)
 	refresh()
 
 
@@ -92,6 +107,11 @@ func _exit_tree() -> void:
 	_unlink(Events.work_cancelled, _on_work_cancelled)
 	_unlink(Events.owners_changed, _on_owners_changed)
 	_unlink(Events.town_grew, _on_town_grew)
+	_unlink(Events.army_raised, _on_army_raised)
+	_unlink(Events.army_disbanded, _on_army_disbanded)
+	_unlink(Events.army_changed, _on_army_changed)
+	_unlink(Events.army_starved, _on_army_starved)
+	_unlink(Events.unit_lost, _on_unit_lost)
 
 
 ## Reads Session: the chips show for the player's country in a game with countries; otherwise the bar hides them.
@@ -104,7 +124,9 @@ func refresh() -> void:
 	var stores: Dictionary = {}
 	var people: Dictionary = {}
 	var food: Dictionary = {}
+	var army: Dictionary = {}
 	if game != null and game.has_countries() and tag != &"":
+		army = MilitaryCards.army(game, tag)
 		ducats = EconomyCards.ducats(game, tag)
 		stores = EconomyCards.stores(game, tag)
 		people = PeopleCards.people(game, tag)
@@ -114,12 +136,14 @@ func refresh() -> void:
 		_food_closed = c != null and not c.goods_closed.is_empty()
 	visible = not ducats.is_empty()
 	_wanted = {DUCATS_ID: visible, PEOPLE_ID: visible and not people.is_empty(),
-		FOOD_ID: visible and not food.is_empty(), STORES_ID: visible and not stores.is_empty()}
+		FOOD_ID: visible and not food.is_empty(), ARMY_ID: visible and not army.is_empty(),
+		STORES_ID: visible and not stores.is_empty()}
 	if not visible:
 		_ducats_card = {}
 		_people_card = {}
 		_food_card = {}
 		_stores_card = {}
+		_army_card = {}
 		refreshed.emit()
 		return
 	_ducats.set_value(int(ducats["value"]), int(ducats["change"]))
@@ -139,6 +163,14 @@ func refresh() -> void:
 		_food.set_card(_food_card)
 	else:
 		_food_card = {}
+	_army.visible = wanted(ARMY_ID)
+	if _army.visible:
+		_army.set_value(int(army["value"]), int(army["change"]))
+		_army.accessibility_name = "%s: %s" % [ARMY_LABEL, Words.number(int(army["value"]))]
+		_army_card = _card_of(army)
+		_army.set_card(_army_card)
+	else:
+		_army_card = {}
 	_stores.visible = wanted(STORES_ID)
 	if _stores.visible:
 		_stores.set_value(int(stores["value"]), int(stores["change"]))
@@ -180,6 +212,15 @@ func food_chip() -> ResourceChip:
 
 func stores_chip() -> ResourceChip:
 	return _stores
+
+
+func army_chip() -> ResourceChip:
+	return _army
+
+
+## The Army chip's hover card last set (empty when the Army chip is hidden).
+func army_card() -> Dictionary:
+	return _army_card
 
 
 ## Whether the data wants the chip with this id (a game without people or goods does not); the top bar's fit uses it
@@ -231,12 +272,14 @@ static func _card_of(data: Dictionary) -> Dictionary:
 
 
 func _apply_narrow() -> void:
-	if _ducats == null or _stores == null:
+	if _ducats == null or _stores == null or _army == null:
 		return
 	_stores.set_name_shown(not _narrow)
 	_stores.set_change_shown(not _narrow and change_wanted(STORES_ID))
 	_food.set_name_shown(not _narrow)
 	_food.set_change_shown(not _narrow and change_wanted(FOOD_ID))
+	_army.set_name_shown(false)  # no name at any width
+	_army.set_change_shown(not _narrow)
 	_people.set_name_shown(not _narrow)
 	_people.set_change_shown(not _narrow and change_wanted(PEOPLE_ID))
 	_ducats.set_change_shown(not _narrow)
@@ -246,8 +289,8 @@ func _on_chip_pressed(tab: StringName) -> void:
 	study_requested.emit(tab)
 
 
-func _on_page_pressed() -> void:
-	page_requested.emit(PEOPLE_PAGE)
+func _on_page_pressed(page: StringName = PEOPLE_PAGE) -> void:
+	page_requested.emit(page)
 
 
 func _link(sig: Signal, handler: Callable) -> void:
@@ -299,4 +342,25 @@ func _on_town_grew(_tag: StringName, _hex: Vector2i, _level: int) -> void:
 
 
 func _on_work_cancelled(_tag: StringName, _hex: Vector2i, _work: Dictionary, _why: StringName) -> void:
+	refresh()
+
+
+## The armies moved (M6): men under arms, the upkeep, the Ducats of a raise or a disband, the Army chip's card.
+func _on_army_raised(_tag: StringName, _hex: Vector2i, _army: int) -> void:
+	refresh()
+
+
+func _on_army_disbanded(_tag: StringName, _hex: Vector2i, _army: int) -> void:
+	refresh()
+
+
+func _on_army_changed(_tag: StringName, _army: int) -> void:
+	refresh()
+
+
+func _on_army_starved(_tag: StringName, _army: int, _lost: int) -> void:
+	refresh()
+
+
+func _on_unit_lost(_tag: StringName, _army: int, _unit: int) -> void:
 	refresh()

@@ -1,11 +1,12 @@
 ## The pages of the Statesman's Study and the milestone each one came in (docs/architecture/m4-build-spec.md 6.7).
 ## Each entry is {id, title, scene, since}. Economy (the "This season" tab) came in M4; its other tabs, Rankings and History
-## came in M4.5 (docs/architecture/m4-5-build-spec.md 6.3); People came in M5 (m5-build-spec.md 6.6).
+## came in M4.5 (docs/architecture/m4-5-build-spec.md 6.3); People came in M5 (m5-build-spec.md 6.6); Military in M6 (m6-build-spec.md 6.9).
 class_name StudyPages
 extends RefCounted
 
 const LIST: Array[Dictionary] = [
 	{id = &"economy", title = "Economy", scene = "res://shell/screens/study/page_economy.tscn", since = "4"},
+	{id = &"military", title = "Military", scene = "res://shell/screens/study/page_military.tscn", since = "6"},
 	{id = &"people", title = "People", scene = "res://shell/screens/study/page_people.tscn", since = "5"},
 	{id = &"rankings", title = "Rankings", scene = "res://shell/screens/study/page_rankings.tscn", since = "4.5"},
 	{id = &"history", title = "History", scene = "res://shell/screens/study/page_history.tscn", since = "4.5"},

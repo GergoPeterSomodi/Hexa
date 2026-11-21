@@ -9,6 +9,8 @@ extends PanelContainer
 
 ## A row was chosen: the App looks at the hex and selects it. The list is already closed.
 signal go_requested(hex: Vector2i)
+## An army row (an army reminder) was chosen: the App selects that army and glides to it. The list is already closed.
+signal army_requested(army: int, hex: Vector2i)
 ## A row whose action is [&"study", page] was chosen: the App opens the study at `page` (spec 6.9). The list is already closed.
 signal study_requested(page: StringName)
 signal list_toggled(open: bool)
@@ -89,6 +91,12 @@ func _bus_links() -> Array:
 		[Events.work_finished, _on_work_finished],
 		[Events.work_cancelled, _on_work_cancelled],
 		[Events.country_chosen, _on_country_chosen],
+		[Events.army_raised, _on_army_event],
+		[Events.army_disbanded, _on_army_event],
+		[Events.army_changed, _on_army_event],
+		[Events.march_halted, _on_army_event],
+		[Events.army_starved, _on_army_event],
+		[Events.unit_lost, _on_army_event],
 		[Events.game_started, _on_game_changed],
 		[Events.game_ended, _on_game_changed],
 	]
@@ -164,9 +172,13 @@ func close_list() -> void:
 func choose_row(index: int) -> bool:
 	if index < 0 or index >= _lines.size():
 		return false
+	var army := _army_of(_lines[index])
 	var hex: Vector2i = _lines[index].get("hex", WorksView.NO_HEX)
 	var page := _study_page(_lines[index])
 	close_list()
+	if army >= 0:
+		army_requested.emit(army, hex)
+		return true
 	if hex == WorksView.NO_HEX:
 		if page == &"":
 			return false
@@ -205,6 +217,19 @@ func _input(event: InputEvent) -> void:
 	if get_global_rect().has_point(at) or _list.get_global_rect().has_point(at):
 		return
 	close_list()
+
+
+## The army of a [&"select_army", id] line, else -1.
+static func _army_of(line: Dictionary) -> int:
+	var action: Array = line.get("action", [])
+	if action.size() >= 2 and StringName(str(action[0])) == &"select_army":
+		return int(action[1])
+	return -1
+
+
+## An army changed, was raised, disbanded, halted or lost men: the army reminders are read again (the order clears them).
+func _on_army_event(_a: Variant = null, _b: Variant = null, _c: Variant = null) -> void:
+	refresh()
 
 
 func _on_season_ended(_turn: int) -> void:
@@ -256,7 +281,8 @@ func _build_row(index: int, line: Dictionary) -> Button:
 	row.custom_minimum_size = Vector2(0, ROW_HEIGHT)
 	row.focus_mode = Control.FOCUS_NONE
 	row.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	row.disabled = (line.get("hex", WorksView.NO_HEX) as Vector2i) == WorksView.NO_HEX and _study_page(line) == &""
+	row.disabled = (line.get("hex", WorksView.NO_HEX) as Vector2i) == WorksView.NO_HEX and _study_page(line) == &"" \
+			and _army_of(line) < 0
 	row.tooltip_text = str(line.get("action_label", ""))
 	row.accessibility_name = str(line.get("text", ""))
 	row.pressed.connect(func() -> void: choose_row(index))

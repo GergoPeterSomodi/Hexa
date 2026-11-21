@@ -1,16 +1,16 @@
 ## Season report sample in the SeasonSummary.of shape (docs/architecture/game-feedback-screens.md A.3; style spec 6.4;
-## docs/architecture/m4-build-spec.md 4.15 b): the Genoa example with all nine sections, and a quiet season. Lets the report screen be drawn and tested without a
+## docs/architecture/m4-build-spec.md 4.15 b): the Genoa example with all ten sections, and a quiet season. Lets the report screen be drawn and tested without a
 ## game. Plain data: no game, no engine calls beyond Vector2i.
 class_name ReportSample
 extends RefCounted
 
 const NO_HEX := Vector2i(-1, -1)
-const SECTION_IDS: Array[StringName] = [&"glance", &"before", &"treasury", &"goods", &"works", &"people", &"orders",
-	&"befell", &"standing"]
+const SECTION_IDS: Array[StringName] = [&"glance", &"before", &"treasury", &"goods", &"works", &"people", &"armies",
+	&"orders", &"befell", &"standing"]
 
 
 ## The report of Spring 1480 on the economy fixture (docs/architecture/m4-build-spec.md 4.15 b), the vineyard at (7, 12)
-## begun that season: nine sections, the top three lines marked, lines with links and actions. The People section is the one of M5's 4.11 (b); 4.15 b of M4 has
+## begun that season: ten sections, the top three lines marked, lines with links and actions. The People section is the one of M5's 4.11 (b); 4.15 b of M4 has
 ## no What befell, so that section is a fixture of M3.
 static func genoa_spring() -> Dictionary:
 	return {
@@ -68,14 +68,26 @@ static func genoa_spring() -> Dictionary:
 				_line("The countryside, 12 places, 42,805", "good", {"amount": 105}),
 				_line("Food: 9 made for 4 eaten. Fed, 5 to spare.", "good", {"sub": true}),
 			], 3, "", _line("82,700 → 83,205", "good", {"from": 82700, "to": 83205, "amount": 505})),
+			_section(&"armies", "Armies", [
+				_line("Army of Genoa: Genoa (8, 13) → Savona (6, 13), 900 men.", "plain", {
+					"hex": Vector2i(6, 13), "action": [&"select_army", 1]}),
+				_line("Army of Genoa at (7, 12): 900 men ▼ −100, out of supply.", "bad", {
+					"hex": Vector2i(7, 12), "action": [&"select_army", 1], "amount": -100, "top": true}),
+				_line("Upkeep: 12 ducats a season.", "plain", {"sub": true}),
+				_line("Your armies ate 1 grain from the stores.", "plain", {"sub": true}),
+			], 4, "", _line("Men under arms 1,000 → 900", "bad", {"from": 1000, "to": 900, "amount": -100})),
 			_section(&"orders", "Your orders", [
 				_line("Ordered to build: vineyard near Savona (7, 12).", "plain", {"hex": Vector2i(7, 12)}),
-			], 1),
+				_line("Ordered to march: the Army of Genoa to Savona (6, 13).", "plain", {"hex": Vector2i(6, 13)}),
+				_line("Raised 2 companies of pikemen at Genoa (8, 13) (▼ −50).", "plain", {"hex": Vector2i(8, 13)}),
+			], 3),
 			_section(&"befell", "What befell Genoa", [
 				_line("Milan finished a vineyard at (9, 11).", "plain", {"hex": Vector2i(9, 11)}),
 				_line("The Duchy of Milan took 3 districts from the Republic of Venice: Bergamo (11, 8) and 2 more.",
 					"warn", {"hex": Vector2i(11, 8)}),
-			], 2),
+				_line("A Milanese army of about 1,000 men stands at Alessandria (7, 9).", "plain", {
+					"hex": Vector2i(7, 9), "action": [&"look_at", Vector2i(7, 9)]}),
+			], 3),
 			_section(&"standing", "Standing", [
 				_line("Among the 3 countries you know, you are 3rd in land (14 districts), 3rd in income (+88 a season) and 3rd in people (83,205).",
 					"plain", {}),

@@ -16,6 +16,7 @@ const LOOK_ACTIONS: Array[StringName] = [&"look_at", &"select"]
 const STUDY_ACTION := &"study"
 const STUDY_PAGE := &"economy"
 const STUDY_LABEL := "Open the study"
+const ARMY_ACTION := &"select_army"
 const CLOSE_KEYS: Array[Key] = [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]
 const SHEET_MAX_W: float = 900.0
 const SHEET_MAX_H: float = 800.0
@@ -342,6 +343,8 @@ func _target_of(line: Dictionary) -> Dictionary:
 	var action: Array = line.get("action", [])
 	if action.size() >= 2 and LOOK_ACTIONS.has(StringName(str(action[0]))):
 		hex = _hex_of(action[1])
+	if _army_of(action) >= 0:
+		return {"hex": hex, "action": action}
 	if hex == NO_HEX:
 		return {}
 	return {"hex": hex, "action": action if not action.is_empty() else [&"look_at", hex]}
@@ -351,6 +354,13 @@ func _hex_of(value: Variant) -> Vector2i:
 	if typeof(value) == TYPE_VECTOR2I:
 		return value
 	return NO_HEX
+
+
+## The army of a [&"select_army", id] action; -1 for any other action.
+func _army_of(action: Array) -> int:
+	if action.size() >= 2 and StringName(str(action[0])) == ARMY_ACTION:
+		return int(action[1])
+	return -1
 
 
 func _link_button(line: Dictionary, tone: String, target: Dictionary) -> Button:
@@ -429,6 +439,11 @@ func _pick(hex: Vector2i, action: Array) -> void:
 	link_chosen.emit(hex, action)
 	if action.size() >= 2 and StringName(str(action[0])) == STUDY_ACTION:
 		_open_study(StringName(str(action[1])))
+		return
+	if _army_of(action) >= 0:
+		if ctx != null:
+			ctx.request(ARMY_ACTION, {"army": _army_of(action), "hex": hex})
+		_close(&"look")
 		return
 	if hex != NO_HEX and ctx != null:
 		ctx.request(&"look_at", {"hex": hex, "select": true})

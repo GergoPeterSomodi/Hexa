@@ -1,7 +1,9 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://shell/panels/hex_panel.gd" id="1_panel"]
 [ext_resource type="Script" path="res://shell/ui/cartouche.gd" id="2_cart"]
+[ext_resource type="Script" path="res://shell/ui/segmented.gd" id="3_seg"]
+[ext_resource type="Script" path="res://shell/panels/raise_list.gd" id="4_raise"]
 
 [node name="HexPanel" type="PanelContainer"]
 custom_minimum_size = Vector2(296, 0)
@@ -181,6 +183,15 @@ autowrap_mode = 3
 layout_mode = 2
 mouse_filter = 2
 
+[node name="TabBox" type="VBoxContainer" parent="Scroll/Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Tabs" type="PanelContainer" parent="Scroll/Body/TabBox"]
+layout_mode = 2
+script = ExtResource("3_seg")
+
 [node name="ActionsBox" type="VBoxContainer" parent="Scroll/Body"]
 layout_mode = 2
 mouse_filter = 2
@@ -193,3 +204,13 @@ text = "Actions"
 [node name="Actions" type="VBoxContainer" parent="Scroll/Body/ActionsBox"]
 layout_mode = 2
 mouse_filter = 2
+
+[node name="RaiseBox" type="VBoxContainer" parent="Scroll/Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="RaiseList" type="VBoxContainer" parent="Scroll/Body/RaiseBox"]
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("4_raise")

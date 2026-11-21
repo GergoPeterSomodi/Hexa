@@ -152,10 +152,13 @@ func set_layers_open(open: bool) -> void:
 		_layers_btn.set_pressed_no_signal(open)
 
 
-## M6 (L17, the Supply segment, key 6): six mode segments, compact padding 1 px (was 2). Measured by test_hud's narrowing
-## test, the width at which each step first happens: the gap 1700, Stores' name 1675, Food's name 1590, the compact modes 1560,
-## the country 1375, People's name 1255, Ducats' name 1220, Ducats' change 1180, the brand 1130, Stores 1050, Food 975, the
-## study button 905, the chips 870. The narrowest fit is about 695 px, so the 700 px window still holds.
+## M6 (L17, the Supply segment, key 6): six mode segments, compact padding 1 px (was 2). M6 (L21, the Army chip between Food
+## and Stores): the Army chip has no name (medal, value, change), its change goes after the compact modes and before the
+## country name, and the chip hides between Stores and Food. Measured by test_hud's narrowing test, the width at which
+## each step first happens (px, the window width): the gap 1915, Stores' name 1790, Food's name 1700, the compact modes 1675, the Army change 1490, the country 1435,
+## People's name 1315, Ducats' name 1280, Ducats' change 1240, the brand 1190, Stores 1110, the Army chip 1035, Food 975, the
+## study button 905, the chips 870. The narrowest fit (a game with the chips gone) was about 695 px and the chips are gone
+## below 870 px, so the 700 px window still holds (not re-measured for L21).
 ## Fits the bar into `width` px: the gap goes first, then the Stores and Food chips shrink to their medals and values, the mode
 ## buttons tighten, the country name (or the map info of a sandbox) goes, then People's and Ducats' names and changes and the
 ## brand, then the Stores chip, the Food chip and the study button, and last of all the chips; the arms,
@@ -180,9 +183,10 @@ func _fit(width: float) -> void:
 	_study_btn.visible = _economy_wanted
 	var stores := _chips.stores_chip()
 	var food := _chips.food_chip()
+	var army := _chips.army_chip()
 	var people := _chips.people_chip()
 	var ducats := _chips.ducats_chip()
-	for chip: ResourceChip in [stores, food, people, ducats]:
+	for chip: ResourceChip in [stores, food, army, people, ducats]:
 		_reset_chip(chip)
 	if width <= 0.0:
 		return
@@ -194,6 +198,8 @@ func _fit(width: float) -> void:
 		_shrink_chip(food)  # then Food's name and change
 	if _too_wide(width):
 		_set_modes_compact(true)  # then the mode buttons tighten (five of them with Food)
+	if _too_wide(width):
+		_shrink_chip(army)  # then the Army chip's change (M6: after the modes, before the country name; it has no name)
 	if _too_wide(width):
 		_country_btn.visible = false  # then the country name
 		_map_info_label.visible = false
@@ -210,6 +216,8 @@ func _fit(width: float) -> void:
 		_sep.visible = false
 	if _too_wide(width):
 		stores.visible = false  # then the Stores and Food chips themselves
+	if _too_wide(width):
+		army.visible = false  # then the Army chip (before Food: Food is worth more to the player than men under arms)
 	if _too_wide(width):
 		food.visible = false
 	if _too_wide(width):

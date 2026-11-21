@@ -21,8 +21,13 @@ signal works_requested(what: StringName, args: Dictionary)
 ## The pointer or the keyboard is on a row: the App shows the row's card and ghost. option is {action, family}.
 signal row_hovered(hex: Vector2i, option: Dictionary)
 signal row_unhovered
+## A toast from the Raise tab (text, tone): the raise's words, or the refusal's reason.
+signal toast_requested(text: String, tone: StringName)
 
 const MAX_CHIPS := 3
+## The segment of an own settlement (spec 6.8): Works (the rows) or Raise (the raise list).
+const TAB_WORKS := &"works"
+const TAB_RAISE := &"raise"
 
 @onready var _cartouche: Cartouche = $Scroll/Body/Cartouche
 @onready var _subtitle: Label = $Scroll/Body/Subtitle
@@ -50,6 +55,10 @@ const MAX_CHIPS := 3
 @onready var _actions_box: VBoxContainer = $Scroll/Body/ActionsBox
 @onready var _actions_heading: Label = $Scroll/Body/ActionsBox/Heading
 @onready var _actions: VBoxContainer = $Scroll/Body/ActionsBox/Actions
+@onready var _tab_box: VBoxContainer = $Scroll/Body/TabBox
+@onready var _tabs: Segmented = $Scroll/Body/TabBox/Tabs
+@onready var _raise_box: VBoxContainer = $Scroll/Body/RaiseBox
+@onready var _raise: RaiseList = $Scroll/Body/RaiseBox/RaiseList
 
 ## The App's settings (game/confirm_works is read from them on each refresh); null reads the shipped default.
 var settings: Settings = null
@@ -58,6 +67,8 @@ var _hex := NO_HEX
 var _retired: Array[Node] = []
 var _refresh_queued := false
 var _fit_queued := false
+var _tab: StringName = TAB_WORKS
+var _raising := false
 
 @onready var _scroll: ScrollContainer = $Scroll
 @onready var _body: VBoxContainer = $Scroll/Body
@@ -67,7 +78,10 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	custom_minimum_size.x = float(Tokens.PANEL_W)
 	visible = false
+	_tabs.set_options([{"id": TAB_WORKS, "label": "Works"}, {"id": TAB_RAISE, "label": "Raise"}])
+	_tabs.changed.connect(_on_tab_changed)
 	_body.minimum_size_changed.connect(_fit_later)
+	_raise.toast_requested.connect(_on_raise_toast)
 	visibility_changed.connect(_fit_later)
 	get_viewport().size_changed.connect(_fit_later)
 	for pair: Array in _wiring():
@@ -117,11 +131,23 @@ func _wiring() -> Array:
 		[Events.season_ended, _on_season_ended],
 		[Events.town_grew, _on_town_grew],
 		[Events.district_declined, _on_district_declined],
+		[Events.army_raised, _on_stock_changed],
+		[Events.army_disbanded, _on_stock_changed],
+		[Events.tax_set, _on_stock_changed],
+		[Events.goods_short, _on_stock_changed],
 	]
 
 
 func show_hex(hex: Vector2i) -> void:
+	if hex != _hex:
+		_tab = TAB_WORKS
 	_hex = hex
+	refresh()
+
+
+## Opens the Raise tab of the shown hex (the hex menu's Raise item). Only an own settlement offers the tab.
+func show_raise() -> void:
+	_tab = TAB_RAISE
 	refresh()
 
 
@@ -132,6 +158,20 @@ func clear() -> void:
 
 func shown_hex() -> Vector2i:
 	return _hex
+
+
+## The segment (Works | Raise) and the raise list, for the tests and the keyboard path.
+func tabs() -> Segmented:
+	return _tabs
+
+
+func raise_list() -> RaiseList:
+	return _raise
+
+
+## The open tab: TAB_WORKS or TAB_RAISE.
+func tab_open() -> StringName:
+	return _tab
 
 
 ## Gives the panel the App's settings, read for game/confirm_works on each refresh.
@@ -193,6 +233,7 @@ func refresh() -> void:
 	var home := Territory.at_home_check(game, Session.player_tag(), _hex)
 	_refresh_home(home)
 	_refresh_work(game)
+	_refresh_tabs(game)
 	if bool(home["ok"]):
 		_write_actions(game, piece)
 	else:
@@ -215,6 +256,8 @@ func _show_sea() -> void:
 	_home_box.visible = false
 	_work_box.visible = false
 	_actions_box.visible = false
+	_tab_box.visible = false
+	_raise_box.visible = false
 	PanelKit.clear_children(_work_actions, _retired)
 	PanelKit.clear_children(_actions, _retired)
 	visible = true
@@ -339,6 +382,33 @@ func _refresh_work(game: Game) -> void:
 		button.pressed.connect(_on_cancel_pressed.bind(args))
 
 
+## The Works | Raise segment (spec 6.8): an own settlement shows it; the Raise tab shows the raise list in place of the
+## works rows. Anywhere else the tab goes back to Works and both hide.
+func _refresh_tabs(game: Game) -> void:
+	var own := RaiseList.offered(game, Session.player_tag(), _hex)
+	if not own:
+		_tab = TAB_WORKS
+	_tab_box.visible = own
+	_tabs.select(_tab)
+	_raising = own and _tab == TAB_RAISE
+	_raise_box.visible = _raising
+	if _raising:
+		_raise.show_hex(_hex)
+
+
+func _on_tab_changed(id: Variant) -> void:
+	_tab = StringName(str(id))
+	refresh()
+
+
+func _on_stock_changed(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null, _e: Variant = null) -> void:
+	_request_refresh()
+
+
+func _on_raise_toast(text: String, tone: StringName) -> void:
+	toast_requested.emit(text, tone)
+
+
 func _on_hex_changed(_changed: Vector2i) -> void:
 	_request_refresh()
 
@@ -404,7 +474,7 @@ func _refresh_ground(map: MapData) -> void:
 ## a piece. A work under way on the hex hides the rows (the work section shows it).
 func _write_actions(game: Game, piece: Dictionary) -> void:
 	PanelKit.clear_children(_actions, _retired)
-	_actions_box.visible = game.state.work_at(_hex) == null
+	_actions_box.visible = game.state.work_at(_hex) == null and not _raising
 	if not _actions_box.visible:
 		return
 	_actions_heading.text = "Build here" if piece.is_empty() else "Actions"
@@ -524,6 +594,11 @@ func _on_row_pressed(option: Dictionary, expensive: bool) -> void:
 			works_requested.emit(&"works_card", {"hex": _hex, "option": option})
 		return
 	_begin(option)
+
+
+## The click of a menu item on a row (the hex menu): the same rule as the row's button, game/confirm_works included.
+func begin_option(option: Dictionary, expensive: bool) -> void:
+	_on_row_pressed(option, expensive)
 
 
 ## Begins the row's work: the App begins it on begin_work; with no listener the panel does it (the M3 path).

@@ -49,6 +49,9 @@ var _dock := Rect2()
 var _reduce_motion := false
 var _waiting := false
 var _clock := 0.0
+## Held (the season and its movement replay run): new ribbons wait in _queued and rise when the hold is released (M6 6.4).
+var _held := false
+var _queued: Array[Dictionary] = []
 ## Live ribbons, oldest first: {node, hex, start (clock seconds), slot}.
 var _ribbons: Array[Dictionary] = []
 
@@ -127,6 +130,22 @@ func is_waiting() -> bool:
 	return _waiting
 
 
+## Holds the new ribbons while a season and its replay run (on), and lets the held ones rise when released (off). A held
+## ribbon is queued and counts as started (spawn returns true for it); the view and dock are checked when it rises.
+func hold(on: bool) -> void:
+	_held = on
+	if on:
+		return
+	var queued := _queued
+	_queued = []
+	for item: Dictionary in queued:
+		spawn(str(item["text"]), item["tone"] as StringName, item["hex"] as Vector2i)
+
+
+func is_held() -> bool:
+	return _held
+
+
 ## Advances the clock by `delta` seconds (unless waiting) and places every ribbon. _process calls it each frame.
 func advance(delta: float) -> void:
 	if not _waiting:
@@ -139,6 +158,9 @@ func advance(delta: float) -> void:
 func spawn(text: String, tone: StringName, hex: Vector2i) -> bool:
 	if text.is_empty():
 		return false
+	if _held:
+		_queued.append({"text": text, "tone": tone, "hex": hex})
+		return true
 	var screen := _xform * MapTiles.cell_centre(hex)
 	if not _view_rect().has_point(screen) or (_dock.size != Vector2.ZERO and _dock.has_point(screen)):
 		return false

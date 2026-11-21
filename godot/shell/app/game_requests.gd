@@ -10,9 +10,11 @@ extends RefCounted
 const UNDO_NOTHING := "Nothing to undo this season."
 const NO_QUICKSAVE := "No quicksave yet."
 const NO_GAME_TO_SAVE := "There is no game to save."
-const SEASON_RUNNING := "the season is running"
+## The save's refusal while a season runs or its movement replay plays (spec 6.4; the pause menu's Save says the same).
+const SEASON_RUNNING := "Wait for the season to end"
 const NO_SAVE_TO_CONTINUE := "There is no save to continue."
 const END_SEASONS_MAX := 40
+const ARMY_GONE := "That army is gone."
 
 ## The running lock is written, cleared and checked only when this is true (the App sets it: a real run, or a test that
 ## points RunLock at a temporary file).
@@ -23,6 +25,10 @@ var bookmarks: Bookmarks = Bookmarks.new()
 var works: WorksFlow = null
 ## Warms the study's views after a season (M4.5 spec 6.8): a child of the App, made in setup.
 var warm: StudyWarm = null
+## The movement replay of the season that just ended (M6 6.4): a child of the App, made in setup.
+var replay: MoveReplay = null
+## The map's ribbons are held (the season and its replay run); bind_scene applies it to a new map.
+var _ribbons_held := false
 
 var _app: App = null
 var _scene: MapScene = null
@@ -50,6 +56,12 @@ func setup() -> void:
 	flow.toast = _flow_toast
 	flow.autosave = _autosave
 	_app.add_child(flow)
+	replay = MoveReplay.new()
+	replay.name = "MoveReplay"
+	_app.add_child(replay)
+	flow.replay_start = replay.start
+	flow.replay_skip = replay.skip
+	flow.hold_ribbons = _hold_ribbons
 	warm = StudyWarm.new()
 	warm.name = "StudyWarm"
 	warm.setup(_app.settings())
@@ -59,7 +71,8 @@ func setup() -> void:
 		return _scene != null and is_instance_valid(_scene) and _scene.mode() == int(MapModes.Mode.FOOD)
 	_app.add_child(warm)
 	_app.hud().debug_overlay().study_info_func = study_info
-	_app.context().season_running_func = func() -> bool: return flow.state() == SeasonFlow.State.RUNNING
+	_app.context().season_running_func = func() -> bool:
+		return flow.state() == SeasonFlow.State.RUNNING or flow.state() == SeasonFlow.State.REPLAY
 	on_setting("dev/save_json")
 	on_setting("accessibility/reduce_motion")
 
@@ -69,9 +82,11 @@ func setup() -> void:
 func connect_signals(link: Callable) -> void:
 	var hud := _app.hud()
 	link.call(flow, &"state_changed", _on_flow_state)
+	link.call(replay, &"finished", flow.replay_done)
 	link.call(hud, &"end_season_requested", _on_end_pressed)
 	link.call(hud, &"report_requested", flow.reopen_report)
 	link.call(hud, &"hex_look_requested", _on_hex_look)
+	link.call(hud, &"army_requested", _on_army_requested)
 	link.call(_app.app_input(), &"quicksave_requested", quicksave)
 	link.call(_app.app_input(), &"quickload_requested", quickload)
 	link.call(_app.app_input(), &"console_requested", _on_console_requested)
@@ -99,12 +114,21 @@ func bind_scene(scene: MapScene) -> void:
 	input.report_requested.connect(flow.reopen_report)
 	input.undo_work_requested.connect(undo_work)
 	input.bookmark_requested.connect(on_bookmark)
+	input.orders_blocked = replay.active
+	input.blocked_click.connect(_on_blocked_click)
 	if scene.camera_rig() != null:
 		scene.camera_rig().view_changed.connect(_on_view_changed)
 	_floaters = scene.get_node_or_null("Names/Floaters") as Floaters
 	if _floaters != null:
 		_floaters.setup(Session.game)
+		_floaters.hold(_ribbons_held)
 	works.bind_scene(scene)
+	var armies := scene.get_node_or_null("MapArmies") as MapArmies
+	if armies != null and not armies.said.is_connected(_on_order_said):
+		armies.said.connect(_on_order_said)
+	if armies != null:
+		replay.bind(armies.tokens(), _follow_walker)
+		armies.orders_blocked = replay.active
 	on_setting("accessibility/reduce_motion")
 	on_stack_changed()
 	sync_floaters()
@@ -112,6 +136,11 @@ func bind_scene(scene: MapScene) -> void:
 
 func unbind_scene(scene: MapScene) -> void:
 	works.unbind_scene(scene)
+	var armies := scene.get_node_or_null("MapArmies") as MapArmies if scene != null and is_instance_valid(scene) else null
+	if armies != null and armies.said.is_connected(_on_order_said):
+		armies.said.disconnect(_on_order_said)
+	if armies != null:
+		armies.orders_blocked = Callable()
 	if scene != null and is_instance_valid(scene):
 		var input := scene.map_input()
 		if input != null:
@@ -119,11 +148,51 @@ func unbind_scene(scene: MapScene) -> void:
 					[input.undo_work_requested, undo_work], [input.bookmark_requested, on_bookmark]]:
 				if (pair[0] as Signal).is_connected(pair[1] as Callable):
 					(pair[0] as Signal).disconnect(pair[1] as Callable)
+		if input != null:
+			input.orders_blocked = Callable()
+			if input.blocked_click.is_connected(_on_blocked_click):
+				input.blocked_click.disconnect(_on_blocked_click)
+		replay.bind(null, Callable())
 		if scene.camera_rig() != null and scene.camera_rig().view_changed.is_connected(_on_view_changed):
 			scene.camera_rig().view_changed.disconnect(_on_view_changed)
 	if scene == _scene:
 		_scene = null
 		_floaters = null
+
+
+## Skips the movement replay (Esc, the App's back key): true when one was running. Esc skips only over the bare map: with a
+## screen or a popover open, or the console's field holding the cursor, the back ladder closes those first (spec 6.4).
+func skip_replay() -> bool:
+	if flow == null or _app.stack().top() != null or _app.hud().has_open_popover():
+		return false
+	var console := _app.hud().debug_overlay().console()
+	if console != null and console.has_line_focus():
+		return false
+	return flow.skip_replay()
+
+
+## A click on the map while the replay runs (spec 6.4): it selects and orders nothing, says so, and does not skip. Space,
+## Esc and End season skip.
+func _on_blocked_click(_map_px: Vector2) -> void:
+	_on_order_said("The moves are still playing: Space skips them.", &"plain")
+
+
+## The map's ribbons wait while the season and its replay run (SeasonFlow's hold_ribbons).
+func _hold_ribbons(on: bool) -> void:
+	_ribbons_held = on
+	if _floaters != null:
+		_floaters.hold(on)
+
+
+## The replay's camera follow: glides to a walker's hex when it steps off the view (at once under reduce motion).
+func _follow_walker(hex: Vector2i) -> void:
+	if _scene == null or not is_instance_valid(_scene) or _scene.camera() == null:
+		return
+	var cam := _scene.camera()
+	var half := _app.get_viewport().get_visible_rect().size * 0.5 / cam.zoom.x
+	var at := _scene.view().centre_of(hex)
+	if absf(at.x - cam.position.x) > half.x * 0.8 or absf(at.y - cam.position.y) > half.y * 0.8:
+		_scene.glide_to_hex(hex, -1.0, bool(_app.settings().get_value("accessibility/reduce_motion")))
 
 
 ## A request from a screen or the console (ShellContext.request) that this class answers. False for any other.
@@ -141,6 +210,8 @@ func handle(what: StringName, args: Dictionary) -> bool:
 			continue_game()
 		&"report_closed":
 			flow.report_closed()
+		&"select_army":
+			_on_army_requested(int(args.get("army", -1)), _hex_arg(args.get("hex", null)))
 		&"end_seasons":
 			flow.request_end(false, clampi(int(args.get("count", 1)), 1, END_SEASONS_MAX))
 		&"dev_look":
@@ -165,6 +236,38 @@ func on_setting(key: String) -> void:
 		Session.save_json = bool(settings.get_value("dev/save_json"))
 	elif key == "accessibility/reduce_motion" and _floaters != null:
 		_floaters.set_reduce_motion(bool(settings.get_value("accessibility/reduce_motion")))
+
+
+## What a request for one of the player's armies does (a report line, a task flag row, a notification's Go, the request
+## "select_army"): the army is selected and glided to; when it is not the player's or is gone, the hex is looked at; with no
+## hex or no map scene, the player is told the army is gone. The hex comes with the request, so a gone army still leads somewhere.
+func _on_army_requested(army: int, hex: Vector2i) -> void:
+	var has_scene := _scene != null and is_instance_valid(_scene)
+	var moved := false
+	if has_scene:
+		var armies := _scene.get_node_or_null("MapArmies") as MapArmies
+		moved = armies != null and armies.show_army(army)
+	match army_outcome(moved, hex, has_scene):
+		&"look":
+			_on_hex_look(hex)
+		&"gone":
+			_toast(ARMY_GONE, &"warn")
+
+
+## The outcome of an army request, pure: &"moved" when the army was selected, &"look" when it was not but there is a hex
+## and a map to look at it on, else &"gone".
+static func army_outcome(moved: bool, hex: Vector2i, has_scene: bool) -> StringName:
+	if moved:
+		return &"moved"
+	if has_scene and hex != WorksView.NO_HEX:
+		return &"look"
+	return &"gone"
+
+
+static func _hex_arg(value: Variant) -> Vector2i:
+	if value is Vector2i:
+		return value as Vector2i
+	return WorksView.NO_HEX
 
 
 ## The screen stack changed: the notifications and the task flag hide under a screen, the ribbons wait under a modal. The
@@ -270,6 +373,12 @@ func _push_report(summary: Dictionary, reopened: bool) -> bool:
 
 func _flow_toast(text: String, tone: StringName, key_action: StringName) -> void:
 	_app.hud().toast(text, tone, key_action)
+
+
+## An order's words from the map's armies (spec 6.10: "The Army of Turin marches to Vercelli (6, 9): ..."): a plain toast.
+func _on_order_said(text: String, tone: StringName) -> void:
+	if _app != null and _app.hud() != null and not text.is_empty():
+		_app.hud().toast(text, tone, &"")
 
 
 func _on_flow_state(state: SeasonFlow.State) -> void:
@@ -483,7 +592,7 @@ func _load_newest() -> String:
 func _save_refusal() -> String:
 	if Session.game == null:
 		return "there is no game"
-	if flow.state() == SeasonFlow.State.RUNNING:
+	if flow.state() == SeasonFlow.State.RUNNING or flow.state() == SeasonFlow.State.REPLAY:
 		return SEASON_RUNNING
 	return ""
 

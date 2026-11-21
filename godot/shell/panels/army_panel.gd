@@ -13,6 +13,8 @@ extends PanelFrame
 signal look_at_requested(hex: Vector2i)
 ## A disband that needs a Confirm: the App pushes the screen. With no listener such a disband is not done.
 signal confirm_requested(screen: Screen)
+## A toast for the player: the words of a disband that was done (plain).
+signal toast_requested(text: String, tone: StringName)
 
 const NO_ARMY := -1
 const ICON_PX := 24
@@ -495,8 +497,35 @@ func _disband_confirm(targets: PackedInt32Array) -> Confirm:
 ## nothing), so the panel never leaves half of a disband behind.
 func _disband_now(targets: PackedInt32Array) -> void:
 	_armed_key = ""
+	var words := _disband_words(targets)
 	if _act("disband", _disband_args_for(targets)):
 		_ticked = {}
+		toast_requested.emit(words, &"plain")
+
+
+## The toast of a disband, worked out before the act: "Disbanded 1 company of pikemen: +25 ducats back, 500 men home to
+## Turin (5, 9)." The men go to the companies' home when they share one, else to the army's hex.
+func _disband_words(targets: PackedInt32Array) -> String:
+	var game := Session.game
+	var army := Armies.by_id(game, _army)
+	if army == null:
+		return ""
+	var drop: Array[Unit] = []
+	for u: Unit in army.units:
+		if _is_whole(targets) or targets.has(u.id):
+			drop.append(u)
+	if drop.is_empty():
+		return ""
+	var what := "1 company" if drop.size() == 1 else "%d companies" % drop.size()
+	if drop.all(func(u: Unit) -> bool: return u.kind == drop[0].kind):
+		what += " of " + Military.unit_def(game, drop[0].kind).name.to_lower()
+	var parts: Array[String] = []
+	var back := _refund_of(targets)
+	if back > 0:
+		parts.append("+%s ducats back" % Words.number(back))
+	var home := drop[0].home if drop.all(func(u: Unit) -> bool: return u.home == drop[0].home) else army.hex
+	parts.append("%s home to %s" % [Words.men(_men_of(targets)), Military.hex_text(game, home)])
+	return "Disbanded %s: %s." % [what, ", ".join(parts)]
 
 
 ## The companies a disband takes: the ticked ones in unit order, or -1 (the whole army) when none is ticked.

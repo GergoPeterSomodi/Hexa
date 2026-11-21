@@ -6,6 +6,9 @@ extends Control
 
 const HOVER_CARD_SCENE := preload("res://shell/ui/hover_card.tscn")
 const CURSOR_OFFSET := Vector2(18.0, 18.0)
+## The group MapArmies calls for the order cursor (order_cursor_moved); the move card (6.7) is this node's child.
+const GROUP := &"map_hover"
+const MOVE_CARD_SCENE := preload("res://shell/hud/move_card.tscn")
 
 const DELAY_BY_CHOICE: Dictionary[String, float] = {
 	"short": 0.2,
@@ -27,6 +30,13 @@ var _elapsed: float = 0.0
 var _shown: bool = false
 var _dragging: bool = false
 var _settings: Settings = null
+## The move card (6.7): while an army of yours is selected, the hover over another hex shows MovePreview.to's words in place of
+## the hex card; the keyboard's order cursor (order_cursor_moved) stands in for the pointer.
+var _move: MoveCard = null
+var _army := -1
+var _keyboard := false
+var _cursor_hex: Vector2i = MapInput.NO_HEX
+var _cursor_screen := Vector2.ZERO
 
 
 func _init() -> void:
@@ -36,18 +46,31 @@ func _init() -> void:
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_to_group(GROUP)
 	_ensure_card()
 	if not Events.hex_changed.is_connected(_on_hex_changed):
 		Events.hex_changed.connect(_on_hex_changed)
+	_bind(Events.army_selected, _on_army_selected)
+	_bind(Events.army_cleared, _on_army_cleared)
+	_bind(Events.army_changed, _on_army_event)
+	_bind(Events.season_ended, _on_army_event)
+	_bind(Events.game_ended, _on_army_cleared)
 
 
 func _exit_tree() -> void:
 	if Events.hex_changed.is_connected(_on_hex_changed):
 		Events.hex_changed.disconnect(_on_hex_changed)
+	_unbind(Events.army_selected, _on_army_selected)
+	_unbind(Events.army_cleared, _on_army_cleared)
+	_unbind(Events.army_changed, _on_army_event)
+	_unbind(Events.season_ended, _on_army_event)
+	_unbind(Events.game_ended, _on_army_cleared)
 	_disconnect_settings()
 
 
 func _process(delta: float) -> void:
+	if _move_wanted():
+		return
 	if _hovered_hex == MapInput.NO_HEX or not hover_cards_enabled or _dragging:
 		return
 	if _is_ui_hovered():
@@ -95,33 +118,38 @@ func on_hover_changed(hex: Vector2i, pointer_pos: Variant = null) -> void:
 	_ensure_card()
 	if pointer_pos is Vector2:
 		_pointer_pos = pointer_pos as Vector2
-	if hex == MapInput.NO_HEX or not hover_cards_enabled or _dragging:
-		_clear_card()
-		return
-	if Session.game == null or Session.game.map == null or not Session.game.map.has(hex):
-		_clear_card()
-		return
-	if hex != _hovered_hex:
-		_hovered_hex = hex
-		_elapsed = 0.0
-		_shown = false
-		_card.clear()
-		if hover_delay_sec <= 0.0 and not _is_ui_hovered():
-			_show_current()
-	elif _shown:
-		_position_card()
+	_keyboard = false
+	_track(hex)
+	_refresh_move()
 
 
 func set_pointer_position(pos: Vector2) -> void:
 	_pointer_pos = pos
 	if _shown:
 		_position_card()
+	_position_move()
 
 
 func set_dragging(dragging: bool) -> void:
 	_dragging = dragging
 	if _dragging:
 		_clear_card()
+		_hide_move()
+
+
+## The order cursor of an army of yours moved to `hex` (MapArmies, Alt+arrows); `screen` is the hex's centre on the screen.
+## The move card follows it, and the pointer's hover takes over again at the next pointer move.
+func order_cursor_moved(hex: Vector2i, screen: Vector2) -> void:
+	_keyboard = true
+	_cursor_hex = hex
+	_cursor_screen = screen
+	_refresh_move()
+
+
+## The move card (6.7) of the hover, for the tests and the pictures; created on first use.
+func move_card() -> MoveCard:
+	_ensure_move()
+	return _move
 
 
 func card() -> HoverCard:
@@ -146,6 +174,8 @@ func _ensure_card() -> void:
 
 
 func _show_current() -> void:
+	if _move_wanted():
+		return
 	if _hovered_hex == MapInput.NO_HEX or Session.game == null:
 		_clear_card()
 		return
@@ -157,6 +187,103 @@ func _show_current() -> void:
 	_card.show_card(model)
 	_shown = true
 	_position_card()
+
+
+## The hover's own tracking: the hex under the pointer, its delay and the hex card (the body the hover always had).
+func _track(hex: Vector2i) -> void:
+	if hex == MapInput.NO_HEX or not hover_cards_enabled or _dragging:
+		_clear_card()
+		return
+	if Session.game == null or Session.game.map == null or not Session.game.map.has(hex):
+		_clear_card()
+		return
+	if hex != _hovered_hex:
+		_hovered_hex = hex
+		_elapsed = 0.0
+		_shown = false
+		_card.clear()
+		if hover_delay_sec <= 0.0 and not _is_ui_hovered():
+			_show_current()
+	elif _shown:
+		_position_card()
+
+
+## The hex the move card is for: the order cursor after a keyboard move, else the hovered hex.
+func _move_hex() -> Vector2i:
+	return _cursor_hex if _keyboard else _hovered_hex
+
+
+## Whether the move card replaces the hex card now: an army of yours is selected, the hex is on the map, not the army's own,
+## and the hover is live (no drag, no UI under the pointer).
+func _move_wanted() -> bool:
+	var game := Session.game
+	if _army < 0 or not hover_cards_enabled or _dragging or game == null or game.map == null:
+		return false
+	var hex := _move_hex()
+	if hex == MapInput.NO_HEX or not game.map.has(hex) or _is_ui_hovered():
+		return false
+	var own := ArmyView.panel(game, Session.player_tag(), _army).get("hex", MapInput.NO_HEX) as Vector2i
+	return hex != own
+
+
+func _refresh_move() -> void:
+	if not _move_wanted():
+		_hide_move()
+		return
+	_ensure_move()
+	_shown = false
+	_elapsed = 0.0
+	if _card != null:
+		_card.clear()
+	_move.show_move(MovePreview.to(Session.game, Session.player_tag(), _army, _move_hex()))
+	_position_move()
+
+
+func _hide_move() -> void:
+	if _move != null:
+		_move.hide_card()
+
+
+func _ensure_move() -> void:
+	if _move == null:
+		_move = MOVE_CARD_SCENE.instantiate() as MoveCard
+		_move.visible = false
+		add_child(_move)
+
+
+func _position_move() -> void:
+	if _move == null or not _move.is_open():
+		return
+	var anchor := _pointer_pos
+	if _keyboard:
+		anchor = get_global_transform_with_canvas().affine_inverse() * _cursor_screen
+	_move.place(anchor, _available_bounds())
+
+
+func _on_army_selected(army_id: int) -> void:
+	_army = army_id
+	_keyboard = false
+	_refresh_move()
+
+
+func _on_army_cleared() -> void:
+	_army = -1
+	_keyboard = false
+	_refresh_move()
+
+
+func _on_army_event(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null, _e: Variant = null) -> void:
+	_refresh_move()
+
+
+func _bind(sig: Signal, fn: Callable) -> void:
+	if not sig.is_connected(fn):
+		sig.connect(fn)
+
+
+func _unbind(sig: Signal, fn: Callable) -> void:
+	if sig.is_connected(fn):
+		sig.disconnect(fn)
 
 
 func _clear_card() -> void:

@@ -15,5 +15,8 @@ layout_mode = 2
 [node name="Food" parent="." instance=ExtResource("2_chip")]
 layout_mode = 2
 
+[node name="Army" parent="." instance=ExtResource("2_chip")]
+layout_mode = 2
+
 [node name="Stores" parent="." instance=ExtResource("2_chip")]
 layout_mode = 2

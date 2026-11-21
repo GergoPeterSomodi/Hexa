@@ -27,6 +27,13 @@ var push_report: Callable = Callable()
 var toast: Callable = Callable()
 ## () -> void: the App's autosave step (thumbnail, Session.autosave_game, toast).
 var autosave: Callable = Callable()
+## (speed: StringName) -> bool: starts the movement replay of the season that just ended (MoveReplay.start); false means no
+## replay (instant, nothing seen). An invalid callable means no replay.
+var replay_start: Callable = Callable()
+## () -> void: skips the running replay (MoveReplay.skip; its finished signal then calls replay_done).
+var replay_skip: Callable = Callable()
+## (on: bool) -> void: holds the map's new ribbons while the season and its replay run (Floaters.hold).
+var hold_ribbons: Callable = Callable()
 ## (turn: int) -> Dictionary: the summary of a season; the default reads Session. Tests may replace it.
 var summarize: Callable = Callable()
 ## The clock value before which End season is refused.
@@ -56,6 +63,7 @@ func _exit_tree() -> void:
 func reset() -> void:
 	_reopened = false
 	guard_until = 0
+	_hold(false)
 	_set_state(State.IDLE)
 
 
@@ -78,16 +86,43 @@ static func autosave_due(turn: int, start_year: int, every: String) -> bool:
 
 ## Starts the season; true when it began. Refused on an echo (a held key), outside IDLE, inside the guard, or when the
 ## rules refuse (the reason is toasted, tone bad). The season itself runs after one drawn frame (the busy ring).
+## During the movement replay the same request skips it instead and starts no season (M6 6.4); it returns false.
 func request_end(echo: bool = false, count: int = 1) -> bool:
-	if echo or _state != State.IDLE or _now() < guard_until:
+	if echo:
+		return false
+	if _state == State.REPLAY:
+		skip_replay()
+		return false
+	if _state != State.IDLE or _now() < guard_until:
 		return false
 	var verdict := Session.end_season_check()
 	if not bool(verdict.get("ok", false)):
 		_toast(String(verdict.get("reason", "")), &"bad", &"")
 		return false
 	_set_state(State.RUNNING)
+	_hold(true)
 	_run(maxi(count, 1))
 	return true
+
+
+## Skips the running movement replay (Space, Enter, Esc, a click on the map, the End season plate): true when one was.
+## The replay's finished signal calls replay_done; a replay with no skip callable is ended here.
+func skip_replay() -> bool:
+	if _state != State.REPLAY:
+		return false
+	if replay_skip.is_valid():
+		replay_skip.call()
+	if _state == State.REPLAY:
+		replay_done()
+	return true
+
+
+## The movement replay ended (its finished signal, or skip): the decisions (none before M7), then the report as M3.
+func replay_done() -> void:
+	if _state != State.REPLAY:
+		return
+	_set_state(State.DECISIONS)
+	_report()
 
 
 ## J: the report of the season that last ended. Only from IDLE.
@@ -132,12 +167,31 @@ func _run(count: int) -> void:
 		played += 1
 	if Session.game == null:
 		return
-	_set_state(State.REPLAY)  # M6 fills these two; the flow passes through
+	if _replay_begin(_speed()):
+		_set_state(State.REPLAY)  # replay_done (the replay's finished) goes on to the decisions and the report
+		return
 	_set_state(State.DECISIONS)
 	if played == 0:
 		_back_to_idle()
 		return
 	_report()
+
+
+## Starts the replay of the season that just ended; false when there is none to show (the replay_start callable says).
+func _replay_begin(speed: StringName) -> bool:
+	return replay_start.is_valid() and replay_start.call(speed) == true
+
+
+## The replay's speed: instant under reduce motion, else the game/movement setting.
+func _speed() -> StringName:
+	if _reduce_motion():
+		return &"instant"
+	return StringName(_setting("game/movement", "normal"))
+
+
+func _hold(on: bool) -> void:
+	if hold_ribbons.is_valid():
+		hold_ribbons.call(on)
 
 
 func _report() -> void:
@@ -161,6 +215,7 @@ func _report() -> void:
 
 
 func _back_to_idle() -> void:
+	_hold(false)
 	var reopened := _reopened
 	_reopened = false
 	guard_until = _now() + GUARD_MS

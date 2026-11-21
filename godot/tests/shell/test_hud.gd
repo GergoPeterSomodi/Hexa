@@ -531,13 +531,11 @@ func test_a_chip_and_the_study_button_reach_the_hud_as_study_requests() -> void:
 	assert_eq(asked, [&"", &"economy", &"economy"], "the button asks its last page, the panel and the flag Economy")
 
 
-# The narrowing order with People, Food and the fifth mode button (top_bar.gd _fit, spec 6.2): gap, Stores name and
-# change, Food name and change, the mode buttons compact, the country name, People's name and change, Ducats' name,
-# Ducats' change, the brand, Stores, Food, the study button, and the chips last. First hidden at (px, 6 mode buttons, the
-# Supply segment in, compact padding 1 px; M6 L17, measured in the narrowing test): Stores' name 1675, Food's name 1590, the
-# compact modes 1560, the country 1375, People's name 1255, Ducats' name 1220, Ducats' change 1180, the brand 1130, Stores 1050,
-# Food 975, the study button 905, the chips 870. The bar's narrowest fit is 695 px (a game with the chips gone).
-# The six modes moved the Stores, Food, study and chip steps up from 1016, 941, 873 and 837 (owner to confirm; top_bar.gd _fit).
+# The narrowing order (top_bar.gd _fit, spec 6.2; the Army chip has no name): gap, Stores name, Food name, the compact
+# modes, the Army change, the country name, People's name, Ducats' name, Ducats' change, the brand, Stores, the Army chip,
+# Food, the study button, the chips. First hidden at (px; M6 L21, 5 px scan): gap 1915, Stores' name 1790, Food's name
+# 1700, modes 1675, Army change 1490, country 1435, People's name 1315, Ducats' name 1280, Ducats' change 1240, brand 1190,
+# Stores 1110, Army chip 1035, Food 975, study button 905, chips 870. Narrowest fit 695 px (not re-measured for L21).
 func test_the_chips_narrow_in_the_order_of_the_spec_and_fit_the_window() -> void:
 	await _harness.wait_frames(self, 2)
 	var bar := _genoa_bar()
@@ -584,10 +582,11 @@ func test_the_narrowing_steps_happen_in_the_pinned_order() -> void:
 	var stores := bar.chips().stores_chip()
 	var food := bar.chips().food_chip()
 	var people := bar.chips().people_chip()
-	var steps := [&"gap", &"stores_name", &"food_name", &"modes", &"country", &"people_name", &"ducats_name",
-		&"ducats_change", &"brand", &"stores", &"food", &"study", &"chips"]
+	var army := bar.chips().army_chip()
+	var steps := [&"gap", &"stores_name", &"food_name", &"modes", &"army_change", &"country", &"people_name", &"ducats_name",
+		&"ducats_change", &"brand", &"stores", &"army", &"food", &"study", &"chips"]
 	var first := {}
-	var width := 1700.0
+	var width := 2000.0  # M6 with the Army chip: the Stores name is first hidden at 1820 px, so the scan starts higher
 	while width >= 600.0:
 		bar.fit_width(width)
 		var now := {
@@ -596,6 +595,8 @@ func test_the_narrowing_steps_happen_in_the_pinned_order() -> void:
 			&"food_name": not food.name_label().visible,
 			&"people_name": not people.name_label().visible,
 			&"modes": bar.mode_segmented().button_for(0).has_theme_font_size_override(&"font_size"),
+			&"army_change": not army.delta_chip().visible,
+			&"army": not army.visible,
 			&"country": not bar.name_shown(),
 			&"ducats_name": not ducats.name_label().visible,
 			&"ducats_change": not ducats.delta_chip().visible,
@@ -612,7 +613,7 @@ func test_the_narrowing_steps_happen_in_the_pinned_order() -> void:
 	bar.fit_width(4000.0)
 	var seen: Array[StringName] = []
 	for step: StringName in steps:
-		assert_true(first.has(step), "the step %s happens somewhere from 1700 to 600 px" % step)
+		assert_true(first.has(step), "the step %s happens somewhere from 2000 to 600 px" % step)
 		seen.append(step)
 	for i: int in range(steps.size() - 1):
 		var a: StringName = steps[i]
@@ -627,6 +628,7 @@ func test_both_chips_and_the_study_button_show_at_1280_and_1024_px() -> void:
 	await _harness.wait_frames(self, 3)
 	var ducats := bar.chips().ducats_chip()
 	var stores := bar.chips().stores_chip()
+	var army := bar.chips().army_chip()
 	for width: int in [1280, 1024]:
 		_harness.viewport.size = Vector2i(width, 720)  # the real resize path
 		await _harness.wait_frames(self, 4)
@@ -647,9 +649,13 @@ func test_both_chips_and_the_study_button_show_at_1280_and_1024_px() -> void:
 		if width == 1280:
 			assert_true(bar.brand_label().visible, "1280 px: the brand shows")
 			assert_false(bar.name_shown(), "1280 px: the country name hides (owner to confirm)")
-			assert_true(ducats.name_label().visible and ducats.delta_chip().visible, "1280 px: Ducats with name and change")
+			assert_false(ducats.name_label().visible, "1280 px: the Ducats name gives way with the Army chip (OPEN: coordinator to decide, the approved look wanted it visible)")
+			assert_true(ducats.delta_chip().visible, "1280 px: the Ducats change stays")
+			assert_false(army.name_label().visible, "1280 px: the Army chip has no name")
+			assert_true(army.visible and army.value_label().visible, "1280 px: the Army chip shows")
 		else:
 			assert_false(bar.brand_label().visible, "1024 px: the brand hides (owner to confirm)")
+			assert_false(army.visible, "1024 px: the Army chip gives way (M6)")
 	for width: int in [900, 800, 700, 1280]:
 		_harness.viewport.size = Vector2i(width, 720)
 		await _harness.wait_frames(self, 4)

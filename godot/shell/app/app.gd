@@ -549,6 +549,8 @@ func _on_stack_changed() -> void:
 
 
 func _on_back_requested() -> void:
+	if _requests.skip_replay():  # M6 6.4: Esc skips a running movement replay before the ladder
+		return
 	if _hud != null and _hud.release_console_focus():
 		return
 	if _hud != null and _hud.has_open_popover():

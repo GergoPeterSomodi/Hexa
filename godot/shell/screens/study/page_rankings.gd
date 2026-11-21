@@ -107,8 +107,8 @@ func _ensure_built() -> void:
 
 
 ## The column of one measure, built on its first refresh (a measure is added to the page, not rebuilt; the two
-## columns sit side by side in the flow and the third, People, wraps to a second row when the page is narrower than three
-## columns: M4.5 6.5, M5 6.7; the Study's page scrolls).
+## columns side by side in the flow and the later measures (People, M5; Men under arms, M6 L21) wrap to a second row when the
+## page is narrower than their columns: M4.5 6.5, M5 6.7, M6 6.10; the Study's page scrolls).
 func _column_for(m: Dictionary) -> Dictionary:
 	var id := StringName(str(m["id"]))
 	if not _columns.has(id):
