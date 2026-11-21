@@ -36,6 +36,16 @@ static func line_of(game: Game, entry: Dictionary, viewer: StringName, memo: Dic
 			line = _tax_line(game, entry, mine)
 		"town_grew", "district_declined":
 			line = _settle_line(game, entry, mine)
+		"army_raised":
+			line = _raised_line(game, entry, viewer, mine)
+		"army_disbanded":
+			line = _disbanded_line(game, entry, viewer, mine)
+		"march_halted":
+			line = _halted_line(game, entry, mine)
+		"army_starved":
+			line = _starved_line(game, entry, viewer, mine)
+		"unit_lost":
+			line = _lost_line(game, entry, viewer, mine)
 		_:
 			return {}
 	if line.is_empty():
@@ -145,6 +155,14 @@ static func _describable(entry: Dictionary, viewer: StringName) -> bool:
 				return false
 			# _settle_line: the player's own fall needs a reason the log knows
 			return tag != viewer or str(entry.get("kind", "")) == "town_grew" or 				["hunger", "people"].has(str(entry.get("why", "")))
+		"army_raised", "army_disbanded":
+			return entry.get("hex", null) is Vector2i
+		"march_halted":
+			return tag == viewer and entry.get("hex", null) is Vector2i and HALT_WHYS.has(str(entry.get("why", "")))
+		"army_starved":
+			return entry.get("hex", null) is Vector2i and STARVE_WHYS.has(str(entry.get("why", "")))
+		"unit_lost":
+			return entry.get("hex", null) is Vector2i and str(entry.get("why", "")) == "starved"
 	return false
 
 
@@ -196,7 +214,7 @@ static func _filters_of(entry: Dictionary, mine: bool) -> Array[StringName]:
 
 ## The kinds that can carry the Money filter (a work does when its ducats moved: checked on the built line).
 static func _money_kind(kind: String) -> bool:
-	return kind == "goods_short" or kind == "tax_set" or kind.begins_with("work_")
+	return kind == "goods_short" or kind == "tax_set" or kind.begins_with("work_") or kind == "army_raised" or kind == "army_disbanded"
 
 
 # ----- who is told -----------------------------------------------------------------------------------------------
@@ -311,6 +329,14 @@ static func _paid_text(entry: Dictionary) -> String:
 			var refund := int(entry.get("refund", 0))
 			if refund > 0:
 				return " (+%s back)" % Words.ducats(refund)
+		"army_raised":
+			var ducats := int(entry.get("ducats", 0))
+			if ducats > 0:
+				return " (%s)" % Words.signed_ducats(-ducats)
+		"army_disbanded":
+			var back := int(entry.get("refund", 0))
+			if back > 0:
+				return " (+%s back)" % Words.ducats(back)
 	return ""
 
 
@@ -431,6 +457,133 @@ static func _settle_line(game: Game, entry: Dictionary, mine: bool) -> Dictionar
 	var who := short_name(game, StringName(str(entry.get("tag", ""))))
 	return {"keyword": keyword, "tone": "muted", "hex": at, "notify": false, "floating": keyword,
 		"text": "%s: %s %s." % [who, name, words]}
+
+
+# ----- armies: raised, disbanded, halted, hungry, lost (m6-build-spec.md 4.11) ------------------------------------------
+
+## The tag of a country the viewer knows, else &"" (Knowledge.knows; the viewer "" knows all). A foreign army line names
+## only a known country: an unknown one reads "An army" or "A company", as ArmyView's tokens hide its army (4.12).
+static func _told_tag(game: Game, viewer: StringName, tag: StringName) -> StringName:
+	return tag if Knowledge.knows(game, viewer, tag) else &""
+
+
+## The subject of a foreign army line: the short name of the entry's country when told, else "An army".
+static func _told_name(game: Game, viewer: StringName, entry: Dictionary) -> String:
+	var told := _told_tag(game, viewer, StringName(str(entry.get("tag", ""))))
+	return short_name(game, told) if told != &"" else Words.army_of(game, &"")
+
+
+## The reasons of march_halted and army_starved that a line says (Movement.WHY_*, Supply's why).
+const HALT_WHYS: Array[String] = ["winter", "no_way", "blocked"]
+const STARVE_WHYS: Array[String] = ["out_of_supply", "stores_empty"]
+
+
+## "The Army of Turin" from the entry's `name` (producers that name their armies), else "Your army".
+static func _the_army(entry: Dictionary) -> String:
+	var army_name := str(entry.get("name", ""))
+	return "The " + army_name if army_name != "" else "Your army"
+
+
+## " of the Army of Turin" from the entry's `name`; "" when the entry names no army.
+static func _of_the_army(entry: Dictionary) -> String:
+	var army_name := str(entry.get("name", ""))
+	return " of the " + army_name if army_name != "" else ""
+
+
+## The kind of company the entry names (`kind_id`), or null.
+static func _unit_def(game: Game, entry: Dictionary) -> UnitDef:
+	if game == null or game.defs == null or not entry.has("kind_id"):
+		return null
+	return game.defs.unit_def(int(entry["kind_id"]))
+
+
+## The number of items of a list the entry holds (its companies), 0 for anything that is no list.
+static func _size_of(value: Variant) -> int:
+	if value is Array:
+		return (value as Array).size()
+	if value is PackedInt32Array:
+		return (value as PackedInt32Array).size()
+	return 0
+
+
+## A raise: the player's own line with its ducats; another's witnessed raise with the band of its men.
+static func _raised_line(game: Game, entry: Dictionary, viewer: StringName, mine: bool) -> Dictionary:
+	if not (entry.get("hex", null) is Vector2i):
+		return {}
+	var hex := entry["hex"] as Vector2i
+	var count := int(entry.get("count", 0))
+	if mine:
+		return {"keyword": "Raised", "tone": "plain", "hex": hex, "notify": false, "floating": "Raised",
+			"text": "You raised %s %s%s." % [Words.units(count, _unit_def(game, entry)), Words.at(game, hex),
+				_paid_text(entry)]}
+	var who := _told_name(game, viewer, entry)
+	return {"keyword": "Raised", "tone": "warn", "hex": hex, "notify": true, "floating": "",
+		"text": "%s raised %s %s: %s." % [who, Words.plural(count, "company", "companies"), Words.at(game, hex),
+			Knowledge.band_text(int(entry.get("men", 0)), "men")]}
+
+
+## A disband: the player's own line with its refund; another's witnessed one with the band of its men.
+static func _disbanded_line(game: Game, entry: Dictionary, viewer: StringName, mine: bool) -> Dictionary:
+	if not (entry.get("hex", null) is Vector2i):
+		return {}
+	var hex := entry["hex"] as Vector2i
+	if mine:
+		var companies := Words.units(_size_of(entry.get("units", [])), _unit_def(game, entry))
+		return {"keyword": "Disbanded", "tone": "plain", "hex": hex, "notify": false, "floating": "",
+			"text": "You disbanded %s%s%s." % [companies, _of_the_army(entry), _paid_text(entry)]}
+	var who := _told_name(game, viewer, entry)
+	return {"keyword": "Disbanded", "tone": "muted", "hex": hex, "notify": false, "floating": "",
+		"text": "%s disbanded %s %s." % [who, Knowledge.band_text(int(entry.get("men", 0)), "men"),
+			Words.at(game, hex)]}
+
+
+## A halt: the player's own line only (the walk's witnesses are its country alone). A winter wait names the pass.
+static func _halted_line(game: Game, entry: Dictionary, mine: bool) -> Dictionary:
+	var why := str(entry.get("why", ""))
+	if not mine or not (entry.get("hex", null) is Vector2i) or not HALT_WHYS.has(why):
+		return {}
+	var hex := entry["hex"] as Vector2i
+	var reason := str(entry.get("reason", ""))
+	var text := ""
+	if why == "winter":
+		var pass_text := "the %s is closed by snow" % reason if reason != "" else "winter closes the way"
+		text = "%s waits for spring %s: %s." % [_the_army(entry), Words.at(game, hex), pass_text]
+	elif why == "no_way":
+		text = "%s halted %s: %s by land." % [_the_army(entry), Words.at(game, hex), reason]
+	else:
+		text = "%s halted %s: %s." % [_the_army(entry), Words.at(game, hex), reason]
+	return {"keyword": "Halted", "tone": "warn", "hex": hex, "notify": true, "floating": "Halted", "text": text}
+
+
+## Hunger: the player's own loss with its cause; another's witnessed loss without a number.
+static func _starved_line(game: Game, entry: Dictionary, viewer: StringName, mine: bool) -> Dictionary:
+	var why := str(entry.get("why", ""))
+	if not (entry.get("hex", null) is Vector2i) or not STARVE_WHYS.has(why):
+		return {}
+	var hex := entry["hex"] as Vector2i
+	if not mine:
+		var army_tag := StringName(str(entry.get("tag", "")))
+		return {"keyword": "Hunger", "tone": "muted", "hex": hex, "notify": false, "floating": "",
+			"text": "%s lost men to hunger %s." % [Words.army_of(game, _told_tag(game, viewer, army_tag)), Words.at(game, hex)]}
+	var lost := int(entry.get("lost", 0))
+	var cause := "out of supply" if why == "out_of_supply" else "the stores are empty"
+	return {"keyword": "Hunger", "tone": "bad", "hex": hex, "notify": true, "floating": "Hunger " + Words.signed(-lost),
+		"text": "%s lost %s to hunger %s: %s." % [_the_army(entry), Words.men(lost), Words.at(game, hex), cause]}
+
+
+## A company lost to hunger: the player's own, or another's witnessed one (muted, no number).
+static func _lost_line(game: Game, entry: Dictionary, viewer: StringName, mine: bool) -> Dictionary:
+	if not (entry.get("hex", null) is Vector2i) or str(entry.get("why", "")) != "starved":
+		return {}
+	var hex := entry["hex"] as Vector2i
+	if not mine:
+		var company_tag := StringName(str(entry.get("tag", "")))
+		return {"keyword": "Lost", "tone": "muted", "hex": hex, "notify": false, "floating": "",
+			"text": "%s starved %s." % [Words.company_of(game, _told_tag(game, viewer, company_tag)), Words.at(game, hex)]}
+	var def := _unit_def(game, entry)
+	var company := capital(Words.with_article(def.one)) if def != null else "A company"
+	return {"keyword": "Lost", "tone": "bad", "hex": hex, "notify": true, "floating": "",
+		"text": "%s%s is gone: starved %s." % [company, _of_the_army(entry), Words.at(game, hex)]}
 
 
 # ----- land and rule ---------------------------------------------------------------------------------------------

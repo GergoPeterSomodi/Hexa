@@ -634,3 +634,57 @@ func test_a_light_row_gives_the_cards_goods_and_people_chips_and_full_gives_the_
 			assert_eq(l["chips"], kept, "%s row %d: the light chips are the card's others" % [str(hex), n])
 			var card := ImprovePreview.of(g, &"GEN", hex, {"action": l["action"], "family": l["family"]})
 			assert_eq(f["chips"], card["chips"])
+
+
+# --- the armies (M6 R9): the what-if of an improvement with armies equals play --------------------------------------------
+
+## Genoa with a town, two pikemen raised in it and two out of supply beside it (the same rig as test_economy_preview's).
+func _armed_for_improve() -> Game:
+	var g := ArmyFixture.game()
+	g.defs.supply_reach = 1
+	var town := ArmyFixture.find_town(g)
+	ArmyFixture.town(g, town)
+	ArmyFixture.rich(g)
+	assert_true(bool(g.act("raise", {"hex": town, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
+	var away := ArmyFixture.NO_HEX
+	for i: int in Territory.districts(g, ArmyFixture.id_of(g, ArmyFixture.TAG)):
+		if not Supply.in_supply(g, ArmyFixture.TAG, g.map.hex_of(i), false):
+			away = g.map.hex_of(i)
+			break
+	assert_true(away != ArmyFixture.NO_HEX, "a land hex of TAG out of supply")
+	ArmyFixture.army(g, ArmyFixture.TAG, away, 0, 2)
+	return g
+
+
+func test_an_improvement_what_if_with_armies_equals_play() -> void:
+	var g := _armed_for_improve()
+	var hex := ArmyFixture.NO_HEX
+	for i: int in Territory.districts(g, ArmyFixture.id_of(g, ArmyFixture.TAG)):
+		if not Supply.in_supply(g, ArmyFixture.TAG, g.map.hex_of(i), false):
+			hex = g.map.hex_of(i)
+			break
+	assert_true(hex != ArmyFixture.NO_HEX)
+	var options := ImprovePreview.options_of(g, ArmyFixture.TAG, hex)
+	assert_true(options.size() > 0, "the options of a hex with armies beside it")
+	# the what-if ImprovePreview asks of EconomyPreview for a settlement that adds a depot (its own arguments)
+	var i := g.map.index_of(hex)
+	var pair := Vector2i(Economy.SETTLEMENTS, g.defs.depot_min_level)
+	var seasons: Array = EconomyPreview.with(g, ArmyFixture.TAG, {"hexes": {i: pair}, "detail": true, "lines": false}, 4)["seasons"]
+	var real := _armed_for_improve()
+	var j := real.map.index_of(hex)
+	real.state.main_use[j] = Economy.SETTLEMENTS
+	real.state.level[j] = real.defs.depot_min_level
+	real.districts.clear()
+	real.version += 1
+	var c := Countries.by_tag(real, ArmyFixture.TAG)
+	for k: int in 4:
+		assert_true(bool(Season.run(real)["ok"]))
+		var p: Dictionary = seasons[k]
+		var where := "improve season %d" % (k + 1)
+		assert_eq(c.stock, p["stock"], where + " stock")
+		assert_eq(c.food_fed, int(p["fed"]), where + " fed")
+		var total := 0
+		for n: int in Territory.districts(real, c.id):
+			total += real.state.people[n]
+		assert_eq(total, int(p["people"]), where + " people")
+		assert_eq(int(p["turn"]), real.turn - 1, where + " turn")

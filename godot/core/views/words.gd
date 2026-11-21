@@ -94,14 +94,28 @@ static func units(n: int, def: UnitDef) -> String:
 
 ## "A Milanese army" (the country's adjective); "The army of XYZ" for a tag with no adjective; "An army" for no tag.
 static func army_of(game: Game, tag: StringName) -> String:
+	return _of_country(game, tag, "army")
+
+
+## "A Milanese company" (the country's adjective); "The company of XYZ" for a tag with no adjective; "A company" for no tag.
+static func company_of(game: Game, tag: StringName) -> String:
+	return _of_country(game, tag, "company")
+
+
+## The country's adjective, one noun: "A Genoese army", "An Austrian company", "The army of ZZZ", "An army".
+static func _of_country(game: Game, tag: StringName, noun: String) -> String:
 	if tag == &"":
-		return "An army"
+		return "%s %s" % [_article(noun), noun]
 	var def := Countries.def_of(game, tag) if game != null else null
 	var adjective := def.adjective if def != null else ""
 	if adjective.is_empty():
-		return "The army of %s" % String(tag)
-	var article := "An" if "AEIOUaeiou".contains(adjective.left(1)) else "A"
-	return "%s %s army" % [article, adjective]
+		return "The %s of %s" % [noun, String(tag)]
+	return "%s %s %s" % [_article(adjective), adjective, noun]
+
+
+## "A" or "An" before `word`.
+static func _article(word: String) -> String:
+	return "An" if "AEIOUaeiou".contains(word.left(1)) else "A"
 
 
 ## The nearest named place within NEAR hexes of `hex` as [name, distance] (distance 0 on the hex itself), [] when none.

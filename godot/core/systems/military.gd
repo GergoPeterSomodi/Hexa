@@ -307,7 +307,7 @@ static func raise(game: Game, args: Dictionary) -> Dictionary:
 	var ids := Armies.add_units(game, army, kind, count, game.turn, hex, ud.cost, per_unit)
 	Sight.refresh(game)  # the army part of the sight (5.0 R4): a live game sees what a loaded one does
 	game.emit({"kind": "army_raised", "tag": tag, "hex": hex, "army": army.id, "units": Array(ids), "kind_id": kind,
-		"count": count, "men": count * ud.men, "ducats": int(cost["ducats"]), "goods": goods})
+		"count": count, "men": count * ud.men, "ducats": int(cost["ducats"]), "goods": goods, "name": army.name})
 	return {"ok": true, "reason": "", "army": army.id}
 
 
@@ -389,12 +389,18 @@ static func disband(game: Game, args: Dictionary) -> Dictionary:
 		People.give_back(game, give[0], give[1])
 	var hex := army.hex
 	var army_id := army.id
+	var army_name := army.name
+	# the kind when every company dropped is of one kind (the line names it); else the event has none
+	var kind_id := drop[0].kind if not drop.is_empty() and drop.all(func(u: Unit) -> bool: return u.kind == drop[0].kind) else -1
 	Armies.remove_units(game, army, ids)
 	if army.units.is_empty():
 		Armies.remove(game, army)
 	Sight.refresh(game)
-	game.emit({"kind": "army_disbanded", "tag": tag, "hex": hex, "army": army_id, "units": Array(ids), "men": men,
-		"refund": refund})
+	var event := {"kind": "army_disbanded", "tag": tag, "hex": hex, "army": army_id, "units": Array(ids), "men": men,
+		"refund": refund, "name": army_name}
+	if kind_id >= 0:
+		event["kind_id"] = kind_id
+	game.emit(event)
 	return {"ok": true, "reason": "", "men": men}
 
 

@@ -438,3 +438,108 @@ func test_worth_seasons_equals_the_worth_worked_out_by_hand_under_works() -> voi
 			var taxes: int = int(base["people"]) * rate * g.defs.tax_permille[c.tax] / 1000000000
 			var want: int = milli / 1000 + int(out["ducats"]) + taxes - int(out["upkeep"]) - int(out["walls"])
 			assert_eq((ws["worth"] as PackedInt32Array)[h * 8 + k], want, "hex %s season %d" % [str(g.map.hex_of(i)), k])
+
+
+# --- the armies (M6 R9): the preview's supply, food, upkeep and refill equal the played seasons -------------------------
+
+## A land hex of TAG out of supply (its armies forage there), or NO_HEX.
+func _out_of_supply(g: Game) -> Vector2i:
+	for i: int in Territory.districts(g, Countries.by_tag(g, ArmyFixture.TAG).id):
+		var hex := g.map.hex_of(i)
+		if not Supply.in_supply(g, ArmyFixture.TAG, hex, false):
+			return hex
+	return ArmyFixture.NO_HEX
+
+
+## Genoa with a town, two pikemen raised in it (in supply, a little short of men: a refill is due), and two pikemen out of
+## supply on the land beside it (they forage, and starve where the land feeds no one).
+func _armed() -> Game:
+	var g := ArmyFixture.game()
+	g.defs.supply_reach = 1  # a copy the game owns: most of Genoa's land is then out of supply
+	var town := ArmyFixture.find_town(g)
+	ArmyFixture.town(g, town)
+	ArmyFixture.rich(g)
+	assert_true(bool(g.act("raise", {"hex": town, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
+	var lost := Armies.lose_men(g, Armies.at(g, town)[0], 300, &"test")
+	assert_true(lost > 0, "the town's army lost men for the refill to make up")
+	var away := _out_of_supply(g)
+	assert_true(away != ArmyFixture.NO_HEX, "a land hex of TAG out of supply")
+	ArmyFixture.army(g, ArmyFixture.TAG, away, 0, 2)
+	return g
+
+
+func _upkeep_line(lines: Array) -> int:
+	for line: Dictionary in lines:
+		if line["why"] == &"upkeep_army":
+			return int(line["amount"])
+	return 0
+
+
+## Checks the first `count` seasons of the preview of `preview_game` (with `change` laid over it) against the seasons of
+## `g` played now, one by one.
+func _check_armed_against_play(g: Game, count: int, change: Dictionary, label: String, preview_game: Game = null) -> void:
+	var source := g if preview_game == null else preview_game
+	var seasons: Array = EconomyPreview.with(source, ArmyFixture.TAG, change, count)["seasons"]
+	var c := Countries.by_tag(g, ArmyFixture.TAG)
+	var armies_seen := 0
+	for k: int in count:
+		assert_true(bool(Season.run(g)["ok"]))
+		var p: Dictionary = seasons[k]
+		var where := "%s season %d" % [label, k + 1]
+		armies_seen += Armies.of_country(g, ArmyFixture.TAG).size()
+		assert_eq(_flow(c, &"made", 1), p["made"], where + " made")
+		assert_eq(_flow(c, &"used", -1), p["used"], where + " used")
+		assert_eq(_flow(c, &"sold", -1), p["sold"], where + " sold")
+		assert_eq(c.stock, p["stock"], where + " stock")
+		assert_eq(c.food_fed, int(p["fed"]), where + " fed")
+		var closed: Array[Dictionary] = []
+		closed.assign(c.ledger_closed["lines"] as Array)
+		assert_eq(_upkeep_line(closed), _upkeep_line(p["lines"] as Array), where + " upkeep_army")
+		assert_eq(Treasury.left_over(closed), int(p["net"]), where + " net")
+		var total := 0
+		var towns := 0
+		for i: int in Territory.districts(g, c.id):
+			total += g.state.people[i]
+			if g.state.main_use[i] == Economy.SETTLEMENTS:
+				towns += g.state.people[i]
+		assert_eq(total, int(p["people"]), where + " people")
+		assert_eq(towns, int(p["towns"]), where + " towns")
+	assert_true(armies_seen > 0, "the armies stood through the seasons")
+
+
+func test_eight_seasons_with_armies_equal_play() -> void:
+	var g := _armed()
+	_check_armed_against_play(g, 4, {}, "armies")
+
+
+func test_a_what_if_settlement_that_adds_a_depot_equals_play_with_armies() -> void:
+	var g := _armed()
+	var away := _out_of_supply(g)
+	var depot := away  # a settlement on the army's own hex: the depot is in reach of the army at once
+	var i := g.map.index_of(depot)
+	var pair := Vector2i(Economy.SETTLEMENTS, g.defs.depot_min_level)
+	var before := Supply.in_supply(g, ArmyFixture.TAG, away, false)
+	var real := _armed()
+	var j := real.map.index_of(depot)
+	real.state.main_use[j] = Economy.SETTLEMENTS
+	real.state.level[j] = g.defs.depot_min_level
+	real.districts.clear()
+	real.version += 1
+	assert_false(before, "the army starts out of supply, so the new depot is what brings it in")
+	assert_true(Supply.in_supply(real, ArmyFixture.TAG, away, false), "the depot puts the army in supply")
+	_check_armed_against_play(real, 4, {"hexes": {i: pair}}, "depot", g)
+
+
+## An army of TAG on land another country holds: it forages that land (the other country's people), and none of them is in
+## TAG's people or towns (play and preview agree for six seasons).
+func test_an_army_on_foreign_land_forages_the_foreign_people_not_ours() -> void:
+	var g := _armed()
+	var id := ArmyFixture.id_of(g, ArmyFixture.TAG)
+	var foreign := ArmyFixture.NO_HEX
+	for i: int in g.map.hex_count():
+		if g.map.is_land(g.map.hex_of(i)) and int(g.state.owner[i]) > 0 and int(g.state.owner[i]) != id:
+			foreign = g.map.hex_of(i)
+			break
+	assert_true(foreign != ArmyFixture.NO_HEX, "a land hex another country holds")
+	ArmyFixture.army(g, ArmyFixture.TAG, foreign, 0, 2)
+	_check_armed_against_play(g, 6, {}, "foreign")

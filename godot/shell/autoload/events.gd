@@ -27,6 +27,20 @@ signal tax_set(tag: StringName, level: int)
 signal town_grew(tag: StringName, hex: Vector2i, level: int)
 ## A settlement fell a level in the people phase; `why` is `hunger` or `people`.
 signal district_declined(tag: StringName, hex: Vector2i, level: int, why: StringName)
+## A company or army was raised in a hex (Military.raise): the army tokens, the panels, the chips, the ribbons.
+signal army_raised(tag: StringName, hex: Vector2i, army: int)
+## An army was disbanded in a hex (Military.disband); the army may be gone now (listeners check Armies.by_id).
+signal army_disbanded(tag: StringName, hex: Vector2i, army: int)
+## An army's order, place, companies or men changed (split, merge, march, halt, refill): tokens, panels, path marks.
+signal army_changed(tag: StringName, army: int)
+## An army walked in the movement phase: its path (start first), the tick of each step and what the player saw of it.
+signal unit_moved(tag: StringName, army: int, path: Array[Vector2i], seen: PackedByteArray, ticks: PackedInt32Array)
+## An army's march stopped in the movement phase; `why` is `winter`, `blocked` or `no_way`.
+signal march_halted(tag: StringName, army: int, why: StringName)
+## An army lost men to hunger in the supply phase.
+signal army_starved(tag: StringName, army: int, lost: int)
+## A company was lost (its last man went): hunger now, battle later.
+signal unit_lost(tag: StringName, army: int, unit: int)
 ## Every notable event, as the chronicle stores it (plain values): the log, notifications and ribbons.
 signal chronicled(entry: Dictionary)
 ## A season ended; `turn` is the season that ended. Emitted once, after the last phase's drain.

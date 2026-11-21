@@ -239,6 +239,12 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 		var people_view := PeopleView.at(game, game.player, hex)
 		if bool(people_view.get("shown", false)):
 			lines.append(["People", &"plain", str(people_view["text"])])
+		var armies_line := ArmyView.hex_text(game, game.player, hex)
+		if armies_line != "":
+			lines.append(["Armies", &"plain", armies_line])
+		var supply_view := SupplyView.at(game, game.player, hex)
+		if bool(supply_view.get("shown", false)):
+			lines.append(["Supply", &"plain", str(supply_view["text"])])
 		var food_text := food_text_of(game, hex)
 		if food_text != "":
 			lines.append(["Food", &"plain", food_text])

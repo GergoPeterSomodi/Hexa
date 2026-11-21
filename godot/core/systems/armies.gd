@@ -131,7 +131,7 @@ static func lose_men(game: Game, army: Army, amount: int, why: StringName) -> in
 	for u: Unit in gone:
 		army.units.erase(u)
 		game.emit({"kind": "unit_lost", "tag": army.tag, "army": army.id, "unit": u.id, "kind_id": u.kind,
-			"hex": army.hex, "why": why, "army_left": army.units.size()})
+			"hex": army.hex, "why": why, "army_left": army.units.size(), "name": army.name})
 	if army.units.is_empty():
 		remove(game, army)
 	return lost

@@ -156,3 +156,7 @@ func test_men_units_and_army_names() -> void:
 	assert_eq(Words.army_of(_game, &""), "An army", "no tag")
 	assert_eq(Words.army_of(_game, &"ZZZ"), "The army of ZZZ", "a tag with no country")
 	assert_eq(Words.army_of(_game, &"AUS"), "An Austrian army", "a vowel takes an")
+	assert_eq(Words.company_of(_game, &"GEN"), "A Genoese company", "the same words, one company")
+	assert_eq(Words.company_of(_game, &""), "A company", "no tag")
+	assert_eq(Words.company_of(_game, &"ZZZ"), "The company of ZZZ", "a tag with no country")
+	assert_eq(Words.company_of(_game, &"AUS"), "An Austrian company", "a vowel takes an")

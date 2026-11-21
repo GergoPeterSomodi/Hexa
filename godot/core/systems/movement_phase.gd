@@ -298,7 +298,8 @@ static func _emit_moved(game: Game, w: Walk, arrived: bool, memo: Dictionary) ->
 ## witness of the halt (its own country).
 static func _emit_halt(game: Game, w: Walk, waits: bool) -> void:
 	game.emit({"kind": "march_halted", "tag": w.tag, "army": w.army.id, "hex": game.map.hex_of(w.end),
-		"why": String(w.status), "reason": w.text, "waits": waits, "witnesses": PackedStringArray([String(w.tag)])})
+		"why": String(w.status), "reason": w.text, "waits": waits, "witnesses": PackedStringArray([String(w.tag)]),
+		"name": w.army.name})
 
 
 ## What the player saw of a hex (1 or 0) and the countries whose sight holds it (the actor not among them), at the phase's start.

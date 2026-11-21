@@ -347,3 +347,37 @@ func test_three_full_towns_are_joined_with_semicolons() -> void:
 	assert_true(text.begins_with("3 towns are full: "), text)
 	assert_true(text.contains("; "), "P: names with commas are not joined with commas: " + text)
 	assert_true(text.contains(" and "), text)
+
+
+# --- the armies (M6 R9): the season in play the reminders read equals the season played --------------------------------
+
+## Genoa with a town, two pikemen raised in it and two out of supply beside it: the rig of test_economy_preview.
+func _armed_for_reminders() -> Game:
+	var g := ArmyFixture.game()
+	g.defs.supply_reach = 1
+	var town := ArmyFixture.find_town(g)
+	ArmyFixture.town(g, town)
+	ArmyFixture.rich(g)
+	assert_true(bool(g.act("raise", {"hex": town, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
+	for i: int in Territory.districts(g, ArmyFixture.id_of(g, ArmyFixture.TAG)):
+		if not Supply.in_supply(g, ArmyFixture.TAG, g.map.hex_of(i), false):
+			ArmyFixture.army(g, ArmyFixture.TAG, g.map.hex_of(i), 0, 2)
+			break
+	return g
+
+
+func test_the_season_in_play_with_armies_is_the_season_played() -> void:
+	var g := _armed_for_reminders()
+	var expected := EconomyPreview.expected(g, ArmyFixture.TAG)
+	assert_false(expected.is_empty(), "the season in play has a preview")
+	var c := Countries.by_tag(g, ArmyFixture.TAG)
+	var upkeep := 0
+	for line: Dictionary in expected["lines"] as Array:
+		if line["why"] == &"upkeep_army":
+			upkeep = int(line["amount"])
+	assert_true(upkeep < 0, "the armies' upkeep is in the season in play")
+	assert_true(bool(Season.run(g)["ok"]))
+	var closed: Array[Dictionary] = []
+	closed.assign(c.ledger_closed["lines"] as Array)
+	assert_eq(Treasury.left_over(closed), int(expected["net"]), "the net the reminders read is the net played")
+	assert_eq(c.stock, expected["stock"], "the stores the reminders read are the stores played")

@@ -176,7 +176,7 @@ static func _apply_army(game: Game, a: Army, res: Dictionary) -> void:
 	if lost <= 0:
 		return
 	game.emit({"kind": "army_starved", "tag": a.tag, "army": id, "hex": a.hex, "lost": lost, "men": men - lost,
-		"why": whys.get(id, &"")})
+		"why": whys.get(id, &""), "name": a.name})
 	Armies.lose_men(game, a, lost, &"starved")
 
 

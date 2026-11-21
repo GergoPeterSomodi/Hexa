@@ -193,11 +193,11 @@ func test_yield_band_edges() -> void:
 
 
 func test_mode_keys_and_mode_of() -> void:
-	assert_eq(MapModes.MODE_KEYS, [&"terrain", &"owner", &"relief", &"yields", &"food"] as Array[StringName])
+	assert_eq(MapModes.MODE_KEYS, [&"terrain", &"owner", &"relief", &"yields", &"food", &"supply"] as Array[StringName])
 	assert_eq(MapModes.mode_of(&"terrain"), MapModes.Mode.TERRAIN)
 	assert_eq(MapModes.mode_of(&"yields"), MapModes.Mode.YIELDS)
 	assert_eq(MapModes.mode_of(&"food"), MapModes.Mode.FOOD)
-	assert_eq(MapModes.mode_of(&"supply"), -1)
+	assert_eq(MapModes.mode_of(&"supply"), MapModes.Mode.SUPPLY)
 	assert_eq(MapModes.mode_of(&""), -1)
 
 
@@ -323,7 +323,7 @@ func test_colour_at_yields_reads_the_players_bytes() -> void:
 
 func test_modes_with_yields() -> void:
 	var all: Array[int] = [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF, MapModes.Mode.YIELDS,
-		MapModes.Mode.FOOD]
+		MapModes.Mode.FOOD, MapModes.Mode.SUPPLY]
 	assert_eq(MapModes.modes(EconomyFixture.game(&"GEN")), all)
 	assert_eq(MapModes.modes(EconomyFixture.game()),
 		[MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF] as Array[int],

@@ -11,7 +11,8 @@ var unsaved_actions: int = 0
 var play_seconds: float = 0.0
 ## The slot last saved or loaded ("" for none).
 var current_slot: String = ""
-## Phase name -> milliseconds the last season spent in it (F3, perf); M4 adds production and income, M5 people.
+## Phase name -> milliseconds the last season spent in it (F3, perf); M4 adds production and income, M5 people, M6 the
+## movement, supply, ready_units and vision phases (Season.PHASES).
 var last_phase_ms: Dictionary = {}
 
 ## The folder of the saves; tests point it at a temporary folder.
@@ -412,6 +413,23 @@ func drain() -> void:
 			"district_declined":
 				Events.district_declined.emit(StringName(event["tag"]), event["hex"], int(event["level"]),
 					StringName(event["why"]))
+			"army_raised":
+				Events.army_raised.emit(StringName(event["tag"]), event["hex"], int(event["army"]))
+			"army_disbanded":
+				Events.army_disbanded.emit(StringName(event["tag"]), event["hex"], int(event["army"]))
+			"army_changed":
+				Events.army_changed.emit(StringName(event["tag"]), int(event["army"]))
+			"unit_moved":
+				var path: Array[Vector2i] = []
+				path.assign(event["path"] as Array)  # typed before the emit (A11)
+				Events.unit_moved.emit(StringName(event["tag"]), int(event["army"]), path,
+					event["seen"] as PackedByteArray, event["ticks"] as PackedInt32Array)
+			"march_halted":
+				Events.march_halted.emit(StringName(event["tag"]), int(event["army"]), StringName(event["why"]))
+			"army_starved":
+				Events.army_starved.emit(StringName(event["tag"]), int(event["army"]), int(event["lost"]))
+			"unit_lost":
+				Events.unit_lost.emit(StringName(event["tag"]), int(event["army"]), int(event["unit"]))
 		if Chronicle.NOTABLE.has(str(event.get("kind", ""))):
 			Events.chronicled.emit(Chronicle.plain(event))
 

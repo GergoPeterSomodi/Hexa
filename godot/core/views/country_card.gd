@@ -50,7 +50,24 @@ static func of(game: Game, tag: StringName) -> Dictionary:
 		"tip": cdef.tip if cdef != null else "",
 		"treasury": _treasury(game, country),
 		"people": _people(game, country),
+		"army": _army(game, country),
 	}
+
+
+## The army field of the country panel (M6, 4.12): {shown, value, banded}. The player's own country: its men exact; a known
+## foreign country: its men banded (Knowledge.band); an unknown country: not `shown`.
+static func _army(game: Game, country: Country) -> Dictionary:
+	var out := {"shown": false, "value": 0, "banded": false}
+	if not Knowledge.knows(game, game.player, country.tag):
+		return out
+	var men := Armies.men_of_country(game, country.tag)
+	out["shown"] = true
+	if game.player != &"" and country.tag == game.player:
+		out["value"] = men
+	else:
+		out["banded"] = true
+		out["value"] = Knowledge.band(men)
+	return out
 
 
 ## Focus hex for `country`: its on-map capital, or the label hex of its largest connected region.

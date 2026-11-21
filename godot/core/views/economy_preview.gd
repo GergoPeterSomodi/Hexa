@@ -58,6 +58,8 @@ static func with(game: Game, tag: StringName, changes: Dictionary, seasons: int 
 	# Where this run differs from the baseline (5.0 R5): `lam` the pieces (hex index -> Vector2i(main_use, level)) and `delta`
 	# the people (hex index -> people), each only for the hexes that differ.
 	var run: Dictionary = {"lam": over.duplicate(), "delta": {}}
+	var track := ArmyPreviewStep.track(game, tag)  # the country's armies (M6 R9): copies, stepped season by season
+	var armed := not (track["armies"] as Array).is_empty()
 	for k: int in count:
 		var rec: Dictionary = column[k]
 		var view: StateView = rec["view"]
@@ -65,6 +67,14 @@ static func with(game: Game, tag: StringName, changes: Dictionary, seasons: int 
 		var touched: Array[Dictionary] = []
 		var lam: Dictionary = run["lam"]
 		var delta: Dictionary = run["delta"]
+		var army := {}
+		if armed:  # the supply phase: the armies eat, forage and starve before production; the foragers' people come off
+			army = ArmyPreviewStep.supply(game, (rec["view"] as StateView).with(lam).with_people(delta), track, stock,
+				int(rec["turn"]))
+			stock = ArmyPreviewStep.after_eating(stock, army["eaten"])
+			for i: int in army["foraged"]:  # only the country's own hexes: a foreign hex's people are not this country's
+				if int(game.state.owner[i]) == c.id:
+					delta[i] = _people_before(game, rec, delta, i) - int(army["foraged"][i])
 		var diverged := not lam.is_empty() or not delta.is_empty()
 		if diverged:
 			made_info = _copy_of(rec, lists)
@@ -72,13 +82,15 @@ static func with(game: Game, tag: StringName, changes: Dictionary, seasons: int 
 			var keys: Array = lam.keys()
 			keys.append_array(delta.keys())
 			_adjust(game, c, made_info, rec["view"], view, _around(game, keys), int(rec["season"]), tax, touched, false, lists, memo)
-		var entry := _step(game, c, tax, made_info, view, stock, lists)
+		var entry := _step(game, c, tax, made_info, view, stock, lists, army)
 		entry["turn"] = rec["turn"]
 		entry["season"] = rec["season"]
 		if diverged or int(entry["fed"]) != int(rec["fed"]):
 			_option_people(game, c, rec, run, entry, tax)
 		else:
 			_same_people(rec, entry)
+		if armed:  # the ready_units phase: the men raised come off the people the next season starts with
+			_refill(game, rec, run, entry, track, view)
 		if detail:
 			entry["hexes"] = touched
 		stock = entry["stock"]
@@ -610,6 +622,26 @@ static func _levels_out(levels: Array) -> Array[Dictionary]:
 	return out
 
 
+## The people an armed run's season starts with on hex `i` before the supply phase: the run's delta, else the baseline's start.
+static func _people_before(game: Game, rec: Dictionary, delta: Dictionary, i: int) -> int:
+	return int(delta.get(i, (rec["p_start"] as Dictionary).get(i, game.state.people[i])))
+
+
+## The ready_units phase of an armed run (M6 R9): the men raised from the people left at each army's hex come off the people
+## the next season starts with (the run's delta) and the entry's people and towns (the season's end is after the refill).
+static func _refill(game: Game, rec: Dictionary, run: Dictionary, entry: Dictionary, track: Dictionary, view: StateView) -> void:
+	var delta: Dictionary = run["delta"]
+	var ends := {}
+	for i: int in ArmyPreviewStep.hexes_of(game, track):
+		ends[i] = int(delta.get(i, (rec["p_next"] as Dictionary).get(i, game.state.people[i])))
+	var raised := ArmyPreviewStep.refill(game, track, ends)
+	for i: int in raised:
+		delta[i] = ends[i]
+		entry["people"] = int(entry["people"]) - int(raised[i])
+		if view.main_use_at(i) == Economy.SETTLEMENTS:
+			entry["towns"] = int(entry["towns"]) - int(raised[i])
+
+
 ## The people step of a run that differs from the baseline (5.0 R5): only the hexes whose people or piece differ from the
 ## baseline's (and every settlement when the food differs) are stepped; the rest is the baseline's. Fills the people fields
 ## of `entry` and the run's next `lam` (pieces) and `delta` (people).
@@ -889,8 +921,9 @@ static func _copy_of(rec: Dictionary, lists: bool) -> Dictionary:
 
 
 ## One season of the country on the land of `rec`: the towns take their needs, the stores sell, the money lines come.
-static func _step(game: Game, c: Country, tax: int, rec: Dictionary, view: StateView, stock: PackedInt32Array, lists: bool) -> Dictionary:
-	var needs := EconomySeason.needs_for(game, int(rec["town"]))
+static func _step(game: Game, c: Country, tax: int, rec: Dictionary, view: StateView, stock: PackedInt32Array, lists: bool,
+		army: Dictionary = {}) -> Dictionary:
+	var needs := EconomySeason.needs_for(game, int(rec["town"]), int(army.get("food", 0)))
 	var prices := Economy.market_prices(game, view, Economy.market_of(game, c.tag), stock)
 	var made: PackedInt32Array = rec["made"]
 	var step := EconomySeason.goods_step(game, needs, EconomySeason.reserve_for(game, needs), stock, made, prices)
@@ -900,7 +933,7 @@ static func _step(game: Game, c: Country, tax: int, rec: Dictionary, view: State
 		info["dues"] = [{"hex": Treasury.NO_HEX, "amount": int(rec["dues_sum"])}]
 		info["walls"] = [{"hex": Treasury.NO_HEX, "amount": int(rec["walls_sum"])}]
 	var lines := EconomySeason.money_lines(game, view, c.tag, tax, int(step["content"]), int(step["sales_milli"]), info,
-		int(rec["town"]), int(rec["rest"]))
+		int(rec["town"]), int(rec["rest"]), int(army.get("upkeep", 0)), int(army.get("count", 0)))
 	var net := Treasury.left_over(lines)
 	var made_milli := 0
 	for g: int in made.size():

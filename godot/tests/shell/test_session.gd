@@ -669,3 +669,55 @@ func test_drain_sends_town_grew_and_district_declined_before_chronicled() -> voi
 		["chron", "district_declined"]])
 	assert_true(game.events.is_empty())
 	assert_eq(game.chronicle.entries.back()["why"], "hunger")
+
+
+func test_drain_sends_the_army_signals_and_chronicles_the_notable_ones() -> void:
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	var game := Session.game
+	var hex := Vector2i(7, 12)
+	var hex2 := Vector2i(6, 13)
+	var log: Array = []
+	var on_raised := func(tag: StringName, at: Vector2i, army: int) -> void: log.append(["raised", tag, at, army])
+	var on_disbanded := func(tag: StringName, at: Vector2i, army: int) -> void: log.append(["disbanded", tag, at, army])
+	var on_changed := func(tag: StringName, army: int) -> void: log.append(["changed", tag, army])
+	var on_moved := func(tag: StringName, army: int, path: Array[Vector2i], seen: PackedByteArray,
+			ticks: PackedInt32Array) -> void:
+		log.append(["moved", tag, army, path, seen, ticks])
+	var on_halted := func(tag: StringName, army: int, why: StringName) -> void: log.append(["halted", tag, army, why])
+	var on_starved := func(tag: StringName, army: int, lost: int) -> void: log.append(["starved", tag, army, lost])
+	var on_lost := func(tag: StringName, army: int, unit: int) -> void: log.append(["lost", tag, army, unit])
+	Events.army_raised.connect(on_raised)
+	Events.army_disbanded.connect(on_disbanded)
+	Events.army_changed.connect(on_changed)
+	Events.unit_moved.connect(on_moved)
+	Events.march_halted.connect(on_halted)
+	Events.army_starved.connect(on_starved)
+	Events.unit_lost.connect(on_lost)
+	var before := game.chronicle.entries.size()
+	game.emit({"kind": "army_raised", "tag": &"GEN", "hex": hex, "army": 1, "units": [1], "kind_id": 0, "count": 1,
+		"men": 1000, "ducats": 0, "goods": {}, "witnesses": [&"GEN"]})
+	game.emit({"kind": "army_changed", "tag": &"GEN", "hex": hex, "army": 1, "gone": false})
+	game.emit({"kind": "unit_moved", "tag": &"GEN", "army": 1, "path": [hex, hex2], "ticks": PackedInt32Array([1]),
+		"seen": PackedByteArray([1, 1]), "witnesses": [&"GEN"], "arrived": true})
+	game.emit({"kind": "march_halted", "tag": &"GEN", "army": 1, "hex": hex2, "why": "winter", "reason": "Mont Cenis",
+		"waits": true, "witnesses": [&"GEN"]})
+	game.emit({"kind": "army_starved", "tag": &"GEN", "army": 1, "hex": hex, "lost": 10, "men": 990,
+		"why": "out_of_supply", "witnesses": [&"GEN"]})
+	game.emit({"kind": "unit_lost", "tag": &"GEN", "army": 1, "unit": 1, "kind_id": 0, "hex": hex, "why": "starved",
+		"army_left": 0, "witnesses": [&"GEN"]})
+	game.emit({"kind": "army_disbanded", "tag": &"GEN", "hex": hex, "army": 2, "units": [2], "men": 500, "refund": 0,
+		"witnesses": [&"GEN"]})
+	assert_eq(game.chronicle.entries.size() - before, 5, "army_changed and unit_moved are not notable")
+	Session.drain()
+	Events.army_raised.disconnect(on_raised)
+	Events.army_disbanded.disconnect(on_disbanded)
+	Events.army_changed.disconnect(on_changed)
+	Events.unit_moved.disconnect(on_moved)
+	Events.march_halted.disconnect(on_halted)
+	Events.army_starved.disconnect(on_starved)
+	Events.unit_lost.disconnect(on_lost)
+	assert_eq(log, [["raised", &"GEN", hex, 1], ["changed", &"GEN", 1],
+		["moved", &"GEN", 1, [hex, hex2], PackedByteArray([1, 1]), PackedInt32Array([1])],
+		["halted", &"GEN", 1, &"winter"], ["starved", &"GEN", 1, 10], ["lost", &"GEN", 1, 1],
+		["disbanded", &"GEN", hex, 2]])
+	assert_true(game.events.is_empty(), "drained")

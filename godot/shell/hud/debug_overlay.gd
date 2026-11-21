@@ -17,7 +17,7 @@ const SEASON_LABELS: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
 const LOOK_CALENDAR := -1
 ## The word for each weather kind (0 calm, 1 good, 2 poor) in the economy line.
 const WEATHER_WORDS: Array[String] = ["calm", "good", "poor"]
-const MODE_WORDS: Array[String] = ["Terrain", "Owner", "Relief", "Yields", "Food"]
+const MODE_WORDS: Array[String] = ["Terrain", "Owner", "Relief", "Yields", "Food", "Supply"]
 const LAYER_SPECS: Array[Array] = [
 	[&"grid", "Grid"],
 	[&"shade", "Shade"],

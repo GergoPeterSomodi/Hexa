@@ -298,14 +298,16 @@ func test_the_pins_of_4_13() -> void:
 	assert_eq([Stats.MADE, Stats.USED, Stats.STOCK], [0, 1, 2])
 
 
-func test_events_gain_only_the_two_people_signals() -> void:
+func test_events_gain_the_army_signals_of_m6() -> void:
+	# M6 (m6-build-spec.md 5.5): the seven army signals join the M5 list.
 	var names: Array[String] = []
 	for sig: Dictionary in (load("res://shell/autoload/events.gd") as GDScript).get_script_signal_list():
 		names.append(str(sig["name"]))
 	names.sort()
-	var want: Array[String] = ["chronicled", "country_chosen", "district_declined", "game_ended", "game_started",
-		"goods_short", "hex_changed", "owners_changed", "season_ended", "tax_set", "town_grew", "work_cancelled",
-		"work_finished", "work_started"]
+	var want: Array[String] = ["army_changed", "army_disbanded", "army_raised", "army_starved", "chronicled",
+		"country_chosen", "district_declined", "game_ended", "game_started", "goods_short", "hex_changed",
+		"march_halted", "owners_changed", "season_ended", "tax_set", "town_grew", "unit_lost", "unit_moved",
+		"work_cancelled", "work_finished", "work_started"]
 	assert_eq(names, want)
 
 

@@ -1,0 +1,168 @@
+## MovePreview (docs/architecture/m6-build-spec.md sections 4.4, 4.7, 4.13, 5.6 and 6.7, L11): the reach of an army (mustering:
+## next only) and the words of a march to a hex for each kind of line: a refusal of a foreign land with its way out, a go or
+## a note for a land hex next door, and the mustering line. North Italy, Genoa (GEN) the player.
+extends GutTest
+
+var _g: Game
+
+
+func before_each() -> void:
+	_g = ArmyFixture.game()
+
+
+func _gen_hex() -> Vector2i:
+	return ArmyFixture.find_town(_g)
+
+
+func _neighbour_of_gen(hex: Vector2i) -> Vector2i:
+	var mine := ArmyFixture.id_of(_g, ArmyFixture.TAG)
+	for d: int in 6:
+		var beside := ImproveRules.neighbour(hex, d)
+		if _g.map.is_land(beside) and Territory.owner_id(_g, beside) == mine:
+			return beside
+	return ArmyFixture.NO_HEX
+
+
+## A land hex of another country (not Genoa's, not unowned), or NO_HEX.
+func _foreign_land() -> Vector2i:
+	var mine := ArmyFixture.id_of(_g, ArmyFixture.TAG)
+	for i: int in _g.map.hex_count():
+		var owner := int(_g.state.owner[i])
+		if _g.map.land[i] == 1 and owner > 0 and owner != mine:
+			return _g.map.hex_of(i)
+	return ArmyFixture.NO_HEX
+
+
+func test_reach_of_a_walking_army_holds_its_own_hex_and_grows_next_season() -> void:
+	var hex := _gen_hex()
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 1)
+	var r := MovePreview.reach(_g, ArmyFixture.TAG, a.id)
+	var own := _g.map.index_of(hex)
+	assert_true((r.season as PackedInt32Array).has(own), "the army stands on its own hex at the season's end")
+	assert_true((r.next as PackedInt32Array).size() >= (r.season as PackedInt32Array).size(),
+		"the next season's reach holds the season's")
+
+
+func test_reach_of_a_mustering_army_is_next_only() -> void:
+	var hex := _gen_hex()
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 1, _g.turn)
+	var r := MovePreview.reach(_g, ArmyFixture.TAG, a.id)
+	assert_true((r.season as PackedInt32Array).is_empty(), "a mustering army has no reach this season")
+	assert_false((r.next as PackedInt32Array).is_empty(), "but it has one for next season")
+
+
+func test_reach_of_a_foreign_army_is_empty_for_the_player() -> void:
+	var foreign := ArmyFixture.army(_g, ArmyFixture.other_tag(_g), _foreign_land(), 0, 1)
+	var r := MovePreview.reach(_g, ArmyFixture.TAG, foreign.id)
+	assert_true((r.season as PackedInt32Array).is_empty(), "P: another country's army has no reach for the player")
+	assert_true((r.next as PackedInt32Array).is_empty())
+	assert_true((MovePreview.reach(_g, &"", foreign.id).next as PackedInt32Array).is_empty(), "no viewer, no reach")
+
+
+func test_refusal_of_an_unknown_owner_does_not_name_it() -> void:
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _gen_hex(), 0, 1)
+	var goal := _unknown_owner_land()
+	assert_ne(goal, ArmyFixture.NO_HEX, "the map has a foreign hex of a country Genoa neither knows nor explored")
+	var p := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
+	var owner := Territory.owner_tag(_g, goal)
+	assert_eq(p.lines[0][0], "not your land: another country holds it, and your armies cross no border in peace",
+		"P: the owner is not named")
+	assert_false(str(p.lines[0][0]).contains(str(owner)), "the owner's tag and name stay out of it")
+	assert_false(str(p.verdict.reason).contains("the the"), "no doubled article")
+
+
+func test_refusal_of_a_known_explored_owner_names_it_once() -> void:
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _gen_hex(), 0, 1)
+	var goal := _known_explored_land()
+	assert_ne(goal, ArmyFixture.NO_HEX, "a foreign hex of a known country Genoa has explored")
+	var owner := Territory.owner_tag(_g, goal)
+	var p := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
+	var named := "%s holds it" % Words.country_the(_g, owner)
+	assert_true(str(p.lines[0][0]).begins_with("not your land: " + named), "the owner is named by the word helper: %s" % str(p.lines[0][0]))
+	assert_false(str(p.lines[0][0]).contains("the the"), "the article is not doubled")
+
+
+## A land hex of a country the player does not know, or NO_HEX.
+func _unknown_owner_land() -> Vector2i:
+	for i: int in _g.map.hex_count():
+		var owner := int(_g.state.owner[i])
+		if _g.map.land[i] == 1 and owner > 0 and not Knowledge.knows(_g, ArmyFixture.TAG, Countries.by_id(_g, owner).tag):
+			return _g.map.hex_of(i)
+	return ArmyFixture.NO_HEX
+
+
+## A land hex of a known foreign country that the player has explored, or NO_HEX.
+func _known_explored_land() -> Vector2i:
+	var mine := ArmyFixture.id_of(_g, ArmyFixture.TAG)
+	for i: int in _g.map.hex_count():
+		var owner := int(_g.state.owner[i])
+		if _g.map.land[i] != 1 or owner <= 0 or owner == mine:
+			continue
+		var hex := _g.map.hex_of(i)
+		if Knowledge.knows(_g, ArmyFixture.TAG, Countries.by_id(_g, owner).tag) and Sight.explored(_g, ArmyFixture.TAG, hex):
+			return hex
+	return ArmyFixture.NO_HEX
+
+
+func test_refusal_of_a_foreign_land_gives_the_way_out() -> void:
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _gen_hex(), 0, 1)
+	var goal := _foreign_land()
+	assert_ne(goal, ArmyFixture.NO_HEX)
+	var p := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
+	assert_false(bool(p.verdict.ok))
+	assert_eq(p.kind, &"refusal")
+	assert_true(str(p.lines[0][0]).begins_with("not your land"), "the reason is the first line")
+	assert_eq(p.lines[0][1], &"bad")
+	assert_eq(p.way_out, "Go round their land.")
+	assert_true((p.hexes as Array).is_empty(), "no route for a refusal")
+
+
+func test_a_march_to_a_neighbour_arrives_with_stops_and_a_kind() -> void:
+	var hex := _gen_hex()
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 1)
+	var goal := _neighbour_of_gen(hex)
+	var p := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
+	assert_true(bool(p.verdict.ok), "the march is allowed: %s" % str(p.verdict.reason))
+	assert_true(p.kind == &"go" or p.kind == &"note", "a march is go or note")
+	assert_eq((p.hexes as Array).back(), goal, "the goal is the last hex of the route")
+	assert_true(int(p.arrives_turn) >= _g.turn)
+	assert_true(int(p.seasons) >= 1)
+	assert_eq((p.stops as Array).size(), int(p.seasons), "one stop per season walked")
+	assert_true(str(p.arrives_text).begins_with("There in "))
+	assert_eq(p.way_out, "")
+
+
+func test_a_mustering_army_gets_the_musters_first_line_and_a_note() -> void:
+	var hex := _gen_hex()
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 1, _g.turn)
+	var goal := _neighbour_of_gen(hex)
+	var p := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
+	assert_true(bool(p.verdict.ok))
+	assert_eq(p.kind, &"note")
+	var texts: Array = []
+	for line: Array in p.lines:
+		texts.append(str(line[0]))
+	assert_true(texts.any(func(t: String) -> bool: return t.begins_with("Musters first")), "the musters line is there")
+
+
+func test_supply_end_of_a_goal_in_supply_is_good() -> void:
+	var hex := _gen_hex()
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 1)
+	var goal := _neighbour_of_gen(hex)
+	var p := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
+	var end := p.supply_end as Dictionary
+	assert_eq(bool(end.in_supply), Supply.in_supply(_g, ArmyFixture.TAG, goal, Calendar.is_winter(int(p.arrives_turn))))
+	if bool(end.in_supply):
+		assert_eq(int(end.loss), 0)
+	else:
+		assert_true(str((p.lines as Array).back()[0]).begins_with("Out of supply"))
+
+
+func test_preview_is_cached_and_equal_on_a_second_ask() -> void:
+	var hex := _gen_hex()
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 1)
+	var goal := _neighbour_of_gen(hex)
+	var first := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
+	var second := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
+	assert_eq(first.hexes, second.hexes)
+	assert_eq(first.kind, second.kind)

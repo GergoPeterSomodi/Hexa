@@ -488,13 +488,13 @@ becomes: M3's rule, **or** `viewer` has explored a hex `other` holds.
 
 | Kind | Fields | Emitted by | Notable | Typed signal | Heard by |
 |---|---|---|---|---|---|
-| `army_raised` | `tag`, `hex`, `army`, `units` (ids), `kind`, `count`, `men`, `ducats`, `goods` ({key: loads}), `witnesses` | `Military.raise` | yes | `army_raised(tag, hex, army)` | `ArmyTokens`, `ArmyPanel`, `RaiseList`, `ResourceChips`, task flag; through `chronicled`: log, notifications (others'), ribbons ("Raised") |
-| `army_disbanded` | `tag`, `hex`, `army`, `units`, `men`, `refund`, `witnesses` | `Military.disband` | yes | `army_disbanded(tag, hex, army)` | `ArmyTokens`, `ArmyPanel`, `RaiseList`, chips; log |
+| `army_raised` | `tag`, `hex`, `army`, `units` (ids), `kind_id` (the unit kind; `kind` is the event's own key), `count`, `men`, `ducats`, `goods` ({key: loads}), `name` (the army's), `witnesses` | `Military.raise` | yes | `army_raised(tag, hex, army)` | `ArmyTokens`, `ArmyPanel`, `RaiseList`, `ResourceChips`, task flag; through `chronicled`: log, notifications (others'), ribbons ("Raised") |
+| `army_disbanded` | `tag`, `hex`, `army`, `units`, `men`, `refund`, `name`, `kind_id` (only when every company dropped is one kind), `witnesses` | `Military.disband` | yes | `army_disbanded(tag, hex, army)` | `ArmyTokens`, `ArmyPanel`, `RaiseList`, chips; log |
 | `army_changed` | `tag`, `hex`, `army`, `gone` (bool) | `split_army`, `merge_armies`, `march`, `halt`, `continue_march`, `Military.refill` | no | `army_changed(tag, army)` | `ArmyTokens`, `ArmyPanel`, `PathMarks`, the reach layers, task flag, chips |
 | `unit_moved` | `tag`, `army`, `path` (hexes, start first), `ticks` (the tick of each step), `seen` (`PackedByteArray`: 1 where `game.player` saw the step's hex or the army is the player's; all 1 when `game.player` is `&""`), `witnesses`, `arrived` | the movement phase | no | `unit_moved(tag, army, path, seen, ticks)` | `MoveReplay`, `ArmyTokens`, F3 |
-| `march_halted` | `tag`, `army`, `hex`, `why` (`winter`, `blocked`, `no_way`), `reason`, `waits` (bool), `witnesses: [tag]` | the movement phase | yes | `march_halted(tag, army, why)` | `ArmyPanel`, task flag; log, notifications |
-| `army_starved` | `tag`, `army`, `hex`, `lost`, `men` (left), `why` (`out_of_supply`, `stores_empty`), `witnesses` | the supply phase | yes | `army_starved(tag, army, lost)` | `ArmyTokens`, `ArmyPanel`, chips; log, notifications, ribbons ("Hunger −100") |
-| `unit_lost` | `tag`, `army`, `unit`, `kind`, `hex`, `why` (`starved`; M7 `battle`), `army_left` (units left), `witnesses` | `Armies.lose_men` | yes | `unit_lost(tag, army, unit)` | `ArmyTokens`, `ArmyPanel`, chips; log, notifications |
+| `march_halted` | `tag`, `army`, `hex`, `why` (`winter`, `blocked`, `no_way`), `reason`, `waits` (bool), `name`, `witnesses: [tag]` | the movement phase | yes | `march_halted(tag, army, why)` | `ArmyPanel`, task flag; log, notifications |
+| `army_starved` | `tag`, `army`, `hex`, `lost`, `men` (left), `why` (`out_of_supply`, `stores_empty`), `name`, `witnesses` | the supply phase | yes | `army_starved(tag, army, lost)` | `ArmyTokens`, `ArmyPanel`, chips; log, notifications, ribbons ("Hunger −100") |
+| `unit_lost` | `tag`, `army`, `unit`, `kind_id`, `hex`, `why` (`starved`; M7 `battle`), `army_left` (units left), `name`, `witnesses` | `Armies.lose_men` | yes | `unit_lost(tag, army, unit)` | `ArmyTokens`, `ArmyPanel`, chips; log, notifications |
 
 `Chronicle.NOTABLE` gains the five notable kinds (fourteen). `SeasonSummary.COVERED` gains `army_starved` and `unit_lost`
 (their toasts drop while a season runs; the report holds them).
@@ -1659,6 +1659,7 @@ walk by id, hexes by index). **Save round trip:** `test_snapshot`, `test_save_fi
 | Saves grow with routes and explored bitsets | `save_mb` nightly | routes rebuilt on load (a re-plan) |
 | Cold supply fields on Europe with armies: about 2.3 s on the first season with armies (the field of every country from cold, each a multi-source search over its land) | the perf rig's first army season (review of L8; issue to be filed) | the fields only for countries with armies, and a field keyed on the owner bytes kept across seasons |
 | Stats army series read this season's chronicle (`army_raised`, `army_starved`) and fall short when the chronicle trims its 3,000 entries inside one season (review of L8; issue to be filed) | a season with 3,100 later notable events after a raise (the review's repro) | the armies' counts kept on the stats row at the event, not read back from the chronicle |
+| Armed previews cost more (L10): `EconomyPreview.with(game, tag, {}, 8)` on a country with two armies, cold, is +2.6 ms over 1.5 ms on the small rig (one supply field built per version; the Europe armies rig is not measured) | a `with(8)` row on the army rig of `probe_preview_perf.gd` (L10 probe, 2026-11-21) | the supply field memoised across a version in the view cache; the armed run only for countries with armies |
 
 ---
 

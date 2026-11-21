@@ -4,9 +4,21 @@
 class_name MapModes
 extends RefCounted
 
-enum Mode { TERRAIN, OWNER, RELIEF, YIELDS, FOOD }  # keys 1 to 5
+enum Mode { TERRAIN, OWNER, RELIEF, YIELDS, FOOD, SUPPLY }  # keys 1 to 6
 ## The values of the setting state/map_mode, by Mode.
-const MODE_KEYS: Array[StringName] = [&"terrain", &"owner", &"relief", &"yields", &"food"]
+const MODE_KEYS: Array[StringName] = [&"terrain", &"owner", &"relief", &"yields", &"food", &"supply"]
+
+## The Supply mode (docs/architecture/m6-build-spec.md 6.6, SupplyView's bytes): bytes 1 to 6 in SUPPLY_COLOURS, 0 the veil.
+const SUPPLY_ALPHA := 0.70
+## The sight veil over the land nobody of the viewer's sees (A13), laid over every mode when the setting is on.
+const SIGHT_VEIL_ALPHA := 0.25
+const SUPPLY_COLOURS: Array[Color] = [Color("#a8321a"), Color("#c8664c"), Color("#e2b97a"), Color("#9cb3d6"),
+	Color("#4f79b8"), Color("#1f3f7a")]
+## The legend's words for bytes 2 to 6 (index byte - 2).
+const SUPPLY_WORDS: Array[String] = ["Out of supply, the land feeds a few", "Out of supply, the land feeds an army",
+	"In supply until winter", "In supply", "A depot (a village or larger, a port)"]
+const SUPPLY_TITLE := "Supply: where your armies are fed"
+const SUPPLY_STARVING := "Out of supply, starving"
 
 const TINT_ALPHA := 0.14
 const OWNER_ALPHA := 0.55
@@ -64,6 +76,7 @@ const DELTA_ALPHA := 0.35
 static var _cached_ramp := PackedColorArray()
 static var _cached_yield_ramp := PackedColorArray()
 static var _cached_food_ramp := PackedColorArray()
+static var _cached_supply_ramp := PackedColorArray()
 
 
 ## The Mode of a state/map_mode value; -1 when unknown.
@@ -186,6 +199,54 @@ static func food_ramp() -> PackedColorArray:
 	return _cached_food_ramp.duplicate()
 
 
+## One byte a hex of the viewer's Supply mode (SupplyView.bytes, 6.6). Pinned in the view cache (R3 d): a whole-map array is
+## not kept under the version. Keyed by the season, the owners, the settlements, the levels and the people.
+static func supply_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	if game == null or game.map == null or game.state == null:
+		return PackedByteArray()
+	var key: Array = [&"supply", viewer, game.turn, hash(game.state.owner), hash(game.state.main_use),
+		hash(game.state.level), hash(game.state.people), game.map.hex_count()]
+	return game.view_cache.pinned(&"supply_bytes", key, func() -> PackedByteArray: return SupplyView.bytes(game, viewer)) as PackedByteArray
+
+
+## One byte a hex: 1 where the viewer sees it, 0 where not (land only matters to the veil). Pinned by the sight revision
+## (R3 d). Everything is seen for the viewer "" and for a game without countries; nothing for a country with no sight.
+static func sight_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	if game == null or game.map == null or game.state == null:
+		return PackedByteArray()
+	var key: Array = [&"sight", viewer, game.sight.revision(), hash(game.state.owner), game.map.hex_count()]
+	return game.view_cache.pinned(&"sight_bytes", key, func() -> PackedByteArray: return _make_sight_bytes(game, viewer)) as PackedByteArray
+
+
+static func _make_sight_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	var n := game.map.hex_count()
+	var out := PackedByteArray()
+	out.resize(n)
+	if viewer == &"" or not game.has_countries():
+		out.fill(1)
+		return out
+	out.fill(0)
+	var c := Countries.by_tag(game, viewer)
+	if c == null:
+		return out
+	var land: PackedByteArray = game.sight.land_of(game, c.id)
+	var armies: PackedByteArray = game.sight.armies_of(c.id)
+	for i: int in n:
+		if SightCache.bit_is(land, i) or SightCache.bit_is(armies, i):
+			out[i] = 1
+	return out
+
+
+## 256-entry colours by Supply byte: [0] clear, [1..6] SUPPLY_COLOURS, the rest clear.
+static func supply_ramp() -> PackedColorArray:
+	if _cached_supply_ramp.size() != PALETTE_SIZE:
+		_cached_supply_ramp.resize(PALETTE_SIZE)
+		_cached_supply_ramp.fill(Color(0.0, 0.0, 0.0, 0.0))
+		for b: int in SUPPLY_COLOURS.size():
+			_cached_supply_ramp[b + 1] = SUPPLY_COLOURS[b]
+	return _cached_supply_ramp.duplicate()
+
+
 ## 256-entry colours by Yields byte: [0] clear, [1..9] YIELD_COLOURS, the rest clear.
 static func yield_ramp() -> PackedColorArray:
 	if _cached_yield_ramp.size() != PALETTE_SIZE:
@@ -203,6 +264,8 @@ static func legend_title(mode: int) -> String:
 			return "Yields: worth a year"
 		Mode.FOOD:
 			return "Food: made less eaten, a year"
+		Mode.SUPPLY:
+			return SUPPLY_TITLE
 	return ""
 
 
@@ -210,6 +273,12 @@ static func legend_title(mode: int) -> String:
 ## for FOOD the bands top first, the two shortfalls striped, then "Not your land"; [] for the other modes.
 static func legend(mode: int) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	if mode == Mode.SUPPLY:
+		for b: int in range(6, 1, -1):
+			out.append({"colour": SUPPLY_COLOURS[b - 1], "text": SUPPLY_WORDS[b - 2], "stripes": false})
+		out.append({"colour": SUPPLY_COLOURS[0], "text": SUPPLY_STARVING, "stripes": true})
+		out.append({"colour": VEIL, "text": "Not your land", "stripes": false})
+		return out
 	if mode == Mode.FOOD:
 		for b: int in range(8, 2, -1):
 			out.append({"colour": FOOD_COLOURS[b - 1], "text": FOOD_WORDS[b - 3], "stripes": false})
@@ -292,10 +361,49 @@ static func palette_from(colours: PackedColorArray, unowned: Color) -> PackedCol
 
 
 ## Fragment colour for one (owner_id, height_byte) pair; matches mode_overlay.gdshader.
+## The sight veil (A13): with `veil_on` and `seen` 0 on land, the veil goes over the mode's colour by source-over, unless the
+## mode already drew its own veil (byte 0 of Yields, Food or Supply).
 static func colour_of(mode: int, owner_id: int, height_byte: int, palette: PackedColorArray,
-		tint_on: bool, hot_id: int, yield_byte: int = 0, food_byte: int = 0) -> Color:
+		tint_on: bool, hot_id: int, yield_byte: int = 0, food_byte: int = 0, supply_byte: int = 0,
+		seen: int = 1, veil_on: bool = false) -> Color:
 	if height_byte <= 0:
 		return Color(0.0, 0.0, 0.0, 0.0)
+	var c := _mode_colour(mode, owner_id, height_byte, palette, tint_on, hot_id, yield_byte, food_byte, supply_byte)
+	if veil_on and seen == 0 and not _veil_by_mode(mode, yield_byte, food_byte, supply_byte):
+		return _veiled(c)
+	return c
+
+
+## True when the mode draws the veil itself at this byte (Yields, Food or Supply at 0 or past its colours).
+static func _veil_by_mode(mode: int, yield_byte: int, food_byte: int, supply_byte: int) -> bool:
+	match mode:
+		Mode.YIELDS:
+			return yield_byte <= 0 or yield_byte > YIELD_COLOURS.size()
+		Mode.FOOD:
+			return food_byte <= 0 or food_byte > FOOD_COLOURS.size()
+		Mode.SUPPLY:
+			return supply_byte <= 0 or supply_byte > SUPPLY_COLOURS.size()
+	return false
+
+
+## The sight veil laid over `c` by source-over: a = av + am (1 - av), rgb = (VEIL av + c am (1 - av)) / a.
+static func _veiled(c: Color) -> Color:
+	var av := SIGHT_VEIL_ALPHA
+	var am := c.a
+	var a := av + am * (1.0 - av)
+	var r := (VEIL.r * av + c.r * am * (1.0 - av)) / a
+	var g := (VEIL.g * av + c.g * am * (1.0 - av)) / a
+	var b := (VEIL.b * av + c.b * am * (1.0 - av)) / a
+	return Color(r, g, b, a)
+
+
+static func _mode_colour(mode: int, owner_id: int, height_byte: int, palette: PackedColorArray,
+		tint_on: bool, hot_id: int, yield_byte: int, food_byte: int, supply_byte: int) -> Color:
+	if mode == Mode.SUPPLY:  # no hover highlight: the colour says the supply
+		if supply_byte <= 0 or supply_byte > SUPPLY_COLOURS.size():
+			return Color(VEIL.r, VEIL.g, VEIL.b, VEIL_ALPHA)
+		var sc := SUPPLY_COLOURS[supply_byte - 1]
+		return Color(sc.r, sc.g, sc.b, SUPPLY_ALPHA)
 	if mode == Mode.YIELDS:  # no hover highlight: the colour says the worth
 		if yield_byte <= 0 or yield_byte > YIELD_COLOURS.size():
 			return Color(VEIL.r, VEIL.g, VEIL.b, VEIL_ALPHA)
@@ -331,12 +439,12 @@ static func colour_of(mode: int, owner_id: int, height_byte: int, palette: Packe
 	return Color(base.r, base.g, base.b, alpha)
 
 
-## Available map modes for `game`: `[TERRAIN, OWNER, RELIEF]`, omitting `OWNER` in a map-only game, and adding `YIELDS` and `FOOD`
-## when the game has countries and a chosen player.
+## Available map modes for `game`: `[TERRAIN, OWNER, RELIEF]`, omitting `OWNER` in a map-only game, and adding `YIELDS`, `FOOD`
+## and `SUPPLY` when the game has countries and a chosen player.
 static func modes(game: Game) -> Array[int]:
 	if game != null and game.has_countries():
 		if game.player != &"":
-			return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF, Mode.YIELDS, Mode.FOOD]
+			return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF, Mode.YIELDS, Mode.FOOD, Mode.SUPPLY]
 		return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF]
 	return [Mode.TERRAIN, Mode.RELIEF]
 
@@ -352,7 +460,7 @@ static func palette(game: Game, colour_blind: bool) -> PackedColorArray:
 
 ## Overlay colour for `hex` in `game`, matching `colour_of` and `mode_overlay.gdshader`.
 static func colour_at(game: Game, mode: int, hex: Vector2i, pal: PackedColorArray,
-		tint_on: bool, hot_id: int) -> Color:
+		tint_on: bool, hot_id: int, veil_on: bool = false) -> Color:
 	if game == null or game.map == null or not game.map.has(hex):
 		return Color(0.0, 0.0, 0.0, 0.0)
 	var idx := game.map.index_of(hex)
@@ -366,7 +474,15 @@ static func colour_at(game: Game, mode: int, hex: Vector2i, pal: PackedColorArra
 	if mode == Mode.FOOD and height_byte > 0:
 		var fbytes := food_bytes(game, game.player)
 		food_byte = int(fbytes[idx]) if idx < fbytes.size() else 0
-	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id, yield_byte, food_byte)
+	var supply_byte := 0
+	if mode == Mode.SUPPLY and height_byte > 0:
+		var sbytes := supply_bytes(game, game.player)
+		supply_byte = int(sbytes[idx]) if idx < sbytes.size() else 0
+	var seen := 1
+	if veil_on and height_byte > 0:
+		var seen_bytes := sight_bytes(game, game.player)
+		seen = int(seen_bytes[idx]) if idx < seen_bytes.size() else 0
+	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id, yield_byte, food_byte, supply_byte, seen, veil_on)
 
 
 static func _height_byte_at(map: MapData, idx: int) -> int:
