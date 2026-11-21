@@ -292,6 +292,7 @@ func _seasons(game: Game) -> bool:
 	_r["production_ms"] = worst[&"production"]
 	_r["income_ms"] = worst[&"income"]
 	_r["works_phase_ms"] = worst[&"works"]
+	_r["people_ms"] = worst[&"people"]
 	_r["stats_phase_ms"] = worst[&"stats"]
 	_r["stats_ms_per_country"] = float(worst[&"stats"]) / float(maxi(game.countries.size(), 1))
 	return true
@@ -387,9 +388,9 @@ func _markdown(limit_rows: String) -> String:
 		COLS, ROWS, _r["hexes"], _r["countries"], SEED]
 	s += "Built: map %.0f ms, scenario and game %.0f ms; %d works begun (%d under way at the start); the largest country is %s with %d hexes.\n\n" % [
 		_r["map_build_ms"], _r["scenario_build_ms"], _r["works_begun"], _r["works_at_start"], _r.get("largest", "?"), _r["largest_hexes"]]
-	s += "| Season | works under way | works ms | stats ms | calendar ms | whole ms |\n|---|---|---|---|---|---|\n"
+	s += "| Season | works under way | works ms | people ms | stats ms | calendar ms | whole ms |\n|---|---|---|---|---|---|---|\n"
 	for row: Dictionary in _r.get("seasons", []):
-		s += "| %d | %d | %.2f | %.2f | %.2f | %.2f |\n" % [row["season"], row["works"], row["works_ms"], row["stats_ms"],
+		s += "| %d | %d | %.2f | %.2f | %.2f | %.2f | %.2f |\n" % [row["season"], row["works"], row["works_ms"], row["people_ms"], row["stats_ms"],
 			row["calendar_ms"], row["total_ms"]]
 	s += "\nStats phase: %.3f ms a country. Save and load: digest matches %s.\n" % [
 		_r.get("stats_ms_per_country", 0.0), str(_r.get("load_digest_matches", false))]

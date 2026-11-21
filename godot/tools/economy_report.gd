@@ -1,6 +1,7 @@
 ## The economy report (docs/architecture/m4-build-plan.md N10): plays seasons of "Italy, 1480" for a seed, with no actions or
 ## seeded random ones for every country, and prints per country the treasury, the season's income lines added up over the
-## run and the goods in store. For Opus's review of the numbers (spec 4.2 to 4.12) and the owner. Headless, no GUT.
+## run and the goods in store, and (M5) a second table of the people: people and towns at the start and the end, the people
+## that starved, the seasons the towns went hungry, the levels gained and lost. For Opus's review of the numbers (spec 4.2 to 4.12) and the owner. Headless, no GUT.
 ##
 ##   godot --headless --path godot -s res://tools/economy_report.gd -- [--seed=1480 | --seeds=1480-1484] [--seasons=12]
 ##       [--actions=none|random] [--weather=real|calm]
@@ -47,15 +48,28 @@ func _report(seed_value: int) -> String:
 	luck.seed_with(seed_value)
 	var start := {}
 	var sums := {}
+	var people := {}
 	for c: Country in g.countries:
 		start[c.tag] = c.treasury
 		sums[c.tag] = {}
+		people[c.tag] = {"people": _people(g, c.id, false), "towns": _people(g, c.id, true), "hungry": 0, "starved": 0, "gained": 0, "lost": 0}
 	for n: int in _seasons:
 		if _random:
 			for c: Country in g.countries:
 				_act(g, c, luck, n)
+		g.events.clear()
 		Season.run(g)
+		for e: Dictionary in g.events:
+			var kind := str(e.get("kind", ""))
+			if (kind == "town_grew" or kind == "district_declined") and people.has(e["tag"]):
+				var counts := people[e["tag"]] as Dictionary
+				counts["gained" if kind == "town_grew" else "lost"] += 1
 		for c: Country in g.countries:
+			var counts := people[c.tag] as Dictionary
+			if c.food_fed < 1000:
+				counts["hungry"] += 1
+			if c.people_closed.has("flows"):
+				counts["starved"] -= int((c.people_closed["flows"] as PackedInt32Array)[People.STARVED])
 			for line: Dictionary in c.ledger_closed["lines"] as Array:
 				var d := sums[c.tag] as Dictionary
 				d[line["why"]] = int(d.get(line["why"], 0)) + int(line["amount"])
@@ -71,7 +85,24 @@ func _report(seed_value: int) -> String:
 		row.append(EconomySeason.TAX_NAMES[c.tax])
 		row.append(_stores(g, c))
 		text += "| " + " | ".join(row) + " |\n"
+	text += "\n| Tag | people start | people end | towns start | towns end | starved | hungry seasons | levels gained | levels lost | grain | fish | fed now |\n"
+	text += "|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+	var grain := g.defs.good_id(&"grain")
+	var fish := g.defs.good_id(&"fish")
+	for c: Country in g.countries:
+		var p := people[c.tag] as Dictionary
+		text += "| %s | %d | %d | %d | %d | %d | %d of %d | %d | %d | %d | %d | %d |\n" % [String(c.tag), p["people"], _people(g, c.id, false),
+			p["towns"], _people(g, c.id, true), p["starved"], p["hungry"], _seasons, p["gained"], p["lost"], c.stock[grain], c.stock[fish], c.food_fed]
 	return text
+
+
+## The people of a country's land (or of its settlements only).
+func _people(g: Game, id: int, towns_only: bool) -> int:
+	var total := 0
+	for i: int in g.map.hex_count():
+		if g.map.land[i] == 1 and int(g.state.owner[i]) == id and (not towns_only or g.state.main_use[i] == Economy.SETTLEMENTS):
+			total += g.state.people[i]
+	return total
 
 
 func _stores(g: Game, c: Country) -> String:
