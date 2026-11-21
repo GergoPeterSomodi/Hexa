@@ -1,7 +1,7 @@
 ## Times the people rules on the made-up Europe (docs/architecture/m5-build-spec.md 5.0 R2, 8 and 10; task P4): the production
 ## phase with the people read live (budget 70 ms), the people phase (People.season, budget 30 ms), the walk People.active
 ## and the live part of the season profile on their own, over seasons played with the people phase between works and stats,
-## as P5's season table will run it. Headless, no window, no GUT. A probe: it prints a table and fails on nothing.
+## as Season.PHASES runs it. Headless, no window, no GUT. A probe: it prints a table and fails on nothing.
 ##
 ##   godot --headless --path godot -s res://tools/probes/probe_people_perf.gd -- [--seasons=8] [--cols=494 --rows=247 --countries=60]
 ## A smaller world (say --cols=247 --rows=124 --countries=15) builds in a minute and scales close to linearly.
@@ -106,8 +106,7 @@ func _run() -> int:
 		People.season(game)
 		people.append(_ms(t))
 		t = Time.get_ticks_usec()
-		Season.run_phase(game, &"stats")
-		People.close(game)
+		Season.run_phase(game, &"stats")  # People.close runs inside it
 		stats.append(_ms(t))
 		t = Time.get_ticks_usec()
 		Season.run_phase(game, &"calendar")

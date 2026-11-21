@@ -27,6 +27,7 @@ static func season(game: Game) -> void:
 		stats.append_year()
 	Treasury.close_ledger(game)
 	Stores.close(game)
+	People.close(game)  # after the rows are written: they read the season's open flows
 
 
 ## The values as the phase would write them for one country now; empty for an unknown tag.
@@ -79,6 +80,9 @@ static func _rows(game: Game, stats: Stats) -> Array[PackedInt32Array]:
 		r.fill(0)
 		rows.append(r)
 	var land_col := Stats.column("land")
+	var people_col := Stats.column("people")
+	var towns_col := Stats.column("people_towns")
+	var has_people := game.state != null and game.state.people.size() == game.state.owner.size()
 	var by_owner := _by_owner(game)
 	if game.map != null and game.state != null:
 		var n := mini(game.map.hex_count(), game.state.owner.size())
@@ -92,6 +96,10 @@ static func _rows(game: Game, stats: Stats) -> Array[PackedInt32Array]:
 					continue
 			rows[c][land_col] += 1
 			var family := int(game.state.main_use[i])
+			if has_people:
+				rows[c][people_col] += game.state.people[i]
+				if family == People.SETTLEMENTS:
+					rows[c][towns_col] += game.state.people[i]
 			if family >= 1 and family < FamilyIds.COUNT:
 				rows[c][Stats.DISTRICTS_FIRST + family - 1] += 1
 	var running_col := Stats.column("works_running")
@@ -110,13 +118,21 @@ static func _rows(game: Game, stats: Stats) -> Array[PackedInt32Array]:
 			if c >= 0:
 				rows[c][finished_col] += 1
 	if by_owner:
-		var held := SeasonProfile.table(game) if game.defs != null and game.state != null else {}
 		for c: int in mini(game.countries.size(), rows.size()):
 			_money_into(game, game.countries[c], rows[c])
-			if game.defs != null and game.state != null:
-				var live := SeasonProfile.live(game, held, game.countries[c].id)
-				rows[c][Stats.column("people")] = int(live["town"]) + int(live["rest"])
+			_people_into(game.countries[c], rows[c])
 	return rows
+
+
+## The M5 series of one country from its open people flows: what grew, what starved and what left (as positive numbers),
+## and the towns' food need of the season.
+static func _people_into(country: Country, row: PackedInt32Array) -> void:
+	var flows := country.people_flows
+	if flows.size() >= People.FLOWS.size():
+		row[Stats.column("people_grew")] = flows[People.GREW]
+		row[Stats.column("people_starved")] = -flows[People.STARVED]
+		row[Stats.column("people_left")] = -flows[People.LEFT]
+	row[Stats.column("food_need")] = country.food_need
 
 
 ## The M4 series of one country from its open ledger (what close_ledger is about to close) and its open flows.

@@ -28,7 +28,7 @@ func after_each() -> void:
 
 ## `calm` forces calm weather (the save round trip: Snapshot carries the weather from N5 on); false plays the real odds.
 func _new_game(calm: bool = true) -> Game:
-	var defs := EconomyFixture.defs(calm)
+	var defs := EconomyFixture.defs(calm, false)  # the people really change (M5)
 	var g := Game.new_scenario(load(MAP_PATH) as MapData, defs, defs.scenarios[defs.scenarios.size() - 1], SEED)
 	assert_true(bool(g.act("choose_country", {"tag": TAG})["ok"]))
 	return g
@@ -74,6 +74,40 @@ func _check_state(g: Game, seasons_done: int) -> void:
 		seen[w.hex] = true
 	assert_eq(g.stats.count, seasons_done, "stats.count, " + label)
 	assert_lte(g.chronicle.entries.size(), Chronicle.KEEP, "the chronicle is bounded, " + label)
+	_check_people(g, label)
+
+
+## The people invariants (m5-build-spec.md 4.12, done-when 2 and 3): no hex under 0 or past the cap, none at sea; for every
+## country the change of its people over the season ended equals its closed flows; the stats people are the sum.
+func _check_people(g: Game, label: String) -> void:
+	var state := g.state
+	var by_owner := {}
+	var world_change := 0
+	var world_flows := 0
+	for i: int in g.map.hex_count():
+		var p := int(state.people[i])
+		assert_gte(p, 0, "no hex below 0, " + label)
+		assert_lte(p, People.PEOPLE_MAX, "the cap, " + label)
+		if g.map.land[i] == 0:
+			assert_eq(p, 0, "no people at sea, " + label)
+		var id := int(state.owner[i])
+		by_owner[id] = int(by_owner.get(id, 0)) + int(state.people_end[i]) - int(state.people_start[i])
+		world_change += int(state.people_end[i]) - int(state.people_start[i])
+		assert_eq(p, int(state.people_end[i]), "the season just closed: people equal people_end, " + label)
+	for c: Country in g.countries:
+		var flows: PackedInt32Array = c.people_closed["flows"]
+		var sum := 0
+		for f: int in flows:
+			sum += f
+		world_flows += sum
+		assert_eq(int(by_owner.get(c.id, 0)), sum, "%s: the change equals the closed flows, %s" % [c.tag, label])
+		assert_eq(c.people_flows.count(0), c.people_flows.size(), "the open flows start again from zero, " + label)
+	assert_eq(world_change, world_flows, "the world's change is the sum of the flows, " + label)
+	var live := 0
+	for i: int in g.map.hex_count():
+		if int(state.owner[i]) == Countries.by_tag(g, TAG).id:
+			live += int(state.people[i])
+	assert_eq(g.stats.value(TAG, g.turn - 1, "people"), live, "the stats people, " + label)
 
 
 ## Every tracked work that is gone must have finished in the turn promised (a cancelled one is dropped from the list);

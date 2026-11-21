@@ -619,7 +619,9 @@ func _assert_invariants(
 				_player_game = game
 				_player_seen = game.player
 			assert_eq(game.player, _player_seen, "%s: the player never changes after the pick" % tag)
-		for hex: Vector2i in _changed_hexes:
+		# A season's people phase changes other countries' hexes too (a village grows, a town falls): only a step that ended no
+		# season has hexes that a works action of the player changed.
+		for hex: Vector2i in ([] if int(_n.get("seasons", 0)) > _step_seasons else _changed_hexes):
 			assert_eq(Territory.owner_tag(game, hex), game.player,
 				"%s: an accepted works action on %s is on the player's land" % [tag, str(hex)])
 

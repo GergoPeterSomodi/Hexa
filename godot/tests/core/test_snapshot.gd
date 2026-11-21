@@ -365,3 +365,97 @@ func test_p_old_and_damaged_economy_fields() -> void:
 		var r := _restore(body)
 		assert_null(r["game"], str(item))
 		assert_eq(r["problem"], "Cannot be read", str(item))
+
+
+
+# ----- M5: the people (m5-build-spec.md 4.18, 5.0 A4) ---------------------------------------------------------------------
+
+
+## A game whose people really changed: growth for a few seasons and a developer change in the log.
+func _people_game() -> Game:
+	var g := PeopleFixture.genoa()
+	assert_true(g.dev_people(Vector2i(6, 13), 2100))
+	for _n: int in 3:
+		Season.run(g)
+	return g
+
+
+func _people_body() -> Dictionary:
+	var g := _people_game()
+	_people_map = g.map
+	_people_defs = g.defs
+	return _through_bytes(Snapshot.of(g))
+
+
+var _people_map: MapData = null
+var _people_defs: GameDefs = null
+
+
+func _people_refused(body: Dictionary, label: String) -> void:
+	var r := Snapshot.restore(body, _people_map, _people_defs)
+	assert_null(r["game"], label)
+	assert_eq(r["problem"], "Cannot be read", label)
+
+
+func test_the_people_fields_round_trip() -> void:
+	var g := _people_game()
+	var back := Snapshot.restore(_through_bytes(Snapshot.of(g)), g.map, g.defs)
+	assert_eq(back["problem"], "")
+	var h := back["game"] as Game
+	assert_eq(h.digest(), g.digest())
+	assert_eq(h.state.people, g.state.people)
+	assert_eq(h.state.people_start, g.state.people_start)
+	assert_eq(h.state.people_end, g.state.people_end)
+	assert_ne(h.state.people_end, h.state.people_start, "the people moved")
+	var gen := Countries.by_tag(g, &"GEN")
+	var hen := Countries.by_tag(h, &"GEN")
+	assert_eq(hen.people_closed, gen.people_closed)
+	assert_eq(hen.food_need, gen.food_need)
+	assert_eq(hen.food_fed, gen.food_fed)
+	assert_eq(var_to_bytes(Snapshot.of(h)), var_to_bytes(Snapshot.of(g)), "the same body")
+	Season.run(g)
+	Season.run(h)
+	assert_eq(h.digest(), g.digest(), "play on")
+
+
+func test_p_damaged_people_fields_are_refused() -> void:
+	var state_cases: Array[Array] = [
+		["people", "text"], ["people", PackedInt32Array([1, 2, 3])], ["people_start", [1, 2]],
+		["people_end", PackedByteArray([1, 2])], ["people", null],
+	]
+	for item: Array in state_cases:
+		var body := _people_body()
+		(body["map_state"] as Dictionary)[item[0]] = item[1]
+		_people_refused(body, str(item))
+	var country_cases: Array[Array] = [
+		["food_need", "4"], ["food_need", 1.5], ["food_fed", "x"], ["food_fed", 1001], ["people_flows", "x"],
+		["people_flows", [1, 2]], ["people_closed", "x"], ["people_closed", {"turn": 1, "flows": "x"}],
+	]
+	for item: Array in country_cases:
+		var body := _people_body()
+		((body["countries"] as Array)[0] as Dictionary)[item[0]] = item[1]
+		_people_refused(body, str(item))
+
+
+## The body with one value of a people array of the map state changed (a packed array is a value: it is put back).
+func _poked(key: String, at: int, value: int) -> Dictionary:
+	var body := _people_body()
+	var ints := (body["map_state"] as Dictionary)[key] as PackedInt32Array
+	ints[at] = value
+	(body["map_state"] as Dictionary)[key] = ints
+	return body
+
+
+func test_p_people_out_of_range_or_at_sea_are_refused() -> void:
+	var sea := -1
+	var land := -1
+	var g := _people_game()
+	for i: int in g.map.hex_count():
+		if g.map.land[i] == 0 and sea < 0:
+			sea = i
+		elif g.map.land[i] == 1 and land < 0:
+			land = i
+	for key: String in ["people", "people_start", "people_end"]:
+		_people_refused(_poked(key, sea, 1), key + " at sea")
+		_people_refused(_poked(key, land, People.PEOPLE_MAX + 1), key + " over the maximum")
+		_people_refused(_poked(key, land, -1), key + " below zero")

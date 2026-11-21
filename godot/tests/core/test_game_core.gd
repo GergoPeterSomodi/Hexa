@@ -177,6 +177,47 @@ func test_dev_money_moves_the_purse_logs_and_clamps() -> void:
 	assert_true(sandbox.action_log.is_empty())
 
 
+func test_dev_people_sets_the_people_logs_and_refuses() -> void:
+	var g := PeopleFixture.genoa()
+	var c := Countries.by_tag(g, &"GEN")
+	var hex := Vector2i(6, 13)
+	var i := g.map.index_of(hex)
+	var was := g.state.people[i]
+	var free := Vector2i(7, 13)
+	g.dev_transfer([free] as Array[Vector2i], 0)
+	var v := g.version
+	assert_true(g.dev_people(hex, 2100))
+	assert_eq(g.state.people[i], 2100)
+	assert_eq(c.people_flows[People.FLOWS.find(&"dev")], 2100 - was)
+	assert_eq(g.version, v + 1)
+	assert_eq(g.action_log[g.action_log.size() - 1], {"turn": 1, "action": "dev_people", "args": {"hex": hex, "people": 2100}})
+	var before := g.digest()
+	var logged := g.action_log.size()
+	assert_false(g.dev_people(hex, -1), "below zero")
+	var sea := 0
+	while g.map.land[sea] == 1:
+		sea += 1
+	assert_false(g.dev_people(g.map.hex_of(sea), 5), "the sea")
+	assert_false(g.dev_people(free, 5), "unowned land")
+	assert_false(g.dev_people(Vector2i(-1, 0), 5), "off the map")
+	assert_false(g.dev_people(hex, People.PEOPLE_MAX + 1), "over the maximum")
+	assert_eq(g.digest(), before, "a refusal changes nothing")
+	assert_eq(g.action_log.size(), logged, "and logs nothing")
+	var sandbox := Game.new_game(EconomyFixture.map(), 1, EconomyFixture.committed())
+	assert_false(sandbox.dev_people(hex, 5), "a map-only game")
+	assert_true(sandbox.action_log.is_empty())
+
+
+func test_people_are_set_up_before_the_purse_in_new_scenario() -> void:
+	var g := PeopleFixture.genoa()
+	assert_eq(g.state.people_start, g.state.people)
+	assert_eq(g.state.people_end, g.state.people)
+	assert_gt(g.state.people[g.map.index_of(Vector2i(8, 13))], 0)
+	var c := Countries.by_tag(g, &"GEN")
+	assert_eq([c.people_flows.size(), c.food_fed, c.food_need], [People.FLOWS.size(), 1000, 0])
+	assert_eq(c.treasury, 610, "the start treasury counts the people as M4 did")
+
+
 func test_dev_goods_moves_the_stores_logs_and_never_below_zero() -> void:
 	var g := EconomyFixture.game()
 	var c := Countries.by_tag(g, &"GEN")

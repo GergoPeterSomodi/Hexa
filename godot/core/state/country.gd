@@ -207,7 +207,7 @@ static func _people_from(value: Variant) -> Variant:
 		return {}
 	var turn: Variant = _whole(raw.get("turn", null))
 	var flows: Variant = _ints_from(raw.get("flows", null))
-	if turn == null or flows == null or (flows as PackedInt32Array).size() > PEOPLE_FLOW_COUNT:
+	if turn == null or int(turn) < 0 or flows == null or (flows as PackedInt32Array).size() > PEOPLE_FLOW_COUNT:
 		return null
 	return {"turn": int(turn), "flows": _flows_padded(flows)}
 

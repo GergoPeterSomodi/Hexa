@@ -3,7 +3,7 @@ extends GutTest
 
 
 func test_phases_are_pinned() -> void:
-	assert_eq(Season.PHASES, [&"production", &"income", &"works", &"stats", &"calendar"] as Array[StringName])
+	assert_eq(Season.PHASES, [&"production", &"income", &"works", &"people", &"stats", &"calendar"] as Array[StringName])
 
 
 func test_end_check_rows() -> void:

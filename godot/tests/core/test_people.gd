@@ -93,7 +93,7 @@ func test_the_view_decides_the_room() -> void:
 
 
 func test_setup_gives_every_land_hex_its_start_people_and_every_country_zero_flows() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	var land := 0
 	for i: int in g.map.hex_count():
 		var hex := g.map.hex_of(i)
@@ -251,7 +251,7 @@ func _flows(c: Country) -> Array:
 
 
 func test_move_changes_the_people_and_the_owners_flow() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	var genoa := Countries.by_tag(g, &"GEN")
 	var hex := Vector2i(8, 13)
 	var i := g.map.index_of(hex)
@@ -274,7 +274,7 @@ func test_move_changes_the_people_and_the_owners_flow() -> void:
 
 
 func test_move_refuses_what_it_must_and_changes_nothing() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	var genoa := Countries.by_tag(g, &"GEN")
 	var hex := Vector2i(8, 13)
 	var i := g.map.index_of(hex)
@@ -311,7 +311,7 @@ func test_move_refuses_what_it_must_and_changes_nothing() -> void:
 
 
 func test_fed_of_reads_the_open_flows_of_grain_and_fish() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	var genoa := Countries.by_tag(g, &"GEN")
 	assert_eq(People.fed_of(g, &"GEN", 0), 1000, "no need: fed")
 	assert_eq(People.fed_of(g, &"GEN", 4), 0, "nothing eaten yet this season")
@@ -335,7 +335,7 @@ func test_fed_of_reads_the_open_flows_of_grain_and_fish() -> void:
 
 
 func test_active_holds_the_settlements_and_the_hexes_that_can_change() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	var genoa := Countries.by_tag(g, &"GEN")
 	var view := _view(g)
 	var active := People.active(g, view, genoa.id)
@@ -439,7 +439,7 @@ func test_close_twice_makes_the_start_the_last_end() -> void:
 
 
 func test_available_is_a_tenth_of_the_people_floored() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	assert_eq(People.available(g, Vector2i(8, 13)), 3000)
 	g.state.people[g.map.index_of(Vector2i(8, 13))] = 30009
 	assert_eq(People.available(g, Vector2i(8, 13)), 3000, "floored")
@@ -454,7 +454,7 @@ func test_available_is_a_tenth_of_the_people_floored() -> void:
 
 
 func test_levy_check_rows_with_their_words() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	var hex := Vector2i(8, 13)
 	var sea_i := 0
 	while g.map.land[sea_i] == 1:
@@ -474,7 +474,7 @@ func test_levy_check_rows_with_their_words() -> void:
 
 
 func test_levy_takes_the_men_as_raised_and_a_refusal_takes_none() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	var genoa := Countries.by_tag(g, &"GEN")
 	var hex := Vector2i(8, 13)
 	var i := g.map.index_of(hex)
@@ -489,7 +489,7 @@ func test_levy_takes_the_men_as_raised_and_a_refusal_takes_none() -> void:
 
 
 func test_give_back_returns_men_and_a_crowd_leaves_next_season() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	var genoa := Countries.by_tag(g, &"GEN")
 	var hex := Vector2i(8, 13)
 	var i := g.map.index_of(hex)
@@ -555,7 +555,7 @@ func test_the_running_set_equals_the_walk_through_seasons_works_and_the_door() -
 
 
 func test_a_hex_made_short_by_the_door_joins_the_set_and_a_full_one_leaves() -> void:
-	var g := EconomyFixture.game(&"GEN")
+	var g := PeopleFixture.genoa()
 	var genoa := Countries.by_tag(g, &"GEN")
 	var i := g.map.index_of(Vector2i(7, 13))  # wild farmland, full
 	assert_false(People.active(g, StateView.of(g.state), genoa.id).has(i))

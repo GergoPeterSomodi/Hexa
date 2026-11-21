@@ -182,7 +182,7 @@ static func _build(body: Dictionary, meta: Dictionary, map: MapData, defs: GameD
 
 
 ## "" when the three byte arrays are base64 text of the map's size, "map" when they decode to another size, "body" when
-## a value is not text or not base64. Checked before MapState.from_dict decodes, which would print an engine error.
+## a value is not text or not base64, or a people array (map-state/4) is not a packed int array of the map's size. Checked before MapState.from_dict decodes, which would print an engine error.
 static func _state_problem(d: Dictionary, map: MapData) -> String:
 	var n := map.hex_count()
 	var other_size := false
@@ -194,7 +194,14 @@ static func _state_problem(d: Dictionary, map: MapData) -> String:
 			other_size = true
 	if d.has("size") and not (d["size"] is int):
 		return "body"
-	return "map" if other_size else ""
+	if other_size:
+		return "map"
+	if str(d.get("schema", "")) == MapState.SCHEMA:
+		for key: String in ["people", "people_start", "people_end"]:
+			var ints: Variant = d.get(key)
+			if not (ints is PackedInt32Array) or (ints as PackedInt32Array).size() != n:
+				return "body"
+	return ""
 
 
 ## True for padded base64: a multiple of 4 characters, the alphabet, "=" only as the last one or two.
@@ -225,6 +232,17 @@ static func _ranges_ok(state: MapState, map: MapData, country_count: int) -> boo
 		if use >= FamilyIds.COUNT or lv > FamilyIds.TOP_LEVEL[use] or owner_id > country_count:
 			return false
 		if map.land[i] == 0 and (use != 0 or lv != 0 or owner_id != 0):
+			return false
+		if not _people_ok(state, map, i):
+			return false
+	return true
+
+
+## A4: every people value of hex `i` in 0..PEOPLE_MAX, and none at sea.
+static func _people_ok(state: MapState, map: MapData, i: int) -> bool:
+	for ints: PackedInt32Array in [state.people, state.people_start, state.people_end]:
+		var v := ints[i]
+		if v < 0 or v > People.PEOPLE_MAX or (v != 0 and map.land[i] == 0):
 			return false
 	return true
 
@@ -257,12 +275,21 @@ static func _countries_of(raw: Array, scenario: ScenarioDef) -> Variant:
 
 ## The types Country.from_dict reads without checking: id int, tag text, capital two ints, alive bool. The M4 fields
 ## (treasury, tax, ledgers, stock, flows ...) are checked by Country.from_dict itself, which refuses a bad one and
-## country/1 (its schema) with null.
+## country/1 (its schema) with null; of the M5 fields (country/3) the whole numbers and the packed flows are checked here.
 static func _country_typed(d: Dictionary) -> bool:
 	if not (d.get("id") is int) or not (d.get("tag") is String) or not (d.get("alive") is bool):
 		return false
+	if str(d.get("schema", "")) == Country.SCHEMA and not _people_fields_typed(d):
+		return false
 	var cap: Variant = d.get("capital")
 	return cap is Array and (cap as Array).size() == 2 and (cap as Array)[0] is int and (cap as Array)[1] is int
+
+
+static func _people_fields_typed(d: Dictionary) -> bool:
+	if not (d.get("food_need") is int) or not (d.get("food_fed") is int) or not (d.get("people_flows") is PackedInt32Array):
+		return false
+	var closed: Variant = d.get("people_closed")
+	return closed is Dictionary and ((closed as Dictionary).is_empty() or (closed as Dictionary).get("flows") is PackedInt32Array)
 
 
 ## The action log records, or null when one is not {turn: int, action: String, args: Dictionary}.

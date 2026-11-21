@@ -47,6 +47,43 @@ func _replay(g: Game, log: Array[Dictionary]) -> Game:
 	return Replay.run(_map(), _defs(), g.scenario.id, g.seed_value, log)
 
 
+## 20 seasons with real growth (north Italy, Genoa), a level change and dev_people in the log.
+func _grown() -> Game:
+	var g := PeopleFixture.genoa(PeopleFixture.always_fed())
+	g.dev_people(Vector2i(6, 11), 3990)  # the village near Turin is nearly full and grows into a town
+	for season: int in 20:
+		if season == 5:
+			g.dev_people(Vector2i(6, 13), 2500)
+		Season.run(g)
+	return g
+
+
+func test_growth_a_level_change_and_dev_people_replay_to_the_same_digest() -> void:
+	var g := _grown()
+	var kinds := {}
+	for e: Dictionary in g.events:
+		kinds[e["kind"]] = true
+	assert_true(kinds.has("town_grew"), "a village grew in the run: %s" % str(kinds.keys()))
+	var again := Replay.run(g.map, g.defs, g.scenario.id, g.seed_value, g.action_log)
+	assert_not_null(again)
+	assert_eq(again.digest(), g.digest())
+	assert_eq(again.state.people, g.state.people)
+
+
+func test_p_a_changed_dev_people_value_gives_another_digest() -> void:
+	var g := _grown()
+	var log: Array[Dictionary] = []
+	for r: Dictionary in g.action_log:
+		log.append(r.duplicate(true))
+	var found := false
+	for r: Dictionary in log:
+		if r["action"] == "dev_people" and (r["args"] as Dictionary)["people"] == 2500:
+			(r["args"] as Dictionary)["people"] = 2600
+			found = true
+	assert_true(found)
+	assert_ne(Replay.run(g.map, g.defs, g.scenario.id, g.seed_value, log).digest(), g.digest())
+
+
 func test_the_same_seed_and_log_give_the_same_digest() -> void:
 	for seed_value: int in [1480, 7]:
 		var g := _played(seed_value)

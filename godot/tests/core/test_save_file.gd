@@ -327,10 +327,10 @@ func _with_line(dir: String, slot: String, change: Callable) -> void:
 
 func test_p_hostile_header_numbers_read_as_broken() -> void:
 	var cases: Array[Array] = [
-		["\"format\":2,", "\"format\":1e999,"], ["\"format\":2,", "\"format\":-1e999,"],
-		["\"format\":2,", "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
+		["\"format\":3,", "\"format\":1e999,"], ["\"format\":3,", "\"format\":-1e999,"],
+		["\"format\":3,", "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
 		["\"saved_unix\":1700000000,", "\"saved_unix\":1e19,"], ["\"play_seconds\":61,", "\"play_seconds\":9007199254740994,"],
-		["\"format\":2,", "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
+		["\"format\":3,", "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
 	]
 	for item: Array in cases:
 		var dir := _saved("1")
@@ -419,9 +419,13 @@ func test_a_write_after_a_crash_between_the_two_renames_leaves_no_bak() -> void:
 # ----- M4: format 2, the economy and the weather (m4-build-spec.md 4.22) ----------------------------------------
 
 
-func test_the_format_is_2_and_an_m3_save_is_older() -> void:
-	assert_eq(SaveFile.FORMAT, 2)
-	assert_eq(SaveFile.OLDEST_FORMAT, 2)
+func test_the_format_is_3_and_a_format_2_save_is_older() -> void:
+	assert_eq(SaveFile.FORMAT, 3)
+	assert_eq(SaveFile.OLDEST_FORMAT, 3)
+	var old := _saved("2")
+	_with_header(old, "2", func(h: Dictionary) -> void: h["format"] = 2)
+	assert_eq(SaveFile.read_header("2", old)["state"], &"older", "a format-2 header reads older")
+	assert_eq(SaveFile.read("2", old)["problem"], "Made by an older test build", "refused quietly")
 	var dir := _saved("1")
 	_with_header(dir, "1", func(h: Dictionary) -> void: h["format"] = 1)
 	assert_eq(SaveFile.read_header("1", dir)["state"], &"older")
@@ -453,3 +457,40 @@ func test_save_load_save_is_byte_equal_with_the_economy_and_a_stormy_weather() -
 	var dir_b := _dir()
 	assert_eq(SaveFile.write(back, "2", INFO, {}, dir_b), "")
 	assert_eq(_bytes(SaveFile.path_of("2", dir_a)), _bytes(SaveFile.path_of("2", dir_b)), "byte-equal files")
+
+
+# ----- M5: the people (m5-build-spec.md 4.18) ------------------------------------------------------------------------
+
+
+func test_save_load_save_is_byte_equal_with_the_people() -> void:
+	var g := PeopleFixture.genoa()
+	g.dev_people(Vector2i(6, 13), 2100)
+	for n: int in 4:
+		Season.run(g)
+	assert_ne(g.state.people_start, g.state.people_end, "the people moved over the last season")
+	assert_false(Countries.by_tag(g, &"GEN").people_closed.is_empty())
+	var dir_a := _dir()
+	assert_eq(SaveFile.write(g, "2", INFO, {}, dir_a), "")
+	var read := SaveFile.read("2", dir_a)
+	assert_eq(read["problem"], "")
+	var r := Snapshot.restore(read["body"] as Dictionary, g.map, g.defs)
+	assert_eq(r["problem"], "")
+	var back := r["game"] as Game
+	assert_eq(back.digest(), g.digest())
+	var dir_b := _dir()
+	assert_eq(SaveFile.write(back, "2", INFO, {}, dir_b), "")
+	assert_eq(_bytes(SaveFile.path_of("2", dir_a)), _bytes(SaveFile.path_of("2", dir_b)), "byte-equal files")
+
+
+func test_a_failed_load_keeps_the_running_game() -> void:
+	var g := PeopleFixture.genoa()
+	Season.run(g)
+	var before := g.digest()
+	var dir := _dir()
+	assert_eq(SaveFile.write(g, "1", INFO, {}, dir), "")
+	var body := SaveFile.read("1", dir)["body"] as Dictionary
+	((body["countries"] as Array)[0] as Dictionary)["food_need"] = "many"
+	var r := Snapshot.restore(body, g.map, g.defs)
+	assert_null(r["game"])
+	assert_eq(r["problem"], "Cannot be read")
+	assert_eq(g.digest(), before, "the game in hand is untouched")

@@ -14,7 +14,7 @@ var _g: Game
 
 
 func before_each() -> void:
-	_g = EconomyFixture.game()
+	_g = EconomyFixture.game(&"", false, true, EconomyFixture.SEED, false)
 
 
 func _view() -> StateView:

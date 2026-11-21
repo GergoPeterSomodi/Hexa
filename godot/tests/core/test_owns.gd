@@ -1,7 +1,10 @@
 ## Who writes what (docs/architecture/m3-build-spec.md 5.7, 9; m4-build-spec.md 5.3): the snapshot before and after every
 ## action and every phase differs only in the owners' fields and the door's (chronicle and action_log; events, version,
 ## view_cache and districts are not saved). The money is the purse (Treasury), the goods the stores (Stores), the tax and the
-## shortage bits EconomySeason's. Planted fault: a phase that writes `turn` from Works is reported.
+## shortage bits EconomySeason's, the people (M5 spec 5.3) People's: `people` (the hexes' people and the open flows), `people_close`
+## (the start and end arrays and the closed flows, People.close, in the stats phase), `people_flows` (the open flows: People.move,
+## and People.close zeroes them) and `food` (the need and the share fed).
+## Planted faults: a phase that writes `turn` from Works, or `people` from the works phase, is reported.
 extends GutTest
 
 const DOOR: Array[String] = ["chronicle", "action_log"]
@@ -17,12 +20,13 @@ const PHASE_OWNERS := {
 	&"production": ["stores", "countries"],
 	&"income": ["purse"],
 	&"works": ["main_use", "level", "works", "next_work_id"],
-	&"stats": ["stats", "purse", "stores"],
+	&"people": ["people", "people_flows", "food", "main_use", "level"],
+	&"stats": ["stats", "purse", "stores", "people_close", "people_flows"],  # People.close zeroes the open flows
 	&"calendar": ["turn", "weather", "luck"],
 }
 const HOME := Vector2i(0, 2)
 const FIELDS: Array[String] = ["turn", "weather", "player", "main_use", "level", "owner", "works", "next_work_id",
-	"countries", "purse", "stores", "stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id"]
+	"countries", "purse", "stores", "people", "people_flows", "people_close", "food", "stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id"]
 
 var _fx: Dictionary = {}
 
@@ -39,16 +43,23 @@ func _fields(game: Game) -> Dictionary:
 	var countries: Array = []
 	var purse: Array = []
 	var stores: Array = []
+	var people_flows: Array = []
+	var closes: Array = [var_to_bytes([state["people_start"], state["people_end"]])]
+	var food: Array = []
 	for c: Dictionary in body["countries"] as Array:
 		var own := c.duplicate()
 		purse.append(var_to_bytes([own.get("treasury"), own.get("ledger_open"), own.get("ledger_from"), own.get("ledger_closed")]))  # bytes: a packed array in a dictionary is shared, not copied
 		stores.append(var_to_bytes([own.get("stock"), own.get("flows_open"), own.get("stock_from"), own.get("goods_closed")]))
-		for key: String in ["treasury", "ledger_open", "ledger_from", "ledger_closed", "stock", "flows_open", "stock_from",
+		people_flows.append(var_to_bytes(own.get("people_flows")))
+		closes.append(var_to_bytes(own.get("people_closed")))
+		food.append([own.get("food_need"), own.get("food_fed")])
+		for key: String in ["people_flows", "people_closed", "food_need", "food_fed", "treasury", "ledger_open", "ledger_from", "ledger_closed", "stock", "flows_open", "stock_from",
 				"goods_closed", "flows_shape"]:
 			own.erase(key)
 		countries.append(own)
 	return {
-		"weather": game.weather, "purse": purse, "stores": stores,
+		"weather": game.weather, "purse": purse, "stores": stores, "food": food,
+		"people": var_to_bytes(state["people"]), "people_flows": people_flows, "people_close": closes,
 		"turn": meta["turn"], "player": meta["player"], "main_use": state["main_use"], "level": state["level"],
 		"owner": state["owner"], "works": state["works"], "next_work_id": state["next_work_id"],
 		"countries": countries, "stats": body["stats"], "chronicle": body["chronicle"], "luck": body["luck"],
@@ -143,7 +154,7 @@ func test_every_phase_changes_only_its_owners() -> void:
 			for key: String in changed:
 				seen[key] = true
 		Season.finish(g)
-	for key: String in ["main_use", "level", "works", "stats", "turn", "chronicle", "countries"]:
+	for key: String in ["main_use", "level", "works", "stats", "turn", "chronicle", "countries", "people", "people_flows", "people_close"]:
 		assert_true(seen.has(key), "a phase wrote " + key)
 	assert_true(seen.has("purse") and seen.has("stores"), "the doors were used")
 	assert_true(seen.has("luck"), "the calendar draws the weather")
@@ -166,6 +177,25 @@ func test_dev_transfer_changes_owner_and_the_door() -> void:
 	var changed := _changed(before, _fields(g))
 	assert_eq(_violations(changed, ["owner"]), [] as Array[String])
 	assert_true(changed.has("owner"))
+
+
+func test_dev_people_writes_people_through_the_door() -> void:
+	var g := _game()
+	var before := _fields(g)
+	var hex := Vector2i(0, 2)
+	var i := g.map.index_of(hex)
+	assert_true(g.dev_people(hex, int(g.state.people[i]) + 25))
+	var changed := _changed(before, _fields(g))
+	assert_eq(_violations(changed, ["people", "people_flows"]), [] as Array[String])
+	assert_true(changed.has("people") and changed.has("people_flows") and changed.has("action_log"))
+	assert_false(changed.has("people_close") or changed.has("food"))
+
+
+func test_p_a_phase_that_writes_people_outside_the_people_phase_is_reported() -> void:
+	var g := _game()
+	var before := _fields(g)
+	g.state.people[g.map.index_of(HOME)] += 1  # the planted fault: the works phase writes a person
+	assert_eq(_violations(_changed(before, _fields(g)), PHASE_OWNERS[&"works"] as Array), ["people"] as Array[String])
 
 
 func test_p_a_phase_that_writes_turn_from_works_is_reported() -> void:

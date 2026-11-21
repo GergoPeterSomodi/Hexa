@@ -142,6 +142,20 @@ func dev_money(tag: StringName, amount: int) -> bool:
 	return done
 
 
+## Developer set of the people on a hex (logged for the replay, M5 spec 5.4): People.move with the flow `dev` for the
+## difference. False (nothing logged) for a value below 0 or when People.move refuses (sea, off the map, unowned land, a
+## map-only game, a result over People.PEOPLE_MAX).
+func dev_people(hex: Vector2i, people_value: int) -> bool:
+	var i := map.index_of(hex) if map != null else -1
+	if i < 0 or state == null or people_value < 0 or i >= state.people.size():
+		return false
+	var done: bool = People.move.call(self, hex, people_value - state.people[i], &"dev")
+	if done:
+		action_log.append({"turn": turn, "action": "dev_people", "args": {"hex": hex, "people": people_value}})
+		version += 1
+	return done
+
+
 ## Developer transfer of goods (logged for the replay): Stores.move with the flow `dev`; the amount is cut to plus or
 ## minus DEV_LIMIT and a take to what the stores hold. False in a map-only game, for an unknown tag or good.
 func dev_goods(tag: StringName, good: int, amount: int) -> bool:

@@ -365,6 +365,9 @@ static func _ring2_of(hex: Vector2i) -> Array:
 ## flows of this season), then each hex of People.active in index order through change_at and move, then each settlement
 ## in index order: it grows (Improve.upgrade, town_grew) or falls (Improve.lower, district_declined) when the checks say so.
 ## A level change earlier in the visit is seen by the later ones. Nothing in a map-only game.
+## The phase writes through `_apply`, the write `move` makes once its checks are done, not through `move` itself (the spec says
+## move): the phase already holds the owner, the hex index and the flow, and its steps pass the checks by construction (land,
+## owned, 0 <= result <= room or the hex's own people), so the per-hex lookups would be the phase's whole cost.
 static func season(game: Game) -> void:
 	if game == null or not game.has_countries() or game.defs == null or game.defs.goods.is_empty():
 		return

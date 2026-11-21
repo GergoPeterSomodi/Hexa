@@ -25,11 +25,17 @@ static func run(map: MapData, defs: GameDefs, scenario_id: String, seed_value: i
 				game.dev_money(StringName(str(args.get("tag", ""))), int(args.get("amount", 0)))
 			"dev_goods":
 				game.dev_goods(StringName(str(args.get("tag", ""))), int(args.get("good", -1)), int(args.get("amount", 0)))
+			"dev_people":
+				game.dev_people(_hex(args.get("hex")), int(args.get("people", 0)))
 			"dev_transfer":
 				game.dev_transfer(_hexes(args.get("hexes")), int(args.get("to_id", 0)))
 			_:
 				game.act(action, args)
 	return game
+
+
+static func _hex(raw: Variant) -> Vector2i:
+	return raw as Vector2i if raw is Vector2i else People.NO_HEX
 
 
 static func _hexes(raw: Variant) -> Array[Vector2i]:

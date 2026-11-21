@@ -316,6 +316,7 @@ func test_two_thousand_random_actions_with_actors_respect_home_rule() -> void:
 			assert_true(bool(Season.run(game)["ok"]))
 			done[action] = int(done[action]) + 1
 			finished += _assert_finished_stand(game)
+			_assert_people_closed(game)
 			for c: Country in game.countries:
 				var total := Works.slots(game, c.tag)
 				assert_true(total < 0 or Works.in_use(game, c.tag) <= total, "slots are never exceeded")
@@ -356,6 +357,23 @@ func test_two_thousand_random_actions_with_actors_respect_home_rule() -> void:
 		_apply(replay, pick)
 		replay.events.clear()
 	assert_eq(replay.digest(), game.digest())
+
+
+## The people phase inside the season end (M5): nobody below 0 or at sea, and every country's closed flows are the change of its
+## hexes' people over the season ended (the actions never move people, and no hex changes hands here).
+func _assert_people_closed(game: Game) -> void:
+	var change := {}
+	for i: int in game.map.hex_count():
+		assert_gte(int(game.state.people[i]), 0, "no hex below 0")
+		if game.map.land[i] == 0:
+			assert_eq(int(game.state.people[i]), 0, "no people at sea")
+		var id := int(game.state.owner[i])
+		change[id] = int(change.get(id, 0)) + int(game.state.people_end[i]) - int(game.state.people_start[i])
+	for c: Country in game.countries:
+		var sum := 0
+		for f: int in (c.people_closed["flows"] as PackedInt32Array):
+			sum += f
+		assert_eq(int(change.get(c.id, 0)), sum, "%s: the closed flows are the change" % c.tag)
 
 
 static func _snapshot_owned_fields(game: Game) -> Dictionary:

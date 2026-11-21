@@ -6,8 +6,8 @@
 ##                      alone: the tests that pin them run on this).
 ##   always_fed(defs):  the towns need no food, so every country is fed whatever its land makes.
 ##   no_food(defs):     the settlements catch no fish and farmland and grassland give no wild grain: Genoa makes no food.
-##   season(game), play(game, n): a season with the people phase between works and stats, as P5's season table runs it
-##                      (until that table exists in Season.PHASES, the fixture is the table).
+##   season(game), play(game, n): a season with the people phase between works and stats, as Season.PHASES runs it (kept
+##                      as a loop of its own for the tests that want a step between the phases).
 class_name PeopleFixture
 extends RefCounted
 
@@ -73,8 +73,7 @@ static func season(game: Game) -> Dictionary:
 	for phase: StringName in [&"production", &"income", &"works"]:
 		Season.run_phase(game, phase)
 	People.season(game)
-	Season.run_phase(game, &"stats")
-	People.close(game)
+	Season.run_phase(game, &"stats")  # People.close runs inside it
 	Season.run_phase(game, &"calendar")
 	Season.finish(game)
 	return verdict

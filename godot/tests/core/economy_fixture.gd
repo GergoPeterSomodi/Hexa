@@ -27,17 +27,20 @@ static func committed() -> GameDefs:
 	return _committed
 
 
-## A copy of the definitions that is yours to change; calm weather unless `calm` is false.
-static func defs(calm: bool = true) -> GameDefs:
-	var out := committed().duplicate() as GameDefs
+## A copy of the definitions that is yours to change; calm weather unless `calm` is false. People never change unless
+## `still` is false: M4's and M4.5's numbers are about the economy alone (PeopleFixture.still); a test of the people's
+## growth takes PeopleFixture.genoa or passes `still` false.
+static func defs(calm: bool = true, still: bool = true) -> GameDefs:
+	var out := PeopleFixture.still(committed()) if still else committed().duplicate() as GameDefs
 	if calm:
 		out.weather_odds = PackedInt32Array([100, 0, 0])
 	return out
 
 
 ## The 1480 scenario game on seed 1480; `tag` is chosen as the player when given. `fixture` makes (7, 12) wild.
-static func game(tag: StringName = &"", fixture: bool = false, calm: bool = true, seed_value: int = SEED) -> Game:
-	var d := defs(calm)
+static func game(tag: StringName = &"", fixture: bool = false, calm: bool = true, seed_value: int = SEED,
+		still: bool = true) -> Game:
+	var d := defs(calm, still)
 	var g := Game.new_scenario(map(), d, d.scenarios[d.scenarios.size() - 1], seed_value)
 	if fixture:
 		g.improvement.clear(VINEYARD_HEX)
