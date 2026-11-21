@@ -337,6 +337,6 @@ func test_worth_seasons_equals_the_worth_worked_out_by_hand_under_works() -> voi
 				milli += goods[n] * prices[n]
 			var factor := EconomySeason.factor_of(g, int(run[k]["content"]))
 			var rate: int = g.defs.town_tax_milli * factor / 1000 if int(base["family"]) == Economy.SETTLEMENTS else g.defs.country_tax_milli
-			var taxes: int = int(base["room"]) * rate * g.defs.tax_permille[c.tax] / 1000000000
+			var taxes: int = int(base["people"]) * rate * g.defs.tax_permille[c.tax] / 1000000000
 			var want: int = milli / 1000 + int(out["ducats"]) + taxes - int(out["upkeep"]) - int(out["walls"])
 			assert_eq((ws["worth"] as PackedInt32Array)[h * 8 + k], want, "hex %s season %d" % [str(g.map.hex_of(i)), k])

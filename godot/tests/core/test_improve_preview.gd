@@ -232,6 +232,9 @@ func test_4_15_c_the_vineyard_card() -> void:
 
 
 func test_4_15_d_genoa_to_city_refused_for_money() -> void:
+	# M5 spec 4.11 (c) replaces M4's 4.15 (d): an upgrade brings room, not people (D17), so the card says "Room 45,000 ->
+	# 100,000" and the gains are the dues, fish, lift and upkeep alone (+15, +16, +15, +10 a season, +56 a year). The people
+	# never change in this game (no people phase runs here), so the realm's year is M4's 557 plus 56.
 	var g := EconomyFixture.game(&"GEN")
 	var card := ImprovePreview.of(g, &"GEN", Vector2i(8, 13), {"action": Works.UPGRADE, "family": 0})
 	_same_keys(card, PreviewSample.genoa_city_refused(), "genoa")
@@ -240,16 +243,22 @@ func test_4_15_d_genoa_to_city_refused_for_money() -> void:
 	assert_eq(card["reason_words"], "Not enough ducats: 1,000 needed, 610 in the treasury.")
 	assert_eq(card["title"], "Genoa, walled town to city")
 	assert_eq(card["brings"], PreviewSample.genoa_city_refused()["brings"])
+	assert_eq((card["brings"] as Array)[0], {"field": &"room", "label": "Room", "before": 45000, "after": 100000, "per": &""})
+	var chip_kinds: Array[StringName] = []
+	for chip: Dictionary in card["chips"]:
+		chip_kinds.append(chip["kind"])
+	assert_eq(chip_kinds, [&"gain", &"room"] as Array[StringName])
+	assert_eq((card["chips"][1] as Dictionary)["text"], "room +55,000")
 	var gains: Array[int] = []
 	var treasury: Array[int] = []
 	for cell: Dictionary in card["by_season"]:
 		gains.append(int(cell["gain_realm"]))
 		treasury.append(int(cell["gain_treasury"]))
-	assert_eq(gains, [45, 46, 45, 40])
-	assert_eq(treasury, [40, 39, 26, 36])
+	assert_eq(gains, [15, 16, 15, 10])
+	assert_eq(treasury, [13, 15, 14, 8])
 	assert_eq((card["by_season"][3] as Dictionary)["note"], "port dues 30 % lower")
 	var year: Dictionary = card["year"]
-	assert_eq([year["before"], year["after"], year["gain_realm"], year["gain_treasury"]], [557, 733, 176, 141])
+	assert_eq([year["before"], year["after"], year["gain_realm"], year["gain_treasury"]], [557, 613, 56, 50])
 	var ring: Array = (card["lands"] as Dictionary)["ring"]
 	assert_eq((ring[0] as Dictionary)["text"], "timber near Genoa (9, 13): +1 a season, +2 in winter (the city's market)")
 	assert_eq(card["cost"]["text"], "1,000 ducats · 20 timber · 40 stone · 8 seasons · ready Spring 1482 if begun now")
@@ -258,8 +267,8 @@ func test_4_15_d_genoa_to_city_refused_for_money() -> void:
 		{"text": "a free work slot: 0 of 2 in use", "ok": true}, {"text": "1,000 of 610 ducats", "ok": false},
 		{"text": "20 of 40 timber", "ok": true}, {"text": "40 of 40 stone", "ok": true}])
 	var pay: Dictionary = card["payback"]
-	assert_eq([pay["seasons"], pay["text"]], [32, "Pays back in Spring 1488, 32 seasons from now (at today's prices)."])
-	assert_eq([pay["seasons_treasury"], pay["text_treasury"]], [37, "Summer 1489, 37 seasons from now."])
+	assert_eq([pay["seasons"], pay["text"]], [83, "Pays back in Winter 1500, 83 seasons from now (at today's prices)."])
+	assert_eq([pay["seasons_treasury"], pay["text_treasury"]], [92, "Spring 1503, 92 seasons from now."])
 	assert_eq(card["next_stages"], [{"level": 5, "ok": false, "text": "None: Genoa is at its top level."}])
 	assert_true(card["expensive"])
 

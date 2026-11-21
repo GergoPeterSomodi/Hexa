@@ -194,8 +194,9 @@ func test_genoas_first_year_equals_4_15_a() -> void:
 
 
 func test_genoa_as_a_city_taxes_and_needs_4_15_d() -> void:
+	# M5: an upgrade brings room, not people, so the view says that Genoa's people stand at the city's 60,000 (M4's table).
 	var i := _game.map.index_of(Vector2i(8, 13))
-	var view := _view().with({i: Vector2i(1, 5)})
+	var view := _view().with({i: Vector2i(1, 5)}).with_people({i: 60000})
 	assert_eq(EconomySeason.town_people(_game, view, &"GEN"), 70000)
 	assert_eq(EconomySeason.needs_of(_game, view, &"GEN")["food"], 7)
 	var info := EconomySeason.made_of(_game, view, &"GEN", 0, PackedByteArray(CALM), 1)

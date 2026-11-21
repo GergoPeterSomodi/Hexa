@@ -179,6 +179,7 @@ func test_start_amount_follows_the_people() -> void:
 	var cap := g.map.index_of(ScenarioFixture.ALPHA_CAPITAL)
 	g.state.main_use[cap] = 1
 	g.state.level[cap] = 3
+	People.setup(g)   # people are the state's (M5): the planted land starts with its table
 	var country_people := 0
 	for i: int in g.map.hex_count():
 		if g.state.owner[i] == c.id and i != cap and g.map.land[i] != 0:

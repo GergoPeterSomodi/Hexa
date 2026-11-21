@@ -114,8 +114,8 @@ static func _rows(game: Game, stats: Stats) -> Array[PackedInt32Array]:
 		for c: int in mini(game.countries.size(), rows.size()):
 			_money_into(game, game.countries[c], rows[c])
 			if game.defs != null and game.state != null:
-				var profile := SeasonProfile.of(game, held, game.countries[c].id)
-				rows[c][Stats.column("people")] = int(profile["town"]) + int(profile["rest"])
+				var live := SeasonProfile.live(game, held, game.countries[c].id)
+				rows[c][Stats.column("people")] = int(live["town"]) + int(live["rest"])
 	return rows
 
 

@@ -17,17 +17,19 @@ const GRAIN := 0
 const FISH := 1
 ## The settlements family id (FamilyIds).
 const SETTLEMENTS := 1
-## The ints of district_base, in the order DistrictCache keeps them; "weather_bound" is a bool, the rest ints.
+## The people-free ints of district_base, in the order DistrictCache keeps them; "weather_bound" is a bool, the rest
+## ints. `raw` is the base times the extra, in thousandths, before staffing and lift. district_base adds the live part:
+## people, staffing and a0 (5.0 R1 of the M5 spec).
 const BASE_FIELDS: Array[String] = [
-	"family", "level", "good", "a0", "keep", "cover", "wild_good", "weather_bound", "port_level", "upkeep", "walls",
-	"jobs", "room", "staffing", "lift",
+	"family", "level", "good", "raw", "keep", "cover", "wild_good", "weather_bound", "port_level", "upkeep", "walls",
+	"jobs", "room", "lift",
 ]
 
 
 ## The index of each field of BASE_FIELDS (DistrictCache keeps them in this order).
 const F_FAMILY := 0
 const F_GOOD := 2
-const F_A0 := 3
+const F_RAW := 3
 const F_KEEP := 4
 const F_COVER := 5
 const F_WILD_GOOD := 6
@@ -35,6 +37,9 @@ const F_BOUND := 7
 const F_PORT := 8
 const F_UPKEEP := 9
 const F_WALLS := 10
+const F_JOBS := 11
+const F_ROOM := 12
+const F_LIFT := 13
 
 
 ## Floor division for a signed quotient (a later milestone's); b must be positive.
@@ -55,29 +60,27 @@ static func slot_of(map: MapData, hex: Vector2i, season: int) -> int:
 	return slot_for(int(map.climate[i]) if i >= 0 else 0, season)
 
 
-## People living on a hex (4.3): a settlement its level's, other land its cover's countryside, the sea none. M5 reads
-## MapState.people here.
+## People living on a hex: the view's own number, else MapState.people (M5 spec 4.7); the sea none.
 static func people_at(game: Game, view: StateView, hex: Vector2i) -> int:
 	var i := game.map.index_of(hex)
-	if i < 0:
-		return 0
-	return people_i(game.map, game.defs, view, i, game.defs.family(SETTLEMENTS))
+	return people_i(game.map, view, i)
 
 
-## Hands of a hex (4.3): the people of the hex and of its six land neighbours, times hands_permille.
+## Hands of a hex (4.7): the people of the hex and of the six neighbours held by the hex's owner, times hands_permille;
+## on unowned land the hex alone.
 static func hands_at(game: Game, view: StateView, hex: Vector2i) -> int:
 	var i := game.map.index_of(hex)
 	if i < 0:
 		return 0
-	return _hands_i(game, view, i, _ring(game.map, i), game.defs.family(SETTLEMENTS))
+	return _hands_i(game, view, i, ring_of(game.map, i))
 
 
-## The jobs of the goods districts on the hex and its six neighbours (4.5).
+## The jobs of the goods districts on the hex and the six neighbours held by the hex's owner (4.5, 4.7).
 static func jobs_near(game: Game, view: StateView, hex: Vector2i) -> int:
 	var i := game.map.index_of(hex)
 	if i < 0:
 		return 0
-	return _jobs_near_i(game, view, i, _ring(game.map, i))
+	return _jobs_near_i(game, view, i, ring_of(game.map, i))
 
 
 ## Permille of its jobs a goods district can staff (4.5); 1,000 for a hex that is not a goods district.
@@ -85,8 +88,7 @@ static func staffing(game: Game, view: StateView, hex: Vector2i) -> int:
 	var i := game.map.index_of(hex)
 	if i < 0 or not _is_goods(game.defs.family(view.main_use_at(i)), view.level_at(i)):
 		return 1000
-	var ring := _ring(game.map, i)
-	return _staffing_i(game, view, i, ring, game.defs.family(SETTLEMENTS))
+	return _staffing_i(game, view, i, ring_of(game.map, i))
 
 
 ## Permille the settlements among the six neighbours lend (4.5): the largest ring_lift, whoever owns them.
@@ -94,7 +96,7 @@ static func lift_at(game: Game, view: StateView, hex: Vector2i) -> int:
 	var i := game.map.index_of(hex)
 	if i < 0:
 		return 0
-	return _lift_i(game, view, _ring(game.map, i), game.defs.family(SETTLEMENTS))
+	return _lift_i(game, view, ring_of(game.map, i), game.defs.family(SETTLEMENTS))
 
 
 ## The district's good id, -1 for none (a wild hex, a settlement, a castle).
@@ -105,9 +107,10 @@ static func good_of(game: Game, view: StateView, hex: Vector2i) -> int:
 	return int(district_base(game, view, hex)["good"])
 
 
-## The season-free part of a hex's output (4.4): {family, level, good, a0 (thousandths of a load a season at 100 %, after
-## staffing and lift), keep, cover, wild_good, weather_bound, port_level (0 none), upkeep, walls, jobs, room (people),
-## staffing, lift}. A sea hex gives all zeros (good and wild_good -1). DistrictCache keeps exactly these.
+## The season-free part of a hex's output (4.4): {family, level, good, raw (the base times the extra, thousandths of a load
+## a season at 100 %), keep, cover, wild_good, weather_bound, port_level (0 none), upkeep, walls, jobs, room (the most
+## people the hex holds, People.room_at), lift} and the live part from the view's people: {people, staffing, a0 (raw after
+## staffing and lift)}. A sea hex gives all zeros (good and wild_good -1). DistrictCache keeps the first fourteen.
 static func district_base(game: Game, view: StateView, hex: Vector2i) -> Dictionary:
 	var map := game.map
 	var defs := game.defs
@@ -121,12 +124,12 @@ static func district_base(game: Game, view: StateView, hex: Vector2i) -> Diction
 	var f := view.main_use_at(i)
 	var level := view.level_at(i)
 	var fam: FamilyDef = defs.family(f) if f > 0 and level >= 1 else null
-	var settle := defs.family(SETTLEMENTS)
 	var cover := int(map.cover[i])
 	if cover < defs.wild_good.size() and defs.wild_good[cover] != &"":
 		out["wild_good"] = defs.good_id(defs.wild_good[cover])
 	out["keep"] = 100
-	out["room"] = people_i(map, defs, view, i, settle)
+	out["room"] = People.room_at(game, view, hex)
+	out["people"] = view.people_at(i)
 	if fam == null:
 		return out
 	out["family"] = f
@@ -140,7 +143,31 @@ static func district_base(game: Game, view: StateView, hex: Vector2i) -> Diction
 		out["port_level"] = level
 	if _is_goods(fam, level):
 		_goods_base(game, view, hex, i, fam, out)
+		live_into(game, view, i, out)
 	return out
+
+
+## The live part of a base `out` (its family, level, raw and lift filled): people from the view, then staffing and a0 for
+## a goods district (R1: Economy.staffed is the one staffing step). Other hexes keep staffing 1,000 and a0 0.
+static func live_into(game: Game, view: StateView, i: int, out: Dictionary) -> void:
+	out["people"] = view.people_at(i)
+	var family := int(out["family"])
+	var level := int(out["level"])
+	var fam: FamilyDef = game.defs.family(family) if family > 0 and level >= 1 else null
+	if not _is_goods(fam, level):
+		out["staffing"] = 1000
+		out["a0"] = 0
+		return
+	var live := staffed(game, view, i, int(out["raw"]), int(out["lift"]))
+	out["staffing"] = live.x
+	out["a0"] = live.y
+
+
+## The one live staffing step (5.0 R1): x the staffing permille of hex index `i` (its owner's hands over the owner's jobs
+## near it, at most 1,000), y the a0 of `raw`: raw x staffing / 1000 x (1000 + lift) / 1000, floored in that order.
+static func staffed(game: Game, view: StateView, i: int, raw: int, lift: int) -> Vector2i:
+	var permille := _staffing_i(game, view, i, ring_of(game.map, i))
+	return Vector2i(permille, raw * permille / 1000 * (1000 + lift) / 1000)
 
 
 ## The base of a hex that gives nothing: every int 0, the goods -1.
@@ -152,11 +179,13 @@ static func empty_base() -> Dictionary:
 	out["wild_good"] = -1
 	out["weather_bound"] = false
 	out["staffing"] = 1000
+	out["people"] = 0
+	out["a0"] = 0
 	out["keep"] = 100
 	return out
 
 
-## A goods district's good, a0, jobs, staffing and lift (4.4, 4.5) into `out`.
+## A goods district's good, raw, jobs and lift (4.4, 4.5) into `out`; live_into adds its staffing and a0.
 static func _goods_base(game: Game, view: StateView, hex: Vector2i, i: int, fam: FamilyDef, out: Dictionary) -> void:
 	var level := int(out["level"])
 	var permille := 1000
@@ -169,14 +198,8 @@ static func _goods_base(game: Game, view: StateView, hex: Vector2i, i: int, fam:
 			permille = int(fam.extra_permille.get(extra, 1000))
 	out["weather_bound"] = fam.weather_bound
 	out["jobs"] = _at(fam.jobs, level, 0)
-	var ring := _ring(game.map, i)
-	var settle := game.defs.family(SETTLEMENTS)
-	var staffed := _staffing_i(game, view, i, ring, settle)
-	var lift := _lift_i(game, view, ring, settle)
-	out["staffing"] = staffed
-	out["lift"] = lift
-	var a0: int = _at(fam.base, level, 0) * permille * staffed / 1000 * (1000 + lift) / 1000
-	out["a0"] = a0
+	out["lift"] = _lift_i(game, view, ring_of(game.map, i), game.defs.family(SETTLEMENTS))
+	out["raw"] = _at(fam.base, level, 0) * permille
 
 
 ## What a base gives in one slot of the year (the slot's percent, the tax's output, the weather) added into `into` (the
@@ -290,50 +313,94 @@ static func _owner_tax(game: Game, i: int) -> int:
 	return c.tax if c != null else 1
 
 
-## The six neighbours' indices in direction order, -1 off the map.
-static func _ring(map: MapData, i: int) -> PackedInt32Array:
+## The six neighbours' indices in direction order (0 E, 1 NE, 2 NW, 3 W, 4 SW, 5 SE), -1 off the map: arithmetic on the
+## index, the odd rows shifted half a hex right as MapData.neighbour (test_economy checks the two agree on every hex).
+static func ring_of(map: MapData, i: int) -> PackedInt32Array:
+	var cols := map.cols
+	var x := i % cols
+	var y := i / cols
+	var odd := (y & 1) == 1
+	var west := x > 0
+	var east := x + 1 < cols
+	var up := y > 0
+	var down := y + 1 < map.rows
 	var out := PackedInt32Array()
-	var hex := map.hex_of(i)
-	for d: int in 6:
-		out.append(map.index_of(map.neighbour(hex, d)))
+	out.resize(6)
+	out[0] = i + 1 if east else -1
+	if up:
+		out[1] = (i - cols + 1 if east else -1) if odd else i - cols
+		out[2] = i - cols if odd else (i - cols - 1 if west else -1)
+	else:
+		out[1] = -1
+		out[2] = -1
+	out[3] = i - 1 if west else -1
+	if down:
+		out[4] = i + cols if odd else (i + cols - 1 if west else -1)
+		out[5] = (i + cols + 1 if east else -1) if odd else i + cols
+	else:
+		out[4] = -1
+		out[5] = -1
 	return out
 
 
-static func people_i(map: MapData, defs: GameDefs, view: StateView, i: int, settle: FamilyDef) -> int:
+## The people of hex index `i` on the view: 0 off the map and at sea.
+static func people_i(map: MapData, view: StateView, i: int) -> int:
 	if i < 0 or map.land[i] == 0:
 		return 0
-	if view.main_use_at(i) == SETTLEMENTS and settle != null:
-		return _at(settle.people, view.level_at(i), 0)
-	return _at(defs.country_people, int(map.cover[i]), 0)
+	return view.people_at(i)
 
 
-static func _hands_i(game: Game, view: StateView, i: int, ring: PackedInt32Array, settle: FamilyDef) -> int:
-	var people := people_i(game.map, game.defs, view, i, settle)
-	for j: int in ring:
-		people += people_i(game.map, game.defs, view, j, settle)
-	return people * game.defs.hands_permille / 1000
+static func _hands_i(game: Game, view: StateView, i: int, ring: PackedInt32Array) -> int:
+	return _hands_and_jobs(game, view, i, ring).x * game.defs.hands_permille / 1000
 
 
-static func _jobs_i(game: Game, view: StateView, i: int) -> int:
-	if i < 0 or game.map.land[i] == 0:
+## The jobs of the goods district on hex index `i` (0 for anything else, the sea and off the map).
+static func jobs_i(game: Game, view: StateView, i: int) -> int:
+	if i < 0:
+		return 0
+	var use := view.main_use_at(i)
+	if use == 0 or game.map.land[i] == 0:
 		return 0
 	var level := view.level_at(i)
-	var fam := game.defs.family(view.main_use_at(i))
+	var fam := _family(game.defs, use)
 	return _at(fam.jobs, level, 0) if _is_goods(fam, level) else 0
 
 
+## The family of an id: the entry `id - 1` of the definitions when it is the one (they are listed by id), else a search.
+static func _family(defs: GameDefs, id: int) -> FamilyDef:
+	var at := id - 1
+	if at >= 0 and at < defs.families.size():
+		var fam := defs.families[at]
+		if fam != null and fam.id == id:
+			return fam
+	return defs.family(id)
+
+
 static func _jobs_near_i(game: Game, view: StateView, i: int, ring: PackedInt32Array) -> int:
-	var jobs := _jobs_i(game, view, i)
-	for j: int in ring:
-		jobs += _jobs_i(game, view, j)
-	return jobs
+	return _hands_and_jobs(game, view, i, ring).y
 
 
-static func _staffing_i(game: Game, view: StateView, i: int, ring: PackedInt32Array, settle: FamilyDef) -> int:
-	var jobs := _jobs_near_i(game, view, i, ring)
-	if jobs == 0:
+## x the people and y the jobs of hex index `i` and the neighbours of `ring` that its owner holds (4.7): on unowned land (or
+## in a map-only game) the hex alone. One pass, as the people and the jobs count the same hexes.
+static func _hands_and_jobs(game: Game, view: StateView, i: int, ring: PackedInt32Array) -> Vector2i:
+	var owner_bytes := view.state.owner
+	var owner_id := int(owner_bytes[i])
+	var map := game.map
+	var people := people_i(map, view, i)
+	var jobs := jobs_i(game, view, i)
+	if owner_id != 0:
+		for j: int in ring:
+			if j >= 0 and owner_bytes[j] == owner_id:
+				people += people_i(map, view, j)
+				jobs += jobs_i(game, view, j)
+	return Vector2i(people, jobs)
+
+
+static func _staffing_i(game: Game, view: StateView, i: int, ring: PackedInt32Array) -> int:
+	var both := _hands_and_jobs(game, view, i, ring)
+	if both.y == 0:
 		return 1000
-	return mini(1000, _hands_i(game, view, i, ring, settle) * 1000 / jobs)
+	return mini(1000, both.x * game.defs.hands_permille / 1000 * 1000 / both.y)
 
 
 static func _lift_i(game: Game, view: StateView, ring: PackedInt32Array, settle: FamilyDef) -> int:

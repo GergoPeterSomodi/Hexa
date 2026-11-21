@@ -87,11 +87,13 @@ static func made_of(game: Game, view: StateView, tag: StringName, season: int, w
 	if c == null:
 		return out
 	var cache: Variant = with_cache
-	if cache == null and view.state == game.state and view.changed().is_empty():
+	if cache == null and view.state == game.state and view.changed().is_empty() and view.people_changed().is_empty():
 		cache = game.get("districts")
 		if cache is DistrictCache and game.defs.wild_yield.size() > 0:
 			# The game's own view: the country's land summed up (SeasonProfile), exact and a pass over its few special hexes.
-			return SeasonProfile.made(game, SeasonProfile.of(game, SeasonProfile.table(game), c.id), season, weather, tax)
+			var held := SeasonProfile.table(game)
+			return SeasonProfile.made(game, SeasonProfile.of(game, held, c.id), SeasonProfile.live(game, held, c.id), season,
+				weather, tax)
 	var fams: Array[FamilyDef] = []
 	for id: int in FamilyIds.COUNT:
 		fams.append(defs.family(id))
@@ -106,7 +108,9 @@ static func made_of(game: Game, view: StateView, tag: StringName, season: int, w
 		if cache is DistrictCache:
 			var ints := (cache as DistrictCache).ints_of(game, i)
 			var o := i * DistrictCache.FIELDS
-			dues = Economy.accumulate(fams[ints[o + Economy.F_FAMILY]], settle, ints[o + Economy.F_GOOD], ints[o + Economy.F_A0],
+			var raw := ints[o + Economy.F_RAW]
+			var a0 := Economy.staffed(game, view, i, raw, ints[o + Economy.F_LIFT]).y if raw > 0 else 0
+			dues = Economy.accumulate(fams[ints[o + Economy.F_FAMILY]], settle, ints[o + Economy.F_GOOD], a0,
 				ints[o + Economy.F_BOUND] != 0, ints[o + Economy.F_WILD_GOOD], ints[o + Economy.F_COVER],
 				ints[o + Economy.F_KEEP], ints[o + Economy.F_PORT], slot, w, tax, defs, made)
 			up = ints[o + Economy.F_UPKEEP]
@@ -233,8 +237,9 @@ static func production(game: Game) -> void:
 		if not c.alive or c.stock.size() != game.defs.goods.size():
 			continue
 		var profile := SeasonProfile.of(game, held, c.id)
-		var made_info := SeasonProfile.made(game, profile, season, game.weather, c.tax)
-		var needs := needs_for(game, int(profile["town"]))
+		var live := SeasonProfile.live(game, held, c.id)
+		var made_info := SeasonProfile.made(game, profile, live, season, game.weather, c.tax)
+		var needs := needs_for(game, int(live["town"]))
 		var prices := Economy.market_prices(game, view, Economy.market_of(game, c.tag), c.stock)
 		var step := goods_step(game, needs, reserve_for(game, needs), c.stock, made_info["made"], prices)
 		var made: PackedInt32Array = made_info["made"]
@@ -272,10 +277,11 @@ static func income(game: Game) -> void:
 		for g: int in goods:
 			used[g] = -Stores.flow(c, g, &"used")
 			sold_milli += -Stores.flow(c, g, &"sold") * (prices[g] if g < prices.size() else 0)
-		var needs := needs_for(game, int(profile["town"]))
-		var made_info := SeasonProfile.made(game, profile, season, game.weather, c.tax)
+		var live := SeasonProfile.live(game, held, c.id)
+		var needs := needs_for(game, int(live["town"]))
+		var made_info := SeasonProfile.made(game, profile, live, season, game.weather, c.tax)
 		var lines := money_lines(game, view, c.tag, c.tax, content_of(game, needs, used), sold_milli, made_info,
-			int(profile["town"]), int(profile["rest"]))
+			int(live["town"]), int(live["rest"]))
 		for line: Dictionary in lines:
 			Treasury.move(game, c.tag, int(line["amount"]), line["why"], line["hex"], int(line["count"]))
 
@@ -365,9 +371,8 @@ static func _people(game: Game, view: StateView, tag: StringName, towns: bool) -
 	var c := Countries.by_tag(game, tag)
 	if c == null:
 		return 0
-	var settle := game.defs.family(Economy.SETTLEMENTS)
 	var total := 0
 	for i: int in Territory.districts(game, c.id):
 		if (view.main_use_at(i) == Economy.SETTLEMENTS) == towns:
-			total += Economy.people_i(game.map, game.defs, view, i, settle)
+			total += Economy.people_i(game.map, view, i)
 	return total

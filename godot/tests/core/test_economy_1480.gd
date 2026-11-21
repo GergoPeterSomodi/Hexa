@@ -1,7 +1,10 @@
 ## The start of a game, 13 countries (docs/architecture/m4-build-spec.md 4.12's table): on "Italy, 1480", seed 1480, Normal
 ## taxes and calm weather, every country's people (town and countryside), start treasury, what the towns need a season
 ## (food, wine, salt, oil), the grain reserve and the first year's net (no works begun; Spring, Summer, Autumn, Winter).
-## People and treasuries do not depend on the seed; the nets are pinned for seed 1480 only.
+## People and treasuries do not depend on the seed; the nets are pinned for seed 1480 only. M5 (spec 4.7, D18): hands and
+## jobs count the owner's own hexes only, so two districts of Venice and of the Papal States that drew hands from a
+## neighbour's land are staffed a little less: their nets are 1 to 2 ducats lower than M4's table in three seasons. The
+## people never change in this test (no people phase runs): every other number is M4's.
 extends GutTest
 
 const GRAIN := 0
@@ -9,7 +12,7 @@ const GRAIN := 0
 const TABLE := {
 	&"SAV": [129000, 131400, 1500, [13, 3, 2, 2], 52, [240, 307, 281, 167]],
 	&"MLO": [249000, 92700, 1905, [25, 5, 3, 3], 100, [261, 314, 309, 263]],
-	&"VEN": [175000, 128200, 1715, [18, 4, 2, 2], 72, [288, 423, 335, 234]],
+	&"VEN": [175000, 128200, 1715, [18, 4, 2, 2], 72, [287, 422, 334, 234]],
 	&"GEN": [40000, 42700, 610, [4, 1, 1, 1], 16, [86, 91, 147, 134]],
 	&"TUS": [63000, 40500, 715, [7, 2, 1, 1], 28, [133, 144, 146, 180]],
 	&"SWI": [66000, 56600, 810, [7, 2, 1, 1], 28, [82, 82, 89, 80]],
@@ -17,14 +20,14 @@ const TABLE := {
 	&"FER": [40000, 30200, 550, [4, 1, 1, 1], 16, [51, 55, 55, 56]],
 	&"SIE": [3000, 15000, 290, [1, 1, 1, 1], 4, [12, 12, 16, 20]],
 	&"LUC": [3000, 2500, 225, [1, 1, 1, 1], 4, [8, 8, 9, 6]],
-	&"PAP": [39000, 78100, 785, [4, 1, 1, 1], 16, [100, 119, 111, 124]],
+	&"PAP": [39000, 78100, 785, [4, 1, 1, 1], 16, [99, 118, 111, 122]],
 	&"FRA": [9000, 53400, 510, [1, 1, 1, 1], 4, [46, 52, 55, 51]],
 	&"AUS": [23000, 30800, 465, [3, 1, 1, 1], 12, [32, 32, 111, 32]],
 }
 ## The year's sums printed in the table's last column.
 const YEAR := {
-	&"SAV": 995, &"MLO": 1147, &"VEN": 1280, &"GEN": 458, &"TUS": 603, &"SWI": 333, &"MAN": 66, &"FER": 217,
-	&"SIE": 60, &"LUC": 31, &"PAP": 454, &"FRA": 204, &"AUS": 207,
+	&"SAV": 995, &"MLO": 1147, &"VEN": 1277, &"GEN": 458, &"TUS": 603, &"SWI": 333, &"MAN": 66, &"FER": 217,
+	&"SIE": 60, &"LUC": 31, &"PAP": 450, &"FRA": 204, &"AUS": 207,
 }
 
 

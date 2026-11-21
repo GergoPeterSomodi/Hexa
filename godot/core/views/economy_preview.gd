@@ -16,8 +16,6 @@ extends RefCounted
 
 ## The seasons a baseline keeps at most (a longer ask is cut).
 const MAX_SEASONS := 16
-## The index of `room` (people) in a hex's base ints.
-const ROOM := 12
 
 
 ## The next `seasons` seasons of `tag`: {seasons: [{turn, season (0 spring to 3 winter), made (loads by good id), used,
@@ -156,18 +154,20 @@ static func _make_worth_seasons(game: Game, tag: StringName, seasons: int) -> Di
 	var affected: Array = inputs["affected"]  # by season: hex index -> true for the hexes the standing works change
 	var any_affected := bool(inputs["any"])
 	var cache := game.districts
+	var own := StateView.of(game.state)
 	var scratch := _zeros(goods_n, 0)
 	var sums := _zeros(goods_n, 0)
-	var wild_memo: Dictionary = {}  # (cover, wild good, keep, room, climate) -> [worth k..., loads k...] of a hex with no piece
+	var wild_memo: Dictionary = {}  # (cover, wild good, keep, people, climate) -> [worth k..., loads k...] of a hex with no piece
 	for h: int in hexes.size():
 		var i := hexes[h]
 		var ints := cache.ints_of(game, i)
 		var o := i * DistrictCache.FIELDS
 		var climate := int(game.map.climate[i])
+		var people := own.people_at(i)
 		var wild_key := -1
-		if ints[o] == 0 and ints[o + ROOM] < 65536 and ints[o + Economy.F_KEEP] < 128 and not (any_affected and _touched(affected, i)):
+		if ints[o] == 0 and people < 65536 and ints[o + Economy.F_KEEP] < 128 and not (any_affected and _touched(affected, i)):
 			wild_key = (((ints[o + Economy.F_COVER] * 32 + ints[o + Economy.F_WILD_GOOD] + 1) * 128 + ints[o + Economy.F_KEEP]) \
-				* 65536 + ints[o + ROOM]) * 4 + climate
+				* 65536 + people) * 4 + climate
 			var memo: Variant = wild_memo.get(wild_key)
 			if memo != null:
 				var m := memo as PackedInt32Array
@@ -186,16 +186,19 @@ static func _make_worth_seasons(game: Game, tag: StringName, seasons: int) -> Di
 				continue
 		sums.fill(0)
 		var record := PackedInt32Array()
+		var raw := ints[o + Economy.F_RAW]
+		var own_a0 := Economy.staffed(game, own, i, raw, ints[o + Economy.F_LIFT]).y if raw > 0 else 0
 		for k: int in count:
 			var rec: Dictionary = records[k]
 			var step: Vector3i
 			scratch.fill(0)
 			var slot := Economy.slot_for(climate, int(rec["season"]))
 			if (affected[k] as Dictionary).has(i):
-				var view_ints := _ints_of_base(Economy.district_base(game, rec["view"] as StateView, game.map.hex_of(i)))
-				step = _worth_step(defs, fams, view_ints, 0, slot, level, prices, factors[k], scratch)
+				var base := Economy.district_base(game, rec["view"] as StateView, game.map.hex_of(i))
+				step = _worth_step(defs, fams, _ints_of_base(base), 0, slot, level, prices, factors[k], scratch, int(base["a0"]),
+					int(base["people"]))
 			else:
-				step = _worth_step(defs, fams, ints, o, slot, level, prices, factors[k], scratch)
+				step = _worth_step(defs, fams, ints, o, slot, level, prices, factors[k], scratch, own_a0, people)
 			var at := h * count + k
 			worth[at] = step.x
 			upkeep[at] = step.y
@@ -282,11 +285,13 @@ static func worth_of(game: Game, tag: StringName, hex: Vector2i) -> Dictionary:
 static func _new_holder(game: Game, tag: StringName) -> Dictionary:
 	var c := Countries.by_tag(game, tag)
 	var holder: Dictionary = {"records": [] as Array[Dictionary], "country": c, "memo": {}, "views": {}, "standing": [] as Array[Dictionary],
-		"profile": {}, "own": StateView.of(game.state)}
+		"profile": {}, "live": {}, "own": StateView.of(game.state)}
 	if c == null or game.defs == null:
 		holder["country"] = null
 		return holder
-	holder["profile"] = SeasonProfile.of(game, SeasonProfile.table(game), c.id)
+	var held := SeasonProfile.table(game)
+	holder["profile"] = SeasonProfile.of(game, held, c.id)
+	holder["live"] = SeasonProfile.live(game, held, c.id)
 	holder["standing"] = _standing(game, c, MAX_SEASONS)
 	return holder
 
@@ -296,6 +301,7 @@ static func _extend(game: Game, holder: Dictionary, tax: int, want: int) -> void
 	var c: Country = holder["country"]
 	var records: Array = holder["records"]
 	var profile: Dictionary = holder["profile"]
+	var live: Dictionary = holder["live"]
 	var own: StateView = holder["own"]
 	var standing: Array = holder["standing"]
 	var views: Dictionary = holder["views"]
@@ -313,12 +319,12 @@ static func _extend(game: Game, holder: Dictionary, tax: int, want: int) -> void
 		if landed > 0 and not views.has(landed):
 			views[landed] = own.with(changes)
 		var view: StateView = views[landed] if landed > 0 else own
-		var info := SeasonProfile.made(game, profile, season, _calm(), tax)
+		var info := SeasonProfile.made(game, profile, live, season, _calm(), tax)
 		var rec: Dictionary = {
 			"turn": turn, "season": season, "made": info["made"], "dues": info["dues"], "upkeep": int(info["upkeep"]),
 			"upkeep_count": int(info["upkeep_count"]), "walls": info["walls"], "dues_sum": _sum_of(info["dues"] as Array),
-			"walls_sum": _sum_of(info["walls"] as Array), "town": int(profile["town"]),
-			"rest": int(profile["rest"]), "view": view,
+			"walls_sum": _sum_of(info["walls"] as Array), "town": int(live["town"]),
+			"rest": int(live["rest"]), "view": view,
 		}
 		if landed > 0:
 			_adjust(game, c, rec, own, view, _around(game, seeds), season, tax, [], true, true, holder["memo"] as Dictionary)
@@ -416,16 +422,16 @@ static func _adjust(game: Game, c: Country, rec: Dictionary, from_view: StateVie
 			_set_entry(rec["walls"] as Array, map, i, int(to_out["walls"]))
 		rec["upkeep"] = int(rec["upkeep"]) + int(to_out["upkeep"]) - int(from_out["upkeep"])
 		rec["upkeep_count"] = int(rec["upkeep_count"]) + int(int(to_out["upkeep"]) > 0) - int(int(from_out["upkeep"]) > 0)
-		var from_room := int(from_base["room"])
-		var to_room := int(to_base["room"])
+		var from_people := int(from_base["people"])
+		var to_people := int(to_base["people"])
 		if int(from_base["family"]) == Economy.SETTLEMENTS:
-			rec["town"] = int(rec["town"]) - from_room
+			rec["town"] = int(rec["town"]) - from_people
 		else:
-			rec["rest"] = int(rec["rest"]) - from_room
+			rec["rest"] = int(rec["rest"]) - from_people
 		if int(to_base["family"]) == Economy.SETTLEMENTS:
-			rec["town"] = int(rec["town"]) + to_room
+			rec["town"] = int(rec["town"]) + to_people
 		else:
-			rec["rest"] = int(rec["rest"]) + to_room
+			rec["rest"] = int(rec["rest"]) + to_people
 
 
 ## Whether two bases hold the same numbers.
@@ -433,7 +439,7 @@ static func _same(a: Dictionary, b: Dictionary) -> bool:
 	for key: String in Economy.BASE_FIELDS:
 		if a[key] != b[key]:
 			return false
-	return a["good"] == b["good"]
+	return a["good"] == b["good"] and a["people"] == b["people"] and a["staffing"] == b["staffing"] and a["a0"] == b["a0"]
 
 
 ## A hex's base in `view`; the game's own state reads the DistrictCache.
@@ -550,7 +556,7 @@ static func _worth_context(game: Game, c: Country) -> Dictionary:
 	return {
 		"defs": game.defs, "season": Calendar.season_of(game.turn), "factor": EconomySeason.factor_of(game, content),
 		"prices": Economy.market_prices(game, null, Economy.market_of(game, c.tag), c.stock), "level": clampi(c.tax, 0, 2),
-		"fams": _families(game.defs),
+		"fams": _families(game.defs), "view": StateView.of(game.state),
 	}
 
 
@@ -558,11 +564,11 @@ static func _worth_context(game: Game, c: Country) -> Dictionary:
 ## the base in `slot` of the year at tax `level`, calm. `goods` (zeroed, one place a good) receives the loads. Returns
 ## (worth, upkeep and walls, port dues): the goods at the fixed prices, the dues and its people's taxes (the towns' factor
 ## for a settlement), less upkeep and walls, floored once for the hex. The one step under worth_by_hex, worth_of and
-## worth_seasons; `fams` are the families by id.
+## worth_seasons; `fams` are the families by id; `a0` and `people` are the hex's live numbers (the cache keeps neither).
 static func _worth_step(defs: GameDefs, fams: Array[FamilyDef], ints: PackedInt32Array, o: int, slot: int, level: int,
-		prices: PackedInt32Array, factor: int, goods: PackedInt32Array) -> Vector3i:
+		prices: PackedInt32Array, factor: int, goods: PackedInt32Array, a0: int, people: int) -> Vector3i:
 	var family := ints[o]
-	var dues := Economy.accumulate(fams[family], fams[Economy.SETTLEMENTS], ints[o + Economy.F_GOOD], ints[o + Economy.F_A0],
+	var dues := Economy.accumulate(fams[family], fams[Economy.SETTLEMENTS], ints[o + Economy.F_GOOD], a0,
 		ints[o + Economy.F_BOUND] != 0, ints[o + Economy.F_WILD_GOOD], ints[o + Economy.F_COVER], ints[o + Economy.F_KEEP],
 		ints[o + Economy.F_PORT], slot, Economy.CALM, level, defs, goods)
 	var milli := 0
@@ -570,7 +576,7 @@ static func _worth_step(defs: GameDefs, fams: Array[FamilyDef], ints: PackedInt3
 		if goods[g] != 0:
 			milli += goods[g] * (prices[g] if g < prices.size() else 0)
 	var rate: int = defs.town_tax_milli * factor / 1000 if family == Economy.SETTLEMENTS else defs.country_tax_milli
-	var taxes := ints[o + ROOM] * rate * defs.tax_permille[level] / 1000000000 if level < defs.tax_permille.size() else 0
+	var taxes := people * rate * defs.tax_permille[level] / 1000000000 if level < defs.tax_permille.size() else 0
 	var upkeep := ints[o + Economy.F_UPKEEP] + ints[o + Economy.F_WALLS]
 	return Vector3i(milli / 1000 + dues + taxes - upkeep, upkeep, dues)
 
@@ -596,9 +602,14 @@ static func _worth_row(game: Game, ctx: Dictionary, i: int) -> Dictionary:
 	var defs: GameDefs = ctx["defs"]
 	var goods := PackedInt32Array()
 	goods.resize(defs.goods.size())
-	var step := _worth_step(defs, ctx["fams"] as Array[FamilyDef], game.districts.ints_of(game, i), i * DistrictCache.FIELDS,
+	var ints := game.districts.ints_of(game, i)
+	var o := i * DistrictCache.FIELDS
+	var raw := ints[o + Economy.F_RAW]
+	var own: StateView = ctx["view"]
+	var a0 := Economy.staffed(game, own, i, raw, ints[o + Economy.F_LIFT]).y if raw > 0 else 0
+	var step := _worth_step(defs, ctx["fams"] as Array[FamilyDef], ints, o,
 		Economy.slot_for(int(game.map.climate[i]), int(ctx["season"])), int(ctx["level"]), ctx["prices"] as PackedInt32Array,
-		int(ctx["factor"]), goods)
+		int(ctx["factor"]), goods, a0, own.people_at(i))
 	if step.x == 0 and step.y == 0:
 		return {}
 	var hex := game.map.hex_of(i)

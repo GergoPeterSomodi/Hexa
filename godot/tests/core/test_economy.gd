@@ -63,8 +63,9 @@ func before_all() -> void:
 	_game = Game.new_scenario(map, _defs, scen, 1480)
 
 
-## A 9 x 9 all-land map of one cover and climate (frost), the game over a wild state.
-func _flat_game(cover: int, climate: int = 1) -> Game:
+## A 9 x 9 all-land map of one cover and climate (frost), the game over a wild state, every hex held by one owner (hands and
+## jobs count the owner's hexes only: M5 spec 4.7). `held` false leaves the land unowned.
+func _flat_game(cover: int, climate: int = 1, held: bool = true) -> Game:
 	var m := MapData.new()
 	m.id = "economy_flat"
 	m.hex_w_km = 28.0
@@ -75,7 +76,10 @@ func _flat_game(cover: int, climate: int = 1) -> Game:
 		m.cover[i] = cover
 		m.climate[i] = climate
 		m.depth[i] = 0
-	return Game.with_state(m, MapState.create(m), 1, _defs)
+	var state := MapState.create(m)
+	if held:
+		state.owner.fill(1)
+	return Game.with_state(m, state, 1, _defs)
 
 
 func _put(g: Game, hex: Vector2i, family: int, level: int) -> int:
@@ -96,6 +100,7 @@ func _bare_base(id: int, level: int, good: StringName, permille: int, bound: boo
 	base["family"] = id
 	base["level"] = level
 	base["good"] = _defs.good_id(good)
+	base["raw"] = fam.base[level] * permille
 	base["a0"] = fam.base[level] * permille
 	base["weather_bound"] = bound
 	return base
@@ -287,9 +292,16 @@ func test_slot_of_people_at_prices_and_floor_div() -> void:
 		assert_eq(Economy.people_at(flat, _view(flat), Vector2i(4, 4)), covers[cover])
 	var town := _flat_game(0)
 	var levels := [1000, 3000, 10000, 30000, 60000]
+	var had := 8000
 	for level: int in range(1, 6):
-		_put(town, Vector2i(4, 4), 1, level)
+		var at := _put(town, Vector2i(4, 4), 1, level)
+		# People are the state's now (M5): the start table is People.start_people, what the view reads is MapState.people.
+		assert_eq(People.start_people(town, Vector2i(4, 4)), levels[level - 1])
+		assert_eq(Economy.people_at(town, _view(town), Vector2i(4, 4)), had, "the hex keeps the people it had")
+		had = levels[level - 1]
+		town.state.people[at] = had
 		assert_eq(Economy.people_at(town, _view(town), Vector2i(4, 4)), levels[level - 1])
+		assert_eq(Economy.people_at(town, _view(town).with_people({at: 7}), Vector2i(4, 4)), 7, "the view's own number")
 	assert_eq(Economy.people_at(town, _view(town), Vector2i(-1, 0)), 0)
 	# The prices are the table's, whatever the supply (P: a changed supply array leaves them).
 	var supply := PackedInt32Array()
@@ -333,6 +345,7 @@ func test_genoa_hex_by_hex_equals_4_15_a() -> void:
 
 
 func test_genoa_as_a_city_4_15_d() -> void:
+	# M5: an upgrade brings room, not people (spec 4.11 c replaces M4's people jump): the city's dues, fish and lift hold.
 	var i := _game.map.index_of(Vector2i(8, 13))
 	var view := _view(_game).with({i: Vector2i(1, 5)})
 	var spring := Economy.district_output(_game, view, Vector2i(8, 13), 0)
@@ -342,7 +355,8 @@ func test_genoa_as_a_city_4_15_d() -> void:
 	var ring := Economy.district_output(_game, view, Vector2i(9, 13), 0)
 	assert_eq(ring["goods"][11], 7, "timber near a city: +1 a season")
 	assert_eq(Economy.district_output(_game, view, Vector2i(9, 13), 3)["goods"][11], 21, "+2 in winter")
-	assert_eq(Economy.people_at(_game, view, Vector2i(8, 13)), 60000)
+	assert_eq(Economy.people_at(_game, view, Vector2i(8, 13)), 30000, "the people are the same")
+	assert_eq(int(Economy.district_base(_game, view, Vector2i(8, 13))["room"]), 100000, "the room is the city's")
 
 
 func test_district_output_equals_season_output_of_the_base_on_every_land_hex() -> void:
@@ -396,3 +410,145 @@ func test_a_defs_without_goods_never_reads_out_of_bounds() -> void:
 	assert_eq(short, PackedInt32Array([0]))
 	var tiny := PackedInt32Array()
 	assert_eq(Economy.add_output(_bare_base(3, 1, &"grain", 1000, true), 1, 0, 1, _defs, tiny)["upkeep"], 0)
+
+
+# ----- M5: people live, hands and jobs of the owner's land, the new base keys (spec 4.7, 5.0 R1, 5.3) -----------------------
+
+
+func test_people_at_reads_the_view_and_zero_at_sea_and_off_the_map() -> void:
+	var g := _flat_game(0)
+	var hex := Vector2i(4, 4)
+	var i := g.map.index_of(hex)
+	assert_eq(Economy.people_at(g, _view(g), hex), 8000)
+	assert_eq(Economy.people_at(g, _view(g).with_people({i: 123}), hex), 123, "a what-if number")
+	assert_eq(g.state.people[i], 8000, "the base is untouched")
+	g.state.people[i] = 4321
+	assert_eq(Economy.people_at(g, _view(g), hex), 4321, "the state's own")
+	assert_eq(Economy.people_at(g, _view(g), Vector2i(-1, 0)), 0)
+	g.map.land[g.map.index_of(Vector2i(0, 0))] = 0
+	assert_eq(Economy.people_at(g, _view(g), Vector2i(0, 0)), 0, "the sea has none")
+
+
+func test_hands_and_jobs_count_the_owners_hexes_only() -> void:
+	var g := _flat_game(4)  # rock: 600 people a hex, all held by owner 1
+	var hex := Vector2i(4, 4)
+	_put(g, hex, 11, 3)
+	assert_eq(Economy.hands_at(g, _view(g), hex), 1260)
+	var next := g.map.neighbour(hex, 0)
+	_put(g, next, 12, 1)
+	assert_eq(Economy.jobs_near(g, _view(g), hex), 5000)
+	# A foreign neighbour's people and jobs do not count (P: a hands_at that counts every neighbour is caught).
+	g.state.owner[g.map.index_of(next)] = 2
+	assert_eq(Economy.hands_at(g, _view(g), hex), 6 * 600 * 300 / 1000, "six neighbours of the owner left: 5 x 600 + 600")
+	assert_eq(Economy.jobs_near(g, _view(g), hex), 4000, "the foreign quarry's jobs do not count")
+	g.state.people[g.map.index_of(next)] = 99999
+	assert_eq(Economy.hands_at(g, _view(g), hex), 6 * 600 * 300 / 1000, "a foreign neighbour's people do not count either")
+	assert_eq(Economy.hands_at(g, _view(g), next), 99999 * 300 / 1000, "the quarry's owner holds nothing beside it: its own hex alone")
+	# Unowned land: the hex alone.
+	var lone := _flat_game(4, 1, false)
+	_put(lone, hex, 11, 3)
+	assert_eq(Economy.hands_at(lone, _view(lone), hex), 180, "600 x 30 %: the hex alone")
+	assert_eq(Economy.jobs_near(lone, _view(lone), hex), 4000)
+	assert_eq(Economy.staffing(lone, _view(lone), hex), 45)
+
+
+func test_district_base_has_the_new_keys_and_room() -> void:
+	var base := Economy.district_base(_game, _view(_game), Vector2i(7, 12))  # Genoa's vineyard
+	for key: String in Economy.BASE_FIELDS + ["people", "staffing", "a0"] as Array[String]:
+		assert_true(base.has(key), key)
+	assert_eq(base["people"], 8000)
+	assert_eq(base["room"], 10000, "farmland 8,000 and the second stage's 2,000 jobs")
+	assert_eq(base["raw"], 24 * 1000, "the base times the extra: 24 loads, no extra")
+	assert_eq(base["staffing"], 1000)
+	assert_eq(base["a0"], 24000)
+	var genoa := Economy.district_base(_game, _view(_game), Vector2i(8, 13))
+	assert_eq([genoa["people"], genoa["room"], genoa["raw"], genoa["a0"]], [30000, 45000, 0, 0])
+	var sea_i := 0
+	while _game.map.land[sea_i] == 1:
+		sea_i += 1
+	var sea := Economy.district_base(_game, _view(_game), _game.map.hex_of(sea_i))
+	assert_eq([sea["people"], sea["room"], sea["staffing"], sea["a0"]], [0, 0, 1000, 0])
+	var scenery := _flat_game(4)
+	_put(scenery, Vector2i(4, 4), 11, 3)
+	var mine := Economy.district_base(scenery, _view(scenery), Vector2i(4, 4))
+	assert_eq(mine["staffing"], 315)
+	assert_eq(mine["a0"], int(mine["raw"]) * 315 / 1000)
+	assert_eq(mine["room"], 600 + 4000, "the cover's countryside people and the district's jobs")
+
+
+func test_staffed_is_the_one_live_step() -> void:
+	var g := _flat_game(4)
+	var hex := Vector2i(4, 4)
+	var i := _put(g, hex, 11, 3)
+	var live := Economy.staffed(g, _view(g), i, 14000, 200)
+	assert_eq(live.x, 315)
+	assert_eq(live.y, 14000 * 315 / 1000 * 1200 / 1000, "floored in that order: staffing, then lift")
+	# People follow without a touch: a view with more people at the hex and its ring gives more hands.
+	var view := _view(g).with_people({i: 5000})
+	assert_gt(Economy.staffed(g, view, i, 14000, 0).x, 315)
+	assert_eq(Economy.staffed(g, _view(g), i, 0, 0), Vector2i(315, 0), "no raw: no output")
+
+
+func test_room_follows_the_district_and_the_level() -> void:
+	var g := _flat_game(0)
+	var hex := Vector2i(4, 4)
+	assert_eq(People.room_at(g, _view(g), hex), 8000)
+	var i := _put(g, hex, 7, 2)
+	assert_eq(People.room_at(g, _view(g), hex), 10000)
+	_put(g, hex, 7, 3)
+	assert_eq(People.room_at(g, _view(g), hex), 12000)
+	_put(g, hex, 2, 1)
+	assert_eq(People.room_at(g, _view(g), hex), 8000, "a castle has no jobs")
+	_put(g, hex, 1, 3)
+	assert_eq(People.room_at(g, _view(g), hex), 20000)
+	assert_eq(People.room_at(g, _view(g).with({i: Vector2i(1, 5)}), hex), 100000, "the view's level")
+
+
+func test_district_output_equals_season_output_of_the_base_after_ten_seasons_of_people() -> void:
+	# M5 spec 9: the same equality on every land hex with the people grown (the games's people phase is the fixture's).
+	var g := PeopleFixture.genoa()
+	PeopleFixture.play(g, 10)
+	var view := _view(g)
+	var moved := 0
+	for i: int in g.map.hex_count():
+		if g.map.land[i] == 0:
+			continue
+		if g.state.people[i] != g.state.people_start[i]:
+			moved += 1
+		var hex := g.map.hex_of(i)
+		var base := Economy.district_base(g, view, hex)
+		assert_eq(base["people"], g.state.people[i], "%s the base reads the live people" % str(hex))
+		for season: int in 4:
+			for tax: int in 3:
+				var out := Economy.district_output(g, view, hex, season, Economy.CALM, tax)
+				var plain := Economy.season_output(base, int(g.map.climate[i]), season, Economy.CALM, tax, g.defs)
+				for key: String in ["goods", "ducats", "upkeep", "walls"]:
+					assert_eq(out[key], plain[key], "%s %s s%d t%d" % [hex, key, season, tax])
+	assert_gt(moved, 0, "the people moved in the ten seasons")
+
+
+func test_staffing_follows_the_people_hex_by_hex() -> void:
+	# A district short of hands is staffed by its owner's people: more people beside it, more of its jobs staffed.
+	var g := _flat_game(4)  # rock: 600 a hex
+	var hex := Vector2i(4, 4)
+	var i := _put(g, hex, 11, 3)  # a mine of 4,000 jobs
+	var before := Economy.district_base(g, _view(g), hex)
+	assert_eq(before["staffing"], 315)
+	g.state.people[g.map.index_of(g.map.neighbour(hex, 0))] += 5000
+	var after := Economy.district_base(g, _view(g), hex)
+	assert_gt(int(after["staffing"]), 315)
+	assert_gt(int(after["a0"]), int(before["a0"]))
+	assert_eq(after["raw"], before["raw"], "the people-free part is the same")
+	assert_eq(Economy.staffed(g, _view(g), i, int(after["raw"]), int(after["lift"])), Vector2i(after["staffing"], after["a0"]))
+
+
+func test_the_ring_by_arithmetic_equals_the_maps_neighbours() -> void:
+	# Economy._ring is arithmetic on the index (the hot path of staffing); it must agree with the map's own neighbours.
+	for g: Game in [_game, _flat_game(0)]:
+		var map := g.map
+		for i: int in map.hex_count():
+			var want := PackedInt32Array()
+			var hex := map.hex_of(i)
+			for d: int in 6:
+				want.append(map.index_of(map.neighbour(hex, d)))
+			assert_eq(Economy.ring_of(map, i), want, "%s" % str(hex))

@@ -38,6 +38,7 @@ func test_setup_stores_at_the_reserve_for_a_planted_town() -> void:
 	var cap := g.map.index_of(ScenarioFixture.ALPHA_CAPITAL)
 	g.state.main_use[cap] = 1
 	g.state.level[cap] = 4   # a walled town: 30,000 people
+	People.setup(g)   # people are the state's (M5): the planted land starts with its table
 	c.stock = PackedInt32Array([9])
 	Stores.setup(g)
 	assert_eq(c.stock.size(), 16)

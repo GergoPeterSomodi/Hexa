@@ -113,7 +113,7 @@ static func _row(game: Game, tag: StringName, hex: Vector2i, action: StringName,
 	}
 
 
-## The chips of a row, from the hex alone: the district's good a year and a town's people (the card has the gain too).
+## The chips of a row, from the hex alone: the district's good a year and a town's room (the card has the gain too).
 static func _light_chips(game: Game, hex: Vector2i, target: Dictionary, c: Country) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if game.defs == null or game.defs.goods.is_empty():
@@ -137,9 +137,9 @@ static func _light_chips(game: Game, hex: Vector2i, target: Dictionary, c: Count
 	if main >= 0 and int(target["family"]) != ImproveRules.SETTLEMENT and to_goods[main] != from_goods[main]:
 		out.append(_chip(&"good", "%s %s a year" % [String(game.defs.goods[main].key), Words.signed(to_goods[main] - from_goods[main])],
 			to_goods[main] - from_goods[main]))
-	var people := int(to_base["room"]) - int(from_base["room"])
-	if int(target["family"]) == ImproveRules.SETTLEMENT and people != 0:
-		out.append(_chip(&"people", "people %s" % Words.signed(people), people))
+	var room := int(to_base["room"]) - int(from_base["room"])
+	if int(target["family"]) == ImproveRules.SETTLEMENT and room != 0:
+		out.append(_chip(&"room", "room %s" % Words.signed(room), room))
 	return out
 
 
@@ -642,12 +642,13 @@ static func _good_sum(cells: Dictionary, i: int, g: int) -> Array[int]:
 	return [from_sum, to_sum]
 
 
-## A settlement: people, taxes on people (the country), port dues and fish (spring), the towns' food, upkeep and walls.
+## A settlement: its room (an upgrade brings room, not people: M5 D17), taxes on people (the country), port dues and fish
+## (spring), the towns' food, upkeep and walls.
 static func _brings_town(game: Game, cells: Dictionary, e: Dictionary) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var from_base: Dictionary = e["from"]
 	var to_base: Dictionary = e["to"]
-	out.append(_bring(&"people", "People", int(from_base["room"]), int(to_base["room"]), &"season"))
+	out.append(_bring(&"room", "Room", int(from_base["room"]), int(to_base["room"]), &""))
 	var b: Dictionary = (cells["before"] as Array)[Calendar.SPRING]
 	var a: Dictionary = (cells["after"] as Array)[Calendar.SPRING]
 	if bool(cells["has"]) and not b.is_empty():
@@ -742,7 +743,7 @@ static func _expensive(game: Game, c: Country, ducats: int, seasons: int) -> boo
 	return ducats * 1000 > c.treasury * game.defs.expensive_permille or seasons >= game.defs.expensive_seasons
 
 
-## Up to three: the district's good a year, the gain a year (both measures), and a town's people.
+## Up to three: the district's good a year, the gain a year (both measures), and a town's room.
 static func _chips(game: Game, cells: Dictionary, target: Dictionary, year: Dictionary, money: bool) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var i := int(cells["i"])
@@ -765,7 +766,7 @@ static func _chips(game: Game, cells: Dictionary, target: Dictionary, year: Dict
 	if int(target["family"]) == ImproveRules.SETTLEMENT:
 		var gone := int((e["to"] as Dictionary)["room"]) - int((e["from"] as Dictionary)["room"])
 		if gone != 0:
-			out.append(_chip(&"people", "people %s" % Words.signed(gone), gone))
+			out.append(_chip(&"room", "room %s" % Words.signed(gone), gone))
 	return out
 
 

@@ -642,7 +642,9 @@ func _m4_hover_card(vp: SubViewport, app: App) -> void:
 	assert_lt(card.card_rect().end.x, Hud.screen_rect(app.hud().hex_panel()).position.x + 1.0, "left of the panel")
 	var marks := app.map_scene().preview_marks()
 	assert_true(marks.shown(), "the ghost and the marks are on the map")
-	assert_true(marks.labels().any(func(l: Dictionary) -> bool: return str(l["text"]) == "+16 timber"), str(marks.labels()))
+	# M5 D18: hands count only Genoa's own hexes, so the new woodland at (10, 13), on Genoa's edge, is staffed a little less
+	# than M4's +16 (which counted a neighbour's people): +10 a year.
+	assert_true(marks.labels().any(func(l: Dictionary) -> bool: return str(l["text"]) == "+10 timber"), str(marks.labels()))
 	card.hold(true)  # Shift
 	woods.mouse_exited.emit()
 	await _wait_frames(2)

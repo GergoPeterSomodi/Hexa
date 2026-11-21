@@ -337,13 +337,13 @@ static func _genoa_city_refused_reason_words() -> Variant:
 
 static func _genoa_city_refused_brings() -> Variant:
 	return [{
-	"after": 60000,
-	"before": 30000,
-	"field": &"people",
-	"label": "People",
-	"per": &"season"
+	"after": 100000,
+	"before": 45000,
+	"field": &"room",
+	"label": "Room",
+	"per": &""
 	}, {
-	"after": 95,
+	"after": 65,
 	"before": 65,
 	"field": &"tax",
 	"label": "Taxes on people (the country)",
@@ -361,7 +361,7 @@ static func _genoa_city_refused_brings() -> Variant:
 	"label": "Fish",
 	"per": &"season"
 	}, {
-	"after": 7,
+	"after": 4,
 	"before": 4,
 	"field": &"food",
 	"label": "Towns' food",
@@ -377,15 +377,15 @@ static func _genoa_city_refused_brings() -> Variant:
 
 static func _genoa_city_refused_by_season() -> Variant:
 	return [{
-	"after": 138,
-	"after_realm": 138,
-	"after_treasury": 126,
+	"after": 108,
+	"after_realm": 108,
+	"after_treasury": 99,
 	"before": 93,
 	"before_realm": 93,
 	"before_treasury": 86,
-	"gain": 45,
-	"gain_realm": 45,
-	"gain_treasury": 40,
+	"gain": 15,
+	"gain_realm": 15,
+	"gain_treasury": 13,
 	"goods": [{
 	"after": 10,
 	"before": 6,
@@ -396,15 +396,15 @@ static func _genoa_city_refused_by_season() -> Variant:
 	"season": "Spring",
 	"turn": 1
 	}, {
-	"after": 146,
-	"after_realm": 146,
-	"after_treasury": 130,
+	"after": 116,
+	"after_realm": 116,
+	"after_treasury": 106,
 	"before": 100,
 	"before_realm": 100,
 	"before_treasury": 91,
-	"gain": 46,
-	"gain_realm": 46,
-	"gain_treasury": 39,
+	"gain": 16,
+	"gain_realm": 16,
+	"gain_treasury": 15,
 	"goods": [{
 	"after": 10,
 	"before": 6,
@@ -415,15 +415,15 @@ static func _genoa_city_refused_by_season() -> Variant:
 	"season": "Summer",
 	"turn": 2
 	}, {
-	"after": 241,
-	"after_realm": 241,
-	"after_treasury": 173,
+	"after": 211,
+	"after_realm": 211,
+	"after_treasury": 161,
 	"before": 196,
 	"before_realm": 196,
 	"before_treasury": 147,
-	"gain": 45,
-	"gain_realm": 45,
-	"gain_treasury": 26,
+	"gain": 15,
+	"gain_realm": 15,
+	"gain_treasury": 14,
 	"goods": [{
 	"after": 10,
 	"before": 6,
@@ -434,15 +434,15 @@ static func _genoa_city_refused_by_season() -> Variant:
 	"season": "Autumn",
 	"turn": 3
 	}, {
-	"after": 208,
-	"after_realm": 208,
-	"after_treasury": 170,
+	"after": 178,
+	"after_realm": 178,
+	"after_treasury": 142,
 	"before": 168,
 	"before_realm": 168,
 	"before_treasury": 134,
-	"gain": 40,
-	"gain_realm": 40,
-	"gain_treasury": 36,
+	"gain": 10,
+	"gain_realm": 10,
+	"gain_treasury": 8,
 	"goods": [{
 	"after": 7,
 	"before": 4,
@@ -457,23 +457,23 @@ static func _genoa_city_refused_by_season() -> Variant:
 
 static func _genoa_city_refused_year() -> Variant:
 	return {
-	"after": 733,
-	"after_realm": 733,
-	"after_treasury": 599,
+	"after": 613,
+	"after_realm": 613,
+	"after_treasury": 508,
 	"before": 557,
 	"before_realm": 557,
 	"before_treasury": 458,
-	"gain": 176,
-	"gain_realm": 176,
-	"gain_treasury": 141
+	"gain": 56,
+	"gain_realm": 56,
+	"gain_treasury": 50
 	}
 
 
 static func _genoa_city_refused_lands() -> Variant:
 	return {
 	"country": {
-	"after": 733,
-	"after_treasury": 599,
+	"after": 613,
+	"after_treasury": 508,
 	"before": 557,
 	"before_treasury": 458
 	},
@@ -537,12 +537,12 @@ static func _genoa_city_refused_payback() -> Variant:
 	return {
 	"prestige": false,
 	"prestige_treasury": false,
-	"seasons": 32,
-	"seasons_treasury": 37,
-	"text": "Pays back in Spring 1488, 32 seasons from now (at today's prices).",
-	"text_treasury": "Summer 1489, 37 seasons from now.",
-	"turn": 33,
-	"turn_treasury": 38
+	"seasons": 83,
+	"seasons_treasury": 92,
+	"text": "Pays back in Winter 1500, 83 seasons from now (at today's prices).",
+	"text_treasury": "Spring 1503, 92 seasons from now.",
+	"turn": 84,
+	"turn_treasury": 93
 	}
 
 
@@ -556,22 +556,22 @@ static func _genoa_city_refused_next_stages() -> Variant:
 
 static func _genoa_city_refused_chips() -> Variant:
 	return [{
-	"amount": 176,
-	"amount_realm": 176,
-	"amount_treasury": 141,
+	"amount": 56,
+	"amount_realm": 56,
+	"amount_treasury": 50,
 	"kind": &"gain",
-	"text": "+176 a year",
-	"text_realm": "+176 a year",
-	"text_treasury": "+141 a year",
+	"text": "+56 a year",
+	"text_realm": "+56 a year",
+	"text_treasury": "+50 a year",
 	"tone": &"good"
 	}, {
-	"amount": 30000,
-	"amount_realm": 30000,
-	"amount_treasury": 30000,
-	"kind": &"people",
-	"text": "people +30,000",
-	"text_realm": "people +30,000",
-	"text_treasury": "people +30,000",
+	"amount": 55000,
+	"amount_realm": 55000,
+	"amount_treasury": 55000,
+	"kind": &"room",
+	"text": "room +55,000",
+	"text_realm": "room +55,000",
+	"text_treasury": "room +55,000",
 	"tone": &"good"
 	}]
 

@@ -57,6 +57,7 @@ static func new_game(p_map: MapData, p_seed: int, p_defs: GameDefs = null) -> Ga
 	out.improvement = WorldImprove.build(p_map, p_seed)
 	out.state = out.improvement.state
 	# Called by reference: a typed call would make Game and StatsSystem need each other to parse.
+	People.setup.call(out)
 	StatsSystem.setup.call(out)
 	return out
 
@@ -74,6 +75,7 @@ static func new_scenario(p_map: MapData, p_defs: GameDefs, p_scenario: ScenarioD
 	Territory.setup(out, p_scenario)
 	out.districts.clear()
 	# Called by reference (the layer rule: a typed call from game into systems makes the files need each other to parse).
+	People.setup.call(out)  # before the purse: the start treasury counts the people (M5 spec 5.4)
 	Treasury.setup.call(out)
 	Stores.setup.call(out)
 	StatsSystem.setup.call(out)  # again, now that the countries are known
@@ -90,6 +92,8 @@ static func with_state(p_map: MapData, p_state: MapState, p_seed: int = 0, p_def
 	out.state = p_state
 	out.improvement = WorldImprove.over(p_map, p_state)
 	out.districts.clear()
+	if p_defs != null and p_state.people.count(0) == p_state.people.size():
+		People.setup.call(out)  # a state with no people yet (a test's, an older save's) starts with M4's table
 	return out
 
 

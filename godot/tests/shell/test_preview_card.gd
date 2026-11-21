@@ -103,7 +103,7 @@ func test_money_refusal_keeps_the_whole_card_with_its_bar() -> void:
 	assert_true(card.body_visible(), "the card still shows everything")
 	assert_eq(card.brings_container().get_child_count(), 6, "every brings line stays")
 	assert_true(card.season_strip().visible)
-	assert_eq(card.payback_label().text, "Pays back in Spring 1488, 32 seasons from now (at today's prices).")
+	assert_eq(card.payback_label().text, "Pays back in Winter 1500, 83 seasons from now (at today's prices).")
 
 
 func test_rule_refusal_shows_only_the_refusal() -> void:

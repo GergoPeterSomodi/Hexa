@@ -42,10 +42,17 @@ func _land_count(game: Game) -> int:
 
 
 func test_fields_match_the_base_keys() -> void:
+	# The cache keeps the people-free fourteen; district_base adds the live people, staffing and a0 (M5 spec 5.3).
 	assert_eq(DistrictCache.FIELDS, Economy.BASE_FIELDS.size())
-	assert_eq(Economy.empty_base().size(), DistrictCache.FIELDS)
+	assert_eq(DistrictCache.FIELDS, 14)
+	assert_eq(Economy.empty_base().size(), DistrictCache.FIELDS + 3)
 	var game := _new_game()
-	assert_eq(Economy.district_base(game, StateView.of(game.state), Vector2i(8, 13)).size(), DistrictCache.FIELDS)
+	var base := Economy.district_base(game, StateView.of(game.state), Vector2i(8, 13))
+	assert_eq(base.size(), DistrictCache.FIELDS + 3)
+	for key: String in Economy.BASE_FIELDS:
+		assert_true(base.has(key), key)
+	for key: String in ["people", "staffing", "a0"]:
+		assert_true(base.has(key), key)
 
 
 func test_a_cold_cache_equals_district_base_on_every_land_hex() -> void:
@@ -199,3 +206,73 @@ func test_two_thousand_random_actions_keep_the_games_own_cache_equal() -> void:
 	assert_eq(_stale(game, cache), [] as Array[int], "after 2,000 actions")
 	assert_gt(changed, 5, "works finished and changed the map through the door")
 	assert_gt(cache.size(), 0)
+
+
+# ----- M5: the cache keeps the people-free fourteen; staffing and a0 are live (spec 5.3) -------------------------------
+
+
+func test_staffing_follows_the_people_without_a_touch() -> void:
+	# P: a cache that kept staffing across a season would show the old number after the people move and nothing is touched.
+	var game := _new_game()
+	var cache := DistrictCache.new()
+	_stale(game, cache)
+	var hex := Vector2i(9, 13)  # the timber district beside Genoa: its hands are Genoa's people and its own ring's
+	var i := game.map.index_of(hex)
+	var before := cache.base_of(game, i)
+	game.state.people[game.map.index_of(Vector2i(9, 12))] = 0
+	game.state.people[game.map.index_of(Vector2i(8, 13))] = 0
+	game.state.people[game.map.index_of(Vector2i(10, 13))] = 0
+	var after := cache.base_of(game, i)
+	assert_eq(after["people"], game.state.people[i])
+	assert_lt(int(after["staffing"]), int(before["staffing"]), "fewer hands: less of the jobs staffed, with no touch")
+	assert_lt(int(after["a0"]), int(before["a0"]))
+	assert_eq(after["raw"], before["raw"])
+	assert_eq(_stale(game, cache), [] as Array[int], "and the cache still equals district_base everywhere")
+
+
+func test_base_of_reads_the_view_given() -> void:
+	var game := _new_game()
+	var cache := DistrictCache.new()
+	var hex := Vector2i(9, 13)
+	var i := game.map.index_of(hex)
+	var own := cache.base_of(game, i)
+	var empty := {i: 0, game.map.index_of(Vector2i(8, 13)): 0}
+	for d: int in 6:
+		empty[game.map.index_of(game.map.neighbour(hex, d))] = 0
+	var view := StateView.of(game.state).with_people(empty)
+	var what_if := cache.base_of(game, i, view)
+	assert_eq(what_if, Economy.district_base(game, view, hex), "equals district_base on the view")
+	assert_eq(cache.base_of(game, i), own, "and the cache itself is as it was")
+	assert_lt(int(what_if["staffing"]), int(own["staffing"]))
+
+
+func test_the_cache_equals_district_base_after_ten_seasons_of_people() -> void:
+	var game := PeopleFixture.genoa()
+	PeopleFixture.play(game, 10)
+	var cache := game.districts
+	assert_eq(_stale(game, cache), [] as Array[int])
+	assert_eq(_stale(game, DistrictCache.new()), [] as Array[int], "a cold cache too")
+
+
+func test_the_caches_staffing_equals_the_one_live_step_on_every_goods_hex() -> void:
+	# DistrictCache.staffed_of (the hot path of SeasonProfile.live) and Economy.staffed (the view's step) agree, at turn 1,
+	# with the people moved by ten seasons, and with a foreign owner on a hex beside a district.
+	var game := PeopleFixture.genoa()
+	for stage: int in 2:
+		if stage == 1:
+			PeopleFixture.play(game, 10)
+			game.state.owner[game.map.index_of(Vector2i(9, 12))] = 0
+		var view := StateView.of(game.state)
+		var cache := game.districts
+		var checked := 0
+		for i: int in game.map.hex_count():
+			if game.map.land[i] == 0:
+				continue
+			var ints := cache.ints_of(game, i)
+			var raw := ints[i * DistrictCache.FIELDS + Economy.F_RAW]
+			if raw == 0:
+				continue
+			var lift := ints[i * DistrictCache.FIELDS + Economy.F_LIFT]
+			assert_eq(cache.staffed_of(game, i, raw, lift), Economy.staffed(game, view, i, raw, lift), str(game.map.hex_of(i)))
+			checked += 1
+		assert_gt(checked, 3, "districts with output")
