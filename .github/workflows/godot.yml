@@ -123,6 +123,11 @@ jobs:
         uses: ./.github/actions/setup-godot
       # Every step that prints to the log is also checked for the engine's error and warning lines: the
       # exit status alone misses some script errors. Warnings are errors in project.godot.
+      # Warm-up: on a fresh checkout there is no .godot/imported cache, and the first --import loads the custom
+      # theme (project.godot theme/custom) before its fonts and PNGs are imported, which logs cannot-open /
+      # failed-loading errors. The output is discarded; the pass after it runs against a populated cache.
+      - name: Warm up the import cache (output discarded)
+        run: '"$GODOT" --headless --path godot --import > /dev/null 2>&1 || true'
       - name: Import the project (fails on any script error or warning)
         run: |
           set -uo pipefail
@@ -240,6 +245,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0 libegl1 mesa-utils
+      # Warm-up (see the lint job): on a fresh checkout there is no .godot/imported cache, and the first --import loads the custom
+      # theme (project.godot theme/custom) before its fonts and PNGs are imported, which logs cannot-open /
+      # failed-loading errors. The output is discarded; the pass after it runs against a populated cache.
+      - name: Warm up the import cache (output discarded)
+        run: '"$GODOT" --headless --path godot --import > /dev/null 2>&1 || true'
       - name: Import the project
         run: |
           "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
@@ -290,6 +300,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libglx-mesa0 libegl1 mesa-utils
+      # Warm-up (see the lint job): on a fresh checkout there is no .godot/imported cache, and the first --import loads the custom
+      # theme (project.godot theme/custom) before its fonts and PNGs are imported, which logs cannot-open /
+      # failed-loading errors. The output is discarded; the pass after it runs against a populated cache.
+      - name: Warm up the import cache (output discarded)
+        run: '"$GODOT" --headless --path godot --import > /dev/null 2>&1 || true'
       - name: Import the project
         run: |
           "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
@@ -339,6 +354,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set up Godot
         uses: ./.github/actions/setup-godot
+      # Warm-up (see the lint job): on a fresh checkout there is no .godot/imported cache, and the first --import loads the custom
+      # theme (project.godot theme/custom) before its fonts and PNGs are imported, which logs cannot-open /
+      # failed-loading errors. The output is discarded; the pass after it runs against a populated cache.
+      - name: Warm up the import cache (output discarded)
+        run: '"$GODOT" --headless --path godot --import > /dev/null 2>&1 || true'
       - name: Import the project
         run: |
           "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
