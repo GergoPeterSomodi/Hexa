@@ -1,0 +1,618 @@
+<title>Hexa Battle Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column. The playable battle window first, the pitch below it, in the game's own Studiolo palette (dark only, by choice). */
+:root{
+  color-scheme: dark;
+  --bg:#14100c; --panel:#221a14; --head:#3a2416; --card:#15110e; --wood:#4a2f1c; --leather:#2a1d15;
+  --line:#6b5637; --rule:#6b563780; --text:#f2e8d0; --muted:#b9a987; --faint:#9c8c70;
+  --gold:#e8c15a; --primary:#d9a93a; --primary-ink:#1c1206;
+  --good:#7fc98a; --bad:#f0806a; --warn:#f0a850; --info:#8fb8ea; --sneaky:#b9a0e8;
+  --you:#e8c15a; --foe:#f0806a;
+  --display:"IM Fell English SC", "Iowan Old Style", Georgia, serif;
+  --body:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:28px 64px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--display);font-weight:400;text-wrap:balance;margin:0;letter-spacing:.01em}
+h1{font-size:clamp(34px,6vw,52px);line-height:1.05;color:var(--gold)}
+h2{font-size:28px;color:var(--gold)}
+h3{font-size:20px;color:var(--text)}
+p{margin:0;max-width:68ch}
+.lede{color:var(--muted);font-size:17px}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+code{font-family:var(--mono);font-size:12.5px;color:var(--muted);background:var(--card);padding:1px 5px;border-radius:3px}
+header{display:flex;flex-direction:column;gap:12px}
+.oneline{border-left:3px solid var(--gold);padding:6px 0 6px 14px;font-size:17px;max-width:70ch}
+
+/* ---------- the battle window ---------- */
+.win{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;box-shadow:0 18px 40px #0008}
+.win-head{background:var(--head);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.win-head .name{font-family:var(--display);font-size:20px;color:var(--text)}
+.win-head .sub{font-size:12px;color:var(--muted)}
+.topbar{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;padding:12px 14px;align-items:start;border-bottom:1px solid var(--rule)}
+.dice{display:flex;flex-direction:column;gap:6px;min-width:0}
+.dice.foe{align-items:flex-end;text-align:right}
+.dice .who{font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+.dice.you .who{color:var(--you)} .dice.foe .who{color:var(--foe)}
+.dierow{display:flex;align-items:center;gap:8px}
+.dice.foe .dierow{flex-direction:row-reverse}
+.die{width:38px;height:38px;border-radius:7px;background:var(--text);color:var(--primary-ink);display:grid;place-items:center;font-family:var(--mono);font-size:20px;flex:none;box-shadow:inset 0 -3px 0 #0003}
+.die.idle{background:var(--card);color:var(--faint);border:1px dashed var(--line)}
+.total{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.total b{color:var(--text);font-size:18px}
+.mods{display:flex;flex-wrap:wrap;gap:4px}
+.dice.foe .mods{justify-content:flex-end}
+.chip{font-size:11.5px;padding:2px 7px;border-radius:10px;background:var(--leather);border:1px solid var(--line);color:var(--muted);white-space:nowrap;cursor:help}
+.chip b{color:var(--text);font-weight:600}
+.mid{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:170px}
+.track{display:flex;gap:4px}
+.track span{width:24px;height:24px;border:1px solid var(--line);border-radius:3px;display:grid;place-items:center;font-family:var(--mono);font-size:12px;color:var(--faint)}
+.track span.done{color:var(--muted);background:var(--card)}
+.track span.now{border-color:var(--gold);color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.morale{width:100%;max-width:220px}
+.mbar{height:8px;border-radius:4px;background:var(--foe);overflow:hidden;display:flex}
+.mbar i{display:block;background:var(--you);transition:width .4s}
+.mnums{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
+
+.boardwrap{padding:10px 14px 4px;overflow-x:auto}
+.board{position:relative;display:grid;grid-template-columns:18px repeat(3,minmax(0,1fr));gap:6px;min-width:330px}
+.rowlab{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;justify-content:center;white-space:nowrap}
+.slot{min-height:54px;border:1px solid var(--rule);border-radius:4px;background:var(--card);padding:6px;display:flex;flex-wrap:wrap;gap:5px;align-content:center;justify-content:center;position:relative}
+.slot.back{min-height:46px;background:transparent;border-style:dashed}
+.slot.res{grid-column:2 / span 3;min-height:40px;background:transparent;border-style:dashed;justify-content:flex-start}
+.slot.can{border-color:var(--gold);border-style:solid;cursor:pointer;background:#e8c15a12}
+.slot.can:hover{background:#e8c15a26}
+.slot .fx{position:absolute;left:4px;top:-8px;display:flex;gap:3px;flex-wrap:wrap;z-index:2}
+.tag{font-size:10px;padding:0 5px;border-radius:3px;line-height:15px;color:var(--primary-ink);font-weight:600}
+.gap{grid-column:2 / span 3;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;height:44px}
+.gap span{display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:14px;color:var(--faint);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.u{width:34px;height:36px;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:3px 3px 3px;font-family:var(--mono);font-size:12px;position:relative;z-index:1}
+.u.you{background:#3b2f14;border:1px solid var(--you);color:var(--you);cursor:pointer}
+.u.you:hover{background:#4d3d18}
+.u.foe{background:#3a1d17;border:1px solid var(--foe);color:var(--foe)}
+.u.sel{outline:2px solid var(--text);outline-offset:2px}
+.u .bar{width:100%;height:4px;background:#0006;border-radius:2px;overflow:hidden}
+.u .bar i{display:block;height:100%;background:currentColor}
+.u.hit{animation:hit .5s}
+@keyframes hit{0%{transform:translateX(0)}25%{transform:translateX(-3px)}50%{transform:translateX(3px)}100%{transform:none}}
+.facedown{width:22px;height:30px;border-radius:3px;background:repeating-linear-gradient(45deg,#5a3b78,#5a3b78 3px,#43295c 3px,#43295c 6px);border:1px solid var(--sneaky);display:grid;place-items:center;color:var(--text);font-size:12px;font-weight:600;cursor:help;z-index:1}
+svg.arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:3}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;padding:2px 14px 8px;font-size:12px;color:var(--faint);align-items:center}
+.legend label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.legend .sw{display:inline-block;width:18px;height:0;border-top:2px solid var(--foe)}
+.legend .sw.d{border-top-style:dashed}
+.legend .sw.y{border-color:var(--you);opacity:.6}
+.legend input{accent-color:var(--gold)}
+
+.foot{border-top:1px solid var(--rule);padding:10px 14px 14px;display:flex;flex-direction:column;gap:10px;background:var(--leather)}
+.cmd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cp{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.cp i{width:14px;height:14px;border-radius:50%;border:1px solid var(--gold);display:inline-block}
+.cp i.on{background:var(--gold)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-size:13px;border-radius:4px;padding:7px 14px;cursor:pointer;border:1px solid var(--line);background:var(--wood);color:var(--text)}
+button:hover{background:#5e4029}
+button:focus-visible,.u:focus-visible,.card:focus-visible,.slot:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+button.primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary);font-weight:600}
+button.primary:hover{background:#f0c85a}
+button:disabled{opacity:.45;cursor:not-allowed}
+.hand{display:flex;gap:8px;overflow-x:auto;padding:10px 2px 4px}
+.card{flex:0 0 150px;min-height:128px;border-radius:6px;background:var(--card);border:1px solid var(--line);padding:8px 9px;display:flex;flex-direction:column;gap:4px;cursor:pointer;position:relative;transition:transform .15s}
+.card:hover{transform:translateY(-4px)}
+.card.pick{transform:translateY(-8px);border-color:var(--gold);box-shadow:0 6px 16px #0009}
+.card.off{opacity:.45;cursor:not-allowed;transform:none}
+.card .ct{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+.card .cn{font-family:var(--display);font-size:16px;line-height:1.1}
+.card .cost{flex:none;width:20px;height:20px;border-radius:50%;background:#8e2618;color:var(--text);font-family:var(--mono);font-size:12px;display:grid;place-items:center}
+.card .ck{font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.card .cx{font-size:12px;color:var(--muted);line-height:1.35;flex:1}
+.card .cf{font-size:10.5px;color:var(--faint);border-top:1px solid var(--rule);padding-top:3px}
+.hint{font-size:13px;color:var(--muted);min-height:20px}
+.log{font-size:12.5px;color:var(--faint);display:flex;flex-direction:column;gap:2px;font-variant-numeric:tabular-nums}
+.log div:first-child{color:var(--muted)}
+.result{position:absolute;inset:0;background:#070504d9;display:flex;align-items:center;justify-content:center;z-index:5;border-radius:4px}
+.result>div{background:var(--panel);border:1px solid var(--gold);border-radius:6px;padding:18px 22px;max-width:340px;display:flex;flex-direction:column;gap:8px;text-align:center}
+.result h3{color:var(--gold);font-size:24px}
+.result p{font-size:13px;color:var(--muted)}
+.cap{font-size:13px;color:var(--faint);max-width:none}
+
+/* ---------- pitch ---------- */
+section{display:flex;flex-direction:column;gap:16px}
+.ideas{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.idea{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.idea.rec{border-color:var(--line)}
+.idea .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.idea .pill{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:1px 7px;border-radius:9px;white-space:nowrap}
+.pill.rec{background:var(--gold);color:var(--primary-ink)}
+.pill.opt{border:1px solid var(--line);color:var(--muted)}
+.idea p{font-size:14px;color:var(--text)}
+.idea .ref{font-size:12.5px;color:var(--faint)}
+.idea .ref b{color:var(--muted);font-weight:500}
+.group{display:flex;flex-direction:column;gap:12px}
+.group>.eyebrow{border-bottom:1px solid var(--rule);padding-bottom:6px}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.vs>div{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+ul.rules{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;max-width:72ch}
+ul.rules li::marker{color:var(--gold)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.two>div{display:flex;flex-direction:column;gap:10px;min-width:0}
+@media (max-width:720px){
+  .topbar{grid-template-columns:1fr 1fr}
+  .mid{grid-column:1 / -1;order:-1}
+  .vs,.two{grid-template-columns:1fr}
+  .card{flex-basis:138px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Hexa · War &amp; Battles · a pitch built on your notebook sketch</span>
+    <h1>The Battle Board</h1>
+    <p class="lede">Your sketch, made playable: three lanes, a front and a back row, a reserve, one die a side and a hand of cards. Play a battle below, then read what I would add to make every day of it a real decision.</p>
+    <p class="oneline">Each day of a battle, the enemy shows its plan, you answer it with a few command points and cards, then the dice fall. Five days at most, about a minute a battle.</p>
+  </header>
+
+  <!-- ============ THE WINDOW ============ -->
+  <section aria-label="Battle window mockup">
+    <div class="win" id="win">
+      <div class="win-head">
+        <div><div class="name">Battle of Alessandria, 1480</div><div class="sub">Savoy attacks Milan · hills · open sky</div></div>
+        <div class="sub" id="cardsHeld"></div>
+      </div>
+      <div class="topbar">
+        <div class="dice you" id="diceYou"></div>
+        <div class="mid">
+          <div class="track" id="track" aria-label="Day track"></div>
+          <div class="morale"><div class="mbar"><i id="mYou"></i></div><div class="mnums"><span id="mYouN"></span><span>morale</span><span id="mFoeN"></span></div></div>
+        </div>
+        <div class="dice foe" id="diceFoe"></div>
+      </div>
+      <div class="boardwrap"><div class="board" id="board"></div></div>
+      <div class="legend">
+        <label><input type="checkbox" id="showFoe" checked> <span class="sw"></span> Milan's plan for today</label>
+        <label><input type="checkbox" id="showYou" checked> <span class="sw y"></span> your regiments' targets</label>
+        <span><span class="sw d"></span> dashed: flank or breakthrough, ×1.25</span>
+      </div>
+      <div class="foot">
+        <div class="cmd">
+          <div class="cp" id="cp"></div>
+          <div class="btns">
+            <button id="bWithdraw">Withdraw</button>
+            <button id="bAuto">Let the general command</button>
+            <button class="primary" id="bFight">Fight the day</button>
+          </div>
+        </div>
+        <div class="hint" id="hint"></div>
+        <div class="hand" id="hand"></div>
+        <div class="log" id="log" aria-live="polite"></div>
+      </div>
+    </div>
+    <p class="cap">A playable mockup with placeholder numbers. Click a gold regiment, then a slot, to move it (1 command point). Click a card, then a lane, to play it. Pk pikemen, Kn knights, Cb crossbowmen, Bo bombards; the bar is men left. Milan has the better modifiers: pressing Fight five times without a card loses every time I tried, and the general wins about 4 in 10. You can do better. <a href="#" id="reset" style="color:var(--gold)">Start again</a></p>
+  </section>
+
+  <!-- ============ WHAT THE SKETCH GETS RIGHT ============ -->
+  <section class="two">
+    <div>
+      <h2>What your sketch already gets right</h2>
+      <ul class="rules">
+        <li><b>Lanes, rows and a reserve</b> match the battle Hexa already has (M7: three lanes and a reserve a side) plus the back slots you approved on 13 November.</li>
+        <li><b>One die and named modifiers</b> at the top. That is the "fortune of the day" the 13 November review measured as the fix for battles that were either a coin flip or a sure thing.</li>
+        <li><b>The day track</b> with crossed boxes. A battle you can see the end of is easy to read.</li>
+        <li><b>Cards at the bottom</b>, as approved in rounds 3 to 9 of <code>docs/design/battle.md</code>.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>What is missing</h2>
+      <ul class="rules">
+        <li><b>A reason to act on a given day.</b> If the units fight on their own and the cards are boosts, the best play is "play the biggest card". The enemy's plan, shown first, gives each day a question.</li>
+        <li><b>Decisions without cards.</b> Until the tech tree is in Godot (M11 builds no battle cards) the board needs its own levers: moving regiments, the reserve, withdrawing.</li>
+        <li><b>A way to skip it.</b> A country at war fights several battles a season. The board must be optional for small ones.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ IDEAS ============ -->
+  <section>
+    <h2>Ten ideas, in four groups</h2>
+    <p class="lede">Marked <span class="pill rec" style="font-size:10.5px">pitch</span> are the ones I would build first; the mockup plays them. The rest are options.</p>
+
+    <div class="group">
+      <span class="eyebrow">A · The day loop</span>
+      <div class="ideas">
+        <div class="idea rec"><div class="top"><h3>1. Show their plan first</h3><span class="pill rec">pitch</span></div>
+          <p>Your second sketch becomes the screen. Before you act, each enemy regiment's target for today is drawn as a red arrow. You answer it: shore up the lane they mass on, pull a gun out of reach, feint where they are thin. Without it, cards on an auto-battle are guesses; with it, every day is a small puzzle.</p>
+          <p class="ref"><b>From:</b> Into the Breach and Slay the Spire, which show what the enemy will do and let you respond. <b>Cost:</b> small. The plan is a pure function of the board, redrawn after every move.</p></div>
+        <div class="idea rec"><div class="top"><h3>2. One die a side, modifiers in the open</h3><span class="pill rec">pitch</span></div>
+          <p>As in the sketch: d6 plus named chips, total against total. Hover a chip to see where it comes from: a tech, an idea, the ground, the general. The luck sits in one visible roll a day, so a close fight swings and a 2-to-1 fight does not.</p>
+          <p class="ref"><b>From:</b> the Europa Universalis battle window; Hexa's own measurements (per-hit luck averaged out to nothing). <b>Cost:</b> none in the rules. M7 already rolls a d6 a side a day; this only shows it.</p></div>
+        <div class="idea"><div class="top"><h3>3. Five days and one morale bar</h3><span class="pill opt">option</span></div>
+          <p>Your crossed-box day track, and a single tug-of-war bar instead of numbers. At the last day, the side with lower morale withdraws (M7's rule; M7 caps at 8 days, the board would want 5 so a battle stays short).</p>
+          <p class="ref"><b>Cost:</b> a data change and a balance check with the scenario bands.</p></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <span class="eyebrow">B · Where the tactics come from</span>
+      <div class="ideas">
+        <div class="idea rec"><div class="top"><h3>4. A targeting rule you can read</h3><span class="pill rec">pitch</span></div>
+          <p>Front regiments hit the lane opposite. If its front is empty, they break through to its back row; if that is empty too, they swing into the next lane as a flank (×1.25). Crossbows shoot their own lane, then a neighbour; guns reach any lane. So leaving a lane thin has a price you can see in the arrows.</p>
+          <p class="ref"><b>From:</b> Darkest Dungeon, where where a unit stands decides what it can hit. Close to M7's flank rule.</p></div>
+        <div class="idea rec"><div class="top"><h3>5. Command points from the general</h3><span class="pill rec">pitch</span></div>
+          <p>Three a day, a good general one more. Spend them on moving a regiment to another lane, sending in the reserve, rotating a worn regiment back (your rotation idea of 13 November), or a card. One currency for everything: a country with no techs still has choices, and techs add options rather than being the only source of them.</p>
+          <p class="ref"><b>From:</b> commanders in Crusader Kings III and Hearts of Iron IV, whose skill sets how much they can do.</p></div>
+        <div class="idea"><div class="top"><h3>6. Deploy before day one</h3><span class="pill opt">option</span></div>
+          <p>A short deploy step for both sides, with the presets you approved in round 2 (Pike and shot, Cavalry wings, Refused flank, Gun line). The 13 November review found the defender had no say before day 1 when the AI attacks; this gives it one.</p>
+          <p class="ref"><b>Cost:</b> one more screen; skip it with "use my preset".</p></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <span class="eyebrow">C · Cards, rethought</span>
+      <div class="ideas">
+        <div class="idea rec"><div class="top"><h3>7. Cards come from your regiments</h3><span class="pill rec">pitch</span></div>
+          <p>Pikemen bring Pike hedge, knights a Knightly charge, guns a Grand battery. A tech upgrades a card (Pike hedge to Pike square) or adds one (Countermarch, Feigned retreat). The general brings one card of his own. You can predict your hand from your army, so building an army on the map becomes building a deck. The deck stays at 8 to 15 cards, and the board works before the tech tree is in Godot.</p>
+          <p class="ref"><b>From:</b> Marvel Snap's 12-card decks; Gwent's rows. Your approved card list from rounds 3 and 4 fits this almost as it is.</p></div>
+        <div class="idea"><div class="top"><h3>8. Hidden cards and a reason to scout</h3><span class="pill opt">option</span></div>
+          <p>Sneaky cards lie face down on a lane until they fire (approved in round 3). In the mockup Milan lays one on day 2. A Scouts card, or a cavalry general, turns one over. Show how many cards the enemy holds, so a bluff reads as a bluff.</p>
+          <p class="ref"><b>Cost:</b> the AI needs a rule for when to bluff; start with "never".</p></div>
+      </div>
+      <div class="vs">
+        <div><h3>Cards (recommended)</h3><p style="font-size:14px">Draw one a day, hold at most five. Surprise and stories ("the feigned retreat on day 3"). Keep the hand small so most of the luck stays in the one die.</p></div>
+        <div><h3>Or: stratagems</h3><p style="font-size:14px">A fixed menu of 6 to 8 orders unlocked by techs, each once a battle, no draw. Easier to balance and for the AI to play; but the best order is the same every time, and there is less to tell afterwards.</p></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <span class="eyebrow">D · Keeping it light</span>
+      <div class="ideas">
+        <div class="idea rec"><div class="top"><h3>9. Watch, command or auto</h3><span class="pill rec">pitch</span></div>
+          <p>The window opens only for battles with a side of yours, by a setting: always, big battles only, never. Auto lets your general fight it by his traits (the mockup's "Let the general command"). Battles between AI countries stay instant.</p>
+          <p class="ref"><b>For:</b> fun principle 11, readable and light to run.</p></div>
+        <div class="idea"><div class="top"><h3>10. A one-glance result</h3><span class="pill opt">option</span></div>
+          <p>After the battle: killed and wounded each side, the deciding moment ("your Grand battery on day 3"), experience gained, where the loser went. One card, one click back to the map.</p>
+          <p class="ref"><b>Cost:</b> small; M7's battle record already holds the numbers.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MINIMAL VIEW ============ -->
+  <section class="two">
+    <div>
+      <h2>Rules for the minimal view</h2>
+      <ul class="rules">
+        <li>Seven rows and nothing else on the board: their reserve, back, front, the gap, your front, back, reserve.</li>
+        <li>A regiment is a box: two letters for its kind, a bar for its men. Colour means side, never kind.</li>
+        <li>Only today's arrows. Theirs solid red; yours faint gold; flanks dashed.</li>
+        <li>Dice and modifiers in the top corners; day track and morale bar between them.</li>
+        <li>Cards at the bottom: name, cost, one line of rules, where it came from. The full card on hover.</li>
+        <li>Exact men, morale per regiment and the full log on hover or in the log line, never on the board.</li>
+        <li>The boxes are small on purpose: you decided width is 3 to 7 lanes, and seven lanes of 34-pixel boxes still fit a 1280-wide window.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>How it fits the Godot plan</h2>
+      <ul class="rules">
+        <li>M7 builds the battle as one pure function, <code>Combat.fight</code>, settled inside the battles phase, with records the battle dock plays back. Its spec already names "the battle board" as its own milestone after M12, with <code>Combat.fight</code> and the records as the seam. This pitch is that milestone; it changes nothing in M7.</li>
+        <li>The board steps the fight a day at a time (<code>Combat.day</code>), with your moves and cards as part of the input. Same seed and same orders give the same battle, so tests and replays still work.</li>
+        <li>End season pauses in the battles phase only for a battle with a human side. Cards and command points are definitions (<code>.tres</code>) like every other number.</li>
+        <li>One question for you: the board as a pause inside End season (my pick: it keeps your 0.2.1 rule that a battle ends within the turn), or battles that carry over one day per season.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+const TY={
+  pike:{n:'Pikemen',g:'Pk',atk:4,def:5,row:'front',men:500},
+  knight:{n:'Knights',g:'Kn',atk:6,def:3,row:'front',men:250},
+  xbow:{n:'Crossbowmen',g:'Cb',atk:5,def:2,row:'back',men:500},
+  bomb:{n:'Bombards',g:'Bo',atk:6,def:1,row:'back',men:100}
+};
+const KIND={shock:'var(--bad)',fire:'var(--warn)',morale:'var(--gold)',sneaky:'var(--sneaky)',move:'var(--info)'};
+const CARDS={
+  hedge:{n:'Pike hedge',cost:1,kind:'shock',tgt:'own',from:'Pikemen',txt:'Your front in this lane takes 40% less today. Horse that hits it loses 30 men.'},
+  battery:{n:'Grand battery',cost:2,kind:'fire',tgt:'foe',from:'Bombards',txt:'Your guns all fire at this enemy lane, ×2.5.'},
+  charge:{n:'Knightly charge',cost:1,kind:'shock',tgt:'own',from:'Knights',txt:'Knights in this lane hit ×1.6 today.'},
+  rally:{n:'Rally the banner',cost:1,kind:'morale',tgt:'none',from:'General',txt:'+15 army morale now.'},
+  feint:{n:'Feigned retreat',cost:2,kind:'sneaky',tgt:'own',from:'Tech: Light horse',txt:'Your front here takes nothing today; the enemy front opposite takes ×1.5.'},
+  counter:{n:'Countermarch',cost:1,kind:'fire',tgt:'own',from:'Crossbowmen + Drill yards',txt:'Crossbows in this lane shoot twice today.'},
+  dig:{n:'Dig in',cost:1,kind:'shock',tgt:'own',from:'Idea: Defensive doctrine',txt:'Front in this lane takes 25% less.'},
+  ambush:{n:'Ambush in the woods',cost:2,kind:'sneaky',tgt:'own',from:'Tech: Skirmishers',txt:'Hidden. When the day starts, the enemy front opposite loses 70 men.'}
+};
+const FOE_PLAN={2:[{c:'dig',lane:1},{c:'ambush',lane:0,hidden:true}],3:[{c:'rally'}],4:[{c:'dig',lane:0}]};
+const LANES=['Left','Centre','Right'];
+let uid=0,S;
+const $=id=>document.getElementById(id);
+const opp=s=>s==='you'?'foe':'you';
+function mk(t){return {id:++uid,type:t,men:TY[t].men,max:TY[t].men};}
+function fxBlank(){return {lanes:[{},{},{}],battery:null};}
+function fresh(){
+  uid=0;
+  S={day:1,maxDay:5,cp:3,cpMax:3,over:null,sel:null,pick:null,busy:false,hits:new Set(),
+    roll:{you:null,foe:null},
+    sides:{
+      you:{name:'Savoy',morale:100,front:[[mk('knight')],[mk('pike'),mk('pike'),mk('pike')],[mk('knight')]],back:[[mk('xbow')],[mk('bomb')],[]],reserve:[mk('pike')],
+        mods:[{n:'Discipline',v:1,src:'Tech: Drill yards'},{n:'General',v:1,src:'Your general: trait Cavalry leader'}],lost:0,killed:0},
+      foe:{name:'Milan',morale:100,front:[[mk('pike'),mk('knight')],[mk('pike'),mk('pike')],[mk('pike')]],back:[[],[mk('xbow')],[]],reserve:[mk('pike')],
+        mods:[{n:'Idea',v:1,src:'Idea: Defensive doctrine'},{n:'Terrain',v:2,src:'Hills: counts for the defender only'},{n:'Commander',v:1,src:'Milan\'s commander: trait Steady'}],lost:0,killed:0,hand:3}
+    },
+    fx:{you:fxBlank(),foe:fxBlank()},
+    hidden:[],
+    hand:['hedge','charge','battery','rally'],deck:['feint','counter','hedge','charge','rally'],
+    log:['Day 1. Milan holds the hills. Its plan is drawn in red: answer it, then fight the day.']};
+  for(const k of ['you','foe']) S.sides[k].start=men(k);
+}
+function all(k){const s=S.sides[k];return [...s.front.flat(),...s.back.flat(),...s.reserve];}
+function men(k){return all(k).reduce((a,u)=>a+u.men,0);}
+function locate(k,u){const s=S.sides[k];for(let L=0;L<3;L++){if(s.front[L].includes(u))return{row:'front',lane:L};if(s.back[L].includes(u))return{row:'back',lane:L};}return{row:'reserve',lane:null};}
+function biggest(list){return list.reduce((a,b)=>b.men>a.men?b:a);}
+function inR(d){return d>=0&&d<3;}
+
+function frontTarget(other,L){
+  if(other.front[L].length)return{lane:L,row:'front',kind:'shock',m:1};
+  if(other.back[L].length)return{lane:L,row:'back',kind:'break',m:1.25};
+  for(const d of [L-1,L+1,0,1,2])if(inR(d)&&other.front[d].length)return{lane:d,row:'front',kind:'flank',m:1.25};
+  for(const d of [0,1,2])if(other.back[d].length)return{lane:d,row:'back',kind:'break',m:1.25};
+  return null;
+}
+function intents(k){
+  const me=S.sides[k],other=S.sides[opp(k)],out=[];
+  for(let L=0;L<3;L++){
+    for(const u of me.front[L]){const t=frontTarget(other,L);if(t)out.push({k,u,from:L,...t,t:biggest(other[t.row][t.lane])});}
+    for(const u of me.back[L]){
+      let t=null;
+      if(u.type==='bomb'){const b=S.fx[k].battery;for(const d of (b!=null?[b,1,0,2]:[1,0,2]))if(other.front[d].length){t={lane:d,row:'front'};break;}}
+      else for(const d of [L,L-1,L+1])if(inR(d)&&other.front[d].length){t={lane:d,row:'front'};break;}
+      if(!t)for(const d of [0,1,2])if(other.back[d].length){t={lane:d,row:'back'};break;}
+      if(t)out.push({k,u,from:L,...t,kind:'fire',m:1,t:biggest(other[t.row][t.lane])});
+    }
+  }
+  return out;
+}
+function damage(i,factor){
+  const a=TY[i.u.type],d=TY[i.t.type],k=i.k,o=opp(k);
+  let x=a.atk*12*(i.u.men/i.u.max)*factor*(5/(d.def+3))*i.m;
+  const my=S.fx[k].lanes[i.from],their=S.fx[o].lanes[i.lane];
+  if(i.u.type==='knight'&&my.charge)x*=1.6;
+  if(i.u.type==='xbow'&&my.counter)x*=2;
+  if(i.u.type==='bomb'&&S.fx[k].battery!=null&&i.lane===S.fx[k].battery)x*=2.5;
+  if(i.row==='front'){
+    if(their.hedge)x*=.6;
+    if(their.dig)x*=.75;
+    if(their.feint)x=0;
+    if(S.fx[k].lanes[i.lane].feint)x*=1.5;
+  }
+  return Math.round(x*(0.85+Math.random()*0.3));
+}
+function addLog(t){S.log.unshift(t);S.log=S.log.slice(0,5);}
+function sum(k){return S.sides[k].mods.reduce((a,m)=>a+m.v,0);}
+
+function fight(){
+  if(S.over||S.busy)return;
+  S.sel=null;S.pick=null;
+  const r={you:1+Math.floor(Math.random()*6),foe:1+Math.floor(Math.random()*6)};
+  S.roll=r;
+  const tot={you:r.you+sum('you'),foe:r.foe+sum('foe')};
+  const parts=[`Day ${S.day}: you roll ${r.you}+${sum('you')} = ${tot.you}, Milan ${r.foe}+${sum('foe')} = ${tot.foe}.`];
+  // hidden cards fire
+  for(const h of S.hidden){const vict=S.sides.you.front[h.lane];if(vict.length){const v=biggest(vict);const dmg=Math.min(70,v.men);v.men-=dmg;S.sides.you.lost+=dmg;S.hits.add(v.id);}
+    parts.push(`Milan's hidden card was ${CARDS[h.c].n}: your ${LANES[h.lane].toLowerCase()} lane loses 70 men.`);}
+  S.hidden=[];
+  const hits=[];
+  for(const k of ['you','foe']){const f=0.7+tot[k]*0.05;for(const i of intents(k)){hits.push([i,damage(i,f)]);
+    if(i.u.type==='knight'&&S.fx[opp(k)].lanes[i.lane].hedge&&i.row==='front')hits.push([{t:i.u,k:opp(k)},30]);}}
+  for(const [i,d] of hits){const dd=Math.min(d,i.t.men);i.t.men-=dd;S.sides[opp(i.k)].lost+=dd;if(dd>0)S.hits.add(i.t.id);}
+  // remove dead, morale
+  for(const k of ['you','foe']){
+    const s=S.sides[k];let dead=0;
+    const before=S.sides[k]._m??S.sides[k].start;
+    for(const arr of [...s.front,...s.back,s.reserve]){for(let j=arr.length-1;j>=0;j--)if(arr[j].men<=0){arr.splice(j,1);dead++;}}
+    const now=men(k),lostToday=before-now;s._m=now;
+    s.morale=Math.max(0,Math.round(s.morale-lostToday/s.start*230-2-dead*6));
+    if(dead)parts.push(`${s.name} loses ${dead} regiment${dead>1?'s':''}.`);
+  }
+  addLog(parts.join(' '));
+  // end?
+  const y=S.sides.you,f=S.sides.foe;
+  const yb=y.morale<=25||!all('you').length,fb=f.morale<=25||!all('foe').length;
+  if(yb||fb){const youLose=yb&&(!fb||y.morale<=f.morale);end(youLose?'foe':'you',youLose?'Savoy breaks':'Milan breaks');return;}
+  if(S.day>=S.maxDay){const youLose=y.morale<=f.morale;end(youLose?'foe':'you',youLose?'Savoy withdraws at the last day':'Milan withdraws at the last day');return;}
+  dawn();
+}
+function dawn(){
+  S.day++;S.cp=S.cpMax;S.fx={you:fxBlank(),foe:fxBlank()};
+  if(S.deck.length&&S.hand.length<5)S.hand.push(S.deck.shift());
+  const fill=[];
+  for(const k of ['you','foe']){const s=S.sides[k];for(const L of [1,0,2]){if(!s.front[L].length){const j=s.reserve.findIndex(u=>TY[u.type].row==='front');if(j>=0){s.front[L].push(s.reserve.splice(j,1)[0]);fill.push(`${s.name}'s reserve fills the ${LANES[L].toLowerCase()} lane.`);}}}}
+  const plan=FOE_PLAN[S.day]||[];const seen=[];
+  for(const p of plan){
+    if(p.hidden){S.hidden.push(p);seen.push('lays a card face down on the '+LANES[p.lane].toLowerCase()+' lane');}
+    else if(p.c==='rally'){S.sides.foe.morale=Math.min(100,S.sides.foe.morale+15);seen.push('plays Rally the banner (+15 morale)');}
+    else{S.fx.foe.lanes[p.lane][p.c]=true;seen.push(`plays ${CARDS[p.c].n} on the ${LANES[p.lane].toLowerCase()} lane`);}
+  }
+  S.sides.foe.hand=Math.min(5,Math.max(0,S.sides.foe.hand-plan.length)+1);
+  let t=`Day ${S.day}.`;if(fill.length)t+=' '+fill.join(' ');if(seen.length)t+=' Milan '+seen.join(' and ')+'.';
+  addLog(t);
+}
+function end(winner,why){
+  const y=S.sides.you,f=S.sides.foe;
+  S.over={winner,why,you:y.start-men('you'),foe:f.start-men('foe')};
+  addLog(`${why}. ${winner==='you'?'Savoy holds the field.':'Milan holds the field.'}`);
+}
+
+function playCard(ci,lane){
+  const id=S.hand[ci],c=CARDS[id];
+  if(c.cost>S.cp)return;
+  S.cp-=c.cost;S.hand.splice(ci,1);S.deck.push(id);S.pick=null;
+  if(id==='rally'){S.sides.you.morale=Math.min(100,S.sides.you.morale+15);addLog(`You play Rally the banner: +15 morale.`);}
+  else if(id==='battery'){S.fx.you.battery=lane;addLog(`You play Grand battery on Milan's ${LANES[lane].toLowerCase()} lane.`);}
+  else{S.fx.you.lanes[lane][id]=true;addLog(`You play ${c.n} on your ${LANES[lane].toLowerCase()} lane.`);}
+}
+function moveTo(u,row,lane){
+  const s=S.sides.you,from=locate('you',u);
+  const arr=from.row==='reserve'?s.reserve:s[from.row][from.lane];
+  arr.splice(arr.indexOf(u),1);
+  if(row==='reserve')s.reserve.push(u);else s[row][lane].push(u);
+  S.cp--;S.sel=null;
+  addLog(`${TY[u.type].n} move to ${row==='reserve'?'the reserve':'the '+row+' row, '+LANES[lane].toLowerCase()+' lane'}.`);
+}
+function canMoveTo(u,row,lane){
+  if(!u||S.cp<1)return false;
+  const from=locate('you',u);
+  if(row==='reserve')return from.row!=='reserve';
+  if(TY[u.type].row!==row)return false;
+  if(from.row===row&&from.lane===lane)return false;
+  return S.sides.you[row][lane].length<3;
+}
+function findU(id){return all('you').find(u=>u.id===id);}
+
+function auto(){
+  if(S.over)return;S.busy=true;render();
+  const step=()=>{
+    if(S.over){S.busy=false;render();return;}
+    // the general plays: hedge where the foe aims most, else charge, else rally if low
+    const aim=[0,0,0];for(const i of intents('foe'))if(i.row==='front')aim[i.lane]++;
+    const hot=aim.indexOf(Math.max(...aim));
+    for(const pref of ['hedge','battery','charge','rally']){const ci=S.hand.indexOf(pref);if(ci>=0&&CARDS[pref].cost<=S.cp){
+      if(pref==='rally'&&S.sides.you.morale>70)continue;
+      const lane=pref==='charge'?(S.sides.you.front.findIndex(l=>l.some(u=>u.type==='knight'))):pref==='battery'?1:hot;
+      if(lane<0)continue;playCard(ci,lane);}}
+    S.busy=false;fight();S.busy=!S.over;render();
+    if(!S.over)setTimeout(step,window.FAST?1:900);else{S.busy=false;render();}
+  };
+  setTimeout(step,window.FAST?1:300);
+}
+
+/* ---------- render ---------- */
+function unitHTML(k,u){
+  const t=TY[u.type],pct=Math.max(0,u.men/u.max*100);
+  const cls=['u',k];if(S.sel===u.id)cls.push('sel');if(S.hits.has(u.id))cls.push('hit');
+  const tip=`${k==='you'?'Savoy':'Milan'} · ${t.n} · ${u.men} of ${u.max} men · attack ${t.atk}, defence ${t.def}`;
+  return `<div class="${cls.join(' ')}" data-uid="${u.id}" data-side="${k}" title="${tip}" ${k==='you'?'tabindex="0" role="button"':''}>${t.g}<span class="bar"><i style="width:${pct}%"></i></span></div>`;
+}
+function fxTags(k,L){
+  const out=[];const f=S.fx[k].lanes[L];
+  for(const key of Object.keys(f))out.push(`<span class="tag" style="background:${KIND[CARDS[key].kind]}">${CARDS[key].n}</span>`);
+  if(k==='foe'&&S.fx.you.battery===L)out.push(`<span class="tag" style="background:${KIND.fire}">Grand battery</span>`);
+  return out.length?`<div class="fx">${out.join('')}</div>`:'';
+}
+function slotHTML(k,row,L){
+  const s=S.sides[k],list=row==='reserve'?s.reserve:s[row][L];
+  let can=false;
+  if(S.pick!=null){const c=CARDS[S.hand[S.pick]];if(row==='front'&&((c.tgt==='own'&&k==='you')||(c.tgt==='foe'&&k==='foe')))can=true;}
+  else if(S.sel!=null&&k==='you')can=canMoveTo(findU(S.sel),row,L);
+  const cls=['slot',row==='back'?'back':'',row==='reserve'?'res':'',can?'can':''].join(' ');
+  let inner=list.map(u=>unitHTML(k,u)).join('');
+  if(k==='foe'&&row==='front')for(const h of S.hidden)if(h.lane===L)inner+=`<div class="facedown" title="A face-down card. It fires when the day starts. A Scouts card would turn it over.">?</div>`;
+  if(row==='reserve'&&!list.length)inner=`<span style="font-size:11px;color:var(--faint)">reserve empty</span>`;
+  return `<div class="${cls}" data-slot="${k}|${row}|${L}" ${can?'tabindex="0" role="button"':''}>${row==='front'?fxTags(k,L):''}${inner}</div>`;
+}
+function rowHTML(k,row,label){
+  if(row==='reserve')return `<div class="rowlab">${label}</div>${slotHTML(k,'reserve',null)}`;
+  return `<div class="rowlab">${label}</div>`+[0,1,2].map(L=>slotHTML(k,row,L)).join('');
+}
+function diceHTML(k){
+  const s=S.sides[k],r=S.roll[k],faces='⚀⚁⚂⚃⚄⚅';
+  const die=r?`<div class="die" aria-label="rolled ${r}">${faces[r-1]}</div>`:`<div class="die idle">?</div>`;
+  const tot=r?`<span class="total">${r} + ${sum(k)} = <b>${r+sum(k)}</b></span>`:`<span class="total">d6 + ${sum(k)}</span>`;
+  const mods=s.mods.map(m=>`<span class="chip" title="${m.src}">${m.n} <b>+${m.v}</b></span>`).join('');
+  return `<span class="who">${k==='you'?'Savoy · you · attacker':'Milan · defender'}</span><div class="dierow">${die}${tot}</div><div class="mods">${mods}</div>`;
+}
+function render(){
+  const y=S.sides.you,f=S.sides.foe;
+  $('diceYou').innerHTML=diceHTML('you');$('diceFoe').innerHTML=diceHTML('foe');
+  $('track').innerHTML=Array.from({length:S.maxDay},(_,i)=>{const d=i+1;return `<span class="${d<S.day||(S.over&&d===S.day)?'done':d===S.day?'now':''}">${d<S.day||(S.over&&d===S.day)?'✕':d}</span>`;}).join('');
+  const tot=y.morale+f.morale||1;$('mYou').style.width=(y.morale/tot*100)+'%';
+  $('mYouN').textContent=`Savoy ${y.morale}`;$('mFoeN').textContent=`Milan ${f.morale}`;
+  $('cardsHeld').textContent=`Milan holds ${f.hand} card${f.hand===1?'':'s'}`;
+  let b='';
+  b+=rowHTML('foe','reserve','Reserve');
+  b+=rowHTML('foe','back','Back');
+  b+=rowHTML('foe','front','Front');
+  b+=`<div></div><div class="gap">${LANES.map(l=>`<span>${l}</span>`).join('')}</div>`;
+  b+=rowHTML('you','front','Front');
+  b+=rowHTML('you','back','Back');
+  b+=rowHTML('you','reserve','Reserve');
+  b+=`<svg class="arrows" id="arrows"></svg>`;
+  if(S.over){const w=S.over.winner==='you';
+    b+=`<div class="result"><div><h3>${w?'Victory':'Defeat'}</h3><p>${S.over.why} on day ${S.day}.</p><p>Savoy lost ${S.over.you} men · Milan lost ${S.over.foe}.</p><p>${w?'Milan retreats toward Pavia. Your regiments gain 2 experience.':'Your army falls back toward Asti. Regiments gain 1 experience.'}</p><button class="primary" data-act="reset">Fight it again</button></div></div>`;}
+  $('board').innerHTML=b;
+  $('cp').innerHTML=`<span>Command</span>${Array.from({length:S.cpMax},(_,i)=>`<i class="${i<S.cp?'on':''}"></i>`).join('')}<span>${S.cp} of ${S.cpMax}</span>`;
+  $('hand').innerHTML=S.hand.map((id,i)=>{const c=CARDS[id],off=c.cost>S.cp||S.over||S.busy;
+    return `<div class="card ${S.pick===i?'pick':''} ${off?'off':''}" data-card="${i}" tabindex="0" role="button" title="${c.n}: ${c.txt}">
+      <div class="ct"><span class="cn">${c.n}</span><span class="cost">${c.cost}</span></div>
+      <span class="ck" style="color:${KIND[c.kind]}">${c.kind}${c.tgt==='none'?' · army':' · lane'}</span>
+      <span class="cx">${c.txt}</span><span class="cf">From: ${c.from}</span></div>`;}).join('');
+  let h='Click a gold regiment to move it, or a card to play it. Then fight the day.';
+  if(S.pick!=null){const c=CARDS[S.hand[S.pick]];h=`Choose ${c.tgt==='foe'?'an enemy':'one of your'} front lanes for ${c.n}. Click the card again to cancel.`;}
+  else if(S.sel!=null){h=S.cp<1?'No command points left today.':`Move ${TY[findU(S.sel).type].n}: click a lit slot (1 point), or the reserve row to rotate it back.`;}
+  if(S.busy)h='Your general is commanding…';
+  if(S.over)h='The battle is over.';
+  $('hint').textContent=h;
+  $('log').innerHTML=S.log.map(l=>`<div>${l}</div>`).join('');
+  $('bFight').disabled=!!S.over||S.busy;$('bAuto').disabled=!!S.over||S.busy;$('bWithdraw').disabled=!!S.over||S.busy;
+  requestAnimationFrame(()=>{drawArrows();S.hits.clear();});
+}
+function drawArrows(){
+  const svg=$('arrows');if(!svg)return;
+  const box=$('board').getBoundingClientRect();
+  const c=(id)=>{const el=$('board').querySelector(`[data-uid="${id}"]`);if(!el)return null;const r=el.getBoundingClientRect();return{x:r.left-box.left+r.width/2,y:r.top-box.top+r.height/2,h:r.height};};
+  let out=`<defs><marker id="hf" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f0806a"/></marker><marker id="hy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e8c15a"/></marker></defs>`;
+  if(S.over){svg.innerHTML='';return;}
+  const show={foe:$('showFoe').checked,you:$('showYou').checked};
+  const seen={};
+  for(const k of ['you','foe']){
+    if(!show[k])continue;
+    for(const i of intents(k)){
+      const a=c(i.u.id),t=c(i.t.id);if(!a||!t)continue;
+      const key=i.t.id;seen[key]=(seen[key]||0)+1;const off=(seen[key]-1)*4-4;
+      const y1=a.y+(k==='foe'?a.h/2:-a.h/2),y2=t.y+(k==='foe'?-t.h/2-2:t.h/2+2);
+      const x1=a.x+(k==='foe'?3:-3),x2=t.x+off;
+      const mx=(x1+x2)/2+(x2-x1)*0.15+(k==='foe'?10:-10),my=(y1+y2)/2;
+      const dashed=i.kind==='flank'||i.kind==='break';
+      out+=`<path d="M${x1},${y1} Q${mx},${my} ${x2},${y2}" fill="none" stroke="${k==='foe'?'#f0806a':'#e8c15a'}" stroke-width="${k==='foe'?1.8:1.2}" opacity="${k==='foe'?0.9:0.45}" ${dashed?'stroke-dasharray="5 4"':''} marker-end="url(#${k==='foe'?'hf':'hy'})"/>`;
+    }
+  }
+  svg.innerHTML=out;
+}
+
+/* ---------- input ---------- */
+function activate(el){
+  if(S.over||S.busy)return;
+  const card=el.closest('[data-card]');
+  if(card){const i=+card.dataset.card;const c=CARDS[S.hand[i]];if(c.cost>S.cp)return;
+    S.sel=null;
+    if(c.tgt==='none'){playCard(i,null);}else S.pick=S.pick===i?null:i;render();return;}
+  const u=el.closest('.u.you');
+  if(u&&S.pick==null){const id=+u.dataset.uid;
+    // clicking a unit inside a lit slot moves the selected one there
+    const slot=u.closest('.slot.can');if(slot&&S.sel!=null&&S.sel!==id){doSlot(slot);return;}
+    S.sel=S.sel===id?null:id;render();return;}
+  const slot=el.closest('.slot.can');if(slot){doSlot(slot);return;}
+}
+function doSlot(slot){
+  const [k,row,Ls]=slot.dataset.slot.split('|');const L=Ls==='null'?null:+Ls;
+  if(S.pick!=null){playCard(S.pick,L);render();return;}
+  if(S.sel!=null){moveTo(findU(S.sel),row,L);render();}
+}
+$('win').addEventListener('click',e=>{const a=e.target.closest('[data-act="reset"]');if(a){fresh();render();return;}activate(e.target);});
+$('win').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){if(e.target.matches('[role="button"]')){e.preventDefault();activate(e.target);}}if(e.key==='Escape'){S.sel=null;S.pick=null;render();}});
+$('bFight').addEventListener('click',()=>{fight();render();});
+$('bAuto').addEventListener('click',auto);
+$('bWithdraw').addEventListener('click',()=>{if(S.over)return;const y=S.sides.you;const loss=Math.round(men('you')*0.1);
+  for(const u of all('you'))u.men=Math.max(1,Math.round(u.men*0.9));addLog(`You withdraw, paying ${loss} men; Milan's horse harries the rear.`);end('foe','Savoy withdraws');render();});
+$('reset').addEventListener('click',e=>{e.preventDefault();fresh();render();});
+$('showFoe').addEventListener('change',drawArrows);$('showYou').addEventListener('change',drawArrows);
+window.addEventListener('resize',()=>requestAnimationFrame(drawArrows));
+fresh();render();
+})();
+</script>

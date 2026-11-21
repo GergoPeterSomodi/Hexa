@@ -42,6 +42,10 @@ Everything decided on 2026-11-13 stays recorded in its own doc and waits its tur
   countries. With it, the AI work to take castles faster (armies gathering). Design: `docs/design/castle-areas.md`.
 - **0.4.x, after the port:** the battle board as a mini game inside the turn (its brief draft), the trade patch, field forts, battle cards,
   the battle mini-map, war goals and peace.
+- **The battle board (M24, after M12; decided 2026-11-21):** the board pauses End season. When the battles phase reaches a
+  battle with a human side, it stops and opens the board; the player plays its days, and the phase goes on when
+  the battle ends. A battle still ends in the season it starts; nothing carries over. Battles between AI countries stay
+  instant. The design is `docs/design/battle.md` round 10 (mockup `docs/design/images/51_battle_board.png`).
 
 ## 1. Vision
 
