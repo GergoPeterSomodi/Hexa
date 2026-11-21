@@ -255,8 +255,11 @@ func _position_move() -> void:
 	if _move == null or not _move.is_open():
 		return
 	var anchor := _pointer_pos
+	var to_local := get_global_transform_with_canvas().affine_inverse()
 	if _keyboard:
-		anchor = get_global_transform_with_canvas().affine_inverse() * _cursor_screen
+		anchor = to_local * _cursor_screen
+	elif is_inside_tree() and get_viewport() != null:
+		anchor = to_local * get_viewport().get_mouse_position()  # the pointer is in viewport pixels, this node is not at 0,0
 	_move.place(anchor, _available_bounds())
 
 

@@ -6,6 +6,11 @@ class_name MoveCard
 extends PanelContainer
 
 const CARD_W: float = 300.0
+## The width the words wrap to: the card less its frame's margins. A label's height is measured at this width, so the card
+## is as tall as its words and no taller (a label measured at width 0 wraps one letter a line).
+const WRAP_W: float = 264.0
+## The meta key of a label's words before it is wrapped.
+const RAW := &"words"
 const TONE_VARIATIONS: Dictionary[StringName, StringName] = {
 	&"good": &"NumberGood",
 	&"bad": &"NumberBad",
@@ -19,11 +24,16 @@ const TONE_VARIATIONS: Dictionary[StringName, StringName] = {
 @onready var _way: Label = $VBox/Way
 
 var _open: bool = false
+var _anchor: Vector2 = Vector2.ZERO
+var _bounds: Rect2 = Rect2()
+var _settle_queued: bool = false
 
 
 func _ready() -> void:
 	custom_minimum_size.x = CARD_W
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_title.autowrap_mode = TextServer.AUTOWRAP_OFF  # the words are wrapped by _wrap, not by the label
+	_way.autowrap_mode = TextServer.AUTOWRAP_OFF
 	focus_mode = Control.FOCUS_NONE
 	hide_card()
 
@@ -37,8 +47,14 @@ func show_move(preview: Dictionary) -> void:
 
 ## Places the card by `anchor` (the pointer, or the order cursor's hex centre), kept inside `bounds` (MapHover's clamp).
 func place(anchor: Vector2, bounds: Rect2) -> void:
-	size = Vector2(CARD_W, get_combined_minimum_size().y)
-	position = MapHover.clamp_card_position(anchor, size, bounds)
+	_anchor = anchor
+	_bounds = bounds
+	_fit()
+	_reposition()
+
+
+func _reposition() -> void:
+	position = MapHover.clamp_card_position(_anchor, size, _bounds)
 
 
 func hide_card() -> void:
@@ -51,24 +67,24 @@ func is_open() -> bool:
 
 
 func title_text() -> String:
-	return _title.text
+	return str(_title.get_meta(RAW, ""))
 
 
 func way_text() -> String:
-	return _way.text if _way.visible else ""
+	return str(_way.get_meta(RAW, "")) if _way.visible else ""
 
 
 ## The texts of the line labels, in order (the preview's lines).
 func line_texts() -> Array[String]:
 	var out: Array[String] = []
 	for child: Node in _rows.get_children():
-		out.append((child as Label).text)
+		out.append(str((child as Label).get_meta(RAW, "")))
 	return out
 
 
 func _fill(preview: Dictionary) -> void:
-	_title.text = str(preview.get("title", ""))
-	_title.visible = not _title.text.is_empty()
+	_set_words(_title, str(preview.get("title", "")))
+	_title.visible = not str(_title.get_meta(RAW, "")).is_empty()
 	_clear_rows()
 	for raw: Variant in preview.get("lines", []) as Array:
 		var line := raw as Array
@@ -76,14 +92,77 @@ func _fill(preview: Dictionary) -> void:
 			continue
 		_rows.add_child(_line_label(str(line[0]), StringName(str(line[1]))))
 	var way := str(preview.get("way_out", ""))
-	_way.text = way
+	_set_words(_way, way)
 	_way.visible = not way.is_empty()
+	_fit()
+
+
+## Sizes the card to its words: each label is wrapped at WRAP_W by its font and set to that height, then the card takes the
+## height of its children (no label wraps itself: a Label's own minimum height is measured one word wide, far too tall).
+func _fit() -> void:
+	var labels: Array[Label] = [_title, _way]
+	for child: Node in _rows.get_children():
+		labels.append(child as Label)
+	for label: Label in labels:
+		var wrapped := _wrap(label)
+		label.text = wrapped[0]
+		label.custom_minimum_size = Vector2(WRAP_W, wrapped[1])
+	size = Vector2(CARD_W, 0.0)
+	reset_size()
+	if not _settle_queued and is_inside_tree():
+		# The theme (fonts, sizes) of the labels is resolved on the next frame: measure again then and place the card again.
+		_settle_queued = true
+		_settle.call_deferred()
+
+
+func _settle() -> void:
+	_settle_queued = false
+	if not _open:
+		return
+	var labels: Array[Label] = [_title, _way]
+	for child: Node in _rows.get_children():
+		labels.append(child as Label)
+	for label: Label in labels:
+		var wrapped := _wrap(label)
+		label.text = wrapped[0]
+		label.custom_minimum_size = Vector2(WRAP_W, wrapped[1])
+	size = Vector2(CARD_W, 0.0)
+	reset_size()
+	_reposition()
+
+
+## The label's words wrapped at WRAP_W with its own font: the text (lines joined by newlines) and its height.
+func _wrap(label: Label) -> Array:
+	var raw := str(label.get_meta(RAW, ""))
+	if raw.is_empty():
+		return ["", 0.0]
+	var font := label.get_theme_font("font")
+	var font_size := label.get_theme_font_size("font_size")
+	var lines := PackedStringArray()
+	for paragraph: String in raw.split("
+"):
+		var line := ""
+		for word: String in paragraph.split(" ", false):
+			var trial := word if line.is_empty() else line + " " + word
+			if line.is_empty() or font.get_string_size(trial, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= WRAP_W:
+				line = trial
+			else:
+				lines.append(line)
+				line = word
+		lines.append(line)
+	return ["
+".join(lines), ceilf(float(lines.size()) * font.get_height(font_size))]
+
+
+func _set_words(label: Label, words: String) -> void:
+	label.set_meta(RAW, words)
+	label.text = words
 
 
 func _line_label(text: String, tone: StringName) -> Label:
 	var label := Label.new()
-	label.text = text
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_set_words(label, text)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.focus_mode = Control.FOCUS_NONE
 	label.theme_type_variation = TONE_VARIATIONS.get(tone, &"Label")

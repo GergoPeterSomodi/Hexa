@@ -19,6 +19,7 @@ signal toast_requested(text: String, tone: StringName)
 const NO_ARMY := -1
 const ICON_PX := 24
 const FIGURE_PX := 32
+const CHECK_PX := 22
 const DISBAND_TITLE := "Disband %s?"
 const DISBAND_SOME := "Disband %s of the %s?"
 const CHOICE_DISBAND := {"id": &"confirm", "label": "Disband", "kind": "danger", "safe": false}
@@ -209,9 +210,14 @@ func _add_order(parent: VBoxContainer, data: Dictionary) -> void:
 		parent.add_child(_wrapped(str(order["arrives_text"])))
 	if str(order["waiting_text"]) != "":
 		parent.add_child(_wrapped(str(order["waiting_text"])))
-	var row := HFlowContainer.new()
-	row.add_child(_action_button("Hold", "halt", KitButton.Kind.SECONDARY, &"hold"))
-	row.add_child(_action_button("Continue march", "continue_march", KitButton.Kind.SECONDARY, &"march"))
+	var row := HBoxContainer.new()
+	var hold := _action_button("Hold", "halt", KitButton.Kind.SECONDARY, &"hold")
+	var cont := _action_button("Continue", "continue_march", KitButton.Kind.SECONDARY, &"march")
+	hold.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cont.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cont.size_flags_stretch_ratio = 1.6  # its text, its lock or icon and its key cap need more room than Hold's
+	row.add_child(hold)
+	row.add_child(cont)
 	parent.add_child(row)
 
 
@@ -231,26 +237,36 @@ func _unit_row(game: Game, unit: Dictionary) -> Control:
 	box.tooltip_text = "Select this company"
 	box.accessibility_name = "Select %s" % str(unit["name"])
 	box.toggled.connect(func(on: bool) -> void: set_ticked(uid, on))
+	box.custom_minimum_size = Vector2(CHECK_PX, CHECK_PX)
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(box)
 	var fig := TextureRect.new()
 	fig.custom_minimum_size = Vector2(FIGURE_PX, FIGURE_PX)
 	fig.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	fig.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	fig.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var ud := Military.unit_def(game, int(unit["kind"]))
 	if ud != null and fig.has_theme_icon(ud.figure, &"Kit"):
 		fig.texture = fig.get_theme_icon(ud.figure, &"Kit")
 	row.add_child(fig)
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(PanelKit.label(str(unit["name"]), &"TableRow"))
+	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.add_theme_constant_override(&"separation", 0)
+	var line := HBoxContainer.new()
+	var name_label := PanelKit.label(str(unit["name"]), &"TableRow")
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_child(name_label)
 	var full := int(unit["full"])
 	var men := int(unit["men"])
-	col.add_child(PanelKit.label("%s / %s men" % [Words.number(men), Words.number(full)], &"Hint"))
+	line.add_child(PanelKit.label("%s / %s men" % [Words.number(men), Words.number(full)], &"Hint"))
+	col.add_child(line)
 	var bar := ProgressBar.new()
 	bar.show_percentage = false
 	bar.max_value = float(maxi(full, 1))
 	bar.value = float(men)
-	bar.custom_minimum_size.y = 6.0
+	bar.custom_minimum_size.y = 5.0
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	col.add_child(bar)
 	var raise_text := "mustering" if bool(unit["mustering"]) else str(unit["raised_text"])
 	col.add_child(PanelKit.label(raise_text, &"Hint"))

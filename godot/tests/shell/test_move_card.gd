@@ -189,3 +189,40 @@ func test_keyboard_o_orders_at_the_cursor_and_the_card_never_takes_focus() -> vo
 	assert_false(_card().has_focus())
 	assert_eq(_card().focus_mode, Control.FOCUS_NONE, "no focus mode")
 	assert_eq(_card().mouse_filter, Control.MOUSE_FILTER_IGNORE, "the mouse goes through it")
+
+
+## The card's size: a three-line sample is as tall as its words (under 160 px), and the card stays inside the viewport.
+func _sample_card() -> MoveCard:
+	var card := (load("res://shell/hud/move_card.tscn") as PackedScene).instantiate() as MoveCard
+	add_child_autofree(card)
+	card.show_move({
+		"title": "near Cuneo (6, 14)",
+		"verdict": {"ok": true, "reason": ""},
+		"lines": [["There in Summer 1480 (2 seasons)", &"plain"],
+			["Musters first: marches from Summer 1480.", &"muted"],
+			["In supply.", &"good"]],
+		"way_out": "",
+	})
+	return card
+
+
+func test_the_card_is_as_tall_as_its_three_line_sample_and_no_taller() -> void:
+	var card := _sample_card()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	card.place(Vector2(300.0, 200.0), Rect2(0.0, 0.0, 1280.0, 720.0))
+	assert_eq(card.size.x, MoveCard.CARD_W, "300 px wide")
+	assert_lt(card.size.y, 160.0, "as tall as its words, not the window (%s)" % card.size.y)
+	assert_gt(card.size.y, 40.0, "and it does hold its words")
+
+
+func test_the_card_sits_by_the_anchor_and_stays_inside_the_viewport() -> void:
+	var card := _sample_card()
+	card.place(Vector2(400.0, 300.0), Rect2(0.0, 0.0, 1280.0, 720.0))
+	assert_eq(card.position, Vector2(400.0 + MapHover.CURSOR_OFFSET.x, 300.0 + MapHover.CURSOR_OFFSET.y), "a small offset from the pointer")
+	card.place(Vector2(1275.0, 715.0), Rect2(0.0, 0.0, 1280.0, 720.0))
+	assert_lte(card.position.x + card.size.x, 1280.0, "clamped inside the right edge")
+	assert_lte(card.position.y + card.size.y, 720.0, "clamped inside the bottom edge")
+	assert_gte(card.position.x, 0.0)
+	assert_gte(card.position.y, 0.0)
+

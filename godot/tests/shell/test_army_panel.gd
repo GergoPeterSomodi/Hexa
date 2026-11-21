@@ -304,3 +304,48 @@ func test_country_panel_under_arms_row() -> void:
 		assert_true(sav_rows[sav_at + 1].begins_with("about "), "a known country's men banded")
 	else:
 		assert_eq(sav_at, -1, "an unknown country has no row")
+
+
+## The picture of L18's review: tick boxes as tall as the row, a company row of about 50 px, and "Continue march" cut by its
+## key cap. Laid out at the dock width, every check box is compact, every company row is under 64 px, and each action
+## button's text, icon and key cap fit inside it.
+func test_rows_and_buttons_fit_at_the_dock_width() -> void:
+	var a := _own_army(3)
+	_panel.size = Vector2(Tokens.PANEL_W, 720)
+	_panel.show_army(a.id)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var boxes := 0
+	for node: Node in _panel.body().find_children("*", "CheckBox", true, false):
+		var box := node as CheckBox
+		boxes += 1
+		assert_lte(box.size.y, 26.0, "a compact check box, not one as tall as its row")
+		var row := box.get_parent() as Control
+		assert_lte(row.size.y, 64.0, "a company row is about 50 px: under 64")
+	assert_eq(boxes, 3, "one check box a company")
+
+	var checked := 0
+	for node: Node in _panel.body().find_children("*", "KitButton", true, false):
+		var btn := node as KitButton
+		if not btn.has_meta(&"action"):
+			continue
+		checked += 1
+		assert_gt(btn.size.x, 40.0, "%s is laid out" % btn.text)
+		assert_lte(_needed_width(btn), btn.size.x + 0.5, "%s fits its button: text, icon and key cap" % btn.text)
+	assert_gte(checked, 4, "Hold, Continue, Split off and Disband are checked")
+
+
+## The width a button's content needs: its text, its icon and its embedded key cap, plus the normal style's margins.
+func _needed_width(btn: KitButton) -> float:
+	var font := btn.get_theme_font(&"font")
+	var font_size := btn.get_theme_font_size(&"font_size")
+	var need := font.get_string_size(btn.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	if btn.icon != null:
+		need += float(btn.icon.get_width()) + float(btn.get_theme_constant(&"h_separation"))
+	var cap := btn.embedded_key_cap()
+	if cap != null and cap.visible:
+		need += cap.get_combined_minimum_size().x
+	var style := btn.get_theme_stylebox(&"normal")
+	if style != null:
+		need += style.get_minimum_size().x
+	return need

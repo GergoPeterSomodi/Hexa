@@ -39,6 +39,9 @@ const REPLAY_STATE := 2
 const DEV_MONEY := 100000
 const SCENES: Array[String] = [
 	"m6_army_tokens",
+	"m6_army_tokens_close",
+	"m6_army_tokens_far",
+	"m6_route_reach",
 	"m6_supply_legend",
 	"m6_army_panel",
 	"m6_raise_tab",
@@ -53,6 +56,12 @@ const SCENES: Array[String] = [
 ]
 ## The scenes whose movement replay is on (every other scene plays its seasons with the replay off).
 const REPLAY_SCENES: Array[String] = ["m6_replay_midwalk"]
+## The token scene whose crop is also saved (320 x 200 physical pixels around the army, upscaled 3x with nearest neighbour).
+const CROP_SCENE := "m6_army_tokens_close"
+const CROP_SIZE := Vector2i(320, 200)
+const CROP_SCALE := 3
+## The screen position of the army the close scene centres on (set by its prepare; (-1, -1) for none).
+static var _token_px := Vector2(-1.0, -1.0)
 ## The scenes whose window is narrower than the rest.
 const NARROW_SCENES: Array[String] = ["m6_army_chip_1024"]
 
@@ -123,6 +132,7 @@ func _capture_all() -> int:
 func _capture_one(packed: PackedScene, scene_name: String, scale_mult: int, scale_dir: String, headless: bool) -> bool:
 	var width := NARROW_W if NARROW_SCENES.has(scene_name) else LOGICAL_W
 	var vp := SubViewport.new()
+	vp.gui_embed_subwindows = true  # the hex menu is a PopupMenu (a window): embedded, the viewport's capture holds it
 	vp.size = Vector2i(width, LOGICAL_H) * scale_mult
 	if scale_mult > 1:
 		vp.size_2d_override = Vector2i(width, LOGICAL_H)
@@ -163,6 +173,18 @@ func _capture_one(packed: PackedScene, scene_name: String, scale_mult: int, scal
 			if img.save_png(png_path) != OK:
 				printerr("shot_ui_m6: failed saving %s" % png_path)
 				ok = false
+			if ok and scene_name == CROP_SCENE and _token_px.x >= 0.0:
+				var k := Vector2(img.get_width(), img.get_height()) / Vector2(width, LOGICAL_H)
+				var centre := Vector2i((_token_px * k).round())
+				var origin := centre - Vector2i(int(CROP_SIZE.x * 0.5), int(CROP_SIZE.y * 0.5))
+				origin.x = clampi(origin.x, 0, img.get_width() - CROP_SIZE.x)
+				origin.y = clampi(origin.y, 0, img.get_height() - CROP_SIZE.y)
+				var crop := img.get_region(Rect2i(origin, CROP_SIZE))
+				crop.resize(CROP_SIZE.x * CROP_SCALE, CROP_SIZE.y * CROP_SCALE, Image.INTERPOLATE_NEAREST)
+				var crop_path := scale_dir.path_join("%s_crop.png" % scene_name)
+				if crop.save_png(crop_path) != OK:
+					printerr("shot_ui_m6: failed saving %s" % crop_path)
+					ok = false
 
 	var session := root.get_node_or_null("Session")
 	if session != null:
@@ -298,13 +320,18 @@ static func _prepare_scene(app: Node, scene_name: String) -> bool:
 			scene.call("fit")
 			await _frames(tree, 4)
 			return int(scene.call("mode")) == int(MapModes.Mode.SUPPLY) and bool((hud_node.call("mode_legend") as CanvasItem).visible)
-		"m6_army_tokens":
+		"m6_army_tokens", "m6_army_tokens_close", "m6_army_tokens_far":
 			fixture_ids = await _fixture(tree, session, g)
 			if fixture_ids.is_empty():
 				return false
-			scene.call("frame_at", view_node.call("centre_of", GENOA), 1.0)
+			var zoom_level := 0.35 if scene_name == "m6_army_tokens_far" else 1.0
+			scene.call("frame_at", view_node.call("centre_of", GENOA), zoom_level)
 			armies.call("select_army", fixture_ids[0])
 			await _frames(tree, 4)
+			_quiet(app)  # the raise's ribbons and the toasts would sit on the tokens
+			await _frames(tree, 2)
+			if scene_name == "m6_army_tokens_close":
+				_token_px = (view_node as CanvasItem).get_global_transform_with_canvas() * (view_node.call("centre_of", GENOA) as Vector2)
 			return int((armies.call("tokens") as Object).call("token_count")) > 0 and int(armies.call("selected_army")) == fixture_ids[0]
 		"m6_army_panel":
 			fixture_ids = await _fixture(tree, session, g)
@@ -323,7 +350,13 @@ static func _prepare_scene(app: Node, scene_name: String) -> bool:
 				return false
 			hex_panel.call("show_raise")
 			await _frames(tree, 4)
-			return hex_panel.is_visible_in_tree() and (hex_panel.call("raise_list") as Object) != null
+			# The Raise rows sit low in the panel's scroll: scroll them into view so the picture shows them.
+			var raise_list := hex_panel.call("raise_list") as Control
+			var scroll := hex_panel.get_node_or_null("Scroll") as ScrollContainer
+			if scroll != null and raise_list != null:
+				scroll.ensure_control_visible(raise_list)
+			await _frames(tree, 3)
+			return hex_panel.is_visible_in_tree() and raise_list != null
 		"m6_hex_menu":
 			fixture_ids = await _fixture(tree, session, g)
 			scene.call("select_hex", GENOA)
@@ -331,9 +364,10 @@ static func _prepare_scene(app: Node, scene_name: String) -> bool:
 			var found := armies.find_children("*", "HexMenu", false, false)
 			if found.is_empty():
 				return false
-			found[0].call("open_for", GENOA, Vector2(360.0, 260.0))
+			var menu := found[0] as Object
+			var opened := bool(menu.call("open_for", GENOA, Vector2(360.0, 260.0)))
 			await _frames(tree, 4)
-			return int((found[0] as Object).call("get_item_count")) > 0
+			return opened and bool(menu.get("visible")) and int(menu.call("get_item_count")) > 0
 		"m6_move_card":
 			fixture_ids = await _fixture(tree, session, g)
 			if fixture_ids.is_empty():
@@ -355,6 +389,8 @@ static func _prepare_scene(app: Node, scene_name: String) -> bool:
 ## The pages, the report, the chips and the replay of the pictures (split from _prepare_scene for the lint's 100 lines).
 static func _prepare_later(tree: SceneTree, session: Node, app: Node, g: Game, hud_node: Node, scene: Node, works: Object, scene_name: String) -> bool:
 	var fixture_ids: Array[int] = []
+	var armies := _armies(app)
+	var view_node := scene.call("view") as Node
 	match scene_name:
 		"m6_military_page":
 			fixture_ids = await _fixture(tree, session, g)
@@ -385,7 +421,7 @@ static func _prepare_later(tree: SceneTree, session: Node, app: Node, g: Game, h
 		"m6_army_chip_1280", "m6_army_chip_1024":
 			fixture_ids = await _fixture(tree, session, g)
 			if await _chip_card(tree, hud_node, "army_chip"):
-				return true
+				return true  # the Army chip is visible and its card hangs under it
 			# The top bar drops chips as the window narrows (the plan's order): at 1024 the Army chip may be gone. Then the
 			# picture is the top bar without it; the planning session checks the picture against the order.
 			if scene_name == "m6_army_chip_1024":
@@ -404,6 +440,59 @@ static func _prepare_later(tree: SceneTree, session: Node, app: Node, g: Game, h
 				await _frames(tree, 1)
 				guard += 1
 			await _frames(tree, 12)  # a few steps into the walk
+			_quiet(app)  # the season's ribbons would sit on the walkers
 			return int(flow.call("state")) == REPLAY_STATE
+		"m6_route_reach":
+			fixture_ids = await _fixture(tree, session, g)
+			if fixture_ids.is_empty():
+				return false
+			var goal := _goal_two_seasons(g, fixture_ids[0])
+			if goal.x < 0:
+				return false
+			armies.call("select_army", fixture_ids[0])  # the reach tint and the army's ring
+			scene.call("frame_at", view_node.call("centre_of", GENOA), 0.7)
+			armies.call("_on_hover", goal)  # the order cursor on the goal: the route to it, with its stops and path marks
+			await _frames(tree, 4)
+			_quiet(app)
+			return int(armies.call("selected_army")) == fixture_ids[0]
 	return false
 
+
+## Clears what the play left on the map: the floating ribbons and the toasts.
+static func _quiet(app: Node) -> void:
+	var scene := app.call("map_scene") as Node
+	var floaters: Node = scene.get_node_or_null("Names/Floaters") if scene != null else null
+	if floaters != null:
+		floaters.call("clear")
+	var hud_node := app.call("hud") as Node
+	var host: Node = hud_node.call("toast_host") as Node if hud_node != null else null
+	if host != null:
+		if host.has_method("clear"):
+			host.call("clear")
+		else:
+			for child: Node in host.get_children():
+				(child as CanvasItem).visible = false
+
+
+## A land hex of the player's, about two seasons' march from the army (MovePreview's arrival); the nearest later one when none
+## is exactly two. (-1, -1) when none.
+static func _goal_two_seasons(g: Game, army_id: int) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	var best_gap := 1000000
+	for i: int in range(0, g.map.hex_count(), 2):
+		var hex := g.map.hex_of(i)
+		if g.map.land[i] == 0 or Territory.owner_tag(g, hex) != TAG or hex == GENOA:
+			continue
+		var preview := MovePreview.to(g, TAG, army_id, hex)
+		var verdict := preview.get("verdict", {}) as Dictionary
+		if not bool(verdict.get("ok", false)):
+			continue
+		var gap := int(preview.get("arrives_turn", -1)) - g.turn
+		if gap < 2:
+			continue
+		if gap - 2 < best_gap:
+			best_gap = gap - 2
+			best = hex
+			if best_gap == 0:
+				break
+	return best

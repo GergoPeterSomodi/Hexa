@@ -136,3 +136,43 @@ func test_the_tokens_follow_the_colour_blind_palette_when_the_scene_changes_it()
 	await get_tree().process_frame
 	assert_eq(_armies().tokens().token_at(hex, ArmyFixture.TAG).plate_colour(), MapModes.palette(_game, false)[id],
 		"and the standard one back")
+
+
+func test_the_token_is_readable_at_zoom_one() -> void:
+	var hex := ArmyFixture.find_town(_game)
+	_army(hex, 100)
+	_armies().sync()
+	var token := _armies().tokens().token_at(hex, ArmyFixture.TAG)
+	_armies().tokens().set_zoom(1.0)
+	assert_eq(token.plate_size(), ArmyToken.PLATE_SIZE, "the plate is 40 by 34 px on the map at zoom 1")
+	assert_gte(token.plate_size().x, 34.0, "at least 34 px wide")
+	assert_lt(token.plate_size().x, 104.0 * 0.5, "and well under a hex (104 px)")
+	assert_eq(token.badge_font_size(), ArmyToken.FONT_SIZE, "the strength is 14 px")
+	assert_gte(token.badge_font_size(), 13, "the strength reads at 13 px or more")
+	assert_gt(ArmyToken.RING_SIZE.x, ArmyToken.PLATE_SIZE.x, "the selection ring is wider than the plate, so it frames it")
+	assert_gt(ArmyToken.RING_SIZE.y, ArmyToken.PLATE_SIZE.y, "and taller")
+	assert_lt(ArmyToken.LIFT, -ArmyToken.PLATE_SIZE.y * 0.5, "the plate stands above the hex centre, clear of the town icon")
+
+
+func test_the_badge_reads_the_men_in_light_ink_on_the_dark_badge() -> void:
+	var hex := ArmyFixture.find_town(_game)
+	_army(hex, 2)
+	_armies().sync()
+	var token := _armies().tokens().token_at(hex, ArmyFixture.TAG)
+	var viewed := ""
+	for v: Dictionary in ArmyView.tokens(_game, ArmyFixture.TAG):
+		if (v["hex"] as Vector2i) == hex:
+			viewed = str(v["text"])
+	assert_ne(viewed, "", "ArmyView lists the token's text")
+	assert_eq(token.badge_text(), viewed, "the badge reads ArmyView's token text")
+	assert_eq(token.badge_text(), "1.0k", "two companies of 500 men")
+	assert_gt(token.badge_label_size().x, 0.0, "the label has a width")
+	assert_gt(token.badge_label_size().y, 0.0, "and a height")
+	assert_eq(token.badge_label_size(), ArmyToken.BADGE_SIZE, "sized to the badge")
+	var ratio := Tokens.contrast_ratio(token.badge_text_colour(), token.badge_fill())
+	assert_gte(ratio, 4.5, "the number reads on the badge (contrast %.1f)" % ratio)
+	assert_ne(token.badge_text_colour(), Tokens.INK, "not the dark ink of the badge's own outline")
+	_armies().tokens().set_zoom(0.39)
+	assert_eq(token.badge_text(), viewed, "zoomed out the number is still there")
+	assert_gte(Tokens.contrast_ratio(token.badge_text_colour(), token.badge_fill()), 4.5)
+
