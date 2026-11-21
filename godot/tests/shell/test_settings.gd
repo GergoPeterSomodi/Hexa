@@ -334,7 +334,7 @@ func test_m2_keys_have_the_spec_defaults_and_choices() -> void:
 	assert_eq(s.get_value("accessibility/country_colours"), "standard")
 	assert_eq(s.choices_for("accessibility/country_colours"), ["standard", "colour_blind"])
 	assert_eq(s.get_value("state/map_mode"), "terrain")
-	assert_eq(s.choices_for("state/map_mode"), ["terrain", "owner", "relief", "yields"])
+	assert_eq(s.choices_for("state/map_mode"), ["terrain", "owner", "relief", "yields", "food"])
 	assert_eq(str(Settings.SCHEMA["state/map_mode"]["page"]), "", "remembered, no row")
 
 
@@ -358,6 +358,9 @@ func test_m2_keys_reject_wrong_values_and_load_back() -> void:
 	assert_true(s.set_value("state/map_mode", "yields"))
 	assert_true(s.save_to(path))
 	assert_eq(Settings.load_from(path, "macOS", false).get_value("state/map_mode"), "yields", "yields round-trips")
+	assert_true(s.set_value("state/map_mode", "food"), "Food arrives with M5")
+	assert_true(s.save_to(path))
+	assert_eq(Settings.load_from(path, "macOS", false).get_value("state/map_mode"), "food", "food round-trips")
 
 
 func test_m2_keys_with_wrong_values_in_a_file_fall_back() -> void:

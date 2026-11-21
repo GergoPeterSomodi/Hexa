@@ -1,9 +1,10 @@
 ## Studiolo walnut top bar (PanelBar): brand, the player's country (arms and long name, or the pick's title in a
 ## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief, Yields: the modes MapModes.modes offers), the date and End turn (DateEnd, right of the middle),
 ## Layers, Help and Pause menu (docs/architecture/m2-build-spec.md section 7.3; ui-and-controls-spec.md section 7).
-## M4 (spec 6.3): the resource chips (Ducats, Stores) sit right after the mode switch with the study button; both show only for
-## the player of a game with countries. When the bar is tight the gap goes first, then the Stores chip shrinks to its medal and value,
-## then the country name, the Ducats chip's name and change and the brand go, then the Stores chip itself; the Ducats medal and value and the study button stay down to about 800 px (the
+## M4 (spec 6.3) and M5 (spec 6.2): the resource chips (Ducats, People, Food, Stores) sit right after the mode switch with the
+## study button; they show only for the player of a game with countries. When the bar is tight the gap goes first, then the
+## Stores chip and the Food chip shrink to their medals and values, then the country name, People's and Ducats' names and
+## changes and the brand go, then the Stores and Food chips themselves; the Ducats and People medals and values and the study button stay down to about 800 px (the
 ## smallest window is 1024), and only below that, where nothing else is left, the chips and the study button hide (I, L and
 ## the country panel still open the study).
 ## It reads Session and Events and sends intents only. The name hides before the mode switch when the window narrows.
@@ -83,6 +84,7 @@ func _ready() -> void:
 	(_study_btn as KitButton).hotkey_action = &"game_study"
 	_study_btn.pressed.connect(func() -> void: study_requested.emit(&""))
 	_chips.study_requested.connect(func(tab: StringName) -> void: study_tab_requested.emit(&"economy", tab))
+	_chips.page_requested.connect(func(page: StringName) -> void: study_requested.emit(page))  # People and Food: the People page
 	_chips.minimum_size_changed.connect(_queue_fit)
 	_chips.refreshed.connect(_queue_fit)  # a refresh shows the chips again; the bar's fit wins
 
@@ -172,39 +174,62 @@ func _fit(width: float) -> void:
 	_chips.visible = _economy_wanted
 	_study_btn.visible = _economy_wanted
 	var stores := _chips.stores_chip()
+	var food := _chips.food_chip()
+	var people := _chips.people_chip()
 	var ducats := _chips.ducats_chip()
-	stores.visible = true
-	stores.set_name_shown(true)
-	stores.set_change_shown(true)
-	ducats.set_name_shown(true)
-	ducats.set_change_shown(true)
-	_resize_chip(stores)
-	_resize_chip(ducats)
+	for chip: ResourceChip in [stores, food, people, ducats]:
+		_reset_chip(chip)
 	if width <= 0.0:
 		return
-	if get_combined_minimum_size().x > width:
-		_gap.visible = false  # the space between End turn and Layers goes first
-	if get_combined_minimum_size().x > width:
-		stores.set_name_shown(false)  # the Stores chip shrinks to its medal and value; it stays
-		stores.set_change_shown(false)
-		_resize_chip(stores)
-	if get_combined_minimum_size().x > width:
+	if _too_wide(width):
+		_gap.visible = false  # the space between End turn and Layers goes first (the gap's 120 px to 0)
+	if _too_wide(width):
+		_shrink_chip(stores)  # the Stores chip keeps its medal and value; its name and change go
+	if _too_wide(width):
+		_shrink_chip(food)  # then Food's name and change
+	if _too_wide(width):
+		_shrink_chip(people)  # then People's name and change
+	if _too_wide(width):
 		_set_modes_compact(true)  # then the mode buttons tighten
-	if get_combined_minimum_size().x > width:
-		_country_btn.visible = false
+	if _too_wide(width):
+		_country_btn.visible = false  # then the country name
 		_map_info_label.visible = false
-	if get_combined_minimum_size().x > width:
-		ducats.set_name_shown(false)
+	if _too_wide(width):
+		ducats.set_name_shown(false)  # then Ducats' name, and after it its change
+		_resize_chip(ducats)
+	if _too_wide(width):
 		ducats.set_change_shown(false)
 		_resize_chip(ducats)
-	if get_combined_minimum_size().x > width:
-		_brand_label.visible = false
+	if _too_wide(width):
+		_brand_label.visible = false  # then the brand
 		_sep.visible = false
-	if get_combined_minimum_size().x > width:
-		stores.visible = false
-	if get_combined_minimum_size().x > width:
+	if _too_wide(width):
+		stores.visible = false  # then the Stores and Food chips themselves
+	if _too_wide(width):
+		food.visible = false
+	if _too_wide(width):
+		_study_btn.visible = false  # Ducats and People keep their medals and values down to the narrowest window
+	if _too_wide(width):
 		_chips.visible = false  # below any real window: the keys and the country panel still open the study
-		_study_btn.visible = false
+
+
+func _too_wide(width: float) -> bool:
+	return get_combined_minimum_size().x > width
+
+
+## A chip back to its full look: shown when the data wants it, with its name and the change the data allows.
+func _reset_chip(chip: ResourceChip) -> void:
+	chip.visible = _chips.wanted(chip.resource_id)
+	chip.set_name_shown(true)
+	chip.set_change_shown(_chips.change_wanted(chip.resource_id))
+	_resize_chip(chip)
+
+
+## A chip narrowed to its medal and value (its name and change go).
+func _shrink_chip(chip: ResourceChip) -> void:
+	chip.set_name_shown(false)
+	chip.set_change_shown(false)
+	_resize_chip(chip)
 
 
 func refresh_hotkeys() -> void:

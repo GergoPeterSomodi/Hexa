@@ -109,7 +109,7 @@ func _rebuild() -> void:
 	if _rows.is_empty():
 		accessibility_description = ""
 	else:
-		_column.add_child(PanelKit.label(TITLE, &"SectionHead"))
+		_column.add_child(PanelKit.label(_title(), &"SectionHead"))
 		for row: Dictionary in _rows:
 			_column.add_child(_row_node(row))
 		accessibility_description = _describe()
@@ -138,7 +138,13 @@ func _describe() -> String:
 	var words := PackedStringArray()
 	for row: Dictionary in _rows:
 		words.append(str(row["text"]))
-	return "%s: %s" % [TITLE, ", ".join(words)]
+	return "%s: %s" % [_title(), ", ".join(words)]
+
+
+## The card's title: MapModes.legend_title of the mode shown (TITLE when it has none).
+func _title() -> String:
+	var title := MapModes.legend_title(_mode)
+	return title if not title.is_empty() else TITLE
 
 
 func _sync_visible() -> void:

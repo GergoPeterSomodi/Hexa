@@ -117,6 +117,7 @@ func _ready() -> void:
 		Session.new_game(map_id, start_seed)
 	else:
 		_on_game_started()
+	add_child(MapPeople.new())  # after the game's first fill: it relays the plates and listens to the people
 	_seasons.request_next()
 
 
@@ -376,7 +377,7 @@ func _on_owners_changed(hexes: Array[Vector2i]) -> void:
 	var map := Session.game.map
 	if Session.game.has_countries():
 		_overlay.update_hexes(hexes)
-		_overlay.sync_yields(Session.game)
+		_overlay.sync_modes(Session.game)
 		var touched := BorderLines.chunks_touched(map, hexes)
 		last_rebuilt_border_chunks.clear()
 		for chunk: Vector2i in touched:
@@ -395,12 +396,11 @@ func _on_owners_changed(hexes: Array[Vector2i]) -> void:
 
 func _on_season_ended(_turn: int) -> void:
 	_seasons.season_ended()
-	_overlay.sync_yields(Session.game)
 
 
-## Works and taxes change a hex's worth: the Yields texture follows (only while the mode is Yields).
+## Works and taxes change a hex's worth: the Yields and Food textures follow (only in their modes).
 func _on_yields_event(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null) -> void:
-	_overlay.sync_yields(Session.game)
+	_overlay.sync_modes(Session.game)
 
 
 ## The player picked a country: ends picking highlight/pennants and restores the remembered map mode.
@@ -533,7 +533,7 @@ func _apply_mode(target: MapModes.Mode, persist: bool) -> void:
 	_mode = target
 	if _overlay != null:
 		_overlay.set_mode(_mode)
-		_overlay.sync_yields(Session.game, true)
+		_overlay.sync_modes(Session.game, true)
 	var is_picking := picking()
 	if _capitals != null:
 		_capitals.set_picking(is_picking)

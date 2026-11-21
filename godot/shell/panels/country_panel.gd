@@ -180,6 +180,9 @@ func _fill_ledger(card: Dictionary) -> void:
 	_add_row("Capital", _capital_control(card["capital"] as Dictionary))
 	_add_row("Districts", _value(str(int(card["districts"]))))
 	_add_row("Towns", _value(_towns_words(card)))
+	var people := card["people"] as Dictionary
+	if bool(people["shown"]):
+		_add_row("People", _value(_people_words(people)))
 	_add_row("Passes", _value(_passes_words(card["passes"] as Array)))
 	_add_row("Land", _value(_land_words(card["land"] as Array)))
 
@@ -205,6 +208,18 @@ func _towns_words(card: Dictionary) -> String:
 	if cities == 1:
 		return "%d, 1 of them a city" % towns
 	return "%d, %d of them cities" % [towns, cities]
+
+
+## The People row (spec 6.4): yours exact with last season's change ("83,285 (▲ +585 last season)"); a known country's
+## banded ("about 260,000"). The row is not shown for an unknown country, so no number of it is.
+func _people_words(people: Dictionary) -> String:
+	if bool(people["banded"]):
+		return Knowledge.band_text(int(people["value"]), "")
+	var text := Words.number(int(people["value"]))
+	var change := int(people["change"])
+	if change != 0:
+		text += " (%s %s last season)" % [PeopleView.UP if change > 0 else PeopleView.DOWN, Words.signed(change)]
+	return text
 
 
 func _passes_words(passes: Array) -> String:
@@ -328,6 +343,8 @@ func _wiring() -> Array:
 		[Events.work_started, _on_work_changed],
 		[Events.work_finished, _on_work_changed],
 		[Events.work_cancelled, _on_work_cancelled],
+		[Events.town_grew, _on_town_grew],
+		[Events.district_declined, _on_district_declined],
 	]
 
 
@@ -365,6 +382,14 @@ func _on_work_changed(_tag: StringName, _hex: Vector2i, _work: Dictionary) -> vo
 
 
 func _on_work_cancelled(_tag: StringName, _hex: Vector2i, _work: Dictionary, _why: StringName) -> void:
+	_refresh_if_shown()
+
+
+func _on_town_grew(_tag: StringName, _hex: Vector2i, _level: int) -> void:
+	_refresh_if_shown()
+
+
+func _on_district_declined(_tag: StringName, _hex: Vector2i, _level: int, _why: StringName) -> void:
 	_refresh_if_shown()
 
 

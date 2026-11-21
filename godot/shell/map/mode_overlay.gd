@@ -38,6 +38,12 @@ var _yields_image: Image = null
 var _yields_tex: ImageTexture = null
 var _yield_ramp_image: Image = null
 var _yield_ramp_tex: ImageTexture = null
+var _food_bytes := PackedByteArray()
+var _food_version := -1  # the game.version the Food texture shows (-1: none)
+var _food_image: Image = null
+var _food_tex: ImageTexture = null
+var _food_ramp_image: Image = null
+var _food_ramp_tex: ImageTexture = null
 var _material: ShaderMaterial = null
 
 
@@ -85,6 +91,14 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	_yield_ramp_image = _image_from_colours(MapModes.yield_ramp())
 	_yield_ramp_tex = ImageTexture.create_from_image(_yield_ramp_image)
 
+	_food_version = -1
+	_food_bytes = PackedByteArray()
+	_food_bytes.resize(count)  # zero: not your land
+	_food_image = Image.create_from_data(map.cols, map.rows, false, Image.FORMAT_R8, _food_bytes)
+	_food_tex = ImageTexture.create_from_image(_food_image)
+	_food_ramp_image = _image_from_colours(MapModes.food_ramp())
+	_food_ramp_tex = ImageTexture.create_from_image(_food_ramp_image)
+
 	if _material == null:
 		_material = ShaderMaterial.new()
 		_material.shader = load(SHADER_PATH) as Shader
@@ -95,6 +109,9 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	_material.set_shader_parameter(&"yields", _yields_tex)
 	_material.set_shader_parameter(&"yield_ramp", _yield_ramp_tex)
 	_material.set_shader_parameter(&"yield_alpha", MapModes.YIELD_ALPHA)
+	_material.set_shader_parameter(&"food", _food_tex)
+	_material.set_shader_parameter(&"food_ramp", _food_ramp_tex)
+	_material.set_shader_parameter(&"food_alpha", MapModes.FOOD_ALPHA)
 	_material.set_shader_parameter(&"veil_alpha", MapModes.VEIL_ALPHA)
 	_material.set_shader_parameter(&"stripe_px", MapModes.STRIPE_PX)
 	_material.set_shader_parameter(&"veil_colour", MapModes.VEIL)
@@ -234,6 +251,50 @@ func sync_yields(game: Game, force: bool = false) -> int:
 	return update_yields(MapModes.yield_bytes(game, game.player))
 
 
+## Writes the Food texels that differ from `bytes` (one byte a hex, MapModes.food_bytes) and uploads the texture once;
+## returns how many texels it wrote (0, and no upload, when nothing differs or `bytes` is not one a hex).
+func update_food(bytes: PackedByteArray) -> int:
+	if _map == null or _food_image == null or _food_tex == null or bytes.size() != _food_bytes.size():
+		return 0
+	var wrote := 0
+	var cols := _map.cols
+	var idx := 0
+	for row: int in _map.rows:
+		for col: int in cols:
+			var b := bytes[idx]
+			if b != _food_bytes[idx]:
+				_food_bytes[idx] = b
+				_food_image.set_pixel(col, row, Color(float(b) / 255.0, 0.0, 0.0, 1.0))
+				wrote += 1
+			idx += 1
+	if wrote > 0:
+		texel_writes += wrote
+		_food_tex.update(_food_image)
+		texture_updates += 1
+	return wrote
+
+
+## Brings the Food texture to `game`'s food for its player: only while the mode is Food, and (unless `force`) only when
+## `game.version` changed since the last time. Returns the texels written.
+func sync_food(game: Game, force: bool = false) -> int:
+	if _mode != MapModes.Mode.FOOD or game == null or game.map == null:
+		return 0
+	if not force and game.version == _food_version:
+		return 0
+	_food_version = game.version
+	return update_food(MapModes.food_bytes(game, game.player))
+
+
+## The Food bytes the texture holds now (a copy; tests).
+func food_bytes() -> PackedByteArray:
+	return _food_bytes.duplicate()
+
+
+## Brings the Yields and Food textures to `game` (each only while its mode is showing); returns the texels written.
+func sync_modes(game: Game, force: bool = false) -> int:
+	return sync_yields(game, force) + sync_food(game, force)
+
+
 ## The Yields bytes the texture holds now (a copy; tests).
 func yields_bytes() -> PackedByteArray:
 	return _yield_bytes.duplicate()
@@ -264,6 +325,27 @@ func yields_texture_bytes() -> int:
 		if img != null:
 			total += img.get_data().size()
 	return total
+
+
+## Bytes of the two Food textures.
+func food_texture_bytes() -> int:
+	var total := 0
+	for img: Image in [_food_image, _food_ramp_image]:
+		if img != null:
+			total += img.get_data().size()
+	return total
+
+
+func food_image() -> Image:
+	return _food_image
+
+
+func food_texture() -> ImageTexture:
+	return _food_tex
+
+
+func food_ramp_texture() -> ImageTexture:
+	return _food_ramp_tex
 
 
 func yields_image() -> Image:

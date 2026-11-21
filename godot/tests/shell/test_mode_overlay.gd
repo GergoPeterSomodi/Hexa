@@ -324,3 +324,81 @@ func test_sync_yields_only_computes_in_yields_and_when_the_version_moved() -> vo
 	game.version += 1
 	assert_eq(overlay.sync_yields(game), 0)
 	assert_eq(overlay.yields_bytes(), cached, "leaving Yields keeps the texture and computes nothing")
+
+
+# ----- Food (M5 P14, docs/architecture/m5-build-spec.md 6.5) ------------------------------------------------------------
+
+
+func test_food_textures_exist_with_the_ramp_and_uniforms() -> void:
+	var overlay := ModeOverlay.new()
+	var map := _yield_fixture(overlay, 30, 20)
+	assert_eq(overlay.food_texture().get_size(), Vector2(30, 20))
+	assert_eq(overlay.food_ramp_texture().get_size(), Vector2(256, 1))
+	assert_eq(overlay.food_texture().get_image().get_format(), Image.FORMAT_R8)
+	assert_eq(overlay.food_ramp_texture().get_image().get_format(), Image.FORMAT_RGBA8)
+	assert_eq(overlay.food_texture_bytes(), 30 * 20 + 256 * 4)
+	assert_eq(overlay.food_bytes().size(), map.hex_count())
+	assert_eq(overlay.food_bytes().count(0), map.hex_count(), "zeros before any update")
+	var ramp := overlay.food_ramp_texture().get_image()
+	var want := MapModes.food_ramp()
+	for b: int in 10:
+		assert_eq(ramp.get_pixel(b, 0).to_rgba32(), want[b].to_rgba32(), "ramp entry %d" % b)
+	var mat := overlay.material as ShaderMaterial
+	assert_same(mat.get_shader_parameter(&"food"), overlay.food_texture())
+	assert_same(mat.get_shader_parameter(&"food_ramp"), overlay.food_ramp_texture())
+	assert_almost_eq(float(mat.get_shader_parameter(&"food_alpha")), MapModes.FOOD_ALPHA, 0.0001)
+	overlay.set_tint(false)
+	overlay.set_mode(MapModes.Mode.FOOD)
+	assert_true(overlay.visible, "Food stays visible with the Terrain tint off")
+	assert_eq(int(mat.get_shader_parameter(&"mode")), 4)
+	var mm := overlay.material_for_minimap()
+	assert_same(mm.get_shader_parameter(&"food"), overlay.food_texture(), "the minimap shares the Food textures")
+
+
+func test_update_food_writes_only_the_changed_texels_and_a_planted_one_texel_fault_is_seen() -> void:
+	var overlay := ModeOverlay.new()
+	var map := _yield_fixture(overlay)
+	var bytes := PackedByteArray()
+	bytes.resize(map.hex_count())
+	assert_eq(overlay.update_food(bytes), 0, "all zeros: nothing differs")
+	assert_eq(overlay.texture_updates, 0)
+	bytes[map.index_of(Vector2i(3, 2))] = 7
+	var writes := overlay.texel_writes
+	assert_eq(overlay.update_food(bytes), 1, "one changed byte, one texel")
+	assert_eq(overlay.texel_writes, writes + 1)
+	assert_eq(overlay.texture_updates, 1, "one texture update")
+	assert_eq(overlay.food_image().get_pixelv(Vector2i(3, 2)).r8, 7)
+	assert_eq(overlay.food_bytes()[map.index_of(Vector2i(3, 2))], 7)
+	assert_eq(overlay.update_food(bytes), 0, "the same bytes again write nothing")
+	assert_eq(overlay.texture_updates, 1)
+	assert_eq(overlay.update_food(PackedByteArray([1, 2, 3])), 0, "bytes of the wrong size are ignored")
+	# The planted fault: one texel of the texture differs from what the read model says.
+	overlay.food_image().set_pixelv(Vector2i(5, 5), Color(3.0 / 255.0, 0.0, 0.0, 1.0))
+	var wrong: Array[Vector2i] = []
+	var img := overlay.food_image()
+	for idx: int in map.hex_count():
+		var at := map.hex_of(idx)
+		if img.get_pixelv(at).r8 != int(bytes[idx]):
+			wrong.append(at)
+	assert_eq(wrong, [Vector2i(5, 5)] as Array[Vector2i], "the one planted texel is the one that disagrees")
+
+
+func test_sync_food_only_computes_in_food_and_when_the_version_moved() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var overlay := ModeOverlay.new()
+	add_child_autofree(overlay)
+	overlay.setup(game)
+	assert_eq(overlay.sync_food(game, true), 0, "not in Food: nothing is computed")
+	assert_eq(overlay.food_bytes().count(0), game.map.hex_count())
+	overlay.set_mode(MapModes.Mode.FOOD)
+	var wrote := overlay.sync_food(game, true)
+	assert_gt(wrote, 0, "Genoa's land is coloured")
+	assert_eq(overlay.food_bytes(), MapModes.food_bytes(game, &"GEN"))
+	assert_eq(overlay.sync_food(game), 0, "the same version: nothing")
+	game.version += 1
+	assert_eq(overlay.sync_food(game), 0, "a new version with the same food writes no texel")
+	overlay.set_mode(MapModes.Mode.OWNER)
+	var cached := overlay.food_bytes()
+	game.version += 1
+	assert_eq(overlay.sync_food(game), 0)
+	assert_eq(overlay.food_bytes(), cached, "leaving Food keeps the texture and computes nothing")

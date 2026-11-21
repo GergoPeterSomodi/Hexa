@@ -32,6 +32,11 @@ const MAX_CHIPS := 3
 @onready var _ground_rows: GridContainer = $Scroll/Body/GroundBox/Rows
 @onready var _owner_row: HBoxContainer = $Scroll/Body/OwnerRow
 @onready var _owner_value: HBoxContainer = $Scroll/Body/OwnerRow/Value
+@onready var _people_box: VBoxContainer = $Scroll/Body/PeopleBox
+@onready var _people_value: Label = $Scroll/Body/PeopleBox/PeopleRow/Value
+@onready var _people_room_row: HBoxContainer = $Scroll/Body/PeopleBox/RoomRow
+@onready var _people_room_value: Label = $Scroll/Body/PeopleBox/RoomRow/Value
+@onready var _people_outlook: Label = $Scroll/Body/PeopleBox/Outlook
 @onready var _gives_row: HBoxContainer = $Scroll/Body/GivesRow
 @onready var _gives_value: Label = $Scroll/Body/GivesRow/Value
 @onready var _worth_row: HBoxContainer = $Scroll/Body/WorthRow
@@ -110,6 +115,8 @@ func _wiring() -> Array:
 		[Events.work_finished, _on_work_changed],
 		[Events.work_cancelled, _on_work_cancelled],
 		[Events.season_ended, _on_season_ended],
+		[Events.town_grew, _on_town_grew],
+		[Events.district_declined, _on_district_declined],
 	]
 
 
@@ -179,6 +186,7 @@ func refresh() -> void:
 	_refresh_piece(piece)
 	_refresh_ground(map)
 	_refresh_owner(game)
+	_refresh_people(game)
 	_refresh_gives(game)
 	_refresh_worth(game)
 	_rule.visible = true
@@ -200,6 +208,7 @@ func _show_sea() -> void:
 	_piece_box.visible = false
 	_ground_box.visible = false
 	_owner_row.visible = false
+	_people_box.visible = false
 	_gives_row.visible = false
 	_worth_row.visible = false
 	_rule.visible = false
@@ -230,6 +239,47 @@ func _refresh_owner(game: Game) -> void:
 	link.focus_mode = Control.FOCUS_ALL
 	link.pressed.connect(func() -> void: country_requested.emit(otag))
 	_owner_value.add_child(link)
+
+
+## The People section (spec 6.3): on land, PeopleView.at's figures. Yours: "People 30,300 (▲ +300 last season)" and "Room
+## 45,000", then the outlook in its tone; a known country's land: "People about 30,000"; unknown: no section; unowned land
+## and the sandbox: the number alone (no outlook).
+func _refresh_people(game: Game) -> void:
+	var seen := PeopleView.at(game, Session.player_tag(), _hex)
+	_people_box.visible = bool(seen.get("shown", false))
+	_people_room_row.visible = false
+	_people_outlook.visible = false
+	if not _people_box.visible:
+		return
+	var player := Session.player_tag()
+	var yours := player != &"" and Territory.owner_tag(game, _hex) == player
+	if not yours or str(seen["text"]) == "none":
+		_people_value.text = str(seen["text"])
+		return
+	var change := int(seen["change"])
+	var people_text := Words.number(int(seen["people"]))
+	if change != 0:
+		people_text += " (%s %s last season)" % [PeopleView.UP if change > 0 else PeopleView.DOWN, Words.signed(change)]
+	_people_value.text = people_text
+	_people_room_value.text = Words.number(int(seen["room"]))
+	_people_room_row.visible = true
+	var outlook := PeopleView.outlook(game, _hex)
+	if not outlook.is_empty():
+		_people_outlook.text = str(outlook["text"])
+		_people_outlook.theme_type_variation = tone_variation(StringName(str(outlook["tone"])))
+		_people_outlook.visible = true
+
+
+## The theme variation of an outlook's tone (spec 6.3): good, bad, warn; plain reads as table text.
+static func tone_variation(tone: StringName) -> StringName:
+	match tone:
+		&"good":
+			return &"NumberGood"
+		&"bad":
+			return &"NumberBad"
+		&"warn":
+			return &"NumberWarn"
+	return &"TableRow"
 
 
 ## The Gives row (spec 6.4): what the hex gives, from the hex card's Gives line; hidden where it gives nothing.
@@ -311,6 +361,17 @@ func _on_work_cancelled(_tag: StringName, _work_hex: Vector2i, _work: Dictionary
 
 func _on_season_ended(_turn: int) -> void:
 	_request_refresh()
+
+
+## A town grew or a district declined: the panel refreshes when it shows that hex (spec 6.3).
+func _on_town_grew(_tag: StringName, hex: Vector2i, _level: int) -> void:
+	if hex == _hex:
+		_request_refresh()
+
+
+func _on_district_declined(_tag: StringName, hex: Vector2i, _level: int, _why: StringName) -> void:
+	if hex == _hex:
+		_request_refresh()
 
 
 ## Signals arrive in bursts (a season's works, the AI's dozens of changes): one refresh runs at the end of the frame

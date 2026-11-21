@@ -210,25 +210,41 @@ func test_accessibility_names_are_set() -> void:
 	assert_false((_column(page, LAND).find_child("Chart", true, false) as InkChart).accessibility_description.is_empty())
 
 
-func test_fits_at_1280_by_720_and_2560_by_1440() -> void:
-	for size: Vector2i in [Vector2i(1280, 720), Vector2i(2560, 1440)]:
+func test_the_third_measure_wraps_to_a_second_row_and_fits_1280_and_1024() -> void:
+	for size: Vector2i in [Vector2i(2560, 1440), Vector2i(1280, 720), Vector2i(1024, 600)]:
 		var harness := UIHarness.new(size)
 		harness.mount(self)
 		var root := Control.new()
 		root.theme = KitTheme.load_for(1.0)
 		root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		harness.viewport.add_child(root)
+		# The Study frame and its nav leave this width to a page (the minimum window is checked as the top bar does).
+		var width := float(size.x) - 260.0
+		var host := Control.new()
+		host.size = Vector2(width, float(size.y))
+		root.add_child(host)
 		var game := InsightsFixture.genoa_first_year()
 		var page := (load(SCENE) as PackedScene).instantiate() as PageRankings
-		page.milestone = "4.5"
-		root.add_child(page)
+		page.milestone = "5"
+		host.add_child(page)
+		page.size = host.size
 		page.refresh(game, &"open")
 		await harness.wait_frames(self, 2)
-		var minimum := page.get_combined_minimum_size()
-		assert_lte(minimum.x, float(size.x) - 60.0, "no horizontal overflow at %s" % str(size))
-		if size.y == 720:
-			# The Study frame leaves about 520 px under its ribbon for a page.
-			assert_lte(minimum.y, 520.0, "both lists and both charts fit at 1280 x 720")
-		assert_true(_column(page, LAND).is_visible_in_tree())
-		assert_true(_column(page, INCOME).is_visible_in_tree())
+		assert_lte(page.get_combined_minimum_size().x, width, "no horizontal overflow at %s" % str(size))
+		var land := _column(page, LAND)
+		var income := _column(page, INCOME)
+		var people := _column(page, "people")
+		assert_true(land.is_visible_in_tree() and income.is_visible_in_tree() and people.is_visible_in_tree())
+		var mine := _row_texts(_table(page, "people")).filter(func(r: Array) -> bool: return str(r[1]).ends_with("(you)"))
+		assert_eq(mine.size(), 1, "your row is in the People list")
+		assert_false(str(mine[0][2]).begins_with("about"), "your people are exact")
+		for col: Control in [land, income, people]:
+			assert_lte(col.position.x + col.size.x, width + 1.0, "no column past the page at %s" % str(size))
+		if size.x >= 2560:
+			assert_eq(people.position.y, land.position.y, "all three on one row at 2560")
+		elif size.x == 1280:
+			assert_eq(income.position.y, land.position.y, "land and income share the first row")
+			assert_gt(people.position.y, land.position.y, "People is on the second row at 1280")
+		else:
+			assert_gt(people.position.y, income.position.y, "one column a row at 1024")
 		harness.dispose()

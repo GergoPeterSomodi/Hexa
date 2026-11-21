@@ -437,3 +437,14 @@ func test_queue_open_opens_the_page_and_focus_once_on_enter() -> void:
 	_harness.stack.remove(study)
 	_harness.stack.push(study)
 	assert_eq(study.current_page().current_tab(), &"goods", "a later push keeps the tab and opens nothing queued")
+
+
+func test_the_four_pages_are_in_the_nav_in_order() -> void:
+	var ids: Array = []
+	for entry: Dictionary in StudyPages.shown("5"):
+		ids.append(entry["id"])
+	assert_eq(ids, [&"economy", &"people", &"rankings", &"history"])
+	var study := _open(StudyPages.shown("5"))
+	for id: StringName in [&"economy", &"people", &"rankings", &"history"]:
+		assert_not_null(study.nav().button_for(id), String(id))
+	assert_eq(study.nav().button_for(&"people").text, "People")

@@ -495,7 +495,7 @@ const SCHEMA: Dictionary = {
 	"dev/save_json": {"type": TYPE_BOOL, "default": false, "page": "advanced", "since": "3", "label": "Write saves as JSON too", "applies": "immediate"},
 	# Remembered state: no row on any page.
 	"state/help_seen": {"type": TYPE_BOOL, "default": false, "page": "", "since": "1.5", "label": "Help seen", "applies": "immediate"},
-	"state/map_mode": {"type": TYPE_STRING, "default": "terrain", "choices": ["terrain", "owner", "relief", "yields"], "page": "", "since": "2", "label": "Map mode", "applies": "immediate"},
+	"state/map_mode": {"type": TYPE_STRING, "default": "terrain", "choices": ["terrain", "owner", "relief", "yields", "food"], "page": "", "since": "2", "label": "Map mode", "applies": "immediate"},
 	"state/study_page": {"type": TYPE_STRING, "default": "economy", "choices": ["economy", "rankings", "history", "people", "military", "diplomacy", "trade", "research"], "page": "", "since": "4", "label": "Study page", "applies": "immediate"},
 	"state/study_span": {"type": TYPE_INT, "default": 12, "choices": [12, 40], "page": "", "since": "4.5", "label": "Study span", "applies": "immediate"},
 	"state/log_open": {"type": TYPE_BOOL, "default": false, "page": "", "since": "3", "label": "Action log open", "applies": "immediate"},

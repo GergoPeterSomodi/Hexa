@@ -206,3 +206,81 @@ func test_the_treasury_refreshes_when_a_season_ends() -> void:
 	Countries.by_tag(Session.game, &"GEN").treasury = 999
 	Events.season_ended.emit(1)
 	assert_eq(_panel.treasury_text(), "Treasury 999")
+
+
+## The People row (spec 6.4): after Towns; yours exact with last season's change; a known country banded; an unknown
+## country has no row; the row refreshes on town_grew and district_declined; the bus is left on exit.
+func _listens(sig: Signal, obj: Object) -> bool:
+	for conn: Dictionary in sig.get_connections():
+		if (conn["callable"] as Callable).get_object() == obj:
+			return true
+	return false
+
+
+func _first_settlement(tag: StringName) -> Vector2i:
+	var game := Session.game
+	var c := Countries.by_tag(game, tag)
+	for i: int in Territory.districts(game, c.id):
+		if int(game.state.main_use[i]) == ImproveRules.SETTLEMENT:
+			return game.map.hex_of(i)
+	return Vector2i(-1, -1)
+
+
+func test_yours_shows_the_people_row_after_towns() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	_panel.show_country(&"GEN", false)
+	var rows := _panel.ledger_texts()
+	assert_eq(rows[4], "Towns", "the row order: Towns")
+	assert_eq(rows[6], "People", "People comes right after Towns")
+	var sums := PeopleView.totals(Session.game, &"GEN")
+	var expected := Words.number(int(sums["people"]))
+	var change := int(sums["change"])
+	if change != 0:
+		expected += " (%s %s last season)" % [PeopleView.UP if change > 0 else PeopleView.DOWN, Words.signed(change)]
+	assert_eq(_value_of("People"), expected, "the exact figure with last season's change")
+
+
+func test_a_known_foreign_country_shows_a_banded_people_row() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	_panel.show_country(&"MLO", false)
+	var card := CountryCard.of(Session.game, &"MLO")
+	var people := int(PeopleView.totals(Session.game, &"MLO")["people"])
+	assert_eq(_value_of("People"), Knowledge.band_text(int(card["people"]["value"]), ""), "a banded figure")
+	if Knowledge.band(people) != people:
+		assert_false(_value_of("People").contains(Words.number(people)), "no exact figure")
+	assert_false(_value_of("People").contains("last season"), "no change for a foreign country")
+
+
+func test_an_unknown_country_has_no_people_row() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	_panel.show_country(&"FRA", false)
+	assert_true(_panel.visible, "France still has a card")
+	assert_eq(_panel.ledger_texts().find("People"), -1, "no People row for an unknown country")
+
+
+func test_the_people_row_refreshes_on_town_grew_and_district_declined() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	_panel.show_country(&"GEN", false)
+	var hex := _first_settlement(&"GEN")
+	assert_ne(hex, Vector2i(-1, -1), "Genoa has a town")
+	var before := int(PeopleView.at(Session.game, &"GEN", hex)["people"])
+	assert_true(Session.dev_people(hex, before + 1000), "the town gains 1,000")
+	Events.town_grew.emit(&"GEN", hex, 2)
+	var total := int(PeopleView.totals(Session.game, &"GEN")["people"])
+	assert_true(_value_of("People").begins_with(Words.number(total)), "town_grew refreshes the row")
+	assert_true(Session.dev_people(hex, before + 2000))
+	Events.district_declined.emit(&"GEN", hex, 1, &"hunger")
+	total = int(PeopleView.totals(Session.game, &"GEN")["people"])
+	assert_true(_value_of("People").begins_with(Words.number(total)), "district_declined refreshes the row")
+
+
+func test_leaving_the_tree_disconnects_the_people_signals() -> void:
+	var extra := (load(PANEL) as PackedScene).instantiate() as CountryPanel
+	extra.theme = KitTheme.load_for(1.0)
+	add_child(extra)
+	assert_true(_listens(Events.town_grew, extra), "listens to town_grew while in the tree")
+	assert_true(_listens(Events.district_declined, extra), "listens to district_declined while in the tree")
+	remove_child(extra)
+	assert_false(_listens(Events.town_grew, extra), "no town_grew listener after exit")
+	assert_false(_listens(Events.district_declined, extra), "no district_declined listener after exit")
+	extra.free()

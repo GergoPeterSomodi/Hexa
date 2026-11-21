@@ -63,6 +63,8 @@ const DEFAULTS: Array[Dictionary] = [
 		"events": ["3"] as Array[String]},
 	{"action": &"view_mode_4", "label": "Map mode 4", "group": "View", "since": "2",
 		"events": ["4"] as Array[String]},
+	{"action": &"view_mode_5", "label": "Map mode 5", "group": "View", "since": "5",
+		"events": ["5"] as Array[String]},
 	{"action": &"ui_find_place", "label": "Find place", "group": "View", "since": "2",
 		"events": ["Ctrl+F"] as Array[String]},
 	{"action": &"game_country", "label": "Country panel", "group": "Game", "since": "2",

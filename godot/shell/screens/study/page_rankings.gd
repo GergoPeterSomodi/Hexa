@@ -33,7 +33,7 @@ var _built: bool = false
 var _head: Label = null
 var _span_seg: Segmented = null
 var _message: Label = null
-var _flow: HBoxContainer = null
+var _flow: HFlowContainer = null
 var _columns: Dictionary = {}
 var _last_game: Game = null
 
@@ -100,14 +100,15 @@ func _ensure_built() -> void:
 	_message.name = "Message"
 	_message.visible = false
 	add_child(_message)
-	_flow = HBoxContainer.new()
+	_flow = HFlowContainer.new()
 	_flow.name = "Lists"
 	_flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(_flow)
 
 
 ## The column of one measure, built on its first refresh (a measure is added to the page, not rebuilt; the two
-## columns sit side by side in the HBox, a third one would wrap as M5 adds it).
+## columns sit side by side in the flow and the third, People, wraps to a second row when the page is narrower than three
+## columns: M4.5 6.5, M5 6.7; the Study's page scrolls).
 func _column_for(m: Dictionary) -> Dictionary:
 	var id := StringName(str(m["id"]))
 	if not _columns.has(id):

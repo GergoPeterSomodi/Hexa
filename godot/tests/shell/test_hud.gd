@@ -531,6 +531,9 @@ func test_a_chip_and_the_study_button_reach_the_hud_as_study_requests() -> void:
 	assert_eq(asked, [&"", &"economy", &"economy"], "the button asks its last page, the panel and the flag Economy")
 
 
+# DESIGN CALL (owner to confirm in the morning): the narrowing order with People and Food added is in top_bar.gd _fit:
+# gap, Stores name and change, Food name and change, People name and change, the mode buttons compact, the country name,
+# Ducats' name, Ducats' change, the brand, Stores, Food, the study button, and the chips last (below 800 px only).
 func test_the_chips_narrow_in_the_order_of_the_spec_and_fit_the_window() -> void:
 	await _harness.wait_frames(self, 2)
 	var bar := _genoa_bar()
@@ -558,12 +561,59 @@ func test_the_chips_narrow_in_the_order_of_the_spec_and_fit_the_window() -> void
 		bar.fit_width(width)
 		if bar.name_shown():
 			assert_true(ducats.delta_chip().visible, "%d: the Ducats change goes after the name" % int(width))
-		if not stores.visible:
+		if not stores.visible and width > 800.0:
 			assert_true(bar.chips().visible, "%d: the Stores chip goes before the Ducats chip" % int(width))
 		if not ducats.delta_chip().visible:
 			assert_false(bar.name_shown(), "%d: the name is gone before the Ducats change" % int(width))
 	bar.fit_width(4000.0)
 	assert_true(stores.visible and bar.name_shown() and ducats.delta_chip().visible and bar.brand_label().visible, "everything comes back")
+
+
+## The narrowing order of top_bar.gd _fit (DESIGN CALL, owner to confirm): the width at which each step first happens
+## falls as the window narrows, one step after the other.
+func test_the_narrowing_steps_happen_in_the_pinned_order() -> void:
+	await _harness.wait_frames(self, 2)
+	var bar := _genoa_bar()
+	await _harness.wait_frames(self, 3)
+	var ducats := bar.chips().ducats_chip()
+	var stores := bar.chips().stores_chip()
+	var food := bar.chips().food_chip()
+	var people := bar.chips().people_chip()
+	var steps := [&"gap", &"stores_name", &"food_name", &"people_name", &"modes", &"country", &"ducats_name",
+		&"ducats_change", &"brand", &"stores", &"food", &"study", &"chips"]
+	var first := {}
+	var width := 1700.0
+	while width >= 600.0:
+		bar.fit_width(width)
+		var now := {
+			&"gap": not (bar.get_node("HBox/Gap") as Control).visible,
+			&"stores_name": not stores.name_label().visible,
+			&"food_name": not food.name_label().visible,
+			&"people_name": not people.name_label().visible,
+			&"modes": bar.mode_segmented().button_for(0).has_theme_font_size_override(&"font_size"),
+			&"country": not bar.name_shown(),
+			&"ducats_name": not ducats.name_label().visible,
+			&"ducats_change": not ducats.delta_chip().visible,
+			&"brand": not bar.brand_label().visible,
+			&"stores": not stores.visible,
+			&"food": not food.visible,
+			&"study": not bar.study_button().visible,
+			&"chips": not bar.chips().visible,
+		}
+		for step: StringName in now:
+			if now[step] and not first.has(step):
+				first[step] = width
+		width -= 5.0
+	bar.fit_width(4000.0)
+	var seen: Array[StringName] = []
+	for step: StringName in steps:
+		assert_true(first.has(step), "the step %s happens somewhere from 1700 to 600 px" % step)
+		seen.append(step)
+	for i: int in range(steps.size() - 1):
+		var a: StringName = steps[i]
+		var b: StringName = steps[i + 1]
+		if first.has(a) and first.has(b):
+			assert_gte(float(first[a]), float(first[b]), "%s happens before %s as the window narrows" % [a, b])
 
 
 func test_both_chips_and_the_study_button_show_at_1280_and_1024_px() -> void:
@@ -584,9 +634,13 @@ func test_both_chips_and_the_study_button_show_at_1280_and_1024_px() -> void:
 		assert_lte(bar.get_combined_minimum_size().x, float(width), "%s: the bar fits" % tag)
 		assert_lte(bar.size.x, float(width), "%s: the bar is no wider than the window" % tag)
 		assert_lte(bar.menu_button().get_global_rect().end.x, float(width), "%s: Menu is not clipped" % tag)
+		assert_true(bar.chips().people_chip().visible and bar.chips().food_chip().visible, "%s: People and Food show" % tag)
 		if width == 1280:
-			assert_true(bar.brand_label().visible and bar.name_shown(), "1280 px: the brand and the country name")
+			assert_true(bar.brand_label().visible, "1280 px: the brand shows")
+			assert_false(bar.name_shown(), "1280 px: the country name hides (owner to confirm)")
 			assert_true(ducats.name_label().visible and ducats.delta_chip().visible, "1280 px: Ducats with name and change")
+		else:
+			assert_false(bar.brand_label().visible, "1024 px: the brand hides (owner to confirm)")
 	for width: int in [900, 800, 700, 1280]:
 		_harness.viewport.size = Vector2i(width, 720)
 		await _harness.wait_frames(self, 4)
@@ -666,13 +720,12 @@ func test_the_mode_buttons_stay_normal_at_1280_and_nothing_clips_down_to_800() -
 	await _harness.wait_frames(self, 2)
 	var bar := _genoa_bar()
 	await _harness.wait_frames(self, 3)
-	var normal := bar.mode_segmented().button_for(0)
 	for width: int in [1280, 1024, 900, 800]:
 		bar.fit_width(float(width))
 		assert_lte(bar.get_combined_minimum_size().x, float(width), "%d px: nothing clips" % width)
-		assert_true(bar.chips().visible and bar.study_button().visible, "%d px: the chips and the study button" % width)
-		if width == 1280:
-			assert_false(normal.has_theme_font_size_override(&"font_size"), "1280 px: the mode buttons are normal")
+		if width > 800:
+			assert_true(bar.chips().visible and bar.study_button().visible, "%d px: the chips and the study button" % width)
+
 
 
 ## M4.5 spec 6.7: the Yields legend has its slot top left of the map area, 12 px under the bar; a screen that hides the

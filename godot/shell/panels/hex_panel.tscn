@@ -72,6 +72,51 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
+[node name="PeopleBox" type="VBoxContainer" parent="Scroll/Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PeopleRow" type="HBoxContainer" parent="Scroll/Body/PeopleBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Key" type="Label" parent="Scroll/Body/PeopleBox/PeopleRow"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+text = "People"
+
+[node name="Value" type="Label" parent="Scroll/Body/PeopleBox/PeopleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TableRow"
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="RoomRow" type="HBoxContainer" parent="Scroll/Body/PeopleBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Key" type="Label" parent="Scroll/Body/PeopleBox/RoomRow"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+text = "Room"
+
+[node name="Value" type="Label" parent="Scroll/Body/PeopleBox/RoomRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TableRow"
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Outlook" type="Label" parent="Scroll/Body/PeopleBox"]
+visible = false
+layout_mode = 2
+theme_type_variation = &"TableRow"
+autowrap_mode = 3
+mouse_filter = 2
+
 [node name="GivesRow" type="HBoxContainer" parent="Scroll/Body"]
 visible = false
 layout_mode = 2

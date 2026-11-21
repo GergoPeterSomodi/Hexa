@@ -1,4 +1,4 @@
-// Per-hex map mode overlay shader (Terrain tint, Owner, Relief, Yields) for Compatibility GLES 3.0.
+// Per-hex map mode overlay shader (Terrain tint, Owner, Relief, Yields, Food) for Compatibility GLES 3.0.
 // Mirrors MapModes.hex_at_px and MapModes.colour_of without any screen texture read.
 shader_type canvas_item;
 
@@ -8,6 +8,8 @@ uniform sampler2D palette : filter_nearest, repeat_disable;
 uniform sampler2D ramp : filter_nearest, repeat_disable;
 uniform sampler2D yields : filter_nearest, repeat_disable;
 uniform sampler2D yield_ramp : filter_nearest, repeat_disable;
+uniform sampler2D food : filter_nearest, repeat_disable;
+uniform sampler2D food_ramp : filter_nearest, repeat_disable;
 
 uniform int mode = 0;
 uniform bool tint_on = true;
@@ -22,6 +24,7 @@ uniform float relief_alpha = 0.65;
 uniform float hot_alpha = 0.20;
 uniform float hot_lighten = 0.15;
 uniform float yield_alpha = 0.70;
+uniform float food_alpha = 0.70;
 uniform float veil_alpha = 0.45;
 uniform float stripe_px = 6.0;
 uniform vec4 veil_colour = vec4(0.109804, 0.078431, 0.050980, 1.0);
@@ -93,6 +96,21 @@ void fragment() {
 					out_col.a = yield_alpha;
 					if (yield_byte == 1) {
 						// Stripes of madder and veil, measured from the hex's middle.
+						vec2 mid = vec2(104.0 * (float(col) + 0.5 + 0.5 * float(row & 1)), 51.0 + 76.5 * float(row));
+						vec2 d = map_px - mid;
+						if (mod(floor((d.x + d.y + 3.0) / stripe_px), 2.0) > 0.5) {
+							out_col = vec4(veil_colour.rgb, veil_alpha);
+						}
+					}
+				}
+			} else if (mode == 4) {
+				// Food: your land by food made less eaten (bytes 1 and 2 a shortfall, striped), the veil on every other hex.
+				int food_byte = clamp(int(floor(texelFetch(food, cell, 0).r * 255.0 + 0.5)), 0, 255);
+				out_col = vec4(veil_colour.rgb, veil_alpha);
+				if (food_byte >= 1 && food_byte <= 8) {
+					out_col = texelFetch(food_ramp, ivec2(food_byte, 0), 0);
+					out_col.a = food_alpha;
+					if (food_byte <= 2) {
 						vec2 mid = vec2(104.0 * (float(col) + 0.5 + 0.5 * float(row & 1)), 51.0 + 76.5 * float(row));
 						vec2 d = map_px - mid;
 						if (mod(floor((d.x + d.y + 3.0) / stripe_px), 2.0) > 0.5) {

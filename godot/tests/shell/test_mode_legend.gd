@@ -32,6 +32,24 @@ func test_yields_shows_one_row_a_band_top_first() -> void:
 	assert_eq(str((_column().get_child(0) as Label).text), ModeLegend.TITLE)
 
 
+func test_food_shows_its_title_its_rows_and_the_two_striped_shortfalls() -> void:
+	_legend.show_mode(MapModes.Mode.FOOD)
+	assert_eq(_legend.rows(), MapModes.legend(MapModes.Mode.FOOD))
+	assert_true(_legend.visible, "shown for Food")
+	assert_eq(str((_column().get_child(0) as Label).text), MapModes.legend_title(MapModes.Mode.FOOD))
+	assert_ne(MapModes.legend_title(MapModes.Mode.FOOD), ModeLegend.TITLE)
+	var striped := 0
+	for row: Dictionary in _legend.rows():
+		if bool(row["stripes"]):
+			striped += 1
+	assert_eq(striped, 2, "short by 1 to 9 and by 10 or more")
+	assert_eq(_column().get_child_count(), _legend.rows().size() + 1)
+	_legend.show_mode(MapModes.Mode.YIELDS)
+	assert_eq(str((_column().get_child(0) as Label).text), ModeLegend.TITLE, "Yields keeps its title")
+	_legend.show_mode(MapModes.Mode.OWNER)
+	assert_false(_legend.visible, "no legend for Owner")
+
+
 func test_only_a_loss_is_striped() -> void:
 	_legend.show_mode(MapModes.Mode.YIELDS)
 	var rows := _legend.rows()

@@ -477,6 +477,10 @@ func _fill_text(item: TreeItem, c: int, col: Dictionary, cell: Variant, mine: bo
 	item.set_text_alignment(c, col["align"] as HorizontalAlignment)
 	if mine:
 		item.set_custom_color(c, _mine_colour())
+	elif typeof(cell) == TYPE_DICTIONARY and (cell as Dictionary).has("tone"):
+		var tone := StringName(str((cell as Dictionary)["tone"]))
+		if tone == &"good" or tone == &"bad" or tone == &"warn":
+			item.set_custom_color(c, _tone_colour(tone))
 
 
 func _fill_number(item: TreeItem, c: int, col: Dictionary, cell: Variant, mine: bool) -> void:
@@ -596,6 +600,8 @@ func _tone_colour(tone: StringName) -> Color:
 			return Tokens.GOOD
 		&"bad":
 			return Tokens.BAD
+		&"warn":
+			return Tokens.WARN
 	return Tokens.MUTED
 
 

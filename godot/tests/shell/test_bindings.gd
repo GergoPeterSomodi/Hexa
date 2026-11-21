@@ -165,12 +165,13 @@ func test_m2_actions_exist_and_season_keys_are_gone() -> void:
 	Bindings.ensure()
 	var wanted: Dictionary = {
 		&"view_mode_1": "1", &"view_mode_2": "2", &"view_mode_3": "3", &"view_mode_4": "4",
+		&"view_mode_5": "5",
 		&"ui_find_place": "Ctrl+F", &"game_country": "C",
 	}
 	for action: StringName in wanted:
 		assert_true(InputMap.has_action(action), "InputMap has %s" % action)
 		var entry := _entry_of(action)
-		assert_eq(str(entry["since"]), "2", "%s arrives in M2" % action)
+		assert_eq(str(entry["since"]), "5" if action == &"view_mode_5" else "2", "%s arrives with its milestone" % action)
 		var ev := Bindings.parse_event(str(wanted[action]))
 		assert_eq(Bindings.serialize_event(Bindings.parse_event(str((entry["events"] as Array)[0]))),
 			Bindings.serialize_event(ev), "%s default key" % action)

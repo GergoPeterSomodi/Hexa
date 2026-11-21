@@ -706,3 +706,5 @@ func test_a_rows_cost_never_overlaps_its_label() -> void:
 		assert_false(cost.get_global_rect().intersects(button.get_global_rect()), "'%s': the cost line is clear of the label" % button.text)
 		var overlay := button.get_node_or_null("CostLabel") as Label
 		assert_true(overlay == null or not overlay.visible, "no cost text drawn over the label")
+
+

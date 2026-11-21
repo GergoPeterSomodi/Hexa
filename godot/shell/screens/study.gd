@@ -289,6 +289,9 @@ func _scroll_for(id: StringName, entry: Dictionary) -> ScrollContainer:
 	var rankings := page_node as PageRankings
 	if rankings != null and ctx != null:
 		rankings.settings = ctx.settings  # the span (state/study_span) is shared with Economy and kept
+	var people := page_node as PagePeople
+	if people != null and ctx != null:
+		people.settings = ctx.settings  # the span is shared with Rankings and Economy
 	page_node.action_requested.connect(_on_page_action)
 	page_node.tab_changed.connect(_on_tab_changed)
 	page_node.size_flags_horizontal = Control.SIZE_EXPAND_FILL

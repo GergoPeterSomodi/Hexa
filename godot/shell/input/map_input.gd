@@ -157,7 +157,7 @@ func _on_key(key: InputEventKey) -> void:
 		new_seed_requested.emit()
 		_mark_handled()
 		return
-	var mode_actions: Array[StringName] = [&"view_mode_1", &"view_mode_2", &"view_mode_3", &"view_mode_4"]
+	var mode_actions: Array[StringName] = [&"view_mode_1", &"view_mode_2", &"view_mode_3", &"view_mode_4", &"view_mode_5"]
 	for i: int in mode_actions.size():
 		if _is_action_pressed_exact(key, mode_actions[i]):
 			mode_requested.emit(i)

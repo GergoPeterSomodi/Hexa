@@ -131,6 +131,7 @@ func test_action_keys_and_rebinding_and_dev_gating() -> void:
 	_input._unhandled_input(_key(KEY_2))
 	_input._unhandled_input(_key(KEY_3))
 	_input._unhandled_input(_key(KEY_4))  # Yields (M4.5)
+	_input._unhandled_input(_key(KEY_5))  # Food (M5)
 	_input._unhandled_input(_key(KEY_2, true, true))  # modified chord must not trigger mode 2
 	_input._unhandled_input(_key(KEY_C))
 	var find_chord := Bindings.events_for(&"ui_find_place")[0].duplicate() as InputEventKey
@@ -146,7 +147,7 @@ func test_action_keys_and_rebinding_and_dev_gating() -> void:
 	seed_chord.pressed = true
 	_input._unhandled_input(seed_chord)
 
-	assert_eq(log, ["mode:0", "mode:1", "mode:2", "mode:3", "country", "find_place", "grid", "names", "hud", "upgrade", "seed"])
+	assert_eq(log, ["mode:0", "mode:1", "mode:2", "mode:3", "mode:4", "country", "find_place", "grid", "names", "hud", "upgrade", "seed"])
 
 	# Rebind view_grid to K: G stops working, K works.
 	log.clear()
