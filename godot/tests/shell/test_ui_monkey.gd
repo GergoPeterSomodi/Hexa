@@ -309,6 +309,8 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	var land_hexes := _collect_land_hexes()
 
 	for step: int in range(EVENTS_PER_SEED):
+		_step_no = step
+		_dev_changed = false
 		if m3:
 			await _m3_before_step(rng, app, step)
 		var prev_game := Session.game
@@ -316,7 +318,6 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 		var prev_unsaved := Session.unsaved_actions
 		var prev_player := Session.player_tag()
 		_changed_hexes.clear()
-		_dev_changed = false
 		_tag = "seed %d step %d" % [seed_value, step]
 		_step_turn = prev_game.turn if prev_game != null else -1
 		_step_seasons = int(_n.get("seasons", 0))
@@ -778,9 +779,9 @@ func _m3_before_step(rng: Rng, app: App, step: int) -> void:
 		await _m3_save_then_load(vp, app)
 	if _m4 and step >= FORCE_M4_STEP:
 		await _m4_force(rng, vp, app)
-	if _m45 and step >= FORCE_M45_STEP:
+	if _m45 and step >= FORCE_M45_STEP and not _m4_coverage_due():
 		await _m45_force(rng, vp, app)
-	if _m5 and step >= FORCE_M5_STEP:
+	if _m5 and step >= FORCE_M5_STEP and not _m4_coverage_due():
 		await _m5_force(rng, vp, app)
 
 
@@ -976,10 +977,11 @@ func _m3_buildable() -> Dictionary:
 
 
 func _m3_step(rng: Rng, vp: SubViewport, app: App) -> void:
-	if _m5 and rng.randi_range(0, 99) < 25:
+	var due := _m4_coverage_due()  # late and an M4 counter still 0: the coverage steps go first
+	if _m5 and not due and rng.randi_range(0, 99) < 25:
 		await _m5_step(rng, vp, app)
 		return
-	if _m45 and rng.randi_range(0, 99) < 45:
+	if _m45 and not due and rng.randi_range(0, 99) < 45:
 		await _m45_step(rng, vp, app)
 		return
 	if _m4 and rng.randi_range(0, 99) < 60:

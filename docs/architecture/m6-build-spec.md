@@ -333,7 +333,7 @@ verdict):
 | 6 | `kind` is not a `UnitDef` id | "no such kind of company" |
 | 7 | The settlement's level is under the kind's `min_level` | "%s are raised in a village or larger" / "... in a town or larger" (the kind's name) |
 | 8 | The companies raised on this hex this season plus `count` exceed `raise_cap[level]` | "%s has raised its %d companies this season" / "... can raise 1 more company this season" (`Military.hex_text`) |
-| 9 | `Military.can_stand(game, tag, hex, count)` refuses | its words ("no room: 8 of 8 companies stand here") |
+| 9 | `Military.can_stand(game, tag, hex, count)` refuses | its words ("no room at Turin (5, 9): 8 of 8 companies") |
 | 10 | The men at hand (`Military.men_at_hand`: `People.available` of the hex and of its ring hexes held by `tag`) are under `count × men` | "only %d men can be raised here this season: %d are needed" |
 | 11 | The treasury is under `count × cost` | "not enough ducats: %d needed, %d in the treasury" (M4's words) |
 | 12 | A good of `count × cost_goods` is short | `Stores.short_of`'s words ("not enough horses: 3 needed, 0 in store") |
@@ -619,6 +619,196 @@ Layers as the standard: `defs`, `state`, `systems`, `game`, `views`, `shell`. `c
 luck in M6. New files are marked **new**; "(M2)" to "(M5)" and "(M1.5)" name pieces those milestones build. Every amount
 is an `int`.
 
+### 5.0 Sign-off amendments (technical director, 2026-11-22; engineering inside the decisions, read against the M5 code)
+
+These bind M6's tasks and are part of the spec. Where a later section (or the plan) says otherwise, this section wins. No
+decision of section 2 changes; each item fixes a contradiction with the code M1.5 to M5 left, or fixes a choice a worker would
+otherwise guess.
+
+- **R1 The season's two halves.** `ready_units` and `vision` run after `calendar`, so they run in the **new** turn: their events
+  are stamped with it, and the refill's `raised` people flow lands in the new season's `people_flows` (M5's `People.close`
+  already ran inside `stats`). The report of season t therefore shows a refill made at the end of season t − 1 under People;
+  that is the rule, not a bug. `Stats.army_men` is written in `stats` (after `supply`, before the refill). `Army.mustering(turn)`
+  is always asked with `game.turn`; the movement phase of the raising turn sees the unit as mustering, the next one does not.
+  `test_men_property` checks its identity **phase by phase** (it calls `Season.begin`, then `Season.run_phase` for each name
+  of `PHASES`, then `Season.finish`, and compares the sums of people and men and the open flows before and after each phase and
+  each action; `stats` is checked as "people and men unchanged"), never across `People.close`.
+- **R2 The armies' door, copied from People's.** `Armies` is the only writer of `game.armies`, `next_army_id`, `next_unit_id`
+  and of every `Army` and `Unit` field; Military, Movement and Supply call its `set_*`, `add_*`, `lose_men`, `remove*`. Ids
+  start at 1, grow by one and are never reused; `game.armies` and each `Army.units` stay sorted by id (append on create, erase
+  on remove). `Armies.by_id` is a binary search on that array (no index cache to invalidate). Inside `armies.gd` a phase may
+  use a private batch write once its checks are done (as `People._apply`), documented in a comment as M5 did. **Who emits:**
+  `Armies` emits only `unit_lost` (from `lose_men`); `Military` emits `army_raised`, `army_disbanded`, and `army_changed` for
+  split, merge and refill; `Movement` emits `army_changed` for march, halt and continue, `unit_moved` and `march_halted`;
+  `Supply` emits `army_starved`.
+- **R3 No version-keyed cache holds a whole-map array.** `game.version` moves on every action, so: (a) `Movement.open_mask`
+  lives in the view cache's pinned slot `&"open_masks"` keyed by `[hash(state.owner), state.owner.size()]` (the key of
+  `Territory.districts`), holding `{tag: PackedByteArray}`, made by duplicating one shared "unowned land" mask and setting the
+  country's `Territory.districts`; (b) `Movement.plan` results go in the pinned slot `&"plans"` keyed by `game.version`,
+  holding `{[army, goal]: result}` (at most 256 entries, then emptied), so `march` reuses the plan its check made in the same
+  version and `MovePreview.to` reuses it on hover; (c) `MovePreview.to` keeps its previews in the pinned slot `&"move_previews"`
+  keyed by `[game.version, army]` (at most 256 hexes), never in the 64 ordinary entries (a hover sweep must not evict
+  `EconomyPreview`'s baseline, whose rows are already over budget, #412); (d) `MapModes.sight_bytes` is keyed by
+  `[&"sight", viewer, game.sight.revision(), hash(state.owner)]` and `supply_bytes` by `[&"supply", viewer, game.turn,
+  game.supplies.revision(), hash(state.owner), hash(state.people)]` (both change only when the sight, the land, the season or
+  the people change, not on an order); (e) the map scene (6.6) re-sends `sight` on `season_ended`, `game_started`,
+  `owners_changed`, and `supply` (in Supply mode) on `season_ended`, `game_started`, `owners_changed`, `hex_changed`,
+  `army_raised`, `army_disbanded` (a levy or a return moves people); `army_changed` and `unit_lost` change neither texture.
+  `SightCache.revision()` grows on every `Vision.refresh` and `forget_land`; `SupplyCache.revision()` on every `forget` and
+  `clear`. `ArmyView.tokens`, `MovePreview.reach`, `StudyMilitary.of` stay keyed by version (small results).
+- **R4 Sight reads the owner bytes; only three writers of `explored`.** Land sight needs no bitset: `Vision.sees(game, tag, hex)`
+  is true when the hex or a hex within `land_sight` of it is held by `tag` (the owner bytes, at most 19 reads), or the army
+  part holds it. `Vision.refresh` rebuilds the army part: per country a bitset (one `fill`, then the bits) and a dictionary
+  `hex index -> PackedStringArray` of the tags whose armies see it, used by `witnesses_of`. `SightCache.land_of` is made
+  lazily only for `sight_bytes` (the viewer's districts and their rings, not a 122,018-hex sweep). **`explored` is written
+  only by `Vision.setup` (new_scenario), `Vision.see_path` (movement) and `Vision.season`; `Vision.refresh` never writes it**
+  (`Snapshot.restore` calls refresh, and `Session.load_game` compares the digest, which hashes `explored`, right after).
+  `Vision.season` ORs the army part's hexes (from the dictionary, not a bitset sweep) and, for a country whose land changed
+  since (`SightCache` keeps the `owners_changed` hexes per country until the vision phase), those hexes and their rings. A
+  fresh `SightCache` (a load) owes nothing: "explored holds the land sight" is an invariant of every saved game
+  (`test_vision` asserts it after 40 seasons). Bit order: hex i is bit `i & 7` of byte `i >> 3`; size `(hex_count + 7) / 8`.
+  **Knowing:** `Vision.explored_any` reads `SightCache.known_of(game, viewer_id) -> PackedByteArray` (256 bytes by country id),
+  set when an explored bit is set on a held hex and rebuilt lazily after `owners_changed` (`forget_land` drops it).
+  `Knowledge.known` and `Knowledge.unknown_count` use the same clause as `knows` (M3 wrote them on `Territory.neighbours`;
+  Rankings and the country panel must agree with `knows`). **A map-only game** stamps no witnesses and `Vision` does nothing.
+- **R5 The supply fields forget only when a depot or the land changes.** Fields are always lazy (made on the first ask, so a
+  country without armies never pays; 10's fallback is the design). `SupplyCache` keeps with each country's fields the sorted
+  depot list it built them from; `Game.emit` of `owners_changed` forgets the countries in `tag` and `others`; of `hex_changed`
+  it forgets the owner only when `Supply.is_depot` of that hex now differs from its place in the kept list (works finish on
+  settlement hexes every season; forgetting on each would make every supply phase cold). A **port** depot is M4's port: a
+  settlement hex whose place has `port` and `level >= 1` and touches the sea (`DistrictCache` field `Economy.F_PORT > 0`).
+  The field is keyed `(country id, winter)` on the game; map and defs are fixed for a game.
+- **R6 The movement phase, exactly.** (a) Legs and ticks work on a local copy; an occupancy dictionary `hex index -> country
+  id` is built at the phase start and updated at every step. (b) **A hex another country's army stood on or passed through in
+  this phase stays closed to other countries until the phase ends** (only unowned land can be shared in M6); so step 3's step
+  back never lands beside or on a foreign army, and step 3 always ends (every army back at its start reproduces the phase's
+  starting state, which fitted). (c) `seen` and `witnesses` use the sight at the phase's start (the cache before the phase);
+  `witnesses` in country id order. (d) `unit_moved` only for an army that took at least one step; `path` starts with its hex at
+  the phase's start. (e) `waiting` becomes `&"winter"` when a CLOSED step stops it and is cleared when its leg takes a step.
+  (f) D20 in integers: a winter detour is taken when `winter_cost * 100 <= summer_cost * wait_ratio_percent` and
+  `winter_cost - summer_cost < wait_extra_seasons * mp_of(army)`, both costs from the army's hex with WADE at
+  `wade_plan_cost`. (g) `Movement.walk_plan` predicts on the stored route and never plans a detour (a march that reaches a
+  pass in winter shows a wait; the winter phase may still find a detour by (f)); a property in `test_movement` holds
+  `walk_plan`'s stops equal to the played seasons for marches with no winter detour and no block. (h) A search's ties follow
+  its fixed order (buckets FIFO, neighbours in direction order 0 to 5, a strict `<` relaxation); "ties by the lower hex index"
+  in 9 reads so, and the test pins the route of an even-cost fixture. (i) `PathSearch.route` and `Movement.plan` give `hexes`
+  without the start, the goal last (as `Army.route`).
+- **R7 The route search's worst case is the goal it cannot reach.** `PathSearch.components(map, steps, allowed) ->
+  PackedInt32Array` labels the allowed hexes connected by steps that are not BLOCKED (WADE and CLOSED count as connected);
+  it is kept beside the open mask (R3 a). `route` returns `{ok: false}` at once for a goal in another component. Within one
+  component a search that passes `max_cost` gives the reason of 4.7 row 9 ("too far"), not row 8; row 9 also applies when
+  `walk_plan(...).seasons > march_seasons_max`. L3's probe (`probe_paths.gd`) times, on the made-up Europe, 200 reachable
+  routes 1 to 4 seasons long, 20 unreachable goals of one component bound (an island, the far side of a great river), 20
+  routes planned in winter (twice, D20), the step fill and 20 cost fields; its numbers go in the pull request before L6
+  builds on the search.
+- **R8 The economy's hooks match the M5 code.** (a) `EconomySeason.needs_for(game, town, army_food := 0)` adds the key
+  `"army_food"`; `needs_of(game, view, tag)` passes `Supply.army_food(game, tag)`; `goods_step` never reads `"army_food"`
+  (armies eat in `supply`); `reserve_for` keeps grain for `reserve_seasons x (food + army_food)` (a missing key is 0). (b)
+  `Supply.army_food(game, tag) = ceil(men of tag's armies whose hex is in its field this season x army_food_milli / 1,000,000)`
+  (`Supply.in_supply` with `Calendar.is_winter(game.turn)`); production calls `needs_for(game, town, Supply.army_food(game,
+  c.tag))`. (c) `money_lines` keeps M4/M5's parameters and appends two: `money_lines(game, view, tag, tax, content,
+  sales_milli, made_info, town_known := -1, rest_known := -1, army_upkeep := 0, army_count := 0)`; the `upkeep_army` line
+  (amount `-army_upkeep`, count `army_count`, `NO_HEX`) follows the walls. (d) `StatsSystem._money_into` counts `raise` with
+  `work` and `refund` as spending and `upkeep_army` into its column; the goods ring's `used` is `-(used + army + raise)`;
+  `food_eaten` stays the towns' (`used` only); `army_raised`, `army_starved` and `losses` are summed from
+  `chronicle.of_turn(game.turn)` (`army_raised.men`; `army_starved.lost`), as M3 counts `works_finished`. So
+  **`Chronicle.NOTABLE` gains its five kinds in L8**, not L9. (e) `Country.FLOW_COUNT` becomes 8 and
+  `Country.PEOPLE_FLOW_COUNT` 7 with the appended flows (L4; `test_stores` and `test_people` pin the equalities).
+- **R9 The preview with armies (D48) inside M5's delta method.** The army step is a new pure file,
+  `core/views/army_preview_step.gd` (`economy_preview.gd` is 1,019 lines: it may grow by at most 40). Each previewed season, in
+  the phase order: `Supply.country_step` on the record's stock and view (the armies' men carried season to season), then
+  production and income (the `upkeep_army` line from the stepped men), the people step, then the refill. The **baseline**
+  record (`[&"made", version, tag, tax]`) holds the army step's result and lays its foraged and refill people into its people
+  deltas (`p_start`/`p_next`), so `People.active` and the people step see them. An **option** re-runs `country_step` every
+  season (a few armies; pure) and enters into its `delta` only the hexes whose foraged or refill people differ from the
+  baseline's. The 200-case property of 9 proves equality by induction, as M5's did. Budget: `expected_ms`, `preview_ms` and
+  `reminders_ms` stay `known_over` #412; L10 prints each with and without the armies of `europe_armies` in one run, and the
+  difference must stay under 10 % of the row (or 0.3 ms).
+- **R10 Speed rows that can hold.** M5 left `season_ms`, `production_ms`, `income_ms`, `people_ms` known over (#409, #414).
+  `season_ms` (320) keeps its `known_over` until those close; M6's own cost gets a row that must hold with no `known_over`:
+  **`army_phases_ms` 95**, the sum of movement, supply, ready_units and vision in the worst season of 8. `movement_ms` (25) is
+  probed by L6 on the made-up Europe in its first days (600 walks, `see_path` with precomputed ring offsets, the refresh);
+  over it, `see_path` marks only the steps' own hexes and the vision phase adds the rings. `cost_field_ms`: no milestone up to
+  M8 calls `cost_field` in a season (`m8-build-spec.md` D48); if the probe is over 120 the row enters with `known_over` and
+  an issue. `PerfFixture.europe_armies` builds its armies through the door, not `raise` (a settlement raises at most 4
+  companies a season, so ten armies of up to 8 a country cannot be raised at one start): `Armies.create` and
+  `Armies.add_units` with `raised_turn = turn - 1` (none musters), people untouched (the rig, like `dev_money`); orders go
+  through `Game.act("march", ...)`; re-orders on arrival run between seasons, outside every timed phase.
+- **R11 Saves.** `Snapshot._format_problem` requires `armies` as a Dictionary. `Armies.from_dict` refuses (problem
+  "body"): a wrong schema, a duplicate army or unit id, an id at or above its counter, a tag not a country of the game, a hex
+  off the map or at sea, a unit `kind` not a `UnitDef`, `men` outside 1..full, an empty army, a route index off the map, an
+  `order` not one of the three, a `goal` off the map when the order is march. `Country.from_dict` accepts only country/4 (drop
+  M5's `SCHEMA_V2` branch); `_build` refuses an `explored` that is not a `PackedByteArray` of `(hex_count + 7) / 8` bytes
+  (map-only games: empty). `Vision.setup` runs only in `new_scenario` (5.3's "and on load" is struck below: no format-4 file
+  lacks `explored`). Digest texts: `explored` hashed with `HashingContext` SHA-256 (hex), as `Stats` and `Chronicle` hash;
+  `paid_goods` written in good id order; `Army.route` as comma-separated indices.
+- **R12 Files that are at their limit.** `shell/map/map_scene.gd` is 800 lines and `shell/app/app.gd` 798: L16 puts the
+  selection, the cursor, the tokens, the path marks, the reach and the replay poses in **`shell/map/map_armies.gd`** (a child
+  node, as M5's `map_people.gd`), and `map_scene.gd` gains only its wiring (it stays at most 800); L24 puts the M6 requests of
+  6.11 in **`shell/app/army_requests.gd`** (as `game_requests.gd` is to `app.gd`). `core/views/season_summary.gd` (677) gets
+  the Armies section in **`core/views/summary_armies.gd`** (as `summary_people.gd`). No new `SIZE_REASONS` entry.
+- **R13 The season flow with the replay.** `SeasonFlow.request_end` in `REPLAY` calls `replay_skip()` before its IDLE test and
+  returns false (no season starts). When a request plays more than one season (`_run(count)` with `count > 1`), no replay
+  plays (the tokens already stand where the last season left them): `replay_start` is not called. `MoveReplay` drops what it
+  recorded on `game_started` and at each `replay_start`/`skip`.
+- **A1** `GoodDef.validate` allows `reserve_fixed > 0` for kinds `material` **and `ware`** (horses and copper are wares; M4's
+  rule refused them); a food or staple with a fixed reserve stays refused (P). L1 edits `core/defs/good_def.gd`.
+- **A2** `TerrainDef` keeps its own `KEYS` constant (defs may not read `MapTiles`, a view); `test_terrain_defs` asserts it equals
+  `MapTiles.COVERS` and `ImproveRules.COVER_WORDS`.
+- **A3** `Military.can_stand`'s one wording is "no room at %s: %d of %d companies" (`hex_text`), and "another country's army
+  stands at %s". `march_check` row 7 passes `adding` = the army's units plus the units of the country's other armies whose
+  order is march with this goal, and `leaving` = its armies on the goal whose order is march.
+- **A4** Raising pays goods in good id order: `cost_goods` keys mapped by `GameDefs.good_id`, multiplied by `count`;
+  `Stores.short_of` gets that multiplied `{key: loads}`.
+- **A5** Disbanding gives men back to `home` when `tag` holds it and it can take them (`people + men <= People.PEOPLE_MAX`),
+  else to the army's hex; `disband_check` refuses "no room for %d people at %s" when neither can (People never vanish).
+- **A6** `Armies.lose_men`: each unit loses `floor(amount x unit men / army men)`; the remainder (fewer men than units) is
+  taken one man each from the units in id order, skipping empty ones.
+- **A7** `Army.supply`: 0 when in supply and fed 1000; 1 when out of supply and its share covers all its men; 2 otherwise
+  (in supply with short stores is 2, `why` `stores_empty`).
+- **A8** Names past "Tenth": "11th Army of Turin", "12th ..." (English ordinal suffixes). `Military.army_name`'s place pick
+  equals `Words.place`'s (rings 0 to 2, nearest, ties by place index); a test compares them on every land hex of north Italy.
+- **A9** `ArmyView.token_text`: under 1,000 the number; else tenths `(men + 50) / 100` as "%d.%dk" ("1.0k"); others' banded
+  (`Knowledge.band`): under 1,000 "~450", else "~1k" / "~1.2k" (a ".0" dropped).
+- **A10** A raise refund is a `refund` line at the hex (D30); `Treasury` merges it with a works refund on the same hex, so the
+  report's "Refund: <units>" text for that hex comes from the season's `army_disbanded` entries with `refund > 0`; the rest of
+  the line is the works'.
+- **A11** `Session.drain` assigns `path` into an `Array[Vector2i]` before `Events.unit_moved.emit` (as `owners_changed`);
+  listeners treat an army id that `Armies.by_id` no longer finds (starved out, merged) as gone.
+- **A12** Static test seams (`Movement.register_test_hostility`, the `StepCosts` memo) are cleared in `after_each`; a test that
+  edits a defs number after a table was filled calls `StepCosts.clear_all()`.
+- **A13** `MapModes.colour_of` appends `supply_byte := 0, seen := 1, veil_on := false`; when `veil_on` and `seen == 0` on land
+  the veil is laid over the mode's colour by source-over (`a = av + am(1 - av)`, `rgb = (VEIL av + c am (1 - av)) / a`, with
+  `av = SIGHT_VEIL_ALPHA`), the shader the same; a hex already drawn as `VEIL` by its mode (byte 0) gets no second veil.
+- **A14** `Game` calls `Vision`, `Armies` (digest) and the two caches' methods by reference (`.call`), as M5 calls `People` and
+  `DistrictCache`: a typed call from `core/game` into a system makes the two scripts need each other to parse.
+- **A15** `Military.refill` takes men by `People.levy` (the flow `raised`), then `Armies.add_men` with what was taken;
+  `Stats.army_raised` counts raises only (R8 d reads `army_raised` events, which a refill does not emit).
+
+| Amendment | Lands in |
+|---|---|
+| R1 | L8 (season), L13 (`test_men_property`) |
+| R2 | L2 (sorted lists), L4 (the door, emitters), L6, L7 |
+| R3 | L6 (a, b), L11 (c, d), L16 (e), L5 and L7 (the revisions) |
+| R4 | L5 (all), L6 (`see_path`), L8 (snapshot calls refresh only) |
+| R5 | L7 |
+| R6 | L3 (h, i), L6 (a to g), L11 (g in the move card) |
+| R7 | L3 (components, probe), L6 (reasons) |
+| R8 | L4 (e), L7 (b), L8 (a, c, d, `Chronicle.NOTABLE`); L9 drops `chronicle.gd` |
+| R9 | L10 (new file `core/views/army_preview_step.gd`) |
+| R10 | L6 (probe), L13 (rows, fixture, budget json) |
+| R11 | L2 (country/4, digest texts), L4 (`Armies.from_dict`), L8 (snapshot, save file) |
+| R12 | L12 (`summary_armies.gd`), L16 (`map_armies.gd`), L24 (`army_requests.gd`) |
+| R13 | L15 |
+| A1, A2 | L1 |
+| A3 to A8, A15 | L4 |
+| A9 | L11 |
+| A10 | L12 |
+| A11 | L9 |
+| A12 | L3, L6 |
+| A13 | L11 (`colour_of`), L17 (shader) |
+| A14 | L2, L5, L7, L8 |
+
 ### 5.1 Definitions (`core/defs/`)
 
 ```gdscript
@@ -855,7 +1045,7 @@ static func hostile(game: Game, a: StringName, b: StringName) -> bool    # false
 static func register_test_hostility(a: StringName, b: StringName) -> void
 static func clear_test_hostility() -> void
 static func zoc_halts(game: Game, tag: StringName, hex: Vector2i) -> bool
-static func open_mask(game: Game, tag: StringName) -> PackedByteArray   # open_to for every hex; cached [&"open", version, tag]
+static func open_mask(game: Game, tag: StringName) -> PackedByteArray   # open_to for every hex; cached by the owner bytes (5.0 R3)
 static func plan(game: Game, army: Army, goal: Vector2i) -> Dictionary    # 4.4: {ok, hexes, cost, waits, reason}
 static func walk_plan(game: Game, army: Army, route: PackedInt32Array, from_turn: int) -> Dictionary   # 4.4
 static func winter_wait(game: Game, army: Army) -> Dictionary             # D20: {waits, pass_name, detour: PackedInt32Array}
@@ -897,7 +1087,7 @@ class_name Vision extends RefCounted
 const OWNS: Array[String] = ["explored"]
 const SIGHTED: Array[String] = ["work_started", "work_finished", "work_cancelled", "town_grew", "district_declined",
 	"army_raised", "army_disbanded", "army_starved", "unit_lost"]
-static func setup(game: Game) -> void             # explored = land sight; called by new_scenario and on load (no explored)
+static func setup(game: Game) -> void             # explored = land sight; called by new_scenario only (5.0 R11)
 static func refresh(game: Game) -> void           # rebuilds the army part of game.sight
 static func sees(game: Game, tag: StringName, hex: Vector2i) -> bool
 static func witnesses_of(game: Game, hex: Vector2i, actor: StringName) -> PackedStringArray
@@ -917,7 +1107,7 @@ func clear() -> void
 # core/systems/stores.gd  (M4, edit): FLOWS appends &"army", &"raise"
 # core/systems/people.gd  (M5, edit): FLOWS appends &"foraged"
 # core/systems/economy_season.gd  (M4, M5, edit): needs_of adds army_food (4.9); reserve_of keeps it;
-#   money_lines(game, view, tag, tax, content, sold, made_info, army_upkeep: int = 0) adds the upkeep_army line
+#   money_lines(..., town_known := -1, rest_known := -1, army_upkeep := 0, army_count := 0) adds the upkeep_army line (5.0 R8)
 # core/systems/stats_system.gd  (M3 to M5, edit): 4.16
 ```
 

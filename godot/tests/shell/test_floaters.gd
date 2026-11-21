@@ -288,3 +288,30 @@ func test_add_ribbon_waits_under_a_modal() -> void:
 	_floaters.resume()
 	_floaters.advance(1.2)
 	assert_eq(_floaters.live_count(), 0)
+
+
+func test_ribbons_of_two_close_hexes_never_overlap_sideways() -> void:
+	_floaters.set_reduce_motion(true)
+	_floaters.set_xform(Transform2D(0.0, Vector2(0.15, 0.15), 0.0, Vector2.ZERO))  # far zoom: the hexes are close
+	var a := Vector2i(5, 5)
+	var b := Vector2i(6, 5)
+	_floaters.spawn("Hunger −7,984", &"bad", a)
+	_floaters.spawn("Hunger −1,200", &"bad", b)
+	_floaters.advance(0.5)
+	var first := _floaters._ribbons[0]["node"] as PanelContainer
+	var second := _floaters._ribbons[1]["node"] as PanelContainer
+	var r1 := Rect2(first.position, first.get_combined_minimum_size())
+	var r2 := Rect2(second.position, second.get_combined_minimum_size())
+	assert_false(r1.intersects(r2), "neighbouring ribbons do not cover each other's text: %s %s" % [r1, r2])
+
+
+func test_a_long_people_ribbon_word_is_as_wide_as_its_text_and_the_plate_holds_it() -> void:
+	for text: String in ["Hunger −7,984", "People +100,000"]:
+		var node := (_floaters.spawn(text, &"bad", Vector2i(5, 5)) as bool)
+		assert_true(node)
+		var ribbon := _floaters._ribbons[_floaters._ribbons.size() - 1]["node"] as PanelContainer
+		var word := ribbon.get_node("HBox/Word") as Label
+		var wide := word.get_theme_font("font").get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, word.get_theme_font_size("font_size")).x
+		assert_gte(word.get_combined_minimum_size().x, wide, "the word's minimum width holds %s" % text)
+		assert_gte(ribbon.get_combined_minimum_size().x, wide + 8.0, "the plate is wider than the word plus the dot")
+		_floaters.clear()

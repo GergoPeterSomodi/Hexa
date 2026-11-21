@@ -241,7 +241,7 @@ func _refresh_owner(game: Game) -> void:
 	_owner_value.add_child(link)
 
 
-## The People section (spec 6.3): on land, PeopleView.at's figures. Yours: "People 30,300 (▲ +300 last season)" and "Room
+## The People section (spec 6.3): on land, PeopleView.at's figures. Yours: "People 30,300 (up 300 last season)" and "Room
 ## 45,000", then the outlook in its tone; a known country's land: "People about 30,000"; unknown: no section; unowned land
 ## and the sandbox: the number alone (no outlook).
 func _refresh_people(game: Game) -> void:
@@ -259,7 +259,7 @@ func _refresh_people(game: Game) -> void:
 	var change := int(seen["change"])
 	var people_text := Words.number(int(seen["people"]))
 	if change != 0:
-		people_text += " (%s %s last season)" % [PeopleView.UP if change > 0 else PeopleView.DOWN, Words.signed(change)]
+		people_text += " (%s %s last season)" % ["up" if change > 0 else "down", Words.number(absi(change))]
 	_people_value.text = people_text
 	_people_room_value.text = Words.number(int(seen["room"]))
 	_people_room_row.visible = true

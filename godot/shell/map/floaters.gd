@@ -145,7 +145,13 @@ func spawn(text: String, tone: StringName, hex: Vector2i) -> bool:
 	_make_room(hex)
 	var start := maxf(_clock, _last_start_at(hex) + STAGGER)
 	var node := RIBBON_SCENE.instantiate() as PanelContainer
-	(node.get_node("HBox/Word") as Label).text = text
+	var word := node.get_node("HBox/Word") as Label
+	word.text = text
+	# The word keeps the width of its own text (and a little air), so a long line is never clipped at the ribbon's edge.
+	var font := word.get_theme_font("font")
+	if font != null:
+		var size := word.get_theme_font_size("font_size")
+		word.custom_minimum_size.x = ceilf(font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x) + 6.0
 	(node.get_node("HBox/Dot") as ColorRect).color = _tone_color(tone)
 	node.accessibility_name = text
 	node.visible = false
@@ -265,9 +271,38 @@ func _update() -> void:
 		if age >= LIFETIME:
 			_discard(ribbon["node"] as Node)
 			continue
-		_place(ribbon, age)
 		kept.append(ribbon)
+	_spread(kept)
+	for ribbon: Dictionary in kept:
+		_place(ribbon, _clock - float(ribbon["start"]))
 	_ribbons = kept
+
+
+## Ribbons of neighbouring hexes can be wider than the hexes are apart (a far zoom), and one would sit on the end of the
+## other's text ("Hunger -7,98" under the next plate). Each ribbon takes the first extra row (a plate's height lower) in
+## which it does not overlap, sideways, a ribbon before it; the row count is written to ribbon["extra"].
+func _spread(list: Array[Dictionary]) -> void:
+	var placed: Array[Dictionary] = []  # {x, y, w} of the ribbons already settled
+	for ribbon: Dictionary in list:
+		var node := ribbon["node"] as PanelContainer
+		var screen := _xform * MapTiles.cell_centre(ribbon["hex"] as Vector2i)
+		var w := node.get_combined_minimum_size().x * SCALE_PEAK
+		var h := node.get_combined_minimum_size().y
+		var y := screen.y - BORN_ABOVE + float(ribbon["slot"]) * STEP_DOWN
+		var extra := 0
+		while extra < MAX_PER_HEX * 4:
+			var clash := false
+			for other: Dictionary in placed:
+				if other["hex"] == ribbon["hex"]:
+					continue  # one hex's ribbons stack by their slots
+				if absf(float(other["y"]) - (y + float(extra) * h)) < h * 0.9 						and absf(float(other["x"]) - screen.x) < (float(other["w"]) + w) * 0.5:
+					clash = true
+					break
+			if not clash:
+				break
+			extra += 1
+		ribbon["extra"] = float(extra) * h
+		placed.append({"hex": ribbon["hex"], "x": screen.x, "y": y + float(extra) * h, "w": w})
 
 
 ## Sets one ribbon's position, scale, alpha and visibility for `age` seconds since its start.
@@ -287,7 +322,7 @@ func _place(ribbon: Dictionary, age: float) -> void:
 		scale_now = _scale_at(age)
 	var fade := clampf((age - FADE_FROM) / (LIFETIME - FADE_FROM), 0.0, 1.0)
 	var alpha := clampf(age / POP_TIME, 0.0, 1.0) * (1.0 - fade)
-	var centre := Vector2(screen.x, screen.y - BORN_ABOVE + float(ribbon["slot"]) * STEP_DOWN - rise)
+	var centre := Vector2(screen.x, screen.y - BORN_ABOVE + float(ribbon["slot"]) * STEP_DOWN + float(ribbon.get("extra", 0.0)) - rise)
 	node.scale = Vector2.ONE * scale_now
 	node.position = centre - box * 0.5
 	node.modulate.a = alpha

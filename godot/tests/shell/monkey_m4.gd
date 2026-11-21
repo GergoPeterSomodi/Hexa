@@ -20,6 +20,13 @@ var _n: Dictionary = {}
 var _m4: bool = false
 ## The seed and step in progress, for the checks' messages.
 var _tag: String = ""
+## The step in progress (0 based).
+var _step_no: int = 0
+## A developer command (`people c r N`, or the money a forced step gives) ran in the current step: the digest may have moved
+## without an accepted action.
+var _dev_changed: bool = false
+## Late in a run (the last third of the steps) a required M4 counter still at 0 gets every step: the coverage steps go first.
+const LATE_STEP := 400
 
 
 func _send_chord(vp: SubViewport, key: Key, ctrl: bool = false, shift: bool = false) -> void:
@@ -229,10 +236,32 @@ func _m4_step(rng: Rng, vp: SubViewport, app: App) -> void:
 			await _m4_study_open(rng, vp, app, KEY_L, true)
 
 
-## From FORCE_M4_STEP on, the first M4 action whose counter is still 0 (one a step, so the seed never passes empty).
+## Whether a required M4 counter is still 0 late in the run: the M4.5 and M5 actions then wait (the coverage steps go first).
+func _m4_coverage_due() -> bool:
+	if not _m4 or _step_no < LATE_STEP:
+		return false
+	for key: String in M4_REQUIRED:
+		if int(_n.get(key, 0)) == 0:
+			return true
+	return false
+
+
+## The player's treasury is topped up (a developer gift, so a Begin on a card can be pressed and not refused for ducats); the
+## step's digest check excuses it.
+func _m4_fund(app: App) -> void:
+	var game := Session.game
+	if game != null and game.player != &"" and Session.dev_money(game.player, 5000):
+		_dev_changed = true
+		app.hud().refresh_economy()  # as the console does: the chip and the panels read the money again
+
+
+## From FORCE_M4_STEP on, the first M4 action whose counter is still 0 (one a step, so the seed never passes empty). Begin and
+## the pin need a card that Begin can be pressed on: the treasury is topped up first, and the counters retry every step.
 func _m4_force(rng: Rng, vp: SubViewport, app: App) -> void:
 	if not _m4_ready(app):
 		return
+	if int(_n["card_begins"]) == 0 or int(_n["card_pins"]) == 0:
+		_m4_fund(app)
 	if int(_n["study_i"]) == 0:
 		await _m4_study_open(rng, vp, app, KEY_I)
 	elif int(_n["study_l"]) == 0:

@@ -1,9 +1,10 @@
 ## The People page of the Statesman's Study (docs/architecture/m5-build-spec.md 6.6; StudyPeople is its read model). The head
 ## says how many people live in the towns and in the countryside and how many more the land holds, with the season's
 ## expected change and the span (12 or 40 seasons, state/study_span, shared with Rankings and Economy). Below: Towns (a
-## StudyTable of your settlements, highest first, the countryside's line, Look there and Show on the map) and, beside it or
-## under it below TOWNS_MIN_W + FOOD_MIN_W of page width (about 985 px: the Study gives a page about 1,000 at 1280 x 720), Food (the report's food line and a chart of made, eaten and the
-## towns' need) and Growth (a stacked chart of who came, who starved and who left). It changes nothing: Look there (or
+## StudyTable of your settlements, highest first, the countryside's line, Look there and Show on the map) at the page's full
+## width (so the Outlook column has the room it needs), then Food (the report's food line) with two compact charts side by
+## side (stacked below CHARTS_MIN_W of page width): Food (made, eaten and the towns' need) and Growth (a stacked chart of
+## who came, who starved and who left). It changes nothing: Look there (or
 ## Enter, or a double click on a row) asks [&"look_at", hex] and Show on the map [&"map_mode", &"food", hex]; the Study turns
 ## them into ctx.request calls. Before a season has ended the table shows its rows without a change, the food line says
 ## "No season has ended yet." and the charts "No data yet.". Built on the first refresh; the Study refreshes it on
@@ -26,9 +27,9 @@ const GROWTH_CAPTION := "Growth and losses, a season"
 const LOOK_TEXT := "Look there"
 const MAP_TEXT := "Show on the map"
 const TOWNS_MIN_W := 560.0
-const FOOD_MIN_W := 420.0
+const CHARTS_MIN_W := 400.0
 const TABLE_MIN_H := 120.0
-const CHART_MIN := Vector2(380.0, 170.0)
+const CHART_MIN := Vector2(300.0, 130.0)
 
 ## The seasons the charts look back over: 12 or 40. The Study may pass the shell's settings, and then the span is read from
 ## and written to state/study_span.
@@ -84,7 +85,7 @@ func _ensure_built() -> void:
 	_built = true
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_build_head()
-	var flow := HFlowContainer.new()
+	var flow := VBoxContainer.new()
 	flow.name = "Flow"
 	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(flow)
@@ -124,6 +125,7 @@ func _build_towns(flow: Container) -> void:
 	var box := VBoxContainer.new()
 	box.name = "Towns"
 	box.custom_minimum_size = Vector2(TOWNS_MIN_W, 0.0)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	flow.add_child(box)
 	var title := PanelKit.label(TOWNS_TITLE, &"SectionHead")
 	title.name = "Title"
@@ -162,7 +164,7 @@ func _button(text: String, node_name: String, handler: Callable) -> KitButton:
 func _build_food(flow: Container) -> void:
 	var box := VBoxContainer.new()
 	box.name = "Food"
-	box.custom_minimum_size = Vector2(FOOD_MIN_W, 0.0)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	flow.add_child(box)
 	var title := PanelKit.label(FOOD_TITLE, &"SectionHead")
 	title.name = "Title"
@@ -171,10 +173,14 @@ func _build_food(flow: Container) -> void:
 	_food_line.name = "FoodLine"
 	_food_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_food_line)
-	var food := _inset(box, "FoodInset", "FoodChart", InkChart.Kind.LINE)
+	var charts := HFlowContainer.new()
+	charts.name = "Charts"
+	charts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(charts)
+	var food := _inset(charts, "FoodInset", "FoodChart", InkChart.Kind.LINE)
 	_food_chart = food[0] as InkChart
 	_food_none = food[1] as Label
-	var growth := _inset(box, "GrowthInset", "GrowthChart", InkChart.Kind.STACKED_BAR)
+	var growth := _inset(charts, "GrowthInset", "GrowthChart", InkChart.Kind.STACKED_BAR)
 	_growth_chart = growth[0] as InkChart
 	_growth_none = growth[1] as Label
 
@@ -185,6 +191,7 @@ func _inset(box: Container, inset_name: String, chart_name: String, chart_kind: 
 	inset.name = inset_name
 	inset.theme_type_variation = &"PanelVellumInset"
 	inset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inset.custom_minimum_size = Vector2(CHARTS_MIN_W, 0.0)
 	box.add_child(inset)
 	var inner := VBoxContainer.new()
 	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL

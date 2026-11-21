@@ -16,8 +16,6 @@ const M5_REQUIRED: Array[String] = [
 ]
 ## The M5 actions are on (a country game with the people).
 var _m5: bool = false
-## A `people c r N` ran in the current step: the digest may have moved without an accepted action (a developer command).
-var _dev_changed: bool = false
 
 
 ## The next M5 action, by the dice.

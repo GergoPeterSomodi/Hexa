@@ -232,7 +232,7 @@ func test_the_study_opens_the_page_and_survives_rapid_switching() -> void:
 		_harness.stack.push(study)
 	await _harness.wait_frames(self, 2)
 	assert_eq(study.nav().button_for(&"people").text, "People")
-	assert_gte(study.page_host().size.x, 984.0, "the Study's page area at 1280 holds both columns")
+	assert_gte(study.page_host().size.x, 984.0, "the Study's page area at 1280 holds both charts")
 
 
 func test_fits_at_1280_by_720_and_1024_by_600() -> void:
@@ -255,10 +255,14 @@ func test_fits_at_1280_by_720_and_1024_by_600() -> void:
 		var towns := page.find_child("Towns", true, false) as Control
 		var food := page.find_child("Food", true, false) as Control
 		assert_true(towns.is_visible_in_tree() and food.is_visible_in_tree())
+		assert_gt(food.position.y, towns.position.y, "Food sits under the table, which has the page's full width at %s" % str(size))
+		assert_gte(towns.size.x, host.size.x - 40.0, "the table takes the page's width at %s" % str(size))
+		var inset_a := page.find_child("FoodInset", true, false) as Control
+		var inset_b := page.find_child("GrowthInset", true, false) as Control
 		if size.x >= 1280:
-			assert_eq(food.position.y, towns.position.y, "the two columns sit side by side at 1280")
-			assert_gt(food.position.x, towns.position.x)
+			assert_eq(inset_a.position.y, inset_b.position.y, "the two charts sit side by side at 1280")
+			assert_gt(inset_b.position.x, inset_a.position.x)
 		else:
-			assert_gt(food.position.y, towns.position.y, "Food stacks under the table at 1024")
+			assert_gt(inset_b.position.y, inset_a.position.y, "the charts stack at 1024")
 		assert_lt((page.find_child("Top", true, false) as Control).size.y, 80.0, "the head stays a line or two at %s" % str(size))
 		harness.dispose()

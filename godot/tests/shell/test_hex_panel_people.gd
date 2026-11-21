@@ -117,7 +117,7 @@ func test_yours_shows_the_people_room_and_outlook_in_its_tone() -> void:
 	var expected := Words.number(int(seen["people"]))
 	var change := int(seen["change"])
 	if change != 0:
-		expected += " (%s %s last season)" % [PeopleView.UP if change > 0 else PeopleView.DOWN, Words.signed(change)]
+		expected += " (%s %s last season)" % ["up" if change > 0 else "down", Words.number(absi(change))]
 	assert_eq(_people_value(), expected, "the People row: the figure and last season's change")
 	assert_true(_room_row().visible, "the Room row shows on your land")
 	assert_eq((_room_row().get_node("Value") as Label).text, Words.number(int(seen["room"])), "the Room row")
