@@ -1,6 +1,6 @@
 ## Warms the Statesman's Study's views after a season ends (docs/architecture/m4-5-build-spec.md 6.8 and 4.12): a child of the
-## App that keeps a queue of read-only view calls (Economy's four, Rankings, History's timeline and first page, and the Yields
-## bytes while the map is in Yields) and runs one a frame, so no frame is long and a page opens from the game's view cache.
+## App that keeps a queue of read-only view calls (Economy's four, Rankings, History's timeline and first page, the People page's view,
+## and the Yields or Food bytes while the map is in that mode) and runs one a frame, so no frame is long and a page opens from the game's view cache.
 ## It calls only views: nothing here changes the game. A newer game version (a work begun, a tax set, the next season) or a
 ## new game clears what is left of the queue; the next season ended or game started fills it again.
 class_name StudyWarm
@@ -11,6 +11,8 @@ const DEFAULT_SPAN := 12
 
 ## True while the map is in Yields (the App's GameRequests sets it); then the Yields bytes are warmed too.
 var yields_active: Callable = Callable()
+## True while the map is in Food (the App's GameRequests sets it); then the Food bytes are warmed too.
+var food_active: Callable = Callable()
 
 var _settings: Settings = null
 var _queue: Array[Callable] = []
@@ -52,8 +54,11 @@ func queue_views() -> void:
 	_queue.append(func() -> void: StudyRankings.of(game, tag, span))
 	_queue.append(func() -> void: StudyHistory.timeline(game, tag))
 	_queue.append(func() -> void: StudyHistory.chronicle(game, tag, &"all", game.turn - 1, StudyHistory.PAGE))
+	_queue.append(func() -> void: StudyPeople.of(game, tag, span))
 	if yields_active.is_valid() and bool(yields_active.call()):
 		_queue.append(func() -> void: MapModes.yield_bytes(game, tag))
+	if food_active.is_valid() and bool(food_active.call()):
+		_queue.append(func() -> void: MapModes.food_bytes(game, tag))
 
 
 ## Runs the whole queue at once (tools and tests).

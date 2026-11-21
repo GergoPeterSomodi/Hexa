@@ -76,6 +76,8 @@ func _enter_tree() -> void:
 	_link(Events.work_started, _on_work_started)
 	_link(Events.work_finished, _on_work_finished)
 	_link(Events.work_cancelled, _on_work_cancelled)
+	_link(Events.owners_changed, _on_owners_changed)
+	_link(Events.town_grew, _on_town_grew)
 	refresh()
 
 
@@ -88,6 +90,8 @@ func _exit_tree() -> void:
 	_unlink(Events.work_started, _on_work_started)
 	_unlink(Events.work_finished, _on_work_finished)
 	_unlink(Events.work_cancelled, _on_work_cancelled)
+	_unlink(Events.owners_changed, _on_owners_changed)
+	_unlink(Events.town_grew, _on_town_grew)
 
 
 ## Reads Session: the chips show for the player's country in a game with countries; otherwise the bar hides them.
@@ -281,6 +285,16 @@ func _on_work_started(_tag: StringName, _hex: Vector2i, _work: Dictionary) -> vo
 
 
 func _on_work_finished(_tag: StringName, _hex: Vector2i, _work: Dictionary) -> void:
+	refresh()
+
+
+## Land changed hands (a conquest, the console): the people and the food of the country change with it.
+func _on_owners_changed(_hexes: Array[Vector2i]) -> void:
+	refresh()
+
+
+## A town grew a level: its room and the food it needs changed, so the cards do.
+func _on_town_grew(_tag: StringName, _hex: Vector2i, _level: int) -> void:
 	refresh()
 
 

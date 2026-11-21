@@ -303,6 +303,30 @@ func test_a_line_with_the_study_action_opens_the_study() -> void:
 	assert_eq(_requested(&"look_at").size(), 0)
 
 
+## M5 spec 6.8 and 6.10: the hunger line of Reminders (its action opens People) and the report's People links.
+func test_the_hunger_line_opens_the_people_page_and_a_people_link_glides() -> void:
+	var summary := ReportSample.genoa_spring()
+	for section: Dictionary in summary["sections"]:
+		if section["id"] == &"before":
+			(section["lines"] as Array).append({
+				"text": "Your towns went hungry: 8 of 9 food. They lose people each season until they are fed.", "tone": "bad",
+				"action": Reminders.PEOPLE_ACTION.duplicate(), "action_label": "Open People", "severity": 2,
+			})
+	var report := _open(summary)
+	await _harness.wait_frames(self, 2)
+	var action: KitButton = null
+	for btn: Button in report.link_buttons():
+		if btn.name.begins_with("Action") and btn.text == "Open People":
+			action = btn as KitButton
+	assert_not_null(action, "the hunger line has its Open People button")
+	action.pressed.emit()
+	await _harness.wait_frames(self, 2)
+	assert_eq(_harness.stack.count(), 0, "the report closes")
+	assert_eq(_requested(&"study").size(), 1)
+	assert_eq(_requested(&"study")[0][1], {"page": &"people"}, "the People page, not Economy")
+	assert_eq(_requested(&"look_at").size(), 0)
+
+
 func test_open_the_study_hides_in_a_game_without_countries() -> void:
 	var prev := Session.game
 	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)

@@ -2,7 +2,7 @@
 ## (docs/architecture/m3-build-spec.md and m4-build-spec.md section 8): the season phases (production and income
 ## included), the cold DistrictCache fill, a digest, a snapshot, a save and a load, the season summary, the reminders, one
 ## works check, ImprovePreview (of, options_of) and EconomyPreview.expected. Headless, no window, no GUT.
-## The M4.5 rows (m4-5-build-spec.md 8) run on a second game, PerfFixture.europe_game(SEASONS_45): the study's views and the
+## The M4.5 and M5 rows (m4-5-build-spec.md 8, m5-build-spec.md 8: study_people_ms, food_bytes_ms) run on a second game, PerfFixture.europe_game(SEASONS_45): the study's views and the
 ## Yields bytes of the largest country, each on a new game version (cold; the owner index of the territories, keyed on the owner bytes, stays), the worst of RUNS_45.
 ## A row may carry "known_over": {"issue", "note"} in the budget: over its limit it prints KNOWN OVER and is listed
 ## in the report and the JSON, but does not fail the run (a row that is back within the limit says so: drop the key).
@@ -140,6 +140,8 @@ func _europe_40() -> int:
 		worst = maxf(worst, _ms(t2))
 	_r["history_page_ms"] = worst
 	_r["yield_bytes_ms"] = _worst(game, func() -> void: MapModes.yield_bytes(game, tag))
+	_r["study_people_ms"] = _worst(game, func() -> void: StudyPeople.of(game, tag, 40))  # M5 (m5-build-spec.md 8)
+	_r["food_bytes_ms"] = _worst(game, func() -> void: MapModes.food_bytes(game, tag))  # M5: worth_seasons cold, then the bytes
 	return 0
 
 

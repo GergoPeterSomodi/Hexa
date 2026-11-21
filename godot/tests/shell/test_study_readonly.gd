@@ -317,7 +317,7 @@ func _walk_study(vp: SubViewport, app: App, touched: Dictionary) -> void:
 	assert_not_null(study, "L opens the study")
 	if study == null:
 		return
-	for entry: Dictionary in StudyPages.shown("4.5"):
+	for entry: Dictionary in StudyPages.shown(Bindings.SHELL_MILESTONE):
 		study.open_page(StringName(str(entry["id"])))
 		await _wait_frames(2)
 		var page := study.current_page()
@@ -462,7 +462,7 @@ func test_planted_a_page_that_writes_is_seen_by_the_detection() -> void:
 	await _play_setup(vp, app)
 	var game := Session.game
 	_count_events()
-	var real := _study_with(StudyPages.shown("4.5"))
+	var real := _study_with(StudyPages.shown(Bindings.SHELL_MILESTONE))
 	var quiet := _changes_by(game, func() -> void: real.open_page(&"economy"))
 	assert_eq(quiet, [] as Array[String], "the real Economy page changes nothing")
 	var bad := _study_with([{id = &"bad", title = "Bad", scene = BAD_PAGE, since = "4.5"}] as Array[Dictionary])
@@ -478,6 +478,6 @@ func test_planted_a_page_that_writes_is_seen_by_the_detection() -> void:
 
 func _study_with(entries: Array[Dictionary]) -> Study:
 	var study := (load("res://shell/screens/study.tscn") as PackedScene).instantiate() as Study
-	study.configure(entries, "4.5")
+	study.configure(entries, Bindings.SHELL_MILESTONE)
 	add_child_autofree(study)
 	return study

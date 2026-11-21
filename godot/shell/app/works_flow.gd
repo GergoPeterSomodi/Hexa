@@ -78,7 +78,7 @@ func handle(what: StringName, args: Dictionary) -> bool:
 		&"refresh_hud":
 			_app.hud().refresh_economy()
 			if _scene != null and is_instance_valid(_scene):
-				_scene.overlay().sync_yields(Session.game, true)  # the console's money and goods change the worth
+				_scene.overlay().sync_modes(Session.game, true)  # the console's money, goods and people change Yields and Food
 		_:
 			return false
 	return true

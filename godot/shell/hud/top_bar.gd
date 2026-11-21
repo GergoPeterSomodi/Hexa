@@ -1,12 +1,12 @@
 ## Studiolo walnut top bar (PanelBar): brand, the player's country (arms and long name, or the pick's title in a
-## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief, Yields: the modes MapModes.modes offers), the date and End turn (DateEnd, right of the middle),
+## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief, Yields, Food: the modes MapModes.modes offers), the date and End turn (DateEnd, right of the middle),
 ## Layers, Help and Pause menu (docs/architecture/m2-build-spec.md section 7.3; ui-and-controls-spec.md section 7).
 ## M4 (spec 6.3) and M5 (spec 6.2): the resource chips (Ducats, People, Food, Stores) sit right after the mode switch with the
-## study button; they show only for the player of a game with countries. When the bar is tight the gap goes first, then the
-## Stores chip and the Food chip shrink to their medals and values, then the country name, People's and Ducats' names and
-## changes and the brand go, then the Stores and Food chips themselves; the Ducats and People medals and values and the study button stay down to about 800 px (the
-## smallest window is 1024), and only below that, where nothing else is left, the chips and the study button hide (I, L and
-## the country panel still open the study).
+## study button; they show only for the player of a game with countries (the sandbox and the pick have no chips and no Food
+## mode). When the bar is tight the gap goes first, then the Stores and Food chips shrink to their medals and values, the
+## mode buttons tighten, the country name goes, then People's and Ducats' names and changes and the brand, then the Stores
+## chip, the Food chip and the study button; the Ducats and People medals and values hold down to about 840 px, and
+## below that, where nothing else is left, the chips hide (I, L and the country panel still open the study).
 ## It reads Session and Events and sends intents only. The name hides before the mode switch when the window narrows.
 class_name TopBar
 extends PanelContainer
@@ -21,12 +21,12 @@ signal study_requested(page: StringName)
 ## A chip was pressed: the study opens at `page` on its `tab` (Ducats: This season, Stores: Goods).
 signal study_tab_requested(page: StringName, tab: StringName)
 
-const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief", "Yields"]
-const MODE_KEYS: Array[String] = ["1", "2", "3", "4"]
+const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief", "Yields", "Food"]
+const MODE_KEYS: Array[String] = ["1", "2", "3", "4", "5"]
 const PICK_TAIL := ": choose your country"
 const MAX_FITS_PER_FRAME := 3
-## The mode buttons' side padding and font size when the bar is tight (four modes need the room the three had).
-const COMPACT_PAD := 6.0
+## The mode buttons' side padding and font size when the bar is tight (five modes need the room the three had).
+const COMPACT_PAD := 2.0
 const COMPACT_FONT := 12
 const BUTTON_STATES: Array[StringName] = [&"normal", &"pressed", &"hover", &"hover_pressed", &"disabled", &"focus"]
 
@@ -152,8 +152,9 @@ func set_layers_open(open: bool) -> void:
 		_layers_btn.set_pressed_no_signal(open)
 
 
-## Fits the bar into `width` px: the gap goes first, then the Stores chip shrinks to its medal and value, then the country
-## name (or the map info of a sandbox), then the Ducats chip's name and change, then the brand, then the Stores chip, and last of all the chips and the study button; the arms,
+## Fits the bar into `width` px: the gap goes first, then the Stores and Food chips shrink to their medals and values, the mode
+## buttons tighten, the country name (or the map info of a sandbox) goes, then People's and Ducats' names and changes and the
+## brand, then the Stores chip, the Food chip and the study button, and last of all the chips; the arms,
 ## the switches, the date and End turn and the buttons stay, and the refusal line of the pick is clipped with an ellipsis
 ## (its label has no minimum width). Called on every resize and by refresh_game.
 func fit_width(width: float) -> void:
@@ -188,12 +189,12 @@ func _fit(width: float) -> void:
 	if _too_wide(width):
 		_shrink_chip(food)  # then Food's name and change
 	if _too_wide(width):
-		_shrink_chip(people)  # then People's name and change
-	if _too_wide(width):
-		_set_modes_compact(true)  # then the mode buttons tighten
+		_set_modes_compact(true)  # then the mode buttons tighten (five of them with Food)
 	if _too_wide(width):
 		_country_btn.visible = false  # then the country name
 		_map_info_label.visible = false
+	if _too_wide(width):
+		_shrink_chip(people)  # then People's name and change
 	if _too_wide(width):
 		ducats.set_name_shown(false)  # then Ducats' name, and after it its change
 		_resize_chip(ducats)

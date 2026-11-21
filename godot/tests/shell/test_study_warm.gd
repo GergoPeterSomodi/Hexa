@@ -4,7 +4,7 @@
 extends GutTest
 
 const GEN := &"GEN"
-const VIEWS := 7  # this_season, districts, goods, history, rankings, timeline, chronicle
+const VIEWS := 8  # this_season, districts, goods, history, rankings, timeline, chronicle, people
 
 var _prev_game: Game = null
 var _game: Game = null
@@ -39,6 +39,13 @@ func test_queue_views_lists_the_views_and_yields_only_while_the_map_is_in_yields
 	_warm.yields_active = func() -> bool: return true
 	_warm.queue_views()
 	assert_eq(_warm.pending(), VIEWS + 1, "the Yields bytes too while the map is in Yields")
+	_warm.yields_active = Callable()
+	_warm.food_active = func() -> bool: return true
+	_warm.queue_views()
+	assert_eq(_warm.pending(), VIEWS + 1, "the Food bytes too while the map is in Food")
+	_warm.yields_active = func() -> bool: return true
+	_warm.queue_views()
+	assert_eq(_warm.pending(), VIEWS + 2, "both when both are asked for")
 
 
 func test_warm_now_fills_the_view_cache_keys_the_pages_read() -> void:
@@ -47,6 +54,7 @@ func test_warm_now_fills_the_view_cache_keys_the_pages_read() -> void:
 		[&"study_districts", _game.version, GEN],
 		[&"study_goods", _game.version, GEN, span],
 		[&"study_history", _game.version, GEN, span],
+		[&"study_people", _game.version, GEN, span],
 	]
 	for key: Array in keys:
 		assert_false(_cached(key), "cold: %s" % str(key))
@@ -119,6 +127,7 @@ func test_warming_leaves_the_game_as_it_was() -> void:
 	var version := _game.version
 	var bytes := var_to_bytes(Snapshot.of(_game))
 	_warm.yields_active = func() -> bool: return true
+	_warm.food_active = func() -> bool: return true
 	_warm.queue_views()
 	_warm.warm_now()
 	assert_eq(_game.digest(), digest)
@@ -137,3 +146,17 @@ func test_a_finished_game_is_not_kept_alive() -> void:
 	await get_tree().process_frame
 	assert_eq(_warm.pending(), 0, "the queue is gone")
 	assert_null(ref.get_ref(), "nothing holds the finished game")
+
+
+func test_the_food_bytes_are_warm_after_warming_in_food_mode() -> void:
+	_game.view_cache.clear()
+	_warm.food_active = func() -> bool: return true
+	_warm.queue_views()
+	_warm.warm_now()
+	var made := 0
+	var key: Array = [&"food", _game.version, GEN]
+	var bytes := _game.view_cache.get_or_make(key, func() -> PackedByteArray:
+		made += 1
+		return PackedByteArray()) as PackedByteArray
+	assert_eq(made, 0, "the Food bytes were already in the view cache")
+	assert_eq(bytes.size(), _game.map.hex_count())

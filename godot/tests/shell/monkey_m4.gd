@@ -624,6 +624,13 @@ func _m4_assert_invariants(app: App, tag: String) -> void:
 			"%s: the Ducats chip shows the treasury" % tag)
 	_bump("m4_checks")
 	var legend := app.hud().mode_legend()
-	var expect := app.map_scene().mode() == int(MapModes.Mode.YIELDS) and not app.hides_world() and app.hud().is_hud_visible()
-	assert_eq(legend.visible, expect, "%s: the Yields legend shows exactly in Yields on the bare map" % tag)
+	var mode := app.map_scene().mode()
+	var has_legend := mode == int(MapModes.Mode.YIELDS) or mode == int(MapModes.Mode.FOOD)
+	var expect := has_legend and not app.hides_world() and app.hud().is_hud_visible()
+	assert_eq(legend.visible, expect, "%s: the legend shows exactly in Yields or Food on the bare map" % tag)
+	if expect:
+		assert_eq(legend.mode(), mode, "%s: the legend is the legend of the mode on the map" % tag)
+		var labels := legend.find_children("*", "Label", true, false)
+		if not labels.is_empty():
+			assert_eq((labels[0] as Label).text, MapModes.legend_title(mode), "%s: the legend's title is the mode's own" % tag)
 	_bump("legend_checks")

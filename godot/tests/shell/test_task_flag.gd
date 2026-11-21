@@ -226,6 +226,19 @@ func test_a_study_row_is_enabled_and_a_row_with_neither_is_not() -> void:
 	assert_false(_flag.choose_row(1), "and does nothing")
 
 
+func test_the_real_hunger_line_opens_the_people_page() -> void:
+	var c := Countries.by_tag(_g, &"GEN")
+	c.food_need = 9
+	c.food_fed = 999
+	var line := Reminders.hunger(_g, &"GEN")
+	assert_eq(line["action"], [&"study", &"people"])
+	_flag._lines = [line]
+	var asked: Array[StringName] = []
+	_flag.study_requested.connect(func(page: StringName) -> void: asked.append(page))
+	assert_true(_flag.choose_row(0))
+	assert_eq(asked, [&"people"], "the flag asks for the People page")
+
+
 func test_the_real_money_lines_carry_the_study_action() -> void:
 	# The treasury lines of Reminders open the study: a line built by the rules, not by hand.
 	var line := Reminders.treasury_empty(_g, &"GEN")

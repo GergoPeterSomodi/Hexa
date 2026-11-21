@@ -17,7 +17,7 @@ const SEASON_LABELS: Array[String] = ["Spring", "Summer", "Autumn", "Winter"]
 const LOOK_CALENDAR := -1
 ## The word for each weather kind (0 calm, 1 good, 2 poor) in the economy line.
 const WEATHER_WORDS: Array[String] = ["calm", "good", "poor"]
-const MODE_WORDS: Array[String] = ["Terrain", "Owner", "Relief", "Yields"]
+const MODE_WORDS: Array[String] = ["Terrain", "Owner", "Relief", "Yields", "Food"]
 const LAYER_SPECS: Array[Array] = [
 	[&"grid", "Grid"],
 	[&"shade", "Shade"],
@@ -50,6 +50,12 @@ var _save_ms: float = -1.0
 ## The App's answer to "what did the study last build": () -> {page, tab, ms, warm}; {} (or unset) before a first open.
 var study_info_func: Callable = Callable()
 var _study_label: Label = null
+## The M5 people line (spec 6.10) and what it counts: the levels changed in the last season played.
+var _people_label: Label = null
+var _grew_now: int = 0
+var _declined_now: int = 0
+var _grew_last: int = 0
+var _declined_last: int = 0
 var _hovered_hex: Vector2i = MapInput.NO_HEX
 
 
@@ -63,6 +69,17 @@ func _ready() -> void:
 	_study_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_m4_label.get_parent().add_child(_study_label)
 	_m4_label.get_parent().move_child(_study_label, _m4_label.get_index() + 1)
+
+	_people_label = Label.new()
+	_people_label.theme_type_variation = &"TableRow"
+	_people_label.text = "no game"
+	_people_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_m4_label.get_parent().add_child(_people_label)
+	_m4_label.get_parent().move_child(_people_label, _m4_label.get_index() + 1)
+	Events.town_grew.connect(_on_town_grew)
+	Events.district_declined.connect(_on_district_declined)
+	Events.season_ended.connect(_on_season_ended)
+	Events.game_started.connect(_on_game_started)
 
 	_season_seg.hud_mode = true
 	var season_items: Array[Dictionary] = [{"id": LOOK_CALENDAR, "label": "Calendar"}]
@@ -97,6 +114,35 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	_disconnect_settings()
+	for pair: Array in [[Events.town_grew, _on_town_grew], [Events.district_declined, _on_district_declined],
+			[Events.season_ended, _on_season_ended], [Events.game_started, _on_game_started]]:
+		if (pair[0] as Signal).is_connected(pair[1] as Callable):
+			(pair[0] as Signal).disconnect(pair[1] as Callable)
+
+
+func _on_town_grew(_tag: StringName, _hex: Vector2i, _level: int) -> void:
+	_grew_now += 1
+
+
+func _on_district_declined(_tag: StringName, _hex: Vector2i, _level: int, _why: StringName) -> void:
+	_declined_now += 1
+
+
+## The season's events came before this signal: what was counted is the last season's, and the count starts again.
+func _on_season_ended(_turn: int) -> void:
+	_grew_last = _grew_now
+	_declined_last = _declined_now
+	_grew_now = 0
+	_declined_now = 0
+	if visible:
+		refresh_metrics()
+
+
+func _on_game_started() -> void:
+	_grew_now = 0
+	_declined_now = 0
+	_grew_last = 0
+	_declined_last = 0
 
 
 func _process(delta: float) -> void:
@@ -225,6 +271,10 @@ func m4_text() -> String:
 	return _m4_label.text if is_node_ready() else ""
 
 
+func people_text() -> String:
+	return _people_label.text if is_node_ready() and _people_label != null else ""
+
+
 func study_text() -> String:
 	return _study_label.text if is_node_ready() and _study_label != null else ""
 
@@ -284,6 +334,25 @@ func refresh_metrics() -> void:
 	_m4_label.text = m4_line()
 	if _study_label != null:
 		_study_label.text = study_line()
+	if _people_label != null:
+		_people_label.text = people_line()
+
+
+## The people line (spec 6.10): "people 1.8 ms · grew 2 · declined 0 · hungry countries 1". The time is the people phase of
+## the last season played ("none yet" before one), the two counts are the levels changed in it, and the hungry countries
+## are those that went short of food (food_fed under 1,000). A sandbox has no people.
+func people_line() -> String:
+	var game := Session.game
+	if game == null:
+		return "no game"
+	if not game.has_countries():
+		return "no people in a map-only game"
+	var hungry := 0
+	for c: Country in game.countries:
+		if c != null and c.food_fed < 1000:
+			hungry += 1
+	var time_text := "%.1f ms" % float(Session.last_phase_ms["people"]) if Session.last_phase_ms.has("people") else "none yet"
+	return "people %s · grew %d · declined %d · hungry countries %d" % [time_text, _grew_last, _declined_last, hungry]
 
 
 ## The study's line (M4.5 spec 6.9): "study economy/districts built in 3.4 ms · warm queue 0". The page and the tab of the last

@@ -94,7 +94,7 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	_booted = true
 	if p_settings != null:
 		_settings_override = p_settings
-	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "4.5": the study and its tabs, Yields (key 4), the M4.5 options
+	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "5": the study and its four pages, Food (key 5), the M5 chips
 	_init_settings()
 	_apply_key_overrides()
 

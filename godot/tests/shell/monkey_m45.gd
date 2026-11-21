@@ -4,7 +4,7 @@
 ## the pointer over a chart's points, "Show on the map", and keys 4 and 1 with a hover on the map. Invariants (m4-5-build-spec.md
 ## sections 6 and 9): the digest, the version, the Snapshot bytes and the Stats are unchanged by every study, page, tab, sort,
 ## hover, legend and Yields action (only Begin, set_tax, the dev actions and a Space may change them: a season that ended inside
-## the step is counted and excuses the comparison); the legend shows exactly in Yields and the world is hidden exactly while the
+## the step is counted and excuses the comparison); the legend shows exactly in Yields or Food (MonkeyM4) and the world is hidden exactly while the
 ## study is up (MonkeyM4's per-step invariants); no orphan growth, no error. Split out of the monkey to keep it under the lint's
 ## 1,200 lines.
 class_name MonkeyM45
@@ -17,7 +17,7 @@ const M45_REQUIRED: Array[String] = [
 	"m45_opens", "m45_tab_clicks", "m45_nav_clicks", "m45_head_clicks", "m45_row_clicks", "m45_row_keys", "m45_timeline",
 	"m45_log_headers", "m45_chart_hovers", "m45_show_map", "m45_yields_keys", "m45_checks",
 ]
-const PAGE_IDS: Array[StringName] = [&"economy", &"rankings", &"history"]
+const PAGE_IDS: Array[StringName] = [&"economy", &"people", &"rankings", &"history"]
 ## The M4.5 actions are on (a country game with the M4.5 study).
 var _m45: bool = false
 
@@ -379,8 +379,8 @@ func _m45_log_header(rng: Rng, vp: SubViewport, app: App) -> void:
 func _m45_chart(rng: Rng, vp: SubViewport, app: App) -> void:
 	var before := _m45_snap()
 	var tab := rng.randi_range(2, 3)
-	var page_ids: Array[StringName] = [&"economy", &"rankings", &"history"]
-	var page := page_ids[rng.randi_range(0, 2)]
+	var page_ids: Array[StringName] = [&"economy", &"people", &"rankings", &"history"]
+	var page := page_ids[rng.randi_range(0, page_ids.size() - 1)]
 	var study := await _m45_goto(vp, app, page, tab)
 	if study == null:
 		return
@@ -424,7 +424,8 @@ func _m45_show_on_map(rng: Rng, vp: SubViewport, app: App) -> void:
 			if show:
 				_bump("m45_show_map")
 				assert_eq(app.map_scene().mode(), int(MapModes.Mode.YIELDS), "%s: Show on the map leaves the map in Yields" % _tag)
-				assert_true(app.hud().mode_legend().visible, "%s: and its legend shows" % _tag)
+				if app.hud().is_hud_visible():  # H hides the HUD, the legend with it
+					assert_true(app.hud().mode_legend().visible, "%s: and its legend shows" % _tag)
 			assert_false(app.stack().has_screen(&"study"), "%s: the study closes" % _tag)
 	_m45_untouched(before, "Show on the map")
 	if _m45_study_of(app) != null:

@@ -26,6 +26,8 @@
     "study_rankings_ms": {"limit": 3.0, "class": "cpu", "what": "M4.5: StudyRankings.of(game, tag, 40), cold"},
     "history_index_ms": {"limit": 6.0, "class": "cpu", "what": "M4.5: StudyHistory.index over the 3,000 chronicle entries, cold", "known_over": {"issue": 410, "note": "10.6 ms here (loaded machine), earlier probes about 6.7; the spec 10 fallback is an index kept across versions"}},
     "history_page_ms": {"limit": 3.0, "class": "cpu", "what": "M4.5: StudyHistory.timeline and chronicle(all, last, 120) with the index warm", "known_over": {"issue": 410, "note": "4.8 ms here (loaded machine), earlier probes about 6; limit 3"}},
-    "yield_bytes_ms": {"limit": 14.0, "class": "cpu", "what": "M4.5: MapModes.yield_bytes (worth_seasons cold, then 122,018 bytes)", "known_over": {"issue": 410, "note": "45 ms here (loaded machine), earlier probes about 78: worth_seasons cold is most of it"}}
+    "yield_bytes_ms": {"limit": 14.0, "class": "cpu", "what": "M4.5: MapModes.yield_bytes (worth_seasons cold, then 122,018 bytes)", "known_over": {"issue": 410, "note": "45 ms here (loaded machine), earlier probes about 78: worth_seasons cold is most of it"}},
+    "study_people_ms": {"limit": 6.0, "class": "cpu", "what": "M5: StudyPeople.of(game, tag, 40), uncached, Europe after 40 seasons, worst of 5", "known_over": {"issue": 415, "note": "85.8 ms on a noisy machine, 2026-11-21"}},
+    "food_bytes_ms": {"limit": 14.0, "class": "cpu", "what": "M5: MapModes.food_bytes (worth_seasons cold, then 122,018 bytes), worst of 5", "known_over": {"issue": 410, "note": "cold worth_seasons dominates, like yield_bytes_ms"}}
   }
 }

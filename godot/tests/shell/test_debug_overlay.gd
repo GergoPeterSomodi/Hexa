@@ -190,6 +190,30 @@ func test_the_m4_line_shows_the_phase_times_the_cached_districts_and_the_weather
 	assert_eq(_overlay.m4_text(), "no game")
 
 
+## M5 spec 6.10: "people 1.8 ms · grew 2 · declined 0 · hungry countries 1".
+func test_the_people_line_shows_the_phase_time_the_level_changes_and_the_hungry_countries() -> void:
+	assert_eq(_overlay.people_text(), "no game" if Session.game == null else _overlay.people_text())
+	Session.new_scenario("north_italy_1480", 5, &"GEN")
+	_overlay.set_open(true)
+	assert_eq(_overlay.people_text(), "people none yet · grew 0 · declined 0 · hungry countries 0")
+	Session.last_phase_ms = {"people": 1.84}
+	Events.town_grew.emit(&"GEN", Vector2i(1, 1), 3)
+	Events.town_grew.emit(&"GEN", Vector2i(2, 1), 3)
+	Events.district_declined.emit(&"GEN", Vector2i(3, 1), 2, &"hunger")
+	Events.season_ended.emit(1)
+	Session.game.countries[0].food_fed = 400
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.people_text(), "people 1.8 ms · grew 2 · declined 1 · hungry countries 1")
+	Events.season_ended.emit(2)
+	assert_eq(_overlay.people_text(), "people 1.8 ms · grew 0 · declined 0 · hungry countries 1", "the count starts again each season")
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.people_text(), "no people in a map-only game")
+	Session.game = null
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.people_text(), "no game")
+
+
 ## M4.5 spec 6.9: the study line names the page and tab last built, its time and the warm queue; before a first open it says so.
 func test_the_study_line_shows_the_last_page_built_and_the_warm_queue() -> void:
 	_overlay.set_open(true)
@@ -211,3 +235,5 @@ func test_the_study_line_shows_the_last_page_built_and_the_warm_queue() -> void:
 
 func test_the_f3_mode_word_names_yields() -> void:
 	assert_eq(DebugOverlay.MODE_WORDS[int(MapModes.Mode.YIELDS)], "Yields")
+	assert_eq(DebugOverlay.MODE_WORDS[int(MapModes.Mode.FOOD)], "Food", "F3 names the Food mode, not Yields")
+	assert_eq(DebugOverlay.MODE_WORDS.size(), MapModes.MODE_KEYS.size(), "a word for every mode")

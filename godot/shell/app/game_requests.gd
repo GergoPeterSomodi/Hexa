@@ -55,6 +55,8 @@ func setup() -> void:
 	warm.setup(_app.settings())
 	warm.yields_active = func() -> bool:
 		return _scene != null and is_instance_valid(_scene) and _scene.mode() == int(MapModes.Mode.YIELDS)
+	warm.food_active = func() -> bool:
+		return _scene != null and is_instance_valid(_scene) and _scene.mode() == int(MapModes.Mode.FOOD)
 	_app.add_child(warm)
 	_app.hud().debug_overlay().study_info_func = study_info
 	_app.context().season_running_func = func() -> bool: return flow.state() == SeasonFlow.State.RUNNING

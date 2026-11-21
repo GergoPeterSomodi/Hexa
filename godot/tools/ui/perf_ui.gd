@@ -20,6 +20,7 @@
 extends SceneTree
 
 const M45 := preload("res://tools/ui/perf_ui_m45.gd")
+const M5 := preload("res://tools/ui/perf_ui_m5.gd")
 const BUDGET := "res://tests/perf_ui_budget.json"
 const APP_SCENE_PATH := "res://shell/app/app.tscn"
 const SCREEN_IDS_PATH := "res://shell/screens/screen_ids.gd"
@@ -446,6 +447,7 @@ func _measure_m45(packed: PackedScene, headless: bool) -> void:
 	vp.add_child(app)
 	await _wait_frames(5)
 	await M45.new(self, _r).measure(app, vp, headless, _europe_seasons)
+	await M5.new(self, _r).measure(app, vp)  # M5 (perf_ui_m5.gd): the People page cold and key 5, on the same game
 
 	session.call("end_game")
 	root.remove_child(vp)
@@ -697,6 +699,10 @@ func _markdown(limit_rows: String, headless: bool) -> String:
 		"skipped" if bool(_r.get("study_open_europe_skipped", false)) else "%.2f ms" % float(_r.get("study_open_europe_ms", 0.0)),
 		float(_r.get("study_tab_switch_ms", 0.0)), float(_r.get("yields_mode_ms", 0.0)), float(_r.get("yields_update_ms", 0.0)),
 		float(_r.get("study_table_rows_ms", 0.0)), float(_r.get("timeline_draw_ms", 0.0)), float(_r.get("legend_show_ms", 0.0)),
+	]
+	s += "M5: People page cold %.2f ms [first build %.2f], Food key 5 %.2f ms.
+" % [
+		float(_r.get("people_page_open_ms", 0.0)), float(_r.get("people_page_first_build_ms", 0.0)), float(_r.get("food_mode_ms", 0.0)),
 	]
 	s += "Season fade: capture warm %.2f ms (cold %.2f), whole show_season with the next season preloaded %.2f ms.\n\n" % [
 		float(_r.get("season_fade_capture_ms", 0.0)), float(_r.get("season_fade_capture_cold_ms", 0.0)), float(_r.get("season_fade_total_ms", 0.0)),

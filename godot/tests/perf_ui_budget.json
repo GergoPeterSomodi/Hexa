@@ -1,5 +1,5 @@
 {
-  "comment": "UI performance and memory budgets (docs/architecture/ui-style-and-feedback-spec.md sections 4.10, 11; ui-and-controls-spec.md section 9; m3-build-spec.md section 8; m4-build-spec.md section 8; m4-5-build-spec.md section 8). Read by tools/ui/perf_ui.gd. Never read by a GUT test.",
+  "comment": "UI performance and memory budgets (docs/architecture/ui-style-and-feedback-spec.md sections 4.10, 11; ui-and-controls-spec.md section 9; m3-build-spec.md section 8; m4-build-spec.md section 8; m4-5-build-spec.md section 8; m5-build-spec.md section 8). Read by tools/ui/perf_ui.gd. Never read by a GUT test.",
   "screens": ["main_menu", "sandbox", "credits", "pause_menu", "options", "about", "help", "confirm", "loading"],
   "limits": {
     "screen_push_cpu_worst_ms": {"limit": 150.0, "class": "cpu", "what": "worst cold instantiate + ScreenStack.push time across M1.5 screens"},
@@ -13,7 +13,7 @@
     "log_open_ms": {"limit": 16.0, "class": "gpu", "what": "opening the action log with two seasons of lines, first drawn frame (M3)"},
     "works_card_push_ms": {"limit": 16.0, "class": "gpu", "what": "the works card's push (the call and one forced draw), warm, worst of 3, in a Genoa game at 1920x1080 (M4)"},
     "study_push_ms": {"limit": 16.0, "class": "gpu", "what": "the Statesman's Study's push (the call and one forced draw), warm, worst of 3, Economy page, 1920x1080 (M4)"},
-    "chips_refresh_ms": {"limit": 1.0, "class": "cpu", "what": "mean CPU time of Chips.refresh (both cards rebuilt) over 30 runs (M4)"},
+    "chips_refresh_ms": {"limit": 1.0, "class": "cpu", "what": "mean CPU time of Chips.refresh (the four chips and their cards rebuilt) over 30 runs (M4, M5)"},
     "marks_show_ms": {"limit": 2.0, "class": "cpu", "what": "mean CPU time of the map marks' show (the ghost, tint and labels of the vineyard card) over 30 runs (M4)"},
     "ribbons_16_frame_ms": {"limit": 1.0, "class": "cpu", "what": "mean CPU time a frame of Floaters.advance with 16 live ribbons (M3)"},
     "season_fade_capture_ms": {"limit": 50.0, "class": "gpu", "what": "the season fade's capture frame on the owner's Mac; enforced with --gpu-limits (M3)"},
@@ -25,6 +25,8 @@
     "study_table_rows_ms": {"limit": 4.0, "class": "cpu", "what": "StudyTable.set_rows with 100 rows of 7 columns, two custom-drawn, worst of 5 (M4.5)"},
     "timeline_draw_ms": {"limit": 2.0, "class": "cpu", "what": "TimelineStrip._draw with 680 seasons and 200 marks, worst of 5 (M4.5)"},
     "legend_show_ms": {"limit": 2.0, "class": "cpu", "what": "ModeLegend.show_mode for Yields, mean of 30 (M4.5)"},
+    "people_page_open_ms": {"limit": 16.0, "class": "gpu", "what": "the People page opened with the view cache cleared, north Italy after 40 seasons, the call and one forced draw, worst of 3 (M5)"},
+    "food_mode_ms": {"limit": 16.0, "class": "gpu", "what": "key 5 to the first Food frame, north Italy, the view cache cleared, worst of 3 (M5)"},
     "kit_1x_mb": {"limit": 4.0, "class": "mem", "what": "1x Studiolo UI kit RGBA8 memory in play (budget < 4 MB)"},
     "kit_2x_mb": {"limit": 16.0, "class": "mem", "what": "2x Studiolo UI kit RGBA8 memory in play (budget < 16 MB)"}
   }

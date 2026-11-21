@@ -38,6 +38,17 @@ countries on this map", and while you are still picking a country it asks you to
 the headers of older seasons in the action log open History at that season. The study warms its pages in the background
 after each season (`shell/app/study_warm.gd`), and F3 shows the page last built and the warm queue.
 
+**M5 People (the App is wired; the owner's playtest is next).** The land now has **people**. The top bar gains the **People**
+and **Food** chips beside Ducats and Stores (hover for the season's change and what was eaten; a click opens the study at its
+**People page**, which the study's `[` `]` and `I` reach too) and a fifth map mode: key `5` is **Food**, your land coloured by
+the food it makes less the food it eats a year, with a legend top left. In a map-only game `5` says "No countries on this
+map", and while you are picking a country it asks you to choose one first; the sandbox has no chips and no People page. The
+**People page** lists your towns with their room and outlook, the countryside, the food line and two charts, with Look there
+and Show on the map (which switches to Food). Towns grow a level when they are full and fed, and fall when they are not; the
+hex panel, the hover card, the report, the task flag and the log tell of it. The developer console takes `people c r N`
+(sets the people of a hex, for tests of growth and hunger), and F3 shows a people line (the phase time, the levels that grew
+and fell last season, the countries that went hungry).
+
 ## Engine
 
 - Godot **4.7.2-stable**, standard build (not .NET), Compatibility renderer, GDScript. Pinned here, in CI and in
@@ -216,11 +227,11 @@ check) and **Check** (the deep validation; its lines go to `facts` and the Outpu
   `user://settings.cfg` (`Settings`), with a 10 s `Confirm` revert for display/window/UI-scale changes.
 - **Default bindings** (`shell/input/bindings.gd`, `Bindings.DEFAULTS`):
   - **Camera:** `WASD` / arrows (pan; hold `Shift` for fast pan), `=` / `+` / `Kp+` (zoom in), `-` / `Kp-` (zoom out), `F` / `Home` (fit whole map).
-  - **Map & View:** left click (select hex), right click (clear selection), `1`–`4` (map modes Terrain / Owner / Relief / Yields; Owner and Yields are refused with a toast in a map-only game, and Yields while picking), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (the works card for the selected hex's upgrade, or its first build on wild land; with Confirm works Off, or Expensive only for a cheap work, it begins the work at once).
+  - **Map & View:** left click (select hex), right click (clear selection), `1`–`5` (map modes Terrain / Owner / Relief / Yields / Food; Owner, Yields and Food are refused with a toast in a map-only game, and Yields and Food while picking), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (the works card for the selected hex's upgrade, or its first build on wild land; with Confirm works Off, or Expensive only for a cheap work, it begins the work at once).
   - **The pick:** click a country's land or choose it in the list (`Up` / `Down`, `Enter` shows it, `Enter` again plays it), or `Play as` in its panel; `Esc` closes the panel, then asks for the pause menu (the pick cannot be skipped).
   - **Time & saves (M3):** `Space` / `Enter` (end the season; a second one inside 400 ms of the report closing is refused), `J` (the last season report), `F5` / `Ctrl+S` / `Cmd+S` (quicksave), `F9` / `Ctrl+L` / `Cmd+L` (quickload; asks first when actions are unsaved), `Ctrl+Z` / `Cmd+Z` (cancel the work begun last this season), `Ctrl+Shift+1..9` (set camera bookmark), `Ctrl+1..9` (go to it), `F2` (the developer console at the foot of F3, developer tools on).
   - **Economy (M4):** `I` (the Statesman's Study on its last page), `L` (the study's Economy page), `[` `]` (study pages: Economy, Rankings, History), `Ctrl+[` `Ctrl+]` (`Cmd` on a Mac: the tabs of the page, as Economy's four), `Enter` or `U` on a works card (begin the work), `Esc` (close the card or the study), `Shift` (keep a hovered card while the pointer is away).
-  - **Saves:** `user://saves/` holds `quick`, `1` to `8` and `auto1` to `auto3` (`.sav`, `.png`); the program writes `user://running.lock` while a game runs and asks to load the newest autosave when it finds one left behind. Continue on the main menu loads the newest save and falls back to older ones when its body is damaged. The shell's key milestone is `Bindings.SHELL_MILESTONE` (`"4.5"`); the Options screen shows the rows up to `Options.TARGET_MILESTONE` (4.5).
+  - **Saves:** `user://saves/` holds `quick`, `1` to `8` and `auto1` to `auto3` (`.sav`, `.png`); the program writes `user://running.lock` while a game runs and asks to load the newest autosave when it finds one left behind. Continue on the main menu loads the newest save and falls back to older ones when its body is damaged. The shell's key milestone is `Bindings.SHELL_MILESTONE` (`"5"`); the Options screen shows the rows up to `Options.TARGET_MILESTONE` (5).
   - **App & Dev:** `Esc` (Esc ladder: console field → popover → top screen → country panel or selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
 - **Pointer & trackpad gestures** (`shell/input/camera_rig.gd`):
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).
