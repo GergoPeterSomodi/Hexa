@@ -3,7 +3,9 @@ extends GutTest
 
 
 func test_phases_are_pinned() -> void:
-	assert_eq(Season.PHASES, [&"production", &"income", &"works", &"people", &"stats", &"calendar"] as Array[StringName])
+	# M6 (m6-build-spec.md 4.10, D39): the army phases run first and the refill and the vision in the new turn (R1).
+	assert_eq(Season.PHASES, [&"movement", &"supply", &"production", &"income", &"works", &"people", &"stats",
+		&"calendar", &"ready_units", &"vision"] as Array[StringName])
 
 
 func test_end_check_rows() -> void:

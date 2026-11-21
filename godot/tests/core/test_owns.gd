@@ -17,16 +17,20 @@ const ACTION_OWNERS := {
 	"set_tax": ["countries"],
 }
 const PHASE_OWNERS := {
+	&"movement": ["armies", "countries"],  # the walks; explored along them (Vision.see_path, 5.0 R4)
+	&"supply": ["armies", "stores", "people", "people_flows"],  # hunger through Armies, food through Stores, foraging through People
 	&"production": ["stores", "countries"],
-	&"income": ["purse"],
+	&"income": ["purse"],  # the upkeep_army line is Treasury's too (M6)
 	&"works": ["main_use", "level", "works", "next_work_id"],
 	&"people": ["people", "people_flows", "food", "main_use", "level"],
 	&"stats": ["stats", "purse", "stores", "people_close", "people_flows"],  # People.close zeroes the open flows
 	&"calendar": ["turn", "weather", "luck"],
+	&"ready_units": ["armies", "people", "people_flows"],  # the refill: People.levy, then Armies.add_men
+	&"vision": ["countries"],  # explored (the army part of the sight is no saved field)
 }
 const HOME := Vector2i(0, 2)
 const FIELDS: Array[String] = ["turn", "weather", "player", "main_use", "level", "owner", "works", "next_work_id",
-	"countries", "purse", "stores", "people", "people_flows", "people_close", "food", "stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id"]
+	"countries", "armies", "purse", "stores", "people", "people_flows", "people_close", "food", "stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id"]
 
 var _fx: Dictionary = {}
 
@@ -62,7 +66,7 @@ func _fields(game: Game) -> Dictionary:
 		"people": var_to_bytes(state["people"]), "people_flows": people_flows, "people_close": closes,
 		"turn": meta["turn"], "player": meta["player"], "main_use": state["main_use"], "level": state["level"],
 		"owner": state["owner"], "works": state["works"], "next_work_id": state["next_work_id"],
-		"countries": countries, "stats": body["stats"], "chronicle": body["chronicle"], "luck": body["luck"],
+		"countries": countries, "armies": body["armies"], "stats": body["stats"], "chronicle": body["chronicle"], "luck": body["luck"],
 		"action_log": body["action_log"], "seed": meta["seed"], "start_year": meta["start_year"],
 		"scenario_id": meta["scenario_id"], "map_id": meta["map_id"],
 	}

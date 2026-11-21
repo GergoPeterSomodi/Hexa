@@ -1,6 +1,7 @@
 ## The stats phase (docs/architecture/m3-build-spec.md 4.6, 5.3): the row of the season that is ending, for every
 ## country in id order (the pseudo-country "" in a map-only game), into the ring, and in Winter into the year rows. From
 ## M4 (m4-build-spec.md 4.20) it also writes the money and goods series, then closes the season's ledgers and flows.
+## M6 (m6-build-spec.md 4.16, 5.0 R8 d): the armies' men, raises, hunger and upkeep.
 class_name StatsSystem
 extends RefCounted
 
@@ -48,7 +49,9 @@ static func _write_goods(game: Game, stats: Stats) -> void:
 		var base := (c * Stats.RING + posmod(game.turn, Stats.RING)) * stats.goods * 3
 		for g: int in stats.goods:
 			stats.goods_ring[base + g * 3] = maxi(Stores.flow(country, g, &"made"), 0)
-			stats.goods_ring[base + g * 3 + 1] = -Stores.flow(country, g, &"used")
+			# Used by the towns, the armies' food and the raises (M6 R8 d; food_eaten stays the towns' alone).
+			stats.goods_ring[base + g * 3 + 1] = -(Stores.flow(country, g, &"used") + Stores.flow(country, g, &"army")
+				+ Stores.flow(country, g, &"raise"))
 			stats.goods_ring[base + g * 3 + 2] = country.stock[g] if g < country.stock.size() else 0
 
 
@@ -117,11 +120,36 @@ static func _rows(game: Game, stats: Stats) -> Array[PackedInt32Array]:
 			var c := stats.tags.find(str(entry.get("tag", "")))
 			if c >= 0:
 				rows[c][finished_col] += 1
+	_army_entries_into(game, stats, rows)
+	var army_men_col := Stats.column("army_men")
+	if by_owner:
+		for c: int in mini(game.countries.size(), rows.size()):
+			rows[c][army_men_col] = Armies.men_of_country(game, game.countries[c].tag)
 	if by_owner:
 		for c: int in mini(game.countries.size(), rows.size()):
 			_money_into(game, game.countries[c], rows[c])
 			_people_into(game.countries[c], rows[c])
 	return rows
+
+
+## The M6 series from this season's chronicle: men raised (army_raised.men) and men lost to hunger (army_starved.lost), which
+## is also the country's losses (battle losses join in M7). Only the chronicle's notable entries count (Chronicle.NOTABLE).
+static func _army_entries_into(game: Game, stats: Stats, rows: Array[PackedInt32Array]) -> void:
+	var raised_col := Stats.column("army_raised")
+	var starved_col := Stats.column("army_starved")
+	var losses_col := Stats.column("losses")
+	for entry: Dictionary in game.chronicle.of_turn(game.turn):
+		var kind := str(entry.get("kind", ""))
+		if kind != "army_raised" and kind != "army_starved":
+			continue
+		var c := stats.tags.find(str(entry.get("tag", "")))
+		if c < 0 or c >= rows.size():
+			continue
+		if kind == "army_raised":
+			rows[c][raised_col] += int(entry.get("men", 0))
+		else:
+			rows[c][starved_col] += int(entry.get("lost", 0))
+			rows[c][losses_col] += int(entry.get("lost", 0))
 
 
 ## The M5 series of one country from its open people flows: what grew, what starved and what left (as positive numbers),
@@ -152,7 +180,9 @@ static func _money_into(game: Game, country: Country, row: PackedInt32Array) -> 
 				row[Stats.column("upkeep_districts")] -= amount
 			&"upkeep_walls":
 				row[Stats.column("upkeep_walls")] -= amount
-			&"work", &"refund":
+			&"upkeep_army":
+				row[Stats.column("upkeep_army")] -= amount
+			&"work", &"refund", &"raise":
 				spent -= amount
 	row[Stats.column("spending")] = spent
 	if game.defs == null:

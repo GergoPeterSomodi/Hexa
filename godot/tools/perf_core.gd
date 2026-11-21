@@ -27,6 +27,7 @@ const MB := 1048576.0
 const RUNS := 20
 const SEASONS_45 := 40
 const RUNS_45 := 5
+const FIELDS := 20
 
 var _cpu_scale := 1.0
 var _out := ""
@@ -85,6 +86,7 @@ func _measure() -> int:
 	_r["work_check_ms"] = _work_check(game, largest)
 	if not _seasons(game):
 		return 1
+	_armies(game)
 
 	t = Time.get_ticks_usec()
 	var digest := game.digest()
@@ -298,6 +300,51 @@ func _seasons(game: Game) -> bool:
 	_r["stats_phase_ms"] = worst[&"stats"]
 	_r["stats_ms_per_country"] = float(worst[&"stats"]) / float(maxi(game.countries.size(), 1))
 	return true
+
+
+## The M6 rows (m6-build-spec.md 8): ten armies a country seeded through the door (PerfFixture.seed_armies), then SEASONS
+## seasons of every phase with the arrivals re-ordered between them (outside the timed phases). movement_ms, supply_ms and
+## vision_ms are the worst of each phase; cost_field_ms the worst of FIELDS cost fields over the whole map. The armies stay in
+## the game, so the digest, the save and the rows after this one carry them.
+func _armies(game: Game) -> void:
+	var luck := Rng.new()
+	luck.seed_with(SEED)
+	var armies := PerfFixture.seed_armies(game, luck)
+	_r["armies"] = armies.size()
+	var worst := {&"movement": 0.0, &"supply": 0.0, &"vision": 0.0}
+	for _n: int in SEASONS:
+		Season.begin(game)
+		for phase: StringName in Season.PHASES:
+			var t := Time.get_ticks_usec()
+			Season.run_phase(game, phase)
+			if worst.has(phase):
+				worst[phase] = maxf(float(worst[phase]), _ms(t))
+		Season.finish(game)
+		PerfFixture.rearm(game, luck, armies)
+	_r["movement_ms"] = worst[&"movement"]
+	_r["supply_ms"] = worst[&"supply"]
+	_r["vision_ms"] = worst[&"vision"]
+	_r["cost_field_ms"] = _cost_fields(game, luck)
+
+
+## PathSearch.cost_field over the whole map (every land hex allowed), worst of FIELDS goals: M8's march (m6 spec 8).
+func _cost_fields(game: Game, luck: Rng) -> float:
+	var map := game.map
+	var steps := StepCosts.of(map, game.defs)
+	var allowed := PackedByteArray()
+	allowed.resize(map.hex_count())
+	var land: Array[int] = []
+	for i: int in map.hex_count():
+		allowed[i] = map.land[i]
+		if map.land[i] == 1:
+			land.append(i)
+	var worst := 0.0
+	for _n: int in FIELDS:
+		var goal := land[luck.randi_range(0, land.size() - 1)]
+		var t := Time.get_ticks_usec()
+		PathSearch.cost_field(map, steps, allowed, map.hex_of(goal), false)
+		worst = maxf(worst, _ms(t))
+	return worst
 
 
 ## Writes the game to user://perf/, reads it back, restores it and checks the digest.

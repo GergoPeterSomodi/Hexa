@@ -305,6 +305,7 @@ static func raise(game: Game, args: Dictionary) -> Dictionary:
 	if army == null:
 		army = Armies.create(game, tag, hex, army_name(game, tag, hex))
 	var ids := Armies.add_units(game, army, kind, count, game.turn, hex, ud.cost, per_unit)
+	Sight.refresh(game)  # the army part of the sight (5.0 R4): a live game sees what a loaded one does
 	game.emit({"kind": "army_raised", "tag": tag, "hex": hex, "army": army.id, "units": Array(ids), "kind_id": kind,
 		"count": count, "men": count * ud.men, "ducats": int(cost["ducats"]), "goods": goods})
 	return {"ok": true, "reason": "", "army": army.id}
@@ -391,6 +392,7 @@ static func disband(game: Game, args: Dictionary) -> Dictionary:
 	Armies.remove_units(game, army, ids)
 	if army.units.is_empty():
 		Armies.remove(game, army)
+	Sight.refresh(game)
 	game.emit({"kind": "army_disbanded", "tag": tag, "hex": hex, "army": army_id, "units": Array(ids), "men": men,
 		"refund": refund})
 	return {"ok": true, "reason": "", "men": men}
@@ -505,6 +507,7 @@ static func split_army(game: Game, args: Dictionary) -> Dictionary:
 	var fresh := Armies.create(game, tag, army.hex, army_name(game, tag, army.hex))
 	Armies.move_units(game, army, fresh, ids)
 	Armies.set_order(game, fresh, Army.ORDER_HOLD, NO_HEX, PackedInt32Array())
+	Sight.refresh(game)  # a company's sight may have moved to the new army
 	_changed(game, army, false)
 	_changed(game, fresh, false)
 	return {"ok": true, "reason": "", "army": fresh.id}
@@ -542,6 +545,7 @@ static func merge_armies(game: Game, args: Dictionary) -> Dictionary:
 	Armies.move_units(game, army, into, ids)
 	_changed(game, army, true)
 	Armies.remove(game, army)
+	Sight.refresh(game)
 	_changed(game, into, false)
 	return {"ok": true, "reason": "", "army": into.id}
 

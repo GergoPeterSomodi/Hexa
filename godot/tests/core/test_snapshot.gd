@@ -2,7 +2,7 @@
 ## before the pick and a scenario after 12 seasons with works; every key of 4.10; the M2 5.9 fields; the planted faults.
 extends GutTest
 
-const KEYS: Array[String] = ["format", "game", "map_state", "countries", "stats", "chronicle", "luck", "action_log", "ui"]
+const KEYS: Array[String] = ["format", "game", "map_state", "countries", "armies", "stats", "chronicle", "luck", "action_log", "ui"]
 
 var _fx: Dictionary = {}
 
@@ -137,11 +137,18 @@ func test_p_wrong_format() -> void:
 
 func test_p_missing_pieces() -> void:
 	for key: String in KEYS:
-		if key == "format":
+		if key == "format" or key == "armies":
 			continue
 		var body := _body()
 		body.erase(key)
 		_refused(body, "Cannot be read", "no " + key)
+	# M6 (5.0 R11): a body without armies is an M5 save (country/3), which an older build made.
+	var m5 := _body()
+	m5.erase("armies")
+	_refused(m5, "Made by an older test build", "no armies (an M5 save)")
+	var bad := _body()
+	bad["armies"] = 3
+	_refused(bad, "Cannot be read", "armies not a dictionary")
 
 
 func test_p_wrong_map_size() -> void:

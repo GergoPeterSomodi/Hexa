@@ -44,7 +44,8 @@ func _prices() -> PackedInt32Array:
 
 
 func _needs(food: int, wine: int, salt: int, oil: int) -> Dictionary:
-	return {"food": food, "wine": wine, "salt": salt, "oil": oil}
+	# M6 (5.0 R8 a): needs_of carries army_food too; no army here, so 0.
+	return {"food": food, "wine": wine, "salt": salt, "oil": oil, "army_food": 0}
 
 
 func test_people_needs_and_reserve_of_genoa() -> void:

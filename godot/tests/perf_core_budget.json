@@ -28,6 +28,10 @@
     "history_page_ms": {"limit": 3.0, "class": "cpu", "what": "M4.5: StudyHistory.timeline and chronicle(all, last, 120) with the index warm", "known_over": {"issue": 410, "note": "4.8 ms here (loaded machine), earlier probes about 6; limit 3"}},
     "yield_bytes_ms": {"limit": 14.0, "class": "cpu", "what": "M4.5: MapModes.yield_bytes (worth_seasons cold, then 122,018 bytes)", "known_over": {"issue": 410, "note": "45 ms here (loaded machine), earlier probes about 78: worth_seasons cold is most of it"}},
     "study_people_ms": {"limit": 6.0, "class": "cpu", "what": "M5: StudyPeople.of(game, tag, 40), uncached, Europe after 40 seasons, worst of 5", "known_over": {"issue": 415, "note": "85.8 ms on a noisy machine, 2026-11-21"}},
-    "food_bytes_ms": {"limit": 14.0, "class": "cpu", "what": "M5: MapModes.food_bytes (worth_seasons cold, then 122,018 bytes), worst of 5", "known_over": {"issue": 410, "note": "cold worth_seasons dominates, like yield_bytes_ms"}}
+    "food_bytes_ms": {"limit": 14.0, "class": "cpu", "what": "M5: MapModes.food_bytes (worth_seasons cold, then 122,018 bytes), worst of 5", "known_over": {"issue": 410, "note": "cold worth_seasons dominates, like yield_bytes_ms"}},
+    "movement_ms": {"limit": 25.0, "class": "cpu", "what": "M6: the movement phase, 600 marching armies, worst of 8 seasons (m6-build-spec.md 8)", "known_over": {"issue": 418, "note": "66 ms on the made-up Europe against 25; 104 ms measured on a loaded machine with 600 armies (perf_core, L8 review)"}},
+    "supply_ms": {"limit": 40.0, "class": "cpu", "what": "M6: the supply phase, warm SupplyCache, worst of 8 seasons (m6-build-spec.md 8)", "known_over": {"issue": 420, "note": "88 ms measured on a loaded machine with 600 armies (perf_core, L8 review): cold fields built on first use"}},
+    "vision_ms": {"limit": 20.0, "class": "cpu", "what": "M6: the vision phase (Sight.season), worst of 8 seasons (m6-build-spec.md 8)", "known_over": {"issue": 422, "note": "30 ms measured on a loaded machine with 600 armies (perf_core, L8 review)"}},
+    "cost_field_ms": {"limit": 120.0, "class": "cpu", "what": "M6: PathSearch.cost_field over the whole map, worst of 20 goals (M8's march; m6-build-spec.md 8)", "known_over": {"issue": 419, "note": "211 ms on the made-up Europe against 120; 408 ms measured on a loaded machine (perf_core, L8 review)"}}
   }
 }

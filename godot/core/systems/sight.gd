@@ -187,9 +187,12 @@ static func _mark(game: Game, c: Country, indices: PackedInt32Array, radius: int
 	c.explored = bits
 
 
-## ORs country `c`'s land sight (its cached bitset) into its explored set. A set that grew drops its known set.
+## ORs country `c`'s land sight (its cached bitset) into its explored set, when that land sight was made since it was last
+## ORed (SightCache.take_fresh: a land that did not change needs no sweep of its bytes). A set that grew drops its known set.
 static func _or_land(game: Game, c: Country) -> void:
 	var land: PackedByteArray = game.sight.land_of(game, c.id)
+	if not game.sight.take_fresh(c.id):
+		return
 	var bits := _bits_of(game, c)
 	var grew := false
 	for k: int in land.size():

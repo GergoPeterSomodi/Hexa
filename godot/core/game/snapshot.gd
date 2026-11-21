@@ -12,11 +12,13 @@ const PROBLEM_OLDER := "Made by an older test build"
 const MAX_TURN := 100000
 
 
-## The body of 4.10: `ui` is the shell's block (bookmarks, camera, map mode, look), kept as given.
+## The body of 4.10: `ui` is the shell's block (bookmarks, camera, map mode, look), kept as given. M6: `armies` (5.0 R11).
 static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 	var countries: Array = []
 	for c: Country in game.countries:
 		countries.append(c.to_dict())
+	# Called by reference (A14): Armies is a system, and Game and Snapshot must not need it to parse.
+	var armies: Dictionary = Armies.to_dict.call(game)
 	var log: Array = []
 	for record: Dictionary in game.action_log:
 		log.append(record.duplicate(true))
@@ -34,6 +36,7 @@ static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 		},
 		"map_state": game.state.to_dict(),
 		"countries": countries,
+		"armies": armies,
 		"stats": game.stats.to_dict() if game.stats != null else {},
 		"chronicle": game.chronicle.to_dict(),
 		"luck": game.luck.to_dict() if game.luck != null else {},
@@ -84,6 +87,11 @@ static func _format_problem(body: Dictionary) -> String:
 		if not (body.get(key) is Dictionary):
 			return PROBLEM_UNREADABLE
 	if not (body.get("countries") is Array) or not (body.get("action_log") is Array):
+		return PROBLEM_UNREADABLE
+	# A body without `armies` is an M5 save (country/3, 5.0 R11): an older build's.
+	if not body.has("armies"):
+		return PROBLEM_OLDER
+	if not (body.get("armies") is Dictionary):
 		return PROBLEM_UNREADABLE
 	return ""
 
@@ -180,6 +188,10 @@ static func _build(body: Dictionary, meta: Dictionary, map: MapData, defs: GameD
 	game.stats = stats
 	game.countries.assign(countries as Array)
 	game.action_log.assign(log as Array)
+	# The armies after the countries (their tags are checked against them); a refused body changes nothing (5.0 R11).
+	if str(Armies.from_dict.call(body["armies"] as Dictionary, game)) != "":
+		return {"problem": "body"}
+	Sight.refresh.call(game)  # the army part of the sight; explored is never written on a load (5.0 R4)
 	return {"game": game}
 
 

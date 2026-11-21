@@ -15,6 +15,8 @@ var watchers: Dictionary = {}
 ## Viewer id -> PackedByteArray(256): 1 for each country the viewer has explored land of.
 var _known: Dictionary = {}
 var _revision := 0
+## Tag id -> true while a land sight made by land_of has not been ORed into explored yet (take_fresh reads and clears it).
+var _fresh: Dictionary = {}
 ## Offsets of a disc by radius and row parity, made once (a derived table, never saved).
 static var _tables: Dictionary = {}
 
@@ -38,7 +40,17 @@ func land_of(game: Game, tag_id: int) -> PackedByteArray:
 		for j: int in disc(game.map, i, radius):
 			bits[j >> 3] = bits[j >> 3] | (1 << (j & 7))
 	_land[tag_id] = bits
+	_fresh[tag_id] = true
 	return bits
+
+
+## True once for each land sight made since its last take: the vision phase ORs only those into explored (5.0 R4). A land
+## that did not change was ORed when it was made, so its bits are never ORed again; a loaded game has none made yet, so
+## its first vision phase ORs every country's land (explored holds the land sight of every save).
+func take_fresh(tag_id: int) -> bool:
+	var was: bool = _fresh.get(tag_id, false)
+	_fresh.erase(tag_id)
+	return was
 
 
 ## The army part of country `tag_id`: a bitset, or an empty array when no army of it stands anywhere.
@@ -68,6 +80,7 @@ func forget_known(viewer_id: int) -> void:
 ## Drops everything (a new game or a replaced state).
 func clear() -> void:
 	_land.clear()
+	_fresh.clear()
 	_armies.clear()
 	watchers.clear()
 	_known.clear()

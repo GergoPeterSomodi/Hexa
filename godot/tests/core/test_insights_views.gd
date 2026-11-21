@@ -283,14 +283,16 @@ func test_the_yield_bytes_are_one_byte_a_hex_and_the_same_each_call() -> void:
 # ---- the pins of 4.13 --------------------------------------------------------------------------------------------------------
 
 func test_the_pins_of_4_13() -> void:
-	assert_eq(Season.PHASES, [&"production", &"income", &"works", &"people", &"stats", &"calendar"] as Array[StringName])
-	assert_eq(Actions.NAMES, ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise", "split_army", "merge_armies", "disband"] as Array[String])
+	# M6 (m6-build-spec.md 4.10, D39): the army phases, and the refill and vision in the new turn.
+	assert_eq(Season.PHASES, [&"movement", &"supply", &"production", &"income", &"works", &"people", &"stats", &"calendar", &"ready_units", &"vision"] as Array[StringName])
+	assert_eq(Actions.NAMES, ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march"] as Array[String])
 	assert_eq(SaveFile.FORMAT, 4)
 	assert_eq(SaveFile.OLDEST_FORMAT, 4)
 	assert_eq(Stats.SERIES.size(), 42)
 	assert_eq(Chronicle.NOTABLE, ["work_started", "work_finished", "work_cancelled", "owners_changed", "country_chosen",
-		"goods_short", "tax_set", "town_grew", "district_declined"] as Array[String])
-	assert_eq(Chronicle.NOTABLE.size(), 9, "nine notable kinds")
+		"goods_short", "tax_set", "town_grew", "district_declined", "army_raised", "army_disbanded", "march_halted",
+		"army_starved", "unit_lost"] as Array[String])
+	assert_eq(Chronicle.NOTABLE.size(), 14, "fourteen notable kinds (M6 adds five)")
 	assert_eq(Chronicle.KEEP, 3000)
 	assert_eq(Stats.RING, 40)
 	assert_eq([Stats.MADE, Stats.USED, Stats.STOCK], [0, 1, 2])
@@ -312,7 +314,7 @@ func test_the_save_body_and_the_digest_are_unchanged() -> void:
 	var body := Snapshot.of(g, {})
 	var keys: Array = body.keys()
 	keys.sort()
-	assert_eq(keys, ["action_log", "chronicle", "countries", "format", "game", "luck", "map_state", "stats", "ui"])
+	assert_eq(keys, ["action_log", "armies", "chronicle", "countries", "format", "game", "luck", "map_state", "stats", "ui"])
 	var with_ui := Snapshot.of(g, {"map_mode": "yields"})
 	assert_eq(str((with_ui["ui"] as Dictionary)["map_mode"]), "yields", "the ui block may hold the yields mode")
 	var restored := Snapshot.restore(bytes_to_var(var_to_bytes(with_ui)) as Dictionary, g.map, g.defs)

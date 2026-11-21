@@ -6,7 +6,8 @@ extends RefCounted
 const SCHEMA := "hexa-godot/chronicle/1"
 const KEEP := 3000
 const NOTABLE: Array[String] = ["work_started", "work_finished", "work_cancelled", "owners_changed", "country_chosen",
-	"goods_short", "tax_set", "town_grew", "district_declined"]
+	"goods_short", "tax_set", "town_grew", "district_declined", "army_raised", "army_disbanded", "march_halted",
+	"army_starved", "unit_lost"]
 
 var entries: Array[Dictionary] = []
 

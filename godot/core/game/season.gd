@@ -1,10 +1,13 @@
 ## The season table (docs/architecture/m3-build-spec.md 4.2, 5.4): what happens, in order, when a season ends.
-## M5's phases: production, income, works, people, stats, calendar (m5-build-spec.md 4.8). A milestone adds its rows
-## where the spec's table puts them.
+## M6's phases (m6-build-spec.md 4.10, D39): movement, supply, production, income, works, people, stats, calendar, then
+## ready_units and vision in the new turn (5.0 R1). A milestone adds its rows where the spec's table puts them.
+## The armies' systems are called by reference (A14): a typed call from core/game into a system would make the two
+## scripts need each other to parse.
 class_name Season
 extends RefCounted
 
-const PHASES: Array[StringName] = [&"production", &"income", &"works", &"people", &"stats", &"calendar"]
+const PHASES: Array[StringName] = [&"movement", &"supply", &"production", &"income", &"works", &"people", &"stats",
+	&"calendar", &"ready_units", &"vision"]
 
 
 ## {ok, reason}: may the season end now?
@@ -21,6 +24,10 @@ static func begin(game: Game) -> void:
 
 static func run_phase(game: Game, phase: StringName) -> void:
 	match phase:
+		&"movement":
+			MovementPhase.season.call(game)
+		&"supply":
+			Supply.season.call(game)
 		&"production":
 			EconomySeason.production(game)
 		&"income":
@@ -33,6 +40,10 @@ static func run_phase(game: Game, phase: StringName) -> void:
 			StatsSystem.season(game)
 		&"calendar":
 			Calendar.season(game)
+		&"ready_units":
+			Military.refill.call(game)
+		&"vision":
+			Sight.season.call(game)
 
 
 static func finish(game: Game) -> void:

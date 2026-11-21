@@ -62,10 +62,15 @@ func test_money_events_are_stored_plain() -> void:
 	assert_eq(c.of_turn(2)[1]["level"], 2)
 
 
-func test_notable_holds_the_people_kinds_nine_in_all() -> void:
+func test_notable_holds_the_people_kinds_and_the_five_army_kinds() -> void:
 	assert_true(Chronicle.NOTABLE.has("town_grew"))
 	assert_true(Chronicle.NOTABLE.has("district_declined"))
-	assert_eq(Chronicle.NOTABLE.size(), 9)
+	# M6 (m6-build-spec.md 4.11, D38): the five notable army kinds; army_changed and unit_moved are not notable.
+	for kind: String in ["army_raised", "army_disbanded", "march_halted", "army_starved", "unit_lost"]:
+		assert_true(Chronicle.NOTABLE.has(kind), kind)
+	assert_false(Chronicle.NOTABLE.has("army_changed"))
+	assert_false(Chronicle.NOTABLE.has("unit_moved"))
+	assert_eq(Chronicle.NOTABLE.size(), 14)
 
 
 func test_people_events_are_stored_plain() -> void:

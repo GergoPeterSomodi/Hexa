@@ -206,7 +206,7 @@ func act(action: String, args: Dictionary) -> Dictionary:
 
 
 ## SHA-256 (hex text) of the game: map id, seed, scenario id, player, start year, turn, state digest, each country's
-## digest_text, stats (R5), chronicle and luck; the weather (as "s,f,m") follows the turn.
+## digest_text, the armies (M6), stats (R5), chronicle and luck; the weather (as "s,f,m") follows the turn.
 func digest() -> String:
 	var map_id := map.id if map != null else ""
 	var scen_id := scenario.id if scenario != null else ""
@@ -215,6 +215,8 @@ func digest() -> String:
 		"%d,%d,%d" % [weather[0], weather[1], weather[2]], state_digest]
 	for c: Country in countries:
 		parts.append(c.digest_text() if c != null else "")
+	# Called by reference (A14): the armies' digest is "next_army|next_unit" and one line per army (4.17).
+	parts.append(str(Armies.digest.call(self)))
 	parts.append(stats.digest() if stats != null else "")
 	parts.append(chronicle.digest())
 	parts.append(luck.digest_text() if luck != null else "")

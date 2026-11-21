@@ -22,6 +22,18 @@ const MONEY_TOP_UP := 100000
 const GOODS_FLOOR := 60
 const GOODS_TOP_UP := 120
 const GENOA := &"GEN"
+## The armies of the speed rigs (m6-build-spec.md 8, 5.0 R10): as tools/probes/probe_movement.gd.
+const ARMIES_PER_COUNTRY := 10
+const MAX_COMPANIES := 8
+const NEAR := 6
+const SEASONS_MAX := 4
+const ORDER_TRIES := 60
+## The movement numbers copied from the committed definitions (the made-up Europe's own come from FakeScenario).
+const MOVEMENT_FIELDS: Array[String] = ["units", "terrains", "relief_move_add", "highway_cap", "road_cap", "track_divisor",
+	"winter_snow_percent", "pass_closing_climate", "stream_cost", "river_cost", "ford_cost", "ferry_cost",
+	"river_wade_class", "river_wall_class", "wade_plan_cost", "supply_reach", "supply_wade_cost", "depot_min_level",
+	"army_food_milli", "forage_percent", "forage_loss_permille", "starve_permille", "stack_limit", "march_seasons_max",
+	"wait_ratio_percent", "wait_extra_seasons", "land_sight"]
 
 
 ## The made-up Europe, `seasons` seasons played. Null when the committed definitions cannot be read.
@@ -98,3 +110,56 @@ static func _begin_works(game: Game, tag: StringName, luck: Rng) -> void:
 			continue
 		var pick := options[luck.randi_range(0, options.size() - 1)]
 		game.act("build", {"hex": hex, "family": int(pick["family_id"]), "tag": tag})
+
+
+## The armies of the speed rigs (m6-build-spec.md 8, 5.0 R10): ARMIES_PER_COUNTRY a country of 1 to MAX_COMPANIES pikemen on
+## random land of its own, through Armies.create and Armies.add_units with raised_turn = turn - 1 (none musters): the rig, not
+## raise. The movement numbers are copied from the committed definitions first (as probe_movement does), then each army is
+## ordered out. Returns the armies in id order.
+static func seed_armies(game: Game, luck: Rng) -> Array[Army]:
+	var real := ResourceLoader.load(GAME_DEFS, "", ResourceLoader.CACHE_MODE_IGNORE) as GameDefs
+	var out: Array[Army] = []
+	if real == null:
+		printerr("PerfFixture: cannot load %s" % GAME_DEFS)
+		return out
+	for field: String in MOVEMENT_FIELDS:
+		game.defs.set(field, real.get(field))
+	for c: Country in game.countries:
+		var land := Territory.districts(game, c.id)
+		if land.is_empty() or not c.alive:
+			continue
+		for _k: int in ARMIES_PER_COUNTRY:
+			var hex := game.map.hex_of(land[luck.randi_range(0, land.size() - 1)])
+			var a := Armies.create(game, c.tag, hex, "Army of perf")
+			Armies.add_units(game, a, 0, luck.randi_range(1, MAX_COMPANIES), game.turn - 1, hex, 0, {})
+			out.append(a)
+	for a: Army in out:
+		march_out(game, a, luck)
+	return out
+
+
+## Between seasons: an army that arrived (it holds) is given a new march (the rig, outside the timed phases).
+static func rearm(game: Game, luck: Rng, armies: Array[Army]) -> void:
+	for a: Army in armies:
+		if a.order == Army.ORDER_HOLD and Armies.by_id(game, a.id) != null:
+			march_out(game, a, luck)
+
+
+## A march (Game.act "march") to a hex of the army's own land near it, kept when its plan walks in 1 to SEASONS_MAX seasons.
+static func march_out(game: Game, a: Army, luck: Rng) -> bool:
+	var country := Countries.by_tag(game, a.tag)
+	var land := Territory.districts(game, country.id) if country != null else PackedInt32Array()
+	if land.is_empty():
+		return false
+	for _k: int in ORDER_TRIES:
+		var goal := game.map.hex_of(land[luck.randi_range(0, land.size() - 1)])
+		if ImproveRules.hex_distance(goal, a.hex) > NEAR or goal == a.hex:
+			continue
+		var res := Movement.plan(game, a, goal)
+		if not bool(res["ok"]):
+			continue
+		var walk := Movement.walk_plan(game, a, res["hexes"], game.turn)
+		if int(walk["seasons"]) < 1 or int(walk["seasons"]) > SEASONS_MAX:
+			continue
+		return bool(game.act("march", {"army": a.id, "goal": goal, "tag": a.tag})["ok"])
+	return false

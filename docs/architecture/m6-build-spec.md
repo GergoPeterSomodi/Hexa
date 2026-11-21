@@ -1657,6 +1657,8 @@ walk by id, hexes by index). **Save round trip:** `test_snapshot`, `test_save_fi
 | The replay of 600 AI walks (M8) is unreadable | M8's busy pill and its own replay rules | `game/movement` Instant |
 | Tokens over the overlay hide the map's colour under them | the pictures of section 9 | a token at 85 % alpha in a map mode (a constant) |
 | Saves grow with routes and explored bitsets | `save_mb` nightly | routes rebuilt on load (a re-plan) |
+| Cold supply fields on Europe with armies: about 2.3 s on the first season with armies (the field of every country from cold, each a multi-source search over its land) | the perf rig's first army season (review of L8; issue to be filed) | the fields only for countries with armies, and a field keyed on the owner bytes kept across seasons |
+| Stats army series read this season's chronicle (`army_raised`, `army_starved`) and fall short when the chronicle trims its 3,000 entries inside one season (review of L8; issue to be filed) | a season with 3,100 later notable events after a raise (the review's repro) | the armies' counts kept on the stats row at the event, not read back from the chronicle |
 
 ---
 

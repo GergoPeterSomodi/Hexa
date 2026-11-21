@@ -66,10 +66,12 @@ static func in_supply(game: Game, tag: StringName, hex: Vector2i, winter: bool) 
 static func army_food(game: Game, tag: StringName) -> int:
 	if not _usable(game):
 		return 0
-	var winter := Calendar.is_winter(game.turn)
+	# One field for the country (not one per army: each lookup hashes the owner, main_use and level bytes).
+	var f := field(game, tag, Calendar.is_winter(game.turn))
 	var men := 0
 	for a: Army in Armies.of_country(game, tag):
-		if in_supply(game, tag, a.hex, winter):
+		var i := game.map.index_of(a.hex)
+		if i >= 0 and i < f.size() and f[i] == 1:
 			men += a.men()
 	return food_need(game, men)
 

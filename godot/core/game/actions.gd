@@ -2,13 +2,14 @@
 ## name -> [check, do]. Each is a static function of (game, args) returning {ok, reason}; `do` checks again and then
 ## acts. The UI and the AI change the game only through Game.act, which looks the pair up here.
 ##   build {hex, family, tag}   upgrade {hex, tag}   clear {hex, tag}   cancel_work {hex, tag}   choose_country {tag}
-##   set_tax {level, tag}
+##   set_tax {level, tag}   raise, split_army, merge_armies, disband (Military)
+##   march {army, goal}   halt {army}   continue_march {army}   (Movement)
 ## build, upgrade and clear begin a work (Works); the works phase puts the piece.
 class_name Actions
 extends RefCounted
 
 const NAMES: Array[String] = ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise",
-	"split_army", "merge_armies", "disband"]
+	"split_army", "merge_armies", "disband", "march", "halt", "continue_march"]
 
 static var _test_pairs: Dictionary[String, Array] = {}
 
@@ -36,6 +37,12 @@ static func pair_of(action: String) -> Array[Callable]:
 			return [Military.merge_check, Military.merge_armies]
 		"disband":
 			return [Military.disband_check, Military.disband]
+		"march":
+			return [Movement.march_check, Movement.march]
+		"halt":
+			return [Movement.halt_check, Movement.halt]
+		"continue_march":
+			return [Movement.continue_check, Movement.continue_march]
 	if _test_pairs.has(action):
 		var raw: Array = _test_pairs[action]
 		var typed: Array[Callable] = [raw[0] as Callable, raw[1] as Callable]

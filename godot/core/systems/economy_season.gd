@@ -23,15 +23,16 @@ static func country_people(game: Game, view: StateView, tag: StringName) -> int:
 	return _people(game, view, tag, false)
 
 
-## The loads a season the towns need: {food, wine, salt, oil} (String keys); ceil(town people x need_milli / 1,000,000).
+## The loads a season the towns need: {food, wine, salt, oil} (String keys); ceil(town people x need_milli / 1,000,000),
+## and army_food, the loads the country's armies in supply eat this season (5.0 R8 a, b).
 static func needs_of(game: Game, view: StateView, tag: StringName) -> Dictionary:
-	return needs_for(game, town_people(game, view, tag))
+	return needs_for(game, town_people(game, view, tag), Supply.army_food(game, tag))
 
 
-## needs_of from the town people already counted.
-static func needs_for(game: Game, town: int) -> Dictionary:
+## needs_of from the town people already counted (and the armies' food, 0 when none).
+static func needs_for(game: Game, town: int, army_food: int = 0) -> Dictionary:
 	var defs := game.defs
-	var out: Dictionary = {"food": need_loads(town, defs.food_need_milli)}
+	var out: Dictionary = {"food": need_loads(town, defs.food_need_milli), "army_food": army_food}
 	for g: GoodDef in defs.goods:
 		if g.kind == &"staple":
 			out[String(g.key)] = need_loads(town, g.need_milli)
@@ -52,15 +53,17 @@ static func reserve_of(game: Game, view: StateView, tag: StringName) -> PackedIn
 	return reserve_for(game, needs_of(game, view, tag))
 
 
-## reserve_of from needs already worked out (needs_of's result).
+## reserve_of from needs already worked out (needs_of's result). Grain keeps the towns' food and the armies' (a missing
+## army_food is 0).
 static func reserve_for(game: Game, needs: Dictionary) -> PackedInt32Array:
 	var defs := game.defs
 	var out := PackedInt32Array()
 	out.resize(defs.goods.size())
+	var army_food := int(needs.get("army_food", 0))
 	for i: int in out.size():
 		var g := defs.goods[i]
 		if g.kind == &"food":
-			out[i] = defs.reserve_seasons * int(needs["food"]) if g.key == &"grain" else 0
+			out[i] = defs.reserve_seasons * (int(needs["food"]) + army_food) if g.key == &"grain" else 0
 		elif g.kind == &"staple":
 			out[i] = defs.reserve_seasons * int(needs[String(g.key)])
 		else:
@@ -204,9 +207,10 @@ static func factor_of(game: Game, content: int) -> int:
 
 
 ## The income phase's lines (4.9), in order: tax_people, tax_goods, port_dues (each port), upkeep_districts, upkeep_walls
-## (each walled hex); [{why, hex, amount, count}], a zero line left out. `made_info` is made_of's result.
+## (each walled hex), upkeep_army (M6: one line for the armies, count = armies, 5.0 R8 c); [{why, hex, amount, count}], a
+## zero line left out. `made_info` is made_of's result.
 static func money_lines(game: Game, view: StateView, tag: StringName, tax: int, content: int, sales_milli: int, made_info: Dictionary,
-		town_known: int = -1, rest_known: int = -1) -> Array[Dictionary]:
+		town_known: int = -1, rest_known: int = -1, army_upkeep: int = 0, army_count: int = 0) -> Array[Dictionary]:
 	var defs := game.defs
 	var t := clampi(tax, 0, 2)
 	var lines: Array[Dictionary] = []
@@ -221,6 +225,7 @@ static func money_lines(game: Game, view: StateView, tag: StringName, tax: int, 
 	_add_line(lines, &"upkeep_districts", Treasury.NO_HEX, -int(made_info.get("upkeep", 0)), int(made_info.get("upkeep_count", 0)))
 	for wall: Dictionary in made_info.get("walls", []):
 		_add_line(lines, &"upkeep_walls", wall["hex"], -int(wall["amount"]), 1)
+	_add_line(lines, &"upkeep_army", Treasury.NO_HEX, -army_upkeep, army_count)
 	return lines
 
 
@@ -239,7 +244,7 @@ static func production(game: Game) -> void:
 		var profile := SeasonProfile.of(game, held, c.id)
 		var live := SeasonProfile.live(game, held, c.id)
 		var made_info := SeasonProfile.made(game, profile, live, season, game.weather, c.tax)
-		var needs := needs_for(game, int(live["town"]))
+		var needs := needs_for(game, int(live["town"]), Supply.army_food(game, c.tag))
 		var prices := Economy.market_prices(game, view, Economy.market_of(game, c.tag), c.stock)
 		var step := goods_step(game, needs, reserve_for(game, needs), c.stock, made_info["made"], prices)
 		var made: PackedInt32Array = made_info["made"]
@@ -281,7 +286,7 @@ static func income(game: Game) -> void:
 		var needs := needs_for(game, int(live["town"]))
 		var made_info := SeasonProfile.made(game, profile, live, season, game.weather, c.tax)
 		var lines := money_lines(game, view, c.tag, c.tax, content_of(game, needs, used), sold_milli, made_info,
-			int(live["town"]), int(live["rest"]))
+			int(live["town"]), int(live["rest"]), Military.upkeep_country(game, c.tag), Armies.of_country(game, c.tag).size())
 		for line: Dictionary in lines:
 			Treasury.move(game, c.tag, int(line["amount"]), line["why"], line["hex"], int(line["count"]))
 
