@@ -14,7 +14,17 @@ const PEOPLE_FIELDS: Array[String] = ["people", "people_start", "people_end", "p
 const PEOPLE_ALLOWED: Array[String] = ["res://core/systems/people.gd", "res://core/state/map_state.gd",
 		"res://core/state/country.gd"]
 const MUTATORS := "append|append_array|push_back|push_front|insert|set|fill|resize|clear|erase|remove_at|sort|assign"
+## M6 (L4): the armies' door. game.armies, next_army_id and next_unit_id are written only by armies.gd (and game.gd's
+## declarations and the snapshot's restore, which assign the whole list through Armies.from_dict); the unit and army fields
+## are written only by the state classes and armies.gd.
+const ARMY_FIELDS: Array[String] = ["armies", "next_army_id", "next_unit_id", "moved_from", "lost_last", "halt_why",
+		"halt_text", "raised_turn", "created_turn"]
+const ARMY_ALLOWED: Array[String] = ["res://core/systems/armies.gd", "res://core/state/army.gd", "res://core/state/unit.gd"]
 const ROOTS: Array[String] = ["res://core", "res://shell"]
+## M6 (4.11, 5.0 R4): the explored bitset has three writers, all in vision.gd (setup, see_path, season); country.gd reads
+## a save into it.
+const EXPLORED_FIELDS: Array[String] = ["explored"]
+const EXPLORED_ALLOWED: Array[String] = ["res://core/systems/sight.gd", "res://core/state/country.gd"]
 
 
 func _pattern(fields: Array[String] = FIELDS) -> RegEx:
@@ -104,6 +114,53 @@ func test_nothing_else_writes_the_people() -> void:
 	assert_eq(found, [] as Array[String], "writers of people, their flows and the food numbers outside people.gd and the state classes")
 
 
+func test_nothing_else_writes_the_explored() -> void:
+	var found: Array[String] = []
+	for path: String in _all_scripts():
+		if EXPLORED_ALLOWED.has(path):
+			continue
+		for line: String in _writers(FileAccess.get_file_as_string(path), EXPLORED_FIELDS):
+			found.append("%s: %s" % [path, line])
+	assert_eq(found, [] as Array[String], "writers of explored outside vision.gd and country.gd")
+
+
+func test_the_explored_door_does_write() -> void:
+	assert_gt(_writers(FileAccess.get_file_as_string("res://core/systems/sight.gd"), EXPLORED_FIELDS).size(), 0)
+
+
+func test_the_scan_sees_each_kind_of_explored_writer() -> void:
+	var bad: Array[String] = ["c.explored = seen", "c.explored[3] = 1", "c.explored[i] |= 4", "c.explored.fill(0)",
+		"c.explored.resize(9)"]
+	for line: String in bad:
+		assert_eq(_writers(line, EXPLORED_FIELDS).size(), 1, line)
+	var fine: Array[String] = ["var e := c.explored", "if c.explored.size() == 0:", "foo(c.explored)", "# c.explored = x",
+		"var copy := c.explored.duplicate()"]
+	for line: String in fine:
+		assert_eq(_writers(line, EXPLORED_FIELDS).size(), 0, line)
+
+
+func test_nothing_else_writes_the_armies() -> void:
+	var found: Array[String] = []
+	for path: String in _all_scripts():
+		if ARMY_ALLOWED.has(path):
+			continue
+		for line: String in _writers(FileAccess.get_file_as_string(path), ARMY_FIELDS):
+			found.append("%s: %s" % [path, line])
+	assert_eq(found, [] as Array[String], "writers of the armies and their fields outside armies.gd and the state classes")
+
+
+func test_the_scan_sees_each_kind_of_army_writer() -> void:
+	var bad: Array[String] = [
+		"game.armies = []", "g.next_army_id += 1", "game.next_unit_id = 5", "game.armies.append(a)", "a.moved_from = Vector2i(1, 1)",
+		"u.raised_turn = 3", "army.halt_why = &\"blocked\"", "army.lost_last -= 3",
+	]
+	for line: String in bad:
+		assert_eq(_writers(line, ARMY_FIELDS).size(), 1, line)
+	var fine: Array[String] = ["var n := g.next_army_id", "if a.raised_turn == turn:", "# a.waiting = &\"winter\""]
+	for line: String in fine:
+		assert_eq(_writers(line, ARMY_FIELDS).size(), 0, line)
+
+
 func test_the_two_doors_do_write() -> void:
 	assert_gt(_writers(FileAccess.get_file_as_string("res://core/systems/treasury.gd")).size(), 0)
 	assert_gt(_writers(FileAccess.get_file_as_string("res://core/systems/stores.gd")).size(), 0)
@@ -174,6 +231,16 @@ func test_planted_writer_in_user_dir_is_caught() -> void:
 	f.store_string("extends RefCounted\nfunc cheat(c: Country) -> void:\n\tc.treasury += 1000000\n")
 	f.close()
 	var hits := _writers(FileAccess.get_file_as_string(path))
+	DirAccess.remove_absolute(path)
+	assert_eq(hits.size(), 1)
+
+
+func test_planted_explored_writer_in_user_dir_is_caught() -> void:
+	var path := "user://planted_explored_writer_test.gd"
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string("extends RefCounted\nfunc cheat(c: Country) -> void:\n\tc.explored[0] = 255\n")
+	f.close()
+	var hits := _writers(FileAccess.get_file_as_string(path), EXPLORED_FIELDS)
 	DirAccess.remove_absolute(path)
 	assert_eq(hits.size(), 1)
 

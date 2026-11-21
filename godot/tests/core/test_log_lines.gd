@@ -42,6 +42,15 @@ func _known() -> StringName:
 	return Knowledge.known(_g, &"GEN")[0]
 
 
+## The first land hex the viewer Genoa does not see, or (-1, -1).
+func _unseen_hex() -> Vector2i:
+	for i: int in _g.map.hex_count():
+		var hex := _g.map.hex_of(i)
+		if _g.map.is_land(hex) and not Sight.sees(_g, &"GEN", hex):
+			return hex
+	return Vector2i(-1, -1)
+
+
 func _stranger() -> StringName:
 	for c: Country in _g.countries:
 		if c.tag != &"GEN" and not Knowledge.knows(_g, &"GEN", c.tag):
@@ -104,7 +113,10 @@ func test_a_known_others_lines_and_an_unknown_other_is_nothing() -> void:
 	assert_eq(pans["text"], "%s finished salt pans at (9, 11)." % who, "no article before salt pans")
 	var stranger := _stranger()
 	assert_ne(stranger, &"", "the scenario has a country Genoa does not know")
-	var far := _emit("work_finished", _work(Works.BUILD, ImproveRules.VINEYARD, 1, WOODS, 4, stranger))
+	# A hex Genoa does not see (M6 4.11: witnesses are the countries whose sight holds the hex when it is made).
+	var far_hex := _unseen_hex()
+	assert_ne(far_hex, Vector2i(-1, -1), "a land hex Genoa does not see")
+	var far := _emit("work_finished", _work(Works.BUILD, ImproveRules.VINEYARD, 1, far_hex, 4, stranger))
 	assert_eq(LogLines.line_of(_g, far, &"GEN"), {}, "P: an unwitnessed event is no line")
 	assert_false(LogLines.line_of(_g, far, &"").is_empty(), "the viewer of everything sees it")
 
@@ -412,7 +424,8 @@ func test_filters_of_equals_the_lines_filters_for_every_kind_and_viewer() -> voi
 
 
 func test_filters_of_gives_nothing_for_an_unwitnessed_entry() -> void:
-	var entry := _emit("work_started", _work(Works.BUILD, ImproveRules.VINEYARD, 1, SAVONA, 4, _stranger()))
+	# A hex Genoa does not see: nobody but the stranger holds the event (M6 4.11).
+	var entry := _emit("work_started", _work(Works.BUILD, ImproveRules.VINEYARD, 1, _unseen_hex(), 4, _stranger()))
 	assert_eq(LogLines.filters_of(_g, entry, &"GEN"), [] as Array[StringName])
 	assert_ne(LogLines.filters_of(_g, entry, &""), [] as Array[StringName], "the sandbox is told everything")
 	var short := {"kind": "goods_short", "tag": _known(), "good": "Salt", "need": 1, "taken": 0, "witnesses": [&"GEN"]}
@@ -520,7 +533,7 @@ func test_people_lines_for_a_known_and_an_unknown_other() -> void:
 	assert_eq(fell["text"], "%s: Savona (6, 13) fell to a village." % who, "no reason for another's town")
 	assert_eq([fell["keyword"], fell["tone"], fell["floating"], fell["notify"]], ["Declined", "muted", "Declined", false])
 	var stranger := _stranger()
-	var far := _settle("town_grew", stranger, Vector2i(7, 12), 3, 2)
+	var far := _settle("town_grew", stranger, _unseen_hex(), 3, 2)
 	assert_eq(LogLines.line_of(_g, far, &"GEN"), {}, "P: never witnessed")
 	assert_eq(LogLines.filters_of(_g, far, &"GEN"), [] as Array[StringName])
 	assert_false(LogLines.line_of(_g, far, &"").is_empty(), "the viewer of everything sees it")

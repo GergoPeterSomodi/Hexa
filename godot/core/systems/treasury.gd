@@ -9,9 +9,10 @@ const NO_HEX := Vector2i(-1, -1)
 ## The reasons of a money line; append-only (M6 army, M10 trade, M12 interest).
 const WHY: Array[StringName] = [
 	&"tax_people", &"tax_goods", &"port_dues", &"upkeep_districts", &"upkeep_walls", &"work", &"refund", &"dev",
+	&"upkeep_army", &"raise",
 ]
 ## Lines that are a choice of the player and not the season's income (left_over leaves them out, with dev).
-const SPENDING: Array[StringName] = [&"work", &"refund"]
+const SPENDING: Array[StringName] = [&"work", &"refund", &"raise"]
 ## The treasury and every line stay within this many ducats either way; a move past it is refused.
 const LIMIT := 2000000000
 

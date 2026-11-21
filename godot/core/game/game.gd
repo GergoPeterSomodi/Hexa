@@ -26,7 +26,7 @@ var next_unit_id: int = 1
 ## Human player's country tag, or &"" before picking, in AI-only games, or in a map-only game.
 var player: StringName = &""
 ## The fields only the door (emit, act, Season) writes (docs/architecture/m3-build-spec.md 5.7).
-const DOOR_FIELDS: Array[String] = ["events", "action_log", "chronicle", "version", "view_cache", "districts"]
+const DOOR_FIELDS: Array[String] = ["events", "action_log", "chronicle", "version", "view_cache", "districts", "sight"]
 ## The largest developer transfer of ducats or loads at once (dev_money, dev_goods).
 const DEV_LIMIT := 1000000000
 ## The year of turn 1 (the scenario's year; 1480 in a sandbox).
@@ -50,6 +50,9 @@ var weather: PackedByteArray = PackedByteArray([0, 0, 0])
 ## The season-free part of every land hex's district output; derived, not saved, not in the digest. Forgets a hex and
 ## its ring on a hex_changed (emit); cleared by a new game, a load and any replaced MapState.
 var districts: DistrictCache = DistrictCache.new()
+## The sight cache (the army part, the land sight, what each viewer has learned); derived, not saved, not in the digest.
+## Written only through Sight (by reference).
+var sight: SightCache = SightCache.new()
 
 
 ## A new map-only game: the improvement search chooses what stands on the map for this seed.
@@ -84,6 +87,8 @@ static func new_scenario(p_map: MapData, p_defs: GameDefs, p_scenario: ScenarioD
 	Treasury.setup.call(out)
 	Stores.setup.call(out)
 	StatsSystem.setup.call(out)  # again, now that the countries are known
+	Sight.setup.call(out)  # explored = the land sight (5.0 R11: only here, never on a load)
+	Sight.refresh.call(out)
 	return out
 
 
@@ -112,6 +117,8 @@ func has_countries() -> bool:
 func emit(event: Dictionary) -> void:
 	if not event.has("turn"):
 		event["turn"] = turn
+	# Called by reference: owners_changed updates the sight cache; a sighted event gets its witnesses (4.11).
+	Sight.on_emit.call(self, event)
 	events.append(event)
 	if event.get("kind", "") == "hex_changed" and event.get("hex") is Vector2i and map != null:
 		districts.touch.call(self, event["hex"] as Vector2i)  # by reference: a typed call makes Game and DistrictCache need each other to parse
@@ -129,6 +136,7 @@ func dev_transfer(hexes: Array[Vector2i], to_id: int) -> int:
 	# Called by reference: a typed call would make Game and Territory need each other to parse.
 	var changed: int = Territory.transfer.call(self, hexes, to_id)
 	action_log.append({"turn": turn, "action": "dev_transfer", "args": Chronicle.plain({"hexes": hexes, "to_id": to_id})})
+	Sight.refresh.call(self)
 	if changed > 0:
 		version += 1  # owner-derived views are cached by version
 	return changed

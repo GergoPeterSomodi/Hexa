@@ -12,7 +12,7 @@ extends RefCounted
 const OWNS: Array[String] = ["people", "people_start", "people_end", "people_flows", "people_closed", "food_need",
 	"food_fed"]
 ## The reasons people change, append-only. The index is the flow in Country.people_flows.
-const FLOWS: Array[StringName] = [&"grew", &"starved", &"left", &"raised", &"returned", &"dev"]
+const FLOWS: Array[StringName] = [&"grew", &"starved", &"left", &"raised", &"returned", &"dev", &"foraged"]
 const GREW := 0
 const STARVED := 1
 const LEFT := 2

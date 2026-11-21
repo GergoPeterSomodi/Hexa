@@ -166,6 +166,8 @@ static func _build(body: Dictionary, meta: Dictionary, map: MapData, defs: GameD
 		return {"problem": "body"}
 	if not _ranges_ok(state, map, (countries as Array).size()):
 		return {"problem": "body"}
+	if not _explored_ok(countries as Array, map):
+		return {"problem": "body"}
 	var game := Game.with_state(map, state, int(meta["seed"]), defs)
 	game.scenario = scenario
 	game.player = player
@@ -243,6 +245,15 @@ static func _people_ok(state: MapState, map: MapData, i: int) -> bool:
 	for ints: PackedInt32Array in [state.people, state.people_start, state.people_end]:
 		var v := ints[i]
 		if v < 0 or v > People.PEOPLE_MAX or (v != 0 and map.land[i] == 0):
+			return false
+	return true
+
+
+## Each country's explored set is (hex_count + 7) >> 3 bytes (5.0 R11, M6 4.11); a save with another size is refused.
+static func _explored_ok(countries: Array, map: MapData) -> bool:
+	var want := (map.hex_count() + 7) >> 3
+	for c: Variant in countries:
+		if (c as Country).explored.size() != want:
 			return false
 	return true
 

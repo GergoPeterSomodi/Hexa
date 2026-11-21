@@ -24,7 +24,7 @@ func _country(g: Game, tag: StringName) -> Country:
 
 func test_owns_and_flows_table() -> void:
 	assert_eq(Stores.OWNS, ["stock", "flows_open", "stock_from", "goods_closed"])
-	assert_eq(Stores.FLOWS, [&"made", &"used", &"sold", &"work", &"refund", &"dev"] as Array[StringName])
+	assert_eq(Stores.FLOWS, [&"made", &"used", &"sold", &"work", &"refund", &"dev", &"army", &"raise"] as Array[StringName])
 	assert_eq(Country.FLOW_COUNT, Stores.FLOWS.size(), "Country lays out as many flows as Stores has")
 
 

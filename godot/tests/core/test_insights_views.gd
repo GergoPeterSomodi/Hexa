@@ -284,7 +284,7 @@ func test_the_yield_bytes_are_one_byte_a_hex_and_the_same_each_call() -> void:
 
 func test_the_pins_of_4_13() -> void:
 	assert_eq(Season.PHASES, [&"production", &"income", &"works", &"people", &"stats", &"calendar"] as Array[StringName])
-	assert_eq(Actions.NAMES, ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax"] as Array[String])
+	assert_eq(Actions.NAMES, ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise", "split_army", "merge_armies", "disband"] as Array[String])
 	assert_eq(SaveFile.FORMAT, 4)
 	assert_eq(SaveFile.OLDEST_FORMAT, 4)
 	assert_eq(Stats.SERIES.size(), 42)

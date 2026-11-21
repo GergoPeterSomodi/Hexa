@@ -72,8 +72,13 @@ func digest_text() -> String:
 static func whole(value: Variant) -> Variant:
 	if typeof(value) == TYPE_INT:
 		return value
-	if typeof(value) == TYPE_FLOAT and is_equal_approx(float(value), roundf(float(value))):
-		return int(value)
+	if typeof(value) == TYPE_FLOAT:
+		var f := float(value)
+		# Past 2^53 a float is no longer exact: it is refused, not rounded into a whole number (1e300 is not a count).
+		if absf(f) > 9007199254740992.0:
+			return null
+		if is_equal_approx(f, roundf(f)):
+			return int(f)
 	return null
 
 

@@ -110,7 +110,7 @@ func test_setup_gives_every_land_hex_its_start_people_and_every_country_zero_flo
 	assert_eq(EconomySeason.town_people(g, _view(g), &"GEN"), 40000, "M4 4.12: Genoa's towns")
 	assert_eq(EconomySeason.country_people(g, _view(g), &"GEN"), 42700, "and its countryside")
 	for c: Country in g.countries:
-		assert_eq(c.people_flows, PackedInt32Array([0, 0, 0, 0, 0, 0]), c.tag)
+		assert_eq(c.people_flows, PackedInt32Array([0, 0, 0, 0, 0, 0, 0]), c.tag)
 		assert_eq(c.food_fed, 1000)
 		assert_eq(c.food_need, 0)
 	assert_eq(People.FLOWS.size(), Country.PEOPLE_FLOW_COUNT, "the flows and the country's width agree")
@@ -257,20 +257,20 @@ func test_move_changes_the_people_and_the_owners_flow() -> void:
 	var i := g.map.index_of(hex)
 	assert_true(People.move(g, hex, 300, &"grew"))
 	assert_eq(g.state.people[i], 30300)
-	assert_eq(_flows(genoa), [300, 0, 0, 0, 0, 0])
+	assert_eq(_flows(genoa), [300, 0, 0, 0, 0, 0, 0])
 	assert_true(People.move(g, hex, -120, &"starved"))
 	assert_true(People.move(g, hex, -80, &"left"))
 	assert_true(People.move(g, hex, -50, &"raised"))
 	assert_true(People.move(g, hex, 20, &"returned"))
 	assert_true(People.move(g, hex, 5, &"dev"))
-	assert_eq(_flows(genoa), [300, -120, -80, -50, 20, 5])
+	assert_eq(_flows(genoa), [300, -120, -80, -50, 20, 5, 0])
 	assert_eq(g.state.people[i], 30300 - 120 - 80 - 50 + 20 + 5)
 	var other := Countries.by_tag(g, &"SAV")
-	assert_eq(_flows(other), [0, 0, 0, 0, 0, 0], "another country's flows are its own")
+	assert_eq(_flows(other), [0, 0, 0, 0, 0, 0, 0], "another country's flows are its own")
 	var before := g.state.people.duplicate()
 	assert_true(People.move(g, hex, 0, &"grew"), "an amount of 0 changes nothing and is true")
 	assert_eq(g.state.people, before)
-	assert_eq(_flows(genoa), [300, -120, -80, -50, 20, 5])
+	assert_eq(_flows(genoa), [300, -120, -80, -50, 20, 5, 0])
 
 
 func test_move_refuses_what_it_must_and_changes_nothing() -> void:
@@ -295,7 +295,7 @@ func test_move_refuses_what_it_must_and_changes_nothing() -> void:
 	for case: Array in cases:
 		assert_false(People.move(g, case[1], case[2], case[3]), case[0])
 		assert_eq(g.state.people, people, "%s: nothing changed" % case[0])
-		assert_eq(_flows(genoa), [0, 0, 0, 0, 0, 0], "%s: no flow" % case[0])
+		assert_eq(_flows(genoa), [0, 0, 0, 0, 0, 0, 0], "%s: no flow" % case[0])
 	assert_true(People.move(g, hex, -30000, &"starved"), "all the way to 0 is allowed")
 	assert_eq(g.state.people[i], 0)
 	assert_true(People.move(g, hex, People.PEOPLE_MAX, &"dev"), "the largest is allowed")
@@ -385,8 +385,8 @@ func test_a_season_moves_the_people_through_the_door_and_close_keeps_the_flows()
 	assert_eq(g.state.people_start, before, "close: the start is the people before")
 	assert_eq(g.state.people_end, g.state.people, "and the end the people now")
 	assert_eq(genoa.people_closed["turn"], 1)
-	assert_eq(Array(genoa.people_closed["flows"]), [585, 0, 0, 0, 0, 0])
-	assert_eq(_flows(genoa), [0, 0, 0, 0, 0, 0], "the open flows start again")
+	assert_eq(Array(genoa.people_closed["flows"]), [585, 0, 0, 0, 0, 0, 0])
+	assert_eq(_flows(genoa), [0, 0, 0, 0, 0, 0, 0], "the open flows start again")
 	assert_eq(genoa.food_need, 4)
 	assert_eq(genoa.food_fed, 1000)
 
@@ -480,12 +480,12 @@ func test_levy_takes_the_men_as_raised_and_a_refusal_takes_none() -> void:
 	var i := g.map.index_of(hex)
 	assert_eq(People.levy(g, &"GEN", hex, 1000), 1000)
 	assert_eq(g.state.people[i], 29000)
-	assert_eq(_flows(genoa), [0, 0, 0, -1000, 0, 0])
+	assert_eq(_flows(genoa), [0, 0, 0, -1000, 0, 0, 0])
 	assert_eq(People.levy(g, &"GEN", hex, 5000), 0, "more than a tenth of the 29,000: refused")
 	assert_eq(People.levy(g, &"SAV", hex, 10), 0, "not its land")
 	assert_eq(People.levy(g, &"GEN", hex, 0), 0)
 	assert_eq(g.state.people[i], 29000, "a refusal changes nothing")
-	assert_eq(_flows(genoa), [0, 0, 0, -1000, 0, 0])
+	assert_eq(_flows(genoa), [0, 0, 0, -1000, 0, 0, 0])
 
 
 func test_give_back_returns_men_and_a_crowd_leaves_next_season() -> void:
@@ -496,7 +496,7 @@ func test_give_back_returns_men_and_a_crowd_leaves_next_season() -> void:
 	assert_eq(People.levy(g, &"GEN", hex, 1000), 1000)
 	assert_eq(People.give_back(g, hex, 1000), 1000)
 	assert_eq(g.state.people[i], 30000)
-	assert_eq(_flows(genoa), [0, 0, 0, -1000, 1000, 0])
+	assert_eq(_flows(genoa), [0, 0, 0, -1000, 1000, 0, 0])
 	g.state.people[i] = 45000
 	assert_eq(People.give_back(g, hex, 100), 100)
 	assert_eq(g.state.people[i], 45100, "over the room")

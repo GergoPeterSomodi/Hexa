@@ -20,7 +20,7 @@ const TOP := 3
 const ORDER_KINDS: Array[String] = ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax"]
 ## The order of the Treasury section's lines (by reason).
 const MONEY_ORDER: Array[StringName] = [&"tax_people", &"tax_goods", &"port_dues", &"upkeep_districts", &"upkeep_walls",
-	&"work", &"refund", &"dev"]
+	&"upkeep_army", &"work", &"refund", &"raise", &"dev"]
 ## A season is quiet in money when the treasury moved less than this many permille of its opening and no stock moved by
 ## QUIET_PERCENT of its opening.
 const QUIET_PERMILLE := 20
@@ -481,15 +481,11 @@ static func _treasury_section(game: Game, lines: Array[Dictionary], opening: int
 				amount += int(line["amount"])
 				count += int(line["count"])
 				hexes.append(line["hex"] as Vector2i)
-				if why == &"work" or why == &"refund":
+				if Treasury.SPENDING.has(why):
 					var at := line["hex"] as Vector2i
-					var text := "%s: %s" % ["Work begun" if why == &"work" else "Refund",
-						_work_label(game, at, started if why == &"work" else cancelled)]
-					if int(line["count"]) > 1:  # several payments merged on one hex: the label would name only the last work
-						text = "%s: %s (%d)" % ["Works begun" if why == &"work" else "Refunds", Words.place(game, at), int(line["count"])]
-					out.append(_money_line(text, int(line["amount"]), at))
+					out.append(_money_line(_spending_text(game, why, line, started, cancelled), int(line["amount"]), at))
 					spending += int(line["amount"])
-		if amount == 0 or why == &"work" or why == &"refund":
+		if amount == 0 or Treasury.SPENDING.has(why):
 			continue
 		match why:
 			&"tax_people":
@@ -502,6 +498,8 @@ static func _treasury_section(game: Game, lines: Array[Dictionary], opening: int
 				out.append(_money_line("District upkeep, %s" % Words.plural(count, "district", "districts"), amount, WorksView.NO_HEX))
 			&"upkeep_walls":
 				out.append(_money_line("Walls of %s" % Words.list(_names_at(game, hexes)), amount, hexes[0]))
+			&"upkeep_army":
+				out.append(_money_line("Army upkeep, %s" % Words.plural(count, "army", "armies"), amount, WorksView.NO_HEX))
 			_:
 				out.append(_money_line("Developer", amount, WorksView.NO_HEX))
 	var total := _line("%s → %s" % [Words.number(opening), Words.number(closing)], _tone_of(closing - opening))
@@ -516,6 +514,19 @@ static func _treasury_section(game: Game, lines: Array[Dictionary], opening: int
 		sub["sub"] = true
 		out.append(sub)
 	return {"id": &"treasury", "title": "Treasury", "count": main_count, "total": total, "lines": out, "more": 0, "unchanged": ""}
+
+
+## The text of one spending line: "Work begun: ..." or "Refund: ..." (several payments on one hex: the place and the count),
+## "Raised: 2 companies at Genoa (8, 13)" for raising.
+static func _spending_text(game: Game, why: StringName, line: Dictionary, started: Dictionary, cancelled: Dictionary) -> String:
+	var at := line["hex"] as Vector2i
+	var count := int(line["count"])
+	if why == &"raise":
+		return "Raised: %s at %s" % [Words.plural(count, "company", "companies"), Words.place(game, at)]
+	var works := started if why == &"work" else cancelled
+	if count > 1:  # several payments merged on one hex: the label would name only the last work
+		return "%s: %s (%d)" % ["Works begun" if why == &"work" else "Refunds", Words.place(game, at), count]
+	return "%s: %s" % ["Work begun" if why == &"work" else "Refund", _work_label(game, at, works)]
 
 
 static func _money_line(text: String, amount: int, hex: Vector2i) -> Dictionary:
@@ -589,6 +600,10 @@ static func _flow_word(def: GoodDef, flow: int) -> String:
 			return "for works"
 		&"refund":
 			return "back from works"
+		&"army":
+			return "eaten by the army"
+		&"raise":
+			return "for raising"
 	return "by the developer"
 
 

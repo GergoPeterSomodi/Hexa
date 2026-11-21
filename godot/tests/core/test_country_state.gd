@@ -287,8 +287,8 @@ func test_a_damaged_purse_is_refused() -> void:
 
 func _with_people() -> Country:
 	var c := _rich()
-	c.people_flows = PackedInt32Array([120, -30, -5, 0, 0, 7])
-	c.people_closed = {"turn": 4, "flows": PackedInt32Array([100, -20, -3, 0, 0, 0])}
+	c.people_flows = PackedInt32Array([120, -30, -5, 0, 0, 7, 0])
+	c.people_closed = {"turn": 4, "flows": PackedInt32Array([100, -20, -3, 0, 0, 0, 0])}
 	c.food_need = 9
 	c.food_fed = 750
 	return c
@@ -313,7 +313,7 @@ func test_country_3_round_trip_every_people_field() -> void:
 		assert_eq(back.digest_text(), src.digest_text())
 		assert_eq(var_to_bytes(back.to_dict()), var_to_bytes(d), "save, load, save equal")
 	assert_eq(src.digest_text().split("|").slice(-5, -1),
-			PackedStringArray(["120,-30,-5,0,0,7", "4:100,-20,-3,0,0,0", "9", "750"]))
+			PackedStringArray(["120,-30,-5,0,0,7,0", "4:100,-20,-3,0,0,0,0", "9", "750"]))
 
 
 func test_the_digest_moves_with_one_flow_and_one_field_and_only_then() -> void:
@@ -389,12 +389,12 @@ func test_a_short_flows_array_is_padded_and_a_long_one_refused() -> void:
 	d["people_flows"] = PackedInt32Array([4, 5, 6])
 	var back := Country.from_dict(d)
 	assert_not_null(back)
-	assert_eq(back.people_flows, PackedInt32Array([4, 5, 6, 0, 0, 0]))
+	assert_eq(back.people_flows, PackedInt32Array([4, 5, 6, 0, 0, 0, 0]))
 	d["people_closed"] = {"turn": 2, "flows": PackedInt32Array([1])}
-	assert_eq(Country.from_dict(d).people_closed["flows"], PackedInt32Array([1, 0, 0, 0, 0, 0]))
-	d["people_flows"] = PackedInt32Array([1, 2, 3, 4, 5, 6, 7])
+	assert_eq(Country.from_dict(d).people_closed["flows"], PackedInt32Array([1, 0, 0, 0, 0, 0, 0]))
+	d["people_flows"] = PackedInt32Array([1, 2, 3, 4, 5, 6, 7, 8])
 	assert_null(Country.from_dict(d), "P: more flows than People knows")
-	assert_eq(Country.PEOPLE_FLOW_COUNT, 6)
+	assert_eq(Country.PEOPLE_FLOW_COUNT, 7, "M6 appends foraged")
 
 
 func test_country_3_refuses_mistyped_people_fields() -> void:
@@ -402,7 +402,7 @@ func test_country_3_refuses_mistyped_people_fields() -> void:
 		["food_need", "9"], ["food_need", -1], ["food_need", 9.5], ["food_fed", "750"], ["food_fed", 1001],
 		["food_fed", -1], ["people_flows", "1,2"], ["people_flows", ["a"]], ["people_flows", {"a": 1}],
 		["people_closed", "x"], ["people_closed", {"turn": "4", "flows": [1]}], ["people_closed", {"turn": 4}],
-		["people_closed", {"turn": 4, "flows": "1"}], ["people_closed", {"turn": 4, "flows": [1, 2, 3, 4, 5, 6, 7]}],
+		["people_closed", {"turn": 4, "flows": "1"}], ["people_closed", {"turn": 4, "flows": [1, 2, 3, 4, 5, 6, 7, 8]}],
 		["people_closed", [4]],
 	]
 	for item: Array in cases:

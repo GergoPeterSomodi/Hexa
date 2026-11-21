@@ -133,3 +133,26 @@ func test_people_words() -> void:
 	assert_eq(Words.people(2), "2 people")
 	assert_eq(Words.people(999), "999 people")
 	assert_eq(Words.people(30300), "30,300 people")
+
+
+## M6 (5.6): "at Susa (4, 9)", "to (3, 8) near Hospice Mont Cenis", "at (3, 8)"; men, units and an army's name.
+func test_at_names_the_named_hex_and_the_unnamed_ones() -> void:
+	assert_eq(Words.at(_game, Vector2i(6, 13)), "at Savona (6, 13)", "a named place: its name")
+	assert_eq(Words.at(_game, Vector2i(7, 12), "to"), "to (7, 12) near Savona", "beside one: the coordinates first")
+	assert_eq(Words.at(_game, Vector2i(0, 0)), "at (0, 0)", "no place within 2 hexes")
+	assert_eq(Words.at(null, Vector2i(3, 4)), "at (3, 4)", "no game")
+
+
+func test_men_units_and_army_names() -> void:
+	assert_eq(Words.men(1000), "1,000 men")
+	assert_eq(Words.men(0), "0 men")
+	var one := UnitDef.new()
+	one.one = "company of pikemen"
+	one.many = "companies of pikemen"
+	assert_eq(Words.units(2, one), "2 companies of pikemen")
+	assert_eq(Words.units(1, one), "1 company of pikemen")
+	assert_eq(Words.units(3, null), "3 companies", "no kind named")
+	assert_eq(Words.army_of(_game, &"GEN"), "A Genoese army")
+	assert_eq(Words.army_of(_game, &""), "An army", "no tag")
+	assert_eq(Words.army_of(_game, &"ZZZ"), "The army of ZZZ", "a tag with no country")
+	assert_eq(Words.army_of(_game, &"AUS"), "An Austrian army", "a vowel takes an")

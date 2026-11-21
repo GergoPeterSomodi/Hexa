@@ -6,7 +6,7 @@ extends RefCounted
 
 const OWNS: Array[String] = ["stock", "flows_open", "stock_from", "goods_closed"]
 ## The reasons a stock changes; append-only. The index is the flow in Country.flows_open.
-const FLOWS: Array[StringName] = [&"made", &"used", &"sold", &"work", &"refund", &"dev"]
+const FLOWS: Array[StringName] = [&"made", &"used", &"sold", &"work", &"refund", &"dev", &"army", &"raise"]
 ## The settlements family id (FamilyIds); its hexes hold the town people.
 const SETTLEMENTS := 1
 ## A stock or a flow cell stays within this many loads either way (a dev_goods of 3,000,000,000 is refused).

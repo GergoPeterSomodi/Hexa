@@ -7,7 +7,8 @@
 class_name Actions
 extends RefCounted
 
-const NAMES: Array[String] = ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax"]
+const NAMES: Array[String] = ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise",
+	"split_army", "merge_armies", "disband"]
 
 static var _test_pairs: Dictionary[String, Array] = {}
 
@@ -27,6 +28,14 @@ static func pair_of(action: String) -> Array[Callable]:
 			return [Countries.choose_check, Countries.choose]
 		"set_tax":
 			return [EconomySeason.set_tax_check, EconomySeason.set_tax]
+		"raise":
+			return [Military.raise_check, Military.raise]
+		"split_army":
+			return [Military.split_check, Military.split_army]
+		"merge_armies":
+			return [Military.merge_check, Military.merge_armies]
+		"disband":
+			return [Military.disband_check, Military.disband]
 	if _test_pairs.has(action):
 		var raw: Array = _test_pairs[action]
 		var typed: Array[Callable] = [raw[0] as Callable, raw[1] as Callable]

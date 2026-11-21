@@ -1,5 +1,6 @@
 ## Who knows whom, and what a viewer is told (docs/architecture/m3-build-spec.md sections 4.7 and 5.6; style spec 6.5).
-## M3's fog: `knows` is a shared border (Territory.neighbours) until M6 adds explored hexes. The viewer "" sees all.
+## `knows` is a shared border (Territory.neighbours) or an explored hex the other holds (M6, 4.11, through Sight). The
+## viewer "" sees all.
 ## Pure core/views/ code: no nodes, no engine calls, no luck.
 class_name Knowledge
 extends RefCounted
@@ -16,7 +17,7 @@ static func knows(game: Game, viewer: StringName, other: StringName) -> bool:
 	var other_country := Countries.by_tag(game, other)
 	if viewer_country == null or other_country == null:
 		return false
-	return Territory.neighbours(game, viewer_country.id).has(other_country.id)
+	return Territory.neighbours(game, viewer_country.id).has(other_country.id) or Sight.explored_any(game, viewer, other)
 
 
 ## The tags `viewer` knows, in country id order, the viewer excluded. The viewer "" knows every country.
@@ -32,9 +33,11 @@ static func known(game: Game, viewer: StringName) -> Array[StringName]:
 	var viewer_country := Countries.by_tag(game, viewer)
 	if viewer_country == null:
 		return out
-	for id: int in Territory.neighbours(game, viewer_country.id):
-		var c := Countries.by_id(game, id)
-		if c != null and c.tag != &"" and c.tag != viewer:
+	# The same clause as knows: the shared border, or the explored set (Sight.known_of), read once per call.
+	var border := Territory.neighbours(game, viewer_country.id)
+	var learned: PackedByteArray = game.sight.known_of(game, viewer_country.id)
+	for c: Country in game.countries:
+		if c != null and c.tag != &"" and c.tag != viewer and (border.has(c.id) or (c.id < learned.size() and learned[c.id] == 1)):
 			out.append(c.tag)
 	return out
 
@@ -48,6 +51,26 @@ static func unknown_count(game: Game, viewer: StringName) -> int:
 		if c != null and c.tag != &"" and c.tag != viewer:
 			total += 1
 	return total - known(game, viewer).size()
+
+
+## True when the viewer sees `hex` now (the viewer "" sees all). Sight does the work (4.11).
+static func sees(game: Game, viewer: StringName, hex: Vector2i) -> bool:
+	return viewer == &"" or Sight.sees(game, viewer, hex)
+
+
+## The armies in the viewer's sight that are not its own, in id order: {army, tag, hex, men_banded}. The viewer "" gets
+## every army; men_banded is `band` of the men (the exact count is army.men(), which the viewer "" may read).
+static func armies_seen(game: Game, viewer: StringName) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if game == null:
+		return out
+	for army: Army in game.armies:
+		if army == null:
+			continue
+		if viewer != &"" and (army.tag == viewer or not Sight.sees(game, viewer, army.hex)):
+			continue
+		out.append({"army": army, "tag": army.tag, "hex": army.hex, "men_banded": band(army.men())})
+	return out
 
 
 ## Two significant figures, half away from zero, sign kept: 87 -> 87, 1,234 -> 1,200, 1,250 -> 1,300,

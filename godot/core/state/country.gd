@@ -6,9 +6,9 @@ extends RefCounted
 const SCHEMA := "hexa-godot/country/4"
 const NO_HEX := Vector2i(-1, -1)
 ## The flows of a stock (Stores.FLOWS.size(); test_stores pins the two equal): the width of flows_open.
-const FLOW_COUNT := 6
+const FLOW_COUNT := 8
 ## The people's flows (People.FLOWS.size()): the width of people_flows.
-const PEOPLE_FLOW_COUNT := 6
+const PEOPLE_FLOW_COUNT := 7
 
 ## Country id in MapState.owner (1 to 254).
 var id: int = 0

@@ -62,8 +62,53 @@ static func seasons(n: int) -> String:
 ## ties by place order); "(7, 12)" otherwise.
 static func place(game: Game, hex: Vector2i) -> String:
 	var coords := "(%d, %d)" % [hex.x, hex.y]
-	if game == null or game.map == null:
+	var found := _pick(game, hex)
+	if found.is_empty():
 		return coords
+	return "%s %s" % [found[0], coords] if int(found[1]) == 0 else "near %s %s" % [found[0], coords]
+
+
+## "at Susa (4, 9)" on a named hex, "to (3, 8) near Hospice Mont Cenis" beside one (the coordinates first), "at (3, 8)"
+## with none; `word` is "at", "to" or another preposition.
+static func at(game: Game, hex: Vector2i, word: String = "at") -> String:
+	var coords := "(%d, %d)" % [hex.x, hex.y]
+	var found := _pick(game, hex)
+	if found.is_empty():
+		return "%s %s" % [word, coords]
+	if int(found[1]) == 0:
+		return "%s %s %s" % [word, found[0], coords]
+	return "%s %s near %s" % [word, coords, found[0]]
+
+
+## "1,000 men".
+static func men(n: int) -> String:
+	return "%s men" % number(n)
+
+
+## "2 companies of pikemen", "1 company of pikemen": the count and the kind's one or many name.
+static func units(n: int, def: UnitDef) -> String:
+	if def == null:
+		return plural(n, "company", "companies")
+	return "%s %s" % [number(n), def.one if n == 1 else def.many]
+
+
+## "A Milanese army" (the country's adjective); "The army of XYZ" for a tag with no adjective; "An army" for no tag.
+static func army_of(game: Game, tag: StringName) -> String:
+	if tag == &"":
+		return "An army"
+	var def := Countries.def_of(game, tag) if game != null else null
+	var adjective := def.adjective if def != null else ""
+	if adjective.is_empty():
+		return "The army of %s" % String(tag)
+	var article := "An" if "AEIOUaeiou".contains(adjective.left(1)) else "A"
+	return "%s %s army" % [article, adjective]
+
+
+## The nearest named place within NEAR hexes of `hex` as [name, distance] (distance 0 on the hex itself), [] when none.
+## The nearest wins; ties go to the place order (the first of two on one hex).
+static func _pick(game: Game, hex: Vector2i) -> Array:
+	if game == null or game.map == null:
+		return []
 	var names := _place_names(game)
 	var seen: Dictionary = {hex: true}
 	var ring: Array[Vector2i] = [hex]
@@ -76,7 +121,7 @@ static func place(game: Game, hex: Vector2i) -> String:
 				best_order = int((held as Array)[1])
 				best_name = str((held as Array)[0])
 		if best_name != "":
-			return "%s %s" % [best_name, coords] if distance == 0 else "near %s %s" % [best_name, coords]
+			return [best_name, distance]
 		var next: Array[Vector2i] = []
 		for at: Vector2i in ring:
 			for d: int in 6:
@@ -85,7 +130,7 @@ static func place(game: Game, hex: Vector2i) -> String:
 					seen[beside] = true
 					next.append(beside)
 		ring = next
-	return coords
+	return []
 
 
 ## hex -> [name, place order] for the named places of the map (the first of two on one hex), made once for a game and

@@ -97,7 +97,8 @@ func _ids(summary: Dictionary) -> Array[StringName]:
 
 ## Spring 1480 as Genoa: a vineyard begun and a timber begun then cancelled (orders), a finishing timber (finished), a
 ## town upgrade under way, Savoy finishes a wheat and takes three districts from Genoa.
-func _spring() -> Dictionary:
+## One season of Genoa's works; `heard` adds a finish on a hex beside Genoa that Genoa witnessed (4.11).
+func _spring(heard: bool = false) -> Dictionary:
 	assert_true(_act("build", SAVONA, ImproveRules.VINEYARD))
 	assert_true(_act("build", WOODS, ImproveRules.TIMBER))
 	assert_true(_act("cancel_work", WOODS))
@@ -107,6 +108,9 @@ func _spring() -> Dictionary:
 	_g.emit({"kind": "work_finished", "tag": other, "hex": Vector2i(11, 8), "work": finishing.to_dict()})
 	_g.emit({"kind": "owners_changed", "hexes": [Vector2i(11, 8), Vector2i(11, 9), Vector2i(12, 9)], "tag": other,
 		"others": [&"GEN"]})
+	if heard:
+		_g.emit({"kind": "work_finished", "tag": other, "hex": ImproveRules.neighbour(GENOA, 0), "work": finishing.to_dict(),
+			"witnesses": [&"GEN"]})
 	_g.version += 1
 	Season.run(_g)
 	return SeasonSummary.of(_g, &"GEN", 1)
@@ -118,7 +122,7 @@ func test_an_m3_season_of_genoa() -> void:
 	assert_eq(s["lede"], "The Chancellor's report to the Doge of Genoa. Summer 1480 begins.")
 	assert_eq([s["seal_letter"], s["quiet"], s["serious"], s["swing_permille"]], ["G", false, false, 78], "48 of 610")
 	assert_eq(s["toast"], "Spring 1480 ended: %s. J: the report" % _change_text(), "the money, once the season has a ledger")
-	assert_eq(_ids(s), [&"glance", &"before", &"treasury", &"goods", &"works", &"orders", &"befell", &"standing"] as Array[StringName],
+	assert_eq(_ids(s), [&"glance", &"before", &"treasury", &"goods", &"works", &"orders", &"standing"] as Array[StringName],
 		"fixed order, empty ones left out")
 	var glance := _section(s, &"glance")
 	assert_eq(glance["title"], "At a glance")
@@ -142,10 +146,14 @@ func test_an_m3_season_of_genoa() -> void:
 		"Cancelled: woodland %s." % place,
 		"Took the rule of the Republic of Genoa.",
 	] as Array[String])
-	var befell := _section(s, &"befell")
-	assert_eq(befell["title"], "What befell Genoa")
-	assert_eq(_texts(s, &"befell"), ["%s finished a woodland at (9, 11)." % LogLines.short_name(_g, Knowledge.known(_g, &"GEN")[0])]
-		as Array[String], "the land Genoa lost is not an event that befell it: the Land chip says it")
+	# M6 (4.11): an event is heard by the countries whose sight held its hex when it was made. Genoa's own woodland at
+	# (9, 11) is its own news (not in What befell), and the other countries' finishes here are out of Genoa's sight.
+	assert_eq(_section(s, &"befell"), {}, "M6: no witnessed other finish in Genoa's sight this season")
+	# The positive case: the same season with a finish on a neighbour's hex that Genoa witnessed is What befell.
+	before_each()
+	var heard := _spring(true)
+	assert_false(_section(heard, &"befell").is_empty(), "a witnessed finish beside Genoa is What befell")
+	assert_true(not _texts(heard, &"befell").is_empty() and not _texts(heard, &"befell")[0].is_empty())
 
 
 func test_orders_are_grouped_by_kind_with_their_links() -> void:
@@ -685,3 +693,48 @@ func test_two_works_on_one_hex_in_a_season_have_a_neutral_label() -> void:
 	assert_eq(_sum_of_lines(treasury), int(treasury["total"]["amount"]), "the sums hold")
 	assert_ne(_line_with(s, &"treasury", "Works begun: ").get("text", ""), "")
 	assert_string_contains(str(_line_with(s, &"treasury", "Works begun: ")["text"]), "(2)")
+
+
+func test_a_raise_is_a_treasury_line_and_the_lines_sum_to_the_change() -> void:
+	assert_true(bool(_g.act("raise", {"hex": GENOA, "kind": 0, "count": 2, "tag": &"GEN"})["ok"]))
+	var turn := _g.turn
+	Season.run(_g)
+	var s := SeasonSummary.of(_g, &"GEN", turn)
+	var treasury := _section(s, &"treasury")
+	var main_sum := 0
+	var spending := 0
+	var raised := ""
+	for line: Dictionary in treasury["lines"]:
+		if bool(line.get("sub", false)):
+			continue
+		main_sum += int(line["amount"])
+		var text := str(line["text"])
+		if text.begins_with("Raised") or text.begins_with("Work") or text.begins_with("Refund"):
+			spending += int(line["amount"])
+		if text.begins_with("Raised"):
+			raised = text
+	assert_eq(main_sum, int(treasury["total"]["amount"]), "the Treasury lines add up to the ledger's change")
+	assert_eq(raised, "Raised: 2 companies at %s" % Words.place(_g, GENOA))
+	var subs := {}
+	for line: Dictionary in treasury["lines"]:
+		if bool(line.get("sub", false)):
+			subs[str(line["text"])] = int(line["amount"])
+	var left := Treasury.left_over(_closed_lines())
+	assert_eq(subs["Left over each season"], left)
+	assert_eq(subs["With your spending"], left + spending, "the spending counts the raising")
+	var goods := SeasonSummary._goods_rows(_g, Countries.by_tag(_g, &"GEN").goods_closed)
+	var iron := -1
+	for row: Dictionary in goods:
+		if row["name"] == _g.defs.good(_g.defs.good_id(&"iron")).name:
+			iron = int(row["stock"])
+			assert_true((row["parts"] as Array).has("for raising 2"), "the stores' flow says what it was for")
+	assert_gt(iron, -1)
+	assert_eq(SeasonSummary._flow_word(_g.defs.good(0), Stores.FLOWS.find(&"army")), "eaten by the army")
+
+
+## The closed ledger lines of Genoa as typed dictionaries.
+func _closed_lines() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for line: Variant in Countries.by_tag(_g, &"GEN").ledger_closed["lines"] as Array:
+		out.append(line as Dictionary)
+	return out

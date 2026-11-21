@@ -58,6 +58,10 @@ static func line_label(game: Game, line: Dictionary) -> String:
 			return "Works, %s" % where if where != "" else "Works"
 		&"refund":
 			return "Refund, %s" % where if where != "" else "Refund"
+		&"upkeep_army":
+			return "Army upkeep"
+		&"raise":
+			return "Raised, %s" % where if where != "" else "Raised"
 		&"dev":
 			return "Console"
 	return String(why)

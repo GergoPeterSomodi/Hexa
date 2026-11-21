@@ -19,9 +19,11 @@ func _country(g: Game, tag: StringName) -> Country:
 
 func test_owns_and_why_table() -> void:
 	assert_eq(Treasury.OWNS, ["treasury", "ledger_open", "ledger_from", "ledger_closed"])
-	assert_eq(Treasury.WHY.size(), 8)
+	assert_eq(Treasury.WHY.size(), 10)
 	assert_eq(Treasury.WHY[0], &"tax_people")
-	assert_eq(Treasury.SPENDING, [&"work", &"refund"] as Array[StringName])
+	assert_eq(Treasury.WHY[8], &"upkeep_army", "M6 appends the army's upkeep and the raise")
+	assert_eq(Treasury.WHY[9], &"raise")
+	assert_eq(Treasury.SPENDING, [&"work", &"refund", &"raise"] as Array[StringName])
 	assert_eq(Treasury.NO_HEX, Vector2i(-1, -1))
 
 

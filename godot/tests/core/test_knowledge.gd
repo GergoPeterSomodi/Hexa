@@ -14,6 +14,8 @@ func _game_with(owners: Dictionary) -> Game:
 	g.state.owner.fill(0)
 	for hex: Vector2i in owners:
 		g.state.owner[g.map.index_of(hex)] = int(owners[hex])
+	# The owners changed after the game started: explored is made again as a new game makes it (Sight.setup, M6 4.11).
+	Sight.setup(g)
 	return g
 
 
