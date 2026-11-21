@@ -48,11 +48,16 @@ static func path_of(id: StringName) -> String:
 
 
 ## Starts loading the scenes of WARM_IDS on a thread (nothing blocks; make() takes the result). Safe to call again.
+## Each scene's script is loaded here first, on the calling thread: scripts that depend on one another (Screen, About, the
+## kit) compile while several loader threads race for them, and on a cold class cache a scene then fails to parse.
 static func warm() -> void:
 	for id: StringName in WARM_IDS:
 		if _scenes.has(id) or _warming.has(id) or not PATHS.has(id):
 			continue
 		var path: String = PATHS[id]
+		var script_path := path.get_basename() + ".gd"
+		if ResourceLoader.exists(script_path):
+			load(script_path)
 		if ResourceLoader.exists(path) and ResourceLoader.load_threaded_request(path) == OK:
 			_warming[id] = true
 
