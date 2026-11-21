@@ -386,8 +386,10 @@ both (`gone` true for `army`). The stack limit always holds: both stand on the h
 | 10 | Otherwise | ok |
 
 `march` sets `order` march, `goal`, `route` (`plan`'s hexes), clears `halt_why`, `halt_text` and `waiting`, and emits
-`army_changed`. `Movement.halt_check(game, {army, tag})`: rows 1 to 3; "the army holds already" when its order is hold;
-else ok; `halt` sets `order` hold and clears goal, route and waiting. `Movement.continue_check(game, {army, tag})`: rows 1
+`army_changed`. `Movement.halt_check(game, {army, tag})`: rows 1 to 3; "the army holds already" when its order is hold; else ok. `halt` on a march sets `order` none and keeps its goal and route
+(a halted march: `continue_march` resumes it, and a march to a new goal replaces it). `halt` on a halted march, or on an army
+with no goal, sets `order` hold and clears goal and route (so a halted army does not stay on the idle list). Waiting is cleared
+(the L6 decision that corrects this line: a player's halt keeps the goal, as D1 and D2 say). `Movement.continue_check(game, {army, tag})`: rows 1
 to 3; "no march to continue" (no goal); "the march goes on by itself" (its order is march); then rows 6 to 9 on the kept
 goal; `continue_march` re-plans and sets `order` march.
 
@@ -551,8 +553,12 @@ Aosta's reach (in supply), in winter too.
 in Summer (11 points). (4, 8) is snow cover at 3,169 m with no depot within 8 supply points: out of supply in Summer and in
 Winter (`Supply.in_supply`, measured), and the land feeds no one (forage 0). Summer's supply phase takes
 `ceil(1,000 × 100 / 1000)` = 100 men (900 left), Autumn's 90 (810), Winter 1480's a fifth (`starve_permille` 200 in the snow
-winter): 162 (648). Ordered back to Turin in Winter, the army walks back in Spring 1481 (one season) and is in supply there
-again. The test pins each season's men. (Measured with `MovementPhase.season` and `Supply.season` on the 1480 game.)
+winter): 162 (648). The army stays on the snow through Winter (its supply phase, not its walk, takes the losses). The
+order back to Turin is given in the planning of Spring 1481, and the walk runs in that spring's movement phase (one season:
+the army is at Turin, in supply, when the season's supply phase runs). At Turin the ready_units phase refills 50 men a
+pikeman company (`pikemen.tres` refill 50), so the army is 748 men at the end of Spring 1481, not 648: 648 + 2 × 50. The
+test pins each season's men: 1,000, 900, 810, 648, 748. (Measured with `MovementPhase.season` and `Supply.season` on the 1480
+game.)
 
 **(e) Upkeep and the report of Spring 1480** (raising at Turin): Treasury: "Raised: 2 companies of pikemen at Turin (5, 9)
 ▼ −50", "Army upkeep, 1 army ▼ −12"; Goods: "Iron 18 ▼ −2 (for raising 2)", "Grain ... (eaten by the army 1)"; Armies:
@@ -585,9 +591,9 @@ treasury, goods, works, people, **armies**, orders, befell, standing):
 | Rule | When | Severity | Text | Action |
 |---|---|---|---|---|
 | `army_hungry` | an army of the player stands out of supply now (`Supply.in_supply` false) and its route does not end this season in supply, or lost men in the last supply phase | 2 | "The Army of Turin at (4, 8) is out of supply: it lost 100 men and will lose about 90 more." (two or more: "2 armies are out of supply: ...") | `[&"select_army", id]`, "Show the army" |
-| `army_stores` | the grain and fish in store are under the supplied armies' food of this season (`EconomySeason.needs_of(...).army_food`) | 2 | "Your stores cannot feed your armies: 0 grain for 1 needed. Unfed men starve." | `[&"study", &"military"]`, "Open Military" |
+| `army_stores` | the grain and fish in store are under the supplied armies' food of this season (`EconomySeason.needs_of(...).army_food`) | 2 | "Your stores cannot feed your armies: 0 grain and fish for 1 needed. Unfed men starve." | `[&"study", &"military"]`, "Open Military" |
 | `winter_passes` | Autumn, and `Movement.walk_plan` of a march of the player's has it wait in Winter at a pass edge that closes then (its route crosses that edge after this season's walk) | 1 | "Winter closes the Little St Bernard: the Army of Turin waits for spring at Hospice Little St Bernard (3, 7) unless it crosses this season." | `[&"select_army", id]` |
-| `army_idle` | an army of the player has no order (new, or halted) | 1 | "1 army awaits orders: the Army of Turin at Turin (5, 9)." / "2 armies await orders: the Army of Turin and the Second Army of Turin." | `[&"select_army", first id]`, "Show the army" |
+| `army_idle` | an army of the player has no order (new, or halted) | 1 | "1 army awaits orders: the Army of Turin at Turin (5, 9)." / "2 armies wait for orders: the Army of Turin and the Second Army of Turin." | `[&"select_army", first id]`, "Show the army" |
 
 The action `[&"select_army", id]` is new (the task flag, the report's buttons and the App understand it: select the army,
 glide there).
@@ -1558,8 +1564,7 @@ No generated game data; the map file and the scenario are unchanged (`build_map 
 
 ## 8. Speed
 
-`godot/tools/perf_core.gd` (M3 to M5) on the made-up Europe: `PerfFixture.europe_armies(seasons)` (**new**, in
-`godot/tools/perf_fixture.gd`): M4.5's `europe_game` and, at its start, ten armies a country (600) of 1 to 8 pikemen raised
+`godot/tools/perf_core.gd` (M3 to M5) on the made-up Europe: the made-up Europe rig of `PerfFixture.seed_armies` (not `europe_armies`, dropped in L13: `perf_core.gd` builds its own world) (M4.5's `europe_game` and, at its start, ten armies a country (600) of 1 to 8 pikemen raised
 through `raise` at the country's settlements (money and iron through `Game.dev_money`, `dev_goods`: the rig, not the
 rules), each ordered by `march` to a hex of its own land 1 to 4 seasons away (`Rng` seeded 1480), re-ordered on arrival;
 `seasons` seasons through `Season.run`. Timing with `Time.get_ticks_usec()` in the tool. Rows in
@@ -1622,7 +1627,7 @@ GUT unless said. Every new check has a planted-fault case (P).
 | `tests/core/test_season.gd` (M3 to M5, edit) | **`PHASES` is `[movement, supply, production, income, works, people, stats, calendar, ready_units, vision]`** (the pin); an army raised in Spring walks in Summer's phase; upkeep paid in its raising season |
 | `tests/core/test_economy_season.gd`, `test_treasury.gd`, `test_stores.gd`, `test_people.gd` (M4, M5, edit) | the `upkeep_army` line and its count; `needs_of.army_food`; the reserve keeps it; WHY, SPENDING, FLOWS appended (P: an unknown why is refused as before); `foraged` moves people and its flow |
 | `tests/core/test_money_property.gd`, `test_people_property.gd` (M4, M5, edit) | the random runs now raise, march, disband: every ducat through `Treasury.move`, every load through `Stores.move`, every person through `People.move` (the `foraged` flow) |
-| `tests/core/test_men_property.gd` (**new**) | **done-when 4 and 6**: 40 seasons, `RandomPlayer` for every country, weather drawn; the conservation identity per country and for the world; the move budget per walk; no army over the stack limit at a phase's end; no store below 0; fed never over the need |
+| `tests/core/test_men_property.gd` (**new**) | **done-when 4 and 6**: 40 seasons, `RandomPlayer` for every country, weather drawn; the identity holds per season over the window closed - open_before + open_after (the flows booked after the stats close, by ready_units and vision of the season, close with the next season; `People.flows` and `Country.people_flows` are read at the season's start and end); the conservation identity per country and for the world; the move budget per walk; no army over the stack limit at a phase's end; no store below 0; fed never over the need |
 | `tests/core/test_check_contract.gd` (**new**) | **done-when 5**: 3,000 `RandomPlayer` actions with 40 season ends; check no: act not ok, digest unchanged; check yes: act ok; P: a test-registered pair whose do ignores its check is caught |
 | `tests/core/test_economy_preview.gd`, `test_improve_preview.gd` (M4 to M5, edit) | `with(game, tag, {}, 8)` equals eight played seasons for every country of the 1480 scenario with armies holding (fed, foraging and starving ones): men, food, losses, upkeep, money lines; the 200-case property with holding armies; a marching army is previewed where it stands (documented, a case) |
 | `tests/core/test_snapshot.gd`, `test_save_file.gd`, `test_replay.gd`, `test_owns.gd`, `test_game_core.gd`, `test_forty_seasons.gd`, `test_insights_views.gd` (edits) | armies, routes and explored round-trip; save, load, save byte-equal; `FORMAT` 4 (P: a format-3 header reads `older`; a string for an army's `hex`; a route of the wrong type); the same digest after 20 seasons of random army actions (P: a changed `march` goal gives another); 5.3's OWNS table (P: a test-only phase writing `armies` directly is reported); `DOOR_FIELDS`; ten seasons after a load equal; the pins move to M6's values (ten phases, `FORMAT` 4, 42 series, fourteen notable kinds, thirteen actions) |

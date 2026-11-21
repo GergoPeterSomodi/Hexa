@@ -158,21 +158,65 @@ func test_refused_march_changes_nothing() -> void:
 	assert_eq(_g.events.size(), log_before)
 
 
-func test_halt_holds_and_continue_takes_the_kept_goal() -> void:
+func test_halt_keeps_the_goal_and_continue_resumes_it() -> void:
 	var a := _sav(VERCELLI)
 	assert_true(bool(_march(a, AOSTA).ok))
+	var route_before := a.route.duplicate()
 	assert_true(bool(Movement.halt_check(_g, {"army": a.id, "tag": SAV}).ok))
 	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok))
-	assert_eq(a.order, Army.ORDER_HOLD)
-	assert_eq(a.goal, Movement.NO_HEX)
-	assert_eq(a.route.size(), 0)
-	assert_string_contains(str(Movement.halt_check(_g, {"army": a.id, "tag": SAV}).reason), "holds already")
-	assert_string_contains(str(Movement.continue_check(_g, {"army": a.id, "tag": SAV}).reason), "no march to continue")
-	Armies.set_order(_g, a, Army.ORDER_NONE, AOSTA, PackedInt32Array())
-	assert_true(bool(Movement.continue_check(_g, {"army": a.id, "tag": SAV}).ok), "a halted march keeps its goal")
+	assert_eq(a.order, Army.ORDER_NONE, "a halted march has no order")
+	assert_eq(a.goal, AOSTA, "its goal is kept")
+	assert_eq(a.route, route_before, "and its route")
+	assert_true(bool(Movement.continue_check(_g, {"army": a.id, "tag": SAV}).ok), "R continues a halted march")
 	assert_true(bool(Movement.continue_march(_g, {"army": a.id, "tag": SAV}).ok))
 	assert_eq(a.order, Army.ORDER_MARCH)
 	assert_eq(a.goal, AOSTA)
+
+
+func test_a_second_halt_of_a_halted_march_is_a_hold() -> void:
+	var a := _sav(VERCELLI)
+	assert_true(bool(_march(a, AOSTA).ok))
+	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok))
+	assert_true(bool(Movement.halt_check(_g, {"army": a.id, "tag": SAV}).ok), "a halted march can be halted again")
+	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok))
+	assert_eq(a.order, Army.ORDER_HOLD, "the second halt holds the army")
+	assert_eq(a.goal, Movement.NO_HEX, "and clears the goal")
+	assert_eq(a.route.size(), 0, "and the route")
+	assert_string_contains(str(Movement.continue_check(_g, {"army": a.id, "tag": SAV}).reason), "no march to continue")
+	assert_string_contains(str(Movement.halt_check(_g, {"army": a.id, "tag": SAV}).reason), "holds already")
+
+
+func test_halted_march_arrives_after_continue() -> void:
+	_g.turn = SUMMER_1480
+	var a := _sav(TURIN)
+	assert_true(bool(_march(a, VERCELLI).ok))
+	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok))
+	MovementPhase.season(_g)
+	assert_eq(a.hex, TURIN, "a halted army does not walk")
+	assert_true(bool(Movement.continue_march(_g, {"army": a.id, "tag": SAV}).ok))
+	MovementPhase.season(_g)
+	assert_eq(a.hex, VERCELLI, "the continued march arrives")
+	assert_eq(a.order, Army.ORDER_HOLD)
+	assert_eq(a.goal, Movement.NO_HEX)
+
+
+func test_march_to_a_new_goal_replaces_a_halted_march() -> void:
+	var a := _sav(TURIN)
+	assert_true(bool(_march(a, VERCELLI).ok))
+	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok))
+	assert_true(bool(_march(a, SUSA).ok), "a march to a new goal is taken while halted")
+	assert_eq(a.order, Army.ORDER_MARCH)
+	assert_eq(a.goal, SUSA)
+	assert_eq(a.halt_why, &"", "the new march clears the halt")
+
+
+func test_the_hold_order_is_unaffected() -> void:
+	var a := _sav(TURIN)
+	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok), "an idle army is halted into hold")
+	assert_eq(a.order, Army.ORDER_HOLD)
+	assert_eq(a.goal, Movement.NO_HEX)
+	assert_string_contains(str(Movement.halt_check(_g, {"army": a.id, "tag": SAV}).reason), "holds already")
+	assert_string_contains(str(Movement.continue_check(_g, {"army": a.id, "tag": SAV}).reason), "no march to continue")
 
 
 func test_planted_fault_a_marching_army_does_not_continue() -> void:

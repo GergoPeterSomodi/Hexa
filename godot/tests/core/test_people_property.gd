@@ -38,6 +38,11 @@ func _reset_seen() -> void:
 
 
 func _act(g: Game, c: Country, luck: Rng) -> void:
+	# Two random army actions (raise, march, split, merge, disband, halt...): the people move with the men (M6, L13).
+	for _k: int in 2:
+		var pick: Dictionary = RandomPlayer.next(g, c.tag, luck)
+		if bool(g.act(str(pick["action"]), pick["args"])["ok"]):
+			_seen["armies"] = int(_seen.get("armies", 0)) + 1
 	if luck.randi_range(0, 3) == 0:
 		g.dev_money(c.tag, luck.randi_range(50, 600))
 	if luck.randi_range(0, 7) == 0:
@@ -99,7 +104,7 @@ func _dev_people(g: Game, luck: Rng, districts: Array) -> void:
 
 ## What the season must do, checked against `pre` (the people before the actions) and `mid` (after them, before the season).
 func _check_season(g: Game, ended: int, pre: PackedInt32Array, mid: PackedInt32Array, mid_level: PackedByteArray,
-		mid_use: PackedByteArray) -> void:
+		mid_use: PackedByteArray, open_before: Dictionary, open_after: Dictionary) -> void:
 	var state := g.state
 	var sums := {}
 	var world_change := 0
@@ -128,8 +133,15 @@ func _check_season(g: Game, ended: int, pre: PackedInt32Array, mid: PackedInt32A
 			assert_true(explained, "a level changes only with its event, " + label)
 	for c: Country in g.countries:
 		var label := "%s, season %d" % [c.tag, ended]
-		var flows := c.people_closed["flows"] as PackedInt32Array
+		var closed := c.people_closed["flows"] as PackedInt32Array
 		assert_eq(int(c.people_closed["turn"]), ended, "the closed flows are of this season, " + label)
+		# The season's window: closed at its stats phase, less what was open before its actions, plus what is open after
+		# it (the refill and the vision of ready_units run after the close: they close with the next season, M6 R1).
+		var flows := PackedInt32Array()
+		var before: PackedInt32Array = open_before[c.tag]
+		var after: PackedInt32Array = open_after[c.tag]
+		for f: int in closed.size():
+			flows.append(closed[f] - before[f] + after[f])
 		var flow_sum := 0
 		for f: int in flows:
 			flow_sum += f
@@ -141,11 +153,18 @@ func _check_season(g: Game, ended: int, pre: PackedInt32Array, mid: PackedInt32A
 		_seen["grew"] += 1 if flows[People.GREW] > 0 else 0
 		_seen["starved"] += 1 if flows[People.STARVED] < 0 else 0
 		_seen["left"] += 1 if flows[People.LEFT] < 0 else 0
-		assert_eq(c.people_flows.count(0), People.FLOWS.size(), "the open flows start again, " + label)
 		_check_food(g, c, ended, label)
 	assert_eq(world_change, world_flows, "the world's change equals the sum over all countries, season %d" % ended)
 	for e: Dictionary in g.events:
 		_check_event(g, e, ended)
+
+
+## Each country's open people flows now: {tag: PackedInt32Array}.
+func _open_flows(g: Game) -> Dictionary:
+	var out := {}
+	for c: Country in g.countries:
+		out[c.tag] = c.people_flows.duplicate()
+	return out
 
 
 func _check_food(g: Game, c: Country, ended: int, label: String) -> void:
@@ -211,6 +230,7 @@ func _play(seed_value: int, save: bool, calm: bool, check: bool) -> Dictionary:
 	var digests: Array[String] = []
 	for n: int in SEASONS:
 		var pre := g.state.people.duplicate()
+		var open_before := _open_flows(g)
 		for c: Country in g.countries:
 			_act(g, c, luck)
 		var mid := g.state.people.duplicate()
@@ -221,7 +241,7 @@ func _play(seed_value: int, save: bool, calm: bool, check: bool) -> Dictionary:
 		assert_true(bool(Season.run(g)["ok"]), "the season ends")
 		assert_eq(g.turn, ended + 1)
 		if check:
-			_check_season(g, ended, pre, mid, mid_level, mid_use)
+			_check_season(g, ended, pre, mid, mid_level, mid_use, open_before, _open_flows(g))
 		if save and (n + 1) % SAVE_EVERY == 0:
 			g = _through_a_file(g)
 		digests.append(g.digest())
@@ -237,6 +257,7 @@ func _exercised() -> void:
 	assert_gt(int(_seen["raised_level"]), 0, "a settlement grew a level")
 	assert_gt(int(_seen["fell_level"]), 0, "a settlement fell a level")
 	assert_gt(int(_seen["hungry"]), 0, "some country went hungry")
+	assert_gt(int(_seen.get("armies", 0)), 20, "army actions were accepted")
 
 
 func test_forty_seasons_real_weather_every_country_conserve_their_people() -> void:

@@ -132,7 +132,8 @@ func test_a_free_slot_alone_is_not_serious() -> void:
 	var lines := Reminders.unfinished(_g, &"GEN")
 	assert_eq(lines.size(), 1)
 	assert_eq(lines[0]["severity"], 1)
-	assert_eq(Reminders.RULES, [&"treasury_empty", &"hunger", &"goods_running_out", &"winter_halt", &"treasury_falling", &"town_full", &"free_slot"] as Array[StringName])
+	assert_eq(Reminders.RULES, [&"treasury_empty", &"hunger", &"army_hungry", &"army_stores", &"goods_running_out", &"winter_halt",
+		&"winter_passes", &"treasury_falling", &"town_full", &"army_idle", &"free_slot"] as Array[StringName])
 
 
 func test_reminders_are_equal_after_a_save_and_load() -> void:
@@ -318,9 +319,9 @@ func test_a_full_village_and_a_town_with_a_work_make_no_line() -> void:
 	assert_eq(Reminders.town_full(_g, &"MLO"), {}, "another country's town is not yours")
 
 
-func test_the_order_of_the_seven_rules() -> void:
-	assert_eq(Reminders.RULES, [&"treasury_empty", &"hunger", &"goods_running_out", &"winter_halt", &"treasury_falling",
-		&"town_full", &"free_slot"] as Array[StringName])
+func test_the_order_of_the_eleven_rules() -> void:
+	assert_eq(Reminders.RULES, [&"treasury_empty", &"hunger", &"army_hungry", &"army_stores", &"goods_running_out", &"winter_halt",
+		&"winter_passes", &"treasury_falling", &"town_full", &"army_idle", &"free_slot"] as Array[StringName])
 	var c := Countries.by_tag(_g, &"GEN")
 	c.food_need = 9
 	c.food_fed = 800

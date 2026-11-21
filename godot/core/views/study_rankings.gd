@@ -9,7 +9,8 @@ extends RefCounted
 
 ## The measures, in the page's order; later milestones append (M5 people, M6 army, M12 score).
 const MEASURES: Array[Dictionary] = [{id = &"land", title = "Land, districts", since = "4.5"},
-	{id = &"income", title = "Income, a season", since = "4.5"}, {id = &"people", title = "People", since = "5"}]
+	{id = &"income", title = "Income, a season", since = "4.5"}, {id = &"people", title = "People", since = "5"},
+	{id = &"army", title = "Men under arms", since = "6"}]
 const _DOWN := "fell to"
 const _UP := "rose to"
 
@@ -38,6 +39,8 @@ static func value_of(stats: Stats, measure: StringName, tag: StringName, turn: i
 			return income_of(stats, tag, turn)
 		&"people":
 			return stats.value(tag, turn, "people")
+		&"army":
+			return stats.value(tag, turn, "army_men")
 	return 0
 
 
@@ -188,6 +191,6 @@ static func _line(game: Game, viewer: StringName, id: StringName, tags: Array[St
 				marks.append({"index": t - first, "turn": t, "text": "%s %s" % [_UP if rank < before else _DOWN, ordinal(rank)],
 					"tone": "good" if rank < before else "bad"})
 			before = rank
-	var what := "land" if id == &"land" else ("income" if id == &"income" else "people")
+	var what := String(id)  # "land", "income", "people", "army": the caption says the measure's id
 	var caption := "Your %s, the last %s" % [what, "season" if n == 1 else "%d seasons" % n]
 	return {"caption": caption, "labels": labels, "you": you, "best": best, "marks": marks}

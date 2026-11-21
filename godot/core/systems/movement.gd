@@ -377,7 +377,8 @@ static func march(game: Game, args: Dictionary) -> Dictionary:
 	return {"ok": true, "reason": ""}
 
 
-## The check of a halt (the army holds where it stands): {ok, reason}.
+## The check of a halt (the army stops where it stands): {ok, reason}. Only an army holding already is refused: a march halts,
+## and a halted march (order none, goal kept) becomes a hold on a second halt.
 static func halt_check(game: Game, args: Dictionary) -> Dictionary:
 	var v := _army_check(game, args)
 	if not bool(v.ok):
@@ -387,13 +388,18 @@ static func halt_check(game: Game, args: Dictionary) -> Dictionary:
 	return {"ok": true, "reason": ""}
 
 
-## Halts the army: it holds, its goal, route and waiting cleared. {ok, reason}.
+## Halts the army (D1, D2): a march stops with its goal and route kept, so continue_march resumes it. A halt on an army
+## already halted (no order, goal kept) or with no goal gives the hold order and clears the goal and route, so the army stops
+## asking for orders. Waiting is cleared. {ok, reason}.
 static func halt(game: Game, args: Dictionary) -> Dictionary:
 	var v := halt_check(game, args)
 	if not bool(v.ok):
 		return v
 	var army := _army_check(game, args).army as Army
-	Armies.set_order(game, army, Army.ORDER_HOLD, NO_HEX, PackedInt32Array())
+	if army.order == Army.ORDER_MARCH:
+		Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route)
+	else:
+		Armies.set_order(game, army, Army.ORDER_HOLD, NO_HEX, PackedInt32Array())
 	_clear_halt(game, army)
 	_changed(game, army)
 	return {"ok": true, "reason": ""}

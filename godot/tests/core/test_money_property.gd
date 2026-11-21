@@ -124,6 +124,19 @@ func _begin_works(g: Game, c: Country, luck: Rng) -> void:
 			assert_eq(c.stock, stock, "and the stores, %s" % c.tag)
 
 
+## Two random army actions a country (raise, march, split, merge, disband, halt...): ducats go through Treasury.move, the
+## raise and the refund of a disband in their lines (M6 L13). A refund of an army is not a work's refund.
+func _armies(g: Game, c: Country, luck: Rng) -> void:
+	for _k: int in 2:
+		var pick: Dictionary = RandomPlayer.next(g, c.tag, luck)
+		var treasury := c.treasury
+		var verdict: Dictionary = g.act(str(pick["action"]), pick["args"])
+		if bool(verdict["ok"]):
+			_seen["armies"] = int(_seen.get("armies", 0)) + 1
+		else:
+			assert_eq(c.treasury, treasury, "a refused army action leaves the treasury alone: %s" % verdict["reason"])
+
+
 func _tax(g: Game, c: Country, luck: Rng) -> void:
 	if luck.randi_range(0, 4) != 0:
 		return
@@ -141,6 +154,10 @@ func _check_season(g: Game, ended: int, closings: Dictionary) -> void:
 		var sum := 0
 		var paid := 0
 		var refunds := 0
+		var army_refunds := 0
+		for e: Dictionary in g.events:
+			if str(e.get("kind", "")) == "army_disbanded" and int(e.get("turn", -1)) == ended:
+				army_refunds += int(e["refund"])
 		for line: Dictionary in closed["lines"] as Array:
 			assert_true(Treasury.WHY.has(line["why"]), "a known reason (%s), %s" % [line["why"], label])
 			sum += int(line["amount"])
@@ -151,7 +168,7 @@ func _check_season(g: Game, ended: int, closings: Dictionary) -> void:
 				refunds += int(line["amount"])
 		assert_eq(int(closed["closing"]) - int(closed["opening"]), sum, "the treasury's change is the lines' sum, " + label)
 		assert_eq(int(closed["closing"]), c.treasury, "closing is the treasury, " + label)
-		assert_lte(refunds, paid, "refunds never exceed what the works paid, " + label)
+		assert_lte(refunds - army_refunds, paid, "refunds never exceed what the works paid, " + label)
 		if closings.has(c.tag):
 			assert_eq(int(closed["opening"]), int(closings[c.tag]), "no change of the treasury between seasons, " + label)
 		closings[c.tag] = int(closed["closing"])
@@ -221,6 +238,7 @@ func _play(seed_value: int, save: bool, calm: bool) -> Dictionary:
 			_begin_works(g, c, luck)
 			_cancel_one(g, c, luck)  # after the begins: some cancels are in the work's first season
 			_tax(g, c, luck)
+			_armies(g, c, luck)
 		var ended := g.turn
 		assert_true(bool(Season.run(g)["ok"]), "the season ends")
 		assert_eq(g.turn, ended + 1)
@@ -238,6 +256,7 @@ func _exercised() -> void:
 	assert_gt(int(_seen["taxed"]), 20, "taxes were set")
 	assert_gt(int(_seen["refused_money"]), 0, "some works were refused for money or goods")
 	assert_gt(int(_seen["work_lines"]), 100, "works were paid in the ledgers")
+	assert_gt(int(_seen.get("armies", 0)), 20, "army actions were accepted")
 
 
 func test_forty_seasons_real_weather_every_country() -> void:

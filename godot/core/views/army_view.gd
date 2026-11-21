@@ -190,6 +190,8 @@ static func _order(game: Game, a: Army) -> Dictionary:
 		stops.assign(walk.stops)
 		if int(walk.arrives_turn) >= 0:
 			arrives_text = "Arrives in " + Calendar.date_text(int(walk.arrives_turn), game.start_year)
+	elif a.order == Army.ORDER_NONE and a.goal != Army.NO_HEX:
+		text = "Halted, can march on"  # a halted march keeps its goal: continue_march resumes it
 	var waiting_text := ""
 	if a.waiting == &"winter":
 		waiting_text = "Waits for spring %s: the pass is closed." % Words.at(game, a.hex, "at")
@@ -260,6 +262,8 @@ static func _word(game: Game, a: Army) -> String:
 		return "waiting"
 	if a.order == Army.ORDER_MARCH:
 		return "marching"
+	if a.order == Army.ORDER_NONE and a.goal != Army.NO_HEX:
+		return "halted, can march on"
 	return "holding"
 
 

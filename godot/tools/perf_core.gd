@@ -28,6 +28,14 @@ const RUNS := 20
 const SEASONS_45 := 40
 const RUNS_45 := 5
 const FIELDS := 20
+## The M6 rows of m6-build-spec.md 8: the phases of army_phases_ms, the samples of the route, reach and step rows.
+const ARMY_PHASES: Array[StringName] = [&"movement", &"supply", &"ready_units", &"vision"]
+const ROUTES := 200
+const ROUTE_NEAR := 12
+const REACH_ARMIES := 200
+const STEP_HEXES := 500
+const TOKEN_RUNS := 5
+const COLD_RUNS := 3
 
 var _cpu_scale := 1.0
 var _out := ""
@@ -87,6 +95,7 @@ func _measure() -> int:
 	if not _seasons(game):
 		return 1
 	_armies(game)
+	_army_rows(game, largest)
 
 	t = Time.get_ticks_usec()
 	var digest := game.digest()
@@ -311,20 +320,135 @@ func _armies(game: Game) -> void:
 	luck.seed_with(SEED)
 	var armies := PerfFixture.seed_armies(game, luck)
 	_r["armies"] = armies.size()
-	var worst := {&"movement": 0.0, &"supply": 0.0, &"vision": 0.0}
+	var worst := {&"movement": 0.0, &"supply": 0.0, &"vision": 0.0, &"ready_units": 0.0}
+	var army_phases := 0.0  # the worst season's sum of ARMY_PHASES (m6-build-spec.md 5.0 R10)
 	for _n: int in SEASONS:
 		Season.begin(game)
+		var season_army := 0.0
 		for phase: StringName in Season.PHASES:
 			var t := Time.get_ticks_usec()
 			Season.run_phase(game, phase)
+			var spent := _ms(t)
 			if worst.has(phase):
-				worst[phase] = maxf(float(worst[phase]), _ms(t))
+				worst[phase] = maxf(float(worst[phase]), spent)
+			if ARMY_PHASES.has(phase):
+				season_army += spent
+		army_phases = maxf(army_phases, season_army)
 		Season.finish(game)
 		PerfFixture.rearm(game, luck, armies)
 	_r["movement_ms"] = worst[&"movement"]
 	_r["supply_ms"] = worst[&"supply"]
 	_r["vision_ms"] = worst[&"vision"]
+	_r["ready_units_ms"] = worst[&"ready_units"]
+	_r["army_phases_ms"] = army_phases
 	_r["cost_field_ms"] = _cost_fields(game, luck)
+
+
+## The M6 rows that read the armies once they are in the game (m6-build-spec.md 8): supply_cold_ms (every country's two
+## fields from cold), route_ms and route_worst_ms (Movement.plan, seeded), reach_ms (MovePreview.reach, uncached),
+## step_fill_us (one hex's twelve step costs from a fresh table), tokens_ms (ArmyView.tokens of the largest country,
+## uncached) and supply_bytes_ms (MapModes.supply_bytes, cold). Each uncached call makes a new game version first.
+func _army_rows(game: Game, largest: StringName) -> void:
+	var luck := Rng.new()
+	luck.seed_with(SEED + 6)
+	_r["supply_cold_ms"] = _supply_cold(game)
+	var routes := _routes(game, luck)
+	_r["route_ms"] = routes[0]
+	_r["route_worst_ms"] = routes[1]
+	_r["reach_ms"] = _reach(game)
+	_r["step_fill_us"] = _step_fill(game, luck)
+	_r["tokens_ms"] = _worst_of(game, func() -> void: ArmyView.tokens(game, largest), TOKEN_RUNS)
+	_r["supply_bytes_ms"] = _cold_worst(game, func() -> void: MapModes.supply_bytes(game, largest), TOKEN_RUNS)
+
+
+## Every country's supply fields (winter and summer) from cold: the view cache is cleared first, worst of COLD_RUNS.
+func _supply_cold(game: Game) -> float:
+	var worst := 0.0
+	for _n: int in COLD_RUNS:
+		game.view_cache.clear()
+		var t := Time.get_ticks_usec()
+		for c: Country in game.countries:
+			Supply.field(game, c.tag, false)
+			Supply.field(game, c.tag, true)
+		worst = maxf(worst, _ms(t))
+	return worst
+
+
+## Movement.plan for ROUTES seeded (army, goal) pairs: an army of the game to a land hex of its country within ROUTE_NEAR
+## hexes (about one to four seasons of march). Returns [mean ms, worst ms].
+func _routes(game: Game, luck: Rng) -> Array[float]:
+	var total := 0.0
+	var worst := 0.0
+	var n := 0
+	if game.armies.is_empty():
+		return [0.0, 0.0]
+	for _k: int in ROUTES:
+		var a := game.armies[luck.randi_range(0, game.armies.size() - 1)]
+		var land := Territory.districts(game, Countries.by_tag(game, a.tag).id)
+		if land.is_empty():
+			continue
+		var goal := game.map.hex_of(land[luck.randi_range(0, land.size() - 1)])
+		if ImproveRules.hex_distance(goal, a.hex) > ROUTE_NEAR:
+			continue
+		var t := Time.get_ticks_usec()
+		Movement.plan(game, a, goal)
+		var spent := _ms(t)
+		total += spent
+		worst = maxf(worst, spent)
+		n += 1
+	return [total / float(maxi(n, 1)), worst]
+
+
+## MovePreview.reach of the first REACH_ARMIES armies, each on a new version (uncached): the worst.
+func _reach(game: Game) -> float:
+	var worst := 0.0
+	var n := 0
+	for a: Army in game.armies:
+		if n >= REACH_ARMIES:
+			break
+		game.version += 1
+		var t := Time.get_ticks_usec()
+		MovePreview.reach(game, a.tag, a.id)
+		worst = maxf(worst, _ms(t))
+		n += 1
+	return worst
+
+
+## One hex's twelve step costs filled from a fresh table (StepCosts fills a hex on its first cost): the mean in microseconds.
+func _step_fill(game: Game, luck: Rng) -> float:
+	var steps := StepCosts.new(game.map, game.defs)
+	var total := 0.0
+	var n := 0
+	for _k: int in STEP_HEXES:
+		var i := luck.randi_range(0, game.map.hex_count() - 1)
+		var t := Time.get_ticks_usec()
+		steps.cost(i, 0, false)
+		total += float(Time.get_ticks_usec() - t)
+		n += 1
+	return total / float(maxi(n, 1))
+
+
+## The worst of `runs` calls of `call`, each on a new game version (uncached).
+func _worst_of(game: Game, call: Callable, runs: int) -> float:
+	var worst := 0.0
+	for _n: int in runs:
+		game.version += 1
+		var t := Time.get_ticks_usec()
+		call.call()
+		worst = maxf(worst, _ms(t))
+	return worst
+
+
+## The worst of `runs` calls of `call` with the view cache cleared first (the fields from cold).
+func _cold_worst(game: Game, call: Callable, runs: int) -> float:
+	var worst := 0.0
+	for _n: int in runs:
+		game.view_cache.clear()
+		game.version += 1
+		var t := Time.get_ticks_usec()
+		call.call()
+		worst = maxf(worst, _ms(t))
+	return worst
 
 
 ## PathSearch.cost_field over the whole map (every land hex allowed), worst of FIELDS goals: M8's march (m6 spec 8).

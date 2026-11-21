@@ -64,6 +64,14 @@ func _begin_works(g: Game, luck: Rng, ready: Dictionary) -> void:
 			ready[work.id] = WorksView.ready_turn(g, work)
 
 
+## Six random actions of the random player for the country (raises, marches, splits, merges, disbands, halts; L13): the
+## armies go through the door, so a save and load carries them (the digests of every season are compared).
+func _random_armies(g: Game, luck: Rng) -> void:
+	for _k: int in 6:
+		var pick: Dictionary = RandomPlayer.next(g, TAG, luck)
+		g.act(str(pick["action"]), pick["args"])
+
+
 func _check_state(g: Game, seasons_done: int) -> void:
 	var label := "after season %d" % seasons_done
 	assert_lte(Works.in_use(g, TAG), Works.slots(g, TAG), "slots, " + label)
@@ -143,6 +151,7 @@ func _play(save: bool, calm: bool = true) -> Dictionary:
 	for n: int in SEASONS:
 		_fund(g, n)
 		_cancel_one(g, luck)
+		_random_armies(g, luck)
 		var before := g.state.works.size()
 		_begin_works(g, luck, ready)
 		begun_total += g.state.works.size() - before

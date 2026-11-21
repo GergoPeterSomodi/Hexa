@@ -9,10 +9,10 @@ extends RefCounted
 
 @warning_ignore_start("integer_division")
 
-const SECTIONS: Array[StringName] = [&"glance", &"before", &"treasury", &"goods", &"works", &"people", &"orders",
-	&"befell", &"standing"]
-## Toast kinds dropped while a season runs (the report says them): M3 raises none.
-const COVERED: Array[String] = ["work_finished", "work_cancelled", "owners_changed", "goods_short"]
+const SECTIONS: Array[StringName] = [&"glance", &"before", &"treasury", &"goods", &"works", &"people", &"armies",
+	&"orders", &"befell", &"standing"]
+## Toast kinds dropped while a season runs (the report says them): M3 raises none; M6 adds the hunger and the losses.
+const COVERED: Array[String] = ["work_finished", "work_cancelled", "owners_changed", "goods_short", "army_starved", "unit_lost"]
 const SHOWN := 6
 const BEFORE_SHOWN := 5
 const TOP := 3
@@ -68,6 +68,9 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 			if not line.is_empty() and not bool(line["mine"]):  # one's own land is the Land chip's
 				befell.append(_from_log(line, 0))
 	var order_lines := _orders(game, tag, turn, started, cancelled)
+	var armies := SummaryArmies.of(game, tag, turn)
+	order_lines.append_array(SummaryArmies.orders(game, tag, turn))
+	befell.append_array(SummaryArmies.witnessed(game, tag, turn))
 	var land := _land(game, tag, turn)
 	var finished := int(counts["work_finished"])
 	var begun := int(counts["work_started"])
@@ -75,7 +78,10 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 	var money := _money(game, tag, turn, started, cancelled)
 	var people := SummaryPeople.of(game, tag, turn)
 	var quiet := finished + begun + stopped == 0 and order_lines.is_empty() and befell.is_empty() \
-			and int(land["delta"]) == 0 and bool(money.get("quiet", true)) and bool(people["quiet"])
+			and int(land["delta"]) == 0 and bool(money.get("quiet", true)) and bool(people["quiet"]) \
+			and bool(armies["quiet"])
+	var news := not befell.is_empty()
+	befell.append_array(armies["sight"] as Array[Dictionary])  # foreign armies in sight: not news of the season
 	# Reminders are of the season in play: only the report of the season that just closed carries them.
 	var reminders: Array[Dictionary] = []
 	if turn == game.turn - 1:
@@ -88,7 +94,7 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 			before.append(_reminder_line(r))
 	var under_way := _under_way(game, tag, turn)
 	var by_id := {
-		&"glance": _glance(game, tag, turn, quiet, finished, land, money, people),
+		&"glance": _glance(game, tag, turn, quiet, finished, land, money, people, armies),
 		&"before": _section(&"before", "Before %s" % Calendar.season_name(turn + 1), before, false),
 		&"works": _section(&"works", "Works", mine_works + under_way, true),
 		&"orders": _section(&"orders", "Your orders", order_lines, false),
@@ -96,12 +102,14 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 	}
 	if not (people["section"] as Dictionary).is_empty():
 		by_id[&"people"] = people["section"]
+	if not (armies["section"] as Dictionary).is_empty():
+		by_id[&"armies"] = armies["section"]
 	if not money.is_empty():
 		by_id[&"treasury"] = money["treasury"]
 		by_id[&"goods"] = money["goods"]
 		by_id[&"standing"] = _standing(game, tag, turn, money)
 	if quiet:
-		for id: StringName in [&"works", &"treasury", &"goods", &"people", &"standing"]:
+		for id: StringName in [&"works", &"treasury", &"goods", &"people", &"armies", &"standing"]:
 			by_id.erase(id)
 	var sections: Array[Dictionary] = []
 	for id: StringName in SECTIONS:
@@ -115,7 +123,7 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 		"turn": turn, "title": title, "next": next, "lede": _lede(game, tag, quiet, next),
 		"seal_letter": _seal(game, tag), "quiet": quiet, "serious": serious,
 		"swing_permille": absi(int(money["change"])) * 1000 / maxi(1, absi(int(money["opening"]))) if not money.is_empty() else 0,
-		"toast": _toast(title, quiet, [finished, begun, stopped], int(land["delta"]), not befell.is_empty(), money),
+		"toast": _toast(title, quiet, [finished, begun, stopped], int(land["delta"]), news, money),
 		"sections": sections,
 	}
 
@@ -226,7 +234,7 @@ static func _mark_top(sections: Array[Dictionary]) -> void:
 
 
 static func _glance(game: Game, tag: StringName, turn: int, quiet: bool, finished: int, land: Dictionary,
-		money: Dictionary, people: Dictionary) -> Dictionary:
+		money: Dictionary, people: Dictionary, armies: Dictionary) -> Dictionary:
 	var lines: Array[Dictionary] = []
 	var countries := game.has_countries()
 	if quiet:
@@ -257,6 +265,12 @@ static func _glance(game: Game, tag: StringName, turn: int, quiet: bool, finishe
 		chip["value"] = int(people["to"])
 		lines.append(chip)
 	var running := WorksView.of_country(game, tag).size()
+	if bool(armies["had"]):
+		var army_chip := _line("Men under arms", _tone_of(int(armies["change"])))
+		army_chip["detail"] = Words.number(int(armies["men"]))
+		army_chip["amount"] = int(armies["change"])
+		army_chip["value"] = int(armies["men"])
+		lines.append(army_chip)
 	var works := _line("Works", "good" if finished > 0 else "plain")
 	if finished > 0:
 		works["detail"] = "%d finished, %d under way" % [finished, running]
@@ -660,6 +674,7 @@ static func _standing(game: Game, tag: StringName, turn: int, money: Dictionary)
 			var c := Countries.by_tag(game, other)
 			if c != null and c.alive and int(c.ledger_closed.get("turn", -1)) == turn:
 				others.append({"tag": other, "land": stats.value(other, turn, "land"), "people": stats.value(other, turn, "people"),
+					"army": stats.value(other, turn, "army_men"),
 					"income": Treasury.left_over(_lines_of(c.ledger_closed)), "n": others.size()})
 		if not others.is_empty():
 			var land := stats.value(tag, turn, "land")
@@ -668,19 +683,36 @@ static func _standing(game: Game, tag: StringName, turn: int, money: Dictionary)
 			var income_rank := 1
 			var people := stats.value(tag, turn, "people")
 			var people_rank := 1
+			var army := stats.value(tag, turn, "army_men")
+			var army_rank := 1
+			# The men under arms are told only when a country in view has some: a world with no armies reads as before M6.
+			var armed := army > 0
 			for o: Dictionary in others:
 				land_rank += 1 if int(o["land"]) > land else 0
 				income_rank += 1 if int(o["income"]) > income else 0
 				people_rank += 1 if int(o["people"]) > people else 0
-			lines.append(_line("Among the %d countries you know, you are %s in land (%s), %s in income (%s a season) and %s in people (%s)." % [
-				others.size() + 1, _ordinal(land_rank), Words.plural(land, "district", "districts"), _ordinal(income_rank),
-				Words.signed(income), _ordinal(people_rank), Words.number(people)], "plain"))
+				army_rank += 1 if int(o["army"]) > army else 0
+				armed = armed or int(o["army"]) > 0
+			if armed:
+				lines.append(_line("Among the %d countries you know, you are %s in land (%s), %s in income (%s a season), %s in people (%s) and %s in men under arms (%s)." % [
+					others.size() + 1, _ordinal(land_rank), Words.plural(land, "district", "districts"), _ordinal(income_rank),
+					Words.signed(income), _ordinal(people_rank), Words.number(people), _ordinal(army_rank), Words.number(army)], "plain"))
+			else:
+				lines.append(_line("Among the %d countries you know, you are %s in land (%s), %s in income (%s a season) and %s in people (%s)." % [
+					others.size() + 1, _ordinal(land_rank), Words.plural(land, "district", "districts"), _ordinal(income_rank),
+					Words.signed(income), _ordinal(people_rank), Words.number(people)], "plain"))
 			others.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 				return int(a["land"]) > int(b["land"]) or (int(a["land"]) == int(b["land"]) and int(a["n"]) < int(b["n"])))
 			for o: Dictionary in others:
-				lines.append(_line("%s: about %s districts, about %s, about %s people." % [LogLines.short_name(game, o["tag"] as StringName),
-					Words.number(Knowledge.band(int(o["land"]))), Words.signed(Knowledge.band(int(o["income"]))),
-					Words.number(Knowledge.band(int(o["people"])))], "plain"))
+				var name := LogLines.short_name(game, o["tag"] as StringName)
+				if armed:
+					lines.append(_line("%s: about %s districts, about %s, about %s people, about %s men." % [name,
+						Words.number(Knowledge.band(int(o["land"]))), Words.signed(Knowledge.band(int(o["income"]))),
+						Words.number(Knowledge.band(int(o["people"]))), Words.number(Knowledge.band(int(o["army"])))], "plain"))
+				else:
+					lines.append(_line("%s: about %s districts, about %s, about %s people." % [name,
+						Words.number(Knowledge.band(int(o["land"]))), Words.signed(Knowledge.band(int(o["income"]))),
+						Words.number(Knowledge.band(int(o["people"])))], "plain"))
 	return _section(&"standing", "Standing", lines, false)
 
 

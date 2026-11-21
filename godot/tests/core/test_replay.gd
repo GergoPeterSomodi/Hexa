@@ -105,6 +105,72 @@ func test_a_replay_through_a_save_gives_the_same_digest() -> void:
 	assert_eq(_replay(back, back.action_log).digest(), g.digest())
 
 
+## Armies: 20 seasons of the random player for two countries (raises, marches, splits, merges, disbands) replay to the
+## same digest, the log written the same (M6 L13: "replay equals live").
+func _armies_played(seed_value: int) -> Game:
+	var g := EconomyFixture.game(&"GEN", false, false, seed_value, false)
+	var luck := Rng.new()
+	luck.seed_with(seed_value)
+	# Every rig goes through the log: money, goods, people (dev_*), and one raise per country at a settlement of its own;
+	# then each army is sent off to a hex of its country (a march that the door accepts is logged).
+	var armies: Array[int] = []
+	for tag: StringName in [&"GEN", &"SAV"]:
+		g.dev_money(tag, 100000)
+		for good: int in g.defs.goods.size():
+			g.dev_goods(tag, good, 200)
+		var c := Countries.by_tag(g, tag)
+		for i: int in Territory.districts(g, c.id):
+			if g.state.main_use[i] == Economy.SETTLEMENTS:
+				var hex := g.map.hex_of(i)
+				g.dev_people(hex, 10000)
+				var raised := g.act("raise", {"hex": hex, "kind": 0, "count": 2, "tag": tag})
+				if bool(raised["ok"]):
+					armies.append(int(raised["army"]))
+				break
+	for id: int in armies:
+		var own := Territory.districts(g, Countries.by_tag(g, Armies.by_id(g, id).tag).id)
+		for k: int in mini(own.size(), 40):
+			var goal := g.map.hex_of(own[k * 7 % own.size()])
+			if bool(g.act("march", {"army": id, "goal": goal, "tag": Armies.by_id(g, id).tag})["ok"]):
+				break
+	for season: int in 20:
+		for tag: StringName in [&"GEN", &"SAV"]:
+			for _k: int in 4:
+				var pick: Dictionary = RandomPlayer.next(g, tag, luck)
+				g.act(str(pick["action"]), pick["args"])
+		Season.run(g)
+	return g
+
+
+func test_armies_replay_to_the_same_digest() -> void:
+	var g := _armies_played(1480)
+	var logged := {}
+	for r: Dictionary in g.action_log:
+		logged[r["action"]] = true
+	assert_true(logged.has("raise") and logged.has("march"), "raises and marches were logged: %s" % str(logged.keys()))
+	var again := Replay.run(g.map, g.defs, g.scenario.id, g.seed_value, g.action_log)
+	assert_not_null(again)
+	assert_eq(again.digest(), g.digest(), "the replay equals the live game")
+	assert_eq(again.action_log, g.action_log, "the replay writes the same log")
+
+
+func test_p_a_changed_raise_gives_another_game() -> void:
+	# The first logged raise with one company fewer: the replay is another game (or refused: null), never the same digest.
+	var g := _armies_played(1480)
+	var log: Array[Dictionary] = []
+	for r: Dictionary in g.action_log:
+		log.append(r.duplicate(true))
+	var first := -1
+	for n: int in log.size():
+		if log[n]["action"] == "raise":
+			first = n
+			break
+	assert_gte(first, 0, "a raise was logged")
+	(log[first]["args"] as Dictionary)["count"] = 1
+	var again := Replay.run(g.map, g.defs, g.scenario.id, g.seed_value, log)
+	assert_true(again == null or again.digest() != g.digest(), "one company fewer gives another game")
+
+
 func test_a_map_only_replay() -> void:
 	var g := Game.new_game(_map(), 5, _defs())
 	g.act("build", {"hex": Vector2i(1, 1), "family": ImproveRules.WHEAT})

@@ -1,12 +1,13 @@
 ## What is still to do this season, as lines for the task flag and the report's "Before" section
-## (docs/architecture/m3-build-spec.md 4.8, 5.6; docs/architecture/m4-build-spec.md 4.18). Seven rules: an empty treasury, hunger
+## (docs/architecture/m3-build-spec.md 4.8, 5.6; docs/architecture/m4-build-spec.md 4.18). Eleven rules: an empty treasury, hunger
 ## and a need that will run out (severity 2 or 1), winter stops works in the snow (2), a treasury that will fall (1), a
-## full town (1) and a free work slot (1) (docs/architecture/m5-build-spec.md 4.14). Pure core/views/ code: reads the game (and EconomyPreview, which writes only the view cache), writes nothing.
+## full town (1) and a free work slot (1) (docs/architecture/m5-build-spec.md 4.14) and four army rules (docs/architecture/m6-build-spec.md 4.15). Pure core/views/ code: reads the game (and EconomyPreview, which writes only the view cache), writes nothing.
 class_name Reminders
 extends RefCounted
 
-const RULES: Array[StringName] = [&"treasury_empty", &"hunger", &"goods_running_out", &"winter_halt", &"treasury_falling",
-	&"town_full", &"free_slot"]
+const RULES: Array[StringName] = [&"treasury_empty", &"hunger", &"army_hungry", &"army_stores",
+	&"goods_running_out", &"winter_halt", &"winter_passes", &"treasury_falling", &"town_full",
+	&"army_idle", &"free_slot"]
 ## The seasons `goods_running_out` looks ahead (spec 4.18).
 const WINDOW := 8
 ## Food that runs out within this many seasons is serious (severity 2).
@@ -15,6 +16,8 @@ const FOOD_SERIOUS := 2
 const STUDY_ACTION: Array = [&"study", &"economy"]
 ## The study's people page: the action of `hunger`.
 const PEOPLE_ACTION: Array = [&"study", &"people"]
+## The study's military page: the action of `army_stores`.
+const MILITARY_ACTION: Array = [&"study", &"military"]
 ## A hunger line is of a season whose towns ate under this many permille of their need.
 const FED_FULL := 1000
 
@@ -47,6 +50,14 @@ static func _build(game: Game, tag: StringName) -> Array[Dictionary]:
 				_add(lines, treasury_falling(game, tag))
 			&"town_full":
 				_add(lines, town_full(game, tag))
+			&"army_hungry":
+				lines.append_array(army_hungry(game, tag))
+			&"army_stores":
+				_add(lines, army_stores(game, tag))
+			&"winter_passes":
+				_add(lines, winter_passes(game, tag))
+			&"army_idle":
+				_add(lines, army_idle(game, tag))
 			&"free_slot":
 				_add(lines, free_slot(game, tag))
 	# A stable sort: equal severities keep the order of RULES.
@@ -259,6 +270,146 @@ static func _maker(game: Game, country: Country, goods: Array[int], last_turn: i
 			best = work
 			best_ready = ready
 	return best.hex if best != null else WorksView.NO_HEX
+
+
+## The hunger reminders of the armies of `tag` (docs/architecture/m6-build-spec.md 4.15; severity 2). An army out of supply now
+## is named when it lost men in the last supply phase, or when the end hex of this season's walk is not in supply: "The Army of
+## Turin at Turin (5, 9) is out of supply: it lost 100 men and will lose about 90 more." (two or more: "2 armies are out of
+## supply: ..."). An army in supply that lost men (its stores ran out) is named too: "The Army of Turin at Turin (5, 9) lost 100 men
+## to hunger: the stores are empty." An army out of supply whose walk ends in supply, with no losses, is not named. The action
+## selects the first army named.
+static func army_hungry(game: Game, tag: StringName) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if game == null or game.state == null or tag == &"":
+		return out
+	var winter := Calendar.is_winter(game.turn)
+	var out_now: Array[Army] = []
+	for a: Army in Armies.of_country(game, tag):
+		if Supply.in_supply(game, tag, a.hex, winter):
+			if a.lost_last > 0:
+				out.append(_starving_line(game, a))
+			continue
+		if a.lost_last > 0 or not Supply.in_supply(game, tag, season_end(game, a), winter):
+			out_now.append(a)
+	if not out_now.is_empty():
+		out.push_front(_out_of_supply_line(game, tag, out_now))
+	return out
+
+
+## The hex where `a` stands at the end of this season's walk (Movement.walk_plan's first stop): its hex when it does not march
+## or does not move this season.
+static func season_end(game: Game, a: Army) -> Vector2i:
+	if a.order != Army.ORDER_MARCH or a.route.is_empty() or a.mustering(game.turn):
+		return a.hex
+	var stops: Array = Movement.walk_plan(game, a, a.route, game.turn).get("stops", [])
+	if stops.is_empty():
+		return a.hex
+	var now := int((stops[0] as Dictionary)["index"])
+	return game.map.hex_of(int(a.route[now - 1])) if now > 0 else a.hex
+
+
+static func _out_of_supply_line(game: Game, tag: StringName, hungry: Array[Army]) -> Dictionary:
+	var first := hungry[0]
+	var text := ""
+	if hungry.size() == 1:
+		var more := Supply.starve_loss(game, first.hex, Calendar.season_of(game.turn), first.men())
+		var place := "The %s %s is out of supply" % [first.name, Words.at(game, first.hex)]
+		text = "%s: it lost %s men and will lose about %s more." % [place, Words.number(first.lost_last), Words.number(more)] \
+			if first.lost_last > 0 else "%s: it will lose about %s men." % [place, Words.number(Supply.starve_loss(game, first.hex, Calendar.season_of(game.turn), first.men()))]
+	else:
+		var names: Array[String] = []
+		for a: Army in hungry:
+			names.append("the " + a.name)
+		text = "%s armies are out of supply: %s." % [Words.number(hungry.size()), Words.list(names, 2)]
+	return {
+		"kind": &"army_hungry", "severity": 2, "text": text, "hint": "", "hex": first.hex,
+		"action": [&"select_army", first.id], "action_label": "Show the army",
+	}
+
+
+static func _starving_line(game: Game, a: Army) -> Dictionary:
+	return {
+		"kind": &"army_hungry", "severity": 2, "hint": "", "hex": a.hex,
+		"text": "The %s %s lost %s men to hunger: the stores are empty." % [a.name, Words.at(game, a.hex), Words.number(a.lost_last)],
+		"action": [&"select_army", a.id], "action_label": "Show the army",
+	}
+
+
+## {} when it does not apply: the grain and fish in the store of `tag` are under the food its supplied armies eat this season
+## (Supply.army_food; severity 2): "Your stores cannot feed your armies: 0 grain and fish for 1 needed. Unfed men starve."
+static func army_stores(game: Game, tag: StringName) -> Dictionary:
+	var country := _country(game, tag)
+	if country == null:
+		return {}
+	var need := Supply.army_food(game, tag)
+	var stock := 0
+	for key: StringName in [&"grain", &"fish"]:
+		var g := game.defs.good_id(key)
+		if g >= 0 and g < country.stock.size():
+			stock += country.stock[g]
+	if need <= 0 or stock >= need:
+		return {}
+	return {
+		"kind": &"army_stores", "severity": 2, "hint": "", "hex": WorksView.NO_HEX,
+		"text": "Your stores cannot feed your armies: %s grain and fish for %s needed. Unfed men starve." % [
+			Words.number(stock), Words.number(need)],
+		"action": MILITARY_ACTION.duplicate(), "action_label": "Open Military",
+	}
+
+
+## {} when it does not apply: it is Autumn and a march of `tag` stops this season short of its goal and will wait in Winter at a
+## pass that winter closes (its walk does not move in the winter season, and the next step crosses a pass; severity 1): "Winter
+## closes the Little St Bernard: the Army of Turin waits for spring at (3, 7) near Hospice Little St Bernard unless it crosses this
+## season." The walk is Movement.walk_plan of the stored route (4.13 (c)). The action selects the army.
+static func winter_passes(game: Game, tag: StringName) -> Dictionary:
+	if game == null or game.state == null or Calendar.season_of(game.turn) != Calendar.AUTUMN or not Calendar.is_winter(game.turn + 1):
+		return {}
+	for a: Army in Armies.of_country(game, tag):
+		if a.order != Army.ORDER_MARCH or a.route.is_empty() or a.mustering(game.turn):
+			continue
+		var stops: Array = Movement.walk_plan(game, a, a.route, game.turn).get("stops", [])
+		if stops.size() < 2:
+			continue
+		var now := int((stops[0] as Dictionary)["index"])
+		if int((stops[1] as Dictionary)["index"]) != now or now >= a.route.size():
+			continue  # the walk goes on in winter: nothing waits
+		var at := game.map.index_of(a.hex) if now == 0 else int(a.route[now - 1])
+		var pass_name := Movement.pass_name(game.map, at, int(a.route[now]))
+		if pass_name.is_empty():
+			continue  # held by the snow, not by a pass
+		return {
+			"kind": &"winter_passes", "severity": 1, "hint": "", "hex": game.map.hex_of(at),
+			"text": "Winter closes the %s: the %s waits for spring %s unless it crosses this season." % [
+				pass_name, a.name, Words.at(game, game.map.hex_of(at))],
+			"action": [&"select_army", a.id], "action_label": "Show the army",
+		}
+	return {}
+
+
+## {} when it does not apply: an army of `tag` has no order (new, or halted; severity 1): "1 army awaits orders: the Army of
+## Turin at Turin (5, 9)." or "2 armies wait for orders: the Army of Turin and the Second Army of Turin." The action selects the first.
+static func army_idle(game: Game, tag: StringName) -> Dictionary:
+	if game == null or game.state == null or tag == &"":
+		return {}
+	var idle: Array[Army] = []
+	for a: Army in Armies.of_country(game, tag):
+		if a.order == Army.ORDER_NONE:
+			idle.append(a)
+	if idle.is_empty():
+		return {}
+	var first := idle[0]
+	var text := ""
+	if idle.size() == 1:
+		text = "1 army awaits orders: the %s %s." % [first.name, Words.at(game, first.hex)]
+	else:
+		var names: Array[String] = []
+		for a: Army in idle:
+			names.append("the " + a.name)
+		text = "%s armies wait for orders: %s." % [Words.number(idle.size()), Words.list(names, 2)]
+	return {
+		"kind": &"army_idle", "severity": 1, "text": text, "hint": "", "hex": first.hex,
+		"action": [&"select_army", first.id], "action_label": "Show the army",
+	}
 
 
 ## The country of `tag` in a game with countries; null otherwise.

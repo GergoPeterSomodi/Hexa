@@ -374,7 +374,7 @@ func test_no_summary_before_a_season_ended() -> void:
 	Season.run(_g)
 	assert_eq(SeasonSummary.of(_g, &"GEN", 2), {}, "the season under way")
 	assert_false(SeasonSummary.of(_g, &"GEN", 1).is_empty())
-	assert_eq(SeasonSummary.SECTIONS.size(), 9)
+	assert_eq(SeasonSummary.SECTIONS.size(), 10, "M6 adds the armies section")
 
 
 func test_the_summary_is_cached_by_version() -> void:

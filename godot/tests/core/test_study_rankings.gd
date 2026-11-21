@@ -216,7 +216,7 @@ func test_the_view_is_cached_and_a_copy() -> void:
 	var g := InsightsFixture.genoa_first_year()
 	var a := _of(g)
 	(a["measures"] as Array).clear()
-	assert_eq((_of(g)["measures"] as Array).size(), 3)
+	assert_eq((_of(g)["measures"] as Array).size(), 4)
 	var before := g.view_cache.size()
 	_of(g)
 	assert_eq(g.view_cache.size(), before, "a second call makes no new entry")
@@ -250,12 +250,15 @@ func _compare_standing(g: Game, ended: int) -> void:
 	var land := _measure(r, &"land")
 	var income := _measure(r, &"income")
 	var people := _measure(r, &"people")
+	var army := _measure(r, &"army")
 	var lines: Array = section["lines"]
 	var mine_land := 0
 	var mine_income := 0
 	var mine_people := 0
 	var income_text := {}
 	var people_text := {}
+	var army_text := {}
+	var mine_army := 0
 	for row: Dictionary in land["rows"]:
 		if bool(row["mine"]):
 			mine_land = int(row["value"])
@@ -267,15 +270,27 @@ func _compare_standing(g: Game, ended: int) -> void:
 		people_text[row["tag"]] = row["text"]
 		if bool(row["mine"]):
 			mine_people = int(row["value"])
-	var head := "Among the %d countries you know, you are %s in land (%s), %s in income (%s a season) and %s in people (%s)." % [
+	for row: Dictionary in army["rows"]:
+		army_text[row["tag"]] = row["text"]
+		if bool(row["mine"]):
+			mine_army = int(row["value"])
+	var head := "Among the %d countries you know, you are %s in land (%s), %s in income (%s a season), %s in people (%s) and %s in men under arms (%s)." % [
 		int(r["known"]), StudyRankings.ordinal(int(land["rank"])), Words.plural(mine_land, "district", "districts"),
 		StudyRankings.ordinal(int(income["rank"])), Words.signed(mine_income), StudyRankings.ordinal(int(people["rank"])),
-		Words.number(mine_people)]
+		Words.number(mine_people), StudyRankings.ordinal(int(army["rank"])), Words.number(mine_army)]
+	var armed := mine_army > 0
+	for row: Dictionary in army["rows"]:
+		armed = armed or int(row["value"]) > 0
+	if not armed:
+		head = "Among the %d countries you know, you are %s in land (%s), %s in income (%s a season) and %s in people (%s)." % [
+			int(r["known"]), StudyRankings.ordinal(int(land["rank"])), Words.plural(mine_land, "district", "districts"),
+			StudyRankings.ordinal(int(income["rank"])), Words.signed(mine_income), StudyRankings.ordinal(int(people["rank"])),
+			Words.number(mine_people)]
 	assert_eq(lines[0]["text"], head, "turn %d" % ended)
 	var want: Array[String] = [head]
 	for row: Dictionary in land["rows"]:
 		if not bool(row["mine"]):
-			want.append("%s: %s districts, %s, %s people." % [row["short"], row["text"], income_text[row["tag"]], people_text[row["tag"]]])
+			want.append("%s: %s districts, %s, %s people%s." % [row["short"], row["text"], income_text[row["tag"]], people_text[row["tag"]], (", %s men" % army_text[row["tag"]]) if armed else ""])
 	var got: Array[String] = []
 	for line: Dictionary in lines:
 		got.append(String(line["text"]))
@@ -299,7 +314,7 @@ func test_people_is_the_third_measure_yours_exact_and_others_banded() -> void:
 	var ids: Array[StringName] = []
 	for m: Dictionary in r["measures"]:
 		ids.append(m["id"] as StringName)
-	assert_eq(ids, [&"land", &"income", &"people"] as Array[StringName])
+	assert_eq(ids, [&"land", &"income", &"people", &"army"] as Array[StringName], "M6 appends the army measure")
 	var people := _measure(r, &"people")
 	assert_eq(people["title"], "People")
 	var t := int(r["turn"])
