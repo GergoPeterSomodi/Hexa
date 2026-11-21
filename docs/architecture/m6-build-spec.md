@@ -39,10 +39,11 @@ the input and the App, and builds its screens into the M1.5 frame as M5 left it.
    crest (15 move points by Turin, Aosta's valley and the Little St Bernard), it walks to the saddle (3, 7) in Autumn,
    waits there for spring in Winter (the pass edge is closed by snow) and crosses the pass edge into (3, 8) in Spring 1481
    (section 4.13); the replay plays each walk. The test pins every hex and season; `unit_moved` carries the paths.
-3. **It starves out of supply.** Ordered to the Mont Cenis saddle (3, 9) (snow cover, 3,320 m, no depot within reach), the
-   army stands out of supply, the land there feeds no one, and it loses a tenth of its men each season (a fifth in a snow
-   winter); `army_starved` is emitted, the report's Armies section, a notification and a ribbon say so; in Winter the
-   saddle's three pass edges are closed while the way back to Susa (4, 9) stays open (the same test).
+3. **It starves out of supply.** Ordered to (4, 8) (snow cover, 3,169 m, Savoy's, no depot within reach), the army walks
+   there in Summer and stands out of supply in every season (`Supply.in_supply` false in Summer and in Winter), the land
+   there feeds no one, and it loses a tenth of its men each season (a fifth in a snow winter); `army_starved` is emitted,
+   the report's Armies section, a notification and a ribbon say so; back at Turin it is in supply again (the same test).
+   (The Mont Cenis saddle (3, 9) is in supply in Summer and out in Winter, so an army there starves in Winter only.)
 4. **Men are conserved.** `tests/core/test_men_property.gd` plays 40 seasons of the 1480 scenario with seeded random
    actions for every country (raises, marches, halts, splits, merges, disbands, works, taxes) and weather drawn, and finds,
    every season and every country: the change of its people plus the change of its men under arms equals grew − starved −
@@ -84,7 +85,7 @@ the input and the App, and builds its screens into the M1.5 frame as M5 left it.
 | `Settings.SCHEMA` already holds `game/movement` (`instant`, `normal`, `slow`; `normal`; Game page, `since: "6"`); `state/study_page` lists `military`; `state/map_mode` has terrain, owner, relief (M4.5 and M5 add yields, food) | `shell/app/settings.gd` | M6 adds `supply` to `state/map_mode` and one key, `map/sight_veil` |
 | `MapData` per edge: `river` (1 to 3 a river's class, 4 a stream), `crest`, `pass_edge`, `road` (1 track, 2 road, 3 highway), `crossing` (1 ford, 2 bridge_wood, 3 bridge_stone, 4 ferry, 5 pass); per hex `cover`, `relief`, `height_m`, `climate` (0 snow, 1 frost, 2 mild) | `core/defs/map_data.gd` | Every movement and supply rule of M6 reads these; no map change |
 | North Italy: 340 land hexes; river edges by class 15, 133, 34 and 53 streams; crossings: 31 pass, 29 wooden and 6 stone bridges, 5 fords, no ferry; 89 crest edges, 45 of them pass edges (31 with a road); land climate snow 174, frost 134, mild 32 | `data/maps/north_italy.tres` (read for this page) | The great river (class 3: the Po, from Turin down) is crossed only at its five wooden bridges: Turin–Vercelli, Vercelli–Alessandria, (9, 10)–Milan, Pavia–Piacenza, and at Ferrara |
-| The Mont Cenis saddle (3, 9): snow cover, 3,320 m, Savoy's; its pass edges lead to (4, 10), (3, 8) and (2, 9); the Little St Bernard saddle (3, 7) has pass edges to (2, 7) and (3, 8) | the same | The worked route and the starving army of 4.13 |
+| The Mont Cenis saddle (3, 9): snow cover, 3,320 m, Savoy's; its pass edges lead to (4, 10), (3, 8) and (2, 9); the Little St Bernard saddle (3, 7) has pass edges to (2, 7) and (3, 8) | the same | The worked pass route of 4.13 (the saddle is in supply in Summer, out in Winter); the starving army of 4.13 (d) goes to (4, 8): snow, out of supply in both seasons |
 | The marks atlas has `mark/grid`, `select`, `target`, `white` and the crossing marks (`ford`, `bridge_wood`, `bridge_stone`, `ferry`, `pass`, six directions each) | `assets/tiles/summer/index.json` | Reach tiles use `mark/white`; the order cursor uses `mark/target` |
 | `TileMapView` has `OVERLAYS = {"marks": [90, ""]}`, the standing group at z 70 (`Standing`, y-sorted), lines at 50, borders at 85 | `shell/mapview/tile_map_view.gd` | Two overlay layers join (`reach`, `reach_next`); tokens get their own node at z 88 (1.2) |
 | `Actions.pair_of` is a `match`; `Actions.register_test_action` lets a test register a stub pair | `core/game/actions.gd` | The M6 hostility seam uses the same pattern (5.3) |
@@ -273,13 +274,13 @@ spends at most that many points; what is left is lost.
 
 **Where an army may stand** (`Movement.open_to(game, tag, hex)`): a land hex held by `tag`, or held by no one; M7 adds the
 land of a country `hostile` to `tag`. **Who is hostile** (`Movement.hostile(game, a, b)`): nobody in M6, except pairs a
-test registers (`Movement.register_test_hostility(a, b)`, the pattern of `Actions.register_test_action`).
+test registers (`Movement.register_test_hostility(a, b)`, the pattern of `Actions.register_test_action`). Each registration or clear changes the plan key (`_hostile_revision`), so no plan from before it is kept. **For M7:** war and peace change hostility through the game, and every action bumps `game.version` (plans and open masks key on it): a war or peace action must bump the version (or the revision), or a plan made before it is kept.
 
 **Room** (`Military.can_stand(game, tag, hex, adding, leaving)`): "" when `hex` holds no army of another country and the
 units of `tag` there (less the armies in `leaving`, which march away) plus `adding` are at most `stack_limit` (8); else the
 words of 4.7.
 
-**The route** (`Movement.plan(game, army, goal)`): A* from the army's hex to `goal` over hexes `open_to` the army's
+**The route** (`Movement.plan(game, army, goal)`): A* from the army's hex (an army on land no longer open to it searches from its own hex: that hex is open to the search only, in a copy of the mask, so it walks out) to `goal` over hexes `open_to` the army's
 country, costs of `StepCosts.cost` with the rules of the current season (winter when `Calendar.is_winter(game.turn)`),
 WADE at `wade_plan_cost`, CLOSED and BLOCKED not entered, the heuristic `hex distance × 1` (the cheapest step), the search
 stopping past `march_seasons_max × mp` (12 seasons). In winter the route is planned twice, with the winter rules and with
@@ -290,7 +291,7 @@ or "", reason}`.
 
 **The walk** (`Movement.walk_plan(game, army, route, from_turn)`): season by season from `from_turn`, the army skipping
 its mustering season, walks the route's steps with the costs of that season until the next step costs more than the
-points left (a WADE step only with all points, then the season ends) or is CLOSED (the season ends: it waits). It gives
+points left (a WADE step only with all points, then the season ends; a step dearer than the army's full points is taken as the season's first step and spends them all: without it an army of 8 points could never enter a snow peak, 9 points or 18 in winter) or is CLOSED (the season ends: it waits). It gives
 `{stops: Array[{turn, index}] (where the army stands at the end of each season), arrives_turn (the season it stands on the
 goal at the end of), seasons}`. The preview and the army panel show these stops; the movement phase walks the same rule
 for one season.
@@ -309,7 +310,7 @@ for one season.
 3. **Room.** The legs' ends are checked in army id order: while the companies of a country ending on a hex exceed 8, the
    last army there in id order steps back one hex along its leg (to its start at worst, where it stood when the phase
    began), and the check runs again until every hex fits (each step back moves one army toward its start, so it ends); a
-   march cut short this way keeps its order and goes on next season.
+   march cut short this way keeps its order and goes on next season. **Decision (L6 review):** a walk stepped back this way gets no halt event and no winter wait, even when its leg had stopped at a closed pass: its status clears, and it resumes next season on its route (the one-hex-short wait is not reported).
 4. **Apply.** `Armies.set_hex` for every army that moved (and `moved_from`, its hex before the phase); the leg's steps are
    removed from its route; an army on its goal holds (`order` hold, the route and goal cleared). Each walk emits one
    `unit_moved` (4.11) and adds the hexes it saw on the way to its country's explored hexes (`Vision.see_path`). The sight
@@ -403,10 +404,12 @@ more, or a place with a port.
 a hex (1 in supply). Kept in `game.supplies` (`SupplyCache`, derived) per (country, winter), dropped for a country when its
 land or one of its settlements changes (`Game.emit` of `owners_changed`, or `hex_changed` on a settlement hex).
 
-On north Italy at the start, out of supply in summer (in winter): Savoy 8 (17) of 58 hexes, among them the Mont Cenis
-saddle (3, 9) and (4, 8); Milan 5 (9) of 52, the snow heights by the Gotthard, the Bernina, the Stelvio and Monte Rosa; Genoa 2 (4) of
-14, (6, 14) and (5, 15); Venice 7 (11) of 42; Austria 26 (30) of 37; France 16 (21) of 34 (worked out from the map data
-with these rules for this page; `tests/core/test_supply.gd` pins the lists).
+On north Italy at the start, out of supply in summer (in winter), as these rules compute them (L7's run, 2026-11-21):
+Savoy 6 (16) of 58 hexes, among them (4, 8) in both seasons and (3, 9) in winter only; Milan 1 (5) of 52, (13, 3) in summer
+and (9, 3), (12, 3), (11, 6), (11, 12) in winter; Genoa 0 (2) of 14, (9, 11) and (10, 12) in winter; Venice 2 (6) of 42;
+Austria 21 (25) of 37; France 16 (21) of 34. Every country's counts are pinned in `tests/core/test_supply.gd`.
+The earlier figures of this page (Savoy 8 (17), Milan 5 (9), Genoa 2 (4), Venice 7 (11), Austria 26 (30)) were
+hand-worked and disagree with the rules as written; France agreed.
 
 **The supply phase** (`Supply.season(game)`), every living country in id order, its armies in id order:
 
@@ -472,7 +475,7 @@ load, after the movement phase, in the vision phase and after `dev_transfer`). `
 `&""` sees all.
 
 **Explored** (`Country.explored`, a bitset of `ceil(hex_count / 8)` bytes, saved): set at game start to the land sight; the
-vision phase adds the season's sight; the movement phase adds the hexes around each walk's steps. `Knowledge.knows` (M3)
+vision phase adds the season's sight; the movement phase adds the steps of each walk (5.0 R10: the armies' rings come with the vision phase). `Knowledge.knows` (M3)
 becomes: M3's rule, **or** `viewer` has explored a hex `other` holds.
 
 **Witnesses** (`Game.emit`): an event whose kind is in `Vision.SIGHTED` (`work_started`, `work_finished`,
@@ -503,8 +506,8 @@ becomes: M3's rule, **or** `viewer` has explored a hex `other` holds.
 | `army_raised` | "You raised 2 companies of pikemen at Turin (5, 9) (−50 ducats)." keyword "Raised", plain, filters all, mine, money; `floating` "Raised" | "Milan raised 2 companies at Novara (7, 8): about 1,000 men." keyword "Raised", warn, all; `notify` true |
 | `army_disbanded` | "You disbanded 1 company of pikemen of the Army of Turin (+25 ducats back)." plain, all, mine (money when refunded) | "Milan disbanded about 500 men at Novara (7, 8)." muted, all |
 | `march_halted` | winter: "The Army of Turin waits for spring at Susa (4, 9): the Mont Cenis is closed by snow." warn; else "The Army of Turin halted at Susa (4, 9): no way to (3, 8) near Hospice Mont Cenis by land." warn; all, mine; `notify` true; `floating` "Halted" | (never witnessed) |
-| `army_starved` | "The Army of Turin lost 100 men to hunger at Hospice Mont Cenis (3, 9): out of supply." bad, all, mine; `notify` true; `floating` "Hunger −100" | "A Milanese army lost men to hunger at (8, 3) near Bellinzona." muted, all |
-| `unit_lost` | "A company of pikemen of the Army of Turin is gone: starved at Hospice Mont Cenis (3, 9)." bad, all, mine; `notify` true | "A Milanese company starved at (8, 3) near Bellinzona." muted, all |
+| `army_starved` | "The Army of Turin lost 100 men to hunger at (4, 8): out of supply." bad, all, mine; `notify` true; `floating` "Hunger −100" | "A Milanese army lost men to hunger at (8, 3) near Bellinzona." muted, all |
+| `unit_lost` | "A company of pikemen of the Army of Turin is gone: starved at (4, 8)." bad, all, mine; `notify` true | "A Milanese company starved at (8, 3) near Bellinzona." muted, all |
 
 No new filter: army lines show in All and Mine (raises with money in Money); M7 adds them to War.
 Places in the army sentences come from `Words.at` (5.6): "at Susa (4, 9)", "at Hospice Mont Cenis (3, 9)" (the saddles'
@@ -544,12 +547,12 @@ winter); the winter detour costs 61 points against the summer route's 5, past th
 spring** at (3, 7) (`march_halted {why: winter, waits: true}`); Spring 1481's phase walks the last step. (3, 7) lies within
 Aosta's reach (in supply), in winter too.
 
-**(d) The Mont Cenis saddle.** The army of (a), ordered from Turin to (3, 9) in Spring 1480, musters in Spring and walks
-in Summer (11 points: Susa 2, the saddle 9): out of supply (no depot within 8 supply points), snow cover with no people:
-the land feeds no one. Summer's supply phase takes `ceil(1,000 × 100 / 1000)` = 100 men (900 left), Autumn's 90 (810), Winter
-1480's a fifth (`starve_permille` 200 in the snow winter): 162 (648). In Winter the saddle's three pass edges are CLOSED,
-but its edge to Susa (4, 9) is no pass edge: ordered back to Turin in Winter, the army walks Susa (2, Susa being frost
-winter) and Turin (2) that season. The test pins each season's men.
+**(d) Out of supply, to (4, 8).** The army of (a), ordered from Turin to (4, 8) in Spring 1480, musters in Spring and walks
+in Summer (11 points). (4, 8) is snow cover at 3,169 m with no depot within 8 supply points: out of supply in Summer and in
+Winter (`Supply.in_supply`, measured), and the land feeds no one (forage 0). Summer's supply phase takes
+`ceil(1,000 × 100 / 1000)` = 100 men (900 left), Autumn's 90 (810), Winter 1480's a fifth (`starve_permille` 200 in the snow
+winter): 162 (648). Ordered back to Turin in Winter, the army walks back in Spring 1481 (one season) and is in supply there
+again. The test pins each season's men. (Measured with `MovementPhase.season` and `Supply.season` on the 1480 game.)
 
 **(e) Upkeep and the report of Spring 1480** (raising at Turin): Treasury: "Raised: 2 companies of pikemen at Turin (5, 9)
 ▼ −50", "Army upkeep, 1 army ▼ −12"; Goods: "Iron 18 ▼ −2 (for raising 2)", "Grain ... (eaten by the army 1)"; Armies:
@@ -567,7 +570,7 @@ treasury, goods, works, people, **armies**, orders, befell, standing):
 | `before` | the reminders of 4.15 |
 | `treasury` | "Raised: <units> at <place>" per raise line; "Army upkeep, n armies"; refunds of raises "Refund: <units>" |
 | `goods` | the flow words "eaten by the army" (`army`) and "for raising" (`raise`) in `detail` |
-| `armies` | `total` "Men under arms 1,000 → 900" (Stats `army_men` of the season before and this one); a line per army of the viewer that moved, changed men, starved or musters: "Army of Turin: Turin (5, 9) → Vercelli (6, 9), 1,000 men." (`moved_from`), "Army of Turin at Hospice Mont Cenis (3, 9): 900 men ▼ −100, out of supply." (a link to the army); lines of the season's `unit_lost` of the viewer; `sub` "Upkeep: 12 ducats a season." and "Your armies ate 1 grain from the stores." Rank: `|men change|`, moved armies 1 |
+| `armies` | `total` "Men under arms 1,000 → 900" (Stats `army_men` of the season before and this one); a line per army of the viewer that moved, changed men, starved or musters: "Army of Turin: Turin (5, 9) → Vercelli (6, 9), 1,000 men." (`moved_from`), "Army of Turin at (4, 8): 900 men ▼ −100, out of supply." (a link to the army); lines of the season's `unit_lost` of the viewer; `sub` "Upkeep: 12 ducats a season." and "Your armies ate 1 grain from the stores." Rank: `|men change|`, moved armies 1 |
 | `orders` | from the action log of the turn: "Raised 2 companies of pikemen at Turin (5, 9) (▼ −50).", "Ordered to march: the Army of Turin to Vercelli (6, 9).", "Ordered to hold: the Army of Turin.", "Split the Army of Turin.", "Joined the Second Army of Turin to the Army of Turin.", "Disbanded 1 company of pikemen of the Army of Turin (+25 ducats back)." |
 | `befell` | M3 to M5's, now with real witnesses; plus others' witnessed `army_raised`, `army_disbanded`, `army_starved`, `unit_lost`; and, for the season that just ended only, one line per foreign army the viewer sees now: "A Milanese army of about 1,000 men stands at Alessandria (7, 9)." (a link) |
 | `standing` | M5's line with "and k-th in men under arms (1,000)"; each known country's line adds "about N men" |
@@ -581,7 +584,7 @@ treasury, goods, works, people, **armies**, orders, befell, standing):
 
 | Rule | When | Severity | Text | Action |
 |---|---|---|---|---|
-| `army_hungry` | an army of the player stands out of supply now (`Supply.in_supply` false) and its route does not end this season in supply, or lost men in the last supply phase | 2 | "The Army of Turin at Hospice Mont Cenis (3, 9) is out of supply: it lost 100 men and will lose about 90 more." (two or more: "2 armies are out of supply: ...") | `[&"select_army", id]`, "Show the army" |
+| `army_hungry` | an army of the player stands out of supply now (`Supply.in_supply` false) and its route does not end this season in supply, or lost men in the last supply phase | 2 | "The Army of Turin at (4, 8) is out of supply: it lost 100 men and will lose about 90 more." (two or more: "2 armies are out of supply: ...") | `[&"select_army", id]`, "Show the army" |
 | `army_stores` | the grain and fish in store are under the supplied armies' food of this season (`EconomySeason.needs_of(...).army_food`) | 2 | "Your stores cannot feed your armies: 0 grain for 1 needed. Unfed men starve." | `[&"study", &"military"]`, "Open Military" |
 | `winter_passes` | Autumn, and `Movement.walk_plan` of a march of the player's has it wait in Winter at a pass edge that closes then (its route crosses that edge after this season's walk) | 1 | "Winter closes the Little St Bernard: the Army of Turin waits for spring at Hospice Little St Bernard (3, 7) unless it crosses this season." | `[&"select_army", id]` |
 | `army_idle` | an army of the player has no order (new, or halted) | 1 | "1 army awaits orders: the Army of Turin at Turin (5, 9)." / "2 armies await orders: the Army of Turin and the Second Army of Turin." | `[&"select_army", first id]`, "Show the army" |
