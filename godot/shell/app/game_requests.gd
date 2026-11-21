@@ -69,6 +69,8 @@ func setup() -> void:
 		return _scene != null and is_instance_valid(_scene) and _scene.mode() == int(MapModes.Mode.YIELDS)
 	warm.food_active = func() -> bool:
 		return _scene != null and is_instance_valid(_scene) and _scene.mode() == int(MapModes.Mode.FOOD)
+	warm.supply_active = func() -> bool:
+		return _scene != null and is_instance_valid(_scene) and _scene.mode() == int(MapModes.Mode.SUPPLY)
 	_app.add_child(warm)
 	_app.hud().debug_overlay().study_info_func = study_info
 	_app.context().season_running_func = func() -> bool:
@@ -87,6 +89,14 @@ func connect_signals(link: Callable) -> void:
 	link.call(hud, &"report_requested", flow.reopen_report)
 	link.call(hud, &"hex_look_requested", _on_hex_look)
 	link.call(hud, &"army_requested", _on_army_requested)
+	var army_panel := hud.army_panel()
+	link.call(army_panel, &"look_at_requested", _on_hex_look)
+	link.call(army_panel, &"confirm_requested", _on_army_confirm)
+	link.call(army_panel, &"toast_requested", _toast)
+	link.call(army_panel, &"closed", _on_army_panel_closed)
+	link.call(Events, &"army_selected", _on_army_selected)
+	link.call(Events, &"army_cleared", _on_army_cleared)
+	link.call(Events, &"game_ended", _on_army_cleared)
 	link.call(_app.app_input(), &"quicksave_requested", quicksave)
 	link.call(_app.app_input(), &"quickload_requested", quickload)
 	link.call(_app.app_input(), &"console_requested", _on_console_requested)
@@ -264,6 +274,58 @@ static func army_outcome(moved: bool, hex: Vector2i, has_scene: bool) -> StringN
 	return &"gone"
 
 
+## Whether an army of the player's is selected on the map (the Esc ladder's has_army).
+func has_army() -> bool:
+	var armies := _armies()
+	return armies != null and armies.selected_army() >= 0
+
+
+## The Esc ladder's clear step (M6 6.4): the army selection and its panel go first, then the country panel's dock, then the
+## hex selection (or the hex panel when there is no map).
+func clear_selection() -> void:
+	var armies := _armies()
+	if armies != null and armies.selected_army() >= 0:
+		armies.clear_army()
+		return
+	var hud := _app.hud()
+	if hud == null:
+		return
+	if hud.country_panel() != null and hud.country_panel().visible:
+		hud.close_dock()
+	elif _app.map_scene() != null:
+		_app.map_scene().select_hex(MapScene.NO_HEX)
+	else:
+		hud.hex_panel().clear()
+
+
+func _armies() -> MapArmies:
+	if _scene == null or not is_instance_valid(_scene):
+		return null
+	return _scene.get_node_or_null("MapArmies") as MapArmies
+
+
+## An army was selected on the map (or from a line): the dock shows its panel alone.
+func _on_army_selected(army_id: int) -> void:
+	_app.hud().close_dock()
+	_app.hud().army_panel().show_army(army_id)
+
+
+func _on_army_cleared() -> void:
+	_app.hud().army_panel().clear()
+
+
+## The panel's close button lets the selection go too (the map and the panel stay in step).
+func _on_army_panel_closed() -> void:
+	var armies := _armies()
+	if armies != null:
+		armies.clear_army()
+
+
+## A disband that needs its Confirm: the screen goes on the stack over the map.
+func _on_army_confirm(screen: Screen) -> void:
+	_app.stack().push(screen)
+
+
 static func _hex_arg(value: Variant) -> Vector2i:
 	if value is Vector2i:
 		return value as Vector2i
@@ -411,6 +473,7 @@ func _on_game_started() -> void:
 	var saved: Variant = Session.loaded_ui().get("bookmarks")
 	bookmarks = Bookmarks.from_dict(saved if saved is Dictionary else {})
 	_due_seen = false
+	_app.hud().layers_popover().set_sight_available(Session.game != null and Session.game.has_countries())
 	if _floaters != null:
 		_floaters.setup(Session.game)
 	if lock_enabled and Session.game != null:

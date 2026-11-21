@@ -30,6 +30,7 @@ const LAYER_SPECS: Array[Array] = [
 @onready var _metrics_label: Label = $VBox/Metrics
 @onready var _m3_label: Label = $VBox/M3Line
 @onready var _m4_label: Label = $VBox/M4Line
+var _army_label: Label = null
 @onready var _console: DevConsole = $VBox/DevConsole
 @onready var _season_seg: Segmented = $VBox/SeasonSeg
 @onready var _new_seed_btn: KitButton = $VBox/ControlsTop/NewSeedButton
@@ -76,6 +77,13 @@ func _ready() -> void:
 	_people_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_m4_label.get_parent().add_child(_people_label)
 	_m4_label.get_parent().move_child(_people_label, _m4_label.get_index() + 1)
+
+	_army_label = Label.new()
+	_army_label.theme_type_variation = &"TableRow"
+	_army_label.text = "no game"
+	_army_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_m4_label.get_parent().add_child(_army_label)
+	_m4_label.get_parent().move_child(_army_label, _m4_label.get_index() + 1)
 	Events.town_grew.connect(_on_town_grew)
 	Events.district_declined.connect(_on_district_declined)
 	Events.season_ended.connect(_on_season_ended)
@@ -271,6 +279,11 @@ func m4_text() -> String:
 	return _m4_label.text if is_node_ready() else ""
 
 
+## The armies line's words (M6), for the tests.
+func m6_text() -> String:
+	return _army_label.text if is_node_ready() and _army_label != null else ""
+
+
 func people_text() -> String:
 	return _people_label.text if is_node_ready() and _people_label != null else ""
 
@@ -332,6 +345,7 @@ func refresh_metrics() -> void:
 	_metrics_label.text = "\n".join(lines)
 	_m3_label.text = m3_line()
 	_m4_label.text = m4_line()
+	_army_label.text = m6_line()
 	if _study_label != null:
 		_study_label.text = study_line()
 	if _people_label != null:
@@ -398,6 +412,22 @@ func m4_line() -> String:
 	for climate: int in 3:
 		weather.append(WEATHER_WORDS[clampi(int(game.weather[climate]), 0, WEATHER_WORDS.size() - 1)])
 	return "%s · districts cached %d · weather %s" % [" · ".join(times), game.districts.size(), ", ".join(weather)]
+
+
+## The armies line (M6 spec 6.11): "armies 3 · units 6 · movement 0.6 ms · supply 0.4 ms · vision 0.2 ms · steps filled 340".
+## The phase times are of the last season played ("none yet" before one); the steps filled are the step table's (0 with no army).
+func m6_line() -> String:
+	var game := Session.game
+	if game == null:
+		return "no game"
+	var units := 0
+	for army: Army in game.armies:
+		units += army.units.size()
+	var times: PackedStringArray = []
+	for phase: String in ["movement", "supply", "vision"]:
+		times.append("%s %s" % [phase, "%.1f ms" % float(Session.last_phase_ms[phase]) if Session.last_phase_ms.has(phase) else "none yet"])
+	var filled := StepCosts.of(game.map, game.defs).filled() if not game.armies.is_empty() else 0
+	return "armies %d · units %d · %s · steps filled %d" % [game.armies.size(), units, " · ".join(times), filled]
 
 
 func _collect_metrics() -> Dictionary:

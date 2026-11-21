@@ -13,6 +13,8 @@ const DEFAULT_SPAN := 12
 var yields_active: Callable = Callable()
 ## True while the map is in Food (the App's GameRequests sets it); then the Food bytes are warmed too.
 var food_active: Callable = Callable()
+## True while the map is in Supply (M6); then the Supply bytes are warmed too.
+var supply_active: Callable = Callable()
 
 var _settings: Settings = null
 var _queue: Array[Callable] = []
@@ -55,10 +57,13 @@ func queue_views() -> void:
 	_queue.append(func() -> void: StudyHistory.timeline(game, tag))
 	_queue.append(func() -> void: StudyHistory.chronicle(game, tag, &"all", game.turn - 1, StudyHistory.PAGE))
 	_queue.append(func() -> void: StudyPeople.of(game, tag, span))
+	_queue.append(func() -> void: StudyMilitary.of(game, tag, span))
 	if yields_active.is_valid() and bool(yields_active.call()):
 		_queue.append(func() -> void: MapModes.yield_bytes(game, tag))
 	if food_active.is_valid() and bool(food_active.call()):
 		_queue.append(func() -> void: MapModes.food_bytes(game, tag))
+	if supply_active.is_valid() and bool(supply_active.call()):
+		_queue.append(func() -> void: MapModes.supply_bytes(game, tag))
 
 
 ## Runs the whole queue at once (tools and tests).

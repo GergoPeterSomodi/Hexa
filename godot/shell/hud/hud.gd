@@ -66,6 +66,7 @@ const LEGEND_GAP := 8.0
 @onready var _dock: VBoxContainer = $Root/Column/Main/Dock
 @onready var _hex_panel: HexPanel = $Root/Column/Main/Dock/HexPanel
 @onready var _country_panel: CountryPanel = $Root/Column/Main/Dock/CountryPanel
+@onready var _army_panel: ArmyPanel = $Root/Column/Main/Dock/ArmyPanel
 
 var _ctx: ShellContext = null
 var _settings: Settings = null
@@ -463,6 +464,11 @@ func dock() -> VBoxContainer:
 
 func country_panel() -> CountryPanel:
 	return _country_panel
+
+
+## The army panel (M6): the dock's view of the map's selected army; GameRequests wires it.
+func army_panel() -> ArmyPanel:
+	return _army_panel
 
 
 func minimap() -> Minimap:

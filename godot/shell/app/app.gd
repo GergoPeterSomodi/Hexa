@@ -94,7 +94,7 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	_booted = true
 	if p_settings != null:
 		_settings_override = p_settings
-	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "5": the study and its four pages, Food (key 5), the M5 chips
+	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "6": the study and its five pages, the Supply mode (key 6), the army keys and chip
 	_init_settings()
 	_apply_key_overrides()
 
@@ -563,6 +563,7 @@ func _on_back_requested() -> void:
 		"has_screen": top != null,
 		"hud_list_open": _hud != null and _hud.has_open_list(),
 		"has_selection": _map_scene != null and _map_scene.selected != MapScene.NO_HEX,
+		"has_army": _requests.has_army(),
 		"dock_open": _hud != null and _hud.is_dock_open(),
 	}
 	match EscLadder.decide(state):
@@ -574,12 +575,7 @@ func _on_back_requested() -> void:
 			if _hud != null:
 				_hud.close_lists()
 		EscLadder.CLEAR_SELECTION:
-			if _hud != null and _hud.country_panel() != null and _hud.country_panel().visible:
-				_hud.close_dock()
-			elif _map_scene != null:
-				_map_scene.select_hex(MapScene.NO_HEX)
-			elif _hud != null:
-				_hud.hex_panel().clear()
+			_requests.clear_selection()
 		EscLadder.OPEN_PAUSE_MENU:
 			_open_pause_menu()
 

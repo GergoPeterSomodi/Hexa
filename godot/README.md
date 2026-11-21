@@ -49,6 +49,18 @@ hex panel, the hover card, the report, the task flag and the log tell of it. The
 (sets the people of a hex, for tests of growth and hunger), and F3 shows a people line (the phase time, the levels that grew
 and fell last season, the countries that went hungry).
 
+**M6 Armies (the App is wired; the owner's playtest is next).** Armies walk the map. The **Raise** tab of an own settlement's hex
+panel (its Works | Raise segment) raises companies, and the **Army chip** (men under arms) appears with the first one. A token
+on the map is an army: a click selects it (or, on a hex with several, the next one), and its **army panel** opens in the dock:
+Hold, Continue march, Split off, Join and Disband, Raise here, its supply and its upkeep. A right click on a reachable hex (or
+`O` at the cursor) orders a march; with an army selected a right click on its own hex holds it, and with none it opens the hex
+menu. `Tab` selects the next army that needs orders, `R` continues a halted march, Alt+arrows move the cursor (the route follows,
+and the move card says what the way costs). Key `6` is **Supply**: where your armies are fed, your land striped where it starves;
+the Layers popover's **Sight** switch shades what you cannot see. The Army chip opens the **Military** page (`[` `]` reach it
+too), the report has an **Armies** section, and `Esc` clears a selected army before anything else. The developer console takes
+`raise c r kind [n]`, `march ID c r`, `hold ID`, `armies` and `as TAG action ...`; F3 shows an armies line. The movement replay
+(`game/movement`) plays the walks between seasons; Space skips it.
+
 ## Engine
 
 - Godot **4.7.2-stable**, standard build (not .NET), Compatibility renderer, GDScript. Pinned here, in CI and in
@@ -227,12 +239,12 @@ check) and **Check** (the deep validation; its lines go to `facts` and the Outpu
   `user://settings.cfg` (`Settings`), with a 10 s `Confirm` revert for display/window/UI-scale changes.
 - **Default bindings** (`shell/input/bindings.gd`, `Bindings.DEFAULTS`):
   - **Camera:** `WASD` / arrows (pan; hold `Shift` for fast pan), `=` / `+` / `Kp+` (zoom in), `-` / `Kp-` (zoom out), `F` / `Home` (fit whole map).
-  - **Map & View:** left click (select hex), right click (clear selection), `1`–`5` (map modes Terrain / Owner / Relief / Yields / Food; Owner, Yields and Food are refused with a toast in a map-only game, and Yields and Food while picking), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (the works card for the selected hex's upgrade, or its first build on wild land; with Confirm works Off, or Expensive only for a cheap work, it begins the work at once).
+  - **Map & View:** left click (select hex), right click (clear selection), `1`–`6` (map modes Terrain / Owner / Relief / Yields / Food / Supply; Owner, Yields, Food and Supply are refused with a toast in a map-only game, and Yields, Food and Supply while picking), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (the works card for the selected hex's upgrade, or its first build on wild land; with Confirm works Off, or Expensive only for a cheap work, it begins the work at once).
   - **The pick:** click a country's land or choose it in the list (`Up` / `Down`, `Enter` shows it, `Enter` again plays it), or `Play as` in its panel; `Esc` closes the panel, then asks for the pause menu (the pick cannot be skipped).
   - **Time & saves (M3):** `Space` / `Enter` (end the season; a second one inside 400 ms of the report closing is refused), `J` (the last season report), `F5` / `Ctrl+S` / `Cmd+S` (quicksave), `F9` / `Ctrl+L` / `Cmd+L` (quickload; asks first when actions are unsaved), `Ctrl+Z` / `Cmd+Z` (cancel the work begun last this season), `Ctrl+Shift+1..9` (set camera bookmark), `Ctrl+1..9` (go to it), `F2` (the developer console at the foot of F3, developer tools on).
   - **Economy (M4):** `I` (the Statesman's Study on its last page), `L` (the study's Economy page), `[` `]` (study pages: Economy, Rankings, History), `Ctrl+[` `Ctrl+]` (`Cmd` on a Mac: the tabs of the page, as Economy's four), `Enter` or `U` on a works card (begin the work), `Esc` (close the card or the study), `Shift` (keep a hovered card while the pointer is away).
   - **Saves:** `user://saves/` holds `quick`, `1` to `8` and `auto1` to `auto3` (`.sav`, `.png`); the program writes `user://running.lock` while a game runs and asks to load the newest autosave when it finds one left behind. Continue on the main menu loads the newest save and falls back to older ones when its body is damaged. The shell's key milestone is `Bindings.SHELL_MILESTONE` (`"5"`); the Options screen shows the rows up to `Options.TARGET_MILESTONE` (5).
-  - **App & Dev:** `Esc` (Esc ladder: console field → popover → top screen → country panel or selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
+  - **App & Dev:** `Esc` (Esc ladder: console field → popover → top screen → army selection, country panel or hex selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
 - **Pointer & trackpad gestures** (`shell/input/camera_rig.gd`):
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).
   - Mac trackpad two-finger scroll (`InputEventPanGesture`) pans at `GESTURE_PAN_PX` (20 px per delta unit); trackpad pinch (`InputEventMagnifyGesture`) zooms directly about the fingers; left/middle/right drag past `CLICK_SLOP` (6 px) pans 1:1.

@@ -672,7 +672,10 @@ func _on_item_selected() -> void:
 	var item := _grid.get_selected()
 	if item == null:
 		return
-	var meta := int(item.get_metadata(0))
+	var raw: Variant = item.get_metadata(0)
+	if not (raw is int):
+		return  # the tree's root (an empty table, with the arrow keys): no row
+	var meta := int(raw)
 	if meta == _MORE:
 		_has_selection = false
 		return

@@ -20,6 +20,7 @@ const HELP_LINES: Array[String] = [
 	"choose TAG   end [n]   goto c r   look spring|summer|autumn|winter|calendar",
 	"give c r [c r ...] TAG|none   digest   seed   help",
 	"money N [TAG]   goods KEY N [TAG]   tax low|normal|high   people c r N",
+	"raise c r kind [n]   march ID c r   hold ID   armies   as TAG action ...",
 ]
 ## The tax words of `tax`, by level.
 const TAX_WORDS: Array[String] = ["low", "normal", "high"]
@@ -56,6 +57,16 @@ static func parse(text: String, game: Game) -> Dictionary:
 			return _parse_tax(rest, game)
 		"people":
 			return _parse_people(rest, game)
+		"raise":
+			return _parse_raise(rest, game)
+		"march":
+			return _parse_march(rest, game)
+		"hold":
+			return _parse_hold(rest, game)
+		"armies":
+			return _parse_armies(rest, game)
+		"as":
+			return _parse_as(rest, game)
 		"digest", "seed", "help":
 			if not rest.is_empty():
 				return _problem("%s takes no arguments." % head)
@@ -90,6 +101,8 @@ static func run(text: String, ctx: ShellContext) -> String:
 			ctx.request(&"dev_look", args)
 			var season := int(args["season"])
 			return "Looking at the calendar's season." if season < 0 else "Looking at %s." % LOOK_WORDS.find_key(season)
+		&"armies":
+			return _armies_words(Session.game)
 		&"give":
 			var tag: StringName = args["tag"]
 			var hexes: Array[Vector2i] = []
@@ -288,6 +301,121 @@ static func _parse_people(rest: PackedStringArray, game: Game) -> Dictionary:
 	if rest[2].to_int() > People.PEOPLE_MAX:
 		return _problem("N must be a whole number from 0 to %s" % Words.number(People.PEOPLE_MAX))
 	return _made(&"people", "", {"hex": hex, "people": rest[2].to_int()})
+
+
+## `raise c r kind [n]`: n companies (1 by default) of a kind, raised at a hex (Military.raise through Session.act). The
+## kind is a unit's key (pikemen, crossbowmen, knights, bombards) or its id 0 to 3.
+static func _parse_raise(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() < 3 or rest.size() > 4:
+		return _problem("Use: raise c r kind [n]")
+	if game == null:
+		return _problem("There is no game.")
+	var hex: Variant = _hex_of(rest[0], rest[1], game)
+	if hex == null:
+		return _no_hex(rest[0], rest[1])
+	var kind := _kind_of(rest[2], game)
+	if kind < 0:
+		return _problem("no such kind '%s'." % rest[2])
+	var count := 1
+	if rest.size() == 4:
+		if not is_small_int(rest[3]):
+			return _problem("'%s' is not a number." % rest[3])
+		count = rest[3].to_int()
+	return _made(&"act", "raise", {"hex": hex, "kind": kind, "count": count})
+
+
+## `march ID c r`: the army goes to the hex (Movement.march through Session.act).
+static func _parse_march(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() != 3:
+		return _problem("Use: march ID c r")
+	if game == null:
+		return _problem("There is no game.")
+	var army := _army_of(rest[0], game)
+	if army < 0:
+		return _no_army(rest[0])
+	var hex: Variant = _hex_of(rest[1], rest[2], game)
+	if hex == null:
+		return _no_hex(rest[1], rest[2])
+	return _made(&"act", "march", {"army": army, "goal": hex})
+
+
+## `hold ID`: the army halts on its own hex (Movement.halt through Session.act).
+static func _parse_hold(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() != 1:
+		return _problem("Use: hold ID")
+	if game == null:
+		return _problem("There is no game.")
+	var army := _army_of(rest[0], game)
+	if army < 0:
+		return _no_army(rest[0])
+	return _made(&"act", "halt", {"army": army})
+
+
+static func _parse_armies(rest: PackedStringArray, game: Game) -> Dictionary:
+	if not rest.is_empty():
+		return _problem("armies takes no arguments.")
+	if game == null:
+		return _problem("There is no game.")
+	return _made(&"armies", "", {})
+
+
+## `as TAG action ...`: the action is done for the country TAG (its args carry the tag, so Session.act keeps it).
+static func _parse_as(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() < 2:
+		return _problem("Use: as TAG action ...")
+	var shut := _economy_problem(game)
+	if shut != "":
+		return _problem(shut)
+	var tag := _tag_word(rest[0], game)
+	if tag == &"":
+		return _problem("no country %s." % rest[0].to_upper())
+	var inner := parse(" ".join(rest.slice(1)), game)
+	if str(inner["problem"]) != "":
+		return inner
+	if inner["kind"] != &"act":
+		return _problem("as takes an action: raise, march, hold, build, upgrade, clear, cancel, choose, money, goods, tax or people.")
+	var args: Dictionary = inner["args"]
+	args["tag"] = tag
+	return inner
+
+
+## The player's armies, one line each (id, name, hex, men, the order's words); "You have no army." with none.
+static func _armies_words(game: Game) -> String:
+	if game == null or not game.has_countries() or game.player == &"":
+		return "You have no army."
+	var lines: PackedStringArray = []
+	for a: Army in Armies.of_country(game, game.player):
+		var order := str((ArmyView.panel(game, game.player, a.id)["order"] as Dictionary)["text"])
+		lines.append("%d %s (%d, %d): %s men, %s." % [a.id, a.name, a.hex.x, a.hex.y, Words.number(a.men()), order])
+	return "You have no army." if lines.is_empty() else "
+".join(lines)
+
+
+## The kind of company of a word: its key (pikemen) or its id (0 to 3); -1 when there is none.
+static func _kind_of(word: String, game: Game) -> int:
+	var low := word.to_lower()
+	for id: int in game.defs.units.size():
+		if game.defs.units[id].key == StringName(low):
+			return id
+	if is_small_int(low) and low.to_int() >= 0 and low.to_int() < game.defs.units.size():
+		return low.to_int()
+	return -1
+
+
+## The id of an army of a word, when it exists; -1 when it does not.
+static func _army_of(word: String, game: Game) -> int:
+	if not is_small_int(word):
+		return -1
+	var id := word.to_int()
+	return id if Armies.by_id(game, id) != null else -1
+
+
+static func _no_hex(c_word: String, r_word: String) -> Dictionary:
+	return _problem("no such hex %s %s." % [c_word, r_word])
+
+
+static func _no_army(word: String) -> Dictionary:
+	return _problem("no army ID %s." % word)
 
 
 ## Why the money commands cannot run (no game, or a map without countries), else "".

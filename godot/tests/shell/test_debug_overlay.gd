@@ -215,6 +215,17 @@ func test_the_people_line_shows_the_phase_time_the_level_changes_and_the_hungry_
 
 
 ## M4.5 spec 6.9: the study line names the page and tab last built, its time and the warm queue; before a first open it says so.
+## M6 (L24): the armies line counts the armies and units and shows the phase times of the last season (none before one).
+func test_the_m6_line_counts_armies_and_units_and_the_last_phase_times() -> void:
+	_overlay.refresh_metrics()
+	assert_true(_overlay.m6_text().begins_with("armies 0 · units 0 · movement none yet · supply none yet · vision none yet"), _overlay.m6_text())
+	assert_true(_overlay.m6_text().ends_with("steps filled 0"), "no army, no step table")
+	Session.last_phase_ms = {"movement": 0.6, "supply": 0.4, "vision": 0.2}
+	_overlay.refresh_metrics()
+	assert_true(_overlay.m6_text().contains("movement 0.6 ms · supply 0.4 ms · vision 0.2 ms"), _overlay.m6_text())
+	Session.last_phase_ms = {}
+
+
 func test_the_study_line_shows_the_last_page_built_and_the_warm_queue() -> void:
 	_overlay.set_open(true)
 	assert_eq(_overlay.study_text(), "study not opened yet · warm queue 0", "no source: nothing opened yet")

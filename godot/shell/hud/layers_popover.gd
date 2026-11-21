@@ -12,8 +12,9 @@ const LAYER_RELIEF := &"graphics/relief_shading"
 const LAYER_BORDERS := &"map/borders"
 const LAYER_TINT := &"map/owner_tint"
 const LAYER_MINIMAP := &"map/minimap"
+const LAYER_SIGHT := &"map/sight_veil"
 const LAYER_KEYS: Array[String] = [
-	"map/grid", "map/place_names", "graphics/relief_shading", "map/borders", "map/owner_tint", "map/minimap",
+	"map/grid", "map/place_names", "graphics/relief_shading", "map/borders", "map/owner_tint", "map/minimap", "map/sight_veil",
 ]
 
 var anchor_button: BaseButton = null
@@ -26,6 +27,8 @@ var anchor_button: BaseButton = null
 @onready var _borders_switch: KitSwitch = $VBox/BordersRow/BordersSwitch
 @onready var _tint_switch: KitSwitch = $VBox/TintRow/TintSwitch
 @onready var _minimap_switch: KitSwitch = $VBox/MinimapRow/MinimapSwitch
+@onready var _sight_row: HBoxContainer = $VBox/SightRow
+@onready var _sight_switch: KitSwitch = $VBox/SightRow/SightSwitch
 
 var _settings: Settings = null
 var _syncing: bool = false
@@ -44,6 +47,7 @@ func _ready() -> void:
 	_borders_switch.focus_mode = Control.FOCUS_NONE
 	_tint_switch.focus_mode = Control.FOCUS_NONE
 	_minimap_switch.focus_mode = Control.FOCUS_NONE
+	_sight_switch.focus_mode = Control.FOCUS_NONE
 
 	_grid_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_GRID, on))
 	_names_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_NAMES, on))
@@ -51,6 +55,7 @@ func _ready() -> void:
 	_borders_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_BORDERS, on))
 	_tint_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_TINT, on))
 	_minimap_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_MINIMAP, on))
+	_sight_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_SIGHT, on))
 
 	if _settings != null:
 		_sync_from_settings()
@@ -133,6 +138,8 @@ func set_layer_state(layer_name: StringName, on: bool) -> void:
 			_tint_switch.set_pressed_no_signal(on)
 		LAYER_MINIMAP, &"minimap":
 			_minimap_switch.set_pressed_no_signal(on)
+		LAYER_SIGHT, &"sight_veil":
+			_sight_switch.set_pressed_no_signal(on)
 	_syncing = false
 
 
@@ -167,6 +174,16 @@ func minimap_switch() -> KitSwitch:
 	return _minimap_switch
 
 
+## The Sight switch (map/sight_veil, M6): shown only in a game with countries (set_sight_available).
+func sight_switch() -> KitSwitch:
+	return _sight_switch
+
+
+func set_sight_available(on: bool) -> void:
+	if is_node_ready():
+		_sight_row.visible = on
+
+
 func _on_switch_toggled(layer_key: StringName, on: bool) -> void:
 	if _syncing:
 		return
@@ -187,6 +204,7 @@ func _sync_from_settings() -> void:
 	_borders_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_BORDERS))))
 	_tint_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_TINT))))
 	_minimap_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_MINIMAP))))
+	_sight_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_SIGHT))))
 	_syncing = false
 
 

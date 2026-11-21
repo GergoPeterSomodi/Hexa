@@ -334,6 +334,69 @@ func test_run_tax_sets_the_level_through_session_act() -> void:
 	assert_true(_sent.is_empty(), "tax sends an event, not a request")
 
 
+## M6 (L24): raise, march, hold, armies and as TAG parse to their actions, and each planted fault says its problem.
+func test_m6_commands_parse_to_their_actions() -> void:
+	var hex := _capital()
+	var pikes := _kind_id(&"pikemen")
+	var raise := DevCommands.parse("raise %d %d pikemen 2" % [hex.x, hex.y], _game())
+	assert_eq(raise["kind"], &"act")
+	assert_eq(raise["action"], "raise")
+	assert_eq(raise["args"], {"hex": hex, "kind": pikes, "count": 2}, "a key names the kind, a count is given")
+	assert_eq((DevCommands.parse("raise %d %d %d" % [hex.x, hex.y, pikes], _game())["args"] as Dictionary)["count"], 1, "one company by default, an id works")
+	assert_eq(DevCommands.parse("as GEN raise %d %d pikemen" % [hex.x, hex.y], _game())["args"]["tag"], &"GEN", "as TAG sets the tag")
+	assert_eq(_problem("hold 3"), "no army ID 3.", "hold needs an army that exists")
+	assert_eq(_problem("raise 999 999 pikemen"), "no such hex 999 999.")
+	assert_eq(_problem("raise %d %d nosuchkind" % [hex.x, hex.y]), "no such kind 'nosuchkind'.")
+	assert_eq(_problem("raise %d %d pikemen x" % [hex.x, hex.y]), "'x' is not a number.")
+	assert_eq(_problem("raise 1 2"), "Use: raise c r kind [n]")
+	assert_eq(_problem("march 999 1 1"), "no army ID 999.")
+	assert_eq(_problem("hold x"), "no army ID x.")
+	assert_eq(_problem("as ZZZ raise %d %d pikemen" % [hex.x, hex.y]), "no country ZZZ.")
+	assert_true(_problem("as GEN money 5").begins_with("as takes an action"), "as takes an action, not money")
+	assert_eq(_problem("as"), "Use: as TAG action ...")
+
+
+## M6 (L24): a raise, then armies, a march and a hold, through the console; the sandbox refuses the army commands.
+func test_m6_raise_armies_march_hold_run_through_the_console() -> void:
+	assert_eq(DevCommands.run("armies", _ctx), "You have no army.")
+	var hex := _capital()
+	var said := DevCommands.run("as GEN raise %d %d pikemen 1" % [hex.x, hex.y], _ctx)
+	assert_true(said.begins_with("Done"), said)
+	var army := Armies.of_country(_game(), &"GEN")[0]
+	assert_true(DevCommands.run("armies", _ctx).begins_with("%d " % army.id), "armies lists the army by id")
+	var goal := _march_goal(army, hex)
+	assert_ne(goal, Vector2i(-1, -1), "a hex the army can march to")
+	assert_true(DevCommands.run("march %d %d %d" % [army.id, goal.x, goal.y], _ctx).begins_with("Done"), "march is done")
+	assert_eq(Armies.by_id(_game(), army.id).goal, goal, "the army's goal is the hex")
+	assert_true(DevCommands.run("hold %d" % army.id, _ctx).begins_with("Done"), "hold is done")
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	assert_eq(DevCommands.run("raise 6 13 pikemen", _ctx), "Refused: the sandbox has no armies", "the sandbox refuses raise")
+	assert_eq(DevCommands.run("armies", _ctx), "You have no army.")
+
+
+func _kind_id(key: StringName) -> int:
+	for i: int in _game().defs.units.size():
+		if _game().defs.units[i].key == key:
+			return i
+	return -1
+
+
+func _capital() -> Vector2i:
+	return Countries.by_tag(_game(), &"GEN").capital
+
+
+## A hex near `from` the army can march to (MovePreview says it is ok), or (-1, -1).
+func _march_goal(army: Army, from: Vector2i) -> Vector2i:
+	for i: int in _game().map.hex_count():
+		var hex := _game().map.hex_of(i)
+		if hex == from or absi(hex.x - from.x) + absi(hex.y - from.y) > 4:
+			continue
+		var preview := MovePreview.to(_game(), &"GEN", army.id, hex)
+		if bool((preview["verdict"] as Dictionary).get("ok", false)):
+			return hex
+	return Vector2i(-1, -1)
+
+
 func test_help_names_the_money_commands() -> void:
 	var help := DevCommands.run("help", _ctx)
 	for word: String in ["money", "goods", "tax low|normal|high"]:

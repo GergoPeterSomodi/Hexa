@@ -324,13 +324,13 @@ func test_game_page_shows_the_milestone_three_rows_and_the_two_works_rows_of_mil
 	for row: OptionRow in options.page_rows(&"game"):
 		keys.append(row.key())
 	keys.sort()
-	assert_eq(keys, ["game/autosave", "game/confirm_works", "game/preview_on_map", "game/season_report", "game/task_flag"])
+	assert_eq(keys, ["game/autosave", "game/confirm_works", "game/movement", "game/preview_on_map", "game/season_report", "game/task_flag"], "M6: the movement replay row shows")
 	assert_not_null(options.option_row("graphics/season_change"), "Season change on Graphics")
 	assert_not_null(options.option_row("dev/save_json"), "Write saves as JSON too on Advanced")
 	assert_not_null(options.option_row("game/confirm_works"), "Confirm works shows from milestone 4")
 	assert_not_null(options.option_row("game/preview_on_map"), "Preview on the map shows from milestone 4")
 	assert_null(options.option_row("game/gain_treasury_only"), "the card's switch has no row")
-	assert_null(options.option_row("game/movement"), "milestone 6 rows stay hidden")
+	assert_not_null(options.option_row("game/movement"), "Movement replay speed shows from milestone 6")
 
 
 ## Pages are built when first needed: only Display at the start, the rest on a page switch or an accessor, and the rows are

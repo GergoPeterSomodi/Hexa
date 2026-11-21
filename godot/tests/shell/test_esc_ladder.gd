@@ -36,6 +36,15 @@ func test_esc_ladder_screen_cases() -> void:
 		assert_eq(EscLadder.decide(state), expected, str(c["name"]))
 
 
+## M6 (L24): a selected army (its panel in the dock) is the first thing the clear step takes, before the hex.
+func test_a_selected_army_clears_before_the_hex() -> void:
+	assert_eq(EscLadder.decide({"has_army": true, "dock_open": true}), EscLadder.CLEAR_SELECTION, "the army panel clears")
+	assert_eq(EscLadder.decide({"has_army": true}), EscLadder.CLEAR_SELECTION, "an army alone clears")
+	assert_eq(EscLadder.decide({"has_army": false, "has_selection": false}), EscLadder.OPEN_PAUSE_MENU, "no army: the pause menu")
+	assert_eq(EscLadder.decide({"hud_list_open": true, "has_army": true}), EscLadder.CLOSE_HUD_LIST, "a HUD list closes first")
+	assert_eq(EscLadder.decide({"top_screen_id": &"help_overlay", "has_screen": true, "has_army": true}), EscLadder.STACK_BACK, "a screen first")
+
+
 func test_esc_ladder_hud_and_map_cases() -> void:
 	var cases: Array[Dictionary] = [
 		{

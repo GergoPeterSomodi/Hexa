@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/hud.gd" id="1_hud"]
 [ext_resource type="PackedScene" path="res://shell/hud/top_bar.tscn" id="2_topbar"]
@@ -16,6 +16,7 @@
 [ext_resource type="PackedScene" path="res://shell/hud/task_flag.tscn" id="14_flag"]
 [ext_resource type="PackedScene" path="res://shell/hud/notifications.tscn" id="15_notif"]
 [ext_resource type="PackedScene" path="res://shell/hud/mode_legend.tscn" id="16_legend"]
+[ext_resource type="PackedScene" path="res://shell/panels/army_panel.tscn" id="17_army"]
 
 [node name="Hud" type="CanvasLayer"]
 process_mode = 1
@@ -195,6 +196,11 @@ layout_mode = 2
 size_flags_vertical = 0
 
 [node name="CountryPanel" parent="Root/Column/Main/Dock" instance=ExtResource("12_country")]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ArmyPanel" parent="Root/Column/Main/Dock" instance=ExtResource("17_army")]
 visible = false
 layout_mode = 2
 size_flags_vertical = 3

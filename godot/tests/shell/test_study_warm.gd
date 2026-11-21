@@ -4,7 +4,7 @@
 extends GutTest
 
 const GEN := &"GEN"
-const VIEWS := 8  # this_season, districts, goods, history, rankings, timeline, chronicle, people
+const VIEWS := 9  # this_season, districts, goods, history, rankings, timeline, chronicle, people, military (M6)
 
 var _prev_game: Game = null
 var _game: Game = null
@@ -46,6 +46,12 @@ func test_queue_views_lists_the_views_and_yields_only_while_the_map_is_in_yields
 	_warm.yields_active = func() -> bool: return true
 	_warm.queue_views()
 	assert_eq(_warm.pending(), VIEWS + 2, "both when both are asked for")
+	_warm.yields_active = Callable()
+	_warm.food_active = Callable()
+	_warm.supply_active = func() -> bool: return true
+	_warm.queue_views()
+	assert_eq(_warm.pending(), VIEWS + 1, "the Supply bytes too while the map is in Supply (M6)")
+	_warm.supply_active = Callable()
 
 
 func test_warm_now_fills_the_view_cache_keys_the_pages_read() -> void:

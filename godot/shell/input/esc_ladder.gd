@@ -1,4 +1,5 @@
-## Pure Esc ladder decision rule (docs/architecture/ui-and-controls-spec.md section 3.3).
+## Pure Esc ladder decision rule (docs/architecture/ui-and-controls-spec.md section 3.3). M6: an army selected (its panel in the
+## dock) is cleared at the dock step, before the hex selection (the App's CLEAR_SELECTION step clears the army first).
 class_name EscLadder
 extends RefCounted
 
@@ -19,6 +20,6 @@ static func decide(state: Dictionary) -> StringName:
 		return STACK_BACK
 	if bool(state.get("hud_list_open", false)):
 		return CLOSE_HUD_LIST
-	if bool(state.get("has_selection", false)) or bool(state.get("dock_open", false)):
+	if bool(state.get("has_selection", false)) or bool(state.get("has_army", false)) or bool(state.get("dock_open", false)):
 		return CLEAR_SELECTION
 	return OPEN_PAUSE_MENU

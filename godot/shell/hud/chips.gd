@@ -20,6 +20,8 @@ const PEOPLE_ID := &"people"
 const FOOD_ID := &"food"
 const STORES_ID := &"stores"
 const ARMY_ID := &"army"
+## The milestone the Army chip comes in (M6): before it, the chip stays hidden whatever the army.
+const ARMY_SINCE := "6"
 const DUCATS_LABEL := "Ducats"
 const PEOPLE_LABEL := "People"
 const FOOD_LABEL := "Food"
@@ -38,6 +40,8 @@ var _people: ResourceChip = null
 var _food: ResourceChip = null
 var _stores: ResourceChip = null
 var _army: ResourceChip = null
+## The milestone the chips are built at: the Army chip waits for ARMY_SINCE (the App sets it: Bindings.SHELL_MILESTONE).
+var milestone: String = Bindings.SHELL_MILESTONE
 var _ducats_card: Dictionary = {}
 var _people_card: Dictionary = {}
 var _food_card: Dictionary = {}
@@ -126,7 +130,7 @@ func refresh() -> void:
 	var food: Dictionary = {}
 	var army: Dictionary = {}
 	if game != null and game.has_countries() and tag != &"":
-		army = MilitaryCards.army(game, tag)
+		army = MilitaryCards.army(game, tag) if has_army_chip() else {}
 		ducats = EconomyCards.ducats(game, tag)
 		stores = EconomyCards.stores(game, tag)
 		people = PeopleCards.people(game, tag)
@@ -216,6 +220,11 @@ func stores_chip() -> ResourceChip:
 
 func army_chip() -> ResourceChip:
 	return _army
+
+
+## Whether the Army chip is in this milestone (the top bar's and the study's number; M6 from "6").
+func has_army_chip() -> bool:
+	return float(milestone) >= float(ARMY_SINCE)
 
 
 ## The Army chip's hover card last set (empty when the Army chip is hidden).
