@@ -45,3 +45,10 @@ signal unit_lost(tag: StringName, army: int, unit: int)
 signal chronicled(entry: Dictionary)
 ## A season ended; `turn` is the season that ended. Emitted once, after the last phase's drain.
 signal season_ended(turn: int)
+
+## An army of the player's was selected on the map (MapArmies.select_army, by a click, Tab or a march's order cursor): the
+## army panel shows it. `army_id` is the army's id; the signal says nothing about the game, which is unchanged.
+signal army_selected(army_id: int)
+## The army selection was cleared on the map (MapArmies.clear_army): the army panel closes. Emitted only when an army was
+## selected.
+signal army_cleared

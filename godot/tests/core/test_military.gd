@@ -288,6 +288,55 @@ func test_disband_refuses_when_neither_home_nor_the_army_can_take_the_men() -> v
 	assert_not_null(Armies.by_id(_g, a.id), "a refused disband changes nothing")
 
 
+func test_a_set_of_companies_is_one_action_that_takes_them_all() -> void:
+	var a := Armies.create(_g, _tag, _hex, "Army of test")
+	Armies.add_units(_g, a, 0, 1, _g.turn, _hex, 25, {})
+	Armies.add_units(_g, a, 0, 1, _g.turn - 1, _hex, 0, {})
+	var ducats := _treasury()
+	var men := _people(_hex)
+	var ids := PackedInt32Array([a.units[0].id, a.units[1].id])
+	var verdict := _g.act("disband", {"army": a.id, "units": ids, "tag": _tag})
+	assert_eq(verdict["ok"], true, "the set is one action")
+	assert_null(Armies.by_id(_g, a.id), "both companies are gone")
+	assert_eq(_treasury(), ducats + 25, "the company raised this season is refunded; the older one gives nothing")
+	assert_eq(_people(_hex), men + 1000, "both companies' men go home")
+	var gone := _events("army_disbanded")
+	assert_eq(gone.size(), 1, "one event for the set")
+	assert_eq((gone[0]["units"] as Array).size(), 2)
+
+
+func test_two_companies_with_room_for_one_refuse_as_a_whole_and_change_nothing() -> void:
+	var a := Armies.create(_g, _tag, _hex, "Army of test")
+	Armies.add_units(_g, a, 0, 2, _g.turn - 1, _hex, 0, {})
+	var first := a.units[0]
+	var second := a.units[1]
+	ArmyFixture.people_at(_g, _hex, People.PEOPLE_MAX - first.men)
+	var ids := PackedInt32Array([first.id, second.id])
+	var digest := Armies.digest(_g)
+	var people := _people(_hex)
+	assert_eq(Military.disband_check(_g, {"army": a.id, "units": ids, "tag": _tag})["reason"],
+		"no room for %d people at %s" % [second.men, Military.hex_text(_g, _hex)],
+		"the second company finds no room once the first has taken its place")
+	var verdict := _g.act("disband", {"army": a.id, "units": ids, "tag": _tag})
+	assert_eq(verdict["ok"], false, "P: a set that cannot all go is refused by the act too")
+	assert_eq(Armies.by_id(_g, a.id).units.size(), 2, "no company is gone: never half a disband")
+	assert_eq(_people(_hex), people, "no man moved")
+	assert_eq(Armies.digest(_g), digest, "the army changed nothing")
+	assert_true(_events("army_disbanded").is_empty(), "no disband event")
+	assert_true(bool(Military.disband_check(_g, {"army": a.id, "unit": first.id, "tag": _tag})["ok"]),
+		"one of them alone is fine: it is the pair that fails")
+
+
+func test_a_set_names_each_company_it_cannot_find_and_an_empty_set_none() -> void:
+	var a := ArmyFixture.army(_g, _tag, _hex, 0, 1)
+	assert_eq(Military.disband_check(_g, {"army": a.id, "units": PackedInt32Array([999]), "tag": _tag})["reason"],
+		"company 999 is not in the Army of test")
+	assert_eq(Military.disband_check(_g, {"army": a.id, "units": PackedInt32Array(), "tag": _tag})["reason"],
+		"no companies given")
+	assert_eq(Military.disband_check(_g, {"army": a.id, "units": PackedInt32Array([a.units[0].id, a.units[0].id]), "tag": _tag})["ok"],
+		true, "a repeated id is one company")
+
+
 # ----- splitting and merging -------------------------------------------------------------------------------------------
 
 

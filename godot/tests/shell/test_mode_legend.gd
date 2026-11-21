@@ -169,3 +169,19 @@ func test_the_rows_are_compact_20_px() -> void:
 		if child is HBoxContainer:
 			assert_lte((child as HBoxContainer).get_combined_minimum_size().y, ModeLegend.ROW_H + 0.5, "a row is 20 px")
 	assert_lt(_legend.get_combined_minimum_size().y, 260.0, "the whole card is compact")
+
+
+func test_supply_shows_its_title_seven_rows_and_the_starving_stripes() -> void:
+	_legend.show_mode(MapModes.Mode.SUPPLY)
+	assert_true(_legend.visible, "shown for Supply")
+	var rows := _legend.rows()
+	assert_eq(rows, MapModes.legend(MapModes.Mode.SUPPLY))
+	assert_eq(rows.size(), 7, "five bands, the starving row and Not your land")
+	assert_eq(str((_column().get_child(0) as Label).text), MapModes.SUPPLY_TITLE)
+	assert_eq(str(rows[0]["text"]), "A depot (a village or larger, a port)", "the top band first")
+	assert_eq(str(rows[-1]["text"]), "Not your land")
+	var striped: Array[String] = []
+	for row: Dictionary in rows:
+		if bool(row["stripes"]):
+			striped.append(str(row["text"]))
+	assert_eq(striped, ["Out of supply, starving"] as Array[String], "only the starving row is striped")

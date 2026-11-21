@@ -117,7 +117,7 @@ func _ready() -> void:
 		Session.new_game(map_id, start_seed)
 	else:
 		_on_game_started()
-	add_child(MapPeople.new())  # after the game's first fill: it relays the plates and listens to the people
+	add_child(MapPeople.new()); add_child(MapArmies.new())  # after the game's first fill: the people relay the plates, the armies draw
 	_seasons.request_next()
 
 
@@ -157,7 +157,7 @@ func _apply_settings(settings: Settings) -> void:
 	_labels.set_visible(bool(settings.get_value("map/place_names")))
 	set_borders(bool(settings.get_value("map/borders")))
 	set_tint(bool(settings.get_value("map/owner_tint")))
-	set_colour_blind(str(settings.get_value("accessibility/country_colours")) == "colour_blind")
+	set_colour_blind(str(settings.get_value("accessibility/country_colours")) == "colour_blind"); _overlay.set_sight_veil(bool(settings.get_value("map/sight_veil")))
 	_persisted_mode = _mode_from_string(str(settings.get_value("state/map_mode")))
 	if not picking() and Session.game != null:
 		_apply_mode(_clamp_mode_for_game(_persisted_mode), false)
@@ -196,7 +196,7 @@ func _on_setting_changed(key: String, value: Variant) -> void:
 				_apply_mode(_clamp_mode_for_game(_persisted_mode), false)
 			return
 	if key in [
-		"map/grid", "map/grid_opacity", "map/place_names",
+		"map/grid", "map/grid_opacity", "map/place_names", "map/sight_veil",
 		"graphics/relief_shading", "graphics/preload_next_season", "graphics/texture_quality",
 		"dev/far_zoom", "dev/slice_ms", "game/preview_on_map"
 	]:
@@ -600,13 +600,13 @@ func _on_select_requested(map_px: Vector2) -> void:
 		if tag != &"":
 			country_clicked.emit(tag)
 		return
-	select_hex(hex)
+	if not ($MapArmies as MapArmies).click(hex, Input.is_key_pressed(KEY_SHIFT)): select_hex(hex)
 
 
-func _on_command_requested(_map_px: Vector2) -> void:
+func _on_command_requested(map_px: Vector2) -> void:
 	if picking():
 		return
-	select_hex(NO_HEX)
+	if not ($MapArmies as MapArmies).command(_view.hex_at(map_px)): select_hex(NO_HEX)
 
 
 func _on_hover_changed(hex: Vector2i) -> void:

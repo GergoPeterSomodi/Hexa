@@ -183,6 +183,9 @@ func _fill_ledger(card: Dictionary) -> void:
 	var people := card["people"] as Dictionary
 	if bool(people["shown"]):
 		_add_row("People", _value(_people_words(people)))
+	var army := card["army"] as Dictionary
+	if bool(army["shown"]):
+		_add_row("Under arms", _value(_army_words(army)))
 	_add_row("Passes", _value(_passes_words(card["passes"] as Array)))
 	_add_row("Land", _value(_land_words(card["land"] as Array)))
 
@@ -220,6 +223,17 @@ func _people_words(people: Dictionary) -> String:
 	if change != 0:
 		text += " (%s %s last season)" % [PeopleView.UP if change > 0 else PeopleView.DOWN, Words.signed(change)]
 	return text
+
+
+## The Under arms row (spec 6.10): yours exact with the count of armies ("1,000 men in 1 army", "none" with no army); a known
+## country's banded ("about 1,000 men"). The row is not shown for an unknown country (CountryCard.army is not shown).
+func _army_words(army: Dictionary) -> String:
+	if bool(army["banded"]):
+		return Knowledge.band_text(int(army["value"]), "men")
+	var count := Armies.of_country(Session.game, _tag).size()
+	if count == 0:
+		return "none"
+	return "%s in %d %s" % [Words.men(int(army["value"])), count, "army" if count == 1 else "armies"]
 
 
 func _passes_words(passes: Array) -> String:

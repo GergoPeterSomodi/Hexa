@@ -166,7 +166,7 @@ const HIGH_CONTRAST: Dictionary[String, Color] = {
 	"MAP_SELECT": Color("#ffd646"),
 	"MAP_REACH": Color("#ffd64633"),
 	"MAP_REACH_NEXT": Color("#ffd64614"),
-	"MAP_PATH": Color("#ffd646"),
+	"MAP_PATH": Color("#f6e3a1"),
 	"MAP_PATH_WARN": BAD,
 	"MAP_PATH_INK": Color("#000000"),
 	"GOOD": GOOD,

@@ -1,7 +1,9 @@
 ## Per-hex map mode overlay (docs/architecture/m2-build-spec.md sections 6.1 and 6.2):
 ## draws one map-sized quad at z_index 80 with mode_overlay.gdshader over four data textures
 ## (owner_ids R8, heights R8, palette RGBA8 256x1, ramp RGBA8 256x1), and for the Yields mode (docs/architecture/m4-5-build-spec.md
-## 6.7) two more: yields R8 (one band byte a hex) and yield_ramp RGBA8 256x1.
+## 6.7) two more: yields R8 (one band byte a hex) and yield_ramp RGBA8 256x1. M6 (spec 6.6) adds the Supply mode (supply R8
+## and supply_ramp RGBA8 256x1) and the sight veil (sight R8, 1 where the viewer sees the hex): the veil goes over every land
+## hex nobody of the viewer's sees, in every mode, when map/sight_veil is on.
 @tool
 class_name ModeOverlay
 extends Node2D
@@ -44,6 +46,17 @@ var _food_image: Image = null
 var _food_tex: ImageTexture = null
 var _food_ramp_image: Image = null
 var _food_ramp_tex: ImageTexture = null
+var _supply_bytes := PackedByteArray()
+var _supply_version := -1  # the game.version the Supply texture shows (-1: none)
+var _supply_image: Image = null
+var _supply_tex: ImageTexture = null
+var _supply_ramp_image: Image = null
+var _supply_ramp_tex: ImageTexture = null
+var _sight_bytes := PackedByteArray()
+var _sight_version := -1  # the game.version the sight texture shows (-1: none)
+var _sight_image: Image = null
+var _sight_tex: ImageTexture = null
+var _sight_veil_on := false
 var _material: ShaderMaterial = null
 
 
@@ -99,6 +112,21 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	_food_ramp_image = _image_from_colours(MapModes.food_ramp())
 	_food_ramp_tex = ImageTexture.create_from_image(_food_ramp_image)
 
+	_supply_version = -1
+	_supply_bytes = PackedByteArray()
+	_supply_bytes.resize(count)  # zero: not your land
+	_supply_image = Image.create_from_data(map.cols, map.rows, false, Image.FORMAT_R8, _supply_bytes)
+	_supply_tex = ImageTexture.create_from_image(_supply_image)
+	_supply_ramp_image = _image_from_colours(MapModes.supply_ramp())
+	_supply_ramp_tex = ImageTexture.create_from_image(_supply_ramp_image)
+
+	_sight_version = -1
+	_sight_bytes = PackedByteArray()
+	_sight_bytes.resize(count)
+	_sight_bytes.fill(1)  # everything seen until the first sync: no veil before the viewer's sight is known
+	_sight_image = Image.create_from_data(map.cols, map.rows, false, Image.FORMAT_R8, _sight_bytes)
+	_sight_tex = ImageTexture.create_from_image(_sight_image)
+
 	if _material == null:
 		_material = ShaderMaterial.new()
 		_material.shader = load(SHADER_PATH) as Shader
@@ -112,6 +140,11 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	_material.set_shader_parameter(&"food", _food_tex)
 	_material.set_shader_parameter(&"food_ramp", _food_ramp_tex)
 	_material.set_shader_parameter(&"food_alpha", MapModes.FOOD_ALPHA)
+	_material.set_shader_parameter(&"supply", _supply_tex)
+	_material.set_shader_parameter(&"supply_ramp", _supply_ramp_tex)
+	_material.set_shader_parameter(&"supply_alpha", MapModes.SUPPLY_ALPHA)
+	_material.set_shader_parameter(&"sight", _sight_tex)
+	_material.set_shader_parameter(&"sight_alpha", MapModes.SIGHT_VEIL_ALPHA)
 	_material.set_shader_parameter(&"veil_alpha", MapModes.VEIL_ALPHA)
 	_material.set_shader_parameter(&"stripe_px", MapModes.STRIPE_PX)
 	_material.set_shader_parameter(&"veil_colour", MapModes.VEIL)
@@ -290,9 +323,10 @@ func food_bytes() -> PackedByteArray:
 	return _food_bytes.duplicate()
 
 
-## Brings the Yields and Food textures to `game` (each only while its mode is showing); returns the texels written.
+## Brings the Yields, Food and Supply textures to `game` (each only while its mode is showing) and the sight texture (always,
+## when the game's version moved); returns the texels written.
 func sync_modes(game: Game, force: bool = false) -> int:
-	return sync_yields(game, force) + sync_food(game, force)
+	return sync_yields(game, force) + sync_food(game, force) + sync_supply(game, force) + sync_sight(game, force)
 
 
 ## The Yields bytes the texture holds now (a copy; tests).
@@ -384,6 +418,130 @@ func ramp_texture() -> ImageTexture:
 	return _ramp_tex
 
 
+## Turns the sight veil on or off (the map/sight_veil setting; MapScene.configure applies it): the uniform and the visibility.
+func set_sight_veil(on: bool) -> void:
+	_sight_veil_on = on
+	if _material != null:
+		_material.set_shader_parameter(&"sight_veil_on", _sight_veil_on)
+	_update_visibility()
+
+
+func is_sight_veil_on() -> bool:
+	return _sight_veil_on
+
+
+## Whether the palette in use is the colour-blind one (the accessibility/country_colours setting, set through MapScene).
+func is_colour_blind() -> bool:
+	return _colour_blind
+
+
+## Writes the Supply texels that differ from `bytes` (one byte a hex, MapModes.supply_bytes) and uploads the texture once;
+## returns how many texels it wrote (0, and no upload, when nothing differs or `bytes` is not one a hex).
+func update_supply(bytes: PackedByteArray) -> int:
+	if _map == null or _supply_image == null or _supply_tex == null or bytes.size() != _supply_bytes.size():
+		return 0
+	var wrote := 0
+	var cols := _map.cols
+	var idx := 0
+	for row: int in _map.rows:
+		for col: int in cols:
+			var b := bytes[idx]
+			if b != _supply_bytes[idx]:
+				_supply_bytes[idx] = b
+				_supply_image.set_pixel(col, row, Color(float(b) / 255.0, 0.0, 0.0, 1.0))
+				wrote += 1
+			idx += 1
+	if wrote > 0:
+		texel_writes += wrote
+		_supply_tex.update(_supply_image)
+		texture_updates += 1
+	return wrote
+
+
+## Brings the Supply texture to `game`'s supply for its player: only while the mode is Supply, and (unless `force`) only when
+## `game.version` changed since the last time. Returns the texels written.
+func sync_supply(game: Game, force: bool = false) -> int:
+	if _mode != MapModes.Mode.SUPPLY or game == null or game.map == null:
+		return 0
+	if not force and game.version == _supply_version:
+		return 0
+	_supply_version = game.version
+	return update_supply(MapModes.supply_bytes(game, game.player))
+
+
+## Writes the sight texels that differ from `bytes` (one byte a hex, 1 seen; MapModes.sight_bytes) and uploads the texture
+## once; returns how many texels it wrote.
+func update_sight(bytes: PackedByteArray) -> int:
+	if _map == null or _sight_image == null or _sight_tex == null or bytes.size() != _sight_bytes.size():
+		return 0
+	var wrote := 0
+	var cols := _map.cols
+	var idx := 0
+	for row: int in _map.rows:
+		for col: int in cols:
+			var b := bytes[idx]
+			if b != _sight_bytes[idx]:
+				_sight_bytes[idx] = b
+				_sight_image.set_pixel(col, row, Color(float(b) / 255.0, 0.0, 0.0, 1.0))
+				wrote += 1
+			idx += 1
+	if wrote > 0:
+		texel_writes += wrote
+		_sight_tex.update(_sight_image)
+		texture_updates += 1
+	return wrote
+
+
+## Brings the sight texture to `game`'s sight for its player whenever `game.version` changed (every mode: the veil is in
+## all of them). Returns the texels written.
+func sync_sight(game: Game, force: bool = false) -> int:
+	if game == null or game.map == null or game.state == null:
+		return 0
+	if not force and game.version == _sight_version:
+		return 0
+	_sight_version = game.version
+	return update_sight(MapModes.sight_bytes(game, game.player))
+
+
+## The Supply bytes the texture holds now (a copy; tests).
+func supply_bytes() -> PackedByteArray:
+	return _supply_bytes.duplicate()
+
+
+## The sight bytes the texture holds now (a copy; tests).
+func sight_bytes() -> PackedByteArray:
+	return _sight_bytes.duplicate()
+
+
+## Bytes of the Supply textures (the supply map and its ramp) and of the sight texture.
+func supply_texture_bytes() -> int:
+	var total := 0
+	for img: Image in [_supply_image, _supply_ramp_image, _sight_image]:
+		if img != null:
+			total += img.get_data().size()
+	return total
+
+
+func supply_image() -> Image:
+	return _supply_image
+
+
+func supply_texture() -> ImageTexture:
+	return _supply_tex
+
+
+func supply_ramp_texture() -> ImageTexture:
+	return _supply_ramp_tex
+
+
+func sight_image() -> Image:
+	return _sight_image
+
+
+func sight_texture() -> ImageTexture:
+	return _sight_tex
+
+
 func _draw() -> void:
 	if _map_size.x > 0.0 and _map_size.y > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, _map_size), Color.WHITE)
@@ -395,10 +553,11 @@ func _sync_uniforms() -> void:
 	_material.set_shader_parameter(&"mode", int(_mode))
 	_material.set_shader_parameter(&"tint_on", _tint_on)
 	_material.set_shader_parameter(&"hot_id", _hot_id)
+	_material.set_shader_parameter(&"sight_veil_on", _sight_veil_on)
 
 
 func _update_visibility() -> void:
-	visible = not (_mode == MapModes.Mode.TERRAIN and not _tint_on)
+	visible = not (_mode == MapModes.Mode.TERRAIN and not _tint_on and not _sight_veil_on)
 
 
 static func _image_from_colours(colours: PackedColorArray) -> Image:

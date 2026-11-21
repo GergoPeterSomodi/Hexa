@@ -612,7 +612,7 @@ func test_scenario_game_borders_modes_labels_pennants_and_settings() -> void:
 	var gen_std := _scene.capital_marks().cloth_colour_of(&"GEN")
 	var rebuilds_before := _scene.border_chunk_rebuilds
 	var settings := Settings.new("macOS", false)
-	_scene.configure(settings)
+	_scene.configure(settings); settings.set_value("map/sight_veil", false)  # the veil (on by default) keeps Terrain up: test_sight_veil_setting
 	assert_true(settings.set_value("accessibility/country_colours", "colour_blind"))
 	assert_gt(_scene.border_chunk_rebuilds, rebuilds_before, "palette switch rebuilds borders")
 	var gen_cb := _scene.capital_marks().cloth_colour_of(&"GEN")

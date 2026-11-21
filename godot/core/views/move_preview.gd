@@ -124,6 +124,32 @@ static func _make_to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -
 	return out
 
 
+## The stored route of a march in progress (Army.route, kept when the march was ordered; the walk of Movement.walk_plan from
+## this season): {hexes, stops, crossings, arrives_turn, seasons}, the shape of `to` for the map's thin line (L16). Empty
+## hexes when the army is not marching or has no route. Cached in the view cache by [&"stored_route", version, tag, army].
+static func stored(game: Game, tag: StringName, army_id: int) -> Dictionary:
+	var empty := {"hexes": [], "stops": [], "crossings": [], "arrives_turn": -1, "seasons": 0}
+	if game == null or game.map == null or game.defs == null or not game.has_countries():
+		return empty
+	var a := Armies.by_id(game, army_id)
+	if a == null or a.tag != tag or a.order != Army.ORDER_MARCH or a.route.is_empty():
+		return empty
+	var key: Array = [&"stored_route", game.version, tag, army_id]
+	return game.view_cache.get_or_make(key, func() -> Dictionary: return _make_stored(game, a)) as Dictionary
+
+
+static func _make_stored(game: Game, a: Army) -> Dictionary:
+	var route := a.route
+	var walk := Movement.walk_plan(game, a, route, game.turn)
+	return {
+		"hexes": _hexes(game, route),
+		"stops": _stops(game, a, route, walk),
+		"crossings": _crossings(game, a, route, false).list,
+		"arrives_turn": int(walk.arrives_turn),
+		"seasons": int(walk.seasons),
+	}
+
+
 static func _shell(game: Game, hex: Vector2i) -> Dictionary:
 	var hexes: Array[Vector2i] = []
 	var stops: Array[Dictionary] = []

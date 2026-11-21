@@ -330,26 +330,33 @@ static func _levy_ring(game: Game, tag: StringName, hex: Vector2i, men: int) -> 
 # --- disbanding ------------------------------------------------------------------------------------------------------
 
 
-## Whether `tag` may disband one company (unit id) or, with unit -1, the whole army (4.6, A5).
+## Whether `tag` may disband companies of its army (4.6, A5): one company (args unit: its id), the whole army (unit -1, the
+## default), or a set (args units: an array of company ids, one action). A set is checked as a whole: the return plan
+## shares one pending count over every company, so the men of all of them must find room, and the refunds must fit the
+## books together. A refused set changes nothing.
 static func disband_check(game: Game, args: Dictionary) -> Dictionary:
 	var why := _missing(game, args)
 	if why != "":
 		return _refusal(why)
 	var army := Armies.by_id(game, int(args["army"]))
 	var tag := StringName(str(args.get("tag", "")))
-	var unit_id := int(args.get("unit", -1))
+	var ids := _disband_ids(args)
 	if army.tag != tag:
 		return _refusal("not your army: the %s commands it" % _country_name(game, army.tag))
-	if unit_id != -1 and army.unit(unit_id) == null:
-		return _refusal("company %d is not in the %s" % [unit_id, army.name])
+	if ids.is_empty():
+		return _refusal("no companies given")
+	for id: int in ids:
+		if id != -1 and army.unit(id) == null:
+			return _refusal("company %d is not in the %s" % [id, army.name])
 	if Territory.owner_tag(game, army.hex) != tag:
 		return _refusal("disband only in your own land: (%d, %d) is not yours" % [army.hex.x, army.hex.y])
-	var plan := _return_plan(game, army, _units_to_drop(army, unit_id))
+	var drop := _drop_of(army, ids)
+	var plan := _return_plan(game, army, drop)
 	if not bool(plan["ok"]):
 		return _refusal(str(plan["reason"]))
 	var refund := 0
 	var back := {}
-	for u: Unit in _units_to_drop(army, unit_id):
+	for u: Unit in drop:
 		if u.raised_turn == game.turn and u.home == army.hex:
 			refund += u.paid
 			for key: Variant in u.paid_goods:
@@ -368,7 +375,7 @@ static func disband(game: Game, args: Dictionary) -> Dictionary:
 		return verdict
 	var army := Armies.by_id(game, int(args["army"]))
 	var tag := army.tag
-	var drop := _units_to_drop(army, int(args.get("unit", -1)))
+	var drop := _drop_of(army, _disband_ids(args))
 	var plan: Dictionary = _return_plan(game, army, drop)
 	var refund := 0
 	var men := 0
@@ -468,10 +475,27 @@ static func _goods_fit(c: Country, good: int, amount: int, why: StringName) -> b
 	return absi(c.flows_open[slot] + amount) <= Stores.LIMIT
 
 
-static func _units_to_drop(army: Army, unit_id: int) -> Array[Unit]:
+## The company ids a disband names: args units (an array: one action for the set) or else the single unit (-1 the whole
+## army). Duplicates are dropped; an args units that is not an array names none.
+static func _disband_ids(args: Dictionary) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	if not args.has("units"):
+		out.append(int(args.get("unit", -1)))
+		return out
+	var raw: Variant = args["units"]
+	if typeof(raw) != TYPE_ARRAY and typeof(raw) != TYPE_PACKED_INT32_ARRAY:
+		return out
+	for id: Variant in raw:
+		if not out.has(int(id)):
+			out.append(int(id))
+	return out
+
+
+## The companies a disband takes, in unit order: all of them when the ids hold -1, else those the ids name.
+static func _drop_of(army: Army, ids: PackedInt32Array) -> Array[Unit]:
 	var out: Array[Unit] = []
 	for u: Unit in army.units:
-		if unit_id == -1 or u.id == unit_id:
+		if ids.has(-1) or ids.has(u.id):
 			out.append(u)
 	return out
 

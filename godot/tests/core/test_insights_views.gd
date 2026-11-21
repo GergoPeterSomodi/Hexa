@@ -304,7 +304,7 @@ func test_events_gain_the_army_signals_of_m6() -> void:
 	for sig: Dictionary in (load("res://shell/autoload/events.gd") as GDScript).get_script_signal_list():
 		names.append(str(sig["name"]))
 	names.sort()
-	var want: Array[String] = ["army_changed", "army_disbanded", "army_raised", "army_starved", "chronicled",
+	var want: Array[String] = ["army_changed", "army_cleared", "army_disbanded", "army_raised", "army_selected", "army_starved", "chronicled",
 		"country_chosen", "district_declined", "game_ended", "game_started", "goods_short", "hex_changed",
 		"march_halted", "owners_changed", "season_ended", "tax_set", "town_grew", "unit_lost", "unit_moved",
 		"work_cancelled", "work_finished", "work_started"]

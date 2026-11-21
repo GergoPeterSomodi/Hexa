@@ -1,11 +1,11 @@
 ## Studiolo walnut top bar (PanelBar): brand, the player's country (arms and long name, or the pick's title in a
-## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief, Yields, Food: the modes MapModes.modes offers), the date and End turn (DateEnd, right of the middle),
+## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief, Yields, Food, Supply: the modes MapModes.modes offers), the date and End turn (DateEnd, right of the middle),
 ## Layers, Help and Pause menu (docs/architecture/m2-build-spec.md section 7.3; ui-and-controls-spec.md section 7).
 ## M4 (spec 6.3) and M5 (spec 6.2): the resource chips (Ducats, People, Food, Stores) sit right after the mode switch with the
 ## study button; they show only for the player of a game with countries (the sandbox and the pick have no chips and no Food
 ## mode). When the bar is tight the gap goes first, then the Stores and Food chips shrink to their medals and values, the
 ## mode buttons tighten, the country name goes, then People's and Ducats' names and changes and the brand, then the Stores
-## chip, the Food chip and the study button; the Ducats and People medals and values hold down to about 840 px, and
+## chip, the Food chip and the study button; the Ducats and People medals and values hold down to about 870 px (M6, six modes), and
 ## below that, where nothing else is left, the chips hide (I, L and the country panel still open the study).
 ## It reads Session and Events and sends intents only. The name hides before the mode switch when the window narrows.
 class_name TopBar
@@ -21,12 +21,12 @@ signal study_requested(page: StringName)
 ## A chip was pressed: the study opens at `page` on its `tab` (Ducats: This season, Stores: Goods).
 signal study_tab_requested(page: StringName, tab: StringName)
 
-const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief", "Yields", "Food"]
-const MODE_KEYS: Array[String] = ["1", "2", "3", "4", "5"]
+const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief", "Yields", "Food", "Supply"]
+const MODE_KEYS: Array[String] = ["1", "2", "3", "4", "5", "6"]
 const PICK_TAIL := ": choose your country"
 const MAX_FITS_PER_FRAME := 3
-## The mode buttons' side padding and font size when the bar is tight (five modes need the room the three had).
-const COMPACT_PAD := 2.0
+## The mode buttons' side padding and font size when the bar is tight (six modes need the room the three had).
+const COMPACT_PAD := 1.0
 const COMPACT_FONT := 12
 const BUTTON_STATES: Array[StringName] = [&"normal", &"pressed", &"hover", &"hover_pressed", &"disabled", &"focus"]
 
@@ -152,6 +152,10 @@ func set_layers_open(open: bool) -> void:
 		_layers_btn.set_pressed_no_signal(open)
 
 
+## M6 (L17, the Supply segment, key 6): six mode segments, compact padding 1 px (was 2). Measured by test_hud's narrowing
+## test, the width at which each step first happens: the gap 1700, Stores' name 1675, Food's name 1590, the compact modes 1560,
+## the country 1375, People's name 1255, Ducats' name 1220, Ducats' change 1180, the brand 1130, Stores 1050, Food 975, the
+## study button 905, the chips 870. The narrowest fit is about 695 px, so the 700 px window still holds.
 ## Fits the bar into `width` px: the gap goes first, then the Stores and Food chips shrink to their medals and values, the mode
 ## buttons tighten, the country name (or the map info of a sandbox) goes, then People's and Ducats' names and changes and the
 ## brand, then the Stores chip, the Food chip and the study button, and last of all the chips; the arms,

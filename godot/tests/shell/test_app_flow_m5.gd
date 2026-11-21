@@ -137,13 +137,21 @@ func _chips_and_key_5(vp: SubViewport, app: App) -> void:
 	assert_true(chips.people_chip().visible and chips.food_chip().visible, "a real game: the People and Food chips")
 	assert_eq(chips.people_chip().value_label().text, Words.number(_people_of(&"GEN")), "the chip shows the country's people")
 	var seg := app.hud().top_bar().mode_segmented()
-	assert_not_null(seg.button_for(int(MapModes.Mode.FOOD)), "five segments in a real game")
+	assert_not_null(seg.button_for(int(MapModes.Mode.FOOD)), "five segments in a real game (six with Supply, M6)")
 	_press(vp, &"view_mode_5")
 	await _wait_frames(3)
 	assert_eq(app.map_scene().mode(), int(MapModes.Mode.FOOD), "key 5 is the Food mode")
 	assert_eq(app.hud().mode_legend().mode(), int(MapModes.Mode.FOOD), "with its legend")
 	assert_true(seg.button_for(int(MapModes.Mode.FOOD)).button_pressed, "the top bar shows Food")
 	assert_false(seg.button_for(int(MapModes.Mode.YIELDS)).button_pressed, "and not Yields")
+	_press(vp, &"view_mode_6")  # M6: key 6 is Supply, with its legend
+	await _wait_frames(3)
+	assert_eq(app.map_scene().mode(), int(MapModes.Mode.SUPPLY), "key 6 is the Supply mode")
+	assert_eq(app.hud().mode_legend().mode(), int(MapModes.Mode.SUPPLY), "with its legend")
+	assert_true(seg.button_for(int(MapModes.Mode.SUPPLY)).button_pressed, "the top bar shows Supply")
+	_press(vp, &"view_mode_5")
+	await _wait_frames(3)
+	assert_eq(app.map_scene().mode(), int(MapModes.Mode.FOOD), "back to Food for the rest of the flow")
 
 
 func _console_and_a_season(vp: SubViewport, app: App) -> void:

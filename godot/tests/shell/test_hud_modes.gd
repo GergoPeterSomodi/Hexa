@@ -28,7 +28,7 @@ func after_each() -> void:
 	Bindings.reset_defaults()
 
 
-func test_the_mode_switch_has_five_segments_and_food_is_key_5() -> void:
+func test_the_mode_switch_has_six_segments_food_is_key_5_and_supply_is_key_6() -> void:
 	await _harness.wait_frames(self, 2)
 	var top := _hud.top_bar()
 	var seg := top.mode_segmented()
@@ -43,12 +43,20 @@ func test_the_mode_switch_has_five_segments_and_food_is_key_5() -> void:
 	assert_not_null(btn, "Food is the fifth segment once you play")
 	assert_eq(btn.text, "Food")
 	assert_true(btn.tooltip_text.contains("[5]"), "its tooltip names key 5")
-	assert_eq(TopBar.MODE_LABELS.size(), 5)
-	assert_eq(TopBar.MODE_KEYS.size(), 5)
+	assert_eq(TopBar.MODE_LABELS.size(), 6, "six mode segments: Supply is the sixth (M6)")
+	assert_eq(TopBar.MODE_KEYS.size(), 6)
+	var supply := seg.button_for(int(MapModes.Mode.SUPPLY))
+	assert_not_null(supply, "Supply is the sixth segment once you play")
+	assert_eq(supply.text, "Supply")
+	assert_true(supply.tooltip_text.contains("[6]"), "its tooltip names key 6")
 	var chosen: Array[int] = []
 	_hud.mode_requested.connect(func(mode: int) -> void: chosen.append(mode))
 	seg.select(food, true)
 	assert_eq(chosen, [4], "the fifth segment reaches the Hud as mode 4")
+	seg.select(int(MapModes.Mode.SUPPLY), true)
+	assert_eq(chosen, [4, 5], "the sixth segment reaches the Hud as mode 5 (Supply)")
 	top.set_mode(food)
 	assert_true(btn.button_pressed, "Food is shown selected, not Yields")
 	assert_false(seg.button_for(int(MapModes.Mode.YIELDS)).button_pressed)
+	top.set_mode(int(MapModes.Mode.SUPPLY))
+	assert_true(supply.button_pressed, "Supply is shown selected when set")

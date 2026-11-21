@@ -33,7 +33,7 @@ func _data(tile_name: String) -> TileData:
 func test_layers_have_the_z_of_the_table() -> void:
 	var want := {
 		"ground": 0, "shade": 10, "light": 11, "sea": 20, "coast": 30, "piece_ground": 40, "addon_ground": 41,
-		"grid": 45, "marks": 90,
+		"grid": 45, "reach": 83, "reach_next": 83, "marks": 90,
 	}
 	for layer_name: String in want:
 		assert_eq(_view.layer(layer_name).z_index, int(want[layer_name]), layer_name)

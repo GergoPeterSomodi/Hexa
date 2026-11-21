@@ -35,9 +35,9 @@ const LAYERS: Dictionary[String, Array] = {
 	"crossing0": [0, "stand"], "crossing1": [0, "stand"], "crossing2": [0, "stand"],
 }
 ## Layers that MapCells does not fill: the selection and build marks (the tint and the fog arrive later).
-const OVERLAYS: Dictionary[String, Array] = {"marks": [90, ""]}
+const OVERLAYS: Dictionary[String, Array] = {"reach": [83, ""], "reach_next": [83, ""], "marks": [90, ""]}
 ## The layers that hold marks only: one TileSet for every season, one TileMapLayer for the whole map.
-const WHOLE: Array[String] = ["grid", "marks"]
+const WHOLE: Array[String] = ["grid", "marks", "reach", "reach_next"]
 const LINES_Z := 50
 const SHADOW_Z := 60
 const STAND_Z := 70
