@@ -34,6 +34,8 @@ static func line_of(game: Game, entry: Dictionary, viewer: StringName, memo: Dic
 			line = _short_line(game, entry, mine)
 		"tax_set":
 			line = _tax_line(game, entry, mine)
+		"town_grew", "district_declined":
+			line = _settle_line(game, entry, mine)
 		_:
 			return {}
 	if line.is_empty():
@@ -138,6 +140,11 @@ static func _describable(entry: Dictionary, viewer: StringName) -> bool:
 			return tag == viewer  # only the owner is told
 		"tax_set":
 			return not Words.tax_name(int(entry.get("level", -1))).is_empty()
+		"town_grew", "district_declined":
+			if tag == &"" or not (entry.get("hex", null) is Vector2i) or _settle_words(entry) == "":
+				return false
+			# _settle_line: the player's own fall needs a reason the log knows
+			return tag != viewer or str(entry.get("kind", "")) == "town_grew" or 				["hunger", "people"].has(str(entry.get("why", "")))
 	return false
 
 
@@ -380,6 +387,50 @@ static func _tax_line(game: Game, entry: Dictionary, mine: bool) -> Dictionary:
 			"text": "You set taxes to %s." % level}
 	return {"keyword": "Taxes", "tone": "muted", "hex": hex, "notify": false, "floating": "",
 		"text": "%s set taxes to %s." % [short_name(game, tag), level]}
+
+
+# ----- people: a settlement grows or falls --------------------------------------------------------------------------
+
+
+## The words after the name: "grew into a town", "fell to a village: hunger" ("" for a level out of range or a fall for
+## a reason the log does not know). A fall's reason is `why` (hunger, people).
+static func _settle_words(entry: Dictionary) -> String:
+	var words: Array = FamilyIds.LEVEL_WORDS["settlements"]
+	var level := int(entry.get("level", 0))
+	if level < 1 or level >= words.size():
+		return ""
+	var noun := Words.with_article(str(words[level]))
+	if str(entry.get("kind", "")) == "town_grew":
+		return "grew into %s" % noun
+	return "fell to %s" % noun
+
+
+## "Savona (6, 13) grew into a town." (mine) or "Savoy: the village near Turin (6, 11) grew into a town." (muted); a fall
+## adds ": hunger." or ": too few people." for the player ("Milan: Cremona (12, 9) fell to a village." for another).
+static func _settle_line(game: Game, entry: Dictionary, mine: bool) -> Dictionary:
+	var words := _settle_words(entry)
+	var at: Variant = entry.get("hex", null)
+	if words == "" or not (at is Vector2i):
+		return {}
+	var grew := str(entry.get("kind", "")) == "town_grew"
+	var level := int(entry.get("from", 0))  # the settlement as it stood: the level word of an unnamed one
+	var name := Words.settlement(game, at as Vector2i, level if level > 0 else int(entry.get("level", 0)))
+	var keyword := "Grew" if grew else "Declined"
+	if mine:
+		var why := ""
+		if not grew:
+			match str(entry.get("why", "")):
+				"hunger":
+					why = ": hunger"
+				"people":
+					why = ": too few people"
+				_:
+					return {}
+		return {"keyword": keyword, "tone": "good" if grew else "bad", "hex": at, "notify": true, "floating": keyword,
+			"text": "%s %s%s." % [name, words, why]}
+	var who := short_name(game, StringName(str(entry.get("tag", ""))))
+	return {"keyword": keyword, "tone": "muted", "hex": at, "notify": false, "floating": keyword,
+		"text": "%s: %s %s." % [who, name, words]}
 
 
 # ----- land and rule ---------------------------------------------------------------------------------------------

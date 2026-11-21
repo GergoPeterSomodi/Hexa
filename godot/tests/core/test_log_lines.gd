@@ -478,3 +478,49 @@ func test_the_work_checks_agree_with_work_from_dict() -> void:
 		var entry := {"kind": "work_started", "tag": &"GEN", "work": v}
 		assert_eq(LogLines._describable(entry, &"GEN"), Work.from_dict(v) != null, str(v))
 		assert_eq(LogLines.line_of(_g, entry, &"GEN").is_empty(), Work.from_dict(v) == null, str(v))
+
+
+func _settle(kind: String, tag: StringName, hex: Vector2i, level: int, from: int, why: StringName = &"") -> Dictionary:
+	var event := {"kind": kind, "tag": tag, "hex": hex, "level": level, "from": from, "people": 4000}
+	if kind == "district_declined":
+		event["family"] = 1
+		event["why"] = why
+	_g.emit(event)
+	return _g.chronicle.entries.back()
+
+
+func test_people_lines_for_the_player() -> void:
+	var grew := LogLines.line_of(_g, _settle("town_grew", &"GEN", Vector2i(6, 13), 3, 2), &"GEN")
+	assert_eq(grew["text"], "Savona (6, 13) grew into a town.")
+	assert_eq([grew["keyword"], grew["tone"], grew["floating"], grew["notify"], grew["mine"]], ["Grew", "good", "Grew", true, true])
+	assert_eq(grew["hex"], Vector2i(6, 13))
+	assert_eq(grew["filters"], [&"all", &"mine"] as Array[StringName])
+	var fell := LogLines.line_of(_g, _settle("district_declined", &"GEN", Vector2i(6, 13), 2, 3, &"hunger"), &"GEN")
+	assert_eq(fell["text"], "Savona (6, 13) fell to a village: hunger.")
+	assert_eq([fell["keyword"], fell["tone"], fell["floating"], fell["notify"]], ["Declined", "bad", "Declined", true])
+	var few := LogLines.line_of(_g, _settle("district_declined", &"GEN", Vector2i(6, 13), 1, 2, &"people"), &"GEN")
+	assert_eq(few["text"], "Savona (6, 13) fell to a hamlet: too few people.")
+	var unnamed := LogLines.line_of(_g, _settle("town_grew", &"GEN", Vector2i(7, 12), 3, 2), &"GEN")
+	assert_eq(unnamed["text"], "the village near Savona (7, 12) grew into a town.")
+	assert_eq(LogLines.line_of(_g, _settle("district_declined", &"GEN", Vector2i(6, 13), 2, 3, &"sacked"), &"GEN"), {},
+		"P: a reason the log does not know")
+	assert_eq(LogLines.line_of(_g, _settle("town_grew", &"GEN", Vector2i(6, 13), 9, 2), &"GEN"), {}, "P: a level past the words")
+	var sacked := _settle("district_declined", &"GEN", Vector2i(6, 13), 2, 3, &"sacked")
+	assert_eq(LogLines.filters_of(_g, sacked, &"GEN"), [] as Array[StringName], "P: no line, so no filters (History counts none)")
+
+
+func test_people_lines_for_a_known_and_an_unknown_other() -> void:
+	var other := _known()
+	var who := LogLines.short_name(_g, other)
+	var grew := LogLines.line_of(_g, _settle("town_grew", other, Vector2i(7, 12), 3, 2), &"GEN")
+	assert_eq(grew["text"], "%s: the village near Savona (7, 12) grew into a town." % who)
+	assert_eq([grew["keyword"], grew["tone"], grew["floating"], grew["notify"], grew["mine"]], ["Grew", "muted", "Grew", false, false])
+	assert_eq(grew["filters"], [&"all"] as Array[StringName], "not in Mine")
+	var fell := LogLines.line_of(_g, _settle("district_declined", other, Vector2i(6, 13), 2, 3, &"hunger"), &"GEN")
+	assert_eq(fell["text"], "%s: Savona (6, 13) fell to a village." % who, "no reason for another's town")
+	assert_eq([fell["keyword"], fell["tone"], fell["floating"], fell["notify"]], ["Declined", "muted", "Declined", false])
+	var stranger := _stranger()
+	var far := _settle("town_grew", stranger, Vector2i(7, 12), 3, 2)
+	assert_eq(LogLines.line_of(_g, far, &"GEN"), {}, "P: never witnessed")
+	assert_eq(LogLines.filters_of(_g, far, &"GEN"), [] as Array[StringName])
+	assert_false(LogLines.line_of(_g, far, &"").is_empty(), "the viewer of everything sees it")

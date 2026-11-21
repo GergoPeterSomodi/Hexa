@@ -229,6 +229,7 @@ static func _make(game: Game, tag: StringName, hex: Vector2i, action: StringName
 	out["cost"] = _cost(game, cost, seasons, ready, first, not bool(verdict["ok"]), c != null)
 	out["by_season"] = _by_season(game, cells)
 	out["brings"] = _brings(game, cells, target)
+	out["people_note"] = _people_note(game, cells, target)
 	var year := _year(cells)
 	var district := _district(game, cells)
 	if c != null:
@@ -251,7 +252,7 @@ static func _make(game: Game, tag: StringName, hex: Vector2i, action: StringName
 static func _blank() -> Dictionary:
 	return {
 		"verdict": {"ok": false, "reason": ""}, "blocked_by": &"", "title": "", "subtitle": "", "reason_words": "", "brings": [],
-		"by_season": [], "year": {}, "lands": {}, "cost": {"text": ""}, "requirements": [], "payback": {}, "next_stages": [],
+		"by_season": [], "year": {}, "lands": {}, "cost": {"text": ""}, "people_note": "", "requirements": [], "payback": {}, "next_stages": [],
 		"chips": [], "expensive": false, "map_marks": {}, "ghost": {},
 	}
 
@@ -624,6 +625,10 @@ static func _brings(game: Game, cells: Dictionary, target: Dictionary) -> Array[
 		out.append(_bring(&"jobs", "Jobs", from_jobs, to_jobs, &""))
 	if int(e["from_cost"]) != int(e["to_cost"]):
 		out.append(_bring(&"upkeep", "Upkeep, a season", int(e["from_cost"]), int(e["to_cost"]), &""))
+	var from_room := int((e["from"] as Dictionary)["room"])
+	var to_room := int((e["to"] as Dictionary)["room"])
+	if from_room != to_room:
+		out.append(_bring(&"room", "Room", from_room, to_room, &""))
 	return out
 
 
@@ -665,6 +670,54 @@ static func _brings_town(game: Game, cells: Dictionary, e: Dictionary) -> Array[
 		out.append(_bring(&"food", "Towns' food", food_from, food_to, &"season"))
 	out.append(_bring(&"upkeep", "Upkeep and walls", int(spring.get("from_cost", 0)), int(spring.get("to_cost", 0)), &"season"))
 	return out
+
+
+## The people note of a settlement's upgrade (spec 4.6 and 4.11 c): below the level the people raise themselves, "Its people
+## raise it themselves at 4,000 (in about 34 seasons)." or "Its people are waiting for it."; above it, what the new room waits
+## for, "People 30,000: the new room counts once they pass 45,000, in about 41 seasons." Else "".
+static func _people_note(game: Game, cells: Dictionary, target: Dictionary) -> String:
+	if int(target["family"]) != ImproveRules.SETTLEMENT or int(target["old_family"]) != ImproveRules.SETTLEMENT:
+		return ""
+	var i := int(cells["i"])
+	if game.defs == null or game.state.people.size() <= i or int(game.state.owner[i]) == 0 and game.has_countries():
+		return ""
+	var people := game.state.people[i]
+	var room_n := People.room_i(game, StateView.of(game.state), i)
+	var room := Words.number(room_n)
+	var full := people >= room_n
+	var left := 0 if full else seasons_to_room(game, i)
+	var in_about := "" if left < 0 else (" (in about %s)" % Words.seasons(left) if left > 0 else "")
+	if int(target["old_level"]) < game.defs.people_top_level:
+		if full:
+			return "Its people are waiting for it."
+		if left < 0:
+			return "Its people do not grow, so only the crown's work raises it."
+		return "Its people raise it themselves at %s%s." % [room, in_about]
+	if full:
+		return "People %s: the new room is theirs at once." % Words.number(people)
+	if left < 0:
+		return "People %s: they do not grow, so the new room stays empty." % Words.number(people)
+	return "People %s: the new room counts once they pass %s, in about %s." % [Words.number(people), room, Words.seasons(left)]
+
+
+## Seasons until the people of hex index `i` reach its room, fed, at the owner's tax from this season (stepping the rule of 4.4);
+## 0 when full, -1 when they never do (past 400 seasons).
+static func seasons_to_room(game: Game, i: int) -> int:
+	var view := StateView.of(game.state)
+	var room := People.room_i(game, view, i)
+	var crowd := int(game.state.people[i])
+	var owner := Countries.by_id(game, int(game.state.owner[i])) if game.has_countries() else null
+	var tax := owner.tax if owner != null else 1
+	var settlement := game.state.main_use[i] == ImproveRules.SETTLEMENT
+	if game.defs.growth_bp[clampi(tax, 0, 2)] <= 0:
+		return 0 if crowd >= room else -1
+	for n: int in PAYBACK_HORIZON:
+		if crowd >= room:
+			return n
+		var rates := People.rates_of(game.defs, Economy.slot_for(int(game.map.climate[i]), Calendar.season_of(game.turn + n)), tax)
+		var step := People.rule_of(game.defs, crowd, room, settlement, rates, 1000)
+		crowd += step.x
+	return -1
 
 
 static func _line(entry: Dictionary, why: StringName) -> int:

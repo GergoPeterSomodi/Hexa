@@ -299,11 +299,12 @@ static func halted(game: Game, work: Work, turn: int) -> bool:
 
 ## "" or the words of the first pair rule the target (family, level_value) breaks against a work under way within two
 ## hexes of `hex` (other than the work on `hex`). A clear work has no target and never clashes.
-static func pending_conflict(game: Game, hex: Vector2i, family: int, level_value: int) -> String:
+## `gone` (the preview's) is a set of works (Work -> true) to leave out: they will have finished.
+static func pending_conflict(game: Game, hex: Vector2i, family: int, level_value: int, gone: Dictionary = {}) -> String:
 	if family <= 0:
 		return ""
 	for w: Work in game.state.works:
-		if w.hex == hex or w.action == CLEAR or absi(w.hex.y - hex.y) > 2:  # a row apart is a hex apart, at least
+		if gone.has(w) or w.hex == hex or w.action == CLEAR or absi(w.hex.y - hex.y) > 2:  # a row apart is a hex apart, at least
 			continue
 		var distance := ImproveRules.hex_distance(hex, w.hex)
 		if distance < 1 or distance > 2:

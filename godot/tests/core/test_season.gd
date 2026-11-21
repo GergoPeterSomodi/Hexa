@@ -44,3 +44,32 @@ func test_run_phase_unknown_does_nothing() -> void:
 	Season.run_phase(g, &"works")
 	Season.run_phase(g, &"stats")
 	assert_eq(g.turn, 2)
+
+
+func test_a_paid_town_upgrade_finishing_in_season_t_gives_its_room_in_ts_people_phase() -> void:
+	# The works phase runs before the people phase: a village whose upgrade finishes in season T already has the town's room
+	# (20,000) when T's people phase grows it, so it passes the village's 4,000 in T; one season earlier it stopped at 4,000.
+	var alba := Vector2i(6, 11)
+	var g := PeopleFixture.genoa(PeopleFixture.always_fed())
+	var i := g.map.index_of(alba)
+	var tag := Territory.owner_tag(g, alba)
+	assert_ne(tag, &"", "Alba has an owner")
+	assert_eq(int(g.state.level[i]), 2, "a village")
+	assert_true(g.dev_money(tag, 5000))
+	assert_true(g.dev_goods(tag, g.defs.good_id(&"timber"), 100))
+	assert_true(g.dev_goods(tag, g.defs.good_id(&"stone"), 100))
+	var verdict := g.act("upgrade", {"hex": alba, "tag": tag})
+	assert_true(bool(verdict["ok"]), str(verdict.get("reason", "")))
+	var work := g.state.work_at(alba)
+	assert_not_null(work, "the upgrade is under way")
+	assert_gt(work.paid, 0, "a paid upgrade")
+	while work.seasons_left > 1:
+		assert_true(g.dev_people(alba, 3999))
+		Season.run(g)
+		assert_lte(g.state.people[i], 4000, "under way: the village's room holds it at 4,000")
+		assert_eq(int(g.state.level[i]), 2)
+	assert_true(g.dev_people(alba, 3999))
+	var finishing := g.turn
+	Season.run(g)
+	assert_eq(int(g.state.level[i]), 3, "the town stands from season %d" % finishing)
+	assert_gt(g.state.people[i], 4000, "its room was the town's in the people phase of the same season")

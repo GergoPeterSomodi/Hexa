@@ -23,6 +23,10 @@ signal work_cancelled(tag: StringName, hex: Vector2i, work: Dictionary, why: Str
 signal goods_short(tag: StringName, good: StringName)
 ## A country set its tax level (0 low, 1 normal, 2 high): chips, study page, country panel, toast.
 signal tax_set(tag: StringName, level: int)
+## A settlement grew a level in the people phase (People.season): the hex panel refreshes, the Food overlay repaints.
+signal town_grew(tag: StringName, hex: Vector2i, level: int)
+## A settlement fell a level in the people phase; `why` is `hunger` or `people`.
+signal district_declined(tag: StringName, hex: Vector2i, level: int, why: StringName)
 ## Every notable event, as the chronicle stores it (plain values): the log, notifications and ribbons.
 signal chronicled(entry: Dictionary)
 ## A season ended; `turn` is the season that ended. Emitted once, after the last phase's drain.

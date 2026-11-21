@@ -31,8 +31,8 @@ func _flow(c: Country, why: StringName, sign_of: int) -> PackedInt32Array:
 
 
 ## A game with works begun by random countries, taxes set and some seasons played (so the cases start in every season).
-func _base_game(rng: RandomNumberGenerator, n: int) -> Game:
-	var g := EconomyFixture.game(&"GEN", n % 2 == 0)
+func _base_game(rng: RandomNumberGenerator, n: int, still: bool = true) -> Game:
+	var g := EconomyFixture.game(&"GEN", n % 2 == 0, true, EconomyFixture.SEED, still)
 	for c: Country in g.countries:
 		g.dev_money(c.tag, 3000)
 		g.dev_goods(c.tag, 11, 100)
@@ -49,7 +49,7 @@ func _base_game(rng: RandomNumberGenerator, n: int) -> Game:
 				var row: Dictionary = rows[rng.randi_range(0, rows.size() - 1)]
 				g.act(String(row["action"]), {"hex": hex, "family": row["family"], "tag": c.tag})
 	for k: int in n % 6:
-		Season.run(g)
+		PeopleFixture.season(g)
 	return g
 
 
@@ -83,6 +83,26 @@ func _finish_at_once(copy: Game, hex: Vector2i, option: Dictionary) -> void:
 	assert_true(bool(done["ok"]), "the piece goes in: %s" % str(done))
 
 
+## The season's people as the game has them: the country's total and towns', the food, the flows (positive), the level changes
+## the preview names equal the ones the played copy's settlements show.
+func _assert_people(copy: Game, c: Country, p: Dictionary, where: String) -> void:
+	var total := 0
+	var towns := 0
+	for i: int in Territory.districts(copy, c.id):
+		total += copy.state.people[i]
+		if copy.state.main_use[i] == Economy.SETTLEMENTS:
+			towns += copy.state.people[i]
+	var flows: PackedInt32Array = c.people_closed["flows"]
+	assert_eq(int(p["people"]), total, where + " people")
+	assert_eq(int(p["towns"]), towns, where + " towns")
+	assert_eq(int(p["fed"]), c.food_fed, where + " fed")
+	assert_eq(int(p["grew"]), flows[People.GREW], where + " grew")
+	assert_eq(int(p["starved"]), -flows[People.STARVED], where + " starved")
+	assert_eq(int(p["left"]), -flows[People.LEFT], where + " left")
+	for level: Dictionary in p["levels"]:
+		assert_eq(copy.state.level[copy.map.index_of(level["hex"] as Vector2i)], int(level["to"]), where + " level")
+
+
 func _check_case(g: Game, found: Dictionary, label: String) -> void:
 	var tag: StringName = found["tag"]
 	var hex: Vector2i = found["hex"]
@@ -111,7 +131,8 @@ func _check_case(g: Game, found: Dictionary, label: String) -> void:
 		var cell: Dictionary = (card["by_season"] as Array)[season]
 		assert_eq(int(cell["after_realm"]), int(p["realm"]), where + " the card's country measure")
 		assert_eq(int(cell["after_treasury"]), int(p["net"]), where + " the card's treasury measure")
-		assert_true(bool(Season.run(copy)["ok"]))
+		assert_true(bool(PeopleFixture.season(copy)["ok"]))
+		_assert_people(copy, c, p, where)
 		assert_eq(_flow(c, &"made", 1), p["made"], where + " made")
 		assert_eq(_flow(c, &"used", -1), p["used"], where + " used")
 		assert_eq(_flow(c, &"sold", -1), p["sold"], where + " sold")
@@ -123,14 +144,23 @@ func _check_case(g: Game, found: Dictionary, label: String) -> void:
 
 
 func test_the_preview_equals_four_calm_seasons_in_200_cases() -> void:
+	_property(20261120, true)
+
+
+## Spec done-when 5: the same 200 cases with the real, growing defs (the people grow, starve and level in the window).
+func test_the_preview_equals_four_calm_seasons_in_200_cases_with_people_growing() -> void:
+	_property(20261121, false)
+
+
+func _property(seed_value: int, still: bool) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 20261120
+	rng.seed = seed_value
 	var done := 0
 	var kinds := {}
 	var blocked := {}
 	var rings := 0
 	for n: int in GAMES:
-		var g := _base_game(rng, n)
+		var g := _base_game(rng, n, still)
 		var digest := g.digest()
 		for case_number: int in CASES / GAMES:
 			var found := _pick(g, rng)
@@ -271,6 +301,59 @@ func test_4_15_d_genoa_to_city_refused_for_money() -> void:
 	assert_eq([pay["seasons_treasury"], pay["text_treasury"]], [92, "Spring 1503, 92 seasons from now."])
 	assert_eq(card["next_stages"], [{"level": 5, "ok": false, "text": "None: Genoa is at its top level."}])
 	assert_true(card["expensive"])
+
+
+func test_4_11_c_genoa_to_city_with_people_growing() -> void:
+	# The same card on the real, growing defs (spec 4.11 c): the people's taxes grow in both runs, so the gains are the
+	# dues, fish, lift and upkeep alone; the realm's year is 561 -> 617 and the treasury's payback is Autumn 1503, 94 seasons
+	# (spec 4.11 c is right: on still people the treasury's gains are 13, 15, 14, 8 and the payback 92 seasons, Spring 1503).
+	var g := PeopleFixture.genoa()
+	var card := ImprovePreview.of(g, &"GEN", Vector2i(8, 13), {"action": Works.UPGRADE, "family": 0})
+	assert_eq(card["blocked_by"], &"ducats")
+	assert_eq(card["reason_words"], "Not enough ducats: 1,000 needed, 610 in the treasury.")
+	var gains: Array[int] = []
+	var treasury: Array[int] = []
+	for cell: Dictionary in card["by_season"]:
+		gains.append(int(cell["gain_realm"]))
+		treasury.append(int(cell["gain_treasury"]))
+	assert_eq(gains, [15, 16, 15, 10])
+	assert_eq(treasury, [13, 14, 14, 8])
+	var year: Dictionary = card["year"]
+	assert_eq([year["before"], year["after"], year["gain_realm"], year["gain_treasury"]], [561, 617, 56, 49])
+	assert_eq((card["brings"] as Array)[0], {"field": &"room", "label": "Room", "before": 45000, "after": 100000, "per": &""})
+	assert_eq(card["people_note"], "People 30,000: the new room counts once they pass 45,000, in about 41 seasons.")
+	var chips: Array = card["chips"]
+	assert_eq((chips[1] as Dictionary)["text"], "room +55,000")
+	var ring: Array = (card["lands"] as Dictionary)["ring"]
+	assert_eq((ring[0] as Dictionary)["text"], "timber near Genoa (9, 13): +1 a season, +2 in winter (the city's market)")
+	var pay: Dictionary = card["payback"]
+	assert_eq([pay["seasons"], pay["text"]], [83, "Pays back in Winter 1500, 83 seasons from now (at today's prices)."])
+	assert_eq([pay["seasons_treasury"], pay["text_treasury"]], [94, "Autumn 1503, 94 seasons from now."])
+	assert_eq(card["next_stages"], [{"level": 5, "ok": false, "text": "None: Genoa is at its top level."}])
+
+
+func test_the_people_note_for_a_village_a_town_and_a_full_one() -> void:
+	# Savoy's village near Turin (6, 11): 3,000 of 4,000 people, frost winters: 34 seasons (4.4's table).
+	var sav := PeopleFixture.genoa()
+	sav.act("choose_country", {"tag": &"SAV"})
+	var village := ImprovePreview.of(sav, &"SAV", Vector2i(6, 11), {"action": Works.UPGRADE, "family": 0})
+	assert_eq(village["people_note"], "Its people raise it themselves at 4,000 (in about 34 seasons).")
+	sav.dev_people(Vector2i(6, 11), 4000)
+	sav.districts.reset_open()
+	var full := ImprovePreview.of(sav, &"SAV", Vector2i(6, 11), {"action": Works.UPGRADE, "family": 0})
+	assert_eq(full["people_note"], "Its people are waiting for it.")
+	# A walled town's note is about the new room.
+	var still := EconomyFixture.game(&"GEN")
+	var walls := ImprovePreview.of(still, &"GEN", Vector2i(8, 13), {"action": Works.UPGRADE, "family": 0})
+	assert_string_contains(walls["people_note"], "do not grow")
+
+
+func test_a_goods_district_brings_its_room_and_a_settlement_its_room() -> void:
+	var g := EconomyFixture.game(&"GEN", true)
+	var card := ImprovePreview.of(g, &"GEN", EconomyFixture.VINEYARD_HEX, {"action": Works.BUILD, "family": VINEYARD})
+	var brings: Array = card["brings"]
+	assert_eq((brings[brings.size() - 1] as Dictionary), {"field": &"room", "label": "Room", "before": 8000, "after": 9000, "per": &""})
+	assert_eq(card["people_note"], "")
 
 
 func test_4_15_e_savona_refused_by_a_rule() -> void:

@@ -103,6 +103,23 @@ static func _place_names(game: Game) -> Dictionary:
 		return out) as Dictionary
 
 
+## "Savona (6, 13)" for a named settlement; "the village near Turin (6, 11)" for an unnamed one: its level word
+## (FamilyIds.LEVEL_WORDS) and then `place`. A level with no word gives the place alone.
+static func settlement(game: Game, hex: Vector2i, level: int) -> String:
+	var at := place(game, hex)
+	if not (at.begins_with("near ") or at.begins_with("(")):
+		return at
+	var words: Array = FamilyIds.LEVEL_WORDS["settlements"]
+	if level < 1 or level >= words.size():
+		return at
+	return "the %s %s" % [str(words[level]), at]
+
+
+## "1 person", "30,300 people".
+static func people(n: int) -> String:
+	return plural(n, "person", "people") if n == 1 else "%s people" % number(n)
+
+
 ## "a, b and 2 more": the first `shown` items, then how many are left. Up to `shown` items are all named.
 ## `separator` joins the named items before the last one ("; " when the items hold commas themselves).
 static func list(items: Array[String], shown: int = 2, separator: String = ", ") -> String:

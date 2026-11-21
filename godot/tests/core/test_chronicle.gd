@@ -60,3 +60,21 @@ func test_money_events_are_stored_plain() -> void:
 	assert_true(short["good"] is String)
 	assert_eq(short["witnesses"], PackedStringArray(["GEN"]))
 	assert_eq(c.of_turn(2)[1]["level"], 2)
+
+
+func test_notable_holds_the_people_kinds_nine_in_all() -> void:
+	assert_true(Chronicle.NOTABLE.has("town_grew"))
+	assert_true(Chronicle.NOTABLE.has("district_declined"))
+	assert_eq(Chronicle.NOTABLE.size(), 9)
+
+
+func test_people_events_are_stored_plain() -> void:
+	var c := Chronicle.new()
+	c.add({"kind": &"town_grew", "turn": 3, "tag": &"GEN", "hex": Vector2i(6, 13), "level": 3, "from": 2, "people": 4000})
+	c.add({"kind": &"district_declined", "turn": 3, "tag": &"GEN", "hex": Vector2i(6, 13), "family": 1, "level": 2, "from": 3,
+		"people": 1900, "why": &"hunger"})
+	var back := Chronicle.from_dict(c.to_dict())
+	assert_eq(back.entries[0]["tag"], "GEN")
+	assert_eq(back.entries[1]["why"], "hunger")
+	assert_eq(back.entries[1]["hex"], Vector2i(6, 13))
+	assert_eq(back.digest(), c.digest())

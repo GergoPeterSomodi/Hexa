@@ -233,7 +233,15 @@ func test_a_mouse_click_on_a_row_keeps_its_card_and_leaves_no_marks_without_it()
 	await _wait_frames(2)
 
 
+## A hex an action changed. Those the season's own phases change (a work finishing, a village growing: any country's land)
+## are not recorded: while a season runs, the log's last record is its end_season of the game's current turn (Season.begin
+## writes it, the calendar phase moves the turn on).
 func _on_hex_changed(hex: Vector2i) -> void:
+	var game := Session.game
+	if game != null and not game.action_log.is_empty():
+		var last: Dictionary = game.action_log.back()
+		if str(last.get("action", "")) == "end_season" and int(last.get("turn", -1)) == game.turn:
+			return
 	_changed_hexes.append(hex)
 
 
@@ -619,9 +627,10 @@ func _assert_invariants(
 				_player_game = game
 				_player_seen = game.player
 			assert_eq(game.player, _player_seen, "%s: the player never changes after the pick" % tag)
-		# A season's people phase changes other countries' hexes too (a village grows, a town falls): only a step that ended no
-		# season has hexes that a works action of the player changed.
-		for hex: Vector2i in ([] if int(_n.get("seasons", 0)) > _step_seasons else _changed_hexes):
+		# _changed_hexes holds the changes of works actions only (a season's phases are left out in _on_hex_changed: a village
+		# of another country grows in the people phase), so an action accepted on foreign land is caught even in a step that
+		# also ended a season.
+		for hex: Vector2i in _changed_hexes:
 			assert_eq(Territory.owner_tag(game, hex), game.player,
 				"%s: an accepted works action on %s is on the player's land" % [tag, str(hex)])
 

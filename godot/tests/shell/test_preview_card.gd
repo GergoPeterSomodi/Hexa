@@ -44,7 +44,7 @@ func test_accepted_vineyard_fills_every_part_of_spec_6_5() -> void:
 	assert_eq(card.accessibility_name, "Vineyard, first stage")
 	assert_eq(card.title_label().text, "Vineyard, first stage")
 	assert_true(card.sub_label().visible)
-	assert_eq(card.brings_container().get_child_count(), 4, "four brings lines")
+	assert_eq(card.brings_container().get_child_count(), 5, "five brings lines")
 	assert_false(card.refusal_panel().visible, "no refusal bar")
 	assert_false(card.begin_button().disabled, "Begin is enabled")
 	assert_true(card.season_strip().visible, "seasons differ, so the strip shows")

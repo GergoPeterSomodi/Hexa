@@ -19,13 +19,13 @@ const HELP_LINES: Array[String] = [
 	"build c r family   upgrade c r   clear c r   cancel c r",
 	"choose TAG   end [n]   goto c r   look spring|summer|autumn|winter|calendar",
 	"give c r [c r ...] TAG|none   digest   seed   help",
-	"money N [TAG]   goods KEY N [TAG]   tax low|normal|high",
+	"money N [TAG]   goods KEY N [TAG]   tax low|normal|high   people c r N",
 ]
 ## The tax words of `tax`, by level.
 const TAX_WORDS: Array[String] = ["low", "normal", "high"]
 
 
-## Reads a line: {kind, action, args, problem}. `kind` is &"act", &"end", &"goto", &"look", &"give", &"money", &"goods",
+## Reads a line: {kind, action, args, problem}. `kind` is &"act", &"end", &"goto", &"look", &"give", &"money", &"goods", &"people",
 ## &"digest", &"seed", &"help" or &"" (a problem, whose words are in `problem`).
 static func parse(text: String, game: Game) -> Dictionary:
 	var words := text.strip_edges().split(" ", false)
@@ -54,6 +54,8 @@ static func parse(text: String, game: Game) -> Dictionary:
 			return _parse_goods(rest, game)
 		"tax":
 			return _parse_tax(rest, game)
+		"people":
+			return _parse_people(rest, game)
 		"digest", "seed", "help":
 			if not rest.is_empty():
 				return _problem("%s takes no arguments." % head)
@@ -112,6 +114,13 @@ static func run(text: String, ctx: ShellContext) -> String:
 			if not made:
 				return "Refused: %s has no stores to change." % String(tag_g)
 			return "Done: %s %s to %s." % [Words.signed(loads), Session.game.defs.good(good).name.to_lower(), String(tag_g)]
+		&"people":
+			var at: Vector2i = args["hex"]
+			var applied := Session.dev_people(at, int(args["people"]))
+			ctx.request(&"refresh_hud")
+			if not applied:
+				return "Refused: no one keeps people there."
+			return "Done: %s at %d, %d." % [Words.people(int(args["people"])), at.x, at.y]
 		&"digest":
 			return Session.game.digest().substr(0, DIGEST_CHARS)
 		&"seed":
@@ -262,6 +271,23 @@ static func _parse_tax(rest: PackedStringArray, game: Game) -> Dictionary:
 	if shut != "":
 		return _problem(shut)
 	return _made(&"act", "set_tax", {"level": TAX_WORDS.find(rest[0].to_lower())})
+
+
+## `people c r N`: sets the people of a hex (Session.dev_people). Sea and unowned land are refused when it runs.
+static func _parse_people(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() != 3:
+		return _problem("Use: people c r N")
+	var shut := _economy_problem(game)
+	if shut != "":
+		return _problem("the sandbox has no countries" if game != null else shut)
+	var hex: Variant = _hex_of(rest[0], rest[1], game)
+	if hex == null:
+		return _problem("no such hex")
+	if not is_small_int(rest[2]) or rest[2].to_int() < 0:
+		return _problem("N must be a whole number of 0 or more")
+	if rest[2].to_int() > People.PEOPLE_MAX:
+		return _problem("N must be a whole number from 0 to %s" % Words.number(People.PEOPLE_MAX))
+	return _made(&"people", "", {"hex": hex, "people": rest[2].to_int()})
 
 
 ## Why the money commands cannot run (no game, or a map without countries), else "".

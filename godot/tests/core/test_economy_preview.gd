@@ -47,6 +47,104 @@ func _check_against_play(g: Game, count: int, label: String) -> void:
 			assert_eq(Treasury.left_over(closed), int(p["net"]), where + " net")
 
 
+## The people of the season just played, from the game itself: the country's total, its settlements', the closed flows, the food.
+func _people_of(g: Game, c: Country) -> Dictionary:
+	var total := 0
+	var towns := 0
+	for i: int in Territory.districts(g, c.id):
+		total += g.state.people[i]
+		if g.state.main_use[i] == Economy.SETTLEMENTS:
+			towns += g.state.people[i]
+	var flows: PackedInt32Array = (c.people_closed["flows"] as PackedInt32Array) if c.people_closed.has("flows") else PackedInt32Array([0, 0, 0])
+	return {"people": total, "towns": towns, "fed": c.food_fed, "grew": flows[People.GREW], "starved": -flows[People.STARVED],
+		"left": -flows[People.LEFT]}
+
+
+## Plays `count` seasons (the people phase between works and stats) and checks the previews, people included.
+func _check_people_against_play(g: Game, count: int, label: String) -> int:
+	var previews := {}
+	for c: Country in g.countries:
+		previews[c.tag] = EconomyPreview.with(g, c.tag, {}, count)
+	var moved := 0
+	var levels := 0
+	for k: int in count:
+		PeopleFixture.season(g)
+		for c: Country in g.countries:
+			var p: Dictionary = (previews[c.tag]["seasons"] as Array)[k]
+			var where := "%s %s season %d" % [label, String(c.tag), k + 1]
+			var real := _people_of(g, c)
+			for key: String in real:
+				assert_eq(int(p[key]), int(real[key]), where + " " + key)
+			assert_eq(_flow(c, &"made", 1), p["made"], where + " made")
+			assert_eq(_flow(c, &"used", -1), p["used"], where + " used")
+			assert_eq(c.stock, p["stock"], where + " stock")
+			assert_eq(_lines_of(c.ledger_closed["lines"] as Array), _lines_of(p["lines"] as Array), where + " money lines")
+			moved += int(p["grew"]) + int(p["starved"]) + int(p["left"])
+			levels += (p["levels"] as Array).size()
+	return moved * 1000 + levels
+
+
+func test_eight_seasons_equal_play_for_every_country_with_people_growing() -> void:
+	var g := EconomyFixture.game(&"GEN", false, true, EconomyFixture.SEED, false)
+	var score := _check_people_against_play(g, 8, "growing")
+	assert_gt(score / 1000, 1000, "people moved")
+
+
+func test_a_village_that_fills_its_room_in_the_window_levels_up_when_it_does_in_play() -> void:
+	# The village near Turin (6, 11) fills 4,000 at turn 34 (4.11 d): from turn 28 the window of eight seasons holds it.
+	var d := PeopleFixture.always_fed(EconomyFixture.committed())
+	var g := PeopleFixture.genoa(d)
+	PeopleFixture.play(g, 27)
+	var levels := _check_people_against_play(g, 8, "village")
+	assert_gt(levels % 1000, 0, "a level change happened in the window")
+
+
+func test_eight_seasons_equal_play_with_works_under_way_and_people_growing() -> void:
+	var g := EconomyFixture.game(&"GEN", true, true, EconomyFixture.SEED, false)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 78
+	for c: Country in g.countries:
+		g.dev_money(c.tag, 5000)
+		for n: int in 6:
+			var districts := Territory.districts(g, c.id)
+			if districts.is_empty():
+				break
+			var hex := g.map.hex_of(districts[rng.randi_range(0, districts.size() - 1)])
+			for row: Dictionary in ImprovePreview.options_of(g, c.tag, hex):
+				if bool(row["verdict"]["ok"]):
+					g.act(String(row["action"]), {"hex": hex, "family": row["family"], "tag": c.tag})
+					break
+	assert_gt(g.state.works.size(), 3)
+	_check_people_against_play(g, 8, "works+people")
+
+
+func test_eight_seasons_equal_play_when_the_towns_go_hungry() -> void:
+	var d := PeopleFixture.no_food(EconomyFixture.committed())
+	var g := PeopleFixture.genoa(d)
+	var score := _check_people_against_play(g, 8, "hungry")
+	assert_gt(score / 1000, 100)
+	var starved := 0
+	for p: Dictionary in EconomyPreview.with(PeopleFixture.genoa(d), &"GEN", {}, 8)["seasons"]:
+		starved += int(p["starved"])
+	assert_gt(starved, 0, "the towns starve in the window")
+
+
+func test_the_stepped_hexes_are_the_settlements_and_the_hexes_not_full() -> void:
+	var g := EconomyFixture.game(&"GEN", false, true, EconomyFixture.SEED, false)
+	var c := Countries.by_tag(g, &"GEN")
+	var active := People.active(g, StateView.of(g.state), c.id)
+	var want := 0
+	for i: int in Territory.districts(g, c.id):
+		var room := People.room_i(g, StateView.of(g.state), i)
+		if g.state.main_use[i] == Economy.SETTLEMENTS or g.state.people[i] != room:
+			want += 1
+	assert_eq(active.size(), want)
+	var rec: Dictionary = EconomyPreview.baseline(g, &"GEN", 2, 1)[0]
+	assert_gt((rec["steps"] as Dictionary).size(), 3, "the settlements and the districts that fill up move")
+	for i: Variant in rec["steps"]:
+		assert_true(active.has(int(i)), "only stepped hexes move")
+
+
 func test_eight_seasons_equal_play_for_every_country() -> void:
 	var g := EconomyFixture.game(&"GEN")
 	assert_gt(g.countries.size(), 10)

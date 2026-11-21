@@ -289,19 +289,21 @@ func test_the_pins_of_4_13() -> void:
 	assert_eq(SaveFile.OLDEST_FORMAT, 3)
 	assert_eq(Stats.SERIES.size(), 40)
 	assert_eq(Chronicle.NOTABLE, ["work_started", "work_finished", "work_cancelled", "owners_changed", "country_chosen",
-		"goods_short", "tax_set"] as Array[String])
+		"goods_short", "tax_set", "town_grew", "district_declined"] as Array[String])
+	assert_eq(Chronicle.NOTABLE.size(), 9, "nine notable kinds")
 	assert_eq(Chronicle.KEEP, 3000)
 	assert_eq(Stats.RING, 40)
 	assert_eq([Stats.MADE, Stats.USED, Stats.STOCK], [0, 1, 2])
 
 
-func test_events_gain_no_signal() -> void:
+func test_events_gain_only_the_two_people_signals() -> void:
 	var names: Array[String] = []
 	for sig: Dictionary in (load("res://shell/autoload/events.gd") as GDScript).get_script_signal_list():
 		names.append(str(sig["name"]))
 	names.sort()
-	var want: Array[String] = ["chronicled", "country_chosen", "game_ended", "game_started", "goods_short", "hex_changed",
-		"owners_changed", "season_ended", "tax_set", "work_cancelled", "work_finished", "work_started"]
+	var want: Array[String] = ["chronicled", "country_chosen", "district_declined", "game_ended", "game_started",
+		"goods_short", "hex_changed", "owners_changed", "season_ended", "tax_set", "town_grew", "work_cancelled",
+		"work_finished", "work_started"]
 	assert_eq(names, want)
 
 

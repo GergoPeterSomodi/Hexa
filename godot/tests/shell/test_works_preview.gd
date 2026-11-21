@@ -64,7 +64,7 @@ func test_show_option_fills_the_card_from_the_real_preview() -> void:
 	var real := ImprovePreview.of(Session.game, &"GEN", VINEYARD_HEX, _vineyard())
 	assert_eq(screen.preview(), real, "the screen holds the ImprovePreview dictionary")
 	assert_eq(screen.card().title_label().text, "Vineyard, first stage")
-	assert_eq(screen.card().brings_container().get_child_count(), 4)
+	assert_eq(screen.card().brings_container().get_child_count(), 5)
 	assert_false(screen.card().begin_button().disabled)
 	assert_eq(screen.shown_hex(), VINEYARD_HEX)
 

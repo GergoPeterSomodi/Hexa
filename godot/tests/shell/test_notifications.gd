@@ -151,3 +151,25 @@ func test_the_planted_fault_no_card_without_a_player() -> void:
 	Session.start_game(Game.new_game(_g.map, 1, _g.defs))  # a map-only game: no player tag
 	Events.chronicled.emit(_work_entry(&"GEN"))
 	assert_eq(_notes.card_count(), 0, "without a viewer there are no notifications")
+
+
+func test_the_players_town_grew_makes_a_good_card_and_a_fall_a_bad_one() -> void:
+	var savona := Vector2i(6, 13)
+	_g.emit({"kind": "town_grew", "tag": &"GEN", "hex": savona, "level": 3, "from": 2, "people": 4000})
+	Events.chronicled.emit(_g.chronicle.entries.back())
+	assert_eq(_notes.card_count(), 1)
+	var card: Dictionary = _notes.cards()[0]
+	assert_eq([card["text"], card["tone"], card["hex"]], ["Savona (6, 13) grew into a town.", &"good", savona])
+	_g.emit({"kind": "district_declined", "tag": &"GEN", "hex": savona, "family": 1, "level": 2, "from": 3, "people": 1900,
+		"why": &"hunger"})
+	Events.chronicled.emit(_g.chronicle.entries.back())
+	assert_eq(_notes.card_count(), 2, "newest on top")
+	card = _notes.cards()[0]
+	assert_eq([card["text"], card["tone"]], ["Savona (6, 13) fell to a village: hunger.", &"bad"])
+
+
+func test_another_countrys_town_makes_no_card() -> void:
+	var other := Knowledge.known(_g, &"GEN")[0]
+	_g.emit({"kind": "town_grew", "tag": other, "hex": Vector2i(7, 12), "level": 3, "from": 2, "people": 4000})
+	Events.chronicled.emit(_g.chronicle.entries.back())
+	assert_eq(_notes.card_count(), 0, "P: a known other's line does not notify")

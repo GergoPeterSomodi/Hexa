@@ -115,3 +115,21 @@ func test_money_words() -> void:
 	assert_eq(Words.tax_name(1), "Normal")
 	assert_eq(Words.tax_name(2), "High")
 	assert_eq(Words.tax_name(3), "")
+
+
+func test_settlement_names_the_place_and_the_level() -> void:
+	assert_eq(Words.settlement(_game, Vector2i(6, 13), 3), "Savona (6, 13)", "a named place: its name")
+	assert_eq(Words.settlement(_game, Vector2i(7, 12), 2), "the village near Savona (7, 12)")
+	assert_eq(Words.settlement(_game, Vector2i(7, 12), 4), "the walled town near Savona (7, 12)")
+	assert_eq(Words.settlement(_game, Vector2i(0, 0), 3), "the town (0, 0)", "no place near: the level and the hex")
+	assert_eq(Words.settlement(_game, Vector2i(7, 12), 0), "near Savona (7, 12)", "P: no level word")
+	assert_eq(Words.settlement(_game, Vector2i(7, 12), 9), "near Savona (7, 12)", "P: a level past the words")
+	assert_eq(Words.settlement(null, Vector2i(3, 4), 2), "the village (3, 4)")
+
+
+func test_people_words() -> void:
+	assert_eq(Words.people(1), "1 person")
+	assert_eq(Words.people(0), "0 people")
+	assert_eq(Words.people(2), "2 people")
+	assert_eq(Words.people(999), "999 people")
+	assert_eq(Words.people(30300), "30,300 people")

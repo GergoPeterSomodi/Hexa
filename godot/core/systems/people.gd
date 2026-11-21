@@ -181,6 +181,33 @@ static func _rule(defs: GameDefs, p: int, room: int, settlement: bool, rates: Ve
 	return Vector2i(grown, GREW) if grown > 0 else Vector2i.ZERO
 
 
+## The preview's doors to the rules (the phase uses the privates on its own cached numbers): the room of hex index `i` on
+## the view, the two rates of a slot at a tax level, the rule of 4.4 on plain numbers, and whether the settlement of index
+## `i` on the view can grow or fall at all (what the phase's walk asks before it runs the checks).
+static func room_i(game: Game, view: StateView, i: int) -> int:
+	return _room_i(game, view, i)
+
+
+static func rates_of(defs: GameDefs, slot: int, tax: int) -> Vector2i:
+	return _rates(defs, slot, tax)
+
+
+static func rule_of(defs: GameDefs, p: int, room: int, settlement: bool, rates: Vector2i, fed: int) -> Vector2i:
+	return _rule(defs, p, room, settlement, rates, fed)
+
+
+static func can_change_level(game: Game, view: StateView, i: int) -> bool:
+	var level := view.level_at(i)
+	var people := view.people_at(i)
+	var defs := game.defs
+	if level < defs.people_top_level and people >= _room_i(game, view, i):
+		return true
+	if level >= 2 and level <= defs.people_top_level:
+		var fam := defs.family(SETTLEMENTS)
+		return fam != null and people < _at(fam.falls_below, level, 0)
+	return false
+
+
 ## The hexes of country `id` whose people can change on the view (R2): its settlements and the hexes whose people differ
 ## from their room, ascending. The room comes from DistrictCache's column (the view's own room for a hex the view has
 ## changed).
@@ -217,7 +244,8 @@ static func active(game: Game, view: StateView, id: int) -> PackedInt32Array:
 ## Whether the settlement on a hex of the view may grow a level by its people (4.5), the first refusal as the verdict:
 ## {ok, reason, rule (the index in ImproveRules.PAIR_RULES of a pair rule that forbids it, -1 for none), other (the hex of
 ## the piece it breaks it against, NO_HEX for none)}.
-static func grow_check(game: Game, view: StateView, hex: Vector2i, fed: int) -> Dictionary:
+## `gone` (the preview's, 5.0 R4) is a set of works (Work -> true) to treat as finished: they no longer block (rows 3 and 7).
+static func grow_check(game: Game, view: StateView, hex: Vector2i, fed: int, gone: Dictionary = {}) -> Dictionary:
 	var verdict := _verdict(true, "")
 	verdict["rule"] = -1
 	var i := game.map.index_of(hex)
@@ -226,7 +254,8 @@ static func grow_check(game: Game, view: StateView, hex: Vector2i, fed: int) -> 
 	var level := view.level_at(i)
 	if level >= game.defs.people_top_level:
 		return _refused(verdict, "the people raise villages and towns; walls are the crown's work")
-	if game.state.work_at(hex) != null:
+	var under_way := game.state.work_at(hex)
+	if under_way != null and not gone.has(under_way):
 		return _refused(verdict, "a work is under way here")
 	var room := _room_i(game, view, i)
 	var people := view.people_at(i)
@@ -241,7 +270,7 @@ static func grow_check(game: Game, view: StateView, hex: Vector2i, fed: int) -> 
 		verdict["other"] = other
 		return _refused(verdict, "%s (%s %d at %d, %d)" % [ImproveRules.PAIR_RULES[int(found["rule"])][5],
 			ImproveRules.NAMES[int(found["family"])], int(found["level"]), other.x, other.y])
-	var pending := Works.pending_conflict(game, hex, SETTLEMENTS, level + 1)
+	var pending := Works.pending_conflict(game, hex, SETTLEMENTS, level + 1, gone)
 	if pending != "":
 		return _refused(verdict, pending)
 	return verdict
@@ -249,7 +278,8 @@ static func grow_check(game: Game, view: StateView, hex: Vector2i, fed: int) -> 
 
 ## Whether the settlement on a hex of the view falls a level (4.5): {ok, reason, other (the goods piece that needs it, NO_HEX
 ## for none)}.
-static func decline_check(game: Game, view: StateView, hex: Vector2i) -> Dictionary:
+## `gone` as in grow_check.
+static func decline_check(game: Game, view: StateView, hex: Vector2i, gone: Dictionary = {}) -> Dictionary:
 	var i := game.map.index_of(hex)
 	if i < 0 or game.defs == null or game.map.land[i] == 0 or view.main_use_at(i) != SETTLEMENTS:
 		return _verdict(false, "not a settlement")
@@ -258,7 +288,8 @@ static func decline_check(game: Game, view: StateView, hex: Vector2i) -> Diction
 		return _verdict(false, "a hamlet falls no further")
 	if level > game.defs.people_top_level:
 		return _verdict(false, "walls do not fall to hunger")
-	if game.state.work_at(hex) != null:
+	var under_way := game.state.work_at(hex)
+	if under_way != null and not gone.has(under_way):
 		return _verdict(false, "a work is under way here")
 	var fam := game.defs.family(SETTLEMENTS)
 	var below := _at(fam.falls_below, level, 0) if fam != null else 0

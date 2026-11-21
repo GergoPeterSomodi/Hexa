@@ -4,9 +4,9 @@
 class_name MapModes
 extends RefCounted
 
-enum Mode { TERRAIN, OWNER, RELIEF, YIELDS }  # keys 1 to 4
+enum Mode { TERRAIN, OWNER, RELIEF, YIELDS, FOOD }  # keys 1 to 5
 ## The values of the setting state/map_mode, by Mode.
-const MODE_KEYS: Array[StringName] = [&"terrain", &"owner", &"relief", &"yields"]
+const MODE_KEYS: Array[StringName] = [&"terrain", &"owner", &"relief", &"yields", &"food"]
 
 const TINT_ALPHA := 0.14
 const OWNER_ALPHA := 0.55
@@ -41,7 +41,21 @@ const YIELD_COLOURS: Array[Color] = [Color("#a8321a"), Color("#efe3c4"), Color("
 const YIELD_WORDS: Array[String] = ["Nothing", "1 to 9", "10 to 24", "25 to 49", "50 to 99", "100 to 199", "200 to 399",
 	"400 and more"]
 
-const DEFAULT_UNOWNED := Color("#d8ccb0")
+## The Food mode (docs/architecture/m5-build-spec.md 5.6, 6.5): your land in eight bands of the food it makes less the food
+## its people eat a year.
+const FOOD_ALPHA := 0.70
+## The net food a year that starts bytes 4 to 8.
+const FOOD_FLOORS: PackedInt32Array = [1, 5, 10, 20, 40]
+## At or under this net food a year: byte 1.
+const FOOD_DEFICIT := -10
+## Bytes 1 (short by 10 or more, madder) to 8.
+const FOOD_COLOURS: Array[Color] = [Color("#8e2a17"), Color("#c8664c"), Color("#efe3c4"), Color("#ead68f"),
+	Color("#d4bc4e"), Color("#a7a03a"), Color("#6b8b4a"), Color("#35665e")]
+## The legend's words for bytes 3 to 8.
+const FOOD_WORDS: Array[String] = ["Nothing", "1 to 4", "5 to 9", "10 to 19", "20 to 39", "40 and more"]
+const FOOD_SEASONS := 4
+
+const DEFAULT_UNOWNED :=Color("#d8ccb0")
 ## The works card's tint (Tokens.GOOD and Tokens.BAD, whose values these are: a view does not read the shell).
 const DELTA_GOOD := Color("#7fc98a")
 const DELTA_BAD := Color("#f0806a")
@@ -49,6 +63,7 @@ const DELTA_ALPHA := 0.35
 
 static var _cached_ramp := PackedColorArray()
 static var _cached_yield_ramp := PackedColorArray()
+static var _cached_food_ramp := PackedColorArray()
 
 
 ## The Mode of a state/map_mode value; -1 when unknown.
@@ -94,6 +109,83 @@ static func _make_yield_bytes(game: Game, viewer: StringName) -> PackedByteArray
 	return out
 
 
+## The food (made, eaten) a year on the viewer's land hex: the grain and fish EconomyPreview.worth_seasons_shared works out
+## for it over four seasons; eaten = its people now x food_need_milli x 4 / 1,000,000 (floored) for a settlement, else 0.
+## (0, 0) on any other hex (sea, another country's, off the map), for no viewer or a game without countries.
+static func food_year(game: Game, viewer: StringName, hex: Vector2i) -> Vector2i:
+	if game == null or game.map == null or viewer == &"" or not game.has_countries():
+		return Vector2i.ZERO
+	var i := game.map.index_of(hex)
+	if i < 0:
+		return Vector2i.ZERO
+	var worth := EconomyPreview.worth_seasons_shared(game, viewer, FOOD_SEASONS)
+	var hexes: PackedInt32Array = worth["hexes"]
+	var h := hexes.bsearch(i)
+	if h >= hexes.size() or hexes[h] != i:
+		return Vector2i.ZERO
+	return _food_of(game, worth, h, i)
+
+
+static func _food_of(game: Game, worth: Dictionary, h: int, i: int) -> Vector2i:
+	var goods: PackedInt32Array = worth["goods"]
+	var seasons := int(worth["seasons"])
+	var goods_n := game.defs.goods.size()
+	var made := 0
+	for k: int in seasons:
+		var o := (h * seasons + k) * goods_n
+		made += goods[o + Economy.GRAIN] + goods[o + Economy.FISH]
+	var eaten := 0
+	if game.state.main_use[i] == Economy.SETTLEMENTS:
+		@warning_ignore("integer_division")
+		eaten = game.state.people[i] * game.defs.food_need_milli * FOOD_SEASONS / 1000000
+	return Vector2i(made, eaten)
+
+
+## The band (byte 1 to 8) of a net food a year: 1 at or under FOOD_DEFICIT, 2 below 0, 3 for 0, 4 to 8 from FOOD_FLOORS.
+static func food_band(net: int) -> int:
+	if net <= FOOD_DEFICIT:
+		return 1
+	if net < 0:
+		return 2
+	var band := 3
+	for floor_value: int in FOOD_FLOORS:
+		if net >= floor_value:
+			band += 1
+	return band
+
+
+## One byte a hex (index = row * cols + col): food_band of made less eaten on your land; 0 on every other hex. All 0 for
+## no viewer or an unknown one. Cached in the game's view cache by [&"food", version, viewer].
+static func food_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	if game == null or game.map == null:
+		return PackedByteArray()
+	var key: Array = [&"food", game.version, viewer]
+	return game.view_cache.get_or_make(key, func() -> PackedByteArray: return _make_food_bytes(game, viewer)) as PackedByteArray
+
+
+static func _make_food_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(game.map.hex_count())  # zero
+	if viewer == &"" or not game.has_countries():
+		return out
+	var worth := EconomyPreview.worth_seasons_shared(game, viewer, FOOD_SEASONS)
+	var hexes: PackedInt32Array = worth["hexes"]
+	for h: int in hexes.size():
+		var food := _food_of(game, worth, h, hexes[h])
+		out[hexes[h]] = food_band(food.x - food.y)
+	return out
+
+
+## 256-entry colours by Food byte: [0] clear, [1..8] FOOD_COLOURS, the rest clear.
+static func food_ramp() -> PackedColorArray:
+	if _cached_food_ramp.size() != PALETTE_SIZE:
+		_cached_food_ramp.resize(PALETTE_SIZE)
+		_cached_food_ramp.fill(Color(0.0, 0.0, 0.0, 0.0))
+		for b: int in FOOD_COLOURS.size():
+			_cached_food_ramp[b + 1] = FOOD_COLOURS[b]
+	return _cached_food_ramp.duplicate()
+
+
 ## 256-entry colours by Yields byte: [0] clear, [1..9] YIELD_COLOURS, the rest clear.
 static func yield_ramp() -> PackedColorArray:
 	if _cached_yield_ramp.size() != PALETTE_SIZE:
@@ -104,10 +196,27 @@ static func yield_ramp() -> PackedColorArray:
 	return _cached_yield_ramp.duplicate()
 
 
+## The legend's title of a mode; "" for the modes without a legend.
+static func legend_title(mode: int) -> String:
+	match mode:
+		Mode.YIELDS:
+			return "Yields: worth a year"
+		Mode.FOOD:
+			return "Food: made less eaten, a year"
+	return ""
+
+
 ## The legend rows of a mode: for YIELDS [{colour, text, stripes}], the top byte first, then "A loss" and "Not your land";
-## [] for the other modes.
+## for FOOD the bands top first, the two shortfalls striped, then "Not your land"; [] for the other modes.
 static func legend(mode: int) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	if mode == Mode.FOOD:
+		for b: int in range(8, 2, -1):
+			out.append({"colour": FOOD_COLOURS[b - 1], "text": FOOD_WORDS[b - 3], "stripes": false})
+		out.append({"colour": FOOD_COLOURS[1], "text": "Short by 1 to 9", "stripes": true})
+		out.append({"colour": FOOD_COLOURS[0], "text": "Short by 10 or more", "stripes": true})
+		out.append({"colour": VEIL, "text": "Not your land", "stripes": false})
+		return out
 	if mode != Mode.YIELDS:
 		return out
 	for b: int in range(9, 1, -1):
@@ -184,7 +293,7 @@ static func palette_from(colours: PackedColorArray, unowned: Color) -> PackedCol
 
 ## Fragment colour for one (owner_id, height_byte) pair; matches mode_overlay.gdshader.
 static func colour_of(mode: int, owner_id: int, height_byte: int, palette: PackedColorArray,
-		tint_on: bool, hot_id: int, yield_byte: int = 0) -> Color:
+		tint_on: bool, hot_id: int, yield_byte: int = 0, food_byte: int = 0) -> Color:
 	if height_byte <= 0:
 		return Color(0.0, 0.0, 0.0, 0.0)
 	if mode == Mode.YIELDS:  # no hover highlight: the colour says the worth
@@ -192,6 +301,11 @@ static func colour_of(mode: int, owner_id: int, height_byte: int, palette: Packe
 			return Color(VEIL.r, VEIL.g, VEIL.b, VEIL_ALPHA)
 		var c := YIELD_COLOURS[yield_byte - 1]
 		return Color(c.r, c.g, c.b, YIELD_ALPHA)
+	if mode == Mode.FOOD:  # likewise
+		if food_byte <= 0 or food_byte > FOOD_COLOURS.size():
+			return Color(VEIL.r, VEIL.g, VEIL.b, VEIL_ALPHA)
+		var fc := FOOD_COLOURS[food_byte - 1]
+		return Color(fc.r, fc.g, fc.b, FOOD_ALPHA)
 	var base := Color(0.0, 0.0, 0.0, 0.0)
 	var alpha := 0.0
 	match mode:
@@ -217,12 +331,12 @@ static func colour_of(mode: int, owner_id: int, height_byte: int, palette: Packe
 	return Color(base.r, base.g, base.b, alpha)
 
 
-## Available map modes for `game`: `[TERRAIN, OWNER, RELIEF]`, omitting `OWNER` in a map-only game, and adding `YIELDS`
+## Available map modes for `game`: `[TERRAIN, OWNER, RELIEF]`, omitting `OWNER` in a map-only game, and adding `YIELDS` and `FOOD`
 ## when the game has countries and a chosen player.
 static func modes(game: Game) -> Array[int]:
 	if game != null and game.has_countries():
 		if game.player != &"":
-			return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF, Mode.YIELDS]
+			return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF, Mode.YIELDS, Mode.FOOD]
 		return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF]
 	return [Mode.TERRAIN, Mode.RELIEF]
 
@@ -248,7 +362,11 @@ static func colour_at(game: Game, mode: int, hex: Vector2i, pal: PackedColorArra
 	if mode == Mode.YIELDS and height_byte > 0:
 		var bytes := yield_bytes(game, game.player)
 		yield_byte = int(bytes[idx]) if idx < bytes.size() else 0
-	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id, yield_byte)
+	var food_byte := 0
+	if mode == Mode.FOOD and height_byte > 0:
+		var fbytes := food_bytes(game, game.player)
+		food_byte = int(fbytes[idx]) if idx < fbytes.size() else 0
+	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id, yield_byte, food_byte)
 
 
 static func _height_byte_at(map: MapData, idx: int) -> int:

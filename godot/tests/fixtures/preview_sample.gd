@@ -78,6 +78,12 @@ static func _vineyard_brings() -> Variant:
 	"field": &"upkeep",
 	"label": "Upkeep, a season",
 	"per": &""
+	}, {
+	"after": 9000,
+	"before": 8000,
+	"field": &"room",
+	"label": "Room",
+	"per": &""
 	}]
 
 

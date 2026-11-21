@@ -619,3 +619,53 @@ func test_drain_sends_goods_short_and_tax_set_and_chronicles_them() -> void:
 	assert_eq(log, [["short", &"GEN", &"salt"], ["chron", "goods_short"], ["tax", &"GEN", 2], ["chron", "tax_set"]])
 	assert_true(game.events.is_empty())
 	assert_eq(game.chronicle.entries.back()["kind"], "tax_set")
+
+
+func test_dev_people_logs_and_drains() -> void:
+	Session.game = null
+	assert_false(Session.dev_people(Vector2i(6, 13), 5), "no game")
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	var game := Session.game
+	var hex := Vector2i(6, 13)
+	var i := game.map.index_of(hex)
+	assert_eq(game.state.owner[i], game.scenario.id_of(&"GEN"), "Savona is Genoa's")
+	assert_true(Session.dev_people(hex, 3990))
+	assert_eq(game.state.people[i], 3990)
+	assert_eq(game.action_log.back()["action"], "dev_people")
+	assert_eq(game.action_log.back()["args"], {"hex": hex, "people": 3990})
+	assert_true(game.events.is_empty(), "drained")
+	assert_false(Session.dev_people(hex, -1), "below 0")
+	var sea := Vector2i.ZERO
+	for k: int in game.map.hex_count():
+		if game.map.land[k] == 0:
+			sea = game.map.hex_of(k)
+			break
+	assert_false(Session.dev_people(sea, 10), "sea")
+	assert_eq(game.state.people[i], 3990, "a refusal changes nothing")
+	Session.end_game()
+	assert_false(Session.dev_people(hex, 5), "no game")
+
+
+func test_drain_sends_town_grew_and_district_declined_before_chronicled() -> void:
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	var game := Session.game
+	var log: Array = []
+	var on_grew := func(tag: StringName, hex: Vector2i, level: int) -> void: log.append(["grew", tag, hex, level])
+	var on_fell := func(tag: StringName, hex: Vector2i, level: int, why: StringName) -> void:
+		log.append(["fell", tag, hex, level, why])
+	var on_chron := func(entry: Dictionary) -> void: log.append(["chron", entry["kind"]])
+	Events.town_grew.connect(on_grew)
+	Events.district_declined.connect(on_fell)
+	Events.chronicled.connect(on_chron)
+	var hex := Vector2i(6, 13)
+	game.emit({"kind": "town_grew", "tag": &"GEN", "hex": hex, "level": 3, "from": 2, "people": 4000})
+	game.emit({"kind": "district_declined", "tag": &"GEN", "hex": hex, "family": 1, "level": 2, "from": 3, "people": 1900,
+		"why": &"hunger"})
+	Session.drain()
+	Events.town_grew.disconnect(on_grew)
+	Events.district_declined.disconnect(on_fell)
+	Events.chronicled.disconnect(on_chron)
+	assert_eq(log, [["grew", &"GEN", hex, 3], ["chron", "town_grew"], ["fell", &"GEN", hex, 2, &"hunger"],
+		["chron", "district_declined"]])
+	assert_true(game.events.is_empty())
+	assert_eq(game.chronicle.entries.back()["why"], "hunger")

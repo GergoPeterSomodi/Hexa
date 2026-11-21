@@ -11,7 +11,7 @@ var unsaved_actions: int = 0
 var play_seconds: float = 0.0
 ## The slot last saved or loaded ("" for none).
 var current_slot: String = ""
-## Phase name -> milliseconds the last season spent in it (F3, perf); M4 adds production and income.
+## Phase name -> milliseconds the last season spent in it (F3, perf); M4 adds production and income, M5 people.
 var last_phase_ms: Dictionary = {}
 
 ## The folder of the saves; tests point it at a temporary folder.
@@ -230,6 +230,16 @@ func dev_goods(tag: StringName, good: int, amount: int) -> bool:
 	return done
 
 
+## Developer console only: sets the people of a hex, logged for the replay, then drains. False with no game, for a value
+## below 0 or when People.move refuses (sea, off the map, unowned land, a map-only game, a result over its limit).
+func dev_people(hex: Vector2i, people_value: int) -> bool:
+	if game == null:
+		return false
+	var done := game.dev_people(hex, people_value)
+	drain()
+	return done
+
+
 ## Saves the game to a slot ("quick", "1" to "8", "auto1" to "auto3"): the file with the wall clock, play_seconds and the
 ## build, then the thumbnail PNG (a null thumbnail removes an old picture). On success unsaved_actions is 0 and
 ## current_slot the slot. Returns "" or the problem; nothing changes on a problem.
@@ -397,6 +407,11 @@ func drain() -> void:
 				Events.goods_short.emit(StringName(event["tag"]), StringName(event["good"]))
 			"tax_set":
 				Events.tax_set.emit(StringName(event["tag"]), int(event["level"]))
+			"town_grew":
+				Events.town_grew.emit(StringName(event["tag"]), event["hex"], int(event["level"]))
+			"district_declined":
+				Events.district_declined.emit(StringName(event["tag"]), event["hex"], int(event["level"]),
+					StringName(event["why"]))
 		if Chronicle.NOTABLE.has(str(event.get("kind", ""))):
 			Events.chronicled.emit(Chronicle.plain(event))
 

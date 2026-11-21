@@ -338,3 +338,39 @@ func test_help_names_the_money_commands() -> void:
 	var help := DevCommands.run("help", _ctx)
 	for word: String in ["money", "goods", "tax low|normal|high"]:
 		assert_true(help.contains(word), "help names " + word)
+
+
+func test_people_sets_the_hexs_people_logs_it_and_asks_for_a_refresh() -> void:
+	var hex := Vector2i(6, 13)
+	var parsed := DevCommands.parse("people 6 13 3990", _game())
+	assert_eq([parsed["kind"], parsed["args"], parsed["problem"]], [&"people", {"hex": hex, "people": 3990}, ""])
+	assert_eq(DevCommands.run("people 6 13 3990", _ctx), "Done: 3,990 people at 6, 13.")
+	assert_eq(_game().state.people[_game().map.index_of(hex)], 3990)
+	assert_eq(_game().action_log.back()["action"], "dev_people", "logged for the replay")
+	assert_eq(_sent, [[&"refresh_hud", {}]])
+	assert_eq(DevCommands.run("people 6 13 1", _ctx), "Done: 1 person at 6, 13.")
+	assert_true(DevCommands.run("help", _ctx).contains("people c r N"))
+
+
+func test_planted_bad_people_lines_give_their_problem_and_change_nothing() -> void:
+	var before := _game().digest()
+	assert_eq(_problem("people"), "Use: people c r N")
+	assert_eq(_problem("people 6 13"), "Use: people c r N")
+	assert_eq(_problem("people 999 999 5"), "no such hex")
+	assert_eq(_problem("people x 13 5"), "no such hex")
+	assert_eq(_problem("people 6 13 x"), "N must be a whole number of 0 or more")
+	assert_eq(_problem("people 6 13 -5"), "N must be a whole number of 0 or more")
+	assert_eq(_problem("people 6 13 99999999999"), "N must be a whole number of 0 or more")
+	assert_eq(_problem("people 6 13 2000000"), "N must be a whole number from 0 to 1,000,000")
+	assert_eq(DevCommands.parse("people 6 13 1000000", _game())["problem"], "", "the limit itself parses")
+	var sea := Vector2i.ZERO
+	for k: int in _game().map.hex_count():
+		if _game().map.land[k] == 0:
+			sea = _game().map.hex_of(k)
+			break
+	assert_eq(DevCommands.run("people %d %d 5" % [sea.x, sea.y], _ctx), "Refused: no one keeps people there.", "sea")
+	assert_eq(_game().digest(), before, "a refused line changes nothing")
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	assert_eq(_problem("people 6 13 5"), "the sandbox has no countries")
+	Session.game = null
+	assert_eq(DevCommands.parse("people 6 13 5", null)["problem"], "There is no game.")

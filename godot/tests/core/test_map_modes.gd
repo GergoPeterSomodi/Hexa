@@ -193,9 +193,10 @@ func test_yield_band_edges() -> void:
 
 
 func test_mode_keys_and_mode_of() -> void:
-	assert_eq(MapModes.MODE_KEYS, [&"terrain", &"owner", &"relief", &"yields"] as Array[StringName])
+	assert_eq(MapModes.MODE_KEYS, [&"terrain", &"owner", &"relief", &"yields", &"food"] as Array[StringName])
 	assert_eq(MapModes.mode_of(&"terrain"), MapModes.Mode.TERRAIN)
 	assert_eq(MapModes.mode_of(&"yields"), MapModes.Mode.YIELDS)
+	assert_eq(MapModes.mode_of(&"food"), MapModes.Mode.FOOD)
 	assert_eq(MapModes.mode_of(&"supply"), -1)
 	assert_eq(MapModes.mode_of(&""), -1)
 
@@ -321,7 +322,8 @@ func test_colour_at_yields_reads_the_players_bytes() -> void:
 
 
 func test_modes_with_yields() -> void:
-	var all: Array[int] = [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF, MapModes.Mode.YIELDS]
+	var all: Array[int] = [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF, MapModes.Mode.YIELDS,
+		MapModes.Mode.FOOD]
 	assert_eq(MapModes.modes(EconomyFixture.game(&"GEN")), all)
 	assert_eq(MapModes.modes(EconomyFixture.game()),
 		[MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF] as Array[int],
@@ -329,3 +331,116 @@ func test_modes_with_yields() -> void:
 	assert_eq(MapModes.modes(Game.new_game(_make_map(4, 3), 1480)),
 		[MapModes.Mode.TERRAIN, MapModes.Mode.RELIEF] as Array[int])
 	assert_eq(MapModes.modes(null), [MapModes.Mode.TERRAIN, MapModes.Mode.RELIEF] as Array[int])
+
+
+# --- Food (docs/architecture/m5-build-spec.md 5.6, 4.11 (f)) ---------------------------------------------------------
+
+
+func test_food_band_edges() -> void:
+	var edges: Dictionary = {-11: 1, -10: 1, -9: 2, -1: 2, 0: 3, 1: 4, 4: 4, 5: 5, 9: 5, 10: 6, 19: 6, 20: 7, 39: 7,
+		40: 8, 500: 8}
+	for net: int in edges:
+		assert_eq(MapModes.food_band(net), int(edges[net]), "band of %d" % net)
+
+
+func test_food_ramp_entries() -> void:
+	var ramp := MapModes.food_ramp()
+	assert_eq(ramp.size(), 256)
+	assert_eq(ramp[0], Color(0.0, 0.0, 0.0, 0.0))
+	for b: int in range(1, 9):
+		assert_eq(ramp[b], MapModes.FOOD_COLOURS[b - 1], "byte %d" % b)
+	assert_eq(ramp[9], Color(0.0, 0.0, 0.0, 0.0))
+	assert_eq(ramp[255], Color(0.0, 0.0, 0.0, 0.0))
+
+
+func test_food_colour_distances() -> void:
+	var cols := MapModes.FOOD_COLOURS
+	for b: int in range(3, 8):  # bytes 3 to 8 are cols[2] to cols[7]
+		assert_gte(ColourContrast.worst_delta_e(cols[b - 1], cols[b]), 6.0, "bytes %d and %d" % [b, b + 1])
+	for b: int in range(1, 9):
+		assert_gte(ColourContrast.worst_delta_e(MapModes.VEIL, cols[b - 1]), 15.0, "veil against byte %d" % b)
+	for b: int in range(2, 9):
+		assert_gte(ColourContrast.worst_delta_e(cols[0], cols[b - 1]), 15.0, "byte 1 against byte %d" % b)
+	for b: int in [1, 2]:
+		assert_gte(ColourContrast.worst_delta_e(cols[b - 1], cols[2]), 15.0, "byte %d against byte 3" % b)
+
+
+func test_colour_of_food() -> void:
+	var pal := MapModes.palette_from(PackedColorArray(), MapModes.DEFAULT_UNOWNED)
+	var clear := Color(0.0, 0.0, 0.0, 0.0)
+	for fb: int in range(0, 9):
+		assert_eq(MapModes.colour_of(MapModes.Mode.FOOD, 1, 0, pal, true, 0, 0, fb), clear, "sea at byte %d" % fb)
+	var veil := MapModes.colour_of(MapModes.Mode.FOOD, 1, 5, pal, true, 0, 0, 0)
+	assert_eq(Color(veil.r, veil.g, veil.b), MapModes.VEIL)
+	assert_almost_eq(veil.a, MapModes.VEIL_ALPHA, 0.0001)
+	for fb: int in range(1, 9):
+		var c := MapModes.colour_of(MapModes.Mode.FOOD, 1, 5, pal, true, 0, 0, fb)
+		assert_eq(Color(c.r, c.g, c.b), MapModes.FOOD_COLOURS[fb - 1], "byte %d" % fb)
+		assert_almost_eq(c.a, 0.70, 0.0001)
+	assert_eq(MapModes.colour_of(MapModes.Mode.FOOD, 1, 5, pal, true, 1, 0, 6),
+		MapModes.colour_of(MapModes.Mode.FOOD, 1, 5, pal, true, 0, 0, 6), "no hover highlight")
+
+
+func test_food_legend_and_titles() -> void:
+	var rows := MapModes.legend(MapModes.Mode.FOOD)
+	var texts: Array[String] = []
+	for row: Dictionary in rows:
+		texts.append(str(row["text"]))
+	assert_eq(texts, ["40 and more", "20 to 39", "10 to 19", "5 to 9", "1 to 4", "Nothing", "Short by 1 to 9",
+		"Short by 10 or more", "Not your land"] as Array[String])
+	for r: int in rows.size():
+		assert_eq(bool(rows[r]["stripes"]), r == 6 or r == 7, "stripes of row %d" % r)
+	assert_eq(rows[0]["colour"], MapModes.FOOD_COLOURS[7])
+	assert_eq(rows[6]["colour"], MapModes.FOOD_COLOURS[1])
+	assert_eq(rows[7]["colour"], MapModes.FOOD_COLOURS[0])
+	assert_eq(rows[8]["colour"], MapModes.VEIL)
+	assert_eq(MapModes.legend_title(MapModes.Mode.FOOD), "Food: made less eaten, a year")
+	assert_eq(MapModes.legend_title(MapModes.Mode.YIELDS), "Yields: worth a year")
+	assert_eq(MapModes.legend_title(MapModes.Mode.TERRAIN), "")
+
+
+func test_food_year_of_genoa_and_savona() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	assert_eq(MapModes.food_year(game, &"GEN", Vector2i(8, 13)), Vector2i(22, 12), "Genoa: fish 22, eaten 12")
+	assert_eq(MapModes.food_year(game, &"GEN", Vector2i(6, 13)), Vector2i(6, 4), "Savona: grain 6, eaten 4")
+	assert_eq(MapModes.food_year(game, &"GEN", Vector2i(-1, -1)), Vector2i.ZERO, "off the map")
+	assert_eq(MapModes.food_year(game, &"", Vector2i(8, 13)), Vector2i.ZERO, "no viewer")
+
+
+func test_food_bytes_of_genoa_at_turn_one() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var map := game.map
+	var bytes := MapModes.food_bytes(game, &"GEN")
+	assert_eq(bytes.size(), map.hex_count())
+	assert_eq(int(bytes[map.index_of(Vector2i(8, 13))]), 6, "Genoa +10")
+	assert_eq(int(bytes[map.index_of(Vector2i(6, 13))]), 4, "Savona +2")
+	assert_eq(int(bytes[map.index_of(Vector2i(7, 13))]), 5, "the wild farmland's 7 grain")
+	var genoa := Countries.by_tag(game, &"GEN")
+	for i: int in map.hex_count():
+		if map.land[i] == 0 or int(game.state.owner[i]) != genoa.id:
+			assert_eq(int(bytes[i]), 0, "not Genoa's land: hex %d is 0" % i)
+		elif map.index_of(Vector2i(8, 13)) != i and map.index_of(Vector2i(6, 13)) != i \
+				and map.index_of(Vector2i(7, 13)) != i:
+			assert_eq(int(bytes[i]), 3, "every other hex of Genoa is 3 (hex %d)" % i)
+
+
+func test_food_bytes_planted_milan_hex_is_zero() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	var milan := Countries.by_tag(game, &"MLO")
+	var found := 0
+	var pal := MapModes.palette(game, false)
+	for i: int in game.map.hex_count():
+		if game.map.land[i] != 0 and int(game.state.owner[i]) == milan.id:
+			found += 1
+			assert_eq(int(MapModes.food_bytes(game, &"GEN")[i]), 0, "a Milan hex is 0 (veiled)")
+			assert_eq(MapModes.food_year(game, &"GEN", game.map.hex_of(i)), Vector2i.ZERO)
+			var col := MapModes.colour_at(game, MapModes.Mode.FOOD, game.map.hex_of(i), pal, true, 0)
+			assert_eq(Color(col.r, col.g, col.b), MapModes.VEIL)
+			if found >= 5:
+				break
+	assert_gt(found, 0, "Milan holds land")
+	var sandbox := Game.new_game(_make_map(4, 3), 1480)
+	assert_eq(MapModes.food_bytes(sandbox, &"GEN").count(0), 12)
+	assert_eq(MapModes.food_bytes(game, &"").count(0), game.map.hex_count())
+	var genoa := MapModes.colour_at(game, MapModes.Mode.FOOD, Vector2i(8, 13), pal, true, 0)
+	assert_eq(Color(genoa.r, genoa.g, genoa.b), MapModes.FOOD_COLOURS[5], "Genoa is byte 6")
