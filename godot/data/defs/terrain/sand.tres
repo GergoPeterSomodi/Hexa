@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="TerrainDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/terrain_def.gd" id="1_terrain"]
+
+[resource]
+script = ExtResource("1_terrain")
+id = 7
+key = &"sand"
+name = "Sand"
+move = 2
+forage_permille = 150

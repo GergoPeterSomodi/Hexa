@@ -327,10 +327,10 @@ func _with_line(dir: String, slot: String, change: Callable) -> void:
 
 func test_p_hostile_header_numbers_read_as_broken() -> void:
 	var cases: Array[Array] = [
-		["\"format\":3,", "\"format\":1e999,"], ["\"format\":3,", "\"format\":-1e999,"],
-		["\"format\":3,", "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
+		["\"format\":4,", "\"format\":1e999,"], ["\"format\":4,", "\"format\":-1e999,"],
+		["\"format\":4,", "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
 		["\"saved_unix\":1700000000,", "\"saved_unix\":1e19,"], ["\"play_seconds\":61,", "\"play_seconds\":9007199254740994,"],
-		["\"format\":3,", "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
+		["\"format\":4,", "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
 	]
 	for item: Array in cases:
 		var dir := _saved("1")
@@ -419,12 +419,12 @@ func test_a_write_after_a_crash_between_the_two_renames_leaves_no_bak() -> void:
 # ----- M4: format 2, the economy and the weather (m4-build-spec.md 4.22) ----------------------------------------
 
 
-func test_the_format_is_3_and_a_format_2_save_is_older() -> void:
-	assert_eq(SaveFile.FORMAT, 3)
-	assert_eq(SaveFile.OLDEST_FORMAT, 3)
+func test_the_format_is_4_and_a_format_3_save_is_older() -> void:
+	assert_eq(SaveFile.FORMAT, 4)
+	assert_eq(SaveFile.OLDEST_FORMAT, 4)
 	var old := _saved("2")
-	_with_header(old, "2", func(h: Dictionary) -> void: h["format"] = 2)
-	assert_eq(SaveFile.read_header("2", old)["state"], &"older", "a format-2 header reads older")
+	_with_header(old, "2", func(h: Dictionary) -> void: h["format"] = 3)
+	assert_eq(SaveFile.read_header("2", old)["state"], &"older", "a format-3 header reads older")
 	assert_eq(SaveFile.read("2", old)["problem"], "Made by an older test build", "refused quietly")
 	var dir := _saved("1")
 	_with_header(dir, "1", func(h: Dictionary) -> void: h["format"] = 1)

@@ -334,7 +334,7 @@ func test_m2_keys_have_the_spec_defaults_and_choices() -> void:
 	assert_eq(s.get_value("accessibility/country_colours"), "standard")
 	assert_eq(s.choices_for("accessibility/country_colours"), ["standard", "colour_blind"])
 	assert_eq(s.get_value("state/map_mode"), "terrain")
-	assert_eq(s.choices_for("state/map_mode"), ["terrain", "owner", "relief", "yields", "food"])
+	assert_eq(s.choices_for("state/map_mode"), ["terrain", "owner", "relief", "yields", "food", "supply"])
 	assert_eq(str(Settings.SCHEMA["state/map_mode"]["page"]), "", "remembered, no row")
 
 
@@ -361,6 +361,30 @@ func test_m2_keys_reject_wrong_values_and_load_back() -> void:
 	assert_true(s.set_value("state/map_mode", "food"), "Food arrives with M5")
 	assert_true(s.save_to(path))
 	assert_eq(Settings.load_from(path, "macOS", false).get_value("state/map_mode"), "food", "food round-trips")
+
+
+func test_m6_map_keys_default_validate_and_fall_back() -> void:
+	var s := Settings.new("macOS", false)
+	assert_true(Settings.SCHEMA.has("map/sight_veil"))
+	assert_true(bool(s.get_value("map/sight_veil")), "the sight veil defaults on")
+	assert_eq(str(Settings.SCHEMA["map/sight_veil"]["since"]), "6")
+	assert_eq(str(Settings.SCHEMA["map/sight_veil"]["page"]), "map")
+	assert_false(s.set_value("map/sight_veil", "yes"), "a string is not a bool")
+	assert_true(s.set_value("state/map_mode", "supply"), "Supply arrives with M6")
+	var path := _tmp_file("m6_keys")
+	assert_true(s.set_value("map/sight_veil", false))
+	assert_true(s.save_to(path))
+	var loaded := Settings.load_from(path, "macOS", false)
+	assert_eq(loaded.get_value("state/map_mode"), "supply", "supply round-trips")
+	assert_false(bool(loaded.get_value("map/sight_veil")))
+	# planted fault: a bad remembered mode in a file falls back to terrain
+	var bad := _tmp_file("m6_bad")
+	var f := FileAccess.open(bad, FileAccess.WRITE)
+	f.store_string("[map]\nsight_veil = \"dim\"\n[state]\nmap_mode = \"fog\"\n")
+	f.close()
+	var fallen := Settings.load_from(bad, "macOS", false)
+	assert_eq(fallen.get_value("state/map_mode"), "terrain", "a bad map mode falls back to terrain")
+	assert_true(bool(fallen.get_value("map/sight_veil")), "a bad sight veil falls back to on")
 
 
 func test_m2_keys_with_wrong_values_in_a_file_fall_back() -> void:

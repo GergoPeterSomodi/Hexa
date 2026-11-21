@@ -165,13 +165,13 @@ func test_m2_actions_exist_and_season_keys_are_gone() -> void:
 	Bindings.ensure()
 	var wanted: Dictionary = {
 		&"view_mode_1": "1", &"view_mode_2": "2", &"view_mode_3": "3", &"view_mode_4": "4",
-		&"view_mode_5": "5",
+		&"view_mode_5": "5", &"view_mode_6": "6",
 		&"ui_find_place": "Ctrl+F", &"game_country": "C",
 	}
 	for action: StringName in wanted:
 		assert_true(InputMap.has_action(action), "InputMap has %s" % action)
 		var entry := _entry_of(action)
-		assert_eq(str(entry["since"]), "5" if action == &"view_mode_5" else "2", "%s arrives with its milestone" % action)
+		assert_eq(str(entry["since"]), {&"view_mode_5": "5", &"view_mode_6": "6"}.get(action, "2"), "%s arrives with its milestone" % action)
 		var ev := Bindings.parse_event(str(wanted[action]))
 		assert_eq(Bindings.serialize_event(Bindings.parse_event(str((entry["events"] as Array)[0]))),
 			Bindings.serialize_event(ev), "%s default key" % action)
@@ -180,6 +180,35 @@ func test_m2_actions_exist_and_season_keys_are_gone() -> void:
 		assert_false(InputMap.has_action(season), "%s is gone from InputMap" % season)
 		assert_true(_entry_of(season).is_empty(), "%s is gone from the table" % season)
 	assert_false(InputMap.has_action(&"view_season_1"))
+
+
+func test_m6_rows_exist_with_since_6_and_the_right_keys() -> void:
+	var wanted: Dictionary = {
+		&"game_next_unit": ["Tab"], &"game_continue_march": ["R"],
+		&"map_cursor_left": ["Alt+Left"], &"map_cursor_right": ["Alt+Right"],
+		&"map_cursor_up": ["Alt+Up"], &"map_cursor_down": ["Alt+Down"],
+		&"map_command_key": ["O", "Shift+F10"], &"view_mode_6": ["6"],
+	}
+	for action: StringName in wanted:
+		var entry := _entry_of(action)
+		assert_false(entry.is_empty(), "%s has a row" % action)
+		assert_eq(str(entry["since"]), "6", "%s arrives in M6" % action)
+		assert_eq(Array(entry["events"]), wanted[action], "%s default keys" % action)
+	assert_eq(str(_entry_of(&"map_command_key")["label"]), "Command at the cursor")
+	assert_eq(str(_entry_of(&"map_command_key")["group"]), "Map")
+	assert_eq(str(_entry_of(&"view_mode_6")["group"]), "View")
+	assert_eq(str(_entry_of(&"map_command")["since"]), "1", "the right click row is older")
+	Bindings.ensure("6")
+	for action: StringName in wanted:
+		assert_true(InputMap.has_action(action), "%s registers at milestone 6" % action)
+
+
+func test_right_click_gesture_line_is_the_same_on_every_platform() -> void:
+	var line := "Right click (two-finger click): order the selected army; with none, the hex menu"
+	for platform: String in ["macOS", "Windows", "Linux", "default"]:
+		assert_true(Bindings.gestures_for(platform).has(line), "%s has the new right-click line" % platform)
+		for old: String in Bindings.gestures_for(platform):
+			assert_false(old.ends_with("clear the selection"), "no stale line on %s" % platform)
 
 
 func test_digit_keys_have_one_owner_at_every_milestone() -> void:

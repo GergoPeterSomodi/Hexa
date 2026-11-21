@@ -18,6 +18,11 @@ var defs: GameDefs = null
 var scenario: ScenarioDef = null
 ## Country state in 1-based id order (`countries[id - 1]`).
 var countries: Array[Country] = []
+## The armies in id order; written only by Armies (docs/architecture/m6-build-spec.md 5.0 R2, 5.2).
+var armies: Array[Army] = []
+## The next army id and the next unit id (from 1, never reused); written only by Armies.
+var next_army_id: int = 1
+var next_unit_id: int = 1
 ## Human player's country tag, or &"" before picking, in AI-only games, or in a map-only game.
 var player: StringName = &""
 ## The fields only the door (emit, act, Season) writes (docs/architecture/m3-build-spec.md 5.7).

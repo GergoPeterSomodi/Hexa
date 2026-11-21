@@ -60,6 +60,8 @@ const SEASON_PERCENT_MAX := 400
 @export var room: PackedInt32Array = PackedInt32Array()
 ## Settlements: per level, the people under which it falls a level (4.5); 0 never. Empty on other families.
 @export var falls_below: PackedInt32Array = PackedInt32Array()
+## Settlements: per level, the companies a season it may raise (M6 spec 5.1; 0, 1, 1, 2, 3, 4); empty on other families.
+@export var raise_cap: PackedInt32Array = PackedInt32Array()
 
 
 ## Problems found, empty when valid: id 1 to 14, key the one FamilyIds gives the id, work_seasons the size
@@ -89,7 +91,27 @@ func validate() -> Array[String]:
 	_check_goods(errors, label, top)
 	_check_settlement(errors, label, top)
 	_check_people(errors, label, top)
+	_check_raise_cap(errors, label, top)
 	return errors
+
+
+## raise_cap is on settlements only: top + 1 entries, [0] is 0, each 0 to 20 and none falling as the level rises.
+func _check_raise_cap(errors: Array[String], label: String, top: int) -> void:
+	if id != 1:
+		if not raise_cap.is_empty():
+			errors.append("%s: raise_cap is for settlements only" % label)
+		return
+	if raise_cap.size() != top + 1:
+		errors.append("%s: raise_cap has %d entries, expected %d" % [label, raise_cap.size(), top + 1])
+		return
+	if raise_cap[0] != 0:
+		errors.append("%s: raise_cap[0] is %d, expected 0" % [label, raise_cap[0]])
+	for level: int in range(1, raise_cap.size()):
+		if raise_cap[level] < 0 or raise_cap[level] > 20:
+			errors.append("%s: raise_cap[%d] is %d, expected 0 to 20" % [label, level, raise_cap[level]])
+		elif level > 1 and raise_cap[level] < raise_cap[level - 1]:
+			errors.append("%s: raise_cap[%d] is %d, under raise_cap[%d] %d"
+				% [label, level, raise_cap[level], level - 1, raise_cap[level - 1]])
 
 
 ## Every per-level array has top + 1 entries, [0] is 0 and no entry is negative; keep_wild is 0 to 100;

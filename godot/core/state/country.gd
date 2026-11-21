@@ -1,10 +1,9 @@
 ## What changes about a country during a game (docs/architecture/m2-build-spec.md section 5.2 and 5.9).
-## The treasury and the stores (M4) and the people's flows (M5, schema country/3) are here; armies (M6) and techs (M11) join with their systems.
+## The treasury and the stores (M4), the people's flows (M5) and what was ever seen (M6, schema country/4) are here; techs (M11) join with their system.
 class_name Country
 extends RefCounted
 
-const SCHEMA_V2 := "hexa-godot/country/2"
-const SCHEMA := "hexa-godot/country/3"
+const SCHEMA := "hexa-godot/country/4"
 const NO_HEX := Vector2i(-1, -1)
 ## The flows of a stock (Stores.FLOWS.size(); test_stores pins the two equal): the width of flows_open.
 const FLOW_COUNT := 6
@@ -46,6 +45,9 @@ var people_closed: Dictionary = {}
 var food_need: int = 0
 ## Food eaten x 1000 / need of the season (1000 when fed); written only by People.
 var food_fed: int = 1000
+## Bit i (byte i >> 3, bit i & 7) is set when hex i was ever seen by this country; empty in a map-only game. Written only by
+## Vision (setup, see_path, season); never by refresh.
+var explored: PackedByteArray = PackedByteArray()
 
 
 static func create(
@@ -85,14 +87,15 @@ func to_dict() -> Dictionary:
 		"people_closed": _people_to_dict(people_closed),
 		"food_need": food_need,
 		"food_fed": food_fed,
+		"explored": explored.duplicate(),
 	}
 
 
-## Restores a Country saved by to_dict, or returns null when the schema is wrong (country/1 included) or a field is
-## malformed. A key that is missing takes its default; a key of the wrong type is refused.
+## Restores a Country saved by to_dict, or returns null when the schema is wrong (country/1 to country/3 included: D40)
+## or a field is malformed. A key that is missing takes its default; a key of the wrong type is refused.
 static func from_dict(d: Dictionary) -> Country:
 	var schema := str(d.get("schema", ""))
-	if schema != SCHEMA and schema != SCHEMA_V2:
+	if schema != SCHEMA:
 		return null
 	var c := Country.new()
 	c.id = int(d.get("id", 0))
@@ -110,22 +113,36 @@ static func from_dict(d: Dictionary) -> Country:
 	c.alive = bool(d.get("alive", true))
 	if not c._load_economy(d):
 		return null
-	if schema == SCHEMA and not c._load_people(d):
+	if not c._load_people(d):
 		return null
+	var seen: Variant = d.get("explored", PackedByteArray())
+	if not (seen is PackedByteArray):
+		return null
+	c.explored = (seen as PackedByteArray).duplicate()
 	return c
 
 
 ## Stable text line used in Game.digest(): "id|tag|col,row|alive|treasury|tax|short_mask|ledger_from|open lines|
-## closed ledger|stock|flows_open|stock_from|closed goods|people_flows|people_closed|food_need|food_fed". A line is "why:col,row:amount:count", lines are joined by ";",
-## a list of numbers by ","; the closed ledger is "turn:opening:closing;" and its lines, the closed goods
+## closed ledger|stock|flows_open|stock_from|closed goods|people_flows|people_closed|food_need|food_fed|sha256 of explored (hex)".
+## A line is "why:col,row:amount:count", lines are joined by ";", a list of numbers by ","; the closed ledger is "turn:opening:closing;" and its lines, the closed goods
 ## "turn:opening:closing:flows" with comma lists, the closed people "turn:flows".
 func digest_text() -> String:
-	return "%d|%s|%d,%d|%s|%d|%d|%d|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%d" % [
+	return "%d|%s|%d,%d|%s|%d|%d|%d|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%d|%s" % [
 		id, String(tag), capital.x, capital.y, "true" if alive else "false",
 		treasury, tax, short_mask, ledger_from, _lines_text(ledger_open), _ledger_text(ledger_closed),
 		_list_text(stock), _list_text(flows_open), _list_text(stock_from), _goods_text(goods_closed),
 		_list_text(people_flows), _people_text(people_closed), food_need, food_fed,
+		_explored_hash(),
 	]
+
+
+## SHA-256 (hex) of explored, as Stats and Chronicle hash (HashingContext).
+func _explored_hash() -> String:
+	var ctx := HashingContext.new()
+	ctx.start(HashingContext.HASH_SHA256)
+	if not explored.is_empty():  # update() refuses no bytes; finish() alone gives the hash of nothing
+		ctx.update(explored)
+	return ctx.finish().hex_encode()
 
 
 ## Reads the M4 fields of `d` into this country; false (nothing read) when one is malformed.

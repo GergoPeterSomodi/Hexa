@@ -112,6 +112,19 @@ func test_high_contrast_and_lapis_sets() -> void:
 	assert_gte(Tokens.contrast_ratio(Tokens.FAINT, Tokens.LAPIS_AND_GILT["LEATHER"]), 4.5)
 
 
+func test_map_route_tokens_of_slice_5() -> void:
+	# m6-build-spec.md 6.2: reach tints and the route colours.
+	assert_eq(Tokens.MAP_REACH, Color("#ffd64633"))
+	assert_eq(Tokens.MAP_REACH_NEXT, Color("#ffd64614"))
+	assert_eq(Tokens.MAP_PATH, Color("#f6e3a1"))
+	assert_eq(Tokens.MAP_PATH_WARN, Color("#f0806a"))
+	assert_eq(Tokens.MAP_PATH_INK, Color("#0b0806"))
+	assert_gte(Tokens.contrast_ratio(Tokens.MAP_PATH, Tokens.MAP_PATH_INK), 4.5, "the route reads on its ink")
+	assert_gte(Tokens.contrast_ratio(Tokens.MAP_PATH_WARN, Tokens.MAP_PATH_INK), 4.5, "the warning leg reads on its ink")
+	for key: String in ["MAP_REACH", "MAP_REACH_NEXT", "MAP_PATH", "MAP_PATH_WARN", "MAP_PATH_INK"]:
+		assert_true(Tokens.HIGH_CONTRAST.has(key), "HIGH_CONTRAST has " + key)
+
+
 func test_type_and_style_variation_tables_are_complete() -> void:
 	assert_eq(Tokens.FONTS.size(), 7, "seven static font files")
 	for font_key: String in Tokens.FONTS:
@@ -192,7 +205,7 @@ func test_every_one_line_const_parses_for_python_bake() -> void:
 		"VELLUM", "VELLUM_INK", "VELLUM_MUTED", "SEAL", "LAPIS", "VELVET", "GLOW",
 		"GOOD_INK", "BAD_INK", "WARN_INK", "GOLD_INK", "INK_LINE",
 		"CHART_IRON", "CHART_LAPIS", "CHART_MADDER", "CHART_VERDIGRIS", "CHART_OCHRE",
-		"MAP_SELECT",
+		"MAP_SELECT", "MAP_REACH", "MAP_REACH_NEXT", "MAP_PATH", "MAP_PATH_WARN", "MAP_PATH_INK",
 		"S1", "S2", "S3", "S4", "S5", "S6",
 		"BAR_H", "BUTTON_H", "BUTTON_SM_H", "BUTTON_LG_H", "BUTTON_MENU_H",
 		"MEDAL", "MEDAL_SM", "PANEL_W", "TARGET_MIN", "MENU_COLUMN_X",

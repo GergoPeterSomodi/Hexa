@@ -68,7 +68,7 @@ func test_stores_card_at_the_start() -> void:
 	var shown := {}
 	for line: Array in card["lines"]:
 		shown[line[0]] = line[2]
-	assert_eq(shown, {"Grain": "16", "Olive oil": "4", "Wine": "4", "Salt": "4", "Timber": "40", "Stone": "40", "Iron": "20"})
+	assert_eq(shown, {"Grain": "16", "Olive oil": "4", "Wine": "4", "Salt": "4", "Horses": "10", "Timber": "40", "Stone": "40", "Iron": "20", "Copper": "5"})
 	assert_eq(c.stock[GRAIN], 16)
 	assert_eq(c.stock[OIL], 4)
 	assert_eq(c.stock[WINE], 4)

@@ -49,6 +49,20 @@
 [ext_resource type="Resource" path="res://data/defs/goods/iron.tres" id="g_iron"]
 [ext_resource type="Resource" path="res://data/defs/goods/copper.tres" id="g_copper"]
 [ext_resource type="Resource" path="res://data/defs/goods/silver.tres" id="g_silver"]
+[ext_resource type="Script" path="res://core/defs/unit_def.gd" id="u0_script"]
+[ext_resource type="Resource" path="res://data/defs/units/pikemen.tres" id="u_pikemen"]
+[ext_resource type="Resource" path="res://data/defs/units/crossbowmen.tres" id="u_crossbowmen"]
+[ext_resource type="Resource" path="res://data/defs/units/knights.tres" id="u_knights"]
+[ext_resource type="Resource" path="res://data/defs/units/bombards.tres" id="u_bombards"]
+[ext_resource type="Script" path="res://core/defs/terrain_def.gd" id="t0_script"]
+[ext_resource type="Resource" path="res://data/defs/terrain/farmland.tres" id="t_farmland"]
+[ext_resource type="Resource" path="res://data/defs/terrain/grassland.tres" id="t_grassland"]
+[ext_resource type="Resource" path="res://data/defs/terrain/woods.tres" id="t_woods"]
+[ext_resource type="Resource" path="res://data/defs/terrain/marsh.tres" id="t_marsh"]
+[ext_resource type="Resource" path="res://data/defs/terrain/rock.tres" id="t_rock"]
+[ext_resource type="Resource" path="res://data/defs/terrain/snow.tres" id="t_snow"]
+[ext_resource type="Resource" path="res://data/defs/terrain/tundra.tres" id="t_tundra"]
+[ext_resource type="Resource" path="res://data/defs/terrain/sand.tres" id="t_sand"]
 
 [resource]
 script = ExtResource("17_eiw27")
@@ -98,3 +112,30 @@ left_bp = 200
 town_floor = 200
 people_top_level = 3
 levy_permille = 100
+units = Array[ExtResource("u0_script")]([ExtResource("u_pikemen"), ExtResource("u_crossbowmen"), ExtResource("u_knights"), ExtResource("u_bombards")])
+terrains = Array[ExtResource("t0_script")]([ExtResource("t_farmland"), ExtResource("t_grassland"), ExtResource("t_woods"), ExtResource("t_marsh"), ExtResource("t_rock"), ExtResource("t_snow"), ExtResource("t_tundra"), ExtResource("t_sand")])
+relief_move_add = PackedInt32Array(0, 0, 0, 0, 1, 2, 3)
+highway_cap = 1
+road_cap = 2
+track_divisor = 2
+winter_snow_percent = 200
+pass_closing_climate = 0
+stream_cost = 1
+river_cost = 2
+ford_cost = 1
+ferry_cost = 2
+river_wade_class = 2
+river_wall_class = 3
+wade_plan_cost = 12
+supply_reach = 8
+supply_wade_cost = 3
+depot_min_level = 2
+army_food_milli = 200
+forage_percent = PackedInt32Array(100, 100, 100, 0, 50, 100)
+forage_loss_permille = 20
+starve_permille = PackedInt32Array(100, 100, 100, 200, 150, 100)
+stack_limit = 8
+march_seasons_max = 12
+wait_ratio_percent = 200
+wait_extra_seasons = 2
+land_sight = 1

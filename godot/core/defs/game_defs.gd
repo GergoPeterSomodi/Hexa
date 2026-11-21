@@ -66,6 +66,43 @@ extends Resource
 ## M6's seam: the share of a hex's people one levy may take, permille (spec 4.20).
 @export var levy_permille := 100
 
+## The armies (M6 spec 4.2, 4.3, 5.1): the 4 kinds of company (external files under data/defs/units/, id order) and the 8
+## grounds (data/defs/terrain/, cover order), then the step cost, supply, forage and sight numbers.
+@export var units: Array[UnitDef] = []
+@export var terrains: Array[TerrainDef] = []
+## Per relief level (7): move points added to entering it.
+@export var relief_move_add: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 1, 2, 3])
+@export var highway_cap := 1
+@export var road_cap := 2
+@export var track_divisor := 2
+@export var winter_snow_percent := 200
+## A pass edge beside this winter climate closes in winter (0 snow).
+@export var pass_closing_climate := 0
+@export var stream_cost := 1
+## A class 1 river with no crossing.
+@export var river_cost := 2
+@export var ford_cost := 1
+@export var ferry_cost := 2
+## This river class with no crossing takes a season to wade.
+@export var river_wade_class := 2
+## From this class on, no crossing means no way.
+@export var river_wall_class := 3
+@export var wade_plan_cost := 12
+@export var supply_reach := 8
+@export var supply_wade_cost := 3
+@export var depot_min_level := 2
+## Loads a season per 1,000 men, thousandths.
+@export var army_food_milli := 200
+## Six slots: spring, summer, autumn, winter snow, winter frost, winter mild.
+@export var forage_percent: PackedInt32Array = PackedInt32Array([100, 100, 100, 0, 50, 100])
+@export var forage_loss_permille := 20
+@export var starve_permille: PackedInt32Array = PackedInt32Array([100, 100, 100, 200, 150, 100])
+@export var stack_limit := 8
+@export var march_seasons_max := 12
+@export var wait_ratio_percent := 200
+@export var wait_extra_seasons := 2
+@export var land_sight := 1
+
 var _country_cache: Dictionary[StringName, CountryDef] = {}
 var _country_cache_size: int = -1
 var _scenario_cache: Dictionary[String, ScenarioDef] = {}
@@ -135,6 +172,20 @@ func good_id(key: StringName) -> int:
 	return _good_cache.get(key, -1)
 
 
+## Looks up a kind of company by id (0 to 3), or null when out of range.
+func unit_def(id: int) -> UnitDef:
+	if id < 0 or id >= units.size():
+		return null
+	return units[id]
+
+
+## Looks up the ground of a cover (0 to 7), or null when out of range.
+func terrain(cover: int) -> TerrainDef:
+	if cover < 0 or cover >= terrains.size():
+		return null
+	return terrains[cover]
+
+
 ## Looks up a scenario definition by id, or null when unknown (cache built on first use).
 func scenario(id: String) -> ScenarioDef:
 	if _scenario_cache_size != scenarios.size():
@@ -195,6 +246,7 @@ func validate() -> Array[String]:
 			seen_ids[s.id] = true
 	_check_people(errors)
 	_check_economy(errors)
+	_check_armies(errors)
 	return errors
 
 
@@ -255,6 +307,77 @@ func _check_people(errors: Array[String]) -> void:
 		if settlements.falls_below[level] != 0:
 			errors.append("settlements: falls_below[%d] is %d above people_top_level %d, expected 0 (it never falls)"
 				% [level, settlements.falls_below[level], people_top_level])
+
+
+## The armies' checks (M6 spec 5.1): 4 units with ids 0 to 3 once each and valid, 8 terrains in cover order and valid,
+## arrays sized (7, 6, 6), every cap and cost 1 to 20, river_wade_class under river_wall_class and both 1 to 3,
+## supply_reach 1 to 40, stack_limit 1 to 20, percents 0 to 400, army_food_milli 1 to 5000, forage_loss_permille 0 to
+## 1000, depot_min_level 1 to 5, march_seasons_max 1 to 40, wait_ratio_percent 100 to 1000, wait_extra_seasons 0 to 12,
+## land_sight 1 to 3, pass_closing_climate 0 to 2.
+func _check_armies(errors: Array[String]) -> void:
+	_check_size(errors, "units", units.size(), 4)
+	var seen_unit_keys: Dictionary = {}
+	for i: int in units.size():
+		var u := units[i]
+		if u == null:
+			errors.append("units[%d]: entry is null" % i)
+			continue
+		if u.id != i:
+			errors.append("units[%d]: id %d should be %d (ids run 0 to 3 in order)" % [i, u.id, i])
+		for err: String in u.validate(self):
+			errors.append(err)
+		if seen_unit_keys.has(u.key):
+			errors.append("units[%d]: duplicate key '%s'" % [i, String(u.key)])
+		seen_unit_keys[u.key] = true
+	_check_size(errors, "terrains", terrains.size(), TerrainDef.COUNT)
+	for i: int in terrains.size():
+		var t := terrains[i]
+		if t == null:
+			errors.append("terrains[%d]: entry is null" % i)
+			continue
+		if t.id != i:
+			errors.append("terrains[%d]: id %d should be %d (cover order)" % [i, t.id, i])
+		for err: String in t.validate():
+			errors.append(err)
+	var cheapest := 21
+	for t: TerrainDef in terrains:
+		if t != null:
+			cheapest = mini(cheapest, t.move)
+	for u: UnitDef in units:
+		if u != null and u.mp < cheapest:
+			errors.append("unit %s: mp %d is under the cheapest ground step %d" % [String(u.key), u.mp, cheapest])
+	_check_size(errors, "relief_move_add", relief_move_add.size(), 7)
+	_check_size(errors, "forage_percent", forage_percent.size(), 6)
+	_check_size(errors, "starve_permille", starve_permille.size(), 6)
+	_check_each(errors, "relief_move_add", relief_move_add, 0, 20)
+	_check_each(errors, "forage_percent", forage_percent, 0, 400)
+	_check_each(errors, "starve_permille", starve_permille, 0, 1000)
+	_check_value(errors, "highway_cap", highway_cap, 1, 20)
+	_check_value(errors, "road_cap", road_cap, 1, 20)
+	_check_value(errors, "track_divisor", track_divisor, 1, 20)
+	_check_value(errors, "stream_cost", stream_cost, 1, 20)
+	_check_value(errors, "river_cost", river_cost, 1, 20)
+	_check_value(errors, "ford_cost", ford_cost, 1, 20)
+	_check_value(errors, "ferry_cost", ferry_cost, 1, 20)
+	_check_value(errors, "wade_plan_cost", wade_plan_cost, 1, 20)
+	_check_value(errors, "supply_wade_cost", supply_wade_cost, 1, 20)
+	_check_value(errors, "winter_snow_percent", winter_snow_percent, 0, 400)
+	if highway_cap > road_cap:
+		errors.append("highway_cap %d should not be over road_cap %d" % [highway_cap, road_cap])
+	_check_value(errors, "river_wade_class", river_wade_class, 1, 3)
+	_check_value(errors, "river_wall_class", river_wall_class, 1, 3)
+	if river_wade_class >= river_wall_class:
+		errors.append("river_wade_class %d should be under river_wall_class %d" % [river_wade_class, river_wall_class])
+	_check_value(errors, "supply_reach", supply_reach, 1, 40)
+	_check_value(errors, "stack_limit", stack_limit, 1, 20)
+	_check_value(errors, "army_food_milli", army_food_milli, 1, 5000)
+	_check_value(errors, "forage_loss_permille", forage_loss_permille, 0, 1000)
+	_check_value(errors, "depot_min_level", depot_min_level, 1, 5)
+	_check_value(errors, "march_seasons_max", march_seasons_max, 1, 40)
+	_check_value(errors, "wait_ratio_percent", wait_ratio_percent, 100, 1000)
+	_check_value(errors, "wait_extra_seasons", wait_extra_seasons, 0, 12)
+	_check_value(errors, "land_sight", land_sight, 1, 3)
+	_check_value(errors, "pass_closing_climate", pass_closing_climate, 0, 2)
 
 
 func _check_each(errors: Array[String], field: String, values: PackedInt32Array, low: int, high: int) -> void:

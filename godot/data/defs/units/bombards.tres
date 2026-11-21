@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/unit_def.gd" id="1_unit"]
+
+[resource]
+script = ExtResource("1_unit")
+id = 3
+key = &"bombards"
+name = "Bombards"
+one = "battery of bombards"
+many = "batteries of bombards"
+branch = &"artillery"
+era = 1
+men = 100
+cost = 60
+cost_goods = Dictionary[String, int]({"iron": 5, "copper": 3})
+upkeep = 8
+mp = 8
+sight = 1
+min_level = 3
+refill = 10
+figure = &"fig_artillery"

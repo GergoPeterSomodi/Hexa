@@ -16,9 +16,10 @@ func _write(st: Stats, turn: int, v: int) -> void:
 
 
 func test_series_shape() -> void:
-	assert_eq(Stats.SERIES.size(), 40)
-	assert_eq(Stats.SERIES.slice(35), ["people_towns", "people_grew", "people_starved", "people_left", "food_need"],
-			"the five of M5 are appended last")
+	assert_eq(Stats.SERIES.size(), 42)
+	assert_eq(Stats.SERIES.slice(35, 40), ["people_towns", "people_grew", "people_starved", "people_left", "food_need"],
+			"the five of M5 come before M6's two")
+	assert_eq(Stats.SERIES.slice(40), ["army_raised", "army_starved"], "the two of M6 are appended last")
 	assert_eq(Stats.column("treasury"), 0)
 	assert_eq(Stats.column("land"), 12)
 	assert_eq(Stats.column("nonsense"), -1)
@@ -68,9 +69,9 @@ func test_missing_and_unknown_series() -> void:
 	_write(st, 1, 5)
 	st.append_year()
 	var d := st.to_dict()
-	# The save lacks the last six series (districts_harbour and the five of M5) and has one the game does not know, first.
+	# The save lacks the last eight series (districts_harbour, the five of M5 and the two of M6) and has one the game does not know, first.
 	var old: Array[String] = ["gone"]
-	old.append_array(Stats.SERIES.slice(0, Stats.SERIES.size() - 6))
+	old.append_array(Stats.SERIES.slice(0, Stats.SERIES.size() - 8))
 	var old_s := old.size()
 	var ring := PackedInt32Array()
 	ring.resize(Stats.RING * old_s)
@@ -316,7 +317,7 @@ func test_a_save_without_the_people_series_loads_them_as_zeros() -> void:
 	for col_name: String in Stats.SERIES.slice(35):
 		assert_eq(back.value(&"AAA", 1, col_name), 0, col_name)
 		assert_eq(back.year_row(&"AAA", 0)[Stats.column(col_name)], 0, col_name)
-	assert_eq(back.ring.size(), Stats.RING * 40)
+	assert_eq(back.ring.size(), Stats.RING * 42)
 
 
 func test_the_digest_moves_with_one_people_value() -> void:
@@ -329,21 +330,34 @@ func test_the_digest_moves_with_one_people_value() -> void:
 	assert_ne(st.digest(), before)
 
 
+func test_the_digest_moves_with_each_army_series() -> void:
+	for col_name: String in ["army_raised", "army_starved"]:
+		var st := Stats.create(PackedStringArray(["AAA"]), 0)
+		_write(st, 1, 3)
+		var before := st.digest()
+		var row := st.row(&"AAA", 1)
+		row[Stats.column(col_name)] += 1
+		st.set_row(0, 1, row)
+		assert_ne(st.digest(), before, col_name)
+		var back := Stats.from_dict(st.to_dict())
+		assert_eq(back.value(&"AAA", 1, col_name), 4, "%s survives a round trip" % col_name)
+
+
 func test_the_projected_size_at_winter_1650_for_sixty_countries() -> void:
 	var tags := PackedStringArray()
 	for c: int in 60:
 		tags.append("C%02d" % c)
 	var st := Stats.create(tags, 0)
-	assert_eq(st.ring.size() * 4, 60 * 40 * 40 * 4, "the ring: 0.38 MB")
-	assert_lt(st.ring.size() * 4, 400_000)
+	assert_eq(st.ring.size() * 4, 60 * 40 * 42 * 4, "the ring: 0.40 MB")
+	assert_lt(st.ring.size() * 4, 420_000)
 	for t: int in range(1, 171 * 4 + 1):
 		_write(st, t, t)
 		if Calendar.is_winter(t):
 			st.append_year()
 	assert_eq(st.year_count(), 171, "1480 to 1650")
 	var year_bytes := st.years.size() * 4
-	assert_gt(year_bytes, 1_600_000, "about 1.64 MB")
-	assert_lt(year_bytes, 1_700_000)
+	assert_gt(year_bytes, 1_650_000, "about 1.72 MB")
+	assert_lt(year_bytes, 1_800_000)
 	assert_lt(year_bytes + st.ring.size() * 4, 2_500_000, "under 2.5 MB in all")
 	var back := Stats.from_dict(bytes_to_var(var_to_bytes(st.to_dict())) as Dictionary)
 	assert_not_null(back, "a full 60-country game loads back")

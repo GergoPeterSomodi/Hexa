@@ -264,3 +264,86 @@ func test_the_study_keys_are_silent_under_a_line_edit_and_when_disabled() -> voi
 	_input.enabled = false
 	_input._unhandled_input(_key(KEY_I))
 	assert_true(log.is_empty(), "nothing while disabled")
+
+
+func _alt(keycode: Key) -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.keycode = keycode
+	ev.physical_keycode = keycode
+	ev.pressed = true
+	ev.alt_pressed = true
+	return ev
+
+
+func _connect_m6(log: Array[String]) -> void:
+	_input.next_army_requested.connect(func() -> void: log.append("next"))
+	_input.continue_march_requested.connect(func() -> void: log.append("continue"))
+	_input.cursor_moved.connect(func(d: int) -> void: log.append("cursor:%d" % d))
+	_input.command_key_requested.connect(func() -> void: log.append("command"))
+	_input.mode_requested.connect(func(m: int) -> void: log.append("mode:%d" % m))
+
+
+func test_m6_keys_emit_their_intents() -> void:
+	var log: Array[String] = []
+	_connect_m6(log)
+	_input._unhandled_input(_key(KEY_TAB))
+	_input._unhandled_input(_key(KEY_R))
+	_input._unhandled_input(_key(KEY_O))
+	var f10 := InputEventKey.new()
+	f10.keycode = KEY_F10
+	f10.physical_keycode = KEY_F10
+	f10.pressed = true
+	f10.shift_pressed = true
+	_input._unhandled_input(f10)
+	_input._unhandled_input(_alt(KEY_LEFT))
+	_input._unhandled_input(_alt(KEY_RIGHT))
+	_input._unhandled_input(_alt(KEY_UP))
+	_input._unhandled_input(_alt(KEY_DOWN))
+	_input._unhandled_input(_key(KEY_6))
+	assert_eq(log, ["next", "continue", "command", "command",
+		"cursor:0", "cursor:1", "cursor:2", "cursor:3", "mode:5"])
+
+
+func test_m6_keys_ignore_other_chords_and_held_repeats() -> void:
+	var log: Array[String] = []
+	_connect_m6(log)
+	_input._unhandled_input(_key(KEY_TAB, true))
+	_input._unhandled_input(_key(KEY_LEFT))
+	_input._unhandled_input(_alt(KEY_O))
+	var held := _key(KEY_TAB)
+	held.echo = true
+	_input._unhandled_input(held)
+	var held_alt := _alt(KEY_LEFT)
+	held_alt.echo = true
+	_input._unhandled_input(held_alt)
+	assert_true(log.is_empty(), "%s" % [log])
+
+
+func test_m6_keys_are_silent_under_a_line_edit_and_when_disabled() -> void:
+	var log: Array[String] = []
+	_connect_m6(log)
+	var edit := LineEdit.new()
+	_vp.add_child(edit)
+	edit.grab_focus()
+	_input._unhandled_input(_key(KEY_TAB))
+	_input._unhandled_input(_key(KEY_R))
+	_input._unhandled_input(_key(KEY_O))
+	_input._unhandled_input(_alt(KEY_LEFT))
+	_input._unhandled_input(_key(KEY_6))
+	assert_true(log.is_empty(), "a focused LineEdit wins")
+	edit.release_focus()
+	_input.enabled = false
+	_input._unhandled_input(_key(KEY_TAB))
+	_input._unhandled_input(_alt(KEY_UP))
+	assert_true(log.is_empty(), "nothing while disabled")
+
+
+func test_cursor_step_keeps_the_column_for_up_and_down() -> void:
+	var even := Vector2i(4, 2)
+	assert_eq(MapInput.cursor_step(even, MapInput.CURSOR_UP), even + HexGrid._EVEN_DIRS[1], "even row up is NE")
+	assert_eq(MapInput.cursor_step(even, MapInput.CURSOR_DOWN), even + HexGrid._EVEN_DIRS[5], "even row down is SE")
+	var odd := Vector2i(4, 3)
+	assert_eq(MapInput.cursor_step(odd, MapInput.CURSOR_UP), odd + HexGrid._ODD_DIRS[2], "odd row up is NW")
+	assert_eq(MapInput.cursor_step(odd, MapInput.CURSOR_DOWN), odd + HexGrid._ODD_DIRS[4], "odd row down is SW")
+	assert_eq(MapInput.cursor_step(even, MapInput.CURSOR_LEFT), even + HexGrid._EVEN_DIRS[3])
+	assert_eq(MapInput.cursor_step(odd, MapInput.CURSOR_RIGHT), odd + HexGrid._ODD_DIRS[0])

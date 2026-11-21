@@ -63,6 +63,20 @@ static func economy_into(defs: GameDefs) -> void:
 	defs.weather_permille = committed.weather_permille
 	defs.expensive_permille = committed.expensive_permille
 	defs.expensive_seasons = committed.expensive_seasons
+	# M6 (spec 4.2, 4.3, 5.1): the four kinds and the eight grounds; the step, supply and sight numbers keep GameDefs' own
+	# defaults, which are the committed ones.
+	var units: Array[UnitDef] = []
+	for u: UnitDef in committed.units:
+		units.append(ResourceLoader.load(
+			"res://data/defs/units/%s.tres" % String(u.key), "", ResourceLoader.CACHE_MODE_IGNORE
+		) as UnitDef)
+	defs.units = units
+	var terrains: Array[TerrainDef] = []
+	for t: TerrainDef in committed.terrains:
+		terrains.append(ResourceLoader.load(
+			"res://data/defs/terrain/%s.tres" % String(t.key), "", ResourceLoader.CACHE_MODE_IGNORE
+		) as TerrainDef)
+	defs.terrains = terrains
 
 
 ## `{defs: GameDefs, scenario: ScenarioDef}` with `count` countries (fewer when the map has fewer places).

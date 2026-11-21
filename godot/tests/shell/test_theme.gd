@@ -322,6 +322,33 @@ func test_slice4_icons_and_feedback_frames() -> void:
 		assert_true(studiolo.has_color(StringName(colour), &"InkChart"), "InkChart has " + colour)
 
 
+func test_slice5_army_pieces_are_kit_icons() -> void:
+	# m6-build-spec.md 6.2: plate, ring, badge and route stop are whole icons; the figures (32 px) and army icons (24 px) are atlas cells.
+	var studiolo := load(KitTheme.THEME_PATH) as Theme
+	var hc := load(KitTheme.HIGH_CONTRAST_PATH) as Theme
+	var theme_2x := KitTheme.load_for(2.0, &"2x", false)
+	var pieces := _load_pieces()
+	var direct: Dictionary = {"army_plate": Vector2(56, 48), "army_plate_ring": Vector2(64, 56), "army_badge": Vector2(36, 18), "path_stop": Vector2(20, 20)}
+	for key: String in direct:
+		var size: Vector2 = direct[key]
+		for pair: Array in [["studiolo", studiolo], ["hc", hc], ["2x", theme_2x]]:
+			var th: Theme = pair[1]
+			assert_true(th.has_icon(StringName(key), &"Kit"), "%s has %s" % [pair[0], key])
+			assert_eq(th.get_icon(StringName(key), &"Kit").get_size(), size, "%s logical size in %s" % [key, pair[0]])
+		assert_eq(theme_2x.get_icon(StringName(key), &"Kit").get_image().get_size(), Vector2i(size * 2.0), "%s 2x pixels" % key)
+	var atlases: Dictionary = {"figures": [4, 32], "icons_army": [16, 24]}
+	for atlas: String in atlases:
+		var names: Array = (pieces[atlas] as Dictionary)["icons"]
+		assert_eq(names.size(), int((atlases[atlas] as Array)[0]), "%s has its cells" % atlas)
+		var cell: int = (atlases[atlas] as Array)[1]
+		for n: Variant in names:
+			var iname := StringName(str(n))
+			for pair: Array in [["studiolo", studiolo], ["hc", hc], ["2x", theme_2x]]:
+				assert_true((pair[1] as Theme).has_icon(iname, &"Kit"), "%s has icon %s" % [pair[0], iname])
+			assert_eq(studiolo.get_icon(iname, &"Kit").get_size(), Vector2(cell, cell), "%s is %d px" % [iname, cell])
+			assert_eq(theme_2x.get_icon(iname, &"Kit").get_image().get_size(), Vector2i(cell * 2, cell * 2), "%s 2x pixels" % iname)
+
+
 func test_the_map_views_delta_tints_are_the_token_colours() -> void:
 	assert_eq(MapModes.DELTA_GOOD, Tokens.GOOD)
 	assert_eq(MapModes.DELTA_BAD, Tokens.BAD)

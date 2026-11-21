@@ -107,8 +107,8 @@ func test_stores_chip_shows_the_worth_and_the_stock_card() -> void:
 	assert_eq(_chips.stores_chip().value_label().text, Words.number(int(stores["value"])), "value at price")
 	assert_eq(_chips.stores_chip().name_label().text, "Stores")
 	var amounts := _amounts(_chips.stores_card())
-	var expected := {"grain": "16", "olive oil": "4", "wine": "4", "salt": "4", "timber": "40", "stone": "40", "iron": "20"}
-	assert_eq(amounts, expected, "the Stores card lists the seven goods in store")
+	var expected := {"grain": "16", "olive oil": "4", "wine": "4", "salt": "4", "horses": "10", "timber": "40", "stone": "40", "iron": "20", "copper": "5"}
+	assert_eq(amounts, expected, "the Stores card lists the nine goods in store (M6: horses and copper join)")
 	assert_eq(str((_chips.stores_card()["lines"] as Array)[-1][0]), "The reserve keeps four seasons of the towns' needs; the rest is sold.",
 		"the Stores hint")
 

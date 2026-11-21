@@ -32,6 +32,7 @@ from tools.ui_bake.pieces_feedback import check_feedback_pieces, feedback_pieces
 from tools.ui_bake.pieces_frames import PieceSpec, frame_pieces
 from tools.ui_bake.pieces_hud import hud_pieces
 from tools.ui_bake.pieces_m2 import m2_pieces
+from tools.ui_bake.pieces_m6 import ARMY_ICON_NAMES, FIGURE_NAMES, check_m6_pieces, m6_pieces, write_token_sheet
 from tools.ui_bake.png import load_png_rgba, rgba_sha256, save_png
 from tools.ui_bake.tokens import TokenTable, load_tokens
 
@@ -42,7 +43,7 @@ TOLERANT_MAX_MAD = 2.5
 
 
 def all_specs() -> list[PieceSpec]:
-    return frame_pieces() + control_pieces() + art_pieces() + m2_pieces() + hud_pieces() + feedback_pieces() + icon_pieces()
+    return frame_pieces() + control_pieces() + art_pieces() + m2_pieces() + hud_pieces() + feedback_pieces() + icon_pieces() + m6_pieces()
 
 
 def _spec_map() -> dict[str, PieceSpec]:
@@ -150,6 +151,12 @@ def build_kit_index(
         if sp.name == "icons":
             entry["cell"] = [24, 24]
             entry["icons"] = list(ICON_NAMES)
+        if sp.name == "figures":
+            entry["cell"] = [32, 32]
+            entry["icons"] = list(FIGURE_NAMES)
+        if sp.name == "icons_army":
+            entry["cell"] = [24, 24]
+            entry["icons"] = list(ARMY_ICON_NAMES)
         pieces_doc[sp.name] = entry
 
     return {
@@ -278,6 +285,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scale", type=str, default="1,2", help="Scales to bake (1, 2, or 1,2)")
     parser.add_argument("--jobs", type=int, default=1, help="Worker processes")
     parser.add_argument("--sheet", type=Path, default=None, help="Optional contact sheet PNG path")
+    parser.add_argument("--token-sheet", type=Path, default=None, help="Write the army token sheet (13 colours x 4 figures, badge, ring, icons) for the art director")
     parser.add_argument("--check", action="store_true", help="Rebuild in memory and verify against committed kit")
     args = parser.parse_args(argv)
 
@@ -294,6 +302,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         run_all_checks(REPO_ROOT, tokens, specs, rendered)
         check_feedback_pieces(specs, rendered)
+        check_m6_pieces(tokens, specs, rendered)
         if args.check:
             verify_committed(args.out, tokens, specs, rendered)
     except BakeCheckError as exc:
@@ -326,6 +335,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.sheet is not None:
         write_contact_sheet(args.sheet, specs, rendered)
         print(f"bake_ui: wrote contact sheet {args.sheet}")
+
+    if args.token_sheet is not None:
+        write_token_sheet(args.token_sheet, tokens, REPO_ROOT)
+        print(f"bake_ui: wrote token sheet {args.token_sheet}")
 
     return 0
 

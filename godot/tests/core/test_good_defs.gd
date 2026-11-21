@@ -2,7 +2,7 @@
 ## sections 4.2, 5.1 and 9): the 16 committed files against table 4.2, the goods list of GameDefs, and planted faults (P).
 extends GutTest
 
-## Table 4.2: id, key, name, kind, price (milli), need (milli), need weight, food order, fixed reserve, harvest word, icon.
+## Table 4.2 (M6 spec 5.1: horses 10 and copper 5 keep a fixed reserve): id, key, name, kind, price (milli), need (milli), need weight, food order, fixed reserve, harvest word, icon.
 const TABLE: Array = [
 	[0, "grain", "Grain", "food", 1000, 0, 0, 1, 0, "harvest", "good_grain"],
 	[1, "fish", "Fish", "food", 1000, 0, 0, 0, 0, "catch", "good_fish"],
@@ -14,11 +14,11 @@ const TABLE: Array = [
 	[7, "dyes", "Dyes", "ware", 5000, 0, 0, -1, 0, "", "good_dyes"],
 	[8, "wool", "Wool", "ware", 1500, 0, 0, -1, 0, "", "good_wool"],
 	[9, "cattle", "Cattle", "ware", 1500, 0, 0, -1, 0, "", "good_cattle"],
-	[10, "horses", "Horses", "ware", 3000, 0, 0, -1, 0, "", "good_horses"],
+	[10, "horses", "Horses", "ware", 3000, 0, 0, -1, 10, "", "good_horses"],
 	[11, "timber", "Timber", "material", 1000, 0, 0, -1, 40, "", "good_timber"],
 	[12, "stone", "Stone", "material", 1000, 0, 0, -1, 40, "", "good_stone"],
 	[13, "iron", "Iron", "material", 2000, 0, 0, -1, 20, "", "good_iron"],
-	[14, "copper", "Copper", "ware", 2500, 0, 0, -1, 0, "", "good_copper"],
+	[14, "copper", "Copper", "ware", 2500, 0, 0, -1, 5, "", "good_copper"],
 	[15, "silver", "Silver", "ware", 7000, 0, 0, -1, 0, "", "good_silver"],
 ]
 
@@ -176,7 +176,23 @@ func test_planted_fault_food_order_and_fixed_reserve() -> void:
 	assert_true(_has(g.validate(), "food has food_order -1"), "food without order refused")
 	g = _load_good("wine")
 	g.reserve_fixed = 5
-	assert_true(_has(g.validate(), "only materials keep a fixed reserve"), "reserve on a staple refused")
+	assert_true(_has(g.validate(), "only materials and wares keep a fixed reserve"), "reserve on a staple refused")
+	g = _load_good("grain")
+	g.reserve_fixed = 5
+	assert_true(_has(g.validate(), "only materials and wares keep a fixed reserve"), "reserve on a food refused")
+	g = _load_good("silk")
+	g.reserve_fixed = 5
+	assert_eq(g.validate(), [] as Array[String], "a fixed reserve on a ware is allowed (M6 A1)")
 	g = _load_good("timber")
 	g.price_milli = -1
 	assert_true(_has(g.validate(), "price_milli is -1"), "negative price refused")
+
+
+func test_m6_the_two_reserves_of_the_wares() -> void:
+	var defs := _committed_defs()
+	assert_eq(defs.good(defs.good_id(&"horses")).reserve_fixed, 10, "horses keep 10")
+	assert_eq(defs.good(defs.good_id(&"copper")).reserve_fixed, 5, "copper keeps 5")
+	for g: GoodDef in defs.goods:
+		if g.key != &"horses" and g.key != &"copper" and g.kind != &"material":
+			assert_eq(g.reserve_fixed, 0, "%s keeps no fixed reserve" % g.key)
+	assert_eq(defs.validate(), [] as Array[String])

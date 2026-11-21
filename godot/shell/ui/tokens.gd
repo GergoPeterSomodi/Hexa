@@ -73,6 +73,11 @@ const CHART_OCHRE := Color("#75510f")
 
 # Map tokens (ui-style-and-feedback-spec.md section 4.2)
 const MAP_SELECT := Color("#ffd646")
+const MAP_REACH := Color("#ffd64633")
+const MAP_REACH_NEXT := Color("#ffd64614")
+const MAP_PATH := Color("#f6e3a1")
+const MAP_PATH_WARN := Color("#f0806a")
+const MAP_PATH_INK := Color("#0b0806")
 
 # Sizes in logical pixels (ui-style-and-feedback-spec.md section 4.2)
 const S1 := 4
@@ -159,6 +164,11 @@ const HIGH_CONTRAST: Dictionary[String, Color] = {
 	"PRIMARY": Color("#ffd646"),
 	"PRIMARY_HOT": Color("#ffffff"),
 	"MAP_SELECT": Color("#ffd646"),
+	"MAP_REACH": Color("#ffd64633"),
+	"MAP_REACH_NEXT": Color("#ffd64614"),
+	"MAP_PATH": Color("#ffd646"),
+	"MAP_PATH_WARN": BAD,
+	"MAP_PATH_INK": Color("#000000"),
 	"GOOD": GOOD,
 	"BAD": BAD,
 	"WARN": WARN,

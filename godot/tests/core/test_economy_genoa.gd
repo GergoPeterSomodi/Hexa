@@ -11,6 +11,8 @@ const SALT := 4
 const TIMBER := 11
 const STONE := 12
 const IRON := 13
+const HORSES := 10
+const COPPER := 14
 
 
 func _stock(g: Game) -> Dictionary:
@@ -36,7 +38,8 @@ func test_genoas_first_year_to_the_ducat() -> void:
 	var g := EconomyFixture.game(&"GEN")
 	var c := Countries.by_tag(g, &"GEN")
 	assert_eq(c.treasury, 610)
-	assert_eq(_stock(g), {GRAIN: 16, OIL: 4, WINE: 4, SALT: 4, TIMBER: 40, STONE: 40, IRON: 20})
+	# M6 (spec 5.1): horses and copper keep a fixed reserve of 10 and 5, so a country starts holding them.
+	assert_eq(_stock(g), {GRAIN: 16, OIL: 4, WINE: 4, SALT: 4, HORSES: 10, TIMBER: 40, STONE: 40, IRON: 20, COPPER: 5})
 	var used := {FISH: 4, OIL: 1, WINE: 1, SALT: 1}
 	# per season: made, sold, [people, goods, dues, upkeep, walls], net, treasury after.
 	var years: Array = [

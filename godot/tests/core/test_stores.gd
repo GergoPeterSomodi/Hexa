@@ -50,7 +50,10 @@ func test_setup_stores_at_the_reserve_for_a_planted_town() -> void:
 	assert_eq(c.stock[TIMBER], 40)
 	assert_eq(c.stock[STONE], 40)
 	assert_eq(c.stock[IRON], 20)
-	for good: int in [5, 6, 7, 8, 9, 10, 14, 15]:
+	# M6 (spec 5.1): horses and copper keep a fixed reserve of 10 and 5; the other wares keep none.
+	assert_eq(c.stock[10], 10, "horses keep 10")
+	assert_eq(c.stock[14], 5, "copper keeps 5")
+	for good: int in [5, 6, 7, 8, 9, 15]:
 		assert_eq(c.stock[good], 0, "a ware has no reserve")
 	assert_eq(c.stock_from, c.stock)
 	assert_eq(c.flows_open.size(), 16 * Stores.FLOWS.size())

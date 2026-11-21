@@ -1,9 +1,9 @@
 {
   "schema": "hexa-godot/ui-kit/1",
-  "tokens_sha": "cb3439b787ead284519c04db4bf587a349e52b6b0a232ca53efc8d8866a3b8c7",
+  "tokens_sha": "685f60ad92470968939cb4b9be45fcfd898965b18dd497d0dcfcd251c407a04a",
   "bytes_rgba": {
-    "kit_1x": 3601040,
-    "kit_2x": 14404160,
+    "kit_1x": 3683568,
+    "kit_2x": 14734272,
     "menu": 8812800
   },
   "pieces": {
@@ -3080,6 +3080,266 @@
         "research",
         "prestige"
       ]
+    },
+    "army_plate": {
+      "size": [
+        56,
+        48
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 5,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "6ad81705168973603c0a037da46476ecfa6050c1d994ba77bcd26fa71af9efbb",
+        "2x": "202d2a152a015ee7de89db2b052f1c73a713d5a188cfd08cc5c9b2976dcfc073"
+      },
+      "check": "exact"
+    },
+    "army_plate_ring": {
+      "size": [
+        64,
+        56
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 5,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "a8c380146961a27f5516e9b15e94a2540071666ea0d6e582ff7c679a65047f9d",
+        "2x": "437b5d66ba2b3968081e4c203024ce9120b075f5290ce16fa2c4e1b424737214"
+      },
+      "check": "exact"
+    },
+    "army_badge": {
+      "size": [
+        36,
+        18
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 5,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "f8720c4f32ee7894099e395b43f713c144d9a7770777db7b0a4c533dd6f01670",
+        "2x": "0dd95a84136d3e24caeaee117418a16981694658164ce8208e92bc7839217e02"
+      },
+      "check": "exact"
+    },
+    "figures": {
+      "size": [
+        128,
+        32
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 5,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "93b089097f927a00f4fbe22cd90da5a7cfacec5bc5152a1cfe6db5da00cb0406",
+        "2x": "16f2e3370b95b80599fdc8f1a2a21b7a3fcf4da40ea323dd3dae2681f4682c1d"
+      },
+      "check": "exact",
+      "cell": [
+        32,
+        32
+      ],
+      "icons": [
+        "fig_infantry",
+        "fig_missile",
+        "fig_cavalry",
+        "fig_artillery"
+      ]
+    },
+    "icons_army": {
+      "size": [
+        192,
+        48
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 5,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "7f3cbc1592307333500a184d0991ff91992c91557d60de067e5da27c0b2ae5d7",
+        "2x": "9b03157927e9dff764422eaa8f4264387cae88f112041e20dfb130e3537b0293"
+      },
+      "check": "exact",
+      "cell": [
+        24,
+        24
+      ],
+      "icons": [
+        "march",
+        "hold",
+        "halted",
+        "wait_snow",
+        "muster",
+        "supply_ok",
+        "supply_out",
+        "forage",
+        "raise",
+        "disband",
+        "split",
+        "merge",
+        "bridge",
+        "ford",
+        "wade",
+        "pass_mark"
+      ]
+    },
+    "path_stop": {
+      "size": [
+        20,
+        20
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 5,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "c8534dd1823b07325fb65e69a7a94171f199d7b20c023d1c4711b93eeae7c8ad",
+        "2x": "1b223935881a4cce9fc050c132403326e1d6a3d10d5105ac1a93b937fc368c55"
+      },
+      "check": "exact"
     }
   }
 }

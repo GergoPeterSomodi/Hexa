@@ -249,6 +249,7 @@ func test_goods_at_turn_5_equal_4_10() -> void:
 		"Olive oil": [4, 0, 42, 4, "over 8 seasons"], "Fish": [0, 0, 22, 16, "over 8 seasons"],
 		"Grain": [16, 0, 13, 0, "over 8 seasons"], "Timber": [40, 0, 47, 0, "—"],
 		"Stone": [40, 0, 0, 0, "—"], "Iron": [20, 0, 0, 0, "—"],
+		"Horses": [10, 0, 0, 0, "—"], "Copper": [5, 0, 0, 0, "—"],  # M6 (spec 5.1): held at their reserves of 10 and 5
 	}
 	assert_eq(by_name.size(), want.size(), str(by_name.keys()))
 	for name: String in want:

@@ -2,6 +2,9 @@
 ## defaults, JSON-safe round trip, schema validation and digest_text sensitivity.
 extends GutTest
 
+## sha256 of no bytes: the digest text of a country that has seen nothing.
+const EMPTY := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
 
 func test_defaults_and_create() -> void:
 	var empty := Country.new()
@@ -28,7 +31,7 @@ func test_round_trip_through_json() -> void:
 	var src := Country.create(7, &"GEN", Vector2i(8, 13), true)
 	var d := src.to_dict()
 	assert_eq(d["schema"], Country.SCHEMA)
-	var parsed: Variant = JSON.parse_string(JSON.stringify(d))
+	var parsed: Variant = _json(d)
 	assert_true(parsed is Dictionary)
 	var back := Country.from_dict(parsed as Dictionary)
 	assert_not_null(back)
@@ -40,7 +43,7 @@ func test_round_trip_through_json() -> void:
 
 	# Outside power with off-map capital and alive = false also survives JSON round trip.
 	var off_map := Country.create(2, &"AUS", Country.NO_HEX, false)
-	var off_parsed: Variant = JSON.parse_string(JSON.stringify(off_map.to_dict()))
+	var off_parsed: Variant = _json(off_map.to_dict())
 	assert_true(off_parsed is Dictionary)
 	var off_back := Country.from_dict(off_parsed as Dictionary)
 	assert_not_null(off_back)
@@ -73,9 +76,9 @@ func test_from_dict_refuses_wrong_schema_and_bad_capital() -> void:
 
 func test_digest_text_format_and_changes_with_each_field() -> void:
 	var gen := Country.create(7, &"GEN", Vector2i(8, 13), true)
-	assert_eq(gen.digest_text(), "7|GEN|8,13|true|0|1|0|0|||||||||0|1000")
+	assert_eq(gen.digest_text(), "7|GEN|8,13|true|0|1|0|0|||||||||0|1000|" + EMPTY)
 	var fra := Country.create(1, &"FRA", Country.NO_HEX, false)
-	assert_eq(fra.digest_text(), "1|FRA|-1,-1|false|0|1|0|0|||||||||0|1000")
+	assert_eq(fra.digest_text(), "1|FRA|-1,-1|false|0|1|0|0|||||||||0|1000|" + EMPTY)
 
 	var base := gen.digest_text()
 	var seen: Dictionary = {base: true}
@@ -122,10 +125,10 @@ func _rich() -> Country:
 
 func test_country_2_round_trip_every_field() -> void:
 	var src := _rich()
-	assert_eq(Country.SCHEMA, "hexa-godot/country/3")
+	assert_eq(Country.SCHEMA, "hexa-godot/country/4")
 	var d := src.to_dict()
 	assert_eq(d["flows_shape"], [16, Country.FLOW_COUNT])
-	var parsed: Variant = JSON.parse_string(JSON.stringify(d))
+	var parsed: Variant = _json(d)
 	assert_true(parsed is Dictionary)
 	var back := Country.from_dict(parsed as Dictionary)
 	assert_not_null(back)
@@ -150,7 +153,7 @@ func test_country_2_round_trip_every_field() -> void:
 
 func test_digest_text_with_the_m4_fields() -> void:
 	var c := Country.create(3, &"GEN", Vector2i(8, 13))
-	assert_eq(c.digest_text(), "3|GEN|8,13|true|0|1|0|0|||||||||0|1000")
+	assert_eq(c.digest_text(), "3|GEN|8,13|true|0|1|0|0|||||||||0|1000|%s" % EMPTY)
 	c.treasury = 50
 	c.tax = 0
 	c.short_mask = 3
@@ -163,7 +166,7 @@ func test_digest_text_with_the_m4_fields() -> void:
 	c.flows_open = PackedInt32Array([3, 4])
 	c.goods_closed = {"turn": 4, "opening": PackedInt32Array([1]), "closing": PackedInt32Array([2]),
 		"flows": PackedInt32Array([1, 0])}
-	assert_eq(c.digest_text(), "3|GEN|8,13|true|50|0|3|40|port_dues:4,5:20:2|4:9:40;work:2,2:-5:1|1,2|3,4|1,1|4:1:2:1,0|||0|1000")
+	assert_eq(c.digest_text(), "3|GEN|8,13|true|50|0|3|40|port_dues:4,5:20:2|4:9:40;work:2,2:-5:1|1,2|3,4|1,1|4:1:2:1,0|||0|1000|%s" % EMPTY)
 	# Every M4 field moves the digest.
 	var base := _rich().digest_text()
 	var edits: Array[Callable] = [
@@ -294,11 +297,11 @@ func _with_people() -> Country:
 func test_country_3_round_trip_every_people_field() -> void:
 	var src := _with_people()
 	var d := src.to_dict()
-	assert_eq(d["schema"], "hexa-godot/country/3")
+	assert_eq(d["schema"], "hexa-godot/country/4")
 	for form: int in 2:
 		var back: Country = null
 		if form == 0:
-			back = Country.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary)
+			back = Country.from_dict(_json(d) as Dictionary)
 		else:
 			back = Country.from_dict(bytes_to_var(var_to_bytes(d)) as Dictionary)
 		assert_not_null(back, "form %d" % form)
@@ -309,7 +312,7 @@ func test_country_3_round_trip_every_people_field() -> void:
 		assert_eq(back.food_fed, 750)
 		assert_eq(back.digest_text(), src.digest_text())
 		assert_eq(var_to_bytes(back.to_dict()), var_to_bytes(d), "save, load, save equal")
-	assert_eq(src.digest_text().split("|").slice(-4),
+	assert_eq(src.digest_text().split("|").slice(-5, -1),
 			PackedStringArray(["120,-30,-5,0,0,7", "4:100,-20,-3,0,0,0", "9", "750"]))
 
 
@@ -332,20 +335,53 @@ func test_the_digest_moves_with_one_flow_and_one_field_and_only_then() -> void:
 		seen[x.digest_text()] = true
 
 
-func test_country_2_loads_with_zeros_and_empty_flows() -> void:
-	var d := _rich().to_dict()
-	d["schema"] = Country.SCHEMA_V2
-	for key: String in ["people_flows", "people_closed", "food_need", "food_fed"]:
-		d.erase(key)
-	var back := Country.from_dict(d)
-	assert_not_null(back)
-	assert_true(back.people_flows.is_empty())
-	assert_true(back.people_closed.is_empty())
-	assert_eq(back.food_need, 0)
+func test_country_2_and_3_are_refused() -> void:
+	for old: String in ["hexa-godot/country/2", "hexa-godot/country/3"]:
+		var d := _rich().to_dict()
+		d["schema"] = old
+		assert_null(Country.from_dict(d), "P: %s is refused (D40)" % old)
+	var fresh := _rich().to_dict()
+	for key: String in ["people_flows", "people_closed", "food_need", "food_fed", "explored"]:
+		fresh.erase(key)
+	var back := Country.from_dict(fresh)
+	assert_not_null(back, "a country/4 dict without the later keys takes their defaults")
+	assert_true(back.explored.is_empty())
 	assert_eq(back.food_fed, 1000)
-	assert_eq(back.treasury, 1234, "the M4 fields are read as before")
-	assert_eq(back.digest_text(), _rich().digest_text())
-	assert_eq(back.to_dict()["schema"], Country.SCHEMA, "saved again as country/3")
+
+
+func _with_explored() -> Country:
+	var c := _with_people()
+	c.explored = PackedByteArray([1, 0, 255, 16])
+	return c
+
+
+func test_country_4_explored_round_trips_and_moves_the_digest() -> void:
+	var src := _with_explored()
+	var d := src.to_dict()
+	assert_true(d["explored"] is PackedByteArray, "kept packed")
+	assert_eq(d["schema"], "hexa-godot/country/4")
+	var back := Country.from_dict(bytes_to_var(var_to_bytes(d)) as Dictionary)
+	assert_not_null(back)
+	assert_eq(back.explored, src.explored)
+	assert_eq(back.digest_text(), src.digest_text())
+	assert_ne(src.digest_text(), _with_people().digest_text(), "explored is in the digest")
+	var ctx := HashingContext.new()
+	ctx.start(HashingContext.HASH_SHA256)
+	ctx.update(src.explored)
+	assert_true(src.digest_text().ends_with("|" + ctx.finish().hex_encode()))
+	var x := _with_explored()
+	x.explored[3] = 17
+	assert_ne(x.digest_text(), src.digest_text(), "one bit moves it")
+	var copy := Country.from_dict(d)
+	copy.explored[0] = 9
+	assert_eq(src.explored[0], 1, "the dict holds its own copy")
+
+
+func test_country_4_refuses_a_mistyped_explored() -> void:
+	for bad: Variant in ["abc", [1, 2], 5, PackedInt32Array([1])]:
+		var d := _with_explored().to_dict()
+		d["explored"] = bad
+		assert_null(Country.from_dict(d), "P: explored must be a PackedByteArray")
 
 
 func test_a_short_flows_array_is_padded_and_a_long_one_refused() -> void:
@@ -373,3 +409,11 @@ func test_country_3_refuses_mistyped_people_fields() -> void:
 		var bad := _with_people().to_dict()
 		bad[str(item[0])] = item[1]
 		assert_null(Country.from_dict(bad), "P: %s = %s" % [item[0], str(item[1])])
+
+
+## d through JSON; JSON writes bytes as text, so explored (kept packed, saved with var_to_bytes) is put back as it was.
+func _json(d: Dictionary) -> Variant:
+	var parsed: Variant = JSON.parse_string(JSON.stringify(d))
+	if parsed is Dictionary:
+		(parsed as Dictionary)["explored"] = d["explored"]
+	return parsed

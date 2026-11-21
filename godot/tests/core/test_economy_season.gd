@@ -54,7 +54,8 @@ func test_people_needs_and_reserve_of_genoa() -> void:
 	var needs := EconomySeason.needs_of(_game, _view(), &"GEN")
 	assert_eq(needs, _needs(4, 1, 1, 1), "ceil: 40,000 people need 0.4 loads of oil")
 	var reserve := EconomySeason.reserve_of(_game, _view(), &"GEN")
-	assert_eq(reserve, _arr({GRAIN: 16, OIL: 4, WINE: 4, SALT: 4, TIMBER: 40, 12: 40, 13: 20}))
+	# M6 (spec 5.1): horses 10 and copper 5 join the fixed reserves.
+	assert_eq(reserve, _arr({GRAIN: 16, OIL: 4, WINE: 4, SALT: 4, 10: 10, TIMBER: 40, 12: 40, 13: 20, 14: 5}))
 
 
 func test_need_loads_rounds_up_and_nothing_for_no_people() -> void:

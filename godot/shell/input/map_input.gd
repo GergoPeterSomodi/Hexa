@@ -23,7 +23,19 @@ signal bookmark_requested(index: int, set: bool)
 signal undo_work_requested
 ## I opens the Statesman's Study on its last page (page &""), L on the Economy page (&"economy"): the App pushes it.
 signal study_requested(page: StringName)
+## Tab: select the next army that needs orders.
+signal next_army_requested
+## R: `continue_march` for the selected army.
+signal continue_march_requested
+## Alt+arrows: `direction` is a CURSOR_* value; `cursor_step` gives the hex it moves to.
+signal cursor_moved(direction: int)
+## O or Shift+F10: a right click at the cursor (or the selection).
+signal command_key_requested
 
+const CURSOR_LEFT := 0
+const CURSOR_RIGHT := 1
+const CURSOR_UP := 2
+const CURSOR_DOWN := 3
 const CLICK_SLOP := 6.0
 const NO_HEX := Vector2i(-9999, -9999)
 
@@ -157,7 +169,7 @@ func _on_key(key: InputEventKey) -> void:
 		new_seed_requested.emit()
 		_mark_handled()
 		return
-	var mode_actions: Array[StringName] = [&"view_mode_1", &"view_mode_2", &"view_mode_3", &"view_mode_4", &"view_mode_5"]
+	var mode_actions: Array[StringName] = [&"view_mode_1", &"view_mode_2", &"view_mode_3", &"view_mode_4", &"view_mode_5", &"view_mode_6"]
 	for i: int in mode_actions.size():
 		if _is_action_pressed_exact(key, mode_actions[i]):
 			mode_requested.emit(i)
@@ -183,7 +195,7 @@ func _on_key(key: InputEventKey) -> void:
 		_mark_handled()
 
 
-## The M3 and M4 keys: report, bookmarks, cancel work, the study. Returns true when one fired.
+## The M3 to M6 keys: report, bookmarks, cancel work, the study, the army keys. Returns true when one fired.
 func _on_game_key(key: InputEventKey) -> bool:
 	var fired := true
 	if _is_action_pressed_exact(key, &"game_report"):
@@ -194,6 +206,14 @@ func _on_game_key(key: InputEventKey) -> bool:
 		study_requested.emit(&"")
 	elif _is_action_pressed_exact(key, &"game_ledger"):
 		study_requested.emit(&"economy")
+	elif _is_action_pressed_exact(key, &"game_next_unit"):
+		next_army_requested.emit()
+	elif _is_action_pressed_exact(key, &"game_continue_march"):
+		continue_march_requested.emit()
+	elif _is_action_pressed_exact(key, &"map_command_key"):
+		command_key_requested.emit()
+	elif _cursor_direction(key) >= 0:
+		cursor_moved.emit(_cursor_direction(key))
 	else:
 		var slot := _bookmark_slot(key)
 		if slot.x == 0:
@@ -203,6 +223,30 @@ func _on_game_key(key: InputEventKey) -> bool:
 	if fired:
 		_mark_handled()
 	return fired
+
+
+## The CURSOR_* value of the Alt+arrow action the key presses, or -1.
+func _cursor_direction(key: InputEventKey) -> int:
+	var actions: Array[StringName] = [&"map_cursor_left", &"map_cursor_right", &"map_cursor_up", &"map_cursor_down"]
+	for i: int in actions.size():
+		if _is_action_pressed_exact(key, actions[i]):
+			return i
+	return -1
+
+
+## The hex one Alt+arrow step from `hex` (odd rows sit half a hex to the right). Left and right are W and E; up and down
+## keep the column: even rows go NE and SE, odd rows NW and SW, which is the same column and one row away.
+static func cursor_step(hex: Vector2i, direction: int) -> Vector2i:
+	match direction:
+		CURSOR_LEFT:
+			return hex + Vector2i(-1, 0)
+		CURSOR_RIGHT:
+			return hex + Vector2i(1, 0)
+		CURSOR_UP:
+			return hex + Vector2i(0, -1)
+		CURSOR_DOWN:
+			return hex + Vector2i(0, 1)
+	return hex
 
 
 ## (index, 1 if set else 0) of the bookmark action the key presses, or (0, 0).

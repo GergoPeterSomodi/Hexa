@@ -28,6 +28,11 @@ const SLICE3_ICONS: Array[String] = [
 const SLICE4_ATLAS := "icons"
 const SLICE4_RENAMES: Dictionary[String, String] = {"study": "study_24", "info": "info_24"}
 
+## Slice 5 icons (m6-build-spec.md 6.2): four whole textures, and two atlases whose cells become 32 px figure and 24 px
+## army icons (`fig_infantry`... `march`...), named in ui_kit.json's `icons` list of each atlas, 1x and 2x like the others.
+const SLICE5_DIRECT: Array[String] = ["army_plate", "army_plate_ring", "army_badge", "path_stop"]
+const SLICE5_ATLASES: Array[String] = ["figures", "icons_army"]
+
 
 func _initialize() -> void:
 	var check := OS.get_cmdline_user_args().has("--check")
@@ -36,8 +41,10 @@ func _initialize() -> void:
 	var studiolo := KitTheme.build_studiolo()
 	_add_slice3_icons(studiolo)
 	_add_slice4_icons(studiolo)
+	_add_slice5_icons(studiolo)
 	var hc := KitTheme.build_high_contrast()
 	_add_slice4_icons(hc)
+	_add_slice5_icons(hc)
 
 	failed += _process_theme("studiolo", studiolo, KitTheme.THEME_PATH, check)
 	failed += _process_theme("high_contrast", hc, KitTheme.HIGH_CONTRAST_PATH, check)
@@ -81,6 +88,37 @@ func _add_slice4_icons(theme: Theme) -> void:
 		sub.atlas = atlas
 		sub.region = Rect2((idx % 10) * 24, floori(idx / 10.0) * 24, 24, 24)
 		theme.set_icon(StringName(names[idx]), &"Kit", sub)
+
+
+func _slice5_cells(atlas_name: String) -> Array:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(KitTheme.KIT_JSON))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return []
+	var piece: Dictionary = ((parsed as Dictionary).get("pieces", {}) as Dictionary).get(atlas_name, {})
+	return [piece.get("icons", []), piece.get("cell", [24, 24]), piece.get("size", [0, 0])]
+
+
+func _add_slice5_icons(theme: Theme) -> void:
+	for icon_name: String in SLICE5_DIRECT:
+		var tex := load("res://assets/ui/kit/1x/%s.png" % icon_name) as Texture2D
+		if tex == null:
+			printerr("build_theme: missing slice 5 texture %s" % icon_name)
+			continue
+		theme.set_icon(StringName(icon_name), &"Kit", tex)
+	for atlas_name: String in SLICE5_ATLASES:
+		var atlas := load("res://assets/ui/kit/1x/%s.png" % atlas_name) as Texture2D
+		var cells := _slice5_cells(atlas_name)
+		if atlas == null or cells.is_empty():
+			printerr("build_theme: missing slice 5 atlas %s" % atlas_name)
+			continue
+		var names: Array = cells[0]
+		var cell: Array = cells[1]
+		var cols := maxi(1, roundi(float((cells[2] as Array)[0]) / float(cell[0])))
+		for idx: int in names.size():
+			var sub := AtlasTexture.new()
+			sub.atlas = atlas
+			sub.region = Rect2((idx % cols) * int(cell[0]), floori(float(idx) / float(cols)) * int(cell[1]), int(cell[0]), int(cell[1]))
+			theme.set_icon(StringName(str(names[idx])), &"Kit", sub)
 
 
 func _process_theme(label: String, theme: Theme, out_path: String, check: bool) -> int:
@@ -130,6 +168,16 @@ func _verify_theme(label: String, theme: Theme) -> int:
 		if not theme.has_icon(StringName(icon_name), &"Kit"):
 			printerr("build_theme: [%s] missing slice 4 Kit icon %s" % [label, icon_name])
 			failed += 1
+
+	for icon_name: String in SLICE5_DIRECT:
+		if not theme.has_icon(StringName(icon_name), &"Kit"):
+			printerr("build_theme: [%s] missing slice 5 Kit icon %s" % [label, icon_name])
+			failed += 1
+	for atlas_name: String in SLICE5_ATLASES:
+		for icon_name: Variant in _slice5_cells(atlas_name)[0]:
+			if not theme.has_icon(StringName(str(icon_name)), &"Kit"):
+				printerr("build_theme: [%s] missing slice 5 Kit icon %s" % [label, icon_name])
+				failed += 1
 
 	if label == "studiolo":
 		for icon_name: String in KitTheme.KIT_DIRECT_ICONS + SLICE3_ICONS:

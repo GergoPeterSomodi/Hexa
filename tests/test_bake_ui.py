@@ -156,7 +156,15 @@ class TestBakeUI(unittest.TestCase):
             "strip_cell_now": ([48, 48], [12, 12, 12, 12], [6, 6, 6, 6], [0, 0, 0, 0], "stretch"),
             "icons": ([256, 128], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
         }
-        expected_all = {**expected_slice1, **expected_slice2, **expected_slice3, **expected_slice4}
+        expected_slice5 = {
+            "army_plate": ([56, 48], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "army_plate_ring": ([64, 56], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "army_badge": ([36, 18], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "figures": ([128, 32], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "icons_army": ([192, 48], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "path_stop": ([20, 20], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+        }
+        expected_all = {**expected_slice1, **expected_slice2, **expected_slice3, **expected_slice4, **expected_slice5}
         self.assertEqual(set(pieces.keys()), set(expected_all.keys()))
         for name, (sz, mar, con, exp, axis) in expected_all.items():
             entry = pieces[name]
@@ -165,7 +173,7 @@ class TestBakeUI(unittest.TestCase):
             self.assertEqual(entry["content"], con, name)
             self.assertEqual(entry["expand"], exp, name)
             self.assertEqual(entry["axis"], axis, name)
-            expected_slice = 2 if name in expected_slice2 else (3 if name in expected_slice3 else (4 if name in expected_slice4 else 1))
+            expected_slice = 2 if name in expected_slice2 else (3 if name in expected_slice3 else (4 if name in expected_slice4 else (5 if name in expected_slice5 else 1)))
             self.assertEqual(entry["slice"], expected_slice, name)
 
     def test_slice2_pieces_geometry_and_apertures(self) -> None:
@@ -413,6 +421,60 @@ class TestBakeUI(unittest.TestCase):
             arr[0, 0, 0] = (int(arr[0, 0, 0]) + 17) % 256
             save_png(png_path, arr)
             self.assertNotEqual(bake_ui.main(["--check", "--out", str(out_dir), "--tokens", str(tok_copy)]), 0)
+
+    def test_slice5_army_pieces(self) -> None:
+        from tools.ui_bake import pieces_m6
+
+        kit_dir = REPO_ROOT / "godot" / "assets" / "ui" / "kit"
+        doc = json.loads(KIT_JSON.read_text(encoding="utf-8"))
+        self.assertEqual(doc["pieces"]["figures"]["icons"], ["fig_infantry", "fig_missile", "fig_cavalry", "fig_artillery"])
+        self.assertEqual(doc["pieces"]["figures"]["cell"], [32, 32])
+        names = doc["pieces"]["icons_army"]["icons"]
+        self.assertEqual(len(names), 16)
+        self.assertEqual(names[:3], ["march", "hold", "halted"])
+        self.assertEqual(names[-1], "pass_mark")
+        sizes = {"army_plate": (56, 48), "army_plate_ring": (64, 56), "army_badge": (36, 18), "figures": (128, 32),
+                 "icons_army": (192, 48), "path_stop": (20, 20)}
+        sheets = {s: {n: load_png_rgba(kit_dir / f"{s}x" / f"{n}.png") for n in sizes} for s in (1, 2)}
+        for n, (w, h) in sizes.items():
+            for s in (1, 2):
+                self.assertEqual(sheets[s][n].shape, (h * s, w * s, 4), f"{n}@{s}x shape")
+        plate = sheets[1]["army_plate"]
+        self.assertEqual(int(plate[0, 0, 3]), 0)
+        self.assertGreaterEqual(int(plate[16:32, 18:38, :3].min()), 200, "the plate face is near white, so a tint works")
+        self.assertEqual(int(sheets[1]["army_plate_ring"][28, 32, 3]), 0, "the ring is open in the middle")
+        tokens = load_tokens(bake_ui.TOKENS_PATH)
+        mine = [sp for sp in bake_ui.all_specs() if sp.name in sizes]
+        rendered = {(sp.name, s): sheets[s][sp.name] for sp in mine for s in (1, 2)}
+        pieces_m6.check_m6_pieces(tokens, mine, rendered)
+        # Planted faults: a grey plate and an empty figure cell both fail.
+        grey = plate.copy()
+        grey[16:32, 18:38, :3] = 120
+        with self.assertRaises(BakeCheckError):
+            pieces_m6.check_m6_pieces(tokens, mine, {**rendered, ("army_plate", 1): grey})
+        blank = sheets[1]["figures"].copy()
+        blank[:, 32:64] = 0
+        with self.assertRaises(BakeCheckError):
+            pieces_m6.check_m6_pieces(tokens, mine, {**rendered, ("figures", 1): blank})
+        # Planted token faults: a missing token and a low-contrast pair both fail (here and in HIGH_CONTRAST).
+        with tempfile.TemporaryDirectory() as tmp:
+            src = bake_ui.TOKENS_PATH.read_text(encoding="utf-8")
+            for label, text in (
+                ("missing", src.replace('const MAP_PATH_INK := Color("#0b0806")\n', "")),
+                ("low", src.replace("const MAP_PATH := Color(\"#f6e3a1\")", "const MAP_PATH := Color(\"#1b1410\")")),
+                ("hc_low", src.replace('"MAP_PATH": Color("#ffd646")', '"MAP_PATH": Color("#101010")')),
+                ("hc_missing", src.replace('\t"MAP_PATH_WARN": BAD,\n', "")),
+            ):
+                tp = Path(tmp) / f"tokens_{label}.gd"
+                tp.write_text(text, encoding="utf-8")
+                with self.assertRaises(BakeCheckError, msg=label):
+                    pieces_m6.check_m6_pieces(load_tokens(tp), mine, rendered, tp)
+        # The sheet for the art director: every scenario colour.
+        self.assertEqual(len(pieces_m6.scenario_colours(REPO_ROOT)), 13)
+        with tempfile.TemporaryDirectory() as tmp:
+            sheet = Path(tmp) / "sheet.png"
+            pieces_m6.write_token_sheet(sheet, tokens, REPO_ROOT, 1)
+            self.assertGreater(load_png_rgba(sheet).shape[0], 13 * 48)
 
 
 if __name__ == "__main__":

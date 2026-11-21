@@ -12,6 +12,6 @@ price_milli = 3000
 need_milli = 0
 need_weight = 0
 food_order = -1
-reserve_fixed = 0
+reserve_fixed = 10
 harvest_word = ""
 icon = &"good_horses"

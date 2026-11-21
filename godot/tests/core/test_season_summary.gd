@@ -474,7 +474,7 @@ func test_4_15_b_the_goods_works_orders_and_standing() -> void:
 		"Fish 0 (caught 6, eaten 4, sold 2)", "Grain 16 (made 3, sold 3)", "Olive oil 3 ▼ −1 (used 1)", "Salt 3 ▼ −1 (used 1)",
 		"Timber 40 (made 6, sold 6)", "Wine 3 ▼ −1 (drunk 1)",
 	] as Array[String])
-	assert_eq(_section(s, &"goods")["unchanged"], "Unchanged: stone, iron")
+	assert_eq(_section(s, &"goods")["unchanged"], "Unchanged: horses, stone, iron, copper")  # M6: held at their reserves, 10 and 5
 	assert_eq(_texts(s, &"works"), ["Begun: vineyard, first stage, near Savona (7, 12). Ready Spring 1481. (−40 ducats)"] as Array[String])
 	assert_eq(_texts(s, &"orders")[0], "Ordered to build: vineyard near Savona (7, 12).")
 	var standing := _texts(s, &"standing")
@@ -650,7 +650,9 @@ func test_the_report_fixture_is_the_summary_of_4_15_b() -> void:
 			want.append("Salt ▼ −1 3")  # and the sample's five chips are then four: M4's fifth is the one it lost
 		assert_eq(want, _rows(real, id), "section %s" % id)
 	assert_eq(_section(sample, &"treasury")["total"]["text"], _section(real, &"treasury")["total"]["text"])
-	assert_eq(_section(sample, &"goods")["unchanged"], _section(real, &"goods")["unchanged"])
+	# M6 (spec 5.1): the real game also holds horses and copper at their reserves; the mockup sample has only stone and iron.
+	assert_eq(_section(sample, &"goods")["unchanged"], "Unchanged: stone, iron")
+	assert_eq(_section(real, &"goods")["unchanged"], "Unchanged: horses, stone, iron, copper")
 	var a := _rows(sample, &"goods")
 	var b := _rows(real, &"goods")
 	a.sort()

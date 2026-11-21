@@ -3,6 +3,7 @@
 extends GutTest
 
 const Tables := preload("res://tools/economy_tables.gd")
+const MilitaryTables := preload("res://tools/military_tables.gd")
 
 ## Table 4.4: the wild yield per cover (farmland first) over the six slots.
 const WILD_YIELD: Array = [
@@ -266,3 +267,107 @@ func test_planted_fault_other_people_numbers() -> void:
 	defs = _committed_defs()
 	defs.levy_permille = 1001
 	assert_true(_has(defs.validate(), "levy_permille is 1001, expected 0 to 1000"), "levy over 1000 refused")
+
+
+## M6 spec 5.1: the step, supply, forage and sight numbers.
+func test_committed_m6_numbers_equal_spec() -> void:
+	var defs := _committed_defs()
+	assert_eq(defs.validate(), [] as Array[String], "committed defs validate")
+	assert_eq(Array(defs.relief_move_add), [0, 0, 0, 0, 1, 2, 3])
+	assert_eq(defs.highway_cap, 1)
+	assert_eq(defs.road_cap, 2)
+	assert_eq(defs.track_divisor, 2)
+	assert_eq(defs.winter_snow_percent, 200)
+	assert_eq(defs.pass_closing_climate, 0)
+	assert_eq(defs.stream_cost, 1)
+	assert_eq(defs.river_cost, 2)
+	assert_eq(defs.ford_cost, 1)
+	assert_eq(defs.ferry_cost, 2)
+	assert_eq(defs.river_wade_class, 2)
+	assert_eq(defs.river_wall_class, 3)
+	assert_eq(defs.wade_plan_cost, 12)
+	assert_eq(defs.supply_reach, 8)
+	assert_eq(defs.supply_wade_cost, 3)
+	assert_eq(defs.depot_min_level, 2)
+	assert_eq(defs.army_food_milli, 200)
+	assert_eq(Array(defs.forage_percent), [100, 100, 100, 0, 50, 100])
+	assert_eq(defs.forage_loss_permille, 20)
+	assert_eq(Array(defs.starve_permille), [100, 100, 100, 200, 150, 100])
+	assert_eq(defs.stack_limit, 8)
+	assert_eq(defs.march_seasons_max, 12)
+	assert_eq(defs.wait_ratio_percent, 200)
+	assert_eq(defs.wait_extra_seasons, 2)
+	assert_eq(defs.land_sight, 1)
+	assert_eq(defs.units.size(), 4)
+	assert_eq(defs.terrains.size(), 8)
+	assert_eq(String(defs.unit_def(2).key), "knights")
+	assert_null(defs.unit_def(4), "no unit 4")
+	assert_null(defs.unit_def(-1), "no unit -1")
+	assert_eq(String(defs.terrain(5).key), "snow")
+	assert_null(defs.terrain(8), "no terrain 8")
+
+
+func test_m6_defaults_match_the_spec() -> void:
+	var defs := GameDefs.new()
+	assert_eq(Array(defs.relief_move_add), [0, 0, 0, 0, 1, 2, 3])
+	assert_eq(Array(defs.forage_percent), [100, 100, 100, 0, 50, 100])
+	assert_eq(Array(defs.starve_permille), [100, 100, 100, 200, 150, 100])
+	assert_eq([defs.stack_limit, defs.march_seasons_max, defs.wait_ratio_percent, defs.wait_extra_seasons, defs.land_sight],
+		[8, 12, 200, 2, 1])
+
+
+func test_military_tables_rows_match_the_spec() -> void:
+	var defs := _committed_defs()
+	var units := MilitaryTables.unit_rows(defs)
+	assert_eq(units.size(), 5, "header and four kinds")
+	assert_true(String(units[3]).contains("goods 1 iron, 3 horses"), "knights' goods")
+	assert_true(String(units[4]).contains("batteries of bombards"), "bombards' plural")
+	var ground := MilitaryTables.terrain_rows(defs)
+	assert_eq(ground.size(), 9, "header and eight covers")
+	assert_true(String(ground[6]).contains("move 6 forage   0"), "snow")
+	assert_eq(MilitaryTables.tables(defs).size(), units.size() + ground.size() + MilitaryTables.number_rows(defs).size())
+
+
+func test_planted_fault_m6_arrays_of_the_wrong_size() -> void:
+	var defs := _committed_defs()
+	defs.forage_percent = PackedInt32Array([100, 100, 100, 0, 50])
+	assert_true(_has(defs.validate(), "forage_percent has 5 entries, expected 6"), "five forage slots refused")
+	defs = _committed_defs()
+	defs.starve_permille = PackedInt32Array([100, 100, 100, 200, 150, 100, 100])
+	assert_true(_has(defs.validate(), "starve_permille has 7 entries, expected 6"), "seven starve slots refused")
+	defs = _committed_defs()
+	defs.relief_move_add = PackedInt32Array([0, 0, 0, 0, 1, 2])
+	assert_true(_has(defs.validate(), "relief_move_add has 6 entries, expected 7"), "six relief steps refused")
+
+
+func test_planted_fault_m6_river_classes_and_limits() -> void:
+	var defs := _committed_defs()
+	defs.river_wade_class = 3
+	assert_true(_has(defs.validate(), "river_wade_class 3 should be under river_wall_class 3"), "wade not under wall refused")
+	defs = _committed_defs()
+	defs.stack_limit = 0
+	assert_true(_has(defs.validate(), "stack_limit is 0, expected 1 to 20"), "stack limit 0 refused")
+	defs = _committed_defs()
+	defs.land_sight = 4
+	assert_true(_has(defs.validate(), "land_sight is 4, expected 1 to 3"), "land sight 4 refused")
+	defs = _committed_defs()
+	defs.road_cap = 21
+	assert_true(_has(defs.validate(), "road_cap is 21, expected 1 to 20"), "a cap of 21 refused")
+	defs = _committed_defs()
+	defs.wait_ratio_percent = 99
+	assert_true(_has(defs.validate(), "wait_ratio_percent is 99, expected 100 to 1000"), "wait ratio 99 refused")
+
+
+func test_planted_fault_m6_unit_and_terrain_lists() -> void:
+	var defs := _committed_defs()
+	var units: Array[UnitDef] = defs.units.duplicate()
+	units.pop_back()
+	defs.units = units
+	assert_true(_has(defs.validate(), "units has 3 entries, expected 4"), "three units refused")
+	defs = _committed_defs()
+	var terrains: Array[TerrainDef] = defs.terrains.duplicate()
+	var first: TerrainDef = terrains[0]
+	terrains[0] = terrains[1]
+	terrains[1] = first
+	defs.terrains = terrains
+	assert_true(_has(defs.validate(), "terrains[0]: id 1 should be 0"), "terrains out of cover order refused")

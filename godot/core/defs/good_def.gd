@@ -26,7 +26,7 @@ const COUNT := 16
 @export var need_weight: int = 0
 ## Food: the order it is eaten (fish 0, grain 1); -1 otherwise.
 @export var food_order: int = -1
-## Materials: loads always kept (timber 40, stone 40, iron 20); 0 otherwise.
+## Materials and wares: loads always kept (timber 40, stone 40, iron 20, horses 10, copper 5); 0 otherwise.
 @export var reserve_fixed: int = 0
 ## "vintage", "harvest", "catch", "olive harvest", "salt season"; "" for the rest.
 @export var harvest_word: String = ""
@@ -56,8 +56,8 @@ func validate() -> Array[String]:
 		errors.append("%s: need_weight is %d, expected 0 to 1000" % [label, need_weight])
 	if reserve_fixed < 0:
 		errors.append("%s: reserve_fixed is %d, expected 0 or more" % [label, reserve_fixed])
-	if reserve_fixed > 0 and kind != &"material":
-		errors.append("%s: reserve_fixed is %d but only materials keep a fixed reserve" % [label, reserve_fixed])
+	if reserve_fixed > 0 and kind != &"material" and kind != &"ware":
+		errors.append("%s: reserve_fixed is %d but only materials and wares keep a fixed reserve" % [label, reserve_fixed])
 	if kind == &"food":
 		if food_order < 0:
 			errors.append("%s: food has food_order %d, expected 0 or more" % [label, food_order])

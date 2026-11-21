@@ -452,3 +452,34 @@ func test_planted_fault_m5_room_on_other_families() -> void:
 	var s := _load_family("settlements")
 	s.room = PackedInt32Array([0, 2000, 4000])
 	assert_true(_has(s.validate(), "room has 3 entries and falls_below 6, expected 6"), "a room of three entries refused")
+
+
+## M6 spec 5.1: the companies a settlement may raise a season, by level.
+func test_m6_settlements_raise_cap_equals_spec() -> void:
+	var s := _load_family("settlements")
+	assert_eq(s.validate(), [] as Array[String], "settlements validate")
+	assert_eq(Array(s.raise_cap), [0, 1, 1, 2, 3, 4], "raise_cap by level")
+	for key: String in ["castles", "wheat", "grazing", "mines", "harbour"]:
+		assert_eq(_load_family(key).raise_cap.size(), 0, "%s has no raise_cap" % key)
+	assert_eq(FamilyDef.new().raise_cap.size(), 0, "empty by default")
+
+
+func test_planted_fault_m6_raise_cap_on_a_goods_family() -> void:
+	var f := _load_family("wheat")
+	f.raise_cap = PackedInt32Array([0, 1, 1, 2])
+	assert_true(_has(f.validate(), "raise_cap is for settlements only"), "raise_cap on wheat refused")
+
+
+func test_planted_fault_m6_raise_cap_shape() -> void:
+	var s := _load_family("settlements")
+	s.raise_cap = PackedInt32Array([0, 1, 1, 2, 3])
+	assert_true(_has(s.validate(), "raise_cap has 5 entries, expected 6"), "five raise caps refused")
+	s = _load_family("settlements")
+	s.raise_cap = PackedInt32Array([1, 1, 1, 2, 3, 4])
+	assert_true(_has(s.validate(), "raise_cap[0] is 1, expected 0"), "a raise cap at level 0 refused")
+	s = _load_family("settlements")
+	s.raise_cap = PackedInt32Array([0, 1, 1, 2, 3, 21])
+	assert_true(_has(s.validate(), "raise_cap[5] is 21, expected 0 to 20"), "a raise cap of 21 refused")
+	s = _load_family("settlements")
+	s.raise_cap = PackedInt32Array([0, 1, 3, 2, 3, 4])
+	assert_true(_has(s.validate(), "raise_cap[3] is 2, under raise_cap[2] 3"), "a falling raise cap refused")

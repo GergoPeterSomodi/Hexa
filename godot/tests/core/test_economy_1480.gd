@@ -5,9 +5,15 @@
 ## jobs count the owner's own hexes only, so two districts of Venice and of the Papal States that drew hands from a
 ## neighbour's land are staffed a little less: their nets are 1 to 2 ducats lower than M4's table in three seasons. The
 ## people never change in this test (no people phase runs): every other number is M4's.
+## M6 (spec 5.1, 9): horses and copper keep a fixed reserve of 10 and 5. Every country starts with its stock at its
+## reserve (Stores.setup), so it starts holding exactly 10 horses and 5 copper and sells neither (sales are only the stock
+## above the reserve, and no country makes either good in its first year without works). The nets below are re-derived
+## with the two reserves and none moves; test_the_two_reserves_are_held_and_sell_nothing pins why.
 extends GutTest
 
 const GRAIN := 0
+const HORSES := 10
+const COPPER := 14
 ## tag: [town, countryside, treasury, [food, wine, salt, oil], grain reserve, [Sp, Su, Au, Wi nets]]
 const TABLE := {
 	&"SAV": [129000, 131400, 1500, [13, 3, 2, 2], 52, [240, 307, 281, 167]],
@@ -63,6 +69,23 @@ func test_people_treasury_needs_and_reserve_at_the_start() -> void:
 		assert_eq(c.stock[GRAIN], row[4], label + ": grain reserve")
 		assert_eq(c.tax, 1, label + ": Normal taxes")
 		assert_eq(c.ledger_from, c.treasury, label + ": the ledger starts at the treasury")
+
+
+func test_the_two_reserves_are_held_and_sell_nothing() -> void:
+	var g := EconomyFixture.game(&"GEN")
+	var view := StateView.of(g.state)
+	for tag: StringName in TABLE:
+		var c := Countries.by_tag(g, tag)
+		var reserve := EconomySeason.reserve_of(g, view, tag)
+		assert_eq(reserve[HORSES], 10, "%s: horses reserve" % tag)
+		assert_eq(reserve[COPPER], 5, "%s: copper reserve" % tag)
+		assert_eq(c.stock[HORSES], 10, "%s: starts holding 10 horses" % tag)
+		assert_eq(c.stock[COPPER], 5, "%s: starts holding 5 copper" % tag)
+	for season: int in 4:
+		assert_true(bool(Season.run(g)["ok"]))
+		for c: Country in g.countries:
+			assert_eq(c.stock[HORSES], 10, "%s: horses kept after season %d" % [c.tag, season + 1])
+			assert_eq(c.stock[COPPER], 5, "%s: copper kept after season %d" % [c.tag, season + 1])
 
 
 func test_the_first_year_on_seed_1480() -> void:
