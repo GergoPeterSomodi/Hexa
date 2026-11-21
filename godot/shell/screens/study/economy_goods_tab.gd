@@ -13,8 +13,10 @@ const NO_DATA := "No data yet."
 const HINT := "Which good runs short. Click a heading to sort."
 const TITLE := "Goods"
 const NO_GOODS := "No goods yet."
-const CHART_MIN := Vector2(360.0, 180.0)
-const TABLE_MIN_H := 150.0
+## The table keeps room for 7 whole rows (a 46 px header and 7 rows of 28 px); the chart below gives way first.
+const TABLE_ROWS := 7
+const TABLE_MIN_H := 46.0 + 28.0 * TABLE_ROWS + 4.0
+const CHART_MIN := Vector2(360.0, 120.0)
 const INK_STOCK := 0
 const INK_MADE := 3
 const SPARK_INK := 0

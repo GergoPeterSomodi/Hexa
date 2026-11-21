@@ -319,6 +319,7 @@ func _line_row(line: Dictionary) -> Control:
 	var sentence := PanelKit.label(str(line.get("text", "")), &"Body" if mine else &"Hint")
 	sentence.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sentence.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sentence.custom_minimum_size.x = 1.0  # an autowrap label never asks for its one-line width, so a long line wraps
 	var hex: Variant = line.get("hex", null)
 	if hex is Vector2i and (hex as Vector2i) != WorksView.NO_HEX:
 		# PASS, not STOP: the wheel still scrolls the card; a click is accepted in _on_line_input.

@@ -315,3 +315,23 @@ func _press() -> InputEventMouseButton:
 	ev.button_index = MOUSE_BUTTON_LEFT
 	ev.pressed = true
 	return ev
+
+
+func test_long_lines_wrap_inside_the_card() -> void:
+	_log()
+	_log("work_finished")
+	_widget.open()
+	await _harness.wait_frames(self, 3)
+	var sentence := _first_sentence()
+	assert_not_null(sentence)
+	sentence.text = "Your towns ran short of salt: 0 of 1, and a very long sentence that must wrap onto several lines inside the card."
+	await _harness.wait_frames(self, 3)
+	var scroll := _widget._card.get_node("VBox/Scroll") as ScrollContainer
+	var right := scroll.get_global_rect().end.x
+	assert_gt(sentence.size.y, sentence.get_line_height() * 1.5, "the long line wraps to more than one line")
+	for child: Node in _widget._seasons.get_children():
+		var row := child as HBoxContainer
+		if row != null and row.get_child_count() == 2:
+			var label := row.get_child(1) as Label
+			assert_lte(label.get_global_rect().end.x, right + 0.5, "a line ends inside the card")
+	assert_lte(_widget._card.get_global_rect().end.x - _widget._card.get_global_rect().position.x, 340.5)

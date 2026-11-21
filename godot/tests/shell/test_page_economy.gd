@@ -528,3 +528,125 @@ func test_a_dead_player_shows_no_data_on_each_tab() -> void:
 	for id: StringName in [&"districts", &"goods", &"history"]:
 		page.select_tab(id)
 		assert_true(_label_texts(_tab(page, id)).has(NO_DATA), String(id))
+
+
+func _table_text_width(table: StudyTable, column: int, text: String) -> float:
+	var grid := table.tree()
+	return grid.get_theme_font(&"font", &"StudyTree").get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, grid.get_theme_font_size(&"font_size", &"StudyTree")).x
+
+
+func test_districts_place_and_what_are_not_truncated_at_1280_and_2560() -> void:
+	for size: Vector2i in [Vector2i(1280, 720), Vector2i(2560, 1440)]:
+		var harness := UIHarness.new(size)
+		harness.mount(self)
+		var root := Control.new()
+		root.theme = KitTheme.load_for(1.0)
+		root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		harness.viewport.add_child(root)
+		var game := EconomyFixture.game(GEN)
+		var page := (load(SCENE) as PackedScene).instantiate() as PageEconomy
+		page.milestone = TABS_AT
+		root.add_child(page)
+		page.refresh(game, &"open")
+		page.select_tab(&"districts")
+		# 1280 x 720: the Study frame holds a page about 1000 px wide.
+		page.size = Vector2(minf(float(size.x) - 280.0, 1000.0 * float(size.x) / 1280.0), float(size.y))
+		await harness.wait_frames(self, 4)
+		var table := (_tab(page, &"districts") as EconomyDistrictsTab).table()
+		var grid := table.tree()
+		var item := grid.get_root().get_first_child()
+		var checked := 0
+		while item != null:
+			for c: int in [0, 1]:
+				var need := _table_text_width(table, c, item.get_text(c))
+				assert_gte(float(grid.get_column_width(c)), need, "%s: column %d holds '%s' at %s" % [table.section_title, c, item.get_text(c), str(size)])
+				assert_ne(item.get_tooltip_text(c), "", "the full text is the tooltip")
+				checked += 1
+			item = item.get_next()
+		assert_eq(checked, 10, "five rows, two columns")
+		harness.dispose()
+
+
+func test_goods_shows_seven_whole_rows_above_the_chart_at_1280_by_720() -> void:
+	var harness := UIHarness.new(Vector2i(1280, 720))
+	harness.mount(self)
+	var root := Control.new()
+	root.theme = KitTheme.load_for(1.0)
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	harness.viewport.add_child(root)
+	var game := InsightsFixture.genoa_first_year()
+	var page := (load(SCENE) as PackedScene).instantiate() as PageEconomy
+	page.milestone = TABS_AT
+	root.add_child(page)
+	page.refresh(game, &"open")
+	page.select_tab(&"goods")
+	await harness.wait_frames(self, 4)
+	var tab := _tab(page, &"goods") as EconomyGoodsTab
+	var grid := tab.table().tree()
+	assert_gte(tab.table().total_count(), 7, "the fixture has seven goods or more")
+	var item := grid.get_root().get_first_child()
+	for i: int in 7:
+		var area := grid.get_item_area_rect(item, 0)
+		assert_lte(area.end.y, grid.size.y + 0.5, "row %d is whole inside the table" % (i + 1))
+		item = item.get_next()
+	assert_gte(tab.table().get_global_rect().end.y, 0.0)
+	assert_lte(tab.table().get_global_rect().end.y, tab.chart().get_global_rect().position.y, "the table ends above the chart")
+	harness.dispose()
+
+
+func _tables_in(node: Node, out: Array[StudyTable]) -> void:
+	if node is StudyTable and (node as Control).is_visible_in_tree():
+		out.append(node as StudyTable)
+	for child: Node in node.get_children():
+		_tables_in(child, out)
+
+
+## Every shown StudyTable of `page` in the real Study frame: each cell's text and each heading fit their column, and the
+## columns together fill at least 90 % of the table's width.
+func _check_tables(page: Control, label: String) -> int:
+	var tables: Array[StudyTable] = []
+	_tables_in(page, tables)
+	for table: StudyTable in tables:
+		var grid := table.tree()
+		var font := grid.get_theme_font(&"font", &"StudyTree")
+		var size := grid.get_theme_font_size(&"font_size", &"StudyTree")
+		var total := 0.0
+		for c: int in grid.columns:
+			var width := float(grid.get_column_width(c))
+			total += width
+			var title := grid.get_column_title(c)
+			var head_font := grid.get_theme_font(&"title_button_font", &"StudyTree")
+			var head_size := grid.get_theme_font_size(&"title_button_font_size", &"StudyTree")
+			assert_gte(width, head_font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, head_size).x, "%s: heading '%s' fits" % [label, title])
+			var item := grid.get_root().get_first_child()
+			while item != null and item.get_metadata(0) != null and int(item.get_metadata(0)) >= 0:
+				var text := item.get_text(c)
+				assert_gte(width, font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x, "%s: '%s' fits column %d" % [label, text, c])
+				item = item.get_next()
+		assert_gte(total, grid.size.x * 0.9, "%s: the columns fill the table (%.0f of %.0f)" % [label, total, grid.size.x])
+	return tables.size()
+
+
+func test_every_study_table_fits_its_columns_and_fills_the_page_at_1280_and_2560() -> void:
+	for size: Vector2i in [Vector2i(1280, 720), Vector2i(2560, 1440)]:
+		var harness := UIHarness.new(size)
+		harness.mount(self)
+		Session.game = InsightsFixture.genoa_first_year()
+		var study := (load(STUDY) as PackedScene).instantiate() as Study
+		study.configure(StudyPages.shown("4.5"))
+		harness.stack.push(study)
+		var seen := 0
+		study.open_page(&"economy")
+		var economy := study.current_page() as PageEconomy
+		for tab: StringName in [&"districts", &"goods"]:
+			economy.select_tab(tab)
+			await harness.wait_frames(self, 4)
+			seen += _check_tables(economy, "%s %s" % [String(tab), str(size)])
+		for id: StringName in [&"rankings", &"history"]:
+			study.open_page(id)
+			await harness.wait_frames(self, 4)
+			seen += _check_tables(study.current_page(), "%s %s" % [String(id), str(size)])
+		assert_gte(seen, 4, "four tables checked at %s" % str(size))
+		harness.stack.remove(study)
+		study.free()
+		harness.dispose()

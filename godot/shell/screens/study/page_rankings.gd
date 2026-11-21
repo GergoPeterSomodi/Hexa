@@ -162,7 +162,7 @@ func _columns_def() -> Array:
 		{"id": &"rank", "title": RANK_TITLE, "kind": &"number", "expand": false, "min_width": 56},
 		{"id": &"country", "title": COUNTRY_TITLE, "kind": &"text", "min_width": 120},
 		{"id": &"value", "title": VALUE_TITLE, "kind": &"number", "expand": false, "min_width": 110},
-		{"id": &"bar", "title": "", "kind": &"bar", "ink": 0, "sortable": false, "min_width": 120},
+		{"id": &"bar", "title": "", "kind": &"bar", "ink": 0, "sortable": false, "expand": true, "min_width": 120},
 		{"id": &"go", "title": "", "kind": &"button", "expand": false, "min_width": 44},
 	]
 

@@ -7,6 +7,10 @@ extends PanelContainer
 
 const TITLE := "Yields: worth a year"
 const WIDTH := 220.0
+## A compact card: rows 20 px tall in a 13 px font, so it ends above the action log's bar at 1280 x 720.
+const ROW_H := 20.0
+const ROW_FONT := 13
+const ROW_GAP := 0
 
 var _mode: int = -1
 var _rows: Array[Dictionary] = []  # {colour, text, stripes}, from MapModes.legend
@@ -101,7 +105,7 @@ func _rebuild() -> void:
 	if not is_node_ready():
 		return
 	PanelKit.clear_children(_column, _retired)
-	_column.add_theme_constant_override("separation", Tokens.S2)
+	_column.add_theme_constant_override("separation", ROW_GAP)
 	if _rows.is_empty():
 		accessibility_description = ""
 	else:
@@ -116,12 +120,15 @@ func _row_node(row: Dictionary) -> HBoxContainer:
 	var line := HBoxContainer.new()
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_theme_constant_override("separation", Tokens.S2)
+	line.custom_minimum_size.y = ROW_H
 	var swatch := Swatch.new()
 	swatch.colour = row["colour"] as Color
 	swatch.stripes = bool(row["stripes"])
 	line.add_child(swatch)
 	var words := PanelKit.label(str(row["text"]), &"TableRow")
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	words.add_theme_font_size_override(&"font_size", ROW_FONT)
 	line.add_child(words)
 	return line
 

@@ -12,6 +12,13 @@ extends VBoxContainer
 const PAGE := 100
 const KINDS: Array[StringName] = [&"text", &"number", &"delta", &"bar", &"spark", &"button"]
 const _MORE := -1
+const TEXT_PAD := 20.0
+const HEAD_PAD := 16.0
+const RATIO_UNIT := 16
+const DELTA_ICON := 20.0
+const CELL_PAD := 4.0
+const BAR_H := 10.0
+const TRACK_ALPHA := 0.4
 const _UP_ARROW := "↑"
 const _DOWN_ARROW := "↓"
 const _SHOW_MORE_FORMAT := "Showing %d of %s · Enter: show %d more"
@@ -37,6 +44,7 @@ var _shown: int = PAGE
 var _has_selection: bool = false
 var _selected_id: int = 0
 var _quiet: int = 0
+var _refit_queued: bool = false
 
 
 ## A Tree that offers each key press to its owner while it has focus, before the Tree's own arrows (`on_key` returns
@@ -71,6 +79,7 @@ func _init() -> void:
 	_grid.column_title_clicked.connect(_on_column_title_clicked)
 	_grid.item_selected.connect(_on_item_selected)
 	_grid.item_activated.connect(_on_item_activated)
+	_grid.resized.connect(_on_grid_resized)
 	_grid.button_clicked.connect(_on_button_clicked)
 	add_child(_grid)
 
@@ -247,7 +256,7 @@ func _normalize_column(d: Dictionary) -> Dictionary:
 		"title": str(d.get("title", str(id))),
 		"kind": kind,
 		"align": align,
-		"expand": bool(d.get("expand", true)),
+		"expand": bool(d.get("expand", kind == &"text")),
 		"min_width": int(d.get("min_width", 0)),
 		"ink": posmod(int(d.get("ink", 0)), InkMarks.FILLS.size()),
 		"descending_first": bool(d.get("descending_first", numeric)),
@@ -379,8 +388,64 @@ func _rebuild() -> void:
 		more.set_text(0, _SHOW_MORE_FORMAT % [n, InkMarks.grouped(total), mini(PAGE, total - n)])
 	if sel_item != null:
 		_grid.set_selected(sel_item, 0)
+	_fit_columns()
 	_quiet -= 1
 	_update_accessibility()
+
+
+## Every column is at least as wide as its widest cell and its heading (with room for the sort arrow), so nothing is cut
+## unless the page itself is too narrow; the free width goes to the expanding (text) columns in proportion to their need,
+## and the number columns shrink to their content. The full text is also each text cell's tooltip.
+func _fit_columns() -> void:
+	if _columns.is_empty():
+		return
+	var font := _grid.get_theme_font(&"font", &"StudyTree")
+	var size := _grid.get_theme_font_size(&"font_size", &"StudyTree")
+	var head_font := _grid.get_theme_font(&"title_button_font", &"StudyTree")
+	var head_size := _grid.get_theme_font_size(&"title_button_font_size", &"StudyTree")
+	var n := mini(maxi(_shown, PAGE), _order.size())
+	for c: int in _columns.size():
+		var col: Dictionary = _columns[c]
+		var kind: StringName = col["kind"]
+		var head := str(col["title"])
+		var need := 0.0
+		if head != "":
+			need = head_font.get_string_size(head + " " + _DOWN_ARROW, HORIZONTAL_ALIGNMENT_LEFT, -1, head_size).x + HEAD_PAD
+		if kind == &"text" or kind == &"number" or kind == &"delta":
+			var widest := 0.0
+			for k: int in n:
+				widest = maxf(widest, font.get_string_size(_display(col, _cell(_rows[_order[k]], col)), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+			need = maxf(need, widest + TEXT_PAD + (DELTA_ICON if kind == &"delta" else 0.0))
+		var min_w := maxi(int(col["min_width"]), ceili(need))
+		_grid.set_column_custom_minimum_width(c, min_w)
+		if kind == &"text" and bool(col["expand"]):
+			# Small ratios: the Tree shares its spare width only while that is at least the sum of the ratios.
+			_grid.set_column_expand_ratio(c, maxi(1, roundi(float(min_w) / RATIO_UNIT)))
+
+
+## The Tree shares its free width among the expanding columns when it is laid out; a resize after that (the page growing
+## to its frame) leaves the old shares, so the columns are set again on the next idle frame.
+func _on_grid_resized() -> void:
+	if _refit_queued:
+		return
+	_refit_queued = true
+	_refit.call_deferred()
+
+
+func _refit() -> void:
+	_refit_queued = false
+	if not is_inside_tree():
+		return
+	for c: int in _columns.size():
+		_grid.set_column_expand(c, not bool(_columns[c]["expand"]))
+		_grid.set_column_expand(c, bool(_columns[c]["expand"]))
+	_fit_columns()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED or what == NOTIFICATION_ENTER_TREE:
+		if _grid != null:
+			_fit_columns()
 
 
 func _fill_row(item: TreeItem, row: Dictionary) -> void:
@@ -408,6 +473,7 @@ func _fill_text(item: TreeItem, c: int, col: Dictionary, cell: Variant, mine: bo
 	if mine and c == _first_text_column():
 		text += " (you)"
 	item.set_text(c, text)
+	item.set_tooltip_text(c, text)
 	item.set_text_alignment(c, col["align"] as HorizontalAlignment)
 	if mine:
 		item.set_custom_color(c, _mine_colour())
@@ -470,11 +536,14 @@ func _fill_button(item: TreeItem, c: int, cell: Variant) -> void:
 
 
 func _draw_bar(_item: Object, rect: Rect2, permille: int, colour: Color) -> void:
-	InkMarks.bar(_grid, rect, permille, colour, Tokens.SLOT)
+	var h := minf(rect.size.y - 2.0 * CELL_PAD, BAR_H)
+	var inner := Rect2(rect.position + Vector2(CELL_PAD, (rect.size.y - h) * 0.5), Vector2(rect.size.x - 2.0 * CELL_PAD, h))
+	InkMarks.bar(_grid, inner, permille, colour, track_ink(_grid))
+	_grid.draw_rect(inner.grow(-0.5), Tokens.RULE, false, 1.0)
 
 
 func _draw_spark(_item: Object, rect: Rect2, values: PackedInt32Array, colour: Color) -> void:
-	InkMarks.spark(_grid, rect, values, colour)
+	InkMarks.spark(_grid, rect.grow_individual(-CELL_PAD, -CELL_PAD, -CELL_PAD, -CELL_PAD), values, colour)
 
 
 func _cell_value(cell: Variant) -> Variant:
@@ -537,10 +606,19 @@ func _mine_colour() -> Color:
 
 
 func _ink(index: int) -> Color:
-	var key := StringName("ink_%d" % posmod(index, InkMarks.FILLS.size()))
-	if _grid.has_theme_color(key, &"InkChart"):
-		return _grid.get_theme_color(key, &"InkChart")
-	return Tokens.CHART_INKS[posmod(index, Tokens.CHART_INKS.size())]
+	return cell_ink(_grid, index)
+
+
+## The ink of a bar or spark cell: the light (leather-ground) form InkChart uses on a SLOT ground, since the table is dark.
+static func cell_ink(ctrl: Control, index: int) -> Color:
+	return InkChart.colour_of(ctrl, StringName("ink_%d" % posmod(index, InkMarks.FILLS.size())), InkChart.Ground.SLOT)
+
+
+## The pale track behind a bar's filled part: the muted text colour, translucent, so it shows on the dark table.
+static func track_ink(ctrl: Control) -> Color:
+	var c := InkChart.colour_of(ctrl, &"axis", InkChart.Ground.SLOT)
+	c.a = TRACK_ALPHA
+	return c
 
 
 func _icon(icon_name: StringName) -> Texture2D:

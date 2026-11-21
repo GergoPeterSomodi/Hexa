@@ -143,3 +143,11 @@ func test_several_reparents_do_not_stack_rows() -> void:
 	_legend.reparent(host_a)
 	assert_eq(_column().get_child_count(), 11, "no double rows after several reparents")
 	assert_eq(_legend.get_parent(), host_a, "ends in the last host")
+
+
+func test_the_rows_are_compact_20_px() -> void:
+	_legend.show_mode(MapModes.Mode.YIELDS)
+	for child: Node in _column().get_children():
+		if child is HBoxContainer:
+			assert_lte((child as HBoxContainer).get_combined_minimum_size().y, ModeLegend.ROW_H + 0.5, "a row is 20 px")
+	assert_lt(_legend.get_combined_minimum_size().y, 260.0, "the whole card is compact")

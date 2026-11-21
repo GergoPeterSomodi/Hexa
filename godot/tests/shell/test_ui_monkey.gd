@@ -3,11 +3,13 @@
 ## pan/magnify gestures, drags, screen stack push/pop, Esc ladder, layers/seasons, and
 ## checks stack/shade/focus/zoom/bounds/digest invariants and zero leaked orphan nodes
 ## M4.5 adds Ctrl+[ and Ctrl+] (the study's tabs), key 4 (it was in the key pool already) and clicks on the tab strip and every
-## button of the three pages; its invariant: the Yields legend shows exactly in Yields.
+## button of the three pages; its invariant: the Yields legend shows exactly in Yields. The M4.5 seeds (1489 to 1491) add
+## monkey_m45.gd's actions: tables, the timeline, the log's headers, chart hovers, Show on the map and Yields, with the digest,
+## the version and the Stats unchanged by every study action.
 ## M4 (m4-build-spec.md section 9): the economy monkey adds I, L, [ and ], U, clicks on the chips, hex panel rows (hover and
 ## click), the works card (Begin, pin, Esc) and the study's tax buttons.
 ## (docs/architecture/ui-and-controls-spec.md section 9; ui-style-and-feedback-spec.md section 11).
-extends MonkeyM4
+extends MonkeyM45
 
 const APP_SCENE := preload("res://shell/app/app.tscn")
 const SEEDS: Array[int] = [1480, 1481, 1482]
@@ -15,6 +17,8 @@ const SEEDS: Array[int] = [1480, 1481, 1482]
 const M3_SEEDS: Array[int] = [1483, 1484, 1485]
 ## M4: country games with the study, the chips, the rows and the works card.
 const M4_SEEDS: Array[int] = [1486, 1487, 1488]
+## M4.5: the same, with the M4.5 study's tables, timeline, log headers, charts, Show on the map and Yields.
+const M45_SEEDS: Array[int] = [1489, 1490, 1491]
 ## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
 const FORCE_SEASON_STEP := 30
 const FORCE_SAVE_STEP := 120
@@ -25,6 +29,8 @@ const COUNTER_KEYS: Array[String] = [
 	"studies", "study_i", "study_l", "study_page_keys", "study_clicks", "tax_clicks", "tax_changes", "u_keys", "u_cards",
 	"chip_clicks", "chip_cards", "row_hovers", "row_refused_hovers", "row_clicks", "card_begins", "card_pins", "card_escs",
 	"orphan_cycles", "m4_checks", "study_tab_keys", "legend_checks",
+	"m45_opens", "m45_tab_clicks", "m45_nav_clicks", "m45_head_clicks", "m45_row_clicks", "m45_row_keys", "m45_timeline",
+	"m45_log_headers", "m45_chart_hovers", "m45_show_map", "m45_yields_keys", "m45_checks",
 ]
 const EVENTS_PER_SEED := 600
 
@@ -175,6 +181,19 @@ func test_ui_monkey_m4_seed_1488() -> void:
 	await _run_monkey_seed(M4_SEEDS[2], true, true, true)
 
 
+## M4.5: the M4 monkey with the study's pages, tabs, tables, timeline, log headers, charts, Show on the map and Yields.
+func test_ui_monkey_m45_seed_1489() -> void:
+	await _run_monkey_seed(M45_SEEDS[0], true, true, true, true)
+
+
+func test_ui_monkey_m45_seed_1490() -> void:
+	await _run_monkey_seed(M45_SEEDS[1], true, true, true, true)
+
+
+func test_ui_monkey_m45_seed_1491() -> void:
+	await _run_monkey_seed(M45_SEEDS[2], true, true, true, true)
+
+
 ## A real bug the M4 monkey found, kept as a minimal failing test (it fails until the card is fixed): with Confirm works on Always
 ## a mouse click on a hex panel row opens the card, the card takes the focus for Begin, the row's focus_exited reads as the
 ## pointer leaving, and the card closes at once (WorksPreview.leave); then WorksFlow.show_card draws the ghost and the marks for
@@ -218,12 +237,13 @@ func _on_hex_changed(hex: Vector2i) -> void:
 	_changed_hexes.append(hex)
 
 
-func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false) -> void:
+func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false) -> void:
 	await _wait_frames(2)
 	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	_player_seen = &""
 	_player_game = null
 	_m4 = m4
+	_m45 = m45
 	Events.hex_changed.connect(_on_hex_changed)
 
 	var vp := SubViewport.new()
@@ -290,6 +310,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	if m3:
 		_m3_end(seed_value)
 	_m4 = false
+	_m45 = false
 	Events.hex_changed.disconnect(_on_hex_changed)
 	Session.end_game()
 	remove_child(vp)
@@ -652,6 +673,9 @@ func _m3_end(seed_value: int) -> void:
 	if _m4:
 		for key: String in M4_REQUIRED:
 			assert_gt(int(_n[key]), 0, "seed %d: the monkey did %s" % [seed_value, key])
+	if _m45:
+		for key: String in M45_REQUIRED:
+			assert_gt(int(_n[key]), 0, "seed %d: the monkey did %s" % [seed_value, key])
 
 
 func _on_season_counted(_turn: int) -> void:
@@ -718,6 +742,8 @@ func _m3_before_step(rng: Rng, app: App, step: int) -> void:
 		await _m3_save_then_load(vp, app)
 	if _m4 and step >= FORCE_M4_STEP:
 		await _m4_force(rng, vp, app)
+	if _m45 and step >= FORCE_M45_STEP:
+		await _m45_force(rng, vp, app)
 
 
 func _m3_clear_screens(app: App) -> void:
@@ -912,6 +938,9 @@ func _m3_buildable() -> Dictionary:
 
 
 func _m3_step(rng: Rng, vp: SubViewport, app: App) -> void:
+	if _m45 and rng.randi_range(0, 99) < 45:
+		await _m45_step(rng, vp, app)
+		return
 	if _m4 and rng.randi_range(0, 99) < 60:
 		await _m4_step(rng, vp, app)
 		return

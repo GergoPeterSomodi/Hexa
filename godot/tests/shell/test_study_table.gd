@@ -395,3 +395,22 @@ func test_selection_comes_back_when_its_id_returns() -> void:
 	assert_eq(table.selected_row()["id"], 3, "the selection returns with its id")
 	assert_eq(table.tree().get_selected().get_text(0), "Row 3")
 
+
+
+func _lum(c: Color) -> float:
+	return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+
+
+func test_bar_and_spark_cells_use_the_light_inks_visible_on_the_dark_table() -> void:
+	var table := _table(_districts_columns(), _districts(3))
+	var grid := table.tree()
+	for ink: int in 5:
+		var cell := StudyTable.cell_ink(grid, ink)
+		var vellum := InkChart.colour_of(grid, StringName("ink_%d" % ink), InkChart.Ground.VELLUM)
+		assert_ne(cell, vellum, "ink %d is not the vellum ink" % ink)
+		assert_gt(_lum(cell), _lum(Tokens.LEATHER) + 0.3, "ink %d stands out from the leather table" % ink)
+		assert_gt(_lum(cell), _lum(vellum) + 0.25, "ink %d is lighter than the vellum ink" % ink)
+	var track := StudyTable.track_ink(grid)
+	assert_gt(track.a, 0.2, "the bar has a visible track")
+	assert_gt(_lum(track), _lum(Tokens.LEATHER) + 0.3, "and it is pale against the table")
+	assert_ne(track, StudyTable.cell_ink(grid, 1), "the track is not the fill")

@@ -715,3 +715,14 @@ func test_an_older_log_header_requests_history_at_its_turn() -> void:
 	_harness.ctx.app_requested.connect(func(what: StringName, args: Dictionary) -> void: sent.append([what, args]))
 	_hud.action_log().history_requested.emit(9)
 	assert_eq(sent, [[&"study", {"page": &"history", "turn": 9}]])
+
+
+## The Yields legend ends at least 8 px above the action log's closed bar at 1280 x 720.
+func test_the_yields_legend_ends_above_the_closed_log_bar() -> void:
+	assert_eq(_harness.viewport.size, Vector2i(1280, 720))
+	_hud.action_log().close()
+	_hud.mode_legend().show_mode(MapModes.Mode.YIELDS)
+	await _harness.wait_frames(self, 3)
+	var legend := _hud.mode_legend().get_global_rect()
+	var bar := _hud.action_log().get_global_rect()
+	assert_lte(legend.end.y + 8.0, bar.position.y, "legend bottom %.0f + 8 <= log bar top %.0f" % [legend.end.y, bar.position.y])

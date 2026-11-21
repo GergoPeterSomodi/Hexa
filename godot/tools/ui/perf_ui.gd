@@ -10,11 +10,16 @@
 ## M4 (m4-build-spec.md section 8): the works card's push and the study's push inside 16 ms each, the chips' refresh inside 1 ms,
 ## the map marks' show inside 2 ms (see _measure_m4).
 ##
+## M4.5 (m4-5-build-spec.md section 8; the rows are in perf_ui_m45.gd): the five study pages cold, on the made-up Europe and
+## between tabs, the Yields switch and its update, the table's 100 rows, the timeline's draw and the legend's show (see
+## _measure_m45). The Europe game takes minutes: it is skipped headless unless --europe-seasons=N is given.
+##
 ## Windowed (GPU or xvfb + Mesa in CI):
-##   godot --path godot -s res://tools/ui/perf_ui.gd -- [--gpu-limits] [--cpu-scale=2.0] [--out=perf_ui.json] [--summary=summary.md]
+##   godot --path godot -s res://tools/ui/perf_ui.gd -- [--gpu-limits] [--cpu-scale=2.0] [--out=perf_ui.json] [--summary=summary.md] [--europe-seasons=N]
 ## Headless: exercises every M1.5 screen push and checks memory budgets; GPU frame times are reported only.
 extends SceneTree
 
+const M45 := preload("res://tools/ui/perf_ui_m45.gd")
 const BUDGET := "res://tests/perf_ui_budget.json"
 const APP_SCENE_PATH := "res://shell/app/app.tscn"
 const SCREEN_IDS_PATH := "res://shell/screens/screen_ids.gd"
@@ -34,6 +39,7 @@ var _cpu_scale := 1.0
 var _out := ""
 var _summary := ""
 var _budget_path := BUDGET
+var _europe_seasons := -1
 var _r: Dictionary = {}
 
 
@@ -47,6 +53,8 @@ func _initialize() -> void:
 			_out = arg.substr(6)
 		elif arg.begins_with("--summary="):
 			_summary = arg.substr(10)
+		elif arg.begins_with("--europe-seasons="):
+			_europe_seasons = int(arg.substr(17))
 		elif arg.begins_with("--budget="):
 			_budget_path = arg.substr(9)
 	if DisplayServer.get_name() != "headless":
@@ -145,6 +153,7 @@ func _measure() -> int:
 
 	await _measure_m3(packed, headless)
 	await _measure_m4(packed)
+	await _measure_m45(packed, headless)
 
 	return _finish(budget, headless)
 
@@ -407,6 +416,46 @@ func _measure_m4(packed: PackedScene) -> void:
 	RunLock.path = old_lock
 
 
+## M4.5 (m4-5-build-spec.md section 8): one country game (Genoa) on a temporary save folder, played 40 seasons; the rows are
+## measured by perf_ui_m45.gd (the pages cold, between tabs and on the made-up Europe, the Yields switch and update, the
+## table's rows, the timeline's draw, the legend's show).
+func _measure_m45(packed: PackedScene, headless: bool) -> void:
+	var session := root.get_node("Session")
+	var old_dir := str(session.get("save_dir"))
+	var old_lock := RunLock.path
+	session.set("save_dir", M3_SAVE_DIR)
+	RunLock.path = M3_LOCK
+	_clean_m3_disk()
+
+	var vp := SubViewport.new()
+	vp.size = FRAME
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(vp)
+	var app := packed.instantiate()
+	app.set("settings_path", "")
+	app.set("allow_tree_quit", false)
+	app.set("pause_tree_when_modal", false)
+	app.set("skip_loading_frames", true)
+	app.set("cli_args_override", PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"]))
+	var s := Settings.new("macOS", true)
+	s.set_value("state/help_seen", true)
+	s.set_value("graphics/preload_next_season", false)
+	s.set_value("accessibility/reduce_motion", true)
+	s.set_value("game/autosave", "off")
+	app.call("set_settings_override", s)
+	vp.add_child(app)
+	await _wait_frames(5)
+	await M45.new(self, _r).measure(app, vp, headless, _europe_seasons)
+
+	session.call("end_game")
+	root.remove_child(vp)
+	vp.queue_free()
+	await _wait_frames(3)
+	_clean_m3_disk()
+	session.set("save_dir", old_dir)
+	RunLock.path = old_lock
+
+
 ## One push, in ms: `open` runs, then one forced draw (RenderingServer.force_draw: the project is in low-processor mode, so no
 ## frame is waited for); `close` runs after and two frames pass.
 func _m4_push_ms(open: Callable, close: Callable) -> float:
@@ -640,6 +689,14 @@ func _markdown(limit_rows: String, headless: bool) -> String:
 		float(_r.get("works_card_push_ms", 0.0)), float(_r.get("works_card_push_cold_ms", 0.0)),
 		float(_r.get("study_push_ms", 0.0)), float(_r.get("study_push_cold_ms", 0.0)),
 		float(_r.get("chips_refresh_ms", 0.0)), float(_r.get("marks_show_ms", 0.0)),
+	]
+	s += "M4.5 (north Italy after %d seasons; first build in brackets): five pages cold %.2f ms [%.2f], warm %.2f ms; Europe %s; tab switch %.2f ms; Yields key 4 %.2f ms, update %.3f ms; table rows %.2f ms; timeline draw %.2f ms; legend show %.3f ms.
+" % [
+		int(_r.get("m45_turn", 1)) - 1, float(_r.get("study_open_cold_ms", 0.0)), float(_r.get("study_first_build_ms", 0.0)),
+		float(_r.get("study_open_warm_ms", 0.0)),
+		"skipped" if bool(_r.get("study_open_europe_skipped", false)) else "%.2f ms" % float(_r.get("study_open_europe_ms", 0.0)),
+		float(_r.get("study_tab_switch_ms", 0.0)), float(_r.get("yields_mode_ms", 0.0)), float(_r.get("yields_update_ms", 0.0)),
+		float(_r.get("study_table_rows_ms", 0.0)), float(_r.get("timeline_draw_ms", 0.0)), float(_r.get("legend_show_ms", 0.0)),
 	]
 	s += "Season fade: capture warm %.2f ms (cold %.2f), whole show_season with the next season preloaded %.2f ms.\n\n" % [
 		float(_r.get("season_fade_capture_ms", 0.0)), float(_r.get("season_fade_capture_cold_ms", 0.0)), float(_r.get("season_fade_total_ms", 0.0)),
