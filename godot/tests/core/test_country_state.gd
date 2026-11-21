@@ -73,9 +73,9 @@ func test_from_dict_refuses_wrong_schema_and_bad_capital() -> void:
 
 func test_digest_text_format_and_changes_with_each_field() -> void:
 	var gen := Country.create(7, &"GEN", Vector2i(8, 13), true)
-	assert_eq(gen.digest_text(), "7|GEN|8,13|true|0|1|0|0||||||")
+	assert_eq(gen.digest_text(), "7|GEN|8,13|true|0|1|0|0|||||||||0|1000")
 	var fra := Country.create(1, &"FRA", Country.NO_HEX, false)
-	assert_eq(fra.digest_text(), "1|FRA|-1,-1|false|0|1|0|0||||||")
+	assert_eq(fra.digest_text(), "1|FRA|-1,-1|false|0|1|0|0|||||||||0|1000")
 
 	var base := gen.digest_text()
 	var seen: Dictionary = {base: true}
@@ -122,7 +122,7 @@ func _rich() -> Country:
 
 func test_country_2_round_trip_every_field() -> void:
 	var src := _rich()
-	assert_eq(Country.SCHEMA, "hexa-godot/country/2")
+	assert_eq(Country.SCHEMA, "hexa-godot/country/3")
 	var d := src.to_dict()
 	assert_eq(d["flows_shape"], [16, Country.FLOW_COUNT])
 	var parsed: Variant = JSON.parse_string(JSON.stringify(d))
@@ -150,7 +150,7 @@ func test_country_2_round_trip_every_field() -> void:
 
 func test_digest_text_with_the_m4_fields() -> void:
 	var c := Country.create(3, &"GEN", Vector2i(8, 13))
-	assert_eq(c.digest_text(), "3|GEN|8,13|true|0|1|0|0||||||")
+	assert_eq(c.digest_text(), "3|GEN|8,13|true|0|1|0|0|||||||||0|1000")
 	c.treasury = 50
 	c.tax = 0
 	c.short_mask = 3
@@ -163,7 +163,7 @@ func test_digest_text_with_the_m4_fields() -> void:
 	c.flows_open = PackedInt32Array([3, 4])
 	c.goods_closed = {"turn": 4, "opening": PackedInt32Array([1]), "closing": PackedInt32Array([2]),
 		"flows": PackedInt32Array([1, 0])}
-	assert_eq(c.digest_text(), "3|GEN|8,13|true|50|0|3|40|port_dues:4,5:20:2|4:9:40;work:2,2:-5:1|1,2|3,4|1,1|4:1:2:1,0")
+	assert_eq(c.digest_text(), "3|GEN|8,13|true|50|0|3|40|port_dues:4,5:20:2|4:9:40;work:2,2:-5:1|1,2|3,4|1,1|4:1:2:1,0|||0|1000")
 	# Every M4 field moves the digest.
 	var base := _rich().digest_text()
 	var edits: Array[Callable] = [
@@ -280,3 +280,96 @@ func test_a_damaged_purse_is_refused() -> void:
 		var ok := _rich().to_dict()
 		ok["tax"] = tax
 		assert_not_null(Country.from_dict(ok))
+
+
+func _with_people() -> Country:
+	var c := _rich()
+	c.people_flows = PackedInt32Array([120, -30, -5, 0, 0, 7])
+	c.people_closed = {"turn": 4, "flows": PackedInt32Array([100, -20, -3, 0, 0, 0])}
+	c.food_need = 9
+	c.food_fed = 750
+	return c
+
+
+func test_country_3_round_trip_every_people_field() -> void:
+	var src := _with_people()
+	var d := src.to_dict()
+	assert_eq(d["schema"], "hexa-godot/country/3")
+	for form: int in 2:
+		var back: Country = null
+		if form == 0:
+			back = Country.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary)
+		else:
+			back = Country.from_dict(bytes_to_var(var_to_bytes(d)) as Dictionary)
+		assert_not_null(back, "form %d" % form)
+		assert_eq(back.people_flows, src.people_flows)
+		assert_eq(back.people_closed["turn"], 4)
+		assert_eq(back.people_closed["flows"], src.people_closed["flows"])
+		assert_eq(back.food_need, 9)
+		assert_eq(back.food_fed, 750)
+		assert_eq(back.digest_text(), src.digest_text())
+		assert_eq(var_to_bytes(back.to_dict()), var_to_bytes(d), "save, load, save equal")
+	assert_eq(src.digest_text().split("|").slice(-4),
+			PackedStringArray(["120,-30,-5,0,0,7", "4:100,-20,-3,0,0,0", "9", "750"]))
+
+
+func test_the_digest_moves_with_one_flow_and_one_field_and_only_then() -> void:
+	var base := _with_people().digest_text()
+	assert_eq(_with_people().digest_text(), base, "the same country, the same text")
+	var seen: Dictionary = {base: true}
+	var edits: Array[Callable] = [
+		func(x: Country) -> void: x.people_flows[0] += 1,
+		func(x: Country) -> void: x.people_flows[5] -= 1,
+		func(x: Country) -> void: x.people_closed["turn"] = 5,
+		func(x: Country) -> void: x.people_closed["flows"][2] -= 1,
+		func(x: Country) -> void: x.food_need += 1,
+		func(x: Country) -> void: x.food_fed = 1000,
+	]
+	for edit: Callable in edits:
+		var x := _with_people()
+		edit.call(x)
+		assert_false(seen.has(x.digest_text()), "one change moves the digest")
+		seen[x.digest_text()] = true
+
+
+func test_country_2_loads_with_zeros_and_empty_flows() -> void:
+	var d := _rich().to_dict()
+	d["schema"] = Country.SCHEMA_V2
+	for key: String in ["people_flows", "people_closed", "food_need", "food_fed"]:
+		d.erase(key)
+	var back := Country.from_dict(d)
+	assert_not_null(back)
+	assert_true(back.people_flows.is_empty())
+	assert_true(back.people_closed.is_empty())
+	assert_eq(back.food_need, 0)
+	assert_eq(back.food_fed, 1000)
+	assert_eq(back.treasury, 1234, "the M4 fields are read as before")
+	assert_eq(back.digest_text(), _rich().digest_text())
+	assert_eq(back.to_dict()["schema"], Country.SCHEMA, "saved again as country/3")
+
+
+func test_a_short_flows_array_is_padded_and_a_long_one_refused() -> void:
+	var d := _with_people().to_dict()
+	d["people_flows"] = PackedInt32Array([4, 5, 6])
+	var back := Country.from_dict(d)
+	assert_not_null(back)
+	assert_eq(back.people_flows, PackedInt32Array([4, 5, 6, 0, 0, 0]))
+	d["people_closed"] = {"turn": 2, "flows": PackedInt32Array([1])}
+	assert_eq(Country.from_dict(d).people_closed["flows"], PackedInt32Array([1, 0, 0, 0, 0, 0]))
+	d["people_flows"] = PackedInt32Array([1, 2, 3, 4, 5, 6, 7])
+	assert_null(Country.from_dict(d), "P: more flows than People knows")
+	assert_eq(Country.PEOPLE_FLOW_COUNT, 6)
+
+
+func test_country_3_refuses_mistyped_people_fields() -> void:
+	var cases: Array = [
+		["food_need", "9"], ["food_need", -1], ["food_need", 9.5], ["food_fed", "750"], ["food_fed", 1001],
+		["food_fed", -1], ["people_flows", "1,2"], ["people_flows", ["a"]], ["people_flows", {"a": 1}],
+		["people_closed", "x"], ["people_closed", {"turn": "4", "flows": [1]}], ["people_closed", {"turn": 4}],
+		["people_closed", {"turn": 4, "flows": "1"}], ["people_closed", {"turn": 4, "flows": [1, 2, 3, 4, 5, 6, 7]}],
+		["people_closed", [4]],
+	]
+	for item: Array in cases:
+		var bad := _with_people().to_dict()
+		bad[str(item[0])] = item[1]
+		assert_null(Country.from_dict(bad), "P: %s = %s" % [item[0], str(item[1])])

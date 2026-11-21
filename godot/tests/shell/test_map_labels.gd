@@ -127,3 +127,68 @@ func test_capitals_come_from_game_countries_and_avoid_obstacles() -> void:
 	var after := MapLabels.layout(map, xform, SCREEN, ThemeDB.fallback_font, labels.obstacles, labels.capitals())
 	for item: Dictionary in after:
 		assert_false((item["box"] as Rect2).intersects(blocked[0]), "plate avoids CountryLabels obstacle")
+
+
+func test_a_settlement_takes_its_level_from_the_state() -> void:
+	var map := _map()
+	var state := MapState.create(map)
+	var como := map.index_of(Vector2i(3, 2))
+	state.main_use[como] = ImproveRules.SETTLEMENT
+	state.level[como] = 4
+	var levels := MapLabels.levels_of(map, state)
+	assert_eq(levels, {Vector2i(3, 2): 4}, "only the settlement hex is read from the state")
+	var xform := _shift(Vector2(300.0, 200.0))
+	var with_state := MapLabels.layout(map, xform, SCREEN, ThemeDB.fallback_font, [], null, levels)
+	var without := MapLabels.layout(map, xform, SCREEN, ThemeDB.fallback_font, [], null, {})
+	var grown := _item(with_state, "Como")
+	var data := _item(without, "Como")
+	assert_eq(int(grown["level"]), 4, "Como takes the state's level")
+	assert_eq(int(data["level"]), 2, "without the state, the data's level")
+	assert_gt((grown["box"] as Rect2).size.y, (data["box"] as Rect2).size.y, "a bigger font, a bigger plate")
+	assert_eq(_overlaps(with_state), 0)
+
+
+func test_a_place_off_a_settlement_keeps_the_data_level() -> void:
+	var map := _map()
+	var state := MapState.create(map)
+	var lodi := map.index_of(Vector2i(2, 3))
+	state.level[lodi] = 5  # wild land: its level is not a settlement's
+	assert_eq(MapLabels.levels_of(map, state), {}, "no settlement, no state level")
+	var placed := MapLabels.layout(map, _shift(Vector2(300.0, 200.0)), SCREEN, ThemeDB.fallback_font, [], null,
+		MapLabels.levels_of(map, state))
+	assert_eq(int(_item(placed, "Lodi")["level"]), 1, "Lodi keeps its data level")
+
+
+func test_no_map_or_no_state_gives_no_levels() -> void:
+	assert_eq(MapLabels.levels_of(null, MapState.create(_map())), {})
+	assert_eq(MapLabels.levels_of(_map(), null), {})
+
+
+func test_set_state_refreshes_only_when_a_label_level_changed() -> void:
+	var map := _map()
+	var labels := MapLabels.new()
+	add_child_autofree(labels)
+	labels.setup(map)
+	labels._dirty = false
+	var state := MapState.create(map)
+	labels.set_state(state)
+	assert_false(labels._dirty, "no settlement, no change: nothing to relay")
+	var como := map.index_of(Vector2i(3, 2))
+	state.main_use[como] = ImproveRules.SETTLEMENT
+	state.level[como] = 3
+	labels.set_state(state)
+	assert_true(labels._dirty, "Como grew: its plate is relaid")
+	assert_eq(labels._levels, {Vector2i(3, 2): 3})
+	labels._dirty = false
+	labels.set_state(state)
+	assert_false(labels._dirty, "the same levels again: no relay")
+	labels.set_state(null)
+	assert_true(labels._dirty, "null goes back to the data's levels")
+	assert_eq(labels._levels, {})
+
+
+func _item(placed: Array[Dictionary], name: String) -> Dictionary:
+	for item: Dictionary in placed:
+		if str(item["name"]) == name:
+			return item
+	return {}

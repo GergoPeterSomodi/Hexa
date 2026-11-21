@@ -16,7 +16,9 @@ func _write(st: Stats, turn: int, v: int) -> void:
 
 
 func test_series_shape() -> void:
-	assert_eq(Stats.SERIES.size(), 35)
+	assert_eq(Stats.SERIES.size(), 40)
+	assert_eq(Stats.SERIES.slice(35), ["people_towns", "people_grew", "people_starved", "people_left", "food_need"],
+			"the five of M5 are appended last")
 	assert_eq(Stats.column("treasury"), 0)
 	assert_eq(Stats.column("land"), 12)
 	assert_eq(Stats.column("nonsense"), -1)
@@ -66,9 +68,9 @@ func test_missing_and_unknown_series() -> void:
 	_write(st, 1, 5)
 	st.append_year()
 	var d := st.to_dict()
-	# The save has one series fewer (the last) and one the game does not know, first.
+	# The save lacks the last six series (districts_harbour and the five of M5) and has one the game does not know, first.
 	var old: Array[String] = ["gone"]
-	old.append_array(Stats.SERIES.slice(0, Stats.SERIES.size() - 1))
+	old.append_array(Stats.SERIES.slice(0, Stats.SERIES.size() - 6))
 	var old_s := old.size()
 	var ring := PackedInt32Array()
 	ring.resize(Stats.RING * old_s)
@@ -144,7 +146,7 @@ func test_scenario_values() -> void:
 		assert_eq(g.stats.value(tag, 1, "land"), Territory.count(g, id))
 		land_total += g.stats.value(tag, 1, "land")
 		var by_family := 0
-		for col: int in range(Stats.DISTRICTS_FIRST, Stats.SERIES.size()):
+		for col: int in range(Stats.DISTRICTS_FIRST, Stats.DISTRICTS_FIRST + FamilyIds.COUNT - 1):
 			by_family += g.stats.row(tag, 1)[col]
 		var expected := 0
 		for hex_i: int in Territory.districts(g, id):
@@ -288,3 +290,71 @@ func test_the_goods_accessors_change_nothing() -> void:
 	st.goods_value(&"AAA", 3, 1, Stats.USED)
 	st.goods_series(&"AAA", 1, Stats.USED, 40)
 	assert_eq(st.digest(), before)
+
+
+func test_a_save_without_the_people_series_loads_them_as_zeros() -> void:
+	var st := Stats.create(PackedStringArray(["AAA"]), 0)
+	_write(st, 1, 4)
+	st.append_year()
+	var d := st.to_dict()
+	var old: Array[String] = []
+	old.assign(Stats.SERIES.slice(0, 35))
+	var ring := PackedInt32Array()
+	ring.resize(Stats.RING * 35)
+	ring.fill(0)
+	for i: int in 35:
+		ring[35 + i] = 6
+	var years := PackedInt32Array()
+	years.resize(35)
+	years.fill(6)
+	d["series"] = PackedStringArray(old)
+	d["ring"] = ring
+	d["years"] = years
+	var back := Stats.from_dict(d)
+	assert_not_null(back)
+	assert_eq(back.value(&"AAA", 1, "people"), 6)
+	for col_name: String in Stats.SERIES.slice(35):
+		assert_eq(back.value(&"AAA", 1, col_name), 0, col_name)
+		assert_eq(back.year_row(&"AAA", 0)[Stats.column(col_name)], 0, col_name)
+	assert_eq(back.ring.size(), Stats.RING * 40)
+
+
+func test_the_digest_moves_with_one_people_value() -> void:
+	var st := Stats.create(PackedStringArray(["AAA"]), 0)
+	_write(st, 1, 3)
+	var before := st.digest()
+	var row := st.row(&"AAA", 1)
+	row[Stats.column("food_need")] += 1
+	st.set_row(0, 1, row)
+	assert_ne(st.digest(), before)
+
+
+func test_the_projected_size_at_winter_1650_for_sixty_countries() -> void:
+	var tags := PackedStringArray()
+	for c: int in 60:
+		tags.append("C%02d" % c)
+	var st := Stats.create(tags, 0)
+	assert_eq(st.ring.size() * 4, 60 * 40 * 40 * 4, "the ring: 0.38 MB")
+	assert_lt(st.ring.size() * 4, 400_000)
+	for t: int in range(1, 171 * 4 + 1):
+		_write(st, t, t)
+		if Calendar.is_winter(t):
+			st.append_year()
+	assert_eq(st.year_count(), 171, "1480 to 1650")
+	var year_bytes := st.years.size() * 4
+	assert_gt(year_bytes, 1_600_000, "about 1.64 MB")
+	assert_lt(year_bytes, 1_700_000)
+	assert_lt(year_bytes + st.ring.size() * 4, 2_500_000, "under 2.5 MB in all")
+	var back := Stats.from_dict(bytes_to_var(var_to_bytes(st.to_dict())) as Dictionary)
+	assert_not_null(back, "a full 60-country game loads back")
+	assert_eq(back.digest(), st.digest())
+
+
+func test_from_dict_refuses_mistyped_series_arrays() -> void:
+	var st := Stats.create(PackedStringArray(["AAA"]), 0)
+	for key: String in ["ring", "years", "goods_ring"]:
+		var d := st.to_dict()
+		d[key] = "text"
+		assert_null(Stats.from_dict(d), "P: %s as text" % key)
+		d[key] = [1, 2, 3]
+		assert_null(Stats.from_dict(d), "P: %s as an untyped list" % key)

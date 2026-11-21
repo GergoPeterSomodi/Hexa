@@ -317,6 +317,26 @@ func upgrade(hex: Vector2i) -> Dictionary:
 	return verdict
 
 
+## Whether the settlement on a hex may fall one level (a town to a village, a village to a hamlet). Only the settlement
+## itself is judged here: the neighbours' reasons belong to the caller (People.decline_check).
+func lower_check(hex: Vector2i) -> Dictionary:
+	if not _index.has(hex):
+		return _verdict(false, "not a land hex")
+	if family_at(hex) != ImproveRules.SETTLEMENT:
+		return _verdict(false, "only a settlement falls a level")
+	if level_at(hex) <= 1:
+		return _verdict(false, "a hamlet falls no further")
+	return _verdict(true)
+
+
+## One level down for the settlement on a hex (after checking again); the distances follow, as in an upgrade.
+func lower(hex: Vector2i) -> Dictionary:
+	var verdict := lower_check(hex)
+	if bool(verdict["ok"]):
+		_put(hex, ImproveRules.SETTLEMENT, level_at(hex) - 1)
+	return verdict
+
+
 func clear_check(hex: Vector2i) -> Dictionary:
 	if not _index.has(hex):
 		return _verdict(false, "not a land hex")

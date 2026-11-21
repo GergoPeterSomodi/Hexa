@@ -248,3 +248,43 @@ func test_a_game_ending_or_starting_clears_the_ribbons() -> void:
 	_floaters.spawn("c", &"plain", Vector2i(5, 5))
 	Events.game_started.emit()
 	assert_eq(_floaters.live_count(), 0, "game_started clears them")
+
+
+func test_add_ribbon_starts_a_ribbon_the_public_way() -> void:
+	var hex := Vector2i(5, 5)
+	_floaters.add_ribbon(hex, "Finished", &"good")
+	assert_eq(_floaters.count_at(hex), 1)
+	var node := _floaters._ribbons[0]["node"] as PanelContainer
+	assert_eq((node.get_node("HBox/Word") as Label).text, "Finished")
+	assert_eq((node.get_node("HBox/Dot") as ColorRect).color, Tokens.GOOD)
+
+
+func test_add_ribbon_never_floats_begun() -> void:
+	_floaters.add_ribbon(Vector2i(5, 5), "Begun", &"plain")
+	_floaters.add_ribbon(Vector2i(6, 5), "Begun the road", &"plain")
+	assert_eq(_floaters.live_count(), 0, "a quiet word is written in the log only")
+
+
+func test_add_ribbon_keeps_the_caps_and_the_view() -> void:
+	var hex := Vector2i(5, 5)
+	_floaters.add_ribbon(hex, "one", &"plain")
+	_floaters.add_ribbon(hex, "two", &"plain")
+	_floaters.add_ribbon(hex, "three", &"plain")
+	_floaters.add_ribbon(hex, "four", &"plain")
+	assert_eq(_floaters.count_at(hex), 3, "3 a hex")
+	for n: int in 20:
+		_floaters.add_ribbon(_hex(n), "x", &"plain")
+	assert_eq(_floaters.live_count(), 16, "16 in all")
+	_floaters.add_ribbon(Vector2i(500, 500), "off", &"plain")
+	assert_eq(_floaters.count_at(Vector2i(500, 500)), 0, "only hexes on the view")
+
+
+func test_add_ribbon_waits_under_a_modal() -> void:
+	_floaters.add_ribbon(Vector2i(5, 5), "Finished", &"good")
+	_floaters.advance(0.3)
+	_floaters.wait()
+	_floaters.advance(5.0)
+	assert_eq(_floaters.live_count(), 1, "not expired while a modal is up")
+	_floaters.resume()
+	_floaters.advance(1.2)
+	assert_eq(_floaters.live_count(), 0)

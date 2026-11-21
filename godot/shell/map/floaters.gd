@@ -156,6 +156,16 @@ func spawn(text: String, tone: StringName, hex: Vector2i) -> bool:
 	return true
 
 
+## Starts a ribbon of `text` in the tone `tone` at `hex`. This is the public way in: the chronicled path and the map
+## scene's season ribbons call it. A quiet word (QUIET_WORD, and any word starting with it) is written in the log
+## only and never floats. The limits are spawn's: 3 a hex, 16 in all, only hexes on the view and not under the dock;
+## a modal waits them.
+func add_ribbon(hex: Vector2i, text: String, tone: StringName) -> void:
+	if text.begins_with(QUIET_WORD):
+		return
+	spawn(text, tone, hex)
+
+
 ## Ribbons alive now (waiting or not).
 func live_count() -> int:
 	return _ribbons.size()
@@ -184,11 +194,11 @@ func _on_chronicled(entry: Dictionary) -> void:
 		return
 	var line := LogLines.line_of(_game, entry, _game.player)
 	var word := str(line.get("floating", ""))
-	if word.is_empty() or word.begins_with(QUIET_WORD):
+	if word.is_empty():
 		return
 	var tone := StringName(str(line.get("tone", "plain")))
 	for hex: Vector2i in _hexes_for(entry, line, word):
-		spawn(word, tone, hex)
+		add_ribbon(hex, word, tone)
 
 
 func _hexes_for(entry: Dictionary, line: Dictionary, word: String) -> Array[Vector2i]:

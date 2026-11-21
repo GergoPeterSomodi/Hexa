@@ -56,11 +56,15 @@ const SEASON_PERCENT_MAX := 400
 @export var port_fish: PackedInt32Array = PackedInt32Array()
 ## Settlements: port dues per level, ducats a season at 100 %.
 @export var port_dues: PackedInt32Array = PackedInt32Array()
+## Settlements: per level, the most people it holds (M5 spec 4.2, 4.5); empty on other families.
+@export var room: PackedInt32Array = PackedInt32Array()
+## Settlements: per level, the people under which it falls a level (4.5); 0 never. Empty on other families.
+@export var falls_below: PackedInt32Array = PackedInt32Array()
 
 
 ## Problems found, empty when valid: id 1 to 14, key the one FamilyIds gives the id, work_seasons the size
 ## TOP_LEVEL[id] + 1 with [0] at 0 and each level 1 to 64, clear_seasons 1 to 64, and the M4 numbers (_check_levels,
-## _check_goods, _check_settlement).
+## _check_goods, _check_settlement, _check_people).
 func validate() -> Array[String]:
 	var errors: Array[String] = []
 	var label := _label()
@@ -84,6 +88,7 @@ func validate() -> Array[String]:
 	_check_levels(errors, label, top)
 	_check_goods(errors, label, top)
 	_check_settlement(errors, label, top)
+	_check_people(errors, label, top)
 	return errors
 
 
@@ -183,6 +188,37 @@ func _check_settlement(errors: Array[String], label: String, top: int) -> void:
 				errors.append("%s: %s[%d] is %d, expected 0 or more" % [label, field, level, values[level]])
 	if id == 1 and cost.size() > 1 and cost[1] != 0:
 		errors.append("%s: cost[1] is %d, expected 0 (a hamlet is never begun)" % [label, cost[1]])
+
+
+## The M5 people numbers of a settlement (spec 4.2, 4.5, 5.1): room and falls_below have top + 1 entries; room[0] is 0
+## and rises with the level; the start people of a level are under its room; falls_below[1] is 0 and no entry is
+## negative; a falls_below of level 2 or more is under the room of the level below (0 is never). Other families have
+## neither.
+func _check_people(errors: Array[String], label: String, top: int) -> void:
+	if id != 1:
+		if not room.is_empty() or not falls_below.is_empty():
+			errors.append("%s: room and falls_below are for settlements only" % label)
+		return
+	if room.size() != top + 1 or falls_below.size() != top + 1:
+		errors.append("%s: room has %d entries and falls_below %d, expected %d"
+			% [label, room.size(), falls_below.size(), top + 1])
+		return
+	if room[0] != 0:
+		errors.append("%s: room[0] is %d, expected 0" % [label, room[0]])
+	for level: int in range(1, top + 1):
+		if room[level] <= room[level - 1]:
+			errors.append("%s: room[%d] is %d, expected more than room[%d] %d"
+				% [label, level, room[level], level - 1, room[level - 1]])
+		if people.size() == top + 1 and people[level] > room[level]:
+			errors.append("%s: people[%d] is %d, over room %d" % [label, level, people[level], room[level]])
+		if falls_below[level] < 0:
+			errors.append("%s: falls_below[%d] is %d, expected 0 or more" % [label, level, falls_below[level]])
+	if falls_below[1] != 0:
+		errors.append("%s: falls_below[1] is %d, expected 0 (a hamlet falls no further)" % [label, falls_below[1]])
+	for level: int in range(2, top + 1):
+		if falls_below[level] > 0 and falls_below[level] >= room[level - 1]:
+			errors.append("%s: falls_below[%d] is %d, expected under room[%d] %d"
+				% [label, level, falls_below[level], level - 1, room[level - 1]])
 
 
 func _label() -> String:

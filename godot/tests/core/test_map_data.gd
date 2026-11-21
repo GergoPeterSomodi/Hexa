@@ -188,7 +188,7 @@ func test_map_state_round_trip() -> void:
 	s.owner[m.index_of(Vector2i(5, 2))] = 254
 	var d := s.to_dict()
 	assert_eq(d["schema"], MapState.SCHEMA)
-	assert_eq(MapState.SCHEMA, "hexa-godot/map-state/3")
+	assert_eq(MapState.SCHEMA, "hexa-godot/map-state/4")
 	# JSON-safe: survives text.
 	var parsed: Variant = JSON.parse_string(JSON.stringify(d))
 	assert_true(parsed is Dictionary)
@@ -230,7 +230,7 @@ func test_map_state_schema_3_round_trip_with_works() -> void:
 	var m := _map()
 	var s := _state_with_works(m)
 	var d := s.to_dict()
-	assert_eq(d["schema"], "hexa-godot/map-state/3")
+	assert_eq(d["schema"], "hexa-godot/map-state/4")
 	var back := MapState.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary, m)
 	assert_not_null(back)
 	assert_eq(back.works.size(), 2)
@@ -338,3 +338,174 @@ func test_map_state_refuses_a_wrong_map_or_schema() -> void:
 	bad_owner["owner"] = Marshalls.raw_to_base64(PackedByteArray([1, 2, 3]))
 	assert_null(MapState.from_dict(bad_owner, m), "schema 2 owner size mismatch")
 	assert_null(MapState.from_dict({}, m), "empty")
+
+
+func _state_with_people(m: MapData) -> MapState:
+	var s := _state_with_works(m)
+	for i: int in m.hex_count():
+		if m.land[i] != 0:
+			s.people[i] = 800 + i * 13
+			s.people_start[i] = 790 + i * 13
+			s.people_end[i] = 800 + i * 13
+	return s
+
+
+func test_map_state_4_create_sizes_and_copies_the_people() -> void:
+	var m := _map()
+	var s := MapState.create(m)
+	assert_eq(s.people.size(), 35)
+	assert_eq(s.people_start.size(), 35)
+	assert_eq(s.people_end.size(), 35)
+	assert_eq(s.people.count(0), 35, "wild people are zero")
+	var p := _state_with_people(m)
+	var copy := p.duplicate_state()
+	assert_eq(copy.people, p.people)
+	assert_eq(copy.people_start, p.people_start)
+	assert_eq(copy.people_end, p.people_end)
+	copy.people[10] += 1
+	copy.people_start[10] += 1
+	copy.people_end[10] += 1
+	assert_ne(copy.people[10], p.people[10], "a copy is independent")
+	assert_ne(copy.people_start[10], p.people_start[10])
+	assert_ne(copy.people_end[10], p.people_end[10])
+
+
+func test_map_state_4_round_trip_with_the_people() -> void:
+	var m := _map()
+	var s := _state_with_people(m)
+	var d := s.to_dict()
+	assert_eq(d["schema"], "hexa-godot/map-state/4")
+	assert_true(d["people"] is PackedInt32Array, "packed as they are")
+	for form: int in 2:
+		var src: Dictionary = d
+		if form == 0:
+			src = JSON.parse_string(JSON.stringify(d)) as Dictionary
+		else:
+			src = bytes_to_var(var_to_bytes(d)) as Dictionary
+		var back := MapState.from_dict(src, m)
+		assert_not_null(back, "form %d" % form)
+		assert_eq(back.people, s.people)
+		assert_eq(back.people_start, s.people_start)
+		assert_eq(back.people_end, s.people_end)
+		assert_eq(back.digest(), s.digest())
+		assert_eq(var_to_bytes(back.to_dict()), var_to_bytes(d), "save, load, save equal")
+
+
+func test_map_state_digest_moves_with_one_person() -> void:
+	var m := _map()
+	var s := _state_with_people(m)
+	var base := s.digest()
+	assert_eq(_state_with_people(m).digest(), base, "the same state, the same digest")
+	var seen: Dictionary = {base: true}
+	for field: String in ["people", "people_start", "people_end"]:
+		for hex_i: int in [8, 20]:
+			var c := s.duplicate_state()
+			match field:
+				"people":
+					c.people[hex_i] += 1
+				"people_start":
+					c.people_start[hex_i] += 1
+				_:
+					c.people_end[hex_i] += 1
+			var dg := c.digest()
+			assert_false(seen.has(dg), "one person in %s at %d moves the digest" % [field, hex_i])
+			seen[dg] = true
+	# The three arrays are told apart: the same number in one array or the next gives another digest.
+	var a := MapState.create(m)
+	var b := MapState.create(m)
+	a.people[9] = 5
+	b.people_start[9] = 5
+	assert_ne(a.digest(), b.digest())
+
+
+func test_map_state_schema_3_loads_with_people_at_zeros() -> void:
+	var m := _map()
+	var s := _state_with_works(m)
+	var v3 := s.to_dict()
+	v3["schema"] = MapState.SCHEMA_V3
+	for key: String in ["people", "people_start", "people_end"]:
+		v3.erase(key)
+	var back := MapState.from_dict(v3, m)
+	assert_not_null(back)
+	assert_eq(back.works.size(), 2, "the works of schema 3 are read")
+	assert_eq(back.people.size(), 35)
+	assert_eq(back.people.count(0), 35)
+	assert_eq(back.people_start.count(0), 35)
+	assert_eq(back.people_end.count(0), 35)
+	assert_eq(back.digest(), s.digest(), "the zero people of a fresh state")
+	assert_eq(back.to_dict()["schema"], MapState.SCHEMA, "saved again as map-state/4")
+	var v2 := {"schema": MapState.SCHEMA_V2, "main_use": Marshalls.raw_to_base64(s.main_use),
+		"level": Marshalls.raw_to_base64(s.level), "owner": Marshalls.raw_to_base64(s.owner)}
+	var back2 := MapState.from_dict(v2, m)
+	assert_not_null(back2)
+	assert_eq(back2.people.size(), 35)
+	assert_eq(back2.people_end.count(0), 35)
+
+
+func test_map_state_4_refuses_mistyped_or_wrongly_sized_people() -> void:
+	var m := _map()
+	var d := _state_with_people(m).to_dict()
+	for key: String in ["people", "people_start", "people_end"]:
+		var bad := d.duplicate(true)
+		bad[key] = "text"
+		assert_null(MapState.from_dict(bad, m), "P: a string in %s" % key)
+		bad = d.duplicate(true)
+		bad[key] = Marshalls.raw_to_base64(PackedByteArray([1, 2, 3]))
+		assert_null(MapState.from_dict(bad, m), "P: base64 text in %s" % key)
+		bad = d.duplicate(true)
+		bad[key] = PackedInt32Array([1, 2, 3])
+		assert_null(MapState.from_dict(bad, m), "P: %s of the wrong size" % key)
+		bad = d.duplicate(true)
+		bad[key] = PackedInt32Array()
+		assert_null(MapState.from_dict(bad, m), "P: %s empty" % key)
+		bad = d.duplicate(true)
+		bad[key] = PackedByteArray([0, 0, 0])
+		assert_null(MapState.from_dict(bad, m), "P: %s as bytes" % key)
+		bad = d.duplicate(true)
+		bad.erase(key)
+		assert_null(MapState.from_dict(bad, m), "P: %s missing in schema 4" % key)
+		bad = d.duplicate(true)
+		bad[key] = null
+		assert_null(MapState.from_dict(bad, m), "P: %s null" % key)
+		bad = d.duplicate(true)
+		var list: Array = []
+		for i: int in 35:
+			list.append(1)
+		list[4] = "7"
+		bad[key] = list
+		assert_null(MapState.from_dict(bad, m), "P: a string inside a list for %s" % key)
+		list[4] = 1.5
+		bad[key] = list
+		assert_null(MapState.from_dict(bad, m), "P: a fraction inside a list for %s" % key)
+		list[4] = -3
+		bad[key] = list
+		assert_null(MapState.from_dict(bad, m), "P: a negative person in %s" % key)
+		bad[key] = list.slice(0, 20)
+		assert_null(MapState.from_dict(bad, m), "P: a list of 20 for %s" % key)
+	var negative := d.duplicate(true)
+	var packed: PackedInt32Array = (negative["people"] as PackedInt32Array).duplicate()
+	packed[8] = -1
+	negative["people"] = packed
+	assert_null(MapState.from_dict(negative, m), "P: a packed negative")
+
+
+func test_the_projected_size_of_the_made_up_europe() -> void:
+	var big := MapData.new()
+	big.allocate(346, 353)
+	assert_eq(big.hex_count(), 122138)
+	var s := MapState.create(big)
+	# The countryside at its room: long runs of equal numbers, a few villages and towns.
+	for i: int in s.people.size():
+		var run := floori(float(i) / 400.0)
+		var v := 0 if run % 5 == 0 else 2000 + (run % 7) * 1000
+		s.people[i] = v
+		s.people_start[i] = v
+		s.people_end[i] = v + (4 if i % 97 == 0 and v > 0 else 0)
+	var raw := s.people.to_byte_array().size() * 3
+	assert_eq(raw, 3 * 4 * big.hex_count())
+	assert_lt(raw, 1_500_000, "about 1.46 MB before compression")
+	var packed := var_to_bytes(s.to_dict()).compress(FileAccess.COMPRESSION_ZSTD)
+	assert_lt(packed.size(), 600_000, "mostly equal runs: well under the raw size")
+	var back := MapState.from_dict(bytes_to_var(var_to_bytes(s.to_dict())) as Dictionary, big)
+	assert_not_null(back)
+	assert_eq(back.digest(), s.digest())

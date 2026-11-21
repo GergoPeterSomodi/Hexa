@@ -201,6 +201,25 @@ static func upgrade(game: Game, args: Dictionary) -> Dictionary:
 	return verdict
 
 
+## A check and its doer for a settlement that falls a level (not an action: no home rule; People.decline_check alone
+## calls it). args {hex, tag}; the tag is not read.
+static func lower_check(game: Game, args: Dictionary) -> Dictionary:
+	var hex: Variant = _hex_arg(args)
+	if hex == null:
+		return _refusal("no hex given")
+	return game.improvement.lower_check(hex as Vector2i)
+
+
+## Lowers the settlement one level (after checking again) and queues one hex_changed.
+static func lower(game: Game, args: Dictionary) -> Dictionary:
+	var verdict := lower_check(game, args)
+	if bool(verdict["ok"]):
+		var hex: Vector2i = args["hex"]
+		game.improvement.lower(hex)
+		_changed(game, hex)
+	return verdict
+
+
 static func clear_check(game: Game, args: Dictionary) -> Dictionary:
 	var home := _hex_and_home(game, args)
 	if not bool(home["ok"]):

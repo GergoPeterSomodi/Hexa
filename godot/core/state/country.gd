@@ -1,12 +1,15 @@
 ## What changes about a country during a game (docs/architecture/m2-build-spec.md section 5.2 and 5.9).
-## The treasury and the stores (M4, schema country/2) are here; armies (M6) and techs (M11) join with their systems.
+## The treasury and the stores (M4) and the people's flows (M5, schema country/3) are here; armies (M6) and techs (M11) join with their systems.
 class_name Country
 extends RefCounted
 
-const SCHEMA := "hexa-godot/country/2"
+const SCHEMA_V2 := "hexa-godot/country/2"
+const SCHEMA := "hexa-godot/country/3"
 const NO_HEX := Vector2i(-1, -1)
 ## The flows of a stock (Stores.FLOWS.size(); test_stores pins the two equal): the width of flows_open.
 const FLOW_COUNT := 6
+## The people's flows (People.FLOWS.size()): the width of people_flows.
+const PEOPLE_FLOW_COUNT := 6
 
 ## Country id in MapState.owner (1 to 254).
 var id: int = 0
@@ -35,6 +38,14 @@ var short_mask: int = 0
 var stock_from: PackedInt32Array = PackedInt32Array()
 ## The last closed season: {turn, opening: PackedInt32Array, closing, flows}; {} before the first; written only by Stores.
 var goods_closed: Dictionary = {}
+## The open season's people flows, signed, by People.FLOWS; written only by People.
+var people_flows: PackedInt32Array = PackedInt32Array()
+## The last season ended: {turn, flows: PackedInt32Array}; {} before the first; written only by People.
+var people_closed: Dictionary = {}
+## The towns' food need of the season; written only by People (in the people phase).
+var food_need: int = 0
+## Food eaten x 1000 / need of the season (1000 when fed); written only by People.
+var food_fed: int = 1000
 
 
 static func create(
@@ -70,13 +81,18 @@ func to_dict() -> Dictionary:
 		"flows_shape": [int(flows_open.size() / float(FLOW_COUNT)), FLOW_COUNT],
 		"stock_from": stock_from,
 		"goods_closed": _goods_to_dict(goods_closed),
+		"people_flows": people_flows.duplicate(),
+		"people_closed": _people_to_dict(people_closed),
+		"food_need": food_need,
+		"food_fed": food_fed,
 	}
 
 
 ## Restores a Country saved by to_dict, or returns null when the schema is wrong (country/1 included) or a field is
 ## malformed. A key that is missing takes its default; a key of the wrong type is refused.
 static func from_dict(d: Dictionary) -> Country:
-	if str(d.get("schema", "")) != SCHEMA:
+	var schema := str(d.get("schema", ""))
+	if schema != SCHEMA and schema != SCHEMA_V2:
 		return null
 	var c := Country.new()
 	c.id = int(d.get("id", 0))
@@ -92,18 +108,23 @@ static func from_dict(d: Dictionary) -> Country:
 	elif cap_val != null:
 		return null
 	c.alive = bool(d.get("alive", true))
-	return c if c._load_economy(d) else null
+	if not c._load_economy(d):
+		return null
+	if schema == SCHEMA and not c._load_people(d):
+		return null
+	return c
 
 
 ## Stable text line used in Game.digest(): "id|tag|col,row|alive|treasury|tax|short_mask|ledger_from|open lines|
-## closed ledger|stock|flows_open|stock_from|closed goods". A line is "why:col,row:amount:count", lines are joined by ";",
+## closed ledger|stock|flows_open|stock_from|closed goods|people_flows|people_closed|food_need|food_fed". A line is "why:col,row:amount:count", lines are joined by ";",
 ## a list of numbers by ","; the closed ledger is "turn:opening:closing;" and its lines, the closed goods
-## "turn:opening:closing:flows" with comma lists.
+## "turn:opening:closing:flows" with comma lists, the closed people "turn:flows".
 func digest_text() -> String:
-	return "%d|%s|%d,%d|%s|%d|%d|%d|%d|%s|%s|%s|%s|%s|%s" % [
+	return "%d|%s|%d,%d|%s|%d|%d|%d|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%d" % [
 		id, String(tag), capital.x, capital.y, "true" if alive else "false",
 		treasury, tax, short_mask, ledger_from, _lines_text(ledger_open), _ledger_text(ledger_closed),
 		_list_text(stock), _list_text(flows_open), _list_text(stock_from), _goods_text(goods_closed),
+		_list_text(people_flows), _people_text(people_closed), food_need, food_fed,
 	]
 
 
@@ -143,6 +164,58 @@ func _load_economy(d: Dictionary) -> bool:
 	flows_open = flows
 	stock_from = _padded(packs[2])
 	return true
+
+
+## Reads the M5 fields of `d` into this country; false (nothing read) when one is malformed. A key that is missing
+## takes its default; a flows list of fewer than PEOPLE_FLOW_COUNT entries is padded with zeros, a longer one is refused.
+func _load_people(d: Dictionary) -> bool:
+	var flows: Variant = _ints_from(d.get("people_flows", []))
+	var closed: Variant = _people_from(d.get("people_closed", {}))
+	var need: Variant = _whole(d.get("food_need", 0))
+	var fed: Variant = _whole(d.get("food_fed", 1000))
+	if flows == null or closed == null or need == null or fed == null:
+		return false
+	if (flows as PackedInt32Array).size() > PEOPLE_FLOW_COUNT or int(need) < 0 or int(fed) < 0 or int(fed) > 1000:
+		return false
+	people_flows = _flows_padded(flows)
+	people_closed = closed as Dictionary
+	food_need = int(need)
+	food_fed = int(fed)
+	return true
+
+
+## A people flows list padded with zeros to PEOPLE_FLOW_COUNT; empty stays empty.
+static func _flows_padded(values: PackedInt32Array) -> PackedInt32Array:
+	var out := values.duplicate()
+	if not out.is_empty() and out.size() < PEOPLE_FLOW_COUNT:
+		out.resize(PEOPLE_FLOW_COUNT)
+	return out
+
+
+static func _people_to_dict(closed: Dictionary) -> Dictionary:
+	if closed.is_empty():
+		return {}
+	return {"turn": int(closed["turn"]), "flows": (closed["flows"] as PackedInt32Array).duplicate()}
+
+
+## The closed people as saved, or null when it is neither {} nor {turn: number, flows: up to PEOPLE_FLOW_COUNT numbers}.
+static func _people_from(value: Variant) -> Variant:
+	if not (value is Dictionary):
+		return null
+	var raw := value as Dictionary
+	if raw.is_empty():
+		return {}
+	var turn: Variant = _whole(raw.get("turn", null))
+	var flows: Variant = _ints_from(raw.get("flows", null))
+	if turn == null or flows == null or (flows as PackedInt32Array).size() > PEOPLE_FLOW_COUNT:
+		return null
+	return {"turn": int(turn), "flows": _flows_padded(flows)}
+
+
+static func _people_text(closed: Dictionary) -> String:
+	if closed.is_empty():
+		return ""
+	return "%d:%s" % [int(closed["turn"]), _list_text(closed["flows"])]
 
 
 ## A stock list of fewer than GoodDef.COUNT goods padded with 0 (a save from before a good was added); empty stays empty.

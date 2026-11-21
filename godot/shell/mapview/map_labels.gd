@@ -41,6 +41,9 @@ var _dirty := true
 var _major: StyleBoxFlat = null
 var _minor: StyleBoxFlat = null
 var _capital: StyleBoxFlat = null
+## The state the settlement levels come from (set_state), and each settlement place's level by hex (levels_of).
+var _state: MapState = null
+var _levels: Dictionary = {}
 
 
 func _init() -> void:
@@ -69,6 +72,7 @@ func setup(map: MapData, capitals_list: Variant = null) -> void:
 				_capitals.append(h as Vector2i)
 	else:
 		_use_game_capitals = false
+	_sync_levels()
 	_dirty = true
 	queue_redraw()
 
@@ -110,6 +114,28 @@ func refresh() -> void:
 	_dirty = true
 
 
+## The map's state (the game's MapState). A place on a settlement hex takes its level from the state; the other
+## places keep MapData.places[].level. The plates are relaid only when a label's level changed (the same state
+## again, or a state with the same levels, costs nothing). null goes back to the data's levels.
+func set_state(state: MapState) -> void:
+	_state = state
+	_sync_levels()
+
+
+## Recomputes the settlement levels from the state; refreshes the plates when one of them changed.
+func _sync_levels() -> void:
+	var fresh := levels_of(_map, _state)
+	var changed := fresh.size() != _levels.size()
+	if not changed:
+		for hex: Vector2i in fresh:
+			if int(_levels.get(hex, -1)) != int(fresh[hex]):
+				changed = true
+				break
+	_levels = fresh
+	if changed:
+		refresh()
+
+
 ## What is placed now: [{name, level, capital, hex, box (screen px)}], great places first.
 func placed() -> Array[Dictionary]:
 	return _placed
@@ -132,7 +158,8 @@ func _process(_delta: float) -> void:
 		_last_size = screen
 		_dirty = false
 		var cap_override: Variant = _capitals if _use_game_capitals else null
-		_placed = layout(_map, xform, Rect2(Vector2.ZERO, screen), ThemeDB.fallback_font, obstacles, cap_override)
+		_placed = layout(_map, xform, Rect2(Vector2.ZERO, screen), ThemeDB.fallback_font, obstacles, cap_override,
+			_levels)
 		queue_redraw()
 
 
@@ -177,8 +204,9 @@ static func font_size(level: int) -> int:
 ## screen px, `screen` is the area the plates must stay in, `blocked` the boxes they keep off. When `capitals_override`
 ## is provided (an Array of capital Vector2i hexes), capital status comes from that set instead of MapData.places[].capital.
 ## Returns [{name, level, capital, hex, box}] in placing order (rank: level, capital first, then by name).
+## `levels` (hex to level, see levels_of) replaces the data's level of a place on a settlement hex.
 static func layout(map: MapData, to_screen: Transform2D, screen: Rect2, font: Font,
-		blocked: Array[Rect2], capitals_override: Variant = null) -> Array[Dictionary]:
+		blocked: Array[Rect2], capitals_override: Variant = null, levels: Dictionary = {}) -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
 	var taken: Array[Rect2] = blocked.duplicate()
 	var cap_set: Dictionary[Vector2i, bool] = {}
@@ -197,13 +225,29 @@ static func layout(map: MapData, to_screen: Transform2D, screen: Rect2, font: Fo
 		var label := str(place.get("name", ""))
 		if label == "":
 			continue
-		var level := int(place.get("level", 0))
+		var level := int(levels[hex]) if levels.has(hex) else int(place.get("level", 0))
 		var fs := font_size(level)
 		var text := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
 		var is_cap := cap_set.has(hex) if has_cap_override else bool(place.get("capital", false))
 		items.append({"name": label, "level": level, "capital": is_cap, "hex": hex, "at": at,
 			"size": Vector2(text.x + 2.0 * PAD_X, text.y + 2.0 * PAD_Y)})
 	return _place(items, taken, screen)
+
+
+## The level of each settlement place by hex, read from `state`: where the hex's main use is a settlement
+## (ImproveRules.SETTLEMENT) the state's level. Empty without a map or a state; a place off the map is skipped.
+static func levels_of(map: MapData, state: MapState) -> Dictionary:
+	var out: Dictionary = {}
+	if map == null or state == null:
+		return out
+	for place: Dictionary in map.places:
+		var hex: Vector2i = place["hex"]
+		var i := map.index_of(hex)
+		if i < 0 or i >= state.main_use.size() or i >= state.level.size():
+			continue
+		if int(state.main_use[i]) == ImproveRules.SETTLEMENT:
+			out[hex] = int(state.level[i])
+	return out
 
 
 ## The collision placement: by rank, each plate takes the first free spot inside `bounds`.

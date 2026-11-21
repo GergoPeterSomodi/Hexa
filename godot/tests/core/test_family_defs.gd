@@ -287,7 +287,8 @@ func test_m4_settlement_and_castle_numbers_equal_table_4_4() -> void:
 	assert_eq(Array(s.ring_lift), [0, 0, 0, 0, 100, 200])
 	assert_eq(Array(s.port_fish), [0, 1, 2, 4, 6, 10])
 	assert_eq(Array(s.port_dues), [0, 2, 5, 12, 30, 45])
-	assert_eq(Array(s.cost), [0, 0, 100, 300, 700, 1000])
+	# M5 4.6 moves the costs of levels 2 and 3 to 60 and 200 (M4: 100 and 300); the M5 test checks them too.
+	assert_eq(Array(s.cost), [0, 0, 60, 200, 700, 1000])
 	assert_eq(_goods_array(s.cost_goods), [{}, {}, {"timber": 10}, {"timber": 20, "stone": 10}, {"timber": 20, "stone": 60}, {"timber": 20, "stone": 40}])
 	assert_eq(s.base.size(), 0, "settlements make no goods")
 	assert_eq(s.ground_text, "")
@@ -371,3 +372,83 @@ func test_resource_round_trip() -> void:
 	assert_eq(loaded.work_seasons, src.work_seasons)
 	assert_eq(loaded.clear_seasons, src.clear_seasons)
 	assert_eq(loaded.validate(), [] as Array[String])
+
+
+## M5 spec 4.2, 4.5 and 4.6: the settlements' room, falls_below and the costs of levels 2 and 3.
+func test_m5_settlement_people_equal_spec() -> void:
+	var s := _load_family("settlements")
+	assert_eq(s.validate(), [] as Array[String], "settlements validate")
+	assert_eq(Array(s.room), [0, 2000, 4000, 20000, 45000, 100000], "room by level (4.2, 4.5)")
+	assert_eq(Array(s.falls_below), [0, 0, 1000, 2000, 0, 0], "falls below by level (4.5): never at 1, 4 and 5")
+	assert_eq(Array(s.cost), [0, 0, 60, 200, 700, 1000], "costs of levels 2 and 3 (4.6)")
+	assert_eq(Array(s.people), [0, 1000, 3000, 10000, 30000, 60000], "start people unchanged (4.2)")
+	assert_eq(s.work_seasons, PackedInt32Array([0, 4, 4, 8, 8, 8]), "durations unchanged (4.6)")
+	var c := _load_family("castles")
+	assert_eq(c.room.size(), 0, "castles have no room")
+	assert_eq(c.falls_below.size(), 0, "castles do not fall")
+	var w := _load_family("wheat")
+	assert_eq(w.room.size(), 0, "goods families have no room")
+	assert_eq(w.falls_below.size(), 0, "goods families do not fall")
+
+
+func test_planted_fault_m5_room_under_start_people() -> void:
+	var s := _load_family("settlements")
+	var room: PackedInt32Array = s.room.duplicate()
+	room[2] = 2000
+	s.room = room
+	assert_true(_has(s.validate(), "people[2] is 3000, over room 2000"), "a village's room under its start people refused")
+
+
+func test_planted_fault_m5_falls_below_not_under_lower_room() -> void:
+	var s := _load_family("settlements")
+	var below: PackedInt32Array = s.falls_below.duplicate()
+	below[3] = 4000
+	s.falls_below = below
+	assert_true(_has(s.validate(), "falls_below[3] is 4000, expected under room[2] 4000"),
+		"a town that falls at the village's room refused")
+	s = _load_family("settlements")
+	below = s.falls_below.duplicate()
+	below[2] = 2000
+	s.falls_below = below
+	assert_true(_has(s.validate(), "falls_below[2] is 2000, expected under room[1] 2000"),
+		"a village that falls at the hamlet's room refused")
+	s = _load_family("settlements")
+	below = s.falls_below.duplicate()
+	below[1] = 500
+	s.falls_below = below
+	assert_true(_has(s.validate(), "falls_below[1] is 500, expected 0"), "a hamlet that falls refused")
+	s = _load_family("settlements")
+	below = s.falls_below.duplicate()
+	below[2] = -1
+	s.falls_below = below
+	assert_true(_has(s.validate(), "falls_below[2] is -1, expected 0 or more"), "a negative fall refused")
+
+
+func test_planted_fault_m5_falls_below_above_people_top_level() -> void:
+	# With a top of 2, the level 3 town's falls_below of 2,000 is above the top: a fault checked by GameDefs.
+	var defs := _committed_copy()
+	defs.people_top_level = 2
+	assert_true(_has(defs.validate(), "settlements: falls_below[3] is 2000 above people_top_level 2"),
+		"a town that falls above a top of 2 refused")
+	# A walled town never falls: a fallen level 4 is refused with the committed top of 3.
+	defs = _committed_copy()
+	var s := _load_family("settlements")
+	var below: PackedInt32Array = s.falls_below.duplicate()
+	below[4] = 1000
+	s.falls_below = below
+	var fams: Array[FamilyDef] = defs.families.duplicate()
+	for i: int in fams.size():
+		if fams[i].id == 1:
+			fams[i] = s
+	defs.families = fams
+	assert_true(_has(defs.validate(), "settlements: falls_below[4] is 1000 above people_top_level 3"),
+		"a walled town that falls refused")
+
+
+func test_planted_fault_m5_room_on_other_families() -> void:
+	var c := _load_family("castles")
+	c.room = PackedInt32Array([0, 2000, 4000, 20000])
+	assert_true(_has(c.validate(), "room and falls_below are for settlements only"), "a castle's room refused")
+	var s := _load_family("settlements")
+	s.room = PackedInt32Array([0, 2000, 4000])
+	assert_true(_has(s.validate(), "room has 3 entries and falls_below 6, expected 6"), "a room of three entries refused")

@@ -91,3 +91,63 @@ func test_base_never_changes_after_many_overlay_writes() -> void:
 	assert_eq(s.level, level_before)
 	assert_eq(s.owner, owner_before)
 	assert_eq(StateView.of(s).changed().size(), 0)
+
+
+func test_people_at_reads_the_base_and_with_people_overlays() -> void:
+	var s := _state(40)
+	s.people.resize(40)
+	s.people_start.resize(40)
+	s.people_end.resize(40)
+	for i: int in 40:
+		s.people[i] = i * 10
+	var v := StateView.of(s)
+	assert_eq(v.people_at(7), 70)
+	assert_eq(v.people_at(-1), 0, "off the state reads 0")
+	assert_eq(v.people_at(40), 0)
+	var w := v.with_people({7: 5000, 8: 0})
+	assert_eq(w.people_at(7), 5000)
+	assert_eq(w.people_at(8), 0)
+	assert_eq(w.people_at(9), 90, "the rest falls through")
+	assert_eq(v.people_at(7), 70, "the old view is untouched")
+	assert_eq(s.people[7], 70, "the base is untouched")
+	assert_eq(w.people_changed(), PackedInt32Array([7, 8]))
+	assert_eq(w.changed().size(), 0, "people are not main use or level changes")
+
+
+func test_with_people_keeps_the_other_changes_and_later_numbers_win() -> void:
+	var s := _state(40)
+	s.people.resize(40)
+	var a := StateView.of(s).with({3: Vector2i(4, 2)}).with_people({5: 100})
+	assert_eq(a.main_use_at(3), 4, "the main use change is kept")
+	assert_eq(a.level_at(3), 2)
+	assert_eq(a.people_at(5), 100)
+	var b := a.with({6: Vector2i(1, 1)}).with_people({5: 250, 6: 7})
+	assert_eq(b.people_at(5), 250, "a later number wins")
+	assert_eq(b.people_at(6), 7)
+	assert_eq(b.main_use_at(3), 4, "with() after with_people keeps the people too")
+	assert_eq(b.changed(), PackedInt32Array([3, 6]))
+	var c := a.with({9: Vector2i(2, 2)})
+	assert_eq(c.people_at(5), 100, "with() keeps the people overlay")
+	assert_eq(a.people_at(6), 0, "the earlier view is untouched")
+	assert_eq(a.people_at(5), 100)
+
+
+func test_with_people_drops_bad_entries() -> void:
+	var s := _state(10)
+	s.people.resize(10)
+	var v := StateView.of(s).with_people({-1: 5, 10: 5, 3: -4, 4: "7", 5: 2.5, "6": 9, 7: 12})
+	assert_eq(v.people_changed(), PackedInt32Array([7]), "P: off the state, negative, text, float and text keys")
+	assert_eq(v.people_at(7), 12)
+
+
+func test_base_people_never_change_after_many_overlay_writes() -> void:
+	var s := _state(200)
+	s.people.resize(200)
+	for i: int in 200:
+		s.people[i] = i
+	var before := s.digest()
+	var v := StateView.of(s)
+	for round_i: int in 300:
+		v = v.with_people({(round_i * 7) % 200: round_i})
+	assert_gt(v.people_changed().size(), 20)
+	assert_eq(s.digest(), before)

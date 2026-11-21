@@ -1,6 +1,7 @@
 ## Prints the M4 economy tables from data/defs/game_defs.tres (docs/architecture/m4-build-spec.md sections 4.2 to 4.12):
 ## the goods, the families' numbers, the settlements, the wild yield and the cover people, and the money, weather and
-## tax numbers. The row builders are static so tests/core/test_economy_defs.gd can check them against the spec.
+## tax numbers, and the people tables (M5 spec 4.4 to 4.6). The row builders are static so
+## tests/core/test_economy_defs.gd can check them against the spec.
 ## Run: godot --headless --path godot -s res://tools/economy_tables.gd   (exit 1 when the defs do not validate)
 extends SceneTree
 
@@ -30,6 +31,8 @@ static func tables(defs: GameDefs) -> Array[String]:
 	lines.append_array(goods_rows(defs))
 	lines.append_array(family_rows(defs))
 	lines.append_array(settlement_rows(defs))
+	lines.append_array(level_rows(defs))
+	lines.append_array(people_rows(defs))
 	lines.append_array(wild_rows(defs))
 	lines.append_array(money_rows(defs))
 	return lines
@@ -89,6 +92,45 @@ static func settlement_rows(defs: GameDefs) -> Array[String]:
 			f.ring_lift[level], f.port_fish[level], f.port_dues[level],
 		])
 	return lines
+
+
+## The level rows of the settlements (spec 4.5, 4.6): level, start people, room, the people under which it falls (never at
+## 0), and the cost to reach the level (ducats and goods).
+static func level_rows(defs: GameDefs) -> Array[String]:
+	var lines: Array[String] = ["settlement levels (level, start people, room, falls below, cost in ducats and goods)"]
+	var f := defs.family(1)
+	if f == null:
+		lines.append("(no settlements family)")
+		return lines
+	for level: int in range(1, f.people.size()):
+		var below := _at(f.falls_below, level)
+		var parts: Array[String] = []
+		if level < f.cost_goods.size():
+			for key: Variant in f.cost_goods[level]:
+				parts.append("%s %d" % [String(key), int(f.cost_goods[level][key])])
+		var goods_text := ", ".join(parts) if not parts.is_empty() else "no goods"
+		lines.append("  %d start %d room %d falls %s cost %d %s" % [
+			level, f.people[level], _at(f.room, level), "never" if below == 0 else str(below),
+			_at(f.cost, level), goods_text,
+		])
+	return lines
+
+
+## The people numbers (spec 4.4): growth by tax level and by slot, hunger by slot, crowding, the town floor, the top level
+## the people raise, and M6's levy share.
+static func people_rows(defs: GameDefs) -> Array[String]:
+	var lines: Array[String] = ["people (growth by tax Low, Normal, High; growth and hunger by slot)"]
+	lines.append("  growth_bp %s; growth_percent %s" % [str(Array(defs.growth_bp)), str(Array(defs.growth_percent))])
+	lines.append("  hunger_bp %d; hunger_percent %s" % [defs.hunger_bp, str(Array(defs.hunger_percent))])
+	lines.append("  left_bp %d; town_floor %d; people_top_level %d; levy_permille %d" % [
+		defs.left_bp, defs.town_floor, defs.people_top_level, defs.levy_permille,
+	])
+	return lines
+
+
+## The value at an index of a per-level array, 0 past its end.
+static func _at(values: PackedInt32Array, index: int) -> int:
+	return values[index] if index < values.size() else 0
 
 
 ## The wild yield per cover (loads a season per slot) with its good and its people.

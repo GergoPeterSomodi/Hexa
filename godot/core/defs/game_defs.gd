@@ -50,6 +50,21 @@ extends Resource
 @export var weather_permille: PackedInt32Array = PackedInt32Array()
 @export var expensive_permille := 250
 @export var expensive_seasons := 8
+## The people numbers (M5 spec 4.4, 5.1). Growth and hunger are basis points (hundredths of a percent) a season.
+@export var growth_bp: PackedInt32Array = PackedInt32Array([125, 100, 50])
+## Six slots: spring, summer, autumn, winter snow, winter frost, winter mild.
+@export var growth_percent: PackedInt32Array = PackedInt32Array([100, 100, 100, 0, 50, 100])
+## A settlement's loss a season at no food at all, basis points.
+@export var hunger_bp := 400
+@export var hunger_percent: PackedInt32Array = PackedInt32Array([100, 100, 100, 150, 125, 100])
+## The share of a crowded hex's people that leaves a season, basis points.
+@export var left_bp := 200
+## Hunger never takes a settlement below this many people.
+@export var town_floor := 200
+## The highest level the people raise a settlement to themselves.
+@export var people_top_level := 3
+## M6's seam: the share of a hex's people one levy may take, permille (spec 4.20).
+@export var levy_permille := 100
 
 var _country_cache: Dictionary[StringName, CountryDef] = {}
 var _country_cache_size: int = -1
@@ -128,7 +143,8 @@ func scenario(id: String) -> ScenarioDef:
 
 
 ## Problems found, empty when valid: unique country tags, each CountryDef valid, 8 CB colours, unique scenario ids,
-## 14 families (each valid, ids 1 to 14 once each), work_slots_base 1 or more, work_slots_city_level 1 to 5.
+## 14 families (each valid, ids 1 to 14 once each), work_slots_base 1 or more, work_slots_city_level 1 to 5,
+## and the people numbers (_check_people).
 func validate() -> Array[String]:
 	var errors: Array[String] = []
 	var seen_tags: Dictionary = {}
@@ -177,6 +193,7 @@ func validate() -> Array[String]:
 			errors.append("scenarios[%d]: duplicate scenario id '%s'" % [i, s.id])
 		else:
 			seen_ids[s.id] = true
+	_check_people(errors)
 	_check_economy(errors)
 	return errors
 
@@ -213,6 +230,42 @@ func digest() -> String:
 	_feed_int(ctx, work_slots_city_level)
 	_feed_int(ctx, 1 if works_halt_in_snow_winter else 0)
 	return ctx.finish().hex_encode()
+
+
+## The people numbers (M5 spec 5.1): growth_bp 3 entries 0 to 1000, growth_percent and hunger_percent 6 entries 0 to
+## 400, hunger_bp 0 to 2000, left_bp 0 to 5000, town_floor 0 or more, people_top_level 1 to 5, levy_permille 0 to 1000.
+## A settlement above people_top_level never falls: its falls_below is 0 (FamilyDef checks the other levels).
+func _check_people(errors: Array[String]) -> void:
+	_check_size(errors, "growth_bp", growth_bp.size(), 3)
+	_check_size(errors, "growth_percent", growth_percent.size(), 6)
+	_check_size(errors, "hunger_percent", hunger_percent.size(), 6)
+	_check_each(errors, "growth_bp", growth_bp, 0, 1000)
+	_check_each(errors, "growth_percent", growth_percent, 0, 400)
+	_check_each(errors, "hunger_percent", hunger_percent, 0, 400)
+	_check_value(errors, "hunger_bp", hunger_bp, 0, 2000)
+	_check_value(errors, "left_bp", left_bp, 0, 5000)
+	_check_value(errors, "people_top_level", people_top_level, 1, 5)
+	_check_value(errors, "levy_permille", levy_permille, 0, 1000)
+	if town_floor < 0:
+		errors.append("town_floor is %d, expected 0 or more" % town_floor)
+	var settlements := family(1)
+	if settlements == null:
+		return
+	for level: int in range(maxi(people_top_level, 0) + 1, settlements.falls_below.size()):
+		if settlements.falls_below[level] != 0:
+			errors.append("settlements: falls_below[%d] is %d above people_top_level %d, expected 0 (it never falls)"
+				% [level, settlements.falls_below[level], people_top_level])
+
+
+func _check_each(errors: Array[String], field: String, values: PackedInt32Array, low: int, high: int) -> void:
+	for index: int in values.size():
+		if values[index] < low or values[index] > high:
+			errors.append("%s[%d] is %d, expected %d to %d" % [field, index, values[index], low, high])
+
+
+func _check_value(errors: Array[String], field: String, value: int, low: int, high: int) -> void:
+	if value < low or value > high:
+		errors.append("%s is %d, expected %d to %d" % [field, value, low, high])
 
 
 ## The economy's checks (spec 5.1): 16 goods with ids 0 to 15 in order and valid, the four weights (food_weight and the

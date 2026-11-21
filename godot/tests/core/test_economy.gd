@@ -171,7 +171,7 @@ func test_family_costs_jobs_and_upkeep_equal_the_tables() -> void:
 	assert_eq(Array(s.ring_lift), [0, 0, 0, 0, 100, 200])
 	assert_eq(Array(s.port_fish), [0, 1, 2, 4, 6, 10])
 	assert_eq(Array(s.port_dues), [0, 2, 5, 12, 30, 45])
-	assert_eq(Array(s.cost), [0, 0, 100, 300, 700, 1000])
+	assert_eq(Array(s.cost), [0, 0, 60, 200, 700, 1000])
 	var c := _defs.family(2)
 	assert_eq(Array(c.walls), [0, 2, 4, 8])
 	assert_eq(Array(c.keep_wild), [0, 100, 100, 100])

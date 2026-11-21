@@ -657,6 +657,56 @@ Layers as the standard: `defs`, `state`, `systems`, `game`, `views`, `shell`. `c
 luck. New files are marked **new**; "(M2)" to "(M4.5)" and "(M1.5)" name pieces those milestones build. Every amount is an
 `int`.
 
+### 5.0 Sign-off amendments (technical director, 2026-11-21; engineering inside the decisions)
+
+These bind M5's tasks and are part of the spec. Where a later section says otherwise, this section wins.
+
+- **R1 One staffing step, the profile and the cache read people live.** `Economy.staffed(game, view, i, raw, lift) -> Vector2i`
+  (x staffing, y a0 = raw x staffing / 1000 x (1000 + lift) / 1000, floored in that order); people from `view.people_at`, hands
+  and jobs of the hex's owner's hexes. It is the one live step: `district_base`, `DistrictCache.base_of`, `SeasonProfile.live` and
+  `EconomyPreview` call it and nothing else computes staffing. `DistrictCache.base_of(game, i, view = null)` reads the view's
+  people when given, else `game.state`'s. `SeasonProfile` (M4) keeps `raw` in its rows in place of `a0`; `town` and `rest` leave
+  the people-free profile; `live(game, held, id) -> {town, rest, a0 (a row)}` is kept in the view cache by `[hash(owner),
+  hash(main_use), hash(level), hash(people)]`: production and income of a season build it once, stats once more after the people
+  phase. `EconomySeason.made_of` reads `raw` and `Economy.staffed`; production and income read `SeasonProfile.live`;
+  `StatsSystem`'s people column reads `SeasonProfile.live`. M4's readers of `room` as people (`SeasonProfile._build`'s
+  `F_ROOM` into `town`/`rest`, `EconomyPreview._adjust` and the worth code's `ROOM`) become readers of live people.
+- **R2 The people phase walks only the hexes that can change.** `People.active(game, view, id) -> PackedInt32Array`: the hexes of
+  country `id` whose people can change on the view: its settlements and its hexes whose people differ from their room (read from
+  `DistrictCache`'s room column, not through a call a hex); ascending. `People.season` and `EconomyPreview` step exactly these.
+  In 4.1 and in `season()`'s comment, "every owned land hex (index order)" reads "`People.active` (index order)". Spec 10's row
+  "people phase over its budget" has the fallback "a running set kept per hex by `People.move` and `hex_changed`".
+  `people_ms` and `production_ms` are probed in P4's pull request (made-up Europe; the made-up Europe's 73,210 owned hexes cost
+  113 ms for a plain per-hex body: the walk must not be over all of them).
+- **R3 Wiring order.** `People.setup` in `new_game`, `new_scenario` and `with_state` belongs to **P4** (three lines of
+  `core/game/game.gd`), not P5: P4 makes `Economy.people_at` read `MapState.people`, and zeros until the setup would break every
+  M4 test. P5 keeps the season table, `dev_people`, stats, replay and saves. P4's files gain `season_profile.gd`,
+  `economy_season.gd`, `stats_system.gd` (the people column), `economy_preview.gd` (only `ROOM`/`a0` as people) and
+  `improve_preview.gd` (the people jump becomes the room line; M4 4.15 (d)'s test moves to 4.11 (c)'s room). P4's done-when
+  gains: **with no people phase, every M4 and M4.5 number is unchanged without `PeopleFixture.still` (people never change),
+  apart from D16's costs and D18.** Spec 5.4's `with_state` condition reads: "`People.setup` when defs is set and the state's
+  people are all 0 (`people.count(0) == people.size()`)": `create()` and the older schemas give zero-filled arrays, not empty.
+- **R4 The preview's level step sees same-season changes.** In 4.10, the sentence ending "the view taking the new levels
+  (`StateView.with`) and the new people (`StateView.with_people`) for the next season" reads: "then the season's new people are
+  laid on the view (`StateView.with_people`) and the level step of 4.5 runs with `grow_check` and `decline_check` on it, each
+  level change laid on the view (`StateView.with`) before the next settlement is checked, as the phase sees its own earlier
+  changes." In 4.5: `town_grew` and `district_declined` are emitted only when `Improve.upgrade` / `Improve.lower` return ok;
+  `test_people_property` checks that `grow_check` ok implies `Improve.upgrade_check` ok on the same hex.
+- **R5 The preview stays within budget.** Countryside change never reads `fed`, so it is the same for every option. In 4.10: the
+  baseline (kept by `[&"made", version, tag, tax]`) holds the people of `People.active` season by season, the levels and fed.
+  An option re-steps its own changed hexes and their ring, and the settlements only from the first season whose fed differs from
+  the baseline's; a district's staffing is re-worked only where its ring's people differ from the baseline's. Equality with the
+  played season holds by induction (the 200-case property proves it).
+- **A1** `fed_of` reads "-(grain used) - (fish used) this season, from `flows_open`: the takes as positive amounts" (M4's rule R4).
+- **A2** `People.move` also refuses a result above `PEOPLE_MAX` (1,000,000): it protects the int32 arrays and country sums.
+- **A3** country/2 reads "with zeros, {} and `food_fed` 1000".
+- **A4** `Snapshot._ranges_ok`: every `people`, `people_start`, `people_end` value in 0..`PEOPLE_MAX`, sea hexes 0.
+- **A5** 4.3: `food_need` equals the need production took (town people do not change between production and the people phase in M5:
+  settlements are never built or cleared there); `test_people_property` asserts food used <= `food_need`.
+- **A6** Section 12, hand-on notes: M6 armies eat through their own Stores flow (`army`), never `used`; `fed_of` reads `used` only.
+  M7: a transfer mid-season breaks per-country conservation (flows are booked to the owner at the move); M7 appends
+  `ceded`/`gained` written by a People call from `Territory.transfer`. In M5 the property is exact per hex, and per country in
+  seasons without a transfer (`dev_transfer` stays out of `test_people_property`).
 ### 5.1 Definitions (`core/defs/`)
 
 ```gdscript

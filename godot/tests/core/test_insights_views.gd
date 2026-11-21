@@ -287,7 +287,7 @@ func test_the_pins_of_4_13() -> void:
 	assert_eq(Actions.NAMES, ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax"] as Array[String])
 	assert_eq(SaveFile.FORMAT, 2)
 	assert_eq(SaveFile.OLDEST_FORMAT, 2)
-	assert_eq(Stats.SERIES.size(), 35)
+	assert_eq(Stats.SERIES.size(), 40)
 	assert_eq(Chronicle.NOTABLE, ["work_started", "work_finished", "work_cancelled", "owners_changed", "country_chosen",
 		"goods_short", "tax_set"] as Array[String])
 	assert_eq(Chronicle.KEEP, 3000)
