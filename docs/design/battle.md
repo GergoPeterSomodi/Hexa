@@ -123,3 +123,27 @@ latest proposal for the frame; only the picture style changed.
 ## Round 9 (2026-11-11): full cards = deluxe frame (mockup 18) + game-style pictures, mockup [21_cards_game_style.png](../design/images/21_cards_game_style.png) (proposed). Script: cards_game_style.py in this session scratchpad.
 
 ## APPROVED (2026-11-11): final card look = mockup [21_cards_game_style.png](../design/images/21_cards_game_style.png) (deluxe era frames from mockup 18 + game-style pictures with art.figure/art.token and Kenney tiles). Mockups 17, 19, 20 are superseded.
+
+## Round 10 (2026-11-21): the battle board for the Godot game. Mockup [51_battle_board.png](images/51_battle_board.png), playable [battle-board-mockup.html](battle-board-mockup.html)
+From the owner's notebook sketch (three lanes; a front row, back row and reserve a side; one d6 a side with named modifiers;
+a day track; cards at the bottom; front regiments striking the enemy front, the back row firing over it). The pitch:
+"each day the enemy shows its plan, you answer with command points and cards, then the dice fall; five days at most, about a
+minute a battle." Proposed, to be specced as M24:
+- **Their plan first:** before the player acts, each enemy regiment's target for the day is drawn as an arrow (a pure
+  function of the board, redrawn after every move or card).
+- **One d6 a side a day, modifiers in the open:** total = roll + named chips (tech, idea, terrain, general), each with its
+  source on hover. M7 already rolls the die; the board shows it.
+- **Targeting rule:** a front regiment hits the lane opposite; an empty front there exposes that lane's back row; both empty,
+  it swings into the next lane as a flank (x1.25). Crossbows: own lane, then a neighbour. Guns: any lane.
+- **Command points** from the general (3 a day, a good general +1): move a regiment between lanes, commit the reserve,
+  rotate a worn regiment back, play a card.
+- **Cards come from the regiments on the field** (Pikemen: Pike hedge; Knights: Knightly charge; Bombards: Grand battery),
+  techs upgrade or add cards, the general adds one. Deck 8 to 15, draw 1 a day, hand at most 5. The approved cards of rounds
+  3 and 4 map onto this. Sneaky cards lie face down until they fire; Scouts reveal them.
+- **Watch, command or auto:** the board opens only for battles with a human side (setting: always, big battles, never);
+  auto lets the general fight; battles between AI countries stay instant.
+- Options, not yet chosen: a deploy step with the round 2 presets; a one-glance result card; stratagems instead of cards.
+
+**DECIDED by the owner (2026-11-21): the board pauses End season.** A battle still ends in the season it starts (decision 2
+of 0.2.1 and M7 D5 stand): the battles phase stops at a battle with a human side, the player plays its days on the board, and
+the phase goes on when that battle ends. Nothing carries over to the next season.
