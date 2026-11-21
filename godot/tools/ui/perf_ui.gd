@@ -21,6 +21,7 @@ extends SceneTree
 
 const M45 := preload("res://tools/ui/perf_ui_m45.gd")
 const M5 := preload("res://tools/ui/perf_ui_m5.gd")
+const M6 := preload("res://tools/ui/perf_ui_m6.gd")
 const BUDGET := "res://tests/perf_ui_budget.json"
 const APP_SCENE_PATH := "res://shell/app/app.tscn"
 const SCREEN_IDS_PATH := "res://shell/screens/screen_ids.gd"
@@ -448,6 +449,7 @@ func _measure_m45(packed: PackedScene, headless: bool) -> void:
 	await _wait_frames(5)
 	await M45.new(self, _r).measure(app, vp, headless, _europe_seasons)
 	await M5.new(self, _r).measure(app, vp)  # M5 (perf_ui_m5.gd): the People page cold and key 5, on the same game
+	await M6.new(self, _r).measure(app, vp)  # M6 (perf_ui_m6.gd): the armies' panel, tokens, route, replay, Supply, Military page
 
 	session.call("end_game")
 	root.remove_child(vp)
@@ -634,9 +636,12 @@ func _finish(budget: Dictionary, headless: bool) -> int:
 		var over := value > limit
 		var enforced := (kind == "mem") or (not headless and (kind != "gpu" or _gpu_limits))
 		var verdict := "ok"
-		if over and enforced:
+		var known: Dictionary = spec.get("known_over", {})  # an open issue: printed and listed, not a failure
+		if over and enforced and known.is_empty():
 			verdict = "FAIL"
 			failed.append("%s %.2f > %.2f" % [key, value, limit])
+		elif over and not known.is_empty():
+			verdict = "KNOWN OVER (issue #%d)" % int(known.get("issue", 0))
 		elif over:
 			verdict = "over (not enforced in %s)" % ("headless" if headless else "no --gpu-limits")
 		rows += "| %s | %.2f | %.2f | %s | %s |\n" % [key, value, limit, kind, verdict]

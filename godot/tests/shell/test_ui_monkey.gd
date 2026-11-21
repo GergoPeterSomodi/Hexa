@@ -9,7 +9,9 @@
 ## M4 (m4-build-spec.md section 9): the economy monkey adds I, L, [ and ], U, clicks on the chips, hex panel rows (hover and
 ## click), the works card (Begin, pin, Esc) and the study's tax buttons.
 ## (docs/architecture/ui-and-controls-spec.md section 9; ui-style-and-feedback-spec.md section 11).
-extends MonkeyM5
+## M6 (monkey_m6.gd): the armies, key 6 (Supply), the army panel, the Raise tab and the console's raise, the hex menu, the Military
+## page, End season with its replay (skipped by Space, Esc or a click) and F5 and F9; seeds 1495 to 1497, each with the replay on.
+extends MonkeyM6
 
 const APP_SCENE := preload("res://shell/app/app.tscn")
 const SEEDS: Array[int] = [1480, 1481, 1482]
@@ -21,6 +23,8 @@ const M4_SEEDS: Array[int] = [1486, 1487, 1488]
 const M45_SEEDS: Array[int] = [1489, 1490, 1491]
 ## M5: the same, with key 5 (Food), the People and Food chips, the People page and the console's `people`.
 const M5_SEEDS: Array[int] = [1492, 1493, 1494]
+## M6: the M5 monkey with the armies (monkey_m6.gd); the replay is on for every M6 seed (movement "normal").
+const M6_SEEDS: Array[int] = [1495, 1496, 1497]
 ## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
 const FORCE_SEASON_STEP := 30
 const FORCE_SAVE_STEP := 120
@@ -34,6 +38,8 @@ const COUNTER_KEYS: Array[String] = [
 	"m45_opens", "m45_tab_clicks", "m45_nav_clicks", "m45_head_clicks", "m45_row_clicks", "m45_row_keys", "m45_timeline",
 	"m45_log_headers", "m45_chart_hovers", "m45_show_map", "m45_yields_keys", "m45_checks",
 	"m5_food_keys", "m5_chip_clicks", "m5_chip_cards", "m5_people_page", "m5_page_actions", "m5_console", "m5_checks",
+	"m6_supply_keys", "m6_selects", "m6_orders", "m6_panel_actions", "m6_raises", "m6_hex_menus", "m6_military_pages",
+	"m6_replays", "m6_replay_blocked", "m6_file_keys", "m6_checks",
 ]
 const EVENTS_PER_SEED := 600
 
@@ -211,6 +217,19 @@ func test_ui_monkey_m5_seed_1494() -> void:
 	await _run_monkey_seed(M5_SEEDS[2], true, true, true, true, true)
 
 
+## M6: the M5 monkey with the armies, key 6, the army panel, the Raise tab, the hex menu, the Military page and the replay.
+func test_ui_monkey_m6_seed_1495() -> void:
+	await _run_monkey_seed(M6_SEEDS[0], true, true, true, true, true, true)
+
+
+func test_ui_monkey_m6_seed_1496() -> void:
+	await _run_monkey_seed(M6_SEEDS[1], true, true, true, true, true, true)
+
+
+func test_ui_monkey_m6_seed_1497() -> void:
+	await _run_monkey_seed(M6_SEEDS[2], true, true, true, true, true, true)
+
+
 ## A real bug the M4 monkey found, kept as a minimal failing test (it fails until the card is fixed): with Confirm works on Always
 ## a mouse click on a hex panel row opens the card, the card takes the focus for Begin, the row's focus_exited reads as the
 ## pointer leaving, and the card closes at once (WorksPreview.leave); then WorksFlow.show_card draws the ghost and the marks for
@@ -262,7 +281,7 @@ func _on_hex_changed(hex: Vector2i) -> void:
 	_changed_hexes.append(hex)
 
 
-func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false) -> void:
+func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false, m6: bool = false) -> void:
 	await _wait_frames(2)
 	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	_player_seen = &""
@@ -270,6 +289,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	_m4 = m4
 	_m45 = m45
 	_m5 = m5
+	_m6 = m6
 	Events.hex_changed.connect(_on_hex_changed)
 
 	var vp := SubViewport.new()
@@ -293,6 +313,11 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	if m3:
 		s.set_value("game/season_report", "full")
 		s.set_value("graphics/season_change", "instant")
+	if m6:
+		# The replay is on: the M6 monkey skips it, watches it and refuses orders in it. (Settings.new(.., true) makes reduce
+		# motion the default, and reduce motion plays every walk instant.)
+		s.set_value("game/movement", "normal")
+		s.set_value("accessibility/reduce_motion", false)
 	app.set_settings_override(s)
 	vp.add_child(app)
 	await _wait_frames(2)
@@ -336,12 +361,15 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 			_m4_assert_invariants(app, "seed %d step %d" % [seed_value, step])
 		if m5:
 			_m5_assert_invariants(app, "seed %d step %d" % [seed_value, step])
+		if m6:
+			_m6_assert_invariants(app, "seed %d step %d" % [seed_value, step])
 
 	if m3:
 		_m3_end(seed_value)
 	_m4 = false
 	_m45 = false
 	_m5 = false
+	_m6 = false
 	Events.hex_changed.disconnect(_on_hex_changed)
 	Session.end_game()
 	remove_child(vp)
@@ -713,6 +741,9 @@ func _m3_end(seed_value: int) -> void:
 	if _m5:
 		for key: String in M5_REQUIRED:
 			assert_gt(int(_n[key]), 0, "seed %d: the monkey did %s" % [seed_value, key])
+	if _m6:
+		for key: String in M6_REQUIRED:
+			assert_gt(int(_n[key]), 0, "seed %d: the monkey did %s" % [seed_value, key])
 
 
 func _on_season_counted(_turn: int) -> void:
@@ -783,6 +814,8 @@ func _m3_before_step(rng: Rng, app: App, step: int) -> void:
 		await _m45_force(rng, vp, app)
 	if _m5 and step >= FORCE_M5_STEP and not _m4_coverage_due():
 		await _m5_force(rng, vp, app)
+	if _m6 and step >= FORCE_M6_STEP and not _m4_coverage_due():
+		await _m6_force(rng, vp, app)
 
 
 func _m3_clear_screens(app: App) -> void:
@@ -978,6 +1011,9 @@ func _m3_buildable() -> Dictionary:
 
 func _m3_step(rng: Rng, vp: SubViewport, app: App) -> void:
 	var due := _m4_coverage_due()  # late and an M4 counter still 0: the coverage steps go first
+	if _m6 and not due and rng.randi_range(0, 99) < 30:
+		await _m6_step(rng, vp, app)
+		return
 	if _m5 and not due and rng.randi_range(0, 99) < 25:
 		await _m5_step(rng, vp, app)
 		return
