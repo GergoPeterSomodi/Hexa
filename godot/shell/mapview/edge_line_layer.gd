@@ -18,6 +18,9 @@ const ROAD_EDGE := Color8(128, 100, 66)
 const TRACK := Color8(196, 176, 126, 190)
 const EDGE := 2.0  # px the dark edge is wider than the line
 const SOFT := 0.5  # px added either side for the soft rim of the stroke texture
+const AREA_WIDTH := 1.6  # the castle-area line's width, dash and gap (AreaLines' defaults)
+const AREA_DASH := 6.0
+const AREA_GAP := 4.0
 
 static var _rim: Texture2D = null
 
@@ -106,6 +109,10 @@ func _build(lines: Array[Dictionary]) -> void:
 		var width := float(line.get("width", BorderLines.INK_WIDTH))
 		var colour: Color = line["colour"] if line.has("colour") else BorderLines.INK
 		_stroke(line["points"] as PackedVector2Array, width, colour, line.get("before"), line.get("after"))
+	for line: Dictionary in by_kind.get("area", []):  # the castle-area lines (M7 6.3): dashes in the owner's colour
+		var area_colour: Color = line["colour"] if line.has("colour") else BorderLines.INK
+		_dashed(line["points"] as PackedVector2Array, float(line.get("width", AREA_WIDTH)), area_colour,
+			float(line.get("dash", AREA_DASH)), float(line.get("gap", AREA_GAP)))
 	_mesh = null
 	if _indices.is_empty():
 		return
@@ -145,6 +152,28 @@ func _polygon(polygon: PackedVector2Array, colours: PackedColorArray) -> void:
 		_indices[written + 1] = first + i
 		_indices[written + 2] = first + i + 1
 		written += 3
+
+
+## A dashed line: dashes of `dash` px and gaps of `gap` px along each segment of `points`, each dash a stroke of `width`.
+func _dashed(points: PackedVector2Array, width: float, colour: Color, dash: float, gap: float) -> void:
+	if dash <= 0.0 or gap <= 0.0:
+		return
+	var on := true
+	var left := dash
+	for i: int in range(points.size() - 1):
+		var a := points[i]
+		var b := points[i + 1]
+		var length := a.distance_to(b)
+		var run := 0.0
+		while run < length:
+			var step := minf(left, length - run)
+			if on:
+				_stroke(PackedVector2Array([a.lerp(b, run / length), a.lerp(b, (run + step) / length)]), width, colour)
+			run += step
+			left -= step
+			if left <= 0.0:
+				on = not on
+				left = dash if on else gap
 
 
 ## One thick line as a ribbon of triangles: two vertices a point, set square to the line's run there.

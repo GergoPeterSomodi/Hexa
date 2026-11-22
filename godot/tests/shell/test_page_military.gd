@@ -239,3 +239,73 @@ func test_fits_at_1280_by_720() -> void:
 	await harness.wait_frames(self, 2)
 	assert_lte(page.get_combined_minimum_size().x, host.size.x, "no horizontal overflow")
 	harness.dispose()
+
+
+# ----- M7 (B27): the Wars and Battles tables ----------------------------------------------------------------------------
+
+
+func _war_table(page: PageMilitary) -> StudyTable:
+	return page.find_child("WarTable", true, false) as StudyTable
+
+
+func _battle_table(page: PageMilitary) -> StudyTable:
+	return page.find_child("BattleTable", true, false) as StudyTable
+
+
+## A battle record fought by Genoa against `defender` (as test_battle_dock makes one), kept in the game.
+func _battle(defender: StringName) -> BattleRecord:
+	var war := CombatFixture.war()
+	var fighters := [CombatFixture.pikemen(101, 0), CombatFixture.pikemen(102, 0), CombatFixture.pikemen(201, 1),
+		CombatFixture.knights(202, 1)]
+	var input := CombatFixture.input_of(war, fighters, 0, false, false)
+	for f: Dictionary in fighters:
+		for ud: UnitDef in _g.defs.units:
+			if String(ud.branch) == str(f["branch"]):
+				f["kind"] = ud.id
+				break
+		f["army"] = 1 if int(f["side"]) == 0 else 2
+	input["attacker"] = String(ArmyFixture.TAG)
+	input["defender"] = String(defender)
+	var rng := Rng.new()
+	rng.seed_with(1480)
+	var before: int = rng.get_state()
+	var out: Dictionary = Combat.fight(war, input, rng)
+	var r := BattleRecord.new()
+	r.id = _g.next_record_id
+	_g.next_record_id += 1
+	r.turn = _g.turn
+	r.hex = ArmyFixture.find_town(_g)
+	r.name = "Battle of Test, 1480"
+	r.year = 1480
+	r.attacker = ArmyFixture.TAG
+	r.defender = defender
+	r.input = input.duplicate(true)
+	r.luck_before = before
+	r.frames.assign(out["frames"])
+	r.end = out["end"]
+	r.witnesses = PackedStringArray()
+	_g.battle_records.append(r)
+	return r
+
+
+func test_a_war_row_asks_for_its_country_and_the_empty_state_clears() -> void:
+	var enemy := ArmyFixture.other_tag(_g)
+	var page := _page(_g)
+	assert_true(_label(page, "NoWar").visible, "no war yet")
+	WarFixture.at_war(_g, ArmyFixture.TAG, enemy)
+	_g.version += 1
+	page.refresh(_g, &"open")
+	assert_false(_label(page, "NoWar").visible, "a war is listed")
+	assert_eq(_war_table(page).total_count(), 1, "one war row")
+	_war_table(page).row_activated.emit({"request": [&"country", enemy]})
+	assert_eq(_requests.back(), [&"country", enemy], "Go asks for the enemy's country")
+
+
+func test_a_battle_row_asks_for_its_record() -> void:
+	var r := _battle(ArmyFixture.other_tag(_g))
+	_g.version += 1
+	var page := _page(_g)
+	assert_false(_label(page, "NoBattle").visible, "a battle is listed")
+	assert_eq(_battle_table(page).total_count(), 1, "one battle row")
+	_battle_table(page).row_activated.emit({"request": [&"battle", r.id]})
+	assert_eq(_requests.back(), [&"battle", r.id], "Open asks for the battle dock at the record")

@@ -17,6 +17,8 @@ const STUDY_ACTION := &"study"
 const STUDY_PAGE := &"economy"
 const STUDY_LABEL := "Open the study"
 const ARMY_ACTION := &"select_army"
+## M7 (spec 6.10): a battle line of the War section asks [&"battle", record]; the App opens the battle dock at that record.
+const BATTLE_ACTION := &"battle"
 const CLOSE_KEYS: Array[Key] = [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]
 const SHEET_MAX_W: float = 900.0
 const SHEET_MAX_H: float = 800.0
@@ -363,6 +365,13 @@ func _army_of(action: Array) -> int:
 	return -1
 
 
+## The battle record of a [&"battle", record] action; -1 for any other action.
+func _record_of(action: Array) -> int:
+	if action.size() >= 2 and StringName(str(action[0])) == BATTLE_ACTION:
+		return int(action[1])
+	return -1
+
+
 func _link_button(line: Dictionary, tone: String, target: Dictionary) -> Button:
 	var btn := Button.new()
 	btn.name = "Link%d" % _next_serial()
@@ -371,7 +380,7 @@ func _link_button(line: Dictionary, tone: String, target: Dictionary) -> Button:
 	btn.text = str(line.get("text", ""))
 	btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	btn.focus_mode = Control.FOCUS_ALL
-	btn.tooltip_text = "Show on the map"
+	btn.tooltip_text = "Open the battle" if _record_of(target["action"] as Array) >= 0 else "Show on the map"
 	btn.accessibility_name = btn.text
 	var ink := _ink_for(tone)
 	btn.add_theme_color_override(&"font_color", ink)
@@ -443,6 +452,11 @@ func _pick(hex: Vector2i, action: Array) -> void:
 	if _army_of(action) >= 0:
 		if ctx != null:
 			ctx.request(ARMY_ACTION, {"army": _army_of(action), "hex": hex})
+		_close(&"look")
+		return
+	if _record_of(action) >= 0:
+		if ctx != null:
+			ctx.request(BATTLE_ACTION, {"record": _record_of(action)})
 		_close(&"look")
 		return
 	if hex != NO_HEX and ctx != null:

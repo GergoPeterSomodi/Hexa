@@ -6,7 +6,7 @@ extends RefCounted
 
 const NO_HEX := Vector2i(-1, -1)
 const SECTION_IDS: Array[StringName] = [&"glance", &"before", &"treasury", &"goods", &"works", &"people", &"armies",
-	&"orders", &"befell", &"standing"]
+	&"war", &"orders", &"befell", &"standing"]
 
 
 ## The report of Spring 1480 on the economy fixture (docs/architecture/m4-build-spec.md 4.15 b), the vineyard at (7, 12)
@@ -76,6 +76,15 @@ static func genoa_spring() -> Dictionary:
 				_line("Upkeep: 12 ducats a season.", "plain", {"sub": true}),
 				_line("Your armies ate 1 grain from the stores.", "plain", {"sub": true}),
 			], 4, "", _line("Men under arms 1,000 → 900", "bad", {"from": 1000, "to": 900, "amount": -100})),
+			_section(&"war", "War", [
+				_line("Battle of Alessandria, 1480: you won in 4 days. You lost 120 men, they 410.", "good", {
+					"hex": Vector2i(7, 9), "action": [&"battle", 1], "action_label": "Open the battle", "rank": 410, "top": true}),
+				_line("Siege of Pavia, 1480: 6 of 10, +2 a season; falls in about 2 seasons.", "good", {
+					"hex": Vector2i(10, 9), "action": [&"look_at", Vector2i(10, 9)], "action_label": "Go to Pavia", "rank": 4}),
+				_line("Milan besieges your Asti (8, 10): 3 of 10.", "bad", {
+					"hex": Vector2i(8, 10), "action": [&"look_at", Vector2i(8, 10)], "action_label": "Go to Asti", "rank": 3}),
+				_line("War score with Milan +2: you hold 2 of their districts, they hold none of yours.", "plain", {"sub": true}),
+			], 4, "", _line("At war with 1 country", "plain")),
 			_section(&"orders", "Your orders", [
 				_line("Ordered to build: vineyard near Savona (7, 12).", "plain", {"hex": Vector2i(7, 12)}),
 				_line("Ordered to march: the Army of Genoa to Savona (6, 13).", "plain", {"hex": Vector2i(6, 13)}),

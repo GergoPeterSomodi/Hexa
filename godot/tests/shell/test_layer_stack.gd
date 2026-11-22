@@ -273,6 +273,9 @@ func test_m2_layer_stack_z_and_name_order() -> void:
 	assert_eq(scene.work_marks().z_index, 87, "WorkMarks sit at z 87")
 	assert_gt(scene.work_marks().z_index, scene.capital_marks().z_index, "work marks over the pennants")
 	assert_lt(scene.work_marks().z_index, scene.view().layer("marks").z_index, "work marks under the selection")
+	assert_eq((scene.get_node("WarMarks") as Node2D).z_index, 89, "war marks sit at z 89 (M7 B25)")
+	assert_eq((scene.view().get_node("Areas") as Node2D).z_index, 82, "castle-area lines sit at z 82 (M7 B25)")
+	assert_lt((scene.view().get_node("Areas") as Node2D).z_index, (scene.view().get_node("Borders") as Node2D).z_index, "area lines under the borders")
 	assert_eq(scene.season_fade().layer, 9, "the season fade is a CanvasLayer under the HUD's 10")
 	assert_lt(scene.far().z_index, scene.overlay().z_index, "FarMap sits below ModeOverlay so overlay draws over it")
 

@@ -11,6 +11,10 @@ extends VBoxContainer
 signal go_requested(hex: Vector2i)
 ## A card of one of the player's armies: its Go selects the army (and glides to it), not only the hex.
 signal army_requested(army: int, hex: Vector2i)
+## M7: a card of one of the player's battles (its Go opens the battle dock at the record), and a card of a declaration on the
+## player (its Go opens the attacker's country panel).
+signal battle_requested(record: int)
+signal country_requested(tag: StringName)
 ## The card list changed: a card came, went or was cleared.
 signal changed
 
@@ -83,6 +87,8 @@ func add_line(line: Dictionary) -> int:
 		"tone": StringName(str(line.get("tone", "plain"))),
 		"hex": hex,
 		"army": int(line.get("army", -1)),
+		"record": int(line.get("record", -1)),
+		"country": StringName(str(line.get("country", ""))),
 		"turn": int(line.get("turn", 0)),
 		"seasons": 0,
 		"skip": 1,  # the season_ended of the season it came in is not counted: the count starts at the next one
@@ -106,7 +112,8 @@ func cards() -> Array[Dictionary]:
 	for card: Dictionary in _cards:
 		out.append({
 			"id": card["id"], "text": card["text"], "tone": card["tone"], "hex": card["hex"],
-			"army": card["army"], "turn": card["turn"], "seasons": card["seasons"],
+			"army": card["army"], "record": card["record"], "country": card["country"],
+			"turn": card["turn"], "seasons": card["seasons"],
 		})
 	return out
 
@@ -132,7 +139,13 @@ func go(id: int) -> bool:
 		if int(card["id"]) == id:
 			var hex: Vector2i = card["hex"]
 			var army := int(card["army"])
-			if army >= 0:
+			var record := int(card["record"])
+			var country := card["country"] as StringName
+			if record >= 0:
+				battle_requested.emit(record)
+			elif country != &"":
+				country_requested.emit(country)
+			elif army >= 0:
 				army_requested.emit(army, hex)
 			elif hex != WorksView.NO_HEX:
 				go_requested.emit(hex)
@@ -174,6 +187,8 @@ func _on_chronicled(entry: Dictionary) -> void:
 	var line := LogLines.line_of(game, entry, viewer)
 	if bool(line.get("mine", false)) and entry.has("army"):
 		line["army"] = int(entry["army"])  # the player's army lines: Go selects the army
+	if str(entry.get("kind", "")) == "war_declared":
+		line["country"] = str(entry.get("tag", ""))  # a declaration on the player: Go opens the attacker's country panel
 	add_line(line)
 
 
@@ -238,7 +253,8 @@ func _build_card(card: Dictionary) -> PanelContainer:
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(body)
-	var can_go: bool = (card["hex"] as Vector2i) != WorksView.NO_HEX or int(card["army"]) >= 0
+	var can_go: bool = (card["hex"] as Vector2i) != WorksView.NO_HEX or int(card["army"]) >= 0 \
+			or int(card["record"]) >= 0 or (card["country"] as StringName) != &""
 	var go_button := Button.new()
 	go_button.theme_type_variation = &"ButtonSmall"
 	go_button.text = "Go"

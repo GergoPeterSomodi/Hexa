@@ -9,6 +9,8 @@ const CURSOR_OFFSET := Vector2(18.0, 18.0)
 ## The group MapArmies calls for the order cursor (order_cursor_moved); the move card (6.7) is this node's child.
 const GROUP := &"map_hover"
 const MOVE_CARD_SCENE := preload("res://shell/hud/move_card.tscn")
+## The odds card (6.4): the hover of a war target of the selected army, in place of the move card.
+const ODDS_CARD_SCENE := preload("res://shell/hud/odds_card.tscn")
 
 const DELAY_BY_CHOICE: Dictionary[String, float] = {
 	"short": 0.2,
@@ -33,6 +35,7 @@ var _settings: Settings = null
 ## The move card (6.7): while an army of yours is selected, the hover over another hex shows MovePreview.to's words in place of
 ## the hex card; the keyboard's order cursor (order_cursor_moved) stands in for the pointer.
 var _move: MoveCard = null
+var _odds: OddsCard = null
 var _army := -1
 var _keyboard := false
 var _cursor_hex: Vector2i = MapInput.NO_HEX
@@ -152,6 +155,20 @@ func move_card() -> MoveCard:
 	return _move
 
 
+## The odds card (6.4) of the hover, for the tests and the pictures; created on first use.
+func odds_card() -> OddsCard:
+	_ensure_odds()
+	return _odds
+
+
+## True while a war mark on `hex` owns the hover (M7 B25): no army of yours is selected and the war layer has a card there.
+func war_mark_at(hex: Vector2i) -> bool:
+	if _army >= 0 or not is_inside_tree():
+		return false
+	var marks := get_tree().get_first_node_in_group(WarMarks.GROUP) as WarMarks
+	return marks != null and not marks.card_at(hex).is_empty()
+
+
 func card() -> HoverCard:
 	_ensure_card()
 	return _card
@@ -175,6 +192,9 @@ func _ensure_card() -> void:
 
 func _show_current() -> void:
 	if _move_wanted():
+		return
+	if war_mark_at(_hovered_hex):  # M7 B25: the war card owns a mark's hex
+		_clear_card()
 		return
 	if _hovered_hex == MapInput.NO_HEX or Session.game == null:
 		_clear_card()
@@ -235,13 +255,35 @@ func _refresh_move() -> void:
 	_elapsed = 0.0
 	if _card != null:
 		_card.clear()
-	_move.show_move(MovePreview.to(Session.game, Session.player_tag(), _army, _move_hex()))
+	var tag := Session.player_tag()
+	var preview := MovePreview.to(Session.game, tag, _army, _move_hex())
+	var odds := OddsCard.odds_of(Session.game, tag, _army, _move_hex(), preview)
+	if OddsCard.wants(preview, odds):
+		_move.hide_card()
+		_ensure_odds()
+		_odds.show_odds(preview, odds)
+	else:
+		_hide_odds()
+		_move.show_move(preview)
 	_position_move()
 
 
 func _hide_move() -> void:
 	if _move != null:
 		_move.hide_card()
+	_hide_odds()
+
+
+func _hide_odds() -> void:
+	if _odds != null:
+		_odds.hide_card()
+
+
+func _ensure_odds() -> void:
+	if _odds == null:
+		_odds = ODDS_CARD_SCENE.instantiate() as OddsCard
+		_odds.visible = false
+		add_child(_odds)
 
 
 func _ensure_move() -> void:
@@ -252,15 +294,21 @@ func _ensure_move() -> void:
 
 
 func _position_move() -> void:
-	if _move == null or not _move.is_open():
-		return
+	if _move != null and _move.is_open():
+		_place_move_card(_move)
+	if _odds != null and _odds.is_open():
+		_place_move_card(_odds)
+
+
+## Places a move or odds card at the pointer, or at the order cursor's hex centre after a keyboard move.
+func _place_move_card(card: MoveCard) -> void:
 	var anchor := _pointer_pos
 	var to_local := get_global_transform_with_canvas().affine_inverse()
 	if _keyboard:
 		anchor = to_local * _cursor_screen
 	elif is_inside_tree() and get_viewport() != null:
 		anchor = to_local * get_viewport().get_mouse_position()  # the pointer is in viewport pixels, this node is not at 0,0
-	_move.place(anchor, _available_bounds())
+	card.place(anchor, _available_bounds())
 
 
 func _on_army_selected(army_id: int) -> void:

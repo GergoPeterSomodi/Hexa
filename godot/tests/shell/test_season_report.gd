@@ -50,10 +50,10 @@ func _button_named(report: SeasonReport, text: String) -> Button:
 	return null
 
 
-func test_fixture_has_the_ten_sections_of_a3_in_order() -> void:
+func test_fixture_has_the_eleven_sections_in_order() -> void:
 	var summary := ReportSample.genoa_spring()
 	assert_eq(_section_ids(summary), ReportSample.SECTION_IDS)
-	assert_eq(ReportSample.SECTION_IDS.size(), 10)
+	assert_eq(ReportSample.SECTION_IDS.size(), 11, "M7 adds the war section after armies")
 	assert_false(bool(summary["quiet"]))
 	assert_eq(summary["title"], "Spring 1480")
 	assert_eq(summary["seal_letter"], "G")
@@ -82,6 +82,12 @@ func test_every_section_of_the_fixture_is_drawn_with_its_count() -> void:
 	assert_eq(_count_of(nav.button_for(&"works")), "1")
 	assert_eq(_count_of(nav.button_for(&"orders")), "3")
 	assert_false((nav.button_for(&"glance").get_node("Count") as Label).visible, "glance has no count")
+
+
+func test_the_war_section_has_its_count_in_the_nav() -> void:
+	var report := _open(ReportSample.genoa_spring())
+	await _harness.wait_frames(self, 2)
+	assert_eq(_count_of(report.sheet().nav().button_for(&"war")), "4", "the War count")
 
 
 func test_glance_shows_up_to_five_boxed_chips() -> void:

@@ -74,6 +74,11 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
+[node name="WarBox" type="VBoxContainer" parent="Scroll/Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
 [node name="PeopleBox" type="VBoxContainer" parent="Scroll/Body"]
 visible = false
 layout_mode = 2

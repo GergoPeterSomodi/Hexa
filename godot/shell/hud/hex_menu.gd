@@ -7,6 +7,9 @@
 ##   [&"raise_tab", hex]        selects the hex and opens its Raise tab
 ##   [&"select_army", id]       selects the army (MapArmies.select_army)
 ##   [&"map_mode", &"supply"]   the Supply mode (MapScene.set_mode)
+##   [&"battle", record]        open the battle of the hex in the dock (M7 6.8: the App listens; nothing is done here)
+##   [&"siege", hex]            show the siege of the hex: the hex is selected and its panel shows the siege
+##   [&"castle_area", hex]      show the castle area of the hex (the App listens; nothing is done here)
 ## Built and owned by MapArmies (its child, set up with setup()). It reads the game and changes it only through Session.
 class_name HexMenu
 extends PopupMenu
@@ -57,9 +60,25 @@ func open_for(hex: Vector2i, at: Vector2) -> bool:
 		if army.tag == tag:
 			_add_item("Select %s" % army.name, [&"select_army", army.id], true, "")
 	_section()
+	_war_items(game, tag, hex)
+	_section()
 	_add_item("Show supply (6)", [&"map_mode", &"supply"], true, "")
 	popup(Rect2i(Vector2i(at), Vector2i.ONE))
 	return true
+
+
+## The war items of an own hex (M7, 6.8): "Open the Battle of X" for a battle fought here last season, "Show the siege of
+## Pavia (10, 9)" while the hex is besieged (the viewer may read it), and "Show the castle area" on land a castle holds while
+## a war of yours is on.
+func _war_items(game: Game, tag: StringName, hex: Vector2i) -> void:
+	for site: Dictionary in BattleView.sites(game, tag):
+		if site["hex"] == hex:
+			_add_item("Open the %s" % str(site["name"]), [&"battle", int(site["record"])], true, "")
+	if not SiegeView.at(game, tag, hex).is_empty():
+		_add_item("Show the siege of %s" % Words.place(game, hex), [&"siege", hex], true, "")
+	var held := AreaLines.held_by(game, hex)
+	if held["fortress"] != Army.NO_HEX and not Wars.enemies(game, tag).is_empty():
+		_add_item("Show the castle area", [&"castle_area", hex], true, "")
 
 
 ## One work row: "Build vineyard · 40 · 4 seasons", disabled with its reason when refused.
@@ -131,6 +150,8 @@ func _carry_out(action: Array) -> void:
 			panel.show_raise()
 	elif kind == &"select_army":
 		_armies.select_army(int(action[1]))
+	elif kind == &"siege":
+		_scene.select_hex(action[1])
 	elif kind == &"map_mode":
 		_scene.set_mode(MapModes.Mode.SUPPLY)
 

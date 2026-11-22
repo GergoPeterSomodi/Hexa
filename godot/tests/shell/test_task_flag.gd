@@ -251,3 +251,22 @@ func test_the_real_money_lines_carry_the_study_action() -> void:
 	_flag.study_requested.connect(func(page: StringName) -> void: asked.append(page))
 	assert_true(_flag.choose_row(0))
 	assert_eq(asked, [&"economy"])
+
+
+## M7 (B27): a war timer row opens the enemy's country panel (the App's country request), and a war event rereads the flag.
+func test_a_war_timer_row_asks_for_the_enemy_country() -> void:
+	var g := Session.game
+	var enemy := ArmyFixture.other_tag(g)
+	WarFixture.at_war(g, ArmyFixture.TAG, enemy)
+	g.turn += g.defs.war.war_timer_warning
+	g.version += 1
+	var asked: Array[StringName] = []
+	_flag.country_requested.connect(func(tag: StringName) -> void: asked.append(tag))
+	_flag.refresh()
+	var index := -1
+	for i: int in _flag.line_count():
+		if _flag.lines()[i]["kind"] == &"war_timer":
+			index = i
+	assert_true(index >= 0, "the timer reminder is on the flag")
+	assert_true(_flag.choose_row(index), "the row is chosen")
+	assert_eq(asked, [enemy], "the enemy's country is asked for")

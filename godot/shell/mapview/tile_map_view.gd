@@ -42,6 +42,7 @@ const LINES_Z := 50
 const SHADOW_Z := 60
 const STAND_Z := 70
 const BORDERS_Z := 85
+const AREAS_Z := 82  # the castle-area dashed lines (M7 6.3): over the overlay, under the borders
 const SHADOW_ALPHA := 0.18
 const SHADOW_SHADER := "res://shell/mapview/shadow_cover.gdshader"
 const FILL_BLOCK := 16  # cells a side of one block of the sliced fill
@@ -75,6 +76,8 @@ var _lines: Node2D = null
 var _line_chunks: Dictionary[Vector2i, EdgeLineLayer] = {}
 var _borders: Node2D = null
 var _border_chunks: Dictionary[Vector2i, EdgeLineLayer] = {}
+var _areas: Node2D = null
+var _area_chunks: Dictionary[Vector2i, EdgeLineLayer] = {}
 var _missing: Dictionary[String, bool] = {}
 var _fill_provider := Callable()
 var _fill_order := PackedInt32Array()  # the view layer of each name a packed provider writes (empty: it gives a Dictionary)
@@ -143,9 +146,13 @@ func setup(tiles: TilesetBuilder) -> void:
 	_borders = Node2D.new()
 	_borders.name = "Borders"
 	_borders.z_index = BORDERS_Z
+	_areas = Node2D.new()
+	_areas.name = "Areas"
+	_areas.z_index = AREAS_Z
 	add_child(_lines)
 	add_child(shadows)
 	add_child(standing)
+	add_child(_areas)
 	add_child(_borders)
 	for k: int in _layer_names.size():
 		if WHOLE.has(_layer_names[k]):
@@ -409,6 +416,7 @@ func clear() -> void:
 			_chunks.erase(chunk)
 	_clear_edge_chunks(_lines, _line_chunks)
 	_clear_edge_chunks(_borders, _border_chunks)
+	_clear_edge_chunks(_areas, _area_chunks)
 
 
 # ----- the sliced fill ----------------------------------------------------------------------------------------------
@@ -600,6 +608,25 @@ func rebuild_borders(map: MapData, owner: PackedByteArray, palette: PackedColorA
 func set_borders_visible(value: bool) -> void:
 	if _borders != null:
 		_borders.visible = value
+
+
+# ----- castle areas ------------------------------------------------------------------------------------------------------
+
+
+## The castle-area dashed lines of one chunk (AreaLines.for_chunk, each with its "colour" set): one mesh node for the chunk,
+## replaced when the chunk's lines change; [] frees it. M7 6.3: z 82, under the borders.
+func set_chunk_areas(chunk: Vector2i, lines: Array[Dictionary]) -> void:
+	_set_chunk_edge_layer(_areas, _area_chunks, "Areas", chunk, lines)
+
+
+## The chunks that have an area node.
+func area_chunks() -> Array[Vector2i]:
+	return _edge_chunk_keys(_area_chunks)
+
+
+## Frees every area node (the gate went off, a peace, a new game).
+func clear_areas() -> void:
+	_clear_edge_chunks(_areas, _area_chunks)
 
 
 func _set_chunk_edge_layer(parent: Node2D, store: Dictionary[Vector2i, EdgeLineLayer], prefix: String,

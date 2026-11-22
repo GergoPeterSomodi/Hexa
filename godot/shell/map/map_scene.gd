@@ -117,7 +117,7 @@ func _ready() -> void:
 		Session.new_game(map_id, start_seed)
 	else:
 		_on_game_started()
-	add_child(MapPeople.new()); add_child(MapArmies.new())  # after the game's first fill: the people relay the plates, the armies draw
+	add_child(MapPeople.new()); add_child(MapArmies.new()); add_child(MapWars.new())  # after the game's first fill: the people relay the plates, the armies draw, the wars mark
 	_seasons.request_next()
 
 

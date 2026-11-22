@@ -37,6 +37,7 @@ const TAB_RAISE := &"raise"
 @onready var _ground_rows: GridContainer = $Scroll/Body/GroundBox/Rows
 @onready var _owner_row: HBoxContainer = $Scroll/Body/OwnerRow
 @onready var _owner_value: HBoxContainer = $Scroll/Body/OwnerRow/Value
+@onready var _war_box: VBoxContainer = $Scroll/Body/WarBox
 @onready var _people_box: VBoxContainer = $Scroll/Body/PeopleBox
 @onready var _people_value: Label = $Scroll/Body/PeopleBox/PeopleRow/Value
 @onready var _people_room_row: HBoxContainer = $Scroll/Body/PeopleBox/RoomRow
@@ -135,6 +136,14 @@ func _wiring() -> Array:
 		[Events.army_disbanded, _on_stock_changed],
 		[Events.tax_set, _on_stock_changed],
 		[Events.goods_short, _on_stock_changed],
+		[Events.controllers_changed, _on_war_changed],
+		[Events.district_captured, _on_war_changed],
+		[Events.siege_started, _on_war_changed],
+		[Events.siege_progress, _on_war_changed],
+		[Events.siege_lifted, _on_war_changed],
+		[Events.battle_ended, _on_war_changed],
+		[Events.war_declared, _on_war_changed],
+		[Events.peace_made, _on_war_changed],
 	]
 
 
@@ -226,6 +235,7 @@ func refresh() -> void:
 	_refresh_piece(piece)
 	_refresh_ground(map)
 	_refresh_owner(game)
+	_war_box.visible = HexWar.fill(_war_box, game, Session.player_tag(), _hex, _retired)
 	_refresh_people(game)
 	_refresh_gives(game)
 	_refresh_worth(game)
@@ -249,6 +259,7 @@ func _show_sea() -> void:
 	_piece_box.visible = false
 	_ground_box.visible = false
 	_owner_row.visible = false
+	_war_box.visible = false
 	_people_box.visible = false
 	_gives_row.visible = false
 	_worth_row.visible = false
@@ -402,6 +413,12 @@ func _on_tab_changed(id: Variant) -> void:
 
 
 func _on_stock_changed(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null, _e: Variant = null) -> void:
+	_request_refresh()
+
+
+## A war signal (occupation, siege, battle, war or peace): the War block re-reads the game. Any arity is accepted, the signals
+## carry different arguments.
+func _on_war_changed(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null, _e: Variant = null) -> void:
 	_request_refresh()
 
 

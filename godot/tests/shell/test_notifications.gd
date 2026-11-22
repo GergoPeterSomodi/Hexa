@@ -173,3 +173,31 @@ func test_another_countrys_town_makes_no_card() -> void:
 	_g.emit({"kind": "town_grew", "tag": other, "hex": Vector2i(7, 12), "level": 3, "from": 2, "people": 4000})
 	Events.chronicled.emit(_g.chronicle.entries.back())
 	assert_eq(_notes.card_count(), 0, "P: a known other's line does not notify")
+
+
+## M7 (B27): a declaration on the player's country opens the attacker's country panel; a battle card opens the dock at its record.
+func _declared(attacker: StringName) -> Dictionary:
+	return {"kind": "war_declared", "tag": str(attacker), "target": "GEN", "turn": _g.turn}
+
+
+func test_a_declaration_on_the_player_goes_to_the_attackers_country() -> void:
+	var asked: Array[StringName] = []
+	_notes.country_requested.connect(func(tag: StringName) -> void: asked.append(tag))
+	Events.chronicled.emit(_declared(&"MLO"))
+	var cards := _notes.cards()
+	assert_eq(cards.size(), 1, "the declaration makes a card")
+	assert_true(_notes.go(int(cards[0]["id"])), "Go on the card")
+	assert_eq(asked, [&"MLO"], "the attacker's country is asked for")
+
+
+func test_a_battle_card_opens_the_dock_at_its_record() -> void:
+	var asked: Array[int] = []
+	_notes.battle_requested.connect(func(record: int) -> void: asked.append(record))
+	Events.chronicled.emit({"kind": "battle_ended", "tag": "GEN", "defender": "MLO", "hex": WOODS, "turn": _g.turn,
+		"record": 7, "name": "Battle of Test, 1480", "winner": "GEN", "loser": "MLO", "days": 2, "how": "",
+		"killed": {"GEN": 10, "MLO": 20}, "wounded": {"GEN": 0, "MLO": 0}})
+	var cards := _notes.cards()
+	assert_eq(cards.size(), 1, "the battle makes a card")
+	assert_eq(int(cards[0]["record"]), 7, "the card carries the record")
+	assert_true(_notes.go(int(cards[0]["id"])), "Go on the card")
+	assert_eq(asked, [7], "the dock is asked for at the record")

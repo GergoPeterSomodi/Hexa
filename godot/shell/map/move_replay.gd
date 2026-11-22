@@ -10,6 +10,8 @@ extends Node
 signal finished
 
 const INSTANT := &"instant"
+## The group the map's war marks find the replay by (MapWars reads marks() while it runs; M7 6.3).
+const GROUP := &"move_replay"
 
 ## The walks of the season that is running (filled by unit_moved, moved to _pending at season_ended).
 var _records: Array[Dictionary] = []
@@ -24,6 +26,8 @@ var _lead_from := Vector2i(-1, -1)
 ## at season_ended and matched to the walks in start() (ReplayMarks).
 var _battle_events: Array[Dictionary] = []
 var _pending_battles: Array[Dictionary] = []
+## The hexes of the battles of the running replay (set at start, cleared at its end): their site badges wait (M7 B25).
+var _battle_hexes: Array[Vector2i] = []
 
 
 func _init() -> void:
@@ -32,6 +36,7 @@ func _init() -> void:
 
 
 func _enter_tree() -> void:
+	add_to_group(GROUP)
 	Events.unit_moved.connect(_on_unit_moved)
 	Events.season_ended.connect(_on_season_ended)
 	Events.battle_started.connect(_on_battle_started)
@@ -79,12 +84,15 @@ func start(speed: StringName) -> bool:
 	if speed == INSTANT or walks.is_empty() or _plan != null:
 		return false
 	var plan := ReplayPlan.new()
+	var hexes: Array[Vector2i] = []
 	for b: Dictionary in ReplayMarks.battles(walks, battles, Session.game, Session.player_tag()):
 		plan.record_battle(b["hex"] as Vector2i, int(b["tick"]), bool(b["shown"]))
+		hexes.append(b["hex"] as Vector2i)
 	plan.setup(walks, speed)
 	if plan.duration() <= 0.0:
 		return false
 	_plan = plan
+	_battle_hexes = hexes
 	_lead_from = Vector2i(-1, -1)
 	set_process(true)
 	_show()
@@ -103,6 +111,11 @@ func skip() -> bool:
 ## Whether a replay is running (the clock is on; input waits for it).
 func active() -> bool:
 	return _plan != null
+
+
+## The hexes of the battles of the running replay, from its start: a battle's site badge is held until it ends (M7 B25).
+func battle_hexes() -> Array[Vector2i]:
+	return _battle_hexes.duplicate()
 
 
 ## The walkers of the running replay (ReplayPlan.poses); none with no replay.
@@ -190,6 +203,7 @@ static func _first_shown(poses: Array[Dictionary]) -> Dictionary:
 
 func _end(emit: bool) -> void:
 	_plan = null
+	_battle_hexes = []
 	set_process(false)
 	_set_poses([])
 	if emit:

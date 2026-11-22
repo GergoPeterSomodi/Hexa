@@ -172,3 +172,17 @@ func test_borders_stay_aligned_in_half_resolution_mode() -> void:
 			found_corner = true
 			break
 	assert_true(found_corner, "border mesh vertices align with world-pixel hex corners in half mode")
+
+
+## The castle-area lines are dashed (M7 B25): a 60 px line of 6 px dashes and 4 px gaps is 6 dashes, each a quad of 4 vertices
+## in the owner's colour; a line of the kind is drawn only as dashes, never as a solid stroke.
+func test_area_lines_are_dashes_in_their_colour() -> void:
+	var layer := EdgeLineLayer.new()
+	add_child_autofree(layer)
+	var ink := Color(0.2, 0.4, 0.8, 0.9)
+	var line := {"kind": "area", "points": PackedVector2Array([Vector2(0, 0), Vector2(60, 0)]), "colour": ink,
+		"dash": 6.0, "gap": 4.0, "width": 1.6}
+	layer.set_lines([line] as Array[Dictionary])
+	assert_eq(layer.vertices().size(), 6 * 4, "six dashes of four vertices")
+	for c: Color in layer.colours():
+		assert_eq(c, ink, "every dash is the owner's colour")

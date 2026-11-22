@@ -10,6 +10,8 @@ extends VBoxContainer
 
 ## The player asked to glide to a line's hex.
 signal line_activated(hex: Vector2i)
+## M7: a battle line (its `record` is 0 or more) asks to open the battle dock at that record instead of gliding to its hex.
+signal battle_requested(record: int)
 ## The player asked for the last season report (the newest season's header).
 signal report_requested
 ## An older season's header asked for the History page at that season's turn.
@@ -320,22 +322,29 @@ func _line_row(line: Dictionary) -> Control:
 	sentence.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sentence.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sentence.custom_minimum_size.x = 1.0  # an autowrap label never asks for its one-line width, so a long line wraps
+	var at: Vector2i = WorksView.NO_HEX
 	var hex: Variant = line.get("hex", null)
-	if hex is Vector2i and (hex as Vector2i) != WorksView.NO_HEX:
+	if hex is Vector2i:
+		at = hex as Vector2i
+	var record := int(line.get("record", -1))
+	if at != WorksView.NO_HEX or record >= 0:
 		# PASS, not STOP: the wheel still scrolls the card; a click is accepted in _on_line_input.
 		sentence.mouse_filter = Control.MOUSE_FILTER_PASS
 		sentence.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		sentence.tooltip_text = ACTIVATE_TIP
-		sentence.gui_input.connect(_on_line_input.bind(hex as Vector2i))
+		sentence.gui_input.connect(_on_line_input.bind(at, record))
 	row.add_child(sentence)
 	return row
 
 
-func _on_line_input(event: InputEvent, hex: Vector2i) -> void:
+func _on_line_input(event: InputEvent, hex: Vector2i, record: int = -1) -> void:
 	var press := event as InputEventMouseButton
 	if press != null and press.pressed and press.button_index == MOUSE_BUTTON_LEFT:
 		accept_event()
-		line_activated.emit(hex)
+		if record >= 0:
+			battle_requested.emit(record)
+		else:
+			line_activated.emit(hex)
 
 
 func _tone_variation(tone: String) -> StringName:

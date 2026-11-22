@@ -15,6 +15,8 @@ signal look_at_requested(hex: Vector2i)
 signal confirm_requested(screen: Screen)
 ## A toast for the player: the words of a disband that was done (plain).
 signal toast_requested(text: String, tone: StringName)
+## An "Open the battle" press of the war part (ArmyWar): the battle's record id, for the App's dock (M7 6.8).
+signal battle_requested(record: int)
 
 const NO_ARMY := -1
 const ICON_PX := 24
@@ -171,6 +173,7 @@ func _fill_own(game: Game, data: Dictionary) -> void:
 	body_box.add_child(_head_row(game, army.tag, data))
 	_add_section(body_box, "Order")
 	_add_order(body_box, data)
+	_add_war(body_box, game, data)
 	_add_section(body_box, "Companies")
 	_add_units(body_box, game, data)
 	_add_section(body_box, "Supply")
@@ -221,6 +224,14 @@ func _add_order(parent: VBoxContainer, data: Dictionary) -> void:
 	parent.add_child(row)
 
 
+## The war part (ArmyWar, M7 6.8): the standing, the morale, the siege and Storm, the battle. Its requests go out as battle_requested.
+func _add_war(parent: VBoxContainer, game: Game, data: Dictionary) -> void:
+	var war := ArmyWar.new()
+	war.battle_requested.connect(func(record: int) -> void: battle_requested.emit(record))
+	parent.add_child(war)
+	war.fill(game, data)
+
+
 ## The units list: a check box, the figure, the kind, the men with a bar, and the raising line.
 func _add_units(parent: VBoxContainer, game: Game, data: Dictionary) -> void:
 	parent.add_child(_wrapped("Tick the companies to split off or disband."))
@@ -269,7 +280,12 @@ func _unit_row(game: Game, unit: Dictionary) -> Control:
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	col.add_child(bar)
 	var raise_text := "mustering" if bool(unit["mustering"]) else str(unit["raised_text"])
-	col.add_child(PanelKit.label(raise_text, &"Hint"))
+	var words := ArmyWar.company_words(unit)
+	if words != "":
+		raise_text += " · " + words
+	var raise_line := PanelKit.label(raise_text, &"Hint")
+	raise_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(raise_line)
 	row.add_child(col)
 	return row
 
@@ -681,7 +697,20 @@ func _wiring() -> Array:
 		[Events.unit_lost, _on_unit_lost],
 		[Events.march_halted, _on_march_halted],
 		[Events.season_ended, _on_season_ended],
+		[Events.controllers_changed, _on_war_changed],
+		[Events.siege_started, _on_war_changed],
+		[Events.siege_progress, _on_war_changed],
+		[Events.siege_lifted, _on_war_changed],
+		[Events.battle_ended, _on_war_changed],
+		[Events.war_declared, _on_war_changed],
+		[Events.peace_made, _on_war_changed],
 	]
+
+
+## A war signal (siege, battle, war or peace): the war part (Storm, the siege line, the battle) is rebuilt while the panel shows.
+## Any arity is accepted, the signals carry different arguments.
+func _on_war_changed(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null, _e: Variant = null) -> void:
+	_refresh_if_shown()
 
 
 func _refresh_if_shown() -> void:

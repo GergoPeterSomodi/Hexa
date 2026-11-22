@@ -6,6 +6,9 @@
 ## sees: banded men, no ids). It changes nothing: Look there (or Enter, a double click or Go on a row) asks [&"look_at", hex]
 ## and Show on the map [&"map_mode", &"supply", hex]; the Study turns them into ctx.request calls. Before any army the head
 ## says where to raise one. Built on the first refresh; the Study refreshes it on season_ended and on every open.
+## M7 (spec 6.9, B27): between the charts and the foreign armies, the Wars table (enemy, since, score, battles, losses, held,
+## state; Go asks [&"country", tag]) and the Battles table (battle, result, losses; Open asks [&"battle", record], which the
+## Study passes on to the App's battle request). The war rows come from StudyMilitary's `wars` and `battles`.
 class_name PageMilitary
 extends StudyPage
 
@@ -33,6 +36,16 @@ const SEEN_MIN_H := 90.0
 const CHARTS_MIN_W := 400.0
 const CHART_MIN := Vector2(300.0, 130.0)
 const TOWNS_MIN_W := 560.0
+const WAR_TITLE := "Wars"
+const BATTLE_TITLE := "Battles"
+const NO_WAR := "No war yet."
+const NO_BATTLE := "No battle yet."
+const OPEN_TEXT := "Open"
+const BATTLE_ACTION := &"battle"
+const COUNTRY_ACTION := &"country"
+const BATTLE_LOSSES_NAME := "Battle"
+const WARS_MIN_H := 100.0
+const BATTLES_MIN_H := 100.0
 
 ## The seasons the charts look back over: 12 or 40. The Study may pass the shell's settings, and then the span is read from
 ## and written to state/study_span.
@@ -52,6 +65,10 @@ var _losses_chart: InkChart = null
 var _losses_none: Label = null
 var _seen: StudyTable = null
 var _no_seen: Label = null
+var _wars: StudyTable = null
+var _no_war: Label = null
+var _battles: StudyTable = null
+var _no_battle: Label = null
 var _last_game: Game = null
 var _selected: Dictionary = {}
 
@@ -92,6 +109,8 @@ func _ensure_built() -> void:
 	add_child(flow)
 	_build_own(flow)
 	_build_charts(flow)
+	_build_wars(flow)
+	_build_battles(flow)
 	_build_seen(flow)
 
 
@@ -223,6 +242,48 @@ func _build_seen(flow: Container) -> void:
 	box.add_child(_no_seen)
 
 
+func _build_wars(flow: Container) -> void:
+	var box := VBoxContainer.new()
+	box.name = "Wars"
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	flow.add_child(box)
+	var title := PanelKit.label(WAR_TITLE, &"SectionHead")
+	title.name = "Title"
+	box.add_child(title)
+	_wars = StudyTable.new()
+	_wars.name = "WarTable"
+	_wars.section_title = WAR_TITLE
+	_wars.custom_minimum_size = Vector2(0.0, WARS_MIN_H)
+	_wars.set_columns(_war_columns())
+	_wars.row_activated.connect(_on_request_row)
+	box.add_child(_wars)
+	_no_war = PanelKit.label(NO_WAR, &"Body")
+	_no_war.name = "NoWar"
+	_no_war.visible = false
+	box.add_child(_no_war)
+
+
+func _build_battles(flow: Container) -> void:
+	var box := VBoxContainer.new()
+	box.name = "Battles"
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	flow.add_child(box)
+	var title := PanelKit.label(BATTLE_TITLE, &"SectionHead")
+	title.name = "Title"
+	box.add_child(title)
+	_battles = StudyTable.new()
+	_battles.name = "BattleTable"
+	_battles.section_title = BATTLE_TITLE
+	_battles.custom_minimum_size = Vector2(0.0, BATTLES_MIN_H)
+	_battles.set_columns(_battle_columns())
+	_battles.row_activated.connect(_on_request_row)
+	box.add_child(_battles)
+	_no_battle = PanelKit.label(NO_BATTLE, &"Body")
+	_no_battle.name = "NoBattle"
+	_no_battle.visible = false
+	box.add_child(_no_battle)
+
+
 func _own_columns() -> Array:
 	return [
 		{"id": &"army", "title": "Army", "kind": &"text", "min_width": 110},
@@ -233,6 +294,30 @@ func _own_columns() -> Array:
 		{"id": &"supply", "title": "Supply", "kind": &"text", "min_width": 110},
 		{"id": &"order", "title": "Order", "kind": &"text", "min_width": 130},
 		{"id": &"go", "title": "", "kind": &"button", "expand": false, "min_width": 44},
+	]
+
+
+func _war_columns() -> Array:
+	return [
+		{"id": &"enemy", "title": "Enemy", "kind": &"text", "min_width": 120},
+		{"id": &"since", "title": "Since", "kind": &"text", "expand": false, "min_width": 110},
+		{"id": &"score", "title": "Score", "kind": &"delta", "expand": false, "min_width": 80},
+		{"id": &"battles", "title": "Battles", "kind": &"text", "expand": false, "min_width": 110},
+		{"id": &"yours", "title": "Your losses", "kind": &"number", "expand": false, "min_width": 100},
+		{"id": &"theirs", "title": "Theirs", "kind": &"number", "expand": false, "min_width": 80},
+		{"id": &"held", "title": "Held", "kind": &"text", "min_width": 150},
+		{"id": &"state", "title": "State", "kind": &"text", "min_width": 150},
+		{"id": &"go", "title": "", "kind": &"button", "expand": false, "min_width": 44},
+	]
+
+
+func _battle_columns() -> Array:
+	return [
+		{"id": &"battle", "title": "Battle", "kind": &"text", "min_width": 180},
+		{"id": &"result", "title": "Result", "kind": &"text", "min_width": 160},
+		{"id": &"yours", "title": "Your losses", "kind": &"number", "expand": false, "min_width": 100},
+		{"id": &"theirs", "title": "Theirs", "kind": &"number", "expand": false, "min_width": 80},
+		{"id": &"open", "title": "", "kind": &"button", "expand": false, "min_width": 44},
 	]
 
 
@@ -256,6 +341,10 @@ func _fill(data: Dictionary) -> void:
 	_table.set_rows(_rows_of(data["rows"]))
 	_keep_selection(data["rows"])
 	_no_army.visible = (data["rows"] as Array).is_empty()
+	_wars.set_rows(_war_rows_of(data["wars"]))
+	_no_war.visible = (data["wars"] as Array).is_empty()
+	_battles.set_rows(_battle_rows_of(data["battles"]))
+	_no_battle.visible = (data["battles"] as Array).is_empty()
 	_seen.set_rows(_seen_rows_of(data["seen"]))
 	_no_seen.visible = (data["seen"] as Array).is_empty()
 	var labels := PackedStringArray(data["labels"])
@@ -271,6 +360,7 @@ func _fill(data: Dictionary) -> void:
 	_losses_none.visible = not has
 	_losses_chart.x_labels = labels
 	_losses_chart.set_series([
+		{"name": BATTLE_LOSSES_NAME, "values": series["battle_losses"], "ink": 1, "role": "out"},
 		{"name": HUNGER_NAME, "values": series["army_starved"], "ink": 2, "role": "out"},
 	])
 
@@ -321,6 +411,44 @@ func _seen_rows_of(seen: Array) -> Array:
 			&"go": {"text": GO_TEXT},
 		}})
 	return out
+
+
+## The wars table's rows: the war's id; Go asks [&"country", enemy] (the country panel, where the war section is).
+func _war_rows_of(wars: Array) -> Array:
+	var out: Array = []
+	for w: Dictionary in wars:
+		out.append({"id": int(w["war"]), "request": [COUNTRY_ACTION, StringName(str(w["tag"]))], "cells": {
+			&"enemy": str(w["country"]),
+			&"since": str(w["since_text"]),
+			&"score": {"value": int(w["score"])},
+			&"battles": "%s won, %s lost" % [Words.number(int(w["won"])), Words.number(int(w["lost"]))],
+			&"yours": int(w["yours_lost"]),
+			&"theirs": int(w["theirs_lost"]),
+			&"held": "%s of theirs · %s of yours" % [Words.number(int(w["held_theirs"])), Words.number(int(w["held_yours"]))],
+			&"state": {"text": str(w["state_text"]), "tone": StringName(str(w["tone"]))},
+			&"go": {"text": GO_TEXT},
+		}})
+	return out
+
+
+## The battles table's rows: the record's id; Open asks [&"battle", record] (the battle dock).
+func _battle_rows_of(battles: Array) -> Array:
+	var out: Array = []
+	for b: Dictionary in battles:
+		out.append({"id": int(b["record"]), "request": [BATTLE_ACTION, int(b["record"])], "cells": {
+			&"battle": str(b["name"]),
+			&"result": {"text": str(b["result"]), "tone": StringName(str(b["tone"]))},
+			&"yours": int(b["yours_lost"]),
+			&"theirs": int(b["theirs_lost"]),
+			&"open": {"text": OPEN_TEXT},
+		}})
+	return out
+
+
+## A war or battle row's Go or Open: its own request (the page's action_requested).
+func _on_request_row(row: Dictionary) -> void:
+	if row.has("request"):
+		request(row["request"] as Array)
 
 
 ## The selection stays on its row when the row is still there, else it is the first row (most men), else none.
