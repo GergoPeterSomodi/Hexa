@@ -9,3 +9,6 @@ key = &"woods"
 name = "Woods"
 move = 3
 forage_permille = 200
+defence_permille = 250
+rough = true
+narrow = false

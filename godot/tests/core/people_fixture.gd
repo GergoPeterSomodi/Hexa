@@ -19,6 +19,7 @@ static func copy_of(defs: GameDefs = null) -> GameDefs:
 	for f: FamilyDef in out.families:
 		families.append(f.duplicate() as FamilyDef if f != null else null)
 	out.families = families
+	out.war = EconomyFixture.war_copy(out.war)
 	return out
 
 

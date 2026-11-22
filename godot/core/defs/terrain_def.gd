@@ -19,9 +19,16 @@ const COUNT := 8
 @export var move: int = 1
 ## Its people fed as soldiers a season, permille.
 @export var forage_permille: int = 0
+## The defence of a defender on it, permille (M7 spec 4.6): woods 250, marsh 150, rock 50, snow 250, the rest 0.
+@export var defence_permille: int = 0
+## Rough ground (woods, marsh, rock, snow): the battle's rough column.
+@export var rough := false
+## Narrow ground (marsh, snow): the right lane is closed in a battle.
+@export var narrow := false
 
 
-## Problems found, empty when valid: id 0 to 7, the key KEYS gives it, a name, move 1 to 20, forage 0 to 1000.
+## Problems found, empty when valid: id 0 to 7, the key KEYS gives it, a name, move 1 to 20, forage 0 to 1000,
+## defence 0 to 1000.
 func validate() -> Array[String]:
 	var errors: Array[String] = []
 	var label := _label()
@@ -36,6 +43,8 @@ func validate() -> Array[String]:
 		errors.append("%s: move is %d, expected 1 to 20" % [label, move])
 	if forage_permille < 0 or forage_permille > 1000:
 		errors.append("%s: forage_permille is %d, expected 0 to 1000" % [label, forage_permille])
+	if defence_permille < 0 or defence_permille > 1000:
+		errors.append("%s: defence_permille is %d, expected 0 to 1000" % [label, defence_permille])
 	return errors
 
 

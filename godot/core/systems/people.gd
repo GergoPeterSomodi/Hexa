@@ -12,7 +12,8 @@ extends RefCounted
 const OWNS: Array[String] = ["people", "people_start", "people_end", "people_flows", "people_closed", "food_need",
 	"food_fed"]
 ## The reasons people change, append-only. The index is the flow in Country.people_flows.
-const FLOWS: Array[StringName] = [&"grew", &"starved", &"left", &"raised", &"returned", &"dev", &"foraged"]
+const FLOWS: Array[StringName] = [&"grew", &"starved", &"left", &"raised", &"returned", &"dev", &"foraged",
+	&"garrisoned", &"sacked"]
 const GREW := 0
 const STARVED := 1
 const LEFT := 2
@@ -516,11 +517,12 @@ static func levy_check(game: Game, tag: StringName, hex: Vector2i, men: int) -> 
 	return _verdict(true, "")
 
 
-## Takes `men` from the hex's people (after checking again) as the flow `raised`; returns the men taken, 0 when refused.
-static func levy(game: Game, tag: StringName, hex: Vector2i, men: int) -> int:
+## Takes `men` from the hex's people (after checking again) as the flow `why` (default `raised`); returns the men taken,
+## 0 when refused.
+static func levy(game: Game, tag: StringName, hex: Vector2i, men: int, why: StringName = &"raised") -> int:
 	if not bool(levy_check(game, tag, hex, men)["ok"]):
 		return 0
-	return men if move(game, hex, -men, &"raised") else 0
+	return men if move(game, hex, -men, why) else 0
 
 
 ## Disbanded men come home: the flow `returned`; over the room they leave as any crowd does. Returns the men placed (0 at

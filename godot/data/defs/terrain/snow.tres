@@ -9,3 +9,6 @@ key = &"snow"
 name = "Snow"
 move = 6
 forage_permille = 0
+defence_permille = 250
+rough = true
+narrow = true

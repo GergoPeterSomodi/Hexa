@@ -387,6 +387,25 @@ func test_m6_map_keys_default_validate_and_fall_back() -> void:
 	assert_true(bool(fallen.get_value("map/sight_veil")), "a bad sight veil falls back to on")
 
 
+func test_m7_castle_areas_default_validate_and_fall_back() -> void:
+	var s := Settings.new("macOS", false)
+	assert_true(Settings.SCHEMA.has("map/castle_areas"))
+	assert_true(bool(s.get_value("map/castle_areas")), "the castle areas default on")
+	assert_eq(str(Settings.SCHEMA["map/castle_areas"]["since"]), "7")
+	assert_eq(str(Settings.SCHEMA["map/castle_areas"]["page"]), "map")
+	assert_false(s.set_value("map/castle_areas", "yes"), "a string is not a bool")
+	var path := _tmp_file("m7_castle")
+	assert_true(s.set_value("map/castle_areas", false))
+	assert_true(s.save_to(path))
+	assert_false(bool(Settings.load_from(path, "macOS", false).get_value("map/castle_areas")), "off round-trips")
+	# planted fault: a bad castle-areas value in a file falls back to on
+	var bad := _tmp_file("m7_bad")
+	var f := FileAccess.open(bad, FileAccess.WRITE)
+	f.store_string("[map]\ncastle_areas = \"dim\"\n")
+	f.close()
+	assert_true(bool(Settings.load_from(bad, "macOS", false).get_value("map/castle_areas")), "a bad value falls back to on")
+
+
 func test_m2_keys_with_wrong_values_in_a_file_fall_back() -> void:
 	var path := _tmp_file("m2_bad")
 	var f := FileAccess.open(path, FileAccess.WRITE)

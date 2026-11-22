@@ -20,3 +20,7 @@ sight = 2
 min_level = 2
 refill = 25
 figure = &"fig_cavalry"
+attack = 6
+defence = 3
+fire_permille = 0
+siege_points = 0

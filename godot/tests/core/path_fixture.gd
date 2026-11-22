@@ -37,7 +37,9 @@ static func allowed_land(map: MapData) -> PackedByteArray:
 
 ## A duplicate of the committed defs (sub-resources included): a planted fault edits this copy only.
 static func defs_copy() -> GameDefs:
-	return EconomyFixture.committed().duplicate(true) as GameDefs
+	var out := EconomyFixture.committed().duplicate(true) as GameDefs
+	out.war = EconomyFixture.war_copy(out.war)
+	return out
 
 
 ## The hex coordinates of a list of hex indices, in the same order.

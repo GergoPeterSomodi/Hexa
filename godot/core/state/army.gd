@@ -3,11 +3,15 @@
 class_name Army
 extends RefCounted
 
-const SCHEMA := "hexa-godot/army/1"
+const SCHEMA := "hexa-godot/army/2"
 const NO_HEX := Vector2i(-1, -1)
 const ORDER_NONE := &""
 const ORDER_HOLD := &"hold"
 const ORDER_MARCH := &"march"
+const ORDER_STORM := &"storm"
+## The standing order (4.7): what the army does when attacked. Apart from ORDER_HOLD (a word, not a field).
+const STANDING_HOLD := &"hold"
+const STANDING_WITHDRAW := &"withdraw"
 
 var id: int = 0
 var tag: StringName = &""
@@ -31,6 +35,8 @@ var supply: int = 0
 ## Men lost in the last supply phase.
 var lost_last: int = 0
 var created_turn: int = 0
+## STANDING_HOLD or STANDING_WITHDRAW (4.7); written only by Armies.
+var standing: StringName = STANDING_HOLD
 
 
 func men() -> int:
@@ -56,7 +62,7 @@ func unit(unit_id: int) -> Unit:
 	return null
 
 
-## Plain: names as text, hexes as pairs, the route packed, the units as unit/1 in id order.
+## Plain: names as text, hexes as pairs, the route packed, the units as unit/2 in id order.
 func to_dict() -> Dictionary:
 	var list: Array = []
 	for u: Unit in units:
@@ -65,7 +71,7 @@ func to_dict() -> Dictionary:
 		"schema": SCHEMA, "id": id, "tag": String(tag), "name": name, "hex": [hex.x, hex.y], "units": list,
 		"order": String(order), "goal": [goal.x, goal.y], "route": route.duplicate(), "waiting": String(waiting),
 		"halt_why": String(halt_why), "halt_text": halt_text, "moved_from": [moved_from.x, moved_from.y],
-		"supply": supply, "lost_last": lost_last, "created_turn": created_turn,
+		"supply": supply, "lost_last": lost_last, "created_turn": created_turn, "standing": String(standing),
 	}
 
 
@@ -77,12 +83,12 @@ static func from_dict(d: Dictionary) -> Army:
 	var a := Army.new()
 	var ints := {}
 	for key: String in ["id", "supply", "lost_last", "created_turn"]:
-		var value: Variant = Unit.whole(d.get(key, null))
+		var value: Variant = Unit.int32(d.get(key, null))
 		if value == null or int(value) < 0:
 			return null
 		ints[key] = int(value)
 	var texts := {}
-	for key: String in ["tag", "name", "order", "waiting", "halt_why", "halt_text"]:
+	for key: String in ["tag", "name", "order", "waiting", "halt_why", "halt_text", "standing"]:
 		var value: Variant = d.get(key, null)
 		if not (value is String or value is StringName):
 			return null
@@ -97,7 +103,9 @@ static func from_dict(d: Dictionary) -> Army:
 	var raw_units: Variant = d.get("units", null)
 	if path == null or not (raw_units is Array) or ints["supply"] > 2:
 		return null
-	if not [ORDER_NONE, ORDER_HOLD, ORDER_MARCH].has(StringName(texts["order"])):
+	if not [ORDER_NONE, ORDER_HOLD, ORDER_MARCH, ORDER_STORM].has(StringName(texts["order"])):
+		return null
+	if not [STANDING_HOLD, STANDING_WITHDRAW].has(StringName(texts["standing"])):
 		return null
 	for item: Variant in raw_units as Array:
 		if not (item is Dictionary):
@@ -110,6 +118,7 @@ static func from_dict(d: Dictionary) -> Army:
 	a.supply = ints["supply"]
 	a.lost_last = ints["lost_last"]
 	a.created_turn = ints["created_turn"]
+	a.standing = StringName(texts["standing"])
 	a.tag = StringName(texts["tag"])
 	a.name = texts["name"]
 	a.order = StringName(texts["order"])
@@ -132,9 +141,9 @@ func digest_text() -> String:
 	var path := PackedStringArray()
 	for index: int in route:
 		path.append(str(index))
-	return "%d|%s|%s|%d,%d|%d|%s|%d,%d|%s|%s|%s|%s|%d,%d|%d|%d|%s" % [
+	return "%d|%s|%s|%d,%d|%d|%s|%d,%d|%s|%s|%s|%s|%d,%d|%d|%d|%s|%s" % [
 		id, String(tag), name, hex.x, hex.y, created_turn, String(order), goal.x, goal.y, ",".join(path),
-		String(waiting), String(halt_why), halt_text, moved_from.x, moved_from.y, supply, lost_last, ";".join(parts),
+		String(waiting), String(halt_why), halt_text, moved_from.x, moved_from.y, supply, lost_last, ";".join(parts), String(standing),
 	]
 
 

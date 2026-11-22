@@ -32,8 +32,42 @@ static func committed() -> GameDefs:
 ## growth takes PeopleFixture.genoa or passes `still` false.
 static func defs(calm: bool = true, still: bool = true) -> GameDefs:
 	var out := PeopleFixture.still(committed()) if still else committed().duplicate() as GameDefs
+	out.war = war_copy(out.war)
 	if calm:
 		out.weather_odds = PackedInt32Array([100, 0, 0])
+	return out
+
+
+## A copy of the war that a test may change: every dictionary, array and word of it is copied, so a change to
+## `g.defs.war.x` (or to a nested odds word or fight row) never reaches the committed war. Null stays null.
+static func war_copy(war: WarDef) -> WarDef:
+	if war == null:
+		return null
+	var out := war.duplicate(true) as WarDef
+	var attack: Dictionary[StringName, PackedInt32Array] = {}
+	for branch: StringName in war.fight_attack:
+		attack[branch] = PackedInt32Array(war.fight_attack[branch])
+	out.fight_attack = attack
+	var defence: Dictionary[StringName, PackedInt32Array] = {}
+	for branch: StringName in war.fight_defence:
+		defence[branch] = PackedInt32Array(war.fight_defence[branch])
+	out.fight_defence = defence
+	var dealt: Dictionary[StringName, int] = {}
+	for stance: StringName in war.stance_dealt:
+		dealt[stance] = war.stance_dealt[stance]
+	out.stance_dealt = dealt
+	var taken: Dictionary[StringName, int] = {}
+	for stance: StringName in war.stance_taken:
+		taken[stance] = war.stance_taken[stance]
+	out.stance_taken = taken
+	var ground: Dictionary[StringName, int] = {}
+	for key: StringName in war.odds_ground:
+		ground[key] = war.odds_ground[key]
+	out.odds_ground = ground
+	var words: Array[Dictionary] = []
+	for entry: Dictionary in war.odds_words:
+		words.append(entry.duplicate())
+	out.odds_words = words
 	return out
 
 

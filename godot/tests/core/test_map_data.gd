@@ -188,7 +188,7 @@ func test_map_state_round_trip() -> void:
 	s.owner[m.index_of(Vector2i(5, 2))] = 254
 	var d := s.to_dict()
 	assert_eq(d["schema"], MapState.SCHEMA)
-	assert_eq(MapState.SCHEMA, "hexa-godot/map-state/4")
+	assert_eq(MapState.SCHEMA, "hexa-godot/map-state/5")
 	# JSON-safe: survives text.
 	var parsed: Variant = JSON.parse_string(JSON.stringify(d))
 	assert_true(parsed is Dictionary)
@@ -230,7 +230,7 @@ func test_map_state_schema_3_round_trip_with_works() -> void:
 	var m := _map()
 	var s := _state_with_works(m)
 	var d := s.to_dict()
-	assert_eq(d["schema"], "hexa-godot/map-state/4")
+	assert_eq(d["schema"], "hexa-godot/map-state/5")
 	var back := MapState.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary, m)
 	assert_not_null(back)
 	assert_eq(back.works.size(), 2)
@@ -374,7 +374,7 @@ func test_map_state_4_round_trip_with_the_people() -> void:
 	var m := _map()
 	var s := _state_with_people(m)
 	var d := s.to_dict()
-	assert_eq(d["schema"], "hexa-godot/map-state/4")
+	assert_eq(d["schema"], "hexa-godot/map-state/5")
 	assert_true(d["people"] is PackedInt32Array, "packed as they are")
 	for form: int in 2:
 		var src: Dictionary = d
@@ -433,7 +433,7 @@ func test_map_state_schema_3_loads_with_people_at_zeros() -> void:
 	assert_eq(back.people_start.count(0), 35)
 	assert_eq(back.people_end.count(0), 35)
 	assert_eq(back.digest(), s.digest(), "the zero people of a fresh state")
-	assert_eq(back.to_dict()["schema"], MapState.SCHEMA, "saved again as map-state/4")
+	assert_eq(back.to_dict()["schema"], MapState.SCHEMA, "saved again as map-state/5")
 	var v2 := {"schema": MapState.SCHEMA_V2, "main_use": Marshalls.raw_to_base64(s.main_use),
 		"level": Marshalls.raw_to_base64(s.level), "owner": Marshalls.raw_to_base64(s.owner)}
 	var back2 := MapState.from_dict(v2, m)
@@ -487,6 +487,105 @@ func test_map_state_4_refuses_mistyped_or_wrongly_sized_people() -> void:
 	packed[8] = -1
 	negative["people"] = packed
 	assert_null(MapState.from_dict(negative, m), "P: a packed negative")
+
+
+func test_map_state_5_occupation_round_trip_and_copies() -> void:
+	var m := _map()
+	var s := _state_with_people(m)
+	var i := 10
+	s.occupier[i] = 3
+	s.garrison[i] = 250
+	s.unsupported[i] = 2
+	var d := s.to_dict()
+	assert_eq(d["schema"], "hexa-godot/map-state/5")
+	var back := MapState.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary, m)
+	assert_not_null(back)
+	assert_eq(back.occupier[i], 3)
+	assert_eq(back.garrison[i], 250)
+	assert_eq(back.unsupported[i], 2)
+	assert_eq(back.digest(), s.digest(), "the occupation is in the digest and survives a save")
+	var copy := s.duplicate_state()
+	copy.occupier[i] = 9
+	assert_eq(s.occupier[i], 3, "a copy is independent")
+
+
+func test_map_state_4_loads_with_the_occupation_at_zeros() -> void:
+	var m := _map()
+	var s := _state_with_people(m)
+	var n := m.hex_count()
+	var v4 := s.to_dict()
+	v4["schema"] = MapState.SCHEMA_V4
+	for key: String in ["occupier", "garrison", "unsupported"]:
+		v4.erase(key)
+	var back := MapState.from_dict(v4, m)
+	assert_not_null(back, "schema 4 is still read (tests only)")
+	assert_eq(back.occupier.count(0), n)
+	assert_eq(back.garrison.count(0), n)
+	assert_eq(back.unsupported.count(0), n)
+	assert_eq(back.people, s.people, "the people come through")
+
+
+func test_map_state_5_refuses_damaged_occupation() -> void:
+	var m := _map()
+	var s := _state_with_people(m)
+	var text := s.to_dict()
+	text["occupier"] = Marshalls.raw_to_base64(PackedByteArray([1, 2, 3]))
+	assert_null(MapState.from_dict(text, m), "P: an occupier of the wrong size")
+	var short := s.to_dict()
+	short["garrison"] = [1, 2]
+	assert_null(MapState.from_dict(short, m), "P: a garrison of the wrong size")
+	var neg := s.to_dict()
+	var g := Array(s.garrison)
+	g[0] = -1
+	neg["garrison"] = g
+	assert_null(MapState.from_dict(neg, m), "P: a negative garrison")
+	var missing := s.to_dict()
+	missing.erase("unsupported")
+	assert_null(MapState.from_dict(missing, m), "P: unsupported missing")
+	var wrong_schema := s.to_dict()
+	wrong_schema["schema"] = "hexa-godot/map-state/6"
+	assert_null(MapState.from_dict(wrong_schema, m), "P: a schema that is not known")
+
+
+func test_map_state_5_occupation_refuses_sea_and_out_of_range_values() -> void:
+	var m := _map()
+	var s := _state_with_people(m)
+	var n := m.hex_count()
+	var sea := -1
+	var land := -1
+	for i: int in n:
+		if m.land[i] == 0 and sea < 0:
+			sea = i
+		if m.land[i] != 0 and land < 0:
+			land = i
+	assert_gt(sea, -1, "the fixture has sea")
+	assert_gt(land, -1, "the fixture has land")
+	var bytes := PackedByteArray()
+	bytes.resize(n)
+	bytes[land] = 3
+	var ok := s.to_dict()
+	ok["occupier"] = Marshalls.raw_to_base64(bytes)
+	assert_not_null(MapState.from_dict(ok, m), "an occupier of a country id on land reads")
+	bytes[land] = 255
+	var top := s.to_dict()
+	top["occupier"] = Marshalls.raw_to_base64(bytes)
+	assert_null(MapState.from_dict(top, m), "P: 255 is no country id")
+	var bytes_sea := PackedByteArray()
+	bytes_sea.resize(n)
+	bytes_sea[sea] = 3
+	var at_sea := s.to_dict()
+	at_sea["occupier"] = Marshalls.raw_to_base64(bytes_sea)
+	assert_null(MapState.from_dict(at_sea, m), "P: an occupier on a sea hex")
+	var g := Array(s.garrison)
+	g[sea] = 1
+	var garrison_sea := s.to_dict()
+	garrison_sea["garrison"] = g
+	assert_null(MapState.from_dict(garrison_sea, m), "P: a garrison on a sea hex")
+	var g2 := Array(s.garrison)
+	g2[land] = 3000000000
+	var huge := s.to_dict()
+	huge["garrison"] = g2
+	assert_null(MapState.from_dict(huge, m), "P: a garrison above int32")
 
 
 func test_the_projected_size_of_the_made_up_europe() -> void:

@@ -5,11 +5,13 @@
 class_name MapState
 extends RefCounted
 
-## Schema 1 loads with owner zeros and no works; 2 loads with no works; 1 to 3 load with the people arrays at zeros.
+## Schema 1 loads with owner zeros and no works; 2 loads with no works; 1 to 3 load with the people arrays at zeros;
+## 4 (tests only) loads with the three occupation arrays at zeros (docs/architecture/m7-build-spec.md 5.2).
 const SCHEMA_V1 := "hexa-godot/map-state/1"
 const SCHEMA_V2 := "hexa-godot/map-state/2"
 const SCHEMA_V3 := "hexa-godot/map-state/3"
-const SCHEMA := "hexa-godot/map-state/4"
+const SCHEMA_V4 := "hexa-godot/map-state/4"
+const SCHEMA := "hexa-godot/map-state/5"
 
 ## ImproveRules family id; 0 = wild.
 var main_use: PackedByteArray = PackedByteArray()
@@ -24,6 +26,12 @@ var people: PackedInt32Array = PackedInt32Array()
 ## The people at the start and at the end of the last season ended; written only by People (close).
 var people_start: PackedInt32Array = PackedInt32Array()
 var people_end: PackedInt32Array = PackedInt32Array()
+## Per hex: 0 the owner holds it, else the occupying country's id. Written only by Occupation (M7).
+var occupier: PackedByteArray = PackedByteArray()
+## Per hex: men of a fortress's garrison; 0 elsewhere. Written only by Occupation (M7).
+var garrison: PackedInt32Array = PackedInt32Array()
+## Per hex: seasons an occupied hex had no support (D18). Written only by Occupation (M7).
+var unsupported: PackedByteArray = PackedByteArray()
 
 
 ## A wild state for a map: every hex unused, level 0, owner 0, no works.
@@ -36,6 +44,9 @@ static func create(map: MapData) -> MapState:
 	s.people.resize(n)
 	s.people_start.resize(n)
 	s.people_end.resize(n)
+	s.occupier.resize(n)
+	s.garrison.resize(n)
+	s.unsupported.resize(n)
 	return s
 
 
@@ -47,6 +58,9 @@ func duplicate_state() -> MapState:
 	s.people = people.duplicate()
 	s.people_start = people_start.duplicate()
 	s.people_end = people_end.duplicate()
+	s.occupier = occupier.duplicate()
+	s.garrison = garrison.duplicate()
+	s.unsupported = unsupported.duplicate()
 	for w: Work in works:
 		s.works.append(w.duplicate_work())
 	s.next_work_id = next_work_id
@@ -77,6 +91,9 @@ func to_dict() -> Dictionary:
 		"people": people.duplicate(),
 		"people_start": people_start.duplicate(),
 		"people_end": people_end.duplicate(),
+		"occupier": Marshalls.raw_to_base64(occupier),
+		"garrison": garrison.duplicate(),
+		"unsupported": Marshalls.raw_to_base64(unsupported),
 	}
 
 
@@ -84,7 +101,7 @@ func to_dict() -> Dictionary:
 ## Schema 1 dicts load with all-zero owners, schemas 1 and 2 with no works, schemas 1 to 3 with zero people.
 static func from_dict(d: Dictionary, map: MapData) -> MapState:
 	var schema := str(d.get("schema", ""))
-	if schema != SCHEMA and schema != SCHEMA_V3 and schema != SCHEMA_V2 and schema != SCHEMA_V1:
+	if not [SCHEMA, SCHEMA_V4, SCHEMA_V3, SCHEMA_V2, SCHEMA_V1].has(schema):
 		return null
 	var n := map.hex_count()
 	var s := MapState.new()
@@ -100,16 +117,43 @@ static func from_dict(d: Dictionary, map: MapData) -> MapState:
 		s.owner = Marshalls.base64_to_raw(str(d.get("owner", "")))
 		if s.owner.size() != n:
 			return null
-	if (schema == SCHEMA or schema == SCHEMA_V3) and not s._load_works(d, map):
+	var has_works := schema != SCHEMA_V1 and schema != SCHEMA_V2
+	if has_works and not s._load_works(d, map):
 		return null
-	if schema == SCHEMA:
+	if schema == SCHEMA or schema == SCHEMA_V4:
 		if not s._load_people(d, n):
 			return null
 	else:
 		s.people.resize(n)
 		s.people_start.resize(n)
 		s.people_end.resize(n)
+	if schema == SCHEMA:
+		if not s._load_occupation(d, map):
+			return null
+	else:
+		s.occupier.resize(n)
+		s.garrison.resize(n)
+		s.unsupported.resize(n)
 	return s
+
+
+## Reads the three occupation arrays of a schema 5 dict: occupier and unsupported as base64 bytes of n, garrison as n
+## whole numbers (a packed array or a JSON list), no negatives. False when one is missing or the wrong size.
+func _load_occupation(d: Dictionary, map: MapData) -> bool:
+	var n := map.hex_count()
+	occupier = Marshalls.base64_to_raw(str(d.get("occupier", "")))
+	unsupported = Marshalls.base64_to_raw(str(d.get("unsupported", "")))
+	var ints: Variant = _ints_of(d.get("garrison", null), n)
+	if occupier.size() != n or unsupported.size() != n or ints == null:
+		return false
+	# A country id is 1 to 254 (0: the owner holds it); only land is occupied or garrisoned.
+	for i: int in n:
+		if occupier[i] > 254:
+			return false
+		if (occupier[i] != 0 or (ints as PackedInt32Array)[i] != 0) and map.land[i] == 0:
+			return false
+	garrison = ints as PackedInt32Array
+	return true
 
 
 ## Reads the three people arrays of a schema 4 dict; false when one is missing, is neither a PackedInt32Array nor a list
@@ -154,10 +198,10 @@ static func _ints_of(raw: Variant, n: int) -> Variant:
 		out = (raw as PackedInt32Array).duplicate()
 	elif raw is Array and (raw as Array).size() == n:
 		for item: Variant in raw as Array:
-			var whole := typeof(item) == TYPE_INT or (typeof(item) == TYPE_FLOAT and is_equal_approx(float(item), roundf(float(item))))
-			if not whole:
+			var whole: Variant = Unit.int32(item)
+			if whole == null:
 				return null
-			out.append(int(item))
+			out.append(int(whole))
 	else:
 		return null
 	if out.size() != n:
@@ -182,6 +226,13 @@ func digest() -> String:
 	for ints: PackedInt32Array in [people, people_start, people_end]:
 		if not ints.is_empty():
 			ctx.update(ints.to_byte_array())
+	# M7 (5.2): occupier, garrison, unsupported, in this order.
+	if not occupier.is_empty():
+		ctx.update(occupier)
+	if not garrison.is_empty():
+		ctx.update(garrison.to_byte_array())
+	if not unsupported.is_empty():
+		ctx.update(unsupported)
 	var parts: PackedStringArray = []
 	for w: Work in works:
 		parts.append(w.digest_text())

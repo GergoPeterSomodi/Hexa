@@ -79,6 +79,11 @@ const MAP_PATH := Color("#f6e3a1")
 const MAP_PATH_WARN := Color("#f0806a")
 const MAP_PATH_INK := Color("#0b0806")
 
+# War tokens (m7 spec 6.2): the siege dial and its track; AREA_INK_ALPHA is the castle-area tint's ink alpha.
+const WAR_DIAL := Color("#f0a850")
+const WAR_DIAL_TRACK := Color("#3a2416")
+const AREA_INK_ALPHA := 0.9
+
 # Sizes in logical pixels (ui-style-and-feedback-spec.md section 4.2)
 const S1 := 4
 const S2 := 8
@@ -169,6 +174,8 @@ const HIGH_CONTRAST: Dictionary[String, Color] = {
 	"MAP_PATH": Color("#f6e3a1"),
 	"MAP_PATH_WARN": BAD,
 	"MAP_PATH_INK": Color("#000000"),
+	"WAR_DIAL": WARN,
+	"WAR_DIAL_TRACK": Color("#5b5b5b"),
 	"GOOD": GOOD,
 	"BAD": BAD,
 	"WARN": WARN,

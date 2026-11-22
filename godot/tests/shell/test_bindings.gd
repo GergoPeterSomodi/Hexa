@@ -36,7 +36,7 @@ func test_ensure_filters_by_milestone() -> void:
 
 
 func test_no_duplicate_default_event_within_group_and_active_milestone() -> void:
-	var milestones: Array[String] = ["1", "1.5", "2", "3", "4", "4.5", "6", "11", "12"]
+	var milestones: Array[String] = ["1", "1.5", "2", "3", "4", "4.5", "6", "7", "11", "12"]
 	for m_str: String in milestones:
 		var m := float(m_str)
 		var by_group: Dictionary = {}
@@ -239,3 +239,41 @@ func test_m3_actions_exist_with_the_spec_keys() -> void:
 		assert_eq(Bindings.serialize_event(Bindings.parse_event(str((entry["events"] as Array)[0]))),
 			Bindings.serialize_event(Bindings.parse_event(str(wanted[action]))), "%s default key" % action)
 	assert_eq(str(_entry_of(&"dev_console")["group"]), "Developer")
+
+
+func test_m7_rows_have_the_spec_keys_and_groups() -> void:
+	var storm := _entry_of(&"map_command_storm")
+	assert_eq(str(storm["since"]), "7", "storm arrives in M7")
+	assert_eq(str(storm["group"]), "Map")
+	assert_eq(str(storm["label"]), "Storm at the cursor")
+	assert_eq(storm["events"], ["Shift+O"], "storm default key")
+	var battle := _entry_of(&"game_battle")
+	assert_eq(str(battle["since"]), "7", "last battle arrives in M7")
+	assert_eq(str(battle["group"]), "Game")
+	assert_eq(str(battle["label"]), "Last battle")
+	assert_eq(battle["events"], ["B"], "battle default key")
+	assert_eq(_entry_of(&"map_command_key")["events"], ["O", "Shift+F10"], "the command key keeps plain O")
+	Bindings.ensure("7")
+	assert_true(InputMap.has_action(&"map_command_storm"))
+	assert_true(InputMap.has_action(&"game_battle"))
+
+
+func test_m7_shift_o_is_the_storm_and_plain_o_still_commands() -> void:
+	Bindings.ensure("7")
+	var shift_o := InputEventKey.new()
+	shift_o.keycode = KEY_O
+	shift_o.shift_pressed = true
+	shift_o.pressed = true
+	assert_true(shift_o.is_action_pressed(&"map_command_storm", false, true), "Shift+O storms")
+	assert_false(shift_o.is_action_pressed(&"map_command_key", false, true), "Shift+O never also fires O")
+	var plain := InputEventKey.new()
+	plain.keycode = KEY_O
+	plain.pressed = true
+	assert_true(plain.is_action_pressed(&"map_command_key", false, true), "plain O still commands")
+	assert_false(plain.is_action_pressed(&"map_command_storm", false, true), "plain O does not storm")
+
+
+func test_m7_shift_right_click_gesture_line_is_on_every_platform() -> void:
+	var line := "Shift+right click (Shift+two-finger click): storm a fortress with the selected army"
+	for platform: String in ["macOS", "Windows", "Linux", "default"]:
+		assert_true(Bindings.gestures_for(platform).has(line), "%s has the storm line" % platform)

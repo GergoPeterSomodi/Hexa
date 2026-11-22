@@ -301,6 +301,7 @@ const SCHEMA: Dictionary = {
 		"label": "Shade what you cannot see",
 		"applies": "immediate",
 	},
+	"map/castle_areas": {"type": TYPE_BOOL, "default": true, "page": "map", "since": "7", "label": "Castle areas with an army selected", "applies": "immediate"},
 	"accessibility/reduce_motion": {
 		"type": TYPE_BOOL,
 		"default": false,

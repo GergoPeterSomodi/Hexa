@@ -352,6 +352,6 @@ static func _army_ok(game: Game, a: Army, unit_ids: Dictionary, next_unit: int) 
 	for index: int in a.route:
 		if index < 0 or index >= game.map.hex_count():
 			return false
-	if a.order == Army.ORDER_MARCH and game.map.index_of(a.goal) < 0:
+	if (a.order == Army.ORDER_MARCH or a.order == Army.ORDER_STORM) and game.map.index_of(a.goal) < 0:
 		return false
 	return true

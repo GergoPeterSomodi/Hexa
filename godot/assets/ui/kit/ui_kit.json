@@ -1,9 +1,9 @@
 {
   "schema": "hexa-godot/ui-kit/1",
-  "tokens_sha": "685f60ad92470968939cb4b9be45fcfd898965b18dd497d0dcfcd251c407a04a",
+  "tokens_sha": "4d5060cd43f1d70ba73c56fd2858790fc2834195182f1dde747105bbe6c870d4",
   "bytes_rgba": {
-    "kit_1x": 3683568,
-    "kit_2x": 14734272,
+    "kit_1x": 3754800,
+    "kit_2x": 15019200,
     "menu": 8812800
   },
   "pieces": {
@@ -3338,6 +3338,188 @@
       "sha": {
         "1x": "c8534dd1823b07325fb65e69a7a94171f199d7b20c023d1c4711b93eeae7c8ad",
         "2x": "1b223935881a4cce9fc050c132403326e1d6a3d10d5105ac1a93b937fc368c55"
+      },
+      "check": "exact"
+    },
+    "badge_battle": {
+      "size": [
+        40,
+        40
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 6,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "124c64420f71b661b986f2cdea4acabc03b55a9334d9ace245bc46bbcda292c3",
+        "2x": "33f02d259fbc75396eaaca3d8b4875c3cda70c57d1afbc5c897d97527c403bc3"
+      },
+      "check": "exact"
+    },
+    "badge_siege": {
+      "size": [
+        40,
+        40
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 6,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "d5c3846399fda55527a784f77fd6629106ea0159b4156595332ce57cbf45db57",
+        "2x": "d44f1e04c9e01b8089dd87bf139eb58eb17f286e6ff911882576743bb91cb3a7"
+      },
+      "check": "exact"
+    },
+    "icons_war": {
+      "size": [
+        192,
+        72
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 6,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "24890df4d45f4da1557683c37a3a0d6b4936596dad3a7bb8c90d477ef055d548",
+        "2x": "8f237e91d4c76407fdb6b2915372d03ddb3c4b2750f24c9238121261c54376c9"
+      },
+      "check": "exact",
+      "cell": [
+        24,
+        24
+      ],
+      "icons": [
+        "war",
+        "peace",
+        "truce",
+        "battle",
+        "siege",
+        "storm",
+        "besiege",
+        "attack",
+        "standing_hold",
+        "withdraw",
+        "flee",
+        "victory",
+        "defeat",
+        "fortress",
+        "garrison",
+        "area_held",
+        "area_open",
+        "routed",
+        "shaken",
+        "fires",
+        "occupied",
+        "uphill",
+        "pass_cross",
+        "river_cross"
+      ]
+    },
+    "die_face": {
+      "size": [
+        28,
+        28
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 6,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "358f0629316466ae485d177556357e5119d160d8fc1f5d892c9c61f21996b31d",
+        "2x": "c2611bb7694ae1f9bb239ced991877eca717753f4d55e56ae2ea412df07f9549"
       },
       "check": "exact"
     }

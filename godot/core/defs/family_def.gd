@@ -62,6 +62,9 @@ const SEASON_PERCENT_MAX := 400
 @export var falls_below: PackedInt32Array = PackedInt32Array()
 ## Settlements: per level, the companies a season it may raise (M6 spec 5.1; 0, 1, 1, 2, 3, 4); empty on other families.
 @export var raise_cap: PackedInt32Array = PackedInt32Array()
+## Per level: the fortress level of the piece (M7 spec 4.3): settlements 0, 0, 0, 0, 2, 3; castles 0, 1, 2, 3. Empty on
+## the goods families; a settlement or castle sets it.
+@export var fortress: PackedInt32Array = PackedInt32Array()
 
 
 ## Problems found, empty when valid: id 1 to 14, key the one FamilyIds gives the id, work_seasons the size
@@ -92,7 +95,25 @@ func validate() -> Array[String]:
 	_check_settlement(errors, label, top)
 	_check_people(errors, label, top)
 	_check_raise_cap(errors, label, top)
+	_check_fortress(errors, label, top)
 	return errors
+
+
+## fortress (M7 4.3) is for settlements and castles only: when set, top + 1 entries, [0] is 0, each level 0 to 3.
+func _check_fortress(errors: Array[String], label: String, top: int) -> void:
+	if fortress.is_empty():
+		return
+	if id != 1 and id != 2:
+		errors.append("%s: fortress is for settlements and castles only" % label)
+		return
+	if fortress.size() != top + 1:
+		errors.append("%s: fortress has %d entries, expected %d" % [label, fortress.size(), top + 1])
+		return
+	if fortress[0] != 0:
+		errors.append("%s: fortress[0] is %d, expected 0" % [label, fortress[0]])
+	for level: int in range(1, fortress.size()):
+		if fortress[level] < 0 or fortress[level] > 3:
+			errors.append("%s: fortress[%d] is %d, expected 0 to 3" % [label, level, fortress[level]])
 
 
 ## raise_cap is on settlements only: top + 1 entries, [0] is 0, each 0 to 20 and none falling as the level rises.

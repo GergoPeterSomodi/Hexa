@@ -352,3 +352,27 @@ func test_slice5_army_pieces_are_kit_icons() -> void:
 func test_the_map_views_delta_tints_are_the_token_colours() -> void:
 	assert_eq(MapModes.DELTA_GOOD, Tokens.GOOD)
 	assert_eq(MapModes.DELTA_BAD, Tokens.BAD)
+
+
+func test_slice6_war_pieces_are_kit_icons() -> void:
+	# m7-build-spec.md 6.2: two badges and the die face are whole icons; the war icons are 24 px atlas cells.
+	var studiolo := load(KitTheme.THEME_PATH) as Theme
+	var hc := load(KitTheme.HIGH_CONTRAST_PATH) as Theme
+	var theme_2x := KitTheme.load_for(2.0, &"2x", false)
+	var pieces := _load_pieces()
+	var direct: Dictionary = {"badge_battle": Vector2(40, 40), "badge_siege": Vector2(40, 40), "die_face": Vector2(28, 28)}
+	for key: String in direct:
+		var size: Vector2 = direct[key]
+		for pair: Array in [["studiolo", studiolo], ["hc", hc], ["2x", theme_2x]]:
+			var th: Theme = pair[1]
+			assert_true(th.has_icon(StringName(key), &"Kit"), "%s has %s" % [pair[0], key])
+			assert_eq(th.get_icon(StringName(key), &"Kit").get_size(), size, "%s logical size in %s" % [key, pair[0]])
+		assert_eq(theme_2x.get_icon(StringName(key), &"Kit").get_image().get_size(), Vector2i(size * 2.0), "%s 2x pixels" % key)
+	var names: Array = (pieces["icons_war"] as Dictionary)["icons"]
+	assert_eq(names.size(), 24, "icons_war has its 24 cells")
+	for n: Variant in names:
+		var iname := StringName(str(n))
+		for pair: Array in [["studiolo", studiolo], ["hc", hc], ["2x", theme_2x]]:
+			assert_true((pair[1] as Theme).has_icon(iname, &"Kit"), "%s has icon %s" % [pair[0], iname])
+		assert_eq(studiolo.get_icon(iname, &"Kit").get_size(), Vector2(24, 24), "%s is 24 px" % iname)
+		assert_eq(theme_2x.get_icon(iname, &"Kit").get_image().get_size(), Vector2i(48, 48), "%s 2x pixels" % iname)

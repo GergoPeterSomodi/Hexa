@@ -201,3 +201,40 @@ func test_planted_fault_duplicate_key_and_slow_unit() -> void:
 	slow_units[0].mp = 1
 	defs.units = slow_units
 	assert_true(_has(defs.validate(), "mp 1 is under the cheapest ground step 2"), "mp under the cheapest step refused")
+
+
+## M7 spec 4.6 and 5.1: the war numbers of each kind (attack, defence, fire, siege points), read beside the table above.
+const WAR_TABLE: Array = [
+	["pikemen", 4, 5, 0, 0],
+	["crossbowmen", 5, 2, 25, 0],
+	["knights", 6, 3, 0, 0],
+	["bombards", 6, 1, 50, 1],
+]
+
+
+func test_committed_war_numbers_equal_spec() -> void:
+	var defs := _committed_defs()
+	for row: Array in WAR_TABLE:
+		var u := _load_unit(row[0])
+		assert_eq(u.validate(defs), [] as Array[String], "%s validates" % row[0])
+		assert_eq(u.attack, row[1], "%s attack" % row[0])
+		assert_eq(u.defence, row[2], "%s defence" % row[0])
+		assert_eq(u.fire_permille, row[3], "%s fire" % row[0])
+		assert_eq(u.siege_points, row[4], "%s siege points" % row[0])
+		assert_eq(u.ranged(), row[3] > 0, "%s ranged" % row[0])
+
+
+func test_planted_fault_war_numbers_out_of_range() -> void:
+	var defs := _committed_defs()
+	var u := _load_unit("pikemen")
+	u.attack = 0
+	assert_true(_has(u.validate(defs), "attack is 0, expected 1 to 20"), "attack 0 refused")
+	u = _load_unit("pikemen")
+	u.defence = 21
+	assert_true(_has(u.validate(defs), "defence is 21, expected 1 to 20"), "defence 21 refused")
+	u = _load_unit("bombards")
+	u.fire_permille = 201
+	assert_true(_has(u.validate(defs), "fire_permille is 201, expected 0 to 200"), "fire 201 refused")
+	u = _load_unit("bombards")
+	u.siege_points = 7
+	assert_true(_has(u.validate(defs), "siege_points is 7, expected 0 to 6"), "siege points 7 refused")

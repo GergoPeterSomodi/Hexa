@@ -69,7 +69,7 @@ LUCK_FORBIDDEN = [
     (r"\bRandomNumberGenerator\b", "RandomNumberGenerator outside rng.gd (luck goes through rng.gd)"),
 ]
 GODOT3_FORBIDDEN = [
-    (r"\byield\b", "yield is Godot 3 (use await, but not in core/)"),
+    (r"\byield\s*\(", "yield() is Godot 3 (use await, but not in core/); the peace term &\"yield\" is a name, not a call"),
     (r"(?<!@)\bexport\s+var\b|(?<!@)\bexport\s*\(", "export var / export(...) is Godot 3 (use @export)"),
     (r"(?<!@)\bonready\s+var\b", "onready var is Godot 3 (use @onready)"),
     (r"\bsetget\b", "setget is Godot 3 (use a setter block)"),

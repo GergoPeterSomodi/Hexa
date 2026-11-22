@@ -147,6 +147,10 @@ const DEFAULTS: Array[Dictionary] = [
 		"events": ["O", "Shift+F10"] as Array[String]},
 	{"action": &"game_tech", "label": "Technology screen", "group": "Game", "since": "11",
 		"events": ["T"] as Array[String]},
+	{"action": &"map_command_storm", "label": "Storm at the cursor", "group": "Map", "since": "7",
+		"events": ["Shift+O"] as Array[String]},
+	{"action": &"game_battle", "label": "Last battle", "group": "Game", "since": "7",
+		"events": ["B"] as Array[String]},
 ]
 
 const GESTURES: Dictionary = {
@@ -155,6 +159,7 @@ const GESTURES: Dictionary = {
 		"Trackpad pinch or mouse wheel: zoom about the pointer",
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
+		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
 		"Shift: hold the works card",
 	] as Array[String],
 	"Windows": [
@@ -162,6 +167,7 @@ const GESTURES: Dictionary = {
 		"Shift+wheel or tilt wheel: pan sideways",
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
+		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
 		"Shift: hold the works card",
 	] as Array[String],
 	"Linux": [
@@ -169,6 +175,7 @@ const GESTURES: Dictionary = {
 		"Shift+wheel or tilt wheel: pan sideways",
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
+		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
 		"Shift: hold the works card",
 	] as Array[String],
 	"default": [
@@ -176,6 +183,7 @@ const GESTURES: Dictionary = {
 		"Shift+wheel or tilt wheel: pan sideways",
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
+		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
 		"Shift: hold the works card",
 	] as Array[String],
 }

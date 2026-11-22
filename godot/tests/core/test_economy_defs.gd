@@ -371,3 +371,15 @@ func test_planted_fault_m6_unit_and_terrain_lists() -> void:
 	terrains[1] = first
 	defs.terrains = terrains
 	assert_true(_has(defs.validate(), "terrains[0]: id 1 should be 0"), "terrains out of cover order refused")
+
+
+## M7 spec 5.1: GameDefs lists the war and validates it (the war's own cases are in test_war_defs.gd).
+func test_planted_fault_war_missing_through_game_defs() -> void:
+	var defs := ResourceLoader.load(
+		"res://data/defs/game_defs.tres", "", ResourceLoader.CACHE_MODE_IGNORE
+	) as GameDefs
+	assert_not_null(defs.war, "the committed war is listed")
+	var war := ResourceLoader.load("res://data/defs/war.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as WarDef
+	war.battle_days = 0
+	defs.war = war
+	assert_true(_has(defs.validate(), "battle_days is 0, expected 1 to 8"), "a bad war refused through GameDefs")

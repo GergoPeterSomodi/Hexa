@@ -55,6 +55,7 @@ func test_unit_round_trip_in_both_forms() -> void:
 func test_unit_digest_text_and_each_field() -> void:
 	var u := _unit(1)
 	var first := "horses:1,grain:2" if GoodDef.KEYS.find(&"horses") < GoodDef.KEYS.find(&"grain") else "grain:2,horses:1"
+	first += "|1000|0"
 	assert_eq(u.digest_text(), "1|2|41|5,9|3|120|" + first, "goods in good id order, not insertion order")
 	var base := u.digest_text()
 	var edits: Array[Callable] = [
@@ -79,7 +80,7 @@ func test_unit_refusals() -> void:
 	var good := _unit(1).to_dict()
 	assert_not_null(Unit.from_dict(good))
 	var wrong := good.duplicate()
-	wrong["schema"] = "hexa-godot/unit/2"
+	wrong["schema"] = "hexa-godot/unit/1"
 	assert_null(Unit.from_dict(wrong), "P: a wrong schema")
 	var text := good.duplicate()
 	text["men"] = "40"
@@ -165,7 +166,7 @@ func test_army_digest_moves_with_every_field() -> void:
 		seen[x.digest_text()] = true
 	assert_eq(_army().digest_text(), base, "the same army, the same text")
 	assert_true(base.begins_with("4|SAV|First Army of Turin|5,9|3|march|7,8|501,502,640|winter|blocked|No way|4,9|1|3|"))
-	assert_true(base.ends_with(_army().units[1].digest_text()))
+	assert_true(base.ends_with(_army().units[1].digest_text() + "|hold"), "the standing comes last")
 
 
 func test_men_unit_and_mustering() -> void:
@@ -187,7 +188,7 @@ func test_army_refusals() -> void:
 	var good := _army().to_dict()
 	assert_not_null(Army.from_dict(good))
 	var wrong := good.duplicate()
-	wrong["schema"] = "hexa-godot/army/2"
+	wrong["schema"] = "hexa-godot/army/1"
 	assert_null(Army.from_dict(wrong), "P: a wrong schema")
 	var str_id := good.duplicate()
 	str_id["id"] = "4"
@@ -226,3 +227,52 @@ func test_army_refusals() -> void:
 	(unsorted["units"] as Array).reverse()
 	assert_null(Army.from_dict(unsorted), "units stay in id order")
 	assert_null(Army.from_dict({}))
+
+
+func test_m7_fields_default_and_round_trip() -> void:
+	assert_eq(Unit.new().morale, 1000, "a unit starts at full morale")
+	assert_eq(Unit.new().xp, 0)
+	assert_eq(Army.new().standing, Army.STANDING_HOLD, "an army starts on Hold")
+	var a := _army()
+	a.order = Army.ORDER_STORM
+	a.standing = Army.STANDING_WITHDRAW
+	a.units[0].morale = 640
+	a.units[0].xp = 17
+	var back := Army.from_dict(a.to_dict())
+	assert_not_null(back)
+	assert_eq(back.standing, Army.STANDING_WITHDRAW)
+	assert_eq(back.order, Army.ORDER_STORM, "the storm order is one of the four")
+	assert_eq(back.units[0].morale, 640)
+	assert_eq(back.units[0].xp, 17)
+	assert_eq(back.digest_text(), a.digest_text())
+
+
+func test_m7_field_refusals() -> void:
+	var standing := _army().to_dict()
+	standing["standing"] = "charge"
+	assert_null(Army.from_dict(standing), "P: a standing that is not Hold or Withdraw")
+	var no_standing := _army().to_dict()
+	no_standing.erase("standing")
+	assert_null(Army.from_dict(no_standing), "P: an army with no standing")
+	var over := _unit(1).to_dict()
+	over["morale"] = 1001
+	assert_null(Unit.from_dict(over), "P: a morale above 1000")
+	var under := _unit(1).to_dict()
+	under["morale"] = -1
+	assert_null(Unit.from_dict(under), "P: a morale below 0")
+	var xp := _unit(1).to_dict()
+	xp["xp"] = -3
+	assert_null(Unit.from_dict(xp), "P: negative experience")
+	var no_xp := _unit(1).to_dict()
+	no_xp.erase("xp")
+	assert_null(Unit.from_dict(no_xp), "P: a unit with no experience")
+	var unit_2 := _unit(1).to_dict()
+	unit_2["schema"] = "hexa-godot/unit/3"
+	assert_null(Unit.from_dict(unit_2))
+	var digest_before := _unit(1).digest_text()
+	var moved := _unit(1)
+	moved.morale = 999
+	assert_ne(digest_before, moved.digest_text(), "morale is in the digest")
+	moved.morale = 1000
+	moved.xp = 1
+	assert_ne(digest_before, moved.digest_text(), "experience is in the digest")

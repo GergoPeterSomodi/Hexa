@@ -31,11 +31,19 @@ signal continue_march_requested
 signal cursor_moved(direction: int)
 ## O or Shift+F10: a right click at the cursor (or the selection).
 signal command_key_requested
+## Shift+O: storm at the cursor (M7 6.1).
+signal storm_key_requested
+## Shift+right click while `storm_ready` says an army of yours is selected: storm at that hex (else command_requested).
+signal storm_requested(map_px: Vector2)
+## B: open the dock on the last battle of yours (M7 6.1).
+signal battle_requested
 ## A click (select or command) while `orders_blocked` says so: it selects and orders nothing (M6 6.4: the replay's skip).
 signal blocked_click(map_px: Vector2)
 
 ## () -> bool, asked on a click's release: true while a movement replay runs, so the click is `blocked_click` instead.
 var orders_blocked: Callable = Callable()
+## () -> bool, asked on a Shift+right click: true while an army of yours is selected, so the click storms. Unset: no army.
+var storm_ready: Callable = Callable()
 
 const CURSOR_LEFT := 0
 const CURSOR_RIGHT := 1
@@ -151,8 +159,16 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 		select_requested.emit(map_px)
 		_mark_handled()
 	elif released_action == &"map_command":
-		command_requested.emit(map_px)
+		if _storms(mb):
+			storm_requested.emit(map_px)
+		else:
+			command_requested.emit(map_px)
 		_mark_handled()
+
+
+## A Shift+right click (no Ctrl, Alt or Meta) with an army of yours selected: a storm, not a command (M7 6.1).
+func _storms(mb: InputEventMouseButton) -> bool:
+	return mb.shift_pressed and not (mb.ctrl_pressed or mb.alt_pressed or mb.meta_pressed) and storm_ready.is_valid() and bool(storm_ready.call())
 
 
 func _on_mouse_motion(motion: InputEventMouseMotion) -> void:
@@ -205,7 +221,7 @@ func _on_key(key: InputEventKey) -> void:
 		_mark_handled()
 
 
-## The M3 to M6 keys: report, bookmarks, cancel work, the study, the army keys. Returns true when one fired.
+## The M3 to M7 keys: report, bookmarks, cancel work, the study, the army keys. Returns true when one fired.
 func _on_game_key(key: InputEventKey) -> bool:
 	var fired := true
 	if _is_action_pressed_exact(key, &"game_report"):
@@ -220,6 +236,10 @@ func _on_game_key(key: InputEventKey) -> bool:
 		next_army_requested.emit()
 	elif _is_action_pressed_exact(key, &"game_continue_march"):
 		continue_march_requested.emit()
+	elif _is_action_pressed_exact(key, &"map_command_storm"):
+		storm_key_requested.emit()
+	elif _is_action_pressed_exact(key, &"game_battle"):
+		battle_requested.emit()
 	elif _is_action_pressed_exact(key, &"map_command_key"):
 		command_key_requested.emit()
 	elif _cursor_direction(key) >= 0:

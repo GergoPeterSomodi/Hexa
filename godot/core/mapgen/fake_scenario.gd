@@ -31,7 +31,8 @@ static func _families() -> Array[FamilyDef]:
 
 
 ## Copies the committed goods (data/defs/goods) and the economy numbers of data/defs/game_defs.tres (M4 spec 4.2 to
-## 4.12, 5.1) into `defs`, so a fake or fixture defs validates under the M4 rules. Numbers are never invented here.
+## 4.12, 5.1), and a fresh WarDef from data/defs/war.tres (M7 5.1), into `defs`, so a fake or fixture defs validates under
+## the M4 and M7 rules. Numbers are never invented here.
 static func economy_into(defs: GameDefs) -> void:
 	var committed := ResourceLoader.load(
 		"res://data/defs/game_defs.tres", "", ResourceLoader.CACHE_MODE_IGNORE
@@ -42,6 +43,8 @@ static func economy_into(defs: GameDefs) -> void:
 			"res://data/defs/goods/%s.tres" % String(g.key), "", ResourceLoader.CACHE_MODE_IGNORE
 		) as GoodDef)
 	defs.goods = goods
+	# The war (M7 5.1): a fresh copy of data/defs/war.tres, so GameDefs.validate() holds and no test shares the committed one.
+	defs.war = ResourceLoader.load("res://data/defs/war.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as WarDef
 	defs.wild_good = committed.wild_good.duplicate()
 	defs.wild_yield = committed.wild_yield
 	defs.country_people = committed.country_people

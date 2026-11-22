@@ -9,3 +9,6 @@ key = &"rock"
 name = "Rock"
 move = 4
 forage_permille = 150
+defence_permille = 50
+rough = true
+narrow = false

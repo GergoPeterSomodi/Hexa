@@ -21,6 +21,7 @@ static func defs() -> GameDefs:
 	for u: UnitDef in out.units:
 		units.append(u.duplicate() as UnitDef)
 	out.units = units
+	out.war = EconomyFixture.war_copy(out.war)
 	return out
 
 

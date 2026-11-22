@@ -3,7 +3,7 @@
 extends GutTest
 
 const TOKENS_PATH := "res://shell/ui/tokens.gd"
-const ONE_LINE_REGEX := '^const ([A-Z][A-Z0-9_]*) := (?:Color\\("(#[0-9a-f]{6,8})"\\)|(\\d+))$'
+const ONE_LINE_REGEX := '^const ([A-Z][A-Z0-9_]*) := (?:Color\\("(#[0-9a-f]{6,8})"\\)|(\\d+(?:\\.\\d+)?))$'
 
 
 func test_leather_and_panel_bg_contrast_ratios() -> void:
@@ -206,8 +206,25 @@ func test_every_one_line_const_parses_for_python_bake() -> void:
 		"GOOD_INK", "BAD_INK", "WARN_INK", "GOLD_INK", "INK_LINE",
 		"CHART_IRON", "CHART_LAPIS", "CHART_MADDER", "CHART_VERDIGRIS", "CHART_OCHRE",
 		"MAP_SELECT", "MAP_REACH", "MAP_REACH_NEXT", "MAP_PATH", "MAP_PATH_WARN", "MAP_PATH_INK",
+		"WAR_DIAL", "WAR_DIAL_TRACK", "AREA_INK_ALPHA",
 		"S1", "S2", "S3", "S4", "S5", "S6",
 		"BAR_H", "BUTTON_H", "BUTTON_SM_H", "BUTTON_LG_H", "BUTTON_MENU_H",
 		"MEDAL", "MEDAL_SM", "PANEL_W", "TARGET_MIN", "MENU_COLUMN_X",
 	]:
 		assert_true(seen.has(required), "parsed one-line constant " + required)
+
+
+func test_war_tokens_read_on_their_track_in_both_themes() -> void:
+	# m7-build-spec.md 6.2: the siege dial reads on its track; the high-contrast pair keeps the same rule.
+	assert_gte(Tokens.contrast_ratio(Tokens.WAR_DIAL, Tokens.WAR_DIAL_TRACK), 4.5, "the siege dial reads on its track")
+	assert_gte(
+		Tokens.contrast_ratio(Tokens.HIGH_CONTRAST["WAR_DIAL"], Tokens.HIGH_CONTRAST["WAR_DIAL_TRACK"]),
+		3.0,
+		"the high-contrast dial reads on its track (non-text, 3:1)",
+	)
+	assert_gte(
+		Tokens.contrast_ratio(Tokens.HIGH_CONTRAST["WAR_DIAL_TRACK"], Tokens.HIGH_CONTRAST["PANEL_BG"]),
+		3.0,
+		"the empty track is visible on the high-contrast panel",
+	)
+	assert_almost_eq(Tokens.AREA_INK_ALPHA, 0.9, 0.0001, "castle-area ink alpha")

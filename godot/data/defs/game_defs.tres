@@ -50,6 +50,7 @@
 [ext_resource type="Resource" path="res://data/defs/goods/copper.tres" id="g_copper"]
 [ext_resource type="Resource" path="res://data/defs/goods/silver.tres" id="g_silver"]
 [ext_resource type="Script" path="res://core/defs/unit_def.gd" id="u0_script"]
+[ext_resource type="Resource" path="res://data/defs/war.tres" id="w_war"]
 [ext_resource type="Resource" path="res://data/defs/units/pikemen.tres" id="u_pikemen"]
 [ext_resource type="Resource" path="res://data/defs/units/crossbowmen.tres" id="u_crossbowmen"]
 [ext_resource type="Resource" path="res://data/defs/units/knights.tres" id="u_knights"]
@@ -114,6 +115,7 @@ people_top_level = 3
 levy_permille = 100
 units = Array[ExtResource("u0_script")]([ExtResource("u_pikemen"), ExtResource("u_crossbowmen"), ExtResource("u_knights"), ExtResource("u_bombards")])
 terrains = Array[ExtResource("t0_script")]([ExtResource("t_farmland"), ExtResource("t_grassland"), ExtResource("t_woods"), ExtResource("t_marsh"), ExtResource("t_rock"), ExtResource("t_snow"), ExtResource("t_tundra"), ExtResource("t_sand")])
+war = ExtResource("w_war")
 relief_move_add = PackedInt32Array(0, 0, 0, 0, 1, 2, 3)
 highway_cap = 1
 road_cap = 2

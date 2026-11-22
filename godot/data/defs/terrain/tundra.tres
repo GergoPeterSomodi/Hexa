@@ -9,3 +9,6 @@ key = &"tundra"
 name = "Tundra"
 move = 3
 forage_permille = 100
+defence_permille = 0
+rough = false
+narrow = false

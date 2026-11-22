@@ -139,3 +139,31 @@ func test_planted_fault_highway_over_road_cap() -> void:
 		slow.append(c)
 	defs.terrains = slow
 	assert_true(_has(defs.validate(), "is under the cheapest ground step 20"), "unit slower than the cheapest step refused")
+
+
+## M7 spec 4.6 and 5.1: the defence, rough and narrow ground of each cover.
+const WAR_TABLE: Array = [
+	["farmland", 0, false, false],
+	["grassland", 0, false, false],
+	["woods", 250, true, false],
+	["marsh", 150, true, true],
+	["rock", 50, true, false],
+	["snow", 250, true, true],
+	["tundra", 0, false, false],
+	["sand", 0, false, false],
+]
+
+
+func test_committed_war_grounds_equal_spec() -> void:
+	for row: Array in WAR_TABLE:
+		var t := _load_terrain(row[0])
+		assert_eq(t.validate(), [] as Array[String], "%s validates" % row[0])
+		assert_eq(t.defence_permille, row[1], "%s defence" % row[0])
+		assert_eq(t.rough, row[2], "%s rough" % row[0])
+		assert_eq(t.narrow, row[3], "%s narrow" % row[0])
+
+
+func test_planted_fault_defence_over_1000() -> void:
+	var t := _load_terrain("woods")
+	t.defence_permille = 1001
+	assert_true(_has(t.validate(), "defence_permille is 1001, expected 0 to 1000"), "defence 1001 refused")

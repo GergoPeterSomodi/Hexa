@@ -41,6 +41,13 @@ const MP_MAX := 1000
 @export var refill: int = 0
 ## The Kit icon of its token figure, for example &"fig_infantry".
 @export var figure: StringName = &""
+## The war numbers (M7 spec 4.6, 5.1): attack and defence 1 to 20 (the company's value in a fight).
+@export var attack: int = 1
+@export var defence: int = 1
+## A ranged company's fire a day from the reserve, permille; 0 is not ranged.
+@export var fire_permille: int = 0
+## Added to a siege's rate (4.5).
+@export var siege_points: int = 0
 
 
 ## Problems found, empty when valid: a key of lowercase letters and underscores, a known branch, men, cost, upkeep and mp
@@ -84,7 +91,20 @@ func validate(defs: Resource = null) -> Array[String]:
 		errors.append("%s: figure is empty" % label)
 	elif not FIGURE_NAMES.has(figure):
 		errors.append("%s: figure '%s' is not one of the four figure icons" % [label, String(figure)])
+	if attack < 1 or attack > 20:
+		errors.append("%s: attack is %d, expected 1 to 20" % [label, attack])
+	if defence < 1 or defence > 20:
+		errors.append("%s: defence is %d, expected 1 to 20" % [label, defence])
+	if fire_permille < 0 or fire_permille > 200:
+		errors.append("%s: fire_permille is %d, expected 0 to 200" % [label, fire_permille])
+	if siege_points < 0 or siege_points > 6:
+		errors.append("%s: siege_points is %d, expected 0 to 6" % [label, siege_points])
 	return errors
+
+
+## True for a company that fires from the reserve (fire_permille above 0).
+func ranged() -> bool:
+	return fire_permille > 0
 
 
 func _key_is_well_formed() -> bool:

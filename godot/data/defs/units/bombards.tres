@@ -20,3 +20,7 @@ sight = 1
 min_level = 3
 refill = 10
 figure = &"fig_artillery"
+attack = 6
+defence = 1
+fire_permille = 50
+siege_points = 1

@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-ONE_LINE_RE = re.compile(r'^const ([A-Z][A-Z0-9_]*) := (?:Color\("(#[0-9a-f]{6,8})"\)|(\d+))$')
+ONE_LINE_RE = re.compile(r'^const ([A-Z][A-Z0-9_]*) := (?:Color\("(#[0-9a-f]{6,8})"\)|(\d+(?:\.\d+)?))$')
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,8 @@ def load_tokens(tokens_path: Path) -> TokenTable:
             colors[name] = parse_hex_color(hex_val)
             raw[name] = hex_val
         elif int_val is not None:
-            sizes[name] = int(int_val)
+            if "." not in int_val:  # a decimal (AREA_INK_ALPHA) joins the digest only: not a colour, not a size
+                sizes[name] = int(int_val)
             raw[name] = int_val
     digest_input = "\n".join(f"{k}={raw[k]}" for k in sorted(raw)).encode("utf-8")
     tokens_sha = hashlib.sha256(digest_input).hexdigest()

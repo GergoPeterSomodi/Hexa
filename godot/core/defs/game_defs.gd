@@ -70,6 +70,8 @@ extends Resource
 ## grounds (data/defs/terrain/, cover order), then the step cost, supply, forage and sight numbers.
 @export var units: Array[UnitDef] = []
 @export var terrains: Array[TerrainDef] = []
+## The war (M7 spec 4.3 to 4.9, 5.1): every number of the war in one file, data/defs/war.tres.
+@export var war: WarDef = null
 ## Per relief level (7): move points added to entering it.
 @export var relief_move_add: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 1, 2, 3])
 @export var highway_cap := 1
@@ -247,7 +249,17 @@ func validate() -> Array[String]:
 	_check_people(errors)
 	_check_economy(errors)
 	_check_armies(errors)
+	_check_war(errors)
 	return errors
+
+
+## The war (M7 spec 5.1): set, and valid (WarDef.validate).
+func _check_war(errors: Array[String]) -> void:
+	if war == null:
+		errors.append("war is not set")
+		return
+	for err: String in war.validate():
+		errors.append(err)
 
 
 ## SHA-256 (hex text) of every field in a fixed order.

@@ -347,3 +347,89 @@ func test_cursor_step_keeps_the_column_for_up_and_down() -> void:
 	assert_eq(MapInput.cursor_step(odd, MapInput.CURSOR_DOWN), odd + HexGrid._ODD_DIRS[4], "odd row down is SW")
 	assert_eq(MapInput.cursor_step(even, MapInput.CURSOR_LEFT), even + HexGrid._EVEN_DIRS[3])
 	assert_eq(MapInput.cursor_step(odd, MapInput.CURSOR_RIGHT), odd + HexGrid._ODD_DIRS[0])
+
+
+func _shift_btn(button: MouseButton, pos: Vector2, pressed: bool) -> InputEventMouseButton:
+	var ev := _btn(button, pos, pressed)
+	ev.shift_pressed = true
+	return ev
+
+
+func _shift_key(keycode: Key) -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.keycode = keycode
+	ev.physical_keycode = keycode
+	ev.pressed = true
+	ev.shift_pressed = true
+	return ev
+
+
+func _connect_m7(log: Array[String]) -> void:
+	_input.storm_key_requested.connect(func() -> void: log.append("storm"))
+	_input.command_key_requested.connect(func() -> void: log.append("command"))
+	_input.battle_requested.connect(func() -> void: log.append("battle"))
+
+
+func test_m7_shift_right_click_storms_only_with_an_army_selected() -> void:
+	var storms: Array[Vector2] = []
+	var commands: Array[Vector2] = []
+	_input.storm_requested.connect(func(px: Vector2) -> void: storms.append(px))
+	_input.command_requested.connect(func(px: Vector2) -> void: commands.append(px))
+	var army := [false]
+	_input.storm_ready = func() -> bool: return army[0]
+	# no army selected: a Shift+right click is a right click
+	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
+	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(121.0, 220.0), false))
+	assert_eq(commands, [Vector2(121.0, 220.0)], "Shift+right click with no army commands")
+	assert_true(storms.is_empty(), "and does not storm")
+	# an army of yours selected: the Shift+right click storms at that hex; a plain right click still commands
+	commands.clear()
+	army[0] = true
+	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
+	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(121.0, 220.0), false))
+	assert_eq(storms, [Vector2(121.0, 220.0)], "Shift+right click storms at the hex")
+	assert_true(commands.is_empty(), "and does not command")
+	_input._unhandled_input(_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
+	_input._unhandled_input(_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), false))
+	assert_eq(storms.size(), 1, "a plain right click does not storm")
+	assert_eq(commands.size(), 1, "a plain right click commands")
+	# an unset gate means no army
+	storms.clear()
+	commands.clear()
+	_input.storm_ready = Callable()
+	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
+	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), false))
+	assert_true(storms.is_empty(), "an unset gate never storms")
+	assert_eq(commands.size(), 1, "an unset gate is a right click")
+
+
+func test_m7_keys_storm_and_battle_and_the_command_key_stays_plain() -> void:
+	var log: Array[String] = []
+	_connect_m7(log)
+	_input._unhandled_input(_shift_key(KEY_O))
+	_input._unhandled_input(_key(KEY_O))
+	_input._unhandled_input(_key(KEY_B))
+	_input._unhandled_input(_shift_key(KEY_B))
+	_input._unhandled_input(_alt(KEY_O))
+	assert_eq(log, ["storm", "command", "battle"], "Shift+O storms only; B opens the last battle; Shift+B and Alt+O do nothing")
+	var held := _shift_key(KEY_O)
+	held.echo = true
+	_input._unhandled_input(held)
+	assert_eq(log.size(), 3, "a held Shift+O is refused")
+
+
+func test_m7_keys_are_silent_under_a_line_edit_and_when_disabled() -> void:
+	var log: Array[String] = []
+	_connect_m7(log)
+	var edit := LineEdit.new()
+	_vp.add_child(edit)
+	edit.grab_focus()
+	_input._unhandled_input(_shift_key(KEY_O))
+	_input._unhandled_input(_key(KEY_B))
+	_input._unhandled_input(_key(KEY_O))
+	assert_true(log.is_empty(), "a focused LineEdit wins")
+	edit.release_focus()
+	_input.enabled = false
+	_input._unhandled_input(_shift_key(KEY_O))
+	_input._unhandled_input(_key(KEY_B))
+	assert_true(log.is_empty(), "nothing while disabled")

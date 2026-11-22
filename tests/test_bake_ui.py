@@ -164,7 +164,13 @@ class TestBakeUI(unittest.TestCase):
             "icons_army": ([192, 48], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
             "path_stop": ([20, 20], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
         }
-        expected_all = {**expected_slice1, **expected_slice2, **expected_slice3, **expected_slice4, **expected_slice5}
+        expected_slice6 = {
+            "badge_battle": ([40, 40], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "badge_siege": ([40, 40], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "icons_war": ([192, 72], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "die_face": ([28, 28], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+        }
+        expected_all = {**expected_slice1, **expected_slice2, **expected_slice3, **expected_slice4, **expected_slice5, **expected_slice6}
         self.assertEqual(set(pieces.keys()), set(expected_all.keys()))
         for name, (sz, mar, con, exp, axis) in expected_all.items():
             entry = pieces[name]
@@ -173,7 +179,7 @@ class TestBakeUI(unittest.TestCase):
             self.assertEqual(entry["content"], con, name)
             self.assertEqual(entry["expand"], exp, name)
             self.assertEqual(entry["axis"], axis, name)
-            expected_slice = 2 if name in expected_slice2 else (3 if name in expected_slice3 else (4 if name in expected_slice4 else (5 if name in expected_slice5 else 1)))
+            expected_slice = 2 if name in expected_slice2 else (3 if name in expected_slice3 else (4 if name in expected_slice4 else (5 if name in expected_slice5 else (6 if name in expected_slice6 else 1))))
             self.assertEqual(entry["slice"], expected_slice, name)
 
     def test_slice2_pieces_geometry_and_apertures(self) -> None:
@@ -462,7 +468,7 @@ class TestBakeUI(unittest.TestCase):
             for label, text in (
                 ("missing", src.replace('const MAP_PATH_INK := Color("#0b0806")\n', "")),
                 ("low", src.replace("const MAP_PATH := Color(\"#f6e3a1\")", "const MAP_PATH := Color(\"#1b1410\")")),
-                ("hc_low", src.replace('"MAP_PATH": Color("#ffd646")', '"MAP_PATH": Color("#101010")')),
+                ("hc_low", src.replace('"MAP_PATH": Color("#f6e3a1")', '"MAP_PATH": Color("#101010")')),
                 ("hc_missing", src.replace('\t"MAP_PATH_WARN": BAD,\n', "")),
             ):
                 tp = Path(tmp) / f"tokens_{label}.gd"
@@ -475,6 +481,55 @@ class TestBakeUI(unittest.TestCase):
             sheet = Path(tmp) / "sheet.png"
             pieces_m6.write_token_sheet(sheet, tokens, REPO_ROOT, 1)
             self.assertGreater(load_png_rgba(sheet).shape[0], 13 * 48)
+
+    def test_slice6_war_pieces(self) -> None:
+        from tools.ui_bake import pieces_m7
+
+        kit_dir = REPO_ROOT / "godot" / "assets" / "ui" / "kit"
+        doc = json.loads(KIT_JSON.read_text(encoding="utf-8"))
+        icons = doc["pieces"]["icons_war"]
+        self.assertEqual(icons["icons"], list(pieces_m7.WAR_ICON_NAMES))
+        self.assertEqual(len(set(icons["icons"])), 24)
+        self.assertEqual(icons["cell"], [24, 24])
+        sizes = {"badge_battle": (40, 40), "badge_siege": (40, 40), "icons_war": (192, 72), "die_face": (28, 28)}
+        sheets = {s: {n: load_png_rgba(kit_dir / f"{s}x" / f"{n}.png") for n in sizes} for s in (1, 2)}
+        for n, (w, h) in sizes.items():
+            for s in (1, 2):
+                self.assertEqual(sheets[s][n].shape, (h * s, w * s, 4), f"{n}@{s}x shape")
+        tokens = load_tokens(bake_ui.TOKENS_PATH)
+        mine = [sp for sp in bake_ui.all_specs() if sp.name in sizes]
+        rendered = {(sp.name, s): sheets[s][sp.name] for sp in mine for s in (1, 2)}
+        pieces_m7.check_m7_pieces(tokens, mine, rendered, bake_ui.TOKENS_PATH)
+        # Planted token faults: a missing track, a dial the same colour as its track, a high-contrast dial that does not read.
+        src = bake_ui.TOKENS_PATH.read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            for label, text in (
+                ("missing", src.replace('const WAR_DIAL_TRACK := Color("#3a2416")\n', "")),
+                ("low", src.replace('const WAR_DIAL := Color("#f0a850")', 'const WAR_DIAL := Color("#3a2416")')),
+                ("hc_low", src.replace('"WAR_DIAL": WARN,', '"WAR_DIAL": Color("#101010")')),
+                ("hc_track_panel", src.replace('"WAR_DIAL_TRACK": Color("#5b5b5b")', '"WAR_DIAL_TRACK": Color("#000000")')),
+            ):
+                tp = Path(tmp) / f"tokens_{label}.gd"
+                tp.write_text(text, encoding="utf-8")
+                with self.assertRaises(BakeCheckError, msg=label):
+                    pieces_m7.check_m7_pieces(load_tokens(tp), mine, rendered, tp)
+        # Planted pixel faults: a dark die face (the pips would not read), an empty icon cell, a repeated icon.
+        dark = rendered[("die_face", 1)].copy()
+        dark[6:22, 6:22, :3] = 20
+        with self.assertRaises(BakeCheckError):
+            pieces_m7.check_m7_pieces(tokens, mine, {**rendered, ("die_face", 1): dark}, bake_ui.TOKENS_PATH)
+        blank = rendered[("icons_war", 1)].copy()
+        blank[0:24, 0:24] = 0
+        with self.assertRaises(BakeCheckError):
+            pieces_m7.check_m7_pieces(tokens, mine, {**rendered, ("icons_war", 1): blank}, bake_ui.TOKENS_PATH)
+        twin = rendered[("icons_war", 1)].copy()
+        twin[0:24, 24:48] = twin[0:24, 0:24]
+        with self.assertRaises(BakeCheckError):
+            pieces_m7.check_m7_pieces(tokens, mine, {**rendered, ("icons_war", 1): twin}, bake_ui.TOKENS_PATH)
+        with tempfile.TemporaryDirectory() as tmp:
+            sheet = Path(tmp) / "war.png"
+            pieces_m7.write_war_sheet(sheet, tokens, 1)
+            self.assertGreater(load_png_rgba(sheet).shape[0], 100)
 
 
 if __name__ == "__main__":

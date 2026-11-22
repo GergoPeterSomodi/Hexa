@@ -20,3 +20,7 @@ sight = 1
 min_level = 1
 refill = 50
 figure = &"fig_infantry"
+attack = 4
+defence = 5
+fire_permille = 0
+siege_points = 0

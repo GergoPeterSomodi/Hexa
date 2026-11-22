@@ -17,6 +17,7 @@ const SERIES: Array[String] = [
 	"districts_mines", "districts_quarry", "districts_salt", "districts_harbour",
 	"people_towns", "people_grew", "people_starved", "people_left", "food_need",
 	"army_raised", "army_starved",
+	"battle_losses", "battles_won", "battles_lost", "districts_held", "districts_lost", "garrison_men", "garrison_lost",
 ]
 ## The first of the districts_<family> columns; the column of family f (1 to 14) is DISTRICTS_FIRST + f - 1.
 const DISTRICTS_FIRST := 21

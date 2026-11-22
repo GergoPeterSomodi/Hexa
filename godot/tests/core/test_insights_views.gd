@@ -288,7 +288,8 @@ func test_the_pins_of_4_13() -> void:
 	assert_eq(Actions.NAMES, ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march"] as Array[String])
 	assert_eq(SaveFile.FORMAT, 4)
 	assert_eq(SaveFile.OLDEST_FORMAT, 4)
-	assert_eq(Stats.SERIES.size(), 42)
+	# M7 (4.19): the seven series of the war are appended, so 49.
+	assert_eq(Stats.SERIES.size(), 49)
 	assert_eq(Chronicle.NOTABLE, ["work_started", "work_finished", "work_cancelled", "owners_changed", "country_chosen",
 		"goods_short", "tax_set", "town_grew", "district_declined", "army_raised", "army_disbanded", "march_halted",
 		"army_starved", "unit_lost"] as Array[String])

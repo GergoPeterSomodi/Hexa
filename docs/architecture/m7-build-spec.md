@@ -8,6 +8,93 @@ where it refines an earlier page. The tasks are in `m7-build-plan.md`. This page
 `ui-style-and-feedback-plan.md` S5 (the losses chart and the wars on the Military page; battle and siege lines in the report;
 the war alert as a `DECISIONS` screen).
 
+## M7 amendments after M6 (2026-11-21)
+
+Read against master `e8a49f5` (M6 built, 2026-11-21): the code under `godot/`, M6's spec sections 4 and 5 (5.0 R1 to R13,
+A1 to A15) and this spec. **Where this section and the rest of the page differ, this section wins for M7.** Each row:
+what the page says, what is true now (file and line, under `godot/` unless marked), what the task must do, and the task
+(B-number of `m7-build-plan.md`). The body was edited only for the plain renames of rows 1, 2, 10, 31 and 47 (and the
+spec's references to them); everything else here is an instruction, not a redesign. Design questions are in "Questions
+for the owner" at the end of this section.
+
+| # | The page says | True now (file:line) | M7 must do | Task |
+|---|---|---|---|---|
+| 1 | `Vision` is the sight system (1.1, 4.12, 4.14, 5.3, 5.6). **Body renamed.** | `class_name Sight` (`core/systems/sight.gd:7`), `SightCache` (`sight_cache.gd:6`), test `tests/core/test_sight.gd`. `Vision` is only an enum in `core/defs/colour_contrast.gd:6`. | Read `Sight` everywhere; the file is `sight.gd`; `Sight.SIGHTED` (`sight.gd:12`) gains the kinds of 4.14. | B14, B15, B16, B17, B23 |
+| 2 | `run_phase`: `movement -> Movement.season` (5.4). **Body renamed.** | `MovementPhase.season` (`core/systems/movement_phase.gd:37`, called from `core/game/season.gd:28`); `movement.gd` has no `season`. | Call `MovementPhase.season`. | B13 |
+| 3 | B12 edits the tick's engage, join and step back in `movement.gd`. | The tick is in `movement_phase.gd` (339 lines: `_leg` 73, `_ticks` 154, `_room` 187, `_step_back` 209, `_apply` 243). `movement.gd` (515) holds `open_to` (99), `march_check` (360), `halt` (394). | B12 also edits `movement_phase.gd`. Its file is added to B12 (the order holds; the plan is not edited). | B12 |
+| 4 | `Movement.hostile` becomes `Wars.at_war`, the test pairs kept (4.8, 5.3). | `hostile(_game, a, b)` (`movement.gd:36`) reads the test registry `_hostile`; `register_test_hostility` (41), `clear_test_hostility` (46). | `hostile` answers from `Wars.at_war`; the test registry (A12's seam) still wins when set. Both paths tested. | B12, B5 |
+| 5 | Open land follows a war (4.8: `open_to` with a war). | `open_mask` is cached in the pinned slot `open_masks` keyed `[hash(owner), owner.size(), hex_count]` (`movement.gd:160`). A declaration moves no owner, so the cached mask stays stale. | Add the war state to the key (a revision of the live wars, or their count and hash). Test: declare, then `open_to` answers yes at once. | B12 (with B5) |
+| 6 | Supply fields live in `SupplyCache` (`supply_cache.gd`), `game.supplies`, `forget_at_war`; DOOR_FIELDS has `supplies` (4.12, 5.3, 5.4, 4.13, B9, B13). | None exists: no `supply_cache.gd`, no `SupplyCache`, no `game.supplies`; `DOOR_FIELDS` (`game.gd:29`) is M6's seven. The fields sit in the view cache's pinned slots `supply_land` and `supply_depots` (`supply.gd:19-20`, 43-53), keyed by `_land_key` and `_depot_key` (`supply.gd:314-322`): owner, settlement and level, not the occupier, besieged land or hostile armies. | Engineering choice for Fable before B9: (a) build `SupplyCache` as M6 R5 wrote it, moving the two slots into it, or (b) keep the view cache and add the occupier and the war state to both keys. Either way the key holds the occupier, and a hostile army's cut is never reused across a phase (a B9 test). `supplies` joins DOOR_FIELDS only under (a). | B9, B13 |
+| 7 | `army/2` adds `standing`; `unit/2` adds `morale`, `xp`; `order` gains `storm` (5.2). | `army/1` (`core/state/army.gd:6`), `unit/1` (`unit.gd:6`). Army: `id, tag, name, hex, units, order` (`none`, `hold`, `march`: `army.gd:8-10`), `goal, route, waiting, halt_why, halt_text, moved_from, supply, lost_last, created_turn`; no `standing`, no `battle`. Unit: `id, kind, men, home, raised_turn, paid, paid_goods`. The order check in `from_dict` is at `army.gd:100`. | As 5.2; `ORDER_STORM`, the check at `army.gd:100`, and the digests (`army.gd:128`, `unit.gd:63`) extended. M7 depends on M6 only through these classes. | B2, B8, B12 |
+| 8 | Event payloads: `kind` names a unit kind (4.14 fields). | `kind` is the event type in every emit. Army events carry `kind_id` and `name`: `army_raised` (`military.gd:309`), `unit_lost` (`armies.gd:133`). | A unit kind in a payload is `kind_id`. No battle or siege payload uses `kind` for anything else. | B8, B16 |
+| 9 | `FORMAT` 5 and `OLDEST_FORMAT` 5; an M6 save reads "Made by an older test build" (4.20, D55, 9). | `FORMAT := 4`, `OLDEST_FORMAT := 4` (`core/game/save_file.gd:9-10`); a header under `OLDEST_FORMAT` gives state `older` (`save_file.gd:179`). | Bump both to 5. Check the words the shell shows for state `older`: they must read "Made by an older test build", or the page's words change (one of the two, decided in B13). | B13 |
+| 10 | `map-state/5` added to "the current `map-state/2`" (1.1). **Body corrected.** | `SCHEMA := "hexa-godot/map-state/4"` (`core/state/map_state.gd:12`); `/1` to `/3` are read as older. | As 5.2: `/5` adds three arrays; `/4` reads with zeros (tests only). | B2 |
+| 11 | `People.FLOWS` appends `garrisoned`, `sacked` (nine); B2's files are `people.gd` only (5.2, B2). | `FLOWS` has seven (`people.gd:15`). `PEOPLE_FLOW_COUNT := 7` lives in `core/state/country.gd:11` and sets the width of `people_flows` (padding and refusal, `country.gd:187-227`). | Add `core/state/country.gd` to B2's files: `PEOPLE_FLOW_COUNT` 9. `test_people` and `test_stores` pins follow. | B2 |
+| 12 | `People.levy(..., why := &"raised")`; levies refused on occupied land (5.3, 4.11). | `levy(game, tag, hex, men)` (`people.gd:520`), no `why`; `levy_check` (504). | Add `why` (default `raised`); the occupied refusal in `levy_check`. Callers in `military.gd` keep their form. | B2, B9 |
+| 13 | Thirteen phases (4.13, 5.4, B13). | Ten (`core/game/season.gd:9-10`): movement, supply, production, income, works, people, stats, calendar, ready_units, vision. `test_season.gd:7` pins the ten. `run_phase` is a `match` (25-46). | Thirteen as 4.13. `ready_units` runs `Military.refill` then `Armies.recover_morale`. Repin `test_season.gd`. | B13 |
+| 14 | `Stats.SERIES` 42 plus seven is 49 (4.19, 5.2). | 42 (`core/state/stats.gd:11-19`; `tests/core/test_stats.gd:19` asserts 42). `war_score` is already series 15 (M3's). | Append the seven; not `war_score` again. Pins move. | B2, B13 |
+| 15 | Halt keeps the goal; a second halt is hold (the M7 halt note). | True: a first halt on a march keeps goal and route, order none; a second halt sets hold and clears goal (`movement.gd:382-407`); `halt_check` refuses a hold order. | No change. Storm and withdraw do not break it: B12 adds a test that a storm order halts the same way. | B12 |
+| 16 | `Military.disband` takes its units atomically (brief). | Already: `disband(game, args)` with the `units` array (`military.gd:372`; `_disband_ids` 480-493; `_drop_of` 495). | No change. Battle losses must not call `disband`. | none |
+| 17 | Standing "Hold" and the order "hold" (4.7, 5.2). | Two fields, one word: `Army.order` `hold` (`army.gd:9`) and the new `standing` `hold`. | Keep both constants apart (`STANDING_HOLD`, `ORDER_HOLD`); no test compares them. Owner question 1. | B2, B12, B26 |
+| 18 | `OddsView.of(game, viewer, army_id, hex, storm)`; `MovePreview.to(...)`; `reach()` unchanged (5.6). | `ArmyView.tokens(game, viewer)` (`core/views/army_view.gd:19`), `panel(game, viewer, army_id)` (124); `MovePreview.reach(game, viewer, army_id)` (`move_preview.gd:26`); `MovePreview.to(game, tag, army_id, hex)` (68) takes the tag, not the viewer. | `OddsView` takes the viewer as `reach` does. `to` keeps `tag` and gains `war` and `odds`. | B23 |
+| 19 | `colour_of(..., occupier_id := 0, area_byte := 0)` (5.6). | Now `colour_of(mode, owner_id, height_byte, palette, tint_on, hot_id, yield_byte, food_byte, supply_byte, seen, veil_on)` (`core/views/map_modes.gd:366-368`). `STRIPE_PX` (46) is the yield stripe; `OCCUPIED_STRIPE_PX` is new. | Append the two after `veil_on`. | B15, B21 |
+| 20 | `Chronicle.NOTABLE` gains six: twenty (4.14). | Fourteen (`core/state/chronicle.gd:8-10`). | Plus six. | B16 |
+| 21 | `Actions.NAMES` seventeen (5.4). | Thirteen (`core/game/actions.gd:11-12`); `pair_of` is a `match` (18). | Plus four; four pairs in `pair_of`. | B5, B11, B12 |
+| 22 | Eleven events drained to their signals (5.5). | Seventeen typed signals in `shell/autoload/events.gd`; `Session.drain` is a `match` (`session.gd` 386 on). `last_phase_ms` keys come from the phase loop (`session.gd:184-189`). | Eleven signals and their arms. `last_phase_ms` needs no change. | B16 |
+| 23 | Three reminder rules (4.18). | Eleven in `RULES` (`core/views/reminders.gd:8-10`). | Fourteen. | B19 |
+| 24 | `war` section after `armies`; `COVERED` gains four (4.17). | Ten sections (`core/views/season_summary.gd:12-13`), `COVERED` six (15). `season_summary.gd` is 724 lines. | Build the section in `core/views/summary_war.gd` (as `summary_armies.gd`, M6 R12), not inside `season_summary.gd`. | B19 |
+| 25 | Military study gains `battle_losses`, `wars`, `battles` (6.9). | Four series (`core/views/study_military.gd:11`); `of(game, viewer, span)` (19). | Add the series and the two keys. | B19 |
+| 26 | `StudyHistory.MARK_KINDS` gains `war` first (5.6). | Nine kinds (`core/views/study_history.gd:10`). | Prepend `war`. | B19 |
+| 27 | A War filter, since 7 (4.14). | Already there: `{id = &"war", since = "7"}` (`core/views/log_lines.gd:7-8`). | No new filter; the 4.14 sentences only. | B16 |
+| 28 | `Knowledge` gains `battle_access`, `siege_access` (5.6). | `core/views/knowledge.gd` has `sees` (57) and `witnessed` (102). | Add both beside `witnessed`. | B14 |
+| 29 | Replay: `shell/map/replay.gd` (plan B20); `replay_plan.gd` gains `record_battle` and battle poses (5.6). | `shell/map/replay.gd` does not exist. The file is `shell/map/move_replay.gd` (class `MoveReplay`). `core/views/replay_plan.gd`: `setup(records, speed)` (24), `poses()` (85). | B20 edits `move_replay.gd`; `replay_plan.gd` gains `record_battle(hex, tick)` and the `battles` key of `poses()`. The plan's name is wrong; the plan is not edited. | B20 |
+| 30 | `DECISIONS` is a new state; `decisions_start`, `decisions_done` (6.6). | `State.DECISIONS` exists (`shell/app/season_flow.gd:8`), entered from `replay_done` (119-124, "none before M7"). The two functions do not. | B20 adds the two functions and the queue; it does not add the state. | B20 |
+| 31 | The App's milestone becomes "7" (6 intro, 6.11, B28). **Body corrected.** | The value is `Bindings.SHELL_MILESTONE := "6"` (`shell/input/bindings.gd:247`), used by `shell/app/app.gd:97`. Also `shell/screens/options.gd:12` `TARGET_MILESTONE := 6.0`; `shell/screens/study.gd:15` `DEFAULT_MILESTONE "4"`. | B28 sets `SHELL_MILESTONE` to "7" and `TARGET_MILESTONE` to 7.0. The M7 `since: "7"` rows of B4 register only then. | B28, B4 |
+| 32 | `map_command_storm` Shift+O; "Shift+O never also fires O" (6.1). | `map_command_key`, since 6, is bound to `O` and `Shift+F10` (`bindings.gd:146-147`). No `B` binding exists (checked). `view_mode_6` since 6 exists (`bindings.gd:68`). | B4 matches Shift+O exactly and tests that Shift+O fires storm only and plain O still fires the command key. | B4 |
+| 33 | A new `map/castle_areas` row (6.1). | Absent. `shell/app/settings.gd` is 781 lines; the row (about 10 lines) leaves under 10 before lint's 800 line. | B4 writes the row compactly, or splits a settings group out first. | B4 |
+| 34 | `season_ms` limit 380 (8, 9). | 320 with `known_over` #409 (`godot/tests/perf_core_budget.json:4`); its text says "the ten phases". | 380 keeps the #409 note until #409 closes; the text says thirteen. Owner question 3. | B18 |
+| 35 | New rows: `battles_ms`, `fight_ms`, `sieges_ms`, `war_ms`, `areas_cold_ms`, `odds_ms`, `battle_view_ms`, `area_lines_ms`; `save_mb` with 60 records (8). | None of the names is in `perf_core_budget.json`; `save_mb` (8, mem) exists. UI rows in `perf_ui_budget.json` are not yet there. | Add the rows; no name clash. | B18, B29 |
+| 36 | `movement_ms` 25 "(M6) with battles engaged at the ticks" (8). | 25 with `known_over` #418 (66 ms measured against 25). `supply_ms` #420, `vision_ms` #422, `cost_field_ms` #419, the army rows #423. No #424 is in the budget file. | Battles at the ticks raise the phase: the row keeps #418 and its text names the battles. A figure past the known number opens an issue. Owner question 3. | B12, B18 |
+| 37 | `app.gd` stays under 800 (5, B28). | 796 lines, no `SIZE_REASONS` entry (`tools/lint_godot.py:50`). | B28 moves the war requests to `shell/app/war_requests.gd` before it adds a line. | B28 |
+| 38 | `game_requests.gd` takes the M7 table (6.11). | 766 lines, 61 functions. M6 R12 asked for `shell/app/army_requests.gd`; it was never created: M6's requests sit in `game_requests.gd` and `app.gd`. | B28 creates `shell/app/war_requests.gd` for M7's requests. The M6 requests stay where they are (a split of them is not M7's). | B28 |
+| 39 | Map scene takes the war marks, area lines and updates (6.3). | `shell/map/map_scene.gd` is 800 lines exactly; lint's limit is "over 800". | B25 puts the wiring in a child node (`shell/map/map_wars.gd`, as `map_armies.gd`) before any line is added to `map_scene.gd`. | B25 |
+| 40 | Army and hex panels gain their M7 parts (6.8). | `shell/panels/army_panel.gd` 717, `hex_panel.gd` 651, `shell/mapview/tile_map_view.gd` 696. | `army_panel.gd` will pass 800: its war parts go into a child node first. Watch `hex_panel.gd`. | B26, B25 |
+| 41 | B10: the preview counts today's occupations. | `core/views/economy_preview.gd` is 1,052 lines with a `SIZE_REASONS` entry (`tools/lint_godot.py:53`). | No M7 task edits this file. B10 must not grow it. | B10 |
+| 42 | Top bar fit thresholds: six modes, the Army chip. | Already so: six mode segments and the Army chip (`shell/hud/top_bar.gd:24-25`; fit steps 155-159, 202, 220). The M7 page adds no chip. | None. A war chip would need its own fit step. | none |
+| 43 | Kit names `PanelCard`, `PanelSlot`, `SectionHead`, `progress_fill` (5.6, 6.4, 6.5, 6.8). | None is a class name. The kit has `PanelFrame`, `PanelKit` (static `label`, `reason`, `fill_rows`), `VellumSheet.section_box`, `Cartouche`, `KitButton`, `KitSwitch`, `DeltaChip`, `Segmented`, `InkChart`, `StudyTable`, `CountryArms` (`shell/ui/`). `TugBar`, `DieFace`, `RegimentTile` are new. | Use the existing kit classes: the odds card is a `PanelFrame`, not a `PanelCard`. | B22, B23, B26, B27 |
+| 44 | The move card (6.4). | `class_name MoveCard` (`shell/hud/move_card.gd:5`). | Name as is. | B26 |
+| 45 | Overlay textures `occupier` and `area` (6.3). | The overlay has owner, heights, palette, ramp (and M6's supply). `shell/map/mode_overlay.gd` 574 lines. | As 6.3. | B21 |
+| 46 | Bake slice 6 in `tools/ui_bake/pieces_m7.py`, `tools/bake_ui.py` (6.2). | `tools/bake_ui.py` and `tools/ui_bake/pieces_m6.py` exist; `pieces_m7.py` is new. | As 6.2. | B3 |
+| 47 | `tests/core/test_vision.gd`; the tests named in 9 and B16. **Body renamed.** | `tests/core/test_sight.gd` exists; `ArmyFixture` (`tests/core/army_fixture.gd`), `tests/core/random_player.gd`, `tests/test_bake_ui.py` exist. | Use `test_sight.gd`; `war_fixture.gd` and `combat_fixture.gd` are new. | B3, B16, B17, B18 |
+| 48 | B9's relief and "no progress beside a battle" cases (4.5, B9). | Battle records come from B8 in the same group C. | B9's tests build a `BattleRecord` by hand from B2's schema; B9 does not call B8's code. The group order holds. | B9 |
+| 49 | B5 in group B: `Wars` for `at_war`, `enemies`, `occupied_count`, and `Territory.neighbours` (4.2, 5.3). | `Territory.neighbours` (`core/systems/territory.gd:154`), `Territory.transfer` (69), `Territory.owner_tag` (38), `Armies.men_of_country` (`armies.gd:54`) exist. | As the plan. | B5 |
+| 50 | Works wait on occupied or besieged land (4.4, 5.3). | `Works.halted(game, work, turn)` exists (`core/systems/works.gd:293`); `Works.build_check` (18). | As the plan. | B6 |
+| 51 | Economy functions (4.10, 5.3). | `Economy.district_output` (`economy.gd:271`), `EconomySeason.town_people` (17), `country_people` (22), `needs_of` (28), `made_of` (79), `money_lines` (212), `production` (235), `income` (267) exist. | As the plan; no rename. | B10 |
+
+**Order of the groups (plan section 1).** Holds, with two notes. Group A (B1 to B4) is independent. Group C's B8 and B9 are
+both in C: B9's cases that read a battle record use a hand-made record (row 48); nothing else crosses inside a group. The
+dependencies that cross groups hold: B12 needs `Battles.engage` (C); B13 needs B9's `SupplyCache` or the view-cache keys
+(row 6); B17 needs B12 and B13 (D); B20 needs `BattleView.latest_of` (E); B26 needs `OddsView` (F); B28 needs the decision
+queue (B20), the dock (B22), the odds card (B26) and the marks (B25). No plan change. Two plan file lists are wrong and
+are corrected here, not in the plan: B12 (row 3) and B20 (row 29).
+
+**The M6 Army fields.** B2 needs only the classes of M6 (`Army`, `Unit`, `army/1`, `unit/1`), not any field M6 has not
+built: its `standing` and morale are new. No task of M7 waits on an M6 change that is not in master.
+
+**Acceptance note for B5, B8, B9 and B13 (added after the group A review, 2026-11-21).** The state classes (`War`, `Battle`, `BattleRecord`, `Siege`, `MapState` /5) check their own fields and caps in `from_dict`. The Game-level loaders do the cross-checks and the wiring: `wars`, `battles`, `battle_records`, `sieges` and the two name maps must be in `Game.digest`, `to_dict` and the snapshot, and on load every id they hold must exist (an army id in a battle is a living army, a war names two living countries, an occupier is a country id and sits on a land hex). B13 pins this with a save/load test that has live wars, sieges and records; B5, B8 and B9 each carry the acceptance line for their own class.
+
+### Questions for the owner (design and scope; the engineering questions went to Fable)
+
+1. **The standing words.** The standing is "Hold" or "Withdraw", and the army order is already "hold" (row 17). Keep
+   "Hold" for the standing, or call it "Stand" to keep the two apart on screen?
+2. **The key.** Shift+O is the storm key in 6.1, next to the plain O that already runs the command at the cursor (row 32).
+   Is Shift+right click enough, with Shift+O only as the keyboard way?
+3. **The budgets.** `season_ms` is already over its limit (#409, 771 ms on a shared machine) and `movement_ms` is over
+   (#418). M7 raises `season_ms` to 380 and keeps `movement_ms` at 25 while battles run at the ticks. Accept those limits
+   with the issues still open, or close #409 and #418 first?
+
+---
+
 **What M7 is.** Countries go to war. A country declares war on a neighbour; from then on each side's armies may enter the
 other's land. An army ordered onto a hex where an enemy army stands **attacks** it: the two armies fight a **battle** of
 lanes and days (battle slice 1) in the season's `battles` phase, right after the movement phase, and the battle is settled
@@ -26,7 +113,7 @@ lines, the report's War section, the Military page's wars, battles and losses, a
 
 **When it starts.** After M6 is closed (its plan's definition of done, and the owner has played it). M7 edits `Game`,
 `Session`, `Events`, the action and season tables, `Unit`, `Army`, `MapState`, `Stats`, `StatsSystem`, `Armies`, `Military`,
-`Movement`, `Supply`, `Vision`, `People`, `Works`, `Economy`, `EconomySeason`, `Knowledge`, the previews, the report's view,
+`Movement`, `Supply`, `Sight`, `People`, `Works`, `Economy`, `EconomySeason`, `Knowledge`, the previews, the report's view,
 the reminders, the log lines, the study's views and pages, the map modes, the mode overlay, the map scene, the floaters,
 the replay, the season flow, the hex, army and country panels, the hex menu, the input and the App, and builds its screens
 into the M1.5 frame as M6 left it.
@@ -96,7 +183,7 @@ into the M1.5 frame as M6 left it.
 | On seed 1480: 6 castle pieces (Hospice Splugen (10, 3) and Hospice Simplon (6, 4) watchtowers, Swiss; Hospice Little St Bernard (3, 7) castle, Savoy; (3, 12) watchtower, France (Col de Larche); (11, 13) castle, Milan (the Cisa); (5, 14) watchtower, Savoy (Col di Tenda)); 10 walled towns (Geneva, Brescia, Verona, Padua, Pavia, Ferrara, Bologna, Genoa, Florence, Pisa) and 2 cities (Milan, Venice) | `tools/worldmap/improve_report.gd -- --seeds=1480` (run read-only for this page) | 18 fortresses on 340 land hexes, 1 in 19: three times denser than v0.2.2's Europe (67 castles on 4,311 hexes), so the castle areas are shorter (D12) |
 | `MapData.places[].castle` holds a historical castle per place (Milan 3, Bellinzona 3, Turin 2, Genoa 2, Pavia 2, Bard fort 1); no rule reads it; Bard fort (6, 7) is a place with no settlement, a wild hex | `data/maps/north_italy.tres` (read for this page) | Unread in M7 (D10): the walls of the game are its pieces |
 | Savoy's neighbours are France, Genoa, Milan and Switzerland (M2's 24 pairs); Venice is not one | `m2-build-spec.md` 4.5 | Done-when 1's refusal |
-| `MapState` holds `main_use`, `level`, `owner` (schema `map-state/2`); `Territory.transfer` writes `owner` and queues one `owners_changed` | `core/state/map_state.gd`, `core/systems/territory.gd` | M7 adds `occupier`, `garrison`, `unsupported` (map-state/5) and calls `transfer` only at a peace |
+| `MapState` holds `main_use`, `level`, `owner` (schema `map-state/4`); `Territory.transfer` writes `owner` and queues one `owners_changed` | `core/state/map_state.gd`, `core/systems/territory.gd` | M7 adds `occupier`, `garrison`, `unsupported` (map-state/5) and calls `transfer` only at a peace |
 | `Actions.pair_of` is a `match`; `register_test_action` lets a test register a stub pair | `core/game/actions.gd` | M7 adds four pairs |
 | `Confirm.configure({title, lines, choices, danger, on_result, ...})`; `ScreenStack` kinds `MODAL`, `OPAQUE`, `OVERLAY` | `shell/screens/confirm.gd`, `shell/ui/screen.gd` | The war alert and the declare and peace questions are `Confirm`s; the battle dock is an `OVERLAY` |
 | `Bindings` parses key chords and the bare mouse buttons; "Shift+MouseRight" is not a parsable event | `shell/input/bindings.gd` 460 to 520 | Shift+right click is read by `MapInput` from the event's modifier, as M6's Shift+click (6.1) |
@@ -104,7 +191,7 @@ into the M1.5 frame as M6 left it.
 | `ModeOverlay` reads `owner_ids`, `heights`, `palette`, `ramp` (M2), with the M4.5 to M6 textures planned | `shell/map/mode_overlay.gd`, `.gdshader` | Two more R8 textures: `occupier` (stripes) and `area` (the castle-area tint) |
 | v0.2.2 war: `war.py` (declare, score, peace, the siege meter, open land, castle areas), `battle.py` (engage, join, retreat, the end), `combat.py` (3 lanes, fire, back line, shock, flanks, morale, the break test, the flight), `battleview.py` (the fog rule, the odds card, the siege view), `battlelog.py` (the log as data), `areas.py` | `hexa/campaign/` | Section 3 |
 | The approved designs: battle slice 1 and 1b, the 0.2.1 rule that a battle ends in the turn it starts (owner decision 2 of `docs/roadmap/release-0.2.1-brief.md`), sieges 0.2.2 (the meter, the floor, Besiege or Storm, the dial badge), castle areas (held and open land), war goals (the `battle_ended` contract, 3.4) | `docs/design/battle*.md`, `sieges-and-retreats.md`, `castle-areas.md`, `war-goals-and-peace.md` | Kept and re-fitted (section 3) |
-| Built by M1.5 to M6 and named "(M2)" to "(M6)" below: `Territory`, `Countries`, `Works`, `Calendar`, `Season`, `Stats`, `StatsSystem`, `Chronicle`, `Luck`, `ViewCache`, `Snapshot`, `SaveFile`, `Replay`, `Knowledge`, `Words`, `LogLines`, `Reminders`, `SeasonSummary`, `Economy`, `EconomySeason`, `Treasury`, `Stores`, `DistrictCache`, `StateView`, `EconomyPreview`, `People`, `UnitDef`, `TerrainDef`, `Unit`, `Army`, `Armies`, `Military`, `StepCosts`, `PathSearch`, `Movement`, `Supply`, `SupplyCache`, `Vision`, `SightCache`, `ArmyView`, `MovePreview`, `SupplyView`, `StudyMilitary`, `StudyHistory`, `ReplayPlan`, `MoveReplay`, `ArmyTokens`, `ArmyPanel`, `MoveCard`, `HexMenu`, `PageMilitary`, `SeasonFlow`, `GameRequests`, `StudyWarm`, `perf_core.gd`, `PerfFixture`, `RandomPlayer`, `ArmyFixture` | their specs | M7 starts after they exist |
+| Built by M1.5 to M6 and named "(M2)" to "(M6)" below: `Territory`, `Countries`, `Works`, `Calendar`, `Season`, `Stats`, `StatsSystem`, `Chronicle`, `Luck`, `ViewCache`, `Snapshot`, `SaveFile`, `Replay`, `Knowledge`, `Words`, `LogLines`, `Reminders`, `SeasonSummary`, `Economy`, `EconomySeason`, `Treasury`, `Stores`, `DistrictCache`, `StateView`, `EconomyPreview`, `People`, `UnitDef`, `TerrainDef`, `Unit`, `Army`, `Armies`, `Military`, `StepCosts`, `PathSearch`, `Movement`, `Supply`, `SupplyCache`, `Sight`, `SightCache`, `ArmyView`, `MovePreview`, `SupplyView`, `StudyMilitary`, `StudyHistory`, `ReplayPlan`, `MoveReplay`, `ArmyTokens`, `ArmyPanel`, `MoveCard`, `HexMenu`, `PageMilitary`, `SeasonFlow`, `GameRequests`, `StudyWarm`, `perf_core.gd`, `PerfFixture`, `RandomPlayer`, `ArmyFixture` | their specs | M7 starts after they exist |
 
 ### 1.2 Refinements (decided here)
 
@@ -660,7 +747,7 @@ Savoy's towns' food need rises by one load a season (139,000 town people); its g
   holding an army of a country at war with it; depots: controlled settlements of level 2 or more, ports, and fortresses it
   owns and controls with no siege on them. `SupplyCache` is dropped for a country on `controllers_changed` and, for every
   country at war, after the movement and battles phases.
-- **Sight** (`Vision`): a country sees the hexes it **controls** and their ring (M6 said "holds"); the land part is dropped on
+- **Sight** (`Sight`): a country sees the hexes it **controls** and their ring (M6 said "holds"); the land part is dropped on
   `controllers_changed`. Fortresses give no sight of their own (M6 D31 stands).
 - **Morale** (`Armies.recover_morale`, the `ready_units` phase, after M6's refill): every company of an army whose `supply`
   is 0 or 1 gains `morale_recovery` (250), up to 1,000. A new company starts at 1,000.
@@ -712,7 +799,7 @@ the timer's peace comes after the season's captures and before the money (war be
 | `district_captured` | `tag` (the new controller), `hex`, `others` ([the old controller]), `owner`, `by` (`walk`, `siege`, `storm`, `retaken`, `freed`), `name`, `seasons`, `opened` (districts its fall opens), `witnesses` | `Occupation.capture` (from `Sieges`, `BattleEnd`) | yes | `district_captured(hex, tag, by)` | `HexPanel`, `CountryPanel`; log, notifications (yours gained or lost), ribbons ("Taken", "Lost", "Freed") |
 | `controllers_changed` | `hexes`, `tag`, `others` | `Occupation.flush` | no | `controllers_changed(hexes)` | `MapScene` (the overlay's occupier texels, the area lines), `WarMarks`, the hex panel and hover card, F3 |
 
-`Chronicle.NOTABLE` gains the six notable kinds (twenty). `Vision.SIGHTED` gains `battle_started`, `battle_joined`,
+`Chronicle.NOTABLE` gains the six notable kinds (twenty). `Sight.SIGHTED` gains `battle_started`, `battle_joined`,
 `battle_fought`, `battle_ended`, `siege_started`, `siege_progress`, `siege_lifted`, `district_captured` (the actor and the
 `others` always witness). `SeasonSummary.COVERED` gains `battle_ended`, `district_captured`, `siege_lifted`, `peace_made`.
 `unit_moved` gains `why` (`march`, `retreat`) and its `ticks` continue after the movement's last tick for retreats.
@@ -750,7 +837,7 @@ land); `occupier` is 0 or a living country at war with the owner; owners change 
 | Wars, peaces, truces, war scores | everything, public (D49) |
 | Who holds a district (occupation) | everything: the map shows it to all |
 | A battle (the dock, the badge, the log) | exact as a side (or the viewer `&""`); seen (men rounded to 100, morale to 5 %, stances and standing orders hidden) when you witnessed it; else nothing |
-| A siege (the badge, the hex panel) | exact as besieger or defender; seen (the meter exact, men rounded) while you see the hex (`Vision.sees`); else nothing |
+| A siege (the badge, the hex panel) | exact as besieger or defender; seen (the meter exact, men rounded) while you see the hex (`Sight.sees`); else nothing |
 | A fortress's garrison | exact for its owner; seen rounded while you see the hex; else "a garrison" |
 | Another country's standing orders, storms, routes | nothing |
 
@@ -1229,7 +1316,7 @@ static func storm_check(game: Game, args: Dictionary) -> Dictionary      # {army
 static func storm(game: Game, args: Dictionary) -> Dictionary
 # open_to, open_mask, zoc_halts, the tick step, march_check row 7: 4.8
 
-# core/systems/supply.gd, vision.gd, people.gd, works.gd, economy.gd, economy_season.gd  (M3 to M6, edits): 4.10 to 4.12;
+# core/systems/supply.gd, sight.gd, people.gd, works.gd, economy.gd, economy_season.gd  (M3 to M6, edits): 4.10 to 4.12;
 #   People.FLOWS appends &"garrisoned", &"sacked"; People.levy(game, tag, hex, men, why := &"raised");
 #   Works.halted adds "occupied or besieged"; Works.build_check, upgrade_check, clear_check gain row 3b "held by the %s: no
 #   work can begin on occupied land" and "under siege: no work can begin"
@@ -1259,7 +1346,7 @@ static func storm(game: Game, args: Dictionary) -> Dictionary
 # core/game/game.gd  (M1 to M6, edit)
 const DOOR_FIELDS: Array[String] = ["events", "action_log", "chronicle", "version", "view_cache", "districts", "sight",
 	"supplies", "war_cache"]
-func emit(event: Dictionary) -> void      # M6's, plus: Vision.SIGHTED kinds get witnesses (the actor and `others` always);
+func emit(event: Dictionary) -> void      # M6's, plus: Sight.SIGHTED kinds get witnesses (the actor and `others` always);
 	# owners_changed calls war_cache.forget_areas() and forget_control(); controllers_changed calls war_cache.forget_control(),
 	# supplies.forget and sight.forget_land for tag and others; hex_changed of a hex whose fortress level changed calls
 	# war_cache.forget_areas()
@@ -1275,7 +1362,7 @@ const NAMES: Array[String] = ["build", "upgrade", "clear", "cancel_work", "choos
 # core/game/season.gd  (M3 to M6, edit)
 const PHASES: Array[StringName] = [&"movement", &"battles", &"supply", &"sieges", &"war", &"production", &"income",
 	&"works", &"people", &"stats", &"calendar", &"ready_units", &"vision"]
-# run_phase: movement -> Movement.season, then game.supplies.forget_at_war(game); battles -> Battles.season, then
+# run_phase: movement -> MovementPhase.season, then game.supplies.forget_at_war(game); battles -> Battles.season, then
 #   game.supplies.forget_at_war(game); sieges -> Sieges.season; war -> Wars.season; ready_units -> Military.refill, then
 #   Armies.recover_morale
 
@@ -1394,7 +1481,7 @@ static func siege(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary  
 ## 6. The UI of M7
 
 Built from the M1.5 kit and the M3 to M6 pieces. Colours and fonts from the Theme; HUD controls take no focus, screens do.
-The App's milestone value becomes `"7"`, so the `since: "7"` rows of `Bindings.DEFAULTS` and `Settings.SCHEMA` register and
+The milestone `Bindings.SHELL_MILESTONE` (the App's value) becomes `"7"`, so the `since: "7"` rows of `Bindings.DEFAULTS` and `Settings.SCHEMA` register and
 show and `LogLines.FILTERS`' War appears.
 
 ### 6.1 Keys and settings
@@ -1624,7 +1711,7 @@ its chronicle's War filter shows from milestone 7.
   problems: "no country TAG", "no such terms", "no army ID", "no such standing order", each a planted fault in its test.
 - **The Layers popover** (`shell/hud/layers_popover.tscn/.gd`, edit): a "Castle areas" `KitSwitch` on `map/castle_areas`;
   hidden in the sandbox.
-- The App sets the milestone `"7"`. `Hud` gains the `OddsCard` slot beside the `MoveCard`. `screen_ids.gd` gains `battle_dock`.
+- The App sets `Bindings.SHELL_MILESTONE` to `"7"`. `Hud` gains the `OddsCard` slot beside the `MoveCard`. `screen_ids.gd` gains `battle_dock`.
 
 ---
 
@@ -1694,7 +1781,7 @@ GUT unless said. Every new check has a planted-fault case (P).
 | `tests/core/test_combat.gd` (**new**) | the values of 4.6 for each branch and fight; the worked hit (33 men) with a stub `Rng`; each phase on fixtures (deploy order, shaken after day 0, fire by kind and lane, back line, shock both ways, flanks ×1.25, pikes against horse); morale (loss, drains, hunger, rank); the break test (centre, lanes, narrow, morale); the flight; Withdraw from the end of day 2 with its price; the cap at 8 and its loser; the garrison in the centre and the assault values; `fight` is pure (the same input and `Rng` state give the same output; the input unchanged); the 30-seed bands of 4.6 (P: a shock of 0 fails a band) |
 | `tests/core/test_battles.gd` (**new**) | `engage_check` every row (P each); a step onto an enemy makes one battle and `battle_started`; a join within the stack limit (P: a ninth company refused); an assault with a garrison; a storm order on arrival and when besieging; stances from standing orders (Withdraw only with a retreat hex); `input_of` from the state; the end: men and morale applied, units lost (`battle`), bombards lost on a flight, retreat to the nearest spot by the rules (own first for Withdraw), surrender with none (`surrendered`), wounded returned only in supply, experience, a stormed fortress (occupier, garrison 0, a town sacked); records kept to 60 (the oldest dropped); `battle_fought` and `battle_ended` fields (the war-goals contract, a case per `how`); `game.battles` empty after the phase; `game.sieges` never written (P: a battle phase that removes a siege is caught) |
 | `tests/core/test_sieges.gd` (**new**) | `terms` and `forecast`; every cell of 4.5's table played in the engine; the floor (P: a siege that falls in 1 season fails); hunger after the stores; no progress in a season with a battle on the hex; lifts by each `why`; a fall opens the area from the next season, not this one; walk-in on open land with 250 men (P: 249 men take nothing), nothing on held land, retake of own land; the storm cut |
-| `tests/core/test_movement.gd`, `test_military.gd`, `test_supply.gd`, `test_vision.gd`, `test_people.gd`, `test_works.gd` (M3 to M6, edits) | `open_to` with a war; the mask closes hostile fortresses but the goal; ZOC beside a fortress; the tick: engage, join, blocked, a step onto a fortress; `march_check` row 7 through `engage_check`; `storm_check` every row, `standing_check` every row (P each); `can_stand` per side; raising refused on occupied land; the field over controlled land, depots with fortresses, a hostile army cuts it; sight from controlled land; `People.FLOWS` nine; occupied growth by the controller's tax and food; besieged hunger; the sack; levies refused on occupied hexes; works halted on occupied or besieged hexes and refused to begin there |
+| `tests/core/test_movement.gd`, `test_military.gd`, `test_supply.gd`, `test_sight.gd`, `test_people.gd`, `test_works.gd` (M3 to M6, edits) | `open_to` with a war; the mask closes hostile fortresses but the goal; ZOC beside a fortress; the tick: engage, join, blocked, a step onto a fortress; `march_check` row 7 through `engage_check`; `storm_check` every row, `standing_check` every row (P each); `can_stand` per side; raising refused on occupied land; the field over controlled land, depots with fortresses, a hostile army cuts it; sight from controlled land; `People.FLOWS` nine; occupied growth by the controller's tax and food; besieged hunger; the sack; levies refused on occupied hexes; works halted on occupied or besieged hexes and refused to begin there |
 | `tests/core/test_war_economy.gd` (**new**) | 4.10's table on fixtures: occupied output and taxes at half to the occupier, needs in full from its stores, nobody pays upkeep or walls, a besieged hex nothing; with no war every M4 and M5 number of `test_economy_1480.gd` and `test_people_growth.gd` unchanged; ceded land in full from the next production |
 | `tests/core/test_war_savoy.gd` (**new**) | **done-when 1 to 5**: 4.16 (a) to (e) season by season, hex by hex, man by man; the battle's result pinned for seed 1480 |
 | `tests/core/test_season.gd` (M3 to M6, edit) | **`PHASES` is `[movement, battles, supply, sieges, war, production, income, works, people, stats, calendar, ready_units, vision]`** (the pin); a capture counts in that season's production; morale recovery in `ready_units` |

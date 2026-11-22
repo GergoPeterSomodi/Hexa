@@ -483,3 +483,33 @@ func test_planted_fault_m6_raise_cap_shape() -> void:
 	s = _load_family("settlements")
 	s.raise_cap = PackedInt32Array([0, 1, 3, 2, 3, 4])
 	assert_true(_has(s.validate(), "raise_cap[3] is 2, under raise_cap[2] 3"), "a falling raise cap refused")
+
+
+## M7 spec 4.3 and 5.1: the fortress level of each piece of settlements and castles, and none on the others.
+func test_committed_fortress_levels_equal_spec() -> void:
+	var defs := _committed_defs()
+	assert_eq(defs.family(1).fortress, PackedInt32Array([0, 0, 0, 0, 2, 3]), "settlements")
+	assert_eq(defs.family(2).fortress, PackedInt32Array([0, 1, 2, 3]), "castles")
+	for id: int in range(3, 15):
+		assert_true(defs.family(id).fortress.is_empty(), "family %d has no fortress" % id)
+	assert_eq(defs.validate(), [] as Array[String], "committed defs validate")
+
+
+func test_planted_fault_fortress_level_four() -> void:
+	var f := _family(1, &"settlements", PackedInt32Array([0, 4, 4, 8, 8, 8]))
+	f.fortress = PackedInt32Array([0, 0, 0, 0, 2, 4])
+	assert_true(_has(f.validate(), "fortress[5] is 4, expected 0 to 3"), "fortress level 4 refused")
+
+
+func test_planted_fault_fortress_size_and_zero() -> void:
+	var f := _family(2, &"castles", PackedInt32Array([0, 4, 8, 16]))
+	f.fortress = PackedInt32Array([0, 1, 2])
+	assert_true(_has(f.validate(), "fortress has 3 entries, expected 4"), "short fortress refused")
+	f.fortress = PackedInt32Array([1, 1, 2, 3])
+	assert_true(_has(f.validate(), "fortress[0] is 1, expected 0"), "fortress[0] not 0 refused")
+
+
+func test_planted_fault_fortress_on_a_goods_family() -> void:
+	var f := _valid_vineyard()
+	f.fortress = PackedInt32Array([0, 1, 1, 1])
+	assert_true(_has(f.validate(), "fortress is for settlements and castles only"), "goods family fortress refused")

@@ -23,6 +23,15 @@ var armies: Array[Army] = []
 ## The next army id and the next unit id (from 1, never reused); written only by Armies.
 var next_army_id: int = 1
 var next_unit_id: int = 1
+## The war state (docs/architecture/m7-build-spec.md 5.2); the writers are named beside each field.
+var wars: Array[War] = []                     # Wars; id order
+var next_war_id: int = 1                      # Wars
+var battles: Array[Battle] = []               # Battles; hex index order; empty at idle
+var battle_records: Array[BattleRecord] = []  # Battles; id order, the newest kept
+var next_record_id: int = 1                   # Battles
+var battle_names: Dictionary = {}             # Battles: place (String) -> battles named there
+var sieges: Array[Siege] = []                 # Sieges; hex index order
+var siege_names: Dictionary = {}              # Sieges: place -> sieges named there
 ## Human player's country tag, or &"" before picking, in AI-only games, or in a map-only game.
 var player: StringName = &""
 ## The fields only the door (emit, act, Season) writes (docs/architecture/m3-build-spec.md 5.7).

@@ -33,6 +33,10 @@ const SLICE4_RENAMES: Dictionary[String, String] = {"study": "study_24", "info":
 const SLICE5_DIRECT: Array[String] = ["army_plate", "army_plate_ring", "army_badge", "path_stop"]
 const SLICE5_ATLASES: Array[String] = ["figures", "icons_army"]
 
+## Slice 6 icons (m7-build-spec.md 6.2): two badges and the die face are whole icons; `icons_war` is an atlas of 24 px cells.
+const SLICE6_DIRECT: Array[String] = ["badge_battle", "badge_siege", "die_face"]
+const SLICE6_ATLASES: Array[String] = ["icons_war"]
+
 
 func _initialize() -> void:
 	var check := OS.get_cmdline_user_args().has("--check")
@@ -42,9 +46,11 @@ func _initialize() -> void:
 	_add_slice3_icons(studiolo)
 	_add_slice4_icons(studiolo)
 	_add_slice5_icons(studiolo)
+	_add_slice6_icons(studiolo)
 	var hc := KitTheme.build_high_contrast()
 	_add_slice4_icons(hc)
 	_add_slice5_icons(hc)
+	_add_slice6_icons(hc)
 
 	failed += _process_theme("studiolo", studiolo, KitTheme.THEME_PATH, check)
 	failed += _process_theme("high_contrast", hc, KitTheme.HIGH_CONTRAST_PATH, check)
@@ -99,17 +105,25 @@ func _slice5_cells(atlas_name: String) -> Array:
 
 
 func _add_slice5_icons(theme: Theme) -> void:
-	for icon_name: String in SLICE5_DIRECT:
+	_add_direct_and_atlas_icons(theme, SLICE5_DIRECT, SLICE5_ATLASES, "slice 5")
+
+
+func _add_slice6_icons(theme: Theme) -> void:
+	_add_direct_and_atlas_icons(theme, SLICE6_DIRECT, SLICE6_ATLASES, "slice 6")
+
+
+func _add_direct_and_atlas_icons(theme: Theme, direct: Array[String], atlases: Array[String], label: String) -> void:
+	for icon_name: String in direct:
 		var tex := load("res://assets/ui/kit/1x/%s.png" % icon_name) as Texture2D
 		if tex == null:
-			printerr("build_theme: missing slice 5 texture %s" % icon_name)
+			printerr("build_theme: missing %s texture %s" % [label, icon_name])
 			continue
 		theme.set_icon(StringName(icon_name), &"Kit", tex)
-	for atlas_name: String in SLICE5_ATLASES:
+	for atlas_name: String in atlases:
 		var atlas := load("res://assets/ui/kit/1x/%s.png" % atlas_name) as Texture2D
 		var cells := _slice5_cells(atlas_name)
 		if atlas == null or cells.is_empty():
-			printerr("build_theme: missing slice 5 atlas %s" % atlas_name)
+			printerr("build_theme: missing %s atlas %s" % [label, atlas_name])
 			continue
 		var names: Array = cells[0]
 		var cell: Array = cells[1]
@@ -169,15 +183,16 @@ func _verify_theme(label: String, theme: Theme) -> int:
 			printerr("build_theme: [%s] missing slice 4 Kit icon %s" % [label, icon_name])
 			failed += 1
 
-	for icon_name: String in SLICE5_DIRECT:
-		if not theme.has_icon(StringName(icon_name), &"Kit"):
-			printerr("build_theme: [%s] missing slice 5 Kit icon %s" % [label, icon_name])
-			failed += 1
-	for atlas_name: String in SLICE5_ATLASES:
-		for icon_name: Variant in _slice5_cells(atlas_name)[0]:
-			if not theme.has_icon(StringName(str(icon_name)), &"Kit"):
-				printerr("build_theme: [%s] missing slice 5 Kit icon %s" % [label, icon_name])
+	for group: Array in [["slice 5", SLICE5_DIRECT, SLICE5_ATLASES], ["slice 6", SLICE6_DIRECT, SLICE6_ATLASES]]:
+		for icon_name: String in group[1]:
+			if not theme.has_icon(StringName(icon_name), &"Kit"):
+				printerr("build_theme: [%s] missing %s Kit icon %s" % [label, group[0], icon_name])
 				failed += 1
+		for atlas_name: String in group[2]:
+			for icon_name: Variant in _slice5_cells(atlas_name)[0]:
+				if not theme.has_icon(StringName(str(icon_name)), &"Kit"):
+					printerr("build_theme: [%s] missing %s Kit icon %s" % [label, group[0], icon_name])
+					failed += 1
 
 	if label == "studiolo":
 		for icon_name: String in KitTheme.KIT_DIRECT_ICONS + SLICE3_ICONS:

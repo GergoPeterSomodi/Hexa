@@ -1,0 +1,91 @@
+[gd_resource type="Resource" script_class="WarDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/war_def.gd" id="1_war"]
+
+[resource]
+script = ExtResource("1_war")
+shock_permille = 80
+backline_permille = 40
+flank_permille = 1250
+pikes_vs_horse_permille = 1250
+fight_attack = Dictionary[StringName, PackedInt32Array]({
+&"infantry": PackedInt32Array(1000, 1000, 1000),
+&"missile": PackedInt32Array(1000, 900, 800),
+&"cavalry": PackedInt32Array(1400, 700, 500),
+&"artillery": PackedInt32Array(1000, 600, 2000)
+})
+fight_defence = Dictionary[StringName, PackedInt32Array]({
+&"infantry": PackedInt32Array(1000, 1100, 1300),
+&"missile": PackedInt32Array(800, 900, 900),
+&"cavalry": PackedInt32Array(1000, 800, 800),
+&"artillery": PackedInt32Array(500, 500, 800)
+})
+stance_dealt = Dictionary[StringName, int]({&"attack": 1200, &"hold": 900, &"withdraw": 1000})
+stance_taken = Dictionary[StringName, int]({&"attack": 1100, &"hold": 800, &"withdraw": 1000})
+dice_permille = PackedInt32Array(700, 800, 900, 1100, 1200, 1400)
+hit_spread_permille = 500
+morale_per_loss = 5
+front_drain = 20
+reserve_drain = 30
+hunger_drain = 30
+reserve_shaken_permille = 500
+flank_morale = 100
+centre_shock = 250
+flee_morale = 100
+flee_pursuit_permille = 150
+flee_morale_left = 150
+withdraw_day = 2
+withdraw_pursuit_permille = 50
+withdraw_pursuit_attacker_permille = 100
+withdraw_morale = 250
+battle_days = 8
+wounded_share_permille = 500
+wounded_return_permille = 500
+attack_morale = 500
+morale_recovery = 250
+retreat_range = 6
+crossing_penalty_permille = 300
+uphill_penalty_permille = 50
+river_penalty_permille = 200
+relief_defence_add = PackedInt32Array(0, 0, 0, 50, 150, 300, 500)
+relief_rough_from = 3
+relief_narrow_from = 5
+relief_elevation = PackedInt32Array(0, 0, 0, 1, 1, 2, 2)
+rank_xp = PackedInt32Array(0, 3, 7)
+rank_permille = PackedInt32Array(1000, 1100, 1200)
+rank_names = PackedStringArray("", "Veteran", "Elite")
+xp_win = 2
+xp_lose = 1
+garrison_attack = 3
+garrison_defence = 3
+garrison_defence_per_level = 2
+castle_defence_permille = 250
+garrison_per_level = 400
+garrison_regen_per_level = 100
+battle_records_kept = 60
+siege_base_need = 4
+siege_per_level = 3
+siege_min_seasons = 2
+siege_hunger = 2
+siege_rate_max = 6
+crowd_bands = PackedInt32Array(2000, 4000)
+storm_cut_permille = 500
+militia_men = 250
+area_reach = PackedInt32Array(0, 1, 2, 3)
+unsupported_seasons = 6
+support_range = 3
+occupied_output_permille = 500
+occupied_tax_permille = 500
+sack_permille = 150
+peace_min_seasons = 4
+take_score = 3
+take_score_weak = 1
+white_score_min = -1
+capital_score = 3
+truce_seasons = 8
+war_timer_seasons = 40
+war_timer_warning = 32
+odds_words = Array[Dictionary]([{"from": 0, "word": "Hopeless"}, {"from": 800, "word": "Poor"}, {"from": 1000, "word": "Even"}, {"from": 1200, "word": "Favourable"}, {"from": 2500, "word": "Overwhelming"}])
+odds_ground = Dictionary[StringName, int]({&"open": 1000, &"hills": 1340, &"woods": 1400, &"marsh": 2080, &"mountains": 3390, &"snow": 2920})
+garrison_odds_permille = 3100
+garrison_odds_alone = PackedInt32Array(0, 1800, 1100, 1000)
