@@ -1,5 +1,6 @@
 ## The replay (docs/architecture/m3-build-spec.md 4.5, 5.4): the same game started again and the action log played in
-## order. The same seed and the same log give the same digest.
+## order. The same seed and the same log give the same digest. M8 (4.15): an end_season record plays the AI records after it
+## through a LogOrders (no AI runs), and a watch record through Game.watch. It needs a whole log (a trimmed save's is not).
 class_name Replay
 extends RefCounted
 
@@ -15,12 +16,24 @@ static func run(map: MapData, defs: GameDefs, scenario_id: String, seed_value: i
 		if scenario == null:
 			return null
 		game = Game.new_scenario(map, defs, scenario, seed_value)
-	for record: Dictionary in log:
+	var i := 0
+	while i < log.size():
+		var record := log[i]
+		i += 1
 		var action := str(record.get("action", ""))
 		var args: Dictionary = record["args"] if record.get("args") is Dictionary else {}
 		match action:
 			"end_season":
+				# M8 (4.15): the AI's records after it are played by a LogOrders, which resumes the replay after the mark.
+				var orders := LogOrders.over(log, i)
+				game.orders = orders
 				Season.run(game)
+				game.orders = null
+				i = orders.index()
+			"orders_done":
+				pass
+			"watch":
+				game.watch()
 			"dev_money":
 				game.dev_money(StringName(str(args.get("tag", ""))), int(args.get("amount", 0)))
 			"dev_goods":

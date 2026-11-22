@@ -204,6 +204,7 @@ func test_p_one_changed_argument_gives_another_digest() -> void:
 			built = true
 	assert_eq(changed, 2)
 	var dropped := g.action_log.duplicate(true)
+	dropped.remove_at(dropped.size() - 1)  # the season ends with its mark (M8): drop both
 	dropped.remove_at(dropped.size() - 1)
 	assert_ne(_replay(g, dropped).digest(), base, "a missing last season")
 
@@ -232,3 +233,46 @@ func test_the_developer_transfers_replay_to_the_same_game() -> void:
 			copy["args"]["amount"] = 701
 		changed.append(copy)
 	assert_ne(_replay(g, changed).digest(), g.digest(), "one changed logged amount gives another game")
+
+
+# ----- M8: AI-only seasons replay from the log with no AI (m8-build-spec.md 4.15) ---------------------------------------------
+
+
+func test_forty_ai_only_seasons_replay_to_the_same_digest_with_no_hook() -> void:
+	var g := OrdersFixture.watched()
+	for n: int in 40:
+		assert_true(bool(Season.run(g)["ok"]))
+	var kinds := {}
+	for r: Dictionary in g.action_log:
+		kinds[r["action"]] = true
+	assert_true(kinds.has("watch") and kinds.has("set_tax") and kinds.has("orders_done"), str(kinds.keys()))
+	var again := _replay(g, g.action_log)
+	assert_not_null(again)
+	assert_null(again.orders, "nothing attached")
+	assert_true(again.ai_only, "the watch record")
+	assert_eq(again.digest(), g.digest())
+	assert_eq(again.action_log, g.action_log)
+
+
+func test_p_one_changed_ai_record_gives_another_digest() -> void:
+	var g := OrdersFixture.watched()
+	for n: int in 6:
+		Season.run(g)
+	var log: Array[Dictionary] = []
+	for r: Dictionary in g.action_log:
+		log.append(r.duplicate(true))
+	var mark := 0
+	while str(log[mark]["action"]) != "orders_done":
+		mark += 1
+	assert_eq(str(log[mark - 1]["action"]), "set_tax")
+	var args := log[mark - 1]["args"] as Dictionary
+	args["level"] = (int(args["level"]) + 1) % 3
+	assert_ne(_replay(g, log).digest(), g.digest())
+
+
+func test_a_watch_record_is_replayed_and_a_pre_pick_game_is_not_ai_only() -> void:
+	var g := ScenarioFixture.game()
+	g.watch()
+	assert_true(_replay(g, g.action_log).ai_only)
+	var none: Array[Dictionary] = []
+	assert_false(_replay(g, none).ai_only)

@@ -23,6 +23,10 @@ const NO_HEX := Vector2i(-1, -1)
 @export var anchor_start: int = 1
 @export var reach: int = 32
 @export var owner: PackedByteArray = PackedByteArray()
+## Per country (the countries' order): a GameDefs.tempers key (M8 spec 4.4, 5.1). Kept by hand; build_scenario.gd leaves it.
+@export var tempers: Array[StringName] = []
+## Companies the scenario starts with: {tag: StringName, hex: Vector2i, kind: int, count: int} (M8 spec 5.1). 1480: none.
+@export var start_armies: Array[Dictionary] = []
 
 
 ## Country id (1..countries.size()) for `tag`, or 0 when not listed.
@@ -88,6 +92,8 @@ func validate(map: MapData, defs: GameDefs, deep: bool) -> Array[String]:
 	_validate_seeds(map, country_set, errors)
 	_validate_pins(map, country_set, errors)
 	_validate_owner(map, errors)
+	_validate_tempers(defs, errors)
+	_validate_start_armies(map, defs, country_set, errors)
 	if deep:
 		_validate_deep(map, defs, errors)
 	return errors
@@ -116,6 +122,10 @@ func digest() -> String:
 	ctx.update(PackedInt32Array([step_cost, crest_cost, river_cost, anchor_start, reach]).to_byte_array())
 	_feed_int(ctx, owner.size())
 	_feed_bytes(ctx, owner)
+	_feed_int(ctx, tempers.size())
+	for key: StringName in tempers:
+		_feed_str(ctx, String(key))
+	_feed_dict_list(ctx, start_armies)
 	return ctx.finish().hex_encode()
 
 
@@ -233,6 +243,37 @@ func _validate_owner(map: MapData, errors: Array[String]) -> void:
 			if cap_idx >= 0 and int(owner[cap_idx]) != cid:
 				errors.append("owner: capital %s of '%s' is owned by id %d, expected %d" % [
 					capitals[i], String(countries[i]), int(owner[cap_idx]), cid])
+
+
+## M8 spec 5.1: one temperament a country, each known to the defs.
+func _validate_tempers(defs: GameDefs, errors: Array[String]) -> void:
+	if tempers.size() != countries.size():
+		errors.append("tempers has %d entries, expected %d" % [tempers.size(), countries.size()])
+	for i: int in tempers.size():
+		if defs.temper(tempers[i]) == null:
+			errors.append("tempers[%d]: unknown temper '%s'" % [i, String(tempers[i])])
+
+
+## M8 spec 5.1: each start army on land its tag owns, a known kind, 1 to 8 companies.
+func _validate_start_armies(map: MapData, defs: GameDefs, country_set: Dictionary, errors: Array[String]) -> void:
+	for i: int in start_armies.size():
+		var a: Dictionary = start_armies[i]
+		var tag := StringName(a.get("tag", &""))
+		if tag == &"" or not country_set.has(tag):
+			errors.append("start_armies[%d]: tag '%s' is not listed in countries" % [i, String(tag)])
+		var hv: Variant = a.get("hex", NO_HEX)
+		if not (hv is Vector2i) or not map.is_land(hv as Vector2i):
+			errors.append("start_armies[%d]: hex %s is not on land" % [i, hv])
+		elif owner.size() == map.hex_count() and tag != &"":
+			var hex_owner := int(owner[map.index_of(hv as Vector2i)])
+			if hex_owner != id_of(tag):
+				errors.append("start_armies[%d]: hex %s is not owned by '%s'" % [i, hv, String(tag)])
+		var kind := int(a.get("kind", -1))
+		if defs.unit_def(kind) == null:
+			errors.append("start_armies[%d]: unknown kind %d" % [i, kind])
+		var count := int(a.get("count", 0))
+		if count < 1 or count > 8:
+			errors.append("start_armies[%d]: count is %d, expected 1 to 8" % [i, count])
 
 
 func _validate_deep(map: MapData, defs: GameDefs, errors: Array[String]) -> void:

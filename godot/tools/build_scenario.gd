@@ -90,7 +90,8 @@ func _run_targets(targets: Array[ScenarioDef], defs: GameDefs, maps_dir: String,
 	return 0
 
 
-## Regrows `scenario.owner` and stamps `scenario.map_digest` from `map`.
+## Regrows `scenario.owner` and stamps `scenario.map_digest` from `map`. `tempers` and `start_armies` (M8 spec 4.4, 7) are
+## written by hand and kept as they are; validate() checks them.
 static func rebuild_scenario(scenario: ScenarioDef, map: MapData) -> void:
 	scenario.owner = ScenarioGrowth.grow(map, scenario)
 	scenario.map_digest = map.digest()

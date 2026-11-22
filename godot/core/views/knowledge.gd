@@ -2,6 +2,7 @@
 ## `knows` is a shared border (Territory.neighbours) or an explored hex the other holds (M6, 4.11, through Sight). The
 ## viewer "" sees all.
 ## Pure core/views/ code: no nodes, no engine calls, no luck.
+@warning_ignore_start("integer_division")
 class_name Knowledge
 extends RefCounted
 
@@ -56,6 +57,35 @@ static func unknown_count(game: Game, viewer: StringName) -> int:
 ## True when the viewer sees `hex` now (the viewer "" sees all). Sight does the work (4.11).
 static func sees(game: Game, viewer: StringName, hex: Vector2i) -> bool:
 	return viewer == &"" or Sight.sees(game, viewer, hex)
+
+
+## The men under arms of `other` as `viewer` may read them (M8, from the Stats of the last closed season): exact for the viewer
+## "" and for the viewer's own country; banded (two significant figures) for a country the viewer knows; -1 for one it does not
+## know (or one with no country, or a game with no statistics). Pure.
+static func men_of(game: Game, viewer: StringName, other: StringName) -> int:
+	if game == null or game.stats == null:
+		return -1
+	if viewer != &"" and other != viewer and not knows(game, viewer, other):
+		return -1
+	if Countries.by_tag(game, other) == null:
+		return -1
+	var men := game.stats.value(other, game.stats.last_turn, "army_men")
+	return men if viewer == &"" or other == viewer else band(men)
+
+
+## What `viewer` may take a fortress's garrison to be (D49): {men, access}. Own (the fortress's owner or controller is the viewer,
+## or the viewer is ""): the exact garrison, &"exact". Seen (the viewer sees the hex): the garrison rounded to 100, &"seen". Else
+## the full garrison of its level (garrison_per_level x level), &"assumed". 0 and &"none" for a hex with no fortress or an
+## occupied one (the controller is public). The real garrison of an unseen fortress is never read.
+static func garrison_estimate(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
+	var none := {"men": 0, "access": &"none"}
+	if game == null or Occupation.fortress_level(game, hex) <= 0 or Occupation.is_occupied(game, hex):
+		return none
+	if viewer == &"" or Occupation.controller_tag(game, hex) == viewer or Territory.owner_tag(game, hex) == viewer:
+		return {"men": Occupation.garrison_of(game, hex), "access": &"exact"}
+	if Sight.sees(game, viewer, hex):
+		return {"men": ((Occupation.garrison_of(game, hex) + 50) / 100) * 100, "access": &"seen"}
+	return {"men": Occupation.garrison_full(game, hex), "access": &"assumed"}
 
 
 ## The armies in the viewer's sight that are not its own, in id order: {army, tag, hex, men_banded}. The viewer "" gets

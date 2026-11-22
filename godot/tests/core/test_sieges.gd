@@ -3,6 +3,7 @@
 ## relief, left, outnumbered), the besieged hunger through the People door, the freed land (D18), regrowth, the walk-in, the
 ## retake and the loader. The plain-ground fortresses are made in a copy of the 1480 map (the shared map is never written):
 ## the relief of the chosen hex is set to 0. Every test makes its own game.
+@warning_ignore_start("integer_division")
 extends GutTest
 
 var WATCH := Vector2i(-1, -1)
@@ -489,3 +490,43 @@ func test_the_loader_refuses_each_forged_case() -> void:
 	var other_m := _game()
 	WarFixture.at_war(other_m, enemy, WATCH_OWNER)
 	assert_ne(Sieges.from_dict(f_many, other_m), "", "more place names than the cap are refused")
+
+
+# --- forecast_for (M8 K13, D49) --------------------------------------------------------------------------------------------
+
+
+func test_forecast_for_equals_forecast_with_the_real_garrison() -> void:
+	# [fortress level, companies]: the cells of the seasons table, and a count too small to take it.
+	for cell: Array in [[1, 2], [2, 2], [3, 4], [3, 8], [1, 1]]:
+		var g := _game()
+		var hex := _lowest_fortress(g, int(cell[0]))
+		var enemy := _enemy_at_war(g, Occupation.controller_tag(g, hex))
+		_pikemen(g, enemy, hex, int(cell[1]))
+		var men := Armies.men_of_country(g, enemy)
+		var real := Sieges.forecast(g, hex, enemy, men, 0, 0, 0)
+		var given := Sieges.forecast_for(g, hex, Occupation.garrison_of(g, hex), men, 0, 0, 0)
+		assert_eq(given, real, "level %d, %d companies: the garrison given is the real one" % [int(cell[0]), int(cell[1])])
+		var mid := Sieges.forecast(g, hex, enemy, men, 1, 1, 1)
+		assert_eq(Sieges.forecast_for(g, hex, Occupation.garrison_of(g, hex), men, 1, 1, 1), mid, "with a gun and progress too")
+
+
+func test_forecast_for_differs_with_another_garrison() -> void:
+	var g := _game()
+	var full := Occupation.garrison_full(g, WATCH)
+	var base := Sieges.forecast_for(g, WATCH, full, 1000, 0, 0, 0)
+	assert_gt(base, 0, "1,000 men take a full watchtower")
+	assert_eq(Sieges.forecast_for(g, WATCH, full * 3, 1000, 0, 0, 0), -1, "a garrison three times as big is too many for them")
+	assert_ne(Sieges.forecast_for(g, WATCH, full / 4, 1000, 0, 0, 0), base, "a small garrison falls on another schedule")
+
+
+func test_planted_forecast_for_never_reads_the_real_garrison() -> void:
+	var g := _game()
+	var full := Occupation.garrison_full(g, WATCH)
+	var with_full := Sieges.forecast_for(g, WATCH, full, 1000, 0, 0, 0)
+	var seen_terms := Sieges.terms(g, WATCH, &"", 1000, 0, full)
+	Occupation.set_garrison(g, WATCH, 100)
+	assert_eq(Sieges.forecast_for(g, WATCH, full, 1000, 0, 0, 0), with_full, "P: a lowered real garrison does not move the estimate")
+	var after := Sieges.terms(g, WATCH, &"", 1000, 0, full)
+	assert_eq(int(after["need"]), int(seen_terms["need"]), "P: nor the need of a siege worked out from a given garrison")
+	assert_eq(int(after["rate"]), int(seen_terms["rate"]))
+	assert_ne(Sieges.forecast(g, WATCH, &"", 1000, 0, 0, 0), with_full, "the plain forecast does read the real one")

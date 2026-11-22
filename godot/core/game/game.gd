@@ -34,6 +34,11 @@ var sieges: Array[Siege] = []                 # Sieges; hex index order
 var siege_names: Dictionary = {}              # Sieges: place -> sieges named there
 ## Human player's country tag, or &"" before picking, in AI-only games, or in a map-only game.
 var player: StringName = &""
+## Who gives the other countries' orders in the ai_orders phase, or null (M8 4.2): not saved, not in the digest; set by
+## Session, the tools and the tests. Game.new_scenario attaches none.
+var orders: OrdersHook = null
+## True when every country is played by the computer (M8 D31, 4.12): saved, in the digest, written only by watch().
+var ai_only := false
 ## The fields only the door (emit, act, Season) writes (docs/architecture/m3-build-spec.md 5.7).
 const DOOR_FIELDS: Array[String] = ["events", "action_log", "chronicle", "version", "view_cache", "districts", "sight",
 	"war_cache"]
@@ -154,6 +159,17 @@ func date_text() -> String:
 	return Calendar.date_text(turn, start_year)
 
 
+## Makes the game AI-only (the developer's Watch, tools and tests): only during the pick (no player yet), in a game with
+## countries, once. Logged for the replay; false (nothing changed or logged) otherwise.
+func watch() -> bool:
+	if not has_countries() or player != &"" or ai_only:
+		return false
+	ai_only = true
+	action_log.append({"turn": turn, "action": "watch", "args": {}})
+	version += 1
+	return true
+
+
 ## Developer transfer of land (logged for the replay): Territory.transfer plus its action log record.
 func dev_transfer(hexes: Array[Vector2i], to_id: int) -> int:
 	# M7 (5.4): the land that will change owner is released from any occupation first (one controllers_changed); a refused
@@ -234,13 +250,13 @@ func act(action: String, args: Dictionary) -> Dictionary:
 	return verdict
 
 
-## SHA-256 (hex text) of the game: map id, seed, scenario id, player, start year, turn, state digest, each country's
+## SHA-256 (hex text) of the game: map id, seed, scenario id, player and ai_only (M8), start year, turn, state digest, each country's
 ## digest_text, the armies (M6), the war state (M7: wars, battles and records, sieges), stats (R5), chronicle and luck; the weather (as "s,f,m") follows the turn.
 func digest() -> String:
 	var map_id := map.id if map != null else ""
 	var scen_id := scenario.id if scenario != null else ""
 	var state_digest := state.digest() if state != null else ""
-	var parts: PackedStringArray = [map_id, str(seed_value), scen_id, String(player), str(start_year), str(turn),
+	var parts: PackedStringArray = [map_id, str(seed_value), scen_id, String(player), "1" if ai_only else "0", str(start_year), str(turn),
 		"%d,%d,%d" % [weather[0], weather[1], weather[2]], state_digest]
 	for c: Country in countries:
 		parts.append(c.digest_text() if c != null else "")

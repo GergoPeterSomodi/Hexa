@@ -341,3 +341,23 @@ func test_a_plan_follows_the_hostility_registered_after_it() -> void:
 	Movement.clear_test_hostility()
 	assert_false(bool(Movement.plan(_g, a, foreign).ok), "and a clear after an ok is seen at once")
 
+
+
+func test_a_march_check_and_its_act_plan_once() -> void:
+	var a := _sav(VERCELLI)
+	var args := {"army": a.id, "goal": AOSTA, "tag": SAV}
+	var table: Dictionary = _g.view_cache.pinned(&"plans", _g.version, func() -> Dictionary: return {}) as Dictionary
+	assert_eq(table.size(), 0, "nothing planned yet")
+	var check := Movement.march_check(_g, args)
+	assert_true(bool(check.ok), str(check.reason))
+	assert_eq(table.size(), 1, "the check searched once")
+	var cached: Dictionary = table.values()[0] as Dictionary
+	cached["marker"] = true
+	var again := Movement.march_check(_g, args)
+	assert_eq(again, check, "a second check gives the same verdict")
+	assert_eq(table.size(), 1, "and does not search again")
+	var res := Movement.march(_g, args)
+	assert_true(bool(res.ok), str(res.reason))
+	assert_true((table.values()[0] as Dictionary).has("marker"), "P: the act read the check's plan (a fresh search would drop the marker)")
+	assert_eq(a.route, cached.hexes, "the order stores the cached route")
+	assert_eq(Movement.replan(_g, SAV, VERCELLI, AOSTA, Movement.mp_of(_g, a)).cost, cached.cost, "the result is the plain search's")

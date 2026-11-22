@@ -29,6 +29,18 @@ func test_sixty_countries_with_defs() -> void:
 	assert_eq(scenario.countries[59], &"FCH")
 
 
+## M8 (spec 4.4): country id gives the temperament [builder, cautious, steadfast, aggressive, opportunist][id mod 5]; no start armies.
+func test_tempers_by_id_mod_five_and_no_start_armies() -> void:
+	var scenario := _scenario()
+	var defs := _built["defs"] as GameDefs
+	var keys: Array[StringName] = [&"builder", &"cautious", &"steadfast", &"aggressive", &"opportunist"]
+	assert_eq(scenario.tempers.size(), 60)
+	for id: int in range(1, 61):
+		assert_eq(scenario.tempers[id - 1], keys[id % 5], "country %d" % id)
+		assert_not_null(defs.temper(scenario.tempers[id - 1]))
+	assert_eq(scenario.start_armies.size(), 0)
+
+
 func test_capitals_are_places_on_land_owned_by_their_country() -> void:
 	var scenario := _scenario()
 	for i: int in 60:

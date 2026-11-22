@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="AiTemperDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ai_temper_def.gd" id="1_temper"]
+
+[resource]
+script = ExtResource("1_temper")
+key = &"cautious"
+name = "Cautious"
+reserve_seasons = 12
+payback_max = 28
+works_at_war = true
+army_permille = 5
+war_army_permille = 10
+army_upkeep_share = 250
+mix = PackedInt32Array(550, 350, 100, 0)
+max_wars = 1
+rest_seasons = 16
+war_chest_seasons = 12
+declare_ratio = 2000
+busy_bonus = 0
+declare_chance = 150
+attack_ratio = 1600
+siege_max = 4
+storm_share = 700
+storm_ratio = 1500
+relief_ratio = 1000
+withdraw_ratio = 1000
+take_score = 2
+tired_seasons = 8
+sue_ratio = 1200
+yield_after = 6
+fortify = false

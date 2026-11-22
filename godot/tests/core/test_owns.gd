@@ -17,6 +17,7 @@ const ACTION_OWNERS := {
 	"set_tax": ["countries"],
 }
 const PHASE_OWNERS := {
+	&"ai_orders": [],  # writes nothing itself: its acts go through Game.act, the mark through the door (M8 5.4)
 	&"movement": ["armies", "countries", "battles"],  # the walks; explored along them (Vision.see_path, 5.0 R4); engage (M7)
 	&"battles": ["armies", "battles", "wars", "occupier", "garrison", "unsupported", "people", "people_flows", "luck"],
 	&"sieges": ["sieges", "occupier", "garrison", "unsupported", "people", "people_flows"],
@@ -273,3 +274,40 @@ func test_the_developer_transfers_write_through_the_doors() -> void:
 	assert_true(changed.has("stores"))
 	assert_eq(g.action_log[g.action_log.size() - 2]["action"], "dev_money")
 	assert_eq(g.action_log[g.action_log.size() - 1]["action"], "dev_goods")
+
+
+# ----- M8: the ai_orders phase (m8-build-spec.md 5.4) -------------------------------------------------------------------------
+
+
+## The phase's diff is its logged acts replayed on a copy taken before it: the digests agree, or the phase wrote something
+## outside Game.act.
+func _acts_equal_the_phase(g: Game) -> bool:
+	var copy := Snapshot.restore(Snapshot.of(g), _fx["map"] as MapData, _fx["defs"] as GameDefs)["game"] as Game
+	var from := g.action_log.size()
+	Season.run_phase(g, &"ai_orders")
+	for i: int in range(from, g.action_log.size()):
+		var r := g.action_log[i]
+		if r["action"] != "orders_done":
+			copy.act(str(r["action"]), r["args"] as Dictionary)
+	return copy.digest() == g.digest()
+
+
+func test_the_ai_orders_phase_writes_only_through_game_act() -> void:
+	var g := OrdersFixture.watched()
+	var wrote := false
+	for n: int in 3:
+		Season.begin(g)
+		var before := _fields(g)
+		assert_true(_acts_equal_the_phase(g))
+		wrote = wrote or _changed(before, _fields(g)).has("countries")
+		Season.finish(g)
+		for phase: StringName in Season.PHASES.slice(1):
+			Season.run_phase(g, phase)
+	assert_true(wrote, "the stub's acts changed something")
+
+
+func test_p_a_stub_that_writes_a_treasury_directly_is_reported() -> void:
+	var g := OrdersFixture.watched()
+	g.orders = OrdersFixture.Cheat.new()
+	Season.begin(g)
+	assert_false(_acts_equal_the_phase(g), "the diff is not its logged acts")

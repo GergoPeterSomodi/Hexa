@@ -99,10 +99,10 @@ core/                   plain GDScript, extends RefCounted (or Resource in defs/
                         WorldImprove, ImproveRules, ImproveSolver), territory.gd (Territory),
                         countries.gd (Countries)
   game/                 game.gd (Game), actions.gd (the action table)
-  ai/                   empty until its milestone
   views/                pure "what to draw" helpers: map_tiles.gd, map_cells.gd, edge_lines.gd, crossings.gd,
                         far_picture.gd, hex_card.gd, border_lines.gd, map_modes.gd, country_names.gd,
                         country_card.gd, place_search.gd
+  ai/                   empty until its milestone (from M8: the AI, above views; it reads what the panels read)
   mapgen/               generators, run in tools and tests only: WorldRelief, WorldWater (with WaterCurves and
                         WaterSearch), WorldCover, WorldPlaces, WorldRoads, climate.gd, fake_map.gd
 shell/                  everything with Nodes (Studiolo UI architecture)
@@ -155,7 +155,7 @@ addons/gut/             GUT 9.7.1, copied unchanged from its release (MIT, see a
 
 ## Rules
 
-- **Layers, one way:** bottom to top `defs`, `state`, `systems`, `game`, `ai`, `views`, `shell`. A file may use its own
+- **Layers, one way:** bottom to top `defs`, `state`, `systems`, `game`, `views`, `ai`, `shell`. A file may use its own
   layer or a lower one, never a higher one. `mapgen` sits beside `systems` and runs only in tools and tests.
   `tools/lint_godot.py` checks the `res://` paths; class names are not checked by it.
 - **`core/` has no engine calls:** no Node, no scene tree (`get_tree`, `get_node`, `$`), no `Input`, `OS`, `Time`,

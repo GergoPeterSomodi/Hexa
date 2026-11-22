@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="AiTemperDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ai_temper_def.gd" id="1_temper"]
+
+[resource]
+script = ExtResource("1_temper")
+key = &"builder"
+name = "Builder"
+reserve_seasons = 6
+payback_max = 40
+works_at_war = true
+army_permille = 3
+war_army_permille = 8
+army_upkeep_share = 200
+mix = PackedInt32Array(600, 400, 0, 0)
+max_wars = 1
+rest_seasons = 16
+war_chest_seasons = 12
+declare_ratio = 2500
+busy_bonus = 0
+declare_chance = 100
+attack_ratio = 1500
+siege_max = 4
+storm_share = 600
+storm_ratio = 1300
+relief_ratio = 900
+withdraw_ratio = 1100
+take_score = 2
+tired_seasons = 8
+sue_ratio = 1300
+yield_after = 8
+fortify = false

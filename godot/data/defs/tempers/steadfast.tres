@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="AiTemperDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ai_temper_def.gd" id="1_temper"]
+
+[resource]
+script = ExtResource("1_temper")
+key = &"steadfast"
+name = "Steadfast"
+reserve_seasons = 8
+payback_max = 32
+works_at_war = true
+army_permille = 6
+war_army_permille = 14
+army_upkeep_share = 350
+mix = PackedInt32Array(500, 400, 50, 50)
+max_wars = 1
+rest_seasons = 12
+war_chest_seasons = 10
+declare_ratio = 2000
+busy_bonus = 0
+declare_chance = 100
+attack_ratio = 1300
+siege_max = 5
+storm_share = 500
+storm_ratio = 1200
+relief_ratio = 700
+withdraw_ratio = 1500
+take_score = 3
+tired_seasons = 16
+sue_ratio = 2000
+yield_after = 16
+fortify = true

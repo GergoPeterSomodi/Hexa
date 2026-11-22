@@ -327,10 +327,10 @@ func _with_line(dir: String, slot: String, change: Callable) -> void:
 
 func test_p_hostile_header_numbers_read_as_broken() -> void:
 	var cases: Array[Array] = [
-		["\"format\":5,", "\"format\":1e999,"], ["\"format\":5,", "\"format\":-1e999,"],
-		["\"format\":5,", "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
+		["\"format\":6,", "\"format\":1e999,"], ["\"format\":6,", "\"format\":-1e999,"],
+		["\"format\":6,", "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
 		["\"saved_unix\":1700000000,", "\"saved_unix\":1e19,"], ["\"play_seconds\":61,", "\"play_seconds\":9007199254740994,"],
-		["\"format\":5,", "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
+		["\"format\":6,", "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
 	]
 	for item: Array in cases:
 		var dir := _saved("1")
@@ -419,10 +419,14 @@ func test_a_write_after_a_crash_between_the_two_renames_leaves_no_bak() -> void:
 # ----- M4: format 2, the economy and the weather (m4-build-spec.md 4.22) ----------------------------------------
 
 
-func test_the_format_is_5_and_a_format_4_save_is_older() -> void:
-	# M7 (4.20, D55): the war body; an M6 (format 4) save reads older and is refused quietly.
-	assert_eq(SaveFile.FORMAT, 5)
-	assert_eq(SaveFile.OLDEST_FORMAT, 5)
+func test_the_format_is_6_and_a_format_5_save_is_older() -> void:
+	# M8 (4.15, D34): ai_only and log_from; an M7 (format 5) save reads older and is refused quietly.
+	assert_eq(SaveFile.FORMAT, 6)
+	assert_eq(SaveFile.OLDEST_FORMAT, 6)
+	var m7 := _saved("5")
+	_with_header(m7, "5", func(h: Dictionary) -> void: h["format"] = 5)
+	assert_eq(SaveFile.read_header("5", m7)["state"], &"older", "a format-5 header reads older")
+	assert_eq(SaveFile.read("5", m7)["problem"], "Made by an older test build", "refused quietly")
 	var old := _saved("2")
 	_with_header(old, "2", func(h: Dictionary) -> void: h["format"] = 4)
 	assert_eq(SaveFile.read_header("2", old)["state"], &"older", "a format-4 header reads older")
@@ -498,3 +502,25 @@ func test_a_failed_load_keeps_the_running_game() -> void:
 	assert_null(r["game"])
 	assert_eq(r["problem"], "Cannot be read")
 	assert_eq(g.digest(), before, "the game in hand is untouched")
+
+
+# ----- M8: the trimmed log (m8-build-spec.md 4.15) ----------------------------------------------------------------------
+
+
+func test_save_load_save_is_byte_equal_with_a_trimmed_log() -> void:
+	var g := OrdersFixture.watched()
+	for n: int in 60:
+		Season.run(g)
+	var dir_a := _dir()
+	assert_eq(SaveFile.write(g, "4", INFO, {}, dir_a), "")
+	var read := SaveFile.read("4", dir_a)
+	assert_eq(read["problem"], "")
+	var body := read["body"] as Dictionary
+	assert_gt(int(body["log_from"]), 1, "trimmed")
+	var r := Snapshot.restore(body, _fx["map"] as MapData, _fx["defs"] as GameDefs)
+	assert_eq(r["problem"], "")
+	var back := r["game"] as Game
+	assert_eq(back.digest(), g.digest())
+	var dir_b := _dir()
+	assert_eq(SaveFile.write(back, "4", INFO, {}, dir_b), "")
+	assert_eq(_bytes(SaveFile.path_of("4", dir_a)), _bytes(SaveFile.path_of("4", dir_b)), "byte-equal files")

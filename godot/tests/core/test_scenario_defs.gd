@@ -67,6 +67,7 @@ func _make_scenario(m: MapData) -> ScenarioDef:
 	s.map_digest = m.digest()
 	s.year = 1480
 	s.countries = [&"AAA", &"BBB"]
+	s.tempers = [&"builder", &"cautious"]
 	s.capitals = [Vector2i(3, 2), Vector2i(5, 2)]
 	s.cb_colours = PackedByteArray([0, 4])
 	s.seeds = [
@@ -145,6 +146,7 @@ func test_scenario_def_helpers_digest_and_round_trip() -> void:
 	var defs := _make_defs()
 	var s := _make_scenario(m)
 	s.countries.append(&"OUT")
+	s.tempers.append(&"opportunist")
 	s.capitals.append(ScenarioDef.NO_HEX)
 	s.cb_colours.append(1)
 	s.seeds.append({"hex": Vector2i(6, 4), "tag": &"OUT", "kind": &"anchor", "note": "border"})
@@ -295,6 +297,25 @@ func test_scenario_validate_planted_faults_rules_4_to_7() -> void:
 	s = _make_scenario(m)
 	s.cb_colours = PackedByteArray([0, 3])
 	assert_true(s.validate(m, defs, true).any(func(e: String) -> bool: return e.contains("cb_colours contrast")))
+
+
+## M8 (spec 4.4, 5.1): the scenario's tempers and start armies are validated and in its digest (P: an unknown temper).
+func test_tempers_and_start_armies_validated_and_in_the_digest() -> void:
+	var m := _make_map()
+	var defs := _make_defs()
+	var s := _make_scenario(m)
+	var base := s.digest()
+	assert_eq(s.validate(m, defs, false), [] as Array[String])
+	s.tempers = [&"builder", &"gambler"]
+	assert_true(s.validate(m, defs, false).any(func(e: String) -> bool: return e.contains("tempers[1]: unknown temper 'gambler'")))
+	s.tempers = [&"builder", &"steadfast"]
+	assert_eq(s.validate(m, defs, false), [] as Array[String])
+	assert_ne(s.digest(), base, "tempers are in the digest")
+	s.tempers = [&"builder", &"cautious"]
+	assert_eq(s.digest(), base)
+	s.start_armies = [{"tag": &"AAA", "hex": Vector2i(3, 2), "kind": 0, "count": 1}] as Array[Dictionary]
+	assert_eq(s.validate(m, defs, false), [] as Array[String])
+	assert_ne(s.digest(), base, "start_armies are in the digest")
 
 
 func test_build_scenario_tool_rebuild_check_and_planted_fault() -> void:

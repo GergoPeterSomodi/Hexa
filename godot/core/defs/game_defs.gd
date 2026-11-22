@@ -72,6 +72,10 @@ extends Resource
 @export var terrains: Array[TerrainDef] = []
 ## The war (M7 spec 4.3 to 4.9, 5.1): every number of the war in one file, data/defs/war.tres.
 @export var war: WarDef = null
+## The computer's countries (M8 spec 4.4, 5.1): the numbers they share (data/defs/ai.tres) and the five temperaments
+## (data/defs/tempers/*.tres). A scenario names one temperament a country.
+@export var ai: AiDef = null
+@export var tempers: Array[AiTemperDef] = []
 ## Per relief level (7): move points added to entering it.
 @export var relief_move_add: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 1, 2, 3])
 @export var highway_cap := 1
@@ -188,6 +192,14 @@ func terrain(cover: int) -> TerrainDef:
 	return terrains[cover]
 
 
+## Looks up a temperament by key, or null when unknown.
+func temper(key: StringName) -> AiTemperDef:
+	for t: AiTemperDef in tempers:
+		if t != null and t.key == key:
+			return t
+	return null
+
+
 ## Looks up a scenario definition by id, or null when unknown (cache built on first use).
 func scenario(id: String) -> ScenarioDef:
 	if _scenario_cache_size != scenarios.size():
@@ -250,6 +262,7 @@ func validate() -> Array[String]:
 	_check_economy(errors)
 	_check_armies(errors)
 	_check_war(errors)
+	_check_ai(errors)
 	return errors
 
 
@@ -260,6 +273,28 @@ func _check_war(errors: Array[String]) -> void:
 		return
 	for err: String in war.validate():
 		errors.append(err)
+
+
+## The computer's numbers (M8 spec 5.1): ai set and valid, 5 tempers with unique keys, each valid.
+func _check_ai(errors: Array[String]) -> void:
+	if ai == null:
+		errors.append("ai is not set")
+	else:
+		for err: String in ai.validate():
+			errors.append(err)
+	if tempers.size() != 5:
+		errors.append("tempers has %d entries, expected 5" % tempers.size())
+	var seen: Dictionary = {}
+	for i: int in tempers.size():
+		var t := tempers[i]
+		if t == null:
+			errors.append("tempers[%d]: entry is null" % i)
+			continue
+		if seen.has(t.key):
+			errors.append("tempers[%d]: duplicate temper key '%s'" % [i, String(t.key)])
+		seen[t.key] = true
+		for err: String in t.validate(units.size()):
+			errors.append(err)
 
 
 ## SHA-256 (hex text) of every field in a fixed order.

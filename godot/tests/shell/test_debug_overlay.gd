@@ -140,7 +140,7 @@ func test_the_m3_line_shows_turn_date_works_phases_and_save() -> void:
 	Session.end_season()
 	_overlay.refresh_metrics()
 	assert_true(_overlay.m3_text().begins_with("turn 2 · Summer 1480"), _overlay.m3_text())
-	assert_true(_overlay.m3_text().contains("phases movement "), "the last season's phase times")
+	assert_true(_overlay.m3_text().contains("phases ai_orders "), "the last season's phase times")
 	Session.game = null
 	_overlay.refresh_metrics()
 	assert_eq(_overlay.m3_text(), "no game")

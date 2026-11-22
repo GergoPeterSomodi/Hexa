@@ -299,3 +299,48 @@ func test_crossing_chips_read_the_edge_between_stand_and_hex() -> void:
 				assert_true(str(OddsView._edge_chips(_g, stand, to, "MLO")[-1].text).begins_with("Across the river "))
 	assert_true(found_pass, "the 1480 map has a pass edge between land hexes")
 	assert_true(found_river, "the 1480 map has a river edge with no crossing tile")
+
+
+# --- M8 K13: the besiege card reads the garrison the viewer may take it to be (D49) ---------------------------------------------
+
+
+func _besiege_of(f: Dictionary, a: Army) -> Dictionary:
+	return OddsView.of(_g, ArmyFixture.TAG, a.id, f.hex).besiege as Dictionary
+
+
+func test_unseen_fortress_card_uses_the_full_garrison_and_a_reduced_one_changes_nothing() -> void:
+	var f := _hostile_fortress(false)
+	assert_false(f.is_empty(), "a hostile garrisoned fortress the player does not see exists")
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, ArmyFixture.find_town(_g), 0, 2)
+	var full := Occupation.garrison_full(_g, f.hex)
+	var estimate := Knowledge.garrison_estimate(_g, ArmyFixture.TAG, f.hex)
+	assert_eq(int(estimate.men), full, "the estimate of an unseen fortress is its full garrison")
+	var before := OddsView.of(_g, ArmyFixture.TAG, a.id, f.hex)
+	Occupation.set_garrison(_g, f.hex, maxi(1, full / 4))
+	var after := OddsView.of(_g, ArmyFixture.TAG, a.id, f.hex)
+	assert_eq(after, before, "P: a reduced unseen garrison does not change the card")
+	# The card is none for a fogged fortress; the besiege numbers it would use (and the AI's) are the estimate's.
+	Occupation.set_garrison(_g, f.hex, full)
+	var strong := ArmyFixture.army(_g, ArmyFixture.TAG, ArmyFixture.find_town(_g), 0, 8)
+	var numbers_full := OddsView._besiege(_g, ArmyFixture.TAG, strong, f.hex)
+	Occupation.set_garrison(_g, f.hex, maxi(1, full / 4))
+	var numbers_low := OddsView._besiege(_g, ArmyFixture.TAG, strong, f.hex)
+	assert_eq(numbers_low, numbers_full, "P: the besiege numbers of an unseen fortress do not follow its real garrison")
+	assert_eq(int(numbers_low.seasons), Sieges.forecast_for(_g, f.hex, full, strong.men(), OddsView._guns(_g, strong), 0, 0),
+		"they are forecast_for the full garrison")
+
+
+func test_the_besiege_numbers_of_a_seen_fortress_follow_its_rounded_garrison() -> void:
+	var f := _hostile_fortress(true)
+	assert_false(f.is_empty(), "a hostile fortress the player sees exists")
+	var a: Army = f.army
+	var seen := Knowledge.garrison_estimate(_g, ArmyFixture.TAG, f.hex)
+	assert_eq(seen.access, &"seen")
+	var guns := 0
+	for u: Unit in a.units:
+		var def := Military.unit_def(_g, u.kind)
+		guns += def.siege_points if def != null else 0
+	var want := Sieges.forecast_for(_g, f.hex, int(seen.men), a.men(), guns, 0, 0)
+	assert_eq(int(_besiege_of(f, a).seasons), want, "the card's seasons are forecast_for the seen garrison")
+	assert_eq(int(_besiege_of(f, a).seasons), Sieges.forecast(_g, f.hex, ArmyFixture.TAG, a.men(), guns, 0, 0),
+		"a full garrison reads as before: the rounded one is the real one")

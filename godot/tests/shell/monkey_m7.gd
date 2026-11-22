@@ -68,6 +68,11 @@ func _m7_step(rng: Rng, vp: SubViewport, app: App) -> void:
 		return
 	_m4_note("m7")
 	_m7_plant(app)
+	await _m7_dice(rng, vp, app)
+	_changed_hexes.clear()  # a war input changes land by the rules (a peace's terms, a capture, a release), never by a works action
+
+
+func _m7_dice(rng: Rng, vp: SubViewport, app: App) -> void:
 	match rng.randi_range(0, 14):
 		0:
 			await _m7_storm(rng, vp, app)
@@ -100,6 +105,7 @@ func _m7_step(rng: Rng, vp: SubViewport, app: App) -> void:
 func _m7_force(rng: Rng, vp: SubViewport, app: App) -> void:
 	var before := _m7_progress()
 	await _m7_force_one(rng, vp, app)
+	_changed_hexes.clear()  # as in _m7_step
 	if _m7_progress() > before:
 		_m7_stalled = 0
 		return
@@ -326,6 +332,7 @@ func _m7_prepare(rng: Rng, vp: SubViewport, app: App) -> void:
 			mine = Armies.of_country(game, SAV)
 		if not mine.is_empty():
 			DevCommands.run("march %d 7 9" % mine[0].id, ctx)
+	_changed_hexes.clear()  # `as MLO raise` changes Milan's hex: it is not a works action of the player's (the owner check of the step)
 	await _wait_frames(2)
 
 

@@ -2,7 +2,7 @@
 ## before the pick and a scenario after 12 seasons with works; every key of 4.10; the M2 5.9 fields; the planted faults.
 extends GutTest
 
-const KEYS: Array[String] = ["format", "game", "map_state", "countries", "armies", "war", "stats", "chronicle", "luck", "action_log", "ui"]
+const KEYS: Array[String] = ["format", "game", "map_state", "countries", "armies", "war", "stats", "chronicle", "luck", "action_log", "log_from", "ui"]
 
 var _fx: Dictionary = {}
 
@@ -137,7 +137,7 @@ func test_p_wrong_format() -> void:
 
 func test_p_missing_pieces() -> void:
 	for key: String in KEYS:
-		if key == "format" or key == "armies":
+		if key == "format" or key == "armies" or key == "log_from":
 			continue
 		var body := _body()
 		body.erase(key)
@@ -466,3 +466,60 @@ func test_p_people_out_of_range_or_at_sea_are_refused() -> void:
 		_people_refused(_poked(key, sea, 1), key + " at sea")
 		_people_refused(_poked(key, land, People.PEOPLE_MAX + 1), key + " over the maximum")
 		_people_refused(_poked(key, land, -1), key + " below zero")
+
+
+# ----- M8: ai_only, the trimmed log and log_from (m8-build-spec.md 4.15) ------------------------------------------------
+
+
+func _watched_played(seasons: int) -> Game:
+	var g := OrdersFixture.watched()
+	for n: int in seasons:
+		Season.run(g)
+	return g
+
+
+func test_ai_only_is_in_the_body_and_the_digest() -> void:
+	var g := _watched_played(2)
+	var body := _through_bytes(Snapshot.of(g))
+	assert_eq((body["game"] as Dictionary)["ai_only"], true)
+	assert_eq(body["log_from"], 1)
+	var r := _restore(body)
+	assert_eq(r["problem"], "")
+	var back := r["game"] as Game
+	assert_true(back.ai_only)
+	assert_eq(back.digest(), g.digest())
+	assert_false((_restore(_through_bytes(Snapshot.of(_scenario_game())))["game"] as Game).ai_only)
+
+
+func test_the_log_is_kept_forty_seasons_with_log_from() -> void:
+	var g := _watched_played(60)
+	assert_eq(g.turn, 61)
+	var body := _through_bytes(Snapshot.of(g))
+	var log := body["action_log"] as Array
+	assert_lt(log.size(), g.action_log.size(), "trimmed")
+	assert_eq(int(body["log_from"]), g.turn - 39)
+	assert_eq(int((log[0] as Dictionary)["turn"]), g.turn - 39)
+	assert_eq(log[log.size() - 1], g.action_log[g.action_log.size() - 1], "the newest is kept")
+	var r := _restore(body)
+	assert_eq(r["problem"], "")
+	assert_eq((r["game"] as Game).digest(), g.digest())
+	assert_eq((r["game"] as Game).action_log.size(), log.size())
+	assert_eq(Snapshot.of(r["game"] as Game), Snapshot.of(g), "the body of a restored game is the same body")
+	assert_eq(int(_through_bytes(Snapshot.of(_watched_played(10)))["log_from"]), 1, "whole when short")
+
+
+func test_p_damaged_ai_only_and_log_from_are_refused() -> void:
+	var body := _through_bytes(Snapshot.of(_watched_played(1)))
+	var bad := body.duplicate(true)
+	(bad["game"] as Dictionary)["ai_only"] = 1
+	_refused(bad, "Cannot be read", "ai_only not a bool")
+	bad = body.duplicate(true)
+	(bad["game"] as Dictionary)["player"] = "AAA"
+	_refused(bad, "Cannot be read", "watched with a player")
+	for value: Variant in ["1", 0, -3, 1.5]:
+		bad = body.duplicate(true)
+		bad["log_from"] = value
+		_refused(bad, "Cannot be read", "log_from %s" % str(value))
+	bad = body.duplicate(true)
+	bad.erase("log_from")
+	assert_eq(_restore(bad)["problem"], "", "a body without it reads as 1")

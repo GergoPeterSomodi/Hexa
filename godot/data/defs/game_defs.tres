@@ -51,6 +51,13 @@
 [ext_resource type="Resource" path="res://data/defs/goods/silver.tres" id="g_silver"]
 [ext_resource type="Script" path="res://core/defs/unit_def.gd" id="u0_script"]
 [ext_resource type="Resource" path="res://data/defs/war.tres" id="w_war"]
+[ext_resource type="Resource" path="res://data/defs/ai.tres" id="a_ai"]
+[ext_resource type="Script" path="res://core/defs/ai_temper_def.gd" id="a0_script"]
+[ext_resource type="Resource" path="res://data/defs/tempers/builder.tres" id="a_builder"]
+[ext_resource type="Resource" path="res://data/defs/tempers/cautious.tres" id="a_cautious"]
+[ext_resource type="Resource" path="res://data/defs/tempers/steadfast.tres" id="a_steadfast"]
+[ext_resource type="Resource" path="res://data/defs/tempers/aggressive.tres" id="a_aggressive"]
+[ext_resource type="Resource" path="res://data/defs/tempers/opportunist.tres" id="a_opportunist"]
 [ext_resource type="Resource" path="res://data/defs/units/pikemen.tres" id="u_pikemen"]
 [ext_resource type="Resource" path="res://data/defs/units/crossbowmen.tres" id="u_crossbowmen"]
 [ext_resource type="Resource" path="res://data/defs/units/knights.tres" id="u_knights"]
@@ -116,6 +123,8 @@ levy_permille = 100
 units = Array[ExtResource("u0_script")]([ExtResource("u_pikemen"), ExtResource("u_crossbowmen"), ExtResource("u_knights"), ExtResource("u_bombards")])
 terrains = Array[ExtResource("t0_script")]([ExtResource("t_farmland"), ExtResource("t_grassland"), ExtResource("t_woods"), ExtResource("t_marsh"), ExtResource("t_rock"), ExtResource("t_snow"), ExtResource("t_tundra"), ExtResource("t_sand")])
 war = ExtResource("w_war")
+ai = ExtResource("a_ai")
+tempers = Array[ExtResource("a0_script")]([ExtResource("a_builder"), ExtResource("a_cautious"), ExtResource("a_steadfast"), ExtResource("a_aggressive"), ExtResource("a_opportunist")])
 relief_move_add = PackedInt32Array(0, 0, 0, 0, 1, 2, 3)
 highway_cap = 1
 road_cap = 2

@@ -92,8 +92,6 @@ var _old_low_proc: bool = false
 var _old_tooltip_delay: float = 0.5
 var _old_save_dir: String = ""
 var _old_lock_path: String = ""
-## Hexes whose state an action changed during the current step (Events.hex_changed).
-var _changed_hexes: Array[Vector2i] = []
 ## The player seen after the pick, and the game it belongs to.
 var _player_seen: StringName = &""
 var _player_game: Game = null
@@ -298,7 +296,14 @@ func _on_hex_changed(hex: Vector2i) -> void:
 	var game := Session.game
 	if game != null and not game.action_log.is_empty():
 		var last: Dictionary = game.action_log.back()
-		if str(last.get("action", "")) == "end_season" and int(last.get("turn", -1)) == game.turn:
+		# The season's own record is the log's last for the season's phases; since M8 the ai_orders phase follows it with its mark
+		# (LogOrders.MARK), so that is the last record for the rest of the season.
+		var done := str(last.get("action", ""))
+		if (done == "end_season" or done == LogOrders.MARK) and int(last.get("turn", -1)) == game.turn:
+			return
+		# An action done for another country (the console's `as TAG`) is not a works action of the player's.
+		var who := str((last.get("args", {}) as Dictionary).get("tag", ""))
+		if who != "" and StringName(who) != game.player:
 			return
 	_changed_hexes.append(hex)
 

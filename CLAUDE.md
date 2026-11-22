@@ -21,7 +21,7 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   `core/systems/`, `Game` and `Actions` in `core/game/`, the pure view helpers in `core/views/`, `TileMapView`
   and `MapLabels`/`CountryLabels` in `shell/mapview/`, `ModeOverlay`/`CapitalMarks` in `shell/map/`, `HexPanel` in `shell/panels/hex_panel.tscn`, `@tool ScenarioEditor` in `shell/editor/scenario_editor.tscn`, and `MapInput` in
   `shell/input/map_input.gd`); the 0.3.0 Europe map, its builder, the Kenney bake and the whole-map prototype scene are
-  retired. The layers, bottom to top: `defs`, `state`, `systems`, `game`, `ai`, `views`, `shell` (`mapgen` sits beside
+  retired. The layers, bottom to top: `defs`, `state`, `systems`, `game`, `views`, `ai`, `shell` (`mapgen` sits beside
   `systems` and runs only in tools). A file uses its own layer or a lower one. `core/` has no engine calls and extends
   `RefCounted` (`Resource` in `core/defs/`); luck only through `core/rng.gd`; Godot 4 only, typed GDScript, scenes as
   text. A script over 800 lines needs a reason in `tools/lint_godot.py`, over 1,200 it is split; a function over 100

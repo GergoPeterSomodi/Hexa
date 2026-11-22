@@ -5,10 +5,10 @@
 class_name SaveFile
 extends RefCounted
 
-## 5: the war body (M7, 4.20: wars, battles, records, sieges), army/2 and unit/2, map-state/5. A format-4 (M6) file is refused
-## as older, quietly ("Made by an older test build"); D55.
-const FORMAT := 5
-const OLDEST_FORMAT := 5
+## 6: M8 (4.15, D34): the digest gains ai_only, the body `game.ai_only` and `log_from`, the log keeps the last 40 seasons. A
+## format-5 (M7) file is refused as older, quietly ("Made by an older test build"). 5 had the war body (M7, 4.20).
+const FORMAT := 6
+const OLDEST_FORMAT := 6
 const DIR := "user://saves"
 const SLOTS: Array[String] = ["quick", "1", "2", "3", "4", "5", "6", "7", "8"]
 const AUTO_SLOTS: Array[String] = ["auto1", "auto2", "auto3"]

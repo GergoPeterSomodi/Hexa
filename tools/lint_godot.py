@@ -4,7 +4,7 @@
 A text scan with no third-party packages (it runs in CI as it is). It checks:
 
 - the layers: a file may use res:// scripts and scenes of its own layer or a lower one. Bottom to top: defs, state,
-  systems, game, ai, views, shell. mapgen sits beside systems and is used only by tools and tests (it runs in tools);
+  systems, game, views, ai, shell. mapgen sits beside systems and is used only by tools and tests (it runs in tools);
 - core/ files extend RefCounted (core/defs/ files may extend Resource: the definitions are Resources) and make no engine calls (no Node, scene tree, Input, OS, Time, Engine,
   threads, await);
 - core/ takes its luck only through core/rng.gd;
@@ -35,8 +35,8 @@ CORE_RANK = [
     ("systems/", 3),
     ("mapgen/", 3),  # beside systems: generators, run in tools (MAPGEN_USERS)
     ("game/", 4),
-    ("ai/", 5),
-    ("views/", 6),
+    ("views/", 5),
+    ("ai/", 6),
 ]
 SHELL_RANK = 7
 TOP_RANK = 9  # tests/ and tools/ may use everything

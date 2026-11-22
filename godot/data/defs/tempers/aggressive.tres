@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="AiTemperDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ai_temper_def.gd" id="1_temper"]
+
+[resource]
+script = ExtResource("1_temper")
+key = &"aggressive"
+name = "Aggressive"
+reserve_seasons = 4
+payback_max = 20
+works_at_war = false
+army_permille = 9
+war_army_permille = 18
+army_upkeep_share = 500
+mix = PackedInt32Array(600, 150, 200, 50)
+max_wars = 2
+rest_seasons = 6
+war_chest_seasons = 6
+declare_ratio = 1200
+busy_bonus = 0
+declare_chance = 600
+attack_ratio = 1100
+siege_max = 6
+storm_share = 400
+storm_ratio = 1000
+relief_ratio = 800
+withdraw_ratio = 1800
+take_score = 4
+tired_seasons = 24
+sue_ratio = 2500
+yield_after = 20
+fortify = false

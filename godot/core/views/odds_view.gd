@@ -196,12 +196,15 @@ static func _held(game: Game, viewer: StringName, a: Army, hex: Vector2i, out: D
 	out.hint = "Besiege it: %s." % ("falls in about %s" % _seasons_text(seasons) if seasons >= 0 else TOO_FEW_TEXT)
 
 
-## The siege numbers of an army on a fortress (Sieges.terms and forecast with the army's men and guns; nothing written).
+## The siege numbers of an army on a fortress (Sieges.terms and forecast_for with the army's men and guns and the garrison the
+## viewer may take it to be, D49: an unseen garrison counts full; nothing written).
 static func _besiege(game: Game, viewer: StringName, a: Army, fortress: Vector2i) -> Dictionary:
 	var men := a.men()
 	var guns := _guns(game, a)
-	var t := Sieges.terms(game, fortress, viewer, men, guns)
-	var seasons := Sieges.forecast(game, fortress, viewer, men, guns, 0, 0)
+	var estimate := Knowledge.garrison_estimate(game, viewer, fortress)
+	var garrison := int(estimate.men)
+	var t := Sieges.terms(game, fortress, viewer, men, guns, garrison)
+	var seasons := Sieges.forecast_for(game, fortress, garrison, men, guns, 0, 0)
 	return {"seasons": seasons, "need": int(t.need), "rate": int(t.rate), "stores": int(t.stores),
 		"too_few_text": TOO_FEW_TEXT if seasons < 0 else ""}
 

@@ -25,6 +25,8 @@ var _step_no: int = 0
 ## A developer command (`people c r N`, or the money a forced step gives) ran in the current step: the digest may have moved
 ## without an accepted action.
 var _dev_changed: bool = false
+## Hexes whose state an action changed during the current step (Events.hex_changed; test_ui_monkey fills it).
+var _changed_hexes: Array[Vector2i] = []
 ## Late in a run (the last third of the steps) a required M4 counter still at 0 gets every step: the coverage steps go first.
 const LATE_STEP := 400
 

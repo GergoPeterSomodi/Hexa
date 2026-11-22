@@ -45,6 +45,14 @@ static func economy_into(defs: GameDefs) -> void:
 	defs.goods = goods
 	# The war (M7 5.1): a fresh copy of data/defs/war.tres, so GameDefs.validate() holds and no test shares the committed one.
 	defs.war = ResourceLoader.load("res://data/defs/war.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as WarDef
+	# The computer's numbers (M8 4.4, 5.1): fresh copies of data/defs/ai.tres and the five temperaments, for the same reason.
+	defs.ai = ResourceLoader.load("res://data/defs/ai.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as AiDef
+	var tempers: Array[AiTemperDef] = []
+	for t: AiTemperDef in committed.tempers:
+		tempers.append(ResourceLoader.load(
+			"res://data/defs/tempers/%s.tres" % String(t.key), "", ResourceLoader.CACHE_MODE_IGNORE
+		) as AiTemperDef)
+	defs.tempers = tempers
 	defs.wild_good = committed.wild_good.duplicate()
 	defs.wild_yield = committed.wild_yield
 	defs.country_people = committed.country_people
@@ -107,6 +115,9 @@ static func build(map: MapData, count: int, _seed_value: int) -> Dictionary:
 	scenario.pins = _pins_for_unowned(map, grown, scenario)
 	scenario.owner = ScenarioGrowth.grow(map, scenario)
 	scenario.cb_colours = _cb_colours(map, scenario.owner, tags.size(), defs.cb_palette)
+	# Country id gives the temperament, [builder, cautious, steadfast, aggressive, opportunist][id mod 5] (M8 spec 4.4).
+	for id: int in range(1, tags.size() + 1):
+		scenario.tempers.append(defs.tempers[id % defs.tempers.size()].key)
 	defs.scenarios.append(scenario)
 	return {"defs": defs, "scenario": scenario}
 

@@ -248,3 +248,41 @@ func test_the_digest_carries_the_weather_and_the_money() -> void:
 	g.dev_money(&"GEN", 1)
 	assert_ne(g.digest(), d0, "a treasury is in the digest")
 	assert_eq(EconomyFixture.game().digest(), d0, "same seed, same digest")
+
+
+# ----- M8: watch and ai_only (m8-build-spec.md 4.12, 5.4) -------------------------------------------------------------------
+
+
+func test_watch_makes_the_game_ai_only_during_the_pick_and_logs_it() -> void:
+	var g := ScenarioFixture.game()
+	var d0 := g.digest()
+	assert_false(g.ai_only)
+	assert_true(g.watch())
+	assert_true(g.ai_only)
+	assert_eq(g.player, &"")
+	assert_eq(g.action_log, [{"turn": 1, "action": "watch", "args": {}}] as Array[Dictionary])
+	assert_ne(g.digest(), d0, "ai_only is in the digest")
+	assert_false(g.watch(), "once")
+	assert_eq(g.action_log.size(), 1)
+
+
+func test_p_watch_after_a_choice_or_in_a_sandbox_is_refused_and_changes_nothing() -> void:
+	var g := ScenarioFixture.game()
+	g.act("choose_country", {"tag": &"AAA"})
+	var before := g.digest()
+	var logged := g.action_log.size()
+	var v := g.version
+	assert_false(g.watch())
+	assert_false(g.ai_only)
+	assert_eq([g.digest(), g.action_log.size(), g.version], [before, logged, v])
+	var sandbox := Game.new_game(ScenarioFixture.build()["map"] as MapData, 1)
+	assert_false(sandbox.watch())
+	assert_true(sandbox.action_log.is_empty())
+
+
+func test_the_hook_is_not_state() -> void:
+	var g := ScenarioFixture.game()
+	var d0 := g.digest()
+	g.orders = OrdersHook.new()
+	assert_eq(g.digest(), d0)
+	assert_false((Snapshot.of(g)["game"] as Dictionary).has("orders"))

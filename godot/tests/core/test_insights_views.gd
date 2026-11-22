@@ -283,11 +283,11 @@ func test_the_yield_bytes_are_one_byte_a_hex_and_the_same_each_call() -> void:
 # ---- the pins of 4.13 --------------------------------------------------------------------------------------------------------
 
 func test_the_pins_of_4_13() -> void:
-	# M7 (m7-build-spec.md 4.13): thirteen phases.
-	assert_eq(Season.PHASES, [&"movement", &"battles", &"supply", &"sieges", &"war", &"production", &"income", &"works", &"people", &"stats", &"calendar", &"ready_units", &"vision"] as Array[StringName])
+	# M8 (m8-build-spec.md 4.2): fourteen phases, ai_orders first.
+	assert_eq(Season.PHASES, [&"ai_orders", &"movement", &"battles", &"supply", &"sieges", &"war", &"production", &"income", &"works", &"people", &"stats", &"calendar", &"ready_units", &"vision"] as Array[StringName])
 	assert_eq(Actions.NAMES, ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war", "make_peace", "storm", "set_standing"] as Array[String])
-	assert_eq(SaveFile.FORMAT, 5)
-	assert_eq(SaveFile.OLDEST_FORMAT, 5)
+	assert_eq(SaveFile.FORMAT, 6)
+	assert_eq(SaveFile.OLDEST_FORMAT, 6)
 	# M7 (4.19): the seven series of the war are appended, so 49.
 	assert_eq(Stats.SERIES.size(), 49)
 	assert_eq(Chronicle.NOTABLE, ["work_started", "work_finished", "work_cancelled", "owners_changed", "country_chosen",
@@ -320,7 +320,7 @@ func test_the_save_body_and_the_digest_are_unchanged() -> void:
 	var body := Snapshot.of(g, {})
 	var keys: Array = body.keys()
 	keys.sort()
-	assert_eq(keys, ["action_log", "armies", "chronicle", "countries", "format", "game", "luck", "map_state", "stats", "ui", "war"])
+	assert_eq(keys, ["action_log", "armies", "chronicle", "countries", "format", "game", "log_from", "luck", "map_state", "stats", "ui", "war"])
 	var with_ui := Snapshot.of(g, {"map_mode": "yields"})
 	assert_eq(str((with_ui["ui"] as Dictionary)["map_mode"]), "yields", "the ui block may hold the yields mode")
 	var restored := Snapshot.restore(bytes_to_var(var_to_bytes(with_ui)) as Dictionary, g.map, g.defs)

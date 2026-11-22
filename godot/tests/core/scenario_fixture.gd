@@ -102,6 +102,7 @@ static func build() -> Dictionary:
 	s.map_digest = m.digest()
 	s.year = 1480
 	s.countries = [&"AAA", &"BBB", &"OUT"]
+	s.tempers = [&"builder", &"cautious", &"steadfast"]
 	s.capitals = [ALPHA_CAPITAL, BETA_CAPITAL, ScenarioDef.NO_HEX]
 	s.cb_colours = PackedByteArray([0, 4, 6])
 	s.seeds = [

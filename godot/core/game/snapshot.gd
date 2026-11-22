@@ -12,10 +12,12 @@ const PROBLEM_OLDER := "Made by an older test build"
 const MAX_TURN := 100000
 ## The fortress levels run 0 to FORTRESS_TOP (FamilyDef.fortress, validated 0..3): the cap of a garrison is the top level's full men.
 const FORTRESS_TOP := 3
+## A save keeps the action log of the last LOG_SEASONS seasons (M8 4.15, D33): the records with turn >= game.turn - (LOG_SEASONS - 1).
+const LOG_SEASONS := 40
 
 
 ## The body of 4.10: `ui` is the shell's block (bookmarks, camera, map mode, look), kept as given. M6: `armies` (5.0 R11).
-## M7: `war` (4.20).
+## M7: `war` (4.20). M8: `game.ai_only`, the log trimmed to its last LOG_SEASONS seasons and `log_from` (4.15).
 static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 	var countries: Array = []
 	for c: Country in game.countries:
@@ -23,7 +25,13 @@ static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 	# Called by reference (A14): Armies is a system, and Game and Snapshot must not need it to parse.
 	var armies: Dictionary = Armies.to_dict.call(game)
 	var log: Array = []
+	var log_from := 1
+	var first_turn := game.turn - (LOG_SEASONS - 1)
 	for record: Dictionary in game.action_log:
+		if int(record.get("turn", 0)) < first_turn:
+			continue
+		if log.is_empty():
+			log_from = maxi(int(record.get("turn", 1)), 1)  # 1 when the log is whole
 		log.append(record.duplicate(true))
 	var scenario_id := ""
 	var scenario_digest := ""
@@ -35,7 +43,7 @@ static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 		"game": {
 			"map_id": game.map.id, "scenario_id": scenario_id, "scenario_digest": scenario_digest,
 			"seed": game.seed_value, "start_year": game.start_year, "turn": game.turn, "player": String(game.player),
-			"weather": game.weather.duplicate(),
+			"weather": game.weather.duplicate(), "ai_only": game.ai_only,
 		},
 		"map_state": game.state.to_dict(),
 		"countries": countries,
@@ -44,7 +52,7 @@ static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 		"stats": game.stats.to_dict() if game.stats != null else {},
 		"chronicle": game.chronicle.to_dict(),
 		"luck": game.luck.to_dict() if game.luck != null else {},
-		"action_log": log,
+		"action_log": log, "log_from": log_from,
 		"ui": ui.duplicate(true),
 	}
 
@@ -159,6 +167,8 @@ static func _meta_ok(meta: Variant) -> bool:
 			return false
 	if d.has("weather") and _weather_of(d["weather"]) == null:
 		return false
+	if d.has("ai_only") and not (d["ai_only"] is bool):
+		return false
 	return int(d["turn"]) >= Calendar.FIRST_TURN and int(d["turn"]) <= MAX_TURN
 
 
@@ -221,6 +231,12 @@ static func _build(body: Dictionary, meta: Dictionary, map: MapData, defs: GameD
 		return {"problem": "body"}
 	if scenario == null and player != &"":
 		return {"problem": "body"}
+	var ai_only: bool = bool(meta.get("ai_only", false))
+	if ai_only and (scenario == null or player != &""):
+		return {"problem": "body"}  # a watched game has countries and no player
+	var log_from: Variant = body.get("log_from", 1)
+	if not (log_from is int) or int(log_from) < 1 or int(log_from) > MAX_TURN:
+		return {"problem": "body"}
 	if player != &"" and not _has_tag(countries as Array, player):
 		return {"problem": "body"}
 	if not _ranges_ok(state, map, (countries as Array).size()):
@@ -230,6 +246,7 @@ static func _build(body: Dictionary, meta: Dictionary, map: MapData, defs: GameD
 	var game := Game.with_state(map, state, int(meta["seed"]), defs)
 	game.scenario = scenario
 	game.player = player
+	game.ai_only = ai_only
 	game.start_year = int(meta["start_year"])
 	game.turn = int(meta["turn"])
 	if (meta as Dictionary).has("weather"):

@@ -1,6 +1,7 @@
 ## Knowledge view tests (docs/architecture/m3-build-spec.md sections 4.7, 5.6 and 9): knows (self, neighbour, far, ""),
 ## known in id order, unknown_count, band, band_text, witnessed (party, others, listed, public and known, public and
 ## unknown, "" sees all). Cases marked P are the planted-fault checks of section 9.
+@warning_ignore_start("integer_division")
 extends GutTest
 
 const AAA := &"AAA"
@@ -157,3 +158,111 @@ func test_siege_access_hides_a_siege_at_peace() -> void:
 	WarFixture.at_war(g, &"FRA", holder)
 	assert_eq(Knowledge.siege_access(g, &"", hex), &"exact", "at war, the viewer \"\" sees it exact")
 	assert_eq(Knowledge.siege_access(g, &"FRA", hex), &"exact", "the besieger")
+
+
+# --- M8 K13: men_of and garrison_estimate (D49) ----------------------------------------------------------------------------
+
+
+## A hostile fortress (held by a country at war with Genoa), garrisoned, on the north Italy game: {g, hex, holder}.
+func _fortress_game(watched: bool) -> Dictionary:
+	var g := ArmyFixture.game()
+	var enemy := WarFixture.neighbour_of(g, ArmyFixture.TAG)
+	WarFixture.at_war(g, enemy, ArmyFixture.TAG)
+	for i: int in g.map.hex_count():
+		var hex := g.map.hex_of(i)
+		if Occupation.fortress_level(g, hex) <= 0 or Occupation.controller_tag(g, hex) != enemy or Occupation.garrison_of(g, hex) <= 0:
+			continue
+		if watched:
+			var mine := ArmyFixture.id_of(g, ArmyFixture.TAG)
+			var at := hex
+			for d: int in 6:
+				var beside := ImproveRules.neighbour(hex, d)
+				if g.map.is_land(beside) and Territory.owner_id(g, beside) == mine:
+					at = beside
+					break
+			ArmyFixture.army(g, ArmyFixture.TAG, at, 0, 2)
+			Sight.refresh(g)
+			if Knowledge.sees(g, ArmyFixture.TAG, hex):
+				return {"g": g, "hex": hex, "holder": enemy}
+		elif not Knowledge.sees(g, ArmyFixture.TAG, hex):
+			return {"g": g, "hex": hex, "holder": enemy}
+	return {}
+
+
+func test_garrison_estimate_own_is_exact() -> void:
+	var f := _fortress_game(false)
+	assert_false(f.is_empty(), "a hostile garrisoned fortress exists")
+	var g: Game = f.g
+	Occupation.set_garrison(g, f.hex, Occupation.garrison_full(g, f.hex) - 13)
+	var whole := Occupation.garrison_of(g, f.hex)
+	var own := Knowledge.garrison_estimate(g, f.holder, f.hex)
+	assert_eq(int(own.men), whole, "the holder reads its own garrison exact")
+	assert_eq(own.access, &"exact")
+	var open := Knowledge.garrison_estimate(g, &"", f.hex)
+	assert_eq(int(open.men), whole, "the viewer \"\" reads it exact")
+	assert_eq(open.access, &"exact")
+
+
+func test_garrison_estimate_seen_is_rounded_to_a_hundred() -> void:
+	var f := _fortress_game(true)
+	assert_false(f.is_empty(), "a hostile fortress the player sees exists")
+	var g: Game = f.g
+	Occupation.set_garrison(g, f.hex, Occupation.garrison_full(g, f.hex) - 13)
+	var whole := Occupation.garrison_of(g, f.hex)
+	assert_ne(whole % 100, 0, "the planted garrison is not a round hundred")
+	var seen := Knowledge.garrison_estimate(g, ArmyFixture.TAG, f.hex)
+	assert_eq(seen.access, &"seen")
+	assert_eq(int(seen.men), ((whole + 50) / 100) * 100, "rounded to 100")
+	assert_ne(int(seen.men), whole, "P: a seen garrison is never exact")
+
+
+func test_garrison_estimate_unseen_is_the_full_garrison_whatever_the_real_one() -> void:
+	var f := _fortress_game(false)
+	assert_false(f.is_empty(), "a hostile fortress the player does not see exists")
+	var g: Game = f.g
+	var full := Occupation.garrison_full(g, f.hex)
+	var before := Knowledge.garrison_estimate(g, ArmyFixture.TAG, f.hex)
+	assert_eq(before.access, &"assumed")
+	assert_eq(int(before.men), full, "the full garrison of its level")
+	Occupation.set_garrison(g, f.hex, maxi(1, full / 4))
+	var after := Knowledge.garrison_estimate(g, ArmyFixture.TAG, f.hex)
+	assert_eq(after, before, "P: a reduced unseen garrison does not change the estimate")
+
+
+func test_garrison_estimate_none_for_no_fortress_and_an_occupied_one() -> void:
+	var f := _fortress_game(false)
+	var g: Game = f.g
+	var plain := Vector2i(-1, -1)
+	for i: int in g.map.hex_count():
+		var hex := g.map.hex_of(i)
+		if g.map.is_land(hex) and Occupation.fortress_level(g, hex) == 0:
+			plain = hex
+			break
+	var none := Knowledge.garrison_estimate(g, ArmyFixture.TAG, plain)
+	assert_eq(int(none.men), 0)
+	assert_eq(none.access, &"none")
+	WarFixture.set_occupier(g, f.hex, ArmyFixture.TAG)
+	if Occupation.is_occupied(g, f.hex):
+		assert_eq(Knowledge.garrison_estimate(g, ArmyFixture.TAG, f.hex).access, &"none", "an occupied fortress holds no garrison")
+
+
+func test_men_of_exact_banded_and_unknown() -> void:
+	var g := ArmyFixture.game()
+	var enemy := WarFixture.neighbour_of(g, ArmyFixture.TAG)
+	var stranger := WarFixture.stranger_of(g, ArmyFixture.TAG)
+	var col := Stats.column("army_men")
+	var ids := {ArmyFixture.TAG: 1234, enemy: 1250, stranger: 777}
+	for tag: StringName in ids:
+		var row := PackedInt32Array()
+		row.resize(Stats.SERIES.size())
+		row[col] = int(ids[tag])
+		g.stats.set_row(g.stats.index_of(tag), 1, row)
+	g.stats.commit(1)
+	assert_eq(Knowledge.men_of(g, ArmyFixture.TAG, ArmyFixture.TAG), 1234, "its own men exact")
+	assert_eq(Knowledge.men_of(g, &"", enemy), 1250, "the viewer \"\" reads exact")
+	assert_true(Knowledge.knows(g, ArmyFixture.TAG, enemy), "a neighbour is known")
+	assert_eq(Knowledge.men_of(g, ArmyFixture.TAG, enemy), 1300, "a known country is banded to two figures")
+	assert_ne(Knowledge.men_of(g, ArmyFixture.TAG, enemy), 1250, "P: a known country is never exact")
+	if not Knowledge.knows(g, ArmyFixture.TAG, stranger):
+		assert_eq(Knowledge.men_of(g, ArmyFixture.TAG, stranger), -1, "an unknown country is -1")
+	assert_eq(Knowledge.men_of(g, ArmyFixture.TAG, &"ZZZ"), -1, "a tag with no country is -1")

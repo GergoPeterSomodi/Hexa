@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="AiDef" format=3]
+
+[ext_resource type="Script" path="res://core/defs/ai_def.gd" id="1_ai"]
+
+[resource]
+script = ExtResource("1_ai")
+think_every = 4
+min_upkeep = 10
+min_army_men = 500
+min_war_men = 1000
+threat_permille = 1500
+threat_range = 3
+prize_range = 3
+attack_range = 6
+relief_range = 8
+target_range = 12
+relief_last = 600
+rest_morale = 600
+switch_permille = 1300
+scan_hexes = 48
+scan_per_step = 24
+works_cards = 4
+works_per_season = 2
+raises_peace = 2
+raises_war = 4
+merges_per_season = 4
+order_tries = 2
+food_priority = 3000
+walls_priority = 2000
+fortify_priority = 2000
+jitter_permille = 50
+disband_surplus = 2000
+peace_order_every = 1
+yield_ratio = 2000

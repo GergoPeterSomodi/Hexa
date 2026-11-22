@@ -177,3 +177,16 @@ func test_map_only_backward_compatibility() -> void:
 			var res := g.act("build", {"hex": hex, "family": int(opts[0]["family_id"])})
 			assert_true(bool(res["ok"]), str(res["reason"]))
 			break
+
+
+func test_p_choose_country_is_refused_in_a_watched_game() -> void:
+	var g := ScenarioFixture.game()
+	assert_true(g.watch())
+	var before := g.digest()
+	var logged := g.action_log.size()
+	var verdict := g.act("choose_country", {"tag": &"AAA"})
+	assert_false(bool(verdict["ok"]))
+	assert_eq(str(verdict["reason"]), "this game is watched: every country is played by the computer")
+	assert_eq(g.player, &"")
+	assert_eq([g.digest(), g.action_log.size()], [before, logged])
+	assert_eq(str(g.check("choose_country", {"tag": &"AAA"})["reason"]), str(verdict["reason"]))

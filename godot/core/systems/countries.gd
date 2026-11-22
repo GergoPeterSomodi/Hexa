@@ -56,6 +56,8 @@ static func playable(game: Game, tag: StringName) -> bool:
 static func choose_check(game: Game, args: Dictionary) -> Dictionary:
 	if game == null or not game.has_countries():
 		return _refusal("this map has no countries")
+	if game.ai_only:
+		return _refusal("this game is watched: every country is played by the computer")
 	if game.player != &"":
 		return _refusal("a country is chosen already: %s" % _country_name(game, game.player))
 	var tag := _tag_arg(args)

@@ -271,10 +271,23 @@ func _m6_during_replay(rng: Rng, vp: SubViewport, app: App) -> void:
 	if rng.randi_range(0, 2) == 0:
 		return
 	var screens := app.stack().count()
-	_send_chord(vp, KEY_SPACE if rng.randi_range(0, 1) == 0 else KEY_ESCAPE)
-	await _wait_frames(3)
+	if rng.randi_range(0, 1) == 0:
+		_send_chord(vp, KEY_SPACE)
+		await _wait_frames(3)
+	else:
+		await _m6_esc(vp, app)
 	if screens == 0:  # with a screen up (the study opened by a click) the key is the screen's: Esc closes it, and skips the replay on the next
 		assert_false(_m6_replaying(app), "%s: Space or Esc skips the replay" % _tag)
+
+
+## Esc while a replay runs: the ladder first lets go of the console's focus and closes an open popover, so a second or third Esc
+## is the one that skips (Esc up to three times, until the replay is over).
+func _m6_esc(vp: SubViewport, app: App) -> void:
+	for _i: int in 3:
+		_send_chord(vp, KEY_ESCAPE)
+		await _wait_frames(3)
+		if not _m6_replaying(app):
+			return
 
 
 ## An order during the replay: a right click, O, R or Tab. Nothing is accepted: the digest, the version and the stores stay.
@@ -475,8 +488,7 @@ func _m6_end_once(rng: Rng, vp: SubViewport, app: App) -> bool:
 					assert_false(_m6_replaying(app), "%s: Space skips the replay" % _tag)
 			1:
 				var screens := app.stack().count()
-				_send_chord(vp, KEY_ESCAPE)
-				await _wait_frames(3)
+				await _m6_esc(vp, app)
 				if screens == 0:  # with a screen up the key is the screen's
 					assert_false(_m6_replaying(app), "%s: Esc skips the replay" % _tag)
 			_:

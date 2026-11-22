@@ -28,31 +28,48 @@ const MAX_NAME_COUNT := 1000
 
 
 ## The numbers of a siege of `hex` by `tag` (4.5): garrison, full garrison, crowd (0 to 3), guns, rate, need, stores and ok (a
-## rate above 0, so the siege moves). `men` and `guns` of -1 read tag's armies on the hex. Nothing is written.
-static func terms(game: Game, hex: Vector2i, tag: StringName, men: int = -1, guns: int = -1) -> Dictionary:
+## rate above 0, so the siege moves). `men` and `guns` of -1 read tag's armies on the hex; `garrison_given` of 0 or more stands
+## in for the hex's real garrison (a viewer's estimate: the crowd and the need follow it, D49), -1 reads the real one. Nothing is written.
+static func terms(game: Game, hex: Vector2i, tag: StringName, men: int = -1, guns: int = -1, garrison_given: int = -1) -> Dictionary:
 	var war := _war(game)
 	var lvl := Occupation.fortress_level(game, hex)
 	var have := _men_of(game, tag, hex) if men < 0 else men
 	var have_guns := _guns_of(game, tag, hex) if guns < 0 else guns
-	var garrison := Occupation.garrison_of(game, hex)
+	var garrison := Occupation.garrison_of(game, hex) if garrison_given < 0 else garrison_given
 	var crowd := 0
 	if war != null and lvl > 0:
 		crowd = _crowd(war, have, garrison)
 	var rate := mini(war.siege_rate_max, crowd + have_guns) if war != null and crowd > 0 else 0
+	var need := Occupation.siege_need(game, hex)
+	if garrison_given >= 0 and war != null:
+		need = _need_for(game, hex, lvl, garrison) if lvl > 0 else 0
 	return {"men": have, "garrison": garrison, "full": Occupation.garrison_full(game, hex), "crowd": crowd,
-		"guns": have_guns, "rate": rate, "need": Occupation.siege_need(game, hex), "stores": 1 + lvl, "ok": rate > 0}
+		"guns": have_guns, "rate": rate, "need": need, "stores": 1 + lvl, "ok": rate > 0}
 
 
 ## Seasons until the siege of `hex` by tag falls at this rate, the arrival season counted (the meters of 4.5 read from the
-## progress and seasons given): -1 when it never falls (too few men) or past FORECAST_MAX seasons. Nothing is written.
+## progress and seasons given): -1 when it never falls (too few men) or past FORECAST_MAX seasons. Nothing is written. It reads
+## the real garrison; a caller that may not (the AI, the odds card of an unseen fortress) uses forecast_for.
 static func forecast(game: Game, hex: Vector2i, tag: StringName, men: int, guns: int, progress: int, seasons: int) -> int:
+	var have := _men_of(game, tag, hex) if men < 0 else men
+	var have_guns := _guns_of(game, tag, hex) if guns < 0 else guns
+	return forecast_for(game, hex, Occupation.garrison_of(game, hex), have, have_guns, progress, seasons)
+
+
+## forecast's arithmetic with the garrison given (D49): the crowd and the need are worked out from `garrison`, and the real
+## garrison of the hex is never read, so a viewer's estimate (Knowledge.garrison_estimate) is not corrected by the truth.
+## `men` and `guns` are the besieger's, given (no -1 here).
+static func forecast_for(game: Game, hex: Vector2i, garrison: int, men: int, guns: int, progress: int, seasons: int) -> int:
 	var war := _war(game)
-	var t := terms(game, hex, tag, men, guns)
-	var rate := int(t["rate"])
-	if war == null or rate <= 0:
+	var lvl := Occupation.fortress_level(game, hex)
+	if war == null or lvl <= 0:
 		return -1
-	var need := int(t["need"])
-	var stores := int(t["stores"])
+	var crowd := _crowd(war, men, garrison)
+	var rate := mini(war.siege_rate_max, crowd + guns) if crowd > 0 else 0
+	if rate <= 0:
+		return -1
+	var need := _need_for(game, hex, lvl, garrison)
+	var stores := 1 + lvl
 	var s := seasons
 	var p := progress
 	for k: int in range(1, FORECAST_MAX + 1):
@@ -61,6 +78,19 @@ static func forecast(game: Game, hex: Vector2i, tag: StringName, men: int, guns:
 		if s >= war.siege_min_seasons and p >= need:
 			return k
 	return -1
+
+
+## Occupation.siege_need (4.5) with `garrison` given: base + ceil(per level x level x garrison / full) + the relief's elevation.
+static func _need_for(game: Game, hex: Vector2i, lvl: int, garrison: int) -> int:
+	var war := _war(game)
+	var full := lvl * war.garrison_per_level
+	var term := 0
+	if full > 0:
+		term = (war.siege_per_level * lvl * garrison + full - 1) / full
+	var i := game.map.index_of(hex)
+	var relief := int(game.map.relief[i]) if i >= 0 else 0
+	var elevation := war.relief_elevation[relief] if relief < war.relief_elevation.size() else 0
+	return war.siege_base_need + term + elevation
 
 
 ## True when a siege stands on `hex` and its stores are out: the season count is past the stores (1 + level, 4.5: hunger
