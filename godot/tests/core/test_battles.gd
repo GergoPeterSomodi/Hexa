@@ -395,7 +395,7 @@ func _pending_saved() -> Dictionary:
 ## The body is refused and the state is left as it was.
 func _refused_unchanged(d: Dictionary, why: String) -> void:
 	var before := Battles.digest(_g)
-	assert_eq(Battles.from_dict(d, _g), Battles.PROBLEM_BODY, why)
+	assert_false(Battles.from_dict(d, _g).is_empty(), "%s is refused" % why)
 	assert_eq(Battles.digest(_g), before, "%s: the state is unchanged" % why)
 
 
@@ -451,3 +451,99 @@ func test_a_battle_the_fight_cannot_take_ends_as_a_draw() -> void:
 	assert_eq(_peace_events().size(), 1, "the battle ends as a draw")
 	assert_not_null(Armies.by_id(_g, att.id), "the armies are not lost")
 	assert_eq(Armies.at(_g, _hb).size(), 2, "both armies still stand on the hex, released")
+
+
+# --- the fighters' identity: kind and army (Combat ignores them; the record and the view read them) -------------------
+
+
+func test_the_record_carries_each_fighters_kind_and_army() -> void:
+	var att := _start_battle()
+	var def_army: Army = Armies.at(_g, _hb)[0] if Armies.at(_g, _hb)[0].tag == _b else Armies.at(_g, _hb)[1]
+	var att_kind: int = att.units[0].kind
+	var def_kind: int = def_army.units[0].kind
+	var att_id := att.id
+	var def_id := def_army.id
+	Battles.season(_g)
+	var rec: BattleRecord = _g.battle_records[0]
+	var fighters: Array = rec.input["fighters"]
+	assert_eq(fighters.size(), 4, "two companies a side")
+	var seen_att := 0
+	var seen_def := 0
+	for f: Variant in fighters:
+		var fd := f as Dictionary
+		assert_true(fd["kind"] is int and fd["army"] is int, "kind and army are whole numbers")
+		if int(fd["side"]) == 0:
+			assert_eq(int(fd["kind"]), att_kind)
+			assert_eq(int(fd["army"]), att_id)
+			seen_att += 1
+		else:
+			assert_eq(int(fd["kind"]), def_kind)
+			assert_eq(int(fd["army"]), def_id)
+			seen_def += 1
+	assert_eq(seen_att, 2)
+	assert_eq(seen_def, 2)
+
+
+func test_a_forged_kind_or_army_is_refused() -> void:
+	_start_battle()
+	var b := Battles.at(_g, _hb)
+	var input := Battles.input_of(_g, b)
+	var count: int = _g.defs.units.size()
+	assert_true(CombatInput.validate(_g.defs.war, input, count).is_empty(), "the live input is valid")
+	var kind_out := input.duplicate(true)
+	((kind_out["fighters"] as Array)[0] as Dictionary)["kind"] = count
+	assert_false(CombatInput.validate(_g.defs.war, kind_out, count).is_empty(), "a kind past the unit kinds is refused")
+	var kind_low := input.duplicate(true)
+	((kind_low["fighters"] as Array)[0] as Dictionary)["kind"] = -2
+	assert_false(CombatInput.validate(_g.defs.war, kind_low, count).is_empty(), "a kind below -1 is refused")
+	var army_neg := input.duplicate(true)
+	((army_neg["fighters"] as Array)[0] as Dictionary)["army"] = -1
+	assert_false(CombatInput.validate(_g.defs.war, army_neg, count).is_empty(), "a negative army is refused")
+
+
+# --- a loaded record's input validates as a live one does (the reader never sees a hostile fighter) -------------------
+
+
+## A saved body with one finished battle, its record's input in the saved form.
+func _finished_saved() -> Dictionary:
+	_start_battle()
+	Battles.season(_g)
+	return Battles.to_dict(_g)
+
+
+## The record's first fighter in the saved body.
+func _first_fighter(d: Dictionary) -> Dictionary:
+	return ((((d["records"] as Array)[0] as Dictionary)["input"] as Dictionary)["fighters"] as Array)[0]
+
+
+func test_a_real_round_tripped_record_loads() -> void:
+	var d := _finished_saved()
+	var before := Battles.digest(_g)
+	assert_eq(Battles.from_dict(d, _g), "", "a real record reads back")
+	assert_eq(Battles.digest(_g), before, "the same state after the load")
+
+
+func test_forged_records_are_refused_with_nothing_changed() -> void:
+	var kind_dict := _finished_saved()
+	_first_fighter(kind_dict)["kind"] = {"a": 1}
+	_refused_unchanged(kind_dict, "a kind that is a dictionary")
+	var not_dict := _finished_saved()
+	((((not_dict["records"] as Array)[0] as Dictionary)["input"] as Dictionary)["fighters"] as Array)[0] = 5
+	_refused_unchanged(not_dict, "a fighter that is not a dictionary")
+	var out_of_range := _finished_saved()
+	_first_fighter(out_of_range)["kind"] = _g.defs.units.size()
+	_refused_unchanged(out_of_range, "a kind past the unit kinds")
+	var negative := _finished_saved()
+	_first_fighter(negative)["army"] = -1
+	_refused_unchanged(negative, "a negative army")
+	var missing := _finished_saved()
+	((missing["records"] as Array)[0] as Dictionary)["input"] = {}
+	_refused_unchanged(missing, "an input with no fighters")
+
+
+func test_the_refusal_gives_the_reason() -> void:
+	var d := _finished_saved()
+	_first_fighter(d)["kind"] = {"a": 1}
+	var reason := Battles.from_dict(d, _g)
+	assert_true(reason.begins_with("record "), reason)
+	assert_true(reason.contains("kind"), reason)

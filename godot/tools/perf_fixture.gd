@@ -29,6 +29,11 @@ const NEAR := 6
 const SEASONS_MAX := 4
 const ORDER_TRIES := 60
 const WAR_PAIRS := 30
+## The war march (m7-build-spec.md 8): an army of a country at war goes at the nearest enemy army or hostile garrisoned fortress
+## within WAR_NEAR hexes, for one army in two (the luck stream's pick).
+const WAR_NEAR := 12
+## The war rows' fixtures (m7-build-spec.md 8): the companies of each battle side and of each siege's army.
+const FIGHT_COMPANIES := 8
 ## The movement numbers copied from the committed definitions (the made-up Europe's own come from FakeScenario).
 const MOVEMENT_FIELDS: Array[String] = ["units", "terrains", "relief_move_add", "highway_cap", "road_cap", "track_divisor",
 	"winter_snow_percent", "pass_closing_climate", "stream_cost", "river_cost", "ford_cost", "ferry_cost",
@@ -158,6 +163,45 @@ static func seed_armies(game: Game, luck: Rng) -> Array[Army]:
 	return out
 
 
+## M7 (m7-build-spec.md 8): one army in two of each country at war marches at the nearest enemy army or hostile garrisoned
+## fortress within WAR_NEAR hexes (the luck stream picks the half; a march refused is kept as it is). Returns the number ordered.
+static func war_march(game: Game, armies: Array[Army], luck: Rng) -> int:
+	var ordered := 0
+	var forts := game.war_cache.fortresses(game)
+	for a: Army in armies:
+		if Armies.by_id(game, a.id) == null or luck.randi_range(0, 1) == 0:
+			continue
+		var goal := _nearest_enemy(game, a, forts)
+		if goal == Army.NO_HEX:
+			continue
+		if bool(game.act("march", {"army": a.id, "goal": goal, "tag": a.tag})["ok"]):
+			ordered += 1
+	return ordered
+
+
+## The nearest hex of an enemy army or of a hostile fortress with a garrison, within WAR_NEAR hexes (Army.NO_HEX when none).
+static func _nearest_enemy(game: Game, a: Army, forts: PackedInt32Array) -> Vector2i:
+	var best := Army.NO_HEX
+	var best_d := WAR_NEAR + 1
+	for e: Army in game.armies:
+		if e.tag == a.tag or not Wars.at_war(game, a.tag, e.tag):
+			continue
+		var d := ImproveRules.hex_distance(e.hex, a.hex)
+		if d < best_d:
+			best_d = d
+			best = e.hex
+	for i: int in forts:
+		var hex := game.map.hex_of(i)
+		var holder := Occupation.controller_tag(game, hex)
+		if holder == a.tag or holder == &"" or not Wars.at_war(game, a.tag, holder) or Occupation.garrison_of(game, hex) <= 0:
+			continue
+		var df := ImproveRules.hex_distance(hex, a.hex)
+		if df < best_d:
+			best_d = df
+			best = hex
+	return best
+
+
 ## Between seasons: an army that arrived (it holds) is given a new march (the rig, outside the timed phases).
 static func rearm(game: Game, luck: Rng, armies: Array[Army]) -> void:
 	for a: Army in armies:
@@ -183,3 +227,78 @@ static func march_out(game: Game, a: Army, luck: Rng) -> bool:
 			continue
 		return bool(game.act("march", {"army": a.id, "goal": goal, "tag": a.tag})["ok"])
 	return false
+
+
+## M7 (m7-build-spec.md 8): `count` battles of FIGHT_COMPANIES pikemen companies against FIGHT_COMPANIES, each on a land hex and
+## the free land hex beside it held by a country at war with the first one's holder. The two armies are made through the
+## armies' door (Armies.create, Armies.add_units) and the battle through Battles.engage at tick 0 (a rig: the battles phase
+## fights them). Hexes with an army or a battle are skipped, so a second call takes the next free pairs. Returns the number made.
+static func battle_set(game: Game, count: int) -> int:
+	var made := 0
+	for i: int in game.map.hex_count():
+		if made >= count:
+			break
+		var h := game.map.hex_of(i)
+		if not game.map.is_land(h) or not Armies.at(game, h).is_empty() or Battles.at(game, h) != null:
+			continue
+		var near := _enemy_beside(game, h)
+		if near == Army.NO_HEX:
+			continue
+		var defender := _rig_army(game, Occupation.controller_tag(game, near), near, FIGHT_COMPANIES)
+		var attacker := _rig_army(game, Occupation.controller_tag(game, h), h, FIGHT_COMPANIES)
+		if Battles.engage(game, attacker, near, 0, -1):
+			made += 1
+		else:
+			Armies.remove(game, attacker)
+			Armies.remove(game, defender)
+	return made
+
+
+## M7 (m7-build-spec.md 8): `sieges` sieges, one army of FIGHT_COMPANIES companies on each garrisoned fortress (in hex index order)
+## held by a country with an enemy, and `occupied` land districts (not fortresses) taken by the holder's enemies (Occupation.capture,
+## by &"perf"). The sieges phase starts the sieges: one run of it is the caller's. Returns {sieges, occupied}: the numbers made.
+static func siege_set(game: Game, sieges: int, occupied: int) -> Dictionary:
+	var made := 0
+	for i: int in game.war_cache.fortresses(game):
+		if made >= sieges:
+			break
+		var hex := game.map.hex_of(i)
+		var holder := Occupation.controller_tag(game, hex)
+		var enemies: Array[StringName] = Wars.enemies(game, holder)
+		if enemies.is_empty() or Occupation.garrison_of(game, hex) <= 0 or not Armies.at(game, hex).is_empty():
+			continue
+		_rig_army(game, enemies[0], hex, FIGHT_COMPANIES)
+		made += 1
+	var taken := 0
+	for i: int in game.map.hex_count():
+		if taken >= occupied:
+			break
+		var h := game.map.hex_of(i)
+		if not game.map.is_land(h) or Occupation.fortress_level(game, h) > 0:
+			continue
+		var enemies := Wars.enemies(game, Occupation.controller_tag(game, h))
+		if enemies.is_empty():
+			continue
+		Occupation.capture(game, h, enemies[0], &"perf", {})
+		taken += 1
+	return {"sieges": made, "occupied": taken}
+
+
+## An army of `companies` pikemen of `tag` on hex (through the armies' door; the rig of seed_armies).
+static func _rig_army(game: Game, tag: StringName, hex: Vector2i, companies: int) -> Army:
+	var a := Armies.create(game, tag, hex, "Army of perf")
+	Armies.add_units(game, a, 0, companies, game.turn - 1, hex, 0, {})
+	return a
+
+
+## A land hex beside h held by a country at war with h's holder, with no army and no battle on it (Army.NO_HEX when none).
+static func _enemy_beside(game: Game, h: Vector2i) -> Vector2i:
+	var holder := Occupation.controller_tag(game, h)
+	for d: int in 6:
+		var n := game.map.neighbour(h, d)
+		if not game.map.has(n) or not game.map.is_land(n) or not Armies.at(game, n).is_empty() or Battles.at(game, n) != null:
+			continue
+		var other := Occupation.controller_tag(game, n)
+		if other != holder and Wars.at_war(game, holder, other):
+			return n
+	return Army.NO_HEX

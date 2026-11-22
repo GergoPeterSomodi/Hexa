@@ -301,16 +301,18 @@ func test_the_pins_of_4_13() -> void:
 
 
 func test_events_gain_the_army_signals_of_m6() -> void:
-	# M6 (m6-build-spec.md 5.5): the seven army signals join the M5 list.
+	# M6 (m6-build-spec.md 5.5): the seven army signals join the M5 list. M7 (5.5) adds the eleven war signals (below).
 	var names: Array[String] = []
 	for sig: Dictionary in (load("res://shell/autoload/events.gd") as GDScript).get_script_signal_list():
 		names.append(str(sig["name"]))
 	names.sort()
-	var want: Array[String] = ["army_changed", "army_cleared", "army_disbanded", "army_raised", "army_selected", "army_starved", "chronicled",
-		"country_chosen", "district_declined", "game_ended", "game_started", "goods_short", "hex_changed",
-		"march_halted", "owners_changed", "season_ended", "tax_set", "town_grew", "unit_lost", "unit_moved",
-		"work_cancelled", "work_finished", "work_started"]
+	var want: Array[String] = ["army_changed", "army_cleared", "army_disbanded", "army_raised", "army_selected", "army_starved",
+		"battle_ended", "battle_fought", "battle_joined", "battle_started", "chronicled", "controllers_changed",
+		"country_chosen", "district_captured", "district_declined", "game_ended", "game_started", "goods_short", "hex_changed",
+		"march_halted", "owners_changed", "peace_made", "season_ended", "siege_lifted", "siege_progress", "siege_started",
+		"tax_set", "town_grew", "unit_lost", "unit_moved", "war_declared", "work_cancelled", "work_finished", "work_started"]
 	assert_eq(names, want)
+	assert_eq(want.size(), 34, "the M6 list and the eleven war signals of 5.5")
 
 
 func test_the_save_body_and_the_digest_are_unchanged() -> void:

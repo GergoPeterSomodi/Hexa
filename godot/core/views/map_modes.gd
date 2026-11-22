@@ -44,6 +44,12 @@ const YIELD_ALPHA := 0.70
 const VEIL := Color("#1c140d")
 const VEIL_ALPHA := 0.45
 const STRIPE_PX := 6.0
+
+## The occupied land (M7, 6.3): diagonal bands of the occupier's colour, OCCUPIED_STRIPE_PX wide along x + y, alternating
+## with the owner's; the shader draws the bands (stripe_is_occupier says which band a pixel is in). AREA_ALPHA is the tint of
+## a castle area of an enemy (AreaLines), in the owner's colour.
+const OCCUPIED_STRIPE_PX := 8.0
+const AREA_ALPHA := 0.12
 ## The worth a year that starts bytes 3 to 9.
 const YIELD_FLOORS: PackedInt32Array = [1, 10, 25, 50, 100, 200, 400]
 ## Bytes 1 (a loss, madder) to 9.
@@ -363,15 +369,68 @@ static func palette_from(colours: PackedColorArray, unowned: Color) -> PackedCol
 ## Fragment colour for one (owner_id, height_byte) pair; matches mode_overlay.gdshader.
 ## The sight veil (A13): with `veil_on` and `seen` 0 on land, the veil goes over the mode's colour by source-over, unless the
 ## mode already drew its own veil (byte 0 of Yields, Food or Supply).
+## The occupier (M7): `occupier_id` > 0 and not the owner paints the occupier's palette colour over the owner's in Owner mode
+## and the Terrain tint (the band choice is the shader's, stripe_is_occupier). `area_byte` 1 tints the owner's colour over
+## the hex at AREA_ALPHA (a held castle area of an enemy) in the land modes. Both default to none.
 static func colour_of(mode: int, owner_id: int, height_byte: int, palette: PackedColorArray,
 		tint_on: bool, hot_id: int, yield_byte: int = 0, food_byte: int = 0, supply_byte: int = 0,
-		seen: int = 1, veil_on: bool = false) -> Color:
+		seen: int = 1, veil_on: bool = false, occupier_id: int = 0, area_byte: int = 0) -> Color:
 	if height_byte <= 0:
 		return Color(0.0, 0.0, 0.0, 0.0)
 	var c := _mode_colour(mode, owner_id, height_byte, palette, tint_on, hot_id, yield_byte, food_byte, supply_byte)
+	c = _occupied_colour(c, mode, owner_id, palette, tint_on, occupier_id)
+	c = _area_tint(c, mode, owner_id, palette, area_byte)
 	if veil_on and seen == 0 and not _veil_by_mode(mode, yield_byte, food_byte, supply_byte):
 		return _veiled(c)
 	return c
+
+
+## The occupier's colour in place of the owner's (alpha kept) in Owner mode and the Terrain tint; `c` otherwise.
+static func _occupied_colour(c: Color, mode: int, owner_id: int, palette: PackedColorArray, tint_on: bool,
+		occupier_id: int) -> Color:
+	if occupier_id <= 0 or occupier_id == owner_id or occupier_id >= palette.size():
+		return c
+	if mode == Mode.OWNER or (mode == Mode.TERRAIN and tint_on):
+		var oc := palette[occupier_id]
+		return Color(oc.r, oc.g, oc.b, c.a)
+	return c
+
+
+## The castle-area tint: the owner's colour at AREA_ALPHA over `c` in the land modes (Yields, Food and Supply keep their own).
+static func _area_tint(c: Color, mode: int, owner_id: int, palette: PackedColorArray, area_byte: int) -> Color:
+	if area_byte <= 0 or owner_id <= 0 or owner_id >= palette.size():
+		return c
+	if mode == Mode.YIELDS or mode == Mode.FOOD or mode == Mode.SUPPLY:
+		return c
+	var oc := palette[owner_id]
+	return _over(Color(oc.r, oc.g, oc.b, AREA_ALPHA), c)
+
+
+## True when a pixel (x, y) is in an occupier band of the occupied stripes (the bands alternate every OCCUPIED_STRIPE_PX
+## along x + y, the occupier's on the even bands).
+static func stripe_is_occupier(px: int, py: int) -> bool:
+	return posmod(floori(float(px + py) / OCCUPIED_STRIPE_PX), 2) == 0
+
+
+## One byte a hex: the occupier's country id from MapState.occupier (0 for none). Public (4.15): the map shows it to all.
+static func occupier_bytes(game: Game) -> PackedByteArray:
+	if game == null or game.state == null:
+		return PackedByteArray()
+	return game.state.occupier
+
+
+## The castle-area bytes of `viewer` (AreaLines.area_bytes): 1 on the held-area hexes of the viewer's enemies.
+static func area_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	return AreaLines.area_bytes(game, viewer)
+
+
+## The legend rows of the occupied land and the castle areas, for Owner and Terrain: [{text, stripes, area}]. The stripe row
+## has no colour of its own (the occupier's colour is the country's); the area row is the dashed line.
+static func occupied_legend() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	out.append({"text": "Held by another country: stripes in its colour", "stripes": true, "area": false})
+	out.append({"text": "Castle area of an enemy: dashed line, tinted", "stripes": false, "area": true})
+	return out
 
 
 ## True when the mode draws the veil itself at this byte (Yields, Food or Supply at 0 or past its colours).
@@ -388,12 +447,17 @@ static func _veil_by_mode(mode: int, yield_byte: int, food_byte: int, supply_byt
 
 ## The sight veil laid over `c` by source-over: a = av + am (1 - av), rgb = (VEIL av + c am (1 - av)) / a.
 static func _veiled(c: Color) -> Color:
-	var av := SIGHT_VEIL_ALPHA
-	var am := c.a
-	var a := av + am * (1.0 - av)
-	var r := (VEIL.r * av + c.r * am * (1.0 - av)) / a
-	var g := (VEIL.g * av + c.g * am * (1.0 - av)) / a
-	var b := (VEIL.b * av + c.b * am * (1.0 - av)) / a
+	return _over(Color(VEIL.r, VEIL.g, VEIL.b, SIGHT_VEIL_ALPHA), c)
+
+
+## `top` laid over `bottom` by source-over (straight alpha); clear when both are clear.
+static func _over(top: Color, bottom: Color) -> Color:
+	var a := top.a + bottom.a * (1.0 - top.a)
+	if a <= 0.0:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var r := (top.r * top.a + bottom.r * bottom.a * (1.0 - top.a)) / a
+	var g := (top.g * top.a + bottom.g * bottom.a * (1.0 - top.a)) / a
+	var b := (top.b * top.a + bottom.b * bottom.a * (1.0 - top.a)) / a
 	return Color(r, g, b, a)
 
 
@@ -482,7 +546,14 @@ static func colour_at(game: Game, mode: int, hex: Vector2i, pal: PackedColorArra
 	if veil_on and height_byte > 0:
 		var seen_bytes := sight_bytes(game, game.player)
 		seen = int(seen_bytes[idx]) if idx < seen_bytes.size() else 0
-	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id, yield_byte, food_byte, supply_byte, seen, veil_on)
+	var occupier_id := 0
+	var area_byte := 0
+	if height_byte > 0:
+		occupier_id = int(game.state.occupier[idx]) if idx < game.state.occupier.size() else 0
+		var abytes := area_bytes(game, game.player)
+		area_byte = int(abytes[idx]) if idx < abytes.size() else 0
+	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id, yield_byte, food_byte, supply_byte, seen, veil_on,
+		occupier_id, area_byte)
 
 
 static func _height_byte_at(map: MapData, idx: int) -> int:

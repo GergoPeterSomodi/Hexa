@@ -80,7 +80,8 @@ func _expected(g: Game, season: int) -> Dictionary:
 					back += int(returned[uid])
 			_add(expect["battle_losses"], sides[side], int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back)
 		var winner := int(r.end["winner"])
-		var loser := int(r.end["loser"])
+		# The record's loser is a tag (battle_end writes it); its side is the other side of the int winner.
+		var loser := 1 - winner if winner >= 0 else -1
 		if winner >= 0:
 			_add(expect["battles_won"], sides[winner], 1)
 		if loser >= 0:

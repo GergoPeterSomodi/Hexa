@@ -10,7 +10,8 @@ extends RefCounted
 const OWNS: Array[String] = ["explored"]
 ## The event kinds that carry witnesses when they have a hex (4.11).
 const SIGHTED: Array[String] = ["work_started", "work_finished", "work_cancelled", "town_grew", "district_declined",
-	"army_raised", "army_disbanded", "army_starved", "unit_lost"]
+	"army_raised", "army_disbanded", "army_starved", "unit_lost", "battle_started", "battle_joined", "battle_fought",
+	"battle_ended", "siege_started", "siege_progress", "siege_lifted", "district_captured"]
 
 
 ## Explored = the land sight at the start (new_scenario only; R11). Called by reference from Game.new_scenario.
@@ -113,7 +114,20 @@ static func on_emit(game: Game, event: Dictionary) -> void:
 		_owners_changed(game, event)
 	elif SIGHTED.has(kind) and event.get("hex") is Vector2i and not event.has("witnesses"):
 		var actor := StringName(str(event.get("tag", "")))
-		event["witnesses"] = witnesses_of(game, event["hex"] as Vector2i, actor)
+		event["witnesses"] = _with_others(witnesses_of(game, event["hex"] as Vector2i, actor), event)
+
+
+## The witnesses of a sighted event: those who see its hex, then the event's `others` (M7 4.14: the actor and the others
+## always witness, even when they do not see the hex).
+static func _with_others(seen: PackedStringArray, event: Dictionary) -> PackedStringArray:
+	var out := seen
+	var others: Variant = event.get("others", [])
+	if others is Array or others is PackedStringArray:
+		for item: Variant in others:
+			var tag := str(item)
+			if tag != "" and not out.has(tag):
+				out.append(tag)
+	return out
 
 
 ## True when `tag` has explored `hex` (the bit of its explored set).

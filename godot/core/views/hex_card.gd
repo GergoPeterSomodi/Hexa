@@ -216,6 +216,7 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 			lines.append(["Owner", &"plain", owner_text])
 		if place_name != "":
 			lines.append(["Place", &"plain", place_name])
+		lines.append_array(war_rows(game, hex))
 		lines.append(["Cover", &"plain", cover])
 		lines.append(["Height", &"plain", "%d m" % height_m])
 		lines.append(["Relief", &"plain", relief])
@@ -280,6 +281,76 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 		"weather": weather_now,
 		"lines": lines,
 	}
+
+
+## The war rows of a land hex (M7, 6.8, 4.15): "Held by" on occupied land (public), "Fortress" on a fortress (its garrison
+## exact to its owner, rounded to a hundred while the viewer sees the hex, else "a garrison"), "Siege" (exact to its besieger
+## and defender, and to a viewer who sees the hex; nothing else), and "Castle area" while a war of the viewer is on. The
+## viewer "" sees everything.
+static func war_rows(game: Game, hex: Vector2i) -> Array:
+	var rows: Array = []
+	var viewer := game.player
+	if Occupation.is_occupied(game, hex):
+		rows.append(["Held by", &"warn", "the " + Occupation.occupier_long_name(game, hex)])
+	var level := Occupation.fortress_level(game, hex)
+	if level > 0:
+		rows.append(["Fortress", &"plain", _fortress_text(game, viewer, hex, level)])
+	var siege := Occupation.siege_at(game, hex)
+	if siege != null and _sees_siege(game, viewer, hex, siege):
+		rows.append(["Siege", &"warn", "%s is besieged by %s: %d of %d" % [_siege_place(siege), _short_name(game, siege.besieger), siege.progress, Occupation.siege_need(game, hex)]])
+	if viewer != &"" and not Wars.enemies(game, viewer).is_empty():
+		var area := _area_text(game, hex)
+		if area != "":
+			rows.append(["Castle area", &"plain", area])
+	return rows
+
+
+## "Walled town · garrison 800 of 800" (the level's word, then the garrison); others see it rounded or as "a garrison".
+static func _fortress_text(game: Game, viewer: StringName, hex: Vector2i, level: int) -> String:
+	var family := str(Improve.piece_at(game, hex).get("family", ""))
+	var label := level_label(family, level)
+	var head := label if label != "" else "level %d" % level
+	var full := Occupation.garrison_full(game, hex)
+	var men := Occupation.garrison_of(game, hex)
+	if viewer == &"" or Territory.owner_tag(game, hex) == viewer:
+		return "%s · garrison %d of %d" % [head, men, full]
+	if Knowledge.sees(game, viewer, hex):
+		return "%s · garrison about %d of %d" % [head, roundi(float(men) / 100.0) * 100, full]
+	return "%s · a garrison" % head
+
+
+static func _sees_siege(game: Game, viewer: StringName, hex: Vector2i, siege: Siege) -> bool:
+	return viewer == &"" or siege.besieger == viewer or Occupation.controller_tag(game, hex) == viewer \
+		or Knowledge.sees(game, viewer, hex)
+
+
+static func _siege_place(siege: Siege) -> String:
+	return siege.name if not siege.name.is_empty() else "This fortress"
+
+
+static func _short_name(game: Game, tag: StringName) -> String:
+	var cdef := Countries.def_of(game, tag)
+	return cdef.name if cdef != null and not cdef.name.is_empty() else String(tag)
+
+
+## The castle-area row: "Held by the castle of Pavia (10, 9), 7 hexes" (the castle's own hex: "This is ..."), "Open: the
+## castle of Pavia (10, 9) has fallen", "Open land: no castle holds it"; "" on occupied land (its row says so).
+static func _area_text(game: Game, hex: Vector2i) -> String:
+	if Occupation.is_occupied(game, hex):
+		return ""
+	var info := AreaLines.held_by(game, hex)
+	var fortress: Vector2i = info["fortress"]
+	if fortress == Army.NO_HEX:
+		return "Open land: no castle holds it"
+	var where := "%s (%d, %d)" % [str(info["name"]), fortress.x, fortress.y]
+	match info["state"]:
+		&"castle":
+			return "This is %s, %d hexes" % [where, int(info["members"])]
+		&"held":
+			return "Held by %s, %d hexes" % [where, int(info["members"])]
+		&"fallen":
+			return "Open: %s has fallen" % where
+	return "Open land: no castle holds it"
 
 
 ## The hover card's Worth line on a land hex of the player's, in a game with countries: ["Worth", tone, "+232 a year (+60 this

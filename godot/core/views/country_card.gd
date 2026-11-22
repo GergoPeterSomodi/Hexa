@@ -51,7 +51,122 @@ static func of(game: Game, tag: StringName) -> Dictionary:
 		"treasury": _treasury(game, country),
 		"people": _people(game, country),
 		"army": _army(game, country),
+		"war": _war(game, country),
 	}
+
+
+## The war section of the country card (M7, 4.2, 4.9, 6.7), from the viewer's side. {state (&"none" with no player,
+## &"self", &"war", &"truce", &"peace"), since_text, score (the viewer's, at war), held_theirs, held_yours (districts
+## occupied either way, at war), truce_text, declare: {verdict} (not at war), peace: [{terms, label, verdict, moves, text}]
+## (at war; take, white, yield), wars: [{tag, name}] and truces: [{tag, name, text}] (your own card only)}. Wars are public
+## (4.15): the viewer sees every country's wars.
+static func _war(game: Game, country: Country) -> Dictionary:
+	var out := {"state": &"none", "since_text": "", "score": 0, "held_theirs": 0, "held_yours": 0, "truce_text": "",
+		"declare": {}, "peace": [], "wars": [], "truces": []}
+	var viewer := game.player
+	if viewer == &"":
+		return out
+	if country.tag == viewer:
+		out["state"] = &"self"
+		out["wars"] = _own_wars(game, country)
+		out["truces"] = _own_truces(game, country)
+		return out
+	var war := Wars.war_between(game, viewer, country.tag)
+	if war != null:
+		out["state"] = &"war"
+		out["since_text"] = "At war since " + Calendar.date_text(war.start_turn, game.start_year)
+		out["score"] = Wars.score(game, viewer, country.tag)
+		out["held_theirs"] = Wars.occupied_count(game, viewer, country.tag)
+		out["held_yours"] = Wars.occupied_count(game, country.tag, viewer)
+		out["peace"] = _peace_options(game, viewer, war, country.tag)
+		return out
+	out["declare"] = {"verdict": Wars.declare_war_check(game, {"target": country.tag, "tag": viewer})}
+	out["state"] = &"peace"
+	var until := Wars.truce_until(game, viewer, country.tag)
+	if until > game.turn:
+		out["state"] = &"truce"
+		out["truce_text"] = "Truce until %s (%d more seasons)" % [Calendar.date_text(until, game.start_year),
+			until - game.turn]
+	return out
+
+
+const PEACE_TERMS: Array[StringName] = [&"take", &"white", &"yield"]
+const PEACE_LABELS := {&"take": "Take what you hold", &"white": "White peace", &"yield": "Yield"}
+
+
+## The three peace options at war, in PEACE_TERMS order: the verdict of make_peace_check and the districts that move (4.9).
+static func _peace_options(game: Game, viewer: StringName, war: War, target: StringName) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for terms: StringName in PEACE_TERMS:
+		var verdict := Wars.make_peace_check(game, {"target": target, "terms": terms, "tag": viewer})
+		var moves: Array[Vector2i] = []
+		if terms != &"white":
+			moves = Wars.ceded(game, war, terms, viewer)
+		out.append({"terms": terms, "label": PEACE_LABELS[terms], "verdict": verdict, "moves": moves,
+			"text": _peace_text(game, target, terms, moves)})
+	return out
+
+
+## The sentence under a peace option: what moves, in the spec's words (4.9, 6.7).
+static func _peace_text(game: Game, target: StringName, terms: StringName, moves: Array[Vector2i]) -> String:
+	var who := "Peace with " + _the_name(game, target)
+	if terms == &"white" or moves.is_empty():
+		return "%s: everything returns to its owner." % who
+	var names := _join_names(game, moves)
+	var verb := "becomes" if moves.size() == 1 else "become"
+	if terms == &"take":
+		return "%s: %s %s yours; every other district returns." % [who, names, verb]
+	return "%s: %s %s theirs." % [who, names, verb]
+
+
+## "Domodossola (7, 6) and Locarno (7, 5)": the district names of the hexes, joined in the card's English.
+static func _join_names(game: Game, hexes: Array[Vector2i]) -> String:
+	var parts := PackedStringArray()
+	for hex: Vector2i in hexes:
+		var place_name := str(Improve.place_of(game.map, hex).get("name", ""))
+		var label := "(%d, %d)" % [hex.x, hex.y]
+		parts.append(label if place_name.is_empty() else "%s %s" % [place_name, label])
+	if parts.size() <= 1:
+		return "".join(parts)
+	return ", ".join(parts.slice(0, parts.size() - 1)) + " and " + parts[parts.size() - 1]
+
+
+## The live wars of a country (your own card): {tag (the other party), name}, in war id order.
+static func _own_wars(game: Game, country: Country) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for w: War in Wars.of_country(game, country.tag):
+		if w.live():
+			out.append({"tag": w.other(country.tag), "name": _short_name(game, w.other(country.tag))})
+	return out
+
+
+## The truces of a country (your own card): one row per other party with a truce still running.
+static func _own_truces(game: Game, country: Country) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var seen: Dictionary = {}
+	for w: War in Wars.of_country(game, country.tag):
+		var other := w.other(country.tag)
+		if w.live() or seen.has(other):
+			continue
+		seen[other] = true
+		var until := Wars.truce_until(game, country.tag, other)
+		if until > game.turn:
+			out.append({"tag": other, "name": _short_name(game, other),
+				"text": "Truce until %s" % Calendar.date_text(until, game.start_year)})
+	return out
+
+
+static func _short_name(game: Game, tag: StringName) -> String:
+	var cdef := Countries.def_of(game, tag)
+	return cdef.name if cdef != null and not cdef.name.is_empty() else String(tag)
+
+
+## "the Duchy of Milan": the long name with its article (CountryDef.long_name, else the short name).
+static func _the_name(game: Game, tag: StringName) -> String:
+	var cdef := Countries.def_of(game, tag)
+	if cdef != null and not cdef.long_name.is_empty():
+		return "the " + cdef.long_name
+	return "the " + _short_name(game, tag)
 
 
 ## The army field of the country panel (M6, 4.12): {shown, value, banded}. The player's own country: its men exact; a known

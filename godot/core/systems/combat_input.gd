@@ -18,7 +18,8 @@ const MAX_GROUND_DEFENCE := 1500
 
 ## Problems found in an input, empty when it is valid. Each value's type is checked before any use of it, so a bad input
 ## gives a message and never an error.
-static func validate(war: WarDef, input: Dictionary) -> Array[String]:
+## unit_count (the number of unit kinds, when the caller knows it) bounds a fighter's kind; -1 checks only that it is at least -1.
+static func validate(war: WarDef, input: Dictionary, unit_count: int = -1) -> Array[String]:
 	var errors: Array[String] = []
 	for key: String in KEYS:
 		if not input.has(key):
@@ -32,7 +33,7 @@ static func validate(war: WarDef, input: Dictionary) -> Array[String]:
 	var assault: bool = typeof(input["assault"]) == TYPE_BOOL and bool(input["assault"])
 	_check_ground(errors, input["ground"])
 	_check_stance(errors, input["stance"], input["can_retreat"])
-	_check_fighters(errors, war, input["fighters"], assault)
+	_check_fighters(errors, war, input["fighters"], assault, unit_count)
 	_check_garrison(errors, war, input["garrison"], assault)
 	return errors
 
@@ -83,7 +84,7 @@ static func _check_stance(errors: Array[String], stance: Variant, retreat: Varia
 		_check_flag(errors, rt[side], "can_retreat %s" % side)
 
 
-static func _check_fighters(errors: Array[String], war: WarDef, value: Variant, assault: bool) -> void:
+static func _check_fighters(errors: Array[String], war: WarDef, value: Variant, assault: bool, unit_count: int) -> void:
 	if not (value is Array):
 		errors.append("input: fighters must be a list")
 		return
@@ -101,12 +102,13 @@ static func _check_fighters(errors: Array[String], war: WarDef, value: Variant, 
 				missing = true
 		if missing:
 			continue
-		_check_fighter(errors, war, f, seen, sides)
+		_check_fighter(errors, war, f, seen, sides, unit_count)
 	if assault and int(sides[0]) == 0 and int(sides[1]) == 0:
 		errors.append("input: a battle with no fighter")
 
 
-static func _check_fighter(errors: Array[String], war: WarDef, f: Dictionary, seen: Dictionary, sides: Array) -> void:
+static func _check_fighter(errors: Array[String], war: WarDef, f: Dictionary, seen: Dictionary, sides: Array,
+		unit_count: int) -> void:
 	var key: Variant = f["key"]
 	if typeof(key) != TYPE_INT or int(key) < 0 or seen.has(int(key)):
 		errors.append("input: a fighter key must be a unique whole number from 0")
@@ -135,6 +137,20 @@ static func _check_fighter(errors: Array[String], war: WarDef, f: Dictionary, se
 	if typeof(f["morale"]) != TYPE_INT or int(f["morale"]) < 0 or int(f["morale"]) > 1000:
 		errors.append("input: fighter %s morale must be 0 to 1000" % label)
 	_check_flag(errors, f["hungry"], "fighter %s hungry" % label)
+	_check_identity(errors, f, label, unit_count)
+
+
+## The unit kind and the army of a company (optional: Battles always writes both, the older fixtures do not). kind is -1 or a
+## unit id below unit_count (any id from 0 when unit_count is -1); army is a whole number from 0 (0 for none).
+static func _check_identity(errors: Array[String], f: Dictionary, label: String, unit_count: int) -> void:
+	if f.has("kind"):
+		var kind: Variant = f["kind"]
+		if typeof(kind) != TYPE_INT or int(kind) < -1 or (unit_count >= 0 and int(kind) >= unit_count):
+			errors.append("input: fighter %s kind must be -1 or a unit id below %d" % [label, unit_count])
+	if f.has("army"):
+		var army: Variant = f["army"]
+		if typeof(army) != TYPE_INT or int(army) < 0 or int(army) > Unit.INT32_MAX:
+			errors.append("input: fighter %s army must be a whole number from 0" % label)
 
 
 static func _check_garrison(errors: Array[String], war: WarDef, value: Variant, assault: bool) -> void:
@@ -205,6 +221,7 @@ static func _add(st: CombatState, raw: Dictionary) -> void:
 		"full": int(raw["full"]), "attack": int(raw["attack"]), "defence": int(raw["defence"]),
 		"fire": int(raw["fire"]), "rank": int(raw["rank"]), "morale": int(raw["morale"]),
 		"hungry": bool(raw["hungry"]),
+		"kind": int(raw.get("kind", -1)), "army": int(raw.get("army", 0)),
 	}
 	st.index[int(f["key"])] = st.fighters.size()
 	st.fighters.append(f)

@@ -111,6 +111,36 @@ static func witnessed(game: Game, event: Dictionary, viewer: StringName) -> bool
 	return knows(game, viewer, tag)
 
 
+## What a viewer may see of a battle record (4.15, M7): &"exact" for the viewer "" and for a side of the battle (the
+## attacker or the defender: the numbers of both sides); &"seen" when the viewer witnessed it (its tag is in the record's
+## witnesses: the men rounded, the morale rounded, no stances and no ids); else &"hidden". Pure.
+static func battle_access(_game: Game, viewer: StringName, record: BattleRecord) -> StringName:
+	if record == null:
+		return &"hidden"
+	if viewer == &"" or viewer == record.attacker or viewer == record.defender:
+		return &"exact"
+	if record.witnesses.has(String(viewer)):
+		return &"seen"
+	return &"hidden"
+
+
+## What a viewer may see of the siege of a hex (4.5, 4.15, M7): &"hidden" when no siege stands there or the besieger and
+## the hex's controller are not at war (a siege between countries at peace is shown as none, for every viewer); &"exact"
+## for the viewer "", the besieger and the controller; &"seen" while the viewer sees the hex (Sight); else &"hidden".
+static func siege_access(game: Game, viewer: StringName, hex: Vector2i) -> StringName:
+	var s := Occupation.siege_at(game, hex)
+	if s == null:
+		return &"hidden"
+	var holder := Occupation.controller_tag(game, hex)
+	if holder == &"" or not Wars.at_war(game, s.besieger, holder):
+		return &"hidden"
+	if viewer == &"" or viewer == s.besieger or viewer == holder:
+		return &"exact"
+	if sees(game, viewer, hex):
+		return &"seen"
+	return &"hidden"
+
+
 ## The tags of a Variant list (an Array of StringName or String, or the PackedStringArray the Chronicle stores);
 ## [] for anything else.
 static func _names(value: Variant) -> Array[StringName]:

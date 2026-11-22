@@ -161,3 +161,91 @@ func test_people_yours_known_and_unknown() -> void:
 	var all := CountryCard.of(game, &"FRA")["people"] as Dictionary
 	assert_true(bool(all["shown"]))
 	assert_false(bool(all["banded"]), "the viewer empty sees everything exact")
+
+
+# --- the war section (M7 B15, 4.2, 4.9, 6.7): a fresh war game per test (WarFixture), the planted states written first ---
+
+func test_war_section_is_none_without_a_player() -> void:
+	var g := WarFixture.game()
+	g.player = &""
+	var war := CountryCard.of(g, &"MLO")["war"] as Dictionary
+	assert_eq(war["state"], &"none")
+	assert_eq((war["peace"] as Array).size(), 0)
+
+
+func test_war_section_at_peace_gives_the_declare_verdict() -> void:
+	var g := WarFixture.game()
+	var me := ArmyFixture.TAG
+	var near := WarFixture.neighbour_of(g, me)
+	var far := WarFixture.stranger_of(g, me)
+	var war_near := CountryCard.of(g, near)["war"] as Dictionary
+	assert_eq(war_near["state"], &"peace")
+	assert_true(bool((war_near["declare"] as Dictionary)["verdict"]["ok"]), "a neighbour can be declared on")
+	var war_far := CountryCard.of(g, far)["war"] as Dictionary
+	var refusal := (war_far["declare"] as Dictionary)["verdict"] as Dictionary
+	assert_false(bool(refusal["ok"]))
+	assert_true(str(refusal["reason"]).contains("shares no border"), str(refusal["reason"]))
+
+
+func test_war_section_at_war_lists_three_peace_options() -> void:
+	var g := WarFixture.game()
+	var me := ArmyFixture.TAG
+	var foe := &"MLO"
+	WarFixture.at_war(g, me, foe)
+	var war := CountryCard.of(g, foe)["war"] as Dictionary
+	assert_eq(war["state"], &"war")
+	assert_true(str(war["since_text"]).begins_with("At war since "))
+	assert_eq(int(war["score"]), 0)
+	assert_eq(int(war["held_theirs"]), 0)
+	assert_eq(int(war["held_yours"]), 0)
+	var peace := war["peace"] as Array
+	assert_eq(peace.size(), 3)
+	assert_eq((peace[0] as Dictionary)["terms"], &"take")
+	assert_eq((peace[1] as Dictionary)["terms"], &"white")
+	assert_eq((peace[2] as Dictionary)["terms"], &"yield")
+	# A white peace is refused in the first seasons of a war (4.9 row 5), and moves nothing.
+	var white := peace[1] as Dictionary
+	assert_false(bool((white["verdict"] as Dictionary)["ok"]))
+	assert_eq((white["moves"] as Array).size(), 0)
+	assert_eq(str(white["text"]), "Peace with the Duchy of Milan: everything returns to its owner.")
+
+
+func test_war_section_planted_occupation_moves_the_score_and_the_take_text() -> void:
+	var g := WarFixture.game()
+	var me := ArmyFixture.TAG
+	var foe := &"MLO"
+	WarFixture.at_war(g, me, foe)
+	# Planted: Genoa holds Pavia, a Milan district that is not its capital (4.4 occupation).
+	WarFixture.set_occupier(g, Vector2i(10, 9), me)
+	var war := CountryCard.of(g, foe)["war"] as Dictionary
+	assert_eq(int(war["held_theirs"]), 1)
+	assert_eq(int(war["held_yours"]), 0)
+	assert_eq(int(war["score"]), Wars.score(g, me, foe), "the card's score is Wars.score")
+	assert_eq(int(war["score"]), 1)
+	var take := (war["peace"] as Array)[0] as Dictionary
+	assert_eq(take["moves"], [Vector2i(10, 9)] as Array[Vector2i])
+	assert_eq(str(take["text"]), "Peace with the Duchy of Milan: Pavia (10, 9) becomes yours; every other district returns.")
+	var yield_option := (war["peace"] as Array)[2] as Dictionary
+	assert_eq((yield_option["moves"] as Array).size(), 0, "yield moves what Genoa holds of Milan's, which is nothing")
+
+
+func test_war_section_truce_after_a_war_ended() -> void:
+	var g := WarFixture.game()
+	var me := ArmyFixture.TAG
+	var foe := &"MLO"
+	WarFixture.ended(g, me, foe, maxi(1, g.turn))
+	var war := CountryCard.of(g, foe)["war"] as Dictionary
+	assert_eq(war["state"], &"truce")
+	assert_true(str(war["truce_text"]).begins_with("Truce until "), str(war["truce_text"]))
+	assert_false(bool((war["declare"] as Dictionary)["verdict"]["ok"]), "no declaration in a truce")
+
+
+func test_war_section_of_your_own_country_lists_wars() -> void:
+	var g := WarFixture.game()
+	var me := ArmyFixture.TAG
+	WarFixture.at_war(g, me, &"MLO")
+	var own := CountryCard.of(g, me)["war"] as Dictionary
+	assert_eq(own["state"], &"self")
+	var wars := own["wars"] as Array
+	assert_eq(wars.size(), 1)
+	assert_eq((wars[0] as Dictionary)["tag"], &"MLO")

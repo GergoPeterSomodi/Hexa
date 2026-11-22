@@ -151,6 +151,45 @@ func test_a_given_witness_list_is_kept() -> void:
 	assert_eq(event["witnesses"], PackedStringArray(["FRA"]))
 
 
+func test_the_battle_and_siege_kinds_get_their_witnesses_when_they_have_none() -> void:
+	# M7 (4.14): the battle, siege and district kinds are sighted kinds: an unlisted witness list is stamped.
+	var capital := Countries.by_tag(_g, GEN).capital
+	for kind: String in ["battle_started", "battle_fought", "battle_ended", "siege_started", "siege_progress",
+			"siege_lifted", "district_captured"]:
+		var event := {"kind": kind, "tag": SAV, "hex": capital}
+		_g.emit(event)
+		assert_true(event.has("witnesses"), "%s is stamped" % kind)
+		assert_true((event["witnesses"] as PackedStringArray).has("GEN"), "%s: Genoa holds the hex" % kind)
+	var unseen := _unseen_land()
+	var far := {"kind": "battle_ended", "tag": SAV, "hex": unseen}
+	_g.emit(far)
+	assert_false((far["witnesses"] as PackedStringArray).has("GEN"), "P: an unseen battle is not witnessed by Genoa")
+	var plain := {"kind": "peace_made", "tag": SAV, "hex": capital}
+	_g.emit(plain)
+	assert_false(plain.has("witnesses"), "peace_made is not a sighted kind (its witnesses are every living country)")
+
+
+func test_the_others_of_a_sighted_event_witness_even_when_they_do_not_see_the_hex() -> void:
+	# M7 (4.14): the actor and the others always witness; an other that does not see the hex is still in the list.
+	var unseen := _unseen_land()
+	var seen_by := Sight.witnesses_of(_g, unseen, &"")
+	var outsider := &""
+	for c: Country in _g.countries:
+		if c.tag != &"" and c.tag != GEN and not seen_by.has(String(c.tag)):
+			outsider = c.tag
+			break
+	assert_ne(outsider, &"", "the scenario has a country that does not see the hex")
+	assert_false(Sight.sees(_g, outsider, unseen), "the outsider does not see it")
+	for kind: String in ["siege_started", "siege_progress", "siege_lifted", "district_captured"]:
+		var event := {"kind": kind, "tag": SAV, "hex": unseen, "others": [outsider]}
+		_g.emit(event)
+		assert_true((event["witnesses"] as PackedStringArray).has(String(outsider)), "%s: the other witnesses" % kind)
+		assert_true((event["witnesses"] as PackedStringArray).has("SAV"), "%s: the actor witnesses" % kind)
+	var listed := {"kind": "siege_started", "tag": SAV, "hex": unseen, "others": [outsider], "witnesses": PackedStringArray(["FRA"])}
+	_g.emit(listed)
+	assert_eq(listed["witnesses"], PackedStringArray(["FRA"]), "a given witness list is kept")
+
+
 func test_a_map_only_game_stamps_nothing() -> void:
 	var bare := Game.new_game(load(MAP_PATH) as MapData, 1)
 	var event := {"kind": "work_finished", "tag": SAV, "hex": Vector2i(4, 3)}

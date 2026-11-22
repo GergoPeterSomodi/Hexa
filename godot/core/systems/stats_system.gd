@@ -229,7 +229,8 @@ static func _battles_into(game: Game, stats: Stats, rows: Array[PackedInt32Array
 			rows[c][men_col] += men
 			rows[c][losses_col] += men
 		var winner := int(r.end.get("winner", -1))
-		var loser := int(r.end.get("loser", -1))
+		# The record's loser is a tag (battle_end writes it); its side is the other of the int winner's (0 or 1).
+		var loser := (1 - winner) if (winner == 0 or winner == 1) else -1
 		if winner == 0 or winner == 1:
 			var w := stats.tags.find(String(sides[winner]))
 			if w >= 0 and w < rows.size():

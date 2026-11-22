@@ -556,7 +556,7 @@ func test_raised_lines_for_the_player_and_a_witnessed_other() -> void:
 	var line := LogLines.line_of(_g, mine, &"GEN")
 	assert_eq(line["text"], "You raised 2 companies of pikemen %s (−50 ducats)." % at)
 	assert_eq([line["keyword"], line["tone"], line["floating"], line["notify"]], ["Raised", "plain", "Raised", false])
-	assert_eq(line["filters"], [&"all", &"mine", &"money"] as Array[StringName])
+	assert_eq(line["filters"], [&"all", &"mine", &"money", &"war"] as Array[StringName])  # M7: army lines join War
 	var stranger := _stranger()
 	var other := _army("army_raised", {"tag": stranger, "hex": SAVONA, "army": 9, "units": [5], "kind_id": 0,
 		"count": 2, "men": 1000, "ducats": 0, "goods": {}, "witnesses": [&"GEN"]})
@@ -564,7 +564,7 @@ func test_raised_lines_for_the_player_and_a_witnessed_other() -> void:
 	assert_eq(seen["text"], "An army raised 2 companies %s: about 1,000 men." % at, "a country the viewer does not know is not named")
 	assert_eq([seen["keyword"], seen["tone"], seen["notify"], seen["mine"]], ["Raised", "warn", true, false])
 	assert_eq(seen["floating"], "", "no ribbon for another's raise")
-	assert_eq(seen["filters"], [&"all"] as Array[StringName], "not in Mine, not in Money")
+	assert_eq(seen["filters"], [&"all", &"war"] as Array[StringName], "not in Mine, not in Money; in War (M7)")
 
 
 func test_disband_lines_name_the_army_and_give_back_the_refund() -> void:
@@ -582,7 +582,7 @@ func test_disband_lines_name_the_army_and_give_back_the_refund() -> void:
 		"refund": 0, "witnesses": [&"GEN"]})
 	var seen := LogLines.line_of(_g, other, &"GEN")
 	assert_eq(seen["text"], "An army disbanded about 500 men %s." % Words.at(_g, SAVONA))
-	assert_eq([seen["tone"], seen["filters"]], ["muted", [&"all"]])
+	assert_eq([seen["tone"], seen["filters"]], ["muted", [&"all", &"war"]])
 
 
 func test_halt_lines_are_the_players_alone() -> void:
@@ -592,7 +592,7 @@ func test_halt_lines_are_the_players_alone() -> void:
 	var line := LogLines.line_of(_g, winter, &"GEN")
 	assert_eq(line["text"], "The Army of Savona waits for spring %s: the Mont Cenis is closed by snow." % at)
 	assert_eq([line["keyword"], line["tone"], line["floating"], line["notify"]], ["Halted", "warn", "Halted", true])
-	assert_eq(line["filters"], [&"all", &"mine"] as Array[StringName])
+	assert_eq(line["filters"], [&"all", &"mine", &"war"] as Array[StringName])
 	var no_way := _army("march_halted", {"tag": &"GEN", "army": 1, "name": "Army of Savona", "hex": SAVONA,
 		"why": "no_way", "reason": "no way to Hospice Mont Cenis (3, 8)", "waits": false, "witnesses": [&"GEN"]})
 	assert_eq(LogLines.line_of(_g, no_way, &"GEN")["text"],
@@ -615,7 +615,7 @@ func test_hunger_lines() -> void:
 	var line := LogLines.line_of(_g, mine, &"GEN")
 	assert_eq(line["text"], "The Army of Savona lost 100 men to hunger %s: out of supply." % at)
 	assert_eq([line["keyword"], line["tone"], line["floating"], line["notify"]], ["Hunger", "bad", "Hunger −100", true])
-	assert_eq(line["filters"], [&"all", &"mine"] as Array[StringName])
+	assert_eq(line["filters"], [&"all", &"mine", &"war"] as Array[StringName])
 	var stores := _army("army_starved", {"tag": &"GEN", "army": 2, "hex": SAVONA, "lost": 40, "men": 10,
 		"why": "stores_empty", "witnesses": [&"GEN"]})
 	assert_eq(LogLines.line_of(_g, stores, &"GEN")["text"], "Your army lost 40 men to hunger %s: the stores are empty." % at)

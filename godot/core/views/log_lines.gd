@@ -8,6 +8,9 @@ const FILTERS: Array[Dictionary] = [{id = &"all", since = "3"}, {id = &"works", 
 	{id = &"money", since = "4"}, {id = &"war", since = "7"}]
 ## The memo slot of the set of tags the viewer knows.
 const _KNOWN := &"*known"
+## The kinds the War filter shows: the six war kinds (4.14) and M6's army kinds (they join War too).
+const WAR_LINE_KINDS: Array[String] = ["war_declared", "peace_made", "battle_ended", "siege_started", "siege_lifted",
+	"district_captured", "army_raised", "army_disbanded", "march_halted", "army_starved", "unit_lost"]
 const SEASONS_SHOWN := 8
 const PER_SEASON := 60
 
@@ -46,10 +49,15 @@ static func line_of(game: Game, entry: Dictionary, viewer: StringName, memo: Dic
 			line = _starved_line(game, entry, viewer, mine)
 		"unit_lost":
 			line = _lost_line(game, entry, viewer, mine)
+		"war_declared", "peace_made", "battle_ended", "siege_started", "siege_lifted", "district_captured":
+			mine = LogLinesWar.mine(entry, viewer)
+			line = LogLinesWar.line(game, entry, viewer, mine)
 		_:
 			return {}
 	if line.is_empty():
 		return {}
+	if not line.has("record"):
+		line["record"] = -1  # the battle record of a battle_ended line (LogLinesWar); -1 elsewhere
 	line["mine"] = mine
 	line["turn"] = int(entry.get("turn", 0))
 	line["filters"] = filters_of(game, entry, viewer, memo)
@@ -116,7 +124,9 @@ static func _may_pass(entry: Dictionary, viewer: StringName, filter: StringName)
 		&"money":
 			return _money_kind(str(entry.get("kind", "")))
 		&"mine":
-			return StringName(str(entry.get("tag", ""))) == viewer or _tags(entry.get("others", [])).has(viewer)
+			return LogLinesWar.mine(entry, viewer)
+		&"war":
+			return WAR_LINE_KINDS.has(str(entry.get("kind", "")))
 	return true
 
 
@@ -125,12 +135,19 @@ static func _may_pass(entry: Dictionary, viewer: StringName, filter: StringName)
 ## `line_of`'s: a caller that reads many entries shares the answers of "does the viewer know this actor".
 static func filters_of(game: Game, entry: Dictionary, viewer: StringName, memo: Dictionary = {}) -> Array[StringName]:
 	var none: Array[StringName] = []
-	if game == null or not _seen(game, entry, viewer, memo) or not _describable(entry, viewer):
+	if game == null or not _seen(game, entry, viewer, memo):
+		return none
+	if not LogLinesWar.is_war_kind(str(entry.get("kind", ""))) and not _describable(entry, viewer):
 		return none
 	var kind := str(entry.get("kind", ""))
 	var mine := StringName(str(entry.get("tag", ""))) == viewer
 	if kind == "owners_changed":
 		mine = mine or _tags(entry.get("others", [])).has(viewer)
+	elif LogLinesWar.is_war_kind(kind):
+		mine = LogLinesWar.mine(entry, viewer)
+		if not LogLinesWar.describable(entry, viewer, mine):
+			return none
+		return _filters_of(entry, mine)
 	return _filters_of(entry, mine)
 
 
@@ -209,6 +226,8 @@ static func _filters_of(entry: Dictionary, mine: bool) -> Array[StringName]:
 		out.append(&"mine")
 	if kind == "goods_short" or kind == "tax_set" or (mine and not _paid_text(entry).is_empty()):
 		out.append(&"money")
+	if WAR_LINE_KINDS.has(kind):
+		out.append(&"war")
 	return out
 
 

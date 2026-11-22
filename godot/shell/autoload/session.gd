@@ -430,6 +430,30 @@ func drain() -> void:
 				Events.army_starved.emit(StringName(event["tag"]), int(event["army"]), int(event["lost"]))
 			"unit_lost":
 				Events.unit_lost.emit(StringName(event["tag"]), int(event["army"]), int(event["unit"]))
+			"war_declared":
+				Events.war_declared.emit(StringName(event["tag"]), StringName(event["target"]))
+			"peace_made":
+				Events.peace_made.emit(StringName(event["tag"]), StringName(event["target"]), StringName(event["terms"]))
+			"battle_started":
+				Events.battle_started.emit(event["hex"], StringName(event["tag"]), StringName(event["defender"]))
+			"battle_joined":
+				Events.battle_joined.emit(event["hex"], StringName(event["tag"]))
+			"battle_fought":
+				Events.battle_fought.emit(event["hex"])
+			"battle_ended":
+				Events.battle_ended.emit(event["hex"], int(event["record"]), StringName(event["winner"]))
+			"siege_started":
+				Events.siege_started.emit(event["hex"], StringName(event["tag"]))
+			"siege_progress":
+				Events.siege_progress.emit(event["hex"], StringName(event["tag"]), int(event["progress"]), int(event["need"]))
+			"siege_lifted":
+				Events.siege_lifted.emit(event["hex"], StringName(event["tag"]), StringName(event["why"]))
+			"district_captured":
+				Events.district_captured.emit(event["hex"], StringName(event["tag"]), StringName(event["by"]))
+			"controllers_changed":
+				var changed: Array[Vector2i] = []
+				changed.assign(event["hexes"] as Array)  # typed before the emit (A11)
+				Events.controllers_changed.emit(changed)
 		if Chronicle.NOTABLE.has(str(event.get("kind", ""))):
 			Events.chronicled.emit(Chronicle.plain(event))
 

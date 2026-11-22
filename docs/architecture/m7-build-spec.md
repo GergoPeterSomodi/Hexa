@@ -138,10 +138,10 @@ into the M1.5 frame as M6 left it.
    garrison 800) takes it at the end of its fourth season of siege (the meter 2, 4, 6, 10 of 10, hunger from the fourth
    season); Pavia's area (Lodi, Piacenza, Cremona and 3 more) lies open from the next season; a save made in the third season
    of the siege loads and plays on to the same digest (4.16 (d)).
-5. **The war is ended by hand.** In Spring 1481 `make_peace {target: MLO, terms: take}` is accepted and Domodossola and
-   Locarno become Savoy's (`owners_changed`), every occupation between the two is cleared, every Savoy army on Milan's land
+5. **The war is ended by hand.** In Spring 1481 `make_peace {target: MLO, terms: take}` is accepted and Domodossola,
+   Locarno and Pavia become Savoy's (`owners_changed`), every occupation between the two is cleared, every Savoy army on Milan's land
    goes to its nearest own hex with room, and for 8 seasons a new declaration is refused ("a truce with the Duchy of Milan holds until Spring 1483 (8 more
-   seasons)"); in a copy of the game a white peace instead returns both districts to Milan (4.16 (e)).
+   seasons)"); in a copy of the game a white peace instead returns the three districts to Milan (4.16 (e)).
 6. **Men and districts are conserved.** `tests/core/test_war_property.gd` plays 40 seasons of the 1480 scenario with seeded
    random actions for every country (M1 to M7's actions: works, taxes, raises, marches onto enemies, storms, standing
    orders, declarations, peaces) and weather drawn, and finds every season, for every country: the change of its people plus
@@ -885,14 +885,14 @@ need 10), progress 2; Summer 4; Autumn 6 (a save here, loaded, plays on to the s
 seasons: `district_captured {by: siege, opened: 6}`, occupier SAV, garrison 0. From Spring 1481 Lodi, Piacenza, Cremona, (12, 8),
 (12, 10) and (11, 11) are `fallen`: any Savoy army standing alone on one takes it.
 
-**(e) The peace, Spring 1481.** Savoy occupies Domodossola and Locarno: score +2; Milan's men under arms are at most 1,000,
-Savoy's at least 2,000: `make_peace {target: MLO, terms: take}` passes row 8 by its second clause: ok. Domodossola and Locarno
-become Savoy's (one `owners_changed {tag: SAV, others: [MLO]}`); `peace_made {terms: take, moved: 2}`; every Savoy army on
+**(e) The peace, Spring 1481.** Savoy occupies Domodossola, Locarno and Pavia (Pavia from (d)): score +3; Milan's men under arms are at most 1,000,
+Savoy's at least 2,000: `make_peace {target: MLO, terms: take}` passes row 8 by its second clause: ok. Domodossola, Locarno and Pavia
+become Savoy's (one `owners_changed {tag: SAV, others: [MLO]}`); `peace_made {terms: take, moved: 3}`; every Savoy army on
 Milan's land goes to its nearest own hex: when the Army of Vercelli won at Alessandria and stands there (no longer open to
-it), to Vercelli (6, 9) (distance 1, the lowest index of the three Savoy hexes beside it), and the test checks whichever the
-seed gives; the take is accepted either way (Savoy keeps at least the Army of Ivrea's 1,000 men, Milan at most 1,000);
+it), to Vercelli (6, 9) (distance 1, the lowest index of the three Savoy hexes beside it), and the test pins Vercelli on seed 1480 (the rules give it, not the hand count); the
+take is accepted (Savoy keeps at least the Army of Ivrea's 1,000 men, Milan at most 1,000);
 `declare_war {target: MLO}` then reads "a truce with the Duchy of Milan holds until Spring 1483 (8 more seasons)". In a copy,
-`make_peace {terms: white}` (the war has lasted 4 seasons, score +2 ≥ −1): both districts go back to Milan's control, Milan's
+`make_peace {terms: white}` (the war has lasted 4 seasons, score +3 ≥ −1): the three districts go back to Milan's control, Milan's
 production counts them in full from that season.
 
 ### 4.17 The season report after M7

@@ -41,6 +41,28 @@ signal march_halted(tag: StringName, army: int, why: StringName)
 signal army_starved(tag: StringName, army: int, lost: int)
 ## A company was lost (its last man went): hunger now, battle later.
 signal unit_lost(tag: StringName, army: int, unit: int)
+## War was declared: `tag` on `target`. Every living country witnesses it (the decision queue, the country panel, the marks).
+signal war_declared(tag: StringName, target: StringName)
+## A peace ended a war on `terms` (take, white, yield or timer); `tag` asked (the timer names the war's first party).
+signal peace_made(tag: StringName, target: StringName, terms: StringName)
+## A battle began at `hex` (movement): `attacker` against `defender`.
+signal battle_started(hex: Vector2i, attacker: StringName, defender: StringName)
+## An army joined the battle at `hex`; `tag` is its country.
+signal battle_joined(hex: Vector2i, tag: StringName)
+## The battle at `hex` was fought this season (its losses are in the event; a ribbon shows them).
+signal battle_fought(hex: Vector2i)
+## A battle at `hex` ended; `record` is its battle record id, `winner` the side that won (&"" for a draw).
+signal battle_ended(hex: Vector2i, record: int, winner: StringName)
+## A siege began at `hex`: `tag` besieges.
+signal siege_started(hex: Vector2i, tag: StringName)
+## A siege at `hex` progressed: `progress` of `need`.
+signal siege_progress(hex: Vector2i, tag: StringName, progress: int, need: int)
+## A siege at `hex` was lifted; `why` is left, relief, outnumbered or peace.
+signal siege_lifted(hex: Vector2i, tag: StringName, why: StringName)
+## The district at `hex` changed hands; `by` is walk, siege, storm, retaken or freed.
+signal district_captured(hex: Vector2i, tag: StringName, by: StringName)
+## Control of `hexes` changed (the occupier overlay, the area lines, the hex panels).
+signal controllers_changed(hexes: Array[Vector2i])
 ## Every notable event, as the chronicle stores it (plain values): the log, notifications and ribbons.
 signal chronicled(entry: Dictionary)
 ## A season ended; `turn` is the season that ended. Emitted once, after the last phase's drain.

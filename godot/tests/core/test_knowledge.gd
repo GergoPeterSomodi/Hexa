@@ -127,3 +127,33 @@ func test_witnessed_reads_the_chronicle_packed_lists() -> void:
 	var listed := {"tag": AAA, "witnesses": PackedStringArray([String(OUT)])}
 	assert_true(Knowledge.witnessed(g, listed, OUT), "a packed witness list tells a listed far viewer")
 	assert_false(Knowledge.witnessed(g, listed, BBB), "and not a neighbour it does not list")
+
+
+## M7 (4.15): what a viewer may see of a battle record and of a siege. A witness sees a battle seen; a side sees it exact;
+## an unwitnessed battle is hidden (P). A siege between countries at peace is hidden for everyone (P).
+func test_battle_access_by_side_and_witness() -> void:
+	var g := ArmyFixture.game()
+	var r := BattleRecord.new()
+	r.attacker = &"SAV"
+	r.defender = &"MLO"
+	r.witnesses = PackedStringArray(["GEN"])
+	assert_eq(Knowledge.battle_access(g, &"", r), &"exact")
+	assert_eq(Knowledge.battle_access(g, &"SAV", r), &"exact")
+	assert_eq(Knowledge.battle_access(g, &"GEN", r), &"seen", "a witness")
+	assert_eq(Knowledge.battle_access(g, &"FRA", r), &"hidden", "P: an unwitnessed battle is hidden")
+	assert_eq(Knowledge.battle_access(g, &"GEN", null), &"hidden")
+
+
+func test_siege_access_hides_a_siege_at_peace() -> void:
+	var g := ArmyFixture.game()
+	var hex := ArmyFixture.find_town(g)
+	var holder := Occupation.controller_tag(g, hex)
+	var s := Siege.new()
+	s.hex = hex
+	s.besieger = &"FRA"
+	s.name = "Siege of Test, 1480"
+	g.sieges.append(s)
+	assert_eq(Knowledge.siege_access(g, &"", hex), &"hidden", "P: no war, no siege")
+	WarFixture.at_war(g, &"FRA", holder)
+	assert_eq(Knowledge.siege_access(g, &"", hex), &"exact", "at war, the viewer \"\" sees it exact")
+	assert_eq(Knowledge.siege_access(g, &"FRA", hex), &"exact", "the besieger")

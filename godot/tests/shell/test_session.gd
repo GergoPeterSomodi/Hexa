@@ -721,3 +721,67 @@ func test_drain_sends_the_army_signals_and_chronicles_the_notable_ones() -> void
 		["halted", &"GEN", 1, &"winter"], ["starved", &"GEN", 1, 10], ["lost", &"GEN", 1, 1],
 		["disbanded", &"GEN", hex, 2]])
 	assert_true(game.events.is_empty(), "drained")
+
+
+func test_drain_sends_the_war_signals_in_order_and_chronicles_the_notable_ones() -> void:
+	# M7 (m7-build-spec.md 5.5, 4.14): each war event reaches its typed signal in queue order; the notable ones then chronicle.
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	var game := Session.game
+	var hex := Vector2i(7, 12)
+	var log: Array = []
+	var on_war := func(tag: StringName, target: StringName) -> void: log.append(["war", tag, target])
+	var on_peace := func(tag: StringName, target: StringName, terms: StringName) -> void:
+		log.append(["peace", tag, target, terms])
+	var on_started := func(at: Vector2i, attacker: StringName, defender: StringName) -> void:
+		log.append(["started", at, attacker, defender])
+	var on_joined := func(at: Vector2i, tag: StringName) -> void: log.append(["joined", at, tag])
+	var on_fought := func(at: Vector2i) -> void: log.append(["fought", at])
+	var on_ended := func(at: Vector2i, record: int, winner: StringName) -> void: log.append(["ended", at, record, winner])
+	var on_siege := func(at: Vector2i, tag: StringName) -> void: log.append(["siege", at, tag])
+	var on_progress := func(at: Vector2i, tag: StringName, progress: int, need: int) -> void:
+		log.append(["progress", at, tag, progress, need])
+	var on_lifted := func(at: Vector2i, tag: StringName, why: StringName) -> void: log.append(["lifted", at, tag, why])
+	var on_captured := func(at: Vector2i, tag: StringName, by: StringName) -> void: log.append(["captured", at, tag, by])
+	var on_changed := func(hexes: Array[Vector2i]) -> void: log.append(["controllers", hexes])
+	var on_chron := func(entry: Dictionary) -> void: log.append(["chron", entry["kind"]])
+	var pairs: Array = [[Events.war_declared, on_war], [Events.peace_made, on_peace], [Events.battle_started, on_started],
+		[Events.battle_joined, on_joined], [Events.battle_fought, on_fought], [Events.battle_ended, on_ended],
+		[Events.siege_started, on_siege], [Events.siege_progress, on_progress], [Events.siege_lifted, on_lifted],
+		[Events.district_captured, on_captured], [Events.controllers_changed, on_changed], [Events.chronicled, on_chron]]
+	for pair: Array in pairs:
+		(pair[0] as Signal).connect(pair[1] as Callable)
+	game.emit({"kind": "war_declared", "tag": &"GEN", "target": &"SAV", "war": 1, "witnesses": [&"GEN", &"SAV"]})
+	game.emit({"kind": "battle_started", "tag": &"GEN", "hex": hex, "others": [&"SAV"], "defender": &"SAV", "tick": 1,
+		"name": "Alessandria", "year": 1480, "assault": false, "witnesses": [&"GEN"]})
+	game.emit({"kind": "battle_joined", "tag": &"SAV", "hex": hex, "army": 2, "side": "defender", "men": 300,
+		"witnesses": [&"SAV"]})
+	game.emit({"kind": "battle_fought", "tag": &"GEN", "hex": hex, "others": [&"SAV"], "days": 2,
+		"killed": {"GEN": 1, "SAV": 2}, "wounded": {}, "morale": {}, "witnesses": [&"GEN"]})
+	game.emit({"kind": "battle_ended", "tag": &"GEN", "hex": hex, "others": [&"SAV"], "attacker": &"GEN",
+		"defender": &"SAV", "winner": &"GEN", "loser": &"SAV", "how": "broke", "cause": "morale", "days": 2,
+		"name": "Alessandria", "year": 1480, "killed": {"GEN": 1, "SAV": 2}, "wounded": {},
+		"retreat": Vector2i(-1, -1), "record": 5, "stormed": false, "witnesses": [&"GEN"]})
+	game.emit({"kind": "siege_progress", "tag": &"GEN", "hex": hex, "others": [&"SAV"], "progress": 2, "need": 5,
+		"rate": 1, "hunger": 0, "seasons": 2, "name": "Pavia", "witnesses": [&"GEN"]})
+	game.emit({"kind": "controllers_changed", "hexes": [hex], "tag": &"GEN", "others": [&"SAV"]})
+	game.emit({"kind": "district_captured", "tag": &"GEN", "hex": hex, "others": [&"SAV"], "owner": &"SAV",
+		"by": "walk", "witnesses": [&"GEN"]})
+	game.emit({"kind": "siege_lifted", "tag": &"GEN", "hex": hex, "others": [&"SAV"], "why": "peace", "name": "Pavia",
+		"progress": 2, "need": 5, "seasons": 2, "witnesses": [&"GEN"]})
+	game.emit({"kind": "peace_made", "tag": &"GEN", "target": &"SAV", "war": 1, "terms": "white", "moved": [],
+		"released": [], "witnesses": [&"GEN"]})
+	Session.drain()
+	for pair: Array in pairs:
+		(pair[0] as Signal).disconnect(pair[1] as Callable)
+	assert_eq(log, [
+		["war", &"GEN", &"SAV"], ["chron", "war_declared"],
+		["started", hex, &"GEN", &"SAV"],
+		["joined", hex, &"SAV"],
+		["fought", hex],
+		["ended", hex, 5, &"GEN"], ["chron", "battle_ended"],
+		["progress", hex, &"GEN", 2, 5],
+		["controllers", [hex]],
+		["captured", hex, &"GEN", &"walk"], ["chron", "district_captured"],
+		["lifted", hex, &"GEN", &"peace"], ["chron", "siege_lifted"],
+		["peace", &"GEN", &"SAV", &"white"], ["chron", "peace_made"]])
+	assert_true(game.events.is_empty(), "drained")
