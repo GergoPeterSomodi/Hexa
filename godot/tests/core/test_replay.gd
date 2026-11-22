@@ -276,3 +276,60 @@ func test_a_watch_record_is_replayed_and_a_pre_pick_game_is_not_ai_only() -> voi
 	assert_true(_replay(g, g.action_log).ai_only)
 	var none: Array[Dictionary] = []
 	assert_false(_replay(g, none).ai_only)
+
+
+# ----- M8: the real AI's seasons replay with no AI (m8-build-spec.md 4.15, done-when 2) ---------------------------------------
+
+
+func _ai_played(seasons: int) -> Game:
+	var g := AiFixture.watch()
+	for n: int in seasons:
+		assert_true(bool(Season.run(g)["ok"]))
+	return g
+
+
+## The log replayed with no AI. The AI's own luck stream (luck.ai) is the one thing a log cannot carry: the AI draws it while it
+## thinks, and a replay does not think. It is put back from the live game, so the digest compares everything the log does carry
+## (an open design note of K21: Game.digest holds luck.ai, so a replay with no AI differs from the live game by that state alone).
+func _no_ai(g: Game, log: Array[Dictionary]) -> Game:
+	var again := Replay.run(g.map, g.defs, g.scenario.id, g.seed_value, log)
+	if again != null:
+		again.luck.ai.set_state(g.luck.ai.get_state())
+	return again
+
+
+func test_forty_seasons_of_the_real_ai_replay_to_the_same_digest_with_no_ai_attached() -> void:
+	var g := _ai_played(40)
+	var kinds := {}
+	for r: Dictionary in g.action_log:
+		kinds[r["action"]] = true
+	for action: String in ["raise", "build", "march", "declare_war", "make_peace", "set_tax", "orders_done"]:
+		assert_true(kinds.has(action), "the log carries the AI's %s: %s" % [action, str(kinds.keys())])
+	var again := _no_ai(g, g.action_log)
+	assert_not_null(again)
+	assert_null(again.orders, "no AI attached to the replay")
+	assert_eq(again.luck.world.get_state(), g.luck.world.get_state(), "the world's luck is the log's")
+	assert_eq(again.digest(), g.digest(), "the log carries the AI's acts")
+	assert_eq(JSON.stringify(again.action_log), JSON.stringify(g.action_log))
+
+
+func test_p_one_changed_act_of_the_real_ai_gives_another_game() -> void:
+	var g := _ai_played(8)
+	var done := 0
+	for i: int in g.action_log.size():
+		var action := str(g.action_log[i]["action"])
+		if action != "raise" and action != "set_tax" and action != "build":
+			continue
+		var log: Array[Dictionary] = []
+		for r: Dictionary in g.action_log:
+			log.append(r.duplicate(true))
+		if action == "set_tax":
+			(log[i]["args"] as Dictionary)["level"] = (int(log[i]["args"]["level"]) + 1) % 3
+		else:
+			log.remove_at(i)
+		var again := _no_ai(g, log)
+		assert_true(again == null or again.digest() != g.digest(), "record %d (%s) changed" % [i, action])
+		done += 1
+		if done >= 6:
+			break
+	assert_eq(done, 6)

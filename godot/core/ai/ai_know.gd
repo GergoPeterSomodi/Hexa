@@ -328,6 +328,29 @@ static func land_of(game: Game, tag: StringName) -> PackedInt32Array:
 	return Territory.districts(game, c.id) if c != null else PackedInt32Array()
 
 
+## The hexes within `range_hexes` of the country's own land (its land included, at distance 0) as keys, each with its distance.
+## A breadth-first field from the land: a hex is a key exactly when some own land hex is at most `range_hexes` away (the
+## same test as hex_distance). Read only; AiBrief.near_land keeps it per game version.
+static func land_field(game: Game, tag: StringName, range_hexes: int) -> Dictionary:
+	var field := {}
+	var frontier: Array[Vector2i] = []
+	for i: int in land_of(game, tag):
+		var hex := hex_of(game, i)
+		if not field.has(hex):
+			field[hex] = 0
+			frontier.append(hex)
+	for step: int in range(1, range_hexes + 1):
+		var next: Array[Vector2i] = []
+		for hex: Vector2i in frontier:
+			for d: int in 6:
+				var beside := ImproveRules.neighbour(hex, d)
+				if not field.has(beside):
+					field[beside] = step
+					next.append(beside)
+		frontier = next
+	return field
+
+
 ## The countries sharing a land border with `tag`, id order.
 static func neighbours(game: Game, tag: StringName) -> Array[StringName]:
 	var out: Array[StringName] = []

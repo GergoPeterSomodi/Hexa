@@ -95,28 +95,20 @@ static func ratio_of(men: int, men_n: int) -> int:
 ## The target's districts within `prize_range` of the seat's land whose area state is open or fallen and that the seat does not
 ## hold, plus 2 for each of its fortresses of level 2 or more within that range.
 static func prize_of(game: Game, brief: AiBrief, target: StringName) -> int:
-	var own: Array[Vector2i] = []
-	for i: int in AiKnow.land_of(game, brief.tag):
-		own.append(AiKnow.hex_of(game, i))
+	# The seat's near-land field (AiBrief.near_land): a hex is within the range of its land exactly when it is a key.
+	var near := brief.near_land()
 	var total := 0
 	for i: int in AiKnow.land_of(game, target):
 		var hex := AiKnow.hex_of(game, i)
 		if not AiKnow.is_land(game, hex) or AiKnow.controller_of(game, hex) == brief.tag:
 			continue
 		var state := AiKnow.area_state(game, hex)
-		if (state == STATE_OPEN or state == STATE_FALLEN) and _within(hex, own, brief.ai.prize_range):
+		if (state == STATE_OPEN or state == STATE_FALLEN) and near.has(hex):
 			total += 1
 	for hex: Vector2i in AiKnow.fortresses_of(game, target):
-		if AiKnow.fortress_level(game, hex) >= 2 and _within(hex, own, brief.ai.prize_range):
+		if AiKnow.fortress_level(game, hex) >= 2 and near.has(hex):
 			total += 2
 	return total
-
-
-static func _within(hex: Vector2i, hexes: Array[Vector2i], range_hexes: int) -> bool:
-	for other: Vector2i in hexes:
-		if AiKnow.hex_distance(hex, other) <= range_hexes:
-			return true
-	return false
 
 
 # ----- 4.10: what an army does ----------------------------------------------------------------------------------------------

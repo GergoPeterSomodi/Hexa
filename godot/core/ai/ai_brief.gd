@@ -30,6 +30,9 @@ var declared_now: Array[StringName] = []
 var claims: Dictionary = {}
 ## The goals an army's march was refused this turn (army id -> Array of Vector2i): its next step tries the next aim (4.10).
 var refused: Dictionary = {}
+## The near-land field of the seat (AiKnow.land_field within the shared prize range), kept for the game version it was made on.
+var _near: Dictionary = {}
+var _near_version := -1
 ## The ducats of the best works card refused for money only this turn (0: none).
 var wanted_cost := 0
 ## The works step's chosen candidates and their cards.
@@ -89,6 +92,17 @@ func post_of(army_id: int) -> Vector2i:
 		if ranked[i].id == army_id:
 			return posts[i % posts.size()]
 	return Army.NO_HEX
+
+
+## The hexes within prize_range of the seat's land, as keys (AiKnow.land_field). Built on first use and again once the game's
+## version has moved, so a read never sees a field from before a change.
+func near_land() -> Dictionary:
+	if _game == null:
+		return {}
+	if _near_version != _game.version:
+		_near = AiKnow.land_field(_game, tag, ai.prize_range)
+		_near_version = _game.version
+	return _near
 
 
 ## The enemies, and each neighbour whose banded men exceed the seat's own by the threat share (id order).

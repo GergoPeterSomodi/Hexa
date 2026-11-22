@@ -344,6 +344,83 @@ jobs:
           path: ${{ runner.temp }}/perf_ui.json
           if-no-files-found: ignore
 
+  # The soak (m8-build-spec section 4.17): all-AI games with the invariants every season. Six runs: the `ai` suite in four shards of
+  # 25 seeds, `passive` and `europe`; each uploads its JSON; soak-ranges judges the `ai` ranges over the 100 games.
+  soak:
+    name: soak (${{ matrix.suite }} ${{ matrix.seeds }})
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {suite: ai, seeds: "1-25", seasons: 80, name: ai-1}
+          - {suite: ai, seeds: "26-50", seasons: 80, name: ai-2}
+          - {suite: ai, seeds: "51-75", seasons: 80, name: ai-3}
+          - {suite: ai, seeds: "76-100", seasons: 80, name: ai-4}
+          - {suite: passive, seeds: "1-20", seasons: 80, name: passive}
+          - {suite: europe, seeds: "1-4", seasons: 40, name: europe}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Godot
+        uses: ./.github/actions/setup-godot
+      - name: Warm up the import cache (output discarded)
+        run: '"$GODOT" --headless --path godot --import > /dev/null 2>&1 || true'
+      - name: Import the project
+        run: |
+          "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
+      - name: Play the games (tables in the job summary)
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot -s res://tools/soak.gd -- --suite=${{ matrix.suite }} --seeds=${{ matrix.seeds }} \
+            --seasons=${{ matrix.seasons }} --out="$RUNNER_TEMP/soak-${{ matrix.name }}.json" --summary="$GITHUB_STEP_SUMMARY" 2>&1 | tee soak.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error' soak.log; then
+            echo "::error::The soak found a broken invariant, an error or a range out of range (see the job summary; a failed game prints its replay line)."
+            exit 1
+          fi
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-${{ matrix.name }}
+          path: ${{ runner.temp }}/soak-${{ matrix.name }}.json
+          if-no-files-found: ignore
+
+  soak-ranges:
+    name: soak ranges (ai, 100 games)
+    needs: soak
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Godot
+        uses: ./.github/actions/setup-godot
+      - name: Warm up the import cache (output discarded)
+        run: '"$GODOT" --headless --path godot --import > /dev/null 2>&1 || true'
+      - name: Import the project
+        run: |
+          "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
+      - name: Download the four ai reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: soak-ai-*
+          path: ${{ runner.temp }}/soak
+          merge-multiple: true
+      - name: Judge the ai ranges over the 100 games
+        run: |
+          set -uo pipefail
+          "$GODOT" --headless --path godot -s res://tools/soak.gd -- \
+            --merge="$RUNNER_TEMP/soak/soak-ai-1.json,$RUNNER_TEMP/soak/soak-ai-2.json,$RUNNER_TEMP/soak/soak-ai-3.json,$RUNNER_TEMP/soak/soak-ai-4.json" \
+            --summary="$GITHUB_STEP_SUMMARY" 2>&1 | tee ranges.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error' ranges.log; then
+            echo "::error::An expected range of the ai suite is broken (see the job summary)."
+            exit 1
+          fi
+
   export-windows:
     name: Windows zip (tag)
     needs: [changes, checks]

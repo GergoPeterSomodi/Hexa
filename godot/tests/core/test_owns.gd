@@ -282,13 +282,14 @@ func test_the_developer_transfers_write_through_the_doors() -> void:
 ## The phase's diff is its logged acts replayed on a copy taken before it: the digests agree, or the phase wrote something
 ## outside Game.act.
 func _acts_equal_the_phase(g: Game) -> bool:
-	var copy := Snapshot.restore(Snapshot.of(g), _fx["map"] as MapData, _fx["defs"] as GameDefs)["game"] as Game
+	var copy := Snapshot.restore(Snapshot.of(g), g.map, g.defs)["game"] as Game
 	var from := g.action_log.size()
 	Season.run_phase(g, &"ai_orders")
 	for i: int in range(from, g.action_log.size()):
 		var r := g.action_log[i]
 		if r["action"] != "orders_done":
 			copy.act(str(r["action"]), r["args"] as Dictionary)
+	copy.luck.ai.set_state(g.luck.ai.get_state())  # the AI's own stream: its draws are not acts (the log cannot carry them)
 	return copy.digest() == g.digest()
 
 
@@ -309,5 +310,48 @@ func test_the_ai_orders_phase_writes_only_through_game_act() -> void:
 func test_p_a_stub_that_writes_a_treasury_directly_is_reported() -> void:
 	var g := OrdersFixture.watched()
 	g.orders = OrdersFixture.Cheat.new()
+	Season.begin(g)
+	assert_false(_acts_equal_the_phase(g), "the diff is not its logged acts")
+
+
+## The real AI attached to the same sort of game: its phase writes only through Game.act.
+func test_the_real_ai_phase_writes_only_through_game_act() -> void:
+	var g := AiFixture.watch()
+	var wrote := false
+	var acts := 0
+	for n: int in 6:
+		Season.begin(g)
+		var before := _fields(g)
+		var from := g.action_log.size()
+		assert_true(_acts_equal_the_phase(g))
+		acts += g.action_log.size() - from - 1
+		wrote = wrote or _changed(before, _fields(g)).has("countries")
+		Season.finish(g)
+		for phase: StringName in Season.PHASES.slice(1):
+			Season.run_phase(g, phase)
+	assert_true(wrote)
+	assert_gt(acts, 30, "the countries acted")
+
+
+## The planted fault: the real AI and then a hook that writes a treasury directly.
+class AiThenCheat:
+	extends OrdersHook
+	var inner: AiTurn
+
+	func begin(game: Game) -> void:
+		inner.begin(game)
+
+	func step(game: Game) -> bool:
+		var done := inner.step(game)
+		if done:
+			game.countries[1].treasury += 5
+		return done
+
+
+func test_p_the_real_ai_plus_a_direct_write_is_reported() -> void:
+	var g := AiFixture.watch()
+	var hook := AiThenCheat.new()
+	hook.inner = g.orders as AiTurn
+	g.orders = hook
 	Season.begin(g)
 	assert_false(_acts_equal_the_phase(g), "the diff is not its logged acts")

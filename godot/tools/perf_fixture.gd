@@ -42,8 +42,10 @@ const MOVEMENT_FIELDS: Array[String] = ["units", "terrains", "relief_move_add", 
 	"wait_ratio_percent", "wait_extra_seasons", "land_sight"]
 
 
-## The made-up Europe, `seasons` seasons played. Null when the committed definitions cannot be read.
-static func europe_game(seasons: int) -> Game:
+## The made-up Europe, `seasons` seasons played. Null when the committed definitions cannot be read. With `watched` (M8, K23: the
+## AI's rig) the game is watched (Game.watch() before its first season: every country AI-played, no player) and the AI is attached;
+## the seeded random works are left out, the AI begins its own.
+static func europe_game(seasons: int, watched: bool = false) -> Game:
 	var map := FakeMap.build(COLS, ROWS, SEED)
 	var built := FakeScenario.build(map, COUNTRIES, SEED)
 	var defs := built["defs"] as GameDefs
@@ -55,16 +57,26 @@ static func europe_game(seasons: int) -> Game:
 	defs.goods = real.goods
 	defs.work_slots_base = WORK_SLOTS
 	var game := Game.new_scenario(map, defs, built["scenario"] as ScenarioDef, SEED)
-	var largest := largest_tag(game)
-	if not bool(game.act("choose_country", {"tag": largest})["ok"]):
-		printerr("PerfFixture: cannot choose %s" % largest)
-		return null
+	if watched:
+		if not game.watch():
+			printerr("PerfFixture: cannot watch the made-up Europe")
+			return null
+		AiPlayers.attach(game)
+	else:
+		var largest := largest_tag(game)
+		if not bool(game.act("choose_country", {"tag": largest})["ok"]):
+			printerr("PerfFixture: cannot choose %s" % largest)
+			return null
 	var luck := Rng.new()
 	luck.seed_with(SEED)
 	for _n: int in seasons:
-		for c: Country in game.countries:
-			_begin_works(game, c.tag, luck)
+		if not watched:
+			for c: Country in game.countries:
+				_begin_works(game, c.tag, luck)
+		var t0 := Time.get_ticks_usec()
 		Season.run(game)
+		if watched:
+			PerfAiRows.progress("warm-up turn %d: %.0f ms (all phases)" % [game.turn, float(Time.get_ticks_usec() - t0) / 1000.0])
 	return game
 
 
@@ -121,8 +133,8 @@ static func _begin_works(game: Game, tag: StringName, luck: Rng) -> void:
 ## M7 (m7-build-spec.md 8): the made-up Europe, `seasons` seasons played, and WAR_PAIRS wars between neighbouring pairs (the
 ## lowest-id countries first, each pair once), declared through the door (Game.act "declare_war"; a refusal is skipped). Null
 ## when the game cannot be built.
-static func europe_war(seasons: int) -> Game:
-	var game := europe_game(seasons)
+static func europe_war(seasons: int, watched: bool = false) -> Game:
+	var game := europe_game(seasons, watched)
 	if game == null:
 		return null
 	var made := 0
@@ -135,6 +147,12 @@ static func europe_war(seasons: int) -> Game:
 			if bool(game.act("declare_war", {"target": b.tag, "tag": a.tag})["ok"]):
 				made += 1
 	return game
+
+
+## M8 (m8-build-spec.md 8.1, K23): M7's europe_war made with Game.watch() before its first season and the AI attached: `seasons`
+## seasons played by the AI, then WAR_PAIRS wars declared through the door. Null when the game cannot be built.
+static func europe_ai(seasons: int) -> Game:
+	return europe_war(seasons, true)
 
 
 ## The armies of the speed rigs (m6-build-spec.md 8, 5.0 R10) a country of 1 to MAX_COMPANIES pikemen on

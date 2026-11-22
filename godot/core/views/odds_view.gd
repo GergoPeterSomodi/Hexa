@@ -88,7 +88,7 @@ static func _kind_of(game: Game, viewer: StringName, hex: Vector2i, storm: bool)
 	if holder == &"" or holder == viewer or not Wars.at_war(game, viewer, holder):
 		return KIND_NONE
 	var fortress := Occupation.fortress_level(game, hex) > 0
-	var garrisoned := Occupation.garrison_of(game, hex) > 0
+	var garrisoned := _garrisoned(game, viewer, hex)
 	if storm:
 		return KIND_STORM if fortress and garrisoned else KIND_NONE
 	if fortress and garrisoned:
@@ -97,6 +97,13 @@ static func _kind_of(game: Game, viewer: StringName, hex: Vector2i, storm: bool)
 		return KIND_WALK_IN
 	var held := AreaLines.held_by(game, hex)
 	return KIND_HELD if held["state"] == &"held" else KIND_WALK_IN
+
+
+## True when the viewer may take the fortress on hex to hold men (D49, the fog rule of M8 4.3): the holder and the viewer ""
+## read the exact garrison, a viewer who sees the hex reads it rounded to 100 (a garrison under 50 reads as none: the card must
+## not tell it from an empty fortress), and the garrison of a fortress it cannot see is the full one (assumed).
+static func _garrisoned(game: Game, viewer: StringName, hex: Vector2i) -> bool:
+	return int(Knowledge.garrison_estimate(game, viewer, hex)["men"]) > 0
 
 
 ## The output shell: the place, the kind, the verdict and the card's keys, empty numbers included.
@@ -211,7 +218,7 @@ static func _besiege(game: Game, viewer: StringName, a: Army, fortress: Vector2i
 
 ## The storm's word for the fortress on hex: the army against its garrison alone; "" when the viewer cannot read the garrison.
 static func _storm_word(game: Game, viewer: StringName, a: Army, hex: Vector2i) -> String:
-	if Occupation.fortress_level(game, hex) <= 0 or Occupation.garrison_of(game, hex) <= 0:
+	if Occupation.fortress_level(game, hex) <= 0 or not _garrisoned(game, viewer, hex):
 		return NO_WORD
 	var holder := Occupation.controller_tag(game, hex)
 	if holder == viewer or holder == &"" or not Wars.at_war(game, viewer, holder):
@@ -317,9 +324,9 @@ static func _garrison_entry(game: Game, viewer: StringName, hex: Vector2i, holde
 	var war := game.defs.war
 	if not assault or Occupation.fortress_level(game, hex) <= 0:
 		return {}
-	var whole := Occupation.garrison_of(game, hex)
-	if whole <= 0:
+	if not _garrisoned(game, viewer, hex):
 		return {}
+	var whole := Occupation.garrison_of(game, hex)
 	var level := Occupation.fortress_level(game, hex)
 	var access := _garrison_access(game, viewer, hex, holder)
 	if access == ACCESS_HIDDEN:

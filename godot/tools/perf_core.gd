@@ -52,6 +52,8 @@ var _out := ""
 var _summary := ""
 var _budget_path := BUDGET
 var _only := ""
+var _ai_map := ""
+var _ai_scenario := ""
 var _r: Dictionary = {}
 
 
@@ -65,9 +67,21 @@ func _initialize() -> void:
 			_summary = arg.substr(10)
 		elif arg.begins_with("--budget="):
 			_budget_path = arg.substr(9)
+		elif arg.begins_with("--ai-map="):
+			_ai_map = arg.substr(9)
+		elif arg.begins_with("--ai-total="):
+			PerfAiRows.total_seasons = int(arg.substr(11))
+		elif arg.begins_with("--ai-scenario="):
+			_ai_scenario = arg.substr(14)
 		elif arg.begins_with("--only="):
 			_only = arg.substr(7)
 	var code := 0
+	if _ai_map != "":
+		_only = "ai"
+	if _only == "ai":
+		code = _ai_rows(_ai_map, _ai_scenario, _ai_map == "")
+		quit(_finish_war() if code == 0 else code)
+		return
 	if _only == "views":
 		quit(_views_only())
 		return
@@ -80,6 +94,8 @@ func _initialize() -> void:
 		code = _war_rows()
 	if code == 0:
 		code = _europe_40()
+	if code == 0:
+		code = _ai_rows("", "", true)
 	quit(_finish() if code == 0 else code)
 
 
@@ -752,3 +768,14 @@ func _markdown(limit_rows: String) -> String:
 		_r.get("stats_ms_per_country", 0.0), str(_r.get("load_digest_matches", false))]
 	s += "\n| Row | measured | limit | what | verdict |\n|---|---|---|---|---|\n" + limit_rows
 	return s
+
+
+## The AI rows (PerfAiRows, m8-build-spec.md 8.1 to 8.3): on the made-up Europe (map "") or the committed map and scenario given
+## (--ai-map, --ai-scenario), with north Italy's row when `with_ni`; then the E3 table is printed.
+func _ai_rows(map_id: String, scenario_id: String, with_ni: bool) -> int:
+	var code := PerfAiRows.run(_r, map_id, scenario_id)
+	if code == 0 and with_ni:
+		code = PerfAiRows.run_ni(_r)
+	if code == 0:
+		PerfAiRows.print_e3(_r, _read_budget().get("limits", {}), _cpu_scale)
+	return code

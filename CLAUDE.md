@@ -47,6 +47,8 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   "$GODOT" --headless --path godot -s res://tools/economy_report.gd -- --seeds=1480-1484 --seasons=12   # M4 economy report: per country treasury, income lines, stores (--actions=random, --weather=calm; one seed: --seed=N)
   "$GODOT" --headless --path godot -s res://tools/army_report.gd -- --seeds=1480-1484   # M6 army report: per country supply coverage, raise capacity a season, route seasons to its farthest town (--weather=real)
   "$GODOT" --headless --path godot -s res://tools/war_report.gd -- --seeds=1480-1484 --seasons=12   # M7 war report: per country wars, score, occupations, fortresses and garrisons; battle outcomes and sieges (--picks=8, --armies=march|none, --actions=none, --weather=real; one seed: --seed=N)
+  "$GODOT" --headless --path godot -s res://tools/soak.gd -- --suite=ai --seeds=1-25 --seasons=80 --out=soak.json   # M8 soak (nightly `soak` + `soak-ranges` jobs): all-AI games, invariants every season, ranges, JSON + summary (suites ai, passive, europe; --quick: all, short; one game: --seed=17; --digest; --merge=a.json,b.json; a failure prints its replay line, exit 1)
+  "$GODOT" --headless --path godot -s res://tools/probes/probe_logger.gd   # does an engine Logger (the soak's error counter) see script errors? prints PASS or FAIL
   "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit   # GUT
   "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe   # Windows build
   ```
