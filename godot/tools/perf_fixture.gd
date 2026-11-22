@@ -284,6 +284,25 @@ static func siege_set(game: Game, sieges: int, occupied: int) -> Dictionary:
 	return {"sieges": made, "occupied": taken}
 
 
+## M7 (m7-build-spec.md 8): an army and an enemy army beside it, made for the odds card's row (no battle is engaged). Returns
+## {viewer, army (id), hex (the enemy's)}; {} when no free pair is left. The armies stay on the map.
+static func odds_pair(game: Game) -> Dictionary:
+	for i: int in game.map.hex_count():
+		var h := game.map.hex_of(i)
+		if not game.map.is_land(h) or not Armies.at(game, h).is_empty() or Battles.at(game, h) != null:
+			continue
+		var near := _enemy_beside(game, h)
+		if near == Army.NO_HEX:
+			continue
+		var viewer := Occupation.controller_tag(game, h)
+		_rig_army(game, Occupation.controller_tag(game, near), near, FIGHT_COMPANIES)
+		var mine := _rig_army(game, viewer, h, FIGHT_COMPANIES)
+		Sight.refresh(game)  # the rig's armies see their surroundings (the vision phase has not run)
+		game.version += 1
+		return {"viewer": viewer, "army": mine.id, "hex": near}
+	return {}
+
+
 ## An army of `companies` pikemen of `tag` on hex (through the armies' door; the rig of seed_armies).
 static func _rig_army(game: Game, tag: StringName, hex: Vector2i, companies: int) -> Army:
 	var a := Armies.create(game, tag, hex, "Army of perf")

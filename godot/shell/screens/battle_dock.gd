@@ -169,9 +169,14 @@ func is_playing() -> bool:
 	return _clock != null and not _clock.is_stopped()
 
 
-## The title shown in the frame's cartouche ("" when hidden).
+## The title shown in the frame's cartouche, without the year, which is on the sub line ("" when hidden).
 func cartouche_text() -> String:
 	return _frame.cartouche_title if _frame != null else ""
+
+
+## The battle's whole name as the spec words it ("" when hidden): the cartouche's tooltip.
+func full_title() -> String:
+	return _frame.cartouche().tooltip_text if _frame != null and visible else ""
 
 
 ## The result sentence of the shown battle ("" when nothing is shown).
@@ -207,7 +212,14 @@ func refresh() -> void:
 		return
 	PanelKit.clear_children(_body, _retired)
 	_arms = {}
-	_frame.cartouche_title = str(_view.get("name", ""))
+	var full := str(_view.get("name", ""))
+	var cut := full.rfind(", ")
+	var year := full.substr(cut + 2) if cut > 0 else ""
+	# The year goes on the sub line so the plate is short; the plate's tooltip keeps the whole name.
+	_frame.cartouche_title = full.substr(0, cut) if year.is_valid_int() else full
+	_frame.subtitle = year if year.is_valid_int() else ""
+	_frame.cartouche().tooltip_text = full
+	_frame.cartouche().accessibility_name = full
 	_body.add_child(_place_row())
 	if _kept():
 		_body.add_child(_face_off())

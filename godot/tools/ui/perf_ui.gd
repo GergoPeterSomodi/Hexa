@@ -22,6 +22,7 @@ extends SceneTree
 const M45 := preload("res://tools/ui/perf_ui_m45.gd")
 const M5 := preload("res://tools/ui/perf_ui_m5.gd")
 const M6 := preload("res://tools/ui/perf_ui_m6.gd")
+const M7 := preload("res://tools/ui/perf_ui_m7.gd")
 const BUDGET := "res://tests/perf_ui_budget.json"
 const APP_SCENE_PATH := "res://shell/app/app.tscn"
 const SCREEN_IDS_PATH := "res://shell/screens/screen_ids.gd"
@@ -450,6 +451,7 @@ func _measure_m45(packed: PackedScene, headless: bool) -> void:
 	await M45.new(self, _r).measure(app, vp, headless, _europe_seasons)
 	await M5.new(self, _r).measure(app, vp)  # M5 (perf_ui_m5.gd): the People page cold and key 5, on the same game
 	await M6.new(self, _r).measure(app, vp)  # M6 (perf_ui_m6.gd): the armies' panel, tokens, route, replay, Supply, Military page
+	await M7.new(self, _r).measure(app)  # M7 (perf_ui_m7.gd): the battle dock, the war marks, the odds card, the hex menu, the castle areas
 
 	session.call("end_game")
 	root.remove_child(vp)

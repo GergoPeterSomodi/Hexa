@@ -38,11 +38,20 @@ const TOKEN_RUNS := 5
 const WAR_SEASONS := 2
 const WAR_RUNS := 8
 const COLD_RUNS := 3
+## The M7 war rows (m7-build-spec.md 8): the battles of a set, the runs of a row, the sieges and occupied districts, the fight's
+## samples and the war's runs.
+const BATTLE_SET := 20
+const BATTLE_RUNS := 3
+const SIEGE_SET := 100
+const OCCUPIED_SET := 1000
+const FIGHTS := 1000
+const WAR_PATH := "res://data/defs/war.tres"
 
 var _cpu_scale := 1.0
 var _out := ""
 var _summary := ""
 var _budget_path := BUDGET
+var _only := ""
 var _r: Dictionary = {}
 
 
@@ -56,12 +65,66 @@ func _initialize() -> void:
 			_summary = arg.substr(10)
 		elif arg.begins_with("--budget="):
 			_budget_path = arg.substr(9)
-	var code := _measure()
+		elif arg.begins_with("--only="):
+			_only = arg.substr(7)
+	var code := 0
+	if _only == "views":
+		quit(_views_only())
+		return
+	if _only == "war":
+		code = _war_rows()
+		quit(_finish_war() if code == 0 else code)
+		return
+	code = _measure()
 	if code == 0:
 		code = _war_rows()
 	if code == 0:
 		code = _europe_40()
 	quit(_finish() if code == 0 else code)
+
+
+## The war rows alone (--only=war): the rows of the budget that this run measured, printed with their verdicts, the results in the
+## --out file; exit 1 past a limit that has no known_over.
+func _finish_war() -> int:
+	var limits: Dictionary = _read_budget().get("limits", {})
+	var failed: Array[String] = []
+	for key: String in limits:
+		if not _r.has(key):
+			continue
+		var spec: Dictionary = limits[key]
+		var value := float(_r[key])
+		var limit := float(spec["limit"]) * (_cpu_scale if str(spec["class"]) == "cpu" else 1.0)
+		var verdict := "ok"
+		var accepted: Dictionary = spec.get("known_over", {})
+		if value > limit and not accepted.is_empty():
+			verdict = "KNOWN OVER (#%s)" % str(int(accepted.get("issue", 0)))
+		elif value > limit:
+			verdict = "FAIL"
+			failed.append("%s %.2f > %.2f" % [key, value, limit])
+		print("| %s | %.3f | %.2f | %s |" % [key, value, limit, verdict])
+	if _out != "":
+		var file := FileAccess.open(_out, FileAccess.WRITE)
+		if file != null:
+			file.store_string(JSON.stringify(_r, "  "))
+	for key: String in _r:
+		if not limits.has(key):
+			print("%s = %s" % [key, str(_r[key])])
+	return 0 if failed.is_empty() else 1
+
+
+## --only=views: the made-up Europe at war, a few battles and the sieges, then the view rows alone (the rig's seasons are left out).
+func _views_only() -> int:
+	var game := PerfFixture.europe_war(WAR_SEASONS)
+	if game == null:
+		return 1
+	PerfFixture.battle_set(game, 3)
+	Season.run_phase(game, &"battles")
+	PerfFixture.siege_set(game, 10, 100)
+	Season.run_phase(game, &"sieges")
+	PerfWarViews.measure(game, game.sieges[0] if not game.sieges.is_empty() else null, _r)
+	for key: String in _r:
+		print("%s = %s" % [key, str(_r[key])])
+	return 0
 
 
 func _ms(from_usec: int) -> float:
@@ -161,18 +224,120 @@ func _europe_40() -> int:
 
 
 ## The worst of RUNS_45 calls of `call`, each on a new game version (cold: the views are made again, the owner index of the territories stays, as after an action).
-## M7 rows (m7-build-spec.md 8): the war phases on the made-up Europe with WAR_PAIRS wars (PerfFixture.europe_war), the worst of
-## WAR_RUNS runs of Wars.season and of Sieges.season. The sieges row has no standing siege on this fixture (the 100-siege
-## fixture of the spec is not built yet); the battles rows wait for their fixture too.
+## The M7 rows (m7-build-spec.md 8) on the made-up Europe with WAR_PAIRS wars (PerfFixture.europe_war) and WAR_SEASONS seasons. The
+## armies of PerfFixture.seed_armies, one in two of each country at war marching at the enemy (PerfFixture.war_march), play SEASONS
+## seasons of every phase: movement_ms is the worst movement phase of them (battles engage at the ticks), battles_season_ms the
+## worst battles phase. Then battles_ms: BATTLE_RUNS runs of BATTLE_SET battles (PerfFixture.battle_set), the worst battles phase;
+## the records kept fill the save (save_mb, with the occupation and the garrisons). Then sieges_ms: SIEGE_SET sieges and
+## OCCUPIED_SET occupied districts (PerfFixture.siege_set), one untimed run starts the sieges, then the worst of WAR_RUNS sieges
+## phases; war_ms the worst of WAR_RUNS war phases; areas_cold_ms the war cache from cold. fight_ms is one Combat.fight of
+## FIGHT_COMPANIES against FIGHT_COMPANIES on the committed war, the mean of FIGHTS fights.
+## The view rows (PerfWarViews) run last on this game: odds_ms, battle_view_ms, siege_view_ms and area_lines_ms.
 func _war_rows() -> int:
+	_r["fight_ms"] = _fight_ms()
+	var rig_t := Time.get_ticks_usec()
 	var game := PerfFixture.europe_war(WAR_SEASONS)
+	_r["rig_build_ms"] = _ms(rig_t)
 	if game == null:
 		printerr("perf_core: cannot build the war fixture")
 		return 1
 	_r["wars_declared"] = game.wars.size()
-	_r["war_ms"] = _worst_of(game, Callable(Season, "run_phase").bind(game, &"war"), WAR_RUNS)
+	var luck := Rng.new()
+	luck.seed_with(SEED + 7)
+	rig_t = Time.get_ticks_usec()
+	var armies := PerfFixture.seed_armies(game, luck)
+	_r["war_armies"] = armies.size()
+	_r["rig_armies_ms"] = _ms(rig_t)
+	rig_t = Time.get_ticks_usec()
+	var worst := {&"movement": 0.0, &"battles": 0.0}
+	var worst_season := 0.0
+	for _n: int in SEASONS:
+		PerfFixture.rearm(game, luck, armies)
+		PerfFixture.war_march(game, armies, luck)
+		var season_t := Time.get_ticks_usec()
+		Season.begin(game)
+		for phase: StringName in Season.PHASES:
+			var t := Time.get_ticks_usec()
+			Season.run_phase(game, phase)
+			var spent := _ms(t)
+			if worst.has(phase):
+				worst[phase] = maxf(float(worst[phase]), spent)
+		Season.finish(game)
+		worst_season = maxf(worst_season, _ms(season_t))
+	_r["rig_seasons_ms"] = _ms(rig_t)
+	_r["movement_ms"] = worst[&"movement"]
+	_r["battles_season_ms"] = worst[&"battles"]
+	_r["season_ms"] = worst_season  # the war season: the thirteen phases on the made-up Europe with the wars (m7-build-spec.md 8)
+	rig_t = Time.get_ticks_usec()
+	var battles := 0.0
+	var made := 0
+	for _k: int in BATTLE_RUNS:
+		made += PerfFixture.battle_set(game, BATTLE_SET)
+		var t := Time.get_ticks_usec()
+		Season.run_phase(game, &"battles")
+		battles = maxf(battles, _ms(t))
+	_r["battles_ms"] = battles
+	_r["rig_battles_ms"] = _ms(rig_t)
+	rig_t = Time.get_ticks_usec()
+	_r["battles_set_made"] = made
+	_r["records_kept"] = game.battle_records.size()
+	var sets := PerfFixture.siege_set(game, SIEGE_SET, OCCUPIED_SET)
+	_r["sieges_set"] = int(sets["sieges"])
+	_r["occupied_set"] = int(sets["occupied"])
+	Season.run_phase(game, &"sieges")
+	var first_siege: Siege = game.sieges[0] if not game.sieges.is_empty() else null  # the view row reads it before the runs lift it
+	_r["sieges_standing"] = game.sieges.size()
+	_r["rig_sieges_ms"] = _ms(rig_t)
 	_r["sieges_ms"] = _worst_of(game, Callable(Season, "run_phase").bind(game, &"sieges"), WAR_RUNS)
+	_r["war_ms"] = _worst_of(game, Callable(Season, "run_phase").bind(game, &"war"), WAR_RUNS)
+	_r["areas_cold_ms"] = _areas_cold(game)
+	PerfWarViews.measure(game, first_siege, _r)
+	_r["save_base_mb"] = _r.get("save_mb", 0.0)
+	_r["save_mb"] = _war_save_mb(game)
 	return 0
+
+
+## One Combat.fight of FIGHT_COMPANIES pikemen against FIGHT_COMPANIES on the committed war: the mean of FIGHTS fights, in ms.
+func _fight_ms() -> float:
+	var war := ResourceLoader.load(WAR_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as WarDef
+	var fighters: Array = []
+	for i: int in PerfFixture.FIGHT_COMPANIES:
+		fighters.append(CombatFixture.pikemen(1 + i, 0))
+		fighters.append(CombatFixture.pikemen(10 + i, 1))
+	var input := CombatFixture.input_of(war, fighters)
+	var t := Time.get_ticks_usec()
+	for seed_value: int in FIGHTS:
+		var rng := Rng.new()
+		rng.seed_with(seed_value + 1)
+		Combat.fight(war, input, rng)
+	return _ms(t) / float(FIGHTS)
+
+
+## The war cache's areas and controlled lists from cold (the cache cleared first), worst of COLD_RUNS, in ms.
+func _areas_cold(game: Game) -> float:
+	var worst := 0.0
+	for _n: int in COLD_RUNS:
+		game.war_cache.clear()
+		var t := Time.get_ticks_usec()
+		game.war_cache.fortresses(game)
+		game.war_cache.area_index(game)
+		for c: Country in game.countries:
+			game.war_cache.controlled(game, c.id)
+		worst = maxf(worst, _ms(t))
+	return worst
+
+
+## The .sav size in MB of the game as it is (its records, occupation and garrisons), written to user://perf/ and removed.
+func _war_save_mb(game: Game) -> float:
+	_remove_dir()
+	var info := {"build": "perf", "name": "perf", "saved_unix": 0, "play_seconds": 0}
+	var problem := SaveFile.write(game, "1", info, {}, SAVE_DIR)
+	if not problem.is_empty():
+		printerr("perf_core: the war save failed: %s" % problem)
+		return -1.0
+	var mb := float(FileAccess.get_file_as_bytes(SaveFile.path_of("1", SAVE_DIR)).size()) / MB
+	_remove_dir()
+	return mb
 
 
 func _worst(game: Game, call: Callable) -> float:
@@ -319,7 +484,7 @@ func _seasons(game: Game) -> bool:
 		worst_season = maxf(worst_season, float(row["total_ms"]))
 		rows.append(row)
 	_r["seasons"] = rows
-	_r["season_ms"] = worst_season
+	_r["season_base_ms"] = worst_season
 	_r["production_ms"] = worst[&"production"]
 	_r["income_ms"] = worst[&"income"]
 	_r["works_phase_ms"] = worst[&"works"]
@@ -354,7 +519,7 @@ func _armies(game: Game) -> void:
 		army_phases = maxf(army_phases, season_army)
 		Season.finish(game)
 		PerfFixture.rearm(game, luck, armies)
-	_r["movement_ms"] = worst[&"movement"]
+	_r["movement_peace_ms"] = worst[&"movement"]  # the peace march; the war rig's movement_ms is the row (M7)
 	_r["supply_ms"] = worst[&"supply"]
 	_r["vision_ms"] = worst[&"vision"]
 	_r["ready_units_ms"] = worst[&"ready_units"]

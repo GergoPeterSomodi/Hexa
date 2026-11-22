@@ -39,12 +39,15 @@ func _init() -> void:
 	_figure.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_figure.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_figure)
+	_men = _label(&"Hint")
+	_men.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_men.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_men)
+	_content.add_child(row)
+	# The name has its own full-width line, one line, trimmed with an ellipsis (the tooltip carries it whole).
 	_name = _label(&"TableRow")
 	_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(_name)
-	_content.add_child(row)
-	_men = _label(&"Hint")
-	_content.add_child(_men)
+	_content.add_child(_name)
 	_men_bar = _bar()
 	_content.add_child(_men_bar)
 	_morale_bar = _bar()
@@ -105,10 +108,7 @@ func kind() -> String:
 func mark_texts() -> PackedStringArray:
 	var out := PackedStringArray()
 	for child: Node in _marks.get_children():
-		for part: Node in child.get_children():
-			var lbl := part as Label
-			if lbl != null:
-				out.append(lbl.text)
+		out.append((child as Control).tooltip_text)
 	return out
 
 
@@ -126,7 +126,8 @@ func _fill_marks(entry: Dictionary) -> void:
 
 func _add_mark(icon: StringName, text: String, colour: Color) -> void:
 	var box := HBoxContainer.new()
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.mouse_filter = Control.MOUSE_FILTER_PASS
+	box.tooltip_text = text
 	var tex := TextureRect.new()
 	tex.custom_minimum_size = Vector2(MARK_PX, MARK_PX)
 	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -134,10 +135,13 @@ func _add_mark(icon: StringName, text: String, colour: Color) -> void:
 	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tex.texture = _icon_of(icon)
 	box.add_child(tex)
-	var lbl := _label(&"Hint")
-	lbl.text = text
-	lbl.add_theme_color_override(&"font_color", colour)
-	box.add_child(lbl)
+	if tex.texture == null:
+		# No icon in the kit: the word stands in (one line, never wrapped).
+		tex.visible = false
+		var lbl := _label(&"Hint")
+		lbl.text = text
+		lbl.add_theme_color_override(&"font_color", colour)
+		box.add_child(lbl)
 	_marks.add_child(box)
 
 
@@ -153,7 +157,10 @@ func _figure_of(name: StringName) -> Texture2D:
 
 func _label(variation: StringName) -> Label:
 	var lbl := PanelKit.label("", variation)
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	lbl.max_lines_visible = 1
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return lbl
 
 

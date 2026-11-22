@@ -1,5 +1,5 @@
 {
-  "comment": "UI performance and memory budgets (docs/architecture/ui-style-and-feedback-spec.md sections 4.10, 11; ui-and-controls-spec.md section 9; m3-build-spec.md section 8; m4-build-spec.md section 8; m4-5-build-spec.md section 8; m5-build-spec.md section 8; m6-build-spec.md section 8). Read by tools/ui/perf_ui.gd. Never read by a GUT test.",
+  "comment": "UI performance and memory budgets (docs/architecture/ui-style-and-feedback-spec.md sections 4.10, 11; ui-and-controls-spec.md section 9; m3-build-spec.md section 8; m4-build-spec.md section 8; m4-5-build-spec.md section 8; m5-build-spec.md section 8; m6-build-spec.md section 8; m7-build-spec.md section 8). Read by tools/ui/perf_ui.gd. Never read by a GUT test.",
   "screens": ["main_menu", "sandbox", "credits", "pause_menu", "options", "about", "help", "confirm", "loading"],
   "limits": {
     "screen_push_cpu_worst_ms": {"limit": 150.0, "class": "cpu", "what": "worst cold instantiate + ScreenStack.push time across M1.5 screens"},
@@ -33,6 +33,12 @@
     "replay_frame_ms": {"limit": 2.0, "class": "cpu", "what": "one frame of the movement replay with 40 walkers (the clock and the poses), mean of 30 (M6)"},
     "supply_mode_ms": {"limit": 16.0, "class": "gpu", "what": "key 6 to the first Supply frame, north Italy, the view cache cleared, worst of 3 (M6)"},
     "military_page_open_ms": {"limit": 16.0, "class": "gpu", "what": "the Military page opened with the view cache cleared, the call and one forced draw, worst of 3 (M6)", "known_over": {"issue": 424, "note": "32 to 36 ms headless (dummy renderer) with about 14 armies; not enforced headless; see the issue"}},
+    "battle_dock_open_ms": {"limit": 16.0, "class": "gpu", "what": "the battle dock opened on an 8-day record, the view cache cleared, the call and one forced draw, worst of 3, Genoa at war with a neighbour and 61 records kept (M7)"},
+    "dock_day_step_ms": {"limit": 4.0, "class": "gpu", "what": "one step of the dock's day stepper (the view of the new day and the dock rebuilt) and one forced draw, worst of the 7 steps through an 8-day record, the view cache cleared before each (M7)", "known_over": {"issue": 429, "note": "10.5 to 13 ms headless (dummy renderer), 3 runs 2026-11-22 (B29): the dock is rebuilt on each day; the issue is to be raised by the planning session"}},
+    "war_marks_refresh_ms": {"limit": 4.0, "class": "cpu", "what": "WarMarks.refresh with 60 battle marks (a record each, read in full) and the sieges, the view cache cleared before each, mean of 10 (M7)"},
+    "odds_hover_ms": {"limit": 4.0, "class": "cpu", "what": "the order cursor moved over an enemy army with an army of eight companies selected (the odds card made and drawn), cold, worst of 3 (M7)"},
+    "hex_menu_war_ms": {"limit": 6.0, "class": "cpu", "what": "the hex menu opened on a hex with a battle site (its war items made), the view cache cleared, the call and one forced draw, worst of 3 (M7)"},
+    "area_show_ms": {"limit": 16.0, "class": "gpu", "what": "an army selected with a war on: the castle-area gate opens, the first slice of the area lines is built and drawn, the view cache cleared, worst of 3, north Italy (M7)"},
     "kit_1x_mb": {"limit": 4.0, "class": "mem", "what": "1x Studiolo UI kit RGBA8 memory in play (budget < 4 MB)"},
     "kit_2x_mb": {"limit": 16.0, "class": "mem", "what": "2x Studiolo UI kit RGBA8 memory in play (budget < 16 MB)"}
   }

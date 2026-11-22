@@ -73,7 +73,7 @@ func _m6_force(rng: Rng, vp: SubViewport, app: App) -> void:
 	elif int(_n["m6_orders"]) == 0 or (int(_n["m6_replays"]) == 0 and not _m6_has_march()):
 		await _m6_march(rng, vp, app)
 	elif int(_n["m6_panel_actions"]) == 0:
-		await _m6_panel(rng, vp, app)
+		await _m6_panel(rng, vp, app, true)
 	elif int(_n["m6_raises"]) == 0:
 		await _m6_raise(rng, vp, app, false)
 	elif int(_n["m6_hex_menus"]) == 0:
@@ -270,9 +270,11 @@ func _m6_during_replay(rng: Rng, vp: SubViewport, app: App) -> void:
 	await _m6_blocked_order(rng, vp, app)
 	if rng.randi_range(0, 2) == 0:
 		return
+	var screens := app.stack().count()
 	_send_chord(vp, KEY_SPACE if rng.randi_range(0, 1) == 0 else KEY_ESCAPE)
 	await _wait_frames(3)
-	assert_false(_m6_replaying(app), "%s: Space or Esc skips the replay" % _tag)
+	if screens == 0:  # with a screen up (the study opened by a click) the key is the screen's: Esc closes it, and skips the replay on the next
+		assert_false(_m6_replaying(app), "%s: Space or Esc skips the replay" % _tag)
 
 
 ## An order during the replay: a right click, O, R or Tab. Nothing is accepted: the digest, the version and the stores stay.
@@ -299,7 +301,7 @@ func _m6_blocked_order(rng: Rng, vp: SubViewport, app: App) -> void:
 
 ## One of the panel's buttons: Split off, Join, Disband (its Confirm answered at random), Hold or Continue march. The men of the
 ## world add up the same after a split, a join or a disband.
-func _m6_panel(rng: Rng, vp: SubViewport, app: App) -> void:
+func _m6_panel(rng: Rng, vp: SubViewport, app: App, forced: bool = false) -> void:
 	var armies := _m6_map_armies(app)
 	if armies == null or Session.game == null:
 		return
@@ -308,8 +310,14 @@ func _m6_panel(rng: Rng, vp: SubViewport, app: App) -> void:
 		if armies.selected_army() < 0:
 			return
 	var names: Array[String] = ["split_army", "merge_armies", "disband", "halt", "continue_march"]
-	var action := names[rng.randi_range(0, names.size() - 1)]
+	var start := rng.randi_range(0, names.size() - 1)
+	var action := names[start]
 	var btn := app.hud().army_panel().action_button(action)
+	for i: int in range(1, names.size()):  # a forced step takes the first button that is enabled, so the counter does not wait on the dice
+		if not forced or (btn != null and btn.is_visible_in_tree() and not btn.disabled):
+			break
+		action = names[(start + i) % names.size()]
+		btn = app.hud().army_panel().action_button(action)
 	if btn == null or not btn.is_visible_in_tree() or btn.disabled:
 		return
 	var game := Session.game
@@ -460,13 +468,17 @@ func _m6_end_once(rng: Rng, vp: SubViewport, app: App) -> bool:
 		await _wait_frames(rng.randi_range(0, 6))
 		match rng.randi_range(0, 2):
 			0:
+				var screens := app.stack().count()
 				_send_chord(vp, KEY_SPACE)
 				await _wait_frames(3)
-				assert_false(_m6_replaying(app), "%s: Space skips the replay" % _tag)
+				if screens == 0:  # with a screen up the key is the screen's
+					assert_false(_m6_replaying(app), "%s: Space skips the replay" % _tag)
 			1:
+				var screens := app.stack().count()
 				_send_chord(vp, KEY_ESCAPE)
 				await _wait_frames(3)
-				assert_false(_m6_replaying(app), "%s: Esc skips the replay" % _tag)
+				if screens == 0:  # with a screen up the key is the screen's
+					assert_false(_m6_replaying(app), "%s: Esc skips the replay" % _tag)
 			_:
 				_send_click(vp, Vector2(float(rng.randi_range(200, vp.size.x - 200)), float(rng.randi_range(120, vp.size.y - 120))), MOUSE_BUTTON_LEFT)
 				await _wait_frames(2)

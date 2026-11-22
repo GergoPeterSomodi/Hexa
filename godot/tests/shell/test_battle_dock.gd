@@ -110,7 +110,9 @@ func test_exact_viewer_sees_every_part_of_the_battle() -> void:
 	assert_eq(_dock.shown_record(), r.id)
 	assert_eq(_dock.day_count(), r.frames.size(), "the stepper counts the battle's days")
 	assert_eq(_dock.shown_day(), r.frames.size(), "the last day is shown first")
-	assert_eq(_dock.cartouche_text(), "Battle of Test, 1480", "the title is the battle's name")
+	assert_eq(_dock.cartouche_text(), "Battle of Test", "the plate holds the name; the year is on the sub line")
+	assert_eq(_dock.full_title(), "Battle of Test, 1480", "the whole name stays in the plate's tooltip")
+	assert_eq(_dock._frame.subtitle, "1480", "the year is on the sub line")
 	assert_eq(_dock.find_children("*", "BattlePicture", true, false).size(), 1, "the face-off picture")
 	assert_eq(_dock.find_children("*", "DieFace", true, false).size(), 2, "a die a side")
 	assert_eq(_dock.find_children("*", "TugBar", true, false).size(), 1, "the front-line tug bar")
@@ -315,3 +317,34 @@ func test_footer_and_title_fit_the_dock_width() -> void:
 	for node: Node in _dock.find_children("*", "KitButton", true, false):
 		var btn := node as KitButton
 		assert_gt(btn.size.x, 0.0, "%s is laid out" % btn.text)
+
+
+func test_title_fits_its_plate_and_lane_tiles_never_wrap() -> void:
+	var r := _battle(ArmyFixture.TAG, SAV, PackedStringArray())
+	_dock.show_record(r.id)
+	_dock.size = Vector2(BattleDock.WIDTH, 720.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var plate := _dock._frame.cartouche().label()
+	var font := plate.get_theme_font(&"font")
+	var text_w := font.get_string_size(plate.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, plate.get_theme_font_size(&"font_size")).x
+	assert_lte(text_w, plate.size.x, "the title '%s' fits its plate whole" % plate.text)
+	for node: Node in _dock.find_children("*", "RegimentTile", true, false):
+		var tile := node as RegimentTile
+		for lbl_node: Node in tile.find_children("*", "Label", true, false):
+			var lbl := lbl_node as Label
+			assert_eq(lbl.autowrap_mode, TextServer.AUTOWRAP_OFF, "no wrapping in a tile: '%s'" % lbl.text)
+			assert_lte(lbl.get_line_count(), 1, "'%s' is one line" % lbl.text)
+
+
+func test_tile_bottom_is_inside_the_scrolled_body() -> void:
+	var r := _battle(ArmyFixture.TAG, SAV, PackedStringArray())
+	_dock.show_record(r.id)
+	_dock.size = Vector2(BattleDock.WIDTH, 720.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var body := _dock._frame.body()
+	for node: Node in _dock.find_children("*", "RegimentTile", true, false):
+		var tile := node as RegimentTile
+		assert_lte(tile.get_global_rect().end.y, body.get_global_rect().end.y + 0.5, "a tile ends inside the scrolled body")
+
