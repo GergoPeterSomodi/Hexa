@@ -437,3 +437,78 @@ func test_planted_bad_people_lines_give_their_problem_and_change_nothing() -> vo
 	assert_eq(_problem("people 6 13 5"), "the sandbox has no countries")
 	Session.game = null
 	assert_eq(DevCommands.parse("people 6 13 5", null)["problem"], "There is no game.")
+
+
+## M7 (B28, D57): declare, peace, storm, standing and wars parse to their actions; each planted fault says its problem.
+func test_m7_commands_parse_to_their_actions() -> void:
+	var neighbour := WarFixture.neighbour_of(_game(), &"GEN")
+	var declare := DevCommands.parse("declare %s" % String(neighbour).to_lower(), _game())
+	assert_eq(declare["problem"], "", "a tag in lower case is read")
+	assert_eq(declare["action"], "declare_war")
+	assert_eq(declare["args"], {"target": neighbour})
+	var peace := DevCommands.parse("peace %s yield" % neighbour, _game())
+	assert_eq(peace["action"], "make_peace")
+	assert_eq(peace["args"], {"target": neighbour, "terms": &"yield"})
+	assert_eq(DevCommands.parse("as %s declare GEN" % neighbour, _game())["args"], {"target": &"GEN", "tag": neighbour}, "as TAG declares for TAG")
+	assert_eq(DevCommands.parse("wars", _game())["kind"], &"wars")
+	assert_eq(_problem("declare ZZZ"), "no country ZZZ.", "planted: a country that is not there")
+	assert_eq(_problem("peace ZZZ take"), "no country ZZZ.")
+	assert_eq(_problem("peace %s sue" % neighbour), "no such terms 'sue': take, white or yield.", "planted: terms that do not exist")
+	assert_eq(_problem("declare"), "Use: declare TAG")
+	assert_eq(_problem("peace GEN"), "Use: peace TAG take|white|yield")
+	assert_eq(_problem("storm 99 1 1"), "no army ID 99.", "planted: an army that is not there")
+	assert_eq(_problem("storm x 1 1"), "no army ID x.")
+	assert_eq(_problem("storm 1 2"), "Use: storm ID c r")
+	assert_eq(_problem("standing 99 hold"), "no army ID 99.")
+	assert_eq(_problem("standing 1"), "Use: standing ID hold|withdraw")
+	assert_eq(_problem("wars now"), "wars takes no arguments.")
+	var hex := _capital()
+	assert_true(DevCommands.run("raise %d %d pikemen 1" % [hex.x, hex.y], _ctx).begins_with("Done"))
+	var army := Armies.of_country(_game(), &"GEN")[0]
+	assert_eq(_problem("standing %d stand" % army.id), "no such standing order 'stand': hold or withdraw.", "planted: an order that does not exist")
+	assert_eq(_problem("storm %d 999 999" % army.id), "no such hex 999 999.")
+
+
+func test_m7_commands_run_through_the_console() -> void:
+	assert_eq(DevCommands.run("wars", _ctx), "You are at war with no one.")
+	var neighbour := WarFixture.neighbour_of(_game(), &"GEN")
+	var hex := _capital()
+	assert_true(DevCommands.run("raise %d %d pikemen 1" % [hex.x, hex.y], _ctx).begins_with("Done"))
+	var army := Armies.of_country(_game(), &"GEN")[0]
+	assert_true(DevCommands.run("standing %d withdraw" % army.id, _ctx).begins_with("Done"), "the standing order is set")
+	assert_eq(Armies.by_id(_game(), army.id).standing, Army.STANDING_WITHDRAW)
+	assert_true(DevCommands.run("standing %d withdraw" % army.id, _ctx).begins_with("Refused"), "the rules refuse the same order twice")
+	assert_true(DevCommands.run("peace %s white" % neighbour, _ctx).begins_with("Refused"), "no peace without a war")
+	assert_true(DevCommands.run("declare %s" % neighbour, _ctx).begins_with("Done"), "the war is declared")
+	assert_true(DevCommands.run("declare %s" % neighbour, _ctx).contains("already at war"), "and not twice")
+	var listed := DevCommands.run("wars", _ctx)
+	assert_true(listed.contains("since Spring 1480") and listed.contains("score 0"), listed)
+	assert_true(DevCommands.run("storm %d %d %d" % [army.id, hex.x, hex.y], _ctx).begins_with("Refused"), "a storm needs a fortress to storm")
+	assert_true(DevCommands.run("peace %s yield" % neighbour, _ctx).begins_with("Done"), "the peace is made")
+	assert_eq(DevCommands.run("wars", _ctx), "You are at war with no one.")
+	assert_true(DevCommands.run("help", _ctx).contains("declare TAG"), "help names the war commands")
+
+
+func test_the_sandbox_refuses_declare_and_peace() -> void:
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	assert_eq(DevCommands.run("declare MLO", _ctx), "the sandbox has no countries, so no war")
+	assert_eq(DevCommands.run("peace MLO take", _ctx), "the sandbox has no countries, so no war")
+	assert_eq(DevCommands.run("wars", _ctx), "You are at war with no one.")
+
+
+## 4.15: the console's storm (and `as`) tells nothing of a place the country cannot see: one sentence for walls and none.
+func test_storm_on_an_unseen_place_gets_the_one_sentence() -> void:
+	var hex := _capital()
+	assert_true(DevCommands.run("raise %d %d pikemen 1" % [hex.x, hex.y], _ctx).begins_with("Done"))
+	var army := Armies.of_country(_game(), &"GEN")[0]
+	var said: Array[String] = []
+	for i: int in _game().map.hex_count():
+		var far := _game().map.hex_of(i)
+		if _game().map.land[i] == 1 and not Sight.sees(_game(), &"GEN", far) and Territory.owner_tag(_game(), far) != &"GEN":
+			said.append(DevCommands.run("storm %d %d %d" % [army.id, far.x, far.y], _ctx))
+			if said.size() == 6:
+				break
+	assert_eq(said.size(), 6, "unseen places were found")
+	for line: String in said:
+		assert_eq(line, "Refused: You cannot see that place.", "walls or none, the same words")
+	assert_eq(DevCommands.run("as GEN storm %d 0 0" % army.id, _ctx).contains("walls"), false, "as TAG leaks nothing either")

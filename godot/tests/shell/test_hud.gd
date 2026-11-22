@@ -796,3 +796,4 @@ func test_the_yields_legend_ends_above_the_closed_log_bar() -> void:
 	var legend := _hud.mode_legend().get_global_rect()
 	var bar := _hud.action_log().get_global_rect()
 	assert_lte(legend.end.y + 8.0, bar.position.y, "legend bottom %.0f + 8 <= log bar top %.0f" % [legend.end.y, bar.position.y])
+

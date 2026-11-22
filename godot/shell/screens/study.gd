@@ -30,6 +30,8 @@ const TAB_KEYS_FROM := 2
 const TAB_PREV_ACTION := &"study_tab_prev"
 const TAB_NEXT_ACTION := &"study_tab_next"
 const COUNTRY_ACTION := &"country"
+## M7: the Battles table's Open asks the battle dock (the App closes the study first).
+const BATTLE_ACTION := &"battle"
 const MAP_MODE_ACTION := &"map_mode"
 const REDUCE_KEY := "accessibility/reduce_motion"
 
@@ -332,6 +334,8 @@ func _on_page_action(action: Array) -> void:
 			ctx.request(LOOK_ACTION, {"hex": action[1], "select": true})
 		COUNTRY_ACTION:
 			ctx.request(COUNTRY_ACTION, {"tag": action[1]})
+		BATTLE_ACTION:
+			ctx.request(BATTLE_ACTION, {"record": int(action[1])})
 		MAP_MODE_ACTION:
 			var args := {"mode": action[1]}
 			if action.size() >= 3:

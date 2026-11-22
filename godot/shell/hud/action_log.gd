@@ -18,10 +18,13 @@ signal report_requested
 signal history_requested(turn: int)
 
 ## The filters up to this milestone (LogLines.FILTERS carries the milestone each one arrives in).
-const MILESTONE := 4
+const MILESTONE := 7
 ## The open card's size: at most 340 px wide (x 12 to 352 at 1280 wide, clear of the centred toast stack) and 268 px
 ## tall; the lines wrap inside it and the card scrolls. The closed bar is BAR_W wide.
 const CARD_W := 340
+## The side padding of a filter tab, so five tabs fit the card.
+const TAB_PAD := 6.0
+const TAB_STATES: Array[String] = ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]
 const CARD_H := 268
 const BAR_W := 400
 ## The key hints row keeps this much of the window's bottom clear of the card (fit_height).
@@ -52,6 +55,7 @@ var _settings: Settings = null
 var _open := false
 var _filter: StringName = &"all"
 var _segments: Segmented = null
+var _tightening := false
 var _retired: Array[Node] = []
 var _dirty := false
 var _flush_queued := false
@@ -63,7 +67,8 @@ func _ready() -> void:
 	_segments = Segmented.new()
 	_segments.hud_mode = true
 	_segments.set_options(_filter_options())
-	(_segments.get_node("Buttons") as HBoxContainer).add_theme_constant_override("separation", 0)  # four tabs fit the 340 px card
+	(_segments.get_node("Buttons") as HBoxContainer).add_theme_constant_override("separation", 0)  # the tabs fit the 340 px card
+	_tighten_tabs()
 	_head.add_child(_segments)
 	_head.move_child(_segments, 0)
 	_segments.changed.connect(_on_filter_picked)
@@ -349,6 +354,33 @@ func _on_line_input(event: InputEvent, hex: Vector2i, record: int = -1) -> void:
 
 func _tone_variation(tone: String) -> StringName:
 	return TONE_VARIATION.get(tone, &"Hint") as StringName
+
+
+## The five tabs (War arrives in M7) keep to the 340 px card: each tab's side padding is TAB_PAD px. The overrides are taken off
+## and made again from the theme as it is now (a theme change calls this), so a new theme or scale is never held by a stale one.
+func _tighten_tabs() -> void:
+	if _segments == null or _tightening:
+		return
+	_tightening = true
+	for id: StringName in _filter_ids():
+		var btn := _segments.button_for(id)
+		if btn == null:
+			continue
+		for state: String in TAB_STATES:
+			btn.remove_theme_stylebox_override(state)
+			var box := btn.get_theme_stylebox(state)
+			if box == null:
+				continue
+			var tight := box.duplicate() as StyleBox
+			tight.content_margin_left = TAB_PAD
+			tight.content_margin_right = TAB_PAD
+			btn.add_theme_stylebox_override(state, tight)
+	_tightening = false
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED and is_node_ready():
+		_tighten_tabs.call_deferred()
 
 
 func _filter_options() -> Array:

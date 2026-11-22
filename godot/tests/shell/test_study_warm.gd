@@ -4,7 +4,7 @@
 extends GutTest
 
 const GEN := &"GEN"
-const VIEWS := 9  # this_season, districts, goods, history, rankings, timeline, chronicle, people, military (M6)
+const VIEWS := 10  # this_season, districts, goods, history, rankings, timeline, chronicle, people, military (M6), battle sites (M7)
 
 var _prev_game: Game = null
 var _game: Game = null
@@ -61,6 +61,7 @@ func test_warm_now_fills_the_view_cache_keys_the_pages_read() -> void:
 		[&"study_goods", _game.version, GEN, span],
 		[&"study_history", _game.version, GEN, span],
 		[&"study_people", _game.version, GEN, span],
+		[&"sites", _game.version, GEN],  # the war marks' battle badges (M7)
 	]
 	for key: Array in keys:
 		assert_false(_cached(key), "cold: %s" % str(key))

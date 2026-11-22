@@ -157,6 +157,14 @@ func test_page_look_request_is_forwarded_as_look_at() -> void:
 	assert_eq((_requests[0][1] as Dictionary)["select"], true)
 
 
+## M7 (B28): the Battles table's Open asks the battle dock with the record's id.
+func test_a_battle_action_is_forwarded_as_battle() -> void:
+	var study := _open(_sample_entries(1))
+	study.current_page().request([&"battle", 7])
+	assert_eq(_requests[0][0], &"battle")
+	assert_eq(_requests[0][1], {"record": 7})
+
+
 func test_country_and_map_mode_actions_are_forwarded() -> void:
 	var study := _open(_sample_entries(1))
 	study.current_page().request([&"country", &"GEN"])

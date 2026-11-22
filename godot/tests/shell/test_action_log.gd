@@ -133,7 +133,10 @@ func test_the_filters_show_only_their_lines() -> void:
 	assert_eq(_widget.filter(), &"money", "the money filter shows from M4")
 	assert_eq(_widget.line_count(), _line_total(&"money"), "the money rows")
 	_widget.set_filter(&"war")
-	assert_eq(_widget.filter(), &"money", "a filter after the milestone is ignored")
+	assert_eq(_widget.filter(), &"war", "the war filter shows from M7")
+	assert_eq(_widget.line_count(), _line_total(&"war"), "the war rows")
+	_widget.set_filter(&"nothing")
+	assert_eq(_widget.filter(), &"war", "a filter that does not exist is ignored")
 
 
 func test_the_newest_header_asks_for_the_report() -> void:
@@ -335,3 +338,19 @@ func test_long_lines_wrap_inside_the_card() -> void:
 			var label := row.get_child(1) as Label
 			assert_lte(label.get_global_rect().end.x, right + 0.5, "a line ends inside the card")
 	assert_lte(_widget._card.get_global_rect().end.x - _widget._card.get_global_rect().position.x, 340.5)
+
+
+## The tabs' padding is made again from the theme as it is after a theme change (no stale override of the old scale).
+func test_the_tab_padding_follows_a_theme_change() -> void:
+	_log()
+	var btn := _widget._segments.button_for(&"war")
+	assert_not_null(btn, "the War tab shows from M7")
+	var before := btn.get_theme_stylebox("normal")
+	assert_eq(before.content_margin_left, ActionLog.TAB_PAD, "the tab is tightened")
+	_widget.theme = KitTheme.load_for(2.0)
+	await _harness.wait_frames(self, 3)
+	var after := btn.get_theme_stylebox("normal")
+	assert_eq(after.content_margin_left, ActionLog.TAB_PAD, "still tightened after the theme changed")
+	btn.remove_theme_stylebox_override("normal")
+	var themed := btn.get_theme_stylebox("normal")
+	assert_eq(after.content_margin_top, themed.content_margin_top, "and the rest of the box is the new theme's, not the old one's")

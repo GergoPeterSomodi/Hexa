@@ -182,6 +182,11 @@ func _key_of(action: String, terms: StringName) -> String:
 	return "%s:%s" % [action, terms]
 
 
+## Asks for a declaration or a peace as a press of its button would (the App's declare_war and peace requests).
+func ask(action: String, terms: StringName) -> void:
+	_press(action, terms)
+
+
 ## A press: with a Confirm listener the question goes out (the act follows its "Declare war" or "Make peace"); without one,
 ## the first press arms the action and a second press on the same action does it.
 func _press(action: String, terms: StringName) -> void:

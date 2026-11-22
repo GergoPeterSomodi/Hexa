@@ -220,6 +220,36 @@ func test_storm_check_rows_before_and_after_the_war() -> void:
 	assert_string_contains(str(Movement.storm_check(_g, args).reason), "its garrison is gone")
 
 
+## 4.15: a place the country cannot see gets one refusal whatever is there (walls or none, war or none), so the reason tells
+## nothing; the same fortress seen gives the real reason. The console's `storm` and `as` go through this check too.
+func test_storm_check_gives_one_sentence_for_a_place_it_cannot_see() -> void:
+	var start := _milan_hex()
+	var a := _sav(_own_neighbour(_milan_hex()) if _own_neighbour(_milan_hex()) != Movement.NO_HEX else start)
+	var fort_unseen := Movement.NO_HEX
+	var plain_unseen := Movement.NO_HEX
+	for i: int in _g.map.hex_count():
+		var hex := _g.map.hex_of(i)
+		if _g.map.land[i] != 1 or Sight.sees(_g, SAV, hex) or Territory.owner_tag(_g, hex) == SAV or Occupation.controller_tag(_g, hex) == SAV:
+			continue
+		if Occupation.fortress_level(_g, hex) > 0 and fort_unseen == Movement.NO_HEX:
+			fort_unseen = hex
+		elif Occupation.fortress_level(_g, hex) == 0 and plain_unseen == Movement.NO_HEX:
+			plain_unseen = hex
+	assert_ne(fort_unseen, Movement.NO_HEX, "an unseen fortress exists")
+	assert_ne(plain_unseen, Movement.NO_HEX, "an unseen plain hex exists")
+	var fort_said := Movement.storm_check(_g, {"army": a.id, "goal": fort_unseen, "tag": SAV})
+	var plain_said := Movement.storm_check(_g, {"army": a.id, "goal": plain_unseen, "tag": SAV})
+	assert_eq(str(fort_said.reason), "You cannot see that place.", "an unseen fortress")
+	assert_eq(str(plain_said.reason), str(fort_said.reason), "an unseen plain hex says the same")
+	WarFixture.at_war(_g, SAV, MLO)
+	assert_eq(str(Movement.storm_check(_g, {"army": a.id, "goal": fort_unseen, "tag": SAV}).reason), "You cannot see that place.", "war or none")
+	assert_false(bool(Movement.storm(_g, {"army": a.id, "goal": fort_unseen, "tag": SAV}).ok), "and nothing is ordered")
+	assert_eq(a.order, Army.ORDER_NONE)
+	var seen := _own_neighbour(a.hex)
+	if seen != Movement.NO_HEX:
+		assert_string_contains(str(Movement.storm_check(_g, {"army": a.id, "goal": seen, "tag": SAV}).reason), "no walls to storm", "a seen hex gives its real reason")
+
+
 func test_storm_refuses_its_own_walls_and_a_shaken_army() -> void:
 	var fort := _milan_fortress()
 	if fort == Movement.NO_HEX:

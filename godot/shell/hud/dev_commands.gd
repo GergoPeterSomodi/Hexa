@@ -21,6 +21,7 @@ const HELP_LINES: Array[String] = [
 	"give c r [c r ...] TAG|none   digest   seed   help",
 	"money N [TAG]   goods KEY N [TAG]   tax low|normal|high   people c r N",
 	"raise c r kind [n]   march ID c r   hold ID   armies   as TAG action ...",
+	"declare TAG   peace TAG take|white|yield   storm ID c r   standing ID hold|withdraw   wars",
 ]
 ## The tax words of `tax`, by level.
 const TAX_WORDS: Array[String] = ["low", "normal", "high"]
@@ -67,6 +68,16 @@ static func parse(text: String, game: Game) -> Dictionary:
 			return _parse_armies(rest, game)
 		"as":
 			return _parse_as(rest, game)
+		"declare":
+			return _parse_declare(rest, game)
+		"peace":
+			return _parse_peace(rest, game)
+		"storm":
+			return _parse_storm(rest, game)
+		"standing":
+			return _parse_standing(rest, game)
+		"wars":
+			return _parse_wars(rest, game)
 		"digest", "seed", "help":
 			if not rest.is_empty():
 				return _problem("%s takes no arguments." % head)
@@ -103,6 +114,8 @@ static func run(text: String, ctx: ShellContext) -> String:
 			return "Looking at the calendar's season." if season < 0 else "Looking at %s." % LOOK_WORDS.find_key(season)
 		&"armies":
 			return _armies_words(Session.game)
+		&"wars":
+			return _wars_words(Session.game)
 		&"give":
 			var tag: StringName = args["tag"]
 			var hexes: Array[Vector2i] = []
@@ -359,6 +372,97 @@ static func _parse_armies(rest: PackedStringArray, game: Game) -> Dictionary:
 	return _made(&"armies", "", {})
 
 
+## `declare TAG`: the player declares war on the country TAG (Wars.declare_war through Session.act). The sandbox has no war.
+static func _parse_declare(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() != 1:
+		return _problem("Use: declare TAG")
+	var shut := _war_problem(game)
+	if shut != "":
+		return _problem(shut)
+	var tag := _tag_word(rest[0], game)
+	if tag == &"":
+		return _problem("no country %s." % rest[0].to_upper())
+	return _made(&"act", "declare_war", {"target": tag})
+
+
+## `peace TAG take|white|yield`: peace with the country TAG on those terms (Wars.make_peace through Session.act).
+static func _parse_peace(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() != 2:
+		return _problem("Use: peace TAG take|white|yield")
+	var shut := _war_problem(game)
+	if shut != "":
+		return _problem(shut)
+	var tag := _tag_word(rest[0], game)
+	if tag == &"":
+		return _problem("no country %s." % rest[0].to_upper())
+	var terms := StringName(rest[1].to_lower())
+	if not Wars.TERMS.has(terms):
+		return _problem("no such terms '%s': take, white or yield." % rest[1])
+	return _made(&"act", "make_peace", {"target": tag, "terms": terms})
+
+
+## `storm ID c r`: the army storms the fortress at the hex (Movement.storm through Session.act).
+static func _parse_storm(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() != 3:
+		return _problem("Use: storm ID c r")
+	if game == null:
+		return _problem("There is no game.")
+	var army := _army_of(rest[0], game)
+	if army < 0:
+		return _no_army(rest[0])
+	var hex: Variant = _hex_of(rest[1], rest[2], game)
+	if hex == null:
+		return _no_hex(rest[1], rest[2])
+	return _made(&"act", "storm", {"army": army, "goal": hex})
+
+
+## `standing ID hold|withdraw`: what the army does when it is attacked (Military.set_standing through Session.act).
+static func _parse_standing(rest: PackedStringArray, game: Game) -> Dictionary:
+	if rest.size() != 2:
+		return _problem("Use: standing ID hold|withdraw")
+	if game == null:
+		return _problem("There is no game.")
+	var army := _army_of(rest[0], game)
+	if army < 0:
+		return _no_army(rest[0])
+	var word := rest[1].to_lower()
+	if word != String(Army.STANDING_HOLD) and word != String(Army.STANDING_WITHDRAW):
+		return _problem("no such standing order '%s': hold or withdraw." % rest[1])
+	return _made(&"act", "set_standing", {"army": army, "standing": word})
+
+
+static func _parse_wars(rest: PackedStringArray, game: Game) -> Dictionary:
+	if not rest.is_empty():
+		return _problem("wars takes no arguments.")
+	if game == null:
+		return _problem("There is no game.")
+	return _made(&"wars", "", {})
+
+
+## The player's wars, one line each (the enemy, since when, the score); "You are at war with no one." with none.
+static func _wars_words(game: Game) -> String:
+	if game == null or not game.has_countries() or game.player == &"":
+		return "You are at war with no one."
+	var lines: PackedStringArray = []
+	for w: War in Wars.of_country(game, game.player):
+		if not w.live():
+			continue
+		var other := w.other(game.player)
+		lines.append("%s: since %s, score %s." % [Words.country_the(game, other), Calendar.date_text(w.start_turn, game.start_year),
+			Words.signed(Wars.score(game, game.player, other))])
+	return "You are at war with no one." if lines.is_empty() else "
+".join(lines)
+
+
+## Why the war commands cannot run (no game, or a map without countries), else "".
+static func _war_problem(game: Game) -> String:
+	if game == null:
+		return "There is no game."
+	if not game.has_countries():
+		return "the sandbox has no countries, so no war"
+	return ""
+
+
 ## `as TAG action ...`: the action is done for the country TAG (its args carry the tag, so Session.act keeps it).
 static func _parse_as(rest: PackedStringArray, game: Game) -> Dictionary:
 	if rest.size() < 2:
@@ -373,7 +477,7 @@ static func _parse_as(rest: PackedStringArray, game: Game) -> Dictionary:
 	if str(inner["problem"]) != "":
 		return inner
 	if inner["kind"] != &"act":
-		return _problem("as takes an action: raise, march, hold, build, upgrade, clear, cancel, choose, money, goods, tax or people.")
+		return _problem("as takes an action: raise, march, hold, build, upgrade, clear, cancel, choose, money, goods, tax, people, declare, peace, storm or standing.")
 	var args: Dictionary = inner["args"]
 	args["tag"] = tag
 	return inner

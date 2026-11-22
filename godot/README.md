@@ -61,6 +61,21 @@ too), the report has an **Armies** section, and `Esc` clears a selected army bef
 `raise c r kind [n]`, `march ID c r`, `hold ID`, `armies` and `as TAG action ...`; F3 shows an armies line. The movement replay
 (`game/movement`) plays the walks between seasons; Space skips it.
 
+**M7 War (the App is wired; the owner's playtest is next).** A neighbour's country panel has **Declare war** (it asks first);
+at war it shows the score and three peace buttons, **Take what you hold**, **White peace** and **Yield**, each asking first. A war
+declared on you shows a **War!** alert at once on the map, or after the moves and before the report in a season. Armies enter
+enemy land and fight: a right click on an enemy army or a fortress orders an attack or a siege, and the odds card (in place of the
+move card) names the odds and the way: Favourable, Even or Poor. **Shift+right click** (or **Shift+O** at the cursor) storms a
+fortress with the selected army. The army panel's **If attacked** segment sets Hold or Withdraw. A battle fought last season has a
+badge on the map; a click, a report or log line, a notification's Go, the Military page's Battles table, the army panel's last
+battle, the hex menu or **B** (the last battle you fought) opens the **battle dock** on the left, day by day (Left, Right, Home,
+End, Enter plays); `Esc` closes it before anything else on the map. A siege shows a dial on its fortress. With an army selected and
+a war on, the Layers popover's **Castle areas** switch (also in Options, Map) draws the land each enemy castle holds. The
+developer console takes `declare TAG`, `peace TAG take|white|yield`, `storm ID c r`, `standing ID hold|withdraw` and `wars`
+(with `as TAG` before an action: `as MLO declare SAV` gives the player a war); the sandbox has no war. F3 shows a war line (wars,
+battles, sieges, occupied hexes, phase times, area hexes). The war UI answers only from milestone 7
+(`Bindings.SHELL_MILESTONE`).
+
 ## Engine
 
 - Godot **4.7.2-stable**, standard build (not .NET), Compatibility renderer, GDScript. Pinned here, in CI and in

@@ -122,7 +122,7 @@ func test_focus_puts_the_cursor_on_a_season_and_lists_from_it() -> void:
 func test_the_filters_are_the_milestones_and_each_one_lists_its_lines() -> void:
 	var game := InsightsFixture.genoa_1483()
 	var page := _page(game)
-	assert_eq(page.filter_ids(), [&"all", &"money", &"works", &"mine"], "4.5 has no War")
+	assert_eq(page.filter_ids(), [&"all", &"war", &"money", &"works", &"mine"], "milestone 7 shows War")
 	page.filters_control().button_for(&"works").button_pressed = true
 	assert_eq(page.filter_id(), &"works")
 	var works := _rows(game, &"works", 0)

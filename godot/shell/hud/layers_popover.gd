@@ -13,8 +13,10 @@ const LAYER_BORDERS := &"map/borders"
 const LAYER_TINT := &"map/owner_tint"
 const LAYER_MINIMAP := &"map/minimap"
 const LAYER_SIGHT := &"map/sight_veil"
+## The castle areas switch (M7 6.11): the setting the Options row changes too; shown only in a game with countries.
+const LAYER_CASTLE := &"map/castle_areas"
 const LAYER_KEYS: Array[String] = [
-	"map/grid", "map/place_names", "graphics/relief_shading", "map/borders", "map/owner_tint", "map/minimap", "map/sight_veil",
+	"map/grid", "map/place_names", "graphics/relief_shading", "map/borders", "map/owner_tint", "map/minimap", "map/sight_veil", "map/castle_areas",
 ]
 
 var anchor_button: BaseButton = null
@@ -29,6 +31,8 @@ var anchor_button: BaseButton = null
 @onready var _minimap_switch: KitSwitch = $VBox/MinimapRow/MinimapSwitch
 @onready var _sight_row: HBoxContainer = $VBox/SightRow
 @onready var _sight_switch: KitSwitch = $VBox/SightRow/SightSwitch
+@onready var _castle_row: HBoxContainer = $VBox/CastleRow
+@onready var _castle_switch: KitSwitch = $VBox/CastleRow/CastleSwitch
 
 var _settings: Settings = null
 var _syncing: bool = false
@@ -48,6 +52,7 @@ func _ready() -> void:
 	_tint_switch.focus_mode = Control.FOCUS_NONE
 	_minimap_switch.focus_mode = Control.FOCUS_NONE
 	_sight_switch.focus_mode = Control.FOCUS_NONE
+	_castle_switch.focus_mode = Control.FOCUS_NONE
 
 	_grid_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_GRID, on))
 	_names_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_NAMES, on))
@@ -56,6 +61,7 @@ func _ready() -> void:
 	_tint_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_TINT, on))
 	_minimap_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_MINIMAP, on))
 	_sight_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_SIGHT, on))
+	_castle_switch.toggled.connect(func(on: bool) -> void: _on_switch_toggled(LAYER_CASTLE, on))
 
 	if _settings != null:
 		_sync_from_settings()
@@ -140,6 +146,8 @@ func set_layer_state(layer_name: StringName, on: bool) -> void:
 			_minimap_switch.set_pressed_no_signal(on)
 		LAYER_SIGHT, &"sight_veil":
 			_sight_switch.set_pressed_no_signal(on)
+		LAYER_CASTLE, &"castle_areas":
+			_castle_switch.set_pressed_no_signal(on)
 	_syncing = false
 
 
@@ -184,6 +192,16 @@ func set_sight_available(on: bool) -> void:
 		_sight_row.visible = on
 
 
+## The Castle areas switch (map/castle_areas, M7): the war's own, so a map-only game (the sandbox) has none.
+func castle_switch() -> KitSwitch:
+	return _castle_switch
+
+
+func set_castle_available(on: bool) -> void:
+	if is_node_ready():
+		_castle_row.visible = on
+
+
 func _on_switch_toggled(layer_key: StringName, on: bool) -> void:
 	if _syncing:
 		return
@@ -205,6 +223,7 @@ func _sync_from_settings() -> void:
 	_tint_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_TINT))))
 	_minimap_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_MINIMAP))))
 	_sight_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_SIGHT))))
+	_castle_switch.set_pressed_no_signal(bool(_settings.get_value(String(LAYER_CASTLE))))
 	_syncing = false
 
 

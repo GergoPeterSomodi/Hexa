@@ -160,6 +160,11 @@ func reach_count(layer: String) -> int:
 	return (_reach[layer] as Array).size()
 
 
+## The hex menu (HexMenu) of the armies' layer: the App listens to its `chosen` for the war items (M7 6.8).
+func hex_menu() -> HexMenu:
+	return _menu
+
+
 ## The selected army's id, -1 for none.
 func selected_army() -> int:
 	return _army
@@ -308,7 +313,25 @@ func _marches_words(game: Game, hex: Vector2i) -> String:
 	var preview := MovePreview.to(game, Session.player_tag(), _army, hex)
 	var arrives := int(preview.get("arrives_turn", -1))
 	var when := ": there in %s" % Calendar.date_text(arrives, game.start_year) if arrives >= 0 else ""
+	var war := _war_words(game, name, hex, arrives)
+	if war != "":
+		return war
 	return "The %s marches to %s%s." % [name, Words.place(game, hex), when]
+
+
+## The toasts of a war march (spec 6.10): "The Army of Vercelli marches on Alessandria (7, 9): Favourable, there in Autumn 1480."
+## for an attack and "... marches to besiege Pavia (10, 9): falls in about 4 seasons." for a siege; "" for any other march.
+func _war_words(game: Game, name: String, hex: Vector2i, arrives: int) -> String:
+	var odds := OddsView.of(game, Session.player_tag(), _army, hex)
+	var kind := StringName(str(odds.get("kind", "")))
+	if kind == OddsView.KIND_ATTACK and str(odds.get("word", "")) != "":
+		var there := ", there in %s" % Calendar.date_text(arrives, game.start_year) if arrives >= 0 else ""
+		return "The %s marches on %s: %s%s." % [name, Words.place(game, hex), str(odds["word"]), there]
+	if kind == OddsView.KIND_SIEGE:
+		var parts := str(odds.get("kind_text", "")).split(" · ")
+		if parts.size() == 2:
+			return "The %s marches to besiege %s: %s." % [name, Words.place(game, hex), parts[1]]
+	return ""
 
 
 func _holds_words(game: Game, hex: Vector2i) -> String:

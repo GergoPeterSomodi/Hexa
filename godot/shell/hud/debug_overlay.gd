@@ -31,6 +31,7 @@ const LAYER_SPECS: Array[Array] = [
 @onready var _m3_label: Label = $VBox/M3Line
 @onready var _m4_label: Label = $VBox/M4Line
 var _army_label: Label = null
+var _war_label: Label = null
 @onready var _console: DevConsole = $VBox/DevConsole
 @onready var _season_seg: Segmented = $VBox/SeasonSeg
 @onready var _new_seed_btn: KitButton = $VBox/ControlsTop/NewSeedButton
@@ -84,6 +85,12 @@ func _ready() -> void:
 	_army_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_m4_label.get_parent().add_child(_army_label)
 	_m4_label.get_parent().move_child(_army_label, _m4_label.get_index() + 1)
+	_war_label = Label.new()
+	_war_label.theme_type_variation = &"TableRow"
+	_war_label.text = "no game"
+	_war_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_m4_label.get_parent().add_child(_war_label)
+	_m4_label.get_parent().move_child(_war_label, _army_label.get_index() + 1)
 	Events.town_grew.connect(_on_town_grew)
 	Events.district_declined.connect(_on_district_declined)
 	Events.season_ended.connect(_on_season_ended)
@@ -284,6 +291,11 @@ func m6_text() -> String:
 	return _army_label.text if is_node_ready() and _army_label != null else ""
 
 
+## The war line's words (M7), for the tests.
+func m7_text() -> String:
+	return _war_label.text if is_node_ready() and _war_label != null else ""
+
+
 func people_text() -> String:
 	return _people_label.text if is_node_ready() and _people_label != null else ""
 
@@ -346,6 +358,7 @@ func refresh_metrics() -> void:
 	_m3_label.text = m3_line()
 	_m4_label.text = m4_line()
 	_army_label.text = m6_line()
+	_war_label.text = m7_line()
 	if _study_label != null:
 		_study_label.text = study_line()
 	if _people_label != null:
@@ -428,6 +441,35 @@ func m6_line() -> String:
 		times.append("%s %s" % [phase, "%.1f ms" % float(Session.last_phase_ms[phase]) if Session.last_phase_ms.has(phase) else "none yet"])
 	var filled := StepCosts.of(game.map, game.defs).filled() if not game.armies.is_empty() else 0
 	return "armies %d · units %d · %s · steps filled %d" % [game.armies.size(), units, " · ".join(times), filled]
+
+
+## The war line (M7 spec 6.11): "wars 1 · battles 1 · sieges 1 · occupied 2 · battles 0.8 ms · sieges 0.3 ms · war 0.0 ms ·
+## areas 139". The counts are live wars, kept battle records, sieges and hexes held by an occupier; the times are of the last
+## season played ("none yet" before one); the areas are the hexes the overlay's area texture marks while the tint is on (0 while it
+## is off, and with no map scene).
+func m7_line() -> String:
+	var game := Session.game
+	if game == null:
+		return "no game"
+	var live := 0
+	for w: War in game.wars:
+		if w.live():
+			live += 1
+	var occupied := 0
+	for byte: int in game.state.occupier:
+		if byte != 0:
+			occupied += 1
+	var times: PackedStringArray = []
+	for phase: String in ["battles", "sieges", "war"]:
+		times.append("%s %s" % [phase, "%.1f ms" % float(Session.last_phase_ms[phase]) if Session.last_phase_ms.has(phase) else "none yet"])
+	var areas := 0
+	var scene := _map_scene as MapScene
+	if scene != null and is_instance_valid(scene) and scene.overlay() != null and scene.overlay().is_areas_on():
+		for byte: int in scene.overlay().area_bytes():
+			if byte != 0:
+				areas += 1
+	return "wars %d · battles %d · sieges %d · occupied %d · %s · areas %d" % [
+		live, game.battle_records.size(), game.sieges.size(), occupied, " · ".join(times), areas]
 
 
 func _collect_metrics() -> Dictionary:

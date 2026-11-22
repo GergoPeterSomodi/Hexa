@@ -148,3 +148,20 @@ layout_mode = 2
 focus_mode = 0
 accessibility_name = "Minimap"
 script = ExtResource("3_sw")
+
+[node name="CastleRow" type="HBoxContainer" parent="VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="VBox/CastleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TableRow"
+text = "Castle areas"
+
+[node name="CastleSwitch" type="CheckButton" parent="VBox/CastleRow"]
+layout_mode = 2
+focus_mode = 0
+accessibility_name = "Castle areas"
+script = ExtResource("3_sw")

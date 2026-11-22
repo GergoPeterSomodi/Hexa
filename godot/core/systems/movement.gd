@@ -25,6 +25,8 @@ const WHY_FOUGHT := &"fought"
 ## (when its checks still pass) and never turns it into a march. Shown as "Halted: ..." with the halt_text.
 const WHY_STORM := &"storm"
 const STORM_HALT_TEXT := "its storm is halted: continue resumes it"
+## The storm's one refusal for a place the army's country cannot see (no walls, no war, no garrison is told apart).
+const UNSEEN_TEXT := "You cannot see that place."
 ## Every halt a walk may end with: the army's order goes to none and its goal is kept.
 const HALT_WHYS: Array[StringName] = [WHY_NO_WAY, WHY_BLOCKED, WHY_ENEMY, WHY_BATTLE, WHY_SHAKEN]
 ## D40: a hostile garrisoned fortress ends a leg beside it too. One line to turn off (the playtest's march to Pavia).
@@ -650,6 +652,8 @@ static func _storm_verdict(game: Game, args: Dictionary) -> Dictionary:
 		return _verdict("that is off the map")
 	if not game.map.is_land(g):
 		return _verdict("armies cannot walk on water")
+	if not _storm_in_view(game, army.tag, g):
+		return _verdict(UNSEEN_TEXT)  # one sentence for every place the country cannot see: no walls, no war, no hint (4.15)
 	if Occupation.fortress_level(game, g) == 0:
 		return _verdict("no walls to storm at %s" % Military.hex_text(game, g))
 	var ctl := Occupation.controller_tag(game, g)
@@ -666,6 +670,13 @@ static func _storm_verdict(game: Game, args: Dictionary) -> Dictionary:
 		return {"ok": true, "reason": "", "army": army, "plan": {}}
 	var res := goal_verdict(game, army, army.tag, g)
 	return {"ok": bool(res.ok), "reason": str(res.reason), "army": army, "plan": res.plan}
+
+
+## Whether `tag` may read the hex at all: it sees it now (Sight), or it is its own land or held by it (OddsView's test).
+static func _storm_in_view(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	if Sight.sees(game, tag, hex):
+		return true
+	return Occupation.controller_tag(game, hex) == tag or Territory.owner_tag(game, hex) == tag
 
 
 ## The long name of a country for a sentence ("the Duchy of Milan" with its article in the text), or "nobody".

@@ -248,3 +248,19 @@ func test_the_f3_mode_word_names_yields() -> void:
 	assert_eq(DebugOverlay.MODE_WORDS[int(MapModes.Mode.YIELDS)], "Yields")
 	assert_eq(DebugOverlay.MODE_WORDS[int(MapModes.Mode.FOOD)], "Food", "F3 names the Food mode, not Yields")
 	assert_eq(DebugOverlay.MODE_WORDS.size(), MapModes.MODE_KEYS.size(), "a word for every mode")
+
+
+## M7 (B28, spec 6.11): the war line counts the live wars, the kept battles, the sieges and the occupied hexes, with the last
+## season's phase times.
+func test_the_m7_line_counts_wars_sieges_and_occupied_hexes() -> void:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480, &"SAV"), "", "a scenario game")
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.m7_text(), "wars 0 · battles 0 · sieges 0 · occupied 0 · battles none yet · sieges none yet · war none yet · areas 0", _overlay.m7_text())
+	assert_true(bool(Session.act("declare_war", {"target": &"MLO"}).get("ok", false)), "Savoy declares on Milan")
+	Session.last_phase_ms = {"battles": 0.8, "sieges": 0.3, "war": 0.0}
+	_overlay.refresh_metrics()
+	assert_true(_overlay.m7_text().begins_with("wars 1 · battles 0 · sieges 0 · occupied 0 · battles 0.8 ms · sieges 0.3 ms · war 0.0 ms"), _overlay.m7_text())
+	Session.last_phase_ms = {}
+	Session.game = null
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.m7_text(), "no game")

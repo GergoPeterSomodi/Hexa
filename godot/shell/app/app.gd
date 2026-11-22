@@ -94,7 +94,7 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	_booted = true
 	if p_settings != null:
 		_settings_override = p_settings
-	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "6": the study and its five pages, the Supply mode (key 6), the army keys and chip
+	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "7": M6 (the study, Supply, armies) and the war (Shift+O, B, castle areas)
 	_init_settings()
 	_apply_key_overrides()
 

@@ -40,6 +40,10 @@ signal army_requested(army: int, hex: Vector2i)
 signal study_requested(page: StringName)
 ## A chip asked for the study at a tab of a page (the Stores chip: Economy's Goods).
 signal study_tab_requested(page: StringName, tab: StringName)
+## M7: a log line, a notification's Go or the army panel asked for the battle dock at a record; a screen of the country panel's
+## war section (a Confirm) goes to the App's stack.
+signal battle_requested(record: int)
+signal confirm_requested(screen: Screen)
 
 ## The key hints' left offset in hud.tscn.
 const KEY_HINTS_LEFT := 12.0
@@ -104,6 +108,13 @@ func _ready() -> void:
 	_top_bar.study_tab_requested.connect(func(page: StringName, tab: StringName) -> void: study_tab_requested.emit(page, tab))
 	_notifications.go_requested.connect(func(hex: Vector2i) -> void: hex_look_requested.emit(hex))
 	_notifications.army_requested.connect(func(army: int, hex: Vector2i) -> void: army_requested.emit(army, hex))
+	_notifications.battle_requested.connect(func(record: int) -> void: battle_requested.emit(record))
+	_notifications.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
+	_task_flag.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
+	_action_log.battle_requested.connect(func(record: int) -> void: battle_requested.emit(record))
+	_army_panel.battle_requested.connect(func(record: int) -> void: battle_requested.emit(record))
+	_country_panel.confirm_requested.connect(func(screen: Screen) -> void: confirm_requested.emit(screen))
+	_country_panel.toast_requested.connect(func(text: String, tone: StringName) -> void: toast(text, tone))
 	Events.game_started.connect(_on_game_started)
 	Events.season_ended.connect(_on_season_ended)
 
@@ -436,6 +447,11 @@ func scale_bar() -> ScaleBar:
 
 func map_hover() -> MapHover:
 	return _map_hover
+
+
+## The odds card (M7 6.4) of the hover, beside the move card: it shows in place of it over a war target of the selected army.
+func odds_card() -> OddsCard:
+	return _map_hover.odds_card()
 
 
 func debug_overlay() -> DebugOverlay:

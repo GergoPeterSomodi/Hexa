@@ -29,6 +29,8 @@ var warm: StudyWarm = null
 var replay: MoveReplay = null
 ## What the player must decide before the report (M7 6.6): a war declared on the player, one Confirm each.
 var decisions := DecisionQueue.new()
+## The war's requests (M7 6.11): Storm, B, the battle dock, the war alert and the Castle areas switch (WarRequests).
+var war: WarRequests = null
 ## The map's ribbons are held (the season and its replay run); bind_scene applies it to a new map.
 var _ribbons_held := false
 
@@ -45,6 +47,7 @@ var _due_seen: bool = false
 func _init(app: Node) -> void:
 	_app = app as App
 	works = WorksFlow.new(app)
+	war = WarRequests.new(app, self)
 
 
 ## Makes the flow (a child of the App) with its callables, and lets the pause menu ask whether the season runs.
@@ -108,11 +111,11 @@ func connect_signals(link: Callable) -> void:
 	link.call(Events, &"game_started", _on_game_started)
 	link.call(Events, &"game_started", decisions.clear)
 	link.call(Events, &"game_ended", decisions.clear)
-	link.call(Events, &"war_declared", _on_war_declared)
 	link.call(Events, &"season_ended", _on_season_ended)
 	link.call(Events, &"work_started", _on_work_started)
 	link.call(Events, &"work_cancelled", _on_work_cancelled)
 	works.connect_signals(link)
+	war.connect_signals(link)
 
 
 ## What the F3 line says of the study: {page, tab, ms} of the last open (WorksFlow.study_info) and `warm`, the views the
@@ -141,6 +144,7 @@ func bind_scene(scene: MapScene) -> void:
 		_floaters.setup(Session.game)
 		_floaters.hold(_ribbons_held)
 	works.bind_scene(scene)
+	war.bind_scene(scene)
 	var armies := scene.get_node_or_null("MapArmies") as MapArmies
 	if armies != null and not armies.said.is_connected(_on_order_said):
 		armies.said.connect(_on_order_said)
@@ -154,6 +158,7 @@ func bind_scene(scene: MapScene) -> void:
 
 func unbind_scene(scene: MapScene) -> void:
 	works.unbind_scene(scene)
+	war.unbind_scene(scene)
 	var armies := scene.get_node_or_null("MapArmies") as MapArmies if scene != null and is_instance_valid(scene) else null
 	if armies != null and armies.said.is_connected(_on_order_said):
 		armies.said.disconnect(_on_order_said)
@@ -238,7 +243,7 @@ func handle(what: StringName, args: Dictionary) -> bool:
 				_scene.preview_season(season)
 			_app.hud().set_look(season)
 		_:
-			return works.handle(what, args)
+			return war.handle(what, args) or works.handle(what, args)
 	return true
 
 
@@ -449,15 +454,6 @@ func _flow_toast(text: String, tone: StringName, key_action: StringName) -> void
 func _on_order_said(text: String, tone: StringName) -> void:
 	if _app != null and _app.hud() != null and not text.is_empty():
 		_app.hud().toast(text, tone, &"")
-
-
-## A war declared on the player queues its Confirm (D44): at once when the flow is idle, else in DECISIONS.
-func _on_war_declared(tag: StringName, target: StringName) -> void:
-	if target == &"" or target != Session.player_tag():
-		return
-	decisions.push({"kind": DecisionQueue.KIND_WAR, "tag": tag, "target": target})
-	if flow.state() == SeasonFlow.State.IDLE:
-		decisions.next(_app.context(), true)
 
 
 ## The season runs or its replay or decisions are up: Save waits and the pause menu greys it (M3 D48, M6 6.4).

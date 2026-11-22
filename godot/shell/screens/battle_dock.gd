@@ -124,6 +124,11 @@ func shown_record() -> int:
 	return _record if visible else NO_RECORD
 
 
+## The hex the shown battle was fought on (Army.NO_HEX when nothing is shown).
+func shown_hex() -> Vector2i:
+	return _view.get("hex", Army.NO_HEX) as Vector2i if visible else Army.NO_HEX
+
+
 ## The day shown (1 to the battle's days; 0 for a battle no longer kept).
 func shown_day() -> int:
 	return _day if visible else 0

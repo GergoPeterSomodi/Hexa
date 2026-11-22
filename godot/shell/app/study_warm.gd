@@ -57,7 +57,8 @@ func queue_views() -> void:
 	_queue.append(func() -> void: StudyHistory.timeline(game, tag))
 	_queue.append(func() -> void: StudyHistory.chronicle(game, tag, &"all", game.turn - 1, StudyHistory.PAGE))
 	_queue.append(func() -> void: StudyPeople.of(game, tag, span))
-	_queue.append(func() -> void: StudyMilitary.of(game, tag, span))
+	_queue.append(func() -> void: StudyMilitary.of(game, tag, span))  # with its wars and battles (M7)
+	_queue.append(func() -> void: BattleView.sites(game, tag))  # the war marks' battle badges (M7)
 	if yields_active.is_valid() and bool(yields_active.call()):
 		_queue.append(func() -> void: MapModes.yield_bytes(game, tag))
 	if food_active.is_valid() and bool(food_active.call()):
