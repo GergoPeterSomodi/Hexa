@@ -1,0 +1,28 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/hud/busy_pill.gd" id="1_pill"]
+
+[node name="BusyPill" type="PanelContainer"]
+visible = false
+mouse_filter = 2
+focus_mode = 0
+theme_type_variation = &"PanelCard"
+script = ExtResource("1_pill")
+
+[node name="Row" type="HBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Icon" type="TextureRect" parent="Row"]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Text" type="Label" parent="Row"]
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+focus_mode = 0
+theme_type_variation = &"Body"

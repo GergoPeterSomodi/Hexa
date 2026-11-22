@@ -58,6 +58,12 @@ static func seasons(n: int) -> String:
 	return plural(n, "season", "seasons")
 
 
+## "Countries are moving 3 / 12": the busy pill's line while the countries' orders are made. `done` seats have finished, so the
+## one thinking now is number done + 1, never past `total` (and "3 / 12" never reads "13 / 12").
+static func orders_progress(done: int, total: int) -> String:
+	return "Countries are moving %d / %d" % [mini(done + 1, total), total]
+
+
 ## "Savona (6, 13)" for the hex of a named place; "near Savona (7, 12)" for a hex within 2 hexes of one (the nearest,
 ## ties by place order); "(7, 12)" otherwise.
 static func place(game: Game, hex: Vector2i) -> String:

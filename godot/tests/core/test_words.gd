@@ -160,3 +160,11 @@ func test_men_units_and_army_names() -> void:
 	assert_eq(Words.company_of(_game, &""), "A company", "no tag")
 	assert_eq(Words.company_of(_game, &"ZZZ"), "The company of ZZZ", "a tag with no country")
 	assert_eq(Words.company_of(_game, &"AUS"), "An Austrian company", "a vowel takes an")
+
+
+## M8 (6.1): the busy pill's count is the seat thinking now, done + 1, never past the total.
+func test_orders_progress_counts_the_seat_thinking() -> void:
+	assert_eq(Words.orders_progress(0, 12), "Countries are moving 1 / 12", "none done: the first is moving")
+	assert_eq(Words.orders_progress(2, 12), "Countries are moving 3 / 12")
+	assert_eq(Words.orders_progress(11, 12), "Countries are moving 12 / 12")
+	assert_eq(Words.orders_progress(12, 12), "Countries are moving 12 / 12", "all done: never 13 / 12")
