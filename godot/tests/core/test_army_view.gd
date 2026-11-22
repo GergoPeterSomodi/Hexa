@@ -25,6 +25,32 @@ func _unseen_land() -> Vector2i:
 	return ArmyFixture.NO_HEX
 
 
+## M7 (6.8): the own panel's standing, morale words, rank and the token's shaken flag; a foreign panel has none of them.
+func test_war_parts_of_the_own_panel_and_the_shaken_token() -> void:
+	var hex := _gen_hex()
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 2)
+	var p := ArmyView.panel(_g, ArmyFixture.TAG, a.id)
+	assert_eq(p.standing, "hold")
+	assert_eq(p.standing_text, "Hold")
+	assert_eq(p.morale_word, "Steady")
+	assert_eq(p.morale_text, "Morale 100 %")
+	assert_false(bool(p.too_shaken))
+	assert_eq((p.siege as Dictionary).size(), 0)
+	assert_eq(str((p.units as Array)[0].rank_name), "Recruit")
+	assert_eq(int((p.units as Array)[0].morale), 1000)
+	for u: Unit in a.units:
+		Armies.set_morale(_g, a, u.id, 300)
+	var shaken := ArmyView.panel(_g, ArmyFixture.TAG, a.id)
+	assert_eq(shaken.morale_word, "Shaken")
+	assert_true(bool(shaken.too_shaken))
+	var token := _token_at(ArmyView.tokens(_g, ArmyFixture.TAG), hex, ArmyFixture.TAG)
+	assert_true(bool(token.shaken), "the own token shows the shaken flag")
+	var foreign := ArmyFixture.army(_g, SAV, _unseen_land(), 0, 1)
+	var seen := ArmyView.panel(_g, ArmyFixture.TAG, foreign.id)
+	assert_true(seen.is_empty() or not seen.has("standing"), "P: another country's standing is not the viewer's to know")
+	assert_true(seen.is_empty() or not seen.has("morale"), "P: another country's morale is not the viewer's to know")
+
+
 func _token_at(tokens: Array[Dictionary], hex: Vector2i, tag: StringName) -> Dictionary:
 	for t: Dictionary in tokens:
 		if t.hex == hex and t.tag == tag:

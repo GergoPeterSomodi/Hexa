@@ -102,10 +102,10 @@ func test_witness_sees_rounded_numbers_and_no_ids() -> void:
 	assert_eq(v.access, &"seen")
 	var last := r.frames.size() - 1
 	var exact_men := _sum_men(r, last, 0)
-	var shown := int(v.side[String(SAV)].men)
+	var shown := int(_side_of(v, "attacker").men)
 	assert_eq(shown, snappedi(exact_men, 100), "P: men rounded to 100, never exact")
-	assert_eq(int(v.side[String(SAV)].front) % 50, 0, "P: morale rounded to 5 %")
-	assert_eq(String(v.side[String(SAV)].stance_text), "", "P: stances hidden")
+	assert_eq(int(_side_of(v, "attacker").front) % 50, 0, "P: morale rounded to 5 %")
+	assert_eq(String(_side_of(v, "attacker").stance_text), "", "P: stances hidden")
 	assert_false(_has_key(v, "key"), "P: no company ids leak to a witness")
 	assert_false(_has_key(v, "armies"), "P: no army ids leak to a witness")
 	assert_eq(String(v.viewer_side), "", "a witness is not a side")
@@ -114,7 +114,7 @@ func test_witness_sees_rounded_numbers_and_no_ids() -> void:
 func test_reserve_and_routed_carry_no_ids_for_a_witness() -> void:
 	var r := _battle(SAV, MLO, PackedStringArray([String(ArmyFixture.TAG)]))
 	var v := BattleView.of(_g, ArmyFixture.TAG, r.id)
-	for side: Dictionary in [v.side[String(SAV)], v.side[String(MLO)]]:
+	for side: Dictionary in [_side_of(v, "attacker"), _side_of(v, "defender")]:
 		for entry: Dictionary in side.reserve:
 			assert_false(entry.has("key"), "P: a reserve company has no id for a witness")
 		for entry: Dictionary in side.lanes:
@@ -126,9 +126,9 @@ func test_witness_reserve_is_one_entry_with_the_rounded_total() -> void:
 	var last := r.frames.size() - 1
 	var exact := BattleView.of(_g, SAV, r.id)
 	var seen := BattleView.of(_g, ArmyFixture.TAG, r.id)
-	for side_tag: String in [String(SAV), String(MLO)]:
-		var exact_reserve: Array = exact.side[side_tag].reserve
-		var seen_reserve: Array = seen.side[side_tag].reserve
+	for role: String in ["attacker", "defender"]:
+		var exact_reserve: Array = _side_of(exact, role).reserve
+		var seen_reserve: Array = _side_of(seen, role).reserve
 		assert_true(seen_reserve.size() <= 1, "P: a witness gets at most one reserve entry, got %d" % seen_reserve.size())
 		var exact_total := 0
 		for e: Dictionary in exact_reserve:
@@ -138,8 +138,8 @@ func test_witness_reserve_is_one_entry_with_the_rounded_total() -> void:
 			shown_total += int(e.men)
 			assert_false(e.has("key"), "P: no company id in the aggregate")
 		assert_eq(shown_total, snappedi(exact_total, 100), "P: the sum is the rounded total")
-	for side_tag: String in [String(SAV), String(MLO)]:
-		var lanes: Array = seen.side[side_tag].lanes
+	for role: String in ["attacker", "defender"]:
+		var lanes: Array = _side_of(seen, role).lanes
 		assert_eq(lanes.size(), 3, "one entry per lane")
 	assert_eq(last, r.frames.size() - 1)
 
@@ -343,8 +343,8 @@ func test_a_witness_who_does_not_know_a_side_sees_a_country() -> void:
 	r.end["days"] = 2
 	assert_false(Knowledge.knows(_g, ArmyFixture.TAG, stranger), "Genoa does not know it")
 	var v := BattleView.of(_g, ArmyFixture.TAG, r.id)
-	assert_eq(str(v.side[String(stranger)].name), "a country", "P: an unknown side is named as a country")
-	assert_eq(str(v.side[String(unknown)].name), "a country")
+	assert_eq(str(_side_of(v, "attacker").name), "a country", "P: an unknown side is named as a country")
+	assert_eq(str(_side_of(v, "defender").name), "a country")
 	assert_true(str(v.log[0].text).begins_with("Day 1: a country "), str(v.log[0].text))
 	var text := str(v.result.text)
 	assert_true(text.begins_with("A country won in 2 days: a country broke"), text)
@@ -354,3 +354,48 @@ func test_a_witness_who_does_not_know_a_side_sees_a_country() -> void:
 	var mine := _battle(ArmyFixture.TAG, SAV, PackedStringArray())
 	var side_view := BattleView.of(_g, ArmyFixture.TAG, mine.id)
 	assert_eq(str(side_view.side[String(SAV)].name), _real_name(SAV), "a side reads the other side's real name")
+
+
+## The side of a view by its role (its key is its tag when the viewer may read it, else its role word).
+func _side_of(v: Dictionary, role: String) -> Dictionary:
+	return (v.side as Dictionary)[(v.sides as Dictionary)[role][0]]
+
+
+## Every string equal to one of the tags, as a key or a value, anywhere in the view tree.
+func _tag_hits(value: Variant, tags: Array, out: Array) -> void:
+	if value is Dictionary:
+		for k: Variant in value:
+			_tag_hits(k, tags, out)
+			_tag_hits((value as Dictionary)[k], tags, out)
+	elif value is Array:
+		for item: Variant in value:
+			_tag_hits(item, tags, out)
+	elif typeof(value) == TYPE_STRING or typeof(value) == TYPE_STRING_NAME:
+		if tags.has(str(value)):
+			out.append(str(value))
+
+
+func test_a_witness_view_carries_no_tag_of_a_country_it_does_not_know() -> void:
+	var stranger := WarFixture.stranger_of(_g, ArmyFixture.TAG)
+	var unknown := &""
+	for c: Country in _g.countries:
+		if c.tag != &"" and c.tag != ArmyFixture.TAG and c.tag != stranger and not Knowledge.knows(_g, ArmyFixture.TAG, c.tag):
+			unknown = c.tag
+			break
+	assert_ne(unknown, &"", "a second country Genoa does not know")
+	var r := _battle(stranger, unknown, PackedStringArray([String(ArmyFixture.TAG)]))
+	r.turn = _g.turn - 1
+	r.end["winner"] = 0
+	r.end["how"] = "broke"
+	r.end["cause"] = "centre"
+	r.end["days"] = 2
+	var tags := [String(stranger), String(unknown)]
+	var hits: Array = []
+	_tag_hits(BattleView.of(_g, ArmyFixture.TAG, r.id), tags, hits)
+	assert_eq(hits, [], "P: no tag of an unknown country anywhere in the witness's view")
+	var badges: Array = []
+	_tag_hits(BattleView.sites(_g, ArmyFixture.TAG), tags, badges)
+	assert_eq(badges, [], "P: nor in the badges")
+	var exact := BattleView.of(_g, &"", r.id)
+	assert_eq(str((exact.sides as Dictionary)["attacker"][0]), String(stranger), "the omniscient viewer has the tag")
+	assert_eq(str(_side_of(BattleView.of(_g, ArmyFixture.TAG, r.id), "attacker").name), "a country")

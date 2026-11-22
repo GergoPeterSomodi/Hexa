@@ -195,3 +195,54 @@ func _dial(dials: Array[Dictionary], hex: Vector2i) -> Dictionary:
 		if d.hex == hex:
 			return d
 	return {}
+
+
+## Every string equal to one of the tags, as a key or a value, anywhere in the view tree.
+func _tag_hits(value: Variant, tags: Array, out: Array) -> void:
+	if value is Dictionary:
+		for k: Variant in value:
+			_tag_hits(k, tags, out)
+			_tag_hits((value as Dictionary)[k], tags, out)
+	elif value is Array:
+		for item: Variant in value:
+			_tag_hits(item, tags, out)
+	elif typeof(value) == TYPE_STRING or typeof(value) == TYPE_STRING_NAME:
+		if tags.has(str(value)):
+			out.append(str(value))
+
+
+func test_a_witness_view_carries_no_tag_of_an_unknown_besieger() -> void:
+	var found := ArmyFixture.NO_HEX
+	var besieger := &""
+	var holder_tag := &""
+	for i: int in _g.map.hex_count():
+		var hex := _g.map.hex_of(i)
+		var holder := Occupation.controller_tag(_g, hex)
+		if Occupation.fortress_level(_g, hex) == 0 or holder == &"" or holder == ArmyFixture.TAG:
+			continue
+		var e := WarFixture.neighbour_of(_g, holder)
+		if e == &"" or e == ArmyFixture.TAG or Knowledge.knows(_g, ArmyFixture.TAG, e):
+			continue
+		if _land_beside(hex, ArmyFixture.TAG) == ArmyFixture.NO_HEX:
+			continue
+		found = hex
+		besieger = e
+		holder_tag = holder
+		break
+	assert_ne(found, ArmyFixture.NO_HEX, "a foreign fortress beside Genoa's land whose besieger Genoa does not know")
+	WarFixture.at_war(_g, besieger, holder_tag)
+	_siege(found, besieger, 3, 1)
+	ArmyFixture.army(_g, ArmyFixture.TAG, _land_beside(found, ArmyFixture.TAG), 0, 1)
+	ArmyFixture.army(_g, besieger, found, 0, 3)
+	var v := SiegeView.at(_g, ArmyFixture.TAG, found)
+	assert_eq(v.access, &"seen")
+	var tags := [String(besieger)]
+	var hits: Array = []
+	_tag_hits(v, tags, hits)
+	_tag_hits(SiegeView.all(_g, ArmyFixture.TAG), tags, hits)
+	assert_eq(hits, [], "P: no tag of an unknown besieger anywhere in the witness's view")
+	assert_eq(str(v.besieger), "besieger", "the role word stands for the unknown besieger")
+	assert_eq(str(v.defender), String(holder_tag) if Knowledge.knows(_g, ArmyFixture.TAG, holder_tag) else "defender")
+	assert_false(_has_key(v, "army"), "P: no army key for a witness")
+	var exact := SiegeView.at(_g, besieger, found)
+	assert_eq(str(exact.besieger), String(besieger), "the besieger has its own tag")

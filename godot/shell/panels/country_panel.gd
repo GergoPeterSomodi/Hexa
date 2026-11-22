@@ -9,6 +9,10 @@ signal play_requested(tag: StringName)
 signal look_at_requested(hex: Vector2i)
 signal country_requested(tag: StringName)
 signal study_requested
+## A declaration or a peace that needs a Confirm: the App pushes the screen. Without a listener the war buttons arm first.
+signal confirm_requested(screen: Screen)
+## A toast for the player: the words of a war act that was done (plain).
+signal toast_requested(text: String, tone: StringName)
 
 const NO_HEX := Country.NO_HEX
 const LAND_SHOWN := 3
@@ -30,6 +34,7 @@ const RELATION_WORDS: Dictionary = {"you": "your country", "neighbour": "neighbo
 @onready var _treasury_expected: DeltaChip = $VBox/BodyScroll/Body/TreasuryBox/Expected
 @onready var _treasury_tax: Label = $VBox/BodyScroll/Body/TreasuryBox/Tax
 @onready var _study: KitButton = $VBox/BodyScroll/Body/TreasuryBox/OpenStudy
+@onready var _war: CountryWar = $VBox/BodyScroll/Body/War
 
 var _tag: StringName = &""
 var _picking: bool = false
@@ -46,6 +51,9 @@ func _ready() -> void:
 	_play.pressed.connect(_on_play_pressed)
 	_show.pressed.connect(_on_show_pressed)
 	_study.pressed.connect(_on_study_pressed)
+	_war.confirm_requested.connect(func(screen: Screen) -> void: confirm_requested.emit(screen))
+	_war.toast_requested.connect(func(text: String, tone: StringName) -> void: toast_requested.emit(text, tone))
+	_war.country_requested.connect(func(who: StringName) -> void: country_requested.emit(who))
 	_wire_bus()
 
 
@@ -71,6 +79,7 @@ func clear() -> void:
 	_tag = &""
 	_picking = false
 	_focus = NO_HEX
+	_war.fill(&"", {}, false)
 	visible = false
 
 
@@ -86,6 +95,7 @@ func refresh() -> void:
 	_fill_head(card)
 	_fill_picking(card)
 	_fill_ledger(card)
+	_war.fill(_tag, card["war"] as Dictionary, confirm_listened())
 	_fill_neighbours(card)
 	_fill_treasury(card)
 	_focus = card["focus"] as Vector2i
@@ -319,6 +329,16 @@ func _fill_treasury(card: Dictionary) -> void:
 	_treasury_tax.visible = str(treasury["tax"]) != ""
 
 
+## The War section (spec 6.7), for the tests and the App's notes.
+func war_section() -> CountryWar:
+	return _war
+
+
+## Whether some listener is connected to confirm_requested (the App pushes the Confirm); the war buttons ask with it.
+func confirm_listened() -> bool:
+	return not get_signal_connection_list(&"confirm_requested").is_empty()
+
+
 ## The treasury section is shown (the viewer's own country or a known one).
 func treasury_visible() -> bool:
 	return _treasury_box.visible
@@ -359,6 +379,11 @@ func _wiring() -> Array:
 		[Events.work_cancelled, _on_work_cancelled],
 		[Events.town_grew, _on_town_grew],
 		[Events.district_declined, _on_district_declined],
+		[Events.war_declared, _on_war_declared],
+		[Events.peace_made, _on_peace_made],
+		[Events.district_captured, _on_district_captured],
+		[Events.controllers_changed, _on_controllers_changed],
+		[Events.country_chosen, _on_country_chosen],
 	]
 
 
@@ -404,6 +429,26 @@ func _on_town_grew(_tag: StringName, _hex: Vector2i, _level: int) -> void:
 
 
 func _on_district_declined(_tag: StringName, _hex: Vector2i, _level: int, _why: StringName) -> void:
+	_refresh_if_shown()
+
+
+func _on_war_declared(_who: StringName, _target: StringName) -> void:
+	_refresh_if_shown()
+
+
+func _on_peace_made(_who: StringName, _target: StringName, _terms: StringName) -> void:
+	_refresh_if_shown()
+
+
+func _on_district_captured(_hex: Vector2i, _who: StringName, _by: StringName) -> void:
+	_refresh_if_shown()
+
+
+func _on_controllers_changed(_hexes: Array[Vector2i]) -> void:
+	_refresh_if_shown()
+
+
+func _on_country_chosen(_who: StringName) -> void:
 	_refresh_if_shown()
 
 

@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://shell/screens/battle_dock.gd" id="1_dock"]
+
+[node name="BattleDock" type="Control"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 3
+anchors_preset = 9
+anchor_bottom = 1.0
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("1_dock")
+kind = 2

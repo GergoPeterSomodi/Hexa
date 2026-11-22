@@ -16,6 +16,7 @@ const TONE_PLAIN := &"plain"
 const NOT_YOUR_LAND := "not your land"
 const WAY_OUT_TEXT := "Go round their land."
 const RIVER_NAME := "the river"
+const FOG_NO_WAY_TEXT := "no way there by land"
 
 
 ## The hexes (indices) an army can stand on at the end of this season (`season`) and by the end of the next (`next`), from
@@ -82,14 +83,14 @@ static func to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> Dict
 static func _make_to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> Dictionary:
 	var verdict := Movement.march_check(game, {"army": army_id, "goal": hex, "tag": tag})
 	if not bool(verdict.ok):
-		var reason := str(verdict.reason)
+		var reason := _fog_safe(game, tag, hex, str(verdict.reason))
 		if reason.begins_with(NOT_YOUR_LAND):
 			reason = _foreign_reason(game, tag, hex)
 		return _refusal(game, hex, reason)
 	var a := Armies.by_id(game, army_id)
 	var res := Movement.plan(game, a, hex)
 	if not bool(res.ok):
-		return _refusal(game, hex, str(res.reason))
+		return _refusal(game, hex, _fog_safe(game, tag, hex, str(res.reason)))
 	var route: PackedInt32Array = res.hexes
 	var waits := str(res.waits) != ""
 	var walk := Movement.walk_plan(game, a, route, game.turn)
@@ -120,8 +121,49 @@ static func _make_to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -
 	out["supply_end"] = end
 	lines.append(_supply_line(end))
 	out["kind"] = &"note" if (a.mustering(game.turn) or waits or not bool(end.in_supply)) else &"go"
+	var stand := game.map.hex_of(route[route.size() - 2]) if route.size() >= 2 else a.hex
+	_war_words(game, tag, army_id, hex, stand, out, lines)
 	out["lines"] = lines
 	return out
+
+
+## The war words of a march that is allowed (M7, 6.4): the odds card's kind and its odds (OddsView.of) for an attack, a siege,
+## a storm, a walk in or a walk in held by a castle, and the first line of the hover card in the same words ("Attacks the Duchy
+## of Milan: odds Even."). war {kind, text, tone}; odds {} for any other march.
+static func _war_words(game: Game, tag: StringName, army_id: int, hex: Vector2i, stand: Vector2i, out: Dictionary,
+		lines: Array) -> void:
+	var odds := OddsView.of(game, tag, army_id, hex, false, stand)
+	var kind: StringName = odds.get("kind", OddsView.KIND_NONE)
+	var text := ""
+	var tone := TONE_PLAIN
+	var word := str(odds.get("word", ""))
+	match kind:
+		OddsView.KIND_ATTACK:
+			text = "Attacks %s: odds %s." % [_enemy_name(game, tag, hex), word if word != "" else "unknown"]
+			tone = TONE_GOOD if str(odds.get("tone", "")) == "good" else (TONE_BAD if str(odds.get("tone", "")) == "bad" else TONE_PLAIN)
+		OddsView.KIND_SIEGE:
+			text = "Besieges %s: %s." % [Words.place(game, hex), word]
+		OddsView.KIND_STORM:
+			text = "Storms %s: %s." % [Words.place(game, hex), word]
+		OddsView.KIND_WALK_IN, OddsView.KIND_HELD:
+			text = str((odds.get("notes", []) as Array)[0]) if kind == OddsView.KIND_HELD else "Takes it at the end of the season."
+	if text == "":
+		out["war"] = {"kind": OddsView.KIND_NONE, "text": "", "tone": TONE_PLAIN}
+		out["odds"] = {}
+		return
+	out["war"] = {"kind": kind, "text": text, "tone": tone}
+	out["odds"] = odds
+	lines.push_front([text, tone])
+
+
+## The country a march to hex would fight, as the viewer names it (its long name if the viewer knows it; else "a country").
+static func _enemy_name(game: Game, tag: StringName, hex: Vector2i) -> String:
+	for other: Army in Armies.at(game, hex):
+		if other.tag != tag:
+			if Knowledge.knows(game, tag, other.tag):
+				return Words.country_the(game, other.tag)
+			return "a country"
+	return "a country"
 
 
 ## The stored route of a march in progress (Army.route, kept when the march was ordered; the walk of Movement.walk_plan from
@@ -189,6 +231,45 @@ static func _foreign_reason(game: Game, tag: StringName, hex: Vector2i) -> Strin
 	if owner != &"" and Knowledge.knows(game, tag, owner) and Sight.explored(game, tag, hex):
 		return "%s: %s holds it%s" % [NOT_YOUR_LAND, Words.country_the(game, owner), tail]
 	return "%s: another country holds it%s" % [NOT_YOUR_LAND, tail]
+
+
+## A refusal's reason as the viewer may read it (4.15): a reason that names a hex the viewer does not see (the goal, or a hex in
+## its words) is the generic no-way words, naming nothing; a reason on seen hexes, and the foreign-land reason (owners are public),
+## stay as the check gave them.
+static func _fog_safe(game: Game, tag: StringName, goal: Vector2i, reason: String) -> String:
+	if reason == "" or reason.begins_with(NOT_YOUR_LAND):
+		return reason
+	var hexes := _named_hexes(reason)
+	hexes.append(goal)
+	for h: Vector2i in hexes:
+		if game.map.index_of(h) >= 0 and not _seen(game, tag, h):
+			return FOG_NO_WAY_TEXT
+	return reason
+
+
+## True when the viewer may read a hex: it sees it, or it is its own land or held by it.
+static func _seen(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	if Knowledge.sees(game, tag, hex):
+		return true
+	return Occupation.controller_tag(game, hex) == tag or Territory.owner_tag(game, hex) == tag
+
+
+## The hexes written as "(x, y)" in a text, in order.
+static func _named_hexes(text: String) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var parts := text.split("(")
+	for k: int in range(1, parts.size()):
+		var close := parts[k].find(")")
+		if close < 0:
+			continue
+		var inner := parts[k].substr(0, close).split(",")
+		if inner.size() != 2:
+			continue
+		var x := inner[0].strip_edges()
+		var y := inner[1].strip_edges()
+		if x.is_valid_int() and y.is_valid_int():
+			out.append(Vector2i(x.to_int(), y.to_int()))
+	return out
 
 
 ## A refusal for a call that has no game to name a place from (an off-map hex or no countries).

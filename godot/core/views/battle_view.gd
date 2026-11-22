@@ -78,17 +78,18 @@ static func _make_of(game: Game, viewer: StringName, record_id: int, day: int) -
 	var idx := _index_of_day(r, day)
 	var frame: Dictionary = r.frames[idx]
 	var names := _names_of(game, viewer, r.attacker, r.defender)
+	var refs := _refs(game, viewer, r.attacker, r.defender)
 	var viewer_side := _viewer_side(r, viewer)
 	var sides := {}
-	sides[String(r.attacker)] = _side(game, r, SIDE_ATTACKER, idx, seen, viewer_side, _name_of(names, r.attacker))
-	sides[String(r.defender)] = _side(game, r, SIDE_DEFENDER, idx, seen, viewer_side, _name_of(names, r.defender))
+	sides[refs.attacker] = _side(game, r, SIDE_ATTACKER, idx, seen, viewer_side, _name_of(names, r.attacker), refs.named_attacker)
+	sides[refs.defender] = _side(game, r, SIDE_DEFENDER, idx, seen, viewer_side, _name_of(names, r.defender), refs.named_defender)
 	return {
 		"access": acc, "kept": true, "id": r.id, "name": r.name, "year": r.year, "hex": r.hex,
 		"place": Words.place(game, r.hex), "days": _int(r.end.get("days", 0)), "day": _int(frame["day"]), "index": idx,
-		"sides": {"attacker": [String(r.attacker)], "defender": [String(r.defender)]},
-		"viewer_side": viewer_side, "ground": _ground(game, r),
+		"sides": {"attacker": [refs.attacker], "defender": [refs.defender]},
+		"viewer_side": viewer_side, "ground": _ground(game, r, refs.defender),
 		"side": sides, "log": _log(r, idx, names, seen, viewer_side),
-		"result": _result(names, r.attacker, r.defender, r.end, viewer_side),
+		"result": _winner_ref(_result(names, r.attacker, r.defender, r.end, viewer_side), r.attacker, r.defender, refs),
 		"note": NO_NOTE,
 	}
 
@@ -104,18 +105,19 @@ static func _gone(game: Game, viewer: StringName, record_id: int) -> Dictionary:
 	var acc := &"exact" if viewer == &"" or own != &"" else &"seen"
 	var seen := acc == &"seen"
 	var names := _names_of(game, viewer, attacker, defender)
+	var refs := _refs(game, viewer, attacker, defender)
 	var hex := _hex_of(entry)
 	var winner_tag := StringName(str(entry.get("winner", "")))
 	var winner := SIDE_ATTACKER if winner_tag == attacker and winner_tag != &"" else (SIDE_DEFENDER if winner_tag == defender and winner_tag != &"" else -1)
-	var killed := _pair_text(entry.get("killed", {}), attacker, defender, seen)
-	var wounded := _pair_text(entry.get("wounded", {}), attacker, defender, seen)
-	var result := _result_text(names, attacker, defender, winner, str(entry.get("how", "")),
-		str(entry.get("cause", "")), _int(entry.get("days", 0)), Army.NO_HEX, own)
+	var killed := _pair_text(entry.get("killed", {}), attacker, defender, seen, refs)
+	var wounded := _pair_text(entry.get("wounded", {}), attacker, defender, seen, refs)
+	var result := _winner_ref(_result_text(names, attacker, defender, winner, str(entry.get("how", "")),
+		str(entry.get("cause", "")), _int(entry.get("days", 0)), Army.NO_HEX, own), attacker, defender, refs)
 	return {
 		"access": acc, "kept": false, "id": record_id, "name": str(entry.get("name", "")),
 		"year": _int(entry.get("year", 0)), "hex": hex, "place": Words.place(game, hex),
 		"days": _int(entry.get("days", 0)), "day": 0, "index": -1,
-		"sides": {"attacker": [String(attacker)], "defender": [String(defender)]},
+		"sides": {"attacker": [refs.attacker], "defender": [refs.defender]},
 		"viewer_side": own, "ground": {}, "side": {},
 		"totals": {"killed": killed, "wounded": wounded}, "log": [], "result": result, "note": GONE_NOTE,
 	}
@@ -130,12 +132,13 @@ static func _chronicle_entry(game: Game, record_id: int) -> Dictionary:
 	return {}
 
 
-static func _pair_text(value: Variant, attacker: StringName, defender: StringName, seen: bool) -> Dictionary:
+static func _pair_text(value: Variant, attacker: StringName, defender: StringName, seen: bool, refs: Dictionary) -> Dictionary:
 	var out := {}
 	if value is Dictionary:
-		for tag: StringName in [attacker, defender]:
-			var n := _int((value as Dictionary).get(String(tag), 0))
-			out[String(tag)] = _round(n, ROUND_MEN) if seen else n
+		var n_a := _int((value as Dictionary).get(String(attacker), 0))
+		var n_d := _int((value as Dictionary).get(String(defender), 0))
+		out[refs.attacker] = _round(n_a, ROUND_MEN) if seen else n_a
+		out[refs.defender] = _round(n_d, ROUND_MEN) if seen else n_d
 	return out
 
 
@@ -153,7 +156,7 @@ static func _make_sites(game: Game, viewer: StringName) -> Array[Dictionary]:
 			shown = PackedInt32Array([_round(front[0], ROUND_MORALE), _round(front[1], ROUND_MORALE)])
 		out.append({
 			"record": r.id, "hex": r.hex, "name": r.name, "tone": _tone(_viewer_side(r, viewer), _int(r.end.get("winner", -1))),
-			"front": shown, "attacker_colour_id": _id_of(game, r.attacker), "defender_colour_id": _id_of(game, r.defender),
+			"front": shown, "attacker_colour_id": _colour(game, viewer, r, r.attacker), "defender_colour_id": _colour(game, viewer, r, r.defender),
 		})
 	return out
 
@@ -161,8 +164,9 @@ static func _make_sites(game: Game, viewer: StringName) -> Array[Dictionary]:
 # --- sides ----------------------------------------------------------------------------------------------------------
 
 
-static func _side(game: Game, r: BattleRecord, side: int, idx: int, seen: bool, viewer_side: StringName, shown: String) -> Dictionary:
+static func _side(game: Game, r: BattleRecord, side: int, idx: int, seen: bool, viewer_side: StringName, shown: String, named: bool) -> Dictionary:
 	var tag := r.attacker if side == SIDE_ATTACKER else r.defender
+	var tag_text := String(tag) if named else ""
 	var frame: Dictionary = r.frames[idx]
 	var keys := _side_keys(r, side)
 	var men_now := 0
@@ -181,7 +185,7 @@ static func _side(game: Game, r: BattleRecord, side: int, idx: int, seen: bool, 
 	if viewer_side == SIDE_WORDS[side]:
 		role += " · you"
 	return {
-		"name": shown, "tag": String(tag), "arms": String(tag),
+		"name": shown, "tag": tag_text, "arms": tag_text,
 		"role_text": role, "general_text": "No general",
 		"men": _num(men_now, seen), "start": _num(start, seen), "killed": _num(killed, seen),
 		"wounded": _num(wounded, seen), "roll": roll, "mult_text": "×%.1f" % (mult / 1000.0),
@@ -336,7 +340,7 @@ static func _routed(game: Game, r: BattleRecord, side: int, idx: int, seen: bool
 # --- the battle's ground, log and result ---------------------------------------------------------------------------
 
 
-static func _ground(game: Game, r: BattleRecord) -> Dictionary:
+static func _ground(game: Game, r: BattleRecord, helps: String) -> Dictionary:
 	var g := _ground_of(r)
 	var i := game.map.index_of(r.hex)
 	var terrain_name := "Open ground"
@@ -347,8 +351,7 @@ static func _ground(game: Game, r: BattleRecord) -> Dictionary:
 	var narrow := _flag(g.get("narrow", false))
 	var lanes_open := LANES - 1 if narrow else LANES
 	var chips: Array[Dictionary] = []
-	var defender := String(r.defender)
-	var attacker := String(r.attacker)
+	var defender := helps
 	if _flag(r.input.get("crossing", false)):
 		chips.append({"text": "Pass crossing", "icon": &"pass", "helps": defender})
 	if _flag(r.input.get("river", false)):
@@ -361,7 +364,7 @@ static func _ground(game: Game, r: BattleRecord) -> Dictionary:
 	if _flag(r.input.get("assault", false)):
 		chips.append({"text": "Assault on a fortress", "icon": &"walls", "helps": defender})
 	var text := "%s · %d lanes" % [terrain_name, lanes_open]
-	return {"text": text, "lanes_open": lanes_open, "chips": chips, "attacker": attacker}
+	return {"text": text, "lanes_open": lanes_open, "chips": chips}
 
 
 static func _log(r: BattleRecord, idx: int, names: Dictionary, seen: bool, viewer_side: StringName) -> Array[Dictionary]:
@@ -559,11 +562,43 @@ static func _round(n: int, step: int) -> int:
 ## country the viewer knows (Knowledge.knows); UNKNOWN_NAME for any other (the log's rule, 4.15).
 static func _names_of(game: Game, viewer: StringName, attacker: StringName, defender: StringName) -> Dictionary:
 	var out := {}
-	var sided := viewer == &"" or viewer == attacker or viewer == defender
 	for tag: StringName in [attacker, defender]:
-		var real := sided or tag == viewer or Knowledge.knows(game, viewer, tag)
+		var real := _named(game, viewer, attacker, defender, tag)
 		out[String(tag)] = _country_name(game, tag) if real else UNKNOWN_NAME
 	return out
+
+
+## Whether the viewer may read a side's country (its name, its tag and its arms): the viewer "", a side, the country itself,
+## or a country the viewer knows (Knowledge.knows). Any other country is shown as a role only (4.15).
+static func _named(game: Game, viewer: StringName, attacker: StringName, defender: StringName, tag: StringName) -> bool:
+	return viewer == &"" or viewer == attacker or viewer == defender or tag == viewer or Knowledge.knows(game, viewer, tag)
+
+
+## The key a side goes by in the view: its tag when the viewer may read it, else its role word.
+static func _ref(named: bool, tag: StringName, role: String) -> String:
+	return String(tag) if named else role
+
+
+## The keys of both sides for a viewer: attacker and defender (the keys), named_attacker and named_defender (flags).
+static func _refs(game: Game, viewer: StringName, attacker: StringName, defender: StringName) -> Dictionary:
+	var na := _named(game, viewer, attacker, defender, attacker)
+	var nd := _named(game, viewer, attacker, defender, defender)
+	return {"attacker": _ref(na, attacker, "attacker"), "defender": _ref(nd, defender, "defender"),
+		"named_attacker": na, "named_defender": nd}
+
+
+## The winner as the view gives it: the winner's key (its tag when named, its role otherwise), "" for none.
+static func _winner_ref(result: Dictionary, attacker: StringName, defender: StringName, refs: Dictionary) -> Dictionary:
+	var w := str(result.get("winner", ""))
+	if w == String(attacker):
+		result["winner"] = refs.attacker
+	elif w == String(defender):
+		result["winner"] = refs.defender
+	return result
+
+
+static func _colour(game: Game, viewer: StringName, r: BattleRecord, tag: StringName) -> int:
+	return _id_of(game, tag) if _named(game, viewer, r.attacker, r.defender, tag) else -1
 
 
 ## A name at the start of a sentence: its first letter capitalised ("a country" reads "A country").

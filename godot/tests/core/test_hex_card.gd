@@ -262,6 +262,21 @@ func _work(id: int, hex: Vector2i, family: int, level_to: int, left: int) -> Wor
 	return w
 
 
+## M7 (6.8): occupied land reads "Held by the <occupier> since <season>", the season of the newest capture by that occupier.
+func test_held_by_row_gives_the_capture_season() -> void:
+	var g := ArmyFixture.game()
+	var enemy := WarFixture.neighbour_of(g, ArmyFixture.TAG)
+	var hex := ArmyFixture.find_town(g)
+	WarFixture.set_occupier(g, hex, enemy)
+	g.chronicle.add({"kind": "district_captured", "hex": hex, "tag": String(enemy), "turn": g.turn})
+	var text := ""
+	for row: Array in HexCard.war_rows(g, hex):
+		if str(row[0]) == "Held by":
+			text = str(row[2])
+	assert_true(text.begins_with("the "), "the occupier's long name: %s" % text)
+	assert_true(text.ends_with(" since " + Calendar.date_text(g.turn, g.start_year)), text)
+
+
 func _find_line(lines: Array, label: String) -> Variant:
 	for row: Variant in lines:
 		var arr: Array = row

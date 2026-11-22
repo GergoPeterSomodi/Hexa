@@ -13,6 +13,8 @@ uniform sampler2D food_ramp : filter_nearest, repeat_disable;
 uniform sampler2D supply : filter_nearest, repeat_disable;
 uniform sampler2D supply_ramp : filter_nearest, repeat_disable;
 uniform sampler2D sight : filter_nearest, repeat_disable;
+uniform sampler2D occupiers : filter_nearest, repeat_disable;
+uniform sampler2D areas : filter_nearest, repeat_disable;
 
 uniform int mode = 0;
 uniform bool tint_on = true;
@@ -33,6 +35,9 @@ uniform float supply_alpha = 0.70;
 uniform float veil_alpha = 0.45;
 uniform float sight_alpha = 0.25;
 uniform float stripe_px = 6.0;
+uniform float occupied_px = 8.0;
+uniform float area_alpha = 0.12;
+uniform bool area_on = false;
 uniform vec4 veil_colour = vec4(0.109804, 0.078431, 0.050980, 1.0);
 
 varying vec2 map_px;
@@ -155,6 +160,25 @@ void fragment() {
 							out_col = vec4(veil_colour.rgb, veil_alpha);
 						}
 					}
+				}
+			}
+			// The occupied land (M7, MapModes._occupied_colour): in Owner mode and the Terrain tint a held hex takes its
+			// occupier's colour in the bands of the stripes (the band is x + y over occupied_px, as MapModes.stripe_is_occupier).
+			int occupier_id = clamp(int(floor(texelFetch(occupiers, cell, 0).r * 255.0 + 0.5)), 0, 255);
+			if (occupier_id > 0 && occupier_id != owner_id && (mode == 1 || (mode == 0 && tint_on))) {
+				float band = floor((floor(map_px.x) + floor(map_px.y)) / occupied_px);
+				if (mod(band, 2.0) < 0.5) {
+					out_col.rgb = texelFetch(palette, ivec2(occupier_id, 0), 0).rgb;
+				}
+			}
+			// The castle-area tint (M7, MapModes._area_tint): the owner's colour at area_alpha over the land modes; Yields,
+			// Food and Supply keep their own colour.
+			int area_byte = clamp(int(floor(texelFetch(areas, cell, 0).r * 255.0 + 0.5)), 0, 255);
+			if (area_on && area_byte > 0 && owner_id > 0 && mode != 3 && mode != 4 && mode != 5) {
+				vec3 owner_rgb = texelFetch(palette, ivec2(owner_id, 0), 0).rgb;
+				float a = area_alpha + out_col.a * (1.0 - area_alpha);
+				if (a > 0.0) {
+					out_col = vec4((owner_rgb * area_alpha + out_col.rgb * out_col.a * (1.0 - area_alpha)) / a, a);
 				}
 			}
 			// The sight veil (A13): over every land hex the viewer does not see, in every mode, unless the mode drew its veil.

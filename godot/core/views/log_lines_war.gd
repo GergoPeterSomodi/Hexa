@@ -140,7 +140,10 @@ static func _battle(game: Game, entry: Dictionary, viewer: StringName, mine_now:
 	var loser := StringName(str(entry.get("loser", "")))
 	var hex := entry["hex"] as Vector2i
 	var record := int(entry.get("record", -1))
-	var head := "Battle of %s, %d" % [str(entry.get("name", "")), int(entry.get("year", 0))]
+	# The producer names the battle in full ("Battle of Alessandria, 1480", Battles.name_for): the name is used as it is.
+	var head := str(entry.get("name", ""))
+	if head == "":
+		head = "Battle at (%d, %d), %d" % [hex.x, hex.y, int(entry.get("year", 0))]
 	var peace_end := str(entry.get("how", "")) == "peace"
 	if not mine_now:
 		var body := ""

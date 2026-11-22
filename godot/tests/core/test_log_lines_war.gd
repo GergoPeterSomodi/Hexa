@@ -64,7 +64,7 @@ func _line(kind: String, extra: Dictionary, viewer: StringName = &"GEN") -> Dict
 
 func _battle(attacker: StringName, defender: StringName, winner: StringName, loser: StringName, extra: Dictionary = {}) -> Dictionary:
 	var event := {"tag": attacker, "hex": PAVIA, "others": [defender], "defender": defender, "attacker": attacker,
-		"assault": false, "how": "broke", "cause": "morale", "seasons": 1, "days": 4, "name": "Alessandria", "year": 1480,
+		"assault": false, "how": "broke", "cause": "morale", "seasons": 1, "days": 4, "name": "Battle of Alessandria, 1480", "year": 1480,
 		"killed": {String(attacker): 120, String(defender): 410}, "wounded": {String(attacker): 60, String(defender): 0},
 		"retreat": Vector2i(8, 8), "record": 3, "stormed": false, "winner": winner, "loser": loser,
 		"witnesses": _living()}
@@ -148,6 +148,26 @@ func test_a_battle_lost_and_a_draw_by_the_player() -> void:
 	assert_eq([draw["tone"], draw["floating"]], ["plain", ""])
 
 
+func test_the_battle_name_is_the_producers_and_is_not_wrapped_again() -> void:
+	# The real producer (Battles.name_for) names the battle; the line must not add "Battle of" or the year a second time.
+	var known := _known()
+	var first := Battles.name_for(_g, PAVIA)
+	assert_true(first.begins_with("Battle") and first.count(", ") == 1, "the producer's name: %s" % first)
+	var line := _line("battle_ended", _battle(&"GEN", known, &"GEN", known, {"name": first, "year": 1480}))
+	assert_true(str(line["text"]).begins_with(first + ": "), "the line starts with the producer's name: %s" % line["text"])
+	assert_eq(str(line["text"]).count(", 1480"), 1, "the year is printed once")
+	var second := Battles.name_for(_g, PAVIA)
+	assert_true(second.begins_with("Second Battle"), "a second battle at the place: %s" % second)
+	var again := _line("battle_ended", _battle(&"GEN", known, &"GEN", known, {"name": second, "year": 1480}))
+	assert_true(str(again["text"]).begins_with(second + ": "), "the second battle's name too")
+	assert_false(str(again["text"]).contains("Battle of Second"), "no double wrap")
+
+
+func test_a_battle_without_a_name_is_named_from_its_hex() -> void:
+	var line := _line("battle_ended", _battle(&"GEN", _known(), &"GEN", _known(), {"name": "", "year": 1480}))
+	assert_true(str(line["text"]).begins_with("Battle at (10, 9), 1480: "), str(line["text"]))
+
+
 func test_a_battle_by_peace_has_no_days_and_no_notice() -> void:
 	var known := _known()
 	var line := _line("battle_ended", _battle(&"GEN", known, &"", &"", {"how": "peace", "record": -1}))
@@ -159,7 +179,7 @@ func test_a_battle_by_peace_has_no_days_and_no_notice() -> void:
 func test_a_witnessed_battle_of_others_names_only_the_known() -> void:
 	var known := _known()
 	var stranger := _stranger()
-	var line := _line("battle_ended", _battle(known, stranger, known, stranger, {"name": "Gavi", "year": 1481,
+	var line := _line("battle_ended", _battle(known, stranger, known, stranger, {"name": "Battle of Gavi, 1481", "year": 1481,
 		"killed": {String(known): 5, String(stranger): 9}, "wounded": {}, "retreat": Army.NO_HEX, "record": 4}))
 	assert_eq(line["text"], "Battle of Gavi, 1481: %s beat a country." % LogLines.short_name(_g, known))
 	assert_eq([line["keyword"], line["tone"], line["notify"], line["floating"], line["mine"]],

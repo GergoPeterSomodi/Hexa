@@ -5,6 +5,10 @@
 ## The Food mode (M5, spec 6.5) is checked the same way with hand-made Food bytes (0 to 8); bytes 1 and 2 are striped.
 ## The Supply mode and the sight veil (M6 L17, spec 6.6): hand-made Supply bytes (0 to 6, 1 striped) and sight bytes (every
 ## third land hex unseen) are checked in Supply, in Terrain under the veil and in Supply under the veil.
+## The occupied stripes and the castle-area tint (M7, spec 6.3): hand-made occupiers (every fifth land hex held by another
+## country) and hand-made areas are checked in Owner, Terrain and Relief, the areas on in Owner, Terrain and Relief as a
+## second pass. A stripe's band is the fragment's map position (MapModes.stripe_is_occupier), so the expected colour takes the
+## occupier only in its band.
 ## Headless (dummy renderer) it prints SKIP and exits 0.
 ##
 ## Run windowed (live GPU / Compatibility GL):
@@ -63,6 +67,8 @@ func _run() -> void:
 	var food_bytes := _hand_made_food(map)
 	var supply_bytes := _hand_made_supply(map)
 	var sight_bytes := _hand_made_sight(map)
+	var occupier_bytes := _hand_made_occupiers(map, owner)
+	var area_bytes := _hand_made_areas(map)
 
 	var world := Node2D.new()
 	world.name = "ProbeWorld"
@@ -88,6 +94,8 @@ func _run() -> void:
 	overlay.update_food(food_bytes)
 	overlay.update_supply(supply_bytes)
 	overlay.update_sight(sight_bytes)
+	overlay.update_occupier_bytes(occupier_bytes)
+	overlay.update_areas(area_bytes)
 	view.set_borders(map, owner, borders_palette)
 
 	if headless:
@@ -108,23 +116,27 @@ func _run() -> void:
 
 	overlay.visible = true
 	var failed_modes: int = await _check_modes(map, owner, h_bytes, palette, world, vp_size, base_img, overlay,
-		yield_bytes, food_bytes, supply_bytes, sight_bytes)
+		yield_bytes, food_bytes, supply_bytes, sight_bytes, occupier_bytes, area_bytes)
 	quit(0 if failed_modes == 0 else 1)
 
 
 ## Renders each mode (and the veil over two of them), compares every hex middle with MapModes; returns the modes that failed.
 func _check_modes(map: MapData, owner: PackedByteArray, h_bytes: PackedByteArray, palette: PackedColorArray,
 		world: Node2D, vp_size: Vector2, base_img: Image, overlay: ModeOverlay, yield_bytes: PackedByteArray,
-		food_bytes: PackedByteArray, supply_bytes: PackedByteArray, sight_bytes: PackedByteArray) -> int:
+		food_bytes: PackedByteArray, supply_bytes: PackedByteArray, sight_bytes: PackedByteArray,
+		occupier_bytes: PackedByteArray, area_bytes: PackedByteArray) -> int:
 	var modes_to_check: Array[Array] = [
-		[MapModes.Mode.TERRAIN, "Terrain", false],
-		[MapModes.Mode.OWNER, "Owner", false],
-		[MapModes.Mode.RELIEF, "Relief", false],
-		[MapModes.Mode.YIELDS, "Yields", false],
-		[MapModes.Mode.FOOD, "Food", false],
-		[MapModes.Mode.SUPPLY, "Supply", false],
-		[MapModes.Mode.TERRAIN, "Terrain+veil", true],
-		[MapModes.Mode.SUPPLY, "Supply+veil", true],
+		[MapModes.Mode.TERRAIN, "Terrain", false, false],
+		[MapModes.Mode.OWNER, "Owner", false, false],
+		[MapModes.Mode.RELIEF, "Relief", false, false],
+		[MapModes.Mode.YIELDS, "Yields", false, false],
+		[MapModes.Mode.FOOD, "Food", false, false],
+		[MapModes.Mode.SUPPLY, "Supply", false, false],
+		[MapModes.Mode.TERRAIN, "Terrain+veil", true, false],
+		[MapModes.Mode.SUPPLY, "Supply+veil", true, false],
+		[MapModes.Mode.OWNER, "Owner+areas", false, true],
+		[MapModes.Mode.TERRAIN, "Terrain+areas", false, true],
+		[MapModes.Mode.RELIEF, "Relief+areas", false, true],
 	]
 	var total_failed_modes := 0
 	for entry: Array in modes_to_check:
@@ -133,6 +145,7 @@ func _check_modes(map: MapData, owner: PackedByteArray, h_bytes: PackedByteArray
 		overlay.set_mode(mode)
 		overlay.set_tint(true)
 		overlay.set_sight_veil(bool(entry[2]))
+		overlay.set_areas_on(bool(entry[3]))
 		await _wait_frames(3)
 		var img := root.get_texture().get_image()
 		if img == null or img.is_empty():
@@ -142,7 +155,7 @@ func _check_modes(map: MapData, owner: PackedByteArray, h_bytes: PackedByteArray
 		if _out_dir != "":
 			_save_shot(img, label.to_lower())
 		var stats := _verify_frame(map, owner, h_bytes, palette, mode, world, vp_size, base_img, img, yield_bytes, food_bytes,
-				supply_bytes, sight_bytes, bool(entry[2]))
+				supply_bytes, sight_bytes, occupier_bytes, area_bytes, bool(entry[2]), bool(entry[3]))
 		var bad := int(stats["bad"])
 		var worst := float(stats["worst"])
 		var status := "PASS" if bad == 0 else "FAIL"
@@ -208,9 +221,12 @@ func _build_tile_view(map: MapData) -> TileMapView:
 func _verify_frame(map: MapData, owner: PackedByteArray, h_bytes: PackedByteArray, palette: PackedColorArray,
 		mode: MapModes.Mode, world: Node2D, vp_size: Vector2, base_img: Image, img: Image,
 		yield_bytes: PackedByteArray, food_bytes: PackedByteArray, supply_bytes: PackedByteArray,
-		sight_bytes: PackedByteArray, veil: bool) -> Dictionary:
+		sight_bytes: PackedByteArray, occupier_bytes: PackedByteArray, area_bytes: PackedByteArray,
+		veil: bool, areas: bool) -> Dictionary:
 	var img_size := Vector2(img.get_size())
 	var xform := world.get_global_transform_with_canvas()
+	var to_map := xform.affine_inverse()
+	var to_view := vp_size / img_size
 	var bad := 0
 	var worst := 0.0
 	var first := ""
@@ -225,8 +241,12 @@ func _verify_frame(map: MapData, owner: PackedByteArray, h_bytes: PackedByteArra
 			)
 			var bg := base_img.get_pixelv(px)
 			var got := img.get_pixelv(px)
+			# the stripe band of the sampled pixel, in map px (the shader's fragment is the pixel's centre)
+			var map_pt := to_map * ((Vector2(px) + Vector2(0.5, 0.5)) * to_view)
+			var occ := int(occupier_bytes[idx]) if MapModes.stripe_is_occupier(floori(map_pt.x), floori(map_pt.y)) else 0
+			var area := int(area_bytes[idx]) if areas else 0
 			var want := MapModes.colour_of(mode, int(owner[idx]), int(h_bytes[idx]), palette, true, 0, int(yield_bytes[idx]),
-				int(food_bytes[idx]), int(supply_bytes[idx]), int(sight_bytes[idx]), veil)
+				int(food_bytes[idx]), int(supply_bytes[idx]), int(sight_bytes[idx]), veil, occ, area)
 			var exp_r := bg.r * (1.0 - want.a) + want.r * want.a
 			var exp_g := bg.g * (1.0 - want.a) + want.g * want.a
 			var exp_b := bg.b * (1.0 - want.a) + want.b * want.a
@@ -323,6 +343,28 @@ static func _hand_made_sight(map: MapData) -> PackedByteArray:
 		if map.land[idx] != 0:
 			var hex := map.hex_of(idx)
 			out[idx] = 0 if (hex.x + hex.y) % 3 == 0 else 1
+	return out
+
+
+## Hand-made occupiers: every fifth land hex (by index) held by another country (the owner's successor on the six, never the
+## owner itself); sea 0.
+static func _hand_made_occupiers(map: MapData, owner: PackedByteArray) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(map.hex_count())
+	for idx: int in map.hex_count():
+		if map.land[idx] != 0 and idx % 5 == 2:
+			out[idx] = (int(owner[idx]) % 6) + 1
+	return out
+
+
+## Hand-made castle areas: the land hexes on a diagonal band of one in five (by column and row); sea 0.
+static func _hand_made_areas(map: MapData) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(map.hex_count())
+	for idx: int in map.hex_count():
+		if map.land[idx] != 0:
+			var hex := map.hex_of(idx)
+			out[idx] = 1 if (hex.x * 3 + hex.y) % 5 == 0 else 0
 	return out
 
 

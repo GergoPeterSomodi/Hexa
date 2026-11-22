@@ -1,12 +1,14 @@
 ## What is still to do this season, as lines for the task flag and the report's "Before" section
 ## (docs/architecture/m3-build-spec.md 4.8, 5.6; docs/architecture/m4-build-spec.md 4.18). Eleven rules: an empty treasury, hunger
 ## and a need that will run out (severity 2 or 1), winter stops works in the snow (2), a treasury that will fall (1), a
-## full town (1) and a free work slot (1) (docs/architecture/m5-build-spec.md 4.14) and four army rules (docs/architecture/m6-build-spec.md 4.15). Pure core/views/ code: reads the game (and EconomyPreview, which writes only the view cache), writes nothing.
+## full town (1) and a free work slot (1) (docs/architecture/m5-build-spec.md 4.14) and four army rules (docs/architecture/m6-build-spec.md 4.15).
+## M7 adds three war rules (docs/architecture/m7-build-spec.md 4.18: a besieged fortress, occupied districts, the war timer; RemindersWar).
+## Pure core/views/ code: reads the game (and EconomyPreview, which writes only the view cache), writes nothing.
 class_name Reminders
 extends RefCounted
 
-const RULES: Array[StringName] = [&"treasury_empty", &"hunger", &"army_hungry", &"army_stores",
-	&"goods_running_out", &"winter_halt", &"winter_passes", &"treasury_falling", &"town_full",
+const RULES: Array[StringName] = [&"treasury_empty", &"hunger", &"army_hungry", &"army_stores", &"besieged",
+	&"goods_running_out", &"winter_halt", &"winter_passes", &"occupied", &"war_timer", &"treasury_falling", &"town_full",
 	&"army_idle", &"free_slot"]
 ## The seasons `goods_running_out` looks ahead (spec 4.18).
 const WINDOW := 8
@@ -56,6 +58,12 @@ static func _build(game: Game, tag: StringName) -> Array[Dictionary]:
 				_add(lines, army_stores(game, tag))
 			&"winter_passes":
 				_add(lines, winter_passes(game, tag))
+			&"besieged":
+				_add(lines, RemindersWar.besieged(game, tag))
+			&"occupied":
+				lines.append_array(RemindersWar.occupied(game, tag))
+			&"war_timer":
+				lines.append_array(RemindersWar.war_timer(game, tag))
 			&"army_idle":
 				_add(lines, army_idle(game, tag))
 			&"free_slot":

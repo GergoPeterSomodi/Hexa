@@ -4,6 +4,7 @@
 extends GutTest
 
 const EDGE_MARGIN_PX := 0.5
+const PAVIA := Vector2i(10, 9)  # Milan's walled castle on seed 1480 (spec 4.3): a held area of seven hexes
 
 
 func _make_map(cols: int, rows: int) -> MapData:
@@ -559,3 +560,171 @@ func test_supply_is_offered_with_a_player_and_its_setting_word_is_supply() -> vo
 	assert_eq(MapModes.mode_of(&"supply"), int(MapModes.Mode.SUPPLY), "the setting word is supply")
 	assert_true(Settings.SCHEMA["state/map_mode"]["choices"].has("supply"), "and the setting accepts it")
 	assert_eq(MapModes.legend_title(MapModes.Mode.SUPPLY), MapModes.SUPPLY_TITLE)
+
+
+# --- M7: the occupied stripes and the castle-area tint (spec 6.3) ---------------------------------------------------
+
+
+func _war_overlay(game: Game) -> ModeOverlay:
+	var overlay := ModeOverlay.new()
+	add_child_autofree(overlay)
+	overlay.setup(game)
+	return overlay
+
+
+## The stripe band the shader computes (floor of (floor x + floor y) over the stripe width; the even bands are the occupier's),
+## written out here so it can be checked against MapModes.stripe_is_occupier.
+static func _shader_band_is_occupier(x: float, y: float) -> bool:
+	var band := floorf((floorf(x) + floorf(y)) / MapModes.OCCUPIED_STRIPE_PX)
+	return fposmod(band, 2.0) < 0.5
+
+
+func test_occupier_and_area_textures_exist_with_the_uniforms() -> void:
+	var overlay := ModeOverlay.new()
+	var map := _supply_fixture(overlay)
+	assert_eq(overlay.occupier_texture().get_size(), Vector2(30, 20))
+	assert_eq(overlay.area_texture().get_size(), Vector2(30, 20))
+	assert_eq(overlay.occupier_texture().get_image().get_format(), Image.FORMAT_R8)
+	assert_eq(overlay.area_texture().get_image().get_format(), Image.FORMAT_R8)
+	assert_eq(overlay.war_texture_bytes(), 2 * 30 * 20, "two R8 textures and no ramp")
+	assert_eq(overlay.occupier_bytes().count(0), map.hex_count(), "no occupied land before the first sync")
+	assert_eq(overlay.area_bytes().count(0), map.hex_count(), "no castle area before the first sync")
+	assert_false(overlay.is_areas_on(), "the castle areas are off until the scene turns them on")
+	var mat := overlay.material as ShaderMaterial
+	assert_same(mat.get_shader_parameter(&"occupiers"), overlay.occupier_texture())
+	assert_same(mat.get_shader_parameter(&"areas"), overlay.area_texture())
+	assert_almost_eq(float(mat.get_shader_parameter(&"occupied_px")), MapModes.OCCUPIED_STRIPE_PX, 0.0001)
+	assert_almost_eq(float(mat.get_shader_parameter(&"area_alpha")), MapModes.AREA_ALPHA, 0.0001)
+	assert_false(bool(mat.get_shader_parameter(&"area_on")))
+
+
+func test_update_occupiers_writes_only_the_changed_texels() -> void:
+	var overlay := ModeOverlay.new()
+	var map := _supply_fixture(overlay)
+	var bytes := PackedByteArray()
+	bytes.resize(map.hex_count())
+	var writes := overlay.texel_writes
+	var updates := overlay.texture_updates
+	assert_eq(overlay.update_occupier_bytes(bytes), 0, "all zeros: nothing differs")
+	assert_eq(overlay.texture_updates, updates, "and no upload")
+	var hex := Vector2i(3, 2)
+	bytes[map.index_of(hex)] = 2
+	assert_eq(overlay.update_occupier_bytes(bytes), 1, "one occupied hex, one texel")
+	assert_eq(overlay.texel_writes - writes, 1)
+	assert_eq(overlay.texture_updates - updates, 1, "one upload")
+	assert_eq(overlay.occupier_image().get_pixelv(hex).r8, 2)
+	assert_eq(overlay.occupier_bytes()[map.index_of(hex)], 2)
+	assert_eq(overlay.update_occupier_bytes(bytes), 0, "the same bytes again write nothing")
+	assert_eq(overlay.update_occupier_bytes(PackedByteArray([1, 2, 3])), 0, "bytes of the wrong size are ignored")
+	var changed: Array[Vector2i] = [hex]
+	assert_eq(overlay.update_occupiers(changed, bytes), 0, "a hex already holding its byte writes nothing")
+	bytes[map.index_of(hex)] = 0
+	assert_eq(overlay.update_occupiers(changed, bytes), 1, "the hexes given write their changed texel")
+	assert_eq(overlay.occupier_bytes()[map.index_of(hex)], 0)
+	assert_eq(overlay.update_occupiers(changed, PackedByteArray([1, 2, 3])), 0, "no game and wrong-size bytes: nothing")
+
+
+func test_occupier_and_area_textures_hold_what_map_modes_says_at_every_land_hex() -> void:
+	var game := WarFixture.game()
+	var me := ArmyFixture.TAG
+	WarFixture.at_war(game, me, &"MLO")
+	var member := game.map.hex_of(Occupation.members(game, PAVIA)[1])
+	WarFixture.set_occupier(game, member, me)
+	game.version += 1
+	var overlay := _war_overlay(game)
+	overlay.set_mode(MapModes.Mode.OWNER)
+	overlay.sync_occupiers(game, true)
+	overlay.set_areas_on(true)
+	assert_eq(overlay.occupier_bytes(), MapModes.occupier_bytes(game), "the occupier texture holds MapModes' bytes")
+	assert_eq(overlay.area_bytes(), MapModes.area_bytes(game, me), "the area texture holds the viewer's castle areas")
+	assert_gt(overlay.area_bytes().count(1), 0, "Pavia's area is held")
+	assert_eq(int(overlay.occupier_bytes()[game.map.index_of(member)]), Countries.by_tag(game, me).id,
+		"the occupied hex holds its occupier")
+	var pal := MapModes.palette(game, false)
+	var heights := MapModes.height_bytes(game.map)
+	var checked := 0
+	for idx: int in game.map.hex_count():
+		if heights[idx] == 0:
+			continue
+		var hex := game.map.hex_of(idx)
+		var from_textures := MapModes.colour_of(MapModes.Mode.OWNER, Territory.owner_id(game, hex), int(heights[idx]), pal,
+			true, 0, 0, 0, 0, 1, false, int(overlay.occupier_bytes()[idx]), int(overlay.area_bytes()[idx]))
+		assert_true(from_textures.is_equal_approx(MapModes.colour_at(game, MapModes.Mode.OWNER, hex, pal, true, 0)),
+			"hex %s" % str(hex))
+		checked += 1
+	assert_gt(checked, 0, "the land was checked")
+
+
+func test_the_stripe_band_of_the_shader_is_the_one_map_modes_names() -> void:
+	var wrong := 0
+	for y: int in range(-40, 41):
+		for x: int in range(-40, 41):
+			for frac: float in [0.0, 0.5, 0.99]:
+				var fx := float(x) + frac
+				var fy := float(y) + frac * 0.5
+				if _shader_band_is_occupier(fx, fy) != MapModes.stripe_is_occupier(floori(fx), floori(fy)):
+					wrong += 1
+	assert_eq(wrong, 0, "the shader's bands and stripe_is_occupier agree on every pixel tested")
+	assert_true(MapModes.stripe_is_occupier(0, 0))
+	assert_false(MapModes.stripe_is_occupier(8, 0), "the band after eight pixels is the owner's")
+	assert_true(_shader_band_is_occupier(-9.0, 0.0), "the bands run on below zero too")
+	assert_eq(_shader_band_is_occupier(-9.0, 0.0), MapModes.stripe_is_occupier(-9, 0))
+
+
+func test_the_castle_area_tint_toggles_the_uniform_the_visibility_and_the_minimap_copy() -> void:
+	var overlay := ModeOverlay.new()
+	_supply_fixture(overlay)
+	var mat := overlay.material as ShaderMaterial
+	overlay.set_mode(MapModes.Mode.TERRAIN)
+	overlay.set_tint(false)
+	assert_false(overlay.visible, "Terrain with the tint off, no veil and no castle areas: hidden")
+	overlay.set_areas_on(true)
+	assert_true(overlay.is_areas_on())
+	assert_true(bool(mat.get_shader_parameter(&"area_on")), "the uniform follows")
+	assert_true(overlay.visible, "the castle-area tint shows in Terrain with the tint off")
+	var mm := overlay.material_for_minimap()
+	assert_true(bool(mm.get_shader_parameter(&"area_on")), "the minimap copy takes the state it was made with")
+	assert_same(mm.get_shader_parameter(&"areas"), overlay.area_texture(), "and shares the area texture")
+	assert_same(mm.get_shader_parameter(&"occupiers"), overlay.occupier_texture(), "and the occupier texture")
+	overlay.set_areas_on(false)
+	assert_false(bool(mat.get_shader_parameter(&"area_on")))
+	assert_false(overlay.visible)
+	assert_false(bool(overlay.material_for_minimap().get_shader_parameter(&"area_on")), "a new copy follows")
+
+
+func test_sync_areas_computes_only_while_the_tint_is_on() -> void:
+	var game := WarFixture.game()
+	WarFixture.at_war(game, ArmyFixture.TAG, &"MLO")
+	game.version += 1
+	var overlay := _war_overlay(game)
+	assert_eq(overlay.sync_areas(game), 0, "off: nothing is computed")
+	assert_eq(overlay.area_bytes().count(1), 0, "and the texture holds no area")
+	overlay.set_areas_on(true)
+	assert_gt(overlay.area_bytes().count(1), 0, "on: the held area is brought up at once")
+	assert_eq(overlay.sync_areas(game), 0, "the same version writes nothing")
+	game.version += 1
+	assert_eq(overlay.sync_areas(game), 0, "a new version with the same areas writes nothing")
+	overlay.set_areas_on(false)
+	assert_eq(overlay.sync_areas(game), 0, "off again: nothing is computed")
+
+
+func test_sync_occupiers_follows_the_version_and_writes_the_changed_texel() -> void:
+	var game := WarFixture.game()
+	var overlay := _war_overlay(game)
+	assert_eq(overlay.sync_occupiers(game), 0, "no occupied land: nothing to write")
+	var member := game.map.hex_of(Occupation.members(game, PAVIA)[2])
+	WarFixture.set_occupier(game, member, ArmyFixture.TAG)
+	game.version += 1
+	assert_eq(overlay.sync_occupiers(game), 1, "one occupied hex, one texel")
+	assert_eq(overlay.sync_occupiers(game), 0, "the same version writes nothing")
+	assert_eq(overlay.occupier_bytes(), MapModes.occupier_bytes(game))
+
+
+func test_the_shader_declares_the_m7_uniforms_and_textures() -> void:
+	# A failed compile leaves the list empty; the GPU compile itself is the windowed probe's job.
+	var shader := load(ModeOverlay.SHADER_PATH) as Shader
+	var names: Array[String] = []
+	for uniform: Dictionary in shader.get_shader_uniform_list():
+		names.append(str(uniform["name"]))
+	for want: String in ["occupiers", "areas", "occupied_px", "area_alpha", "area_on", "sight", "owner_ids"]:
+		assert_true(names.has(want), "the shader declares %s" % want)

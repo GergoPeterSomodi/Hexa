@@ -291,7 +291,7 @@ static func war_rows(game: Game, hex: Vector2i) -> Array:
 	var rows: Array = []
 	var viewer := game.player
 	if Occupation.is_occupied(game, hex):
-		rows.append(["Held by", &"warn", "the " + Occupation.occupier_long_name(game, hex)])
+		rows.append(["Held by", &"warn", "the " + Occupation.occupier_long_name(game, hex) + _since_text(game, hex)])
 	var level := Occupation.fortress_level(game, hex)
 	if level > 0:
 		rows.append(["Fortress", &"plain", _fortress_text(game, viewer, hex, level)])
@@ -317,6 +317,17 @@ static func _fortress_text(game: Game, viewer: StringName, hex: Vector2i, level:
 	if Knowledge.sees(game, viewer, hex):
 		return "%s · garrison about %d of %d" % [head, roundi(float(men) / 100.0) * 100, full]
 	return "%s · a garrison" % head
+
+
+## " since Summer 1480": the season of the newest capture of this hex by its present occupier (the chronicle's district_captured);
+## "" when the chronicle holds none.
+static func _since_text(game: Game, hex: Vector2i) -> String:
+	var tag := String(Occupation.controller_tag(game, hex))
+	for k: int in range(game.chronicle.entries.size() - 1, -1, -1):
+		var e: Dictionary = game.chronicle.entries[k]
+		if str(e.get("kind", "")) == "district_captured" and e.get("hex") == hex and str(e.get("tag", "")) == tag:
+			return " since " + Calendar.date_text(int(e.get("turn", 0)), game.start_year)
+	return ""
 
 
 static func _sees_siege(game: Game, viewer: StringName, hex: Vector2i, siege: Siege) -> bool:

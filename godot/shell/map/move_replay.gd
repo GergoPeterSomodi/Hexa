@@ -20,6 +20,10 @@ var _tokens: ArmyTokens = null
 ## (hex) -> void: asked when the lead walker steps somewhere the camera should follow (the game requests' glide).
 var _follow: Callable = Callable()
 var _lead_from := Vector2i(-1, -1)
+## The battles heard this season ({hex, tag}: battle_started's attacker, battle_joined's joiner); moved to _pending_battles
+## at season_ended and matched to the walks in start() (ReplayMarks).
+var _battle_events: Array[Dictionary] = []
+var _pending_battles: Array[Dictionary] = []
 
 
 func _init() -> void:
@@ -30,6 +34,8 @@ func _init() -> void:
 func _enter_tree() -> void:
 	Events.unit_moved.connect(_on_unit_moved)
 	Events.season_ended.connect(_on_season_ended)
+	Events.battle_started.connect(_on_battle_started)
+	Events.battle_joined.connect(_on_battle_joined)
 	Events.game_started.connect(cancel)
 	Events.game_ended.connect(cancel)
 
@@ -39,6 +45,10 @@ func _exit_tree() -> void:
 		Events.unit_moved.disconnect(_on_unit_moved)
 	if Events.season_ended.is_connected(_on_season_ended):
 		Events.season_ended.disconnect(_on_season_ended)
+	if Events.battle_started.is_connected(_on_battle_started):
+		Events.battle_started.disconnect(_on_battle_started)
+	if Events.battle_joined.is_connected(_on_battle_joined):
+		Events.battle_joined.disconnect(_on_battle_joined)
 	if Events.game_started.is_connected(cancel):
 		Events.game_started.disconnect(cancel)
 	if Events.game_ended.is_connected(cancel):
@@ -63,10 +73,14 @@ func record(tag: StringName, army: int, path: Array[Vector2i], seen: PackedByteA
 ## walks are dropped), when nothing was seen, when a replay already runs or when nothing would show. True: the clock runs.
 func start(speed: StringName) -> bool:
 	var walks := _pending
+	var battles := _pending_battles
 	_pending = []
+	_pending_battles = []
 	if speed == INSTANT or walks.is_empty() or _plan != null:
 		return false
 	var plan := ReplayPlan.new()
+	for b: Dictionary in ReplayMarks.battles(walks, battles, Session.game, Session.player_tag()):
+		plan.record_battle(b["hex"] as Vector2i, int(b["tick"]), bool(b["shown"]))
 	plan.setup(walks, speed)
 	if plan.duration() <= 0.0:
 		return false
@@ -99,10 +113,21 @@ func poses() -> Array[Dictionary]:
 	return out
 
 
+## The battle marks of the running replay (ReplayPlan.marks): {hex, shown} for each battle whose tick has begun; none without a
+## replay. The map draws the shown ones (M7 6.5's badge; the draw is not in MoveReplay).
+func marks() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if _plan != null:
+		out = _plan.marks()
+	return out
+
+
 ## Drops the replay and the walks kept: a new game or a load. `finished` is not emitted.
 func cancel() -> void:
 	_records = []
 	_pending = []
+	_battle_events = []
+	_pending_battles = []
 	if _plan != null:
 		_plan = null
 		set_process(false)
@@ -128,6 +153,17 @@ func _on_season_ended(_turn: int) -> void:
 	_pending = []
 	_pending.assign(_records)
 	_records = []
+	_pending_battles = _battle_events
+	_battle_events = []
+
+
+## A battle began at `hex` (the attacker's walk ends there): its tick is found from the walks at start().
+func _on_battle_started(hex: Vector2i, attacker: StringName, _defender: StringName) -> void:
+	_battle_events.append({"hex": hex, "tag": attacker})
+
+
+func _on_battle_joined(hex: Vector2i, tag: StringName) -> void:
+	_battle_events.append({"hex": hex, "tag": tag})
 
 
 ## Puts the walkers on the map and asks the camera to follow the first shown walker's step when it has changed.

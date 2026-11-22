@@ -27,6 +27,8 @@ var works: WorksFlow = null
 var warm: StudyWarm = null
 ## The movement replay of the season that just ended (M6 6.4): a child of the App, made in setup.
 var replay: MoveReplay = null
+## What the player must decide before the report (M7 6.6): a war declared on the player, one Confirm each.
+var decisions := DecisionQueue.new()
 ## The map's ribbons are held (the season and its replay run); bind_scene applies it to a new map.
 var _ribbons_held := false
 
@@ -62,6 +64,9 @@ func setup() -> void:
 	flow.replay_start = replay.start
 	flow.replay_skip = replay.skip
 	flow.hold_ribbons = _hold_ribbons
+	decisions.emptied.connect(flow.decisions_done)
+	flow.decisions_start = func(_on_done: Callable) -> bool:
+		return decisions.next(_app.context())
 	warm = StudyWarm.new()
 	warm.name = "StudyWarm"
 	warm.setup(_app.settings())
@@ -74,7 +79,7 @@ func setup() -> void:
 	_app.add_child(warm)
 	_app.hud().debug_overlay().study_info_func = study_info
 	_app.context().season_running_func = func() -> bool:
-		return flow.state() == SeasonFlow.State.RUNNING or flow.state() == SeasonFlow.State.REPLAY
+		return _season_busy()
 	on_setting("dev/save_json")
 	on_setting("accessibility/reduce_motion")
 
@@ -101,6 +106,9 @@ func connect_signals(link: Callable) -> void:
 	link.call(_app.app_input(), &"quickload_requested", quickload)
 	link.call(_app.app_input(), &"console_requested", _on_console_requested)
 	link.call(Events, &"game_started", _on_game_started)
+	link.call(Events, &"game_started", decisions.clear)
+	link.call(Events, &"game_ended", decisions.clear)
+	link.call(Events, &"war_declared", _on_war_declared)
 	link.call(Events, &"season_ended", _on_season_ended)
 	link.call(Events, &"work_started", _on_work_started)
 	link.call(Events, &"work_cancelled", _on_work_cancelled)
@@ -443,6 +451,21 @@ func _on_order_said(text: String, tone: StringName) -> void:
 		_app.hud().toast(text, tone, &"")
 
 
+## A war declared on the player queues its Confirm (D44): at once when the flow is idle, else in DECISIONS.
+func _on_war_declared(tag: StringName, target: StringName) -> void:
+	if target == &"" or target != Session.player_tag():
+		return
+	decisions.push({"kind": DecisionQueue.KIND_WAR, "tag": tag, "target": target})
+	if flow.state() == SeasonFlow.State.IDLE:
+		decisions.next(_app.context(), true)
+
+
+## The season runs or its replay or decisions are up: Save waits and the pause menu greys it (M3 D48, M6 6.4).
+func _season_busy() -> bool:
+	return flow.state() == SeasonFlow.State.RUNNING or flow.state() == SeasonFlow.State.REPLAY \
+		or flow.state() == SeasonFlow.State.DECISIONS
+
+
 func _on_flow_state(state: SeasonFlow.State) -> void:
 	var date := _app.hud().date_end()
 	date.set_busy(state == SeasonFlow.State.RUNNING)
@@ -655,7 +678,7 @@ func _load_newest() -> String:
 func _save_refusal() -> String:
 	if Session.game == null:
 		return "there is no game"
-	if flow.state() == SeasonFlow.State.RUNNING or flow.state() == SeasonFlow.State.REPLAY:
+	if _season_busy():
 		return SEASON_RUNNING
 	return ""
 

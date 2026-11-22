@@ -109,7 +109,7 @@ func test_a_season_with_two_events_shows_the_one_of_the_highest_priority() -> vo
 	# lost land is bad
 	g.chronicle.add({"kind": "owners_changed", "turn": 2, "tag": _stranger(g), "others": [GEN], "hexes": [hex]})
 	assert_eq(_mark_of(StudyHistory.timeline(g, GEN)["marks"], 2)["tone"], &"bad")
-	assert_eq(StudyHistory.MARK_KINDS, [&"land", &"declined", &"grew", &"finished", &"stopped", &"short", &"begun", &"tax", &"chosen"] as Array[StringName])
+	assert_eq(StudyHistory.MARK_KINDS, [&"war", &"land", &"declined", &"grew", &"finished", &"stopped", &"short", &"begun", &"tax", &"chosen"] as Array[StringName])
 
 
 func test_other_countries_lines_raise_the_tick_but_are_no_mark() -> void:
@@ -340,3 +340,18 @@ func test_the_season_line_names_the_people_of_a_growing_country() -> void:
 	assert_eq(s["people"], g.stats.value(GEN, 1, "people"))
 	assert_true(String(s["text"]).ends_with(" · people " + Words.number(int(s["people"]))), String(s["text"]))
 	assert_eq(StudyHistory.season(g, &"", 1)["people"], 0)
+
+
+## M7 B19: a war mark's tone follows the viewer's part. A declaration on the viewer is bad; the viewer's own declaration on
+## a stranger is plain (a war mark is the top priority, so it shows over the season's other lines).
+func test_a_war_mark_tone_follows_the_viewers_part() -> void:
+	var g := InsightsFixture.genoa_1483()
+	var foe := _stranger(g)
+	g.chronicle.add({"kind": "war_declared", "turn": 3, "tag": foe, "target": GEN, "war": 1,
+		"witnesses": [String(GEN), String(foe)]})
+	var on_me := _mark_of(StudyHistory.timeline(g, GEN)["marks"], 3)
+	assert_eq([on_me["kind"], on_me["tone"]], [&"war", &"bad"], "a declaration on the viewer is bad")
+	g.chronicle.add({"kind": "war_declared", "turn": 4, "tag": GEN, "target": foe, "war": 2,
+		"witnesses": [String(GEN), String(foe)]})
+	var own := _mark_of(StudyHistory.timeline(g, GEN)["marks"], 4)
+	assert_eq([own["kind"], own["tone"]], [&"war", &"plain"], "the viewer's own declaration is plain")

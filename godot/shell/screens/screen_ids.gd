@@ -23,6 +23,7 @@ const PATHS: Dictionary[StringName, String] = {
 	&"tech": "res://shell/screens/tech.tscn",
 	&"idea_pick": "res://shell/screens/idea_pick.tscn",
 	&"peace": "res://shell/screens/peace.tscn",
+	&"battle_dock": "res://shell/screens/battle_dock.tscn",
 }
 
 ## The screens a player opens from the menus: warm() loads them on a thread while the main menu is up.

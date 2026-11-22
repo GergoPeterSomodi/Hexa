@@ -10,6 +10,8 @@ extends RefCounted
 
 const TOKEN_ROUND := 50
 const K_UNIT := 1000
+## The morale from which a company is Steady (the morale words of morale_word; the other two bands are WarDef's).
+const STEADY_MORALE := 750
 
 
 ## One token per (hex, country) the viewer sees, in the order of the first army of each (id order). A token is
@@ -64,6 +66,7 @@ static func _token(game: Game, viewer: StringName, armies: Array) -> Dictionary:
 			hungry = hungry or a.supply == Supply.HUNGRY
 	if not exact:
 		ids = PackedInt32Array()
+	var siege := Occupation.siege_at(game, first.hex)
 	return {
 		"hex": first.hex,
 		"tag": first.tag,
@@ -76,8 +79,18 @@ static func _token(game: Game, viewer: StringName, armies: Array) -> Dictionary:
 		"marching": marching and exact,
 		"waiting": waiting and exact,
 		"hungry": hungry and exact,
+		"besieging": exact and siege != null and siege.besieger == first.tag,
+		"shaken": exact and _any_shaken(game, armies),
 		"mine": viewer != &"" and first.tag == viewer,
 	}
+
+
+## True when one of the armies is too shaken to attack (its morale under WarDef.attack_morale).
+static func _any_shaken(game: Game, armies: Array) -> bool:
+	for item: Variant in armies:
+		if Armies.morale_of(item as Army) < game.defs.war.attack_morale:
+			return true
+	return false
 
 
 ## The figure of the kind with the most men on a token (ties: the lower kind id); &"" for none.
@@ -140,6 +153,7 @@ static func _own_panel(game: Game, a: Army, viewer: StringName) -> Dictionary:
 	var sight := 1
 	for u: Unit in a.units:
 		var ud := Military.unit_def(game, u.kind)
+		var rank := Armies.rank_of(game, u)
 		units.append({
 			"id": u.id,
 			"kind": u.kind,
@@ -148,6 +162,11 @@ static func _own_panel(game: Game, a: Army, viewer: StringName) -> Dictionary:
 			"full": ud.men if ud != null else 0,
 			"raised_text": "Raised " + Calendar.date_text(u.raised_turn, game.start_year),
 			"mustering": u.raised_turn == game.turn,
+			"morale": u.morale,
+			"morale_word": morale_word(game, u.morale),
+			"xp": u.xp,
+			"rank": rank,
+			"rank_name": rank_name(game, rank),
 		})
 		if ud != null:
 			sight = maxi(sight, ud.sight)
@@ -155,7 +174,7 @@ static func _own_panel(game: Game, a: Army, viewer: StringName) -> Dictionary:
 	for o: Army in Armies.at(game, a.hex):
 		if o.id != a.id and o.tag == a.tag:
 			others.append({"id": o.id, "name": o.name, "men": o.men()})
-	return {
+	var out := {
 		"mine": a.tag == viewer,
 		"id": a.id,
 		"name": a.name,
@@ -174,6 +193,77 @@ static func _own_panel(game: Game, a: Army, viewer: StringName) -> Dictionary:
 		"sight": sight,
 		"others_here": others,
 	}
+	out.merge(_war_parts(game, viewer, a))
+	return out
+
+
+## The war parts of an army's panel (6.8, M7): its standing (Hold or Withdraw) and the words of its morale; its battle when it
+## is in one; its siege and the storm of its hex when it besieges; its last battle as the country's newest. Keys: standing,
+## standing_text, morale (permille), morale_text ("Morale 62 %"), morale_word, too_shaken, battle {name, hex} or {}, siege {hex,
+## name, progress, need, falls_in} or {}, storm_verdict {ok, reason} or {}, storm_word, last_battle {record, name, result} or {}.
+static func _war_parts(game: Game, viewer: StringName, a: Army) -> Dictionary:
+	var morale := Armies.morale_of(a)
+	var out := {
+		"standing": String(a.standing),
+		"standing_text": "Withdraw" if a.standing == Army.STANDING_WITHDRAW else "Hold",
+		"morale": morale,
+		"morale_text": "Morale %d %%" % (morale / 10),
+		"morale_word": morale_word(game, morale),
+		"too_shaken": morale < game.defs.war.attack_morale,
+		"battle": _battle_of(game, a),
+		"siege": {},
+		"storm_verdict": {},
+		"storm_word": "",
+		"last_battle": _last_battle(game, viewer, a.tag),
+	}
+	var s := Occupation.siege_at(game, a.hex)
+	if s != null and s.besieger == a.tag:
+		var v := SiegeView.at(game, viewer, a.hex)
+		out.siege = {"hex": a.hex, "name": str(v.get("name", s.name)), "progress": int(v.get("progress", s.progress)),
+			"need": int(v.get("need", Occupation.siege_need(game, a.hex))), "falls_in": int(v.get("falls_in", -1))}
+		out.storm_verdict = Movement.storm_check(game, {"army": a.id, "goal": a.hex, "tag": a.tag})
+		out.storm_word = str(OddsView.of(game, viewer, a.id, a.hex, true).get("word", ""))
+	return out
+
+
+## The word of a morale (permille): Steady from 750, Wavering from attack_morale, Shaken from withdraw_morale, else Broken.
+static func morale_word(game: Game, morale: int) -> String:
+	var war := game.defs.war
+	if morale >= STEADY_MORALE:
+		return "Steady"
+	if morale >= war.attack_morale:
+		return "Wavering"
+	if morale >= war.withdraw_morale:
+		return "Shaken"
+	return "Broken"
+
+
+## A company's rank name (WarDef.rank_names); the first rank, with no name in the data, is "Recruit".
+static func rank_name(game: Game, rank: int) -> String:
+	var names := game.defs.war.rank_names
+	if rank < 0 or rank >= names.size() or names[rank].is_empty():
+		return "Recruit" if rank <= 0 else ""
+	return names[rank]
+
+
+static func _battle_of(game: Game, a: Army) -> Dictionary:
+	var b := Battles.of_army(game, a.id)
+	if b == null:
+		return {}
+	return {"name": b.name, "hex": b.hex}
+
+
+## The newest battle the country fought in, with its name and result as the viewer reads it ("won", "lost", "drawn").
+static func _last_battle(game: Game, viewer: StringName, tag: StringName) -> Dictionary:
+	var record := BattleView.latest_of(game, tag)
+	if record < 0:
+		return {}
+	var v := BattleView.of(game, viewer, record)
+	if v.is_empty():
+		return {}
+	var winner := str(v.result.winner)
+	var result := "drawn" if winner == "" else ("won" if winner == String(tag) else "lost")
+	return {"record": record, "name": str(v.name), "result": result}
 
 
 static func _order(game: Game, a: Army) -> Dictionary:

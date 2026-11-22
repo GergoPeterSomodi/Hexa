@@ -166,3 +166,112 @@ func test_preview_is_cached_and_equal_on_a_second_ask() -> void:
 	var second := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
 	assert_eq(first.hexes, second.hexes)
 	assert_eq(first.kind, second.kind)
+
+
+## M7 (6.4): a march onto an enemy's army is an attack; its hover card's first line names the attack and its odds, and the
+## odds card (OddsView) rides along. Planted: a march onto own land has no war words.
+func test_an_attack_march_gives_the_war_line_and_the_odds() -> void:
+	var enemy := WarFixture.neighbour_of(_g, ArmyFixture.TAG)
+	WarFixture.at_war(_g, enemy, ArmyFixture.TAG)
+	var eid := ArmyFixture.id_of(_g, enemy)
+	var mine := ArmyFixture.id_of(_g, ArmyFixture.TAG)
+	var ours := ArmyFixture.NO_HEX
+	var theirs := ArmyFixture.NO_HEX
+	for i: int in _g.map.hex_count():
+		var hex := _g.map.hex_of(i)
+		if not _g.map.is_land(hex) or Territory.owner_id(_g, hex) != mine:
+			continue
+		for d: int in 6:
+			var beside := ImproveRules.neighbour(hex, d)
+			if _g.map.is_land(beside) and Territory.owner_id(_g, beside) == eid:
+				ours = hex
+				theirs = beside
+				break
+		if theirs != ArmyFixture.NO_HEX:
+			break
+	assert_ne(theirs, ArmyFixture.NO_HEX, "Genoa borders the enemy")
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, ours, 0, 2)
+	ArmyFixture.army(_g, enemy, theirs, 0, 1)
+	var v := MovePreview.to(_g, ArmyFixture.TAG, a.id, theirs)
+	assert_true(bool(v.verdict.ok), "the march to the enemy's hex is allowed: %s" % str(v.verdict.reason))
+	assert_eq(v.war.kind, &"attack")
+	assert_eq(v.odds.kind, &"attack")
+	assert_true(str((v.lines as Array)[0][0]).begins_with("Attacks the "), str((v.lines as Array)[0][0]))
+	var own := MovePreview.to(_g, ArmyFixture.TAG, a.id, ArmyFixture.find_town(_g))
+	assert_false(str((own.get("war", {}) as Dictionary).get("kind", "")) == "attack", "P: own land is no attack")
+	assert_true((own.get("odds", {}) as Dictionary).is_empty(), "P: a march onto own land has no odds card")
+
+
+## True when a string anywhere in a value (dictionaries and lists, recursively) contains needle.
+func _text_holds(value: Variant, needle: String) -> bool:
+	if value is String:
+		return (value as String).contains(needle)
+	if value is Dictionary:
+		for k: Variant in value:
+			if _text_holds(k, needle) or _text_holds((value as Dictionary)[k], needle):
+				return true
+	elif value is Array:
+		for item: Variant in value:
+			if _text_holds(item, needle):
+				return true
+	return false
+
+
+## M7 (4.15) fog: a refusal that names an unseen goal says the generic no-way words and names no enemy. The same words for an
+## unseen empty sea goal; a seen refusal keeps its exact reason.
+func test_planted_refusal_on_an_unseen_goal_names_nothing() -> void:
+	var enemy := WarFixture.neighbour_of(_g, ArmyFixture.TAG)
+	WarFixture.at_war(_g, enemy, ArmyFixture.TAG)
+	var hex := ArmyFixture.NO_HEX
+	for i: int in _g.map.hex_count():
+		var h := _g.map.hex_of(i)
+		if _g.map.is_land(h) and int(_g.state.owner[i]) == ArmyFixture.id_of(_g, enemy) 				and not Knowledge.sees(_g, ArmyFixture.TAG, h) and Armies.at(_g, h).is_empty():
+			hex = h
+			break
+	assert_ne(hex, ArmyFixture.NO_HEX, "an unseen enemy land hex exists")
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _gen_hex(), 0, 2)
+	for u: Unit in a.units:
+		Armies.set_morale(_g, a, u.id, 300)
+	ArmyFixture.army(_g, enemy, hex, 0, 3)
+	var v := MovePreview.to(_g, ArmyFixture.TAG, a.id, hex)
+	assert_eq(v.kind, &"refusal")
+	assert_eq(str(v.verdict.reason), "no way there by land", "P: an unseen goal's refusal names nothing")
+	assert_false(_text_holds(v, String(enemy)), "P: no enemy tag in the card")
+	assert_false(_text_holds(v, "shaken"), "P: the enemy's presence is not named")
+	var sea := ArmyFixture.NO_HEX
+	for i: int in _g.map.hex_count():
+		var h := _g.map.hex_of(i)
+		if not _g.map.is_land(h) and not Knowledge.sees(_g, ArmyFixture.TAG, h):
+			sea = h
+			break
+	assert_ne(sea, ArmyFixture.NO_HEX, "an unseen sea hex exists")
+	var empty := MovePreview.to(_g, ArmyFixture.TAG, a.id, sea)
+	assert_eq(str(empty.verdict.reason), str(v.verdict.reason), "P: the same words as an empty unseen hex")
+
+
+func test_a_seen_refusal_keeps_its_reason() -> void:
+	var enemy := WarFixture.neighbour_of(_g, ArmyFixture.TAG)
+	WarFixture.at_war(_g, enemy, ArmyFixture.TAG)
+	var eid := ArmyFixture.id_of(_g, enemy)
+	var mine := ArmyFixture.id_of(_g, ArmyFixture.TAG)
+	var ours := ArmyFixture.NO_HEX
+	var theirs := ArmyFixture.NO_HEX
+	for i: int in _g.map.hex_count():
+		var hex := _g.map.hex_of(i)
+		if not _g.map.is_land(hex) or Territory.owner_id(_g, hex) != mine:
+			continue
+		for d: int in 6:
+			var beside := ImproveRules.neighbour(hex, d)
+			if _g.map.is_land(beside) and Territory.owner_id(_g, beside) == eid:
+				ours = hex
+				theirs = beside
+				break
+		if theirs != ArmyFixture.NO_HEX:
+			break
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, ours, 0, 2)
+	ArmyFixture.army(_g, enemy, theirs, 0, 1)
+	for u: Unit in a.units:
+		Armies.set_morale(_g, a, u.id, 300)
+	var v := MovePreview.to(_g, ArmyFixture.TAG, a.id, theirs)
+	assert_eq(v.kind, &"refusal")
+	assert_true(str(v.verdict.reason).begins_with("too shaken to attack"), str(v.verdict.reason))

@@ -3,6 +3,9 @@
 ## reads the records it is given and the time it is advanced by, never the game. A step the viewer did not see takes no
 ## time (it is instant); a shown step takes the speed's seconds, shortened so the whole replay stays within MAX_SECONDS and
 ## never below MIN_STEP a step.
+## Battle marks (M7 5.6, B20): record_battle gives a battle at a hex and the movement tick it began at; its mark shows from
+## that tick (marks()). A retreat walk (a walk that starts on a battle hex after the battle's tick) is laid after the last
+## movement tick, so the beaten army walks off once the armies have stopped.
 class_name ReplayPlan
 extends RefCounted
 
@@ -15,17 +18,27 @@ const MIN_STEP := 0.04
 
 ## One walk per record: {army, tag, path, seen, ticks, starts, ends}; starts and ends are PackedFloat64Array, one a step.
 var _walks: Array[Dictionary] = []
+## One battle per record_battle: {hex, tick, shown, start} (start: the clock second its tick begins, set by setup).
+var _battles: Array[Dictionary] = []
 var _duration := 0.0
 var _time := 0.0
 
 
+## A battle at `hex` that began at movement `tick` (the step that ends on the hex). `shown` is what the viewer may see of it.
+## Call before setup: setup lays the retreats from these hexes after the movement.
+func record_battle(hex: Vector2i, tick: int, shown: bool = true) -> void:
+	if tick < 1:
+		return
+	_battles.append({"hex": hex, "tick": tick, "shown": shown, "start": 0.0})
+
+
 ## Lays the records on the clock at `speed` (an unknown speed takes "normal"). A record whose path has under two hexes, or
-## whose seen and ticks do not fit its path, is left out.
+## whose seen and ticks do not fit its path, is left out. A retreat walk is moved after the last movement tick.
 func setup(records: Array[Dictionary], speed: StringName) -> void:
 	_walks = []
 	_duration = 0.0
 	_time = 0.0
-	var last_tick := 0
+	var kept: Array[Dictionary] = []
 	for r: Dictionary in records:
 		var path: Array[Vector2i] = []
 		path.assign(r["path"] as Array)
@@ -33,10 +46,24 @@ func setup(records: Array[Dictionary], speed: StringName) -> void:
 		var ticks := r["ticks"] as PackedInt32Array
 		if path.size() < 2 or seen.size() != path.size() or ticks.size() != path.size() - 1:
 			continue
-		_walks.append({"army": int(r["army"]), "tag": StringName(r["tag"]), "path": path, "seen": seen, "ticks": ticks,
+		kept.append({"army": int(r["army"]), "tag": StringName(r["tag"]), "path": path, "seen": seen, "ticks": ticks,
 			"starts": PackedFloat64Array(), "ends": PackedFloat64Array()})
-		for tick: int in ticks:
-			last_tick = maxi(last_tick, tick)
+	var retreat := PackedByteArray()
+	var move_last := 0
+	for w: Dictionary in kept:
+		var back := _is_retreat(w)
+		retreat.append(1 if back else 0)
+		if not back:
+			move_last = maxi(move_last, _last_tick(w["ticks"] as PackedInt32Array))
+	for b: Dictionary in _battles:
+		move_last = maxi(move_last, int(b["tick"]))
+	for i: int in kept.size():
+		if retreat[i] == 1:
+			kept[i]["ticks"] = _after(kept[i]["ticks"] as PackedInt32Array, move_last)
+	_walks.assign(kept)
+	var last_tick := move_last
+	for w: Dictionary in _walks:
+		last_tick = maxi(last_tick, _last_tick(w["ticks"] as PackedInt32Array))
 	var shown_tick := _shown_ticks(last_tick)
 	var shown_count := 0
 	for t: int in range(1, last_tick + 1):
@@ -52,6 +79,8 @@ func setup(records: Array[Dictionary], speed: StringName) -> void:
 		tick_start[t + 1] = tick_start[t] + (step if shown_tick[t] == 1 else 0.0)
 	for w: Dictionary in _walks:
 		_lay_steps(w, tick_start, step)
+	for b: Dictionary in _battles:
+		b["start"] = tick_start[int(b["tick"])]
 	_duration = maxf(0.0, tick_start[last_tick + 1]) if last_tick > 0 else 0.0
 
 
@@ -88,6 +117,38 @@ func poses() -> Array[Dictionary]:
 		var pose := _pose(w)
 		if not pose.is_empty():
 			out.append(pose)
+	return out
+
+
+## The battle marks that have begun by now, in record order: {hex, shown}. `shown` is false for a battle the viewer may not
+## see (the shell does not show it).
+func marks() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for b: Dictionary in _battles:
+		if float(b["start"]) <= _time:
+			out.append({"hex": b["hex"], "shown": b["shown"]})
+	return out
+
+
+static func _last_tick(ticks: PackedInt32Array) -> int:
+	return ticks[ticks.size() - 1] if ticks.size() > 0 else 0
+
+
+## A walk that starts on a battle hex after that battle's tick is a retreat (no army walks out of a battle in the movement).
+func _is_retreat(w: Dictionary) -> bool:
+	var path := w["path"] as Array[Vector2i]
+	var ticks := w["ticks"] as PackedInt32Array
+	for b: Dictionary in _battles:
+		if b["hex"] == path[0] and int(b["tick"]) < ticks[0]:
+			return true
+	return false
+
+
+## The same walk's ticks moved to start one tick after `after`, keeping their spacing.
+static func _after(ticks: PackedInt32Array, after: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for tick: int in ticks:
+		out.append(after + tick - ticks[0] + 1)
 	return out
 
 

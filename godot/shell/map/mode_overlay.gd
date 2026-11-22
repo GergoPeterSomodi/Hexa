@@ -3,7 +3,9 @@
 ## (owner_ids R8, heights R8, palette RGBA8 256x1, ramp RGBA8 256x1), and for the Yields mode (docs/architecture/m4-5-build-spec.md
 ## 6.7) two more: yields R8 (one band byte a hex) and yield_ramp RGBA8 256x1. M6 (spec 6.6) adds the Supply mode (supply R8
 ## and supply_ramp RGBA8 256x1) and the sight veil (sight R8, 1 where the viewer sees the hex): the veil goes over every land
-## hex nobody of the viewer's sees, in every mode, when map/sight_veil is on.
+## hex nobody of the viewer's sees, in every mode, when map/sight_veil is on. M7 (spec 6.3) adds occupiers (R8: the occupier's
+## country id, the occupied stripes in Owner and the Terrain tint) and areas (R8: 1 on a held castle-area hex, the 12 % tint);
+## the castle-area tint shows only while area_on (the scene's gate: map/castle_areas, an army of yours selected, a war of yours).
 @tool
 class_name ModeOverlay
 extends Node2D
@@ -57,6 +59,15 @@ var _sight_version := -1  # the game.version the sight texture shows (-1: none)
 var _sight_image: Image = null
 var _sight_tex: ImageTexture = null
 var _sight_veil_on := false
+var _occupier_bytes := PackedByteArray()
+var _occupiers_version := -1  # the game.version the occupier texture shows (-1: none)
+var _occupiers_image: Image = null
+var _occupiers_tex: ImageTexture = null
+var _area_bytes_held := PackedByteArray()
+var _areas_version := -1  # the game.version the area texture shows (-1: none)
+var _areas_image: Image = null
+var _areas_tex: ImageTexture = null
+var _areas_on := false
 var _material: ShaderMaterial = null
 
 
@@ -127,6 +138,8 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	_sight_image = Image.create_from_data(map.cols, map.rows, false, Image.FORMAT_R8, _sight_bytes)
 	_sight_tex = ImageTexture.create_from_image(_sight_image)
 
+	_make_war_textures(map, count)
+
 	if _material == null:
 		_material = ShaderMaterial.new()
 		_material.shader = load(SHADER_PATH) as Shader
@@ -160,6 +173,21 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	material = _material
 	_update_visibility()
 	queue_redraw()
+
+
+## The M7 textures (spec 6.3): the occupier and the area bytes, one R8 byte a hex, zero until the first sync.
+func _make_war_textures(map: MapData, count: int) -> void:
+	_occupiers_version = -1
+	_occupier_bytes = PackedByteArray()
+	_occupier_bytes.resize(count)  # zero: no occupied land
+	_occupiers_image = Image.create_from_data(map.cols, map.rows, false, Image.FORMAT_R8, _occupier_bytes)
+	_occupiers_tex = ImageTexture.create_from_image(_occupiers_image)
+
+	_areas_version = -1
+	_area_bytes_held = PackedByteArray()
+	_area_bytes_held.resize(count)  # zero: no castle area shown
+	_areas_image = Image.create_from_data(map.cols, map.rows, false, Image.FORMAT_R8, _area_bytes_held)
+	_areas_tex = ImageTexture.create_from_image(_areas_image)
 
 
 ## Configures the overlay directly from `game` using standard or colour-blind safe colours.
@@ -326,7 +354,8 @@ func food_bytes() -> PackedByteArray:
 ## Brings the Yields, Food and Supply textures to `game` (each only while its mode is showing) and the sight texture (always,
 ## when the game's version moved); returns the texels written.
 func sync_modes(game: Game, force: bool = false) -> int:
-	return sync_yields(game, force) + sync_food(game, force) + sync_supply(game, force) + sync_sight(game, force)
+	return (sync_yields(game, force) + sync_food(game, force) + sync_supply(game, force) + sync_sight(game, force)
+	+ sync_occupiers(game, force) + sync_areas(game, force))
 
 
 ## The Yields bytes the texture holds now (a copy; tests).
@@ -542,6 +571,158 @@ func sight_texture() -> ImageTexture:
 	return _sight_tex
 
 
+## Writes the occupier texels that differ from `bytes` (one byte a hex: the occupier's country id, 0 for none; MapModes.occupier_bytes)
+## and uploads the texture once; returns how many texels it wrote (0, and no upload, when nothing differs or `bytes` is not one a hex).
+func update_occupier_bytes(bytes: PackedByteArray) -> int:
+	if _map == null or _occupiers_image == null or _occupiers_tex == null or bytes.size() != _occupier_bytes.size():
+		return 0
+	var wrote := 0
+	var cols := _map.cols
+	var idx := 0
+	for row: int in _map.rows:
+		for col: int in cols:
+			var b := bytes[idx]
+			if b != _occupier_bytes[idx]:
+				_occupier_bytes[idx] = b
+				_occupiers_image.set_pixel(col, row, Color(float(b) / 255.0, 0.0, 0.0, 1.0))
+				wrote += 1
+			idx += 1
+	if wrote > 0:
+		texel_writes += wrote
+		_occupiers_tex.update(_occupiers_image)
+		texture_updates += 1
+	return wrote
+
+
+## Rewrites the occupier texels of `hexes` from `occupier` (one byte a hex), or from the bound game's occupiers when none is
+## given, and uploads the texture once; returns the texels written (a hex already holding its byte writes nothing).
+func update_occupiers(hexes: Array[Vector2i], occupier: PackedByteArray = PackedByteArray()) -> int:
+	if _map == null or _occupiers_image == null or _occupiers_tex == null or hexes.is_empty():
+		return 0
+	var count := _map.hex_count()
+	var src := PackedByteArray()
+	if occupier.size() == count:
+		src = occupier
+	elif _game != null and _game.state != null and _game.state.occupier.size() == count:
+		src = _game.state.occupier
+	if src.size() != count:
+		return 0
+	var wrote := 0
+	for hex: Vector2i in hexes:
+		var idx := _map.index_of(hex)
+		if idx < 0:
+			continue
+		var b := int(src[idx])
+		if b == int(_occupier_bytes[idx]):
+			continue
+		_occupier_bytes[idx] = b
+		_occupiers_image.set_pixel(hex.x, hex.y, Color(float(b) / 255.0, 0.0, 0.0, 1.0))
+		wrote += 1
+	if wrote > 0:
+		texel_writes += wrote
+		_occupiers_tex.update(_occupiers_image)
+		texture_updates += 1
+	return wrote
+
+
+## Brings the occupier texture to `game`'s occupiers whenever `game.version` changed (the stripes show in Owner and Terrain).
+## Returns the texels written.
+func sync_occupiers(game: Game, force: bool = false) -> int:
+	if game == null or game.map == null or game.state == null:
+		return 0
+	if not force and game.version == _occupiers_version:
+		return 0
+	_occupiers_version = game.version
+	return update_occupier_bytes(MapModes.occupier_bytes(game))
+
+
+## Writes the castle-area texels that differ from `bytes` (one byte a hex, 1 on a held area; MapModes.area_bytes) and uploads the
+## texture once; returns how many texels it wrote (0 when nothing differs or `bytes` is not one a hex).
+func update_areas(bytes: PackedByteArray) -> int:
+	if _map == null or _areas_image == null or _areas_tex == null or bytes.size() != _area_bytes_held.size():
+		return 0
+	var wrote := 0
+	var cols := _map.cols
+	var idx := 0
+	for row: int in _map.rows:
+		for col: int in cols:
+			var b := bytes[idx]
+			if b != _area_bytes_held[idx]:
+				_area_bytes_held[idx] = b
+				_areas_image.set_pixel(col, row, Color(float(b) / 255.0, 0.0, 0.0, 1.0))
+				wrote += 1
+			idx += 1
+	if wrote > 0:
+		texel_writes += wrote
+		_areas_tex.update(_areas_image)
+		texture_updates += 1
+	return wrote
+
+
+## Brings the area texture to `game`'s held areas of its player whenever `game.version` changed. Only while the tint is on: off,
+## it marks the texture stale so the next sync on writes what changed. Returns the texels written.
+func sync_areas(game: Game, force: bool = false) -> int:
+	if game == null or game.map == null or game.state == null:
+		return 0
+	if not _areas_on and not force:
+		_areas_version = -1
+		return 0
+	if not force and game.version == _areas_version:
+		return 0
+	_areas_version = game.version
+	return update_areas(MapModes.area_bytes(game, game.player))
+
+
+## Turns the castle-area tint on or off (the uniform area_on). The scene sets it from map/castle_areas, an army of the viewer
+## selected and a war of the viewer's (spec 6.3). On, the texture is brought up to the bound game at once.
+func set_areas_on(on: bool) -> void:
+	_areas_on = on
+	if _material != null:
+		_material.set_shader_parameter(&"area_on", _areas_on)
+	if _areas_on and _game != null:
+		sync_areas(_game, true)
+	_update_visibility()
+
+
+func is_areas_on() -> bool:
+	return _areas_on
+
+
+## The occupier bytes the texture holds now (a copy; tests).
+func occupier_bytes() -> PackedByteArray:
+	return _occupier_bytes.duplicate()
+
+
+## The castle-area bytes the texture holds now (a copy; tests).
+func area_bytes() -> PackedByteArray:
+	return _area_bytes_held.duplicate()
+
+
+## Bytes of the two M7 textures (occupier and area, one byte a hex each).
+func war_texture_bytes() -> int:
+	var total := 0
+	for img: Image in [_occupiers_image, _areas_image]:
+		if img != null:
+			total += img.get_data().size()
+	return total
+
+
+func occupier_image() -> Image:
+	return _occupiers_image
+
+
+func occupier_texture() -> ImageTexture:
+	return _occupiers_tex
+
+
+func area_image() -> Image:
+	return _areas_image
+
+
+func area_texture() -> ImageTexture:
+	return _areas_tex
+
+
 func _draw() -> void:
 	if _map_size.x > 0.0 and _map_size.y > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, _map_size), Color.WHITE)
@@ -554,10 +735,15 @@ func _sync_uniforms() -> void:
 	_material.set_shader_parameter(&"tint_on", _tint_on)
 	_material.set_shader_parameter(&"hot_id", _hot_id)
 	_material.set_shader_parameter(&"sight_veil_on", _sight_veil_on)
+	_material.set_shader_parameter(&"area_on", _areas_on)
+	_material.set_shader_parameter(&"occupiers", _occupiers_tex)
+	_material.set_shader_parameter(&"areas", _areas_tex)
+	_material.set_shader_parameter(&"occupied_px", MapModes.OCCUPIED_STRIPE_PX)
+	_material.set_shader_parameter(&"area_alpha", MapModes.AREA_ALPHA)
 
 
 func _update_visibility() -> void:
-	visible = not (_mode == MapModes.Mode.TERRAIN and not _tint_on and not _sight_veil_on)
+	visible = not (_mode == MapModes.Mode.TERRAIN and not _tint_on and not _sight_veil_on and not _areas_on)
 
 
 static func _image_from_colours(colours: PackedColorArray) -> Image:

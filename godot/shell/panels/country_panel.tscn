@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://shell/panels/country_panel.gd" id="1_panel"]
 [ext_resource type="Script" path="res://shell/ui/cartouche.gd" id="2_cart"]
 [ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="3_btn"]
 [ext_resource type="Script" path="res://shell/ui/country_arms.gd" id="4_arms"]
 [ext_resource type="Script" path="res://shell/ui/delta_chip.gd" id="5_delta"]
+[ext_resource type="Script" path="res://shell/panels/country_war.gd" id="6_war"]
 
 [node name="CountryPanel" type="PanelContainer"]
 size_flags_vertical = 3
@@ -114,6 +115,12 @@ mouse_filter = 2
 layout_mode = 2
 mouse_filter = 2
 columns = 2
+
+[node name="War" type="VBoxContainer" parent="VBox/BodyScroll/Body"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("6_war")
 
 [node name="TreasuryBox" type="VBoxContainer" parent="VBox/BodyScroll/Body"]
 visible = false

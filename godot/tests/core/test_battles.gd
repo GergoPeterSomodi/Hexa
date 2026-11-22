@@ -86,7 +86,7 @@ func test_engage_check_refuses_a_shaken_army() -> void:
 		u.morale = 100
 	var v := Battles.engage_check(_g, {"army": att.id, "hex": _hb, "tag": _a})
 	assert_false(v.ok)
-	assert_true(str(v.reason).begins_with("too shaken to attack: morale 10 %, 50 % needed"), str(v.reason))
+	assert_eq(str(v.reason), "too shaken to attack: morale 10 %, 50 % needed (it recovers 25 a season when fed)")
 	assert_false(Battles.engage(_g, att, _hb, 1, -1), "a refused attack changes nothing")
 	assert_eq(att.hex, _ha)
 

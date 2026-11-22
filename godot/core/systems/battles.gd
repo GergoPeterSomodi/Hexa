@@ -109,7 +109,7 @@ static func _hostile_reason(game: Game, army: Army, hex: Vector2i) -> String:
 	var morale := Armies.morale_of(army)
 	if morale < war.attack_morale:
 		return "too shaken to attack: morale %d %%, %d %% needed (it recovers %d a season when fed)" % [
-			morale / 10, war.attack_morale / 10, war.morale_recovery]
+			morale / 10, war.attack_morale / 10, war.morale_recovery / 10]
 	return ""
 
 
@@ -153,7 +153,7 @@ static func _attack(game: Game, army: Army, enemies: Array[Army], hex: Vector2i,
 	b.defender = enemies[0].tag
 	b.start_turn = game.turn
 	b.tick = tick
-	b.assault = _assault_at(game, hex, b.defender)
+	b.assault = assault_at(game, hex, b.defender)
 	b.set_group(String(army.tag), PackedInt32Array([army.id]))
 	b.set_group(String(b.defender), _ids_of(enemies))
 	_set_flags(game, b, stand, last_edge)
@@ -298,7 +298,7 @@ static func _storm_target(game: Game, tag: StringName, hex: Vector2i) -> bool:
 
 
 ## An assault: a garrisoned fortress the defender holds.
-static func _assault_at(game: Game, hex: Vector2i, defender: StringName) -> bool:
+static func assault_at(game: Game, hex: Vector2i, defender: StringName) -> bool:
 	return Occupation.fortress_level(game, hex) > 0 and Occupation.controller_tag(game, hex) == defender \
 		and Occupation.garrison_of(game, hex) > 0
 
@@ -427,7 +427,7 @@ static func input_of(game: Game, b: Battle) -> Dictionary:
 		def_can = true
 	return {
 		"attacker": String(b.attacker), "defender": String(b.defender),
-		"assault": b.assault and not garrison.is_empty(), "ground": _ground(game, b.hex),
+		"assault": b.assault and not garrison.is_empty(), "ground": ground_at(game, b.hex),
 		"crossing": b.crossing, "uphill": b.uphill, "river": b.river,
 		"stance": {"att": "attack", "def": stance_def}, "can_retreat": {"att": att_can, "def": def_can},
 		"fighters": _fighters(game, b), "garrison": garrison,
@@ -444,7 +444,7 @@ static func _standing(armies: Array[Army]) -> StringName:
 
 
 ## The ground of a hex for Combat (4.6): the cover's defence and its rough and narrow flags, the relief's additions, and the odds key.
-static func _ground(game: Game, hex: Vector2i) -> Dictionary:
+static func ground_at(game: Game, hex: Vector2i) -> Dictionary:
 	var map := game.map
 	var i := map.index_of(hex)
 	var relief := int(map.relief[i])

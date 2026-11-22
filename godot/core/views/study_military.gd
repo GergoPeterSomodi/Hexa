@@ -8,14 +8,15 @@ extends RefCounted
 
 @warning_ignore_start("integer_division")
 
-const SERIES: Array[String] = ["army_men", "upkeep_army", "losses", "army_starved"]
+const SERIES: Array[String] = ["army_men", "upkeep_army", "losses", "army_starved", "battle_losses"]
 
 
 ## {has_data (a season has ended), head: {men, armies, units, upkeep (the army's upkeep a season now), share (permille of
 ## the last season's income before army upkeep that the army took), income (the last season's left-over income)},
 ## rows: [{id, name, place, hex, men, units, upkeep, supply_text, order_text, tone}] (own armies, men descending, ties by id),
 ## seen: [{tag, country, hex, place, men_text}] (foreign armies in sight, banded), labels (season titles of the series, oldest
-## first), series: {army_men, upkeep_army, losses, army_starved, income} (PackedInt32Array; losses and starved as Stats keep them)}.
+## first), series: {army_men, upkeep_army, losses, army_starved, battle_losses, income} (PackedInt32Array; losses and starved as Stats
+## keep them), wars and battles (M7: StudyMilitaryWar's rows)}.
 static func of(game: Game, viewer: StringName, span: int) -> Dictionary:
 	if game == null or game.view_cache == null or game.state == null or game.defs == null:
 		return _empty()
@@ -34,6 +35,7 @@ static func _empty() -> Dictionary:
 		"has_data": false,
 		"head": {"men": 0, "armies": 0, "units": 0, "upkeep": 0, "share": 0, "income": 0},
 		"rows": [] as Array[Dictionary], "seen": [] as Array[Dictionary],
+		"wars": [] as Array[Dictionary], "battles": [] as Array[Dictionary],
 		"labels": [] as Array[String], "series": series,
 	}
 
@@ -61,6 +63,8 @@ static func _build(game: Game, viewer: StringName, span: int) -> Dictionary:
 	}
 	out["rows"] = _rows(game, viewer)
 	out["seen"] = _seen(game, viewer)
+	out["wars"] = StudyMilitaryWar.wars(game, viewer)
+	out["battles"] = StudyMilitaryWar.battles(game, viewer)
 	_series(game, viewer, span, out)
 	return out
 

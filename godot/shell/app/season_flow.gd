@@ -34,6 +34,9 @@ var replay_start: Callable = Callable()
 var replay_skip: Callable = Callable()
 ## (on: bool) -> void: holds the map's new ribbons while the season and its replay run (Floaters.hold).
 var hold_ribbons: Callable = Callable()
+## (on_done: Callable) -> bool: shows the next decision of the queue (DecisionQueue.next); true when one is up, and then
+## the queue calls decisions_done() when it is empty. False (or no callable) means nothing to decide: the report follows.
+var decisions_start: Callable = Callable()
 ## (turn: int) -> Dictionary: the summary of a season; the default reads Session. Tests may replace it.
 var summarize: Callable = Callable()
 ## The clock value before which End season is refused.
@@ -117,12 +120,26 @@ func skip_replay() -> bool:
 	return true
 
 
-## The movement replay ended (its finished signal, or skip): the decisions (none before M7), then the report as M3.
+## The movement replay ended (its finished signal, or skip): the decisions, then the report as M3.
 func replay_done() -> void:
 	if _state != State.REPLAY:
 		return
-	_set_state(State.DECISIONS)
+	_decisions()
+
+
+## The decision queue is empty (its emptied signal): the report follows. Only from DECISIONS.
+func decisions_done() -> void:
+	if _state != State.DECISIONS:
+		return
 	_report()
+
+
+## DECISIONS (M7 6.6): the queue's first Confirm is up; decisions_done follows its last answer. With nothing queued the
+## state passes at once to the report.
+func _decisions() -> void:
+	_set_state(State.DECISIONS)
+	if not (decisions_start.is_valid() and decisions_start.call(decisions_done) == true):
+		_report()
 
 
 ## J: the report of the season that last ended. Only from IDLE.
@@ -170,11 +187,11 @@ func _run(count: int) -> void:
 	if _replay_begin(_speed()):
 		_set_state(State.REPLAY)  # replay_done (the replay's finished) goes on to the decisions and the report
 		return
-	_set_state(State.DECISIONS)
 	if played == 0:
+		_set_state(State.DECISIONS)
 		_back_to_idle()
 		return
-	_report()
+	_decisions()
 
 
 ## Starts the replay of the season that just ended; false when there is none to show (the replay_start callable says).

@@ -12,6 +12,7 @@ const RELIEF_LIMIT := 3
 const TONE_GOOD := &"good"
 const TONE_BAD := &"bad"
 const TONE_PLAIN := &"plain"
+const UNKNOWN_NAME := "a country"
 
 
 ## The siege of a hex as the viewer sees it; {} when none stands, or it is hidden. Keys: access, hex, name, place, besieger,
@@ -43,7 +44,7 @@ static func _make_at(game: Game, viewer: StringName, hex: Vector2i) -> Dictionar
 	var level := Occupation.fortress_level(game, hex)
 	var out := {
 		"access": acc, "hex": hex, "name": s.name, "place": Words.place(game, hex),
-		"besieger": String(s.besieger), "defender": String(holder),
+		"besieger": _key(game, viewer, s.besieger, exact, "besieger"), "defender": _key(game, viewer, holder, exact, "defender"),
 		"besieger_name": _name_seen(game, viewer, s.besieger, exact), "defender_name": _name_seen(game, viewer, holder, exact),
 		"progress": s.progress, "need": Occupation.siege_need(game, hex), "seasons": s.seasons,
 		"stores_left": maxi(0, 1 + level - s.seasons), "starving": Sieges.starving(game, hex),
@@ -124,9 +125,20 @@ static func _relief(game: Game, holder: StringName, hex: Vector2i) -> Array[Dict
 
 ## A country's name as the viewer reads it: the real one for an exact view or a country the viewer knows; "a country" otherwise.
 static func _name_seen(game: Game, viewer: StringName, tag: StringName, exact: bool) -> String:
-	if exact or viewer == tag or Knowledge.knows(game, viewer, tag):
+	if _named(game, viewer, tag, exact):
 		return _country_name(game, tag)
-	return "a country"
+	return UNKNOWN_NAME
+
+
+## Whether the viewer may read a country of the siege (its name, its tag): an exact view, the country itself, or a country the
+## viewer knows (Knowledge.knows). Any other country is shown by its role only (4.15, as the battle view).
+static func _named(game: Game, viewer: StringName, tag: StringName, exact: bool) -> bool:
+	return exact or viewer == tag or Knowledge.knows(game, viewer, tag)
+
+
+## The key of a country in the view: its tag when the viewer may read it, else its role word.
+static func _key(game: Game, viewer: StringName, tag: StringName, exact: bool, role: String) -> String:
+	return String(tag) if _named(game, viewer, tag, exact) else role
 
 
 static func _country_name(game: Game, tag: StringName) -> String:

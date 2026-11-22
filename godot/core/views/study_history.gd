@@ -7,9 +7,9 @@ class_name StudyHistory
 extends RefCounted
 
 const PAGE := 120
-const MARK_KINDS: Array[StringName] = [&"land", &"declined", &"grew", &"finished", &"stopped", &"short", &"begun", &"tax", &"chosen"]  # priority
+const MARK_KINDS: Array[StringName] = [&"war", &"land", &"declined", &"grew", &"finished", &"stopped", &"short", &"begun", &"tax", &"chosen"]  # priority
 const MARK_ICONS: Dictionary = {land = &"settlement", declined = &"settlement", grew = &"settlement", finished = &"district", stopped = &"district", short = &"warning",
-	begun = &"spending", tax = &"tax", chosen = &"study"}
+	begun = &"spending", tax = &"tax", chosen = &"study", war = &"war"}
 const FILTER_ORDER: Array[StringName] = [&"all", &"war", &"money", &"works", &"mine"]  # shown when LogLines.FILTERS allows
 const KEPT_NONE_TEXT := "Numbers are kept for the last 40 seasons and each winter."
 
@@ -140,11 +140,30 @@ static func _mark_kind(entry: Dictionary, viewer: StringName) -> StringName:
 			return &"tax" if tag == viewer else &""
 		"country_chosen":
 			return &"chosen" if tag == viewer else &""
+		"war_declared", "peace_made", "battle_ended", "siege_started", "siege_lifted", "district_captured":
+			return &"war" if LogLinesWar.mine(entry, viewer) else &""
 	return &""
+
+
+## The tone of a war mark: a battle or a capture the viewer won is good, a declaration on it or a loss bad (M7 B19).
+static func _war_tone(entry: Dictionary, viewer: StringName) -> StringName:
+	var tag := StringName(str(entry.get("tag", "")))
+	match str(entry.get("kind", "")):
+		"battle_ended":
+			if StringName(str(entry.get("winner", ""))) == viewer:
+				return &"good"
+			return &"bad" if StringName(str(entry.get("loser", ""))) == viewer else &"plain"
+		"district_captured":
+			return &"good" if tag == viewer else &"bad"
+		"war_declared":
+			return &"bad" if StringName(str(entry.get("target", ""))) == viewer else &"plain"
+	return &"plain"
 
 
 static func _tone(kind: StringName, entry: Dictionary, viewer: StringName) -> StringName:
 	match kind:
+		&"war":
+			return _war_tone(entry, viewer)
 		&"land":
 			return &"good" if StringName(str(entry.get("tag", ""))) == viewer else &"bad"
 		&"finished", &"grew":

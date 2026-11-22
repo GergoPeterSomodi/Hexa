@@ -10,9 +10,11 @@ extends RefCounted
 @warning_ignore_start("integer_division")
 
 const SECTIONS: Array[StringName] = [&"glance", &"before", &"treasury", &"goods", &"works", &"people", &"armies",
-	&"orders", &"befell", &"standing"]
-## Toast kinds dropped while a season runs (the report says them): M3 raises none; M6 adds the hunger and the losses.
-const COVERED: Array[String] = ["work_finished", "work_cancelled", "owners_changed", "goods_short", "army_starved", "unit_lost"]
+	&"war", &"orders", &"befell", &"standing"]
+## Toast kinds dropped while a season runs (the report says them): M3 raises none; M6 adds the hunger and the losses; M7 the
+## battles, captures, lifts and peaces (SummaryWar says them).
+const COVERED: Array[String] = ["work_finished", "work_cancelled", "owners_changed", "goods_short", "army_starved", "unit_lost",
+	"battle_ended", "district_captured", "siege_lifted", "peace_made"]
 const SHOWN := 6
 const BEFORE_SHOWN := 5
 const TOP := 3
@@ -71,6 +73,9 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 	var armies := SummaryArmies.of(game, tag, turn)
 	order_lines.append_array(SummaryArmies.orders(game, tag, turn))
 	befell.append_array(SummaryArmies.witnessed(game, tag, turn))
+	var war := SummaryWar.of(game, tag, turn)
+	order_lines.append_array(SummaryWar.orders(game, tag, turn))
+	befell.append_array(SummaryWar.witnessed(game, tag, turn))
 	var land := _land(game, tag, turn)
 	var finished := int(counts["work_finished"])
 	var begun := int(counts["work_started"])
@@ -79,7 +84,7 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 	var people := SummaryPeople.of(game, tag, turn)
 	var quiet := finished + begun + stopped == 0 and order_lines.is_empty() and befell.is_empty() \
 			and int(land["delta"]) == 0 and bool(money.get("quiet", true)) and bool(people["quiet"]) \
-			and bool(armies["quiet"])
+			and bool(armies["quiet"]) and bool(war["quiet"])
 	var news := not befell.is_empty()
 	befell.append_array(armies["sight"] as Array[Dictionary])  # foreign armies in sight: not news of the season
 	# Reminders are of the season in play: only the report of the season that just closed carries them.
@@ -94,7 +99,7 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 			before.append(_reminder_line(r))
 	var under_way := _under_way(game, tag, turn)
 	var by_id := {
-		&"glance": _glance(game, tag, turn, quiet, finished, land, money, people, armies),
+		&"glance": _glance(game, tag, turn, quiet, finished, land, money, people, armies, war["chips"]),
 		&"before": _section(&"before", "Before %s" % Calendar.season_name(turn + 1), before, false),
 		&"works": _section(&"works", "Works", mine_works + under_way, true),
 		&"orders": _section(&"orders", "Your orders", order_lines, false),
@@ -104,12 +109,14 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 		by_id[&"people"] = people["section"]
 	if not (armies["section"] as Dictionary).is_empty():
 		by_id[&"armies"] = armies["section"]
+	if not (war["section"] as Dictionary).is_empty():
+		by_id[&"war"] = war["section"]
 	if not money.is_empty():
 		by_id[&"treasury"] = money["treasury"]
 		by_id[&"goods"] = money["goods"]
 		by_id[&"standing"] = _standing(game, tag, turn, money)
 	if quiet:
-		for id: StringName in [&"works", &"treasury", &"goods", &"people", &"armies", &"standing"]:
+		for id: StringName in [&"works", &"treasury", &"goods", &"people", &"armies", &"war", &"standing"]:
 			by_id.erase(id)
 	var sections: Array[Dictionary] = []
 	for id: StringName in SECTIONS:
@@ -234,7 +241,7 @@ static func _mark_top(sections: Array[Dictionary]) -> void:
 
 
 static func _glance(game: Game, tag: StringName, turn: int, quiet: bool, finished: int, land: Dictionary,
-		money: Dictionary, people: Dictionary, armies: Dictionary) -> Dictionary:
+		money: Dictionary, people: Dictionary, armies: Dictionary, war_chips: Array[Dictionary]) -> Dictionary:
 	var lines: Array[Dictionary] = []
 	var countries := game.has_countries()
 	if quiet:
@@ -271,6 +278,8 @@ static func _glance(game: Game, tag: StringName, turn: int, quiet: bool, finishe
 		army_chip["amount"] = int(armies["change"])
 		army_chip["value"] = int(armies["men"])
 		lines.append(army_chip)
+	for chip: Dictionary in war_chips:
+		lines.append(chip)
 	var works := _line("Works", "good" if finished > 0 else "plain")
 	if finished > 0:
 		works["detail"] = "%d finished, %d under way" % [finished, running]
