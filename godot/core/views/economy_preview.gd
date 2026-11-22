@@ -747,7 +747,7 @@ static func _standing(game: Game, c: Country, seasons: int) -> Array[Dictionary]
 		if not _touches(game, i, c.id):
 			continue
 		var ready := Works.ready_turn(game, work)
-		if ready > last:
+		if ready == Works.NO_DATE or ready > last:
 			continue
 		var pair := Vector2i(0, 0) if work.action == Works.CLEAR else Vector2i(work.family, work.level_to)
 		out.append({"i": i, "pair": pair, "ready": ready, "id": work.id, "work": work})

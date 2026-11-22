@@ -518,12 +518,12 @@ func _on_work_started(tag: StringName, _hex: Vector2i, work: Dictionary) -> void
 	var w := Work.from_dict(work)
 	if game == null or w == null or tag != game.player:
 		return
-	var ready := Calendar.date_text(WorksView.ready_turn(game, w), game.start_year)
+	var ready := "Halted by war" if Works.ready_turn(game, w) == Works.NO_DATE else "Ready " + Works.ready_words(game, w)
 	var paid := _paid_words(game, w)
 	var text := "Work begun: %s." % WorksView.line(game, w)
 	if paid != "":
 		text += " %s." % paid
-	_toast("%s Ready %s." % [text, ready], &"plain", &"game_undo_work")
+	_toast("%s %s." % [text, ready], &"plain", &"game_undo_work")
 
 
 func _on_work_cancelled(tag: StringName, _hex: Vector2i, work: Dictionary, why: StringName) -> void:

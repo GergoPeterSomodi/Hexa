@@ -10,6 +10,8 @@ const UPGRADE := &"upgrade"
 const CLEAR := &"clear"
 ## The longest a ready date is searched for (seasons); a work never takes anywhere near it.
 const HORIZON := 1024
+## ready_turn's answer when occupation or a siege halts the work now: no date can be given (the halt may end, or not).
+const NO_DATE := -1
 
 
 # ----- the checks ------------------------------------------------------------------------------------------------
@@ -48,8 +50,13 @@ static func _begin_check(game: Game, action: StringName, hex: Vector2i, tag: Str
 		return home
 	var under_way := game.state.work_at(hex)
 	if under_way != null:
-		return _refusal("a work is under way here: %s, ready %s" % [
-			_label(under_way), Calendar.date_text(ready_turn(game, under_way), game.start_year)])
+		var when := ready_words(game, under_way)
+		if when != "halted by war":
+			when = "ready " + when
+		return _refusal("a work is under way here: %s, %s" % [_label(under_way), when])
+	var held := _occupation_clash(game, hex)
+	if held != "":
+		return _refusal(held)
 	var piece: Dictionary
 	match action:
 		BUILD:
@@ -77,6 +84,15 @@ static func _begin_check(game: Game, action: StringName, hex: Vector2i, tag: Str
 		if total >= 0 and in_use(game, tag) >= total:
 			return _refusal("no free work slot: %d of %d in use" % [in_use(game, tag), total])
 	return _payment_check(game, action, tag, target_family, target_level)
+
+
+## Row 3b (M7 5.3): no work begins on occupied land or under siege; "" when it may begin.
+static func _occupation_clash(game: Game, hex: Vector2i) -> String:
+	if Occupation.is_occupied(game, hex):
+		return "held by the %s: no work can begin on occupied land" % Occupation.occupier_long_name(game, hex)
+	if Occupation.besieged(game, hex):
+		return "under siege: no work can begin"
+	return ""
 
 
 ## Rows 8 and 9 (4.11): the treasury holds the work's ducats (a free work needs no check, so a treasury below zero can
@@ -289,8 +305,11 @@ static func in_use(game: Game, tag: StringName) -> int:
 	return n
 
 
-## The winter rule: the season `turn` is Winter, the hex's climate is snow, and the rule is on.
+## The winter rule: the season `turn` is Winter, the hex's climate is snow, and the rule is on; M7 (5.3): a work on
+## occupied or besieged land halts too.
 static func halted(game: Game, work: Work, turn: int) -> bool:
+	if Occupation.is_occupied(game, work.hex) or Occupation.besieged(game, work.hex):
+		return true
 	if game.defs == null or not game.defs.works_halt_in_snow_winter or not Calendar.is_winter(turn):
 		return false
 	var i := game.map.index_of(work.hex)
@@ -350,6 +369,9 @@ static func _good_count(game: Game) -> int:
 
 ## The season from which the work stands: walks the seasons from game.turn, skipping the halted ones.
 static func ready_turn(game: Game, work: Work) -> int:
+	# Occupation or a siege halts the work for as long as it lasts: no walk over the horizon can give a date (M7).
+	if Occupation.is_occupied(game, work.hex) or Occupation.besieged(game, work.hex):
+		return NO_DATE
 	var left := work.seasons_left
 	var t := game.turn
 	for n: int in HORIZON:
@@ -359,6 +381,12 @@ static func ready_turn(game: Game, work: Work) -> int:
 				return t + 1
 		t += 1
 	return t
+
+
+## "Spring 1481", or "halted by war" when the work has no date (ready_turn is NO_DATE).
+static func ready_words(game: Game, work: Work) -> String:
+	var ready := ready_turn(game, work)
+	return "halted by war" if ready == NO_DATE else Calendar.date_text(ready, game.start_year)
 
 
 # ----- words -----------------------------------------------------------------------------------------------------

@@ -86,6 +86,6 @@ truce_seasons = 8
 war_timer_seasons = 40
 war_timer_warning = 32
 odds_words = Array[Dictionary]([{"from": 0, "word": "Hopeless"}, {"from": 800, "word": "Poor"}, {"from": 1000, "word": "Even"}, {"from": 1200, "word": "Favourable"}, {"from": 2500, "word": "Overwhelming"}])
-odds_ground = Dictionary[StringName, int]({&"open": 1000, &"hills": 1340, &"woods": 1400, &"marsh": 2080, &"mountains": 3390, &"snow": 2920})
+odds_ground = Dictionary[StringName, int]({&"open": 1000, &"hills": 1340, &"woods": 1617, &"marsh": 2080, &"mountains": 3390, &"snow": 2920})
 garrison_odds_permille = 3100
 garrison_odds_alone = PackedInt32Array(0, 1800, 1100, 1000)

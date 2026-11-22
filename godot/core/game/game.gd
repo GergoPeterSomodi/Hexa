@@ -35,7 +35,8 @@ var siege_names: Dictionary = {}              # Sieges: place -> sieges named th
 ## Human player's country tag, or &"" before picking, in AI-only games, or in a map-only game.
 var player: StringName = &""
 ## The fields only the door (emit, act, Season) writes (docs/architecture/m3-build-spec.md 5.7).
-const DOOR_FIELDS: Array[String] = ["events", "action_log", "chronicle", "version", "view_cache", "districts", "sight"]
+const DOOR_FIELDS: Array[String] = ["events", "action_log", "chronicle", "version", "view_cache", "districts", "sight",
+	"war_cache"]
 ## The largest developer transfer of ducats or loads at once (dev_money, dev_goods).
 const DEV_LIMIT := 1000000000
 ## The year of turn 1 (the scenario's year; 1480 in a sandbox).
@@ -62,6 +63,8 @@ var districts: DistrictCache = DistrictCache.new()
 ## The sight cache (the army part, the land sight, what each viewer has learned); derived, not saved, not in the digest.
 ## Written only through Sight (by reference).
 var sight: SightCache = SightCache.new()
+## The occupation door's derived lists (castle areas, control); not saved, not in the digest. Written only through Occupation.
+var war_cache: WarCache = WarCache.new()
 
 
 ## A new map-only game: the improvement search chooses what stands on the map for this seed.
@@ -128,6 +131,15 @@ func emit(event: Dictionary) -> void:
 		event["turn"] = turn
 	# Called by reference: owners_changed updates the sight cache; a sighted event gets its witnesses (4.11).
 	Sight.on_emit.call(self, event)
+	# M7 (5.4): the war cache is dropped by the changes it reads (owners, controllers, a fortress's level).
+	var kind := str(event.get("kind", ""))
+	if kind == "owners_changed":
+		war_cache.forget_areas()
+		war_cache.forget_control()
+	elif kind == "controllers_changed":
+		war_cache.forget_control()
+	elif kind == "hex_changed" and event.get("hex") is Vector2i and map != null:
+		war_cache.on_hex_changed.call(self, event["hex"] as Vector2i)  # by reference: WarCache takes a Game, Game holds a WarCache
 	events.append(event)
 	if event.get("kind", "") == "hex_changed" and event.get("hex") is Vector2i and map != null:
 		districts.touch.call(self, event["hex"] as Vector2i)  # by reference: a typed call makes Game and DistrictCache need each other to parse
@@ -142,6 +154,12 @@ func date_text() -> String:
 
 ## Developer transfer of land (logged for the replay): Territory.transfer plus its action log record.
 func dev_transfer(hexes: Array[Vector2i], to_id: int) -> int:
+	# M7 (5.4): the land that will change owner is released from any occupation first (one controllers_changed); a refused
+	# or no-op transfer releases nothing.
+	var moving: Array[Vector2i] = Occupation.changing_hexes.call(self, hexes, to_id)
+	if not moving.is_empty():
+		Occupation.release.call(self, moving)
+		Occupation.flush.call(self)
 	# Called by reference: a typed call would make Game and Territory need each other to parse.
 	var changed: int = Territory.transfer.call(self, hexes, to_id)
 	action_log.append({"turn": turn, "action": "dev_transfer", "args": Chronicle.plain({"hexes": hexes, "to_id": to_id})})

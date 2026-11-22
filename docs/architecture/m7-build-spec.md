@@ -530,7 +530,8 @@ retreat hex exists for it (else Hold).
 |---|---|
 | Rough | the hex's cover is woods, marsh, rock or snow (`TerrainDef.rough`), or its relief is 3 (hills) or more |
 | Narrow (the right lane closed) | marsh or snow cover (`TerrainDef.narrow`), or relief 5 (mountains) or more |
-| Defence (for the defender only) | `TerrainDef.defence_permille` (woods 250, marsh 150, rock 50, snow 250, the rest 0) + `relief_defence_add[relief]` (0, 0, 0, 50, 150, 300, 500) |
+| Defence (for the defender only) | `TerrainDef.defence_permille` (woods 350, marsh 150, rock 50, snow 250, the rest 0; woods was 250 and went to 350 in the B7 review, 2026-11-22, so that
+the woods gap of the starting expectations holds) + `relief_defence_add[relief]` (0, 0, 0, 50, 150, 300, 500) |
 | Fight | the attacker strikes in `assault` while the garrison fights, else `open` or `rough`; the defender's companies are struck in `garrison` in an assault, else `open` or `rough`; the attacker is struck in `open` or `rough` |
 | The attacker's penalties | uphill −50 permille all battle; a pass crossing −300 and a river crossing −200 on day 1 (multiplied) |
 
@@ -616,10 +617,16 @@ follows (`relief`). Then `Wars.book_battle`
 (the war's battles won and men lost), the record (D43), `battle_fought {tag, hex, days, killed, wounded, morale}` and
 `battle_ended` (5.5).
 
-**Starting expectations** (v0.2.2's 0.2.1 measures, pikemen on farmland, attacker on Attack, defender on Hold, 100 seeds;
-`godot/tools/war_report.gd` measures the same table on the district map in task B18 and `tests/core/test_combat.gd` keeps
-30-seed bands of it): 3 v 3 attacker wins 35 to 55 %; 4 v 3 60 to 85 %; 6 v 4 60 to 90 %; 4 v 2 and 6 v 3 65 to 95 %; the same
-pairs in woods at least 10 points lower than on farmland; every battle ends in 1 to 8 days and the day cap ends under 10 %.
+**Starting expectations** (v0.2.2's 0.2.1 measures, pikemen on farmland, attacker on Attack, defender on Hold;
+`godot/tools/war_report.gd` measures the same table on the district map in task B18; `tests/core/test_combat_bands.gd` keeps
+the bands over seeds 1 to 500): 3 v 3 attacker wins 35 to 55 %; 4 v 3 60 to 85 %; 6 v 4 60 to 90 %; 4 v 2 and 6 v 3 65 to 95 %;
+the same pairs in woods at least 10 points lower than on farmland; every battle ends in 1 to 8 days and the day cap ends under
+10 %.
+**B7 review (2026-11-22), what the calibration found:** with woods at 350 (`data/defs/terrain/woods.tres`, from 250) the
+measured table is 3 v 3 47 % farmland, 9 % woods; 4 v 3 72 / 28; 6 v 4 76 / 64; 6 v 3 83 / 72; every day cap 0 %. The woods rule
+holds for 3 v 3, 4 v 3, 6 v 4 and 6 v 3. **4 v 2 on farmland is 100 %, outside 65 to 95, and its woods are 99 %:** no data value
+that keeps the pinned worked hit (33 men) and the other bands moves it (morale costs, flank, stances, dice, all tried). It is an
+open owner decision (a unit or formula change, or the band), recorded as a pending test; this text is not changed to match it.
 
 **The odds** (D50; `Combat.odds_strength`, `odds_factor`, `odds_word`): a side's strength is the sum over its companies of
 men x morale / 1,000; a garrison adds its men x `garrison_odds_permille` (3,100) / 1,000 when a field army of its side stands
@@ -1024,8 +1031,10 @@ const BRANCHES: Array[StringName] = [&"infantry", &"missile", &"cavalry", &"arti
 @export var war_timer_warning := 32
 @export var odds_words: Array[Dictionary] = []     # [{word: "Hopeless", from: 0}, {"Poor", 800}, {"Even", 1000},
 	# {"Favourable", 1200}, {"Overwhelming", 2500}] (permille of the ratio; ascending)
-@export var odds_ground: Dictionary[StringName, int] = {}   # open 1000, hills 1340, woods 1400, marsh 2080,
-	# mountains 3390, snow 2920 (the v0.2.2 measures; re-fitted by B18)
+@export var odds_ground: Dictionary[StringName, int] = {}   # open 1000, hills 1340, woods 1617, marsh 2080,
+	# mountains 3390, snow 2920 (woods 1617 in the B7 review, 2026-11-22, for the woods defence of 350: the
+	# woods' attacker needs about 4.85 companies to 3 for an even fight, interpolated from the 500-seed table; was 1400, the
+	# v0.2.2 measure for woods 250)
 @export var garrison_odds_permille := 3100         # a garrison's weight behind a field army
 @export var garrison_odds_alone: PackedInt32Array  # by fortress level 0..3: 0, 1800, 1100, 1000
 func validate() -> Array[String]   # every branch in both fight tables with 3 entries 1..4000; the stance keys attack, hold,

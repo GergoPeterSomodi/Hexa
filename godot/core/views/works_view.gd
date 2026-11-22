@@ -54,6 +54,8 @@ static func ready_turn(game: Game, work: Work) -> int:
 static func ready_turn_of(game: Game, hex: Vector2i, seasons: int) -> int:
 	var probe := Work.new()
 	probe.hex = hex
+	if Occupation.is_occupied(game, hex) or Occupation.besieged(game, hex):
+		return Works.NO_DATE
 	var left := maxi(seasons, 1)
 	var t := game.turn
 	for n: int in Works.HORIZON:
@@ -106,7 +108,7 @@ static func _entry(game: Game, work: Work) -> Dictionary:
 		"label": label(game, work),
 		"tag": work.tag,
 		"progress": "%d of %s" % [done, Words.seasons(work.seasons)],
-		"ready": Calendar.date_text(ready, game.start_year),
+		"ready": Works.ready_words(game, work),
 		"ready_turn": ready,
 		"halted": Works.halted(game, work, game.turn),
 		"started_turn": work.started_turn,

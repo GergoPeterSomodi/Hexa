@@ -69,6 +69,9 @@ func _begin_works(g: Game, luck: Rng, ready: Dictionary) -> void:
 func _random_armies(g: Game, luck: Rng) -> void:
 	for _k: int in 6:
 		var pick: Dictionary = RandomPlayer.next(g, TAG, luck)
+		# declare_war is not played here until the snapshot carries game.wars (M7 B13): a load would forget the war.
+		if str(pick["action"]) == "declare_war":
+			continue
 		g.act(str(pick["action"]), pick["args"])
 
 
@@ -227,17 +230,24 @@ func _check_money_and_goods(g: Game, ended: int, ledgers: Dictionary) -> void:
 		assert_eq(int(closed["turn"]), ended)
 		var sum := 0
 		var work := 0
+		var raised := 0
 		var refunds := 0
 		for line: Dictionary in closed["lines"] as Array:
 			assert_true(Treasury.WHY.has(line["why"]), "a known reason: %s" % line["why"])
 			sum += int(line["amount"])
 			if line["why"] == &"work":
 				work -= int(line["amount"])
+			elif line["why"] == &"raise":
+				raised -= int(line["amount"])
 			elif line["why"] == &"refund":
 				refunds += int(line["amount"])
 		assert_eq(int(closed["closing"]) - int(closed["opening"]), sum, "%s: treasury change == the lines' sum" % c.tag)
 		assert_eq(int(closed["closing"]), c.treasury)
-		assert_lte(refunds, work, "%s: refunds never exceed what the works paid" % c.tag)
+		# The refund reason is shared: a cancelled work gives back what it paid in its first season (M3 D14), and a disband
+		# gives back the cost of a company raised this season on its home (M6 D10, Military.disband). Both are paid out of
+		# this season's work and raise spending, so the bound is their sum (the refund of a company raised in an earlier season
+		# is not allowed by Military.disband, so it never appears in this season's lines).
+		assert_lte(refunds, work + raised, "%s: refunds never exceed what the works and the raises paid" % c.tag)
 		if ledgers.has(c.tag):
 			assert_eq(int(closed["opening"]), int(ledgers[c.tag]), "%s: the ledger continues from the last closing" % c.tag)
 		ledgers[c.tag] = int(closed["closing"])

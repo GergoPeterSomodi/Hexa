@@ -263,7 +263,7 @@ static func _maker(game: Game, country: Country, goods: Array[int], last_turn: i
 		if work.tag != country.tag or work.action == Works.CLEAR or i < 0:
 			continue
 		var ready := Works.ready_turn(game, work)
-		if ready > last_turn or (best != null and (ready > best_ready or (ready == best_ready and work.id > best.id))):
+		if ready == Works.NO_DATE or ready > last_turn or (best != null and (ready > best_ready or (ready == best_ready and work.id > best.id))):
 			continue
 		var base := Economy.district_base(game, view.with({i: Vector2i(work.family, work.level_to)}), work.hex)
 		if goods.has(int(base["good"])):

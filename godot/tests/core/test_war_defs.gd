@@ -100,7 +100,7 @@ func test_peace_score_and_odds_equal_spec() -> void:
 		froms.append(entry["from"])
 	assert_eq(words, ["Hopeless", "Poor", "Even", "Favourable", "Overwhelming"] as Array[String])
 	assert_eq(froms, [0, 800, 1000, 1200, 2500] as Array[int])
-	assert_eq(w.odds_ground, {&"open": 1000, &"hills": 1340, &"woods": 1400, &"marsh": 2080, &"mountains": 3390, &"snow": 2920} as Dictionary[StringName, int])
+	assert_eq(w.odds_ground, {&"open": 1000, &"hills": 1340, &"woods": 1617, &"marsh": 2080, &"mountains": 3390, &"snow": 2920} as Dictionary[StringName, int])
 	assert_eq(w.garrison_odds_permille, 3100)
 	assert_eq(w.garrison_odds_alone, PackedInt32Array([0, 1800, 1100, 1000]))
 

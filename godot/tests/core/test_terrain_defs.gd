@@ -145,7 +145,7 @@ func test_planted_fault_highway_over_road_cap() -> void:
 const WAR_TABLE: Array = [
 	["farmland", 0, false, false],
 	["grassland", 0, false, false],
-	["woods", 250, true, false],
+	["woods", 350, true, false],
 	["marsh", 150, true, true],
 	["rock", 50, true, false],
 	["snow", 250, true, true],

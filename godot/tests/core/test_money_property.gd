@@ -129,6 +129,11 @@ func _begin_works(g: Game, c: Country, luck: Rng) -> void:
 func _armies(g: Game, c: Country, luck: Rng) -> void:
 	for _k: int in 2:
 		var pick: Dictionary = RandomPlayer.next(g, c.tag, luck)
+		# declare_war is not played here until the snapshot carries game.wars (M7 B13): a loaded game would forget a war
+		# while the plain run keeps it, and Game.digest does not show wars yet, so the two runs would part unseen. The war's
+		# own tests (test_wars*.gd) cover the action; this property is about money.
+		if str(pick["action"]) == "declare_war":
+			continue
 		var treasury := c.treasury
 		var verdict: Dictionary = g.act(str(pick["action"]), pick["args"])
 		if bool(verdict["ok"]):

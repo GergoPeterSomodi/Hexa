@@ -67,7 +67,7 @@ func test_three_thousand_random_actions_keep_their_checks() -> void:
 	assert_eq(problems.size(), 0, "the contract holds: %s" % str(problems.slice(0, 5)))
 	for name: String in Actions.NAMES:
 		assert_gt(int(ok_count.get(name, 0)) + int(refused.get(name, 0)), 0, "%s was picked" % name)
-	for name: String in ["raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march"]:
+	for name: String in ["raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war"]:
 		assert_gt(int(ok_count.get(name, 0)), 0, "%s succeeded at least once" % name)
 		assert_gt(int(refused.get(name, 0)), 0, "%s was refused at least once" % name)
 	assert_eq(g.turn, 1 + SEASON_ENDS, "%d season ends" % SEASON_ENDS)

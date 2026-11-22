@@ -352,6 +352,8 @@ static func cancelled_text(place: String, why: String, reason: String) -> String
 ## "Spring 1481": the season a work begun in season `turn` stands from, skipping halted seasons (as Works.ready_turn,
 ## which walks from the current turn; an old entry needs the walk from its own).
 static func ready_text(game: Game, work: Work, turn: int) -> String:
+	if Occupation.is_occupied(game, work.hex) or Occupation.besieged(game, work.hex):
+		return "halted by war"
 	var left := work.seasons
 	var t := turn
 	for n: int in Works.HORIZON:

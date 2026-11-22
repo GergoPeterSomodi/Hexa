@@ -48,7 +48,22 @@ static func _args(game: Game, tag: StringName, action: String, luck: Rng) -> Dic
 			return {"army": _army_id(game, tag, luck), "tag": tag}
 		"continue_march":
 			return {"army": _halted_id(game, tag, luck), "tag": tag}
+		"declare_war":
+			return _war_args(game, tag, luck)
 	return {}
+
+
+## A declaration of war: a neighbour of the country half the time (a declaration that can succeed), else any country.
+static func _war_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
+	var target := _any_tag(game, tag, luck)
+	var c := Countries.by_tag(game, tag)
+	if c != null and luck.randi_range(0, 1) == 0:
+		var around := Territory.neighbours(game, c.id)
+		if not around.is_empty():
+			var near := Countries.by_id(game, around[luck.randi_range(0, around.size() - 1)])
+			if near != null:
+				target = near.tag
+	return {"target": target, "tag": tag}
 
 
 ## A halted march of the country (order none, its goal kept: movement.gd halt), most picks, so that continue_march
