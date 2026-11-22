@@ -474,6 +474,10 @@ func _m6_end(rng: Rng, vp: SubViewport, app: App) -> void:
 func _m6_end_once(rng: Rng, vp: SubViewport, app: App) -> bool:
 	_send_chord(vp, KEY_ENTER if rng.randi_range(0, 1) == 0 else KEY_SPACE)
 	await _wait_frames(2)
+	var waited := 0
+	while app.requests().flow.state() == SeasonFlow.State.RUNNING and waited < 120:  # the sliced season takes a few frames (M8)
+		await _wait_frames(1)
+		waited += 1
 	var replayed := _m6_replaying(app)
 	if replayed:
 		_bump("m6_replays")

@@ -28,6 +28,8 @@ var think := false
 var declared_now: Array[StringName] = []
 ## Open land claimed by the seat's armies this turn: hex index -> army id.
 var claims: Dictionary = {}
+## The goals an army's march was refused this turn (army id -> Array of Vector2i): its next step tries the next aim (4.10).
+var refused: Dictionary = {}
 ## The ducats of the best works card refused for money only this turn (0: none).
 var wanted_cost := 0
 ## The works step's chosen candidates and their cards.

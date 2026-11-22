@@ -6,6 +6,7 @@ const VIEW_SIZE := Vector2i(1280, 720)
 var _vp: SubViewport = null
 var _map_node: Node2D = null
 var _input: MapInput = null
+var _t := 0
 
 
 func before_each() -> void:
@@ -433,3 +434,105 @@ func test_m7_keys_are_silent_under_a_line_edit_and_when_disabled() -> void:
 	_input._unhandled_input(_shift_key(KEY_O))
 	_input._unhandled_input(_key(KEY_B))
 	assert_true(log.is_empty(), "nothing while disabled")
+
+
+## The signals of the intents block_orders gates (M8 6.2, D36), by the action that makes them.
+func _watch_orders(log: Array[String]) -> void:
+	_input.select_requested.connect(func(_p: Vector2) -> void: log.append("select"))
+	_input.command_requested.connect(func(_p: Vector2) -> void: log.append("command"))
+	_input.storm_requested.connect(func(_p: Vector2) -> void: log.append("storm"))
+	_input.command_key_requested.connect(func() -> void: log.append("command_key"))
+	_input.upgrade_requested.connect(func() -> void: log.append("upgrade"))
+	_input.next_army_requested.connect(func() -> void: log.append("next"))
+	_input.continue_march_requested.connect(func() -> void: log.append("continue"))
+	_input.undo_work_requested.connect(func() -> void: log.append("undo"))
+	_input.storm_key_requested.connect(func() -> void: log.append("storm_key"))
+	_input.battle_requested.connect(func() -> void: log.append("battle"))
+	_input.report_requested.connect(func() -> void: log.append("report"))
+
+
+func _chord_of(action: StringName) -> InputEventKey:
+	var ev := Bindings.events_for(action)[0].duplicate() as InputEventKey
+	ev.pressed = true
+	return ev
+
+
+func _click_at(button: MouseButton, pos: Vector2, shift: bool = false) -> void:
+	var down := _btn(button, pos, true)
+	var up := _btn(button, pos, false)
+	down.shift_pressed = shift
+	up.shift_pressed = shift
+	_input._unhandled_input(down)
+	_input._unhandled_input(up)
+
+
+func test_block_orders_emits_blocked_instead_of_each_order_and_changes_nothing() -> void:
+	_t = 5000
+	_input.clock = func() -> int: return _t
+	var log: Array[String] = []
+	var reasons: Array[String] = []
+	_watch_orders(log)
+	_input.blocked.connect(func(reason: String) -> void: reasons.append(reason))
+	_input.storm_ready = func() -> bool: return true
+	_input.block_orders("Countries are moving")
+	var intents: Array[Callable] = [
+		func() -> void: _click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0)),
+		func() -> void: _click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0)),
+		func() -> void: _click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), true),
+	]
+	for action: StringName in [&"map_command_key", &"game_upgrade", &"game_next_unit", &"game_continue_march",
+			&"game_undo_work", &"map_command_storm", &"game_battle", &"game_report"]:
+		intents.append(func() -> void: _input._unhandled_input(_chord_of(action)))
+	for intent: Callable in intents:
+		var before := reasons.size()
+		_t += 1100  # past the once-a-second gap
+		intent.call()
+		assert_eq(reasons.size(), before + 1, "each blocked intent says why")
+	assert_true(log.is_empty(), "and none of them did anything: %s" % str(log))
+	assert_eq(reasons[0], "Countries are moving")
+
+
+func test_blocked_is_said_once_a_second_at_most() -> void:
+	_t = 10000
+	_input.clock = func() -> int: return _t
+	var reasons: Array[String] = []
+	_input.blocked.connect(func(reason: String) -> void: reasons.append(reason))
+	_input.block_orders("why")
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0))
+	_t += 400
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0))
+	_t += 400
+	_input._unhandled_input(_chord_of(&"game_next_unit"))
+	assert_eq(reasons.size(), 1, "inside a second: once")
+	_t += 300
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0))
+	assert_eq(reasons.size(), 2, "after it: again")
+
+
+func test_camera_intents_still_work_while_blocked_and_empty_lifts_it() -> void:
+	var seen: Array[String] = []
+	var reasons: Array[String] = []
+	_input.blocked.connect(func(reason: String) -> void: reasons.append(reason))
+	_input.mode_requested.connect(func(_m: int) -> void: seen.append("mode"))
+	_input.grid_toggled.connect(func() -> void: seen.append("grid"))
+	_input.names_toggled.connect(func() -> void: seen.append("names"))
+	_input.find_place_requested.connect(func() -> void: seen.append("find"))
+	_input.bookmark_requested.connect(func(_i: int, _s: bool) -> void: seen.append("bookmark"))
+	_input.study_requested.connect(func(_p: StringName) -> void: seen.append("study"))
+	var hovered: Array[Vector2i] = []
+	_input.hover_changed.connect(func(hex: Vector2i) -> void: hovered.append(hex))
+	_input.block_orders("busy")
+	for action: StringName in [&"view_mode_1", &"view_grid", &"view_names", &"ui_find_place", &"cam_bookmark_go_1",
+			&"cam_bookmark_set_2", &"game_study"]:
+		_input._unhandled_input(_chord_of(action))
+	assert_eq(seen, ["mode", "grid", "names", "find", "bookmark", "bookmark", "study"], "every camera intent works")
+	_input._unhandled_input(_motion(Vector2(250.0, 350.0)))
+	assert_eq(hovered, [Vector2i(2, 3)], "the hover card works")
+	assert_true(reasons.is_empty(), "none of them was blocked")
+	var log: Array[String] = []
+	_watch_orders(log)
+	_input.block_orders("")
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0))
+	_input._unhandled_input(_chord_of(&"game_next_unit"))
+	assert_eq(log, ["select", "next"], "lifted")
+	assert_true(reasons.is_empty())

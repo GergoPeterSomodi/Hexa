@@ -12,7 +12,15 @@ const GUARD_MS := 400
 const SWING_BRIEF_PERMILLE := 100
 const NO_SEASON_TEXT := "No season has ended yet."
 
+## The AI's slice of a frame while the camera moved in the last CAMERA_QUIET_MS, and while it did not (M8 4.2).
+const AI_SLICE_MS := 5.0
+const AI_SLICE_IDLE_MS := 10.0
+const CAMERA_QUIET_MS := 500
+const SYNC_STEP_CAP := 1000000
+
 signal state_changed(state: State)
+## The computer's turn moved on: seats done, seats (once after the begin, then after each slice).
+signal progressed(done: int, total: int)
 
 var settings: Settings = null
 ## () -> int, milliseconds. The App gives Time.get_ticks_msec; tests a fake.
@@ -39,11 +47,26 @@ var hold_ribbons: Callable = Callable()
 var decisions_start: Callable = Callable()
 ## (turn: int) -> Dictionary: the summary of a season; the default reads Session. Tests may replace it.
 var summarize: Callable = Callable()
+## () -> Dictionary: begins the season ({ok, reason}); the default is Session.begin_season. Tests inject.
+var begin_season: Callable = Callable()
+## (budget_ms: float) -> bool: runs AI steps for about that long; true when the turn is over (Session.step_orders).
+var step_orders: Callable = Callable()
+## () -> void: Session.finish_season.
+var finish_season: Callable = Callable()
+## () -> Vector2i: (seats done, seats) (Session.orders_progress).
+var orders_progress: Callable = Callable()
 ## The clock value before which End season is refused.
 var guard_until: int = 0
 
 var _state: State = State.IDLE
 var _reopened: bool = false
+## RUNNING: &"orders" (the begin and the slices), &"phases" (the season's end); &"" outside RUNNING.
+var _stage: StringName = &""
+var _armed := false  # the frame after End season is drawn before the season begins
+var _begun := false  # begin_season ran for the season in hand
+var _left := 0  # seasons still to play (count)
+var _played := 0
+var _camera_at := -CAMERA_QUIET_MS * 100
 
 
 func _init() -> void:
@@ -64,6 +87,7 @@ func _exit_tree() -> void:
 
 ## Back to IDLE with no guard: a new game or none (a report left open must not block End season for good).
 func reset() -> void:
+	_stage = &""
 	_reopened = false
 	guard_until = 0
 	_hold(false)
@@ -102,10 +126,47 @@ func request_end(echo: bool = false, count: int = 1) -> bool:
 	if not bool(verdict.get("ok", false)):
 		_toast(String(verdict.get("reason", "")), &"bad", &"")
 		return false
+	_stage = &"orders"
+	_armed = false
+	_begun = false
+	_left = maxi(count, 1)
+	_played = 0
 	_set_state(State.RUNNING)
 	_hold(true)
-	_run(maxi(count, 1))
+	if not is_inside_tree():  # no frames to wait for: run the season through at once (tests without a tree)
+		_armed = true
+		var guard := 0
+		while _state == State.RUNNING and _stage != &"" and guard < SYNC_STEP_CAP:
+			_tick()
+			guard += 1
 	return true
+
+
+## The camera moved (the App connects CameraRig.view_changed): the AI's slices shrink for CAMERA_QUIET_MS.
+func camera_moved() -> void:
+	_camera_at = _now()
+
+
+## The game ended while RUNNING: the hook's turn is dropped and the flow is IDLE again.
+func abort() -> void:
+	if _state != State.RUNNING:
+		return
+	_stage = &""
+	var hook := Session.ai()
+	if hook != null:
+		hook.clear()
+	_hold(false)
+	_set_state(State.IDLE)
+
+
+## &"orders", &"phases", or &"" outside RUNNING.
+func running_stage() -> StringName:
+	return _stage if _state == State.RUNNING else &""
+
+
+func _process(_delta: float) -> void:
+	if _state == State.RUNNING:
+		_tick()
 
 
 ## Skips the running movement replay (Space, Enter, Esc, a click on the map, the End season plate): true when one was.
@@ -167,27 +228,70 @@ func report_closed() -> void:
 	_back_to_idle()
 
 
-func _run(count: int) -> void:
-	if is_inside_tree():
-		await get_tree().process_frame  # the busy ring is drawn before the season blocks the thread
-	var played := 0
-	for i in count:
-		if Session.game == null:
-			return  # the game ended while the flow was busy: stop quietly (reset() already ran)
-		if i > 0 and not bool(Session.end_season_check().get("ok", false)):
-			break
-		var verdict := Session.end_season()
-		if not bool(verdict.get("ok", false)):
-			if played == 0:
-				_toast(String(verdict.get("reason", "")), &"bad", &"")
-			break
-		played += 1
+## One frame of RUNNING: arm, begin, one AI slice, or the season's end.
+func _tick() -> void:
+	if Session.game == null:
+		abort()
+		return
+	if not _armed:
+		_armed = true
+		return
+	if _stage == &"phases":
+		_finish_one()
+	elif not _begun:
+		_begin_one()
+	else:
+		_slice()
+
+
+func _begin_one() -> void:
+	var verdict := (begin_season.call() if begin_season.is_valid() else Session.begin_season()) as Dictionary
+	if not bool(verdict.get("ok", false)):
+		if _played == 0:
+			_toast(String(verdict.get("reason", "")), &"bad", &"")
+		_ended()
+		return
+	_begun = true
+	_emit_progress()
+
+
+func _slice() -> void:
+	var quiet := _now() - _camera_at >= CAMERA_QUIET_MS
+	var budget := AI_SLICE_IDLE_MS if quiet else AI_SLICE_MS
+	var done: bool = (step_orders.call(budget) if step_orders.is_valid() else Session.step_orders(budget)) == true
+	_emit_progress()
+	if done:
+		_stage = &"phases"  # one frame shows "The season ends", then the phases run
+
+
+func _finish_one() -> void:
+	if finish_season.is_valid():
+		finish_season.call()
+	else:
+		Session.finish_season()
+	_played += 1
+	_left -= 1
+	_begun = false
+	_stage = &"orders"
+	if _left > 0 and Session.game != null and bool(Session.end_season_check().get("ok", false)):
+		return  # the next season begins on the next tick
+	_ended()
+
+
+func _emit_progress() -> void:
+	var p := (orders_progress.call() if orders_progress.is_valid() else Session.orders_progress()) as Vector2i
+	progressed.emit(p.x, p.y)
+
+
+## The seasons are played (or the first was refused): the replay, the decisions and the report as M6 and M7.
+func _ended() -> void:
+	_stage = &""
 	if Session.game == null:
 		return
 	if _replay_begin(_speed()):
 		_set_state(State.REPLAY)  # replay_done (the replay's finished) goes on to the decisions and the report
 		return
-	if played == 0:
+	if _played == 0:
 		_set_state(State.DECISIONS)
 		_back_to_idle()
 		return

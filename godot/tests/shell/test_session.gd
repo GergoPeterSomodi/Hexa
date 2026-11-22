@@ -9,6 +9,8 @@ var _prev_origin: Dictionary = {}
 var _prev_dir: String = ""
 var _prev_json: bool = false
 var _dir: String = "user://test_saves_session"
+var _prev_ai: bool = true
+
 
 
 func before_each() -> void:
@@ -19,10 +21,15 @@ func before_each() -> void:
 	_prev_dir = Session.save_dir
 	_prev_json = Session.save_json
 	Session.save_dir = _dir
+	_prev_ai = Session.ai_enabled
+	Session.ai_enabled = false  # M3 to M7 pinned a passive world (M8 D47); the M8 cases turn it on
 	_wipe()
 
 
 func after_each() -> void:
+	Session.ai_enabled = _prev_ai
+	Session._passive = []
+	Session._in_season = false
 	Session.game = _prev_game
 	Session.unsaved_actions = _prev_unsaved
 	Session._defs = _prev_defs

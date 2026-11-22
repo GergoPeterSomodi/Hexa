@@ -40,6 +40,10 @@ signal battle_requested
 ## A click (select or command) while `orders_blocked` says so: it selects and orders nothing (M6 6.4: the replay's skip).
 signal blocked_click(map_px: Vector2)
 
+## An order the map would take is refused while the countries move or the replay plays (block_orders): the reason to toast,
+## at most once a second. M8 6.2, D36.
+signal blocked(reason: String)
+
 ## () -> bool, asked on a click's release: true while a movement replay runs, so the click is `blocked_click` instead.
 var orders_blocked: Callable = Callable()
 ## () -> bool, asked on a Shift+right click: true while an army of yours is selected, so the click storms. Unset: no army.
@@ -51,6 +55,7 @@ const CURSOR_UP := 2
 const CURSOR_DOWN := 3
 const CLICK_SLOP := 6.0
 const NO_HEX := Vector2i(-9999, -9999)
+const BLOCKED_GAP_MS := 1000
 
 var camera: Camera2D = null
 ## Any node at the map's origin (usually TileMapView); viewport points are transformed to its local space.
@@ -76,6 +81,10 @@ var _press_at := Vector2.ZERO
 var _slop_broken := false
 var _saw_hardware_button := false
 var _last_hover := NO_HEX
+var _block_reason := ""
+var _blocked_at := -BLOCKED_GAP_MS * 10
+## () -> int, milliseconds, for the once-a-second rule; tests inject a fake.
+var clock: Callable = Callable()
 
 
 func _ready() -> void:
@@ -116,6 +125,24 @@ func _disconnect_settings() -> void:
 	_settings = null
 
 
+## While `reason` is not empty, select, command, the command key, upgrade, Tab, R, Ctrl+Z, Shift+O, Shift+right click, B
+## and J emit `blocked(reason)` and nothing else; the camera, the modes, the grid and names keys and the hover work.
+## "" lifts it.
+func block_orders(reason: String) -> void:
+	_block_reason = reason
+
+
+## True when the intent is refused: says so (once a second at most).
+func _refuses() -> bool:
+	if _block_reason.is_empty():
+		return false
+	var now := int(clock.call()) if clock.is_valid() else Time.get_ticks_msec()
+	if now - _blocked_at >= BLOCKED_GAP_MS:
+		_blocked_at = now
+		blocked.emit(_block_reason)
+	return true
+
+
 func current_hover() -> Vector2i:
 	return _last_hover
 
@@ -151,6 +178,9 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 		return
 	var map_px := map_px_of(mb.position)
 	var orders := released_action == &"map_select" or released_action == &"map_command"
+	if orders and _refuses():
+		_mark_handled()
+		return
 	if orders and orders_blocked.is_valid() and bool(orders_blocked.call()):
 		blocked_click.emit(map_px)
 		_mark_handled()
@@ -217,31 +247,27 @@ func _on_key(key: InputEventKey) -> void:
 		hud_toggled.emit()
 		_mark_handled()
 	elif _is_action_pressed_exact(key, &"game_upgrade"):
-		upgrade_requested.emit()
+		if not _refuses():
+			upgrade_requested.emit()
 		_mark_handled()
 
 
-## The M3 to M7 keys: report, bookmarks, cancel work, the study, the army keys. Returns true when one fired.
+## The M3 to M7 keys: report, bookmarks, cancel work, the study, the army keys. Returns true when one fired. While orders
+## are blocked the keys that order, select or open a report emit `blocked` instead.
 func _on_game_key(key: InputEventKey) -> bool:
+	var gated := _gated_key(key)
+	if gated != &"":
+		if _refuses():
+			_mark_handled()
+			return true
+		_emit_gated(gated)
+		_mark_handled()
+		return true
 	var fired := true
-	if _is_action_pressed_exact(key, &"game_report"):
-		report_requested.emit()
-	elif _is_action_pressed_exact(key, &"game_undo_work"):
-		undo_work_requested.emit()
-	elif _is_action_pressed_exact(key, &"game_study"):
+	if _is_action_pressed_exact(key, &"game_study"):
 		study_requested.emit(&"")
 	elif _is_action_pressed_exact(key, &"game_ledger"):
 		study_requested.emit(&"economy")
-	elif _is_action_pressed_exact(key, &"game_next_unit"):
-		next_army_requested.emit()
-	elif _is_action_pressed_exact(key, &"game_continue_march"):
-		continue_march_requested.emit()
-	elif _is_action_pressed_exact(key, &"map_command_storm"):
-		storm_key_requested.emit()
-	elif _is_action_pressed_exact(key, &"game_battle"):
-		battle_requested.emit()
-	elif _is_action_pressed_exact(key, &"map_command_key"):
-		command_key_requested.emit()
 	elif _cursor_direction(key) >= 0:
 		cursor_moved.emit(_cursor_direction(key))
 	else:
@@ -253,6 +279,33 @@ func _on_game_key(key: InputEventKey) -> bool:
 	if fired:
 		_mark_handled()
 	return fired
+
+
+## The action of the keys that order or select (the ones block_orders gates), or &"".
+func _gated_key(key: InputEventKey) -> StringName:
+	for action: StringName in [&"game_report", &"game_undo_work", &"game_next_unit", &"game_continue_march",
+			&"map_command_storm", &"game_battle", &"map_command_key"]:
+		if _is_action_pressed_exact(key, action):
+			return action
+	return &""
+
+
+func _emit_gated(action: StringName) -> void:
+	match action:
+		&"game_report":
+			report_requested.emit()
+		&"game_undo_work":
+			undo_work_requested.emit()
+		&"game_next_unit":
+			next_army_requested.emit()
+		&"game_continue_march":
+			continue_march_requested.emit()
+		&"map_command_storm":
+			storm_key_requested.emit()
+		&"game_battle":
+			battle_requested.emit()
+		&"map_command_key":
+			command_key_requested.emit()
 
 
 ## The CURSOR_* value of the Alt+arrow action the key presses, or -1.

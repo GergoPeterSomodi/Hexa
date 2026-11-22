@@ -33,13 +33,16 @@ func _m45_snap() -> Dictionary:
 	out["stats"] = game.stats.digest() if game.stats != null else ""
 	out["body"] = hash(var_to_bytes(Snapshot.of(game, {})))
 	out["seasons"] = int(_n.get("seasons", 0))
+	out["in_season"] = Session.in_season()
 	return out
 
 
-## `what` leaves the digest, the version, the Stats and the snapshot as `before` took them (unless a season ended meanwhile).
+## `what` leaves the digest, the version, the Stats and the snapshot as `before` took them (unless a season ended or runs meanwhile).
 func _m45_untouched(before: Dictionary, what: String) -> void:
 	if Session.game == null or Session.game != before["game"] or int(_n.get("seasons", 0)) != int(before["seasons"]):
 		return
+	if bool(before.get("in_season", false)) or Session.in_season():
+		return  # the sliced season (M8 D40) is mid-way: its log record and phases land between the frames
 	var now := _m45_snap()
 	assert_eq(now["digest"], before["digest"], "%s: %s leaves the game digest" % [_tag, what])
 	assert_eq(now["version"], before["version"], "%s: %s is not an action" % [_tag, what])

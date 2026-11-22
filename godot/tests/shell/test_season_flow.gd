@@ -14,11 +14,14 @@ var _saves: int = 0
 var _states: Array[int] = []
 var _prev_game: Game = null
 var _prev_unsaved: int = 0
+var _prev_ai: bool = true
 
 
 func before_each() -> void:
 	_prev_game = Session.game
 	_prev_unsaved = Session.unsaved_actions
+	_prev_ai = Session.ai_enabled
+	Session.ai_enabled = false  # the M3 to M7 cases pin a passive world; the slices are tested with injected callables
 	assert_eq(Session.new_scenario("north_italy_1480", 1480), "", "the committed scenario starts")
 	var verdict := Session.act("choose_country", {"tag": &"GEN"})
 	assert_true(bool(verdict.get("ok", false)), "Genoa is chosen")
@@ -45,6 +48,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	Session.ai_enabled = _prev_ai
 	Session.game = _prev_game
 	Session.unsaved_actions = _prev_unsaved
 	_flow = null
@@ -282,3 +286,82 @@ func test_game_ending_mid_run_stops_quietly() -> void:
 	assert_eq(_pushed.size(), 0)
 	assert_eq(_flow.state(), SeasonFlow.State.IDLE)
 	assert_false(_states.has(SeasonFlow.State.REPLAY), "no pass through REPLAY")
+
+
+## Injects a fake orders turn of `steps` steps; returns the log {budgets, begun, finished, stages, progress}.
+func _fake_turn(steps: int) -> Dictionary:
+	var rec := {"budgets": [], "begun": 0, "finished": 0, "stages": [], "calls": 0, "progress": []}
+	_flow.begin_season = func() -> Dictionary:
+		rec["begun"] += 1
+		rec["calls"] = 0
+		return {"ok": true, "reason": ""}
+	_flow.step_orders = func(budget: float) -> bool:
+		(rec["budgets"] as Array).append(budget)
+		rec["calls"] += 1
+		_now += 300
+		return int(rec["calls"]) >= steps
+	_flow.orders_progress = func() -> Vector2i: return Vector2i(int(rec["calls"]), steps)
+	_flow.finish_season = func() -> void:
+		rec["finished"] += 1
+		(rec["stages"] as Array).append(_flow.running_stage())
+	_flow.progressed.connect(func(done: int, total: int) -> void: (rec["progress"] as Array).append(Vector2i(done, total)))
+	_flow.summarize = func(turn: int) -> Dictionary: return {"turn": turn, "toast": "t"}
+	return rec
+
+
+func test_slices_run_over_frames_and_the_budget_follows_the_camera() -> void:
+	var rec := _fake_turn(4)
+	_flow.camera_moved()  # at 1000
+	assert_true(_flow.request_end())
+	assert_eq(_flow.running_stage(), &"orders")
+	assert_eq(rec["begun"], 0, "the season begins on a later frame, after the busy state is drawn")
+	await _settle()
+	assert_eq(rec["budgets"], [SeasonFlow.AI_SLICE_MS, SeasonFlow.AI_SLICE_MS, SeasonFlow.AI_SLICE_IDLE_MS, SeasonFlow.AI_SLICE_IDLE_MS],
+		"5 ms while the camera moved in the last 500 ms, 10 ms after")
+	assert_eq(rec["progress"], [Vector2i(0, 4), Vector2i(1, 4), Vector2i(2, 4), Vector2i(3, 4), Vector2i(4, 4)],
+		"progressed after the begin and after each slice")
+	assert_eq(rec["finished"], 1)
+	assert_eq(rec["stages"], [&"phases"], "the phases follow the last slice")
+	assert_eq(_flow.running_stage(), &"", "no stage outside RUNNING")
+	assert_eq(_flow.state(), SeasonFlow.State.REPORT, "then the report")
+
+
+func test_a_refused_begin_toasts_and_goes_back_to_idle() -> void:
+	var rec := _fake_turn(2)
+	_flow.begin_season = func() -> Dictionary: return {"ok": false, "reason": "not now"}
+	assert_true(_flow.request_end())
+	await _settle()
+	assert_eq(_toasts.size(), 1)
+	assert_eq(_toasts[0][0], "not now")
+	assert_eq(_toasts[0][1], &"bad")
+	assert_eq(_flow.state(), SeasonFlow.State.IDLE)
+	assert_eq((rec["budgets"] as Array).size(), 0, "no step ran")
+	assert_eq(rec["finished"], 0)
+
+
+func test_abort_drops_the_turn_and_returns_to_idle() -> void:
+	var rec := _fake_turn(1000000)
+	assert_true(_flow.request_end())
+	await wait_frames(4)
+	assert_eq(_flow.state(), SeasonFlow.State.RUNNING, "still slicing")
+	assert_gt((rec["budgets"] as Array).size(), 0)
+	_flow.abort()
+	assert_eq(_flow.state(), SeasonFlow.State.IDLE)
+	assert_eq(_flow.running_stage(), &"")
+	var seen: int = (rec["budgets"] as Array).size()
+	await wait_frames(3)
+	assert_eq((rec["budgets"] as Array).size(), seen, "no more steps")
+	assert_eq(rec["finished"], 0)
+	_flow.abort()
+	assert_eq(_flow.state(), SeasonFlow.State.IDLE, "an abort outside RUNNING does nothing")
+
+
+func test_count_three_plays_three_sliced_seasons_and_one_report() -> void:
+	var rec := _fake_turn(2)
+	assert_true(_flow.request_end(false, 3))
+	await _settle()
+	assert_eq(rec["begun"], 3)
+	assert_eq(rec["finished"], 3)
+	assert_eq((rec["budgets"] as Array).size(), 6, "two slices a season")
+	assert_eq(_pushed.size(), 1, "one report, after the last")
+	assert_eq(_flow.state(), SeasonFlow.State.REPORT)

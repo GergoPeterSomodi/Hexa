@@ -13,6 +13,10 @@ signal screenshot_requested
 signal quicksave_requested
 signal quickload_requested
 signal console_requested
+## F5 or F9 while the season runs (Session.in_season): nothing is saved or loaded; the App toasts the reason (M8 6.2).
+signal season_blocked(reason: String)
+
+const SEASON_TEXT := "Wait for the season to end"
 
 var allow_dev_actions: bool = true
 var enabled: bool = true
@@ -78,10 +82,16 @@ func handle_key_event(key: InputEventKey) -> bool:
 		screenshot_requested.emit()
 		return true
 	if _is_action_pressed_exact(key, &"game_quicksave"):
-		quicksave_requested.emit()
+		if Session.in_season():
+			season_blocked.emit(SEASON_TEXT)
+		else:
+			quicksave_requested.emit()
 		return true
 	if _is_action_pressed_exact(key, &"game_quickload"):
-		quickload_requested.emit()
+		if Session.in_season():
+			season_blocked.emit(SEASON_TEXT)
+		else:
+			quickload_requested.emit()
 		return true
 	if allow_dev_actions and _is_action_pressed_exact(key, &"dev_console"):
 		console_requested.emit()

@@ -463,3 +463,102 @@ func test_a_raise_is_one_ledger_line_with_its_count() -> void:
 	var raised: Array = lines.filter(func(line: Dictionary) -> bool: return line["why"] == &"raise")
 	assert_eq(raised.size(), 1)
 	assert_eq([raised[0]["count"], raised[0]["amount"]], [2, -50], "two companies, 50 ducats, one line")
+
+
+# ----- the scenario's starting armies (M8 5.3, D30) ---------------------------------------------------------------------------
+
+
+const MILAN := &"MLO"
+
+
+## The land hex of Milan where a levy can find the most men on the game `g` (a test's search, not a rule).
+func _levy_hex(g: Game) -> Vector2i:
+	var best := ArmyFixture.NO_HEX
+	var most := -1
+	for i: int in AiKnow.land_of(g, MILAN):
+		var hex := g.map.hex_of(i)
+		var here := Military.men_at_hand(g, MILAN, hex)
+		if g.map.is_land(hex) and here > most:
+			most = here
+			best = hex
+	return best
+
+
+## A game on a copy of the 1480 scenario whose start_armies is `list`; the definitions are the test's own copies.
+func _started(list: Array[Dictionary]) -> Game:
+	var d := ArmyFixture.defs()
+	var s := d.scenarios[d.scenarios.size() - 1].duplicate(true) as ScenarioDef
+	s.start_armies = list
+	return Game.new_scenario(EconomyFixture.map(), d, s, EconomyFixture.SEED)
+
+
+func test_a_start_list_raises_its_armies_through_the_door_with_their_men_levied() -> void:
+	var plain := _started([] as Array[Dictionary])
+	var hex := _levy_hex(plain)
+	var elsewhere := AiFixture.land_hex(plain, AiFixture.GENOA)
+	var list: Array[Dictionary] = [
+		{"tag": MILAN, "hex": hex, "kind": 0, "count": 1},
+		{"tag": MILAN, "hex": hex, "kind": 2, "count": 1},
+		{"tag": AiFixture.GENOA, "hex": elsewhere, "kind": 1, "count": 2},
+	]
+	var g := _started(list)
+	assert_eq(g.armies.size(), 2, "the two entries on one hex join one army; Genoa's is another")
+	var milan := Armies.of_country(g, MILAN)
+	assert_eq(milan.size(), 1)
+	assert_eq(milan[0].hex, hex)
+	assert_eq(milan[0].units.size(), 2)
+	assert_eq(milan[0].men(), g.defs.unit_def(0).men + g.defs.unit_def(2).men, "every company at full men")
+	for u: Unit in milan[0].units:
+		assert_eq([u.raised_turn, u.paid, u.home], [0, 0, hex], "raised at turn 0, paid nothing, home the hex")
+		assert_true(u.paid_goods.is_empty())
+	var genoa := Armies.of_country(g, AiFixture.GENOA)[0]
+	assert_eq([genoa.hex, genoa.units.size(), genoa.men()], [elsewhere, 2, 2 * g.defs.unit_def(1).men])
+	assert_ne(milan[0].name, "")
+	assert_eq(g.events.filter(func(e: Dictionary) -> bool: return e["kind"] == "army_raised").size(), 0, "no event for a start")
+	assert_ne(Armies.digest(g), Armies.digest(plain))
+
+
+func test_the_men_of_a_start_army_are_levied_from_the_hex_and_its_ring() -> void:
+	var plain := _started([] as Array[Dictionary])
+	var hex := _levy_hex(plain)
+	var before := 0
+	var spots: Array[Vector2i] = [hex]
+	for d: int in 6:
+		spots.append(ImproveRules.neighbour(hex, d))
+	for spot: Vector2i in spots:
+		var i := plain.map.index_of(spot)
+		if i >= 0:
+			before += plain.state.people[i]
+	var g := _started([{"tag": MILAN, "hex": hex, "kind": 0, "count": 1}] as Array[Dictionary])
+	var after := 0
+	for spot: Vector2i in spots:
+		var i := g.map.index_of(spot)
+		if i >= 0:
+			after += g.state.people[i]
+	assert_eq(before - after, g.defs.unit_def(0).men, "the company's men, no more, left the people")
+	var flows := Countries.by_tag(g, MILAN).people_flows
+	assert_eq(flows[People.FLOWS.find(&"raised")], -g.defs.unit_def(0).men, "booked as the flow raised")
+
+
+func test_1480s_empty_list_changes_nothing() -> void:
+	var g := _started([] as Array[Dictionary])
+	assert_eq(g.armies.size(), 0)
+	assert_eq([g.next_army_id, g.next_unit_id], [1, 1])
+	var reference := EconomyFixture.game()
+	var same := _started([] as Array[Dictionary])
+	assert_eq(same.digest(), reference.digest(), "the game of an empty list is the game 1480 always was")
+	assert_eq(reference.armies.size(), 0)
+
+
+func test_p_an_entry_the_game_cannot_raise_is_skipped_and_changes_nothing() -> void:
+	var plain := _started([] as Array[Dictionary])
+	var hex := _levy_hex(plain)
+	var list: Array[Dictionary] = [
+		{"tag": &"XXX", "hex": hex, "kind": 0, "count": 1},
+		{"tag": MILAN, "hex": hex, "kind": 9, "count": 1},
+		{"tag": MILAN, "hex": hex, "kind": 0, "count": 0},
+		{"tag": MILAN, "kind": 0, "count": 1},
+	]
+	var g := _started(list)
+	assert_eq(g.armies.size(), 0, "an unknown tag, kind, count or a missing hex raises nothing")
+	assert_eq(g.digest(), plain.digest())

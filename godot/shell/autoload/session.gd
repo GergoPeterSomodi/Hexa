@@ -14,6 +14,15 @@ var current_slot: String = ""
 ## Phase name -> milliseconds the last season spent in it (F3, perf); M4 adds production and income, M5 people, M6 the
 ## movement, supply, ready_units and vision phases (Season.PHASES).
 var last_phase_ms: Dictionary = {}
+## False: every seat is passive (the console's `ai off`; tests/shell/ui_harness.gd). Read when a game starts.
+var ai_enabled := true:
+	set(value):
+		ai_enabled = value
+		var hook := ai()
+		if hook != null:
+			hook.enabled = value
+## The worst single AI step of the last season, in milliseconds (F3, perf_ui).
+var ai_worst_step_ms: float = 0.0
 
 ## The folder of the saves; tests point it at a temporary folder.
 var save_dir: String = SaveFile.DIR
@@ -23,6 +32,7 @@ var save_json: bool = false
 const DEFS := "res://data/defs/game_defs.tres"
 const DAMAGED := "The save is damaged"
 const NO_GAME := "no game"
+const WAIT_TEXT := "wait for the season to end"
 
 ## The ui block of the last load ({} after a new game).
 var _loaded_ui: Dictionary = {}
@@ -36,6 +46,10 @@ var _maps: Dictionary[String, MapData] = {}
 var _defs: GameDefs = null
 ## What the current game was made from, for reseed: {map_id, scenario_id, player}; empty for a game put in place.
 var _origin: Dictionary = {}
+## Between begin_season and finish_season: check and act are refused (M8 D40).
+var _in_season := false
+## The tags the AI leaves alone; kept across games and given to each new hook.
+var _passive: Array[StringName] = []
 
 
 ## A new game on a map of data/maps/<map_id>.tres (or .res): runs the improvement search for the seed.
@@ -114,6 +128,9 @@ func _process(delta: float) -> void:
 ## Puts a game that exists already in place (a loaded save, a test's game over a made-up map).
 func start_game(new_game_value: Game, slot: String = "", seconds: float = 0.0, ui: Dictionary = {}) -> void:
 	game = new_game_value
+	_in_season = false
+	if game.has_countries() and game.orders == null:
+		AiPlayers.attach(game, _passive).enabled = ai_enabled
 	_origin = {}
 	unsaved_actions = 0
 	play_seconds = seconds
@@ -126,6 +143,7 @@ func start_game(new_game_value: Game, slot: String = "", seconds: float = 0.0, u
 ## Ends the current game cleanly, resets unsaved_actions, and emits Events.game_ended.
 func end_game() -> void:
 	game = null
+	_in_season = false
 	_origin = {}
 	unsaved_actions = 0
 	play_seconds = 0.0
@@ -153,6 +171,8 @@ func map_of(map_id: String) -> MapData:
 func check(action: String, args: Dictionary) -> Dictionary:
 	if game == null:
 		return {"ok": false, "reason": "no game"}
+	if _in_season:
+		return {"ok": false, "reason": WAIT_TEXT}
 	return game.check(action, _for_player(args))
 
 
@@ -160,6 +180,8 @@ func check(action: String, args: Dictionary) -> Dictionary:
 func act(action: String, args: Dictionary) -> Dictionary:
 	if game == null:
 		return {"ok": false, "reason": "no game"}
+	if _in_season:
+		return {"ok": false, "reason": WAIT_TEXT}
 	var verdict := game.act(action, _for_player(args))
 	if bool(verdict.get("ok", false)):
 		unsaved_actions += 1
@@ -174,24 +196,112 @@ func end_season_check() -> Dictionary:
 	return Season.end_check(game)
 
 
-## Ends the season: checks, logs it, runs each phase and drains the events after it, then emits season_ended once.
-## Refused with {ok: false, reason} and nothing changed. A played season counts as an unsaved action.
-func end_season() -> Dictionary:
+## The computer's turn of the game, or null (no hook, or another kind).
+func ai() -> AiTurn:
+	return game.orders as AiTurn if game != null else null
+
+
+## Between begin_season and finish_season.
+func in_season() -> bool:
+	return _in_season
+
+
+## Begins the season: checks, logs it, begins the computer's turn and drains. {ok, reason}; refused with nothing changed.
+func begin_season() -> Dictionary:
+	if _in_season:
+		return {"ok": false, "reason": "the season is running"}
 	var verdict := end_season_check()
 	if not bool(verdict.get("ok", false)):
 		return verdict
-	var ended_turn := game.turn
-	last_phase_ms = {}
+	last_phase_ms = {"ai_orders": 0.0}
+	ai_worst_step_ms = 0.0
 	Season.begin(game)
+	Season.orders_begin(game)
+	drain()
+	_in_season = true
+	return verdict
+
+
+## Runs AI steps while the time since the call is under `budget_ms` (one at least), draining after each; true when the
+## turn is over. last_phase_ms["ai_orders"] sums the steps, ai_worst_step_ms is the worst one.
+func step_orders(budget_ms: float) -> bool:
+	if not _in_season:
+		return true
+	var started := Time.get_ticks_usec()
+	while true:
+		var t0 := Time.get_ticks_usec()
+		var done := Season.orders_step(game)
+		drain()
+		var now := Time.get_ticks_usec()
+		var step_ms := float(now - t0) / 1000.0
+		last_phase_ms["ai_orders"] = float(last_phase_ms.get("ai_orders", 0.0)) + step_ms
+		ai_worst_step_ms = maxf(ai_worst_step_ms, step_ms)
+		if done:
+			return true
+		if float(now - started) / 1000.0 >= budget_ms:
+			return false
+	return true
+
+
+## (seats done, seats) of the computer's turn; (0, 0) with no hook.
+func orders_progress() -> Vector2i:
+	var hook: OrdersHook = game.orders if game != null else null
+	return Vector2i(hook.seats_done(), hook.seats()) if hook != null else Vector2i.ZERO
+
+
+## Ends the orders and runs each phase from movement on (draining after each), then emits season_ended once. A played
+## season counts as an unsaved action.
+func finish_season() -> void:
+	if not _in_season:
+		return
+	var ended_turn := game.turn
+	var started := Time.get_ticks_usec()
+	Season.orders_end(game)
+	drain()
+	last_phase_ms["ai_orders"] = float(last_phase_ms.get("ai_orders", 0.0)) + float(Time.get_ticks_usec() - started) / 1000.0
 	for phase: StringName in Season.PHASES:
-		var started := Time.get_ticks_usec()
+		if phase == &"ai_orders":
+			continue
+		started = Time.get_ticks_usec()
 		Season.run_phase(game, phase)
 		last_phase_ms[String(phase)] = float(Time.get_ticks_usec() - started) / 1000.0
 		drain()
 	Season.finish(game)
 	unsaved_actions += 1
+	_in_season = false
 	Events.season_ended.emit(ended_turn)
+
+
+## Ends the season at once: begin_season, every AI step, finish_season. Refused with {ok: false, reason} and nothing
+## changed. The console's and the tests' way; the flow slices the same calls.
+func end_season() -> Dictionary:
+	var verdict := begin_season()
+	if not bool(verdict.get("ok", false)):
+		return verdict
+	step_orders(INF)
+	finish_season()
 	return verdict
+
+
+## Developer console: makes the game AI-only (Game.watch, during the country pick). False when refused.
+func watch() -> bool:
+	if game == null or _in_season:
+		return false
+	var done := game.watch()
+	drain()
+	if done:
+		unsaved_actions += 1
+	return done
+
+
+## Developer console: the AI leaves a country alone (or plays it again). Kept for later games.
+func set_seat_passive(tag: StringName, on: bool) -> void:
+	_passive.erase(tag)
+	if on:
+		_passive.append(tag)
+	var hook := ai()
+	if hook != null:
+		hook.passive = _passive.duplicate()
 
 
 ## Developer console only: gives land to a country by tag ("" frees it), logged for the replay, then drains. Returns how

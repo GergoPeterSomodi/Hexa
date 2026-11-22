@@ -16,6 +16,7 @@ var _old_lock_path: String = ""
 
 
 func before_each() -> void:
+	Session.ai_enabled = false  # M3 to M7 pin a passive world (M8 D47)
 	Bindings.reset_defaults()
 	_prev_game = Session.game
 	_prev_unsaved = Session.unsaved_actions

@@ -16,6 +16,7 @@ var ctx: ShellContext = null
 
 func _init(p_size: Vector2i = DEFAULT_SIZE) -> void:
 	Bindings.ensure()
+	Session.ai_enabled = false  # M3 to M7's end-to-end tests pin a passive world (M8 D47); M8's tests turn it on
 	settings = Settings.new()
 	viewport = SubViewport.new()
 	viewport.size = p_size

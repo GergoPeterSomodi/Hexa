@@ -101,6 +101,11 @@ func judged(tag: StringName, action: String, args: Dictionary, verdict: Dictiona
 		judge.call(tag, action, args, verdict, result)
 
 
+## A step's trace line (what it chose and the numbers it chose by).
+func note(tag: StringName, text: String) -> void:
+	_trace.line(tag, text)
+
+
 func brief_of(tag: StringName) -> AiBrief:
 	return _briefs.get(tag) as AiBrief
 

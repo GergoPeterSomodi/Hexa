@@ -105,6 +105,8 @@ static func new_scenario(p_map: MapData, p_defs: GameDefs, p_scenario: ScenarioD
 	People.setup.call(out)  # before the purse: the start treasury counts the people (M5 spec 5.4)
 	Treasury.setup.call(out)
 	Stores.setup.call(out)
+	# The scenario's starting armies (none in 1480): after the purse and the people, so their men are levied from the final table.
+	Military.setup_start_armies.call(out, p_scenario)
 	StatsSystem.setup.call(out)  # again, now that the countries are known
 	Sight.setup.call(out)  # explored = the land sight (5.0 R11: only here, never on a load)
 	Sight.refresh.call(out)

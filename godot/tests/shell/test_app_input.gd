@@ -84,3 +84,21 @@ func test_console_needs_developer_tools_and_a_line_edit_blocks_all() -> void:
 	var held := _chord(&"game_quicksave")
 	held.echo = true
 	assert_false(_input.handle_key_event(held), "a held key does not repeat a save")
+
+
+func test_f5_and_f9_are_refused_with_a_reason_while_the_season_runs() -> void:
+	var log: Array[String] = []
+	_watch(log)
+	var reasons: Array[String] = []
+	_input.season_blocked.connect(func(reason: String) -> void: reasons.append(reason))
+	var prev_game := Session.game
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	Session._in_season = true
+	assert_true(_input.handle_key_event(_chord(&"game_quicksave")), "the key is still taken")
+	assert_true(_input.handle_key_event(_chord(&"game_quickload")), "a quickload mid-season loads nothing")
+	Session._in_season = false
+	Session.game = prev_game
+	assert_true(log.is_empty(), "no save or load request")
+	assert_eq(reasons, ["Wait for the season to end", "Wait for the season to end"])
+	assert_true(_input.handle_key_event(_chord(&"game_quicksave")))
+	assert_eq(log, ["save"], "outside the season it works")

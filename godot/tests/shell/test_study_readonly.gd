@@ -21,6 +21,7 @@ var _inputs: int = 0
 
 
 func before_each() -> void:
+	Session.ai_enabled = false  # M3 to M7 pin a passive world (M8 D47)
 	Bindings.reset_defaults()
 	_prev_game = Session.game
 	_old_save_dir = Session.save_dir

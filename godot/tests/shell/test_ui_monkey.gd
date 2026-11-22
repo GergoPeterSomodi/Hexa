@@ -114,6 +114,7 @@ func before_each() -> void:
 	_old_tooltip_delay = float(ProjectSettings.get_setting("gui/timers/tooltip_delay_sec", 0.5))
 	# Enter now ends seasons and autosaves: never the real user://saves (R11 rewrites the monkey for M3).
 	_old_save_dir = Session.save_dir
+	Session.ai_enabled = false  # the AI would play in the background and move the digest mid-season (M8 D47); K29 adds an AI-on monkey
 	_old_lock_path = RunLock.path
 	var apart := OS.get_environment("HEXA_MONKEY_APART")  # a name: this run keeps its own saves and lock, so seeds can run side by side
 	Session.save_dir = "user://test_monkey_saves" + apart

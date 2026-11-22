@@ -210,6 +210,57 @@ static func own_siege(game: Game, tag: StringName, hex: Vector2i) -> Dictionary:
 	return SiegeView.at(game, tag, hex)
 
 
+## What stands on a hex: x the family id, y the level; (0, 0) for a wild hex (public: the piece is drawn on everyone's map).
+static func use_at(game: Game, hex: Vector2i) -> Vector2i:
+	var i := game.map.index_of(hex)
+	if i < 0 or game.map.land[i] == 0:
+		return Vector2i(0, 0)
+	return Vector2i(int(game.state.main_use[i]), int(game.state.level[i]))
+
+
+## {cover, climate} of a hex from the fixed map (climate 0 snow, 1 frost, 2 mild; cover is a WorldCover number).
+static func ground(game: Game, hex: Vector2i) -> Dictionary:
+	var i := game.map.index_of(hex)
+	if i < 0:
+		return {"cover": 0, "climate": 1}
+	return {"cover": int(game.map.cover[i]), "climate": int(game.map.climate[i])}
+
+
+## True when the hex is a port as the economy counts it: a place of level 1 or more with a port and a shore.
+static func is_port(game: Game, hex: Vector2i) -> bool:
+	var place := Improve.place_of(game.map, hex)
+	return bool(place.get("port", false)) and int(place.get("level", 0)) >= 1 and game.map.coast_mask(hex) != 0
+
+
+## The animal or ore (or "-") that a grazing or mines district of `family` and `level` would have on the hex.
+static func piece_extra(game: Game, hex: Vector2i, family: int, level: int) -> String:
+	return str(Improve.piece_for(game.map, hex, family, level).get("extra", "-"))
+
+
+## 4.7's fortify candidates: the seat's controlled, owned, unbesieged land hexes with no work and a pass, beside the land of
+## one of `threats`, either wild or a castle under level 3; hex index order.
+static func fortify_candidates(game: Game, tag: StringName, threats: Array[StringName]) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var c := Countries.by_tag(game, tag)
+	if c == null or not c.alive or threats.is_empty():
+		return out
+	var busy := {}
+	for w: Work in game.state.works:
+		busy[w.hex] = true
+	for i: int in Occupation.controlled(game, c.id):
+		var hex := game.map.hex_of(i)
+		if game.map.pass_id[i] < 0 or int(game.state.owner[i]) != c.id or busy.has(hex) or Occupation.besieged(game, hex):
+			continue
+		var family := int(game.state.main_use[i])
+		if family != ImproveRules.NONE and (family != ImproveRules.CASTLE or int(game.state.level[i]) >= FamilyIds.TOP_LEVEL[family]):
+			continue
+		for beside: Vector2i in land_neighbours(game, hex):
+			if threats.has(owner_of(game, beside)):
+				out.append(hex)
+				break
+	return out
+
+
 # ----- public --------------------------------------------------------------------------------------------------------
 
 
@@ -405,3 +456,29 @@ static func roll(game: Game) -> int:
 ## A draw of 1,000 - permille to 1,000 + permille from the AI's own stream.
 static func jitter(game: Game, permille: int) -> int:
 	return game.luck.ai.randi_range(1000 - permille, 1000 + permille)
+
+
+# ----- war reads (4.9, 4.10) -----------------------------------------------------------------------------------------
+
+
+## The season the seat's newest ended war ended (0 when none has ended): the rest before it declares again counts from it.
+static func last_peace(game: Game, tag: StringName) -> int:
+	var newest := 0
+	for w: War in Wars.of_country(game, tag):
+		if not w.live():
+			newest = maxi(newest, w.end_turn)
+	return newest
+
+
+## True when the hex is land of the fixed map.
+static func is_land(game: Game, hex: Vector2i) -> bool:
+	return game.map.is_land(hex)
+
+
+## The siege points (guns) of the companies of one of the seat's armies.
+static func guns_of(game: Game, army: Army) -> int:
+	var total := 0
+	for u: Unit in army.units:
+		var def := Military.unit_def(game, u.kind)
+		total += def.siege_points if def != null else 0
+	return total

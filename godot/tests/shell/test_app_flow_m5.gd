@@ -14,6 +14,7 @@ var _old_lock_path: String = ""
 
 
 func before_each() -> void:
+	Session.ai_enabled = false  # M3 to M7 pin a passive world (M8 D47)
 	Bindings.reset_defaults()
 	_prev_game = Session.game
 	_old_save_dir = Session.save_dir
@@ -67,7 +68,7 @@ func _press(vp: SubViewport, action: StringName) -> void:
 
 func _app_with(args: Array) -> Dictionary:
 	var vp := SubViewport.new()
-	vp.size = Vector2i(1280, 720)
+	vp.size = Vector2i(1440, 720)  # the top bar at 1280 is borderline: which change it drops depends on the frames the season took (M8 slices)
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	vp.gui_disable_input = false
 	add_child_autofree(vp)

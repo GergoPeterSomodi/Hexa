@@ -329,6 +329,34 @@ static func _levy_ring(game: Game, tag: StringName, hex: Vector2i, men: int) -> 
 			left -= People.levy(game, tag, spot, take)
 
 
+# --- the scenario's starting armies ---------------------------------------------------------------------------------------
+
+
+## The scenario's start_armies through the Armies door (M8 5.3, D30): each entry's companies at full men, raised_turn 0, paid
+## nothing, their men levied from their hex and its ring (People.levy, the flow raised); they join an army of the country on
+## the hex that does not march, else a new one. No event. Called by Game.new_scenario once the people are set up; nothing for 1480.
+static func setup_start_armies(game: Game, scenario: ScenarioDef) -> void:
+	if game == null or scenario == null or game.defs == null or game.map == null:
+		return
+	for entry: Dictionary in scenario.start_armies:
+		var tag := StringName(str(entry.get("tag", "")))
+		var at: Variant = entry.get("hex", null)
+		var ud := unit_def(game, int(entry.get("kind", -1)))
+		var count := int(entry.get("count", 0))
+		if typeof(at) != TYPE_VECTOR2I or ud == null or count < 1 or Countries.by_tag(game, tag) == null:
+			continue
+		var hex: Vector2i = at
+		_levy_ring(game, tag, hex, count * ud.men)
+		var army: Army = null
+		for a: Army in Armies.at(game, hex):
+			if a.tag == tag and a.order != Army.ORDER_MARCH:
+				army = a
+				break
+		if army == null:
+			army = Armies.create(game, tag, hex, army_name(game, tag, hex))
+		Armies.add_units(game, army, ud.id, count, 0, hex, 0, {})
+
+
 # --- disbanding ------------------------------------------------------------------------------------------------------
 
 
