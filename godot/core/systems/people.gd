@@ -114,10 +114,13 @@ static func move(game: Game, hex: Vector2i, amount: int, why: StringName) -> boo
 
 ## The write of `move`, its checks done: the people of hex index `i` and the owner's flow.
 static func _apply(game: Game, c: Country, i: int, amount: int, flow: int) -> void:
-	while c.people_flows.size() < FLOWS.size():
-		c.people_flows.append(0)
+	# M7 (4.11): people are booked on the hex's owner, whoever controls it (c may be the controller).
+	var owner := Countries.by_id(game, int(game.state.owner[i]))
+	var book := owner if owner != null else c
+	while book.people_flows.size() < FLOWS.size():
+		book.people_flows.append(0)
 	game.state.people[i] += amount
-	c.people_flows[flow] += amount
+	book.people_flows[flow] += amount
 	game.districts.note_people(game, i)
 
 
@@ -217,19 +220,23 @@ static func active(game: Game, view: StateView, id: int) -> PackedInt32Array:
 	if game == null or game.defs == null or game.state == null:
 		return out
 	if view.state == game.state and view.changed().is_empty() and view.people_changed().is_empty():
-		# The game's own state: the running set, filtered to the country (index order).
+		# The game's own state: the running set, filtered to the country that controls it (index order), not the besieged (M7 4.11).
 		var keys := game.districts.open_hexes(game).keys()
 		keys.sort()
+		var besieged := EconomySeason.besieged_set(game)
 		for i: int in keys:
-			if int(game.state.owner[i]) == id and id > 0:
+			if _controller_i(game, i) == id and id > 0 and not besieged.has(i):
 				out.append(i)
 		return out
-	# A what-if view: the country's hexes, the room of a hex the view has changed worked out on the view.
+	# A what-if view: the hexes the country controls, the room of a hex the view has changed worked out on the view.
 	var over: Dictionary = {}
 	for i: int in view.changed():
 		over[i] = true
 	var cache := game.districts
-	for i: int in Territory.districts(game, id):
+	var besieged_w := EconomySeason.besieged_set(game)
+	for i: int in Occupation.controlled.call(game, id) as PackedInt32Array:
+		if besieged_w.has(i):
+			continue
 		if view.main_use_at(i) == SETTLEMENTS:
 			out.append(i)
 			continue
@@ -406,7 +413,7 @@ static func season(game: Game) -> void:
 	var view := StateView.of(game.state)
 	var season_of := Calendar.season_of(game.turn)
 	var held := SeasonProfile.table(game)
-	var walks := _open_by_owner(game)
+	var walks := _open_by_controller(game)
 	var open := game.districts.open_hexes(game)
 	var state := game.state
 	var climates := game.map.climate
@@ -437,6 +444,9 @@ static func _level_step(game: Game, view: StateView, c: Country, i: int) -> void
 	if not _may_change_level(game, i, level):
 		return
 	var hex := game.map.hex_of(i)
+	# M7 (4.11): an occupied or besieged settlement never changes its level.
+	if bool(Occupation.is_occupied.call(game, hex)) or bool(Occupation.besieged.call(game, hex)):
+		return
 	if bool(grow_check(game, view, hex, c.food_fed)["ok"]):
 		if bool(Improve.upgrade(game, {"hex": hex, "tag": c.tag})["ok"]):
 			game.emit({"kind": "town_grew", "tag": c.tag, "hex": hex, "level": level + 1, "from": level,
@@ -461,13 +471,23 @@ static func _may_change_level(game: Game, i: int, level: int) -> bool:
 	return false
 
 
-## The running set grouped by country: id -> an Array of the hex indices of the set it holds, ascending.
-static func _open_by_owner(game: Game) -> Dictionary:
+## The country that controls land hex index `i`: its occupier, else its owner (0 when neither).
+static func _controller_i(game: Game, i: int) -> int:
+	var occ := int(game.state.occupier[i]) if i < game.state.occupier.size() else 0
+	return occ if occ != 0 else int(game.state.owner[i])
+
+
+## The running set grouped by controller (M7 4.11: the hexes each country controls): id -> an Array of the hex indices of
+## the set it holds, ascending. Their people are booked on the owners (_apply).
+static func _open_by_controller(game: Game) -> Dictionary:
 	var keys := game.districts.open_hexes(game).keys()
 	keys.sort()
+	var besieged := EconomySeason.besieged_set(game)
 	var out: Dictionary = {}
 	for i: int in keys:
-		var id := int(game.state.owner[i])
+		if besieged.has(i):
+			continue  # M7 4.11: a besieged hex grows nothing and is not walked (its starvation is Sieges')
+		var id := _controller_i(game, i)
 		if id > 0:
 			if not out.has(id):
 				out[id] = []
@@ -508,6 +528,8 @@ static func levy_check(game: Game, tag: StringName, hex: Vector2i, men: int) -> 
 	var home := Territory.at_home_check(game, tag, hex)
 	if not bool(home["ok"]):
 		return _verdict(false, str(home["reason"]))
+	if bool(Occupation.is_occupied.call(game, hex)):
+		return _verdict(false, "held by the %s: no men can be raised here" % Occupation.occupier_long_name(game, hex))
 	if men < 1:
 		return _verdict(false, "no men asked")
 	var most := available(game, hex)

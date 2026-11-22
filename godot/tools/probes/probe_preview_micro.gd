@@ -33,7 +33,7 @@ func _initialize() -> void:
 	_avg("district_base (vineyard view)", func() -> void: Economy.district_base(g, view, hex))
 	_avg("districts.base_of", func() -> void: g.districts.base_of(g, i))
 	_avg("view.with(over)", func() -> void: own.with(over))
-	_avg("_around", func() -> void: EconomyPreview._around(g, over.keys()))
+	_avg("_around", func() -> void: EconomyPreviewDelta.around(g, over.keys()))
 	var rec: Dictionary = EconomyPreview.baseline(g, &"GEN", 4, 1)[0]
 	var stock := c.stock.duplicate()
 	_avg("_step no lines", func() -> void: EconomyPreview._step(g, c, 1, rec, own, stock, false))

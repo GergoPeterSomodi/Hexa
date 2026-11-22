@@ -24,6 +24,11 @@ var storm_from: int = 0
 var storm_cut: int = 0
 
 
+## Sets the army ids of one side (tag as text): Battles' writer for its groups (5.2); the ids are copied.
+func set_group(tag: String, ids: PackedInt32Array) -> void:
+	armies[tag] = ids.duplicate()
+
+
 func to_dict() -> Dictionary:
 	var groups: Dictionary = {}
 	for tag: Variant in armies:

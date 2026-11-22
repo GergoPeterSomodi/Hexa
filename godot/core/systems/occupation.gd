@@ -326,13 +326,20 @@ static func regrow(game: Game, hex: Vector2i) -> int:
 	return levied
 
 
-## regrow on every hex that holds men in a garrison, in hex index order: a fortress that fell to level 0 is off the fortress
-## list, so the sieges phase calls this, not a loop over the fortresses. Returns the men levied.
+## regrow on every fortress (an empty one too) and every hex that holds men in a garrison (a fortress that fell to level 0 is
+## off the fortress list), each once, in hex index order. Returns the men levied.
 static func regrow_all(game: Game) -> int:
-	var total := 0
+	var visit: Dictionary = {}
+	for f: int in game.war_cache.fortresses(game):
+		visit[f] = true
 	for i: int in game.map.hex_count():
 		if _at_int(game.state.garrison, i) > 0:
-			total += regrow(game, game.map.hex_of(i))
+			visit[i] = true
+	var order: Array = visit.keys()
+	order.sort()
+	var total := 0
+	for i: Variant in order:
+		total += regrow(game, game.map.hex_of(int(i)))
 	return total
 
 

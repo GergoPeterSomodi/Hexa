@@ -77,7 +77,7 @@ static func bytes(game: Game, viewer: StringName) -> PackedByteArray:
 static func _byte(game: Game, viewer: StringName, i: int, now_f: PackedByteArray, win_f: PackedByteArray,
 		winter: bool, view: StateView) -> int:
 	var hex := game.map.hex_of(i)
-	if int(game.state.main_use[i]) == Economy.SETTLEMENTS and Supply.is_depot(game, viewer, hex):
+	if Supply.is_depot(game, viewer, hex):  # settlements and fortresses alike (M7 4.12)
 		return BYTE_DEPOT
 	if _in(now_f, i):
 		return BYTE_WINTER_CUT if (not winter and not _in(win_f, i)) else BYTE_IN

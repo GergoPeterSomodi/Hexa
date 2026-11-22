@@ -35,7 +35,7 @@ static func is_depot(game: Game, tag: StringName, hex: Vector2i) -> bool:
 	if c == null or not _usable(game):
 		return false
 	var i := game.map.index_of(hex)
-	return i >= 0 and game.map.land[i] == 1 and int(game.state.owner[i]) == c.id and _depot_at(game, i)
+	return i >= 0 and game.map.land[i] == 1 and Occupation.controller_id(game, hex) == c.id and _depot_for(game, i, c.id)
 
 
 ## The supply field of `tag` (4.8): one byte a hex, 1 where the hex is within supply_reach of a depot of the country through
@@ -245,6 +245,10 @@ static func _slot(game: Game, i: int, season: int) -> int:
 ## One depot per settlement that counts (4.8): a settlement of depot_min_level or more, or a port on the coast of level 1 or
 ## more. Only a settlement held by someone is a depot.
 static func _depot_at(game: Game, i: int) -> bool:
+	var hex := game.map.hex_of(i)
+	if Occupation.fortress_level(game, hex) > 0:
+		# M7 (4.12): a fortress its owner holds with no siege on it is a depot, whatever its kind.
+		return Occupation.siege_at(game, hex) == null
 	if int(game.state.main_use[i]) != Economy.SETTLEMENTS:
 		return false
 	var level := int(game.state.level[i])
@@ -252,7 +256,6 @@ static func _depot_at(game: Game, i: int) -> bool:
 		return true
 	if level < 1:
 		return false
-	var hex := game.map.hex_of(i)
 	var place := Improve.place_of(game.map, hex)
 	return bool(place.get("port", false)) and int(place.get("level", 0)) >= 1 and game.map.coast_mask(hex) != 0
 
@@ -266,9 +269,9 @@ static func _depots_of(game: Game) -> Dictionary:
 	var out := {}
 	var s := game.state
 	for i: int in game.map.hex_count():
-		if game.map.land[i] == 0 or int(s.owner[i]) == 0 or not _depot_at(game, i):
+		var oid := Occupation.controller_id(game, game.map.hex_of(i))
+		if oid == 0 or not _depot_for(game, i, oid):
 			continue
-		var oid := int(s.owner[i])
 		var arr: PackedInt32Array = out.get(oid, PackedInt32Array())
 		arr.append(i)
 		out[oid] = arr
@@ -281,10 +284,14 @@ static func _make_field(game: Game, oid: int, winter: bool, depots: Dictionary) 
 	var out := PackedByteArray()
 	out.resize(n)
 	out.fill(0)
-	var starts: PackedInt32Array = depots.get(oid, PackedInt32Array())
+	var cut := _cut_mask(game, oid)
+	var starts := PackedInt32Array()
+	for s: int in depots.get(oid, PackedInt32Array()):
+		if cut[s] == 1:
+			starts.append(s)
 	if starts.is_empty():
 		return out
-	var cost := PathSearch.field(game.map, StepCosts.of(game.map, game.defs), _land_mask(game, oid), starts,
+	var cost := PathSearch.field(game.map, StepCosts.of(game.map, game.defs), cut, starts,
 		game.defs.supply_reach, winter, true)
 	var reach := game.defs.supply_reach
 	for i: int in n:
@@ -302,9 +309,79 @@ static func _land_mask(game: Game, oid: int) -> PackedByteArray:
 		var mask := PackedByteArray()
 		mask.resize(n)
 		for i: int in n:
-			mask[i] = 1 if game.map.land[i] == 1 and int(game.state.owner[i]) == oid else 0
+			mask[i] = 1 if game.map.land[i] == 1 and _controller_byte(game, i) == oid else 0
 		masks[oid] = mask
 	return masks[oid]
+
+
+## The land a country's supply runs over (M7 4.12): its controlled land (its own, not occupied, or occupied by it) less the
+## hexes holding an army of a country at war with it. A fresh copy; the shared mask is never written.
+static func _cut_mask(game: Game, oid: int) -> PackedByteArray:
+	var base := _land_mask(game, oid)
+	var hostile := _hostile_hexes(game, oid)
+	if hostile.is_empty():
+		return base
+	var out := base.duplicate()
+	for i: int in hostile:
+		out[i] = 0
+	return out
+
+
+## The hex indices where an army of a country at war with oid stands (ascending, one each).
+static func _hostile_hexes(game: Game, oid: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	if not _any_live_war(game):
+		return out
+	var owner_tag := Countries.by_id(game, oid).tag if Countries.by_id(game, oid) != null else &""
+	if owner_tag == &"":
+		return out
+	var seen := {}
+	for a: Army in game.armies:
+		var i := game.map.index_of(a.hex)
+		if i < 0 or seen.has(i) or a.tag == owner_tag or not Wars.at_war(game, a.tag, owner_tag):
+			continue
+		seen[i] = true
+		out.append(i)
+	out.sort()
+	return out
+
+
+static func _controller_byte(game: Game, i: int) -> int:
+	var occ := int(game.state.occupier[i]) if i < game.state.occupier.size() else 0
+	return occ if occ != 0 else int(game.state.owner[i])
+
+
+## The depot rule for the controller `ctrl` of hex index `i` (M7 4.12, D34): a settlement or port of level 2 or more, or a
+## fortress with no siege, is a depot for whoever controls it. A hex with a fortress is a depot only for its owner when the
+## owner also controls it (a captured fortress gives its occupier no depot).
+static func _depot_for(game: Game, i: int, ctrl: int) -> bool:
+	if not _depot_at(game, i):
+		return false
+	if Occupation.fortress_level(game, game.map.hex_of(i)) > 0:
+		return int(game.state.owner[i]) == ctrl
+	return true
+
+
+## The armies as key rows, only while a war is live (a hostile army can cut a field; with no war the rows are not built and
+## the key does not scan the armies). army_key_scans counts the scans (the perf guard reads it; tests only).
+static var army_key_scans: int = 0
+
+
+static func _army_rows(game: Game) -> Array:
+	var rows: Array = []
+	if not _any_live_war(game):
+		return rows
+	army_key_scans += 1
+	for a: Army in game.armies:
+		rows.append([a.id, String(a.tag), a.hex.x, a.hex.y])
+	return rows
+
+
+static func _any_live_war(game: Game) -> bool:
+	for w: War in game.wars:
+		if w.live():
+			return true
+	return false
 
 
 static func _no_masks() -> Dictionary:
@@ -312,12 +389,22 @@ static func _no_masks() -> Dictionary:
 
 
 static func _land_key(game: Game) -> Array:
-	return [game.map.get_instance_id(), hash(game.state.owner)]
+	return [game.map.get_instance_id(), hash(game.state.owner), hash(game.state.occupier)]
 
 
+## The key of the depots and fields: the land, the occupiers, the sieges, the wars and the armies' places (M7: a hostile
+## army's cut is never reused across a phase, and a siege or a fall changes the depots).
 static func _depot_key(game: Game) -> Array:
+	var sieges: Array = []
+	for s: Siege in game.sieges:
+		sieges.append([s.hex.x, s.hex.y, String(s.besieger)])
+	var wars: Array = []
+	for w: War in game.wars:
+		wars.append([w.id, String(w.a), String(w.b), w.end_turn])
+	var armies := _army_rows(game)
 	return [game.map.get_instance_id(), game.defs.get_instance_id(), game.defs.supply_reach, game.defs.depot_min_level,
-		game.defs.supply_wade_cost, hash(game.state.owner), hash(game.state.main_use), hash(game.state.level)]
+		game.defs.supply_wade_cost, hash(game.state.owner), hash(game.state.main_use), hash(game.state.level),
+		hash(game.state.occupier), hash(sieges), hash(wars), hash(armies)]
 
 
 static func _usable(game: Game) -> bool:

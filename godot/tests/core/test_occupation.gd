@@ -560,3 +560,36 @@ func test_regrow_all_visits_a_hex_with_men_that_is_no_fortress() -> void:
 	Occupation.regrow_all(g)
 	assert_eq(g.state.garrison[i], 0)
 	assert_eq(g.state.people[i], 50)
+
+
+## An empty fortress retaken by its owner regrows (4.3): Geneva is taken and its garrison lost, retaken by Savoy, then
+## regrow_all levies its regrowth (two levels a hundred men each) from its people.
+func test_an_empty_fortress_retaken_by_its_owner_regrows() -> void:
+	var g := _fresh()
+	var i := _index(g, GENEVA)
+	Occupation.capture(g, GENEVA, &"FRA", &"siege", {})
+	Occupation.capture(g, GENEVA, &"SAV", &"retaken", {})
+	assert_eq(Occupation.garrison_of(g, GENEVA), 0)
+	ArmyFixture.people_at(g, GENEVA, 20000)
+	assert_eq(Occupation.regrow_all(g), 200)
+	assert_eq(g.state.garrison[i], 200)
+
+
+## One pass: a fortress that fell to level 0 with its garrison gives the men back, and an empty fortress regrows; each hex is
+## visited once (Milan regrows 300 once, not 600).
+func test_one_pass_gives_back_and_regrows_each_hex_once() -> void:
+	var g := _fresh()
+	var geneva := _index(g, GENEVA)
+	g.state.main_use[geneva] = 0
+	g.state.level[geneva] = 0
+	g.emit({"kind": "hex_changed", "hex": GENEVA})
+	ArmyFixture.people_at(g, GENEVA, 0)
+	Occupation.capture(g, MILAN, &"FRA", &"siege", {})
+	Occupation.capture(g, MILAN, &"MLO", &"retaken", {})
+	ArmyFixture.people_at(g, MILAN, 20000)
+	ArmyFixture.people_at(g, GENEVA, 0)
+	var returned := Occupation.regrow_all(g)
+	assert_eq(g.state.garrison[geneva], 0, "the fallen fortress gives its men back")
+	assert_eq(g.state.people[geneva], 800)
+	assert_eq(g.state.garrison[_index(g, MILAN)], 300, "Milan regrows once: level 3, a hundred men a level")
+	assert_eq(returned, 300, "the levied total counts Milan once")

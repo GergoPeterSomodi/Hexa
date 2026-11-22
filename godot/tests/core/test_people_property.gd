@@ -41,6 +41,10 @@ func _act(g: Game, c: Country, luck: Rng) -> void:
 	# Two random army actions (raise, march, split, merge, disband, halt...): the people move with the men (M6, L13).
 	for _k: int in 2:
 		var pick: Dictionary = RandomPlayer.next(g, c.tag, luck)
+		# Wars are not in the snapshot yet (B13 wires them): a declaration or a peace would make the saved run forget its wars
+		# and diverge. The pick still draws from the stream, so the other picks do not move.
+		if str(pick["action"]) in ["declare_war", "make_peace"]:
+			continue
 		if bool(g.act(str(pick["action"]), pick["args"])["ok"]):
 			_seen["armies"] = int(_seen.get("armies", 0)) + 1
 	if luck.randi_range(0, 3) == 0:

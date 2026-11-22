@@ -43,6 +43,9 @@ func _act_all(g: Game) -> void:
 		for _t: int in PLAYER_TURNS:
 			var pick: Dictionary = RandomPlayer.next(g, c.tag, _luck)
 			var action: String = str(pick["action"])
+			# Wars are not in the snapshot yet (B13 wires them); the pick still drew from the stream, so the others do not move.
+			if action in ["declare_war", "make_peace"]:
+				continue
 			var logged := g.action_log.size()
 			var verdict: Dictionary = g.act(action, pick["args"])
 			if not bool(verdict["ok"]):
@@ -237,7 +240,8 @@ func test_forty_seasons_every_country_conserves_its_men_and_its_people() -> void
 	assert_gt(int(_seen["disbanded"]), 0, "armies were disbanded")
 	assert_gt(int(_seen["split"]) + int(_seen["merged"]), 0, "armies were split or merged")
 	assert_gt(int(_seen["continued"]), 0, "a halted march continued (a player halt keeps its goal)")
-	assert_gt(int(_seen["refill_windows"]), 0, "a refill brought men back from the people: %s" % str(_seen))
+	# The refill is pinned by the deterministic tests below (a fixed seed, no random actions): this counter depends on the
+	# random stream, and a country that raised companies that season is not counted.
 	assert_gt(int(_seen["starved"]), 0, "an army went hungry with its country's stores empty")
 
 
@@ -257,3 +261,55 @@ func test_p_one_person_from_nowhere_breaks_the_identity() -> void:
 	var post := _census(g)
 	var change: int = int(post[c.tag][0]) + int(post[c.tag][1]) - int(pre[c.tag][0]) - int(pre[c.tag][1])
 	assert_ne(change, rest, "one person from nowhere is seen: the change is not the flows")
+
+
+func _men_and_people(g: Game, tag: StringName) -> Array:
+	var people := 0
+	for i: int in Territory.districts(g, Countries.by_tag(g, tag).id):
+		people += int(g.state.people[i])
+	return [Armies.men_of_country(g, tag), people]
+
+
+func test_a_damaged_company_refills_from_its_people_on_a_fixed_seed() -> void:
+	var g := _seeded_game()
+	var before := _men_and_people(g, ArmyFixture.TAG)
+	for _k: int in 3:
+		assert_true(bool(Season.run(g)["ok"]), "the season ends")
+	var after := _men_and_people(g, ArmyFixture.TAG)
+	assert_gt(int(after[0]), int(before[0]), "the men under arms rose: the refill brought men back")
+
+
+func test_a_refill_in_a_war_draws_on_an_own_home_and_stops_on_an_occupied_one() -> void:
+	var g := _seeded_game()
+	var enemy := WarFixture.neighbour_of(g, ArmyFixture.TAG)
+	WarFixture.at_war(g, ArmyFixture.TAG, enemy)
+	var home := g.armies[0].hex
+	assert_eq(Territory.owner_tag(g, home), ArmyFixture.TAG, "the army stands on its own land")
+	_damage_all(g, 200)
+	var damaged := Armies.men_of_country(g, ArmyFixture.TAG)
+	Military.refill(g)
+	assert_gt(Armies.men_of_country(g, ArmyFixture.TAG), damaged, "an own unoccupied home refills during the war")
+	_damage_all(g, 200)
+	WarFixture.set_occupier(g, home, enemy)
+	var on_home := _men_on(g, home)
+	Military.refill(g)
+	assert_eq(_men_on(g, home), on_home, "the armies on an occupied home take no levy")
+
+
+## The men of the player's armies standing on hex.
+func _men_on(g: Game, hex: Vector2i) -> int:
+	var n := 0
+	for a: Army in g.armies:
+		if a.tag == ArmyFixture.TAG and a.hex == hex:
+			for u: Unit in a.units:
+				n += u.men
+	return n
+
+
+## Takes `men` from every company of every army of the player's country (a test's rig, before any census).
+func _damage_all(g: Game, men: int) -> void:
+	for a: Army in g.armies:
+		if a.tag != ArmyFixture.TAG:
+			continue
+		for u: Unit in a.units:
+			u.men = maxi(1, u.men - men)

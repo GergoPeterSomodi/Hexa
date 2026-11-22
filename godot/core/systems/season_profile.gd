@@ -24,7 +24,7 @@ const LIVE := -1
 ## when an owner, a use or a level changes. Fetch it once a phase and pass it to `of`.
 static func table(game: Game) -> Dictionary:
 	var key: Array = [hash(game.state.owner), hash(game.state.main_use), hash(game.state.level), game.map.hex_count(),
-		game.defs.get_instance_id()]
+		game.defs.get_instance_id(), hash(game.state.occupier), EconomySeason.sieges_key(game), EconomySeason.wars_key(game)]
 	var held := game.view_cache.pinned(&"season_profiles", key, func() -> Dictionary: return {}) as Dictionary
 	# The live part follows the people: a new table of it when their hash is not the one it was made with.
 	var people := hash(game.state.people)
@@ -96,6 +96,19 @@ static func made(game: Game, profile: Dictionary, live_part: Dictionary, season:
 			rows[o + 5], rows[o + 6], rows[o + 7], Economy.slot_for(climate, season), w, tax, defs, made_loads)
 		if dues > 0:
 			dues_list.append({"hex": map.hex_of(rows[o + 9]), "amount": dues})
+	# The land held for an occupier (4.10): its goods and dues per hex, the hex's own district_output, at the output permille.
+	var share := EconomySeason.occupied_permille(game, &"output")
+	var state_view := StateView.of(game.state)
+	for i: int in profile["half"]:
+		var climate := int(map.climate[i])
+		var w := int(weather[climate]) if climate < weather.size() else Economy.CALM
+		var got := Economy.district_output(game, state_view, map.hex_of(i), season, w)
+		var goods: PackedInt32Array = got["goods"]
+		for g: int in made_loads.size():
+			made_loads[g] += goods[g] * share / 1000
+		var amount := int(got["ducats"]) * share / 1000
+		if amount > 0:
+			dues_list.append({"hex": map.hex_of(i), "amount": amount})
 	var walls: Array[Dictionary] = []
 	for wall: Dictionary in profile["walls"]:
 		walls.append(wall.duplicate())
@@ -120,15 +133,10 @@ static func a0_of(game: Game, profile: Dictionary, live_part: Dictionary) -> Pac
 
 
 static func _live_of(game: Game, profile: Dictionary, id: int) -> Dictionary:
-	var rows: PackedInt32Array = profile["rows"]
-	var total := 0
-	for i: int in Territory.districts(game, id):
-		total += game.state.people[i]
-	var town := 0
-	for o: int in range(0, rows.size(), ROW):
-		if rows[o] == Economy.SETTLEMENTS:
-			town += game.state.people[rows[o + 9]]
-	return {"town": town, "rest": total - town, "a0": PackedInt32Array(), "ready": false}
+	# The people by the war rules (4.10), the one count EconomySeason keeps: full for the needs, weighted for the tax.
+	var counts := EconomySeason.counts_of(game, StateView.of(game.state), id)
+	return {"town": counts["town"], "rest": counts["rest"], "town_tax": counts["town_tax"], "rest_tax": counts["rest_tax"],
+		"a0": PackedInt32Array(), "ready": false}
 
 
 static func _build(game: Game, id: int) -> Dictionary:
@@ -145,7 +153,16 @@ static func _build(game: Game, id: int) -> Dictionary:
 	var walls: Array[Dictionary] = []
 	var upkeep := 0
 	var upkeep_count := 0
-	for i: int in Territory.districts(game, id):
+	# The land the country controls (4.4): its own unoccupied land, the land it holds for an occupier's sake (`half`, at the
+	# occupier's output and tax permille, nothing paid as upkeep), and no besieged hex (its output, upkeep and people are nothing).
+	var besieged := EconomySeason.besieged_set(game)
+	var half := PackedInt32Array()
+	for i: int in Occupation.controlled(game, id):
+		if besieged.has(i):
+			continue
+		if int(game.state.owner[i]) != id:
+			half.append(i)
+			continue
 		var ints := cache.ints_of(game, i)
 		var o := i * DistrictCache.FIELDS
 		var family := ints[o + Economy.F_FAMILY]
@@ -174,4 +191,4 @@ static func _build(game: Game, id: int) -> Dictionary:
 		if wall > 0:
 			walls.append({"hex": map.hex_of(i), "amount": wall})
 	return {"upkeep": upkeep, "upkeep_count": upkeep_count, "walls": walls, "wild": wild,
-		"wild_good": wild_good, "rows": rows}
+		"wild_good": wild_good, "rows": rows, "half": half, "besieged": besieged}

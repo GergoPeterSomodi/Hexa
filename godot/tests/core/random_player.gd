@@ -50,6 +50,8 @@ static func _args(game: Game, tag: StringName, action: String, luck: Rng) -> Dic
 			return {"army": _halted_id(game, tag, luck), "tag": tag}
 		"declare_war":
 			return _war_args(game, tag, luck)
+		"make_peace":
+			return _peace_args(game, tag, luck)
 	return {}
 
 
@@ -64,6 +66,16 @@ static func _war_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
 			if near != null:
 				target = near.tag
 	return {"target": target, "tag": tag}
+
+
+## A peace with one of the country's enemies half the time (a peace that can be made), else any country; the terms at random.
+static func _peace_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
+	var target := _any_tag(game, tag, luck)
+	var foes := Wars.enemies(game, tag)
+	if not foes.is_empty() and luck.randi_range(0, 1) == 0:
+		target = foes[luck.randi_range(0, foes.size() - 1)]
+	var terms := ["take", "white", "yield"]
+	return {"target": target, "terms": terms[luck.randi_range(0, 2)], "tag": tag}
 
 
 ## A halted march of the country (order none, its goal kept: movement.gd halt), most picks, so that continue_march

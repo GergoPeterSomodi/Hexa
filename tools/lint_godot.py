@@ -50,7 +50,6 @@ FUNC_LIMIT = 100
 SIZE_REASONS = {
     "core/mapgen/world_water.gd": "one routing model: corners, courses, the flood and the router share their state; "
                                   "split again when the Europe map arrives",
-    "core/views/economy_preview.gd": "one what-if: the baseline, the option run and the worth pass share the people step and the district delta",
     "core/views/improve_preview.gd": "one card: the cells, the brings, the paybacks, the chips and the marks read the same preview",
     "tests/shell/test_ui_monkey.gd": "one monkey: every seed shares one step table, its invariants and counters",
 }

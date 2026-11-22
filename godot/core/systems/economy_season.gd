@@ -15,18 +15,18 @@ const TAX_NAMES: Array[String] = ["Low", "Normal", "High"]
 
 ## The people of a country's settlement hexes.
 static func town_people(game: Game, view: StateView, tag: StringName) -> int:
-	return _people(game, view, tag, true)
+	return int(counts(game, view, tag)["town_tax"])
 
 
-## The people of the rest of a country's land.
+## The people of the rest of a country's land, the tax count (see counts).
 static func country_people(game: Game, view: StateView, tag: StringName) -> int:
-	return _people(game, view, tag, false)
+	return int(counts(game, view, tag)["rest_tax"])
 
 
 ## The loads a season the towns need: {food, wine, salt, oil} (String keys); ceil(town people x need_milli / 1,000,000),
 ## and army_food, the loads the country's armies in supply eat this season (5.0 R8 a, b).
 static func needs_of(game: Game, view: StateView, tag: StringName) -> Dictionary:
-	return needs_for(game, town_people(game, view, tag), Supply.army_food(game, tag))
+	return needs_for(game, int(counts(game, view, tag)["town"]), Supply.army_food(game, tag))
 
 
 ## needs_of from the town people already counted (and the armies' food, 0 when none).
@@ -101,9 +101,23 @@ static func made_of(game: Game, view: StateView, tag: StringName, season: int, w
 	for id: int in FamilyIds.COUNT:
 		fams.append(defs.family(id))
 	var settle := fams[Economy.SETTLEMENTS]
-	for i: int in Territory.districts(game, c.id):
+	var besieged := besieged_set(game)
+	var share := occupied_permille(game, &"output")
+	for i: int in Occupation.controlled(game, c.id):
+		if besieged.has(i):
+			continue
 		var climate := int(map.climate[i])
 		var w := int(weather[climate]) if climate < weather.size() else Economy.CALM
+		if int(game.state.owner[i]) != c.id:
+			# Land held for an occupier (4.10): the hex's own district_output at the output permille; no upkeep or walls.
+			var got := Economy.district_output(game, view, map.hex_of(i), season, w, -1)
+			var goods: PackedInt32Array = got["goods"]
+			for g: int in made.size():
+				made[g] += goods[g] * share / 1000
+			var amount := int(got["ducats"]) * share / 1000
+			if amount > 0:
+				dues_list.append({"hex": map.hex_of(i), "amount": amount})
+			continue
 		var slot := Economy.slot_for(climate, season)
 		var dues := 0
 		var up := 0
@@ -286,7 +300,7 @@ static func income(game: Game) -> void:
 		var needs := needs_for(game, int(live["town"]))
 		var made_info := SeasonProfile.made(game, profile, live, season, game.weather, c.tax)
 		var lines := money_lines(game, view, c.tag, c.tax, content_of(game, needs, used), sold_milli, made_info,
-			int(live["town"]), int(live["rest"]), Military.upkeep_country(game, c.tag), Armies.of_country(game, c.tag).size())
+			int(live["town_tax"]), int(live["rest_tax"]), Military.upkeep_country(game, c.tag), Armies.of_country(game, c.tag).size())
 		for line: Dictionary in lines:
 			Treasury.move(game, c.tag, int(line["amount"]), line["why"], line["hex"], int(line["count"]))
 
@@ -372,12 +386,68 @@ static func _satisfaction(taken: int, need: int) -> int:
 	return 1000 if need <= 0 else mini(1000, taken * 1000 / need)
 
 
-static func _people(game: Game, view: StateView, tag: StringName, towns: bool) -> int:
+## The people of a country by the war rules (4.10): {town, rest} the full counts (the towns' needs: an occupier's towns need
+## its stores in full) and {town_tax, rest_tax} the counts the taxes read. Besieged land counts for nothing.
+static func counts(game: Game, view: StateView, tag: StringName) -> Dictionary:
 	var c := Countries.by_tag(game, tag)
 	if c == null:
+		return {"town": 0, "rest": 0, "town_tax": 0, "rest_tax": 0}
+	return counts_of(game, view, c.id)
+
+
+## counts of a country by its id. Its own unoccupied land in full for the tax; the land it holds for an occupier (its
+## owner's land is not its own) at occupied_tax_permille.
+static func counts_of(game: Game, view: StateView, id: int) -> Dictionary:
+	var besieged := besieged_set(game)
+	var share := occupied_permille(game, &"tax")
+	var town_own := 0
+	var town_held := 0
+	var rest_own := 0
+	var rest_held := 0
+	for i: int in Occupation.controlled(game, id):
+		if besieged.has(i):
+			continue
+		var people := Economy.people_i(game.map, view, i)
+		var own := int(game.state.owner[i]) == id
+		if view.main_use_at(i) == Economy.SETTLEMENTS:
+			town_own += people if own else 0
+			town_held += 0 if own else people
+		else:
+			rest_own += people if own else 0
+			rest_held += 0 if own else people
+	return {"town": town_own + town_held, "rest": rest_own + rest_held,
+		"town_tax": town_own + town_held * share / 1000, "rest_tax": rest_own + rest_held * share / 1000}
+
+
+## The land indices under a siege (Occupation.besieged: the besieger is at war with the hex's controller), as a set.
+static func besieged_set(game: Game) -> Dictionary:
+	var out: Dictionary = {}
+	for s: Siege in game.sieges:
+		var i := game.map.index_of(s.hex)
+		if i >= 0 and Occupation.besieged(game, s.hex):
+			out[i] = true
+	return out
+
+
+## A key of the wars by their sides and end turns: the season profile's table is dropped when a war starts, ends or changes.
+static func wars_key(game: Game) -> int:
+	var rows: Array = []
+	for w: War in game.wars:
+		rows.append([w.a, w.b, w.end_turn])
+	return hash(rows)
+
+
+## A key of the sieges by their hexes: the season profile's table is dropped when one starts or lifts.
+static func sieges_key(game: Game) -> int:
+	var hexes: Array = []
+	for s: Siege in game.sieges:
+		hexes.append(s.hex)
+	return hash(hexes)
+
+
+## The WarDef's permille for held land: &"output" (goods and dues) or &"tax" (the people's tax). 0 with no war numbers.
+static func occupied_permille(game: Game, which: StringName) -> int:
+	var w: WarDef = game.defs.war if game != null and game.defs != null else null
+	if w == null:
 		return 0
-	var total := 0
-	for i: int in Territory.districts(game, c.id):
-		if (view.main_use_at(i) == Economy.SETTLEMENTS) == towns:
-			total += Economy.people_i(game.map, view, i)
-	return total
+	return w.occupied_output_permille if which == &"output" else w.occupied_tax_permille

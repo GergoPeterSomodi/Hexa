@@ -1,7 +1,7 @@
 ## The war door (docs/architecture/m7-build-spec.md 4.2, 4.9, 5.3; M7 plan B5): declaring a war, the score, the peace terms and
 ## their checks, what a peace would cede, the truce, the books of a fought battle, and the wars' digest and save body. The
 ## only writer of game.wars and next_war_id. Land and armies are read here, never written. The peace itself (make_peace,
-## end_war) and the timer (season) are B11: they need Occupation.release (B6) and the armies' moves (B8, B12).
+## end_war) and the timer (season) are here (B11); the fight systems' doors are called by Callable (door).
 ## Words name a country by "the " + its long name, as the spec says; a verdict is {ok, reason}, "" when ok.
 class_name Wars
 extends RefCounted
@@ -11,6 +11,9 @@ const OWNS: Array[String] = ["wars", "next_war_id"]
 const TERMS: Array[StringName] = [&"take", &"white", &"yield"]
 ## The text a refused saved body gives (Armies.PROBLEM_BODY's form).
 const PROBLEM_BODY := "body"
+## The most wars a saved body may hold (ended ones stay in the list: a dozen in a long game); a longer list is refused
+## before any war is read.
+const MAX_WARS := 10000
 
 
 # --- queries ---------------------------------------------------------------------------------------------------------
@@ -150,7 +153,7 @@ static func declare_war(game: Game, args: Dictionary) -> Dictionary:
 	return verdict
 
 
-## Verdict for make_peace {target, terms, tag} (4.9), in the spec's order. The peace itself is B11.
+## Verdict for make_peace {target, terms, tag} (4.9), in the spec's order; make_peace does the peace.
 static func make_peace_check(game: Game, args: Dictionary) -> Dictionary:
 	var target := _name_arg(args, "target")
 	if target == &"":
@@ -251,6 +254,227 @@ static func _pair_of(value: Variant) -> PackedInt32Array:
 	return out
 
 
+# --- the peace and the timer (4.9, D31) ----------------------------------------------------------------------------
+
+## The fight systems' doors (5.3): B8's Battles.end_all and B9's Sieges.end_between, called by Callable. A file that is not in
+## the tree yet is an empty call. A test may put a Callable under the door's key in fight_seam (it clears it after each test).
+const BATTLES_PATH := "res://core/systems/battles.gd"
+const SIEGES_PATH := "res://core/systems/sieges.gd"
+static var fight_seam: Dictionary = {}
+
+
+## Makes the peace (4.9): checks again, then ends the live war between the two. A refused peace changes nothing.
+static func make_peace(game: Game, args: Dictionary) -> Dictionary:
+	var verdict := make_peace_check(game, args)
+	if not bool(verdict["ok"]):
+		return verdict
+	var tag := _name_arg(args, "tag")
+	var war := War.live_between(game.wars, tag, _name_arg(args, "target"))
+	end_war(game, war, _name_arg(args, "terms"), tag)
+	return verdict
+
+
+## The war phase's timer (4.9, D31): every live war that has lasted war_timer_seasons ends as a white peace with the term
+## &"timer" (the same steps; it moves no land). The warning is the reminder war_timer (B19), read from the same numbers.
+static func season(game: Game) -> void:
+	var numbers := _def(game)
+	if numbers == null:
+		return
+	var due: Array[War] = []
+	for w: War in game.wars:
+		if w.live() and game.turn - w.start_turn >= numbers.war_timer_seasons:
+			due.append(w)
+	for w: War in due:
+		end_war(game, w, &"timer", &"")
+
+
+## The peace's steps (4.9) for one live war, in order: the battles, then the sieges, between the two end (their doors); the
+## land that moves and the occupations that clear are read; the war ends (end_turn, terms, moved); the occupations clear
+## (Occupation.release, the garrisons of the ceded hexes 0); peace_made; the land moves (Territory.transfer, owners_changed);
+## the armies of either on closed land go to their nearest own hex with room, or home with none; then the halts, the disbands
+## and the controllers (Occupation.flush). Terms take and yield move districts; white and timer move none. The actor is the
+## side that asks; with &"" (the timer) the war's first party is named as the tag.
+static func end_war(game: Game, war: War, terms: StringName, actor: StringName) -> void:
+	if war == null or not war.live() or game.map == null or game.state == null:
+		return
+	var tag := actor if actor != &"" else war.a
+	var target := war.other(tag)
+	_end_fights(game, war.a, war.b)
+	var moved := ceded(game, war, terms, tag)
+	var winner := _winner_of(terms, tag, target)
+	var released := _occupied_between(game, war.a, war.b)
+	war.end_turn = game.turn
+	war.terms = terms
+	war.moved = moved.size()
+	Occupation.release(game, released)
+	for hex: Vector2i in moved:
+		Occupation.set_garrison(game, hex, 0)
+	game.emit({"kind": "peace_made", "tag": tag, "target": target, "war": war.id, "terms": terms, "moved": moved,
+		"released": released, "witnesses": living_tags(game)})
+	if not moved.is_empty():
+		Territory.transfer(game, moved, Countries.by_tag(game, winner).id)
+	var later: Array[Dictionary] = []
+	_send_armies_home(game, war, later)
+	for event: Dictionary in later:
+		game.emit(event)
+	Occupation.flush(game)
+	Sight.refresh(game)
+
+
+## The fight systems' doors: the battles, then the sieges, between the two end. A door that is not in the tree is skipped.
+static func _end_fights(game: Game, a: StringName, b: StringName) -> void:
+	var battles := door(&"battles", BATTLES_PATH, &"end_all")
+	if battles.is_valid():
+		battles.call(game, a, b)
+	var sieges := door(&"sieges", SIEGES_PATH, &"end_between")
+	if sieges.is_valid():
+		sieges.call(game, a, b)
+
+
+## The Callable of a fight system's door: the test seam when one is set, else the script's static function when the file
+## exists and has it, else an invalid Callable.
+static func door(key: StringName, path: String, method: StringName) -> Callable:
+	if fight_seam.has(key):
+		return fight_seam[key] as Callable
+	if not ResourceLoader.exists(path):
+		return Callable()
+	var script := ResourceLoader.load(path) as GDScript
+	if script == null:
+		return Callable()
+	var fn := Callable(script, method)
+	return fn if fn.is_valid() else Callable()
+
+
+## The side that takes the land: the actor on take, the other side on yield; &"" on white and the timer.
+static func _winner_of(terms: StringName, tag: StringName, target: StringName) -> StringName:
+	if terms == &"take":
+		return tag
+	if terms == &"yield":
+		return target
+	return &""
+
+
+## Every land hex that one of the two countries occupies for the other (either way), in hex index order.
+static func _occupied_between(game: Game, a: StringName, b: StringName) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var ca := Countries.by_tag(game, a)
+	var cb := Countries.by_tag(game, b)
+	if ca == null or cb == null:
+		return out
+	for i: int in mini(game.state.occupier.size(), game.state.owner.size()):
+		var occ := int(game.state.occupier[i])
+		var own := int(game.state.owner[i])
+		if (occ == ca.id and own == cb.id) or (occ == cb.id and own == ca.id):
+			out.append(game.map.hex_of(i))
+	return out
+
+
+## The armies of the two countries that stand on land now closed to them (4.9): each goes to its nearest own hex (hex distance,
+## ties by index) where its companies fit the stack limit, or home when there is none. Their halts and disbands are queued in
+## `later`, so their events come after the owners change.
+static func _send_armies_home(game: Game, war: War, later: Array[Dictionary]) -> void:
+	var limit := Military.stack_limit(game, &"")
+	for army: Army in _armies_of(game, war.a, war.b):
+		if _open(game, army.tag, army.hex):
+			continue
+		var fits: Callable = func(i: int) -> bool: return Armies.units_at(game, army.tag, game.map.hex_of(i), PackedInt32Array([army.id])) + army.units.size() <= limit
+		var at := _nearest_own(game, army.hex, army.tag, fits)
+		if at == Army.NO_HEX:
+			_disband_home(game, army, later)
+		else:
+			_march_home(game, army, at, later)
+
+
+## An army set down on hex `at`: its order cleared; a march or a storm halts with why peace, and that halt is queued.
+static func _march_home(game: Game, army: Army, at: Vector2i, later: Array[Dictionary]) -> void:
+	var marching := army.order == Army.ORDER_MARCH or army.order == Army.ORDER_STORM
+	Armies.set_hex(game, army, at, army.moved_from)
+	if army.order == Army.ORDER_NONE:
+		return
+	var text := "the peace sends it to %s" % Military.hex_text(game, at)
+	Armies.set_order(game, army, Army.ORDER_NONE, Army.NO_HEX, PackedInt32Array())
+	Armies.set_waiting(game, army, &"")
+	if marching:
+		Armies.set_halt(game, army, &"peace", text)
+		later.append({"kind": "march_halted", "tag": army.tag, "army": army.id, "hex": at, "why": "peace", "reason": text,
+			"waits": false, "witnesses": PackedStringArray([String(army.tag)]), "name": army.name})
+
+
+## An army with no own hex to fit: each company's men go home (its home when that is own land with room for them, else the
+## nearest own hex with room), and the army is removed with no refund. Men with no room anywhere are booked as lost (the
+## event's `lost`, so no man vanishes unbooked). The disband's event is queued.
+static func _disband_home(game: Game, army: Army, later: Array[Dictionary]) -> void:
+	var ids := PackedInt32Array()
+	var men := 0
+	var lost := 0
+	for u: Unit in army.units:
+		ids.append(u.id)
+		men += u.men
+		var target := _room_for(game, u, army)
+		var placed := People.give_back(game, target, u.men) if target != Army.NO_HEX else 0
+		lost += u.men - placed
+	var event := {"kind": "army_disbanded", "tag": army.tag, "hex": army.hex, "army": army.id, "units": Array(ids),
+		"men": men, "refund": 0, "lost": lost, "name": army.name}
+	Armies.remove_units(game, army, ids)
+	if army.units.is_empty():
+		Armies.remove(game, army)
+	later.append(event)
+
+
+## The hex a company's men go to when it disbands: its home when that is own land with room for them, else the nearest own
+## hex (from the army's hex) with room for them, else Army.NO_HEX.
+static func _room_for(game: Game, u: Unit, army: Army) -> Vector2i:
+	var fits: Callable = func(i: int) -> bool: return i >= 0 and i < game.state.people.size() and int(game.state.people[i]) + u.men <= People.PEOPLE_MAX
+	if _own(game, u.home, army.tag) and bool(fits.call(game.map.index_of(u.home))):
+		return u.home
+	return _nearest_own(game, army.hex, army.tag, fits)
+
+
+## The nearest land hex of `tag` (hex distance, ties to the lower index) that `fits` takes, or Army.NO_HEX.
+static func _nearest_own(game: Game, from: Vector2i, tag: StringName, fits: Callable) -> Vector2i:
+	var best := Army.NO_HEX
+	var best_d := -1
+	for i: int in game.map.hex_count():
+		var hex := game.map.hex_of(i)
+		if not _own(game, hex, tag) or not bool(fits.call(i)):
+			continue
+		var d := ImproveRules.hex_distance(from, hex)
+		if best_d < 0 or d < best_d:
+			best = hex
+			best_d = d
+	return best
+
+
+## True when a hex is land and its owner is tag.
+static func _own(game: Game, hex: Vector2i, tag: StringName) -> bool:
+	return game.map.is_land(hex) and Territory.owner_tag(game, hex) == tag
+
+
+## True when an army of tag may stand on hex now: Movement.open_to's rule, read from the owners as they are (not from the
+## open-mask cache, which a peace leaves for a white peace with the same owners).
+static func _open(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	var i := game.map.index_of(hex)
+	if i < 0 or game.map.land[i] != 1 or i >= game.state.owner.size():
+		return false
+	var owner := int(game.state.owner[i])
+	if owner == 0:
+		return true
+	var mine := Countries.by_tag(game, tag)
+	if mine != null and mine.id == owner:
+		return true
+	var theirs := Countries.by_id(game, owner)
+	return theirs != null and bool(Movement.hostile.call(game, tag, theirs.tag))
+
+
+## The armies of a or b, in id order (a copy: the caller may remove some of them).
+static func _armies_of(game: Game, a: StringName, b: StringName) -> Array[Army]:
+	var out: Array[Army] = []
+	for army: Army in game.armies:
+		if army.tag == a or army.tag == b:
+			out.append(army)
+	return out
+
+
 # --- the saved body and the digest -----------------------------------------------------------------------------------
 
 
@@ -275,6 +499,8 @@ static func from_dict(d: Dictionary, game: Game) -> String:
 	var next_id: Variant = Unit.int32(d.get("next_war_id", null))
 	var raw: Variant = d.get("wars", null)
 	if next_id == null or int(next_id) < 1 or not (raw is Array):
+		return PROBLEM_BODY
+	if (raw as Array).size() > MAX_WARS:
 		return PROBLEM_BODY
 	var list: Array[War] = []
 	var last_id := 0

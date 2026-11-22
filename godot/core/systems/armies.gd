@@ -223,6 +223,83 @@ static func clear_moved(game: Game) -> void:
 		a.moved_from = Army.NO_HEX
 
 
+# --- battles (M7 B8, 4.6, 4.12, 5.3): the morale, the experience, the standing and the ranks ---------------------------
+
+
+## Takes `amount` men from one company (a battle's losses, or a surrender): the men are cut to the company's men. A company
+## at 0 is removed with unit_lost (`why`); an army left with no company is removed. Returns the men lost.
+static func lose_unit_men(game: Game, army: Army, unit_id: int, amount: int, why: StringName) -> int:
+	var u := army.unit(unit_id)
+	if u == null:
+		return 0
+	var lost := clampi(amount, 0, u.men)
+	if lost == 0:
+		return 0
+	u.men -= lost
+	if u.men == 0:
+		army.units.remove_at(_unit_index(army, unit_id))
+		game.emit({"kind": "unit_lost", "tag": army.tag, "army": army.id, "unit": u.id, "kind_id": u.kind,
+			"hex": army.hex, "why": why, "army_left": army.units.size(), "name": army.name})
+		if army.units.is_empty():
+			remove(game, army)
+	return lost
+
+
+## A company's morale, 0 to Unit.MAX_MORALE (4.6, 4.12).
+static func set_morale(_game: Game, army: Army, unit_id: int, morale: int) -> void:
+	var u := army.unit(unit_id)
+	if u != null:
+		u.morale = clampi(morale, 0, Unit.MAX_MORALE)
+
+
+## Adds experience to one company (0 and up); its rank follows from rank_of.
+static func add_xp(_game: Game, army: Army, unit_id: int, xp: int) -> void:
+	var u := army.unit(unit_id)
+	if u != null:
+		u.xp = maxi(0, u.xp + xp)
+
+
+## The army's standing order (4.7): Army.STANDING_HOLD or Army.STANDING_WITHDRAW.
+static func set_standing(_game: Game, army: Army, standing: StringName) -> void:
+	army.standing = standing
+
+
+## The ready_units phase (4.12): every company of an army fed from the stores or the land (supply 0 or 1) gains morale_recovery,
+## up to the maximum. Hungry armies (supply 2) recover nothing.
+static func recover_morale(game: Game) -> void:
+	if game == null or game.defs == null or game.defs.war == null:
+		return
+	var gain := game.defs.war.morale_recovery
+	for a: Army in game.armies:
+		if a.supply == 2:
+			continue
+		for u: Unit in a.units:
+			u.morale = mini(Unit.MAX_MORALE, u.morale + gain)
+
+
+## The men-weighted morale of an army, permille (0 with no man).
+static func morale_of(army: Army) -> int:
+	var men := army.men()
+	if men <= 0:
+		return 0
+	var weighted := 0
+	for u: Unit in army.units:
+		weighted += u.men * u.morale
+	return Economy.floor_div(weighted, men)
+
+
+## The rank of a company by its experience: the highest k with xp at least WarDef.rank_xp[k] (0 Recruit, 1 Veteran, 2 Elite).
+static func rank_of(game: Game, unit: Unit) -> int:
+	var war: WarDef = game.defs.war if game != null and game.defs != null else null
+	if war == null or unit == null:
+		return 0
+	var rank := 0
+	for k: int in mini(war.rank_xp.size(), WarDef.RANK_COUNT):
+		if unit.xp >= war.rank_xp[k]:
+			rank = k
+	return rank
+
+
 # --- save and digest -------------------------------------------------------------------------------------------------
 
 

@@ -138,10 +138,11 @@ func test_out_of_supply_counts_of_every_country_on_the_1480_map() -> void:
 	# Pinned from the rules as written (the spec's page, corrected 2026-11-21, lists the same): tag -> [land hexes,
 	# out of supply in summer, out of supply in winter]. A country with no depot is all out of supply.
 	var pinned := {
-		"FRA": [34, 16, 21], "AUS": [37, 21, 25], "SWI": [45, 7, 17], "SAV": [58, 6, 16], "MLO": [52, 1, 5],
+		"FRA": [34, 12, 20], "AUS": [37, 21, 25], "SWI": [45, 5, 15], "SAV": [58, 6, 16], "MLO": [52, 1, 5],
 		"VEN": [42, 2, 6], "GEN": [14, 0, 2], "TUS": [14, 1, 2], "PAP": [20, 0, 2], "MAN": [3, 1, 1],
 		"FER": [12, 2, 3], "SIE": [7, 1, 1], "LUC": [2, 0, 0],
 	}
+	# M7 (4.12): owned, controlled fortresses with no siege are depots too; FRA and SWI moved with the castles they hold.
 	for c: Country in _g.countries:
 		if c == null:
 			continue
@@ -394,3 +395,73 @@ func test_a_country_with_no_armies_is_never_asked_for_a_field() -> void:
 	Supply.season(_g)
 	assert_eq(_c.stock, stock_before)
 	assert_eq(Armies.of_country(_g, ArmyFixture.TAG).size(), 0)
+
+
+## M7 (4.12): a hostile army cuts its hex out of the field, and occupied land is never supply of its owner.
+func test_a_hostile_army_and_occupied_land_are_not_supply() -> void:
+	var enemy := WarFixture.neighbour_of(_g, ArmyFixture.TAG)
+	assert_ne(enemy, &"", "Genoa has a neighbour")
+	WarFixture.at_war(_g, enemy, ArmyFixture.TAG)
+	var before := Supply.field(_g, ArmyFixture.TAG, false)
+	var found: Array[int] = []
+	for i: int in before.size():
+		if before[i] == 1 and _g.map.index_of(_town) != i and found.size() < 2:
+			found.append(i)
+	assert_eq(found.size(), 2, "Genoa has two field hexes besides its depot")
+	ArmyFixture.army(_g, enemy, _g.map.hex_of(found[0]), _g.defs.units[0].id, 1)
+	assert_false(Supply.in_supply(_g, ArmyFixture.TAG, _g.map.hex_of(found[0]), false),
+		"a hex with a hostile army is out of supply")
+	Occupation.capture(_g, _g.map.hex_of(found[1]), enemy, &"walk", {})
+	assert_false(Supply.in_supply(_g, ArmyFixture.TAG, _g.map.hex_of(found[1]), false),
+		"land the enemy occupies is out of supply")
+
+
+## M7 review: a captured town is a depot for its occupier (it controls it); a captured fortress is not (only the owner who also
+## controls it has the depot).
+func test_a_captured_town_is_a_depot_for_its_occupier_and_a_captured_fortress_is_not() -> void:
+	var g := EconomyFixture.game(&"SAV", false, true, 1480, true)
+	Occupation.setup(g)
+	var sav := Countries.by_tag(g, &"SAV")
+	var nb := WarFixture.neighbour_of(g, &"SAV")
+	WarFixture.at_war(g, &"SAV", nb)
+	var town := Army.NO_HEX
+	var fort := Army.NO_HEX
+	for i: int in g.map.hex_count():
+		var h := g.map.hex_of(i)
+		if g.map.land[i] != 1 or int(g.state.owner[i]) != sav.id:
+			continue
+		if town == Army.NO_HEX and g.state.main_use[i] == Economy.SETTLEMENTS and Occupation.fortress_level(g, h) == 0 \
+				and int(g.state.level[i]) >= g.defs.depot_min_level:
+			town = h
+		if fort == Army.NO_HEX and Occupation.fortress_level(g, h) > 0:
+			fort = h
+	assert_true(town != Army.NO_HEX and fort != Army.NO_HEX, "SAV has a depot town and a fortress")
+	assert_true(Supply.is_depot(g, &"SAV", town) and Supply.is_depot(g, &"SAV", fort), "both are SAV's depots before the war")
+	Occupation.capture(g, town, nb, &"walk", {})
+	Occupation.capture(g, fort, nb, &"walk", {})
+	Occupation.flush(g)
+	assert_true(Supply.is_depot(g, nb, town), "the occupier's captured town is its depot")
+	assert_false(Supply.is_depot(g, nb, fort), "the occupier's captured fortress is no depot")
+	assert_false(Supply.is_depot(g, &"SAV", town), "the owner's lost town is no depot for the owner")
+
+
+## M7 review (perf): with no war the depot key does not scan the armies (a counter, no timing); a live war makes it scan.
+func test_no_war_key_does_not_scan_the_armies() -> void:
+	var g := EconomyFixture.game(&"SAV", false, true, 1480, true)
+	Occupation.setup(g)
+	var sav := Countries.by_tag(g, &"SAV")
+	var nb := WarFixture.neighbour_of(g, &"SAV")
+	var placed := 0
+	for i: int in g.map.hex_count():
+		if placed < 20 and g.map.land[i] == 1 and int(g.state.owner[i]) == sav.id:
+			WarFixture.army_at(g, &"SAV", g.map.hex_of(i), 1)
+			placed += 1
+	var hex: Vector2i = g.armies[0].hex
+	var before := Supply.army_key_scans
+	for k: int in 5:
+		Supply.field(g, &"SAV", false)
+		Supply.in_supply(g, &"SAV", hex, k % 2 == 0)
+	assert_eq(Supply.army_key_scans, before, "no war: the key never scans the armies")
+	WarFixture.at_war(g, &"SAV", nb)
+	Supply.field(g, &"SAV", false)
+	assert_gt(Supply.army_key_scans, before, "a live war: the key scans the armies")

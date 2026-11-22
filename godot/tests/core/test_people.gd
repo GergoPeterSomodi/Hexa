@@ -569,3 +569,19 @@ func test_a_hex_made_short_by_the_door_joins_the_set_and_a_full_one_leaves() -> 
 	g.improvement.clear(Vector2i(7, 12))
 	g.emit({"kind": "hex_changed", "hex": Vector2i(7, 12)})
 	assert_false(People.active(g, StateView.of(g.state), genoa.id).has(vineyard), "cleared: 8,000 of 8,000")
+
+
+## M7 (4.11): a levy is refused on land an enemy holds, with the reason naming the occupier.
+func test_a_levy_is_refused_on_occupied_land() -> void:
+	var g := ArmyFixture.game()
+	var hex := ArmyFixture.find_town(g)
+	ArmyFixture.town(g, hex)
+	assert_gt(People.available(g, hex), 0, "the town has men to levy")
+	var enemy := ArmyFixture.other_tag(g)
+	WarFixture.at_war(g, enemy, ArmyFixture.TAG)
+	Occupation.capture(g, hex, enemy, &"walk", {})
+	var verdict := People.levy_check(g, ArmyFixture.TAG, hex, 10)
+	assert_false(bool(verdict["ok"]), "an occupied hex gives no men")
+	assert_string_contains(str(verdict["reason"]), "held by")
+	assert_eq(People.levy(g, ArmyFixture.TAG, hex, 10), 0, "the door refuses too")
+
