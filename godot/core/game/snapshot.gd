@@ -10,9 +10,12 @@ const PROBLEM_OTHER_BUILD := "Made by another build"
 const PROBLEM_NEWER := "Made by a newer Hexa"
 const PROBLEM_OLDER := "Made by an older test build"
 const MAX_TURN := 100000
+## The fortress levels run 0 to FORTRESS_TOP (FamilyDef.fortress, validated 0..3): the cap of a garrison is the top level's full men.
+const FORTRESS_TOP := 3
 
 
 ## The body of 4.10: `ui` is the shell's block (bookmarks, camera, map mode, look), kept as given. M6: `armies` (5.0 R11).
+## M7: `war` (4.20).
 static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 	var countries: Array = []
 	for c: Country in game.countries:
@@ -37,12 +40,57 @@ static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 		"map_state": game.state.to_dict(),
 		"countries": countries,
 		"armies": armies,
+		"war": _war_of(game),
 		"stats": game.stats.to_dict() if game.stats != null else {},
 		"chronicle": game.chronicle.to_dict(),
 		"luck": game.luck.to_dict() if game.luck != null else {},
 		"action_log": log,
 		"ui": ui.duplicate(true),
 	}
+
+
+## True when the war body holds nothing: no war, battle, record or siege, and no place name (a sandbox writes exactly this).
+static func _war_empty(body: Dictionary) -> bool:
+	for key: String in ["wars", "battles", "battle_records", "sieges"]:
+		if not (body.get(key) is Array) or not (body[key] as Array).is_empty():
+			return false
+	for key: String in ["battle_names", "siege_names"]:
+		if not (body.get(key) is Dictionary) or not (body[key] as Dictionary).is_empty():
+			return false
+	return true
+
+
+## The war body (4.20): the wars, the battles with their records and place names, the sieges with theirs. Each system writes
+## its own form (called by reference, A14); the keys are spread here.
+static func _war_of(game: Game) -> Dictionary:
+	var wars: Dictionary = Wars.to_dict.call(game)
+	var battles: Dictionary = Battles.to_dict.call(game)
+	var sieges: Dictionary = Sieges.to_dict.call(game)
+	return {"schema": War.SCHEMA, "next_war_id": wars["next_war_id"], "wars": wars["wars"],
+		"battles": battles["battles"], "battle_records": battles["records"],
+		"next_record_id": battles["next_record_id"], "battle_names": battles["names"],
+		"sieges": sieges["sieges"], "siege_names": sieges["siege_names"]}
+
+
+## Puts the war body into the game, wars first: the battles name armies and wars, the sieges name the wars. "" when all three
+## load, else "body" (the caller drops the game it was building; nothing live changes).
+static func _war_from(body: Dictionary, game: Game) -> String:
+	if str(body.get("schema", "")) != War.SCHEMA:
+		return "body"
+	# A sandbox (no countries) holds no war: its body must be empty (Wars.from_dict needs a scenario's countries).
+	if not game.has_countries():
+		return "" if _war_empty(body) else "body"
+	var wars := {"schema": War.SCHEMA, "next_war_id": body.get("next_war_id"), "wars": body.get("wars")}
+	if str(Wars.from_dict.call(wars, game)) != "":
+		return "body"
+	var battles := {"schema": Battles.SCHEMA, "next_record_id": body.get("next_record_id"),
+		"names": body.get("battle_names"), "battles": body.get("battles"), "records": body.get("battle_records")}
+	if str(Battles.from_dict.call(battles, game)) != "":
+		return "body"
+	var sieges := {"sieges": body.get("sieges"), "siege_names": body.get("siege_names")}
+	if str(Sieges.from_dict.call(sieges, game)) != "":
+		return "body"
+	return ""
 
 
 ## {game: Game or null, ui: Dictionary, problem: String}: a game with the digest the body was made with, or null and the
@@ -92,6 +140,9 @@ static func _format_problem(body: Dictionary) -> String:
 	if not body.has("armies"):
 		return PROBLEM_OLDER
 	if not (body.get("armies") is Dictionary):
+		return PROBLEM_UNREADABLE
+	# M7 (4.20): a format-5 body carries the war state.
+	if not (body.get("war") is Dictionary):
 		return PROBLEM_UNREADABLE
 	return ""
 
@@ -191,6 +242,12 @@ static func _build(body: Dictionary, meta: Dictionary, map: MapData, defs: GameD
 	# The armies after the countries (their tags are checked against them); a refused body changes nothing (5.0 R11).
 	if str(Armies.from_dict.call(body["armies"] as Dictionary, game)) != "":
 		return {"problem": "body"}
+	# M7 (4.20): the wars, battles and sieges after the armies (their cross-checks read the living armies and countries).
+	if _war_from(body["war"] as Dictionary, game) != "":
+		return {"problem": "body"}
+	# M7 (4.3, 4.4): the occupation and the garrisons are checked against the countries and the wars just restored.
+	if not _occupation_ok(game):
+		return {"problem": "body"}
 	Sight.refresh.call(game)  # the army part of the sight; explored is never written on a load (5.0 R4)
 	return {"game": game}
 
@@ -235,6 +292,43 @@ static func _base64_ok(text: String) -> bool:
 		elif not ((b >= 65 and b <= 90) or (b >= 97 and b <= 122) or (b >= 48 and b <= 57) or b == 43 or b == 47):
 			return false
 	return true
+
+
+## The occupation and the garrisons of a saved body (4.3, 4.4), checked once the countries and the wars are in the game: a
+## garrison is 0 at sea and 0 to the cap elsewhere; an occupier is 0 or an occupation of owned land (see _occupied_ok). False
+## when one fails; the caller drops the game.
+static func _occupation_ok(game: Game) -> bool:
+	var n := game.map.hex_count()
+	if game.state.occupier.size() != n or game.state.garrison.size() != n:
+		return false
+	var cap := _garrison_cap(game)
+	for i: int in n:
+		var gar := int(game.state.garrison[i])
+		if gar < 0 or gar > cap or (gar != 0 and game.map.land[i] == 0):
+			return false
+		var occ := int(game.state.occupier[i])
+		if occ != 0 and not _occupied_ok(game, i, occ):
+			return false
+	return true
+
+
+## The most men a hex's garrison may hold: the full garrison of the top fortress level (a fortress that lost its level keeps its
+## men until they are used, so the cap is the top level's, not the current one's). 0 without a war definition.
+static func _garrison_cap(game: Game) -> int:
+	var war: WarDef = game.defs.war if game.defs != null else null
+	return 0 if war == null else FORTRESS_TOP * war.garrison_per_level
+
+
+## One occupied hex: land the owner holds, and an occupier that is a living country other than the owner and at a live war with it.
+static func _occupied_ok(game: Game, i: int, occ: int) -> bool:
+	var owner_id := int(game.state.owner[i])
+	if game.map.land[i] == 0 or owner_id == 0 or occ == owner_id or occ > game.countries.size():
+		return false
+	var occupier := game.countries[occ - 1]
+	var owner := game.countries[owner_id - 1]
+	if occupier == null or owner == null or not occupier.alive:
+		return false
+	return bool(Wars.at_war.call(game, occupier.tag, owner.tag))
 
 
 ## Every use is a family, every level within the family's top, every owner a country, and the sea holds none.

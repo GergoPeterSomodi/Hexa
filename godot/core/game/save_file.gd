@@ -5,9 +5,10 @@
 class_name SaveFile
 extends RefCounted
 
-## 4: country/4 (explored, M6) and the armies in the body. A format-3 (M5) file is refused as older.
-const FORMAT := 4
-const OLDEST_FORMAT := 4
+## 5: the war body (M7, 4.20: wars, battles, records, sieges), army/2 and unit/2, map-state/5. A format-4 (M6) file is refused
+## as older, quietly ("Made by an older test build"); D55.
+const FORMAT := 5
+const OLDEST_FORMAT := 5
 const DIR := "user://saves"
 const SLOTS: Array[String] = ["quick", "1", "2", "3", "4", "5", "6", "7", "8"]
 const AUTO_SLOTS: Array[String] = ["auto1", "auto2", "auto3"]

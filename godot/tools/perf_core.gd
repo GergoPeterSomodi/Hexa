@@ -35,6 +35,8 @@ const ROUTE_NEAR := 12
 const REACH_ARMIES := 200
 const STEP_HEXES := 500
 const TOKEN_RUNS := 5
+const WAR_SEASONS := 2
+const WAR_RUNS := 8
 const COLD_RUNS := 3
 
 var _cpu_scale := 1.0
@@ -55,6 +57,8 @@ func _initialize() -> void:
 		elif arg.begins_with("--budget="):
 			_budget_path = arg.substr(9)
 	var code := _measure()
+	if code == 0:
+		code = _war_rows()
 	if code == 0:
 		code = _europe_40()
 	quit(_finish() if code == 0 else code)
@@ -157,6 +161,20 @@ func _europe_40() -> int:
 
 
 ## The worst of RUNS_45 calls of `call`, each on a new game version (cold: the views are made again, the owner index of the territories stays, as after an action).
+## M7 rows (m7-build-spec.md 8): the war phases on the made-up Europe with WAR_PAIRS wars (PerfFixture.europe_war), the worst of
+## WAR_RUNS runs of Wars.season and of Sieges.season. The sieges row has no standing siege on this fixture (the 100-siege
+## fixture of the spec is not built yet); the battles rows wait for their fixture too.
+func _war_rows() -> int:
+	var game := PerfFixture.europe_war(WAR_SEASONS)
+	if game == null:
+		printerr("perf_core: cannot build the war fixture")
+		return 1
+	_r["wars_declared"] = game.wars.size()
+	_r["war_ms"] = _worst_of(game, Callable(Season, "run_phase").bind(game, &"war"), WAR_RUNS)
+	_r["sieges_ms"] = _worst_of(game, Callable(Season, "run_phase").bind(game, &"sieges"), WAR_RUNS)
+	return 0
+
+
 func _worst(game: Game, call: Callable) -> float:
 	var worst := 0.0
 	for n: int in RUNS_45:

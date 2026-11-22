@@ -28,6 +28,7 @@ const MAX_COMPANIES := 8
 const NEAR := 6
 const SEASONS_MAX := 4
 const ORDER_TRIES := 60
+const WAR_PAIRS := 30
 ## The movement numbers copied from the committed definitions (the made-up Europe's own come from FakeScenario).
 const MOVEMENT_FIELDS: Array[String] = ["units", "terrains", "relief_move_add", "highway_cap", "road_cap", "track_divisor",
 	"winter_snow_percent", "pass_closing_climate", "stream_cost", "river_cost", "ford_cost", "ferry_cost",
@@ -112,7 +113,26 @@ static func _begin_works(game: Game, tag: StringName, luck: Rng) -> void:
 		game.act("build", {"hex": hex, "family": int(pick["family_id"]), "tag": tag})
 
 
-## The armies of the speed rigs (m6-build-spec.md 8, 5.0 R10): ARMIES_PER_COUNTRY a country of 1 to MAX_COMPANIES pikemen on
+## M7 (m7-build-spec.md 8): the made-up Europe, `seasons` seasons played, and WAR_PAIRS wars between neighbouring pairs (the
+## lowest-id countries first, each pair once), declared through the door (Game.act "declare_war"; a refusal is skipped). Null
+## when the game cannot be built.
+static func europe_war(seasons: int) -> Game:
+	var game := europe_game(seasons)
+	if game == null:
+		return null
+	var made := 0
+	for a: Country in game.countries:
+		for b: Country in game.countries:
+			if made >= WAR_PAIRS:
+				return game
+			if b.id <= a.id:
+				continue
+			if bool(game.act("declare_war", {"target": b.tag, "tag": a.tag})["ok"]):
+				made += 1
+	return game
+
+
+## The armies of the speed rigs (m6-build-spec.md 8, 5.0 R10) a country of 1 to MAX_COMPANIES pikemen on
 ## random land of its own, through Armies.create and Armies.add_units with raised_turn = turn - 1 (none musters): the rig, not
 ## raise. The movement numbers are copied from the committed definitions first (as probe_movement does), then each army is
 ## ordered out. Returns the armies in id order.

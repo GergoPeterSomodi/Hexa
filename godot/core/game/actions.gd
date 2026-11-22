@@ -6,12 +6,14 @@
 ##   march {army, goal}   halt {army}   continue_march {army}   (Movement)
 ##   declare_war {target, tag}   (Wars, M7 B5)
 ##   make_peace {target, terms, tag}   (Wars, M7 B11)
+##   storm {army, goal, tag}   (Movement, M7 B12)   set_standing {army, standing, tag}   (Military, M7 B12)
 ## build, upgrade and clear begin a work (Works); the works phase puts the piece.
 class_name Actions
 extends RefCounted
 
 const NAMES: Array[String] = ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise",
-	"split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war", "make_peace"]
+	"split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war", "make_peace", "storm",
+	"set_standing"]
 
 static var _test_pairs: Dictionary[String, Array] = {}
 
@@ -49,6 +51,10 @@ static func pair_of(action: String) -> Array[Callable]:
 			return [Wars.declare_war_check, Wars.declare_war]
 		"make_peace":
 			return [Wars.make_peace_check, Wars.make_peace]
+		"storm":
+			return [Movement.storm_check, Movement.storm]
+		"set_standing":
+			return [Military.standing_check, Military.set_standing]
 	if _test_pairs.has(action):
 		var raw: Array = _test_pairs[action]
 		var typed: Array[Callable] = [raw[0] as Callable, raw[1] as Callable]

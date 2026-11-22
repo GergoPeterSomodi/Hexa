@@ -5,7 +5,8 @@
 ##   next(game, tag, luck) -> {action, args}
 ## The argument shapes are those of Actions: build {hex, family, tag}, upgrade and clear and cancel_work {hex, tag},
 ## choose_country {tag}, set_tax {level, tag}, raise {hex, kind, count, tag}, split_army {army, units, tag},
-## merge_armies {army, into, tag}, disband {army, unit, tag}, march {army, goal, tag}, halt and continue_march {army, tag}.
+## merge_armies {army, into, tag}, disband {army, unit, tag}, march {army, goal, tag}, halt and continue_march {army, tag},
+## storm {army, goal, tag}, set_standing {army, standing, tag}.
 class_name RandomPlayer
 extends RefCounted
 
@@ -52,7 +53,33 @@ static func _args(game: Game, tag: StringName, action: String, luck: Rng) -> Dic
 			return _war_args(game, tag, luck)
 		"make_peace":
 			return _peace_args(game, tag, luck)
+		"storm":
+			return _storm_args(game, tag, luck)
+		"set_standing":
+			return {"army": _army_id(game, tag, luck), "standing": _standing(luck), "tag": tag}
 	return {}
+
+
+## A fortress of the game (most picks: a storm's goal; a hostile one, held by a country at war with the country, first) or
+## any land hex.
+static func _fortress_or_land(game: Game, tag: StringName, luck: Rng) -> Vector2i:
+	var forts := game.war_cache.fortresses(game)
+	var hostile: Array[int] = []
+	for i: int in forts:
+		var ctl := Occupation.controller_tag(game, game.map.hex_of(i))
+		if ctl != &"" and ctl != tag and Wars.at_war(game, tag, ctl):
+			hostile.append(i)
+	if not hostile.is_empty() and luck.randi_range(0, STRAY - 1) != 0:
+		return game.map.hex_of(hostile[luck.randi_range(0, hostile.size() - 1)])
+	if not forts.is_empty() and luck.randi_range(0, STRAY - 1) != 0:
+		return game.map.hex_of(forts[luck.randi_range(0, forts.size() - 1)])
+	return _any_land(game, luck)
+
+
+## A standing order: hold or withdraw, or none now and then (refused).
+static func _standing(luck: Rng) -> String:
+	var words := ["hold", "withdraw", ""]
+	return words[luck.randi_range(0, words.size() - 1)]
 
 
 ## A declaration of war: a neighbour of the country half the time (a declaration that can succeed), else any country.
@@ -152,12 +179,59 @@ static func _disband_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
 	return {"army": _army_id_of(army), "unit": unit, "tag": tag}
 
 
-## A march of one of the country's armies to a hex of its land, near it or far; sometimes any land hex.
+## A march of one of the country's armies: to a hex of its land, near it or far; sometimes any land hex; now and then an
+## attack on a hex of a country at war with it (M7: an enemy army's hex, or the land of the enemy).
 static func _march_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
 	var army := _army_of(game, tag, luck)
 	var goal := _hex_of_land(game, tag, luck)
 	if army != null and luck.randi_range(0, 1) == 0:
 		goal = _near_land(game, army.hex, luck)
+	elif luck.randi_range(0, 2) == 0:
+		goal = _enemy_hex(game, tag, luck)
+	return {"army": _army_id_of(army), "goal": goal, "tag": tag}
+
+
+## A hex of a country at war with tag (its land, a district picked at random), or any land hex when it is at war with none.
+static func _enemy_hex(game: Game, tag: StringName, luck: Rng) -> Vector2i:
+	var fort := _hostile_fortress(game, tag, luck)
+	if fort != Movement.NO_HEX and luck.randi_range(0, 1) == 0:
+		return fort
+	var foes := Wars.enemies(game, tag)
+	if foes.is_empty():
+		return _any_land(game, luck)
+	var foe := Countries.by_tag(game, foes[luck.randi_range(0, foes.size() - 1)])
+	if foe == null:
+		return _any_land(game, luck)
+	var land := Territory.districts(game, foe.id)
+	if land.is_empty():
+		return _any_land(game, luck)
+	return game.map.hex_of(land[luck.randi_range(0, land.size() - 1)])
+
+
+## A hostile garrisoned fortress (held by a country at war with tag, with men in it): a siege's goal, picked at random; NO_HEX
+## when there is none.
+static func _hostile_fortress(game: Game, tag: StringName, luck: Rng) -> Vector2i:
+	var list: Array[Vector2i] = []
+	for i: int in game.war_cache.fortresses(game):
+		var h := game.map.hex_of(i)
+		if Occupation.garrison_of(game, h) > 0 and Wars.at_war(game, tag, Occupation.controller_tag(game, h)):
+			list.append(h)
+	if list.is_empty():
+		return Movement.NO_HEX
+	return list[luck.randi_range(0, list.size() - 1)]
+
+
+## A storm: a fortress (a hostile one most picks; M7), and an army of the country near it when there is one (most picks), else
+## a random army of the country's.
+static func _storm_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
+	var goal := _fortress_or_land(game, tag, luck)
+	var army := _army_of(game, tag, luck)
+	var near: Array[Army] = []
+	for a: Army in Armies.of_country(game, tag):
+		if a.hex != goal and ImproveRules.hex_distance(a.hex, goal) <= NEAR:
+			near.append(a)
+	if not near.is_empty() and luck.randi_range(0, STRAY - 1) != 0:
+		army = near[luck.randi_range(0, near.size() - 1)]
 	return {"army": _army_id_of(army), "goal": goal, "tag": tag}
 
 

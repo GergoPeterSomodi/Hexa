@@ -13,6 +13,22 @@ const NO_HEX := Vector2i(-1, -1)
 const WHY_NO_WAY := &"no_way"
 const WHY_BLOCKED := &"blocked"
 const WHY_WINTER := &"winter"
+## M7 (4.8, 4.14): the halts of a war. Shaken: too shaken to attack; battle: a battle of the other side is fought on the hex;
+## enemy: a zone of control ended the leg beside an enemy army or a hostile fortress (D21, D40).
+const WHY_SHAKEN := &"shaken"
+const WHY_BATTLE := &"battle"
+const WHY_ENEMY := &"enemy"
+## A walk stopped because its army is fought in a battle (the attacker's step came first): not a halt. The order and the route
+## stay (4.8: a winner goes on next season), so it is no halt word and no march_halted.
+const WHY_FOUGHT := &"fought"
+## The halt of a storm order: the army's order goes to none and its halt_why is this word, so continue_march resumes the storm
+## (when its checks still pass) and never turns it into a march. Shown as "Halted: ..." with the halt_text.
+const WHY_STORM := &"storm"
+const STORM_HALT_TEXT := "its storm is halted: continue resumes it"
+## Every halt a walk may end with: the army's order goes to none and its goal is kept.
+const HALT_WHYS: Array[StringName] = [WHY_NO_WAY, WHY_BLOCKED, WHY_ENEMY, WHY_BATTLE, WHY_SHAKEN]
+## D40: a hostile garrisoned fortress ends a leg beside it too. One line to turn off (the playtest's march to Pavia).
+const ZOC_FORTRESSES := true
 ## The key of the shared unowned-land mask in the open-mask table (no country has an empty tag).
 const UNOWNED_KEY := &""
 ## Plans kept per game version before the table is emptied (5.0 R3 b).
@@ -27,14 +43,24 @@ static var _hostile: Dictionary = {}
 ## Counts every change of the test pairs: a plan's key holds it, so a plan made before a registration is not kept after it.
 ## M7's war and peace change the hostility through the game (their actions bump game.version too; see spec 4.4).
 static var _hostile_revision: int = 0
+## The armies by hex for one movement phase (MovementPhase builds it at its start, moves it with each step and drops it after the
+## ticks): armies_on reads it while it is on, so a zone of control and a contact cost a lookup, not a scan of every army.
+static var _index: Dictionary = {}
+static var _indexed: bool = false
+## Test seam: false makes every read the plain scan of game.armies (the equality test of the index, see test_movement_index.gd).
+static var use_index: bool = true
 
 
 # --- hostility (D21, D13: M7 makes it war) ---------------------------------------------------------------------------
 
 
-## True when `a` and `b` are hostile: nobody in M6 except the pairs a test registers.
-static func hostile(_game: Game, a: StringName, b: StringName) -> bool:
-	return a != b and a != &"" and b != &"" and _hostile.has(_pair(a, b))
+## True when `a` and `b` are hostile: at war (Wars.at_war, M7), or a pair a test registered (the seam wins as well).
+static func hostile(game: Game, a: StringName, b: StringName) -> bool:
+	if a == b or a == &"" or b == &"":
+		return false
+	if _hostile.has(_pair(a, b)):
+		return true
+	return game != null and Wars.at_war(game, a, b)
 
 
 ## Makes `a` and `b` hostile for the tests (their land opens to each other and their armies stop each other).
@@ -59,13 +85,116 @@ static func _pair(a: StringName, b: StringName) -> String:
 	return x + "|" + y if x < y else y + "|" + x
 
 
-## True when a neighbour of `hex` holds an army of a country hostile to `tag` (D21; M7 adds the hostile castles).
+## True when a neighbour of `hex` holds an army of a country hostile to `tag`, or a hostile garrisoned fortress (D21, D40).
 static func zoc_halts(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	return zoc_text(game, tag, hex) != ""
+
+
+## The words of the zone of control beside `hex` ("" when none applies): the first neighbour, in direction order, that holds a
+## hostile army or a hostile garrisoned fortress. Nothing while no war is live (contested).
+static func zoc_text(game: Game, tag: StringName, hex: Vector2i) -> String:
+	if not contested(game):
+		return ""
 	for d: int in 6:
-		for a: Army in Armies.at(game, game.map.neighbour(hex, d)):
+		var n := game.map.neighbour(hex, d)
+		for a: Army in armies_on(game, n):
 			if hostile(game, tag, a.tag):
-				return true
+				return "an army of %s stands beside it" % country_name(game, a.tag)
+		if ZOC_FORTRESSES and game.map.index_of(n) >= 0 and closed_fortress(game, tag, n):
+			return "a fortress of %s stands beside it" % country_name(game, Occupation.controller_tag(game, n))
+	return ""
+
+
+## True while a war is live or a test registers hostility: the open land and the plans then depend on the wars.
+static func contested(game: Game) -> bool:
+	if has_hostility():
+		return true
+	for w: War in game.wars:
+		if w.live():
+			return true
 	return false
+
+
+## The war state in a cache key: the pairs of the live wars, sorted (a declaration or a peace changes it).
+static func war_key(game: Game) -> String:
+	var pairs := PackedStringArray()
+	for w: War in game.wars:
+		if w.live():
+			pairs.append(_pair(w.a, w.b))
+	pairs.sort()
+	return ";".join(pairs)
+
+
+## True when `hex` holds a fortress with men in its garrison that is controlled by a country at war with `tag` (4.8: the mask
+## closes it, but for the march's goal).
+static func closed_fortress(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	if Occupation.fortress_level(game, hex) == 0 or Occupation.garrison_of(game, hex) <= 0:
+		return false
+	var ctl := Occupation.controller_tag(game, hex)
+	return ctl != &"" and hostile(game, tag, ctl)
+
+
+## Starts the phase's index of the armies by hex (the phase's own moves are kept with index_move).
+static func begin_index(game: Game) -> void:
+	_index.clear()
+	_indexed = use_index
+	if not _indexed:
+		return
+	for a: Army in game.armies:
+		_add_to_index(game, a, a.hex)
+
+
+## Drops the phase's index: every read is the plain scan again.
+static func end_index() -> void:
+	_index.clear()
+	_indexed = false
+
+
+## An army of the phase moved from `from` to `to` (index only; the army's hex is set by Armies).
+static func index_move(game: Game, army: Army, from: Vector2i, to: Vector2i) -> void:
+	if not _indexed:
+		return
+	var i := game.map.index_of(from)
+	if _index.has(i):
+		(_index[i] as Array).erase(army)
+	_add_to_index(game, army, to)
+
+
+static func _add_to_index(game: Game, army: Army, hex: Vector2i) -> void:
+	var k := game.map.index_of(hex)
+	if k < 0:
+		return
+	if not _index.has(k):
+		_index[k] = []
+	(_index[k] as Array).append(army)
+
+
+## Every army (any country) standing on `hex`: the phase's index while one is on, else Armies.at.
+static func armies_on(game: Game, hex: Vector2i) -> Array[Army]:
+	if not _indexed:
+		return Armies.at(game, hex)
+	var out: Array[Army] = []
+	var k := game.map.index_of(hex)
+	if k >= 0 and _index.has(k):
+		for a: Variant in _index[k] as Array:
+			out.append(a as Army)
+	return out
+
+
+## True when an army of a country at war with `tag` stands on `hex` (the armies' hexes as they are now). The test seam does not
+## count: a registered pair is blocked on the walk (M6), it is not a battle.
+static func enemy_army_at(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	for a: Army in armies_on(game, hex):
+		if a.tag != tag and Wars.at_war(game, tag, a.tag):
+			return true
+	return false
+
+
+## The open step of a leg (4.8): the land is open to `tag`, and no hostile garrisoned fortress stands on it unless it is the goal.
+static func open_step(game: Game, tag: StringName, hex: Vector2i, goal: Vector2i) -> bool:
+	if not open_to(game, tag, hex):
+		return false
+	return hex == goal or not closed_fortress(game, tag, hex)
 
 
 # --- reads -----------------------------------------------------------------------------------------------------------
@@ -157,7 +286,8 @@ static func _area(game: Game, tag: StringName) -> Dictionary:
 
 
 static func _table(game: Game) -> Dictionary:
-	var key: Array = [hash(game.state.owner), game.state.owner.size(), game.map.hex_count()]
+	var key: Array = [hash(game.state.owner), game.state.owner.size(), game.map.hex_count(), hash(game.state.occupier),
+		hash(game.state.garrison), war_key(game)]
 	return game.view_cache.pinned(&"open_masks", key, func() -> Dictionary: return {}) as Dictionary
 
 
@@ -178,11 +308,14 @@ static func _make_area(game: Game, tag: StringName, base: PackedByteArray) -> Di
 	if mine != null:
 		for i: int in Territory.districts(game, mine.id):
 			mask[i] = 1
-	if has_hostility():
+	if contested(game):
 		for c: Country in game.countries:
 			if c != null and hostile(game, tag, c.tag):
 				for i: int in Territory.districts(game, c.id):
 					mask[i] = 1
+		for i: int in game.war_cache.fortresses(game):
+			if closed_fortress(game, tag, game.map.hex_of(i)):
+				mask[i] = 0
 	return {"mask": mask, "comps": PackedInt32Array()}
 
 
@@ -202,7 +335,8 @@ static func _components(game: Game, tag: StringName) -> PackedInt32Array:
 ## A check and the order that follows it plan once.
 static func plan(game: Game, army: Army, goal: Vector2i) -> Dictionary:
 	var mp := mp_of(game, army)
-	var key: Array = [army.id, army.hex, goal, mp, game.turn, army.tag, _hostile_revision]
+	var key: Array = [army.id, army.hex, goal, mp, game.turn, army.tag, _hostile_revision, war_key(game),
+		hash(game.state.occupier), hash(game.state.garrison)]
 	var table: Dictionary = game.view_cache.pinned(&"plans", game.version, func() -> Dictionary: return {}) as Dictionary
 	if table.has(key):
 		return table[key] as Dictionary
@@ -225,11 +359,16 @@ static func replan(game: Game, tag: StringName, from_hex: Vector2i, goal: Vector
 	var steps := StepCosts.of(m, game.defs)
 	var mask := open_mask(game, tag)
 	var comps := _components(game, tag)
-	if mask[i_from] == 0:
+	var i_goal := m.index_of(goal)
+	var open_goal := i_goal >= 0 and mask[i_goal] == 0 and open_to(game, tag, goal)
+	if mask[i_from] == 0 or open_goal:
 		# An army on land no longer open to it (its hex changed owner) still walks out: its own hex is open to the search,
-		# in a copy of the mask, so the cached mask and components stay as they are (a bug the L6 repro r1 showed).
+		# in a copy of the mask, so the cached mask and components stay as they are (a bug the L6 repro r1 showed). A march
+		# ends on a hostile fortress (4.8): the goal is open to the search in the copy too.
 		mask = mask.duplicate()
 		mask[i_from] = 1
+		if open_goal:
+			mask[i_goal] = 1
 		comps = PathSearch.components(m, steps, mask)
 	var wade := game.defs.wade_plan_cost
 	var max_cost := game.defs.march_seasons_max * mp
@@ -380,7 +519,7 @@ static func march(game: Game, args: Dictionary) -> Dictionary:
 ## The check of a halt (the army stops where it stands): {ok, reason}. Only an army holding already is refused: a march halts,
 ## and a halted march (order none, goal kept) becomes a hold on a second halt.
 static func halt_check(game: Game, args: Dictionary) -> Dictionary:
-	var v := _army_check(game, args)
+	var v := army_check(game, args)
 	if not bool(v.ok):
 		return {"ok": false, "reason": str(v.reason)}
 	if (v.army as Army).order == Army.ORDER_HOLD:
@@ -395,19 +534,22 @@ static func halt(game: Game, args: Dictionary) -> Dictionary:
 	var v := halt_check(game, args)
 	if not bool(v.ok):
 		return v
-	var army := _army_check(game, args).army as Army
-	if army.order == Army.ORDER_MARCH:
+	var army := army_check(game, args).army as Army
+	var storming := army.order == Army.ORDER_STORM
+	if army.order == Army.ORDER_MARCH or storming:
 		Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route)
 	else:
 		Armies.set_order(game, army, Army.ORDER_HOLD, NO_HEX, PackedInt32Array())
 	_clear_halt(game, army)
+	if storming:
+		Armies.set_halt(game, army, WHY_STORM, STORM_HALT_TEXT)
 	_changed(game, army)
 	return {"ok": true, "reason": ""}
 
 
 ## The check of continuing a halted march toward its kept goal (R: "continue"): {ok, reason}.
 static func continue_check(game: Game, args: Dictionary) -> Dictionary:
-	var v := _army_check(game, args)
+	var v := army_check(game, args)
 	if not bool(v.ok):
 		return {"ok": false, "reason": str(v.reason)}
 	var army: Army = v.army
@@ -415,6 +557,12 @@ static func continue_check(game: Game, args: Dictionary) -> Dictionary:
 		return {"ok": false, "reason": "no march to continue"}
 	if army.order == Army.ORDER_MARCH:
 		return {"ok": false, "reason": "the march goes on by itself"}
+	if army.order == Army.ORDER_STORM:
+		return {"ok": false, "reason": "the storm goes on by itself"}
+	if army.halt_why == WHY_STORM:
+		# A halted storm resumes as a storm: its checks again (a war may have ended, a garrison gone).
+		var s := storm_check(game, {"army": army.id, "goal": army.goal, "tag": army.tag})
+		return {"ok": bool(s.ok), "reason": str(s.reason)}
 	var g := goal_verdict(game, army, army.tag, army.goal)
 	return {"ok": bool(g.ok), "reason": str(g.reason)}
 
@@ -424,7 +572,9 @@ static func continue_march(game: Game, args: Dictionary) -> Dictionary:
 	var v := continue_check(game, args)
 	if not bool(v.ok):
 		return v
-	var army := _army_check(game, args).army as Army
+	var army := army_check(game, args).army as Army
+	if army.halt_why == WHY_STORM:
+		return storm(game, {"army": army.id, "goal": army.goal, "tag": army.tag})
 	var res: Dictionary = goal_verdict(game, army, army.tag, army.goal).plan
 	Armies.set_order(game, army, Army.ORDER_MARCH, army.goal, res.hexes)
 	_clear_halt(game, army)
@@ -443,9 +593,14 @@ static func goal_verdict(game: Game, army: Army, tag: StringName, goal: Vector2i
 	if not open_to(game, tag, goal):
 		var holder := country_name(game, Territory.owner_tag(game, goal))
 		return _verdict("not your land: the %s holds it, and your armies cross no border in peace" % holder)
-	var stand := Military.can_stand(game, tag, goal, _adding(game, army, goal), _leaving(game, army, goal))
-	if stand != "":
-		return _verdict(stand)
+	if enemy_army_at(game, tag, goal):
+		var attack := Battles.engage_check(game, {"army": army.id, "hex": goal, "tag": tag})
+		if not bool(attack.ok):
+			return _verdict(str(attack.reason))
+	else:
+		var stand := Military.can_stand(game, tag, goal, _adding(game, army, goal), _leaving(game, army, goal))
+		if stand != "":
+			return _verdict(stand)
 	var res := plan(game, army, goal)
 	if not bool(res.ok):
 		if str(res.reason) == "too_far":
@@ -455,6 +610,72 @@ static func goal_verdict(game: Game, army: Army, tag: StringName, goal: Vector2i
 	if int(w.seasons) > game.defs.march_seasons_max:
 		return _verdict(TOO_FAR_TEXT % game.defs.march_seasons_max)
 	return {"ok": true, "reason": "", "plan": res}
+
+
+## The check of a storm (4.7): {ok, reason}. A fortress of a country at war with the army's, with men in it, not its own walls;
+## the engage check (rows 3 and 4); then the route when the army does not stand on the goal.
+static func storm_check(game: Game, args: Dictionary) -> Dictionary:
+	var v := _storm_verdict(game, args)
+	return {"ok": bool(v.ok), "reason": str(v.reason)}
+
+
+## Orders the army to storm the fortress at its goal: the route stored (none when it stands there), the order storm.
+## A refused storm changes nothing. {ok, reason}.
+static func storm(game: Game, args: Dictionary) -> Dictionary:
+	var v := _storm_verdict(game, args)
+	if not bool(v.ok):
+		return {"ok": false, "reason": str(v.reason)}
+	var army: Army = v.army
+	var goal: Vector2i = args["goal"]
+	var route := PackedInt32Array()
+	if army.hex != goal:
+		var res: Dictionary = v.plan
+		route = res.hexes as PackedInt32Array
+	Armies.set_order(game, army, Army.ORDER_STORM, goal, route)
+	_clear_halt(game, army)
+	_changed(game, army)
+	return {"ok": true, "reason": ""}
+
+
+static func _storm_verdict(game: Game, args: Dictionary) -> Dictionary:
+	var goal: Variant = args.get("goal", null)
+	if not (goal is Vector2i) or goal == NO_HEX:
+		return _verdict("no goal given")
+	var v := army_check(game, args)
+	if not bool(v.ok):
+		return _verdict(str(v.reason))
+	var army: Army = v.army
+	var g: Vector2i = goal
+	if game.map.index_of(g) < 0:
+		return _verdict("that is off the map")
+	if not game.map.is_land(g):
+		return _verdict("armies cannot walk on water")
+	if Occupation.fortress_level(game, g) == 0:
+		return _verdict("no walls to storm at %s" % Military.hex_text(game, g))
+	var ctl := Occupation.controller_tag(game, g)
+	if ctl == army.tag:
+		return _verdict("your own walls")
+	if not Wars.at_war(game, army.tag, ctl):
+		return _verdict("not at war with %s" % _long_name(game, ctl))
+	if Occupation.garrison_of(game, g) <= 0:
+		return _verdict("its garrison is gone: march in to take it")
+	var engage := Battles.engage_check(game, {"army": army.id, "hex": g, "tag": army.tag})
+	if not bool(engage.ok):
+		return _verdict(str(engage.reason))
+	if army.hex == g:
+		return {"ok": true, "reason": "", "army": army, "plan": {}}
+	var res := goal_verdict(game, army, army.tag, g)
+	return {"ok": bool(res.ok), "reason": str(res.reason), "army": army, "plan": res.plan}
+
+
+## The long name of a country for a sentence ("the Duchy of Milan" with its article in the text), or "nobody".
+static func _long_name(game: Game, tag: StringName) -> String:
+	if tag == &"":
+		return "nobody"
+	var cdef := Countries.def_of(game, tag)
+	if cdef != null and not cdef.long_name.is_empty():
+		return cdef.long_name
+	return country_name(game, tag)
 
 
 static func _verdict(reason: String) -> Dictionary:
@@ -484,7 +705,7 @@ static func _march_verdict(game: Game, args: Dictionary) -> Dictionary:
 	var goal: Variant = args.get("goal", null)
 	if not (goal is Vector2i) or goal == NO_HEX:
 		return {"ok": false, "reason": "no goal given", "army": null, "plan": {}}
-	var v := _army_check(game, args)
+	var v := army_check(game, args)
 	if not bool(v.ok):
 		return {"ok": false, "reason": str(v.reason), "army": null, "plan": {}}
 	var army: Army = v.army
@@ -493,7 +714,7 @@ static func _march_verdict(game: Game, args: Dictionary) -> Dictionary:
 
 
 ## Rows 1 to 3 of 4.7 for an order: the army id given and existing, and the army of the country the args name.
-static func _army_check(game: Game, args: Dictionary) -> Dictionary:
+static func army_check(game: Game, args: Dictionary) -> Dictionary:
 	var id := int(args.get("army", 0))
 	if id < 1:
 		return {"ok": false, "reason": "no army given", "army": null}

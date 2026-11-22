@@ -69,9 +69,6 @@ func _begin_works(g: Game, luck: Rng, ready: Dictionary) -> void:
 func _random_armies(g: Game, luck: Rng) -> void:
 	for _k: int in 6:
 		var pick: Dictionary = RandomPlayer.next(g, TAG, luck)
-		# declare_war is not played here until the snapshot carries game.wars (M7 B13): a load would forget the war.
-		if str(pick["action"]) == "declare_war":
-			continue
 		g.act(str(pick["action"]), pick["args"])
 
 

@@ -732,7 +732,7 @@ static func _names_from(raw: Dictionary) -> Variant:
 	var out := {}
 	for key: Variant in raw:
 		var value: Variant = raw[key]
-		if not (key is String) or (key as String).length() > NAME_KEY_MAX:
+		if not (key is String) or not PlaceNames.key_ok(key as String):  # the shared rule (PlaceNames: length, no control or separator)
 			return null
 		if not (value is int or value is float):
 			return null

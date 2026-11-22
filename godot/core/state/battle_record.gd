@@ -80,6 +80,7 @@ func to_dict() -> Dictionary:
 ## Null on a wrong schema, a damaged frame or end, or a missing or mistyped field. The frames must be as many as the
 ## end's days (1 to 8), in day order; the loser must be one of the two sides; every count is an int32.
 static func from_dict(d: Dictionary) -> BattleRecord:
+	refusal = ""
 	if str(d.get("schema", "")) != SCHEMA:
 		return null
 	var r := BattleRecord.new()
@@ -257,10 +258,10 @@ static func _frame_from(d: Dictionary) -> Variant:
 		return null
 	if withdrew == null or int(withdrew) < 0 or not (d["cause"] is String or d["cause"] is StringName):
 		return null
-	var rolls: Variant = _ints_checked(d["rolls"], 2, 0)
-	var killed: Variant = _ints_checked(d["killed"], 2, 0)
-	var wounded: Variant = _ints_checked(d["wounded"], 2, 0)
-	var front: Variant = _ints_checked(d["front"], 2, 0)
+	var rolls: Variant = _side_pair(d["rolls"], "frame.rolls")
+	var killed: Variant = _side_pair(d["killed"], "frame.killed")
+	var wounded: Variant = _side_pair(d["wounded"], "frame.wounded")
+	var front: Variant = _side_pair(d["front"], "frame.front")
 	var routed: Variant = _ints_checked(d["routed"], -1, -1)
 	var shaken: Variant = _ints_checked(d["shaken"], -1, -1)
 	if rolls == null or killed == null or wounded == null or front == null or routed == null or shaken == null:
@@ -340,12 +341,15 @@ static func _end_from(value: Variant, attacker: String, defender: String) -> Var
 	var retreat: Variant = _retreat_from(raw["retreat"])
 	if men == null or morale == null or wounded == null or returned == null or garrison == null or retreat == null:
 		return null
-	var killed: Variant = _ints_checked(raw["killed"], -1, 0)
-	var wounded_total: Variant = _ints_checked(raw["wounded_total"], -1, 0)
+	# killed and wounded_total are per side (attacker, defender): exactly two counts each (Stats reads index 0 and 1).
+	var killed: Variant = _side_pair(raw["killed"], "end.killed")
+	var wounded_total: Variant = _side_pair(raw["wounded_total"], "end.wounded_total")
+	if killed == null or wounded_total == null:
+		return null
 	var lost_whole: Variant = _ints_checked(raw["lost_whole"], -1, 0)
 	var surrendered: Variant = _ints_checked(raw["surrendered"], -1, 0)
-	if killed == null or wounded_total == null or lost_whole == null or surrendered == null:
-		return null
+	if lost_whole == null or surrendered == null:
+		return _refuse("end.lost_whole and end.surrendered must be lists of whole numbers 0 and up")
 	return {
 		"how": str(raw["how"]), "cause": str(raw["cause"]), "winner": int(winner), "loser": loser,
 		"days": int(days), "men": men, "morale": morale, "wounded": wounded, "killed": killed,
@@ -410,6 +414,32 @@ static func _key_of(key: Variant) -> Variant:
 		if found != null and int(found) >= Unit.INT32_MIN and int(found) <= Unit.INT32_MAX:
 			return found
 	return null
+
+
+## Why the last record was refused (for the save's report and the tests); "" when none was refused for a stated reason.
+static var refusal: String = ""
+
+
+static func _refuse(reason: String) -> Variant:
+	refusal = reason
+	return null
+
+
+## A per-side pair (attacker, defender): a list of exactly two int32 counts, each 0 and up. Null with a reason otherwise.
+static func _side_pair(value: Variant, what: String) -> Variant:
+	if not (value is Array or value is PackedInt32Array):
+		return _refuse("%s is not a list" % what)
+	var count := 0
+	if value is Array:
+		count = (value as Array).size()
+	else:
+		count = (value as PackedInt32Array).size()
+	if count != 2:
+		return _refuse("%s must have two counts (attacker, defender), not %d" % [what, count])
+	var out: Variant = _ints_checked(value, 2, 0)
+	if out == null:
+		return _refuse("%s has a count that is not a whole number from 0 to 2147483647" % what)
+	return out
 
 
 ## A PackedInt32Array of `size` int32 numbers at least `low` (size -1: any count); from a packed array or a list.

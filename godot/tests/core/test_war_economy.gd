@@ -228,13 +228,15 @@ func test_preview_equals_play_with_an_occupied_district_for_owner_and_occupier()
 		return
 	WarFixture.at_war(g, owner, occupier)
 	_occupy(g, i, occupier)
+	# An army of the occupier on the held hex keeps it supported (D18): no freeing inside the horizon the preview foresees.
+	WarFixture.army_at(g, occupier, g.map.hex_of(i), 2)
 	for tag: StringName in [owner, occupier]:
-		var ahead: Array = EconomyPreview.with(g, tag, {}, 3)["seasons"]
+		var ahead: Array = EconomyPreview.with(g, tag, {}, 8)["seasons"]
 		var played: Array = []
-		for k: int in 3:
+		for k: int in 8:
 			Season.run(g)
 			played.append(Countries.by_tag(g, tag).ledger_closed.get("lines", []))
-		for k: int in 3:
+		for k: int in 8:
 			assert_eq(EconomyFixture.totals(ahead[k]["lines"]), EconomyFixture.totals(played[k]),
 				"%s, season %d: the preview's money lines are the played ones" % [tag, k])
 
@@ -253,6 +255,8 @@ func test_an_occupiers_held_town_grows_in_play_and_in_the_preview() -> void:
 	assert_true(g.dev_people(hex, maxi(g.districts.room_of(g, i) / 2, 1)), "the town starts half full")
 	WarFixture.at_war(g, owner, occupier)
 	_occupy(g, i, occupier)
+	# An army of the occupier on the held hex keeps it supported (D18): the freeing rule is outside what the preview foresees.
+	WarFixture.army_at(g, occupier, hex, 2)
 	var start := int(g.state.people[i])
 	var ahead: Array = EconomyPreview.with(g, occupier, {}, 8)["seasons"]
 	var occ := Countries.by_tag(g, occupier)

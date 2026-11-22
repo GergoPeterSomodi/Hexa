@@ -41,10 +41,6 @@ func _act(g: Game, c: Country, luck: Rng) -> void:
 	# Two random army actions (raise, march, split, merge, disband, halt...): the people move with the men (M6, L13).
 	for _k: int in 2:
 		var pick: Dictionary = RandomPlayer.next(g, c.tag, luck)
-		# Wars are not in the snapshot yet (B13 wires them): a declaration or a peace would make the saved run forget its wars
-		# and diverge. The pick still draws from the stream, so the other picks do not move.
-		if str(pick["action"]) in ["declare_war", "make_peace"]:
-			continue
 		if bool(g.act(str(pick["action"]), pick["args"])["ok"]):
 			_seen["armies"] = int(_seen.get("armies", 0)) + 1
 	if luck.randi_range(0, 3) == 0:
@@ -111,6 +107,7 @@ func _check_season(g: Game, ended: int, pre: PackedInt32Array, mid: PackedInt32A
 		mid_use: PackedByteArray, open_before: Dictionary, open_after: Dictionary) -> void:
 	var state := g.state
 	var sums := {}
+	var excess := {}  # per owner: the people a hex holds above its room and above its mid-season count
 	var world_change := 0
 	var world_flows := 0
 	for i: int in g.map.hex_count():
@@ -126,7 +123,12 @@ func _check_season(g: Game, ended: int, pre: PackedInt32Array, mid: PackedInt32A
 			assert_eq(delta, 0, "unowned land never changes, " + label)
 		else:
 			sums[owner_id] = int(sums.get(owner_id, 0)) + delta
-		assert_lte(state.people[i], maxi(mid[i], g.districts.room_of(g, i)), "growth never passes the room, " + label)
+		var bound := maxi(mid[i], g.districts.room_of(g, i))
+		# Men sent home by a peace (the war phase runs before the people phase) are booked as returned people on the hex
+		# (People.give_back): over the room they stay until the people phase lets them leave (as any crowd does). Only
+		# those may pass the bound; the owner's returned flow of the season must cover them (checked per country below).
+		if state.people[i] > bound:
+			excess[owner_id] = int(excess.get(owner_id, 0)) + int(state.people[i]) - bound
 		var changed_level: bool = int(state.level[i]) != int(mid_level[i]) or int(state.main_use[i]) != int(mid_use[i])
 		if changed_level:
 			var hex := g.map.hex_of(i)
@@ -152,6 +154,9 @@ func _check_season(g: Game, ended: int, pre: PackedInt32Array, mid: PackedInt32A
 		world_flows += flow_sum
 		assert_eq(int(sums.get(c.id, 0)), flow_sum, "the change of the people equals the flows' sum, " + label)
 		assert_gte(flows[People.GREW], 0, "grew, " + label)
+		var over := int(excess.get(c.id, 0))
+		assert_lte(over, maxi(int(flows[People.FLOWS.find(&"returned")]), 0),
+			"growth never passes the room; only men sent home overfill a hex, " + label)
 		assert_lte(flows[People.STARVED], 0, "starved, " + label)
 		assert_lte(flows[People.LEFT], 0, "left, " + label)
 		_seen["grew"] += 1 if flows[People.GREW] > 0 else 0

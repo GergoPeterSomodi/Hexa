@@ -508,3 +508,43 @@ func test_battle_refuses_armies_that_do_not_add_up() -> void:
 	sg = _siege().to_dict()
 	sg["besieger"] = "S,V"
 	assert_null(Siege.from_dict(sg), "P: a comma in a tag")
+
+
+# --- review of B2 (s15): the per-side counts of a record are exactly two whole numbers, or the record is refused ---------
+
+
+func test_per_side_end_counts_are_exactly_two_whole_numbers() -> void:
+	var bad: Array = [
+		[1], [1, 2, 3], [], "12", {"a": 1}, [1, "x"], [1.5, 2], [2147483648, 0], [-1, 0], [1e300, 0], [1, null],
+	]
+	for key: String in ["killed", "wounded_total"]:
+		for value: Variant in bad:
+			var d := _record().to_dict()
+			(d["end"] as Dictionary)[key] = value
+			assert_null(BattleRecord.from_dict(d), "P: %s = %s" % [key, str(value)])
+			assert_true(BattleRecord.refusal.contains(key), "the refusal names %s: %s" % [key, BattleRecord.refusal])
+		var ok := _record().to_dict()
+		(ok["end"] as Dictionary)[key] = [2.0, 3]
+		assert_not_null(BattleRecord.from_dict(ok), "a whole float is a count: %s" % key)
+		var zero := _record().to_dict()
+		(zero["end"] as Dictionary)[key] = [0, 0]
+		assert_not_null(BattleRecord.from_dict(zero), "zero counts are fine: %s" % key)
+
+
+func test_per_side_frame_arrays_are_exactly_two_whole_numbers() -> void:
+	for key: String in ["rolls", "killed", "wounded", "front"]:
+		for value: Variant in [[1], [1, 2, 3], [1.5, 2], [2147483648, 0], "12"]:
+			var d := _record().to_dict()
+			var first: Dictionary = (d["frames"] as Array)[0]
+			first[key] = value
+			assert_null(BattleRecord.from_dict(d), "P: frame %s = %s" % [key, str(value)])
+			assert_true(BattleRecord.refusal.contains(key), "the refusal names frame %s" % key)
+
+
+func test_a_valid_record_clears_the_refusal() -> void:
+	var d := _record().to_dict()
+	(d["end"] as Dictionary)["killed"] = [1]
+	assert_null(BattleRecord.from_dict(d))
+	assert_false(BattleRecord.refusal.is_empty())
+	assert_not_null(BattleRecord.from_dict(_record().to_dict()))
+	assert_eq(BattleRecord.refusal, "", "a good load leaves no refusal behind")

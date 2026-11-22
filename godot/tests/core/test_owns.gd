@@ -17,7 +17,10 @@ const ACTION_OWNERS := {
 	"set_tax": ["countries"],
 }
 const PHASE_OWNERS := {
-	&"movement": ["armies", "countries"],  # the walks; explored along them (Vision.see_path, 5.0 R4)
+	&"movement": ["armies", "countries", "battles"],  # the walks; explored along them (Vision.see_path, 5.0 R4); engage (M7)
+	&"battles": ["armies", "battles", "wars", "occupier", "garrison", "unsupported", "people", "people_flows", "luck"],
+	&"sieges": ["sieges", "occupier", "garrison", "unsupported", "people", "people_flows"],
+	&"war": ["wars", "occupier", "garrison", "unsupported", "owner", "armies"],  # a timer peace moves no owner (4.9)
 	&"supply": ["armies", "stores", "people", "people_flows"],  # hunger through Armies, food through Stores, foraging through People
 	&"production": ["stores", "countries"],
 	&"income": ["purse"],  # the upkeep_army line is Treasury's too (M6)
@@ -30,7 +33,8 @@ const PHASE_OWNERS := {
 }
 const HOME := Vector2i(0, 2)
 const FIELDS: Array[String] = ["turn", "weather", "player", "main_use", "level", "owner", "works", "next_work_id",
-	"countries", "armies", "purse", "stores", "people", "people_flows", "people_close", "food", "stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id"]
+	"countries", "armies", "purse", "stores", "people", "people_flows", "people_close", "food", "stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id",
+	"wars", "battles", "sieges", "occupier", "garrison", "unsupported"]
 
 var _fx: Dictionary = {}
 
@@ -61,7 +65,12 @@ func _fields(game: Game) -> Dictionary:
 				"goods_closed", "flows_shape"]:
 			own.erase(key)
 		countries.append(own)
+	var war := body["war"] as Dictionary
 	return {
+		"wars": var_to_bytes([war["wars"], war["next_war_id"]]),
+		"battles": var_to_bytes([war["battles"], war["battle_records"], war["next_record_id"], war["battle_names"]]),
+		"sieges": var_to_bytes([war["sieges"], war["siege_names"]]),
+		"occupier": state["occupier"], "garrison": state["garrison"], "unsupported": state["unsupported"],
 		"weather": game.weather, "purse": purse, "stores": stores, "food": food,
 		"people": var_to_bytes(state["people"]), "people_flows": people_flows, "people_close": closes,
 		"turn": meta["turn"], "player": meta["player"], "main_use": state["main_use"], "level": state["level"],
@@ -164,6 +173,14 @@ func test_every_phase_changes_only_its_owners() -> void:
 	assert_true(seen.has("luck"), "the calendar draws the weather")
 	assert_false(seen.has("owner"))
 	assert_false(seen.has("player"))
+
+
+func test_a_test_only_write_to_occupier_is_reported() -> void:
+	# The planted fault of 5.3: a phase that writes the occupation directly is outside its owners (stats owns no occupier).
+	var g := _game()
+	var before := _fields(g)
+	g.state.occupier[g.map.index_of(HOME)] = 1
+	assert_eq(_violations(_changed(before, _fields(g)), PHASE_OWNERS[&"stats"] as Array), ["occupier"] as Array[String])
 
 
 func test_season_begin_writes_only_the_door() -> void:

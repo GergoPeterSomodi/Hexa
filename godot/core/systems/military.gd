@@ -67,7 +67,7 @@ static func men_at_hand(game: Game, tag: StringName, hex: Vector2i) -> int:
 static func can_stand(game: Game, tag: StringName, hex: Vector2i, adding: int,
 		leaving: PackedInt32Array = PackedInt32Array()) -> String:
 	for a: Army in Armies.at(game, hex):
-		if a.tag != tag:
+		if a.tag != tag and not Wars.at_war(game, tag, a.tag):
 			return "another country's army stands at %s" % hex_text(game, hex)
 	var present := Armies.units_at(game, tag, hex, leaving)
 	var limit := stack_limit(game, tag)
@@ -235,6 +235,8 @@ static func raise_check(game: Game, args: Dictionary) -> Dictionary:
 	var home := Territory.at_home_check(game, tag, hex)
 	if not bool(home["ok"]):
 		return _refusal(str(home["reason"]))
+	if Occupation.is_occupied(game, hex):
+		return _refusal("held by the %s: no men can be raised here" % Occupation.occupier_long_name(game, hex))
 	var i := game.map.index_of(hex)
 	if i < 0 or int(game.state.main_use[i]) != SETTLEMENTS:
 		return _refusal("companies are raised in towns and villages: no settlement here")
@@ -637,6 +639,34 @@ static func _country_name(game: Game, tag: StringName) -> String:
 	if cdef != null and not cdef.name.is_empty():
 		return cdef.name
 	return String(tag)
+
+
+## The check of a standing order (4.7: what the army does when it is attacked): {ok, reason}. Changes nothing.
+static func standing_check(game: Game, args: Dictionary) -> Dictionary:
+	var v := Movement.army_check(game, args)
+	if not bool(v.ok):
+		return _refusal(str(v.reason))
+	var army: Army = v.army
+	var standing := str(args.get("standing", ""))
+	if standing == "":
+		return _refusal("no standing order given")
+	if standing != String(Army.STANDING_HOLD) and standing != String(Army.STANDING_WITHDRAW):
+		return _refusal("no such standing order: hold or withdraw")
+	if String(army.standing) == standing:
+		var word := "holds" if standing == String(Army.STANDING_HOLD) else "withdraws"
+		return _refusal("%s already %s when attacked" % [army.name, word])
+	return {"ok": true, "reason": ""}
+
+
+## Sets the standing order of an army (Army.STANDING_HOLD or Army.STANDING_WITHDRAW) after checking it again: {ok, reason}.
+static func set_standing(game: Game, args: Dictionary) -> Dictionary:
+	var v := standing_check(game, args)
+	if not bool(v.ok):
+		return v
+	var army := Movement.army_check(game, args).army as Army
+	Armies.set_standing(game, army, StringName(str(args["standing"])))
+	_changed(game, army, false)
+	return {"ok": true, "reason": ""}
 
 
 static func _refusal(reason: String) -> Dictionary:

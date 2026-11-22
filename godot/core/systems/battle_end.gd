@@ -257,13 +257,15 @@ static func _settle_fortress(game: Game, battle: Battle, end: Dictionary, raw: D
 	var morale := int(garrison.get("morale", 0))
 	var how := str(raw["how"])
 	var fell := int(raw["winner"]) == SIDE_ATTACKER and (how == "broke" or how == "wiped" or surrendered)
+	var uncut := battle.storm_from - battle.storm_cut if battle.storm_cut > 0 else 0
+	# The garrison's men the fight left are written first: a capture books the garrison it finds as lost, and the men the fight
+	# killed or wounded are booked as battle losses already (each man counted once).
+	Occupation.set_garrison(game, battle.hex, uncut + men_after)
 	if fell and (men_after == 0 or morale == 0 or defender_field == 0):
 		var opened := maxi(Occupation.members(game, battle.hex).size() - 1, 0)
 		Occupation.capture(game, battle.hex, battle.attacker, &"storm",
 			{"name": _text(game, battle.hex), "seasons": 0, "opened": opened})
 		return true
-	var uncut := battle.storm_from - battle.storm_cut if battle.storm_cut > 0 else 0
-	Occupation.set_garrison(game, battle.hex, uncut + men_after)
 	return false
 
 

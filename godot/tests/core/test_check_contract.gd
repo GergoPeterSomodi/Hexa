@@ -64,12 +64,18 @@ func test_three_thousand_random_actions_keep_their_checks() -> void:
 			refused[action] = int(refused.get(action, 0)) + 1
 		if (n + 1) % EVERY == 0:
 			assert_true(bool(Season.run(g)["ok"]), "the season ends at action %d" % n)
+			# The two M7 actions changed the random stream, so the picks no longer meet two companies on one hex by chance:
+			# two more companies of the player's country muster on the town each season (a merge is then always on offer).
+			ArmyFixture.army(g, ArmyFixture.TAG, town, 0, 2)
 	assert_eq(problems.size(), 0, "the contract holds: %s" % str(problems.slice(0, 5)))
 	for name: String in Actions.NAMES:
 		assert_gt(int(ok_count.get(name, 0)) + int(refused.get(name, 0)), 0, "%s was picked" % name)
-	for name: String in ["raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war"]:
+	for name: String in ["raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war",
+			"set_standing"]:
 		assert_gt(int(ok_count.get(name, 0)), 0, "%s succeeded at least once" % name)
 		assert_gt(int(refused.get(name, 0)), 0, "%s was refused at least once" % name)
+	# No war on this fixture: a storm is refused every time it is picked (its successes are in test_movement_war.gd).
+	assert_gt(int(refused.get("storm", 0)), 0, "storm was refused at least once (no war here)")
 	assert_eq(g.turn, 1 + SEASON_ENDS, "%d season ends" % SEASON_ENDS)
 
 

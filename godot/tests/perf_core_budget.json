@@ -1,14 +1,16 @@
 {
   "comment": "Core speed budgets (docs/architecture/m3-build-spec.md, m4-build-spec.md and m5-build-spec.md section 8). Read by tools/perf_core.gd, nightly in CI. Never read by a GUT test. A row past its limit fails the job, unless it has a known_over entry (an open issue): then it prints KNOWN OVER and is listed in the report, and the run does not fail. Times are CPU milliseconds, headless; save_mb is the size of the .sav file.",
   "limits": {
-    "season_ms": {"limit": 320.0, "class": "cpu", "what": "the ten phases of Season.run (armies, M6, included), worst of 8 seasons (M5: 190, M4: 150; the limit was raised to 320 for the army phases, spec 8)", "known_over": {"issue": 409, "note": "over 320 on the M4 quiet-machine measure 2026-11-20 and on 2026-11-21 (771 ms, shared machine); see the issue"}},
+    "season_ms": {"limit": 380.0, "class": "cpu", "what": "the thirteen phases of Season.run (M7; armies and the war included), worst of 8 seasons (M5: 190, M4: 150; M6: 320 for the army phases; M7: 380, m7-build-spec.md 8)", "known_over": {"issue": 409, "note": "over the limit on the M4 quiet-machine measure 2026-11-20 and on 2026-11-21 (771 ms, shared machine); see the issue"}},
     "production_ms": {"limit": 70.0, "class": "cpu", "what": "the production phase over every land hex (warm DistrictCache, staffing live), worst (M4: 60)", "known_over": {"issue": 409, "note": "M4 quiet-machine measure 2026-11-20, see the issue"}},
     "people_ms": {"limit": 30.0, "class": "cpu", "what": "M5: the people phase over every owned land hex, 60 countries, worst of 8 seasons", "known_over": {"issue": 414, "note": "spikes when works finish, not measured quiet"}},
     "income_ms": {"limit": 20.0, "class": "cpu", "what": "the income phase, worst", "known_over": {"issue": 409, "note": "M5 measure 2026-11-21: 24 ms worst of 8 seasons, machine not quiet (a core season row)"}},
     "cache_build_ms": {"limit": 400.0, "class": "cpu", "what": "DistrictCache filled for every land hex from cold (a new game, a load)", "known_over": {"issue": 408, "note": "measured about 780 ms on the fake Europe"}},
     "works_phase_ms": {"limit": 20.0, "class": "cpu", "what": "the works phase with 600 works, worst", "known_over": {"issue": 409, "note": "M4 quiet-machine measure 2026-11-20, see the issue"}},
-    "stats_phase_ms": {"limit": 60.0, "class": "cpu", "what": "the stats phase with 42 series and People.close (1 ms a country), worst"},
+    "stats_phase_ms": {"limit": 60.0, "class": "cpu", "what": "the stats phase with 49 series (M7's war series included) and People.close (1 ms a country), worst", "known_over": {"issue": 425, "note": "90.98 ms on a loaded machine (perf_core, 2026-11-22, M7 B13): the war pass in StatsSystem"}},
     "digest_ms": {"limit": 100.0, "class": "cpu", "what": "Game.digest()"},
+    "war_ms": {"limit": 2.0, "class": "cpu", "what": "M7: the war phase (Wars.season, the timer) with 30 wars on the made-up Europe, worst of 8 runs (m7-build-spec.md 8)"},
+    "sieges_ms": {"limit": 25.0, "class": "cpu", "what": "M7: the sieges phase on the war fixture (30 wars, no standing siege; the 100-siege row of m7-build-spec.md 8 waits for its fixture), worst of 8 runs", "known_over": {"issue": 426, "note": "73 ms on a loaded machine (perf_core, 2026-11-22, M7 B13): whole-map passes with no siege standing"}},
     "snapshot_ms": {"limit": 150.0, "class": "cpu", "what": "Snapshot.of"},
     "save_ms": {"limit": 1000.0, "class": "cpu", "what": "SaveFile.write (bytes, zstd, sha, the file sequence)"},
     "load_ms": {"limit": 2000.0, "class": "cpu", "what": "SaveFile.read, Snapshot.restore with WorldImprove.over, the digest check"},

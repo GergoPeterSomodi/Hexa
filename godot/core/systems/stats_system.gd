@@ -2,6 +2,8 @@
 ## country in id order (the pseudo-country "" in a map-only game), into the ring, and in Winter into the year rows. From
 ## M4 (m4-build-spec.md 4.20) it also writes the money and goods series, then closes the season's ledgers and flows.
 ## M6 (m6-build-spec.md 4.16, 5.0 R8 d): the armies' men, raises, hunger and upkeep.
+## M7 (m7-build-spec.md 4.19): the seven war series and war_score (the districts held and lost, the garrisons, the battles
+## of the season's records, the garrison a capture books lost); `losses` takes the battle losses too.
 class_name StatsSystem
 extends RefCounted
 
@@ -121,6 +123,7 @@ static func _rows(game: Game, stats: Stats) -> Array[PackedInt32Array]:
 			if c >= 0:
 				rows[c][finished_col] += 1
 	_army_entries_into(game, stats, rows)
+	_war_into(game, stats, rows)
 	var army_men_col := Stats.column("army_men")
 	if by_owner:
 		for c: int in mini(game.countries.size(), rows.size()):
@@ -150,6 +153,100 @@ static func _army_entries_into(game: Game, stats: Stats, rows: Array[PackedInt32
 		else:
 			rows[c][starved_col] += int(entry.get("lost", 0))
 			rows[c][losses_col] += int(entry.get("lost", 0))
+
+
+## The M7 series (4.19), for every country when there is one: its districts held (others' land it occupies) and lost (its
+## land others occupy), the men of its fortresses, the battles of this season's records, the garrisons its captures booked
+## lost (the chronicle's district_captured) and its war score (Wars.score over its enemies).
+static func _war_into(game: Game, stats: Stats, rows: Array[PackedInt32Array]) -> void:
+	if not _by_owner(game):
+		return
+	_districts_into(game, rows)
+	_battles_into(game, stats, rows)
+	var garrison_col := Stats.column("garrison_lost")
+	for entry: Dictionary in game.chronicle.of_turn(game.turn):
+		if str(entry.get("kind", "")) != "district_captured":
+			continue
+		var c := stats.tags.find(str(entry.get("owner", "")))
+		if c >= 0 and c < rows.size():
+			rows[c][garrison_col] += int(entry.get("garrison_lost", 0))
+	var score_col := Stats.column("war_score")
+	for c: int in mini(game.countries.size(), rows.size()):
+		var tag := game.countries[c].tag
+		var total := 0
+		for enemy: StringName in Wars.enemies(game, tag):
+			total += Wars.score(game, tag, enemy)
+		rows[c][score_col] = total
+
+
+## The occupied and lost districts and the garrison men, from the map (a country's owned land and what sits on it).
+static func _districts_into(game: Game, rows: Array[PackedInt32Array]) -> void:
+	if game.map == null or game.state == null:
+		return
+	var held_col := Stats.column("districts_held")
+	var lost_col := Stats.column("districts_lost")
+	var men_col := Stats.column("garrison_men")
+	var n := mini(game.map.hex_count(), mini(game.state.owner.size(), game.state.occupier.size()))
+	var has_garrison := game.state.garrison.size() == game.state.owner.size()
+	for i: int in n:
+		var owner_c := int(game.state.owner[i]) - 1
+		if owner_c < 0 or owner_c >= rows.size():
+			continue
+		var occupier_c := int(game.state.occupier[i]) - 1
+		if occupier_c >= 0 and occupier_c < rows.size() and occupier_c != owner_c:
+			rows[occupier_c][held_col] += 1
+			rows[owner_c][lost_col] += 1
+		if has_garrison:
+			rows[owner_c][men_col] += int(game.state.garrison[i])
+
+
+## This season's battle records: each side's men lost (killed, and the wounded who did not return: the returns are booked to
+## the country whose units they went back to), and the battles each country won and lost.
+static func _battles_into(game: Game, stats: Stats, rows: Array[PackedInt32Array]) -> void:
+	var men_col := Stats.column("battle_losses")
+	var losses_col := Stats.column("losses")
+	var won_col := Stats.column("battles_won")
+	var lost_col := Stats.column("battles_lost")
+	var owner_of := _owner_of_units(game)
+	for r: BattleRecord in game.battle_records:
+		if r.turn != game.turn:
+			continue
+		var sides: Array[StringName] = [r.attacker, r.defender]
+		var killed: PackedInt32Array = r.end.get("killed", PackedInt32Array([0, 0]))
+		var wounded: PackedInt32Array = r.end.get("wounded_total", PackedInt32Array([0, 0]))
+		if killed.size() < 2 or wounded.size() < 2:
+			continue  # a record is validated on load (BattleRecord._side_pair); this keeps a bad one from crashing the phase
+		var returned: Dictionary = r.end.get("returned", {})
+		for side: int in 2:
+			var c := stats.tags.find(String(sides[side]))
+			if c < 0 or c >= rows.size():
+				continue
+			var back := 0
+			for uid: Variant in returned:
+				if owner_of.get(int(uid), &"") == sides[side]:
+					back += int(returned[uid])
+			var men := int(killed[side]) + int(wounded[side]) - back
+			rows[c][men_col] += men
+			rows[c][losses_col] += men
+		var winner := int(r.end.get("winner", -1))
+		var loser := int(r.end.get("loser", -1))
+		if winner == 0 or winner == 1:
+			var w := stats.tags.find(String(sides[winner]))
+			if w >= 0 and w < rows.size():
+				rows[w][won_col] += 1
+		if loser == 0 or loser == 1:
+			var l := stats.tags.find(String(sides[loser]))
+			if l >= 0 and l < rows.size():
+				rows[l][lost_col] += 1
+
+
+## The country of every unit the armies hold now (a returned man's unit may have gone since the fight; then it books nowhere).
+static func _owner_of_units(game: Game) -> Dictionary:
+	var out := {}
+	for a: Army in game.armies:
+		for u: Unit in a.units:
+			out[u.id] = a.tag
+	return out
 
 
 ## The M5 series of one country from its open people flows: what grew, what starved and what left (as positive numbers),

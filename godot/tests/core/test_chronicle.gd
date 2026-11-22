@@ -70,7 +70,7 @@ func test_notable_holds_the_people_kinds_and_the_five_army_kinds() -> void:
 		assert_true(Chronicle.NOTABLE.has(kind), kind)
 	assert_false(Chronicle.NOTABLE.has("army_changed"))
 	assert_false(Chronicle.NOTABLE.has("unit_moved"))
-	assert_eq(Chronicle.NOTABLE.size(), 14)
+	assert_eq(Chronicle.NOTABLE.size(), 20, "M7 adds six war kinds (4.14)")
 
 
 func test_people_events_are_stored_plain() -> void:

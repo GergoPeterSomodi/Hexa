@@ -1,8 +1,9 @@
 ## The men properties (docs/architecture/m6-build-spec.md 9, done-when 4 and 6; 5.0 R1): 40 seasons of the 1480 scenario with the
 ## RandomPlayer for every country (raises, marches, halts, splits, merges, disbands) and weather drawn. Every season, every
-## country: the change of its people plus the change of its men under arms equals its closed flows other than raised and
-## returned, less the men lost by armies (army_starved); the men under arms move by the raised people less the returned
-## ones, less the losses. The world's change is the sum of the countries'. Each walk spends no more move points than its
+## country: the change of its people plus its men under arms plus its garrisons equals its closed flows other than raised,
+## returned and garrisoned, less the men lost by armies (starved, battle) and the garrison men a capture books lost (M7 4.11,
+## 4.20); the men under arms move by the raised people less the returned ones, less the army losses. A season in which a peace
+## moved an owner's land checks the world only (its people moved with the land). The world's change is the sum of the countries'. Each walk spends no more move points than its
 ## slowest unit has (or is a single step), crosses no closed pass or blocked edge, and enters only land open to its
 ## country; at a season's end no army is over the stack limit, no hex holds another country's army, no store is below zero,
 ## no company or army is empty, and fed is never over its full 1,000.
@@ -16,6 +17,9 @@ var _luck: Rng = null
 var _seen := {}
 ## The countries that raised companies this season (a window's raised people then are not a refill's alone).
 var _raised_tags := {}
+## The countries that fought a battle this season: a defending garrison's killed men are in the defender side's killed count
+## (not the armies' alone), so only the total identity holds for them.
+var _fought := {}
 
 
 func before_each() -> void:
@@ -31,9 +35,49 @@ func _census(g: Game) -> Dictionary:
 	var out := {}
 	for c: Country in g.countries:
 		var people := 0
+		var garrison := 0
 		for i: int in Territory.districts(g, c.id):
 			people += int(g.state.people[i])
-		out[c.tag] = [people, Armies.men_of_country(g, c.tag)]
+			garrison += int(g.state.garrison[i])
+		out[c.tag] = [people, Armies.men_of_country(g, c.tag), garrison]
+	return out
+
+
+## Adds the season's battle losses to `lost` (by tag): each side's killed and wounded men, less the wounded who came back
+## (booked to the country whose units they went back to; a unit gone since books nowhere). Counts the battles.
+func _battle_losses(g: Game, season: int, lost: Dictionary) -> void:
+	var owner_of := {}
+	for a: Army in g.armies:
+		for u: Unit in a.units:
+			owner_of[u.id] = a.tag
+	for r: BattleRecord in g.battle_records:
+		if r.turn != season:
+			continue
+		_seen["battles"] = int(_seen.get("battles", 0)) + 1
+		var sides: Array[StringName] = [r.attacker, r.defender]
+		_fought[r.attacker] = true
+		_fought[r.defender] = true
+		var returned: Dictionary = r.end["returned"]
+		for side: int in 2:
+			var back := 0
+			for uid: Variant in returned:
+				if owner_of.get(int(uid), &"") == sides[side]:
+					back += int(returned[uid])
+			var men := int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back
+			lost[sides[side]] = int(lost.get(sides[side], 0)) + men
+
+
+## The season's war events: counts of the declarations, peaces and battles, and the garrison men each owner's captures booked
+## lost (the district_captured events, by the owner).
+func _war_events(g: Game) -> Dictionary:
+	var out := {}
+	for e: Dictionary in g.events:
+		var kind := str(e.get("kind", ""))
+		if kind == "war_declared" or kind == "peace_made":
+			_seen[kind] = int(_seen.get(kind, 0)) + 1
+		if kind == "district_captured":
+			var t := StringName(str(e.get("owner", "")))
+			out[t] = int(out.get(t, 0)) + int(e.get("garrison_lost", 0))
 	return out
 
 
@@ -43,9 +87,6 @@ func _act_all(g: Game) -> void:
 		for _t: int in PLAYER_TURNS:
 			var pick: Dictionary = RandomPlayer.next(g, c.tag, _luck)
 			var action: String = str(pick["action"])
-			# Wars are not in the snapshot yet (B13 wires them); the pick still drew from the stream, so the others do not move.
-			if action in ["declare_war", "make_peace"]:
-				continue
 			var logged := g.action_log.size()
 			var verdict: Dictionary = g.act(action, pick["args"])
 			if not bool(verdict["ok"]):
@@ -106,8 +147,8 @@ func _check_walks(g: Game, budgets: Dictionary, season: int, winter: bool) -> vo
 
 ## The identity and the state at the end of a season. `pre` is the census before the actions, `post` after the season,
 ## `lost` the men each country lost to hunger this season, `planted` a person added behind the door (P only).
-func _check_season(g: Game, season: int, pre: Dictionary, post: Dictionary, lost: Dictionary,
-		open_before: Dictionary, open_after: Dictionary) -> void:
+func _check_season(g: Game, season: int, pre: Dictionary, post: Dictionary, lost: Dictionary, garrison_lost: Dictionary,
+		moved: bool, open_before: Dictionary, open_after: Dictionary) -> void:
 	var world_change := 0
 	var world_flows := 0
 	for c: Country in g.countries:
@@ -124,17 +165,24 @@ func _check_season(g: Game, season: int, pre: Dictionary, post: Dictionary, lost
 			window.append(closed[f] - before[f] + after[f])
 		var raised := int(window[People.FLOWS.find(&"raised")])
 		var returned := int(window[People.FLOWS.find(&"returned")])
+		var garrisoned := int(window[People.FLOWS.find(&"garrisoned")])
 		var rest := 0
 		for f: int in window:
 			rest += f
-		rest -= raised + returned
-		var men_lost := int(lost.get(c.tag, 0))
+		rest -= raised + returned + garrisoned  # moves between people, men and garrisons: none leaves the country
+		var men_lost := int(lost.get(c.tag, 0))  # the armies' losses: starved and in battle
+		var fort_lost := int(garrison_lost.get(c.tag, 0))  # a capture books its garrison's men lost
 		var dp := int(post[c.tag][0]) - int(pre[c.tag][0])
 		var dm := int(post[c.tag][1]) - int(pre[c.tag][1])
-		assert_eq(dp + dm, rest - men_lost, "people plus men change by the flows less the men lost, " + label)
-		assert_eq(dm, -(raised + returned) - men_lost, "the men under arms move by the raised and returned people, less losses, " + label)
-		world_change += dp + dm
-		world_flows += rest - men_lost
+		var dg := int(post[c.tag][2]) - int(pre[c.tag][2])
+		if not moved:
+			assert_eq(dp + dm + dg, rest - men_lost - fort_lost, "people, men and garrisons change by the flows less the losses, " + label)
+			# The men-under-arms split holds where no garrison moved and no battle was fought (a garrison's levy or regrowth is
+			# not a flow of the men; the total above holds in every season).
+			if not _fought.has(c.tag) and dg == 0:
+				assert_eq(dm, -(raised + returned) - men_lost, "the men under arms move by the raised and returned people, less losses, " + label)
+		world_change += dp + dm + dg
+		world_flows += rest - men_lost - fort_lost
 		for stock: int in c.stock:
 			assert_gte(stock, 0, "no store below zero, " + label)
 		assert_lte(c.food_fed, 1000, "fed is never over the full, " + label)
@@ -181,9 +229,13 @@ func _remarch(g: Game) -> void:
 func _run(g: Game) -> void:
 	for season: int in SEASONS:
 		var pre := _census(g)
+		var owners_before := g.state.owner.duplicate()
 		var open_before := _open_flows(g)
 		_raised_tags.clear()
+		_fought.clear()
 		_act_all(g)
+		if not g.wars.is_empty():
+			_seen["war_seasons"] = int(_seen.get("war_seasons", 0)) + 1
 		_remarch(g)
 		# Every third season the country's food is gone before the supply phase (which runs before production): its armies
 		# on its land go hungry (a rig through the door, logged; a dev transfer, like the rest of the tests' rigs).
@@ -205,8 +257,10 @@ func _run(g: Game) -> void:
 				_seen["starved"] += 1
 				var t := StringName(str(e["tag"]))
 				lost[t] = int(lost.get(t, 0)) + int(e["lost"])
+		_battle_losses(g, ended, lost)
 		_check_walks(g, budgets, ended, winter)
-		_check_season(g, ended, pre, _census(g), lost, open_before, _open_flows(g))
+		var moved := g.state.owner != owners_before
+		_check_season(g, ended, pre, _census(g), lost, _war_events(g), moved, open_before, _open_flows(g))
 		for c: Country in g.countries:
 			var closed := c.people_closed["flows"] as PackedInt32Array
 			var window_raised := int(closed[People.FLOWS.find(&"raised")]) - int(open_before[c.tag][People.FLOWS.find(&"raised")]) + int(_open_flows(g)[c.tag][People.FLOWS.find(&"raised")])
@@ -234,6 +288,9 @@ func test_forty_seasons_every_country_conserves_its_men_and_its_people() -> void
 	var g := _seeded_game()
 	_run(g)
 	assert_eq(g.turn, SEASONS + 1)
+	# The random players make wars in the forty seasons (M7 B13): the identity below covers them. No battle is fought here yet:
+	# the random player orders no attack (its war actions are B12's); the battle rows wait for that.
+	assert_gt(int(_seen.get("war_seasons", 0)), 0, "a war stood in some season: %s" % str(_seen))
 	assert_gt(int(_seen["raised"]), 3, "armies were raised: %s" % str(_seen))
 	assert_gt(int(_seen["marched"]), 3, "armies were ordered on the march")
 	assert_gt(int(_seen["walks"]), 3, "armies walked")

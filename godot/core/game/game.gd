@@ -94,6 +94,8 @@ static func new_scenario(p_map: MapData, p_defs: GameDefs, p_scenario: ScenarioD
 	Countries.setup(out, p_scenario)
 	Territory.setup(out, p_scenario)
 	out.districts.clear()
+	# Called by reference (A14): nobody occupies anything and every fortress holds its full garrison (M7 4.3, B13).
+	Occupation.setup.call(out)
 	# Called by reference (the layer rule: a typed call from game into systems makes the files need each other to parse).
 	People.setup.call(out)  # before the purse: the start treasury counts the people (M5 spec 5.4)
 	Treasury.setup.call(out)
@@ -233,7 +235,7 @@ func act(action: String, args: Dictionary) -> Dictionary:
 
 
 ## SHA-256 (hex text) of the game: map id, seed, scenario id, player, start year, turn, state digest, each country's
-## digest_text, the armies (M6), stats (R5), chronicle and luck; the weather (as "s,f,m") follows the turn.
+## digest_text, the armies (M6), the war state (M7: wars, battles and records, sieges), stats (R5), chronicle and luck; the weather (as "s,f,m") follows the turn.
 func digest() -> String:
 	var map_id := map.id if map != null else ""
 	var scen_id := scenario.id if scenario != null else ""
@@ -244,6 +246,10 @@ func digest() -> String:
 		parts.append(c.digest_text() if c != null else "")
 	# Called by reference (A14): the armies' digest is "next_army|next_unit" and one line per army (4.17).
 	parts.append(str(Armies.digest.call(self)))
+	# M7 (4.20): the war state, each system's digest by reference (the wars, the battles and records, the sieges).
+	parts.append(str(Wars.digest.call(self)))
+	parts.append(str(Battles.digest.call(self)))
+	parts.append(str(Sieges.digest.call(self)))
 	parts.append(stats.digest() if stats != null else "")
 	parts.append(chronicle.digest())
 	parts.append(luck.digest_text() if luck != null else "")

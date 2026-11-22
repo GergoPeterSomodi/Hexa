@@ -426,6 +426,8 @@ static func from_dict(d: Dictionary, game: Game) -> String:
 		last = game.map.index_of(s.hex)
 		out.append(s)
 	for key: Variant in table:
+		if not (key is String) or not PlaceNames.key_ok(key as String):
+			return "siege_names: a place name is not a plain name of 1 to %d characters" % PlaceNames.NAME_KEY_MAX
 		var count: Variant = table[key]
 		if not (count is int or count is float) or float(count) != floor(float(count)) or float(count) < 0 				or float(count) > MAX_NAME_COUNT:
 			return "siege_names: a count is not a whole number of at most %d" % MAX_NAME_COUNT
