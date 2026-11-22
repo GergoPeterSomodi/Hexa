@@ -19,7 +19,7 @@ const TEMPER_TABLE := {
 	"war_chest_seasons": [12, 12, 10, 6, 8],
 	"declare_ratio": [2500, 2000, 2000, 1200, 1500],
 	"busy_bonus": [0, 0, 0, 0, 400],
-	"declare_chance": [100, 150, 100, 600, 450],
+	"declare_chance": [100, 150, 100, 200, 150],
 	"attack_ratio": [1500, 1600, 1300, 1100, 1300],
 	"siege_max": [4, 4, 5, 6, 4],
 	"storm_share": [600, 700, 500, 400, 500],

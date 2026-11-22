@@ -1,6 +1,6 @@
 ## The Armies part of the season report (docs/architecture/m6-build-spec.md 4.14 and 4.11; L12): the men under arms and the
 ## armies of the viewer that moved, changed men, musters or lost companies; the army lines of "Your orders" (raised, disbanded,
-## marched, held, split, joined); the witnessed army events of others and the foreign armies in sight ("What befell"). SeasonSummary
+## marched, held, split, joined); the foreign armies in sight ("What befell"; the others' army doings are SummaryDoings'). SeasonSummary
 ## asks for them and puts them in the report; this file lives apart to keep that one small. Pure core/views/ code: it reads
 ## the game and writes nothing.
 class_name SummaryArmies
@@ -12,8 +12,6 @@ extends RefCounted
 const QUIET_PERCENT := 2
 ## The chronicle kinds an army event of a season is (its lines are the report's; any of them makes the season not quiet).
 const EVENT_KINDS: Array[String] = ["army_raised", "army_disbanded", "army_starved", "unit_lost", "march_halted"]
-## The witnessed kinds "What befell" takes from others (the viewer's own are in its other sections).
-const BEFELL_KINDS: Array[String] = ["army_raised", "army_disbanded", "army_starved", "unit_lost"]
 ## The action-log kinds of "Your orders" that the army section words itself (the others come from the chronicle).
 const ORDER_KINDS: Array[String] = ["march", "halt", "continue_march", "split_army", "merge_armies"]
 
@@ -116,24 +114,6 @@ static func orders(game: Game, tag: StringName, turn: int) -> Array[Dictionary]:
 		var text := _action_text(game, str(record["action"]), args as Dictionary)
 		if not text.is_empty():
 			out.append(_order(text, _hex_arg((args as Dictionary).get("goal", null))))
-	return out
-
-
-## The witnessed army events of others in `turn` ("A Milanese company starved at (8, 3) near Bellinzona."): the lines of
-## What befell. The viewer's own are not here.
-static func witnessed(game: Game, tag: StringName, turn: int) -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
-	if game == null or not game.has_countries():
-		return out
-	for entry: Dictionary in game.chronicle.of_turn(turn):
-		if not BEFELL_KINDS.has(str(entry.get("kind", ""))):
-			continue
-		var line := LogLines.line_of(game, entry, tag)
-		if line.is_empty() or bool(line["mine"]):
-			continue
-		var out_line := _line(str(line["text"]), "plain" if str(line["tone"]) == "muted" else str(line["tone"]), 0)
-		out_line["hex"] = line["hex"]
-		out.append(out_line)
 	return out
 
 

@@ -18,6 +18,12 @@ const ORDER_KINDS: Array[String] = ["declare_war", "make_peace", "storm", "set_s
 const SIDE_ATTACKER := 0
 const SIDE_DEFENDER := 1
 const UNKNOWN := "a country"
+## What befell ranks (4.14): a war or peace RANK_WAR, a battle its killed and wounded (at least RANK_BATTLE_MIN), a siege
+## RANK_SIEGE, a capture or owner change RANK_CAPTURE.
+const RANK_WAR := 1000
+const RANK_BATTLE_MIN := 100
+const RANK_SIEGE := 50
+const RANK_CAPTURE := 20
 
 
 ## {section (the War section; {} when there is no line and no war), quiet (no war event of the viewer's and no live siege of
@@ -80,7 +86,8 @@ static func orders(game: Game, tag: StringName, turn: int) -> Array[Dictionary]:
 
 
 ## The witnessed war events of others in `turn` (What befell): wars and peaces between others (public), and the battles,
-## sieges and districts of others the viewer witnessed. The viewer's own are in the section, never here.
+## sieges and districts of others the viewer witnessed. The viewer's own are in the section, never here. Each line's rank
+## is its kind's (_witnessed_rank).
 static func witnessed(game: Game, tag: StringName, turn: int) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if game == null or not game.has_countries():
@@ -97,6 +104,7 @@ static func witnessed(game: Game, tag: StringName, turn: int) -> Array[Dictionar
 				line = _line(str(found["text"]), "plain" if str(found["tone"]) == "muted" else str(found["tone"]), 0)
 				line["hex"] = found["hex"]
 		if not line.is_empty():
+			line["rank"] = _witnessed_rank(game, entry)
 			out.append(line)
 	return out
 
@@ -324,6 +332,47 @@ static func _moved_of(game: Game, tag: StringName, target: StringName, turn: int
 				and StringName(str(entry.get("target", ""))) == target:
 			return (entry.get("moved", []) as Array).size() if entry.get("moved", null) is Array else 0
 	return 0
+
+
+## The rank of a witnessed line of others by its kind (4.14): a war or peace RANK_WAR; a battle its killed and wounded, at
+## least RANK_BATTLE_MIN and rounded to a hundred (the viewer sees a battle's numbers rounded, as the battle view does); a
+## siege RANK_SIEGE; a capture RANK_CAPTURE.
+static func _witnessed_rank(game: Game, entry: Dictionary) -> int:
+	match str(entry.get("kind", "")):
+		"battle_ended":
+			return maxi(RANK_BATTLE_MIN, (_battle_total(game, entry) + 50) / 100 * 100)
+		"siege_started", "siege_lifted":
+			return RANK_SIEGE
+		"district_captured":
+			return RANK_CAPTURE
+	return RANK_WAR
+
+
+## The killed and wounded of both sides of a battle entry: the record's when it is kept, else the entry's own counts.
+static func _battle_total(game: Game, entry: Dictionary) -> int:
+	var record := Battles.record(game, int(entry.get("record", -1)))
+	if record != null:
+		return _sum_of(record.end.get("killed", PackedInt32Array())) + _sum_of(record.end.get("wounded_total", PackedInt32Array()))
+	return _dict_total(entry, "killed") + _dict_total(entry, "wounded")
+
+
+static func _sum_of(values: Variant) -> int:
+	var total := 0
+	if values is PackedInt32Array or values is Array:
+		for value: Variant in values:
+			total += int(value)
+	return total
+
+
+static func _dict_total(entry: Dictionary, key: String) -> int:
+	var value: Variant = entry.get(key, null)
+	if not (value is Dictionary):
+		return 0
+	var counts := value as Dictionary
+	var total := 0
+	for who: Variant in counts:
+		total += int(counts[who])
+	return total
 
 
 static func _owners(game: Game) -> Dictionary:

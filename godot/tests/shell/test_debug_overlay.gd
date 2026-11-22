@@ -264,3 +264,27 @@ func test_the_m7_line_counts_wars_sieges_and_occupied_hexes() -> void:
 	Session.game = null
 	_overlay.refresh_metrics()
 	assert_eq(_overlay.m7_text(), "no game")
+
+
+## K27 (spec 6.5): the F3 AI line says no AI without countries, and counts the seats, the time and the passive seats.
+func test_the_ai_line_says_no_ai_without_countries_and_shows_the_turn() -> void:
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.ai_text(), "no AI in this game", _overlay.ai_text())
+	assert_eq(Session.new_scenario("north_italy_1480", 1480, &"SAV"), "", "a scenario game")
+	_overlay.refresh_metrics()
+	assert_true(_overlay.ai_text().begins_with("ai "), _overlay.ai_text())
+	assert_true(_overlay.ai_text().contains("none yet"), _overlay.ai_text())
+	assert_true(_overlay.ai_text().ends_with("passive 0"), _overlay.ai_text())
+	Session.set_seat_passive(&"MLO", true)
+	_overlay.refresh_metrics()
+	assert_true(_overlay.ai_text().ends_with("passive 1"), _overlay.ai_text())
+	Session.set_seat_passive(&"MLO", false)
+	Session.last_phase_ms = {"ai_orders": 61.2}
+	Session.ai_worst_step_ms = 2.1
+	_overlay.refresh_metrics()
+	assert_true(_overlay.ai_text().contains("· 61.2 ms · worst step 2.1 ms"), _overlay.ai_text())
+	Session.last_phase_ms = {}
+	Session.ai_worst_step_ms = 0.0
+	Session.game = null
+	_overlay.refresh_metrics()
+	assert_eq(_overlay.ai_text(), "no game")

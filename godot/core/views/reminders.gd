@@ -3,12 +3,13 @@
 ## and a need that will run out (severity 2 or 1), winter stops works in the snow (2), a treasury that will fall (1), a
 ## full town (1) and a free work slot (1) (docs/architecture/m5-build-spec.md 4.14) and four army rules (docs/architecture/m6-build-spec.md 4.15).
 ## M7 adds three war rules (docs/architecture/m7-build-spec.md 4.18: a besieged fortress, occupied districts, the war timer; RemindersWar).
+## M8 adds `peace_risk` (docs/architecture/m8-build-spec.md 4.14, D28): an enemy that could make peace and keep the viewer's land.
 ## Pure core/views/ code: reads the game (and EconomyPreview, which writes only the view cache), writes nothing.
 class_name Reminders
 extends RefCounted
 
 const RULES: Array[StringName] = [&"treasury_empty", &"hunger", &"army_hungry", &"army_stores", &"besieged",
-	&"goods_running_out", &"winter_halt", &"winter_passes", &"occupied", &"war_timer", &"treasury_falling", &"town_full",
+	&"goods_running_out", &"winter_halt", &"winter_passes", &"occupied", &"peace_risk", &"war_timer", &"treasury_falling", &"town_full",
 	&"army_idle", &"free_slot"]
 ## The seasons `goods_running_out` looks ahead (spec 4.18).
 const WINDOW := 8
@@ -62,6 +63,8 @@ static func _build(game: Game, tag: StringName) -> Array[Dictionary]:
 				_add(lines, RemindersWar.besieged(game, tag))
 			&"occupied":
 				lines.append_array(RemindersWar.occupied(game, tag))
+			&"peace_risk":
+				lines.append_array(peace_risk(game, tag))
 			&"war_timer":
 				lines.append_array(RemindersWar.war_timer(game, tag))
 			&"army_idle":
@@ -484,3 +487,30 @@ static func capital_link(game: Game, tag: StringName) -> Dictionary:
 	if name.is_empty():
 		name = "the capital"
 	return {"action": [&"look_at", country.capital], "action_label": "Show %s" % name, "hex": country.capital}
+
+
+## One line per live enemy that could make peace with the viewer and keep its land (4.14, D28): its score against the viewer
+## (Wars.score, the districts it holds of the viewer's, less the viewer's of its, with the capital term) at take_score makes
+## severity 2 ("it can make peace now and keep them"), from take_score_weak severity 1 ("if its armies outnumber yours").
+## A score under take_score_weak, or no district held, makes no line.
+static func peace_risk(game: Game, tag: StringName) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if game == null or game.state == null or game.defs == null or game.defs.war == null or not game.has_countries():
+		return out
+	if Countries.by_tag(game, tag) == null:
+		return out
+	var numbers: WarDef = game.defs.war
+	for enemy: StringName in Wars.enemies(game, tag):
+		var score := Wars.score(game, enemy, tag)
+		var count := Wars.occupied_count(game, enemy, tag)
+		if score < maxi(numbers.take_score_weak, 1) or count <= 0:
+			continue
+		var words := "%s holds %s of your districts" % [LogLines.capital(Words.country_the(game, enemy)), Words.number(count)]
+		var severity := 1
+		var text := "%s: if its armies outnumber yours, it can make peace and keep it." % words
+		if score >= numbers.take_score:
+			severity = 2
+			text = "%s: it can make peace now and keep them. Retake land, or make peace first." % words
+		out.append({"kind": &"peace_risk", "severity": severity, "text": text, "hint": "", "hex": WorksView.NO_HEX,
+			"action": [&"country", enemy], "action_label": "Show %s" % LogLines.short_name(game, enemy)})
+	return out

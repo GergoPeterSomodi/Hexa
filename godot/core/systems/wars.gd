@@ -377,7 +377,7 @@ static func _send_armies_home(game: Game, war: War, later: Array[Dictionary]) ->
 	for army: Army in _armies_of(game, war.a, war.b):
 		if _open(game, army.tag, army.hex):
 			continue
-		var fits: Callable = func(i: int) -> bool: return Armies.units_at(game, army.tag, game.map.hex_of(i), PackedInt32Array([army.id])) + army.units.size() <= limit
+		var fits: Callable = func(i: int) -> bool: return not Armies.held_by_other(game, army.tag, game.map.hex_of(i)) and Armies.units_at(game, army.tag, game.map.hex_of(i), PackedInt32Array([army.id])) + army.units.size() <= limit
 		var at := _nearest_own(game, army.hex, army.tag, fits)
 		if at == Army.NO_HEX:
 			_disband_home(game, army, later)

@@ -158,3 +158,47 @@ func test_the_clock_never_runs_past_the_end() -> void:
 	plan.advance(100.0)
 	assert_almost_eq(plan.time(), plan.duration(), 0.0001)
 	assert_true(plan.finished())
+
+
+## D37: a seen step with neither hex in the focus is instant; one with a hex in it is timed; the default focus times all.
+func test_a_seen_step_outside_the_focus_is_instant() -> void:
+	var plan := ReplayPlan.new()
+	plan.set_focus(Rect2i(A, Vector2i(2, 1)))  # x 1 and 2: A and B are in view, C and D are not
+	var path: Array[Vector2i] = [A, B, C, D]
+	plan.setup([_rec(1, path, [1, 1, 1, 1], [1, 2, 3])], &"normal")
+	assert_almost_eq(plan.duration(), 0.4, 0.0001, "the A-B and B-C steps are timed; C-D is instant")
+	plan.advance(0.2)
+	var pose := plan.poses()[0]
+	assert_eq(pose["from"], B, "the second timed step starts on B")
+	assert_eq(pose["to"], C)
+	plan.advance(0.2)
+	assert_true(plan.finished(), "the instant step leaves nothing to wait for")
+	assert_eq(plan.poses().size(), 0)
+
+
+func test_a_walk_wholly_outside_the_focus_takes_no_time() -> void:
+	var plan := ReplayPlan.new()
+	plan.set_focus(Rect2i(Vector2i(50, 50), Vector2i(2, 2)))
+	plan.setup(_walk_abc(), &"normal")
+	assert_eq(plan.duration(), 0.0, "P: no step is in view, so nothing is timed")
+	assert_eq(plan.poses().size(), 0)
+
+
+func test_an_unseen_step_in_the_focus_stays_instant_and_unshown() -> void:
+	var plan := ReplayPlan.new()
+	plan.set_focus(Rect2i(0, 0, 10, 10))
+	var path: Array[Vector2i] = [A, B, C]
+	plan.setup([_rec(1, path, [1, 0, 1], [1, 2])], &"normal")
+	assert_almost_eq(plan.duration(), 0.2, 0.0001, "only the B-C step is seen at its end, so only it is timed")
+	var first := plan.poses()
+	assert_eq(first.size(), 1, "one walker, on B: the unseen A-B step took no time")
+	assert_eq(first[0]["from"], B, "the walk never animates the unseen A-B step")
+	assert_eq(first[0]["to"], C)
+	assert_true(bool(first[0]["shown"]), "B-C ends on a seen hex, so it is shown")
+
+
+func test_an_empty_focus_times_every_seen_step() -> void:
+	var plan := ReplayPlan.new()
+	plan.set_focus(Rect2i())
+	plan.setup(_walk_abc(), &"normal")
+	assert_almost_eq(plan.duration(), 0.4, 0.0001, "no focus is the M6 rule: two shown ticks")

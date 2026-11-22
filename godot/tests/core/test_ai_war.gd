@@ -225,7 +225,7 @@ func test_4_16_b_milan_declares_on_a_passive_genoa_on_the_think_turn_its_roll_al
 	var probe := Rng.new()
 	probe.set_state(S.luck(g))
 	var turn := 3
-	while probe.randi_range(1, 1000) > 450:
+	while probe.randi_range(1, 1000) > 150:
 		turn += 4
 	var b := S.brief(g)
 	assert_eq([b.men, b.treasury >= 8 * b.upkeep, b.hungry], [2000, true, false], "M 2,000, the chest reached, fed")
@@ -241,8 +241,8 @@ func test_4_16_b_milan_declares_on_a_passive_genoa_on_the_think_turn_its_roll_al
 		if not step.declared_now.is_empty():
 			declared = t
 			break
-	assert_eq(declared, turn, "the turn the seed's rolls give (a chance of 450)")
-	assert_eq(declared, 19, "pinned: the rolls of turns 3, 7, 11 and 15 fail, turn 19's passes")
+	assert_eq(declared, turn, "the turn the seed's rolls give (a chance of 150)")
+	assert_eq(declared, 35, "pinned: the rolls of turns 3 to 31 fail, turn 35's passes (a chance of 150)")
 	assert_true(Wars.at_war(g, M, GEN))
 	assert_eq(AiKnow.wars_of(g, M)[0]["start_turn"], declared)
 

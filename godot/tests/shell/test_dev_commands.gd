@@ -512,3 +512,68 @@ func test_storm_on_an_unseen_place_gets_the_one_sentence() -> void:
 	for line: String in said:
 		assert_eq(line, "Refused: You cannot see that place.", "walls or none, the same words")
 	assert_eq(DevCommands.run("as GEN storm %d 0 0" % army.id, _ctx).contains("walls"), false, "as TAG leaks nothing either")
+
+
+## K27 (spec 6.5, D45): the console's AI commands and watch, and their planted faults.
+func test_the_ai_commands_parse_to_their_kinds() -> void:
+	var cases := {"ai MLO": &"ai_trace", "ai off": &"ai_switch", "ai on": &"ai_switch", "ai pass MLO": &"ai_seat", "ai play MLO": &"ai_seat"}
+	for line: String in cases:
+		var parsed := DevCommands.parse(line, _game())
+		assert_eq(parsed["problem"], "", line)
+		assert_eq(parsed["kind"], cases[line], line)
+	assert_true(bool(DevCommands.parse("ai pass MLO", _game())["args"]["passive"]), "pass makes the seat passive")
+	assert_false(bool(DevCommands.parse("ai play MLO", _game())["args"]["passive"]), "play gives the seat back")
+
+
+func test_planted_ai_and_watch_lines_give_their_problem() -> void:
+	assert_eq(_problem("ai ZZZ"), "no country ZZZ.")
+	assert_eq(_problem("ai pass ZZZ"), "no country ZZZ.")
+	assert_eq(_problem("ai play ZZZ"), "no country ZZZ.")
+	assert_eq(_problem("ai"), "Use: ai TAG, ai off|on or ai pass|play TAG")
+	assert_eq(_problem("watch now"), "watch takes no arguments.")
+	assert_eq(_problem("watch"), "watch works only during the pick.", "the game has its player")
+
+
+func test_the_sandbox_has_no_ai() -> void:
+	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
+	assert_eq(_problem("ai off"), "no AI in this game")
+	assert_eq(_problem("ai MLO"), "no AI in this game")
+	assert_eq(_problem("watch"), "no AI in this game")
+	assert_eq(DevCommands.run("ai on", _ctx), "no AI in this game")
+	assert_true(_sent.is_empty())
+
+
+func test_run_ai_off_on_and_the_seats_change_the_session() -> void:
+	assert_eq(DevCommands.run("ai off", _ctx), "Done: the AI is off.")
+	assert_false(Session.ai_enabled)
+	assert_eq(DevCommands.run("ai on", _ctx), "Done: the AI is on.")
+	assert_true(Session.ai_enabled)
+	assert_eq(DevCommands.run("ai pass MLO", _ctx), "Done: MLO is passive.")
+	assert_true(Session.ai().passive.has(&"MLO"))
+	assert_eq(DevCommands.run("ai play MLO", _ctx), "Done: MLO is played by the AI.")
+	assert_false(Session.ai().passive.has(&"MLO"))
+	assert_true(_sent.is_empty())
+
+
+func test_ai_trace_says_when_a_seat_has_no_turn_to_show() -> void:
+	assert_eq(DevCommands.run("ai MLO", _ctx), "MLO has no AI turn to show.")
+
+
+func test_watch_makes_the_game_ai_only_in_the_pick_and_asks_the_app() -> void:
+	assert_eq(Session.new_scenario(SCENARIO, 5, &""), "")
+	assert_eq(DevCommands.run("watch", _ctx), "Done: the computer plays every country.")
+	assert_true(_game().ai_only)
+	assert_eq(_sent.size(), 1)
+	assert_eq(_sent[0][0], &"watch")
+	assert_eq(_problem("watch"), "watch works only during the pick.", "a watched game cannot be watched again")
+
+
+func test_the_acting_ai_commands_wait_for_the_season_to_end() -> void:
+	Session.ai_enabled = true
+	Session._in_season = true
+	assert_eq(DevCommands.run("ai off", _ctx), "wait for the season to end.")
+	assert_eq(DevCommands.run("ai pass MLO", _ctx), "wait for the season to end.")
+	Session._in_season = false
+	assert_true(Session.ai_enabled, "a refused ai off changes nothing")
+	assert_false(Session.ai().passive.has(&"MLO"), "a refused ai pass changes nothing")
+	assert_true(_sent.is_empty())

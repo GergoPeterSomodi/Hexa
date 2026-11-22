@@ -99,7 +99,7 @@ static func _enemy_held(game: Game, tag: StringName, hex: Vector2i) -> bool:
 
 ## Whether a side may stop on spot (see retreat_path): not enemy-held, the land rule, and room for the whole side.
 static func _spot_ok(game: Game, tag: StringName, spot: Vector2i, own_only: bool, total: int, leaving: PackedInt32Array) -> bool:
-	if _enemy_held(game, tag, spot):
+	if _enemy_held(game, tag, spot) or Armies.held_by_other(game, tag, spot):
 		return false
 	if own_only:
 		if Occupation.controller_tag(game, spot) != tag:

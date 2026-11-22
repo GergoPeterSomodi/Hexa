@@ -91,7 +91,8 @@ static func genoa_spring() -> Dictionary:
 				_line("Raised 2 companies of pikemen at Genoa (8, 13) (▼ −50).", "plain", {"hex": Vector2i(8, 13)}),
 			], 3),
 			_section(&"befell", "What befell Genoa", [
-				_line("Milan finished a vineyard at (9, 11).", "plain", {"hex": Vector2i(9, 11)}),
+				_line("Milan began 2 works, finished 1 work, raised about 1,000 men at Alessandria (7, 9) and set taxes to Low.", "plain", {
+					"hex": Vector2i(9, 11), "rank": 4}),
 				_line("The Duchy of Milan took 3 districts from the Republic of Venice: Bergamo (11, 8) and 2 more.",
 					"warn", {"hex": Vector2i(11, 8)}),
 				_line("A Milanese army of about 1,000 men stands at Alessandria (7, 9).", "plain", {

@@ -306,7 +306,7 @@ on `game.player` outside `ai_turn.gd` (which skips the player's seat).
 | `war_chest_seasons` | treasury it needs to declare: seasons of upkeep | 12 | 12 | 10 | 6 | 8 |
 | `declare_ratio` | its men over the target's (banded), at least | 2,500 | 2,000 | 2,000 | 1,200 | 1,500 |
 | `busy_bonus` | taken off the ratio when the target is at war with another | 0 | 0 | 0 | 0 | 400 |
-| `declare_chance` | the roll (of 1,000) that lets it declare | 100 | 150 | 100 | 600 | 450 |
+| `declare_chance` | the roll (of 1,000) that lets it declare | 100 | 150 | 100 | 200 | 150 |
 | `attack_ratio` | the odds ratio over the ground factor to attack an army | 1,500 | 1,600 | 1,300 | 1,100 | 1,300 |
 | `siege_max` | the longest forecast siege it lays (+2 with bombards) | 4 | 4 | 5 | 6 | 4 |
 | `storm_share` | the meter's share of the need before it storms | 600 | 700 | 500 | 400 | 500 |
@@ -665,7 +665,7 @@ Autumn 1480 Milan has raised 2 companies a season toward `G` = 341,700 × 6 / 10
 treasury, about 2,000, is over its war chest of 8 × `U`. Against a neighbour with 2,000 men the ratio is 1,000, under 1,500.
 Genoa's banded men are 0: `ratio` = 2,000 × 1000 / 1, capped at 4,000. Genoa's prize: its districts within 3 hexes of Milan's
 land that are open (of the two its walls do not hold, M7 4.3) plus 2 for Genoa's walls (8, 13), 3 hexes from Milan's (11, 13):
-at least 2. Genoa is the only candidate; the roll is drawn (`declare_chance` 450); on a failed roll Milan thinks again at turn
+at least 2. Genoa is the only candidate; the roll is drawn (`declare_chance` 150); on a failed roll Milan thinks again at turn
 7. The test pins the turn the seed gives.
 
 **(c) Milan's army before Genoa.** Milan's army of 4 companies (2,000 men) at war with Genoa: Genoa's walls (8, 13) are

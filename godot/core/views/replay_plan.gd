@@ -2,7 +2,7 @@
 ## `unit_moved` records: tag, army, path, seen, ticks) laid on one clock, so the armies walk together tick by tick. Pure: it
 ## reads the records it is given and the time it is advanced by, never the game. A step the viewer did not see takes no
 ## time (it is instant); a shown step takes the speed's seconds, shortened so the whole replay stays within MAX_SECONDS and
-## never below MIN_STEP a step.
+## never below MIN_STEP a step. A focus (set_focus, D37): a seen step with neither hex in view is instant too.
 ## Battle marks (M7 5.6, B20): record_battle gives a battle at a hex and the movement tick it began at; its mark shows from
 ## that tick (marks()). A retreat walk (a walk that starts on a battle hex after the battle's tick) is laid after the last
 ## movement tick, so the beaten army walks off once the armies have stopped.
@@ -22,6 +22,8 @@ var _walks: Array[Dictionary] = []
 var _battles: Array[Dictionary] = []
 var _duration := 0.0
 var _time := 0.0
+## The hexes in view at the replay's start (set_focus); an empty rect times every seen step (M6).
+var _focus := Rect2i()
 
 
 ## A battle at `hex` that began at movement `tick` (the step that ends on the hex). `shown` is what the viewer may see of it.
@@ -30,6 +32,12 @@ func record_battle(hex: Vector2i, tick: int, shown: bool = true) -> void:
 	if tick < 1:
 		return
 	_battles.append({"hex": hex, "tick": tick, "shown": shown, "start": 0.0})
+
+
+## The hexes in view (D37): a seen step is timed only when one of its hexes lies in `focus`, else it is instant. An empty
+## rect (the default) times every seen step. Call before setup.
+func set_focus(focus: Rect2i) -> void:
+	_focus = focus
 
 
 ## Lays the records on the clock at `speed` (an unknown speed takes "normal"). A record whose path has under two hexes, or
@@ -47,7 +55,7 @@ func setup(records: Array[Dictionary], speed: StringName) -> void:
 		if path.size() < 2 or seen.size() != path.size() or ticks.size() != path.size() - 1:
 			continue
 		kept.append({"army": int(r["army"]), "tag": StringName(r["tag"]), "path": path, "seen": seen, "ticks": ticks,
-			"starts": PackedFloat64Array(), "ends": PackedFloat64Array()})
+			"timed": _timed_flags(path, seen), "starts": PackedFloat64Array(), "ends": PackedFloat64Array()})
 	var retreat := PackedByteArray()
 	var move_last := 0
 	for w: Dictionary in kept:
@@ -159,23 +167,23 @@ func _shown_ticks(last_tick: int) -> PackedByteArray:
 	shown.fill(0)
 	for w: Dictionary in _walks:
 		var ticks := w["ticks"] as PackedInt32Array
-		var seen := w["seen"] as PackedByteArray
+		var timed := w["timed"] as PackedByteArray
 		for i: int in ticks.size():
-			if _shown_step(seen, i):
+			if timed[i] == 1:
 				shown[ticks[i]] = 1
 	return shown
 
 
-## Each step's start and end on the clock: a shown step takes `step` seconds from its tick's start, an unseen one none.
+## Each step's start and end on the clock: a timed step takes `step` seconds from its tick's start, any other none.
 static func _lay_steps(w: Dictionary, tick_start: PackedFloat64Array, step: float) -> void:
 	var ticks := w["ticks"] as PackedInt32Array
-	var seen := w["seen"] as PackedByteArray
+	var timed := w["timed"] as PackedByteArray
 	var starts := PackedFloat64Array()
 	var ends := PackedFloat64Array()
 	for i: int in ticks.size():
 		var start := tick_start[ticks[i]]
 		starts.append(start)
-		ends.append(start + (step if _shown_step(seen, i) else 0.0))
+		ends.append(start + (step if timed[i] == 1 else 0.0))
 	w["starts"] = starts
 	w["ends"] = ends
 
@@ -184,6 +192,16 @@ static func _lay_steps(w: Dictionary, tick_start: PackedFloat64Array, step: floa
 ## see, and the camera never follows to one). A walk that leaves the viewer's sight shows nothing of that step.
 static func _shown_step(seen: PackedByteArray, i: int) -> bool:
 	return seen[i + 1] == 1
+
+
+## The timed flag of each step of one walk: 1 for a step the viewer sees at its end and, with a focus, that has one of its
+## two hexes in it (D37); 0 for the rest, which are instant.
+func _timed_flags(path: Array[Vector2i], seen: PackedByteArray) -> PackedByteArray:
+	var out := PackedByteArray()
+	for i: int in path.size() - 1:
+		var in_view := not _focus.has_area() or _focus.has_point(path[i]) or _focus.has_point(path[i + 1])
+		out.append(1 if _shown_step(seen, i) and in_view else 0)
+	return out
 
 
 func _pose(w: Dictionary) -> Dictionary:

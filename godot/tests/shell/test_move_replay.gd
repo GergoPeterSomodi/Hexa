@@ -202,3 +202,21 @@ func test_show_poses_draws_an_army_the_tokens_do_not_list_and_clears() -> void:
 	assert_eq(_tokens().walker_count(), 1, "a walker is made from the pose alone")
 	_tokens().show_poses([])
 	assert_eq(_tokens().walker_count(), 0, "an empty list takes the walkers away")
+
+
+## D37: the focus (the hexes on screen at the start) times a seen step only when one of its hexes is in it.
+func test_a_seen_step_outside_the_focus_plays_instantly() -> void:
+	_season()
+	var away := Rect2i(Vector2i(900, 900), Vector2i(2, 2))
+	assert_false(_replay.start(&"normal", away), "the one seen step is out of view: instant, nothing to play")
+	assert_false(_replay.active(), "no replay runs")
+	assert_eq(_finished, 0, "no replay, so no finished")
+	assert_eq(_army.hex, _goal, "the core is where the season put the army")
+
+
+func test_a_seen_step_inside_the_focus_is_timed() -> void:
+	_season()
+	var near := Rect2i(_hex, Vector2i(1, 1))
+	assert_true(_replay.start(&"normal", near), "the step starts from a hex in view: it is timed")
+	_replay._process(0.1)
+	assert_eq(_replay.poses().size(), 1, "the walker is on the clock")

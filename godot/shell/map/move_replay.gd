@@ -74,9 +74,10 @@ func record(tag: StringName, army: int, path: Array[Vector2i], seen: PackedByteA
 		"ticks": ticks.duplicate()})
 
 
-## Starts the replay of the season that just ended at `speed` (&"normal" or &"slow"). False when `speed` is instant (the
-## walks are dropped), when nothing was seen, when a replay already runs or when nothing would show. True: the clock runs.
-func start(speed: StringName) -> bool:
+## Starts the replay of the season that just ended at `speed` (&"normal" or &"slow"). `focus` is the hexes in view (D37):
+## a seen step with neither hex in it is instant; the default (no area) times every seen step. False when `speed` is instant
+## (the walks are dropped), when nothing was seen, when a replay already runs or when nothing would show. True: the clock runs.
+func start(speed: StringName, focus: Rect2i = Rect2i()) -> bool:
 	var walks := _pending
 	var battles := _pending_battles
 	_pending = []
@@ -84,6 +85,7 @@ func start(speed: StringName) -> bool:
 	if speed == INSTANT or walks.is_empty() or _plan != null:
 		return false
 	var plan := ReplayPlan.new()
+	plan.set_focus(focus)
 	var hexes: Array[Vector2i] = []
 	for b: Dictionary in ReplayMarks.battles(walks, battles, Session.game, Session.player_tag()):
 		plan.record_battle(b["hex"] as Vector2i, int(b["tick"]), bool(b["shown"]))

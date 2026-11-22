@@ -133,7 +133,7 @@ func test_a_free_slot_alone_is_not_serious() -> void:
 	assert_eq(lines.size(), 1)
 	assert_eq(lines[0]["severity"], 1)
 	assert_eq(Reminders.RULES, [&"treasury_empty", &"hunger", &"army_hungry", &"army_stores", &"besieged", &"goods_running_out", &"winter_halt",
-		&"winter_passes", &"occupied", &"war_timer", &"treasury_falling", &"town_full", &"army_idle", &"free_slot"] as Array[StringName])
+		&"winter_passes", &"occupied", &"peace_risk", &"war_timer", &"treasury_falling", &"town_full", &"army_idle", &"free_slot"] as Array[StringName])
 
 
 func test_reminders_are_equal_after_a_save_and_load() -> void:
@@ -319,9 +319,9 @@ func test_a_full_village_and_a_town_with_a_work_make_no_line() -> void:
 	assert_eq(Reminders.town_full(_g, &"MLO"), {}, "another country's town is not yours")
 
 
-func test_the_order_of_the_fourteen_rules() -> void:
+func test_the_order_of_the_fifteen_rules() -> void:
 	assert_eq(Reminders.RULES, [&"treasury_empty", &"hunger", &"army_hungry", &"army_stores", &"besieged", &"goods_running_out", &"winter_halt",
-		&"winter_passes", &"occupied", &"war_timer", &"treasury_falling", &"town_full", &"army_idle", &"free_slot"] as Array[StringName])
+		&"winter_passes", &"occupied", &"peace_risk", &"war_timer", &"treasury_falling", &"town_full", &"army_idle", &"free_slot"] as Array[StringName])
 	var c := Countries.by_tag(_g, &"GEN")
 	c.food_need = 9
 	c.food_fed = 800
@@ -382,3 +382,57 @@ func test_the_season_in_play_with_armies_is_the_season_played() -> void:
 	closed.assign(c.ledger_closed["lines"] as Array)
 	assert_eq(Treasury.left_over(closed), int(expected["net"]), "the net the reminders read is the net played")
 	assert_eq(c.stock, expected["stock"], "the stores the reminders read are the stores played")
+
+
+# ----- M8 (m8-build-spec.md 4.14, D28): the reminder peace_risk -------------------------------------------------------
+
+## Occupies `count` districts of Genoa (not its capital) for `enemy`: the score of the enemy against Genoa is `count`.
+func _occupy_for(enemy: StringName, count: int) -> void:
+	var held := Countries.by_tag(_g, &"GEN")
+	var capital := held.capital
+	var done := 0
+	for district: int in Territory.districts(_g, held.id):
+		if done >= count:
+			break
+		var hex := _g.map.hex_of(district)
+		if hex == capital:
+			continue
+		WarFixture.set_occupier(_g, hex, enemy)
+		done += 1
+	assert_eq(done, count, "enough districts of Genoa that are not its capital")
+	_g.version += 1  # occupation changed by hand: the reminder cache must not answer for the old one
+
+
+func test_peace_risk_at_the_take_score_is_serious() -> void:
+	var enemy := WarFixture.neighbour_of(_g, &"GEN")
+	assert_ne(enemy, &"", "Genoa has a neighbour")
+	WarFixture.at_war(_g, &"GEN", enemy)
+	_occupy_for(enemy, 3)
+	var lines := Reminders.peace_risk(_g, &"GEN")
+	assert_eq(lines.size(), 1, "one enemy at the take score: one line")
+	assert_eq(int(lines[0]["severity"]), 2, "a score at take_score is serious")
+	var words := "%s holds 3 of your districts: it can make peace now and keep them." % LogLines.capital(Words.country_the(_g, enemy))
+	assert_true(str(lines[0]["text"]).begins_with(words), "the words: %s" % str(lines[0]["text"]))
+	assert_eq(lines[0]["action"], [&"country", enemy], "the action shows the enemy")
+	assert_eq(str(lines[0]["action_label"]), "Show %s" % LogLines.short_name(_g, enemy), "the label names it")
+	assert_true(Reminders.unfinished(_g, &"GEN").size() >= 1, "the reminders carry it")
+
+
+func test_peace_risk_from_the_weak_score_is_a_warning() -> void:
+	var enemy := WarFixture.neighbour_of(_g, &"GEN")
+	WarFixture.at_war(_g, &"GEN", enemy)
+	_occupy_for(enemy, 1)
+	var lines := Reminders.peace_risk(_g, &"GEN")
+	assert_eq(lines.size(), 1, "a score of 1 makes one line")
+	assert_eq(int(lines[0]["severity"]), 1, "a weak score is severity 1")
+	assert_true(str(lines[0]["text"]).ends_with("if its armies outnumber yours, it can make peace and keep it."), "the words: %s" % str(lines[0]["text"]))
+
+
+func test_peace_risk_with_no_score_or_no_live_war_is_no_line() -> void:
+	var enemy := WarFixture.neighbour_of(_g, &"GEN")
+	WarFixture.at_war(_g, &"GEN", enemy)
+	assert_true(Reminders.peace_risk(_g, &"GEN").is_empty(), "P: a score of 0 makes no line")
+	_occupy_for(enemy, 3)
+	_g.wars.clear()
+	_g.version += 1
+	assert_true(Reminders.peace_risk(_g, &"GEN").is_empty(), "P: no live war, no line")

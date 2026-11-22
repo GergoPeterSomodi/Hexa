@@ -30,6 +30,8 @@ const QUIET_PERCENT := 2
 ## Goods chips of the glance (at most), and the chips of the glance in all.
 const GLANCE_GOODS := 3
 const GLANCE_CHIPS := 5
+## What befell, one line a country (4.14, D38; SummaryDoings): the rank of the other lines. A capture or owner change is
+## SummaryWar.RANK_CAPTURE; a war, peace, battle or siege ranks by its kind (SummaryWar.witnessed), above every doing.
 
 
 ## {turn, title, next, lede, seal_letter, quiet, serious, swing_permille, toast, sections}; {} when turn < 1 or turn >=
@@ -65,14 +67,14 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 				if kind == "work_finished":
 					work_line["detail"] = _brings(game, tag, work)
 				mine_works.append(work_line)
-		elif kind == "owners_changed" or kind == "tax_set" or kind.begins_with("work_"):
+		elif kind == "owners_changed":
 			var line := LogLines.line_of(game, entry, tag, memo)
 			if not line.is_empty() and not bool(line["mine"]):  # one's own land is the Land chip's
-				befell.append(_from_log(line, 0))
+				befell.append(_from_log(line, SummaryWar.RANK_CAPTURE))
 	var order_lines := _orders(game, tag, turn, started, cancelled)
 	var armies := SummaryArmies.of(game, tag, turn)
 	order_lines.append_array(SummaryArmies.orders(game, tag, turn))
-	befell.append_array(SummaryArmies.witnessed(game, tag, turn))
+	befell.append_array(SummaryDoings.of(game, tag, turn))
 	var war := SummaryWar.of(game, tag, turn)
 	order_lines.append_array(SummaryWar.orders(game, tag, turn))
 	befell.append_array(SummaryWar.witnessed(game, tag, turn))
@@ -103,7 +105,7 @@ static func _build(game: Game, tag: StringName, turn: int) -> Dictionary:
 		&"before": _section(&"before", "Before %s" % Calendar.season_name(turn + 1), before, false),
 		&"works": _section(&"works", "Works", mine_works + under_way, true),
 		&"orders": _section(&"orders", "Your orders", order_lines, false),
-		&"befell": _section(&"befell", _befell_title(game, tag), befell, false),
+		&"befell": _section(&"befell", _befell_title(game, tag), befell, true),
 	}
 	if not (people["section"] as Dictionary).is_empty():
 		by_id[&"people"] = people["section"]
@@ -143,6 +145,9 @@ static func _lede(game: Game, tag: StringName, quiet: bool, next: String) -> Str
 		return "A quiet season."
 	if not game.has_countries():
 		return "The sandbox of %s, seed %d. %s begins." % [game.map.id.replace("_", " ").capitalize(), game.seed_value, next]
+	if tag == &"":  # a watched game: the viewer of everything, every country played by the computer
+		var scenario_name := game.scenario.name if game.scenario != null and not game.scenario.name.is_empty() else "the map"
+		return "A watched game of %s, %d. %s begins." % [scenario_name, game.start_year, next]
 	var def := Countries.def_of(game, tag)
 	if def == null or def.ruler.is_empty():
 		return "The Chancellor's report. %s begins." % next

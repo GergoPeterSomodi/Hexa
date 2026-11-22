@@ -22,9 +22,16 @@ const HELP_LINES: Array[String] = [
 	"money N [TAG]   goods KEY N [TAG]   tax low|normal|high   people c r N",
 	"raise c r kind [n]   march ID c r   hold ID   armies   as TAG action ...",
 	"declare TAG   peace TAG take|white|yield   storm ID c r   standing ID hold|withdraw   wars",
+	"ai TAG   ai off|on   ai pass|play TAG   watch",
 ]
 ## The tax words of `tax`, by level.
 const TAX_WORDS: Array[String] = ["low", "normal", "high"]
+## The words of `ai off|on` and `ai pass|play TAG`.
+const AI_SWITCH_WORDS: Array[String] = ["off", "on"]
+const AI_SEAT_WORDS: Array[String] = ["pass", "play"]
+## The kinds that change the computer's turn or its players: they wait for a running season to end (D40, spec 6.5).
+const ACTING_KINDS: Array[StringName] = [&"ai_switch", &"ai_seat", &"watch"]
+const WAIT_SEASON := "wait for the season to end."
 
 
 ## Reads a line: {kind, action, args, problem}. `kind` is &"act", &"end", &"goto", &"look", &"give", &"money", &"goods", &"people",
@@ -78,6 +85,10 @@ static func parse(text: String, game: Game) -> Dictionary:
 			return _parse_standing(rest, game)
 		"wars":
 			return _parse_wars(rest, game)
+		"ai":
+			return _parse_ai(rest, game)
+		"watch":
+			return _parse_watch(rest, game)
 		"digest", "seed", "help":
 			if not rest.is_empty():
 				return _problem("%s takes no arguments." % head)
@@ -93,6 +104,8 @@ static func run(text: String, ctx: ShellContext) -> String:
 	var problem := str(parsed["problem"])
 	if not problem.is_empty():
 		return problem
+	if ACTING_KINDS.has(parsed["kind"]) and Session.in_season():
+		return WAIT_SEASON
 	var args: Dictionary = parsed["args"]
 	match parsed["kind"] as StringName:
 		&"act":
@@ -147,6 +160,22 @@ static func run(text: String, ctx: ShellContext) -> String:
 			if not applied:
 				return "Refused: no one keeps people there."
 			return "Done: %s at %d, %d." % [Words.people(int(args["people"])), at.x, at.y]
+		&"ai_trace":
+			return _ai_trace_words(args["tag"])
+		&"ai_switch":
+			var on := bool(args["on"])
+			Session.ai_enabled = on
+			return "Done: the AI is %s." % ("on" if on else "off")
+		&"ai_seat":
+			var seat_tag: StringName = args["tag"]
+			var seat_passive := bool(args["passive"])
+			Session.set_seat_passive(seat_tag, seat_passive)
+			return "Done: %s is %s." % [String(seat_tag), "passive" if seat_passive else "played by the AI"]
+		&"watch":
+			if not Session.watch():
+				return "Refused: watch works only during the pick."
+			ctx.request(&"watch")
+			return "Done: the computer plays every country."
 		&"digest":
 			return Session.game.digest().substr(0, DIGEST_CHARS)
 		&"seed":
@@ -429,6 +458,54 @@ static func _parse_standing(rest: PackedStringArray, game: Game) -> Dictionary:
 	if word != String(Army.STANDING_HOLD) and word != String(Army.STANDING_WITHDRAW):
 		return _problem("no such standing order '%s': hold or withdraw." % rest[1])
 	return _made(&"act", "set_standing", {"army": army, "standing": word})
+
+
+## `ai TAG`: the seat's last turn (its trace). `ai off|on`: every seat passive, or back. `ai pass|play TAG`: one seat.
+static func _parse_ai(rest: PackedStringArray, game: Game) -> Dictionary:
+	if game == null:
+		return _problem("There is no game.")
+	if not _has_ai(game):
+		return _problem("no AI in this game")
+	if rest.size() == 1 and AI_SWITCH_WORDS.has(rest[0].to_lower()):
+		return _made(&"ai_switch", "", {"on": rest[0].to_lower() == "on"})
+	if rest.size() == 1:
+		var tag := _tag_word(rest[0], game)
+		if tag == &"":
+			return _problem("no country %s." % rest[0].to_upper())
+		return _made(&"ai_trace", "", {"tag": tag})
+	if rest.size() == 2 and AI_SEAT_WORDS.has(rest[0].to_lower()):
+		var seat := _tag_word(rest[1], game)
+		if seat == &"":
+			return _problem("no country %s." % rest[1].to_upper())
+		return _made(&"ai_seat", "", {"tag": seat, "passive": rest[0].to_lower() == "pass"})
+	return _problem("Use: ai TAG, ai off|on or ai pass|play TAG")
+
+
+## `watch`: the developer's Watch, during the country pick: the computer plays every country (Session.watch).
+static func _parse_watch(rest: PackedStringArray, game: Game) -> Dictionary:
+	if not rest.is_empty():
+		return _problem("watch takes no arguments.")
+	if game == null:
+		return _problem("There is no game.")
+	if not _has_ai(game):
+		return _problem("no AI in this game")
+	if game.player != &"" or game.ai_only:
+		return _problem("watch works only during the pick.")
+	return _made(&"watch", "", {})
+
+
+## Whether the game has a computer's turn: a game with countries does (the sandbox has none).
+static func _has_ai(game: Game) -> bool:
+	return game.has_countries() and game.orders is AiTurn
+
+
+## The seat's last turn, one line per step (its AI trace); a line saying so when there is none.
+static func _ai_trace_words(tag: StringName) -> String:
+	var hook := Session.ai()
+	var lines := hook.trace_of(tag) if hook != null else PackedStringArray()
+	if lines.is_empty():
+		return "%s has no AI turn to show." % String(tag)
+	return "\n".join(lines)
 
 
 static func _parse_wars(rest: PackedStringArray, game: Game) -> Dictionary:

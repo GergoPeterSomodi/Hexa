@@ -13,6 +13,11 @@ const WAR_LINE_KINDS: Array[String] = ["war_declared", "peace_made", "battle_end
 	"district_captured", "army_raised", "army_disbanded", "march_halted", "army_starved", "unit_lost"]
 const SEASONS_SHOWN := 8
 const PER_SEASON := 60
+## What others did a season, the newest first (4.14, D39): at most this many lines of others' after the viewer's own; the
+## rest are counted in one muted "more" line with no link.
+const OTHERS_PER_SEASON := 24
+## Another's raise notifies only within this many hexes of the viewer's land, or from a country at war with the viewer.
+const NOTIFY_RANGE := 2
 
 
 ## {} when `viewer` is not told of the entry (Knowledge.witnessed) or it cannot be described; else {text, keyword, tone
@@ -83,30 +88,57 @@ static func _build(game: Game, viewer: StringName, filter: StringName) -> Array[
 		return out
 	var memo := {}
 	var all := game.chronicle.entries
-	var current: Dictionary = {}
+	var season: Dictionary = {}
 	var i := all.size() - 1
-	while i >= 0:
+	while i >= 0 and out.size() < SEASONS_SHOWN:
 		var entry: Dictionary = all[i]
 		i -= 1
 		if not _may_pass(entry, viewer, filter):
 			continue
 		var turn := int(entry.get("turn", 0))
-		if current.is_empty() or int(current["turn"]) != turn:
+		if not season.is_empty() and int(season["turn"]) != turn:
+			out.append(_season_of(game, season, filter))
+			season = {}
 			if out.size() >= SEASONS_SHOWN:
 				break
-			current = {}
-		if not current.is_empty() and int(current["turn"]) == turn and (current["lines"] as Array).size() >= PER_SEASON:
-			continue  # the season is full: its older entries are never read
 		var line := line_of(game, entry, viewer, memo)
 		if line.is_empty() or not (line["filters"] as Array).has(filter):
 			continue
-		if current.is_empty():
-			current = {"turn": turn, "title": Calendar.date_text(turn, game.start_year), "lines": [] as Array[Dictionary]}
-			out.append(current)
-		var lines: Array[Dictionary] = current["lines"]
-		if lines.size() < PER_SEASON:
-			lines.append(line)
+		if season.is_empty():
+			season = {"turn": turn, "mine": [] as Array[Dictionary], "others": [] as Array[Dictionary], "dropped": 0}
+		if bool(line["mine"]):
+			var mine: Array[Dictionary] = season["mine"]
+			if mine.size() < PER_SEASON:
+				mine.append(line)
+		else:
+			var others: Array[Dictionary] = season["others"]
+			if others.size() < OTHERS_PER_SEASON:
+				others.append(line)
+			else:
+				season["dropped"] = int(season["dropped"]) + 1
+	if not season.is_empty():
+		out.append(_season_of(game, season, filter))
 	return out
+
+
+## One season's lines: the viewer's first, then the newest others (at most OTHERS_PER_SEASON), then the "more" line.
+static func _season_of(game: Game, season: Dictionary, filter: StringName) -> Dictionary:
+	var turn := int(season["turn"])
+	var lines: Array[Dictionary] = []
+	lines.append_array(season["mine"] as Array[Dictionary])
+	lines.append_array(season["others"] as Array[Dictionary])
+	var dropped := int(season["dropped"])
+	if dropped > 0:
+		lines.append(_more_line(dropped, turn, filter))
+	return {"turn": turn, "title": Calendar.date_text(turn, game.start_year), "lines": lines}
+
+
+## "and 31 more about other countries": muted, no link; the others of a season that the cap leaves out.
+static func _more_line(count: int, turn: int, filter: StringName) -> Dictionary:
+	var filters: Array[StringName] = [filter]
+	return {"text": "and %s more about other countries" % Words.number(count), "keyword": "More", "tone": "muted",
+		"hex": WorksView.NO_HEX, "notify": false, "floating": "", "mine": false, "record": -1, "turn": turn,
+		"filters": filters, "more": count}
 
 
 static func _filter_ids() -> Array[StringName]:
@@ -527,6 +559,23 @@ static func _size_of(value: Variant) -> int:
 	return 0
 
 
+## Another's raise notifies only at war with the viewer or within NOTIFY_RANGE hexes of the viewer's land (4.14, D39).
+static func _notifies_raise(game: Game, entry: Dictionary, viewer: StringName) -> bool:
+	var raiser := StringName(str(entry.get("tag", "")))
+	if viewer == &"" or raiser == &"" or game.state == null:
+		return false
+	if Wars.at_war(game, raiser, viewer):
+		return true
+	var held := Countries.by_tag(game, viewer)
+	if held == null:
+		return false
+	var hex := entry["hex"] as Vector2i
+	for i: int in Territory.districts(game, held.id):
+		if ImproveRules.hex_distance(hex, game.map.hex_of(i)) <= NOTIFY_RANGE:
+			return true
+	return false
+
+
 ## A raise: the player's own line with its ducats; another's witnessed raise with the band of its men.
 static func _raised_line(game: Game, entry: Dictionary, viewer: StringName, mine: bool) -> Dictionary:
 	if not (entry.get("hex", null) is Vector2i):
@@ -538,7 +587,7 @@ static func _raised_line(game: Game, entry: Dictionary, viewer: StringName, mine
 			"text": "You raised %s %s%s." % [Words.units(count, _unit_def(game, entry)), Words.at(game, hex),
 				_paid_text(entry)]}
 	var who := _told_name(game, viewer, entry)
-	return {"keyword": "Raised", "tone": "warn", "hex": hex, "notify": true, "floating": "",
+	return {"keyword": "Raised", "tone": "warn", "hex": hex, "notify": _notifies_raise(game, entry, viewer), "floating": "",
 		"text": "%s raised %s %s: %s." % [who, Words.plural(count, "company", "companies"), Words.at(game, hex),
 			Knowledge.band_text(int(entry.get("men", 0)), "men")]}
 

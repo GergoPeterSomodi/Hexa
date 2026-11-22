@@ -344,7 +344,8 @@ func test_the_money_filter_shows_money_lines_only() -> void:
 	assert_eq(_count(LogLines.entries(_g, &"GEN", &"money")), 3, "a free work is not a money line")
 	assert_eq(_count(LogLines.entries(_g, &"GEN", &"mine")), 4)
 	var lines := LogLines.entries(_g, &"GEN", &"money")[0]["lines"] as Array
-	assert_eq((lines[0] as Dictionary)["text"], "%s set taxes to High." % LogLines.short_name(_g, _known()), "newest first")
+	assert_eq((lines[0] as Dictionary)["text"], "You set taxes to Low.", "the viewer's line first (4.14, D39)")
+	assert_eq((lines[2] as Dictionary)["text"], "%s set taxes to High." % LogLines.short_name(_g, _known()), "then the others, newest first")
 	var other_view := LogLines.entries(_g, _known(), &"money")
 	for season: Dictionary in other_view:
 		for l: Dictionary in season["lines"]:

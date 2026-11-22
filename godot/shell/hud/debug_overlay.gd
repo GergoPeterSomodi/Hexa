@@ -32,6 +32,7 @@ const LAYER_SPECS: Array[Array] = [
 @onready var _m4_label: Label = $VBox/M4Line
 var _army_label: Label = null
 var _war_label: Label = null
+var _ai_label: Label = null
 @onready var _console: DevConsole = $VBox/DevConsole
 @onready var _season_seg: Segmented = $VBox/SeasonSeg
 @onready var _new_seed_btn: KitButton = $VBox/ControlsTop/NewSeedButton
@@ -91,6 +92,12 @@ func _ready() -> void:
 	_war_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_m4_label.get_parent().add_child(_war_label)
 	_m4_label.get_parent().move_child(_war_label, _army_label.get_index() + 1)
+	_ai_label = Label.new()
+	_ai_label.theme_type_variation = &"TableRow"
+	_ai_label.text = "no game"
+	_ai_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_m4_label.get_parent().add_child(_ai_label)
+	_m4_label.get_parent().move_child(_ai_label, _war_label.get_index() + 1)
 	Events.town_grew.connect(_on_town_grew)
 	Events.district_declined.connect(_on_district_declined)
 	Events.season_ended.connect(_on_season_ended)
@@ -296,6 +303,11 @@ func m7_text() -> String:
 	return _war_label.text if is_node_ready() and _war_label != null else ""
 
 
+## The AI line, for the tests.
+func ai_text() -> String:
+	return _ai_label.text if is_node_ready() and _ai_label != null else ""
+
+
 func people_text() -> String:
 	return _people_label.text if is_node_ready() and _people_label != null else ""
 
@@ -359,6 +371,7 @@ func refresh_metrics() -> void:
 	_m4_label.text = m4_line()
 	_army_label.text = m6_line()
 	_war_label.text = m7_line()
+	_ai_label.text = ai_line()
 	if _study_label != null:
 		_study_label.text = study_line()
 	if _people_label != null:
@@ -470,6 +483,21 @@ func m7_line() -> String:
 				areas += 1
 	return "wars %d · battles %d · sieges %d · occupied %d · %s · areas %d" % [
 		live, game.battle_records.size(), game.sieges.size(), occupied, " · ".join(times), areas]
+
+
+## The AI line (spec 6.5): "ai 12 seats · 143 steps · 61.2 ms · worst step 2.1 ms · refused 3 · passive 0". The counts are
+## the computer's turn now (or the last one); the times are of the last season played ("none yet" before one). A game with
+## no computer's turn says so.
+func ai_line() -> String:
+	var game := Session.game
+	if game == null:
+		return "no game"
+	var hook := Session.ai()
+	if hook == null:
+		return "no AI in this game"
+	var time_text := "%.1f ms" % float(Session.last_phase_ms["ai_orders"]) if Session.last_phase_ms.has("ai_orders") else "none yet"
+	return "ai %d seats · %d steps · %s · worst step %.1f ms · refused %d · passive %d" % [
+		hook.seats(), hook.steps_done(), time_text, Session.ai_worst_step_ms, hook.refusals(), hook.passive.size()]
 
 
 func _collect_metrics() -> Dictionary:

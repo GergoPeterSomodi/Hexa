@@ -118,3 +118,109 @@ func test_no_ctx_shows_nothing_and_keeps_the_queue() -> void:
 	_queue.push(_war(&"SAV"))
 	assert_false(_queue.next(null), "no stack, no Confirm")
 	assert_eq(_queue.count(), 1, "the decision waits for a stack")
+
+
+# ----- the peace alert (M8 spec 4.14, 6.4): the entry is the real producer's (Wars.end_war, what make_peace calls) ------------
+
+func _neighbour() -> StringName:
+	var nb := WarFixture.neighbour_of(Session.game, &"GEN")
+	assert_ne(nb, &"", "Genoa has a neighbour in the committed scenario")
+	return nb
+
+
+## The first `n` districts of `tag` that are not its capital, in index order.
+func _districts_of(tag: StringName, n: int) -> Array[Vector2i]:
+	var g := Session.game
+	var c := Countries.by_tag(g, tag)
+	var out: Array[Vector2i] = []
+	for i: int in Territory.districts(g, c.id):
+		var hex := g.map.hex_of(i)
+		if hex != c.capital and out.size() < n:
+			out.append(hex)
+	return out
+
+
+## A peace ended by `actor` on `terms` with the neighbour, moving `n` districts: returns the chronicle's peace_made entry.
+func _peace(terms: StringName, actor: StringName, n: int) -> Dictionary:
+	var g := Session.game
+	var nb := _neighbour()
+	var war := WarFixture.at_war(g, &"GEN", nb)
+	if terms == &"take":
+		for hex: Vector2i in _districts_of(&"GEN", n):
+			WarFixture.set_occupier(g, hex, nb)
+	elif terms == &"yield":
+		for hex: Vector2i in _districts_of(nb, n):
+			WarFixture.set_occupier(g, hex, &"GEN")
+	g.version += 1
+	Wars.end_war(g, war, terms, actor)
+	for i: int in range(g.chronicle.entries.size() - 1, -1, -1):
+		if str(g.chronicle.entries[i].get("kind", "")) == "peace_made":
+			return g.chronicle.entries[i]
+	return {}
+
+
+func test_the_peace_entry_of_the_producer_makes_the_alert() -> void:
+	var nb := _neighbour()
+	var entry := _peace(&"take", nb, 2)
+	var d := DecisionQueue.peace_decision(entry, &"GEN")
+	assert_eq(StringName(d.get("kind", &"")), DecisionQueue.KIND_PEACE)
+	assert_eq(StringName(d.get("tag", &"")), nb, "the country that made the peace")
+	assert_eq(StringName(d.get("target", &"")), &"GEN", "the player is the target")
+	assert_eq(StringName(d.get("terms", &"")), &"take")
+	assert_eq((d.get("moved", []) as Array).size(), 2, "the two districts that change hands")
+
+
+func test_a_peace_the_player_made_is_no_alert() -> void:
+	var entry := _peace(&"white", &"GEN", 0)
+	assert_eq(DecisionQueue.peace_decision(entry, &"GEN").size(), 0, "the player's own peace makes no alert")
+
+
+func test_a_take_alert_is_bad_toned_and_names_the_land_as_theirs() -> void:
+	var nb := _neighbour()
+	_queue.push(DecisionQueue.peace_decision(_peace(&"take", nb, 2), &"GEN"))
+	assert_true(_queue.next(_ctx), "the peace alert is up")
+	assert_eq(_top().get("_title"), "Peace", "the title")
+	assert_true(bool(_top().get("_danger")), "a take is a bad tone")
+	var body := str(_top().get("_body"))
+	assert_true(body.contains("has made peace with you: "), "the first line names the peace")
+	assert_true(body.contains(" become theirs."), "two districts become theirs")
+	assert_true(body.contains("("), "each district is named with its hex")
+	assert_false(body.contains("truce"), "no truce line for a take")
+
+
+func test_a_yield_alert_is_plain_and_gives_the_truce_line() -> void:
+	var nb := _neighbour()
+	_queue.push(DecisionQueue.peace_decision(_peace(&"yield", nb, 1), &"GEN"))
+	_queue.next(_ctx)
+	assert_false(bool(_top().get("_danger")), "a yield is a plain tone")
+	var body := str(_top().get("_body"))
+	assert_true(body.contains(" becomes yours."), "one district becomes yours")
+	assert_true(body.contains("A truce holds until "), "the truce line follows a yield")
+
+
+func test_a_white_alert_says_every_district_returns() -> void:
+	var nb := _neighbour()
+	_queue.push(DecisionQueue.peace_decision(_peace(&"white", nb, 0), &"GEN"))
+	_queue.next(_ctx)
+	assert_false(bool(_top().get("_danger")), "a white peace is a plain tone")
+	assert_true(str(_top().get("_body")).contains("every district returns to its owner."))
+
+
+func test_the_war_alert_is_shown_before_the_peace_alert() -> void:
+	var nb := _neighbour()
+	_queue.push(DecisionQueue.peace_decision(_peace(&"white", nb, 0), &"GEN"))
+	_queue.push(_war(&"SAV"))
+	assert_true(_queue.next(_ctx))
+	assert_eq(_top().get("_title"), "War!", "the war alert goes first, though pushed second")
+	assert_eq(_queue.count(), 1, "the peace alert waits")
+
+
+func test_show_on_the_peace_alert_asks_for_the_country() -> void:
+	var nb := _neighbour()
+	_queue.push(DecisionQueue.peace_decision(_peace(&"white", nb, 0), &"GEN"))
+	_queue.next(_ctx)
+	_top().call("_resolve", DecisionQueue.CHOICE_SHOW)
+	assert_eq(_requests.size(), 1)
+	assert_eq(_requests[0][0], &"country")
+	assert_eq((_requests[0][1] as Dictionary)["tag"], nb, "the country that made the peace is asked for")
+	assert_eq(_emptied, 1)

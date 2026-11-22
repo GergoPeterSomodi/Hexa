@@ -52,14 +52,23 @@ static func raised_here(game: Game, tag: StringName, hex: Vector2i) -> int:
 	return n
 
 
-## The men a levy can take on `hex` and on its ring held by `tag` (People.available each; direction order 0 to 5).
+## The men a levy can take on `hex` and on its ring held by `tag` (direction order 0 to 5). A hex counts only when People.levy
+## would take from it (owned by tag and not occupied: an occupied hex refuses every levy, so its men are not at hand). Counting
+## what the levy refuses would let a raise mint the men it could not take (K24b: the men identity).
 static func men_at_hand(game: Game, tag: StringName, hex: Vector2i) -> int:
-	var total := People.available(game, hex)
+	var total := _levyable(game, tag, hex)
 	for d: int in 6:
 		var beside := ImproveRules.neighbour(hex, d)
 		if Territory.owner_tag(game, beside) == tag:
-			total += People.available(game, beside)
+			total += _levyable(game, tag, beside)
 	return total
+
+
+## The men People.levy takes from `spot` for `tag`: its people at the levy permille, 0 on an occupied hex.
+static func _levyable(game: Game, tag: StringName, spot: Vector2i) -> int:
+	if Occupation.is_occupied(game, spot):
+		return 0
+	return People.available(game, spot)
 
 
 ## "" when `adding` more companies of `tag` fit on `hex` (leaving: armies whose ids march away and do not count), else
@@ -254,6 +263,8 @@ static func raise_check(game: Game, args: Dictionary) -> Dictionary:
 			return _refusal("%s has raised its %d companies this season" % [hex_text(game, hex), cap])
 		return _refusal("%s can raise %s this season" % [hex_text(game, hex),
 			"1 more company" if left == 1 else "%d more companies" % left])
+	if Armies.held_by_other(game, tag, hex):
+		return _refusal("another country's army stands at %s" % hex_text(game, hex))
 	var stand := can_stand(game, tag, hex, count)
 	if stand != "":
 		return _refusal(stand)
@@ -327,6 +338,7 @@ static func _levy_ring(game: Game, tag: StringName, hex: Vector2i, men: int) -> 
 		var take := mini(left, People.available(game, spot))
 		if take > 0:
 			left -= People.levy(game, tag, spot, take)
+	assert(left == 0, "the raise's men were not all levied: the check counted men that cannot be taken")
 
 
 # --- the scenario's starting armies ---------------------------------------------------------------------------------------

@@ -70,7 +70,7 @@ func test_a_fortress_of_the_player_besieged_is_serious() -> void:
 
 func test_the_war_rules_are_in_the_spec_order() -> void:
 	var rules := Reminders.RULES
-	assert_eq(rules.size(), 14, "fourteen rules")
+	assert_eq(rules.size(), 15, "fifteen rules (M8 adds peace_risk after occupied)")
 	assert_eq(rules.find(&"besieged"), 4, "besieged after army_stores")
 	assert_eq(rules.find(&"occupied"), 8, "occupied after winter_passes")
-	assert_eq(rules.find(&"war_timer"), 9, "war_timer after occupied")
+	assert_eq(rules.find(&"war_timer"), 10, "war_timer after peace_risk, which follows occupied")

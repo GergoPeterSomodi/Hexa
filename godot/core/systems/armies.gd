@@ -41,6 +41,15 @@ static func at(game: Game, hex: Vector2i) -> Array[Army]:
 	return out
 
 
+## True when an army of a country other than `tag` stands on `hex`. Outside a battle no two countries' armies may share a hex
+## (the armies invariant), so every placement that is not a battle's walk asks this first.
+static func held_by_other(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	for a: Army in at(game, hex):
+		if a.tag != tag:
+			return true
+	return false
+
+
 ## The companies of `tag` on `hex`, not counting the armies whose ids are in `leaving` (the ones that march away).
 static func units_at(game: Game, tag: StringName, hex: Vector2i, leaving: PackedInt32Array = PackedInt32Array()) -> int:
 	var n := 0
