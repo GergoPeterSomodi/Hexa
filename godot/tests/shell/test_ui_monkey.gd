@@ -14,7 +14,7 @@
 ## M7 (monkey_m7.gd): the war's inputs (Shift+right click, Shift+O, B, the badges, the battle dock, the hex menu's war items, the
 ## console's war commands, the country panel's declare and peace, the Castle areas switch, the standing orders) and its invariants
 ## (no leak of what the player was not told, the dock and the stack, no stuck Confirm); seeds 1498 to 1500, each playing Savoy.
-extends MonkeyM7
+extends MonkeyM8
 
 const APP_SCENE := preload("res://shell/app/app.tscn")
 const SEEDS: Array[int] = [1480, 1481, 1482]
@@ -30,6 +30,9 @@ const M5_SEEDS: Array[int] = [1492, 1493, 1494]
 const M6_SEEDS: Array[int] = [1495, 1496, 1497]
 ## M7: the M6 monkey with the war (monkey_m7.gd); every M7 seed plays Savoy.
 const M7_SEEDS: Array[int] = [1498, 1499, 1500]
+## M8: the M7 monkey with the computer playing the other countries (monkey_m8.gd): End season in slices, the map limited to the
+## camera meanwhile, the replay skipped, the saves mid-flow, the console's ai and watch; every M8 seed plays Savoy.
+const M8_SEEDS: Array[int] = [1501, 1502, 1503]
 ## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
 const FORCE_SEASON_STEP := 30
 const FORCE_SAVE_STEP := 120
@@ -251,6 +254,22 @@ func test_ui_monkey_m7_seed_1500() -> void:
 	await _run_monkey_seed(M7_SEEDS[2], true, true, true, true, true, true, true)
 
 
+## M8: the AI on (Session.ai_enabled, which before_each turns off for the older seeds) with every earlier milestone's actions.
+func test_ui_monkey_m8_seed_1501() -> void:
+	Session.ai_enabled = true
+	await _run_monkey_seed(M8_SEEDS[0], true, true, true, true, true, true, true, true)
+
+
+func test_ui_monkey_m8_seed_1502() -> void:
+	Session.ai_enabled = true
+	await _run_monkey_seed(M8_SEEDS[1], true, true, true, true, true, true, true, true)
+
+
+func test_ui_monkey_m8_seed_1503() -> void:
+	Session.ai_enabled = true
+	await _run_monkey_seed(M8_SEEDS[2], true, true, true, true, true, true, true, true)
+
+
 ## A real bug the M4 monkey found, kept as a minimal failing test (it fails until the card is fixed): with Confirm works on Always
 ## a mouse click on a hex panel row opens the card, the card takes the focus for Begin, the row's focus_exited reads as the
 ## pointer leaving, and the card closes at once (WorksPreview.leave); then WorksFlow.show_card draws the ghost and the marks for
@@ -309,7 +328,7 @@ func _on_hex_changed(hex: Vector2i) -> void:
 	_changed_hexes.append(hex)
 
 
-func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false, m6: bool = false, m7: bool = false) -> void:
+func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false, m6: bool = false, m7: bool = false, m8: bool = false) -> void:
 	await _wait_frames(2)
 	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	_player_seen = &""
@@ -354,6 +373,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 		waited += 1
 	if m3:
 		_m3_begin(app)
+	_m8_begin(m8)
 
 	var rng := Rng.new()
 	rng.seed_with(seed_value)
@@ -369,19 +389,22 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 		var prev_digest := prev_game.digest() if (prev_game != null and prev_game.map != null and prev_game.state != null) else ""
 		var prev_unsaved := Session.unsaved_actions
 		var prev_player := Session.player_tag()
+		var m8_len := _m8_mark(prev_game)
 		_changed_hexes.clear()
 		_tag = "seed %d step %d" % [seed_value, step]
 		_step_turn = prev_game.turn if prev_game != null else -1
 		_step_seasons = int(_n.get("seasons", 0))
 		_step_slot = Session.current_slot
-
-		if m3 and rng.randi_range(0, 99) < (70 if m4 else 45):
+		if m8 and (app.stack().top() is Confirm or rng.randi_range(0, 99) < M8_STEP_PERCENT):
+			await _m8_step(rng, vp, app)
+		elif m3 and rng.randi_range(0, 99) < (70 if m4 else 45):
 			await _m3_step(rng, vp, app)
 		else:
 			_perform_monkey_step(rng, vp, app, land_hexes, step)
 		await _wait_frames(1)
 
-		_assert_invariants(vp, app, prev_game, prev_digest, prev_unsaved, prev_player, seed_value, step)
+		var m8_season := _m8_check(app, prev_game, m8_len, _step_turn, prev_unsaved)  # the digest moves in slices with the computer on
+		_assert_invariants(vp, app, prev_game, "" if m8_season else prev_digest, prev_unsaved, prev_player, seed_value, step)
 		if m3:
 			_m3_assert_invariants(app, "seed %d step %d" % [seed_value, step])
 		if m4:
@@ -395,6 +418,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 
 	if m3:
 		_m3_end(seed_value)
+	_m8_end(m8, seed_value)
 	_set_milestones(false, false, false, false, false)
 	Events.hex_changed.disconnect(_on_hex_changed)
 	Session.end_game()

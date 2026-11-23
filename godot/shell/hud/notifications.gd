@@ -189,7 +189,49 @@ func _on_chronicled(entry: Dictionary) -> void:
 		line["army"] = int(entry["army"])  # the player's army lines: Go selects the army
 	if str(entry.get("kind", "")) == "war_declared":
 		line["country"] = str(entry.get("tag", ""))  # a declaration on the player: Go opens the attacker's country panel
-	add_line(line)
+	if str(entry.get("kind", "")) == "army_raised" and not bool(line.get("mine", false)) and _merge_raise(game, viewer, entry):
+		return
+	var id := add_line(line)
+	if id >= 0 and str(entry.get("kind", "")) == "army_raised":
+		for card: Dictionary in _cards:
+			if int(card["id"]) == id:
+				card["raise"] = _raise_key(entry)
+
+
+## Several raises by one country at one hex in one season are one card: "raised N companies at X" (the raise line of LogLines
+## on the summed counts). Only raises the viewer was told of merge (their cards), so nothing new is shown. True when merged.
+func _merge_raise(game: Game, viewer: StringName, entry: Dictionary) -> bool:
+	var key := _raise_key(entry)
+	for card: Dictionary in _cards:
+		var known := card.get("raise", {}) as Dictionary
+		if known.is_empty() or str(known["tag"]) != str(key["tag"]) or known["hex"] != key["hex"] or int(known["turn"]) != int(key["turn"]):
+			continue
+		var merged := entry.duplicate()
+		merged["count"] = int(known["count"]) + int(entry.get("count", 0))
+		merged["men"] = int(known["men"]) + int(entry.get("men", 0))
+		card["text"] = str(LogLines.line_of(game, merged, viewer).get("text", ""))
+		card["raise"] = _raise_key(merged)
+		_rebuild_card(card)
+		return true
+	return false
+
+
+## What identifies one country's raise at one hex in one season, with its counts so far.
+static func _raise_key(entry: Dictionary) -> Dictionary:
+	return {"tag": str(entry.get("tag", "")), "hex": entry.get("hex", WorksView.NO_HEX),
+		"turn": int(entry.get("turn", -1)), "count": int(entry.get("count", 0)), "men": int(entry.get("men", 0))}
+
+
+## Builds the card's node again (its text changed) in the same place in the stack.
+func _rebuild_card(card: Dictionary) -> void:
+	var old := card["node"] as Control
+	var at := old.get_index()
+	remove_child(old)
+	old.queue_free()
+	card["node"] = _build_card(card)
+	add_child(card["node"] as Control)
+	move_child(card["node"] as Control, at)
+	_sync_visible()
 
 
 ## Two seasons ended since a card came: it is dropped at the second season's end.

@@ -325,10 +325,16 @@ func _text_column(line: Dictionary) -> VBoxContainer:
 	var tone := str(line.get("tone", "plain"))
 	var target := _target_of(line)
 	if target.is_empty():
+		# A line with no place is a label; a line with one is a flat button, whose text sits in from the column's edge. The label
+		# takes the same inset, so the lines of one list start in one column.
 		var label := PanelKit.label(str(line.get("text", "")), &"LabelInk")
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_tint(label, tone)
-		col.add_child(label)
+		var inset := MarginContainer.new()
+		inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		inset.add_theme_constant_override(&"margin_left", _link_inset())
+		inset.add_child(label)
+		col.add_child(inset)
 	else:
 		col.add_child(_link_button(line, tone, target))
 	var detail := str(line.get("detail", ""))
@@ -370,6 +376,16 @@ func _record_of(action: Array) -> int:
 	if action.size() >= 2 and StringName(str(action[0])) == BATTLE_ACTION:
 		return int(action[1])
 	return -1
+
+
+## The left inset of a flat button's text (its normal style's content margin): the same inset a label takes beside a link.
+func _link_inset() -> int:
+	var probe := Button.new()
+	probe.flat = true
+	var box := probe.get_theme_stylebox(&"normal")
+	var inset := int(box.get_content_margin(SIDE_LEFT)) if box != null else 0
+	probe.free()
+	return inset
 
 
 func _link_button(line: Dictionary, tone: String, target: Dictionary) -> Button:

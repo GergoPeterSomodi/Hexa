@@ -123,6 +123,10 @@ func _process(_delta: float) -> void:
 		_dirty = true
 	if _dirty:
 		sync()
+	elif _army >= 0 and Session.game != null and not _mine(Session.game, _army):
+		# An army that died or merged away without an event of its own (a battle or a merge in the computer's turn): the selection
+		# goes on this frame, not at the next event.
+		clear_army()
 
 
 ## Brings the tokens, the reach and the route up to the game as it is now (an army event, a season, a new game).

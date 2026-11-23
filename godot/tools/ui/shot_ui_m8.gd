@@ -6,6 +6,7 @@
 ##   m8_pill_replay    the busy pill while the moves of the season play: "The moves of ... Space skips them"
 ##   m8_blocked_toast  a click on the map during the turn: the toast says the map takes orders when they are done
 ##   m8_watch_bar      a watched game: the top bar's sandbox seal "S" with "Watching"
+##   m8_replay_war     the replay of a season of war (the M7 war sample as Savoy): the moves play, the pill says "Space skips them"
 ##
 ## Windowed (GPU or xvfb + Mesa):
 ##   godot --path godot -s res://tools/ui/shot_ui_m8.gd -- --out=DIR [--scale=1,2] [--only=m8_pill_turn,...]
@@ -17,7 +18,10 @@ const DEFAULT_OUT_DIR := "/tmp/hexa_ui_shots_m8"
 const APP_SCENE_PATH := "res://shell/app/app.tscn"
 const LOGICAL_H := 720
 const LOGICAL_W := 1280
-const SCENES: Array[String] = ["m8_pill_turn", "m8_pill_replay", "m8_blocked_toast", "m8_watch_bar"]
+const SCENES: Array[String] = ["m8_pill_turn", "m8_pill_replay", "m8_blocked_toast", "m8_watch_bar", "m8_replay_war",
+	"m8_peace_alert", "m8_report_befell"]
+## The scenes whose movement replay is on, with the report off between seasons.
+const REPLAY_SCENES: Array[String] = ["m8_pill_replay", "m8_replay_war"]
 ## SeasonFlow.State values (the numbers stand for the enum: the shell's classes compile after the autoloads).
 const STATE_IDLE := 0
 const STATE_RUNNING := 1
@@ -107,18 +111,19 @@ func _capture_one(packed: PackedScene, scene_name: String, scale_mult: int, scal
 	app.set("allow_tree_quit", false)
 	app.set("pause_tree_when_modal", false)
 	app.set("skip_loading_frames", true)
+	var country := "SAV" if (scene_name == "m8_replay_war" or scene_name == "m8_report_befell") else "GEN"
 	var cli := PackedStringArray(["--new-game", "--scenario=north_italy_1480", "--seed=1480"]) if scene_name == "m8_watch_bar" \
-		else PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"])
+		else PackedStringArray(["--new-game", "--country=%s" % country, "--seed=1480"])
 	app.set("cli_args_override", cli)
 	var s := Settings.new("macOS", true)
 	s.set_value("state/help_seen", true)
 	s.set_value("graphics/preload_next_season", false)
-	s.set_value("accessibility/reduce_motion", scene_name != "m8_pill_replay")
+	s.set_value("accessibility/reduce_motion", not REPLAY_SCENES.has(scene_name))
 	s.set_value("display/ui_scale", "100" if scale_mult == 1 else "200")
-	s.set_value("game/season_report", "off" if scene_name == "m8_pill_replay" else "full")  # the replay scene: no report between seasons
+	s.set_value("game/season_report", "off" if REPLAY_SCENES.has(scene_name) else "full")  # the replay scenes: no report between seasons
 	s.set_value("game/autosave", "off")
 	s.set_value("graphics/season_change", "instant")
-	s.set_value("game/movement", "normal" if scene_name == "m8_pill_replay" else "instant")
+	s.set_value("game/movement", "normal" if REPLAY_SCENES.has(scene_name) else "instant")
 	app.call("set_settings_override", s)
 	vp.add_child(app)
 	await _wait_frames(3)
@@ -170,11 +175,41 @@ func _prepare(app: Node, scene_name: String, session: Node, vp: SubViewport) -> 
 		return watched
 	var flow: Object = req.get("flow")
 	var hold := {"frozen": false}
-	if scene_name != "m8_pill_replay":
+	if not REPLAY_SCENES.has(scene_name):
 		flow.set("step_orders", func(_budget: float) -> bool:
 			if bool(hold["frozen"]):
 				return false
 			return bool(session.call("step_orders", 0.0)))
+	if scene_name == "m8_peace_alert":
+		# A take peace of Milan with Genoa (the player) that moves one district: the decision queue shows its Confirm.
+		var decisions := req.get("decisions") as Object
+		decisions.call("push", {"kind": &"peace_made", "tag": &"MLO", "target": &"GEN", "terms": &"take",
+			"moved": [Vector2i(10, 13)], "turn": 1})
+		var shown := bool(decisions.call("next", (app as Object).call("context")))
+		await _wait_frames(3)
+		return shown
+	if scene_name == "m8_report_befell":
+		# The M7 war sample as Savoy, then the season ends: the report with What befell (the computer's lines among them).
+		var war_sample: Dictionary = UiSample.war(session, session.get("game") as Object)
+		if not bool(war_sample["ok"]):
+			printerr("shot_ui_m8: the war sample did not come up: %s" % str(war_sample["problem"]))
+			return false
+		flow.call("request_end", false)
+		for _i: int in FRAMES_MAX:
+			await process_frame
+			var st := (app.call("stack") as Object).call("top") as Object
+			if st != null and str(st.get("screen_id")) == "season_report":
+				(st.call("sheet") as Object).call("scroll_to", &"befell")  # the What befell section is the picture
+				await _wait_frames(3)
+				return true
+		return false
+	if scene_name == "m8_replay_war":
+		# The M7 war sample (Savoy's army at Vercelli, Milan's at Alessandria, a siege at Pavia), then seasons with the walks.
+		var sample: Dictionary = UiSample.war(session, session.get("game") as Object)
+		if not bool(sample["ok"]):
+			printerr("shot_ui_m8: the war sample did not come up: %s" % str(sample["problem"]))
+			return false
+		return await _replay_season(app, flow)
 	if scene_name == "m8_pill_replay":
 		return await _replay_season(app, flow)
 	flow.call("request_end", false)

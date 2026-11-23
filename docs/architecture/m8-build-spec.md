@@ -10,7 +10,7 @@ pill; the AI's moves replayed) and of `ui-style-and-feedback-plan.md` S5 (the AI
 `stats` budget).
 
 **What M8 is.** Every country the player does not play is played by the computer, through the same actions and the same checks
-as the player, seeing only what its country may know. Each season, when the player presses End season, the countries take
+as the player, seeing only what its country may know. Each season, when the player presses End turn, the countries take
 their turns one after another: they set their taxes, begin works, raise and disband companies, give their armies orders, set
 their standing orders, declare war, storm, and make peace. Their thinking runs in short slices over several frames, so the
 map stays smooth; a pill says "Countries are moving 3 / 12" and the map takes only camera moves meanwhile. Then the season's
@@ -54,7 +54,7 @@ the HUD, the console, F3, the App and the lint, and adds the `core/ai/` layer, t
    holds.
 8. **Time.** In the nightly `perf_core.gd`: an AI season on north Italy (12 seats) under 200 ms; on the made-up Europe (60
    countries, 600 armies, 30 wars) under 3,000 ms mean; no AI step over 8 ms; and in the windowed `perf_ui.gd` on north Italy
-   no frame over 16 ms while the AI runs, the whole AI turn under 1 s from End season to the phases (section 8).
+   no frame over 16 ms while the AI runs, the whole AI turn under 1 s from End turn to the phases (section 8).
 9. Every M8 UI row of the standard's 9.1 is in the game, built from the M1.5 kit, each with its GUT test: the AI-turn pill
    ("Countries are moving 3 / 12", "The season ends", the replay's line); the map taking only camera moves while the countries
    move and while the replay plays; the AI's moves in the replay, timed only where you look; what others did in the report
@@ -156,7 +156,7 @@ Each is decided. "Reverse" is the cost to change it later (S half a day, M a day
 | D28 | A peace on the player | An AI may make peace with the player through the same check (it stands for the loser's acceptance, as when the player makes it); the player gets a **peace alert** in `DECISIONS`, and the reminder **`peace_risk`** warns when an enemy holds enough of the player's land to impose one | Same actions, same checks; the owner can lose a war and sees it coming | S (a data flag that spares the player, if the playtest asks) |
 | D29 | Difficulty | **None in M8**; one AI for everyone. A difficulty would be an `AiDef` scale chosen on the New game page (M12) | Measure the plain AI first | M |
 | D30 | Starting armies | `ScenarioDef.start_armies` (a list of `{tag, hex, kind, count}`) exists; **1480's is empty**; every AI raises its first company in its first season | M4 to M7's pinned numbers hold; a Europe scenario may fill it | Data (S) |
-| D31 | AI-only games | `Game.ai_only` (saved, in the digest), set by `Game.watch()` during the pick (logged): every living country is an AI and End season needs no player; the viewer is `&""` (sees all) | The soak, the tests, and the developer's Watch | S |
+| D31 | AI-only games | `Game.ai_only` (saved, in the digest), set by `Game.watch()` during the pick (logged): every living country is an AI and End turn needs no player; the viewer is `&""` (sees all) | The soak, the tests, and the developer's Watch | S |
 | D32 | Passive seats | `AiTurn.passive` (a list of tags the AI does not play): the developer's `ai pass TAG` and `ai off`, and the tests; not saved | The duel test, the playtest's passive enemy | S |
 | D33 | The action log | Every AI act is logged by `Game.act`; the `ai_orders` phase ends with a mark `{turn, action: "orders_done"}`; `Replay` plays a season's AI records through `LogOrders`; a save keeps the last 40 seasons of records (`log_from`), memory keeps all | A logged game replays without the AI; a save stays small on Europe | S |
 | D34 | Saves | `SaveFile.FORMAT` **6**, `OLDEST_FORMAT` 6: the digest gains `ai_only` and the scenario digest gains `tempers`, so an M7 save reads "Made by an older test build" | M3 D31 | S |
@@ -208,7 +208,7 @@ Each is decided. "Reverse" is the cost to change it later (S half a day, M a day
 ### 4.1 The model in one picture
 
 ```
- End season (the flow's RUNNING)
+ End turn (the flow's RUNNING)
    Session.begin_season     end_check; Season.begin (the end_season record); Season.orders_begin -> AiTurn.begin: the seats
    every frame              Session.step_orders(5 or 10 ms): AiTurn.step, one bounded step at a time, then drain
      a seat's turn          brief -> peace -> war -> works scan (2) -> works cards (up to 4) -> works -> forces
@@ -1220,7 +1220,7 @@ No generated data. The map file is unchanged (`build_map --check`). The AI's tab
 | `save_mb` | 8 (M3) | after 40 AI seasons on the made-up Europe, the trimmed log |
 
 `godot/tools/ui/perf_ui.gd` gains in `perf_ui_budget.json`: `ai_frame_ms` 16 (the worst frame while the AI runs, north Italy,
-End season with the camera still and panning), `ai_turn_wall_ms` 1,000 (End season to the phases, north Italy),
+End turn with the camera still and panning), `ai_turn_wall_ms` 1,000 (End season to the phases, north Italy),
 `busy_pill_ms` 1 (a frame's pill update).
 
 **How it stays in budget.** A seat's turn is about twenty steps: one brief, two scans of 24 hexes on the cheap rules, at most
@@ -1291,7 +1291,7 @@ GUT unless said. Every new check has a planted-fault case (P).
 | `tests/shell/test_map_input.gd`, `test_app_input.gd` (edits) | `block_orders`: each blocked intent emits `blocked` once a second at most, each camera intent still works; `""` lifts it; F5 and F9 toast "Wait for the season to end" while `Session.in_season()` (P: a quickload mid-season loads nothing) |
 | `tests/shell/test_move_replay.gd`, `test_decision_queue.gd` (edits) | `start` with a focus; the `peace_made` decision's title, lines per terms and choices, after the war alerts |
 | `tests/shell/test_dev_commands.gd`, `test_debug_overlay.gd` (edits) | the five commands and their planted faults; the F3 line |
-| `tests/shell/test_app_flow.gd`, `test_hud.gd`, `test_map_scene.gd` (edits) | the top bar's "Watching" in a watched game; end to end with the AI on: New game as Genoa, End season: the pill counts 1 / 12 to 12 / 12, a click on the map toasts the block, a pan works, the replay plays seen AI walks, the report's befell has one line a country; `ai MLO` prints a trace; `ai off`, End season: no AI act in the log; `watch` from the pick; the pill's slot; `view_hexes` |
+| `tests/shell/test_app_flow.gd`, `test_hud.gd`, `test_map_scene.gd` (edits) | the top bar's "Watching" in a watched game; end to end with the AI on: New game as Genoa, End turn: the pill counts 1 / 12 to 12 / 12, a click on the map toasts the block, a pan works, the replay plays seen AI walks, the report's befell has one line a country; `ai MLO` prints a trace; `ai off`, End season: no AI act in the log; `watch` from the pick; the pill's slot; `view_hexes` |
 | `tests/shell/test_ui_monkey.gd` (edit) | the AI on; invariants: no player act accepted while the season runs; the digest changes only at an accepted act or a season |
 | Pictures (`godot/tools/ui/shot_ui.gd`, edit) | the pill over the map at 1280 x 720 scale 1 and 2560 x 1440 scale 2 (its three texts); the report with the grouped "What befell" of a seed 1480 season; the peace alert; signed by the art director, then goldens `godot/tests/goldens/m8_*.png` (0.5 %) |
 | `godot/tools/probes/probe_logger.gd` (**new**, headless) | an engine `Logger` added with `OS.add_logger` counts a deliberate script error and a `push_error` in 4.7.2; prints PASS or FAIL |

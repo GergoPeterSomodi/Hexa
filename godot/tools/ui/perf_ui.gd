@@ -23,6 +23,7 @@ const M45 := preload("res://tools/ui/perf_ui_m45.gd")
 const M5 := preload("res://tools/ui/perf_ui_m5.gd")
 const M6 := preload("res://tools/ui/perf_ui_m6.gd")
 const M7 := preload("res://tools/ui/perf_ui_m7.gd")
+const M8 := preload("res://tools/ui/perf_ui_m8.gd")
 const BUDGET := "res://tests/perf_ui_budget.json"
 const APP_SCENE_PATH := "res://shell/app/app.tscn"
 const SCREEN_IDS_PATH := "res://shell/screens/screen_ids.gd"
@@ -43,6 +44,10 @@ var _out := ""
 var _summary := ""
 var _budget_path := BUDGET
 var _europe_seasons := -1
+## M8 (perf_ui_m8.gd): --ai-map and --ai-scenario run the windowed AI rows on that game alone (the E3 table), --ai-seasons how many.
+var _ai_map := ""
+var _ai_scenario := ""
+var _ai_seasons := -1
 var _r: Dictionary = {}
 
 
@@ -58,6 +63,12 @@ func _initialize() -> void:
 			_summary = arg.substr(10)
 		elif arg.begins_with("--europe-seasons="):
 			_europe_seasons = int(arg.substr(17))
+		elif arg.begins_with("--ai-map="):
+			_ai_map = arg.substr(9)
+		elif arg.begins_with("--ai-scenario="):
+			_ai_scenario = arg.substr(14)
+		elif arg.begins_with("--ai-seasons="):
+			_ai_seasons = int(arg.substr(13))
 		elif arg.begins_with("--budget="):
 			_budget_path = arg.substr(9)
 	if DisplayServer.get_name() != "headless":
@@ -98,6 +109,18 @@ func _measure() -> int:
 	if screen_ids == null:
 		printerr("perf_ui: cannot load %s" % SCREEN_IDS_PATH)
 		return 1
+
+	if _ai_map != "" or _ai_scenario != "":
+		# The E3 rows alone: the AI's windowed rows on the given game (the made-up Europe when no scenario is given).
+		var seasons := _ai_seasons if _ai_seasons > 0 else 2
+		var code := await M8.new(self, _r).measure_e3(packed, _ai_scenario, seasons)
+		if code == 0:
+			print("E3 windowed rows (map %s, scenario %s, %d measured seasons, 60 frames a second):" % [
+				_ai_map if _ai_map != "" else "fake", _ai_scenario if _ai_scenario != "" else "fake", int(_r["e3_ai_seasons_measured"])])
+			print("  ai_turn_wall_ms  worst %.0f ms, mean %.0f ms   (8.3 limit 10000 ms)" % [float(_r["e3_ai_turn_wall_ms"]), float(_r["e3_ai_turn_wall_mean_ms"])])
+			print("  ai_frame_ms      worst %.2f ms, mean %.2f ms   (8.3 limits 24 worst, 16 mean)" % [float(_r["e3_ai_frame_ms"]), float(_r["e3_ai_frame_mean_ms"])])
+			print("  busy_pill_ms     %.4f ms a pill update" % float(_r["e3_busy_pill_ms"]))
+		return code
 
 	var vp := SubViewport.new()
 	vp.size = FRAME
@@ -157,6 +180,7 @@ func _measure() -> int:
 	await _measure_m3(packed, headless)
 	await _measure_m4(packed)
 	await _measure_m45(packed, headless)
+	await M8.new(self, _r).measure_budget(packed)
 
 	return _finish(budget, headless)
 
