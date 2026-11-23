@@ -17,6 +17,9 @@ var _prev_unsaved: int = 0
 var _prev_ai: bool = true
 
 
+const SETTLE_FRAMES := 5000
+
+
 func before_each() -> void:
 	_prev_game = Session.game
 	_prev_unsaved = Session.unsaved_actions
@@ -54,8 +57,14 @@ func after_each() -> void:
 	_flow = null
 
 
+## Waits by frames, not seconds: a season of AI slices takes as many frames as its work needs, and a slow machine must not
+## end the wait early (the flake of the batch run). The cap is far above any season here.
 func _settle() -> void:
-	await wait_until(func() -> bool: return _flow.state() != SeasonFlow.State.RUNNING, 3)
+	var frames := 0
+	while _flow.state() == SeasonFlow.State.RUNNING and frames < SETTLE_FRAMES:
+		await get_tree().process_frame
+		frames += 1
+	assert_ne(_flow.state(), SeasonFlow.State.RUNNING, "the flow settles within %d frames" % SETTLE_FRAMES)
 
 
 func test_guard_refuses_at_399_and_accepts_at_401() -> void:
@@ -289,6 +298,21 @@ func test_game_ending_mid_run_stops_quietly() -> void:
 
 
 ## Injects a fake orders turn of `steps` steps; returns the log {budgets, begun, finished, stages, progress}.
+## phases_started (M8 K28): once a season, when the last seat is done and before the phases run; the stage reads "phases".
+func test_phases_started_once_a_season_when_the_seats_are_done() -> void:
+	var rec := _fake_turn(2)
+	var starts := [0]
+	var stage_at_start := [&""]
+	_flow.phases_started.connect(func() -> void:
+		starts[0] += 1
+		stage_at_start[0] = _flow.running_stage())
+	assert_true(_flow.request_end(false, 2))
+	await _settle()
+	assert_eq(starts[0], 2, "one per season of the run")
+	assert_eq(rec["finished"], 2, "the phases ran for both seasons")
+	assert_eq(stage_at_start[0], &"phases", "the stage reads phases when it is emitted")
+
+
 func _fake_turn(steps: int) -> Dictionary:
 	var rec := {"budgets": [], "begun": 0, "finished": 0, "stages": [], "calls": 0, "progress": []}
 	_flow.begin_season = func() -> Dictionary:

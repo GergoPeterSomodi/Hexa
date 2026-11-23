@@ -64,6 +64,7 @@ const LEGEND_GAP := 8.0
 @onready var _action_log: ActionLog = $Root/Column/Main/MapArea/ActionLog
 @onready var _task_flag: TaskFlag = $Root/Column/Main/MapArea/TopRight/TaskFlag
 @onready var _notifications: Notifications = $Root/Column/Main/MapArea/TopRight/Notifications
+@onready var _busy_pill: BusyPill = $Root/Column/Main/MapArea/TopCentre/BusyPill
 @onready var _toasts: ToastHost = $Root/Column/Main/MapArea/Toasts
 @onready var _map_hover: MapHover = $Root/Column/Main/MapArea/MapHover
 @onready var _bottom_right: Control = $Root/Column/Main/MapArea/BottomRight
@@ -415,6 +416,11 @@ func refresh_bindings(platform: String = OS.get_name()) -> void:
 
 func top_bar() -> TopBar:
 	return _top_bar
+
+
+## The busy pill in the top centre of the map (M8 6.1): the computer's turn, the season's end and the replay.
+func busy_pill() -> BusyPill:
+	return _busy_pill
 
 
 func date_end() -> DateEnd:

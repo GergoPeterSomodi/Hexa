@@ -94,7 +94,7 @@ func boot(p_cli_args: PackedStringArray = PackedStringArray(), p_settings: Setti
 	_booted = true
 	if p_settings != null:
 		_settings_override = p_settings
-	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "7": M6 (the study, Supply, armies) and the war (Shift+O, B, castle areas)
+	Bindings.ensure(Bindings.SHELL_MILESTONE)  # "8": M8 (the AI turn: the busy pill, the replay of the AI's moves, watch)
 	_init_settings()
 	_apply_key_overrides()
 
@@ -473,6 +473,7 @@ func _on_app_requested(what: StringName, args: Dictionary) -> void:
 		&"pause":
 			_open_pause_menu()
 		&"main_menu", &"end_game":
+			_requests.flow.abort()  # M8: a turn running ends with the game
 			Session.end_game()
 			_open_main_menu()
 		&"quit":
@@ -777,6 +778,7 @@ func _save_settings() -> void:
 
 func _perform_quit() -> void:
 	_save_countdown = -1.0
+	_requests.flow.abort()
 	_save_settings()
 	_requests.clear_lock()
 	_quit_count += 1

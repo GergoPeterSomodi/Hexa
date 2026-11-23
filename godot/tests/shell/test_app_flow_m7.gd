@@ -164,7 +164,7 @@ func test_m7_flow_declare_march_odds_battle_siege_dock_save_and_peace() -> void:
 	var app := env["app"] as App
 	var game := Session.game
 	_give_money(game, SAV)
-	assert_eq(Bindings.SHELL_MILESTONE, "7", "the shell is at milestone 7")
+	assert_eq(Bindings.SHELL_MILESTONE, "8", "the shell is at milestone 8 (M8 K28)")
 
 	# The console makes Milan's army; the war is declared from the country panel's Confirm.
 	var made := DevCommands.run("as MLO raise 7 9 pikemen 2", app.context())

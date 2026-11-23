@@ -27,6 +27,8 @@ var works: WorksFlow = null
 var warm: StudyWarm = null
 ## The movement replay of the season that just ended (M6 6.4): a child of the App, made in setup.
 var replay: MoveReplay = null
+## The computer's turn in the App: the pill, the order block, the replay's focus, watch (AiTurnUI, M8 6.1 to 6.3).
+var ai_turn: AiTurnUI = null
 ## What the player must decide before the report (M7 6.6): a war declared on the player, one Confirm each.
 var decisions := DecisionQueue.new()
 ## The war's requests (M7 6.11): Storm, B, the battle dock, the war alert and the Castle areas switch (WarRequests).
@@ -56,6 +58,7 @@ func setup() -> void:
 	flow.name = "SeasonFlow"
 	flow.settings = _app.settings()
 	flow.clock = Callable(Time, "get_ticks_msec")
+	ai_turn = AiTurnUI.new(_app, flow)
 	flow.show_season = _show_season
 	flow.push_report = _push_report
 	flow.toast = _flow_toast
@@ -64,7 +67,7 @@ func setup() -> void:
 	replay = MoveReplay.new()
 	replay.name = "MoveReplay"
 	_app.add_child(replay)
-	flow.replay_start = replay.start
+	flow.replay_start = func(speed: StringName) -> bool: return replay.start(speed, ai_turn.replay_focus())
 	flow.replay_skip = replay.skip
 	flow.hold_ribbons = _hold_ribbons
 	decisions.emptied.connect(flow.decisions_done)
@@ -92,6 +95,7 @@ func setup() -> void:
 func connect_signals(link: Callable) -> void:
 	var hud := _app.hud()
 	link.call(flow, &"state_changed", _on_flow_state)
+	ai_turn.connect_signals(link)
 	link.call(replay, &"finished", flow.replay_done)
 	link.call(hud, &"end_season_requested", _on_end_pressed)
 	link.call(hud, &"report_requested", flow.reopen_report)
@@ -145,6 +149,7 @@ func bind_scene(scene: MapScene) -> void:
 		_floaters.hold(_ribbons_held)
 	works.bind_scene(scene)
 	war.bind_scene(scene)
+	ai_turn.bind_scene(scene)
 	var armies := scene.get_node_or_null("MapArmies") as MapArmies
 	if armies != null and not armies.said.is_connected(_on_order_said):
 		armies.said.connect(_on_order_said)
@@ -159,6 +164,7 @@ func bind_scene(scene: MapScene) -> void:
 func unbind_scene(scene: MapScene) -> void:
 	works.unbind_scene(scene)
 	war.unbind_scene(scene)
+	ai_turn.unbind_scene(scene)
 	var armies := scene.get_node_or_null("MapArmies") as MapArmies if scene != null and is_instance_valid(scene) else null
 	if armies != null and armies.said.is_connected(_on_order_said):
 		armies.said.disconnect(_on_order_said)
@@ -237,6 +243,8 @@ func handle(what: StringName, args: Dictionary) -> bool:
 			_on_army_requested(int(args.get("army", -1)), _hex_arg(args.get("hex", null)))
 		&"end_seasons":
 			flow.request_end(false, clampi(int(args.get("count", 1)), 1, END_SEASONS_MAX))
+		&"watch":
+			ai_turn.on_watch()
 		&"dev_look":
 			var season := int(args.get("season", -1))
 			if _scene != null:

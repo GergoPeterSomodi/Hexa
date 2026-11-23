@@ -21,6 +21,8 @@ const SYNC_STEP_CAP := 1000000
 signal state_changed(state: State)
 ## The computer's turn moved on: seats done, seats (once after the begin, then after each slice).
 signal progressed(done: int, total: int)
+## The computer's seats are all done: the phases run next frame (M8 K28, the pill's "The season ends").
+signal phases_started
 
 var settings: Settings = null
 ## () -> int, milliseconds. The App gives Time.get_ticks_msec; tests a fake.
@@ -262,6 +264,7 @@ func _slice() -> void:
 	_emit_progress()
 	if done:
 		_stage = &"phases"  # one frame shows "The season ends", then the phases run
+		phases_started.emit()
 
 
 func _finish_one() -> void:

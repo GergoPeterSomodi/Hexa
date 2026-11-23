@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/hud.gd" id="1_hud"]
 [ext_resource type="PackedScene" path="res://shell/hud/top_bar.tscn" id="2_topbar"]
@@ -17,6 +17,7 @@
 [ext_resource type="PackedScene" path="res://shell/hud/notifications.tscn" id="15_notif"]
 [ext_resource type="PackedScene" path="res://shell/hud/mode_legend.tscn" id="16_legend"]
 [ext_resource type="PackedScene" path="res://shell/panels/army_panel.tscn" id="17_army"]
+[ext_resource type="PackedScene" path="res://shell/hud/busy_pill.tscn" id="18_pill"]
 
 [node name="Hud" type="CanvasLayer"]
 process_mode = 1
@@ -68,6 +69,23 @@ offset_left = 12.0
 offset_top = 12.0
 offset_right = 232.0
 offset_bottom = 12.0
+
+[node name="TopCentre" type="Control" parent="Root/Column/Main/MapArea"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 8.0
+offset_bottom = 8.0
+grow_horizontal = 2
+mouse_filter = 2
+
+[node name="BusyPill" parent="Root/Column/Main/MapArea/TopCentre" instance=ExtResource("18_pill")]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+grow_horizontal = 2
 
 [node name="TopRight" type="VBoxContainer" parent="Root/Column/Main/MapArea"]
 layout_mode = 1

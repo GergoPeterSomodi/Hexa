@@ -43,6 +43,7 @@ func connect_signals(link: Callable) -> void:
 	link.call(_app.hud(), &"confirm_requested", _push_screen)
 	link.call(Events, &"battle_mark_clicked", open_battle)
 	link.call(Events, &"war_declared", _on_war_declared)
+	link.call(Events, &"peace_made", _on_peace_made)
 	link.call(Events, &"game_started", _on_game_started)
 
 
@@ -259,6 +260,29 @@ func _on_war_declared(tag: StringName, target: StringName) -> void:
 	_req.decisions.push({"kind": DecisionQueue.KIND_WAR, "tag": tag, "target": target})
 	if _req.flow.state() == SeasonFlow.State.IDLE:
 		_req.decisions.next(_app.context(), true)
+
+
+## A peace that ends a war with the player (M8 6.4): its alert is queued, and shown at once when the flow is idle. The entry
+## is the latest peace_made of this turn in the chronicle (the event carries the same fields).
+func _on_peace_made(_tag: StringName, _target: StringName, _terms: StringName) -> void:
+	if not enabled() or Session.game == null:
+		return
+	var player := Session.player_tag()
+	var decision := DecisionQueue.peace_decision(_latest_peace(Session.game), player)
+	if decision.is_empty():
+		return
+	_req.decisions.push(decision)
+	if _req.flow.state() == SeasonFlow.State.IDLE:
+		_req.decisions.next(_app.context(), true)
+
+
+## The newest peace_made entry of the game's turn in the chronicle, or {}.
+static func _latest_peace(game: Game) -> Dictionary:
+	var entries := game.chronicle.of_turn(game.turn)
+	for i: int in range(entries.size() - 1, -1, -1):
+		if str(entries[i].get("kind", "")) == "peace_made":
+			return entries[i]
+	return {}
 
 
 ## The Castle areas switch of the Layers popover is there in a game with countries only (the sandbox has no war).

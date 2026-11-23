@@ -4,6 +4,9 @@ Status as of 2026-11-13. Sources: the project notes, `docs/design/tech-tree.md`,
 
 ## Next up (decided 2026-11-14): the Godot port first, then war
 
+**Owner's playtest asks (2026-11-23):** the log as a bottom-left icon, moves within the month, separate unit clicks, smooth paths, conquest and sight, one tile window, round-by-round battles, the Python unit and battle UIs brought over: `docs/roadmap/owner-asks-2026-11-23.md` (issues 431 to 438), and the economy rethink (one raw material a tile, industries that add value, village/town/city output, population from surplus and prosperity; issue 439).
+
+
 **The port (decided 2026-11-14, the 0.3.0 brief locked):** the game moves to Godot, Europe only, Windows builds. The
 Python game is frozen at v0.2.2, the last Python release. The "New engine" line is 0.3.x, six releases, each with its
 own brief in `docs/roadmap/`:

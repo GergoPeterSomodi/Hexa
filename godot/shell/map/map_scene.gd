@@ -453,7 +453,7 @@ func upgrade_selected() -> Dictionary:
 
 ## True when a scenario game with countries is active and the player has not yet chosen a country.
 func picking() -> bool:
-	return Session.game != null and Session.game.has_countries() and Session.game.player == &""
+	return Session.game != null and Session.game.has_countries() and Session.game.player == &"" and not Session.game.ai_only
 
 
 ## Returns the active MapModes.Mode integer value.
@@ -494,12 +494,6 @@ func set_colour_blind(on: bool) -> void:
 	_overlay.set_palette(_colour_blind)
 	_capitals.set_colour_blind(_colour_blind)
 	_queue_all_borders(Session.game.map)
-
-
-## Glides the camera smoothly to `map_px`, optionally changing zoom.
-func glide_to(map_px: Vector2, new_zoom: float = -1.0, instant: bool = false) -> void:
-	if _rig != null:
-		_rig.look_at(map_px, new_zoom, instant)
 
 
 ## Glides the camera smoothly to the middle of `hex`.
@@ -751,6 +745,18 @@ func camera_rig() -> CameraRig: return _rig
 func map_input() -> MapInput: return _input
 
 
+## The hexes the camera sees: the replay's focus (M8 6.3; the public form of MapSeasons' view rect).
+func view_hexes() -> Rect2i:
+	var half := get_viewport_rect().size / (2.0 * _camera.zoom.x)
+	var low := _view.hex_at(_camera.position - half)
+	return Rect2i(low, _view.hex_at(_camera.position + half) - low + Vector2i.ONE).abs()
+
+
+## The country pick is over (the console's watch): the pick's marks go and the remembered mode returns.
+func end_pick() -> void:
+	_on_country_chosen(&"")
+
+
 func _hex_under_camera() -> Vector2i:
 	if _camera == null or not is_inside_tree():
 		return Vector2i.ZERO
@@ -770,16 +776,7 @@ func set_screen_cover(rects: Array[Rect2]) -> void:
 
 
 func _sync_country_labels() -> void:
-	if _country_labels == null or _camera == null:
-		return
-	var z := _camera.zoom.x
-	var vp_size := get_viewport_rect().size if is_inside_tree() else Vector2(1280.0, 720.0)
-	if vp_size.x <= 0.0 or vp_size.y <= 0.0:
-		vp_size = Vector2(1280.0, 720.0)
-	var xform := Transform2D(Vector2(z, 0.0), Vector2(0.0, z), vp_size * 0.5 - _camera.position * z)
-	_country_labels.set_view(xform, z, vp_size)
-	if _labels != null:
-		_labels.set_obstacles(_country_labels.obstacles())
+	MapLabelSync.sync(_country_labels, _labels, _camera, get_viewport_rect().size if is_inside_tree() else Vector2.ZERO)
 
 
 func _apply_zoom() -> void:

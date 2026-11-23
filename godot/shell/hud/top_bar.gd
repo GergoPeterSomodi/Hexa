@@ -24,6 +24,8 @@ signal study_tab_requested(page: StringName, tab: StringName)
 const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief", "Yields", "Food", "Supply"]
 const MODE_KEYS: Array[String] = ["1", "2", "3", "4", "5", "6"]
 const PICK_TAIL := ": choose your country"
+const WATCHING_TEXT := "Watching"
+const SEAL_LETTER := "S"
 const MAX_FITS_PER_FRAME := 3
 ## The mode buttons' side padding and font size when the bar is tight (six modes need the room the three had).
 const COMPACT_PAD := 1.0
@@ -58,6 +60,8 @@ var _fitting: bool = false
 ## A fit shows and hides parts, which tells the bar to fit again; the fits queued in one frame are capped so it settles.
 var _fit_frame: int = -1
 var _fits_in_frame: int = 0
+## The sandbox seal of a watched game (M8 4.12): an "S" where the arms are, with "Watching" beside it.
+var _seal: Label = null
 
 
 func _ready() -> void:
@@ -69,6 +73,12 @@ func _ready() -> void:
 	_mode_seg.add_theme_stylebox_override("panel", StyleBoxEmpty.new())  # no dark box round the three mode buttons
 	_mode_seg.changed.connect(_on_mode_changed)
 
+	_seal = Label.new()
+	_seal.text = SEAL_LETTER
+	_seal.tooltip_text = "The computer plays every country"
+	_seal.visible = false
+	_country_box.add_child(_seal)
+	_country_box.move_child(_seal, 0)
 	_country_btn.focus_mode = Control.FOCUS_NONE
 	_country_btn.pressed.connect(func() -> void: country_requested.emit(_country_tag))
 
@@ -307,6 +317,13 @@ func _refresh_name() -> void:
 		_arms.visible = false
 		_country_btn.visible = false
 		return
+	if _country_tag == &"" and Session.game != null and Session.game.ai_only:
+		_arms.visible = false
+		_seal.visible = true
+		_country_btn.text = WATCHING_TEXT
+		_country_btn.tooltip_text = "The computer plays every country"
+		return
+	_seal.visible = false
 	if _country_tag == &"":
 		_arms.set_country({})
 		_arms.visible = false

@@ -102,7 +102,8 @@ core/                   plain GDScript, extends RefCounted (or Resource in defs/
   views/                pure "what to draw" helpers: map_tiles.gd, map_cells.gd, edge_lines.gd, crossings.gd,
                         far_picture.gd, hex_card.gd, border_lines.gd, map_modes.gd, country_names.gd,
                         country_card.gd, place_search.gd
-  ai/                   empty until its milestone (from M8: the AI, above views; it reads what the panels read)
+  ai/                   the computer's turn (M8): AiKnow (the one door to what a seat may know), AiBrief, AiTurn and its step
+                        modules (AiEconomy, AiForces, AiWar, AiPeace), AiTrace, AiPlayers; it reads what the panels read
   mapgen/               generators, run in tools and tests only: WorldRelief, WorldWater (with WaterCurves and
                         WaterSearch), WorldCover, WorldPlaces, WorldRoads, climate.gd, fake_map.gd
 shell/                  everything with Nodes (Studiolo UI architecture)
@@ -264,6 +265,23 @@ check) and **Check** (the deep validation; its lines go to `facts` and the Outpu
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).
   - Mac trackpad two-finger scroll (`InputEventPanGesture`) pans at `GESTURE_PAN_PX` (20 px per delta unit); trackpad pinch (`InputEventMagnifyGesture`) zooms directly about the fingers; left/middle/right drag past `CLICK_SLOP` (6 px) pans 1:1.
 - **Tiles & Map:** tiles are baked by `tools/worldmap/tileset_bake/bake.py` and assembled into `assets/tiles/tiles_<season>.tres` (full) and `assets/tiles/tiles_<season>_half.tres` (0.5× atlases in `assets/tiles/half/`, default on macOS `gl_compatibility` and in the Low preset to avoid `BPTC_RGBA -> RGBA8` 4× VRAM expansion; `import_etc2_astc` is also enabled in `project.godot`) by `tools/build_tileset.gd`; `data/maps/north_italy.tres` is built by `tools/build_map.gd`; the rules are `core/systems/improve.gd`.
+
+## The computer's turn (M8)
+
+- **The AI:** every country but the player's plays each season through `Session` (`begin_season`, `step_orders(budget_ms)`,
+  `finish_season`). The App runs the turn in slices of a few milliseconds, so the map and the panels stay live; the busy pill
+  (top centre of the map, `shell/hud/busy_pill.gd`) says "Countries are moving 3 / 12", then "The moves of Summer 1480" while the
+  replay plays. While the computer moves or its moves replay, the map takes no orders (a click toasts why); panning, zooming and
+  the Layers stay free, and a camera move makes the slices shorter. The replay shows the walks in view (the view grown by two
+  hexes). `AiTurnUI` (`shell/app/ai_turn_ui.gd`) holds this wiring; `GameRequests` owns it.
+- **Watching:** the console's `watch` (during the country pick) makes every country computer-played: the pick ends and the top
+  bar shows an "S" seal with "Watching". `ai off` and `ai on` play every seat passively or back; `ai TAG` prints that seat's
+  last turn; `ai pass TAG` and `ai play TAG` play one seat. The console is `F2` with developer tools on.
+- **The soak** (nightly): all-AI games with invariants checked every season, its tables and ranges in JSON and a summary:
+  `"$GODOT" --headless --path godot -s res://tools/soak.gd -- --suite=ai --seeds=1-25 --seasons=80 --out=soak.json`
+  (`--quick` for a short run; a failure prints its replay line and exits 1).
+- **Alerts:** a war on the player and a peace that ends one are queued as Confirms: shown at once when no season runs, else in
+  the season's decisions, before its report.
 
 ## Checks in CI
 

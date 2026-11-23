@@ -141,6 +141,8 @@ func test_o_and_r_during_the_replay_give_no_order_and_say_so() -> void:
 	input._unhandled_input(_key(KEY_O))
 	assert_true(app.hud().toast_host().messages().has(MapArmies.REPLAY_BLOCKED), "O is refused with the replay's line")
 	app.hud().toast_host().clear()
+	# The map input says a refusal once a second at most (M8): let a second pass so R is told too.
+	input._blocked_at = -MapInput.BLOCKED_GAP_MS * 10
 	input._unhandled_input(_key(KEY_R))
 	assert_true(app.hud().toast_host().messages().has(MapArmies.REPLAY_BLOCKED), "R is refused with the replay's line")
 	assert_eq(Session.game.digest(), before, "neither key orders anything")
