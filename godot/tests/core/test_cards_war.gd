@@ -96,14 +96,32 @@ func test_siege_card_shows_rate_and_forecast_to_the_besieger_only() -> void:
 	assert_true(str((defender.lines as Array)[0][0]).begins_with("Each season +"), "the defender reads the rate too")
 
 
-func test_planted_siege_is_hidden_from_a_country_that_does_not_see_it() -> void:
+func test_planted_siege_is_hidden_from_a_country_that_has_not_discovered_it() -> void:
 	var f := _enemy_fortress()
 	_siege(f.hex, ArmyFixture.TAG)
 	var third := &""
 	for c: Country in _g.countries:
-		if c.tag != ArmyFixture.TAG and c.tag != f.holder:
+		if c.tag == &"" or c.tag == ArmyFixture.TAG or c.tag == f.holder:
+			continue
+		FogFixture.thin(_g, c.tag, 0)
+		if not Knowledge.discovered(_g, c.tag, f.hex):
 			third = c.tag
 			break
-	assert_ne(third, &"")
-	if not Knowledge.sees(_g, third, f.hex):
-		assert_true(WarCards.siege(_g, third, f.hex).is_empty(), "P: an unseen siege has no card for a third country")
+	assert_ne(third, &"", "a country that has not discovered the fortress exists")
+	assert_true(WarCards.siege(_g, third, f.hex).is_empty(), "P: an undiscovered siege has no card for a third country")
+
+
+func test_light_fog_siege_card_names_no_besieger() -> void:
+	var f := _enemy_fortress()
+	_siege(f.hex, ArmyFixture.TAG)
+	var third := &""
+	for c: Country in _g.countries:
+		if c.tag != &"" and c.tag != ArmyFixture.TAG and c.tag != f.holder and not Knowledge.sees(_g, c.tag, f.hex) \
+				and Knowledge.discovered(_g, c.tag, f.hex):
+			third = c.tag
+			break
+	assert_ne(third, &"", "a country that has discovered the fortress but does not see it")
+	var card := WarCards.siege(_g, third, f.hex)
+	assert_false(card.is_empty(), "a light-fog siege has a card")
+	assert_eq(str((card.lines as Array)[0][0]), "Besieged", "P: a light-fog siege card says only Besieged")
+	assert_false(str(card.lines).contains(String(ArmyFixture.TAG)), "P: no besieger tag on the light-fog card")

@@ -1,7 +1,8 @@
-## The hover cards of the war's map marks (docs/architecture/m7-build-spec.md 5.6, 6.3; M7 B23): a battle site (WarCards.site)
-## and a siege dial (WarCards.siege). Each reads the BattleView or SiegeView of the viewer, so the fog is theirs: a witness
-## of a battle reads its totals rounded; a siege's rate and forecast show only to its besieger and defender, and a viewer who
-## sees the hex reads the meter and no more. Pure core/views/ code: no nodes, no engine calls, no writes.
+## The hover cards of the war's map marks (docs/architecture/m7-build-spec.md 5.6, 6.3; M7 B23; fog-build spec R21, R22): a battle
+## site (WarCards.site) and a siege dial (WarCards.siege). Each reads the BattleView or SiegeView of the viewer, so the fog is
+## theirs: a witness of a battle reads its exact totals; a siege's rate and forecast show only to its besieger and defender; a
+## viewer who sees the hex reads the besieger and its men; a viewer who has only discovered the hex reads the meter, the garrison
+## and the word "Besieged", and no besieger. Pure core/views/ code: no nodes, no engine calls, no writes.
 class_name WarCards
 extends RefCounted
 
@@ -28,8 +29,9 @@ static func site(game: Game, viewer: StringName, record_id: int) -> Dictionary:
 
 
 ## A siege dial's card: {title ("Siege of Pavia: 6 of 10"), lines ([[text, tone]]), hint}. The besieger and the defender read
-## the rate, the forecast season and the stores; a viewer who only sees the hex reads who besieges and no numbers beyond the
-## meter. {} when the viewer may not see the siege (SiegeView.at gives nothing).
+## the rate, the forecast season and the stores; a viewer who sees the hex reads the besieger and its men; a viewer who has
+## only discovered it reads the word "Besieged" and the garrison, and no besieger. {} when the viewer may not see the siege
+## (SiegeView.at gives nothing).
 static func siege(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
 	var v := SiegeView.at(game, viewer, hex)
 	if v.is_empty():
@@ -44,8 +46,14 @@ static func siege(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
 			lines.append(["The garrison is starving", SiegeView.TONE_BAD])
 		else:
 			lines.append(["The garrison starves after %d" % int(v.stores_left), TONE_PLAIN])
+	elif str(v.besieger_name) != "":
+		var text := "Besieged by %s" % str(v.besieger_name)
+		if str(v.men_text) != "":
+			text += " with %s" % str(v.men_text)
+		lines.append([text, TONE_PLAIN])
 	else:
-		lines.append(["Besieged by %s" % str(v.besieger_name), TONE_PLAIN])
+		lines.append(["Besieged", TONE_PLAIN])
+	lines.append([str(v.garrison_text), TONE_PLAIN])
 	return {"title": title, "lines": lines, "hint": HINT_SIEGE}
 
 

@@ -51,7 +51,15 @@ func _unseen_hex() -> Vector2i:
 	return Vector2i(-1, -1)
 
 
+## A country Genoa does not know. North Italy starts fully discovered, so the world is thinned first (FogFixture, FG11):
+## Genoa keeps its land and its neighbours, and a country beyond them is unknown.
 func _stranger() -> StringName:
+	FogFixture.thin(_g, &"GEN", 0)
+	return _unknown_now()
+
+
+## The first country Genoa does not know, as the world stands now (no thinning).
+func _unknown_now() -> StringName:
 	for c: Country in _g.countries:
 		if c.tag != &"GEN" and not Knowledge.knows(_g, &"GEN", c.tag):
 			return c.tag
@@ -146,9 +154,10 @@ func test_land_lines() -> void:
 
 
 func test_a_victim_the_viewer_does_not_know_is_not_named() -> void:
+	var third := _stranger()  # thins Genoa first: the known country is read after it
 	var other := _known()
-	var third := _stranger()
-	var hexes: Array[Vector2i] = [Vector2i(11, 8)]
+	# A hex Genoa has discovered: a land event is told by the hexes the viewer knows (fog build R29), so the capture is told.
+	var hexes: Array[Vector2i] = [SAVONA]
 	_g.emit({"kind": "owners_changed", "hexes": hexes, "tag": other, "others": [third]})
 	var taken := LogLines.line_of(_g, _g.chronicle.entries.back(), &"GEN")
 	assert_eq(taken["text"], "%s took 1 district from another country: %s." % [LogLines.capital(Words.country_the(_g, other)),
@@ -435,9 +444,26 @@ func test_filters_of_gives_nothing_for_an_unwitnessed_entry() -> void:
 		"another country's shortage is nobody else's line")
 
 
+## `_told` (LogLines._seen) equals Knowledge.witnessed on north Italy and on the thin fixture (FG11, R29), then the land rule
+## alone: a stranger's town on a hex Genoa has discovered is told by the sight list; on an undiscovered hex it is not.
 func test_seen_equals_knowledge_witnessed() -> void:
+	_check_told("north Italy")
+	FogFixture.thin(_g, &"GEN", 0)
+	var stranger := _unknown_now()
+	_g.emit({"kind": "town_grew", "tag": stranger, "hex": SAVONA, "level": 2, "from": 1})
+	var near: Dictionary = _g.chronicle.entries.back()
+	_g.emit({"kind": "town_grew", "tag": stranger, "hex": _unseen_hex(), "level": 2, "from": 1})
+	var far: Dictionary = _g.chronicle.entries.back()
+	assert_true(LogLines._seen(_g, near, &"GEN", {}), "P: a land event told by the sight list")
+	assert_false(LogLines._seen(_g, far, &"GEN", {}), "P: a land event on an undiscovered hex is not told")
+	_check_told("the thin fixture")
+
+
+## Every entry the real producer makes and the handmade forms of a witness list, for every viewer: `_seen` and
+## Knowledge.witnessed give the same answer.
+func _check_told(world: String) -> void:
 	var known := _known()
-	var stranger := _stranger()
+	var stranger := _unknown_now()
 	var parties: Array[StringName] = [&"GEN", known, stranger, &""]
 	var entries: Array[Dictionary] = []
 	for tag: StringName in parties:
@@ -447,13 +473,23 @@ func test_seen_equals_knowledge_witnessed() -> void:
 		entries.append({"kind": "tax_set", "tag": tag, "level": 1, "witnesses": [&"GEN"]})
 		entries.append({"kind": "tax_set", "tag": tag, "level": 1, "witnesses": PackedStringArray([String(stranger)])})
 		entries.append({"kind": "tax_set", "tag": tag, "level": 1, "others": "GEN", "witnesses": 3})
+	_emit("work_finished", _work(Works.BUILD, ImproveRules.VINEYARD, 1, SAVONA, 4, stranger))
+	_emit("work_started", _work(Works.BUILD, ImproveRules.TIMBER, 1, WOODS, 4, known))
+	_g.emit({"kind": "owners_changed", "hexes": [SAVONA], "tag": known, "others": [stranger]})
+	_g.emit({"kind": "war_declared", "tag": known, "target": &"GEN", "war": 3})
+	_g.emit({"kind": "army_raised", "tag": stranger, "hex": SAVONA, "count": 1, "men": 100, "units": [1], "kind_id": 0})
+	_g.emit({"kind": "district_captured", "tag": stranger, "hex": SAVONA, "by": "walk", "others": [known]})
+	entries.append_array(_g.chronicle.entries)
+	var viewers: Array[StringName] = [&""]
+	viewers.append_array(parties)
 	var checked := 0
-	for viewer: StringName in parties:
+	for viewer: StringName in viewers:
 		var memo := {}
 		for e: Dictionary in entries:
-			assert_eq(LogLines._seen(_g, e, viewer, memo), Knowledge.witnessed(_g, e, viewer), "%s sees %s" % [viewer, e])
+			assert_eq(LogLines._seen(_g, e, viewer, memo), Knowledge.witnessed(_g, e, viewer),
+				"%s: %s for %s" % [world, e.get("kind", "?"), viewer])
 			checked += 1
-	assert_gt(checked, 80)
+	assert_gt(checked, 150)
 
 
 func test_the_work_checks_agree_with_work_from_dict() -> void:
@@ -562,7 +598,7 @@ func test_raised_lines_for_the_player_and_a_witnessed_other() -> void:
 	var other := _army("army_raised", {"tag": stranger, "hex": SAVONA, "army": 9, "units": [5], "kind_id": 0,
 		"count": 2, "men": 1000, "ducats": 0, "goods": {}, "witnesses": [&"GEN"]})
 	var seen := LogLines.line_of(_g, other, &"GEN")
-	assert_eq(seen["text"], "An army raised 2 companies %s: about 1,000 men." % at, "a country the viewer does not know is not named")
+	assert_eq(seen["text"], "An army raised 2 companies %s: 1,000 men." % at, "a country the viewer does not know is not named")
 	assert_eq([seen["keyword"], seen["tone"], seen["notify"], seen["mine"]], ["Raised", "warn", true, false])
 	assert_eq(seen["floating"], "", "no ribbon for another's raise")
 	assert_eq(seen["filters"], [&"all", &"war"] as Array[StringName], "not in Mine, not in Money; in War (M7)")
@@ -582,7 +618,7 @@ func test_disband_lines_name_the_army_and_give_back_the_refund() -> void:
 	var other := _army("army_disbanded", {"tag": stranger, "hex": SAVONA, "army": 9, "units": [7], "men": 500,
 		"refund": 0, "witnesses": [&"GEN"]})
 	var seen := LogLines.line_of(_g, other, &"GEN")
-	assert_eq(seen["text"], "An army disbanded about 500 men %s." % Words.at(_g, SAVONA))
+	assert_eq(seen["text"], "An army disbanded 500 men %s." % Words.at(_g, SAVONA))
 	assert_eq([seen["tone"], seen["filters"]], ["muted", [&"all", &"war"]])
 
 
@@ -724,8 +760,8 @@ func test_the_live_halt_and_hunger_name_the_army() -> void:
 
 func test_a_foreign_army_names_only_a_country_the_viewer_knows() -> void:
 	# Two countries GEN witnesses an army of: one it knows (named) and one it does not (unnamed, 4.12).
-	var known := _known()
 	var unknown := _stranger()
+	var known := _known()
 	var at := Words.at(_g, SAVONA)
 	for tag: StringName in [known, unknown]:
 		var told: StringName = tag if tag == known else &""
@@ -733,11 +769,11 @@ func test_a_foreign_army_names_only_a_country_the_viewer_knows() -> void:
 		var raised := _army("army_raised", {"tag": tag, "hex": SAVONA, "army": 1, "units": [1, 2], "kind_id": 0,
 			"count": 2, "men": 1000, "ducats": 0, "goods": {}, "witnesses": [&"GEN"]})
 		assert_eq(LogLines.line_of(_g, raised, &"GEN")["text"],
-			"%s raised 2 companies %s: about 1,000 men." % [subject, at], "raised: %s" % tag)
+			"%s raised 2 companies %s: 1,000 men." % [subject, at], "raised: %s" % tag)
 		var disbanded := _army("army_disbanded", {"tag": tag, "hex": SAVONA, "army": 2, "units": [3], "men": 500,
 			"refund": 0, "witnesses": [&"GEN"]})
 		assert_eq(LogLines.line_of(_g, disbanded, &"GEN")["text"],
-			"%s disbanded about 500 men %s." % [subject, at], "disbanded: %s" % tag)
+			"%s disbanded 500 men %s." % [subject, at], "disbanded: %s" % tag)
 		var starved := _army("army_starved", {"tag": tag, "army": 3, "hex": SAVONA, "lost": 90, "men": 10,
 			"why": "out_of_supply", "witnesses": [&"GEN"]})
 		assert_eq(LogLines.line_of(_g, starved, &"GEN")["text"],

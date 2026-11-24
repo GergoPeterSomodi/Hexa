@@ -102,13 +102,14 @@ static func prize_of(game: Game, brief: AiBrief, target: StringName) -> int:
 	var total := 0
 	for i: int in AiKnow.land_of(game, target):
 		var hex := AiKnow.hex_of(game, i)
-		if not AiKnow.is_land(game, hex) or AiKnow.controller_of(game, hex) == brief.tag:
+		if not AiKnow.is_land(game, hex) or not AiKnow.discovered(game, brief.tag, hex) \
+				or AiKnow.controller_of(game, hex) == brief.tag:
 			continue
 		var state := AiKnow.area_state(game, hex)
 		if (state == STATE_OPEN or state == STATE_FALLEN or state == STATE_HELD) and near.has(hex):
 			total += 1
 	for hex: Vector2i in AiKnow.fortresses_of(game, target):
-		if AiKnow.fortress_level(game, hex) >= 2 and near.has(hex):
+		if AiKnow.discovered(game, brief.tag, hex) and AiKnow.fortress_level(game, hex) >= 2 and near.has(hex):
 			total += 2
 	return total
 
@@ -365,7 +366,10 @@ static func _besiege(game: Game, brief: AiBrief, army: Army, enemies: Array[Stri
 		var age := _war_age(game, brief.tag, enemy)
 		for hex: Vector2i in AiKnow.fortresses_of(game, enemy):
 			var d := AiKnow.hex_distance(army.hex, hex)
-			if d > brief.ai.target_range or hex == army.hex or _warned(game, brief, hex) or _men_on(seen, hex) > 0:
+			# R33, R34: an undiscovered fortress is no target; its garrison is -1 (unknown), never read as none.
+			if d > brief.ai.target_range or hex == army.hex or not AiKnow.discovered(game, brief.tag, hex):
+				continue
+			if _warned(game, brief, hex) or _men_on(seen, hex) > 0:
 				continue
 			if AiKnow.garrison_estimate(game, brief.tag, hex) <= 0 or _besieged_by_other(game, brief, army, hex):
 				continue
@@ -398,7 +402,8 @@ static func _walk_in(game: Game, brief: AiBrief, army: Army, enemies: Array[Stri
 		for i: int in AiKnow.land_of(game, enemy):
 			var hex := AiKnow.hex_of(game, i)
 			var d := AiKnow.hex_distance(army.hex, hex)
-			if d > brief.ai.target_range or hex == army.hex or not AiKnow.is_land(game, hex) or _warned(game, brief, hex):
+			if d > brief.ai.target_range or hex == army.hex or not AiKnow.is_land(game, hex) \
+					or not AiKnow.discovered(game, brief.tag, hex) or _warned(game, brief, hex):
 				continue
 			if brief.claims.has(i) and int(brief.claims[i]) != army.id:
 				continue
@@ -416,7 +421,8 @@ static func _approach(game: Game, brief: AiBrief, army: Army, enemies: Array[Str
 	for enemy: StringName in enemies:
 		for i: int in AiKnow.land_of(game, enemy):
 			var hex := AiKnow.hex_of(game, i)
-			if hex == army.hex or not AiKnow.is_land(game, hex) or _warned(game, brief, hex):
+			if hex == army.hex or not AiKnow.is_land(game, hex) or not AiKnow.discovered(game, brief.tag, hex) \
+					or _warned(game, brief, hex):
 				continue
 			var d := AiKnow.hex_distance(army.hex, hex)
 			if d < least:

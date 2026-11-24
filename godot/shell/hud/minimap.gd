@@ -55,7 +55,7 @@ func _process(_delta: float) -> void:
 	if not _bound:
 		return
 	var far_tex: Texture2D = _far.texture() if _far != null else null
-	var key := "%d|%s|%d|%d|%d|%d|%s|%s" % [
+	var key := "%d|%s|%d|%d|%d|%d|%s|%s|%d" % [
 		int(_mode_overlay.mode()),
 		str(_mode_overlay.is_tint_on()),
 		_mode_overlay.hot_id(),
@@ -64,6 +64,7 @@ func _process(_delta: float) -> void:
 		_id_of(_mode_overlay.palette_texture()),
 		str(_mode_overlay.is_areas_on()),
 		str(_mode_overlay.is_sight_veil_on()),
+		_id_of(_mode_overlay.discovered_texture()),
 	]
 	if key != _overlay_key:
 		_overlay_key = key

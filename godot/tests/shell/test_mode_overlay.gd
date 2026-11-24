@@ -728,3 +728,63 @@ func test_the_shader_declares_the_m7_uniforms_and_textures() -> void:
 		names.append(str(uniform["name"]))
 	for want: String in ["occupiers", "areas", "occupied_px", "area_alpha", "area_on", "sight", "owner_ids"]:
 		assert_true(names.has(want), "the shader declares %s" % want)
+
+
+# ----- Deep fog (fog spec R36, D17; FG13): the texture, its sync, the visibility ----------------------------------------------
+
+func test_deep_fog_texture_starts_all_discovered_and_the_shader_declares_it() -> void:
+	var game := ArmyFixture.game()
+	var overlay := ModeOverlay.new()
+	add_child_autofree(overlay)
+	overlay.setup(game)
+	assert_eq(overlay.discovered_texture().get_size(), Vector2(game.map.cols, game.map.rows), "one texel a hex")
+	assert_eq(overlay.discovered_image().get_format(), Image.FORMAT_R8)
+	assert_eq(overlay.discovered_image().get_data().count(1), game.map.hex_count(), "all discovered before the first sync")
+	var mat := overlay.material as ShaderMaterial
+	assert_same(mat.get_shader_parameter(&"discovered"), overlay.discovered_texture())
+	assert_eq(mat.get_shader_parameter(&"deep_fog_colour"), MapModes.DEEP_FOG_COLOUR)
+	var names: Array[String] = []
+	for uniform: Dictionary in (load(ModeOverlay.SHADER_PATH) as Shader).get_shader_uniform_list():
+		names.append(str(uniform["name"]))
+	assert_true(names.has("discovered") and names.has("deep_fog_colour"), "the shader declares both")
+
+
+func test_sync_discovered_writes_the_fog_and_follows_a_walk() -> void:
+	var game := ArmyFixture.game()
+	FogFixture.thin(game, ArmyFixture.TAG, 1)
+	var overlay := ModeOverlay.new()
+	add_child_autofree(overlay)
+	overlay.setup(game)
+	assert_gt(MapModes.discovered_bytes(game, ArmyFixture.TAG).count(0), 0, "the thin fixture has deep fog")
+	assert_eq(overlay.discovered_image().get_data(), MapModes.discovered_bytes(game, ArmyFixture.TAG),
+		"setup writes MapModes' bytes into the texture")
+	assert_eq(overlay.sync_discovered(game), 0, "nothing moved since setup: no write")
+	var hex := Army.NO_HEX
+	for i: int in game.map.hex_count():
+		var h := game.map.hex_of(i)
+		if game.map.is_land(h) and not Knowledge.discovered(game, ArmyFixture.TAG, h):
+			hex = h
+			break
+	assert_ne(hex, Army.NO_HEX, "an undiscovered land hex exists")
+	var path: Array[Vector2i] = [hex]
+	Sight.see_path(game, ArmyFixture.TAG, path, 0)
+	assert_eq(overlay.sync_discovered(game), 1, "the walk explored one hex: one texel")
+	assert_eq(overlay.discovered_image().get_data(), MapModes.discovered_bytes(game, ArmyFixture.TAG),
+		"the image follows the walk")
+
+
+func test_deep_fog_shows_the_overlay_in_terrain_without_tint_or_veil() -> void:
+	var game := ArmyFixture.game()
+	FogFixture.thin(game, ArmyFixture.TAG, 1)
+	var overlay := ModeOverlay.new()
+	add_child_autofree(overlay)
+	overlay.setup(game)
+	overlay.set_mode(MapModes.Mode.TERRAIN)
+	overlay.set_tint(false)
+	overlay.set_sight_veil(false)
+	assert_true(overlay.visible, "deep fog: the overlay shows even in Terrain with no tint and no veil")
+	var all_known := PackedByteArray()
+	all_known.resize(game.map.hex_count())
+	all_known.fill(1)
+	overlay.update_discovered(all_known)
+	assert_false(overlay.visible, "nothing under deep fog: hidden again")

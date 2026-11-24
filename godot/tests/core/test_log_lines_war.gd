@@ -30,7 +30,9 @@ func _known() -> StringName:
 	return Knowledge.known(_g, &"GEN")[0]
 
 
+## Genoa thinned first (FogFixture, FG11): north Italy starts fully discovered, so a country beyond Genoa's land is unknown.
 func _stranger() -> StringName:
+	FogFixture.thin(_g, &"GEN", 0)
 	for c: Country in _g.countries:
 		if c.tag != &"GEN" and not Knowledge.knows(_g, &"GEN", c.tag):
 			return c.tag
@@ -39,6 +41,7 @@ func _stranger() -> StringName:
 
 ## Two countries the player does not know, neither the player's own.
 func _two_strangers() -> Array[StringName]:
+	FogFixture.thin(_g, &"GEN", 0)
 	var out: Array[StringName] = []
 	for c: Country in _g.countries:
 		if c.tag != &"" and c.tag != &"GEN" and not Knowledge.knows(_g, &"GEN", c.tag):
@@ -177,8 +180,8 @@ func test_a_battle_by_peace_has_no_days_and_no_notice() -> void:
 
 
 func test_a_witnessed_battle_of_others_names_only_the_known() -> void:
+	var stranger := _stranger()  # thins Genoa first, so the known country is read after it
 	var known := _known()
-	var stranger := _stranger()
 	var line := _line("battle_ended", _battle(known, stranger, known, stranger, {"name": "Battle of Gavi, 1481", "year": 1481,
 		"killed": {String(known): 5, String(stranger): 9}, "wounded": {}, "retreat": Army.NO_HEX, "record": 4}))
 	assert_eq(line["text"], "Battle of Gavi, 1481: %s beat a country." % LogLines.short_name(_g, known))
@@ -263,9 +266,10 @@ func test_a_fortress_fall_names_the_seasons_and_the_open_land() -> void:
 func test_a_district_of_others_is_muted_and_unknown_is_unnamed() -> void:
 	var stranger := _stranger()
 	var known := _known()
-	var line := _line("district_captured", {"tag": stranger, "hex": HEX_A, "others": [known], "owner": known, "by": "walk",
+	var hex := Vector2i(7, 12)  # a land Genoa has discovered: a land event is told by the sight list (R29)
+	var line := _line("district_captured", {"tag": stranger, "hex": hex, "others": [known], "owner": known, "by": "walk",
 		"garrison_lost": 0, "witnesses": [&"GEN"]})
-	assert_eq(line["text"], "A country took %s." % Words.place(_g, HEX_A), "a witnessed take by an unknown country")
+	assert_eq(line["text"], "A country took %s." % Words.place(_g, hex), "a witnessed take by an unknown country")
 	assert_eq([line["tone"], line["notify"]], ["muted", false])
 
 
@@ -342,8 +346,9 @@ func test_filters_of_equals_the_lines_filters_for_every_war_kind_and_viewer() ->
 
 
 func test_the_war_filter_holds_war_and_army_kinds_and_mine_holds_the_players() -> void:
+	var target := _stranger()  # thins Genoa first
 	var known := _known()
-	_emit("war_declared", {"tag": known, "target": _stranger(), "war": 1, "witnesses": _living()})
+	_emit("war_declared", {"tag": known, "target": target, "war": 1, "witnesses": _living()})
 	_emit("war_declared", {"tag": &"GEN", "target": known, "war": 2, "witnesses": _living()})
 	_g.turn = 2
 	_g.version += 1
@@ -359,7 +364,7 @@ func test_the_war_filter_holds_war_and_army_kinds_and_mine_holds_the_players() -
 		for line: Dictionary in season["lines"]:
 			if str(line["keyword"]) == "War":
 				mine_wars.append(str(line["text"]))
-	assert_eq(mine_wars, ["You declared war on %s." % _the(_known())], "only the player's own declaration is a mine war line")
+	assert_eq(mine_wars, ["You declared war on %s." % _the(known)], "only the player's own declaration is a mine war line")
 
 
 func test_war_lines_are_equal_after_a_save_and_load() -> void:

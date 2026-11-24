@@ -175,6 +175,8 @@ static func filters_of(game: Game, entry: Dictionary, viewer: StringName, memo: 
 	var mine := StringName(str(entry.get("tag", ""))) == viewer
 	if kind == "owners_changed":
 		mine = mine or _tags(entry.get("others", [])).has(viewer)
+		if Knowledge.land_hexes(game, viewer, entry).is_empty():
+			return none  # the line names no hex the viewer has discovered: no line, so no filter either
 	elif LogLinesWar.is_war_kind(kind):
 		mine = LogLinesWar.mine(entry, viewer)
 		if not LogLinesWar.describable(entry, viewer, mine):
@@ -280,6 +282,8 @@ static func _seen(game: Game, entry: Dictionary, viewer: StringName, memo: Dicti
 	var tag := StringName(str(entry.get("tag", "")))
 	if tag == viewer or _lists(entry.get("others", []), viewer):
 		return true
+	if bool(entry.get("land", false)):  # Knowledge.witnessed (R29): a land event is told to whoever discovered one of its hexes
+		return not Knowledge.land_hexes(game, viewer, entry).is_empty()
 	var witnesses: Variant = entry.get("witnesses", [])
 	if not _no_tags(witnesses):
 		return _lists(witnesses, viewer)
@@ -576,7 +580,7 @@ static func _notifies_raise(game: Game, entry: Dictionary, viewer: StringName) -
 	return false
 
 
-## A raise: the player's own line with its ducats; another's witnessed raise with the band of its men.
+## A raise: the player's own line with its ducats; another's witnessed raise with its men, exact (R31).
 static func _raised_line(game: Game, entry: Dictionary, viewer: StringName, mine: bool) -> Dictionary:
 	if not (entry.get("hex", null) is Vector2i):
 		return {}
@@ -589,10 +593,10 @@ static func _raised_line(game: Game, entry: Dictionary, viewer: StringName, mine
 	var who := _told_name(game, viewer, entry)
 	return {"keyword": "Raised", "tone": "warn", "hex": hex, "notify": _notifies_raise(game, entry, viewer), "floating": "",
 		"text": "%s raised %s %s: %s." % [who, Words.plural(count, "company", "companies"), Words.at(game, hex),
-			Knowledge.band_text(int(entry.get("men", 0)), "men")]}
+			Words.men(int(entry.get("men", 0)))]}
 
 
-## A disband: the player's own line with its refund; another's witnessed one with the band of its men.
+## A disband: the player's own line with its refund; another's witnessed one with its men, exact (R31).
 static func _disbanded_line(game: Game, entry: Dictionary, viewer: StringName, mine: bool) -> Dictionary:
 	if not (entry.get("hex", null) is Vector2i):
 		return {}
@@ -603,8 +607,7 @@ static func _disbanded_line(game: Game, entry: Dictionary, viewer: StringName, m
 			"text": "You disbanded %s%s%s." % [companies, _of_the_army(entry), _paid_text(entry)]}
 	var who := _told_name(game, viewer, entry)
 	return {"keyword": "Disbanded", "tone": "muted", "hex": hex, "notify": false, "floating": "",
-		"text": "%s disbanded %s %s." % [who, Knowledge.band_text(int(entry.get("men", 0)), "men"),
-			Words.at(game, hex)]}
+		"text": "%s disbanded %s %s." % [who, Words.men(int(entry.get("men", 0))), Words.at(game, hex)]}
 
 
 ## A halt: the player's own line only (the walk's witnesses are its country alone). A winter wait names the pass.
@@ -660,7 +663,8 @@ static func _lost_line(game: Game, entry: Dictionary, viewer: StringName, mine: 
 
 
 static func _land_line(game: Game, entry: Dictionary, viewer: StringName, tag: StringName, others: Array[StringName]) -> Dictionary:
-	var hexes := _hexes(entry.get("hexes", []))
+	# Only the hexes the viewer has discovered: an undiscovered hex's place is never named (R29, R30).
+	var hexes := Knowledge.land_hexes(game, viewer, entry)
 	if hexes.is_empty():
 		return {}
 	var gained := tag == viewer and viewer != &""

@@ -122,7 +122,7 @@ func test_an_m3_season_of_genoa() -> void:
 	assert_eq(s["lede"], "The Chancellor's report to the Doge of Genoa. Summer 1480 begins.")
 	assert_eq([s["seal_letter"], s["quiet"], s["serious"], s["swing_permille"]], ["G", false, false, 78], "48 of 610")
 	assert_eq(s["toast"], "Spring 1480 ended: %s. J: the report" % _change_text(), "the money, once the season has a ledger")
-	assert_eq(_ids(s), [&"glance", &"before", &"treasury", &"goods", &"works", &"orders", &"standing"] as Array[StringName],
+	assert_eq(_ids(s), [&"glance", &"before", &"treasury", &"goods", &"works", &"orders", &"befell", &"standing"] as Array[StringName],
 		"fixed order, empty ones left out")
 	var glance := _section(s, &"glance")
 	assert_eq(glance["title"], "At a glance")
@@ -146,9 +146,11 @@ func test_an_m3_season_of_genoa() -> void:
 		"Cancelled: woodland %s." % place,
 		"Took the rule of the Republic of Genoa.",
 	] as Array[String])
-	# M6 (4.11): an event is heard by the countries whose sight held its hex when it was made. Genoa's own woodland at
-	# (9, 11) is its own news (not in What befell), and the other countries' finishes here are out of Genoa's sight.
-	assert_eq(_section(s, &"befell"), {}, "M6: no witnessed other finish in Genoa's sight this season")
+	# R31 (M6 4.11): a land event is heard by every country that has discovered its hex; north Italy starts discovered, so
+	# the other's finish at (11, 8) is What befell. Genoa's own woodland at (9, 11) is its own news (not in What befell).
+	var other := Knowledge.known(_g, &"GEN")[0]
+	assert_eq(_texts(s, &"befell"), ["%s finished 1 work." % LogLines.short_name(_g, other)] as Array[String],
+		"the other's finish is told")
 	# The positive case: the same season with a finish on a neighbour's hex that Genoa witnessed is What befell.
 	before_each()
 	var heard := _spring(true)
@@ -333,20 +335,48 @@ func test_the_summary_is_a_copy_of_the_cache() -> void:
 	assert_eq((again["sections"] as Array).size(), count)
 
 
-func test_an_unwitnessed_event_is_absent() -> void:
+## The Standing reads another country's land and people as the viewer has discovered them (Knowledge.land_seen, as Rankings do),
+## so the two agree on a thin start. Planted fault: the Stats' whole land would show, and at least one known country differs.
+func test_standing_reads_other_lands_as_discovered_like_rankings() -> void:
+	_fixture_report()
+	FogFixture.thin(_g, &"GEN", 1)
+	var standing := _section(SeasonSummary.of(_g, &"GEN", 1), &"standing")
+	assert_false(standing.is_empty(), "a standing for Genoa")
+	var checked := 0
+	var differs := false
+	for other: StringName in Knowledge.known(_g, &"GEN"):
+		var seen := Knowledge.land_seen(_g, &"GEN", other)
+		if int(seen["districts"]) != _g.stats.value(other, 1, "land"):
+			differs = true
+		var name := LogLines.short_name(_g, other)
+		for line: Dictionary in standing["lines"]:
+			var text := str(line["text"])
+			if text.begins_with(name + ":"):
+				checked += 1
+				assert_true(text.begins_with("%s: %d districts," % [name, int(seen["districts"])]), "land as discovered: %s" % text)
+				assert_true(text.contains("%s people." % Words.number(int(seen["people"]))), "people as discovered: %s" % text)
+	assert_gt(checked, 0, "a known country is in the standing")
+	assert_true(differs, "P: on the thin start a known country's land differs from the Stats' whole land")
+
+
+func test_an_undiscovered_land_event_is_absent() -> void:
 	Season.run(_g)
+	FogFixture.thin(_g, &"GEN", 1)  # Genoa has discovered its land and a ring; the far hex is undiscovered
 	var stranger := &""
 	for c: Country in _g.countries:
 		if c.tag != &"GEN" and not Knowledge.knows(_g, &"GEN", c.tag):
 			stranger = c.tag
 			break
 	assert_ne(stranger, &"")
-	var w := _inject(Works.BUILD, ImproveRules.WHEAT, 1, Vector2i(2, 3), 4, 4)
+	var far := Vector2i(2, 3)
+	assert_false(Knowledge.discovered(_g, &"GEN", far), "the far hex is undiscovered by Genoa")
+	assert_true(Knowledge.discovered(_g, &"GEN", GENOA), "Genoa's capital is discovered")
+	var w := _inject(Works.BUILD, ImproveRules.WHEAT, 1, far, 4, 4)
 	_g.state.works.erase(w)
-	_g.emit({"kind": "work_finished", "tag": stranger, "hex": Vector2i(2, 3), "work": w.to_dict()})
+	_g.emit({"kind": "work_finished", "tag": stranger, "hex": far, "work": w.to_dict()})
 	_g.turn = 3
 	_g.version += 1
-	assert_eq(_section(SeasonSummary.of(_g, &"GEN", 2), &"befell"), {}, "P: Genoa does not hear of a stranger's work")
+	assert_eq(_section(SeasonSummary.of(_g, &"GEN", 2), &"befell"), {}, "P: Genoa does not hear of a land event on an undiscovered hex")
 	assert_eq(_texts(SeasonSummary.of(_g, &"", 2), &"befell").size(), 1, "the viewer of everything does")
 
 
@@ -487,22 +517,25 @@ func test_4_15_b_the_goods_works_orders_and_standing() -> void:
 	assert_eq(_texts(s, &"orders")[0], "Ordered to build: vineyard near Savona (7, 12).")
 	var standing := _texts(s, &"standing")
 	var people := _g.stats.value(&"GEN", 1, "people")
-	assert_true(standing[0].begins_with("Among the 3 countries you know, you are 3rd in land (14 districts), 3rd in income (+88 a season) and "), standing[0])
+	assert_true(standing[0].begins_with("Among the 13 countries you know, you are 8th in land (14 districts), 6th in income (+88 a season) and "), standing[0])
 	assert_true(standing[0].ends_with(" in people (%s)." % Words.number(people)), standing[0])
-	assert_eq(standing[1], "Savoy: about 58 districts, about +240, about %s people." % Words.number(Knowledge.band(_g.stats.value(&"SAV", 1, "people"))))
-	assert_eq(standing[2], "Milan: about 52 districts, about +260, about %s people." % Words.number(Knowledge.band(_g.stats.value(&"MLO", 1, "people"))))
+	assert_eq(standing[1], "Savoy: 58 districts, +240, %s people." % Words.number(_g.stats.value(&"SAV", 1, "people")))
+	assert_eq(standing[2], "Milan: 52 districts, +261, %s people." % Words.number(_g.stats.value(&"MLO", 1, "people")))
 	assert_eq(_section(s, &"people"), {}, "M4's numbers on still people: no change, no People section, no chip")
 	assert_eq([s["toast"], s["swing_permille"]], ["Spring 1480 ended: ▲ +48 ducats. J: the report", 78])
 
 
 func test_standing_names_only_the_countries_known() -> void:
-	var s := _fixture_report()
+	_fixture_report()
+	FogFixture.thin(_g, &"GEN", 1)  # Genoa keeps its neighbours and a ring; the rest of the map is undiscovered
 	var known := Knowledge.known(_g, &"GEN")
-	assert_eq(_texts(s, &"standing").size(), known.size() + 1)
+	var standing := _section(SeasonSummary.of(_g, &"GEN", 1), &"standing")
+	assert_true(known.size() < 12, "a thin Genoa knows fewer than the twelve others")
+	assert_lte(int(standing["count"]), known.size() + 1, "the Standing counts Genoa and the known countries, no more")
 	for c: Country in _g.countries:
 		if c.tag != &"GEN" and not known.has(c.tag):
-			for text: String in _texts(s, &"standing"):
-				assert_false(text.begins_with(LogLines.short_name(_g, c.tag) + ":"), "P: %s is not known" % c.tag)
+			for line: Dictionary in standing["lines"]:
+				assert_false(str(line["text"]).begins_with(LogLines.short_name(_g, c.tag) + ":"), "P: %s is not known" % c.tag)
 	assert_eq(_section(SeasonSummary.of(_g, &"", 1), &"standing"), {}, "no country, no standing")
 
 

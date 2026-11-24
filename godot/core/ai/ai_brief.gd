@@ -149,7 +149,11 @@ func _posts() -> Array[Vector2i]:
 	for t: StringName in order:
 		var best := Army.NO_HEX
 		var best_d := 1 << 30
-		var land := AiKnow.land_of(_game, t)
+		# R33: a post is taken from the threat's land the seat has discovered only (an unseen district is no reference).
+		var land := PackedInt32Array()
+		for i: int in AiKnow.land_of(_game, t):
+			if AiKnow.discovered(_game, tag, AiKnow.hex_of(_game, i)):
+				land.append(i)
 		for depot: Vector2i in depots:
 			var d := _nearest(depot, land, best_d)
 			if d < best_d:

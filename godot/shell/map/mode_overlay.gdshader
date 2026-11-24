@@ -15,6 +15,7 @@ uniform sampler2D supply_ramp : filter_nearest, repeat_disable;
 uniform sampler2D sight : filter_nearest, repeat_disable;
 uniform sampler2D occupiers : filter_nearest, repeat_disable;
 uniform sampler2D areas : filter_nearest, repeat_disable;
+uniform sampler2D discovered : filter_nearest, repeat_disable;
 
 uniform int mode = 0;
 uniform bool tint_on = true;
@@ -39,6 +40,7 @@ uniform float occupied_px = 8.0;
 uniform float area_alpha = 0.12;
 uniform bool area_on = false;
 uniform vec4 veil_colour = vec4(0.109804, 0.078431, 0.050980, 1.0);
+uniform vec4 deep_fog_colour = vec4(0.239216, 0.211765, 0.176471, 1.0);
 
 varying vec2 map_px;
 
@@ -72,6 +74,11 @@ void fragment() {
 	}
 	int row = int(floor(rr + 0.5));
 	int col = int(floor(rq + 0.5)) + int(floor(rr * 0.5));
+	// Deep fog (R36): a hex the viewer has never discovered is one flat fill in every mode, sea included; nothing under it shows.
+	bool fogged = false;
+	if (col >= 0 && row >= 0 && col < grid_size.x && row < grid_size.y) {
+		fogged = int(floor(texelFetch(discovered, ivec2(col, row), 0).r * 255.0 + 0.5)) == 0;
+	}
 
 	if (col < 0 || row < 0 || col >= grid_size.x || row >= grid_size.y) {
 		COLOR = vec4(0.0);
@@ -187,5 +194,8 @@ void fragment() {
 			}
 			COLOR = out_col;
 		}
+	}
+	if (fogged) {
+		COLOR = deep_fog_colour;
 	}
 }

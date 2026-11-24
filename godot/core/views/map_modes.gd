@@ -43,6 +43,9 @@ const RELIEF_STOPS: Array[Array] = [
 const YIELD_ALPHA := 0.70
 const VEIL := Color("#1c140d")
 const VEIL_ALPHA := 0.45
+## The deep fog (R36, D17): one flat opaque fill over every hex the viewer has not discovered, in every mode. A placeholder:
+## the final art comes with the map track. Owners, sea, marks and the veil are not drawn under it.
+const DEEP_FOG_COLOUR := Color("#3d362d")
 const STRIPE_PX := 6.0
 
 ## The occupied land (M7, 6.3): diagonal bands of the occupier's colour, OCCUPIED_STRIPE_PX wide along x + y, alternating
@@ -243,6 +246,45 @@ static func _make_sight_bytes(game: Game, viewer: StringName) -> PackedByteArray
 	return out
 
 
+## One byte a hex: 1 where the viewer has discovered it (R36, D1: explored, or in sight now), 0 under deep fog. All 1 for the
+## viewer "" and for a game without countries. Pinned by discovered_key (the viewer's explored revision and the sight revision).
+static func discovered_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	if game == null or game.map == null or game.state == null:
+		return PackedByteArray()
+	return game.view_cache.pinned(&"discovered_bytes", discovered_key(game, viewer),
+		func() -> PackedByteArray: return _make_discovered_bytes(game, viewer)) as PackedByteArray
+
+
+## The key of discovered_bytes, which the overlay's deep-fog texture compares too: it moves when the viewer's explored set
+## grows or its sight moves.
+static func discovered_key(game: Game, viewer: StringName) -> Array:
+	var rev := -1
+	if viewer != &"" and game.has_countries():
+		var c := Countries.by_tag(game, viewer)
+		if c != null:
+			rev = game.sight.explored_revision(c.id)
+	return [&"discovered", viewer, rev, game.sight.revision(), game.map.hex_count()]
+
+
+static func _make_discovered_bytes(game: Game, viewer: StringName) -> PackedByteArray:
+	var n := game.map.hex_count()
+	var out := PackedByteArray()
+	out.resize(n)
+	if viewer == &"" or not game.has_countries():
+		out.fill(1)
+		return out
+	out.fill(0)
+	var c := Countries.by_tag(game, viewer)
+	if c == null:
+		return out
+	var land: PackedByteArray = game.sight.land_of(game, c.id)
+	var armies: PackedByteArray = game.sight.armies_of(c.id)
+	for i: int in n:
+		if SightCache.bit_is(c.explored, i) or SightCache.bit_is(land, i) or SightCache.bit_is(armies, i):
+			out[i] = 1
+	return out
+
+
 ## 256-entry colours by Supply byte: [0] clear, [1..6] SUPPLY_COLOURS, the rest clear.
 static func supply_ramp() -> PackedColorArray:
 	if _cached_supply_ramp.size() != PALETTE_SIZE:
@@ -374,7 +416,9 @@ static func palette_from(colours: PackedColorArray, unowned: Color) -> PackedCol
 ## the hex at AREA_ALPHA (a held castle area of an enemy) in the land modes. Both default to none.
 static func colour_of(mode: int, owner_id: int, height_byte: int, palette: PackedColorArray,
 		tint_on: bool, hot_id: int, yield_byte: int = 0, food_byte: int = 0, supply_byte: int = 0,
-		seen: int = 1, veil_on: bool = false, occupier_id: int = 0, area_byte: int = 0) -> Color:
+		seen: int = 1, veil_on: bool = false, occupier_id: int = 0, area_byte: int = 0, discovered: int = 1) -> Color:
+	if discovered <= 0:  # R36: under deep fog, whatever the rest says
+		return DEEP_FOG_COLOUR
 	if height_byte <= 0:
 		return Color(0.0, 0.0, 0.0, 0.0)
 	var c := _mode_colour(mode, owner_id, height_byte, palette, tint_on, hot_id, yield_byte, food_byte, supply_byte)
@@ -552,8 +596,12 @@ static func colour_at(game: Game, mode: int, hex: Vector2i, pal: PackedColorArra
 		occupier_id = int(game.state.occupier[idx]) if idx < game.state.occupier.size() else 0
 		var abytes := area_bytes(game, game.player)
 		area_byte = int(abytes[idx]) if idx < abytes.size() else 0
+	var discovered := 1
+	var dbytes := discovered_bytes(game, game.player)
+	if idx < dbytes.size():
+		discovered = int(dbytes[idx])
 	return colour_of(mode, oid, height_byte, pal, tint_on, hot_id, yield_byte, food_byte, supply_byte, seen, veil_on,
-		occupier_id, area_byte)
+		occupier_id, area_byte, discovered)
 
 
 static func _height_byte_at(map: MapData, idx: int) -> int:

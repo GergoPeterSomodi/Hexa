@@ -2,7 +2,8 @@
 ## planted fault that breaks it (P each): a turn that did not move, a treasury edited outside a ledger, a stock below 0, a hex below
 ## 0 people, a person from nowhere, a land hex with no owner, a company at 0 men, two countries on a hex, a live battle at idle, a
 ## garrison over full, a morale past 1,000, a war past 40 seasons (two live wars of a pair, a war in a truce), a chronicle out of
-## turn order, a stats row missing, the judge's problem and the logger's error. The soak's counting judge is read too.
+## turn order, a stats row missing, the fog invariants (an explored hex lost; a controlled hex not explored by its controller,
+## fog spec R4 and section 7), the judge's problem and the logger's error. The soak's counting judge is read too.
 extends GutTest
 
 
@@ -50,7 +51,7 @@ func test_a_clean_game_breaks_nothing_and_the_checks_change_nothing() -> void:
 		Season.run(g)
 		var lines := Invariants.check(g, before)
 		assert_eq(lines.size(), 0, "no invariant broken: %s" % str(lines))
-	assert_eq(Invariants.NAMES.size(), 15)
+	assert_eq(Invariants.NAMES.size(), 17)
 
 
 func test_p_turn() -> void:
@@ -140,6 +141,48 @@ func test_p_wars_past_forty_two_live_wars_and_a_war_in_a_truce() -> void:
 	assert_true(_breaks("wars", func(g: Game, _b: Dictionary) -> void:
 		WarFixture.ended(g, AiFixture.MILAN, AiFixture.GENOA, g.turn)
 		WarFixture.at_war(g, AiFixture.MILAN, AiFixture.GENOA)))
+
+
+func test_p_explored_only_grows_a_hex_lost() -> void:
+	assert_true(_breaks("explored", func(g: Game, _b: Dictionary) -> void: _clear_far_hex(g, AiFixture.MILAN)))
+
+
+func test_p_controlled_hex_must_be_explored_by_its_controller() -> void:
+	assert_true(_breaks("controlled", func(g: Game, _b: Dictionary) -> void: _unexplore_controlled(g)))
+
+
+func test_the_fog_plant_clears_once_and_is_named() -> void:
+	var g := AiFixture.watch()
+	var before := Invariants.before(g)
+	Season.run(g)
+	Invariants.planted = "fog"
+	var lines := Invariants.check(g, before)
+	assert_eq(Invariants.planted, "", "the plant fired and cleared itself")
+	assert_true(_has(lines, "explored"), "named: %s" % str(lines))
+	var again := Invariants.check(g, Invariants.before(g))
+	assert_false(_has(again, "explored"), "no plant, nothing lost")
+
+
+## Clears the first explored bit of `tag` that its sight does not reach: a hex it has discovered and lost.
+func _clear_far_hex(g: Game, tag: StringName) -> void:
+	var c := Countries.by_tag(g, tag)
+	for i: int in g.map.hex_count():
+		if SightCache.bit_is(c.explored, i) and not Sight.sees(g, tag, g.map.hex_of(i)):
+			c.explored[i >> 3] = c.explored[i >> 3] & ~(1 << (i & 7))
+			return
+
+
+## Clears the explored bit of the owner of a land hex it holds itself (no occupier): the hex is controlled and unexplored.
+func _unexplore_controlled(g: Game) -> void:
+	for i: int in g.map.hex_count():
+		if g.map.land[i] != 1 or int(g.state.owner[i]) == 0:
+			continue
+		if i < g.state.occupier.size() and g.state.occupier[i] != 0:
+			continue
+		var c := Countries.by_id(g, int(g.state.owner[i]))
+		if c != null:
+			c.explored[i >> 3] = c.explored[i >> 3] & ~(1 << (i & 7))
+			return
 
 
 func test_p_chronicle_out_of_order_and_too_long() -> void:

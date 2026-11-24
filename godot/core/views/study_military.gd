@@ -1,6 +1,6 @@
 ## The Military page's read model (docs/architecture/m6-build-spec.md 5.6 and 6.9; L12): the head (men under arms, armies,
 ## companies, upkeep and its share of the income), the viewer's armies (its table, men descending), the foreign armies in
-## sight (banded, no ids, no orders: 4.12) and the series of the charts over a span of seasons. Own country only: another
+## sight (exact men, no ids, no orders: 4.12) and the series of the charts over a span of seasons. Own country only: another
 ## country's tag, or a game without countries, gives the empty page (as StudyPeople). Pure core/views/ code: it reads the game
 ## and writes nothing. Cached in game.view_cache by [&"study_military", version, viewer, span].
 class_name StudyMilitary
@@ -14,7 +14,7 @@ const SERIES: Array[String] = ["army_men", "upkeep_army", "losses", "army_starve
 ## {has_data (a season has ended), head: {men, armies, units, upkeep (the army's upkeep a season now), share (permille of
 ## the last season's income before army upkeep that the army took), income (the last season's left-over income)},
 ## rows: [{id, name, place, hex, men, units, upkeep, supply_text, order_text, tone}] (own armies, men descending, ties by id),
-## seen: [{tag, country, hex, place, men_text}] (foreign armies in sight, banded), labels (season titles of the series, oldest
+## seen: [{tag, country, hex, place, men_text}] (foreign armies in sight, exact men), labels (season titles of the series, oldest
 ## first), series: {army_men, upkeep_army, losses, army_starved, battle_losses, income} (PackedInt32Array; losses and starved as Stats
 ## keep them), wars and battles (M7: StudyMilitaryWar's rows)}.
 static func of(game: Game, viewer: StringName, span: int) -> Dictionary:
@@ -87,7 +87,7 @@ static func _rows(game: Game, viewer: StringName) -> Array[Dictionary]:
 	return rows
 
 
-## The foreign armies the viewer sees (its sight, and a country it knows): banded men, no army id.
+## The foreign armies the viewer sees (its sight, and a country it knows): exact men, no army id.
 static func _seen(game: Game, viewer: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for item: Dictionary in Knowledge.armies_seen(game, viewer):
@@ -95,7 +95,7 @@ static func _seen(game: Game, viewer: StringName) -> Array[Dictionary]:
 		if a == null or a.tag == viewer or not ArmyView.visible(game, viewer, a):
 			continue
 		out.append({"tag": a.tag, "country": LogLines.short_name(game, a.tag), "hex": a.hex,
-			"place": Words.place(game, a.hex), "men_text": Knowledge.band_text(a.men(), "men")})
+			"place": Words.place(game, a.hex), "men_text": Words.men(a.men())})
 	return out
 
 

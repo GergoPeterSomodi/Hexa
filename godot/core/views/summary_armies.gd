@@ -120,14 +120,14 @@ static func orders(game: Game, tag: StringName, turn: int) -> Array[Dictionary]:
 # ----- helpers ----------------------------------------------------------------------------------------------------------
 
 
-## The foreign armies in sight that the viewer knows: "A Milanese army of about 1,000 men stands at Alessandria (7, 9)."
+## The foreign armies in sight that the viewer knows: "A Milanese army of 1,000 men stands at Alessandria (7, 9)."
 static func _sight(game: Game, tag: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for item: Dictionary in Knowledge.armies_seen(game, tag):
 		var a := item["army"] as Army
 		if a == null or not ArmyView.visible(game, tag, a) or a.tag == tag:
 			continue
-		var line := _line("%s of %s stands %s." % [Words.army_of(game, a.tag), Knowledge.band_text(a.men(), "men"),
+		var line := _line("%s of %s stands %s." % [Words.army_of(game, a.tag), Words.men(a.men()),
 			Words.at(game, a.hex)], "plain", 0)
 		line["hex"] = a.hex
 		line["action"] = [&"look_at", a.hex]

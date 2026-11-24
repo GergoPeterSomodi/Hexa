@@ -34,11 +34,20 @@ func test_the_setting_applies_to_the_overlay_on_configure_and_on_change() -> voi
 	assert_true(_scene.overlay().is_sight_veil_on(), "and back")
 
 
+## The veil's field of the minimap key (Minimap._process: mode|tint|hot|far|owner|palette|areas|veil|discovered). The key
+## grew a discovered-texture id at its end (fog build), so the veil is read from its place, not from the key's end.
+const VEIL_FIELD := 7
+
+
+func _veil_field(key: String) -> String:
+	return key.split("|")[VEIL_FIELD]
+
+
 func test_the_minimap_rebinds_when_the_veil_changes() -> void:
 	await wait_process_frames(2)
 	var before := _minimap._overlay_key
-	assert_true(before.ends_with("true"), "the key carries the veil on")
+	assert_eq(_veil_field(before), "true", "the key carries the veil on")
 	_settings.set_value("map/sight_veil", false)
 	await wait_process_frames(2)
 	assert_ne(_minimap._overlay_key, before, "the minimap rebinds")
-	assert_true(_minimap._overlay_key.ends_with("false"), "with the veil off in its key")
+	assert_eq(_veil_field(_minimap._overlay_key), "false", "with the veil off in its key")

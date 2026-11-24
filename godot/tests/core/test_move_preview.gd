@@ -59,10 +59,11 @@ func test_reach_of_a_foreign_army_is_empty_for_the_player() -> void:
 	assert_true((MovePreview.reach(_g, &"", foreign.id).next as PackedInt32Array).is_empty(), "no viewer, no reach")
 
 
-func test_refusal_of_an_unknown_owner_does_not_name_it() -> void:
+func test_refusal_of_an_undiscovered_owner_does_not_name_it() -> void:
+	FogFixture.thin(_g, ArmyFixture.TAG, 1)
 	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _gen_hex(), 0, 1)
-	var goal := _unknown_owner_land()
-	assert_ne(goal, ArmyFixture.NO_HEX, "the map has a foreign hex of a country Genoa neither knows nor explored")
+	var goal := _undiscovered_land()
+	assert_ne(goal, ArmyFixture.NO_HEX, "the thin map has a foreign land hex Genoa has not discovered")
 	var p := MovePreview.to(_g, ArmyFixture.TAG, a.id, goal)
 	var owner := Territory.owner_tag(_g, goal)
 	assert_eq(p.lines[0][0], "not your land: another country holds it, and your armies cross no border in peace",
@@ -82,12 +83,13 @@ func test_refusal_of_a_known_explored_owner_names_it_once() -> void:
 	assert_false(str(p.lines[0][0]).contains("the the"), "the article is not doubled")
 
 
-## A land hex of a country the player does not know, or NO_HEX.
-func _unknown_owner_land() -> Vector2i:
+## A land hex of another country that the player has not discovered (on the thin map), or NO_HEX.
+func _undiscovered_land() -> Vector2i:
 	for i: int in _g.map.hex_count():
 		var owner := int(_g.state.owner[i])
-		if _g.map.land[i] == 1 and owner > 0 and not Knowledge.knows(_g, ArmyFixture.TAG, Countries.by_id(_g, owner).tag):
-			return _g.map.hex_of(i)
+		var hex := _g.map.hex_of(i)
+		if _g.map.land[i] == 1 and owner > 0 and owner != ArmyFixture.id_of(_g, ArmyFixture.TAG) and not Knowledge.discovered(_g, ArmyFixture.TAG, hex):
+			return hex
 	return ArmyFixture.NO_HEX
 
 

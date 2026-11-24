@@ -56,7 +56,7 @@ func test_an_own_army_has_a_token_on_its_hex_with_its_men() -> void:
 	_armies().sync()
 	var token := _armies().tokens().token_at(hex, ArmyFixture.TAG)
 	assert_not_null(token, "the army has a token")
-	assert_eq(token.badge_text(), ArmyView.token_text(army.men(), true), "the badge reads the men as ArmyView gives them")
+	assert_eq(token.badge_text(), ArmyView.token_text(army.men()), "the badge reads the men as ArmyView gives them")
 	assert_eq(token.badge_text(), "1.0k", "two companies of 500 men")
 	assert_eq(token.position, _scene.view().centre_of(hex), "the token's foot stands on the hex's centre")
 	assert_eq(_armies().tokens().token_count(), ArmyView.tokens(_game, ArmyFixture.TAG).size(), "one node a token")

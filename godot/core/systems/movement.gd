@@ -101,8 +101,13 @@ static func zoc_text(game: Game, tag: StringName, hex: Vector2i) -> String:
 		var n := game.map.neighbour(hex, d)
 		for a: Army in armies_on(game, n):
 			if hostile(game, tag, a.tag):
+				# R32: an army or a fortress the viewer cannot see or has not discovered is not named.
+				if not _in_sight(game, tag, n):
+					return "an army stands beside it"
 				return "an army of %s stands beside it" % country_name(game, a.tag)
 		if ZOC_FORTRESSES and game.map.index_of(n) >= 0 and closed_fortress(game, tag, n):
+			if not _discovered(game, tag, n):
+				return "a fortress stands beside it"
 			return "a fortress of %s stands beside it" % country_name(game, Occupation.controller_tag(game, n))
 	return ""
 
@@ -593,8 +598,9 @@ static func goal_verdict(game: Game, army: Army, tag: StringName, goal: Vector2i
 	if goal == army.hex:
 		return _verdict("the army stands there already")
 	if not open_to(game, tag, goal):
-		var holder := country_name(game, Territory.owner_tag(game, goal))
-		return _verdict("not your land: the %s holds it, and your armies cross no border in peace" % holder)
+		if _discovered(game, tag, goal):
+			return _verdict("not your land: the %s holds it, and your armies cross no border in peace" % country_name(game, Territory.owner_tag(game, goal)))
+		return _verdict("not your land: another country holds it, and your armies cross no border in peace")  # R32: not named
 	if enemy_army_at(game, tag, goal):
 		var attack := Battles.engage_check(game, {"army": army.id, "hex": goal, "tag": tag})
 		if not bool(attack.ok):
@@ -672,6 +678,16 @@ static func _storm_verdict(game: Game, args: Dictionary) -> Dictionary:
 	return {"ok": bool(res.ok), "reason": str(res.reason), "army": army, "plan": res.plan}
 
 
+## Whether `tag` sees `hex` now (Sight; the viewer "" sees all). Movement sits below the views layer, so it reads Sight.
+static func _in_sight(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	return tag == &"" or Sight.sees(game, tag, hex)
+
+
+## Whether `tag` has discovered `hex` (R1, D15): explored or in sight; the viewer "" discovers all.
+static func _discovered(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	return tag == &"" or Sight.explored(game, tag, hex) or Sight.sees(game, tag, hex)
+
+
 ## Whether `tag` may read the hex at all: it sees it now (Sight), or it is its own land or held by it (OddsView's test).
 static func _storm_in_view(game: Game, tag: StringName, hex: Vector2i) -> bool:
 	if Sight.sees(game, tag, hex):
@@ -734,6 +750,8 @@ static func army_check(game: Game, args: Dictionary) -> Dictionary:
 		return {"ok": false, "reason": "no army %d" % id, "army": null}
 	var tag := StringName(str(args.get("tag", "")))
 	if army.tag != tag:
+		if not _in_sight(game, tag, army.hex):
+			return {"ok": false, "reason": "not your army", "army": null}  # R32: an army out of sight is not named
 		return {"ok": false, "reason": "not your army: the %s commands it" % country_name(game, army.tag), "army": null}
 	return {"ok": true, "reason": "", "army": army}
 

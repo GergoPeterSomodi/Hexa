@@ -1,15 +1,14 @@
 ## The read-only battle view (docs/architecture/m7-build-spec.md 4.6, 4.15, 5.6, M7 B14): one battle as a viewer may see it, from
 ## its kept BattleRecord, day by day. `of` is the dock's model; `sites` the battle badges of the last season; `latest_of` the
 ## newest battle a country fought in; `log_line` the day's sentence. Fog (Knowledge.battle_access): exact for the viewer ""
-## and for a side (both sides' numbers, the stances); seen when the viewer witnessed the battle (men rounded to 100, morale
-## to 5 %, no stances, no unit or army ids); hidden otherwise, and then nothing at all. A battle no longer kept gives the
+## and for a side (both sides' numbers, the stances); seen when the viewer witnessed the battle (exact men, killed, wounded
+## and morale, R22; no stances, no unit or army ids; the reserve and the routed as one entry each); hidden otherwise, and then
+## nothing at all. A battle no longer kept gives the
 ## totals of its chronicle entry. Pure core/views/ code: a function of the game and the viewer; no nodes, no engine calls.
 @warning_ignore_start("integer_division")
 class_name BattleView
 extends RefCounted
 
-const ROUND_MEN := 100
-const ROUND_MORALE := 50
 const SIDE_ATTACKER := 0
 const SIDE_DEFENDER := 1
 const SIDE_WORDS: Array[String] = ["attacker", "defender"]
@@ -57,9 +56,9 @@ static func latest_of(game: Game, tag: StringName) -> int:
 
 
 ## The sentence of one day (v0.2.2's battlelog.describe): "Day 2: Savoy 48 killed, 46 wounded; Milan 61 killed, 59 wounded.
-## Milan broke (centre)." `names` maps each tag to the country's name. Exact numbers (the fogged view rounds them itself).
+## Milan broke (centre)." `names` maps each tag to the country's name. The numbers are exact.
 static func log_line(record: BattleRecord, frame: Dictionary, names: Dictionary) -> String:
-	return _line(record, frame, names, false)
+	return _line(record, frame, names)
 
 
 # --- the view of a kept record -----------------------------------------------------------------------------------------
@@ -88,7 +87,7 @@ static func _make_of(game: Game, viewer: StringName, record_id: int, day: int) -
 		"place": Words.place(game, r.hex), "days": _int(r.end.get("days", 0)), "day": _int(frame["day"]), "index": idx,
 		"sides": {"attacker": [refs.attacker], "defender": [refs.defender]},
 		"viewer_side": viewer_side, "ground": _ground(game, r, refs.defender),
-		"side": sides, "log": _log(r, idx, names, seen, viewer_side),
+		"side": sides, "log": _log(r, idx, names, viewer_side),
 		"result": _winner_ref(_result(names, r.attacker, r.defender, r.end, viewer_side), r.attacker, r.defender, refs),
 		"note": NO_NOTE,
 	}
@@ -103,14 +102,13 @@ static func _gone(game: Game, viewer: StringName, record_id: int) -> Dictionary:
 	var defender := StringName(str(entry.get("defender", "")))
 	var own := _viewer_side_of(attacker, defender, viewer)
 	var acc := &"exact" if viewer == &"" or own != &"" else &"seen"
-	var seen := acc == &"seen"
 	var names := _names_of(game, viewer, attacker, defender)
 	var refs := _refs(game, viewer, attacker, defender)
 	var hex := _hex_of(entry)
 	var winner_tag := StringName(str(entry.get("winner", "")))
 	var winner := SIDE_ATTACKER if winner_tag == attacker and winner_tag != &"" else (SIDE_DEFENDER if winner_tag == defender and winner_tag != &"" else -1)
-	var killed := _pair_text(entry.get("killed", {}), attacker, defender, seen, refs)
-	var wounded := _pair_text(entry.get("wounded", {}), attacker, defender, seen, refs)
+	var killed := _pair_text(entry.get("killed", {}), attacker, defender, refs)
+	var wounded := _pair_text(entry.get("wounded", {}), attacker, defender, refs)
 	var result := _winner_ref(_result_text(names, attacker, defender, winner, str(entry.get("how", "")),
 		str(entry.get("cause", "")), _int(entry.get("days", 0)), Army.NO_HEX, own), attacker, defender, refs)
 	return {
@@ -132,13 +130,13 @@ static func _chronicle_entry(game: Game, record_id: int) -> Dictionary:
 	return {}
 
 
-static func _pair_text(value: Variant, attacker: StringName, defender: StringName, seen: bool, refs: Dictionary) -> Dictionary:
+static func _pair_text(value: Variant, attacker: StringName, defender: StringName, refs: Dictionary) -> Dictionary:
 	var out := {}
 	if value is Dictionary:
 		var n_a := _int((value as Dictionary).get(String(attacker), 0))
 		var n_d := _int((value as Dictionary).get(String(defender), 0))
-		out[refs.attacker] = _round(n_a, ROUND_MEN) if seen else n_a
-		out[refs.defender] = _round(n_d, ROUND_MEN) if seen else n_d
+		out[refs.attacker] = n_a
+		out[refs.defender] = n_d
 	return out
 
 
@@ -152,8 +150,6 @@ static func _make_sites(game: Game, viewer: StringName) -> Array[Dictionary]:
 			continue
 		var front: PackedInt32Array = (r.frames[r.frames.size() - 1]["front"] as PackedInt32Array)
 		var shown := PackedInt32Array([front[0], front[1]])
-		if acc == &"seen":
-			shown = PackedInt32Array([_round(front[0], ROUND_MORALE), _round(front[1], ROUND_MORALE)])
 		out.append({
 			"record": r.id, "hex": r.hex, "name": r.name, "tone": _tone(_viewer_side(r, viewer), _int(r.end.get("winner", -1))),
 			"front": shown, "attacker_colour_id": _colour(game, viewer, r, r.attacker), "defender_colour_id": _colour(game, viewer, r, r.defender),
@@ -187,9 +183,9 @@ static func _side(game: Game, r: BattleRecord, side: int, idx: int, seen: bool, 
 	return {
 		"name": shown, "tag": tag_text, "arms": tag_text,
 		"role_text": role, "general_text": "No general",
-		"men": _num(men_now, seen), "start": _num(start, seen), "killed": _num(killed, seen),
-		"wounded": _num(wounded, seen), "roll": roll, "mult_text": "×%.1f" % (mult / 1000.0),
-		"mult_tone": _mult_tone(mult), "front": _round(front, ROUND_MORALE) if seen else front,
+		"men": men_now, "start": start, "killed": killed,
+		"wounded": wounded, "roll": roll, "mult_text": "×%.1f" % (mult / 1000.0),
+		"mult_tone": _mult_tone(mult), "front": front,
 		"stance_text": stance, "lanes": _lanes(game, r, side, idx, seen), "reserve": _reserve(game, r, side, idx, seen),
 		"routed": _routed(game, r, side, idx, seen),
 	}
@@ -227,7 +223,7 @@ static func _stance_text(r: BattleRecord, side: int) -> String:
 
 ## The three lanes of a side at a day: a company (kind, name, figure, men, full, morale, routed, shaken, fires), or an empty,
 ## closed (the right lane on narrow ground) or broken lane (it held a company before and stands empty today). A fogged view
-## carries no key, and men and morale are rounded.
+## carries no key; its men and morale are exact (R22).
 static func _lanes(game: Game, r: BattleRecord, side: int, idx: int, seen: bool) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var lanes: Array = (r.frames[idx]["lanes"] as Array)
@@ -266,10 +262,9 @@ static func _company(game: Game, r: BattleRecord, key: int, idx: int, seen: bool
 		"kind": ud.id if ud != null else -1,
 		"name": ud.name if ud != null else "the garrison",
 		"figure": ud.figure if ud != null else &"",
-		"men": _num(_int((frame["men"] as Dictionary).get(key, 0)), seen),
+		"men": _int((frame["men"] as Dictionary).get(key, 0)),
 		"full": _fighter_full(r, key),
-		"morale": _round(_int((frame["morale"] as Dictionary).get(key, 0)), ROUND_MORALE) if seen
-			else _int((frame["morale"] as Dictionary).get(key, 0)),
+		"morale": _int((frame["morale"] as Dictionary).get(key, 0)),
 		"routed": routed, "shaken": (frame["shaken"] as PackedInt32Array).has(key),
 		"fires": not routed,
 	}
@@ -295,7 +290,8 @@ static func _reserve(game: Game, r: BattleRecord, side: int, idx: int, seen: boo
 
 
 ## A witness's view of a group of companies (the reserve, the routed): one entry for the whole group, the figure of its most
-## numerous kind, men rounded, morale banded by men; no per-company entries and no ids (4.15, the foreign-army rule). An
+## numerous kind, the exact men total and the morale weighted by men; no per-company entries and no ids (4.15, the foreign-army
+## rule). An
 ## exact view keeps its entries (the caller does not aggregate). `fires` is the entry's fires flag.
 static func _aggregate(entries: Array[Dictionary], fires: bool) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -321,10 +317,10 @@ static func _aggregate(entries: Array[Dictionary], fires: bool) -> Array[Diction
 		if _int(kind_men[k]) > best_men:
 			best_men = _int(kind_men[k])
 			best = _int(k)
-	var morale := _round(weighted / total, ROUND_MORALE) if total > 0 else 0
+	var morale := weighted / total if total > 0 else 0
 	var lead: Dictionary = sample[best]
 	out.append({"empty": false, "closed": false, "broken": false, "kind": best, "name": lead["name"],
-		"figure": lead["figure"], "men": _round(total, ROUND_MEN), "full": 0, "morale": morale, "routed": false,
+		"figure": lead["figure"], "men": total, "full": 0, "morale": morale, "routed": false,
 		"shaken": false, "fires": fires})
 	return out
 
@@ -367,11 +363,11 @@ static func _ground(game: Game, r: BattleRecord, helps: String) -> Dictionary:
 	return {"text": text, "lanes_open": lanes_open, "chips": chips}
 
 
-static func _log(r: BattleRecord, idx: int, names: Dictionary, seen: bool, viewer_side: StringName) -> Array[Dictionary]:
+static func _log(r: BattleRecord, idx: int, names: Dictionary, viewer_side: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for j: int in range(0, idx + 1):
 		var frame: Dictionary = r.frames[j]
-		out.append({"day": _int(frame["day"]), "text": _line(r, frame, names, seen),
+		out.append({"day": _int(frame["day"]), "text": _line(r, frame, names),
 			"tone": _tone_of_day(frame, viewer_side)})
 	return out
 
@@ -383,13 +379,13 @@ static func _tone_of_day(frame: Dictionary, viewer_side: StringName) -> StringNa
 	return TONE_BAD if SIDE_WORDS[broke] == viewer_side else TONE_GOOD
 
 
-static func _line(r: BattleRecord, frame: Dictionary, names: Dictionary, rounded: bool) -> String:
+static func _line(r: BattleRecord, frame: Dictionary, names: Dictionary) -> String:
 	var killed: PackedInt32Array = frame["killed"]
 	var wounded: PackedInt32Array = frame["wounded"]
-	var a := _shown_num(killed[0], rounded)
-	var b := _shown_num(wounded[0], rounded)
-	var c := _shown_num(killed[1], rounded)
-	var d := _shown_num(wounded[1], rounded)
+	var a := Words.number(killed[0])
+	var b := Words.number(wounded[0])
+	var c := Words.number(killed[1])
+	var d := Words.number(wounded[1])
 	var text := "Day %d: %s %s killed, %s wounded; %s %s killed, %s wounded." % [_int(frame["day"]),
 		_name_of(names, r.attacker), a, b, _name_of(names, r.defender), c, d]
 	var broke := _int(frame["broke"])
@@ -543,19 +539,6 @@ static func _unit_of(game: Game, r: BattleRecord, key: int) -> UnitDef:
 				return ud
 		return fallback
 	return null
-
-
-## Men or morale shown: exact, or rounded to ROUND_MEN for a fogged view.
-static func _num(n: int, seen: bool) -> int:
-	return _round(n, ROUND_MEN) if seen else n
-
-
-static func _shown_num(n: int, rounded: bool) -> String:
-	return Words.number(_round(n, ROUND_MEN) if rounded else n)
-
-
-static func _round(n: int, step: int) -> int:
-	return ((n + step / 2) / step) * step
 
 
 ## The names of the two sides as the viewer may read them: the real name for the viewer "", for a side (both sides), and for a

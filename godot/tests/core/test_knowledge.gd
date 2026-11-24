@@ -423,6 +423,26 @@ func test_witnessed_land_event_follows_discovery() -> void:
 	assert_false(Knowledge.witnessed(g, {"tag": AAA, "land": true}, OUT), "a land event with no hex is not told to a far viewer")
 
 
+## owners_changed is a land event (fog build, R10, R29, R30): a viewer is told when it has discovered one of the changed hexes,
+## not because it knows the actor, and the hexes it is told of are only the ones it has discovered.
+func test_owners_changed_is_told_by_the_hexes_discovered() -> void:
+	var g := _border_game()
+	var far := Vector2i(8, 0)
+	assert_true(Sight.LAND_KINDS.has("owners_changed"), "owners_changed is a land kind")
+	var ev := {"kind": "owners_changed", "tag": AAA, "land": true, "hexes": [far]}
+	assert_true(Knowledge.witnessed(g, ev, OUT), "a viewer that discovered the changed hex is told")
+	# Planted fault: BBB knows the actor (a shared border) but has not discovered the hex; a land event must not reach it that way.
+	assert_true(Knowledge.knows(g, BBB, AAA), "precondition: BBB knows AAA")
+	assert_false(Knowledge.discovered(g, BBB, far), "precondition: BBB has not discovered the hex")
+	assert_false(Knowledge.witnessed(g, ev, BBB), "P: a neighbour that knows the actor, not the hex, is not told")
+	assert_true(Knowledge.witnessed(g, ev, AAA), "the actor is told")
+	var mixed := {"hexes": [Vector2i(0, 0), far]}
+	var told := Knowledge.land_hexes(g, OUT, mixed)
+	assert_eq(told.size(), 1, "P: only the discovered hex is named")
+	assert_eq(told[0] if not told.is_empty() else Vector2i(-1, -1), far)
+	assert_true(Knowledge.land_hexes(g, OUT, {"hexes": [Vector2i(0, 0)]}).is_empty(), "no discovered hex, nothing to tell")
+
+
 ## The real north Italy start (FG1): one region, `europe`, over every hex, so every country has discovered the whole map and knows
 ## every other country. A fact of the scenario, pinned here.
 func test_north_italy_every_country_knows_every_other() -> void:

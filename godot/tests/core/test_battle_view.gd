@@ -1,7 +1,8 @@
 ## BattleView (docs/architecture/m7-build-spec.md 4.6, 4.15, 5.6, M7 B14): the battle as a viewer may see it. Genoa (GEN, the
 ## player) and Savoy (SAV) and a third country (MLO) fight in made records (CombatFixture inputs, fought with a fixed luck
 ## stream). Planted faults (P): an unwitnessed foreign battle is absent (of, sites); a seen battle has no unit or army ids,
-## no stances and rounded numbers; the sides see exact numbers; a kept-less battle gives its chronicle totals only.
+## no stances; the witness reads the exact numbers too (R22); the sides see exact numbers; a kept-less battle gives its chronicle
+## totals only.
 extends GutTest
 
 const SAV := &"SAV"
@@ -96,15 +97,16 @@ func test_empty_viewer_and_a_side_see_exact() -> void:
 	assert_eq(String(v.side[String(ArmyFixture.TAG)].stance_text).begins_with("Fought on:"), true)
 
 
-func test_witness_sees_rounded_numbers_and_no_ids() -> void:
+func test_witness_sees_exact_numbers_and_no_ids() -> void:
 	var r := _battle(SAV, MLO, PackedStringArray([String(ArmyFixture.TAG)]))
 	var v := BattleView.of(_g, ArmyFixture.TAG, r.id)
 	assert_eq(v.access, &"seen")
 	var last := r.frames.size() - 1
 	var exact_men := _sum_men(r, last, 0)
 	var shown := int(_side_of(v, "attacker").men)
-	assert_eq(shown, snappedi(exact_men, 100), "P: men rounded to 100, never exact")
-	assert_eq(int(_side_of(v, "attacker").front) % 50, 0, "P: morale rounded to 5 %")
+	assert_eq(shown, exact_men, "P: a witness reads the exact men (R22)")
+	assert_eq(int(_side_of(v, "attacker").front), int((r.frames[last]["front"] as PackedInt32Array)[0]),
+		"P: and the exact morale (R22)")
 	assert_eq(String(_side_of(v, "attacker").stance_text), "", "P: stances hidden")
 	assert_false(_has_key(v, "key"), "P: no company ids leak to a witness")
 	assert_false(_has_key(v, "armies"), "P: no army ids leak to a witness")
@@ -121,7 +123,7 @@ func test_reserve_and_routed_carry_no_ids_for_a_witness() -> void:
 			assert_false(entry.has("key"), "P: a lane has no id for a witness")
 
 
-func test_witness_reserve_is_one_entry_with_the_rounded_total() -> void:
+func test_witness_reserve_is_one_entry_with_the_exact_total() -> void:
 	var r := _battle(SAV, MLO, PackedStringArray([String(ArmyFixture.TAG)]))
 	var last := r.frames.size() - 1
 	var exact := BattleView.of(_g, SAV, r.id)
@@ -137,7 +139,7 @@ func test_witness_reserve_is_one_entry_with_the_rounded_total() -> void:
 		for e: Dictionary in seen_reserve:
 			shown_total += int(e.men)
 			assert_false(e.has("key"), "P: no company id in the aggregate")
-		assert_eq(shown_total, snappedi(exact_total, 100), "P: the sum is the rounded total")
+		assert_eq(shown_total, exact_total, "P: the sum is the exact total")
 	for role: String in ["attacker", "defender"]:
 		var lanes: Array = _side_of(seen, role).lanes
 		assert_eq(lanes.size(), 3, "one entry per lane")
@@ -329,6 +331,7 @@ func test_a_hostile_record_never_raises_and_gives_nothing_it_cannot_read() -> vo
 
 func test_a_witness_who_does_not_know_a_side_sees_a_country() -> void:
 	var stranger := WarFixture.stranger_of(_g, ArmyFixture.TAG)
+	FogFixture.thin(_g, ArmyFixture.TAG, 0)
 	assert_ne(stranger, &"", "the 1480 map has a country Genoa shares no border with")
 	var unknown := &""
 	for c: Country in _g.countries:
@@ -377,6 +380,7 @@ func _tag_hits(value: Variant, tags: Array, out: Array) -> void:
 
 func test_a_witness_view_carries_no_tag_of_a_country_it_does_not_know() -> void:
 	var stranger := WarFixture.stranger_of(_g, ArmyFixture.TAG)
+	FogFixture.thin(_g, ArmyFixture.TAG, 0)
 	var unknown := &""
 	for c: Country in _g.countries:
 		if c.tag != &"" and c.tag != ArmyFixture.TAG and c.tag != stranger and not Knowledge.knows(_g, ArmyFixture.TAG, c.tag):

@@ -188,14 +188,18 @@ func _fill_picking(card: Dictionary) -> void:
 func _fill_ledger(card: Dictionary) -> void:
 	PanelKit.clear_children(_ledger, _retired)
 	_add_row("Capital", _capital_control(card["capital"] as Dictionary))
-	_add_row("Districts", _value(str(int(card["districts"]))))
+	if bool(card["full"]):
+		_add_row("Districts", _value(str(int(card["districts"]))))
+	else:
+		# D10: a foreign country's total is never shown; the land you have discovered is.
+		_add_row("Land you have seen", _value(Words.plural(int(card["districts"]), "district", "districts")))
 	_add_row("Towns", _value(_towns_words(card)))
 	var people := card["people"] as Dictionary
 	if bool(people["shown"]):
 		_add_row("People", _value(_people_words(people)))
 	var army := card["army"] as Dictionary
 	if bool(army["shown"]):
-		_add_row("Under arms", _value(_army_words(army)))
+		_add_row("Under arms", _value(_army_words(army, bool(card["full"]))))
 	_add_row("Passes", _value(_passes_words(card["passes"] as Array)))
 	_add_row("Land", _value(_land_words(card["land"] as Array)))
 
@@ -223,11 +227,9 @@ func _towns_words(card: Dictionary) -> String:
 	return "%d, %d of them cities" % [towns, cities]
 
 
-## The People row (spec 6.4): yours exact with last season's change ("83,285 (▲ +585 last season)"); a known country's
-## banded ("about 260,000"). The row is not shown for an unknown country, so no number of it is.
+## The People row (spec 6.4, D9): exact. Yours with last season's change ("83,285 (▲ +585 last season)"); a known foreign
+## country's over the hexes you have discovered, with no change. The row is not shown for an unknown country, so no number of it is.
 func _people_words(people: Dictionary) -> String:
-	if bool(people["banded"]):
-		return Knowledge.band_text(int(people["value"]), "")
 	var text := Words.number(int(people["value"]))
 	var change := int(people["change"])
 	if change != 0:
@@ -235,11 +237,11 @@ func _people_words(people: Dictionary) -> String:
 	return text
 
 
-## The Under arms row (spec 6.10): yours exact with the count of armies ("1,000 men in 1 army", "none" with no army); a known
-## country's banded ("about 1,000 men"). The row is not shown for an unknown country (CountryCard.army is not shown).
-func _army_words(army: Dictionary) -> String:
-	if bool(army["banded"]):
-		return Knowledge.band_text(int(army["value"]), "men")
+## The Under arms row (spec 6.10, D9): yours exact with the count of armies ("1,000 men in 1 army", "none" with no army); a known
+## foreign country's exact men alone ("1,000 men"). The row is not shown for an unknown country (CountryCard.army is not shown).
+func _army_words(army: Dictionary, full: bool) -> String:
+	if not full:
+		return Words.men(int(army["value"]))
 	var count := Armies.of_country(Session.game, _tag).size()
 	if count == 0:
 		return "none"
@@ -302,8 +304,8 @@ func _on_show_pressed() -> void:
 	look_at_requested.emit(_focus)
 
 
-## Spec 6.10: the treasury section. Yours: the exact treasury, last season's change, the expected net (when the card
-## carries one) and the tax. A known foreign country: a banded figure only. Unknown: no section at all.
+## Spec 6.10 (D7, D9): the treasury section. Every known country: the exact treasury. Yours: last season's change, the expected
+## net (when the card carries one), the tax and the study button. A known foreign country: the treasury alone. Unknown: no section.
 func _fill_treasury(card: Dictionary) -> void:
 	var treasury := card["treasury"] as Dictionary
 	var shown := bool(treasury["shown"])
@@ -311,14 +313,13 @@ func _fill_treasury(card: Dictionary) -> void:
 	if not shown:
 		_study.visible = false
 		return
-	var banded := bool(treasury["banded"])
-	var value := int(treasury["value"])
-	_treasury_value.text = "Treasury " + (Knowledge.band_text(value, "") if banded else Words.number(value))
-	_study.visible = not banded
-	_treasury_change.visible = not banded
+	var own := bool(treasury["own"])
+	_treasury_value.text = "Treasury " + Words.number(int(treasury["value"]))
+	_study.visible = own
+	_treasury_change.visible = own
 	_treasury_expected.visible = false
 	_treasury_tax.visible = false
-	if banded:
+	if not own:
 		return
 	_treasury_change.set_delta(int(treasury["change"]), "", "Last season")
 	var expected: Variant = treasury["expected"]
@@ -344,7 +345,7 @@ func treasury_visible() -> bool:
 	return _treasury_box.visible
 
 
-## "Treasury 658" or "Treasury about 1,900", or "" when hidden.
+## "Treasury 658" or "Treasury 1,905", or "" when hidden.
 func treasury_text() -> String:
 	return _treasury_value.text if _treasury_box.visible else ""
 

@@ -148,14 +148,12 @@ func test_yours_shows_the_exact_treasury_change_and_tax() -> void:
 	assert_false(_panel.study_button().disabled)
 
 
-func test_a_known_foreign_country_is_banded_with_no_change_tax_or_study() -> void:
+func test_a_known_foreign_country_shows_its_exact_treasury_with_no_change_tax_or_study() -> void:
 	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
 	var mlo := Countries.by_tag(Session.game, &"MLO")
 	_panel.show_country(&"MLO", false)
 	assert_true(_panel.treasury_visible(), "Milan borders Genoa: known")
-	assert_eq(_panel.treasury_text(), "Treasury " + Knowledge.band_text(mlo.treasury, ""), "the banded figure")
-	if Knowledge.band(mlo.treasury) != mlo.treasury:
-		assert_false(_panel.treasury_text().contains(Words.number(mlo.treasury)), "no exact figure anywhere")
+	assert_eq(_panel.treasury_text(), "Treasury " + Words.number(mlo.treasury), "the exact figure (D7)")
 	assert_eq(_panel.change_text(), "", "no change for a foreign country")
 	assert_eq(_panel.tax_text(), "", "no tax for a foreign country")
 	assert_false(_panel.study_button().visible, "the study is yours only")
@@ -163,34 +161,36 @@ func test_a_known_foreign_country_is_banded_with_no_change_tax_or_study() -> voi
 
 func test_an_unknown_country_shows_no_treasury_section() -> void:
 	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	FogFixture.thin(Session.game, &"GEN", 0)  # a thin start: France is unknown to Genoa
 	_panel.show_country(&"FRA", false)
-	assert_false(_panel.treasury_visible(), "France does not border Genoa")
+	assert_false(_panel.treasury_visible(), "France is unknown to Genoa")
 	assert_eq(_panel.treasury_text(), "")
 	assert_false(_panel.study_button().visible)
 
 
-func test_with_no_player_every_country_is_banded() -> void:
+func test_with_no_player_every_country_is_exact_with_no_change() -> void:
 	_panel.show_country(&"GEN", false)
 	assert_true(_panel.treasury_visible())
 	assert_eq(_panel.change_text(), "", "no change without a player")
 	assert_false(_panel.study_button().visible)
 
 
-func test_the_expected_line_follows_the_card_and_a_banded_card_never_shows_change() -> void:
-	var yours := {"shown": true, "value": 658, "banded": false, "change": 48, "expected": 95, "tax": "Normal"}
+func test_the_expected_line_follows_the_card_and_a_foreign_card_never_shows_change() -> void:
+	var yours := {"shown": true, "value": 658, "own": true, "change": 48, "expected": 95, "tax": "Normal"}
 	_panel._fill_treasury({"treasury": yours})
 	assert_eq(_panel.change_text(), "Last season +48")
 	assert_eq(_panel.expected_text(), "Expected this season +95")
 	yours["expected"] = null
 	_panel._fill_treasury({"treasury": yours})
 	assert_eq(_panel.expected_text(), "", "a null expected hides the line")
-	# planted fault: a banded card that carries change, tax and expected must show none of them
-	var banded := {"shown": true, "value": 1900, "banded": true, "change": 50, "expected": 95, "tax": "Normal"}
-	_panel._fill_treasury({"treasury": banded})
-	assert_eq(_panel.treasury_text(), "Treasury about 1,900")
+	# planted fault: a foreign card that carries change, tax and expected must show none of them (the figure is exact, D7)
+	var foreign := {"shown": true, "value": 1905, "own": false, "change": 50, "expected": 95, "tax": "Normal"}
+	_panel._fill_treasury({"treasury": foreign})
+	assert_eq(_panel.treasury_text(), "Treasury 1,905")
 	assert_eq(_panel.change_text(), "")
 	assert_eq(_panel.expected_text(), "")
 	assert_eq(_panel.tax_text(), "")
+	assert_false(_panel.study_button().visible, "the study is yours only")
 
 
 func test_open_the_study_requests_the_study() -> void:
@@ -208,7 +208,7 @@ func test_the_treasury_refreshes_when_a_season_ends() -> void:
 	assert_eq(_panel.treasury_text(), "Treasury 999")
 
 
-## The People row (spec 6.4): after Towns; yours exact with last season's change; a known country banded; an unknown
+## The People row (spec 6.4): after Towns; yours exact with last season's change; a known foreign country exact; an unknown
 ## country has no row; the row refreshes on town_grew and district_declined; the bus is left on exit.
 func _listens(sig: Signal, obj: Object) -> bool:
 	for conn: Dictionary in sig.get_connections():
@@ -240,19 +240,31 @@ func test_yours_shows_the_people_row_after_towns() -> void:
 	assert_eq(_value_of("People"), expected, "the exact figure with last season's change")
 
 
-func test_a_known_foreign_country_shows_a_banded_people_row() -> void:
+func test_a_known_foreign_country_shows_its_exact_people_row() -> void:
 	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
 	_panel.show_country(&"MLO", false)
-	var card := CountryCard.of(Session.game, &"MLO")
-	var people := int(PeopleView.totals(Session.game, &"MLO")["people"])
-	assert_eq(_value_of("People"), Knowledge.band_text(int(card["people"]["value"]), ""), "a banded figure")
-	if Knowledge.band(people) != people:
-		assert_false(_value_of("People").contains(Words.number(people)), "no exact figure")
+	var seen := int(Knowledge.land_seen(Session.game, &"GEN", &"MLO")["people"])
+	assert_eq(_value_of("People"), Words.number(seen), "exact over the land you have seen (D9)")
+	assert_eq(seen, int(PeopleView.totals(Session.game, &"MLO")["people"]), "north Italy: all of its land is seen")
 	assert_false(_value_of("People").contains("last season"), "no change for a foreign country")
+
+
+func test_a_foreign_country_shows_the_land_you_have_seen_and_no_total() -> void:
+	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	_panel.show_country(&"MLO", false)
+	assert_eq(_panel.ledger_texts().find("Districts"), -1, "P: no total districts for a foreign country")
+	assert_eq(_value_of("Land you have seen"), "52 districts", "north Italy: all of Milan is seen")
+	assert_false(_value_of("Under arms").contains(" army"), "a foreign country's men alone: no count of its armies")
+	FogFixture.thin(Session.game, &"GEN", 0)
+	_panel.show_country(&"MLO", false)
+	var seen := int(CountryCard.of(Session.game, &"MLO")["districts"])
+	assert_eq(_value_of("Land you have seen"), Words.plural(seen, "district", "districts"), "a thin start: the count seen")
+	assert_lt(seen, 52, "a thin start does not see all of Milan")
 
 
 func test_an_unknown_country_has_no_people_row() -> void:
 	assert_true(bool(Session.act("choose_country", {"tag": &"GEN"})["ok"]))
+	FogFixture.thin(Session.game, &"GEN", 0)  # France is unknown to Genoa on a thin start
 	_panel.show_country(&"FRA", false)
 	assert_true(_panel.visible, "France still has a card")
 	assert_eq(_panel.ledger_texts().find("People"), -1, "no People row for an unknown country")

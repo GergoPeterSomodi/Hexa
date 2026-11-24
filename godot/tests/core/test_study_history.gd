@@ -9,7 +9,9 @@ const GEN := &"GEN"
 var _g: Game
 
 
+## A country Genoa does not know. North Italy starts fully discovered, so Genoa is thinned first (FogFixture, FG11).
 func _stranger(g: Game) -> StringName:
+	FogFixture.thin(g, GEN, 0)
 	for c: Country in g.countries:
 		if c.tag != GEN and not Knowledge.knows(g, GEN, c.tag):
 			return c.tag
@@ -114,13 +116,14 @@ func test_a_season_with_two_events_shows_the_one_of_the_highest_priority() -> vo
 
 func test_other_countries_lines_raise_the_tick_but_are_no_mark() -> void:
 	var g := InsightsFixture.genoa_1483()
+	var unknown := _stranger(g)  # thins Genoa first: the known country is read after it
 	var known := Knowledge.known(g, GEN)[0]
 	var before := StudyHistory.timeline(g, GEN)
 	g.chronicle.add({"kind": "tax_set", "turn": 6, "tag": known, "level": 2})
 	var after := StudyHistory.timeline(g, GEN)
 	assert_eq((after["counts"] as PackedInt32Array)[5], (before["counts"] as PackedInt32Array)[5] + 1)
 	assert_eq((after["marks"] as Array).size(), (before["marks"] as Array).size())
-	g.chronicle.add({"kind": "tax_set", "turn": 6, "tag": _stranger(g), "level": 2})
+	g.chronicle.add({"kind": "tax_set", "turn": 6, "tag": unknown, "level": 2})
 	assert_eq((StudyHistory.timeline(g, GEN)["counts"] as PackedInt32Array)[5], (after["counts"] as PackedInt32Array)[5], "unknown: unseen")
 
 

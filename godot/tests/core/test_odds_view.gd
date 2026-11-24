@@ -1,7 +1,7 @@
 ## OddsView (docs/architecture/m7-build-spec.md 4.6, 4.7, 4.15, 5.6, 6.4; M7 B23): the odds card of a march. Genoa (GEN, the
 ## player) at war with a neighbour. Planted faults (P): a hex the player does not see gives the same card as an empty unseen
 ## hex (kind none, no numbers, no words, no army, no garrison, no siege); an unseen enemy army gives no number and no word; a
-## seen garrison is rounded, never exact; a shaken army's refusal gives the two sentences of 6.4. The viewer "" gets {}.
+## discovered garrison is exact, never rounded (R19); a shaken army's refusal gives the two sentences of 6.4. The viewer "" gets {}.
 @warning_ignore_start("integer_division")
 extends GutTest
 
@@ -50,7 +50,7 @@ func _unseen_enemy_hex(enemy: StringName) -> Vector2i:
 	var eid := ArmyFixture.id_of(_g, enemy)
 	for i: int in _g.map.hex_count():
 		var hex := _g.map.hex_of(i)
-		if _g.map.is_land(hex) and int(_g.state.owner[i]) == eid and not Knowledge.sees(_g, ArmyFixture.TAG, hex) \
+		if _g.map.is_land(hex) and int(_g.state.owner[i]) == eid and not Knowledge.discovered(_g, ArmyFixture.TAG, hex) \
 				and Armies.at(_g, hex).is_empty():
 			return hex
 	return ArmyFixture.NO_HEX
@@ -106,6 +106,7 @@ func test_attack_ratio_and_word_are_combats_odds() -> void:
 
 func test_planted_unseen_enemy_army_gives_no_number_and_no_word() -> void:
 	var c := _contact()
+	FogFixture.thin(_g, ArmyFixture.TAG, 0)
 	var a := ArmyFixture.army(_g, ArmyFixture.TAG, c.ours, 0, 2)
 	var hex := _unseen_enemy_hex(c.enemy)
 	assert_ne(hex, ArmyFixture.NO_HEX, "an enemy hex Genoa does not see exists")
@@ -123,6 +124,7 @@ func test_planted_unseen_enemy_army_gives_no_number_and_no_word() -> void:
 
 func test_planted_unseen_enemy_hex_card_equals_an_empty_unseen_hex() -> void:
 	var c := _contact()
+	FogFixture.thin(_g, ArmyFixture.TAG, 0)
 	var a := ArmyFixture.army(_g, ArmyFixture.TAG, c.ours, 0, 2)
 	var hex := _unseen_enemy_hex(c.enemy)
 	assert_ne(hex, ArmyFixture.NO_HEX)
@@ -130,7 +132,7 @@ func test_planted_unseen_enemy_hex_card_equals_an_empty_unseen_hex() -> void:
 	var empty := ArmyFixture.NO_HEX
 	for i: int in _g.map.hex_count():
 		var h := _g.map.hex_of(i)
-		if _g.map.is_land(h) and not Knowledge.sees(_g, ArmyFixture.TAG, h) and Armies.at(_g, h).is_empty() and h != hex:
+		if _g.map.is_land(h) and not Knowledge.discovered(_g, ArmyFixture.TAG, h) and Armies.at(_g, h).is_empty() and h != hex:
 			empty = h
 			break
 	assert_ne(empty, ArmyFixture.NO_HEX, "an empty unseen hex exists")
@@ -144,6 +146,7 @@ func test_planted_unseen_enemy_hex_card_equals_an_empty_unseen_hex() -> void:
 func test_planted_unseen_fortress_leaks_neither_garrison_nor_need() -> void:
 	var f := _hostile_fortress(false)
 	assert_false(f.is_empty(), "a hostile garrisoned fortress the player does not see exists")
+	FogFixture.thin(_g, ArmyFixture.TAG, 0)
 	var garrison := Occupation.garrison_of(_g, f.hex)
 	var need := Occupation.siege_need(_g, f.hex)
 	var a := ArmyFixture.army(_g, ArmyFixture.TAG, ArmyFixture.find_town(_g), 0, 2)
@@ -159,7 +162,7 @@ func test_planted_unseen_fortress_leaks_neither_garrison_nor_need() -> void:
 		assert_eq((v.notes as Array).size(), 0, "P: no fortress note for a fogged fortress")
 
 
-func test_planted_garrison_seen_only_rounded_never_exact() -> void:
+func test_discovered_garrison_is_exact_never_rounded() -> void:
 	var f := _hostile_fortress(true)
 	assert_false(f.is_empty(), "a hostile garrisoned fortress the player sees exists")
 	var target := Occupation.garrison_full(_g, f.hex) - 13
@@ -168,9 +171,9 @@ func test_planted_garrison_seen_only_rounded_never_exact() -> void:
 	assert_ne(whole % 100, 0, "the planted garrison is not a round hundred")
 	var v := OddsView.of(_g, ArmyFixture.TAG, f.army.id, f.hex, true)
 	assert_eq(v.kind, &"storm")
-	assert_eq(v.defence.access, &"seen", "the seen garrison makes the defence seen")
-	assert_ne(int(v.defence.garrison.men), whole, "P: a seen garrison is rounded, never exact")
-	assert_false(_holds(v, whole), "P: the exact garrison appears nowhere in the card")
+	assert_eq(v.defence.access, &"exact", "a discovered garrison is read exact, so the defence is exact")
+	assert_eq(int(v.defence.garrison.men), whole, "P: a discovered garrison is exact, never rounded (R19)")
+	assert_true(_holds(v, whole), "the exact garrison is in the card")
 
 
 func test_storm_card_of_a_seen_garrisoned_fortress() -> void:

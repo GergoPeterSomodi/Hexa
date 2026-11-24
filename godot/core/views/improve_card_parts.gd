@@ -82,7 +82,7 @@ static func _ring_line(game: Game, tag: StringName, cells: Dictionary, target: D
 	var hex := e0["hex"] as Vector2i
 	var owner_id := int(e0["owner"])
 	var owner_tag: StringName = Countries.by_id(game, owner_id).tag if Countries.by_id(game, owner_id) != null else &""
-	if owner_tag != tag and not Knowledge.knows(game, tag, owner_tag):
+	if owner_tag != tag and not Knowledge.discovered(game, tag, hex):
 		return {}
 	if owner_tag != tag:
 		var def := Countries.def_of(game, owner_tag)

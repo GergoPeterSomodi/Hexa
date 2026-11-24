@@ -168,8 +168,7 @@ static func witnessed(game: Game, event: Dictionary, viewer: StringName) -> bool
 	if tag == viewer or _names(event.get("others", [])).has(viewer):
 		return true
 	if bool(event.get("land", false)):
-		var at: Variant = event.get("hex", null)
-		return at is Vector2i and discovered(game, viewer, at)
+		return not land_hexes(game, viewer, event).is_empty()
 	var witnesses := _names(event.get("witnesses", []))
 	if not witnesses.is_empty():
 		return witnesses.has(viewer)
@@ -207,6 +206,23 @@ static func siege_access(game: Game, viewer: StringName, hex: Vector2i) -> Strin
 	if discovered(game, viewer, hex):
 		return &"land"
 	return &"hidden"
+
+
+## The hexes of a land event (`hex`, or the `hexes` list of an owners_changed) that `viewer` has discovered, in the event's
+## order; the viewer "" gets all of them. A land event is told to a viewer with at least one of them (R29, R30).
+static func land_hexes(game: Game, viewer: StringName, event: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var candidates: Array = []
+	var at: Variant = event.get("hex", null)
+	if at is Vector2i:
+		candidates.append(at)
+	var listed: Variant = event.get("hexes", [])
+	if typeof(listed) == TYPE_ARRAY:
+		candidates.append_array(listed as Array)
+	for hex: Variant in candidates:
+		if hex is Vector2i and discovered(game, viewer, hex as Vector2i):
+			out.append(hex as Vector2i)
+	return out
 
 
 ## The tags of a Variant list (an Array of StringName or String, or the PackedStringArray the Chronicle stores);

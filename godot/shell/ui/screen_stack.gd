@@ -72,7 +72,7 @@ func replace(screen: Screen) -> void:
 		return
 	var top_idx := _screens.size() - 1
 	var old_screen := _screens[top_idx]
-	var inherited_focus := _focus_owners[top_idx]
+	var inherited_focus: Control = _live(_focus_owners[top_idx])
 	_disconnect_finished(old_screen)
 	_screens.remove_at(top_idx)
 	_focus_owners.remove_at(top_idx)
@@ -211,7 +211,9 @@ func _sync_shade() -> void:
 
 func _detach_at(idx: int, restore_focus: bool) -> void:
 	var screen := _screens[idx]
-	var saved_focus := _focus_owners[idx]
+	var saved_raw: Variant = _focus_owners[idx]
+	var saved_focus: Control = _live(saved_raw)
+	var saved_freed := typeof(saved_raw) == TYPE_OBJECT and not is_instance_valid(saved_raw)
 	_disconnect_finished(screen)
 	if not restore_focus and idx + 1 < _focus_owners.size():
 		var next_focus := _focus_owners[idx + 1]
@@ -221,7 +223,8 @@ func _detach_at(idx: int, restore_focus: bool) -> void:
 			or next_focus == screen
 			or (is_instance_valid(screen) and screen.is_ancestor_of(next_focus))
 		):
-			_focus_owners[idx + 1] = saved_focus
+			if not saved_freed:  # a freed focus owner is not handed on (a typed Array refuses it)
+				_focus_owners[idx + 1] = saved_focus
 	_screens.remove_at(idx)
 	_focus_owners.remove_at(idx)
 	if is_instance_valid(screen):
@@ -261,6 +264,12 @@ func _on_screen_finished(_result: StringName, screen: Screen) -> void:
 		return
 	remove(screen)
 	screen.queue_free()
+
+
+## A stored focus owner as a typed entry: null when the Control was freed since it was saved (a typed Array refuses a freed
+## instance; the monkey's stack of screens reached it after a card was freed on the way out).
+func _live(saved: Variant) -> Control:
+	return saved as Control if is_instance_valid(saved) else null
 
 
 func _current_focus_owner() -> Control:

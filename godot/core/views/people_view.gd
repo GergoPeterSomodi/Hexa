@@ -13,9 +13,9 @@ const HORIZON := 400
 
 
 ## {} at sea, off the map, in a game without people; else {shown, exact, people, room, change (people_end - people_start,
-## the last season's), text}. Yours (viewer is the owner): exact, "30,300 · room 45,000 · ▲ +300"; a known country's:
-## "about 30,000"; unowned land and the viewer "": exact, the number alone; "none" where no one can live; an unknown
-## country's land: shown false and nothing else (no text, no figures).
+## the last season's), text}. Yours (viewer is the owner): exact, "30,300 · room 45,000 · ▲ +300"; another country's hex the
+## viewer has discovered (light fog too, R18): exact, the number alone; unowned land and the viewer "": exact, the number
+## alone; "none" where no one can live; an undiscovered hex (D18, R18): shown false and nothing else (no text, no figures).
 static func at(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
 	if game == null or game.map == null or game.state == null or game.defs == null or not game.map.has(hex):
 		return {}
@@ -24,19 +24,18 @@ static func at(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
 		return {}
 	var owner_tag := Territory.owner_tag(game, hex) if game.has_countries() else &""
 	var out := {"shown": true, "exact": true, "people": 0, "room": 0, "change": 0, "text": ""}
-	var foreign := owner_tag != &"" and viewer != &"" and owner_tag != viewer
-	if foreign and not Knowledge.knows(game, viewer, owner_tag):
+	if game.has_countries() and not Knowledge.discovered(game, viewer, hex):
 		out["shown"] = false
 		return out
+	var foreign := owner_tag != &"" and viewer != &"" and owner_tag != viewer
 	var people := int(game.state.people[i])
 	var room := People.room_at(game, StateView.of(game.state), hex)
 	if people == 0 and room == 0:
 		out["text"] = "none"
 		return out
 	if foreign:
-		out["exact"] = false
-		out["people"] = Knowledge.band(people)
-		out["text"] = Knowledge.band_text(people, "")
+		out["people"] = people
+		out["text"] = Words.number(people)
 		return out
 	out["people"] = people
 	if owner_tag == &"" or viewer == &"":

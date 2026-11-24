@@ -149,7 +149,7 @@ func _known_foreign() -> StringName:
 func test_a_foreign_army_in_sight_is_banded_and_has_no_id() -> void:
 	var foreign := _known_foreign()
 	assert_ne(foreign, &"", "a country Genoa knows")
-	ArmyFixture.army(_g, foreign, _town(), 0, 3)
+	var army := ArmyFixture.army(_g, foreign, _town(), 0, 3)
 	var page := _page(_g)
 	var tables := page.find_children("Table", "StudyTable", true, false)
 	assert_eq(tables.size(), 2, "the own table and the foreign one")
@@ -157,7 +157,8 @@ func test_a_foreign_army_in_sight_is_banded_and_has_no_id() -> void:
 	assert_eq(seen.total_count(), 1)
 	assert_false(_label(page, "NoSeen").visible)
 	var cells := _cells(seen, 0)
-	assert_true(str(cells[2]).begins_with("about "), "banded: %s" % str(cells[2]))
+	# Foreign men in sight are exact (fog build, R25): the army's own count, not a band.
+	assert_eq(str(cells[2]), Words.men(army.men()), "exact: %s" % str(cells[2]))
 	for cell: Variant in cells:
 		assert_false(str(cell).contains("#"), "no army id: %s" % str(cell))
 	assert_true(seen.column_header(0).begins_with("Country"), seen.column_header(0))

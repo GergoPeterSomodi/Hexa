@@ -1,7 +1,7 @@
-## StudyRankings (docs/architecture/m4-5-build-spec.md 4.6, 4.9, 4.10, 9): land and income from Stats, the same numbers as the
-## report's Standing every season of a forty-season game, only the viewer and the countries it knows in the lists (the others'
-## values banded), the unknown only counted, ranks with ties by id, the line and its marks, the viewer `&""`, and the views
-## leave the game as it was.
+## StudyRankings (docs/architecture/m4-5-build-spec.md 4.6, 4.9, 4.10, 9; D7, D9): land and income from Stats, the same numbers as
+## the report's Standing every season of a forty-season game; a foreign country's land and people count the hexes the viewer has
+## discovered; only the viewer and the countries it knows are in the lists (every value exact), the unknown only counted, ranks
+## with ties by id, the line and its marks, the viewer `&""`, and the views leave the game as it was.
 extends GutTest
 
 const GEN := &"GEN"
@@ -41,25 +41,28 @@ func test_before_a_season_has_ended() -> void:
 	assert_eq((r["measures"] as Array).size(), 0)
 
 
-func test_turn_two_lists_of_the_worked_example() -> void:
+func test_turn_two_lists_on_north_italy_every_country_known() -> void:
 	var g := EconomyFixture.game(GEN)
 	Season.run(g)
 	var r := _of(g)
 	assert_true(bool(r["has_data"]))
 	assert_eq(r["turn"], 1)
-	assert_eq(r["known"], 3, "Genoa and the 2 it knows")
-	assert_eq(r["unknown"], 10, "13 countries, you, and the 2 you know")
-	assert_eq(r["head"], "The 3 countries you know, you among them. 10 countries unknown. Their numbers are rounded.")
+	assert_eq(r["known"], 13, "north Italy: every country knows every other (D3)")
+	assert_eq(r["unknown"], 0)
+	assert_eq(r["head"], "The 13 countries you know, you among them.")
 	var land := _measure(r, &"land")
-	assert_eq(_texts(land), ["Savoy about 58", "Milan about 52", "Genoa 14"] as Array[String])
-	assert_eq(land["rank"], 3)
-	assert_eq(land["total"], 3)
-	assert_eq(land["you_text"], "You are 3rd of 3.")
-	assert_eq((land["rows"] as Array)[2]["name"], "Genoa (you)")
+	assert_eq(_texts(land)[0], "Savoy 58")
+	assert_eq(_texts(land)[1], "Milan 52")
+	assert_eq(land["rank"], 8)
+	assert_eq(land["total"], 13)
+	assert_eq(land["you_text"], "You are 8th of 13.")
+	assert_eq((land["rows"] as Array)[7]["name"], "Genoa (you)")
+	assert_eq((land["rows"] as Array)[7]["text"], "14", "yours exact, no band")
 	var income := _measure(r, &"income")
-	assert_eq(_texts(income), ["Milan about +260", "Savoy about +240", "Genoa +86"] as Array[String])
-	assert_eq(income["rank"], 3)
-	assert_eq(income["you_text"], "You are 3rd of 3.")
+	assert_eq(_texts(income)[0], "Venice +287")
+	assert_eq(_texts(income)[1], "Milan +261")
+	assert_eq(income["rank"], 6)
+	assert_eq(income["you_text"], "You are 6th of 13.")
 
 
 func test_values_come_from_stats_and_income_is_the_closed_ledger() -> void:
@@ -106,25 +109,25 @@ func test_only_the_viewer_and_the_known_are_listed() -> void:
 	assert_eq(r["unknown"], Knowledge.unknown_count(g, GEN))
 
 
-func test_a_known_others_value_is_banded_and_yours_exact() -> void:
+func test_every_value_is_exact_and_none_is_banded() -> void:
 	var g := InsightsFixture.genoa_first_year()
 	var r := _of(g)
 	var t := int(r["turn"])
 	for m: Dictionary in r["measures"]:
 		for row: Dictionary in m["rows"]:
-			var exact := StudyRankings.value_of(g.stats, m["id"], row["tag"], t)
-			if bool(row["mine"]):
-				assert_eq(row["value"], exact)
-				assert_false(String(row["text"]).begins_with("about"))
-			else:
-				assert_eq(row["value"], Knowledge.band(exact), "banded: %s" % row["tag"])
-				assert_true(String(row["text"]).begins_with("about "))
+			var want := StudyRankings.value_of(g.stats, m["id"], row["tag"], t)
+			if not bool(row["mine"]) and (m["id"] == &"land" or m["id"] == &"people"):
+				var seen := Knowledge.land_seen(g, GEN, row["tag"])
+				want = int(seen["districts"]) if m["id"] == &"land" else int(seen["people"])
+			assert_eq(row["value"], want, "exact: %s %s" % [m["id"], row["tag"]])
+			assert_false(String(row["text"]).begins_with("about"), "no banded text: %s" % row["tag"])
 
 
 func test_ties_share_the_rank_and_sit_in_id_order() -> void:
 	var g := InsightsFixture.genoa_first_year()
 	var known := Knowledge.known(g, GEN)
-	_set_ring(g, known[0], g.stats.last_turn, "land", g.stats.value(GEN, g.stats.last_turn, "land"))
+	# a foreign country's land is the land you have seen (D9): the viewer's own Stats are set to that count, so the two tie
+	_set_ring(g, GEN, g.stats.last_turn, "land", int(Knowledge.land_seen(g, GEN, known[0])["districts"]))
 	var m := _measure(_of(g), &"land")
 	var rank_of := {}
 	var pair: Array[int] = []
@@ -199,17 +202,61 @@ func test_a_mark_where_the_rank_changed() -> void:
 	var g := InsightsFixture.genoa_first_year()
 	var known := Knowledge.known(g, GEN)
 	var turn := g.stats.last_turn
-	var mine_now := g.stats.value(GEN, turn, "land")
-	# the neighbour led Genoa the season before and is behind it now
-	_set_ring(g, known[0], turn - 1, "land", mine_now + 50)
-	_set_ring(g, known[0], turn, "land", maxi(mine_now - 5, 0))
-	var marks: Array = _measure(_of(g), &"land")["line"]["marks"]
-	var found := false
-	for mark: Dictionary in marks:
-		if int(mark["turn"]) == turn and String(mark["text"]).begins_with("rose to "):
-			found = true
-			assert_eq(mark["tone"], "good")
-	assert_true(found, "Genoa rose past it: %s" % [marks])
+	# the neighbour tops the income list one season and sits at the bottom the next (income is Stats in every season)
+	_set_ring(g, known[0], turn - 1, "income_people", 1000000)
+	_set_ring(g, known[0], turn, "income_people", -1000000)
+	var line: Dictionary = _measure(_of(g), &"income")["line"]
+	var first := turn - (line["you"] as PackedInt32Array).size() + 1
+	var ranks: Array[int] = []
+	for t: int in range(first, turn + 1):
+		ranks.append(_income_rank(g, t))
+	var want: Array[int] = []
+	for i: int in range(1, ranks.size()):
+		if ranks[i] != ranks[i - 1]:
+			want.append(first + i)
+	var got: Array[int] = []
+	for mark: Dictionary in line["marks"]:
+		got.append(int(mark["turn"]))
+	assert_false(want.is_empty(), "the lead changed hands in the run")
+	assert_eq(got, want, "a mark in each season the rank changed")
+	for mark: Dictionary in line["marks"]:
+		assert_eq(mark["tone"], "good" if String(mark["text"]).begins_with("rose to ") else "bad")
+
+
+## Genoa's place among the living countries it knows, in income in season `t`: the rule of the line (one more than each larger).
+func _income_rank(g: Game, t: int) -> int:
+	var mine := StudyRankings.income_of(g.stats, GEN, t)
+	var rank := 1
+	for tag: StringName in Knowledge.known(g, GEN):
+		if Countries.by_tag(g, tag).alive and StudyRankings.income_of(g.stats, tag, t) > mine:
+			rank += 1
+	return rank
+
+
+func _row_of(m: Dictionary, tag: StringName) -> Dictionary:
+	for row: Dictionary in m["rows"]:
+		if row["tag"] == tag:
+			return row
+	return {}
+
+
+## A thin start (FogFixture, FG7): the lists hold the viewer and the countries it knows, a foreign country's land is the land
+## you have seen (D9), and the head counts the unknown. P: an undiscovered district of a known neighbour is not counted.
+func test_a_thin_start_lists_the_known_and_counts_the_land_seen() -> void:
+	var g := InsightsFixture.genoa_first_year()
+	FogFixture.thin(g, GEN, 0)
+	var r := _of(g)
+	var known := Knowledge.known(g, GEN)
+	assert_lt(known.size(), 13, "a thin start knows fewer countries")
+	assert_eq(r["known"], known.size() + 1)
+	assert_eq(r["unknown"], Knowledge.unknown_count(g, GEN))
+	assert_true(str(r["head"]).contains("countries unknown."), str(r["head"]))
+	var land := _measure(r, &"land")
+	for row: Dictionary in land["rows"]:
+		if not bool(row["mine"]):
+			assert_eq(row["value"], int(Knowledge.land_seen(g, GEN, row["tag"])["districts"]), "the land you have seen: %s" % row["tag"])
+	var milan := _row_of(land, &"MLO")
+	assert_lt(int(milan["value"]), StudyRankings.value_of(g.stats, &"land", &"MLO", int(r["turn"])), "P: an undiscovered district is not counted")
 
 
 func test_the_view_is_cached_and_a_copy() -> void:
@@ -222,7 +269,7 @@ func test_the_view_is_cached_and_a_copy() -> void:
 	assert_eq(g.view_cache.size(), before, "a second call makes no new entry")
 	g.version += 1
 	_of(g)
-	assert_eq(g.view_cache.size(), before + 1, "a new version is a new key")
+	assert_gt(g.view_cache.size(), before, "a new version is a new key (the land you have seen of each country comes with it)")
 
 
 func test_the_view_changes_nothing() -> void:
@@ -294,7 +341,9 @@ func _compare_standing(g: Game, ended: int) -> void:
 	var got: Array[String] = []
 	for line: Dictionary in lines:
 		got.append(String(line["text"]))
-	assert_eq(got, want, "turn %d" % ended)
+	# The report shows the head and at most SeasonSummary.SHOWN lines; the rest are counted only (the section's count).
+	assert_eq(int(section["count"]), want.size(), "turn %d: every line is counted" % ended)
+	assert_eq(got, want.slice(0, SeasonSummary.SHOWN), "turn %d" % ended)
 	_standing_checked += 1
 
 
@@ -307,7 +356,7 @@ func test_equal_to_the_reports_standing_every_season() -> void:
 # ----- M5: the people measure -----------------------------------------------------------------------------------------
 
 
-func test_people_is_the_third_measure_yours_exact_and_others_banded() -> void:
+func test_people_is_the_third_measure_every_value_exact() -> void:
 	var g := EconomyFixture.game(GEN, false, true, EconomyFixture.SEED, false)  # people grow
 	Season.run(g)
 	var r := _of(g)
@@ -324,7 +373,7 @@ func test_people_is_the_third_measure_yours_exact_and_others_banded() -> void:
 		if bool(row["mine"]):
 			assert_eq(row["text"], Words.number(exact), "yours exact")
 		else:
-			assert_eq(row["text"], "about " + Words.number(Knowledge.band(exact)), "banded: %s" % row["tag"])
+			assert_eq(row["text"], Words.number(exact), "exact: %s" % row["tag"])
 	assert_eq((people["line"] as Dictionary)["caption"], "Your people, the last season")
 	var tags: Array[StringName] = []
 	for row: Dictionary in people["rows"]:

@@ -793,6 +793,7 @@ func _apply_zoom() -> void:
 
 func _process(_delta: float) -> void:
 	_apply_zoom()
+	_overlay.sync_discovered(Session.game)  # R36: the deep fog follows the explored set (one compare while it holds)
 	if _seasons.tick():
 		return
 	if is_loading():

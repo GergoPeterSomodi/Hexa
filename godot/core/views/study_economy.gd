@@ -365,7 +365,7 @@ static func _build_districts(game: Game, tag: StringName) -> Dictionary:
 			cost += upkeep[at + k]
 			for g: int in goods_n:
 				made[g] += loads[(at + k) * goods_n + g]
-		var work := WorksView.at(game, hex)
+		var work := WorksView.at(game, hex, game.player)
 		var what := _piece_words_at(game, i)
 		if not work.is_empty():
 			what += " · under way: %s, ready %s" % [work_words(game, game.state.work_at(hex)), work["ready"]]

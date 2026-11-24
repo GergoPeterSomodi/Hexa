@@ -6,7 +6,7 @@ extends GutTest
 const ROOT := "res://core/ai"
 const TOKENS: Array[String] = ["game.state", "game.armies", "game.countries", "game.wars", "game.sieges", "game.battles",
 	"game.battle_records", "game.luck", "game.stats", "game.chronicle", "Armies.", "Stats.", "Sieges.", "Occupation.", "Treasury.",
-	"Stores.", "People.", "Wars.men_under_arms"]
+	"Stores.", "People.", "Wars.men_under_arms", "Sight.", "Knowledge.discovered"]
 const CALLS := "(?<!AiKnow)\\.(act|check)\\("
 
 
@@ -58,6 +58,14 @@ func test_p_game_player_is_reported_outside_the_turn() -> void:
 	assert_eq(_problems("if tag == game.player:", "ai_war.gd").size(), 1)
 	assert_eq(_problems("if tag == game.player:", "ai_know.gd").size(), 1, "even the door leaves the player to the turn")
 	assert_eq(_problems("if tag == game.player:", "ai_turn.gd").size(), 0)
+
+
+## FG12 (R35): the discovery and the sight are read only by the door; a step module that asks them directly is reported.
+func test_p_sight_and_discovery_read_outside_the_door_are_reported() -> void:
+	assert_eq(_problems("var x := Sight.sees(game, tag, hex)", "ai_war.gd").size(), 1, "Sight.")
+	assert_eq(_problems("var x := Knowledge.discovered(game, tag, hex)", "ai_brief.gd").size(), 1, "Knowledge.discovered")
+	assert_eq(_problems("var x := AiKnow.discovered(game, tag, hex)", "ai_war.gd").size(), 0, "the door's own gate is allowed")
+	assert_eq(_problems("var x := Sight.sees(game, tag, hex)", "ai_know.gd").size(), 0, "the door itself may")
 
 
 func test_p_a_step_module_that_reads_the_armies_is_reported() -> void:

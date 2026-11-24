@@ -86,7 +86,7 @@ func test_foreign_army_out_of_sight_is_absent() -> void:
 		assert_ne(s["hex"], hex, "an army out of sight is not listed")
 
 
-func test_foreign_army_in_sight_is_banded_and_carries_no_id() -> void:
+func test_foreign_army_in_sight_has_exact_men_and_carries_no_id() -> void:
 	var g := ArmyFixture.game()
 	var other := ArmyFixture.other_tag(g)
 	var hex := ArmyFixture.find_town(g)
@@ -98,7 +98,7 @@ func test_foreign_army_in_sight_is_banded_and_carries_no_id() -> void:
 			found = true
 			assert_false(s.has("army"), "a foreign army has no id")
 			assert_false(s.has("id"), "a foreign army has no id")
-			assert_true(str(s["men_text"]).begins_with("about "), "its men are banded")
+			assert_eq(s["men_text"], Words.men(foreign.men()), "its men are exact")
 	# A country the viewer knows is listed; an unknown one is not (4.12).
 	assert_eq(found, Knowledge.knows(g, ArmyFixture.TAG, other) and foreign.men() > 0)
 

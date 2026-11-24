@@ -224,11 +224,11 @@ static func _refusal(game: Game, hex: Vector2i, reason: String) -> Dictionary:
 
 
 ## The refusal of a foreign hex, worded for the viewer: the owner is named (Words.country_the, which carries its own article)
-## only when the viewer knows that country and has explored the hex; otherwise "another country holds it".
+## only when the viewer knows that country and has discovered the hex (R32, D15); otherwise "another country holds it".
 static func _foreign_reason(game: Game, tag: StringName, hex: Vector2i) -> String:
 	var owner := Territory.owner_tag(game, hex)
 	var tail := ", and your armies cross no border in peace"
-	if owner != &"" and Knowledge.knows(game, tag, owner) and Sight.explored(game, tag, hex):
+	if owner != &"" and Knowledge.knows(game, tag, owner) and Knowledge.discovered(game, tag, hex):
 		return "%s: %s holds it%s" % [NOT_YOUR_LAND, Words.country_the(game, owner), tail]
 	return "%s: another country holds it%s" % [NOT_YOUR_LAND, tail]
 
@@ -388,7 +388,7 @@ static func _supply_line(end: Dictionary) -> Array:
 	if bool(end.in_supply):
 		return ["In supply.", TONE_GOOD]
 	var feeds := int(end.feeds)
-	var text := "Out of supply: %s" % ("the land feeds no one" if feeds == 0 else "the land feeds %s" % Knowledge.band_text(feeds, "men a season"))
+	var text := "Out of supply: %s" % ("the land feeds no one" if feeds == 0 else "the land feeds %s men a season" % Words.number(feeds))
 	if int(end.loss) > 0:
-		text += "; %s lost a season" % Knowledge.band_text(int(end.loss), "men")
+		text += "; %s lost a season" % Words.men(int(end.loss))
 	return [text + ".", TONE_BAD]

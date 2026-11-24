@@ -361,3 +361,38 @@ func test_a_march_check_and_its_act_plan_once() -> void:
 	assert_true((table.values()[0] as Dictionary).has("marker"), "P: the act read the check's plan (a fresh search would drop the marker)")
 	assert_eq(a.route, cached.hexes, "the order stores the cached route")
 	assert_eq(Movement.replan(_g, SAV, VERCELLI, AOSTA, Movement.mp_of(_g, a)).cost, cached.cost, "the result is the plain search's")
+
+
+## R32 (D15): a refusal of an undiscovered foreign goal names no owner; a discovered one names it (P: an owner named).
+func test_refusal_of_an_undiscovered_goal_names_no_owner() -> void:
+	FogFixture.thin(_g, ArmyFixture.TAG, 1)
+	var goal := Movement.NO_HEX
+	var owner := &""
+	for i: int in _g.map.hex_count():
+		var hex := _g.map.hex_of(i)
+		var o := int(_g.state.owner[i])
+		if _g.map.land[i] == 1 and o > 0 and o != ArmyFixture.id_of(_g, ArmyFixture.TAG) and not Knowledge.discovered(_g, ArmyFixture.TAG, hex):
+			goal = hex
+			owner = Countries.by_id(_g, o).tag
+			break
+	assert_ne(goal, Movement.NO_HEX, "an undiscovered foreign land hex exists")
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, ArmyFixture.find_town(_g), 0, 1)
+	var res := Movement.march_check(_g, {"army": a.id, "tag": ArmyFixture.TAG, "goal": goal})
+	assert_false(bool(res.ok))
+	assert_string_contains(str(res.reason), "another country holds it")
+	assert_false(str(res.reason).contains(Movement.country_name(_g, owner)), "P: the undiscovered owner is not named")
+
+
+func test_refusal_of_a_discovered_goal_names_its_owner() -> void:
+	var goal := Movement.NO_HEX
+	var owner := &""
+	for i: int in _g.map.hex_count():
+		var o := int(_g.state.owner[i])
+		if _g.map.land[i] == 1 and o > 0 and o != ArmyFixture.id_of(_g, ArmyFixture.TAG):
+			goal = _g.map.hex_of(i)
+			owner = Countries.by_id(_g, o).tag
+			break
+	assert_ne(goal, Movement.NO_HEX, "a foreign land hex exists")
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, ArmyFixture.find_town(_g), 0, 1)
+	var res := Movement.march_check(_g, {"army": a.id, "tag": ArmyFixture.TAG, "goal": goal})
+	assert_string_contains(str(res.reason), Movement.country_name(_g, owner), "P: a discovered owner is named")

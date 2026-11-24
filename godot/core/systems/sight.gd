@@ -13,9 +13,10 @@ extends RefCounted
 
 const OWNS: Array[String] = ["explored"]
 ## The land kinds (fog spec D12, R30): facts of a hex, told to whoever has discovered it. They carry `land: true` and no
-## witness list.
+## witness list. owners_changed is one too (a capture or cession between others): its hexes are the `hexes` list, and a
+## viewer is told when it has discovered one of them (Knowledge.land_hexes).
 const LAND_KINDS: Array[String] = ["work_started", "work_finished", "work_cancelled", "town_grew", "district_declined",
-	"district_captured"]
+	"district_captured", "owners_changed"]
 ## The other event kinds that carry witnesses when they have a hex (4.11).
 const SIGHTED: Array[String] = ["army_raised", "army_disbanded", "army_starved", "unit_lost", "battle_started",
 	"battle_joined", "battle_fought", "battle_ended", "siege_started", "siege_progress", "siege_lifted"]

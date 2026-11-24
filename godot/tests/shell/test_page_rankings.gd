@@ -1,6 +1,6 @@
 ## GUT tests for the Rankings page of the Statesman's Study (docs/architecture/m4-5-build-spec.md 4.6, 4.10, 6.5): Genoa
-## on seed 1480 after Spring 1480 (the turn-2 lists: land Savoy about 58, Milan about 52, Genoa 14; income Milan about +260,
-## Savoy about +240, Genoa +86; 10 countries unknown; "You are 3rd of 3."), your row, banded foreign values, a row's Go or
+## on seed 1480 after Spring 1480 (north Italy: all 13 countries known; the turn-2 lists: land Savoy 58, Milan 52, Genoa 14,
+## "You are 8th of 13."; income Venice +287, Milan +261, Genoa +86, "You are 6th of 13."), your row, exact foreign values, a row's Go or
 ## Enter asking for the country, the chart captions, the refresh leaving the digest and version alone, the page with no
 ## player, before a season, the milestone, and the fit at 1280 x 720 and 2560 x 1440.
 extends GutTest
@@ -76,44 +76,38 @@ func _played_one_season() -> Game:
 	return game
 
 
-func test_the_lists_show_the_turn_two_numbers() -> void:
+func test_the_lists_show_the_exact_numbers_of_north_italy() -> void:
 	var page := _page(_played_one_season())
 	var land := _row_texts(_table(page, LAND))
-	assert_eq(land.size(), 3)
-	assert_eq(land[0], ["1", "Savoy", "about 58"])
-	assert_eq(land[1], ["2", "Milan", "about 52"])
-	assert_eq(land[2], ["3", "Genoa (you)", "14"])
+	assert_eq(land.size(), 13, "north Italy: every country is known")
+	assert_eq(land[0], ["1", "Savoy", "58"])
+	assert_eq(land[1], ["2", "Milan", "52"])
+	assert_eq(land[7], ["8", "Genoa (you)", "14"])
 	var income := _row_texts(_table(page, INCOME))
-	assert_eq(income.size(), 3)
-	assert_eq(income[0], ["1", "Milan", "about +260"])
-	assert_eq(income[1], ["2", "Savoy", "about +240"])
-	assert_eq(income[2], ["3", "Genoa (you)", "+86"])
+	assert_eq(income.size(), 13)
+	assert_eq(income[0], ["1", "Venice", "+287"])
+	assert_eq(income[1], ["2", "Milan", "+261"])
+	assert_eq(income[5], ["6", "Genoa (you)", "+86"])
 
 
-func test_you_are_third_of_three_under_both_lists() -> void:
+func test_you_are_ranked_under_both_lists() -> void:
 	var page := _page(_played_one_season())
-	assert_true(_labels(_column(page, LAND)).has("You are 3rd of 3."))
-	assert_true(_labels(_column(page, INCOME)).has("You are 3rd of 3."))
+	assert_true(_labels(_column(page, LAND)).has("You are 8th of 13."))
+	assert_true(_labels(_column(page, INCOME)).has("You are 6th of 13."))
 
 
-func test_the_head_line_counts_the_countries_and_the_unknown_ones() -> void:
+func test_the_head_line_counts_the_countries_you_know() -> void:
 	var page := _page(_played_one_season())
 	var head := page.find_child("Head", true, false) as Label
 	assert_true(head.visible)
-	assert_true(head.text.begins_with("The 3 countries you know, you among them."), head.text)
-	assert_true(head.text.contains("10 countries unknown."), head.text)
-	assert_true(head.text.contains("Their numbers are rounded."), head.text)
+	assert_eq(head.text, "The 13 countries you know, you among them.", head.text)
 
 
-func test_foreign_values_are_banded_and_yours_is_exact() -> void:
+func test_every_value_is_exact() -> void:
 	var page := _page(_played_one_season())
 	for measure: String in [LAND, INCOME]:
 		for row: Array in _row_texts(_table(page, measure)):
-			var text := str(row[2])
-			if str(row[1]).begins_with("Genoa"):
-				assert_false(text.begins_with("about"), "your value is exact: %s" % text)
-			else:
-				assert_true(text.begins_with("about "), "a foreign value is banded: %s" % text)
+			assert_false(str(row[2]).begins_with("about"), "no banded value: %s" % str(row))
 
 
 func test_your_row_is_marked_and_the_list_is_sorted_by_rank() -> void:
@@ -191,7 +185,7 @@ func test_the_fourth_measure_men_under_arms_shows_from_milestone_six() -> void:
 	assert_true(army.visible, "the army list shows at milestone 6")
 	assert_eq(_table(page, "army").section_title, "Men under arms")
 	var rows := _row_texts(_table(page, "army"))
-	assert_eq(rows.size(), 3, "the three countries you know")
+	assert_eq(rows.size(), 13, "every country you know (north Italy)")
 	var mine := rows.filter(func(r: Array) -> bool: return str(r[1]).ends_with("(you)"))
 	assert_eq(mine.size(), 1, "your row is in the army list")
 	var chart := army.find_child("Chart", true, false) as InkChart

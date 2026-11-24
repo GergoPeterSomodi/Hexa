@@ -1,5 +1,5 @@
 ## Rankings' fourth measure, men under arms (docs/architecture/m6-build-spec.md D46 and 9; L12): the measure is Stats' army_men,
-## banded for the others, and its rank equals the Standing line's "in men under arms" in every season of a run (M4.5's done-when 5
+## exact for every country (D7), and its rank equals the Standing line's "in men under arms" in every season of a run (M4.5's done-when 5
 ## carried to the fourth measure), and a view leaves the game as it was.
 extends GutTest
 

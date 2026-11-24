@@ -2,8 +2,8 @@
 ## 6.3 and 6.5; L11). `tokens`: one token per (hex, country) the viewer sees; `panel`: one army; `needing_orders`: the
 ## armies of a country in the order they want; `hex_text`: the Armies line of the hex card; `token_text`: a men count as
 ## the badge reads it. Pure core/views/ code: a function of the game and the viewer, no nodes, no engine calls, no luck.
-## The viewer "" sees every army exact. Any other viewer sees its own armies exact, and the foreign armies it sees (Sight)
-## of a country it knows (Knowledge.knows): their men banded, no army ids, no order (4.12).
+## The viewer "" sees every army exact. Any other viewer sees its own armies exact, and the foreign armies on a hex it sees
+## (R23, Sight): their men exact (R25, D7), no army ids, no order (D8).
 @warning_ignore_start("integer_division")
 class_name ArmyView
 extends RefCounted
@@ -15,9 +15,9 @@ const STEADY_MORALE := 750
 
 
 ## One token per (hex, country) the viewer sees, in the order of the first army of each (id order). A token is
-## {hex, tag, armies: PackedInt32Array, men, text, exact, figure, mustering, marching, waiting, hungry, mine}. A foreign
-## token carries no army ids, a banded men count and no flags (the order is not the viewer's to know). Cached in the view
-## cache by [&"tokens", version, viewer].
+## {hex, tag, armies: PackedInt32Array, men, text, figure, mustering, marching, waiting, hungry, besieging, shaken, mine}.
+## A foreign token carries its men exact but no army ids and no flags (the orders are not the viewer's to know). Cached in
+## the view cache by [&"tokens", version, viewer].
 static func tokens(game: Game, viewer: StringName) -> Array[Dictionary]:
 	var empty: Array[Dictionary] = []
 	if game == null or game.map == null or not game.has_countries():
@@ -45,7 +45,7 @@ static func _make_tokens(game: Game, viewer: StringName) -> Array[Dictionary]:
 
 static func _token(game: Game, viewer: StringName, armies: Array) -> Dictionary:
 	var first := armies[0] as Army
-	var exact := viewer == &"" or first.tag == viewer
+	var own := viewer == &"" or first.tag == viewer
 	var men := 0
 	var ids := PackedInt32Array()
 	var by_kind: Dictionary = {}
@@ -58,29 +58,28 @@ static func _token(game: Game, viewer: StringName, armies: Array) -> Dictionary:
 		men += a.men()
 		for u: Unit in a.units:
 			by_kind[u.kind] = int(by_kind.get(u.kind, 0)) + u.men
-		if exact:
+		if own:
 			ids.append(a.id)
 			mustering = mustering or a.mustering(game.turn)
 			marching = marching or a.order == Army.ORDER_MARCH
 			waiting = waiting or a.waiting != &""
 			hungry = hungry or a.supply == Supply.HUNGRY
-	if not exact:
+	if not own:
 		ids = PackedInt32Array()
 	var siege := Occupation.siege_at(game, first.hex)
 	return {
 		"hex": first.hex,
 		"tag": first.tag,
 		"armies": ids,
-		"men": men if exact else Knowledge.band(men),
-		"text": token_text(men, exact),
-		"exact": exact,
+		"men": men,
+		"text": token_text(men),
 		"figure": _figure(game, by_kind),
-		"mustering": mustering and exact,
-		"marching": marching and exact,
-		"waiting": waiting and exact,
-		"hungry": hungry and exact,
-		"besieging": exact and siege != null and siege.besieger == first.tag,
-		"shaken": exact and _any_shaken(game, armies),
+		"mustering": mustering and own,
+		"marching": marching and own,
+		"waiting": waiting and own,
+		"hungry": hungry and own,
+		"besieging": own and siege != null and siege.besieger == first.tag,
+		"shaken": own and _any_shaken(game, armies),
 		"mine": viewer != &"" and first.tag == viewer,
 	}
 
@@ -107,28 +106,20 @@ static func _figure(game: Game, by_kind: Dictionary) -> StringName:
 	return ud.figure if ud != null else &""
 
 
-## True when the viewer may see `army`: its own (or the viewer ""), or a foreign one on a hex it sees whose country it knows.
+## True when the viewer may see `army` (R23): its own (or the viewer ""), or a foreign one on a hex it sees whose country it knows.
 static func visible(game: Game, viewer: StringName, army: Army) -> bool:
 	if viewer == &"" or army.tag == viewer:
 		return true
-	return Knowledge.sees(game, viewer, army.hex) and Knowledge.knows(game, viewer, army.tag)
+	return Knowledge.sees(game, viewer, army.hex)
 
 
-## The badge text of a men count (A9): exact, under 1,000 the number, else tenths of a thousand as "1.0k" or "1.2k";
-## banded (another's), the band (Knowledge.band) as "~450", "~1k" or "~1.2k".
-static func token_text(men: int, exact: bool) -> String:
-	if exact:
-		if men < K_UNIT:
-			return str(men)
-		var t := (men + TOKEN_ROUND) / 100
-		return "%d.%dk" % [t / 10, t % 10]
-	var n := Knowledge.band(men)
-	if n < K_UNIT:
-		return "~%d" % n
-	var tt := (n + TOKEN_ROUND) / 100
-	if tt % 10 == 0:
-		return "~%dk" % (tt / 10)
-	return "~%d.%dk" % [tt / 10, tt % 10]
+## The badge text of a men count (A9, D7: exact everywhere): under 1,000 the number, else tenths of a thousand as "1.0k"
+## or "1.2k".
+static func token_text(men: int) -> String:
+	if men < K_UNIT:
+		return str(men)
+	var t := (men + TOKEN_ROUND) / 100
+	return "%d.%dk" % [t / 10, t % 10]
 
 
 ## The Army panel's model of one army (6.5), {} when the viewer does not see it. Its own army (or any army for the viewer
@@ -143,7 +134,7 @@ static func panel(game: Game, viewer: StringName, army_id: int) -> Dictionary:
 			"mine": false,
 			"country": _country_name(game, a.tag),
 			"hex": a.hex,
-			"men_text": Knowledge.band_text(a.men(), "men"),
+			"men_text": Words.men(a.men()),
 		}
 	return _own_panel(game, a, viewer)
 
@@ -321,7 +312,7 @@ static func needing_orders(game: Game, tag: StringName) -> PackedInt32Array:
 
 
 ## The Armies line of a hex card for the viewer: "Army of Turin: 1,000 men, holding; ..." for the armies the viewer sees
-## there, "Milan: about 1,000 men" for a foreign one; "" for none.
+## there, "Milan: 1,000 men" for a foreign one; "" for none.
 static func hex_text(game: Game, viewer: StringName, hex: Vector2i) -> String:
 	if game == null or game.map == null or not game.has_countries():
 		return ""
@@ -334,12 +325,12 @@ static func hex_text(game: Game, viewer: StringName, hex: Vector2i) -> String:
 		if a.tag == viewer or viewer == &"":
 			parts.append("%s: %s, %s" % [a.name, Words.men(a.men()), _word(game, a)])
 		else:
-			# Another country's armies on one hex are one figure, as their token is: summed, then banded once.
+			# Another country's armies on one hex are one figure, as their token is: summed.
 			if not foreign_tags.has(a.tag):
 				foreign_tags.append(a.tag)
 			foreign_men[a.tag] = int(foreign_men.get(a.tag, 0)) + a.men()
 	for tag: StringName in foreign_tags:
-		parts.append("%s: %s" % [_country_name(game, tag), Knowledge.band_text(int(foreign_men[tag]), "men")])
+		parts.append("%s: %s" % [_country_name(game, tag), Words.men(int(foreign_men[tag]))])
 	return "; ".join(parts)
 
 

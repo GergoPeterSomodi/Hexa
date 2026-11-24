@@ -225,7 +225,19 @@ func test_owner_line_in_scenario_and_map_only_games() -> void:
 	assert_true(bool(game.act("choose_country", {"tag": &"AAA"})["ok"]))
 	var alpha_yours := HexCard.of(game, ScenarioFixture.ALPHA_CAPITAL)
 	assert_eq(_find_line(alpha_yours["lines"] as Array, "Owner"), ["Owner", &"plain", "Republic of Alpha, yours"])
+	# Fog build (R18, D18): AAA has not discovered Beta's capital, so its card says "Unexplored" and names no owner (P).
 	var beta_card := HexCard.of(game, ScenarioFixture.BETA_CAPITAL)
+	assert_eq(beta_card["title"], "Unexplored", "an undiscovered hex")
+	assert_null(_find_line(beta_card["lines"] as Array, "Owner"), "an undiscovered hex has no Owner line")
+	# Once AAA has discovered it (its explored bit set, as a walk would), the owner shows again.
+	var bits := FogFixture.grown(game, &"AAA", 0)
+	var idx := game.map.index_of(ScenarioFixture.BETA_CAPITAL)
+	bits[idx >> 3] = bits[idx >> 3] | (1 << (idx & 7))
+	Countries.by_tag(game, &"AAA").explored = bits
+	game.sight.clear()
+	Sight.refresh(game)
+	game.version += 1
+	beta_card = HexCard.of(game, ScenarioFixture.BETA_CAPITAL)
 	assert_eq(_find_line(beta_card["lines"] as Array, "Owner"), ["Owner", &"plain", "Duchy of Beta"])
 	var unowned_after := HexCard.of(game, ScenarioFixture.UNOWNED_HEXES[0])
 	assert_eq(_find_line(unowned_after["lines"] as Array, "Owner"), ["Owner", &"plain", "no one"])
@@ -402,7 +414,8 @@ func test_people_and_food_lines_of_genoa() -> void:
 		"30,300 · room 45,000 · ▲ +300")
 
 
-func test_people_line_for_known_unknown_and_no_food_on_foreign_land() -> void:
+## Fog build (R18): a discovered foreign hex's people line is exact, not banded (the whole of north Italy is discovered).
+func test_people_line_of_a_discovered_foreign_hex_is_exact_and_no_food() -> void:
 	var game := PeopleFixture.genoa()
 	var milan := Countries.by_tag(game, &"MLO")
 	var france := Countries.by_tag(game, &"FRA")
@@ -416,11 +429,13 @@ func test_people_line_for_known_unknown_and_no_food_on_foreign_land() -> void:
 			seen_milan = true
 			var row: Variant = _find_line(lines, "People")
 			if row != null:
-				assert_true(str((row as Array)[2]).begins_with("about "), "known: banded")
+				assert_eq(str((row as Array)[2]), Words.number(int(game.state.people[i])), "known: exact")
 			assert_null(_find_line(lines, "Food"), "no food line on foreign land")
 		if int(game.state.owner[i]) == france.id and not seen_france:
 			seen_france = true
-			assert_null(_find_line(lines, "People"), "an unknown country's people are not shown")
+			var france_row: Variant = _find_line(lines, "People")
+			if france_row != null:
+				assert_eq(str((france_row as Array)[2]), Words.number(int(game.state.people[i])), "France: discovered, exact")
 	assert_true(seen_milan and seen_france)
 
 
@@ -431,3 +446,95 @@ func test_no_people_line_at_sea_or_in_a_map_only_game() -> void:
 			assert_null(_find_line(HexCard.of(game, game.map.hex_of(i))["lines"] as Array, "People"))
 			break
 	assert_null(_find_line(HexCard.of(_game, Vector2i(9, 9))["lines"] as Array, "People"))
+
+
+## Fog build (R18, D18): an undiscovered hex's card is the title "Unexplored" and nothing else; a named place is not told (P).
+func test_an_undiscovered_hex_reads_unexplored_and_nothing_else() -> void:
+	var game := PeopleFixture.genoa()
+	FogFixture.thin(game, &"GEN", 0)
+	var deep := 0
+	var placed := 0
+	for i: int in game.map.hex_count():
+		var hex := game.map.hex_of(i)
+		if Knowledge.discovered(game, &"GEN", hex):
+			continue
+		deep += 1
+		var card := HexCard.of(game, hex)
+		assert_eq(card["title"], "Unexplored", "the title")
+		assert_eq((card["lines"] as Array).size(), 0, "nothing else is shown")
+		assert_eq(str(card["owner"]), "", "no owner")
+		assert_eq(str(card["place"]), "", "no place name")
+		var place_name := str(Improve.place_of(game.map, hex).get("name", ""))
+		if place_name != "":
+			placed += 1
+			assert_ne(card["title"], place_name, "P: a place name is not shown")
+	assert_gt(deep, 0, "the thin fixture leaves hexes undiscovered")
+	assert_gt(placed, 0, "an undiscovered hex with a place name exists")
+
+
+## Fog build (R19, D6): a light-fog fortress shows its garrison exact, never rounded or "a garrison".
+func test_a_light_fog_fortress_shows_its_garrison_exact() -> void:
+	var game := PeopleFixture.genoa()
+	FogFixture.thin(game, &"GEN", 2)
+	var light := 0
+	for i: int in game.map.hex_count():
+		var hex := game.map.hex_of(i)
+		if Occupation.fortress_level(game, hex) <= 0 or not Knowledge.discovered(game, &"GEN", hex) \
+				or Knowledge.sees(game, &"GEN", hex):
+			continue
+		light += 1
+		var text := ""
+		for row: Array in HexCard.war_rows(game, hex):
+			if str(row[0]) == "Fortress":
+				text = str(row[2])
+		var expect := "garrison %d of %d" % [Occupation.garrison_of(game, hex), Occupation.garrison_full(game, hex)]
+		assert_true(text.ends_with(expect), "exact: " + text)
+		assert_false(text.contains("about") or text.contains("a garrison"), "no rounding: " + text)
+	assert_gt(light, 0, "a light-fog fortress on the thin fixture")
+
+
+## Fog build (R21): a light-fog siege reads "Besieged" with the progress and the need, and names no besieger; the holder
+## and the besieger see it exact.
+func test_a_light_fog_siege_reads_besieged_and_names_no_besieger() -> void:
+	var g := ArmyFixture.game()
+	var hex := ArmyFixture.find_town(g)
+	var holder := Occupation.controller_tag(g, hex)
+	var besieger := WarFixture.neighbour_of(g, holder)
+	assert_ne(besieger, &"", "a neighbour of the holder exists")
+	WarFixture.at_war(g, besieger, holder)
+	var s := Siege.new()
+	s.hex = hex
+	s.besieger = besieger
+	s.name = "Siege of Test, 1480"
+	g.sieges.append(s)
+	for c: Country in g.countries:
+		if c != null and c.tag != &"":
+			FogFixture.thin(g, c.tag, 0)
+	var viewer := &""
+	for c: Country in g.countries:
+		if c != null and c.tag != &"" and c.tag != holder and c.tag != besieger:
+			viewer = c.tag
+			break
+	assert_ne(viewer, &"", "a third country exists")
+	var bits := FogFixture.grown(g, viewer, 0)
+	var idx := g.map.index_of(hex)
+	bits[idx >> 3] = bits[idx >> 3] | (1 << (idx & 7))
+	Countries.by_tag(g, viewer).explored = bits
+	g.sight.clear()
+	Sight.refresh(g)
+	g.version += 1
+	assert_true(Knowledge.discovered(g, viewer, hex), "precondition: the viewer has discovered the hex")
+	assert_false(Knowledge.sees(g, viewer, hex), "precondition: and does not see it")
+	g.player = viewer
+	var siege_text := _siege_row(g, hex)
+	assert_eq(siege_text, "Siege of Test, 1480: Besieged, %d of %d" % [s.progress, Occupation.siege_need(g, hex)])
+	assert_false(siege_text.contains(String(besieger)), "P: no besieger named")
+	g.player = holder
+	assert_true(_siege_row(g, hex).contains("besieged by"), "the holder sees it exact")
+
+
+func _siege_row(g: Game, hex: Vector2i) -> String:
+	for row: Array in HexCard.war_rows(g, hex):
+		if str(row[0]) == "Siege":
+			return str(row[2])
+	return ""

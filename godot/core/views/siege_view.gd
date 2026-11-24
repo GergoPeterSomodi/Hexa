@@ -1,8 +1,9 @@
-## The read-only siege view (docs/architecture/m7-build-spec.md 4.5, 4.15, 5.6, M7 B14): a siege of a fortress hex as the viewer
-## may see it. Fog (Knowledge.siege_access): exact for the viewer "", the besieger and the controller (the meter, the men, the
-## rate, the forecast season and the defender's relief); seen while the viewer sees the hex (the meter exact, the men banded,
-## no rate, no forecast, no relief); hidden otherwise, and a siege between countries at peace is none for everyone.
-## The garrison: exact for its owner, banded while the viewer sees the hex, "a garrison" otherwise. Pure core/views/ code.
+## The read-only siege view (docs/architecture/m7-build-spec.md 4.5, 4.15, 5.6, M7 B14; fog-build spec R19, R21): a siege of a fortress
+## hex as the viewer may see it. Fog (Knowledge.siege_access): exact for the viewer "", the besieger and the controller (the meter,
+## the men, the rate, the forecast season and the defender's relief); seen while the viewer sees the hex (the besieger named, its
+## men exact; no rate, no forecast, no relief); land while the viewer has only discovered the hex (the holder, the meter, the
+## garrison and the word "Besieged": no besieger, no men); hidden otherwise, and a siege between countries at peace is none for
+## everyone. The garrison of a discovered fortress is exact for every viewer (R19). Pure core/views/ code.
 @warning_ignore_start("integer_division")
 class_name SiegeView
 extends RefCounted
@@ -17,7 +18,7 @@ const UNKNOWN_NAME := "a country"
 
 ## The siege of a hex as the viewer sees it; {} when none stands, or it is hidden. Keys: access, hex, name, place, besieger,
 ## defender (tags), besieger_name, defender_name, progress, need, seasons, stores_left, starving, hunger, garrison_text,
-## men_text, rate and falls_in (-1 unless exact), relief ([] unless the viewer is the defender or ""). Cached by
+## men_text, men, rate and falls_in (-1 unless exact), relief ([] unless the viewer is the defender or ""). Cached by
 ## [&"siege_view", version, viewer, hex].
 static func at(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
 	var key: Array = [&"siege_view", game.version, viewer, hex]
@@ -40,29 +41,31 @@ static func _make_at(game: Game, viewer: StringName, hex: Vector2i) -> Dictionar
 		return {}
 	var holder := Occupation.controller_tag(game, hex)
 	var exact := acc == &"exact"
+	var named := acc != &"land"
 	var war := game.defs.war
 	var level := Occupation.fortress_level(game, hex)
 	var out := {
 		"access": acc, "hex": hex, "name": s.name, "place": Words.place(game, hex),
-		"besieger": _key(game, viewer, s.besieger, exact, "besieger"), "defender": _key(game, viewer, holder, exact, "defender"),
-		"besieger_name": _name_seen(game, viewer, s.besieger, exact), "defender_name": _name_seen(game, viewer, holder, exact),
+		"besieger": _key(game, viewer, s.besieger, exact, "besieger") if named else "",
+		"defender": _key(game, viewer, holder, exact, "defender"),
+		"besieger_name": _name_seen(game, viewer, s.besieger, exact) if named else "",
+		"defender_name": _name_seen(game, viewer, holder, exact),
 		"progress": s.progress, "need": Occupation.siege_need(game, hex), "seasons": s.seasons,
 		"stores_left": maxi(0, 1 + level - s.seasons), "starving": Sieges.starving(game, hex),
-		"hunger": 0, "garrison_text": _garrison_text(game, viewer, hex, holder),
+		"hunger": 0, "garrison_text": _garrison_text(game, hex),
 		"rate": -1, "falls_in": -1, "relief": [], "men_text": "", "men": 0,
 	}
 	if bool(out["starving"]):
 		out["hunger"] = war.siege_hunger
-	var men := Sieges.terms(game, hex, s.besieger)
-	if exact:
+	if named:
+		var men := Sieges.terms(game, hex, s.besieger)
 		out["men"] = int(men["men"])
 		out["men_text"] = Words.men(int(men["men"]))
-		out["rate"] = int(men["rate"])
-		out["falls_in"] = Sieges.forecast(game, hex, s.besieger, int(men["men"]), int(men["guns"]), s.progress, s.seasons)
-		if viewer == &"" or viewer == holder:
-			out["relief"] = _relief(game, holder, hex)
-	else:
-		out["men_text"] = Knowledge.band_text(int(men["men"]), "men")
+		if exact:
+			out["rate"] = int(men["rate"])
+			out["falls_in"] = Sieges.forecast(game, hex, s.besieger, int(men["men"]), int(men["guns"]), s.progress, s.seasons)
+			if viewer == &"" or viewer == holder:
+				out["relief"] = _relief(game, holder, hex)
 	return out
 
 
@@ -82,16 +85,10 @@ static func _make_all(game: Game, viewer: StringName) -> Array[Dictionary]:
 	return out
 
 
-## The garrison as the viewer reads it: exact for its owner (and the viewer ""), banded while the viewer sees the hex, else
-## "a garrison".
-static func _garrison_text(game: Game, viewer: StringName, hex: Vector2i, holder: StringName) -> String:
-	var full := Occupation.garrison_full(game, hex)
-	var men := Occupation.garrison_of(game, hex)
-	if viewer == &"" or viewer == holder:
-		return "garrison %s of %s" % [Words.number(men), Words.number(full)]
-	if Knowledge.sees(game, viewer, hex):
-		return "garrison about %s of %s" % [Words.number(Knowledge.band(men)), Words.number(full)]
-	return "a garrison"
+## The garrison as the viewer reads it (R19): the real men of the fortress against its full garrison, for every viewer who
+## may see the siege (the discovered hex).
+static func _garrison_text(game: Game, hex: Vector2i) -> String:
+	return "garrison %s of %s" % [Words.number(Occupation.garrison_of(game, hex)), Words.number(Occupation.garrison_full(game, hex))]
 
 
 ## The defender's armies that can reach the besieged hex within RELIEF_SEASONS seasons: nearest first (ties by army id),

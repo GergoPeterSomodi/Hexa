@@ -6,6 +6,7 @@
 ## hex nobody of the viewer's sees, in every mode, when map/sight_veil is on. M7 (spec 6.3) adds occupiers (R8: the occupier's
 ## country id, the occupied stripes in Owner and the Terrain tint) and areas (R8: 1 on a held castle-area hex, the 12 % tint);
 ## the castle-area tint shows only while area_on (the scene's gate: map/castle_areas, an army of yours selected, a war of yours).
+## R36 (fog build): the deep-fog texture (DeepFog: 0 under deep fog) and the deep_fog_colour uniform paint every undiscovered hex.
 @tool
 class_name ModeOverlay
 extends Node2D
@@ -69,6 +70,7 @@ var _areas_image: Image = null
 var _areas_tex: ImageTexture = null
 var _areas_on := false
 var _material: ShaderMaterial = null
+var _fog := DeepFog.new()  # R36: the deep-fog texture (1 discovered, 0 under deep fog)
 
 
 func _init() -> void:
@@ -138,6 +140,7 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	_sight_image = Image.create_from_data(map.cols, map.rows, false, Image.FORMAT_R8, _sight_bytes)
 	_sight_tex = ImageTexture.create_from_image(_sight_image)
 
+	_fog.setup(map.cols, map.rows)
 	_make_war_textures(map, count)
 
 	if _material == null:
@@ -158,6 +161,8 @@ func setup_from(map: MapData, owner: PackedByteArray, palette: PackedColorArray)
 	_material.set_shader_parameter(&"supply_alpha", MapModes.SUPPLY_ALPHA)
 	_material.set_shader_parameter(&"sight", _sight_tex)
 	_material.set_shader_parameter(&"sight_alpha", MapModes.SIGHT_VEIL_ALPHA)
+	_material.set_shader_parameter(&"discovered", _fog.texture())
+	_material.set_shader_parameter(&"deep_fog_colour", MapModes.DEEP_FOG_COLOUR)
 	_material.set_shader_parameter(&"veil_alpha", MapModes.VEIL_ALPHA)
 	_material.set_shader_parameter(&"stripe_px", MapModes.STRIPE_PX)
 	_material.set_shader_parameter(&"veil_colour", MapModes.VEIL)
@@ -198,6 +203,7 @@ func setup(game: Game, colour_blind: bool = false) -> void:
 		return
 	setup_from(game.map, game.state.owner, MapModes.palette(game, colour_blind))
 	_game = game
+	sync_discovered(game)
 
 
 ## Replaces the 256 x 1 palette texture from plain colours (used by the editor and tests).
@@ -532,6 +538,36 @@ func sync_sight(game: Game, force: bool = false) -> int:
 	return update_sight(MapModes.sight_bytes(game, game.player))
 
 
+## Writes the deep-fog texels that differ from `bytes` (MapModes.discovered_bytes); returns the texels written.
+func update_discovered(bytes: PackedByteArray) -> int:
+	return _count_fog(_fog.write(bytes))
+
+
+## Brings the deep-fog texture to the viewer's discovered hexes when their key moved (the explored set or the sight). The map
+## scene calls it every frame: one compare while nothing moved. Returns the texels written.
+func sync_discovered(game: Game) -> int:
+	return _count_fog(_fog.sync(game))
+
+
+## Counts a deep-fog write (texel_writes, texture_updates) and re-checks the visibility: the overlay shows under any deep fog.
+func _count_fog(wrote: int) -> int:
+	if wrote > 0:
+		texel_writes += wrote
+		texture_updates += 1
+		_update_visibility()
+	return wrote
+
+
+## The deep-fog texture (R36); the minimap's copy of the material shares it.
+func discovered_texture() -> ImageTexture:
+	return _fog.texture()
+
+
+## The image behind the deep-fog texture (its bytes are the fog).
+func discovered_image() -> Image:
+	return _fog.image()
+
+
 ## The Supply bytes the texture holds now (a copy; tests).
 func supply_bytes() -> PackedByteArray:
 	return _supply_bytes.duplicate()
@@ -743,7 +779,7 @@ func _sync_uniforms() -> void:
 
 
 func _update_visibility() -> void:
-	visible = not (_mode == MapModes.Mode.TERRAIN and not _tint_on and not _sight_veil_on and not _areas_on)
+	visible = _fog.any_fog() or not (_mode == MapModes.Mode.TERRAIN and not _tint_on and not _sight_veil_on and not _areas_on)
 
 
 static func _image_from_colours(colours: PackedColorArray) -> Image:

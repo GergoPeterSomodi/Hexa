@@ -159,17 +159,16 @@ func test_4_11_b_the_glance_chip_and_standing() -> void:
 	var chip := _line_with(s, &"glance", "People")
 	assert_eq([chip["detail"], chip["amount"], chip["value"], chip["tone"]], ["83,205", 505, 83205, "good"])
 	var standing := _texts(s, &"standing")
-	assert_string_contains(standing[0], "3rd in people (83,205).")
-	assert_true(standing[0].begins_with("Among the 3 countries you know, you are 3rd in land (14 districts), "))
+	assert_string_contains(standing[0], "7th in people (83,205).")
+	assert_true(standing[0].begins_with("Among the 13 countries you know, you are 8th in land (14 districts), "))
 	var known := Knowledge.known(_g, &"GEN")
-	assert_eq(standing.size(), known.size() + 1)
+	assert_eq(int(_section(s, &"standing")["count"]), known.size() + 1, "Genoa and every known country are counted")
 	for other: StringName in known:
 		var short := LogLines.short_name(_g, other)
-		var want := ", about %s people." % Words.number(Knowledge.band(_g.stats.value(other, 1, "people")))
-		var found := false
+		var want := ", %s people." % Words.number(_g.stats.value(other, 1, "people"))
 		for text: String in standing:
-			found = found or (text.begins_with(short + ":") and text.ends_with(want))
-		assert_true(found, "%s: banded people" % short)
+			if text.begins_with(short + ":"):
+				assert_true(text.ends_with(want), "%s: the exact people: %s" % [short, text])
 	var sample := ReportSample.genoa_spring()
 	assert_eq(_rows(sample, &"people"), _rows(s, &"people"), "the fixture's People section is the real one")
 	assert_eq(_total_text(sample), _total_text(s))

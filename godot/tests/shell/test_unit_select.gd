@@ -45,6 +45,11 @@ func _token_screen(hex: Vector2i) -> Vector2:
 	return _token(hex).get_global_transform_with_canvas() * Vector2(0.0, -25.0)
 
 
+## The same point on the token of `tag` (a foreign army in sight has a token too: the fog build makes one for it).
+func _tag_token_screen(hex: Vector2i, tag: StringName) -> Vector2:
+	return _armies().tokens().token_at(hex, tag).get_global_transform_with_canvas() * Vector2(0.0, -25.0)
+
+
 ## A left click (press and release at `screen`) given to MapInput as the viewport gives it.
 func _click(screen: Vector2, shift: bool = false) -> void:
 	for pressed: bool in [true, false]:
@@ -117,7 +122,8 @@ func test_an_unseen_foreign_unit_is_no_unit_and_a_seen_one_is_not_selected() -> 
 	var seen := ArmyView.visible(_game, ArmyFixture.TAG, foreign)
 	var token := _armies().tokens().token_at(hex, other)
 	assert_eq(token != null, seen, "a token exists exactly when the viewer sees the army")
-	var point := _token_screen(hex) if token != null else _hex_screen(hex)
+	# A seen foreign army has its token on the hex: the click goes to that token's area, which must still not pick it.
+	var point := _tag_token_screen(hex, other) if token != null else _hex_screen(hex)
 	assert_null(_armies().tokens().own_token_at(point), "a foreign token is never a unit to pick")
 	_click(point)
 	assert_eq(_armies().selected_army(), -1, "a click there does not select the foreign army")

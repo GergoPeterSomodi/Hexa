@@ -3,8 +3,8 @@
 ## fortress with a garrison (&"siege"), a storm of one (&"storm", the storm flag), a walk in on open or fallen land (&"walk_in"),
 ## a walk in on land a standing castle holds (&"held": it moves in but cannot take it), or none (&"none"). The word is Combat's
 ## odds (strength ratio over the ground factor; the garrison's weight behind a field army or alone, D50). Fog: the viewer's own
-## army exact; an enemy army the viewer sees is banded and its morale rounded to 5 %; a garrison the viewer sees is rounded to
-## 100 (exact for its owner and for the viewer ""); a hidden defender gives no number and no word (4.15). A refusal is the
+## army exact; an enemy army the viewer sees (in sight) exact too; a fortress the viewer has discovered gives its real garrison,
+## exact (R19); a hidden defender or an undiscovered fortress gives no number and no word (4.15). A refusal is the
 ## check's reason, in sentences. Pure core/views/ code: a function of the game and the viewer; no nodes, no engine calls, no luck.
 @warning_ignore_start("integer_division")
 class_name OddsView
@@ -22,8 +22,6 @@ const ACCESS_HIDDEN := &"hidden"
 const TONE_GOOD := &"good"
 const TONE_BAD := &"bad"
 const TONE_PLAIN := &"plain"
-const ROUND_MEN := 100
-const ROUND_MORALE := 50
 const PERCENT := 10
 const UNIT := 1000
 const MINUS := "−"
@@ -40,8 +38,8 @@ const WHOLE := -1
 ## (districts a fortress taken opens), held_by {hex, name, distance}. {} for a viewer "" or no countries. Cached in the view
 ## cache by [&"odds", version, viewer, army, hex, storm].
 ## `stand` is the hex the army strikes from (the penultimate hex of its route; the army's own hex when NO_HEX): the uphill and
-## the crossing chips read it. A hex the viewer does not see (Knowledge.sees, or not its own land nor held by it) gives the
-## same card as any unseen hex: kind none, no numbers, no words (4.15).
+## the crossing chips read it. A hex the viewer has not discovered (Knowledge.discovered; its own land and land it holds
+## count too) gives the same card as any undiscovered hex: kind none, no numbers, no words (4.15, R19).
 static func of(game: Game, viewer: StringName, army_id: int, hex: Vector2i, storm: bool = false,
 		stand: Vector2i = Army.NO_HEX) -> Dictionary:
 	if game == null or game.map == null or game.defs == null or game.defs.war == null or not game.has_countries() \
@@ -99,9 +97,8 @@ static func _kind_of(game: Game, viewer: StringName, hex: Vector2i, storm: bool)
 	return KIND_HELD if held["state"] == &"held" else KIND_WALK_IN
 
 
-## True when the viewer may take the fortress on hex to hold men (D49, the fog rule of M8 4.3): the holder and the viewer ""
-## read the exact garrison, a viewer who sees the hex reads it rounded to 100 (a garrison under 50 reads as none: the card must
-## not tell it from an empty fortress), and the garrison of a fortress it cannot see is the full one (assumed).
+## True when the viewer may take the fortress on hex to hold men (D49): the garrison it reads (Knowledge.garrison_known, R19) is
+## over zero. An undiscovered fortress reads as none, so the card never tells it from an empty one.
 static func _garrisoned(game: Game, viewer: StringName, hex: Vector2i) -> bool:
 	return int(Knowledge.garrison_known(game, viewer, hex)["men"]) > 0
 
@@ -149,7 +146,7 @@ static func _attack(game: Game, viewer: StringName, a: Army, hex: Vector2i, stan
 	var enemies := _enemies_at(game, viewer, hex)
 	var holder := Occupation.controller_tag(game, hex)
 	var assault := Battles.assault_at(game, hex, enemies[0].tag)
-	var garrison := _garrison_entry(game, viewer, hex, holder, WHOLE, assault, true)
+	var garrison := _garrison_entry(game, viewer, hex, WHOLE, assault, true)
 	var defence := _defence_of(game, viewer, enemies, garrison, assault, true)
 	out.defence = defence
 	out.factor_permille = Combat.odds_factor(war, key, assault)
@@ -162,8 +159,7 @@ static func _attack(game: Game, viewer: StringName, a: Army, hex: Vector2i, stan
 
 ## The storm of the fortress on hex: the army against its garrison alone (4.6, 4.7, D19).
 static func _storm(game: Game, viewer: StringName, a: Army, hex: Vector2i, key: String, out: Dictionary) -> void:
-	var holder := Occupation.controller_tag(game, hex)
-	var garrison := _garrison_entry(game, viewer, hex, holder, Occupation.storm_garrison(game, hex, viewer), true, false)
+	var garrison := _garrison_entry(game, viewer, hex, Occupation.storm_garrison(game, hex, viewer), true, false)
 	var defence := _defence_of(game, viewer, [], garrison, true, false)
 	out.defence = defence
 	out.factor_permille = Combat.odds_factor(game.defs.war, key, true)
@@ -237,7 +233,7 @@ static func _storm_word(game: Game, viewer: StringName, a: Army, hex: Vector2i) 
 	var holder := Occupation.controller_tag(game, hex)
 	if holder == viewer or holder == &"" or not Wars.at_war(game, viewer, holder):
 		return NO_WORD
-	var garrison := _garrison_entry(game, viewer, hex, holder, Occupation.storm_garrison(game, hex, viewer), true, false)
+	var garrison := _garrison_entry(game, viewer, hex, Occupation.storm_garrison(game, hex, viewer), true, false)
 	if str(garrison.get("access", ACCESS_HIDDEN)) == ACCESS_HIDDEN:
 		return NO_WORD
 	var key := String(Battles.ground_at(game, hex).get("key", OPEN_KEY))
@@ -287,7 +283,7 @@ static func _enemies_at(game: Game, viewer: StringName, hex: Vector2i) -> Array[
 
 
 ## The defending side as the viewer may read it: {access, men, morale, strength, garrison}. Enemy armies the viewer sees are
-## banded (men) and rounded (morale) and count as one company; a hidden army or garrison gives no number and no word. The
+## read exact (men, morale and their companies; access seen); a hidden army or garrison gives no number and no word. The
 ## garrison joins when the battle is an assault; with_field says whether a field army stands with it (Combat's weight).
 static func _defence_of(game: Game, viewer: StringName, enemies: Array[Army], garrison: Dictionary, assault: bool,
 		with_field: bool) -> Dictionary:
@@ -304,10 +300,6 @@ static func _defence_of(game: Game, viewer: StringName, enemies: Array[Army], ga
 		weighted += e.men() * Armies.morale_of(e)
 		companies.append_array(_companies(e))
 	var morale := Economy.floor_div(weighted, men) if men > 0 else 0
-	if access == ACCESS_SEEN:
-		men = Knowledge.band(men)
-		morale = _round(morale, ROUND_MORALE)
-		companies = [{"men": men, "morale": morale}] if men > 0 else []
 	var use_garrison := assault and not garrison.is_empty()
 	if use_garrison:
 		var g_access := str(garrison.access)
@@ -330,38 +322,25 @@ static func _defence_empty() -> Dictionary:
 		"garrison": {"men": 0, "weight_permille": 0, "cut": 0}}
 
 
-## The garrison of a hex in an assault as the viewer reads it: {access, men (exact, or rounded to 100 when seen), level,
-## weight_permille (Combat's weight: behind a field army or alone), cut (the storm's cut)}. `faced` is the storm's garrison
-## (WHOLE for the whole one). {} when there is no assault or no garrison; a hidden one has access hidden and no men.
-static func _garrison_entry(game: Game, viewer: StringName, hex: Vector2i, holder: StringName, faced: int, assault: bool,
+## The garrison of a hex in an assault as the viewer reads it (R19): {access (exact), men (the real garrison, or the part a
+## storm faces), level, weight_permille (Combat's weight: behind a field army or alone), cut (the storm's cut)}. `faced` is the
+## storm's garrison (WHOLE for the whole one). {} when there is no assault or the viewer reads no garrison there.
+static func _garrison_entry(game: Game, viewer: StringName, hex: Vector2i, faced: int, assault: bool,
 		with_field: bool) -> Dictionary:
 	var war := game.defs.war
 	if not assault or Occupation.fortress_level(game, hex) <= 0:
 		return {}
 	if not _garrisoned(game, viewer, hex):
 		return {}
-	var whole := Occupation.garrison_of(game, hex)
+	var whole := int(Knowledge.garrison_known(game, viewer, hex)["men"])
 	var level := Occupation.fortress_level(game, hex)
-	var access := _garrison_access(game, viewer, hex, holder)
-	if access == ACCESS_HIDDEN:
-		return {"access": ACCESS_HIDDEN, "men": 0, "level": level, "weight_permille": 0, "cut": 0}
 	var men := whole
 	var cut := 0
 	if faced >= 0 and faced < whole:
 		men = faced
 		cut = whole - faced
 	var weight := war.garrison_odds_permille if with_field else int(war.garrison_odds_alone[clampi(level, 0, 3)])
-	return {"access": access, "men": men if access == ACCESS_EXACT else _round(men, ROUND_MEN), "level": level,
-		"weight_permille": weight, "cut": cut}
-
-
-## Exact for the viewer "" and for the holder of the fortress; seen while the viewer sees the hex; else hidden.
-static func _garrison_access(game: Game, viewer: StringName, hex: Vector2i, holder: StringName) -> StringName:
-	if viewer == &"" or viewer == holder:
-		return ACCESS_EXACT
-	if Knowledge.sees(game, viewer, hex):
-		return ACCESS_SEEN
-	return ACCESS_HIDDEN
+	return {"access": ACCESS_EXACT, "men": men, "level": level, "weight_permille": weight, "cut": cut}
 
 
 ## The numbers Combat.odds_side reads from a garrison entry: men and level; {} for no garrison.
@@ -395,9 +374,10 @@ static func _tone_of(value: int) -> StringName:
 	return TONE_BAD if value < UNIT else TONE_PLAIN
 
 
-## True when the viewer may read a hex at all: it sees it (Knowledge.sees), or it is the viewer's own land or held by the viewer.
+## True when the viewer may read a hex at all: it has discovered it (Knowledge.discovered, R19: a discovered fortress is read
+## exact, in sight or not), or it is the viewer's own land or held by the viewer.
 static func _in_view(game: Game, viewer: StringName, hex: Vector2i) -> bool:
-	if Knowledge.sees(game, viewer, hex):
+	if Knowledge.discovered(game, viewer, hex):
 		return true
 	return Occupation.controller_tag(game, hex) == viewer or Territory.owner_tag(game, hex) == viewer
 
@@ -484,7 +464,3 @@ static func _seasons_text(n: int) -> String:
 static func _worse(a: String, b: String) -> String:
 	var rank := {ACCESS_EXACT: 2, ACCESS_SEEN: 1, ACCESS_HIDDEN: 0}
 	return a if int(rank.get(a, 0)) <= int(rank.get(b, 0)) else b
-
-
-static func _round(n: int, step: int) -> int:
-	return ((n + step / 2) / step) * step

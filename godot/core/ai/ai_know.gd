@@ -1,9 +1,12 @@
 ## THE DOOR (docs/architecture/m8-build-spec.md 4.3, 5.5): every read of the game and every act of the AI goes through a function
 ## of this class. The other core/ai files read only what these functions return, the definitions and plain values
-## (tests/core/test_ai_door.gd scans them for the game's own fields and the systems' names). The fog rule is here: a
-## country's own state is exact; the public facts (owners, wars, fortresses) are exact; another country's men, armies
-## and garrisons come only through Knowledge (banded, seen, estimated); nothing else is readable. The AI acts only through
-## act(), which asks the same check the player's door asks, never acts on a refusal and tells the turn.
+## (tests/core/test_ai_door.gd scans them for the game's own fields and the systems' names). The fog rule (fog build):
+## a country's own state is exact. Another country's men, armies and garrisons come only through Knowledge, which gives
+## them exact when the viewer sees or has discovered the place and hides them otherwise. The land facts of another
+## country (its districts and what it holds) are gated by discovery in AiWar and AiBrief, the functions that read them;
+## this door does not yet gate every public read by discovery, since R33's literal door gate is a later task. Nothing
+## else is readable. The AI acts only through act(), which asks the same check the player's door asks, never acts on a
+## refusal and tells the turn.
 ## Pure core/ai/ code: no engine calls; luck only through the game's own AI stream.
 class_name AiKnow
 extends RefCounted
@@ -454,14 +457,25 @@ static func seen_enemies(game: Game, tag: StringName) -> Array[Dictionary]:
 
 
 ## -1 means unknown: the hex is undiscovered by `tag`, so its garrison is not read. Callers must not read -1 as no garrison
-## (a `<= 0` test would take it for an empty fortress); FG12 (the AI door) decides how the AI treats it.
+## (a `<= 0` test would take it for an empty fortress): AiWar skips an undiscovered fortress before it asks (R33, R34).
 static func garrison_estimate(game: Game, tag: StringName, hex: Vector2i) -> int:
 	return int(Knowledge.garrison_known(game, tag, hex)["men"])
 
 
 ## Seasons until a siege of `hex` by `men` and `guns` would fall, against the garrison `tag` may take it to be (-1: never).
+## True when `tag` has discovered the hex (R1): the gate of every AI read of another country's land (R33). Own land is
+## always discovered.
+static func discovered(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	return Knowledge.discovered(game, tag, hex)
+
+
+## Seasons until a siege falls against what `tag` may read of the garrison; -1 (never) when the garrison is unknown (R34):
+## an undiscovered fortress is never forecast against a guess.
 static func forecast(game: Game, tag: StringName, hex: Vector2i, men: int, guns: int) -> int:
-	return Sieges.forecast_for(game, hex, garrison_estimate(game, tag, hex), men, guns, 0, 0)
+	var garrison := garrison_estimate(game, tag, hex)
+	if garrison < 0:
+		return -1
+	return Sieges.forecast_for(game, hex, garrison, men, guns, 0, 0)
 
 
 ## The odds card's numbers of the army against `hex`.

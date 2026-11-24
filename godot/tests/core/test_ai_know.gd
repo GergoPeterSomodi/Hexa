@@ -105,22 +105,37 @@ func test_garrison_estimate_is_exact_for_the_holder_and_full_for_a_stranger() ->
 	assert_eq(AiKnow.garrison_estimate(g, holder, Army.NO_HEX), 0, "no fortress, none")
 
 
-func test_forecast_uses_the_estimate_and_p_the_real_garrison_does_not_move_it() -> void:
-	var g := _game()
-	var hex := _fortress(g)
-	var holder := Occupation.controller_tag(g, hex)
-	var viewer := &""
-	for c: Country in g.countries:
-		if c.tag != holder and not Sight.sees(g, c.tag, hex):
-			viewer = c.tag
+# FG12 (R34): the forecast is the siege against the garrison the viewer may read; -1 (never) for a fortress it has not discovered,
+# whatever the fortress holds. It was counted full (the old rule) before FG12.
+func test_forecast_is_the_siege_against_the_reading_and_unknown_when_undiscovered() -> void:
+	# The full duel has every hex discovered, so this one runs on the thin duel: Milan has not discovered a fortress far away.
+	var g := FogFixture.duel_thin()
+	var hex := Army.NO_HEX
+	for i: int in g.map.hex_count():
+		var h := g.map.hex_of(i)
+		if Occupation.fortress_level(g, h) > 0 and not Knowledge.discovered(g, AiFixture.MILAN, h):
+			hex = h
 			break
-	assert_ne(viewer, &"")
-	var estimate := AiKnow.garrison_estimate(g, viewer, hex)
-	assert_eq(AiKnow.forecast(g, viewer, hex, 2000, 2), Sieges.forecast_for(g, hex, estimate, 2000, 2, 0, 0))
-	var before := AiKnow.forecast(g, viewer, hex, 2000, 2)
+	assert_ne(hex, Army.NO_HEX, "a fortress Milan has not discovered")
 	Occupation.set_garrison(g, hex, 1)
 	g.version += 1
-	assert_eq(AiKnow.forecast(g, viewer, hex, 2000, 2), before, "an unseen fortress is counted full whatever it holds")
+	assert_eq(AiKnow.garrison_estimate(g, AiFixture.MILAN, hex), -1, "unknown")
+	assert_eq(AiKnow.forecast(g, AiFixture.MILAN, hex, 2000, 2), -1, "no forecast against a guess, whatever the fortress holds")
+	var holder := Occupation.controller_tag(g, hex)
+	assert_eq(AiKnow.forecast(g, holder, hex, 2000, 2), Sieges.forecast_for(g, hex, 1, 2000, 2, 0, 0),
+		"the holder reads its own garrison exactly")
+
+
+## The door's gate (R33): on the thin duel Milan's own land is discovered and a far hex of another country is not.
+func test_the_gate_opens_on_discovered_hexes_only_on_the_thin_duel() -> void:
+	var g := FogFixture.duel_thin()
+	var own := AiKnow.land_of(g, AiFixture.MILAN)[0]
+	assert_true(AiKnow.discovered(g, AiFixture.MILAN, g.map.hex_of(own)), "own land is discovered")
+	var far := 0
+	for i: int in g.map.hex_count():
+		if g.map.is_land(g.map.hex_of(i)) and not AiKnow.discovered(g, AiFixture.MILAN, g.map.hex_of(i)):
+			far += 1
+	assert_gt(far, 0, "the thin duel leaves undiscovered land")
 
 
 func test_act_checks_first_and_never_acts_on_a_refusal() -> void:

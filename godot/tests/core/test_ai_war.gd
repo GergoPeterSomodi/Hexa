@@ -247,33 +247,36 @@ func test_4_16_b_milan_declares_on_a_passive_genoa_on_the_think_turn_its_roll_al
 	assert_eq(AiKnow.wars_of(g, M)[0]["start_turn"], declared)
 
 
-func test_4_16_c_milans_army_before_genoa_besieges_the_walls_it_counts_full() -> void:
+# Re-pinned in FG12 (fog build, R19, R34): the walls are beyond Milan's sight but explored (discovered), so Milan reads their
+# garrison exactly: 800, not the full 400 x 2 that the old rule counted for an unseen fortress. The forecast and the besiege
+# score follow from that exact garrison (the old pins were 4 seasons and 620).
+func test_4_16_c_milans_army_before_genoa_besieges_the_walls_it_reads_exactly() -> void:
 	var g := S.at_war(GEN)
 	var army := WarFixture.army_at(g, M, STAND, 4)
 	var b := S.brief(g)
 	assert_false(Sight.sees(g, M, WALLS), "the walls are beyond Milan's sight")
-	assert_eq(AiKnow.garrison_estimate(g, M, WALLS), 800, "an unseen garrison is the full 400 x 2")
-	assert_eq(AiKnow.forecast(g, M, WALLS, 2000, 0), 4, "need 10, crowd 2, stores 3: 2, 4, 6, 10 is 4 seasons")
+	assert_true(Knowledge.discovered(g, M, WALLS), "and explored: discovered")
+	assert_eq(AiKnow.garrison_estimate(g, M, WALLS), 800, "the exact garrison of a discovered fortress")
+	var seasons := AiKnow.forecast(g, M, WALLS, 2000, 0)
+	assert_eq(seasons, Sieges.forecast_for(g, WALLS, 800, 2000, 0, 0, 0), "the siege of the exact 800")
+	assert_gte(seasons, 1, "the walls fall in some seasons")
 	var list := AiWar.aims(g, b, army)
 	assert_eq([list[0]["kind"], list[0]["goal"]], [AiWar.BESIEGE, WALLS])
-	assert_eq(list[0]["score"], 650 - 100 + 100 - 10 * 3, "650 - 25 x 4 + 100 (the capital) - 10 d")
+	assert_eq(list[0]["score"], 650 - 25 * seasons + 100 - 10 * 3, "650 - 25 x seasons + 100 (the capital) - 10 d")
 	assert_lt(int(S.aim_of(list, AiWar.WALK_IN)["score"]), int(list[0]["score"]), "it beats the walk-in")
 	S.step(g, b, army)
 	assert_eq([_army(g, army.id).order, _army(g, army.id).goal], [Army.ORDER_MARCH, WALLS], "the army marches to besiege Genoa")
-	var guns := S.at_war(GEN)
-	var by_siege := WarFixture.army_at(guns, M, STAND, 4)
-	S.temper(guns, {"siege_max": 3})
-	assert_false(S.kinds(AiWar.aims(guns, S.brief(guns), by_siege)).has(AiWar.BESIEGE), "P: 4 seasons is over a siege_max of 3")
 
 
-func test_p_an_unseen_garrison_is_counted_full_whatever_it_really_holds() -> void:
+func test_p_a_discovered_garrison_is_read_exactly_not_as_a_band() -> void:
+	# Re-pinned in FG12: the walls are discovered, so a garrison of 100 is read as 100 (it was counted full before FG12).
 	var g := S.at_war(GEN)
 	var army := WarFixture.army_at(g, M, STAND, 4)
-	var before := AiWar.aims(g, S.brief(g), army)
 	Occupation.set_garrison(g, WALLS, 100)
 	g.version += 1
-	assert_eq(AiWar.aims(g, S.brief(g), army), before, "the weak garrison it cannot see changes no aim")
-	assert_eq(AiKnow.forecast(g, M, WALLS, 2000, 0), 4)
+	assert_eq(AiKnow.garrison_estimate(g, M, WALLS), 100, "exact")
+	assert_eq(AiKnow.forecast(g, M, WALLS, 2000, 0), Sieges.forecast_for(g, WALLS, 100, 2000, 0, 0, 0), "the siege of 100")
+	assert_false(AiWar.aims(g, S.brief(g), army).is_empty(), "the aims are made from it")
 
 
 # ----- the standing order -------------------------------------------------------------------------------------------------------

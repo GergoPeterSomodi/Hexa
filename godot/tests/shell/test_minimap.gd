@@ -201,3 +201,18 @@ func test_overlay_material_follows_the_mode() -> void:
 	var mat_after := layer.material as ShaderMaterial
 	assert_eq(int(mat_after.get_shader_parameter(&"mode")), int(MapModes.Mode.OWNER), "mode switch reaches the minimap")
 	assert_false(bool((_overlay.material as ShaderMaterial).get_shader_parameter(&"from_uv")), "the map's own material is unchanged")
+
+
+func test_minimap_overlay_samples_the_deep_fog_texture() -> void:
+	await _bind()
+	var layer := _minimap.get_node("Overlay") as Control
+	var mat := layer.material as ShaderMaterial
+	assert_not_null(mat, "the minimap overlay has its material once bound")
+	assert_same(mat.get_shader_parameter(&"discovered"), _overlay.discovered_texture(), "the minimap samples the deep-fog texture")
+	var fog := PackedByteArray()
+	fog.resize(48)  # the 8 x 6 fixture
+	fog.fill(1)
+	fog[0] = 0
+	_overlay.update_discovered(fog)
+	assert_eq(_overlay.discovered_image().get_pixel(0, 0).r8, 0, "the fogged hex is fog in the texture the minimap samples")
+	assert_eq(_overlay.discovered_image().get_pixel(1, 0).r8, 1, "a discovered hex stays discovered")

@@ -112,17 +112,63 @@ func test_my_orders_are_only_mine() -> void:
 
 
 func test_a_stranger_doing_is_not_in_what_befell() -> void:
+	Season.run(_g)
+	FogFixture.thin(_g, &"GEN", 0)  # Genoa knows its neighbours only
 	var stranger := &""
 	for c: Country in _g.countries:
 		if c.tag != &"GEN" and not Knowledge.knows(_g, &"GEN", c.tag):
 			stranger = c.tag
 			break
-	assert_ne(stranger, &"", "the scenario has a country Genoa does not know")
+	assert_ne(stranger, &"", "the thin Genoa does not know some country")
 	_g.emit({"kind": "tax_set", "tag": stranger, "level": 0, "from": 1})
 	_g.turn = 3
 	_g.version += 1
 	var befell := _texts(SeasonSummary.of(_g, &"GEN", 2), &"befell")
 	assert_true(_starts_with(befell, LogLines.short_name(_g, stranger)).is_empty(), "P: an unknown country's doing is absent")
+
+
+## A work of `tag` at `hex`, in the producer's payload shape (a finished or cancelled work).
+func _work_at(tag: StringName, hex: Vector2i) -> Work:
+	var w := Work.new()
+	w.id = _next_id
+	_next_id += 1
+	w.tag = tag
+	w.hex = hex
+	w.action = Works.BUILD
+	w.family = ImproveRules.VINEYARD
+	w.level_to = 1
+	w.started_turn = _g.turn
+	w.seasons = 4
+	w.seasons_left = 0
+	return w
+
+
+## R31: a land event is told to every country that has discovered its hex, whoever did it; the same event on a hex Genoa
+## has not discovered is not told. The thin fixture (radius 1) makes both; the cancel is counted in the same line.
+func test_a_land_event_is_told_by_discovery_not_by_the_actor() -> void:
+	Season.run(_g)
+	FogFixture.thin(_g, &"GEN", 1)
+	var stranger := &""
+	for c: Country in _g.countries:
+		if c.tag != &"GEN" and not Knowledge.knows(_g, &"GEN", c.tag):
+			stranger = c.tag
+			break
+	assert_ne(stranger, &"", "the thin Genoa does not know some country")
+	var near := GENOA
+	var far := Vector2i(2, 3)
+	assert_true(Knowledge.discovered(_g, &"GEN", near), "Genoa's capital is discovered")
+	assert_false(Knowledge.discovered(_g, &"GEN", far), "the far hex is undiscovered")
+	_g.emit({"kind": "work_finished", "tag": stranger, "hex": far, "work": _work_at(stranger, far).to_dict()})
+	_g.emit({"kind": "work_finished", "tag": stranger, "hex": near, "work": _work_at(stranger, near).to_dict()})
+	_g.emit({"kind": "work_cancelled", "tag": stranger, "hex": near, "why": "", "work": _work_at(stranger, near).to_dict()})
+	_g.turn = 3
+	_g.version += 1
+	var who := LogLines.short_name(_g, stranger)
+	var told := _starts_with(_texts(SeasonSummary.of(_g, &"GEN", 2), &"befell"), who)
+	assert_eq(told.size(), 1, "one line for the stranger, discovered land only: %s" % str(told))
+	assert_true(told[0].contains("finished 1 work") and told[0].contains("cancelled 1 work"), told[0])
+	var all := _starts_with(_texts(SeasonSummary.of(_g, &"", 2), &"befell"), who)
+	assert_true(all[0].contains("finished 2 works"), "the viewer of everything is told of both: %s" % all[0])
 
 
 func test_the_watched_lede_names_the_scenario() -> void:

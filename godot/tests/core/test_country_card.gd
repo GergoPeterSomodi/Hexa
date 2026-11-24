@@ -115,20 +115,24 @@ func test_france_outside_power_with_reason_and_region_focus() -> void:
 	assert_eq(int(fra["districts"]), 34)
 
 
-func test_treasury_yours_known_and_unknown() -> void:
+func test_treasury_is_exact_yours_with_the_season_and_a_known_foreign_one_alone() -> void:
 	var game := EconomyFixture.game(&"GEN")
 	var gen := CountryCard.of(game, &"GEN")["treasury"] as Dictionary
-	assert_eq(gen, {"shown": true, "value": 610, "banded": false, "change": 0, "expected": 86, "expected_realm": 93, "tax": "Normal"})
+	assert_eq(gen, {"shown": true, "value": 610, "own": true, "change": 0, "expected": 86, "expected_realm": 93, "tax": "Normal"})
 	var mlo := CountryCard.of(game, &"MLO")["treasury"] as Dictionary
 	assert_true(bool(mlo["shown"]))
-	assert_true(bool(mlo["banded"]))
+	assert_false(bool(mlo["own"]), "another country's card carries no change and no tax")
+	assert_eq(int(mlo["value"]), Countries.by_tag(game, &"MLO").treasury, "D7: a known country's treasury is exact")
 	assert_null(mlo["expected"], "another country's expected season is never shown")
 	assert_null(mlo["expected_realm"])
-	assert_eq(int(mlo["value"]), Knowledge.band(Countries.by_tag(game, &"MLO").treasury))
-	assert_eq(Knowledge.band_text(int(mlo["value"]), ""), "about 1,900")
 	assert_eq(mlo["tax"], "", "a foreign country shows no tax")
+
+
+func test_treasury_of_an_unknown_country_is_not_shown() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	FogFixture.thin(game, &"GEN", 0)
 	var fra := CountryCard.of(game, &"FRA")["treasury"] as Dictionary
-	assert_false(bool(fra["shown"]), "France is unknown to Genoa: no treasury")
+	assert_false(bool(fra["shown"]), "France is unknown to Genoa on a thin start: no treasury")
 	assert_eq(int(fra["value"]), 0)
 
 
@@ -141,18 +145,17 @@ func test_own_treasury_change_after_a_season() -> void:
 	assert_eq(gen["tax"], "Normal")
 
 
-func test_people_yours_known_and_unknown() -> void:
+func test_people_yours_exact_and_a_known_foreign_one_exact_too() -> void:
 	var game := PeopleFixture.genoa()
 	var gen := CountryCard.of(game, &"GEN")["people"] as Dictionary
-	assert_eq(gen, {"shown": true, "value": 82700, "banded": false, "change": 0})
+	assert_eq(gen, {"shown": true, "value": 82700, "change": 0})
 	var mlo := CountryCard.of(game, &"MLO")["people"] as Dictionary
 	assert_true(bool(mlo["shown"]))
-	assert_true(bool(mlo["banded"]))
-	assert_eq(int(mlo["value"]), Knowledge.band(int(PeopleView.totals(game, &"MLO")["people"])))
+	assert_eq(int(mlo["value"]), int(PeopleView.totals(game, &"MLO")["people"]), "D7: exact; north Italy: all of its land is seen")
 	assert_eq(int(mlo["change"]), 0, "a foreign change is not told")
 	var fra := CountryCard.of(game, &"FRA")["people"] as Dictionary
-	assert_false(bool(fra["shown"]), "France is unknown to Genoa: no people")
-	assert_eq(int(fra["value"]), 0)
+	assert_true(bool(fra["shown"]), "north Italy: every country is known to Genoa")
+	assert_eq(int(fra["value"]), int(PeopleView.totals(game, &"FRA")["people"]))
 	Season.run(game)
 	var after := CountryCard.of(game, &"GEN")["people"] as Dictionary
 	assert_eq(int(after["value"]), 83285)
@@ -160,7 +163,47 @@ func test_people_yours_known_and_unknown() -> void:
 	game.player = &""
 	var all := CountryCard.of(game, &"FRA")["people"] as Dictionary
 	assert_true(bool(all["shown"]))
-	assert_false(bool(all["banded"]), "the viewer empty sees everything exact")
+	assert_eq(int(all["value"]), int(PeopleView.totals(game, &"FRA")["people"]), "the viewer empty sees everything exact")
+
+
+## D9, D10: a foreign country's people and districts are over the hexes the viewer has discovered; P: an undiscovered hex counted.
+func test_a_foreign_country_counts_only_the_hexes_you_discovered() -> void:
+	var game := PeopleFixture.genoa()
+	FogFixture.thin(game, &"GEN", 0)
+	var viewer := game.player
+	var mlo := Countries.by_tag(game, &"MLO")
+	var seen := 0
+	var people := 0
+	for i: int in Territory.districts(game, mlo.id):
+		if Knowledge.discovered(game, viewer, game.map.hex_of(i)):
+			seen += 1
+			people += int(game.state.people[i])
+	var card := CountryCard.of(game, &"MLO")
+	assert_false(bool(card["full"]), "a foreign country is not whole")
+	assert_lt(seen, Territory.districts(game, mlo.id).size(), "a thin start does not see all of Milan")
+	assert_eq(int(card["districts"]), seen, "P: the districts counted are the discovered ones")
+	assert_eq(int(card["people"]["value"]), people, "P: the people counted are the discovered hexes'")
+	assert_eq(Knowledge.land_seen(game, viewer, &"MLO"), {"districts": seen, "people": people})
+	var land := 0
+	for row: Variant in card["land"] as Array:
+		land += int((row as Dictionary)["count"])
+	assert_eq(land, seen, "the land covers add up to the land seen")
+
+
+func test_the_full_card_is_your_own_or_the_sandbox() -> void:
+	assert_true(bool(CountryCard.of(_game, &"MLO")["full"]), "no player: the sandbox sees every country whole")
+	assert_true(bool(_game.act("choose_country", {"tag": &"GEN"})["ok"]))
+	assert_true(bool(CountryCard.of(_game, &"GEN")["full"]))
+	assert_false(bool(CountryCard.of(_game, &"MLO")["full"]), "a foreign country shows the land you have seen")
+
+
+func test_under_arms_is_exact_for_a_known_country_and_its_count_is_yours_alone() -> void:
+	var game := EconomyFixture.game(&"GEN")
+	Season.run(game)
+	var mlo := CountryCard.of(game, &"MLO")["army"] as Dictionary
+	assert_true(bool(mlo["shown"]))
+	assert_eq(int(mlo["value"]), Knowledge.men_of(game, &"GEN", &"MLO"), "D7: the men of the last closed season, exact")
+	assert_false(bool(CountryCard.of(game, &"MLO")["full"]))
 
 
 # --- the war section (M7 B15, 4.2, 4.9, 6.7): a fresh war game per test (WarFixture), the planted states written first ---

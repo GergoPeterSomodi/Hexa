@@ -1,4 +1,4 @@
-## Standing's army clause (docs/architecture/m6-build-spec.md 4.14; L12): the "in men under arms" clause and the "about N men" of each
+## Standing's army clause (docs/architecture/m6-build-spec.md 4.14; L12): the "in men under arms" clause and the "N men" of each
 ## country are told only when a country in view has men under arms; a world with no armies reads as before M6 (P: no "1st in men
 ## under arms (0)"). Rankings itself keeps its fourth measure (test_study_rankings and test_rankings_armies).
 extends GutTest
@@ -23,7 +23,7 @@ func test_no_army_in_view_no_army_clause() -> void:
 	assert_eq(lines[0].find("men under arms"), -1, lines[0])
 	assert_true(lines[0].find(" in people (") >= 0 and lines[0].ends_with(")."), lines[0])
 	for k: int in range(1, lines.size()):
-		assert_false(lines[k].ends_with(" men."), "no 'about N men' without armies: %s" % lines[k])
+		assert_false(lines[k].ends_with(" men."), "no 'N men' without armies: %s" % lines[k])
 
 
 func test_an_army_of_the_player_adds_the_clause_and_the_men() -> void:

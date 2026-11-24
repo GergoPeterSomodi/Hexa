@@ -4,17 +4,22 @@
 ##   check(game, before, extra) -> PackedStringArray   one line a broken invariant, "name: what", empty when all hold; `extra` may
 ##                                              carry {"contract": PackedStringArray (the judge's problems), "errors": int (the
 ##                                              logger's count)}
-## The names: turn, money, goods, people, men, districts, armies, battles, garrisons, morale, wars, chronicle, stats, contract, errors.
+## The names: turn, money, goods, people, men, districts, armies, battles, garrisons, morale, wars, chronicle, stats, explored,
+## controlled, contract, errors. `explored` (spec R4, the explored set only grows) and `controlled` (every land hex a country
+## controls is explored by it) are the fog invariants of FG14; `Invariants.planted = "fog"` (tests only) breaks `explored`.
 class_name Invariants
 extends RefCounted
 
 const NAMES: Array[String] = ["turn", "money", "goods", "people", "men", "districts", "armies", "battles", "garrisons", "morale",
-	"wars", "chronicle", "stats", "contract", "errors"]
+	"wars", "chronicle", "stats", "explored", "controlled", "contract", "errors"]
 ## A war lives at most this many seasons (WarDef.war_timer_seasons, 40): the timer ends it in the war phase.
 const WAR_MAX := 40
 const MORALE_MAX := Unit.MAX_MORALE
 ## Country ids run 1 to 254; slot 0 is the unowned.
 const SLOTS := 256
+## Tests and tools only: the soak's planted fault (`soak --plant=fog` sets it per game). "fog" clears one explored hex that
+## the country's sight does not reach, once, in the check of the first season that has one; check() then names it.
+static var planted := ""
 
 
 ## The numbers the season's checks compare with: the turn, the land count, every country's people, men under arms and garrison men,
@@ -24,17 +29,24 @@ static func before(game: Game) -> Dictionary:
 	var flows := {}
 	for c: Country in game.countries:
 		flows[c.tag] = c.people_flows.duplicate()
+	var explored := {}
+	for c: Country in game.countries:
+		explored[c.tag] = c.explored.duplicate()
 	return {"turn": game.turn, "land": _land(game), "census": census, "open": flows, "owner": game.state.owner.duplicate(),
-		"events": game.events.size(), "stats": game.stats.count if game.stats != null else 0}
+		"events": game.events.size(), "stats": game.stats.count if game.stats != null else 0, "explored": explored}
 
 
 ## Every broken invariant after a season, named first. `before` is Invariants.before taken ahead of it.
 static func check(game: Game, before_state: Dictionary, extra: Dictionary = {}) -> PackedStringArray:
 	var out := PackedStringArray()
+	if planted == "fog":
+		_plant_fog(game)
 	_turn(game, before_state, out)
 	_money(game, before_state, out)
 	_goods(game, out)
 	_hexes(game, before_state, out)
+	_explored_grows(game, before_state, out)
+	_controlled(game, out)
 	_men(game, before_state, out)
 	_armies(game, out)
 	if not game.battles.is_empty():
@@ -275,6 +287,77 @@ static func _losses(game: Game, ended: int, from_event: int) -> Dictionary:
 					back += int(returned[uid])
 			out[sides[side]] = int(out.get(sides[side], 0)) + int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back
 	return out
+
+
+# --- the discovery: the explored set only grows, every controlled hex is explored ---------------------------------------
+
+
+## R4 (spec 3.1, a soak invariant): a country's explored set after a season is a superset of its set before it.
+static func _explored_grows(game: Game, before_state: Dictionary, out: PackedStringArray) -> void:
+	var was: Dictionary = before_state["explored"]
+	for c: Country in game.countries:
+		if not was.has(c.tag):
+			continue
+		var old: PackedByteArray = was[c.tag]
+		if old.is_empty():
+			continue
+		if c.explored.size() != old.size():
+			out.append("explored: %s has %d bytes of explored, was %d" % [c.tag, c.explored.size(), old.size()])
+			continue
+		var lost := _lost_bits(old, c.explored)
+		if not lost.is_empty():
+			out.append("explored: %s lost %d explored hex(es), first %s" % [c.tag, lost.size(), str(game.map.hex_of(lost[0]))])
+
+
+## The hex indices set in `old` and clear in `now`.
+static func _lost_bits(old: PackedByteArray, now: PackedByteArray) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for k: int in old.size():
+		var gone: int = old[k] & ~now[k]
+		for b: int in 8:
+			if ((gone >> b) & 1) == 1:
+				out.append(k * 8 + b)
+	return out
+
+
+## Spec 7 (a soak invariant): every land hex is explored by its controller, the occupier where one stands, else the owner.
+static func _controlled(game: Game, out: PackedStringArray) -> void:
+	var by_id := {}
+	for c: Country in game.countries:
+		by_id[c.id] = c
+	var state := game.state
+	var missed := PackedInt32Array()
+	var holder := ""
+	for i: int in game.map.hex_count():
+		if game.map.land[i] != 1:
+			continue
+		var ctl := int(state.owner[i])
+		if i < state.occupier.size() and state.occupier[i] != 0:
+			ctl = int(state.occupier[i])
+		if ctl == 0 or not by_id.has(ctl):
+			continue
+		var held: Country = by_id[ctl]
+		if not SightCache.bit_is(held.explored, i):
+			if missed.is_empty():
+				holder = str(held.tag)
+			missed.append(i)
+	if not missed.is_empty():
+		out.append("controlled: %d controlled hex(es) not explored by their controller, first %s held by %s" % [missed.size(),
+			str(game.map.hex_of(missed[0])), holder])
+
+
+## Tests only (`soak --plant=fog`): clears one explored hex that the country's sight does not reach, before the check reads
+## the game, so `explored` must name it. Clears `planted` after it fires; a game with no such hex is left as it is.
+static func _plant_fog(game: Game) -> void:
+	var n := game.map.hex_count()
+	for c: Country in game.countries:
+		if c.explored.size() != (n + 7) >> 3:
+			continue
+		for i: int in n:
+			if SightCache.bit_is(c.explored, i) and not Sight.sees(game, c.tag, game.map.hex_of(i)):
+				c.explored[i >> 3] = c.explored[i >> 3] & ~(1 << (i & 7))
+				planted = ""
+				return
 
 
 # --- wars, chronicle, stats -----------------------------------------------------------------------------------------------

@@ -44,18 +44,18 @@ func test_lost_last_season_is_a_line_when_men_were_lost() -> void:
 		assert_ne(str(line[0]), "Lost last season")
 
 
-func test_country_card_army_is_exact_for_the_player_and_banded_for_a_known_country() -> void:
+func test_country_card_army_is_exact_for_the_player_and_for_a_known_country() -> void:
 	var hex := ArmyFixture.find_town(_g)
 	var a := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 2)
 	var own: Dictionary = CountryCard.of(_g, ArmyFixture.TAG).army
 	assert_true(bool(own.shown))
-	assert_false(bool(own.banded))
+	assert_false(bool(own.get("banded", false)))
 	assert_eq(int(own.value), a.men())
 	var other := ArmyFixture.other_tag(_g)
 	var card: Dictionary = CountryCard.of(_g, other).army
 	if Knowledge.knows(_g, ArmyFixture.TAG, other):
-		assert_true(bool(card.banded), "a known country's men are banded")
-		assert_eq(int(card.value), Knowledge.band(Armies.men_of_country(_g, other)))
+		assert_false(bool(card.get("banded", false)), "D7: a known country's men are exact")
+		assert_eq(int(card.value), Knowledge.men_of(_g, ArmyFixture.TAG, other), "R24: the last closed season's men")
 	else:
 		assert_false(bool(card.shown), "an unknown country shows no army row")
 

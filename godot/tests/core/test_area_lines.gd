@@ -323,18 +323,29 @@ func test_hex_card_garrison_is_exact_to_the_owner_and_hidden_otherwise() -> void
 	# Planted fault: the card reads the garrison the state holds.
 	_g.state.garrison[_g.map.index_of(PAVIA)] = 123
 	assert_true(str(_row(HexCard.of(_g, PAVIA)["lines"], "Fortress")[2]).ends_with("garrison 123 of 800"))
-	# A viewer that does not see the hex sees "a garrison".
+	# A viewer that does not see the hex but has discovered it reads the garrison exact (R19: hidden only when undiscovered).
 	_g.player = _me
 	var fortress_hex := Vector2i(-1, -1)
 	var fortresses := _g.war_cache.fortresses(_g)
 	for i: int in fortresses:
 		var hex := _g.map.hex_of(i)
-		if not Knowledge.sees(_g, _me, hex):
+		if not Knowledge.sees(_g, _me, hex) and Knowledge.discovered(_g, _me, hex):
 			fortress_hex = hex
 			break
-	assert_true(fortress_hex != Vector2i(-1, -1), "a fortress the viewer does not see")
-	var hidden := _row(HexCard.of(_g, fortress_hex)["lines"], "Fortress")
-	assert_true(str(hidden[2]).ends_with("a garrison"), str(hidden[2]))
+	assert_true(fortress_hex != Vector2i(-1, -1), "a fortress the viewer has discovered but does not see")
+	var seen := _row(HexCard.of(_g, fortress_hex)["lines"], "Fortress")
+	var exact := "garrison %d of %d" % [Occupation.garrison_of(_g, fortress_hex), Occupation.garrison_full(_g, fortress_hex)]
+	assert_true(str(seen[2]).ends_with(exact), str(seen[2]))
+	# An undiscovered fortress gives no card at all: a thin start (FogFixture) leaves the far fortresses dark.
+	FogFixture.thin(_g, _me, 0)
+	var dark := Vector2i(-1, -1)
+	for i: int in fortresses:
+		var hex := _g.map.hex_of(i)
+		if not Knowledge.discovered(_g, _me, hex):
+			dark = hex
+			break
+	assert_true(dark != Vector2i(-1, -1), "a fortress the viewer has not discovered")
+	assert_eq(_row(HexCard.of(_g, dark)["lines"], "Fortress"), [], "no fortress row on an undiscovered hex")
 
 
 func test_hex_card_siege_row_is_exact_to_the_besieger_and_the_defender() -> void:
@@ -344,11 +355,20 @@ func test_hex_card_siege_row_is_exact_to_the_besieger_and_the_defender() -> void
 	s.progress = 6
 	s.name = "Pavia"
 	_g.sieges.append(s)
+	# A siege shows only between countries at war (Knowledge.siege_access): the holder of the castle and the besieger fight.
+	WarFixture.at_war(_g, _me, Occupation.controller_tag(_g, PAVIA))
 	_g.player = _me
 	var row := _row(HexCard.of(_g, PAVIA)["lines"], "Siege")
 	assert_eq(str(row[2]), "Pavia is besieged by Genoa: 6 of %d" % Occupation.siege_need(_g, PAVIA))
-	# A stranger that sees nothing of the hex sees no siege row.
+	# A stranger that has discovered the hex but does not see it reads the land level: "Besieged", no besieger (R21).
+	# A stranger that has not discovered it sees no siege row at all.
 	var stranger := WarFixture.stranger_of(_g, _me)
 	_g.player = stranger
-	if not Knowledge.sees(_g, stranger, PAVIA):
-		assert_eq(_row(HexCard.of(_g, PAVIA)["lines"], "Siege"), [])
+	var srow := _row(HexCard.of(_g, PAVIA)["lines"], "Siege")
+	if Knowledge.sees(_g, stranger, PAVIA):
+		assert_true(str(srow[2]).contains("besieged by"), str(srow))
+	elif Knowledge.discovered(_g, stranger, PAVIA):
+		assert_true(str(srow[2]).contains("Besieged"), str(srow))
+		assert_false(str(srow[2]).contains("besieged by"), "no besieger's name on land: %s" % str(srow))
+	else:
+		assert_eq(srow, [])

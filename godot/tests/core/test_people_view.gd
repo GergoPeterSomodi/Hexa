@@ -1,5 +1,5 @@
-## PeopleView (docs/architecture/m5-build-spec.md 5.6, 6.3, 4.19): `at` for yours, a known country's (banded), an unknown
-## one's (not shown), unowned land and the sea; every row of `outlook` with its words; `seasons_to_full`; `ribbons`.
+## PeopleView (docs/architecture/m5-build-spec.md 5.6, 6.3, 4.19; fog build R18): `at` for yours, a discovered foreign hex's
+## (exact, light fog too), an undiscovered hex's (not shown), unowned land and the sea; every row of `outlook` with its words; `seasons_to_full`; `ribbons`.
 extends GutTest
 
 @warning_ignore_start("integer_division")
@@ -41,25 +41,38 @@ func test_at_yours_before_and_after_a_season() -> void:
 	assert_eq(int(at["change"]), 300)
 
 
-func test_at_known_is_banded_unknown_is_not_shown() -> void:
+## The fog build (R18, D7): a foreign hex the viewer has discovered gives its people exact (light fog too, no band); an
+## undiscovered one gives nothing (P: no figure leaks).
+func test_at_foreign_hex_is_exact_when_discovered_and_hidden_when_not() -> void:
 	var g := PeopleFixture.genoa()
-	var milan := _land_of(g, &"MLO")
-	var known := PeopleView.at(g, &"GEN", milan)
-	assert_true(bool(known["shown"]))
-	assert_false(bool(known["exact"]))
-	var n := int(g.state.people[_i(g, milan)])
-	assert_eq(known["text"], Knowledge.band_text(n, ""))
-	assert_eq(int(known["people"]), Knowledge.band(n))
-	assert_eq(int(known["room"]), 0, "a foreign room is not told")
-	var france := _land_of(g, &"FRA")
-	var unknown := PeopleView.at(g, &"GEN", france)
-	assert_false(bool(unknown["shown"]), "France is unknown to Genoa")
-	assert_eq(unknown["text"], "")
-	assert_eq(int(unknown["people"]), 0, "no figure leaks")
-	var all := PeopleView.at(g, &"", france)
+	FogFixture.thin(g, &"GEN", 1)
+	var gen := Countries.by_tag(g, &"GEN")
+	var light := Vector2i(-1, -1)
+	var dark := Vector2i(-1, -1)
+	for i: int in g.map.hex_count():
+		var owner_id := int(g.state.owner[i])
+		if g.map.land[i] == 0 or owner_id == 0 or owner_id == gen.id or int(g.state.people[i]) == 0:
+			continue
+		var hex := g.map.hex_of(i)
+		if not Knowledge.discovered(g, &"GEN", hex):
+			if dark == Vector2i(-1, -1):
+				dark = hex
+		elif not Knowledge.sees(g, &"GEN", hex) and light == Vector2i(-1, -1):
+			light = hex
+	assert_ne(light, Vector2i(-1, -1), "a light-fog foreign hex with people on the thin fixture")
+	assert_ne(dark, Vector2i(-1, -1), "an undiscovered foreign hex with people on the thin fixture")
+	var lit := PeopleView.at(g, &"GEN", light)
+	assert_true(bool(lit["shown"]))
+	assert_true(bool(lit["exact"]), "light fog: exact")
+	assert_eq(lit["text"], Words.number(int(g.state.people[_i(g, light)])))
+	assert_eq(int(lit["room"]), 0, "a foreign room is not told")
+	var hidden := PeopleView.at(g, &"GEN", dark)
+	assert_false(bool(hidden["shown"]), "an undiscovered hex is not shown")
+	assert_eq(hidden["text"], "")
+	assert_eq(int(hidden["people"]), 0, "no figure leaks")
+	var all := PeopleView.at(g, &"", dark)
 	assert_true(bool(all["shown"]))
-	assert_true(bool(all["exact"]))
-	assert_eq(all["text"], Words.number(int(g.state.people[_i(g, france)])))
+	assert_eq(all["text"], Words.number(int(g.state.people[_i(g, dark)])))
 
 
 func test_at_sea_off_map_and_unowned() -> void:

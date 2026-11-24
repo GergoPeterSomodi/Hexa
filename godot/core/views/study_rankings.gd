@@ -1,9 +1,10 @@
-## The Rankings page's read model (docs/architecture/m4-5-build-spec.md 4.6, 4.9, 5.6, D9 to D11): where the viewer stands among
-## the countries it knows in land and in income, each a ranked list and a line through time. Both measures are of the last
-## season ended and come from Stats, the same numbers as the report's Standing (SeasonSummary): the viewer's own values are
-## exact, the others' are Knowledge.band'ed, and a country the viewer does not know is only counted. Ranks come from the
-## exact values (a tie shares the better rank, as Standing's; the rows of a tie are in country id order). The viewer `&""`
-## (the sandbox) sees every country exact. Pure core/views/ code: it reads the game and writes only game.view_cache.
+## The Rankings page's read model (docs/architecture/m4-5-build-spec.md 4.6, 4.9, 5.6, D7, D9 to D11): where the viewer stands
+## among the countries it knows in each measure, each a ranked list and a line through time. The measures are of the last season
+## ended and come from Stats, the same numbers as the report's Standing (SeasonSummary), except a foreign country's land and
+## people, which count the hexes the viewer has discovered (Knowledge.land_seen, D9). Every value is exact (D7); a country the
+## viewer does not know is only counted. Ranks come from the exact values (a tie shares the better rank, as Standing's; the rows
+## of a tie are in country id order). The viewer `&""` (the sandbox) sees every country. Pure core/views/ code: it reads the
+## game and writes only game.view_cache.
 class_name StudyRankings
 extends RefCounted
 
@@ -60,8 +61,8 @@ static func ordinal(n: int) -> String:
 ## {has_data (a season has ended and the viewer is a country or `&""`), turn (the last season ended), known (the countries
 ## in the lists, the viewer among them), unknown (countries the viewer does not know), head,
 ## measures: [{id, title, rank, total, you_text ("You are 3rd of 3."), rows: [{id (country id), tag, name, short, rank,
-## value (exact for the viewer, banded for others), text ("14", "about 58"), mine, bar (permille of the largest shown)}],
-## line: {caption, labels, you, best (the largest known other's banded value; empty with no other), marks: [{index, turn,
+## value, text ("14", "58"), mine, bar (permille of the largest shown)}],
+## line: {caption, labels, you, best (the largest known other's value; empty with no other), marks: [{index, turn,
 ## text ("rose to 2nd"), tone}]}}]}. Cached in game.view_cache by [&"rankings", version, viewer, span].
 static func of(game: Game, viewer: StringName, span: int) -> Dictionary:
 	if game == null or game.view_cache == null:
@@ -111,27 +112,20 @@ static func _head(known: int, unknown: int, sees_all: bool) -> String:
 	var text := "The %d countries you know, you among them." % known if known > 1 else "You know no other country yet."
 	if unknown > 0:
 		text += " %s unknown." % Words.plural(unknown, "country", "countries")
-	if known > 1:
-		text += " Their numbers are rounded."
 	return text
 
 
 static func _measure(game: Game, viewer: StringName, def: Dictionary, tags: Array[StringName], turn: int, span: int) -> Dictionary:
 	var id: StringName = def["id"]
-	var stats := game.stats
-	var sees_all := viewer == &""
 	var rows: Array[Dictionary] = []
 	for tag: StringName in tags:
 		var c := Countries.by_tag(game, tag)
-		var exact := value_of(stats, id, tag, turn)
+		var exact := _read(game, viewer, id, tag, turn)
 		var mine := tag == viewer
-		var shown := exact if (mine or sees_all) else Knowledge.band(exact)
-		var text := Words.signed(shown) if id == &"income" else Words.number(shown)
-		if not mine and not sees_all:
-			text = "about " + text
+		var text := Words.signed(exact) if id == &"income" else Words.number(exact)
 		var short := LogLines.short_name(game, tag)
 		rows.append({"id": c.id, "tag": tag, "name": short + " (you)" if mine else short, "short": short, "rank": 1,
-			"value": shown, "text": text, "mine": mine, "bar": 0, "exact": exact})
+			"value": exact, "text": text, "mine": mine, "bar": 0, "exact": exact})
 	_rank(rows)
 	var largest := 0
 	for r: Dictionary in rows:
@@ -147,6 +141,16 @@ static func _measure(game: Game, viewer: StringName, def: Dictionary, tags: Arra
 		"line": _line(game, viewer, id, tags, turn, span)}
 
 
+## One measure of `tag` as `viewer` reads it in season `turn` (exact, D7). A foreign country's land and people are the hexes the
+## viewer has discovered (Knowledge.land_seen, D9): the live count, since a season's Stats are not split by discovery. The viewer's
+## own values and the viewer "" read the Stats of the season.
+static func _read(game: Game, viewer: StringName, id: StringName, tag: StringName, turn: int) -> int:
+	if viewer != &"" and tag != viewer and (id == &"land" or id == &"people"):
+		var seen := Knowledge.land_seen(game, viewer, tag)
+		return int(seen["districts"]) if id == &"land" else int(seen["people"])
+	return value_of(game.stats, id, tag, turn)
+
+
 ## Orders `rows` by exact value, largest first, ties by country id; each row's rank is one more than the rows with a
 ## larger exact value (a tie shares the better rank: the report's Standing counts the same way).
 static func _rank(rows: Array[Dictionary]) -> void:
@@ -160,7 +164,7 @@ static func _rank(rows: Array[Dictionary]) -> void:
 		r["rank"] = rank
 
 
-## The viewer's value a season over the last `span` seasons, the largest known other's banded value, and a mark where
+## The viewer's value a season over the last `span` seasons, the largest known other's value, and a mark where
 ## the viewer's rank changed from the season before ("known" is known now, D11).
 static func _line(game: Game, viewer: StringName, id: StringName, tags: Array[StringName], turn: int, span: int) -> Dictionary:
 	var stats := game.stats
@@ -180,13 +184,13 @@ static func _line(game: Game, viewer: StringName, id: StringName, tags: Array[St
 		var mine := value_of(stats, id, viewer, t)
 		you.append(mine)
 		if not others.is_empty():
-			var top := value_of(stats, id, others[0], t)
+			var top := _read(game, viewer, id, others[0], t)
 			var rank := 1
 			for o: StringName in others:
-				var v := value_of(stats, id, o, t)
+				var v := _read(game, viewer, id, o, t)
 				top = maxi(top, v)
 				rank += 1 if v > mine else 0
-			best.append(Knowledge.band(top))
+			best.append(top)
 			if before > 0 and rank != before and viewer != &"":
 				marks.append({"index": t - first, "turn": t, "text": "%s %s" % [_UP if rank < before else _DOWN, ordinal(rank)],
 					"tone": "good" if rank < before else "bad"})

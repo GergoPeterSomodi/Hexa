@@ -309,9 +309,11 @@ func _question_4(vp: SubViewport, app: App) -> int:
 	await _wait_frames(3)
 	assert_eq(study.current_page_id(), &"rankings", "] ] ] is Rankings")
 	var words := _words(study.current_page())
-	assert_true(words.contains("You are 3rd of 3."), words)
-	assert_true(words.contains("about 58") and words.contains("about 52"), words)
-	assert_true(words.contains("10 countries unknown"), words)
+	# North Italy starts fully discovered (fog build, spec 7): every country is known, its numbers exact, no unknown count.
+	assert_true(words.contains("You are 8th of 13."), words)
+	assert_true(words.contains("You are 5th of 13."), words)
+	assert_true(words.contains("Savoy, Value 58") and words.contains("Milan, Value 52"), words)
+	assert_false(words.contains("unknown"), words)
 	return _inputs
 
 

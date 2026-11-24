@@ -239,12 +239,10 @@ func test_disband_refused_by_its_check_shows_the_reason() -> void:
 	assert_string_contains(_button("disband").reason_text(), "disband only in your own land")
 
 
-func test_a_seen_foreign_army_is_banded_with_no_buttons() -> void:
+## R23: a seen foreign army shows, whether or not its country is known; no action buttons.
+func test_a_seen_foreign_army_is_shown_with_no_buttons() -> void:
 	var hex := ArmyFixture.find_town(_g)
 	var a := ArmyFixture.army(_g, SAV, hex, 0, 2)
-	if not Knowledge.knows(_g, ArmyFixture.TAG, SAV):
-		pending("Genoa knows nothing of Savoy in this fixture")
-		return
 	_panel.show_army(a.id)
 	assert_true(_panel.visible, "a seen foreign army shows")
 	assert_eq(_panel.cartouche().text, "Savoy", "the country's name")
@@ -282,7 +280,7 @@ func test_refresh_follows_the_bus() -> void:
 	assert_true(_button("halt").disabled, "an army_changed event refreshes the verdicts")
 
 
-## CountryPanel's Under arms row: yours exact with the count, a known country banded, an unknown one no row.
+## CountryPanel's Under arms row: yours exact with the count, a known country exact too (D7), an unknown one no row.
 func test_country_panel_under_arms_row() -> void:
 	var country := (load(COUNTRY) as PackedScene).instantiate() as CountryPanel
 	country.theme = KitTheme.load_for(1.0)
@@ -301,7 +299,7 @@ func test_country_panel_under_arms_row() -> void:
 	var sav_rows := country.ledger_texts()
 	var sav_at := sav_rows.find("Under arms")
 	if Knowledge.knows(_g, ArmyFixture.TAG, SAV):
-		assert_true(sav_rows[sav_at + 1].begins_with("about "), "a known country's men banded")
+		assert_true(sav_rows[sav_at + 1].begins_with(Words.men(Knowledge.men_of(_g, ArmyFixture.TAG, SAV))), "D7: a known country's men exact")
 	else:
 		assert_eq(sav_at, -1, "an unknown country has no row")
 

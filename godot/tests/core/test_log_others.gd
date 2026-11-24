@@ -132,3 +132,25 @@ func test_a_far_raise_by_a_country_at_war_notifies() -> void:
 	WarFixture.at_war(_g, enemy, &"GEN")
 	assert_true(bool(LogLines.line_of(_g, _raise(enemy, far), &"GEN")["notify"]), "a country at war with the viewer notifies from anywhere")
 
+
+
+## A capture between two others (owners_changed, a land event: fog build R10, R29, R30) is told to Genoa by the hexes Genoa has
+## discovered, and names only those: a hex it has not discovered is never named (a planted fault would name both).
+func test_a_capture_between_others_names_only_the_hexes_the_viewer_discovered() -> void:
+	FogFixture.thin(_g, &"GEN", 0)  # Genoa keeps its land sight: Savona is its, the far hex is not discovered
+	var far := _far_from_genoa()
+	assert_ne(far, Vector2i(-1, -1), "a land hex far from Genoa")
+	assert_true(Knowledge.discovered(_g, &"GEN", SAVONA), "precondition: Genoa discovered Savona")
+	assert_false(Knowledge.discovered(_g, &"GEN", far), "precondition: Genoa has not discovered the far hex")
+	_g.emit({"kind": "owners_changed", "tag": &"SAV", "others": [&"MLO"], "hexes": [SAVONA, far]})
+	var entry := _g.chronicle.entries[_g.chronicle.entries.size() - 1]
+	var line := LogLines.line_of(_g, entry, &"GEN")
+	assert_false(line.is_empty(), "Genoa is told of a capture on a hex it discovered")
+	assert_true(str(line["text"]).contains(Words.place(_g, SAVONA)), str(line["text"]))
+	assert_false(str(line["text"]).contains(Words.place(_g, far)), "P: an undiscovered hex is not named: %s" % str(line["text"]))
+	assert_false(LogLines.filters_of(_g, entry, &"GEN").is_empty(), "the filters agree with the line")
+	# Planted fault: a capture on the far hex alone reaches no line of Genoa's, though Genoa knows the actor's neighbours.
+	_g.emit({"kind": "owners_changed", "tag": &"SAV", "others": [&"MLO"], "hexes": [far]})
+	var alone := _g.chronicle.entries[_g.chronicle.entries.size() - 1]
+	assert_true(LogLines.line_of(_g, alone, &"GEN").is_empty(), "P: no discovered hex, no line")
+	assert_true(LogLines.filters_of(_g, alone, &"GEN").is_empty(), "and no filter")

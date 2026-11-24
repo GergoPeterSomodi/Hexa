@@ -191,6 +191,8 @@ static func owner_of(game: Game, hex: Vector2i) -> String:
 static func of(game: Game, hex: Vector2i) -> Dictionary:
 	if game == null or game.map == null or not game.map.has(hex):
 		return {}
+	if _undiscovered(game, hex):
+		return _unexplored(hex)
 	var map := game.map
 	var i := map.index_of(hex)
 	var is_land := map.land[i] == 1
@@ -283,21 +285,26 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 	}
 
 
-## The war rows of a land hex (M7, 6.8, 4.15): "Held by" on occupied land (public), "Fortress" on a fortress (its garrison
-## exact to its owner, rounded to a hundred while the viewer sees the hex, else "a garrison"), "Siege" (exact to its besieger
-## and defender, and to a viewer who sees the hex; nothing else), and "Castle area" while a war of the viewer is on. The
-## viewer "" sees everything.
+## The war rows of a land hex (M7, 6.8, 4.15; R19, R21): none on an undiscovered hex (D18). "Held by" on occupied land, "Fortress"
+## on a fortress (its garrison exact on any discovered fortress, R19), "Siege" by Knowledge.siege_access: exact or seen names the
+## besieger and its men; land (discovered, not in sight) reads "Besieged" with the progress and the need, no besieger; and
+## "Castle area" while a war of the viewer is on. The viewer "" sees everything.
 static func war_rows(game: Game, hex: Vector2i) -> Array:
 	var rows: Array = []
 	var viewer := game.player
+	if _undiscovered(game, hex):
+		return rows
 	if Occupation.is_occupied(game, hex):
 		rows.append(["Held by", &"warn", "the " + Occupation.occupier_long_name(game, hex) + _since_text(game, hex)])
 	var level := Occupation.fortress_level(game, hex)
 	if level > 0:
-		rows.append(["Fortress", &"plain", _fortress_text(game, viewer, hex, level)])
+		rows.append(["Fortress", &"plain", _fortress_text(game, hex, level)])
 	var siege := Occupation.siege_at(game, hex)
-	if siege != null and _sees_siege(game, viewer, hex, siege):
+	var access := Knowledge.siege_access(game, viewer, hex) if siege != null else &"hidden"
+	if access == &"exact" or access == &"seen":
 		rows.append(["Siege", &"warn", "%s is besieged by %s: %d of %d" % [_siege_place(siege), _short_name(game, siege.besieger), siege.progress, Occupation.siege_need(game, hex)]])
+	elif access == &"land":
+		rows.append(["Siege", &"warn", "%s: Besieged, %d of %d" % [_siege_place(siege), siege.progress, Occupation.siege_need(game, hex)]])
 	if viewer != &"" and not Wars.enemies(game, viewer).is_empty():
 		var area := _area_text(game, hex)
 		if area != "":
@@ -305,18 +312,12 @@ static func war_rows(game: Game, hex: Vector2i) -> Array:
 	return rows
 
 
-## "Walled town · garrison 800 of 800" (the level's word, then the garrison); others see it rounded or as "a garrison".
-static func _fortress_text(game: Game, viewer: StringName, hex: Vector2i, level: int) -> String:
+## "Walled town · garrison 800 of 800" (the level's word, then the garrison): exact on any discovered fortress (R19, D6).
+static func _fortress_text(game: Game, hex: Vector2i, level: int) -> String:
 	var family := str(Improve.piece_at(game, hex).get("family", ""))
 	var label := level_label(family, level)
 	var head := label if label != "" else "level %d" % level
-	var full := Occupation.garrison_full(game, hex)
-	var men := Occupation.garrison_of(game, hex)
-	if viewer == &"" or Territory.owner_tag(game, hex) == viewer:
-		return "%s · garrison %d of %d" % [head, men, full]
-	if Knowledge.sees(game, viewer, hex):
-		return "%s · garrison about %d of %d" % [head, roundi(float(men) / 100.0) * 100, full]
-	return "%s · a garrison" % head
+	return "%s · garrison %d of %d" % [head, Occupation.garrison_of(game, hex), Occupation.garrison_full(game, hex)]
 
 
 ## " since Summer 1480": the season of the newest capture of this hex by its present occupier (the chronicle's district_captured);
@@ -330,9 +331,17 @@ static func _since_text(game: Game, hex: Vector2i) -> String:
 	return ""
 
 
-static func _sees_siege(game: Game, viewer: StringName, hex: Vector2i, siege: Siege) -> bool:
-	return viewer == &"" or siege.besieger == viewer or Occupation.controller_tag(game, hex) == viewer \
-		or Knowledge.sees(game, viewer, hex)
+## True when the player has not discovered `hex` (R1, D18): the card then says "Unexplored" and nothing else. A game with no
+## countries has no fog; the viewer "" sees all (Knowledge.discovered).
+static func _undiscovered(game: Game, hex: Vector2i) -> bool:
+	return game.has_countries() and not Knowledge.discovered(game, game.player, hex)
+
+
+## The card of an undiscovered hex (D18): the title "Unexplored" and no other fact (no ground, place, owner or people).
+static func _unexplored(hex: Vector2i) -> Dictionary:
+	return {"hex": hex, "title": "Unexplored", "subtitle": "", "is_land": false, "cover": "", "height_m": 0,
+		"relief": "", "climate": "", "place": "", "pass_name": "", "owner": "", "rivers": "none", "roads": "none",
+		"crossings": "none", "piece": {}, "gives": "", "weather": "", "lines": []}
 
 
 static func _siege_place(siege: Siege) -> String:
@@ -403,7 +412,7 @@ static func food_text_of(game: Game, hex: Vector2i) -> String:
 ## The hover card's Work line: "vineyard, first stage: 1 of 4 seasons, ready Spring 1481" (": stopped for the winter,
 ## ready Autumn 1481" when halted this season); "" when no work stands on `hex`.
 static func work_text(game: Game, hex: Vector2i) -> String:
-	var work := WorksView.at(game, hex)
+	var work := WorksView.at(game, hex, game.player)
 	if work.is_empty():
 		return ""
 	var middle := "stopped for the winter" if bool(work["halted"]) else str(work["progress"])

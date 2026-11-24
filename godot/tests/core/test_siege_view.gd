@@ -135,7 +135,7 @@ func test_unseen_foreign_siege_never_appears() -> void:
 	assert_false(SiegeView.at(_g, besieger, found).is_empty(), "the besieger sees it")
 
 
-func test_witness_of_the_hex_sees_banded_men_and_no_forecast() -> void:
+func test_witness_of_the_hex_sees_exact_men_and_no_forecast() -> void:
 	var found := ArmyFixture.NO_HEX
 	var besieger := &""
 	var holder_tag := &""
@@ -166,12 +166,52 @@ func test_witness_of_the_hex_sees_banded_men_and_no_forecast() -> void:
 	assert_eq(int(v.falls_in), -1, "P: no forecast for a witness")
 	assert_eq((v.relief as Array).size(), 0)
 	assert_false(_has_key(v, "army"), "P: no army ids for a witness")
-	assert_true(str(v.garrison_text).begins_with("garrison about"), "the garrison banded: %s" % v.garrison_text)
-	assert_true(str(v.men_text).begins_with("about"), "the besieger's men banded")
+	assert_eq(str(v.garrison_text), "garrison %s of %s" % [Words.number(Occupation.garrison_of(_g, found)),
+		Words.number(Occupation.garrison_full(_g, found))], "the garrison exact (R19)")
+	assert_eq(int(v.men), int(Sieges.terms(_g, found, besieger)["men"]), "the besieger's men exact (R21)")
 	if not Knowledge.knows(_g, ArmyFixture.TAG, besieger):
 		assert_eq(str(v.besieger_name), "a country", "P: a besieger the witness does not know is a country")
 	assert_ne(str(SiegeView.at(_g, besieger, found).besieger_name), "a country", "the besieger reads its own name")
 	assert_eq(int(v.progress), 3, "the meter is exact")
+
+
+## FG9 (R21): a hex the viewer has discovered but does not see is a light-fog siege: the holder, the meter, the garrison and
+## "Besieged", and no besieger (no tag, no name) and no men.
+func test_light_fog_siege_names_no_besieger() -> void:
+	FogFixture.thin(_g, ArmyFixture.TAG, 3)
+	var found := ArmyFixture.NO_HEX
+	var besieger := &""
+	var holder_tag := &""
+	for i: int in _g.map.hex_count():
+		var hex := _g.map.hex_of(i)
+		var holder := Occupation.controller_tag(_g, hex)
+		if Occupation.fortress_level(_g, hex) == 0 or holder == &"" or holder == ArmyFixture.TAG:
+			continue
+		var e := WarFixture.neighbour_of(_g, holder)
+		if e == &"" or e == ArmyFixture.TAG:
+			continue
+		if Knowledge.discovered(_g, ArmyFixture.TAG, hex) and not Knowledge.sees(_g, ArmyFixture.TAG, hex):
+			found = hex
+			besieger = e
+			holder_tag = holder
+			break
+	assert_ne(found, ArmyFixture.NO_HEX, "a foreign fortress Genoa has discovered but does not see")
+	WarFixture.at_war(_g, besieger, holder_tag)
+	_siege(found, besieger, 3, 1)
+	var v := SiegeView.at(_g, ArmyFixture.TAG, found)
+	assert_eq(v.access, &"land")
+	assert_eq(str(v.besieger), "", "P: a light-fog siege names no besieger")
+	assert_eq(str(v.besieger_name), "", "P: and no besieger name")
+	assert_eq(str(v.men_text), "", "P: and no men")
+	assert_eq(int(v.men), 0)
+	assert_eq(int(v.rate), -1)
+	assert_eq(int(v.falls_in), -1)
+	var tags := [String(besieger)]
+	var hits: Array = []
+	_tag_hits(v, tags, hits)
+	assert_eq(hits, [], "P: no tag of the besieger anywhere in the light-fog view")
+	assert_true(str(v.garrison_text).begins_with("garrison "), "the garrison is shown")
+	assert_eq(int(v.progress), 3, "the meter is shown")
 
 
 func test_dials_and_tones_for_each_side() -> void:

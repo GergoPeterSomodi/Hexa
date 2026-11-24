@@ -1,6 +1,7 @@
 ## The odds card (docs/architecture/m7-build-spec.md 6.4; M7 B26): the hover card of a war target of the selected army, in place of the
 ## move card. Its words are OddsView's and MovePreview's, laid out as they are (the card text equals card_of of them). Fog: a hex the
-## player does not see gives no odds card (the move card's words, with no numbers). A shaken army's refusal gives its two sentences in
+## player has not discovered gives no odds card (the move card's words, with no numbers); an enemy army out of sight is never
+## numbered. A shaken army's refusal gives its two sentences in
 ## BAD. The card takes no mouse and no focus. Planted faults: an odds card that shows an unseen enemy's numbers; a card that steals
 ## the focus; a card that wraps past its width.
 extends GutTest
@@ -47,12 +48,12 @@ func _contact() -> Dictionary:
 	return {}
 
 
-## The first hex of an enemy at war with Genoa that Genoa does not see and holds no army on; NO_HEX when none.
+## The first hex of an enemy at war with Genoa that Genoa has not discovered and holds no army on; NO_HEX when none.
 func _unseen_enemy_hex(enemy: StringName) -> Vector2i:
 	var eid := ArmyFixture.id_of(_game, enemy)
 	for i: int in _game.map.hex_count():
 		var hex := _game.map.hex_of(i)
-		if _game.map.is_land(hex) and int(_game.state.owner[i]) == eid and not Knowledge.sees(_game, ArmyFixture.TAG, hex) \
+		if _game.map.is_land(hex) and int(_game.state.owner[i]) == eid and not Knowledge.discovered(_game, ArmyFixture.TAG, hex) \
 				and Armies.at(_game, hex).is_empty():
 			return hex
 	return ArmyFixture.NO_HEX
@@ -119,6 +120,7 @@ func test_the_odds_word_is_in_its_tone() -> void:
 
 func test_unseen_enemy_hex_shows_no_odds_card() -> void:
 	var set_up := _fight_set_up()
+	FogFixture.thin(_game, ArmyFixture.TAG, 0)
 	var hex := _unseen_enemy_hex(set_up.c.enemy)
 	if hex == ArmyFixture.NO_HEX:
 		pending("no unseen enemy hex on this map")

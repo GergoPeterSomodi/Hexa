@@ -1,5 +1,5 @@
 ## ArmyView (docs/architecture/m6-build-spec.md sections 4.12, 5.6 and 9, L11): tokens per (hex, country) the viewer sees,
-## exact and banded texts, the panel's order texts, needing_orders and the hex card's Armies text. North Italy: Genoa (GEN)
+## exact texts, the panel's order texts, needing_orders and the hex card's Armies text. North Italy: Genoa (GEN)
 ## is the player; Savoy (SAV) is the foreign country. Planted faults: an unseen foreign army is absent from the tokens.
 extends GutTest
 
@@ -58,15 +58,14 @@ func _token_at(tokens: Array[Dictionary], hex: Vector2i, tag: StringName) -> Dic
 	return {}
 
 
-func test_token_text_exact_and_banded() -> void:
-	assert_eq(ArmyView.token_text(450, true), "450")
-	assert_eq(ArmyView.token_text(999, true), "999")
-	assert_eq(ArmyView.token_text(1000, true), "1.0k")
-	assert_eq(ArmyView.token_text(1234, true), "1.2k")
-	assert_eq(ArmyView.token_text(1450, true), "1.5k")
-	assert_eq(ArmyView.token_text(450, false), "~450")
-	assert_eq(ArmyView.token_text(1000, false), "~1k")
-	assert_eq(ArmyView.token_text(1234, false), "~1.2k", "banded to two figures first")
+## D7: the badge text is exact for every token; no banded "~" form is left.
+func test_token_text_is_exact() -> void:
+	assert_eq(ArmyView.token_text(450), "450")
+	assert_eq(ArmyView.token_text(999), "999")
+	assert_eq(ArmyView.token_text(1000), "1.0k")
+	assert_eq(ArmyView.token_text(1234), "1.2k")
+	assert_eq(ArmyView.token_text(1249), "1.2k")
+	assert_eq(ArmyView.token_text(1450), "1.5k")
 
 
 func test_own_army_is_an_exact_token_with_its_figure() -> void:
@@ -76,9 +75,9 @@ func test_own_army_is_an_exact_token_with_its_figure() -> void:
 	var tokens := ArmyView.tokens(_g, ArmyFixture.TAG)
 	var t := _token_at(tokens, hex, ArmyFixture.TAG)
 	assert_false(t.is_empty(), "the player's army has a token")
-	assert_true(t.mine and t.exact)
+	assert_true(bool(t.mine))
 	assert_eq(int(t.men), a.men())
-	assert_eq(t.text, ArmyView.token_text(a.men(), true))
+	assert_eq(t.text, ArmyView.token_text(a.men()))
 	assert_true((t.armies as PackedInt32Array).has(a.id))
 	assert_eq(t.figure, Military.unit_def(_g, 0).figure)
 	assert_false(bool(t.mustering), "raised a turn ago: not mustering")
@@ -92,16 +91,13 @@ func test_unseen_foreign_army_is_absent() -> void:
 		"P: an unseen foreign army is absent from the tokens")
 
 
-func test_seen_foreign_army_is_banded_with_no_ids() -> void:
+func test_seen_foreign_army_has_exact_men_and_no_ids() -> void:
 	var hex := _gen_hex()
 	var a := ArmyFixture.army(_g, SAV, hex, 0, 2)
 	var t := _token_at(ArmyView.tokens(_g, ArmyFixture.TAG), hex, SAV)
-	if not Knowledge.knows(_g, ArmyFixture.TAG, SAV):
-		assert_true(t.is_empty(), "an unknown country's army row is absent")
-		return
-	assert_false(t.is_empty())
-	assert_false(bool(t.exact))
-	assert_eq(int(t.men), Knowledge.band(a.men()), "men banded, never the exact count")
+	assert_false(t.is_empty(), "a foreign army in sight has a token")
+	assert_eq(int(t.men), a.men(), "D7: men exact, never banded")
+	assert_eq(t.text, ArmyView.token_text(a.men()))
 	assert_true((t.armies as PackedInt32Array).is_empty(), "no army ids for another country")
 	assert_false(bool(t.marching or t.mustering or t.waiting or t.hungry), "no order is shown")
 
@@ -111,7 +107,6 @@ func test_viewer_empty_sees_every_army_exact() -> void:
 	var a := ArmyFixture.army(_g, SAV, hex, 0, 2)
 	var t := _token_at(ArmyView.tokens(_g, &""), hex, SAV)
 	assert_false(t.is_empty())
-	assert_true(bool(t.exact))
 	assert_eq(int(t.men), a.men())
 
 
@@ -149,7 +144,7 @@ func test_needing_orders_lists_none_first_then_id_order() -> void:
 	assert_eq(ArmyView.needing_orders(_g, ArmyFixture.TAG), PackedInt32Array([idle.id, walker.id]))
 
 
-func test_hex_text_names_own_and_banded_foreign_armies() -> void:
+func test_hex_text_names_own_and_seen_foreign_armies() -> void:
 	var hex := _gen_hex()
 	var mine := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 2)
 	var text := ArmyView.hex_text(_g, ArmyFixture.TAG, hex)
@@ -170,8 +165,25 @@ func test_foreign_armies_of_one_country_are_one_summed_figure() -> void:
 	var a2 := ArmyFixture.army(_g, StringName(known), hex, 0, 2)
 	var text := ArmyView.hex_text(_g, ArmyFixture.TAG, hex)
 	assert_eq(text.count(":"), 1, "P: one figure for the country, not one per army: %s" % text)
-	assert_true(text.ends_with(Knowledge.band_text(a1.men() + a2.men(), "men")),
-		"the summed men banded once: %s" % text)
+	assert_true(text.ends_with(Words.men(a1.men() + a2.men())),
+		"the summed men, exact once: %s" % text)
+
+
+## R23 (P): an army on a hex the country has discovered but does not see is not shown: discovery is not sight.
+func test_discovered_but_unseen_foreign_army_is_absent() -> void:
+	FogFixture.thin(_g, ArmyFixture.TAG, 3)
+	var hex := ArmyFixture.NO_HEX
+	for i: int in _g.map.hex_count():
+		var h := _g.map.hex_of(i)
+		if _g.map.land[i] == 1 and Knowledge.discovered(_g, ArmyFixture.TAG, h) and not Knowledge.sees(_g, ArmyFixture.TAG, h):
+			hex = h
+			break
+	assert_ne(hex, ArmyFixture.NO_HEX, "a land hex Genoa has discovered but does not see")
+	var a := ArmyFixture.army(_g, SAV, hex, 0, 2)
+	assert_false(ArmyView.visible(_g, ArmyFixture.TAG, a), "P: an army out of sight is not visible")
+	assert_true(_token_at(ArmyView.tokens(_g, ArmyFixture.TAG), hex, SAV).is_empty(), "P: no token out of sight")
+	assert_true(ArmyView.panel(_g, ArmyFixture.TAG, a.id).is_empty(), "P: no panel out of sight")
+	assert_eq(ArmyView.hex_text(_g, ArmyFixture.TAG, hex), "", "P: no Armies line out of sight")
 
 
 ## A land hex next to `hex` that Genoa holds, or NO_HEX.

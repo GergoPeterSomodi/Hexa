@@ -373,7 +373,7 @@ func _refresh_home(home: Dictionary) -> void:
 ## winter" while halted), and Cancel the work for the player's own work only; another country's work has no button.
 func _refresh_work(game: Game) -> void:
 	PanelKit.clear_children(_work_actions, _retired)
-	var at := WorksView.at(game, _hex)
+	var at := WorksView.at(game, _hex, game.player)
 	_work_box.visible = not at.is_empty()
 	if at.is_empty():
 		return

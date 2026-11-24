@@ -444,3 +444,99 @@ func test_food_bytes_planted_milan_hex_is_zero() -> void:
 	assert_eq(MapModes.food_bytes(game, &"").count(0), game.map.hex_count())
 	var genoa := MapModes.colour_at(game, MapModes.Mode.FOOD, Vector2i(8, 13), pal, true, 0)
 	assert_eq(Color(genoa.r, genoa.g, genoa.b), MapModes.FOOD_COLOURS[5], "Genoa is byte 6")
+
+
+# ----- Deep fog (fog spec R36, D17; FG13): the thin fixture, every mode ---------------------------------------------------------
+
+func _thin_game() -> Game:
+	var g := ArmyFixture.game()
+	FogFixture.thin(g, ArmyFixture.TAG, 1)
+	return g
+
+
+## The first land hex the viewer (Genoa) has not discovered: owned (1), unowned (0), or either (-1). NO_HEX when none.
+func _undiscovered_land(g: Game, owned: int) -> Vector2i:
+	for i: int in g.map.hex_count():
+		var hex := g.map.hex_of(i)
+		if g.map.is_land(hex) and (owned < 0 or (g.state.owner[i] != 0) == (owned == 1)) and not Knowledge.discovered(g, ArmyFixture.TAG, hex):
+			return hex
+	return Army.NO_HEX
+
+
+func test_discovered_bytes_are_knowledge_discovered_at_every_hex() -> void:
+	var g := _thin_game()
+	var bytes := MapModes.discovered_bytes(g, ArmyFixture.TAG)
+	assert_eq(bytes.size(), g.map.hex_count(), "one byte a hex")
+	var mismatches := 0
+	var deep := 0
+	for i: int in g.map.hex_count():
+		var known := Knowledge.discovered(g, ArmyFixture.TAG, g.map.hex_of(i))
+		if (int(bytes[i]) == 1) != known:
+			mismatches += 1
+		if not known:
+			deep += 1
+	assert_eq(mismatches, 0, "the byte is 1 exactly where Knowledge.discovered is true")
+	assert_gt(deep, 0, "the thin fixture has deep fog")
+	assert_lt(deep, g.map.hex_count(), "and discovered hexes")
+
+
+func test_discovered_bytes_are_all_one_for_nobody_and_a_map_only_game() -> void:
+	var g := _thin_game()
+	assert_eq(MapModes.discovered_bytes(g, &"").count(1), g.map.hex_count(), "the viewer nobody discovers every hex")
+	var sandbox := Game.new_game(_make_map(4, 3), 1480)
+	assert_eq(MapModes.discovered_bytes(sandbox, &"").count(1), 12, "a map-only game shows everything")
+
+
+func test_discovered_bytes_follow_a_walk_into_the_fog() -> void:
+	var g := _thin_game()
+	var hex := _undiscovered_land(g, -1)
+	assert_ne(hex, Army.NO_HEX, "an undiscovered land hex exists")
+	var idx := g.map.index_of(hex)
+	assert_eq(int(MapModes.discovered_bytes(g, ArmyFixture.TAG)[idx]), 0, "deep fog before the walk")
+	var path: Array[Vector2i] = [hex]
+	Sight.see_path(g, ArmyFixture.TAG, path, 0)
+	assert_eq(int(MapModes.discovered_bytes(g, ArmyFixture.TAG)[idx]), 1,
+		"P: the walk explored it and the cached bytes moved on (the key holds the explored revision)")
+
+
+func test_deep_fog_paints_an_owned_undiscovered_hex_in_every_mode() -> void:
+	var g := _thin_game()
+	var pal := MapModes.palette(g, false)
+	var hex := _undiscovered_land(g, 1)
+	assert_ne(hex, Army.NO_HEX, "an owned undiscovered land hex exists")
+	var modes: Array[int] = [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF,
+		MapModes.Mode.YIELDS, MapModes.Mode.FOOD, MapModes.Mode.SUPPLY]
+	for mode: int in modes:
+		assert_eq(MapModes.colour_at(g, mode, hex, pal, true, 0, true), MapModes.DEEP_FOG_COLOUR,
+			"mode %d: the deep fog, no owner colour or mode value under it" % mode)
+	var owner_id := int(g.state.owner[g.map.index_of(hex)])
+	var owner_only := MapModes.colour_of(MapModes.Mode.OWNER, owner_id, 5, pal, true, 0, 0, 0, 0, 1, false, 0, 0, 1)
+	assert_ne(owner_only, MapModes.DEEP_FOG_COLOUR, "P: the same hex discovered is its owner colour, so the gate is the cause")
+
+
+func test_deep_fog_covers_undiscovered_sea_too() -> void:
+	var g := _thin_game()
+	var sea := Army.NO_HEX
+	for i: int in g.map.hex_count():
+		if g.map.land[i] == 0 and not Knowledge.discovered(g, ArmyFixture.TAG, g.map.hex_of(i)):
+			sea = g.map.hex_of(i)
+			break
+	assert_ne(sea, Army.NO_HEX, "an undiscovered sea hex exists on the thin fixture")
+	var pal := MapModes.palette(g, false)
+	assert_eq(MapModes.colour_at(g, MapModes.Mode.TERRAIN, sea, pal, true, 0, true), MapModes.DEEP_FOG_COLOUR)
+
+
+func test_light_fog_veil_is_unchanged_on_a_discovered_unseen_hex() -> void:
+	var g := _thin_game()
+	var hex := Army.NO_HEX
+	for i: int in g.map.hex_count():
+		var h := g.map.hex_of(i)
+		if g.map.is_land(h) and Knowledge.discovered(g, ArmyFixture.TAG, h) and not Knowledge.sees(g, ArmyFixture.TAG, h):
+			hex = h
+			break
+	assert_ne(hex, Army.NO_HEX, "a discovered land hex out of sight exists (light fog)")
+	var pal := MapModes.palette(g, false)
+	var off := MapModes.colour_at(g, MapModes.Mode.TERRAIN, hex, pal, true, 0, false)
+	var on := MapModes.colour_at(g, MapModes.Mode.TERRAIN, hex, pal, true, 0, true)
+	assert_ne(on, MapModes.DEEP_FOG_COLOUR, "light fog is not deep fog")
+	assert_false(on.is_equal_approx(off), "the veil still goes over a discovered hex out of sight")

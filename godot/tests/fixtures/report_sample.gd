@@ -91,18 +91,18 @@ static func genoa_spring() -> Dictionary:
 				_line("Raised 2 companies of pikemen at Genoa (8, 13) (▼ −50).", "plain", {"hex": Vector2i(8, 13)}),
 			], 3),
 			_section(&"befell", "What befell Genoa", [
-				_line("Milan began 2 works, finished 1 work, raised about 1,000 men at Alessandria (7, 9) and set taxes to Low.", "plain", {
+				_line("Milan began 2 works, finished 1 work, raised 1,000 men at Alessandria (7, 9) and set taxes to Low.", "plain", {
 					"hex": Vector2i(9, 11), "rank": 4}),
 				_line("The Duchy of Milan took 3 districts from the Republic of Venice: Bergamo (11, 8) and 2 more.",
 					"warn", {"hex": Vector2i(11, 8)}),
-				_line("A Milanese army of about 1,000 men stands at Alessandria (7, 9).", "plain", {
+				_line("A Milanese army of 1,000 men stands at Alessandria (7, 9).", "plain", {
 					"hex": Vector2i(7, 9), "action": [&"look_at", Vector2i(7, 9)]}),
 			], 3),
 			_section(&"standing", "Standing", [
 				_line("Among the 3 countries you know, you are 3rd in land (14 districts), 3rd in income (+88 a season) and 3rd in people (83,205).",
 					"plain", {}),
-				_line("Savoy: about 58 districts, about +240, about 260,000 people.", "plain", {}),
-				_line("Milan: about 52 districts, about +260, about 250,000 people.", "plain", {}),
+				_line("Savoy: 58 districts, +240, 260,000 people.", "plain", {}),
+				_line("Milan: 52 districts, +260, 250,000 people.", "plain", {}),
 			], 3),
 		],
 	}

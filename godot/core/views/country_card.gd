@@ -17,11 +17,16 @@ static func of(game: Game, tag: StringName) -> Dictionary:
 	var adjective := cdef.adjective if cdef != null else ""
 	var colour := cdef.colour if cdef != null else Color()
 
+	var viewer := game.player
+	var full := viewer == &"" or country.tag == viewer
 	var dists := Territory.districts(game, country.id)
 	var towns := 0
 	var cities := 0
 	var cover_counts: Dictionary[String, int] = {}
 	for idx: int in dists:
+		# D9: a foreign country's towns and land count only the hexes the viewer has discovered.
+		if not full and not Knowledge.discovered(game, viewer, game.map.hex_of(idx)):
+			continue
 		var cover_word := HexCard.cover_words(int(game.map.cover[idx]))
 		cover_counts[cover_word] = int(cover_counts.get(cover_word, 0)) + 1
 		if idx < game.state.main_use.size() and int(game.state.main_use[idx]) == ImproveRules.SETTLEMENT:
@@ -39,7 +44,8 @@ static func of(game: Game, tag: StringName) -> Dictionary:
 		"relation": _relation_of(game, country),
 		"capital": _capital_dict(game, country, cdef, short_name),
 		"focus": focus_hex(game, country),
-		"districts": dists.size(),
+		"full": full,
+		"districts": dists.size() if full else int(Knowledge.land_seen(game, viewer, country.tag)["districts"]),
 		"towns": towns,
 		"cities": cities,
 		"land": _sorted_land(cover_counts),
@@ -169,19 +175,18 @@ static func _the_name(game: Game, tag: StringName) -> String:
 	return "the " + _short_name(game, tag)
 
 
-## The army field of the country panel (M6, 4.12): {shown, value, banded}. The player's own country: its men exact; a known
-## foreign country: its men banded (Knowledge.band); an unknown country: not `shown`.
+## The army field of the country panel (M6, 4.12, D7, D9): {shown, value}. The men under arms are exact for a known country: the
+## viewer "" and the player's own country read the live men, a known foreign country the last closed season's (R24). An unknown
+## country is not `shown`.
 static func _army(game: Game, country: Country) -> Dictionary:
-	var out := {"shown": false, "value": 0, "banded": false}
+	var out := {"shown": false, "value": 0}
 	if not Knowledge.knows(game, game.player, country.tag):
 		return out
-	var men := Armies.men_of_country(game, country.tag)
 	out["shown"] = true
-	if game.player != &"" and country.tag == game.player:
-		out["value"] = men
+	if game.player == &"" or country.tag == game.player:
+		out["value"] = Armies.men_of_country(game, country.tag)
 	else:
-		out["banded"] = true
-		out["value"] = Knowledge.band(men)
+		out["value"] = maxi(Knowledge.men_of(game, game.player, country.tag), 0)
 	return out
 
 
@@ -299,26 +304,26 @@ static func _play_reason(country: Country, short_name: String, cdef: CountryDef)
 	return ""
 
 
-## The treasury fields of the country panel (spec 6.10). The viewer's own country: its exact treasury, last season's change
-## (closing less opening in the closed ledger), the tax name, and `expected` (this season's net from EconomyPreview.expected,
-## the treasury's measure; `expected_realm` the realm's, 5.0 R2; both null for any other country). A known foreign country (Knowledge.knows; every country for the viewer "") is banded to two figures in `value`,
-## with no change and no tax. An unknown country is not `shown`.
+## The treasury fields of the country panel (spec 6.10, D7, D9): {shown, value, own, change, expected, expected_realm, tax}. The
+## treasury is exact for every known country. `own` is true for the player's own country only (not the viewer ""): its last
+## season's change (closing less opening in the closed ledger), the tax name, and `expected` (this season's net from
+## EconomyPreview.expected, the treasury's measure; `expected_realm` the realm's, 5.0 R2). Any other country: no change, no tax,
+## both expected null. An unknown country is not `shown`.
 static func _treasury(game: Game, country: Country) -> Dictionary:
-	var out := {"shown": false, "value": 0, "banded": false, "change": 0, "expected": null, "expected_realm": null, "tax": ""}
+	var out := {"shown": false, "value": 0, "own": false, "change": 0, "expected": null, "expected_realm": null, "tax": ""}
 	if not Knowledge.knows(game, game.player, country.tag):
 		return out
 	out["shown"] = true
-	if game.player != &"" and country.tag == game.player:
-		out["value"] = country.treasury
-		out["change"] = _last_change(country)
-		out["tax"] = Words.tax_name(country.tax)
-		var now := EconomyPreview.expected(game, country.tag)
-		if not now.is_empty():
-			out["expected"] = int(now["net"])
-			out["expected_realm"] = int(now["realm"])
-	else:
-		out["banded"] = true
-		out["value"] = Knowledge.band(country.treasury)
+	out["value"] = country.treasury
+	if game.player == &"" or country.tag != game.player:
+		return out
+	out["own"] = true
+	out["change"] = _last_change(country)
+	out["tax"] = Words.tax_name(country.tax)
+	var now := EconomyPreview.expected(game, country.tag)
+	if not now.is_empty():
+		out["expected"] = int(now["net"])
+		out["expected_realm"] = int(now["realm"])
 	return out
 
 
@@ -329,21 +334,21 @@ static func _last_change(country: Country) -> int:
 	return int(country.ledger_closed["closing"]) - int(country.ledger_closed["opening"])
 
 
-## The people fields of the country panel (spec 5.6, 4.19): {shown, value, banded, change}. The viewer's own country: exact, with
-## last season's change; the viewer "" sees every country exact; a known foreign country is banded to two figures with no
-## change; an unknown country is not `shown`.
+## The people fields of the country panel (spec 5.6, 4.19, D9): {shown, value, change}. The viewer's own country and the viewer "":
+## exact, with last season's change. A known foreign country: exact over the hexes the viewer has discovered (Knowledge.land_seen),
+## no change. An unknown country is not `shown`.
 static func _people(game: Game, country: Country) -> Dictionary:
-	var out := {"shown": false, "value": 0, "banded": false, "change": 0}
+	var out := {"shown": false, "value": 0, "change": 0}
 	if not Knowledge.knows(game, game.player, country.tag):
+		return out
+	if game.player != &"" and country.tag != game.player:
+		out["shown"] = true
+		out["value"] = int(Knowledge.land_seen(game, game.player, country.tag)["people"])
 		return out
 	var sums := PeopleView.totals(game, country.tag)
 	if sums.is_empty():
 		return out
 	out["shown"] = true
-	if game.player == &"" or country.tag == game.player:
-		out["value"] = int(sums["people"])
-		out["change"] = int(sums["change"])
-	else:
-		out["banded"] = true
-		out["value"] = Knowledge.band(int(sums["people"]))
+	out["value"] = int(sums["people"])
+	out["change"] = int(sums["change"])
 	return out

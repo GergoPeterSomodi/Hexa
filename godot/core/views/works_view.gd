@@ -34,9 +34,12 @@ static func line(game: Game, work: Work) -> String:
 
 
 ## The work on `hex` as {label, tag, progress ("1 of 4 seasons"), ready ("Spring 1481"), ready_turn, halted (halted in
-## the current season), started_turn}; {} when none. The progress counts the season under way.
-static func at(game: Game, hex: Vector2i) -> Dictionary:
+## the current season), started_turn}; {} when none. The progress counts the season under way. The viewer (default "": sees
+## all) gets nothing for a hex it has not discovered (R18, a foreign work is a fact of the land).
+static func at(game: Game, hex: Vector2i, viewer: StringName = &"") -> Dictionary:
 	if game == null or game.state == null:
+		return {}
+	if game.has_countries() and not Knowledge.discovered(game, viewer, hex):
 		return {}
 	for work: Work in game.state.works:
 		if work.hex == hex:

@@ -187,22 +187,22 @@ func test_a_town_that_can_grow_gives_a_good_outlook() -> void:
 	assert_eq(_outlook().theme_type_variation, &"NumberGood", "growth is good")
 
 
-func test_an_unknown_countrys_land_shows_no_people_section() -> void:
+func test_an_undiscovered_hex_shows_no_people_section() -> void:
 	_gen_buildable()
 	var game := Session.game
+	FogFixture.thin(game, &"GEN", 0)
 	var hex := Vector2i(-1, -1)
-	for c: Country in game.countries:
-		if c.tag == &"GEN" or Territory.districts(game, c.id).is_empty() or Knowledge.knows(game, &"GEN", c.tag):
-			continue
-		hex = game.map.hex_of(Territory.districts(game, c.id)[0])
-		break
-	assert_ne(hex, Vector2i(-1, -1), "a country Genoa does not know")
+	for i: int in game.map.hex_count():
+		if game.map.land[i] == 1 and not Knowledge.discovered(game, &"GEN", game.map.hex_of(i)):
+			hex = game.map.hex_of(i)
+			break
+	assert_ne(hex, Vector2i(-1, -1), "an undiscovered land hex on the thin fixture")
 	_panel.show_hex(hex)
 	assert_true(_panel.visible, "the panel shows the hex")
-	assert_false(_people_box().visible, "no People section for an unknown country")
+	assert_false(_people_box().visible, "no People section for an undiscovered hex")
 
 
-func test_a_known_countrys_land_shows_a_banded_figure_and_no_room() -> void:
+func test_a_discovered_countrys_land_shows_an_exact_figure_and_no_room() -> void:
 	_gen_buildable()
 	var hex := Vector2i(-1, -1)
 	var milan := Countries.by_tag(Session.game, &"MLO")
@@ -216,8 +216,8 @@ func test_a_known_countrys_land_shows_a_banded_figure_and_no_room() -> void:
 	_panel.show_hex(hex)
 	var seen := PeopleView.at(Session.game, &"GEN", hex)
 	assert_true(_people_box().visible, "Milan borders Genoa: known")
-	assert_eq(_people_value(), str(seen["text"]), "the banded figure")
-	assert_true(_people_value().begins_with("about "), "a band: " + _people_value())
+	assert_eq(_people_value(), str(seen["text"]), "the exact figure")
+	assert_false(_people_value().begins_with("about "), "exact, not banded: " + _people_value())
 	assert_false(_room_row().visible, "no Room row for a known country")
 	assert_false(_outlook().visible, "no outlook for a known country")
 

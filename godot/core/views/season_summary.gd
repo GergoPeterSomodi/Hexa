@@ -341,7 +341,7 @@ static func _under_way(game: Game, tag: StringName, turn: int) -> Array[Dictiona
 	for work: Work in game.state.works:
 		if work.tag != tag or work.started_turn >= turn:
 			continue
-		var info := WorksView.at(game, work.hex)
+		var info := WorksView.at(game, work.hex, game.player)
 		var halted := Works.halted(game, work, turn)
 		var middle := "stopped for the winter" if halted else str(info["progress"])
 		var line := _line("Under way: %s: %s. Ready %s." % [WorksView.line(game, work), middle, info["ready"]],
@@ -678,7 +678,7 @@ static func _brings(game: Game, tag: StringName, work: Work) -> String:
 
 
 ## The Standing section's lines (spec 4.19): where `tag` stands among the countries it knows in land and in income (the
-## closed ledger without work, refund and dev), then a banded line for each known country, the larger land first.
+## closed ledger without work, refund and dev), then a line for each known country, the larger land first (exact numbers: R31).
 static func _standing(game: Game, tag: StringName, turn: int, money: Dictionary) -> Dictionary:
 	var lines: Array[Dictionary] = []
 	var stats := game.stats
@@ -687,7 +687,10 @@ static func _standing(game: Game, tag: StringName, turn: int, money: Dictionary)
 		for other: StringName in Knowledge.known(game, tag):
 			var c := Countries.by_tag(game, other)
 			if c != null and c.alive and int(c.ledger_closed.get("turn", -1)) == turn:
-				others.append({"tag": other, "land": stats.value(other, turn, "land"), "people": stats.value(other, turn, "people"),
+				# The land and people of another country are what the viewer has discovered (Knowledge.land_seen, as Rankings
+				# reads them): the same numbers on a thin start. The viewer's own come from the season's Stats.
+				var seen := Knowledge.land_seen(game, tag, other)
+				others.append({"tag": other, "land": int(seen["districts"]), "people": int(seen["people"]),
 					"army": stats.value(other, turn, "army_men"),
 					"income": Treasury.left_over(_lines_of(c.ledger_closed)), "n": others.size()})
 		if not others.is_empty():
@@ -720,13 +723,13 @@ static func _standing(game: Game, tag: StringName, turn: int, money: Dictionary)
 			for o: Dictionary in others:
 				var name := LogLines.short_name(game, o["tag"] as StringName)
 				if armed:
-					lines.append(_line("%s: about %s districts, about %s, about %s people, about %s men." % [name,
-						Words.number(Knowledge.band(int(o["land"]))), Words.signed(Knowledge.band(int(o["income"]))),
-						Words.number(Knowledge.band(int(o["people"]))), Words.number(Knowledge.band(int(o["army"])))], "plain"))
+					lines.append(_line("%s: %s districts, %s, %s people, %s men." % [name,
+						Words.number(int(o["land"])), Words.signed(int(o["income"])),
+						Words.number(int(o["people"])), Words.number(int(o["army"]))], "plain"))
 				else:
-					lines.append(_line("%s: about %s districts, about %s, about %s people." % [name,
-						Words.number(Knowledge.band(int(o["land"]))), Words.signed(Knowledge.band(int(o["income"]))),
-						Words.number(Knowledge.band(int(o["people"])))], "plain"))
+					lines.append(_line("%s: %s districts, %s, %s people." % [name,
+						Words.number(int(o["land"])), Words.signed(int(o["income"])),
+						Words.number(int(o["people"]))], "plain"))
 	return _section(&"standing", "Standing", lines, false)
 
 
