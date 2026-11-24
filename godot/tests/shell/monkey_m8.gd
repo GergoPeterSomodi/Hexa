@@ -218,6 +218,11 @@ func _m8_assert_invariants(app: App, tag: String, prev_game: Game, from_len: int
 		return
 	_bump("m8_checks")
 	assert_eq(app.requests().flow.state(), SeasonFlow.State.RUNNING, "%s: the flow runs while the session's season runs" % tag)
+	assert_eq(Session.unsaved_actions, prev_unsaved, "%s: no player act is accepted while the season runs" % tag)
+	if app.requests().flow.running_stage() == &"phases":
+		# The season's end runs one phase a frame (issue 441): the calendar moves the turn inside it, and the phases write the
+		# game's own records. What holds here: the flow runs and the unsaved count does not move (it moves at the finish).
+		return
 	assert_eq(game.turn, prev_turn, "%s: the turn does not move while the countries move" % tag)
 	assert_eq(Session.unsaved_actions, prev_unsaved, "%s: no player act is accepted while the countries move" % tag)
 	# The records after this season's own end_season (or all of the step's, when the season began earlier) are the computer's.

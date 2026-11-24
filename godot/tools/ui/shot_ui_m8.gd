@@ -7,6 +7,8 @@
 ##   m8_blocked_toast  a click on the map during the turn: the toast says the map takes orders when they are done
 ##   m8_watch_bar      a watched game: the top bar's sandbox seal "S" with "Watching"
 ##   m8_replay_war     the replay of a season of war (the M7 war sample as Savoy): the moves play, the pill says "Space skips them"
+##   m8_log_others     the action log open with 30 of others' lines in one season: the "and 6 more about other countries" line
+##   m8_reminder_peace_risk  the task flag's list with the peace_risk line: an enemy at war holds three of Genoa's districts (take_score)
 ##
 ## Windowed (GPU or xvfb + Mesa):
 ##   godot --path godot -s res://tools/ui/shot_ui_m8.gd -- --out=DIR [--scale=1,2] [--only=m8_pill_turn,...]
@@ -19,7 +21,11 @@ const APP_SCENE_PATH := "res://shell/app/app.tscn"
 const LOGICAL_H := 720
 const LOGICAL_W := 1280
 const SCENES: Array[String] = ["m8_pill_turn", "m8_pill_replay", "m8_blocked_toast", "m8_watch_bar", "m8_replay_war",
-	"m8_peace_alert", "m8_report_befell"]
+	"m8_peace_alert", "m8_report_befell", "m8_log_others", "m8_reminder_peace_risk"]
+## Others' lines of one season in the log: the cap (24) and six more, so the "more" line shows (issue 443).
+const OTHER_LINES := 30
+## Districts of Genoa an enemy holds in the peace_risk picture: take_score (war.tres), so the line is serious.
+const PEACE_RISK_DISTRICTS := 3
 ## The scenes whose movement replay is on, with the report off between seasons.
 const REPLAY_SCENES: Array[String] = ["m8_pill_replay", "m8_replay_war"]
 ## SeasonFlow.State values (the numbers stand for the enum: the shell's classes compile after the autoloads).
@@ -180,6 +186,10 @@ func _prepare(app: Node, scene_name: String, session: Node, vp: SubViewport) -> 
 			if bool(hold["frozen"]):
 				return false
 			return bool(session.call("step_orders", 0.0)))
+	if scene_name == "m8_log_others":
+		return await _others_log(app, session)
+	if scene_name == "m8_reminder_peace_risk":
+		return await _peace_risk_list(app, session)
 	if scene_name == "m8_peace_alert":
 		# A take peace of Milan with Genoa (the player) that moves one district: the decision queue shows its Confirm.
 		var decisions := req.get("decisions") as Object
@@ -275,6 +285,67 @@ func _has_toast(app: Node, part: String) -> bool:
 		if str(m).contains(part):
 			return true
 	return false
+
+
+## The log with others' lines (issue 443): OTHER_LINES works finished by the first country Genoa knows, in this season, with
+## Genoa among the witnesses, then the log opened. The cap of 24 leaves the "more" line.
+func _others_log(app: Node, session: Node) -> bool:
+	var g: Game = session.get("game") as Game
+	var known: Array = Knowledge.known(g, &"GEN")
+	var other: StringName = &""
+	for tag: StringName in known:
+		if tag != &"GEN":
+			other = tag
+			break
+	if other == &"":
+		printerr("shot_ui_m8: Genoa knows no other country")
+		return false
+	for k: int in OTHER_LINES:
+		var w := Work.new()
+		w.id = 1000 + k
+		w.tag = other
+		w.hex = Vector2i(k % 20, 3 + k % 9)
+		w.action = Works.BUILD
+		w.family = ImproveRules.VINEYARD
+		w.level_to = 1
+		w.started_turn = g.turn
+		w.seasons = 4
+		w.seasons_left = 4
+		g.emit({"kind": "work_finished", "tag": other, "hex": w.hex, "work": w.to_dict(),
+			"witnesses": ["GEN", String(other)]})
+	session.call("drain")
+	await _wait_frames(2)
+	var log_card: Object = (app.call("hud") as Object).call("action_log")
+	log_card.call("open")
+	await _wait_frames(3)
+	return bool(log_card.call("is_open"))
+
+
+## The peace_risk reminder (issue 443): a war with a neighbour that holds PEACE_RISK_DISTRICTS of Genoa's districts (its
+## take score), then the task flag's list open.
+func _peace_risk_list(app: Node, session: Node) -> bool:
+	var g: Game = session.get("game") as Game
+	var enemy: StringName = WarFixture.neighbour_of(g, &"GEN")
+	if enemy == &"":
+		printerr("shot_ui_m8: Genoa has no neighbour")
+		return false
+	WarFixture.at_war(g, &"GEN", enemy)
+	var held: Country = Countries.by_tag(g, &"GEN")
+	var done := 0
+	for district: int in Territory.districts(g, held.id):
+		if done >= PEACE_RISK_DISTRICTS:
+			break
+		var hex: Vector2i = g.map.hex_of(district)
+		if hex == held.capital:
+			continue
+		WarFixture.set_occupier(g, hex, enemy)
+		done += 1
+	g.version += 1
+	var flag: Object = (app.call("hud") as Object).call("task_flag")
+	flag.call("refresh")
+	flag.call("open_list")
+	await _wait_frames(3)
+	return bool(flag.call("is_list_open"))
 
 
 func _wait_frames(n: int) -> void:

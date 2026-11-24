@@ -1,357 +1,507 @@
-# Economy rethink: raw materials, industries, settlements, people (design draft)
+# Economy rethink: raw materials, industries, settlements, people (revision 3)
 
-Status: DRAFT for the owner (2026-11-23, issue #439). Planning only. Nothing here is approved or built. The numbers are
-starting points for the soak to tune, not promises. Sources: the owner's words in `docs/roadmap/owner-asks-2026-11-23.md`,
-the M4 to M6 build specs (goods, works, stores, people), the M10 (trade) and M11 (research) specs, `docs/design/tech-tree.md`,
-`docs/design/reactive-prices.md`, and the frozen Python game for the old manufactories.
+Status: **ready for the build plan** (2026-11-23, issue #439). Planning only. Nothing here is built. This revision folds in
+the owner's answers of 2026-11-23: the first twelve questions (all closed) and the new questions N1 to N5. One detail, N6,
+carries a recommended default that the owner has not yet confirmed (marked "default, owner to confirm"). The numbers are
+starting points for the soak to tune. Sources: `docs/roadmap/owner-asks-2026-11-23.md`, the M4 to M6 build specs, the M10
+(trade) and M11 (research) specs, `docs/design/tech-tree.md`, `docs/design/reactive-prices.md`, and the frozen Python game.
+
+## Changed from the first draft (history)
+
+The owner's answers overrode these recommendations of draft 1:
+
+| Topic | Draft 1 recommended | Owner decided (now the rule) |
+|---|---|---|
+| Where an industry stands | Its own hex near a town | A **slot in the settlement** (a building inside a village, town or city) |
+| Raw at hand | Any owner's raw district counts | Only the country's **own** raw districts count |
+| Inputs | Only the surplus in the country's stores | Also **bought from the market** |
+| Bread | Comfort good, not food | Bread is **food** |
+| Start workshops | A few in the Italy scenario | **None** at 1480; industries open by **year** before M11, then by technology |
+| How industries unlock before M11 (N1) | A charter purchase | **A set year per industry** (armourer 1485, weaver 1490, bakery 1495 as a placeholder); no charter |
+| Arms (Q12) | 1 arms = 2 iron in a company's cost, no other effect | **Arms are required to raise a company**; a country without arms buys them at a premium |
+| Unchanged from draft 1 (confirmed) | | Weaver, armourer, bakery first; tier 0.8 / 1.0 / 1.1 / 1.25, no hamlets; one raw per tile (drop `keep_wild` on goods districts); growth `500 + 350 x surplus + 350 x prosperity`, ceiling 1200; M9.5 between M9 and M10 with the tile window (#436) first; FORMAT 7, older saves refused |
+
+Draft 1's "cut for the first version" list is partly reversed: building slots inside settlements and workshops that buy input
+from the market are now IN. Still out: luxury industries, mint, winter and weather for workshops, quality of goods.
 
 ## 1. Goal
 
-A country can get rich from the land alone: sell wool, iron, grain. But a country that turns its raw material into something
-better, in the right place, earns clearly more. A weaver beside a sheep district in a town beats the same wool sold raw, and
-a city does it better than a village. People are part of the same loop: a country with a food surplus and comfortable towns
-grows faster, and bigger towns are better places for industry. The player's choice each season becomes: expand the land,
-build an industry, or grow the towns.
+A country can get rich from the land alone: sell wool, iron, grain. A country that turns its raw material into something
+better, inside the right town, earns clearly more. People are part of the same loop: a country with a food surplus and
+comfortable towns grows faster, bigger towns have more room for industries, and bread feeds people directly. The player's
+choice each season: expand the land, learn and build an industry, or grow the towns.
 
-What the player does: reads the land (what each tile makes), places workshops next to the right raw tile and the right
-town, watches stocks turn into dearer goods, and grows the towns that host them. Why it is fun: a visible chain (sheep, wool,
-cloth, ducats) that the map shows, a siting puzzle (raw at hand, town tier), and a real reason to care about people.
+What the player does: reads the land (what each tile makes), learns an industry, puts it in a settlement slot beside the
+right raw tile, watches stocks turn into dearer goods, and grows the towns that host them. Why it is fun: a visible chain
+(sheep, wool, cloth, ducats), a siting puzzle (own raw at hand, town size), a real reason to care about people, and a first
+taste of "technology changes my economy".
 
-## 2. What exists today (read from the Godot build and its specs)
+## 2. What exists today
 
-**Goods (M4, `data/defs/goods/`).** 16 goods in four kinds: food (grain, fish), staple (oil, wine, salt), ware (hemp, silk,
-dyes, wool, cattle, horses, copper, silver) and material (timber, stone, iron). Each has one fixed base price (1.0 to 7.0
-ducats a load). No good is ever made from another good. Goods leave the stores in four ways only: towns' needs (food, wine,
-salt, oil), works' costs (timber, stone, iron), raising companies (iron, timber, horses, copper), and sale of the stock above
-the reserve at the fixed price. The crown's income from goods is `tax_goods`: 50 / 70 / 90 % (Low / Normal / High) of the
-value sold. Stores are one pool per country (not per town). M10 turns the fixed price into market prices and adds routes.
+**Goods (M4).** 16 goods in four kinds: food (grain, fish), staple (oil, wine, salt), ware (hemp, silk, dyes, wool, cattle,
+horses, copper, silver), material (timber, stone, iron), each with one fixed base price. No good is made from another. Goods
+leave the stores through town needs, works' costs, raising companies, and the sale of stock above the reserve at the fixed
+price. Crown income from goods is `tax_goods` 50 / 70 / 90 % of value sold. Stores are one pool per country.
 
-**Tiles (M3, M4).** A hex holds one piece: wild land, a settlement (level 1 to 5), a castle, or a goods district (a family
-at stage 1 to 3: wheat, hemp, silk, dyes, vineyard, olives, grazing, timber, quarry, salt, mines, harbour). So the
-land is already close to "one raw per tile": a district makes one good (grazing picks sheep, cattle or horses; mines pick
-iron, copper or silver, chosen when it is built). Three things break "one raw per tile" today:
-- Wild yield: every land hex also makes its cover's grain or timber. A goods district keeps part of it (`keep_wild`: 50 / 25 /
-  0 % at stages 1 / 2 / 3 for most families; settlements keep 100 to 50 %). At stage 2 this is usually under one load a season
-  and floors to 0 in M4's own worked table.
-- Port fish: a coastal settlement also makes fish.
-- A wild hex makes its cover's good, which is its one raw (this part is already right).
-
-Output of a district: `base[stage] x staffing x ring lift x season x tax x weather` (M4 4.4). Hands (people nearby) staff the
-jobs of nearby districts. **Ring lift** already exists: a walled town gives neighbouring goods districts +10 %, a city +20 %.
+**Tiles (M3, M4).** A hex holds one piece: wild land, a settlement (level 1 to 5), a castle or a goods district (stage 1 to
+3). A district makes one good; output = `base[stage] x staffing x ring lift x season x tax x weather`. A walled town gives
+neighbouring goods districts +10 %, a city +20 % (ring lift, any owner, unchanged). Works are one job at a time per hex.
 
 **Settlements and people (M5).** Levels: 1 hamlet 1,000 people, 2 village 3,000, 3 town 10,000, 4 walled town 30,000, 5 city
-60,000, each with a room (cap). People grow a flat rate per season (by tax level and season) as long as the country is
-fully fed; they starve if not; a full village or town raises itself a level, up to town; walls and cities are the crown's
-works. Growth ignores how much surplus the country has and how comfortable the people are. Taxes: towns pay by contentment
-(food 70 %, wine, salt, oil 10 % each), the countryside pays a flat rate.
+60,000. People grow a flat rate while the country is fed and starve if not; a full village or town raises itself a level, up
+to town; walls and cities are the crown's works.
 
-**Research and trade not built yet.** M10: markets, routes, reactive prices (0.3x to 3.5x base), appetite per good. M11: 50
-techs and ideas as a table of modifiers that every system reads through the owner's effective definitions. `tech-tree.md`
-already names industry techs (Guilds, Ropewalk, Glass and leather, Corned powder) from the old Python game, where seven
-"manufactories" turned wool to cloth, iron to tools and weapons, hemp to rope, and so on, inside provinces.
+**Not built yet.** M10 (markets, routes, reactive prices 0.3x to 3.5x base) and M11 (50 techs and ideas as modifier rows).
+`tech-tree.md` already names the industry techs (Guilds, Ropewalk, Glass and leather, Corned powder).
 
-## 3. What the owner's idea changes, and what stays
+## 3. What the answers change (the honest reconciliation)
 
-| Owner's idea | Today | Change |
+### 3.1 Slots inside settlements (Q1)
+
+An industry is no longer a hex piece. A settlement hex now holds its settlement plus a short list of **slots**.
+
+- **Slots by level:** hamlet 0, village 1, town 2, walled town 3, city 4 (`slots_by_level`, data). One of each industry per
+  settlement (no two weavers in one town), so the extra slots of a city leave room for later industries (rope, glass).
+- **Tier is the settlement's own level.** No more "best settlement within two hexes" scan: the workshop sits in the town, so
+  the town's level is its tier. Simpler than draft 1.
+- **Building into a slot** is a works job on the settlement hex with the same cards, costs and stages (4 / 8 / 16 seasons) as
+  every district. One job per hex still holds, so **a slot build and a level upgrade of the same settlement cannot run at
+  once** (new question N5). Costs (data): stage 1 100 ducats + 5 timber, stage 2 +100 + 5, stage 3 +180 + 10.
+- **A level drop** (hunger) makes the slots above the new count **idle** (they keep their stage, produce nothing, and wake
+  when the level returns). Nothing is destroyed. Capture or cession of the town hands the slots to the new owner (3.5).
+- **Staffing:** the settlement's own people are the first hands for its slots (the M4 hands rule, with the settlement hex
+  counted as a source). Jobs per stage are data, like districts.
+- **New state:** per settlement hex a slot list (industry id, stage, works timer). This is a per-hex field in `MapState`
+  (schema bump) and goes into saves (FORMAT 7, Q10). The hex still holds one *piece*, so M3's one-piece rule is intact; the
+  slots are a property of the settlement piece.
+- **Settlement panel:** the tile window (#436) gets, for an own settlement, an **Industries** tab: slot rows (kind, stage,
+  idle or working, where its input comes from, yield breakdown), free slots with a Build button and a card, and a line when
+  the industry is not yet open ("opens in 1490"). #436 must be built first (Q9) and must leave room for this
+  tab. A foreign settlement shows its slot kinds and stages if the hex is seen (a building is visible) and nothing of the
+  output, tier bonus or stocks.
+- **Map:** a small trade mark (loom, anvil, loaf) beside the settlement per working slot, so the player sees industry
+  without opening the window.
+
+### 3.2 Buying inputs from the market, and M10 (Q6)
+
+This is the real conflict. M10 builds markets and prices; the owner wants workshops to buy there, and Q9 puts the economy
+BEFORE M10. Resolution (recommended): **M9.5 ships a minimal "home market", M10 replaces its body.**
+
+- **M9.5 home market:** one per country, a single door `Buying.price(country, good)` and `Buying.take(country, good, loads)`.
+  Price = base price x `market_buy_permille` (1200: 20 % above base). Supply is unlimited. Only the recipe inputs (wool, iron,
+  grain) are buyable by workshops, and **arms** by a raise of companies at a higher premium (3.7); never by towns. No selling side change (selling stays at the fixed base
+  price), no routes, no foreign stock. The goods come from nowhere and the money goes nowhere: a faucet of goods, a sink of
+  money, deliberately small.
+- **M10 adds:** real markets, stock, routes, reactive prices; the `Buying` door's body reads them. The caller (the workshop
+  step) does not change. M10's spec gets one line: "replaces `Buying`'s static price and unlimited supply".
+- **The order inside a workshop run:** take from the country's own surplus above the reserve first (free), then, if the
+  workshop's **Buy inputs** switch is on (default on), buy the shortfall up to capacity at the market price, but only while
+  the treasury stays above a floor (`buy_treasury_floor`, one season's upkeep and the army's pay, data). Buying shows as a new
+  treasury line "Inputs bought" and a new stores flow `bought`; both extend the money and goods properties.
+- **Why it cannot print money:** the crown keeps only 70 % of sales. Buy at 1.2x, sell the product, crown takes 0.7: a
+  workshop must reach 0.7 x m x tier >= 1.2 to profit on bought input. Worked numbers (section 5) show village workshops
+  LOSE on bought input, town ones break even, cities profit modestly. Own raw plus own bonus is where the money is.
+- **Risks of this split:** (a) the `Buying` seam may be the wrong shape once M10 needs scarcity and per-market prices (keep it
+  two functions, test it with a stub); (b) M10's tuning then also re-tunes workshop profit (one tuning, as draft 1 wanted, but
+  the numbers shift when prices move: the soak ranges are re-run); (c) with unlimited supply a country with no land can still
+  run a city weaver for a small profit: capped by slots and capacity and gone once M10 prices bite; (d) players may find a
+  bakery a back-door food import (3.4): by design, at a price, bounded by capacity.
+- **Alternatives:** (B) move the economy after M10, no seam, but the economy waits for trade, the longest queue; (C) fold the
+  whole real market into M9.5, which is M10's size. Recommend the seam.
+
+### 3.3 Own raw only (Q4)
+
+"Raw at hand" gives **+25 %** (`near_input_permille` 250) when the **country owns** a district of the recipe's main input
+within two hexes of the settlement, working at stage 2 or more (`near_input_min_stage`, new question N6, so a cheap stage 1
+tile does not buy a bonus for bought input). Foreign raw tiles never count. The bonus is recomputed at once when ownership
+changes. Ring lift for raw districts stays any-owner (unrelated).
+
+### 3.4 Bread is food (Q7)
+
+- **Food value (new `food_permille` on a good):** grain 1000, fish 1000, **bread 1500** a load. Recipe 3 grain -> 2 bread, so
+  baking at tier 1.0 with no bonus is food-neutral (3.0 in, 3.0 out); with tier below 1 it loses food, above it gains.
+- **Eating:** towns draw their food need in food units from the store, cheapest per unit first (grain, fish, then bread), so
+  bread piles up as a comfort stock and a sale good unless grain runs short. (Recommended; alternative: bread first, which
+  burns the made bread but is simpler to explain.)
+- **No double counting:** the country's "food made" for the surplus number counts raw food the districts make minus the grain
+  the workshops take from its own stock, plus bread made x 1.5. Grain eaten and the same grain baked can never both count.
+  Bought grain adds bread food without taking from the stock: an import, and so a surplus gain (by design).
+- **Starvation by industry:** needs are served before workshops take anything (the reserve rule), so a workshop never makes a
+  town starve this season. It can eat the surplus above the reserve, which is the carry for next season; a village bakery with
+  no bonus (0.8) turns 3 grain into 2.4 food, so it shrinks the carry by 20 %. A pin: "after the works step, every town's
+  need of this season is still met and the reserve is unchanged".
+- **Comfort:** the comfort part of prosperity is cloth met for towns plus **bread's share of the food eaten** (full comfort at
+  30 % bread, `bread_comfort_share` 300). Comfort still changes growth only, not taxes.
+- **M4 food pins affected** (the first task is to grep tests for food, and the food keys of `game_defs`: `food_need_milli`):
+  `test_good_defs` (good count 16 -> 19, kinds, new `food_permille`), `test_economy_defs`, `test_economy_season`,
+  `test_economy_preview` and `test_economy_1480` (Genoa's table: bread stock zero so food units equal the old loads; stays
+  exact with `IndustryFixture.off`), `test_improve_preview`, `test_no_other_writers` (new flows), `test_people_*`,
+  `test_cards_people`, `test_people_growth` (the surplus now in food units), `test_map_modes`, `test_stats` and `test_snapshot`
+  (new series), `test_save_file` (FORMAT 7). The rule that keeps almost all of them unchanged: with the fixture off, bread stock
+  is zero and `food_permille` of grain and fish is 1000, so food units equal loads.
+
+### 3.5 Own raw for bonus, any source for input: AI and conquest (Q4 + Q6)
+
+Together: the bonus rewards owning the raw land beside the town, the input itself can come from anywhere.
+
+- **AI:** the AI never needs a neighbour's raw or a trade deal to run a workshop; it needs a free slot, an open industry and a
+  treasury above the floor. Its payback prior (`works_scan`) uses the card's number, which includes the bonus only if the AI
+  owns a working raw district nearby, and subtracts the buying cost for the part it must buy. So AIs build raw districts
+  beside their towns before the slot (the siting puzzle, solved by the same prior), and a merchant temper buys more.
+- **Conquest:** (a) taking a town hands over its slots intact, but the new owner has no bonus unless it owns raw there: a
+  conquered weaver town runs at tier only, on bought input; (b) taking or burning a raw district beside an enemy workshop
+  town removes its bonus at once, a new war target value the AI should learn (a small `industry_value` term in province
+  value, data weight); (c) an occupied town's slots are idle while occupied (M7 occupation), they wake on cession or
+  liberation; (d) pillage stays out (as draft 1). The old "any owner" rule would have made border meadows a shared gift;
+  "own only" makes them worth fighting for. It also means a rich city can still run on bought input: it is weaker, not dead.
+- **Snowball check:** the rich country with own raw and a city gets +1.5625 yield; the poor one with bought input and a
+  village gets 0.8 and loses money. The gap is wider than draft 1's; the soak range (section 10) is the brake test.
+
+### 3.6 Industries open by year, later by technology (Q11, N1)
+
+No workshop exists at the 1480 start in any scenario (the scenario bake has no slot rows). Industries are **buildings in
+villages, towns and cities** (slots, 3.1), and a country may build one only once its **year gate** is open.
+
+- **Before M11 (the owner's decision, no charter):** each industry has an `available_year` in data, the same for every
+  country: **armourer 1485, weaver 1490, bakery 1495**; stage 3 of every industry opens at 1520 (`stage3_year`, the start of
+  era II). Nothing to buy, no new country field, no new save state: `industry_open(year, industry)` is derived from the
+  calendar. The slot rules ask only that one function.
+- **Why these years (a placeholder, tuned in the soak):** the three arrive one after another, so the first decades have
+  news each time (the first weaver appears ten years in). The armourer comes first because arms are now needed to raise
+  companies (3.7): until 1485 every army is equipped by buying, at a premium, which makes the first years tense and gives the
+  armourer an immediate reason. The bakery comes last because food is not scarce early and bread needs a grain surplus to be
+  worth baking. Five to fifteen years is 20 to 60 seasons: long enough to feel like a new age, short enough that a playthrough
+  sees it.
+- **M11 replaces the gate with technology** (`tech-tree.md`, Trade & Industry): Guilds (era I) opens weaver and armourer,
+  Crop rotation (era I) opens bakery, Guilds' era II follow-up opens stage 3. `industry_open` then reads the tech modifiers
+  (`industry_unlock`, `industry_stage_max`) instead of the year; the callers do not change, and the year data is removed in
+  M11's spec. Later industries (rope, glass, leather, powder) go straight to era II techs.
+- **How the player and the AI first get one:** the Industries tab shows a not yet open industry greyed out with "opens in
+  1490"; once open, a slot with a Build button. The AI needs no new option: the same slot build in `works_scan`, with the
+  payback prior, starts the year it opens (merchants first on weavers, warlike on armourers, builders on bakeries).
+- **Accepted cost:** with a year gate nobody can race ahead of the others; there is no choice in the opening of an industry,
+  only in where and when to build it. That choice returns with M11.
+
+### 3.7 Arms equip armies (Q12, decided)
+
+**Rule:** raising a company needs **arms** in its cost. Iron is no longer the stand-in for the equipment. Arms are a made
+good (4.2) from the armourer, or bought from the market at a **premium** (`arms_buy_permille` 1500: 50 % above the base of
+9.0, so 13.5 a load, against 1.2x for ordinary inputs, because war cannot wait; confirmed in new question N7).
+
+**Company cost (unit defs, data), today and new** (the other goods stay as they are):
+
+| Company | Today (ducats + goods) | New (ducats + goods) |
 |---|---|---|
-| One raw material per tile | Nearly true; wild yield and port fish stack on top | Make it a rule: a tile's raw is shown and counted once; drop the small `keep_wild` second yield on goods districts (Q5) |
-| Industry turns raw into something more valuable | No processing exists | New: workshop districts with recipes raw -> product, product dearer than its inputs |
-| Raw alone can make a country rich | Yes, that is all there is | Stays: raw income is untouched. Industry adds on top |
-| Output depends on village / town / city | Only ring lift (+10 / +20 %) for raw districts | Settlement tier sets how well a workshop runs (section 4.4) |
-| Raw at hand gives efficiency | Nothing | A workshop with a district making its input within two hexes runs +25 % |
-| Population from food surplus and prosperity | Flat growth while fed | Growth speed scales with the food surplus and the towns' comfort (section 4.6) |
+| Pikemen | 25 + 1 iron | 25 + **1 arms** |
+| Crossbowmen | 30 + 1 iron + 1 timber | 30 + **1 arms** + 1 timber |
+| Knights | 45 + 1 iron + 3 horses | 45 + **1 arms** + 3 horses |
+| Bombards | 60 + 5 iron + 3 copper | 60 + **2 arms** + 5 iron + 3 copper |
 
-Stays: districts, stages, works, jobs and hands, stores as one pool, fixed-price sale of the surplus (until M10), taxes, the
-reserve rule (needs and reserves come before anything is sold or processed), integer arithmetic, one season order.
+**Paying:** the raise first uses arms in the country's stores. If the stores are short, the shortfall is **bought** at the
+premium and paid from the treasury together with the ducats, in the same action (the card shows "arms: 1 from stores" or
+"arms: 1 bought, 13.5 ducats"). Buying shows on the "Inputs bought" treasury line and the `bought` flow.
+
+**No arms and no money:** the raise is refused with one line, "no arms: 1 needed, 0 in the stores, 14 ducats to buy it, 8 in
+the treasury", and nothing changes (the `raise_check` and `raise` pair contract holds). There is no unequipped or
+half-strength company in the first version (new question N8). The answers open to the player are to build an armourer, save
+up, or raise fewer companies.
+
+**Worked cost of the equipment part of a company** (one arms load; own arms are valued at what the crown forgoes by not
+selling them, 70 % of 9.0 = 6.3; the other goods and the ducat cost are unchanged and left out):
+
+| Company | Old equipment (iron, 2.0 a load) | Own arms, cash 0 (forgone sale 6.3) | Bought arms, cash |
+|---|---|---|---|
+| Pikemen, Crossbowmen, Knights (1 arms) | 2.0 | 6.3 | 13.5 |
+| Bombards (2 arms) | 0 (iron stays) | 12.6 | 27.0 |
+
+So a pikemen company costs 25 ducats plus 1 arms: **31.3 with own arms, 38.5 with bought arms, against 27 before** (+16 % and
++43 %). Six pikemen companies: 188 with own arms, 231 bought. A country that arms itself keeps its army nearly as cheap as
+before in cash (25 a company, the arms come from its own stores); a country that buys pays dearly. This drag is deliberate
+(a country now pays for equipping its men); the soak watches army size per country, and the levers are data only (the ducat
+cost of a company, the premium). One armourer town of section 5 makes about 18 arms a year at stage 2 with own iron: enough
+for 18 companies in a year, so one armourer arms a peacetime country; a country at war needs a second.
+
+**M7 / M8 interaction:**
+- `Military.raise_check` keeps its order (hex, level, cap, held hex, stand, men, ducats) and gains the arms step after the
+  ducats: stores, else market, else the refusal above. `men_at_hand` and the raise cap per hex do not change: men and arms are
+  two separate limits and the smaller binds. Supply (M6, feeding in the field) is untouched: arms are a one-time cost of
+  raising, not an upkeep. Refit and upgrade costs (`upgrade_cost`) check iron too and need an arms translation in the same
+  data pass.
+- **Reserve:** arms get a stores reserve (`arms_reserve_loads`, data, two companies' worth), so the armourer's product is kept
+  for the army and not sold the moment it is made; only the surplus above the reserve is sold.
+- **AI (M8):** `ai_forces` asks `raise_check`, so it sees the refusal; `ai_economy` prices a company's goods at the base
+  price, so arms count 9 in its payback numbers. The armourer becomes **strategic**: warlike tempers get a high
+  `industry_priority` for it, and an AI that cannot arm itself does not plan a war it cannot equip (a readiness line in the
+  war plan: arms in stores plus treasury buying power for the planned companies). War needs arms, so the armourer's town
+  becomes a military target, and in M10 an arms embargo or a blockade that stops buying is a real weapon (a line for M10's
+  spec).
+- **Fixture and pins:** `IndustryFixture.off(defs)` restores the iron cost in the unit defs, so every M6 to M8 pin holds with
+  the fixture off. With it on, these change: `test_military` (`cost_of`, the shortfall text), `test_ai_forces`,
+  `test_army_share`, `test_log_others`, `test_movement_war` (any raise that sets up armies), `test_ai_economy` (company
+  valuation), the unit-def and good-def tests (goods 16 to 19), the raise-list panel text (`raise_list.gd`). New tests: raise
+  with own arms, with bought arms, with neither (refusal, nothing changed), arms reserve not sold, the check-and-act pair
+  property for raise with arms.
+
 
 ## 4. The model in plain words
 
-### 4.1 Raw material per tile
+### 4.1 Raw material per tile (Q5)
 
-Every land tile has exactly one raw material it makes: its district's good, or, if wild, its cover's good (grain on
-farmland and grassland, timber on woods). A settlement's raw is its cover's wild good at its keep percent. The tile window
-(#436) says it in one line: "Raw: wool, 12 loads this season". Raw goods are sold as today, at the base price now and the
-market price from M10.
+Every land tile makes exactly one raw: its district's good, or, if wild, its cover's good. The small second wild yield
+(`keep_wild`) on goods districts is **dropped** (0 % at every stage); settlements and ports keep theirs (a village still
+makes some grain, a port its fish). The tile window says it in one line: "Raw: wool, 12 loads this season". Raw is sold as
+today (base price now, market price from M10).
 
-### 4.2 Industries are workshops: recipes from raw to product
+### 4.2 Industries: recipes from input to product
 
-A **workshop** is a new kind of goods district (a family, like vineyard or quarry). It stands on its own hex within two hexes
-of a settlement of level 2 or more. It has a **recipe**: inputs in, product out, per season, at stages 1, 2, 3 (capacity grows
-with the stage, as for every district). It takes its input from the country's stores, only from the stock above the
-reserve (so food and needs come first; no workshop starves a town), up to its capacity, then sells or keeps the product.
+A **recipe**: inputs in, product out, per season, with a capacity per stage. Value multiplier m = product value / input value.
 
-Value multiplier m = (product price x loads out) / (input price x loads in). Starting recipes (all in `data/defs/`):
+| Industry | Recipe | Product price | Input value | m | Capacity in, stage 1 / 2 / 3 (loads a season) | Upkeep a season, stage 2 | Opens (year, then tech) |
+|---|---|---|---|---|---|---|---|
+| Weaver | 2 wool -> 1 cloth | 6.0 | 3.0 | 2.0 | 8 / 16 / 28 | 3 | 1490 / Guilds |
+| Armourer | 2 iron -> 1 arms | 9.0 | 4.0 | 2.25 | 4 / 8 / 14 | 3 | 1485 / Guilds |
+| Bakery | 3 grain -> 2 bread | 2.4 | 3.0 | 1.6 | 12 / 24 / 40 | 2 | 1495 / Crop rotation |
 
-| Workshop | Recipe (in -> out) | Product price | Input value | Multiplier m | Capacity in, stages 1 / 2 / 3 (loads a season) |
-|---|---|---|---|---|---|
-| Weaver | 2 wool -> 1 cloth | 6.0 | 3.0 | 2.0 | 8 / 16 / 28 |
-| Armourer | 2 iron -> 1 arms | 9.0 | 4.0 | 2.25 | 4 / 8 / 14 |
-| Bakery | 3 grain -> 2 bread | 2.4 | 3.0 | 1.6 | 12 / 24 / 40 |
-
-Rarer or dearer raw gets a higher multiplier; bulk food gets the lowest, so raw stays attractive for grain. Luxury raws
-(silk, silver, dyes) have no industry in the first version: they are already rich as raw (silk stage 2 is about 54 ducats a
-year from one tile).
-
-New goods are `made` kind (a fifth kind): cloth, arms, bread, ids appended after silver (16, 17, 18). Cloth and arms have
-reserve 0 (sold as made, until M10 lets them wait for a good price); arms are also kept as a war stock (4.8).
+New goods are a fifth kind, `made`: cloth, arms, bread, ids 16, 17, 18 (appended after silver). Cloth: reserve 0 (sold
+as made until M10). Bread: food 1500 permille, kept as a food reserve (4.3). Luxury raws (silk, silver, dyes) have no industry.
 
 ### 4.3 The season step
 
-Inside `production`, after the goods are made and the towns have taken their needs, a new step runs between needs and sales:
+Inside `production`, between needs and sales:
 
 ```
 made    districts make their raw (as M4)
-needs   towns take food, wine, salt, oil; the rest is the surplus above the reserve
-works   each workshop, in hex index order: takes min(capacity x staffing, surplus of its input) of the raw
-        makes   taken x out / in x tier x (1000 + at_hand) / 1000        (integers, floored)
+needs   towns take food (in food units: grain, fish, then bread), wine, salt, oil; the rest is the surplus above the reserve
+works   each working slot, in settlement index then slot order:
+          own    = min(capacity x staffing, own surplus of the input)
+          bought = if Buy inputs on and treasury stays above the floor:
+                     min(capacity x staffing - own, ...) at base x market_buy_permille / 1000   (Buying.take)
+          makes  = (own + bought) x out / in x tier x (1000 + at_hand) / 1000      (integers, floored)
 sales   the surplus of raw and the new goods is sold (M4 4.8, or M10's trade phase)
 ```
 
-Workshops have no weather and no winter slot in the first version (flat 100 % all year); the people who work them are staffed
-by hands like any district. One new flow in Stores, `worked` (raw taken in); the product is an ordinary `made` flow. The
-property "closing minus opening equals the sum of the flows" still holds.
+Workshops have no weather or winter slot (flat all year). New stores flows: `worked` (own raw taken in) and `bought`
+(market input); the product is an ordinary `made` flow; a new treasury line "Inputs bought". "Closing minus opening equals
+the sum of the flows" and the money identity still hold.
 
-### 4.4 Settlement tier: village, town, city
+### 4.4 Tier by settlement level (Q3)
 
-The tier is the best settlement within two hexes of the workshop (same reach as silk and dyes rules today, and the same
-neighbour scan that ring lift already uses). Tier multiplies the yield:
-
-| Nearest settlement | hamlet | village | town | walled town | city |
+| Settlement | hamlet | village | town | walled town | city |
 |---|---|---|---|---|---|
-| Can host a workshop | no | yes | yes | yes | yes |
-| Yield (permille) | - | 800 | 1000 | 1100 | 1250 |
+| Slots | 0 | 1 | 2 | 3 | 4 |
+| Yield (permille) | no | 800 | 1000 | 1100 | 1250 |
 
-The tier also fits the existing ring lift for raw districts (unchanged: +10 % walled town, +20 % city). A town that falls a
-level (hunger) lowers its workshops at once, so people and industry are tied together.
+Total yield = tier x (1 + own at-hand 0.25): 0.8 (village, none) to 1.5625 (city with own raw). A level drop lowers tier and
+idles the top slots at once; the card warns ("this town is under 3,000 people").
 
-### 4.5 Raw at hand
-
-If a district whose good is the recipe's main input stands within two hexes of the workshop (the same reach), the workshop runs
-**+25 %** (`near_input_permille` 250). Any owner counts, as ring lift does. This is a siting reward only: the input itself
-still comes from the stores, so a country without the raw nearby can still run the workshop, less well. It makes the puzzle:
-a weaver in a town with sheep meadow beside it (+25 %) against a weaver in a bigger town far away (higher tier, no bonus).
-
-Total yield = tier x (1 + at hand): from 0.8 (village, none) to 1.5625 (city, at hand).
-
-### 4.6 People: surplus and prosperity
-
-Growth in M5 (`People.change_at`) stays the one rule for one hex, with one new factor. Hunger, crowding and the room rules do not
-change. Growth now needs the country fed (as today) and is scaled:
+### 4.5 People: surplus and prosperity (Q8)
 
 ```
 mult   = 500 + surplus x 350 / 1000 + prosperity x 350 / 1000          # permille; 500 fed only, 1200 at best
 growth = floor(people x growth_bp[tax] x growth_percent[slot] x mult / 1e9)
 ```
 
-- **Surplus** (0 to 1000): how far the country's food made over the season exceeds the food its towns eat, scaled so a surplus
-  of 25 % of the need or more counts 1000 (data constants).
-- **Prosperity** (0 to 1000): the mean of M4's contentment (wine, salt, oil, food) and a new **comfort** (cloth and bread
-  met for the towns, appetite per 1,000 town people, like the other needs). Comfort changes growth only, not taxes: M4's
-  tax pins do not move.
+- **Surplus** (0 to 1000): food units made over the season minus food units eaten, as a share of the need; 25 % of the need
+  or more counts 1000 (data). Food units per 3.4.
+- **Prosperity** (0 to 1000): the mean of M4's contentment (wine, salt, oil, food) and the new **comfort** (cloth met for towns
+  plus bread's share of food eaten). Growth only, not taxes: M4's tax pins do not move.
+- Pace (a village to a town, 34 seasons today in frost at Normal): at mult 500 it takes 68, at 750 45, at 1000 34, at 1200 28.
+  Hunger, crowding and room rules do not change; settlements still raise themselves to town only.
 
-Pace check, a village growing to a town (34 seasons today in frost at Normal): at mult 500 it takes 68, at 750 it takes 45,
-at 1000 as today 34, at 1200 it takes 28. A country that only just feeds its people grows slowly; a rich fed one grows faster
-than today. Settlements still raise themselves to town only; walls and cities stay the crown's works.
+### 4.6 How it feeds treasury, trade, people, army
 
-### 4.7 How it feeds treasury, trade, people, army
+- **Treasury:** products are sold like any good, taxed by `tax_goods`. Workshops pay upkeep; bought input is a new expense
+  line. The report shows Goods, "worked", "bought" and a per-country "Industry added +n" note.
+- **Trade (M10):** cloth, arms and bread get appetite and market prices; a glut of cloth lowers its price (the natural brake,
+  from M10 only). `Buying` becomes a real market read.
+- **People:** bread feeds, bread and cloth raise prosperity; bigger towns have more slots and a better tier.
+- **Army (M6, M7):** arms are required to raise a company; a country without them buys them at a premium (3.7). The
+  armourer is strategic, not just a sale good. No quality effect of arms in the first version.
 
-- **Treasury:** processed goods are sold like any good, so `tax_goods` (50 / 70 / 90 %) taxes their value. No new line is
-  needed; the report's Goods section shows the new goods and "worked" flows. Workshops pay upkeep (stage 2: 3 a season, like a
-  mine) so a badly sited one can lose money.
-- **Trade (M10):** cloth, arms and bread get an appetite and a market price like the others; a glut of cloth now lowers its
-  price. That is the natural brake on industrial snowball, and it works only from M10.
-- **People:** comfort goods (cloth, bread) raise prosperity, so industry feeds growth; bigger towns host better workshops.
-- **Army (M6):** arms stand in for iron when raising a company (1 arms = 2 iron in the cost goods, Q12), so an armourer
-  cheapens war. No quality effect in the first version.
+## 5. Worked numbers under the new rules
 
-## 5. Worked numbers: raw only against industry
+All per year (4 seasons), stage 2 slot, calm weather, Normal taxes (crown takes 70 %), fixed prices, market buying at 1.2x.
+Raw from M4's frost column: wool 48 (x1.5 = 72, crown 50.4), iron 29 (x2.0 = 58, crown 40.6), grain 32 (x1.0 = 32, crown
+22.4). "Own" = own working raw district at hand, input from the country's own surplus (bonus 1.25). "Bought" = no raw land,
+all input at 1.2x, no bonus. "Net" = crown take of the product, minus what the raw would have given the crown (own) or the
+buying cost (bought), minus upkeep (weaver and armourer 12 a year, bakery 8).
 
-All per year (4 seasons), stage 2 districts, calm weather, Normal taxes, fixed prices. Raw output from M4's frost-year column
-(sheep 48 loads, iron 29, wheat 32). The workshop takes all of that tile's output (capacity is not the limit). "Worth" is the
-value of what is sold; the crown takes 70 % of it. Gain is worth minus the raw worth.
+**Chain 1: wool -> cloth (6.0 a load)**
 
-**Chain 1: wool -> cloth** (raw: 48 wool x 1.5 = **72**)
+| Site | Yield | Cloth | Worth | Crown 70 % | Net before upkeep | Net after upkeep |
+|---|---|---|---|---|---|---|
+| Village, own wool | 1.0 | 24 | 144 | 100.8 | +50.4 | +38.4 |
+| Town, own wool | 1.25 | 30 | 180 | 126.0 | +75.6 | +63.6 |
+| Walled town, own wool | 1.375 | 33 | 198 | 138.6 | +88.2 | +76.2 |
+| City, own wool | 1.5625 | 37.5 | 225 | 157.5 | +107.1 | +95.1 |
+| Village, bought (cost 86.4) | 0.8 | 19.2 | 115 | 80.6 | -5.8 | -17.8 |
+| Town, bought | 1.0 | 24 | 144 | 100.8 | +14.4 | +2.4 |
+| City, bought | 1.25 | 30 | 180 | 126.0 | +39.6 | +27.6 |
 
-| Site | Yield | Cloth | Worth | Gain over raw |
-|---|---|---|---|---|
-| Village, no wool at hand (0.8) | 19.2 | 19.2 x 6 | 115 | +43 (+60 %) |
-| Town, no wool at hand (1.0) | 24 | 24 x 6 | 144 | +72 (+100 %) |
-| Town, wool at hand (1.25) | 30 | 30 x 6 | 180 | +108 (+150 %) |
-| City, wool at hand (1.5625) | 37.5 | 37.5 x 6 | 225 | +153 (+212 %) |
+**Chain 2: iron -> arms (9.0 a load)**
 
-**Chain 2: iron -> arms** (raw: 29 iron x 2.0 = **58**)
+| Site | Yield | Arms | Worth | Crown | Net before | Net after |
+|---|---|---|---|---|---|---|
+| Village, own iron | 1.0 | 14.5 | 130.5 | 91.4 | +50.8 | +38.8 |
+| Town, own iron | 1.25 | 18.1 | 163.1 | 114.2 | +73.6 | +61.6 |
+| City, own iron | 1.5625 | 22.7 | 203.9 | 142.7 | +102.1 | +90.1 |
+| Village, bought (cost 69.6) | 0.8 | 11.6 | 104.4 | 73.1 | +3.5 | -8.5 |
+| Town, bought | 1.0 | 14.5 | 130.5 | 91.4 | +21.8 | +9.8 |
+| City, bought | 1.25 | 18.1 | 163.1 | 114.2 | +44.6 | +32.6 |
 
-| Site | Arms | Worth | Gain |
-|---|---|---|---|
-| Village, none at hand | 11.6 | 104 | +46 (+80 %) |
-| Town, none at hand | 14.5 | 131 | +73 (+125 %) |
-| Town, iron at hand | 18.1 | 163 | +105 (+181 %) |
-| City, iron at hand | 22.7 | 204 | +146 (+252 %) |
+**Chain 3: grain -> bread (2.4 a load; also food at 1.5 a load)**
 
-**Chain 3: grain -> bread** (raw: 32 grain x 1.0 = **32**; only surplus above the reserve is baked)
+| Site | Yield | Bread | Worth | Crown | Net before | Net after | Food units made from the grain |
+|---|---|---|---|---|---|---|---|
+| Village, own grain | 1.0 | 21.3 | 51.2 | 35.8 | +13.4 | +5.4 | 32 (from 32: neutral) |
+| Town, own grain | 1.25 | 26.7 | 64.0 | 44.8 | +22.4 | +14.4 | 40 (+8) |
+| City, own grain | 1.5625 | 33.3 | 80.0 | 56.0 | +33.6 | +25.6 | 50 (+18) |
+| Village, bought (cost 38.4) | 0.8 | 17.1 | 41.0 | 28.7 | -9.7 | -17.7 | 25.6 imported |
+| Town, bought | 1.0 | 21.3 | 51.2 | 35.8 | -2.6 | -10.6 | 32 imported |
+| City, bought | 1.25 | 26.7 | 64.0 | 44.8 | +6.4 | -1.6 | 40 imported |
 
-| Site | Bread | Worth | Gain |
-|---|---|---|---|
-| Village, none at hand | 17.1 | 41 | +9 (+28 %) |
-| Town, none at hand | 21.3 | 51 | +19 (+60 %) |
-| Town, wheat at hand | 26.7 | 64 | +32 (+100 %) |
-| City, wheat at hand | 33.3 | 80 | +48 (+150 %) |
+The bakery is a thin ducat earner and a good people engine: it makes more food from the same grain in a bigger town, and
+bought grain is food imported at 1.2 ducats a unit (a famine relief, bounded by capacity and a slot).
 
-**Chain 4 (raw is enough): silk.** 9 loads x 6.0 = **54** a year from one tile, no industry in the first version. A silk tile
-earns more than a plain bread chain in a town. Raw luxury stays a real strategy.
+**Chain 4 (raw is enough): silk.** 9 loads x 6.0 = 54 a year from one tile, no industry. Raw luxury stays a real strategy.
 
-**Is it worth the hex?** A second raw wool tile adds 72 worth. A weaver beside the first tile adds 43 (village, no wool at
-hand), 72 (town), 108 (town, wool at hand) or 153 (city, at hand). So a bad site (village, far from the raw) loses to simply
-planting more raw land; a good site clearly wins. Treasury effect of the good town weaver: +108 x 0.7 = 75.6, less upkeep
-12 = about **+64 a year**, for a cost of about 200 ducats and 10 timber: a payback of about 3 years, against about 2.5 for a
-new raw tile (100 + 10 timber, +42 a year after upkeep). Industry pays back at about the same pace as raw but adds to what the
-raw tile already makes, and raw land is limited by terrain.
+**Is it worth the slot?** Weaver in a town with own wool: net +63.6 a year for about 200 ducats and 10 timber: payback about
+3.1 years, against about 2.5 for a raw tile (100 + 10 timber, +42 after upkeep). A bought-only village slot loses money, so
+the bad site is also a visible loss (the card says so). The slot is not free: a settlement has 1 to 4 of them.
 
-**A whole country.** A country with one stage-2 sheep district, one iron mine and one wheat district, each with a workshop in
-a town with the raw at hand: raw-only worth 72 + 58 + 32 = 162 (crown 113); with the three workshops 180 + 163 + 64 = 407
-(crown 285, less 36 upkeep = 249). That is about +136 a year, 2.2 times the raw crown take, or about +30 % on Genoa's
-whole 1480 income of 458 a year (M4 4.15). It must not be more: the soak target is an industrial country earning 1.2 to
-1.6 times a raw-only twin at year 40, and the raw-only twin never below 60 % of it.
+**A whole country.** One stage-2 sheep, iron and wheat district; weaver and armourer in a town (2 slots), bakery in a second
+town, all own at hand: raw crown 113.4; with industry 113.4 + (75.6 + 73.6 + 22.4) - 32 upkeep = 252.9: about **+139.6 a year**,
+2.2 times the raw crown, about +30 % on Genoa's 1480 income of 458. Soak target unchanged: an industrial country earns 1.2 to
+1.6 times its raw-only twin at year 40, and the raw-only twin never falls below 60 % of it.
 
 ## 6. Player and AI
 
-**Player:** builds a workshop through the same works card as every district (cost, stages 4 / 8 / 16 seasons, ground rules).
-The card shows the recipe, tier, "at hand" bonus, this season's use and output and the change in income, from the same code
-the season runs (`ImprovePreview`), so what the card says is what happens.
+**Player:** waits for the industry's year (3.6), then builds it in a free slot through the settlement's works card (cost, stages
+4 / 8 / 16 seasons). The card shows the recipe, tier, whether own raw is at hand, the Buy inputs switch, this season's use,
+buying and output, and the income change per year, from the same code the season runs (`ImprovePreview`).
 
-**AI (M8 `AiEconomy`):** workshops are one more option in `works_scan` (hexes within two of a settlement of level 2 or more).
-The prior is the card's payback; it is zero when the input has no surplus, so the AI never builds a weaver without wool. Each
-temper gets one data weight (`industry_priority`: merchants high, warlike armourer-leaning, builders middle, as the walls
-priority is done today). The AI also upgrades a settlement partly for the workshops it hosts. Traces log "industry: weaver at
-(x, y), wool at hand, payback n seasons". No AI micro-management: it builds and upgrades, the season runs the rest.
+**AI (M8 `AiEconomy`):** one new option, a slot build in `works_scan` (settlements with a free slot and an open industry),
+plus the arms readiness rule and the strategic armourer weight (3.7). The prior is the card's payback, zero when there is neither a surplus nor a positive bought-input
+margin, so the AI never builds a loss maker. One data weight per temper (`industry_priority`). It also upgrades a settlement
+partly for its slots and builds raw next to its industry towns (3.5). No micro-management. Traces log "industry: weaver in
+Genoa slot 2, own wool at hand, payback n seasons".
 
 ## 7. UI
 
-Points to `docs/design/ui/` (the Studiolo style) and the tile window of issue #436.
+Points to `docs/design/ui/` (the Studiolo style) and the tile window #436.
 
-- **Tile window (#436):** header with name and owner; a Details block with **Raw** (good, loads this season), **People**,
-  and for a workshop the **Chain** line "2 wool -> 1 cloth: town x1.0, wool at hand x1.25, uses 12, makes 15, worth 90".
-  A Build tab lists raw districts and workshops with their cards; the tab for an army and the tab for ships are #436's.
-  A foreign tile shows its piece, stage and owner, and nothing about its output (section 9). A sea or unseen tile shows
-  what it shows today.
-- **Works card:** one new section "Industry" with the recipe, the tier table (village / town / city), whether raw is at
-  hand, the capacity, and the change in income per year.
-- **Goods screen (Statesman's Study, Economy page):** the goods list shows the new made goods; a "worked" column and each
-  workshop's line. The Treasury section does not change.
-- **Map:** the workshop is drawn as its own piece (a Kenney-style flat building with its smoke or loom mark); the "at hand"
-  relation shows as a thin link to the raw tile while the card is open, like M4's map marks.
-- **People:** the town card adds the surplus and prosperity bars and the growth speed in words ("slow", "steady", "fast").
-- **Report:** the Goods section lists "worked" and "made" per good; a new Industry note per country in the glance ("Industry
-  added +64 this year").
+- **Tile window (#436):** own settlement: Details (people, raw, goods), tab **Industries** (slot rows, Build, "opens in <year>" lines),
+  tabs for army and ships are #436's. A raw district shows "Raw: wool, 12 loads". Foreign: piece, stage, owner, slot kinds
+  if seen. Sea or unseen: as today.
+- **Works card (slot):** recipe, tier table (village / town / city), own raw at hand (a yes or no and where), Buy inputs
+  switch, capacity, change in income per year.
+- **Goods screen (Statesman's Study):** the new goods, "worked" and "bought" columns, each slot's line, an **Industries**
+  list (open and not yet open, with the year; M11 replaces the year with the tech link). Treasury page: the "Inputs bought" line.
+- **Map:** a small mark per working slot; the "at hand" relation as a thin link to the own raw tile while the card is open.
+- **People:** the town card adds the surplus and prosperity bars, the growth word ("slow", "steady", "fast") and bread's food
+  line.
+- **Report:** per good "worked", "bought", "made"; the glance note "Industry added +64 this year".
 
 ## 8. Interactions
 
 | System | Effect |
 |---|---|
-| Economy (M4) | One new step in `production`; `EconomySeason`, `EconomyPreview` and `DistrictCache` learn the workshop. The cache keeps tier and "at hand" (season-free); the input is run in the country step |
-| People (M5) | `change_at` takes `mult`; two new numbers per country derived each season, not stored |
-| War (M6, M7) | Armies raised with arms; occupying a town hands its workshops to the new owner; a lost town lowers tier at once; pillaging stays out |
-| Diplomacy (M9) | Nothing new. War weariness reads `tax_goods`, which now includes made goods |
-| Trade (M10) | New goods in markets, appetite and price tuning (X31 includes them); free traders carry cloth and arms; a toll on them |
-| Research (M11) | Modifier keys: `industry_unlock` (which families), `industry_yield_permille`, `industry_stage_max`. Guilds opens stage 3; Ropewalk, Glass and leather, Corned powder add workshops in era II |
-| Debt (M12) | Workshops are upkeep, so a deficit shows sooner; no other change |
+| Economy (M4) | One new step in `production`; `EconomySeason`, `EconomyPreview`, `DistrictCache` learn slots; food measured in food units; a treasury line |
+| People (M5) | `change_at` takes `mult`; surplus and prosperity derived each season, not stored; slots idle on a level drop |
+| War (M6, M7) | Arms required to raise a company, bought at a premium if short (3.7); conquest and occupation rules in 3.5; raw loss removes the bonus; pillage out |
+| Diplomacy (M9) | Nothing new; war weariness reads `tax_goods`, now including made goods |
+| Trade (M10) | Replaces `Buying`; cloth, arms, bread get appetite and prices (X31); free traders carry them; a toll on them |
+| Research (M11) | Modifier keys `industry_unlock`, `industry_yield_permille`, `industry_stage_max`; replaces the year gate: Guilds and Crop rotation open the industries |
+| Debt (M12) | Upkeep and purchases show deficits sooner; no other change |
 
 ## 9. Saves, balance, fog
 
-**Saves (FORMAT).** `save_file.gd` is at FORMAT 6 with OLDEST_FORMAT 6 and no upgrade step yet. What changes: goods ids
-appended (stock and stats arrays are already padded with zeros when shorter); `MapState.main_use` ids appended for the three
-workshop families; Stores `FLOWS` appends `worked`; `Stats.SERIES` appends the industry rows; the digest text gains the new
-flows. No new stored field for the efficiency: tier and "at hand" are derived. But a saved game plays differently afterwards
-(growth rule, dropped keep_wild), so replays and digests of old saves would differ. Recommendation: bump FORMAT to 7 and
-refuse older saves with a clear message, since public save compatibility only starts at M12 (Q10). `ScenarioDef` and the
-scenario bake: workshop families added to the family list; a few start workshops (Q11).
+**Saves (Q10).** Bump `save_file.gd` FORMAT to **7** and refuse older saves with a clear message (public save compatibility
+starts at M12). Changes in the file: goods ids 16 to 18; `MapState` slot lists per settlement hex; unit defs use arms; Stores `FLOWS` + `worked`, `bought`; `Stats.SERIES` industry rows; a treasury line; the digest text. The saved game plays by
+new rules (growth, no `keep_wild`), so old digests cannot match anyway.
 
-**Balance.** The crown takes 70 % of sales, so a new good adds to treasuries quickly. The brakes, in order: input must exist as
-surplus, capacity by stage, upkeep, the hex it takes, tier and "at hand" siting, and from M10 the falling price of a glut.
-`IndustryFixture.off(defs)` (tests only, same pattern as `TradeFixture.still` and `ResearchFixture.off`): no workshop usable and
-`mult` fixed at 1000, so every pin of M3 to M9 holds. Genoa's table (M4 4.15) is untouched: all workshops off, and the dropped
-`keep_wild` floors to 0 in it already.
+**Balance.** The brakes, in order: slots per settlement, the year gate, input as own surplus or bought at 1.2x,
+capacity by stage, upkeep, tier and own-raw siting, and from M10 falling prices. `IndustryFixture.off(defs)` (tests only, the
+`TradeFixture.still` pattern): no slot usable, `Buying` off, `mult` fixed at 1000, bread stock zero, so every pin of M3 to M9
+holds. Genoa's table (M4 4.15) is untouched.
 
-**Fog and knowledge.** You see a foreign piece if you see or know its hex (it is drawn); you do not see its output, tier
-bonus, stock or comfort. Market prices of cloth and arms follow M10's knowledge rule (only markets you know). Standing and
-rankings stay banded; no new exact value of another country leaks. The viewer `&""` (tests) sees all, as before. A lost tile
-is not fogged for the old owner by this system (that is #435, one rule shared).
+**Fog.** A foreign settlement's slot kinds and stages are visible with the hex; output, tier bonus, stocks, buying and
+comfort are not. Cloth and arms prices follow M10's knowledge rule. Rankings stay banded. The test viewer `&""` sees all. A
+lost tile's fog is #435's one shared rule.
 
 ## 10. Tests and the soak
 
-- Pure unit tests: the recipe step (integer floors, capacity, surplus), tier table, "at hand" scan, growth `mult`, 40 cases
-  seeded; text test that no writer of stock exists outside `stores.gd`; the money and goods properties (M4 done-when 2) extended
-  to `worked`.
-- Preview equals season for workshops: 200 seeded cases (M4 done-when 4) now include workshop builds and upgrades.
-- Worked-numbers test: each cell of the tables in section 5 pinned on a fixture, so the doc and the code cannot drift.
-- Soak (`tools/soak.gd`, suites ai, passive, europe): invariants every season: no negative stock; made never above capacity x
-  tier x at-hand; `worked` equals the raw taken; people grow only when fed. Ranges: an industrial twin earns 1.2 to 1.6 times
-  the raw-only twin at year 40; at least half of the AI countries own a workshop by year 40; no AI ruin from workshops alone.
-- `tools/economy_report.gd` gains an industry block (per country, per workshop: used, made, worth, tier, at hand).
-- Goldens (UI screenshots) change for the goods screen, works card and tile window: planned with #436, refreshed once.
+- Pure unit tests: recipe step (floors, capacity, own then bought, treasury floor), tier and slot tables, own at-hand scan with
+  the stage rule, food units and no double counting, growth `mult` (40 seeded cases), no stock writer outside `stores.gd`, money
+  and goods properties extended to `worked` and `bought`.
+- Pins: "needs met and reserve unchanged after the works step"; "bought-only village slot never raises the treasury"; "a level
+  drop idles the top slot and nothing else"; "capture hands slots over, bonus recomputed".
+- Preview equals season for slots: 200 seeded cases now include slot builds, the year gate, Buy inputs and raising with arms.
+- Worked-numbers test: each cell of section 5 pinned on a fixture so doc and code cannot drift.
+- Soak (`tools/soak.gd`): invariants every season: no negative stock; made never above capacity x tier x at-hand; `worked +
+  bought` equals input taken; people grow only when fed; no slot built before its industry's year; no raise without arms. Ranges: industrial twin 1.2 to 1.6 of the
+  raw-only twin at year 40; at least half the AI countries own a workshop by year 40; no AI ruin from workshops or buying alone;
+  no country buying more than a set share of its inputs for 40 years (a monitor for the unlimited-supply loophole).
+- `tools/economy_report.gd` gains an industry block (per country and slot: used, bought, made, worth, tier, at hand).
+- Goldens change for the goods screen, works card and tile window: planned with #436, refreshed once.
 
-## 11. Where it fits, and what to cut or reorder
+## 11. Where it fits (Q9)
 
-Order today: M7 war (in build), M8 AI (specced, `ai_economy.gd` exists), M9 diplomacy, M10 trade, M11 research, M12 whole game.
-
-Recommended: **M9.5 "Industry", after M9 and before M10**, with the tile window (#436) built just before it so the window is
-the home of the chain line. Reasons: M10 tunes appetites and prices good by good (task X31); doing industries first means one
-tuning, not two. M11 can then give industries their techs as modifier rows without a rewrite. M9 (diplomacy) hardly touches
-the economy, so nothing blocks the order. Fits roughly one M4-sized slice: defs and recipes, the workshop family and its works
-rules, the production step and preview, growth rule, AI option, cards and tile window rows, report and stats, tests and
-soak, docs. M10's spec needs a small edit (three more goods, appetite rows, `worked` in its flow table); M11's table adds
-three modifier keys.
-
-Cut for the first version: building slots inside settlements, luxury industries, mint, workshops that buy input from the market,
-winter and weather for workshops, quality of goods, prosperity room, specialisation by country. Reorder: nothing from M10 to M12
-leaves; the era II workshops (rope, glass, leather, powder) wait for M11's techs.
+Order: M7 war (building), M8 AI, M9 diplomacy, **M9.5 Industry**, M10 trade, M11 research, M12 whole game. The tile window
+(#436) is built just before M9.5 and must leave an Industries tab. M9.5 is now about **1.3 M4-sized slices** (slots and the
+settlement panel, the home market seam, arms as a raise cost and bread-as-food are new); plan it as two build groups: **A** the model
+(defs, slots, recipes, year gate, arms in unit defs, stores, season step, preview, tests), **B** the surfaces (growth rule, `Buying`, AI options,
+cards and Industries tab, report, soak ranges, docs). M10's spec gets three edits (goods and appetite rows, `Buying`
+replacement, `worked`/`bought` in its flow table); M11's gets four modifier keys and the removal of the year gate; M10's also gets the arms embargo line.
 
 ## 12. Risks
 
-- **Snowball.** Rich countries build more workshops. Brakes in 9; the soak range and M10's falling prices. If still strong,
-  lower tier 1250 to 1150 (data only).
-- **Feels like a spreadsheet.** The chain line and the "at hand" link on the map must be clear. Playtest with the card first.
-- **Starving by industry.** Prevented by the reserve rule (workshops take only surplus), pinned by a test.
-- **Input arbitrage (M10).** If workshops could buy raw abroad cheaply, import-process-sell loops appear. Not allowed in v1.
-- **Growth slower than today for unfed-surplus countries** (500 vs 1000 permille). Intended, but a playtest must confirm it
-  does not stall early game; the pace table in 4.6 is the lever.
-- **Two numbers for "raw" (wild yield).** Dropping `keep_wild` on goods districts changes a few small pins; the grep of
-  tests is the first task.
-- **Tier drop on a hungry town** can collapse a chain; the card should warn ("this town is under 3,000 people").
-- **Build size.** About one M4-sized slice; do not add era II workshops to it.
+- **Snowball.** Rich countries with own raw and cities pull ahead. Brakes in section 9; soak range; lower the city tier 1250
+  to 1150 (data only) if still strong.
+- **The seam.** `Buying` may not fit M10; keep it two functions and stub-tested.
+- **Unlimited-supply loophole until M10.** A landless city weaver earns about +28 a year on bought input; capped by slots,
+  capacity and the soak monitor; gone when M10 prices bite.
+- **Food model confusion.** Two food units (grain 1.0, bread 1.5) and a surplus in food units may confuse players; the town
+  card must say it in words.
+- **Slot and level upgrade share one job.** Can slow a growing city; see N5.
+- **The year gate dies with M11.** Little throw-away code (a year table); one spec line removes it.
+- **Arms make wars dearer and slower to start.** +16 % (own arms) to +43 % (bought) on a company; the soak watches army size;
+  levers are data only (3.7). An AI with no armourer buys at the premium, so early wars can drain treasuries.
+- **Spreadsheet feel.** The chain line and at-hand link must be clear; playtest the card first.
+- **Slower growth** for countries that only just feed their people (500 vs 1000): intended, playtest early game.
+- **Build size.** Do not add era II industries to M9.5.
+- **Arms as the raise bottleneck.** A country that loses its armourer town in war cannot rearm except by buying; in M10 a
+  blockade can stop that. Intended, but the AI's readiness rule must be tested for deadlocks (no raise, no peace).
 
 ## 13. Smallest first version
 
-Three workshops (weaver, armourer, bakery), on their own hexes within two of a village or bigger; tier table; "at hand" +25 %;
-the production step and preview; the growth multiplier with surplus and prosperity (comfort from cloth and bread); one AI
-option with a temper weight; the works card section and the tile window rows; the three goods; tests, soak ranges, the
-economy report. No trade effects yet beyond fixed prices; M10 adds prices.
+Three industries (weaver, armourer, bakery) as settlement slots (village 1, town 2, walled 3, city 4); year gate as the
+tech stand-in; arms required to raise a company (own or bought at a premium); tier table; own at-hand +25 %; the home market `Buying` at 1.2x for the three inputs; bread as food 1.5; the
+growth multiplier with surplus and prosperity (comfort from cloth and bread); one AI option pair with a temper weight; the
+Industries tab, works card section, the raise card's arms line and report lines; three goods; tests, soak ranges, economy report. No real prices (M10).
 
 ## 14. Questions for the owner
 
-1. **Where does an industry stand?** (A) on its own hex near a town, a goods district like the others; (B) a building slot
-   inside the settlement hex, with slots by level (hamlet 0, village 1, town 2, walled 3, city 4). Recommend A for the first
-   version: it reuses works, pieces, previews and the AI unchanged and keeps one piece a hex; B needs a new per-hex state
-   and a save change, and can come later on top of A.
-2. **Which industries first?** Recommend three: weaver (wool), armourer (iron), bakery (grain). Rope, tannery, glassworks,
-   powder mill come with M11's era II techs.
-3. **Tier numbers and who can host.** Recommend village 0.8, town 1.0, walled 1.1, city 1.25, hamlets cannot host.
-   Alternative: allow hamlets at 0.6.
-4. **"Raw at hand".** Recommend +25 % when a raw district is within two hexes, any owner. Alternative: only your own district,
-   or a graded bonus by how much raw it makes.
-5. **One raw per tile and the wild yield.** Recommend dropping the small `keep_wild` second yield on goods districts only;
-   settlements and ports keep theirs. Alternative: keep everything and only show one raw in the tile window.
-6. **Where do inputs come from?** Recommend only the surplus above the reserve in the country's stores. Alternative (from
-   M10): workshops may buy raw at the home market; richer, but creates arbitrage.
-7. **Is bread food?** Recommend no: a comfort good that helps growth and sells, so the food rules stay as they are.
-   Alternative: bread feeds 1.5 loads of grain (baking then costs no food).
-8. **Growth rule.** Recommend `500 + 350 x surplus + 350 x prosperity` (ceiling 1200 of today's pace). Alternative: ceiling
-   1000, so no country ever grows faster than now.
-9. **Milestone placement.** Recommend M9.5 after M9, before M10, with the #436 tile window first. Alternatives: fold it into
-   M10 (one tuning, bigger milestone) or after M12 (safest, but the economy stays flat for the first public release).
-10. **Saves.** Recommend bump FORMAT to 7 and refuse older saves with a clear message. Alternative: keep loading old saves
-    (they would play by the new rules from the load).
-11. **Historic start workshops (1480).** Recommend a few in the Italy scenario as data (Florence weavers, Milan armourers),
-    so the AI and the player see industry from turn 1. Alternative: none, everyone builds.
-12. **Arms and the army.** Recommend arms replace iron in a company's cost (1 arms = 2 iron), no quality effect yet.
-    Alternative: arms in the store give new companies +1 attack, which needs an M7 balance pass.
+**Closed by the owner's answers of 2026-11-23:** Q1 slot in the settlement; Q2 weaver, armourer, bakery; Q3 0.8 / 1.0 / 1.1 /
+1.25, no hamlets; Q4 own raw only; Q5 one raw per tile, drop `keep_wild` on goods districts; Q6 buy from the market; Q7 bread
+is food; Q8 `500 + 350 x surplus + 350 x prosperity`, ceiling 1200; Q9 M9.5, tile window first; Q10 FORMAT 7, refuse older
+saves; Q11 no start workshops, technology unlocks; **Q12 arms are needed to raise companies, bought at a premium if not made
+(3.7)**; **N1 industries open from a set year (no charter), M11 replaces the year with techs (3.6)**; **N2 market buying 1.2x
+base, per-workshop switch, treasury floor**; **N3 bread is 1.5 food per load**; **N4 slots grow with the settlement, 1 / 2 / 3
+/ 4 by level, one of each industry**; **N5 one job per settlement hex at a time**.
+
+**Default, owner to confirm:**
+
+N6. **At-hand rule detail.** Own district, working at stage 2 or more, within two hexes, flat 25 %. Alternatives: stage 1
+    counts; or the bonus scales with the raw's output. **Default: stage 2 or more, flat 25 %.**
+
+**New questions from this revision (each with a recommendation):**
+
+N7. **The arms premium and the count per company.** Recommend 1500 permille of base (13.5 a load) and 1 arms per pikemen,
+    crossbowmen and knights company, 2 per bombards. Alternatives: premium 1300 (kinder to a young country) or 2000 (makes the
+    armourer almost mandatory). The soak tunes it; the card shows both prices.
+N8. **A raise with no arms and no money.** Recommend refusal with a clear line, no half-equipped company. Alternative: a
+    cheap unarmed "levy" company at half strength, raisable without arms (a safety valve against deadlock, but a new unit kind
+    and a balance pass).
+N9. **Arms for refit and upgrade (M6).** Recommend refit and upgrade costs use arms as well (the same data pass as 3.7), with
+    the same buying rule. Alternative: they keep iron, so arms are only for raising.

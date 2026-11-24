@@ -44,6 +44,7 @@ var _body_filled: bool = false
 var _closed: bool = false
 var _ui_built: bool = false
 var _serial: int = 0
+var _insets: Array[MarginContainer] = []  # the "What befell" label insets, set to the theme's link inset (_apply_insets)
 
 
 ## Builds the frame and footer once; safe before the screen enters the tree.
@@ -84,6 +85,7 @@ func _apply_layout() -> void:
 
 func _ready() -> void:
 	_ensure_ui()
+	_apply_insets()
 
 
 ## Fills the sheet from a SeasonSummary.of dictionary. `reopened` true when J or the log reopened an older report
@@ -110,6 +112,7 @@ func show_summary(summary: Dictionary, reopened: bool = false) -> void:
 func on_enter() -> void:
 	_ensure_ui()
 	_apply_layout()
+	_apply_insets()
 	if ctx != null and not ctx.top_inset_changed.is_connected(_apply_layout):
 		ctx.top_inset_changed.connect(_apply_layout)
 	var reduce := _reduce_motion()
@@ -333,6 +336,7 @@ func _text_column(line: Dictionary) -> VBoxContainer:
 		var inset := MarginContainer.new()
 		inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		inset.add_theme_constant_override(&"margin_left", _link_inset())
+		_insets.append(inset)
 		inset.add_child(label)
 		col.add_child(inset)
 	else:
@@ -379,13 +383,20 @@ func _record_of(action: Array) -> int:
 
 
 ## The left inset of a flat button's text (its normal style's content margin): the same inset a label takes beside a link.
+## Read from this screen's own theme chain (the stack's Studiolo theme), not from a probe button on the default theme, so
+## a label and a link line up in every theme (issue 443). The sheet is filled before the screen is in the tree, so the
+## insets are set again when it is (_ready, on_enter) by _apply_insets.
 func _link_inset() -> int:
-	var probe := Button.new()
-	probe.flat = true
-	var box := probe.get_theme_stylebox(&"normal")
-	var inset := int(box.get_content_margin(SIDE_LEFT)) if box != null else 0
-	probe.free()
-	return inset
+	var box := get_theme_stylebox(&"normal", &"Button")
+	return int(box.get_content_margin(SIDE_LEFT)) if box != null else 0
+
+
+## Sets every "What befell" label's inset to the screen's theme value (see _link_inset).
+func _apply_insets() -> void:
+	var inset_px := _link_inset()
+	for inset: MarginContainer in _insets:
+		if is_instance_valid(inset):
+			inset.add_theme_constant_override(&"margin_left", inset_px)
 
 
 func _link_button(line: Dictionary, tone: String, target: Dictionary) -> Button:

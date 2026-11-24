@@ -128,6 +128,7 @@ func test_the_numbers_follow_the_bus() -> void:
 	for emit: Callable in emits:
 		c.treasury += 1
 		emit.call()
+		await get_tree().process_frame  # work_finished refreshes the chips at the next idle frame (issue 441)
 		assert_eq(_chips.ducats_chip().value_label().text, Words.number(c.treasury), "the Ducats chip follows the treasury")
 
 

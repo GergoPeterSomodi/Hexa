@@ -722,7 +722,12 @@ func _assert_invariants(
 			# frames of a slow machine): an autosave between two of them leaves unsaved at 1, not 0 (found under load: turn 12 -> 14,
 			# unsaved 4 -> 1, slot auto1). The season_ended events counted by the monkey say so; nothing else explains a change.
 			var seasons_ended := int(_n.get("seasons", 0)) > _step_seasons
-			if not picked and not autosaved and not seasons_ended and not _dev_changed:
+			# A season still running after the step (its countries' turn, or its end, which runs one phase a frame: issue 441)
+			# moves the digest with no accepted action; the M8 invariants judge it (monkey_m8.gd), not this check.
+			var season_running := Session.in_season()
+			if season_running and not seasons_ended:
+				assert_eq(Session.unsaved_actions, prev_unsaved, "%s: a running season accepts no player act (unsaved moves at its finish only)" % tag)
+			if not picked and not autosaved and not seasons_ended and not season_running and not _dev_changed:
 				if Session.unsaved_actions <= prev_unsaved:
 					gut.p("DIGEST DIAGNOSTIC %s: turn %d -> %d, seasons ended this step %d, unsaved %d -> %d, slot '%s' -> '%s', digest %s -> %s" % [
 						tag, _step_turn, Session.game.turn, int(_n.get("seasons", 0)) - _step_seasons, prev_unsaved, Session.unsaved_actions,

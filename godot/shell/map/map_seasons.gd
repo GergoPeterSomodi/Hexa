@@ -133,11 +133,12 @@ func request_next() -> void:
 	TilesetBuilder.request_season(seasons[(seasons.find(_scene.season) + 1) % seasons.size()], _scene.is_half_textures())
 
 
+## The swap starts here and its first slice runs in the next frame (tick), not in the frame that ends the season: the
+## season-end frame already holds the phases (M8 K29c, issue 441). Only the next-season request is made at once.
 func _swap_to(loaded: TilesetBuilder) -> void:
 	tiles = loaded
 	var view := _scene.view()
 	view.begin_season_swap(loaded, _hexes_on_screen())
-	view.swap_step(_scene.slice_ms)
 	request_next()
 
 

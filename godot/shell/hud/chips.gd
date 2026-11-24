@@ -47,6 +47,7 @@ var _people_card: Dictionary = {}
 var _food_card: Dictionary = {}
 var _stores_card: Dictionary = {}
 var _army_card: Dictionary = {}
+var _refresh_queued := false  # a deferred refresh is waiting for the work_finished burst to end
 ## Whether the data wants each chip (a game with the resource); the top bar's fit may still hide it.
 var _wanted: Dictionary = {}
 ## Whether a season has closed for People and Food: before it, their changes show no DeltaChip.
@@ -336,7 +337,15 @@ func _on_work_started(_tag: StringName, _hex: Vector2i, _work: Dictionary) -> vo
 	refresh()
 
 
+## A season's works finish in one drain (one per work): the chips are rebuilt once, next frame, not once per work (issue 441).
 func _on_work_finished(_tag: StringName, _hex: Vector2i, _work: Dictionary) -> void:
+	if not _refresh_queued:
+		_refresh_queued = true
+		_flush_queued.call_deferred()
+
+
+func _flush_queued() -> void:
+	_refresh_queued = false
 	refresh()
 
 

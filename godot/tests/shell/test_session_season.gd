@@ -215,3 +215,25 @@ func test_passive_seats_are_kept_and_watch_only_in_the_pick() -> void:
 	assert_eq(Session.orders_progress().y, all + 1, "every country is a seat in a watched game")
 	Session.step_orders(INF)
 	Session.finish_season()
+
+
+## Issue 441: the season's end in steps (finish_step, one a frame in the flow) is the calls of finish_season in the same
+## order: the orders' end, each phase from movement on, then the finish, which emits season_ended once, on the last step.
+func test_the_end_in_steps_emits_season_ended_only_on_the_last() -> void:
+	Session.new_scenario(SCENARIO, 5, &"GEN")
+	Session.game.orders = StepHook.new()
+	assert_true(bool(Session.begin_season()["ok"]))
+	assert_true(Session.step_orders(INF))
+	var ended: Array = []
+	var h := func(turn: int) -> void: ended.append(turn)
+	Events.season_ended.connect(h)
+	var steps := 0
+	while not Session.finish_step():
+		steps += 1
+		assert_true(ended.is_empty(), "no season_ended before the last step")
+		assert_true(Session.in_season(), "the season is still running between steps")
+	Events.season_ended.disconnect(h)
+	assert_eq(steps, Season.PHASES.size(), "orders' end, the phases from movement on, then the finish: one step each")
+	assert_eq(ended.size(), 1, "season_ended once")
+	assert_false(Session.in_season())
+	assert_true(Session.finish_step(), "a step outside the season is done at once")

@@ -341,3 +341,21 @@ func test_open_the_study_hides_in_a_game_without_countries() -> void:
 	assert_false((report.find_child("StudyButton", true, false) as Button).visible, "the sandbox has no treasury")
 	_harness.stack.clear()
 	Session.game = prev
+
+
+## Issue 443: the "What befell" labels are indented by the link's inset read from the screen's own theme, so they line up
+## with the links in any theme (the old probe button read the default theme).
+func test_the_what_befell_indent_follows_the_screen_theme() -> void:
+	var theme := Theme.new()
+	var box := StyleBoxFlat.new()
+	box.content_margin_left = 17.0
+	theme.set_stylebox(&"normal", &"Button", box)
+	_harness.stack.theme = theme
+	var report := _open(ReportSample.genoa_spring())
+	assert_eq(report._link_inset(), 17, "the link inset is the theme's Button normal margin")
+	var indented := 0
+	for node: Node in report.find_children("*", "MarginContainer", true, false):
+		if (node as Control).has_theme_constant_override(&"margin_left"):
+			assert_eq((node as Control).get_theme_constant(&"margin_left"), 17, "an indented label of What befell lines up with the links")
+			indented += 1
+	assert_gt(indented, 0, "the sections have indented labels")

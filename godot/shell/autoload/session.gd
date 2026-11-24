@@ -48,6 +48,8 @@ var _defs: GameDefs = null
 var _origin: Dictionary = {}
 ## Between begin_season and finish_season: check and act are refused (M8 D40).
 var _in_season := false
+var _finish_next := 0  # the next step of finish_step (0 is the orders' end)
+var _ended_turn := 0  # the turn the season that finish_step ends was played in
 ## The tags the AI leaves alone; kept across games and given to each new hook.
 var _passive: Array[StringName] = []
 
@@ -252,24 +254,43 @@ func orders_progress() -> Vector2i:
 ## Ends the orders and runs each phase from movement on (draining after each), then emits season_ended once. A played
 ## season counts as an unsaved action.
 func finish_season() -> void:
+	while not finish_step():
+		pass
+
+
+## One step of the season's end (issue 441, the flow runs one a frame): step 0 is the orders' end, then each phase from
+## movement on (draining after each), then the finish, whose step emits season_ended once. The same calls in the same
+## order as finish_season, which runs them all. Returns true when the season is over (or was not running). Nothing else
+## can act between the steps: act and check are refused while in season.
+func finish_step() -> bool:
 	if not _in_season:
-		return
-	var ended_turn := game.turn
-	var started := Time.get_ticks_usec()
-	Season.orders_end(game)
-	drain()
-	last_phase_ms["ai_orders"] = float(last_phase_ms.get("ai_orders", 0.0)) + float(Time.get_ticks_usec() - started) / 1000.0
+		_finish_next = 0
+		return true
+	var phases: Array[StringName] = []
 	for phase: StringName in Season.PHASES:
-		if phase == &"ai_orders":
-			continue
-		started = Time.get_ticks_usec()
+		if phase != &"ai_orders":
+			phases.append(phase)
+	if _finish_next == 0:
+		_ended_turn = game.turn
+		var started := Time.get_ticks_usec()
+		Season.orders_end(game)
+		drain()
+		last_phase_ms["ai_orders"] = float(last_phase_ms.get("ai_orders", 0.0)) + float(Time.get_ticks_usec() - started) / 1000.0
+	elif _finish_next <= phases.size():
+		var phase: StringName = phases[_finish_next - 1]
+		var started := Time.get_ticks_usec()
 		Season.run_phase(game, phase)
 		last_phase_ms[String(phase)] = float(Time.get_ticks_usec() - started) / 1000.0
 		drain()
-	Season.finish(game)
-	unsaved_actions += 1
-	_in_season = false
-	Events.season_ended.emit(ended_turn)
+	else:
+		Season.finish(game)
+		unsaved_actions += 1
+		_in_season = false
+		_finish_next = 0
+		Events.season_ended.emit(_ended_turn)
+		return true
+	_finish_next += 1
+	return false
 
 
 ## Ends the season at once: begin_season, every AI step, finish_season. Refused with {ok: false, reason} and nothing

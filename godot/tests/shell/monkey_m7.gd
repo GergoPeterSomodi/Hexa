@@ -103,6 +103,8 @@ func _m7_dice(rng: Rng, vp: SubViewport, app: App) -> void:
 ## From FORCE_M7_STEP on, the first M7 action whose counter is still 0 (one a step). Until a battle is fought the war is prepared
 ## and a season played; the peace comes last (a truce follows it).
 func _m7_force(rng: Rng, vp: SubViewport, app: App) -> void:
+	if Session.in_season():  # a season runs (its end is one phase a frame, issue 441): no stall counted, nothing forced into it
+		return
 	var before := _m7_progress()
 	await _m7_force_one(rng, vp, app)
 	_changed_hexes.clear()  # as in _m7_step

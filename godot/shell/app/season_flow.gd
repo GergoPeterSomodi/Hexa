@@ -53,8 +53,11 @@ var summarize: Callable = Callable()
 var begin_season: Callable = Callable()
 ## (budget_ms: float) -> bool: runs AI steps for about that long; true when the turn is over (Session.step_orders).
 var step_orders: Callable = Callable()
-## () -> void: Session.finish_season.
+## () -> void: Session.finish_season. When set, it ends the season in one call (tests); when not, the end runs in steps.
 var finish_season: Callable = Callable()
+## () -> bool: one step of the season's end, true when the season is over (Session.finish_step). The steps run one a frame
+## of the phases stage (issue 441), so the season-end frame holds one phase and its drain.
+var finish_step: Callable = Callable()
 ## () -> Vector2i: (seats done, seats) (Session.orders_progress).
 var orders_progress: Callable = Callable()
 ## The clock value before which End season is refused.
@@ -270,8 +273,8 @@ func _slice() -> void:
 func _finish_one() -> void:
 	if finish_season.is_valid():
 		finish_season.call()
-	else:
-		Session.finish_season()
+	elif not _finish_step():
+		return  # the next step of the season's end runs next frame
 	_played += 1
 	_left -= 1
 	_begun = false
@@ -279,6 +282,13 @@ func _finish_one() -> void:
 	if _left > 0 and Session.game != null and bool(Session.end_season_check().get("ok", false)):
 		return  # the next season begins on the next tick
 	_ended()
+
+
+## One step of the season's end; true when the season is over.
+func _finish_step() -> bool:
+	if finish_step.is_valid():
+		return finish_step.call() == true
+	return Session.finish_step()
 
 
 func _emit_progress() -> void:
