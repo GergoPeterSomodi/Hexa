@@ -236,6 +236,7 @@ func _europe_40() -> int:
 	_r["yield_bytes_ms"] = _worst(game, func() -> void: MapModes.yield_bytes(game, tag))
 	_r["study_people_ms"] = _worst(game, func() -> void: StudyPeople.of(game, tag, 40))  # M5 (m5-build-spec.md 8)
 	_r["food_bytes_ms"] = _worst(game, func() -> void: MapModes.food_bytes(game, tag))  # M5: worth_seasons cold, then the bytes
+	PerfFog.measure(game, tag, PerfFixture.north_italy_game(0), RUNS_45, _r)  # FG18: discovered_bytes_ms, land_seen_ms (fog-build-spec 8)
 	return 0
 
 

@@ -277,11 +277,9 @@ static func _make_discovered_bytes(game: Game, viewer: StringName) -> PackedByte
 	var c := Countries.by_tag(game, viewer)
 	if c == null:
 		return out
-	var land: PackedByteArray = game.sight.land_of(game, c.id)
-	var armies: PackedByteArray = game.sight.armies_of(c.id)
+	var bits: PackedByteArray = game.sight.discovered_of(game, c.id)
 	for i: int in n:
-		if SightCache.bit_is(c.explored, i) or SightCache.bit_is(land, i) or SightCache.bit_is(armies, i):
-			out[i] = 1
+		out[i] = (bits[i >> 3] >> (i & 7)) & 1
 	return out
 
 

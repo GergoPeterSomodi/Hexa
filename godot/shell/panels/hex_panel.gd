@@ -222,6 +222,9 @@ func refresh() -> void:
 		visible = false
 		return
 	var map := game.map
+	if game.has_countries() and not Knowledge.discovered(game, game.player, _hex):
+		_show_unexplored()
+		return
 	var i := map.index_of(_hex)
 	if map.land[i] == 0:
 		_show_sea()
@@ -250,6 +253,13 @@ func refresh() -> void:
 		PanelKit.clear_children(_actions, _retired)
 		_actions_box.visible = false
 	visible = true
+
+
+## An undiscovered hex (fog D18, as HexCard): the header says Unexplored and no row of the panel shows (no owner, place, ground, people).
+func _show_unexplored() -> void:
+	_show_sea()
+	_cartouche.text = "Unexplored"
+	_subtitle.text = "Hex %d, %d" % [_hex.x, _hex.y]
 
 
 ## A sea hex: the cartouche says so and no row of the panel shows.

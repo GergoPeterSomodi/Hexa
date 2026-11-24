@@ -85,6 +85,24 @@ static func _make_land_seen(game: Game, viewer: StringName, id: int) -> Dictiona
 	var out := {"districts": 0, "people": 0}
 	if game.state.people.size() != game.map.hex_count():
 		return out
+	var bits := PackedByteArray()
+	if viewer != &"":
+		var v := Countries.by_tag(game, viewer)
+		if v == null:
+			return out
+		bits = game.sight.discovered_of(game, v.id)
+	for i: int in Territory.districts(game, id):
+		if viewer == &"" or SightCache.bit_is(bits, i):
+			out["districts"] = int(out["districts"]) + 1
+			out["people"] = int(out["people"]) + int(game.state.people[i])
+	return out
+
+
+## The slow reference of _make_land_seen (one Knowledge.discovered per district). Tests compare the fast path with it.
+static func make_land_seen_slow(game: Game, viewer: StringName, id: int) -> Dictionary:
+	var out := {"districts": 0, "people": 0}
+	if game.state.people.size() != game.map.hex_count():
+		return out
 	for i: int in Territory.districts(game, id):
 		if discovered(game, viewer, game.map.hex_of(i)):
 			out["districts"] = int(out["districts"]) + 1

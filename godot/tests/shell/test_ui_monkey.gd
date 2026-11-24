@@ -14,7 +14,9 @@
 ## M7 (monkey_m7.gd): the war's inputs (Shift+right click, Shift+O, B, the badges, the battle dock, the hex menu's war items, the
 ## console's war commands, the country panel's declare and peace, the Castle areas switch, the standing orders) and its invariants
 ## (no leak of what the player was not told, the dock and the stack, no stuck Confirm); seeds 1498 to 1500, each playing Savoy.
-extends MonkeyM8
+## Fog (monkey_fog.gd; FG18): the M8 monkey with the fog step and the fog invariants; seeds 1504 to 1506 play Savoy with the
+## computer's turns; 1505 is thin (FogFixture.thin on the player's country, deep fog).
+extends MonkeyFog
 
 const APP_SCENE := preload("res://shell/app/app.tscn")
 const SEEDS: Array[int] = [1480, 1481, 1482]
@@ -33,6 +35,8 @@ const M7_SEEDS: Array[int] = [1498, 1499, 1500]
 ## M8: the M7 monkey with the computer playing the other countries (monkey_m8.gd): End season in slices, the map limited to the
 ## camera meanwhile, the replay skipped, the saves mid-flow, the console's ai and watch; every M8 seed plays Savoy.
 const M8_SEEDS: Array[int] = [1501, 1502, 1503]
+## Fog (FG18): the M8 monkey with the fog step; 1505 is the thin seed.
+const FOG_SEEDS: Array[int] = [1504, 1505, 1506]
 ## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
 const FORCE_SEASON_STEP := 30
 const FORCE_SAVE_STEP := 120
@@ -270,6 +274,22 @@ func test_ui_monkey_m8_seed_1503() -> void:
 	await _run_monkey_seed(M8_SEEDS[2], true, true, true, true, true, true, true, true)
 
 
+## FG18: the fog monkey (monkey_fog.gd) on three seeds, the middle one thin (deep fog on the player's country).
+func test_ui_monkey_fog_seed_1504() -> void:
+	Session.ai_enabled = true
+	await _run_monkey_seed(FOG_SEEDS[0], true, true, true, true, true, true, true, true, true, false)
+
+
+func test_ui_monkey_fog_seed_1505() -> void:
+	Session.ai_enabled = true
+	await _run_monkey_seed(FOG_SEEDS[1], true, true, true, true, true, true, true, true, true, true)
+
+
+func test_ui_monkey_fog_seed_1506() -> void:
+	Session.ai_enabled = true
+	await _run_monkey_seed(FOG_SEEDS[2], true, true, true, true, true, true, true, true, true, false)
+
+
 ## A real bug the M4 monkey found, kept as a minimal failing test (it fails until the card is fixed): with Confirm works on Always
 ## a mouse click on a hex panel row opens the card, the card takes the focus for Begin, the row's focus_exited reads as the
 ## pointer leaving, and the card closes at once (WorksPreview.leave); then WorksFlow.show_card draws the ghost and the marks for
@@ -328,7 +348,7 @@ func _on_hex_changed(hex: Vector2i) -> void:
 	_changed_hexes.append(hex)
 
 
-func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false, m6: bool = false, m7: bool = false, m8: bool = false) -> void:
+func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false, m6: bool = false, m7: bool = false, m8: bool = false, fog: bool = false, thin: bool = false) -> void:
 	await _wait_frames(2)
 	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	_player_seen = &""
@@ -342,30 +362,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	vp.gui_disable_input = false
 	add_child(vp)
 
-	var app := APP_SCENE.instantiate() as App
-	app.settings_path = ""
-	app.allow_tree_quit = false
-	app.pause_tree_when_modal = false
-	app.skip_loading_frames = true
-	if new_game:
-		app.cli_args_override = PackedStringArray(["--new-game", "--seed=%d" % seed_value])
-	else:
-		app.cli_args_override = PackedStringArray(["--sandbox", "--seed=%d" % seed_value])
-	var s := Settings.new("macOS", true)
-	s.set_value("state/help_seen", true)
-	s.set_value("graphics/preload_next_season", false)
-	s.set_value("display/background_fps", 0)  # the headless window counts as unfocused: its 10 fps cap would make a seed take an hour
-	if m3:
-		s.set_value("game/season_report", "full")
-		s.set_value("graphics/season_change", "instant")
-	if m6 or m7:
-		# The replay is on: the M6 monkey skips it, watches it and refuses orders in it. (Settings.new(.., true) makes reduce
-		# motion the default, and reduce motion plays every walk instant.)
-		s.set_value("game/movement", "normal")
-		s.set_value("accessibility/reduce_motion", false)
-	app.set_settings_override(s)
-	vp.add_child(app)
-	await _wait_frames(2)
+	var app := await _seed_app(vp, seed_value, new_game, m3, m6 or m7)
 
 	var waited := 0
 	while app.is_starting() and waited < 240:
@@ -374,6 +371,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	if m3:
 		_m3_begin(app)
 	_m8_begin(m8)
+	_fog_begin(fog, thin)
 
 	var rng := Rng.new()
 	rng.seed_with(seed_value)
@@ -415,10 +413,12 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 			_m6_assert_invariants(app, "seed %d step %d" % [seed_value, step])
 		if m7:
 			_m7_assert_invariants(app, "seed %d step %d" % [seed_value, step])
+		_fog_after_step(app, seed_value, step)
 
 	if m3:
 		_m3_end(seed_value)
 	_m8_end(m8, seed_value)
+	_fog_end(fog, seed_value)
 	_set_milestones(false, false, false, false, false)
 	Events.hex_changed.disconnect(_on_hex_changed)
 	Session.end_game()
@@ -428,6 +428,35 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 
 	var orphans_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	assert_eq(orphans_after, orphans_before, "seed %d teardown must leave zero orphan nodes" % seed_value)
+
+
+## The app of one seed, in its viewport: a new game or the sandbox, the M3 settings, and the replay on (M6 and M7 seeds).
+func _seed_app(vp: SubViewport, seed_value: int, new_game: bool, m3: bool, replay: bool) -> App:
+	var app := APP_SCENE.instantiate() as App
+	app.settings_path = ""
+	app.allow_tree_quit = false
+	app.pause_tree_when_modal = false
+	app.skip_loading_frames = true
+	if new_game:
+		app.cli_args_override = PackedStringArray(["--new-game", "--seed=%d" % seed_value])
+	else:
+		app.cli_args_override = PackedStringArray(["--sandbox", "--seed=%d" % seed_value])
+	var s := Settings.new("macOS", true)
+	s.set_value("state/help_seen", true)
+	s.set_value("graphics/preload_next_season", false)
+	s.set_value("display/background_fps", 0)  # the headless window counts as unfocused: its 10 fps cap would make a seed take an hour
+	if m3:
+		s.set_value("game/season_report", "full")
+		s.set_value("graphics/season_change", "instant")
+	if replay:
+		# The replay is on: the M6 monkey skips it, watches it and refuses orders in it. (Settings.new(.., true) makes reduce
+		# motion the default, and reduce motion plays every walk instant.)
+		s.set_value("game/movement", "normal")
+		s.set_value("accessibility/reduce_motion", false)
+	app.set_settings_override(s)
+	vp.add_child(app)
+	await _wait_frames(2)
+	return app
 
 
 ## Which milestones' actions the seed plays (each includes the ones before it).

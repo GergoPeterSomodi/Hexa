@@ -14,6 +14,8 @@ var _explored_rev: Dictionary = {}
 var _armies: Dictionary = {}
 ## Hex index -> PackedStringArray: the tags whose armies see it (in no order; witnesses sort by country id).
 var watchers: Dictionary = {}
+## Viewer id -> [explored revision, sight revision, PackedByteArray]: the viewer's discovered bits (discovered_of).
+var _discovered: Dictionary = {}
 ## Viewer id -> PackedByteArray(256): 1 for each country the viewer has explored land of.
 var _known: Dictionary = {}
 var _revision := 0
@@ -93,11 +95,41 @@ func forget_known(viewer_id: int) -> void:
 ## Drops everything (a new game or a replaced state).
 func clear() -> void:
 	_land.clear()
+	_discovered.clear()
 	_fresh.clear()
 	_armies.clear()
 	watchers.clear()
 	_known.clear()
 	_revision += 1
+
+
+## The discovered bits of `viewer_id` (fog spec R1, the bitset form of Knowledge.discovered): its explored bits, or its land sight,
+## or its armies' sight. Made on the first ask and kept while the viewer's explored revision and the sight revision stand (grew,
+## forget_land, set_army_part and clear bump them). Equal to Knowledge.discovered for every hex (test_fog_fast.gd).
+func discovered_of(game: Game, viewer_id: int) -> PackedByteArray:
+	var rev := explored_revision(viewer_id)
+	var entry: Array = _discovered.get(viewer_id, [])
+	if entry.size() == 3 and int(entry[0]) == rev and int(entry[1]) == _revision:
+		return entry[2] as PackedByteArray
+	var bits := PackedByteArray()
+	bits.resize((game.map.hex_count() + 7) >> 3)
+	bits.fill(0)
+	var viewer := Countries.by_id(game, viewer_id)
+	if viewer != null:
+		var explored: PackedByteArray = viewer.explored
+		var land := land_of(game, viewer_id)
+		var armies := armies_of(viewer_id)
+		for b: int in bits.size():
+			var v := 0
+			if b < explored.size():
+				v = v | explored[b]
+			if b < land.size():
+				v = v | land[b]
+			if b < armies.size():
+				v = v | armies[b]
+			bits[b] = v
+	_discovered[viewer_id] = [rev, _revision, bits]
+	return bits
 
 
 ## The 256 bytes of what `viewer_id` has explored: 1 for each country that controls a hex the viewer explored. Made on the

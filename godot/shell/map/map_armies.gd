@@ -42,6 +42,8 @@ var _reach: Dictionary = {REACH_LAYER: [], REACH_NEXT_LAYER: []}
 var _zoom := 1.0
 var _colour_blind := false
 var _dirty := false
+## The sight this sync last read: its revision and the player's explored revision (a change of sight with no army event re-syncs).
+var _sight_key: Array = []
 var _links: Array[Array] = []
 
 
@@ -127,12 +129,29 @@ func _process(_delta: float) -> void:
 	if colour_blind != _colour_blind:
 		_colour_blind = colour_blind
 		_dirty = true
+	if _sight_moved():
+		_dirty = true
 	if _dirty:
 		sync()
 	elif _army >= 0 and Session.game != null and not _mine(Session.game, _army):
 		# An army that died or merged away without an event of its own (a battle or a merge in the computer's turn): the selection
 		# goes on this frame, not at the next event.
 		clear_army()
+
+
+## True when the player's sight moved since the last sync: the sight's revision (its army part and land) or the player's explored
+## revision. A district taken, a fog change or a foreign army that left sight moves it with no army event of its own, so its
+## token must go (a token never stands on a hex the viewer cannot see).
+func _sight_moved() -> bool:
+	var game := Session.game
+	if game == null or not game.has_countries():
+		return false
+	var c := Countries.by_tag(game, Session.player_tag())
+	var key: Array = [game.sight.revision(), game.sight.explored_revision(c.id) if c != null else -1]
+	if key == _sight_key:
+		return false
+	_sight_key = key
+	return true
 
 
 ## Brings the tokens, the reach and the route up to the game as it is now (an army event, a season, a new game).
