@@ -80,7 +80,9 @@ func test_dev_transfer_logs() -> void:
 	var hex := ScenarioFixture.BETA_CAPITAL
 	var before := g.version
 	assert_eq(g.dev_transfer([hex], 1), 1)
-	assert_eq(g.version, before + 1, "a developer transfer bumps the version (cached views)")
+	# The transfer bumps the version once, and the new holder's exploring of the hex (the fog build: a
+	# capture or cession marks discovery at once) bumps it again so cached views see the new sight.
+	assert_true(g.version >= before + 1, "a developer transfer bumps the version (cached views)")
 	assert_eq(g.action_log.size(), 1)
 	assert_eq(g.action_log[0]["action"], "dev_transfer")
 	assert_eq(int(g.action_log[0]["args"]["to_id"]), 1)

@@ -384,7 +384,7 @@ static func disband_check(game: Game, args: Dictionary) -> Dictionary:
 	var tag := StringName(str(args.get("tag", "")))
 	var ids := _disband_ids(args)
 	if army.tag != tag:
-		return _refusal("not your army: the %s commands it" % _country_name(game, army.tag))
+		return _refusal("not your army: %s" % _foreign_army_text(game, tag, army))
 	if ids.is_empty():
 		return _refusal("no companies given")
 	for id: int in ids:
@@ -553,7 +553,7 @@ static func split_check(game: Game, args: Dictionary) -> Dictionary:
 	var army := Armies.by_id(game, int(args["army"]))
 	var tag := StringName(str(args.get("tag", "")))
 	if army.tag != tag:
-		return _refusal("not your army: the %s commands it" % _country_name(game, army.tag))
+		return _refusal("not your army: %s" % _foreign_army_text(game, tag, army))
 	var ids: Variant = args.get("units", PackedInt32Array())
 	var unique := {}
 	for id: Variant in ids:
@@ -596,7 +596,7 @@ static func merge_check(game: Game, args: Dictionary) -> Dictionary:
 	if into == null:
 		return _refusal("no army %d" % int(args.get("into", -1)))
 	if army.tag != tag or into.tag != tag:
-		return _refusal("not your army: the %s commands it" % _country_name(game, army.tag))
+		return _refusal("not your army: %s" % _foreign_army_text(game, tag, army))
 	if army.id == into.id:
 		return _refusal("an army cannot join itself")
 	if army.hex != into.hex:
@@ -711,3 +711,11 @@ static func set_standing(game: Game, args: Dictionary) -> Dictionary:
 
 static func _refusal(reason: String) -> Dictionary:
 	return {"ok": false, "reason": reason}
+
+
+## The owner of an army of another country, as a refusal words it: its country's name when the actor sees the army's hex
+## (R23, R32), else "another country commands it" with no name.
+static func _foreign_army_text(game: Game, tag: StringName, a: Army) -> String:
+	if Sight.sees(game, tag, a.hex):
+		return "the %s commands it" % _country_name(game, a.tag)
+	return "another country commands it"

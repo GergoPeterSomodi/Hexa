@@ -6,9 +6,6 @@
 class_name Knowledge
 extends RefCounted
 
-const MINUS := "−"
-
-
 ## True when `viewer` knows `other`: the same tag, a neighbour by a shared land border, or either tag is "" (the sandbox
 ## viewer and a public party). A tag with no country knows only itself.
 static func knows(game: Game, viewer: StringName, other: StringName) -> bool:
@@ -134,29 +131,6 @@ static func armies_seen(game: Game, viewer: StringName) -> Array[Dictionary]:
 	return out
 
 
-## Two significant figures, half away from zero, sign kept: 87 -> 87, 1,234 -> 1,200, 1,250 -> 1,300,
-## -1,234 -> -1,200, 99,960 -> 100,000.
-static func band(n: int) -> int:
-	if n == 0:
-		return 0
-	var a := absi(n)
-	var scale := 1
-	while a >= 100 * scale:
-		scale *= 10
-	var q := floori(float(a) / float(scale))
-	if (a % scale) * 2 >= scale:
-		q += 1
-	return (-1 if n < 0 else 1) * q * scale
-
-
-## "about 1,200 ducats"; "about 87" when `unit` is "".
-static func band_text(n: int, unit: String) -> String:
-	var text := "about " + _grouped(band(n))
-	if unit != "":
-		text += " " + unit
-	return text
-
-
 ## True when the viewer is told of `event` (a chronicle entry: tag, others, witnesses; style spec 6.5):
 ## the viewer "" is told everything; the actor (`tag`) and each of `others` are told; a non-empty `witnesses` list
 ## tells exactly the tags it holds; an event with no witness list is public, seen by whoever knows its actor. A land event
@@ -233,19 +207,4 @@ static func _names(value: Variant) -> Array[StringName]:
 		return out
 	for item: Variant in value:
 		out.append(StringName(str(item)))
-	return out
-
-
-## "1,234" with a comma every three digits; a minus sign (MINUS) for a negative number.
-static func _grouped(n: int) -> String:
-	var digits := str(absi(n))
-	var out := ""
-	var count := 0
-	for i: int in range(digits.length() - 1, -1, -1):
-		if count > 0 and count % 3 == 0:
-			out = "," + out
-		out = digits.substr(i, 1) + out
-		count += 1
-	if n < 0:
-		out = MINUS + out
 	return out

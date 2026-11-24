@@ -68,7 +68,7 @@ static func card_of(preview: Dictionary, odds: Dictionary) -> Dictionary:
 	return {"title": title, "lines": lines, "way_out": str(odds.get("hint", ""))}
 
 
-## The defender's line: the men and morale of the army it faces, "They about 1,000 men · morale 100 %" when seen (banded),
+## The defender's line: the men and morale of the army it faces, "They 1,000 men · morale 100 %" when seen (exact, R25),
 ## "They: unknown" when hidden, and the garrison's count and weight behind its walls. "" when the card has none.
 static func _defence_line(odds: Dictionary) -> String:
 	var defence := odds.get("defence", {}) as Dictionary
@@ -77,13 +77,12 @@ static func _defence_line(odds: Dictionary) -> String:
 	var kind := str(odds.get("kind", ""))
 	if access == OddsView.ACCESS_HIDDEN:
 		return "They: unknown" if kind == str(OddsView.KIND_ATTACK) or kind == str(OddsView.KIND_STORM) else ""
-	var about := "about " if access == OddsView.ACCESS_SEEN else ""
 	var parts := PackedStringArray()
 	if int(defence.get("men", 0)) > 0:
-		parts.append("They %s%s · morale %s" % [about, Words.men(int(defence.men)), _percent(int(defence.get("morale", 0)))])
+		parts.append("They %s · morale %s" % [Words.men(int(defence.men)), _percent(int(defence.get("morale", 0)))])
 	if int(garrison.get("men", 0)) > 0:
 		var weight := int(garrison.get("weight_permille", 0)) / 1000.0
-		parts.append("a garrison of %s%s · counts ×%.1f behind its walls" % [about, Words.number(int(garrison.men)), weight])
+		parts.append("a garrison of %s · counts ×%.1f behind its walls" % [Words.number(int(garrison.men)), weight])
 	return " · ".join(parts)
 
 

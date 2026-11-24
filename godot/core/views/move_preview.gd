@@ -156,11 +156,12 @@ static func _war_words(game: Game, tag: StringName, army_id: int, hex: Vector2i,
 	lines.push_front([text, tone])
 
 
-## The country a march to hex would fight, as the viewer names it (its long name if the viewer knows it; else "a country").
+## The country a march to hex would fight, as the viewer names it (its long name when the viewer sees the army, R23, R32;
+## else "a country").
 static func _enemy_name(game: Game, tag: StringName, hex: Vector2i) -> String:
 	for other: Army in Armies.at(game, hex):
 		if other.tag != tag:
-			if Knowledge.knows(game, tag, other.tag):
+			if Knowledge.sees(game, tag, hex):
 				return Words.country_the(game, other.tag)
 			return "a country"
 	return "a country"

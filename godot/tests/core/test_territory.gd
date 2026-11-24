@@ -66,14 +66,20 @@ func test_at_home_check_every_table_row() -> void:
 	assert_false(bool(unowned["ok"]))
 	assert_eq(str(unowned["reason"]), "no one holds this land")
 
-	# 7. Held by another country -> "not your land: the %s holds it" (long name).
+	# 7. Held by another country -> "not your land: the %s holds it" (long name), but only on a hex the actor has discovered
+	# (R32, D15). AAA has not discovered BETA's capital or OUTLAND's anchor in this fixture, so no name is given.
 	var other_b := Territory.at_home_check(g, &"AAA", ScenarioFixture.BETA_CAPITAL)
 	assert_false(bool(other_b["ok"]))
-	assert_eq(str(other_b["reason"]), "not your land: the Duchy of Beta holds it")
+	assert_eq(str(other_b["reason"]), "not your land: another country holds it")
 
 	var other_out := Territory.at_home_check(g, &"AAA", ScenarioFixture.OUTLAND_ANCHOR)
 	assert_false(bool(other_out["ok"]))
-	assert_eq(str(other_out["reason"]), "not your land: the Kingdom of Outland holds it")
+	assert_eq(str(other_out["reason"]), "not your land: another country holds it")
+
+	# The same refusal names the holder once AAA has discovered the hex (a thin radius that covers the whole 9x7 map).
+	FogFixture.thin(g, &"AAA", 30)
+	assert_eq(str(Territory.at_home_check(g, &"AAA", ScenarioFixture.BETA_CAPITAL)["reason"]),
+		"not your land: the Duchy of Beta holds it", "discovered: the holder is named")
 
 	# 8. Own land -> ok (including outside power acting on its own hex).
 	var own := Territory.at_home_check(g, &"AAA", ScenarioFixture.ALPHA_CAPITAL)

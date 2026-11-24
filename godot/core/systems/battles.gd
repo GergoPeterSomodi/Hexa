@@ -85,7 +85,8 @@ static func engage_check(game: Game, args: Dictionary) -> Dictionary:
 		return _refusal("no army %d" % id)
 	var tag := StringName(str(args.get("tag", "")))
 	if army.tag != tag:
-		return _refusal("not your army: %s commands it" % _the(game, army.tag))
+		# R32: the owner of an army is not named here (the army may be out of sight)
+		return _refusal("not your army: it is another country's")
 	var hex: Vector2i = args.get("hex", Army.NO_HEX)
 	if game.map.index_of(hex) < 0 or not game.map.is_land(hex):
 		return _refusal("no way there by land: %s is not land" % _coords(hex))
@@ -97,14 +98,16 @@ static func engage_check(game: Game, args: Dictionary) -> Dictionary:
 
 ## Rows 2 and 3 of engage_check and the refusals beside them: "" when none applies.
 static func _hostile_reason(game: Game, army: Army, hex: Vector2i) -> String:
+	# R32: a place, a battle or a country is named only on a hex the actor has discovered.
+	var seen := Sight.explored(game, army.tag, hex) or Sight.sees(game, army.tag, hex)
 	var foreign := _foreign_at(game, army.tag, hex)
 	if foreign != null:
-		return "another country's army stands at %s" % _place_text(game, hex)
+		return "another country's army stands at %s" % _place_text(game, hex, seen)
 	if _enemy_tags_at(game, army.tag, hex).size() > 1:
-		return "more than one enemy country stands at %s: one battle at a time" % _place_text(game, hex)
+		return "more than one enemy country stands at %s: one battle at a time" % _place_text(game, hex, seen)
 	var b := at(game, hex)
 	if b != null and _side(b, army.tag) < 0:
-		return "the %s is fought there: you cannot join it" % b.name
+		return "the %s is fought there: you cannot join it" % (b.name if seen else "battle")
 	var war := _war(game)
 	var morale := Armies.morale_of(army)
 	if morale < war.attack_morale:
@@ -353,16 +356,13 @@ static func _ok() -> Dictionary:
 	return {"ok": true, "reason": ""}
 
 
-static func _the(game: Game, tag: StringName) -> String:
-	var cdef := Countries.def_of(game, tag)
-	return "the " + (cdef.long_name if cdef != null and cdef.long_name != "" else String(tag))
-
-
 static func _coords(hex: Vector2i) -> String:
 	return "(%d, %d)" % [hex.x, hex.y]
 
 
-static func _place_text(game: Game, hex: Vector2i) -> String:
+static func _place_text(game: Game, hex: Vector2i, seen: bool = true) -> String:
+	if not seen:
+		return "a place you cannot see"
 	var text := str(Improve.place_of(game.map, hex).get("name", ""))
 	return "%s %s" % [text, _coords(hex)] if text != "" else _coords(hex)
 

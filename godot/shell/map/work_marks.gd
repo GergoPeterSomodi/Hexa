@@ -19,6 +19,7 @@ const OUTLINE := 3
 var _game: Game = null
 var _zoom := 1.0
 var _marks: Array[Dictionary] = []  # {hex, text, halted}
+var _fog_rev := -1  # the player's explored revision the marks were read for (R37)
 var _fallback_theme: Theme = null
 
 
@@ -51,12 +52,15 @@ func refresh() -> void:
 	_marks.clear()
 	if _game != null and _game.state != null:
 		for work: Work in _game.state.works:
+			if not Knowledge.discovered(_game, _game.player, work.hex):  # R37: no mark on an undiscovered hex
+				continue
 			var done := clampi(work.seasons - work.seasons_left + 1, 1, maxi(work.seasons, 1))
 			_marks.append({
 				"hex": work.hex,
 				"text": "%d/%d" % [done, work.seasons],
 				"halted": Works.halted(_game, work, _game.turn),
 			})
+	_fog_rev = _explored_rev()
 	queue_redraw()
 
 
@@ -116,6 +120,20 @@ func _on_cancelled(_tag: StringName, _hex: Vector2i, _work: Dictionary, _why: St
 
 func _on_season_ended(_turn: int) -> void:
 	refresh()
+
+
+## A hex the player discovers gets its work mark back (R37): the marks are read again when the revision moves.
+func _process(_delta: float) -> void:
+	if _explored_rev() != _fog_rev:
+		refresh()
+
+
+## The player's explored revision (-1 with no game or player); it grows when a hex is discovered.
+func _explored_rev() -> int:
+	if _game == null or _game.player == &"":
+		return -1
+	var c := Countries.by_tag(_game, _game.player)
+	return _game.sight.explored_revision(c.id) if c != null else -1
 
 
 ## The themes to look in, in order: the window's, the project's, the Studiolo theme from disk. A Node2D has no theme of its

@@ -81,10 +81,12 @@ func refresh(game: Game, viewer: StringName, palette := PackedColorArray(), hold
 	if game != null and game.map != null and _view != null:
 		_palette = palette if not palette.is_empty() else MapModes.palette(game, false)
 		for site: Dictionary in BattleView.sites(game, viewer):
-			if hold.has(site["hex"]):
+			if hold.has(site["hex"]) or not Knowledge.discovered(game, viewer, site["hex"] as Vector2i):  # R37
 				continue
 			want[BATTLE_PREFIX + str(site["record"])] = _battle_fields(site)
 		for siege: Dictionary in SiegeView.all(game, viewer):
+			if not Knowledge.discovered(game, viewer, siege["hex"] as Vector2i):  # R37: no dial off the map of the player
+				continue
 			want[_siege_key(siege["hex"] as Vector2i)] = _siege_fields(siege)
 	_sync(want, [BATTLE_PREFIX, SIEGE_PREFIX])
 

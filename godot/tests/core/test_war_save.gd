@@ -197,3 +197,38 @@ func test_a_legal_fortress_at_level_zero_with_its_garrison_loads() -> void:
 	var r := _restore(g, _through_bytes(Snapshot.of(g)))
 	assert_not_null(r["game"], str(r["problem"]))
 	assert_eq((r["game"] as Game).digest(), g.digest(), "a level-0 fortress with its garrison loads")
+
+
+# ----- FG17: the fog build's round trip (fog-build-spec R38, done-when 6): a thin start and north Italy at turn 8 --------
+
+
+func test_a_thin_start_at_war_round_trips_byte_equal() -> void:
+	# A country with a thin explored set (FogFixture.thin) and a live war: save, load, save is byte-equal.
+	var g := WarFixture.game()
+	var nb := WarFixture.neighbour_of(g, ArmyFixture.TAG)
+	FogFixture.thin(g, ArmyFixture.TAG, 1)
+	WarFixture.at_war(g, ArmyFixture.TAG, nb)
+	var body := Snapshot.of(g)
+	var r := _restore(g, _through_bytes(body))
+	assert_not_null(r["game"], str(r["problem"]))
+	var back := r["game"] as Game
+	assert_eq(back.digest(), g.digest(), "the thin start keeps its digest")
+	assert_eq(var_to_bytes(Snapshot.of(back)), var_to_bytes(body), "thin start: save, load, save byte-equal")
+
+
+func test_north_italy_at_turn_8_with_a_war_round_trips_byte_equal() -> void:
+	# North Italy from Spring 1480: seven seasons reach turn 8; Genoa is at war with a neighbour. The body is the same
+	# through the save's bytes and through a restore.
+	var g := EconomyFixture.game(&"GEN")
+	for n: int in 7:
+		Season.run(g)
+	assert_eq(g.turn, 8)
+	var nb := WarFixture.neighbour_of(g, &"GEN")
+	assert_ne(nb, &"", "Genoa has a neighbour")
+	WarFixture.at_war(g, &"GEN", nb)
+	var body := Snapshot.of(g)
+	var r := _restore(g, _through_bytes(body))
+	assert_not_null(r["game"], str(r["problem"]))
+	var back := r["game"] as Game
+	assert_eq(back.digest(), g.digest(), "turn 8 keeps its digest")
+	assert_eq(var_to_bytes(Snapshot.of(back)), var_to_bytes(body), "north Italy turn 8: save, load, save byte-equal")

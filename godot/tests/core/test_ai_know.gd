@@ -28,7 +28,11 @@ func test_seen_enemies_are_only_the_seen_and_banded_without_the_army() -> void:
 	var ids: Array[int] = []
 	for e: Dictionary in AiKnow.seen_enemies(g, AiFixture.MILAN):
 		ids.append(int(e["army"]))
-		assert_eq(e["men"], Knowledge.band(int(e["men"])), "banded")
+		var exact := -1
+		for a: Army in g.armies:
+			if a.id == int(e["army"]):
+				exact = a.men()
+		assert_eq(e["men"], exact, "exact men (R34), not banded")
 		assert_false(e.has("order") or e.has("route") or e.has("kind") or e.get("army") is Army, "no order, route or kind")
 		assert_true(Knowledge.sees(g, AiFixture.MILAN, e["hex"]), "only what it sees")
 	assert_true(ids.has(seen_army.id), "the army on Milan's own land is seen")

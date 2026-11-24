@@ -180,7 +180,9 @@ static func work_candidates(game: Game, tag: StringName) -> Array[Vector2i]:
 				near[ImproveRules.neighbour(ring, e)] = true
 	for i: int in Occupation.controlled(game, c.id):
 		var hex := game.map.hex_of(i)
-		if int(game.state.owner[i]) != c.id or not game.map.is_land(hex) or busy.has(hex) or Occupation.besieged(game, hex):
+		# R33: a candidate is discovered by the seat (its own land always is; the wild ring is checked too).
+		if int(game.state.owner[i]) != c.id or not game.map.is_land(hex) or busy.has(hex) or Occupation.besieged(game, hex) \
+				or not discovered(game, tag, hex):
 			continue
 		var family := int(game.state.main_use[i])
 		if family <= ImproveRules.NONE or family >= ImproveRules.FAMILIES:

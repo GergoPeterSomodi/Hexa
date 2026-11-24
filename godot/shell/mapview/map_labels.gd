@@ -44,6 +44,7 @@ var _capital: StyleBoxFlat = null
 ## The state the settlement levels come from (set_state), and each settlement place's level by hex (levels_of).
 var _state: MapState = null
 var _levels: Dictionary = {}
+var _fog_rev := -1  # the player's explored revision the plates were laid out for (R37)
 
 
 func _init() -> void:
@@ -141,6 +142,23 @@ func placed() -> Array[Dictionary]:
 	return _placed
 
 
+## The player's explored revision (Session's game; -1 with no game or player). A new discovery lays the plates out again.
+func _fog_rev_now() -> int:
+	var game := Session.game
+	if game == null or game.player == &"":
+		return -1
+	var c := Countries.by_tag(game, game.player)
+	return game.sight.explored_revision(c.id) if c != null else -1
+
+
+## The discovery test of the places: the player's (Session's game); empty with no game or player.
+func _discovered_fn() -> Callable:
+	var game := Session.game
+	if game == null or game.player == &"":
+		return Callable()
+	return func(hex: Vector2i) -> bool: return Knowledge.discovered(game, game.player, hex)
+
+
 func _on_visibility_changed() -> void:
 	_dirty = true
 	set_process(visible)
@@ -153,13 +171,15 @@ func _process(_delta: float) -> void:
 		return
 	var xform := get_viewport().get_canvas_transform()
 	var screen := get_viewport_rect().size
-	if _dirty or xform != _last_transform or screen != _last_size:
+	var fog := _fog_rev_now()
+	if _dirty or xform != _last_transform or screen != _last_size or fog != _fog_rev:
 		_last_transform = xform
 		_last_size = screen
+		_fog_rev = fog
 		_dirty = false
 		var cap_override: Variant = _capitals if _use_game_capitals else null
 		_placed = layout(_map, xform, Rect2(Vector2.ZERO, screen), ThemeDB.fallback_font, obstacles, cap_override,
-			_levels)
+			_levels, _discovered_fn())
 		queue_redraw()
 
 
@@ -205,8 +225,10 @@ static func font_size(level: int) -> int:
 ## is provided (an Array of capital Vector2i hexes), capital status comes from that set instead of MapData.places[].capital.
 ## Returns [{name, level, capital, hex, box}] in placing order (rank: level, capital first, then by name).
 ## `levels` (hex to level, see levels_of) replaces the data's level of a place on a settlement hex.
+## `discovered` (a Callable hex -> bool; empty: every place shows) hides the places the player has not discovered (R37).
 static func layout(map: MapData, to_screen: Transform2D, screen: Rect2, font: Font,
-		blocked: Array[Rect2], capitals_override: Variant = null, levels: Dictionary = {}) -> Array[Dictionary]:
+		blocked: Array[Rect2], capitals_override: Variant = null, levels: Dictionary = {},
+		discovered: Callable = Callable()) -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
 	var taken: Array[Rect2] = blocked.duplicate()
 	var cap_set: Dictionary[Vector2i, bool] = {}
@@ -218,6 +240,8 @@ static func layout(map: MapData, to_screen: Transform2D, screen: Rect2, font: Fo
 	var reach := screen.grow(40.0)
 	for place: Dictionary in map.places:
 		var hex: Vector2i = place["hex"]
+		if discovered.is_valid() and not bool(discovered.call(hex)):
+			continue
 		var at: Vector2 = to_screen * MapTiles.cell_centre(hex)
 		if not reach.has_point(at):
 			continue

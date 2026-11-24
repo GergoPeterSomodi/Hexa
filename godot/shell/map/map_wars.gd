@@ -27,6 +27,7 @@ var _area_key: Array = []
 var _area_queue: Array[Vector2i] = []
 var _replay_last: Array[Dictionary] = []
 var _hold_last: Array = []
+var _fog_rev := -1  # the player's explored revision the marks were built for (R37)
 
 
 func _init() -> void:
@@ -111,6 +112,7 @@ func _process(_delta: float) -> void:
 	if not is_equal_approx(_scene.zoom(), _zoom):
 		_zoom = _scene.zoom()
 		_marks.set_zoom(_zoom)
+	_sync_fog()
 	_sync_replay()
 	_build_areas()
 
@@ -220,6 +222,36 @@ func _colour_blind() -> bool:
 	return _scene.overlay().is_colour_blind()
 
 
+# --- the discovery of the marks (R37) ---------------------------------------------------------------------------
+
+
+## The player's explored revision (-1 with no game or player); it grows when a hex is discovered.
+func _explored_rev() -> int:
+	var game := Session.game
+	if game == null or game.player == &"":
+		return -1
+	var c := Countries.by_tag(game, game.player)
+	return game.sight.explored_revision(c.id) if c != null else -1
+
+
+## The war marks follow the player's discovery: a newly discovered hex brings its marks back.
+func _sync_fog() -> void:
+	var rev := _explored_rev()
+	if rev != _fog_rev:
+		_fog_rev = rev
+		_refresh_marks()
+
+
+## The replay badges on discovered hexes only (R37).
+func _discovered_only(marks: Array[Dictionary]) -> Array[Dictionary]:
+	var game := Session.game
+	var out: Array[Dictionary] = []
+	for item: Dictionary in marks:
+		if game == null or Knowledge.discovered(game, game.player, item["hex"] as Vector2i):
+			out.append(item)
+	return out
+
+
 # --- the marks, the replay and the events -----------------------------------------------------------------------------
 
 
@@ -257,7 +289,7 @@ func _sync_replay() -> void:
 	var replay := _replay_node()
 	var list: Array[Dictionary] = []
 	if replay != null and replay.active():
-		list = replay.marks()
+		list = _discovered_only(replay.marks())
 	if list != _replay_last:
 		_replay_last = list
 		_marks.set_replay(list)
@@ -333,6 +365,9 @@ static func _lost_in(game: Game, viewer: StringName, r: BattleRecord) -> int:
 
 
 func _ribbon(hex: Vector2i, text: String, tone: StringName) -> void:
+	var game := Session.game
+	if game != null and not Knowledge.discovered(game, game.player, hex):  # R37: no ribbon on an undiscovered hex
+		return
 	var floaters := _scene.get_node_or_null(FLOATERS) as Floaters
 	if floaters != null:
 		floaters.add_ribbon(hex, text, tone)

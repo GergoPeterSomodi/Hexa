@@ -1,6 +1,7 @@
 ## Country name labels in screen space (docs/architecture/m2-build-spec.md sections 6.1 and 6.4):
 ## sits in the Names CanvasLayer before MapLabels, draws upper-cased Cinzel TitlePanel text
-## sized by region span and zoom, recomputed only on game_started and owners_changed and laid out
+## sized by region span and zoom, recomputed only on game_started, owners_changed and a new discovery of the player (R37:
+## a country is named by its discovered hexes only) and laid out
 ## only on CameraRig.view_changed (never every frame).
 class_name CountryLabels
 extends Node2D
@@ -33,6 +34,7 @@ var _dirty := true
 ## Screen rects the HUD covers (top bar, dock, minimap, a screen's side list): names slide out of them or hide.
 var _cover: Array[Rect2] = []
 var _fallback_theme: Theme = null
+var _fog_rev := -1  # the player's explored revision the names were built for (R37)
 
 
 func _init() -> void:
@@ -56,11 +58,12 @@ static func font_size_for(span_px: float, zoom_val: float, letters: int) -> int:
 ## Recomputes all country region entries for `game` (or clears when null / map-only).
 func setup(game: Game) -> void:
 	_game = game
+	_fog_rev = _explored_rev()
 	_entries.clear()
 	_prev_owners = PackedByteArray()
 	last_recomputed_ids = PackedInt32Array()
 	if _game != null and _game.has_countries() and _game.state != null:
-		_entries = CountryNames.places(_game)
+		_entries = fog_places_of(_game, _all_ids(_game), _game.player)
 		_prev_owners = _game.state.owner.duplicate()
 	_dirty = true
 	_relayout()
@@ -94,7 +97,7 @@ func on_owners_changed(hexes: Array[Vector2i]) -> void:
 	for i: int in keys.size():
 		changed_ids[i] = int(keys[i])
 	last_recomputed_ids = changed_ids
-	var fresh := CountryNames.places_of(_game, changed_ids)
+	var fresh := fog_places_of(_game, changed_ids, _game.player)
 	var merged: Array[Dictionary] = []
 	var fresh_idx := 0
 	for entry: Dictionary in _entries:
@@ -173,6 +176,64 @@ func placed() -> Array[Dictionary]:
 
 func obstacles() -> Array[Rect2]:
 	return _boxes
+
+
+## The label placements of the countries `ids` (ascending), each named by the hexes of its region that the viewer has
+## discovered (R37): a region keeps only those and is named at the centre-most of them; fewer than
+## CountryNames.MIN_REGION_HEXES of them give no label. With every hex discovered (the viewer "") it is CountryNames.places_of.
+static func fog_places_of(game: Game, ids: PackedInt32Array, viewer: StringName) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if game == null or not game.has_countries() or game.map == null or game.state == null:
+		return out
+	for cid: int in ids:
+		var country := Countries.by_id(game, cid)
+		if country == null:
+			continue
+		var cdef := Countries.def_of(game, country.tag)
+		var short_name := cdef.name if cdef != null and not cdef.name.is_empty() else String(country.tag)
+		for region: PackedInt32Array in ScenarioGrowth.regions(game.map, game.state.owner, cid):
+			var known := PackedInt32Array()
+			for idx: int in region:
+				if Knowledge.discovered(game, viewer, game.map.hex_of(idx)):
+					known.append(idx)
+			if known.size() >= CountryNames.MIN_REGION_HEXES:
+				out.append(_entry(game.map, cid, country.tag, short_name, known))
+	return out
+
+
+static func _entry(map: MapData, cid: int, tag: StringName, text: String, known: PackedInt32Array) -> Dictionary:
+	var min_col := map.cols
+	var max_col := -1
+	for idx: int in known:
+		var col := idx % map.cols
+		min_col = mini(min_col, col)
+		max_col = maxi(max_col, col)
+	return {"id": cid, "tag": tag, "text": text,
+		"at": MapTiles.cell_centre(CountryNames.region_label_hex(map, known)),
+		"span_px": float(max_col - min_col + 1) * float(MapTiles.CELL.x), "hexes": known.size()}
+
+
+static func _all_ids(game: Game) -> PackedInt32Array:
+	var ids := PackedInt32Array()
+	for i: int in game.countries.size():
+		ids.append(i + 1)
+	return ids
+
+
+## The player's explored revision (-1 with no game or player); a new discovery names the countries again.
+func _explored_rev() -> int:
+	if _game == null or _game.player == &"":
+		return -1
+	var c := Countries.by_tag(_game, _game.player)
+	return _game.sight.explored_revision(c.id) if c != null else -1
+
+
+func _process(_delta: float) -> void:
+	if _game == null:
+		return
+	var rev := _explored_rev()
+	if rev != _fog_rev:
+		setup(_game)
 
 
 func _relayout() -> void:

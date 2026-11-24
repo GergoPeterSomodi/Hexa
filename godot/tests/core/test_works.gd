@@ -83,7 +83,8 @@ func test_row_3_the_home_rule_comes_first() -> void:
 	_build(g)
 	assert_eq(g.check("build", {"hex": ALPHA, "family": ImproveRules.WHEAT})["reason"], "choose your country first")
 	var foreign := g.check("upgrade", {"hex": ALPHA, "tag": &"BBB"})
-	assert_eq(foreign["reason"], "not your land: the Republic of Alpha holds it", "another country's work is never named")
+	# R32: ALPHA is not discovered by BBB in this fixture, so the holder is not named.
+	assert_eq(foreign["reason"], "not your land: another country holds it", "another country's work is never named")
 	assert_eq(g.check("clear", {"hex": ScenarioFixture.UNOWNED_HEXES[0], "tag": &"AAA"})["reason"], "no one holds this land")
 
 
@@ -178,8 +179,9 @@ func test_cancel_work_check_rows() -> void:
 	assert_eq(g.check("cancel_work", {})["reason"], "no hex given")
 	assert_eq(g.check("cancel_work", {"hex": ALPHA, "tag": &"AAA"})["reason"], "no work is under way here")
 	_build(g)
-	assert_eq(g.check("cancel_work", {"hex": ALPHA, "tag": &"BBB"})["reason"], "not your work: the Republic of Alpha ordered it")
-	assert_eq(g.check("cancel_work", {"hex": ALPHA})["reason"], "not your work: the Republic of Alpha ordered it")
+	# R32: ALPHA is not discovered by BBB or by the empty tag, so the orderer is not named.
+	assert_eq(g.check("cancel_work", {"hex": ALPHA, "tag": &"BBB"})["reason"], "not your work: another country ordered it")
+	assert_eq(g.check("cancel_work", {"hex": ALPHA})["reason"], "not your work: another country ordered it")
 	assert_true(bool(g.check("cancel_work", {"hex": ALPHA, "tag": &"AAA"})["ok"]))
 	assert_eq(g.state.works.size(), 1, "a check changes nothing")
 

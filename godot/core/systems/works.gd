@@ -118,8 +118,12 @@ static func cancel_work_check(game: Game, args: Dictionary) -> Dictionary:
 	var work := game.state.work_at(hex as Vector2i)
 	if work == null:
 		return _refusal("no work is under way here")
-	if work.tag != _tag_of(args):
-		return _refusal("not your work: the %s ordered it" % _long_name(game, work.tag))
+	var actor := _tag_of(args)
+	if work.tag != actor:
+		# R32: the orderer is named only on a hex the actor has discovered; else no name.
+		if Sight.explored(game, actor, hex as Vector2i) or Sight.sees(game, actor, hex as Vector2i):
+			return _refusal("not your work: the %s ordered it" % _long_name(game, work.tag))
+		return _refusal("not your work: another country ordered it")
 	return {"ok": true, "reason": ""}
 
 

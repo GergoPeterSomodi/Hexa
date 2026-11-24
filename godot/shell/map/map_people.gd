@@ -69,4 +69,7 @@ func _on_season_ended(_turn: int) -> void:
 	if _floaters == null or game == null or game.state == null or game.player == &"":
 		return
 	for ribbon: Dictionary in PeopleView.ribbons(game, game.player):
-		_floaters.add_ribbon(ribbon["hex"] as Vector2i, str(ribbon["text"]), StringName(str(ribbon["tone"])))
+		var hex := ribbon["hex"] as Vector2i
+		if not Knowledge.discovered(game, game.player, hex):  # R37: no people ribbon on an undiscovered hex
+			continue
+		_floaters.add_ribbon(hex, str(ribbon["text"]), StringName(str(ribbon["tone"])))

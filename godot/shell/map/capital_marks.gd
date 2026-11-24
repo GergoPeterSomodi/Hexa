@@ -15,6 +15,7 @@ var _mode: MapModes.Mode = MapModes.Mode.TERRAIN
 var _picking := false
 var _items: Array[Dictionary] = []  # {id, tag, capital, pole, cloth}
 var _fallback_theme: Theme = null
+var _fog_rev := -1  # the player's explored revision the pennants were built for (R37)
 
 
 func _init() -> void:
@@ -83,6 +84,7 @@ func _rebuild() -> void:
 		remove_child(child)
 		child.queue_free()
 	_items.clear()
+	_fog_rev = _explored_rev()
 	if _game == null or not _game.has_countries():
 		return
 	var pole_tex := _kit_icon(&"pennant_pole")
@@ -90,6 +92,8 @@ func _rebuild() -> void:
 	var pal := MapModes.palette(_game, _colour_blind)
 	for country: Country in _game.countries:
 		if country == null or not Countries.playable(_game, country.tag):
+			continue
+		if not _discovered(country.capital):  # R37: no pennant on a capital the player has not discovered
 			continue
 		var pole := Sprite2D.new()
 		pole.name = "Pennant_%s" % String(country.tag)
@@ -114,6 +118,27 @@ func _rebuild() -> void:
 			"pole": pole,
 			"cloth": cloth,
 		})
+
+
+## Whether the game's player has discovered `hex` (R37).
+func _discovered(hex: Vector2i) -> bool:
+	return hex != Country.NO_HEX and Knowledge.discovered(_game, _game.player, hex)
+
+
+## The player's explored revision (it grows when a hex is discovered); -1 with no game, player or country.
+func _explored_rev() -> int:
+	if _game == null or _game.player == &"":
+		return -1
+	var c := Countries.by_tag(_game, _game.player)
+	return _game.sight.explored_revision(c.id) if c != null else -1
+
+
+## A capital discovered since the pennants were built gets its pennant back (R37).
+func _process(_delta: float) -> void:
+	if Engine.is_editor_hint() or _game == null:
+		return
+	if _explored_rev() != _fog_rev:
+		refresh()
 
 
 func _update_visibility() -> void:

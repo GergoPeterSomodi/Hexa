@@ -47,7 +47,7 @@ static func at(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
 		_:
 			out.state = &"out"
 			out.text = "Out of supply: the land feeds no one" if int(out.feeds) == 0 \
-				else "Out of supply: the land feeds %s" % Knowledge.band_text(int(out.feeds), "men a season")
+				else "Out of supply: the land feeds %s men a season" % Words.number(int(out.feeds))
 	return out
 
 

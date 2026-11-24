@@ -60,7 +60,10 @@ static func at_home_check(game: Game, tag: StringName, hex: Vector2i) -> Diction
 	if oid == 0:
 		return _refusal("no one holds this land")
 	if oid != actor.id:
-		return _refusal("not your land: the %s holds it" % _holder_long_name(game, oid))
+		# R32: the holder is named only on a hex the actor has discovered; else no name.
+		if Sight.explored(game, tag, hex) or Sight.sees(game, tag, hex):
+			return _refusal("not your land: the %s holds it" % _holder_long_name(game, oid))
+		return _refusal("not your land: another country holds it")
 	return {"ok": true, "reason": ""}
 
 

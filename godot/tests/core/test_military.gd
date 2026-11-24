@@ -270,8 +270,10 @@ func test_disband_refusals_in_their_words() -> void:
 	var a := ArmyFixture.army(_g, _tag, _hex, 0, 1)
 	assert_eq(Military.disband_check(_g, {"tag": _tag})["reason"], "no army given")
 	assert_eq(Military.disband_check(_g, {"army": 999, "tag": _tag})["reason"], "no army 999")
+	# R23, R32: the army's country is named only when the actor sees the army's hex; this hex is not in the other
+	# country's sight, so the refusal names no one.
 	assert_true(str(Military.disband_check(_g, {"army": a.id, "tag": ArmyFixture.other_tag(_g)})["reason"]).begins_with(
-		"not your army: the "))
+		"not your army: another country commands it"))
 	assert_eq(Military.disband_check(_g, {"army": a.id, "unit": 999, "tag": _tag})["reason"],
 		"company 999 is not in the Army of test")
 	var foreign := _hex_where(ArmyFixture.other_tag(_g), func(_i: int) -> bool: return true)

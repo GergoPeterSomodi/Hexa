@@ -291,6 +291,10 @@ static func _mark(game: Game, c: Country, indices: PackedInt32Array, radius: int
 	c.explored = bits
 	if grew:
 		game.sight.grew(c.id)
+		# The cached views of the discovered set (Knowledge.land_seen, the cards) are keyed by game.version: a walk or a
+		# vision that discovers hexes must move it, or a view read after the walk stays stale (FG17 proof). The version is
+		# in neither the digest nor the save, so no saved or replayed number moves.
+		game.version += 1
 
 
 ## ORs country `c`'s land sight (its cached bitset) into its explored set, when that land sight was made since it was last

@@ -1,5 +1,5 @@
 ## Knowledge view tests (docs/architecture/m3-build-spec.md sections 4.7, 5.6 and 9): knows (self, neighbour, far, ""),
-## known in id order, unknown_count, band, band_text, witnessed (party, others, listed, public and known, public and
+## known in id order, unknown_count, witnessed (party, others, listed, public and known, public and
 ## unknown, "" sees all). Cases marked P are the planted-fault checks of section 9.
 @warning_ignore_start("integer_division")
 extends GutTest
@@ -85,26 +85,6 @@ func test_unknown_count() -> void:
 	assert_eq(Knowledge.unknown_count(_between_game(), AAA), 0)
 	assert_eq(Knowledge.unknown_count(Game.new_game(ScenarioFixture.build()["map"] as MapData, 1), AAA), 0,
 		"a map-only game has no countries")
-
-
-func test_band_two_significant_figures() -> void:
-	assert_eq(Knowledge.band(87), 87)
-	assert_eq(Knowledge.band(1234), 1200)
-	assert_eq(Knowledge.band(1250), 1300, "half rounds away from zero")
-	assert_eq(Knowledge.band(-1234), -1200)
-	assert_eq(Knowledge.band(-1250), -1300)
-	assert_eq(Knowledge.band(0), 0)
-	assert_eq(Knowledge.band(99960), 100000)
-	assert_eq(Knowledge.band(-5), -5)
-
-
-func test_band_text() -> void:
-	assert_eq(Knowledge.band_text(1234, "ducats"), "about 1,200 ducats")
-	assert_eq(Knowledge.band_text(87, ""), "about 87")
-	assert_eq(Knowledge.band_text(99960, "ducats"), "about 100,000 ducats")
-	assert_eq(Knowledge.band_text(1250, ""), "about 1,300")
-	assert_eq(Knowledge.band_text(-1234, "ducats"), "about " + Knowledge.MINUS + "1,200 ducats")
-	assert_eq(Knowledge.band_text(0, ""), "about 0")
 
 
 func test_witnessed_party_and_others() -> void:
