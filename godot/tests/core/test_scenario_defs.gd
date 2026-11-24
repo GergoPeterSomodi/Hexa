@@ -373,3 +373,110 @@ func test_build_scenario_tool_rebuild_check_and_planted_fault() -> void:
 	for fname: String in ["fixture_map.tres", "fixture_scen.tres", "game_defs.tres"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(scratch.path_join(fname)))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(scratch))
+
+
+## Fog spec R5 (FG1): the discovery fields are validated; the five planted faults, each with its message.
+func _regions_fixture(m: MapData) -> ScenarioDef:
+	var s := _make_scenario(m)
+	s.regions = [&"north", &"south"]
+	s.region = PackedByteArray()
+	s.region.resize(m.hex_count())
+	for i: int in m.hex_count():
+		s.region[i] = 1 if i < 14 else 2
+	s.discovery = [
+		{"tag": &"AAA", "regions": [&"north"]},
+		{"tag": &"BBB", "regions": [&"north", &"south"]},
+	]
+	return s
+
+
+func test_regions_planted_faults_r5() -> void:
+	var m := _make_map()
+	var defs := _make_defs()
+	var s := _regions_fixture(m)
+	assert_eq(s.validate(m, defs, false), [] as Array[String], "the fixture is valid")
+
+	# Wrong size: 34 bytes for 35 hexes.
+	s = _regions_fixture(m)
+	s.region.resize(34)
+	assert_true(s.validate(m, defs, false).any(func(e: String) -> bool: return e.contains("region has 34 bytes")))
+
+	# Byte out of range: 3 with two regions.
+	s = _regions_fixture(m)
+	s.region[0] = 3
+	assert_true(s.validate(m, defs, false).any(func(e: String) -> bool: return e.contains("region byte 3")))
+
+	# Missing country: BBB has no entry.
+	s = _regions_fixture(m)
+	s.discovery.remove_at(1)
+	assert_true(s.validate(m, defs, false).any(func(e: String) -> bool: return e.contains("'BBB' has 0 entries")))
+
+	# Unknown name.
+	s = _regions_fixture(m)
+	s.discovery[0]["regions"] = [&"nowhere"]
+	assert_true(s.validate(m, defs, false).any(func(e: String) -> bool: return e.contains("region 'nowhere' is not in regions")))
+
+	# Duplicate: a name twice in one entry, and a country with two entries.
+	s = _regions_fixture(m)
+	s.discovery[1]["regions"] = [&"north", &"north"]
+	assert_true(s.validate(m, defs, false).any(func(e: String) -> bool: return e.contains("listed twice")))
+	s = _regions_fixture(m)
+	s.discovery.append({"tag": &"AAA", "regions": [&"south"]})
+	assert_true(s.validate(m, defs, false).any(func(e: String) -> bool: return e.contains("'AAA' has 2 entries")))
+
+	# Discovery without regions.
+	s = _regions_fixture(m)
+	s.regions = []
+	s.region = PackedByteArray()
+	assert_true(s.validate(m, defs, false).any(func(e: String) -> bool: return e.contains("no regions")))
+
+
+## Fog spec R6 (FG1): discovery_of gives one byte a hex from the tag's regions; the region bytes are in the digest.
+func test_discovery_of_and_region_in_the_digest() -> void:
+	var m := _make_map()
+	var s := _regions_fixture(m)
+	var north := s.discovery_of(&"AAA")
+	assert_eq(north.size(), m.hex_count())
+	var ones := 0
+	for b: int in north:
+		ones += b
+	assert_eq(ones, 14, "AAA holds the north hexes only")
+	assert_eq(north[0], 1)
+	assert_eq(north[20], 0)
+	var both := s.discovery_of(&"BBB")
+	var missing := 0
+	for b: int in both:
+		if b != 1:
+			missing += 1
+	assert_eq(both.size(), m.hex_count())
+	assert_eq(missing, 0, "BBB holds both regions")
+	assert_eq(s.discovery_of(&"ZZZ").size(), 0, "no entry, no bytes")
+	var base := s.digest()
+	s.region[0] = 2
+	assert_ne(s.digest(), base, "region is in the digest")
+
+
+## Fog spec D3 and R5 (FG1): north Italy is one region, `europe`, on every hex; each of its 13 countries holds every hex.
+func test_north_italy_discovery_is_every_bit() -> void:
+	var map := ResourceLoader.load("res://data/maps/north_italy.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as MapData
+	var scen := ResourceLoader.load(
+		"res://data/scenarios/north_italy_1480.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as ScenarioDef
+	assert_not_null(map)
+	assert_not_null(scen)
+	assert_eq(scen.regions.size(), 1)
+	assert_eq(scen.regions[0], &"europe")
+	assert_eq(scen.discovery.size(), 13)
+	assert_eq(scen.region.size(), map.hex_count())
+	var not_europe := 0
+	for b: int in scen.region:
+		if b != 1:
+			not_europe += 1
+	assert_eq(not_europe, 0, "every hex is europe")
+	for tag: StringName in scen.countries:
+		var bits := scen.discovery_of(tag)
+		assert_eq(bits.size(), map.hex_count(), "%s: one byte a hex" % String(tag))
+		var missing := 0
+		for b: int in bits:
+			if b != 1:
+				missing += 1
+		assert_eq(missing, 0, "%s discovers every hex" % String(tag))

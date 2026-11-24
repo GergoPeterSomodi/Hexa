@@ -8,6 +8,10 @@ extends SceneTree
 const DEFAULT_DEFS := "res://data/defs/game_defs.tres"
 const DEFAULT_MAPS_DIR := "res://data/maps"
 const DEFAULT_SCENARIOS_DIR := "res://data/scenarios"
+## The region source (fog spec section 4): scenarios whose every hex lies in one region, by scenario id. Every hex, sea
+## too, takes that region's byte (its index in `regions` + 1). A scenario not listed keeps its `region` as it is; the
+## Europe map (later) rasterises its regions from lon/lat polygons instead.
+const ALL_HEXES_IN := {"north_italy_1480": &"europe"}
 
 
 func _initialize() -> void:
@@ -68,6 +72,10 @@ func _run_targets(targets: Array[ScenarioDef], defs: GameDefs, maps_dir: String,
 		if map == null:
 			printerr("build_scenario: cannot load MapData %s for scenario %s" % [map_path, scenario.id])
 			return 1
+		if ALL_HEXES_IN.has(scenario.id) and scenario.regions.find(StringName(ALL_HEXES_IN[scenario.id])) < 0:
+			printerr("build_scenario: %s: regions do not name the region source '%s'" % [
+				scenario.id, str(ALL_HEXES_IN[scenario.id])])
+			return 1
 		if not check:
 			rebuild_scenario(scenario, map)
 		var errors := scenario.validate(map, defs, true)
@@ -76,6 +84,10 @@ func _run_targets(targets: Array[ScenarioDef], defs: GameDefs, maps_dir: String,
 				printerr("build_scenario: %s: %s" % [scenario.id, err])
 			return 1
 		if check:
+			var source := region_source(scenario, map)
+			if not source.is_empty() and source != scenario.region:
+				printerr("build_scenario: %s: region differs from the region source (run build_scenario.gd)" % scenario.id)
+				return 1
 			print("build_scenario: %s is current (digest %s)" % [scenario.id, scenario.digest()])
 			continue
 		var save_path := out_path if out_path != "" else (
@@ -90,11 +102,29 @@ func _run_targets(targets: Array[ScenarioDef], defs: GameDefs, maps_dir: String,
 	return 0
 
 
-## Regrows `scenario.owner` and stamps `scenario.map_digest` from `map`. `tempers` and `start_armies` (M8 spec 4.4, 7) are
-## written by hand and kept as they are; validate() checks them.
+## Regrows `scenario.owner`, stamps `scenario.map_digest` and writes `scenario.region` from the region source. `regions`,
+## `discovery`, `tempers` and `start_armies` (M8 spec 4.4, 7; fog spec R5) are written by hand and kept as they are;
+## validate() checks them.
 static func rebuild_scenario(scenario: ScenarioDef, map: MapData) -> void:
 	scenario.owner = ScenarioGrowth.grow(map, scenario)
 	scenario.map_digest = map.digest()
+	var source := region_source(scenario, map)
+	if not source.is_empty():
+		scenario.region = source
+
+
+## The `region` bytes the source gives `scenario` on `map` (ALL_HEXES_IN), or empty when the source names none for it.
+static func region_source(scenario: ScenarioDef, map: MapData) -> PackedByteArray:
+	var out := PackedByteArray()
+	if not ALL_HEXES_IN.has(scenario.id):
+		return out
+	var k := scenario.regions.find(StringName(ALL_HEXES_IN[scenario.id]))
+	if k < 0:
+		return out
+	out.resize(map.hex_count())
+	for i: int in map.hex_count():
+		out[i] = k + 1
+	return out
 
 
 ## Computes per-country district and town counts (section 4.2 table).

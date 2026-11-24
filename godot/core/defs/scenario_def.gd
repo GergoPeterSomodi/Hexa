@@ -27,6 +27,12 @@ const NO_HEX := Vector2i(-1, -1)
 @export var tempers: Array[StringName] = []
 ## Companies the scenario starts with: {tag: StringName, hex: Vector2i, kind: int, count: int} (M8 spec 5.1). 1480: none.
 @export var start_armies: Array[Dictionary] = []
+## Regions of the discovery set (fog spec R5): index 0 is the first region; byte value k + 1 in `region` means regions[k].
+@export var regions: Array[StringName] = []
+## One byte a hex, in the map's order: the region's byte, 0 for none. Empty when the scenario has no regions (R7).
+@export var region: PackedByteArray = PackedByteArray()
+## Per country (R5): {tag: StringName, regions: Array[StringName]}, the regions every hex of which the country starts knowing (R6).
+@export var discovery: Array[Dictionary] = []
 
 
 ## Country id (1..countries.size()) for `tag`, or 0 when not listed.
@@ -94,6 +100,7 @@ func validate(map: MapData, defs: GameDefs, deep: bool) -> Array[String]:
 	_validate_owner(map, errors)
 	_validate_tempers(defs, errors)
 	_validate_start_armies(map, defs, country_set, errors)
+	_validate_regions(map, errors)
 	if deep:
 		_validate_deep(map, defs, errors)
 	return errors
@@ -126,6 +133,12 @@ func digest() -> String:
 	for key: StringName in tempers:
 		_feed_str(ctx, String(key))
 	_feed_dict_list(ctx, start_armies)
+	_feed_int(ctx, regions.size())
+	for reg: StringName in regions:
+		_feed_str(ctx, String(reg))
+	_feed_int(ctx, region.size())
+	_feed_bytes(ctx, region)
+	_feed_dict_list(ctx, discovery)
 	return ctx.finish().hex_encode()
 
 
@@ -274,6 +287,77 @@ func _validate_start_armies(map: MapData, defs: GameDefs, country_set: Dictionar
 		var count := int(a.get("count", 0))
 		if count < 1 or count > 8:
 			errors.append("start_armies[%d]: count is %d, expected 1 to 8" % [i, count])
+
+
+## The start discovery of `tag` (fog spec R6): one byte a hex, 1 where the hex's region is one of the tag's regions.
+## Empty when the scenario has no regions or `tag` has no entry.
+func discovery_of(tag: StringName) -> PackedByteArray:
+	var out := PackedByteArray()
+	if regions.is_empty() or region.is_empty():
+		return out
+	var names: Array = []
+	var found := false
+	for entry: Dictionary in discovery:
+		if StringName(entry.get("tag", &"")) == tag:
+			names = entry.get("regions", [])
+			found = true
+			break
+	if not found:
+		return out
+	var flags := PackedByteArray()
+	flags.resize(regions.size() + 1)
+	for k: int in regions.size():
+		flags[k + 1] = 1 if names.has(regions[k]) else 0
+	out.resize(region.size())
+	for i: int in region.size():
+		var b := int(region[i])
+		out[i] = flags[b] if b < flags.size() else 0
+	return out
+
+
+## Fog spec R5: `region` has the map's hex count or is empty, and no byte above the region count. With no regions,
+## `discovery` is empty; else every country of `countries` has exactly one entry, every name is in `regions`, and no name
+## is given twice.
+func _validate_regions(map: MapData, errors: Array[String]) -> void:
+	var known: Dictionary = {}
+	for k: int in regions.size():
+		var reg := regions[k]
+		if reg == &"" or known.has(reg):
+			errors.append("regions[%d]: empty or duplicate name '%s'" % [k, String(reg)])
+		known[reg] = true
+	if not region.is_empty() and region.size() != map.hex_count():
+		errors.append("region has %d bytes, expected %d or none" % [region.size(), map.hex_count()])
+	var reported := 0
+	for i: int in region.size():
+		if int(region[i]) > regions.size():
+			if reported < 20:
+				errors.append("region: hex %s has region byte %d (max %d)" % [map.hex_of(i), int(region[i]), regions.size()])
+			reported += 1
+	if regions.is_empty():
+		if not discovery.is_empty():
+			errors.append("discovery has %d entries but the scenario has no regions" % discovery.size())
+		return
+	var entries: Dictionary = {}
+	for i: int in discovery.size():
+		var entry: Dictionary = discovery[i]
+		var tag := StringName(entry.get("tag", &""))
+		entries[tag] = int(entries.get(tag, 0)) + 1
+		var given: Array = entry.get("regions", [])
+		var named: Dictionary = {}
+		for item: Variant in given:
+			var sn := StringName(item)
+			if not known.has(sn):
+				errors.append("discovery[%d] (%s): region '%s' is not in regions" % [i, String(tag), String(sn)])
+			if named.has(sn):
+				errors.append("discovery[%d] (%s): region '%s' listed twice" % [i, String(tag), String(sn)])
+			named[sn] = true
+	for tag: StringName in entries:
+		if not countries.has(tag):
+			errors.append("discovery: tag '%s' is not listed in countries" % String(tag))
+	for tag: StringName in countries:
+		var n := int(entries.get(tag, 0))
+		if n != 1:
+			errors.append("discovery: country '%s' has %d entries, expected 1" % [String(tag), n])
 
 
 func _validate_deep(map: MapData, defs: GameDefs, errors: Array[String]) -> void:

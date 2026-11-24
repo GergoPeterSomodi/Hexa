@@ -132,3 +132,12 @@ func test_fewer_countries_and_none() -> void:
 	assert_eq((few["scenario"] as ScenarioDef).countries.size(), 5)
 	var none := FakeScenario.build(_map, 0, 1)
 	assert_eq((none["scenario"] as ScenarioDef).countries.size(), 0)
+
+
+## Fog spec R7 (FG1): the made-up world has no regions and no discovery; it starts with the land sight only.
+func test_no_regions_no_discovery() -> void:
+	var scenario := _scenario()
+	assert_eq(scenario.regions.size(), 0)
+	assert_eq(scenario.region.size(), 0)
+	assert_eq(scenario.discovery.size(), 0)
+	assert_eq(scenario.discovery_of(&"FAA").size(), 0)

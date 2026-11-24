@@ -515,3 +515,45 @@ seeds = Array[Dictionary]([{
 }])
 owner = PackedByteArray("AQEBAwMDAwMDAwMDAgICAgICAgICAQEDAwMDAwMDAwMDAgICAgICAgICAQEEAwMDAwMDAwMDAgICAgICBgICBAQEAwMDAwMFBQMDBQUCAgIGBgYGBAQEAwMDAwUFBQUFBQUCAgIGBgYGBAQDAwMDBQUFBQUFBQYCAgIGBgYGBAQEAwMEBQUFBQUFBgYGAgIGBgYGBAQEBAQEBAUFBQUGBgYGBgYGBgAABAQEBAQEBAUFBQUGBQUGBgYGBgAAAQQEBAQEBAUFBQUFBQUKBgYGBgAAAQEBBAQEBAQEBAUFBQoKCwsLBgAAAQEBBAQEBAQHBwUFBQULCQsLAAAAAQEBAQQEBAcHBwcFBQsLCQkGBgAAAQEBBAQEBwcHBwcFBQsLCQkJAAAAAQEBBAQEBwcAAAAADQsLCAgJCQAAAQEBBAQHAAAAAAAADQgICAgICQkJAQEBBAQAAAAAAAAAAAgICAwICQkJAQEBAAAAAAAAAAAAAAgMDAwICQkJAAABAAAAAAAAAAAAAAAMDAwICQkJ")
 tempers = Array[StringName]([&"opportunist", &"aggressive", &"aggressive", &"steadfast", &"opportunist", &"aggressive", &"builder", &"builder", &"opportunist", &"cautious", &"steadfast", &"cautious", &"builder"])
+regions = Array[StringName]([&"europe"])
+region = PackedByteArray("AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB")
+discovery = Array[Dictionary]([{
+"regions": Array[StringName]([&"europe"]),
+"tag": &"FRA"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"AUS"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"SWI"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"SAV"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"MLO"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"VEN"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"GEN"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"TUS"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"PAP"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"MAN"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"FER"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"SIE"
+}, {
+"regions": Array[StringName]([&"europe"]),
+"tag": &"LUC"
+}])

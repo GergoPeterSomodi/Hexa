@@ -100,6 +100,7 @@ static func build(map: MapData, count: int, _seed_value: int) -> Dictionary:
 	var scenario := ScenarioDef.new()
 	scenario.id = "fake"
 	scenario.name = "Fake %d" % count
+	# No regions and no discovery (fog spec R7): the made-up world starts with the land sight only.
 	if map == null:
 		return {"defs": defs, "scenario": scenario}
 	var capitals := _pick_capitals(map, clampi(count, 0, MAX_COUNTRIES))

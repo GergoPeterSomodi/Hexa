@@ -327,10 +327,10 @@ func _with_line(dir: String, slot: String, change: Callable) -> void:
 
 func test_p_hostile_header_numbers_read_as_broken() -> void:
 	var cases: Array[Array] = [
-		["\"format\":6,", "\"format\":1e999,"], ["\"format\":6,", "\"format\":-1e999,"],
-		["\"format\":6,", "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
+		["\"format\":%d," % SaveFile.FORMAT, "\"format\":1e999,"], ["\"format\":%d," % SaveFile.FORMAT, "\"format\":-1e999,"],
+		["\"format\":%d," % SaveFile.FORMAT, "\"format\":1e300,"], ["\"turn\":4}", "\"turn\":1e30}"],
 		["\"saved_unix\":1700000000,", "\"saved_unix\":1e19,"], ["\"play_seconds\":61,", "\"play_seconds\":9007199254740994,"],
-		["\"format\":6,", "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
+		["\"format\":%d," % SaveFile.FORMAT, "\"format\":1.5,"], ["\"turn\":4}", "\"turn\":%s}" % "9".repeat(400)], ["\"turn\":4}", "\"turn\":-4}"],
 	]
 	for item: Array in cases:
 		var dir := _saved("1")
@@ -419,10 +419,15 @@ func test_a_write_after_a_crash_between_the_two_renames_leaves_no_bak() -> void:
 # ----- M4: format 2, the economy and the weather (m4-build-spec.md 4.22) ----------------------------------------
 
 
-func test_the_format_is_6_and_a_format_5_save_is_older() -> void:
-	# M8 (4.15, D34): ai_only and log_from; an M7 (format 5) save reads older and is refused quietly.
-	assert_eq(SaveFile.FORMAT, 6)
-	assert_eq(SaveFile.OLDEST_FORMAT, 6)
+func test_the_format_is_7_and_a_format_6_save_is_older() -> void:
+	# FG2 (fog-build R38, D16): the format is 7; a format-6 (M8) save reads older and is refused quietly. The
+	# format-5 and older cases below are unchanged (they were older at 6 too).
+	assert_eq(SaveFile.FORMAT, 7)
+	assert_eq(SaveFile.OLDEST_FORMAT, 7)
+	var m8 := _saved("4")
+	_with_header(m8, "4", func(h: Dictionary) -> void: h["format"] = 6)
+	assert_eq(SaveFile.read_header("4", m8)["state"], &"older", "a format-6 header reads older")
+	assert_eq(SaveFile.read("4", m8)["problem"], "Made by an older test build", "refused quietly")
 	var m7 := _saved("5")
 	_with_header(m7, "5", func(h: Dictionary) -> void: h["format"] = 5)
 	assert_eq(SaveFile.read_header("5", m7)["state"], &"older", "a format-5 header reads older")
@@ -524,3 +529,38 @@ func test_save_load_save_is_byte_equal_with_a_trimmed_log() -> void:
 	var dir_b := _dir()
 	assert_eq(SaveFile.write(back, "4", INFO, {}, dir_b), "")
 	assert_eq(_bytes(SaveFile.path_of("4", dir_a)), _bytes(SaveFile.path_of("4", dir_b)), "byte-equal files")
+
+
+# ----- FG2: the format 7 of the fog build (fog-build-spec R38, D16) ----------------------------------------------
+
+
+func test_a_format_6_file_is_refused_without_a_crash() -> void:
+	# R38: a format-6 save is refused quietly. The read gives the problem and no body; nothing is restored, and it
+	# reads the same again.
+	var dir := _saved("1")
+	_with_header(dir, "1", func(h: Dictionary) -> void: h["format"] = 6)
+	var read := SaveFile.read("1", dir)
+	assert_eq(read["problem"], "Made by an older test build")
+	assert_true((read["body"] as Dictionary).is_empty(), "no body is read")
+	assert_eq(SaveFile.read("1", dir)["problem"], "Made by an older test build", "the same again")
+	assert_eq(SaveFile.read_header("1", dir)["state"], &"older")
+
+
+func test_save_load_save_is_byte_equal_on_north_italy_at_turn_8() -> void:
+	# R38: the format-7 body round-trips on the north Italy map. Seven seasons from Spring 1480 reach turn 8.
+	var g := EconomyFixture.game(&"GEN")
+	for n: int in 7:
+		Season.run(g)
+	assert_eq(g.turn, 8)
+	var dir_a := _dir()
+	assert_eq(SaveFile.write(g, "2", INFO, {}, dir_a), "")
+	var read := SaveFile.read("2", dir_a)
+	assert_eq(read["problem"], "")
+	assert_eq((read["header"] as Dictionary)["format"], 7)
+	var r := Snapshot.restore(read["body"] as Dictionary, g.map, g.defs)
+	assert_eq(r["problem"], "")
+	var back := r["game"] as Game
+	assert_eq(back.digest(), g.digest())
+	var dir_b := _dir()
+	assert_eq(SaveFile.write(back, "2", INFO, {}, dir_b), "")
+	assert_eq(_bytes(SaveFile.path_of("2", dir_a)), _bytes(SaveFile.path_of("2", dir_b)), "byte-equal files")
