@@ -384,3 +384,26 @@ About 3 L + 2 M, 9 to 10 worker-days. Opus reads T1 and T2 (the determinism seam
 10. **Order of work.** Options: (a) U1 after M7, U2 after M8; (b) U2 first because war feels thin now; (c) both after M12.
     **Recommend (a):** U1 unblocks M9.5 and is the owner's daily pain; U2 waits for M8 so the AI is measured on auto
     battles first. If M7's playtest shows the war flat, move U2 up and leave U1 where it is.
+
+---
+
+## Owner's answers (2026-11-24)
+
+These override the recommendations above where they differ.
+
+1. **Tile window:** keep the small right-click menu as well as the window (the window is for details; the menu stays for
+   the quick actions).
+2. **Ships tab:** show an empty tab until ships exist (M19).
+3. **Fog has two levels** (a rule change, see issue 446):
+   - **Deep fog:** never discovered; nothing is shown.
+   - **Light fog (the fog of war):** discovered but not in sight now. Everything about the land stays visible: owner, people,
+     goods, buildings, works and the tile's window. Light fog hides only armies, their movement and orders, and battles you
+     are not part of. The same rule applies to every country, the AI included (issue 435 follows from it).
+4. **Battle default:** play my battles on the board, with Auto one click away.
+5. **Daily orders on the board:** the deeper version (stance, reserve fills, and targets for guns, as the owner's earlier
+   ideas for the board describe); the owner will share the earlier ideas again, and v1's scope is set from them.
+6. **Order of work:** decide the "moves in the month" rule (issue 432) before building the battle board.
+7. **Saving during a battle:** allowed anywhere. The save stores the battle's start, its luck state and the orders given so
+   far; a reload replays to the same point. (The risk of retrying dice by reloading is accepted.)
+
+Not asked yet: whether the AI picks a stance per day (recommend no for v1), and the order of the two builds.
