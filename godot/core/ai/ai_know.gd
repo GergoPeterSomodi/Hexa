@@ -17,14 +17,33 @@ static func treasury(game: Game, tag: StringName) -> int:
 
 
 ## The country's money this season at tax level `tax` (-1: its own level), calm weather: EconomyPreview with one season.
+## Memoised by the game's version and the resolved level (a version moves on every change, so a read never sees an old net);
+## the own level reads the two-season preview of `_two`, which the brief's upkeep and food alarm share.
 static func preview_net(game: Game, tag: StringName, tax: int = -1) -> int:
-	var list: Array = EconomyPreview.with(game, tag, {"tax": tax}, 1)["seasons"]
-	return int((list[0] as Dictionary)["net"]) if not list.is_empty() else 0
+	var c := Countries.by_tag(game, tag)
+	if c == null:
+		return 0
+	var level := tax if tax >= 0 and tax <= 2 else c.tax
+	if level == c.tax:
+		var own := _two(game, tag)
+		return int((own[0] as Dictionary)["net"]) if not own.is_empty() else 0
+	return int(game.view_cache.get_or_make([&"ai_net", game.version, tag, level], func() -> int:
+		var list: Array = EconomyPreview.with(game, tag, {"tax": level}, 1)["seasons"]
+		return int((list[0] as Dictionary)["net"]) if not list.is_empty() else 0))
+
+
+## The next two seasons of the country's own preview (calm, its own tax, lines on), kept for the game's version. Season 0 is
+## the one-season preview (its net, its lines and its used goods equal the one-season ask to the unit: EconomyPreview.with's
+## count only cuts the walk), season 1 is the food alarm's second season. One walk serves the brief's net, upkeep and alarms.
+static func _two(game: Game, tag: StringName) -> Array:
+	return game.view_cache.get_or_make([&"ai_two", game.version, tag], func() -> Array:
+		return EconomyPreview.with(game, tag, {}, 2)["seasons"]) as Array
 
 
 ## The negative lines of the season's preview (districts, walls, army), as a positive number.
 static func upkeep(game: Game, tag: StringName) -> int:
-	var entry := EconomyPreview.expected(game, tag)
+	var own := _two(game, tag)
+	var entry: Dictionary = own[0] if not own.is_empty() else {}
 	var total := 0
 	for line: Dictionary in entry.get("lines", []):
 		var amount := int(line["amount"])
@@ -94,7 +113,7 @@ static func _food_soon(game: Game, tag: StringName) -> bool:
 	for g: int in game.defs.goods.size():
 		if game.defs.goods[g].kind == &"food":
 			food.append(g)
-	for entry: Dictionary in EconomyPreview.with(game, tag, {"lines": false}, 2)["seasons"]:
+	for entry: Dictionary in _two(game, tag):
 		var used: PackedInt32Array = entry["used"]
 		var taken := 0
 		for g: int in food:

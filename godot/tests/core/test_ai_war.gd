@@ -171,7 +171,7 @@ func test_the_ratio_is_capped_at_4000() -> void:
 func test_the_prize_counts_open_districts_in_range_and_two_for_each_strong_fortress() -> void:
 	var g := S.ready_duel()
 	var b := S.brief(g)
-	assert_eq(AiWar.prize_of(g, b, GEN), 2, "Genoa's walls (8, 13), 3 hexes from Milan's (11, 13), count 2")
+	assert_eq(AiWar.prize_of(g, b, GEN), 10, "Genoa's 8 held or open districts within 3 hexes of Milan's land, plus 2 for its walls (8, 13), 3 hexes from Milan's (11, 13)")
 	var swiss := AiWar.prize_of(g, b, &"SWI")
 	var open := Vector2i(9, 2)
 	assert_eq([AiKnow.area_state(g, open), AiKnow.owner_of(g, open)], [&"open", &"SWI"], "a Swiss district 1 hex from Milan's land")

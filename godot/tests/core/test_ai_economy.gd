@@ -48,6 +48,7 @@ func _tax(money: int, level: int, war: bool = false, armies: int = 0, flags: Dic
 	b.hungry = bool(flags.get("hungry", false))
 	b.food_soon = bool(flags.get("food_soon", false))
 	b.wanted_cost = int(flags.get("wanted", 0))
+	g.version += 1  # the planted state is a change as an action makes it: the brief's cached previews must not serve the old one
 	AiEconomy.tax(hook, g, b, 0)
 	var line := ""
 	var acted := false

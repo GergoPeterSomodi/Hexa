@@ -165,8 +165,8 @@ On Windows (mouse) and on the MacBook (trackpad), with a fresh user folder.
 8. Main menu, New game, seed 1480, Play as **Savoy**. Declare war on Milan (the country panel); End season: Milan's armies move
    to meet you or to its posts; set your army on Hold beside a Milanese army and watch whether Milan's stands on Withdraw (the
    dock after a battle shows "them: Hold" or "Withdraw"). Fight on until Milan makes a white peace or yields (the peace alert).
-9. Main menu, New game, seed **1480** (K24 replaces this number with the first seed from 1480 on that gives the loss, when
-   1480 does not), Play as **Genoa**, and raise nothing. Play
+9. Main menu, New game, seed **1515** (K24's seed: the first seed from 1485 on where a passive Genoa loses a war within 40
+   seasons: `soak --suite=passive --seed=1515 --seasons=40`), Play as **Genoa**, and raise nothing. Play
    `end 4` again and again: a war is declared on you (the war alert); enemy armies take your open land and besiege Genoa (the
    dial); the task flag's **peace_risk** line warns "...: it can make peace now and keep them"; then the **peace alert**:
    "The Duchy of Milan has made peace with you: ... become theirs." You have lost a war.

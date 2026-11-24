@@ -294,12 +294,13 @@ func test_slice3_kit_icons_and_end_season_plate() -> void:
 
 
 func test_slice4_icons_and_feedback_frames() -> void:
-	# Spec 6.2: 48 icons of the `icons` atlas are 24 px Kit icons at 1x and 2x (study and info are `_24`, the 16 px names stay).
+	# Spec 6.2: the icons of the `icons` atlas are 24 px Kit icons at 1x and 2x (study and info are `_24`, the 16 px names stay).
+	# The atlas lists 49 names: the 48 of the spec, and `log` (the action log's button, kit_theme KIT_GRID_ICONS), added later.
 	var studiolo := load(KitTheme.THEME_PATH) as Theme
 	var hc := load(KitTheme.HIGH_CONTRAST_PATH) as Theme
 	var pieces := _load_pieces()
 	var names: Array = (pieces["icons"] as Dictionary)["icons"]
-	assert_eq(names.size(), 48, "48 icons")
+	assert_eq(names.size(), 49, "49 icons: the spec's 48 and log")
 	var theme_2x := KitTheme.load_for(2.0, &"2x", false)
 	for n: Variant in names:
 		var iname := StringName(str(n) + "_24" if str(n) in ["study", "info"] else str(n))

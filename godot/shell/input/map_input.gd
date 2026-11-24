@@ -5,6 +5,9 @@ class_name MapInput
 extends Node
 
 signal select_requested(map_px: Vector2)
+## A left click (no Shift) released on one of the viewer's unit tokens: `screen` is the viewport point. The token is
+## hit before the hex (unit_at_func), so the hex under a unit is not selected by that click (MapArmies picks the unit).
+signal unit_requested(screen: Vector2)
 signal command_requested(map_px: Vector2)
 signal hover_changed(hex: Vector2i)
 signal mode_requested(mode: int)
@@ -48,6 +51,9 @@ signal blocked(reason: String)
 var orders_blocked: Callable = Callable()
 ## () -> bool, asked on a Shift+right click: true while an army of yours is selected, so the click storms. Unset: no army.
 var storm_ready: Callable = Callable()
+## Callable(screen: Vector2) -> bool, asked on a left click's release: true while one of the viewer's unit tokens stands
+## under the viewport point (its screen rect, the zoom included). Unset: no units, every click is a hex click.
+var unit_at_func := Callable()
 
 const CURSOR_LEFT := 0
 const CURSOR_RIGHT := 1
@@ -186,7 +192,10 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 		_mark_handled()
 		return
 	if released_action == &"map_select":
-		select_requested.emit(map_px)
+		if _on_unit(mb):
+			unit_requested.emit(mb.position)
+		else:
+			select_requested.emit(map_px)
 		_mark_handled()
 	elif released_action == &"map_command":
 		if _storms(mb):
@@ -194,6 +203,11 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 		else:
 			command_requested.emit(map_px)
 		_mark_handled()
+
+
+## True for a left click (no Shift) on a unit token: the unit is the target, not the hex under it.
+func _on_unit(mb: InputEventMouseButton) -> bool:
+	return not mb.shift_pressed and unit_at_func.is_valid() and bool(unit_at_func.call(mb.position))
 
 
 ## A Shift+right click (no Ctrl, Alt or Meta) with an army of yours selected: a storm, not a command (M7 6.1).

@@ -149,8 +149,7 @@ func test_the_token_is_readable_at_zoom_one() -> void:
 	assert_lt(token.plate_size().x, 104.0 * 0.5, "and well under a hex (104 px)")
 	assert_eq(token.badge_font_size(), ArmyToken.FONT_SIZE, "the strength is 14 px")
 	assert_gte(token.badge_font_size(), 13, "the strength reads at 13 px or more")
-	assert_gt(ArmyToken.RING_SIZE.x, ArmyToken.PLATE_SIZE.x, "the selection ring is wider than the plate, so it frames it")
-	assert_gt(ArmyToken.RING_SIZE.y, ArmyToken.PLATE_SIZE.y, "and taller")
+	assert_gt(ArmyToken.RING_GAP, 0.0, "the selection ring stands off the token, so it frames it")
 	assert_lt(ArmyToken.LIFT, -ArmyToken.PLATE_SIZE.y * 0.5, "the plate stands above the hex centre, clear of the town icon")
 
 

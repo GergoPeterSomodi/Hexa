@@ -118,6 +118,7 @@ func _ready() -> void:
 	else:
 		_on_game_started()
 	add_child(MapPeople.new()); add_child(MapArmies.new()); add_child(MapWars.new())  # after the game's first fill: the people relay the plates, the armies draw, the wars mark
+	if _settings != null: ($MapArmies as MapArmies).set_path_look(str(_settings.get_value("map/path_look")))
 	_seasons.request_next()
 
 
@@ -174,6 +175,7 @@ func _apply_settings(settings: Settings) -> void:
 	slice_ms = clampf(float(settings.get_value("dev/slice_ms")), 2.0, 16.0)
 	_rig.configure(settings)
 	_input.configure(settings)
+	if has_node("MapArmies"): ($MapArmies as MapArmies).set_path_look(str(settings.get_value("map/path_look")))
 	_apply_zoom()
 
 
@@ -198,7 +200,7 @@ func _on_setting_changed(key: String, value: Variant) -> void:
 	if key in [
 		"map/grid", "map/grid_opacity", "map/place_names", "map/sight_veil",
 		"graphics/relief_shading", "graphics/preload_next_season", "graphics/texture_quality",
-		"dev/far_zoom", "dev/slice_ms", "game/preview_on_map"
+		"dev/far_zoom", "dev/slice_ms", "game/preview_on_map", "map/path_look"
 	]:
 		_apply_settings(_settings)
 
@@ -594,7 +596,7 @@ func _on_select_requested(map_px: Vector2) -> void:
 		if tag != &"":
 			country_clicked.emit(tag)
 		return
-	if not ($MapArmies as MapArmies).click(hex, Input.is_key_pressed(KEY_SHIFT)): select_hex(hex)
+	select_hex(hex)
 
 
 func _on_command_requested(map_px: Vector2) -> void:

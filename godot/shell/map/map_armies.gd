@@ -1,5 +1,5 @@
-## The map's armies (docs/architecture/m6-build-spec.md 6.1 and 6.3; L16): the army tokens, the selection (a click, a second
-## click on the same token, Tab), the order cursor (Alt+arrows, O and a right click), the route of the cursor or of the hex
+## The map's armies (docs/architecture/m6-build-spec.md 6.1 and 6.3; L16): the army tokens, the selection (a click on your unit
+## token, a second click on a stack, Tab), the order cursor (Alt+arrows, O and a right click), the route of the cursor or of the hex
 ## under the pointer, the stored route of a march in progress (thin), the reach of the selected army and R. A child of the
 ## map scene, made once the scene's layers exist, as MapPeople is. It reads the game through ArmyView and MovePreview and
 ## orders only through Session.act; it never changes the game.
@@ -33,6 +33,7 @@ var _view: TileMapView = null
 var _tokens: ArmyTokens = null
 var _route: PathMarks = null
 var _stored: PathMarks = null
+var _look: StringName = PathMarks.LOOK_RIBBON
 var _menu: HexMenu = null
 var _army := -1
 var _cursor := NO_HEX
@@ -60,6 +61,7 @@ func _ready() -> void:
 	_stored = PathMarks.new()
 	_stored.setup(_view)
 	add_child(_stored)
+	_set_look_all()
 	_menu = HexMenu.new()  # the hex menu (L19): no army of yours selected, a right click or O on an own hex
 	add_child(_menu)
 	_menu.setup(_scene, self)
@@ -72,6 +74,8 @@ func _ready() -> void:
 	_link(input.cursor_moved, move_cursor)
 	_link(input.command_key_requested, _on_command_key)
 	_link(input.hover_changed, _on_hover)
+	_link(input.unit_requested, _on_unit_requested)
+	input.unit_at_func = _own_unit_at
 	_link(Events.game_started, _on_game_started)
 	_link(Events.game_ended, _on_game_ended)
 	_link(_scene.selection_changed, _on_selection_changed)
@@ -117,6 +121,8 @@ func _process(_delta: float) -> void:
 	if not is_equal_approx(z, _zoom):
 		_zoom = z
 		_tokens.set_zoom(z)
+		_route.set_zoom(z)
+		_stored.set_zoom(z)
 	var colour_blind := _scene.overlay().is_colour_blind()
 	if colour_blind != _colour_blind:
 		_colour_blind = colour_blind
@@ -227,19 +233,19 @@ func _on_selection_changed(hex: Vector2i) -> void:
 	_release()
 
 
-## A left click on `hex` (not while picking). Your token there selects its first army, and each further click on it the
-## next one. Shift, or a hex with none of your tokens, clears the army and returns false: the scene selects the hex.
-func click(hex: Vector2i, shift: bool = false) -> bool:
-	if shift or Session.game == null:
-		clear_army()
-		return false
-	var token := _own_token(hex)
-	if token.is_empty():
-		clear_army()
-		return false
-	var ids := token["armies"] as PackedInt32Array
+## A left click on one of your unit tokens (MapInput.unit_requested; a hex click is the scene's, and the hex is not picked
+## here). The token's first army is selected, and each further click on the stack takes the next army of it.
+func _on_unit_requested(screen: Vector2) -> void:
+	var token := _tokens.own_token_at(screen)
+	if token == null or token.armies.is_empty():
+		return
+	var ids := token.armies
 	select_army(ids[(ids.find(_army) + 1) % ids.size()])
-	return true
+
+
+## MapInput's hit test: true while one of your unit tokens stands under the viewport point `screen`.
+func _own_unit_at(screen: Vector2) -> bool:
+	return _tokens.own_token_at(screen) != null
 
 
 ## Tab: the next army of the player in ArmyView.needing_orders (the ones with no order first), selected and glided to.
@@ -418,14 +424,6 @@ func _mine(game: Game, army_id: int) -> bool:
 	return bool(ArmyView.panel(game, Session.player_tag(), army_id).get("mine", false))
 
 
-## The token of the player's armies on `hex` (ArmyView.tokens' dictionary), {} when there is none.
-func _own_token(hex: Vector2i) -> Dictionary:
-	for token: Dictionary in ArmyView.tokens(Session.game, Session.player_tag()):
-		if bool(token["mine"]) and (token["hex"] as Vector2i) == hex:
-			return token
-	return {}
-
-
 func _set_cursor(hex: Vector2i) -> void:
 	if _cursor != NO_HEX:
 		_view.set_tile("marks", _cursor, "")
@@ -443,17 +441,33 @@ func _show_route() -> void:
 		_stored.clear_route()
 		return
 	var tag := Session.player_tag()
+	var panel := ArmyView.panel(game, tag, _army)
+	var here := panel["hex"] as Vector2i
 	var target := _hover if _hover != NO_HEX else _cursor
-	_route.show_route(_with_beyond(MovePreview.to(game, tag, _army, target)))
+	_route.show_route(_with_beyond(MovePreview.to(game, tag, _army, target), here))
 	_stored.clear_route()
-	var order := ArmyView.panel(game, tag, _army)["order"] as Dictionary
+	var order := panel["order"] as Dictionary
 	if StringName(order["kind"]) == MARCH_KIND and (order["goal"] as Vector2i) != target:
-		_stored.show_route(_with_beyond(MovePreview.stored(game, tag, _army)), true)
+		_stored.show_route(_with_beyond(MovePreview.stored(game, tag, _army), here), true)
 
 
-## The preview with `beyond` added: one byte a hex, 1 where the hex is out of supply for the player (SupplyView.at).
-func _with_beyond(preview: Dictionary) -> Dictionary:
+## The setting map/path_look: the look of the cursor's route and of the stored route (PathMarks.set_look). Kept until the marks exist.
+func set_path_look(look: String) -> void:
+	_look = StringName(look)
+	_set_look_all()
+
+
+func _set_look_all() -> void:
+	if _route != null:
+		_route.set_look(_look)
+		_stored.set_look(_look)
+
+
+## The preview with `beyond` added: one byte a hex, 1 where the hex is out of supply for the player (SupplyView.at), and `from`,
+## the army's own hex, where the route starts.
+func _with_beyond(preview: Dictionary, from: Vector2i) -> Dictionary:
 	var out := preview.duplicate()
+	out["from"] = from
 	var beyond := PackedByteArray()
 	for item: Variant in preview.get("hexes", []) as Array:
 		var supply := SupplyView.at(Session.game, Session.player_tag(), item as Vector2i)

@@ -31,6 +31,9 @@ const KIT_DIRECT_ICONS: Array[String] = [
 	"pennant_cloth",
 ]
 
+## Names of the 24 px `icons` atlas registered as Kit theme icons (the action log's button).
+const KIT_GRID_ICONS: Array[String] = ["log"]
+
 const ICON_ALIASES: Dictionary[String, String] = {
 	"fit": "zoom_fit",
 }
@@ -566,6 +569,11 @@ static func _apply_kit_icons(
 			var target := ICON_ALIASES[alias_name]
 			if theme.has_icon(StringName(target), &"Kit"):
 				theme.set_icon(StringName(alias_name), &"Kit", theme.get_icon(StringName(target), &"Kit"))
+	# The 24 px icons atlas: only the names the shell uses are registered (the rest of it has no shell user yet).
+	for grid_name: String in KIT_GRID_ICONS:
+		var grid := _make_icon_subtex(grid_name, pieces, tex_cache, "icons")
+		if grid != null:
+			theme.set_icon(StringName(grid_name), &"Kit", grid)
 
 
 static func _focus_box(pieces: Dictionary, tex_cache: Dictionary[String, Texture2D], hc: bool) -> StyleBox:
@@ -589,11 +597,12 @@ static func _load_kit_tex(piece_name: String, tex_cache: Dictionary[String, Text
 static func _make_icon_subtex(
 	icon_name: String,
 	pieces: Dictionary,
-	tex_cache: Dictionary[String, Texture2D]
+	tex_cache: Dictionary[String, Texture2D],
+	piece_key: String = "icons_base"
 ) -> AtlasTexture:
-	if not pieces.has("icons_base"):
+	if not pieces.has(piece_key):
 		return null
-	var piece: Dictionary = pieces["icons_base"]
+	var piece: Dictionary = pieces[piece_key]
 	var icon_names: Array = piece.get("icons", [])
 	var idx := icon_names.find(icon_name)
 	if idx < 0:
@@ -605,7 +614,7 @@ static func _make_icon_subtex(
 	var cols := maxi(1, roundi(float(size[0]) / float(cw)))
 	var col := idx % cols
 	var row := int(float(idx) / float(cols))
-	var atlas := _load_kit_tex("icons_base", tex_cache)
+	var atlas := _load_kit_tex(piece_key, tex_cache)
 	if atlas == null:
 		return null
 	var sub := AtlasTexture.new()

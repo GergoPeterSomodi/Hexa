@@ -73,12 +73,24 @@ func _line_total(filter: StringName) -> int:
 	return count
 
 
-func test_starts_closed_as_a_bar() -> void:
+func test_starts_closed_as_an_icon() -> void:
 	assert_false(_widget.is_open(), "closed at the start")
-	assert_true(_widget._bar.visible, "the bar shows")
+	assert_true(_widget._toggle.visible, "the icon button shows")
+	assert_eq(_widget._toggle.tooltip_text, "Log", "its tooltip is Log")
+	assert_eq((_widget._toggle as KitButton).icon_name, &"log", "it is the kit's log icon")
 	assert_false(_widget._card.visible, "the card does not")
 	assert_eq(_widget.season_titles().size(), 0, "a closed log lists no seasons")
 	assert_eq(_widget.line_count(), 0, "a closed log has no line rows")
+
+
+## Closed, the log takes no room: a 40 px square, and no card on the map.
+func test_closed_it_is_a_40_px_icon_only() -> void:
+	_log()
+	await _harness.wait_frames(self, 2)
+	assert_eq(_widget.custom_minimum_size, Vector2(40.0, 40.0), "the log is a 40 px square")
+	assert_eq(_widget._toggle.size, Vector2(40.0, 40.0), "the icon fills it")
+	assert_false(_widget._card.visible, "no card while closed")
+	assert_eq(_widget._toggle.text, "", "the icon has no text")
 
 
 func test_a_new_line_counts_unread_while_closed() -> void:
@@ -87,8 +99,20 @@ func test_a_new_line_counts_unread_while_closed() -> void:
 	_log()
 	assert_eq(_widget.unread(), before + 1, "one new line is unread at once")
 	await _harness.wait_frames(self, 2)
-	assert_eq(_widget.badge_text(), "+%d new" % _widget.unread(), "the badge shows the count after the frame")
-	assert_true(_widget.bar_text().begins_with("Begun"), "the bar shows the newest line")
+	assert_eq(_widget.badge_text(), str(_widget.unread()), "the badge shows the count after the frame")
+
+
+## The badge is a number: above nine it reads 9+.
+func test_the_badge_caps_at_nine() -> void:
+	_widget.close()
+	for i: int in 10:
+		_log()
+	assert_gte(_widget.unread(), 10, "unread counts every line")
+	await _harness.wait_frames(self, 2)
+	assert_eq(_widget.badge_text(), "9+", "ten unread read 9+")
+	_widget.open()
+	await _harness.wait_frames(self, 2)
+	assert_eq(_widget.badge_text(), "", "opening reads them all and hides the badge")
 
 
 func test_opening_marks_read_and_lists_the_seasons() -> void:
@@ -114,9 +138,12 @@ func test_toggle_and_escape() -> void:
 	assert_false(_widget.is_open(), "toggle twice closes")
 
 
-func test_the_toggle_button_opens() -> void:
+func test_the_toggle_button_opens_and_closes() -> void:
 	_widget._toggle.pressed.emit()
-	assert_true(_widget.is_open(), "the Log button opens the card")
+	assert_true(_widget.is_open(), "the Log icon opens the card")
+	_widget._toggle.pressed.emit()
+	assert_false(_widget.is_open(), "a second click on the icon closes it")
+	_widget._toggle.pressed.emit()
 	_widget._close.pressed.emit()
 	assert_false(_widget.is_open(), "the Close button closes it")
 
@@ -221,13 +248,16 @@ func test_a_clickable_line_passes_the_wheel_to_the_card() -> void:
 	assert_gt(clickable, 0, "the rule line of the pick has a hex and is clickable")
 
 
-func test_the_bar_shows_a_placeholder_when_there_is_no_game() -> void:
+func test_no_game_means_no_badge_and_no_lines() -> void:
 	_widget.bind_settings(_harness.settings)
 	Session.game = null
 	_widget._on_game_ended()
-	assert_eq(_widget.bar_text(), ActionLog.EMPTY_TEXT, "no game, no line")
 	assert_eq(_widget.badge_text(), "", "no badge")
 	assert_eq(_widget.unread(), 0, "nothing unread")
+	_widget.open()
+	assert_eq(_widget.season_titles().size(), 0, "no seasons")
+	assert_eq(_widget.line_count(), 0, "no line rows")
+	_widget.close()
 
 
 func test_the_open_state_and_filter_are_kept_in_settings() -> void:
@@ -272,7 +302,7 @@ func test_a_burst_of_events_causes_one_rebuild() -> void:
 	assert_eq(_widget.line_count(), _line_total(&"all"), "and its rows are the log's lines")
 
 
-func test_the_open_card_is_at_most_340_wide_and_the_bar_stays_400() -> void:
+func test_the_open_card_is_at_most_340_wide_and_the_icon_stays_40() -> void:
 	# The UIHarness viewport is 1280 x 720, the size the picture check uses.
 	assert_eq(_harness.viewport.size, Vector2i(1280, 720), "the test viewport is 1280 x 720")
 	_log()
@@ -286,15 +316,32 @@ func test_the_open_card_is_at_most_340_wide_and_the_bar_stays_400() -> void:
 	assert_eq(sentence.autowrap_mode, TextServer.AUTOWRAP_WORD_SMART, "the line text wraps inside the card")
 	_widget.close()
 	await _harness.wait_frames(self, 3)
-	assert_eq(_widget._bar.custom_minimum_size.x, 400.0, "the closed bar keeps its 400 px")
-	assert_gte(_widget._bar.size.x, 400.0 - 0.5, "and is never drawn narrower than 400 px")
+	assert_eq(_widget._toggle.size.x, ActionLog.ICON_SIZE, "the closed icon keeps its 40 px")
 
 
-func test_the_open_card_ends_above_the_key_hints_at_1280_720() -> void:
-	# The card starts at y 368 at 1280 x 720; its bottom must stay above the hints row (720 - 44).
+## The card stands over the icon, and the icon clears the key hints row, at 1280 x 720 and at 2560 x 1440 (scale 2).
+func test_the_card_rises_above_the_icon_and_the_icon_clears_the_hints() -> void:
+	_still_motion()
 	_widget.open()
-	var top := 368.0
-	assert_lte(top + float(ActionLog.CARD_H), 720.0 - float(ActionLog.HINTS_CLEARANCE), "the default card clears the hints")
+	await _harness.wait_frames(self, 3)
+	var icon := _widget._toggle.get_global_rect()
+	var card := _widget._card.get_global_rect()
+	assert_eq(icon.size, Vector2(40.0, 40.0), "the icon is 40 px square")
+	assert_lte(card.end.y, icon.position.y, "the card ends above the icon")
+	assert_gte(card.end.y, icon.position.y - float(ActionLog.CARD_GAP) - 0.5, "by the card gap, not far off")
+	assert_lte(icon.end.y, 720.0 - 38.0, "the icon ends above the key hints row (38 px from the bottom)")
+	assert_lte(float(ActionLog.CARD_H), card.size.y + 0.5, "the open card is its full height")
+	_widget.close()
+	await _harness.wait_frames(self, 2)
+	assert_false(_widget._card.visible, "closed, the card is gone at once in still motion")
+
+
+## The open card's height: fit_height caps it, and the default card clears the hints row.
+func test_fit_height_caps_the_card() -> void:
+	_still_motion()
+	_widget.open()
+	var top := _widget._toggle.get_global_rect().position.y - float(ActionLog.CARD_GAP) - float(ActionLog.CARD_H)
+	assert_gt(top, 0.0, "the default card fits on the screen at 1280 x 720")
 	_widget.fit_height(100.0)
 	assert_eq(_widget._card.custom_minimum_size.y, 100.0, "fit_height caps the card")
 	await _harness.wait_frames(self, 3)
@@ -354,3 +401,70 @@ func test_the_tab_padding_follows_a_theme_change() -> void:
 	btn.remove_theme_stylebox_override("normal")
 	var themed := btn.get_theme_stylebox("normal")
 	assert_eq(after.content_margin_top, themed.content_margin_top, "and the rest of the box is the new theme's, not the old one's")
+
+
+## Reduce motion on: the card is shown or hidden at once, with no slide.
+func _still_motion() -> void:
+	var s := Settings.new("macOS", true)
+	s.set_value("accessibility/reduce_motion", true)
+	_widget.bind_settings(s)
+
+
+## Motion on: opening starts 48 px below the rest height and slides up to it; the card is visible while it slides.
+func test_opening_slides_up_from_below() -> void:
+	var s := Settings.new("macOS", true)
+	s.set_value("accessibility/reduce_motion", false)
+	_widget.bind_settings(s)
+	_widget.close()
+	await _harness.wait_frames(self, 3)
+	assert_false(_widget._card.visible, "closed and still")
+	_widget.open()
+	assert_true(_widget._card.visible, "the card is shown as it starts to slide")
+	var rest := _widget._rest_y
+	assert_eq(_widget._card.position.y, rest + Motion.LOG_SLIDE_PX, "it starts 48 px below its rest")
+	assert_not_null(_widget._slide_tween, "a slide runs")
+	await _widget._slide_tween.finished
+	assert_eq(_widget._card.position.y, rest, "and ends at rest")
+	assert_eq(_widget._card.modulate.a, 1.0, "fully shown")
+
+
+## Motion on: closing slides the card down and out, and hides it at the end.
+func test_closing_slides_down_and_hides() -> void:
+	var s := Settings.new("macOS", true)
+	s.set_value("accessibility/reduce_motion", false)
+	_widget.bind_settings(s)
+	_widget.open()
+	await _harness.wait_frames(self, 3)
+	var rest := _widget._rest_y
+	_widget.close()
+	assert_true(_widget._card.visible, "still visible while it slides out")
+	await _widget._slide_tween.finished
+	assert_false(_widget._card.visible, "hidden at the end of the slide")
+	assert_eq(_widget._card.position.y, rest, "back at rest, ready for the next open")
+
+
+## A close and a reopen while the card is still sliding keep its rest height, so the card does not jump.
+func test_a_click_mid_slide_turns_the_slide_round() -> void:
+	var s := Settings.new("macOS", true)
+	s.set_value("accessibility/reduce_motion", false)
+	_widget.bind_settings(s)
+	_widget.close()
+	await _harness.wait_frames(self, 3)
+	_widget.open()
+	var rest := _widget._rest_y
+	_widget.close()
+	_widget.open()
+	assert_eq(_widget._rest_y, rest, "the rest height is kept across the turn")
+	await _widget._slide_tween.finished
+	assert_true(_widget._card.visible, "reopened, the card stays")
+	assert_eq(_widget._card.position.y, rest, "and it ends at rest")
+
+
+## Reduce motion: the card shows and hides at once.
+func test_reduce_motion_sets_the_final_state_at_once() -> void:
+	_still_motion()
+	_widget.open()
+	assert_true(_widget._card.visible, "shown at once")
+	assert_eq(_widget._card.position.y, _widget._rest_y, "at rest at once")
+	_widget.close()
+	assert_false(_widget._card.visible, "hidden at once")

@@ -1096,210 +1096,214 @@ atlas = ExtResource("54")
 region = Rect2(96, 0, 16, 16)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_57"]
+atlas = ExtResource("50")
+region = Rect2(192, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_58"]
 atlas = ExtResource("57")
 region = Rect2(0, 0, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_58"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_59"]
 atlas = ExtResource("54")
 region = Rect2(16, 16, 16, 16)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_59"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_60"]
 atlas = ExtResource("57")
 region = Rect2(72, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_60"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_61"]
 atlas = ExtResource("57")
 region = Rect2(96, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_61"]
-atlas = ExtResource("49")
-region = Rect2(96, 48, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_62"]
 atlas = ExtResource("49")
-region = Rect2(144, 48, 24, 24)
+region = Rect2(96, 48, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_63"]
+atlas = ExtResource("49")
+region = Rect2(144, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_64"]
 atlas = ExtResource("57")
 region = Rect2(168, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_64"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_65"]
 atlas = ExtResource("50")
 region = Rect2(96, 48, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_65"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_66"]
 atlas = ExtResource("49")
 region = Rect2(24, 0, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_66"]
-atlas = ExtResource("50")
-region = Rect2(120, 48, 24, 24)
-
 [sub_resource type="AtlasTexture" id="AtlasTexture_67"]
 atlas = ExtResource("50")
-region = Rect2(168, 72, 24, 24)
+region = Rect2(120, 48, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_68"]
 atlas = ExtResource("50")
-region = Rect2(24, 48, 24, 24)
+region = Rect2(168, 72, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_69"]
 atlas = ExtResource("50")
-region = Rect2(168, 96, 24, 24)
+region = Rect2(24, 48, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_70"]
-atlas = ExtResource("57")
-region = Rect2(0, 24, 24, 24)
+atlas = ExtResource("50")
+region = Rect2(168, 96, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_71"]
-atlas = ExtResource("50")
-region = Rect2(72, 48, 24, 24)
+atlas = ExtResource("57")
+region = Rect2(0, 24, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_72"]
 atlas = ExtResource("50")
-region = Rect2(144, 96, 24, 24)
+region = Rect2(72, 48, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_73"]
 atlas = ExtResource("50")
-region = Rect2(24, 96, 24, 24)
+region = Rect2(144, 96, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_74"]
-atlas = ExtResource("49")
-region = Rect2(168, 48, 24, 24)
+atlas = ExtResource("50")
+region = Rect2(24, 96, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_75"]
 atlas = ExtResource("49")
-region = Rect2(24, 48, 24, 24)
+region = Rect2(168, 48, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_76"]
-atlas = ExtResource("50")
-region = Rect2(48, 72, 24, 24)
+atlas = ExtResource("49")
+region = Rect2(24, 48, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_77"]
 atlas = ExtResource("50")
-region = Rect2(0, 72, 24, 24)
+region = Rect2(48, 72, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_78"]
 atlas = ExtResource("50")
-region = Rect2(24, 72, 24, 24)
+region = Rect2(0, 72, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_79"]
 atlas = ExtResource("50")
-region = Rect2(72, 72, 24, 24)
+region = Rect2(24, 72, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_80"]
 atlas = ExtResource("50")
-region = Rect2(192, 48, 24, 24)
+region = Rect2(72, 72, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_81"]
-atlas = ExtResource("49")
-region = Rect2(48, 48, 24, 24)
+atlas = ExtResource("50")
+region = Rect2(192, 48, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_82"]
 atlas = ExtResource("49")
-region = Rect2(96, 0, 24, 24)
+region = Rect2(48, 48, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_83"]
-atlas = ExtResource("50")
-region = Rect2(72, 96, 24, 24)
+atlas = ExtResource("49")
+region = Rect2(96, 0, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_84"]
 atlas = ExtResource("50")
-region = Rect2(48, 48, 24, 24)
+region = Rect2(72, 96, 24, 24)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_85"]
+atlas = ExtResource("50")
+region = Rect2(48, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_86"]
 atlas = ExtResource("57")
 region = Rect2(48, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_86"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_87"]
 atlas = ExtResource("49")
 region = Rect2(0, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_87"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_88"]
 atlas = ExtResource("50")
 region = Rect2(168, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_88"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_89"]
 atlas = ExtResource("49")
 region = Rect2(120, 0, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_89"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_90"]
 atlas = ExtResource("54")
 region = Rect2(96, 16, 16, 16)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_90"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_91"]
 atlas = ExtResource("50")
 region = Rect2(144, 72, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_91"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_92"]
 atlas = ExtResource("57")
 region = Rect2(120, 0, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_92"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_93"]
 atlas = ExtResource("57")
 region = Rect2(144, 0, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_93"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_94"]
 atlas = ExtResource("50")
 region = Rect2(192, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_94"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_95"]
 atlas = ExtResource("54")
 region = Rect2(64, 0, 16, 16)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_95"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_96"]
 atlas = ExtResource("49")
 region = Rect2(48, 0, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_96"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_97"]
 atlas = ExtResource("49")
 region = Rect2(120, 48, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_97"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_98"]
 atlas = ExtResource("50")
 region = Rect2(216, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_98"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_99"]
 atlas = ExtResource("49")
 region = Rect2(72, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_99"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_100"]
 atlas = ExtResource("57")
 region = Rect2(144, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_100"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_101"]
 atlas = ExtResource("57")
 region = Rect2(72, 0, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_101"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_102"]
 atlas = ExtResource("50")
 region = Rect2(0, 48, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_102"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_103"]
 atlas = ExtResource("49")
 region = Rect2(0, 0, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_103"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_104"]
 atlas = ExtResource("50")
 region = Rect2(0, 96, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_104"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_105"]
 atlas = ExtResource("50")
 region = Rect2(96, 72, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_105"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_106"]
 atlas = ExtResource("50")
 region = Rect2(120, 72, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_106"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_107"]
 atlas = ExtResource("49")
 region = Rect2(24, 24, 24, 24)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_107"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_108"]
 atlas = ExtResource("54")
 region = Rect2(48, 16, 16, 16)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_108"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_109"]
 atlas = ExtResource("54")
 region = Rect2(64, 16, 16, 16)
 
@@ -1363,7 +1367,7 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_109"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_110"]
 atlas = ExtResource("54")
 region = Rect2(16, 0, 16, 16)
 
@@ -1564,7 +1568,7 @@ texture_margin_bottom = 16.0
 axis_stretch_horizontal = 1
 axis_stretch_vertical = 1
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_110"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_111"]
 atlas = ExtResource("54")
 region = Rect2(64, 0, 16, 16)
 
@@ -2276,76 +2280,77 @@ Kit/icons/info = SubResource("AtlasTexture_53")
 Kit/icons/info_24 = SubResource("AtlasTexture_54")
 Kit/icons/jobs = SubResource("AtlasTexture_55")
 Kit/icons/lock = SubResource("AtlasTexture_56")
-Kit/icons/march = SubResource("AtlasTexture_57")
+Kit/icons/log = SubResource("AtlasTexture_57")
+Kit/icons/march = SubResource("AtlasTexture_58")
 Kit/icons/medallion_30 = ExtResource("64")
 Kit/icons/medallion_64 = ExtResource("65")
-Kit/icons/menu = SubResource("AtlasTexture_58")
-Kit/icons/merge = SubResource("AtlasTexture_59")
-Kit/icons/muster = SubResource("AtlasTexture_60")
-Kit/icons/occupied = SubResource("AtlasTexture_61")
-Kit/icons/pass_cross = SubResource("AtlasTexture_62")
-Kit/icons/pass_mark = SubResource("AtlasTexture_63")
+Kit/icons/menu = SubResource("AtlasTexture_59")
+Kit/icons/merge = SubResource("AtlasTexture_60")
+Kit/icons/muster = SubResource("AtlasTexture_61")
+Kit/icons/occupied = SubResource("AtlasTexture_62")
+Kit/icons/pass_cross = SubResource("AtlasTexture_63")
+Kit/icons/pass_mark = SubResource("AtlasTexture_64")
 Kit/icons/path_stop = ExtResource("66")
-Kit/icons/payback = SubResource("AtlasTexture_64")
-Kit/icons/peace = SubResource("AtlasTexture_65")
+Kit/icons/payback = SubResource("AtlasTexture_65")
+Kit/icons/peace = SubResource("AtlasTexture_66")
 Kit/icons/pennant_cloth = ExtResource("67")
 Kit/icons/pennant_pole = ExtResource("68")
-Kit/icons/people = SubResource("AtlasTexture_66")
-Kit/icons/pin = SubResource("AtlasTexture_67")
-Kit/icons/port_dues = SubResource("AtlasTexture_68")
-Kit/icons/prestige = SubResource("AtlasTexture_69")
-Kit/icons/raise = SubResource("AtlasTexture_70")
-Kit/icons/refund = SubResource("AtlasTexture_71")
-Kit/icons/research = SubResource("AtlasTexture_72")
-Kit/icons/ring = SubResource("AtlasTexture_73")
-Kit/icons/river_cross = SubResource("AtlasTexture_74")
+Kit/icons/people = SubResource("AtlasTexture_67")
+Kit/icons/pin = SubResource("AtlasTexture_68")
+Kit/icons/port_dues = SubResource("AtlasTexture_69")
+Kit/icons/prestige = SubResource("AtlasTexture_70")
+Kit/icons/raise = SubResource("AtlasTexture_71")
+Kit/icons/refund = SubResource("AtlasTexture_72")
+Kit/icons/research = SubResource("AtlasTexture_73")
+Kit/icons/ring = SubResource("AtlasTexture_74")
+Kit/icons/river_cross = SubResource("AtlasTexture_75")
 Kit/icons/rose = ExtResource("69")
-Kit/icons/routed = SubResource("AtlasTexture_75")
+Kit/icons/routed = SubResource("AtlasTexture_76")
 Kit/icons/rule_diamond = ExtResource("70")
 Kit/icons/seal = ExtResource("71")
 Kit/icons/seal_cracked = ExtResource("72")
 Kit/icons/seal_good = ExtResource("73")
 Kit/icons/seal_plain = ExtResource("74")
-Kit/icons/season_autumn = SubResource("AtlasTexture_76")
-Kit/icons/season_spring = SubResource("AtlasTexture_77")
-Kit/icons/season_summer = SubResource("AtlasTexture_78")
-Kit/icons/season_winter = SubResource("AtlasTexture_79")
-Kit/icons/settlement = SubResource("AtlasTexture_80")
-Kit/icons/shaken = SubResource("AtlasTexture_81")
+Kit/icons/season_autumn = SubResource("AtlasTexture_77")
+Kit/icons/season_spring = SubResource("AtlasTexture_78")
+Kit/icons/season_summer = SubResource("AtlasTexture_79")
+Kit/icons/season_winter = SubResource("AtlasTexture_80")
+Kit/icons/settlement = SubResource("AtlasTexture_81")
+Kit/icons/shaken = SubResource("AtlasTexture_82")
 Kit/icons/shield_rim = ExtResource("75")
 Kit/icons/shield_rim_sm = ExtResource("76")
-Kit/icons/siege = SubResource("AtlasTexture_82")
-Kit/icons/sold = SubResource("AtlasTexture_83")
-Kit/icons/spending = SubResource("AtlasTexture_84")
-Kit/icons/split = SubResource("AtlasTexture_85")
-Kit/icons/standing_hold = SubResource("AtlasTexture_86")
-Kit/icons/stores = SubResource("AtlasTexture_87")
-Kit/icons/storm = SubResource("AtlasTexture_88")
+Kit/icons/siege = SubResource("AtlasTexture_83")
+Kit/icons/sold = SubResource("AtlasTexture_84")
+Kit/icons/spending = SubResource("AtlasTexture_85")
+Kit/icons/split = SubResource("AtlasTexture_86")
+Kit/icons/standing_hold = SubResource("AtlasTexture_87")
+Kit/icons/stores = SubResource("AtlasTexture_88")
+Kit/icons/storm = SubResource("AtlasTexture_89")
 Kit/icons/stud = ExtResource("77")
-Kit/icons/study = SubResource("AtlasTexture_89")
-Kit/icons/study_24 = SubResource("AtlasTexture_90")
-Kit/icons/supply_ok = SubResource("AtlasTexture_91")
-Kit/icons/supply_out = SubResource("AtlasTexture_92")
+Kit/icons/study = SubResource("AtlasTexture_90")
+Kit/icons/study_24 = SubResource("AtlasTexture_91")
+Kit/icons/supply_ok = SubResource("AtlasTexture_92")
+Kit/icons/supply_out = SubResource("AtlasTexture_93")
 Kit/icons/switch_off = ExtResource("41")
 Kit/icons/switch_on = ExtResource("40")
-Kit/icons/tax = SubResource("AtlasTexture_93")
-Kit/icons/tick = SubResource("AtlasTexture_94")
-Kit/icons/truce = SubResource("AtlasTexture_95")
-Kit/icons/uphill = SubResource("AtlasTexture_96")
-Kit/icons/upkeep = SubResource("AtlasTexture_97")
-Kit/icons/victory = SubResource("AtlasTexture_98")
-Kit/icons/wade = SubResource("AtlasTexture_99")
-Kit/icons/wait_snow = SubResource("AtlasTexture_100")
-Kit/icons/walls = SubResource("AtlasTexture_101")
-Kit/icons/war = SubResource("AtlasTexture_102")
-Kit/icons/warning = SubResource("AtlasTexture_103")
-Kit/icons/weather_good = SubResource("AtlasTexture_104")
-Kit/icons/weather_poor = SubResource("AtlasTexture_105")
-Kit/icons/withdraw = SubResource("AtlasTexture_106")
+Kit/icons/tax = SubResource("AtlasTexture_94")
+Kit/icons/tick = SubResource("AtlasTexture_95")
+Kit/icons/truce = SubResource("AtlasTexture_96")
+Kit/icons/uphill = SubResource("AtlasTexture_97")
+Kit/icons/upkeep = SubResource("AtlasTexture_98")
+Kit/icons/victory = SubResource("AtlasTexture_99")
+Kit/icons/wade = SubResource("AtlasTexture_100")
+Kit/icons/wait_snow = SubResource("AtlasTexture_101")
+Kit/icons/walls = SubResource("AtlasTexture_102")
+Kit/icons/war = SubResource("AtlasTexture_103")
+Kit/icons/warning = SubResource("AtlasTexture_104")
+Kit/icons/weather_good = SubResource("AtlasTexture_105")
+Kit/icons/weather_poor = SubResource("AtlasTexture_106")
+Kit/icons/withdraw = SubResource("AtlasTexture_107")
 Kit/icons/wordmark = ExtResource("78")
 Kit/icons/zoom_fit = SubResource("AtlasTexture_26")
-Kit/icons/zoom_in = SubResource("AtlasTexture_107")
-Kit/icons/zoom_out = SubResource("AtlasTexture_108")
+Kit/icons/zoom_in = SubResource("AtlasTexture_108")
+Kit/icons/zoom_out = SubResource("AtlasTexture_109")
 KitSwitch/base_type = &"CheckButton"
 KitSwitch/colors/font_color = Color(0.9490196, 0.9098039, 0.8156863, 1)
 KitSwitch/colors/font_disabled_color = Color(0.6117647, 0.54901963, 0.4392157, 1)
@@ -2431,7 +2436,7 @@ NumberWarn/base_type = &"Label"
 NumberWarn/colors/font_color = Color(0.9411765, 0.65882355, 0.3137255, 1)
 NumberWarn/font_sizes/font_size = 16
 NumberWarn/fonts/font = SubResource("FontVariation_2")
-OptionButton/icons/arrow = SubResource("AtlasTexture_109")
+OptionButton/icons/arrow = SubResource("AtlasTexture_110")
 PanelBar/base_type = &"PanelContainer"
 PanelBar/styles/panel = SubResource("StyleBoxTexture_57")
 PanelCard/base_type = &"PanelContainer"
@@ -2468,8 +2473,8 @@ PopupMenu/colors/font_disabled_color = Color(0.6117647, 0.54901963, 0.4392157, 1
 PopupMenu/colors/font_hover_color = Color(0.9647059, 0.8901961, 0.6313726, 1)
 PopupMenu/font_sizes/font_size = 14
 PopupMenu/fonts/font = SubResource("FontVariation_1")
-PopupMenu/icons/checked = SubResource("AtlasTexture_110")
-PopupMenu/icons/radio_checked = SubResource("AtlasTexture_110")
+PopupMenu/icons/checked = SubResource("AtlasTexture_111")
+PopupMenu/icons/radio_checked = SubResource("AtlasTexture_111")
 PopupMenu/styles/hover = SubResource("StyleBoxFlat_14")
 PopupMenu/styles/panel = SubResource("StyleBoxTexture_71")
 PopupMenu/styles/separator = SubResource("StyleBoxFlat_15")

@@ -406,6 +406,26 @@ func test_m7_castle_areas_default_validate_and_fall_back() -> void:
 	assert_true(bool(Settings.load_from(bad, "macOS", false).get_value("map/castle_areas")), "a bad value falls back to on")
 
 
+func test_path_look_default_choices_and_fall_back() -> void:
+	var s := Settings.new("Windows", false)
+	assert_true(Settings.SCHEMA.has("map/path_look"))
+	assert_eq(str(Settings.SCHEMA["map/path_look"]["since"]), "12")
+	assert_eq(str(Settings.SCHEMA["map/path_look"]["page"]), "map")
+	assert_eq(str(s.get_value("map/path_look")), str(Settings.SCHEMA["map/path_look"]["default"]), "starts at the default")
+	assert_eq(s.choices_for("map/path_look"), ["ribbon", "dashed", "footprints"], "the three looks")
+	assert_false(s.set_value("map/path_look", "zigzag"), "an unknown look is refused")
+	var path := _tmp_file("path_look")
+	assert_true(s.set_value("map/path_look", "dashed"))
+	assert_true(s.save_to(path))
+	assert_eq(str(Settings.load_from(path, "Windows", false).get_value("map/path_look")), "dashed", "the look round-trips")
+	var bad := _tmp_file("path_look_bad")
+	var f := FileAccess.open(bad, FileAccess.WRITE)
+	f.store_string("[map]\npath_look = \"zigzag\"\n")
+	f.close()
+	assert_eq(str(Settings.load_from(bad, "Windows", false).get_value("map/path_look")), str(Settings.SCHEMA["map/path_look"]["default"]),
+		"a bad look falls back to the default")
+
+
 func test_m2_keys_with_wrong_values_in_a_file_fall_back() -> void:
 	var path := _tmp_file("m2_bad")
 	var f := FileAccess.open(path, FileAccess.WRITE)

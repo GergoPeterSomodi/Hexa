@@ -76,6 +76,28 @@ func test_left_click_within_slop_selects_and_drag_does_not() -> void:
 	assert_true(selected.is_empty(), "drag past 6 px slop suppresses click even if released near start")
 
 
+func test_a_unit_under_the_pointer_takes_the_click_before_the_hex() -> void:
+	var units: Array[Vector2] = []
+	var hexes: Array[Vector2] = []
+	_input.unit_at_func = func(screen: Vector2) -> bool: return screen.x < 150.0
+	_input.unit_requested.connect(func(screen: Vector2) -> void: units.append(screen))
+	_input.select_requested.connect(func(px: Vector2) -> void: hexes.append(px))
+	_input._unhandled_input(_btn(MOUSE_BUTTON_LEFT, Vector2(100.0, 100.0), true))
+	_input._unhandled_input(_btn(MOUSE_BUTTON_LEFT, Vector2(100.0, 100.0), false))
+	_input._unhandled_input(_btn(MOUSE_BUTTON_LEFT, Vector2(400.0, 100.0), true))
+	_input._unhandled_input(_btn(MOUSE_BUTTON_LEFT, Vector2(400.0, 100.0), false))
+	assert_eq(units, [Vector2(100.0, 100.0)], "a click on a unit is the unit's")
+	assert_eq(hexes, [Vector2(400.0, 100.0)], "a click off the units is the hex's")
+	var shift := _btn(MOUSE_BUTTON_LEFT, Vector2(100.0, 100.0), true)
+	shift.shift_pressed = true
+	_input._unhandled_input(shift)
+	shift = _btn(MOUSE_BUTTON_LEFT, Vector2(100.0, 100.0), false)
+	shift.shift_pressed = true
+	_input._unhandled_input(shift)
+	assert_eq(hexes.back(), Vector2(100.0, 100.0), "Shift+click is the hex's, units or not")
+	_input.unit_at_func = Callable()
+
+
 func test_right_click_emits_command_requested_only_within_slop() -> void:
 	var commands: Array[Vector2] = []
 	_input.command_requested.connect(func(px: Vector2) -> void: commands.append(px))

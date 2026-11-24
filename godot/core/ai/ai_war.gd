@@ -18,6 +18,7 @@ const RATIO_CAP := 4000
 const STATE_OPEN := &"open"
 const STATE_FALLEN := &"fallen"
 const STATE_CASTLE := &"castle"
+const STATE_HELD := &"held"
 
 
 # ----- 4.9: when to declare -------------------------------------------------------------------------------------------------
@@ -92,7 +93,8 @@ static func ratio_of(men: int, men_n: int) -> int:
 	return mini(RATIO_CAP, men * 1000 / maxi(1, men_n))
 
 
-## The target's districts within `prize_range` of the seat's land whose area state is open or fallen and that the seat does not
+## The target's districts within `prize_range` of the seat's land whose area state is open, fallen or held (a held one needs a
+## siege, but it is land the seat would win: the passive seat behind its walls is a prize too, 4.9) and that the seat does not
 ## hold, plus 2 for each of its fortresses of level 2 or more within that range.
 static func prize_of(game: Game, brief: AiBrief, target: StringName) -> int:
 	# The seat's near-land field (AiBrief.near_land): a hex is within the range of its land exactly when it is a key.
@@ -103,7 +105,7 @@ static func prize_of(game: Game, brief: AiBrief, target: StringName) -> int:
 		if not AiKnow.is_land(game, hex) or AiKnow.controller_of(game, hex) == brief.tag:
 			continue
 		var state := AiKnow.area_state(game, hex)
-		if (state == STATE_OPEN or state == STATE_FALLEN) and near.has(hex):
+		if (state == STATE_OPEN or state == STATE_FALLEN or state == STATE_HELD) and near.has(hex):
 			total += 1
 	for hex: Vector2i in AiKnow.fortresses_of(game, target):
 		if AiKnow.fortress_level(game, hex) >= 2 and near.has(hex):

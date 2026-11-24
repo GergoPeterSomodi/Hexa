@@ -38,6 +38,29 @@ func _centre(hex: Vector2i) -> Vector2:
 	return _scene.view().centre_of(hex)
 
 
+## The viewport point of the centre of `hex`.
+func _hex_screen(hex: Vector2i) -> Vector2:
+	return _scene.view().get_global_transform_with_canvas() * _centre(hex)
+
+
+## The viewport point on your army's token at `hex`: 25 px above its foot, in its click area.
+func _token_screen(hex: Vector2i) -> Vector2:
+	var token := _armies().tokens().token_at(hex, ArmyFixture.TAG)
+	return token.get_global_transform_with_canvas() * Vector2(0.0, -25.0)
+
+
+## A left click (press and release at `screen`) given to MapInput as the viewport gives it.
+func _click(screen: Vector2, shift: bool = false) -> void:
+	for pressed: bool in [true, false]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.position = screen
+		ev.global_position = screen
+		ev.pressed = pressed
+		ev.shift_pressed = shift
+		_scene.map_input()._unhandled_input(ev)
+
+
 ## A neighbour of `hex` the army can march to now (MovePreview's verdict is ok), NO_HEX when none.
 func _goal_near(hex: Vector2i, army_id: int) -> Vector2i:
 	for d: int in 6:
@@ -57,11 +80,11 @@ func test_a_click_on_your_token_selects_its_army_and_a_second_click_takes_the_ne
 	_armies().sync()
 	var picked: Array[int] = []
 	_armies().army_selected.connect(func(id: int) -> void: picked.append(id))
-	_scene._on_select_requested(_centre(hex))
+	_click(_token_screen(hex))
 	assert_eq(_armies().selected_army(), first, "the first click selects the first army there")
-	_scene._on_select_requested(_centre(hex))
+	_click(_token_screen(hex))
 	assert_eq(_armies().selected_army(), second, "a second click on the same token takes the next army")
-	_scene._on_select_requested(_centre(hex))
+	_click(_token_screen(hex))
 	assert_eq(_armies().selected_army(), first, "and the next click comes back round")
 	assert_eq(picked, [first, second, first], "army_selected said each pick")
 	assert_eq(_scene.selected, MapScene.NO_HEX, "an army selection leaves the hex selection empty")
@@ -72,11 +95,12 @@ func test_shift_click_selects_the_hex_and_a_click_elsewhere_clears_the_army() ->
 	var id := _army(hex, 2).id
 	_armies().sync()
 	assert_true(_armies().select_army(id))
-	assert_false(_armies().click(hex, true), "Shift+click does not pick the army")
-	assert_eq(_armies().selected_army(), -1, "and clears it")
+	_click(_token_screen(hex), true)
+	assert_eq(_armies().selected_army(), -1, "Shift+click on the token does not pick the army")
+	assert_eq(_scene.selected, hex, "and selects the hex")
 	assert_true(_armies().select_army(id))
 	var beside := ImproveRules.neighbour(hex, 0)
-	_scene._on_select_requested(_centre(beside))
+	_click(_hex_screen(beside))
 	assert_eq(_armies().selected_army(), -1, "a click on a hex with none of your tokens clears the army")
 	assert_eq(_scene.selected, beside, "and selects that hex")
 
@@ -171,7 +195,9 @@ func test_the_route_and_the_reach_are_drawn_from_the_preview() -> void:
 	_scene.map_input().hover_changed.emit(goal)
 	var preview := MovePreview.to(_game, ArmyFixture.TAG, id, goal)
 	var route := _armies().route_marks()
-	assert_eq(route.points().size(), (preview["hexes"] as Array).size(), "the route has a point a hex")
+	assert_eq(route.points().size(), (preview["hexes"] as Array).size() + 1, "the route has a point a hex and the army's own hex")
+	assert_eq(route.points()[0], _centre(hex), "the line starts on the army's own hex (issue 434: the first segment was missing)")
+	assert_eq(route.points().back(), _centre(goal), "and ends on the goal's centre")
 	assert_eq(route.stop_count(), (preview["stops"] as Array).size(), "one stop a season end")
 	assert_eq(route.crossing_count(), (preview["crossings"] as Array).size(), "one mark a crossing")
 	_scene.map_input().hover_changed.emit(ArmyFixture.NO_HEX)
@@ -206,7 +232,8 @@ func test_a_march_in_progress_keeps_its_stored_route_as_a_thin_line() -> void:
 	var hexes := stored["hexes"] as Array
 	assert_gt(hexes.size(), 0, "the march's route is stored")
 	assert_eq(hexes.back(), goal, "the stored route ends at the goal")
-	assert_eq(_armies().stored_marks().points().size(), hexes.size(), "the thin line has a point a hex")
+	assert_eq(_armies().stored_marks().points().size(), hexes.size() + 1, "the thin line has a point a hex and the army's own hex")
+	assert_eq(_armies().stored_marks().points()[0], _centre(hex), "and starts on the army's own hex")
 	assert_eq(_armies().stored_marks().points().back(), _centre(goal), "and ends on the goal's centre")
 	_armies().move_cursor(MapInput.CURSOR_RIGHT)
 	assert_eq(_armies().stored_marks().points().size(), 0, "back on the goal the stored line is not drawn twice")

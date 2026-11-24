@@ -10,7 +10,10 @@ extends Node2D
 ## On-map sizes at zoom 1 (px): the plate (about 38 % of a hex's width, so it reads at a glance), its selection ring, the
 ## figure inside it, the strength badge under it, the state icon at its top right corner.
 const PLATE_SIZE := Vector2(40.0, 34.0)
-const RING_SIZE := Vector2(52.0, 45.0)
+## The selection ring: an ink line with a gold line inside it, round the whole token (its click area, grown by RING_GAP).
+const RING_GAP := 5.0
+const RING_INK_WIDTH := 5.0
+const RING_GOLD_WIDTH := 2.5
 const FIGURE_SIZE := Vector2(26.0, 26.0)
 const BADGE_SIZE := Vector2(46.0, 22.0)
 const STATE_SIZE := Vector2(16.0, 16.0)
@@ -41,11 +44,10 @@ var _figure: Sprite2D = null
 var _badge: Sprite2D = null
 var _text: Label = null
 var _state: Sprite2D = null
-var _ring: Sprite2D = null
+var _ringed := false
 
 
 func _init() -> void:
-	_ring = _sprite(&"army_plate_ring", Vector2(0.0, LIFT), RING_SIZE)
 	_plate = _sprite(&"army_plate", Vector2(0.0, LIFT), PLATE_SIZE)
 	_figure = _sprite(FIGURE_FALLBACK, Vector2(0.0, LIFT - 1.0), FIGURE_SIZE)
 	_badge = _sprite(&"army_badge", BADGE_OFFSET, BADGE_SIZE)
@@ -60,7 +62,6 @@ func _init() -> void:
 	_text.add_theme_color_override(&"font_color", TEXT_INK)
 	_text.add_theme_color_override(&"font_outline_color", Tokens.INK)
 	add_child(_text)
-	_ring.visible = false
 	_state.visible = false
 
 
@@ -92,7 +93,28 @@ func _state_icon(token: Dictionary) -> StringName:
 
 ## Shows or hides the selection ring.
 func set_ring(on: bool) -> void:
-	_ring.visible = on
+	if on != _ringed:
+		_ringed = on
+		queue_redraw()
+
+
+func _draw() -> void:
+	if not _ringed:
+		return
+	var box := hit_rect().grow(RING_GAP)
+	draw_rect(box, Tokens.INK, false, RING_INK_WIDTH)
+	draw_rect(box, Tokens.MAP_SELECT, false, RING_GOLD_WIDTH)
+
+
+## The click area of the token in its own space (px at zoom 1): the plate and the badge, the part above the hex's centre.
+func hit_rect() -> Rect2:
+	var top := LIFT - PLATE_SIZE.y * 0.5
+	return Rect2(Vector2(-BADGE_SIZE.x * 0.5, top), Vector2(BADGE_SIZE.x, BADGE_OFFSET.y + BADGE_SIZE.y * 0.5 - top))
+
+
+## Whether the viewport point `screen` is in the click area; the token's scale and the camera's zoom are in the transform.
+func hit_screen(screen: Vector2) -> bool:
+	return hit_rect().has_point(get_global_transform_with_canvas().affine_inverse() * screen)
 
 
 ## The plate's colour (the country's, in the palette in use: tests and the colour-blind check).
@@ -129,7 +151,7 @@ func badge_font_size() -> int:
 
 ## Whether the selection ring is up (tests and the cursor's check).
 func ringed() -> bool:
-	return _ring.visible
+	return _ringed
 
 
 ## The badge's text (the men as ArmyView.token_text gives them).

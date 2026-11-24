@@ -17,6 +17,26 @@ const RING_TURN_DURATION := 2.0
 const DRIFT_HALF_DURATION := 70.0
 const DRIFT_SCALE := 1.06
 const ROSE_TURN_DURATION := 120.0
+const LOG_SLIDE_PX := 48.0
+const LOG_SLIDE_DURATION := 0.16
+
+
+## Slides the action log's card up from `LOG_SLIDE_PX` below its rest height `rest_y` while it fades in (opening), or down
+## to it while it fades out (closing). When `reduce_motion` is true it sets the final state at once and returns `null`.
+static func log_sheet(sheet: Control, rest_y: float, opening: bool, reduce_motion: bool = false) -> Tween:
+	if reduce_motion:
+		sheet.position.y = rest_y
+		sheet.modulate.a = 1.0 if opening else 0.0
+		return null
+	var from_y := rest_y + LOG_SLIDE_PX if opening else rest_y
+	var to_y := rest_y if opening else rest_y + LOG_SLIDE_PX
+	sheet.position.y = from_y
+	sheet.modulate.a = 0.0 if opening else 1.0
+	var tween := _make_tween(sheet)
+	tween.set_parallel(true)
+	tween.tween_property(sheet, "position:y", to_y, LOG_SLIDE_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(sheet, "modulate:a", 1.0 if opening else 0.0, LOG_SLIDE_DURATION)
+	return tween
 
 
 ## Fades a lazy `Glow` child in (1.0) on hover/focus or out (0.0) on exit over 120 ms.

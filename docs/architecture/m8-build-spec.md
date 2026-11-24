@@ -147,7 +147,7 @@ Each is decided. "Reverse" is the cost to change it later (S half a day, M a day
 | D19 | Raising | A goal of men from its people by temperament (more under threat or at war), capped by a share of its money left for armies, the first company always allowed; kinds by the temperament's mix, the most wanting first; at its settlements nearest the front (4.8) | v0.2.2's goal by people and mix by branch, re-fitted to 500-man companies | Data (S) |
 | D20 | Armies at peace | Held at **posts**: one facing each threatening neighbour (its nearest depot to that border), and the capital; armies to posts in turn, largest first; armies on one hex merged (4.8) | v0.2.2 gathered at the capital; the front matters on a small map | S |
 | D21 | Disbanding | One company a season when the treasury is below zero and even High taxes leave a deficit, or at peace with no threat and twice the goal (4.8) | v0.2.2's distress disband | Data (S) |
-| D22 | Declaring war | Thought every 4 seasons per seat (staggered by id); only when its wars, rest since the last peace, war chest and army allow; a neighbour whose banded men it outnumbers by the temperament's ratio (less for an opportunist against a country already at war); the target with the best prize (its open land and walled towns near); then a roll against the temperament's chance (4.9) | v0.2.2's `_diplomacy` with knowledge instead of exact strength and with temperaments | Data (S) |
+| D22 | Declaring war | Thought every 4 seasons per seat (staggered by id); only when its wars, rest since the last peace, war chest and army allow; a neighbour whose banded men it outnumbers by the temperament's ratio (less for an opportunist against a country already at war); the target with the best prize (its open and held land and walled towns near); then a roll against the temperament's chance (4.9) | v0.2.2's `_diplomacy` with knowledge instead of exact strength and with temperaments | Data (S) |
 | D23 | Fair warning | In the season a seat declares a war, its armies take no order into that enemy's land; those with no other aim keep to their posts | The player hears of the war after the season; the AI defender already has its turn before the walks | S |
 | D24 | Armies at war | Per army: a shaken army goes to the nearest depot; a besieger keeps its siege or storms it; otherwise the best of retake, relieve, attack, besiege, walk in and approach by score, keeping its march unless a new aim scores 30 % more (4.10) | v0.2.2's `_campaign` tiers, with scores and a hysteresis instead of a memory | Data (S) |
 | D25 | Standing orders | Withdraw when a seen enemy army within 3 hexes outnumbers it by the temperament's ratio and it is not on its own fortress or besieging; else Hold (4.10) | M7 D41: the decision before contact; v0.2.2's withdraw ratio 0.6 | Data (S) |
@@ -499,12 +499,16 @@ On a think turn, the seat declares when **all** hold:
 ```
 ratio  = M × 1000 / max(1, men_n)                       capped at 4,000
 need   = declare_ratio − (busy_bonus when n has a live war with a third country)
-prize  = n's districts within prize_range of t's land whose area state is open or fallen, not occupied by t
+prize  = n's districts within prize_range of t's land whose area state is open, fallen or held, not occupied by t
          + 2 × n's fortresses of level 2 or more within prize_range
 score  = prize × ratio / 1000                           candidates: ratio ≥ need and prize ≥ 1
 ```
 
 The best score (ties: lower id) is the target; `declare_war {target}`; the target joins `declared_now`.
+
+**Held land is prize (K24, playtest seed rule).** A walled seat's land is mostly `held` (M7 D12), so counting only open land
+left a passive Genoa a prize of 2 among its 14 districts: its score was 8, and the other candidates of its neighbours scored
+more, so it was declared on in 2 of 51 games at 40 seasons. A held district is land the seat would win by a siege, so it counts.
 
 ### 4.10 War: what each army does (the `army` step)
 
@@ -664,8 +668,7 @@ them stays under its 1,500). Milan's think turns are those with `(turn + 5) mod 
 Autumn 1480 Milan has raised 2 companies a season toward `G` = 341,700 × 6 / 1000 = 2,050: `M` 2,000 ≥ `min_war_men`; its
 treasury, about 2,000, is over its war chest of 8 × `U`. Against a neighbour with 2,000 men the ratio is 1,000, under 1,500.
 Genoa's banded men are 0: `ratio` = 2,000 × 1000 / 1, capped at 4,000. Genoa's prize: its districts within 3 hexes of Milan's
-land that are open (of the two its walls do not hold, M7 4.3) plus 2 for Genoa's walls (8, 13), 3 hexes from Milan's (11, 13):
-at least 2. Genoa is the only candidate; the roll is drawn (`declare_chance` 150); on a failed roll Milan thinks again at turn
+land that are open or held (8 of them, M7 4.3) plus 2 for Genoa's walls (8, 13), 3 hexes from Milan's (11, 13): 10. Genoa is the only candidate; the roll is drawn (`declare_chance` 150); on a failed roll Milan thinks again at turn
 7. The test pins the turn the seed gives.
 
 **(c) Milan's army before Genoa.** Milan's army of 4 companies (2,000 men) at war with Genoa: Genoa's walls (8, 13) are

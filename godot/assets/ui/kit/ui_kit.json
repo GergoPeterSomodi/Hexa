@@ -3022,8 +3022,8 @@
       ],
       "subdir": "kit",
       "sha": {
-        "1x": "d023c82774423c24e1a8e8c501eae13031d0d111ce284042b297df1c57a0133d",
-        "2x": "04f1499904dfda6e5edacd6699e82a65a231ba4883a5fb95aeaebe4f6728477d"
+        "1x": "a046e45720cc604f447843fd2c84fce72d70a75fd08668c82b792b25a33659db",
+        "2x": "b2c5b98b2ea4f613a4fc974d51938418b85bd3e7da4dc527ec15f5715bb49759"
       },
       "check": "exact",
       "cell": [
@@ -3078,7 +3078,8 @@
         "food",
         "army",
         "research",
-        "prestige"
+        "prestige",
+        "log"
       ]
     },
     "army_plate": {

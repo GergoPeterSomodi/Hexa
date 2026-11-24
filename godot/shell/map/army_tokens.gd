@@ -75,6 +75,21 @@ func set_selected(army_id: int) -> void:
 		(_walkers[id] as ArmyToken).set_ring(int(id) == army_id)
 
 
+## The viewer's own token under the viewport point `screen`, the lower one on the map when several overlap (the one drawn
+## on top); null for none. Only the shown static tokens are units: a walker is not, nor a token hidden while its army
+## walks, and a foreign token never is (ArmyView lists only the armies the viewer sees, so an unseen one cannot be picked).
+func own_token_at(screen: Vector2) -> ArmyToken:
+	var best: ArmyToken = null
+	if _viewer == &"":
+		return null
+	for node: ArmyToken in tokens():
+		if not node.visible or node.tag != _viewer or not node.hit_screen(screen):
+			continue
+		if best == null or node.position.y > best.position.y:
+			best = node
+	return best
+
+
 ## The walker of army `army_id` while the replay draws it, or null.
 func walker(army_id: int) -> ArmyToken:
 	return _walkers.get(army_id) as ArmyToken
@@ -223,6 +238,7 @@ func _apply_visibility() -> void:
 				rest.append(id)
 		dict["armies"] = rest
 		node.show_token(dict, source["colour"] as Color)
+		node.set_ring(_selected >= 0 and node.armies.has(_selected))  # the ring goes with the army that stays here
 
 
 ## The armies of `armies` that have a walker now (none outside a replay).

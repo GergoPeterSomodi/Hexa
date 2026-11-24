@@ -103,6 +103,14 @@ func _m6_replaying(app: App) -> bool:
 
 
 ## A hex's place in the viewport's pixels.
+## Where a click selects `army`: its token's click area (the token on its hex), else the hex's centre.
+func _m6_unit_pos(app: App, army: Army) -> Vector2:
+	var token := (app.map_scene().get_node("MapArmies") as MapArmies).tokens().token_at(army.hex, army.tag)
+	if token == null:
+		return _m6_screen_pos(app, army.hex)
+	return token.get_global_transform_with_canvas() * Vector2(0.0, -25.0)
+
+
 func _m6_screen_pos(app: App, hex: Vector2i) -> Vector2:
 	var view := app.map_scene().view()
 	return view.get_global_transform_with_canvas() * view.centre_of(hex)
@@ -187,7 +195,7 @@ func _m6_select(rng: Rng, vp: SubViewport, app: App) -> void:
 	if mine.is_empty():
 		return
 	var army := mine[rng.randi_range(0, mine.size() - 1)]
-	var pos := _m6_screen_pos(app, army.hex)
+	var pos := _m6_unit_pos(app, army)
 	if rng.randi_range(0, 2) == 0 or not Rect2(Vector2.ZERO, Vector2(vp.size)).has_point(pos):
 		_send_chord(vp, KEY_TAB)
 	else:
@@ -233,7 +241,7 @@ func _m6_march(rng: Rng, vp: SubViewport, app: App) -> void:
 	var view := app.map_scene().view()
 	app.map_scene().frame_at(view.centre_of(army.hex), 1.0)
 	await _wait_frames(3)
-	_send_click(vp, _m6_screen_pos(app, army.hex), MOUSE_BUTTON_LEFT)
+	_send_click(vp, _m6_unit_pos(app, army), MOUSE_BUTTON_LEFT)
 	await _wait_frames(2)
 	var inside := Rect2(Vector2.ZERO, Vector2(vp.size))
 	var goals: Array[Vector2i] = []

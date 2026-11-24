@@ -22,7 +22,7 @@ static func brute_prize(game: Game, brief: AiBrief, target: StringName) -> int:
 		if not AiKnow.is_land(game, hex) or AiKnow.controller_of(game, hex) == brief.tag:
 			continue
 		var state := AiKnow.area_state(game, hex)
-		if (state == AiWar.STATE_OPEN or state == AiWar.STATE_FALLEN) and _brute_within(hex, own, brief.ai.prize_range):
+		if (state == AiWar.STATE_OPEN or state == AiWar.STATE_FALLEN or state == AiWar.STATE_HELD) and _brute_within(hex, own, brief.ai.prize_range):
 			total += 1
 	for hex: Vector2i in AiKnow.fortresses_of(game, target):
 		if AiKnow.fortress_level(game, hex) >= 2 and _brute_within(hex, own, brief.ai.prize_range):

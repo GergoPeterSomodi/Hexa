@@ -1,12 +1,13 @@
-## The action log (docs/architecture/m3-build-spec.md section 6.5), bottom left of the map. Collapsed: one line, the newest
-## line and a "+N new" badge. Open: a card with the filters (LogLines.FILTERS up to the milestone), the seasons newest first
-## and their lines. A line with a hex asks to glide there (line_activated); the newest season's header asks for the last
-## report (report_requested), an older one (in a game with countries) opens the study's History page at its turn
-## (history_requested). Esc closes it: the App's Esc ladder calls escape(). It reads Session and Events and sends
-## intents only; the HUD places and wires it (Y18). Once bind_settings is called, its open state and filter are kept in
-## Settings (state/log_open, state/log_filter).
+## The action log (docs/architecture/m3-build-spec.md section 6.5), bottom left of the map, above the key hints. Closed: one
+## icon button (the kit's `log` icon, tooltip "Log") with a small badge of the unread lines; it takes no room on the map.
+## Open: a card slides up from the icon (Motion.log_sheet; reduce motion sets it at once) with the filters (LogLines.FILTERS up
+## to the milestone), the seasons newest first and their lines. A line with a hex asks to glide there (line_activated); the
+## newest season's header asks for the last report (report_requested), an older one (in a game with countries) opens the
+## study's History page at its turn (history_requested). The icon and Esc close it: the App's Esc ladder calls escape(). It
+## reads Session and Events and sends intents only; the HUD places and wires it (Y18). Once bind_settings is called, its open
+## state and filter are kept in Settings (state/log_open, state/log_filter).
 class_name ActionLog
-extends VBoxContainer
+extends Control
 
 ## The player asked to glide to a line's hex.
 signal line_activated(hex: Vector2i)
@@ -20,17 +21,24 @@ signal history_requested(turn: int)
 ## The filters up to this milestone (LogLines.FILTERS carries the milestone each one arrives in).
 const MILESTONE := 7
 ## The open card's size: at most 340 px wide (x 12 to 352 at 1280 wide, clear of the centred toast stack) and 268 px
-## tall; the lines wrap inside it and the card scrolls. The closed bar is BAR_W wide.
+## tall; the lines wrap inside it and the card scrolls.
 const CARD_W := 340
 ## The side padding of a filter tab, so five tabs fit the card.
 const TAB_PAD := 6.0
 const TAB_STATES: Array[String] = ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]
 const CARD_H := 268
-const BAR_W := 400
+## The icon button is a square of this size; the card's bottom sits CARD_GAP above its top edge.
+const ICON_SIZE := 40.0
+const CARD_GAP := 8.0
 ## The key hints row keeps this much of the window's bottom clear of the card (fit_height).
 const HINTS_CLEARANCE := 44
 const KEYWORD_W := 96
-const NEW_FORMAT := "+%d new"
+## The badge shows the unread count up to BADGE_MAX; more reads BADGE_OVER.
+const BADGE_MAX := 9
+const BADGE_OVER := "9+"
+const ICON_COLOUR_STATES: Array[StringName] = [
+	&"icon_normal_color", &"icon_hover_color", &"icon_pressed_color", &"icon_hover_pressed_color", &"icon_focus_color", &"icon_disabled_color",
+]
 const EMPTY_TEXT := "No actions yet."
 const EMPTY_FILTER_TEXT := "Nothing under this filter yet."
 const ACTIVATE_TIP := "Show on the map"
@@ -38,12 +46,9 @@ const REPORT_TIP := "Open the last report"
 const HISTORY_TIP := "Open History at %s"
 const TONE_VARIATION := {"good": &"NumberGood", "bad": &"NumberBad", "plain": &"SectionHead", "muted": &"Hint"}
 
-@onready var _bar: PanelContainer = $Bar
-@onready var _keyword: Label = $Bar/Row/Keyword
-@onready var _sentence: Label = $Bar/Row/Sentence
-@onready var _badge: PanelContainer = $Bar/Row/Badge
-@onready var _badge_text: Label = $Bar/Row/Badge/BadgeText
-@onready var _toggle: Button = $Bar/Row/Toggle
+@onready var _toggle: Button = $Toggle
+@onready var _badge: PanelContainer = $Badge
+@onready var _badge_text: Label = $Badge/BadgeText
 @onready var _card: PanelContainer = $Card
 @onready var _head: HBoxContainer = $Card/VBox/Head
 @onready var _close: Button = $Card/VBox/Head/Close
@@ -60,6 +65,9 @@ var _retired: Array[Node] = []
 var _dirty := false
 var _flush_queued := false
 var _refresh_count := 0
+var _slide_tween: Tween = null
+## The card's resting y (its position when closed-and-shown); the slide starts and ends from it.
+var _rest_y := 0.0
 
 
 func _ready() -> void:
@@ -72,8 +80,12 @@ func _ready() -> void:
 	_head.add_child(_segments)
 	_head.move_child(_segments, 0)
 	_segments.changed.connect(_on_filter_picked)
-	_toggle.pressed.connect(open)
+	_toggle.pressed.connect(toggle)
 	_close.pressed.connect(close)
+	(_toggle as KitButton).tooltip_text = "Log"  # through KitButton, which keeps the base tip (the scene's value is lost to the script)
+	# The 24 px icon is full-colour art: the button would tint it with its font colour, so its icon colours stay white (as vellum_sheet's seal does).
+	for key: StringName in ICON_COLOUR_STATES:
+		_toggle.add_theme_color_override(key, Color.WHITE)
 	if Session.game != null:
 		feed.rebuild(Session.game, Session.player_tag())
 	_apply_visibility()
@@ -113,19 +125,23 @@ func bind_settings(settings: Settings) -> void:
 		refresh()
 
 
-## Caps the open card's height at `available` px (the space above the key hints row, which the HUD measures); the
-## card is never taller than CARD_H, and its lines scroll when they do not fit.
+## Caps the open card's height at `available` px; the card is never taller than CARD_H, and its lines scroll when they do not fit.
 func fit_height(available: float) -> void:
-	if is_node_ready():
-		_card.custom_minimum_size.y = minf(float(CARD_H), maxf(0.0, available))
+	if not is_node_ready():
+		return
+	var height := minf(float(CARD_H), maxf(0.0, available))
+	_card.custom_minimum_size.y = height
+	_card.offset_top = _card.offset_bottom - height  # the card keeps its bottom edge and grows up from it
+	if not (_slide_tween != null and _slide_tween.is_running()):
+		_rest_y = _card.position.y
 
 
-## Opens the card and marks every line read.
+## Opens the card (it slides up) and marks every line read.
 func open() -> void:
 	_set_open(true)
 
 
-## Closes the card; the one-line bar stays.
+## Closes the card (it slides down); the icon stays.
 func close() -> void:
 	_set_open(false)
 
@@ -205,24 +221,19 @@ func header_buttons() -> Array[Button]:
 	return out
 
 
-## The text of the collapsed bar's newest line ("" when there is none).
-func bar_text() -> String:
-	return _sentence.text
-
-
-## The text of the "+N new" badge ("" when hidden).
+## The text of the "+N new" badge's count ("" when hidden): the unread lines, "9+" above nine.
 func badge_text() -> String:
 	return _badge_text.text if _badge.visible else ""
 
 
-## Refreshes the bar and, when open, the card from the feed. Runs at once; bursts of chronicled events go through
+## Refreshes the badge and, when open, the card from the feed. Runs at once; bursts of chronicled events go through
 ## _mark_dirty, which runs one refresh at the next idle frame.
 func refresh() -> void:
 	if not is_node_ready():
 		return
 	_refresh_count += 1
 	_dirty = false
-	_sync_bar()
+	_sync_badge()
 	if _open:
 		_rebuild_seasons()
 
@@ -253,15 +264,49 @@ func _set_open(value: bool) -> void:
 		feed.mark_read()
 	if _settings != null:
 		_settings.set_value("state/log_open", _open)
-	_apply_visibility()
+	_slide(_open)
 	refresh()
+
+
+## Slides the card up (opening) or down and out (closing). A slide already running keeps the resting height it started from,
+## so a click in mid-slide turns it round without a jump.
+func _slide(opening: bool) -> void:
+	if not is_node_ready():
+		return
+	var sliding := _slide_tween != null and _slide_tween.is_running()
+	if sliding:
+		_slide_tween.kill()
+	else:
+		_rest_y = _card.position.y
+	if opening:
+		_card.visible = true
+	var tween := Motion.log_sheet(_card, _rest_y, opening, _reduce_motion())
+	_slide_tween = tween
+	if tween == null:
+		_card.visible = opening
+	elif not opening:
+		tween.finished.connect(_on_slide_closed)
+
+
+func _on_slide_closed() -> void:
+	if _open:
+		return
+	_card.visible = false
+	_card.position.y = _rest_y
+	_slide_tween = null
 
 
 func _apply_visibility() -> void:
 	if not is_node_ready():
 		return
-	_bar.visible = not _open
+	if _slide_tween != null and _slide_tween.is_running():
+		return
 	_card.visible = _open
+	_card.modulate.a = 1.0
+
+
+func _reduce_motion() -> bool:
+	return _settings != null and bool(_settings.get_value("accessibility/reduce_motion"))
 
 
 func _read_settings() -> void:
@@ -273,16 +318,9 @@ func _read_settings() -> void:
 		feed.mark_read()
 
 
-func _sync_bar() -> void:
-	var newest := feed.entries(&"all")
-	var line: Dictionary = {}
-	if not newest.is_empty() and not (newest[0]["lines"] as Array).is_empty():
-		line = (newest[0]["lines"] as Array)[0]
-	_keyword.text = str(line.get("keyword", ""))
-	_keyword.theme_type_variation = _tone_variation(str(line.get("tone", "")))
-	_sentence.text = str(line.get("text", EMPTY_TEXT)) if not line.is_empty() else EMPTY_TEXT
+func _sync_badge() -> void:
 	_badge.visible = feed.unread > 0
-	_badge_text.text = NEW_FORMAT % feed.unread
+	_badge_text.text = str(feed.unread) if feed.unread <= BADGE_MAX else BADGE_OVER
 
 
 func _rebuild_seasons() -> void:

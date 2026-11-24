@@ -36,6 +36,8 @@ ICON_NAMES: tuple[str, ...] = (
     "study", "pin", "info", "go", "warning", "ring", "chart", "sold",
     # Later chips, baked now (4)
     "food", "army", "research", "prestige",
+    # The action log's button (1), baked in the spare cell of the last row
+    "log",
 )
 
 # One flat pigment each (plus a rare accent), lit enough to read on leather and on vellum beside an ink line.
@@ -457,6 +459,15 @@ def _study(c: _Canvas) -> None:
         c.line(18.8, 8.4 + k, 14.0, 10.0 + k, 0.8, "bark")
 
 
+def _log_icon(c: _Canvas) -> None:
+    """A ledger: a cream sheet with three ruled lines, a bark roll at each end."""
+    c.fill(c.rbox(5.0, 5.0, 19.0, 19.0, 1.0), "cream")
+    for y in (9.0, 12.4, 15.8):
+        c.line(8.0, y, 16.0, y, 0.9, "bark")
+    c.fill(c.rbox(2.0, 3.6, 6.4, 20.4, 1.6), "bark")
+    c.fill(c.rbox(17.6, 3.6, 22.0, 20.4, 1.6), "bark")
+
+
 def _pin(c: _Canvas) -> None:
     c.fill(c.poly([(6.8, 11.0), (17.2, 11.0), (12.0, 22.4)]), "red")
     c.fill(c.circle(12.0, 9.4, 6.8), "red")
@@ -560,6 +571,7 @@ _DRAW: dict[str, Callable[[_Canvas], None]] = {
     "study": _study, "pin": _pin, "info": _info, "go": _go, "warning": _warning, "ring": _ring, "chart": _chart,
     "sold": _sold,
     "food": _food, "army": _army, "research": _research, "prestige": _prestige,
+    "log": _log_icon,
 }
 
 
