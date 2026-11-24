@@ -352,3 +352,17 @@ first. The M9 spec (next after M8) is read against group C for the AI's walks.
 7. **When a battle is opened by your move, is it fought on the board at once?** Option 1 (recommended, as the audit
    plans): yes, the board opens at once and you play it day by day, or press Auto. Option 2: the battle is marked and you
    fight it later this season or at End turn. Option 1 gives the "I see what happened at once" feel the decision wants.
+
+---
+
+## Owner's answers, 2026-11-24
+
+1. **Many moves a month:** an army may move many times until its movement allowance for the month runs out (option B).
+2. **Who moves first:** the player first, then the computer answers at End turn (its armies also walk at once).
+3. **Confirm:** ask once more only on risky moves (a move that starts a battle, enters enemy land, or ends out of supply).
+4. **Long marches:** the first leg at once, the rest one leg a month at End turn (the pace of a march is unchanged).
+5. **Stop on sight:** the walk stops when an enemy army comes into sight, and the rest of the allowance is kept.
+6. **Unknown land (deep fog):** an army MAY be ordered into land never discovered, with a movement penalty (for example one
+   tile a month, to be tuned); scouts discover land more easily. The owner will come back to the exact rule. This replaces the
+   draft's recommendation to refuse such orders.
+7. **Battle at once:** a move that reaches an enemy army at war opens the battle at once on the board.

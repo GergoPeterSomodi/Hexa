@@ -305,3 +305,20 @@ buildable; C needs the tile window (U1 of the UI audit).
 - Raising the start world (question 1) can flatten early discovery and the first war's surprise; keep it small.
 - Re-pinning AI tests hides real regressions if done carelessly; each re-pin states a reason.
 - The map's deep-fog art is not designed here; it belongs to the map track (group D waits on it).
+
+---
+
+## Owner's answers, 2026-11-24
+
+1. **The 1480 start world:** each country starts knowing what it historically knew about: a European country knows the whole of
+   Europe. Deep fog is for the world beyond (what is outside what that country would have known); the hand-made list per
+   country is the model, by region, as data.
+2. **Castle garrisons:** always visible. The garrison is part of the land, not a hidden army: the men inside every
+   discovered castle are shown exactly. (This replaces the estimate the garrison has today; the odds and siege views follow.)
+3. **Numbers:** everything exact for discovered land (tiles, and the sums of a country's discovered land). The owner chose exact
+   everywhere, so the draft's rounded bands for a foreign country's treasury and men under arms are dropped too.
+4. **The AI:** exactly the same rules (it knows only what it discovered and sees armies only in sight).
+5. **After conquest:** the old owner keeps seeing the land (light fog); the conqueror sees the held land fully at once.
+6. A besieged castle follows from 2: it shows its holder, the meter and the garrison. (Draft question 4 is closed.)
+Open from the draft: how a country panel looks when you have discovered only a sliver of that country (default: the same card
+with a "land seen" line).
