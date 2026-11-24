@@ -182,6 +182,19 @@ addons/gut/             GUT 9.7.1, copied unchanged from its release (MIT, see a
   `assets/ui/kit` paths in `shell/{ui,hud,screens,panels,app}/` outside `tokens.gd` and `kit_theme.gd` (`tools/lint_godot.py`).
 - **A refactor never rides with a behaviour change.**
 
+## Fog (two levels)
+
+- **Deep fog** is a hex the country has never discovered: nothing of it is shown, and the hex card says "Unexplored".
+- **Light fog** is a discovered hex not in sight: its land is shown exact and live; armies, their orders and routes, and
+  battles the country did not witness are hidden.
+- **In sight** is a hex the country's land or armies see now (the control of the hex and its ring, `Sight`).
+- One rule for every view, the map modes, the minimap, the logs and the AI: `Knowledge.discovered`, `Knowledge.sees` and
+  `Knowledge.garrison_known` in `core/views/knowledge.gd`; the AI reads other countries only through `AiKnow`. The discovered
+  set is `Country.explored`; its five writers are listed in `tests/core/test_no_other_writers.gd` (R11). The deep-fog fill is `MapModes.discovered_bytes`.
+- The thin test fixture `FogFixture.thin(g, tag, radius)` (`tests/core/fog_fixture.gd`) makes a thin start on purpose:
+  north Italy starts with every hex discovered, so deep fog shows in play only on a thin start or on the Europe map.
+- Pictures of the fog: `docs/design/ui/fog/` (made by `tools/ui/shot_ui_fog.gd`).
+
 ## Commands
 
 Run from the repository root (the folder that holds `godot/`), with `GODOT` set.

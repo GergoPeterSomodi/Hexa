@@ -1,6 +1,6 @@
 # Two fog levels (issue 446; issue 435 follows)
 
-Status: draft for the owner. Written 2026-11-24. Nothing is built. The owner's decision (ui-family-audit.md, owner's
+Status: built (2026-11-24) by the fog build, tasks FG1 to FG19 of `docs/architecture/fog-build-plan.md`; the owner's answers in the last section are applied. The pictures are in `docs/design/ui/fog/`. The owner's decision (ui-family-audit.md, owner's
 answers, number 3) is the starting point: deep fog and light fog, the same for every country, the AI included.
 
 ## 1. The rule in plain words

@@ -70,3 +70,43 @@ func test_a_token_is_not_listed_for_a_hex_the_viewer_cannot_see_after_a_sight_re
 	_game.version += 1
 	_armies()._process(0.0)  # one frame of the map (its sync reads the sight)
 	assert_null(_armies().tokens().token_at(away, foreign), "an army out of sight has no token (R23)")
+
+
+func test_a_foreign_walk_that_ends_out_of_sight_keeps_no_token() -> void:
+	# The replay walk-end case (FG19): a foreign army in sight starts walking, and its walk ends on a hex out of sight with no
+	# army event of its own. The frames of the walk, and the frame after, leave no token at the start or at the end.
+	var start := _seen_foreign_hex()
+	var foreign := ArmyFixture.other_tag(_game)
+	assert_ne(start, ArmyFixture.NO_HEX, "a hex of another country the player sees")
+	var army := ArmyFixture.army(_game, foreign, start, 0, 2, -1)
+	Sight.refresh(_game)
+	_game.version += 1
+	_armies()._process(0.0)
+	assert_not_null(_armies().tokens().token_at(start, foreign), "the army starts in sight with a token")
+	var end := _unseen_land_hex()
+	assert_ne(end, ArmyFixture.NO_HEX, "a hex the player does not see")
+	army.hex = end
+	Sight.refresh(_game)
+	_game.version += 1
+	for _i: int in 3:
+		_armies()._process(0.1)  # the walk's frames
+	assert_null(_armies().tokens().token_at(end, foreign), "a walk that ends out of sight leaves no token at its end")
+	assert_null(_armies().tokens().token_at(start, foreign), "and none where it started")
+
+
+## The lag is one frame at most: a foreign army that leaves sight loses its token at the next frame of the map (one _process), so a
+## check made two frames after a change reads the map as it is (a lag of a frame is not a leak; FG18 issue 457 round).
+func test_a_token_is_gone_within_one_frame_of_a_sight_change() -> void:
+	var own := _seen_foreign_hex()
+	assert_ne(own, ArmyFixture.NO_HEX, "a hex of another country the player sees")
+	var foreign := ArmyFixture.other_tag(_game)
+	var army := ArmyFixture.army(_game, foreign, own, 0, 2, -1)
+	Sight.refresh(_game)
+	_game.version += 1
+	_armies()._process(0.0)
+	assert_not_null(_armies().tokens().token_at(own, foreign), "the token is there while the army is in sight")
+	army.hex = _unseen_land_hex()
+	Sight.refresh(_game)
+	_game.version += 1
+	_armies()._process(0.0)
+	assert_null(_armies().tokens().token_at(own, foreign), "gone after one frame of the map, not later")

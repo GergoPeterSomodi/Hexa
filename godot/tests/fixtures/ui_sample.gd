@@ -8,6 +8,7 @@
 class_name UiSample
 extends RefCounted
 
+const GEN := &"GEN"
 const SAV := &"SAV"
 const MLO := &"MLO"
 const VERCELLI := Vector2i(6, 9)
@@ -144,3 +145,57 @@ static func _area_hex(g: Game) -> Vector2i:
 		if g.map.land[i] == 1 and Territory.owner_tag(g, hex) == MLO and Armies.at(g, hex).is_empty() 				and Occupation.area_state(g, hex, standing) == &"held" and Knowledge.sees(g, SAV, hex):
 			return hex
 	return Vector2i(-1, -1)
+
+
+## The fog sample of the fog pictures (docs/architecture/fog-build-spec.md 7; tools/ui/shot_ui_fog.gd): Genoa's game made thin
+## (FogFixture.thin at radius 1: the hexes two steps out of its land are light fog, the rest deep), with its hexes picked by
+## state. Returns {deep, light, fortress, in_sight, siege, besieger, holder}: a deep-fog land hex, a light-fog land hex of
+## another country, a light-fog fortress of another country (the card's exact people and garrison), a Genoese hex in sight, and
+## a light-fog hex of another country with a siege by a third country at war with its holder (the dial without the besieger's
+## colour). A hex that is not found is Vector2i(-1, -1); besieger and holder are "" then.
+static func fog(g: Game) -> Dictionary:
+	var none := Vector2i(-1, -1)
+	var out := {"deep": none, "light": none, "fortress": none, "in_sight": none, "siege": none, "besieger": &"", "holder": &""}
+	FogFixture.thin(g, GEN, 1)
+	for i: int in g.map.hex_count():
+		if g.map.land[i] != 1:
+			continue
+		var hex := g.map.hex_of(i)
+		var holder := Territory.owner_tag(g, hex)
+		if not Knowledge.discovered(g, GEN, hex):
+			if out["deep"] == none:
+				out["deep"] = hex
+		elif Knowledge.sees(g, GEN, hex):
+			if out["in_sight"] == none and holder == GEN:
+				out["in_sight"] = hex
+		elif holder != GEN and holder != &"":
+			if out["light"] == none:
+				out["light"] = hex
+			if out["fortress"] == none and Occupation.fortress_level(g, hex) > 0:
+				out["fortress"] = hex
+	var known: Array[StringName] = Knowledge.known(g, GEN)
+	var candidate: Vector2i = out["fortress"] if out["fortress"] != none else out["light"]
+	if candidate != none:
+		var holder: StringName = Territory.owner_tag(g, candidate)
+		for tag: StringName in known:
+			if tag != GEN and tag != holder:
+				WarFixture.at_war(g, tag, holder)
+				_siege_at(g, candidate, tag)
+				out["siege"] = candidate
+				out["besieger"] = tag
+				out["holder"] = holder
+				break
+	g.version += 1
+	return out
+
+
+## A siege of two seasons on `hex` by `besieger` (the rig of the fog pictures; the sample's own siege, UiSample._siege, is Pavia's).
+static func _siege_at(g: Game, hex: Vector2i, besieger: StringName) -> void:
+	var s := Siege.new()
+	s.hex = hex
+	s.besieger = besieger
+	s.progress = 2
+	s.seasons = 2
+	s.name = "Siege, 1480"
+	s.started_turn = g.turn
+	g.sieges.append(s)

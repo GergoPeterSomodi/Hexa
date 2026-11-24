@@ -262,10 +262,18 @@ says so each time you try.
 - **Units:** close up, a stack shows up to three figures of what it holds, with a shield for its size. Zoomed out, it shows as a board-game token with era pips.
 
 ### Fog
-- **Black fog:** places your country has never seen. In 1480 that is everything west of the Canaries:
-  the Azores, Cape Verde and the Americas (Portugal and Castile also know the African coast).
-- **Light fog:** places you know but cannot see right now. You see owners and terrain, not armies.
-  You see around your provinces and your units; ships see furthest.
+Every country, the AI included, sees the map in three states. The same rule applies to you and to every AI country.
+- **Deep fog:** a place your country has never discovered. Nothing shows there: no owner, people, goods or buildings, and
+  no armies. The hex card says "Unexplored". Deep fog is a flat dark fill, sea included.
+- **Light fog:** a place you have discovered but cannot see right now. Its land stays shown and up to date, and every
+  number is exact: who holds it, its people, goods, buildings and works, its fortress and the men inside. A siege shows its
+  holder, its meter and its garrison, but not the besieger. Armies there, their orders and their routes stay hidden, and so
+  do battles you did not fight in or witness.
+- **In sight:** the hexes your land and your armies can see, and the ring around them. Armies there are shown with exact men.
+
+A country starts knowing what it knew in 1480: on the north Italy map every country knows the whole map. A conqueror sees
+the land it takes at once; the old owner keeps seeing it in light fog. A country's land and people in the statistics count
+only the hexes you have discovered.
 
 ### Economy
 - **Goods (32):**

@@ -63,8 +63,12 @@ static func _siege_block(game: Game, hex: Vector2i, v: Dictionary) -> VBoxContai
 	meter.value = float(int(v.get("progress", 0)))
 	meter.custom_minimum_size.y = 6.0
 	out.add_child(meter)
-	out.add_child(_text("%s is besieged by %s: %d of %d." % [Words.place(game, hex), str(v.get("besieger_name", "")),
-		int(v.get("progress", 0)), need], &"TableRow"))
+	# Light fog (R21): no besieger is named, so the sentence says only that the place is besieged.
+	var besieger := str(v.get("besieger_name", ""))
+	var meter_text := "%d of %d." % [int(v.get("progress", 0)), need]
+	var sentence := "%s is besieged by %s: %s" % [Words.place(game, hex), besieger, meter_text] if besieger != "" \
+		else "%s is besieged: %s" % [Words.place(game, hex), meter_text]
+	out.add_child(_text(sentence, &"TableRow"))
 	if str(v.get("access", "")) == "exact":
 		out.add_child(_text("+%d a season" % int(v.get("rate", 0)), &"Hint"))
 		var falls := int(v.get("falls_in", -1))
