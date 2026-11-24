@@ -59,9 +59,45 @@ static func sees(game: Game, viewer: StringName, hex: Vector2i) -> bool:
 	return viewer == &"" or Sight.sees(game, viewer, hex)
 
 
-## The men under arms of `other` as `viewer` may read them (M8, from the Stats of the last closed season): exact for the viewer
-## "" and for the viewer's own country; banded (two significant figures) for a country the viewer knows; -1 for one it does not
-## know (or one with no country, or a game with no statistics). Pure.
+## True when `viewer` has discovered `hex` (D1, R1): the viewer "" sees all; else the hex is in the viewer's explored set (a walk,
+## the start, the vision phase, a district it took) or the viewer sees it now. One test for the player, the views and the AI.
+static func discovered(game: Game, viewer: StringName, hex: Vector2i) -> bool:
+	if viewer == &"":
+		return true
+	if game == null:
+		return false
+	return Sight.explored(game, viewer, hex) or Sight.sees(game, viewer, hex)
+
+
+## What `viewer` has seen of the land of `other` (R26, D9): its districts and their people, over the hexes the viewer has
+## discovered. The viewer "" gets all of them; a viewer that has discovered every district gets the whole land. Cached per
+## game.version in the view cache. Every writer of explored (Sight.setup, see_path, season, the R9 and R10 marks) must bump
+## game.version, or this cache goes stale. {districts, people}.
+static func land_seen(game: Game, viewer: StringName, other: StringName) -> Dictionary:
+	if game == null or game.view_cache == null or game.state == null or game.map == null:
+		return {"districts": 0, "people": 0}
+	var c := Countries.by_tag(game, other)
+	if c == null:
+		return {"districts": 0, "people": 0}
+	var key: Array = [&"land_seen", game.version, viewer, other]
+	var id := c.id
+	return (game.view_cache.get_or_make(key, func() -> Dictionary: return _make_land_seen(game, viewer, id)) as Dictionary).duplicate()
+
+
+static func _make_land_seen(game: Game, viewer: StringName, id: int) -> Dictionary:
+	var out := {"districts": 0, "people": 0}
+	if game.state.people.size() != game.map.hex_count():
+		return out
+	for i: int in Territory.districts(game, id):
+		if discovered(game, viewer, game.map.hex_of(i)):
+			out["districts"] = int(out["districts"]) + 1
+			out["people"] = int(out["people"]) + int(game.state.people[i])
+	return out
+
+
+## The men under arms of `other` as `viewer` may read them (M8, from the Stats of the last closed season): exact for every
+## country the viewer knows (R24, D7: no band); -1 for one it does not know (or one with no country, or a game with no
+## statistics). Pure.
 static func men_of(game: Game, viewer: StringName, other: StringName) -> int:
 	if game == null or game.stats == null:
 		return -1
@@ -69,27 +105,22 @@ static func men_of(game: Game, viewer: StringName, other: StringName) -> int:
 		return -1
 	if Countries.by_tag(game, other) == null:
 		return -1
-	var men := game.stats.value(other, game.stats.last_turn, "army_men")
-	return men if viewer == &"" or other == viewer else band(men)
+	return game.stats.value(other, game.stats.last_turn, "army_men")
 
 
-## What `viewer` may take a fortress's garrison to be (D49): {men, access}. Own (the fortress's owner or controller is the viewer,
-## or the viewer is ""): the exact garrison, &"exact". Seen (the viewer sees the hex): the garrison rounded to 100, &"seen". Else
-## the full garrison of its level (garrison_per_level x level), &"assumed". 0 and &"none" for a hex with no fortress or an
-## occupied one (the controller is public). The real garrison of an unseen fortress is never read.
-static func garrison_estimate(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
-	var none := {"men": 0, "access": &"none"}
-	if game == null or Occupation.fortress_level(game, hex) <= 0 or Occupation.is_occupied(game, hex):
-		return none
-	if viewer == &"" or Occupation.controller_tag(game, hex) == viewer or Territory.owner_tag(game, hex) == viewer:
-		return {"men": Occupation.garrison_of(game, hex), "access": &"exact"}
-	if Sight.sees(game, viewer, hex):
-		return {"men": ((Occupation.garrison_of(game, hex) + 50) / 100) * 100, "access": &"seen"}
-	return {"men": Occupation.garrison_full(game, hex), "access": &"assumed"}
+## What `viewer` may read of a fortress's garrison (R19, D6): {men, access}. A discovered fortress, for any viewer and any
+## holder (own, other, or occupied by a third): the real garrison, &"exact" (no rounding, no assumed value). An undiscovered
+## one: -1 and &"hidden" (its garrison is never read). A hex with no fortress: 0 and &"none".
+static func garrison_known(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
+	if game == null or Occupation.fortress_level(game, hex) <= 0:
+		return {"men": 0, "access": &"none"}
+	if not discovered(game, viewer, hex):
+		return {"men": -1, "access": &"hidden"}
+	return {"men": Occupation.garrison_of(game, hex), "access": &"exact"}
 
 
-## The armies in the viewer's sight that are not its own, in id order: {army, tag, hex, men_banded}. The viewer "" gets
-## every army; men_banded is `band` of the men (the exact count is army.men(), which the viewer "" may read).
+## The armies in the viewer's sight that are not its own, in id order: {army, tag, hex, men}. The viewer "" gets every
+## army; men are exact (R25).
 static func armies_seen(game: Game, viewer: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if game == null:
@@ -99,7 +130,7 @@ static func armies_seen(game: Game, viewer: StringName) -> Array[Dictionary]:
 			continue
 		if viewer != &"" and (army.tag == viewer or not Sight.sees(game, viewer, army.hex)):
 			continue
-		out.append({"army": army, "tag": army.tag, "hex": army.hex, "men_banded": band(army.men())})
+		out.append({"army": army, "tag": army.tag, "hex": army.hex, "men": army.men()})
 	return out
 
 
@@ -128,13 +159,17 @@ static func band_text(n: int, unit: String) -> String:
 
 ## True when the viewer is told of `event` (a chronicle entry: tag, others, witnesses; style spec 6.5):
 ## the viewer "" is told everything; the actor (`tag`) and each of `others` are told; a non-empty `witnesses` list
-## tells exactly the tags it holds; an event with no witness list is public, seen by whoever knows its actor.
+## tells exactly the tags it holds; an event with no witness list is public, seen by whoever knows its actor. A land event
+## (`land: true`, D12) is told to a viewer that has discovered its hex, and to no one else on the list (R29).
 static func witnessed(game: Game, event: Dictionary, viewer: StringName) -> bool:
 	if viewer == &"":
 		return true
 	var tag := StringName(str(event.get("tag", "")))
 	if tag == viewer or _names(event.get("others", [])).has(viewer):
 		return true
+	if bool(event.get("land", false)):
+		var at: Variant = event.get("hex", null)
+		return at is Vector2i and discovered(game, viewer, at)
 	var witnesses := _names(event.get("witnesses", []))
 	if not witnesses.is_empty():
 		return witnesses.has(viewer)
@@ -156,7 +191,8 @@ static func battle_access(_game: Game, viewer: StringName, record: BattleRecord)
 
 ## What a viewer may see of the siege of a hex (4.5, 4.15, M7): &"hidden" when no siege stands there or the besieger and
 ## the hex's controller are not at war (a siege between countries at peace is shown as none, for every viewer); &"exact"
-## for the viewer "", the besieger and the controller; &"seen" while the viewer sees the hex (Sight); else &"hidden".
+## for the viewer "", the besieger and the controller; &"seen" while the viewer sees the hex (Sight); &"land" while it has only
+## discovered the hex (R21); else &"hidden".
 static func siege_access(game: Game, viewer: StringName, hex: Vector2i) -> StringName:
 	var s := Occupation.siege_at(game, hex)
 	if s == null:
@@ -168,6 +204,8 @@ static func siege_access(game: Game, viewer: StringName, hex: Vector2i) -> Strin
 		return &"exact"
 	if sees(game, viewer, hex):
 		return &"seen"
+	if discovered(game, viewer, hex):
+		return &"land"
 	return &"hidden"
 
 

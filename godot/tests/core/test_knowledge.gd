@@ -17,7 +17,27 @@ func _game_with(owners: Dictionary) -> Game:
 		g.state.owner[g.map.index_of(hex)] = int(owners[hex])
 	# The owners changed after the game started: explored is made again as a new game makes it (Sight.setup, M6 4.11).
 	Sight.setup(g)
+	# The fog test world: each country has explored only its own hexes, so a far country is unknown. The 9x7 fixture is too small
+	# for a land sight of radius 2 to leave one out (FogFixture.thin would reach every hex here). The real north Italy start is
+	# the other way round (see test_north_italy_every_country_knows_every_other).
+	for c: Country in g.countries:
+		if c != null and c.tag != &"":
+			c.explored = _own_bits(g, c.id)
+	g.sight.clear()
+	Sight.refresh(g)
+	g.version += 1
 	return g
+
+
+## The explored bits of the hexes `id` owns (a test's world state, as WarFixture writes its own).
+func _own_bits(g: Game, id: int) -> PackedByteArray:
+	var bits := PackedByteArray()
+	bits.resize((g.map.hex_count() + 7) >> 3)
+	bits.fill(0)
+	for i: int in g.map.hex_count():
+		if int(g.state.owner[i]) == id:
+			bits[i >> 3] = bits[i >> 3] | (1 << (i & 7))
+	return bits
 
 
 ## AAA (id 1) and BBB (id 2) share a border; OUT (id 3) is far from both.
@@ -160,94 +180,184 @@ func test_siege_access_hides_a_siege_at_peace() -> void:
 	assert_eq(Knowledge.siege_access(g, &"FRA", hex), &"exact", "the besieger")
 
 
-# --- M8 K13: men_of and garrison_estimate (D49) ----------------------------------------------------------------------------
+# --- FG5: discovered, land_seen, garrison_known, men_of exact, siege_access land, the land witness rule (R1, R19, R21, R24 to
+# R26, R29). Discovery is made by the real writers: Sight.see_path (a walk) and the army part (Sight.refresh).
 
 
-## A hostile fortress (held by a country at war with Genoa), garrisoned, on the north Italy game: {g, hex, holder}.
-func _fortress_game(watched: bool) -> Dictionary:
+## The ArmyFixture world thinned (FG3): each country explores only its land sight, so undiscovered hexes exist.
+func _fog_game() -> Game:
 	var g := ArmyFixture.game()
-	var enemy := WarFixture.neighbour_of(g, ArmyFixture.TAG)
-	WarFixture.at_war(g, enemy, ArmyFixture.TAG)
+	_thin_all(g)
+	return g
+
+
+## Every country of `g` thin at radius 0: its explored set is its land sight.
+func _thin_all(g: Game) -> void:
+	for c: Country in g.countries:
+		if c != null and c.tag != &"":
+			FogFixture.thin(g, c.tag, 0)
+
+
+## A land hex next to `hex` (NO_HEX when none).
+func _land_beside(g: Game, hex: Vector2i) -> Vector2i:
+	for d: int in 6:
+		var beside := ImproveRules.neighbour(hex, d)
+		if g.map.is_land(beside):
+			return beside
+	return Army.NO_HEX
+
+
+## The first land hex of the map for which `want` is true (NO_HEX when none).
+func _first_hex(g: Game, want: Callable) -> Vector2i:
 	for i: int in g.map.hex_count():
 		var hex := g.map.hex_of(i)
-		if Occupation.fortress_level(g, hex) <= 0 or Occupation.controller_tag(g, hex) != enemy or Occupation.garrison_of(g, hex) <= 0:
-			continue
-		if watched:
-			var mine := ArmyFixture.id_of(g, ArmyFixture.TAG)
-			var at := hex
-			for d: int in 6:
-				var beside := ImproveRules.neighbour(hex, d)
-				if g.map.is_land(beside) and Territory.owner_id(g, beside) == mine:
-					at = beside
-					break
-			ArmyFixture.army(g, ArmyFixture.TAG, at, 0, 2)
-			Sight.refresh(g)
-			if Knowledge.sees(g, ArmyFixture.TAG, hex):
-				return {"g": g, "hex": hex, "holder": enemy}
-		elif not Knowledge.sees(g, ArmyFixture.TAG, hex):
-			return {"g": g, "hex": hex, "holder": enemy}
-	return {}
+		if g.map.is_land(hex) and bool(want.call(hex)):
+			return hex
+	return Army.NO_HEX
 
 
-func test_garrison_estimate_own_is_exact() -> void:
-	var f := _fortress_game(false)
-	assert_false(f.is_empty(), "a hostile garrisoned fortress exists")
-	var g: Game = f.g
-	Occupation.set_garrison(g, f.hex, Occupation.garrison_full(g, f.hex) - 13)
-	var whole := Occupation.garrison_of(g, f.hex)
-	var own := Knowledge.garrison_estimate(g, f.holder, f.hex)
-	assert_eq(int(own.men), whole, "the holder reads its own garrison exact")
-	assert_eq(own.access, &"exact")
-	var open := Knowledge.garrison_estimate(g, &"", f.hex)
-	assert_eq(int(open.men), whole, "the viewer \"\" reads it exact")
-	assert_eq(open.access, &"exact")
+## The first unoccupied fortress whose discovery by `tag` is `discovered_now` (NO_HEX when none).
+func _fortress(g: Game, tag: StringName, discovered_now: bool) -> Vector2i:
+	return _first_hex(g, func(h: Vector2i) -> bool:
+		return Occupation.fortress_level(g, h) > 0 and not Occupation.is_occupied(g, h) and Knowledge.discovered(g, tag, h) == discovered_now)
 
 
-func test_garrison_estimate_seen_is_rounded_to_a_hundred() -> void:
-	var f := _fortress_game(true)
-	assert_false(f.is_empty(), "a hostile fortress the player sees exists")
-	var g: Game = f.g
-	Occupation.set_garrison(g, f.hex, Occupation.garrison_full(g, f.hex) - 13)
-	var whole := Occupation.garrison_of(g, f.hex)
+## The tags of the countries of `g` (id order) that are not in `skip`.
+func _others(g: Game, skip: Array[StringName]) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for c: Country in g.countries:
+		if c != null and c.tag != &"" and not skip.has(c.tag):
+			out.append(c.tag)
+	return out
+
+
+## A walk of `tag` over `hex` alone (Sight.see_path, the real writer of explored); the version moves on as a walk does.
+func _walk(g: Game, tag: StringName, hex: Vector2i) -> void:
+	var path: Array[Vector2i] = [hex]
+	Sight.see_path(g, tag, path, 0)
+	g.version += 1
+
+
+func test_discovered_three_states() -> void:
+	var g := _fog_game()
+	var tag := ArmyFixture.TAG
+	var hex := _first_hex(g, func(h: Vector2i) -> bool:
+		return not Knowledge.discovered(g, tag, h) and _land_beside(g, h) != Army.NO_HEX)
+	assert_ne(hex, Army.NO_HEX, "an undiscovered land hex exists")
+	assert_false(Knowledge.discovered(g, tag, hex), "state 1, undiscovered: nothing of it is known")
+	assert_false(Knowledge.sees(g, tag, hex))
+	_walk(g, tag, hex)
+	assert_true(Knowledge.discovered(g, tag, hex), "state 2, discovered: the walk explored it")
+	assert_false(Knowledge.sees(g, tag, hex), "state 2, not in sight")
+	ArmyFixture.army(g, tag, _land_beside(g, hex), 0, 2)
+	Sight.refresh(g)
+	assert_true(Knowledge.sees(g, tag, hex), "state 3, in sight: an army stands beside it")
+	assert_true(Knowledge.discovered(g, tag, hex))
+	assert_true(Knowledge.discovered(g, &"", hex), "the viewer \"\" discovers every hex")
+
+
+func test_discovered_counts_an_army_ring_before_the_explored_bit() -> void:
+	var g := _fog_game()
+	var tag := ArmyFixture.TAG
+	var hex := _first_hex(g, func(h: Vector2i) -> bool:
+		return not Knowledge.discovered(g, tag, h) and _land_beside(g, h) != Army.NO_HEX)
+	assert_ne(hex, Army.NO_HEX, "an undiscovered land hex exists")
+	ArmyFixture.army(g, tag, _land_beside(g, hex), 0, 2)
+	Sight.refresh(g)
+	assert_false(Sight.explored(g, tag, hex), "no walk and no season: the explored bit is not written")
+	assert_true(Knowledge.sees(g, tag, hex))
+	assert_true(Knowledge.discovered(g, tag, hex), "P: an army's new ring is discovered before the vision phase")
+
+
+func test_land_seen_whole_and_partial() -> void:
+	var g := _fog_game()
+	var tag := ArmyFixture.TAG
+	var other := WarFixture.neighbour_of(g, tag)
+	assert_ne(other, &"", "a neighbour exists")
+	var c := Countries.by_tag(g, other)
+	var whole := Knowledge.land_seen(g, &"", other)
+	assert_eq(int(whole["districts"]), Territory.districts(g, c.id).size(), "the viewer \"\" sees every district")
+	assert_eq(int(whole["people"]), int(PeopleView.totals(g, other)["people"]), "and every person of them")
+	var expect_d := 0
+	var expect_p := 0
+	for i: int in Territory.districts(g, c.id):
+		if Knowledge.discovered(g, tag, g.map.hex_of(i)):
+			expect_d += 1
+			expect_p += int(g.state.people[i])
+	var part := Knowledge.land_seen(g, tag, other)
+	assert_eq(int(part["districts"]), expect_d, "partial: only the districts the viewer has discovered")
+	assert_eq(int(part["people"]), expect_p, "P: no undiscovered district is counted")
+	assert_lte(int(part["districts"]), int(whole["districts"]))
+	var hidden := _first_hex(g, func(h: Vector2i) -> bool:
+		return int(g.state.owner[g.map.index_of(h)]) == c.id and not Knowledge.discovered(g, tag, h))
+	assert_ne(hidden, Army.NO_HEX, "an undiscovered district of the other country exists")
+	_walk(g, tag, hidden)
+	var after := Knowledge.land_seen(g, tag, other)
+	assert_eq(int(after["districts"]), int(part["districts"]) + 1, "a walk into a district counts it at once (the cache follows the version)")
+
+
+func test_garrison_known_is_exact_on_a_discovered_fortress() -> void:
+	var g := _fog_game()
+	var tag := ArmyFixture.TAG
+	var hex := _fortress(g, tag, false)
+	assert_ne(hex, Army.NO_HEX, "an undiscovered fortress exists")
+	_walk(g, tag, hex)
+	assert_false(Knowledge.sees(g, tag, hex), "discovered, not in sight")
+	Occupation.set_garrison(g, hex, Occupation.garrison_full(g, hex) - 13)
+	g.version += 1
+	var whole := Occupation.garrison_of(g, hex)
 	assert_ne(whole % 100, 0, "the planted garrison is not a round hundred")
-	var seen := Knowledge.garrison_estimate(g, ArmyFixture.TAG, f.hex)
-	assert_eq(seen.access, &"seen")
-	assert_eq(int(seen.men), ((whole + 50) / 100) * 100, "rounded to 100")
-	assert_ne(int(seen.men), whole, "P: a seen garrison is never exact")
+	var known := Knowledge.garrison_known(g, tag, hex)
+	assert_eq(int(known["men"]), whole, "P: a discovered fortress reads its real garrison, never a rounded one")
+	assert_eq(known["access"], &"exact")
+	assert_eq(Knowledge.garrison_known(g, &"", hex), known, "the viewer \"\" reads the same")
 
 
-func test_garrison_estimate_unseen_is_the_full_garrison_whatever_the_real_one() -> void:
-	var f := _fortress_game(false)
-	assert_false(f.is_empty(), "a hostile fortress the player does not see exists")
-	var g: Game = f.g
-	var full := Occupation.garrison_full(g, f.hex)
-	var before := Knowledge.garrison_estimate(g, ArmyFixture.TAG, f.hex)
-	assert_eq(before.access, &"assumed")
-	assert_eq(int(before.men), full, "the full garrison of its level")
-	Occupation.set_garrison(g, f.hex, maxi(1, full / 4))
-	var after := Knowledge.garrison_estimate(g, ArmyFixture.TAG, f.hex)
-	assert_eq(after, before, "P: a reduced unseen garrison does not change the estimate")
+func test_garrison_known_is_hidden_on_an_undiscovered_fortress() -> void:
+	var g := _fog_game()
+	var tag := ArmyFixture.TAG
+	var hex := _fortress(g, tag, false)
+	assert_ne(hex, Army.NO_HEX, "an undiscovered fortress exists")
+	var full := Occupation.garrison_full(g, hex)
+	Occupation.set_garrison(g, hex, maxi(1, full / 4))
+	g.version += 1
+	var hidden := Knowledge.garrison_known(g, tag, hex)
+	assert_eq(hidden["access"], &"hidden")
+	assert_eq(int(hidden["men"]), -1, "nothing of its garrison is read")
+	assert_ne(int(hidden["men"]), full, "P: an undiscovered fortress never reports its full garrison")
+	Occupation.set_garrison(g, hex, full)
+	g.version += 1
+	assert_eq(Knowledge.garrison_known(g, tag, hex), hidden, "P: the real garrison of an undiscovered fortress is never read")
 
 
-func test_garrison_estimate_none_for_no_fortress_and_an_occupied_one() -> void:
-	var f := _fortress_game(false)
-	var g: Game = f.g
-	var plain := Vector2i(-1, -1)
-	for i: int in g.map.hex_count():
-		var hex := g.map.hex_of(i)
-		if g.map.is_land(hex) and Occupation.fortress_level(g, hex) == 0:
-			plain = hex
-			break
-	var none := Knowledge.garrison_estimate(g, ArmyFixture.TAG, plain)
-	assert_eq(int(none.men), 0)
-	assert_eq(none.access, &"none")
-	WarFixture.set_occupier(g, f.hex, ArmyFixture.TAG)
-	if Occupation.is_occupied(g, f.hex):
-		assert_eq(Knowledge.garrison_estimate(g, ArmyFixture.TAG, f.hex).access, &"none", "an occupied fortress holds no garrison")
+func test_garrison_known_is_none_without_a_fortress() -> void:
+	var g := _fog_game()
+	var plain := _first_hex(g, func(h: Vector2i) -> bool:
+		return Occupation.fortress_level(g, h) == 0)
+	assert_ne(plain, Army.NO_HEX, "a land hex with no fortress exists")
+	var none := Knowledge.garrison_known(g, ArmyFixture.TAG, plain)
+	assert_eq(int(none["men"]), 0)
+	assert_eq(none["access"], &"none")
+	assert_eq(Knowledge.garrison_known(g, &"", plain)["access"], &"none")
 
 
-func test_men_of_exact_banded_and_unknown() -> void:
-	var g := ArmyFixture.game()
+func test_garrison_known_is_exact_for_a_fortress_occupied_by_a_third() -> void:
+	var g := _fog_game()
+	var tag := ArmyFixture.TAG
+	var hex := _fortress(g, tag, false)
+	assert_ne(hex, Army.NO_HEX, "an undiscovered fortress exists")
+	var third := WarFixture.stranger_of(g, tag)
+	assert_ne(third, &"", "a country that is no neighbour exists")
+	WarFixture.set_occupier(g, hex, third)
+	_walk(g, tag, hex)
+	assert_true(Occupation.is_occupied(g, hex), "the fortress is occupied")
+	var known := Knowledge.garrison_known(g, tag, hex)
+	assert_eq(known["access"], &"exact", "an occupied fortress is exact on a discovered hex (R19)")
+	assert_eq(int(known["men"]), Occupation.garrison_of(g, hex))
+
+
+func test_men_of_is_exact_for_a_known_country() -> void:
+	var g := _fog_game()
 	var enemy := WarFixture.neighbour_of(g, ArmyFixture.TAG)
 	var stranger := WarFixture.stranger_of(g, ArmyFixture.TAG)
 	var col := Stats.column("army_men")
@@ -261,8 +371,71 @@ func test_men_of_exact_banded_and_unknown() -> void:
 	assert_eq(Knowledge.men_of(g, ArmyFixture.TAG, ArmyFixture.TAG), 1234, "its own men exact")
 	assert_eq(Knowledge.men_of(g, &"", enemy), 1250, "the viewer \"\" reads exact")
 	assert_true(Knowledge.knows(g, ArmyFixture.TAG, enemy), "a neighbour is known")
-	assert_eq(Knowledge.men_of(g, ArmyFixture.TAG, enemy), 1300, "a known country is banded to two figures")
-	assert_ne(Knowledge.men_of(g, ArmyFixture.TAG, enemy), 1250, "P: a known country is never exact")
+	assert_eq(Knowledge.men_of(g, ArmyFixture.TAG, enemy), 1250, "P: a known country is exact, not banded to 1,300")
 	if not Knowledge.knows(g, ArmyFixture.TAG, stranger):
 		assert_eq(Knowledge.men_of(g, ArmyFixture.TAG, stranger), -1, "an unknown country is -1")
 	assert_eq(Knowledge.men_of(g, ArmyFixture.TAG, &"ZZZ"), -1, "a tag with no country is -1")
+
+
+func test_siege_access_four_levels() -> void:
+	var g := _fog_game()
+	var tag := ArmyFixture.TAG
+	var hex := ArmyFixture.find_town(g)
+	assert_ne(hex, Army.NO_HEX, "a town of TAG exists")
+	var holder := Occupation.controller_tag(g, hex)
+	var besieger := WarFixture.neighbour_of(g, holder)
+	assert_ne(besieger, &"", "a neighbour of the holder exists")
+	WarFixture.at_war(g, besieger, holder)
+	var s := Siege.new()
+	s.hex = hex
+	s.besieger = besieger
+	s.name = "Siege of Test, 1480"
+	g.sieges.append(s)
+	var skip: Array[StringName] = [besieger, holder]
+	var others := _others(g, skip)
+	assert_gte(others.size(), 3, "three other countries exist")
+	var seer := others[0]
+	var distant := others[1]
+	var blind := others[2]
+	assert_eq(Knowledge.siege_access(g, &"", hex), &"exact", "the viewer \"\" sees it exact")
+	assert_eq(Knowledge.siege_access(g, besieger, hex), &"exact", "the besieger")
+	assert_eq(Knowledge.siege_access(g, holder, hex), &"exact", "the holder")
+	ArmyFixture.army(g, seer, _land_beside(g, hex), 0, 2)
+	Sight.refresh(g)
+	_walk(g, distant, hex)
+	assert_true(Knowledge.sees(g, seer, hex), "precondition: an army of the seer sees the hex")
+	assert_false(Knowledge.sees(g, distant, hex), "precondition: distant does not see the hex")
+	assert_true(Knowledge.discovered(g, distant, hex), "precondition: distant has discovered it")
+	assert_false(Knowledge.discovered(g, blind, hex), "precondition: blind has not discovered it")
+	assert_eq(Knowledge.siege_access(g, seer, hex), &"seen", "in sight: the siege is seen")
+	assert_eq(Knowledge.siege_access(g, distant, hex), &"land", "P: discovered, not in sight, is land, never seen")
+	assert_eq(Knowledge.siege_access(g, blind, hex), &"hidden", "undiscovered: hidden")
+
+
+func test_witnessed_land_event_follows_discovery() -> void:
+	var g := _border_game()
+	var far := Vector2i(8, 0)
+	assert_true(Knowledge.witnessed(g, {"tag": AAA, "land": true, "hex": far}, OUT), "a viewer that discovered the hex is told (D12)")
+	assert_false(Knowledge.witnessed(g, {"tag": AAA, "land": true, "hex": far, "witnesses": [BBB]}, BBB),
+		"P: a land event on an undiscovered hex is not told to a listed witness that has not discovered it")
+	assert_true(Knowledge.witnessed(g, {"tag": AAA, "land": true, "hex": far, "witnesses": [BBB]}, OUT),
+		"P: a discovering viewer the witness list leaves out is told")
+	assert_false(Knowledge.witnessed(g, {"tag": AAA, "land": true}, OUT), "a land event with no hex is not told to a far viewer")
+
+
+## The real north Italy start (FG1): one region, `europe`, over every hex, so every country has discovered the whole map and knows
+## every other country. A fact of the scenario, pinned here.
+func test_north_italy_every_country_knows_every_other() -> void:
+	var defs := ResourceLoader.load("res://data/defs/game_defs.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as GameDefs
+	var map := ResourceLoader.load("res://data/maps/north_italy.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as MapData
+	var scen := ResourceLoader.load("res://data/scenarios/north_italy_1480.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as ScenarioDef
+	var g := Game.new_scenario(map, defs, scen, 1480)
+	var tags: Array[StringName] = []
+	for c: Country in g.countries:
+		if c != null and c.tag != &"":
+			tags.append(c.tag)
+	assert_eq(tags.size(), 13, "north Italy has thirteen countries")
+	for tag: StringName in tags:
+		assert_eq(Knowledge.known(g, tag).size(), tags.size() - 1, "%s knows the other twelve (the whole map is discovered)" % tag)
+		assert_eq(Knowledge.unknown_count(g, tag), 0, "%s knows no country as unknown" % tag)
+

@@ -1,27 +1,56 @@
-## Sight, the explored land and the witnesses (docs/architecture/m6-build-spec.md 4.11, 5.0 R4, 5.3). A country sees the
-## hexes it holds and every hex within the land sight of them (the owner bytes), and the hexes its armies see; it has
-## explored what it has ever seen. Game calls this by reference (`.call`): a typed call from core/game into a system
-## would make the two scripts need each other to parse. A map-only game (no countries) does nothing here.
-## `explored` is written only by setup, see_path and season (R4). Season is self-healing: it explores each country's
-## current land sight from the state, so nothing waits in memory between a change and the vision phase.
+## Sight, the explored land and the witnesses (docs/architecture/m6-build-spec.md 4.11, 5.0 R4, 5.3; fog spec R6 to R17, R30).
+## A country sees the hexes it CONTROLS and every hex within the land sight of them (fog spec R13: the controller bytes, the
+## occupier where one stands, else the owner), and the hexes its armies see; it has explored what it has ever seen.
+## Game calls this by reference (`.call`): a typed call from core/game into a system would make the two scripts need each
+## other to parse. A map-only game (no countries) does nothing here.
+## `explored` is written by five entry points only (fog spec R11, pinned by test_no_other_writers.gd): setup (the start: the
+## land sight OR the scenario's regions, R6), see_path and season (the walks and the vision phase), and on_emit for
+## district_captured (R9) and for the two ownership events (R10). Season is self-healing: it explores each country's
+## current land sight from the state, so nothing waits in memory between a change and the vision phase, except the land
+## made at once by the events.
 class_name Sight
 extends RefCounted
 
 const OWNS: Array[String] = ["explored"]
-## The event kinds that carry witnesses when they have a hex (4.11).
-const SIGHTED: Array[String] = ["work_started", "work_finished", "work_cancelled", "town_grew", "district_declined",
-	"army_raised", "army_disbanded", "army_starved", "unit_lost", "battle_started", "battle_joined", "battle_fought",
-	"battle_ended", "siege_started", "siege_progress", "siege_lifted", "district_captured"]
+## The land kinds (fog spec D12, R30): facts of a hex, told to whoever has discovered it. They carry `land: true` and no
+## witness list.
+const LAND_KINDS: Array[String] = ["work_started", "work_finished", "work_cancelled", "town_grew", "district_declined",
+	"district_captured"]
+## The other event kinds that carry witnesses when they have a hex (4.11).
+const SIGHTED: Array[String] = ["army_raised", "army_disbanded", "army_starved", "unit_lost", "battle_started",
+	"battle_joined", "battle_fought", "battle_ended", "siege_started", "siege_progress", "siege_lifted"]
 
 
-## Explored = the land sight at the start (new_scenario only; R11). Called by reference from Game.new_scenario.
+## Explored = the start (new_scenario only; R11): each country's land sight OR the hexes of its scenario regions (R6).
+## Called by reference from Game.new_scenario.
 static func setup(game: Game) -> void:
 	if not _ready(game):
 		return
 	for c: Country in game.countries:
 		if c != null:
 			game.sight.forget_land(c.id)  # the land of the start, never a land cached before it
-			c.explored = game.sight.land_of(game, c.id).duplicate()
+			var bits := game.sight.land_of(game, c.id).duplicate()
+			var start := _start_of(game, c)
+			for k: int in mini(start.size(), bits.size()):
+				bits[k] = bits[k] | start[k]
+			c.explored = bits
+			game.sight.grew(c.id)
+
+
+## The scenario's start discovery of `c` (R6) as an explored bitset: empty when the game has no scenario regions. The
+## scenario gives one byte a hex (ScenarioDef.discovery_of, FG1), read here into bits.
+static func _start_of(game: Game, c: Country) -> PackedByteArray:
+	var n := game.map.hex_count()
+	var bits := PackedByteArray()
+	bits.resize((n + 7) >> 3)
+	bits.fill(0)
+	if game.scenario == null:
+		return bits
+	var flags := game.scenario.discovery_of(c.tag)
+	for i: int in mini(flags.size(), n):
+		if flags[i] != 0:
+			bits[i >> 3] = bits[i >> 3] | (1 << (i & 7))
+	return bits
 
 
 ## Rebuilds the army part of game.sight: per country a bitset of the hexes its armies see, and the watchers of each hex.
@@ -57,7 +86,7 @@ static func refresh(game: Game) -> void:
 	game.sight.set_army_part(bits_by_tag, watch)
 
 
-## True when `tag` sees `hex` now: it holds the hex or a hex within the land sight of it, or an army of its sees it.
+## True when `tag` sees `hex` now: it controls the hex or a hex within the land sight of it (R13), or an army of its sees it.
 static func sees(game: Game, tag: StringName, hex: Vector2i) -> bool:
 	if not _ready(game) or tag == &"":
 		return false
@@ -67,16 +96,15 @@ static func sees(game: Game, tag: StringName, hex: Vector2i) -> bool:
 		return false
 	if SightCache.bit_is(game.sight.armies_of(c.id), i):
 		return true
-	var owner: PackedByteArray = game.state.owner
 	for j: int in SightCache.disc(game.map, i, _land_sight(game)):
-		if j < owner.size() and int(owner[j]) == c.id:
+		if _controller_at(game, j) == c.id:
 			return true
 	return false
 
 
 ## The tags that see `hex` (country id order), `actor` among them whether or not it sees it. Read from the hex's disc
-## alone (the owners of its hexes within the land sight, the armies' watchers there, the actor): the same tags `sees`
-## gives for every country, without a loop over the countries (at most seven owners and a few watchers).
+## alone (the controllers of its hexes within the land sight, the armies' watchers there, the actor): the same tags `sees`
+## gives for every country, without a loop over the countries (at most seven controllers and a few watchers).
 static func witnesses_of(game: Game, hex: Vector2i, actor: StringName) -> PackedStringArray:
 	var out := PackedStringArray()
 	if not _ready(game):
@@ -84,10 +112,10 @@ static func witnesses_of(game: Game, hex: Vector2i, actor: StringName) -> Packed
 	var ids: Array[int] = []
 	var i := game.map.index_of(hex)
 	if i >= 0:
-		var owner: PackedByteArray = game.state.owner
 		for j: int in SightCache.disc(game.map, i, _land_sight(game)):
-			if j < owner.size() and owner[j] > 0 and not ids.has(int(owner[j])):
-				ids.append(int(owner[j]))
+			var ctl := _controller_at(game, j)
+			if ctl > 0 and not ids.has(ctl):
+				ids.append(ctl)
 		var watchers: PackedStringArray = game.sight.watchers.get(i, PackedStringArray())
 		for watcher: String in watchers:
 			var held := Countries.by_tag(game, StringName(watcher))
@@ -104,14 +132,22 @@ static func witnesses_of(game: Game, hex: Vector2i, actor: StringName) -> Packed
 	return out
 
 
-## Called by Game.emit for every event, before it is queued: owners_changed forgets the land sight of the countries it
-## names; a sighted kind with a hex gets its witnesses unless it has some.
+## Called by Game.emit for every event, before it is queued. A land kind is marked `land` and gets no witness list (R30).
+## district_captured explores the taker's land at once (R9); owners_changed and controllers_changed explore the new holders'
+## land at once and forget the land sight of every country they name (R10, R16, R17). A sighted kind with a hex gets its
+## witnesses unless it has some.
 static func on_emit(game: Game, event: Dictionary) -> void:
 	if not _ready(game):
 		return
 	var kind := str(event.get("kind", ""))
-	if kind == "owners_changed":
+	if LAND_KINDS.has(kind):
+		event["land"] = true
+	if kind == "district_captured":
+		_captured(game, event)
+	elif kind == "owners_changed":
 		_owners_changed(game, event)
+	elif kind == "controllers_changed":
+		_controllers_changed(game, event)
 	elif SIGHTED.has(kind) and event.get("hex") is Vector2i and not event.has("witnesses"):
 		var actor := StringName(str(event.get("tag", "")))
 		event["witnesses"] = _with_others(witnesses_of(game, event["hex"] as Vector2i, actor), event)
@@ -186,19 +222,74 @@ static func season(game: Game) -> void:
 		_mark(game, Countries.by_id(game, int(id)), lists[id], 0)
 
 
+## R9: a district captured is explored by its taker, the hex and its ring, before the event is queued; the land sights of
+## the taker and of the countries named are forgotten (their control changed).
+static func _captured(game: Game, event: Dictionary) -> void:
+	_forget_named(game, event)
+	var hex: Variant = event.get("hex")
+	if hex is Vector2i:
+		_mark_rings(game, StringName(str(event.get("tag", ""))), [hex as Vector2i])
+
+
+## Owners changed: forget the land sight of the countries named (the gain is explored at once, here, and read from the state
+## at the next season), and explore each changed hex and its ring for the new owner (R10).
+static func _owners_changed(game: Game, event: Dictionary) -> void:
+	_forget_named(game, event)
+	_mark_rings(game, StringName(str(event.get("tag", ""))), event.get("hexes", []) as Array)
+
+
+## Controllers changed (a release at peace, the flush of a phase; R10, R16, R17): forget the land sight of the countries
+## named, then explore each changed hex and its ring for the country that controls it now.
+static func _controllers_changed(game: Game, event: Dictionary) -> void:
+	_forget_named(game, event)
+	for hex: Variant in event.get("hexes", []):
+		var holder := Countries.by_id(game, Occupation.controller_id(game, hex as Vector2i))
+		if holder != null:
+			_mark_rings(game, holder.tag, [hex as Vector2i])
+
+
+## Explores the hex and its land-sight ring of `hexes` for the country `tag` (the R9 and R10 door; through _mark).
+static func _mark_rings(game: Game, tag: StringName, hexes: Array) -> void:
+	var c := Countries.by_tag(game, tag)
+	if c == null:
+		return
+	var indices := PackedInt32Array()
+	for hex: Variant in hexes:
+		var i := game.map.index_of(hex as Vector2i)
+		if i >= 0:
+			indices.append(i)
+	_mark(game, c, indices, _land_sight(game))
+
+
+## Forgets the land sight of the tag and the others an event names (R16).
+static func _forget_named(game: Game, event: Dictionary) -> void:
+	var names: Array = [str(event.get("tag", ""))]
+	for other: Variant in event.get("others", []):
+		names.append(str(other))
+	for name: Variant in names:
+		var c := Countries.by_tag(game, StringName(str(name)))
+		if c != null:
+			game.sight.forget_land(c.id)
+
+
 ## Sets the explored bits of `c` for each index and its disc of `radius`; the bitset is copied once, then changed in place.
+## A set that grew bumps its explored revision and tells the known sets of the bits' controllers (learned).
 static func _mark(game: Game, c: Country, indices: PackedInt32Array, radius: int) -> void:
 	if c == null or indices.is_empty():
 		return
 	var bits := _bits_of(game, c)
-	var owner: PackedByteArray = game.state.owner
+	var grew := false
 	for i: int in indices:
 		for j: int in SightCache.disc(game.map, i, radius):
 			if ((bits[j >> 3] >> (j & 7)) & 1) == 0:
 				bits[j >> 3] = bits[j >> 3] | (1 << (j & 7))
-				if j < owner.size() and int(owner[j]) > 0 and int(owner[j]) != c.id:
-					game.sight.learned(c.id, int(owner[j]))
+				grew = true
+				var ctl := _controller_at(game, j)
+				if ctl > 0 and ctl != c.id:
+					game.sight.learned(c.id, ctl)
 	c.explored = bits
+	if grew:
+		game.sight.grew(c.id)
 
 
 ## ORs country `c`'s land sight (its cached bitset) into its explored set, when that land sight was made since it was last
@@ -218,6 +309,7 @@ static func _or_land(game: Game, c: Country) -> void:
 	c.explored = bits
 	if grew:
 		game.sight.forget_known(c.id)
+		game.sight.grew(c.id)
 
 
 ## The explored bitset of `c`, made empty when its size is not the map's (an in-memory game that never set it up).
@@ -231,15 +323,15 @@ static func _bits_of(game: Game, c: Country) -> PackedByteArray:
 	return bits
 
 
-## Owners changed: forget the land sight of the countries named (the gain is explored at the next season, from the state).
-static func _owners_changed(game: Game, event: Dictionary) -> void:
-	var names: Array = [str(event.get("tag", ""))]
-	for other: Variant in event.get("others", []):
-		names.append(str(other))
-	for name: Variant in names:
-		var c := Countries.by_tag(game, StringName(str(name)))
-		if c != null:
-			game.sight.forget_land(c.id)
+## The controller byte of hex index j (fog spec R13): its occupier where one stands, else its owner; 0 at sea and off the map.
+static func _controller_at(game: Game, j: int) -> int:
+	if j < 0 or j >= game.map.land.size() or game.map.land[j] == 0:
+		return 0
+	var occ: PackedByteArray = game.state.occupier
+	if j < occ.size() and occ[j] != 0:
+		return int(occ[j])
+	var owner: PackedByteArray = game.state.owner
+	return int(owner[j]) if j < owner.size() else 0
 
 
 ## The army sight of an army: the largest sight of its kinds (1 when the defs do not say).

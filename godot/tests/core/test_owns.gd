@@ -19,9 +19,9 @@ const ACTION_OWNERS := {
 const PHASE_OWNERS := {
 	&"ai_orders": [],  # writes nothing itself: its acts go through Game.act, the mark through the door (M8 5.4)
 	&"movement": ["armies", "countries", "battles"],  # the walks; explored along them (Vision.see_path, 5.0 R4); engage (M7)
-	&"battles": ["armies", "battles", "wars", "occupier", "garrison", "unsupported", "people", "people_flows", "luck"],
-	&"sieges": ["sieges", "occupier", "garrison", "unsupported", "people", "people_flows"],
-	&"war": ["wars", "occupier", "garrison", "unsupported", "owner", "armies"],  # a timer peace moves no owner (4.9)
+	&"battles": ["armies", "battles", "wars", "occupier", "garrison", "unsupported", "people", "people_flows", "luck", "countries"],  # countries: a capture explores its taker's land (FG4, fog R9)
+	&"sieges": ["sieges", "occupier", "garrison", "unsupported", "people", "people_flows", "countries"],  # countries: a capture explores (FG4, R9)
+	&"war": ["wars", "occupier", "garrison", "unsupported", "owner", "armies", "countries"],  # a timer peace moves no owner (4.9); a peace explores the land it moves (FG4, R10, R17)
 	&"supply": ["armies", "stores", "people", "people_flows"],  # hunger through Armies, food through Stores, foraging through People
 	&"production": ["stores", "countries"],
 	&"income": ["purse"],  # the upkeep_army line is Treasury's too (M6)
@@ -197,8 +197,10 @@ func test_dev_transfer_changes_owner_and_the_door() -> void:
 	var moved: Array[Vector2i] = [ScenarioFixture.UNOWNED_HEXES[0]]
 	assert_eq(g.dev_transfer(moved, 1), 1)
 	var changed := _changed(before, _fields(g))
-	assert_eq(_violations(changed, ["owner"]), [] as Array[String])
+	# FG4 (fog R10): the new owner's hex and its ring are explored at once, so the countries' explored set changes too.
+	assert_eq(_violations(changed, ["owner", "countries"]), [] as Array[String])
 	assert_true(changed.has("owner"))
+	assert_true(changed.has("countries"), "the explored set of the new owner grows at once")
 
 
 func test_dev_people_writes_people_through_the_door() -> void:

@@ -103,7 +103,7 @@ static func _kind_of(game: Game, viewer: StringName, hex: Vector2i, storm: bool)
 ## read the exact garrison, a viewer who sees the hex reads it rounded to 100 (a garrison under 50 reads as none: the card must
 ## not tell it from an empty fortress), and the garrison of a fortress it cannot see is the full one (assumed).
 static func _garrisoned(game: Game, viewer: StringName, hex: Vector2i) -> bool:
-	return int(Knowledge.garrison_estimate(game, viewer, hex)["men"]) > 0
+	return int(Knowledge.garrison_known(game, viewer, hex)["men"]) > 0
 
 
 ## The output shell: the place, the kind, the verdict and the card's keys, empty numbers included.
@@ -175,9 +175,18 @@ static func _storm(game: Game, viewer: StringName, a: Army, hex: Vector2i, key: 
 
 
 ## The siege of a garrisoned fortress by the army alone: the forecast season (4.5); a siege has no odds word of its own.
+## An undiscovered fortress gives the unseen sentence and no numbers (R19, R21): the card never reads its garrison.
 static func _siege(game: Game, viewer: StringName, a: Army, hex: Vector2i, out: Dictionary) -> void:
 	var besiege := _besiege(game, viewer, a, hex)
 	out.besiege = besiege
+	if bool(besiege.hidden):
+		out.word = Movement.UNSEEN_TEXT
+		out.kind_text = "Besiege"
+		out.tone = TONE_PLAIN
+		out.storm_word = NO_WORD
+		out.opens = 0
+		out.notes = [] as Array[String]
+		return
 	var seasons := int(besiege.seasons)
 	out.word = besiege.too_few_text if seasons < 0 else "falls in about %s" % _seasons_text(seasons)
 	out.kind_text = "Besiege · " + str(out.word)
@@ -199,20 +208,25 @@ static func _held(game: Game, viewer: StringName, a: Army, hex: Vector2i, out: D
 		"hex" if distance == 1 else "hexes"]] as Array[String]
 	var besiege := _besiege(game, viewer, a, fortress)
 	out.besiege = besiege
+	if bool(besiege.hidden):
+		return
 	var seasons := int(besiege.seasons)
 	out.hint = "Besiege it: %s." % ("falls in about %s" % _seasons_text(seasons) if seasons >= 0 else TOO_FEW_TEXT)
 
 
 ## The siege numbers of an army on a fortress (Sieges.terms and forecast_for with the army's men and guns and the garrison the
-## viewer may take it to be, D49: an unseen garrison counts full; nothing written).
+## viewer may read, R19). An undiscovered fortress gives no numbers at all: {hidden: true}. Sieges reads the real garrison for
+## a -1 garrison, so -1 is never passed on here. Nothing written.
 static func _besiege(game: Game, viewer: StringName, a: Army, fortress: Vector2i) -> Dictionary:
+	var estimate := Knowledge.garrison_known(game, viewer, fortress)
+	if estimate.access == &"hidden":
+		return {"hidden": true, "seasons": -1, "need": 0, "rate": 0, "stores": 0, "too_few_text": ""}
 	var men := a.men()
 	var guns := _guns(game, a)
-	var estimate := Knowledge.garrison_estimate(game, viewer, fortress)
 	var garrison := int(estimate.men)
 	var t := Sieges.terms(game, fortress, viewer, men, guns, garrison)
 	var seasons := Sieges.forecast_for(game, fortress, garrison, men, guns, 0, 0)
-	return {"seasons": seasons, "need": int(t.need), "rate": int(t.rate), "stores": int(t.stores),
+	return {"hidden": false, "seasons": seasons, "need": int(t.need), "rate": int(t.rate), "stores": int(t.stores),
 		"too_few_text": TOO_FEW_TEXT if seasons < 0 else ""}
 
 

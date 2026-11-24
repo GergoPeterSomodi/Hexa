@@ -11,6 +11,13 @@ func before_each() -> void:
 	_g = ArmyFixture.game()
 
 
+## Every country thin at radius 0 (FogFixture, FG3): each country knows only its land sight and its neighbours.
+func _thin_all(g: Game) -> void:
+	for c: Country in g.countries:
+		if c != null and c.tag != &"":
+			FogFixture.thin(g, c.tag, 0)
+
+
 ## A fortress of any level that Genoa holds; NO_HEX when none.
 func _own_fortress() -> Vector2i:
 	for i: int in _g.map.hex_count():
@@ -103,6 +110,7 @@ func test_siege_between_countries_at_peace_is_none() -> void:
 
 
 func test_unseen_foreign_siege_never_appears() -> void:
+	_thin_all(_g)
 	var found := ArmyFixture.NO_HEX
 	var besieger := &""
 	for i: int in _g.map.hex_count():
@@ -110,7 +118,7 @@ func test_unseen_foreign_siege_never_appears() -> void:
 		var holder := Occupation.controller_tag(_g, hex)
 		if Occupation.fortress_level(_g, hex) == 0 or holder == &"" or holder == ArmyFixture.TAG:
 			continue
-		if Knowledge.sees(_g, ArmyFixture.TAG, hex):
+		if Knowledge.discovered(_g, ArmyFixture.TAG, hex):
 			continue
 		var e := WarFixture.neighbour_of(_g, holder)
 		if e == &"" or e == ArmyFixture.TAG:
@@ -212,6 +220,7 @@ func _tag_hits(value: Variant, tags: Array, out: Array) -> void:
 
 
 func test_a_witness_view_carries_no_tag_of_an_unknown_besieger() -> void:
+	_thin_all(_g)
 	var found := ArmyFixture.NO_HEX
 	var besieger := &""
 	var holder_tag := &""

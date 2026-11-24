@@ -449,12 +449,14 @@ static func seen_enemies(game: Game, tag: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for seen: Dictionary in Knowledge.armies_seen(game, tag):
 		if Wars.at_war(game, tag, seen["tag"] as StringName):
-			out.append({"army": (seen["army"] as Army).id, "tag": seen["tag"], "hex": seen["hex"], "men": int(seen["men_banded"])})
+			out.append({"army": (seen["army"] as Army).id, "tag": seen["tag"], "hex": seen["hex"], "men": int(seen["men"])})
 	return out
 
 
+## -1 means unknown: the hex is undiscovered by `tag`, so its garrison is not read. Callers must not read -1 as no garrison
+## (a `<= 0` test would take it for an empty fortress); FG12 (the AI door) decides how the AI treats it.
 static func garrison_estimate(game: Game, tag: StringName, hex: Vector2i) -> int:
-	return int(Knowledge.garrison_estimate(game, tag, hex)["men"])
+	return int(Knowledge.garrison_known(game, tag, hex)["men"])
 
 
 ## Seasons until a siege of `hex` by `men` and `guns` would fall, against the garrison `tag` may take it to be (-1: never).

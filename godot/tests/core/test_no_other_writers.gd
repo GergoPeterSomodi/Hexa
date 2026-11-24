@@ -268,6 +268,49 @@ func test_the_explored_door_does_write() -> void:
 	assert_gt(_writers(FileAccess.get_file_as_string("res://core/systems/sight.gd"), EXPLORED_FIELDS).size(), 0)
 
 
+## FG4 (fog spec R11): the explored set has five entry points, all in sight.gd: setup, see_path, season, and on_emit for
+## district_captured (R9) and for the ownership events (R10). Pinned here by the functions that write it and the ones
+## that call the door: _mark (and _or_land, from season) write; see_path and season call _mark; the three on_emit
+## handlers reach it through _mark_rings. A sixth entry point makes one of these lists longer and fails.
+func test_sight_has_its_five_explored_entry_points_and_no_more() -> void:
+	var text := FileAccess.get_file_as_string("res://core/systems/sight.gd")
+	assert_eq(_functions_with(text, EXPLORED_FIELDS), ["_mark", "_or_land", "setup"] as Array[String],
+		"the functions that write explored")
+	assert_eq(_callers(text, "_mark("), ["_mark_rings", "season", "see_path"] as Array[String],
+		"the callers of the door _mark")
+	assert_eq(_callers(text, "_mark_rings("), ["_captured", "_controllers_changed", "_owners_changed"] as Array[String],
+		"the on_emit handlers that mark a ring")
+	assert_eq(_callers(text, "_or_land("), ["season"] as Array[String], "the callers of the vision phase's sweep")
+
+
+## The sorted names of the functions of `text` whose body writes one of `fields` (a write as _writers reads it).
+func _functions_with(text: String, fields: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	var current := ""
+	for line: String in text.split("\n"):
+		if line.begins_with("static func ") or line.begins_with("func "):
+			current = line.split("(")[0].trim_prefix("static func ").trim_prefix("func ")
+		elif not _writers(line, fields).is_empty() and not out.has(current):
+			out.append(current)
+	out.sort()
+	return out
+
+
+## The sorted names of the functions of `text` (other than the one defined on the line) whose body calls `needle`.
+func _callers(text: String, needle: String) -> Array[String]:
+	var out: Array[String] = []
+	var current := ""
+	for line: String in text.split("\n"):
+		if line.begins_with("static func ") or line.begins_with("func "):
+			current = line.split("(")[0].trim_prefix("static func ").trim_prefix("func ")
+		elif line.strip_edges().begins_with("#"):
+			continue
+		elif line.contains(needle) and not out.has(current):
+			out.append(current)
+	out.sort()
+	return out
+
+
 func test_the_scan_sees_each_kind_of_explored_writer() -> void:
 	var bad: Array[String] = ["c.explored = seen", "c.explored[3] = 1", "c.explored[i] |= 4", "c.explored.fill(0)",
 		"c.explored.resize(9)"]

@@ -59,8 +59,17 @@ func test_seen_enemies_leave_out_armies_not_at_war_with_the_seat() -> void:
 	assert_true(ids.has(guest.id), "at war: an enemy")
 
 
+## AiFixture.duel with every country thin (its land sight only): far countries are unknown (FG5; north Italy knows all).
+func _game_thin() -> Game:
+	var g := AiFixture.duel()
+	for c: Country in g.countries:
+		if c != null and c.tag != &"":
+			FogFixture.thin(g, c.tag, 0)
+	return g
+
+
 func test_men_of_is_minus_one_for_a_country_it_does_not_know() -> void:
-	var g := _game()
+	var g := _game_thin()
 	var stranger := &""
 	for c: Country in g.countries:
 		if c.tag != AiFixture.MILAN and not Knowledge.knows(g, AiFixture.MILAN, c.tag):
@@ -89,9 +98,10 @@ func test_garrison_estimate_is_exact_for_the_holder_and_full_for_a_stranger() ->
 	Occupation.set_garrison(g, hex, 60)
 	assert_eq(AiKnow.garrison_estimate(g, holder, hex), 60, "own: exact")
 	for c: Country in g.countries:
-		if c.tag != holder and not Sight.sees(g, c.tag, hex):
-			assert_eq(AiKnow.garrison_estimate(g, c.tag, hex), Occupation.garrison_full(g, hex), "unseen: the full garrison")
-		assert_eq(AiKnow.garrison_estimate(g, c.tag, hex), int(Knowledge.garrison_estimate(g, c.tag, hex)["men"]))
+		# FG5 (R19): a discovered fortress is exact for every viewer; an undiscovered one is -1 (unknown), never the full garrison.
+		var want := Occupation.garrison_of(g, hex) if Knowledge.discovered(g, c.tag, hex) else -1
+		assert_eq(AiKnow.garrison_estimate(g, c.tag, hex), want, "a discovered fortress is exact; an undiscovered one is -1")
+		assert_eq(AiKnow.garrison_estimate(g, c.tag, hex), int(Knowledge.garrison_known(g, c.tag, hex)["men"]))
 	assert_eq(AiKnow.garrison_estimate(g, holder, Army.NO_HEX), 0, "no fortress, none")
 
 

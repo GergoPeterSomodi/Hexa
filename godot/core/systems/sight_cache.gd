@@ -6,8 +6,10 @@
 class_name SightCache
 extends RefCounted
 
-## Tag id -> PackedByteArray: the land sight of a country (held hexes and their rings).
+## Tag id -> PackedByteArray: the land sight of a country (its controlled hexes and their rings, fog spec R13).
 var _land: Dictionary = {}
+## Tag id -> int: grows each time the country's explored set grows (Sight calls grew); the map's deep-fog cache reads it.
+var _explored_rev: Dictionary = {}
 ## Tag id -> PackedByteArray: the hexes the country's armies see.
 var _armies: Dictionary = {}
 ## Hex index -> PackedStringArray: the tags whose armies see it (in no order; witnesses sort by country id).
@@ -26,8 +28,19 @@ func revision() -> int:
 	return _revision
 
 
-## The land sight of country `tag_id` as a bitset: its held hexes and every hex within the land sight of them. Made on
-## the first ask and kept until its land changes (forget_land). Nothing is made for a country that asks for nothing.
+## The explored revision of country `tag_id`: it grows each time that country's explored set grows.
+func explored_revision(tag_id: int) -> int:
+	return int(_explored_rev.get(tag_id, 0))
+
+
+## Called by Sight when the explored set of country `tag_id` grew (any of its writers).
+func grew(tag_id: int) -> void:
+	_explored_rev[tag_id] = explored_revision(tag_id) + 1
+
+
+## The land sight of country `tag_id` as a bitset: its controlled hexes (fog spec R13: the occupier where one stands, else the
+## owner) and every hex within the land sight of them. Made on the first ask and kept until its land changes (forget_land).
+## Nothing is made for a country that asks for nothing.
 func land_of(game: Game, tag_id: int) -> PackedByteArray:
 	if _land.has(tag_id):
 		return _land[tag_id]
@@ -36,7 +49,7 @@ func land_of(game: Game, tag_id: int) -> PackedByteArray:
 	bits.resize((n + 7) >> 3)
 	bits.fill(0)
 	var radius := _land_sight(game)
-	for i: int in Territory.districts(game, tag_id):
+	for i: int in Occupation.controlled(game, tag_id):
 		for j: int in disc(game.map, i, radius):
 			bits[j >> 3] = bits[j >> 3] | (1 << (j & 7))
 	_land[tag_id] = bits
@@ -87,7 +100,7 @@ func clear() -> void:
 	_revision += 1
 
 
-## The 256 bytes of what `viewer_id` has explored: 1 for each country that holds a hex the viewer explored. Made on the
+## The 256 bytes of what `viewer_id` has explored: 1 for each country that controls a hex the viewer explored. Made on the
 ## first ask after a change of land; SightCache.learned keeps it up to date as the explored bits grow.
 func known_of(game: Game, viewer_id: int) -> PackedByteArray:
 	if _known.has(viewer_id):
@@ -100,7 +113,7 @@ func known_of(game: Game, viewer_id: int) -> PackedByteArray:
 	if viewer != null and viewer.explored.size() == (n + 7) >> 3:
 		var seen: PackedByteArray = viewer.explored
 		for id: int in range(1, game.countries.size() + 1):
-			for i: int in Territory.districts(game, id):
+			for i: int in Occupation.controlled(game, id):
 				if ((seen[i >> 3] >> (i & 7)) & 1) == 1:
 					out[id] = 1
 					break
