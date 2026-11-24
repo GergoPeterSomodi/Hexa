@@ -505,3 +505,17 @@ N8. **A raise with no arms and no money.** Recommend refusal with a clear line, 
     and a balance pass).
 N9. **Arms for refit and upgrade (M6).** Recommend refit and upgrade costs use arms as well (the same data pass as 3.7), with
     the same buying rule. Alternative: they keep iron, so arms are only for raising.
+
+---
+
+## Owner's answers, 2026-11-24 (N6 to N9)
+
+- **N6, raw at hand:** an own raw district at stage 2 or better within two hexes gives the +25 % bonus (the recommended
+  rule), and the bonus grows by small steps as that raw district is upgraded (a higher stage of the raw tile adds a little
+  more; the exact steps are data, set by the soak).
+- **N7, arms price:** the market price of arms is to be decided later; use 50 % over the base price as a placeholder.
+- **N8, no arms and no money:** the raise is refused with a clear message; no unarmed levy.
+- **N9, refit and upgrade:** they need arms too (the same rule as raising).
+
+All the open questions of this design are now answered; the next step is its build plan (M9.5), after the tile window
+and the fog and movement decisions that touch the same panels and views.
