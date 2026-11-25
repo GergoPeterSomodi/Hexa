@@ -197,3 +197,12 @@ spec's fallback in TW18's pull request.
 | Gains fill one row a frame after the rows appear | compute every gain before the first draw |
 | Window opens on the last tab picked, else Buildings, else Land | always Land first |
 | `RaiseScreen` is a non-opaque screen over the map | a second dock panel |
+
+---
+
+## Owner note, 2026-11-25: the settlement picture is a placeholder
+
+The owner said to ignore the settlement picture for now: TW8's code-drawn picture stays in the window as a placeholder for
+future stylised backgrounds. No more art work on it in this build (no art director pass, no new kinds); its weak points (dark
+water, arrow-like masts, small hamlets and villages) are not to be fixed now. When real backgrounds arrive they replace the
+`SettlementPicture` Control behind the same `TileView` picture facts, so nothing else changes.
