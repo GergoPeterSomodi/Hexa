@@ -3,7 +3,9 @@
 ##
 ## `recipe()` is pure: the same input gives the same recipe (no luck, no clock, no node state). `_draw()` only walks the
 ## recipe. The recipe is laid out in a logical 296 x 72 box and scaled to the Control's rect, so the picture stays sharp
-## at scale 2. Flat two-tone faces (lit left, shaded right), ink outlines, and colours only from `Tokens`.
+## at scale 2. Flat two-tone faces (lit left, shaded right), ink outlines, and colours only from `Tokens`. The box is scaled by
+## the Control's height, the same on both axes, and centred: a wider Control crops the sides (the tile window's 434 x 150
+## picture shows the middle of the scene). Two more kinds have no settlement: LAND (the bare land) and SEA (open water).
 class_name SettlementPicture
 extends Control
 
@@ -17,6 +19,9 @@ const MAX_HARBOUR: int = 3
 const HARBOUR_CENTRE: float = 96.0
 const PLAIN_CENTRE: float = 148.0
 const KINDS: Array[StringName] = [&"hamlet", &"village", &"town", &"walled_town", &"city", &"castle"]
+## The kinds with no settlement (the tile window's picture of other tiles).
+const LAND := &"land"
+const SEA := &"sea"
 const PENNANT_PARTS: Array[StringName] = [&"tower", &"keep", &"spire", &"roof"]
 const SNOW_PARTS: Array[StringName] = [&"roof", &"spire"]
 const TOKEN_NAMES: Array[StringName] = [
@@ -50,9 +55,15 @@ const CITY_HOUSES: Array = [
 static func recipe(
 	kind: StringName, level: int, harbour: int, snow: bool, owner_colour: Color
 ) -> Array[Dictionary]:
+	var items: Array[Dictionary] = []
+	if kind == LAND or kind == SEA:
+		_bare(items, kind == SEA)
+		var bare: Array[Dictionary] = []
+		for item: Dictionary in items:
+			bare.append(_coloured(item, owner_colour))
+		return bare
 	var kind_id: StringName = kind if KINDS.has(kind) else &"hamlet"
 	var hb := clampi(harbour, 0, MAX_HARBOUR)
-	var items: Array[Dictionary] = []
 	_land(items, hb)
 	var settlement := _settlement_items(kind_id, clampi(level, 1, CASTLE_LEVELS), snow)
 	var span := _span(settlement)
@@ -132,9 +143,17 @@ func current_recipe() -> Array[Dictionary]:
 
 
 func _draw() -> void:
-	var k := Vector2(size.x / LOGICAL_SIZE.x, size.y / LOGICAL_SIZE.y)
+	var scale_y := size.y / LOGICAL_SIZE.y
+	var k := Vector2(scale_y, scale_y)
+	draw_set_transform(Vector2((size.x - LOGICAL_SIZE.x * scale_y) * 0.5, 0.0))
+	# The sky and ground bands reach the Control's edges even where the scene is narrower than it.
+	if LOGICAL_SIZE.x * scale_y < size.x and not _recipe.is_empty():
+		var pad := (size.x - LOGICAL_SIZE.x * scale_y) * 0.5
+		draw_rect(Rect2(-pad, 0.0, size.x, size.y * 0.55), _recipe[0]["colour"] as Color)
+		draw_rect(Rect2(-pad, size.y * 0.55, size.x, size.y * 0.45), Tokens.PIC_GROUND)
 	for shape: Dictionary in _recipe:
 		_paint(shape, k)
+	draw_set_transform(Vector2.ZERO)
 
 
 func _paint(shape: Dictionary, k: Vector2) -> void:
@@ -229,6 +248,19 @@ static func _coloured(item: Dictionary, owner_colour: Color) -> Dictionary:
 		"ink": item["ink"],
 		"part": item["part"],
 	}
+
+
+## A picture with no settlement: the land's sky, hills and ground, or the sky over open water with its waves; the foot fade.
+static func _bare(items: Array[Dictionary], sea: bool) -> void:
+	if not sea:
+		_land(items, 0)
+	else:
+		_box(items, 0.0, 0.0, LOGICAL_SIZE.x, LOGICAL_SIZE.y, &"PIC_SKY", &"sky", false)
+		_box(items, 0.0, 34.0, LOGICAL_SIZE.x, LOGICAL_SIZE.y - 34.0, &"PIC_WATER", &"water", false)
+		for wave: Array in [[30.0, 44.0, 56.0], [120.0, 50.0, 150.0], [210.0, 42.0, 236.0], [70.0, 60.0, 98.0], [180.0, 64.0, 206.0]]:
+			_item(items, &"line", PackedVector2Array([Vector2(wave[0], wave[1]), Vector2(wave[2], wave[1])]), &"PIC_WATER_LIGHT",
+				false, &"wave")
+	_fade(items)
 
 
 ## Sky, far hills, the ground line; on a harbour town the water band and its waves.

@@ -57,31 +57,31 @@ func _std_tabs() -> Array[GDScript]:
 
 
 func _strip() -> StripCells:
-	return _window.get_node("Scroll/Body/Strip") as StripCells
+	return _window.get_node("%Strip") as StripCells
 
 
 func _tab_body() -> VBoxContainer:
-	return _window.get_node("Scroll/Body/TabBody") as VBoxContainer
+	return _window.get_node("%TabBody") as VBoxContainer
 
 
 func _tab_strip() -> HBoxContainer:
-	return _window.get_node("Scroll/Body/TabStrip") as HBoxContainer
+	return _window.get_node("%TabStrip") as HBoxContainer
 
 
 func _picture() -> SettlementPicture:
-	return _window.get_node("Scroll/Body/Header/Picture") as SettlementPicture
+	return _window.get_node("%Picture") as SettlementPicture
 
 
 func _title() -> Label:
-	return _window.get_node("Scroll/Body/Header/Title") as Label
+	return _window.get_node("%Title") as Label
 
 
 func _place() -> Button:
-	return _window.get_node("Scroll/Body/Header/Meta/Place") as Button
+	return _window.get_node("%Place") as Button
 
 
 func _job() -> JobLine:
-	return _window.get_node("Scroll/Body/WorkBox") as JobLine
+	return _window.get_node("%WorkBox") as JobLine
 
 
 func _tab_button(id: StringName) -> Button:
@@ -197,8 +197,11 @@ func test_settlement_shows_its_picture_and_other_land_does_not() -> void:
 	assert_false(_picture().current_recipe().is_empty(), "the picture has a recipe")
 	var plain := _hex_where(func(view: Dictionary) -> bool: return _foreign(view) and not _has_picture(view))
 	if plain != HexPanelContract.NO_HEX:
+		# Mockup v4 (issue 436): the wide picture is on every tile; other land shows the bare land, with no settlement in it.
 		_window.show_hex(plain)
-		assert_false(_picture().visible, "other land shows a title bar, no picture")
+		assert_true(_picture().visible, "other land shows the bare land")
+		for shape: Dictionary in _picture().current_recipe():
+			assert_ne(shape["part"], &"house", "no house on land without a settlement")
 
 
 func test_strip_values_match_the_view_on_foreign_land() -> void:
@@ -411,7 +414,8 @@ func test_five_labels_fit_the_panel_width_in_both_themes() -> void:
 		for child: Node in _tab_strip().get_children():
 			total += (child as Control).get_combined_minimum_size().x
 		assert_eq(_tab_strip().get_child_count(), 5, "five tab buttons")
-		assert_true(total <= float(Tokens.PANEL_W), "five labels fit %d px (they need %d)" % [Tokens.PANEL_W, int(total)])
+		# The tile window's own width since issue 436 (mockup v4), no longer the dock's PANEL_W.
+		assert_true(total <= float(Tokens.TILE_WINDOW_W), "five labels fit %d px (they need %d)" % [Tokens.TILE_WINDOW_W, int(total)])
 
 
 func _window_inside(size: Vector2i, ui_scale: float) -> bool:
@@ -442,6 +446,186 @@ func _long_tabs() -> Array[GDScript]:
 func test_window_stays_inside_the_viewport_at_both_sizes() -> void:
 	assert_true(await _window_inside(Vector2i(1280, 720), 1.0), "1280 x 720 at scale 1 stays inside the viewport")
 	assert_true(await _window_inside(Vector2i(2560, 1440), 2.0), "2560 x 1440 at scale 2 stays inside the viewport")
+
+
+# --- issue 436: one size for every case and tab, legible text ----------------------------------------------------------
+
+
+## A window with the real tabs in a 1280 x 720 viewport (scale 1, or the high-contrast theme), under a 64 px top bar.
+func _real_window(high_contrast: bool) -> TileWindow:
+	var sub := SubViewport.new()
+	sub.size = Vector2i(1280, 720)
+	add_child_autofree(sub)
+	var win := (load(WINDOW) as PackedScene).instantiate() as TileWindow
+	sub.add_child(win)
+	win.theme = KitTheme.load_for(1.0, &"auto", high_contrast)
+	win.position = Vector2(984.0, 64.0)
+	return win
+
+
+## The hexes of each case this map has: own settlement, own plain land, foreign, sea, undiscovered.
+func _case_hexes() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for pred: Callable in [_own_settlement, func(v: Dictionary) -> bool: return _own_land(v) and not _has_picture(v),
+			_foreign, _sea, _unexplored]:
+		var hex := _hex_where(pred)
+		if hex != HexPanelContract.NO_HEX:
+			out.append(hex)
+	return out
+
+
+func test_the_window_is_one_size_for_every_case_and_tab() -> void:
+	var win := _real_window(false)
+	var sizes := {}
+	for hex: Vector2i in _case_hexes():
+		win.show_hex(hex)
+		var tabs := win.live_tab_ids()
+		if tabs.is_empty():
+			tabs.append(&"")
+		for id: StringName in tabs:
+			if id != &"":
+				win.show_tab(id)
+			for i: int in 3:
+				await get_tree().process_frame
+			sizes["%s %s" % [hex, id]] = win.size
+	assert_gt(sizes.size(), 4, "several cases and tabs were shown")
+	for key: String in sizes:
+		assert_eq(sizes[key], Vector2(Tokens.TILE_WINDOW_W, Tokens.TILE_WINDOW_H), "the window's size on %s" % key)
+
+
+## Issue 436 (mockup v4): at UI scale 1.0, 1.25 and 1.5 (the App's content scale: a 1920 x 1080 window seen as 1920 x 1080,
+## 1536 x 864 and 1280 x 720 logical pixels, its kit theme for that scale), the window is the same size on every case and tab,
+## TILE_WINDOW_W wide, as tall as the room under a 64 px top bar allows up to TILE_WINDOW_H, and inside the viewport.
+func test_the_window_is_one_size_for_every_case_and_tab_at_each_ui_scale() -> void:
+	var physical := Vector2i(1920, 1080)
+	for ui_scale: float in [1.0, 1.25, 1.5]:
+		var logical := Vector2i(roundi(physical.x / ui_scale), roundi(physical.y / ui_scale))
+		var sub := SubViewport.new()
+		sub.size = physical
+		sub.size_2d_override = logical
+		sub.size_2d_override_stretch = true
+		add_child_autofree(sub)
+		var win := (load(WINDOW) as PackedScene).instantiate() as TileWindow
+		sub.add_child(win)
+		win.theme = KitTheme.load_for(ui_scale)
+		win.position = Vector2(float(logical.x - Tokens.TILE_WINDOW_W), 64.0)
+		var sizes := {}
+		for hex: Vector2i in _case_hexes():
+			win.show_hex(hex)
+			var tabs := win.live_tab_ids()
+			if tabs.is_empty():
+				tabs.append(&"")
+			for id: StringName in tabs:
+				if id != &"":
+					win.show_tab(id)
+				var node := win.tab_node()
+				if node != null and node.has_method("finish_now"):
+					node.call("finish_now")
+				for i: int in 3:
+					await get_tree().process_frame
+				sizes["%s %s" % [hex, id]] = win.size
+		var want := Vector2(Tokens.TILE_WINDOW_W, minf(float(Tokens.TILE_WINDOW_H), float(logical.y) - 64.0 - float(Tokens.S2)))
+		assert_gt(sizes.size(), 4, "several cases and tabs were shown at scale %s" % ui_scale)
+		for key: String in sizes:
+			assert_eq(sizes[key], want, "the window's size on %s at scale %s" % [key, ui_scale])
+		assert_lte(win.get_rect().end.y, float(logical.y) + 0.5, "inside the viewport at scale %s" % ui_scale)
+
+
+## Every label the window shows on a case and tab, with its colour: none uses a vellum ink (dark on the dark panel), none is
+## faded by its ancestors, and each reads against the panel at 4.5 : 1 or better, in the Studiolo and the high-contrast theme.
+func test_every_label_reads_on_the_dark_panel_in_both_themes() -> void:
+	for high_contrast: bool in [false, true]:
+		var win := _real_window(high_contrast)
+		var panel: Color = Tokens.HIGH_CONTRAST["PANEL_BG"] if high_contrast else Tokens.PANEL_BG
+		for hex: Vector2i in _case_hexes():
+			win.show_hex(hex)
+			var tabs := win.live_tab_ids()
+			if tabs.is_empty():
+				tabs.append(&"")
+			for id: StringName in tabs:
+				if id != &"":
+					win.show_tab(id)
+				var node := win.tab_node()
+				if node != null and node.has_method("finish_now"):
+					node.call("finish_now")
+				await get_tree().process_frame
+				_check_labels(win, panel, "%s %s hc=%s" % [hex, id, high_contrast])
+
+
+func _check_labels(node: Node, panel: Color, where: String) -> void:
+	if node is Label and (node as Label).is_visible_in_tree() and (node as Label).text != "":
+		var label := node as Label
+		assert_false(str(label.theme_type_variation).begins_with("LabelInk"), "%s: '%s' is vellum ink" % [where, label.text])
+		var colour := label.get_theme_color(&"font_color")
+		var ratio := Tokens.contrast_ratio(colour, panel)
+		assert_gte(ratio, 4.5, "%s: '%s' (%s) reads at %.1f : 1" % [where, label.text, label.theme_type_variation, ratio])
+		var at: Node = label
+		while at != null and at is CanvasItem:
+			assert_eq((at as CanvasItem).modulate.a, 1.0, "%s: '%s' is not faded" % [where, label.text])
+			at = at.get_parent()
+	for child: Node in node.get_children():
+		_check_labels(child, panel, where)
+
+
+# --- the owner's two mockup defects (issue 436): the close cross centred, the chips' numbers inside their pills ------------
+
+
+func test_the_close_cross_is_drawn_centred_in_its_circle() -> void:
+	var hex := _hex_where(_own_land)
+	_window.use_tabs(_std_tabs())
+	_window.show_hex(hex)
+	await get_tree().process_frame
+	var close := _window.close_button()
+	assert_eq(close.text, "", "no text glyph (font metrics would move it)")
+	assert_null(close.icon, "no icon either: two lines drawn about the centre")
+	var cross := _window.close_glyph_rect()
+	assert_almost_eq(cross.get_center().x, close.size.x * 0.5, 0.01, "centred across")
+	assert_almost_eq(cross.get_center().y, close.size.y * 0.5, 0.01, "centred down")
+	assert_true(Rect2(Vector2.ZERO, close.size).encloses(cross), "inside the button")
+
+
+## The chips of these values, in a window of a 1280 or 1024 wide game at UI scale 1.0, 1.25 and 1.5: each number lies inside its
+## pill, a value that fits is whole, a long one ends in an ellipsis, and the tooltip always says it whole.
+func test_chip_numbers_stay_inside_their_pills_at_every_scale_and_width() -> void:
+	var sets: Array = [["9,999,999", "9,999,999", "9,999,999", "9,999,999"], ["400 / 400", "6,200", "+11", "5,820"],
+		["1,500 / 1,500", "9,800", "2", "fog"], ["29,500", "+11", "0 of 2", "100,585"]]
+	var hex := _hex_where(_own_land)
+	for width: int in [1280, 1024]:
+		for ui_scale: float in [1.0, 1.25, 1.5]:
+			var sub := SubViewport.new()
+			var height := roundi(width * 9.0 / 16.0)
+			sub.size = Vector2i(roundi(width * ui_scale), roundi(height * ui_scale))
+			sub.size_2d_override = Vector2i(width, height)
+			sub.size_2d_override_stretch = true
+			add_child_autofree(sub)
+			var win := (load(WINDOW) as PackedScene).instantiate() as TileWindow
+			sub.add_child(win)
+			win.theme = KitTheme.load_for(ui_scale)
+			win.use_tabs(_std_tabs())
+			win.show_hex(hex)
+			var strip := win.get_node("%Strip") as StripCells
+			for values: Array in sets:
+				var cells: Array = []
+				for v: Variant in values:
+					cells.append({"key": "people", "value": str(v), "label": "People", "tone": "plain"})
+				strip.show_cells(cells)
+				for i: int in 2:
+					await get_tree().process_frame
+				_check_chips(strip, "%s at %d wide, scale %s" % [str(values), width, ui_scale])
+
+
+func _check_chips(strip: StripCells, where: String) -> void:
+	for chip: Node in strip.get_children():
+		var pill := (chip as Control).get_global_rect().grow(0.5)
+		var value := chip.find_child("Value", true, false) as Label
+		var text := str(chip.get_meta("value"))
+		assert_true(pill.encloses(value.get_global_rect()), "%s: '%s' lies inside its pill" % [where, text])
+		assert_true(value.clip_text, "%s: '%s' clips rather than spill" % [where, text])
+		assert_true((chip as Control).tooltip_text.contains(": " + text), "%s: the tooltip says '%s' whole" % [where, text])
+		var font := value.get_theme_font(&"font")
+		var need := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, value.get_theme_font_size(&"font_size")).x
+		if text.length() <= 9:
+			assert_lte(need, value.size.x + 0.5, "%s: '%s' fits whole (needs %d, has %d)" % [where, text, int(need), int(value.size.x)])
 
 
 # --- the strip cells widget --------------------------------------------------------------------------------------------

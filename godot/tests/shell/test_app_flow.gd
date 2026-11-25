@@ -200,7 +200,8 @@ func _verify_build_confirm_menu_and_relaunch(vp: SubViewport, app: App) -> void:
 	await _wait_frames(1)
 	var build_btn: Button = null
 	for b: Button in app.hud().tile_window().action_buttons():
-		if not b.disabled and b.text.begins_with("Build"):
+		# The hammer is an icon button (issue 436): its verb is its accessible name, "Build <row>".
+		if not b.disabled and (b.text.begins_with("Build") or b.accessibility_name.begins_with("Build")):
 			build_btn = b
 			break
 	assert_not_null(build_btn, "the tile window has an enabled Build hammer")
@@ -624,11 +625,11 @@ func _m4_chips_and_gives(app: App) -> void:
 	assert_true(app.hud().top_bar().study_button().visible, "the study button shows")
 	app.map_scene().select_hex(VINEYARD)
 	await _wait_frames(3)
-	assert_true(app.hud().tile_window().show_tab(&"land"), "the Land tab is live on own land")
+	assert_true(app.hud().tile_window().show_tab(&"town"), "the Town tab is live on own land")
 	var texts := AppFlowHelpers.labels_under(app.hud().tile_window().tab_node())
 	for entry: Dictionary in (TileView.of(Session.game, &"GEN", VINEYARD)["land"] as Dictionary)["made"]:
-		assert_true(texts.has("%d loads" % int(entry["loads"])), "the Land tab shows what the vineyard makes: %s" % str(texts))
-	app.hud().tile_window().show_tab(&"buildings")  # the pick is remembered: the rows are on the Buildings tab
+		assert_true(texts.has("%d loads" % int(entry["loads"])), "the Town tab shows what the vineyard makes: %s" % str(texts))
+	app.hud().tile_window().show_tab(&"town")  # the pick is remembered: the rows are on the Town tab
 
 
 ## Checklist 3: a row's hover opens the card beside the panel and the marks on the map; Shift and pin keep it; Esc closes it.

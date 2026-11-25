@@ -1,8 +1,8 @@
-## The hex menu (docs/architecture/m6-build-spec.md 6.1 and 6.8; L19, issue #209). Opened by a right click, or O and Shift+F10,
-## on an own hex while no army of yours is selected. Items: the hex's works (a refused one disabled), "Raise companies here..."
-## on your settlement, "Select the Army of X", "Show supply (6)". Each choice is carried out here: the hex selected and its Raise
-## tab opened, the army selected, the Supply mode, a work begun through the tile window. Planted faults to catch: a menu opened on
-## foreign land, a Raise item on wild land, an item that does nothing.
+## The hex menu (tile window spec R31; m6-build-spec 6.1 and 6.8; L19, issue #209). Opened by a right click, or O and Shift+F10,
+## on an own hex while no army of yours is selected. Items: "Tile details...", "Build here...", "Raise companies..." on your
+## settlement, "Select <army>", "Show supply (6)", the war items, "Cancel <work>". Each choice is carried out here: the hex
+## selected and the window's tab opened, the army selected, the Supply mode, the work cancelled. Planted faults to catch: a menu
+## opened on foreign land, a Raise item on wild land, an item that does nothing, works rows still inline.
 extends GutTest
 
 const MAP := "res://shell/map/map_scene.tscn"
@@ -81,16 +81,22 @@ func _own_hex_with_options() -> Vector2i:
 	return ArmyFixture.NO_HEX
 
 
-func test_own_settlement_menu_has_the_raise_and_supply_items() -> void:
+func test_own_settlement_menu_has_the_r31_items_and_no_inline_works() -> void:
 	assert_true(_menu().open_for(_hex, Vector2(10, 10)), "opens on an own hex")
 	assert_true(_menu().visible)
-	assert_eq(_label_of(&"raise_tab"), "Raise companies here...")
+	assert_eq(_label_of(&"details"), "Tile details...")
+	assert_eq(_label_of(&"raise_tab"), "Raise companies...")
 	assert_eq(_label_of(&"map_mode"), "Show supply (6)")
-	var works := 0
 	for entry: Dictionary in _menu().entries():
-		if StringName(entry["action"][0]) == &"work":
-			works += 1
-	assert_eq(works, ImprovePreview.options_of(_g, TAG, _hex).size(), "one item a works option of the hex")
+		assert_ne(StringName(entry["action"][0]), &"work", "no inline works rows: %s" % entry["label"])
+	if not ImprovePreview.options_of(_g, TAG, _hex).is_empty():
+		assert_eq(_label_of(&"build_tab"), "Build here...")
+
+
+func test_the_title_is_the_place_name() -> void:
+	assert_true(_menu().open_for(_hex, Vector2(10, 10)))
+	assert_true(_menu().is_item_separator(0), "the first row is the title")
+	assert_eq(_menu().get_item_text(0), Words.place(_g, _hex))
 
 
 func test_foreign_hex_opens_nothing() -> void:
@@ -113,19 +119,14 @@ func test_army_items_name_each_army_of_yours_on_the_hex() -> void:
 	assert_eq(_label_of(&"select_army"), "Select %s" % army.name)
 
 
-func test_refused_works_are_disabled() -> void:
+func test_build_here_is_offered_only_where_building_is() -> void:
 	var hex := _own_hex_with_options()
 	if hex == ArmyFixture.NO_HEX:
 		pending("no own wild hex with works on this map")
 		return
-	Countries.by_tag(_g, TAG).treasury = 0
 	assert_true(_menu().open_for(hex, Vector2(10, 10)))
-	var works := 0
-	for entry: Dictionary in _menu().entries():
-		if StringName(entry["action"][0]) == &"work":
-			works += 1
-			assert_false(bool(entry["enabled"]), "no ducats: %s is disabled" % entry["label"])
-	assert_gt(works, 0)
+	assert_ne(_label_of(&"build_tab"), "", "an own hex with options offers Build here")
+	assert_eq(_label_of(&"details"), "Tile details...")
 
 
 func test_raise_item_selects_the_hex_and_opens_the_army_tab() -> void:
@@ -152,27 +153,48 @@ func test_show_supply_switches_the_map_mode() -> void:
 	assert_eq(_scene.mode(), MapModes.Mode.SUPPLY, "the Supply mode is on")
 
 
-func test_work_item_begins_the_work_through_the_tile_window() -> void:
+func test_tile_details_selects_the_hex_and_opens_the_land_tab() -> void:
+	assert_true(_menu().open_for(_hex, Vector2(10, 10)))
+	_panel.show_hex(_hex)
+	_panel.show_tab(&"army")
+	_menu().id_pressed.emit(_menu().item_id_of(&"details"))
+	assert_eq(_scene.selected, _hex, "the hex is selected")
+	assert_eq(_panel.tab_open(), &"town", "the Town tab opens")
+
+
+func test_build_here_selects_the_hex_and_opens_the_buildings_tab() -> void:
 	var hex := _own_hex_with_options()
 	if hex == ArmyFixture.NO_HEX:
 		pending("no own wild hex with works on this map")
 		return
 	assert_true(_menu().open_for(hex, Vector2(10, 10)))
-	var pick := -1
-	for entry: Dictionary in _menu().entries():
-		var action: Array = entry["action"]
-		if StringName(action[0]) == &"work" and bool(entry["enabled"]) and not bool((action[2] as Dictionary)["expensive"]):
-			pick = int(entry["id"])
-			break
-	if pick == -1:
-		pending("no cheap enabled work on this hex")
+	_menu().id_pressed.emit(_menu().item_id_of(&"build_tab"))
+	assert_eq(_scene.selected, hex)
+	assert_eq(_panel.tab_open(), &"town", "the Town tab opens")
+
+
+func test_cancel_item_cancels_the_work_under_way() -> void:
+	var hex := _own_hex_with_options()
+	if hex == ArmyFixture.NO_HEX:
+		pending("no own wild hex with works on this map")
 		return
-	_panel.works_requested.connect(func(what: StringName, args: Dictionary) -> void:  # the test is the App
-		if what == &"begin_work":
-			var option: Dictionary = args["option"]
-			Session.act(str(option["action"]), {"hex": args["hex"], "family": int(option["family"])}))
-	_menu().id_pressed.emit(pick)
-	assert_not_null(_g.state.work_at(hex), "the work is begun through the window's hammer rule")
+	assert_true(_menu().open_for(hex, Vector2(10, 10)))
+	assert_eq(_label_of(&"cancel_work"), "", "no work, no Cancel item")
+	var pick := -1
+	for row: Dictionary in ImprovePreview.options_of(_g, TAG, hex):
+		if bool((row["verdict"] as Dictionary)["ok"]):
+			var verdict := Session.act(str(row["action"]), {"hex": hex, "family": int(row["family"])})
+			if bool(verdict["ok"]):
+				pick = 1
+				break
+	if pick == -1:
+		pending("no work could be begun on this hex")
+		return
+	assert_not_null(_g.state.work_at(hex))
+	assert_true(_menu().open_for(hex, Vector2(10, 10)))
+	assert_true(_label_of(&"cancel_work").begins_with("Cancel "), "the work has a Cancel item")
+	_menu().id_pressed.emit(_menu().item_id_of(&"cancel_work"))
+	assert_null(_g.state.work_at(hex), "the item cancels the work")
 
 
 func test_right_click_on_own_hex_without_an_army_opens_the_menu() -> void:

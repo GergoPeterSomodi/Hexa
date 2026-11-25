@@ -3,7 +3,8 @@
 ##   foreign armies in sight (named "An army of <country>", men exact, read-only: no arrow, no state line).
 ##   Raise a company here (own settlements only): the head line ("Men to levy ... raised this season"), the arms banner when
 ##   the model gives arms (absent until M9.5), one compact CompanyRow per kind, and "Show all", which asks the App for the
-##   Raise companies window.
+##   Raise companies window. A refusal every row shares word for word (the season's cap: "Genoa (8, 13) has raised its 3
+##   companies this season") is said once, under the head line, and the rows keep their own small line (issue 436).
 ## The tab changes the game only through Session.act (the hammer: the old raise list's rule and toasts, unchanged) and
 ## requests the App for the rest (app_requested). The company hover card is CompanyCard.of, given through row_hovered.
 ## Only the open tab exists and the window rebuilds it on each refresh, so fill builds everything once.
@@ -14,10 +15,8 @@ const ID := &"army"
 const LABEL := "Army"
 const ORDER := 30
 const FIGURE_ARMY := &"army"
-const OPEN_ICON := &"arrow_right"
-const OPEN_FALLBACK := ">"
-const ARMY_ICON_PX := 26
-const ARMY_BUTTON := Vector2(28, 28)
+const SELECT_TEXT := "Select"
+const HEAD := &"TileHead"
 const LAND_NOT := [&"sea", &"unexplored", &"sandbox"]
 
 var _game: Game = null
@@ -50,6 +49,8 @@ func fill(game: Game, viewer: StringName, hex: Vector2i, _view: Dictionary) -> v
 	var raise: Dictionary = data.get("raise", {})
 	if not raise.is_empty():
 		_build_raise(raise)
+	if _show_all != null:
+		_show_all.theme_type_variation = &"ButtonTileSmall"  # after its _ready, which sets the kind's variation
 
 
 ## The rows of the armies here, for the tests: each army's row node (its open arrow sits on it, own armies only).
@@ -93,7 +94,8 @@ static func raised_text(game: Game, kind: int, hex: Vector2i) -> String:
 
 
 func _build_armies(rows: Array) -> void:
-	add_child(PanelKit.label("Armies here", &"SectionHead"))
+	add_theme_constant_override(&"separation", Tokens.S1 + 1)
+	add_child(_head("Armies here", false))
 	if rows.is_empty():
 		add_child(PanelKit.label("No armies here", &"Hint"))
 		return
@@ -101,49 +103,51 @@ func _build_armies(rows: Array) -> void:
 		add_child(_army_row(row))
 
 
-## One army: the figure, the title (own name, or "An army of <country>"), the state line (own only), the men exact, and the open
-## arrow (own armies only).
+## One army as mockup v4's small card: the figure on a wooden icon tile, the title (own name, or "An army of <country>"), one
+## small line (the men, and for an own army its state), and the Select button (own armies only).
 func _army_row(row: Dictionary) -> Control:
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"PanelTileUnit"
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	var line := HBoxContainer.new()
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	line.add_theme_constant_override(&"separation", 9)
-	var icon := TextureRect.new()
-	icon.custom_minimum_size = Vector2(ARMY_ICON_PX, ARMY_ICON_PX)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if has_theme_icon(FIGURE_ARMY, &"Kit"):
-		icon.texture = get_theme_icon(FIGURE_ARMY, &"Kit")
-	line.add_child(icon)
+	line.add_theme_constant_override(&"separation", Tokens.S2 + 2)
+	card.add_child(line)
+	line.add_child(icon_tile(self, FIGURE_ARMY))
 	var text := VBoxContainer.new()
 	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	text.add_theme_constant_override(&"separation", 0)
 	var own := bool(row.get("own", false))
 	var title := str(row.get("name", "")) if own else "An army of %s" % str(row.get("country", ""))
-	text.add_child(PanelKit.label(title, &"CompanyName"))
+	var name_label := PanelKit.label(title, &"TileName")
+	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	text.add_child(name_label)
+	var men := str(row.get("men_text", ""))
 	var state := str(row.get("state_text", ""))
-	if own and state != "":
-		text.add_child(PanelKit.label(state, &"CompanyMeta"))
+	var small := PanelKit.label("%s · %s" % [men, state] if own and state != "" else men, &"Hint")
+	card.tooltip_text = "%s: %s%s" % [title, small.text, "" if own else "
+Not yours: seen, not commanded."]
+	small.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.add_child(small)
 	line.add_child(text)
-	line.add_child(PanelKit.label(str(row.get("men_text", "")), &"CompanyMeta"))
 	if own:
 		line.add_child(_open_button(row))
-	return line
+	return card
 
 
 func _open_button(row: Dictionary) -> Button:
 	var open := Button.new()
-	open.theme_type_variation = &"ButtonIcon"
+	open.theme_type_variation = &"ButtonTileAct"
 	open.focus_mode = Control.FOCUS_ALL
 	open.mouse_filter = Control.MOUSE_FILTER_STOP
-	open.custom_minimum_size = ARMY_BUTTON
+	open.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var name_text := str(row.get("name", ""))
+	open.text = SELECT_TEXT
 	open.tooltip_text = "Select %s" % name_text
 	open.accessibility_name = "Select %s" % name_text
-	if has_theme_icon(OPEN_ICON, &"Kit"):
-		open.icon = get_theme_icon(OPEN_ICON, &"Kit")
-	else:
-		open.text = OPEN_FALLBACK
 	open.pressed.connect(_on_open_pressed.bind(int(row["id"])))
 	_open.append(open)
 	return open
@@ -156,13 +160,31 @@ func _on_open_pressed(army_id: int) -> void:
 ## The raise block of an own settlement: the head line, the arms banner (only when the model has arms), one compact row a kind
 ## and Show all.
 func _build_raise(raise: Dictionary) -> void:
-	add_child(PanelKit.label("Raise a company here", &"SectionHead"))
-	add_child(PanelKit.label(str(raise.get("head", "")), &"Hint"))
+	# The head line (mockup v4): the heading at the left, the men to levy and the season's raises at the right.
+	var line := HBoxContainer.new()
+	line.add_child(_head("Raise a company here", true))
+	var head := PanelKit.label(str(raise.get("head", "")), &"HintGood")
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	head.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_child(head)
+	add_child(line)
+	var rows: Array = raise.get("rows", [])
+	var shared := shared_reason(rows)
+	if shared != "":
+		var once := PanelKit.label(shared, &"HintBad")
+		once.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		add_child(once)
 	var arms: Dictionary = raise.get("arms", {})
 	if not arms.is_empty():
-		add_child(PanelKit.label("Arms in stores %s · %s" % [str(arms.get("in_stores", "")), str(arms.get("premium_text", ""))],
-			&"Hint"))
-	for row: Dictionary in raise.get("rows", []):
+		var banner := PanelKit.label("Arms in stores %s · %s" % [str(arms.get("in_stores", "")), str(arms.get("premium_text", ""))],
+			&"Hint")
+		banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		add_child(banner)
+	for raw: Variant in rows:
+		var row := (raw as Dictionary).duplicate()
+		row["reason_shared"] = shared != "" and str(row.get("reason", "")) == shared
 		var company := CompanyRow.make(row, CompanyRow.COMPACT)
 		company.hammer_pressed.connect(raise_company)
 		company.hovered.connect(_on_company_hovered.bind(company))
@@ -170,12 +192,41 @@ func _build_raise(raise: Dictionary) -> void:
 		add_child(company)
 		_rows.append(company)
 	_show_all = KitButton.new()
-	_show_all.kind = KitButton.Kind.SECONDARY
+	_show_all.kind = KitButton.Kind.SMALL
 	_show_all.text = "Show all"
+	_show_all.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_show_all.focus_mode = Control.FOCUS_ALL
 	_show_all.mouse_filter = Control.MOUSE_FILTER_STOP
 	_show_all.pressed.connect(_on_show_all_pressed)
 	add_child(_show_all)
+
+
+## The refusal that every raise row shares word for word, when there are two rows or more and none is ready (the season's
+## cap, or a town that may not raise): said once above the rows. "" when the rows differ or one may be raised.
+## A small-caps group head; `gap` puts room above it (a group after another).
+static func _head(text: String, gap: bool) -> Label:
+	var head := PanelKit.label(text, HEAD)
+	head.uppercase = true
+	if gap:
+		head.custom_minimum_size.y = 26.0
+		head.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	return head
+
+
+static func shared_reason(rows: Array) -> String:
+	if rows.size() < 2:
+		return ""
+	var first := ""
+	for raw: Variant in rows:
+		var row := raw as Dictionary
+		var reason := str(row.get("reason", ""))
+		if StringName(str(row.get("state", ""))) == TileArmy.STATE_READY or reason == "":
+			return ""
+		if first == "":
+			first = reason
+		elif reason != first:
+			return ""
+	return first
 
 
 func _on_show_all_pressed() -> void:

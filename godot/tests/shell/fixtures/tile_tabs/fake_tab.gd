@@ -1,4 +1,4 @@
-## A fake tab for the registry test (tile-window spec R11): ORDER 50 is free (land 10, buildings 20, army 30, ships 40), so the fake can
+## A fake tab for the registry test (tile-window spec R11): ORDER 50 is free (town 10, army 30, ships 40), so the fake can
 ## take it. It applies on an own settlement: a view of the player's own case with a settlement. Lives in a test folder, never
 ## in the game.
 extends TileTab

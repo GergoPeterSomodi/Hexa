@@ -1,4 +1,5 @@
-## The Land tab of the tile window (tile-window spec R18, R24; the approved Land mockup). Sections in order: People and
+## The land facts, the lower part of the Town tab (town_tab.gd; until issue 436 the Land tab, whose ID, LABEL and ORDER it keeps
+## for its own tests, but the file is no *_tab.gd so the registry does not list it; tile-window spec R18, R24). Sections: People and
 ## food; Made here a year (one row per good: loads, and at own land the value); Buildings (foreign and unowned land only);
 ## Ground and defence (the ground rows, the war rows, the siege meter, and the battle row when the battle was witnessed);
 ## Armies (the out-of-sight line on foreign land); the buttons Show supply and Show the castle area. Sea shows its rows
@@ -6,7 +7,8 @@
 ##
 ## Read-only: it reads the TileView dictionary (`land` and the header facts) and the views it is given, and it changes no
 ## game object. Its requests go out as app_requested: open_battle (record), map_mode (supply) and castle_area (hex).
-## Rows are compact: an icon box, the name with a small line, and a right-aligned number, all in Studiolo theme types.
+## The facts are one ledger (issue 436, the owner's mockup v4): under small-caps heads, a line per fact with its key at the left,
+## an optional quiet note, its value at the right and a hairline under it (PanelTileLine).
 extends TileTab
 
 const ID := &"land"
@@ -29,8 +31,14 @@ const ROOM := "Room"
 const FOOD := "Food"
 const SIEGE_ROW := "Siege"
 const DASH := "-"
-const ICON_SIZE := Vector2(26, 26)
-const NUMBER_WIDTH := 64.0
+const NUMBER_WIDTH := 60.0
+const HEAD := &"TileHead"
+## A row's number variation (the views' Number tones) in the window's value size.
+const VALUE_VARIATIONS := {&"Number": &"TileValue", &"NumberGood": &"TileValueGood", &"NumberBad": &"TileValueBad",
+	&"NumberWarn": &"TileValueMuted", &"Hint": &"TileValueMuted", &"TableRow": &"TileValue"}
+const ICON_PEOPLE := &"people"
+const ICON_FOOD := &"food"
+const ICON_ROOM := &"settlement"
 
 
 ## Shown for every land case and the sea; never for an undiscovered hex (the view has no case there).
@@ -43,17 +51,20 @@ static func applies(view: Dictionary) -> bool:
 func fill(game: Game, viewer: StringName, hex: Vector2i, view: Dictionary) -> void:
 	var case_id := str(view.get("case", ""))
 	var land: Dictionary = view.get("land", {})
+	add_theme_constant_override(&"separation", 0)
 	if case_id == "sea":
 		_section(HEAD_SEA)
+		var sea := _ledger()
 		for pair: Variant in land.get("sea_rows", []) as Array:
-			_pair(pair as Array)
+			_pair(sea, pair as Array)
 		return
 	_people(game, hex, case_id, land)
-	_made(case_id, land)
+	_made(game, case_id, land)
 	_buildings(case_id, land)
-	_ground(game, viewer, hex, land)
+	_ground(land)
 	_armies(land)
 	_buttons(hex, land)
+	_restyle(self)
 
 
 # --- sections ------------------------------------------------------------------------------------------------------------
@@ -73,13 +84,13 @@ func _people(game: Game, hex: Vector2i, case_id: String, land: Dictionary) -> vo
 		if case_id == "own" and text != "none":
 			_own_people(game, hex, people)
 		else:
-			_row("People", "", text, &"Number")
+			_row("People", "", text, &"Number", null, ICON_PEOPLE)
 	if not food.is_empty():
 		var made := int(food.get("made", 0))
 		var eaten := int(food.get("eaten", 0))
 		var net := made - eaten
 		_row(FOOD, "makes %s, eats %s" % [Words.number(made), Words.number(eaten)], _signed(net),
-			&"NumberGood" if net >= 0 else &"NumberBad")
+			&"NumberGood" if net >= 0 else &"NumberBad", null, ICON_FOOD)
 
 
 ## Own people: the figure with last season's change under it, the room, and the outlook as a line in its tone.
@@ -88,15 +99,15 @@ func _own_people(game: Game, hex: Vector2i, people: Dictionary) -> void:
 	var small := ""
 	if change != 0:
 		small = "%s %s last season" % ["up" if change > 0 else "down", Words.number(absi(change))]
-	_row("People", small, Words.number(int(people.get("people", 0))), &"Number")
-	_row(ROOM, "", Words.number(int(people.get("room", 0))), &"Number")
+	_row("People", small, Words.number(int(people.get("people", 0))), &"Number", null, ICON_PEOPLE)
+	_row(ROOM, "", Words.number(int(people.get("room", 0))), &"Number", null, ICON_ROOM)
 	var outlook := PeopleView.outlook(game, hex)
 	if not outlook.is_empty():
 		add_child(_wrapped(str(outlook.get("text", "")), _tone_variation(StringName(str(outlook.get("tone", ""))))))
 
 
 ## Made here a year: one row per good, its loads; own land adds the value at the good's price (a plus sign, good tone).
-func _made(case_id: String, land: Dictionary) -> void:
+func _made(game: Game, case_id: String, land: Dictionary) -> void:
 	_section(HEAD_MADE)
 	var made: Array = land.get("made", [])
 	if made.is_empty():
@@ -107,10 +118,18 @@ func _made(case_id: String, land: Dictionary) -> void:
 		var loads := int(entry.get("loads", 0))
 		var value: Variant = entry.get("value")
 		var title := str(entry.get("name", "")).capitalize()
+		var icon := _good_icon(game, int(entry.get("good", -1)))
 		if value == null or case_id != "own":
-			_row(title, "%d loads" % loads, DASH, &"Hint")
+			_row(title, "", "%d loads" % loads, &"TileValue", null, icon)
 		else:
-			_row(title, "%d loads" % loads, "+" + Words.number(int(value)), &"NumberGood")
+			_row(title, "%d loads" % loads, "+" + Words.number(int(value)), &"NumberGood", null, icon)
+
+
+## The Kit icon of a good ("good_grain"...), or &"" when the good is unknown.
+static func _good_icon(game: Game, good: int) -> StringName:
+	if game == null or good < 0 or good >= game.defs.goods.size():
+		return &""
+	return StringName("good_" + String(game.defs.good(good).key))
 
 
 ## Buildings on foreign and unowned land: each built piece (working) and the work under way (its progress). Own land and
@@ -124,24 +143,25 @@ func _buildings(case_id: String, land: Dictionary) -> void:
 	_section(HEAD_BUILDINGS)
 	for row: Variant in rows:
 		var entry := row as Dictionary
-		_row(str(entry.get("name", "")), str(entry.get("state_text", "")), DASH, &"Hint")
+		var name := str(entry.get("name", ""))
+		_row(name.capitalize(), "", str(entry.get("state_text", "")), &"Hint", null,
+			StringName(BuildingRow.FAMILY_ICONS.get(name.to_lower(), &"")))
 
 
-## Ground and defence: the ground rows, the war rows (holder, fortress, garrison, castle area; the Siege row is the meter),
-## the siege meter, then the battle row when the battle was witnessed. Fog is the views' (the war rows and the siege are
-## already read for the viewer).
-func _ground(game: Game, viewer: StringName, hex: Vector2i, land: Dictionary) -> void:
+## Ground and defence: the ground rows, the war rows (holder, fortress, garrison, castle area; the Siege row is the Town tab's
+## siege block), then the battle row when the battle was witnessed. Fog is the views' (the war rows are already read for the
+## viewer).
+func _ground(land: Dictionary) -> void:
 	_section(HEAD_GROUND)
+	var ledger := _ledger()
 	for pair: Variant in land.get("ground_rows", []) as Array:
-		_pair(pair as Array)
+		_pair(ledger, pair as Array)
 	for row: Variant in land.get("war_rows", []) as Array:
 		var cells := row as Array
 		if str(cells[0]) == SIEGE_ROW:
 			continue
-		_row(str(cells[0]), "", str(cells[2]), _tone_variation(StringName(str(cells[1]))))
-	var siege := SiegeView.at(game, viewer, hex)
-	if not siege.is_empty():
-		_siege(siege)
+		_line(ledger, str(cells[0]), str(cells[2]), _tone_variation(StringName(str(cells[1]))))
+	# The siege meter is the Town tab's siege block, at its top (the owner's decision, issue 436).
 	var battle: Dictionary = land.get("battle", {})
 	if not battle.is_empty():
 		var button := _button(BATTLE_BUTTON)
@@ -150,12 +170,16 @@ func _ground(game: Game, viewer: StringName, hex: Vector2i, land: Dictionary) ->
 		_row(str(battle.get("name", "")), BATTLE_SMALL, "", &"Hint", button)
 
 
-## Armies: on foreign and unowned land out of sight, the line that no armies are shown. Armies in sight are the Army tab's.
+## Armies: on foreign and unowned land out of sight, the line that no armies are shown (a quiet boxed note, as mockup v4's).
+## Armies in sight are the Army tab's.
 func _armies(land: Dictionary) -> void:
 	if not bool(land.get("armies_hidden", false)):
 		return
 	_section(HEAD_ARMIES)
-	add_child(_wrapped(OUT_OF_SIGHT, &"Hint"))
+	var box := PanelContainer.new()
+	box.theme_type_variation = &"PanelTileNote"
+	box.add_child(_wrapped(OUT_OF_SIGHT, &"TileText"))
+	add_child(box)
 
 
 ## The two buttons: Show supply on land with supply, Show the castle area on land a castle holds. Requests only.
@@ -176,69 +200,79 @@ func _buttons(hex: Vector2i, land: Dictionary) -> void:
 		box.free()
 
 
-## A siege meter (progress of need) and its sentence; a besieger is named only where the view names one.
-func _siege(siege: Dictionary) -> void:
-	var need := maxi(int(siege.get("need", 1)), 1)
-	var progress := int(siege.get("progress", 0))
-	var meter := ProgressBar.new()
-	meter.show_percentage = false
-	meter.max_value = float(need)
-	meter.value = float(progress)
-	meter.custom_minimum_size.y = 6.0
-	add_child(meter)
-	var besieger := str(siege.get("besieger_name", ""))
-	var by := " by " + besieger if besieger != "" else ""
-	add_child(_wrapped("Besieged%s: %d of %d." % [by, progress, need], &"TableRow"))
-
-
 # --- rows and labels ----------------------------------------------------------------------------------------------------
 
 
-## A key and value pair of the views' rows (ground and sea rows): the key is the name, the value the number.
-func _pair(pair: Array) -> void:
+## A key and value pair of the views' rows (ground and sea rows) as one line of the ledger.
+func _pair(ledger: VBoxContainer, pair: Array) -> void:
 	if pair.size() < 2:
 		return
-	_row(str(pair[0]), "", str(pair[1]), &"TableRow")
+	_line(ledger, str(pair[0]), str(pair[1]), &"TileValue")
 
 
-## One compact row: an icon box (the name's first letter, until the goods art lands), the name with an optional small
-## line, a right-aligned number in its variation, and an optional control at the end.
-func _row(title: String, small: String, number: String, number_variation: StringName, control: Control = null) -> void:
+## A ledger: its lines are added to the tab itself (mockup v4: the facts as a short list of key and value lines).
+func _ledger() -> VBoxContainer:
+	return self
+
+
+## One ledger line: the key at the left, the value at the right, a hairline under it.
+func _line(ledger: VBoxContainer, key: String, value: String, variation: StringName) -> void:
+	_row(key, "", value, variation, null, &"", ledger)
+
+
+## One ledger line (mockup v4's Land tab): the key, an optional quiet small text after it, a right-aligned value in its
+## variation (the window's value size), and an optional control at the end; a hairline under it. `icon` is kept for the
+## callers' sake and not drawn (the ledger has no icons).
+func _row(title: String, small: String, number: String, number_variation: StringName, control: Control = null,
+		_icon: StringName = &"", into: Container = null) -> void:
 	var card := PanelContainer.new()
-	card.theme_type_variation = &"PanelCard"
+	card.theme_type_variation = &"PanelTileLine"
 	var line := HBoxContainer.new()
+	line.add_theme_constant_override(&"separation", Tokens.S2)
 	card.add_child(line)
-	var box := PanelContainer.new()
-	box.theme_type_variation = &"PanelSlot"
-	box.custom_minimum_size = ICON_SIZE
-	var glyph := PanelKit.label(title.substr(0, 1).to_upper(), &"SectionHead")
-	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	box.add_child(glyph)
-	line.add_child(box)
-	var text := VBoxContainer.new()
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_child(_wrapped(title, &"TableRow"))
+	var key := _wrapped(title, &"TileKey")
+	key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	key.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(key)
 	if small != "":
-		text.add_child(_wrapped(small, &"Hint"))
-	line.add_child(text)
+		var quiet := PanelKit.label(small, &"Hint")
+		quiet.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		line.add_child(quiet)
 	if number != "":
-		var value := PanelKit.label(number, number_variation)
+		# A short value keeps one line; a long one (a fortress and its garrison) shares the line with the key and wraps.
+		var variation: StringName = VALUE_VARIATIONS.get(number_variation, number_variation)
+		var value := _wrapped(number, variation) if number.length() > 24 else PanelKit.label(number, variation)
 		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		value.custom_minimum_size.x = NUMBER_WIDTH
-		value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		value.size_flags_horizontal = Control.SIZE_EXPAND_FILL if number.length() > 24 else Control.SIZE_FILL
+		value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		line.add_child(value)
 	if control != null:
+		control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		line.add_child(control)
-	add_child(card)
+	(into if into != null else self as Container).add_child(card)
 
 
 func _section(text: String) -> void:
-	add_child(PanelKit.label(text, &"SectionHead"))
+	var head := PanelKit.label(text, HEAD)
+	head.uppercase = true
+	if get_child_count() > 0:
+		head.custom_minimum_size.y = 28.0  # the gap above a group: the head sits at the foot of its taller box
+		head.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	add_child(head)
+
+
+## The tab's small buttons in the window's flat style (a KitButton sets its kind's variation when it enters the tree).
+static func _restyle(node: Node) -> void:
+	for child: Node in node.get_children():
+		if child is KitButton:
+			(child as KitButton).theme_type_variation = &"ButtonTileSmall"
+		_restyle(child)
 
 
 func _button(text: String) -> KitButton:
 	var button := KitButton.new()
+	button.kind = KitButton.Kind.SMALL
 	button.text = text
 	return button
 
@@ -253,7 +287,7 @@ static func _signed(n: int) -> String:
 	return ("+" if n >= 0 else "-") + Words.number(absi(n))
 
 
-## The theme variation of a tone: good, bad or warn; any other tone reads as table text.
+## The theme variation of a tone: good, bad or warn; any other tone reads as the window's body text (15 px, mockup v4).
 static func _tone_variation(tone: StringName) -> StringName:
 	match tone:
 		&"good":
@@ -262,4 +296,4 @@ static func _tone_variation(tone: StringName) -> StringName:
 			return &"NumberBad"
 		&"warn":
 			return &"NumberWarn"
-	return &"TableRow"
+	return &"TileText"

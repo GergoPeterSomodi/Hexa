@@ -18,6 +18,10 @@ signal app_requested(what: StringName, args: Dictionary)
 ## The tab asks the window to open another tab (a live one; the window ignores a dimmed or absent id).
 signal open_tab_requested(id: StringName)
 
+## The icon inside a card's square icon tile and inside a round plaque icon (issue 436, mockup v4), in logical pixels.
+const ICON_TILE_PX := Vector2(24, 24)
+const ICON_ROUND_PX := Vector2(14, 14)
+
 
 ## Whether the tab shows for this view (a TileView dictionary). Static, so the registry can ask without an instance.
 static func applies(_view: Dictionary) -> bool:
@@ -33,3 +37,21 @@ static func dimmed(_view: Dictionary) -> String:
 ## Fills the tab for the hex. Overridden by each tab.
 func fill(_game: Game, _viewer: StringName, _hex: Vector2i, _view: Dictionary) -> void:
 	pass
+
+
+## The square wooden icon tile of a card (mockup v4), or with `round_icon` the small round icon of a plaque: the Kit icon `icon`
+## of `host`'s theme, or an empty tile when the kit has none. Shared by the tabs.
+static func icon_tile(host: Control, icon: StringName, round_icon: bool = false) -> PanelContainer:
+	var tile := PanelContainer.new()
+	tile.theme_type_variation = &"PanelTileRound" if round_icon else &"PanelTileIcon"
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var picture := TextureRect.new()
+	picture.custom_minimum_size = ICON_ROUND_PX if round_icon else ICON_TILE_PX
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if icon != &"" and host.has_theme_icon(icon, &"Kit"):
+		picture.texture = host.get_theme_icon(icon, &"Kit")
+	tile.add_child(picture)
+	return tile

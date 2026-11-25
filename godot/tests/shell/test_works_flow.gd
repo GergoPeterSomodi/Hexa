@@ -226,3 +226,58 @@ func test_the_study_is_one_screen_for_the_game_and_a_new_game_makes_another() ->
 	app.context().request(&"main_menu")
 	assert_true(await _wait_until(func() -> bool: return app.stack().top() is MainMenu, 60))
 	assert_false(is_instance_valid(first) and first.is_inside_tree(), "the study went with its game")
+
+
+# ----- TW17: Show all and the window's tab keys ------------------------------------------------------------------------------
+
+
+func _ctrl_key(code: Key) -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.keycode = code
+	ev.physical_keycode = code
+	ev.ctrl_pressed = true
+	ev.pressed = true
+	return ev
+
+
+func test_show_all_opens_the_raise_screen_and_esc_closes_it() -> void:
+	var app := await _game_app()
+	app.map_scene().select_hex(GENOA)
+	await _frames(3)
+	var window := app.hud().tile_window()
+	assert_true(window.show_tab(&"army"), "Genoa has a live Army tab")
+	var tab := window.tab_node() as ArmyTab
+	assert_not_null(tab)
+	tab.show_all_button().pressed.emit()
+	await _frames(2)
+	var screen := app.stack().top() as RaiseScreen
+	assert_not_null(screen, "Show all pushes the Raise companies window")
+	assert_eq(screen.shown_hex(), GENOA, "for the tab's hex")
+	app.stack().back()
+	await _frames(2)
+	assert_eq(app.stack().count(), 0, "Esc closes it")
+	assert_eq(app.map_scene().selected, GENOA, "the map and its selection are as they were")
+
+
+func test_ctrl_bracket_moves_the_window_only_while_no_screen_is_up() -> void:
+	var app := await _game_app()
+	app.map_scene().select_hex(GENOA)
+	await _frames(3)
+	var window := app.hud().tile_window()
+	assert_gt(window.live_tab_ids().size(), 1, "Genoa has several live tabs")
+	window.show_tab(&"town")
+	assert_true(window.handle_key(_ctrl_key(KEY_BRACKETRIGHT)), "with no screen up Ctrl+] steps the tab")
+	assert_ne(window.tab_open(), &"town")
+	window.show_tab(&"town")
+	app.requests().works.open_study(&"")
+	await _frames(2)
+	assert_true(app.stack().top() is Study)
+	assert_false(window.handle_key(_ctrl_key(KEY_BRACKETRIGHT)), "with the Study up the window ignores Ctrl+]")
+	assert_eq(window.tab_open(), &"town", "the window's tab did not move")
+	app.stack().back()
+	await _frames(2)
+	app.requests().works.open_raise_screen(GENOA)
+	await _frames(2)
+	assert_true(app.stack().top() is RaiseScreen)
+	assert_false(window.handle_key(_ctrl_key(KEY_BRACKETLEFT)), "with the Raise screen up it ignores Ctrl+[ too")
+	assert_eq(window.tab_open(), &"town")

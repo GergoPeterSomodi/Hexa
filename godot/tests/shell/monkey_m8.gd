@@ -71,19 +71,63 @@ func _m8_force_skip(vp: SubViewport, app: App) -> void:
 		return
 	await _m8_wait_until(func() -> bool: return SimClock.msec() >= app.requests().flow.guard_until, 600)
 	_send_chord(vp, KEY_SPACE)
-	if app.requests().flow.state() == SeasonFlow.State.RUNNING and Session.in_season():  # the season is up at once: F5 comes next
+	# The flow turns RUNNING a few frames before the session's season is up (F5 and a click are refused only in the season): wait for it.
+	await _m8_wait_until(func() -> bool: return Session.in_season() or app.requests().flow.state() != SeasonFlow.State.RUNNING, 120)
+	if app.requests().flow.state() == SeasonFlow.State.RUNNING and Session.in_season():  # the season is up: F5 and a pan come next
 		var game := Session.game
 		_send_chord(vp, KEY_F5)  # refused while the countries move (the counter the M8 end check asks for)
 		await _wait_frames(1)
 		if Session.in_season():
 			assert_eq(Session.game, game, "%s: F5 does nothing while the countries move" % _tag)
 			_bump("m8_refused_files")
+		if int(_n["m8_blocked_clicks"]) == 0:  # a click on the map is refused while the countries move
+			_send_click(vp, Vector2(vp.size) * 0.4, MOUSE_BUTTON_LEFT)
+			_bump("m8_blocked_clicks")
+		if int(_n["m8_pans"]) == 0:
+			await _m8_force_pan(vp, app)
 	await _m8_wait_until(func() -> bool: return app.requests().flow.state() != SeasonFlow.State.RUNNING, M8_SEASON_WAIT)
 	if app.requests().flow.state() != SeasonFlow.State.REPLAY:
 		return
 	_send_chord(vp, KEY_SPACE)
 	if await _m8_wait_until(func() -> bool: return app.requests().flow.state() != SeasonFlow.State.REPLAY, M8_WAIT_LIMIT):
 		_bump("m8_skips")
+
+
+## A pan while the countries move, from the middle of the map (clear of every panel and window): the camera must move.
+func _m8_force_pan(vp: SubViewport, app: App) -> void:
+	var map := app.map_scene()
+	if map == null or not Session.in_season():
+		return
+	var before := map.camera().position
+	var start := Vector2(vp.size) * 0.4
+	for delta: Vector2 in [Vector2(70, 40), Vector2(-70, -40)]:
+		var press := InputEventMouseButton.new()
+		press.button_index = MOUSE_BUTTON_LEFT
+		press.position = start
+		press.global_position = start
+		press.pressed = true
+		vp.push_input(press)
+		for pt: Vector2 in [start + delta * 0.5, start + delta]:
+			var motion := InputEventMouseMotion.new()
+			motion.position = pt
+			motion.global_position = pt
+			motion.relative = pt - start
+			vp.push_input(motion)
+		var release := InputEventMouseButton.new()
+		release.button_index = MOUSE_BUTTON_LEFT
+		release.position = start + delta
+		release.global_position = start + delta
+		release.pressed = false
+		vp.push_input(release)
+		await _wait_frames(1)
+		if Session.in_season() and map.camera().position != before:
+			_bump("m8_pans")
+			return
+
+
+## True while an M8 counter the forced season serves is still 0 (the replay skip, the refused file keys, the pan, the refused click).
+func _m8_starved() -> bool:
+	return int(_n["m8_skips"]) == 0 or int(_n["m8_refused_files"]) == 0 or int(_n["m8_pans"]) == 0 or int(_n["m8_blocked_clicks"]) == 0
 
 
 func _m8_wait_until(done: Callable, limit: int) -> bool:

@@ -276,7 +276,7 @@ func test_focused_tile_window_row_keeps_the_card_open() -> void:
 	panel.set_settings(settings)
 	_harness.viewport.add_child(panel)
 	panel.show_hex(hex)
-	assert_eq(panel.tab_open(), &"buildings", "an own hex opens on the Buildings tab")
+	assert_eq(panel.tab_open(), &"town", "an own hex opens on the Town tab")
 	var screen := WORKS_PREVIEW_SCENE.instantiate() as WorksPreview
 	_harness.stack.push(screen)
 	# Under the "always" rule the hammer asks for the works card; the card is opened here as the App does.

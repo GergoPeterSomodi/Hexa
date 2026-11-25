@@ -94,13 +94,15 @@ func on_works_requested(what: StringName, args: Dictionary) -> void:
 
 
 ## A request from a tab of the tile window (TileTab.app_requested): the Supply mode, the castle area, an army to select, the
-## Raise companies window (TW17 wires it: ignored until then), a battle to open, a hex to look at. The other requests are the
+## Raise companies window (pushed on the stack for the hex), a battle to open, a hex to look at. The other requests are the
 ## App's own (select_army and look_at go through the shell context).
 func on_tile_request(what: StringName, args: Dictionary) -> void:
 	match what:
 		&"map_mode":
 			if _scene != null and is_instance_valid(_scene) and StringName(str(args.get("mode", ""))) == &"supply":
 				_scene.set_mode(MapModes.Mode.SUPPLY)
+		&"raise_screen":
+			open_raise_screen(args.get("hex", WorksView.NO_HEX) as Vector2i)
 		&"castle_area":
 			_app.requests().war.show_castle_area(args.get("hex", WorksView.NO_HEX) as Vector2i)
 		&"select_army":
@@ -109,6 +111,24 @@ func on_tile_request(what: StringName, args: Dictionary) -> void:
 			_app.requests().war.open_battle(int(args.get("record", -1)))
 		&"goto_hex":
 			_app.context().request(&"look_at", {"hex": args.get("hex", WorksView.NO_HEX), "select": true})
+		&"close_tile":
+			# The window's close button: the map's selection goes, and the window with it (the Esc ladder's hex step).
+			if _scene != null and is_instance_valid(_scene):
+				_scene.select_hex(MapScene.NO_HEX)
+			elif _app.hud() != null:
+				_app.hud().tile_window().clear()
+
+
+## "Show all" of the Army tab: the Raise companies window for `hex` on the stack. Nothing when a screen is already up.
+func open_raise_screen(hex: Vector2i) -> void:
+	if Session.game == null or hex == WorksView.NO_HEX or _app.is_starting() or _app.stack().count() > 0:
+		return
+	close_card()
+	var screen := ScreenIds.make(&"raise_screen") as RaiseScreen
+	if screen == null:
+		return
+	screen.open_for(hex)
+	_app.stack().push(screen)
 
 
 ## The pointer or the keyboard is on a row: its hover card (a BuildingCard or CompanyCard dictionary) shows beside the window,

@@ -36,15 +36,15 @@ func after_each() -> void:
 	await get_tree().process_frame
 
 
-## The body of the Land tab, where the war rows and the siege meter are.
+## The body of the Town tab, where the war rows and the siege meter are.
 func _box() -> VBoxContainer:
-	return _panel.get_node("Scroll/Body/TabBody") as VBoxContainer
+	return _panel.get_node("%TabBody") as VBoxContainer
 
 
-## Shows the hex on the Land tab (an own settlement opens on Buildings).
+## Shows the hex on the Town tab (an own settlement opens on Buildings).
 func _show(hex: Vector2i) -> void:
 	_panel.show_hex(hex)
-	assert_true(_panel.show_tab(&"land"), "the Land tab is live")
+	assert_true(_panel.show_tab(&"town"), "the Town tab is live")
 
 
 func _menu() -> HexMenu:
@@ -154,7 +154,8 @@ func test_a_siege_the_viewer_is_in_shows_its_meter_and_forecast() -> void:
 	var site := _siege_of_own_town(3)
 	_show(site)
 	var meter: ProgressBar = null
-	for node: Node in _box().find_children("*", "ProgressBar", true, false):
+	# The Town tab's building tiles have bars of their own (issue 436): the siege's is the one named SiegeMeter.
+	for node: Node in _box().find_children("SiegeMeter", "ProgressBar", true, false):
 		meter = node as ProgressBar
 	assert_not_null(meter, "the siege has a meter")
 	var v := SiegeView.at(_g, TAG, site)
@@ -207,16 +208,16 @@ func test_no_war_items_on_an_unbesieged_own_hex_without_a_war() -> void:
 
 func test_the_war_rows_fit_the_window_width() -> void:
 	var site := _siege_of_own_town(3)
-	_panel.size = Vector2(Tokens.PANEL_W, 720)
+	_panel.size = Vector2(Tokens.TILE_WINDOW_W, 720)  # the tile window's own width since issue 436 (mockup v4)
 	_show(site)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	for node: Node in _box().find_children("*", "Label", true, false):
 		var label := node as Label
 		if label.visible:
-			assert_lte(label.size.x, float(Tokens.PANEL_W) + 0.5, "%s is no wider than the panel" % label.text)
+			assert_lte(label.size.x, float(Tokens.TILE_WINDOW_W) + 0.5, "%s is no wider than the panel" % label.text)
 	for node: Node in _box().find_children("*", "ProgressBar", true, false):
-		assert_lte((node as Control).size.x, float(Tokens.PANEL_W) + 0.5, "the meter fits the panel")
+		assert_lte((node as Control).size.x, float(Tokens.TILE_WINDOW_W) + 0.5, "the meter fits the panel")
 
 
 func test_the_war_rows_drop_an_occupier_that_is_cleared() -> void:
@@ -237,13 +238,13 @@ func test_the_war_rows_drop_an_occupier_that_is_cleared() -> void:
 func test_a_lifted_siege_clears_the_siege_block() -> void:
 	var site := _siege_of_own_town(3)
 	_show(site)
-	assert_eq(_box().find_children("*", "ProgressBar", true, false).size(), 1, "the siege meter is shown")
+	assert_eq(_box().find_children("SiegeMeter", "ProgressBar", true, false).size(), 1, "the siege meter is shown")
 	_g.sieges.clear()
 	_g.version += 1
 	Events.siege_lifted.emit(site, TAG, &"lifted")
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_eq(_box().find_children("*", "ProgressBar", true, false).size(), 0, "a lifted siege has no meter")
+	assert_eq(_box().find_children("SiegeMeter", "ProgressBar", true, false).size(), 0, "a lifted siege has no meter")
 
 
 func test_a_freed_tile_window_leaves_no_war_listener() -> void:

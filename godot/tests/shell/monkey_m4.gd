@@ -474,7 +474,7 @@ func _m4_row_hover(rng: Rng, vp: SubViewport, app: App, mode: int, act: int = -1
 		return
 	app.map_scene().select_hex(hex)
 	await _wait_frames(2)
-	app.hud().tile_window().show_tab(&"buildings")  # the rows are on the Buildings tab: a click on another tab is remembered
+	app.hud().tile_window().show_tab(&"town")  # the rows are on the Buildings tab: a click on another tab is remembered
 	var rows := app.hud().tile_window().action_buttons()
 	if rows.is_empty():
 		return
@@ -539,7 +539,7 @@ func _m4_row_click(rng: Rng, vp: SubViewport, app: App) -> void:
 		return
 	app.map_scene().select_hex(hex)
 	await _wait_frames(2)
-	app.hud().tile_window().show_tab(&"buildings")  # the rows are on the Buildings tab: a click on another tab is remembered
+	app.hud().tile_window().show_tab(&"town")  # the rows are on the Buildings tab: a click on another tab is remembered
 	var rows: Array[Button] = []
 	for button: Button in app.hud().tile_window().action_buttons():
 		if not button.disabled and button.is_visible_in_tree():
@@ -607,7 +607,7 @@ func _m4_card_cycle(rng: Rng, vp: SubViewport, app: App) -> void:
 		return
 	app.map_scene().select_hex(hex)
 	await _wait_frames(3)
-	app.hud().tile_window().show_tab(&"buildings")  # the rows are on the Buildings tab: a click on another tab is remembered
+	app.hud().tile_window().show_tab(&"town")  # the rows are on the Buildings tab: a click on another tab is remembered
 	if app.hud().tile_window().action_buttons().is_empty():
 		return
 	var before := _m4_snapshot()

@@ -352,7 +352,7 @@ static func _prepare_scene(app: Node, scene_name: String) -> bool:
 			await _frames(tree, 4)
 			# The raise rows sit low in the window's scroll: scroll them into view so the picture shows them.
 			var raise_rows := hex_panel.call("tab_node") as Control
-			var scroll := hex_panel.get_node_or_null("Scroll") as ScrollContainer
+			var scroll := hex_panel.get_node_or_null("%Scroll") as ScrollContainer
 			if scroll != null and raise_rows != null:
 				scroll.ensure_control_visible(raise_rows)
 			await _frames(tree, 3)

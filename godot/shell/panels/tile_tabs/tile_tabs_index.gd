@@ -3,7 +3,6 @@ extends RefCounted
 
 const PATHS: PackedStringArray = [
 	"res://shell/panels/tile_tabs/army_tab.gd",
-	"res://shell/panels/tile_tabs/buildings_tab.gd",
-	"res://shell/panels/tile_tabs/land_tab.gd",
 	"res://shell/panels/tile_tabs/ships_tab.gd",
+	"res://shell/panels/tile_tabs/town_tab.gd",
 ]

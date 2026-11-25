@@ -105,6 +105,36 @@ const PIC_WALL := Color("#c9b48a")
 const PIC_WINDOW := Color("#2b2219")
 const PIC_SAIL := Color("#efe3c4")
 
+# Tile window (issue 436, the owner's mockup v4): the walnut grounds, the wooden strips and tiles, the teal sub line and chips,
+# the ledger's keys and hairlines, the free-slot green, the dimmed tab and the fog. Used through TileStyle and the Tile* types.
+const TILE_SEP := Color("#4a3a26")
+const TILE_DIM := Color("#8a7b63")
+const TILE_FOG := Color("#3d362d")
+const TILE_BODY := Color("#241b13")
+const TILE_TITLE := Color("#33261a")
+const TILE_TAB := Color("#251c14")
+const TILE_TAB_ON := Color("#3d2f20")
+const TILE_WOOD := Color("#4d3a28")
+const TILE_WOOD_DARK := Color("#3f2f20")
+const TILE_WOOD_LINE := Color("#2a1d12")
+const TILE_TILE := Color("#5e482f")
+const TILE_INSET := Color("#1c150e")
+const TILE_LOCK := Color("#17110b")
+const TILE_FREE := Color("#3f8f4c")
+const TILE_GOLD_D := Color("#8a6d3b")
+const TILE_LINE := Color("#3a2d1e")
+const TILE_KEY := Color("#d9c8a2")
+const TILE_SUB := Color("#1d2a30")
+const TILE_SUB_INK := Color("#9fc4d4")
+const TILE_SUB_HI := Color("#e5f1f6")
+const TILE_CHIPS := Color("#1b1510")
+const TILE_CHIP := Color("#1c3a47")
+const TILE_CHIP_LINE := Color("#2f6076")
+const TILE_CHIP_INK := Color("#cfe6ef")
+const TILE_CHIP_DOT := Color("#10242c")
+const TILE_SIEGE := Color("#43291f")
+const TILE_SIEGE_LINE := Color("#7a3b2e")
+
 # Sizes in logical pixels (ui-style-and-feedback-spec.md section 4.2)
 const S1 := 4
 const S2 := 8
@@ -120,6 +150,10 @@ const BUTTON_MENU_H := 42
 const MEDAL := 64
 const MEDAL_SM := 30
 const PANEL_W := 296
+## The tile window's width and tallest height (issue 436, mockup v4: about a third of a 1280 x 720 screen); a shorter viewport
+## shrinks the height to the room below its top (1024 x 600: 528). One size for every case and tab.
+const TILE_WINDOW_W := 440
+const TILE_WINDOW_H := 640
 const TARGET_MIN := 24
 const MENU_COLUMN_X := 270
 
@@ -127,13 +161,7 @@ const MENU_COLUMN_X := 270
 const VELLUM_MIN_LUMINANCE: float = 0.66
 
 ## Ordered five-series chart palette (spec 4.2).
-const CHART_INKS: Array[Color] = [
-	CHART_IRON,
-	CHART_LAPIS,
-	CHART_MADDER,
-	CHART_VERDIGRIS,
-	CHART_OCHRE,
-]
+const CHART_INKS: Array[Color] = [CHART_IRON, CHART_LAPIS, CHART_MADDER, CHART_VERDIGRIS, CHART_OCHRE]
 
 ## Non-colour second cues (dash pattern and point marker) for each chart ink (spec 4.2).
 const CHART_CUES: Array[Dictionary] = [
@@ -211,6 +239,13 @@ const HIGH_CONTRAST: Dictionary[String, Color] = {
 	"CHART_MADDER": BAD,
 	"CHART_VERDIGRIS": GOOD,
 	"CHART_OCHRE": WARN,
+	"TILE_FOG": Color("#000000"), "TILE_BODY": Color("#000000"), "TILE_TITLE": Color("#000000"), "TILE_TAB": Color("#000000"),
+	"TILE_TAB_ON": Color("#000000"), "TILE_WOOD": Color("#000000"), "TILE_WOOD_DARK": Color("#000000"), "TILE_TILE": Color("#000000"),
+	"TILE_INSET": Color("#000000"), "TILE_LOCK": Color("#000000"), "TILE_SUB": Color("#000000"), "TILE_CHIPS": Color("#000000"),
+	"TILE_CHIP": Color("#000000"), "TILE_CHIP_DOT": Color("#000000"), "TILE_SEP": Color("#ffd646"), "TILE_WOOD_LINE": Color("#ffd646"),
+	"TILE_GOLD_D": Color("#ffd646"), "TILE_LINE": Color("#ffd646"), "TILE_CHIP_LINE": Color("#ffd646"), "TILE_FREE": GOOD,
+	"TILE_DIM": Color("#d0d0d0"), "TILE_KEY": Color("#ffffff"), "TILE_SUB_INK": Color("#ffffff"), "TILE_SUB_HI": Color("#ffffff"),
+	"TILE_CHIP_INK": Color("#ffffff"), "TILE_SIEGE": Color("#000000"), "TILE_SIEGE_LINE": BAD,
 }
 
 ## Committed static TTF font paths (spec 4.3).
@@ -399,6 +434,36 @@ const TYPE_VARIATIONS: Dictionary[String, Dictionary] = {
 		"tabular": true,
 		"uppercase": false,
 	},
+	"HintGood": {
+		"base_type": "Label",
+		"font": "alegreya_sans_medium",
+		"size": 13,
+		"color": GOOD,
+		"color_token": "GOOD",
+		"tracking_em": 0.0,
+		"tabular": true,
+		"uppercase": false,
+	},
+	"HintBad": {
+		"base_type": "Label",
+		"font": "alegreya_sans_medium",
+		"size": 13,
+		"color": BAD,
+		"color_token": "BAD",
+		"tracking_em": 0.0,
+		"tabular": true,
+		"uppercase": false,
+	},
+	"HintWarn": {
+		"base_type": "Label",
+		"font": "alegreya_sans_medium",
+		"size": 13,
+		"color": WARN,
+		"color_token": "WARN",
+		"tracking_em": 0.0,
+		"tabular": true,
+		"uppercase": false,
+	},
 	"LabelInk": {
 		"base_type": "Label",
 		"font": "alegreya_sans_medium",
@@ -481,46 +546,26 @@ const TYPE_VARIATIONS: Dictionary[String, Dictionary] = {
 		"tabular": false,
 		"uppercase": false,
 	},
-	"CompanyName": {
-		"base_type": "Label",
-		"font": "alegreya_sans_bold",
-		"size": 14,
-		"color": TEXT,
-		"color_token": "TEXT",
-		"tracking_em": 0.0,
-		"tabular": false,
-		"uppercase": false,
-	},
-	"CompanyMeta": {
-		"base_type": "Label",
-		"font": "alegreya_sans_regular",
-		"size": 12,
-		"color": MUTED,
-		"color_token": "MUTED",
-		"tracking_em": 0.0,
-		"tabular": true,
-		"uppercase": false,
-	},
-	"CompanyEra": {
-		"base_type": "Label",
-		"font": "alegreya_sc_bold",
-		"size": 12,
-		"color": GOLD,
-		"color_token": "GOLD",
-		"tracking_em": 0.04,
-		"tabular": false,
-		"uppercase": false,
-	},
-	"CompanyCount": {
-		"base_type": "Label",
-		"font": "alegreya_sans_bold",
-		"size": 13,
-		"color": GOLD,
-		"color_token": "GOLD",
-		"tracking_em": 0.0,
-		"tabular": true,
-		"uppercase": false,
-	},
+	"CompanyName": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 14, "color": TEXT, "color_token": "TEXT", "tracking_em": 0.0, "tabular": false, "uppercase": false},
+	"CompanyMeta": {"base_type": "Label", "font": "alegreya_sans_regular", "size": 12, "color": MUTED, "color_token": "MUTED", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"CompanyEra": {"base_type": "Label", "font": "alegreya_sc_bold", "size": 12, "color": GOLD, "color_token": "GOLD", "tracking_em": 0.04, "tabular": false, "uppercase": false},
+	"CompanyCount": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 13, "color": GOLD, "color_token": "GOLD", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	# The tile window (issue 436, mockup v4): the title in the display serif, the fog word, names, body text, the ledger's keys and
+	# values, the small-caps heads (upper-cased where they are made), the sub line, the chips, the plaques and the tiles' levels.
+	"TileTitle": {"base_type": "Label", "font": "cinzel_bold", "size": 25, "color": TEXT, "color_token": "TEXT", "tracking_em": 0.02, "tabular": false, "uppercase": false},
+	"TileFog": {"base_type": "Label", "font": "cinzel_bold", "size": 28, "color": MUTED, "color_token": "MUTED", "tracking_em": 0.04, "tabular": false, "uppercase": false},
+	"TileName": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 16, "color": TEXT, "color_token": "TEXT", "tracking_em": 0.0, "tabular": false, "uppercase": false},
+	"TileText": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 15, "color": TEXT, "color_token": "TEXT", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileKey": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 15, "color": TILE_KEY, "color_token": "TILE_KEY", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileValue": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 15, "color": TEXT, "color_token": "TEXT", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileValueGood": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 15, "color": GOOD, "color_token": "GOOD", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileValueBad": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 15, "color": BAD, "color_token": "BAD", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileValueMuted": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 15, "color": MUTED, "color_token": "MUTED", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileHead": {"base_type": "Label", "font": "alegreya_sc_bold", "size": 13, "color": MUTED, "color_token": "MUTED", "tracking_em": 0.09, "tabular": false, "uppercase": true},
+	"TileSub": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 14, "color": TILE_SUB_INK, "color_token": "TILE_SUB_INK", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileChip": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 15, "color": TILE_CHIP_INK, "color_token": "TILE_CHIP_INK", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TilePlaque": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 13, "color": TILE_KEY, "color_token": "TILE_KEY", "tracking_em": 0.0, "tabular": false, "uppercase": false},
+	"TileLevel": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 13, "color": BRASS_HI, "color_token": "BRASS_HI", "tracking_em": 0.0, "tabular": true, "uppercase": false},
 }
 
 ## Panel, button and composite Theme variations for `build_theme.gd` (spec 4.7, ui-and-controls-spec.md 3.4).
@@ -536,6 +581,9 @@ const STYLE_VARIATIONS: Dictionary[String, Dictionary] = {
 	"PanelCartouche": {"base_type": "PanelContainer", "kind": "texture", "texture": "cartouche"},
 	"PanelMinimap": {"base_type": "PanelContainer", "kind": "texture", "texture": "minimap_frame"},
 	"PanelSlot": {"base_type": "PanelContainer", "kind": "texture", "texture": "slot"},
+	"PanelTile": {"base_type": "PanelContainer", "kind": "texture", "texture": "panel_frame"},
+	"PanelRow": {"base_type": "PanelContainer", "kind": "texture", "texture": "panel_card"},
+	"PanelInset": {"base_type": "PanelContainer", "kind": "texture", "texture": "slot"},
 	"PanelStripCell": {"base_type": "PanelContainer", "kind": "texture", "texture": "strip_cell"},
 	"PanelStripCellNow": {"base_type": "PanelContainer", "kind": "texture", "texture": "strip_cell_now"},
 	"TooltipPanel": {"base_type": "PanelContainer", "kind": "texture", "texture": "panel_card"},

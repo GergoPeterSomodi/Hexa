@@ -34,11 +34,15 @@ func fill(_game: Game, _viewer: StringName, _hex: Vector2i, _view: Dictionary) -
 	column.name = &"Column"
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(column)
-	var heading := PanelKit.label(HEADING, &"SectionHead")
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	column.custom_minimum_size.y = 96.0
+	var heading := PanelKit.label(HEADING, &"TileName")
 	heading.name = &"Heading"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(heading)
 	var note := PanelKit.reason(NOTE)
 	note.name = &"Note"
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(note)
 
 

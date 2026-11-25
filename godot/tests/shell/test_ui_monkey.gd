@@ -16,7 +16,7 @@
 ## (no leak of what the player was not told, the dock and the stack, no stuck Confirm); seeds 1498 to 1500, each playing Savoy.
 ## Fog (monkey_fog.gd; FG18): the M8 monkey with the fog step and the fog invariants; seeds 1504 to 1506 play Savoy with the
 ## computer's turns; 1505 is thin (FogFixture.thin on the player's country, deep fog).
-extends MonkeyFog
+extends MonkeyTile
 
 const APP_SCENE := preload("res://shell/app/app.tscn")
 const SEEDS: Array[int] = [1480, 1481, 1482]
@@ -37,6 +37,7 @@ const M7_SEEDS: Array[int] = [1498, 1499, 1500]
 const M8_SEEDS: Array[int] = [1501, 1502, 1503]
 ## Fog (FG18): the M8 monkey with the fog step; 1505 is the thin seed.
 const FOG_SEEDS: Array[int] = [1504, 1505, 1506]
+const TILE_SEEDS: Array[int] = [1507, 1508, 1509]
 ## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
 const FORCE_SEASON_STEP := 30
 const FORCE_SAVE_STEP := 120
@@ -293,6 +294,15 @@ func test_ui_monkey_fog_seed_1505() -> void:
 	await _run_monkey_seed(FOG_SEEDS[1], true, true, true, true, true, true, true, true, true, true)
 
 
+## Tile window (TW18, monkey_tile.gd): the fog monkey with the tile steps; 1508 is thin. The runner turns the computer on.
+func test_ui_monkey_tile_seed_1507() -> void:
+	await _run_monkey_seed(TILE_SEEDS[0], true, true, true, true, true, true, true, true, true, false, true)
+func test_ui_monkey_tile_seed_1508() -> void:
+	await _run_monkey_seed(TILE_SEEDS[1], true, true, true, true, true, true, true, true, true, true, true)
+func test_ui_monkey_tile_seed_1509() -> void:
+	await _run_monkey_seed(TILE_SEEDS[2], true, true, true, true, true, true, true, true, true, false, true)
+
+
 func test_ui_monkey_fog_seed_1506() -> void:
 	Session.ai_enabled = true
 	await _run_monkey_seed(FOG_SEEDS[2], true, true, true, true, true, true, true, true, true, false)
@@ -356,7 +366,7 @@ func _on_hex_changed(hex: Vector2i) -> void:
 	_changed_hexes.append(hex)
 
 
-func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false, m6: bool = false, m7: bool = false, m8: bool = false, fog: bool = false, thin: bool = false) -> void:
+func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false, m6: bool = false, m7: bool = false, m8: bool = false, fog: bool = false, thin: bool = false, tile: bool = false) -> void:
 	await _wait_frames(2)
 	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	_player_seen = &""
@@ -370,6 +380,8 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	vp.gui_disable_input = false
 	add_child(vp)
 
+	if tile:
+		Session.ai_enabled = true
 	var app := await _seed_app(vp, seed_value, new_game, m3, m6 or m7)
 
 	var waited := 0
@@ -380,6 +392,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 		_m3_begin(app)
 	_m8_begin(m8)
 	_fog_begin(fog, thin)
+	_tile_begin(tile)
 
 	var rng := Rng.new()
 	rng.seed_with(seed_value)
@@ -426,6 +439,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	if m3:
 		_m3_end(seed_value)
 	_m8_end(m8, seed_value)
+	_tile_end(tile, seed_value)
 	_fog_end(fog, seed_value)
 	_set_milestones(false, false, false, false, false)
 	Events.hex_changed.disconnect(_on_hex_changed)
@@ -922,7 +936,7 @@ func _m3_before_step(rng: Rng, app: App, step: int) -> void:
 		await _m6_force(rng, vp, app)
 	if _m7 and step >= FORCE_M7_STEP and not _m4_coverage_due():
 		await _m7_force(rng, vp, app)
-	if _m8 and step >= FORCE_M8_SKIP_STEP and step % FORCE_M8_EVERY == 0 and (int(_n["m8_skips"]) == 0 or int(_n["m8_refused_files"]) == 0):
+	if _m8 and step >= FORCE_M8_SKIP_STEP and step % FORCE_M8_EVERY == 0 and _m8_starved():
 		await _m8_force_skip(vp, app)
 
 

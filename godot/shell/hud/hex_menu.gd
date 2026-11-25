@@ -1,12 +1,15 @@
-## The hex menu (docs/architecture/m6-build-spec.md 6.1 and 6.8; L19, issue #209). A right click, or O and Shift+F10 at the
-## cursor, on a hex of yours while no army of yours is selected opens it at the pointer (or the hex). Items: the hex's works
-## (ImprovePreview.options_of; a refused one is disabled with its reason as the tooltip), "Raise companies here..." on your
-## settlement, one "Select the Army of X" per army of yours on the hex, and "Show supply (6)". Keyboard: the PopupMenu's own
-## focus (Up, Down, Enter, Esc). A choice is emitted as chosen(action) and then carried out here, so no App wiring is needed:
-##   [&"work", hex, row]        the tile window's row click (game/confirm_works: the card or the work)
+## The hex menu (docs/architecture/tilewin-build-spec.md R31; before: m6-build-spec 6.1 and 6.8; L19, issue #209). A right click,
+## or O and Shift+F10 at the cursor, on a hex of yours while no army of yours is selected opens it at the pointer (or the hex),
+## under the place name. Items: "Tile details..." (the window on Land), "Build here..." (the window on Buildings; when building
+## is offered), "Raise companies..." (the window on Army; your settlement), "Show supply (6)", one "Select <army>" per army of
+## yours on the hex, the war items, and "Cancel <work>" for your work under way. Keyboard: the PopupMenu's own focus (Up, Down,
+## Enter, Esc). A choice is emitted as chosen(action) and then carried out here, so no App wiring is needed:
+##   [&"details", hex]          selects the hex and opens its Town tab (Land and Buildings are one since issue 436)
+##   [&"build_tab", hex]        selects the hex and opens its Town tab (its building strips are on top)
 ##   [&"raise_tab", hex]        selects the hex and opens its Army tab
 ##   [&"select_army", id]       selects the army (MapArmies.select_army)
 ##   [&"map_mode", &"supply"]   the Supply mode (MapScene.set_mode)
+##   [&"cancel_work", hex]      cancels the work under way (Session.act, the job line's Cancel)
 ##   [&"battle", record]        open the battle of the hex in the dock (M7 6.8: the App listens; nothing is done here)
 ##   [&"siege", hex]            show the siege of the hex: the hex is selected and its panel shows the siege
 ##   [&"castle_area", hex]      show the castle area of the hex (the App listens; nothing is done here)
@@ -49,12 +52,12 @@ func open_for(hex: Vector2i, at: Vector2) -> bool:
 		return false
 	clear()
 	_entries.clear()
-	var works := ImprovePreview.options_of(game, tag, hex)
-	for row: Dictionary in works:
-		_add_work(game, hex, row)
-	_section()
+	add_separator(Words.place(game, hex))  # the place name is the title
+	_add_item("Tile details...", [&"details", hex], true, "")
+	if not ImprovePreview.options_of(game, tag, hex).is_empty():
+		_add_item("Build here...", [&"build_tab", hex], true, "")
 	if Military.raise_offered(game, tag, hex):
-		_add_item("Raise companies here...", [&"raise_tab", hex], true, "")
+		_add_item("Raise companies...", [&"raise_tab", hex], true, "")
 	_section()
 	for army: Army in Armies.at(game, hex):
 		if army.tag == tag:
@@ -63,6 +66,7 @@ func open_for(hex: Vector2i, at: Vector2) -> bool:
 	_war_items(game, tag, hex)
 	_section()
 	_add_item("Show supply (6)", [&"map_mode", &"supply"], true, "")
+	_cancel_item(game, tag, hex)
 	popup(Rect2i(Vector2i(at), Vector2i.ONE))
 	return true
 
@@ -81,17 +85,14 @@ func _war_items(game: Game, tag: StringName, hex: Vector2i) -> void:
 		_add_item("Show the castle area", [&"castle_area", hex], true, "")
 
 
-## One work row: "Build vineyard · 40 · 4 seasons", disabled with its reason when refused.
-func _add_work(game: Game, hex: Vector2i, row: Dictionary) -> void:
-	var verdict: Dictionary = row["verdict"]
-	var ok := bool(verdict["ok"])
-	var option := {"action": row["action"], "family": row["family"]}
-	var label := str(row["label"])
-	var cost := str(row["cost_text"])
-	if cost != "":
-		label += " · " + cost
-	var reason := "" if ok else ImprovePreview.reason_words(game, hex, option, verdict)
-	_add_item(label, [&"work", hex, row], ok, reason)
+## "Cancel <work>" for your own work under way here; disabled with the refusal's reason when the cancel is refused.
+func _cancel_item(game: Game, tag: StringName, hex: Vector2i) -> void:
+	var at := WorksView.at(game, hex, tag)
+	if at.is_empty() or game.state.work_at(hex) == null or StringName(at["tag"]) != tag:
+		return
+	_section()
+	var verdict := Session.check("cancel_work", {"hex": hex, "tag": tag})
+	_add_item("Cancel %s" % str(at["label"]).to_lower(), [&"cancel_work", hex], bool(verdict["ok"]), str(verdict.get("reason", "")))
 
 
 func _add_item(label: String, action: Array, enabled: bool, reason: String) -> void:
@@ -141,13 +142,13 @@ func _on_id_pressed(id: int) -> void:
 ## Carries out a choice here (the rules are Session's; the panel and the map are the scene's).
 func _carry_out(action: Array) -> void:
 	var kind := StringName(action[0])
-	if kind == &"work":
-		_work(action[1], action[2] as Dictionary)
-	elif kind == &"raise_tab":
+	if kind == &"details" or kind == &"build_tab" or kind == &"raise_tab":
 		_scene.select_hex(action[1])
 		var window := _scene.panel() as TileWindow
 		if window != null:
-			window.show_tab(&"army")
+			window.show_tab({&"details": &"town", &"build_tab": &"town", &"raise_tab": &"army"}[kind])
+	elif kind == &"cancel_work":
+		Session.act("cancel_work", {"hex": action[1], "tag": Session.player_tag()})
 	elif kind == &"select_army":
 		_armies.select_army(int(action[1]))
 	elif kind == &"siege":
@@ -155,18 +156,3 @@ func _carry_out(action: Array) -> void:
 	elif kind == &"map_mode":
 		_scene.set_mode(MapModes.Mode.SUPPLY)
 
-
-## The work of a row: the tile window's row click when it is there (the confirm rule and the App's card); else the work itself.
-func _work(hex: Vector2i, row: Dictionary) -> void:
-	_scene.select_hex(hex)
-	var option := {"action": row["action"], "family": row["family"]}
-	var window := _scene.panel() as TileWindow
-	if window != null and window.shown_hex() == hex:
-		if window.tab_open() != &"buildings":
-			window.show_tab(&"buildings")
-		if window.begin_option(option, bool(row["expensive"])):
-			return
-	var args := {"hex": hex}
-	if str(row["action"]) == String(Works.BUILD):
-		args["family"] = int(row["family"])
-	Session.act(str(row["action"]), args)

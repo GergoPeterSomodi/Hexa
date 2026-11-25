@@ -101,7 +101,7 @@ func test_clicks_on_hud_panels_never_reach_map_while_open_canvas_does() -> void:
 	await _harness.wait_frames(self, 1)
 	assert_eq(_catcher.clicks.size(), 0, "TileWindow blocks map clicks")
 
-	var below_panel := Vector2(_hud.tile_window().get_global_rect().get_center().x, 700.0)
+	var below_panel := Vector2(_hud.tile_window().get_global_rect().get_center().x, (_hud.tile_window().get_global_rect().end.y + _hud.get_viewport().get_visible_rect().size.y) * 0.5)  # issue 436: the window is 640 tall; the free dock space is under its foot
 	_harness.send_click(below_panel)
 	await _harness.wait_frames(self, 1)
 	assert_eq(_catcher.clicks.size(), 1, "transparent Dock space below TileWindow lets clicks reach map")

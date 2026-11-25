@@ -96,7 +96,8 @@ static func _header(game: Game, viewer: StringName, hex: Vector2i, case_id: Stri
 		subtitle = "%s · hex %d, %d" % [ground, hex.x, hex.y]
 	var parts := PackedStringArray()
 	if not is_sea and family_id in [ImproveRules.SETTLEMENT, ImproveRules.CASTLE]:
-		parts.append(HexCard.level_label(str(piece.get("family", "")), level).capitalize())
+		var kind := HexCard.level_label(str(piece.get("family", "")), level)
+		parts.append(kind.substr(0, 1).to_upper() + kind.substr(1))  # "Walled town", as a sentence (not "Walled Town")
 	if owner != &"":
 		parts.append(_long_name(game, owner))
 	return {

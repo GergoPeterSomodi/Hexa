@@ -1,8 +1,9 @@
 ## A company row: one kind of company the player may raise (tile-window spec R21, R27; the approved mockups, Appendix B). Two
 ## forms share one row dictionary, the raise row of TileArmy.of (kind, name, figure, era_text, men, parts, cost_text, upkeep,
 ## can_raise, state, reason, and attack when a later milestone adds it):
-##   COMPACT  (the Army tab): the figure, the name with its age badge, a small line (men, cost, upkeep; or the refusal's
-##            reason in its tone), "can raise N" or "-", and the hammer.
+##   COMPACT  (the Army tab, mockup v4's small card): the figure on a wooden icon tile, the name with its age badge, one small
+##            line (men, cost, upkeep; or the refusal's reason in red, unless the row says `reason_shared`: the tab then says it
+##            once in its head line), and the Raise button (the hammer; greyed with its reason as tooltip when refused).
 ##   TALL     (the Raise companies window): a portrait, the name and badge, the men and upkeep line, the cost one part a line,
 ##            "can raise N", and the hammer. A refusal shows its reason under the row.
 ## The row changes nothing. The hammer emits hammer_pressed(kind) and its owner raises through Session.act. The hammer is
@@ -19,12 +20,19 @@ signal hovered(kind: int)
 signal unhovered
 
 ## Sizes of the two forms in logical pixels, from the mockups: the compact figure, the tall portrait, the hammer button.
-const COMPACT_ICON_PX := 26
+const COMPACT_ICON_PX := 28
 const TALL_PORTRAIT := Vector2(42, 46)
 const HAMMER_SIZE := Vector2(28, 28)
 const HAMMER_ICON := &"raise"
 const HAMMER_FALLBACK := "+"
 const ROW_VARIATION := &"PanelSlot"
+const COMPACT_VARIATION := &"PanelTileUnit"
+## The compact form's text, number and hammer variations (the tile window's look, mockup v4); the tall form keeps the kit's.
+const COMPACT_TEXT := {&"CompanyName": &"TileName", &"CompanyMeta": &"Hint", &"CompanyCount": &"TileValueMuted",
+	&"ButtonIcon": &"ButtonTileAct"}
+## The compact form's Raise button.
+const RAISE_TEXT := "Raise"
+## The tall form's count when none can be raised (the compact form shows nothing then: its small line says why).
 const NO_COUNT := "-"
 
 var kind: int = -1
@@ -57,7 +65,9 @@ func count_text() -> String:
 func _ready() -> void:
 	if _figure != null and has_theme_icon(_figure_name, &"Kit"):
 		_figure.texture = get_theme_icon(_figure_name, &"Kit")
-	if _hammer != null:
+	if _hammer != null and layout == COMPACT:
+		_hammer.text = RAISE_TEXT
+	elif _hammer != null:
 		if has_theme_icon(HAMMER_ICON, &"Kit"):
 			_hammer.icon = get_theme_icon(HAMMER_ICON, &"Kit")
 		else:
@@ -71,17 +81,29 @@ func setup(row: Dictionary) -> void:
 	_figure_name = StringName(str(row.get("figure", "")))
 	var state := StringName(str(row.get("state", "")))
 	var reason := str(row.get("reason", ""))
-	theme_type_variation = ROW_VARIATION
+	theme_type_variation = COMPACT_VARIATION if layout == COMPACT else ROW_VARIATION
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var body := HBoxContainer.new()
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body.add_theme_constant_override(&"separation", 9)
+	body.add_theme_constant_override(&"separation", Tokens.S2)
 	add_child(body)
-	body.add_child(_figure_node())
+	if layout == COMPACT:
+		body.add_theme_constant_override(&"separation", Tokens.S2 + 2)
+	if layout == COMPACT:
+		var tile := PanelContainer.new()
+		tile.theme_type_variation = &"PanelTileIcon"
+		tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tile.add_child(_figure_node())
+		body.add_child(tile)
+	else:
+		body.add_child(_figure_node())
 	var text := VBoxContainer.new()
 	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	text.add_theme_constant_override(&"separation", 0)
 	text.add_child(_name_line(row))
 	_fill_text(text, row, state, reason)
 	body.add_child(text)
@@ -104,6 +126,7 @@ func _figure_node() -> TextureRect:
 	_figure.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_figure.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_figure.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_figure.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return _figure
 
 
@@ -112,7 +135,8 @@ func _name_line(row: Dictionary) -> HBoxContainer:
 	var line := HBoxContainer.new()
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_theme_constant_override(&"separation", 6)
-	line.add_child(PanelKit.label(_name, &"CompanyName"))
+	var title := PanelKit.label(_name, _v(&"CompanyName"))
+	line.add_child(title)
 	var era := str(row.get("era_text", ""))
 	if era != "":
 		line.add_child(PanelKit.label(era, &"CompanyEra"))
@@ -122,11 +146,13 @@ func _name_line(row: Dictionary) -> HBoxContainer:
 ## The small line under the name: the compact form shows the refusal's reason instead when the row is not ready; the tall
 ## form shows men and upkeep, and the reason goes under it.
 func _fill_text(text: VBoxContainer, row: Dictionary, state: StringName, reason: String) -> void:
-	if layout == COMPACT and state != TileArmy.STATE_READY and reason != "":
+	var shared := bool(row.get("reason_shared", false))
+	if layout == COMPACT and state != TileArmy.STATE_READY and reason != "" and not shared:
 		text.add_child(_reason_label(state, reason))
 		return
-	var meta := PanelKit.label(_meta_text(row), &"CompanyMeta")
+	var meta := PanelKit.label(_meta_text(row), _v(&"CompanyMeta"))
 	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meta.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(meta)
 	if layout == TALL and state != TileArmy.STATE_READY and reason != "":
 		text.add_child(_reason_label(state, reason))
@@ -148,9 +174,9 @@ func _meta_text(row: Dictionary) -> String:
 
 ## A locked row's reason is a quiet line (the era is not open yet); a refused or short row's reason is in the bad tone.
 static func _reason_label(state: StringName, reason: String) -> Label:
-	if state == TileArmy.STATE_LOCKED:
-		return PanelKit.label(reason, &"CompanyMeta")
-	return PanelKit.reason(reason)
+	var label := PanelKit.label(reason, &"Hint" if state == TileArmy.STATE_LOCKED else &"HintBad")
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return label
 
 
 ## The tall form's costs, one part a line: "30 ducats", "1 iron".
@@ -163,14 +189,19 @@ func _cost_column(row: Dictionary) -> VBoxContainer:
 	return column
 
 
-## "can raise N" in the state's colour (the tabular count), or the dash when none can be raised.
+## The tall form: "can raise N" (the tabular count), or the dash when none can be raised. The compact form: "×N", or nothing
+## (the column hides) when none can be raised: its small line or the tab's head says why.
 func _count_column(row: Dictionary, state: StringName) -> VBoxContainer:
 	var column := VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	var n := int(row.get("can_raise", 0))
-	var text := "can raise %d" % n if n > 0 and state == TileArmy.STATE_READY else NO_COUNT
-	_count = PanelKit.label(text, &"CompanyCount")
+	var ready := n > 0 and state == TileArmy.STATE_READY
+	var text := "can raise %d" % n if ready else NO_COUNT
+	if layout == COMPACT:
+		text = "×%d" % n if ready else ""
+		column.visible = false  # mockup v4's card has no count: the company card on hover says how many
+	_count = PanelKit.label(text, _v(&"CompanyCount"))
 	_count.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(_count)
 	return column
@@ -179,15 +210,22 @@ func _count_column(row: Dictionary, state: StringName) -> VBoxContainer:
 ## The hammer: enabled when the row is ready; its tooltip and name carry the raise, or the refusal's reason.
 func _hammer_button(row: Dictionary, state: StringName, reason: String) -> Button:
 	_hammer = Button.new()
-	_hammer.theme_type_variation = &"ButtonIcon"
+	_hammer.theme_type_variation = _v(&"ButtonIcon")
 	_hammer.focus_mode = Control.FOCUS_ALL
 	_hammer.mouse_filter = Control.MOUSE_FILTER_STOP
 	_hammer.custom_minimum_size = HAMMER_SIZE
+	_hammer.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_hammer.expand_icon = true
 	_hammer.accessibility_name = "Raise one %s" % _name
 	_hammer.disabled = state != TileArmy.STATE_READY
 	_hammer.tooltip_text = "Raise one %s" % _name if state == TileArmy.STATE_READY else reason
 	_hammer.pressed.connect(_on_hammer_pressed)
 	return _hammer
+
+
+## A variation in this row's form: the compact form's tile-window variation, or the kit's own in the tall form.
+func _v(kit: StringName) -> StringName:
+	return COMPACT_TEXT.get(kit, kit) if layout == COMPACT else kit
 
 
 func _on_hammer_pressed() -> void:

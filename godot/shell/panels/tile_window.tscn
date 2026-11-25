@@ -6,88 +6,263 @@
 [ext_resource type="Script" path="res://shell/panels/tile_tabs/job_line.gd" id="4_job"]
 
 [node name="TileWindow" type="PanelContainer"]
-custom_minimum_size = Vector2(296, 0)
+custom_minimum_size = Vector2(440, 640)
 size_flags_vertical = 0
 mouse_filter = 0
+theme_type_variation = &"PanelTileFrame"
 script = ExtResource("1_window")
 
-[node name="Scroll" type="ScrollContainer" parent="."]
+[node name="Content" type="Control" parent="."]
+clip_contents = true
 layout_mode = 2
-mouse_filter = 1
-horizontal_scroll_mode = 0
+mouse_filter = 2
 
-[node name="Body" type="VBoxContainer" parent="Scroll"]
+[node name="Frame" type="VBoxContainer" parent="Content"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Header" type="VBoxContainer" parent="Content/Frame"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Bar" type="PanelContainer" parent="Content/Frame/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"PanelTileTitle"
+
+[node name="TitleRow" type="HBoxContainer" parent="Content/Frame/Header/Bar"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Left" type="HBoxContainer" parent="Content/Frame/Header/Bar/TitleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(76, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Stars" type="Control" parent="Content/Frame/Header/Bar/TitleRow/Left"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Content/Frame/Header/Bar/TitleRow"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-mouse_filter = 2
+theme_type_variation = &"TileTitle"
+horizontal_alignment = 1
+text_overrun_behavior = 3
 
-[node name="Header" type="VBoxContainer" parent="Scroll/Body"]
+[node name="Right" type="HBoxContainer" parent="Content/Frame/Header/Bar/TitleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(76, 0)
 layout_mode = 2
 mouse_filter = 2
+alignment = 2
 
-[node name="Picture" type="Control" parent="Scroll/Body/Header"]
-custom_minimum_size = Vector2(296, 72)
+[node name="Close" type="Button" parent="Content/Frame/Header/Bar/TitleRow/Right"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Close"
+theme_type_variation = &"ButtonTileIcon"
+expand_icon = true
+
+[node name="SubBand" type="PanelContainer" parent="Content/Frame/Header"]
+unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-script = ExtResource("2_picture")
+theme_type_variation = &"PanelTileSub"
 
-[node name="Title" type="Label" parent="Scroll/Body/Header"]
-layout_mode = 2
-theme_type_variation = &"SectionHead"
-autowrap_mode = 3
-
-[node name="Subtitle" type="Label" parent="Scroll/Body/Header"]
-layout_mode = 2
-theme_type_variation = &"Hint"
-autowrap_mode = 3
-
-[node name="Meta" type="HBoxContainer" parent="Scroll/Body/Header"]
+[node name="SubRow" type="HBoxContainer" parent="Content/Frame/Header/SubBand"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Place" type="Button" parent="Scroll/Body/Header/Meta"]
+[node name="Subtitle" type="Label" parent="Content/Frame/Header/SubBand/SubRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-flat = true
-alignment = 0
-clip_text = true
+theme_type_variation = &"TileSub"
+text_overrun_behavior = 3
 
-[node name="Stars" type="Label" parent="Scroll/Body/Header/Meta"]
+[node name="Place" type="Button" parent="Content/Frame/Header/SubBand/SubRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
-theme_type_variation = &"Number"
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.7
+theme_type_variation = &"ButtonTileLink"
+text_overrun_behavior = 3
 
-[node name="Badges" type="HBoxContainer" parent="Scroll/Body/Header"]
+[node name="Food" type="Label" parent="Content/Frame/Header/SubBand/SubRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"HintGood"
+horizontal_alignment = 2
+
+[node name="StripBand" type="PanelContainer" parent="Content/Frame/Header"]
+unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
+theme_type_variation = &"PanelTileChips"
 
-[node name="Strip" type="HBoxContainer" parent="Scroll/Body"]
+[node name="Strip" type="HBoxContainer" parent="Content/Frame/Header/StripBand"]
+unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("3_strip")
 
-[node name="WorkBox" type="VBoxContainer" parent="Scroll/Body"]
-layout_mode = 2
-mouse_filter = 2
-script = ExtResource("4_job")
-
-[node name="Text" type="Label" parent="Scroll/Body/WorkBox"]
-layout_mode = 2
-autowrap_mode = 3
-
-[node name="Progress" type="Label" parent="Scroll/Body/WorkBox"]
-layout_mode = 2
-theme_type_variation = &"Hint"
-autowrap_mode = 3
-
-[node name="Actions" type="VBoxContainer" parent="Scroll/Body/WorkBox"]
+[node name="Postcard" type="MarginContainer" parent="Content/Frame/Header"]
+unique_name_in_owner = true
+clip_contents = true
+custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="TabStrip" type="HBoxContainer" parent="Scroll/Body"]
+[node name="Picture" type="Control" parent="Content/Frame/Header/Postcard"]
+unique_name_in_owner = true
+clip_contents = true
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("2_picture")
+
+[node name="FogBox" type="PanelContainer" parent="Content/Frame/Header/Postcard"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"PanelTileFog"
+
+[node name="Fog" type="Label" parent="Content/Frame/Header/Postcard/FogBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"TileFog"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BadgePad" type="MarginContainer" parent="Content/Frame/Header/Postcard"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 8
+mouse_filter = 2
+
+[node name="BadgeBand" type="PanelContainer" parent="Content/Frame/Header/Postcard/BadgePad"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"PanelTileBadgeBox"
+
+[node name="Badges" type="HBoxContainer" parent="Content/Frame/Header/Postcard/BadgePad/BadgeBand"]
+unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 
-[node name="TabBody" type="VBoxContainer" parent="Scroll/Body"]
+[node name="TabStrip" type="HBoxContainer" parent="Content/Frame"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Content/Frame"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 1
+horizontal_scroll_mode = 0
+
+[node name="BodyPad" type="MarginContainer" parent="Content/Frame/Scroll"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
+
+[node name="TabBody" type="VBoxContainer" parent="Content/Frame/Scroll/BodyPad"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="WorkBand" type="PanelContainer" parent="Content/Frame"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"PanelTileQueue"
+
+[node name="Queue" type="VBoxContainer" parent="Content/Frame/WorkBand"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="QueueHead" type="HBoxContainer" parent="Content/Frame/WorkBand/Queue"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="QueueTitle" type="Label" parent="Content/Frame/WorkBand/Queue/QueueHead"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TileHead"
+text = "Building queue"
+uppercase = true
+
+[node name="QueueNote" type="Label" parent="Content/Frame/WorkBand/Queue/QueueHead"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"HintGood"
+text = "one work at a time"
+
+[node name="QueueRow" type="PanelContainer" parent="Content/Frame/WorkBand/Queue"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"PanelTileQueueRow"
+
+[node name="JobRow" type="HBoxContainer" parent="Content/Frame/WorkBand/Queue/QueueRow"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="QueueNo" type="Label" parent="Content/Frame/WorkBand/Queue/QueueRow/JobRow"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+text = "1"
+
+[node name="WorkBox" type="HBoxContainer" parent="Content/Frame/WorkBand/Queue/QueueRow/JobRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+script = ExtResource("4_job")
+
+[node name="Text" type="Label" parent="Content/Frame/WorkBand/Queue/QueueRow/JobRow/WorkBox"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TileText"
+text_overrun_behavior = 3
+
+[node name="Progress" type="Label" parent="Content/Frame/WorkBand/Queue/QueueRow/JobRow/WorkBox"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Hint"
+horizontal_alignment = 2
+text_overrun_behavior = 3
+
+[node name="Actions" type="HBoxContainer" parent="Content/Frame/WorkBand/Queue/QueueRow/JobRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+alignment = 2

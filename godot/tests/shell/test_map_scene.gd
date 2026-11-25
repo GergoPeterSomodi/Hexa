@@ -136,7 +136,7 @@ func test_the_panel_build_button_changes_the_state_and_only_the_touched_cells() 
 	assert_false(found.is_empty(), "something can be built on north Italy")
 	var hex := found["hex"] as Vector2i
 	_scene.select_hex(hex)
-	var button := _scene.panel().action_buttons().filter(func(b: Button) -> bool: return not b.disabled and b.text.begins_with("Build")).front() as Button
+	var button := _scene.panel().action_buttons().filter(func(b: Button) -> bool: return not b.disabled and b.accessibility_name.begins_with("Build")).front() as Button
 	assert_not_null(button, "the panel has an enabled Build button")
 	var before := _snapshot()
 	var writes := _scene.view().cell_writes

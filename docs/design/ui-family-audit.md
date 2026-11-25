@@ -1,6 +1,6 @@
 # The unit, tile and battle screens: audit and plan (issues #436, #437, #438)
 
-Game designer, 2026-11-24. **Status: a proposal for the owner. Planning only: nothing is built, no code touched.** One design
+Game designer, 2026-11-24. **Status: a proposal for the owner. Planning only: nothing is built, no code touched.** *Update 2026-11-25: section 3 (the tile window, #436) is built except its pictures, goldens and docs (TW19), as the owner answered it and then changed it in playtest rounds: one fixed 440 x 640 window, Land and Buildings merged into one Town tab, tabs Town, Army and Ships; see `docs/architecture/tilewin-build-spec.md` section 10 for what was built. Sections 4 and 5 (the battle board, the Python port) are not built.* One design
 pass for the family the owner asked for together: what the last Python version (v0.2.2) had, what Godot has now, one uniform
 tile window (#436), battles played round by round (#437) and the order to build it in (#438).
 

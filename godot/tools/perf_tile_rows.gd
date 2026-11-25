@@ -12,19 +12,58 @@ const SEED := 1480
 const COUNTRIES := 60
 const PER_COUNTRY := 10
 const GAME_DEFS := "res://data/defs/game_defs.tres"
-const KEYS: Array[String] = ["tile_buildings_ms", "tile_buildings_gains_ms"]
+## TW18 adds the tile view (every land hex of the largest country, mean and worst) and the army read (TileArmy.of with every
+## raise kind, the hex with the most options). Rows in tests/perf_core_budget.json.
+const KEYS: Array[String] = ["tile_buildings_ms", "tile_buildings_gains_ms", "tile_view_ms", "tile_view_worst_ms", "tile_army_ms"]
 
 
 static func measure(game: Game, tag: StringName, results: Dictionary) -> void:
 	var hex := _most_options(game, tag)
+	var view := _view_ms(game, tag)
+	results["tile_view_ms"] = view["mean"]
+	results["tile_view_worst_ms"] = view["worst"]
 	if hex == Vector2i(-1, -1):
 		results["tile_buildings_ms"] = 0.0
 		results["tile_buildings_gains_ms"] = 0.0
 		results["tile_buildings_rows"] = 0
+		results["tile_army_ms"] = 0.0
 		return
 	results["tile_buildings_rows"] = _row_count(TileBuildings.of(game, tag, hex, true))
 	results["tile_buildings_ms"] = _worst_ms(game, tag, hex, false)
 	results["tile_buildings_gains_ms"] = _worst_ms(game, tag, hex, true)
+	results["tile_army_ms"] = _army_ms(game, tag, hex)
+
+
+## TileView.of over every land hex of the country, the cache cleared before each: the mean and the worst hex, in ms.
+static func _view_ms(game: Game, tag: StringName) -> Dictionary:
+	var c := Countries.by_tag(game, tag)
+	var total := 0
+	var worst := 0
+	var n := 0
+	if c == null:
+		return {"mean": 0.0, "worst": 0.0}
+	for i: int in Territory.districts(game, c.id):
+		game.version += 1
+		var t := Time.get_ticks_usec()
+		TileView.of(game, tag, game.map.hex_of(i))
+		var dt := Time.get_ticks_usec() - t
+		total += dt
+		worst = maxi(worst, dt)
+		n += 1
+	if n == 0:
+		return {"mean": 0.0, "worst": 0.0}
+	return {"mean": float(total) / 1000.0 / float(n), "worst": float(worst) / 1000.0}
+
+
+## TileArmy.of on `hex` (armies and every raise row), uncached, mean of RUNS.
+static func _army_ms(game: Game, tag: StringName, hex: Vector2i) -> float:
+	var total := 0
+	for _n: int in RUNS:
+		game.version += 1
+		var t := Time.get_ticks_usec()
+		TileArmy.of(game, tag, hex)
+		total += Time.get_ticks_usec() - t
+	return float(total) / 1000.0 / float(RUNS)
 
 
 static func _worst_ms(game: Game, tag: StringName, hex: Vector2i, full: bool) -> float:

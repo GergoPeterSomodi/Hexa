@@ -13,23 +13,8 @@ const KIT_JSON := "res://assets/ui/kit/ui_kit.json"
 const KIT_1X_DIR := "res://assets/ui/kit/1x/"
 const KIT_2X_DIR := "res://assets/ui/kit/2x/"
 
-const KIT_DIRECT_ICONS: Array[String] = [
-	"seal",
-	"stud",
-	"glow_soft",
-	"rule_diamond",
-	"rose",
-	"wordmark",
-	"switch_off",
-	"switch_on",
-	"grabber",
-	"grabber_hot",
-	"icons_base",
-	"shield_rim",
-	"shield_rim_sm",
-	"pennant_pole",
-	"pennant_cloth",
-]
+const KIT_DIRECT_ICONS: Array[String] = ["seal", "stud", "glow_soft", "rule_diamond", "rose", "wordmark", "switch_off", "switch_on",
+	"grabber", "grabber_hot", "icons_base", "shield_rim", "shield_rim_sm", "pennant_pole", "pennant_cloth"]
 
 ## Names of the 24 px `icons` atlas registered as Kit theme icons (the action log's button).
 const KIT_GRID_ICONS: Array[String] = ["log"]
@@ -55,6 +40,10 @@ const PANEL_VARIATION_PIECES: Dictionary[String, String] = {
 	"KeyCapPanel": "keycap",
 	"KeyCapPanelWait": "keycap_wait",
 }
+## The tile window's frame, compact rows and insets (issue 436): a kit piece with its own content margins (l, t, r, b).
+const PANEL_PADDED: Dictionary[String, Array] = {"PanelTile": ["panel_frame", [12.0, 12.0, 12.0, 12.0]],
+	"PanelTileFrame": ["panel_frame", [7.0, 7.0, 7.0, 7.0]],
+	"PanelRow": ["panel_card", [8.0, 5.0, 8.0, 5.0]], "PanelInset": ["slot", [8.0, 4.0, 8.0, 4.0]]}
 
 
 ## Builds the full 1x Studiolo Theme from `Tokens`, `ui_kit.json`, and the imported static fonts.
@@ -108,6 +97,7 @@ static func _build(hc: bool) -> Theme:
 	_apply_panels(theme, pieces, tex_cache, hc)
 	_apply_buttons(theme, font_cache, pieces, tex_cache, hc)
 	_apply_composites(theme, font_cache, hc)
+	_apply_tile(theme, font_cache, pieces, tex_cache, hc)
 	_apply_kit_icons(theme, pieces, tex_cache, hc)
 	return theme
 
@@ -394,6 +384,11 @@ static func _apply_panels(theme: Theme, pieces: Dictionary, tc: Dictionary[Strin
 		elif var_name == "PanelStripCellNow":
 			theme.set_stylebox(&"panel", tname, _make_flat(Tokens.VELLUM, Tokens.BRASS, 2, 6.0, 6.0, 2))
 
+	for var_name: String in PANEL_PADDED:
+		var pad: Array = PANEL_PADDED[var_name][1]
+		theme.set_type_variation(StringName(var_name), &"PanelContainer")
+		theme.set_stylebox(&"panel", StringName(var_name), _make_flat(c_bg, c_line, 2, float(pad[0]), float(pad[1]), 0)
+			if hc else _sb_tex(str(PANEL_PADDED[var_name][0]), pieces, tc, pad))
 	theme.set_type_variation(&"PanelDebug", &"PanelContainer")
 	theme.set_stylebox(&"panel", &"PanelDebug", _make_flat(c_bg if hc else Color(Tokens.CARD_BG, 0.94), c_line, 2 if hc else 1, 8.0, 8.0, 0 if hc else 2))
 	theme.set_type_variation(&"PanelShade", &"PanelContainer")
@@ -520,6 +515,45 @@ static func _set_button_font_colors(theme: Theme, tname: StringName, font: FontV
 	theme.set_constant(&"h_separation", tname, Tokens.S1)
 
 
+## The tile window's flat parts and buttons (issue 436, mockup v4): TileStyle.BOXES and TileStyle.BUTTONS.
+static func _apply_tile(theme: Theme, fc: Dictionary, pieces: Dictionary, tc: Dictionary[String, Texture2D], hc: bool) -> void:
+	for var_name: String in TileStyle.BOXES:
+		theme.set_type_variation(StringName(var_name), &"PanelContainer")
+		theme.set_stylebox(&"panel", StringName(var_name), _tile_box(TileStyle.BOXES[var_name], hc))
+	var f_med := _get_font_var(fc, "alegreya_sans_medium", 0, true)
+	var sb_focus := _focus_box(pieces, tc, hc)
+	for var_name: String in TileStyle.BUTTONS:
+		var spec: Dictionary = TileStyle.BUTTONS[var_name]
+		var tname := StringName(var_name)
+		theme.set_type_variation(tname, &"Button")
+		for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
+			theme.set_stylebox(state, tname, _tile_box(spec[String(state)] as Array, hc))
+		theme.set_stylebox(&"hover_pressed", tname, theme.get_stylebox(&"pressed", tname))
+		theme.set_stylebox(&"focus", tname, sb_focus)
+		var c: Array = spec["font"]
+		_set_button_font_colors(theme, tname, f_med, int(spec["size"]), _tile_colour(str(c[0]), hc), _tile_colour(str(c[1]), hc),
+			_tile_colour(str(c[2]), hc), _tile_colour(str(c[3]), hc))
+
+
+## One BOXES entry as a StyleBoxFlat: [ground, border, widths l t r b (or one), radius, content margins l t r b].
+static func _tile_box(spec: Array, hc: bool) -> StyleBoxFlat:
+	var sb := _make_flat(_tile_colour(str(spec[0]), hc), _tile_colour(str(spec[1]), hc), 0, 0.0, 0.0, int(spec[3]))
+	var w: Array = spec[2] if spec[2] is Array else [spec[2], spec[2], spec[2], spec[2]]
+	var m: Array = spec[4]
+	for side: int in 4:
+		sb.set_border_width(side as Side, int(w[side]))
+		sb.set_content_margin(side as Side, float(m[side]))
+	return sb
+
+
+## A token's colour by name ("" is clear); the high-contrast theme reads Tokens.HIGH_CONTRAST first.
+static func _tile_colour(token: String, hc: bool) -> Color:
+	if token == "":
+		return Color(0, 0, 0, 0)
+	var fallback: Color = (load("res://shell/ui/tokens.gd") as GDScript).get_script_constant_map().get(token, Tokens.INK)
+	return _tok(token, fallback, hc)
+
+
 static func _apply_composites(theme: Theme, font_cache: Dictionary, hc: bool) -> void:
 	theme.set_type_variation(&"InkChart", &"Control")
 	var f_hint := _get_font_var(font_cache, "alegreya_sans_regular", 0, true)
@@ -547,12 +581,7 @@ static func _apply_composites(theme: Theme, font_cache: Dictionary, hc: bool) ->
 			theme.set_color(StringName(key), &"InkChart", chart_colors[key] as Color)
 
 
-static func _apply_kit_icons(
-	theme: Theme,
-	pieces: Dictionary,
-	tex_cache: Dictionary[String, Texture2D],
-	atlas_only: bool
-) -> void:
+static func _apply_kit_icons(theme: Theme, pieces: Dictionary, tex_cache: Dictionary[String, Texture2D], atlas_only: bool) -> void:
 	if not atlas_only:
 		for icon_name: String in KIT_DIRECT_ICONS:
 			var tex := _load_kit_tex(icon_name, tex_cache)
@@ -595,12 +624,7 @@ static func _load_kit_tex(piece_name: String, tex_cache: Dictionary[String, Text
 	return tex
 
 
-static func _make_icon_subtex(
-	icon_name: String,
-	pieces: Dictionary,
-	tex_cache: Dictionary[String, Texture2D],
-	piece_key: String = "icons_base"
-) -> AtlasTexture:
+static func _make_icon_subtex(icon_name: String, pieces: Dictionary, tex_cache: Dictionary[String, Texture2D], piece_key: String = "icons_base") -> AtlasTexture:
 	if not pieces.has(piece_key):
 		return null
 	var piece: Dictionary = pieces[piece_key]
@@ -624,12 +648,7 @@ static func _make_icon_subtex(
 	return sub
 
 
-static func _sb_tex(
-	piece_name: String,
-	pieces: Dictionary,
-	tex_cache: Dictionary[String, Texture2D],
-	content_override: Array = []
-) -> StyleBoxTexture:
+static func _sb_tex(piece_name: String, pieces: Dictionary, tex_cache: Dictionary[String, Texture2D], content_override: Array = []) -> StyleBoxTexture:
 	var sb := StyleBoxTexture.new()
 	sb.texture = _load_kit_tex(piece_name, tex_cache)
 	if not pieces.has(piece_name):
@@ -743,12 +762,7 @@ static func _get_2x_image(piece_name: String, img_2x_cache: Dictionary[String, I
 	return img
 
 
-static func _get_2x_image_texture(
-	piece_name: String,
-	pieces: Dictionary,
-	tex_2x_cache: Dictionary[String, ImageTexture],
-	img_2x_cache: Dictionary[String, Image]
-) -> ImageTexture:
+static func _get_2x_image_texture(piece_name: String, pieces: Dictionary, tex_2x_cache: Dictionary[String, ImageTexture], img_2x_cache: Dictionary[String, Image]) -> ImageTexture:
 	if tex_2x_cache.has(piece_name):
 		return tex_2x_cache[piece_name]
 	var img := _get_2x_image(piece_name, img_2x_cache)
@@ -765,19 +779,8 @@ static func _get_2x_image_texture(
 	return itex
 
 
-static func _get_2x_sub_texture(
-	piece_name: String,
-	region_1x: Rect2,
-	img_2x_cache: Dictionary[String, Image],
-	sub_2x_cache: Dictionary[String, ImageTexture]
-) -> ImageTexture:
-	var key := "%s|%d,%d,%d,%d" % [
-		piece_name,
-		roundi(region_1x.position.x),
-		roundi(region_1x.position.y),
-		roundi(region_1x.size.x),
-		roundi(region_1x.size.y),
-	]
+static func _get_2x_sub_texture(piece_name: String, region_1x: Rect2, img_2x_cache: Dictionary[String, Image], sub_2x_cache: Dictionary[String, ImageTexture]) -> ImageTexture:
+	var key := "%s|%d,%d,%d,%d" % [piece_name, roundi(region_1x.position.x), roundi(region_1x.position.y), roundi(region_1x.size.x), roundi(region_1x.size.y)]
 	if sub_2x_cache.has(key):
 		return sub_2x_cache[key]
 	var img_2x := _get_2x_image(piece_name, img_2x_cache)

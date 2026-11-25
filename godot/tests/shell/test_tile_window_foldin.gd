@@ -26,15 +26,15 @@ func after_each() -> void:
 
 
 func _job() -> JobLine:
-	return _window.get_node("Scroll/Body/WorkBox") as JobLine
+	return _window.get_node("%WorkBox") as JobLine
 
 
 func _title() -> Label:
-	return _window.get_node("Scroll/Body/Header/Title") as Label
+	return _window.get_node("%Title") as Label
 
 
 func _place() -> Button:
-	return _window.get_node("Scroll/Body/Header/Meta/Place") as Button
+	return _window.get_node("%Place") as Button
 
 
 # --- cases folded in from test_hex_panel.gd and test_hex_panel_people.gd (TW16): the frame, the job line, the refresh ------------
@@ -87,7 +87,8 @@ func _listens(sig: Signal, obj: Object) -> bool:
 
 func test_the_frame_stops_the_mouse_takes_the_dock_width_and_hides_on_clear() -> void:
 	assert_eq(_window.mouse_filter, Control.MOUSE_FILTER_STOP, "a click on the window never reaches the map")
-	assert_eq(_window.custom_minimum_size.x, float(Tokens.PANEL_W), "width matches Tokens.PANEL_W")
+	# Issue 436 (mockup v4): the tile window has its own width, about a third of a 1280 x 720 screen (was PANEL_W).
+	assert_eq(_window.custom_minimum_size.x, float(Tokens.TILE_WINDOW_W), "width matches Tokens.TILE_WINDOW_W")
 	var args := _buildable_for(&"GEN", [])
 	assert_false(args.is_empty(), "Genoa can build somewhere")
 	var hex: Vector2i = args["hex"]
@@ -199,7 +200,7 @@ func test_a_town_grew_or_declined_refreshes_the_people_value() -> void:
 			other = game.map.hex_of(i)
 	assert_ne(town, Vector2i(-1, -1), "Genoa has a town")
 	_window.show_hex(town)
-	assert_true(_window.show_tab(&"land"), "the Land tab is live on own land")
+	assert_true(_window.show_tab(&"town"), "the Town tab is live on own land")
 	var before := int(PeopleView.at(game, &"GEN", town)["people"])
 	assert_true(Session.dev_people(town, before + 1000), "the town gains 1,000 (no signal)")
 	assert_false(_texts_of(_window.tab_node(), PackedStringArray()).has(Words.number(before + 1000)), "no refresh without the signal")

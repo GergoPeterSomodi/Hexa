@@ -366,3 +366,10 @@ first. The M9 spec (next after M8) is read against group C for the AI's walks.
    tile a month, to be tuned); scouts discover land more easily. The owner will come back to the exact rule. This replaces the
    draft's recommendation to refuse such orders.
 7. **Battle at once:** a move that reaches an enemy army at war opens the battle at once on the board.
+8. **Multi-leg marches (owner request, 2026-11-25; GitHub issue "Multi-leg marches: Shift+left click adds waypoints to an army's
+   route").** With an army selected, Shift+left click on a hex adds a waypoint. The path preview is drawn through every waypoint
+   in order, with each leg's cost and the seasons it takes; a plain right click on the last hex (or the command key) commits the
+   whole route; Esc clears the waypoints; Shift+left click on the last waypoint removes it. After the order the army marches leg
+   by leg (the first leg at once, the rest a month at a time at End turn), stopping when an enemy comes into sight; the route
+   stays drawn until done and a new command changes it. Fog applies per waypoint (deep-fog legs allowed with the movement
+   penalty). Built by `docs/architecture/moves-build-spec.md` section 3.11 (R58 to R72, D29 to D37) and task MV19 of the plan.

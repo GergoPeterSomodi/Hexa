@@ -1,8 +1,13 @@
-## The Buildings tab of the tile window (tile-window spec R19, R20, D8, D14; build plan TW11): on any land tile, live on
-## own land (the sandbox too) and dimmed elsewhere with the reason of Territory.at_home_check. The tab shows the summary line
-## ("Buildings here make +N a year · upkeep -M"), a search box, a filter (All, Can build, Built), and the rows of
-## TileBuildings.of grouped by category; each row is a BuildingRow. The rows come first without their gains; the gains and
-## the upkeep fill one row a frame (_process), then the summary. finish_now() fills them all at once (tests).
+## The building strips, the upper part of the Town tab (town_tab.gd; until issue 436 the Buildings tab, whose ID, LABEL, ORDER,
+## applies and dimmed it keeps for its own tests; the file is no *_tab.gd, so the registry does not list it; tile-window spec R19,
+## R20, D8, D14): shown where building is offered (own land, the sandbox). As the owner's mockup v4 draws it
+## (after EU4 and EU5): one wooden strip per group of TileBuildings.of (Settlement, Land, Harbour, Defence), a plaque at its left
+## (the group's icon, its name, how many are built of the tiles shown) and its buildings as icon tiles at its right (BuildingRow:
+## built with its level, building, can build, short, locked); the words are in each tile's hover card. Under a strip, one red line
+## names what a short tile lacks. Above the strips, the summary line ("Buildings here make +N a year · upkeep -M"). The search box
+## and the filter (All, Can build, Built) are kept for the keys and the tests but not shown: a tile has a handful of buildings
+## until M9.5. The rows come first without their gains; the gains and the upkeep fill one row a frame (_process), then the
+## summary. finish_now() fills them all at once (tests).
 ##
 ## The hammer runs the works rule of BuildRows (game/confirm_works through `settings`, the card or the begin request). The
 ## tab never changes the game: a begin is a works_requested request, which the App answers (WorksFlow, begin_work). U is not
@@ -21,6 +26,13 @@ const FILTER_LABELS := {&"all": "All", &"ready": "Can build", &"built": "Built"}
 const SEARCH_HINT := "Search buildings"
 const NOT_YOURS := "Not your land"
 const WORKING_OUT := "Working out the year's gains"
+## The plaque's width and the Kit icon of each group, from mockup v4.
+const PLAQUE_W := 116.0
+const GROUP_ICONS := {"settlement": &"settlement", "land": &"district", "harbour": &"port_dues", "defence": &"castle"}
+const TILE_GAP := 6
+const GROUP_MEANINGS := {"settlement": "The settlement itself: its size and what it may grow into.",
+	"land": "What the land of this tile makes: fields, pastures, woods, mines.", "harbour": "The harbour of a coastal settlement.",
+	"defence": "Walls and castles that hold the tile."}
 
 ## The Settings the hammer's rule reads (game/confirm_works); the window passes App.settings(). Null: the shipped default.
 var settings: Settings = null
@@ -90,6 +102,7 @@ func fill(game: Game, viewer: StringName, hex: Vector2i, view: Dictionary) -> vo
 	var model := TileBuildings.of(game, viewer, hex, false)
 	if model.is_empty():
 		_summary.text = ""
+		(_summary.get_parent() as Control).visible = false
 		_note.text = dimmed(view)
 		_note.visible = true
 		return
@@ -104,6 +117,20 @@ func fill(game: Game, viewer: StringName, hex: Vector2i, view: Dictionary) -> vo
 	else:
 		_summary.text = WORKING_OUT
 		set_process(true)
+
+
+## Shows the given groups (TileBuildings.of's shape) instead of the model's, with no gains: a fixture's way to lay out more
+## tiles than any tile has today (the strips wrap their tiles onto more rows; the tests check it). The game never calls it.
+func fill_groups(game: Game, viewer: StringName, hex: Vector2i, groups: Array) -> void:
+	_game = game
+	_tag = viewer
+	_hex = hex
+	_numbers = {}
+	_queue = []
+	_build_controls()
+	_index(groups)
+	_refresh_list()
+	_finish()
 
 
 ## One row's gain and upkeep per frame (the one-row-a-frame fill of R20); the summary when the queue is empty.
@@ -194,16 +221,23 @@ func press_row(id: StringName) -> void:
 # --- the controls -------------------------------------------------------------------------------------------------------
 
 
+## The summary band (the table text on an inset, legible on the dark panel), the search box and the filter, then the list.
 func _build_controls() -> void:
 	PanelKit.clear_children(self)
-	_summary = PanelKit.label("", &"LabelInk")
+	add_theme_constant_override(&"separation", Tokens.S1)
+	var band := MarginContainer.new()
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.add_theme_constant_override(&"margin_left", Tokens.S1)
+	add_child(band)
+	_summary = PanelKit.label("", &"Hint")
 	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(_summary)
+	band.add_child(_summary)
 	_search = LineEdit.new()
 	_search.placeholder_text = SEARCH_HINT
 	_search.clear_button_enabled = true
-	_search.custom_minimum_size.y = float(Tokens.BUTTON_H)
+	_search.custom_minimum_size.y = float(Tokens.BUTTON_SM_H)
 	_search.text_changed.connect(_on_query_changed)
+	_search.visible = false
 	add_child(_search)
 	_segment = Segmented.new()
 	var options: Array = []
@@ -212,13 +246,14 @@ func _build_controls() -> void:
 	_segment.set_options(options)
 	_segment.changed.connect(_on_filter_changed)
 	_segment.select(FILTER_ALL)
+	_segment.visible = false
 	add_child(_segment)
-	_note = PanelKit.label("", &"Reason")
+	_note = PanelKit.label("", &"Hint")
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.visible = false
 	add_child(_note)
 	_list = VBoxContainer.new()
-	_list.add_theme_constant_override(&"separation", Tokens.S2)
+	_list.add_theme_constant_override(&"separation", TILE_GAP)
 	add_child(_list)
 	_filter = FILTER_ALL
 	_query = ""
@@ -243,6 +278,7 @@ func _index(groups: Array) -> void:
 	_rows_by_id = {}
 	_order = []
 	var offers := ImprovePreview.options_of(_game, _tag, _hex)
+	var level := int(Improve.piece_at(_game, _hex).get("level", 0))
 	for group: Variant in groups:
 		for row: Variant in (group as Dictionary)["rows"]:
 			var data := (row as Dictionary).duplicate()
@@ -250,6 +286,8 @@ func _index(groups: Array) -> void:
 			data["expensive"] = false
 			if not option.is_empty():
 				data["expensive"] = _expensive_of(offers, option)
+			if StringName(str(data["state"])) == &"built":
+				data["level"] = level
 			var id := StringName(str(data["id"]))
 			_rows_by_id[id] = data
 			_order.append(id)
@@ -279,13 +317,73 @@ func _refresh_list() -> void:
 				rows.append(data)
 		if rows.is_empty():
 			continue
-		var head := PanelKit.label(_heading_of(g), &"SectionHead")
-		_list.add_child(head)
-		for data: Dictionary in rows:
-			_list.add_child(_row_node(data))
-			shown += 1
+		_list.add_child(_strip_of(g, rows))
+		shown += rows.size()
+		var short := _short_line(rows)
+		if short != "":
+			var why := PanelKit.label(short, &"HintBad")
+			why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_list.add_child(why)
 	_note.text = "Nothing matches." if shown == 0 and _rows_by_id.size() > 0 else ""
 	_note.visible = _note.text != ""
+
+
+## One wooden strip: the plaque (the group's icon and name, "built N / M" of the tiles shown) and the group's tiles.
+func _strip_of(group: Dictionary, rows: Array[Dictionary]) -> PanelContainer:
+	var strip := PanelContainer.new()
+	strip.theme_type_variation = &"PanelTileStrip"
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override(&"separation", 0)
+	strip.add_child(line)
+	var plaque := PanelContainer.new()
+	plaque.theme_type_variation = &"PanelTilePlaque"
+	plaque.custom_minimum_size.x = PLAQUE_W
+	plaque.mouse_filter = Control.MOUSE_FILTER_STOP
+	line.add_child(plaque)
+	var column := VBoxContainer.new()
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	column.add_theme_constant_override(&"separation", 2)
+	plaque.add_child(column)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override(&"separation", Tokens.S1 + 2)
+	head.add_child(icon_tile(self, StringName(GROUP_ICONS.get(str(group.get("id", "")), &"")), true))
+	var name_label := PanelKit.label(_heading_of(group), &"TilePlaque")
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(name_label)
+	column.add_child(head)
+	var built := 0
+	for data: Dictionary in rows:
+		if StringName(str(data["state"])) == &"built":
+			built += 1
+	column.add_child(PanelKit.label("%d built of %d" % [built, rows.size()], &"Hint"))
+	plaque.tooltip_text = "%s
+%s
+%d built of %d: the buildings standing here, of the %d shown in this strip." % [
+		_heading_of(group), str(GROUP_MEANINGS.get(str(group.get("id", "")), "")), built, rows.size(), rows.size()]
+	var pad := MarginContainer.new()
+	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for side: StringName in [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]:
+		pad.add_theme_constant_override(side, 7)
+	line.add_child(pad)
+	var tiles := HFlowContainer.new()
+	tiles.add_theme_constant_override(&"h_separation", TILE_GAP)
+	tiles.add_theme_constant_override(&"v_separation", TILE_GAP)
+	tiles.alignment = FlowContainer.ALIGNMENT_BEGIN
+	pad.add_child(tiles)
+	for data: Dictionary in rows:
+		tiles.add_child(_row_node(data))
+	return strip
+
+
+## The one red line under a strip: what its first short tile lacks ("Upgrade to city: cost 1,000 · you have 204"); "" if none.
+static func _short_line(rows: Array[Dictionary]) -> String:
+	for data: Dictionary in rows:
+		if StringName(str(data["state"])) == &"short":
+			return "%s: %s" % [str(data["name"]), str(data.get("state_text", ""))]
+	return ""
 
 
 ## The group's heading: its name, and "n of m slots" when the group has slots (none before M9.5).
