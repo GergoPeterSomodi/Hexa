@@ -85,6 +85,9 @@ func _initialize() -> void:
 	if _only == "views":
 		quit(_views_only())
 		return
+	if _only == "tile":
+		quit(PerfTileRows.only(_cpu_scale, _budget_path))
+		return
 	if _only == "war":
 		code = _war_rows()
 		quit(_finish_war() if code == 0 else code)
@@ -191,6 +194,7 @@ func _measure() -> int:
 
 	_save_and_load(game, map, defs, digest)
 	_previews(game, largest)
+	PerfTileRows.measure(game, largest, _r)
 
 	game.version += 1  # a new version: the views are made again (the index of the owners stays: it is keyed on the owner bytes)
 	t = Time.get_ticks_usec()

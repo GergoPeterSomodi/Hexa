@@ -84,6 +84,27 @@ const WAR_DIAL := Color("#f0a850")
 const WAR_DIAL_TRACK := Color("#3a2416")
 const AREA_INK_ALPHA := 0.9
 
+# Settlement picture (tilewin spec R28, R29; TW8): flat two-tone art colours, ink outlines from INK. The owner's pennant
+# colour is not a token: SettlementPicture takes it from the caller.
+const PIC_SKY := Color("#4f6e8c")
+const PIC_HILL := Color("#5f6b3c")
+const PIC_HILL_SHADE := Color("#46502c")
+const PIC_GROUND := Color("#7a6a3e")
+const PIC_GROUND_SHADE := Color("#5c4e2c")
+const PIC_WATER := Color("#3f7aa8")
+const PIC_WATER_LIGHT := Color("#8fbde0")
+const PIC_QUAY := Color("#8c7450")
+const PIC_HOUSE := Color("#d8c39a")
+const PIC_HOUSE_SHADE := Color("#a58c62")
+const PIC_ROOF := Color("#8e3f2a")
+const PIC_ROOF_SHADE := Color("#5f2a1c")
+const PIC_SNOW := Color("#f4f1e6")
+const PIC_STONE := Color("#b7ad9a")
+const PIC_STONE_SHADE := Color("#7d7566")
+const PIC_WALL := Color("#c9b48a")
+const PIC_WINDOW := Color("#2b2219")
+const PIC_SAIL := Color("#efe3c4")
+
 # Sizes in logical pixels (ui-style-and-feedback-spec.md section 4.2)
 const S1 := 4
 const S2 := 8

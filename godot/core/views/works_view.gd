@@ -115,6 +115,7 @@ static func _entry(game: Game, work: Work) -> Dictionary:
 		"ready_turn": ready,
 		"halted": Works.halted(game, work, game.turn),
 		"started_turn": work.started_turn,
+		"family": work.family,
 	}
 
 
