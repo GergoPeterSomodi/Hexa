@@ -203,7 +203,7 @@ func _fog_check_panels(app: App, game: Game, viewer: StringName, tag: String) ->
 		var hovered := hover.hovered_hex()
 		if hovered != MapInput.NO_HEX and not Knowledge.discovered(game, viewer, hovered):
 			_fog_check_texts(hover.card(), game, hovered, "the hover card", tag)
-	var panel := hud.hex_panel()
+	var panel := hud.tile_window()
 	if panel.is_visible_in_tree() and panel.shown_hex() != MapInput.NO_HEX:
 		var shown := panel.shown_hex()
 		if not Knowledge.discovered(game, viewer, shown):

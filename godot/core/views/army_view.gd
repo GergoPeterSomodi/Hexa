@@ -22,7 +22,9 @@ static func tokens(game: Game, viewer: StringName) -> Array[Dictionary]:
 	var empty: Array[Dictionary] = []
 	if game == null or game.map == null or not game.has_countries():
 		return empty
-	var key: Array = [&"tokens", game.version, viewer]
+	# The sight's revision is in the key: the army part of the sight moves inside a season (a phase, a computer's turn) before the
+	# version does, and a token list made before that would still show an army that has left the viewer's sight.
+	var key: Array = [&"tokens", game.version, game.sight.revision(), viewer]
 	return game.view_cache.get_or_make(key, func() -> Array[Dictionary]: return _make_tokens(game, viewer)) as Array[Dictionary]
 
 

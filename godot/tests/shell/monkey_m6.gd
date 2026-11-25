@@ -382,13 +382,13 @@ func _m6_raise(rng: Rng, vp: SubViewport, app: App, console: bool) -> void:
 	else:
 		app.map_scene().select_hex(hex)
 		await _wait_frames(2)
-		var panel := app.map_scene().panel() as HexPanel
-		if panel == null:
+		var panel := app.map_scene().panel() as TileWindow
+		if panel == null or not panel.show_tab(&"army"):
 			return
-		panel.show_raise()
 		await _wait_frames(2)
-		var enabled: Array[KitButton] = []
-		for button: KitButton in panel.raise_list().raise_buttons():
+		var enabled: Array[Button] = []
+		for company: CompanyRow in (panel.tab_node() as ArmyTab).company_rows():
+			var button := company.hammer()
 			if button.is_visible_in_tree() and not button.disabled:
 				enabled.append(button)
 		if enabled.is_empty():

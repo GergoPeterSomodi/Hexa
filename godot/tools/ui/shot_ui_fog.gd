@@ -214,7 +214,7 @@ func _select(ms: Object, hud: Object, hex: Vector2i) -> bool:
 		return false
 	ms.call("select_hex", hex)
 	await _wait_frames(4)
-	var panel := hud.call("hex_panel") as CanvasItem
+	var panel := hud.call("tile_window") as CanvasItem
 	return ms.get("selected") == hex and panel != null and panel.visible
 
 

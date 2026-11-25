@@ -194,3 +194,27 @@ func _neighbour_of_gen(hex: Vector2i) -> Vector2i:
 		if _g.map.is_land(beside) and Territory.owner_id(_g, beside) == mine:
 			return beside
 	return ArmyFixture.NO_HEX
+
+
+## A token list is not kept past a change of sight that moves no version (a phase of a season, a computer's turn, an army that stops
+## watching): a foreign army that has left the viewer's sight leaves the list at once (fog R23; the fog monkey, seed 1504).
+func test_a_foreign_army_leaves_the_tokens_when_the_sight_moves_with_the_version_unchanged() -> void:
+	var out := _unseen_land()
+	assert_ne(out, ArmyFixture.NO_HEX)
+	var watcher := ArmyFixture.army(_g, ArmyFixture.TAG, out, 0, 1)
+	Sight.refresh(_g)
+	var beside := ArmyFixture.NO_HEX
+	for d: int in 6:
+		var h := ImproveRules.neighbour(out, d)
+		if _g.map.is_land(h):
+			beside = h
+			break
+	assert_ne(beside, ArmyFixture.NO_HEX)
+	ArmyFixture.army(_g, SAV, beside, 0, 2)
+	_g.version += 1
+	assert_true(Knowledge.sees(_g, ArmyFixture.TAG, beside), "the watching army sees the hex beside it")
+	assert_false(_token_at(ArmyView.tokens(_g, ArmyFixture.TAG), beside, SAV).is_empty(), "in sight: listed")
+	Armies.remove(_g, watcher)
+	Sight.refresh(_g)  # the army part moves; the version does not
+	assert_false(Knowledge.sees(_g, ArmyFixture.TAG, beside), "the watcher is gone: the hex is out of sight")
+	assert_true(_token_at(ArmyView.tokens(_g, ArmyFixture.TAG), beside, SAV).is_empty(), "out of sight: no token, though the version stands")

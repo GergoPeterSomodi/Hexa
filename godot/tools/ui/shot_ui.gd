@@ -264,7 +264,7 @@ func _prepare_scene(app: Node, scene_name: String) -> bool:
 			var view_node := ms.call("view") as Node
 			if view_node != null:
 				ms.call("frame_at", view_node.call("centre_of", hex), 1.0)
-			var hex_panel := hud_node.call("hex_panel") as CanvasItem
+			var hex_panel := hud_node.call("tile_window") as CanvasItem
 			return ms.get("selected") == hex and hex_panel != null and hex_panel.visible
 		"confirm":
 			var screen_ids := ResourceLoader.load(SCREEN_IDS_PATH) as GDScript
@@ -587,10 +587,10 @@ func _m4_card_for(app: Node, g: Game, hex: Vector2i) -> bool:
 	return _m4_top_id(app) == &"works_preview"
 
 
-## The hex panel's action buttons (Cancel the work, then the rows), as an untyped list of Buttons.
+## The tile window's action buttons (Cancel the work, then the row hammers), as an untyped list of Buttons.
 func _m4_rows(app: Node) -> Array[Button]:
 	var out: Array[Button] = []
-	var panel := (app.call("hud") as Node).call("hex_panel") as Node
+	var panel := (app.call("hud") as Node).call("tile_window") as Node
 	for raw: Variant in panel.call("action_buttons"):
 		out.append(raw as Button)
 	return out
@@ -690,7 +690,7 @@ func _prepare_m4(app: Node, scene_name: String) -> bool:
 			if view_node != null:
 				scene.call("frame_at", view_node.call("centre_of", M4_WOODS), 1.0)
 			await _wait_frames(3)
-			var panel := hud_node.call("hex_panel") as Control
+			var panel := hud_node.call("tile_window") as Control
 			return panel.is_visible_in_tree() and not _m4_rows(app).is_empty()
 		"m4_country_panel":
 			hud_node.call("show_country", g.player, false)

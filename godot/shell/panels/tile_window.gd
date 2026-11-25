@@ -1,5 +1,5 @@
 ## The tile window (tile-window spec R11 to R17, R32 its part, R33, R34; build plan TW9): the dock panel of one tile that
-## replaces HexPanel in the swap (TW16), behind the same HexPanelContract. Its parts, top to bottom: the postcard header (a
+## replaced the old hex panel in the swap (TW16), behind the same HexPanelContract. Its parts, top to bottom: the postcard header (a
 ## SettlementPicture with the name, the place link, the size stars and the badges on a settlement or castle; a title bar
 ## elsewhere; no header on unexplored land but its title), the number strip (StripCells from TileView.strip), the job line
 ## (JobLine), the tab strip and the open tab's body. Only the open tab has children: the tabs are scripts of
@@ -10,7 +10,7 @@
 ## its reason as tooltip; it is disabled, so it is not clickable and not reached by the keys (R14).
 ##
 ## The window reads the game through TileView and the tabs; it changes the game only through the tabs and Session.act. Its
-## signals keep the names of HexPanel's, so Hud and WarRequests reconnect to it in TW16. Tab workers implement begin_option
+## signals keep the names of the old panel's, so Hud and WarRequests connect to it. Tab workers implement begin_option
 ## (called by begin_option here) and may emit through the window's signals by way of the tab's own connections.
 class_name TileWindow
 extends HexPanelContract
@@ -39,6 +39,11 @@ const DIMMED_ALPHA := 0.5
 var screens_up: Callable = Callable()
 ## The number of rebuilds so far (tests check one refresh per burst, R17).
 var rebuilds := 0
+## The App's settings (game/confirm_works is read from them by the Buildings tab's hammer); null reads the shipped default.
+var settings: Settings = null:
+	set(value):
+		settings = value
+		_give_settings(_open_node())
 
 @onready var _scroll: ScrollContainer = $Scroll
 @onready var _body: VBoxContainer = $Scroll/Body
@@ -102,17 +107,40 @@ func _wiring() -> Array:
 		[Events.work_started, _on_event],
 		[Events.work_finished, _on_event],
 		[Events.work_cancelled, _on_event],
-		[Events.town_grew, _on_event],
-		[Events.district_declined, _on_event],
+		[Events.town_grew, _on_town_grew],
+		[Events.district_declined, _on_district_declined],
 		[Events.season_ended, _on_event],
+		[Events.army_raised, _on_event],
+		[Events.army_disbanded, _on_event],
+		[Events.tax_set, _on_event],
+		[Events.goods_short, _on_event],
+		[Events.controllers_changed, _on_event],
+		[Events.district_captured, _on_event],
+		[Events.siege_started, _on_event],
+		[Events.siege_progress, _on_event],
+		[Events.siege_lifted, _on_event],
+		[Events.battle_ended, _on_event],
+		[Events.war_declared, _on_event],
+		[Events.peace_made, _on_event],
 	]
 
 
-func _on_event(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null) -> void:
+func _on_event(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null, _e: Variant = null) -> void:
 	if _shown == NO_HEX or _queued:
 		return
 	_queued = true
 	_flush.call_deferred()
+
+
+## A town grew or a district declined: the window refreshes when it shows that hex (the old panel's rule).
+func _on_town_grew(_tag: StringName, hex: Vector2i, _level: int) -> void:
+	if hex == _shown:
+		_on_event()
+
+
+func _on_district_declined(_tag: StringName, hex: Vector2i, _level: int, _why: StringName) -> void:
+	if hex == _shown:
+		_on_event()
 
 
 func _flush() -> void:
@@ -147,8 +175,9 @@ func clear() -> void:
 	_dimmed = {}
 	_open = &""
 	_tab_buttons = {}
-	PanelKit.clear_children(_tab_body, _retired)
-	PanelKit.clear_children(_tab_strip, _retired)
+	if _tab_body != null:  # a window not yet in the tree (the map scene clears its panel when it is set) has no nodes to clear
+		PanelKit.clear_children(_tab_body, _retired)
+		PanelKit.clear_children(_tab_strip, _retired)
 	visible = false
 
 
@@ -216,6 +245,38 @@ func begin_option(option: Dictionary, expensive: bool) -> bool:
 		return false
 	tab.call("begin_option", option, expensive)
 	return true
+
+
+## Gives the window the App's settings (the open tab reads game/confirm_works from them).
+func set_settings(p_settings: Settings) -> void:
+	settings = p_settings
+
+
+## The buttons of the work and the rows, in display order: Cancel the work first, then the open Buildings tab's hammers (the
+## tests and the keyboard path; a built or locked row has none).
+func action_buttons() -> Array[Button]:
+	var out: Array[Button] = []
+	for child: Node in _job.actions_box().get_children():
+		if child is KitButton:
+			out.append(child as Button)
+	for row: BuildingRow in building_rows():
+		if row.hammer() != null:
+			out.append(row.hammer())
+	return out
+
+
+## The compact rows of the open Buildings tab, in display order (empty on any other tab).
+func building_rows() -> Array[BuildingRow]:
+	var out: Array[BuildingRow] = []
+	var tab := _open_node()
+	if tab == null or not tab.has_method("row_nodes"):
+		return out
+	var nodes: Dictionary = tab.call("row_nodes")
+	for id: Variant in nodes:
+		var row := nodes[id] as BuildingRow
+		if row != null and is_instance_valid(row):
+			out.append(row)
+	return out
 
 
 ## Replaces the tab registry with these scripts (tests and the monkey); an empty list restores TileTabs.all().
@@ -334,6 +395,7 @@ func _open_tab() -> void:
 	var script := _script_of(_open)
 	if script != null and _shown != NO_HEX:
 		var tab := script.new() as TileTab
+		_give_settings(tab)
 		_tab_body.add_child(tab)
 		_wire_tab(tab)
 		tab.fill(Session.game, Session.player_tag(), _shown, _view)
@@ -350,12 +412,24 @@ func _wire_tab(tab: TileTab) -> void:
 	tab.open_tab_requested.connect(func(id: StringName) -> void: show_tab(id))
 
 
+func _give_settings(tab: Node) -> void:
+	if tab != null and "settings" in tab:
+		tab.set("settings", settings)
+
+
 func _forward_works(request: Dictionary) -> void:
 	var args: Dictionary = request.get("args", {})
 	works_requested.emit(StringName(str(request.get("what", ""))), args)
 
 
+## The open tab's node, or null when none is open (tests and tools read the tab's own accessors through it).
+func tab_node() -> Node:
+	return _open_node()
+
+
 func _open_node() -> Node:
+	if _tab_body == null:
+		return null
 	return _tab_body.get_child(0) if _tab_body.get_child_count() > 0 else null
 
 

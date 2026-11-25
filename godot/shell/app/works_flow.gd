@@ -27,9 +27,10 @@ func _init(app: Node) -> void:
 ## Connects the signals this class answers. `link` is the App's `_link(emitter, signal, handler)`.
 func connect_signals(link: Callable) -> void:
 	var hud := _app.hud()
-	link.call(hud.hex_panel(), &"works_requested", on_works_requested)
-	link.call(hud.hex_panel(), &"row_hovered", on_row_hovered)
-	link.call(hud.hex_panel(), &"row_unhovered", on_row_unhovered)
+	link.call(hud.tile_window(), &"works_requested", on_works_requested)
+	link.call(hud.tile_window(), &"row_hovered", on_row_hovered)
+	link.call(hud.tile_window(), &"row_unhovered", on_row_unhovered)
+	link.call(hud, &"tile_requested", on_tile_request)
 	link.call(hud, &"study_requested", open_study)
 	link.call(hud, &"study_tab_requested", on_study_tab)
 	link.call(Events, &"tax_set", _on_tax_set)
@@ -87,19 +88,43 @@ func handle(what: StringName, args: Dictionary) -> bool:
 # ----- the hex panel's requests ---------------------------------------------------------------------------------------
 
 
-## The hex panel's works_requested(what, args): the same requests as app_requested.
+## The tile window's works_requested(what, args): the same requests as app_requested.
 func on_works_requested(what: StringName, args: Dictionary) -> void:
 	handle(what, args)
 
 
-## The pointer or the keyboard is on a row: its card opens beside the panel (no focus taken) with its marks on the map.
-func on_row_hovered(hex: Vector2i, option: Dictionary) -> void:
-	show_card(hex, option, false)
+## A request from a tab of the tile window (TileTab.app_requested): the Supply mode, the castle area, an army to select, the
+## Raise companies window (TW17 wires it: ignored until then), a battle to open, a hex to look at. The other requests are the
+## App's own (select_army and look_at go through the shell context).
+func on_tile_request(what: StringName, args: Dictionary) -> void:
+	match what:
+		&"map_mode":
+			if _scene != null and is_instance_valid(_scene) and StringName(str(args.get("mode", ""))) == &"supply":
+				_scene.set_mode(MapModes.Mode.SUPPLY)
+		&"castle_area":
+			_app.requests().war.show_castle_area(args.get("hex", WorksView.NO_HEX) as Vector2i)
+		&"select_army":
+			_app.context().request(&"select_army", args)
+		&"open_battle":
+			_app.requests().war.open_battle(int(args.get("record", -1)))
+		&"goto_hex":
+			_app.context().request(&"look_at", {"hex": args.get("hex", WorksView.NO_HEX), "select": true})
 
 
-## The pointer left the row: the card closes unless Shift holds it or it is pinned. The panel may have been freed with
-## the row (a refresh), and the card with it: both are checked.
+## The pointer or the keyboard is on a row: its hover card (a BuildingCard or CompanyCard dictionary) shows beside the window,
+## level with the row's rect `anchor`. The works card with its marks on the map opens from the hammer (works_card).
+func on_row_hovered(card: Dictionary, anchor: Rect2) -> void:
+	var hud := _app.hud()
+	if hud != null:
+		hud.show_row_card(card, anchor)
+
+
+## The pointer or the keyboard left the row: the hover card goes, and a works card up closes unless Shift holds it or it is
+## pinned. The window may have been freed with the row (a refresh), and the card with it: both are checked.
 func on_row_unhovered() -> void:
+	var hud := _app.hud()
+	if hud != null:
+		hud.hide_row_card()
 	var card := _live_card()
 	if card != null:
 		card.leave()
@@ -155,7 +180,7 @@ func wants_card(row: Dictionary) -> bool:
 # ----- the card -------------------------------------------------------------------------------------------------------
 
 
-## Pushes the card (or updates the one up) for `option` on `hex`, beside the hex panel, and shows its ghost and marks on the
+## Pushes the card (or updates the one up) for `option` on `hex`, beside the tile window, and shows its ghost and marks on the
 ## map. `focus` puts the focus on Begin (the (i) button, U); a hover leaves it where it is.
 func show_card(hex: Vector2i, option: Dictionary, focus: bool) -> void:
 	var game := Session.game
@@ -173,7 +198,7 @@ func show_card(hex: Vector2i, option: Dictionary, focus: bool) -> void:
 		_app.stack().push(card)
 	if not focus and card.opened_explicitly() and not (card.shown_hex() == hex and card.shown_option() == option):
 		return  # a hover does not replace a card the player opened by click
-	var panel := _app.hud().hex_panel()
+	var panel := _app.hud().tile_window()
 	if panel.is_visible_in_tree():
 		card.set_beside(Hud.screen_rect(panel))
 	card.show_option(hex, option, focus)

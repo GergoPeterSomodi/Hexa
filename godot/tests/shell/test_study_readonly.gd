@@ -370,10 +370,10 @@ func _walk_map(vp: SubViewport, app: App, touched: Dictionary) -> void:
 	for hex: Vector2i in [GENOA, WOODS, Vector2i(6, 13), Vector2i(7, 12)]:
 		app.map_scene().select_hex(hex)
 		await _wait_frames(2)
-		for row: Button in app.hud().hex_panel().action_buttons():
-			row.mouse_entered.emit()
+		for row: Button in app.hud().tile_window().action_buttons():
+			AppFlowHelpers.hover_card(app, hex, row)
 			await _wait_frames(1)
-			row.mouse_exited.emit()
+			AppFlowHelpers.hover_out(row)
 			await _wait_frames(1)
 	app.map_scene().select_hex(MapScene.NO_HEX)
 	_key(vp, KEY_1)

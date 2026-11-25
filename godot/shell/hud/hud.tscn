@@ -9,7 +9,7 @@
 [ext_resource type="PackedScene" path="res://shell/hud/zoom_control.tscn" id="7_zoom"]
 [ext_resource type="PackedScene" path="res://shell/ui/toast_host.tscn" id="8_toasts"]
 [ext_resource type="Script" path="res://shell/hud/map_hover.gd" id="9_hover"]
-[ext_resource type="PackedScene" path="res://shell/panels/hex_panel.tscn" id="10_hex"]
+[ext_resource type="PackedScene" path="res://shell/panels/tile_window.tscn" id="10_hex"]
 [ext_resource type="PackedScene" path="res://shell/hud/minimap.tscn" id="11_minimap"]
 [ext_resource type="PackedScene" path="res://shell/panels/country_panel.tscn" id="12_country"]
 [ext_resource type="PackedScene" path="res://shell/hud/action_log.tscn" id="13_log"]
@@ -209,7 +209,7 @@ layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 
-[node name="HexPanel" parent="Root/Column/Main/Dock" instance=ExtResource("10_hex")]
+[node name="TileWindow" parent="Root/Column/Main/Dock" instance=ExtResource("10_hex")]
 layout_mode = 2
 size_flags_vertical = 0
 

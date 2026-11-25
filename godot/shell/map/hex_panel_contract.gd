@@ -1,4 +1,4 @@
-## What the map scene needs of the panel that shows the selected hex (T13 to T14). A real panel (shell/panels/hex_panel)
+## What the map scene needs of the panel that shows the selected hex (T13 to T14). A real panel (shell/panels/tile_window)
 ## extends this class and overrides the four methods marked "override"; the map scene knows only this type.
 ##
 ## The contract:

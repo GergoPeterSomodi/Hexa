@@ -106,6 +106,10 @@ func _m7_force(rng: Rng, vp: SubViewport, app: App) -> void:
 	if Session.in_season():  # a season runs (its end is one phase a frame, issue 441): no stall counted, nothing forced into it
 		return
 	var before := _m7_progress()
+	# The H key (a random key of the monkey) hides the HUD, and a forced action then finds its buttons hidden for good (a press
+	# that cannot land, step after step: seed 1504 never made its peace): the forced action starts from a shown HUD.
+	if app.hud() != null and not app.hud().is_hud_visible():
+		app.hud().set_hud_visible(true)
 	await _m7_force_one(rng, vp, app)
 	_changed_hexes.clear()  # as in _m7_step
 	if _m7_progress() > before:

@@ -140,12 +140,12 @@ func _march_goal(game: Game, army_id: int, from: Vector2i) -> Vector2i:
 func _raise_at(app: App, vp: SubViewport, hex: Vector2i) -> void:
 	app.map_scene().select_hex(hex)
 	await _wait_frames(2)
-	app.hud().hex_panel().show_raise()
+	assert_true(app.hud().tile_window().show_tab(&"army"), "the Army tab opens")
 	await _wait_frames(2)
 	var raised := false
-	for button: KitButton in app.hud().hex_panel().raise_list().raise_buttons():
-		if not button.disabled:
-			button.pressed.emit()
+	for row: CompanyRow in (app.hud().tile_window().tab_node() as ArmyTab).company_rows():
+		if not row.hammer().disabled:
+			row.hammer().pressed.emit()
 			raised = true
 			break
 	assert_true(raised, "the Raise tab offers a company it can pay for")
@@ -190,7 +190,7 @@ func test_m6_flow_raise_orders_seasons_report_ladder_save_and_supply() -> void:
 	await _wait_frames(3)
 	assert_true(app.hud().army_panel().visible, "the army panel shows")
 	assert_eq(app.hud().army_panel().shown_army(), army.id, "for that army")
-	assert_false(app.hud().hex_panel().visible, "the hex panel gives way")
+	assert_false(app.hud().tile_window().visible, "the tile window gives way")
 
 	# Tab selects the next army needing orders (the same one here); R refuses a march that is not halted; O orders a halt on its own hex.
 	_press(vp, &"game_next_unit")

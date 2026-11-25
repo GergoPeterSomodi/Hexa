@@ -273,3 +273,133 @@ func _foreign_hex() -> Vector2i:
 		if game.map.land[i] == 1 and Territory.owner_tag(game, hex) not in [&"", &"GEN"]:
 			return hex
 	return Vector2i(-1, -1)
+
+
+# --- cases folded in from test_hex_panel.gd (TW16) --------------------------------------------------------------------------
+
+
+## The App's answer to the tab's begin_work request (WorksFlow.begin): the work of the row through Session.
+func _answer_as_the_app(tab: TileTab) -> void:
+	tab.set("settings", _set_mode("off"))  # no card in the way: a hammer begins its work
+	tab.works_requested.connect(func(request: Dictionary) -> void:
+		if request["what"] != &"begin_work":
+			return
+		var option: Dictionary = request["args"]["option"]
+		var args := {"hex": request["args"]["hex"]}
+		if str(option["action"]) == String(Works.BUILD):
+			args["family"] = int(option["family"])
+		Session.act(str(option["action"]), args)
+	)
+
+
+func _row_of_action(tab: TileTab, action: StringName) -> BuildingRow:
+	for id: StringName in _rows_of(tab):
+		var node := _rows_of(tab)[id] as BuildingRow
+		var option: Dictionary = node.data().get("option", {})
+		if not option.is_empty() and StringName(str(option["action"])) == action:
+			return node
+	return null
+
+
+func _stand(hex: Vector2i) -> void:
+	var n := 0
+	while Session.game.state.work_at(hex) != null and n < 40:
+		Session.end_season()
+		n += 1
+	assert_null(Session.game.state.work_at(hex), "the work finished")
+
+
+## Was test_build_then_upgrade_then_clear_go_through_session: the hammers of the rows build, upgrade and clear one piece, each
+## through the App's begin_work answer and Session.act.
+func test_the_hammers_build_then_upgrade_then_clear_through_session() -> void:
+	var args := _buildable_for(&"GEN")
+	var hex: Vector2i = args["hex"]
+	var tab := _tab_on(hex)
+	_answer_as_the_app(tab)
+	_first_ready(tab).press_hammer()
+	assert_not_null(Session.game.state.work_at(hex), "the hammer began a work (Build only begins)")
+	assert_true(Improve.piece_at(Session.game, hex).is_empty(), "nothing stands yet")
+	_stand(hex)
+	assert_false(Improve.piece_at(Session.game, hex).is_empty(), "the work put a piece on the hex")
+	tab = _tab_on(hex)
+	_answer_as_the_app(tab)
+	var up := _row_of_action(tab, Works.UPGRADE)
+	if up != null and not up.hammer().disabled:
+		var level_before := Session.game.state.level[Session.game.map.index_of(hex)]
+		up.press_hammer()
+		_stand(hex)
+		assert_eq(Session.game.state.level[Session.game.map.index_of(hex)], level_before + 1, "Upgrade raised the level by one")
+		tab = _tab_on(hex)
+		_answer_as_the_app(tab)
+	var down := _row_of_action(tab, Works.CLEAR)
+	assert_not_null(down, "a piece has a Clear row")
+	assert_false(down.hammer().disabled, "Clear can be pressed here")
+	down.press_hammer()
+	_stand(hex)
+	assert_true(Improve.piece_at(Session.game, hex).is_empty(), "Clear took the piece away")
+
+
+## Was test_confirm_expensive_opens_the_card_for_a_row_a_poor_treasury_makes_expensive: the verdict, the request name and the
+## confirm mode are asserted on a real row.
+func test_a_poor_treasury_makes_an_affordable_row_expensive_so_expensive_mode_asks_for_the_card() -> void:
+	var args := _buildable_for(&"GEN")
+	var hex: Vector2i = args["hex"]
+	assert_true(Session.dev_money(&"GEN", -540), "70 ducats are left")
+	var tab := _tab_on(hex)
+	tab.set("settings", _set_mode("expensive"))
+	var dear: BuildingRow = null
+	for id: StringName in _rows_of(tab):
+		var node := _rows_of(tab)[id] as BuildingRow
+		if not node.hammer().disabled and bool(node.data().get("expensive", false)):
+			dear = node
+			break
+	assert_not_null(dear, "an enabled expensive row at this hex")
+	var option := dear.data()["option"] as Dictionary
+	dear.press_hammer()
+	assert_eq(_log.size(), 1, "one request for the expensive row")
+	assert_eq(_log[-1]["what"], &"works_card", "an expensive row opens the card first")
+	assert_eq(str((_log[-1]["args"]["option"] as Dictionary)["action"]), str(option["action"]), "the card of the row's own option")
+	assert_null(Session.game.state.work_at(hex), "nothing begun by the click")
+	assert_true(Session.dev_money(&"GEN", 540))
+	tab = _tab_on(hex)
+	tab.set("settings", _set_mode("expensive"))
+	var cheap := _first_ready(tab)
+	assert_false(bool(cheap.data().get("expensive", false)), "with 610 ducats the row is not expensive")
+	cheap.press_hammer()
+	assert_eq(_log[-1]["what"], &"begin_work", "and a click on it begins the work")
+
+
+## Was test_a_full_slot_gives_its_reason_on_the_build_buttons: a hex the slots refuse says so on its rows.
+func test_a_full_slot_gives_its_reason_on_the_rows() -> void:
+	var slots := WorksView.slots(Session.game, &"GEN")
+	var taken: Array[Vector2i] = []
+	for n: int in int(slots["total"]):
+		var args := _buildable_for(&"GEN")
+		for hex: Vector2i in taken:
+			if args.get("hex", Vector2i(-2, -2)) == hex:
+				args = {}
+		assert_false(args.is_empty(), "Genoa can start work %d" % (n + 1))
+		assert_true(bool(Session.act("build", args)["ok"]), "work %d is accepted" % (n + 1))
+		taken.append(args["hex"])
+	var blocked := Vector2i(-1, -1)
+	for i: int in Session.game.map.hex_count():
+		var here := Session.game.map.hex_of(i)
+		if Session.game.map.land[i] != 1 or taken.has(here) or not Improve.piece_at(Session.game, here).is_empty():
+			continue
+		if Territory.owner_tag(Session.game, here) != &"GEN":
+			continue
+		for option: Dictionary in Improve.build_options(Session.game, here):
+			var check := Session.check("build", {"hex": here, "family": int(option["family_id"])})
+			if str(check["reason"]).begins_with("no free work slot"):
+				blocked = here
+				break
+		if blocked != Vector2i(-1, -1):
+			break
+	assert_ne(blocked, Vector2i(-1, -1), "a further build is refused by the slots")
+	var tab := _tab_on(blocked)
+	var found := 0
+	for id: StringName in _rows_of(tab):
+		var node := _rows_of(tab)[id] as BuildingRow
+		if node.hammer() != null and node.hammer().disabled and str(node.data().get("reason", "")).contains("work slot"):
+			found += 1
+	assert_gt(found, 0, "a row shows the full slots' reason")

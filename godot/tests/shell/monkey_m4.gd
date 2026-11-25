@@ -474,14 +474,15 @@ func _m4_row_hover(rng: Rng, vp: SubViewport, app: App, mode: int, act: int = -1
 		return
 	app.map_scene().select_hex(hex)
 	await _wait_frames(2)
-	var rows := app.hud().hex_panel().action_buttons()
+	app.hud().tile_window().show_tab(&"buildings")  # the rows are on the Buildings tab: a click on another tab is remembered
+	var rows := app.hud().tile_window().action_buttons()
 	if rows.is_empty():
 		return
 	var before := _m4_snapshot()
 	var begun := int(_n["works_begun"])
 	var row := rows[rng.randi_range(0, rows.size() - 1)]
 	var refused := row.disabled
-	row.mouse_entered.emit()
+	AppFlowHelpers.hover_card(app, hex, row)
 	await _wait_frames(2)
 	var card := _m4_card(app)
 	if card != null:
@@ -492,7 +493,7 @@ func _m4_row_hover(rng: Rng, vp: SubViewport, app: App, mode: int, act: int = -1
 	_m4_assert_untouched(before, "hovering a row")
 	if card != null and mode == 1:
 		card.hold(true)
-		row.mouse_exited.emit()
+		AppFlowHelpers.hover_out(row)
 		await _wait_frames(2)
 		assert_true(app.stack().has_screen(&"works_preview"), "%s: Shift holds the card while the pointer leaves" % _tag)
 		_m4_assert_untouched(before, "the pointer leaving a held card")
@@ -506,11 +507,11 @@ func _m4_row_hover(rng: Rng, vp: SubViewport, app: App, mode: int, act: int = -1
 		assert_true(card.pinned(), "%s: the card is pinned" % _tag)
 		# A second row beside the pinned card: two columns, the game untouched.
 		var second := rows[rng.randi_range(0, rows.size() - 1)]
-		second.mouse_entered.emit()
+		AppFlowHelpers.hover_card(app, hex, second)
 		await _wait_frames(2)
 		_m4_assert_untouched(before, "a second row beside a pinned card")
-		second.mouse_exited.emit()
-		row.mouse_exited.emit()
+		AppFlowHelpers.hover_out(second)
+		AppFlowHelpers.hover_out(row)
 		await _wait_frames(2)
 		assert_true(app.stack().has_screen(&"works_preview"), "%s: a pinned card stays when the pointer leaves" % _tag)
 		_m4_assert_untouched(before, "the pointer leaving a pinned card")
@@ -519,7 +520,7 @@ func _m4_row_hover(rng: Rng, vp: SubViewport, app: App, mode: int, act: int = -1
 			if card != null:
 				await _m4_card_actions(rng, vp, app, card, act)
 	else:
-		row.mouse_exited.emit()
+		AppFlowHelpers.hover_out(row)
 		await _wait_frames(2)
 		if card != null:
 			assert_false(app.stack().has_screen(&"works_preview"), "%s: the card goes when the pointer leaves" % _tag)
@@ -538,8 +539,9 @@ func _m4_row_click(rng: Rng, vp: SubViewport, app: App) -> void:
 		return
 	app.map_scene().select_hex(hex)
 	await _wait_frames(2)
+	app.hud().tile_window().show_tab(&"buildings")  # the rows are on the Buildings tab: a click on another tab is remembered
 	var rows: Array[Button] = []
-	for button: Button in app.hud().hex_panel().action_buttons():
+	for button: Button in app.hud().tile_window().action_buttons():
 		if not button.disabled and button.is_visible_in_tree():
 			rows.append(button)
 	if rows.is_empty():
@@ -605,18 +607,19 @@ func _m4_card_cycle(rng: Rng, vp: SubViewport, app: App) -> void:
 		return
 	app.map_scene().select_hex(hex)
 	await _wait_frames(3)
-	if app.hud().hex_panel().action_buttons().is_empty():
+	app.hud().tile_window().show_tab(&"buildings")  # the rows are on the Buildings tab: a click on another tab is remembered
+	if app.hud().tile_window().action_buttons().is_empty():
 		return
 	var before := _m4_snapshot()
 	var orphans := -1
 	for round_no: int in 4:
-		var rows := app.hud().hex_panel().action_buttons()
+		var rows := app.hud().tile_window().action_buttons()
 		if rows.is_empty():
 			return
 		var row := rows[0]
-		row.mouse_entered.emit()
+		AppFlowHelpers.hover_card(app, hex, row)
 		await _wait_frames(2)
-		row.mouse_exited.emit()
+		AppFlowHelpers.hover_out(row)
 		await _wait_frames(2)
 		await _m4_close_cards(vp, app)
 		if round_no == 0:
@@ -643,7 +646,10 @@ func _m4_assert_invariants(app: App, tag: String) -> void:
 	if game == null or not game.has_countries():
 		return
 	for country: Country in game.countries:
-		assert_gte(country.treasury, 0, "%s: the treasury of %s is never negative" % [tag, str(country.tag)])
+		# A computer's country may be in debt (M8 spec 8: the soak allows up to 20 % of country-games under 0; its upkeep can outrun its
+		# taxes and AiForces then disbands); the player's treasury is never negative, as an action never spends past it.
+		if country.tag == game.player or game.player == &"":
+			assert_gte(country.treasury, 0, "%s: the treasury of %s is never negative" % [tag, str(country.tag)])
 		for good: int in country.stock.size():
 			assert_gte(country.stock[good], 0, "%s: the stock %d of %s is never negative" % [tag, good, str(country.tag)])
 	if game.player == &"" or app.map_scene() == null or app.is_starting():

@@ -1,17 +1,17 @@
 ## The hex menu (docs/architecture/m6-build-spec.md 6.1 and 6.8; L19, issue #209). Opened by a right click, or O and Shift+F10,
 ## on an own hex while no army of yours is selected. Items: the hex's works (a refused one disabled), "Raise companies here..."
 ## on your settlement, "Select the Army of X", "Show supply (6)". Each choice is carried out here: the hex selected and its Raise
-## tab opened, the army selected, the Supply mode, a work begun through the hex panel. Planted faults to catch: a menu opened on
+## tab opened, the army selected, the Supply mode, a work begun through the tile window. Planted faults to catch: a menu opened on
 ## foreign land, a Raise item on wild land, an item that does nothing.
 extends GutTest
 
 const MAP := "res://shell/map/map_scene.tscn"
-const PANEL := "res://shell/panels/hex_panel.tscn"
+const PANEL := "res://shell/panels/tile_window.tscn"
 const TAG := ArmyFixture.TAG
 
 var _g: Game
 var _scene: MapScene = null
-var _panel: HexPanel = null
+var _panel: TileWindow = null
 var _hex := Vector2i(-1, -1)
 
 
@@ -25,7 +25,7 @@ func before_each() -> void:
 	_scene.preload_next_season = false
 	add_child_autofree(_scene)
 	_scene.finish_loading()
-	_panel = (load(PANEL) as PackedScene).instantiate() as HexPanel
+	_panel = (load(PANEL) as PackedScene).instantiate() as TileWindow
 	_panel.theme = KitTheme.load_for(1.0)
 	add_child_autofree(_panel)
 	_scene.set_panel(_panel)
@@ -128,14 +128,14 @@ func test_refused_works_are_disabled() -> void:
 	assert_gt(works, 0)
 
 
-func test_raise_item_selects_the_hex_and_opens_the_raise_tab() -> void:
+func test_raise_item_selects_the_hex_and_opens_the_army_tab() -> void:
 	assert_true(_menu().open_for(_hex, Vector2(10, 10)))
 	var id := _menu().item_id_of(&"raise_tab")
 	assert_ne(id, -1)
 	_menu().id_pressed.emit(id)
 	assert_eq(_scene.selected, _hex, "the hex is selected")
-	assert_eq(_panel.tab_open(), &"raise", "the Raise tab opens")
-	assert_true(_panel.raise_list().visible)
+	assert_eq(_panel.tab_open(), &"army", "the Army tab opens")
+	assert_not_null(_panel.tab_node() as ArmyTab, "and its body is the Army tab")
 
 
 func test_select_army_item_selects_the_army() -> void:
@@ -152,7 +152,7 @@ func test_show_supply_switches_the_map_mode() -> void:
 	assert_eq(_scene.mode(), MapModes.Mode.SUPPLY, "the Supply mode is on")
 
 
-func test_work_item_begins_the_work_through_the_hex_panel() -> void:
+func test_work_item_begins_the_work_through_the_tile_window() -> void:
 	var hex := _own_hex_with_options()
 	if hex == ArmyFixture.NO_HEX:
 		pending("no own wild hex with works on this map")
@@ -167,8 +167,12 @@ func test_work_item_begins_the_work_through_the_hex_panel() -> void:
 	if pick == -1:
 		pending("no cheap enabled work on this hex")
 		return
+	_panel.works_requested.connect(func(what: StringName, args: Dictionary) -> void:  # the test is the App
+		if what == &"begin_work":
+			var option: Dictionary = args["option"]
+			Session.act(str(option["action"]), {"hex": args["hex"], "family": int(option["family"])}))
 	_menu().id_pressed.emit(pick)
-	assert_not_null(_g.state.work_at(hex), "the work is begun")
+	assert_not_null(_g.state.work_at(hex), "the work is begun through the window's hammer rule")
 
 
 func test_right_click_on_own_hex_without_an_army_opens_the_menu() -> void:

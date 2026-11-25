@@ -1,17 +1,16 @@
-## The war parts of the hex panel and the hex menu (docs/architecture/m7-build-spec.md 6.8; M7 B26; HexWar in shell/panels/hex_war.gd).
-## The panel's War block is the hex card's war rows (without the Siege row) and, for a siege the viewer may read, the siege block with
-## its meter, rate, forecast and relief. The menu's war items: "Open the Battle of ..." for a battle fought on the hex last season,
+## The war parts of the tile window and the hex menu (docs/architecture/m7-build-spec.md 6.8; M7 B26). The window's Land tab shows
+## the hex card's war rows (without the Siege row) and, for a siege the viewer may read, the siege meter and its line. The menu's war items: "Open the Battle of ..." for a battle fought on the hex last season,
 ## "Show the siege of ..." on a besieged hex, "Show the castle area" on land a castle holds while a war of yours is on; each is a
 ## chosen(action) and carried out here where the menu can. Planted faults: a siege the viewer cannot read shows in the panel; a war
 ## row missing; a battle item with no record.
 extends GutTest
 
-const PANEL := "res://shell/panels/hex_panel.tscn"
+const PANEL := "res://shell/panels/tile_window.tscn"
 const MAP := "res://shell/map/map_scene.tscn"
 const TAG := ArmyFixture.TAG
 
 var _g: Game
-var _panel: HexPanel = null
+var _panel: TileWindow = null
 var _scene: MapScene = null
 var _own := Vector2i(-1, -1)
 
@@ -26,7 +25,7 @@ func before_each() -> void:
 	_scene.preload_next_season = false
 	add_child_autofree(_scene)
 	_scene.finish_loading()
-	_panel = (load(PANEL) as PackedScene).instantiate() as HexPanel
+	_panel = (load(PANEL) as PackedScene).instantiate() as TileWindow
 	_panel.theme = KitTheme.load_for(1.0)
 	add_child_autofree(_panel)
 	_scene.set_panel(_panel)
@@ -37,8 +36,15 @@ func after_each() -> void:
 	await get_tree().process_frame
 
 
+## The body of the Land tab, where the war rows and the siege meter are.
 func _box() -> VBoxContainer:
-	return _panel.get_node("Scroll/Body/WarBox") as VBoxContainer
+	return _panel.get_node("Scroll/Body/TabBody") as VBoxContainer
+
+
+## Shows the hex on the Land tab (an own settlement opens on Buildings).
+func _show(hex: Vector2i) -> void:
+	_panel.show_hex(hex)
+	assert_true(_panel.show_tab(&"land"), "the Land tab is live")
 
 
 func _menu() -> HexMenu:
@@ -133,10 +139,10 @@ func _labels_in(box: Node) -> Array[String]:
 	return out
 
 
-func test_the_war_block_shows_the_hex_cards_war_rows_without_the_siege_row() -> void:
+func test_the_land_tab_shows_the_hex_cards_war_rows_without_the_siege_row() -> void:
 	var fort := _enemy_fortress()
-	_panel.show_hex(fort)
-	assert_true(_box().visible, "a fortress at war shows the War block")
+	_show(fort)
+	assert_gt(_labels_in(_box()).size(), 0, "a fortress at war shows its war rows")
 	var texts := _labels_in(_box())
 	for row: Array in HexCard.war_rows(_g, fort):
 		if str(row[0]) == "Siege":
@@ -146,8 +152,7 @@ func test_the_war_block_shows_the_hex_cards_war_rows_without_the_siege_row() -> 
 
 func test_a_siege_the_viewer_is_in_shows_its_meter_and_forecast() -> void:
 	var site := _siege_of_own_town(3)
-	_panel.show_hex(site)
-	assert_true(_box().visible, "the besieged fortress shows the block")
+	_show(site)
 	var meter: ProgressBar = null
 	for node: Node in _box().find_children("*", "ProgressBar", true, false):
 		meter = node as ProgressBar
@@ -156,7 +161,7 @@ func test_a_siege_the_viewer_is_in_shows_its_meter_and_forecast() -> void:
 	assert_eq(int(meter.max_value), int(v.need), "the meter's full mark is the siege's need")
 	assert_eq(int(meter.value), mini(3, int(v.need)), "the meter is the siege's progress, up to the need")
 	var texts := _labels_in(_box())
-	assert_true(texts.any(func(t: String) -> bool: return t.contains("is besieged by")), "its line names the besieger")
+	assert_true(texts.any(func(t: String) -> bool: return t.contains("Besieged by")), "its line names the besieger")
 
 
 func test_a_siege_the_viewer_cannot_read_shows_nothing() -> void:
@@ -166,7 +171,7 @@ func test_a_siege_the_viewer_cannot_read_shows_nothing() -> void:
 		pending("no country outside Genoa's borders on this map")
 		return
 	_siege(fort, stranger, 2)
-	_panel.show_hex(fort)
+	_show(fort)
 	var texts := _labels_in(_box())
 	assert_false(texts.has("Siege"), "a siege between two others is hidden from Genoa")
 
@@ -200,13 +205,12 @@ func test_no_war_items_on_an_unbesieged_own_hex_without_a_war() -> void:
 		assert_ne(StringName(entry["action"][0]), &"castle_area", "no castle area with no war of yours")
 
 
-func test_the_war_block_fits_the_panel_width() -> void:
+func test_the_war_rows_fit_the_window_width() -> void:
 	var site := _siege_of_own_town(3)
 	_panel.size = Vector2(Tokens.PANEL_W, 720)
-	_panel.show_hex(site)
+	_show(site)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_true(_box().visible, "the block is shown")
 	for node: Node in _box().find_children("*", "Label", true, false):
 		var label := node as Label
 		if label.visible:
@@ -215,11 +219,11 @@ func test_the_war_block_fits_the_panel_width() -> void:
 		assert_lte((node as Control).size.x, float(Tokens.PANEL_W) + 0.5, "the meter fits the panel")
 
 
-func test_the_war_block_drops_an_occupier_that_is_cleared() -> void:
+func test_the_war_rows_drop_an_occupier_that_is_cleared() -> void:
 	var enemy := WarFixture.neighbour_of(_g, TAG)
 	WarFixture.set_occupier(_g, _own, enemy)
 	_g.version += 1
-	_panel.show_hex(_own)
+	_show(_own)
 	assert_true(_labels_in(_box()).has("Held by"), "occupied land says who holds it")
 	WarFixture.set_occupier(_g, _own, &"")
 	_g.version += 1
@@ -232,7 +236,7 @@ func test_the_war_block_drops_an_occupier_that_is_cleared() -> void:
 
 func test_a_lifted_siege_clears_the_siege_block() -> void:
 	var site := _siege_of_own_town(3)
-	_panel.show_hex(site)
+	_show(site)
 	assert_eq(_box().find_children("*", "ProgressBar", true, false).size(), 1, "the siege meter is shown")
 	_g.sieges.clear()
 	_g.version += 1
@@ -242,9 +246,9 @@ func test_a_lifted_siege_clears_the_siege_block() -> void:
 	assert_eq(_box().find_children("*", "ProgressBar", true, false).size(), 0, "a lifted siege has no meter")
 
 
-func test_a_freed_hex_panel_leaves_no_war_listener() -> void:
+func test_a_freed_tile_window_leaves_no_war_listener() -> void:
 	var before := Events.controllers_changed.get_connections().size()
-	var panel := (load(PANEL) as PackedScene).instantiate() as HexPanel
+	var panel := (load(PANEL) as PackedScene).instantiate() as TileWindow
 	panel.theme = KitTheme.load_for(1.0)
 	add_child(panel)
 	assert_gt(Events.controllers_changed.get_connections().size(), before, "it listens while in the tree")

@@ -93,18 +93,18 @@ func test_clicks_on_hud_panels_never_reach_map_while_open_canvas_does() -> void:
 	assert_eq(_catcher.clicks.size(), 0, "DebugOverlay blocks map clicks")
 	_hud.set_debug_open(false)
 
-	# Open HexPanel and click inside -> blocked; click below HexPanel in Dock area -> reaches map
-	_hud.hex_panel().show_hex(_find_land_hex())
+	# Open TileWindow and click inside -> blocked; click below TileWindow in Dock area -> reaches map
+	_hud.tile_window().show_hex(_find_land_hex())
 	await _harness.wait_frames(self, 2)
-	assert_true(_hud.hex_panel().visible)
-	_harness.send_click(_hud.hex_panel().get_global_rect().get_center())
+	assert_true(_hud.tile_window().visible)
+	_harness.send_click(_hud.tile_window().get_global_rect().get_center())
 	await _harness.wait_frames(self, 1)
-	assert_eq(_catcher.clicks.size(), 0, "HexPanel blocks map clicks")
+	assert_eq(_catcher.clicks.size(), 0, "TileWindow blocks map clicks")
 
-	var below_panel := Vector2(_hud.hex_panel().get_global_rect().get_center().x, 700.0)
+	var below_panel := Vector2(_hud.tile_window().get_global_rect().get_center().x, 700.0)
 	_harness.send_click(below_panel)
 	await _harness.wait_frames(self, 1)
-	assert_eq(_catcher.clicks.size(), 1, "transparent Dock space below HexPanel lets clicks reach map")
+	assert_eq(_catcher.clicks.size(), 1, "transparent Dock space below TileWindow lets clicks reach map")
 
 	# Photo mode (view_hud hidden): clicking where TopBar was reaches map
 	_catcher.clicks.clear()
@@ -121,22 +121,22 @@ func test_zoom_cluster_shifts_left_when_hex_panel_opens_and_returns_on_clear() -
 	var zoom_rect_closed := _hud.zoom_control().get_global_rect()
 	var scale_rect_closed := _hud.scale_bar().get_global_rect()
 
-	_hud.hex_panel().show_hex(_find_land_hex())
+	_hud.tile_window().show_hex(_find_land_hex())
 	await _harness.wait_frames(self, 2)
 	assert_true(_hud.dock().visible)
-	var panel_rect := _hud.hex_panel().get_global_rect()
+	var panel_rect := _hud.tile_window().get_global_rect()
 	var zoom_rect_open := _hud.zoom_control().get_global_rect()
 	var scale_rect_open := _hud.scale_bar().get_global_rect()
 
-	assert_lt(zoom_rect_open.position.x, zoom_rect_closed.position.x - 200.0, "ZoomControl shifts left when HexPanel opens")
-	assert_lt(scale_rect_open.position.x, scale_rect_closed.position.x - 200.0, "ScaleBar shifts left when HexPanel opens")
-	assert_lte(zoom_rect_open.end.x, panel_rect.position.x, "ZoomControl never overlaps HexPanel")
+	assert_lt(zoom_rect_open.position.x, zoom_rect_closed.position.x - 200.0, "ZoomControl shifts left when TileWindow opens")
+	assert_lt(scale_rect_open.position.x, scale_rect_closed.position.x - 200.0, "ScaleBar shifts left when TileWindow opens")
+	assert_lte(zoom_rect_open.end.x, panel_rect.position.x, "ZoomControl never overlaps TileWindow")
 
-	_hud.hex_panel().clear()
+	_hud.tile_window().clear()
 	await _harness.wait_frames(self, 2)
 	assert_false(_hud.dock().visible)
 	var zoom_rect_restored := _hud.zoom_control().get_global_rect()
-	assert_almost_eq(zoom_rect_restored.position.x, zoom_rect_closed.position.x, 1.0, "ZoomControl returns when HexPanel closes")
+	assert_almost_eq(zoom_rect_restored.position.x, zoom_rect_closed.position.x, 1.0, "ZoomControl returns when TileWindow closes")
 
 
 func test_top_bar_and_layers_popover() -> void:
@@ -233,7 +233,7 @@ func test_zoom_control_key_hints_and_toasts() -> void:
 				grid_cap_text = (sub as KeyCap).label().text
 	assert_eq(grid_cap_text, "K", "KeyHints updates when Bindings rebind")
 
-	_hud.hex_panel().show_hex(_find_land_hex())
+	_hud.tile_window().show_hex(_find_land_hex())
 	await _harness.wait_frames(self, 1)
 	assert_true(_hud.key_hints().hint_actions().has(&"game_upgrade"), "KeyHints switches to selection context")
 
@@ -287,16 +287,16 @@ func test_dock_shows_one_panel_at_a_time_and_closes() -> void:
 	await _harness.wait_frames(self, 2)
 	assert_true(_hud.country_panel().visible, "the country panel shows")
 	assert_eq(_hud.country_panel().shown_tag(), &"GEN")
-	assert_false(_hud.hex_panel().visible, "the hex panel is closed")
+	assert_false(_hud.tile_window().visible, "the hex panel is closed")
 	assert_true(_hud.dock().visible, "the dock opens")
 
-	_hud.hex_panel().show_hex(_find_land_hex())
+	_hud.tile_window().show_hex(_find_land_hex())
 	await _harness.wait_frames(self, 1)
 	assert_false(_hud.country_panel().visible, "a hex replaces the country panel")
-	assert_true(_hud.hex_panel().visible)
+	assert_true(_hud.tile_window().visible)
 
 	_hud.show_country(&"SAV", false)
-	assert_false(_hud.hex_panel().visible, "a country replaces the hex panel")
+	assert_false(_hud.tile_window().visible, "a country replaces the hex panel")
 	assert_true(_hud.country_panel().visible)
 
 	_hud.country_panel().country_requested.emit(&"MLO")
@@ -306,7 +306,7 @@ func test_dock_shows_one_panel_at_a_time_and_closes() -> void:
 	await _harness.wait_frames(self, 2)
 	assert_false(_hud.dock().visible, "close_dock closes the dock")
 	assert_false(_hud.country_panel().visible)
-	assert_false(_hud.hex_panel().visible)
+	assert_false(_hud.tile_window().visible)
 
 
 func test_top_bar_names_the_country_and_switches_modes() -> void:
@@ -679,7 +679,7 @@ func test_below_any_real_window_the_chips_and_the_button_give_way_to_the_rest() 
 
 func test_the_hex_panel_gets_the_settings_and_refresh_economy_reads_the_chips_again() -> void:
 	await _harness.wait_frames(self, 2)
-	assert_eq(_hud.hex_panel().settings, _harness.settings, "the panel reads game/confirm_works from the App's settings")
+	assert_eq(_hud.tile_window().settings, _harness.settings, "the panel reads game/confirm_works from the App's settings")
 	var bar := _genoa_bar()
 	await _harness.wait_frames(self, 3)
 	assert_true(Session.dev_money(&"GEN", 90))
@@ -694,12 +694,12 @@ func test_a_tall_hex_panel_never_pushes_the_hud_past_the_window() -> void:
 	for view: Vector2i in [Vector2i(1280, 720), Vector2i(2560, 1440)]:
 		_harness.viewport.size = view
 		for hex: Vector2i in [Vector2i(10, 13), Vector2i(7, 12)]:
-			_hud.hex_panel().show_hex(hex)
+			_hud.tile_window().show_hex(hex)
 			await _harness.wait_frames(self, 3)
-			assert_true(_hud.hex_panel().visible)
+			assert_true(_hud.tile_window().visible)
 			assert_eq(_hud.root().get_global_rect(), Rect2(Vector2.ZERO, Vector2(view)), "HUD root is the viewport at %s, %s" % [str(view), str(hex)])
 			assert_eq(_hud.top_bar().get_global_position().y, 0.0, "top bar at y 0 at %s, %s" % [str(view), str(hex)])
-			assert_lte(_hud.hex_panel().get_global_rect().end.y, float(view.y) + 0.5, "the panel ends inside the window")
+			assert_lte(_hud.tile_window().get_global_rect().end.y, float(view.y) + 0.5, "the panel ends inside the window")
 	Session.end_game()
 
 

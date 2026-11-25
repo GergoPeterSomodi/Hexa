@@ -302,7 +302,7 @@ func has_army() -> bool:
 
 
 ## The Esc ladder's clear step (M6 6.4): the army selection and its panel go first, then the country panel's dock, then the
-## hex selection (or the hex panel when there is no map).
+## hex selection (or the tile window when there is no map).
 func clear_selection() -> void:
 	var armies := _armies()
 	if armies != null and armies.selected_army() >= 0:
@@ -316,7 +316,7 @@ func clear_selection() -> void:
 	elif _app.map_scene() != null:
 		_app.map_scene().select_hex(MapScene.NO_HEX)
 	else:
-		hud.hex_panel().clear()
+		hud.tile_window().clear()
 
 
 func _armies() -> MapArmies:

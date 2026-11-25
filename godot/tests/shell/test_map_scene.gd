@@ -12,7 +12,7 @@ func before_each() -> void:
 	var packed := load("res://shell/map/map_scene.tscn") as PackedScene
 	_scene = packed.instantiate() as MapScene
 	_scene.preload_next_season = false
-	var injected_panel := (load("res://shell/panels/hex_panel.tscn") as PackedScene).instantiate() as HexPanelContract
+	var injected_panel := (load("res://shell/panels/tile_window.tscn") as PackedScene).instantiate() as HexPanelContract
 	_scene.add_child(injected_panel)
 	_scene.set_panel(injected_panel)
 	add_child_autofree(_scene)
@@ -135,20 +135,20 @@ func test_the_panel_build_button_changes_the_state_and_only_the_touched_cells() 
 	var found := _buildable()
 	assert_false(found.is_empty(), "something can be built on north Italy")
 	var hex := found["hex"] as Vector2i
-	var family := int(found["family"])
 	_scene.select_hex(hex)
-	var button: Button = null
-	for b: Button in _scene.panel().action_buttons():
-		if not b.disabled and b.text.begins_with("Build"):
-			button = b
-			break
+	var button := _scene.panel().action_buttons().filter(func(b: Button) -> bool: return not b.disabled and b.text.begins_with("Build")).front() as Button
 	assert_not_null(button, "the panel has an enabled Build button")
 	var before := _snapshot()
 	var writes := _scene.view().cell_writes
 	var use_before := Session.game.state.main_use[Session.game.map.index_of(hex)]
 	Events.hex_changed.connect(_remember)
+	var asked: Array[int] = []  # the begin_work requests: the test answers as the App
+	(_scene.panel() as TileWindow).works_requested.connect(func(what: StringName, args: Dictionary) -> void:
+		if what == &"begin_work":
+			asked.append(int(args["option"]["family"]))
+			Session.act(str(args["option"]["action"]), {"hex": args["hex"], "family": asked[-1]}))
 	button.pressed.emit()
-	assert_eq(Session.game.state.work_at(hex).family, family, "Build begins a work")
+	assert_eq(Session.game.state.work_at(hex).family, asked[0], "Build begins a work")
 	assert_eq(Session.game.state.main_use[Session.game.map.index_of(hex)], use_before, "nothing stands yet")
 	assert_eq(_hexes_changed, [] as Array[Vector2i], "no hex changed yet")
 	_stand(hex)
@@ -172,7 +172,7 @@ func test_the_panel_build_button_changes_the_state_and_only_the_touched_cells() 
 	assert_eq(_unexplained_missing(), [] as Array[String])
 	assert_false(_scene.panel().action_buttons().is_empty(), "the panel shows Upgrade and Clear now")
 	assert_true(Session.check("clear", {"hex": hex})["ok"])
-	assert_true(family > 0)
+	assert_true(asked[0] > 0)
 
 
 ## Ends seasons until the work on the hex has finished (a build, an upgrade or a clearing takes seasons since M3).

@@ -137,7 +137,7 @@ func test_cli_sandbox_and_seed_boots_directly_into_game() -> void:
 	assert_not_null(Session.game)
 	assert_eq(Session.game.seed_value, 42, "--seed=42 applied")
 	assert_not_null(app.map_scene(), "MapScene created in World")
-	assert_eq(app.map_scene().panel(), app.hud().hex_panel(), "HexPanel injected into MapScene")
+	assert_eq(app.map_scene().panel(), app.hud().tile_window(), "TileWindow injected into MapScene")
 	assert_true(app.hud().visible, "Hud visible in sandbox")
 	assert_false(app.hides_world())
 	assert_false(app.wants_pause())
@@ -206,14 +206,14 @@ func test_ui_covers_map_clicks_and_scroll_over_modal_does_not_zoom() -> void:
 	await _wait_frames(1)
 	assert_eq(map_scene.selected, MapScene.NO_HEX, "TopBar click does not reach MapScene")
 
-	# Selecting a hex opens HexPanel; clicking HexPanel does not change selection
+	# Selecting a hex opens the TileWindow; clicking the TileWindow does not change selection
 	var land_hex := _first_land_hex()
 	map_scene.select_hex(land_hex)
 	await _wait_frames(1)
-	assert_true(app.hud().hex_panel().visible)
-	_send_click(vp, app.hud().hex_panel().get_global_rect().get_center())
+	assert_true(app.hud().tile_window().visible)
+	_send_click(vp, app.hud().tile_window().get_global_rect().get_center())
 	await _wait_frames(1)
-	assert_eq(map_scene.selected, land_hex, "HexPanel click does not hit map underneath")
+	assert_eq(map_scene.selected, land_hex, "TileWindow click does not hit map underneath")
 
 	# Opening Options modal pauses map and wheel over Options does not zoom map
 	var zoom_before := map_scene.zoom()

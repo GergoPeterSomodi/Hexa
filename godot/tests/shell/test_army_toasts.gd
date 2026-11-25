@@ -4,7 +4,7 @@
 ## Planted faults to catch: a toast twice on one click, a toast before a refused act, wording that drops the refund or the men.
 extends GutTest
 
-const HEX_PANEL := "res://shell/panels/hex_panel.tscn"
+const WINDOW := "res://shell/panels/tile_window.tscn"
 const ARMY_PANEL := "res://shell/panels/army_panel.tscn"
 const TAG := ArmyFixture.TAG
 
@@ -37,32 +37,32 @@ func _settle() -> void:
 
 
 func test_raise_click_toasts_its_words_once() -> void:
-	var panel := (load(HEX_PANEL) as PackedScene).instantiate() as HexPanel
+	var panel := (load(WINDOW) as PackedScene).instantiate() as TileWindow
 	panel.theme = KitTheme.load_for(1.0)
 	add_child_autofree(panel)
 	_listen(panel.toast_requested)
 	panel.show_hex(_hex)
-	panel.show_raise()
+	assert_true(panel.show_tab(&"army"), "the Army tab is live on an own settlement")
 	await _settle()
 	var cost := Military.cost_of(_g, 0, 1)
 	var expected := "Raised 1 company of pikemen at %s: −%d ducats, −%d iron." % [
 		Military.hex_text(_g, _hex), int(cost["ducats"]), int((cost["goods"] as Dictionary)["iron"])]
-	panel.raise_list().raise_buttons()[0].pressed.emit()
+	(panel.tab_node() as ArmyTab).company_rows()[0].hammer().pressed.emit()
 	assert_eq(_toasts.size(), 1, "one click, one toast")
 	assert_eq(_toasts[0][0], expected, "the raise's words")
 	assert_eq(_toasts[0][1], &"plain")
 
 
 func test_refused_raise_toasts_its_reason_as_a_warning() -> void:
-	var panel := (load(HEX_PANEL) as PackedScene).instantiate() as HexPanel
+	var panel := (load(WINDOW) as PackedScene).instantiate() as TileWindow
 	panel.theme = KitTheme.load_for(1.0)
 	add_child_autofree(panel)
 	_listen(panel.toast_requested)
 	panel.show_hex(_hex)
-	panel.show_raise()
+	assert_true(panel.show_tab(&"army"), "the Army tab is live on an own settlement")
 	await _settle()
 	Countries.by_tag(_g, TAG).treasury = 0
-	panel.raise_list()._on_raise_pressed(0)
+	(panel.tab_node() as ArmyTab).raise_company(0)
 	assert_eq(_toasts.size(), 1, "one refused click, one toast")
 	assert_true(str(_toasts[0][0]).contains("not enough ducats"), str(_toasts[0][0]))
 	assert_eq(_toasts[0][1], &"warn")

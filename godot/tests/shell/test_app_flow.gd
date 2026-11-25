@@ -152,19 +152,19 @@ func _verify_esc_ladder_and_options(vp: SubViewport, app: App) -> void:
 	assert_eq(app.stack().count(), 0, "first Esc closes HelpOverlay")
 	assert_false(app.wants_pause())
 
-	# Esc ladder step 2: select hex -> HexPanel opens -> Esc clears selection
+	# Esc ladder step 2: select hex -> the tile window opens -> Esc clears selection
 	var hex := _first_buildable_hex()
 	assert_ne(hex, MapScene.NO_HEX)
 	map_scene.select_hex(hex)
 	await _wait_frames(2)
 	assert_eq(map_scene.selected, hex)
-	assert_true(app.hud().hex_panel().visible)
+	assert_true(app.hud().tile_window().visible)
 	assert_true(app.hud().is_dock_open())
 
 	_send_key(vp, KEY_ESCAPE)
 	await _wait_frames(2)
 	assert_eq(map_scene.selected, MapScene.NO_HEX, "second Esc clears hex selection")
-	assert_false(app.hud().hex_panel().visible)
+	assert_false(app.hud().tile_window().visible)
 	assert_eq(app.stack().count(), 0)
 
 	# Esc ladder step 3: Esc with no selection opens PauseMenu -> Options -> Back
@@ -199,14 +199,14 @@ func _verify_build_confirm_menu_and_relaunch(vp: SubViewport, app: App) -> void:
 	map_scene.select_hex(hex)
 	await _wait_frames(1)
 	var build_btn: Button = null
-	for b: Button in app.hud().hex_panel().action_buttons():
+	for b: Button in app.hud().tile_window().action_buttons():
 		if not b.disabled and b.text.begins_with("Build"):
 			build_btn = b
 			break
-	assert_not_null(build_btn, "HexPanel has enabled Build button")
+	assert_not_null(build_btn, "the tile window has an enabled Build hammer")
 	build_btn.pressed.emit()
 	await _wait_frames(1)
-	assert_eq(Session.unsaved_actions, 1, "HexPanel build increments Session.unsaved_actions")
+	assert_eq(Session.unsaved_actions, 1, "a window build increments Session.unsaved_actions")
 
 	_send_key(vp, KEY_ESCAPE)
 	await _wait_frames(1)
@@ -624,9 +624,11 @@ func _m4_chips_and_gives(app: App) -> void:
 	assert_true(app.hud().top_bar().study_button().visible, "the study button shows")
 	app.map_scene().select_hex(VINEYARD)
 	await _wait_frames(3)
-	var gives := app.hud().hex_panel().get_node("Scroll/Body/GivesRow/Value") as Label
-	assert_eq(gives.text, "wine 24 in autumn · upkeep 2 a season")
-	assert_eq(HexCard.of(Session.game, VINEYARD)["gives"], gives.text, "the hover card says the same")
+	assert_true(app.hud().tile_window().show_tab(&"land"), "the Land tab is live on own land")
+	var texts := AppFlowHelpers.labels_under(app.hud().tile_window().tab_node())
+	for entry: Dictionary in (TileView.of(Session.game, &"GEN", VINEYARD)["land"] as Dictionary)["made"]:
+		assert_true(texts.has("%d loads" % int(entry["loads"])), "the Land tab shows what the vineyard makes: %s" % str(texts))
+	app.hud().tile_window().show_tab(&"buildings")  # the pick is remembered: the rows are on the Buildings tab
 
 
 ## Checklist 3: a row's hover opens the card beside the panel and the marks on the map; Shift and pin keep it; Esc closes it.
@@ -636,32 +638,32 @@ func _m4_hover_card(vp: SubViewport, app: App) -> void:
 	var woods := AppFlowHelpers.row_button(app, "Build woodland")
 	assert_not_null(woods, "a woodland row")
 	assert_not_null(AppFlowHelpers.row_button(app, "Build harbour"), "a harbour row")
-	woods.mouse_entered.emit()
+	AppFlowHelpers.hover_card(app, WOODS, woods)
 	await _wait_frames(2)
 	var card := app.stack().top() as WorksPreview
 	assert_not_null(card, "the hover opens the card")
-	assert_lt(card.card_rect().end.x, Hud.screen_rect(app.hud().hex_panel()).position.x + 1.0, "left of the panel")
+	assert_lt(card.card_rect().end.x, Hud.screen_rect(app.hud().tile_window()).position.x + 1.0, "left of the panel")
 	var marks := app.map_scene().preview_marks()
 	assert_true(marks.shown(), "the ghost and the marks are on the map")
 	# M5 D18: hands count only Genoa's own hexes, so the new woodland at (10, 13), on Genoa's edge, is staffed a little less
 	# than M4's +16 (which counted a neighbour's people): +10 a year.
 	assert_true(marks.labels().any(func(l: Dictionary) -> bool: return str(l["text"]) == "+10 timber"), str(marks.labels()))
 	card.hold(true)  # Shift
-	woods.mouse_exited.emit()
+	AppFlowHelpers.hover_out(woods)
 	await _wait_frames(2)
 	assert_eq(app.stack().top(), card, "Shift keeps the card while the pointer is away")
 	card.hold(false)
 	await _wait_frames(2)
 	assert_eq(app.stack().count(), 0, "released, it goes")
 	assert_false(marks.shown(), "and its marks with it")
-	woods.mouse_entered.emit()
+	AppFlowHelpers.hover_card(app, WOODS, woods)
 	await _wait_frames(2)
 	card = app.stack().top() as WorksPreview
 	card.pin(true)
-	woods.mouse_exited.emit()
+	AppFlowHelpers.hover_out(woods)
 	await _wait_frames(2)
 	assert_eq(app.stack().top(), card, "a pinned card stays")
-	AppFlowHelpers.row_button(app, "Build harbour").mouse_entered.emit()
+	AppFlowHelpers.hover_card(app, WOODS, AppFlowHelpers.row_button(app, "Build harbour"))
 	await _wait_frames(2)
 	assert_eq(app.stack().count(), 1, "the next option opens in the same card, beside the pinned one")
 	_send_key(vp, KEY_ESCAPE)

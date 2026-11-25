@@ -11,6 +11,8 @@ signal army_cleared
 ## An order's toast (spec 6.10): the App shows it (GameRequests); a refusal is `refused` on the scene, as before.
 signal said(text: String, tone: StringName)
 
+## The process priority of the layer: after every other node of the frame (the default is 0).
+const SYNC_PRIORITY := 1000
 const NO_HEX := Vector2i(-9999, -9999)
 const REACH_TILE := "mark/white"
 const CURSOR_TILE := "mark/target"
@@ -49,6 +51,9 @@ var _links: Array[Array] = []
 
 func _init() -> void:
 	name = &"MapArmies"  # the map scene finds it as $MapArmies
+	# Last of the frame: the computer's season slices and the replay move armies and sight in other nodes' _process, and the
+	# tokens must follow in the same frame (a token never stands on a hex the viewer cannot see, not even for a frame).
+	process_priority = SYNC_PRIORITY
 
 
 func _ready() -> void:

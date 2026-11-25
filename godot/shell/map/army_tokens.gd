@@ -227,7 +227,8 @@ func _apply_visibility() -> void:
 			continue
 		var all_armies := (source["token"] as Dictionary)["armies"] as PackedInt32Array
 		var walking := _walking_in(all_armies)
-		node.visible = walking.size() < all_armies.size()
+		# A foreign token carries no army ids (ArmyView, fog D7), so none of its armies can be matched to a walker: it is shown.
+		node.visible = all_armies.is_empty() or walking.size() < all_armies.size()
 		if walking == (source["walking"] as PackedInt32Array):
 			continue
 		source["walking"] = walking

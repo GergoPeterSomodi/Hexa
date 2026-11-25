@@ -90,7 +90,7 @@ static func _show_hex(tree: SceneTree, scene: Node, hud_node: Node, hex: Vector2
 	if view_node != null:
 		scene.call("frame_at", view_node.call("centre_of", hex), 1.0)
 	await _frames(tree, 4)
-	var panel := hud_node.call("hex_panel") as Control
+	var panel := hud_node.call("tile_window") as Control
 	return panel.is_visible_in_tree() and panel.call("shown_hex") == hex
 
 

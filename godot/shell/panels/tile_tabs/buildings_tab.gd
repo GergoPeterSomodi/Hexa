@@ -273,8 +273,10 @@ func _refresh_list() -> void:
 		var g := group as Dictionary
 		var rows: Array[Dictionary] = []
 		for row: Variant in g["rows"]:
-			if _passes(row as Dictionary):
-				rows.append(row as Dictionary)
+			# The indexed copy carries the `expensive` flag the hammer's rule reads.
+			var data := _rows_by_id.get(StringName(str((row as Dictionary)["id"])), row) as Dictionary
+			if _passes(data):
+				rows.append(data)
 		if rows.is_empty():
 			continue
 		var head := PanelKit.label(_heading_of(g), &"SectionHead")

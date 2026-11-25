@@ -596,3 +596,4 @@ func test_job_line_uses_the_window_viewer_not_game_player() -> void:
 	_window.show_hex(hex)
 	var shown_by_viewer := not WorksView.at(Session.game, hex, Session.player_tag()).is_empty()
 	assert_eq(_job().visible, shown_by_viewer, "the job line shows the work of the window's viewer")
+

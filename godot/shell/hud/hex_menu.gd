@@ -3,8 +3,8 @@
 ## (ImprovePreview.options_of; a refused one is disabled with its reason as the tooltip), "Raise companies here..." on your
 ## settlement, one "Select the Army of X" per army of yours on the hex, and "Show supply (6)". Keyboard: the PopupMenu's own
 ## focus (Up, Down, Enter, Esc). A choice is emitted as chosen(action) and then carried out here, so no App wiring is needed:
-##   [&"work", hex, row]        the hex panel's row click (game/confirm_works: the card or the work)
-##   [&"raise_tab", hex]        selects the hex and opens its Raise tab
+##   [&"work", hex, row]        the tile window's row click (game/confirm_works: the card or the work)
+##   [&"raise_tab", hex]        selects the hex and opens its Army tab
 ##   [&"select_army", id]       selects the army (MapArmies.select_army)
 ##   [&"map_mode", &"supply"]   the Supply mode (MapScene.set_mode)
 ##   [&"battle", record]        open the battle of the hex in the dock (M7 6.8: the App listens; nothing is done here)
@@ -26,7 +26,7 @@ func _init() -> void:
 	hide_on_item_selection = true
 
 
-## Gives the menu the map scene (selection, mode, the hex panel) and the map's armies (selection).
+## Gives the menu the map scene (selection, mode, the tile window) and the map's armies (selection).
 func setup(scene: MapScene, armies: Node) -> void:
 	_scene = scene
 	_armies = armies as MapArmies
@@ -53,7 +53,7 @@ func open_for(hex: Vector2i, at: Vector2) -> bool:
 	for row: Dictionary in works:
 		_add_work(game, hex, row)
 	_section()
-	if RaiseList.offered(game, tag, hex):
+	if Military.raise_offered(game, tag, hex):
 		_add_item("Raise companies here...", [&"raise_tab", hex], true, "")
 	_section()
 	for army: Army in Armies.at(game, hex):
@@ -145,9 +145,9 @@ func _carry_out(action: Array) -> void:
 		_work(action[1], action[2] as Dictionary)
 	elif kind == &"raise_tab":
 		_scene.select_hex(action[1])
-		var panel := _scene.panel() as HexPanel
-		if panel != null:
-			panel.show_raise()
+		var window := _scene.panel() as TileWindow
+		if window != null:
+			window.show_tab(&"army")
 	elif kind == &"select_army":
 		_armies.select_army(int(action[1]))
 	elif kind == &"siege":
@@ -156,14 +156,16 @@ func _carry_out(action: Array) -> void:
 		_scene.set_mode(MapModes.Mode.SUPPLY)
 
 
-## The work of a row: the hex panel's row click when it is there (the confirm rule and the App's card); else the work itself.
+## The work of a row: the tile window's row click when it is there (the confirm rule and the App's card); else the work itself.
 func _work(hex: Vector2i, row: Dictionary) -> void:
 	_scene.select_hex(hex)
 	var option := {"action": row["action"], "family": row["family"]}
-	var panel := _scene.panel() as HexPanel
-	if panel != null and panel.shown_hex() == hex:
-		panel.begin_option(option, bool(row["expensive"]))
-		return
+	var window := _scene.panel() as TileWindow
+	if window != null and window.shown_hex() == hex:
+		if window.tab_open() != &"buildings":
+			window.show_tab(&"buildings")
+		if window.begin_option(option, bool(row["expensive"])):
+			return
 	var args := {"hex": hex}
 	if str(row["action"]) == String(Works.BUILD):
 		args["family"] = int(row["family"])

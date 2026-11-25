@@ -64,10 +64,7 @@ func _game_app() -> App:
 
 
 func _row(app: App, prefix: String) -> Button:
-	for button: Button in app.hud().hex_panel().action_buttons():
-		if button.text.begins_with(prefix):
-			return button
-	return null
+	return AppFlowHelpers.row_button(app, prefix)
 
 
 func _has_toast(app: App, part: String) -> bool:
@@ -78,7 +75,7 @@ func test_the_card_closes_with_a_new_selection_and_takes_its_marks_off_the_map()
 	var app := await _game_app()
 	app.map_scene().select_hex(WOODS)
 	await _frames()
-	_row(app, "Build woodland").mouse_entered.emit()
+	AppFlowHelpers.hover_card(app, WOODS, _row(app, "Build woodland"))
 	await _frames(2)
 	assert_true(app.stack().top() is WorksPreview)
 	assert_true(app.map_scene().preview_marks().shown())
@@ -92,14 +89,14 @@ func test_a_row_that_loses_its_panel_while_the_card_is_up_is_harmless() -> void:
 	var app := await _game_app()
 	app.map_scene().select_hex(WOODS)
 	await _frames()
-	_row(app, "Build woodland").mouse_entered.emit()
+	AppFlowHelpers.hover_card(app, WOODS, _row(app, "Build woodland"))
 	await _frames(2)
 	app.stack().clear()  # the card is freed with the stack
 	await _frames(2)
 	app.requests().works.on_row_unhovered()  # the panel's row lets go after the card is gone
 	app.requests().works.close_card()
 	assert_eq(app.stack().count(), 0)
-	_row(app, "Build woodland").mouse_entered.emit()  # and a new hover makes a new card
+	AppFlowHelpers.hover_card(app, WOODS, _row(app, "Build woodland"))  # and a new hover makes a new card
 	await _frames(2)
 	assert_true(app.stack().top() is WorksPreview)
 
@@ -120,7 +117,7 @@ func test_a_screen_pushed_over_the_card_closes_it_and_its_marks() -> void:
 	var app := await _game_app()
 	app.map_scene().select_hex(WOODS)
 	await _frames()
-	_row(app, "Build woodland").mouse_entered.emit()
+	AppFlowHelpers.hover_card(app, WOODS, _row(app, "Build woodland"))
 	await _frames(2)
 	assert_true(app.stack().top() is WorksPreview)
 	assert_true(app.map_scene().preview_marks().shown())

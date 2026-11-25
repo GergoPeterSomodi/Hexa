@@ -1,4 +1,4 @@
-## Studiolo HUD frame coordinating TopBar, right Dock (HexPanel), bottom-right ZoomControl + ScaleBar
+## Studiolo HUD frame coordinating TopBar, right Dock (TileWindow), bottom-right ZoomControl + ScaleBar
 ## (shifting left automatically when Dock opens), KeyHints, MapHover, LayersPopover, ToastHost, and DebugOverlay
 ## (docs/architecture/ui-and-controls-spec.md sections 3.1, 3.3, 7; ui-style-and-feedback-plan.md U14).
 class_name Hud
@@ -19,7 +19,7 @@ signal slice_ms_changed(ms: int)
 signal hud_visibility_changed(shown: bool)
 ## The top bar's mode switch (0 Terrain, 1 Owner, 2 Relief, 3 Yields).
 signal mode_requested(mode: int)
-## A country's name was asked for: the top bar's name, a neighbour link or the hex panel's owner link.
+## A country's name was asked for: the top bar's name, a neighbour link or the tile window's owner link.
 signal country_requested(tag: StringName)
 signal country_play_requested(tag: StringName)
 signal country_look_at_requested(hex: Vector2i)
@@ -44,12 +44,15 @@ signal study_tab_requested(page: StringName, tab: StringName)
 ## war section (a Confirm) goes to the App's stack.
 signal battle_requested(record: int)
 signal confirm_requested(screen: Screen)
+## The tile window's tabs ask the App for something (map_mode, castle_area, select_army, raise_screen, open_battle, goto_hex).
+signal tile_requested(what: StringName, args: Dictionary)
 
 ## The key hints' left offset in hud.tscn.
 const KEY_HINTS_LEFT := 12.0
 ## The Yields legend's top edge in the map area: 12 px under the bar, and this far under the F3 panel when that is open.
 const LEGEND_TOP := 12.0
 const LEGEND_GAP := 8.0
+const ROW_CARD_SCENE := preload("res://shell/ui/hover_card.tscn")
 
 @onready var _root: Control = $Root
 @onready var _top_bar: TopBar = $Root/Column/TopBar
@@ -69,11 +72,13 @@ const LEGEND_GAP := 8.0
 @onready var _map_hover: MapHover = $Root/Column/Main/MapArea/MapHover
 @onready var _bottom_right: Control = $Root/Column/Main/MapArea/BottomRight
 @onready var _dock: VBoxContainer = $Root/Column/Main/Dock
-@onready var _hex_panel: HexPanel = $Root/Column/Main/Dock/HexPanel
+@onready var _tile_window: TileWindow = $Root/Column/Main/Dock/TileWindow
 @onready var _country_panel: CountryPanel = $Root/Column/Main/Dock/CountryPanel
 @onready var _army_panel: ArmyPanel = $Root/Column/Main/Dock/ArmyPanel
 
 var _ctx: ShellContext = null
+var _row_card: HoverCard = null
+var _any_screen := false
 var _settings: Settings = null
 var _bound_rig: CameraRig = null
 var _bound_map_input: MapInput = null
@@ -126,9 +131,11 @@ func _ready() -> void:
 	_country_panel.look_at_requested.connect(func(hex: Vector2i) -> void: country_look_at_requested.emit(hex))
 	_country_panel.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
 	_country_panel.study_requested.connect(func() -> void: study_requested.emit(&"economy"))
-	_hex_panel.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
-	_hex_panel.toast_requested.connect(func(text: String, tone: StringName) -> void: toast(text, tone))
-	_hex_panel.visibility_changed.connect(_on_hex_panel_visibility_changed)
+	_tile_window.country_requested.connect(func(tag: StringName) -> void: country_requested.emit(tag))
+	_tile_window.toast_requested.connect(func(text: String, tone: StringName) -> void: toast(text, tone))
+	_tile_window.app_requested.connect(func(what: StringName, args: Dictionary) -> void: tile_requested.emit(what, args))
+	_tile_window.screens_up = _screen_is_up
+	_tile_window.visibility_changed.connect(_on_tile_window_visibility_changed)
 
 	_layers_popover.layer_toggled.connect(func(lname: StringName, on: bool) -> void: layer_toggled.emit(lname, on))
 	_layers_popover.closed.connect(_on_layers_popover_closed)
@@ -149,7 +156,7 @@ func _ready() -> void:
 	_sync_dock_visibility()
 	if _settings != null:
 		_minimap.configure(_settings)
-		_hex_panel.set_settings(_settings)
+		_tile_window.set_settings(_settings)
 
 
 func _exit_tree() -> void:
@@ -180,7 +187,7 @@ func configure(settings: Settings) -> void:
 	_disconnect_settings()
 	_settings = settings
 	if is_node_ready():
-		_hex_panel.set_settings(_settings)
+		_tile_window.set_settings(_settings)
 		_layers_popover.configure(_settings)
 		_debug_overlay.configure(_settings)
 		_map_hover.configure(_settings)
@@ -231,15 +238,15 @@ func bind_map_scene(scene: Node) -> void:
 		map_scene.mode_changed.connect(_on_mode_changed)
 
 
-## Shows the country `tag` in the dock (its panel replaces the hex panel). `picking` adds the tip and "Play as".
+## Shows the country `tag` in the dock (its panel replaces the tile window). `picking` adds the tip and "Play as".
 func show_country(tag: StringName, picking: bool) -> void:
-	_hex_panel.clear()
+	_tile_window.clear()
 	_country_panel.show_country(tag, picking)
 
 
 ## Closes whichever panel the dock shows.
 func close_dock() -> void:
-	_hex_panel.clear()
+	_tile_window.clear()
 	_country_panel.clear()
 
 
@@ -249,11 +256,11 @@ func chips() -> Chips:
 
 
 ## Reads the money and the stores again after a change that sends no event (the console's money and goods): the chips, the
-## hex panel and the country panel in view.
+## tile window and the country panel in view.
 func refresh_economy() -> void:
 	_top_bar.chips().refresh()
-	if _hex_panel.visible:
-		_hex_panel.refresh()
+	if _tile_window.visible:
+		_tile_window.refresh()
 	if _country_panel.visible:
 		_country_panel.refresh()
 
@@ -356,6 +363,7 @@ func close_lists() -> bool:
 
 ## A screen is up: `hides_world` hides the notifications (and the HUD with them), any screen hides the task flag.
 func set_covered(hides_world: bool, any_screen: bool) -> void:
+	_any_screen = any_screen
 	_notifications.set_covered(hides_world)
 	_mode_legend.set_covered(hides_world)
 	_task_flag.set_covered(any_screen)
@@ -476,8 +484,38 @@ func toast_host() -> ToastHost:
 	return _toasts
 
 
-func hex_panel() -> HexPanel:
-	return _hex_panel
+func _screen_is_up() -> bool:
+	return _any_screen
+
+
+func tile_window() -> TileWindow:
+	return _tile_window
+
+
+## Shows the hover card of a window row beside the window, level with the row (the tabs' row_hovered); the card is built once.
+func show_row_card(card: Dictionary, anchor: Rect2) -> void:
+	var data := RowCard.hover_of(card)
+	if data.is_empty():
+		hide_row_card()
+		return
+	if _row_card == null:
+		_row_card = ROW_CARD_SCENE.instantiate() as HoverCard
+		_root.add_child(_row_card)
+	_row_card.show_card(data)
+	_row_card.reset_size()
+	_row_card.global_position = RowCard.place(anchor, _tile_window.get_global_rect(), _row_card.get_combined_minimum_size(),
+		_root.get_viewport_rect().size)
+
+
+## Takes the row card away (the pointer or the keyboard left the row).
+func hide_row_card() -> void:
+	if _row_card != null and is_instance_valid(_row_card):
+		_row_card.clear()
+
+
+## The row card's node, or null before the first hover (tests).
+func row_card() -> HoverCard:
+	return _row_card
 
 
 func dock() -> VBoxContainer:
@@ -505,9 +543,11 @@ func root() -> Control:
 	return _root
 
 
-## A hex panel shown (a hex selected) replaces the country panel in the dock.
-func _on_hex_panel_visibility_changed() -> void:
-	if _hex_panel.visible and _country_panel.visible:
+## The tile window shown (a hex selected) replaces the country panel in the dock.
+func _on_tile_window_visibility_changed() -> void:
+	if not _tile_window.visible:
+		hide_row_card()
+	if _tile_window.visible and _country_panel.visible:
 		_country_panel.clear()
 
 

@@ -43,7 +43,7 @@ static func raise_cap(game: Game, hex: Vector2i) -> int:
 
 
 ## The Raise tab is offered on a settlement of the player's own land, in a game with countries (M6, 6.8; L19). Moved here
-## from RaiseList.offered (TW1) so that TileView may read it; the raise list calls this.
+## from the old raise list (TW1) so that TileView may read it; the raise list calls this.
 static func raise_offered(game: Game, tag: StringName, hex: Vector2i) -> bool:
 	if game == null or game.map == null or game.state == null or tag == &"" or not game.has_countries():
 		return false

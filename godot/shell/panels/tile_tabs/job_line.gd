@@ -1,4 +1,4 @@
-## The job line of the hex panel (spec R10), moved out of hex_panel.gd in TW2 with its words and Cancel rule unchanged:
+## The job line of the hex panel (spec R10), moved out of the old hex panel in TW2 with its words and Cancel rule unchanged:
 ## the work under way on the hex (its label, its progress and ready season, "stopped for the winter" while halted) and
 ## Cancel the work for the player's own work only; another country's work has no button. This script is the WorkBox
 ## node of the hex panel: Heading, Text, Progress and Actions children. The panel gives it ask (see BuildRows.ask) and

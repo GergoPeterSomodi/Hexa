@@ -175,3 +175,16 @@ func test_the_badge_reads_the_men_in_light_ink_on_the_dark_badge() -> void:
 	assert_eq(token.badge_text(), viewed, "zoomed out the number is still there")
 	assert_gte(Tokens.contrast_ratio(token.badge_text_colour(), token.badge_fill()), 4.5)
 
+
+
+## A foreign army in sight has a shown token (ArmyView gives it no army ids, and a token with none of its armies walking is drawn).
+func test_a_seen_foreign_army_has_a_shown_token() -> void:
+	var hex := ArmyFixture.find_town(_game)
+	var other := ArmyFixture.other_tag(_game)
+	ArmyFixture.army(_game, other, hex, 0, 300)
+	_game.version += 1
+	assert_true(Knowledge.sees(_game, ArmyFixture.TAG, hex), "the town is in the player's sight")
+	_armies().sync()
+	var token := _armies().tokens().token_at(hex, other)
+	assert_not_null(token, "the foreign army in sight has a token")
+	assert_true(token.visible, "and it is shown")

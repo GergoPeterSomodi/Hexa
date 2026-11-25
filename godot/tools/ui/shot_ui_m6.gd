@@ -346,17 +346,17 @@ static func _prepare_scene(app: Node, scene_name: String) -> bool:
 			scene.call("select_hex", GENOA)
 			await _frames(tree, 3)
 			var hex_panel := scene.call("panel") as Control
-			if hex_panel == null or not hex_panel.has_method("show_raise"):
+			if hex_panel == null or not hex_panel.has_method("show_tab"):
 				return false
-			hex_panel.call("show_raise")
+			hex_panel.call("show_tab", &"army")
 			await _frames(tree, 4)
-			# The Raise rows sit low in the panel's scroll: scroll them into view so the picture shows them.
-			var raise_list := hex_panel.call("raise_list") as Control
+			# The raise rows sit low in the window's scroll: scroll them into view so the picture shows them.
+			var raise_rows := hex_panel.call("tab_node") as Control
 			var scroll := hex_panel.get_node_or_null("Scroll") as ScrollContainer
-			if scroll != null and raise_list != null:
-				scroll.ensure_control_visible(raise_list)
+			if scroll != null and raise_rows != null:
+				scroll.ensure_control_visible(raise_rows)
 			await _frames(tree, 3)
-			return hex_panel.is_visible_in_tree() and raise_list != null
+			return hex_panel.is_visible_in_tree() and raise_rows != null
 		"m6_hex_menu":
 			fixture_ids = await _fixture(tree, session, g)
 			scene.call("select_hex", GENOA)

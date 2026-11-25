@@ -286,3 +286,91 @@ func test_the_tab_writes_nothing_to_the_game() -> void:
 	for token: String in forbidden:
 		assert_false(text.contains(token), "the Land tab never uses: " + token)
 	assert_false(text.contains("Session"), "the Land tab reads no session")
+
+
+# --- cases folded in from test_hex_panel_people.gd (TW16): the outlook in its tone -----------------------------------------
+
+
+## The Land tab's outlook line (the label that starts with `start`), or null.
+func _outlook_label(start: String) -> Label:
+	var found: Label = null
+	for node: Node in _tab.find_children("*", "Label", true, false):
+		if (node as Label).text.begins_with(start):
+			found = node as Label
+	return found
+
+
+func test_each_outlook_tone_has_its_theme_variation() -> void:
+	assert_eq(LAND._tone_variation(&"good"), &"NumberGood")
+	assert_eq(LAND._tone_variation(&"bad"), &"NumberBad")
+	assert_eq(LAND._tone_variation(&"warn"), &"NumberWarn")
+	assert_eq(LAND._tone_variation(&"plain"), &"TableRow")
+
+
+func test_the_outlook_line_is_in_the_views_tone() -> void:
+	_gen_start()
+	var hex := _hex_of_country(&"GEN", true)
+	var game := Session.game
+	var outlook := PeopleView.outlook(game, hex)
+	assert_false(outlook.is_empty(), "your town has an outlook")
+	_fill(game, &"GEN", hex, _view(game, &"GEN", hex))
+	var line := _outlook_label(str(outlook["text"]))
+	assert_not_null(line, "the outlook line shows")
+	assert_eq(line.theme_type_variation, LAND._tone_variation(StringName(str(outlook["tone"]))), "in its tone")
+
+
+func test_a_hungry_town_gives_a_bad_outlook() -> void:
+	_gen_start()
+	var hex := _hex_of_country(&"GEN", true)
+	Countries.by_tag(Session.game, &"GEN").food_fed = 0
+	_fill(Session.game, &"GEN", hex, _view(Session.game, &"GEN", hex))
+	var line := _outlook_label("Hungry")
+	assert_not_null(line, "the hunger line shows")
+	assert_eq(line.theme_type_variation, &"NumberBad", "hunger is bad")
+
+
+func test_a_countryside_over_its_room_is_crowded_and_warn() -> void:
+	_gen_start()
+	var hex := _hex_of_country(&"GEN", false)
+	assert_ne(hex, Vector2i(-1, -1), "Genoa has countryside")
+	var room := int(PeopleView.at(Session.game, &"GEN", hex)["room"])
+	assert_true(Session.dev_people(hex, room + 500), "the people go over the room")
+	_fill(Session.game, &"GEN", hex, _view(Session.game, &"GEN", hex))
+	var line := _outlook_label("Crowded")
+	assert_not_null(line, "the crowding line shows")
+	assert_eq(line.theme_type_variation, &"NumberWarn", "crowding is a warning")
+
+
+func test_a_countryside_with_room_left_is_plain() -> void:
+	_gen_start()
+	var hex := _hex_of_country(&"GEN", false)
+	assert_true(Session.dev_people(hex, 0), "an empty countryside hex")
+	_fill(Session.game, &"GEN", hex, _view(Session.game, &"GEN", hex))
+	var line := _outlook_label("Room for")
+	assert_not_null(line, "the room line shows")
+	assert_eq(line.theme_type_variation, &"TableRow", "room left is plain")
+
+
+func test_a_town_that_can_grow_gives_a_good_outlook() -> void:
+	_gen_start()
+	var game := Session.game
+	var c := Countries.by_tag(game, &"GEN")
+	var hex := Vector2i(-1, -1)
+	var said := PackedStringArray()
+	for i: int in Territory.districts(game, c.id):
+		if int(game.state.main_use[i]) != People.SETTLEMENTS:
+			continue
+		# Genoa's towns start at or above the top growing level: a hamlet (level 1) is set up for the test.
+		game.state.level[i] = 1
+		var here := game.map.hex_of(i)
+		Session.dev_people(here, int(PeopleView.at(game, &"GEN", here)["room"]))
+		var o := PeopleView.outlook(game, here)
+		said.append("%s/%s" % [str(o.get("tone", "")), str(o.get("text", ""))])
+		if str(o.get("tone", "")) == "good":
+			hex = here
+			break
+	assert_ne(hex, Vector2i(-1, -1), "a Genoese town can grow into the next level; said: " + " | ".join(said))
+	_fill(game, &"GEN", hex, _view(game, &"GEN", hex))
+	var line := _outlook_label(str(PeopleView.outlook(game, hex)["text"]))
+	assert_not_null(line)
+	assert_eq(line.theme_type_variation, &"NumberGood", "growth is good")

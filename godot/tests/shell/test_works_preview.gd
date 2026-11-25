@@ -1,6 +1,6 @@
 ## GUT tests for WorksPreview (docs/architecture/m4-build-spec.md 6.5, 6.12): the card of a real ImprovePreview, Begin's
 ## request, Enter and U, Esc, pin (two options on one scale), Shift holding the card, the treasury switch (remembered),
-## the placement left of the hex panel at 1280 x 720 and 2560 x 1440, and the wheel.
+## the placement left of the tile window at 1280 x 720 and 2560 x 1440, and the wheel.
 extends GutTest
 
 const WORKS_PREVIEW_SCENE := preload("res://shell/screens/works_preview.tscn")
@@ -182,7 +182,7 @@ func _overflows(screen: WorksPreview, vp: Vector2) -> bool:
 	return r.position.x < 0.0 or r.position.y < 0.0 or r.end.x > vp.x or r.end.y > vp.y
 
 
-func test_card_opens_left_of_the_hex_panel_at_1280_x_720() -> void:
+func test_card_opens_left_of_the_tile_window_at_1280_x_720() -> void:
 	var screen := _open()
 	await _harness.wait_frames(self, 2)
 	var vp := Vector2(1280, 720)
@@ -196,7 +196,7 @@ func test_card_opens_left_of_the_hex_panel_at_1280_x_720() -> void:
 	assert_gte(r.size.x, float(WorksPreview.CARD_W))
 
 
-func test_card_opens_left_of_the_hex_panel_at_2560_x_1440() -> void:
+func test_card_opens_left_of_the_tile_window_at_2560_x_1440() -> void:
 	var big := UIHarness.new(Vector2i(2560, 1440))
 	big.mount(self)
 	big.stack.theme = KitTheme.load_for(1.0)
@@ -267,25 +267,41 @@ func test_an_explicit_open_takes_the_focus_on_begin() -> void:
 	assert_true(screen.card().begin_button().has_focus(), "the info button or U focuses Begin")
 
 
-func test_focused_hex_panel_row_keeps_the_card_open() -> void:
+func test_focused_tile_window_row_keeps_the_card_open() -> void:
 	var hex: Vector2i = _accepted_build()[0]
-	var panel := (load("res://shell/panels/hex_panel.tscn") as PackedScene).instantiate() as HexPanel
+	var panel := (load("res://shell/panels/tile_window.tscn") as PackedScene).instantiate() as TileWindow
 	panel.theme = KitTheme.load_for(1.0)
+	var settings := Settings.new("macOS", false)
+	assert_true(settings.set_value("game/confirm_works", "always"))
+	panel.set_settings(settings)
 	_harness.viewport.add_child(panel)
 	panel.show_hex(hex)
+	assert_eq(panel.tab_open(), &"buildings", "an own hex opens on the Buildings tab")
 	var screen := WORKS_PREVIEW_SCENE.instantiate() as WorksPreview
 	_harness.stack.push(screen)
-	panel.row_hovered.connect(func(h: Vector2i, option: Dictionary) -> void: screen.show_option(h, option))
+	# Under the "always" rule the hammer asks for the works card; the card is opened here as the App does.
+	panel.works_requested.connect(func(what: StringName, args: Dictionary) -> void:
+		if what == &"works_card":
+			screen.show_option(args["hex"], args["option"])
+	)
 	panel.row_unhovered.connect(func() -> void:
 		if is_instance_valid(screen):
 			screen.leave()
 	)
 	var buttons := panel.action_buttons()
 	assert_gt(buttons.size(), 0, "the hex has rows")
-	buttons[0].grab_focus()
+	var hammer: Button = null
+	for button: Button in buttons:
+		if not button.disabled:
+			hammer = button
+			break
+	assert_not_null(hammer, "a hammer can be pressed")
+	hammer.pressed.emit()
+	assert_eq(screen.shown_hex(), hex, "the hammer opened the card for the row")
+	hammer.grab_focus()
 	await _harness.wait_frames(self, 2)
 	assert_eq(_harness.stack.count(), 1, "the card stays while the row has focus")
-	assert_true(buttons[0].has_focus(), "the row keeps its focus")
+	assert_true(hammer.has_focus(), "the row keeps its focus")
 	assert_false(screen.card().begin_button().has_focus(), "the hover did not move the focus to Begin")
 	panel.free()
 

@@ -1,8 +1,8 @@
-## The works rows of the Build tab (spec R17), moved out of hex_panel.gd in TW2 with their words, order and signal
+## The works rows of the Build tab (spec R17), moved out of the old hex panel in TW2 with their words, order and signal
 ## names unchanged. This script is the Actions box of the hex panel (the ActionsBox node): a heading, then one row per
 ## ImprovePreview.options_of option: a KitButton with its cost text, an (i) button for the works card, up to three
 ## DeltaChips and the reason under a refused row. A click follows game/confirm_works.
-## The panel gives the rows: ask (the App's works requests, see HexPanel: true when a listener took the request, false
+## The panel gives the rows: ask (the App's works requests, see TileWindow: true when a listener took the request, false
 ## when none listens and the row acts itself, the M3 path), retired (the panel's freed-later nodes), settings and the hex.
 ##   &"works_card"  {hex, option}   the (i) button, and a click under the "always" rule (or "expensive" for an expensive row)
 ##   &"begin_work"  {hex, option}   a click that begins the work

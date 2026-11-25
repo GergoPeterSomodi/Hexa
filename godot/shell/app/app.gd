@@ -307,7 +307,7 @@ func _open_main_menu() -> void:
 	if _hud != null:
 		_hud.close_popovers()
 		_hud.set_debug_open(false)
-		_hud.hex_panel().clear()
+		_hud.tile_window().clear()
 		_hud.set_hud_visible(true)
 	RenderingServer.set_default_clear_color(Tokens.BG)
 	var menu := ScreenIds.make(&"main_menu")
@@ -421,7 +421,7 @@ func _mount_map_scene(map_id_val: String, seed_val: int) -> void:
 	_world.add_child(scene)
 	_map_scene = scene
 	scene.configure(_settings)
-	scene.set_panel(_hud.hex_panel())
+	scene.set_panel(_hud.tile_window())
 	_hud.bind_map_scene(scene)
 	_routes.bind_scene(scene)
 	_requests.bind_scene(scene)
