@@ -191,7 +191,7 @@ static func owner_of(game: Game, hex: Vector2i) -> String:
 static func of(game: Game, hex: Vector2i) -> Dictionary:
 	if game == null or game.map == null or not game.map.has(hex):
 		return {}
-	if _undiscovered(game, hex):
+	if _undiscovered(game, game.player, hex):
 		return _unexplored(hex)
 	var map := game.map
 	var i := map.index_of(hex)
@@ -290,9 +290,14 @@ static func of(game: Game, hex: Vector2i) -> Dictionary:
 ## besieger and its men; land (discovered, not in sight) reads "Besieged" with the progress and the need, no besieger; and
 ## "Castle area" while a war of the viewer is on. The viewer "" sees everything.
 static func war_rows(game: Game, hex: Vector2i) -> Array:
+	return war_rows_for(game, game.player, hex)
+
+
+## The same rows as the viewer sees them (TW1, the tile window's read): the viewer's fog decides what is named. war_rows
+## (above) is the player's.
+static func war_rows_for(game: Game, viewer: StringName, hex: Vector2i) -> Array:
 	var rows: Array = []
-	var viewer := game.player
-	if _undiscovered(game, hex):
+	if _undiscovered(game, viewer, hex):
 		return rows
 	if Occupation.is_occupied(game, hex):
 		rows.append(["Held by", &"warn", "the " + Occupation.occupier_long_name(game, hex) + _since_text(game, hex)])
@@ -333,8 +338,8 @@ static func _since_text(game: Game, hex: Vector2i) -> String:
 
 ## True when the player has not discovered `hex` (R1, D18): the card then says "Unexplored" and nothing else. A game with no
 ## countries has no fog; the viewer "" sees all (Knowledge.discovered).
-static func _undiscovered(game: Game, hex: Vector2i) -> bool:
-	return game.has_countries() and not Knowledge.discovered(game, game.player, hex)
+static func _undiscovered(game: Game, viewer: StringName, hex: Vector2i) -> bool:
+	return game.has_countries() and not Knowledge.discovered(game, viewer, hex)
 
 
 ## The card of an undiscovered hex (D18): the title "Unexplored" and no other fact (no ground, place, owner or people).

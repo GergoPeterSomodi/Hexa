@@ -42,6 +42,18 @@ static func raise_cap(game: Game, hex: Vector2i) -> int:
 	return fam.raise_cap[level]
 
 
+## The Raise tab is offered on a settlement of the player's own land, in a game with countries (M6, 6.8; L19). Moved here
+## from RaiseList.offered (TW1) so that TileView may read it; the raise list calls this.
+static func raise_offered(game: Game, tag: StringName, hex: Vector2i) -> bool:
+	if game == null or game.map == null or game.state == null or tag == &"" or not game.has_countries():
+		return false
+	if not game.map.has(hex) or not game.map.is_land(hex):
+		return false
+	if Territory.owner_tag(game, hex) != tag:
+		return false
+	return int(game.state.main_use[game.map.index_of(hex)]) == SETTLEMENTS
+
+
 ## Companies of `tag` raised on `hex` this season (their home is the hex and their raising turn is now).
 static func raised_here(game: Game, tag: StringName, hex: Vector2i) -> int:
 	var n := 0

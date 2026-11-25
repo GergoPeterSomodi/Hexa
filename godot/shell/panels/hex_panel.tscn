@@ -1,9 +1,11 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://shell/panels/hex_panel.gd" id="1_panel"]
 [ext_resource type="Script" path="res://shell/ui/cartouche.gd" id="2_cart"]
 [ext_resource type="Script" path="res://shell/ui/segmented.gd" id="3_seg"]
 [ext_resource type="Script" path="res://shell/panels/raise_list.gd" id="4_raise"]
+[ext_resource type="Script" path="res://shell/panels/tile_tabs/job_line.gd" id="5_job"]
+[ext_resource type="Script" path="res://shell/panels/tile_tabs/build_rows.gd" id="6_build"]
 
 [node name="HexPanel" type="PanelContainer"]
 custom_minimum_size = Vector2(296, 0)
@@ -168,6 +170,7 @@ mouse_filter = 2
 visible = false
 layout_mode = 2
 mouse_filter = 2
+script = ExtResource("5_job")
 
 [node name="Heading" type="Label" parent="Scroll/Body/WorkBox"]
 layout_mode = 2
@@ -200,6 +203,7 @@ script = ExtResource("3_seg")
 [node name="ActionsBox" type="VBoxContainer" parent="Scroll/Body"]
 layout_mode = 2
 mouse_filter = 2
+script = ExtResource("6_build")
 
 [node name="Heading" type="Label" parent="Scroll/Body/ActionsBox"]
 layout_mode = 2

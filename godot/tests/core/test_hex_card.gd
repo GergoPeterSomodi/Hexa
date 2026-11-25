@@ -282,7 +282,7 @@ func test_held_by_row_gives_the_capture_season() -> void:
 	WarFixture.set_occupier(g, hex, enemy)
 	g.chronicle.add({"kind": "district_captured", "hex": hex, "tag": String(enemy), "turn": g.turn})
 	var text := ""
-	for row: Array in HexCard.war_rows(g, hex):
+	for row: Array in HexCard.war_rows_for(g, g.player, hex):
 		if str(row[0]) == "Held by":
 			text = str(row[2])
 	assert_true(text.begins_with("the "), "the occupier's long name: %s" % text)
@@ -472,6 +472,14 @@ func test_an_undiscovered_hex_reads_unexplored_and_nothing_else() -> void:
 	assert_gt(placed, 0, "an undiscovered hex with a place name exists")
 
 
+## TW1: the viewer's fog decides the war rows (war_rows_for); a viewer that has discovered nothing gets none on an occupied hex.
+func test_war_rows_for_reads_the_viewer_not_the_player() -> void:
+	var g := ArmyFixture.game()
+	var hex := ArmyFixture.find_town(g)
+	WarFixture.set_occupier(g, hex, WarFixture.neighbour_of(g, ArmyFixture.TAG))
+	assert_false(HexCard.war_rows(g, hex).is_empty(), "the player sees the occupation")
+	assert_true(HexCard.war_rows_for(g, &"NOBODY", hex).is_empty(), "a viewer with no discovery gets no rows")
+
 ## Fog build (R19, D6): a light-fog fortress shows its garrison exact, never rounded or "a garrison".
 func test_a_light_fog_fortress_shows_its_garrison_exact() -> void:
 	var game := PeopleFixture.genoa()
@@ -484,7 +492,7 @@ func test_a_light_fog_fortress_shows_its_garrison_exact() -> void:
 			continue
 		light += 1
 		var text := ""
-		for row: Array in HexCard.war_rows(game, hex):
+		for row: Array in HexCard.war_rows_for(game, game.player, hex):
 			if str(row[0]) == "Fortress":
 				text = str(row[2])
 		var expect := "garrison %d of %d" % [Occupation.garrison_of(game, hex), Occupation.garrison_full(game, hex)]
@@ -534,7 +542,7 @@ func test_a_light_fog_siege_reads_besieged_and_names_no_besieger() -> void:
 
 
 func _siege_row(g: Game, hex: Vector2i) -> String:
-	for row: Array in HexCard.war_rows(g, hex):
+	for row: Array in HexCard.war_rows_for(g, g.player, hex):
 		if str(row[0]) == "Siege":
 			return str(row[2])
 	return ""

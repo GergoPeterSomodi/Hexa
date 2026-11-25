@@ -42,6 +42,7 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   "$GODOT" --headless --path godot -s res://tools/build_map.gd -- --check       # check committed MapData
   "$GODOT" --headless --path godot -s res://tools/build_scenario.gd -- --check  # check committed scenarios
   "$GODOT" --headless --path godot -s res://tools/build_theme.gd -- --check     # check committed Studiolo themes
+  "$GODOT" --headless --path godot -s res://tools/build_tile_tabs.gd -- --check  # check the tile window's tab index
   python tools/bake_ui.py --check                                  # check Studiolo baked UI kit
   "$GODOT" --headless --path godot -s res://tools/perf_core.gd -- --out=perf_core.json   # core speed table vs tests/perf_core_budget.json (nightly; ~3 min, exit 1 past a limit)
   "$GODOT" --headless --path godot -s res://tools/economy_report.gd -- --seeds=1480-1484 --seasons=12   # M4 economy report: per country treasury, income lines, stores (--actions=random, --weather=calm; one seed: --seed=N)

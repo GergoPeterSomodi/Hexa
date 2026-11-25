@@ -31,16 +31,9 @@ func _init() -> void:
 	add_child(_rows)
 
 
-## The Raise tab is offered on a settlement of the player's own land, in a game with countries: the one rule the hex
-## panel and the hex menu share.
+## The Raise tab's rule is Military.raise_offered (in core, TW1); the hex panel and the hex menu keep calling this name.
 static func offered(game: Game, tag: StringName, hex: Vector2i) -> bool:
-	if game == null or game.map == null or game.state == null or tag == &"" or not game.has_countries():
-		return false
-	if not game.map.has(hex) or not game.map.is_land(hex):
-		return false
-	if Territory.owner_tag(game, hex) != tag:
-		return false
-	return int(game.state.main_use[game.map.index_of(hex)]) == Economy.SETTLEMENTS
+	return Military.raise_offered(game, tag, hex)
 
 
 ## Shows the list for `hex` (the hex panel calls it on each refresh while the tab is open).
@@ -58,7 +51,7 @@ func refresh() -> void:
 	var game := Session.game
 	var tag := Session.player_tag()
 	PanelKit.clear_children(_rows, _retired)
-	if not offered(game, tag, _hex):
+	if not Military.raise_offered(game, tag, _hex):
 		visible = false
 		_head.text = ""
 		return

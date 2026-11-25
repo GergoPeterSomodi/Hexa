@@ -54,6 +54,16 @@ func _events(kind: String) -> Array:
 # ----- definitions and numbers -----------------------------------------------------------------------------------------
 
 
+## TW1: the Raise tab's rule in core: an own settlement offers it; own wild land, no tag and no hex do not.
+func test_raise_offered_is_an_own_settlement_only() -> void:
+	assert_true(Military.raise_offered(_g, _tag, _hex), "an own settlement offers the Raise tab")
+	var wild := _hex_where(_tag, func(i: int) -> bool: return int(_g.state.main_use[i]) != Military.SETTLEMENTS)
+	if wild != ArmyFixture.NO_HEX:
+		assert_false(Military.raise_offered(_g, _tag, wild), "own wild land does not")
+	assert_false(Military.raise_offered(_g, &"", _hex), "no tag offers nothing")
+	assert_false(Military.raise_offered(_g, _tag, ArmyFixture.NO_HEX), "no hex offers nothing")
+
+
 func test_cost_and_upkeep_of_a_company() -> void:
 	var cost := Military.cost_of(_g, 0, 3)
 	assert_eq(cost["ducats"], 75)

@@ -55,6 +55,13 @@ static func place_of(map: MapData, hex: Vector2i) -> Dictionary:
 	return map.places[p]
 
 
+## True when the hex is a port as the economy counts it: a place of level 1 or more with a port and a shore. Moved here from
+## AiKnow (TW1) so that the tile window's view (TileView) may read it; AiKnow.is_port calls this.
+static func is_port(game: Game, hex: Vector2i) -> bool:
+	var place := place_of(game.map, hex)
+	return bool(place.get("port", false)) and int(place.get("level", 0)) >= 1 and game.map.coast_mask(hex) != 0
+
+
 static func _port_mode(place: Dictionary) -> String:
 	var mode := str(place.get("port_mode", ""))
 	return mode if mode != "" else "seaside"

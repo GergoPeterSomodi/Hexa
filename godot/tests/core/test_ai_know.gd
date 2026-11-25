@@ -21,6 +21,14 @@ func _venetian(g: Game, hex: Vector2i, count: int) -> Army:
 	return a
 
 
+## TW1: the door's is_port answers as Improve.is_port does (the rule moved; the door keeps its name), on every hex.
+func test_the_door_is_port_is_the_improve_rule_on_every_hex() -> void:
+	var g := _game()
+	for i: int in g.map.hex_count():
+		var hex := g.map.hex_of(i)
+		assert_eq(AiKnow.is_port(g, hex), Improve.is_port(g, hex), "the same answer at %s" % str(hex))
+
+
 func test_seen_enemies_are_only_the_seen_and_banded_without_the_army() -> void:
 	var g := _game()
 	WarFixture.at_war(g, AiFixture.MILAN, AiFixture.VENICE)

@@ -250,10 +250,9 @@ static func ground(game: Game, hex: Vector2i) -> Dictionary:
 	return {"cover": int(game.map.cover[i]), "climate": int(game.map.climate[i])}
 
 
-## True when the hex is a port as the economy counts it: a place of level 1 or more with a port and a shore.
+## True when the hex is a port as the economy counts it (the rule is Improve.is_port; the door reads it through here).
 static func is_port(game: Game, hex: Vector2i) -> bool:
-	var place := Improve.place_of(game.map, hex)
-	return bool(place.get("port", false)) and int(place.get("level", 0)) >= 1 and game.map.coast_mask(hex) != 0
+	return Improve.is_port(game, hex)
 
 
 ## The animal or ore (or "-") that a grazing or mines district of `family` and `level` would have on the hex.
