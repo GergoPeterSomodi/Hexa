@@ -142,7 +142,7 @@ func block_orders(reason: String) -> void:
 func _refuses() -> bool:
 	if _block_reason.is_empty():
 		return false
-	var now := int(clock.call()) if clock.is_valid() else Time.get_ticks_msec()
+	var now := int(clock.call()) if clock.is_valid() else SimClock.msec()
 	if now - _blocked_at >= BLOCKED_GAP_MS:
 		_blocked_at = now
 		blocked.emit(_block_reason)

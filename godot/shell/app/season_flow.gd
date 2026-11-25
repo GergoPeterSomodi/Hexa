@@ -382,7 +382,7 @@ func _toast(text: String, tone: StringName, key_action: StringName) -> void:
 
 
 func _now() -> int:
-	return int(clock.call()) if clock.is_valid() else Time.get_ticks_msec()
+	return int(clock.call()) if clock.is_valid() else SimClock.msec()
 
 
 func _setting(key: String, fallback: String) -> String:

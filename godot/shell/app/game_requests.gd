@@ -57,7 +57,7 @@ func setup() -> void:
 	flow = SeasonFlow.new()
 	flow.name = "SeasonFlow"
 	flow.settings = _app.settings()
-	flow.clock = Callable(Time, "get_ticks_msec")
+	flow.clock = Callable(SimClock, "msec")
 	ai_turn = AiTurnUI.new(_app, flow)
 	flow.show_season = _show_season
 	flow.push_report = _push_report
@@ -690,9 +690,9 @@ func _save_refusal() -> String:
 ## The picture and the file; the time of the write goes to F3.
 func _write(slot: String, save_name: String) -> String:
 	var image := await _thumbnail()
-	var started := Time.get_ticks_usec()
+	var started := SimClock.usec()
 	var problem := Session.save_game(slot, image, ui_block(), save_name)
-	_app.hud().debug_overlay().record_save_ms(float(Time.get_ticks_usec() - started) / 1000.0)
+	_app.hud().debug_overlay().record_save_ms(float(SimClock.usec() - started) / 1000.0)
 	return problem
 
 
@@ -702,9 +702,9 @@ func _autosave() -> void:
 		return
 	_busy = true
 	var image := await _thumbnail()
-	var started := Time.get_ticks_usec()
+	var started := SimClock.usec()
 	var problem := Session.autosave_game(image, ui_block())
-	_app.hud().debug_overlay().record_save_ms(float(Time.get_ticks_usec() - started) / 1000.0)
+	_app.hud().debug_overlay().record_save_ms(float(SimClock.usec() - started) / 1000.0)
 	_busy = false
 	if problem.is_empty():
 		_toast("Autosaved.")

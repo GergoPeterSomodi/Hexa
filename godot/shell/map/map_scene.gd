@@ -283,24 +283,24 @@ func finish_loading() -> void:
 
 ## Up to `budget_ms` of loading: the far picture first, then tiles nearest camera, then lines, then borders.
 func _load_step(budget_ms: float) -> void:
-	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
+	var until := SimClock.usec() + int(budget_ms * 1000.0)
 	if _far.is_building():
 		_far.step(budget_ms)
 	if _view.is_filling():
-		_view.fill_for(float(until - Time.get_ticks_usec()) / 1000.0)
-	if Time.get_ticks_usec() < until and not _line_queue.is_empty():
-		_line_step(float(until - Time.get_ticks_usec()) / 1000.0)
-	if Time.get_ticks_usec() < until and not _border_queue.is_empty():
-		_border_step(float(until - Time.get_ticks_usec()) / 1000.0)
+		_view.fill_for(float(until - SimClock.usec()) / 1000.0)
+	if SimClock.usec() < until and not _line_queue.is_empty():
+		_line_step(float(until - SimClock.usec()) / 1000.0)
+	if SimClock.usec() < until and not _border_queue.is_empty():
+		_border_step(float(until - SimClock.usec()) / 1000.0)
 
 
 ## Builds the lines of the queued chunks, one at least, until the time is up.
 func _line_step(budget_ms: float) -> void:
-	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
+	var until := SimClock.usec() + int(budget_ms * 1000.0)
 	while not _line_queue.is_empty():
 		var chunk: Vector2i = _line_queue.pop_front()
 		_view.set_chunk_lines(chunk, EdgeLines.for_chunk(_loading_map, _loading_state, chunk))
-		if Time.get_ticks_usec() >= until:
+		if SimClock.usec() >= until:
 			break
 
 
@@ -309,13 +309,13 @@ func _border_step(budget_ms: float) -> void:
 	if _loading_map == null or _loading_state == null:
 		_border_queue.clear()
 		return
-	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
+	var until := SimClock.usec() + int(budget_ms * 1000.0)
 	while not _border_queue.is_empty():
 		var chunk: Vector2i = _border_queue.pop_front()
 		_view.set_chunk_borders(chunk, BorderLines.for_chunk(_loading_map, _loading_state.owner, chunk, _active_palette))
 		border_chunk_rebuilds += 1
 		last_rebuilt_border_chunks.append(chunk)
-		if Time.get_ticks_usec() >= until:
+		if SimClock.usec() >= until:
 			break
 
 

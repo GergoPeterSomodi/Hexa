@@ -24,7 +24,7 @@ const LOG_SLIDE_DURATION := 0.16
 ## Slides the action log's card up from `LOG_SLIDE_PX` below its rest height `rest_y` while it fades in (opening), or down
 ## to it while it fades out (closing). When `reduce_motion` is true it sets the final state at once and returns `null`.
 static func log_sheet(sheet: Control, rest_y: float, opening: bool, reduce_motion: bool = false) -> Tween:
-	if reduce_motion:
+	if reduce_motion or SimClock.fixed():
 		sheet.position.y = rest_y
 		sheet.modulate.a = 1.0 if opening else 0.0
 		return null
@@ -42,7 +42,7 @@ static func log_sheet(sheet: Control, rest_y: float, opening: bool, reduce_motio
 ## Fades a lazy `Glow` child in (1.0) on hover/focus or out (0.0) on exit over 120 ms.
 static func hover_glow(glow_node: Control, hot: bool, reduce_motion: bool = false) -> Tween:
 	var target_alpha := 1.0 if hot else 0.0
-	if reduce_motion:
+	if reduce_motion or SimClock.fixed():
 		glow_node.modulate.a = target_alpha
 		return null
 	var tween := _make_tween(glow_node)
@@ -54,7 +54,7 @@ static func hover_glow(glow_node: Control, hot: bool, reduce_motion: bool = fals
 ## and alpha 0.0 -> 1.0 in the first 60 ms.
 static func press_seal(seal_node: Control, reduce_motion: bool = false) -> Tween:
 	seal_node.pivot_offset = seal_node.size * 0.5
-	if reduce_motion:
+	if reduce_motion or SimClock.fixed():
 		seal_node.scale = Vector2.ONE
 		seal_node.modulate.a = 1.0
 		return null
@@ -71,7 +71,7 @@ static func press_seal(seal_node: Control, reduce_motion: bool = false) -> Tween
 
 ## Enters a modal or panel frame: alpha 0.0 -> 1.0 and `position.y` +6.0 -> 0.0 over 120 ms.
 static func enter(frame_node: Control, reduce_motion: bool = false) -> Tween:
-	if reduce_motion:
+	if reduce_motion or SimClock.fixed():
 		frame_node.modulate.a = 1.0
 		frame_node.position.y = 0.0
 		return null
@@ -91,7 +91,7 @@ static func enter(frame_node: Control, reduce_motion: bool = false) -> Tween:
 ## Cross-fades two pages sharing a plain parent `Control` over 120 ms, then hides `out_node`. `keep_visible` (optional, a
 ## Callable taking a node) names a node the end of the fade must not hide: a later switch may have brought it back into view.
 static func cross_fade(out_node: CanvasItem, in_node: CanvasItem, reduce_motion: bool = false, keep_visible: Callable = Callable()) -> Tween:
-	if reduce_motion:
+	if reduce_motion or SimClock.fixed():
 		if out_node != null and out_node != in_node:
 			out_node.modulate.a = 0.0
 			out_node.visible = false
@@ -123,7 +123,7 @@ static func cross_fade(out_node: CanvasItem, in_node: CanvasItem, reduce_motion:
 static func spin_ring(ring_node: Control, reduce_motion: bool = false) -> Tween:
 	ring_node.pivot_offset = ring_node.size * 0.5
 	ring_node.rotation = 0.0
-	if reduce_motion:
+	if reduce_motion or SimClock.fixed():
 		return null
 	var tween := _make_tween(ring_node)
 	tween.set_loops()
@@ -135,7 +135,7 @@ static func spin_ring(ring_node: Control, reduce_motion: bool = false) -> Tween:
 static func drift_map(bg_node: Control, reduce_motion: bool = false) -> Tween:
 	bg_node.pivot_offset = bg_node.size * 0.5
 	bg_node.scale = Vector2.ONE
-	if reduce_motion:
+	if reduce_motion or SimClock.fixed():
 		return null
 	var tween := _make_tween(bg_node)
 	tween.set_loops()
@@ -152,7 +152,7 @@ static func drift_map(bg_node: Control, reduce_motion: bool = false) -> Tween:
 static func wiggle_rose(rose_node: Control, reduce_motion: bool = false) -> Tween:
 	rose_node.pivot_offset = rose_node.size * 0.5
 	rose_node.rotation = 0.0
-	if reduce_motion:
+	if reduce_motion or SimClock.fixed():
 		return null
 	var amp := deg_to_rad(3.5)
 	var tween := _make_tween(rose_node)
@@ -167,7 +167,7 @@ static func wiggle_rose(rose_node: Control, reduce_motion: bool = false) -> Twee
 static func spin_rose(rose_node: Control, reduce_motion: bool = false) -> Tween:
 	rose_node.pivot_offset = rose_node.size * 0.5
 	rose_node.rotation = 0.0
-	if reduce_motion:
+	if reduce_motion or SimClock.fixed():
 		return null
 	var tween := _make_tween(rose_node)
 	tween.set_loops()

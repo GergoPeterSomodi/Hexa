@@ -124,7 +124,7 @@ func reseed() -> void:
 
 func _process(delta: float) -> void:
 	if game != null and not get_tree().paused:
-		play_seconds += delta
+		play_seconds += SimClock.delta(delta)
 
 
 ## Puts a game that exists already in place (a loaded save, a test's game over a made-up map).
@@ -229,12 +229,12 @@ func begin_season() -> Dictionary:
 func step_orders(budget_ms: float) -> bool:
 	if not _in_season:
 		return true
-	var started := Time.get_ticks_usec()
+	var started := SimClock.usec()
 	while true:
-		var t0 := Time.get_ticks_usec()
+		var t0 := SimClock.usec()
 		var done := Season.orders_step(game)
 		drain()
-		var now := Time.get_ticks_usec()
+		var now := SimClock.usec()
 		var step_ms := float(now - t0) / 1000.0
 		last_phase_ms["ai_orders"] = float(last_phase_ms.get("ai_orders", 0.0)) + step_ms
 		ai_worst_step_ms = maxf(ai_worst_step_ms, step_ms)
@@ -272,15 +272,15 @@ func finish_step() -> bool:
 			phases.append(phase)
 	if _finish_next == 0:
 		_ended_turn = game.turn
-		var started := Time.get_ticks_usec()
+		var started := SimClock.usec()
 		Season.orders_end(game)
 		drain()
-		last_phase_ms["ai_orders"] = float(last_phase_ms.get("ai_orders", 0.0)) + float(Time.get_ticks_usec() - started) / 1000.0
+		last_phase_ms["ai_orders"] = float(last_phase_ms.get("ai_orders", 0.0)) + float(SimClock.usec() - started) / 1000.0
 	elif _finish_next <= phases.size():
 		var phase: StringName = phases[_finish_next - 1]
-		var started := Time.get_ticks_usec()
+		var started := SimClock.usec()
 		Season.run_phase(game, phase)
-		last_phase_ms[String(phase)] = float(Time.get_ticks_usec() - started) / 1000.0
+		last_phase_ms[String(phase)] = float(SimClock.usec() - started) / 1000.0
 		drain()
 	else:
 		Season.finish(game)

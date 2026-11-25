@@ -253,6 +253,10 @@ func _m6_march(rng: Rng, vp: SubViewport, app: App) -> void:
 			goals.append(hex)
 	if goals.is_empty():
 		return
+	# issue 457: an open debug overlay (F3) covers the map and takes the clicks: the march goals are clicked with it closed
+	if app.hud().debug_overlay().is_open():
+		app.hud().debug_overlay().set_open(false)
+		await _wait_frames(1)
 	var start := rng.randi_range(0, goals.size() - 1)
 	for step: int in mini(goals.size(), 4):
 		var goal := goals[(start + step) % goals.size()]
@@ -468,8 +472,8 @@ func _m6_end(rng: Rng, vp: SubViewport, app: App) -> void:
 	for _attempt: int in 5:
 		if await _m6_end_once(rng, vp, app) or Session.game == null:
 			return
-		var opened := Time.get_ticks_msec()
-		while Time.get_ticks_msec() - opened < GUARD_MSEC:  # the report's guard refuses an End season this soon after it closed
+		var opened := SimClock.msec()
+		while SimClock.msec() - opened < GUARD_MSEC:  # the report's guard refuses an End season this soon after it closed
 			await _wait_frames(2)
 		if not _m6_has_march():
 			await _m6_march(rng, vp, app)

@@ -63,6 +63,29 @@ func _m8_check(app: App, prev_game: Game, from_len: int, prev_turn: int, prev_un
 	return touched
 
 
+## issue 457: the replay skip is held by the seed's sequence (a replay is up at a step's start only by chance, and the fixed
+## clock makes the chance the same every run), so a seed that has skipped none by FORCE_M8_SKIP_STEP ends one season and skips
+## its replay, as the counter needs. A season that has no replay just passes.
+func _m8_force_skip(vp: SubViewport, app: App) -> void:
+	if not _m8 or Session.game == null or app.stack().count() > 0 or app.requests().flow.state() != SeasonFlow.State.IDLE:
+		return
+	await _m8_wait_until(func() -> bool: return SimClock.msec() >= app.requests().flow.guard_until, 600)
+	_send_chord(vp, KEY_SPACE)
+	if app.requests().flow.state() == SeasonFlow.State.RUNNING and Session.in_season():  # the season is up at once: F5 comes next
+		var game := Session.game
+		_send_chord(vp, KEY_F5)  # refused while the countries move (the counter the M8 end check asks for)
+		await _wait_frames(1)
+		if Session.in_season():
+			assert_eq(Session.game, game, "%s: F5 does nothing while the countries move" % _tag)
+			_bump("m8_refused_files")
+	await _m8_wait_until(func() -> bool: return app.requests().flow.state() != SeasonFlow.State.RUNNING, M8_SEASON_WAIT)
+	if app.requests().flow.state() != SeasonFlow.State.REPLAY:
+		return
+	_send_chord(vp, KEY_SPACE)
+	if await _m8_wait_until(func() -> bool: return app.requests().flow.state() != SeasonFlow.State.REPLAY, M8_WAIT_LIMIT):
+		_bump("m8_skips")
+
+
 func _m8_wait_until(done: Callable, limit: int) -> bool:
 	var frames := 0
 	while not bool(done.call()) and frames < limit:

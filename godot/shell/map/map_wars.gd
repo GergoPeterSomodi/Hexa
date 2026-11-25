@@ -192,7 +192,7 @@ func _build_until(budget_ms: float) -> void:
 	if game == null or game.map == null or not _area_on:
 		_area_queue.clear()
 		return
-	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
+	var until := SimClock.usec() + int(budget_ms * 1000.0)
 	var viewer := Session.player_tag()
 	var palette := MapModes.palette(game, _colour_blind())
 	while not _area_queue.is_empty():
@@ -201,7 +201,7 @@ func _build_until(budget_ms: float) -> void:
 		for line: Dictionary in lines:
 			line["colour"] = _ink(palette, int(line["colour_id"]))
 		_view.set_chunk_areas(chunk, lines)
-		if Time.get_ticks_usec() >= until:
+		if SimClock.usec() >= until:
 			break
 
 

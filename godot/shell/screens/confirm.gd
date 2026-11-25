@@ -74,7 +74,7 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if not _timer_active or _resolved:
 		return
-	_remaining_s -= delta
+	_remaining_s -= SimClock.delta(delta)
 	if _remaining_s <= 0.0:
 		_remaining_s = 0.0
 		_update_countdown_display()

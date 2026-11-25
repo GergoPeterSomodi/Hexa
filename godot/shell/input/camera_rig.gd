@@ -435,11 +435,12 @@ func _process(delta: float) -> void:
 	if camera == null:
 		return
 	_sync_held_inputs()
+	var step := SimClock.delta(delta)
 	if enabled:
-		_step_key_pan(delta)
-		_step_edge_pan(delta)
-	_step_glide(delta)
-	_step_zoom(delta)
+		_step_key_pan(step)
+		_step_edge_pan(step)
+	_step_glide(step)
+	_step_zoom(step)
 	_emit_view_if_changed()
 
 

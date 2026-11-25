@@ -40,6 +40,9 @@ const FOG_SEEDS: Array[int] = [1504, 1505, 1506]
 ## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
 const FORCE_SEASON_STEP := 30
 const FORCE_SAVE_STEP := 120
+## An M8 seed with no replay skip (or no refused F5) by this step plays one forced season (monkey_m8.gd _m8_force_skip).
+const FORCE_M8_SKIP_STEP := 200
+const FORCE_M8_EVERY := 40
 const COUNTER_KEYS: Array[String] = [
 	"picks", "works_begun", "works_cancelled", "seasons", "saves", "loads", "new_games", "games",
 	"reports", "report_links", "log_opens", "log_lines", "save_screens", "slot_keys", "bookmarks_set", "bookmarks_go",
@@ -56,7 +59,7 @@ const COUNTER_KEYS: Array[String] = [
 	"m7_standing", "m7_checks",
 ]
 const EVENTS_PER_SEED := 600
-## The replay's step per frame in the monkey (seconds): 1/60, so a walk takes the same frames on every machine.
+## The shell's clock step per frame in the monkey (seconds, SimClock.step_s): 1/60, so every timer takes the same frames on every machine.
 const FIXED_FRAME := 1.0 / 60.0
 
 ## Documented non-fatal quirks (empty when clean; matches ui-and-controls-spec.md section 9).
@@ -116,7 +119,8 @@ var _last_season_msec: int = -1
 
 func before_each() -> void:
 	Bindings.reset_defaults()
-	MoveReplay.fixed_delta = FIXED_FRAME  # frame-deterministic replays (issue 457): a seed's counters do not depend on the machine
+	SimClock.reset()  # issue 457: the shell's clock is the fixed one, so a seed's counters do not depend on the machine
+	SimClock.step_s = FIXED_FRAME
 	_prev_game = Session.game
 	_prev_unsaved = Session.unsaved_actions
 	_old_max_fps = Engine.max_fps
@@ -145,7 +149,7 @@ func _clean_disk() -> void:
 
 
 func after_each() -> void:
-	MoveReplay.fixed_delta = -1.0
+	SimClock.step_s = -1.0
 	_clean_disk()
 	Session.save_dir = _old_save_dir
 	RunLock.path = _old_lock_path
@@ -843,14 +847,12 @@ func _m3_end(seed_value: int) -> void:
 			assert_gt(int(_n[key]), 0, "seed %d: the monkey did %s" % [seed_value, key])
 	if _m7:
 		for key: String in M7_REQUIRED:
-			if key == "m7_peaces" and _fog_run:  # a peace needs a war the season order allows: timing-dependent (issue 457); the base seeds hold it
-				continue
 			assert_gt(int(_n[key]), 0, "seed %d: the monkey did %s" % [seed_value, key])
 
 
 func _on_season_counted(_turn: int) -> void:
 	_n["seasons"] = int(_n["seasons"]) + 1
-	var now := Time.get_ticks_msec()
+	var now := SimClock.msec()
 	if _last_season_msec >= 0:
 		assert_gte(now - _last_season_msec, SeasonFlow.GUARD_MS,
 			"at most one season per %d ms guard window" % SeasonFlow.GUARD_MS)
@@ -920,6 +922,8 @@ func _m3_before_step(rng: Rng, app: App, step: int) -> void:
 		await _m6_force(rng, vp, app)
 	if _m7 and step >= FORCE_M7_STEP and not _m4_coverage_due():
 		await _m7_force(rng, vp, app)
+	if _m8 and step >= FORCE_M8_SKIP_STEP and step % FORCE_M8_EVERY == 0 and (int(_n["m8_skips"]) == 0 or int(_n["m8_refused_files"]) == 0):
+		await _m8_force_skip(vp, app)
 
 
 func _m3_clear_screens(app: App) -> void:
@@ -940,7 +944,7 @@ func _m3_wait_until(done: Callable, limit: int) -> bool:
 
 
 func _m3_wait_guard(app: App) -> void:
-	await _m3_wait_until(func() -> bool: return Time.get_ticks_msec() >= app.requests().flow.guard_until, 600)
+	await _m3_wait_until(func() -> bool: return SimClock.msec() >= app.requests().flow.guard_until, 600)
 
 
 func _m3_report_up(app: App) -> bool:
@@ -970,7 +974,7 @@ func _m3_double_space(vp: SubViewport, app: App) -> void:
 		return
 	var before := int(_n["seasons"])
 	_send_chord(vp, KEY_SPACE)
-	var inside := Time.get_ticks_msec() < app.requests().flow.guard_until
+	var inside := SimClock.msec() < app.requests().flow.guard_until
 	await _wait_frames(2)
 	_bump("double_spaces")
 	if inside:

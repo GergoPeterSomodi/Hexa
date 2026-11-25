@@ -48,9 +48,10 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if _entries.is_empty():
 		return
+	var step := SimClock.delta(delta)
 	var expired := false
 	for entry: Dictionary in _entries:
-		entry["elapsed"] = float(entry["elapsed"]) + delta
+		entry["elapsed"] = float(entry["elapsed"]) + step
 		if float(entry["elapsed"]) >= ttl_sec:
 			expired = true
 	if not expired:

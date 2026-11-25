@@ -249,7 +249,7 @@ func begin_season_swap(tiles: TilesetBuilder, focus: Rect2i = Rect2i()) -> void:
 func swap_step(budget_ms: float) -> bool:
 	if _swap_to == null:
 		return false
-	var until := Time.get_ticks_usec() + int(minf(budget_ms, 1.0e9) * 1000.0)
+	var until := SimClock.usec() + int(minf(budget_ms, 1.0e9) * 1000.0)
 	while _swap_at < _swap_chunks.size():
 		var chunk := _swap_chunks[_swap_at]
 		var layers: Array = _chunks[chunk] if _chunks.has(chunk) else []
@@ -260,13 +260,13 @@ func swap_step(budget_ms: float) -> bool:
 				layer.tile_set = _swap_to
 				layer.scale = _swap_scale
 				layer.update_internals()  # the rebuild happens here, inside the slice, not at the end of the frame
-				if Time.get_ticks_usec() >= until:
+				if SimClock.usec() >= until:
 					return _finish_swap_step()
 		if _swap_focus.has_area() and _swap_focus.intersects(_chunk_rect(chunk)):
 			_swap_focus_left -= 1
 		_swap_at += 1
 		_swap_layer = 0
-		if Time.get_ticks_usec() >= until:
+		if SimClock.usec() >= until:
 			break
 	return _finish_swap_step()
 
@@ -466,8 +466,8 @@ func fill_progress() -> float:
 
 ## Fills for up to `budget_ms` (a few hexes at a time, so it stops soon after the time is up); true while more is to do.
 func fill_for(budget_ms: float) -> bool:
-	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
-	while is_filling() and Time.get_ticks_usec() < until:
+	var until := SimClock.usec() + int(budget_ms * 1000.0)
+	while is_filling() and SimClock.usec() < until:
 		fill_step(24)
 	return is_filling()
 

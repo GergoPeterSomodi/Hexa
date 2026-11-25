@@ -91,7 +91,7 @@ func configure(entries: Array[Dictionary], at_milestone: String = "") -> void:
 ## Shows `page`; &"" the last page shown (or the first when none was). An id that is not shown changes nothing.
 ## `focus` goes to the page's focus() (a tab: {tab}). The synchronous part is timed into last_open_ms.
 func open_page(page: StringName, focus: Dictionary = {}) -> void:
-	var started := Time.get_ticks_usec()
+	var started := SimClock.usec()
 	if _pages.is_empty():
 		return
 	var id := page
@@ -115,7 +115,7 @@ func open_page(page: StringName, focus: Dictionary = {}) -> void:
 		shown_page.focus(focus)
 	_refresh_date()
 	_refresh_hint()
-	last_open_ms = float(Time.get_ticks_usec() - started) / 1000.0
+	last_open_ms = float(SimClock.usec() - started) / 1000.0
 
 
 ## Names the page (&"" the last one) and its focus that the next push opens, in one open_page.

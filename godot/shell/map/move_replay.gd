@@ -10,9 +10,6 @@ extends Node
 signal finished
 
 const INSTANT := &"instant"
-## Test-only (the UI monkey, issue 457): when 0 or more, every frame advances the replay by this many seconds instead of the
-## frame's delta, so a seed plays the same walks at the same steps on every run. The game keeps -1.
-static var fixed_delta := -1.0
 ## The group the map's war marks find the replay by (MapWars reads marks() while it runs; M7 6.3).
 const GROUP := &"move_replay"
 
@@ -155,7 +152,7 @@ func cancel() -> void:
 func _process(delta: float) -> void:
 	if _plan == null:
 		return
-	_plan.advance(delta if fixed_delta < 0.0 else fixed_delta)
+	_plan.advance(SimClock.delta(delta))
 	_show()
 	if _plan.finished():
 		_end(true)

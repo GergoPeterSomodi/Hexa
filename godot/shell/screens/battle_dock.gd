@@ -26,7 +26,8 @@ signal look_at_requested(hex: Vector2i)
 
 var _frame: PanelFrame = null
 var _body: VBoxContainer = null
-var _clock: Timer = null
+var _playing := false
+var _play_acc := 0.0
 var _prev: KitButton = null
 var _next: KitButton = null
 var _skip: KitButton = null
@@ -50,18 +51,14 @@ func _ready() -> void:
 	add_child(_frame)
 	_frame.closed.connect(_on_close)
 	_body = _frame.body()
-	_clock = Timer.new()
-	_clock.wait_time = PLAY_STEP_S
-	_clock.one_shot = false
-	add_child(_clock)
-	_clock.timeout.connect(_on_tick)
+	set_process(false)
 	_build_footer()
 	visible = false
 
 
 func _exit_tree() -> void:
-	if _clock != null:
-		_clock.stop()
+	_playing = false
+	set_process(false)
 	PanelKit.free_retired(_retired)
 
 
@@ -160,13 +157,15 @@ func play() -> void:
 		return
 	if _day >= _days:
 		_show_day(1)
-	_clock.start()
+	_playing = true
+	_play_acc = 0.0
+	set_process(true)
 	_sync_stepper()
 
 
 ## Whether a play is running.
 func is_playing() -> bool:
-	return _clock != null and not _clock.is_stopped()
+	return _playing
 
 
 ## The title shown in the frame's cartouche, without the year, which is on the sub line ("" when hidden).
@@ -186,8 +185,8 @@ func result_text() -> String:
 
 ## Stops a running play (the stepper's controls come back).
 func stop() -> void:
-	if _clock != null and not _clock.is_stopped():
-		_clock.stop()
+	_playing = false
+	set_process(false)
 	if is_node_ready():
 		_sync_stepper()
 
@@ -566,6 +565,18 @@ func _hide() -> void:
 	visible = false
 	if _body != null:
 		PanelKit.clear_children(_body, _retired)
+
+
+## The play's clock: one day every PLAY_STEP_S on the shell's clock (SimClock), so the monkey's runs repeat.
+func _process(delta: float) -> void:
+	if not _playing:
+		set_process(false)
+		return
+	_play_acc += SimClock.delta(delta)
+	if _play_acc < PLAY_STEP_S:
+		return
+	_play_acc -= PLAY_STEP_S
+	_on_tick()
 
 
 func _on_tick() -> void:

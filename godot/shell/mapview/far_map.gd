@@ -65,12 +65,12 @@ func is_building() -> bool:
 func step(budget_ms: float) -> void:
 	if not _building:
 		return
-	var until := Time.get_ticks_usec() + int(budget_ms * 1000.0)
+	var until := SimClock.usec() + int(budget_ms * 1000.0)
 	while _next_row < _map.rows:
 		for c: int in _map.cols:
 			FarPicture.write_hex(_bytes, _map, _state, Vector2i(c, _next_row))
 		_next_row += 1
-		if Time.get_ticks_usec() >= until:
+		if SimClock.usec() >= until:
 			break
 	if _next_row < _map.rows:
 		return

@@ -45,18 +45,19 @@ func _fog_begin(on: bool, thin: bool) -> void:
 		_n["fog_thins"] = 0
 
 
-## The M8 end check. On the thin seed m8_skips is not asserted: a replay's pace follows real frame time (issue 457, not yet
-## deterministic), so a thin seed may play no replay at the steps where a skip could happen. Skip coverage is held by the other
-## fog and M8 seeds. Every other M8 counter is asserted as the base does.
+## The M8 end check. Every M8 counter is asserted as the base does, except m8_skips on the thin seed (1505): the forced
+## skip found no replay to skip on it in the runs of issue 457 (its walks are mostly out of sight), so the other fog and M8
+## seeds hold the skip.
 func _m8_end(on: bool, seed_value: int) -> void:
 	if not (on and _fog_run):
 		super._m8_end(on, seed_value)
 		return
 	_m8 = false
-	gut.p("monkey m8 seed %d counters (fog seed: m8_skips not required): %s" % [seed_value, JSON.stringify(_n)])
+	gut.p("monkey m8 seed %d counters: %s" % [seed_value, JSON.stringify(_n)])
 	for key: String in M8_REQUIRED + M8_MAIN:
-		if key != "m8_skips":
-			assert_gt(int(_n[key]), 0, "seed %d: the monkey did %s" % [seed_value, key])
+		if key == "m8_skips" and _fog_thin:
+			continue
+		assert_gt(int(_n[key]), 0, "seed %d: the monkey did %s" % [seed_value, key])
 
 
 ## Stops the fog actions and checks that each fog counter was raised (a thin seed thinned its country once).
@@ -246,7 +247,8 @@ func _fog_check_armies(game: Game, viewer: StringName, tokens: ArmyTokens, tag: 
 		_bump("fog_armies_hidden")
 		assert_false(ArmyView.visible(game, viewer, army), "%s: an army out of sight is in no view" % tag)
 		if tokens != null:
-			assert_null(tokens.token_at(army.hex, army.tag), "%s: an army out of sight has no token" % tag)
+			var leftover := tokens.token_at(army.hex, army.tag)
+			assert_null(leftover, "%s: an army out of sight has no token (token visible %s, walkers %d, view %s, version %d)" % [tag, str(leftover.visible) if leftover != null else "-", tokens.walker_count(), str(ArmyView.visible(game, viewer, army)), game.version])
 	for seen: Dictionary in Knowledge.armies_seen(game, viewer):
 		var army := seen["army"] as Army
 		if army.tag != viewer:

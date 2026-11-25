@@ -149,8 +149,9 @@ func _process(_delta: float) -> void:
 		var tex := ResourceLoader.load_threaded_get(path) as Texture2D
 		if path == MENU_BG_PATH:
 			_bg_rect.texture = tex
-			_bg_rect.modulate.a = 0.0 if not _reduce_motion() else 1.0
-			if not _reduce_motion():
+			var instant := _reduce_motion() or SimClock.fixed()
+			_bg_rect.modulate.a = 1.0 if instant else 0.0
+			if not instant:
 				create_tween().tween_property(_bg_rect, "modulate:a", 1.0, 0.2)
 		else:
 			_shade_rect.texture = tex

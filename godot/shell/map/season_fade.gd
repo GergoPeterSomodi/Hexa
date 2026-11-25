@@ -62,7 +62,7 @@ func capture() -> void:
 			_tween.tween_property(world, "modulate", Tokens.BG, DURATION / 2.0)
 			await _tween.finished
 		return
-	var started := Time.get_ticks_usec()
+	var started := SimClock.usec()
 	RenderingServer.force_draw(false)  # not `await frame_post_draw`: low-processor mode draws no idle frames
 	var image := get_viewport().get_texture().get_image()
 	if image == null or image.is_empty():
@@ -70,7 +70,7 @@ func capture() -> void:
 	_rect.texture = ImageTexture.create_from_image(image)
 	_rect.modulate.a = 1.0
 	_rect.visible = true
-	note_capture_cost(float(Time.get_ticks_usec() - started) / 1000.0)
+	note_capture_cost(float(SimClock.usec() - started) / 1000.0)
 
 
 ## Records a capture's cost; a capture over SLOW_CAPTURE_MS makes the fade use the FALLBACK from then on.

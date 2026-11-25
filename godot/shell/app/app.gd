@@ -65,7 +65,7 @@ func _exit_tree() -> void:
 
 func _process(delta: float) -> void:
 	if _save_countdown > 0.0:
-		_save_countdown -= delta
+		_save_countdown -= SimClock.delta(delta)
 		if _save_countdown <= 0.0:
 			_save_countdown = -1.0
 			_save_settings()

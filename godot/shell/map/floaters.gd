@@ -80,7 +80,7 @@ func _on_game_changed() -> void:
 
 
 func _process(delta: float) -> void:
-	advance(delta)
+	advance(SimClock.delta(delta))
 
 
 ## The game whose lines are shown (null: none); the viewer is its player.

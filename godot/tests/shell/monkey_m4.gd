@@ -65,6 +65,7 @@ func _send_click(vp: SubViewport, pos: Vector2, button: MouseButton) -> void:
 
 func _wait_frames(frames: int = 1) -> void:
 	for _i: int in range(frames):
+		SimClock.tick()  # issue 457: one frame of the shell's fixed clock per frame the monkey waits
 		await get_tree().process_frame
 
 

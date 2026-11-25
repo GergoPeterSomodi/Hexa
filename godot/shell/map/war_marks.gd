@@ -116,7 +116,7 @@ func flash_lifted(hex: Vector2i) -> void:
 	flash.position = _view.centre_of(hex)
 	flash.scale = Vector2.ONE * _scale_at(_zoom)
 	add_child(flash)
-	if _reduce_motion:
+	if _reduce_motion or SimClock.fixed():
 		flash.queue_free()
 		return
 	var tween := flash.create_tween()

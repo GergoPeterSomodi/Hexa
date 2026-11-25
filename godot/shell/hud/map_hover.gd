@@ -82,7 +82,7 @@ func _process(delta: float) -> void:
 	if _shown:
 		_position_card()
 		return
-	_elapsed += maxf(delta, 0.0)
+	_elapsed += maxf(SimClock.delta(delta), 0.0)
 	if _elapsed >= hover_delay_sec:
 		_show_current()
 

@@ -167,7 +167,8 @@ func _on_game_started() -> void:
 	_declined_last = 0
 
 
-func _process(delta: float) -> void:
+func _process(real_delta: float) -> void:
+	var delta := SimClock.delta(real_delta)
 	var frame_ms := delta * 1000.0
 	if frame_ms > _worst_frame_ms:
 		_worst_frame_ms = frame_ms
