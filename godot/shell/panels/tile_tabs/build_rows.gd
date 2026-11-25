@@ -159,12 +159,25 @@ func _on_row_left() -> void:
 ## A click on an enabled row, by game/confirm_works: "off" asks for the work at once; "expensive" asks for the card of an
 ## expensive row only, and the work of the others; "always" asks for the card.
 func _on_row_pressed(option: Dictionary, expensive: bool) -> void:
-	var mode := _confirm_mode()
-	var want_card := mode == "always" or (mode == "expensive" and expensive)
-	if want_card:
+	if click_of(confirm_mode_of(settings), expensive) == &"card":
 		ask.call(&"works_card", {"hex": _hex, "option": option})
 		return
 	_begin(option)
+
+
+## The click rule of a works row (the M4 rule, spec R19): &"card" opens the works card, &"begin" begins the work. "off"
+## always begins; "expensive" asks for the card of an expensive row only; "always" asks for the card. Shared with the
+## Buildings tab, whose hammers keep this rule.
+static func click_of(mode: String, expensive: bool) -> StringName:
+	var want_card := mode == "always" or (mode == "expensive" and expensive)
+	return &"card" if want_card else &"begin"
+
+
+## The game/confirm_works mode of a settings object; null reads the shipped default ("expensive").
+static func confirm_mode_of(p_settings: Settings) -> String:
+	if p_settings == null:
+		return "expensive"
+	return str(p_settings.get_value("game/confirm_works"))
 
 
 ## Begins the row's work: the App begins it on begin_work; with no listener the row does it (the M3 path).
@@ -176,12 +189,6 @@ func _begin(option: Dictionary) -> void:
 	if action == String(Works.BUILD):
 		args["family"] = int(option["family"])
 	Session.act(action, args)
-
-
-func _confirm_mode() -> String:
-	if settings == null:
-		return "expensive"
-	return str(settings.get_value("game/confirm_works"))
 
 
 static func new_button(label_text: String, kind: KitButton.Kind) -> KitButton:

@@ -57,3 +57,19 @@ func test_the_forms_that_stay_are_not_reported() -> void:
 	assert_eq(_problems("var b := yield_band(year)\nvar f := food_band(net)", "map_modes.gd").size(), 0, "other bands")
 	assert_eq(_problems("var band := 2\nband += 1", "map_modes.gd").size(), 0, "a band variable")
 	assert_eq(_problems("\"falls in about %s\" % text", "odds_view.gd").size(), 0, "a forecast is a projection, not a band")
+
+
+## The tile window's files (tilewin-build-spec 7.1: the fog proofs of TW15) are named here as well, so the scan above is not the
+## only thing that covers them: each must exist, have text, and name no band and no built "about " text.
+const TILE_FILES: Array[String] = [
+	"res://core/views/tile_view.gd", "res://core/views/tile_army.gd", "res://core/views/tile_buildings.gd",
+	"res://core/views/building_card.gd", "res://core/views/company_card.gd",
+	"res://tests/core/test_tile_fog.gd", "res://tests/core/test_tile_door.gd",
+]
+
+
+func test_the_tile_window_files_name_no_band_and_no_about() -> void:
+	for path: String in TILE_FILES:
+		var text := FileAccess.get_file_as_string(path)
+		assert_gt(text.length(), 0, "%s has text" % path)
+		assert_eq(_problems(text, path), [] as Array[String], path)

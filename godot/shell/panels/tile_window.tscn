@@ -1,0 +1,93 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://shell/panels/tile_window.gd" id="1_window"]
+[ext_resource type="Script" path="res://shell/ui/settlement_picture.gd" id="2_picture"]
+[ext_resource type="Script" path="res://shell/ui/strip_cells.gd" id="3_strip"]
+[ext_resource type="Script" path="res://shell/panels/tile_tabs/job_line.gd" id="4_job"]
+
+[node name="TileWindow" type="PanelContainer"]
+custom_minimum_size = Vector2(296, 0)
+size_flags_vertical = 0
+mouse_filter = 0
+script = ExtResource("1_window")
+
+[node name="Scroll" type="ScrollContainer" parent="."]
+layout_mode = 2
+mouse_filter = 1
+horizontal_scroll_mode = 0
+
+[node name="Body" type="VBoxContainer" parent="Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Header" type="VBoxContainer" parent="Scroll/Body"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Picture" type="Control" parent="Scroll/Body/Header"]
+custom_minimum_size = Vector2(296, 72)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("2_picture")
+
+[node name="Title" type="Label" parent="Scroll/Body/Header"]
+layout_mode = 2
+theme_type_variation = &"SectionHead"
+autowrap_mode = 3
+
+[node name="Subtitle" type="Label" parent="Scroll/Body/Header"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[node name="Meta" type="HBoxContainer" parent="Scroll/Body/Header"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Place" type="Button" parent="Scroll/Body/Header/Meta"]
+layout_mode = 2
+size_flags_horizontal = 3
+flat = true
+alignment = 0
+clip_text = true
+
+[node name="Stars" type="Label" parent="Scroll/Body/Header/Meta"]
+layout_mode = 2
+theme_type_variation = &"Number"
+
+[node name="Badges" type="HBoxContainer" parent="Scroll/Body/Header"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Strip" type="HBoxContainer" parent="Scroll/Body"]
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("3_strip")
+
+[node name="WorkBox" type="VBoxContainer" parent="Scroll/Body"]
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("4_job")
+
+[node name="Text" type="Label" parent="Scroll/Body/WorkBox"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="Progress" type="Label" parent="Scroll/Body/WorkBox"]
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[node name="Actions" type="VBoxContainer" parent="Scroll/Body/WorkBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="TabStrip" type="HBoxContainer" parent="Scroll/Body"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="TabBody" type="VBoxContainer" parent="Scroll/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2

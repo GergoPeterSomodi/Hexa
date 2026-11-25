@@ -342,3 +342,78 @@ func _keys_of(view: Dictionary) -> Array:
 	var keys := view.keys()
 	keys.sort()
 	return keys
+
+
+# ----- the badges and the castle picture (TW4's missing fixtures: the Occupation, Sieges and WarFixture producers) ----------
+
+
+## The badge with `prefix` at the start of its text in a view's header; {} when none.
+func _badge(view: Dictionary, prefix: String) -> Dictionary:
+	for badge: Dictionary in view["header"]["badges"]:
+		if str(badge["text"]).begins_with(prefix):
+			return badge
+	return {}
+
+
+func _short_name(g: Game, tag: StringName) -> String:
+	var cdef := Countries.def_of(g, tag)
+	return cdef.name if cdef != null and cdef.name != "" else String(tag)
+
+
+func _long_name(g: Game, tag: StringName) -> String:
+	var cdef := Countries.def_of(g, tag)
+	return cdef.long_name if cdef != null and cdef.long_name != "" else String(tag)
+
+
+func test_an_occupied_own_tile_is_own_with_the_occupied_badge() -> void:
+	var g := _italy()
+	var savona := _named(g, "Savona")
+	Occupation.capture(g, savona, MLO, &"walk", {})
+	Occupation.flush(g)
+	_bump(g)
+	assert_true(Occupation.is_occupied(g, savona), "the hex is occupied by Milan")
+	var v := TileView.of(g, GEN, savona)
+	assert_eq(v["case"], &"own", "R2: an occupied own tile is own, not foreign")
+	var badge := _badge(v, "Occupied")
+	assert_false(badge.is_empty(), "an Occupied badge on the header")
+	assert_eq(badge["text"], "Occupied by " + _long_name(g, MLO), "the occupier's long name")
+	assert_eq(badge["tone"], &"warn", "Occupied is a warn badge")
+	assert_eq(v["header"]["badges"][0], badge, "Occupied comes first in the badge order (R11)")
+
+
+func test_a_besieged_own_tile_shows_besieged_by_the_besieger() -> void:
+	var g := _italy()
+	var savona := _named(g, "Savona")
+	WarFixture.at_war(g, MLO, GEN)
+	Sieges._start_siege(g, savona, MLO, GEN)
+	_bump(g)
+	var v := TileView.of(g, GEN, savona)
+	var badge := _badge(v, "Besieged")
+	assert_false(badge.is_empty(), "a Besieged badge for the holder")
+	assert_eq(badge["text"], "Besieged by " + _short_name(g, MLO), "R11: the besieger's name for the holder")
+	assert_eq(badge["tone"], &"bad", "Besieged is a bad badge")
+	var milan := TileView.of(g, MLO, savona)
+	assert_eq(_badge(milan, "Besieged")["text"], "Besieged by " + _short_name(g, MLO), "the besieger sees its own siege")
+
+
+func test_a_siege_at_peace_shows_no_besieged_badge() -> void:
+	var g := _italy()
+	var savona := _named(g, "Savona")
+	Sieges._start_siege(g, savona, MLO, GEN)
+	_bump(g)
+	assert_true(_badge(TileView.of(g, GEN, savona), "Besieged").is_empty(), "P: a siege between countries at peace is no badge")
+
+
+func test_a_castle_hex_has_the_castle_picture_kind() -> void:
+	var g := _italy()
+	var hex := Vector2i(-1, -1)
+	for i: int in g.map.hex_count():
+		var h := g.map.hex_of(i)
+		if int(Improve.piece_at(g, h).get("family_id", ImproveRules.NONE)) == ImproveRules.CASTLE:
+			hex = h
+			break
+	assert_ne(hex, Vector2i(-1, -1), "north Italy has a castle to picture")
+	var v := TileView.of(g, GEN if Territory.owner_tag(g, hex) == GEN else MLO, hex)
+	var pic: Dictionary = v["header"]["picture"]
+	assert_eq(pic["kind"], TileView.CASTLE_KIND, "a castle is the castle picture, not a settlement kind")
+	assert_eq(pic["level"], int(Improve.piece_at(g, hex)["level"]), "its level")

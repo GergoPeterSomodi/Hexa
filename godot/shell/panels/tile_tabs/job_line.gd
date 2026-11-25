@@ -28,9 +28,11 @@ func clear_actions() -> void:
 
 ## The Work section (spec 6.8): the work under way on the hex, its progress and ready season ("stopped for the winter"
 ## while halted), and Cancel the work for the player's own work only; another country's work has no button.
-func refresh(game: Game, hex: Vector2i) -> void:
+## `viewer` is who the work is shown to (the window passes the player's tag); empty means game.player, as the old panel did.
+func refresh(game: Game, hex: Vector2i, viewer: StringName = &"") -> void:
 	PanelKit.clear_children(_actions, retired)
-	var at := WorksView.at(game, hex, game.player)
+	var who: StringName = viewer if viewer != &"" else game.player
+	var at := WorksView.at(game, hex, who)
 	visible = not at.is_empty()
 	if at.is_empty():
 		return

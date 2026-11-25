@@ -29,11 +29,35 @@ static func all() -> Array[GDScript]:
 
 ## The ids of the tabs that apply to a view, in ORDER.
 static func for_view(view: Dictionary) -> Array[StringName]:
+	return shown_in(all(), view)
+
+
+## The ids of the tabs of `scripts` that apply to a view, in ORDER (the tile window's strip; R14).
+static func shown_in(scripts: Array, view: Dictionary) -> Array[StringName]:
+	var sorted: Array = scripts.duplicate()
+	sorted.sort_custom(func(a: GDScript, b: GDScript) -> bool: return order_of(a) < order_of(b))
 	var ids: Array[StringName] = []
-	for script: GDScript in all():
+	for script: GDScript in sorted:
 		if script.call("applies", view):
 			ids.append(id_of(script))
 	return ids
+
+
+## Id to reason for every tab of the registry that applies to the view and is dimmed (tile-window spec R13, R14).
+static func dimmed_for(view: Dictionary) -> Dictionary:
+	return dimmed_in(all(), view)
+
+
+## Id to reason for every tab of `scripts` that applies to the view and whose `dimmed` gives a reason.
+static func dimmed_in(scripts: Array, view: Dictionary) -> Dictionary:
+	var out := {}
+	for script: GDScript in scripts:
+		if not script.call("applies", view):
+			continue
+		var reason := str(script.call("dimmed", view))
+		if reason != "":
+			out[id_of(script)] = reason
+	return out
 
 
 ## Adds a folder to the registry (for tests) and returns every tab now listed.

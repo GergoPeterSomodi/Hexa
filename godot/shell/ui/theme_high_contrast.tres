@@ -4,21 +4,21 @@
 [ext_resource type="FontFile" path="res://assets/fonts/noto/NotoSans-Regular.ttf" id="2"]
 [ext_resource type="FontFile" path="res://assets/fonts/alegreya_sans/AlegreyaSans-Bold.ttf" id="3"]
 [ext_resource type="FontFile" path="res://assets/fonts/cinzel/Cinzel-Bold.ttf" id="4"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sans/AlegreyaSans-Regular.ttf" id="5"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_war.png" id="6"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons.png" id="7"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/army_badge.png" id="8"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/army_plate.png" id="9"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/army_plate_ring.png" id="10"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_base.png" id="11"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/badge_battle.png" id="12"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/badge_siege.png" id="13"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_army.png" id="14"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/die_face.png" id="15"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/figures.png" id="16"]
-[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/path_stop.png" id="17"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya/Alegreya-MediumItalic.ttf" id="18"]
-[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sc/AlegreyaSC-Bold.ttf" id="19"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sc/AlegreyaSC-Bold.ttf" id="5"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya_sans/AlegreyaSans-Regular.ttf" id="6"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_war.png" id="7"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons.png" id="8"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/army_badge.png" id="9"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/army_plate.png" id="10"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/army_plate_ring.png" id="11"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_base.png" id="12"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/badge_battle.png" id="13"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/badge_siege.png" id="14"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/icons_army.png" id="15"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/die_face.png" id="16"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/figures.png" id="17"]
+[ext_resource type="Texture2D" path="res://assets/ui/kit/1x/path_stop.png" id="18"]
+[ext_resource type="FontFile" path="res://assets/fonts/alegreya/Alegreya-MediumItalic.ttf" id="19"]
 
 [sub_resource type="FontVariation" id="FontVariation_1"]
 fallbacks = Array[Font]([ExtResource("2")])
@@ -654,6 +654,54 @@ border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_50"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_51"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_52"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(1, 0.8392157, 0.27450982, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 1, 1, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_53"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8392157, 0.27450982, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_54"]
 content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
@@ -665,7 +713,7 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_51"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_55"]
 content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
@@ -677,7 +725,7 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(1, 1, 1, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_52"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_56"]
 content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
@@ -689,7 +737,7 @@ border_width_right = 3
 border_width_bottom = 3
 border_color = Color(1, 1, 1, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_53"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_57"]
 content_margin_left = 14.0
 content_margin_top = 4.0
 content_margin_right = 14.0
@@ -707,7 +755,7 @@ content_margin_top = 2.0
 content_margin_right = 4.0
 content_margin_bottom = 2.0
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_54"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_58"]
 content_margin_left = 6.0
 content_margin_top = 4.0
 content_margin_right = 6.0
@@ -719,7 +767,31 @@ border_width_right = 3
 border_width_bottom = 3
 border_color = Color(0.56078434, 0.72156864, 0.91764706, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_55"]
+[sub_resource type="FontVariation" id="FontVariation_4"]
+fallbacks = Array[Font]([ExtResource("2")])
+base_font = ExtResource("5")
+opentype_features = {
+1819178349: 1,
+1953396077: 1
+}
+
+[sub_resource type="FontVariation" id="FontVariation_5"]
+fallbacks = Array[Font]([ExtResource("2")])
+base_font = ExtResource("6")
+opentype_features = {
+1819178349: 1,
+1953396077: 1
+}
+
+[sub_resource type="FontVariation" id="FontVariation_6"]
+fallbacks = Array[Font]([ExtResource("2")])
+base_font = ExtResource("3")
+opentype_features = {
+1819178349: 1,
+1953396077: 1
+}
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_59"]
 content_margin_left = 0.0
 content_margin_top = 4.0
 content_margin_right = 0.0
@@ -727,7 +799,7 @@ content_margin_bottom = 4.0
 bg_color = Color(1, 0.8392157, 0.27450982, 1)
 border_color = Color(0, 0, 0, 0)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_56"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_60"]
 content_margin_left = 0.0
 content_margin_top = 4.0
 content_margin_right = 0.0
@@ -735,7 +807,7 @@ content_margin_bottom = 4.0
 bg_color = Color(1, 0.8392157, 0.27450982, 1)
 border_color = Color(0, 0, 0, 0)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_57"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_61"]
 content_margin_left = 0.0
 content_margin_top = 4.0
 content_margin_right = 0.0
@@ -743,7 +815,7 @@ content_margin_bottom = 4.0
 bg_color = Color(1, 0.8392157, 0.27450982, 1)
 border_color = Color(0, 0, 0, 0)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_58"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_62"]
 content_margin_left = 0.0
 content_margin_top = 4.0
 content_margin_right = 0.0
@@ -755,7 +827,7 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_59"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_63"]
 content_margin_left = 0.0
 content_margin_top = 4.0
 content_margin_right = 0.0
@@ -767,7 +839,7 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(0.56078434, 0.72156864, 0.91764706, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_60"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_64"]
 content_margin_left = 0.0
 content_margin_top = 0.5
 content_margin_right = 0.0
@@ -775,7 +847,7 @@ content_margin_bottom = 0.5
 bg_color = Color(1, 0.8392157, 0.27450982, 1)
 border_color = Color(0, 0, 0, 0)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_61"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_65"]
 content_margin_left = 2.0
 content_margin_top = 2.0
 content_margin_right = 2.0
@@ -786,510 +858,6 @@ border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
 border_color = Color(1, 0.8392157, 0.27450982, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_62"]
-content_margin_left = 8.0
-content_margin_top = 4.0
-content_margin_right = 8.0
-content_margin_bottom = 4.0
-bg_color = Color(0, 0, 0, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.8392157, 0.27450982, 1)
-
-[sub_resource type="FontVariation" id="FontVariation_4"]
-fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("5")
-opentype_features = {
-1819178349: 1,
-1953396077: 1
-}
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_63"]
-content_margin_left = 6.0
-content_margin_top = 3.0
-content_margin_right = 6.0
-content_margin_bottom = 3.0
-bg_color = Color(0, 0, 0, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.8392157, 0.27450982, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_64"]
-content_margin_left = 6.0
-content_margin_top = 3.0
-content_margin_right = 6.0
-content_margin_bottom = 3.0
-bg_color = Color(0, 0, 0, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.8392157, 0.27450982, 1)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_1"]
-atlas = ExtResource("6")
-region = Rect2(168, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_2"]
-atlas = ExtResource("6")
-region = Rect2(0, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_3"]
-atlas = ExtResource("7")
-region = Rect2(120, 96, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_4"]
-atlas = ExtResource("11")
-region = Rect2(16, 0, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_5"]
-atlas = ExtResource("11")
-region = Rect2(32, 0, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_6"]
-atlas = ExtResource("11")
-region = Rect2(48, 0, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_7"]
-atlas = ExtResource("11")
-region = Rect2(0, 0, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_8"]
-atlas = ExtResource("6")
-region = Rect2(168, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_9"]
-atlas = ExtResource("6")
-region = Rect2(72, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_10"]
-atlas = ExtResource("6")
-region = Rect2(144, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_11"]
-atlas = ExtResource("14")
-region = Rect2(96, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_12"]
-atlas = ExtResource("7")
-region = Rect2(216, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_13"]
-atlas = ExtResource("7")
-region = Rect2(48, 96, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_14"]
-atlas = ExtResource("11")
-region = Rect2(0, 16, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_15"]
-atlas = ExtResource("11")
-region = Rect2(80, 0, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_16"]
-atlas = ExtResource("11")
-region = Rect2(112, 0, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_17"]
-atlas = ExtResource("6")
-region = Rect2(96, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_18"]
-atlas = ExtResource("14")
-region = Rect2(24, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_19"]
-atlas = ExtResource("7")
-region = Rect2(168, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_20"]
-atlas = ExtResource("7")
-region = Rect2(144, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_21"]
-atlas = ExtResource("16")
-region = Rect2(96, 0, 32, 32)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_22"]
-atlas = ExtResource("16")
-region = Rect2(64, 0, 32, 32)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_23"]
-atlas = ExtResource("16")
-region = Rect2(0, 0, 32, 32)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_24"]
-atlas = ExtResource("16")
-region = Rect2(32, 0, 32, 32)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_25"]
-atlas = ExtResource("6")
-region = Rect2(72, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_26"]
-atlas = ExtResource("11")
-region = Rect2(80, 16, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_27"]
-atlas = ExtResource("6")
-region = Rect2(48, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_28"]
-atlas = ExtResource("7")
-region = Rect2(96, 96, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_29"]
-atlas = ExtResource("14")
-region = Rect2(168, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_30"]
-atlas = ExtResource("14")
-region = Rect2(120, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_31"]
-atlas = ExtResource("6")
-region = Rect2(120, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_32"]
-atlas = ExtResource("6")
-region = Rect2(144, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_33"]
-atlas = ExtResource("7")
-region = Rect2(216, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_34"]
-atlas = ExtResource("7")
-region = Rect2(216, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_35"]
-atlas = ExtResource("7")
-region = Rect2(96, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_36"]
-atlas = ExtResource("7")
-region = Rect2(168, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_37"]
-atlas = ExtResource("7")
-region = Rect2(24, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_38"]
-atlas = ExtResource("7")
-region = Rect2(0, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_39"]
-atlas = ExtResource("7")
-region = Rect2(120, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_40"]
-atlas = ExtResource("7")
-region = Rect2(0, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_41"]
-atlas = ExtResource("7")
-region = Rect2(72, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_42"]
-atlas = ExtResource("7")
-region = Rect2(48, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_43"]
-atlas = ExtResource("7")
-region = Rect2(96, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_44"]
-atlas = ExtResource("7")
-region = Rect2(144, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_45"]
-atlas = ExtResource("7")
-region = Rect2(120, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_46"]
-atlas = ExtResource("7")
-region = Rect2(48, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_47"]
-atlas = ExtResource("7")
-region = Rect2(24, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_48"]
-atlas = ExtResource("7")
-region = Rect2(72, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_49"]
-atlas = ExtResource("7")
-region = Rect2(192, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_50"]
-atlas = ExtResource("14")
-region = Rect2(48, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_51"]
-atlas = ExtResource("11")
-region = Rect2(32, 16, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_52"]
-atlas = ExtResource("14")
-region = Rect2(24, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_53"]
-atlas = ExtResource("11")
-region = Rect2(112, 16, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_54"]
-atlas = ExtResource("7")
-region = Rect2(192, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_55"]
-atlas = ExtResource("7")
-region = Rect2(144, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_56"]
-atlas = ExtResource("11")
-region = Rect2(96, 0, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_57"]
-atlas = ExtResource("7")
-region = Rect2(192, 96, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_58"]
-atlas = ExtResource("14")
-region = Rect2(0, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_59"]
-atlas = ExtResource("11")
-region = Rect2(16, 16, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_60"]
-atlas = ExtResource("14")
-region = Rect2(72, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_61"]
-atlas = ExtResource("14")
-region = Rect2(96, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_62"]
-atlas = ExtResource("6")
-region = Rect2(96, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_63"]
-atlas = ExtResource("6")
-region = Rect2(144, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_64"]
-atlas = ExtResource("14")
-region = Rect2(168, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_65"]
-atlas = ExtResource("7")
-region = Rect2(96, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_66"]
-atlas = ExtResource("6")
-region = Rect2(24, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_67"]
-atlas = ExtResource("7")
-region = Rect2(120, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_68"]
-atlas = ExtResource("7")
-region = Rect2(168, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_69"]
-atlas = ExtResource("7")
-region = Rect2(24, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_70"]
-atlas = ExtResource("7")
-region = Rect2(168, 96, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_71"]
-atlas = ExtResource("14")
-region = Rect2(0, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_72"]
-atlas = ExtResource("7")
-region = Rect2(72, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_73"]
-atlas = ExtResource("7")
-region = Rect2(144, 96, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_74"]
-atlas = ExtResource("7")
-region = Rect2(24, 96, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_75"]
-atlas = ExtResource("6")
-region = Rect2(168, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_76"]
-atlas = ExtResource("6")
-region = Rect2(24, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_77"]
-atlas = ExtResource("7")
-region = Rect2(48, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_78"]
-atlas = ExtResource("7")
-region = Rect2(0, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_79"]
-atlas = ExtResource("7")
-region = Rect2(24, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_80"]
-atlas = ExtResource("7")
-region = Rect2(72, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_81"]
-atlas = ExtResource("7")
-region = Rect2(192, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_82"]
-atlas = ExtResource("6")
-region = Rect2(48, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_83"]
-atlas = ExtResource("6")
-region = Rect2(96, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_84"]
-atlas = ExtResource("7")
-region = Rect2(72, 96, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_85"]
-atlas = ExtResource("7")
-region = Rect2(48, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_86"]
-atlas = ExtResource("14")
-region = Rect2(48, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_87"]
-atlas = ExtResource("6")
-region = Rect2(0, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_88"]
-atlas = ExtResource("7")
-region = Rect2(168, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_89"]
-atlas = ExtResource("6")
-region = Rect2(120, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_90"]
-atlas = ExtResource("11")
-region = Rect2(96, 16, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_91"]
-atlas = ExtResource("7")
-region = Rect2(144, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_92"]
-atlas = ExtResource("14")
-region = Rect2(120, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_93"]
-atlas = ExtResource("14")
-region = Rect2(144, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_94"]
-atlas = ExtResource("7")
-region = Rect2(192, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_95"]
-atlas = ExtResource("11")
-region = Rect2(64, 0, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_96"]
-atlas = ExtResource("6")
-region = Rect2(48, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_97"]
-atlas = ExtResource("6")
-region = Rect2(120, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_98"]
-atlas = ExtResource("7")
-region = Rect2(216, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_99"]
-atlas = ExtResource("6")
-region = Rect2(72, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_100"]
-atlas = ExtResource("14")
-region = Rect2(144, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_101"]
-atlas = ExtResource("14")
-region = Rect2(72, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_102"]
-atlas = ExtResource("7")
-region = Rect2(0, 48, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_103"]
-atlas = ExtResource("6")
-region = Rect2(0, 0, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_104"]
-atlas = ExtResource("7")
-region = Rect2(0, 96, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_105"]
-atlas = ExtResource("7")
-region = Rect2(96, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_106"]
-atlas = ExtResource("7")
-region = Rect2(120, 72, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_107"]
-atlas = ExtResource("6")
-region = Rect2(24, 24, 24, 24)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_108"]
-atlas = ExtResource("11")
-region = Rect2(48, 16, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_109"]
-atlas = ExtResource("11")
-region = Rect2(64, 16, 16, 16)
-
-[sub_resource type="FontVariation" id="FontVariation_5"]
-fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("18")
-
-[sub_resource type="FontVariation" id="FontVariation_6"]
-fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("19")
-opentype_features = {
-1819178349: 1,
-1953396077: 1
-}
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_65"]
-content_margin_left = 8.0
-content_margin_top = 4.0
-content_margin_right = 8.0
-content_margin_bottom = 4.0
-bg_color = Color(0, 0, 0, 1)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.56078434, 0.72156864, 0.91764706, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_66"]
 content_margin_left = 8.0
@@ -1304,32 +872,476 @@ border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_67"]
-content_margin_left = 8.0
-content_margin_top = 4.0
-content_margin_right = 8.0
-content_margin_bottom = 4.0
-bg_color = Color(0, 0, 0, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_110"]
-atlas = ExtResource("11")
-region = Rect2(16, 0, 16, 16)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_68"]
-content_margin_left = 8.0
-content_margin_top = 4.0
-content_margin_right = 8.0
-content_margin_bottom = 4.0
+content_margin_left = 6.0
+content_margin_top = 3.0
+content_margin_right = 6.0
+content_margin_bottom = 3.0
 bg_color = Color(0, 0, 0, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_68"]
+content_margin_left = 6.0
+content_margin_top = 3.0
+content_margin_right = 6.0
+content_margin_bottom = 3.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8392157, 0.27450982, 1)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1"]
+atlas = ExtResource("7")
+region = Rect2(168, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_2"]
+atlas = ExtResource("7")
+region = Rect2(0, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3"]
+atlas = ExtResource("8")
+region = Rect2(120, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_4"]
+atlas = ExtResource("12")
+region = Rect2(16, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_5"]
+atlas = ExtResource("12")
+region = Rect2(32, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_6"]
+atlas = ExtResource("12")
+region = Rect2(48, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_7"]
+atlas = ExtResource("12")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_8"]
+atlas = ExtResource("7")
+region = Rect2(168, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_9"]
+atlas = ExtResource("7")
+region = Rect2(72, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_10"]
+atlas = ExtResource("7")
+region = Rect2(144, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_11"]
+atlas = ExtResource("15")
+region = Rect2(96, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_12"]
+atlas = ExtResource("8")
+region = Rect2(216, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_13"]
+atlas = ExtResource("8")
+region = Rect2(48, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_14"]
+atlas = ExtResource("12")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_15"]
+atlas = ExtResource("12")
+region = Rect2(80, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_16"]
+atlas = ExtResource("12")
+region = Rect2(112, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_17"]
+atlas = ExtResource("7")
+region = Rect2(96, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_18"]
+atlas = ExtResource("15")
+region = Rect2(24, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_19"]
+atlas = ExtResource("8")
+region = Rect2(168, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_20"]
+atlas = ExtResource("8")
+region = Rect2(144, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_21"]
+atlas = ExtResource("17")
+region = Rect2(96, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_22"]
+atlas = ExtResource("17")
+region = Rect2(64, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_23"]
+atlas = ExtResource("17")
+region = Rect2(0, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_24"]
+atlas = ExtResource("17")
+region = Rect2(32, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_25"]
+atlas = ExtResource("7")
+region = Rect2(72, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_26"]
+atlas = ExtResource("12")
+region = Rect2(80, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_27"]
+atlas = ExtResource("7")
+region = Rect2(48, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_28"]
+atlas = ExtResource("8")
+region = Rect2(96, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_29"]
+atlas = ExtResource("15")
+region = Rect2(168, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_30"]
+atlas = ExtResource("15")
+region = Rect2(120, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_31"]
+atlas = ExtResource("7")
+region = Rect2(120, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_32"]
+atlas = ExtResource("7")
+region = Rect2(144, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_33"]
+atlas = ExtResource("8")
+region = Rect2(216, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_34"]
+atlas = ExtResource("8")
+region = Rect2(216, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_35"]
+atlas = ExtResource("8")
+region = Rect2(96, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_36"]
+atlas = ExtResource("8")
+region = Rect2(168, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_37"]
+atlas = ExtResource("8")
+region = Rect2(24, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_38"]
+atlas = ExtResource("8")
+region = Rect2(0, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_39"]
+atlas = ExtResource("8")
+region = Rect2(120, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_40"]
+atlas = ExtResource("8")
+region = Rect2(0, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_41"]
+atlas = ExtResource("8")
+region = Rect2(72, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_42"]
+atlas = ExtResource("8")
+region = Rect2(48, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_43"]
+atlas = ExtResource("8")
+region = Rect2(96, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_44"]
+atlas = ExtResource("8")
+region = Rect2(144, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_45"]
+atlas = ExtResource("8")
+region = Rect2(120, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_46"]
+atlas = ExtResource("8")
+region = Rect2(48, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_47"]
+atlas = ExtResource("8")
+region = Rect2(24, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_48"]
+atlas = ExtResource("8")
+region = Rect2(72, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_49"]
+atlas = ExtResource("8")
+region = Rect2(192, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_50"]
+atlas = ExtResource("15")
+region = Rect2(48, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_51"]
+atlas = ExtResource("12")
+region = Rect2(32, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_52"]
+atlas = ExtResource("15")
+region = Rect2(24, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_53"]
+atlas = ExtResource("12")
+region = Rect2(112, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_54"]
+atlas = ExtResource("8")
+region = Rect2(192, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_55"]
+atlas = ExtResource("8")
+region = Rect2(144, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_56"]
+atlas = ExtResource("12")
+region = Rect2(96, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_57"]
+atlas = ExtResource("8")
+region = Rect2(192, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_58"]
+atlas = ExtResource("15")
+region = Rect2(0, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_59"]
+atlas = ExtResource("12")
+region = Rect2(16, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_60"]
+atlas = ExtResource("15")
+region = Rect2(72, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_61"]
+atlas = ExtResource("15")
+region = Rect2(96, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_62"]
+atlas = ExtResource("7")
+region = Rect2(96, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_63"]
+atlas = ExtResource("7")
+region = Rect2(144, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_64"]
+atlas = ExtResource("15")
+region = Rect2(168, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_65"]
+atlas = ExtResource("8")
+region = Rect2(96, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_66"]
+atlas = ExtResource("7")
+region = Rect2(24, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_67"]
+atlas = ExtResource("8")
+region = Rect2(120, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_68"]
+atlas = ExtResource("8")
+region = Rect2(168, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_69"]
+atlas = ExtResource("8")
+region = Rect2(24, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_70"]
+atlas = ExtResource("8")
+region = Rect2(168, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_71"]
+atlas = ExtResource("15")
+region = Rect2(0, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_72"]
+atlas = ExtResource("8")
+region = Rect2(72, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_73"]
+atlas = ExtResource("8")
+region = Rect2(144, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_74"]
+atlas = ExtResource("8")
+region = Rect2(24, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_75"]
+atlas = ExtResource("7")
+region = Rect2(168, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_76"]
+atlas = ExtResource("7")
+region = Rect2(24, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_77"]
+atlas = ExtResource("8")
+region = Rect2(48, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_78"]
+atlas = ExtResource("8")
+region = Rect2(0, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_79"]
+atlas = ExtResource("8")
+region = Rect2(24, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_80"]
+atlas = ExtResource("8")
+region = Rect2(72, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_81"]
+atlas = ExtResource("8")
+region = Rect2(192, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_82"]
+atlas = ExtResource("7")
+region = Rect2(48, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_83"]
+atlas = ExtResource("7")
+region = Rect2(96, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_84"]
+atlas = ExtResource("8")
+region = Rect2(72, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_85"]
+atlas = ExtResource("8")
+region = Rect2(48, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_86"]
+atlas = ExtResource("15")
+region = Rect2(48, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_87"]
+atlas = ExtResource("7")
+region = Rect2(0, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_88"]
+atlas = ExtResource("8")
+region = Rect2(168, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_89"]
+atlas = ExtResource("7")
+region = Rect2(120, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_90"]
+atlas = ExtResource("12")
+region = Rect2(96, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_91"]
+atlas = ExtResource("8")
+region = Rect2(144, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_92"]
+atlas = ExtResource("15")
+region = Rect2(120, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_93"]
+atlas = ExtResource("15")
+region = Rect2(144, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_94"]
+atlas = ExtResource("8")
+region = Rect2(192, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_95"]
+atlas = ExtResource("12")
+region = Rect2(64, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_96"]
+atlas = ExtResource("7")
+region = Rect2(48, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_97"]
+atlas = ExtResource("7")
+region = Rect2(120, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_98"]
+atlas = ExtResource("8")
+region = Rect2(216, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_99"]
+atlas = ExtResource("7")
+region = Rect2(72, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_100"]
+atlas = ExtResource("15")
+region = Rect2(144, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_101"]
+atlas = ExtResource("15")
+region = Rect2(72, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_102"]
+atlas = ExtResource("8")
+region = Rect2(0, 48, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_103"]
+atlas = ExtResource("7")
+region = Rect2(0, 0, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_104"]
+atlas = ExtResource("8")
+region = Rect2(0, 96, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_105"]
+atlas = ExtResource("8")
+region = Rect2(96, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_106"]
+atlas = ExtResource("8")
+region = Rect2(120, 72, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_107"]
+atlas = ExtResource("7")
+region = Rect2(24, 24, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_108"]
+atlas = ExtResource("12")
+region = Rect2(48, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_109"]
+atlas = ExtResource("12")
+region = Rect2(64, 16, 16, 16)
+
+[sub_resource type="FontVariation" id="FontVariation_7"]
+fallbacks = Array[Font]([ExtResource("2")])
+base_font = ExtResource("19")
+
+[sub_resource type="FontVariation" id="FontVariation_8"]
+fallbacks = Array[Font]([ExtResource("2")])
+base_font = ExtResource("5")
+opentype_features = {
+1819178349: 1,
+1953396077: 1
+}
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_69"]
 content_margin_left = 8.0
@@ -1337,11 +1349,11 @@ content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 4.0
 bg_color = Color(0, 0, 0, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.8392157, 0.27450982, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.56078434, 0.72156864, 0.91764706, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_70"]
 content_margin_left = 8.0
@@ -1356,22 +1368,26 @@ border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_71"]
-content_margin_left = 16.0
-content_margin_top = 16.0
-content_margin_right = 16.0
-content_margin_bottom = 16.0
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
 bg_color = Color(0, 0, 0, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(1, 0.8392157, 0.27450982, 1)
+border_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_110"]
+atlas = ExtResource("12")
+region = Rect2(16, 0, 16, 16)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_72"]
 content_margin_left = 8.0
-content_margin_top = 8.0
+content_margin_top = 4.0
 content_margin_right = 8.0
-content_margin_bottom = 8.0
+content_margin_bottom = 4.0
 bg_color = Color(0, 0, 0, 1)
 border_width_left = 2
 border_width_top = 2
@@ -1392,10 +1408,10 @@ border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_74"]
-content_margin_left = 16.0
-content_margin_top = 8.0
-content_margin_right = 16.0
-content_margin_bottom = 8.0
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
 bg_color = Color(0, 0, 0, 1)
 border_width_left = 2
 border_width_top = 2
@@ -1404,10 +1420,10 @@ border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_75"]
-content_margin_left = 8.0
-content_margin_top = 4.0
-content_margin_right = 8.0
-content_margin_bottom = 4.0
+content_margin_left = 16.0
+content_margin_top = 16.0
+content_margin_right = 16.0
+content_margin_bottom = 16.0
 bg_color = Color(0, 0, 0, 1)
 border_width_left = 2
 border_width_top = 2
@@ -1417,6 +1433,18 @@ border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_76"]
 content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8392157, 0.27450982, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_77"]
+content_margin_left = 8.0
 content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 4.0
@@ -1427,19 +1455,11 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_77"]
-content_margin_left = 0.0
-content_margin_top = 0.0
-content_margin_right = 0.0
-content_margin_bottom = 0.0
-bg_color = Color(0, 0, 0, 0.8784314)
-border_color = Color(0, 0, 0, 0)
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_78"]
-content_margin_left = 8.0
-content_margin_top = 4.0
-content_margin_right = 8.0
-content_margin_bottom = 4.0
+content_margin_left = 16.0
+content_margin_top = 8.0
+content_margin_right = 16.0
+content_margin_bottom = 8.0
 bg_color = Color(0, 0, 0, 1)
 border_width_left = 2
 border_width_top = 2
@@ -1472,22 +1492,18 @@ border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_81"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0, 0, 0, 0.8784314)
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_82"]
 content_margin_left = 8.0
 content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 4.0
-bg_color = Color(0, 0, 0, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.8392157, 0.27450982, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_82"]
-content_margin_left = 16.0
-content_margin_top = 8.0
-content_margin_right = 16.0
-content_margin_bottom = 8.0
 bg_color = Color(0, 0, 0, 1)
 border_width_left = 2
 border_width_top = 2
@@ -1507,11 +1523,59 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_84"]
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8392157, 0.27450982, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_85"]
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8392157, 0.27450982, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_86"]
+content_margin_left = 16.0
+content_margin_top = 8.0
+content_margin_right = 16.0
+content_margin_bottom = 8.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8392157, 0.27450982, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_87"]
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8392157, 0.27450982, 1)
+
 [sub_resource type="AtlasTexture" id="AtlasTexture_111"]
-atlas = ExtResource("11")
+atlas = ExtResource("12")
 region = Rect2(64, 0, 16, 16)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_84"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_88"]
 content_margin_left = 8.0
 content_margin_top = 4.0
 content_margin_right = 8.0
@@ -1523,7 +1587,7 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(1, 1, 1, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_85"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_89"]
 content_margin_left = 10.0
 content_margin_top = 10.0
 content_margin_right = 10.0
@@ -1535,7 +1599,7 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_86"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_90"]
 content_margin_left = 4.0
 content_margin_top = 1.0
 content_margin_right = 4.0
@@ -1543,7 +1607,7 @@ content_margin_bottom = 1.0
 bg_color = Color(1, 0.8392157, 0.27450982, 1)
 border_color = Color(0, 0, 0, 0)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_87"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_91"]
 content_margin_left = 2.0
 content_margin_top = 2.0
 content_margin_right = 2.0
@@ -1568,63 +1632,6 @@ content_margin_right = 0.0
 content_margin_bottom = 0.0
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_9"]
-content_margin_left = 0.0
-content_margin_top = 0.0
-content_margin_right = 0.0
-content_margin_bottom = 0.0
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_88"]
-content_margin_left = 4.0
-content_margin_top = 2.0
-content_margin_right = 4.0
-content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.8392157, 0.27450982, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_89"]
-content_margin_left = 4.0
-content_margin_top = 2.0
-content_margin_right = 4.0
-content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.8392157, 0.27450982, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_90"]
-content_margin_left = 6.0
-content_margin_top = 4.0
-content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0, 0, 0, 1)
-border_color = Color(0, 0, 0, 0)
-
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_10"]
-content_margin_left = 6.0
-content_margin_top = 4.0
-content_margin_right = 6.0
-content_margin_bottom = 4.0
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_91"]
-content_margin_left = 6.0
-content_margin_top = 4.0
-content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0, 0, 0, 1)
-border_color = Color(0, 0, 0, 0)
-
-[sub_resource type="FontVariation" id="FontVariation_7"]
-fallbacks = Array[Font]([ExtResource("2")])
-base_font = ExtResource("4")
-spacing_glyph = 3
-
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_11"]
 content_margin_left = 0.0
 content_margin_top = 0.0
 content_margin_right = 0.0
@@ -1662,7 +1669,7 @@ content_margin_bottom = 4.0
 bg_color = Color(0, 0, 0, 1)
 border_color = Color(0, 0, 0, 0)
 
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_12"]
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_10"]
 content_margin_left = 6.0
 content_margin_top = 4.0
 content_margin_right = 6.0
@@ -1676,23 +1683,64 @@ content_margin_bottom = 4.0
 bg_color = Color(0, 0, 0, 1)
 border_color = Color(0, 0, 0, 0)
 
+[sub_resource type="FontVariation" id="FontVariation_9"]
+fallbacks = Array[Font]([ExtResource("2")])
+base_font = ExtResource("4")
+spacing_glyph = 3
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_11"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_96"]
 content_margin_left = 4.0
-content_margin_top = 0.0
+content_margin_top = 2.0
 content_margin_right = 4.0
-content_margin_bottom = 0.0
-bg_color = Color(1, 0.8392157, 0.27450982, 1)
-border_color = Color(0, 0, 0, 0)
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_97"]
 content_margin_left = 4.0
-content_margin_top = 0.0
+content_margin_top = 2.0
 content_margin_right = 4.0
-content_margin_bottom = 0.0
-bg_color = Color(1, 0.8392157, 0.27450982, 1)
-border_color = Color(0, 0, 0, 0)
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8392157, 0.27450982, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_98"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 1)
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_12"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_99"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 1)
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_100"]
 content_margin_left = 4.0
 content_margin_top = 0.0
 content_margin_right = 4.0
@@ -1700,7 +1748,23 @@ content_margin_bottom = 0.0
 bg_color = Color(1, 0.8392157, 0.27450982, 1)
 border_color = Color(0, 0, 0, 0)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_99"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_101"]
+content_margin_left = 4.0
+content_margin_top = 0.0
+content_margin_right = 4.0
+content_margin_bottom = 0.0
+bg_color = Color(1, 0.8392157, 0.27450982, 1)
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_102"]
+content_margin_left = 4.0
+content_margin_top = 0.0
+content_margin_right = 4.0
+content_margin_bottom = 0.0
+bg_color = Color(1, 0.8392157, 0.27450982, 1)
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_103"]
 content_margin_left = 4.0
 content_margin_top = 0.0
 content_margin_right = 4.0
@@ -1712,7 +1776,7 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(1, 0.8392157, 0.27450982, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_100"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_104"]
 content_margin_left = 4.0
 content_margin_top = 0.0
 content_margin_right = 4.0
@@ -1724,7 +1788,7 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(0.56078434, 0.72156864, 0.91764706, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_101"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_105"]
 content_margin_left = 0.5
 content_margin_top = 0.0
 content_margin_right = 0.5
@@ -2046,6 +2110,28 @@ ButtonTab/styles/hover = SubResource("StyleBoxFlat_47")
 ButtonTab/styles/hover_pressed = SubResource("StyleBoxFlat_48")
 ButtonTab/styles/normal = SubResource("StyleBoxFlat_49")
 ButtonTab/styles/pressed = SubResource("StyleBoxFlat_48")
+ButtonTabCompact/base_type = &"Button"
+ButtonTabCompact/colors/font_color = Color(1, 1, 1, 1)
+ButtonTabCompact/colors/font_disabled_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
+ButtonTabCompact/colors/font_focus_color = Color(1, 1, 1, 1)
+ButtonTabCompact/colors/font_hover_color = Color(1, 1, 1, 1)
+ButtonTabCompact/colors/font_hover_pressed_color = Color(0, 0, 0, 1)
+ButtonTabCompact/colors/font_pressed_color = Color(0, 0, 0, 1)
+ButtonTabCompact/colors/icon_disabled_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
+ButtonTabCompact/colors/icon_focus_color = Color(1, 1, 1, 1)
+ButtonTabCompact/colors/icon_hover_color = Color(1, 1, 1, 1)
+ButtonTabCompact/colors/icon_hover_pressed_color = Color(0, 0, 0, 1)
+ButtonTabCompact/colors/icon_normal_color = Color(1, 1, 1, 1)
+ButtonTabCompact/colors/icon_pressed_color = Color(0, 0, 0, 1)
+ButtonTabCompact/constants/h_separation = 4
+ButtonTabCompact/font_sizes/font_size = 14
+ButtonTabCompact/fonts/font = SubResource("FontVariation_2")
+ButtonTabCompact/styles/disabled = SubResource("StyleBoxFlat_50")
+ButtonTabCompact/styles/focus = SubResource("StyleBoxFlat_2")
+ButtonTabCompact/styles/hover = SubResource("StyleBoxFlat_51")
+ButtonTabCompact/styles/hover_pressed = SubResource("StyleBoxFlat_52")
+ButtonTabCompact/styles/normal = SubResource("StyleBoxFlat_53")
+ButtonTabCompact/styles/pressed = SubResource("StyleBoxFlat_52")
 ButtonToggle/base_type = &"Button"
 ButtonToggle/colors/font_color = Color(1, 1, 1, 1)
 ButtonToggle/colors/font_disabled_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
@@ -2062,12 +2148,12 @@ ButtonToggle/colors/icon_pressed_color = Color(0, 0, 0, 1)
 ButtonToggle/constants/h_separation = 4
 ButtonToggle/font_sizes/font_size = 14
 ButtonToggle/fonts/font = SubResource("FontVariation_2")
-ButtonToggle/styles/disabled = SubResource("StyleBoxFlat_50")
+ButtonToggle/styles/disabled = SubResource("StyleBoxFlat_54")
 ButtonToggle/styles/focus = SubResource("StyleBoxFlat_2")
-ButtonToggle/styles/hover = SubResource("StyleBoxFlat_51")
-ButtonToggle/styles/hover_pressed = SubResource("StyleBoxFlat_52")
-ButtonToggle/styles/normal = SubResource("StyleBoxFlat_53")
-ButtonToggle/styles/pressed = SubResource("StyleBoxFlat_52")
+ButtonToggle/styles/hover = SubResource("StyleBoxFlat_55")
+ButtonToggle/styles/hover_pressed = SubResource("StyleBoxFlat_56")
+ButtonToggle/styles/normal = SubResource("StyleBoxFlat_57")
+ButtonToggle/styles/pressed = SubResource("StyleBoxFlat_56")
 CheckButton/colors/font_color = Color(1, 1, 1, 1)
 CheckButton/colors/font_disabled_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 CheckButton/colors/font_focus_color = Color(1, 1, 1, 1)
@@ -2077,28 +2163,44 @@ CheckButton/constants/h_separation = 8
 CheckButton/font_sizes/font_size = 14
 CheckButton/fonts/font = SubResource("FontVariation_1")
 CheckButton/styles/disabled = SubResource("StyleBoxEmpty_6")
-CheckButton/styles/focus = SubResource("StyleBoxFlat_54")
+CheckButton/styles/focus = SubResource("StyleBoxFlat_58")
 CheckButton/styles/hover = SubResource("StyleBoxEmpty_6")
 CheckButton/styles/hover_pressed = SubResource("StyleBoxEmpty_6")
 CheckButton/styles/normal = SubResource("StyleBoxEmpty_6")
 CheckButton/styles/pressed = SubResource("StyleBoxEmpty_6")
+CompanyCount/base_type = &"Label"
+CompanyCount/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
+CompanyCount/font_sizes/font_size = 13
+CompanyCount/fonts/font = SubResource("FontVariation_2")
+CompanyEra/base_type = &"Label"
+CompanyEra/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
+CompanyEra/font_sizes/font_size = 12
+CompanyEra/fonts/font = SubResource("FontVariation_4")
+CompanyMeta/base_type = &"Label"
+CompanyMeta/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
+CompanyMeta/font_sizes/font_size = 12
+CompanyMeta/fonts/font = SubResource("FontVariation_5")
+CompanyName/base_type = &"Label"
+CompanyName/colors/font_color = Color(1, 1, 1, 1)
+CompanyName/font_sizes/font_size = 14
+CompanyName/fonts/font = SubResource("FontVariation_6")
 GridContainer/constants/h_separation = 12
 GridContainer/constants/v_separation = 4
 HBoxContainer/constants/separation = 8
-HScrollBar/styles/grabber = SubResource("StyleBoxFlat_55")
-HScrollBar/styles/grabber_highlight = SubResource("StyleBoxFlat_56")
-HScrollBar/styles/grabber_pressed = SubResource("StyleBoxFlat_57")
-HScrollBar/styles/scroll = SubResource("StyleBoxFlat_58")
-HScrollBar/styles/scroll_focus = SubResource("StyleBoxFlat_59")
+HScrollBar/styles/grabber = SubResource("StyleBoxFlat_59")
+HScrollBar/styles/grabber_highlight = SubResource("StyleBoxFlat_60")
+HScrollBar/styles/grabber_pressed = SubResource("StyleBoxFlat_61")
+HScrollBar/styles/scroll = SubResource("StyleBoxFlat_62")
+HScrollBar/styles/scroll_focus = SubResource("StyleBoxFlat_63")
 HSeparator/constants/separation = 8
-HSeparator/styles/separator = SubResource("StyleBoxFlat_60")
-HSlider/styles/grabber_area = SubResource("StyleBoxFlat_61")
-HSlider/styles/grabber_area_highlight = SubResource("StyleBoxFlat_61")
-HSlider/styles/slider = SubResource("StyleBoxFlat_62")
+HSeparator/styles/separator = SubResource("StyleBoxFlat_64")
+HSlider/styles/grabber_area = SubResource("StyleBoxFlat_65")
+HSlider/styles/grabber_area_highlight = SubResource("StyleBoxFlat_65")
+HSlider/styles/slider = SubResource("StyleBoxFlat_66")
 Hint/base_type = &"Label"
 Hint/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 Hint/font_sizes/font_size = 13
-Hint/fonts/font = SubResource("FontVariation_4")
+Hint/fonts/font = SubResource("FontVariation_5")
 InkChart/base_type = &"Control"
 InkChart/colors/axis = Color(0.8156863, 0.8156863, 0.8156863, 1)
 InkChart/colors/axis_slot = Color(0.8156863, 0.8156863, 0.8156863, 1)
@@ -2121,7 +2223,7 @@ InkChart/colors/ink_4_slot = Color(0.9411765, 0.65882355, 0.3137255, 1)
 InkChart/font_sizes/font_size = 13
 InkChart/font_sizes/keycap_font_size = 12
 InkChart/font_sizes/label_font_size = 14
-InkChart/fonts/font = SubResource("FontVariation_4")
+InkChart/fonts/font = SubResource("FontVariation_5")
 InkChart/fonts/keycap_font = SubResource("FontVariation_2")
 InkChart/fonts/label_font = SubResource("FontVariation_2")
 KeyCap/base_type = &"Label"
@@ -2129,22 +2231,22 @@ KeyCap/colors/font_color = Color(1, 1, 1, 1)
 KeyCap/font_sizes/font_size = 12
 KeyCap/fonts/font = SubResource("FontVariation_2")
 KeyCapPanel/base_type = &"PanelContainer"
-KeyCapPanel/styles/panel = SubResource("StyleBoxFlat_63")
+KeyCapPanel/styles/panel = SubResource("StyleBoxFlat_67")
 KeyCapPanelWait/base_type = &"PanelContainer"
-KeyCapPanelWait/styles/panel = SubResource("StyleBoxFlat_64")
+KeyCapPanelWait/styles/panel = SubResource("StyleBoxFlat_68")
 Kit/icons/area_held = SubResource("AtlasTexture_1")
 Kit/icons/area_open = SubResource("AtlasTexture_2")
 Kit/icons/army = SubResource("AtlasTexture_3")
-Kit/icons/army_badge = ExtResource("8")
-Kit/icons/army_plate = ExtResource("9")
-Kit/icons/army_plate_ring = ExtResource("10")
+Kit/icons/army_badge = ExtResource("9")
+Kit/icons/army_plate = ExtResource("10")
+Kit/icons/army_plate_ring = ExtResource("11")
 Kit/icons/arrow_down = SubResource("AtlasTexture_4")
 Kit/icons/arrow_left = SubResource("AtlasTexture_5")
 Kit/icons/arrow_right = SubResource("AtlasTexture_6")
 Kit/icons/arrow_up = SubResource("AtlasTexture_7")
 Kit/icons/attack = SubResource("AtlasTexture_8")
-Kit/icons/badge_battle = ExtResource("12")
-Kit/icons/badge_siege = ExtResource("13")
+Kit/icons/badge_battle = ExtResource("13")
+Kit/icons/badge_siege = ExtResource("14")
 Kit/icons/battle = SubResource("AtlasTexture_9")
 Kit/icons/besiege = SubResource("AtlasTexture_10")
 Kit/icons/bridge = SubResource("AtlasTexture_11")
@@ -2154,7 +2256,7 @@ Kit/icons/close = SubResource("AtlasTexture_14")
 Kit/icons/cross = SubResource("AtlasTexture_15")
 Kit/icons/dash = SubResource("AtlasTexture_16")
 Kit/icons/defeat = SubResource("AtlasTexture_17")
-Kit/icons/die_face = ExtResource("15")
+Kit/icons/die_face = ExtResource("16")
 Kit/icons/disband = SubResource("AtlasTexture_18")
 Kit/icons/district = SubResource("AtlasTexture_19")
 Kit/icons/ducats = SubResource("AtlasTexture_20")
@@ -2202,7 +2304,7 @@ Kit/icons/muster = SubResource("AtlasTexture_61")
 Kit/icons/occupied = SubResource("AtlasTexture_62")
 Kit/icons/pass_cross = SubResource("AtlasTexture_63")
 Kit/icons/pass_mark = SubResource("AtlasTexture_64")
-Kit/icons/path_stop = ExtResource("17")
+Kit/icons/path_stop = ExtResource("18")
 Kit/icons/payback = SubResource("AtlasTexture_65")
 Kit/icons/peace = SubResource("AtlasTexture_66")
 Kit/icons/people = SubResource("AtlasTexture_67")
@@ -2259,7 +2361,7 @@ KitSwitch/constants/h_separation = 8
 KitSwitch/font_sizes/font_size = 14
 KitSwitch/fonts/font = SubResource("FontVariation_1")
 KitSwitch/styles/disabled = SubResource("StyleBoxEmpty_6")
-KitSwitch/styles/focus = SubResource("StyleBoxFlat_54")
+KitSwitch/styles/focus = SubResource("StyleBoxFlat_58")
 KitSwitch/styles/hover = SubResource("StyleBoxEmpty_6")
 KitSwitch/styles/hover_pressed = SubResource("StyleBoxEmpty_6")
 KitSwitch/styles/normal = SubResource("StyleBoxEmpty_6")
@@ -2271,7 +2373,7 @@ Label/fonts/font = SubResource("FontVariation_2")
 LabelFlavour/base_type = &"Label"
 LabelFlavour/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 LabelFlavour/font_sizes/font_size = 17
-LabelFlavour/fonts/font = SubResource("FontVariation_5")
+LabelFlavour/fonts/font = SubResource("FontVariation_7")
 LabelInk/base_type = &"Label"
 LabelInk/colors/font_color = Color(1, 1, 1, 1)
 LabelInk/font_sizes/font_size = 16
@@ -2279,7 +2381,7 @@ LabelInk/fonts/font = SubResource("FontVariation_1")
 LabelInkHead/base_type = &"Label"
 LabelInkHead/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
 LabelInkHead/font_sizes/font_size = 16
-LabelInkHead/fonts/font = SubResource("FontVariation_6")
+LabelInkHead/fonts/font = SubResource("FontVariation_8")
 LabelInkMuted/base_type = &"Label"
 LabelInkMuted/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 LabelInkMuted/font_sizes/font_size = 15
@@ -2291,9 +2393,9 @@ LineEdit/colors/font_selected_color = Color(0, 0, 0, 1)
 LineEdit/colors/selection_color = Color(1, 0.8392157, 0.27450982, 1)
 LineEdit/font_sizes/font_size = 14
 LineEdit/fonts/font = SubResource("FontVariation_1")
-LineEdit/styles/focus = SubResource("StyleBoxFlat_65")
-LineEdit/styles/normal = SubResource("StyleBoxFlat_66")
-LineEdit/styles/read_only = SubResource("StyleBoxFlat_67")
+LineEdit/styles/focus = SubResource("StyleBoxFlat_69")
+LineEdit/styles/normal = SubResource("StyleBoxFlat_70")
+LineEdit/styles/read_only = SubResource("StyleBoxFlat_71")
 Number/base_type = &"Label"
 Number/colors/font_color = Color(1, 1, 1, 1)
 Number/font_sizes/font_size = 16
@@ -2328,36 +2430,36 @@ NumberWarn/font_sizes/font_size = 16
 NumberWarn/fonts/font = SubResource("FontVariation_2")
 OptionButton/icons/arrow = SubResource("AtlasTexture_110")
 PanelBar/base_type = &"PanelContainer"
-PanelBar/styles/panel = SubResource("StyleBoxFlat_68")
+PanelBar/styles/panel = SubResource("StyleBoxFlat_72")
 PanelCard/base_type = &"PanelContainer"
-PanelCard/styles/panel = SubResource("StyleBoxFlat_69")
+PanelCard/styles/panel = SubResource("StyleBoxFlat_73")
 PanelCartouche/base_type = &"PanelContainer"
-PanelCartouche/styles/panel = SubResource("StyleBoxFlat_70")
-PanelContainer/styles/panel = SubResource("StyleBoxFlat_71")
+PanelCartouche/styles/panel = SubResource("StyleBoxFlat_74")
+PanelContainer/styles/panel = SubResource("StyleBoxFlat_75")
 PanelDebug/base_type = &"PanelContainer"
-PanelDebug/styles/panel = SubResource("StyleBoxFlat_72")
+PanelDebug/styles/panel = SubResource("StyleBoxFlat_76")
 PanelMinimap/base_type = &"PanelContainer"
-PanelMinimap/styles/panel = SubResource("StyleBoxFlat_73")
+PanelMinimap/styles/panel = SubResource("StyleBoxFlat_77")
 PanelModal/base_type = &"PanelContainer"
-PanelModal/styles/panel = SubResource("StyleBoxFlat_74")
+PanelModal/styles/panel = SubResource("StyleBoxFlat_78")
 PanelPlate/base_type = &"PanelContainer"
-PanelPlate/styles/panel = SubResource("StyleBoxFlat_75")
+PanelPlate/styles/panel = SubResource("StyleBoxFlat_79")
 PanelRibbon/base_type = &"PanelContainer"
-PanelRibbon/styles/panel = SubResource("StyleBoxFlat_76")
+PanelRibbon/styles/panel = SubResource("StyleBoxFlat_80")
 PanelShade/base_type = &"PanelContainer"
-PanelShade/styles/panel = SubResource("StyleBoxFlat_77")
+PanelShade/styles/panel = SubResource("StyleBoxFlat_81")
 PanelSlot/base_type = &"PanelContainer"
-PanelSlot/styles/panel = SubResource("StyleBoxFlat_78")
+PanelSlot/styles/panel = SubResource("StyleBoxFlat_82")
 PanelStripCell/base_type = &"PanelContainer"
-PanelStripCell/styles/panel = SubResource("StyleBoxFlat_79")
+PanelStripCell/styles/panel = SubResource("StyleBoxFlat_83")
 PanelStripCellNow/base_type = &"PanelContainer"
-PanelStripCellNow/styles/panel = SubResource("StyleBoxFlat_80")
+PanelStripCellNow/styles/panel = SubResource("StyleBoxFlat_84")
 PanelToast/base_type = &"PanelContainer"
-PanelToast/styles/panel = SubResource("StyleBoxFlat_81")
+PanelToast/styles/panel = SubResource("StyleBoxFlat_85")
 PanelVellum/base_type = &"PanelContainer"
-PanelVellum/styles/panel = SubResource("StyleBoxFlat_82")
+PanelVellum/styles/panel = SubResource("StyleBoxFlat_86")
 PanelVellumInset/base_type = &"PanelContainer"
-PanelVellumInset/styles/panel = SubResource("StyleBoxFlat_83")
+PanelVellumInset/styles/panel = SubResource("StyleBoxFlat_87")
 PopupMenu/colors/font_color = Color(1, 1, 1, 1)
 PopupMenu/colors/font_disabled_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 PopupMenu/colors/font_hover_color = Color(1, 0.8392157, 0.27450982, 1)
@@ -2365,35 +2467,35 @@ PopupMenu/font_sizes/font_size = 14
 PopupMenu/fonts/font = SubResource("FontVariation_1")
 PopupMenu/icons/checked = SubResource("AtlasTexture_111")
 PopupMenu/icons/radio_checked = SubResource("AtlasTexture_111")
-PopupMenu/styles/hover = SubResource("StyleBoxFlat_84")
-PopupMenu/styles/panel = SubResource("StyleBoxFlat_85")
-PopupMenu/styles/separator = SubResource("StyleBoxFlat_86")
-PopupPanel/styles/panel = SubResource("StyleBoxFlat_85")
+PopupMenu/styles/hover = SubResource("StyleBoxFlat_88")
+PopupMenu/styles/panel = SubResource("StyleBoxFlat_89")
+PopupMenu/styles/separator = SubResource("StyleBoxFlat_90")
+PopupPanel/styles/panel = SubResource("StyleBoxFlat_89")
 ProgressBar/colors/font_color = Color(1, 1, 1, 1)
 ProgressBar/font_sizes/font_size = 12
 ProgressBar/fonts/font = SubResource("FontVariation_2")
-ProgressBar/styles/background = SubResource("StyleBoxFlat_62")
-ProgressBar/styles/fill = SubResource("StyleBoxFlat_61")
+ProgressBar/styles/background = SubResource("StyleBoxFlat_66")
+ProgressBar/styles/fill = SubResource("StyleBoxFlat_65")
 Reason/base_type = &"Label"
 Reason/colors/font_color = Color(0.8156863, 0.8156863, 0.8156863, 1)
 Reason/font_sizes/font_size = 13
-Reason/fonts/font = SubResource("FontVariation_4")
+Reason/fonts/font = SubResource("FontVariation_5")
 RichTextLabel/colors/default_color = Color(1, 1, 1, 1)
 RichTextLabel/font_sizes/bold_font_size = 15
 RichTextLabel/font_sizes/bold_italics_font_size = 15
 RichTextLabel/font_sizes/italics_font_size = 15
 RichTextLabel/font_sizes/normal_font_size = 15
 RichTextLabel/fonts/bold_font = SubResource("FontVariation_2")
-RichTextLabel/fonts/bold_italics_font = SubResource("FontVariation_5")
-RichTextLabel/fonts/italics_font = SubResource("FontVariation_5")
+RichTextLabel/fonts/bold_italics_font = SubResource("FontVariation_7")
+RichTextLabel/fonts/italics_font = SubResource("FontVariation_7")
 RichTextLabel/fonts/normal_font = SubResource("FontVariation_1")
-RichTextLabel/styles/focus = SubResource("StyleBoxFlat_87")
+RichTextLabel/styles/focus = SubResource("StyleBoxFlat_91")
 RichTextLabel/styles/normal = SubResource("StyleBoxEmpty_7")
 ScrollContainer/styles/panel = SubResource("StyleBoxEmpty_8")
 SectionHead/base_type = &"Label"
 SectionHead/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
 SectionHead/font_sizes/font_size = 16
-SectionHead/fonts/font = SubResource("FontVariation_6")
+SectionHead/fonts/font = SubResource("FontVariation_8")
 StudyTree/base_type = &"Tree"
 StudyTree/colors/font_color = Color(1, 1, 1, 1)
 StudyTree/colors/font_selected_color = Color(1, 0.8392157, 0.27450982, 1)
@@ -2406,17 +2508,17 @@ StudyTree/constants/v_separation = 4
 StudyTree/font_sizes/font_size = 14
 StudyTree/font_sizes/title_button_font_size = 13
 StudyTree/fonts/font = SubResource("FontVariation_1")
-StudyTree/fonts/title_button_font = SubResource("FontVariation_6")
+StudyTree/fonts/title_button_font = SubResource("FontVariation_8")
 StudyTree/styles/panel = SubResource("StyleBoxEmpty_9")
-StudyTree/styles/selected = SubResource("StyleBoxFlat_88")
-StudyTree/styles/selected_focus = SubResource("StyleBoxFlat_89")
-StudyTree/styles/title_button_hover = SubResource("StyleBoxFlat_90")
+StudyTree/styles/selected = SubResource("StyleBoxFlat_92")
+StudyTree/styles/selected_focus = SubResource("StyleBoxFlat_93")
+StudyTree/styles/title_button_hover = SubResource("StyleBoxFlat_94")
 StudyTree/styles/title_button_normal = SubResource("StyleBoxEmpty_10")
-StudyTree/styles/title_button_pressed = SubResource("StyleBoxFlat_91")
+StudyTree/styles/title_button_pressed = SubResource("StyleBoxFlat_95")
 TableHeader/base_type = &"Label"
 TableHeader/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
 TableHeader/font_sizes/font_size = 13
-TableHeader/fonts/font = SubResource("FontVariation_6")
+TableHeader/fonts/font = SubResource("FontVariation_8")
 TableRow/base_type = &"Label"
 TableRow/colors/font_color = Color(1, 1, 1, 1)
 TableRow/font_sizes/font_size = 14
@@ -2436,12 +2538,12 @@ TitlePanel/fonts/font = SubResource("FontVariation_3")
 TitleRibbon/base_type = &"Label"
 TitleRibbon/colors/font_color = Color(1, 0.8392157, 0.27450982, 1)
 TitleRibbon/font_sizes/font_size = 20
-TitleRibbon/fonts/font = SubResource("FontVariation_7")
+TitleRibbon/fonts/font = SubResource("FontVariation_9")
 TooltipLabel/colors/font_color = Color(1, 1, 1, 1)
 TooltipLabel/font_sizes/font_size = 13
-TooltipLabel/fonts/font = SubResource("FontVariation_4")
+TooltipLabel/fonts/font = SubResource("FontVariation_5")
 TooltipPanel/base_type = &"PanelContainer"
-TooltipPanel/styles/panel = SubResource("StyleBoxFlat_85")
+TooltipPanel/styles/panel = SubResource("StyleBoxFlat_89")
 Tree/colors/font_color = Color(1, 1, 1, 1)
 Tree/colors/font_selected_color = Color(1, 0.8392157, 0.27450982, 1)
 Tree/colors/guide_color = Color(1, 0.8392157, 0.27450982, 1)
@@ -2453,18 +2555,18 @@ Tree/constants/v_separation = 4
 Tree/font_sizes/font_size = 14
 Tree/font_sizes/title_button_font_size = 13
 Tree/fonts/font = SubResource("FontVariation_1")
-Tree/fonts/title_button_font = SubResource("FontVariation_6")
+Tree/fonts/title_button_font = SubResource("FontVariation_8")
 Tree/styles/panel = SubResource("StyleBoxEmpty_11")
-Tree/styles/selected = SubResource("StyleBoxFlat_92")
-Tree/styles/selected_focus = SubResource("StyleBoxFlat_93")
-Tree/styles/title_button_hover = SubResource("StyleBoxFlat_94")
+Tree/styles/selected = SubResource("StyleBoxFlat_96")
+Tree/styles/selected_focus = SubResource("StyleBoxFlat_97")
+Tree/styles/title_button_hover = SubResource("StyleBoxFlat_98")
 Tree/styles/title_button_normal = SubResource("StyleBoxEmpty_12")
-Tree/styles/title_button_pressed = SubResource("StyleBoxFlat_95")
+Tree/styles/title_button_pressed = SubResource("StyleBoxFlat_99")
 VBoxContainer/constants/separation = 8
-VScrollBar/styles/grabber = SubResource("StyleBoxFlat_96")
-VScrollBar/styles/grabber_highlight = SubResource("StyleBoxFlat_97")
-VScrollBar/styles/grabber_pressed = SubResource("StyleBoxFlat_98")
-VScrollBar/styles/scroll = SubResource("StyleBoxFlat_99")
-VScrollBar/styles/scroll_focus = SubResource("StyleBoxFlat_100")
+VScrollBar/styles/grabber = SubResource("StyleBoxFlat_100")
+VScrollBar/styles/grabber_highlight = SubResource("StyleBoxFlat_101")
+VScrollBar/styles/grabber_pressed = SubResource("StyleBoxFlat_102")
+VScrollBar/styles/scroll = SubResource("StyleBoxFlat_103")
+VScrollBar/styles/scroll_focus = SubResource("StyleBoxFlat_104")
 VSeparator/constants/separation = 8
-VSeparator/styles/separator = SubResource("StyleBoxFlat_101")
+VSeparator/styles/separator = SubResource("StyleBoxFlat_105")

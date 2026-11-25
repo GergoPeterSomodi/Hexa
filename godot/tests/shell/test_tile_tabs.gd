@@ -27,7 +27,7 @@ func test_fake_tab_found_through_with_folder() -> void:
 	assert_true(ids.has(&"industry"), "with_folder lists the fixture's fake tab")
 	for script: GDScript in tabs:
 		if TileTabs.id_of(script) == &"industry":
-			assert_eq(TileTabs.order_of(script), 30, "the fake tab has ORDER 30")
+			assert_eq(TileTabs.order_of(script), 50, "the fake tab has ORDER 50")
 			assert_eq(script.get_script_constant_map()["LABEL"], "Industry", "the fake tab is labelled Industry")
 
 
@@ -66,10 +66,10 @@ func test_index_matches_the_real_folder() -> void:
 
 func test_duplicate_order_is_named() -> void:
 	var fake := load(FAKE) as GDScript
-	var dup := _in_memory("extends TileTab\nconst ID := &\"dup\"\nconst LABEL := \"Dup\"\nconst ORDER := 30\n")
+	var dup := _in_memory("extends TileTab\nconst ID := &\"dup\"\nconst LABEL := \"Dup\"\nconst ORDER := 50\n")
 	var problems := TileTabs.check([fake, dup])
 	assert_eq(problems.size(), 1, "one problem for the duplicate")
-	assert_true(problems.size() > 0 and problems[0].contains("duplicate ORDER 30"),
+	assert_true(problems.size() > 0 and problems[0].contains("duplicate ORDER 50"),
 			"the duplicate ORDER is named with its value")
 
 
@@ -85,3 +85,40 @@ func test_unique_orders_pass_the_check() -> void:
 	var fake := load(FAKE) as GDScript
 	var other := _in_memory("extends TileTab\nconst ID := &\"other\"\nconst LABEL := \"Other\"\nconst ORDER := 40\n")
 	assert_eq(TileTabs.check([fake, other]).size(), 0, "two tabs with different ORDER pass")
+
+
+func test_a_tab_is_live_by_default() -> void:
+	assert_eq(TileTab.dimmed({"case": "own"}), "", "the base tab is live for any view")
+	var fake := load(FAKE) as GDScript
+	assert_eq(str(fake.call("dimmed", {"case": "own", "settlement": true})), "", "the fake tab is live on its own settlement")
+
+
+func test_dimmed_in_gives_the_reason_of_a_shown_dimmed_tab() -> void:
+	var shut := _in_memory("extends TileTab\nconst ID := &\"shut\"\nconst LABEL := \"Shut\"\nconst ORDER := 60\n"
+			+ "static func applies(view: Dictionary) -> bool:\n\treturn view.get(\"case\", \"\") == \"foreign\"\n"
+			+ "static func dimmed(_view: Dictionary) -> String:\n\treturn \"Not yours\"\n")
+	var view := {"case": "foreign"}
+	var dimmed := TileTabs.dimmed_in([shut], view)
+	assert_eq(dimmed, {&"shut": "Not yours"}, "a dimmed tab that applies gives its reason, keyed by id")
+
+
+func test_dimmed_in_skips_tabs_that_do_not_apply() -> void:
+	var shut := _in_memory("extends TileTab\nconst ID := &\"shut\"\nconst LABEL := \"Shut\"\nconst ORDER := 60\n"
+			+ "static func applies(view: Dictionary) -> bool:\n\treturn view.get(\"case\", \"\") == \"foreign\"\n"
+			+ "static func dimmed(_view: Dictionary) -> String:\n\treturn \"Not yours\"\n")
+	assert_true(TileTabs.dimmed_in([shut], {"case": "own"}).is_empty(),
+			"a tab that does not apply is not listed as dimmed (it is absent, not dimmed)")
+
+
+func test_dimmed_in_is_empty_for_live_tabs() -> void:
+	var fake := load(FAKE) as GDScript
+	assert_true(TileTabs.dimmed_in([fake], {"case": "own", "settlement": true}).is_empty(),
+			"a live shown tab gives no reason")
+
+
+func test_shown_in_orders_by_order() -> void:
+	var late := _in_memory("extends TileTab\nconst ID := &\"late\"\nconst LABEL := \"Late\"\nconst ORDER := 90\n"
+			+ "static func applies(_view: Dictionary) -> bool:\n\treturn true\n")
+	var early := _in_memory("extends TileTab\nconst ID := &\"early\"\nconst LABEL := \"Early\"\nconst ORDER := 5\n"
+			+ "static func applies(_view: Dictionary) -> bool:\n\treturn true\n")
+	assert_eq(TileTabs.shown_in([late, early], {}), [&"early", &"late"] as Array[StringName], "shown tabs sort by ORDER")
