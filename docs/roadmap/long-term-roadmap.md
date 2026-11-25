@@ -46,6 +46,7 @@ The finished game is a long-campaign Europa Universalis-like strategy game on th
   - Explorer and colonial events, such as discoveries, native contacts and disease.
   - Native nations as real actors with their own rulers and alliances, not just villages.
   - Trade companies (suggested): charters that bundle colonies and routes under one owner.
+  - Merchant houses and trade stories (suggested, draft 2026-11-25): named merchants and houses, price information that ages, stockpiles, price policy and trade events built on the M10 trade layer. Proposal: `docs/design/merchant-houses-and-trade-stories.md`.
 - **Depends on:** Phase 2 (diplomacy and religion give the events their hooks).
 - **Finished when:** each major event chain fires in a suitable seeded run, shows its choices, and the outcome changes the map.
 

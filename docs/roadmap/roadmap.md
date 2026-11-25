@@ -135,6 +135,8 @@ Per the README and notes. The README does not confirm the 2x finer hex grid from
 
 ## 5. Idea backlog (saved, not designed)
 
+- **Merchant houses and trade stories (suggested, 2026-11-25):** named merchants and merchant houses with succession, price information that ages, small stockpiles, price policy (export ban, price ceiling, staple right) and trade events, all on top of M10's trade layer. Draft proposal for the owner: `docs/design/merchant-houses-and-trade-stories.md`. Not approved; waits for Phase 3 events and characters.
+
 - **Tile blending:** soften the hard hex edges between neighbouring tiles.
 - **More zoom:** a closer zoom level than the current maximum (hex radius 34 px).
 - **Province names:** replace "near X" with a better scheme, such as real region or county names, generated local names, or terrain plus region.
