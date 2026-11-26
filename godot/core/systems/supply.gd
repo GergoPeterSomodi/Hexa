@@ -45,6 +45,12 @@ static func field(game: Game, tag: StringName, winter: bool) -> PackedByteArray:
 	if c == null or not _usable(game):
 		return PackedByteArray()
 	var parts: Dictionary = game.view_cache.pinned(DEPOT_SLOT, _depot_key(game), Callable(Supply, "_new_parts").bind(game))
+	# The depots do not depend on the armies, only the fields' cut masks do: a change of the armies' places drops the fields
+	# and keeps the depots (a retreat or a death no longer rebuilds every depot of the map).
+	var armies := hash(_army_rows(game))
+	if parts["armies"] != armies:
+		parts["fields"] = {}
+		parts["armies"] = armies
 	var fields: Dictionary = parts["fields"]
 	var k := c.id * 2 + (1 if winter else 0)
 	if not fields.has(k):
@@ -262,13 +268,18 @@ static func _depot_at(game: Game, i: int) -> bool:
 
 ## The depots of every country (country id -> sorted hex indices) and an empty field table, made when the key changes.
 static func _new_parts(game: Game) -> Dictionary:
-	return {"depots": _depots_of(game), "fields": {}}
+	return {"depots": _depots_of(game), "fields": {}, "armies": null}
 
 
 static func _depots_of(game: Game) -> Dictionary:
+	depot_builds += 1
 	var out := {}
-	var s := game.state
+	var main_use := game.state.main_use
+	var hot := _depot_families(game)
 	for i: int in game.map.hex_count():
+		# Only a settlement or a fortress hex can be a depot (_depot_at): the cheap byte test skips the rest of the map.
+		if hot[main_use[i]] == 0:
+			continue
 		var oid := Occupation.controller_id(game, game.map.hex_of(i))
 		if oid == 0 or not _depot_for(game, i, oid):
 			continue
@@ -276,6 +287,23 @@ static func _depots_of(game: Game) -> Dictionary:
 		arr.append(i)
 		out[oid] = arr
 	return out
+
+
+## One byte per main_use value (256): 1 for the settlements family and for every family with a fortress level, the only hexes
+## `_depot_at` can accept.
+static func _depot_families(game: Game) -> PackedByteArray:
+	var hot := PackedByteArray()
+	hot.resize(256)
+	hot.fill(0)
+	hot[Economy.SETTLEMENTS] = 1
+	for f: int in range(1, mini(FamilyIds.COUNT, 256)):
+		var fam := game.defs.family(f)
+		if fam == null:
+			continue
+		for lvl: int in fam.fortress:
+			if lvl > 0:
+				hot[f] = 1
+	return hot
 
 
 ## The field of one country: a multi-source search from its depots over its own land (4.8), one byte a hex.
@@ -365,6 +393,8 @@ static func _depot_for(game: Game, i: int, ctrl: int) -> bool:
 ## The armies as key rows, only while a war is live (a hostile army can cut a field; with no war the rows are not built and
 ## the key does not scan the armies). army_key_scans counts the scans (the perf guard reads it; tests only).
 static var army_key_scans: int = 0
+## How many times the depots were built from every hex (the perf guard and the cache tests read it; tests only).
+static var depot_builds: int = 0
 
 
 static func _army_rows(game: Game) -> Array:
@@ -392,8 +422,9 @@ static func _land_key(game: Game) -> Array:
 	return [game.map.get_instance_id(), hash(game.state.owner), hash(game.state.occupier)]
 
 
-## The key of the depots and fields: the land, the occupiers, the sieges, the wars and the armies' places (M7: a hostile
-## army's cut is never reused across a phase, and a siege or a fall changes the depots).
+## The key of the depots (and of the fields' table): the land, the occupiers, the sieges and the wars (a siege or a fall
+## changes the depots). The armies' places are not in it: they cut a field, not a depot, and `field` drops the fields when
+## `_army_rows` changes (M7: a hostile army's cut is never reused across a phase).
 static func _depot_key(game: Game) -> Array:
 	var sieges: Array = []
 	for s: Siege in game.sieges:
@@ -401,10 +432,9 @@ static func _depot_key(game: Game) -> Array:
 	var wars: Array = []
 	for w: War in game.wars:
 		wars.append([w.id, String(w.a), String(w.b), w.end_turn])
-	var armies := _army_rows(game)
 	return [game.map.get_instance_id(), game.defs.get_instance_id(), game.defs.supply_reach, game.defs.depot_min_level,
 		game.defs.supply_wade_cost, hash(game.state.owner), hash(game.state.main_use), hash(game.state.level),
-		hash(game.state.occupier), hash(sieges), hash(wars), hash(armies)]
+		hash(game.state.occupier), hash(sieges), hash(wars)]
 
 
 static func _usable(game: Game) -> bool:

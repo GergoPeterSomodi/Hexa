@@ -465,3 +465,77 @@ func test_no_war_key_does_not_scan_the_armies() -> void:
 	WarFixture.at_war(g, &"SAV", nb)
 	Supply.field(g, &"SAV", false)
 	assert_gt(Supply.army_key_scans, before, "a live war: the key scans the armies")
+
+
+## Issue 427 (perf): the depots do not depend on the armies. An army moving or dying keeps the depots (counted by
+## Supply.depot_builds, no timing) and still changes the field's cut mask; a change of owner rebuilds the depots.
+func test_depots_survive_an_army_moving_or_dying_but_the_field_still_cuts() -> void:
+	var enemy := WarFixture.neighbour_of(_g, ArmyFixture.TAG)
+	WarFixture.at_war(_g, enemy, ArmyFixture.TAG)
+	var base := Supply.field(_g, ArmyFixture.TAG, false)
+	var hexes: Array[int] = []
+	for i: int in base.size():
+		if base[i] == 1 and _i(_town) != i and hexes.size() < 2:
+			hexes.append(i)
+	assert_eq(hexes.size(), 2)
+	var builds := Supply.depot_builds
+	var foe := ArmyFixture.army(_g, enemy, _g.map.hex_of(hexes[0]), _g.defs.units[0].id, 1)
+	assert_eq(Supply.field(_g, ArmyFixture.TAG, false)[hexes[0]], 0, "the arriving army cuts its hex")
+	Armies.set_hex(_g, foe, _g.map.hex_of(hexes[1]), foe.hex)
+	var moved := Supply.field(_g, ArmyFixture.TAG, false)
+	assert_eq(moved[hexes[0]], 1, "the hex it left is supply again")
+	assert_eq(moved[hexes[1]], 0, "the hex it entered is cut")
+	Armies.remove(_g, foe)
+	assert_eq(Supply.field(_g, ArmyFixture.TAG, false), base, "a dead army cuts nothing")
+	assert_eq(Supply.depot_builds, builds, "no move or death rebuilt the depots")
+	_g.state.owner[hexes[0]] = 0
+	Supply.field(_g, ArmyFixture.TAG, false)
+	assert_eq(Supply.depot_builds, builds + 1, "a change of owner rebuilds the depots once")
+
+
+## Issue 427: the cached field equals a from-scratch field over random armies of both sides (cache soundness).
+func test_cached_field_equals_a_fresh_one_over_random_army_states() -> void:
+	var enemy := WarFixture.neighbour_of(_g, ArmyFixture.TAG)
+	WarFixture.at_war(_g, enemy, ArmyFixture.TAG)
+	var land := _genoa_land()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 427
+	var armies: Array[Army] = []
+	for step: int in 30:
+		var roll := rng.randi_range(0, 3)
+		if roll == 0 or armies.is_empty():
+			var tag: StringName = enemy if rng.randi_range(0, 1) == 0 else ArmyFixture.TAG
+			armies.append(ArmyFixture.army(_g, tag, land[rng.randi_range(0, land.size() - 1)], _g.defs.units[0].id, 1))
+		elif roll == 1:
+			var a := armies[rng.randi_range(0, armies.size() - 1)]
+			Armies.set_hex(_g, a, land[rng.randi_range(0, land.size() - 1)], a.hex)
+		elif roll == 2:
+			var d := rng.randi_range(0, armies.size() - 1)
+			Armies.remove(_g, armies[d])
+			armies.remove_at(d)
+		var winter := step % 2 == 0
+		var fresh := Supply._make_field(_g, _c.id, winter, Supply._depots_of(_g))
+		assert_eq(Supply.field(_g, ArmyFixture.TAG, winter), fresh, "step %d: cached field equals fresh" % step)
+
+
+## Issue 427: the depot list built from the settlement and fortress hexes only equals the rule asked of every hex (is_depot).
+func test_depot_list_equals_the_rule_asked_of_every_hex() -> void:
+	var g := EconomyFixture.game(&"SAV", false, true, 1480, true)
+	Occupation.setup(g)
+	var nb := WarFixture.neighbour_of(g, &"SAV")
+	for i: int in g.map.hex_count():
+		if g.map.land[i] == 1 and Occupation.fortress_level(g, g.map.hex_of(i)) > 0 and int(g.state.owner[i]) == Countries.by_tag(g, &"SAV").id:
+			Occupation.capture(g, g.map.hex_of(i), nb, &"walk", {})
+			break
+	Occupation.flush(g)
+	var expected := {}
+	for c: Country in g.countries:
+		if c == null:
+			continue
+		for i: int in g.map.hex_count():
+			if Supply.is_depot(g, c.tag, g.map.hex_of(i)):
+				var arr: PackedInt32Array = expected.get(c.id, PackedInt32Array())
+				arr.append(i)
+				expected[c.id] = arr
+	assert_gt(expected.size(), 1, "several countries hold depots")
+	assert_eq(Supply._depots_of(g), expected)
