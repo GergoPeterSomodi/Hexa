@@ -108,6 +108,9 @@ extends Resource
 @export var wait_ratio_percent := 200
 @export var wait_extra_seasons := 2
 @export var land_sight := 1
+## Moves in the month (moves-build-spec.md D9, R36): the move points a step onto a hex the walker's country never explored spends;
+## such a step is taken only by a fresh army. -1: all its points (one such step a season).
+@export var fog_step_cost := -1
 
 var _country_cache: Dictionary[StringName, CountryDef] = {}
 var _country_cache_size: int = -1
@@ -360,7 +363,7 @@ func _check_people(errors: Array[String]) -> void:
 ## arrays sized (7, 6, 6), every cap and cost 1 to 20, river_wade_class under river_wall_class and both 1 to 3,
 ## supply_reach 1 to 40, stack_limit 1 to 20, percents 0 to 400, army_food_milli 1 to 5000, forage_loss_permille 0 to
 ## 1000, depot_min_level 1 to 5, march_seasons_max 1 to 40, wait_ratio_percent 100 to 1000, wait_extra_seasons 0 to 12,
-## land_sight 1 to 3, pass_closing_climate 0 to 2.
+## land_sight 1 to 3, pass_closing_climate 0 to 2, fog_step_cost -1 or 1 to 99.
 func _check_armies(errors: Array[String]) -> void:
 	_check_size(errors, "units", units.size(), 4)
 	var seen_unit_keys: Dictionary = {}
@@ -425,6 +428,8 @@ func _check_armies(errors: Array[String]) -> void:
 	_check_value(errors, "wait_extra_seasons", wait_extra_seasons, 0, 12)
 	_check_value(errors, "land_sight", land_sight, 1, 3)
 	_check_value(errors, "pass_closing_climate", pass_closing_climate, 0, 2)
+	if fog_step_cost != -1 and (fog_step_cost < 1 or fog_step_cost > 99):
+		errors.append("fog_step_cost is %d, expected -1 or 1 to 99" % fog_step_cost)
 
 
 func _check_each(errors: Array[String], field: String, values: PackedInt32Array, low: int, high: int) -> void:

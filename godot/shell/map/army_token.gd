@@ -21,6 +21,9 @@ const STATE_SIZE := Vector2(16.0, 16.0)
 const LIFT := -34.0
 const BADGE_OFFSET := Vector2(0.0, -11.0)
 const STATE_OFFSET := Vector2(18.0, -47.0)
+## The points mark (moves-build-spec.md R51): a bar under the badge, an ink slot with a fill of left over full.
+const POINTS_BAR := Rect2(-18.0, 3.0, 36.0, 6.0)
+const POINTS_INK := 1.5
 ## The strength text: 14 px in the light Studiolo text colour on the dark badge slot, with a 3 px dark ink outline.
 const TEXT_INK := Tokens.TEXT
 const FONT_SIZE := 14
@@ -45,6 +48,8 @@ var _badge: Sprite2D = null
 var _text: Label = null
 var _state: Sprite2D = null
 var _ringed := false
+var _points_left := -1
+var _points_full := -1
 
 
 func _init() -> void:
@@ -76,6 +81,12 @@ func show_token(token: Dictionary, colour: Color) -> void:
 	_text.text = str(token.text)
 	_set_icon(_state, _state_icon(token), STATE_SIZE)
 	_state.visible = _state.texture != null
+	var left := int(token.get("points_left", -1))
+	var full := int(token.get("points_full", -1))
+	if left != _points_left or full != _points_full:
+		_points_left = left
+		_points_full = full
+		queue_redraw()
 
 
 ## The state icon's name for the token's first flag that is set, &"" for none.
@@ -99,11 +110,58 @@ func set_ring(on: bool) -> void:
 
 
 func _draw() -> void:
+	_draw_points()
 	if not _ringed:
 		return
 	var box := hit_rect().grow(RING_GAP)
 	draw_rect(box, Tokens.INK, false, RING_INK_WIDTH)
 	draw_rect(box, Tokens.MAP_SELECT, false, RING_GOLD_WIDTH)
+
+
+## The points mark: nothing on a foreign token (points -1); full is a whole green bar, part of it an amber bar of that
+## share, empty an ink slot with a red outline.
+func _draw_points() -> void:
+	if not points_shown():
+		return
+	var share := clampf(float(_points_left) / float(_points_full), 0.0, 1.0)
+	draw_rect(POINTS_BAR.grow(POINTS_INK), Tokens.INK)
+	if _points_left <= 0:
+		draw_rect(POINTS_BAR.grow(POINTS_INK), Tokens.BAD, false, 1.0)
+		return
+	var fill := POINTS_BAR
+	fill.size.x *= share
+	draw_rect(fill, Tokens.GOOD if _points_left >= _points_full else Tokens.WARN)
+
+
+## Whether the points mark is up: an own token (its points are known) with a full allowance above 0.
+func points_shown() -> bool:
+	return _points_left >= 0 and _points_full > 0
+
+
+## The mark's state: &"full", &"half" (some left), &"empty", or &"" when none is shown (tests and the pictures).
+func points_state() -> StringName:
+	if not points_shown():
+		return &""
+	if _points_left <= 0:
+		return &"empty"
+	return &"full" if _points_left >= _points_full else &"half"
+
+
+## The mark's words, its hover text: "8 of 12 move points left this season", "" when no mark is shown.
+func points_tip() -> String:
+	if not points_shown():
+		return ""
+	return "%d of %d move points left this season" % [_points_left, _points_full]
+
+
+## Whether the viewport point `screen` is over the points mark (its hover text is points_tip).
+func points_hit_screen(screen: Vector2) -> bool:
+	return points_shown() and POINTS_BAR.grow(POINTS_INK + 2.0).has_point(get_global_transform_with_canvas().affine_inverse() * screen)
+
+
+## The mark's fill share, 0 to 1 (tests).
+func points_share() -> float:
+	return clampf(float(_points_left) / float(_points_full), 0.0, 1.0) if points_shown() else 0.0
 
 
 ## The click area of the token in its own space (px at zoom 1): the plate and the badge, the part above the hex's centre.

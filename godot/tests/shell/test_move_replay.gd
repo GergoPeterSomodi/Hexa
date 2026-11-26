@@ -20,7 +20,9 @@ func before_each() -> void:
 	_hex = ArmyFixture.find_town(_game)
 	_goal = _game.map.neighbour(_hex, 0)
 	_army = ArmyFixture.army(_game, ArmyFixture.TAG, _hex, 0, 2, _game.turn - 1)
-	assert_true(bool(Movement.march(_game, {"army": _army.id, "goal": _goal, "tag": ArmyFixture.TAG}).ok), "the march is ordered")
+	# A standing march (the movement phase walks it: MV8 plays the walks of an act live, so a march ordered through the door
+	# would not be in the season's replay).
+	Armies.set_order(_game, _army, Army.ORDER_MARCH, _goal, PackedInt32Array([_game.map.index_of(_goal)]))
 	_scene = (load("res://shell/map/map_scene.tscn") as PackedScene).instantiate() as MapScene
 	_scene.preload_next_season = false
 	add_child_autofree(_scene)
@@ -220,3 +222,43 @@ func test_a_seen_step_inside_the_focus_is_timed() -> void:
 	assert_true(_replay.start(&"normal", near), "the step starts from a hex in view: it is timed")
 	_replay._process(0.1)
 	assert_eq(_replay.poses().size(), 1, "the walker is on the clock")
+
+
+## R50: two at-once walks of the season (the computer's orders) are played one after another, not on the same ticks.
+func test_two_at_once_walks_of_a_season_play_one_after_another() -> void:
+	var far := _game.map.neighbour(_goal, 0)
+	var first: Array[Vector2i] = [_hex, _goal]
+	var second: Array[Vector2i] = [far, _goal]
+	Session.begin_season()
+	_replay.record(&"SAV", 81, first, PackedByteArray([1, 1]), PackedInt32Array([1]), true)
+	_replay.record(&"MIL", 82, second, PackedByteArray([1, 1]), PackedInt32Array([1]), true)
+	Session.step_orders(INF)
+	Session.finish_season()
+	_replay._pending = _replay._pending.filter(func(r: Dictionary) -> bool: return int(r["army"]) >= 81)
+	assert_true(_replay.start(&"normal"))
+	_replay._process(0.1)
+	var poses := _replay.poses()
+	var by_army := {}
+	for pose: Dictionary in poses:
+		by_army[int(pose["army"])] = pose
+	assert_almost_eq(float(by_army[81]["t"]), 0.5, 0.01, "the first walk is half way")
+	assert_eq(by_army[82]["from"], by_army[82]["to"], "P: the second walk waits for the first (not on the same ticks)")
+	_replay._process(0.2)
+	assert_almost_eq(float((_replay.poses()[0] as Dictionary)["t"]), 0.5, 0.01, "then the second walks")
+	_replay._process(1.0)
+	assert_false(_replay.active())
+
+
+## R49: a live walk and the season replay are separate: a live walk is no season replay, and skip() leaves it alone.
+func test_a_live_walk_is_not_the_season_replay_and_skip_leaves_it_alone() -> void:
+	var other := ArmyFixture.army(_game, ArmyFixture.TAG, _goal, 0, 1, _game.turn - 1)
+	_game.version += 1
+	var back := _game.map.neighbour(_hex, 1)
+	var verdict := Session.act("march", {"army": other.id, "goal": back})
+	assert_true(bool(verdict.get("ok", false)), "the live march is ordered: %s" % str(verdict.get("reason", "")))
+	_replay._process(0.0)
+	assert_true(_replay.live_active())
+	assert_false(_replay.active(), "a live walk does not refuse orders: it is not the season replay")
+	assert_false(_replay.skip(), "skip() is the season replay's")
+	assert_true(_replay.live_active())
+	assert_true(_replay.skip_live())

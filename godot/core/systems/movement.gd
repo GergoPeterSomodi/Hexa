@@ -18,6 +18,8 @@ const WHY_WINTER := &"winter"
 const WHY_SHAKEN := &"shaken"
 const WHY_BATTLE := &"battle"
 const WHY_ENEMY := &"enemy"
+## Moves in the month (R32): an army at war that the walker's country did not see came into its sight; the points are kept.
+const WHY_SIGHTED := &"sighted"
 ## A walk stopped because its army is fought in a battle (the attacker's step came first): not a halt. The order and the route
 ## stay (4.8: a winner goes on next season), so it is no halt word and no march_halted.
 const WHY_FOUGHT := &"fought"
@@ -28,7 +30,7 @@ const STORM_HALT_TEXT := "its storm is halted: continue resumes it"
 ## The storm's one refusal for a place the army's country cannot see (no walls, no war, no garrison is told apart).
 const UNSEEN_TEXT := "You cannot see that place."
 ## Every halt a walk may end with: the army's order goes to none and its goal is kept.
-const HALT_WHYS: Array[StringName] = [WHY_NO_WAY, WHY_BLOCKED, WHY_ENEMY, WHY_BATTLE, WHY_SHAKEN]
+const HALT_WHYS: Array[StringName] = [WHY_NO_WAY, WHY_BLOCKED, WHY_ENEMY, WHY_BATTLE, WHY_SHAKEN, WHY_SIGHTED]
 ## D40: a hostile garrisoned fortress ends a leg beside it too. One line to turn off (the playtest's march to Pavia).
 const ZOC_FORTRESSES := true
 ## The key of the shared unowned-land mask in the open-mask table (no country has an empty tag).
@@ -439,9 +441,10 @@ static func winter_wait(game: Game, army: Army) -> Dictionary:
 ## One season's walk of a stored route from hex index `cur`, the next step at route index `idx`, with `mp` points in the
 ## season's rules: the steps taken, where it stands and what is left. A WADE step only as the first step of a fresh army (it
 ## spends all the points); a step costing more than the points left likewise (moves-build-spec R18: `fresh` false for an army
-## that has walked this season); a BLOCKED or CLOSED step ends the season. {cur, idx, pts}.
+## that has walked this season); a BLOCKED or CLOSED step ends the season. `fog` (FogStep.mapped: the country's explored bits,
+## empty for none) makes a step onto an unexplored hex a fog step (R38): only fresh, spending `fog_cost` (-1: all). {cur, idx, pts}.
 static func walk_season(map: MapData, steps: StepCosts, cur: int, route: PackedInt32Array, idx: int, mp: int,
-		winter: bool, fresh: bool = true) -> Dictionary:
+		winter: bool, fresh: bool = true, fog: PackedByteArray = PackedByteArray(), fog_cost: int = -1) -> Dictionary:
 	var pts := mp
 	var first := fresh
 	while idx < route.size():
@@ -452,12 +455,10 @@ static func walk_season(map: MapData, steps: StepCosts, cur: int, route: PackedI
 		var c := steps.cost(cur, d, winter)
 		if c == StepCosts.BLOCKED or c == StepCosts.CLOSED:
 			break
-		if c == StepCosts.WADE or c > pts:
-			if not first:
-				break
-			pts = 0
-		else:
-			pts -= c
+		var foggy := FogStep.is_fog(fog, nxt)
+		if (foggy or c == StepCosts.WADE or c > pts) and not first:
+			break
+		pts = FogStep.after(fog_cost, pts) if foggy else (0 if (c == StepCosts.WADE or c > pts) else pts - c)
 		cur = nxt
 		idx += 1
 		first = false
@@ -469,7 +470,8 @@ static func walk_season(map: MapData, steps: StepCosts, cur: int, route: PackedI
 ## The season-by-season walk of a stored route from `from_turn` (4.4): {stops: [{turn, index}] (where the army stands at the
 ## end of each season: its route index), arrives_turn (the season it stands on the goal at the end of, or -1), seasons (from
 ## from_turn to the arrival, inclusive)}. A season the army is mustering is skipped (it stands still). This season (from_turn the
-## game's turn) walks with the points the army has left (R18), the next ones with its full points.
+## game's turn) walks with the points the army has left (R18), the next ones with its full points. The unexplored hexes of the
+## army's country are fog steps in every season (R38: a cautious estimate, the explored set as it is now).
 static func walk_plan(game: Game, army: Army, route: PackedInt32Array, from_turn: int) -> Dictionary:
 	var stops: Array = []
 	if route.is_empty():
@@ -479,13 +481,14 @@ static func walk_plan(game: Game, army: Army, route: PackedInt32Array, from_turn
 	var cur := game.map.index_of(army.hex)
 	var idx := 0
 	var arrives := -1
+	var fog := FogStep.mapped(game, army.tag)
 	var limit := from_turn + 4 * game.defs.march_seasons_max + 2 * route.size() + 4
 	var t := from_turn
 	while t <= limit:
 		if not army.mustering(t):
 			var now := t == game.turn
 			var r := walk_season(game.map, steps, cur, route, idx, army.points if now else mp, Calendar.is_winter(t),
-				not now or Allowance.fresh(game, army))
+				not now or Allowance.fresh(game, army), fog, game.defs.fog_step_cost)
 			cur = int(r.cur)
 			idx = int(r.idx)
 		stops.append({"turn": t, "index": idx})

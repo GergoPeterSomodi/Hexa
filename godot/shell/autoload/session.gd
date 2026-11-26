@@ -554,7 +554,7 @@ func drain() -> void:
 				var path: Array[Vector2i] = []
 				path.assign(event["path"] as Array)  # typed before the emit (A11)
 				Events.unit_moved.emit(StringName(event["tag"]), int(event["army"]), path,
-					event["seen"] as PackedByteArray, event["ticks"] as PackedInt32Array)
+					event["seen"] as PackedByteArray, event["ticks"] as PackedInt32Array, bool(event.get("now", false)))
 			"march_halted":
 				Events.march_halted.emit(StringName(event["tag"]), int(event["army"]), StringName(event["why"]))
 			"army_starved":

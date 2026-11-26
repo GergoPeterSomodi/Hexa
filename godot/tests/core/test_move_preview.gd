@@ -500,3 +500,61 @@ func test_the_leg_is_cached_with_the_preview_and_a_refusal_has_none() -> void:
 	assert_eq(refused.why, &"")
 	assert_true((refused.hexes as Array).is_empty())
 	assert_true(((_leg(g, a, Vector2i(-5, -5)).risks) as Array).is_empty())
+
+
+# --- the deep-fog leg and its line (moves-build-spec.md R36, R45, R47; MV7) -------------------------------------------------------
+# MovesFixture.thin() with the duel's Milanese armies taken off: (8, 7) and (9, 7) are explored, (10, 6) and (11, 6) are not.
+
+const FOG_INNER := Vector2i(8, 7)
+const FOG_FRONT := Vector2i(9, 7)
+const FOG_STEP := Vector2i(10, 6)
+const FOG_GOAL := Vector2i(11, 6)
+
+
+func _thin() -> Game:
+	var g := MovesFixture.thin()
+	for a: Army in g.armies.duplicate():
+		if a.tag == MovesFixture.MILAN:
+			Armies.remove(g, a)
+	Sight.refresh(g)
+	return g
+
+
+func test_a_fog_step_ends_the_leg_with_the_unmapped_land_line_and_equals_the_walk() -> void:
+	var g := _thin()
+	var a := ArmyFixture.army(g, MovesFixture.SAVOY, FOG_FRONT, 0, 1, 0)
+	var p := _leg(g, a, FOG_GOAL)
+	assert_true(bool(p.verdict.ok), "an undiscovered goal is accepted: %s" % str(p.verdict.reason))
+	assert_eq(p.leg.why, MovePreview.WHY_FOG)
+	assert_eq(p.leg.hexes, [FOG_STEP] as Array[Vector2i])
+	assert_eq(int(p.leg.points_after), 0, "P: a fog step at its normal cost")
+	assert_eq(int(p.leg.cost), 12)
+	assert_true(_has_line(p, "Unmapped land at (10, 6): the army spends its season finding the way."), str(_lines_text(p)))
+	var res := g.act("march", {"army": a.id, "goal": FOG_GOAL, "tag": MovesFixture.SAVOY})
+	assert_eq(a.hex, p.leg.end, "the leg is the walk")
+	assert_eq(a.points, int(p.leg.points_after))
+
+
+func test_an_army_that_has_walked_stops_before_the_fog_step_in_the_preview() -> void:
+	var g := _thin()
+	var a := ArmyFixture.army(g, MovesFixture.SAVOY, FOG_INNER, 0, 1, 0)
+	var p := _leg(g, a, FOG_GOAL)
+	assert_eq(p.leg.why, MovePreview.WHY_FOG)
+	assert_eq(p.leg.hexes, [FOG_FRONT] as Array[Vector2i], "it walks to the edge of the land it knows")
+	assert_gt(int(p.leg.points_after), 0, "the points are kept")
+	assert_true(_lines_text(p).has("Unmapped land at (10, 6): the army spends its season finding the way."),
+		"P: an unexplored hex named by more than its coordinates: %s" % str(_lines_text(p)))
+	assert_true(bool(g.act("march", {"army": a.id, "goal": FOG_GOAL, "tag": MovesFixture.SAVOY}).ok))
+	assert_eq(a.hex, p.leg.end, "the leg is the walk")
+	assert_eq(a.points, int(p.leg.points_after))
+
+
+func test_north_italy_gives_no_fog_leg() -> void:
+	var g := _duel()
+	for b: Army in g.armies.duplicate():
+		if b.tag == MovesFixture.MILAN:
+			Armies.remove(g, b)
+	var a := ArmyFixture.army(g, MovesFixture.SAVOY, FOG_FRONT, 0, 1, 0)
+	var p := _leg(g, a, FOG_GOAL)
+	assert_ne(p.leg.why, MovePreview.WHY_FOG, "P: a fog step on north Italy")
+	assert_false(_has_line(p, "Unmapped land"))

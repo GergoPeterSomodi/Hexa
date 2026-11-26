@@ -691,8 +691,8 @@ func test_drain_sends_the_army_signals_and_chronicles_the_notable_ones() -> void
 	var on_disbanded := func(tag: StringName, at: Vector2i, army: int) -> void: log.append(["disbanded", tag, at, army])
 	var on_changed := func(tag: StringName, army: int) -> void: log.append(["changed", tag, army])
 	var on_moved := func(tag: StringName, army: int, path: Array[Vector2i], seen: PackedByteArray,
-			ticks: PackedInt32Array) -> void:
-		log.append(["moved", tag, army, path, seen, ticks])
+			ticks: PackedInt32Array, now: bool) -> void:
+		log.append(["moved", tag, army, path, seen, ticks, now])
 	var on_halted := func(tag: StringName, army: int, why: StringName) -> void: log.append(["halted", tag, army, why])
 	var on_starved := func(tag: StringName, army: int, lost: int) -> void: log.append(["starved", tag, army, lost])
 	var on_lost := func(tag: StringName, army: int, unit: int) -> void: log.append(["lost", tag, army, unit])
@@ -708,7 +708,7 @@ func test_drain_sends_the_army_signals_and_chronicles_the_notable_ones() -> void
 		"men": 1000, "ducats": 0, "goods": {}, "witnesses": [&"GEN"]})
 	game.emit({"kind": "army_changed", "tag": &"GEN", "hex": hex, "army": 1, "gone": false})
 	game.emit({"kind": "unit_moved", "tag": &"GEN", "army": 1, "path": [hex, hex2], "ticks": PackedInt32Array([1]),
-		"seen": PackedByteArray([1, 1]), "witnesses": [&"GEN"], "arrived": true})
+		"seen": PackedByteArray([1, 1]), "witnesses": [&"GEN"], "arrived": true, "now": true})
 	game.emit({"kind": "march_halted", "tag": &"GEN", "army": 1, "hex": hex2, "why": "winter", "reason": "Mont Cenis",
 		"waits": true, "witnesses": [&"GEN"]})
 	game.emit({"kind": "army_starved", "tag": &"GEN", "army": 1, "hex": hex, "lost": 10, "men": 990,
@@ -727,7 +727,7 @@ func test_drain_sends_the_army_signals_and_chronicles_the_notable_ones() -> void
 	Events.army_starved.disconnect(on_starved)
 	Events.unit_lost.disconnect(on_lost)
 	assert_eq(log, [["raised", &"GEN", hex, 1], ["changed", &"GEN", 1],
-		["moved", &"GEN", 1, [hex, hex2], PackedByteArray([1, 1]), PackedInt32Array([1])],
+		["moved", &"GEN", 1, [hex, hex2], PackedByteArray([1, 1]), PackedInt32Array([1]), true],
 		["halted", &"GEN", 1, &"winter"], ["starved", &"GEN", 1, 10], ["lost", &"GEN", 1, 1],
 		["disbanded", &"GEN", hex, 2]])
 	assert_true(game.events.is_empty(), "drained")

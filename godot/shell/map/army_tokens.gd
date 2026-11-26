@@ -90,6 +90,15 @@ func own_token_at(screen: Vector2) -> ArmyToken:
 	return best
 
 
+## The hover text of the points mark under `screen` ("8 of 12 move points left this season"), "" when none is there. Only
+## an own token has a mark, so a foreign one never answers.
+func points_tip_at(screen: Vector2) -> String:
+	for node: ArmyToken in tokens():
+		if node.visible and node.tag == _viewer and node.points_hit_screen(screen):
+			return node.points_tip()
+	return ""
+
+
 ## The walker of army `army_id` while the replay draws it, or null.
 func walker(army_id: int) -> ArmyToken:
 	return _walkers.get(army_id) as ArmyToken

@@ -366,7 +366,11 @@ func test_a_refused_begin_toasts_and_goes_back_to_idle() -> void:
 func test_abort_drops_the_turn_and_returns_to_idle() -> void:
 	var rec := _fake_turn(1000000)
 	assert_true(_flow.request_end())
-	await wait_frames(4)
+	# Wait until the first slice has run: a fixed number of frames is too few on a loaded machine.
+	for _i: int in 240:
+		if not (rec["budgets"] as Array).is_empty():
+			break
+		await wait_frames(1)
 	assert_eq(_flow.state(), SeasonFlow.State.RUNNING, "still slicing")
 	assert_gt((rec["budgets"] as Array).size(), 0)
 	_flow.abort()

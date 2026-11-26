@@ -18,7 +18,7 @@ const CAUSE_WORDS: Dictionary = {"stance": "order", "timer": "cap", "centre": "c
 ## Combat.fight's output, luck_before the luck state before its first day. Writes the armies through Armies, the fortress through
 ## Occupation, the war through Wars, and queues battle_fought and battle_ended.
 static func apply(game: Game, battle: Battle, input: Dictionary, result: Dictionary, luck_before: int, id: int,
-		retreat_fn: Callable) -> BattleRecord:
+		retreat_fn: Callable, now: bool = false) -> BattleRecord:
 	var rec := _record(game, battle, input, result, luck_before, id)
 	var raw: Dictionary = result["end"]
 	var loser := _loser_side(raw)
@@ -27,7 +27,7 @@ static func apply(game: Game, battle: Battle, input: Dictionary, result: Diction
 	var retreat := Army.NO_HEX
 	var surrendered := false
 	if loser >= 0 and not _side_armies(game, battle, loser).is_empty():
-		var path: Array = _beaten(game, battle, loser, raw, rec.end, retreat_fn)
+		var path: Array = _beaten(game, battle, loser, raw, rec.end, retreat_fn, now)
 		if path.is_empty():
 			_surrender(game, battle, loser, rec.end)
 			surrendered = true
@@ -155,18 +155,21 @@ static func _book_fight_losses(game: Game, battle: Battle, end: Dictionary) -> v
 
 ## The retreat of the beaten side: its walk (Battles.retreat_path) when it has a spot; the walk is applied and [] is returned
 ## when it has none (the caller surrenders the side). A Withdraw (stance) goes only to its own land.
-static func _beaten(game: Game, battle: Battle, loser: int, raw: Dictionary, end: Dictionary, retreat_fn: Callable) -> Array:
+static func _beaten(game: Game, battle: Battle, loser: int, raw: Dictionary, end: Dictionary, retreat_fn: Callable,
+		now: bool = false) -> Array:
 	var armies := _side_armies(game, battle, loser)
 	var own := str(raw["how"]) == "withdraw" and str(raw["cause"]) == "stance"
 	var path: Array = retreat_fn.call(game, _tag_of(battle, loser), armies, battle.hex, own)
 	if not path.is_empty():
-		_retreat(game, battle, loser, armies, path, end)
+		_retreat(game, battle, loser, armies, path, end, now)
 	return path
 
 
 ## Every army of the beaten side walks to the spot (one unit_moved each, ticks after the battle's tick), halts (order none,
-## halt_why defeated, march_halted) and is recorded in end.retreat.
-static func _retreat(game: Game, battle: Battle, loser: int, armies: Array[Army], path: Array, end: Dictionary) -> void:
+## halt_why defeated, march_halted) and is recorded in end.retreat. `now` is unit_moved's flag: true for the retreat of a battle
+## fought at once (Battles.fight_now), so the replay lays it right after that battle's walk (R50).
+static func _retreat(game: Game, battle: Battle, loser: int, armies: Array[Army], path: Array, end: Dictionary,
+		now: bool = false) -> void:
 	var tag := _tag_of(battle, loser)
 	var spot: Vector2i = path.back()
 	var text := "defeated at %s" % _text(game, battle.hex)
@@ -183,7 +186,7 @@ static func _retreat(game: Game, battle: Battle, loser: int, armies: Array[Army]
 		Armies.set_halt(game, army, &"defeated", text)
 		(end["retreat"] as Dictionary)[army.id] = spot
 		game.emit({"kind": "unit_moved", "tag": tag, "army": army.id, "path": full, "ticks": ticks,
-			"seen": _seen(game, tag, full), "witnesses": witnessed, "arrived": true, "why": &"retreat"})
+			"seen": _seen(game, tag, full), "witnesses": witnessed, "arrived": true, "why": &"retreat", "now": now})
 		game.emit({"kind": "march_halted", "tag": tag, "army": army.id, "hex": spot, "why": "defeated", "reason": text,
 			"waits": false, "witnesses": PackedStringArray([String(tag)]), "name": army.name})
 

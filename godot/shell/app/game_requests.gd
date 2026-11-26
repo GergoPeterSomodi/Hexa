@@ -69,6 +69,8 @@ func setup() -> void:
 	_app.add_child(replay)
 	flow.replay_start = func(speed: StringName) -> bool: return replay.start(speed, ai_turn.replay_focus())
 	flow.replay_skip = replay.skip
+	flow.live_skip = replay.skip_live
+	replay.live_speed = flow.speed
 	flow.hold_ribbons = _hold_ribbons
 	decisions.emptied.connect(flow.decisions_done)
 	flow.decisions_start = func(_on_done: Callable) -> bool:
@@ -140,6 +142,7 @@ func bind_scene(scene: MapScene) -> void:
 	input.undo_work_requested.connect(undo_work)
 	input.bookmark_requested.connect(on_bookmark)
 	input.orders_blocked = replay.active
+	input.live_skip = replay.skip_live
 	input.blocked_click.connect(_on_blocked_click)
 	if scene.camera_rig() != null:
 		scene.camera_rig().view_changed.connect(_on_view_changed)
@@ -179,6 +182,7 @@ func unbind_scene(scene: MapScene) -> void:
 					(pair[0] as Signal).disconnect(pair[1] as Callable)
 		if input != null:
 			input.orders_blocked = Callable()
+			input.live_skip = Callable()
 			if input.blocked_click.is_connected(_on_blocked_click):
 				input.blocked_click.disconnect(_on_blocked_click)
 		replay.bind(null, Callable())
@@ -197,7 +201,7 @@ func skip_replay() -> bool:
 	var console := _app.hud().debug_overlay().console()
 	if console != null and console.has_line_focus():
 		return false
-	return flow.skip_replay()
+	return replay.skip_live() or flow.skip_replay()  # Esc ends a live walk and does nothing more (R49)
 
 
 ## A click on the map while the replay runs (spec 6.4): it selects and orders nothing, says so, and does not skip. Space,
@@ -603,6 +607,7 @@ func _goods_words(game: Game, loads: Dictionary, sign: int) -> PackedStringArray
 func save(slot: String, save_name: String) -> void:
 	if _busy:
 		return
+	replay.skip_live()  # the game already holds the end of a live walk; the picture is skipped
 	var problem := _save_refusal()
 	if problem.is_empty():
 		_busy = true
@@ -641,6 +646,7 @@ func quickload() -> void:
 func load_slot(slot: String) -> void:
 	if _busy or _app.is_starting() or flow.state() == SeasonFlow.State.RUNNING:
 		return
+	replay.skip_live()
 	_busy = true
 	var text := "Loading %s..." % SaveRows.label_of(slot)
 	await _app.launch("Reading the save", text, func() -> String: return Session.load_game(slot), true)

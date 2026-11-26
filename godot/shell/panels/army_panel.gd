@@ -314,7 +314,16 @@ func _add_costs(parent: VBoxContainer, data: Dictionary) -> void:
 	chip.invert = true
 	chip.set_delta(-int(data["upkeep"]), "ducats a season", "Upkeep")
 	parent.add_child(chip)
-	parent.add_child(PanelKit.label("Move points %d · Sight %d" % [int(data["mp"]), int(data["sight"])], &"Hint"))
+	var points := data["points"] as Dictionary
+	var row := PanelKit.label(str(points["text"]), &"TableRow")
+	row.name = "PointsRow"
+	row.tooltip_text = "Move points left this season over the army's full allowance (%d a season)." % int(data["mp"])
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	parent.add_child(row)
+	var sight := PanelKit.label("Sight %d" % int(data["sight"]), &"Hint")
+	sight.tooltip_text = "How many hexes away the army sees."
+	sight.mouse_filter = Control.MOUSE_FILTER_PASS
+	parent.add_child(sight)
 
 
 # --- actions ----------------------------------------------------------------------------------------------------------

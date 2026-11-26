@@ -29,6 +29,9 @@ const WHY_MUSTERING := &"mustering"
 const WHY_NO_POINTS := &"no_points"
 const WHY_BLOCKED := &"blocked"
 const WHY_NO_WAY := &"no_way"
+## MV7: a deep-fog step ends the leg (FogStep, R36); `sighted` is a why of the walk the preview never gives (R45).
+const WHY_FOG := FogStep.WHY
+const WHY_SIGHTED := Movement.WHY_SIGHTED
 const RISK_BATTLE := &"battle"
 const RISK_ENEMY_LAND := &"enemy_land"
 const RISK_OUT_OF_SUPPLY := &"out_of_supply"
@@ -472,7 +475,9 @@ static func _leg(game: Game, tag: StringName, a: Army, goal: Vector2i, route: Pa
 		why = WHY_NO_WAY
 	elif not hexes.is_empty() and hexes.back() == goal:
 		why = WHY_BATTLE if (war_kind == OddsView.KIND_ATTACK or war_kind == OddsView.KIND_STORM) else WHY_ARRIVES
-	var cost := _spent(game, steps, a.hex, hexes, winter, before)
+	elif StringName(walk.status) == FogStep.WHY:
+		why = WHY_FOG
+	var cost := _spent(game, steps, a.hex, hexes, winter, before, FogStep.mapped(game, a.tag))
 	out["hexes"] = hexes
 	out["cost"] = cost
 	out["end"] = hexes.back() if not hexes.is_empty() else a.hex
@@ -491,10 +496,11 @@ static func _walk(game: Game, tag: StringName, a: Army, goal: Vector2i, route: P
 	var cur := a.hex
 	var rem := route
 	var left := points
+	var mapped := FogStep.mapped(game, tag)
 	for _segment: int in 64:
-		var w := MarchLeg.leg(game, steps, _probe(a, cur, goal, rem), winter, left)
+		var w := MarchLeg.leg(game, steps, _probe(a, cur, goal, rem), winter, left, false)
 		var taken := _hexes(game, w.walked)
-		left -= _spent(game, steps, cur, taken, winter, left)
+		left = w.points_left()
 		hexes.append_array(taken)
 		if w.status != &"":
 			out["status"] = w.status
@@ -508,7 +514,7 @@ static func _walk(game: Game, tag: StringName, a: Army, goal: Vector2i, route: P
 			out["zoc"] = true
 			break
 		# The stop was caused by an army the viewer does not see: walk on as if it were not there.
-		if _next_is_dear(game, steps, w.end, w.rem, left, winter):
+		if _next_is_dear(game, steps, w.end, w.rem, left, winter, mapped):
 			break
 		cur = end_hex
 		rem = w.rem
@@ -530,8 +536,9 @@ static func _probe(a: Army, hex: Vector2i, goal: Vector2i, route: PackedInt32Arr
 
 
 ## The move points the steps onto `hexes` from `from` spend out of `points`: a wade, or a step dearer than what is left, spends
-## all that is left (the engine's rule).
-static func _spent(game: Game, steps: StepCosts, from: Vector2i, hexes: Array[Vector2i], winter: bool, points: int) -> int:
+## all that is left (the engine's rule); a fog step (`mapped`, FogStep) spends fog_step_cost.
+static func _spent(game: Game, steps: StepCosts, from: Vector2i, hexes: Array[Vector2i], winter: bool, points: int,
+		mapped: PackedByteArray) -> int:
 	var m := game.map
 	var left := points
 	var prev := m.index_of(from)
@@ -539,16 +546,22 @@ static func _spent(game: Game, steps: StepCosts, from: Vector2i, hexes: Array[Ve
 		var i := m.index_of(h)
 		var d := Movement.direction(m, prev, i)
 		var c: int = steps.cost(prev, d, winter) if d >= 0 else 0
-		left = 0 if (c == StepCosts.WADE or c > left) else left - c
+		if FogStep.is_fog(mapped, i):
+			left = FogStep.after(game.defs.fog_step_cost, left)
+		else:
+			left = 0 if (c == StepCosts.WADE or c > left) else left - c
 		prev = i
 	return points - left
 
 
-## True when the next step of the rest would be a wade or dearer than the points left: the engine ends a leg there when the army
-## has walked already, so a leg walked on past an unseen zone of control ends there too.
-static func _next_is_dear(game: Game, steps: StepCosts, at: int, rem: PackedInt32Array, left: int, winter: bool) -> bool:
+## True when the next step of the rest would be a wade, a fog step or dearer than the points left: the engine ends a leg there
+## when the army has walked already, so a leg walked on past an unseen zone of control ends there too.
+static func _next_is_dear(game: Game, steps: StepCosts, at: int, rem: PackedInt32Array, left: int, winter: bool,
+		mapped: PackedByteArray) -> bool:
 	if rem.is_empty():
 		return false
+	if FogStep.is_fog(mapped, rem[0]):
+		return true
 	var d := Movement.direction(game.map, at, rem[0])
 	if d < 0:
 		return false
@@ -620,8 +633,8 @@ static func _risks(game: Game, tag: StringName, a: Army, leg: Dictionary) -> Arr
 
 
 ## The lines of the leg and its risks (R47), put into `lines` from index `at` (after the war line): the walk now, the stop of a
-## route longer than the season, the zone of control, a blocked way, then a line for each risk. The unmapped-land line comes with
-## the fog step of the walk (MV4).
+## route longer than the season, the zone of control, a blocked way, the unmapped land of a fog step (MV7, R47: the hex by its
+## coordinates alone, never explored), then a line for each risk.
 static func _leg_lines(game: Game, a: Army, leg: Dictionary, route: PackedInt32Array, risks: Array[Dictionary], lines: Array,
 		at: int) -> void:
 	var made: Array = []
@@ -638,10 +651,23 @@ static func _leg_lines(game: Game, a: Army, leg: Dictionary, route: PackedInt32A
 			made.append(["Stops beside an enemy at %s: its season is over." % Words.place(game, leg.end), TONE_WARN])
 		WHY_BLOCKED:
 			made.append(["Stops at %s: another country's army stands in the way." % Words.place(game, leg.end), TONE_WARN])
+		WHY_FOG:
+			var fog := _fog_hex(game, a, leg, route)
+			made.append(["Unmapped land at (%d, %d): the army spends its season finding the way." % [fog.x, fog.y], TONE_WARN])
 	for r: Dictionary in risks:
 		made.append([str(r.text), TONE_WARN])
 	for k: int in made.size():
 		lines.insert(at + k, made[k])
+
+
+## The hex of the fog step that ended the leg: its last hex when the step was taken, else the route's next step after its end.
+static func _fog_hex(game: Game, a: Army, leg: Dictionary, route: PackedInt32Array) -> Vector2i:
+	var end: Vector2i = leg.end
+	var i := game.map.index_of(end)
+	if end != a.hex and FogStep.is_fog(FogStep.mapped(game, a.tag), i):
+		return end
+	var at := route.find(i) + 1 if end != a.hex else 0
+	return game.map.hex_of(route[at]) if at < route.size() else end
 
 
 static func _walks_text(leg: Dictionary, why: StringName) -> String:

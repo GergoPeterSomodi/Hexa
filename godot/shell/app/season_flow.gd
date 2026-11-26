@@ -42,6 +42,8 @@ var autosave: Callable = Callable()
 var replay_start: Callable = Callable()
 ## () -> void: skips the running replay (MoveReplay.skip; its finished signal then calls replay_done).
 var replay_skip: Callable = Callable()
+## () -> bool: skips a running live walk (MoveReplay.skip_live; moves-build-spec.md R49): End season does it first.
+var live_skip: Callable = Callable()
 ## (on: bool) -> void: holds the map's new ribbons while the season and its replay run (Floaters.hold).
 var hold_ribbons: Callable = Callable()
 ## (on_done: Callable) -> bool: shows the next decision of the queue (DecisionQueue.next); true when one is up, and then
@@ -125,6 +127,8 @@ func request_end(echo: bool = false, count: int = 1) -> bool:
 	if _state == State.REPLAY:
 		skip_replay()
 		return false
+	if live_skip.is_valid():
+		live_skip.call()  # the player's own walk lands first (R49); the season goes on
 	if _state != State.IDLE or _now() < guard_until:
 		return false
 	var verdict := Session.end_season_check()
@@ -301,7 +305,7 @@ func _ended() -> void:
 	_stage = &""
 	if Session.game == null:
 		return
-	if _replay_begin(_speed()):
+	if _replay_begin(speed()):
 		_set_state(State.REPLAY)  # replay_done (the replay's finished) goes on to the decisions and the report
 		return
 	if _played == 0:
@@ -316,8 +320,8 @@ func _replay_begin(speed: StringName) -> bool:
 	return replay_start.is_valid() and replay_start.call(speed) == true
 
 
-## The replay's speed: instant under reduce motion, else the game/movement setting.
-func _speed() -> StringName:
+## The speed of the season replay and of a live walk: instant under reduce motion, else the game/movement setting.
+func speed() -> StringName:
 	if _reduce_motion():
 		return &"instant"
 	return StringName(_setting("game/movement", "normal"))

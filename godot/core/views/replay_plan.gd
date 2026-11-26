@@ -6,6 +6,8 @@
 ## Battle marks (M7 5.6, B20): record_battle gives a battle at a hex and the movement tick it began at; its mark shows from
 ## that tick (marks()). A retreat walk (a walk that starts on a battle hex after the battle's tick) is laid after the last
 ## movement tick, so the beaten army walks off once the armies have stopped.
+## The chain (R50, moves-build-spec.md): the walks of at-once orders (`now`) all count ticks from 1, so chain() lays them one
+## after another, then the phase's walks after the last; a chained walk is `fixed` and setup() leaves its ticks as they are.
 class_name ReplayPlan
 extends RefCounted
 
@@ -16,7 +18,7 @@ const MAX_SECONDS := 6.0
 ## The shortest a shown step gets, in seconds.
 const MIN_STEP := 0.04
 
-## One walk per record: {army, tag, path, seen, ticks, starts, ends}; starts and ends are PackedFloat64Array, one a step.
+## One walk per record: {army, tag, path, seen, ticks, fixed, starts, ends}; starts and ends are PackedFloat64Array, one a step.
 var _walks: Array[Dictionary] = []
 ## One battle per record_battle: {hex, tick, shown, start} (start: the clock second its tick begins, set by setup).
 var _battles: Array[Dictionary] = []
@@ -40,6 +42,38 @@ func set_focus(focus: Rect2i) -> void:
 	_focus = focus
 
 
+## The records with the at-once walks laid one after another (R50): pure, in a new list. A record with `now` set is an at-once
+## walk; its ticks count from 1, so each walk's ticks move after the last tick of the walks before it, in arrival order. A
+## retreat of the same fight (its ticks start after 1: the battle's tick and one) keeps its walk's offset, so it comes right
+## after its battle. The records without `now` (the phase's) then move after the last tick of all of those, keeping their own
+## spacing and order. Each at-once record gets `fixed` true. With no `now` record the ticks are unchanged.
+static func chain(records: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var offset := 0
+	var end := 0
+	for r: Dictionary in records:
+		if not bool(r.get("now", false)):
+			continue
+		var ticks := r.get("ticks", PackedInt32Array()) as PackedInt32Array
+		if ticks.is_empty():
+			continue
+		if ticks[0] <= 1:
+			offset = end
+		var moved := r.duplicate()
+		moved["ticks"] = _shifted(ticks, offset)
+		moved["fixed"] = true
+		end = maxi(end, _last_tick(moved["ticks"] as PackedInt32Array))
+		out.append(moved)
+	for r: Dictionary in records:
+		if bool(r.get("now", false)):
+			continue
+		var moved := r.duplicate()
+		if end > 0 and r.get("ticks") is PackedInt32Array:
+			moved["ticks"] = _shifted(r["ticks"] as PackedInt32Array, end)
+		out.append(moved)
+	return out
+
+
 ## Lays the records on the clock at `speed` (an unknown speed takes "normal"). A record whose path has under two hexes, or
 ## whose seen and ticks do not fit its path, is left out. A retreat walk is moved after the last movement tick.
 func setup(records: Array[Dictionary], speed: StringName) -> void:
@@ -55,11 +89,15 @@ func setup(records: Array[Dictionary], speed: StringName) -> void:
 		if path.size() < 2 or seen.size() != path.size() or ticks.size() != path.size() - 1:
 			continue
 		kept.append({"army": int(r["army"]), "tag": StringName(r["tag"]), "path": path, "seen": seen, "ticks": ticks,
-			"timed": _timed_flags(path, seen), "starts": PackedFloat64Array(), "ends": PackedFloat64Array()})
+			"fixed": bool(r.get("fixed", false)), "timed": _timed_flags(path, seen), "starts": PackedFloat64Array(), "ends": PackedFloat64Array()})
 	var retreat := PackedByteArray()
 	var move_last := 0
+	var fixed_end := 0
 	for w: Dictionary in kept:
-		var back := _is_retreat(w)
+		if bool(w["fixed"]):
+			fixed_end = maxi(fixed_end, _last_tick(w["ticks"] as PackedInt32Array))
+	for w: Dictionary in kept:
+		var back := _is_retreat(w, fixed_end)
 		retreat.append(1 if back else 0)
 		if not back:
 			move_last = maxi(move_last, _last_tick(w["ticks"] as PackedInt32Array))
@@ -142,12 +180,22 @@ static func _last_tick(ticks: PackedInt32Array) -> int:
 	return ticks[ticks.size() - 1] if ticks.size() > 0 else 0
 
 
+static func _shifted(ticks: PackedInt32Array, by: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for tick: int in ticks:
+		out.append(tick + by)
+	return out
+
+
 ## A walk that starts on a battle hex after that battle's tick is a retreat (no army walks out of a battle in the movement).
-func _is_retreat(w: Dictionary) -> bool:
+## A chained (fixed) walk is never laid again, and a battle of the chained walks (tick up to `fixed_end`) has its retreats there.
+func _is_retreat(w: Dictionary, fixed_end: int = 0) -> bool:
+	if bool(w["fixed"]):
+		return false
 	var path := w["path"] as Array[Vector2i]
 	var ticks := w["ticks"] as PackedInt32Array
 	for b: Dictionary in _battles:
-		if b["hex"] == path[0] and int(b["tick"]) < ticks[0]:
+		if int(b["tick"]) > fixed_end and b["hex"] == path[0] and int(b["tick"]) < ticks[0]:
 			return true
 	return false
 

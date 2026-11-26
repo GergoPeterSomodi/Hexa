@@ -298,6 +298,7 @@ func test_committed_m6_numbers_equal_spec() -> void:
 	assert_eq(defs.wait_ratio_percent, 200)
 	assert_eq(defs.wait_extra_seasons, 2)
 	assert_eq(defs.land_sight, 1)
+	assert_eq(defs.fog_step_cost, -1, "moves-build-spec D9: a fog step spends all the points")
 	assert_eq(defs.units.size(), 4)
 	assert_eq(defs.terrains.size(), 8)
 	assert_eq(String(defs.unit_def(2).key), "knights")
@@ -314,6 +315,7 @@ func test_m6_defaults_match_the_spec() -> void:
 	assert_eq(Array(defs.starve_permille), [100, 100, 100, 200, 150, 100])
 	assert_eq([defs.stack_limit, defs.march_seasons_max, defs.wait_ratio_percent, defs.wait_extra_seasons, defs.land_sight],
 		[8, 12, 200, 2, 1])
+	assert_eq(defs.fog_step_cost, -1)
 
 
 func test_military_tables_rows_match_the_spec() -> void:
@@ -371,6 +373,18 @@ func test_planted_fault_m6_unit_and_terrain_lists() -> void:
 	terrains[1] = first
 	defs.terrains = terrains
 	assert_true(_has(defs.validate(), "terrains[0]: id 1 should be 0"), "terrains out of cover order refused")
+
+
+## Moves in the month (moves-build-spec.md R36): fog_step_cost is -1 (all the points) or 1 to 99.
+func test_planted_fault_fog_step_cost_out_of_range() -> void:
+	for bad: int in [0, -2, 100]:
+		var defs := _committed_defs()
+		defs.fog_step_cost = bad
+		assert_true(_has(defs.validate(), "fog_step_cost is %d, expected -1 or 1 to 99" % bad), "fog_step_cost %d refused" % bad)
+	for good: int in [-1, 1, 99]:
+		var defs := _committed_defs()
+		defs.fog_step_cost = good
+		assert_eq(defs.validate(), [] as Array[String], "fog_step_cost %d accepted" % good)
 
 
 ## M7 spec 5.1: GameDefs lists the war and validates it (the war's own cases are in test_war_defs.gd).

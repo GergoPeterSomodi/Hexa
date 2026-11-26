@@ -33,8 +33,11 @@ signal army_raised(tag: StringName, hex: Vector2i, army: int)
 signal army_disbanded(tag: StringName, hex: Vector2i, army: int)
 ## An army's order, place, companies or men changed (split, merge, march, halt, refill): tokens, panels, path marks.
 signal army_changed(tag: StringName, army: int)
-## An army walked in the movement phase: its path (start first), the tick of each step and what the player saw of it.
-signal unit_moved(tag: StringName, army: int, path: Array[Vector2i], seen: PackedByteArray, ticks: PackedInt32Array)
+## An army walked: its path (start first), the tick of each step and what the player saw of it. `now` is true for a walk done at
+## once (an order's walk, a retreat after a battle fought at once), false for the movement phase's: the replay lays the first
+## kind one after another (ReplayPlan.chain) and plays the player's own live (MoveReplay).
+signal unit_moved(tag: StringName, army: int, path: Array[Vector2i], seen: PackedByteArray, ticks: PackedInt32Array,
+		now: bool)
 ## An army's march stopped in the movement phase; `why` is `winter`, `blocked` or `no_way`.
 signal march_halted(tag: StringName, army: int, why: StringName)
 ## An army lost men to hunger in the supply phase.

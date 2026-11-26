@@ -347,3 +347,17 @@ func _needed_width(btn: KitButton) -> float:
 	if style != null:
 		need += style.get_minimum_size().x
 	return need
+
+
+## The points row (R51): its text is ArmyView.panel's points text, and it follows the army's points.
+func test_the_points_row_is_the_views_text() -> void:
+	var a := _own_army(2)
+	a.points = 5
+	_g.version += 1
+	_panel.show_army(a.id)
+	var want := str(ArmyView.panel(_g, ArmyFixture.TAG, a.id)["points"]["text"])
+	assert_true(want.begins_with("5 of "), "the view says 5 left: %s" % want)
+	var row := _panel.find_child("PointsRow", true, false) as Label
+	assert_not_null(row, "the panel has a points row")
+	assert_eq(row.text, want)
+	assert_ne(row.tooltip_text, "", "the row has a hover text")

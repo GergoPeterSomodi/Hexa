@@ -89,7 +89,8 @@ func _replay_running(app: App) -> Vector2i:
 	var goal := game.map.neighbour(hex, 0)
 	var a := ArmyFixture.army(game, ArmyFixture.TAG, hex, 0, 2, game.turn - 1)
 	game.version += 1
-	assert_true(bool(Session.act("march", {"army": a.id, "goal": goal}).get("ok", false)), "the march is ordered")
+	# A standing march: the season's movement phase walks it. A march ordered through the door walks live (MV8), not in the replay.
+	Armies.set_order(game, a, Army.ORDER_MARCH, goal, PackedInt32Array([game.map.index_of(goal)]))
 	_army_id = a.id
 	app.context().request(&"end_seasons", {"count": 1})
 	await get_tree().process_frame
@@ -190,3 +191,77 @@ func test_esc_skips_the_replay_through_the_app_input() -> void:
 	await _replay_running(app)
 	assert_true(app.app_input().handle_key_event(_key(KEY_ESCAPE)), "Esc is taken")
 	assert_false(app._requests.replay.active(), "Esc skips the replay")
+
+
+## R49: a live walk (the walk of the player's own order) is skipped by Space, Enter, Esc, a click, F5 and End season; none of them is
+## refused or told "The moves are still playing". Starts a live walk in the App: an army of Genoa is marched one hex through the door.
+func _live_running(app: App) -> Vector2i:
+	var game := Session.game
+	var hex := ArmyFixture.find_town(game)
+	var goal := game.map.neighbour(hex, 0)
+	var a := ArmyFixture.army(game, ArmyFixture.TAG, hex, 0, 2, game.turn - 1)
+	game.version += 1
+	_army_id = a.id
+	assert_true(bool(Session.act("march", {"army": a.id, "goal": goal}).get("ok", false)), "the march is ordered")
+	await get_tree().process_frame
+	assert_true(app._requests.replay.live_active(), "the live walk plays")
+	assert_false(app._requests.replay.active(), "it is not the season replay")
+	Engine.time_scale = 0.01
+	return hex
+
+
+func test_space_skips_a_live_walk_and_does_not_end_the_season() -> void:
+	var app := await _game_app()
+	await _live_running(app)
+	var turn := Session.game.turn
+	app.map_scene().map_input()._unhandled_input(_key(KEY_SPACE))
+	assert_false(app._requests.replay.live_active(), "Space skips the live walk")
+	assert_eq(app._requests.flow.state(), SeasonFlow.State.IDLE, "and starts no season")
+	assert_eq(Session.game.turn, turn)
+
+
+func test_esc_skips_a_live_walk_through_the_app_input() -> void:
+	var app := await _game_app()
+	await _live_running(app)
+	assert_true(app.app_input().handle_key_event(_key(KEY_ESCAPE)), "Esc is taken")
+	assert_false(app._requests.replay.live_active(), "Esc skips the live walk")
+
+
+func test_a_click_on_the_map_skips_a_live_walk_and_acts() -> void:
+	var app := await _game_app()
+	var hex := await _live_running(app)
+	app.hud().toast_host().clear()
+	_click_on(app, hex)
+	assert_false(app._requests.replay.live_active(), "the click skips the live walk")
+	assert_false(app.hud().toast_host().messages().has(MapArmies.REPLAY_BLOCKED), "and is not refused: only the season replay refuses")
+
+
+func test_f5_skips_a_live_walk_and_saves() -> void:
+	var app := await _game_app()
+	await _live_running(app)
+	app.hud().toast_host().clear()
+	assert_true(app.app_input().handle_key_event(_key(KEY_F5)), "F5 is taken")
+	assert_false(app._requests.replay.live_active(), "F5 skips the live walk")
+	assert_true(await _wait_until(func() -> bool: return SaveFile.read_header(SaveRows.QUICK_SLOT, Session.save_dir)["state"] != &"empty"),
+		"and the game is saved (the walk is done in the game)")
+
+
+func test_end_season_skips_a_live_walk_then_runs_the_season() -> void:
+	var app := await _game_app()
+	await _live_running(app)
+	Engine.time_scale = 1.0
+	assert_true(app._requests.flow.request_end(), "End season starts the season")
+	assert_false(app._requests.replay.live_active(), "the live walk was skipped first")
+	assert_eq(app._requests.flow.state(), SeasonFlow.State.RUNNING)
+
+
+func test_reduce_motion_plays_no_live_walk() -> void:
+	var app := await _game_app()
+	app.settings().set_value("accessibility/reduce_motion", true)
+	assert_eq(app._requests.flow.speed(), MoveReplay.INSTANT, "reduce motion is the instant speed")
+	var game := Session.game
+	var hex := ArmyFixture.find_town(game)
+	var a := ArmyFixture.army(game, ArmyFixture.TAG, hex, 0, 2, game.turn - 1)
+	game.version += 1
+	assert_true(bool(Session.act("march", {"army": a.id, "goal": game.map.neighbour(hex, 0)}).get("ok", false)))
+	assert_false(app._requests.replay.live_active(), "nothing is played")

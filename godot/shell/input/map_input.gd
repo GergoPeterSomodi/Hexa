@@ -49,6 +49,9 @@ signal blocked(reason: String)
 
 ## () -> bool, asked on a click's release: true while a movement replay runs, so the click is `blocked_click` instead.
 var orders_blocked: Callable = Callable()
+## () -> bool: skips a running live walk (MoveReplay.skip_live; moves-build-spec.md R49) and says whether it did. A click on the map
+## and the keys that order skip it and then act; the End turn keys (Space, Enter) only skip it and do nothing more.
+var live_skip: Callable = Callable()
 ## () -> bool, asked on a Shift+right click: true while an army of yours is selected, so the click storms. Unset: no army.
 var storm_ready: Callable = Callable()
 ## Callable(screen: Vector2) -> bool, asked on a left click's release: true while one of the viewer's unit tokens stands
@@ -191,6 +194,7 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 		blocked_click.emit(map_px)
 		_mark_handled()
 		return
+	_skip_live()
 	if released_action == &"map_select":
 		if _on_unit(mb):
 			unit_requested.emit(mb.position)
@@ -203,6 +207,11 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 		else:
 			command_requested.emit(map_px)
 		_mark_handled()
+
+
+## Skips a running live walk before an input that acts; true when one was skipped.
+func _skip_live() -> bool:
+	return live_skip.is_valid() and bool(live_skip.call())
 
 
 ## True for a left click (no Shift) on a unit token: the unit is the target, not the hex under it.
@@ -228,6 +237,9 @@ func _on_key(key: InputEventKey) -> void:
 	if not key.pressed or _is_text_input_focused():
 		return
 	if event_is_exact_action(key, &"game_end_season", true):
+		if _skip_live():  # Space and Enter end a live walk and do nothing more (R49)
+			_mark_handled()
+			return
 		end_season_requested.emit(key.echo)
 		_mark_handled()
 		return
@@ -274,6 +286,7 @@ func _on_game_key(key: InputEventKey) -> bool:
 		if _refuses():
 			_mark_handled()
 			return true
+		_skip_live()
 		_emit_gated(gated)
 		_mark_handled()
 		return true

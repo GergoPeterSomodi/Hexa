@@ -106,7 +106,8 @@ func _link(sig: Signal, fn: Callable) -> void:
 	_links.append([sig, fn])
 
 
-func _mark_dirty(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null, _e: Variant = null) -> void:
+func _mark_dirty(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null, _e: Variant = null,
+		_f: Variant = null) -> void:
 	_dirty = true
 
 

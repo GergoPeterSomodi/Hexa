@@ -116,3 +116,21 @@ func test_a_walk_that_does_not_start_on_a_battle_hex_is_not_moved() -> void:
 	var pose := _pose_of(plan.poses(), 2)
 	assert_eq(pose["to"], Y, "army 2 steps at tick 1, as the core recorded it")
 	assert_gt(float(pose["t"]), 0.0)
+
+
+## R50: a battle of the chained at-once walks does not make a later phase walk from its hex a retreat.
+func test_a_phase_walk_from_an_at_once_battle_hex_is_not_a_retreat() -> void:
+	var records: Array[Dictionary] = [
+		_rec(1, _p([A, B, C]), [1, 1, 1], [1, 2]),
+		_rec(2, _p([C, D]), [1, 1], [1]),
+	]
+	records[0]["now"] = true
+	var chained := ReplayPlan.chain(records)
+	var plan := ReplayPlan.new()
+	plan.record_battle(C, 2)
+	plan.setup(chained, &"normal")
+	assert_almost_eq(plan.duration(), 0.6, 0.001, "ticks 1, 2 (at once) then 3 (phase): three shown ticks, no retreat laid after")
+	plan.advance(0.5)
+	var pose := _pose_of(plan.poses(), 2)
+	assert_eq(pose["to"], D, "the phase walk steps on tick 3, as chained")
+	assert_gt(float(pose["t"]), 0.0)

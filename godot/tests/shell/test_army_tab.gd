@@ -239,3 +239,24 @@ func test_tall_form_shows_one_line_a_part_and_the_count() -> void:
 	var n := int(rows[0]["can_raise"])
 	assert_eq(tall.count_text(), "can raise %d" % n if n > 0 else "-", "the count")
 	assert_eq(tall.hammer().disabled, str(rows[0]["state"]) != "ready", "the hammer follows the state")
+
+
+## An own army's card shows its points_text; a foreign card shows none (R51).
+func test_an_own_card_shows_the_points_text_and_a_foreign_card_none() -> void:
+	var army := ArmyFixture.army(_g, TAG, _hex, 0, 1)
+	army.points = 3
+	_g.version += 1
+	var want := str(TileArmy.of(_g, TAG, _hex)["armies"][0]["points_text"])
+	assert_true(want.begins_with("3 of "), want)
+	assert_true(_has_text(_tab(_hex), ""), "sanity")
+	var found := false
+	for text: String in _texts(_tab(_hex)):
+		found = found or text.ends_with(want)
+	assert_true(found, "the card's line ends with the points text")
+	var seen := _seen_foreign_hex()
+	if seen == ArmyFixture.NO_HEX:
+		return
+	ArmyFixture.army(_g, ArmyFixture.other_tag(_g), seen, 0, 2)
+	Sight.refresh(_g)
+	for text: String in _texts(_tab(seen)):
+		assert_false(text.contains("left this season"), "P: points on a foreign card")

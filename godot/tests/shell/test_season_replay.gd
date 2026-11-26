@@ -155,3 +155,29 @@ func test_a_reset_during_the_replay_ends_it_and_a_late_finish_is_ignored() -> vo
 	_flow.replay_done()
 	assert_eq(_flow.state(), SeasonFlow.State.IDLE, "a finish after the reset does nothing")
 	assert_eq(_pushed.size(), 0, "no report")
+
+
+## R49: End season skips a running live walk first and then goes on to end the season.
+func test_end_season_skips_a_live_walk_first_and_then_runs_the_season() -> void:
+	var order: Array[String] = []
+	_flow.live_skip = func() -> bool:
+		order.append("live_skip")
+		return true
+	_flow.state_changed.connect(func(s: int) -> void:
+		if s == SeasonFlow.State.RUNNING:
+			order.append("running"))
+	assert_true(_flow.request_end(), "the season starts after the skip")
+	assert_eq(order, ["live_skip", "running"], "the live walk is skipped before the season begins")
+	await _settle()
+
+
+func test_a_press_during_the_season_replay_does_not_skip_a_live_walk() -> void:
+	var skips := [0]
+	_flow.live_skip = func() -> bool:
+		skips[0] += 1
+		return true
+	assert_true(_flow.request_end())
+	await _settle()
+	var before: int = skips[0]
+	assert_false(_flow.request_end(), "the press in the replay skips the replay")
+	assert_eq(skips[0], before, "and asks nothing of the live walk")

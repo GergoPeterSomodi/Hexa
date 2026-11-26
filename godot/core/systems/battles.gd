@@ -402,7 +402,7 @@ static func fight_now(game: Game, battle: Battle) -> int:
 	game.battles.erase(battle)
 	if game.map == null or game.defs == null or game.defs.war == null:
 		return -1
-	var id := _fight(game, battle)
+	var id := _fight(game, battle, true)
 	Occupation.flush(game)
 	Sight.refresh(game)
 	return id
@@ -420,7 +420,7 @@ static func armies_of(game: Game, battle: Battle) -> Array[Army]:
 
 ## Fights one battle and keeps its record (the oldest records go past battle_records_kept). Returns the record's id, -1 when no
 ## day was fought. The one private path of the phase and of fight_now.
-static func _fight(game: Game, b: Battle) -> int:
+static func _fight(game: Game, b: Battle, now: bool = false) -> int:
 	var war := _war(game)
 	var input := input_of(game, b)
 	var problems := CombatInput.validate(war, input, game.defs.units.size())
@@ -433,7 +433,7 @@ static func _fight(game: Game, b: Battle) -> int:
 	var result := Combat.fight(war, input, game.luck.world)
 	var id := game.next_record_id
 	game.next_record_id += 1
-	var rec := BattleEnd.apply(game, b, input, result, luck_before, id, Battles.retreat_path)
+	var rec := BattleEnd.apply(game, b, input, result, luck_before, id, Battles.retreat_path, now)
 	# moves-build-spec.md R27, D11: every army of both sides that fought and is left has ended its season.
 	for a: Army in armies_of(game, b):
 		Armies.set_points(game, a, 0)

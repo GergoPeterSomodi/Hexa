@@ -188,3 +188,36 @@ func test_a_seen_foreign_army_has_a_shown_token() -> void:
 	var token := _armies().tokens().token_at(hex, other)
 	assert_not_null(token, "the foreign army in sight has a token")
 	assert_true(token.visible, "and it is shown")
+
+
+## The points mark (moves-build-spec.md R51): full, half and empty read differently, and a foreign token has none.
+## Planted faults: a wrong mark for a state; a mark on a foreign token.
+func test_the_points_mark_reads_full_half_and_empty() -> void:
+	var hex := ArmyFixture.find_town(_game)
+	var army := _army(hex, 2)
+	var full := int(ArmyView.panel(_game, ArmyFixture.TAG, army.id)["points"]["full"])
+	assert_gt(full, 1, "the army has a full allowance above 1")
+	var half := int(full * 0.5)
+	for case: Array in [[full, &"full", 1.0], [half, &"half", float(half) / float(full)], [0, &"empty", 0.0]]:
+		army.points = case[0]
+		_game.version += 1
+		_armies().sync()
+		var token := _armies().tokens().token_at(hex, ArmyFixture.TAG)
+		assert_true(token.points_shown(), "the own token has a mark")
+		assert_eq(token.points_state(), case[1], "the mark for %d of %d" % [case[0], full])
+		assert_almost_eq(token.points_share(), float(case[2]), 0.001, "the bar's share")
+		assert_eq(token.points_tip(), "%d of %d move points left this season" % [case[0], full], "the hover text")
+	assert_eq(_armies().tokens().points_tip_at(Vector2(-99999.0, -99999.0)), "", "no tip away from a mark")
+
+
+func test_a_foreign_token_has_no_points_mark() -> void:
+	var hex := ArmyFixture.find_town(_game)
+	var other := ArmyFixture.other_tag(_game)
+	ArmyFixture.army(_game, other, hex, 0, 300)
+	_game.version += 1
+	_armies().sync()
+	var token := _armies().tokens().token_at(hex, other)
+	assert_not_null(token)
+	assert_false(token.points_shown(), "P: points on a foreign token")
+	assert_eq(token.points_state(), &"")
+	assert_eq(token.points_tip(), "")

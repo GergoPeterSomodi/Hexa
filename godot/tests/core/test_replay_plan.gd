@@ -202,3 +202,37 @@ func test_an_empty_focus_times_every_seen_step() -> void:
 	plan.set_focus(Rect2i())
 	plan.setup(_walk_abc(), &"normal")
 	assert_almost_eq(plan.duration(), 0.4, 0.0001, "no focus is the M6 rule: two shown ticks")
+
+
+## R50: the chained cases. The old cases above have no `now` and no `fixed`: they are unchanged.
+func test_a_fixed_walk_keeps_its_ticks_even_when_it_starts_on_a_battle_hex() -> void:
+	var plan := ReplayPlan.new()
+	plan.record_battle(B, 1)
+	var path: Array[Vector2i] = [B, C]
+	var fixed := _rec(1, path, [1, 1], [3])
+	fixed["fixed"] = true
+	var first := _rec(2, _p([A, B]), [1, 1], [1])
+	plan.setup([first, fixed], &"normal")
+	plan.advance(0.3)
+	var pose := _plan_pose(plan, 1)
+	assert_eq(pose["to"], C, "the chained walk is on its own step (ticks 3 starts at 0.2 s; tick 2 has no walk)")
+	assert_gt(float(pose["t"]), 0.0)
+
+
+func test_the_cap_holds_for_a_chained_season() -> void:
+	var records: Array[Dictionary] = []
+	for i: int in 60:
+		var r := _rec(i, _p([A, B]), [1, 1], [1])
+		r["now"] = true
+		records.append(r)
+	var plan := ReplayPlan.new()
+	plan.setup(ReplayPlan.chain(records), &"normal")
+	assert_lte(plan.duration(), ReplayPlan.MAX_SECONDS + 0.001, "sixty one-step walks in a row stay within the cap")
+	assert_gt(plan.duration(), 0.0)
+
+
+func _plan_pose(plan: ReplayPlan, army: int) -> Dictionary:
+	for pose: Dictionary in plan.poses():
+		if int(pose["army"]) == army:
+			return pose
+	return {}

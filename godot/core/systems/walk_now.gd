@@ -13,8 +13,11 @@ const OWNS: Array[String] = []
 ## The reasons a walk stops (`stopped`): "" arrived; points: the season's points are spent, the rest of the route stands; room:
 ## the hex ahead is full of the country's companies, the rest stands; mustering, no_points: nothing walked, the order stands;
 ## winter: it waits at a closed pass; zoc: it stands beside an enemy and its season is over; battle: a battle was fought (`battle`
-## the record id) or, with `battle` -1, a battle of others is fought on the hex ahead; the halt words of Movement (no_way, blocked,
-## shaken, enemy): the march halted.
+## the record id) or, with `battle` -1, a battle of others is fought on the hex ahead; fog: a deep-fog step took the season's
+## points, or the next step is one and the army has walked (R36: the rest stands); the halt words of Movement (no_way, blocked,
+## shaken, enemy, sighted: an enemy army it did not see when the walk began came into sight, the points kept, R32): the march
+## halted. The seen set of the walk is MarchLeg.leg's (Sight.sees at the act's start), so Continue after a sighted halt walks
+## with a new one that holds the army seen (R35).
 const ARRIVED := &""
 const POINTS := &"points"
 const ROOM := &"room"
@@ -22,6 +25,8 @@ const MUSTERING := &"mustering"
 const NO_POINTS := &"no_points"
 const ZOC := &"zoc"
 const FOUGHT := &"battle"
+const FOG := FogStep.WHY
+const SIGHTED := Movement.WHY_SIGHTED
 
 
 ## Walks the army's order now. {steps (taken), from, to (where the army stands after the act; its last hex when it is gone),
@@ -79,6 +84,8 @@ static func _why(w: MarchLeg) -> StringName:
 		return ZOC
 	if w.end == w.goal:
 		return ARRIVED
+	if w.status == FogStep.WHY:
+		return FOG
 	if w.walked.size() < w.leg_size:
 		return ROOM
 	return POINTS

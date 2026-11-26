@@ -4,6 +4,9 @@
 ## another country's army stood on is cut, a battle stops the walk), the stack limit (room) and the end (apply: Armies' setters,
 ## unit_moved, march_halted, the explored steps). MovementPhase walks many of them tick by tick, WalkNow walks one at once (MV4:
 ## the leg spends the points left, apply writes what is left, R18 to R27); the callers share these rules.
+## MV7: the deep-fog step (FogStep, R36: a step onto a hex the country never explored, only fresh, spends fog_step_cost) is a rule
+## of the leg; stop on sight (R32 to R35, D6 to D8) is a rule of the ticks: the leg keeps the enemy armies its country did not see
+## when the walk began, and a step after which one stands within the army's sight ends the walk (halt sighted, points kept).
 ## Luck: none. Integer maths. Armies are written only through Armies; the rules are Movement's and Battles'.
 class_name MarchLeg
 extends RefCounted
@@ -39,14 +42,20 @@ var spent := PackedInt32Array()
 var leg_size: int = 0
 var zoc: bool = false
 var now: bool = false
+## Stop on sight (R32 to R34): the armies at war with the walker's country that it did not see when the walk began (the seen set S
+## is every other army at war: Sight.sees at the leg's start, the phase's start for the phase), and the walking army's sight.
+var unseen: Array[Army] = []
+var sight: int = 1
 
 
 ## The leg: the steps the army takes this season by its own rules (no other army counted), a detour or a wait at a closed
 ## pass (D20), and a re-plan where the next step is blocked or no longer open. A zone of control beside an enemy ends it
 ## (D21, D40). A walk with no way ends halted (no_way). `points` are the move points the leg may spend (the army's points left);
 ## -1 is the army's full points. A wade step or a step costing more than the points left is taken only as the first step of a
-## fresh army (points equal to its full, R18), and spends all its points.
-static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: int = -1) -> MarchLeg:
+## fresh army (points equal to its full, R18), and spends all its points. A fog step (FogStep: a hex the country never explored,
+## R36) likewise only fresh, spending fog_step_cost; a leg that ends on one, or before one, ends with the status FogStep.WHY.
+## `watch` false leaves out the seen set (the preview's legs: an army the viewer sees cannot be newly sighted).
+static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: int = -1, watch: bool = true) -> MarchLeg:
 	var m := game.map
 	var w := MarchLeg.new()
 	w.army = army
@@ -62,6 +71,9 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 	w.points_start = mp
 	var pts := mp
 	var first := mp >= full and full > 0
+	var mapped := FogStep.mapped(game, w.tag)
+	if watch:
+		_watch(game, w)
 	while mp > 0 and w.goal >= 0 and w.end != w.goal:
 		var nxt := w.rem[0] if not w.rem.is_empty() else -1
 		var d := Movement.direction(m, w.end, nxt) if nxt >= 0 else -1
@@ -84,7 +96,13 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 			if not _count_replan(game, w):
 				return _sized(w)
 			continue
-		if c == StepCosts.WADE or c > pts:
+		var foggy := FogStep.is_fog(mapped, nxt)
+		if foggy:
+			if not first:
+				w.status = FogStep.WHY
+				break
+			pts = FogStep.after(game.defs.fog_step_cost, pts)
+		elif c == StepCosts.WADE or c > pts:
 			if not first:
 				break
 			pts = 0
@@ -96,12 +114,38 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 		w.rem = w.rem.slice(1)
 		first = false
 		if pts <= 0:
+			if foggy:
+				w.status = FogStep.WHY
 			break
 		# D21, D40: a zone of control ends the leg (no halt: the march goes on next season, M6's rule); R25: and the season.
 		if nxt != w.goal and Movement.zoc_halts(game, w.tag, m.hex_of(nxt)):
 			w.zoc = true
 			break
 	return _sized(w)
+
+
+## The seen set of a walk (R32): the armies of the countries at war with the walker's that its country does not see now are kept
+## (`unseen`), with the walking army's sight (the largest sight of its kinds, as Sight's discs).
+static func _watch(game: Game, w: MarchLeg) -> void:
+	if game.wars.is_empty():
+		return
+	var foes := Wars.enemies(game, w.tag)
+	if foes.is_empty():
+		return
+	w.sight = army_sight(game, w.army)
+	for a: Army in game.armies:
+		if a.hex != Army.NO_HEX and foes.has(a.tag) and not Sight.sees(game, w.tag, a.hex):
+			w.unseen.append(a)
+
+
+## The sight of an army: the largest sight of its kinds (1 when the defs do not say), the radius of its disc (SightCache.disc).
+static func army_sight(game: Game, army: Army) -> int:
+	var out := 1
+	for u: Unit in army.units:
+		var def: UnitDef = game.defs.unit_def(u.kind) if game.defs != null else null
+		if def != null:
+			out = maxi(out, def.sight)
+	return out
 
 
 static func _sized(w: MarchLeg) -> MarchLeg:
@@ -148,10 +192,17 @@ static func _no_way(game: Game, w: MarchLeg) -> void:
 
 ## One walk's step k in this tick (see MovementPhase._ticks). A walk whose army is in a battle stops; a contact is Battles' (engage); else the
 ## step is taken, unless another country's army stood there this phase.
+## Stop on sight (R32, R34): after a step taken that opened no battle, an army not in the seen set within the army's sight ends
+## the walk there; in the phase the test also runs before the step (an army that walked into its sight in this tick or the last).
 static func step(game: Game, w: MarchLeg, k: int, occ: Dictionary) -> void:
 	if Battles.of_army(game, w.army.id) != null:
 		_stop(game, w, k, Movement.WHY_FOUGHT, "the army is fought in its battle")
 		return
+	if not w.now and not w.unseen.is_empty():
+		var before := spotted(game, w, w.army.hex)
+		if before != null:
+			_stop(game, w, k, Movement.WHY_SIGHTED, sighted_text(game, before))
+			return
 	var h: int = w.walked[k]
 	var hex := game.map.hex_of(h)
 	if _contact(game, w, hex):
@@ -170,6 +221,31 @@ static func step(game: Game, w: MarchLeg, k: int, occ: Dictionary) -> void:
 	var from := w.army.hex
 	Armies.set_hex(game, w.army, hex, game.map.hex_of(w.start))
 	Movement.index_move(game, w.army, from, hex)
+	# R33: a step onto the goal arrives, and a zone of control on the leg's last step wins (points 0, D8).
+	if w.unseen.is_empty() or h == w.goal or (w.zoc and k == w.leg_size - 1):
+		return
+	var seen := spotted(game, w, hex)
+	if seen != null:
+		_sighted(game, w, k, sighted_text(game, seen))
+
+
+## The first army of the walk's unseen set that stands within its sight of `here` now (in the order the set was made), or null.
+## The hex distance is the disc's (SightCache.disc), read from the armies' hexes as they stand at this tick.
+static func spotted(game: Game, w: MarchLeg, here: Vector2i) -> Army:
+	for a: Army in w.unseen:
+		if a.hex != Army.NO_HEX and ImproveRules.hex_distance(a.hex, here) <= w.sight and Armies.by_id(game, a.id) != null:
+			return a
+	return null
+
+
+## The words of a halt on sight (R32): the army is in the walker's sight, so its country and its place may be named.
+static func sighted_text(game: Game, foe: Army) -> String:
+	return "an army of %s came into sight at %s" % [Movement.country_name(game, foe.tag), Military.hex_text(game, foe.hex)]
+
+
+## The walk ends after its step k (taken): the steps after it go back to the route, halt sighted with `text`.
+static func _sighted(game: Game, w: MarchLeg, k: int, text: String) -> void:
+	_stop(game, w, k + 1, Movement.WHY_SIGHTED, text)
 
 
 ## True when a step onto hex meets Battles: a battle on it, an army of a country at war with the walk's, or (a storm's walk) the

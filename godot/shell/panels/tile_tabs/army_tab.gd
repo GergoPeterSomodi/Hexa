@@ -127,7 +127,13 @@ func _army_row(row: Dictionary) -> Control:
 	text.add_child(name_label)
 	var men := str(row.get("men_text", ""))
 	var state := str(row.get("state_text", ""))
-	var small := PanelKit.label("%s · %s" % [men, state] if own and state != "" else men, &"TileHint")
+	var points := str(row.get("points_text", "")) if own else ""
+	var parts: Array[String] = [men]
+	if own and state != "":
+		parts.append(state)
+	if points != "":
+		parts.append(points)
+	var small := PanelKit.label(" · ".join(parts), &"TileHint")
 	card.tooltip_text = "%s: %s%s" % [title, small.text, "" if own else "
 Not yours: seen, not commanded."]
 	small.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

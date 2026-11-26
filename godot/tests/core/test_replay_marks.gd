@@ -64,3 +64,15 @@ func test_each_event_keeps_its_order_and_its_own_tick() -> void:
 	assert_eq(int(out[0]["tick"]), 1)
 	assert_eq(out[1]["hex"], C)
 	assert_eq(int(out[1]["tick"]), 2)
+
+
+## R50: the marks of chained walks take the chained ticks, so the second at-once battle's mark comes after the first walk.
+func test_the_tick_of_a_chained_walk_is_its_laid_tick() -> void:
+	var records: Array[Dictionary] = [_walk(&"SAV", _p([A, B]), [1]), _walk(&"MIL", _p([D, C]), [1])]
+	records[0]["now"] = true
+	records[1]["now"] = true
+	var events: Array[Dictionary] = [_event(B, &"SAV"), _event(C, &"MIL")]
+	var out := ReplayMarks.battles(ReplayPlan.chain(records), events, null, &"")
+	assert_eq(out.size(), 2)
+	assert_eq(int(out[0]["tick"]), 1)
+	assert_eq(int(out[1]["tick"]), 2, "P: both battles on tick 1 would be shown together")
