@@ -1,7 +1,8 @@
 # Moves in the month (issue 432)
 
 Status: draft for the owner. Written 2026-11-24 by the game designer from the M6, M7 and M8 build specs and the UI family
-audit (no code was read or run). Nothing here is built. Where a number is named it is a data value, not a constant in code.
+audit (no code was read or run). Nothing here is built. Where a number is named it is a data value, not a constant in code. The owner's answers of
+2026-11-24 and 2026-11-25 are in the last section; where a section above says otherwise, the answers win.
 
 Words: the game calls one turn a "season". The owner says "month". This page says "season" and means the same thing.
 
@@ -127,8 +128,10 @@ hex and your side is in it):
 
 - The step is taken, the army stands in the hex, and **the battle opens at once**: the attacker is you, the defender the
   other army's country (the M7 rules for sides, ground, crossing, uphill and river are unchanged).
-- The shell opens the **battle board** (the live dock of the UI audit, section 4) before you can do anything else. Your
-  stance and the fills are set by you day by day; Auto to the end is one click. A battle of the other side's moving, in
+- The shell opens the **battle board** (a window over the map, as decided for the board build; the UI audit's section 4 called
+  it the live dock) before you can do anything else. Your stance and the fills are set by you day by day; Auto to the end
+  is one click. **Order (owner, 2026-11-25):** this change ships before the board (issue 437). Until the board exists the
+  battle is fought automatically at the click and the battle dock shows the result. A battle of the other side's moving, in
   which you take no part, is never played for you.
 - **The defender's orders**: it has none to give now; it fights on its standing order (Hold, or Withdraw when a retreat
   hex exists), as today and as the audit says. The computer keeps its fixed stance and automatic fills.
@@ -227,8 +230,11 @@ unchanged data.
   when they are in its sight after they have happened. The computer does not read your orders; there are no orders to read
   (the move is done), only positions.
 - **A declared war** ("fair warning" of M8): a country that declares war this season does not send armies into the enemy's
-  land in that same season. Because the player moves first in a season, the same rule keeps the player from being struck
-  in the season a war begins, as today.
+  land in that same season. **Owner answer, 2026-11-25: this holds for every country, the player included.** You may declare
+  a war and fight the enemy's armies on your own or unclaimed land at once, but your armies may not enter its land until the
+  next season, and an order that breaks the rule is refused with a clear sentence and a hint. The rule binds the one who
+  declares: when a computer country declares war on you, your armies are free. Without it a declaration and a strike would
+  come in one season of the player's, before the other country can move at all.
 
 ## 3. Saves, determinism, replay, fog
 
@@ -300,7 +306,7 @@ works stay visible; **only armies, their moves and orders, and battles you are n
 |---|---|---|
 | **Misclick** | A final move is a costly mistake | The preview, the points left, a confirm for battle, enemy land and out-of-supply moves (Q3) |
 | **Scouting with undo is gone** | Intended | Looking costs points; the riders' sight 2 does the rest |
-| **Player first-mover advantage** | The player strikes an AI army before it can move away | The AI answers in the same End turn; Withdraw standing order; if the playtest shows it, the AI may keep a defender's free "step away" (not built now) |
+| **Player first-mover advantage** | The player strikes an AI army before it can move away | Fair warning for every country (no entering the land of a country you declared war on in the same season); the AI answers in the same End turn; Withdraw standing order; if the playtest shows it, the AI may keep a defender's free "step away" (not built now) |
 | **The AI feels slow** | Each AI march now includes a walk and a sight refresh | One walk per march costs little (a route search dominates); the sight is refreshed for the moved army only, not the whole map; `perf_core` pins the limit (AI season on north Italy under 200 ms today) |
 | **Combat before the AI acts** | The AI never gets to react to your attack in the season | It reacts the next End turn; the board shows the AI's army fights on its standing order |
 | **Long animations** | A turn of ten moves is ten walks | Short walk time, Space skips, reduce motion; moves play in order and never block input for long |
@@ -321,11 +327,11 @@ Sizes: S under half a day, M about a day, L two to three days of a worker, then 
 |---|---|---|---|
 | **A. Allowance and the walk now** | L | The army's `points left` (army/3 and its digest, reset each season, split and merge rules). `march` walks its first leg at once; `continue_march` and `halt` rewritten around it; a march's leftover is a standing march. The step rules (first step of a season, wade, zone of control, closed pass, room) for a single walking army; sight refreshed for that army only. Option A or B by one data value. | M6 4.4, 4.7, 4.11; M6's movement tests and the army fixture; one new test file for points |
 | **B. Meeting and battle at once** | L | A walk onto an enemy army or a storm opens a battle at once (`Battles.engage` reused); the battle can be idle (save: battle/2 and the format number); luck order; "stop when an enemy comes into sight"; unseen armies; refusal words | M7 4.6, 4.8; battle replay tests; save and snapshot tests; the audit's 4.3 and 4.4 updated |
-| **C. The season and the computer** | L | The movement phase only walks standing marches with points left; the AI's march acts at once (same action), the seat order rotating; pill and replay of the computer's walks you can see; `Season`, `SeasonFlow` states (a flow with a battle in the player's turn); fair-warning rule kept | M8 4.2, 4.10, 6.2; `test_season`, AI door, `perf_core`, the soak |
+| **C. The season and the computer** | L | The movement phase only walks standing marches with points left; the AI's march acts at once (same action), the seat order rotating; pill and replay of the computer's walks you can see; `Season`, `SeasonFlow` states (a flow with a battle in the player's turn); fair-warning rule for every country, the player included (owner answer 2026-11-25) | M8 4.2, 4.10, 6.2; `test_season`, AI door, `perf_core`, the soak |
 | **D. The shell** | M | The live walk playback and skip; points-left mark on tokens and the army panel; preview lines and warnings; the confirm for risky moves; toasts, help line "Army moves are final" | the UI audit's unit and map parts; golden pictures; the UI test for the confirm |
 | **E. Proof** | M | Monkey invariants (points left, battle at idle, save then load); soak ranges measured and set again; the behaviour oracle re-based by hand; README rule text; the three build specs and the audit amended in the same change | `test_ui_monkey`, soak tool, nightly reports, README, CHANGELOG |
 
-Order against the rest: this goes **before** the battle board (the owner's answer 6), because the board's trigger moves
+Order against the rest: this goes **before** the battle board (the owner's answer 6, confirmed on 2026-11-25), because the board's trigger moves
 from the battles phase to the walk. Group B and the board share the saved battle record, so they are built together or B
 first. The M9 spec (next after M8) is read against group C for the AI's walks.
 
@@ -373,3 +379,14 @@ first. The M9 spec (next after M8) is read against group C for the AI's walks.
    by leg (the first leg at once, the rest a month at a time at End turn), stopping when an enemy comes into sight; the route
    stays drawn until done and a new command changes it. Fog applies per waypoint (deep-fog legs allowed with the movement
    penalty). Built by `docs/architecture/moves-build-spec.md` section 3.11 (R58 to R72, D29 to D37) and task MV19 of the plan.
+9. **Fair warning (2026-11-25):** the rule "no country may enter an enemy's land in the season it declares war" applies to every
+   country, the player included. The player gets a clear refusal text and a hint. Built by
+   `docs/architecture/moves-build-spec.md` section 3.12 (R73, D24) and task MV20.
+10. **Order (2026-11-25):** moves in the month (#432) ships before the battle board (#437). Until the board exists a battle is
+    fought automatically at the click and the battle dock shows the result (spec D39).
+11. **Several battles at End turn (2026-11-25):** "Auto all battles at the end of turn is a hit. Ask before it runs all, with a
+    notification that can be turned off." At End turn, when you have one or more battles to fight, the game asks once "Fight
+    your N battles automatically?" (Yes: all of them on Auto; No: play them on the board once it exists), with a "Don't ask
+    again" option that is turned back on in Options. This applies from the moves build on; before the board exists every
+    battle is automatic anyway, so the question first appears with the board. The setting, its Options row and the question
+    are built with this change and stay dormant until then (spec 3.12, R74, D40; task MV21).

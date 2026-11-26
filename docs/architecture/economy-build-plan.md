@@ -18,7 +18,7 @@ S is about half a day of one worker, M a day, L two days.
 
 | Group | Ships | Tasks | Effort |
 |---|---|---|---|
-| **Gate. The mockup** | the Workshops strip, the plaque bar, the Slots chip, locked and idle tiles, the workshop card with its Buy inputs switch, the arms banner; approved by the owner | EC0 | 1 M |
+| **Gate. The mockup** | the Workshops strip, the plaque count (no bar), the Slots chip, locked and idle tiles, the final workshop card with its Buy inputs switch and the coin badge, the arms banner; approved by the owner | EC0 | 1 M |
 | **A. Data and state** | three goods, three industries, the economy numbers, the fixture that keeps every old pin; slot arrays, the workshop work, the save format; flow and line names; the icons | EC1 to EC4 | 1 L, 1 M, 2 S |
 | **B. The rules, part 1** | slots and the workshop works, gates, tier, raw at hand, workers; the home market and arms for raising; the growth multiplier | EC5 to EC7 | 1 L, 2 M |
 | **C. The rules, part 2** | the season step (needs, works, comfort, sales, money); the read models of the tile window; words, events, log, stats | EC8 to EC10 | 1 L, 2 M |
@@ -69,7 +69,7 @@ prefix are under `godot/`; `tools/` (Python), `docs/`, `README.md`, `CLAUDE.md`,
 
 | ID | Size, who | Task | Files | Done when |
 |---|---|---|---|---|
-| EC0 | M, Haiku (art director leads, creative director reviews) | **The mockup** | an HTML mockup outside the repository (`mockups/`), shared as a private page | The owner's v4 Town tab with: the Workshops strip in its four moments (1480 all locked; 1485 one ready; a walled town with two built, one building, one idle; a city full), the plaque's count and bar on every strip, the Slots chip, every tooltip of spec 6.3, the workshop card with the Buy inputs switch, the Army tab's arms banner and a refused raise; the owner has approved it (open questions 3, 4 and 6 are answered on it) |
+| EC0 | M, Haiku (art director leads, creative director reviews) | **The mockup** | an HTML mockup outside the repository (`mockups/`), shared as a private page | The owner's v4 Town tab with: the Workshops strip in its four moments (1480 all locked; 1485 one ready; a walled town with two built, one building, one idle; a city full), the plaque's name and "N built of M" count on every strip (no bar), the Slots chip, every tooltip of spec 6.3, the Army tab's arms banner and a refused raise; and the **mockup of the final workshop card** (owner's choice, option A of the sketch "Buy Inputs Switch"): status, what it needs and makes per season, upkeep, the Buy inputs switch (on and off, default on), the line about the 1.2 times price and the country's treasury floor, "bought this season", and the tile's small coin badge while the workshop buys, with the switch's tooltips for both states; the owner has approved it (open question 6 is answered on it; 1, 3 and 4 are already answered) |
 
 ### Group A (parallel)
 
@@ -92,7 +92,7 @@ prefix are under `godot/`; `tools/` (Python), `docs/`, `README.md`, `CLAUDE.md`,
 
 | ID | Size, who | Task | Files | Done when |
 |---|---|---|---|---|
-| EC8 | L, Sonnet (technical director and systems designer read) | **The season step** | new `tests/core/test_workshop_season.gd`, `test_industry_numbers.gd`; edit `core/systems/economy_season.gd` (`goods_step` with food units, bread first up to the share, works, cloth comfort, sales; `reserve_for` for bread; `content_of` in units; `production` applying the moves in R36's order; `money_lines` and `income` with `upkeep_workshops` and `inputs_bought`; the floor), `data/defs/families/hemp.tres`, `silk.tres`, `dyes.tres`, `vineyard.tres`, `olives.tres` (`keep_wild` 0), `tests/core/test_economy_season.gd`, `test_money_property.gd`, `test_economy_genoa.gd`, `test_economy_1480.gd`, `test_family_defs.gd`, `test_economy_preview.gd` (only where `goods_step`'s new keys appear) | Spec R5, R30, R32 to R39, R41's inputs: the step order (P: works before needs); own then bought; the floor (P); the switch; the reserve never lowered by a workshop (P); needs met and reserve unchanged after the works step over 40 seeded seasons; bread as 1.5 units (P: one unit); cloth comfort; the move order never below 0; flows and money identities; upkeep only for working slots; bought input paid once (P); `test_industry_numbers.gd` pins every cell of the design's section 5 as integers; with the fixture off Genoa's table unchanged |
+| EC8 | L, Sonnet (technical director and systems designer read) | **The season step** | new `tests/core/test_workshop_season.gd`, `test_industry_numbers.gd`; edit `core/systems/economy_season.gd` (`goods_step` with food units, food by efficiency (bread first), works, cloth comfort, sales; `reserve_for` for bread; `content_of` in units; `production` applying the moves in R36's order; `money_lines` and `income` with `upkeep_workshops` and `inputs_bought`; the floor), `data/defs/families/hemp.tres`, `silk.tres`, `dyes.tres`, `vineyard.tres`, `olives.tres` (`keep_wild` 0), `tests/core/test_economy_season.gd`, `test_money_property.gd`, `test_economy_genoa.gd`, `test_economy_1480.gd`, `test_family_defs.gd`, `test_economy_preview.gd` (only where `goods_step`'s new keys appear) | Spec R5, R30, R32 to R39, R41's inputs: the step order (P: works before needs); own then bought; the floor (P); the switch; the reserve never lowered by a workshop (P); needs met and reserve unchanged after the works step over 40 seeded seasons; bread as 1.5 units (P: one unit); cloth comfort; the move order never below 0; flows and money identities; upkeep only for working slots; bought input paid once (P); `test_industry_numbers.gd` pins every cell of the design's section 5 as integers; with the fixture off Genoa's table unchanged |
 | EC9 | M, Sonnet | **The tile window's models** | new `tests/core/test_tile_workshops.gd`, `test_industry_fog.gd`; edit `core/views/tile_view.gd` (Slots chip with `tip`, `raw`, `workers`, `growth`, foreign slot buildings and count), `core/views/tile_buildings.gd` (the Workshops group, its rows and states including `idle`, `gate_of` from `kind`, `slots`, every group's `workforce` and `tip`, each row's `tip`), `core/views/tile_army.gd` (the arms banner), `core/views/company_card.gd` (the arms line), `core/views/map_modes.gd` (`food_year` with the bakery), `tests/core/test_tile_view.gd`, `test_tile_buildings.gd`, `test_tile_army.gd`, `test_company_card.gd`, `test_tile_fog.gd`, `test_tile_door.gd`, `test_fog_exact.gd`, `test_map_modes.gd` | Spec R24, R53 to R60's model fields, section 6.1 and the words of 6.3 (from the models: P a word built elsewhere), section 7: Genoa through 1480, 1485, 1490, 1520; a ready row for a closed industry (P); a hammer against its check over every row of three settlements (P); bar values within max (P); the twin test with slots (P); no output of a foreign slot (P); workshop row gains stay `null` until EC11 (the tab shows no number) |
 | EC10 | M, Sonnet | **Words, events, log and stats** | new `core/views/log_lines_industry.gd`; edit `core/game/season.gd` (the `calendar` row calls `Industry.season_news`), `core/views/log_lines.gd` (dispatch only), `core/state/chronicle.gd` (`industry_opened` notable), `core/state/stats.gd` (SERIES appended), `core/systems/stats_system.gd` (the new series), `shell/autoload/session.gd` and `shell/autoload/events.gd` (the two events), `tests/core/test_log_lines.gd`, `test_stats.gd`, `test_chronicle.gd`, `test_season.gd` (names unchanged; the news case) | Spec R41, D19, the events of section 4: one `industry_opened` per industry per game in its year's first season (none in a sandbox); log lines for workshop works, `buy_inputs_set` and the openings; the stats columns filled and an older stats dict loading with zeros; the phase names unchanged |
 
@@ -108,7 +108,7 @@ prefix are under `godot/`; `tools/` (Python), `docs/`, `README.md`, `CLAUDE.md`,
 | ID | Size, who | Task | Files | Done when |
 |---|---|---|---|---|
 | EC12 | L, Sonnet (technical director reads the prior) | **The AI** | new `tests/core/test_ai_industry.gd`; edit `core/ai/ai_economy.gd` (workshop options in `_scan_hex`, their prior, the weights, the siting priority and slot value), `core/ai/ai_know.gd` (`workshop_options`, `input_surplus`, `slots_seen`, `arms_quote`: the door), `core/ai/ai_forces.gd` (priced raises), `core/ai/ai_war.gd` (the arms blocker line, the prize term), `core/ai/ai_turn.gd` (the `buying` step after `works_act`), `core/defs/ai_temper_def.gd` (`industry_priority`), `core/defs/ai_def.gd` (`arms_priority`, `at_hand_priority`, `slot_value`, `war_arms_companies`, `industry_value`), `data/defs/tempers/*.tres`, `data/defs/ai.tres`, `tests/core/test_ai_economy.gd`, `test_ai_turn.gd`, `test_ai_war.gd`, `test_ai_door.gd`, `test_ai_fog.gd`, `test_ai_determinism.gd`, `test_ai_forces.gd` | Spec R64 to R69: the prior on four fixture towns (own wool, bought only, a loss: 0, an upgrade); the weights table; siting priority; the buying step's switches and the armourer's exception; a raise priced with arms never refused for money (P); the blocker line and peace still made at war; the prize term; the traces; the door scan lists the new reads; the fixture games' determinism digests unchanged (P: the blocker firing under the fixture) |
-| EC13 | L, Sonnet | **The Town tab and the workshop card** | new `tests/shell/test_town_workshops.gd`, `tests/shell/test_workshop_card.gd`; edit `shell/panels/tile_tabs/building_strips.gd`, `shell/ui/building_row.gd`, `shell/ui/strip_cells.gd`, `shell/panels/tile_tabs/land_facts.gd`, `core/views/building_card.gd` (the workshop sections), `shell/screens/works_preview.gd` (the workshop section and the switch), `shell/app/works_flow.gd` (`workshop_card`), `tools/build_theme.gd`, `shell/ui/theme.tres`, `shell/ui/theme_high_contrast.tres` (`PanelTileTileIdle`), `tests/shell/test_town_tab_strips.gd`, `test_building_row.gd`, `test_tile_window_tips.gd`, `test_works_preview.gd`, `test_works_flow.gd`, `tests/core/test_building_card.gd` | Spec R55 to R57, R59, R61, section 6.2 against the approved EC0 mockup: the Workshops strip, plaque count and bar with tooltips, the idle tile, locked tiles' words, the Slots chip, the raw, workers and growth lines; a click on a built tile opens the card (P: on a foreign tile); the switch acts through `Session.act` (P); no word formatted in the shell (P); `build_theme.gd --check` green |
+| EC13 | L, Sonnet | **The Town tab and the workshop card** | new `tests/shell/test_town_workshops.gd`, `tests/shell/test_workshop_card.gd`; edit `shell/panels/tile_tabs/building_strips.gd`, `shell/ui/building_row.gd`, `shell/ui/strip_cells.gd`, `shell/panels/tile_tabs/land_facts.gd`, `core/views/building_card.gd` (the workshop sections), `shell/screens/works_preview.gd` (the workshop section and the switch), `shell/app/works_flow.gd` (`workshop_card`), `tools/build_theme.gd`, `shell/ui/theme.tres`, `shell/ui/theme_high_contrast.tres` (`PanelTileTileIdle`), `tests/shell/test_town_tab_strips.gd`, `test_building_row.gd`, `test_tile_window_tips.gd`, `test_works_preview.gd`, `test_works_flow.gd`, `tests/core/test_building_card.gd` | Spec R55 to R57, R59, R61, section 6.2 against the approved EC0 mockup: the Workshops strip, plaque name and count with tooltips (no bar), the coin badge, the idle tile, locked tiles' words, the Slots chip, the raw, workers and growth lines; a click on a built tile opens the card (P: on a foreign tile); the switch acts through `Session.act` (P); no word formatted in the shell (P); `build_theme.gd --check` green |
 | EC14 | S, Sonnet | **Arms on the Army tab** | edit `shell/panels/tile_tabs/army_tab.gd`, `shell/screens/raise_screen.gd`, `shell/ui/company_row.gd`, `tests/shell/test_army_tab.gd`, `test_raise_screen.gd` | Spec R60 shown: the arms banner when present; the arms part of each row's line; the refused row's words; the card's arms line |
 | EC15 | M, Sonnet | **Study, report and reminders** | new `core/views/summary_industry.gd`; edit `core/views/study_economy.gd` (19 goods, the three columns, the Industries list), `core/views/season_summary.gd` (calls `SummaryIndustry` only), `core/views/reminders.gd` (the opening reminder), `core/views/study_people.gd` (the growth word), `core/views/cards_economy.gd` (the new lines' cards), `shell/screens/study_pages.gd` (the Industries list and columns, if the page lays them out), `tests/core/test_study_economy.gd`, `test_season_summary.gd`, `test_reminders.gd`, `test_study_people.gd`, `test_cards_economy.gd`, `tests/shell/test_study.gd` | Spec R63: the columns and the list (open, "opens in 1490"); the treasury page's three lines; "Industry added +64 this year" equal to the year's crafted worth less the input's worth and the upkeep; the reminder for four seasons after an opening with a free slot, gone when built; `season_summary.gd` grows by its call lines only |
 | EC16 | S, Sonnet | **Map marks** | new `core/views/workshop_marks.gd`, `shell/map/workshop_marks.gd`, `tests/core/test_workshop_marks.gd`, `tests/shell/test_workshop_marks_layer.gd`; edit `shell/map/map_scene.gd` (adds the layer) | Spec R62, section 7: one mark per working slot beside its settlement; none on undiscovered hexes (P) or for idle slots; the layer redraws on `game.version` only |
@@ -225,8 +225,8 @@ EC18's pull request.
 **The owner's playtest** (Windows, fresh user folder):
 
 1. New game, Italy 1480, play as Genoa. Click Genoa: the Town tab shows a **Workshops** strip with three locked tiles
-   ("opens in 1485", "1490", "1495"), the plaque "0 / 4 slots" and the **Slots** chip "0 / 4". Hover each tile and the plaque.
-2. The Land and Settlement strips' bars and their tooltips (workers; people of room). The land facts' raw and workers lines.
+   ("opens in 1485", "1490", "1495"), the plaque "0 built of 4" and the **Slots** chip "0 / 4". Hover each tile and the plaque.
+2. The plaques show the category name and "N built of M" only (no bar, by the owner's answer). The land facts' raw and workers lines.
 3. Army tab at Genoa: the arms banner. Raise pikemen until the stores' 2 arms are used: the next one says "1 bought, 14
    ducats". Spend the treasury down and try again: the refusal line names arms, stores and ducats.
 4. Play to Spring 1485: the log says the armourer's craft is open. Build an armourer: the job line shows it; Cancel gives the
@@ -278,7 +278,7 @@ EC18's pull request.
 
 | Default | Alternative |
 |---|---|
-| The owner's cut-off note on the Buildings tab is read as "category rows, each row a kind of building with its workforce on the tile": one wooden strip per category, a workforce bar on its plaque (spec D24, D25) | per-building workers on each tile; a separate Workers tab |
+| The owner's cut-off note on the Buildings tab is read as "category rows, each row a kind of building": one wooden strip per category with its name and "N built of M" on the plaque; the workers bar is deferred by the owner (2026-11-25), the `workforce` data stays (spec D24, D25) | per-building workers on each tile; a separate Workers tab; a bar |
 | Group order on the Town tab: Settlement, Workshops, Land, Harbour, Defence | Workshops last |
 | Workshop jobs 500 / 1,000 / 2,000 by stage, sharing the settlement's hands with the districts round it | free workers (no jobs); jobs from the town alone |
 | Upkeep by stage: weaver and armourer 2 / 3 / 5, bakery 1 / 2 / 4 (the design gives stage 2 only) | flat upkeep |
@@ -289,7 +289,7 @@ EC18's pull request.
 | The Buy inputs flag survives capture (the new owner inherits the switch) | reset to on |
 | Arms bought for a raise ignore the treasury floor | the floor for arms too |
 | Countries start with 2 arms each (the reserve) | no arms at the start |
-| Towns keep eating fish before grain (the code), bread first up to its comfort share (open question 1) | the design's grain, fish, then bread |
+| Towns eat the most efficient food first: bread (1.5 a load), then fish, grain (ties by fish before grain; owner's answer 2026-11-25, spec D9, R33) | the design's bread last; bread first up to 30 % |
 | Armies eat grain only (bread is for towns) | armies eat bread |
 | Cloth's comfort need: 0.05 loads a season per 1,000 town people (`need_milli` 50; a town of 10,000 uses 1 load a season) | no cloth need |
 | The growth word: slow under 700, steady under 1,000, fast from 1,000 | three bands from the soak |
@@ -302,20 +302,30 @@ EC18's pull request.
 
 ## 10. Open owner questions (each with a recommendation)
 
-1. **How towns eat bread.** The design eats bread last, which leaves its comfort (and so its effect on growth) at zero almost
-   always. *Recommend: towns eat bread first up to 30 % of their food, then fish and grain, then any other bread (spec D9).*
-   Alternative: bread last as the design (bread is then mostly a sale good and an emergency food).
+1. **How towns eat bread.** *Answered 2026-11-25, see below.*
 2. **Does the free refill of men need arms?** The owner said refit and upgrade need arms (N9); Godot has neither yet, only the
    free regaining of men in supply. *Recommend: refill stays free in M9.5; M11's refit and upgrade take arms (spec R49).*
    Alternative: refill takes 1 arms a season for every country that regains men (a small steady drain).
-3. **Where the Buy inputs switch lives.** *Recommend: on the workshop's card, opened by a click on its tile in the Workshops
-   strip (spec D27); on by default.* Alternative: a right-click on the tile toggles it, with a small mark on the tile when off.
-4. **The plaque bars.** For Land, Harbour and Workshops the bar is workers employed of the jobs; Settlement and Defence have no
-   jobs. *Recommend: Settlement shows people of its room, Defence its garrison of full; no bar where neither applies (spec
-   D25).* Alternative: bars only on strips with jobs.
+3. **Where the Buy inputs switch lives.** *Answered 2026-11-25, see below.*
+4. **The plaque bars.** *Answered 2026-11-25, see below.*
 5. **Cloth as a comfort need.** Comfort from cloth needs the towns to use some cloth, which then is not sold. *Recommend: towns
    use a little cloth (0.05 loads a season per 1,000 town people) after the workshops make it (spec D10).*
    Alternative: comfort from cloth counts cloth made, not used (towns consume none; simpler, but comfort then rewards
    making, not wearing).
 6. **The fourth chip on a settlement.** *Recommend: Slots "2 / 3" replaces Works on settlements; Works stays on other own land
    and in the hammer's refusals (spec D26).* Alternative: five chips on settlements.
+
+**Owner's answers, 2026-11-25 (questions 1, 3 and 4; questions 2, 5 and 6 stay open with their recommendations).**
+
+- **1. Eating order:** towns eat the **most efficient food first**: the edible goods by food value per load, highest first
+  (bread 1.5, then fish and grain 1.0); a tie goes to the lower `food_order` (fish before grain), then the lower good id, so
+  the order is fixed. It replaces both the design's "bread last" and the recommended "bread first up to 30 %" (spec D9, R33).
+  Consequences: bread's comfort is full whenever the stock holds 30 % of the need and proportional below, so it is never
+  zero; growth reads the surplus in units, which does not depend on the order; bread is sold only above the whole food need,
+  grain and fish last longer in the store; the soak gains `bread_eaten` and `bread_sold` and re-measures the bakery's payback
+  (EC8, EC17, EC20).
+- **3. The Buy inputs switch:** decided, option A of the sketch "Buy Inputs Switch": one switch per workshop on its own card,
+  opened by a click on its tile, default on, with a small coin badge on the tile while it buys. EC0 draws the final card
+  (spec D27, R61).
+- **4. The plaque bars:** nothing yet. Plaques show only the category name and "N built of M"; no workers bar; the
+  `workforce` data is kept and a bar is a later decision, not part of any done-when (spec D25, R56).

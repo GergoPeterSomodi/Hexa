@@ -52,7 +52,6 @@ const KEY_HINTS_LEFT := 12.0
 ## The Yields legend's top edge in the map area: 12 px under the bar, and this far under the F3 panel when that is open.
 const LEGEND_TOP := 12.0
 const LEGEND_GAP := 8.0
-const ROW_CARD_SCENE := preload("res://shell/ui/hover_card.tscn")
 
 @onready var _root: Control = $Root
 @onready var _top_bar: TopBar = $Root/Column/TopBar
@@ -77,7 +76,7 @@ const ROW_CARD_SCENE := preload("res://shell/ui/hover_card.tscn")
 @onready var _army_panel: ArmyPanel = $Root/Column/Main/Dock/ArmyPanel
 
 var _ctx: ShellContext = null
-var _row_card: HoverCard = null
+var _row_card: TileHoverCard = null
 var _any_screen := false
 var _settings: Settings = null
 var _bound_rig: CameraRig = null
@@ -492,19 +491,27 @@ func tile_window() -> TileWindow:
 	return _tile_window
 
 
-## Shows the hover card of a window row beside the window, level with the row (the tabs' row_hovered); the card is built once.
+## Shows the hover card of a window row beside the row, top-aligned with it and above the key-hint bar (the tabs' row_hovered;
+## issue 436 round 3, H5); the card is built once. Placed again a frame later, when its wrapped lines know their height.
 func show_row_card(card: Dictionary, anchor: Rect2) -> void:
 	var data := RowCard.hover_of(card)
 	if data.is_empty():
 		hide_row_card()
 		return
 	if _row_card == null:
-		_row_card = ROW_CARD_SCENE.instantiate() as HoverCard
+		_row_card = TileHoverCard.new()
 		_root.add_child(_row_card)
 	_row_card.show_card(data)
+	_place_row_card(anchor)
+	_place_row_card.call_deferred(anchor)
+
+
+func _place_row_card(anchor: Rect2) -> void:
+	if _row_card == null or not is_instance_valid(_row_card) or not _row_card.visible:
+		return
 	_row_card.reset_size()
-	_row_card.global_position = RowCard.place(anchor, _tile_window.get_global_rect(), _row_card.get_combined_minimum_size(),
-		_root.get_viewport_rect().size)
+	var floor_y := _key_hints.get_global_rect().position.y if _key_hints.is_visible_in_tree() else -1.0
+	_row_card.global_position = RowCard.place(anchor, _row_card.size, _root.get_viewport_rect().size, floor_y)
 
 
 ## Takes the row card away (the pointer or the keyboard left the row).
@@ -514,7 +521,7 @@ func hide_row_card() -> void:
 
 
 ## The row card's node, or null before the first hover (tests).
-func row_card() -> HoverCard:
+func row_card() -> TileHoverCard:
 	return _row_card
 
 

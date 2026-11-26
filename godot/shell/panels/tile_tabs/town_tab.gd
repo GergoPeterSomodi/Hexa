@@ -20,6 +20,7 @@ const FACTS := preload("res://shell/panels/tile_tabs/land_facts.gd")
 ## The gap between the strips and the facts, in logical pixels.
 const PART_GAP := 10
 const SIEGE_TITLE := "Under siege"
+const SIEGE_BY := "Under siege by %s"
 const SIEGE_BUTTON := "Show siege"
 
 ## The Settings the strips' hammer reads (game/confirm_works); the window passes App.settings(). Null: the shipped default.
@@ -70,15 +71,15 @@ func facts() -> TileTab:
 	return _facts
 
 
-## The siege block (mockup v4, 6): "Under siege", who besieges with how many men (or "Besieged" where the viewer may not know),
-## Show siege (the map looks at the hex), the meter of progress over need, the seasons and, where the viewer knows it, when the
-## place falls if not relieved.
+## The siege block (mockup v4, 6; issue 436 round 3, M5): "Under siege by <besieger>" where the viewer may know who (else "Under
+## siege"), the men under it, Show siege (the map looks at the hex), the meter of progress over need with a tick a season, the
+## season of the siege and, where the viewer knows it, "Falls in N seasons".
 func _siege_block(siege: Dictionary, hex: Vector2i) -> PanelContainer:
 	var box := PanelContainer.new()
 	box.name = &"SiegeBlock"
 	box.theme_type_variation = &"PanelTileSiege"
-	box.tooltip_text = "This place is under siege: %d of %d. It falls when the meter is full, unless an army relieves it." % [
-		int(siege.get("progress", 0)), maxi(int(siege.get("need", 1)), 1)]
+	box.tooltip_text = "This place is under siege: %s of %s. It falls when the meter is full, unless an army relieves it." % [
+		Words.number(int(siege.get("progress", 0))), Words.number(maxi(int(siege.get("need", 1)), 1))]
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 4)
 	box.add_child(column)
@@ -88,13 +89,13 @@ func _siege_block(siege: Dictionary, hex: Vector2i) -> PanelContainer:
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_theme_constant_override(&"separation", 0)
 	top.add_child(words)
-	words.add_child(PanelKit.label(SIEGE_TITLE, &"TileName"))
 	var besieger := str(siege.get("besieger_name", ""))
+	var title := PanelKit.label(SIEGE_BY % besieger if besieger != "" else SIEGE_TITLE, &"TileName")
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	words.add_child(title)
 	var men := str(siege.get("men_text", ""))
-	var by := "Besieged by %s" % besieger if besieger != "" else "Besieged"
-	var line := PanelKit.label(by + (" with %s" % men if men != "" and besieger != "" else ""), &"HintBad")
-	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	words.add_child(line)
+	if men != "" and besieger != "":
+		words.add_child(PanelKit.label("with %s" % men, &"TileHintBad"))
 	var look := Button.new()
 	look.theme_type_variation = &"ButtonTileAct"
 	look.text = SIEGE_BUTTON
@@ -109,16 +110,23 @@ func _siege_block(siege: Dictionary, hex: Vector2i) -> PanelContainer:
 	meter.show_percentage = false
 	meter.max_value = float(need)
 	meter.value = float(mini(progress, need))
-	meter.custom_minimum_size.y = 7.0
+	meter.custom_minimum_size.y = 8.0
 	column.add_child(meter)
+	var seasons := int(siege.get("seasons", 0))
+	var falls := int(siege.get("falls_in", -1))
+	if falls > 0:
+		# One tick a season of the whole siege as the viewer knows it: the seasons so far and those to its fall.
+		var ticks := TileGlyph.make(TileGlyph.TICKS, 0.0)
+		ticks.count = seasons + falls
+		meter.add_child(ticks)
+		ticks.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var foot := HBoxContainer.new()
 	column.add_child(foot)
-	var left := PanelKit.label("%d of %d · season %d" % [progress, need, int(siege.get("seasons", 0))], &"Hint")
+	var left := PanelKit.label("Season %s of the siege" % Words.number(maxi(seasons, 1)), &"TileHint")
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	foot.add_child(left)
-	var falls := int(siege.get("falls_in", -1))
 	if falls >= 0:
-		foot.add_child(PanelKit.label("Falls in %d season%s if not relieved" % [falls, "" if falls == 1 else "s"], &"HintBad"))
+		foot.add_child(PanelKit.label("Falls in %s season%s" % [Words.number(falls), "" if falls == 1 else "s"], &"TileHint"))
 	return box
 
 

@@ -3,7 +3,10 @@
 ## function that takes the viewer (Knowledge, PeopleView, WorksView, ArmyView.visible, BattleView.sites, MapModes.food_year,
 ## HexCard.war_rows_for, ...), never the player; the door scan (tests/core/test_tile_door.gd) keeps the names out of this file.
 ## Light (R1): no EconomyPreview base of its own and no raise check; the food line is MapModes.food_year, which the view cache
-## shares. Cached per game.version in game.view_cache under [&"tile", version, viewer, hex].
+## shares. Cached per game.version in game.view_cache under [&"tile", version, viewer, hex]. The own tile's income chip (issue 436
+## round 3, the owner's decision: this tile's income a year, not the treasury) is not in the light view: it reads the country's
+## worth of the four seasons ahead (EconomyPreview.worth_seasons_shared, the map hover's Worth line and the Yields mode share it),
+## so strip_cells adds it for the window and `of` stays light.
 @warning_ignore_start("integer_division")
 class_name TileView
 extends RefCounted
@@ -13,6 +16,9 @@ const SETTLEMENT_KINDS: Array[String] = ["", "hamlet", "village", "town", "walle
 const CASTLE_KIND := "castle"
 ## The food years of MapModes (its four seasons of a year).
 const FOOD_SEASONS := 4
+## The title of land with no place name: an owner's ("Land of Genoa"), or no one's (M2: not the ground word twice).
+const WILD_LAND := "Wild land"
+const LAND_OF := "Land of %s"
 
 
 ## The view of `hex` for `viewer` ("" sees all): {} off the map; see the module comment for the keys. An unexplored hex
@@ -92,7 +98,9 @@ static func _header(game: Game, viewer: StringName, hex: Vector2i, case_id: Stri
 		subtitle = "%s · hex %d, %d" % [HexCard.word(HexCard.DEPTH_WORDS, int(map.depth[i])), hex.x, hex.y]
 	else:
 		var ground := HexCard.cover_words(int(map.cover[i]))
-		title = place_name if place_name != "" else ground.capitalize()
+		title = place_name
+		if title == "":
+			title = LAND_OF % _short_name(game, owner) if owner != &"" else WILD_LAND
 		subtitle = "%s · hex %d, %d" % [ground, hex.x, hex.y]
 	var parts := PackedStringArray()
 	if not is_sea and family_id in [ImproveRules.SETTLEMENT, ImproveRules.CASTLE]:
@@ -181,6 +189,8 @@ static func _strip(game: Game, viewer: StringName, hex: Vector2i, case_id: Strin
 	match case_id:
 		&"own":
 			return _own_strip(game, viewer, hex)
+		&"sea":
+			return _sea_strip(game, viewer, hex)
 		&"foreign", &"unowned":
 			return _other_strip(game, viewer, hex)
 		&"sandbox":
@@ -192,13 +202,54 @@ static func _own_strip(game: Game, viewer: StringName, hex: Vector2i) -> Array:
 	var food := MapModes.food_year(game, viewer, hex)
 	var net := food.x - food.y
 	var slots := WorksView.slots(game, viewer)
-	var country := Countries.by_tag(game, viewer)
-	var ducats := country.treasury if country != null else 0
 	return [
 		_cell("people", _people_text(PeopleView.at(game, viewer, hex)), "People", &"plain"),
 		_cell("food", Words.signed(net), "Food", _sign_tone(net)),
-		_cell("works", "%d of %d" % [int(slots["used"]), int(slots["total"])], "Works", &"plain"),
-		_cell("ducats", Words.number(ducats), "Ducats", &"plain"),
+		_cell("works", "%s of %s" % [Words.number(int(slots["used"])), Words.number(int(slots["total"]))], "Works", &"plain"),
+	]
+
+
+## The chips the window shows: the view's strip, and on own land the tile's income a year as the fourth (see the module comment).
+static func strip_cells(game: Game, viewer: StringName, hex: Vector2i, view: Dictionary) -> Array:
+	var cells: Array = (view.get("strip", []) as Array).duplicate()
+	if StringName(str(view.get("case", ""))) == &"own":
+		cells.append(income_cell(game, viewer, hex))
+	return cells
+
+
+## The own tile's income a year: what the hex gives in the four seasons ahead (its goods at price, its dues and taxes, less its
+## upkeep and walls), as the map hover's Worth line sums it. 0 for a hex that gives and costs nothing.
+static func income_cell(game: Game, viewer: StringName, hex: Vector2i) -> Dictionary:
+	var year := 0
+	var i := game.map.index_of(hex)
+	var worth := EconomyPreview.worth_seasons_shared(game, viewer, FOOD_SEASONS)
+	var hexes: PackedInt32Array = worth.get("hexes", PackedInt32Array())
+	var h := hexes.bsearch(i)
+	if h < hexes.size() and hexes[h] == i:
+		var seasons := int(worth["seasons"])
+		var values: PackedInt32Array = worth["worth"]
+		for k: int in seasons:
+			year += values[h * seasons + k]
+	return _cell("income", Words.signed(year), "Income a year", _sign_tone(year))
+
+
+## The sea's chips (M6): the depth, the winter, and who holds the coast beside it (a discovered land neighbour's owner; "-"
+## when no one's or no land is known).
+static func _sea_strip(game: Game, viewer: StringName, hex: Vector2i) -> Array:
+	var i := game.map.index_of(hex)
+	var coast := "-"
+	for d: int in 6:
+		var n := ImproveRules.neighbour(hex, d)
+		if not game.map.has(n) or not game.map.is_land(n) or not Knowledge.discovered(game, viewer, n):
+			continue
+		var owner := Territory.owner_tag(game, n)
+		if owner != &"":
+			coast = _short_name(game, owner)
+			break
+	return [
+		_cell("depth", HexCard.word(HexCard.DEPTH_WORDS, int(game.map.depth[i])), "Depth", &"plain"),
+		_cell("winter", HexCard.word(HexCard.CLIMATE_WORDS, int(game.map.climate[i])), "Winter", &"plain"),
+		_cell("coast", coast, "Coast held by", &"plain"),
 	]
 
 
@@ -207,7 +258,7 @@ static func _other_strip(game: Game, viewer: StringName, hex: Vector2i) -> Array
 	var garrison := Knowledge.garrison_known(game, viewer, hex)
 	var garrison_text := "-"
 	if garrison["access"] == &"exact":
-		garrison_text = "%d/%d" % [int(garrison["men"]), Occupation.garrison_full(game, hex)]
+		garrison_text = "%s of %s" % [Words.number(int(garrison["men"])), Words.number(Occupation.garrison_full(game, hex))]
 	var sight := sight_of(game, viewer, hex)
 	var armies_text := str(_armies_here(game, viewer, hex).size()) if sight == &"sight" else "fog"
 	return [

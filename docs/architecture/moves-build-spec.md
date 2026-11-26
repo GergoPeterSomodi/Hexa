@@ -4,7 +4,9 @@ Technical director, 2026-11-25. **Status: a proposal; no task starts before the 
 `docs/design/moves-in-the-month.md` ("the design") **as the owner answered it** in its last section (2026-11-24). Where the
 design's sections 2 to 6 say something else, the owner's answers win, and this page wins over both for the build. The tasks
 are in `moves-build-plan.md`. Appendix A lists every place in earlier specs that this page amends (those specs are not
-edited); Appendix B lists where the design and today's code disagree.
+edited); Appendix B lists where the design and today's code disagree. The owner's answers of 2026-11-25 (fair warning for
+every country, this build before the battle board, a prompt before the End season's battles run on Auto) are recorded in
+section 3.12 (R73, R74) and D24, D38 to D40.
 
 Words: the game calls a turn a "season", the owner says "month"; this page says "season". "Move points" are the allowance
 the design calls "points".
@@ -16,8 +18,9 @@ march**, which the movement phase walks one leg a season from the next season on
 walk stops when an enemy army it did not see comes into sight (the points are kept), stops for good beside an enemy (zone of
 control), and steps slowly through land the country has never mapped. A step onto an enemy army opens the battle **in the
 same click**; until the battle board (issue 437) exists the battle is fought at once and its result is shown in the
-battle dock. The player moves first; at End season every computer seat moves the same way, through the same action. Risky
-moves (a battle, entering enemy land, ending out of supply) ask once. The picture of a walk plays live on the map and never
+battle dock (this build ships first, D39). The player moves first; at End season every computer seat moves the same way, through the same action. Risky
+moves (a battle, entering enemy land, ending out of supply) ask once; in the season a country declares a war none of
+its armies, the player's included, may enter that enemy's land (R73). The picture of a walk plays live on the map and never
 changes the result.
 
 **The moves build is done when:**
@@ -40,6 +43,9 @@ changes the result.
 9. Multi-leg marches (owner request 2026-11-25, section 3.11, R58 to R72): Shift+left click stages stops, the preview and the
    commit run through them, one `march` with `via` walks the whole route season by season, the stops survive a save, and the
    AI never uses them (`test_march_via.gd`, `test_via_preview.gd`, `test_waypoints.gd`, I9 and I10).
+10. The owner's answers of 2026-11-25 (section 3.12, D24, D38 to D40): fair warning holds for every country, the player
+   included (R73, `test_fair_warning.gd`), and the End season prompt, its setting and its Options row are built and dormant
+   until the board (R74, `test_auto_battles_prompt.gd`).
 
 ---
 
@@ -100,11 +106,11 @@ changes the result.
 | D21 | A battle you open, before the board | After its walk has played, the battle dock opens on its record (read-only stepper, as a badge click does) | "I see what happened at once" (the design 1) without building the board |
 | D22 | Saves | `SaveFile.FORMAT` **8**, `OLDEST_FORMAT` 8, no upgrade step; `Army.SCHEMA` `army/3` | Two new army fields enter the digest, so a format-7 file would load as "damaged"; a format-7 action log means something else under the new rules; no Godot save has reached players (fog D16's reasoning) |
 | D23 | Luck | At-once battles draw `game.luck.world` inside the act, in act order; checks, previews, views and pauses draw nothing (pinned) | The action log fixes the order of every draw (the design 3) |
-| D24 | Fair warning (M8 D23) | Stays a rule of the AI only (default); open owner question Q1 | Not asked; changing the player's war start is the owner's call |
+| D24 | Fair warning (M8 D23) | A rule of **every** country, the player included (owner answer 2026-11-25): in the season a country declares a war none of its armies may enter that enemy's land; one check shared by both walks and the order's checks (R73). The AI keeps its candidate filter (M8 D23) and meets the check only as a backstop | The owner's rule that the computer follows the same rules, both ways; it keeps the player's first move from being a free surprise attack |
 | D25 | Option A of the design (one move a season) | **Not built**: no `moves_per_season` switch | The owner chose B; a switch nobody uses is dead code |
 | D26 | Sight after a walk | `Sight.refresh` (the whole army part) once at the walk's end; the per-step sight test reads the walker's own disc only. Fallback (section 9): an incremental refresh | Simplest correct; `Sight.refresh` is a loop over the armies |
 | D27 | Explored along an at-once walk | The steps only (radius 0), as the phase (fog R8); the rings come with the vision phase | One explored rule for both walks; D9's pace depends on it |
-| D28 | Task IDs | `MV0` to `MV18` (and `MV19`, D37) | M, MOV and W are taken or ambiguous |
+| D28 | Task IDs | `MV0` to `MV18` (and `MV19`, D37; `MV20` and `MV21`, D38) | M, MOV and W are taken or ambiguous |
 | D29 | What a stop is (multi-leg, owner request 2026-11-25) | A **stop is a place the route must pass, not a place the army halts**: the stops and the goal are one longer route walked under one allowance, season by season, by the same engine (`MarchLeg`). The army does not stop at a stop; it halts only for the reasons it halts today | "First leg at once, the rest per month" is exactly R5 applied to the longer route; separate orders per leg would ask a confirm and wait a season at every stop |
 | D30 | How the order carries the stops | `march` gains an optional `via` (list of hexes, in order, the goal not included); **no new action name**; `march_check` and `march` stay a pair | A second action would double the checks, the AI door, the log grammar and `random_player.gd`; an empty or missing `via` is today's march byte for byte |
 | D31 | Where the stops are stored | `Army.via` (hex indices of the stops not yet reached, the goal not in it), a third new field of `army/3` beside `points` and `season_from`; written only by `Armies.set_order`. **Fits `army/3` and FORMAT 8**: `army/3` is unbuilt, so MV19 edits it in place; if a FORMAT 8 build has reached players by then, MV19 bumps to 9 (`OLDEST_FORMAT` 9) and says so | The route alone loses the stops (a re-plan would cut across them), and the preview, the panel and the markers need them |
@@ -114,6 +120,9 @@ changes the result.
 | D35 | The computer | **No multi-leg for the AI** (default): its marches never carry `via`; `Army.via` is empty for every computer army | The AI plans destination by destination each season (`AiWar`, `AiForces`); stops give it nothing and cost soak time |
 | D36 | How many stops | `GameDefs.max_stops` = 6 (at most six stops before the goal, so at most seven legs) | A data value; the check and the shell read it |
 | D37 | Task IDs for this request | One task, `MV19`, in a new group D2 between D and E | It edits `map_armies.gd` and `move_card.gd`, which MV10 also edits, so it cannot be in group D |
+| D38 | Task IDs for the owner's answers of 2026-11-25 | `MV20` (fair warning, R73, group D) and `MV21` (the End season prompt's setting, row and widget, R74, group D2) | MV20 edits the checks and the walk in files no other group D task edits; MV21 edits `settings.gd` and the Options screen, which MV10 edits, so it follows group D |
+| D39 | Order against the battle board | Owner answer 2026-11-25: moves in the month (#432) ships **before** the battle board (#437). Until the board exists a battle fought on a click, and every battle at End season, is fought automatically and the battle dock shows the result (D10, D21) | The rule change is large and wants its own playtest; the board then lands on a tested trigger (section 7.1) and each can be judged alone |
+| D40 | Several battles at End season | Owner answer 2026-11-25 ("Auto all battles at the end of turn is a hit"): ask once "Fight your N battles automatically?" before they run; Yes runs them all on Auto, No plays them on the board; a "Don't ask again" box keeps the answer as a setting that Options turns back to ask (R74). Built here, dormant until the board (section 7.1) | The owner likes Auto for all battles but wants to be asked first, with the ask switchable off |
 
 ---
 
@@ -272,8 +281,8 @@ rule holds for the player's armies and the computer's alike.
   most `order_tries` steps a season, as today). P: a sighted halt that leaves the army halted for the season.
 - **R42** A later seat reads where an earlier seat's armies now stand through the live sight (`AiKnow`), as it reads anything.
   The brief stays made at the seat's start; only `seen` is refreshed (R41).
-- **R43** Fair warning (M8 D23) is unchanged: in the season a seat declares a war, its armies take no order into that enemy's
-  land (Q1 asks whether the player gets the same rule).
+- **R43** Fair warning (M8 D23) keeps the AI's candidate filter: in the season a seat declares a war, its armies take no order
+  into that enemy's land; the check of R73 backs it up for every country, the player included (owner answer 2026-11-25).
 - **R44** A turn stepped one step a frame equals the turn at once (`test_ai_turn.gd`, `test_ai_determinism.gd`), and the
   replay of the AI's records through `LogOrders` equals the live season, with at-once walks and battles in it. P: a step that
   reads the event queue (kept from M8).
@@ -422,6 +431,49 @@ rule holds for the player's armies and the computer's alike.
   (10, 9) by Novara (8, 9): 8 of 12 move points left."; a stored one: "... sets out for Pavia (10, 9) by Novara (8, 9) at the end
   of next season."; a halt on sight keeps the line of R52 and the panel says "Halted" with Continue (the stops kept). Only seen
   or discovered places are named. P: a toast that names a stop out of sight.
+
+### 3.12 Fair warning for every country, and the End season battle prompt (owner answers 2026-11-25)
+
+- **R73 Fair warning for every country, the player included.** In the season a country declares a war, none of its armies may
+  enter that enemy's land: a step onto a hex the enemy owns is not taken. The rule binds the country that declared the war, not
+  the one it was declared on (a war declared on you does not stop your armies). It holds for the player and for every computer
+  country alike, by one check shared by both walks (`WalkNow` and the movement phase) and by the order's checks. From the next
+  season on the land is open. Armies may still fight the enemy's armies on their own land and on unclaimed land.
+  - **The order.** `march_check`, `continue_march`'s check and `storm_check` refuse an order whose goal lies in that land, with
+    the words "You declared war on the Duchy of Milan this season. Your armies may not enter its land until next season." and a
+    hint line under it, "Hint: march to your own or unclaimed land, or wait for the next season." (the toast, the move card and
+    the confirm's refusal show both; the computer is refused with the same check and never meets it, because the AI keeps its
+    candidate filter, M8 D23).
+  - **The walk.** An order whose route crosses that land is accepted; the walk (at once, and in the movement phase of the same
+    End season) stops before the first hex of the enemy's land: `stopped` is `&"warned"`, the points are kept, the march stays
+    standing and no halt is set (as a zone of control, R25), so the army walks on in the next season. `MovePreview.to(...).leg`
+    gains the `why` value `&"warned"`; the move card shows the refusal or the stop in the warning tone with the hint; the toast
+    of R52 says "The Army of Turin stops at the border of the Duchy of Milan: you declared war this season."
+  - **Fog.** The words name only the country the walker's own country declared war on. An order's check reads the owner of a
+    hex only where the country has explored it; the walk tests the owner of the step it is about to take, as the other walk
+    stops do (R24), so no fact shows that the step would not show anyway. The technical director reads this at MV20's review.
+  - **The war's start.** The check reads the season the war began. MV20 first reads the war record: if it keeps the season, no
+    save changes; if it keeps only the year, MV20 adds the season to the record inside `army/3`'s FORMAT 8 edit (FORMAT 8 is
+    unbuilt, as D31) and says so in its pull request.
+
+  P: a march of the player into the land of a country it declared war on this season that is accepted or walks in; the same
+  march in the next season refused; a march of the country the war was declared on that is stopped; a computer army that enters
+  in the season it declares; a refusal without the hint.
+- **R74 The End season battle prompt (shell).** When the player is a side of one or more battles to fight in the End season,
+  one question is asked before they run: "Fight your N battles automatically?" ("Fight your battle automatically?" for one),
+  with the answers "Yes, fight automatically" and "No, I will play them" and a box "Don't ask again". Yes runs every one of them
+  on Auto (the defaults, logged as `battle_auto` once the board exists); No plays them on the battle board, in hex order. With
+  the box ticked the answer is kept as the setting `game/battles_at_end` (`ask` by default, `auto`, `board`; label "Battles at
+  End season"; a row in Options with the three words "Ask me", "Fight automatically" and "Play on the board" turns it back to
+  ask). The prompt is not shown when the board's own setting "Your battles" is Auto (battle-board-build-spec D19, R43), or when
+  `game/battles_at_end` is not `ask`. A setting is not game state: nothing is saved in the game or the log, and the prompt
+  draws no luck. **Built when:** this build (MV21) builds the setting, its Options row, the prompt widget (`AutoBattlesAsk`, on
+  `Confirm`) and their tests, with a seam `BattlesAtEnd.count(game, viewer)` that gives 0 until the board exists; so in a game
+  of this build no prompt appears (battles at End season, and battles on a click, are fought automatically as D10 says) and
+  the Options row stays hidden (`BattlesAtEnd.available()` is false). The battle board build (issue 437, BB7) gives `count` the
+  number of the player's battles waiting in the battles phase, gives No its effect and shows the Options row. P: a prompt
+  shown with a count of 0; a box ticked that does not keep the answer; a prompt shown with the setting `auto`; a prompt that
+  changes the game's digest.
 
 ---
 
@@ -599,7 +651,8 @@ holds the end), with the stops that were left.
 
 ### 7.1 The battle board (#437)
 
-The board replaces **how a battle's days are played**, not when a battle starts. What this build leaves for it:
+The board replaces **how a battle's days are played**, not when a battle starts. This build ships first (D39). What this build
+leaves for it:
 
 | Seam | In this build | What #437 does with it |
 |---|---|---|
@@ -610,6 +663,7 @@ The board replaces **how a battle's days are played**, not when a battle starts.
 | Luck | `game.luck.world` in act order (D23) | Unchanged: a day is drawn when played; a pause draws nothing |
 | Battles in End season (the computer attacks you in `ai_orders`; standing marches in the battles phase) | Fought automatically, as today | The flow pauses the computer's turn (an `AiTurn` step not done while a board battle is open) and the battles phase (`Season.run_to` / `run_from` of the audit) |
 | Points | Every army that fought has 0 (R27) | Unchanged |
+| The End season prompt (R74, D40) | The setting `game/battles_at_end`, its Options row (hidden), `AutoBattlesAsk` and `BattlesAtEnd.count` (0 until the board) are built by MV21; no prompt is shown, battles at End season are fought automatically | Gives `count` the number of the player's battles waiting in the battles phase, gives No its effect (play on the board) and shows the Options row (battle-board-build-spec D23, R47) |
 
 ### 7.2 The economy (M9.5 and M10)
 
@@ -653,6 +707,8 @@ with Savoy thin at radius 2 (`FogFixture.thin`). `ArmyFixture.spent(g, army, poi
 | `core/test_march_via.gd` (MV19) | R63 to R66, R70, R71: the check and the act agree for `via` (a bad leg refused with its prefix, too many stops, a stop equal to its neighbour); the joined route; the walk passes a stop without halting; a re-plan goes through the next stop; a unreachable stop halts with the words and Continue resumes; `halt` once keeps and twice clears `via`; save, load, save equal; `Replay.run` of a log with multi-leg marches equals the live digest; the log's JSON round trip keeps `via` | each of R63 to R66 and R70 |
 | `core/test_via_preview.gd` (MV19) | R59, R67, R68: legs, totals (the sum of the legs), seasons and arrival per leg; the whole route's `leg` and `risks`; the stored route's stops; the fog-safe words on `FogFixture.thin`; the cache by leg | a total that is not the sum; a skipped stop |
 | `shell/test_waypoints.gd` (MV19) | R58, R60 to R62: Shift+left stages, again on the last removes, with no army selects, refused while the season replay runs; the digest and version never change before the commit; right click and O commit the staged route; a refusal keeps the stops; Esc clears all (ladder rung); a new selection, End season, load and a new game clear; `V` at the cursor; the card's "March" and "Clear stops"; the storm refused with stops | each |
+| `core/test_fair_warning.gd` (MV20) | R73: the player's march into the land of a country it declared war on this season refused with the words and the hint; a route across that land walks to the border and stops (`warned`, points kept, no halt) and walks on next season; the same march the next season accepted; the country the war was declared on is not stopped; a computer country under the same check; the preview's `warned` line; check and act agree; the words name only the declared enemy | a march that enters in the declaration season; the player exempt; a refusal with no hint; the defender stopped |
+| `shell/test_auto_battles_prompt.gd` (MV21) | R74: the prompt's three answers and the box on a stub count; the setting kept and read back; no prompt with a count of 0, with `auto` or `board`, or with "Your battles" Auto; the Options row hidden while `available()` is false; the digest and the log unchanged | a prompt with a count of 0; a box that keeps nothing; a prompt that acts on the game |
 
 ### 8.2 Tests that move or change (and why)
 
@@ -761,9 +817,9 @@ stop and computes the risks only for the hovered hex; past `preview_via_ms`, the
   `walk_battle_ms` as the gate; north Italy is smaller, but the Europe map is not.
 - **The computer's turn gets slower and lumpier.** Each march walks and may fight inside one AI step. `walk_now_worst_ms` and
   `ai_step_worst_ms` watch it; a battle step past the frame budget is visible as one long frame of the pill.
-- **The player's first move.** The player strikes before the computer can move away; the computer answers at End season. With
-  fair warning AI-only (D24), a player can declare war and attack in the same click-season while the defender cannot answer:
-  Q1.
+- **The player's first move.** The player strikes before the computer can move away; the computer answers at End season. Fair
+  warning for every country (D24, R73) keeps the player from declaring a war and striking in the same season; the first
+  strike comes in the next season, after the defender has had its End season turn.
 - **Stop on sight changes End season's marches.** Standing marches that see a new enemy now halt instead of walking into it; the
   AI re-orders every season, the player gets a halt to answer. The soak's war ranges (battles a season, wars lost) are read
   again by the systems designer (MV11).
@@ -804,6 +860,7 @@ These sections are amended by this page; the old pages stay as written.
 | moves-in-the-month.md | 2.5 (Option A switch), 2.8 (deep fog refused), 3 ("the save format goes up once for both"; "behaviour oracle") | D25; owner answer 6 and D9; FORMAT 8 now, `battle/2` with #437; no Godot oracle (Appendix B) |
 | ui-and-controls-spec.md | 3.3 (the Esc ladder), 4.1 (the pointer actions), the key table | A rung `CLEAR_STOPS`; Shift+left click with an army selected stages a stop; the key `V` (R61, R62) |
 | m7-build-spec.md | 6.1 (Shift+right click storms) | Unchanged; refused while stops are staged (R60) |
+| m8-build-spec.md | D23, 4.2 (fair warning, a rule of the AI only) | A rule of every country, the player included; the AI keeps its filter and meets the check as a backstop (R73, D24) |
 
 ## Appendix B. Where the design and today's code disagree
 
@@ -815,7 +872,7 @@ These sections are amended by this page; the old pages stay as written.
 | 4 | Orders into never-discovered land are refused (2.8; replaced by owner answer 6) | No discovery gate: undiscovered goals are accepted and routed on the real map, at normal cost | The fog step penalty (D9) |
 | 5 | A blocked step onto an unseen army at peace gives the check's words "another country's army stands at ..." | The phase's `_cut` names the country whatever the sight | Fog-safe words in both walks (R24) |
 | 6 | The behaviour oracle is turned off and re-based by hand | The oracle (`tools/same_behaviour.py`) is the frozen Python game's; the Godot game has none | The proofs are the replay and digest tests, the soak and MV1's digest comparison |
-| 7 | Fair warning keeps the player from being struck in the season a war begins, and "the AI defender already has its turn before the walks" (M8 D23) | Fair warning is the AI's rule only; under at-once moves the defender has no turn before the player's walk | Q1 |
+| 7 | Fair warning keeps the player from being struck in the season a war begins, and "the AI defender already has its turn before the walks" (M8 D23) | Fair warning is the AI's rule only; under at-once moves the defender has no turn before the player's walk | Fair warning for every country (D24, R73): no army enters the declared enemy's land in the declaration season |
 | 8 | Points are given back in the calendar step | The season's refills are in `ready_units` (after `calendar`) | `ready_units` (R13) |
 | 9 | The season report and its "moves" are not discussed | `moved_from` is cleared at the movement phase's start, so at-once walks would vanish from the report | `season_from` (R40) |
 | 10 | Sight is refreshed for the moved army only | `Sight.refresh` rebuilds the army part of every country | Whole refresh at the walk's end, incremental only as the perf fallback (D26) |

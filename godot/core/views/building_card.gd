@@ -3,7 +3,8 @@
 ## the viewer's own land: {} for a hex that is not the tag's (R9); the sandbox (no countries) sees every hex. Pure core/views/
 ## code: no nodes, no engine calls, no writes. Its numbers come from ImprovePreview (the works card), Works and Improve.
 ## Sections are {head, lines: [[label, tone, text]]}; a section with no line is left out, and the cost lines are always
-## worked out from Works.cost_of, so a refused card keeps them.
+## worked out from Works.cost_of, so a refused card keeps them. Issue 436 round 3 (H5): `heading` is the card's action ("Upgrade
+## to city", "Build a vineyard"; the building's stage for a standing piece), `subheading` what stands now; all money is a year.
 class_name BuildingCard
 extends RefCounted
 
@@ -14,6 +15,7 @@ const HEAD_YEAR := "Each year it would"
 const HEAD_BUILT_YEAR := "Each year it makes"
 const HEAD_COST := "To build"
 const BUILT_TEXT := "It stands here."
+const SEASONS_A_YEAR := 4
 
 
 ## {title, kind, sections, verdict {ok, text, tone}}; {} for a hex the viewer may not see here, or a hex with nothing to show.
@@ -46,8 +48,15 @@ static func _offer(game: Game, tag: StringName, hex: Vector2i, action: StringNam
 	if not year.is_empty():
 		sections.append({"head": HEAD_YEAR, "lines": year})
 	sections.append({"head": HEAD_COST, "lines": _cost_lines(game, action, family, level_to, preview)})
+	var kind := _kind(family, level_to)
+	var heading := "Upgrade to %s" % kind.to_lower() if action == Works.UPGRADE else "Build: %s" % _capital(Words.piece_noun(
+		FamilyIds.NAMES[family]))
+	var now := Improve.piece_at(game, hex)
+	var subheading := _title(game, hex, family)
+	if action == Works.UPGRADE and not now.is_empty():
+		subheading = "Now: %s in %s" % [_kind(family, int(now["level"])).to_lower(), ImproveCardParts.named(game, hex)]
 	return {
-		"title": _title(game, hex, family), "kind": _kind(family, level_to), "sections": sections,
+		"title": _title(game, hex, family), "kind": kind, "sections": sections, "heading": heading, "subheading": subheading,
 		"verdict": _verdict(game, tag, preview, action, family, level_to),
 	}
 
@@ -66,16 +75,17 @@ static func _built(game: Game, tag: StringName, hex: Vector2i) -> Dictionary:
 	var year := _year_lines(game, preview, true)
 	if not year.is_empty():
 		sections.append({"head": HEAD_BUILT_YEAR, "lines": year})
+	var kind := _kind(family, int(piece["level"]))
 	return {
-		"title": _title(game, hex, family), "kind": _kind(family, int(piece["level"])), "sections": sections,
-		"verdict": {"ok": true, "text": BUILT_TEXT, "tone": TONE_GOOD},
+		"title": _title(game, hex, family), "kind": kind, "sections": sections, "heading": kind,
+		"subheading": _title(game, hex, family), "verdict": {"ok": true, "text": BUILT_TEXT, "tone": TONE_GOOD},
 	}
 
 
 ## The verdict line: the hammer's words when the row is ok, else the rule's own words in bad tone (a ducat refusal names the gap).
 static func _verdict(game: Game, tag: StringName, preview: Dictionary, action: StringName, family: int, level_to: int) -> Dictionary:
 	if bool((preview["verdict"] as Dictionary).get("ok", false)):
-		var words := "You can upgrade this: the hammer, or a click." if action == Works.UPGRADE else "You can build this: the hammer, or a click."
+		var words := "You can upgrade this: click the tile." if action == Works.UPGRADE else "You can build this: click the tile."
 		return {"ok": true, "text": words, "tone": TONE_GOOD}
 	var text := str(preview.get("reason_words", ""))
 	if StringName(preview.get("blocked_by", &"")) == &"ducats":
@@ -125,10 +135,10 @@ static func _year_lines(game: Game, preview: Dictionary, built: bool) -> Array:
 	if built:
 		gain = -gain
 	out.append(["Profit a year", _tone(gain), Words.signed_ducats(gain)])
-	var upkeep := int(lands["upkeep"])
+	var upkeep := int(lands["upkeep"]) * SEASONS_A_YEAR
 	if built:
 		upkeep = -upkeep
-	out.append(["Upkeep a season", _tone(-upkeep), Words.signed_ducats(-upkeep)])
+	out.append(["Upkeep a year", _tone(-upkeep), Words.signed_ducats(-upkeep)])
 	return out
 
 

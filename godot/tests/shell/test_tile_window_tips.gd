@@ -103,7 +103,11 @@ func _walk(node: Node, where: String) -> int:
 		elif c is Button and ((c as Button).text == "" or (c as Button).disabled):
 			assert_ne(c.tooltip_text, "", what + " (an icon or a greyed button) has a tooltip")
 			count += 1
-		elif c.name == &"Stars" or c.name == &"Food":
+		elif node is SettlementEmblem:
+			# Issue 436 round 3: the settlement type's emblem replaced the stars; it names the type on hover.
+			assert_ne(c.tooltip_text, "", what + " (the emblem) names the type")
+			count += 1
+		elif c.name == &"Stars" or c.name == &"Food" or c.name == &"HexCell" or c.name == &"QueueNote":
 			assert_ne(c.tooltip_text, "", what + " has a tooltip")
 			count += 1
 	for child: Node in node.get_children():

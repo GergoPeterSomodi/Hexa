@@ -1,11 +1,12 @@
 # Battle board build plan: battles played day by day on a board (issue 437, with 438)
 
 Technical director, 2026-11-25. **Status: a proposal; nothing starts before the owner's go; no build task before the
-mockups (BB0) are approved and the open questions of section 9 are answered.** Builds
+mockups (BB0) are approved and the open questions of section 9 (1, 3 and 5, each with its recommendation as the default) are answered; the owner answered
+2 and 4 on 2026-11-25.** Builds
 `docs/architecture/battle-board-build-spec.md` ("the spec").
 
 **When it runs.** After the moves build (issue 432, `docs/design/moves-in-the-month.md`; the owner's answer 6: decide 432
-before the board). Group A may start once the moves build's spec is approved, because it touches only the fight and the
+before the board; confirmed on 2026-11-25: moves ships first, and until the board exists battles are fought automatically). Group A may start once the moves build's spec is approved, because it touches only the fight and the
 season's battles phase; group B and the later groups wait until the moves build has merged its walk and its `Battles.engage` call at idle
 (the spec's section 3.6). Before M9.5 and M9. It changes no balance number: with default orders every fight is M7's
 (the spec's done-when 2), so the AI, the soak and the bands do not move. It changes the save format (spec R45).
@@ -20,11 +21,11 @@ S is about half a day of one worker, M a day, L two days.
 
 | Group | Ships | Tasks | Effort |
 |---|---|---|---|
-| **Gate. The mockups** | six mockups approved by the owner (spec Appendix B); the answers of section 9 | BB0 | 1 M |
+| **Gate. The mockups** | six mockups approved by the owner (spec Appendix B); the answers of section 9 (1, 3 and 5) | BB0 | 1 M |
 | **A. The fight's seam** | the split of `Combat` with orders, the identity proved over 500 seeds; the battles phase sliced; the perf baseline | BB1, BB2, BB3 | 1 L, 1 M, 1 S |
 | **B. The live battle** | `battle/2`, `BattleLive`, the two actions, the guard, the wait in the phase | BB4 | 1 L |
 | **C. Saves, views, widgets** | the save and the replay; `BattlePlan`, `BattleMatchup`, `BattleRound`, `of_live`; the dock's parts as shared widgets | BB5, BB6, BB8 | 1 L, 2 M |
-| **D. The flow and the board** | Session's wait, the BATTLE state, the Options entry; the board screen | BB7, BB9 | 2 L |
+| **D. The flow and the board** | Session's wait, the BATTLE state, the Options entries and the End-turn question; the board screen (a window over the map) | BB7, BB9 | 2 L |
 | **E. Openers, soak, perf** | every way in; the `orders` soak suite; the perf rows | BB10, BB12, BB13 | 2 M, 1 S |
 | **F. Proofs and finish** | the monkey; pictures, goldens, docs | BB11, BB14 | 2 M |
 
@@ -65,7 +66,7 @@ under `godot/`; `tools/`, `docs/`, `README.md` at the repository root.
 
 | ID | Size, who | Task | Files | Done when |
 |---|---|---|---|---|
-| BB0 | M, the planning session's designer (Sonnet), the art director and the creative director review | **The mockups** | artifact pages, linked from the spec's Appendix B (no repository file) | MK1 to MK6 made at 1280 x 720 with a 2x crop, one battle throughout, code-drawn look, Studiolo tokens; reviewed; **approved by the owner**, his choices written into the spec (D4, D5, D18, D19 and the fill form of MK2) |
+| BB0 | M, the planning session's designer (Sonnet), the art director and the creative director review | **The mockups** | artifact pages, linked from the spec's Appendix B (no repository file) | MK1 to MK6 made at 1280 x 720 with a 2x crop, one battle throughout, code-drawn look, Studiolo tokens; reviewed; **approved by the owner**, his choices written into the spec (D4, D19, D23 and the fill form of MK2; D5 and D18 are decided) |
 
 ### Group A (parallel)
 
@@ -93,8 +94,8 @@ under `godot/`; `tools/`, `docs/`, `README.md` at the repository root.
 
 | ID | Size, who | Task | Files | Done when |
 |---|---|---|---|---|
-| BB7 | L, Sonnet | **The wait in Session, the BATTLE state, the Options entry** | edit `shell/autoload/session.gd` (`BATTLE_ACTIONS`, `waiting_battle`, the wait in `finish_step`, `battle_waiting` from `drain`, the resume on load), `shell/autoload/events.gd` (`battle_waiting`, `battle_day_fought`), `shell/app/season_flow.gd` (BATTLE, the two replays, `open_board`, `battle_done`, the report count), new `shell/app/board_hook.gd`, edit `shell/app/settings.gd`, `shell/screens/options.gd` (the `battles` entry), `shell/screens/pause_menu.gd` (Save allowed in BATTLE; the autosave skipped); edit `tests/shell/test_season_flow.gd`, `test_options.gd`, the settings test; new `tests/shell/test_battle_wait.gd` | Spec R43, R44 with a fake board callable: the state walk RUNNING, REPLAY, BATTLE, RUNNING, REPLAY, DECISIONS, REPORT (P: a report before the battle); act refuses everything but the battle actions in the wait (P); save in the wait then load resumes at the waited battle without re-running movement (P); the Options' Auto sends `battle_auto` at idle and the hook wants nothing (P) |
-| BB9 | L, Sonnet | **The board** | new `shell/screens/battle_board.gd`, `.tscn`, `shell/screens/battle/orders_strip.gd`, `fill_chooser.gd`, `target_chip.gd`, `round_card.gd`, `result_card.gd` and their tests; edit `shell/screens/screen_ids.gd` (`battle_board`), `shell/input/bindings.gd` (the board's actions); new `tests/shell/test_battle_board.gd`, `test_board_tips.gd`, `test_board_sizes.gd` | Spec R31 to R41 on the approved mockup: opened in its tests by `open_live` on a fixture battle; pending orders only on the board until Fight day (P); Fight day sends exactly the chosen parts (P); Esc asks (P); the hover walk (P); every label 15 or more and inside the viewport at the four sizes and both themes (P); keys (P: Space reaching End season); reduce motion |
+| BB7 | L, Sonnet | **The wait in Session, the BATTLE state, the Options entries, the End-turn question** | edit `shell/autoload/session.gd` (`BATTLE_ACTIONS`, `waiting_battle`, the wait in `finish_step`, `battle_waiting` from `drain`, the resume on load), `shell/autoload/events.gd` (`battle_waiting`, `battle_day_fought`), `shell/app/season_flow.gd` (BATTLE, the two replays, `open_board`, `battle_done`, the report count), new `shell/app/board_hook.gd`, edit `shell/app/settings.gd`, `shell/screens/options.gd` (the `battles` entry; the row "Battles at End turn" shown, built hidden by the moves build's MV21), `core/views/battles_at_end.gd` (`count` and `available`, from MV21), `shell/screens/auto_battles_ask.gd` (Yes sends `battle_auto`, No opens the board; MV21's widget), `shell/screens/pause_menu.gd` (Save allowed in BATTLE; the autosave skipped); edit `tests/shell/test_season_flow.gd`, `test_options.gd`, the settings test, `test_auto_battles_prompt.gd` (MV21's); new `tests/shell/test_battle_wait.gd`, `test_battle_prompt.gd` | Spec R43, R44, R47 with a fake board callable: the state walk RUNNING, REPLAY, BATTLE, RUNNING, REPLAY, DECISIONS, REPORT (P: a report before the battle); act refuses everything but the battle actions in the wait (P); save in the wait then load resumes at the waited battle without re-running movement (P); the Options' Auto sends `battle_auto` at idle and the hook wants nothing (P); the End-turn question: Yes sends `battle_auto` for each waiting battle in hex order, No opens the board, the box keeps the answer and Options sets it back to ask, no question with a count of 0 or with `auto` (P each) |
+| BB9 | L, Sonnet | **The board** | new `shell/screens/battle_board.gd`, `.tscn`, `shell/screens/battle/orders_strip.gd`, `fill_chooser.gd`, `target_chip.gd`, `round_card.gd`, `result_card.gd` and their tests; edit `shell/screens/screen_ids.gd` (`battle_board`), `shell/input/bindings.gd` (the board's actions); new `tests/shell/test_battle_board.gd`, `test_board_tips.gd`, `test_board_sizes.gd` | Spec R31 to R41 and R48 on the approved mockup (a window over the map and the dock column, no dock changed while it is up; no footer button for the other battles): opened in its tests by `open_live` on a fixture battle; pending orders only on the board until Fight day (P); Fight day sends exactly the chosen parts (P); Esc asks (P); the hover walk (P); every label 15 or more and inside the viewport at the four sizes and both themes (P); keys (P: Space reaching End season); reduce motion |
 
 ### Group E (after D, parallel)
 
@@ -109,7 +110,7 @@ under `godot/`; `tools/`, `docs/`, `README.md` at the repository root.
 | ID | Size, who | Task | Files | Done when |
 |---|---|---|---|---|
 | BB11 | M, Haiku | **The monkey** | new `tests/shell/monkey_board.gd`; edit `tests/shell/test_ui_monkey.gd` | Spec 7.4: invariants green on 3 seeds (one thin), counters above 0; a failure prints its replay line |
-| BB14 | M, Haiku (art director signs) | **Pictures, goldens, docs** | new `tools/ui/shot_ui_board.gd`; the regenerated goldens of the army panel, the Town tab's battle row and the dock; edit `README.md` (the board, its orders, Auto, the keys, the Options entry), `godot/README.md`, `CLAUDE.md` (the Godot port rules' list where it names the battle dock), `docs/architecture/ui-and-controls-spec.md` (bindings), `docs/design/ui-family-audit.md` (status: section 4 built, the amendments of spec Appendix A), `docs/architecture/m7-build-spec.md` is **not** edited (spec Appendix A is the record) | Spec 7.5: **the owner is asked before the windowed run**; pictures at the three sizes signed against the approved mockups; changed goldens reviewed side by side; README in plain words matching spec R29's prices and R41's keys |
+| BB14 | M, Haiku (art director signs) | **Pictures, goldens, docs** | new `tools/ui/shot_ui_board.gd`; the regenerated goldens of the army panel, the Town tab's battle row and the dock; edit `README.md` (the board, its orders, Auto, the keys, the Options entries, the End-turn question), `godot/README.md`, `CLAUDE.md` (the Godot port rules' list where it names the battle dock), `docs/architecture/ui-and-controls-spec.md` (bindings), `docs/design/ui-family-audit.md` (status: section 4 built, the amendments of spec Appendix A), `docs/architecture/m7-build-spec.md` is **not** edited (spec Appendix A is the record) | Spec 7.5: **the owner is asked before the windowed run**; pictures at the three sizes signed against the approved mockups; changed goldens reviewed side by side; README in plain words matching spec R29's prices and R41's keys |
 
 ---
 
@@ -137,7 +138,7 @@ The full table is spec 7.2; by task:
 
 **Monkey (BB11).** `MonkeyBoard` adds one step and its invariants to the fog monkey (spec 7.4): marches into enemy armies,
 random legal and illegal orders, Fight day, Auto, Esc and both answers, saves and loads at random dawns, End seasons that
-bring the computer's attacks, the Options' entry switched. Invariants each frame: nothing but the battle actions while a
+bring the computer's attacks, the End-turn question answered both ways, the Options' entries switched. Invariants each frame: nothing but the battle actions while a
 battle is live; Fight day disabled when the pending orders fail the check; the board shows the plan's numbers; the rebuilt
 luck equals the world's; days 0 to 8 and no more orders than days; save and load give the same digest and plan; the board
 inside the viewport; no board without a live or waited battle. Counters `board_days`, `board_autos`, `board_saves`,
@@ -165,7 +166,7 @@ the spec's fallback in BB13's pull request.
 **The owner's playtest** (Windows, fresh user folder):
 
 1. New game, Italy 1480, play as Savoy at war with Milan. March an army onto a Milanese army (the moves build's confirm
-   appears first). The board opens at once: both armies, the odds word, three empty lanes each offering its companies with
+   appears first). A board window opens over the map at once: both armies, the odds word, three empty lanes each offering its companies with
    the matchup words. Put the knights on a flank, the pikes in the centre; press Fight day.
 2. The round card says what each lane lost and why ("your pikes held their knights: +25 %"); the dice show. The next dawn
    keeps your stance.
@@ -176,9 +177,11 @@ the spec's fallback in BB13's pull request.
 7. Press Esc in a battle: "Fight the rest automatically?"; Keep fighting returns to the board.
 8. Save on day 2, quit, load: the same dawn and the same pending stance; Fight day gives the same day each time you reload
    (the dice are fixed by the save).
-9. Press End season with your army next to Milan's: Milan's march plays, then the board opens inside the season; save
-   there, load, finish it; the report counts your battles.
-10. Options: "Your battles: Auto": the next battle is only a toast with "Review".
+9. Press End season with your army next to Milan's: Milan's march plays, then the question "Fight your N battles
+   automatically?" appears (No: the board opens inside the season; save there, load, finish it; the report counts your
+   battles). With two battles, Yes runs both on Auto. Tick "Don't ask again" once and see the answer kept; Options' "Battles at
+   End turn" sets it back to "Ask me".
+10. Options: "Your battles: Auto": the next battle is only a toast with "Review" and the End turn asks nothing.
 11. Look at BB14's signed pictures.
 
 ---
@@ -205,7 +208,7 @@ the spec's fallback in BB13's pull request.
 | Two FORMAT bumps in one release (moves and board) | BB5 | D20: one bump when both ship together, agreed in BB5's pull request |
 | The board is too big for 1280 x 720 with 8 companies a side | BB9 | R39's test with a full battle; the mockup at that size first |
 | The triangle words read wrong | BB6 | computed from the hit's own factors, tested over every pair |
-| Battles tire the player | playtest | Auto, "Auto this season's other battles", the Options' Auto, D17 |
+| Battles tire the player | playtest | Auto, the End-turn question (Yes: all on Auto), the Options' Auto, D17 |
 | Windowed runs needed for pictures | BB14 | the owner's go first; every other task is headless |
 | The owner's earlier battle ideas (answer 5) arrive after the build starts | BB0, BB1 | section 9 Q1 is answered before group A; anything beyond stance, fills and targets goes to M24 (spec Appendix C) |
 
@@ -225,24 +228,32 @@ the spec's fallback in BB13's pull request.
 | Witnesses see a battle only when it is over (D14) | a live view for witnesses |
 | The board's text 15 logical or larger everywhere, lane labels included (R39) | 14 for lane labels |
 | The computer's side keeps M7's fixed stance and usual picks (D9) | see Q3 |
+| The board is a window over the shaded map, not the dock in live mode (owner answer 2026-11-25; D5, R48) | the dock in live mode, 420 px on the left |
+| Several battles in one End turn: one question before they run, Yes all on Auto, No the board, with a "Don't ask again" box and an Options row (owner answer 2026-11-25; D18, D23, R47); each board keeps "Auto this one" | an "Auto the rest" button on each board |
 
 ---
 
-## 9. Open questions for the owner (design and scope only)
+## 9. Questions for the owner (design and scope only)
+
+Questions 2 and 4 were answered on 2026-11-25 and are kept below as the record. **Still open: 1, 3 and 5**, each with its
+recommendation as the default.
 
 1. **The orders of v1.** You asked for the deeper version: stance, which reserve company fills an open lane, and targets
    for guns, and said you would share your earlier ideas again. Options: (a) those three, and anything more from your
    earlier ideas (rotation, width, back slots, cards) waits for M24; (b) add one more from your ideas now (name it).
    **Recommend (a):** the three are cheap on M7's model and each is a real choice; rotation and width change the battle's
    numbers and need their own balance pass.
-2. **The board's place (mockup MK1).** Options: (a) the battle dock in live mode, 420 px on the left with the map beside it;
-   (b) a board window over the shaded map, like the Python battle panel. **Recommend (b):** the line-up choosers, the gun
-   targets and the triangle words need the width, and it is the screen you asked to bring over.
+2. **The board's place (mockup MK1). ANSWERED 2026-11-25: (b), a board window over the shaded map, like the Python battle
+   panel.** The dock in live mode is dropped; the finished-battle dock stays the review (spec D5, R48).
 3. **Does the computer choose its stance day by day in your battles?** Options: (a) no, it keeps M7's fixed stance (results
    stay as measured); (b) a simple rule (Hold when ahead, Withdraw under 30 % front morale after day 2). **Recommend (a) for
    v1** and (b) after your playtest; (b) makes battles harder and moves the measured bands.
-4. **Several of your battles in one End turn.** Options: (a) each opens in turn, with "Auto this season's other battles"
-   beside "Auto to the end"; (b) each opens in turn, no extra button. **Recommend (a).**
+4. **Several of your battles in one End turn. ANSWERED 2026-11-25.** The owner's words: "Auto all battles at the end of turn
+   is a hit. Ask before it runs all, with a notification that can be turned off." So the "Auto the rest" button idea is
+   replaced: at End turn, when you have battles to fight, the game asks once "Fight your N battles automatically?" (Yes: all
+   on Auto; No: play them on the board), with a "Don't ask again" box and an Options row that turns it back on; each board
+   keeps its own "Auto this one" (Auto to the end). Spec D18, D23, R47; the setting and the widget are built earlier, by the
+   moves build's MV21, and stay dormant until this build.
 5. **An Options entry "Your battles".** Options: (a) Play on the board (default) or Auto; (b) no entry, the board always
    opens; (c) three values with "ask only when the odds are not Hopeless or Overwhelming". **Recommend (a):** your rule is
-   "play my battles, Auto one click away"; the entry costs little and helps a long war.
+   "play my battles, Auto one click away"; the entry costs little and helps a long war. (The End-turn question has its own row, "Battles at End turn": spec D23.)

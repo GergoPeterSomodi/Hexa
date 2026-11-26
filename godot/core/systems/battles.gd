@@ -392,8 +392,35 @@ static func season(game: Game) -> void:
 		Sight.refresh(game)
 
 
-## Fights one battle and keeps its record (the oldest records go past battle_records_kept).
-static func _fight(game: Game, b: Battle) -> void:
+## Fights one battle at once (moves-build-spec.md R26, D10), as a march or a storm does in the act: the battle leaves
+## game.battles, is fought and settled as the phase does (Combat.fight on input_of, BattleEnd.apply), its record is kept, and the
+## occupation is flushed and the sight refreshed. Returns the record's id; -1 for a draw by peace (the input the fight cannot
+## take, or a game without a war) where no day is fought and no record is made.
+static func fight_now(game: Game, battle: Battle) -> int:
+	if game == null or battle == null:
+		return -1
+	game.battles.erase(battle)
+	if game.map == null or game.defs == null or game.defs.war == null:
+		return -1
+	var id := _fight(game, battle)
+	Occupation.flush(game)
+	Sight.refresh(game)
+	return id
+
+
+## The armies of both sides of a battle that still exist: the attacker's, then the defender's, each in the order they came.
+static func armies_of(game: Game, battle: Battle) -> Array[Army]:
+	var out: Array[Army] = []
+	if game == null or battle == null:
+		return out
+	out.append_array(_battle_armies(game, battle, battle.attacker))
+	out.append_array(_battle_armies(game, battle, battle.defender))
+	return out
+
+
+## Fights one battle and keeps its record (the oldest records go past battle_records_kept). Returns the record's id, -1 when no
+## day was fought. The one private path of the phase and of fight_now.
+static func _fight(game: Game, b: Battle) -> int:
 	var war := _war(game)
 	var input := input_of(game, b)
 	var problems := CombatInput.validate(war, input, game.defs.units.size())
@@ -401,7 +428,7 @@ static func _fight(game: Game, b: Battle) -> void:
 		# Conservative: a battle the fight cannot take is ended as a draw (as end_all does), never dropped with its armies stacked.
 		push_warning("battle at %s ended as a draw, not fought: %s" % [_coords(b.hex), problems[0]])
 		BattleEnd.peace(game, b)
-		return
+		return -1
 	var luck_before := game.luck.world.get_state()
 	var result := Combat.fight(war, input, game.luck.world)
 	var id := game.next_record_id
@@ -410,6 +437,7 @@ static func _fight(game: Game, b: Battle) -> void:
 	game.battle_records.append(rec)
 	while game.battle_records.size() > war.battle_records_kept:
 		game.battle_records.remove_at(0)
+	return id
 
 
 ## Combat.fight's input for a battle, from the live state (4.6, 5.3): the ground of its hex, the sides' companies, the stances

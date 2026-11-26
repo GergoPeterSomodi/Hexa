@@ -4,6 +4,7 @@
 [ext_resource type="Script" path="res://shell/ui/settlement_picture.gd" id="2_picture"]
 [ext_resource type="Script" path="res://shell/ui/strip_cells.gd" id="3_strip"]
 [ext_resource type="Script" path="res://shell/panels/tile_tabs/job_line.gd" id="4_job"]
+[ext_resource type="Script" path="res://shell/panels/tile_header.gd" id="5_header"]
 
 [node name="TileWindow" type="PanelContainer"]
 custom_minimum_size = Vector2(440, 640)
@@ -13,6 +14,7 @@ theme_type_variation = &"PanelTileFrame"
 script = ExtResource("1_window")
 
 [node name="Content" type="Control" parent="."]
+unique_name_in_owner = true
 clip_contents = true
 layout_mode = 2
 mouse_filter = 2
@@ -31,6 +33,7 @@ mouse_filter = 2
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
+script = ExtResource("5_header")
 
 [node name="Bar" type="PanelContainer" parent="Content/Frame/Header"]
 unique_name_in_owner = true
@@ -46,12 +49,6 @@ mouse_filter = 2
 unique_name_in_owner = true
 custom_minimum_size = Vector2(76, 0)
 layout_mode = 2
-mouse_filter = 2
-
-[node name="Stars" type="Control" parent="Content/Frame/Header/Bar/TitleRow/Left"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 4
 mouse_filter = 2
 
 [node name="Title" type="Label" parent="Content/Frame/Header/Bar/TitleRow"]
@@ -90,25 +87,27 @@ mouse_filter = 2
 
 [node name="Subtitle" type="Label" parent="Content/Frame/Header/SubBand/SubRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(40, 0)
+custom_minimum_size = Vector2(24, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"TileSub"
+clip_text = true
 text_overrun_behavior = 3
 
 [node name="Place" type="Button" parent="Content/Frame/Header/SubBand/SubRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(40, 0)
+custom_minimum_size = Vector2(60, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.7
+size_flags_stretch_ratio = 2.6
 theme_type_variation = &"ButtonTileLink"
+clip_text = true
 text_overrun_behavior = 3
 
-[node name="Food" type="Label" parent="Content/Frame/Header/SubBand/SubRow"]
+[node name="HexCell" type="Label" parent="Content/Frame/Header/SubBand/SubRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_type_variation = &"HintGood"
+theme_type_variation = &"TileSub"
 horizontal_alignment = 2
 
 [node name="StripBand" type="PanelContainer" parent="Content/Frame/Header"]
@@ -137,20 +136,6 @@ custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_picture")
-
-[node name="FogBox" type="PanelContainer" parent="Content/Frame/Header/Postcard"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-mouse_filter = 2
-theme_type_variation = &"PanelTileFog"
-
-[node name="Fog" type="Label" parent="Content/Frame/Header/Postcard/FogBox"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_type_variation = &"TileFog"
-horizontal_alignment = 1
-vertical_alignment = 1
 
 [node name="BadgePad" type="MarginContainer" parent="Content/Frame/Header/Postcard"]
 layout_mode = 2
@@ -219,8 +204,8 @@ uppercase = true
 [node name="QueueNote" type="Label" parent="Content/Frame/WorkBand/Queue/QueueHead"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_type_variation = &"HintGood"
-text = "one work at a time"
+theme_type_variation = &"TileHint"
+text = "No work under way"
 
 [node name="QueueRow" type="PanelContainer" parent="Content/Frame/WorkBand/Queue"]
 unique_name_in_owner = true
@@ -235,7 +220,7 @@ mouse_filter = 2
 
 [node name="QueueNo" type="Label" parent="Content/Frame/WorkBand/Queue/QueueRow/JobRow"]
 layout_mode = 2
-theme_type_variation = &"Hint"
+theme_type_variation = &"TileHint"
 text = "1"
 
 [node name="WorkBox" type="HBoxContainer" parent="Content/Frame/WorkBand/Queue/QueueRow/JobRow"]
@@ -256,7 +241,7 @@ text_overrun_behavior = 3
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_type_variation = &"Hint"
+theme_type_variation = &"TileHint"
 horizontal_alignment = 2
 text_overrun_behavior = 3
 

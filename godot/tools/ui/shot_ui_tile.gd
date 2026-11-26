@@ -14,6 +14,11 @@
 ##   tile_deep             a deep-fog hex on the thin game ("Unexplored" only)
 ##   tile_own_army_1024, tile_own_town_1024
 ##                         the same window in a 1024 x 600 window
+##   tile_queue_idle       another own town of Genoa's with no work (the queue's idle line, issue 436 round 3 H2)
+##   tile_building         Genoa with its upgrade under way (the building tile's bar and hourglass, the queue's row and Cancel)
+##   tile_short            Genoa short of ducats (the short tile's red rim and "!", the line under the strip)
+##   tile_many             the Town tab with the 26-tile fixture of test_tile_window_strips.gd (the strips wrap)
+##   tile_own_town_folded  the Town tab with People and food and Made here folded (M8)
 ## Every scene prints the window's rect and the map's ("shot_ui_tile: <scene> ... window <rect> map <rect>"): the window is one
 ## size for all of them, and the map keeps its room.
 ##
@@ -40,8 +45,25 @@ const FRAMES_MAX := 1200
 const SCENES: Array[String] = [
 	"tile_own_town", "tile_own_town_facts", "tile_own_town_hover", "tile_own_army", "tile_own_ships", "tile_own_army_cap",
 	"tile_wild_town", "tile_castle_town", "tile_foreign_town", "tile_sight_town", "tile_sea_town", "tile_deep",
-	"tile_own_army_1024", "tile_own_town_1024",
+	"tile_own_army_1024", "tile_own_town_1024", "tile_queue_idle", "tile_building", "tile_short", "tile_many",
+	"tile_own_town_folded",
 ]
+const LAND_FACTS := preload("res://shell/panels/tile_tabs/land_facts.gd")
+## The 26-tile fixture's Town tab (as test_tile_window_strips.gd's).
+const MANY_STUB := """extends TileTab
+const ID := &"town"
+const LABEL := "Town"
+const ORDER := 10
+const STRIPS := preload("res://shell/panels/tile_tabs/building_strips.gd")
+static func applies(view: Dictionary) -> bool:
+	return str(view.get("case", "")) != "unexplored"
+
+func fill(game: Game, viewer: StringName, hex: Vector2i, _view: Dictionary) -> void:
+	var part := STRIPS.new() as TileTab
+	add_child(part)
+	part.call("fill_groups", game, viewer, hex, Engine.get_meta(&"tile_fixture_groups", []))
+"""
+const MANY_STATES: Array[StringName] = [&"built", &"building", &"ready", &"short", &"locked", &"refused"]
 ## The scenes played on the thin game (UiSample.fog): deep fog and light fog exist there.
 const THIN: Array[String] = ["tile_foreign_town", "tile_deep"]
 
@@ -88,7 +110,7 @@ func _runs() -> Array[Dictionary]:
 		var wh := at[0].split("x")
 		if wh.size() != 2:
 			continue
-		var ui := _auto_scale() if at.size() < 2 or at[1] == "auto" else float(at[1])
+		var ui := _auto_scale(int(wh[1])) if at.size() < 2 or at[1] == "auto" else float(at[1])
 		out.append({"name": "%s@%s" % [at[0], str(ui)], "phys": Vector2i(int(wh[0]), int(wh[1])), "ui": ui})
 	return out
 
@@ -180,6 +202,9 @@ func _capture_one(packed: PackedScene, scene_name: String, run: Dictionary, scal
 			crop = crop.intersection(Rect2i(Vector2i.ZERO, img.get_size()))
 			ok = ok and _save(img.get_region(crop), scale_dir.path_join("%s_win.png" % scene_name))
 
+	if Engine.has_meta(&"tile_fixture_groups"):
+		Engine.remove_meta(&"tile_fixture_groups")
+	LAND_FACTS.folded = {}
 	if session != null:
 		session.call("end_game")
 	root.remove_child(vp)
@@ -188,10 +213,12 @@ func _capture_one(packed: PackedScene, scene_name: String, run: Dictionary, scal
 	return ok
 
 
-## The UI scale the game picks on this screen with display/ui_scale "auto" (App._resolved_ui_scale's rule), printed.
-func _auto_scale() -> float:
+## The UI scale the game picks on this screen with display/ui_scale "auto" for a window `height` pixels tall (App._resolved_ui_scale's
+## rule, M9: the screen's scale or the height's, the larger), printed.
+func _auto_scale(height: int) -> float:
 	var scr := DisplayServer.get_primary_screen()
-	var scale := Display.resolve_ui_scale("auto", OS.get_name(), DisplayServer.screen_get_scale(scr), DisplayServer.screen_get_dpi(scr))
+	var scale := Display.resolve_ui_scale("auto", OS.get_name(), DisplayServer.screen_get_scale(scr), DisplayServer.screen_get_dpi(scr),
+		height)
 	print("shot_ui_tile: auto UI scale %s (screen scale %s, dpi %d)" % [str(scale), str(DisplayServer.screen_get_scale(scr)),
 		DisplayServer.screen_get_dpi(scr)])
 	return scale
@@ -221,7 +248,11 @@ func _prepare(app: Node, scene_name: String, session: Node) -> bool:
 		return false
 	var ms := app.call("map_scene") as Object
 	var picks: Dictionary = UiSample.fog(g) if THIN.has(scene_name) else {}
-	session.call("dev_money", GEN, DEV_MONEY)
+	LAND_FACTS.folded = {}
+	if scene_name == "tile_short":
+		session.call("dev_money", GEN, 150 - Countries.by_tag(g, GEN).treasury)
+	else:
+		session.call("dev_money", GEN, DEV_MONEY)
 	var hex := Vector2i(-1, -1)
 	var tab := &"town"
 	match scene_name:
@@ -229,6 +260,16 @@ func _prepare(app: Node, scene_name: String, session: Node) -> bool:
 			_raise(session, g, 1)
 			hex = GENOA
 			tab = StringName(scene_name.trim_prefix("tile_own_").trim_suffix("_1024").trim_suffix("_facts").trim_suffix("_hover"))
+		"tile_queue_idle":
+			hex = _find(g, func(view: Dictionary) -> bool:
+				return str(view.get("case", "")) == "own" and bool(view["army"]["raise_offered"]) and view["hex"] != GENOA)
+		"tile_building":
+			var verdict := session.call("act", "upgrade", {"hex": GENOA, "tag": GEN}) as Dictionary
+			if not bool(verdict.get("ok", false)):
+				printerr("shot_ui_tile: the upgrade at Genoa was refused: %s" % str(verdict.get("reason", "")))
+			hex = GENOA
+		"tile_short", "tile_many", "tile_own_town_folded":
+			hex = GENOA
 		"tile_own_army_cap":
 			_raise(session, g, RAISE_CAP)
 			hex = GENOA
@@ -261,6 +302,14 @@ func _prepare(app: Node, scene_name: String, session: Node) -> bool:
 	var window := (app.call("hud") as Object).call("tile_window") as Control
 	if window == null or not window.visible:
 		return false
+	if scene_name == "tile_many":
+		var stub := GDScript.new()
+		stub.source_code = MANY_STUB
+		if stub.reload() != OK:
+			return false
+		Engine.set_meta(&"tile_fixture_groups", _many_groups())
+		window.call("use_tabs", [stub] as Array[GDScript])
+		await _wait_frames(2)
 	var no_tabs := (window.call("tab_ids") as Array).is_empty()
 	if not no_tabs and window.call("tab_open") != tab:
 		if not bool(window.call("show_tab", tab)):
@@ -272,6 +321,10 @@ func _prepare(app: Node, scene_name: String, session: Node) -> bool:
 	await _wait_frames(2)
 	if scene_name == "tile_own_town_facts":
 		(window.get_node("%Scroll") as ScrollContainer).scroll_vertical = 100000
+	elif scene_name == "tile_own_town_folded":
+		var facts := (window.call("tab_node") as Object).call("facts") as Object
+		facts.call("set_folded", LAND_FACTS.HEAD_PEOPLE, true)
+		facts.call("set_folded", LAND_FACTS.HEAD_MADE, true)
 	elif scene_name == "tile_own_town_hover":
 		for tile: Control in window.call("building_rows") as Array:
 			if not (tile.call("hammer") as Button).disabled:
@@ -282,6 +335,26 @@ func _prepare(app: Node, scene_name: String, session: Node) -> bool:
 	print("shot_ui_tile: %s hex %s tabs %s live %s" % [scene_name, str(hex), str(window.call("tab_ids")),
 		str(window.call("live_tab_ids"))])
 	return true
+
+
+## The 26-tile fixture of test_tile_window_strips.gd: three groups of 12, 8 and 6 tiles in every state.
+func _many_groups() -> Array:
+	var out: Array = []
+	var n := 0
+	for spec: Array in [[&"settlement", "Settlement", 12], [&"land", "Land", 8], [&"harbour", "Harbour", 6]]:
+		var rows: Array = []
+		for i: int in int(spec[2]):
+			var state: StringName = MANY_STATES[n % MANY_STATES.size()]
+			rows.append({"id": "fixture:%d" % n, "group": spec[0], "name": "Fixture building %d" % n,
+				"icon": ["settlements", "wheat", "vineyard", "harbour", "mines", "timber"][n % 6],
+				"option": {} if state == &"built" or state == &"building" else {"action": &"build", "family": 1},
+				"state": state, "state_text": "opens in 1495" if state == &"locked" else "state line %d" % n, "tone": &"plain",
+				"progress": 0.5, "gain": null, "upkeep": null, "cost": {}, "build_seasons": 2, "payback": {},
+				"hammer": state == &"ready", "reason": "" if state == &"ready" else "a fixture reason", "gate": {},
+				"level": 2})
+			n += 1
+		out.append({"id": spec[0], "name": spec[1], "slots": {}, "rows": rows})
+	return out
 
 
 ## Raises `count` companies of pikemen at Genoa through the door (an army then stands on the town).

@@ -2,8 +2,9 @@
 ## applies and dimmed it keeps for its own tests; the file is no *_tab.gd, so the registry does not list it; tile-window spec R19,
 ## R20, D8, D14): shown where building is offered (own land, the sandbox). As the owner's mockup v4 draws it
 ## (after EU4 and EU5): one wooden strip per group of TileBuildings.of (Settlement, Land, Harbour, Defence), a plaque at its left
-## (the group's icon, its name, how many are built of the tiles shown) and its buildings as icon tiles at its right (BuildingRow:
-## built with its level, building, can build, short, locked); the words are in each tile's hover card. Under a strip, one red line
+## (two lines: the group's icon and name, then "N built of M" of the tiles shown) and its buildings as 40 px icon tiles at its
+## right (issue 436 round 3, the owner's decision: smaller tiles, so six fit a row before the strip wraps; BuildingRow: built with
+## its level, building, can build, short, locked, each with its own shape); the words are in each tile's hover card. Under a strip, one red line
 ## names what a short tile lacks. Above the strips, the summary line ("Buildings here make +N a year · upkeep -M"). The search box
 ## and the filter (All, Can build, Built) are kept for the keys and the tests but not shown: a tile has a handful of buildings
 ## until M9.5. The rows come first without their gains; the gains and the upkeep fill one row a frame (_process), then the
@@ -27,9 +28,9 @@ const SEARCH_HINT := "Search buildings"
 const NOT_YOURS := "Not your land"
 const WORKING_OUT := "Working out the year's gains"
 ## The plaque's width and the Kit icon of each group, from mockup v4.
-const PLAQUE_W := 116.0
+const PLAQUE_W := 120.0
 const GROUP_ICONS := {"settlement": &"settlement", "land": &"district", "harbour": &"port_dues", "defence": &"castle"}
-const TILE_GAP := 6
+const TILE_GAP := 5
 const GROUP_MEANINGS := {"settlement": "The settlement itself: its size and what it may grow into.",
 	"land": "What the land of this tile makes: fields, pastures, woods, mines.", "harbour": "The harbour of a coastal settlement.",
 	"defence": "Walls and castles that hold the tile."}
@@ -229,7 +230,7 @@ func _build_controls() -> void:
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	band.add_theme_constant_override(&"margin_left", Tokens.S1)
 	add_child(band)
-	_summary = PanelKit.label("", &"Hint")
+	_summary = PanelKit.label("", &"TileHint")
 	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	band.add_child(_summary)
 	_search = LineEdit.new()
@@ -248,7 +249,7 @@ func _build_controls() -> void:
 	_segment.select(FILTER_ALL)
 	_segment.visible = false
 	add_child(_segment)
-	_note = PanelKit.label("", &"Hint")
+	_note = PanelKit.label("", &"TileHint")
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.visible = false
 	add_child(_note)
@@ -321,7 +322,7 @@ func _refresh_list() -> void:
 		shown += rows.size()
 		var short := _short_line(rows)
 		if short != "":
-			var why := PanelKit.label(short, &"HintBad")
+			var why := PanelKit.label(short, &"TileHintBad")
 			why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			_list.add_child(why)
 	_note.text = "Nothing matches." if shown == 0 and _rows_by_id.size() > 0 else ""
@@ -358,15 +359,16 @@ func _strip_of(group: Dictionary, rows: Array[Dictionary]) -> PanelContainer:
 	for data: Dictionary in rows:
 		if StringName(str(data["state"])) == &"built":
 			built += 1
-	column.add_child(PanelKit.label("%d built of %d" % [built, rows.size()], &"Hint"))
+	var count := "%s built of %s" % [Words.number(built), Words.number(rows.size())]
+	column.add_child(PanelKit.label(count, &"TileHint"))
 	plaque.tooltip_text = "%s
 %s
-%d built of %d: the buildings standing here, of the %d shown in this strip." % [
-		_heading_of(group), str(GROUP_MEANINGS.get(str(group.get("id", "")), "")), built, rows.size(), rows.size()]
+%s: the buildings standing here, of the %s shown in this strip." % [
+		_heading_of(group), str(GROUP_MEANINGS.get(str(group.get("id", "")), "")), count, Words.number(rows.size())]
 	var pad := MarginContainer.new()
 	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for side: StringName in [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]:
-		pad.add_theme_constant_override(side, 7)
+		pad.add_theme_constant_override(side, 6)
 	line.add_child(pad)
 	var tiles := HFlowContainer.new()
 	tiles.add_theme_constant_override(&"h_separation", TILE_GAP)
@@ -391,7 +393,7 @@ static func _heading_of(group: Dictionary) -> String:
 	var slots: Dictionary = group.get("slots", {})
 	if slots.is_empty():
 		return str(group["name"])
-	return "%s  %d of %d slots" % [str(group["name"]), int(slots["used"]), int(slots["total"])]
+	return "%s  %s of %s slots" % [str(group["name"]), Words.number(int(slots["used"])), Words.number(int(slots["total"]))]
 
 
 func _passes(row: Dictionary) -> bool:

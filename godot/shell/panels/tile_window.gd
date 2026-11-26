@@ -1,11 +1,11 @@
 ## The tile window (tile-window spec R11 to R17, R32 its part, R33, R34; build plan TW9): the dock panel of one tile that
 ## replaced the old hex panel in the swap (TW16), behind the same HexPanelContract. Its parts, top to bottom, as the owner's mockup
-## v4 draws them: the title bar (the size stars, the name, the close button), the sub line (the ground and hex, the owner's place
-## link, the food), the chips (StripCells: an icon and a number per TileView.strip cell), the wide picture (SettlementPicture: the
-## settlement, or the bare land or sea; badge icons at its foot; the fog's word on an unexplored hex), the tab strip, the open
-## tab's body, and the queue at the foot (JobLine: the work under way, Cancel on your own). Only the open tab has children: the
-## tabs are scripts of shell/panels/tile_tabs/ found by TileTabs, and a switch frees the old one (R17). On the Town tab, the
-## reasons of the dimmed tabs are written under the facts (mockup v4, tab 5).
+## v4 draws them: the header (TileHeader: the title bar, the sub line, the chips, the wide picture with its emblem and badges), the
+## tab strip (a dimmed tab shows a lock), the open tab's body (a fade under its last visible row while more lies below, L1), and
+## the queue at the foot (issue 436 round 3, H2: on your own land and the sandbox always there, "No work under way" when idle;
+## JobLine: the work under way, Cancel on your own; not shown on foreign land, at sea or on a never discovered hex). Only the open
+## tab has children: the tabs are scripts of shell/panels/tile_tabs/ found by TileTabs, and a switch frees the old one (R17). On the
+## Town tab, the reasons of the dimmed tabs are written before the facts (mockup v4, tab 5; on foreign land at the top, L6).
 ##
 ## One size for every tile and tab (issue 436): Tokens.TILE_WINDOW_W wide and, at most, Tokens.TILE_WINDOW_H tall (440 x 640 at
 ## 1280 x 720); a shorter viewport shrinks it to the room below its top (R33), the same for every tile and tab, so the window never
@@ -41,26 +41,17 @@ const TAB_ARMY := &"army"
 ## The tab that opens when the last pick is not live (R16): the Town tab (Land and Buildings in one since issue 436); the old
 ## ids stay in the list for windows given other tabs (the tests' stubs): Buildings first, then Land.
 const FALLBACK_ORDER: Array[StringName] = [&"town", &"buildings", &"land"]
-## The size stars beside the name: the point radius and the gap, in logical pixels (the fonts have no star glyph).
-const STAR_R := 7.0
-const STAR_GAP := 3.0
 ## The tab strip's height and the tab body's inner margins (left, top, right, bottom), in logical pixels.
 const TAB_H := 36.0
 const BODY_PAD: Array[int] = [8, 8, 8, 6]
-## The badge icons at the foot of the picture: their side and the inset from the picture's corner, in logical pixels.
-const BADGE_ICON := Vector2(18, 18)
-const BADGE_INSET := 6
-## The Kit icon of a badge, by the start of its words; and of the harbour badge.
-const BADGE_ICONS := {"Occupied": &"castle", "Besieged": &"walls", "Battle": &"army", "Enemy army": &"army",
-	"Foreign army": &"army"}
-const HARBOUR_ICON := &"port_dues"
-## The close button's cross: half its arm in logical pixels and its stroke; drawn as two lines about the button's centre, so it
-## sits exactly in the middle of the circle whatever the font (no glyph, no icon).
-const CLOSE_ARM := 4.5
-const CLOSE_STROKE := 2.0
-## The note under the Town tab's facts when other tabs are dimmed (mockup v4, tab 5), at sea, and on a never discovered hex.
+## The fade under the tab body's last visible row (L1), in logical pixels.
+const FADE_H := 14.0
+## The queue's words (H2): its note while a work is under way, and the idle line.
+const QUEUE_BUSY := "one work at a time"
+const QUEUE_IDLE := "No work under way"
+## The note before the Town tab's facts when other tabs are dimmed (mockup v4, tab 5), at sea, and on a never discovered hex.
 const CLOSED_NOTE := "%s closed here"
-const SEA_NOTE: Array[String] = ["Nothing to build or raise at sea", "Ports and ships arrive later."]
+const SEA_NOTE: Array[String] = ["Nothing to build or raise at sea", "Fleets and shipyards come with the age of sail."]
 const FOG_NOTE: Array[String] = ["Never discovered",
 	"Nothing is shown here until one of your armies or lands sees it. Explore by marching to the edge of the map."]
 
@@ -76,23 +67,11 @@ var settings: Settings = null:
 
 @onready var _frame: VBoxContainer = %Frame
 @onready var _scroll: ScrollContainer = %Scroll
-@onready var _picture: SettlementPicture = %Picture
-@onready var _title: Label = %Title
-@onready var _close: Button = %Close
-@onready var _food: Label = %Food
-@onready var _subtitle: Label = %Subtitle
-@onready var _place: Button = %Place
-@onready var _stars: Control = %Stars
-@onready var _badges: HBoxContainer = %Badges
-@onready var _badge_band: PanelContainer = %BadgeBand
+@onready var _header: TileHeader = %Header
 @onready var _body_pad: MarginContainer = %BodyPad
-@onready var _fog_box: PanelContainer = %FogBox
-@onready var _strip_band: PanelContainer = %StripBand
-@onready var _strip: StripCells = %Strip
 @onready var _work_band: PanelContainer = %WorkBand
 @onready var _job: JobLine = %WorkBox
 @onready var _tab_strip: HBoxContainer = %TabStrip
-@onready var _fog: Label = %Fog
 @onready var _tab_body: VBoxContainer = %TabBody
 
 var _shown: Vector2i = NO_HEX
@@ -101,36 +80,41 @@ var _tab_ids: Array[StringName] = []
 var _dimmed: Dictionary = {}
 var _open: StringName = &""
 var _last_pick: StringName = &""
-var _owner: StringName = &""
+var _fade: Control = null
 var _scripts_override: Array[GDScript] = []
 var _group := ButtonGroup.new()
 var _tab_buttons: Dictionary = {}
 var _retired: Array[Node] = []
 var _queued := false
 var _fit_queued := false
-var _star_count := 0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	custom_minimum_size = Vector2(float(Tokens.TILE_WINDOW_W), float(Tokens.TILE_WINDOW_H))
 	visible = false
-	_place.pressed.connect(_on_owner_pressed)
+	_header.retired = _retired
+	_header.owner_pressed.connect(_on_owner_pressed)
+	_header.close_pressed.connect(_on_close_pressed)
+	_header.app_requested.connect(func(what: StringName, args: Dictionary) -> void: app_requested.emit(what, args))
 	_job.retired = _retired
 	_job.ask = _ask_app
-	for box: BoxContainer in [_frame, %Header as BoxContainer, _tab_strip]:
+	for box: BoxContainer in [_frame, _tab_strip]:
 		box.add_theme_constant_override(&"separation", 0)
 	(%JobRow as BoxContainer).add_theme_constant_override(&"separation", Tokens.S2)
 	(%Queue as BoxContainer).add_theme_constant_override(&"separation", 2)
-	_badges.add_theme_constant_override(&"separation", Tokens.S1 + 1)
 	var names: Array[StringName] = [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]
 	for i: int in names.size():
 		_body_pad.add_theme_constant_override(names[i], BODY_PAD[i])
-		(_badge_band.get_parent() as MarginContainer).add_theme_constant_override(names[i], BADGE_INSET)
-	_stars.draw.connect(_draw_stars)
-	_close.pressed.connect(_on_close_pressed)
-	_close.draw.connect(_draw_close)
-	_close.accessibility_name = "Close the tile window"
+	_fade = Control.new()
+	_fade.name = &"Fade"
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fade.draw.connect(_draw_fade)
+	(%Content as Control).add_child(_fade)
+	var bar := _scroll.get_v_scroll_bar()
+	bar.value_changed.connect(func(_v: float) -> void: _place_fade())
+	bar.changed.connect(_place_fade)
+	_scroll.resized.connect(_place_fade)
 	visibility_changed.connect(_fit_later)
 	get_viewport().size_changed.connect(_fit_later)
 	for pair: Array in _wiring():
@@ -385,23 +369,11 @@ func _rebuild() -> void:
 	if _view.is_empty():
 		clear()
 		return
-	var unexplored := StringName(str(_view.get("case", ""))) == &"unexplored"
-	_show_header(game)
-	_strip.show_cells(_view.get("strip", []) if not unexplored else [])
-	_strip_band.visible = _strip.visible
-	if unexplored:
-		_job.visible = false
-	else:
-		_job.refresh(game, _shown, Session.player_tag())
-	_work_band.visible = _job.visible
-	var queue_row := %QueueRow as Control
-	queue_row.mouse_filter = Control.MOUSE_FILTER_PASS
-	queue_row.tooltip_text = "The work under way here: %s, %s.
-One work at a time on a tile." % [
-		(_job.get_node("Text") as Label).text, (_job.get_node("Progress") as Label).text] if _job.visible else ""
-	_fog_box.visible = unexplored
-	_fog.text = _title.text if unexplored else ""
-	_picture.visible = not unexplored
+	var case_id := StringName(str(_view.get("case", "")))
+	var unexplored := case_id == &"unexplored"
+	var viewer := Session.player_tag()
+	_header.show_view(game, _view, [] if unexplored else TileView.strip_cells(game, viewer, _shown, _view))
+	_show_queue(game, case_id)
 	var scripts := _scripts()
 	_tab_ids = []
 	_dimmed = {}
@@ -413,6 +385,30 @@ One work at a time on a tile." % [
 		_open = _fallback(live)
 	_build_tab_strip()
 	_open_tab()
+
+
+## The queue at the foot (H2): on your own land and the sandbox always, the work under way in its row or the idle line; on
+## foreign and unowned land only while a work of theirs is under way (no idle line, no Cancel); never at sea or on a never
+## discovered hex.
+func _show_queue(game: Game, case_id: StringName) -> void:
+	var own := case_id == &"own" or case_id == &"sandbox"
+	if own or case_id == &"foreign" or case_id == &"unowned":
+		_job.refresh(game, _shown, Session.player_tag())
+	else:
+		_job.visible = false
+	_work_band.visible = own or _job.visible
+	var busy := _job.visible
+	var queue_row := %QueueRow as Control
+	queue_row.visible = busy
+	queue_row.mouse_filter = Control.MOUSE_FILTER_PASS
+	queue_row.tooltip_text = "The work under way here: %s, %s.
+One work at a time on a tile." % [
+		(_job.get_node("Text") as Label).text, (_job.get_node("Progress") as Label).text] if busy else ""
+	var note := %QueueNote as Label
+	note.text = QUEUE_BUSY if busy else QUEUE_IDLE
+	note.mouse_filter = Control.MOUSE_FILTER_PASS
+	note.tooltip_text = "A tile does one work at a time; the next can begin when this one is done." if busy \
+		else "Nothing is being built here. Click a tile with a + to begin a work."
 
 
 ## R16: the last pick when live, else Buildings, else Land; the first live tab when none of those is.
@@ -445,6 +441,8 @@ func _build_tab_strip() -> void:
 		var reason := str(_dimmed.get(id, ""))
 		button.disabled = reason != ""
 		button.tooltip_text = reason
+		if button.disabled and has_theme_icon(&"lock", &"Kit"):
+			button.icon = get_theme_icon(&"lock", &"Kit")  # L6: a dimmed tab says so by its shape, not only its grey
 		button.pressed.connect(_on_tab_pressed.bind(id))
 		_tab_strip.add_child(button)
 		_tab_buttons[id] = button
@@ -463,13 +461,15 @@ func _open_tab() -> void:
 		tab.fill(Session.game, Session.player_tag(), _shown, _view)
 		if _open == TAB_TOWN:
 			_closed_note(tab)
+		_place_fade.call_deferred()
 	elif _shown != NO_HEX and StringName(str(_view.get("case", ""))) == &"unexplored":
 		_tab_body.add_child(_note(FOG_NOTE[0], [FOG_NOTE[1]]))
 	_sync_buttons()
 
 
-## Under the Town tab's facts, inside the tab: which tabs are dimmed here and why (their tooltips' reasons, once each; mockup
-## v4, tab 5); at sea, that nothing is built or raised there.
+## Before the Town tab's facts, inside the tab: which tabs are dimmed here and why (their tooltips' reasons, once each; mockup
+## v4, tab 5); on foreign land, where there are no strips, that is at the top, under the siege block, so it is seen without
+## scrolling (L6). At sea, that nothing is built or raised there.
 func _closed_note(tab: TileTab) -> void:
 	if StringName(str(_view.get("case", ""))) == &"sea":
 		tab.add_child(_note(SEA_NOTE[0], [SEA_NOTE[1]]))
@@ -486,7 +486,17 @@ func _closed_note(tab: TileTab) -> void:
 	if names.is_empty():
 		return
 	var verb := " is" if names.size() == 1 else " are"
-	tab.add_child(_note(CLOSED_NOTE % (" and ".join(names) + verb), reasons))
+	var note := _note(CLOSED_NOTE % (" and ".join(names) + verb), reasons)
+	tab.add_child(note)
+	var facts: Node = tab.call("facts") if tab.has_method("facts") else null
+	if facts != null and facts.get_parent() == tab:
+		tab.move_child(note, facts.get_index())
+
+
+## The closed note shown on the open tab, or null (tests).
+func closed_note() -> Control:
+	var tab := _open_node()
+	return tab.find_child("ClosedNote", true, false) as Control if tab != null else null
 
 
 ## A quiet boxed note (mockup v4): its title in the name's type, then its lines in the small text.
@@ -500,7 +510,7 @@ func _note(title: String, lines: Array[String]) -> PanelContainer:
 	note.add_child(column)
 	column.add_child(PanelKit.label(title, &"TileName"))
 	for text: String in lines:
-		var line := PanelKit.label(text, &"Hint")
+		var line := PanelKit.label(text, &"TileHint")
 		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		column.add_child(line)
 	return note
@@ -565,143 +575,27 @@ func _on_tab_pressed(id: StringName) -> void:
 	show_tab(id)
 
 
-# --- the header ---------------------------------------------------------------------------------------------------------
-
-
-func _show_header(game: Game) -> void:
-	var head: Dictionary = _view.get("header", {})
-	_title.text = str(head.get("title", ""))
-	_subtitle.text = str(head.get("subtitle", ""))
-	_subtitle.tooltip_text = _subtitle.text
-	var owner: Dictionary = head.get("owner", {})
-	_owner = StringName(str(owner.get("tag", "")))
-	var place := str(head.get("place", ""))
-	_place.text = place
-	_place.tooltip_text = place
-	_place.visible = place != ""
-	_place.disabled = _owner == &""
-	_show_food()
-	_star_count = int(head.get("stars", 0))
-	_stars.custom_minimum_size = Vector2(_star_count * (2.0 * STAR_R + STAR_GAP), 2.0 * STAR_R)
-	_stars.visible = _star_count > 0
-	_stars.mouse_filter = Control.MOUSE_FILTER_PASS
-	_stars.tooltip_text = "Size %d of 5: %s" % [_star_count, place.get_slice(" · ", 0).to_lower()] if _star_count > 0 else ""
-	_stars.queue_redraw()
-	var picture: Dictionary = head.get("picture", {})
-	_show_badges(head.get("badges", []), int(picture.get("harbour", 0)) > 0)
-	var colour := _colour_of(game, StringName(str(picture.get("owner_tag", owner.get("tag", "")))))
-	var snow := int(picture.get("climate", -1)) == HexCard.CLIMATE_WORDS.find("snow")
-	if not picture.is_empty():
-		_picture.show_picture(StringName(str(picture.get("kind", "hamlet"))), int(picture.get("level", 1)),
-				int(picture.get("harbour", 0)), snow, colour)
-	else:
-		# No settlement: the bare land, or the sea (mockup v4: the picture is there on every tile).
-		var sea := StringName(str(_view.get("case", ""))) == &"sea"
-		_picture.show_picture(SettlementPicture.SEA if sea else SettlementPicture.LAND, 1, 0, snow, colour)
-
-
-## The sub line's food: the strip's food cell ("Food +11"), in its tone; hidden where the strip has none.
-func _show_food() -> void:
-	_food.visible = false
-	for raw: Variant in _view.get("strip", []):
-		var cell := raw as Dictionary
-		if str(cell.get("key", "")) == "food":
-			_food.text = "Food %s" % str(cell.get("value", ""))
-			_food.mouse_filter = Control.MOUSE_FILTER_PASS
-			_food.tooltip_text = "Food a year here: %s (what is made less what is eaten)." % str(cell.get("value", ""))
-			_food.theme_type_variation = _badge_variation(StringName(str(cell.get("tone", "plain"))))
-			_food.visible = true
-
-
-## The badges as round icons at the foot of the picture, each with its words as tooltip (a bad one rimmed in red); a port
-## shows the harbour's icon first.
-func _show_badges(badges: Array, harbour: bool) -> void:
-	PanelKit.clear_children(_badges, _retired)
-	var items: Array[Dictionary] = []
-	if harbour:
-		items.append({"text": "A port", "tone": "plain", "icon": HARBOUR_ICON})
-	for raw: Variant in badges:
-		var badge := (raw as Dictionary).duplicate()
-		badge["icon"] = _badge_icon(str(badge.get("text", "")))
-		items.append(badge)
-	_badge_band.visible = not items.is_empty()
-	for badge: Dictionary in items:
-		var disc := PanelContainer.new()
-		var tone := StringName(str(badge.get("tone", "plain")))
-		disc.theme_type_variation = &"PanelTileRoundBad" if tone == &"bad" else &"PanelTileRound"
-		disc.tooltip_text = str(badge.get("text", ""))
-		disc.mouse_filter = Control.MOUSE_FILTER_STOP
-		disc.set_meta("text", disc.tooltip_text)
-		var icon := TextureRect.new()
-		icon.custom_minimum_size = BADGE_ICON
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var icon_name := StringName(str(badge["icon"]))
-		if has_theme_icon(icon_name, &"Kit"):
-			icon.texture = get_theme_icon(icon_name, &"Kit")
-		disc.add_child(icon)
-		_badges.add_child(disc)
+# --- the header (TileHeader) --------------------------------------------------------------------------------------------
 
 
 ## The words of the badges shown (tests read them, in order).
 func badge_texts() -> PackedStringArray:
-	var out := PackedStringArray()
-	for child: Node in _badges.get_children():
-		out.append(str(child.get_meta("text", "")))
-	return out
+	return _header.badge_texts()
 
 
-static func _badge_icon(text: String) -> StringName:
-	for start: String in BADGE_ICONS:
-		if text.begins_with(start):
-			return BADGE_ICONS[start]
-	return &"warning"
-
-
-## A tone's small text: bad and warn in their colours, good in green, plain in the table text.
-static func _badge_variation(tone: StringName) -> StringName:
-	match tone:
-		&"bad":
-			return &"HintBad"
-		&"warn":
-			return &"HintWarn"
-		&"good":
-			return &"HintGood"
-	return &"TileSub"
-
-
-## The size stars, drawn (the fonts have no star glyph): five-pointed, filled in GOLD with an INK rim.
-func _draw_stars() -> void:
-	var gold := _stars.get_theme_color(&"font_color", &"SectionHead")
-	for n: int in _star_count:
-		var centre := Vector2(STAR_R + n * (2.0 * STAR_R + STAR_GAP), STAR_R)
-		var points := PackedVector2Array()
-		for k: int in 10:
-			var r := STAR_R if k % 2 == 0 else STAR_R * 0.45
-			var a := -PI / 2.0 + k * PI / 5.0
-			points.append(centre + Vector2(cos(a), sin(a)) * r)
-		_stars.draw_colored_polygon(points, gold)
-		points.append(points[0])
-		_stars.draw_polyline(points, Tokens.INK, 1.0, true)
-
-
-func _draw_close() -> void:
-	var colour := _close.get_theme_color(&"font_hover_color" if _close.is_hovered() else &"font_color")
-	var rect := close_glyph_rect()
-	_close.draw_line(rect.position, rect.end, colour, CLOSE_STROKE, true)
-	_close.draw_line(Vector2(rect.end.x, rect.position.y), Vector2(rect.position.x, rect.end.y), colour, CLOSE_STROKE, true)
-
-
-## The close cross's box in the button's own coordinates: centred on the button (tests check it).
-func close_glyph_rect() -> Rect2:
-	var centre := _close.size * 0.5
-	return Rect2(centre - Vector2(CLOSE_ARM, CLOSE_ARM), Vector2(CLOSE_ARM, CLOSE_ARM) * 2.0)
+## The header part (tests and tools read its emblem and icon buttons).
+func header() -> TileHeader:
+	return _header
 
 
 ## The close button (tests).
 func close_button() -> Button:
-	return _close
+	return %Close as Button
+
+
+## The close cross's box in the button's own coordinates (tests check it is centred).
+func close_glyph_rect() -> Rect2:
+	return _header.close_glyph_rect()
 
 
 ## The close button: the App clears the selection (the map's hex, so the window and the map agree); with no App, the window
@@ -713,16 +607,9 @@ func _on_close_pressed() -> void:
 	app_requested.emit(&"close_tile", {})
 
 
-func _colour_of(game: Game, tag: StringName) -> Color:
-	var cdef: CountryDef = Countries.def_of(game, tag) if tag != &"" else null
-	if cdef == null:
-		return Tokens.MUTED
-	return cdef.colour
-
-
-func _on_owner_pressed() -> void:
-	if _owner != &"":
-		country_requested.emit(_owner)
+func _on_owner_pressed(tag: StringName) -> void:
+	if tag != &"":
+		country_requested.emit(tag)
 
 
 ## The App's works requests: true when a listener took the request, else false and the job line acts itself.
@@ -731,6 +618,35 @@ func _ask_app(what: StringName, args: Dictionary) -> bool:
 		return false
 	works_requested.emit(what, args)
 	return true
+
+
+# --- the fade (L1) ------------------------------------------------------------------------------------------------------
+
+
+## Lays the fade over the foot of the scroll area while more of the body lies below.
+func _place_fade() -> void:
+	if _fade == null or _scroll == null:
+		return
+	var bar := _scroll.get_v_scroll_bar()
+	var more := bar.max_value - bar.page > bar.value + 1.0
+	var width := _scroll.size.x - (bar.size.x if bar.visible else 0.0)
+	_fade.position = _frame.position + _scroll.position + Vector2(0.0, _scroll.size.y - FADE_H)
+	_fade.size = Vector2(maxf(width, 0.0), FADE_H)
+	_fade.visible = more and _shown != NO_HEX
+	_fade.queue_redraw()
+
+
+## Whether the fade shows (tests).
+func fade_shown() -> bool:
+	return _fade != null and _fade.visible
+
+
+func _draw_fade() -> void:
+	var clear := Tokens.TILE_BODY
+	clear.a = 0.0
+	var size_f := _fade.size
+	_fade.draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(size_f.x, 0.0), size_f, Vector2(0.0, size_f.y)]),
+		PackedColorArray([clear, clear, Tokens.TILE_BODY, Tokens.TILE_BODY]))
 
 
 # --- fit ---------------------------------------------------------------------------------------------------------------

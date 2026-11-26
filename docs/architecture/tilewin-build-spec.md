@@ -2,7 +2,7 @@
 
 Technical director, 2026-11-25. **Status: built 2026-11-25 except TW19 (pictures signed, goldens, README and docs). The rules
 below describe the window as built; section 10 lists where the build left the first design and marks every rule built, not
-built or deferred.** The design was approved by the owner after the mockups of Appendix B, then changed in three polish rounds
+built or deferred. Design review round 3 (TW23, in progress) is building the owner's decisions of 2026-11-25, D21 to D26, and the designer's findings H1 to H5, M1 to M9 and L1 to L7: where a rule says "from TW23" it describes the target and 10.4 says what the code does until then.** The design was approved by the owner after the mockups of Appendix B, then changed in three polish rounds
 after his playtest (one fixed size, Land and Buildings merged into one Town tab, the mockup v4 look). Builds section 3 of
 `docs/design/ui-family-audit.md` ("the audit") as the owner answered it (2026-11-24), on top of the fog build
 (`fog-build-spec.md`, on master) and ready for the economy rethink (`docs/design/economy-rethink.md`, M9.5). Where the audit
@@ -10,14 +10,15 @@ or the mockups say something else, this page wins for the build. The tasks are i
 
 **What it is, in one paragraph.** Every tile has one window, in the dock on the right where the hex panel was, in the kit's gold
 frame, **440 x 640** logical pixels on every tile and every tab (`Tokens.TILE_WINDOW_W` and `TILE_WINDOW_H`; it shrinks only on
-a viewport too short for it). Its **header** has the size stars at the left, the name centred and a round close button at the
-right; a teal sub line (the ground and hex, the owner's link, the food); a row of **round-icon chips** (people, food, works
-or slots, ducats; foreign land: people, garrison, buildings, armies); and a 150 px **picture** on every tile (the settlement,
-the bare land or the sea) with round badge icons at its foot, or the word "Unexplored" on deep fog. Under it flat **tabs** with a
-gold underline: **Town**, **Army**, and **Ships** (your own ports only, empty until ships exist); a tab that does not apply is
+a viewport too short for it). Its **header** has the name centred and a round close button at the
+right (the size stars are gone from TW23: a settlement-type emblem sits on the picture, D22); a teal sub line (the ground and hex, the owner's link, the food); a row of **round-icon chips** (people, food, works
+or slots, and this tile's income a year in ducats (D21); foreign land: people, garrison, buildings, armies); and a 150 px **picture**
+on every tile (the settlement, the bare land or the sea) scaled to the window's width so the whole town shows (D25), with the
+emblem and round badge icons, or the word "Unexplored" on deep fog. Under it flat **tabs** with a
+gold underline: **Town**, **Army**, and **Ships** (your own ports only, empty until ships exist, in the game's own words, D23); a tab that does not apply is
 dimmed, keeps its reason as a tooltip and has it written under the facts of the Town tab. The **Town tab** holds, top to
-bottom, the siege block when the tile is besieged, the **building strips** (one wooden strip per group: a plaque and 48 px icon
-tiles) on land you may build on, and the **land facts** ledger. The **Army tab** holds icon cards (armies here, a company to
+bottom, the siege block when the tile is besieged, the **building strips** (one wooden strip per group: a two-line plaque and 40 px icon
+tiles, D24) on land you may build on, and the **land facts** ledger in collapsible sections (D26). The **Army tab** holds icon cards (armies here, a company to
 raise); a **Raise companies** window with tall rows opens from its "Show all". The **queue** (the work under way, its seasons, a
 red Cancel) is one row pinned at the foot of the window on every tab. Every icon and number has a tooltip or a hover card
 (R37). Industries are plain buildings in the strips (no Industry tab). The small right-click menu stays. Every fact comes from
@@ -63,7 +64,7 @@ and nothing else, so the tests run headless and the fog is proved in one place.
 | D2 | Size | `Tokens.TILE_WINDOW_W` x `Tokens.TILE_WINDOW_H` (440 x 640 logical), the same for every tile and tab | Room for the icon strips and the chips; one size so the window never jumps when another tile or tab is picked (R33). The first draft was `Tokens.PANEL_W` (296) and a height that followed the content |
 | D3 | Where "which tab, live or dimmed" is decided | `TileView` gives facts and reasons; each tab's static `applies(view)` and `dimmed(view)` read only that dictionary | Core cannot know the shell's tabs; the choice stays testable headless |
 | D4 | How a later milestone adds a tab | One `*_tab.gd` file in `shell/panels/tile_tabs/` plus `build_tile_tabs.gd` (the index; CI `--check`). Built in TW3 | "Add a file" kept; the index is safe in exports |
-| D5 | Ships tab | Own port settlements only (`Improve.is_port`), one empty line; never dimmed elsewhere | Owner's answer; a dead tab on most of the map otherwise |
+| D5 | Ships tab | Own port settlements only (`Improve.is_port`), one empty line, with in-game wording from TW23 (D23); never dimmed elsewhere; the owner kept the tab on 2026-11-25 | Owner's answer; a dead tab on most of the map otherwise |
 | D6 | Industries | **No Industry tab.** Industries are buildings in the Town tab's strips (M9.5 adds a Workshops strip, not a tab) | Owner, 2026-11-25; economy-rethink: industries are buildings in slots |
 | D7 | Which tab opens | The last tab picked if it is live on the new tile; else the Town tab (the retired ids Buildings and Land stay as fall-backs for a window given stub tabs). Not saved | A player on Army stays on Army; the Town tab is the common act |
 | D8 | Tabs that do not apply on land | On any discovered land tile the strip shows **Town and Army**; a tab that does not apply is **dimmed** (not clickable, its reason as tooltip, and written under the facts on the Town tab). Ships is shown only on own ports. Sea: Town only, the tab strip hidden. Unexplored: no tabs, a fog note. The sandbox: Town only | A stable strip reads better than tabs that come and go; the first draft's tabs Land and Buildings are the Town tab since the owner's decision of 2026-11-25 (the audit's Infrastructure idea) |
@@ -72,13 +73,20 @@ and nothing else, so the tests run headless and the fog is proved in one place.
 | D11 | The job line | The work under way, as one **queue row pinned at the foot of the window** on every tab; siege, battle and occupation are badges on the picture, and a siege has its own block at the top of the Town tab | One job per settlement shows on every tab; the siege is a state of the tile, not of its army |
 | D12 | Hover cards | `BuildingCard.of` and `CompanyCard.of` in `core/views/`, fed by `ImprovePreview.of` and `Military`; the shell shows them in `HoverCard`. `RaiseCard` of the earlier draft is renamed `CompanyCard` and takes the hex | One card model per row kind, testable headless |
 | D13 | Raise companies window | The **Army tab holds the compact rows**; "Show all" opens `RaiseScreen`, a non-opaque screen on the `ScreenStack` (`ModalFrame`) with tall rows, search and filter, for long lists | Owner, 2026-11-25 |
-| D14 | Buildings in v1 | **One wooden strip per group** (Settlement, Land, Harbour, Defence; M9.5 adds Workshops): a plaque (icon, name, "N built of M") and 48 px icon tiles that wrap onto more rows; the words are in each tile's hover card. **No building levels with + / -, no workforce bars, no workers or capacity numbers on the plaque** (Appendix C) | Mockup v4 (after EU4 and EU5); the economy design has no levels or staffing yet |
+| D14 | Buildings in v1 | **One wooden strip per group** (Settlement, Land, Harbour, Defence; M9.5 adds Workshops): a plaque (icon, name, "N built of M"; two lines from TW23) and 40 px icon tiles (48 px until TW23, D24) that wrap onto more rows; the words are in each tile's hover card. **No building levels with + / -, no workforce bars, no workers or capacity numbers on the plaque** (Appendix C) | Mockup v4 (after EU4 and EU5); the economy design has no levels or staffing yet |
 | D15 | Settlement picture | Code-drawn in a `Control` (`SettlementPicture._draw`) from a pure recipe; no baked files (R28) | Cheapest honest way: no import, no atlas, sharp at scale 2, in the Kenney flat look; a bake can come later from the same recipe |
 | D16 | Slots, arms, gates (M9.5, M11) | The row and card models carry `slots`, `arms`, `gate` fields now, empty until those builds fill them; before M9.5 the strip's third cell is the country's **Works** (crews in use of the limit) | The window does not change when M9.5 lands; M9.5 fills fields and adds rows |
 | D17 | The right-click menu | Stays, own hexes only, with the approved items (R31); the inline works rows leave the menu for "Build here..." | The approved mockup; one click more for a build, the same confirm rule |
 | D18 | Names | `TileWindow` replaces `HexPanel`; `Hud.tile_window()` replaces `Hud.hex_panel()` (no alias); `HexPanelContract` keeps its name | No deprecated alias |
 | D19 | Sandbox (no countries) | The Town tab (strips and facts) as today; no Army, no Ships; chips: people and food | The map sandbox keeps working |
-| D20 | Task IDs | `TW0` to `TW19`, then `TW20` to `TW22` for the polish rounds | T, F, FG, K are taken |
+| D20 | Task IDs | `TW0` to `TW19`, then `TW20` to `TW22` for the polish rounds and `TW23` for design review round 3 | T, F, FG, K are taken |
+| D21 | The ducats chip of the header (owner, 2026-11-25) | The own-tile chip "Ducats" shows **this tile's income a year**, not the viewer's treasury (the treasury is on the top bar). Default formula: what the buildings here make a year less their upkeep, plus the district's yearly worth at the viewer's tax; TW23 pins the one formula so that the chip, the Town tab's summary line and the hover card give the same numbers, and writes it in 10.4. Own land only: a foreign tile has no ducats chip. Tooltip: "Income of this tile a year" | A tile's chip should say what the tile brings; the treasury is not a fact of the tile |
+| D22 | Settlement size on the picture (owner, 2026-11-25) | A **settlement-type emblem** sits on the picture (one small round emblem for each picture kind: hamlet, village, town, walled town, city, castle; its tooltip names the type). The **size stars are removed** from the title bar and `TileView.header.stars` goes; the emblem reads the picture's `kind` | The picture and the emblem say the size once; the stars said it a second time |
+| D23 | The Ships tab (owner, 2026-11-25) | **Kept** (own ports only, empty until ships exist) with **in-game wording**: no development words such as "milestone" or "this tab is here". Default text "No ships here yet. Ships and shipyards will be built in your ports."; the creative director confirms the words in TW23 | The tab gives ports their place; the text must speak the game's language |
+| D24 | Building tiles and the plaque (owner, 2026-11-25) | The tiles are **40 px** (were 48) and the plaque is **two lines** (the name over "N built of M") so a group with many buildings keeps its room; tiles still wrap onto more strip rows | Smaller tiles let more buildings show before the body scrolls |
+| D25 | The picture's scale (owner, 2026-11-25) | The picture is **scaled to the window's width** so the whole town is visible: the scale is the Control's width over the recipe box's width, the sky and ground bands fill the Control's height, the town sits on the ground band, nothing is cropped at the sides. A layout fix, not art work (the owner's note of 2026-11-25 stands) | The code scaled by the height and cropped the middle |
+| D26 | The facts ledger (owner, 2026-11-25) | Each small-caps head of the land facts is a **collapsible section** (a click or Enter on the head folds or opens it; open by default; the state is kept for the session by the window and never saved) | A long ledger hides the strips' neighbours; the player folds what he does not need |
+| D27 | Design review round 3 | The designer's review of the window (findings **H1 to H5**, **M1 to M9** and **L1 to L7**) is fixed in one task, **TW23**, listed as the next polish task; **status: in progress**. TW23 builds D21 to D26 as well | One round, one pull request; each finding is fixed or answered in the pull request by its id |
 
 ---
 
@@ -125,18 +133,18 @@ and nothing else, so the tests run headless and the fog is proved in one place.
 
 | Case | Cells |
 |---|---|
-| own (any land) | People (`PeopleView.at`), Food (net a year from `MapModes.food_year(viewer)`, signed, tone), Works ("1 of 3", `WorksView.slots`; M9.5: a settlement shows Slots "3 of 4" instead), Ducats (the viewer's treasury) |
+| own (any land) | People (`PeopleView.at`), Food (net a year from `MapModes.food_year(viewer)`, signed, tone), Works ("1 of 3", `WorksView.slots`; M9.5: a settlement shows Slots "3 of 4" instead), Ducats (this tile's income a year, D21; until TW23 the viewer's treasury) |
 | foreign, unowned | People, Garrison ("400/400" from `war_rows_for`; "-" without a fortress), Buildings (count of built pieces and slot buildings), Armies (count in sight; "fog" out of sight) |
 | sandbox | People, Food |
 | sea, unexplored | none |
 
-  P: the owner's treasury on a foreign tile; Food read through `game.player`.
+  P: the owner's treasury on a foreign tile, or (from TW23) in the ducats chip of an own one; Food read through `game.player`.
 - **R11** **The header** (`TileView.header`): `title` (place name, else the ground word capitalised; sea "Coastal sea" or
   "Open sea"); `place` ("Walled town · Republic of Genoa", the owner's long name, a link); `subtitle` ("farmland · hex 4, 10";
   sea "<depth> · hex x, y"); `owner {tag, name, relation}` (`yours`, `at_war`, `foreign`, `no_one`); `stars` (settlement level
-  1 to 5, else 0); `picture` (R28; `{}` when none); `badges` in order, each `{text, tone}`: "Occupied by <holder>" (warn),
+  1 to 5, else 0; removed in TW23, D22: the emblem reads the picture's `kind`); `picture` (R28; `{}` when none); `badges` in order, each `{text, tone}`: "Occupied by <holder>" (warn),
   "Besieged" / "Besieged by <besieger>" (bad; R6, R7), "Battle here, <season>" (bad; witnessed only), "Enemy army here" (bad)
-  or "Foreign army here" (plain). **As drawn:** a title bar with the size stars at the left (drawn, five-pointed), the name
+  or "Foreign army here" (plain). **As drawn:** a title bar (until TW23 with the size stars at the left, drawn and five-pointed; from TW23 without them, D22) with the name
   centred in the display font (25) and the round close button at the right (R39); a teal sub line (the subtitle, the owner's
   place as a link, the food cell's value in its tone); the chips (R10, R40); the picture (R28); the badges as **round icons**
   at the picture's foot, each with its words as tooltip and a bad one rimmed in red. P: a battle badge the viewer did not
@@ -181,7 +189,7 @@ and nothing else, so the tests run headless and the fog is proved in one place.
   and just "Besieged" where it does not, a `SiegeMeter`, "N of M · season S", "Falls in N seasons if not relieved" where known, and
   a "Show siege" button (the map looks at the hex); the siege is **not** on the Army tab. (2) The **building strips** (R19), on
   land you may build on. (3) The **land facts** ledger (`land_facts.gd`), one line a fact (key, optional quiet note, value, a
-  hairline) under small-caps heads: *People and food* (people with change and outlook for own, exact number for others; food
+  hairline) under small-caps heads, **each head a collapsible section** (from TW23, D26: a click or Enter on the head folds or opens it; open by default; the state is kept for the session and never saved): *People and food* (people with change and outlook for own, exact number for others; food
   made and eaten for own); *Made here a year* (one row per good: loads; own adds the value at price; from the district output
   over four calm seasons, the viewer's tax); *Buildings* (foreign and unowned only: built pieces and slot buildings with their
   state, "working" or "building 2 of 4"); *Ground and defence* (`HexCard.ground_rows`, the war rows: holder, fortress,
@@ -192,8 +200,8 @@ and nothing else, so the tests run headless and the fog is proved in one place.
 - **R19** **Building strips** (own land and the sandbox; none on foreign land, unowned land or the sea): a summary line
   "Buildings here make +N a year · upkeep -M" (from `TileBuildings`), then **one wooden strip per `TileBuildings` group**
   (Settlement, Land, Harbour, Defence; M9.5: Workshops). A strip has at its left a **plaque** (the group's icon, its name, "N
-  built of M" of the tiles shown, a tooltip saying what the group is) and at its right the group's buildings as **48 px icon
-  tiles** (`BuildingRow`), which wrap onto more strip rows when they do not fit; the body scrolls. A tile's look is its state:
+  built of M" of the tiles shown, a tooltip saying what the group is; from TW23 the plaque is **two lines**, the name over "N built of M", D24) and at its right the group's buildings as **40 px icon
+  tiles** (48 px until TW23, D24) (`BuildingRow`), which wrap onto more strip rows when they do not fit; the body scrolls. A tile's look is its state:
   **built** = wood tile, gold rim, the level in roman numerals at the corner; **building** = green rim and a thin progress bar;
   **can build** = dark tile, green rim, the whole tile is the hammer; **short** (of ducats or goods) = red rim, and **one red
   line under the strip** names what the first short tile lacks ("cost 300 · you have 204"); **refused or locked** (`slot`,
@@ -222,7 +230,7 @@ and nothing else, so the tests run headless and the fog is proved in one place.
 - **R22** **`can_raise`** is the largest `n` (0 to `raise_cap` left) with `raise_check(count = n)` ok, found by stepping
   down from the bound `min(cap left, men_at_hand / men, ducats / cost, each good / its need)`. P: off by one (the test
   checks `n` ok and `n + 1` refused).
-- **R23** **Ships** shows one empty box: "No ships yet" and "Ships and shipyards arrive with a later milestone. This tab is here so
+- **R23** **Ships** shows one empty box: "No ships yet" and, from TW23, in-game wording with no development words (D23; default "No ships here yet. Ships and shipyards will be built in your ports."); until TW23 "Ships and shipyards arrive with a later milestone. This tab is here so
   ports have a place for them." No button, no list.
 - **R24** Tabs change the game only through `Session.act` or the window's requests; they never assign to game objects
   (`test_tile_tabs.gd` scans the folder for `game.state.` and `.tag =` style writes). P: a planted write.
@@ -256,15 +264,17 @@ and nothing else, so the tests run headless and the fog is proved in one place.
   open water (`SEA`); on an unexplored hex a fog box with the word "Unexplored" replaces it.
 - **R29** **`SettlementPicture`** (`shell/ui/settlement_picture.gd`, a `Control`, 150 px tall at the window's content width):
   `static func recipe(picture) -> Array[Dictionary]` is pure (shapes: `{shape: &"rect"|&"poly"|&"line", points, fill_token,
-  ink: bool}`) and laid out in a logical 296 x 72 box; `_draw()` only walks it. The picture must **scale to the Control's
-  width so the whole town is visible** (the intent; at this writing the code scales by the height and crops the sides of a
-  wider Control, a fix under way). The recipe: a sky band (by season; snow on roofs in snow climate), a ground band (by
+  ink: bool}`) and laid out in a logical 296 x 72 box; `_draw()` only walks it. The picture **scales to the Control's
+  width so the whole town is visible** (D25: the scale is the Control's width over the recipe box's width, the sky and ground
+  bands fill the Control's height, the town sits on the ground band, nothing is cropped at the sides; until TW23 the code
+  scales by the height and crops the sides of a wider Control). The recipe: a sky band (by season; snow on roofs in snow climate), a ground band (by
   cover), then the kind: hamlet 2 to 3 houses; village 4 to 5 and a chapel; town 6 to 8, a church tower; walled town the town
   behind a wall with a gate and two towers; city denser roofs, a cathedral, walls and four towers; castle a keep (one tower for
   a watchtower, keep and curtain for a castle, bastions for a fortress); `LAND` and `SEA` have no settlement. Harbour 1 to 3
   adds a water band on the right third, a quay and 1 to 3 masts. A pennant in the owner's colour flies on the tallest tower.
-  Flat two-tone faces, ink outlines, token colours only. The name, owner and stars are no longer drawn over the picture (they
-  are the title bar and sub line above it); the badges are round icons at its foot. The same picture shows in light fog. The
+  Flat two-tone faces, ink outlines, token colours only. The name and owner are not drawn over the picture (they are the title bar and sub line above it); from TW23 a **settlement-type
+  emblem** (one small round emblem for the picture's kind, with a tooltip that names the type, D22) sits at the picture's top left
+  and replaces the size stars; the badges are round icons at its foot. The same picture shows in light fog. The
   owner's note of 2026-11-25 stands: the picture is a placeholder for future stylised backgrounds, with no new kinds. P: a
   recipe that differs for the same input; a walled town without a wall; a port without a mast.
 
@@ -295,14 +305,14 @@ and nothing else, so the tests run headless and the fog is proved in one place.
   scale 1 and 2560 x 1440 scale 2: inside the viewport, and the tab strip with **five** labels (the real ones and the
   fixture's) fits the content width in both themes. P: a label long enough to overflow; a window that grows with its content.
 - **R34** Studiolo style, tokens only. New widgets go to `shell/ui/` with their own test: `SettlementPicture`, `BuildingRow`
-  (the 48 px tile), `CompanyRow` (compact and tall forms), `StripCells` (the chips), `TileStyle` (the flat boxes and buttons of
+  (the tile, 40 px from TW23), `CompanyRow` (compact and tall forms), `StripCells` (the chips), `TileStyle` (the flat boxes and buttons of
   the window as data for `KitTheme`, the Tile* type variations). Flat tabs with a gold underline on the open tab. No `Color(`
   literal, no `theme_override_` in `.tscn`. The picture's colours are `Tokens` art entries.
 - **R35** No save change; nothing of the window is saved. `Game.digest()` unchanged; replay, save, soak and AI tests do not
   move.
 - **R36** The window reads models cached per version; opening, switching and the gain fill stay within section 8.
 - **R37** **The hover rule.** Every icon and every number the window shows explains itself: a **tooltip** on each chip, the
-  stars, each badge icon, each plaque, the food, the queue row, each tab (a dimmed tab keeps its reason), the Show buttons and
+  emblem (the stars until TW23), each badge icon, each plaque, the food, the queue row, each tab (a dimmed tab keeps its reason), the Show buttons and
   the close button; a **hover card** on every building tile (`BuildingCard`) and company row (`CompanyCard`), through the tab's
   `row_hovered` and the HUD's `RowCard`. `test_tile_window_tips.gd` walks an own settlement, own land with no settlement,
   foreign land, the sea and an unexplored hex, each on every live tab with the real tabs, and fails on a control without one.
@@ -323,7 +333,7 @@ and nothing else, so the tests run headless and the fog is proved in one place.
 
 | Case | Header | Chips | Queue | Tabs (live; *dimmed*) |
 |---|---|---|---|---|
-| Own port settlement | picture with harbour, name, stars | People, Food, Works, Ducats | work or "No work under way" | Town, Army, Ships |
+| Own port settlement | picture with harbour and emblem, name | People, Food, Works, Income (ducats a year) | work or "No work under way" | Town, Army, Ships |
 | Own inland settlement | picture | as above | as above | Town, Army |
 | Own district or wild land | bare-land picture | as above | as above | Town; Army live only with armies |
 | Own land occupied | + "Occupied by X" | as above | the work, if any | Town, Army if armies |
@@ -428,10 +438,10 @@ sketch fixes the order of parts only (440 x 640 logical).
 ```
 OWN TOWN (Town tab)                            FOREIGN, LIGHT FOG (Town tab)
 +------------------------------------+         +------------------------------------+
-| ***         Asti                (x) |         | **          Novara             (x) |
+|             Asti                (x) |         |             Novara             (x) |
 | Walled town . hex 4, 10 . Genoa . Food +14 |  | Town . hex 7, 3 . Duchy of Milan   |
-| (6,200) (+14) (1 of 3) (204)       |         | (9,800) (400/400) (2) (fog)        |
-| [ picture, 150 px: houses, wall ]  |         | [ picture: town ]                  |
+| (6,200) (+14) (1 of 3) (+38)       |         | (9,800) (400/400) (2) (fog)        |
+| [ picture, 150 px, whole town [W] ]|         | [ picture: town [T] ]              |
 |   (o) (o) round badge icons        |         |   (o)                              |
 | Town | Army | Ships                |         | Town | Army (dimmed)               |
 +------------------------------------+         +------------------------------------+
@@ -447,6 +457,9 @@ OWN TOWN (Town tab)                            FOREIGN, LIGHT FOG (Town tab)
 +------------------------------------+         +------------------------------------+
 ```
 
+[W] and [T] are the settlement-type emblem on the picture (D22, from TW23); the size stars of the first sketches are gone. The
+last chip of the own town is the tile's income a year (D21). The heads of the facts ledger fold and open (D26).
+
 ---
 
 
@@ -458,7 +471,7 @@ All under `godot/tests/`. Every edited test keeps its planted faults; a task may
 
 | Test | Cases | Planted faults |
 |---|---|---|
-| `core/test_tile_view.gd` | each row of 3.9 on north Italy (Genoa, Savona port, Asti, Milan) and the sandbox; header, stars, badge order; strip cells per case; job own and foreign; dimmed reasons; `own_port` on Savona, not Asti; picture kinds | R2, R3, R10, R11, R12, R14's facts |
+| `core/test_tile_view.gd` | each row of 3.9 on north Italy (Genoa, Savona port, Asti, Milan) and the sandbox; header, emblem (from TW23; the stars are gone), badge order; strip cells per case; job own and foreign; dimmed reasons; `own_port` on Savona, not Asti; picture kinds | R2, R3, R10, R11, R12, R14's facts |
 | `core/test_tile_buildings.gd` | groups and order; each state from a real verdict (ok, ducats, goods, slot, rule) and `state_of` for `gate`; hammer iff ok (the check/act pair over every row); built rows; gains equal the cards; summary = sum; `{}` on foreign | R9, R19, R20 |
 | `core/test_tile_army.gd` | armies own and foreign by sight; raise rows; `can_raise` (n ok, n + 1 refused) on 3 towns; era badge; refusals keep words | R7, R9, R21, R22 |
 | `core/test_building_card.gd`, `test_company_card.gd` | sections and lines per state; refusal in bad tone; refused card keeps cost lines | R25, R26 |
@@ -554,7 +567,7 @@ If `tile_window_open_ms` passes its limit: the open tab fills on the frame after
 ## 10. As built (2026-11-25)
 
 The window is built and tested; what is left is TW19 (pictures signed against the mockups at both scales, regenerated goldens,
-README, `CLAUDE.md` and the docs). The code is in `godot/shell/panels/` (`tile_window.gd`, `tile_tabs/`), `godot/shell/ui/`,
+README, `CLAUDE.md` and the docs) and TW23 (design review round 3, in progress, 10.4). The code is in `godot/shell/panels/` (`tile_window.gd`, `tile_tabs/`), `godot/shell/ui/`,
 `godot/shell/screens/raise_screen.gd`, `godot/shell/hud/` and `godot/core/views/`; commits: group A 3950cfa, B 2e1d3be, C
 ef7cbc6, D 0f7827f; the rest (TW17, TW18 and the polish rounds TW20 to TW22) was built after 0f7827f. `HexPanel`, `RaiseList` and `HexWar` are
 deleted.
@@ -566,12 +579,12 @@ deleted.
 | Tabs Land, Buildings, Army, Ships (R14, D8) | **Town** (10: the siege, the strips, the facts), **Army** (30), **Ships** (40, own ports only); the fixture's fake tab is 50 | The owner's decision after playtest: Land and Buildings are one tab (as EU5's Infrastructure); one click less, the facts and the building in one place |
 | Width `Tokens.PANEL_W` (296), height from the content (D2, R33) | A fixed 440 x 640 logical on every tile and tab (`TILE_WINDOW_W`, `TILE_WINDOW_H`); shrinks only on a short viewport; the body scrolls | The window jumped in size between tiles and tabs; the icon strips need width |
 | The siege meter lives in Land's war block | The **siege block tops the Town tab** (besieger and men where the fog allows, a `SiegeMeter`, the season, "falls in N seasons", Show siege); not on the Army tab | The owner: a siege is a state of the tile, not of its army |
-| Compact building rows: icon, name, state line, gain number, hammer (R19) | One wooden strip per group, a plaque (icon, name, "N built of M") and **48 px icon tiles**; the state is the rim; one red line under a strip for a short tile; the words moved to the hover card | Mockup v4 (after EU4 and EU5): icon first |
+| Compact building rows: icon, name, state line, gain number, hammer (R19) | One wooden strip per group, a plaque (icon, name, "N built of M") and **48 px icon tiles** (40 px from TW23, D24); the state is the rim; one red line under a strip for a short tile; the words moved to the hover card | Mockup v4 (after EU4 and EU5): icon first |
 | Summary line, search box and filter shown (R19) | The summary shows; the search and the filter exist for keys and tests but are not drawn | A tile has a handful of buildings until M9.5 |
 | Gain number on each row (R20) | Computed one row a frame as before; shown in the hover card and the summary, not on the tile | No room on a 48 px tile |
 | Number strip of four cells (R10) | Four **round-icon chips**, sized to their content, number centred, ellipsis with the full value in the tooltip (R40) | Mockup v4; a long number must not widen the window |
-| Header: picture with name, kind, owner and stars laid over it; a plain title bar off settlements (R11, R28, R29) | A title bar (stars left, name centred, a drawn round close button right), a teal sub line (ground and hex, owner link, food), the chips, then a **150 px picture on every tile** (`SettlementPicture` gained the `LAND` and `SEA` kinds) with **round badge icons**; "Unexplored" on deep fog | Mockup v4; the same layout on every tile |
-| Picture 296 x 72 logical (R29) | 150 px tall at the window's width; the intent is to scale to the width so the whole town is visible | A cropped middle hid the town; the fix is under way |
+| Header: picture with name, kind, owner and stars laid over it; a plain title bar off settlements (R11, R28, R29) | A title bar (stars left, name centred, a drawn round close button right), a teal sub line (ground and hex, owner link, food), the chips, then a **150 px picture on every tile** (`SettlementPicture` gained the `LAND` and `SEA` kinds) with **round badge icons**; "Unexplored" on deep fog (the stars leave the title bar in TW23: an emblem on the picture, D22) | Mockup v4; the same layout on every tile |
+| Picture 296 x 72 logical (R29) | 150 px tall at the window's width; the intent is to scale to the width so the whole town is visible | A cropped middle hid the town; the fix is D25, built in TW23 |
 | The job line sits under the strip (D11, R12) | The **queue**: one row (work, seasons, red Cancel) pinned at the foot of the window on every tab | The work stays in view while the body scrolls |
 | Army rows: compact rows with an open arrow (R21) | Icon cards; a Select button (own armies only); the season's cap said once under the head line | Mockup v4; the same refusal on every row was noise |
 | Dimmed tabs: reason as tooltip (R14) | Also **written under the Town tab's facts** ("Army is closed here" and the reason); at sea "Nothing to build or raise at sea" | A tooltip is easy to miss (mockup v4) |
@@ -581,21 +594,21 @@ deleted.
 | `row_hovered(hex, option)` (section 4) | `row_hovered(card, anchor)`; `app_requested(what, args)` added; `show_tab` and `begin_option` return a bool | The card is built where the row is |
 | Close button not specified | Round, its cross drawn and centred, asks the App for `close_tile` (R39, new) | The font glyph sat off centre |
 | Window opens on the last tab, else Buildings, else Land (D7) | Last tab, else Town | Merge |
-| Ships text "keeps their place at the port" (R23) | "Ships and shipyards arrive with a later milestone. This tab is here so ports have a place for them." | Wording only |
+| Ships text "keeps their place at the port" (R23) | "Ships and shipyards arrive with a later milestone. This tab is here so ports have a place for them." until TW23, then in-game wording (D23) | Wording only |
 
 ### 10.2 Every requirement
 
 | Rules | State |
 |---|---|
 | R1 to R9 (the models, the cases, the fog, the door) | **Built**; tests `test_tile_view`, `test_tile_fog`, `test_tile_door`, `test_fog_exact` |
-| R10 (chips), R11 (header), R12 (job line) | **Built**, changed as 10.1 says |
+| R10 (chips), R11 (header), R12 (job line) | **Built**, changed as 10.1 says; the ducats chip as income, the emblem and the stars' removal: TW23 (D21, D22), in progress |
 | R13 (registry) | **Built**; three tabs, ids and orders in R14 |
 | R14 to R17 (tabs, which opens, lazy) | **Built**, changed as 10.1 says |
-| R18 to R21 (Town tab, strips, gains, Army) | **Built**, changed as 10.1 says. **Not built:** workers and capacity numbers and bars on the plaque (deferred to M9.5: slots and workers) |
-| R22 (`can_raise`), R23 (Ships), R24 (no writes) | **Built** |
+| R18 to R21 (Town tab, strips, gains, Army) | **Built**, changed as 10.1 says. **Not built:** workers and capacity numbers and bars on the plaque (deferred to M9.5: slots and workers). 40 px tiles, the two-line plaque and the collapsible sections: TW23 (D24, D26), in progress |
+| R22 (`can_raise`), R23 (Ships), R24 (no writes) | **Built**; the Ships wording: TW23 (D23), in progress |
 | R25, R26 (the cards) | **Built** |
 | R27 (`RaiseScreen`) | **Built; restyle deferred** (it keeps the first draft's look) |
-| R28, R29 (the picture) | **Built** as a placeholder (owner note); **scale to the window's width: under way** (not in the code as read); **wild-land trees: deferred** |
+| R28, R29 (the picture) | **Built** as a placeholder (owner note); **scale to the window's width: decided (D25), built in TW23, in progress** (not in the code as read); the emblem (D22): TW23; **wild-land trees: deferred** |
 | R30 to R32 (opening, menu, keys) | **Built** |
 | R33 (one size) | **Built** |
 | R34 to R36 (style, saves, speed) | **Built**; the perf rows are in 10.3 |
@@ -603,6 +616,7 @@ deleted.
 | Back button (v4 mockup) | **Not built**, deferred |
 | Slots, arms and gates (D16) | The fields are carried and empty; **M9.5 fills them** |
 | TW19: pictures signed at both scales against the mockups, goldens, README, `CLAUDE.md` and docs | **Not done** (the plan's remaining task); `tools/ui/shot_ui_tile.gd` is written |
+| TW23: design review round 3 (findings H1 to H5, M1 to M9, L1 to L7; D21 to D26) | **In progress** (the next polish task; 10.4) |
 
 ### 10.3 Tests and tools that carry it
 
@@ -613,6 +627,24 @@ the strips wrap and the body scrolls), `test_tile_window_tips.gd` (the hover rul
 `test_building_row.gd`, `test_settlement_picture.gd`, `test_tile_tabs.gd`, `monkey_tile.gd`; tools `tools/build_tile_tabs.gd`
 (the generated index `tile_tabs_index.gd` lists `army_tab.gd`, `ships_tab.gd`, `town_tab.gd`), `tools/ui/picture_sheet.gd`,
 `tools/ui/perf_ui_tile.gd`, `tools/ui/shot_ui_tile.gd`, `tools/perf_tile_rows.gd`.
+
+### 10.4 Design review round 3 (TW23, in progress)
+
+TW23 is the next polish task after TW22 and is **in progress**. It fixes the designer's findings H1 to H5, M1 to M9 and L1 to
+L7 (each by its id in the pull request, or answered there) and builds the owner's decisions of 2026-11-25:
+
+| Decision | What changes | Rules touched |
+|---|---|---|
+| D21 | the own-tile ducats chip is this tile's income a year | R10 |
+| D22 | the size stars go; a settlement-type emblem sits on the picture | R11, R28, R29, R37, `TileView.header` |
+| D23 | the Ships tab stays, with in-game wording | R23 |
+| D24 | 40 px building tiles and a two-line plaque | R19, R34 |
+| D25 | the picture scales to the window's width, the whole town visible | R29 |
+| D26 | the facts sections collapse | R18 |
+
+Until TW23 is merged the code is as 10.1 and 10.2 describe it (stars, a treasury chip, 48 px tiles, a one-line plaque, the
+first Ships wording, a picture scaled by its height). The pictures of TW19 are made after TW23 so they show the finished
+window. Nothing here changes a core rule, a save or the digest.
 
 ---
 

@@ -238,6 +238,79 @@ func _outcome_digest() -> String:
 	return Battles.digest(_g) + "|" + str(_g.battle_records[0].end["days"]) + "|" + str(_g.luck.world.get_state())
 
 
+# --- one battle fought at once (moves-build-spec.md R26, D10) ------------------------------------------------------------
+
+
+func test_fight_now_fights_one_battle_keeps_its_record_and_empties_the_list() -> void:
+	var att := _start_battle()
+	var both := Battles.armies_of(_g, _g.battles[0])
+	assert_eq(both.size(), 2, "both sides' armies")
+	assert_eq(both[0].id, att.id, "the attacker's first")
+	var before := Armies.men_of_country(_g, _a) + Armies.men_of_country(_g, _b)
+	var id := Battles.fight_now(_g, _g.battles[0])
+	assert_gt(id, 0, "the record's id")
+	assert_true(_g.battles.is_empty(), "the battle is no longer listed")
+	assert_null(Battles.at(_g, _hb))
+	assert_eq(_g.battle_records.size(), 1)
+	assert_eq(_g.battle_records[0].id, id)
+	assert_same(Battles.record(_g, id), _g.battle_records[0])
+	assert_true(_kinds().has("battle_ended"))
+	var after := Armies.men_of_country(_g, _a) + Armies.men_of_country(_g, _b)
+	var w: War = _g.wars[0]
+	assert_eq(before - after, w.lost_a + w.lost_b, "the war books every man the armies lost")
+
+
+func test_fight_now_gives_what_the_phase_gives() -> void:
+	var by_phase := _outcome_digest()
+	_g = WarFixture.game()
+	Occupation.setup(_g)
+	_a = ArmyFixture.TAG
+	_b = WarFixture.neighbour_of(_g, _a)
+	var pair := _border(_g, _a, _b)
+	_ha = pair[0]
+	_hb = pair[1]
+	WarFixture.at_war(_g, _a, _b)
+	_start_battle()
+	Battles.fight_now(_g, _g.battles[0])
+	var now := Battles.digest(_g) + "|" + str(_g.battle_records[0].end["days"]) + "|" + str(_g.luck.world.get_state())
+	assert_eq(now, by_phase, "the same fight, the same luck, the same end")
+
+
+func test_fight_now_keeps_the_newest_records_only() -> void:
+	_g.defs.war.battle_records_kept = 2
+	var last := -1
+	for _k: int in 3:
+		var att := WarFixture.army_at(_g, _a, _ha, 2)
+		WarFixture.army_at(_g, _b, _hb, 2)
+		assert_true(Battles.engage(_g, att, _hb, 1, -1))
+		last = Battles.fight_now(_g, _g.battles[0])
+	assert_eq(_g.battle_records.size(), 2)
+	assert_eq(_g.battle_records[1].id, last)
+	assert_eq(_g.battle_records[0].id, last - 1)
+
+
+func test_fight_now_ends_a_battle_the_fight_cannot_take_as_a_draw() -> void:
+	var att := _start_battle()
+	var def_men: int = _g.defs.unit_def(att.units[0].kind).men
+	att.units[0].men = def_men + 1
+	var id := Battles.fight_now(_g, _g.battles[0])
+	assert_eq(id, -1, "a draw by peace has no record")
+	assert_true(_g.battles.is_empty())
+	assert_true(_g.battle_records.is_empty())
+	assert_eq(_peace_events().size(), 1)
+
+
+func test_armies_of_names_only_the_armies_that_still_exist() -> void:
+	_start_battle()
+	var b: Battle = _g.battles[0]
+	var def: Army = Armies.at(_g, _hb)[0] if Armies.at(_g, _hb)[0].tag == _b else Armies.at(_g, _hb)[1]
+	Armies.remove(_g, def)
+	var left := Battles.armies_of(_g, b)
+	assert_eq(left.size(), 1)
+	assert_eq(left[0].tag, _a)
+	assert_eq(Battles.armies_of(_g, null).size(), 0)
+
+
 # --- the save body and its refusals ----------------------------------------------------------------------------------
 
 

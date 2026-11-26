@@ -1,10 +1,11 @@
 # Battle board build spec: battles played day by day on a board (issue 437, with 438)
 
 Technical director, 2026-11-25. **Status: a proposal; no task starts before the owner's go, and no build task before the
-mockups of Appendix B are approved (gate BB0).** Builds section 4 of `docs/design/ui-family-audit.md` ("the audit") **as the
+mockups of Appendix B are approved (gate BB0).** The owner's answers of 2026-11-25 are recorded: the board is a window over the map (D5, R48), and the End turn's
+battles are preceded by one question with a setting that turns it off (D18, D23, R47). Builds section 4 of `docs/design/ui-family-audit.md` ("the audit") **as the
 owner answered it** (2026-11-24: play my battles on the board with Auto one click away; the deeper orders; save anywhere;
 decide issue 432 first), on top of the moves build of issue 432 (`docs/design/moves-in-the-month.md`, "the moves design";
-its build spec `moves-build-spec.md` is written in parallel). Where the audit or the moves design say something else, this
+its build spec `moves-build-spec.md`; the moves build ships first, the owner's answer of 2026-11-25). Where the audit or the moves design say something else, this
 page wins for the build. The tasks are in `battle-board-build-plan.md`. Appendix A lists the specs this page amends.
 
 **What it is, in one paragraph.** A battle the player is a side of is no longer fought out of sight: it is fought on a
@@ -14,13 +15,13 @@ back), and gives the day's **orders**: a stance (Attack, Hold, Withdraw, each wi
 an open lane, and where each gun or crossbow company shoots. **Fight day** plays the day with the M7 rules unchanged; a
 **round card** says what happened; **Auto to the end** is always one click away. A battle opened by the player's own move
 (issue 432) is fought at once; a battle the computer starts at End turn is fought in the season's battles phase, which
-pauses for it. The computer's side, and every battle nobody plays, use the default orders, which give **exactly** M7's
+pauses for it, after one question: "Fight your N battles automatically?" (D23, R47). The computer's side, and every battle nobody plays, use the default orders, which give **exactly** M7's
 fight: the same frames and the same luck draws. A battle is a pure function of its input, its luck state before day 1 and
 the orders, so it replays exactly and a save taken at any dawn (even inside End turn) reloads to the same dawn.
 
 **The battle board build is done when:**
 
-1. Every rule R1 to R46 holds, each with its GUT case and its planted fault (P) of section 7.
+1. Every rule R1 to R48 holds, each with its GUT case and its planted fault (P) of section 7.
 2. **Default orders are the identity:** over seeds 1 to 500 of the bands fixture, `Combat.fight` built on the split gives
    the same frames, end and luck state as the M7 code recorded before BB1 (`test_combat_split.gd`); `test_combat_bands.gd`,
    the soak's ranges and every AI test are unchanged.
@@ -65,7 +66,7 @@ and `hud/odds.py`. Port the content and the interactions, never the code (the au
 
 | Python | What it did | In the board |
 |---|---|---|
-| The battle panel's place | A window over a shade of the map, centred, up to 1240 x 880, closed by Esc or a click outside | Layout B of MK1 (D5); Esc asks instead of closing (D8) |
+| The battle panel's place | A window over a shade of the map, centred, up to 1240 x 880, closed by Esc or a click outside | Layout B of MK1, decided 2026-11-25 (D5, R48); Esc asks instead of closing (D8) |
 | The field | Enemy back line and reserve at the top, enemy lanes, a dashed front line with crossed swords, our lanes, our reserve at the foot; band labels ("left flank"); cards shrink when a reserve is long | **Ported** as is (R32), our side at the foot; the shrink is the body's scroll at R39's sizes |
 | The morale bar | A tug of war of front morale, each country's name and percent on its own fill, ink chosen by the fill's lightness, a gold middle tick | **Ported** (the dock's tug bar already has it), plus the flee line |
 | "Your orders this season" | Attack, Hold, Withdraw as three choices with the reason when refused; two lines of what the stance does; the Withdraw price in its hover | **Ported per day** (R33, R29): the choice is made at every dawn, not once a season |
@@ -103,8 +104,9 @@ usual pick); for each ranged company in his reserve, which enemy lane it shoots 
 
 ## 2. Decisions taken
 
-Q1 to Q5 are the open owner questions of `battle-board-build-plan.md`, section 9; each decision that names one is its
-recommended answer and changes if the owner answers otherwise.
+Q1 to Q5 are the owner questions of `battle-board-build-plan.md`, section 9. Q2 and Q4 were answered on 2026-11-25 (D5, D18,
+D23); Q1, Q3 and Q5 stay open, and each decision that names one is its recommended answer and changes if the owner answers
+otherwise.
 
 | # | Question | Decision | Why |
 |---|---|---|---|
@@ -112,7 +114,7 @@ recommended answer and changes if the owner answers otherwise.
 | D2 | Luck | **One stream** (`game.luck.world`), as M7. No per-battle stream. A live battle's days are contiguous on it because nothing else may act while it is live (R10) | Keeps "default orders are the identity": M7's frames, the bands, the soak and the AI tests do not move. A per-battle stream would re-base all of them |
 | D3 | What is saved of a battle in progress | Its **input, luck state before day 1, orders so far and day count**; the `CombatState` is never saved: it is re-fought on demand (R11) | The audit 4.4 and the owner's answer 7; a fight is a pure function of those |
 | D4 | Board or dock | A new screen **`BattleBoard`** for a live battle; the dock stays the review of a finished one. Both build from shared widgets moved out of the dock (BB8) | One job per screen; the dock's tests stay; the board's size is the mockup's choice (D5) |
-| D5 | The board's size and place | **Mockup choice (Q2).** Default: a board window over the shaded map like the Python panel (centred, at most 1100 x 680 logical, the battle hex glided into the visible strip); alternative: the dock in live mode (420 px left) | The owner asked to port the Python battle UI; fills, targets and the triangle need width |
+| D5 | The board's size and place | **A window over the map** (the owner's answer to Q2, 2026-11-25): a board window over the shaded map like the Python battle panel, centred, at most 1100 x 680 logical, the battle hex glided into the visible strip; not the dock. The dock in live mode is dropped. The window lies over the map and the right-hand dock column alike (R48); the dock stays the review of a finished battle | The owner asked to port the Python battle UI; fills, targets and the triangle need width |
 | D6 | When a battle is fought | **Opened at idle by the player's own action:** at once, on the board, before anything else. **Opened during End turn** (the computer's at-once marches, standing marches in the movement phase, storms): in the battles phase, in hex index order, the season **pausing** at each one the player is a side of | Moves design 2.6 and the audit 4.3; hex order keeps the bands and the AI's battles as M7; the computer never waits for the player inside its turn |
 | D7 | Saving during the End-turn pause | **Allowed.** The game is at a clean point (AI orders and movement done, earlier battles settled); `game.season_stage = &"battles"` is saved and a load resumes the pause | Owner answer 7 ("allowed anywhere") |
 | D8 | Leaving a battle undecided | **Never.** Esc and Close ask "Fight the rest automatically?"; the only ways out are a battle's end or Auto | A battle at idle blocks every other action (R10); an undecided battle would block the game |
@@ -125,11 +127,12 @@ recommended answer and changes if the owner answers otherwise.
 | D15 | Per-round results | Derived in a view from consecutive frames (men per company) and the dawn lanes; **no new frame key** | The record stays M7's form apart from `orders` |
 | D16 | The triangle on the board | A matchup word (Strong, Even, Weak) and its reasons for each facing pair and each fill candidate, computed from the same functions the hit uses (`attack_value`, `defence_value`, `extra_of`, `ground_mult`) with the dice and spread left out | Visible, honest and never out of date with the data |
 | D17 | A battle the player cannot influence | A battle whose human side has nothing to choose (a lone garrison: no reserve, no retreat, no ranged company) is fought at once with defaults and named in the report | No board of eight Fight-day clicks with no choice |
-| D18 | Several battles in one End turn | Each opens in hex order; the footer adds **"Auto this season's other battles"** when more wait | Fun principle 11 (light to run); Q4 |
-| D19 | The Options entry | "Your battles": **Play on the board** (default) or **Auto** | The audit's option, in two values; Q5 |
+| D18 | Several battles in one End turn | Each opens in hex order, after **one question before the first**: "Fight your N battles automatically?" (the owner's answer to Q4, 2026-11-25; D23, R47). The footer has no "Auto the rest" button; each board keeps its own **Auto to the end** ("Auto this one") | The owner: "Auto all battles at the end of turn is a hit"; a question before it runs, not a button inside a battle; Q4 is answered |
+| D19 | The Options entry | "Your battles": **Play on the board** (default) or **Auto**; a second row "Battles at End turn" (ask, auto, board) belongs to D23 | The audit's option, in two values; Q5 |
 | D20 | Format | `SaveFile.FORMAT` up by one with `OLDEST_FORMAT` the same (older refused quietly, as the fog build). If the moves build's FORMAT bump is merged but not released, the board rides it (one bump for the release) | One release at a time; no save from an unreleased format must load |
 | D21 | Ownership of the seam with the moves build | Section 3.6: the moves build opens battles and owns movement points; this build owns the fight, the live state, the orders, the pause, the board and the saved battle | Group B of the moves design shares the saved battle; one owner per file avoids a collision |
 | D22 | Task IDs | `BB0` to `BB14` | T, F, FG, K, TW, B, C, L are taken |
+| D23 | The End-turn prompt (the owner's answer, 2026-11-25) | At the first wait of the battles phase, when the player is a side of one or more battles in it that need a choice (not D17's lone garrisons), one question: "Fight your N battles automatically?" ("Fight your battle automatically?" for one) with **Yes** (every one runs on Auto, logged `battle_auto`, named in the report), **No** (each opens on the board in hex order) and a box **"Don't ask again"** that keeps the answer as the setting `game/battles_at_end` (`ask` default, `auto`, `board`); an Options row "Battles at End turn" turns it back to `ask`. Not shown when "Your battles" is Auto (D19) or the setting is not `ask`. The moves build (MV21) builds the setting, the row and the widget, dormant because every battle is automatic there; this build gives `BattlesAtEnd.count` its value, gives No its effect and shows the row | "Auto all battles at the end of turn is a hit. Ask before it runs all, with a notification that can be turned off."; the box is the planner's reading of "turned off" (it keeps the answer you gave) |
 
 ---
 
@@ -296,8 +299,8 @@ recommended answer and changes if the owner answers otherwise.
   log on a toggle), and the footer. Regiments are the dock's `RegimentTile` (code-drawn figure, men, morale bar, rank
   pips).
 - **R33** **The footer**: the stance as a `Segmented` (Attack, Hold, Withdraw; a refused one disabled with its reason as
-  tooltip; the price in each hover, R29), **Fight day N** (primary), **Auto to the end**, and "Auto this season's other
-  battles" when `more_waiting > 0` (D18). The stance is sticky from day to day. P: Fight day sending a stance the strip does
+  tooltip; the price in each hover, R29), **Fight day N** (primary), **Auto to the end** (the owner's "Auto this one"; there is no button for the other battles, the question of D23 covers
+  them, and `more_waiting` shows only as a quiet line "1 more of your battles waits"). The stance is sticky from day to day. P: Fight day sending a stance the strip does
   not show.
 - **R34** **Fills.** Each fill slot of the plan shows as an empty lane with a chooser (a small list under the lane, or the
   mockup's form): each candidate's figure, name, men of full, morale, rank, and its matchup word with the reasons in the
@@ -332,7 +335,7 @@ recommended answer and changes if the owner answers otherwise.
   opens the dock. P: a live battle's badge opening the dock with no record.
 - **R43** **The Options entry** "Your battles" (`battles`: `board` default, `auto`). With `auto`, `BoardHook.wants` is
   false (the phase fights them with defaults: D12) and a battle that becomes live at idle is sent `battle_auto` at once
-  (logged) and its result shown as a toast with "Review" (opens the dock).
+  (logged) and its result shown as a toast with "Review" (opens the dock). With `board`, the End-turn question of R47 applies.
 
 ### 3.6 The flow, the saves and the moves seam
 
@@ -342,7 +345,8 @@ recommended answer and changes if the owner answers otherwise.
   - `Session.act` and `check` accept `battle_day` and `battle_auto` while the season waits (the only exception to "wait for
     the season to end"); everything else keeps that refusal.
   - `SeasonFlow` gains **BATTLE**. In End turn: RUNNING until the wait; then REPLAY of the walks recorded so far (the
-    enemy's march onto the hex; skippable); then BATTLE (the board); when the battle ends, RUNNING resumes `finish_step`
+    enemy's march onto the hex; skippable); then, at the first wait only, the prompt of R47 when it applies (Yes runs every waiting battle on Auto and the
+    flow goes on; No goes on to the board); then BATTLE (the board); when the battle ends, RUNNING resumes `finish_step`
     (more waits repeat REPLAY and BATTLE); after the last phase REPLAY of what is left (retreats), DECISIONS and REPORT as
     today. At idle: IDLE, BATTLE, IDLE. The report counts the battles played ("You fought 2 battles; 1 was fought
     automatically").
@@ -363,9 +367,27 @@ recommended answer and changes if the owner answers otherwise.
 | Until the board lands | A battle opened at idle is fought at once by `BattleLive.fight_at(game, hex)` (defaults to the end; added by whichever build lands first) | Turns `fight_at` into the board's Auto and the Options' Auto |
 | Gets back | `Events.battle_ended(hex, record, winner)`, the record id, the armies' men and hexes after `BattleEnd.apply` (a retreat is a walk, `unit_moved`, replayed by the shell), the game idle and free again | |
 | Saved | `army/3` (points left) | `battle/2`, `battles/2`, `battle-record/2`, `season_stage`; one FORMAT bump with the moves build when both are in one release |
+| The End-turn prompt (R47) | MV21 builds the setting `game/battles_at_end`, its Options row (hidden), the widget `AutoBattlesAsk` and `BattlesAtEnd.count` (0 until the board); no prompt is shown, battles at End turn are fought automatically | Gives `count` its value, gives No its effect (the board) and shows the Options row |
 
   P: a battle fought inside the computer's orders phase (`test_battle_season_wait.gd` drives an AI march into the player's
   army and checks no record exists before the battles phase).
+- **R47** **The End-turn question** (D23). `BattlesAtEnd.count(game, viewer)` (`core/views/battles_at_end.gd`, built by the moves
+  build's MV21 and returning 0 there) gives the number of the player's battles in the battles phase that need a choice (a side
+  of the battle, D17's lone garrisons not counted). At the first wait, when it is 1 or more, the setting is `ask` and "Your
+  battles" is not Auto, the shell pushes `AutoBattlesAsk` (a `Confirm`): "Fight your N battles automatically?" with Yes, No
+  and the box "Don't ask again". Yes sends `battle_auto` for each of the player's waiting battles in hex order (logged; the
+  report says "You fought N battles automatically"); No opens the first on the board, the rest in hex order as D6 says. With
+  the box ticked the answer is kept as `game/battles_at_end` (`auto` for Yes, `board` for No); the Options row "Battles at End
+  turn" (Ask me, Fight automatically, Play on the board) sets it back. The question is a setting and a shell widget: nothing is
+  saved in the game, nothing is drawn from luck, and a save made while it is up reloads at the same wait. P: a question with a
+  count of 0; a box that keeps nothing; a question shown with the setting `auto`; Yes that leaves one battle for the board.
+- **R48** **The window and its seam with the docks** (D5). The board is a `Screen` over the map: a shade over the whole viewport
+  (map input blocked), the board centred over the map and the right-hand dock column alike, at most 1100 x 680 logical and
+  shrunk to the viewport minus `Tokens.S2` on every side; the battle hex is glided into the visible strip by the camera. It does
+  not resize or move any dock: the tile window (440 x 640, `tilewin-build-spec.md` R33) keeps its state under the shade and is
+  as it was when the board closes. The finished-battle dock (the 420 px left overlay) is a separate surface: "Review in the
+  dock" closes the board and opens the dock on the record. P: a board wider than the viewport at 1280 x 720; a tile window that
+  changes tab or size while the board is up; "Review in the dock" that leaves the board open.
 
 ---
 
@@ -489,7 +511,7 @@ in its sight. What it may not see:
 
 ## 6. Sketches
 
-The approved mockups (Appendix B) fix look and spacing; this sketch fixes the order of parts (layout B, the default).
+The approved mockups (Appendix B) fix look and spacing; this sketch fixes the order of parts (layout B, the window, decided 2026-11-25).
 
 ```
 +--------------------------- Battle of Cerano, Spring 1481 ------------------------- [look] [x] +
@@ -507,7 +529,7 @@ The approved mockups (Appendix B) fix look and spacing; this sketch fixes the or
 |  SAVOY reserve   [kn 250] [bm 100 shoots: centre v]                   | Log ...               |
 |  TRIANGLE  pikes hold horse . horse rides down shot and guns . shot and guns wear pikes      |
 +-----------------------------------------------------------------------+-----------------------+
-| Stance [Attack][Hold][Withdraw]     [ Fight day 3 ]   [Auto to the end]   (Auto this season's 1 other battle) |
+| Stance [Attack][Hold][Withdraw]     [ Fight day 3 ]   [Auto to the end]   1 more of your battles waits         |
 +-----------------------------------------------------------------------------------------------+
 ```
 
@@ -537,6 +559,7 @@ All under `godot/tests/`. Every edited test keeps its planted faults; a task may
 | `shell/test_board_sizes.gd` | R39 at the four sizes and scales, both themes, a full battle; every label 15 or more | R39 |
 | `shell/test_orders_strip.gd`, `test_fill_chooser.gd`, `test_target_chip.gd`, `test_round_card.gd`, `test_result_card.gd`, `test_regiment_card.gd` | each widget alone | a disabled stance that sends; a chooser with a refused candidate |
 | `shell/test_battle_wait.gd` | the flow with a fake board: the state walk of R44, act refused but for the battle actions, save in the wait and the resume, the Options' Auto | R43, R44 |
+| `shell/test_battle_prompt.gd` | R47: the question with a stub count of 0, 1 and 3 (the words for one); Yes sends `battle_auto` in hex order, No opens the board; the box keeps `auto` or `board` and Options sets `ask` back; not shown with `auto`, with "Your battles" Auto or with a lone garrison; a save while it is up reloads at the same wait | R47 |
 | `shell/test_battle_flow.gd` | headless app: a march into an enemy army (moves build) opens the board; three days and Auto; IDLE again. End season with a computer attack: REPLAY, BATTLE, RUNNING, REPORT; save in the wait and load resumes; the Options' Auto | R42 to R44 |
 
 ### 7.2 Tests that move or change
@@ -573,7 +596,7 @@ before BB1 (identity).
 **Monkey** (`tests/shell/monkey_board.gd`, extends the fog monkey): on a fixture where the player's armies stand next to
 enemy armies at war, it marches into them (a battle at idle), plays random legal and illegal orders (fills, targets,
 stances), presses Fight day, Auto, Esc then both answers, saves and loads at random dawns, ends seasons so the computer
-attacks (the wait), and switches the Options' entry. **Invariants each frame:** while a battle is live, every non-battle
+attacks (the wait), answers the End-turn question both ways and switches the Options' entries. **Invariants each frame:** while a battle is live, every non-battle
 action is refused and End season is refused; the board's pending orders pass `CombatOrders.check` or Fight day is
 disabled; the board shows `BattlePlan.of`'s numbers; the rebuilt state's luck equals the world's; a battle has 0 to 8 days
 and no more orders than days; after save and load the digest and the plan are equal; the board is inside the viewport; no
@@ -584,8 +607,8 @@ board is up without a live or waited battle. **Counters** above 0: `board_days`,
 
 `tools/ui/shot_ui_board.gd` (1280 x 720 scale 1, 2560 x 1440 scale 2, 1920 x 1080 at UI scale 1.5): day 1 with the
 line-up chooser; a mid-battle dawn with an open lane, the chooser open and a gun target chip open; the Withdraw hover; a
-round card; a result card (won, withdrew, fled); an assault; a narrow ground; the End-turn "battle awaits" moment; the Esc
-confirm; the Options entry; the army panel's "Open the board". **The owner is asked before any windowed run.** The art
+round card; a result card (won, withdrew, fled); an assault; a narrow ground; the End-turn "battle awaits" moment and the question "Fight your N battles automatically?"; the Esc
+confirm; the Options entries; the army panel's "Open the board". **The owner is asked before any windowed run.** The art
 director signs them against the approved mockups. Goldens that show the army panel, the Town tab's battle row or the dock
 are made again and reviewed side by side.
 
@@ -625,7 +648,7 @@ If `battle_rebuild_ms` passes its limit: keep the last rebuilt `CombatState` per
   R21 and the bands break. The planning session reads both specs side by side before either build starts (plan, review).
 - **Orders change later luck.** Two players' choices in one battle change every later draw. Accepted (the log replays it);
   the owner accepted reloading for other dice (answer 7).
-- **Ten clicks a battle tire the player.** Auto to the end, "Auto this season's other battles", the Options' Auto and D17
+- **Ten clicks a battle tire the player.** Auto to the end, the End-turn question of D23, the Options' Auto and D17
   keep it light; the playtest measures it.
 - **The triangle words mislead.** They come from the hit's own factors and are tested against them over every pair.
 - **Three lanes may feel thin.** It is v1 on purpose (audit R6); M24 adds width, back slots, rotation and cards on this seam.
@@ -642,6 +665,7 @@ If `battle_rebuild_ms` passes its limit: keep the last rebuilt `CombatState` per
 | ui-family-audit.md | 4.2 to 4.5, Q4 to Q9 | the board is its own screen (D4, D5); orders include targets (D1); saving allowed in the board (D7); End-turn battles in the battles phase (D6) |
 | moves-in-the-month.md | 2.6 "battles are fought in the order they happen, not in hex order"; group B "battle/2 and the format number" | idle battles in the order played; End-turn battles in hex order in the phase; `battle/2` is this build's (R46) |
 | ui-and-controls-spec.md | bindings | the board's keys (R41) |
+| moves-in-the-month.md | 2.6 ("the battle board (the live dock)") | a window over the map, not the dock (D5, R48) |
 | fog-build-spec.md | R22 (battle view access) | unchanged; `of_live` and `BattlePlan` follow it (R24, R28) |
 
 ## Appendix B. Mockups to approve before the build (gate BB0)
@@ -652,11 +676,11 @@ director before the owner sees them.
 
 | # | Mockup | What the owner decides |
 |---|---|---|
-| MK1 | **The board's layout**: A, the dock in live mode (420 px on the left, map beside it); B, a board window over the shaded map (the Python panel's place) | Q2: A or B |
+| MK1 | **The board's layout** (decided 2026-11-25: a board window over the shaded map, the Python panel's place; the dock in live mode is dropped): the window at 1280 x 720 with the tile window's dock column behind its shade, the battle hex in the visible strip, and "Review in the dock" | the look and spacing only (Q2 is answered) |
 | MK2 | **Day 1, the line-up**: three empty lanes each with its chooser, the matchup words, the usual pick marked | how a fill is chosen (list under the lane, or drag from the reserve) |
 | MK3 | **A dawn mid-battle**: an open lane with its chooser, a gun's target chip open, the stance strip with the Withdraw hover, the triangle legend | the orders' look and words |
 | MK4 | **The round card and the result card**: per-lane losses, dice, a broken lane, the triangle's sentence; won, withdrew and fled results | what a round says |
-| MK5 | **Entry and exit**: the End-turn moment (the enemy's walk, then "Milan attacks your army at Cerano"), Esc's "Fight the rest automatically?", "Auto this season's other battles", the Options entry, the army panel's "Open the board" | Q4, Q5 |
+| MK5 | **Entry and exit**: the End-turn moment (the enemy's walk, then "Milan attacks your army at Cerano"), Esc's "Fight the rest automatically?", the End-turn question "Fight your N battles automatically?" with its "Don't ask again" box, the Options entries, the army panel's "Open the board" | Q5 (Q4 is answered) |
 | MK6 | **The regiment hover card** with its strong and weak lines | the card's lines |
 
 ## Appendix C. Later (not in v1)

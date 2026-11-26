@@ -561,11 +561,19 @@ const TYPE_VARIATIONS: Dictionary[String, Dictionary] = {
 	"TileValueGood": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 15, "color": GOOD, "color_token": "GOOD", "tracking_em": 0.0, "tabular": true, "uppercase": false},
 	"TileValueBad": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 15, "color": BAD, "color_token": "BAD", "tracking_em": 0.0, "tabular": true, "uppercase": false},
 	"TileValueMuted": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 15, "color": MUTED, "color_token": "MUTED", "tracking_em": 0.0, "tabular": true, "uppercase": false},
-	"TileHead": {"base_type": "Label", "font": "alegreya_sc_bold", "size": 13, "color": MUTED, "color_token": "MUTED", "tracking_em": 0.09, "tabular": false, "uppercase": true},
-	"TileSub": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 14, "color": TILE_SUB_INK, "color_token": "TILE_SUB_INK", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileHead": {"base_type": "Label", "font": "alegreya_sc_bold", "size": 14, "color": MUTED, "color_token": "MUTED", "tracking_em": 0.09, "tabular": false, "uppercase": true},
+	"TileSub": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 15, "color": TILE_SUB_INK, "color_token": "TILE_SUB_INK", "tracking_em": 0.0, "tabular": true, "uppercase": false},
 	"TileChip": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 15, "color": TILE_CHIP_INK, "color_token": "TILE_CHIP_INK", "tracking_em": 0.0, "tabular": true, "uppercase": false},
-	"TilePlaque": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 13, "color": TILE_KEY, "color_token": "TILE_KEY", "tracking_em": 0.0, "tabular": false, "uppercase": false},
-	"TileLevel": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 13, "color": BRASS_HI, "color_token": "BRASS_HI", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TilePlaque": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 15, "color": TILE_KEY, "color_token": "TILE_KEY", "tracking_em": 0.0, "tabular": false, "uppercase": false},
+	"TileLevel": {"base_type": "Label", "font": "alegreya_sans_bold", "size": 14, "color": BRASS_HI, "color_token": "BRASS_HI", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	# The window's secondary text (issue 436 round 3, H3: no text under 15 logical px in the window, heads 14): the muted line, its
+	# tones, the age badge, and the hover card's title in the title bar's serif.
+	"TileHint": {"base_type": "Label", "font": "alegreya_sans_regular", "size": 15, "color": MUTED, "color_token": "MUTED", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileHintGood": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 15, "color": GOOD, "color_token": "GOOD", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileHintBad": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 15, "color": BAD, "color_token": "BAD", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileHintWarn": {"base_type": "Label", "font": "alegreya_sans_medium", "size": 15, "color": WARN, "color_token": "WARN", "tracking_em": 0.0, "tabular": true, "uppercase": false},
+	"TileEra": {"base_type": "Label", "font": "alegreya_sc_bold", "size": 14, "color": GOLD, "color_token": "GOLD", "tracking_em": 0.04, "tabular": false, "uppercase": false},
+	"TileCardTitle": {"base_type": "Label", "font": "cinzel_bold", "size": 17, "color": TEXT, "color_token": "TEXT", "tracking_em": 0.02, "tabular": false, "uppercase": false},
 }
 
 ## Panel, button and composite Theme variations for `build_theme.gd` (spec 4.7, ui-and-controls-spec.md 3.4).

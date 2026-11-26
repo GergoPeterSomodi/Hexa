@@ -7,6 +7,7 @@ extends GutTest
 
 const PANEL := "res://shell/panels/tile_window.tscn"
 const MAP := "res://shell/map/map_scene.tscn"
+const LAND := preload("res://shell/panels/tile_tabs/land_facts.gd")
 const TAG := ArmyFixture.TAG
 
 var _g: Game
@@ -147,7 +148,11 @@ func test_the_land_tab_shows_the_hex_cards_war_rows_without_the_siege_row() -> v
 	for row: Array in HexCard.war_rows(_g, fort):
 		if str(row[0]) == "Siege":
 			continue
-		assert_true(texts.has(str(row[2])), "the row %s reads its card's words" % str(row[0]))
+		var words := str(row[2])
+		if str(row[0]) == "Fortress":
+			# The tile window words the Fortress row from the fort level (round 3): "Town walls, garrison 800 of 800".
+			words = LAND.fortress_words(words, _g.defs.war.garrison_per_level)
+		assert_true(texts.has(words), "the row %s reads its card's words" % str(row[0]))
 
 
 func test_a_siege_the_viewer_is_in_shows_its_meter_and_forecast() -> void:
@@ -162,7 +167,9 @@ func test_a_siege_the_viewer_is_in_shows_its_meter_and_forecast() -> void:
 	assert_eq(int(meter.max_value), int(v.need), "the meter's full mark is the siege's need")
 	assert_eq(int(meter.value), mini(3, int(v.need)), "the meter is the siege's progress, up to the need")
 	var texts := _labels_in(_box())
-	assert_true(texts.any(func(t: String) -> bool: return t.contains("Besieged by")), "its line names the besieger")
+	# Round 3 reworded the siege block's title from "Besieged by X" to "Under siege by X" (the besieger is still named).
+	assert_true(texts.any(func(t: String) -> bool: return t.begins_with("Under siege by ") and t.length() > "Under siege by ".length()),
+		"its line names the besieger")
 
 
 func test_a_siege_the_viewer_cannot_read_shows_nothing() -> void:

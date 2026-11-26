@@ -225,18 +225,17 @@ class TestLandFacts:
 		assert_eq((_requests[0][1] as Dictionary)["record"], 4, "with the record")
 
 
-	func test_supply_and_castle_buttons_only_ask_and_show_when_the_view_says() -> void:
+	## Issue 436 round 3 (L3): Show supply and Show the castle area are icon buttons on the window's picture (TileHeader) now; the
+	## facts carry no such button. Their requests and their show-only-when-the-view-says rule are tested on the window
+	## (test_tile_window_r3.gd, test_picture_icon_buttons_ask_and_show_only_when_the_view_says).
+	func test_supply_and_castle_buttons_are_not_in_the_facts() -> void:
 		var land := _land_base()
 		land["supply"] = true
 		land["castle_area"] = true
 		_fill(Session.game, &"GEN", Vector2i(1, 1), _fake_view("own", land))
-		_button(LAND.SUPPLY_BUTTON).pressed.emit()
-		_button(LAND.CASTLE_BUTTON).pressed.emit()
-		assert_eq(_requests[0][0], &"map_mode", "the supply request")
-		assert_eq(_requests[1][0], &"castle_area", "the castle request")
-		_fill(Session.game, &"GEN", Vector2i(1, 1), _fake_view("own", _land_base()))
-		assert_null(_button(LAND.SUPPLY_BUTTON), "no supply button without supply")
-		assert_null(_button(LAND.CASTLE_BUTTON), "no castle button without a castle")
+		for button: Button in _buttons():
+			assert_false(button.text.begins_with("Show "), "no Show button in the facts: " + button.text)
+		assert_eq(_requests.size(), 0, "nothing asked")
 
 
 	func test_sea_shows_its_rows_and_no_people_section() -> void:
@@ -311,11 +310,13 @@ class TestLandFacts:
 		return found
 
 
+	## Issue 436 round 3 (M1, H3): the outlook is a note of the Room row in the window's 15 px secondary text, in its tone's colour;
+	## a plain note is muted.
 	func test_each_outlook_tone_has_its_theme_variation() -> void:
-		assert_eq(LAND._tone_variation(&"good"), &"NumberGood")
-		assert_eq(LAND._tone_variation(&"bad"), &"NumberBad")
-		assert_eq(LAND._tone_variation(&"warn"), &"NumberWarn")
-		assert_eq(LAND._tone_variation(&"plain"), &"TileText", "plain is the window's 15 px body text (issue 436, mockup v4)")
+		assert_eq(LAND._tone_variation(&"good"), &"TileHintGood")
+		assert_eq(LAND._tone_variation(&"bad"), &"TileHintBad")
+		assert_eq(LAND._tone_variation(&"warn"), &"TileHintWarn")
+		assert_eq(LAND._tone_variation(&"plain"), &"TileHint", "a plain note is the window's muted secondary text (M1)")
 
 
 	func test_the_outlook_line_is_in_the_views_tone() -> void:
@@ -337,7 +338,7 @@ class TestLandFacts:
 		_fill(Session.game, &"GEN", hex, _view(Session.game, &"GEN", hex))
 		var line := _outlook_label("Hungry")
 		assert_not_null(line, "the hunger line shows")
-		assert_eq(line.theme_type_variation, &"NumberBad", "hunger is bad")
+		assert_eq(line.theme_type_variation, &"TileHintBad", "hunger is bad")
 
 
 	func test_a_countryside_over_its_room_is_crowded_and_warn() -> void:
@@ -349,7 +350,7 @@ class TestLandFacts:
 		_fill(Session.game, &"GEN", hex, _view(Session.game, &"GEN", hex))
 		var line := _outlook_label("Crowded")
 		assert_not_null(line, "the crowding line shows")
-		assert_eq(line.theme_type_variation, &"NumberWarn", "crowding is a warning")
+		assert_eq(line.theme_type_variation, &"TileHintWarn", "crowding is a warning")
 
 
 	func test_a_countryside_with_room_left_is_plain() -> void:
@@ -359,7 +360,7 @@ class TestLandFacts:
 		_fill(Session.game, &"GEN", hex, _view(Session.game, &"GEN", hex))
 		var line := _outlook_label("Room for")
 		assert_not_null(line, "the room line shows")
-		assert_eq(line.theme_type_variation, &"TileText", "room left is plain (the window's body text)")
+		assert_eq(line.theme_type_variation, &"TileHint", "room left is plain (the window's muted note, M1)")
 
 
 	func test_a_town_that_can_grow_gives_a_good_outlook() -> void:
@@ -384,7 +385,7 @@ class TestLandFacts:
 		_fill(game, &"GEN", hex, _view(game, &"GEN", hex))
 		var line := _outlook_label(str(PeopleView.outlook(game, hex)["text"]))
 		assert_not_null(line)
-		assert_eq(line.theme_type_variation, &"NumberGood", "growth is good")
+		assert_eq(line.theme_type_variation, &"TileHintGood", "growth is good")
 
 
 ## The Town tab itself (issue 436, the owner's decision of 2026-11-25): Land and Buildings in one tab. Its registry facts, when

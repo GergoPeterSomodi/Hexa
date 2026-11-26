@@ -28,8 +28,11 @@ const HAMMER_FALLBACK := "+"
 const ROW_VARIATION := &"PanelSlot"
 const COMPACT_VARIATION := &"PanelTileUnit"
 ## The compact form's text, number and hammer variations (the tile window's look, mockup v4); the tall form keeps the kit's.
-const COMPACT_TEXT := {&"CompanyName": &"TileName", &"CompanyMeta": &"Hint", &"CompanyCount": &"TileValueMuted",
-	&"ButtonIcon": &"ButtonTileAct"}
+const COMPACT_TEXT := {&"CompanyName": &"TileName", &"CompanyMeta": &"TileHint", &"CompanyCount": &"TileValueMuted",
+	&"ButtonIcon": &"ButtonTileAct", &"CompanyEra": &"TileEra", &"Hint": &"TileHint", &"HintBad": &"TileHintBad"}
+## The compact form's mark over a figure whose silhouette is close to another's at the card's size (L4): pikemen carry a long
+## pike across the tile, crossbowmen a crossbow.
+const FIGURE_MARKS := {&"fig_infantry": TileGlyph.PIKE, &"fig_missile": TileGlyph.CROSSBOW}
 ## The compact form's Raise button.
 const RAISE_TEXT := "Raise"
 ## The tall form's count when none can be raised (the compact form shows nothing then: its small line says why).
@@ -67,6 +70,9 @@ func _ready() -> void:
 		_figure.texture = get_theme_icon(_figure_name, &"Kit")
 	if _hammer != null and layout == COMPACT:
 		_hammer.text = RAISE_TEXT
+		_hammer.expand_icon = false
+		if _hammer.disabled and has_theme_icon(&"lock", &"Kit"):
+			_hammer.icon = get_theme_icon(&"lock", &"Kit")  # M4: a refused Raise shows a lock, not only a lower contrast
 	elif _hammer != null:
 		if has_theme_icon(HAMMER_ICON, &"Kit"):
 			_hammer.icon = get_theme_icon(HAMMER_ICON, &"Kit")
@@ -96,6 +102,10 @@ func setup(row: Dictionary) -> void:
 		tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		tile.add_child(_figure_node())
+		if FIGURE_MARKS.has(_figure_name):
+			var mark := TileGlyph.make(FIGURE_MARKS[_figure_name], float(COMPACT_ICON_PX))
+			mark.name = &"FigureMark"
+			tile.add_child(mark)
 		body.add_child(tile)
 	else:
 		body.add_child(_figure_node())
@@ -139,7 +149,7 @@ func _name_line(row: Dictionary) -> HBoxContainer:
 	line.add_child(title)
 	var era := str(row.get("era_text", ""))
 	if era != "":
-		line.add_child(PanelKit.label(era, &"CompanyEra"))
+		line.add_child(PanelKit.label(era, _v(&"CompanyEra")))
 	return line
 
 
@@ -148,18 +158,18 @@ func _name_line(row: Dictionary) -> HBoxContainer:
 func _fill_text(text: VBoxContainer, row: Dictionary, state: StringName, reason: String) -> void:
 	var shared := bool(row.get("reason_shared", false))
 	if layout == COMPACT and state != TileArmy.STATE_READY and reason != "" and not shared:
-		text.add_child(_reason_label(state, reason))
+		text.add_child(_reason_label(state, reason, layout))
 		return
 	var meta := PanelKit.label(_meta_text(row), _v(&"CompanyMeta"))
 	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(meta)
 	if layout == TALL and state != TileArmy.STATE_READY and reason != "":
-		text.add_child(_reason_label(state, reason))
+		text.add_child(_reason_label(state, reason, layout))
 
 
-## "500 men · 30 ducats + 1 iron · upkeep 6" in the compact form; "500 men · upkeep 6" in the tall one (its costs are lines of
-## their own). An attack figure is added when the row carries one.
+## "500 men · 30 ducats + 1 iron" in the compact form (issue 436 round 3, H3: one line at 15 px; the upkeep is in the hover card);
+## "500 men · upkeep 6" in the tall one (its costs are lines of their own). An attack figure is added when the row carries one.
 func _meta_text(row: Dictionary) -> String:
 	var men := Words.men(int(row.get("men", 0)))
 	var upkeep := "upkeep %d" % int(row.get("upkeep", 0))
@@ -168,13 +178,18 @@ func _meta_text(row: Dictionary) -> String:
 		parts.append(str(row.get("cost_text", "")))
 	if row.has("attack"):
 		parts.append("attack %d" % int(row["attack"]))
-	parts.append(upkeep)
+	if layout == TALL:
+		parts.append(upkeep)
 	return " · ".join(parts)
 
 
-## A locked row's reason is a quiet line (the era is not open yet); a refused or short row's reason is in the bad tone.
-static func _reason_label(state: StringName, reason: String) -> Label:
-	var label := PanelKit.label(reason, &"Hint" if state == TileArmy.STATE_LOCKED else &"HintBad")
+## A locked row's reason is a quiet line (the era is not open yet); a refused or short row's reason is in the bad tone. The compact
+## form uses the tile window's 15 px secondary text.
+static func _reason_label(state: StringName, reason: String, form: int) -> Label:
+	var variation := &"Hint" if state == TileArmy.STATE_LOCKED else &"HintBad"
+	if form == COMPACT:
+		variation = COMPACT_TEXT[variation]
+	var label := PanelKit.label(reason, variation)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
 

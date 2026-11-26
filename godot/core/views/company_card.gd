@@ -14,6 +14,7 @@ const HEAD_MEN := "Men"
 const HEAD_RAISE := "To raise"
 const HEAD_AFTER := "Afterwards"
 const AGES: Array[String] = ["I", "II", "III"]
+const SEASONS_A_YEAR := 4
 
 
 ## {title, kind, sections, verdict {ok, text, tone}}; {} unless `tag` may raise companies on `hex` at all.
@@ -33,6 +34,8 @@ static func of(game: Game, tag: StringName, hex: Vector2i, kind: int) -> Diction
 	]
 	return {
 		"title": ud.name, "kind": _capital(String(ud.branch)), "sections": sections,
+		"heading": "Raise a company of %s" % ud.many, "subheading": "%s, age %s" % [_capital(String(ud.branch)),
+			AGES[clampi(ud.era - 1, 0, AGES.size() - 1)]],
 		"verdict": _verdict(game, tag, hex, kind, ud),
 	}
 
@@ -64,10 +67,11 @@ static func _raise_lines(game: Game, c: Country, tag: StringName, hex: Vector2i,
 	return out
 
 
-## Upkeep a season (ducats) and the food the company eats a season (the army's ration, as the supply counts it).
+## Upkeep a year (ducats; issue 436 round 3, H5: all money a year) and the food the company eats a season (the army's ration,
+## as the supply counts it).
 static func _after_lines(game: Game, ud: UnitDef) -> Array:
 	return [
-		["Upkeep a season", TONE_PLAIN, Words.ducats(ud.upkeep)],
+		["Upkeep a year", TONE_PLAIN, Words.ducats(ud.upkeep * SEASONS_A_YEAR)],
 		["Food a season", TONE_PLAIN, Words.plural(Supply.food_need(game, ud.men), "load of food", "loads of food")],
 	]
 

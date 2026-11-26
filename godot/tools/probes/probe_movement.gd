@@ -103,7 +103,7 @@ func _timed_season(game: Game) -> Dictionary:
 	for army: Army in game.armies:
 		if army.order != Army.ORDER_MARCH or army.mustering(game.turn):
 			continue
-		var w: MovementPhase.Walk = MovementPhase._leg(game, steps, army, winter)
+		var w: MarchLeg = MarchLeg.leg(game, steps, army, winter)
 		walks.append(w)
 		by_id[army.id] = w
 	out.legs = _ms(t)
@@ -111,10 +111,10 @@ func _timed_season(game: Game) -> Dictionary:
 	MovementPhase._ticks(game, walks, occ)
 	out.ticks = _ms(t)
 	t = Time.get_ticks_usec()
-	MovementPhase._room(game, walks, by_id)
+	MarchLeg.room(game, walks, by_id)
 	out.room = _ms(t)
 	t = Time.get_ticks_usec()
-	MovementPhase._apply(game, walks, {})
+	MarchLeg.apply(game, walks, {})
 	out.apply = _ms(t)
 	return out
 

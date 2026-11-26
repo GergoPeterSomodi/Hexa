@@ -76,7 +76,10 @@ func test_genoa_own_port_picture_and_header() -> void:
 	assert_eq(pic["harbour"], 3, "the harbour addon is the port picture (1 to 3)")
 	assert_eq(pic["owner_tag"], "GEN")
 	assert_eq(pic["season"], Calendar.season_of(g.turn))
-	assert_eq(_keys(v["strip"]), ["people", "food", "works", "ducats"], "own strip: people, food, works, ducats")
+	# Issue 436 round 3 (the owner's decision 1): the fourth own chip is this tile's income a year, added by strip_cells (it reads
+	# the country's worth, which the light view does not).
+	assert_eq(_keys(v["strip"]), ["people", "food", "works"], "own view strip: people, food, works")
+	assert_eq(_keys(TileView.strip_cells(g, GEN, hex, v)), ["people", "food", "works", "income"], "the chips add the income")
 
 
 func test_savona_own_inland_strip_and_facts() -> void:
@@ -89,8 +92,12 @@ func test_savona_own_inland_strip_and_facts() -> void:
 	assert_false(bool(v["own_port"]))
 	assert_eq(v["header"]["picture"]["kind"], "town")
 	assert_eq(v["header"]["picture"]["harbour"], 0)
-	var treasury := Countries.by_tag(g, GEN).treasury
-	assert_eq(_cell(v["strip"], "ducats")["value"], Words.number(treasury), "the viewer's own treasury")
+	# The owner's decision 1 (issue 436 round 3): the chip is this tile's income a year, the map hover's Worth line, not the treasury.
+	var income := _cell(TileView.strip_cells(g, GEN, hex, v), "income")
+	var worth := HexCard.worth_row(g, hex) if g.player == GEN else []
+	if not worth.is_empty():
+		assert_true(str(worth[2]).begins_with(str(income["value"]) + " a year"), "the tile's income a year: %s" % str(worth))
+	assert_ne(income["value"], Words.number(Countries.by_tag(g, GEN).treasury), "not the treasury")
 	var food := MapModes.food_year(g, GEN, hex)
 	assert_eq(v["land"]["food"], {"made": food.x, "eaten": food.y})
 	assert_eq(_cell(v["strip"], "food")["value"], Words.signed(food.x - food.y))
@@ -139,7 +146,8 @@ func test_milan_light_fog_shows_land_not_armies() -> void:
 	var v := TileView.of(g, GEN, hex)
 	assert_eq(v["sight"], &"light")
 	assert_eq(v["header"]["picture"]["kind"], "city", "the picture shows in light fog (R6)")
-	assert_eq(_cell(v["strip"], "garrison")["value"], "1200/1200", "the garrison is exact on a discovered fortress")
+	# L2 (issue 436 round 3): fractions read "N of M" with thousands separators everywhere.
+	assert_eq(_cell(v["strip"], "garrison")["value"], "1,200 of 1,200", "the garrison is exact on a discovered fortress")
 	assert_eq(_cell(v["strip"], "armies")["value"], "fog", "no army count out of sight")
 	assert_true(bool(v["land"]["armies_hidden"]))
 	assert_eq(v["army"]["reason"], "Out of sight: no armies are shown")
@@ -218,7 +226,8 @@ func test_sea_case_has_no_strip_no_picture_and_land_only() -> void:
 	assert_ne(hex, Vector2i(-1, -1), "a discovered sea hex")
 	var v := TileView.of(g, GEN, hex)
 	assert_eq(v["case"], &"sea")
-	assert_eq(v["strip"], [], "the strip is hidden at sea")
+	# M6 (issue 436 round 3): the sea keeps the header's skeleton: chips for its depth, winter and who holds the coast.
+	assert_eq(_keys(v["strip"]), ["depth", "winter", "coast"], "the sea's chips")
 	assert_eq(v["job"], {})
 	assert_eq(v["header"]["picture"], {})
 	assert_eq(v["header"]["owner"], {})

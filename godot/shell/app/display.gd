@@ -23,14 +23,25 @@ static func auto_scale(platform: String, screen_scale: float, screen_dpi: int) -
 	return clampf(roundf(raw_dpi * 4.0) / 4.0, 0.75, 2.0)
 
 
+## The UI scale a window `window_height` pixels tall asks for (issue 436 round 3, M9): its height over the 720 lines the layout
+## is made for, to the nearest quarter, 0.75 to 2.0 (a 1440-line window starts at 2.0); 0 when the height is not known.
+static func height_scale(window_height: int) -> float:
+	if window_height <= 0:
+		return 0.0
+	return clampf(roundf(float(window_height) / 720.0 * 4.0) / 4.0, 0.75, 2.0)
+
+
+## The UI scale of the setting: a number is its percent; "auto" is the screen's scale (auto_scale) or, when the window's height
+## is given and asks for more, the height's (height_scale; M9), so a 2560 x 1440 window is not drawn at 1.0.
 static func resolve_ui_scale(
 	ui_scale_setting: String,
 	platform: String,
 	screen_scale: float,
-	screen_dpi: int
+	screen_dpi: int,
+	window_height: int = 0
 ) -> float:
 	if ui_scale_setting == "auto" or not ui_scale_setting.is_valid_int():
-		return auto_scale(platform, screen_scale, screen_dpi)
+		return maxf(auto_scale(platform, screen_scale, screen_dpi), height_scale(window_height))
 	var pct := float(ui_scale_setting.to_int()) / 100.0
 	return clampf(pct, 0.75, 2.0)
 
@@ -144,7 +155,8 @@ static func apply(window: Window, settings: Settings) -> void:
 		str(settings.get_value("display/ui_scale")),
 		settings.platform,
 		screen_scale,
-		screen_dpi
+		screen_dpi,
+		0 if is_headless else window.size.y
 	)
 	window.content_scale_factor = scale
 	window.content_scale_size = window.size

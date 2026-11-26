@@ -2,15 +2,16 @@
 
 Technical director, 2026-11-25. **Status: a proposal; no task starts before the owner's go.** Builds
 `docs/architecture/moves-build-spec.md` ("the spec"), which builds `docs/design/moves-in-the-month.md` as the owner answered it
-(2026-11-24).
+(2026-11-24), and records his answers of 2026-11-25 (fair warning for every country, this build before the battle board, the End
+season battle prompt): section 9, MV20 and MV21.
 
-**When it runs.** After the tile window build (issue 436) closes, and **before the battle board** (issue 437, the audit's U2):
+**When it runs.** After the tile window build (issue 436) closes, and **before the battle board** (issue 437, the audit's U2; the owner confirmed the order on 2026-11-25):
 the owner's answer 6 of the UI family audit ("decide 432 before building the battle board"), and the board's trigger is the
 seam this build leaves (spec 7.1). Both go before M9, whose peace terms make wars longer (the audit 5.1). M9.5 (the economy)
 follows and takes the save format after 8 (spec 7.2). By the "fix issues first" rule, issue 427 (the battle end's cost) is fixed
 inside this build, in group A, because a battle on a click depends on it.
 
-**Task IDs** are `MV0` to `MV18`, and `MV19` (the owner's request of 2026-11-25, multi-leg marches: Shift+left click adds waypoints; spec 3.11, R58 to R72, D29 to D37).
+**Task IDs** are `MV0` to `MV18`, and `MV19` (the owner's request of 2026-11-25, multi-leg marches: Shift+left click adds waypoints; spec 3.11, R58 to R72, D29 to D37), and `MV20` and `MV21` (the owner's answers of 2026-11-25: fair warning for every country and the End season battle prompt; spec 3.12, R73 and R74, D24, D38 to D40).
 
 ---
 
@@ -23,11 +24,11 @@ S is about half a day of one worker, M a day, L two to three days.
 | **A. Foundations** | the fixture and the perf baseline; the walk engine split out (a pure refactor); the allowance and the save format; one battle fought at once, and issue 427 | MV0, MV1, MV2, MV3 | 1 S, 3 M |
 | **B. The walk at once** | the march walks in the act, the standing march, battles and storms at once, `season_from`; the preview's leg and risks and the order words; points in the views | MV4, MV5, MV6 | 1 L, 1 M, 1 S |
 | **C. The stops and the shell's picture** | stop on sight, the deep-fog step; the live walk and the chained season replay; the points on tokens and panels | MV7, MV8, MV9 | 1 L, 2 M |
-| **D. The confirm, the computer, the proofs** | the confirm, the toasts, the dock after a battle, the setting and help; the AI re-pinned on the soak; the invariants; the AI fog test and the twin test; the preview property and the replay proofs | MV10, MV11, MV12, MV13, MV14 | 1 L, 4 M |
-| **D2. Multi-leg marches** | stops staged by Shift+left click, the route through them previewed, ordered, stored, walked and drawn; the key `V`, the Esc rung, the card's buttons | MV19 | 1 L |
+| **D. The confirm, the computer, the proofs** | the confirm, the toasts, the dock after a battle, the setting and help; the AI re-pinned on the soak; the invariants; the AI fog test and the twin test; the preview property and the replay proofs; fair warning for every country, the player included | MV10, MV11, MV12, MV13, MV14, MV20 | 1 L, 4 M, 1 S |
+| **D2. Multi-leg marches** | stops staged by Shift+left click, the route through them previewed, ordered, stored, walked and drawn; the key `V`, the Esc rung, the card's buttons; the End season battle prompt's setting, row and widget (dormant until the board) | MV19, MV21 | 1 L, 1 S |
 | **E. Finish** | the monkey, the perf rows, the pictures and docs, the App flow test | MV15, MV16, MV17, MV18 | 4 M |
 
-**20 tasks: 2 S, 14 M, 4 L**, about 25 worker-days; about 11 working days end to end (each group as long as its longest
+**22 tasks: 4 S, 14 M, 4 L**, about 26 worker-days; about 11 working days end to end (each group as long as its longest
 task), plus reviews and the owner's playtest.
 
 ```
@@ -35,8 +36,8 @@ tile window closed, owner's go
   -> A:  MV0 (S)  MV1  MV2  MV3                (MV1's digests and MV3's battle cost read by the technical director)
   -> B:  MV4 (L)  MV5  MV6 (S)                 (MV4 is the heart: code reviewer and technical director)
   -> C:  MV7 (L)  MV8  MV9
-  -> D:  MV10  MV11 (L)  MV12  MV13  MV14      (MV11's soak tables: the systems designer's verdict before E)
-  -> D2: MV19 (L)                              (after MV10: it edits the shell files MV10 edits; code reviewer and technical director)
+  -> D:  MV10  MV11 (L)  MV12  MV13  MV14  MV20 (S)  (MV11's soak tables: the systems designer's verdict before E)
+  -> D2: MV19 (L)  MV21 (S)                   (after MV10: it edits the shell files MV10 edits; code reviewer and technical director)
   -> E:  MV15  MV16  MV17  MV18   -> the owner plays the checklist of section 5
 
 Critical path: MV1 -> MV4 -> MV7 -> MV11 -> MV15 (MV10 -> MV19 -> MV15 runs beside it; MV19 is shorter than MV11, so the path stays)        (and MV3 -> MV4; MV5 -> MV10 -> MV18; MV8 -> MV10)
@@ -92,12 +93,14 @@ without the owner's go.** Paths without a prefix are under `godot/`; `tools/`, `
 | MV12 | M, Sonnet | **The invariants and the soak's plant** | edit `tests/core/invariants.gd` (I1 to I8), `tests/core/test_invariants.gd`, `godot/tools/soak.gd` (`--plant=moves`, tests only) | Spec 8.4: each invariant with its P; `soak --quick` green; `--plant=moves` prints its replay line and exits 1 |
 | MV13 | M, Sonnet | **The AI fog test and the twin test** | rewrite the scene and add the case of spec 8.2 in `tests/core/test_ai_fog.gd`; new `tests/core/test_walk_twin.gd` | Spec R57, 8.2: the fog test green with its plants kept and the new case (acts before the first revealing walk equal, P: a step reading a hidden army's hex before it); the twin test over every order of Savoy's armies on `duel()` and `thin()` (P: a leg end that moves with an unseen army) |
 | MV14 | M, Sonnet | **The cross-proofs** | new `tests/core/test_walk_preview.gd` (the property), `tests/core/test_moves_replay.gd` | Spec done-when 3 and 4, R45, R55, R56: `leg` equals the walk over 200 seeded orders with no unseen army near (P: a leg that ignores the zone of control, planted through a test seam); 20 seasons with player marches, at-once battles and the AI replay to the same digest; a mid-season save loads to the same digest and plays on alike; save, load, save byte-equal |
+| MV20 | S, Sonnet | **Fair warning for every country** (owner answer 2026-11-25) | new `core/systems/fair_warning.gd` (the pure check: the walker's country declared this war this season and the hex is the enemy's land; the words and the hint), edit `core/systems/movement.gd` (`march_check`, `continue_march`'s check and `storm_check` each call it once; no growth past the 800-line mark), `core/systems/march_leg.gd` (the stop `&"warned"` in the step test), `core/views/move_preview.gd` (the `why` `&"warned"` and its line), `core/views/move_words.gd` (the toast); the war record's file only if it keeps no season (spec R73); new `tests/core/test_fair_warning.gd`; edit `tests/core/test_move_preview.gd`, `test_move_words.gd` | Spec R73, D24: each P of `test_fair_warning.gd`; the check and the act agree (`test_check_contract.gd`); the player's refusal carries the words and the hint; a march across the enemy's land stops at the border, keeps its points and walks on next season; the AI's candidate filter is untouched and no computer army meets the check in `test_moves_replay.gd`'s 20 seasons; the soak's war ranges are re-read by the systems designer (standing marches of the declaration season now stop at the border); the technical director reads the fog note of R73 |
 
 ### Group D2 (after D)
 
 | ID | Size, who | Task | Files | Done when |
 |---|---|---|---|---|
 | MV19 | L, Sonnet | **Multi-leg marches: Shift+left click adds waypoints** (GitHub issue "Multi-leg marches: Shift+left click adds waypoints to an army's route", 2026-11-25). Depends on MV2 (`army/3`), MV4 (`WalkNow`), MV5 (`MovePreview`), MV7 (fog and sight in `walk_plan`), MV10 (`map_armies.gd`, `move_card.gd`, the confirm, `MoveWords`) | edit `core/state/army.gd` (`via`: field, `to_dict`, `from_dict`, `digest_text`), `core/systems/armies.gd` (`set_order` takes `via`; the `from_dict` checks), `core/systems/movement.gd` (`march_check`, `march`, `legs_verdict`, `goal_verdict`'s `from`; `halt` clears `via` on the second halt; `continue_march` re-plans through the stops; keep the file under 800 lines by putting `legs_verdict` in `core/systems/march_via.gd`, new), `core/systems/march_leg.gd` (pop a stop on arrival; re-plan through the next stop), `core/systems/walk_now.gd` (pass `via` on), `core/defs/game_defs.gd` (`max_stops`, `validate`), `data/defs/game_defs.tres`, `core/game/replay.gd` and the log encoder only if the round-trip proof fails, `core/views/move_preview.gd` (`via`, `stored`'s stops, the leg cache), `core/views/move_words.gd` (the route shape), `core/views/tile_army.gd` and `core/views/army_view.gd` (the order line "by ..."), `shell/input/map_input.gd` (Shift+left click and `waypoint_requested`, `waypoint_ready`), `shell/input/bindings.gd` (`map_waypoint_key`, the four GESTURES lists), `shell/input/esc_ladder.gd` (`CLEAR_STOPS`), `shell/app/app.gd` (the ladder's state key and the new rung), `shell/map/map_armies.gd` (staging, `command` through the stops, the clears of spec R61), `shell/map/path_marks.gd` (stop markers), `shell/hud/move_card.gd` (the leg lines, "March" and "Clear stops"), `shell/hud/key_hints.gd`, `shell/screens/help_overlay.gd`; new `tests/core/test_march_via.gd`, `test_via_preview.gd`, `tests/shell/test_waypoints.gd`; edit the tests of spec 8.2 marked MV19, plus `tests/core/invariants.gd`, `test_invariants.gd` (I9, I10) and `test_moves_replay.gd` (a multi-leg march in the 20 seasons) | Spec R58 to R72, D29 to D37: every case and P of the three new tests; the check and the act agree for `via` (`test_check_contract.gd`); `via` in `army/3`, FORMAT unchanged at 8 (or 9, the planner says at the start: D31); the round trip of a `march` with `via` through the action log's JSON and `Replay.run` proved first, in the first commit; no file of `core/ai/` names `via` (door scan); Shift+left with no army still selects, Shift+right still storms; `preview_via_ms` and `march_via_ms` measured once headless, the numbers in the pull request; the staged stops never change the digest (test); lint rules of this plan's header. If the first pull request passes 1,500 changed lines, split into MV19a (core: `via`, the check, the walk, the preview, the three core tests) and MV19b (shell: the gestures, the key, the rung, the card, the markers, `test_waypoints.gd`), MV19b after MV19a |
+| MV21 | S, Sonnet | **The End season battle prompt: setting, row and widget (dormant until the board)** (owner answer 2026-11-25) | edit `shell/app/settings.gd` (`game/battles_at_end`: `ask` default, `auto`, `board`), the Options screen's script (the row "Battles at End season", hidden while `BattlesAtEnd.available()` is false), new `shell/screens/auto_battles_ask.gd` (`AutoBattlesAsk` on `Confirm`: the question, Yes, No, "Don't ask again"), new `core/views/battles_at_end.gd` (`count(game, viewer)` gives 0 and `available()` false until the board; the one place the board build replaces), the shell file that handles the End season button (the prompt is pushed before the season runs and only when `count` is above 0); new `tests/shell/test_auto_battles_prompt.gd`; edit the settings and Options tests | Spec R74, D40: each P of `test_auto_battles_prompt.gd`; no prompt in a game of this build (count 0, the Options row hidden); with a stub count above 0 the three answers and the box work and the setting reads back; nothing is saved in the game or the log; the digest is unchanged. It edits `settings.gd` and the Options screen, which MV10 edits, so it runs after group D |
 
 ### Group E (after D and D2, parallel)
 
@@ -166,9 +169,12 @@ baseline, or past its limit, takes the spec's fallback before merge.
 - **The creative director** reads MV5's and MV10's words (the move card, the toasts, the confirm) with the owner's playtest.
 - **MV19** is read by the code reviewer (the re-plan through the stops, the pair rule of `via`) and the technical director (R63 to R65, the
   `army/3` edit and the log round trip); the creative director reads its words (the leg lines, the toast, the card's buttons).
+- **MV20** is read by the code reviewer and the technical director (R73's fog note, the war record's season) and the systems
+  designer (the soak's war ranges); the creative director reads its refusal words and hint. **MV21** is read by the code
+  reviewer; the creative director reads the question and its answers.
 - **Pull requests say what changes for the player:** MV2 makes every saved game of earlier builds unloadable ("Made by an older
   test build"); MV4 makes orders walk at once; MV7 halts marches on sight; MV10 adds the confirm; MV11 changes what the computer
-  does (with the soak's tables).
+  does (with the soak's tables); MV20 stops your armies at the border of a country you declared war on in the same season; MV21 adds an Options setting that stays hidden until the board.
 
 **The owner's playtest** (Windows, fresh user folder, the Movement replay speed at Normal):
 
@@ -195,15 +201,21 @@ baseline, or past its limit, takes the spec's fallback before merge.
     last stop to remove it; right click: the army walks as far as its points reach without halting at a stop; End season: it walks
     on; the thin route with the markers of the stops ahead stays drawn until the end; F5, quit, Continue: the stops left are still
     there. With no army selected Shift+left click still selects, and Shift+right click still storms.
+11. Fair warning: declare war on Milan and, in the same season, order an army into Milanese land: the order is refused with a
+    clear sentence and a hint; an army ordered across its land stops at the border with its points kept; the next season the
+    same order is accepted. In a game where a computer country declares war on you, your armies are not stopped (the rule
+    binds the one who declares).
+12. Battles: a battle you open on a click is fought at once and the battle dock opens on the result (there is no board yet).
+    Options shows no "Battles at End season" row yet and End season asks nothing about battles; both arrive with the board.
 
 ---
 
 ## 6. Definition of done
 
 1. The spec's done-when items 1 to 8 hold.
-2. MV0 to MV18 merged; CI green with the nightly `soak`, `soak-ranges`, `perf_core` and `perf_ui` jobs within limits.
+2. MV0 to MV21 merged; CI green with the nightly `soak`, `soak-ranges`, `perf_core` and `perf_ui` jobs within limits.
 3. Issue 432 closed by MV18's pull request (with the playtest note), issue 427 by MV3's.
-4. The owner has played section 5, and answered Q1 (or left the default).
+4. The owner has played section 5.
 
 ---
 
@@ -240,7 +252,10 @@ baseline, or past its limit, takes the spec's fallback before merge.
 | Space, Enter and Esc during your own live walk skip it and do nothing else; an order, End season, F5 and F9 skip it and then act (spec R49) | the live walk blocks input like the season replay |
 | The computer's walks are replayed one after another in the order they were done, then the standing marches together (spec D20) | all together by tick, as today |
 | No "one move a season" switch (spec D25) | the design's data switch |
-| Fair warning stays the computer's rule only (spec D24) | Q1 |
+| Fair warning holds for every country, the player included (owner answer 2026-11-25; spec D24, R73): in the season a country declares a war its armies may not enter that enemy's land | the computer's rule only (the earlier default) |
+| Moves in the month ships before the battle board; until then a battle is fought automatically and the dock shows the result (owner answer 2026-11-25; spec D39) | hold #432 until the board is built and ship both together |
+| At End season, with one or more battles of yours, ask once "Fight your N battles automatically?" (Yes: all on Auto; No: play them on the board); built here, dormant until the board (owner answer 2026-11-25; spec D40, R74) | run them all on Auto with no question, or always open the board |
+| "Don't ask again" keeps the clicked answer as the setting `game/battles_at_end` (ask, auto, board) and Options turns it back to ask (the planner's reading of the owner's words) | the box only hides the prompt and always chooses Auto |
 | Multi-leg marches: a stop is a place to pass, not to halt; the army walks the stops and the goal as one route under one allowance, and does not wait at a stop (spec D29) | the army halts at each stop and needs Continue, or waits one season there |
 | Stops are staged in the shell and only the commit is an act; the commit is a right click on the hex under the pointer (or O, or the card's "March"), with the stops drawn on the way (spec D32, D33) | each Shift+left click is an act that stores a stop at once |
 | Esc clears every staged stop in one press; one stop is removed by Shift+left click or `V` on the last one (spec D34) | Esc removes the last stop only |
@@ -252,15 +267,19 @@ baseline, or past its limit, takes the spec's fallback before merge.
 
 ## 9. Open owner questions
 
-1. **Q1. Fair warning for you too?** Today, in the season a computer country declares war, its armies take no order into the
-   enemy's land (M8 D23); you have no such rule. With moves at once, you can declare war and strike in the same season before the
-   other country can move at all (it answers only at End season). Options: (a) keep it as it is: you may strike at once; (b) the
-   same rule for every country: in the season you declare a war, your armies may not step into that enemy's land (they may still
-   fight its armies on your own or on unclaimed land), from the next season on they may. **Recommend (b):** the owner's rule is
-   that the computer follows the same rules, so the rules should be the same both ways, and it keeps your first move from being
-   a free surprise attack. Cost if (b): one check in the march's open land (a small task in group D, `movement.gd` and its tests).
-2. **Q2. Ship this before the battle board?** This build gives "battle at once" as a battle fought automatically at the click, its
-   result shown in the battle dock; the board (#437) comes next and changes only how the days are played. Options: (a) ship #432
-   on its own, then the board (recommended); (b) hold #432 until the board is built and ship both together. **Recommend (a):** the
-   rule change is large and wants its own playtest; the board then lands on a tested trigger (spec 7.1), and each can be judged
-   alone.
+None. Both questions of the first draft were answered by the owner on 2026-11-25, and the note he added to them is built as
+well:
+
+1. **Q1. Fair warning for you too?** Answered: **yes, for every country, the player included.** The rule "no country may enter
+   an enemy's land in the season it declares war" holds for you and for every computer country (the computer's own filter of
+   M8 D23 stays, and the same check backs it up). You get a clear refusal text and a hint when an order breaks it. Spec D24,
+   R73; task MV20 (a small task in group D, `movement.gd`'s checks and the walk, with its tests).
+2. **Q2. Ship this before the battle board?** Answered: **yes, moves in the month (#432) ships before the battle board (#437).**
+   Until the board exists a battle is fought automatically at the click and the battle dock shows the result; the board comes
+   next and changes only how the days are played. Spec D39, 7.1.
+3. **The owner's note on several battles at End turn:** "Auto all battles at the end of turn is a hit. Ask before it runs all,
+   with a notification that can be turned off." Built as the End season prompt: when you have one or more battles to fight, ask
+   once "Fight your N battles automatically?" (Yes: all on Auto; No: play them on the board once it exists), with a "Don't ask
+   again" box that Options turns back on. **When it is built:** the setting, the Options row and the prompt widget in this build
+   (MV21), dormant because before the board every battle is automatic anyway; the board build (BB7) makes the prompt appear
+   and gives No its effect. Spec D40, R74.

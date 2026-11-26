@@ -2,14 +2,15 @@
 
 Technical director, 2026-11-25. **Status: built 2026-11-25 except TW19 (pictures signed, goldens, README and docs). The gate
 (TW0), groups A to E (TW1 to TW18) and three polish rounds added after the owner's playtest (TW20 to TW22: one fixed size,
-the Town tab, the mockup v4 look) are done; the as-built state is section 10 of the spec.** Builds
+the Town tab, the mockup v4 look) are done; a fourth round, **TW23** (design review round 3), is **in progress**; the as-built
+state is section 10 of the spec.** Builds
 `docs/architecture/tilewin-build-spec.md` ("the spec").
 
 **When it runs.** After the fog build (on master) and before M9.5, which adds its workshops as a strip of the Town tab (was: rows of the Buildings tab)
 and fills the `slots`, `arms` and `gate` fields the models carry (spec D16). It changes no rule, no save and no AI. Issue
 432 (moves in the month) and the battle board are not part of it; the Army rows keep a `points_text` field for 432.
 
-**Task IDs** are `TW0` to `TW22` (`TW20` to `TW22` are the polish rounds, added after TW18).
+**Task IDs** are `TW0` to `TW23` (`TW20` to `TW22` are the polish rounds, added after TW18; `TW23` is design review round 3, in progress).
 
 ---
 
@@ -26,9 +27,10 @@ S is about half a day of one worker, M a day, L two days.
 | **D. Swap and recruiting window** | **DONE (0f7827f):** the window replaces the hex panel; `RaiseScreen` built beside it | TW14, TW16 | done |
 | **E. Menu, keys, proofs, finish** | TW17 and TW18 **DONE** (built and tested; in the working tree after 0f7827f, hash to add when committed); **TW19 remains:** pictures, goldens, docs | TW17, TW18, TW19 | TW19: 1 M |
 | **Polish rounds** | **DONE** (same state as TW17 and TW18): one fixed size, the Town tab, the mockup v4 look | TW20, TW21, TW22 | done |
+| **Polish round 3** | **IN PROGRESS:** design review round 3: findings H1 to H5, M1 to M9, L1 to L7 and the owner's decisions of 2026-11-25 (ducats chip as income, the emblem for the stars, the Ships tab's wording, 40 px tiles and a two-line plaque, collapsible facts, the picture at the window's width) | TW23 | 1 M |
 
 **Remaining: TW19** (1 M, Haiku with the art director): about 1 worker-day, plus the owner's go for the windowed run and the
-owner's playtest.
+owner's playtest. **In progress: TW23** (1 M, Sonnet): design review round 3, about 1 worker-day; TW19's pictures come after it.
 
 ```
 owner's go
@@ -38,6 +40,7 @@ owner's go
   -> E:  TW17  TW18                              DONE (not yet committed)
          TW19                                    REMAINING  -> the owner plays the checklist of section 5
   polish: TW20  TW21  TW22                       DONE (not yet committed; after the owner's playtest of group D)
+  round 3: TW23                                  IN PROGRESS (design review round 3; spec D21 to D27)
 ```
 
 A group starts when every task of the group before it is merged. Inside a group no two tasks touch one file and no task
@@ -122,8 +125,9 @@ without a prefix are under `godot/`; `tools/`, `docs/`, `README.md` at the repos
 | ID | Task | State |
 |---|---|---|
 | TW20 | **One fixed size** | **DONE.** The window is `Tokens.TILE_WINDOW_W` x `TILE_WINDOW_H` (440 x 640) on every tile and tab; header, tabs and queue pinned, the body scrolls; shrinks only on a viewport shorter than that; tests at 1280 x 720 and at 1920 x 1080 with UI scales 1, 1.25 and 1.5 (spec R33, R38) |
-| TW21 | **The Town tab** | **DONE.** Land and Buildings merged into one Town tab (`town_tab.gd` with the parts `building_strips.gd` and `land_facts.gd`); the siege block on top when besieged; one wooden strip per building group with 48 px icon tiles that wrap; the land facts ledger under them; foreign land and sea get the facts alone; `land_tab.gd`, `buildings_tab.gd` and their tests replaced by `test_town_tab.gd`, `test_town_tab_strips.gd`, `test_tile_window_strips.gd`; the menu opens the Town tab; registry now Town 10, Army 30, Ships 40 (spec R14, R18 to R20) |
-| TW22 | **The mockup v4 look** | **DONE.** Header: stars at the left, name centred, a drawn round close button, a teal sub line, round-icon chips (`StripCells`), a 150 px picture on every tile (`SettlementPicture` gains the LAND and SEA kinds) with round badge icons, "Unexplored" on deep fog; flat tabs with a gold underline; the queue as one row at the foot; Army icon cards with the season's cap said once; `TileStyle` (the flat boxes as data for `KitTheme`); every icon and number has a tooltip or hover card, walked by `test_tile_window_tips.gd` (spec R37, R39, R40) |
+| TW21 | **The Town tab** | **DONE.** Land and Buildings merged into one Town tab (`town_tab.gd` with the parts `building_strips.gd` and `land_facts.gd`); the siege block on top when besieged; one wooden strip per building group with 48 px icon tiles (40 px from TW23) that wrap; the land facts ledger under them; foreign land and sea get the facts alone; `land_tab.gd`, `buildings_tab.gd` and their tests replaced by `test_town_tab.gd`, `test_town_tab_strips.gd`, `test_tile_window_strips.gd`; the menu opens the Town tab; registry now Town 10, Army 30, Ships 40 (spec R14, R18 to R20) |
+| TW22 | **The mockup v4 look** | **DONE.** Header: stars at the left (replaced by an emblem on the picture in TW23), name centred, a drawn round close button, a teal sub line, round-icon chips (`StripCells`), a 150 px picture on every tile (`SettlementPicture` gains the LAND and SEA kinds) with round badge icons, "Unexplored" on deep fog; flat tabs with a gold underline; the queue as one row at the foot; Army icon cards with the season's cap said once; `TileStyle` (the flat boxes as data for `KitTheme`); every icon and number has a tooltip or hover card, walked by `test_tile_window_tips.gd` (spec R37, R39, R40) |
+| TW23 | **Design review round 3** | **IN PROGRESS** (the next polish task). Fixes the findings **H1 to H5, M1 to M9 and L1 to L7** of the designer's review (each by its id in the pull request, or answered there) and builds the owner's decisions of 2026-11-25 (spec D21 to D27): the header's ducats chip shows this tile's income a year; the settlement-type emblem on the picture replaces the size stars; the Ships tab keeps its place with in-game wording; 40 px building tiles and a two-line plaque for groups with many buildings; collapsible facts sections; the picture scaled to the window's width so the whole town shows. Expected files: `shell/panels/tile_window.gd`, `shell/ui/strip_cells.gd`, `shell/ui/settlement_picture.gd`, `shell/ui/building_row.gd`, `shell/panels/tile_tabs/` (`town_tab.gd`, `building_strips.gd`, `land_facts.gd`, `ships_tab.gd`), `core/views/tile_view.gd` and their tests (the review's findings name the rest). Done when: every finding fixed or answered; spec R10, R11, R18, R19, R23, R29 as written; `test_tile_window_tips.gd` still walks every control, the emblem included; the size and scale tests of R33 and R38 green; no core rule, save or digest changes; TW19's pictures are made after it |
 
 
 ---
@@ -170,7 +174,7 @@ spec's fallback in TW18's pull request.
 
 **The owner's playtest** (Windows, fresh user folder):
 
-1. New game, Italy 1480, play as Genoa. Click Asti: the window shows its picture, the stars, the name, the chips, and opens on
+1. New game, Italy 1480, play as Genoa. Click Asti: the window shows its picture with the settlement emblem, the name, the chips (the last one is the tile's income a year), and opens on
    the Town tab. The strips show each building's state; hover a tile for its card; a too-dear tile has a red rim and a red line.
 2. Start a building with the hammer (press its tile): the queue at the foot shows it on every tab; its tile shows a green rim
    and a bar; Cancel works from the queue and from the menu.
@@ -185,13 +189,15 @@ spec's fallback in TW18's pull request.
 8. Right-click your own town: Tile details and Build here (the Town tab), Raise companies (the Army tab), Show supply, Select
    army, Cancel work each do what they say. The close button clears the selection.
 9. Look at TW19's signed pictures (deep fog shows on the thin test fixture).
+10. Fold and open a section of the facts on the Town tab; on a town with many buildings the 40 px tiles and the two-line plaques fit,
+    and the picture shows the whole town at the window's width.
 
 ---
 
 ## 6. Definition of done
 
 1. The spec's done-when items 1 to 7 hold.
-2. TW4 to TW22 merged (TW4 to TW16 are, TW17, TW18 and TW20 to TW22 are built and wait for their commit, TW19 remains); CI green with the nightly `perf_core` and `perf_ui` jobs within limits; the soak unchanged.
+2. TW4 to TW23 merged (TW4 to TW16 are, TW17, TW18 and TW20 to TW22 are built and wait for their commit, TW19 remains, TW23 is in progress); CI green with the nightly `perf_core` and `perf_ui` jobs within limits; the soak unchanged.
 3. Issue 436 closed by TW19's pull request, with the approved mockups and the signed pictures linked.
 4. The owner has played section 5.
 
@@ -219,12 +225,17 @@ spec's fallback in TW18's pull request.
 | On land the Town and Army tabs always show; a tab that does not apply is dimmed with its reason (the approved mockup); as built, Land and Buildings are one Town tab, so only Army is ever dimmed | absent tabs, as the earlier draft |
 | The chips are the same on every tab (four cells by case) | per-tab cells as the mockup's sketches varied |
 | Before M9.5 the strip's third cell is Works (crews in use of the limit); M9.5 turns it into Slots on settlements | an empty cell until M9.5 |
-| Size stars = settlement level, 1 (hamlet) to 5 (city); castles show no stars | stars from people bands |
+| A settlement-type emblem on the picture shows the size; the size stars are removed (owner, 2026-11-25; spec D22) | size stars from the settlement level, as TW22 built them |
 | As built: a 150 px picture on every tile (a settlement, the bare land or the sea); the first draft gave a title bar to other tiles | a title bar and no picture off settlements |
 | The menu loses its inline works rows ("Build here..." opens the Town tab), as the approved menu shows | keep the works rows in the menu too |
 | Gains fill one row a frame after the rows appear | compute every gain before the first draw |
 | Window opens on the last tab picked, else Town | always the first tab |
 | `RaiseScreen` is a non-opaque screen over the map | a second dock panel |
+| The header's ducats chip is this tile's income a year (owner, 2026-11-25; spec D21) | the viewer's treasury, as built |
+| The Ships tab is kept for own ports, with in-game wording (owner, 2026-11-25; spec D23) | hide the tab until ships exist |
+| Building tiles are 40 px and the plaque has two lines (owner, 2026-11-25; spec D24) | 48 px tiles and a one-line plaque, as built |
+| The picture scales to the window's width so the whole town shows (owner, 2026-11-25; spec D25) | scale by the height and crop the sides, as built |
+| The facts sections collapse, open by default, the state kept for the session and not saved (owner, 2026-11-25; spec D26) | always open |
 
 ---
 
@@ -233,4 +244,4 @@ spec's fallback in TW18's pull request.
 The owner said to ignore the settlement picture for now: TW8's code-drawn picture stays in the window as a placeholder for
 future stylised backgrounds. No more art work on it in this build (no art director pass, no new kinds); its weak points (dark
 water, arrow-like masts, small hamlets and villages) are not to be fixed now. When real backgrounds arrive they replace the
-`SettlementPicture` Control behind the same `TileView` picture facts, so nothing else changes.
+`SettlementPicture` Control behind the same `TileView` picture facts, so nothing else changes. The scale-to-width fix and the emblem of round 3 (spec D25, D22) are layout, not art work, and are built in TW23.

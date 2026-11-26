@@ -4,8 +4,10 @@
 ## `recipe()` is pure: the same input gives the same recipe (no luck, no clock, no node state). `_draw()` only walks the
 ## recipe. The recipe is laid out in a logical 296 x 72 box and scaled to the Control's rect, so the picture stays sharp
 ## at scale 2. Flat two-tone faces (lit left, shaded right), ink outlines, and colours only from `Tokens`. The box is scaled by
-## the Control's height, the same on both axes, and centred: a wider Control crops the sides (the tile window's 434 x 150
-## picture shows the middle of the scene). Two more kinds have no settlement: LAND (the bare land) and SEA (open water).
+## the Control's WIDTH, the same on both axes, and stands on the Control's foot: the whole scene shows, and the room above it is
+## the sky (issue 436 round 3: the tile window's 434 x 150 picture is the 296 x 72 scene at about 1.5 times, with sky over it;
+## a Control too short for that falls back to the height, centred). Three more kinds have no settlement: LAND (the bare land),
+## SEA (open water) and FOG (a hatched terra incognita on a never discovered hex, stretched to the whole Control).
 class_name SettlementPicture
 extends Control
 
@@ -22,13 +24,14 @@ const KINDS: Array[StringName] = [&"hamlet", &"village", &"town", &"walled_town"
 ## The kinds with no settlement (the tile window's picture of other tiles).
 const LAND := &"land"
 const SEA := &"sea"
+const FOG := &"fog"
 const PENNANT_PARTS: Array[StringName] = [&"tower", &"keep", &"spire", &"roof"]
 const SNOW_PARTS: Array[StringName] = [&"roof", &"spire"]
 const TOKEN_NAMES: Array[StringName] = [
 	&"OWNER", &"INK", &"SHADE",
 	&"PIC_SKY", &"PIC_HILL", &"PIC_GROUND", &"PIC_WATER", &"PIC_WATER_LIGHT", &"PIC_QUAY",
 	&"PIC_HOUSE", &"PIC_HOUSE_SHADE", &"PIC_ROOF", &"PIC_ROOF_SHADE", &"PIC_SNOW",
-	&"PIC_STONE", &"PIC_STONE_SHADE", &"PIC_WALL", &"PIC_WINDOW", &"PIC_SAIL",
+	&"PIC_STONE", &"PIC_STONE_SHADE", &"PIC_WALL", &"PIC_WINDOW", &"PIC_SAIL", &"TILE_FOG", &"TILE_SEP",
 ]
 
 ## House tables: [x, width, height] on the ground line.
@@ -56,8 +59,11 @@ static func recipe(
 	kind: StringName, level: int, harbour: int, snow: bool, owner_colour: Color
 ) -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
-	if kind == LAND or kind == SEA:
+	if kind == FOG:
+		_terra_incognita(items)
+	elif kind == LAND or kind == SEA:
 		_bare(items, kind == SEA)
+	if kind == FOG or kind == LAND or kind == SEA:
 		var bare: Array[Dictionary] = []
 		for item: Dictionary in items:
 			bare.append(_coloured(item, owner_colour))
@@ -118,6 +124,10 @@ static func token_colour(token: StringName, owner_colour: Color) -> Color:
 			return Tokens.PIC_WINDOW
 		&"PIC_SAIL":
 			return Tokens.PIC_SAIL
+		&"TILE_FOG":
+			return Tokens.TILE_FOG
+		&"TILE_SEP":
+			return Tokens.TILE_SEP
 	return Tokens.INK
 
 
@@ -143,17 +153,28 @@ func current_recipe() -> Array[Dictionary]:
 
 
 func _draw() -> void:
-	var scale_y := size.y / LOGICAL_SIZE.y
-	var k := Vector2(scale_y, scale_y)
-	draw_set_transform(Vector2((size.x - LOGICAL_SIZE.x * scale_y) * 0.5, 0.0))
-	# The sky and ground bands reach the Control's edges even where the scene is narrower than it.
-	if LOGICAL_SIZE.x * scale_y < size.x and not _recipe.is_empty():
-		var pad := (size.x - LOGICAL_SIZE.x * scale_y) * 0.5
-		draw_rect(Rect2(-pad, 0.0, size.x, size.y * 0.55), _recipe[0]["colour"] as Color)
-		draw_rect(Rect2(-pad, size.y * 0.55, size.x, size.y * 0.45), Tokens.PIC_GROUND)
+	if _recipe.is_empty():
+		return
+	var k := scene_scale(size)
+	if _recipe[0]["part"] == &"parchment":
+		k = size / LOGICAL_SIZE  # terra incognita fills the whole Control
+	var origin := Vector2((size.x - LOGICAL_SIZE.x * k.x) * 0.5, size.y - LOGICAL_SIZE.y * k.y)
+	# The sky over the scene, and the bands at its sides where the Control is wider than the scene.
+	if origin.y > 0.0 or origin.x > 0.0:
+		draw_rect(Rect2(0.0, 0.0, size.x, origin.y + 1.0), _recipe[0]["colour"] as Color)
+		if origin.x > 0.0:
+			draw_rect(Rect2(0.0, origin.y, size.x, size.y - origin.y), Tokens.PIC_GROUND)
+	draw_set_transform(origin)
 	for shape: Dictionary in _recipe:
 		_paint(shape, k)
 	draw_set_transform(Vector2.ZERO)
+
+
+## The scale of the 296 x 72 scene in a Control of `area`: by the width, unless the scene would then be taller than the Control
+## (then by the height). The same on both axes.
+static func scene_scale(area: Vector2) -> Vector2:
+	var s := minf(area.x / LOGICAL_SIZE.x, area.y / LOGICAL_SIZE.y)
+	return Vector2(s, s)
 
 
 func _paint(shape: Dictionary, k: Vector2) -> void:
@@ -440,14 +461,33 @@ static func _pennant(items: Array[Dictionary]) -> void:
 	]), &"OWNER", true, &"pennant")
 
 
+## The quay and one moored ship a harbour level: a hull, a mast and a square sail (issue 436 round 3, L5: the old triangle sail
+## read as a video's play button).
 static func _harbour(items: Array[Dictionary], hb: int) -> void:
 	_box(items, 196.0, 60.0, 100.0, 6.0, &"PIC_QUAY", &"quay")
 	for i: int in hb:
 		var mx := 226.0 + 26.0 * float(i)
-		_item(items, &"line", PackedVector2Array([Vector2(mx, 60.0), Vector2(mx, 22.0)]), &"INK", false, &"mast")
+		_item(items, &"line", PackedVector2Array([Vector2(mx, 63.0), Vector2(mx, 36.0)]), &"INK", false, &"mast")
+		_box(items, mx - 7.0, 40.0, 14.0, 13.0, &"PIC_SAIL", &"sail")
 		_item(items, &"poly", PackedVector2Array([
-			Vector2(mx, 24.0), Vector2(mx + 14.0, 36.0), Vector2(mx, 48.0),
-		]), &"PIC_SAIL", true, &"sail")
+			Vector2(mx - 11.0, 63.0), Vector2(mx + 11.0, 63.0), Vector2(mx + 8.0, 69.0), Vector2(mx - 8.0, 69.0),
+		]), &"PIC_ROOF_SHADE", true, &"hull")
+
+
+## A never discovered hex: dark parchment under diagonal hatching and a dotted coast that leads nowhere (terra incognita).
+static func _terra_incognita(items: Array[Dictionary]) -> void:
+	_box(items, 0.0, 0.0, LOGICAL_SIZE.x, LOGICAL_SIZE.y, &"TILE_FOG", &"parchment", false)
+	var x := -LOGICAL_SIZE.y
+	while x < LOGICAL_SIZE.x:
+		_item(items, &"line", PackedVector2Array([Vector2(x, LOGICAL_SIZE.y), Vector2(x + LOGICAL_SIZE.y, 0.0)]), &"TILE_SEP", false,
+			&"hatch")
+		_item(items, &"line", PackedVector2Array([Vector2(x + 1.0, LOGICAL_SIZE.y), Vector2(x + 1.0 + LOGICAL_SIZE.y, 0.0)]),
+			&"PIC_STONE_SHADE", false, &"hatch")
+		x += 9.0
+	for k: int in 14:
+		var px := 40.0 + 16.0 * float(k)
+		var py := 40.0 + 9.0 * sin(float(k) * 0.9)
+		_box(items, px, py, 3.0, 3.0, &"PIC_STONE", &"coast", false)
 
 
 ## The dark fade at the foot, under the name, kind and owner that the window lays over the picture.

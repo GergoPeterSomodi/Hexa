@@ -157,7 +157,7 @@ func test_own_land_shows_the_four_strip_cells_and_the_title() -> void:
 	var view := TileView.of(Session.game, Session.player_tag(), hex)
 	assert_eq(_title().text, str(view["header"]["title"]), "the title is the header's title")
 	var expected := PackedStringArray()
-	for cell: Dictionary in view["strip"]:
+	for cell: Dictionary in TileView.strip_cells(Session.game, Session.player_tag(), hex, view):
 		expected.append(str(cell["value"]))
 	assert_eq(_strip().values(), expected, "the strip shows the view's values in order")
 
@@ -170,7 +170,8 @@ func test_unexplored_shows_only_its_title() -> void:
 	_window.use_tabs(_std_tabs())
 	_window.show_hex(hex)
 	assert_eq(_title().text, "Unexplored", "an undiscovered hex is titled Unexplored")
-	assert_eq(_strip().cell_count(), 0, "no strip on an undiscovered hex")
+	# M6 (issue 436 round 3): one muted "Unexplored" chip keeps the header's skeleton.
+	assert_eq(_strip().values(), PackedStringArray(["Unexplored"]), "one Unexplored chip on an undiscovered hex")
 	assert_true(_window.tab_ids().is_empty(), "no tabs on an undiscovered hex")
 	assert_false(_job().visible, "no job line on an undiscovered hex")
 
@@ -182,7 +183,8 @@ func test_sea_hides_the_strip_and_the_tab_strip() -> void:
 		return
 	_window.use_tabs(_std_tabs())
 	_window.show_hex(hex)
-	assert_eq(_strip().cell_count(), 0, "sea has no strip cells")
+	# M6 (issue 436 round 3): the sea keeps the header's skeleton with its own chips (depth, winter, the coast's holder).
+	assert_eq(_strip().cell_count(), 3, "sea has its three chips")
 	assert_false(_tab_strip().visible, "the tab strip hides when only Land is shown")
 
 

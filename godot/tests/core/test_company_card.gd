@@ -50,7 +50,7 @@ func test_an_ok_kind_says_how_many_it_raises() -> void:
 	assert_true(str(verdict["text"]).ends_with("here this season."))
 	assert_true(_has_label(_lines(card, "Men"), "Men"))
 	assert_true(_has_label(_lines(card, "To raise"), "Ducats"))
-	assert_true(_has_label(_lines(card, "Afterwards"), "Upkeep a season"))
+	assert_true(_has_label(_lines(card, "Afterwards"), "Upkeep a year"))  # issue 436 round 3 (H5): the hover card says all money a year
 
 
 func test_can_raise_is_the_largest_count_that_passes() -> void:
@@ -77,7 +77,7 @@ func test_refused_kind_is_in_bad_tone_and_keeps_its_whole_card() -> void:
 	assert_eq(verdict["tone"], &"bad")
 	assert_true(str(verdict["text"]).contains("raised in a"), str(verdict["text"]))
 	assert_true(_has_label(_lines(card, "To raise"), "Ducats"), "a refused card keeps the ducat line (P)")
-	assert_true(_has_label(_lines(card, "Afterwards"), "Upkeep a season"), "a refused card keeps the upkeep (P)")
+	assert_true(_has_label(_lines(card, "Afterwards"), "Upkeep a year"), "a refused card keeps the upkeep (P)")
 
 
 func test_missing_horses_name_the_goods_in_the_refusal() -> void:

@@ -120,9 +120,11 @@ changes. Ring lift for raw districts stays any-owner (unrelated).
 
 - **Food value (new `food_permille` on a good):** grain 1000, fish 1000, **bread 1500** a load. Recipe 3 grain -> 2 bread, so
   baking at tier 1.0 with no bonus is food-neutral (3.0 in, 3.0 out); with tier below 1 it loses food, above it gains.
-- **Eating:** towns draw their food need in food units from the store, cheapest per unit first (grain, fish, then bread), so
-  bread piles up as a comfort stock and a sale good unless grain runs short. (Recommended; alternative: bread first, which
-  burns the made bread but is simpler to explain.)
+- **Eating (owner, 2026-11-25):** towns draw their food need in food units, **the most efficient food first**: highest food
+  value per load first, so bread (1.5) leads, then fish and grain (1.0 each); a tie goes to fish, then grain, then the lower
+  good id, so the order is the same every time. This replaces "cheapest per unit first (grain, fish, then bread)" and the
+  alternative "bread first". Bread is then eaten as it is made and sold only above the whole food need; grain and fish stay
+  in the store (a larger carry) and are sold instead.
 - **No double counting:** the country's "food made" for the surplus number counts raw food the districts make minus the grain
   the workshops take from its own stock, plus bread made x 1.5. Grain eaten and the same grain baked can never both count.
   Bought grain adds bread food without taking from the stock: an import, and so a surplus gain (by design).
@@ -131,7 +133,8 @@ changes. Ring lift for raw districts stays any-owner (unrelated).
   no bonus (0.8) turns 3 grain into 2.4 food, so it shrinks the carry by 20 %. A pin: "after the works step, every town's
   need of this season is still met and the reserve is unchanged".
 - **Comfort:** the comfort part of prosperity is cloth met for towns plus **bread's share of the food eaten** (full comfort at
-  30 % bread, `bread_comfort_share` 300). Comfort still changes growth only, not taxes.
+  30 % bread, `bread_comfort_share` 300). Because bread is eaten first, the share is met whenever the stock holds it, so
+  bread's comfort is never stuck at zero. Comfort still changes growth only, not taxes.
 - **M4 food pins affected** (the first task is to grep tests for food, and the food keys of `game_defs`: `food_need_milli`):
   `test_good_defs` (good count 16 -> 19, kinds, new `food_permille`), `test_economy_defs`, `test_economy_season`,
   `test_economy_preview` and `test_economy_1480` (Genoa's table: bread stock zero so food units equal the old loads; stays
@@ -271,7 +274,7 @@ Inside `production`, between needs and sales:
 
 ```
 made    districts make their raw (as M4)
-needs   towns take food (in food units: grain, fish, then bread), wine, salt, oil; the rest is the surplus above the reserve
+needs   towns take food (in food units, the most food per load first: bread, then fish, grain), wine, salt, oil; the rest is the surplus above the reserve
 works   each working slot, in settlement index then slot order:
           own    = min(capacity x staffing, own surplus of the input)
           bought = if Buy inputs on and treasury stays above the floor:
@@ -377,7 +380,7 @@ town, all own at hand: raw crown 113.4; with industry 113.4 + (75.6 + 73.6 + 22.
 ## 6. Player and AI
 
 **Player:** waits for the industry's year (3.6), then builds it in a free slot through the settlement's works card (cost, stages
-4 / 8 / 16 seasons). The card shows the recipe, tier, whether own raw is at hand, the Buy inputs switch, this season's use,
+4 / 8 / 16 seasons). The card shows the recipe, tier, whether own raw is at hand, the Buy inputs switch (per workshop, on its own card; decided 2026-11-25), this season's use,
 buying and output, and the income change per year, from the same code the season runs (`ImprovePreview`).
 
 **AI (M8 `AiEconomy`):** one new option, a slot build in `works_scan` (settlements with a free slot and an open industry),
@@ -519,3 +522,18 @@ N9. **Arms for refit and upgrade (M6).** Recommend refit and upgrade costs use a
 
 All the open questions of this design are now answered; the next step is its build plan (M9.5), after the tile window
 and the fog and movement decisions that touch the same panels and views.
+
+## Owner's answers, 2026-11-25 (build questions of M9.5)
+
+- **Bread order:** towns eat the most efficient food first (highest food value per load; bread 1.5, then fish and grain; ties
+  fish, grain, then good id). This replaces "bread last" (the design) and "bread first up to 30 %" (the build spec's
+  recommendation). Bread's comfort is full whenever the stock holds 30 % of the need; the food surplus does not depend on the
+  order; bread is sold only above the whole food need; the balance soak adds bread eaten and sold and re-measures the
+  bakery's payback.
+- **Plaque bar:** nothing yet. The Town tab plaques show the category name and "N built of M" only; no workers bar. The
+  workers data stays in the models, and a bar is a later decision once real workers data exists.
+- **Buy inputs switch:** one switch per workshop, on that workshop's own card (opened by a click on its tile), default on,
+  with a small coin badge on the tile while it buys (option A of the sketch "Buy Inputs Switch"). The final card is mocked up
+  at the gate (EC0) before the shell is built.
+- Still open, with their recommendations in the build plan (section 10): whether the free refill of men needs arms (question 2),
+  cloth as a comfort need (5), and the Slots chip replacing the Works chip on settlements (6).

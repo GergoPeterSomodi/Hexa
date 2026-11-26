@@ -18,7 +18,7 @@ floor. Workshops employ **workers** from the settlement's hands, like districts.
 **arms** and **bread**. Bread is food (1.5 a load). **Arms are needed to raise a company**, from the stores or bought at
 1.5 times the base price. People grow by `500 + 350 x surplus + 350 x prosperity` permille of today's rate, where comfort
 (cloth and bread) is part of prosperity. The tile window's Town tab shows it with no redesign: a **Workshops** strip, the
-plaque's **workforce bar**, the **Slots** chip ("2 / 3"), locked tiles that say what opens them, and the words of every
+plaques' name and "N built of M" count (no workers bar yet), the **Slots** chip ("2 / 3"), locked tiles that say what opens them, and the words of every
 tooltip.
 
 **The economy build is done when:**
@@ -37,7 +37,7 @@ tooltip.
    ranges hold.
 7. The perf rows of section 10 are within their limits.
 8. Lint, import, check_scripts, GUT, both UI `--check`s, `build_tile_tabs.gd --check`, `build_scenario.gd --check` and
-   `bake_ui.py --check` green; the owner has approved the gate mockup (EC0) and played the plan's checklist.
+   `bake_ui.py --check` green; the owner has approved the gate mockup (EC0, which includes the workshop card with its Buy inputs switch) and played the plan's checklist.
 
 ---
 
@@ -57,7 +57,7 @@ tooltip.
 | **No refit and no upgrade exist in Godot.** The one way a company regains men is the free `Military.refill` in `ready_units` | `core/systems/military.gd` | N9 ("refit and upgrade need arms") has nothing to change now; recorded for M11 (R49, open question 2) |
 | The AI: `AiEconomy.works_scan / works_card / works_act` with a prior in permille a year of the cost; `AiForces._raise_one` tests `treasury - ud.cost` against the reserve; `AiWar.blocker` lists the war gates; `AiTemperDef`, `AiDef` hold the weights | `core/ai/*.gd`, `core/defs/ai_*.gd` | One new option, one new step, three new weights (R58 to R64) |
 | Previews: `EconomyPreview` (718 lines) runs the same `goods_step` and money lines as the season; `ImprovePreview` (829 lines, allowlisted) makes the works card | `core/views/economy_preview.gd`, `improve_preview.gd` | Both near or over the size limit: the workshop card goes to a new `core/views/workshop_preview.gd` (R51) |
-| The tile window (v4): the Town tab stacks `building_strips.gd` (one wooden strip a group of `TileBuildings.of`: a plaque with the group's icon, name and "N built of M", then icon tiles `BuildingRow` in six states) and `land_facts.gd`; `StripCells` draws up to four chips of `TileView.strip`; `TileBuildings.gate_of` returns `{}`, groups carry `slots: {}` | `shell/panels/tile_tabs/`, `shell/ui/building_row.gd`, `strip_cells.gd`, `core/views/tile_buildings.gd`, `tile_view.gd`, `building_card.gd`, `tile_army.gd`, `company_card.gd` | The models fill the fields the window already reads; the strips gain a bar and one tile state (section 6) |
+| The tile window (v4): the Town tab stacks `building_strips.gd` (one wooden strip a group of `TileBuildings.of`: a plaque with the group's icon, name and "N built of M", then icon tiles `BuildingRow` in six states) and `land_facts.gd`; `StripCells` draws up to four chips of `TileView.strip`; `TileBuildings.gate_of` returns `{}`, groups carry `slots: {}` | `shell/panels/tile_tabs/`, `shell/ui/building_row.gd`, `strip_cells.gd`, `core/views/tile_buildings.gd`, `tile_view.gd`, `building_card.gd`, `tile_army.gd`, `company_card.gd` | The models fill the fields the window already reads; the strips gain one tile state and a coin badge (section 6); no bar |
 | `SaveFile.FORMAT` 7 (the fog build); the M9 spec also claims 7, the M10 spec 8 and the M11 spec 9 | `core/game/save_file.gd`, `m9/m10/m11-build-spec.md` | The chain is stale; this build takes master's plus one and the later specs move up (R13, Appendix A) |
 | The scenario bakes owners, regions, discovery and start armies; pieces come from the map | `core/defs/scenario_def.gd`, `tools/build_scenario.gd` | No start workshops (the owner's Q11): the scenario does not change (R8) |
 | `EconomyFixture.defs(calm, still)` is the one entry to test definitions (84 test files use it); `PeopleFixture.still` freezes people | `tests/core/economy_fixture.gd` | `IndustryFixture.off` is applied there by default, so the old pins hold without editing them (R67, D20) |
@@ -76,7 +76,7 @@ tooltip.
 | D6 | One job a settlement (N5) | The existing `work_at(hex)` rule: a workshop work and a level upgrade of the same settlement never run at once; a workshop work takes one of the country's works crews | Already true in `Works._begin_check`; no new rule |
 | D7 | The word "slot" | Code: `Works.slots` stays (crews). Words: "works crews" for crews ("no free works crew: 3 of 3 in use"), "slots" only for workshop slots | Two meanings of one word on one window would confuse; the tile window's R19 already says "works crews" |
 | D8 | Bread's kind | `made`, with `food_permille` 1500 and `food_order` 2; edible means `food_permille > 0` | A made good that is also food; the food code reads one field instead of a kind |
-| D9 | How towns eat bread | Towns first eat bread up to the comfort share (30 % of the food need, in food units), then fish, grain, then more bread | The design's order (bread last) leaves bread's comfort at zero almost always (section 11, item 5); open question 1 |
+| D9 | How towns eat food (owner, 2026-11-25) | Towns eat the **most efficient food first**: the edible goods sorted by `food_permille` from the highest (bread 1500 a load), then by `food_order` (fish 0 before grain 1, as today's code), then by good id; each takes `min(held, ceil(left / food_permille))`. No comfort share limits the eating | The owner's answer replaces both the design's "bread last" and this page's earlier "bread first up to 30 %"; a load of bread feeds half as much again, so fewer loads leave the store. Consequences in R33 |
 | D10 | Cloth for the towns | Cloth has a comfort need (`need_milli` 50 a season per 1,000 town people); towns take it **after** the workshops have made it and before the sale | The design's "cloth met" needs a need; cloth's reserve is 0, so the need must be met in the same season; open question 5 |
 | D11 | The money for bought input | Production moves the goods (`bought`), income pays them (`inputs_bought` = the `bought` flow at the buying price, rounded up), as income already does for `tax_goods` from `sold` | One way to pay, the same in the season and the preview; the floor is checked in production on the treasury of that moment |
 | D12 | The workshop's product flow | A new flow `crafted`, not `made` | `made` stays the land's output (stats, the Study's columns, M4's pins); the report adds both |
@@ -92,9 +92,9 @@ tooltip.
 | D22 | Start stock | Countries start at their reserve, as today: 2 arms each (arms' `reserve_fixed`), no cloth, no bread | One rule; a tiny gift, the soak sees it |
 | D23 | Demolishing a workshop | None in v1; clearing the whole settlement drops its slots | One of each industry fits in every slot count; no real need |
 | D24 | Groups on the Town tab | Settlement, **Workshops**, Land, Harbour, Defence | The workshops belong to the settlement; one strip a category |
-| D25 | The workforce bar | Per group: Land and Harbour: workers employed of the jobs on the tile; Workshops: the same summed over its working slots; Settlement: people of room; Defence: garrison of full (fortress only); none otherwise | The owner's intent ("its workforce on the tile"), with the two groups that have no jobs given the nearest honest measure; open question 4 |
+| D25 | The workforce bar (owner, 2026-11-25: nothing yet) | **Deferred.** The Town tab plaques show only the category name and "N built of M"; no workers bar and no workers line in the plaque tooltips. The models still carry `workforce` per group (data kept, R56) so a later bar follows the data without redesign; a bar is a later owner decision and no task asks for one | The owner wants nothing on the plaques beyond the count until real workers data exists |
 | D26 | The fourth chip on own land | A settlement shows **Slots** ("2 / 3") in place of Works; other own land keeps Works ("1 of 3") | Tile window D16; the chip row holds four cells |
-| D27 | The Buy inputs switch | On the workshop's works card (the `WorksPreview` screen), opened by a click on a built workshop tile; default on; the AI flips it by the same action | Hover cards are not interactive; the card is where the numbers are; open question 3 |
+| D27 | The Buy inputs switch (owner, 2026-11-25: decided, option A) | One switch **per workshop**, on that workshop's own card (the `WorksPreview` screen), opened by a click on its built tile; default on; the AI flips it by the same action. While the workshop is buying, its tile wears a small coin badge. The card (the approved sketch "Buy Inputs Switch", option A) shows the status, what it needs and makes per season, its upkeep, the switch, a line about the 1.2 times price and the treasury floor, and "bought this season" | Hover cards are not interactive; the card is where the numbers are. The sketch's floor of 200 ducats is an example: the rule stays `buy_floor_seasons` and the card prints the country's own floor. EC0 re-draws the final card first |
 | D28 | Task IDs | `EC0` to `EC21`; rules `R1` to `R70`, decisions `D1` to `D32` | E, T, F, FG, K, TW are taken |
 | D29 | M11 hooks | `Slots.count_at`, `Works.industry_open`, `Works.stage_max`, `Industry.output` and `Buying.price` all take the tag | Tech rows K1 to K6 read per country |
 | D30 | AI raises with arms | `AiForces` prices a company as `Military.cost_of(...).ducats + Military.arms_quote(...).cost` against its reserve | It never asks for a raise it cannot pay |
@@ -102,7 +102,16 @@ tooltip.
 | D32 | Where words come from | Every player-facing string of this build is in `core/views/` (models) or the tooltip table of R57, never built in the shell from numbers | One place for the words, testable headless |
 
 "Open question n" in this page points to section 10 of the plan, where each has a recommendation; the build takes the
-recommendation until the owner answers. Every other default is listed in the plan's section 9.
+recommendation until the owner answers. Open questions 1, 3 and 4 are answered (below); 2, 5 and 6 stay open.
+
+**Owner's answers, 2026-11-25.**
+
+- **Eating order (question 1):** towns eat the most efficient food first, highest food value per load first (D9, R33); this
+  replaces both "bread last" and "bread first up to 30 %". Ties go to `food_order`, then good id.
+- **Plaque bar (question 4):** nothing yet. Plaques show the category name and "N built of M"; no workers bar; the data is kept
+  (D25, R56) and a bar is a later decision, not part of any done-when.
+- **Buy inputs switch (question 3):** decided, option A of the sketch "Buy Inputs Switch": one switch per workshop on its own
+  card, opened by a click on its tile, default on, with a small coin badge on the tile while it is buying (D27, R61). Every other default is listed in the plan's section 9.
 
 ---
 
@@ -115,7 +124,7 @@ the tag and not occupied by another country.
 
 - **R1 Goods.** `GoodDef.KEYS` gains `cloth` (16), `arms` (17), `bread` (18); `COUNT` 19; `KINDS` gains `&"made"`. New field
   `food_permille` (food units a load: grain 1000, fish 1000, bread 1500, all others 0). A good is edible when
-  `food_permille > 0`; an edible good has a `food_order` (fish 0, grain 1, bread 2), others -1. `validate` allows
+  `food_permille > 0`; an edible good has a `food_order` (fish 0, grain 1, bread 2), others -1; it only breaks ties between equal `food_permille` (R33). `validate` allows
   `reserve_fixed` on `made` goods and `need_milli` (a comfort need) on `made` goods with `need_weight` 0.
 
 | Key | Id | Kind | Price (milli) | food_permille | food_order | need_milli | reserve_fixed | Icon |
@@ -151,7 +160,7 @@ the tag and not occupied by another country.
 | `stage3_year` | 1520 | the third stage of every industry opens |
 | `growth_base`, `growth_surplus`, `growth_prosperity` | 500, 350, 350 | permille of the growth multiplier (R42) |
 | `surplus_full_permille` | 250 | a surplus of 25 % of the need counts full |
-| `bread_comfort_share` | 300 | permille of the food need eaten as bread first; full bread comfort |
+| `bread_comfort_share` | 300 | permille of the food need that, eaten as bread, gives full bread comfort (it no longer limits the eating) |
 
 - **R4 Arms in the units' costs** (N7: 1 arms a company, 2 for bombards; the other goods unchanged):
 
@@ -289,12 +298,26 @@ the tag and not occupied by another country.
   It returns today's keys plus `worked` (input taken by good, positive), `bought` (by good), `crafted` (by good),
   `bought_milli`, `slots` ([{position, own, bought, crafted}] in R28's order). With no working slot and no bread or cloth it
   returns exactly today's values. P: works before needs; the reserve lowered by a workshop.
-- **R33 Food units (N3).** Food need in units = today's loads (`food_need_milli`); towns eat in milli-units: first bread up to
-  `bread_comfort_share` of the need, then every edible good by `food_order` (fish, grain, bread), each `take = min(held,
-  ceil(left / food_permille))`; `taken.food` = need - ceil(left / 1000), at most the need. Grain's reserve stays four seasons
-  of the food need (and the armies' food); bread's reserve is four seasons of the comfort share (`reserve_seasons x
-  need_loads(town, food_need_milli x share / 1000) x 1000 / 1500`, rounded up). `content_of` and `People.fed_of` count food
-  units (`used x food_permille / 1000`). With no bread every number equals today's. P: bread counted as one unit.
+- **R33 Food units (N3, D9).** Food need in units = today's loads (`food_need_milli`); towns eat in milli-units, the **most
+  efficient food first**: every edible good sorted by `food_permille` descending, then `food_order` ascending, then good id (so
+  bread 1500, fish 1000, grain 1000: a fixed order, no randomness), each `take = min(held, ceil(left / food_permille))`;
+  `taken.food` = need - ceil(left / 1000), at most the need (the last bread load may overshoot by under 1.5 units: capped,
+  not carried). Grain's reserve stays four seasons of the food need (and the armies' food, which is grain only); bread's
+  reserve stays four seasons of the comfort share (`reserve_seasons x need_loads(town, food_need_milli x share / 1000) x 1000
+  / 1500`, rounded up), and now only guards the sale: bread is eaten before anything else, so it is sold only above the whole
+  food need. `content_of` and `People.fed_of` count food units (`used x food_permille / 1000`). With no bread every number
+  equals today's (fish before grain). P: bread eaten after grain; a tie broken by anything but `food_order`.
+  *Consequences (owner's answer of 2026-11-25).* (a) **Comfort:** `bread met` (R44) is the bread eaten over the comfort share
+  of the need, so it reaches 1000 as soon as the stock the bakeries left at the start of the season is 30 % of the need in
+  units, and it is proportional below that; bread eaten above 30 % feeds but adds no comfort. Bread baked in the works step is
+  in the stock for the next season's eating (needs come before works). (b) **Growth:** the surplus counts food made less food
+  eaten in units, so it does not depend on the order; growth differs from the old "up to 30 %" rule only through the stock.
+  (c) **Stock and sale:** towns draw bread down first, so the bread stock stays near zero and bread is sold only when the
+  bakeries outrun the whole food need; grain and fish stay in the store longer (more carry, a little more sold). A bakery
+  earns by sparing grain and fish, not by selling bread, until M10 prices bite. (d) **The soak (EC17, EC20):** new records
+  `bread_eaten` and `bread_sold` per country and a range for bread's share of the food eaten; the `industry` income ratio
+  and the bakery's payback (so the AI's bakery prior) are re-measured; the levers are data (`bread_comfort_share`, the
+  bakery's recipe and years). Whether bread's reserve should become four seasons of the whole food need is left to EC20.
 - **R34 Needs before workshops.** After the works step every town's need of this season is still met as before it and the
   reserve of every good is unchanged (a pinned property over 40 seeded seasons).
 - **R35 No double counting.** The country's food made for the surplus (R43) = edible `made` and `crafted` in units minus the
@@ -325,7 +348,7 @@ the tag and not occupied by another country.
   `surplus_full_permille`), 0, 1000); need 0 gives 1000. `eaten` = the towns' food used plus the armies' (`army` flow), in units.
 - **R44 Prosperity and comfort.** `prosperity = (content + comfort) / 2`; `content` = M4's contentment (R33 units);
   `comfort = (cloth met + bread met) / 2`: cloth met = cloth used over its need (1000 when the need is 0), bread met =
-  bread eaten in units over `need x bread_comfort_share / 1000`, at most 1000. Growth only: taxes do not read it.
+  bread eaten in units over `need x bread_comfort_share / 1000`, at most 1000 (bread is eaten first, so it is met whenever the stock holds that share). Growth only: taxes do not read it.
   A fed, content country with no workshop gets `mult` about 500 + 350 x surplus + 175: about today's pace at a 25 % surplus.
   `People.season` computes `mult` per country from the open flows (`Growth.of_flows(game, c)`); the preview from its step's
   arrays (`Growth.of_step`), the same pure function. P: the preview's mult read from the flows of the game.
@@ -376,9 +399,11 @@ the tag and not occupied by another country.
   locked by `stage3_year`, refused), one **build** row per industry not built here (ready, short, locked by year `kind` gate,
   locked by slots `kind` level). Every hammer is its check's ok. `gate_of` returns `{year}` from the check's `kind` gate;
   `state_of` maps `kind` level to `locked` too. P: a ready row for a closed industry; a hammer that disagrees with its check.
-- **R56 The workforce bar (D25).** Every group carries `workforce: {} | {value, max, text, tip}`: Land and Harbour: the district
-  on the hex (`jobs x staffing / 1000` of `jobs`); Workshops: `Industry.workforce`; Settlement: people of room; Defence:
-  garrison men of full (a fortress only). P: a bar value above its max.
+- **R56 The workforce data (D25; no bar yet).** Every group still carries `workforce: {} | {value, max, text, tip}`: Land and
+  Harbour: the district on the hex (`jobs x staffing / 1000` of `jobs`); Workshops: `Industry.workforce`; Settlement: people
+  of room; Defence: garrison men of full (a fortress only). The shell draws **no bar** and prints none of these in a plaque
+  tooltip; the plaque shows the name and "N built of M" only (a later bar is the owner's decision and reads these fields as
+  they are). P: a `workforce` value above its max.
 - **R57 The words.** Every tooltip and line of section 6.3 comes from the models (`TileBuildings` rows' `state_text`, `tip`,
   the groups' `tip`, `TileView` cells' `tip`); the shell prints them. P: a shell file that formats a number into a tooltip
   of this build.
@@ -392,7 +417,8 @@ the tag and not occupied by another country.
   `CompanyCard` lines "arms: 1 from the stores (6 there)" or "arms: 1 bought, 14 ducats"; a company row's state line
   "500 men · 25 ducats + 1 arms · upkeep 6".
 - **R61 The workshop card on screen.** `WorksPreview.show_option` shows R51's workshop section and, for a built workshop,
-  the **Buy inputs** switch (`KitSwitch`, `Session.act("set_buy_inputs", ...)`); a click on a built workshop tile opens it
+  the **Buy inputs** switch (`KitSwitch`, `Session.act("set_buy_inputs", ...)`, per workshop); the workshop's tile wears a coin
+  badge while it is buying (`buying` on its `TileBuildings` row); a click on a built workshop tile opens the card
   (`works_requested {what: &"workshop_card", args: {hex, industry}}`).
 - **R62 Map marks.** A small trade mark beside a settlement per working slot (loom, anvil, loaf: the industry icons), drawn
   from a pure `core/views/workshop_marks.gd` (fog: discovered hexes only); idle slots draw no mark.
@@ -533,7 +559,7 @@ all), `buy_inputs_set {tag, hex, industry, on}`. Work events carry the work's `i
 ```
 production, per country in id order (pure goods_step, then the moves)
   held   = stock + made                                    (districts, as M4)
-  needs  = bread up to 30 % of the food need, then fish, grain, bread; wine, salt, oil
+  needs  = food, the most food per load first (bread, then fish, grain); wine, salt, oil
   works  = for each working slot (settlement index, position):
              own    = min(capacity x staffing, held - reserve)          whole batches
              bought = Buy on and price > 0 ? min(capacity - own, budget above the floor) : 0
@@ -551,8 +577,8 @@ people
 
 ## 6. The window follows the data
 
-The approved Town tab (mockup v4) needs no redesign: the models fill what it already reads, the strips draw one bar and one
-more tile state. The gate mockup (EC0) shows the result before the shell work starts.
+The approved Town tab (mockup v4) needs no redesign: the models fill what it already reads, the strips draw one more tile
+state and a coin badge. The gate mockup (EC0) shows the result before the shell work starts.
 
 ### 6.1 What each model gains
 
@@ -571,7 +597,7 @@ more tile state. The gate mockup (EC0) shows the result before the shell work st
 
 | File | Change |
 |---|---|
-| `shell/panels/tile_tabs/building_strips.gd` | `GROUP_ICONS` and `GROUP_MEANINGS` gain `workshops`; the plaque's count line reads the group (`"2 / 3 slots"` for Workshops, else "N built of M"); a thin `ProgressBar` under it from `group.workforce` with its `tip`; the plaque tooltip is `group.tip`; a click on a built workshop tile emits `workshop_card` |
+| `shell/panels/tile_tabs/building_strips.gd` | `GROUP_ICONS` and `GROUP_MEANINGS` gain `workshops`; the plaque shows the name and the count line "N built of M" for every group (for Workshops M is the slots: "2 built of 3"); **no bar**; the plaque tooltip is `group.tip`; a click on a built workshop tile emits `workshop_card` |
 | `shell/ui/building_row.gd` | `FAMILY_ICONS` gains the three industry keys; state `idle` (`PanelTileTileIdle`: the built look, dimmed, with the level); the tooltip is `data.tip` when present |
 | `shell/ui/strip_cells.gd` | `ICONS` gains `slots`; the tooltip is the cell's `tip` when present |
 | `shell/panels/tile_tabs/land_facts.gd` | the raw line and the workers line (R54) |
@@ -586,10 +612,10 @@ more tile state. The gate mockup (EC0) shows the result before the shell work st
 
 | Where | Text |
 |---|---|
-| Workshops plaque | "Workshops" · "2 / 3 slots"; tooltip "Workshops\nBuildings that turn raw goods into dearer ones. 2 of 3 slots in use: a walled town has 3 (a village 1, a town 2, a city 4).\nWorkers: 900 of 1,000 jobs filled (90 %)." |
-| Land plaque bar | "Workers: 1,800 of 2,000 jobs filled (90 %). The hands come from the people of this tile and the six round it that you hold." |
-| Settlement plaque bar | "People: 6,200 of 10,000. A town grows to its room, then may become a larger place." |
-| Defence plaque bar | "Garrison: 400 of 600 men." |
+| Workshops plaque | "Workshops" · "2 built of 3"; tooltip "Workshops\nBuildings that turn raw goods into dearer ones. 2 of 3 slots in use: a walled town has 3 (a village 1, a town 2, a city 4)." |
+| Land plaque bar (deferred, D25: not shown) | "Workers: 1,800 of 2,000 jobs filled (90 %). The hands come from the people of this tile and the six round it that you hold." Kept as data for a later bar |
+| Settlement plaque bar (deferred, D25: not shown) | "People: 6,200 of 10,000. A town grows to its room, then may become a larger place." |
+| Defence plaque bar (deferred, D25: not shown) | "Garrison: 400 of 600 men." |
 | Slots chip | value "2 / 3", label "Slots"; tooltip "Slots: 2 / 3\nWorkshop slots in use here, of the 3 a walled town has. A village has 1, a town 2, a walled town 3, a city 4." |
 | Ready build tile | "Weaver\nCan build: 100 ducats, 5 timber, 4 seasons.\n2 wool make 1 cloth. Own wool at hand: +25 %." (or "No own wool within two hexes: input from your stores or bought.") |
 | Short tile | "Weaver\ncost 100 · you have 64" (bad tone; the strip's red line) |
@@ -640,10 +666,10 @@ All under `godot/tests/`. Every edited test keeps its planted faults; a task may
 | `core/test_growth.gd` | `mult` on 40 seeded cases; surplus clamp and need 0; comfort parts; `of_flows` equals `of_step` on the same season; hunger untouched | R42 to R44 |
 | `core/test_military_arms.gd` | raise with own arms, with bought arms, the reserve used, neither (refusal, nothing changed), market off; the arms_bought line; the check/act pair with arms | R45 to R48 |
 | `core/test_workshop_preview.gd` | card fields per state; gain equals EconomyPreview's year difference; options of a settlement | R51, R52 |
-| `core/test_tile_workshops.gd` | the Workshops group rows and states on Genoa through 1480, 1485, 1490, 1520; slots chip; workforce bars per group; the growth facts; the words of 6.3 | R53 to R59 |
+| `core/test_tile_workshops.gd` | the Workshops group rows and states on Genoa through 1480, 1485, 1490, 1520; slots chip; workforce data per group (no bar drawn); the growth facts; the words of 6.3 | R53 to R59 |
 | `core/test_ai_industry.gd` | the prior on four fixture towns (own, bought, loss: 0); weights; siting priority; the buying step's switch; raising priced with arms; the war blocker line; prize term; traces | R64 to R68 |
 | `core/test_industry_fog.gd` | slots in the twin test; foreign rows without output; marks gated | R24, R58, section 7 |
-| `shell/test_town_workshops.gd` | the strip with its plaque, count, bar and tooltip; idle tiles; a click on a built tile asks `workshop_card`; locked tiles' words | R55 to R57, R61 |
+| `shell/test_town_workshops.gd` | the strip with its plaque (name and count, no bar) and tooltip; the coin badge on a buying workshop; idle tiles; a click on a built tile asks `workshop_card`; locked tiles' words | R55 to R57, R61 |
 | `shell/test_workshop_card.gd` | the card's section; the switch acts through `Session.act`; Esc | R61 |
 
 ### 8.2 Tests that move or change
@@ -684,7 +710,7 @@ the art director signs them against the EC0 mockup. Changed goldens are reviewed
 `tests/shell/monkey_tile.gd` gains a workshop step: on own settlements it hovers Workshops tiles, presses a ready hammer when
 one allows, clicks a built workshop to open its card and flips Buy inputs, closes the card. Invariants each frame: the
 Workshops strip shows exactly `TileBuildings` rows; the Slots chip equals `Slots.used / count_at`; no ready tile for a closed
-industry; the bar's value is at most its max; each settlement shows each industry at most once. Counters `workshop_cards`,
+industry; no plaque draws a bar; a coin badge shows exactly on buying workshops; each settlement shows each industry at most once. Counters `workshop_cards`,
 `buy_switches`, `workshop_builds` above 0 on at least one of three seeds (one past 1490 by a prepared state).
 
 ---
@@ -765,15 +791,17 @@ M4 cache key), as the tile window's spec 8 does.
    changes the words.
 4. **Food order.** The design says towns eat "grain, fish, then bread"; the code eats fish (order 0) before grain (1). The
    code's order stays.
-5. **Bread's comfort.** Eating bread last (the design's recommendation) makes "bread's share of the food eaten" almost always
-   0, so bread could never raise prosperity; D9 eats bread first up to the comfort share (open question 1).
+5. **Bread's comfort and the eating order.** Eating bread last (the design's recommendation) makes "bread's share of the food
+   eaten" almost always 0, so bread could never raise prosperity. The owner decided (2026-11-25) that towns eat the most
+   efficient food first, bread leading (D9, R33), which also gives bread comfort.
 6. **Cloth's comfort.** "Cloth met for towns" needs a cloth need, and cloth's reserve of 0 sells it the season it is made;
    D10 adds a comfort need met after the works step (open question 5).
 7. **The product's flow.** The design books the product as `made`; D12 uses `crafted` so `made` stays the land's.
 8. **The Industries tab.** The design asks for an Industries tab; the tile window decided no such tab (its D6), and the built
    v4 has a Town tab with strips: workshops are a Workshops strip (D24).
-9. **Workforce bars.** The tile window spec (D14, Appendix C) left out workforce bars; the owner's v4 has a bar on every
-   plaque; M9.5 supplies its data (D25).
+9. **Workforce bars.** The tile window spec (D14, Appendix C) left out workforce bars; the owner's v4 had a bar on every
+   plaque and M9.5 first supplied its data (D25). The owner then decided (2026-11-25) on no bar yet: plaques show the name and
+   count only; the data stays.
 10. **The worked numbers.** The design's section 5 uses fractions (37.5 cloth); the game floors a season and a slot (about
     36). `test_industry_numbers.gd` pins the integers and EC21 updates the table.
 11. **The AI's company price.** The design says the AI prices a company's goods at base; `AiForces` compares only the ducats
@@ -811,5 +839,5 @@ M4 cache key), as the tile window's spec 8 does.
 | `m9-build-spec.md` D60 | FORMAT 8 (not 7; the fog build took 7), `map-state/6`, `country/5`, `war/2` unchanged in meaning |
 | `m10-build-spec.md` | FORMAT one above M9.5's; `map-state` and `work` one above M9.5's; `Buying.price` and `take` read the market (stock, price, scarcity); cloth, arms, bread get appetite rows; `worked`, `bought`, `crafted` in its flow table; an arms embargo or blockade stops arms buying |
 | `m11-build-spec.md` | FORMAT one above M10's; tech rows K1 (`Works.industry_open`), K2 (`Works.stage_max`), K3 (`Industry.output`), K4 (`Slots.count_at`), K5 and K6 (`Buying.price`); the year table (`IndustryDef.year`, `stage3_year`) removed; refit and upgrade take arms through `Military.arms_quote` |
-| `tilewin-build-spec.md` D14, D16, Appendix C | Workforce bars and the Slots chip are built (this page's D25, D26) |
+| `tilewin-build-spec.md` D14, D16, Appendix C | The Slots chip is built (D26); workforce bars are deferred, their data only (D25) |
 | `docs/design/economy-rethink.md` | status built; FORMAT; D9, D10, D12; section 5's integers |

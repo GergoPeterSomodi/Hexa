@@ -7,8 +7,9 @@ const MAP_PATH := "res://data/maps/north_italy.tres"
 const DEFS_PATH := "res://data/defs/game_defs.tres"
 const GEN := &"GEN"
 const ShipsScript := preload("res://shell/panels/tile_tabs/ships_tab.gd")
-const HEADING := "No ships yet"
-const NOTE := "Ships and shipyards arrive with a later milestone. This tab is here so ports have a place for them."
+# The owner's decision 3 (issue 436 round 3): the game's words, no milestone talk.
+const HEADING := "No ships in port."
+const NOTE := "Shipyards come with the age of sail."
 
 
 func _italy() -> Game:
@@ -102,8 +103,8 @@ func test_fill_writes_the_empty_box() -> void:
 	var texts: Array[String] = []
 	for label: Label in _labels(tab, []):
 		texts.append(label.text)
-	assert_true(texts.has(HEADING), "the bold heading reads No ships yet")
-	assert_true(texts.has(NOTE), "the note names the later milestone")
+	assert_true(texts.has(HEADING), "the bold heading reads No ships in port")
+	assert_true(texts.has(NOTE), "the note says when shipyards come")
 	assert_eq(texts.size(), 2, "one box: a heading and one line, no list")
 	var box := tab.get_node("EmptyBox") as PanelContainer
 	assert_eq(box.theme_type_variation, &"PanelSlot", "the bordered box is the PanelSlot variation")

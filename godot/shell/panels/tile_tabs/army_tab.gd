@@ -97,7 +97,7 @@ func _build_armies(rows: Array) -> void:
 	add_theme_constant_override(&"separation", Tokens.S1 + 1)
 	add_child(_head("Armies here", false))
 	if rows.is_empty():
-		add_child(PanelKit.label("No armies here", &"Hint"))
+		add_child(PanelKit.label("No armies here", &"TileHint"))
 		return
 	for row: Dictionary in rows:
 		add_child(_army_row(row))
@@ -127,7 +127,7 @@ func _army_row(row: Dictionary) -> Control:
 	text.add_child(name_label)
 	var men := str(row.get("men_text", ""))
 	var state := str(row.get("state_text", ""))
-	var small := PanelKit.label("%s · %s" % [men, state] if own and state != "" else men, &"Hint")
+	var small := PanelKit.label("%s · %s" % [men, state] if own and state != "" else men, &"TileHint")
 	card.tooltip_text = "%s: %s%s" % [title, small.text, "" if own else "
 Not yours: seen, not commanded."]
 	small.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -157,29 +157,22 @@ func _on_open_pressed(army_id: int) -> void:
 	app_requested.emit(&"select_army", {"army": army_id, "hex": _hex})
 
 
-## The raise block of an own settlement: the head line, the arms banner (only when the model has arms), one compact row a kind
-## and Show all.
+## The raise block of an own settlement: the head, the counts on their own muted line under it (M4: green is for gains only), the
+## shared refusal said once with a stop sign, the arms banner (only when the model has arms), one compact row a kind and Show all.
 func _build_raise(raise: Dictionary) -> void:
-	# The head line (mockup v4): the heading at the left, the men to levy and the season's raises at the right.
-	var line := HBoxContainer.new()
-	line.add_child(_head("Raise a company here", true))
-	var head := PanelKit.label(str(raise.get("head", "")), &"HintGood")
+	add_child(_head("Raise a company here", true))
+	var head := PanelKit.label(str(raise.get("head", "")), &"TileHint")
+	head.name = &"RaiseCounts"
 	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	head.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	line.add_child(head)
-	add_child(line)
+	add_child(head)
 	var rows: Array = raise.get("rows", [])
 	var shared := shared_reason(rows)
 	if shared != "":
-		var once := PanelKit.label(shared, &"HintBad")
-		once.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		add_child(once)
+		add_child(_refusal(_season_words(shared)))
 	var arms: Dictionary = raise.get("arms", {})
 	if not arms.is_empty():
 		var banner := PanelKit.label("Arms in stores %s · %s" % [str(arms.get("in_stores", "")), str(arms.get("premium_text", ""))],
-			&"Hint")
+			&"TileHint")
 		banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		add_child(banner)
 	for raw: Variant in rows:
@@ -201,8 +194,32 @@ func _build_raise(raise: Dictionary) -> void:
 	add_child(_show_all)
 
 
-## The refusal that every raise row shares word for word, when there are two rows or more and none is ready (the season's
-## cap, or a town that may not raise): said once above the rows. "" when the rows differ or one may be raised.
+## The shared refusal's words (M4): the season's cap reads "All 3 companies raised this season" (the town and the hex are the
+## window's title already); any other refusal is said as the rule says it.
+func _season_words(shared: String) -> String:
+	var cap := Military.raise_cap(_game, _hex)
+	if cap > 0 and Military.raised_here(_game, _viewer, _hex) >= cap:
+		return "All %s companies raised this season" % Words.number(cap)
+	return shared
+
+
+## The refusal line: a red stop sign and the words, the reason whole as its tooltip.
+func _refusal(words: String) -> HBoxContainer:
+	var line := HBoxContainer.new()
+	line.name = &"Refusal"
+	line.add_theme_constant_override(&"separation", Tokens.S2)
+	line.mouse_filter = Control.MOUSE_FILTER_PASS
+	line.tooltip_text = words + "\nNo company can be raised here until the next season."
+	var stop := TileGlyph.make(TileGlyph.STOP, 16.0)
+	stop.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(stop)
+	var text := PanelKit.label(words, &"TileHintBad")
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_child(text)
+	return line
+
+
 ## A small-caps group head; `gap` puts room above it (a group after another).
 static func _head(text: String, gap: bool) -> Label:
 	var head := PanelKit.label(text, HEAD)
@@ -213,6 +230,8 @@ static func _head(text: String, gap: bool) -> Label:
 	return head
 
 
+## The refusal that every raise row shares word for word, when there are two rows or more and none is ready (the season's
+## cap, or a town that may not raise): said once above the rows. "" when the rows differ or one may be raised.
 static func shared_reason(rows: Array) -> String:
 	if rows.size() < 2:
 		return ""
