@@ -7,6 +7,12 @@ mockup v4, the Town tab with its wooden building strips, is in the working tree 
 something else, this page wins for the build; every place it differs is in section 11. The tasks are in
 `economy-build-plan.md`. M9.5 sits between M9 (diplomacy) and M10 (trade) in the roadmap.
 
+**Owner's answers of 2026-11-26 and 2026-11-27, recorded here:** refilling lost men also needs arms (R49); there is no special
+cloth comfort need (D10); the population's needs are to be met on the settlement's **own market**, and the market decides the
+price, a direction **still to be designed** (`economy-rethink.md` section 15; nothing in this page's rules builds it yet); and
+the tile window's header chip shows the building slots used on a settlement ("3 of 4 slots") instead of the works under way
+(D26, R53).
+
 **What it is, in one paragraph.** Every land tile makes one raw good. Settlements get **slots** (village 1, town 2, walled
 town 3, city 4) that hold **workshops**: the **weaver** (2 wool make 1 cloth), the **armourer** (2 iron make 1 arms) and the
 **bakery** (3 grain make 2 bread), one of each per settlement, built and upgraded through three stages by the ordinary works.
@@ -16,9 +22,12 @@ district of its input within two hexes, takes its input from the country's own s
 switch is on, buys the rest from a small **home market** at 1.2 times the base price while the treasury stays above a
 floor. Workshops employ **workers** from the settlement's hands, like districts. Three goods join the game: **cloth**,
 **arms** and **bread**. Bread is food (1.5 a load). **Arms are needed to raise a company**, from the stores or bought at
-1.5 times the base price. People grow by `500 + 350 x surplus + 350 x prosperity` permille of today's rate, where comfort
-(cloth and bread) is part of prosperity. The tile window's Town tab shows it with no redesign: a **Workshops** strip, the
-plaques' name and "N built of M" count (no workers bar yet), the **Slots** chip ("2 / 3"), locked tiles that say what opens them, and the words of every
+1.5 times the base price, **and to refill lost men** (R49). People grow by `500 + 350 x surplus + 350 x prosperity` permille
+of today's rate, where comfort is part of prosperity (no special cloth need, D10; what comfort reads is open question 9).
+The tile window's Town tab shows it
+with no redesign: a **Workshops** strip, the
+plaques' name and "N built of M" count (no workers bar yet), the **Slots** chip in the header ("3 of 4 slots"), locked tiles
+that say what opens them, and the words of every
 tooltip.
 
 **The economy build is done when:**
@@ -27,7 +36,8 @@ tooltip.
 2. On "Italy, 1480", seed 1480, as Genoa (a city, 4 slots): in Spring 1480 every workshop row is locked ("opens in 1485",
    "opens in 1490", "opens in 1495"); in Spring 1485 `build_workshop {hex: Genoa, industry: armourer}` succeeds, the job
    line shows "armourer, first stage", and four seasons later the slot works; a pikemen company raised in Genoa then takes 1
-   arms from the stores, or buys it for 14 ducats when the stores are empty.
+   arms from the stores, or buys it for 14 ducats when the stores are empty; a company that regains lost men takes arms too
+   (R49).
 3. With `IndustryFixture.off` every pinned number of M3 to M9 holds unchanged (Genoa's table of the M4 spec 4.15 included).
 4. The preview equals the season to the unit over 200 seeded cases that include workshop builds, the year gates, the Buy
    inputs switch, buying at the floor, bread and raising with arms (R50).
@@ -54,7 +64,7 @@ tooltip.
 | `Stores.FLOWS` made, used, sold, work, refund, dev, army, raise; `Treasury.WHY` ten reasons, `SPENDING` work, refund, raise | `core/systems/stores.gd`, `treasury.gd` | Appended: flows `worked`, `bought`, `crafted`; lines `upkeep_workshops`, `inputs_bought`, `arms_bought` (R40) |
 | Growth: `grown = people x growth_bp[tax] x growth_percent[slot] / 1e6`, only when fed; settlements raise themselves to town (`people_top_level` 3) | `core/systems/people.gd` (`_rule`, `season`, `fed_of`) | `_rule` gains the multiplier (R42); `fed_of` counts food units (R35) |
 | Raising: `raise_check` order hex, home, occupied, settlement, kind, level, cap, held, stand, men, ducats, goods, books; units cost iron (pikemen 1, crossbowmen 1 + 1 timber, knights 1 + 3 horses, bombards 5 + 3 copper) | `core/systems/military.gd`, `data/defs/units/*.tres` | Iron becomes arms (R45); an arms step joins the check after the ducats (R46) |
-| **No refit and no upgrade exist in Godot.** The one way a company regains men is the free `Military.refill` in `ready_units` | `core/systems/military.gd` | N9 ("refit and upgrade need arms") has nothing to change now; recorded for M11 (R49, open question 2) |
+| **No refit and no upgrade exist in Godot.** The one way a company regains men is the free `Military.refill` in `ready_units` | `core/systems/military.gd` | The owner (2026-11-26 and 2026-11-27): refilling lost men also needs arms, so `refill` changes in M9.5 (R49); refit and upgrade are recorded for M11 |
 | The AI: `AiEconomy.works_scan / works_card / works_act` with a prior in permille a year of the cost; `AiForces._raise_one` tests `treasury - ud.cost` against the reserve; `AiWar.blocker` lists the war gates; `AiTemperDef`, `AiDef` hold the weights | `core/ai/*.gd`, `core/defs/ai_*.gd` | One new option, one new step, three new weights (R58 to R64) |
 | Previews: `EconomyPreview` (718 lines) runs the same `goods_step` and money lines as the season; `ImprovePreview` (829 lines, allowlisted) makes the works card | `core/views/economy_preview.gd`, `improve_preview.gd` | Both near or over the size limit: the workshop card goes to a new `core/views/workshop_preview.gd` (R51) |
 | The tile window (v4): the Town tab stacks `building_strips.gd` (one wooden strip a group of `TileBuildings.of`: a plaque with the group's icon, name and "N built of M", then icon tiles `BuildingRow` in six states) and `land_facts.gd`; `StripCells` draws up to four chips of `TileView.strip`; `TileBuildings.gate_of` returns `{}`, groups carry `slots: {}` | `shell/panels/tile_tabs/`, `shell/ui/building_row.gd`, `strip_cells.gd`, `core/views/tile_buildings.gd`, `tile_view.gd`, `building_card.gd`, `tile_army.gd`, `company_card.gd` | The models fill the fields the window already reads; the strips gain one tile state and a coin badge (section 6); no bar |
@@ -77,10 +87,10 @@ tooltip.
 | D7 | The word "slot" | Code: `Works.slots` stays (crews). Words: "works crews" for crews ("no free works crew: 3 of 3 in use"), "slots" only for workshop slots | Two meanings of one word on one window would confuse; the tile window's R19 already says "works crews" |
 | D8 | Bread's kind | `made`, with `food_permille` 1500 and `food_order` 2; edible means `food_permille > 0` | A made good that is also food; the food code reads one field instead of a kind |
 | D9 | How towns eat food (owner, 2026-11-25) | Towns eat the **most efficient food first**: the edible goods sorted by `food_permille` from the highest (bread 1500 a load), then by `food_order` (fish 0 before grain 1, as today's code), then by good id; each takes `min(held, ceil(left / food_permille))`. No comfort share limits the eating | The owner's answer replaces both the design's "bread last" and this page's earlier "bread first up to 30 %"; a load of bread feeds half as much again, so fewer loads leave the store. Consequences in R33 |
-| D10 | Cloth for the towns | Cloth has a comfort need (`need_milli` 50 a season per 1,000 town people); towns take it **after** the workshops have made it and before the sale | The design's "cloth met" needs a need; cloth's reserve is 0, so the need must be met in the same season; open question 5 |
+| D10 | Cloth and the towns' needs (owner, 2026-11-26 and 2026-11-27) | **No special cloth comfort need.** The population's needs are to be met on the settlement's own market, which decides the price: a design direction **to be designed** (`economy-rethink.md` section 15). Until then cloth has no need and is sold as made; what comfort reads meanwhile is open question 9 | The owner's answer; it removes this page's `need_milli` 50 and the comfort step |
 | D11 | The money for bought input | Production moves the goods (`bought`), income pays them (`inputs_bought` = the `bought` flow at the buying price, rounded up), as income already does for `tax_goods` from `sold` | One way to pay, the same in the season and the preview; the floor is checked in production on the treasury of that moment |
 | D12 | The workshop's product flow | A new flow `crafted`, not `made` | `made` stays the land's output (stats, the Study's columns, M4's pins); the report adds both |
-| D13 | Arms bought for a raise | Paid at once in the raise on its own line `arms_bought` (in `SPENDING`), the goods through `bought` then `raise` | A player's choice, not the season's income; `left_over` stays the season's measure |
+| D13 | Arms bought for a raise | Paid at once in the raise on its own line `arms_bought` (in `SPENDING`), the goods through `bought` then `raise` (a refill's bought arms the same way, R49) | A player's choice, not the season's income; `left_over` stays the season's measure |
 | D14 | The treasury floor | One season of upkeep: districts, walls, workshops and the army (`buy_floor_seasons` 1) | The design's rule, from numbers the income phase already has |
 | D15 | Rounding of the recipe | Input taken in whole batches (`input_loads`); output `batches x output_loads x tier x (1000 + at hand) / 1,000,000`, floored a season and a slot | Integer and exact; no input wasted on a part batch |
 | D16 | Raw at hand (N6) | The country's own district (owned and not occupied) whose good is the input, at stage 2 or more, within two hexes; the best one counts: stage 2 250 permille, stage 3 300 (`near_input_permille`) | The owner's answer: +25 %, growing by a small step with the raw tile's stage |
@@ -93,7 +103,7 @@ tooltip.
 | D23 | Demolishing a workshop | None in v1; clearing the whole settlement drops its slots | One of each industry fits in every slot count; no real need |
 | D24 | Groups on the Town tab | Settlement, **Workshops**, Land, Harbour, Defence | The workshops belong to the settlement; one strip a category |
 | D25 | The workforce bar (owner, 2026-11-25: nothing yet) | **Deferred.** The Town tab plaques show only the category name and "N built of M"; no workers bar and no workers line in the plaque tooltips. The models still carry `workforce` per group (data kept, R56) so a later bar follows the data without redesign; a bar is a later owner decision and no task asks for one | The owner wants nothing on the plaques beyond the count until real workers data exists |
-| D26 | The fourth chip on own land | A settlement shows **Slots** ("2 / 3") in place of Works; other own land keeps Works ("1 of 3") | Tile window D16; the chip row holds four cells |
+| D26 | The header's works chip on own land (owner, 2026-11-26 and 2026-11-27) | On a settlement the chip shows the building **slots used, "3 of 4 slots"** (value "3 of 4", label "Slots"), **instead of** the works under way; other own land keeps Works ("1 of 3"). The work under way stays on the window's footer queue row | The owner's answer; tile window R10 and D16 name the same chip; the chip row holds four cells |
 | D27 | The Buy inputs switch (owner, 2026-11-25: decided, option A) | One switch **per workshop**, on that workshop's own card (the `WorksPreview` screen), opened by a click on its built tile; default on; the AI flips it by the same action. While the workshop is buying, its tile wears a small coin badge. The card (the approved sketch "Buy Inputs Switch", option A) shows the status, what it needs and makes per season, its upkeep, the switch, a line about the 1.2 times price and the treasury floor, and "bought this season" | Hover cards are not interactive; the card is where the numbers are. The sketch's floor of 200 ducats is an example: the rule stays `buy_floor_seasons` and the card prints the country's own floor. EC0 re-draws the final card first |
 | D28 | Task IDs | `EC0` to `EC21`; rules `R1` to `R70`, decisions `D1` to `D32` | E, T, F, FG, K, TW are taken |
 | D29 | M11 hooks | `Slots.count_at`, `Works.industry_open`, `Works.stage_max`, `Industry.output` and `Buying.price` all take the tag | Tech rows K1 to K6 read per country |
@@ -102,7 +112,8 @@ tooltip.
 | D32 | Where words come from | Every player-facing string of this build is in `core/views/` (models) or the tooltip table of R57, never built in the shell from numbers | One place for the words, testable headless |
 
 "Open question n" in this page points to section 10 of the plan, where each has a recommendation; the build takes the
-recommendation until the owner answers. Open questions 1, 3 and 4 are answered (below); 2, 5 and 6 stay open.
+recommendation until the owner answers. Questions 1 to 6 are answered (below and above: 2, 5 and 6 on 2026-11-26 and
+2026-11-27); 7 to 11 are open.
 
 **Owner's answers, 2026-11-25.**
 
@@ -112,6 +123,13 @@ recommendation until the owner answers. Open questions 1, 3 and 4 are answered (
   (D25, R56) and a bar is a later decision, not part of any done-when.
 - **Buy inputs switch (question 3):** decided, option A of the sketch "Buy Inputs Switch": one switch per workshop on its own
   card, opened by a click on its tile, default on, with a small coin badge on the tile while it is buying (D27, R61). Every other default is listed in the plan's section 9.
+
+**Owner's answers, 2026-11-26 and 2026-11-27.**
+
+- **Refill (question 2):** refilling lost men also needs arms (R49).
+- **Cloth (question 5):** no special cloth comfort need; the population's needs must be met on the settlement's own market, and
+  the market decides the price. To be designed; not a rule of this build yet (D10, `economy-rethink.md` section 15).
+- **The header chip (question 6):** building slots used on settlements ("3 of 4 slots") instead of works under way (D26, R53).
 
 ---
 
@@ -125,11 +143,11 @@ the tag and not occupied by another country.
 - **R1 Goods.** `GoodDef.KEYS` gains `cloth` (16), `arms` (17), `bread` (18); `COUNT` 19; `KINDS` gains `&"made"`. New field
   `food_permille` (food units a load: grain 1000, fish 1000, bread 1500, all others 0). A good is edible when
   `food_permille > 0`; an edible good has a `food_order` (fish 0, grain 1, bread 2), others -1; it only breaks ties between equal `food_permille` (R33). `validate` allows
-  `reserve_fixed` on `made` goods and `need_milli` (a comfort need) on `made` goods with `need_weight` 0.
+  `reserve_fixed` on `made` goods; a `made` good has no need (`need_milli` 0, D10).
 
 | Key | Id | Kind | Price (milli) | food_permille | food_order | need_milli | reserve_fixed | Icon |
 |---|---|---|---|---|---|---|---|---|
-| cloth | 16 | made | 6000 | 0 | -1 | 50 | 0 | `good_cloth` |
+| cloth | 16 | made | 6000 | 0 | -1 | 0 | 0 | `good_cloth` |
 | arms | 17 | made | 9000 | 0 | -1 | 0 | 2 | `good_arms` |
 | bread | 18 | made | 2400 | 1500 | 2 | 0 | 0 (R33) | `good_bread` |
 
@@ -288,15 +306,17 @@ the tag and not occupied by another country.
   a workshop input, x `arms_buy_permille` / 1000 for arms; 0 for any other good or when the permille is 0. `Buying.plan(game,
   tag, good, loads, budget) -> {loads, ducats}` (pure: the most whole batches the budget pays, `ducats` = ceil(loads x price /
   1000)); `Buying.take(game, tag, good, loads, why) -> bool` (`Stores.move(+loads, &"bought")`; the money is R37's or R46's).
-  Supply is unlimited; nothing is sold through it; towns never buy. **M10 replaces the bodies**; callers stay.
+  Supply is unlimited; nothing is sold through it; towns never buy. **M10 replaces the bodies**; callers stay. These fixed
+  multiples are placeholders: the owner's direction is that the market decides the price, on the settlement's own market
+  (not designed yet; `price` takes no settlement today; `economy-rethink.md` section 15, open question 10).
 - **R32 The goods step** (`EconomySeason.goods_step`, pure; the order is the rule):
   1. **held** = stock + made;
   2. **needs**: food in food units (R33), then wine, salt, oil as today;
   3. **works**: each working slot of R28 in order (R30, R29): input taken, bought, crafted (added to held);
-  4. **comfort**: towns take cloth up to its need (`need_loads(town, cloth.need_milli)`);
+  4. *(removed, D10: there is no cloth need and no comfort step)*;
   5. **sales**: held above the reserve is sold at `prices`.
   It returns today's keys plus `worked` (input taken by good, positive), `bought` (by good), `crafted` (by good),
-  `bought_milli`, `slots` ([{position, own, bought, crafted}] in R28's order). With no working slot and no bread or cloth it
+  `bought_milli`, `slots` ([{position, own, bought, crafted}] in R28's order). With no working slot and no bread it
   returns exactly today's values. P: works before needs; the reserve lowered by a workshop.
 - **R33 Food units (N3, D9).** Food need in units = today's loads (`food_need_milli`); towns eat in milli-units, the **most
   efficient food first**: every edible good sorted by `food_permille` descending, then `food_order` ascending, then good id (so
@@ -347,7 +367,8 @@ the tag and not occupied by another country.
 - **R43 Surplus.** `Growth.surplus(made_units, eaten_units, need) -> permille` = clamp((made - eaten) x 1000 x 1000 / (need x
   `surplus_full_permille`), 0, 1000); need 0 gives 1000. `eaten` = the towns' food used plus the armies' (`army` flow), in units.
 - **R44 Prosperity and comfort.** `prosperity = (content + comfort) / 2`; `content` = M4's contentment (R33 units);
-  `comfort = (cloth met + bread met) / 2`: cloth met = cloth used over its need (1000 when the need is 0), bread met =
+  `comfort` has no cloth part any more (D10). Until the settlement market is designed it is **bread met** alone (open question
+  9; this page's recommendation, not yet the owner's answer):
   bread eaten in units over `need x bread_comfort_share / 1000`, at most 1000 (bread is eaten first, so it is met whenever the stock holds that share). Growth only: taxes do not read it.
   A fed, content country with no workshop gets `mult` about 500 + 350 x surplus + 175: about today's pace at a 25 % surplus.
   `People.season` computes `mult` per country from the open flows (`Growth.of_flows(game, c)`); the preview from its step's
@@ -365,15 +386,23 @@ the tag and not occupied by another country.
 - **R47 No arms and no money (N8).** One line, nothing changed: "no arms: 1 needed, 0 in the stores, 14 ducats to buy it, 8 in
   the treasury"; with the market off "no arms: 1 needed, 0 in the stores, and none can be bought". No unarmed company.
 - **R48 The texts.** `raise_options` cost text "25 · 1 arms"; the arms part of every card from `arms_quote` (R60).
-- **R49 Refit and upgrade (N9).** Neither exists in Godot. M11's refit and upgrade (era troops, tech row K7) must take arms
-  through `arms_quote` (Appendix A). `Military.refill` (men regained in supply) stays free in M9.5 (open question 2).
+- **R49 Refill, refit and upgrade (N9; owner, 2026-11-26 and 2026-11-27).** **Refilling lost men needs arms.**
+  `Military.refill` (the `ready_units` phase: a fed army on its country's land regains up to `UnitDef.refill` men a company a
+  season, today at no cost in money or goods) takes arms from M9.5. How many, and what happens when there are none, are open
+  questions 7 and 8; the build takes their recommendations until answered: a country's refills of a season need arms **in
+  proportion to the men regained** (men x the kind's arms cost / its full men), added up over its companies in army id order
+  and rounded up to whole loads; the arms come from the stores (the reserve included), then are bought as for a raise
+  (`arms_quote`, `Buying.take`, the `arms_bought` line) while the treasury stays above the floor of R38; a company that gets no
+  arms regains no men that season, with one log line. `refill` runs after the season's income and ledger close, so its arms and
+  money open the next season's flows. Neither refit nor upgrade exists in Godot: M11's (era troops, tech row K7) must take
+  arms through `arms_quote` (Appendix A). P: men regained with no arms taken; arms taken for a company that regained no man.
 
 ### 3.7 Previews
 
 - **R50 The preview equals the season.** `EconomyPreview.with` passes each season's working list (from its view, with
   `changes.slots` laid over by `StateView.with_slots`) and the running treasury (the treasury now plus the earlier seasons'
   net) to `goods_step`; `money_lines` gets the same upkeep and bought numbers; the people step uses `Growth.of_step`. Over
-  200 seeded cases (builds, upgrades, gates, the switch, the floor, bread, cloth, raises) the preview of the next season
+  200 seeded cases (builds, upgrades, gates, the switch, the floor, bread, cloth, raises, refills) the preview of the next season
   equals the played season to the unit. P: the preview reading the game's treasury after season 1.
 - **R51 The workshop card.** `ImprovePreview.of(game, tag, hex, {action: &"workshop", industry, stage})` delegates to
   `WorkshopPreview.of` (new `core/views/workshop_preview.gd`) with the card's usual keys (verdict, `blocked_by`, cost,
@@ -386,9 +415,10 @@ the tag and not occupied by another country.
 
 ### 3.8 The window follows the data (section 6 has the tables)
 
-- **R53 The Slots chip.** On an own settlement `TileView.strip`'s third cell is `{key "slots", value "2 / 3", label "Slots",
-  tone plain}` (used includes a workshop under way; bad tone never); other own land keeps "works". P: a slots chip on a
-  district.
+- **R53 The Slots chip.** On an own settlement `TileView.strip`'s third cell is `{key "slots", value "3 of 4", label "Slots",
+  tone plain}`, read as "3 of 4 slots" (used includes a workshop under way; bad tone never); it takes the place of the works
+  cell there (a hamlet reads "0 of 0": open question 11); other own land keeps "works". P: a slots chip on a
+  district; a works chip on an own settlement.
 - **R54 Land facts.** `TileView.land` gains `raw` (`{good, name, loads}` this season, own and foreign-discovered: "Raw: wool,
   12 loads this season") and, own only, `workers` (`{employed, capacity, hands}` of the tile, Economy's hands and jobs). The
   Food chip (`MapModes.food_year`) counts a settlement's bakery: bread made in units less the own grain it takes, over a calm
@@ -463,7 +493,8 @@ the tag and not occupied by another country.
   `(treasury - chest) x 1000 / arms price` is under `war_arms_companies` (asked only when some unit kind's cost names arms,
   so under `IndustryFixture.off` nothing changes). The blocker only stops a declaration; a country at
   war still makes peace by `AiPeace` (no deadlock by construction). `AiWar.prize_of` adds `AiDef.industry_value` (300) per
-  working slot it has seen in the target's land within `prize_range`. Traces: "industry: weaver in Genoa slot 2, own wool at
+  working slot it has seen in the target's land within `prize_range`. The arms a seat keeps for its refills (R49) count in its
+  arms readiness. Traces: "industry: weaver in Genoa slot 2, own wool at
   hand, payback 12 seasons". P: an AI raise refused for arms it could not pay (the soak counts refusals).
 
 ### 3.10 Determinism, fixtures, soak, speed
@@ -472,7 +503,8 @@ the tag and not occupied by another country.
   with non-negative operands or `Economy.floor_div`. The AI's jitter draw count does not change for a seat with no workshop
   option (one draw per card as today).
 - **R70 The fixture (D20).** `IndustryFixture.off(defs)` (tests only, `tests/core/industry_fixture.gd`) and `on(defs)`;
-  `EconomyFixture.defs(calm, still, industry = false)` applies `off` unless `industry` is true. With `off`, the M3 to M9 pins
+  `EconomyFixture.defs(calm, still, industry = false)` applies `off` unless `industry` is true. `off` also keeps the refill free
+  of arms (it restores the iron costs, so no kind's cost names arms). With `off`, the M3 to M9 pins
   and Genoa's table hold unchanged, and the fixture games' digests move only once, when R14 adds the slot arrays to the
   digest. P: a pinned test that only passes with
   the fixture on.
@@ -542,7 +574,7 @@ static func stage_max(game: Game, tag: StringName) -> int
 static func workshop_cost(game: Game, industry: int, stage: int) -> Dictionary
 # core/systems/economy_season.gd (edit): goods_step(game, needs, reserve, stock, made, prices, slots := [], budget := 0)
 # money_lines(..., workshop_upkeep := 0, workshop_count := 0, bought_milli := 0, bought_count := 0)
-# core/systems/military.gd (edit): static func arms_quote(game, tag, kind, count) -> Dictionary
+# core/systems/military.gd (edit): static func arms_quote(game, tag, kind, count) -> Dictionary; refill takes arms (R49)
 # core/game/actions.gd (edit): "build_workshop", "upgrade_workshop", "set_buy_inputs"
 
 # core/views/workshop_preview.gd (new); core/views/workshop_marks.gd (new); core/views/summary_industry.gd (new);
@@ -564,13 +596,14 @@ production, per country in id order (pure goods_step, then the moves)
              own    = min(capacity x staffing, held - reserve)          whole batches
              bought = Buy on and price > 0 ? min(capacity - own, budget above the floor) : 0
              crafted = batches x out x tier x (1000 + at hand) / 1e6    floored
-  comfort = towns take cloth up to its need
   sales   = held above the reserve
   moves   = made, bought, crafted, worked, used, sold                   (Stores.move each)
 income
   ... today's lines, then upkeep_workshops (working slots), inputs_bought (bought flow x price, rounded up)
 people
   mult = 500 + 350 x surplus + 350 x prosperity (permille);  growth = people x rate x mult / 1e9
+ready_units  (after the calendar turns)
+  refill: the men regained take arms, from the stores, then bought above the floor (R49)
 ```
 
 ---
@@ -584,7 +617,7 @@ state and a coin badge. The gate mockup (EC0) shows the result before the shell 
 
 | Model | Today | After M9.5 |
 |---|---|---|
-| `TileView.strip` (own settlement) | People, Food, Works "1 of 3", Ducats | People, Food, **Slots "2 / 3"**, Ducats (each cell gains `tip`) |
+| `TileView.strip` (own settlement) | People, Food, Works "1 of 3", Ducats | People, Food, **Slots "3 of 4"** (read "3 of 4 slots"), Ducats (each cell gains `tip`) |
 | `TileView.land` | people, food, made, buildings (foreign), ground, war | + `raw` (R54), + `workers` (own), + slot buildings in `buildings` (foreign, R58) |
 | `TileBuildings.of` groups | Settlement, Land, Harbour, Defence; `slots: {}` | + **Workshops** after Settlement with `slots {used, total}`; every group + `workforce` (R56) and `tip` |
 | `TileBuildings` rows | states built, building, ready, short, locked, refused; `gate {}` | + state **idle**; `gate {year}` or `{level}`; workshop rows with `icon` = the industry key, `level` = the stage; + `tip` |
@@ -616,7 +649,7 @@ state and a coin badge. The gate mockup (EC0) shows the result before the shell 
 | Land plaque bar (deferred, D25: not shown) | "Workers: 1,800 of 2,000 jobs filled (90 %). The hands come from the people of this tile and the six round it that you hold." Kept as data for a later bar |
 | Settlement plaque bar (deferred, D25: not shown) | "People: 6,200 of 10,000. A town grows to its room, then may become a larger place." |
 | Defence plaque bar (deferred, D25: not shown) | "Garrison: 400 of 600 men." |
-| Slots chip | value "2 / 3", label "Slots"; tooltip "Slots: 2 / 3\nWorkshop slots in use here, of the 3 a walled town has. A village has 1, a town 2, a walled town 3, a city 4." |
+| Slots chip | value "3 of 4", label "Slots" (read "3 of 4 slots"); tooltip "Slots: 3 of 4\nWorkshop slots in use here, of the 4 a city has. A village has 1, a town 2, a walled town 3, a city 4." |
 | Ready build tile | "Weaver\nCan build: 100 ducats, 5 timber, 4 seasons.\n2 wool make 1 cloth. Own wool at hand: +25 %." (or "No own wool within two hexes: input from your stores or bought.") |
 | Short tile | "Weaver\ncost 100 · you have 64" (bad tone; the strip's red line) |
 | Locked by year | "Weaver\nLocked: opens in 1490." (M11: "Locked: needs Guilds.") |
@@ -661,10 +694,10 @@ All under `godot/tests/`. Every edited test keeps its planted faults; a task may
 | `core/test_industry_actions.gd` | every row of R17 and R18 in order on Genoa, Asti, a hamlet, a foreign town; gates at Winter 1489 / Spring 1490; finish, cancel, refund; blocked when the town fell; capture hands over; clearing drops; `set_buy_inputs` | R17 to R23 |
 | `core/test_industry_rules.gd` | tier, at hand (own, foreign, stage 1, 2, 3, ties, occupied), workers in a neighbour's staffing, the working list order, `output` floors | R25 to R29 |
 | `core/test_buying.gd` | price per good and permille 0; plan in batches and at a budget; take moves `bought` only; a stub market (M10's seam test) | R31 |
-| `core/test_workshop_season.gd` | the step order; own then bought; the floor; the switch off; needs met and reserve unchanged after works (40 seeded seasons); food units and the bread share; cloth comfort; the move order never below 0; flows and lines; upkeep only for working slots | R30, R32 to R40 |
+| `core/test_workshop_season.gd` | the step order; own then bought; the floor; the switch off; needs met and reserve unchanged after works (40 seeded seasons); food units and the bread share; no cloth taken by towns; the move order never below 0; flows and lines; upkeep only for working slots | R30, R32 to R40 |
 | `core/test_industry_numbers.gd` | each cell of the design's section 5, computed by the season on a fixture town, pinned as integers (and the doc table updated to them in EC21) | drift between doc and code |
-| `core/test_growth.gd` | `mult` on 40 seeded cases; surplus clamp and need 0; comfort parts; `of_flows` equals `of_step` on the same season; hunger untouched | R42 to R44 |
-| `core/test_military_arms.gd` | raise with own arms, with bought arms, the reserve used, neither (refusal, nothing changed), market off; the arms_bought line; the check/act pair with arms | R45 to R48 |
+| `core/test_growth.gd` | `mult` on 40 seeded cases; surplus clamp and need 0; comfort (bread); `of_flows` equals `of_step` on the same season; hunger untouched | R42 to R44 |
+| `core/test_military_arms.gd` | raise with own arms, with bought arms, the reserve used, neither (refusal, nothing changed), market off; the arms_bought line; the check/act pair with arms; refill with own arms, bought, at the floor and with none (no men regained, one log line), the rounding over several companies | R45 to R49 |
 | `core/test_workshop_preview.gd` | card fields per state; gain equals EconomyPreview's year difference; options of a settlement | R51, R52 |
 | `core/test_tile_workshops.gd` | the Workshops group rows and states on Genoa through 1480, 1485, 1490, 1520; slots chip; workforce data per group (no bar drawn); the growth facts; the words of 6.3 | R53 to R59 |
 | `core/test_ai_industry.gd` | the prior on four fixture towns (own, bought, loss: 0); weights; siting priority; the buying step's switch; raising priced with arms; the war blocker line; prize term; traces | R64 to R68 |
@@ -685,7 +718,7 @@ All under `godot/tests/`. Every edited test keeps its planted faults; a task may
 | `core/test_economy.gd`, `test_district_cache.gd`, `test_season_profile.gd` | settlement jobs with slots; the profile's key | R26 | EC5 |
 | `core/test_economy_season.gd`, `test_money_property.gd`, `test_economy_genoa.gd`, `test_economy_1480.gd` | food units; the step's new keys; with the fixture off unchanged | R32 to R40, R70 | EC8 |
 | `core/test_people*.gd`, `test_cards_people.gd` | `mult` 1000 under the fixture; `fed_of` in units | R42, R33 | EC7 |
-| `core/test_military.gd`, `test_ai_forces.gd`, `test_army_share.gd`, `test_log_others.gd`, `test_movement_war.gd` | arms in the cost texts and the shortfall line when the fixture is on; off: unchanged | R46 to R48 | EC6 |
+| `core/test_military.gd`, `test_ai_forces.gd`, `test_army_share.gd`, `test_log_others.gd`, `test_movement_war.gd` | arms in the cost texts and the shortfall line when the fixture is on; the refill takes arms; off: unchanged | R46 to R49 | EC6 |
 | `core/test_economy_preview.gd`, `test_improve_preview.gd`, `test_ai_preview_share.gd` | the 200 cases gain workshops; options of a settlement | R50, R51 | EC11 |
 | `core/test_tile_buildings.gd`, `test_tile_view.gd`, `test_tile_army.gd`, `test_building_card.gd`, `test_company_card.gd`, `test_works_view.gd` | the new group, chip, fields, labels | R53 to R60 | EC9, EC13 |
 | `core/test_ai_economy.gd`, `test_ai_turn.gd`, `test_ai_war.gd`, `test_ai_door.gd`, `test_ai_fog.gd`, `test_ai_determinism.gd` | the option, the `buying` step in the table, the blocker, the door's new reads; the fixture games' digests unchanged since EC2's one re-pin of the digest's shape | R64 to R69 | EC12 |
@@ -726,13 +759,15 @@ industry; no plaque draws a bar; a coin badge shows exactly on buying workshops;
 4. every filled slot is on a settlement hex, its industry opened (the year is at least its `year`), its stage at most
    `stage_max`, no industry twice on a hex, positions without holes;
 5. a slot is idle exactly when R21 says;
-6. every `army_raised` event's goods include arms per its unit def (no raise without arms);
+6. every `army_raised` event's goods include arms per its unit def (no raise without arms), and no company regains men in a
+   season without its country's arms taken (R49);
 7. people grow only where the country is fed (kept), and `mult` is 500 to 1200.
 
 **The `industry` suite** (`tools/soak.gd --suite=industry --seeds=1-10 --seasons=160`, nightly `soak-ranges` job): each seed
 plays twice, A with the committed defs and B with every industry's year at 9999 (D31). Per country at year 40 (the last 4
 seasons) the record keeps: crown income (`Treasury.left_over` of the four closed ledgers), workshops, input taken and bought
-over the game, men under arms, people, seasons under 0, raises refused for arms. Ranges (judged over the full 10 seeds;
+over the game, men under arms, people, seasons under 0, raises refused for arms, men not regained for lack of arms. Ranges
+(judged over the full 10 seeds;
 starting values the balance task EC20 measures and keeps):
 
 | Measure | Range |
@@ -786,7 +821,8 @@ M4 cache key), as the tile window's spec 8 does.
 1. **The save format.** The design says FORMAT 7; the fog build already took 7, and the M9, M10 and M11 specs claim 7, 8, 9
    (with `map-state/6`, `map-state/7`, `work/3`). This build takes master's plus one (R13); Appendix A moves the later specs.
 2. **Refit and upgrade (N9).** The design and tech-tree v2 (`Military.refit_cost`, K7) assume the Python refit and upgrade;
-   Godot has neither, only the free `refill`. Nothing to change now; M11 carries the rule (R49).
+   Godot has neither, only `refill`. The owner decided (2026-11-26 and 2026-11-27) that refilling lost men needs arms, so
+   M9.5 changes `refill`; M11 carries the rule for refit and upgrade (R49).
 3. **The word "slot".** "Work slots" (country crews) already exist in code, the strip and refusals; D7 keeps the code and
    changes the words.
 4. **Food order.** The design says towns eat "grain, fish, then bread"; the code eats fish (order 0) before grain (1). The
@@ -794,8 +830,8 @@ M4 cache key), as the tile window's spec 8 does.
 5. **Bread's comfort and the eating order.** Eating bread last (the design's recommendation) makes "bread's share of the food
    eaten" almost always 0, so bread could never raise prosperity. The owner decided (2026-11-25) that towns eat the most
    efficient food first, bread leading (D9, R33), which also gives bread comfort.
-6. **Cloth's comfort.** "Cloth met for towns" needs a cloth need, and cloth's reserve of 0 sells it the season it is made;
-   D10 adds a comfort need met after the works step (open question 5).
+6. **Cloth's comfort.** "Cloth met for towns" needs a cloth need, and cloth's reserve of 0 sells it the season it is made.
+   The owner decided (2026-11-26 and 2026-11-27) on no special cloth need (D10).
 7. **The product's flow.** The design books the product as `made`; D12 uses `crafted` so `made` stays the land's.
 8. **The Industries tab.** The design asks for an Industries tab; the tile window decided no such tab (its D6), and the built
    v4 has a Town tab with strips: workshops are a Workshops strip (D24).
@@ -810,6 +846,10 @@ M4 cache key), as the tile window's spec 8 does.
 13. **Castles' `keep_wild`.** The design names settlements and ports as keeping their wild yield; castles keep it too (R5).
 14. **Slot techs.** Tech-tree v2 adds slots through K4 (Work house, Manufactories); the review recommends none in the first
     version. Out of this build; `Slots.count_at` takes the tag for M11 (D29).
+15. **Markets.** The owner wants the population's needs met on the settlement's own market, with the market deciding the price.
+    The code, and this page's season step, take every town's need from the country's one store at fixed prices; the M10 spec
+    puts markets only at walled towns, cities and capitals. Not designed yet (`economy-rethink.md` section 15, open question
+    10).
 
 ---
 
@@ -821,8 +861,10 @@ M4 cache key), as the tile window's spec 8 does.
 - **The unlimited-supply loophole until M10.** The bought-share range and the floor; gone when M10's prices bite.
 - **Food in two units.** The words say it ("bread feeds half again as much as grain"); the town card shows food in loads and
   units only where they differ.
-- **Arms slow wars and drain treasuries.** The soak's men and refusal ranges; levers in data; the AI's blocker and its
-  priced raise.
+- **Arms slow wars and drain treasuries,** more so now that refills need them too (R49). The soak's men and refusal ranges;
+  levers in data; the AI's blocker and its priced raise.
+- **The market direction may rebuild the needs step** (R32, R33, R44) and `Buying` (R31). Design it before EC8 is built, or
+  accept that this part is interim (open question 10).
 - **Slower growth (500 when only just fed).** Intended; the owner's early-game playtest; growth weights are data.
 - **Shared hands.** A workshop's jobs lower its neighbours' staffing; the card shows it (the year gain includes it).
 - **Pins.** Goods 16 to 19 and the new rules touch many tests; the fixture default keeps M3 to M9's; the plan's grep list.

@@ -1,6 +1,22 @@
 # Battle board: what the player orders each round
 
-Game designer, 2026-11-25. **Status: DRAFT for the owner. Nothing here is approved, and no code or other doc was changed.**
+Game designer, 2026-11-25. **Status: decided for version 1 (owner, 2026-11-26 and 2026-11-27): watch only. Packages A, B
+and C of section 3 are not chosen for v1; they are kept as later options. Nothing here is built.**
+
+## The owner's answers (2026-11-26 and 2026-11-27)
+
+- **Version 1 is watch only:** no stances, no fills, no targets, no presets. The line-up is automatic. The player watches the
+  rounds and **may withdraw from the second round**.
+- **Withdraw** keeps today's rule as the default (noted here, not newly decided): it needs a hex to fall back to; it costs 5 %
+  of the men (10 % as the attacker) and sets morale to 25 %; the army leaves at the end of the round; a break or a wipe in
+  that round goes first. Today's code leaves only at the end of day 2, so the build widens it to any round from the second
+  (build spec R5, D10).
+- **Battles should aim for about 10 rounds.** Today they end after about 3 to 4 days and are capped at 8; what controls this
+  and what must change is in the build spec, section 1.3.
+- **The board is still a window** over the map, and **Auto stays one click**.
+
+A round is one day of the fight. The rest of this page is the study of orders made before these answers; read "recommended"
+and "Core" in it as advice for a later version.
 
 **Why this doc.** The owner was asked "what can you order each round in battle board v1?" and answered (2026-11-25):
 "Nothing yet, this should be planned first." This is that plan. It lays out what the fight already decides on its own,
@@ -12,7 +28,8 @@ to the spec's default of stance, fills and gun targets; called "the spec" and "t
 section 4 and the owner's answers there, `docs/design/battle.md` (the owner's earlier battle ideas: stance, reserve to a lane,
 cannon target, formation presets, events, cards) and `docs/design/battle-size-and-frontage.md` (width, back line, rotation).
 
-**The short answer.** Recommended package **B, "Line and guns"**: each dawn you set a **stance** (Attack, Hold, Withdraw,
+**The short answer.** Version 1 is **watch only** (section 3.0). The advice for a later version with orders was package
+**B, "Line and guns"**: each dawn you set a **stance** (Attack, Hold, Withdraw,
 with Withdraw open on any day from day 2), you choose **who fills a lane** when one opens (on day 1 this is your opening
 line-up, with a few named presets), you may **keep a flank open** to hold a company back, and you give **one fire order**
 for all your guns and crossbows. Everything has a default that is exactly today's fight, so Auto, the computer and the soak
@@ -61,6 +78,9 @@ the right lane is shut on narrow ground); each lane holds one company; everythin
 ---
 
 ## 2. The order candidates
+
+**For v1 only one of these is built: Withdraw from the second round (2.2).** Every other candidate is later; the ratings
+below are the advice for that later version.
 
 Each candidate below says what it changes in play, its depth against its cost, what it does to determinism and replay, what
 the UI needs, how the computer gets the same order, and a rating: **Core** (in the recommended package), **Good** (worth it,
@@ -225,10 +245,23 @@ Two forms:
 
 ---
 
-## 3. Three packages
+## 3. Version 1 and the three packages
 
-All three keep the spec's frame: a board for battles you are a side of, Fight day, the round card, Auto to the end one click
-away, save at any dawn, and **default orders give exactly M7's fight**.
+### 3.0 Version 1: watch only (decided)
+
+1. **Dawn.** The board (a window over the map) shows both armies, the lanes, the reserves, the tug bar with the flee line,
+   the ground chips, the odds word and the round number. The line-up and every refill are automatic.
+2. **Next round** plays the day with today's rules. Dice show, hits play, the round card says what happened.
+3. **Withdraw** is greyed on the first round and open from the second when the army has a hex to fall back to; its hover names
+   the price.
+4. **Auto to the end**, one click, plays the rest with default orders; it never withdraws.
+5. **The end.** The result card, and "Review in the dock".
+
+The computer's side keeps its input stance all battle. The End-turn question "Fight your N battles automatically?" and the
+options stand as the build spec says (D19, D23).
+
+**Packages A, B and C below are not chosen for v1.** All three keep the spec's frame: a board for battles you are a side of,
+the round card, Auto to the end one click away, save at any dawn, and **default orders give exactly M7's fight**.
 
 ### 3.1 Fun principles for the board
 
@@ -241,13 +274,13 @@ Taken from `docs/research/fun-principles.md` and applied to a battle:
    left: their knights lost 60 men before the charge").
 4. **No hidden dice:** the dice are shown with their multiplier after each day; matchup words leave the dice out and say
    so; nothing is rolled while you think, and a reload gives the same day for the same orders.
-5. **Short** (principle 11): a battle is 3 to 5 days. At most one or two real decisions a day; Enter fights the day; a
-   whole battle should take under a minute, under ten seconds with Auto.
+5. **Short** (principle 11): the owner's target is about 10 rounds (today 3 to 5 days). At most one or two real decisions
+   a round; Enter fights the round; a whole battle should still take about a minute, under ten seconds with Auto.
 6. **Auto is honest:** Auto plays the default orders, the same the computer plays. Playing well should beat Auto by a
    little, not a lot (target: **5 to 15 points of win rate in an even fight**, owner decision Q9), so nobody feels forced
    to play every battle.
 
-### 3.2 Package A, "Command the day" (minimal)
+### 3.2 Package A, "Command the day" (minimal; later)
 
 **Orders:** stance each day; Withdraw on any day from day 2. Line-up, fills and fire stay automatic and are shown.
 
@@ -263,7 +296,7 @@ Taken from `docs/research/fun-principles.md` and applied to a battle:
 **Good:** tiny to build (the spec minus BB9's choosers), nothing to balance. **Bad:** the triangle is something you watch,
 not something you use; most days have no decision. The audit's risk R6 ("three stances may feel thin") is likely true.
 
-### 3.3 Package B, "Line and guns" (recommended)
+### 3.3 Package B, "Line and guns" (the advice for later)
 
 **Orders:** package A, plus fills with the day-1 line-up and presets, "Leave open" on a flank, and one fire order.
 
@@ -289,7 +322,7 @@ not something you use; most days have no decision. The audit's risk R6 ("three s
 **Typical decisions in a 4-day battle:** a line-up (one click with a preset), one refill, maybe one fire change, one
 "leave or stay" from day 2. Four to six choices, each tied to the triangle or to the price of leaving.
 
-### 3.4 Package C, "Battle plan" (rich)
+### 3.4 Package C, "Battle plan" (rich; later)
 
 **Orders:** package B, plus three one-shot tactics (2.11), the loss forecast (2.13), and the computer using the same menu by
 simple rules (4.5).
@@ -304,8 +337,8 @@ real cards (the stand-in tactics would be replaced or would need to become cards
 
 ### 3.5 How Auto fits every package
 
-- **Auto to the end** on the board: plays the remaining days with the last stance given and default fills and fire (spec
-  D11). In package C it plays no tactics.
+- **Auto to the end** on the board: in v1 it plays the remaining days with default orders and never withdraws (spec D11).
+  In a later version with orders it would keep the last stance given and default fills and fire; in package C no tactics.
 - **Auto in Options** ("Your battles"): the board does not open; the battle is fought with defaults and shown as a toast
   with "Review".
 - **The battles prompt** at End turn (4.4).
@@ -354,6 +387,9 @@ fills make knights useful (flank against crossbows), which is a small fix by pla
 - Besiege or Storm stays a map decision (sieges design 4.5); the board adds nothing before the storm starts.
 
 ### 4.4 Several battles in one season: the prompt
+
+**Settled on 2026-11-25** (build spec D23, R47): one question "Fight your N battles automatically?" with Yes, No and "Don't
+ask again". The proposal below, with ticks by battle, is the earlier idea and is not what is built.
 
 The owner wants a prompt "Fight your N battles automatically?" with a setting to turn it off.
 
@@ -405,35 +441,31 @@ choice visible.
 
 ---
 
-## 5. Recommendation and the owner's decisions
+## 5. The owner's decision and what is left for later
 
-**Recommended: package B, "Line and guns".** It turns the owner's earlier ideas (stance, reserve to a lane, cannon target,
-deployment presets) into orders on the engine that exists, adds one honest trade-off (keep a flank open), keeps every default
-equal to today's fight, and leaves the approved cards, rotation and width to M24 where they belong. Package A is too thin to
-justify a board; package C moves every measured number and pre-empts the card system.
+**Decided (2026-11-26 and 2026-11-27): watch only** (section 3.0). The earlier recommendation was package B; it, package A
+and package C are kept for a later version. Answered and no longer open: Q1 (no package in v1), Q2 and Q3 (no fire orders
+and no held flank in v1), Q5 (no presets), Q6 (Withdraw from the second round), Q7 (the End-turn question, 2026-11-25) and
+Q11 (no tactics now).
 
-**Decisions for the owner** (each with a recommendation):
+**Questions that matter only if orders come back** (none blocks v1; the numbers are kept):
 
 | # | Question | Options | Recommend |
 |---|---|---|---|
-| Q1 | Which package is v1? | (a) A, stance and Withdraw only; (b) **B**, plus fills, line-up, presets, leave a flank open, one fire order; (c) C, plus three one-shot tactics, forecast and a smarter computer | **(b)** |
-| Q2 | Guns' targets | (a) **one fire order for all your ranged companies**; (b) one per company (the spec's R4); (c) none, always the usual target | **(a)**: era 1 armies rarely have more than two; (b) when era 2 shot arrives |
-| Q3 | Holding a company back | (a) **"Leave open" on a flank only; the centre is always filled while the reserve can fill it**; (b) never; (c) on any lane | **(a)**: (c) lets an army never break |
-| Q4 | What you see on day 1 | (a) **their army list, not their line-up** (both deploy at the same dawn); (b) the defender lines up first and the attacker sees it; (c) the computer's line-up shown | **(a)**; (b) is a good later rule for scouts or a cavalry general |
-| Q5 | Line-up presets | (a) **yes: Usual, Horse on the wings, Strongest against their strongest, Guns kept back**; (b) choosers only | **(a)** |
-| Q6 | When Withdraw can be ordered | (a) **any day from day 2** (spec D10); (b) day 2 only (today) | **(a)** |
-| Q7 | The battles prompt | (a) **ask when 2 or more of your battles wait, ticks on the close ones; Options "Your battles": Ask (default), Always play, Always auto**; (b) ask even for one battle; (c) no prompt, only the board's "Auto this season's other battles" | **(a)** |
-| Q8 | The computer's orders | (a) **defaults in v1 (today's fight); a matchup and morale rule for every battle as the first follow-up, bands measured again**; (b) the rule now | **(a)** |
+| Q4 | What you see on day 1 when you line up yourself | (a) **their army list, not their line-up** (both deploy at the same dawn); (b) the defender lines up first and the attacker sees it; (c) the computer's line-up shown | **(a)**; (b) is a good later rule for scouts or a cavalry general |
+| Q8 | The computer's orders | (a) **defaults (today's fight); a matchup and morale rule for every battle as the first follow-up, bands measured again**; (b) the rule at once | **(a)** |
 | Q9 | How much better is a played battle than Auto? | (a) **a little: 5 to 15 points of win rate in an even fight**; (b) a lot, playing is the way to win | **(a)**: you will not want to play every battle |
-| Q10 | Help before Fight day | (a) **matchup words with reasons**; (b) also the men each side may lose today (a range) | **(a)** for v1; (b) after the playtest |
-| Q11 | One-shot tactics before the card system | (a) **wait for the cards (M24, from techs and generals)**; (b) three universal tactics now | **(a)** |
-| Q12 | Stance as a pace dial | (a) **keep today's numbers (Attack and Hold trade evenly; Attack is faster and bloodier) and say so on the board**; (b) a balance pass to give stances counters | **(a)** for v1; revisit with the computer's rule (Q8) |
+| Q10 | Help before the day is fought | (a) **matchup words with reasons**; (b) also the men each side may lose today (a range) | **(a)**; (b) after a playtest (whether v1 shows the words: build plan question 8) |
+| Q12 | Stance as a pace dial | (a) **keep today's numbers (Attack and Hold trade evenly; Attack is faster and bloodier) and say so on the board**; (b) a balance pass to give stances counters | **(a)** first; revisit with the computer's rule (Q8) |
 
 ---
 
 ## 6. Mockups, and what changes in the build spec and plan
 
 ### 6.1 Mockups to draw before any build
+
+**Reduced for the watch-only v1:** only the build spec's Appendix B mockups are drawn (MK1 and MK3 to MK6). **None of MK-O1
+to MK-O7 below is drawn for v1**; they belong to a later version with orders.
 
 These extend the spec's Appendix B (MK1 to MK6, gate BB0). One battle throughout: Savoy against Milan at Cerano, 4 against
 4 companies (pikes, pikes, knights, bombards against pikes, knights, crossbows, pikes), code-drawn Studiolo look, 1280 x 720
@@ -452,9 +484,10 @@ with a 2x crop, as the tile window's mockups were made (artifact pages, no repos
 The art director reviews the look, the creative director reviews the fun (each decision with a price, a short round)
 before the owner sees them.
 
-### 6.2 What changes in the build spec and plan if package B is chosen
+### 6.2 What would change in the build spec and plan if package B is chosen later
 
-Listed for the technical director; this doc edits neither.
+**Not applied: B is not chosen for v1.** The rule and task numbers refer to the spec and plan as they stood before the
+watch-only cut, kept here as the starting list for a later version.
 
 **Spec, decisions:**
 
@@ -506,6 +539,10 @@ The effort stays about the same as the plan's (one widget simpler, one prompt ad
 
 ## 7. Risks
 
+**For v1 (watch only):** watching may feel passive, and about 10 rounds mean about 10 clicks a battle (build plan question
+6; Auto stays one click); the 10-round retune moves every measured battle (build spec 1.3). The risks below belong to a
+later version with orders.
+
 | Risk | Where | Answer |
 |---|---|---|
 | Playing beats Auto by too much, so every battle must be played | the triangle against the computer's blind `_pick` | measure in BB12 against Q9's target; the computer's matchup pick (Q8) as the first follow-up |
@@ -519,9 +556,10 @@ The effort stays about the same as the plan's (one widget simpler, one prompt ad
 
 ## 8. Smallest first version
 
-Package B without presets is the floor worth shipping: stance each day, Withdraw from day 2 on any day, fills with the
-day-1 line-up, "Leave open" on a flank, one fire order, the round card naming each order's effect, Auto, and the battles
-prompt. Presets are a day of view work and should ride with it unless time is short.
+Watch only (section 3.0): the board as a window, the automatic line-up, Next round, the round card, Withdraw from the second
+round, Auto to the end, the End-turn question, and battles of about 10 rounds. The earlier floor with orders (package B
+without presets: a stance each day, fills with the day-1 line-up, "Leave open" on a flank, one fire order, the battles
+prompt) is the starting point if orders come back.
 
 ## 9. Genre notes (for reference, not copied)
 

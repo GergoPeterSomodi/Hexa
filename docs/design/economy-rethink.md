@@ -6,6 +6,10 @@ carries a recommended default that the owner has not yet confirmed (marked "defa
 starting points for the soak to tune. Sources: `docs/roadmap/owner-asks-2026-11-23.md`, the M4 to M6 build specs, the M10
 (trade) and M11 (research) specs, `docs/design/tech-tree.md`, `docs/design/reactive-prices.md`, and the frozen Python game.
 
+**Later owner answers (2026-11-26 and 2026-11-27), at the end of this page:** refilling lost men also needs arms; there is no
+special cloth comfort need; the population's needs must be met on the settlement's **own market**, and the market decides the
+price (a direction **to be designed**, section 15); the tile window's header chip shows the building slots used.
+
 ## Changed from the first draft (history)
 
 The owner's answers overrode these recommendations of draft 1:
@@ -91,7 +95,8 @@ BEFORE M10. Resolution (recommended): **M9.5 ships a minimal "home market", M10 
   Price = base price x `market_buy_permille` (1200: 20 % above base). Supply is unlimited. Only the recipe inputs (wool, iron,
   grain) are buyable by workshops, and **arms** by a raise of companies at a higher premium (3.7); never by towns. No selling side change (selling stays at the fixed base
   price), no routes, no foreign stock. The goods come from nowhere and the money goes nowhere: a faucet of goods, a sink of
-  money, deliberately small.
+  money, deliberately small. Its fixed multiples are placeholders: the owner's direction is that the market decides the price,
+  on the settlement's own market (section 15, not designed yet).
 - **M10 adds:** real markets, stock, routes, reactive prices; the `Buying` door's body reads them. The caller (the workshop
   step) does not change. M10's spec gets one line: "replaces `Buying`'s static price and unlimited supply".
 - **The order inside a workshop run:** take from the country's own surplus above the reserve first (free), then, if the
@@ -132,9 +137,10 @@ changes. Ring lift for raw districts stays any-owner (unrelated).
   town starve this season. It can eat the surplus above the reserve, which is the carry for next season; a village bakery with
   no bonus (0.8) turns 3 grain into 2.4 food, so it shrinks the carry by 20 %. A pin: "after the works step, every town's
   need of this season is still met and the reserve is unchanged".
-- **Comfort:** the comfort part of prosperity is cloth met for towns plus **bread's share of the food eaten** (full comfort at
-  30 % bread, `bread_comfort_share` 300). Because bread is eaten first, the share is met whenever the stock holds it, so
-  bread's comfort is never stuck at zero. Comfort still changes growth only, not taxes.
+- **Comfort:** there is **no special cloth comfort need** (owner, 2026-11-26 and 2026-11-27). The earlier rule (cloth met plus
+  **bread's share of the food eaten**) therefore loses its cloth half; what comfort reads until the settlement market is
+  designed is open (build plan question 9; recommended: bread alone, full at 30 % bread, `bread_comfort_share` 300). Because
+  bread is eaten first, the share is met whenever the stock holds it. Comfort still changes growth only, not taxes.
 - **M4 food pins affected** (the first task is to grep tests for food, and the food keys of `game_defs`: `food_need_milli`):
   `test_good_defs` (good count 16 -> 19, kinds, new `food_permille`), `test_economy_defs`, `test_economy_season`,
   `test_economy_preview` and `test_economy_1480` (Genoa's table: bread stock zero so food units equal the old loads; stays
@@ -187,7 +193,8 @@ villages, towns and cities** (slots, 3.1), and a country may build one only once
 
 ### 3.7 Arms equip armies (Q12, decided)
 
-**Rule:** raising a company needs **arms** in its cost. Iron is no longer the stand-in for the equipment. Arms are a made
+**Rule:** raising a company needs **arms** in its cost, **and so does refilling lost men** (owner, 2026-11-26 and
+2026-11-27). Iron is no longer the stand-in for the equipment. Arms are a made
 good (4.2) from the armourer, or bought from the market at a **premium** (`arms_buy_permille` 1500: 50 % above the base of
 9.0, so 13.5 a load, against 1.2x for ordinary inputs, because war cannot wait; confirmed in new question N7).
 
@@ -227,9 +234,10 @@ for 18 companies in a year, so one armourer arms a peacetime country; a country 
 **M7 / M8 interaction:**
 - `Military.raise_check` keeps its order (hex, level, cap, held hex, stand, men, ducats) and gains the arms step after the
   ducats: stores, else market, else the refusal above. `men_at_hand` and the raise cap per hex do not change: men and arms are
-  two separate limits and the smaller binds. Supply (M6, feeding in the field) is untouched: arms are a one-time cost of
-  raising, not an upkeep. Refit and upgrade costs (`upgrade_cost`) check iron too and need an arms translation in the same
-  data pass.
+  two separate limits and the smaller binds. Supply (M6, feeding in the field) is untouched. Arms are paid when a company is
+  raised and again for the men it regains: `Military.refill`, free today, takes arms (how many, and what happens with none:
+  build plan questions 7 and 8; recommended: in proportion to the men regained, from the stores, then bought above the
+  treasury floor, else no men that season). Godot has no refit or upgrade yet; when they come (M11) they take arms too.
 - **Reserve:** arms get a stores reserve (`arms_reserve_loads`, data, two companies' worth), so the armourer's product is kept
   for the army and not sold the moment it is made; only the surplus above the reserve is sold.
 - **AI (M8):** `ai_forces` asks `raise_check`, so it sees the refusal; `ai_economy` prices a company's goods at the base
@@ -306,8 +314,9 @@ growth = floor(people x growth_bp[tax] x growth_percent[slot] x mult / 1e9)
 
 - **Surplus** (0 to 1000): food units made over the season minus food units eaten, as a share of the need; 25 % of the need
   or more counts 1000 (data). Food units per 3.4.
-- **Prosperity** (0 to 1000): the mean of M4's contentment (wine, salt, oil, food) and the new **comfort** (cloth met for towns
-  plus bread's share of food eaten). Growth only, not taxes: M4's tax pins do not move.
+- **Prosperity** (0 to 1000): the mean of M4's contentment (wine, salt, oil, food) and the new **comfort** (no cloth need;
+  until the settlement market is designed, bread's share of food eaten: build plan question 9). Growth only, not taxes: M4's
+  tax pins do not move.
 - Pace (a village to a town, 34 seasons today in frost at Normal): at mult 500 it takes 68, at 750 45, at 1000 34, at 1200 28.
   Hunger, crowding and room rules do not change; settlements still raise themselves to town only.
 
@@ -317,8 +326,9 @@ growth = floor(people x growth_bp[tax] x growth_percent[slot] x mult / 1e9)
   line. The report shows Goods, "worked", "bought" and a per-country "Industry added +n" note.
 - **Trade (M10):** cloth, arms and bread get appetite and market prices; a glut of cloth lowers its price (the natural brake,
   from M10 only). `Buying` becomes a real market read.
-- **People:** bread feeds, bread and cloth raise prosperity; bigger towns have more slots and a better tier.
-- **Army (M6, M7):** arms are required to raise a company; a country without them buys them at a premium (3.7). The
+- **People:** bread feeds and raises prosperity (cloth has no special need); bigger towns have more slots and a better tier.
+- **Army (M6, M7):** arms are required to raise a company and to refill lost men; a country without them buys them at a
+  premium (3.7). The
   armourer is strategic, not just a sale good. No quality effect of arms in the first version.
 
 ## 5. Worked numbers under the new rules
@@ -396,6 +406,8 @@ Points to `docs/design/ui/` (the Studiolo style) and the tile window #436.
 - **Tile window (#436):** own settlement: Details (people, raw, goods), tab **Industries** (slot rows, Build, "opens in <year>" lines),
   tabs for army and ships are #436's. A raw district shows "Raw: wool, 12 loads". Foreign: piece, stage, owner, slot kinds
   if seen. Sea or unseen: as today.
+- **Header chip:** on a settlement the tile window's header shows the building **slots used, "3 of 4 slots"**, instead of the
+  works under way (owner, 2026-11-26 and 2026-11-27).
 - **Works card (slot):** recipe, tier table (village / town / city), own raw at hand (a yes or no and where), Buy inputs
   switch, capacity, change in income per year.
 - **Goods screen (Statesman's Study):** the new goods, "worked" and "bought" columns, each slot's line, an **Industries**
@@ -411,7 +423,7 @@ Points to `docs/design/ui/` (the Studiolo style) and the tile window #436.
 |---|---|
 | Economy (M4) | One new step in `production`; `EconomySeason`, `EconomyPreview`, `DistrictCache` learn slots; food measured in food units; a treasury line |
 | People (M5) | `change_at` takes `mult`; surplus and prosperity derived each season, not stored; slots idle on a level drop |
-| War (M6, M7) | Arms required to raise a company, bought at a premium if short (3.7); conquest and occupation rules in 3.5; raw loss removes the bonus; pillage out |
+| War (M6, M7) | Arms required to raise a company and to refill lost men, bought at a premium if short (3.7); conquest and occupation rules in 3.5; raw loss removes the bonus; pillage out |
 | Diplomacy (M9) | Nothing new; war weariness reads `tax_goods`, now including made goods |
 | Trade (M10) | Replaces `Buying`; cloth, arms, bread get appetite and prices (X31); free traders carry them; a toll on them |
 | Research (M11) | Modifier keys `industry_unlock`, `industry_yield_permille`, `industry_stage_max`; replaces the year gate: Guilds and Crop rotation open the industries |
@@ -480,7 +492,8 @@ replacement, `worked`/`bought` in its flow table); M11's gets four modifier keys
 
 Three industries (weaver, armourer, bakery) as settlement slots (village 1, town 2, walled 3, city 4); year gate as the
 tech stand-in; arms required to raise a company (own or bought at a premium); tier table; own at-hand +25 %; the home market `Buying` at 1.2x for the three inputs; bread as food 1.5; the
-growth multiplier with surplus and prosperity (comfort from cloth and bread); one AI option pair with a temper weight; the
+growth multiplier with surplus and prosperity (comfort without a cloth need); arms to refill lost men; one AI option pair
+with a temper weight; the
 Industries tab, works card section, the raise card's arms line and report lines; three goods; tests, soak ranges, economy report. No real prices (M10).
 
 ## 14. Questions for the owner
@@ -509,6 +522,71 @@ N8. **A raise with no arms and no money.** Recommend refusal with a clear line, 
 N9. **Arms for refit and upgrade (M6).** Recommend refit and upgrade costs use arms as well (the same data pass as 3.7), with
     the same buying rule. Alternative: they keep iron, so arms are only for raising.
 
+## 15. Settlement markets: a design direction, to be designed
+
+**The owner's direction (2026-11-26 and 2026-11-27):** there is no special cloth comfort need. Instead, the population's needs
+must be met on the settlement's **own market**, and **the market decides the price**. That sentence is all that is decided.
+Nothing below is a rule; it is what a design has to start from and answer.
+
+### 15.1 What the code does today (Godot, `core/`)
+
+| Matter | Today |
+|---|---|
+| Prices | One fixed price a good, `GoodDef.price_milli` (`data/defs/goods/`). `Economy.market_prices(game, view, market, supply)` returns that table and reads neither the market nor the supply (left as the seam for M10) |
+| Markets | `Economy.market_of(game, tag)` returns the country's id: one market a country in name only. No market object, no market state on a settlement, nothing saved |
+| Goods held | One store a country (`Country.stock`); no stock on a settlement |
+| Needs | Added up over the people of all the country's settlement hexes (besieged ones left out): food (0.1 loads a season per 1,000 town people), wine (0.02), salt and oil (0.01 each). `EconomySeason.goods_step` takes them from the country's store: fish before grain, then the staples |
+| Unmet needs | One contentment figure for the country, a factor on all town taxes; hunger and growth read one fed figure for the country; one shortage notice a country |
+| Selling | What the store holds above its reserve leaves the game at the fixed price; the crown's `tax_goods` is a share of that value (50, 70 or 90 % by tax level). Nobody buys and no money comes from a buyer |
+| Other readers of prices | The previews, the worth views and the computer's works estimate read the same fixed table |
+| "Market" on screen | The tile window's Town tab has placeholder boxes with example rows (Market, Sells, Buys); a walled town or city lifts the output of the districts beside it, which a works card words as the town's market. Neither is a market |
+
+### 15.2 What is on paper, and where it differs
+
+- **This page's home market** (3.2, M9.5): a country buys workshop inputs at 1.2 times and arms at 1.5 times the base price,
+  with unlimited supply; towns never buy. The price is not decided by a market.
+- **M10** (`docs/architecture/m10-build-spec.md`, a proposal): markets only at walled towns, cities and capitals (14 on north
+  Italy); every land hex belongs to one market's catchment; prices follow supply and demand, smoothed, between 0.3 and 3.5
+  times the base; demand is an appetite per 1,000 town people plus countries' bids. The towns' needs are still taken from the
+  country's store, and a country buys what it lacks at its home market only. A village has no market of its own.
+
+### 15.3 What is missing
+
+1. A market belonging to a settlement: its offers or stock, its price a good, its history; saved.
+2. How goods reach it: which tiles sell into which settlement.
+3. Needs taken settlement by settlement from that market, and what an unmet need does there (contentment, tax, growth,
+   hunger), all of which are one national figure today.
+4. A price rule for a small market, and who buys, who is paid and what the crown takes.
+5. What is left of the country's store, which works, raising, refills, army food and workshops draw on today or in M9.5.
+6. Goods moving between markets (trade, merchants, tolls), and how that fits M10.
+7. War: a besieged or occupied settlement's market.
+8. Workshops and arms buying at a market price (`Buying.price` takes a country, not a settlement).
+9. Knowledge of foreign prices (fog), the computer's use of markets, the screens, speed with many markets, the save format.
+
+### 15.4 Open questions (recommendations, not decisions)
+
+- **MQ1. Which places have a market?** (a) Every settlement, hamlets included. (b) A village or larger. (c) Walled towns,
+  cities and capitals, as M10. **Recommend (a):** your words are the settlement's own market.
+- **MQ2. What supplies it?** (a) Its own tile and the land that reaches it more cheaply than any other settlement (M10's
+  catchment search, with settlements as the targets). (b) Its tile and the ring round it. (c) The country's store shares goods
+  out. **Recommend (a).**
+- **MQ3. How is the price decided?** (a) M10's supply and demand rule (its 4.5), in every settlement market. (b) A new,
+  simpler rule. **Recommend (a):** one price rule in the game.
+- **MQ4. Who pays?** (a) The people buy their needs at the market's price from what is offered, and the crown takes its tax
+  share of the sales, as `tax_goods` does now. (b) Needs are taken free and only the surplus is priced. **Recommend (a).**
+- **MQ5. A need unmet on the market.** (a) That settlement's contentment, tax and growth suffer. (b) It counts into one
+  national figure. **Recommend (a).**
+- **MQ6. The country's store.** (a) The crown keeps one store for works, armies, raising and refills, and fills it from the
+  markets (buying or a share in kind: a further choice). (b) No store: the crown buys at a market when it needs.
+  **Recommend (a).**
+- **MQ7. Trade between markets.** (a) Design settlement markets and M10's routes and merchants as one design, so a settlement
+  without salt can get it. (b) First markets with nothing moving between them. **Recommend (a).**
+- **MQ8. Which goods are needs?** Today food, wine, salt and oil. (a) Keep these four; cloth or any other joins only through
+  this design, under the same rule as the rest. (b) Add cloth as a fifth need at once. **Recommend (a).**
+- **MQ9. Workshop inputs and bought arms.** (a) They pay the market price of the settlement concerned once markets exist; the
+  fixed 1.2 and 1.5 stay as placeholders until then. (b) The crown's purchases stay at fixed multiples. **Recommend (a).**
+- **When to design it** is build plan question 10 (recommended: now, with M10, before M9.5's season step is built).
+
 ---
 
 ## Owner's answers, 2026-11-24 (N6 to N9)
@@ -520,8 +598,9 @@ N9. **Arms for refit and upgrade (M6).** Recommend refit and upgrade costs use a
 - **N8, no arms and no money:** the raise is refused with a clear message; no unarmed levy.
 - **N9, refit and upgrade:** they need arms too (the same rule as raising).
 
-All the open questions of this design are now answered; the next step is its build plan (M9.5), after the tile window
-and the fog and movement decisions that touch the same panels and views.
+The open questions of this design up to N9 are answered with these (later ones: section 15 and the build plan); the next
+step was its build plan (M9.5), after the tile window and the fog and movement decisions that touch the same panels and
+views.
 
 ## Owner's answers, 2026-11-25 (build questions of M9.5)
 
@@ -535,5 +614,11 @@ and the fog and movement decisions that touch the same panels and views.
 - **Buy inputs switch:** one switch per workshop, on that workshop's own card (opened by a click on its tile), default on,
   with a small coin badge on the tile while it buys (option A of the sketch "Buy Inputs Switch"). The final card is mocked up
   at the gate (EC0) before the shell is built.
-- Still open, with their recommendations in the build plan (section 10): whether the free refill of men needs arms (question 2),
-  cloth as a comfort need (5), and the Slots chip replacing the Works chip on settlements (6).
+
+## Owner's answers, 2026-11-26 and 2026-11-27
+
+- **Refill:** refilling lost men also needs arms (3.7). How many, and the case of none: build plan questions 7 and 8.
+- **Cloth and needs:** no special cloth comfort need. The population's needs must be met on the settlement's own market, and
+  the market decides the price: a direction to be designed (section 15; build plan questions 9 and 10).
+- **Header chip:** the tile window shows the building slots used on settlements ("3 of 4 slots") instead of the works under
+  way.
