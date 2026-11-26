@@ -3,6 +3,9 @@
 ## (its check rows, its halt, the assault on arrival), the standing order's rows, can_stand per side, the tick's engage, shaken and
 ## blocked stops, determinism and the conservation of men. North Italy's 1480 game (ArmyFixture); Savoy (SAV) and Milan (MLO) are
 ## at war by WarFixture.at_war in the tests that need it. Every case has its planted twin where the rule is a refusal.
+## Moves in the month (moves-build-spec.md 8.2, MV4; R26, R29): a march onto an enemy army is fought in the act now, and a storm
+## with points left walks and fights its assault at once; the tick's engage stays for standing marches (MovesFixture.standing),
+## and a storm meant to stay ordered is given with no points left (it is stored, R29).
 extends GutTest
 
 const SAV := &"SAV"
@@ -212,6 +215,7 @@ func test_storm_check_rows_before_and_after_the_war() -> void:
 	assert_eq(a.order, Army.ORDER_NONE)
 	WarFixture.at_war(_g, SAV, MLO)
 	assert_true(bool(Movement.storm_check(_g, args).ok), "at war with the walls' controller the storm is ok")
+	ArmyFixture.spent(_g, a, 0)  # moves in the month (R29): with no points left the storm is stored, not fought now
 	assert_true(bool(Movement.storm(_g, args).ok))
 	assert_eq(a.order, Army.ORDER_STORM)
 	assert_eq(a.goal, fort)
@@ -293,6 +297,7 @@ func test_a_storm_order_halts_like_a_march_and_a_second_halt_holds() -> void:
 		return
 	WarFixture.at_war(_g, SAV, MLO)
 	var a := _sav(beside)
+	ArmyFixture.spent(_g, a, 0)  # moves in the month (R29): a stored storm (with points it would be fought now)
 	assert_true(bool(Movement.storm(_g, {"army": a.id, "goal": fort, "tag": SAV}).ok))
 	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok), "a storm halts")
 	assert_eq(a.order, Army.ORDER_NONE, "as a march does: no order")
@@ -313,14 +318,21 @@ func test_a_storm_that_arrives_starts_an_assault() -> void:
 		return
 	WarFixture.at_war(_g, SAV, MLO)
 	var a := _sav(beside)
-	assert_true(bool(Movement.storm(_g, {"army": a.id, "goal": fort, "tag": SAV}).ok))
-	MovementPhase.season(_g)
-	assert_eq(a.hex, fort, "the army walks onto the fortress")
-	var b := Battles.at(_g, fort)
-	assert_not_null(b, "and the step starts the battle: the storm")
-	if b != null:
-		assert_true(b.assault, "an assault")
-	assert_eq(_events("battle_started").size(), 1)
+	var res := Movement.storm(_g, {"army": a.id, "goal": fort, "tag": SAV})
+	assert_true(bool(res.ok))
+	# moves in the month (R26, R29): the storm walks onto the fortress in the act and its assault is fought at once.
+	var started := _events("battle_started")
+	assert_eq(started.size(), 1, "the step starts the battle: the storm")
+	if started.size() == 1:
+		assert_true(bool(started[0].assault), "an assault")
+		assert_eq(started[0].hex, fort, "on the fortress")
+	assert_null(Battles.at(_g, fort), "P: the battle left for the battles phase")
+	var id := int(res.walk.battle)
+	assert_true(id >= 1, "the walk names the record it fought")
+	assert_not_null(Battles.record(_g, id))
+	assert_eq(_events("battle_ended").size(), 1)
+	if Armies.by_id(_g, a.id) != null:
+		assert_eq(a.points, 0, "the storm ends the army's season (R27)")
 
 
 # --- the standing order ------------------------------------------------------------------------------------------------------
@@ -371,8 +383,10 @@ func _clash() -> Dictionary:
 	WarFixture.at_war(_g, SAV, MLO)
 	var a := _sav(pair[0], 2)
 	ArmyFixture.army(_g, MLO, pair[1], 0, 2, 0)
-	var res := Movement.march(_g, {"army": a.id, "goal": pair[1], "tag": SAV})
+	var res := Movement.march_check(_g, {"army": a.id, "goal": pair[1], "tag": SAV})
 	assert_true(bool(res.ok), "a march to the enemy army is an attack: %s" % str(res.reason))
+	# moves in the month: a standing march (the act would fight now), so the tick's engage is what these cases test.
+	assert_true(MovesFixture.standing(_g, a, pair[1]))
 	return {"army": a, "hex": pair[1]}
 
 
@@ -391,6 +405,27 @@ func test_a_march_onto_an_enemy_army_engages_it_in_the_tick() -> void:
 	assert_eq(_events("march_halted").size(), 0, "an engaged walk halts nowhere: the battle tells it")
 
 
+## Moves in the month (R1, R8, R26, R27): the same march given as an order is fought in the act; nothing is left for the phase.
+func test_a_march_onto_an_enemy_army_is_fought_in_the_act() -> void:
+	var pair := _clash_pair()
+	if pair.is_empty():
+		pending("no clash pair on the map")
+		return
+	WarFixture.at_war(_g, SAV, MLO)
+	var a := _sav(pair[0], 2)
+	var foe := ArmyFixture.army(_g, MLO, pair[1], 0, 2, 0)
+	var res := _g.act("march", {"army": a.id, "goal": pair[1], "tag": SAV})
+	assert_true(bool(res.ok), str(res.reason))
+	assert_eq(_events("battle_started").size(), 1, "the step started the battle in the act")
+	assert_eq(_events("battle_ended").size(), 1, "and it was fought there")
+	assert_eq(_g.battles.size(), 0, "P: a battle left in game.battles after the act")
+	assert_eq(StringName(res.walk.stopped), WalkNow.FOUGHT)
+	assert_true(int(res.walk.battle) >= 1)
+	for x: Army in [a, foe]:
+		if Armies.by_id(_g, x.id) != null:
+			assert_eq(x.points, 0, "both sides end their season")
+
+
 func test_a_marching_army_caught_in_a_battle_keeps_its_march() -> void:
 	var pair := _clash_pair()
 	if pair.is_empty():
@@ -404,8 +439,9 @@ func test_a_marching_army_caught_in_a_battle_keeps_its_march() -> void:
 	# The Milan army has the lower id, so its step onto Savoy's marching army comes first in the tick.
 	var attacker := ArmyFixture.army(_g, MLO, pair[1], 0, 2, 0)
 	var defender := _sav(pair[0], 2)
-	assert_true(bool(Movement.march(_g, {"army": attacker.id, "goal": pair[0], "tag": MLO}).ok))
-	assert_true(bool(Movement.march(_g, {"army": defender.id, "goal": beyond, "tag": SAV}).ok))
+	# moves in the month: both standing marches (an act would walk and fight now); the phase's tick is the case.
+	assert_true(MovesFixture.standing(_g, attacker, pair[0]))
+	assert_true(MovesFixture.standing(_g, defender, beyond))
 	MovementPhase.season(_g)
 	assert_not_null(Battles.of_army(_g, defender.id), "the marching army is in the battle")
 	assert_eq(defender.hex, pair[0], "it does not walk out of the fight")
@@ -460,7 +496,7 @@ func test_the_same_clash_plays_the_same_twice() -> void:
 	WarFixture.at_war(second, SAV, MLO)
 	var a := ArmyFixture.army(second, SAV, pair[0], 0, 2, 0)
 	ArmyFixture.army(second, MLO, pair[1], 0, 2, 0)
-	Movement.march(second, {"army": a.id, "goal": pair[1], "tag": SAV})
+	MovesFixture.standing(second, a, pair[1])  # moves in the month: the same standing march as _clash
 	MovementPhase.season(second)
 	assert_eq(second.digest(), digest_a, "the same walk gives the same state")
 
@@ -487,6 +523,7 @@ func _halted_storm() -> Dictionary:
 		return {}
 	WarFixture.at_war(_g, SAV, MLO)
 	var a := _sav(beside)
+	ArmyFixture.spent(_g, a, 0)  # moves in the month (R29): a stored storm; Continue then resumes it stored too
 	assert_true(bool(Movement.storm(_g, {"army": a.id, "goal": fort, "tag": SAV}).ok))
 	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok))
 	return {"army": a, "fort": fort}

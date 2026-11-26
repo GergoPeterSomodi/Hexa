@@ -24,15 +24,16 @@ func after_each() -> void:
 
 
 ## Savoy's army on `hex`, marching to `goal` (the order stored through the door).
+## Moves in the month (MV4): a march walks at once now, so the standing march comes from MovesFixture.standing (nothing walks).
 func _march(g: Game, hex: Vector2i, goal: Vector2i, count: int = 2) -> Army:
 	var a := ArmyFixture.army(g, SAV, hex, 0, count, 0)
-	assert_true(bool(Movement.march(g, {"army": a.id, "goal": goal, "tag": SAV}).ok), "the march is ordered")
+	assert_true(MovesFixture.standing(g, a, goal), "the march is ordered")
 	return a
 
 
 ## The movement phase's season, written out with MarchLeg's four calls, with `points` handed to every leg (-1: the full points).
 func _by_hand(g: Game, points: int = -1) -> void:
-	Armies.clear_moved(g)
+	# moves in the month (R40): the phase no longer clears moved_from (close_season in ready_units does).
 	var steps := StepCosts.of(g.map, g.defs)
 	var winter := Movement.winter_now(g)
 	var occ := {}

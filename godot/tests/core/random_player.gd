@@ -16,12 +16,18 @@ const TRIES := 12
 const NEAR := 5
 ## One pick in this many aims at another country's army or hex (refusals then happen too).
 const STRAY := 8
+## Moves in the month (moves-build-spec.md 8.2, MV4): the orders whose do half now walks at once, picked more often when `next` is
+## asked with `moves` (one pick in MOVES_EVERY is one of them); without it the stream is the one of before.
+const MOVES: Array[String] = ["continue_march", "storm"]
+const MOVES_EVERY := 4
 
 
-## One random action for `tag`: {action, args}. Changes nothing.
-static func next(game: Game, tag: StringName, luck: Rng) -> Dictionary:
+## One random action for `tag`: {action, args}. Changes nothing. `moves` weights Continue and storm up (MOVES).
+static func next(game: Game, tag: StringName, luck: Rng, moves: bool = false) -> Dictionary:
 	var names := Actions.NAMES
 	var action := names[luck.randi_range(0, names.size() - 1)]
+	if moves and luck.randi_range(0, MOVES_EVERY - 1) == 0:
+		action = MOVES[luck.randi_range(0, MOVES.size() - 1)]
 	return {"action": action, "args": _args(game, tag, action, luck)}
 
 

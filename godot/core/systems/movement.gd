@@ -437,13 +437,13 @@ static func winter_wait(game: Game, army: Army) -> Dictionary:
 
 
 ## One season's walk of a stored route from hex index `cur`, the next step at route index `idx`, with `mp` points in the
-## season's rules: the steps taken, where it stands and what is left. A WADE step only as the first step (it spends all the
-## points); a step costing more than the points left only as the first step of the season (it spends them all); a BLOCKED
-## or CLOSED step ends the season. {cur, idx, pts}.
+## season's rules: the steps taken, where it stands and what is left. A WADE step only as the first step of a fresh army (it
+## spends all the points); a step costing more than the points left likewise (moves-build-spec R18: `fresh` false for an army
+## that has walked this season); a BLOCKED or CLOSED step ends the season. {cur, idx, pts}.
 static func walk_season(map: MapData, steps: StepCosts, cur: int, route: PackedInt32Array, idx: int, mp: int,
-		winter: bool) -> Dictionary:
+		winter: bool, fresh: bool = true) -> Dictionary:
 	var pts := mp
-	var first := true
+	var first := fresh
 	while idx < route.size():
 		var nxt := route[idx]
 		var d := direction(map, cur, nxt)
@@ -468,7 +468,8 @@ static func walk_season(map: MapData, steps: StepCosts, cur: int, route: PackedI
 
 ## The season-by-season walk of a stored route from `from_turn` (4.4): {stops: [{turn, index}] (where the army stands at the
 ## end of each season: its route index), arrives_turn (the season it stands on the goal at the end of, or -1), seasons (from
-## from_turn to the arrival, inclusive)}. A season the army is mustering is skipped (it stands still).
+## from_turn to the arrival, inclusive)}. A season the army is mustering is skipped (it stands still). This season (from_turn the
+## game's turn) walks with the points the army has left (R18), the next ones with its full points.
 static func walk_plan(game: Game, army: Army, route: PackedInt32Array, from_turn: int) -> Dictionary:
 	var stops: Array = []
 	if route.is_empty():
@@ -482,7 +483,9 @@ static func walk_plan(game: Game, army: Army, route: PackedInt32Array, from_turn
 	var t := from_turn
 	while t <= limit:
 		if not army.mustering(t):
-			var r := walk_season(game.map, steps, cur, route, idx, mp, Calendar.is_winter(t))
+			var now := t == game.turn
+			var r := walk_season(game.map, steps, cur, route, idx, army.points if now else mp, Calendar.is_winter(t),
+				not now or Allowance.fresh(game, army))
 			cur = int(r.cur)
 			idx = int(r.idx)
 		stops.append({"turn": t, "index": idx})
@@ -508,8 +511,8 @@ static func march_check(game: Game, args: Dictionary) -> Dictionary:
 	return {"ok": bool(v.ok), "reason": str(v.reason)}
 
 
-## Orders the army to march to `goal` (its route stored, the old order and halt replaced): {ok, reason}. A refused march
-## changes nothing.
+## Orders the army to march to `goal` (its route stored, the old order and halt replaced) and walks it now as far as its points
+## reach (moves-build-spec.md R17, WalkNow): {ok, reason, army, walk}. A refused march changes nothing.
 static func march(game: Game, args: Dictionary) -> Dictionary:
 	var v := _march_verdict(game, args)
 	if not bool(v.ok):
@@ -519,8 +522,15 @@ static func march(game: Game, args: Dictionary) -> Dictionary:
 	var res: Dictionary = v.plan
 	Armies.set_order(game, army, Army.ORDER_MARCH, goal, res.hexes)
 	_clear_halt(game, army)
+	return _walk_now(game, army)
+
+
+## The walk at once of an order just set (R17), then army_changed (R19): {ok, reason, army, walk}. WalkNow is called by reference
+## (A14): it reads Movement, so a typed call back would make the two scripts need each other to parse.
+static func _walk_now(game: Game, army: Army) -> Dictionary:
+	var walk: Dictionary = WalkNow.walk.call(game, army)
 	_changed(game, army)
-	return {"ok": true, "reason": ""}
+	return {"ok": true, "reason": "", "army": army.id, "walk": walk}
 
 
 ## The check of a halt (the army stops where it stands): {ok, reason}. Only an army holding already is refused: a march halts,
@@ -574,7 +584,7 @@ static func continue_check(game: Game, args: Dictionary) -> Dictionary:
 	return {"ok": bool(g.ok), "reason": str(g.reason)}
 
 
-## Continues a halted march to its kept goal: {ok, reason}.
+## Continues a halted march to its kept goal and walks it now (R17): {ok, reason, army, walk}.
 static func continue_march(game: Game, args: Dictionary) -> Dictionary:
 	var v := continue_check(game, args)
 	if not bool(v.ok):
@@ -585,8 +595,7 @@ static func continue_march(game: Game, args: Dictionary) -> Dictionary:
 	var res: Dictionary = goal_verdict(game, army, army.tag, army.goal).plan
 	Armies.set_order(game, army, Army.ORDER_MARCH, army.goal, res.hexes)
 	_clear_halt(game, army)
-	_changed(game, army)
-	return {"ok": true, "reason": ""}
+	return _walk_now(game, army)
 
 
 ## The verdict of a goal for an army of `tag` (4.7 rows 4 to 9) and its plan: {ok, reason, plan}.
@@ -627,8 +636,8 @@ static func storm_check(game: Game, args: Dictionary) -> Dictionary:
 	return {"ok": bool(v.ok), "reason": str(v.reason)}
 
 
-## Orders the army to storm the fortress at its goal: the route stored (none when it stands there), the order storm.
-## A refused storm changes nothing. {ok, reason}.
+## Orders the army to storm the fortress at its goal: the route stored (none when it stands there), the order storm; with points
+## left it walks there now and the assault is fought on arrival (R29). A refused storm changes nothing. {ok, reason, army, walk}.
 static func storm(game: Game, args: Dictionary) -> Dictionary:
 	var v := _storm_verdict(game, args)
 	if not bool(v.ok):
@@ -641,8 +650,7 @@ static func storm(game: Game, args: Dictionary) -> Dictionary:
 		route = res.hexes as PackedInt32Array
 	Armies.set_order(game, army, Army.ORDER_STORM, goal, route)
 	_clear_halt(game, army)
-	_changed(game, army)
-	return {"ok": true, "reason": ""}
+	return _walk_now(game, army)
 
 
 static func _storm_verdict(game: Game, args: Dictionary) -> Dictionary:
@@ -762,4 +770,4 @@ static func _clear_halt(game: Game, army: Army) -> void:
 
 
 static func _changed(game: Game, army: Army) -> void:
-	game.emit({"kind": "army_changed", "tag": army.tag, "hex": army.hex, "army": army.id, "gone": false})
+	game.emit({"kind": "army_changed", "tag": army.tag, "hex": army.hex, "army": army.id, "gone": Armies.by_id(game, army.id) == null})

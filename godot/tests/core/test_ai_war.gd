@@ -339,6 +339,9 @@ func test_a_shaken_army_marches_to_the_nearest_depot_and_holds_there() -> void:
 	var g := S.at_war(GEN)
 	var from := _non_depot(g)
 	var army := WarFixture.army_at(g, M, from, 4)
+	# moves in the month: an at-once walk would take the army to the depot in the act and clear its order; with its points spent
+	# the order stands as a standing march, so the test still pins the AI's choice of the nearest depot
+	Armies.set_points(g, army, 0)
 	S.morale(g, army, 500)
 	S.step(g, S.brief(g), army)
 	var depot := _depot_near(g, from)
@@ -357,6 +360,8 @@ func test_a_hungry_army_goes_to_the_depot_unless_it_besieges_a_place_that_falls_
 	var g := S.at_war(GEN)
 	var from := _non_depot(g)
 	var army := WarFixture.army_at(g, M, from, 4)
+	# moves in the month: an at-once walk would arrive at the depot in the act; points spent, the order stands (see the test above)
+	Armies.set_points(g, army, 0)
 	Armies.set_supply(g, army, 2, 0)
 	g.version += 1
 	S.step(g, S.brief(g), army)
@@ -370,6 +375,7 @@ func test_a_hungry_army_goes_to_the_depot_unless_it_besieges_a_place_that_falls_
 	assert_ne(_army(near, holder.id).order, Army.ORDER_MARCH, "the place falls in 2: it keeps the siege")
 	var far := S.at_war(GEN)
 	var starving := WarFixture.army_at(far, M, WALLS, 4)
+	Armies.set_points(far, starving, 0)  # moves in the month: an at-once walk would arrive at the depot; the order stands
 	Armies.set_supply(far, starving, 2, 0)
 	S.siege(far, WALLS, M, 0, 1)
 	assert_gt(int(AiKnow.own_siege(far, M, WALLS)["falls_in"]), 2)
@@ -383,6 +389,9 @@ func test_a_hungry_army_goes_to_the_depot_unless_it_besieges_a_place_that_falls_
 func _storm_scene(progress: int, seasons: int) -> Dictionary:
 	var g := S.at_war(GEN)
 	var army := WarFixture.army_at(g, M, WALLS, 4)
+	# moves in the month: a storm with points left is fought in the act (R29) and its order is spent; the besieger has spent its
+	# points, so the storm order stands for the battles phase and the tests still pin when the AI gives it
+	Armies.set_points(g, army, 0)
 	S.siege(g, WALLS, M, progress, seasons)
 	return {"g": g, "army": army}
 

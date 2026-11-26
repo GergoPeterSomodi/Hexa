@@ -260,6 +260,30 @@ func test_fight_now_fights_one_battle_keeps_its_record_and_empties_the_list() ->
 	assert_eq(before - after, w.lost_a + w.lost_b, "the war books every man the armies lost")
 
 
+## Moves in the month (moves-build-spec.md 8.2, MV4; R27, D11): after a fought battle every army of both sides that is left has 0
+## move points, through fight_now and the battles phase alike; an army outside the battle keeps its points.
+## P: a beaten army that walks again in the same season (points kept after the fight).
+func test_both_sides_end_their_season_after_a_fought_battle() -> void:
+	var by_now := _start_battle()
+	var outside := WarFixture.army_at(_g, _a, _ha, 1)
+	var both := Battles.armies_of(_g, _g.battles[0])
+	Battles.fight_now(_g, _g.battles[0])
+	for a: Army in both:
+		if Armies.by_id(_g, a.id) != null:
+			assert_eq(a.points, 0, "fight_now: army %d has ended its season" % a.id)
+	assert_eq(outside.points, Allowance.full(_g, outside), "an army outside the battle keeps its points")
+	assert_not_null(by_now)
+	# The battles phase's fights do the same.
+	var att := WarFixture.army_at(_g, _a, _ha, 2)
+	WarFixture.army_at(_g, _b, _hb, 2)
+	assert_true(Battles.engage(_g, att, _hb, 1, -1))
+	var in_phase := Battles.armies_of(_g, _g.battles[0])
+	Battles.season(_g)
+	for a: Army in in_phase:
+		if Armies.by_id(_g, a.id) != null:
+			assert_eq(a.points, 0, "the phase: army %d has ended its season" % a.id)
+
+
 func test_fight_now_gives_what_the_phase_gives() -> void:
 	var by_phase := _outcome_digest()
 	_g = WarFixture.game()

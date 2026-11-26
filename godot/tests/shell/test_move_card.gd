@@ -181,6 +181,9 @@ func test_keyboard_o_orders_at_the_cursor_and_the_card_never_takes_focus() -> vo
 	assert_ne(step, -1)
 	_armies().move_cursor(step)
 	var cursor := _armies().cursor_hex()
+	# moves in the month: a march one step away is walked in the act and its goal cleared on arrival; the army has spent its
+	# points, so the order stands and the test still reads the goal O ordered
+	Armies.set_points(_game, Armies.by_id(_game, id), 0)
 	var before := Session.unsaved_actions
 	_armies()._on_command_key()
 	assert_eq(Session.unsaved_actions, before + 1, "O orders the march at the cursor")

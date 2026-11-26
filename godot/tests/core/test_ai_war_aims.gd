@@ -148,6 +148,8 @@ func test_approach_is_the_nearest_enemy_hex_when_nothing_else_is_in_reach() -> v
 	assert_eq(list[0]["score"], 100 - least)
 	assert_eq(AiKnow.hex_distance(army.hex, list[0]["goal"]), least)
 	assert_eq(AiKnow.owner_of(g, list[0]["goal"]), GEN)
+	# moves in the month: an at-once walk would move the army on its approach in the act; points spent, the march stands
+	Armies.set_points(g, army, 0)
 	S.step(g, S.brief(g), army)
 	assert_eq([_army(g, army.id).order, _army(g, army.id).goal], [Army.ORDER_MARCH, list[0]["goal"]])
 
@@ -232,6 +234,9 @@ func _run_one_army(g: Game, army: Army) -> AiTurn:
 
 func test_a_refused_march_asks_for_the_next_aim_at_most_order_tries_times() -> void:
 	var s := _blocked_scene()
+	# moves in the month: an at-once walk would take the army to its next aim in the act (and an arrival clears the order); with
+	# its points spent the march stands, so the test still pins that the next aim is ordered after the refusal
+	Armies.set_points(s["g"], s["mine"], 0)
 	var hook := _run_one_army(s["g"], s["mine"])
 	var refused := 0
 	for line: String in hook.trace_of(M):

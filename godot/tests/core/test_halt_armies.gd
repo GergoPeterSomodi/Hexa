@@ -23,9 +23,12 @@ func _panel_order(g: Game, a: Army) -> String:
 
 
 ## A march of a new army of the player toward a neighbour of its town; returns the army.
+## Moves in the month (moves-build-spec.md 8.2, MV4; R5, R20): a march walks in the act, so the army has spent its points first
+## and the order is stored unwalked, as a march that waits for the next season.
 func _marching(g: Game) -> Army:
 	var town := ArmyFixture.find_town(g)
 	var a := ArmyFixture.army(g, ArmyFixture.TAG, town, 0, 1)
+	ArmyFixture.spent(g, a, 0)
 	assert_true(bool(g.act("march", {"army": a.id, "goal": ImproveRules.neighbour(town, 0), "tag": ArmyFixture.TAG})["ok"]))
 	return a
 

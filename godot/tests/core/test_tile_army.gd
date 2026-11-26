@@ -269,3 +269,22 @@ func test_the_model_has_no_direct_reads_of_state_or_the_player() -> void:
 	assert_false(text.is_empty(), "the file is read")
 	for bad: String in ["game.state.", "Armies.", "Occupation.garrison_of", "Sight.", "Session", "Events", "game.player"]:
 		assert_false(text.contains(bad), "P: tile_army.gd names %s" % bad)
+
+
+## Moves in the month (R51): an own row says how many move points the army has left; a foreign row says nothing.
+func test_an_own_row_has_the_points_text_and_a_foreign_row_none() -> void:
+	var hex := _owned_land(TAG, 1)[0]
+	ArmyFixture.town(_g, hex, 3, 20000)
+	var a := ArmyFixture.army(_g, TAG, hex, _kind("pikemen"), 1)
+	ArmyFixture.army(_g, SAV, hex, _kind("pikemen"), 1)
+	var full := Allowance.full(_g, a)
+	for r: Dictionary in TileArmy.of(_g, TAG, hex).armies:
+		if bool(r.own):
+			assert_eq(str(r.points_text), "%d of %d left this season" % [full, full])
+		else:
+			assert_eq(str(r.points_text), "", "P: points on a foreign row")
+	ArmyFixture.spent(_g, a, 5)
+	_g.version += 1
+	for r: Dictionary in TileArmy.of(_g, TAG, hex).armies:
+		if bool(r.own):
+			assert_eq(str(r.points_text), "5 of %d left this season" % full)

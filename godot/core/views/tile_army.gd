@@ -17,8 +17,8 @@ const LEVEL_GATE_WORDS := " are raised in a "
 
 
 ## {armies: Array[row], raise: {} | {head, arms, rows: Array[row]}} for the viewer `tag` on `hex`. An army row: own, open,
-## tag, country, name, men, men_text, state_text, points_text, arms_text, and id (own rows only). `points_text` and
-## `arms_text` are "" until their milestones. `arms` is {} until M9.5 (the arms banner is absent before). A raise row: kind,
+## tag, country, name, men, men_text, state_text, points_text, arms_text, and id (own rows only). `points_text` is the
+## own army's "8 of 12 left this season" (a foreign row has none); `arms_text` is "" until its milestone. `arms` is {} until M9.5 (the arms banner is absent before). A raise row: kind,
 ## name, figure, era, era_text, men, parts (Array of {key, name, amount}: ducats, then goods), cost_text, upkeep, can_raise,
 ## state (ready, short, locked or refused), reason ("" when ready; the rule's own words otherwise).
 static func of(game: Game, tag: StringName, hex: Vector2i) -> Dictionary:
@@ -80,7 +80,7 @@ static func _own_row(game: Game, tag: StringName, id: int) -> Dictionary:
 	var men := int(p.men)
 	return {
 		"own": true, "open": true, "id": id, "tag": tag, "country": str(p.country), "name": str(p.name),
-		"men": men, "men_text": Words.men(men), "state_text": state, "points_text": "", "arms_text": "",
+		"men": men, "men_text": Words.men(men), "state_text": state, "points_text": str((p.points as Dictionary).text), "arms_text": "",
 	}
 
 

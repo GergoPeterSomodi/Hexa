@@ -2,6 +2,9 @@
 ## the move points, mustering, the winter wait (one march_halted, then the spring step), a halt with no way, the ticks and the
 ## block of a hostile army (with its planted twin), the stack limit at the phase's end, unit_moved's fields, the explored hexes
 ## along a walk, and determinism. North Italy, the 1480 game (ArmyFixture); Savoy's armies walk its own and unowned land.
+## Moves in the month (moves-build-spec.md 8.2, MV4): a march walks its first leg at once now, so the phase has nothing left to
+## walk after an act: the cases give their armies standing marches through MovesFixture.standing; the phase walks with the points
+## left (R22), the zone of control ends the season (R25), and unit_moved gains `now` (false in the phase).
 extends GutTest
 
 const SAV := &"SAV"
@@ -32,8 +35,9 @@ func _sav(hex: Vector2i, count: int = 2, raised: int = 0) -> Army:
 	return ArmyFixture.army(_g, SAV, hex, 0, count, raised)
 
 
+## moves in the month: a standing march (the order and route stored, nothing walked), as the phase finds it next season.
 func _march(a: Army, goal: Vector2i) -> Dictionary:
-	return Movement.march(_g, {"army": a.id, "goal": goal, "tag": a.tag})
+	return {"ok": MovesFixture.standing(_g, a, goal)}
 
 
 func _events(kind: String) -> Array:
@@ -72,7 +76,10 @@ func test_an_army_walks_within_its_move_points() -> void:
 	assert_eq(a.hex, SADDLE, "ten of its twelve points take it to the saddle; the 5-point step waits")
 	assert_eq(a.order, Army.ORDER_MARCH, "the march goes on next season")
 	assert_eq(a.route.size(), 1, "one step is left on the stored route")
-	assert_eq(a.moved_from, VERCELLI)
+	# moves in the month (R40): the walk keeps where it set out in season_from; moved_from comes at ready_units.
+	assert_eq(a.season_from, VERCELLI)
+	# moves in the month (R22): the phase spends the points: two of its twelve are left.
+	assert_eq(a.points, 2, "ten of twelve spent")
 	assert_eq(a.waiting, &"", "no winter wait in autumn")
 	var moved := _moved_for(a.id)
 	assert_eq(moved.size(), 1)
@@ -82,12 +89,33 @@ func test_an_army_walks_within_its_move_points() -> void:
 	assert_eq(path[path.size() - 1], SADDLE)
 	assert_eq(Array(moved[0].ticks), [1, 2, 3, 4], "one tick a step")
 	assert_false(bool(moved[0].arrived))
+	assert_false(bool(moved[0].now), "moves in the month: a phase walk is not an at-once walk")
+
+
+## Moves in the month (R22): the phase walks a standing march with the points the army has left, and none with no points.
+func test_the_phase_walks_with_the_points_left_and_not_at_all_with_none() -> void:
+	_g.turn = AUTUMN_1480
+	var a := _sav(VERCELLI)
+	assert_true(bool(_march(a, AOSTA).ok))
+	ArmyFixture.spent(_g, a, 4)
+	var b := _sav(TURIN)
+	assert_true(bool(_march(b, AOSTA).ok))
+	ArmyFixture.spent(_g, b, 0)
+	MovementPhase.season(_g)
+	assert_ne(a.hex, VERCELLI, "four points take it a step or two")
+	assert_true(a.points >= 0 and a.points < 4, "and are spent")
+	assert_ne(a.hex, SADDLE, "P: a phase that walks with the full points reaches the saddle")
+	assert_eq(b.hex, TURIN, "P: a phase that walks an army that spent its points at once")
+	assert_eq(_moved_for(b.id).size(), 0)
+	assert_eq(b.order, Army.ORDER_MARCH, "its march stands for next season")
 
 
 func test_a_mustering_army_stands_for_its_season() -> void:
 	_g.turn = SUMMER_1480
 	var a := _sav(TURIN, 2, SUMMER_1480)
-	assert_true(bool(_march(a, VERCELLI).ok), "orders are taken while it musters")
+	# moves in the month (R20): the order is accepted and stored while it musters (march would store it too, unwalked).
+	assert_true(bool(Movement.march(_g, {"army": a.id, "goal": VERCELLI, "tag": SAV}).ok), "orders are taken while it musters")
+	assert_eq(a.hex, TURIN, "and the act walks nothing")
 	MovementPhase.season(_g)
 	assert_eq(a.hex, TURIN, "it musters in the season it was raised")
 	assert_eq(_moved_for(a.id).size(), 0)
@@ -242,10 +270,11 @@ func _run_three_seasons() -> String:
 	var g := ArmyFixture.game()
 	var a := ArmyFixture.army(g, SAV, VERCELLI, 0, 2, 0)
 	g.turn = AUTUMN_1480
-	Movement.march(g, {"army": a.id, "goal": AOSTA, "tag": SAV})
+	MovesFixture.standing(g, a, AOSTA)  # moves in the month: a standing march, walked by the phase
 	for k: int in 3:
 		g.turn += 1
 		MovementPhase.season(g)
+		Allowance.refill(g)  # moves in the month: ready_units refills the points each season
 	var out := Armies.digest(g)
 	Movement.clear_test_hostility()
 	return out
@@ -318,6 +347,8 @@ func test_a_zone_of_control_ends_the_leg_but_is_not_a_halt() -> void:
 	assert_true(Movement.zoc_halts(_g, SAV, a.hex))
 	assert_eq(a.halt_why, &"", "a zone of control is not a halt")
 	assert_eq(a.order, Army.ORDER_MARCH, "the march goes on next season")
+	# moves in the month (R25, D5): the zone of control ends the army's season too.
+	assert_eq(a.points, 0, "P: points kept after a zone of control")
 	assert_eq(blocker.hex, beside)
 
 

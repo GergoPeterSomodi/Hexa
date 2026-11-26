@@ -1,6 +1,8 @@
 ## Movement: the open land, the move points, the three checks (4.7 rows 1 to 9, halt, continue), the orders, the plan and the
 ## winter wait (D20), and walk_plan's stops on north Italy (docs/architecture/m6-build-spec.md sections 4.4, 4.7, 4.13 and 9;
 ## task L6). Every check case has a planted-fault twin (P). North Italy's 1480 game is ArmyFixture's (Genoa is the player).
+## Moves in the month (moves-build-spec.md 8.2, MV4; R5, R17, R18): a march walks its first leg in the act, so the cases read the
+## army's hex after the act (a one-step march arrives at once); a march that must stay unwalked comes from MovesFixture.standing.
 extends GutTest
 
 const SAV := &"SAV"
@@ -138,11 +140,15 @@ func test_accepted_march_sets_order_route_and_event() -> void:
 	var a := _sav(TURIN)
 	var before := Armies.digest(_g)
 	assert_true(bool(Movement.march_check(_g, {"army": a.id, "tag": SAV, "goal": VERCELLI}).ok))
-	assert_true(bool(_march(a, VERCELLI).ok))
-	assert_eq(a.order, Army.ORDER_MARCH)
-	assert_eq(a.goal, VERCELLI)
-	assert_eq(a.route.size(), 1, "one step over the bridge")
-	assert_eq(_g.map.hex_of(a.route[0]), VERCELLI)
+	var res := _march(a, VERCELLI)
+	assert_true(bool(res.ok))
+	# moves in the month (R1, R17): the one step over the bridge is walked in the act; on arrival the army holds.
+	assert_eq(a.hex, VERCELLI, "one step over the bridge, walked now")
+	assert_eq(a.order, Army.ORDER_HOLD)
+	assert_eq(a.goal, Movement.NO_HEX)
+	assert_eq(int(res.walk.steps), 1, "the act's walk took the one step")
+	assert_eq(StringName(res.walk.stopped), WalkNow.ARRIVED)
+	assert_eq(int(res.army), a.id)
 	var last: Dictionary = _events("army_changed").back()
 	assert_eq(int(last.get("army", -1)), a.id)
 	assert_ne(Armies.digest(_g), before)
@@ -189,12 +195,13 @@ func test_a_second_halt_of_a_halted_march_is_a_hold() -> void:
 func test_halted_march_arrives_after_continue() -> void:
 	_g.turn = SUMMER_1480
 	var a := _sav(TURIN)
-	assert_true(bool(_march(a, VERCELLI).ok))
+	# moves in the month: a standing march (an act would walk it now), halted before the phase.
+	assert_true(MovesFixture.standing(_g, a, VERCELLI))
 	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok))
 	MovementPhase.season(_g)
 	assert_eq(a.hex, TURIN, "a halted army does not walk")
 	assert_true(bool(Movement.continue_march(_g, {"army": a.id, "tag": SAV}).ok))
-	MovementPhase.season(_g)
+	# moves in the month (R17): Continue walks at once.
 	assert_eq(a.hex, VERCELLI, "the continued march arrives")
 	assert_eq(a.order, Army.ORDER_HOLD)
 	assert_eq(a.goal, Movement.NO_HEX)
@@ -202,11 +209,12 @@ func test_halted_march_arrives_after_continue() -> void:
 
 func test_march_to_a_new_goal_replaces_a_halted_march() -> void:
 	var a := _sav(TURIN)
-	assert_true(bool(_march(a, VERCELLI).ok))
+	assert_true(MovesFixture.standing(_g, a, VERCELLI))  # moves in the month: a standing march, halted unwalked
 	assert_true(bool(Movement.halt(_g, {"army": a.id, "tag": SAV}).ok))
 	assert_true(bool(_march(a, SUSA).ok), "a march to a new goal is taken while halted")
-	assert_eq(a.order, Army.ORDER_MARCH)
-	assert_eq(a.goal, SUSA)
+	# moves in the month (R17): the new march walks its one step now and holds on arrival.
+	assert_eq(a.hex, SUSA)
+	assert_eq(a.order, Army.ORDER_HOLD)
 	assert_eq(a.halt_why, &"", "the new march clears the halt")
 
 
@@ -329,7 +337,7 @@ func test_an_army_on_land_closed_to_it_marches_out() -> void:
 	var verdict := Movement.march_check(_g, {"army": a.id, "tag": SAV, "goal": VERCELLI})
 	assert_true(bool(verdict.ok), "it still marches out to its neighbour")
 	assert_true(bool(_march(a, VERCELLI).ok))
-	assert_eq(a.route.size(), 1)
+	assert_eq(a.hex, VERCELLI, "moves in the month (R17): it walks out in the act")
 
 
 func test_a_plan_follows_the_hostility_registered_after_it() -> void:
@@ -359,7 +367,11 @@ func test_a_march_check_and_its_act_plan_once() -> void:
 	var res := Movement.march(_g, args)
 	assert_true(bool(res.ok), str(res.reason))
 	assert_true((table.values()[0] as Dictionary).has("marker"), "P: the act read the check's plan (a fresh search would drop the marker)")
-	assert_eq(a.route, cached.hexes, "the order stores the cached route")
+	# moves in the month (R5): the act walks the cached route's head now and stores its tail.
+	var hexes: PackedInt32Array = cached.hexes
+	var head := hexes.size() - a.route.size()
+	assert_eq(hexes.slice(head), a.route, "the order stores the cached route, less the steps walked now")
+	assert_eq(_g.map.index_of(a.hex), hexes[head - 1], "and stands on the last step it walked")
 	assert_eq(Movement.replan(_g, SAV, VERCELLI, AOSTA, Movement.mp_of(_g, a)).cost, cached.cost, "the result is the plain search's")
 
 

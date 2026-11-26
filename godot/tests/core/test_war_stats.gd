@@ -56,7 +56,14 @@ func _stage_siege(g: Game) -> void:
 				continue
 			if Occupation.garrison_of(g, fort) <= 0 or not Wars.at_war(g, ArmyFixture.TAG, Occupation.controller_tag(g, fort)):
 				continue
-			g.act("march", {"army": a.id, "goal": fort, "tag": ArmyFixture.TAG})
+			# Moves in the month (moves-build-spec.md R1, R29, MV4): orders walk and fight in their act, which changes the seeded
+			# run; the staged army storms the fortress (fought now, in turn 1) so the storm's series are still worked, and the
+			# season's stats must count a battle fought at once. The check is unchanged.
+			var storm := {"army": a.id, "goal": fort, "tag": ArmyFixture.TAG}
+			if bool(g.check("storm", storm).ok):
+				g.act("storm", storm)
+			else:
+				g.act("march", storm)
 			return
 
 
@@ -111,7 +118,8 @@ func test_the_seven_war_series_match_their_recomputation_every_season() -> void:
 	luck.seed_with(SEED)
 	var worked := {}
 	for _n: int in SEASONS:
-		g.events.clear()
+		# Moves in the month: a season's events run from the end of the last season, so the first holds the staged storm's (in
+		# turn 1, before the loop); they are cleared after each season's check.
 		for c: Country in g.countries:
 			for _t: int in 8:
 				var pick: Dictionary = RandomPlayer.next(g, c.tag, luck)
@@ -126,6 +134,7 @@ func test_the_seven_war_series_match_their_recomputation_every_season() -> void:
 				assert_eq(g.stats.value(c.tag, ended, series), want, "%s of %s in season %d" % [series, c.tag, ended])
 				if want != 0:
 					worked[series] = int(worked.get(series, 0)) + 1
+		g.events.clear()
 	gut.p("worked cells: %s" % str(worked))
 	for series: String in ["battle_losses", "battles_won", "battles_lost", "garrison_lost", "garrison_men", "districts_held", "districts_lost"]:
 		assert_gt(int(worked.get(series, 0)), 0, "the run worked %s (a non-zero value was checked)" % series)

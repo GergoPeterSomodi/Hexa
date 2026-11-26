@@ -434,6 +434,9 @@ static func _fight(game: Game, b: Battle) -> int:
 	var id := game.next_record_id
 	game.next_record_id += 1
 	var rec := BattleEnd.apply(game, b, input, result, luck_before, id, Battles.retreat_path)
+	# moves-build-spec.md R27, D11: every army of both sides that fought and is left has ended its season.
+	for a: Army in armies_of(game, b):
+		Armies.set_points(game, a, 0)
 	game.battle_records.append(rec)
 	while game.battle_records.size() > war.battle_records_kept:
 		game.battle_records.remove_at(0)

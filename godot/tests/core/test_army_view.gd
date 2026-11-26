@@ -130,7 +130,9 @@ func test_order_text_for_a_holding_mustering_and_marching_army() -> void:
 	var neighbour := _neighbour_of_gen(hex)
 	assert_ne(neighbour, ArmyFixture.NO_HEX)
 	var walker := ArmyFixture.army(_g, ArmyFixture.TAG, neighbour, 0, 1)
-	assert_true(Movement.march(_g, {"army": walker.id, "goal": hex, "tag": ArmyFixture.TAG}).ok)
+	# moves in the month: Movement.march walks at once and this march arrives in the act (the panel reads "Holding"), so the
+	# marching state is a standing march made through the fixture
+	assert_true(MovesFixture.standing(_g, walker, hex))
 	var text := str(ArmyView.panel(_g, ArmyFixture.TAG, walker.id).order.text)
 	assert_true(text.begins_with("Marching"), "marching text, got %s" % text)
 
@@ -218,3 +220,44 @@ func test_a_foreign_army_leaves_the_tokens_when_the_sight_moves_with_the_version
 	Sight.refresh(_g)  # the army part moves; the version does not
 	assert_false(Knowledge.sees(_g, ArmyFixture.TAG, beside), "the watcher is gone: the hex is out of sight")
 	assert_true(_token_at(ArmyView.tokens(_g, ArmyFixture.TAG), beside, SAV).is_empty(), "out of sight: no token, though the version stands")
+
+
+## Moves in the month (R51): an own token carries the lowest points left and the lowest full of its armies; a foreign token
+## carries none (planted: points on a foreign token).
+func test_an_own_token_carries_the_lowest_points_of_its_armies() -> void:
+	var hex := _gen_hex()
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 1)
+	var b := ArmyFixture.army(_g, ArmyFixture.TAG, hex, 0, 1)
+	ArmyFixture.spent(_g, a, 8)
+	ArmyFixture.spent(_g, b, 3)
+	var t := _token_at(ArmyView.tokens(_g, ArmyFixture.TAG), hex, ArmyFixture.TAG)
+	assert_eq(int(t.points_left), 3, "the lowest left of the two armies")
+	assert_eq(int(t.points_full), mini(Allowance.full(_g, a), Allowance.full(_g, b)), "the lowest full")
+	ArmyFixture.spent(_g, b, 0)
+	_g.version += 1
+	var spent := _token_at(ArmyView.tokens(_g, ArmyFixture.TAG), hex, ArmyFixture.TAG)
+	assert_eq(int(spent.points_left), 0, "an army with no points left shows 0, not 'none'")
+	assert_gt(int(spent.points_full), 0)
+
+
+func test_a_foreign_token_and_panel_carry_no_points() -> void:
+	var hex := _gen_hex()
+	var foreign := ArmyFixture.army(_g, SAV, hex, 0, 2)
+	ArmyFixture.spent(_g, foreign, 2)
+	var t := _token_at(ArmyView.tokens(_g, ArmyFixture.TAG), hex, SAV)
+	assert_false(t.is_empty())
+	assert_lt(int(t.points_left), 0, "P: points on a foreign token")
+	assert_lt(int(t.points_full), 0, "P: points on a foreign token")
+	assert_false(ArmyView.panel(_g, ArmyFixture.TAG, foreign.id).has("points"), "P: points on a foreign panel")
+
+
+func test_the_panel_gives_the_points_and_their_words() -> void:
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _gen_hex(), 0, 1)
+	var full := Allowance.full(_g, a)
+	var p := ArmyView.panel(_g, ArmyFixture.TAG, a.id)
+	assert_eq(int(p.points.left), full)
+	assert_eq(int(p.points.full), full)
+	assert_eq(str(p.points.text), "%d of %d left this season" % [full, full])
+	ArmyFixture.spent(_g, a, 4)
+	var q := ArmyView.panel(_g, ArmyFixture.TAG, a.id)
+	assert_eq(str(q.points.text), "4 of %d left this season" % full)

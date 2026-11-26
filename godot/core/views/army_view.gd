@@ -15,8 +15,9 @@ const STEADY_MORALE := 750
 
 
 ## One token per (hex, country) the viewer sees, in the order of the first army of each (id order). A token is
-## {hex, tag, armies: PackedInt32Array, men, text, figure, mustering, marching, waiting, hungry, besieging, shaken, mine}.
-## A foreign token carries its men exact but no army ids and no flags (the orders are not the viewer's to know). Cached in
+## {hex, tag, armies: PackedInt32Array, men, text, figure, mustering, marching, waiting, hungry, besieging, shaken, mine,
+## points_left, points_full}. A foreign token carries its men exact but no army ids, no flags and no points (points_left and
+## points_full are -1: the orders are not the viewer's to know; moves-build-spec.md R51). Cached in
 ## the view cache by [&"tokens", version, viewer].
 static func tokens(game: Game, viewer: StringName) -> Array[Dictionary]:
 	var empty: Array[Dictionary] = []
@@ -55,6 +56,8 @@ static func _token(game: Game, viewer: StringName, armies: Array) -> Dictionary:
 	var marching := false
 	var waiting := false
 	var hungry := false
+	var points_left := -1
+	var points_full := -1
 	for item: Variant in armies:
 		var a := item as Army
 		men += a.men()
@@ -66,6 +69,10 @@ static func _token(game: Game, viewer: StringName, armies: Array) -> Dictionary:
 			marching = marching or a.order == Army.ORDER_MARCH
 			waiting = waiting or a.waiting != &""
 			hungry = hungry or a.supply == Supply.HUNGRY
+			# The lowest left and the lowest full of the armies on the token (R51).
+			points_left = a.points if points_left < 0 else mini(points_left, a.points)
+			var top := Allowance.full(game, a)
+			points_full = top if points_full < 0 else mini(points_full, top)
 	if not own:
 		ids = PackedInt32Array()
 	var siege := Occupation.siege_at(game, first.hex)
@@ -83,6 +90,8 @@ static func _token(game: Game, viewer: StringName, armies: Array) -> Dictionary:
 		"besieging": own and siege != null and siege.besieger == first.tag,
 		"shaken": own and _any_shaken(game, armies),
 		"mine": viewer != &"" and first.tag == viewer,
+		"points_left": points_left,
+		"points_full": points_full,
 	}
 
 
@@ -125,7 +134,8 @@ static func token_text(men: int) -> String:
 
 
 ## The Army panel's model of one army (6.5), {} when the viewer does not see it. Its own army (or any army for the viewer
-## ""): {mine, id, name, tag, country, hex, place, men, limit, here, units, order, supply, upkeep, mp, sight, others_here}.
+## ""): {mine, id, name, tag, country, hex, place, men, limit, here, units, order, supply, upkeep, mp, points, sight,
+## others_here}; `points` is {left, full, text} ("8 of 12 left this season", R51).
 ## A foreign army seen: {mine: false, country, hex, men_text}. Units: [{id, kind, name, men, full, raised_text, mustering}].
 static func panel(game: Game, viewer: StringName, army_id: int) -> Dictionary:
 	var a := Armies.by_id(game, army_id)
@@ -183,6 +193,7 @@ static func _own_panel(game: Game, a: Army, viewer: StringName) -> Dictionary:
 		"supply": _supply(a),
 		"upkeep": Military.upkeep_of(game, a),
 		"mp": Movement.mp_of(game, a),
+		"points": points_of(game, a),
 		"sight": sight,
 		"others_here": others,
 	}
@@ -229,6 +240,12 @@ static func morale_word(game: Game, morale: int) -> String:
 	if morale >= war.withdraw_morale:
 		return "Shaken"
 	return "Broken"
+
+
+## The army's move points this season: {left, full, text}, the text "8 of 12 left this season" (R51).
+static func points_of(game: Game, a: Army) -> Dictionary:
+	var full := Allowance.full(game, a)
+	return {"left": a.points, "full": full, "text": "%d of %d left this season" % [a.points, full]}
 
 
 ## A company's rank name (WarDef.rank_names); the first rank, with no name in the data, is "Recruit".

@@ -93,7 +93,7 @@ func _arg(name: String, default: int) -> int:
 ## MovementPhase.season, step by step, with the time of each step in ms (the same calls, in the same order).
 func _timed_season(game: Game) -> Dictionary:
 	var out := {"legs": 0.0, "ticks": 0.0, "room": 0.0, "apply": 0.0}
-	Armies.clear_moved(game)
+	# moves-build-spec R40: the movement phase no longer clears moved_from (close_season in ready_units does).
 	var steps := StepCosts.of(game.map, game.defs)
 	var winter := Movement.winter_now(game)
 	var occ := MovementPhase._occupancy(game)

@@ -2,6 +2,8 @@
 ## movement phase (task L6). (a), the raising, and (d)'s starvation belong to later tasks. The Vercelli to Aosta route is the
 ## 15-point one by Turin (4.13 (c) as first written): the 14-point east chain through (7, 9) and (7, 8) is Milan's land, closed
 ## to Savoy in peace (D13).
+## Moves in the month (moves-build-spec.md 8.2, MV4; R5, R18): a march's first leg is walked by the act, so a worked walk's army
+## stands on the plan's first stop after the act; the seasons after are the phase's, with the points refilled as ready_units does.
 extends GutTest
 
 const SAV := &"SAV"
@@ -61,18 +63,26 @@ func test_c_across_the_little_st_bernard_waits_for_spring() -> void:
 	_g.turn = AUTUMN_1480
 	var a := ArmyFixture.army(_g, SAV, VERCELLI, 0, 2, SPRING_1480)
 	assert_true(bool(Movement.march(_g, {"army": a.id, "goal": AOSTA, "tag": SAV}).ok))
+	# moves in the month (R5): the act walked the route's head; the route is the walk's steps then the stored rest.
 	var route: Array[Vector2i] = []
+	var walked: Array = _moved(a.id)[0].path
+	for h: Variant in walked.slice(1):
+		route.append(h as Vector2i)
 	for i: int in a.route:
 		route.append(_g.map.hex_of(i))
 	var expected := _path([TURIN, Vector2i(5, 8), Vector2i(4, 7), SADDLE, AOSTA])
 	assert_eq(route, expected, "the 15-point route by Turin and the Little St Bernard")
-	MovementPhase.season(_g)
+	# moves in the month (R5): the act walks autumn's leg at once.
 	assert_eq(a.hex, SADDLE, "autumn walks ten points to the saddle; the 5-point step waits")
+	MovementPhase.season(_g)
+	assert_eq(a.hex, SADDLE, "moves in the month (R22): the phase of the same season has no step its two points pay")
 	_g.turn = WINTER_1480
+	Allowance.refill(_g)  # moves in the month: ready_units refills the points
 	MovementPhase.season(_g)
 	assert_eq(a.hex, SADDLE, "winter: the pass edge is closed by snow")
 	assert_eq(a.waiting, Movement.WHY_WINTER)
 	_g.turn = SPRING_1481
+	Allowance.refill(_g)  # moves in the month: ready_units refills the points
 	MovementPhase.season(_g)
 	assert_eq(a.hex, AOSTA, "spring 1481 crosses the pass edge")
 	assert_eq(a.order, Army.ORDER_HOLD)

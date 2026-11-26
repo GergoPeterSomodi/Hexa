@@ -277,3 +277,226 @@ func test_a_seen_refusal_keeps_its_reason() -> void:
 	var v := MovePreview.to(_g, ArmyFixture.TAG, a.id, theirs)
 	assert_eq(v.kind, &"refusal")
 	assert_true(str(v.verdict.reason).begins_with("too shaken to attack"), str(v.verdict.reason))
+
+
+# --- the leg and the risks of this season's walk (moves-build-spec.md R45 to R47, R57; MV5) --------------------------------
+# North Italy, Savoy (SAV) the player at war with Milan (MLO): MovesFixture.duel(). Its home hex (5, 6) lies on Milan's border; the
+# long march to (0, 3) crosses Savoy's own land west (6 hexes of 12 points, then the rest standing). Written against the walk
+# engine as it is before the at-once walks (MV4): its first-step-only rule for a wade or a costly step is the engine's.
+
+const FAR_GOAL := Vector2i(0, 3)
+const NEXT_DOOR := Vector2i(5, 7)
+const MILAN_BORDER := Vector2i(6, 6)
+
+
+func _duel() -> Game:
+	return MovesFixture.duel()
+
+
+func _home(g: Game) -> Army:
+	return MovesFixture.named(g, MovesFixture.NAME_HOME)
+
+
+func _leg(g: Game, army: Army, goal: Vector2i) -> Dictionary:
+	return MovePreview.to(g, MovesFixture.SAVOY, army.id, goal)
+
+
+func _lines_text(p: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	for line: Array in p.lines:
+		out.append(str(line[0]))
+	return out
+
+
+func _has_line(p: Dictionary, begins: String) -> bool:
+	return _lines_text(p).any(func(t: String) -> bool: return t.begins_with(begins))
+
+
+func _kinds(p: Dictionary) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for r: Dictionary in p.risks:
+		out.append(StringName(r.kind))
+	return out
+
+
+func test_a_long_march_walks_its_points_and_leaves_the_rest_standing() -> void:
+	var g := _duel()
+	var a := _home(g)
+	var p := _leg(g, a, FAR_GOAL)
+	assert_true(bool(p.verdict.ok), str(p.verdict.reason))
+	var leg: Dictionary = p.leg
+	assert_eq(leg.why, &"points", "the points end the walk before the goal")
+	assert_eq(leg.hexes, (p.hexes as Array).slice(0, (leg.hexes as Array).size()), "the leg is the head of the route")
+	assert_eq((leg.hexes as Array).size(), 6)
+	assert_eq(leg.end, (leg.hexes as Array).back())
+	assert_eq(int(leg.points_before), 12)
+	assert_eq(int(leg.full), 12)
+	assert_eq(int(leg.cost), 12, "six hexes of two points")
+	assert_eq(int(leg.points_after), int(leg.points_before) - int(leg.cost))
+	assert_true(_has_line(p, "Walks 6 hexes now: 12 of 12 move points, 0 left."), str(_lines_text(p)))
+	assert_true(_has_line(p, "Stops at "), "the stop of a route longer than the season")
+	assert_true(_lines_text(p).any(func(t: String) -> bool: return t.contains("walks on at the end of next season, there in ")))
+
+
+func test_the_points_left_shorten_the_leg() -> void:
+	var g := _duel()
+	var a := _home(g)
+	ArmyFixture.spent(g, a, 5)
+	g.version += 1
+	var leg: Dictionary = _leg(g, a, FAR_GOAL).leg
+	assert_eq(int(leg.points_before), 5, "R45: the leg is made with the points left")
+	assert_true(int(leg.cost) <= 5)
+	assert_eq(int(leg.points_after), 5 - int(leg.cost))
+	assert_eq(leg.why, &"points")
+	assert_lt((leg.hexes as Array).size(), 6, "P: a leg that walks with the full points")
+
+
+func test_a_march_next_door_arrives() -> void:
+	var g := _duel()
+	var a := _home(g)
+	var p := _leg(g, a, NEXT_DOOR)
+	var leg: Dictionary = p.leg
+	assert_eq(leg.why, &"arrives")
+	assert_eq(leg.hexes, [NEXT_DOOR])
+	assert_eq(leg.end, NEXT_DOOR)
+	assert_true(_has_line(p, "Walks 1 hex now: "), str(_lines_text(p)))
+	assert_false(_has_line(p, "Stops at "), "an arrival leaves nothing standing")
+
+
+func test_an_army_with_no_points_walks_nothing_and_says_when_it_sets_out() -> void:
+	var g := _duel()
+	var a := _home(g)
+	ArmyFixture.spent(g, a, 0)
+	g.version += 1
+	var p := _leg(g, a, FAR_GOAL)
+	assert_eq(p.leg.why, &"no_points")
+	assert_true((p.leg.hexes as Array).is_empty())
+	assert_eq(p.leg.end, a.hex)
+	assert_true(_has_line(p, "No move points left this season: it sets out at the end of next season."))
+	assert_false(_has_line(p, "Walks "))
+
+
+func test_a_mustering_army_walks_nothing() -> void:
+	var g := _duel()
+	var a := ArmyFixture.army(g, MovesFixture.SAVOY, _home(g).hex, 0, 1, g.turn)
+	var p := _leg(g, a, NEXT_DOOR)
+	assert_eq(p.leg.why, &"mustering")
+	assert_true((p.leg.hexes as Array).is_empty())
+	assert_true(_has_line(p, "Musters first"), "the old line stays")
+
+
+func test_a_seen_zone_of_control_ends_the_leg_and_the_season() -> void:
+	var g := _duel()
+	var a := _home(g)
+	ArmyFixture.army(g, MovesFixture.MILAN, Vector2i(6, 8), 0, 1)
+	Sight.refresh(g)
+	assert_true(Knowledge.sees(g, MovesFixture.SAVOY, Vector2i(6, 8)), "the Milanese army is in sight")
+	var p := _leg(g, a, FAR_GOAL)
+	assert_true(bool(p.verdict.ok), str(p.verdict.reason))
+	assert_eq(p.leg.why, &"zoc", "P: a leg that ignores the zone of control")
+	assert_eq(p.leg.hexes, [NEXT_DOOR], "it stops on the step beside the enemy")
+	assert_eq(int(p.leg.points_after), 0, "R25: the season is over")
+	assert_true(_has_line(p, "Walks 1 hex now: "))
+	assert_true(_lines_text(p).any(func(t: String) -> bool: return t.contains("its season is over")))
+
+
+func test_a_march_onto_a_seen_army_at_war_is_a_battle_with_its_risk() -> void:
+	var g := _duel()
+	var a := _home(g)
+	ArmyFixture.army(g, MovesFixture.MILAN, MILAN_BORDER, 0, 1)
+	Sight.refresh(g)
+	var p := _leg(g, a, MILAN_BORDER)
+	assert_true(bool(p.verdict.ok), str(p.verdict.reason))
+	assert_eq(p.leg.why, &"battle")
+	assert_eq(p.leg.hexes, [MILAN_BORDER])
+	assert_eq(int(p.leg.points_after), 0, "D11: a battle ends the season")
+	assert_true(_kinds(p).has(&"battle"), "R46")
+	assert_true(_kinds(p).has(&"enemy_land"), "Milan's land is entered")
+	assert_true(str(p.lines[0][0]).begins_with("Attacks "), "the war line stays first")
+	assert_true(str(p.lines[1][0]).begins_with("Walks 1 hex now: "), "the leg lines follow it: %s" % str(_lines_text(p)))
+	assert_true(_has_line(p, "This opens a battle at "))
+
+
+func test_an_army_of_a_country_at_peace_in_sight_blocks_the_leg() -> void:
+	var g := _duel()
+	var a := _home(g)
+	var route: Array = _leg(g, a, FAR_GOAL).hexes
+	ArmyFixture.army(g, &"GEN", route[2], 0, 1)
+	Sight.refresh(g)
+	g.version += 1
+	var p := _leg(g, a, FAR_GOAL)
+	assert_true(bool(p.verdict.ok), str(p.verdict.reason))
+	assert_eq(p.leg.why, &"blocked")
+	assert_eq(p.leg.hexes, route.slice(0, 2), "it stops before the hex held")
+	assert_true(_has_line(p, "Stops at "))
+
+
+func test_risks_enemy_land_and_out_of_supply_follow_the_leg_end() -> void:
+	var g := _duel()
+	var a := _home(g)
+	var own := _leg(g, a, FAR_GOAL)
+	assert_false(_kinds(own).has(&"enemy_land"), "a walk through its own land enters no enemy land")
+	assert_false(_kinds(own).has(&"battle"))
+	var near := MovesFixture.named(g, MovesFixture.NAME_NEAR)
+	var p := _leg(g, a, near.hex)
+	assert_true(bool(p.verdict.ok), str(p.verdict.reason))
+	assert_true(_kinds(p).has(&"enemy_land"), "the leg enters Milan's land: %s" % str(p.risks))
+	var end := Supply.in_supply(g, MovesFixture.SAVOY, p.leg.end, Calendar.is_winter(g.turn))
+	assert_eq(_kinds(p).has(&"out_of_supply"), not end, "out of supply exactly when the leg's end is")
+	for r: Dictionary in p.risks:
+		assert_true(_has_line(p, str(r.text)), "each risk is a line of the card")
+
+
+func test_an_army_the_viewer_does_not_see_makes_no_risk_and_no_stop() -> void:
+	# P: a risk or a leg end that moves with an unseen army. The Milanese army on the goal (7, 4) is out of Savoy's sight.
+	var g := _duel()
+	var a := _home(g)
+	var near := MovesFixture.named(g, MovesFixture.NAME_NEAR)
+	assert_false(Knowledge.sees(g, MovesFixture.SAVOY, near.hex), "the fixture's army is out of sight")
+	var p := _leg(g, a, near.hex)
+	assert_eq((p.leg.hexes as Array).back(), near.hex, "the leg walks onto the hex as if it were empty")
+	assert_eq(p.leg.why, &"arrives")
+	assert_false(_kinds(p).has(&"battle"), "P: a battle risk from an unseen army")
+	var steps := StepCosts.of(g.map, g.defs)
+	var probe := MovePreview._probe(a, a.hex, near.hex, Movement.plan(g, a, near.hex).hexes as PackedInt32Array)
+	var engine := MarchLeg.leg(g, steps, probe, Movement.winter_now(g), a.points)
+	assert_lt(engine.walked.size(), (p.leg.hexes as Array).size(), "the engine's own leg stops beside the unseen army: the preview must not")
+
+
+## R57, the twin: a game that differs only in an army the viewer cannot see gives the same preview for every order of the viewer's army.
+func test_twin_games_that_differ_in_an_unseen_army_give_equal_previews() -> void:
+	var one := _duel()
+	var two := _duel()
+	var a1 := _home(one)
+	var a2 := _home(two)
+	var route: Array = _leg(one, a1, MovesFixture.named(one, MovesFixture.NAME_NEAR).hex).hexes
+	var extra := ArmyFixture.NO_HEX
+	for k: int in route.size() - 1:
+		for d: int in 6:
+			var n := ImproveRules.neighbour(route[k], d)
+			if two.map.index_of(n) >= 0 and two.map.is_land(n) and not route.has(n) and not Knowledge.sees(two, MovesFixture.SAVOY, n) \
+					and Armies.at(two, n).is_empty() and extra == ArmyFixture.NO_HEX:
+				extra = n
+	assert_ne(extra, ArmyFixture.NO_HEX, "an unseen land hex beside the route")
+	ArmyFixture.army(two, MovesFixture.MILAN, extra, 0, 1)
+	Sight.refresh(two)
+	assert_false(Knowledge.sees(two, MovesFixture.SAVOY, extra), "the added army stays unseen")
+	for goal: Vector2i in [route.back(), FAR_GOAL, NEXT_DOOR]:
+		var p1 := _leg(one, a1, goal)
+		var p2 := _leg(two, a2, goal)
+		assert_eq(p2.verdict, p1.verdict, "the verdict, goal %s" % str(goal))
+		assert_eq(p2.leg, p1.leg, "the leg, goal %s" % str(goal))
+		assert_eq(p2.risks, p1.risks, "the risks, goal %s" % str(goal))
+		assert_eq(p2.lines, p1.lines, "the lines, goal %s" % str(goal))
+
+
+func test_the_leg_is_cached_with_the_preview_and_a_refusal_has_none() -> void:
+	var g := _duel()
+	var a := _home(g)
+	var p := _leg(g, a, FAR_GOAL)
+	assert_eq(MovePreview.leg_of(g, MovesFixture.SAVOY, a.id, FAR_GOAL), p.leg)
+	assert_true(is_same(MovePreview.leg_of(g, MovesFixture.SAVOY, a.id, FAR_GOAL), p.leg), "the same dictionary: no second walk")
+	var refused := MovePreview.leg_of(g, MovesFixture.SAVOY, a.id, Vector2i(-5, -5))
+	assert_eq(refused.why, &"")
+	assert_true((refused.hexes as Array).is_empty())
+	assert_true(((_leg(g, a, Vector2i(-5, -5)).risks) as Array).is_empty())

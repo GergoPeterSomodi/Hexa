@@ -9,6 +9,8 @@
 ## explored hexes grow along the walks and the sight is refreshed. Luck: none. Integer maths. Armies are written only through
 ## Armies; the rules are Movement's and Battles'. The walk engine itself is MarchLeg (march_leg.gd); this phase plans every leg, runs
 ## the ticks in id order and keeps the occupancy and the movement index.
+## Moves in the month (moves-build-spec.md R5, R22): an order walks its first leg at once (WalkNow); this phase walks the standing
+## marches, each with the move points it has left this season (an army with none waits for the next season).
 class_name MovementPhase
 extends RefCounted
 
@@ -19,7 +21,6 @@ const OWNS: Array[String] = []
 static func season(game: Game) -> void:
 	if game == null or game.map == null or game.defs == null or not game.has_countries():
 		return
-	Armies.clear_moved(game)
 	if game.armies.is_empty():
 		return
 	var steps := StepCosts.of(game.map, game.defs)
@@ -29,9 +30,9 @@ static func season(game: Game) -> void:
 	var walks: Array = []
 	var by_id: Dictionary = {}
 	for army: Army in game.armies:
-		if not _walks(army) or army.mustering(game.turn):
+		if not _walks(army) or army.mustering(game.turn) or army.points <= 0:
 			continue
-		var w := MarchLeg.leg(game, steps, army, winter)
+		var w := MarchLeg.leg(game, steps, army, winter, army.points)
 		walks.append(w)
 		by_id[army.id] = w
 	_ticks(game, walks, occ)
@@ -46,15 +47,9 @@ static func _walks(army: Army) -> bool:
 	return army.order == Army.ORDER_MARCH or army.order == Army.ORDER_STORM
 
 
-## The country holding each army's hex at the phase's start (occupancy, R6 a).
+## The country holding each army's hex at the phase's start (occupancy, R6 a; MarchLeg.occupancy).
 static func _occupancy(game: Game) -> Dictionary:
-	var occ := {}
-	for army: Army in game.armies:
-		var i := game.map.index_of(army.hex)
-		var c := Countries.by_tag(game, army.tag)
-		if i >= 0 and c != null:
-			occ[i] = c.id
-	return occ
+	return MarchLeg.occupancy(game)
 
 
 ## Tick by tick, in army id order (4.8): a step into a hex another country holds is not taken, the walk is cut there and its
@@ -67,4 +62,3 @@ static func _ticks(game: Game, walks: Array, occ: Dictionary) -> void:
 		for w: MarchLeg in walks:
 			if w.walked.size() > k:
 				MarchLeg.step(game, w, k, occ)
-

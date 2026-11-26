@@ -2,6 +2,8 @@
 ## every name of Actions.NAMES on the army fixture, with 40 season ends among them. When the check says no, the action is
 ## refused and Game.digest() is unchanged; when it says yes, the action succeeds. A planted pair whose do ignores its check
 ## is caught by the same contract (P).
+## Moves in the month (moves-build-spec.md 8.2, MV4): march, Continue and storm now walk (and may fight) in their do half; the pair
+## rule must still hold, so the picks weight Continue and storm up (RandomPlayer.next's `moves`). The contract is unchanged.
 extends GutTest
 
 const ACTIONS := 3000
@@ -51,7 +53,7 @@ func test_three_thousand_random_actions_keep_their_checks() -> void:
 	var problems: Array[String] = []
 	for n: int in ACTIONS:
 		var tag := g.player if _luck.randi_range(0, 1) == 0 else g.countries[_luck.randi_range(0, g.countries.size() - 1)].tag
-		var pick: Dictionary = RandomPlayer.next(g, tag, _luck)
+		var pick: Dictionary = RandomPlayer.next(g, tag, _luck, true)  # moves in the month: Continue and storm weighted up
 		var action: String = str(pick["action"])
 		var args: Dictionary = pick["args"]
 		var logged := g.action_log.size()

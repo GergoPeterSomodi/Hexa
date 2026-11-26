@@ -174,10 +174,14 @@ func test_setters_write_their_fields_and_copy_the_route() -> void:
 	route[0] = 99
 	assert_eq(a.route, PackedInt32Array([4, 5]), "the stored route is a copy")
 	assert_eq([a.order, a.goal], [Army.ORDER_MARCH, Vector2i(1, 1)])
+	# moves in the month (R40): set_hex keeps where the army set out in season_from; close_season (ready_units) gives moved_from.
 	Armies.set_hex(_g, a, Vector2i(2, 2), _hex)
-	assert_eq([a.hex, a.moved_from], [Vector2i(2, 2), _hex])
-	Armies.clear_moved(_g)
-	assert_eq(a.moved_from, Army.NO_HEX)
+	Armies.set_hex(_g, a, Vector2i(2, 3), Vector2i(2, 2))
+	assert_eq([a.hex, a.season_from, a.moved_from], [Vector2i(2, 3), _hex, Army.NO_HEX], "the first move of the season is kept")
+	Armies.close_season(_g)
+	assert_eq([a.moved_from, a.season_from], [_hex, Army.NO_HEX], "close_season: moved_from for the report, season_from cleared")
+	Armies.close_season(_g)
+	assert_eq(a.moved_from, Army.NO_HEX, "a season with no move")
 	Armies.set_halt(_g, a, &"blocked", "the pass is shut")
 	Armies.set_waiting(_g, a, &"winter")
 	Armies.set_supply(_g, a, 2, 40)

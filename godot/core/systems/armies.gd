@@ -1,6 +1,6 @@
 ## The armies' door (docs/architecture/m6-build-spec.md 5.0 R2, 5.2, 5.3): the only writer of game.armies, next_army_id,
 ## next_unit_id and of every Army and Unit field. Military, Movement and Supply call its create, add_*, lose_men, add_men,
-## remove*, move_units, set_* and clear_moved; nothing else assigns to an army. Ids start at 1, grow by one and are never
+## remove*, move_units, set_* and close_season; nothing else assigns to an army. Ids start at 1, grow by one and are never
 ## reused; game.armies and each Army.units stay sorted by id (append on create and add, erase on remove, sort on move).
 ## by_id is a binary search. The door emits unit_lost only (from lose_men); the callers emit the rest. Integer maths; no
 ## luck; no engine calls.
@@ -191,10 +191,13 @@ static func remove(game: Game, army: Army) -> void:
 # --- writes: the fields of an army -----------------------------------------------------------------------------------
 
 
-## The army stands on `hex`; `moved_from` is where it stood before this movement phase (NO_HEX when it did not move).
-static func set_hex(_game: Game, army: Army, hex: Vector2i, moved_from: Vector2i) -> void:
+## The army stands on `hex` (moves-build-spec.md R40). The first move of a season (a walk, a retreat, a peace placement) keeps
+## where it stood in `season_from`; a later move keeps it. `moved_from` is the caller's origin of the step, kept in the signature
+## for the callers; the report's moved_from is written once a season by close_season.
+static func set_hex(_game: Game, army: Army, hex: Vector2i, _moved_from: Vector2i) -> void:
+	if hex != army.hex and army.season_from == Army.NO_HEX:
+		army.season_from = army.hex
 	army.hex = hex
-	army.moved_from = moved_from
 
 
 ## The move points left this season (moves-build-spec.md R12), cut to 0 and the army's full (R14): the only writer of `points`.
@@ -231,10 +234,12 @@ static func set_supply(_game: Game, army: Army, state: int, lost: int) -> void:
 	army.lost_last = lost
 
 
-## Every army's moved_from becomes NO_HEX: called at the start of the movement phase.
-static func clear_moved(game: Game) -> void:
+## The ready_units phase (R40): every army's moved_from becomes the hex it set out from this season (NO_HEX when it did not
+## move, or stands where it set out), and season_from is cleared for the new season. The season report reads moved_from.
+static func close_season(game: Game) -> void:
 	for a: Army in game.armies:
-		a.moved_from = Army.NO_HEX
+		a.moved_from = a.season_from if a.season_from != a.hex else Army.NO_HEX
+		a.season_from = Army.NO_HEX
 
 
 # --- battles (M7 B8, 4.6, 4.12, 5.3): the morale, the experience, the standing and the ranks ---------------------------

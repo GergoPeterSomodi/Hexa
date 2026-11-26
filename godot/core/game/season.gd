@@ -3,6 +3,8 @@
 ## ready_units and vision in the new turn (5.0 R1). A milestone adds its rows where the spec's table puts them.
 ## M7 (m7-build-spec.md 4.13, thirteen): battles after movement, sieges after supply, war (the timer) after sieges and
 ## before production; ready_units refills, then recovers morale.
+## Moves in the month (moves-build-spec.md R13, R40): ready_units also refills the move points and closes the season's moves
+## (moved_from for the report, season_from cleared).
 ## M8 (m8-build-spec.md 4.2, fourteen): ai_orders first, before movement; Game.orders (an OrdersHook, or null) gives the other
 ## countries' orders in it, in three calls the atomic and the sliced paths share (orders_begin, orders_step, orders_end).
 ## The armies' systems are called by reference (A14): a typed call from core/game into a system would make the two
@@ -75,6 +77,7 @@ static func run_phase(game: Game, phase: StringName) -> void:
 			Military.refill.call(game)
 			Armies.recover_morale.call(game)
 			Allowance.refill.call(game)
+			Armies.close_season.call(game)
 		&"vision":
 			Sight.season.call(game)
 

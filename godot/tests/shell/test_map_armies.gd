@@ -136,6 +136,9 @@ func test_r_without_an_army_is_refused_and_a_refused_continue_is_said() -> void:
 func test_a_right_click_with_an_army_selected_orders_a_march_through_session() -> void:
 	var hex := ArmyFixture.find_town(_game)
 	var id := _army(hex, 2).id
+	# moves in the month: with no move points left the march is stored as a standing march instead of walking at once.
+	Armies.set_points(_game, Armies.by_id(_game, id), 0)
+	_game.version += 1
 	_armies().sync()
 	assert_true(_armies().select_army(id))
 	var goal := _goal_near(hex, id)
@@ -221,6 +224,9 @@ func test_clearing_the_army_empties_its_reach_and_cursor_and_says_so() -> void:
 func test_a_march_in_progress_keeps_its_stored_route_as_a_thin_line() -> void:
 	var hex := ArmyFixture.find_town(_game)
 	var id := _army(hex, 2).id
+	# moves in the month: with no move points left the march is stored as a standing march instead of walking at once.
+	Armies.set_points(_game, Armies.by_id(_game, id), 0)
+	_game.version += 1
 	_armies().sync()
 	assert_true(_armies().select_army(id))
 	var goal := _goal_near(hex, id)

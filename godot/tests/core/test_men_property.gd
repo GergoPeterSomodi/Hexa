@@ -233,6 +233,12 @@ func _run(g: Game) -> void:
 		var open_before := _open_flows(g)
 		_raised_tags.clear()
 		_fought.clear()
+		# Moves in the month (moves-build-spec.md R1, R17; MV4): a march walks (and may fight) in its act, so the season's events
+		# are gathered from before the actions: the at-once walks are checked with the phase's.
+		g.events.clear()
+		var budgets_before := {}
+		for a: Army in g.armies:
+			budgets_before[a.id] = Movement.mp_of(g, a)
 		_act_all(g)
 		if not g.wars.is_empty():
 			_seen["war_seasons"] = int(_seen.get("war_seasons", 0)) + 1
@@ -244,12 +250,11 @@ func _run(g: Game) -> void:
 				var id := g.defs.good_id(StringName(good))
 				g.dev_goods(ArmyFixture.TAG, id, -Countries.by_tag(g, ArmyFixture.TAG).stock[id])
 		# The walk budget is the slowest unit's move points as the phase will read them: after the actions.
-		var budgets := {}
+		var budgets := budgets_before.duplicate()  # moves in the month: an army that walked in its act may be merged or split since
 		for a: Army in g.armies:
-			budgets[a.id] = Movement.mp_of(g, a)
+			budgets[a.id] = maxi(int(budgets.get(a.id, 0)), Movement.mp_of(g, a))
 		var ended := g.turn
 		var winter := Movement.winter_now(g)  # read before the season: the calendar moves the turn on
-		g.events.clear()
 		assert_true(bool(Season.run(g)["ok"]), "the season ends")
 		var lost := {}
 		for e: Dictionary in g.events:

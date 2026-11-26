@@ -221,14 +221,18 @@ func test_a_walk_that_discovers_hexes_refreshes_the_cached_land_seen_without_a_h
 	WarFixture.at_war(g, tag, other)  # a march into another country's land needs a war (peace refuses it)
 	var goal := _nearest_walkable(g, army, other)
 	assert_ne(goal, Army.NO_HEX, "an undiscovered hex of the other country to walk to")
-	var ordered := g.act("march", {"army": army.id, "tag": tag, "goal": goal})
+	# Moves in the month (moves-build-spec.md 8.2, MV4): an act would walk the march at once, so the fixture gives the standing
+	# march the season's walk takes (the check still says yes); its version bump is the act's.
+	var ordered := g.check("march", {"army": army.id, "tag": tag, "goal": goal})
 	assert_true(bool(ordered.get("ok", false)), "the march is ordered: " + str(ordered.get("reason", "")))
+	assert_true(MovesFixture.standing(g, army, goal))
 	# Read after the order (its act bumped the version): the cache now holds the value of the version the walk runs under.
 	var before := Knowledge.land_seen(g, tag, other)
 	assert_eq(int(before["districts"]), _seen_count(g, tag, other), "the cache is right before the walk")
 	var walks := 0
 	while not Knowledge.discovered(g, tag, goal) and walks < 40:
 		MovementPhase.season(g)
+		Allowance.refill(g)  # moves in the month: ready_units refills the points each season
 		walks += 1
 	assert_true(Knowledge.discovered(g, tag, goal), "the walk discovers the goal hex in %d seasons" % walks)
 	var fresh := _seen_count(g, tag, other)

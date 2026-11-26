@@ -565,6 +565,9 @@ func test_the_forces_step_acts_only_for_its_seat() -> void:
 func test_an_army_off_its_post_marches_to_it_and_one_on_it_stays() -> void:
 	var towns := _towns(2)
 	var army := _army(towns[0])
+	# moves in the month: an at-once walk would arrive at the post in the act and clear the order; the army has spent its
+	# points, so the order stands as a standing march and the test still checks "already marching: no second order"
+	Armies.set_points(_g, army, 0)
 	var b := _brief()
 	b.posts = [towns[1]] as Array[Vector2i]
 	AiForces.peace_army(_hook, _g, b, army.id)

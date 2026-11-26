@@ -2,7 +2,8 @@
 ## behaviour). One MarchLeg is one army's walk: its leg (the steps its stored route takes within its move points: re-plans, the
 ## closed-pass wait or detour, the wade rule, the zone of control), then its ticks (a step into contact is Battles' engage, a hex
 ## another country's army stood on is cut, a battle stops the walk), the stack limit (room) and the end (apply: Armies' setters,
-## unit_moved, march_halted, the explored steps). MovementPhase walks many of them tick by tick; the callers share these rules.
+## unit_moved, march_halted, the explored steps). MovementPhase walks many of them tick by tick, WalkNow walks one at once (MV4:
+## the leg spends the points left, apply writes what is left, R18 to R27); the callers share these rules.
 ## Luck: none. Integer maths. Armies are written only through Armies; the rules are Movement's and Battles'.
 class_name MarchLeg
 extends RefCounted
@@ -30,12 +31,21 @@ var text := ""
 var replans: int = 0
 ## True when the walk ended on a battle hex: Battles took the army in (its order and goal are Battles').
 var engaged: bool = false
+## Moves in the month (moves-build-spec.md R18, R19, R25): the points the leg could spend, the points spent after each step of
+## the leg (parallel to the leg's walked; a cut walk keeps a prefix), the steps of the leg as planned, whether its last step
+## stood beside an enemy (the zone of control ends the season), and whether it is an at-once walk (unit_moved's `now`).
+var points_start: int = 0
+var spent := PackedInt32Array()
+var leg_size: int = 0
+var zoc: bool = false
+var now: bool = false
 
 
 ## The leg: the steps the army takes this season by its own rules (no other army counted), a detour or a wait at a closed
 ## pass (D20), and a re-plan where the next step is blocked or no longer open. A zone of control beside an enemy ends it
-## (D21, D40). A walk with no way ends halted (no_way). `points` are the move points the leg may spend; -1 is the army's
-## full points (the movement phase's).
+## (D21, D40). A walk with no way ends halted (no_way). `points` are the move points the leg may spend (the army's points left);
+## -1 is the army's full points. A wade step or a step costing more than the points left is taken only as the first step of a
+## fresh army (points equal to its full, R18), and spends all its points.
 static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: int = -1) -> MarchLeg:
 	var m := game.map
 	var w := MarchLeg.new()
@@ -47,30 +57,32 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 	w.goal_hex = army.goal
 	w.goal = m.index_of(army.goal)
 	w.rem = army.route.duplicate()
-	var mp := points if points >= 0 else Movement.mp_of(game, army)
+	var full := Movement.mp_of(game, army)
+	var mp := points if points >= 0 else full
+	w.points_start = mp
 	var pts := mp
-	var first := true
+	var first := mp >= full and full > 0
 	while mp > 0 and w.goal >= 0 and w.end != w.goal:
 		var nxt := w.rem[0] if not w.rem.is_empty() else -1
 		var d := Movement.direction(m, w.end, nxt) if nxt >= 0 else -1
 		var c: int = steps.cost(w.end, d, winter) if d >= 0 else StepCosts.BLOCKED
 		var open := c != StepCosts.BLOCKED and Movement.open_step(game, w.tag, m.hex_of(nxt), w.goal_hex)
 		if not open:
-			if not _reroute(game, w, mp):
-				return w
+			if not _reroute(game, w, full):
+				return _sized(w)
 			continue
 		if c == StepCosts.CLOSED:
-			var ww := Movement.winter_at(game, w.tag, m.hex_of(w.end), w.goal_hex, mp)
+			var ww := Movement.winter_at(game, w.tag, m.hex_of(w.end), w.goal_hex, full)
 			if not bool(ww.ok):
 				_no_way(game, w)
-				return w
+				return _sized(w)
 			if bool(ww.waits):
 				w.status = Movement.WHY_WINTER
 				w.text = str(ww.pass_name)
-				return w
+				return _sized(w)
 			w.rem = ww.detour as PackedInt32Array
 			if not _count_replan(game, w):
-				return w
+				return _sized(w)
 			continue
 		if c == StepCosts.WADE or c > pts:
 			if not first:
@@ -79,15 +91,32 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 		else:
 			pts -= c
 		w.walked.append(nxt)
+		w.spent.append(mp - pts)
 		w.end = nxt
 		w.rem = w.rem.slice(1)
 		first = false
 		if pts <= 0:
 			break
-		# D21, D40: a zone of control ends the leg (no halt: the march goes on next season, M6's rule).
+		# D21, D40: a zone of control ends the leg (no halt: the march goes on next season, M6's rule); R25: and the season.
 		if nxt != w.goal and Movement.zoc_halts(game, w.tag, m.hex_of(nxt)):
+			w.zoc = true
 			break
+	return _sized(w)
+
+
+static func _sized(w: MarchLeg) -> MarchLeg:
+	w.leg_size = w.walked.size()
 	return w
+
+
+## The points the walk has left after the steps it kept (R19): what it could spend less what its kept steps cost.
+func points_left() -> int:
+	return points_start - (spent[walked.size() - 1] if not walked.is_empty() else 0)
+
+
+## True when the walk's last kept step is the leg's step beside an enemy (R25): its season is over.
+func zoc_ended() -> bool:
+	return zoc and not walked.is_empty() and walked.size() == leg_size
 
 
 ## Re-plans a walk from its end toward its goal with the season's rules; false (and halted) when there is no way.
@@ -190,11 +219,20 @@ static func _refuse(game: Game, w: MarchLeg, k: int, hex: Vector2i) -> void:
 	_stop(game, w, k, why, text)
 
 
-## The walk stops before its step k (into hex h, held by country `held`): blocked, the words of the holder.
+## The walk stops before its step k (into hex h, held by country `held`): blocked, with the words of blocked_text.
 static func _cut(game: Game, w: MarchLeg, k: int, h: int, held: int) -> void:
+	_stop(game, w, k, Movement.WHY_BLOCKED, blocked_text(game, w.tag, game.map.hex_of(h), held))
+
+
+## The words of a step not taken onto `hex`, where an army of the country `held` (an id) stands (R24, fog-safe): the holder is
+## named only when `tag` sees the hex ("an army of the Duchy of Milan is at Novara (8, 9)"); else "another country's army stands
+## at Novara (8, 9)" (Battles.engage_check's words), and the place only when `tag` has discovered it.
+static func blocked_text(game: Game, tag: StringName, hex: Vector2i, held: int) -> String:
 	var holder := Countries.by_id(game, held)
-	var who := Movement.country_name(game, holder.tag) if holder != null else "another country"
-	_stop(game, w, k, Movement.WHY_BLOCKED, "an army of %s is at %s" % [who, Military.hex_text(game, game.map.hex_of(h))])
+	if holder != null and Sight.sees(game, tag, hex):
+		return "an army of %s is at %s" % [Movement.country_name(game, holder.tag), Military.hex_text(game, hex)]
+	var known := Sight.explored(game, tag, hex) or Sight.sees(game, tag, hex)
+	return "another country's army stands at %s" % (Military.hex_text(game, hex) if known else "a place you cannot see")
 
 
 ## The walk stops before its step k with why and text: the steps from k on go back to the route, and the army stands on the
@@ -288,6 +326,8 @@ static func apply(game: Game, walks: Array, memo: Dictionary) -> void:
 			Armies.set_route(game, army, w.rem)
 		else:
 			_apply_orders(game, w, arrived)
+		# R19, R25, R27: the points its kept steps left; none after a step beside an enemy or into a battle.
+		Armies.set_points(game, army, 0 if w.engaged or w.zoc_ended() else w.points_left())
 		if moved:
 			_emit_moved(game, w, arrived, memo)
 			# R10: the steps alone are explored here; the rings of the armies come with the vision phase (Sight.season).
@@ -341,7 +381,7 @@ static func _emit_moved(game: Game, w: MarchLeg, arrived: bool, memo: Dictionary
 		for t: String in read[1]:
 			tags[t] = true
 	game.emit({"kind": "unit_moved", "tag": w.tag, "army": w.army.id, "path": path, "ticks": w.ticks, "seen": seen,
-		"witnesses": _ordered(game, tags), "arrived": arrived, "why": "march"})
+		"witnesses": _ordered(game, tags), "arrived": arrived, "why": "march", "now": w.now})
 
 
 ## march_halted: why (no_way, blocked, winter, shaken, battle, enemy), the reason text (a pass's name at a winter wait), whether
@@ -371,6 +411,17 @@ static func _ordered(game: Game, tags: Dictionary) -> PackedStringArray:
 	for id: int in ids:
 		out.append(String(Countries.by_id(game, id).tag))
 	return out
+
+
+## The country id holding each army's hex now (occupancy, m6-build-spec R6 a): the phase's start, or an at-once walk's.
+static func occupancy(game: Game) -> Dictionary:
+	var occ := {}
+	for army: Army in game.armies:
+		var i := game.map.index_of(army.hex)
+		var c := Countries.by_tag(game, army.tag)
+		if i >= 0 and c != null:
+			occ[i] = c.id
+	return occ
 
 
 static func _hexes(game: Game, indices: PackedInt32Array) -> Array[Vector2i]:
